@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.10)
 
 # Project name
-project(BucketGraphVRPTW)
+project(BALDES)
 
 # C++ standard
 set(CMAKE_CXX_STANDARD 23)
@@ -10,9 +10,10 @@ set(CMAKE_CXX_STANDARD_REQUIRED True)
 # Include directories
 include_directories(include)
 
-# Enable debug set(CMAKE_BUILD_TYPE Debug) set(CMAKE_CXX_FLAGS_RELEASE
-# "${CMAKE_CXX_FLAGS_RELEASE} -O3")
-set(CMAKE_BUILD_TYPE Debug)
+# Enable release build
+set(CMAKE_BUILD_TYPE Release)
+set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3")
+
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 option(RIH "Enable RIH compilation option" OFF)
@@ -21,6 +22,8 @@ option(SRC3 "Enable 3SRC compilation option" OFF)
 option(SRC "Enable SRC compilation option" OFF)
 option(GET_TBB "Enable TBB compilation option" OFF)
 option(UNREACHABLE_DOMINANCE "Enable Unreachable Dominance compilation option" OFF)
+option(SORTED_LABELS "Enable Sorted Labels compilation option" OFF)
+option(MCD "Enable MCD compilation option" OFF)
 
 # Define an option to specify the size of resources
 set(R_SIZE
@@ -60,6 +63,14 @@ endif()
 
 if(UNREACHABLE_DOMINANCE)
   add_definitions(-DUNREACHABLE_DOMINANCE)
+endif()
+
+if(SORTED_LABELS)
+  add_definitions(-DSORTED_LABELS)
+endif()
+
+if(MCD)
+  add_definitions(-DMCD)
 endif()
 
 

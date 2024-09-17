@@ -41,6 +41,29 @@ cd build
 make -j$nprocs
 ```
 
+#### Compilation Options
+
+| Option                    | Description                     | Default |
+|---------------------------|----------------------------------------------------|---------|
+| `R_SIZE`                  | Number of resources             | 1       |
+| `N_SIZE`                  | Number of customers   | 102     |
+| `RIH`                     | Enable improvement heuristics   | OFF     |
+| `RCC`                     | Enable RCC cuts                 | OFF     |
+| `SRC3`                    | Enable classical SRC cuts       | OFF     |
+| `SRC`                     | Enable limited memory SRC cuts  | OFF     |
+| `MAX_SRC_CUTS`            | Number of allowed SRC cuts      | 50      |
+| `SORTED_LABELS`           | Sort labels on bucket insertion | OFF     |
+| `UNREACHABLE_DOMINANCE`   | Enable unreachable dominance    | OFF     |
+| `MCD`                     | Perform MCD on instance capacities | OFF |
+| `GET_TBB`                 | Enable TBB compilation          | OFF (will use system lib)  |
+
+> **Note**: Both `SRC` and `SRC3` cannot be enabled simultaneously. Please ensure that only one is selected.
+
+
+#### Compile Options
+
+
+
 ### Input File Format
 
 - The input file should specify the number of jobs, the time horizon, vehicle capacities, and any other relevant VRP constraints.
