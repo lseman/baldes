@@ -41,6 +41,8 @@ cd build
 make -j$nprocs
 ```
 
+Make sure the GUROBI_HOME environment variable is set.
+
 #### Compilation Options
 
 | Option                    | Description                     | Default |
