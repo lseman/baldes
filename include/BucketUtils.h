@@ -473,6 +473,8 @@ std::vector<double> BucketGraph::labeling_algorithm(std::vector<double> q_point,
                                 n_labels++;
 #ifdef SORTED_LABELS
                                 buckets[to_bucket].add_sorted_label(new_label);
+#elif LIMITED_BUCKETS
+                                buckets[to_bucket].add_label_lim(new_label, BUCKET_CAPACITY);
 #else
                                 buckets[to_bucket].add_label(new_label);
 #endif

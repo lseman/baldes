@@ -1068,6 +1068,29 @@ struct Bucket {
     }
 
     /**
+     * @brief Adds a label to the labels vector with a limit on the number of labels.
+     *
+     * This function attempts to add a given label to the labels vector. If the vector
+     * has not yet reached the specified limit, the label is simply added. If the vector
+     * has reached the limit, the function will replace the label with the highest cost
+     * if the new label has a lower cost.
+     *
+     * @param label Pointer to the label to be added.
+     * @param limit The maximum number of labels allowed in the vector.
+     */
+    void add_label_lim(Label *label, size_t limit) noexcept {
+        if (labels_vec.size() < limit) {
+            labels_vec.push_back(label);
+        } else {
+            auto it = std::max_element(labels_vec.begin(), labels_vec.end(),
+                                       [](const Label *a, const Label *b) { return a->cost < b->cost; });
+            if (label->cost < (*it)->cost) {
+                *it = label;
+            }
+        }
+    }
+
+    /**
      * @brief Removes a label from the labels vector.
      *
      * This function searches for the specified label in the labels vector.

@@ -29,9 +29,9 @@ Some features are in the highly experimental stages and will evolve based on com
 
 ### Prerequisites
 
-- C++23 compliant compiler
-- [nvidia/stdexec] for executing paralell tasks.
-- [tbb] for concurrent maps.
+- C++23 compliant compiler (GCC 14.* tested)
+- [[NVIDIA/stdexec]](https://github.com/NVIDIA/stdexec) for executing parallel tasks.
+- [[tbb]](https://github.com/oneapi-src/oneTBB) for concurrent maps.
 
 ### Compiling
 
@@ -46,23 +46,22 @@ make -j$nprocs
 | Option                    | Description                     | Default |
 |---------------------------|----------------------------------------------------|---------|
 | `R_SIZE`                  | Number of resources             | 1       |
-| `N_SIZE`                  | Number of customers   | 102     |
+| `N_SIZE`$^1$                  | Number of customers   | 102     |
 | `RIH`                     | Enable improvement heuristics   | OFF     |
-| `RCC`                     | Enable RCC cuts                 | OFF     |
-| `SRC3`                    | Enable classical SRC cuts       | OFF     |
+| `RCC`$^2$                     | Enable RCC cuts                 | OFF     |
+| `SRC3`$^2$                    | Enable classical SRC cuts       | OFF     |
 | `SRC`                     | Enable limited memory SRC cuts  | OFF     |
 | `MAX_SRC_CUTS`            | Number of allowed SRC cuts      | 50      |
-| `SORTED_LABELS`           | Sort labels on bucket insertion | OFF     |
 | `UNREACHABLE_DOMINANCE`   | Enable unreachable dominance    | OFF     |
 | `MCD`                     | Perform MCD on instance capacities | OFF |
+| `LIMITED_BUCKETS`         | Limit the capacity of the buckets  | OFF |
+| `SORTED_LABELS`           | Sort labels on bucket insertion | OFF     |
+| `BUCKET_CAPACITY`         | The maximum capacity of the bucket if LIMITED_BUCKETS is enabled | 50 |
 | `GET_TBB`                 | Enable TBB compilation          | OFF (will use system lib)  |
 
-> **Note**: Both `SRC` and `SRC3` cannot be enabled simultaneously. Please ensure that only one is selected.
+> **Note 1**: Including depot and depot copy (end node).
 
-
-#### Compile Options
-
-
+> **Note 2**: Both `SRC` and `SRC3` cannot be enabled simultaneously. Please ensure that only one is selected.
 
 ### Input File Format
 
@@ -106,4 +105,4 @@ We would like to thank you [Vladislav Nepogodin](https://github.com/vnepogodin) 
 ## References
 
 1. **A Bucket Graph Based Labeling Algorithm for Vehicle Routing.** Ruslan Sadykov, Eduardo Uchoa, Artur Alves Pessoa. Transportation Science, 2021. [DOI: 10.1287/trsc.2020.0985](https://doi.org/10.1287/trsc.2020.0985)
-2. **Limited memory rank-1 cuts for vehicle routing problems.** Pecin, Diego, et al. Operations Research Letters 45.3 (2017): 206-209.
+2. **Limited memory rank-1 cuts for vehicle routing problems.** Diego Pecin, Artur Pessoa, Marcus Poggi, Eduardo Uchoa, Haroldo Santos. Operations Research Letters 45.3 (2017): 206-209. [DOI: 10.1016/j.orl.2017.02.006](https://doi.org/10.1016/j.orl.2017.02.006)

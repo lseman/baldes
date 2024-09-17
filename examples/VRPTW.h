@@ -25,9 +25,11 @@
 
 #include "../../bucket/include/Reader.h"
 
+#ifdef RCC
 #include "../cvrpsep/basegrph.h"
 #include "../cvrpsep/capsep.h"
 #include "../cvrpsep/cnstrmgr.h"
+#endif
 
 #include "../cuts/RCC.h"
 #include "../include/Hashes.h"
@@ -43,8 +45,10 @@ public:
 
     int                           labels_counter = 0;
     std::vector<std::vector<int>> labels;
-    CnstrMgrPointer               oldCutsCMP = nullptr;
-    RCCmanager                    rccManager;
+#ifdef RCC
+    CnstrMgrPointer oldCutsCMP = nullptr;
+#endif
+    RCCmanager rccManager;
 
     tbb::concurrent_unordered_map<std::pair<int, int>, std::vector<GRBLinExpr>, pair_hash, pair_equal> arcCache;
 
@@ -236,8 +240,8 @@ public:
                 bool updated = cut.updated;
                 if (added && !updated) { continue; }
 
-                changed = true;
-                int z   = cut.id;
+                changed                     = true;
+                int         z               = cut.id;
                 std::string constraint_name = "cuts(z" + std::to_string(z) + ")";
                 auto        coeffs          = cut.coefficients;
                 if (added && updated) {
@@ -293,7 +297,7 @@ public:
         std::mutex                       cuts_mutex;
         std::mutex                       arcCache_mutex; // Mutex to protect arcCache
 
-        const int JOBS = 10;
+        const int                JOBS = 10;
         exec::static_thread_pool pool(JOBS);
         auto                     sched = pool.get_scheduler();
 
@@ -359,6 +363,7 @@ public:
         return true;
     }
 
+#ifdef RCC
     /**
      * @brief Performs RCC (Robust Capacity Cuts) separation for the given model and solution.
      *
@@ -378,6 +383,7 @@ public:
      * 5. If violated cuts are found, processes them in parallel to generate constraints.
      * 6. Adds the generated constraints to the model and updates the model.
      */
+
     bool RCCsep(GRBModel *model, const std::vector<double> &solution,
                 std::vector<std::vector<std::vector<GRBConstr>>> &constraints) {
 
@@ -441,7 +447,7 @@ public:
         std::vector<std::vector<RCCarc>> arcGroups(cutsCMP->Size);
         std::mutex                       cuts_mutex;
 
-        const int JOBS = 10;
+        const int                JOBS = 10;
         exec::static_thread_pool pool(JOBS);
         auto                     sched = pool.get_scheduler();
 
@@ -456,8 +462,8 @@ public:
                 std::vector<int> S(cutsCMP->CPL[cutIdx]->IntList + 1,
                                    cutsCMP->CPL[cutIdx]->IntList + cutsCMP->CPL[cutIdx]->IntListSize + 1);
 
-                GRBLinExpr                                                                     cutExpr = 0.0;
-                std::vector<RCCarc>                                                            arcs;
+                GRBLinExpr                                                                 cutExpr = 0.0;
+                std::vector<RCCarc>                                                        arcs;
                 std::unordered_map<std::pair<int, int>, GRBLinExpr, pair_hash, pair_equal> localContributions;
 
                 // Generate all possible arc pairs from nodes in S
@@ -501,6 +507,7 @@ public:
 
         return true;
     }
+#endif
 
     /**
      * Column generation algorithm.
@@ -571,7 +578,9 @@ public:
         std::vector<std::vector<std::vector<GRBConstr>>> cvrsep_ctrs(
             instance.nC + 3, std::vector<std::vector<GRBConstr>>(instance.nC + 3, std::vector<GRBConstr>()));
 
+#ifdef RCC
         CMGR_CreateCMgr(&oldCutsCMP, 100); // For old cuts, if needed
+#endif
         bool rcc = false;
         for (int iter = 0; iter < 1000; ++iter) {
             cuts    = r1c.cutStorage;
@@ -584,8 +593,8 @@ public:
             if (cuts.size() > 0) {
                 jobDuals          = getDuals(node);
                 auto matrixSparse = extractModelDataSparse(node);
-                auto numJobs = bucket_graph.getJobs().size() - 1;
-                cutDuals     = std::vector<double>(jobDuals.begin() + numJobs, jobDuals.end());
+                auto numJobs      = bucket_graph.getJobs().size() - 1;
+                cutDuals          = std::vector<double>(jobDuals.begin() + numJobs, jobDuals.end());
                 cuts.setDuals(cutDuals);
             }
 

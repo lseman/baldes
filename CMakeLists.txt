@@ -35,6 +35,9 @@ set(N_SIZE
 set(MAX_SRC_CUTS
     50
     CACHE STRING "Number of allowed SRC cuts")
+set(BUCKET_CAPACITY
+    50
+    CACHE STRING "Bucket max capacity")
 
 # Ensure that both SRC3 and SRC are not selected at the same time
 if(SRC AND SRC3)
@@ -57,8 +60,8 @@ if(SRC3)
   add_definitions(-DSRC3)
 endif()
 
-if(FIXED_BUCKETS)
-  add_definitions(-DFIXED_BUCKETS)
+if(LIMITED_BUCKETS)
+  add_definitions(-DLIMITED_BUCKETS)
 endif()
 
 if(UNREACHABLE_DOMINANCE)
@@ -161,7 +164,11 @@ set(CVRPSEP_SOURCES
     cvrpsep/sort.cpp)
 
 # Executable
-add_executable(vrptw ${SOURCES} ${CVRPSEP_SOURCES})
+if(RCC)
+    add_executable(vrptw ${SOURCES} ${CVRPSEP_SOURCES})
+else()
+    add_executable(vrptw ${SOURCES})
+endif()
 
 # Linking libraries
 target_link_libraries(vrptw PRIVATE STDEXEC::stdexec)
@@ -180,3 +187,4 @@ target_link_libraries(
 target_compile_definitions(vrptw PUBLIC R_SIZE=${R_SIZE})
 target_compile_definitions(vrptw PUBLIC N_SIZE=${N_SIZE})
 target_compile_definitions(vrptw PUBLIC MAX_SRC_CUTS=${MAX_SRC_CUTS})
+target_compile_definitions(vrptw PUBLIC BUCKET_CAPACITY=${BUCKET_CAPACITY})
