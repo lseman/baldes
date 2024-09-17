@@ -1,0 +1,79 @@
+cmake-build-debug/
+more_examples/
+new_examples/
+rapids-cmake
+*.bs
+*.cmake
+*.csv
+*.ipynb
+*.pdf
+*.pkl
+*.json
+
+cmake/
+CPM_modules/
+reports/
+.vscode
+.idea
+.gdb_history
+.cache
+build/
+
+*.log
+*.mps
+*.lp
+
+.DS_Store
+
+# Prerequisites
+*.d
+
+# Compiled Object files
+*.slo
+*.lo
+*.o
+*.obj
+
+# Precompiled Headers
+*.gch
+*.pch
+
+# Compiled Dynamic libraries
+*.so
+*.dylib
+*.dll
+
+# Fortran module files
+*.mod
+*.smod
+
+# Compiled Static libraries
+*.lai
+*.la
+*.a
+*.lib
+
+# Executables
+*.exe
+*.out
+*.app
+
+CMakeLists.txt.user
+CMakeCache.txt
+CMakeFiles
+CMakeScripts
+Testing
+Makefile
+cmake_install.cmake
+install_manifest.txt
+compile_commands.json
+CTestTestfile.cmake
+_deps
+/.cmake/
+/.ninja_deps
+/.ninja_log
+/build.ninja
+/cmake_install.cmake
+/CMakeCache.txt
+/mip.log
+/main
