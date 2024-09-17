@@ -65,12 +65,12 @@ If you use this library please use the following citation:
 ```
 @Misc{BucketGraphLabeling,
   author       = {Laio Oriel Seman and Pedro Munari and Teobaldo Bulhões and Eduardo Camponogara},
-  title        = {BALDES: a Bucket Graph Labeling Algorithm for Vehicle Routing},
+  title        = {BALDES: a modern C++ Bucket Graph Labeling Algorithm for Vehicle Routing},
   howpublished = {\url{https://github.com/lseman/baldes}},
   year         = {2024},
   note         = {GitHub repository},
-  urldate      = {2024-08-10},
-  month        = aug
+  urldate      = {2024-09-17},
+  month        = sep
 }
 ```
 
