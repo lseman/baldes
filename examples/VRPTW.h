@@ -16,14 +16,14 @@
 
 #pragma once
 
-#include "../../bucket/include/Definitions.h"
+#include "../include/Definitions.h"
 
-#include "../../bucket/include/BucketGraph.h"
-#include "../../bucket/include/BucketUtils.h"
+#include "../include/BucketGraph.h"
+#include "../include/BucketUtils.h"
 
 #include "../extra/Stabilization.h"
 
-#include "../../bucket/include/Reader.h"
+#include "../include/Reader.h"
 
 #ifdef RCC
 #include "../cvrpsep/basegrph.h"
