@@ -183,7 +183,6 @@ target_link_libraries(
   vrptw PRIVATE ${GUROBI_HOME}/lib/libgurobi_c++.a
                 ${GUROBI_HOME}/lib/libgurobi${GUROBI_VERSION_MAJOR}.so tbb)
 
-# Set compile-time definition for R_SIZE
 target_compile_definitions(vrptw PUBLIC R_SIZE=${R_SIZE})
 target_compile_definitions(vrptw PUBLIC N_SIZE=${N_SIZE})
 target_compile_definitions(vrptw PUBLIC MAX_SRC_CUTS=${MAX_SRC_CUTS})

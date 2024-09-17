@@ -516,7 +516,7 @@ public:
         print_info("Column generation started...\n");
 
         node->optimize();
-        int bucket_interval = 1;
+        int bucket_interval = 20;
         int time_horizon    = instance.T_max;
 
         int                 numConstrs = node->get(GRB_IntAttr_NumConstrs);
@@ -598,21 +598,6 @@ public:
                 cuts.setDuals(cutDuals);
             }
 
-            /*
-    #ifdef RCC
-            if (iter > 50 && iter % 10 == 0) {
-                print_cut("Separating RCC cuts..\n");
-                rcc = RCCsep(node, solution, cvrsep_ctrs);
-                rccManager.computeDualsDeleteAndCache(node);
-                bucket_graph.rcc_manager = &rccManager;
-            } else if (iter > 50) {
-                rccManager.computeDualsDeleteAndCache(node);
-                bucket_graph.rcc_manager = &rccManager;
-            }
-    #endif
-    */
-
-            //   flip duals
             auto onlyJobDuals = std::vector<double>(jobDuals.begin(), jobDuals.begin() + bucket_graph.getJobs().size());
             bucket_graph.setDuals(onlyJobDuals);
 
@@ -623,9 +608,9 @@ public:
             double n_bw_labels = bucket_graph.n_bw_labels;
 
             if (((n_bw_labels - n_fw_labels) / n_fw_labels) > 0.05) {
-                split += 0.02 * time_horizon;
+                split += 0.05 * time_horizon;
             } else if (((n_fw_labels - n_bw_labels) / n_bw_labels) > 0.05) {
-                split -= 0.02 * time_horizon;
+                split -= 0.05 * time_horizon;
             }
             std::vector<double> q_star = {split};
 
@@ -661,36 +646,14 @@ public:
                 if (inner_obj >= -1e-2) {
                     s4 = true;
                     s3 = false;
-                    /*
-    #ifdef RCC
-                    print_cut("Testing RCC feasibility..\n");
-                    rcc                      = RCCsep(node, solution, cvrsep_ctrs);
-                    bucket_graph.rcc_manager = &rccManager;
-    #endif
-    */
-                    // bucket_graph.redefine(25);
                 }
             } else if (s4) {
                 stage = 4;
                 rccManager.computeDualsDeleteAndCache(node);
                 paths     = bucket_graph.bi_labeling_algorithm<Stage::Four>(q_star);
                 inner_obj = paths[0]->cost;
-                // print paths[0]->jobs_covered
-                /*
-                                if (lag_gap < 50 && !transition) {
-                                    s4    = true;
-                                    s3    = false;
-                                    stage = 5;
-                                    std::print("Entering stage 4 for enumeration with gap: {}\n", lag_gap);
-                                    paths     = bucket_graph.bi_labeling_algorithm<Stage::Enumerate>(q_star);
-                                    inner_obj = paths[0]->cost;
-                                    // prints paths size
-                                    print_info("Enumeration generated {} paths\n", paths.size());
-                                } else
-                */
                 if (inner_obj >= -1e-1) {
                     ss = true;
-                    // s5 = true;
 #ifndef SRC
                     break;
 #endif
@@ -703,48 +666,12 @@ public:
                     if (rcc) { duals = getDuals(node); }
 #endif
                 }
-            } else if (s5) {
-                stage     = 5;
-                paths     = bucket_graph.bi_labeling_algorithm<Stage::Four>(q_star);
-                inner_obj = paths[0]->cost;
-                /*
-                                if (lag_gap < 50 && !transition) {
-                                    s4    = true;
-                                    s3    = false;
-                                    stage = 5;
-                                    std::print("Entering stage 4 for enumeration with gap: {}\n", lag_gap);
-                                    paths     = bucket_graph.bi_labeling_algorithm<Stage::Enumerate>(q_star);
-                                    inner_obj = paths[0]->cost;
-                                    // prints paths size
-                                    print_info("Enumeration generated {} paths\n", paths.size());
-                                } else
-                */
-                /*
-                    if (inner_obj >= -1e-1) {
-                        s5 = false;
-
-    #ifdef RCC
-                        print_cut("Testing RCC feasibility..\n");
-                        rcc                      = RCCsep(node, solution, cvrsep_ctrs);
-                        bucket_graph.rcc_manager = &rccManager;
-                        if (rcc) {
-                            duals = getDuals(node);
-                        } else {
-                            break;
-                        }
-    #else
-                        break;
-    #endif
-                    }
-                    */
             }
 
             //////////////////////////////////////////////////////////////////////
-
             bidi_relation = bucket_graph.bidi_relation;
 
-            // if (!std::isnan(inner_obj) || inner_obj < 0) {
-            auto colAdded = addColumn(node, paths, cuts, stage == 6);
+            auto colAdded = addColumn(node, paths, cuts, false);
 
             if (colAdded == 0) {
                 stab.add_misprice();
@@ -755,13 +682,11 @@ public:
             double obj;
 
             node->optimize();
-            highs_obj     = node->get(GRB_DoubleAttr_ObjVal);
-            auto dual_obj = node->get(GRB_DoubleAttr_ObjBound);
-            jobDuals      = getDuals(node);
-            // print size of jobDuals
+            highs_obj         = node->get(GRB_DoubleAttr_ObjVal);
+            auto dual_obj     = node->get(GRB_DoubleAttr_ObjBound);
+            jobDuals          = getDuals(node);
             auto matrixSparse = extractModelDataSparse(node);
             jobDuals          = stab.run(matrixSparse, jobDuals);
-
             solution = extractSolution(node);
 
 #ifdef RCC
@@ -792,11 +717,10 @@ public:
 
             bucket_graph.relaxation = highs_obj;
 
-            // if (stage == 5) { break; }
 #if defined(SRC3) || defined(SRC)
             if (ss && !rcc) {
                 print_info("Removing most negative reduced cost variables\n");
-                // removeNegativeReducedCostVarsAndPaths(node);
+                removeNegativeReducedCostVarsAndPaths(node);
                 node->optimize();
                 highs_obj    = node->get(GRB_DoubleAttr_ObjVal);
                 solution     = extractSolution(node);

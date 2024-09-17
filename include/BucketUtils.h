@@ -439,26 +439,24 @@ std::vector<double> BucketGraph::labeling_algorithm(std::vector<double> q_point,
 
                             dominated                    = false;
                             const auto &to_bucket_labels = buckets[to_bucket].get_labels();
-                            if (!to_bucket_labels.empty()) {
-                                if constexpr (S == Stage::One) {
-                                    for (auto *existing_label : to_bucket_labels) {
-                                        stat_n_dom++;
-                                        if (label->cost < existing_label->cost) {
-                                            buckets[to_bucket].remove_label(existing_label);
-                                        } else {
-                                            dominated = true;
-                                            break;
-                                        }
+                            if constexpr (S == Stage::One) {
+                                for (auto *existing_label : to_bucket_labels) {
+                                    stat_n_dom++;
+                                    if (label->cost < existing_label->cost) {
+                                        buckets[to_bucket].remove_label(existing_label);
+                                    } else {
+                                        dominated = true;
+                                        break;
                                     }
-                                } else {
-                                    for (auto *existing_label : to_bucket_labels) {
-                                        if (is_dominated<D, S>(new_label, existing_label)) {
-                                            dominated = true;
-                                            break;
-                                        }
-                                    }
-                                    // dominated = new_label->check_dominance_against_vector<D,S>(to_bucket_labels);
                                 }
+                            } else {
+                                for (auto *existing_label : to_bucket_labels) {
+                                    if (is_dominated<D, S>(new_label, existing_label)) {
+                                        dominated = true;
+                                        break;
+                                    }
+                                }
+                                dominated = new_label->check_dominance_against_vector<D, S>(to_bucket_labels);
                             }
 
                             if (!dominated) {
@@ -681,19 +679,17 @@ inline Label *BucketGraph::Extend(const std::conditional_t<M == Mutability::Mut,
             const auto &cut = *it;
 
             const auto &baseSet = cut.baseSet;
-            // print size of baseset
             const auto &baseSetorder = cut.baseSetOrder;
             const auto &neighbors    = cut.neighbors;
             const auto &multipliers  = cut.multipliers;
-            // auto        id           = cut.id;
 #endif
 #ifdef SRC3
             bool bitIsSet = baseSet[segment] & (1 << bit_position);
             if (bitIsSet) {
-                new_label->SRCmap[id]++;
-                if (new_label->SRCmap[id] % 2 == 0) {
+                new_label->SRCmap[idx]++;
+                if (new_label->SRCmap[idx] % 2 == 0) {
                     // std::print("SRC duals: {}\n", SRCDuals[id]);
-                    new_label->cost -= SRCDuals[id];
+                    new_label->cost -= SRCDuals[idx];
                 }
             }
         }
@@ -710,9 +706,7 @@ inline Label *BucketGraph::Extend(const std::conditional_t<M == Mutability::Mut,
     }
     if (bitIsSet2) {
         double &value = new_label->SRCmap[idx];
-        // base set only has 3 elements equal to 1, get the order of the job in the base set
         value += multipliers[baseSetorder[job_id]];
-        // std::print("value: {}\n", value);
         if (value >= 1) {
             new_label->SRCmap[idx] -= 1;
             new_label->cost -= SRCDuals[idx];

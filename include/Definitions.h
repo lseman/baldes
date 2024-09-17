@@ -143,9 +143,9 @@ struct RCCarcHash {
  *
  */
 struct RCCmanager {
-    std::vector<RCCcut>                                                           cuts;
-    int                                                                           cut_counter = 0;
-    std::unordered_map<RCCarc, double, RCCarcHash>                                dualCache;
+    std::vector<RCCcut>                                                       cuts;
+    int                                                                       cut_counter = 0;
+    std::unordered_map<RCCarc, double, RCCarcHash>                            dualCache;
     std::unordered_map<std::pair<int, int>, std::vector<RCCcut *>, pair_hash> arcCutMap;
     std::mutex cache_mutex; // Protect shared resources during concurrent access
 
@@ -295,10 +295,10 @@ struct Path {
 
     /**
      * @brief Checks if the given integer is present in the route.
-     * 
+     *
      * This function searches for the specified integer within the route
      * and returns true if the integer is found, otherwise false.
-     * 
+     *
      * @param i The integer to search for in the route.
      * @return true if the integer is found in the route, false otherwise.
      */
@@ -306,10 +306,10 @@ struct Path {
 
     /**
      * @brief Counts the occurrences of a given integer in the route.
-     * 
+     *
      * This function iterates through the 'route' container and counts how many times
      * the specified integer 'i' appears in it.
-     * 
+     *
      * @param i The integer value to count within the route.
      * @return int The number of times the integer 'i' appears in the route.
      */
@@ -339,11 +339,11 @@ struct Path {
 
     /**
      * @brief Adds an arc between two nodes and increments its count in the arc map.
-     * 
+     *
      * This function creates a pair representing an arc between nodes `i` and `j`,
-     * and increments the count of this arc in the `arcMap`. If the arc does not 
+     * and increments the count of this arc in the `arcMap`. If the arc does not
      * already exist in the map, it is added with an initial count of 1.
-     * 
+     *
      * @param i The starting node of the arc.
      * @param j The ending node of the arc.
      */
@@ -367,12 +367,12 @@ struct Path {
      * @brief Retrieves the count of arcs between two nodes.
      *
      * This function takes two integers representing nodes and returns the count
-     * of arcs between them. If the arc pair (i, j) exists in the arcMap, the 
+     * of arcs between them. If the arc pair (i, j) exists in the arcMap, the
      * function returns the associated count. Otherwise, it returns 0.
      *
      * @param i The first node of the arc.
      * @param j The second node of the arc.
-     * @return The count of arcs between node i and node j. Returns 0 if the arc 
+     * @return The count of arcs between node i and node j. Returns 0 if the arc
      *         does not exist in the arcMap.
      */
     auto getArcCount(int i, int j) const {
@@ -425,7 +425,7 @@ struct Label {
     std::vector<int>           jobs_covered = {}; // Add jobs_covered to Label
     int                        job_id       = -1; // Add job_id to Label
     const Label               *parent       = nullptr;
-    int status = 0;
+    int                        status       = 0;
 #if SRC3
     std::array<std::uint16_t, MAX_SRC_CUTS> SRCmap  = {};
     double                                  SRCcost = 0.0;
@@ -463,13 +463,11 @@ struct Label {
      * @param job_id The identifier of the job to check.
      * @return true if the job has been visited, false otherwise.
      */
-    bool visits(int job_id) const {
-        return visited_bitmap[job_id / 64] & (1ULL << (job_id % 64));
-    }
+    bool visits(int job_id) const { return visited_bitmap[job_id / 64] & (1ULL << (job_id % 64)); }
 
     /**
      * @brief Resets the state of the object to its initial values.
-     * 
+     *
      * This function sets the following member variables to their default values:
      * - vertex: -1
      * - cost: 0.0
@@ -480,12 +478,12 @@ struct Label {
      * - is_extended: false
      * - status: 0
      * - jobs_covered: cleared
-     * 
+     *
      * Additionally, it zeroes out the following bitmaps if the corresponding macros are defined:
      * - visited_bitmap
      * - unreachable_bitmap (if UNREACHABLE_DOMINANCE is defined)
      * - SRCmap (if SRC3 or SRC is defined)
-     * 
+     *
      * If the SRC macro is defined, it also sets SRCcost to 0.0.
      */
     inline void reset() {
@@ -517,7 +515,7 @@ struct Label {
 
     /**
      * @brief Initializes the object with the given parameters.
-     * 
+     *
      * @param vertex The vertex identifier.
      * @param cost The cost associated with the vertex.
      * @param resources A vector of resource values.
@@ -837,7 +835,7 @@ public:
             Label *new_label = available_labels.back();
             available_labels.pop_back();
             in_use_labels.push_back(new_label);
-            new_label->reset();
+            //new_label->reset();
             return new_label;
         }
 
@@ -877,11 +875,11 @@ public:
 private:
     /**
      * @brief Allocates a specified number of labels.
-     * 
-     * This function reserves space for a given number of labels in the 
-     * available_labels container and initializes each label by creating 
+     *
+     * This function reserves space for a given number of labels in the
+     * available_labels container and initializes each label by creating
      * a new Label object.
-     * 
+     *
      * @param count The number of labels to allocate.
      */
     void allocate_labels(size_t count) {
@@ -891,9 +889,9 @@ private:
 
     /**
      * @brief Cleans up and deallocates memory for all labels and states.
-     * 
-     * This function iterates through the containers `available_labels`, 
-     * `in_use_labels`, and `deleted_states`, deleting each label and 
+     *
+     * This function iterates through the containers `available_labels`,
+     * `in_use_labels`, and `deleted_states`, deleting each label and
      * clearing the containers to free up memory.
      */
     void cleanup() {
@@ -991,8 +989,8 @@ struct Bucket {
     /**
      * @brief Adds a jump arc between two buckets.
      *
-     * This function adds a jump arc from one bucket to another with the specified resource increment and cost increment.
-     * The direction of the jump arc is determined by the `fw` parameter.
+     * This function adds a jump arc from one bucket to another with the specified resource increment and cost
+     * increment. The direction of the jump arc is determined by the `fw` parameter.
      *
      * @param from_bucket The index of the source bucket.
      * @param to_bucket The index of the destination bucket.
@@ -1011,11 +1009,11 @@ struct Bucket {
 
     /**
      * @brief Retrieves a reference to the vector of arcs based on the specified direction.
-     * 
-     * This function template returns a reference to either the forward arcs (fw_arcs) 
+     *
+     * This function template returns a reference to either the forward arcs (fw_arcs)
      * or the backward arcs (bw_arcs) depending on the template parameter `dir`.
-     * 
-     * @tparam dir The direction for which to retrieve the arcs. It can be either 
+     *
+     * @tparam dir The direction for which to retrieve the arcs. It can be either
      *             Direction::Forward or Direction::Backward.
      * @return std::vector<Arc>& A reference to the vector of arcs corresponding to the specified direction.
      */
@@ -1035,22 +1033,20 @@ struct Bucket {
     Bucket(int job_id, std::vector<int> lb, std::vector<int> ub)
         : job_id(job_id), lb(std::move(lb)), ub(std::move(ub)) {
 
-        labels_vec.reserve(200);
+        labels_vec.reserve(250);
     }
 
     // create default constructor
-    Bucket() { labels_vec.reserve(200); }
+    Bucket() { labels_vec.reserve(250); }
 
     /**
      * @brief Adds a label to the labels vector.
-     * 
+     *
      * This function adds a label to the labels vector. The label is currently added to the end of the vector.
-     * 
+     *
      * @param label Pointer to the Label object to be added.
      */
-    void add_label(Label *label) noexcept {
-        labels_vec.push_back(label);
-    }
+    void add_label(Label *label) noexcept { labels_vec.push_back(label); }
 
     /**
      * @brief Adds a label to the labels_vec in sorted order based on the cost.
@@ -1062,9 +1058,15 @@ struct Bucket {
      * @param label Pointer to the Label object to be added.
      */
     void add_sorted_label(Label *label) noexcept {
-        auto it = std::lower_bound(labels_vec.begin(), labels_vec.end(), label,
-                                   [](const Label *a, const Label *b) { return a->cost < b->cost; });
-         labels_vec.insert(it, label);
+        if (labels_vec.empty() || label->cost >= labels_vec.back()->cost) {
+            labels_vec.push_back(label); // Direct insertion at the end
+        } else if (label->cost <= labels_vec.front()->cost) {
+            labels_vec.insert(labels_vec.begin(), label); // Direct insertion at the beginning
+        } else {
+            auto it = std::lower_bound(labels_vec.begin(), labels_vec.end(), label,
+                                       [](const Label *a, const Label *b) { return a->cost < b->cost; });
+            labels_vec.insert(it, label); // Insertion in the middle
+        }
     }
 
     /**
@@ -1084,9 +1086,7 @@ struct Bucket {
         } else {
             auto it = std::max_element(labels_vec.begin(), labels_vec.end(),
                                        [](const Label *a, const Label *b) { return a->cost < b->cost; });
-            if (label->cost < (*it)->cost) {
-                *it = label;
-            }
+            if (label->cost < (*it)->cost) { *it = label; }
         }
     }
 
@@ -1121,10 +1121,10 @@ struct Bucket {
 
     /**
      * @brief Clears the arcs in the specified direction.
-     * 
+     *
      * This function clears the arcs in either the forward or backward direction
      * based on the input parameter.
-     * 
+     *
      * @param fw A boolean value indicating the direction of arcs to clear.
      *           - If true, clears the forward bucket arcs.
      *           - If false, clears the backward bucket arcs.
@@ -1228,10 +1228,10 @@ struct VRPJob {
 
     /**
      * @brief Adds an arc to the forward or backward arc list.
-     * 
+     *
      * This function adds an arc between two buckets, either to the forward arc list
      * or the backward arc list, based on the direction specified by the `fw` parameter.
-     * 
+     *
      * @param from_bucket The index of the source bucket.
      * @param to_bucket The index of the destination bucket.
      * @param res_inc A vector of resource increments associated with the arc.
@@ -1260,7 +1260,7 @@ struct VRPJob {
     /**
      * @brief Sorts the forward and backward arcs based on their priority.
      *
-     * This function sorts the `fw_arcs` in descending order of priority and 
+     * This function sorts the `fw_arcs` in descending order of priority and
      * the `bw_arcs` in ascending order of priority.
      */
     void sort_arcs() {
@@ -1270,9 +1270,9 @@ struct VRPJob {
 
     /**
      * @brief Sets the location coordinates.
-     * 
+     *
      * This function sets the x and y coordinates for the location.
-     * 
+     *
      * @param x The x-coordinate to set.
      * @param y The y-coordinate to set.
      */
@@ -1283,12 +1283,14 @@ struct VRPJob {
 
     /**
      * @brief Retrieves a constant reference to the vector of arcs based on the specified direction.
-     * 
+     *
      * This function template returns a constant reference to either the forward arcs or backward arcs
      * vector, depending on the direction specified by the template parameter.
-     * 
-     * @tparam dir The direction for which to retrieve the arcs. It can be either Direction::Forward or Direction::Backward.
-     * @return const std::vector<Arc>& A constant reference to the vector of arcs corresponding to the specified direction.
+     *
+     * @tparam dir The direction for which to retrieve the arcs. It can be either Direction::Forward or
+     * Direction::Backward.
+     * @return const std::vector<Arc>& A constant reference to the vector of arcs corresponding to the specified
+     * direction.
      */
     template <Direction dir>
     inline const std::vector<Arc> &get_arcs() const {
@@ -1301,7 +1303,7 @@ struct VRPJob {
 
     /**
      * @brief Retrieves the arcs associated with a given strongly connected component (SCC) in the specified direction.
-     * 
+     *
      * @tparam dir The direction of the arcs to retrieve. It can be either Direction::Forward or Direction::Backward.
      * @param scc The index of the strongly connected component.
      * @return const std::vector<Arc>& A reference to the vector of arcs in the specified direction for the given SCC.
@@ -1334,7 +1336,7 @@ struct VRPJob {
  * @brief Logs debug information to a file.
  *
  * This function appends the provided debug information to a file named "debug_info.txt".
- * If the file does not exist, it will be created. If the file is already open, the 
+ * If the file does not exist, it will be created. If the file is already open, the
  * information will be appended to the end of the file.
  *
  * @param info The debug information to be logged.
@@ -1350,9 +1352,9 @@ constexpr const char *vivid_yellow = "\033[38;5;226m"; // Bright yellow
 constexpr const char *vivid_red    = "\033[38;5;196m"; // Bright red
 constexpr const char *vivid_green  = "\033[38;5;46m";  // Bright green
 constexpr const char *vivid_blue   = "\033[38;5;27m";  // Bright blue
-constexpr const char *reset_color = "\033[0m";
-constexpr const char *blue = "\033[34m";
-constexpr const char *dark_yellow = "\033[93m";
+constexpr const char *reset_color  = "\033[0m";
+constexpr const char *blue         = "\033[34m";
+constexpr const char *dark_yellow  = "\033[93m";
 
 /**
  * @brief Prints an informational message with a specific format.
