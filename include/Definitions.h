@@ -835,7 +835,7 @@ public:
             Label *new_label = available_labels.back();
             available_labels.pop_back();
             in_use_labels.push_back(new_label);
-            //new_label->reset();
+            new_label->reset();
             return new_label;
         }
 
