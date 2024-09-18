@@ -210,23 +210,22 @@ void BucketGraph::BucketArcElimination(double theta) {
  */
 template <Direction D>
 void BucketGraph::ObtainJumpBucketArcs() {
-    auto               &buckets          = assign_buckets<D>(fw_buckets, bw_buckets);
-    auto               &fixed_buckets    = assign_buckets<D>(fw_fixed_buckets, bw_fixed_buckets);
-    auto               &num_buckets_index = assign_buckets<D>(num_buckets_index_fw, num_buckets_index_bw);
-    auto               &num_buckets      = assign_buckets<D>(num_buckets_fw, num_buckets_bw);
-    auto &Phi           = assign_buckets<D>(Phi_fw, Phi_bw);
+    auto &buckets           = assign_buckets<D>(fw_buckets, bw_buckets);
+    auto &fixed_buckets     = assign_buckets<D>(fw_fixed_buckets, bw_fixed_buckets);
+    auto &num_buckets_index = assign_buckets<D>(num_buckets_index_fw, num_buckets_index_bw);
+    auto &num_buckets       = assign_buckets<D>(num_buckets_fw, num_buckets_bw);
+    auto &Phi               = assign_buckets<D>(Phi_fw, Phi_bw);
 
-    std::vector<double> res              = {0.0};
-    auto                cost             = 0.0;
-    auto                missing_counter  = 0;
+    std::vector<double> res             = {0.0};
+    auto                cost            = 0.0;
+    auto                missing_counter = 0;
 
     int arc_counter = 0;
     for (auto b = 0; b < fw_buckets_size; ++b) {
         std::vector<int> B_bar;
 
-        // Retrieve the arcs from the current bucket
-        auto arcs          = buckets[b].template get_bucket_arcs<Direction::Forward>();
-        auto original_arcs = jobs[buckets[b].job_id].template get_arcs<Direction::Forward>();
+        auto arcs          = buckets[b].template get_bucket_arcs<D>();
+        auto original_arcs = jobs[buckets[b].job_id].template get_arcs<D>();
         if (arcs.empty()) { continue; }
 
         for (const auto orig_arc : original_arcs) {
@@ -245,20 +244,16 @@ void BucketGraph::ObtainJumpBucketArcs() {
             }
 
             if (!have_path) {
-                // print b
                 missing_counter++;
                 auto start_bucket = num_buckets_index[buckets[b].job_id];
                 for (auto b_prime = b + 1; b_prime < start_bucket + num_buckets[buckets[b].job_id]; ++b_prime) {
-                    if (std::find(Phi[b_prime].begin(), Phi[b_prime].end(), b) == Phi[b_prime].end()) {
-                        continue;
-                    }
-                    auto arcs_prime = buckets[b_prime].template get_bucket_arcs<Direction::Forward>();
+                    if (std::find(Phi[b_prime].begin(), Phi[b_prime].end(), b) == Phi[b_prime].end()) { continue; }
+                    auto arcs_prime = buckets[b_prime].template get_bucket_arcs<D>();
                     for (const auto &gamma_prime : arcs_prime) {
-                        if (fw_fixed_buckets[gamma_prime.from_bucket][gamma_prime.to_bucket] == 1) { continue; }
+                        if (fixed_buckets[gamma_prime.from_bucket][gamma_prime.to_bucket] == 1) { continue; }
                         auto from_job_prime = buckets[gamma_prime.from_bucket].job_id;
                         auto to_job_prime   = buckets[gamma_prime.to_bucket].job_id;
                         if (from_job == from_job_prime && to_job == to_job_prime) {
-                            // fmt::print("found path from {} to {} in bucket {}\n", from_job, to_job, b_prime);
                             B_bar.push_back(b_prime);
                             auto res  = gamma_prime.resource_increment;
                             auto cost = gamma_prime.cost_increment;
@@ -274,5 +269,3 @@ void BucketGraph::ObtainJumpBucketArcs() {
 
     print_info("Added {} jump arcs\n", arc_counter);
 }
-
-

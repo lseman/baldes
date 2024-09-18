@@ -737,6 +737,7 @@ public:
 
 #if defined(SRC3) || defined(SRC)
             if (ss && !rcc) {
+                auto cuts_before = cuts.size();
                 print_info("Removing most negative reduced cost variables\n");
                 removeNegativeReducedCostVarsAndPaths(node);
                 node->optimize();
@@ -751,7 +752,7 @@ public:
                 r1c.the45Heuristic<CutType::FiveRow>(matrixSparse.A_sparse, solution, N_SIZE - 2);
 #endif
                 cuts = r1c.cutStorage;
-                if (cuts.size() == 0) {
+                if (cuts_before == cuts.size()) {
                     print_info("No violations found, calling it a day\n");
                     break;
                 }

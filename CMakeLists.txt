@@ -41,6 +41,9 @@ set(MAX_SRC_CUTS
 set(BUCKET_CAPACITY
     50
     CACHE STRING "Bucket max capacity")
+set(TIME_INDEX 0 CACHE STRING "Time index")
+set(DEMAND_INDEX 1 CACHE STRING "Demand index")
+set(MAIN_RESOURCES 1 CACHE STRING "Main resources")
 
 # Ensure that both SRC3 and SRC are not selected at the same time
 if(SRC AND SRC3)
@@ -153,7 +156,7 @@ include_directories(${GUROBI_HOME}/include)
 
 # Source files
 set(SOURCES examples/VRPTW.cpp src/BucketGraph.cpp src/SRC.cpp
-            extra/Heuristic.cpp src/BucketJump.cpp src/RIH.cpp)
+            extra/Heuristic.cpp src/RIH.cpp)
 
 set(CVRPSEP_SOURCES
     cvrpsep/basegrph.cpp
@@ -202,3 +205,6 @@ target_compile_definitions(vrptw PUBLIC R_SIZE=${R_SIZE})
 target_compile_definitions(vrptw PUBLIC N_SIZE=${N_SIZE})
 target_compile_definitions(vrptw PUBLIC MAX_SRC_CUTS=${MAX_SRC_CUTS})
 target_compile_definitions(vrptw PUBLIC BUCKET_CAPACITY=${BUCKET_CAPACITY})
+target_compile_definitions(vrptw PUBLIC TIME_INDEX=${TIME_INDEX})
+target_compile_definitions(vrptw PUBLIC DEMAND_INDEX=${DEMAND_INDEX})
+target_compile_definitions(vrptw PUBLIC MAIN_RESOURCES=${MAIN_RESOURCES})

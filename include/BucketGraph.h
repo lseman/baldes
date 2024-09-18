@@ -566,7 +566,9 @@ public:
 
     BucketGraph(const std::vector<VRPJob> &jobs, int time_horizon, int bucket_interval);
 
-    // bool check_ng_path_condition(const Label &new_label);
+    BucketGraph(const std::vector<VRPJob> &jobs, std::vector<int> &bounds, std::vector<int> &bucket_intervals);
+
+
     template <Direction D>
     void add_arc(int from_bucket, int to_bucket, const std::vector<double> &res_inc, double cost_inc);
 

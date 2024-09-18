@@ -30,13 +30,3 @@
 #include <functional>
 #include <vector>
 
-/**
- * Checks if a given bucket is present in the bucket set.
- *
- * @param bucket_set The set of buckets to search in.
- * @param bucket The bucket to check for.
- * @return True if the bucket is found in the set, false otherwise.
- */
-bool BucketGraph::BucketSetContains(const std::set<int> &bucket_set, const int &bucket) {
-    return bucket_set.find(bucket) != bucket_set.end();
-}

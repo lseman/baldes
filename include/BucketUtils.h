@@ -70,13 +70,13 @@ inline int BucketGraph::get_bucket_number(int job, const std::vector<double> &re
 
     if constexpr (R_SIZE > 1) {
         auto            &vrpjob = jobs[job];
-        std::vector<int> base_intervals(intervals.size());
-        std::vector<int> first_lb(intervals.size());
-        std::vector<int> first_ub(intervals.size());
-        std::vector<int> remainders(intervals.size());
+        std::vector<int> base_intervals(MAIN_RESOURCES);
+        std::vector<int> first_lb(MAIN_RESOURCES);
+        std::vector<int> first_ub(MAIN_RESOURCES);
+        std::vector<int> remainders(MAIN_RESOURCES);
 
         // Compute base intervals, remainders, and bounds for each dimension
-        for (int r = 0; r < intervals.size(); ++r) {
+        for (int r = 0; r < MAIN_RESOURCES; ++r) {
             base_intervals[r] = (R_max[r] - R_min[r] + 1) / intervals[r].interval;
             remainders[r]     = static_cast<int>(R_max[r] - R_min[r] + 1) % intervals[r].interval;
             first_lb[r]       = vrpjob.lb[r]; // Lower bound for each dimension
@@ -88,7 +88,7 @@ inline int BucketGraph::get_bucket_number(int job, const std::vector<double> &re
 
         if constexpr (D == Direction::Forward) {
             // Iterate over each resource value and compute the bucket index for forward direction
-            for (int r = resource_values_vec.size() - 1; r >= 0; --r) {
+            for (int r = MAIN_RESOURCES - 1; r >= 0; --r) {
                 int resource_value_int = static_cast<int>(resource_values_vec[r]);
                 int bucket_dim_index;
 
@@ -105,7 +105,7 @@ inline int BucketGraph::get_bucket_number(int job, const std::vector<double> &re
             }
         } else if constexpr (D == Direction::Backward) {
             // Iterate over each resource value and compute the bucket index for backward direction
-            for (int r = resource_values_vec.size() - 1; r >= 0; --r) {
+            for (int r = MAIN_RESOURCES - 1; r >= 0; --r) {
                 int resource_value_int = static_cast<int>(resource_values_vec[r]);
                 int bucket_dim_index;
 
@@ -125,7 +125,7 @@ inline int BucketGraph::get_bucket_number(int job, const std::vector<double> &re
     } else {
         const auto &num_buckets_index = assign_buckets<D>(num_buckets_index_fw, num_buckets_index_bw);
         const int   start_index       = num_buckets_index[job];
-        const int   base_interval     = (T_max - 0.0 + 1) / static_cast<int>(intervals[0].interval);
+        const int   base_interval     = (R_max[0] - R_min[0] + 1) / intervals[0].interval;
         int         value             = static_cast<int>(resource_values_vec[0]);
         // print number of buckets for job
 
@@ -154,13 +154,13 @@ inline int BucketGraph::get_bucket_number(int job, const std::vector<double> &re
  */
 template <Direction D>
 void BucketGraph::define_buckets() {
-    int              num_intervals = intervals.size(); // Determine how many resources we have (number of intervals)
+    int              num_intervals = MAIN_RESOURCES;
     std::vector<int> total_ranges(num_intervals);
     std::vector<int> base_intervals(num_intervals);
     std::vector<int> remainders(num_intervals);
 
     // Determine the base interval and other relevant values for each resource
-    for (int r = 0; r < intervals.size(); ++r) {
+    for (int r = 0; r < num_intervals; ++r) {
         total_ranges[r]   = R_max[r] - R_min[r] + 1;
         base_intervals[r] = total_ranges[r] / intervals[r].interval;
         remainders[r]     = total_ranges[r] % intervals[r].interval; // Use std::fmod for floating-point modulo

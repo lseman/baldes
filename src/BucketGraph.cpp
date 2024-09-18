@@ -60,8 +60,8 @@ JumpArc::JumpArc(int base, int jump, const std::vector<double> &res_inc, double 
  * @param time_horizon An integer representing the total time horizon for the scheduling.
  * @param bucket_interval An integer representing the interval for the buckets.
  * @param capacity An integer representing the total capacity for the scheduling.
-    * @param capacity_interval An integer representing the interval for the capacity buckets.
-    */
+ * @param capacity_interval An integer representing the interval for the capacity buckets.
+ */
 BucketGraph::BucketGraph(const std::vector<VRPJob> &jobs, int time_horizon, int bucket_interval, int capacity,
                          int capacity_interval)
     : fw_buckets(), bw_buckets(), jobs(jobs), time_horizon(time_horizon), capacity(capacity),
@@ -104,6 +104,28 @@ BucketGraph::BucketGraph(const std::vector<VRPJob> &jobs, int time_horizon, int 
     intervals = {intervalTime};
     R_min     = {0};
     R_max     = {static_cast<double>(time_horizon)};
+
+    define_buckets<Direction::Forward>();
+    define_buckets<Direction::Backward>();
+}
+
+BucketGraph::BucketGraph(const std::vector<VRPJob> &jobs, std::vector<int> &bounds, std::vector<int> &bucket_intervals)
+    : fw_buckets(), bw_buckets(), jobs(jobs), time_horizon(bounds[0]), bucket_interval(bucket_intervals[0]),
+      best_cost(std::numeric_limits<double>::infinity()), fw_best_label() {
+
+    cvrsep_duals.assign(jobs.size() + 2, std::vector<double>(jobs.size() + 2, 0.0));
+
+    initInfo();
+    for (int i = 0; i < bounds.size(); ++i) {
+        Interval interval(bucket_intervals[i], bounds[i]);
+        intervals.push_back(interval);
+    }
+
+    T_max = bounds[0];
+    for (int i = 1; i < bounds.size(); ++i) {
+        R_min.push_back(0);
+        R_max.push_back(static_cast<double>(bounds[i]));
+    }
 
     define_buckets<Direction::Forward>();
     define_buckets<Direction::Backward>();
@@ -487,14 +509,13 @@ void BucketGraph::set_adjacency_list() {
             auto   travel_cost = getcij(job.id, next_job.id);
             double cost_inc    = travel_cost - next_job.cost;
 
-            res_inc[0] = travel_cost + job.consumption[0];
-            if (R_SIZE > 1) {
-                for (int r = 1; r < R_SIZE; ++r) { res_inc[r] = job.consumption[r]; }
-            }
+            for (int r = 0; r < R_SIZE; ++r) { res_inc[r] = job.consumption[r]; }
+            res_inc[TIME_INDEX] += travel_cost;
+
             int to_bucket = next_job.id;
             if (from_bucket == to_bucket) continue;
 
-            if (job.lb[0] + res_inc[0] > next_job.ub[0]) continue;
+            if (job.lb[TIME_INDEX] + res_inc[TIME_INDEX] > next_job.ub[TIME_INDEX]) continue;
 
             double aux_double = 1.E-5 * next_job.start_time;
             best_arcs.emplace_back(aux_double, next_job.id, res_inc, cost_inc);
@@ -667,14 +688,23 @@ void BucketGraph::common_initialization() {
  */
 double BucketGraph::knapsackBound(const Label *l) {
     Knapsack kp;
-    int      rload = R_max[1] - l->resources[1];
+    int      rload = R_max[DEMAND_INDEX] - l->resources[DEMAND_INDEX];
     kp.setCapacity(rload);
 
     for (int i = 1; i < jobs.size(); ++i) {
-        if (!l->visits(i) && jobs[i].consumption[1] <= rload) {
-            kp.addItem(jobs[i].cost, jobs[i].consumption[1]);
-        }
+        if (!l->visits(i) && jobs[i].consumption[DEMAND_INDEX] <= rload) { kp.addItem(jobs[i].cost, jobs[i].consumption[DEMAND_INDEX]); }
     }
 
     return l->cost - kp.solve();
+}
+
+/**
+ * Checks if a given bucket is present in the bucket set.
+ *
+ * @param bucket_set The set of buckets to search in.
+ * @param bucket The bucket to check for.
+ * @return True if the bucket is found in the set, false otherwise.
+ */
+bool BucketGraph::BucketSetContains(const std::set<int> &bucket_set, const int &bucket) {
+    return bucket_set.find(bucket) != bucket_set.end();
 }
