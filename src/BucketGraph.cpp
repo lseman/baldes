@@ -136,7 +136,7 @@ Label *BucketGraph::compute_label(const Label *L, const Label *L_prime) {
     if (!SRCDuals.empty()) {
         for (size_t i = 0; i < SRCDuals.size(); ++i) {
             if (L->SRCmap[i] + L_prime->SRCmap[i] >= 1) {
-                // std::print("SRC: ", SRCDuals[i]);
+                // fmt::print("SRC: ", SRCDuals[i]);
                 sumSRC += SRCDuals[i];
             }
         }

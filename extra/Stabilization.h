@@ -383,7 +383,7 @@ public:
             // dec
             cur_alpha = std::max(0.0, cur_alpha - 0.1);
         }
-        // std::print(fg(fmt::color::yellow), "alpha: {}\n", cur_alpha);
+        // fmt::print(fg(fmt::color::yellow), "alpha: {}\n", cur_alpha);
         cur_alpha = _misprice_schedule(nb_misprices, base_alpha);
 
         return duals_sep;

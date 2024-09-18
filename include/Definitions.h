@@ -38,10 +38,12 @@
 #include <map>
 #include <memory>
 #include <mutex>
-#include <print>
 #include <ranges>
 #include <unordered_map>
 #include <vector>
+
+#include <fmt/core.h>
+#include <fmt/color.h>
 
 enum class Direction { Forward, Backward };
 enum class Stage { One, Two, Three, Four, Enumerate, Fix };
@@ -223,7 +225,7 @@ struct RCCmanager {
         // Step 3: Bulk erasure of cuts from the cut vector
         std::sort(toRemoveIndices.begin(), toRemoveIndices.end(), std::greater<>());
         for (int idx : toRemoveIndices) {
-            // std::print("Erasing cut {}\n", idx);
+            // fmt::print("Erasing cut {}\n", idx);
             cuts.erase(cuts.begin() + idx);
         }
 
@@ -1367,10 +1369,10 @@ constexpr const char *dark_yellow  = "\033[93m";
  * @param args The arguments to be formatted and printed according to the format string.
  */
 template <typename... Args>
-inline void print_info(std::format_string<Args...> format, Args &&...args) {
+inline void print_info(fmt::format_string<Args...> format, Args &&...args) {
     // Print "[", then yellow "info", then reset color and print "] "
-    std::print("[{}{}{}] ", vivid_yellow, "info", reset_color);
-    std::print(format, std::forward<Args>(args)...);
+    fmt::print(fg(fmt::color::yellow), "[info] ");
+    fmt::print(format, std::forward<Args>(args)...);
 }
 
 /**
@@ -1385,10 +1387,10 @@ inline void print_info(std::format_string<Args...> format, Args &&...args) {
  * @param args The arguments to be formatted and printed according to the format string.
  */
 template <typename... Args>
-inline void print_heur(std::format_string<Args...> format, Args &&...args) {
+inline void print_heur(fmt::format_string<Args...> format, Args &&...args) {
     // Print "[", then yellow "info", then reset color and print "] "
-    std::print("[{}{}{}] ", vivid_blue, "heuristic", reset_color);
-    std::print(format, std::forward<Args>(args)...);
+    fmt::print(fg(fmt::color::blue), "[info] ");
+    fmt::print(format, std::forward<Args>(args)...);
 }
 
 /**
@@ -1402,10 +1404,10 @@ inline void print_heur(std::format_string<Args...> format, Args &&...args) {
  * @param args The arguments to be formatted according to the format string.
  */
 template <typename... Args>
-inline void print_cut(std::format_string<Args...> format, Args &&...args) {
+inline void print_cut(fmt::format_string<Args...> format, Args &&...args) {
     // Print "[", then yellow "info", then reset color and print "] "
-    std::print("[{}{}{}] ", vivid_green, "cut", reset_color);
-    std::print(format, std::forward<Args>(args)...);
+    fmt::print(fg(fmt::color::green), "[info] ");
+    fmt::print(format, std::forward<Args>(args)...);
 }
 
 /**
@@ -1419,10 +1421,10 @@ inline void print_cut(std::format_string<Args...> format, Args &&...args) {
  * @param args The arguments to be formatted according to the format string.
  */
 template <typename... Args>
-inline void print_blue(std::format_string<Args...> format, Args &&...args) {
-    // Print "[", then yellow "info", then reset color and print "] "
-    std::print("[{}{}{}] ", blue, "info", reset_color);
-    std::print(format, std::forward<Args>(args)...);
+inline void print_blue(fmt::format_string<Args...> format, Args &&...args) {
+    // Print "[", then blue "info", then reset color and print "] "
+    fmt::print(fg(fmt::color::blue), "[info] ");
+    fmt::print(format, std::forward<Args>(args)...);
 }
 
 /**
@@ -1479,23 +1481,23 @@ inline void printBaldes() {
     constexpr auto blue  = "\033[34m";
     constexpr auto reset = "\033[0m";
 
-    std::print("\n");
-    std::print("+------------------------------------------------------+\n");
-    std::print("| {}{:<52}{} |\n", bold, "BALDES", reset); // Bold "BALDES"
-    std::print("| {:<52} |\n", " ");
-    std::print("| {}{:<52}{} |\n", blue, "BALDES, a Bucket Graph Labeling Algorithm", reset); // Blue text
-    std::print("| {:<52} |\n", "for Vehicle Routing");
-    std::print("| {:<52} |\n", " ");
-    std::print("| {:<52} |\n", "a C++ implementation");
-    std::print("| {:<52} |\n", "of a Bucket Graph-based labeling algorithm");
-    std::print("| {:<52} |\n", "designed to solve the Resource-Constrained");
-    std::print("| {:<52} |\n", "Shortest Path Problem (RSCPP), which commonly");
-    std::print("| {:<52} |\n", "arises as a subproblem in state-of-the-art");
-    std::print("| {:<52} |\n", "Branch-Cut-and-Price algorithms for various");
-    std::print("| {:<52} |\n", "Vehicle Routing Problems (VRPs).");
-    std::print("| {:<52} |\n", " ");
-    std::print("+------------------------------------------------------+\n");
-    std::print("\n");
+    fmt::print("\n");
+    fmt::print("+------------------------------------------------------+\n");
+    fmt::print("| {}{:<52}{} |\n", bold, "BALDES", reset); // Bold "BALDES"
+    fmt::print("| {:<52} |\n", " ");
+    fmt::print("| {}{:<52}{} |\n", blue, "BALDES, a Bucket Graph Labeling Algorithm", reset); // Blue text
+    fmt::print("| {:<52} |\n", "for Vehicle Routing");
+    fmt::print("| {:<52} |\n", " ");
+    fmt::print("| {:<52} |\n", "a C++ implementation");
+    fmt::print("| {:<52} |\n", "of a Bucket Graph-based labeling algorithm");
+    fmt::print("| {:<52} |\n", "designed to solve the Resource-Constrained");
+    fmt::print("| {:<52} |\n", "Shortest Path Problem (RSCPP), which commonly");
+    fmt::print("| {:<52} |\n", "arises as a subproblem in state-of-the-art");
+    fmt::print("| {:<52} |\n", "Branch-Cut-and-Price algorithms for various");
+    fmt::print("| {:<52} |\n", "Vehicle Routing Problems (VRPs).");
+    fmt::print("| {:<52} |\n", " ");
+    fmt::print("+------------------------------------------------------+\n");
+    fmt::print("\n");
 }
 
 /**

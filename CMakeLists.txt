@@ -21,7 +21,8 @@ option(RCC "Enable RCC compilation option" OFF)
 option(SRC3 "Enable 3SRC compilation option" OFF)
 option(SRC "Enable SRC compilation option" OFF)
 option(GET_TBB "Enable TBB compilation option" OFF)
-option(UNREACHABLE_DOMINANCE "Enable Unreachable Dominance compilation option" OFF)
+option(UNREACHABLE_DOMINANCE "Enable Unreachable Dominance compilation option"
+       OFF)
 option(SORTED_LABELS "Enable Sorted Labels compilation option" OFF)
 option(MCD "Enable MCD compilation option" OFF)
 
@@ -41,7 +42,10 @@ set(BUCKET_CAPACITY
 
 # Ensure that both SRC3 and SRC are not selected at the same time
 if(SRC AND SRC3)
-  message(FATAL_ERROR "Both SRC and SRC3 cannot be enabled at the same time. Please choose only one.")
+  message(
+    FATAL_ERROR
+      "Both SRC and SRC3 cannot be enabled at the same time. Please choose only one."
+  )
 endif()
 
 if(RIH)
@@ -76,7 +80,6 @@ if(MCD)
   add_definitions(-DMCD)
 endif()
 
-
 # Attempt to include CPM.cmake from provided path
 include(cmake/CPM.cmake OPTIONAL)
 
@@ -88,8 +91,7 @@ if(NOT COMMAND CPMAddPackage)
   FetchContent_Declare(
     CPM
     GIT_REPOSITORY https://github.com/cpm-cmake/CPM.cmake.git
-    GIT_TAG v0.40.2 # You can specify a specific version of CPM.cmake
-  )
+    GIT_TAG v0.40.2)
   # Fetch CPM
   FetchContent_MakeAvailable(CPM)
   # Include CPM.cmake after it has been fetched
@@ -109,6 +111,8 @@ cpmaddpackage(
   "STDEXEC_BUILD_BENCHMARKS OFF"
   "STDEXEC_BUILD_DOCS OFF"
   "BUILD_TESTING OFF")
+
+cpmaddpackage(NAME fmt GITHUB_REPOSITORY fmtlib/fmt GIT_TAG 11.0.2)
 
 find_package(TBB)
 if(TBB_FOUND)
@@ -165,13 +169,14 @@ set(CVRPSEP_SOURCES
 
 # Executable
 if(RCC)
-    add_executable(vrptw ${SOURCES} ${CVRPSEP_SOURCES})
+  add_executable(vrptw ${SOURCES} ${CVRPSEP_SOURCES})
 else()
-    add_executable(vrptw ${SOURCES})
+  add_executable(vrptw ${SOURCES})
 endif()
 
 # Linking libraries
 target_link_libraries(vrptw PRIVATE STDEXEC::stdexec)
+target_link_libraries(vrptw PRIVATE fmt::fmt)
 if(GET_TBB)
   target_link_libraries(vrptw PRIVATE TBB::tbb)
 endif()

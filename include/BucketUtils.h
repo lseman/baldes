@@ -364,7 +364,7 @@ void BucketGraph::generate_arcs() {
         }
     });
 
-    // std::print("Generated arcs for {} jobs.\n", jobs.size());
+    // fmt::print("Generated arcs for {} jobs.\n", jobs.size());
 }
 
 /**
@@ -550,7 +550,7 @@ inline Label *BucketGraph::Extend(const std::conditional_t<M == Mutability::Mut,
 
     // Early exit for enumeration
     if constexpr (S == Stage::Enumerate) {
-        std::print("Job id: {}\n", job_id);
+        fmt::print("Job id: {}\n", job_id);
         if (is_job_visited(L_prime->visited_bitmap, job_id)) { return nullptr; }
     }
 
@@ -619,11 +619,11 @@ inline Label *BucketGraph::Extend(const std::conditional_t<M == Mutability::Mut,
 #ifdef KP_BOUND
     if constexpr (D == Direction::Forward) {
         auto kpBound = knapsackBound(L_prime);
-        // std::print("Knapsack bound: {}\n", kpBound);
+        // fmt::print("Knapsack bound: {}\n", kpBound);
 
         if (kpBound > 0.0) {
-            std::print("new_cost/kpBound: {}/{}\n", new_cost, kpBound);
-            // std::print("Knapsack bound exceeded\n");
+            fmt::print("new_cost/kpBound: {}/{}\n", new_cost, kpBound);
+            // fmt::print("Knapsack bound exceeded\n");
             return nullptr;
         }
     }
@@ -688,7 +688,7 @@ inline Label *BucketGraph::Extend(const std::conditional_t<M == Mutability::Mut,
             if (bitIsSet) {
                 new_label->SRCmap[idx]++;
                 if (new_label->SRCmap[idx] % 2 == 0) {
-                    // std::print("SRC duals: {}\n", SRCDuals[id]);
+                    // fmt::print("SRC duals: {}\n", SRCDuals[id]);
                     new_label->cost -= SRCDuals[idx];
                 }
             }
@@ -1032,7 +1032,7 @@ std::vector<Label *> BucketGraph::bi_labeling_algorithm(std::vector<double> q_st
 #else
     if constexpr (S == Stage::Three) {
         if (fixed == false) {
-            std::print("Setting fixed to true\n");
+            fmt::print("Setting fixed to true\n");
             fixed = true;
             common_initialization();
 
@@ -1053,7 +1053,7 @@ std::vector<Label *> BucketGraph::bi_labeling_algorithm(std::vector<double> q_st
             }
 
             gap = incumbent - (relaxation + std::min(0.0, best_label->cost));
-            std::print("Gap: {}\n", gap);
+            fmt::print("Gap: {}\n", gap);
             fw_c_bar = forward_cbar;
             bw_c_bar = backward_cbar;
             std::vector<BucketArc> arcos;
@@ -1066,9 +1066,9 @@ std::vector<Label *> BucketGraph::bi_labeling_algorithm(std::vector<double> q_st
                 { BucketArcElimination<Direction::Backward>(gap, arcos); }
             }
 
-            std::print("Arcs to eliminate: {}\n", arcos.size());
+            fmt::print("Arcs to eliminate: {}\n", arcos.size());
             ObtainJumpBucketArcs(arcos);
-            std::print("Jump arcs obtained\n");
+            fmt::print("Jump arcs obtained\n");
         }
     }
     // reset_fixed();
@@ -1095,7 +1095,7 @@ std::vector<Label *> BucketGraph::bi_labeling_algorithm(std::vector<double> q_st
 
     merged_labels.push_back(best_label);
 
-    if constexpr (S == Stage::Enumerate) { std::print("Labels generated, concatenating...\n"); }
+    if constexpr (S == Stage::Enumerate) { fmt::print("Labels generated, concatenating...\n"); }
 
     const size_t          n_segments = fw_buckets_size / 64 + 1;
     std::vector<uint64_t> Bvisited(n_segments, 0);
@@ -1339,19 +1339,19 @@ void BucketGraph::SCC_handler() {
     constexpr auto blue  = "\033[34m";
     constexpr auto reset = "\033[0m";
     if constexpr (D == Direction::Forward) {
-        std::print("FW SCCs: \n");
+        fmt::print("FW SCCs: \n");
     } else {
-        std::print("BW SCCs: \n");
+        fmt::print("BW SCCs: \n");
     }
     for (auto scc : topological_order) {
         if constexpr (D == Direction::Forward) {
-            std::print("{}({}) -> {}", blue, scc, reset);
+            fmt::print("{}({}) -> {}", blue, scc, reset);
         } else {
-            std::print("{}({}) -> {}", blue, scc, reset);
+            fmt::print("{}({}) -> {}", blue, scc, reset);
         }
-        for (auto &bucket : sccs[scc]) { std::print("{} ", bucket); }
+        for (auto &bucket : sccs[scc]) { fmt::print("{} ", bucket); }
     }
-    std::print("\n");
+    fmt::print("\n");
 
     std::vector<std::vector<int>> ordered_sccs;
     ordered_sccs.reserve(sccs.size()); // Reserve space for all SCCs
@@ -1419,7 +1419,7 @@ void BucketGraph::SCC_handler() {
                     if (it != job.bw_arcs.end()) {
                         // Add the arc to the filtered arcs
                         filtered_bw_arcs.push_back(*it); // Forward arcs
-                        // std::print("Adding arc from {} to {}\n", from_job_id, to_job_id);
+                        // fmt::print("Adding arc from {} to {}\n", from_job_id, to_job_id);
                     }
                 }
             }

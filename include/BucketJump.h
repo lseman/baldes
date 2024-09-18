@@ -270,5 +270,5 @@ void BucketGraph::BucketArcElimination(double theta, std::vector<BucketArc> &Gam
         }
     }
 
-    std::print("Removed arcs: {}\n", removed_arcs.load());
+    fmt::print("Removed arcs: {}\n", removed_arcs.load());
 }

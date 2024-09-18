@@ -148,7 +148,7 @@ std::vector<set<int>> separate_Rounded_Capacity_cuts(GRBModel *gurobi_model, int
         m_separation.set(GRB_IntParam_SolutionNumber, solIndex); // Set the solution number
         auto solution = m_separation.get(GRB_DoubleAttr_ObjVal); // Get the objective value for this solution
         if (m_separation.get(GRB_DoubleAttr_PoolObjVal) >= eps_for_violation) {
-            std::print("RCC Violation {}; Objective value - {}\n", solIndex + 1,
+            fmt::print("RCC Violation {}; Objective value - {}\n", solIndex + 1,
                        m_separation.get(GRB_DoubleAttr_ObjVal));
 
             std::set<int> S; // Store nodes for this solution

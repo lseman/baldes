@@ -60,7 +60,7 @@ void BucketGraph::ObtainJumpBucketArcs(const std::vector<BucketArc> &Gamma) {
 
             auto job_start = to_job * num_buckets_per_job;
             for (auto b_prime = job_start; b_prime < job_start + num_buckets_per_job; ++b_prime) {
-                // std::print("Adding bucket {} to B_bar\n", b_prime);
+                // fmt::print("Adding bucket {} to B_bar\n", b_prime);
                 B_bar.push_back(b_prime);
             }
             cost = gamma.cost_increment;
@@ -76,7 +76,7 @@ void BucketGraph::ObtainJumpBucketArcs(const std::vector<BucketArc> &Gamma) {
             }
 
             for (const auto &b_prime : B_bar) {
-                std::print("Adding jump arc from {} to {}\n", b, b_prime);
+                fmt::print("Adding jump arc from {} to {}\n", b, b_prime);
                 buckets[b_from].add_jump_arc(b_from, b_prime, res, cost, true);
             }
         }

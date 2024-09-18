@@ -157,7 +157,7 @@ inline int VRPTW_reduce_time_windows(InstanceData &instance) {
     double aux_1;
 
     while (changed && it < 20) {
-        // std::print("Iteration {}\n", it);
+        // fmt::print("Iteration {}\n", it);
         changed = false;
 
         for (int k = 1; k < instance.nN - 1; ++k) {
@@ -168,7 +168,7 @@ inline int VRPTW_reduce_time_windows(InstanceData &instance) {
                 }
             }
             if (aux_1 > instance.window_open[k]) {
-                // std::print("Reducing time window for vertex {}\n", k);
+                // fmt::print("Reducing time window for vertex {}\n", k);
                 instance.window_open[k] = aux_1;
                 changed                 = true;
             }
@@ -182,7 +182,7 @@ inline int VRPTW_reduce_time_windows(InstanceData &instance) {
                 }
             }
             if (aux_1 > instance.window_open[k]) {
-                // std::print("Reducing time window for vertex {}\n", k);
+                // fmt::print("Reducing time window for vertex {}\n", k);
                 instance.window_open[k] = aux_1;
                 changed                 = true;
             }
@@ -196,7 +196,7 @@ inline int VRPTW_reduce_time_windows(InstanceData &instance) {
                 }
             }
             if (aux_1 < instance.window_close[k]) {
-                // std::print("Reducing time window for vertex {}\n", k);
+                // fmt::print("Reducing time window for vertex {}\n", k);
                 instance.window_close[k] = aux_1;
                 changed                  = true;
             }
@@ -210,7 +210,7 @@ inline int VRPTW_reduce_time_windows(InstanceData &instance) {
                 }
             }
             if (aux_1 < instance.window_close[k]) {
-                // std::print("Reducing time window for vertex {}\n", k);
+                // fmt::print("Reducing time window for vertex {}\n", k);
                 instance.window_close[k] = aux_1;
                 changed                  = true;
             }

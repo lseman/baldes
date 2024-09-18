@@ -356,7 +356,7 @@ public:
         }
 
         rccManager.addCutBulk(arcGroups, rhsValues, newConstraints);
-        std::print("Added {} RCC cuts\n", cutExpressions.size());
+        fmt::print("Added {} RCC cuts\n", cutExpressions.size());
         model->update();
         model->optimize();
 
@@ -569,7 +569,7 @@ public:
         // set start timer
         auto start_timer = std::chrono::high_resolution_clock::now();
 
-        std::print("\n");
+        fmt::print("\n");
         print_info("Starting column generation..\n\n");
         bool transition = false;
 
@@ -727,7 +727,7 @@ public:
                 matrixSparse = extractModelDataSparse(node);
                 r1c.allPaths = allPaths;
                 r1c.separate(matrixSparse.A_sparse, solution, N_SIZE - 2, 1e-3);
-                std::print("Separating cuts..\n");
+                fmt::print("Separating cuts..\n");
 #ifdef SRC
                 r1c.the45Heuristic<CutType::FourRow>(matrixSparse.A_sparse, solution, N_SIZE - 2, 1e-3);
                 r1c.the45Heuristic<CutType::FiveRow>(matrixSparse.A_sparse, solution, N_SIZE - 2, 1e-3);
@@ -737,13 +737,13 @@ public:
                     print_info("No violations found, calling it a day\n");
                     break;
                 }
-                std::print("Found {} violated cuts\n", cuts.size());
+                fmt::print("Found {} violated cuts\n", cuts.size());
                 ss = false;
             }
 #endif
 
             if (iter % 10 == 0)
-                std::print("| It.: {:4} | Obj.: {:8.2f} | Pricing: {:10.2f} | Cuts: {:4} | Paths: {:4} | "
+                fmt::print("| It.: {:4} | Obj.: {:8.2f} | Pricing: {:10.2f} | Cuts: {:4} | Paths: {:4} | "
                            "Stage: {:1} | "
                            "Lag. Gap: {:10.4f} | RCC: {:4} |\n",
                            iter, highs_obj, inner_obj, cuts.size(), paths.size(), stage, lag_gap, rcc);
@@ -766,11 +766,11 @@ public:
         constexpr auto blue  = "\033[34m";
         constexpr auto reset = "\033[0m";
 
-        std::print("+----------------------+----------------+\n");
-        std::print("| {:<14} | {}{:>20}{} |\n", "Bound", blue, relaxed_result, reset);
-        std::print("| {:<14} | {}{:>20}{} |\n", "Incumbent", blue, ip_result, reset);
-        std::print("| {:<14} | {}{:>16}.{:03}{} |\n", "VRP Duration", blue, duration_seconds, duration_milliseconds,
+        fmt::print("+----------------------+----------------+\n");
+        fmt::print("| {:<14} | {}{:>20}{} |\n", "Bound", blue, relaxed_result, reset);
+        fmt::print("| {:<14} | {}{:>20}{} |\n", "Incumbent", blue, ip_result, reset);
+        fmt::print("| {:<14} | {}{:>16}.{:03}{} |\n", "VRP Duration", blue, duration_seconds, duration_milliseconds,
                    reset);
-        std::print("+----------------------+----------------+\n");
+        fmt::print("+----------------------+----------------+\n");
     }
 };

@@ -378,7 +378,7 @@ public:
         double S     = 0;
 
         for (size_t j = 1; j < P.size() - 1; ++j) {
-            // std::print("P[j]: {}\n", P[j]);
+            // fmt::print("P[j]: {}\n", P[j]);
             int vj = P[j];
 
             // Check if the node vj is in AM (bitwise check)
@@ -539,7 +539,7 @@ inline std::vector<std::vector<int>> findVisitingNodes(const SparseModel &A, con
     std::vector<std::vector<int>> col_to_rows(A.num_cols);
     for (int j = 0; j < A.row_indices.size(); ++j) {
         // print A.values[j]
-        // std::print("A.values[j]: {}\n", A.values[j]);
+        // fmt::print("A.values[j]: {}\n", A.values[j]);
         if (A.values[j] == -1) { col_to_rows[A.col_indices[j]].push_back(A.row_indices[j]); }
     }
     // Filter only the selected nodes

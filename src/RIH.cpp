@@ -129,7 +129,7 @@ int BucketGraph::RIH1(std::priority_queue<Label *, std::vector<Label *>, LabelCo
                     continue;
                 }
                 if (new_label->cost < current_label->cost) {
-                    // std::print("RIH1: new_label->cost: {}, current_label->cost: {}\n", new_label->cost,
+                    // fmt::print("RIH1: new_label->cost: {}, current_label->cost: {}\n", new_label->cost,
                     //            current_label->cost);
                     best_labels_out.push(new_label);
                 } else {

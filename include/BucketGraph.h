@@ -94,34 +94,34 @@ public:
     void initInfo() {
 
         // Print header
-        std::print("\n+----------------------------------+\n");
-        std::print("|        CONFIGURATION INFO     |\n");
-        std::print("+----------------------------------+\n");
+        fmt::print("\n+----------------------------------+\n");
+        fmt::print("|        CONFIGURATION INFO     |\n");
+        fmt::print("+----------------------------------+\n");
 
         // Print Resource size
-        std::print("Resources: {}\n", R_SIZE);
-        std::print("Number of Clients: {}\n", N_SIZE);
-        std::print("Maximum SRC cuts: {}\n", MAX_SRC_CUTS);
+        fmt::print("Resources: {}\n", R_SIZE);
+        fmt::print("Number of Clients: {}\n", N_SIZE);
+        fmt::print("Maximum SRC cuts: {}\n", MAX_SRC_CUTS);
 
         // Conditional configuration (RIH enabled/disabled)
 #ifdef RIH
-        std::print("RIH: enabled\n");
+        fmt::print("RIH: enabled\n");
 #else
-        std::print("RIH: disabled\n");
+        fmt::print("RIH: disabled\n");
 #endif
 #ifdef RCC
-        std::print("RCC: enabled\n");
+        fmt::print("RCC: enabled\n");
 #else
-        std::print("RCC: disabled\n");
+        fmt::print("RCC: disabled\n");
 #endif
 #ifdef SRC
-        std::print("SRC: enabled\n");
+        fmt::print("SRC: enabled\n");
 #else
-        std::print("SRC: disabled\n");
+        fmt::print("SRC: disabled\n");
 #endif
-        std::print("+----------------------------------+\n");
+        fmt::print("+----------------------------------+\n");
 
-        std::print("\n");
+        fmt::print("\n");
     }
 
     std::vector<double>                R_max;
@@ -234,21 +234,21 @@ public:
         const char *reset     = "\033[0m";    // Reset color
 
         // Print table header with horizontal line and separators
-        std::print("\n+----------------------+-----------------+-----------------+\n");
-        std::print("|{}{:<20}{}| {:<15} | {:<15} |\n", blue_bold, " Metric", reset, " Forward", " Backward");
-        std::print("+----------------------+-----------------+-----------------+\n");
+        fmt::print("\n+----------------------+-----------------+-----------------+\n");
+        fmt::print("|{}{:<20}{}| {:<15} | {:<15} |\n", blue_bold, " Metric", reset, " Forward", " Backward");
+        fmt::print("+----------------------+-----------------+-----------------+\n");
 
         // Print labels for forward and backward with bold blue metric
-        std::print("|{}{:<20}{}| {:<15} | {:<15} |\n", blue_bold, " Labels", reset, stat_n_labels_fw, stat_n_labels_bw);
+        fmt::print("|{}{:<20}{}| {:<15} | {:<15} |\n", blue_bold, " Labels", reset, stat_n_labels_fw, stat_n_labels_bw);
 
         // Print dominated forward and backward labels with bold blue metric
-        std::print("|{}{:<20}{}| {:<15} | {:<15} |\n", blue_bold, " Dominance Check", reset, stat_n_dom_fw,
+        fmt::print("|{}{:<20}{}| {:<15} | {:<15} |\n", blue_bold, " Dominance Check", reset, stat_n_dom_fw,
                    stat_n_dom_bw);
 
         // Print the final horizontal line
-        std::print("+----------------------+-----------------+-----------------+\n");
+        fmt::print("+----------------------+-----------------+-----------------+\n");
 
-        std::print("\n");
+        fmt::print("\n");
     }
 
     /**
