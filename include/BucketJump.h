@@ -9,7 +9,6 @@
  * Key components:
  * - `UpdateBucketsSet`: Updates the set of visited buckets and checks feasibility for adding arcs to the set.
  * - `BucketArcElimination`: Eliminates non-improving arcs from the Bucket Graph based on a threshold (theta).
- * - `std::hash` specializations: Custom hash functions for `std::pair` to enable their use in unordered containers.
  *
  * The utilities use template parameters for direction (`Forward` or `Backward`) to handle the arc elimination
  * process in both directions of the Bucket Graph. It leverages parallel processing using Intel's Threading
@@ -18,6 +17,7 @@
 
 #pragma once
 #include "BucketGraph.h"
+#include "Hashes.h"
 
 #include <tbb/concurrent_unordered_map.h>
 #include <tbb/parallel_for.h> // Include TBB's parallel_for
@@ -85,78 +85,6 @@ void BucketGraph::UpdateBucketsSet(const double theta, Label *&label, std::unord
 }
 
 /**
- * Performs bucket arc elimination on the BucketGraph.
- *
- * This function eliminates non-improving bucket arcs based on the given threshold value (theta).
- * It takes a vector of BucketArcs (Gamma), a vector of JumpArcs (Psi), a vector of Labels (L),
- * and a vector of Labels (L_opposite) as input parameters.
- *
- * The function iterates over the buckets in lexicographic order and performs the following steps:
- * 1. Initializes a 2D vector B_Ba_b, where the first dimension is indexed by arcs (a) and the second by
- * buckets (b).
- * 2. Checks if the current bucket's Phi is not empty.
- * 3. Gets the arcs associated with the current bucket in the forward direction.
- * 4. Loops over the arcs and performs the following operations:
- *    a. Initializes the set for B_Ba_b[a][b].
- *    b. Computes the union of B_Ba_b'[a_index][b'] for b' in Phi[b].
- * 5. Gets the jump arcs associated with the current bucket.
- * 6. Loops over the jump arcs and performs the following operations:
- *    a. Clears the set for B_Ba_b[a][b].
- *    b. Updates the set with jump bucket arcs.
- * 7. Updates the set with regular bucket arcs.
- * 8. Eliminates non-improving bucket arcs by checking if the arc is present in B_Ba_b[a][b].
- *
- * @param theta The threshold value for eliminating non-improving bucket arcs.
- * @param Gamma The vector of BucketArcs.
- * @param Psi The vector of JumpArcs.
- * @param L The vector of Labels.
- * @param L_opposite The vector of Labels (opposite).
- */
-
-namespace std {
-
-/**
- * @brief Specialization of the std::hash template for std::pair<int, int>.
- *
- * This struct provides a hash function for pairs of integers, allowing them
- * to be used as keys in unordered containers such as std::unordered_map.
- *
- * @tparam std::pair<int, int> The type of the pair to be hashed.
- */
-template <>
-struct hash<std::pair<int, int>> {
-    std::size_t operator()(const std::pair<int, int> &p) const noexcept {
-        // Simple hash combination for two integers
-        std::size_t h1 = std::hash<int>()(p.first);
-        std::size_t h2 = std::hash<int>()(p.second);
-        return h1 ^ (h2 << 1); // Combine the two hashes
-    }
-};
-
-/**
- * @brief Specialization of std::hash for std::pair<std::pair<int, int>, int>.
- *
- * This struct provides a hash function for a pair consisting of another pair of integers
- * and an integer. It combines the hash values of the inner pair and the integer to produce
- * a single hash value.
- *
- * @tparam None Template specialization for std::pair<std::pair<int, int>, int>.
- */
-template <>
-struct hash<std::pair<std::pair<int, int>, int>> {
-    std::size_t operator()(const std::pair<std::pair<int, int>, int> &p) const noexcept {
-        // Reuse the hash for the inner pair
-        std::size_t inner_hash = std::hash<std::pair<int, int>>()(p.first);
-        std::size_t b_hash     = std::hash<int>()(p.second);
-
-        // Combine the hashes
-        return inner_hash ^ (b_hash << 1);
-    }
-};
-
-} // namespace std
-
-/**
  * @brief Eliminates bucket arcs based on a given threshold.
  *
  * This function performs bucket arc elimination in either the forward or backward direction,
@@ -205,14 +133,13 @@ void BucketGraph::BucketArcElimination(double theta) {
                     auto a_index_interest = std::make_pair(std::make_pair(a.from, a.to), b_prime);
                     auto it               = local_B_Ba_b.find(a_index_interest);
                     if (it != local_B_Ba_b.end()) { Bidi_map.insert(it->second.begin(), it->second.end()); }
-                    // auto it = Bidi_map.find(b_prime);
-                    // if (it != Bidi_map.end()) { Bidi_map.insert(*it); }
                 }
             } else {
                 local_B_Ba_b[a_index] = {};
             }
         }
 
+        // Checking bucket jump arcs
         auto jump_arcs = buckets[b].template get_jump_arcs<D>();
         if (!jump_arcs.empty()) {
             for (const auto &a : jump_arcs) {
@@ -229,6 +156,8 @@ void BucketGraph::BucketArcElimination(double theta) {
                 }
             }
         }
+
+        // Checking bucket arcs
         auto bucket_arcs = buckets[b].template get_bucket_arcs<D>();
         for (const auto &a : bucket_arcs) {
             auto a_index =
@@ -249,7 +178,6 @@ void BucketGraph::BucketArcElimination(double theta) {
 
             if (it != local_B_Ba_b.end()) {
                 auto &Bidi_map = it->second;
-                // if (Bidi_map.find(b) != Bidi_map.end()) {
                 for (const auto &b_prime : Phi_opposite[b_opposite]) {
                     if (Bidi_map.find(b_prime) != Bidi_map.end()) {
                         contains = true;
@@ -257,7 +185,6 @@ void BucketGraph::BucketArcElimination(double theta) {
                     }
                 }
                 if (!contains && Bidi_map.find(b_opposite) != Bidi_map.end()) { contains = true; }
-                // ß}
             }
 
             if (!contains) {
@@ -269,3 +196,83 @@ void BucketGraph::BucketArcElimination(double theta) {
 
     print_info("Removed arcs: {}\n", removed_arcs.load());
 }
+
+/**
+ * @brief Obtains jump bucket arcs for the BucketGraph.
+ *
+ * This function iterates over each bucket in the BucketGraph and adds jump arcs to the set of buckets.
+ * It checks if each arc exists in the given Gamma vector for the current bucket.
+ * If an arc exists, it adds the corresponding bucket to the set of buckets to add jump arcs to.
+ * It then removes the non-component-wise minimal buckets from the set.
+ * Finally, it adds jump arcs from the current bucket to each bucket in the set.
+ *
+ * @param Gamma The vector of BucketArcs to check for each bucket.
+ */
+template <Direction D>
+void BucketGraph::ObtainJumpBucketArcs() {
+    auto               &buckets          = assign_buckets<D>(fw_buckets, bw_buckets);
+    auto               &fixed_buckets    = assign_buckets<D>(fw_fixed_buckets, bw_fixed_buckets);
+    auto               &num_buckets_index = assign_buckets<D>(num_buckets_index_fw, num_buckets_index_bw);
+    auto               &num_buckets      = assign_buckets<D>(num_buckets_fw, num_buckets_bw);
+    auto &Phi           = assign_buckets<D>(Phi_fw, Phi_bw);
+
+    std::vector<double> res              = {0.0};
+    auto                cost             = 0.0;
+    auto                missing_counter  = 0;
+
+    int arc_counter = 0;
+    for (auto b = 0; b < fw_buckets_size; ++b) {
+        std::vector<int> B_bar;
+
+        // Retrieve the arcs from the current bucket
+        auto arcs          = buckets[b].template get_bucket_arcs<Direction::Forward>();
+        auto original_arcs = jobs[buckets[b].job_id].template get_arcs<Direction::Forward>();
+        if (arcs.empty()) { continue; }
+
+        for (const auto orig_arc : original_arcs) {
+            auto from_job = orig_arc.from;
+
+            auto to_job    = orig_arc.to;
+            bool have_path = false;
+            for (const auto &gamma : arcs) {
+                if (fixed_buckets[gamma.from_bucket][gamma.to_bucket] == 1) { continue; }
+                auto from_job_b = buckets[gamma.from_bucket].job_id;
+                auto to_job_b   = buckets[gamma.to_bucket].job_id;
+                if (from_job == from_job_b && to_job == to_job_b) {
+                    have_path = true;
+                    break;
+                }
+            }
+
+            if (!have_path) {
+                // print b
+                missing_counter++;
+                auto start_bucket = num_buckets_index[buckets[b].job_id];
+                for (auto b_prime = b + 1; b_prime < start_bucket + num_buckets[buckets[b].job_id]; ++b_prime) {
+                    if (std::find(Phi[b_prime].begin(), Phi[b_prime].end(), b) == Phi[b_prime].end()) {
+                        continue;
+                    }
+                    auto arcs_prime = buckets[b_prime].template get_bucket_arcs<Direction::Forward>();
+                    for (const auto &gamma_prime : arcs_prime) {
+                        if (fw_fixed_buckets[gamma_prime.from_bucket][gamma_prime.to_bucket] == 1) { continue; }
+                        auto from_job_prime = buckets[gamma_prime.from_bucket].job_id;
+                        auto to_job_prime   = buckets[gamma_prime.to_bucket].job_id;
+                        if (from_job == from_job_prime && to_job == to_job_prime) {
+                            // fmt::print("found path from {} to {} in bucket {}\n", from_job, to_job, b_prime);
+                            B_bar.push_back(b_prime);
+                            auto res  = gamma_prime.resource_increment;
+                            auto cost = gamma_prime.cost_increment;
+                            buckets[b].add_jump_arc(b, b_prime, res, cost, true);
+                            arc_counter++;
+                        }
+                    }
+                }
+            }
+        }
+    }
+    // fmt::print("Missing paths: {}\n", missing_counter);
+
+    print_info("Added {} jump arcs\n", arc_counter);
+}
+
+

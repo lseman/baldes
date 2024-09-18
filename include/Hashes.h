@@ -50,3 +50,24 @@ struct pair_equal {
         return lhs.first == rhs.first && lhs.second == rhs.second;
     }
 };
+
+/**
+ * @brief Specialization of std::hash for std::pair<std::pair<int, int>, int>.
+ *
+ * This struct provides a hash function for a pair consisting of another pair of integers
+ * and an integer. It combines the hash values of the inner pair and the integer to produce
+ * a single hash value.
+ *
+ * @tparam None Template specialization for std::pair<std::pair<int, int>, int>.
+ */
+template <>
+struct std::hash<std::pair<std::pair<int, int>, int>> {
+    std::size_t operator()(const std::pair<std::pair<int, int>, int> &p) const noexcept {
+        // Use pair_hash for the inner pair
+        std::size_t inner_hash = pair_hash()(p.first);
+        std::size_t b_hash     = std::hash<int>()(p.second);
+
+        // Combine the hashes
+        return inner_hash ^ (b_hash << 1);
+    }
+};

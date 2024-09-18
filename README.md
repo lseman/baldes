@@ -32,6 +32,7 @@ Some features are in the highly experimental stages and will evolve based on com
 - C++23 compliant compiler (GCC 14.* tested)
 - [[NVIDIA/stdexec]](https://github.com/NVIDIA/stdexec) for executing parallel tasks.
 - [[tbb]](https://github.com/oneapi-src/oneTBB) for concurrent maps.
+- [[fmt]](https://github.com/fmtlib/fmt) for console output.
 
 ### Compiling
 

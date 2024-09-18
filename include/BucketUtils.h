@@ -421,30 +421,21 @@ std::vector<double> BucketGraph::labeling_algorithm(std::vector<double> q_point,
 
                     if (!domin_smaller) {
 
-                        const auto &arcs      = jobs[label->job_id].get_arcs<D>(scc_index);
-                        const auto &jump_arcs = buckets[bucket].template get_jump_arcs<D>();
-                        // if (jump_arcs.size() > 0) { fmt::print("Jump arcs: {}\n", jump_arcs.size()); }
-                        for (const auto &arc : arcs) {
-                            Label *new_label = Extend<D, S, ArcType::Job, Mutability::Mut>(label, arc);
-                            if (!new_label) {
-#ifdef UNREACHABLE_DOMINANCE
-                                set_job_unreachable(label->unreachable_bitmap, arc.to);
-#endif
-                                continue;
-                            }
+                        // Lambda to process new labels
+                        auto process_new_label = [&](Label *new_label) {
                             if constexpr (F == Full::Partial) {
                                 if constexpr (D == Direction::Forward) {
-                                    if (label->resources[0] > q_point[0]) continue;
+                                    if (label->resources[0] > q_point[0]) return;
                                 } else {
-                                    if (label->resources[0] <= q_point[0]) continue;
+                                    if (label->resources[0] <= q_point[0]) return;
                                 }
                             }
                             stat_n_labels++;
 
-                            int &to_bucket = new_label->vertex;
-
+                            int &to_bucket               = new_label->vertex;
                             dominated                    = false;
                             const auto &to_bucket_labels = buckets[to_bucket].get_labels();
+
                             if constexpr (S == Stage::One) {
                                 for (auto *existing_label : to_bucket_labels) {
                                     stat_n_dom++;
@@ -462,7 +453,6 @@ std::vector<double> BucketGraph::labeling_algorithm(std::vector<double> q_point,
                                         break;
                                     }
                                 }
-                                // dominated = new_label->check_dominance_against_vector<D, S>(to_bucket_labels);
                             }
 
                             if (!dominated) {
@@ -484,8 +474,39 @@ std::vector<double> BucketGraph::labeling_algorithm(std::vector<double> q_point,
 #endif
                                 all_ext = false;
                             }
+                        };
+
+                        // Process normal arcs
+                        const auto &arcs = jobs[label->job_id].get_arcs<D>(scc_index);
+                        for (const auto &arc : arcs) {
+                            Label *new_label = Extend<D, S, ArcType::Job, Mutability::Mut>(label, arc);
+                            if (!new_label) {
+#ifdef UNREACHABLE_DOMINANCE
+                                set_job_unreachable(label->unreachable_bitmap, arc.to);
+#endif
+                                continue;
+                            }
+                            process_new_label(new_label);
                         }
+
+#ifdef FIX_BUCKETS
+                        if constexpr (S == Stage::Four) {
+                            // Process jump arcs
+                            const auto &jump_arcs = buckets[bucket].template get_jump_arcs<D>();
+                            for (const auto &jump_arc : jump_arcs) {
+                                Label *new_label = Extend<D, S, ArcType::Jump, Mutability::Const>(label, jump_arc);
+                                if (!new_label) {
+#ifdef UNREACHABLE_DOMINANCE
+                                    set_job_unreachable(label->unreachable_bitmap, jump_arc.to);
+#endif
+                                    continue;
+                                }
+                                process_new_label(new_label);
+                            }
+                        }
+#endif
                     }
+
                     label->set_extended(true);
                 }
             }
@@ -529,21 +550,35 @@ std::vector<double> BucketGraph::labeling_algorithm(std::vector<double> q_point,
  */
 
 template <Direction D, Stage S, ArcType A, Mutability M>
-inline Label *BucketGraph::Extend(const std::conditional_t<M == Mutability::Mut, Label *, const Label *> L_prime,
-                                  const std::conditional_t<A == ArcType::Bucket, BucketArc, Arc> &gamma) noexcept {
+inline Label *
+BucketGraph::Extend(const std::conditional_t<M == Mutability::Mut, Label *, const Label *>          L_prime,
+                    const std::conditional_t<A == ArcType::Bucket, BucketArc,
+                                             std::conditional_t<A == ArcType::Jump, JumpArc, Arc>> &gamma) noexcept {
     auto &buckets       = assign_buckets<D>(fw_buckets, bw_buckets);
     auto &label_pool    = assign_buckets<D>(label_pool_fw, label_pool_bw);
     auto &fixed_buckets = assign_buckets<D>(fw_fixed_buckets, bw_fixed_buckets);
     // Precompute some values to avoid recalculating inside the loop
     const int    initial_job_id    = L_prime->job_id;
-    const auto  &initial_resources = L_prime->resources;
+    auto         initial_resources = L_prime->resources;
     const double initial_cost      = L_prime->cost;
 
     int job_id = -1;
     if constexpr (A == ArcType::Bucket) {
         job_id = buckets[gamma.to_bucket].job_id;
-    } else {
+    } else if constexpr (A == ArcType::Job) {
         job_id = gamma.to;
+    } else if constexpr (A == ArcType::Jump) {
+        job_id = buckets[gamma.jump_bucket].job_id;
+        // iterate over initial resources
+        for (size_t i = 0; i < initial_resources.size(); ++i) {
+            if constexpr (D == Direction::Forward) {
+                initial_resources[i] =
+                    std::max(initial_resources[i], static_cast<double>(buckets[gamma.jump_bucket].lb[i]));
+            } else {
+                initial_resources[i] =
+                    std::min(initial_resources[i], static_cast<double>(buckets[gamma.jump_bucket].ub[i]));
+            }
+        }
     }
 
     // Early exit if the arc is fixed
@@ -600,7 +635,7 @@ inline Label *BucketGraph::Extend(const std::conditional_t<M == Mutability::Mut,
     int to_bucket = get_bucket_number<D>(job_id, new_resources);
 
 #ifdef FIX_BUCKETS
-    if constexpr (S == Stage::Three || S == Stage::Four) {
+    if constexpr (S == Stage::Four && A != ArcType::Jump) {
         if (fixed_buckets[L_prime->vertex][to_bucket] == 1) { return nullptr; }
     }
 #endif
@@ -689,41 +724,38 @@ inline Label *BucketGraph::Extend(const std::conditional_t<M == Mutability::Mut,
             const auto &baseSetorder = cut.baseSetOrder;
             const auto &neighbors    = cut.neighbors;
             const auto &multipliers  = cut.multipliers;
-#endif
-#ifdef SRC3
-            bool bitIsSet = baseSet[segment] & (1 << bit_position);
-            if (bitIsSet) {
+
+#if defined(SRC3)
+            bool bitIsSet3 = baseSet[segment] & (1 << bit_position);
+            if (bitIsSet3) {
                 new_label->SRCmap[idx]++;
-                if (new_label->SRCmap[idx] % 2 == 0) {
-                    // fmt::print("SRC duals: {}\n", SRCDuals[id]);
+                if (new_label->SRCmap[idx] % 2 == 0) { new_label->cost -= SRCDuals[idx]; }
+            }
+#endif
+
+#if defined(SRC)
+            bool bitIsSet  = neighbors[segment] & (1ULL << bit_position);
+            bool bitIsSet2 = baseSet[segment] & (1ULL << bit_position);
+            if (bitIsSet) {
+                new_label->SRCmap[idx] = L_prime->SRCmap[idx];
+            } else {
+                new_label->SRCmap[idx] = 0.0;
+            }
+            if (bitIsSet2) {
+                double &value = new_label->SRCmap[idx];
+                value += multipliers[baseSetorder[job_id]];
+                if (value >= 1) {
+                    new_label->SRCmap[idx] -= 1;
                     new_label->cost -= SRCDuals[idx];
+                    new_label->SRCcost += SRCDuals[idx];
                 }
             }
+#endif
         }
     }
 #endif
 
-#ifdef SRC
-    bool bitIsSet  = neighbors[segment] & (1ULL << bit_position);
-    bool bitIsSet2 = baseSet[segment] & (1ULL << bit_position);
-    if (bitIsSet) {
-        new_label->SRCmap[idx] = L_prime->SRCmap[idx];
-    } else {
-        new_label->SRCmap[idx] = 0.0;
-    }
-    if (bitIsSet2) {
-        double &value = new_label->SRCmap[idx];
-        value += multipliers[baseSetorder[job_id]];
-        if (value >= 1) {
-            new_label->SRCmap[idx] -= 1;
-            new_label->cost -= SRCDuals[idx];
-            new_label->SRCcost += SRCDuals[idx];
-        }
-    }
-}
-}
-#endif
-return new_label;
+    return new_label;
 }
 
 /**

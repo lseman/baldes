@@ -164,7 +164,8 @@ public:
         stdexec::sync_wait(std::move(work));
     }
 
-    bool first_reset = true;
+    double min_red_cost = std::numeric_limits<double>::infinity();
+    bool   first_reset  = true;
     /**
      * @brief Applies heuristic fixing to the current solution.
      *
@@ -258,17 +259,7 @@ public:
             // if constexpr (S == Stage::Two) {
             run_labeling_algorithms<Stage::Four, Full::Full>(forward_cbar, backward_cbar, q_star);
 
-            auto best_label = label_pool_fw.acquire();
-
-            if (check_feasibility(fw_best_label, bw_best_label)) {
-                best_label = compute_label(fw_best_label, bw_best_label);
-            } else {
-                best_label->cost         = std::numeric_limits<double>::infinity();
-                best_label->real_cost    = std::numeric_limits<double>::infinity();
-                best_label->jobs_covered = {};
-            }
-
-            gap = incumbent - (relaxation + std::min(0.0, best_label->cost));
+            gap = incumbent - (relaxation + std::min(0.0, min_red_cost));
             // print_info("Running arc elimination with gap: {}\n", gap);
             fw_c_bar = forward_cbar;
             bw_c_bar = backward_cbar;
@@ -276,17 +267,17 @@ public:
 #pragma omp parallel sections
             {
 #pragma omp section
-                { BucketArcElimination<Direction::Forward>(gap); }
+                {
+                    BucketArcElimination<Direction::Forward>(gap);
+                    ObtainJumpBucketArcs<Direction::Forward>();
+                }
 #pragma omp section
-                { BucketArcElimination<Direction::Backward>(gap); }
+                {
+                    BucketArcElimination<Direction::Backward>(gap);
+                    ObtainJumpBucketArcs<Direction::Backward>();
+                }
             }
-
-            ObtainJumpBucketArcs();
-            fmt::print("Jump arcs obtained\n");
-
             generate_arcs();
-            // SCC_handler<Direction::Forward>();
-            //  SCC_handler<Direction::Backward>();
         }
     }
 
@@ -661,8 +652,10 @@ public:
                                            const std::vector<std::vector<int>> &bucket_order) noexcept;
 
     template <Direction D, Stage S, ArcType A, Mutability M>
-    inline Label *Extend(const std::conditional_t<M == Mutability::Mut, Label *, const Label *> L_prime,
-                         const std::conditional_t<A == ArcType::Bucket, BucketArc, Arc>        &gamma) noexcept;
+    inline Label *
+    Extend(const std::conditional_t<M == Mutability::Mut, Label *, const Label *>          L_prime,
+           const std::conditional_t<A == ArcType::Bucket, BucketArc,
+                                    std::conditional_t<A == ArcType::Jump, JumpArc, Arc>> &gamma) noexcept;
     template <Direction D, Stage S>
     bool is_dominated(Label *&new_label, Label *&labels) noexcept;
 
@@ -728,6 +721,7 @@ public:
     void UpdateBucketsSet(const double theta, Label *&label, std::unordered_set<int> &Bbidi, int &current_bucket,
                           std::unordered_set<int> &Bvisited);
 
+    template <Direction D>
     void ObtainJumpBucketArcs();
     bool BucketSetContains(const std::set<int> &bucket_set, const int &bucket);
 

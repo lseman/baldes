@@ -644,12 +644,30 @@ public:
                 inner_obj = paths[0]->cost;
 
                 if (inner_obj >= -1e-2) {
-                    s4 = true;
-                    s3 = false;
+                    s4         = true;
+                    s3         = false;
+                    transition = true;
                 }
             } else if (s4) {
                 stage = 4;
+#ifdef RCC
                 rccManager.computeDualsDeleteAndCache(node);
+#endif
+
+#ifdef FIX_BUCKETS
+                if (transition) {
+                    print_cut("Transitioning to stage 4\n");
+                    bucket_graph.fixed = true;
+                    paths     = bucket_graph.bi_labeling_algorithm<Stage::Four>(q_star);
+                    transition = false;
+                    bucket_graph.fixed = false;
+                    bucket_graph.min_red_cost = paths[0]->cost;
+                    auto colAdded = addColumn(node, paths, cuts, false);
+                    node->optimize();
+                    bucket_graph.relaxation = node->get(GRB_DoubleAttr_ObjVal);
+                    fmt::print("Relaxation: {}\n", bucket_graph.relaxation);
+                }
+#endif
                 paths     = bucket_graph.bi_labeling_algorithm<Stage::Four>(q_star);
                 inner_obj = paths[0]->cost;
                 if (inner_obj >= -1e-1) {
@@ -715,7 +733,7 @@ public:
             bucket_graph.gap = lag_gap;
             bucket_graph.augment_ng_memories(solution, allPaths, true, 5, 100, 16, N_SIZE);
 
-            bucket_graph.relaxation = highs_obj;
+            //bucket_graph.relaxation = highs_obj;
 
 #if defined(SRC3) || defined(SRC)
             if (ss && !rcc) {
