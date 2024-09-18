@@ -2,10 +2,10 @@
  * @file BucketGraph.h
  * @brief Defines the BucketGraph class and associated functionalities used in solving vehicle routing problems (VRPs).
  *
- * This file contains the definition of the BucketGraph class, a key component used in bucket-based optimization for 
- * resource-constrained shortest path problems (RCSPP) and vehicle routing problems (VRPs). The BucketGraph class 
- * provides methods for arc generation, label management, dominance checking, feasibility tests, and various 
- * operations related to the buckets in both forward and backward directions. It also includes utilities for managing 
+ * This file contains the definition of the BucketGraph class, a key component used in bucket-based optimization for
+ * resource-constrained shortest path problems (RCSPP) and vehicle routing problems (VRPs). The BucketGraph class
+ * provides methods for arc generation, label management, dominance checking, feasibility tests, and various
+ * operations related to the buckets in both forward and backward directions. It also includes utilities for managing
  * neighborhood relationships, handling strongly connected components (SCCs), and checking non-dominance of labels.
  *
  * Key Components:
@@ -13,8 +13,8 @@
  * - `BucketGraph`: The primary class implementing bucket-based graph management.
  * - Functions for parallel arc generation, feasibility checks, and job visitation management.
  * - Support for multiple stages of optimization and various arc types.
- * 
- * Additionally, this file includes specialized bitmap operations for tracking visited and unreachable jobs, and 
+ *
+ * Additionally, this file includes specialized bitmap operations for tracking visited and unreachable jobs, and
  * provides multiple templates to handle direction (`Forward`/`Backward`) and stage-specific optimization.
  */
 
@@ -30,11 +30,10 @@
 
 #define RCESPP_TOL_ZERO 1.E-6
 
-
 /**
  * @class LabelComparator
  * @brief Comparator class for comparing two Label objects based on their cost.
- * 
+ *
  * This class provides an overloaded operator() that allows for comparison
  * between two Label pointers. The comparison is based on the cost attribute
  * of the Label objects, with the comparison being in descending order.
@@ -128,6 +127,168 @@ public:
     std::vector<double>                R_min;
     std::vector<std::vector<uint64_t>> neighborhoods_bitmap; // Bitmap for neighborhoods of each job
     std::mutex                         label_pool_mutex;
+
+    /**
+     * @brief Runs forward and backward labeling algorithms in parallel and synchronizes the results.
+     *
+     * This function creates tasks for forward and backward labeling algorithms using the provided
+     * scheduling mechanism. The tasks are executed in parallel, and the results are synchronized
+     * and stored in the provided vectors.
+     *
+     * @tparam state The stage of the algorithm.
+     * @tparam fullness The fullness state of the algorithm.
+     * @param forward_cbar A reference to a vector where the results of the forward labeling algorithm will be stored.
+     * @param backward_cbar A reference to a vector where the results of the backward labeling algorithm will be stored.
+     * @param q_star A constant reference to a vector used as input for the labeling algorithms.
+     */
+    template <Stage state, Full fullness>
+    void run_labeling_algorithms(std::vector<double> &forward_cbar, std::vector<double> &backward_cbar,
+                                 const std::vector<double> &q_star) {
+        // Create tasks for forward and backward labeling algorithms
+
+        auto forward_task = stdexec::schedule(bi_sched) | stdexec::then([&]() {
+                                return labeling_algorithm<Direction::Forward, state, fullness>(q_star);
+                            });
+
+        auto backward_task = stdexec::schedule(bi_sched) | stdexec::then([&]() {
+                                 return labeling_algorithm<Direction::Backward, state, fullness>(q_star);
+                             });
+
+        // Execute the tasks in parallel and synchronize
+        auto work = stdexec::when_all(std::move(forward_task), std::move(backward_task)) |
+                    stdexec::then([&](auto forward_result, auto backward_result) {
+                        forward_cbar  = std::move(forward_result);
+                        backward_cbar = std::move(backward_result);
+                    });
+
+        stdexec::sync_wait(std::move(work));
+    }
+
+    bool first_reset = true;
+    /**
+     * @brief Applies heuristic fixing to the current solution.
+     *
+     * This function modifies the current solution based on the heuristic
+     * fixing strategy using the provided vector of values.
+     *
+     * @param q_star A vector of double values representing the heuristic
+     *               fixing parameters.
+     */
+    template <Stage S>
+    void heuristic_fixing(const std::vector<double> &q_star) {
+        // Stage 3 fixing heuristic
+        reset_pool();
+        reset_fixed();
+        common_initialization();
+
+        std::vector<double> forward_cbar(fw_buckets.size(), std::numeric_limits<double>::infinity());
+        std::vector<double> backward_cbar(bw_buckets.size(), std::numeric_limits<double>::infinity());
+
+        if constexpr (S == Stage::Three) {
+            run_labeling_algorithms<Stage::Two, Full::Full>(forward_cbar, backward_cbar, q_star);
+        } else {
+            run_labeling_algorithms<Stage::Three, Full::Full>(forward_cbar, backward_cbar, q_star);
+        }
+        std::vector<std::vector<Label *>> fw_labels_map(jobs.size());
+        std::vector<std::vector<Label *>> bw_labels_map(jobs.size());
+
+        auto group_labels = [&](auto &buckets, auto &labels_map) {
+            for (auto &bucket : buckets) {
+                for (auto &label : bucket.get_labels()) {
+                    labels_map[label->job_id].push_back(label); // Directly index using job_id
+                }
+            }
+        };
+
+        // Create tasks for forward and backward labels grouping
+        auto forward_task =
+            stdexec::schedule(bi_sched) | stdexec::then([&]() { group_labels(fw_buckets, fw_labels_map); });
+        auto backward_task =
+            stdexec::schedule(bi_sched) | stdexec::then([&]() { group_labels(bw_buckets, bw_labels_map); });
+
+        // Execute the tasks in parallel
+        auto work = stdexec::when_all(std::move(forward_task), std::move(backward_task));
+
+        stdexec::sync_wait(std::move(work));
+
+        auto num_fixes = 0;
+        //  Function to find the minimum cost label in a vector of labels
+        auto find_min_cost_label = [](const std::vector<Label *> &labels) -> const Label * {
+            return *std::min_element(labels.begin(), labels.end(),
+                                     [](const Label *a, const Label *b) { return a->cost < b->cost; });
+        };
+        for (const auto &job_I : jobs) {
+            const auto &fw_labels = fw_labels_map[job_I.id];
+            if (fw_labels.empty()) continue; // Skip if no labels for this job_id
+
+            for (const auto &job_J : jobs) {
+                if (job_I.id == job_J.id) continue; // Compare based on id (or other key field)
+                const auto &bw_labels = bw_labels_map[job_J.id];
+                if (bw_labels.empty()) continue; // Skip if no labels for this job_id
+
+                const Label *min_fw_label = find_min_cost_label(fw_labels);
+                const Label *min_bw_label = find_min_cost_label(bw_labels);
+
+                if (!min_fw_label || !min_bw_label) continue;
+
+                const VRPJob &L_last_job = jobs[min_fw_label->job_id];
+                auto          cost       = getcij(min_fw_label->job_id, min_bw_label->job_id);
+
+                // Check for infeasibility
+                if (min_fw_label->resources[0] + cost + L_last_job.duration > min_bw_label->resources[0]) { continue; }
+
+                if (min_fw_label->cost + cost + L_last_job.duration + min_bw_label->cost > gap) {
+                    fixed_arcs[job_I.id][job_J.id] = 1; // Index with job ids
+                    num_fixes++;
+                }
+            }
+        }
+    }
+
+    template <Stage S>
+    void bucket_fixing(const std::vector<double> &q_star) {
+        // Stage 4 bucket arc fixing
+        if (fixed == false) {
+            fixed = true;
+            common_initialization();
+
+            std::vector<double> forward_cbar(fw_buckets.size(), std::numeric_limits<double>::infinity());
+            std::vector<double> backward_cbar(bw_buckets.size(), std::numeric_limits<double>::infinity());
+
+            // if constexpr (S == Stage::Two) {
+            run_labeling_algorithms<Stage::Four, Full::Full>(forward_cbar, backward_cbar, q_star);
+
+            auto best_label = label_pool_fw.acquire();
+
+            if (check_feasibility(fw_best_label, bw_best_label)) {
+                best_label = compute_label(fw_best_label, bw_best_label);
+            } else {
+                best_label->cost         = std::numeric_limits<double>::infinity();
+                best_label->real_cost    = std::numeric_limits<double>::infinity();
+                best_label->jobs_covered = {};
+            }
+
+            gap = incumbent - (relaxation + std::min(0.0, best_label->cost));
+            // print_info("Running arc elimination with gap: {}\n", gap);
+            fw_c_bar = forward_cbar;
+            bw_c_bar = backward_cbar;
+
+#pragma omp parallel sections
+            {
+#pragma omp section
+                { BucketArcElimination<Direction::Forward>(gap); }
+#pragma omp section
+                { BucketArcElimination<Direction::Backward>(gap); }
+            }
+
+            ObtainJumpBucketArcs();
+            fmt::print("Jump arcs obtained\n");
+
+            generate_arcs();
+            // SCC_handler<Direction::Forward>();
+            //  SCC_handler<Direction::Backward>();
+        }
+    }
 
     /**
      * @brief Checks if a job has been visited based on a bitmap.
@@ -454,25 +615,27 @@ public:
      */
     void generate_arcs() {
 
-#pragma omp parallel sections
-        {
-#pragma omp section
-            {
-                generate_arcs<Direction::Forward>();
-                Phi_fw.clear();
-                Phi_fw.resize(fw_buckets_size);
-                for (int i = 0; i < fw_buckets_size; ++i) { Phi_fw[i] = computePhi(i, true); }
-                SCC_handler<Direction::Forward>();
-            }
-#pragma omp section
-            {
-                generate_arcs<Direction::Backward>();
-                Phi_bw.clear();
-                Phi_bw.resize(bw_buckets_size);
-                for (int i = 0; i < bw_buckets_size; ++i) { Phi_bw[i] = computePhi(i, false); }
-                SCC_handler<Direction::Backward>();
-            }
-        }
+        auto forward_task = stdexec::schedule(bi_sched) | stdexec::then([&]() {
+                                generate_arcs<Direction::Forward>();
+                                Phi_fw.clear();
+                                Phi_fw.resize(fw_buckets_size);
+                                for (int i = 0; i < fw_buckets_size; ++i) { Phi_fw[i] = computePhi(i, true); }
+                                SCC_handler<Direction::Forward>();
+                            });
+
+        auto backward_task = stdexec::schedule(bi_sched) | stdexec::then([&]() {
+                                 generate_arcs<Direction::Backward>();
+                                 Phi_bw.clear();
+                                 Phi_bw.resize(bw_buckets_size);
+                                 for (int i = 0; i < bw_buckets_size; ++i) { Phi_bw[i] = computePhi(i, false); }
+                                 SCC_handler<Direction::Backward>();
+                             });
+
+        // Use when_all to combine forward_task and backward_task
+        auto work = stdexec::when_all(std::move(forward_task), std::move(backward_task));
+
+        // Synchronize and wait for completion
+        stdexec::sync_wait(std::move(work));
     }
     template <Direction D>
     Label &get_best_label();
@@ -565,11 +728,11 @@ public:
     void UpdateBucketsSet(const double theta, Label *&label, std::unordered_set<int> &Bbidi, int &current_bucket,
                           std::unordered_set<int> &Bvisited);
 
-    void ObtainJumpBucketArcs(const std::vector<BucketArc> &Gamma);
+    void ObtainJumpBucketArcs();
     bool BucketSetContains(const std::set<int> &bucket_set, const int &bucket);
 
     template <Direction D>
-    void BucketArcElimination(double theta, std::vector<BucketArc> &Gamma);
+    void BucketArcElimination(double theta);
 
     template <Direction D>
     int get_opposite_bucket_number(int current_bucket_index);

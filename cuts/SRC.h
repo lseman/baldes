@@ -3,16 +3,18 @@
  * @brief Definitions for handling cuts and optimizations for the Vehicle Routing Problem with Time Windows (VRPTW).
  *
  * This header file contains the structure and class definitions required for the limited memory rank-1 cuts,
- * including the handling of cuts for optimization algorithms used in the Vehicle Routing Problem with Time Windows (VRPTW).
+ * including the handling of cuts for optimization algorithms used in the Vehicle Routing Problem with Time Windows
+ * (VRPTW).
  *
  * The file defines the following key structures and classes:
  * 1. `VRPTW_SRC`: Holds the state and best sets for processing cuts.
  * 2. `Cut`: Represents an individual cut with coefficients and multipliers.
  * 3. `CutStorage`: Manages storage and operations related to cuts in the solver.
- * 4. `LimitedMemoryRank1Cuts`: Provides methods for separating and generating cuts, including heuristics like the 45 Heuristic.
+ * 4. `LimitedMemoryRank1Cuts`: Provides methods for separating and generating cuts, including heuristics like the 45
+ * Heuristic.
  *
- * It also includes utility functions to compute coefficients, generate cuts, and work with sparse models. 
- * The file facilitates the optimization process by allowing computation of limited memory coefficients and 
+ * It also includes utility functions to compute coefficients, generate cuts, and work with sparse models.
+ * The file facilitates the optimization process by allowing computation of limited memory coefficients and
  * the generation of cuts via heuristics. The file makes use of Gurobi for handling constraints in the solver.
  *
  * @note Several methods are optimized for parallel execution using thread pools.
@@ -27,6 +29,12 @@
 
 #define VRPTW_SRC_max_S_n 10000
 
+/**
+ * @struct VRPTW_SRC
+ * @brief A structure to represent the Vehicle Routing Problem with Time Windows (VRPTW) source data.
+ * 
+ * This structure holds various vectors and integers that are used in the context of solving the VRPTW.
+ */
 struct VRPTW_SRC {
     std::vector<int>                    S;
     std::vector<int>                    S_C_P;
@@ -42,62 +50,13 @@ struct PairHash;
 
 enum class CutType { ThreeRow, FourRow, FiveRow };
 
-
 /**
  * @struct Cut
  * @brief Represents a cut in the optimization problem.
- * 
+ *
  * The Cut structure holds information about a specific cut, including its base set,
  * neighbors, coefficients, multipliers, and other properties.
- * 
- * @var Cut::cutMaster
- * Integer representing the master cut.
- * 
- * @var Cut::baseSet
- * Bit-level base set represented as an array of uint64_t.
- * 
- * @var Cut::neighbors
- * Bit-level neighbors represented as an array of uint64_t.
- * 
- * @var Cut::baseSetOrder
- * Order for the base set represented as a vector of integers.
- * 
- * @var Cut::coefficients
- * Cut coefficients represented as a vector of doubles.
- * 
- * @var Cut::multipliers
- * Multipliers for the cut, initialized to {0.5, 0.5, 0.5}.
- * 
- * @var Cut::rhs
- * Right-hand side value of the cut, initialized to 1.
- * 
- * @var Cut::id
- * Identifier for the cut, initialized to -1.
- * 
- * @var Cut::added
- * Boolean flag indicating whether the cut has been added, initialized to false.
- * 
- * @var Cut::updated
- * Boolean flag indicating whether the cut has been updated, initialized to false.
- * 
- * @var Cut::type
- * Type of the cut, initialized to CutType::ThreeRow.
- * 
- * @var Cut::grbConstr
- * Gurobi constraint associated with the cut.
- * 
- * @fn Cut::Cut()
- * Default constructor.
- * 
- * @fn Cut::Cut(const std::array<uint64_t, num_words> baseSetInput, const std::array<uint64_t, num_words> &neighborsInput, const std::vector<double> &coefficients)
- * Constructor that initializes the base set, neighbors, and coefficients.
- * 
- * @fn Cut::Cut(const std::array<uint64_t, num_words> baseSetInput, const std::array<uint64_t, num_words> &neighborsInput, const std::vector<double> &coefficients, const std::vector<double> &multipliers)
- * Constructor that initializes the base set, neighbors, coefficients, and multipliers.
- * 
- * @fn size_t Cut::size() const
- * Returns the size of the cut, which is the size of the coefficients vector.
- * 
+ *
  */
 struct Cut {
     int                             cutMaster;
@@ -134,87 +93,36 @@ using Cuts = std::vector<Cut>;
 /**
  * @class CutStorage
  * @brief Manages the storage and operations related to cuts in a solver.
- * 
+ *
  * The CutStorage class provides functionalities to add, manage, and query cuts.
  * It also allows setting dual values and computing coefficients with limited memory.
- * 
- * @var latest_column
- * The latest column index.
- * 
- * @var SRCDuals
- * A vector storing the dual values.
- * 
- * @fn void addCut(Cut &cut)
- * @brief Adds a cut to the storage.
- * @param cut The cut to be added.
- * 
- * @fn void setDuals(const std::vector<double> &duals)
- * @brief Sets the dual values.
- * @param duals A vector of dual values.
- * 
- * @fn size_t size() const noexcept
- * @brief Returns the number of cuts in the storage.
- * @return The number of cuts.
- * 
- * @fn auto begin() const noexcept
- * @brief Returns a const iterator to the beginning of the cuts.
- * @return A const iterator to the beginning.
- * 
- * @fn auto end() const noexcept
- * @brief Returns a const iterator to the end of the cuts.
- * @return A const iterator to the end.
- * 
- * @fn auto begin() noexcept
- * @brief Returns an iterator to the beginning of the cuts.
- * @return An iterator to the beginning.
- * 
- * @fn auto end() noexcept
- * @brief Returns an iterator to the end of the cuts.
- * @return An iterator to the end.
- * 
- * @fn bool empty() const noexcept
- * @brief Checks if the storage is empty.
- * @return True if the storage is empty, false otherwise.
- * 
- * @fn std::pair<int, std::vector<double>> cutExists(const std::size_t &cut_key) const
- * @brief Checks if a cut exists in the storage.
- * @param cut_key The key of the cut to check.
- * @return A pair containing the size of the cut and its coefficients if it exists, otherwise {-1, {}}.
- * 
- * @fn auto getCtr(int i) const
- * @brief Retrieves the constraint associated with a cut.
- * @param i The index of the cut.
- * @return The constraint associated with the cut.
- * 
- * @fn auto computeLimitedMemoryCoefficients(const std::vector<int> &P)
- * @brief Computes coefficients with limited memory.
- * @param P A vector of integers used in the computation.
- * @return A vector of computed coefficients.
- * 
- * @fn std::size_t generateCutKey(const int &cutMaster, const std::vector<bool> &baseSetStr) const
- * @brief Generates a key for a cut.
- * @param cutMaster The master identifier for the cut.
- * @param baseSetStr A vector representing the base set structure.
- * @return The generated key.
- * 
- * @var cutMaster_to_cut_map
- * A map from cut keys to their indices in the cuts vector.
- * 
- * @var cuts
- * A collection of cuts.
- * 
- * @var indexCuts
- * A map from cut keys to vectors of indices.
+ *
  */
 class CutStorage {
 public:
     int latest_column = 0;
 
     // Add a cut to the storage
+    /**
+     * @brief Adds a cut to the current collection of cuts.
+     * 
+     * This function takes a reference to a Cut object and adds it to the 
+     * collection of cuts maintained by the solver. The cut is used to 
+     * refine the solution space and improve the efficiency of the solver.
+     * 
+     * @param cut A reference to the Cut object to be added.
+     */
     void addCut(Cut &cut);
 
     std::vector<double> SRCDuals = {};
 
+    /**
+     * @brief Sets the dual values for the SRC.
+     *
+     * This function assigns the provided vector of dual values to the SRCDuals member.
+     *
+     * @param duals A vector of double values representing the duals to be set.
+     */
     void setDuals(const std::vector<double> &duals) { SRCDuals = duals; }
 
     // Define size method
@@ -252,10 +160,10 @@ public:
 
     /**
      * @brief Retrieves the constraint at the specified index.
-     * 
-     * This function returns the Gurobi constraint object associated with the 
+     *
+     * This function returns the Gurobi constraint object associated with the
      * cut at the given index.
-     * 
+     *
      * @param i The index of the cut whose constraint is to be retrieved.
      * @return The Gurobi constraint object at the specified index.
      */
@@ -324,7 +232,8 @@ struct SparseModel;
  * managing and printing base sets, inserting sets, and performing heuristics.
  *
  * @public
- * @fn std::vector<std::vector<double>> separateByEnumeration(const SparseModel &A, const std::vector<double> &x, int nC, double violation_threshold)
+ * @fn std::vector<std::vector<double>> separateByEnumeration(const SparseModel &A, const std::vector<double> &x, int
+ * nC, double violation_threshold)
  * @brief Separates cuts by enumeration.
  * @param A The sparse model.
  * @param x The vector of variables.
@@ -355,7 +264,7 @@ public:
                                  const SparseModel &A, const std::vector<double> &x);
 
     template <CutType T>
-    void the45Heuristic(const SparseModel &A, const std::vector<double> &x, int numNodes, int subsetSize);
+    void the45Heuristic(const SparseModel &A, const std::vector<double> &x, int numNodes);
 
     /**
      * @brief Computes the limited memory coefficient based on the given parameters.
@@ -462,7 +371,7 @@ inline std::vector<std::vector<double>> getPermutationsForSize4() {
 /**
  * @brief Generates all combinations of a given size from a set of elements.
  *
- * This function computes all possible combinations of `k` elements from the 
+ * This function computes all possible combinations of `k` elements from the
  * input vector `elements` and stores them in the `result` vector.
  *
  * @tparam T The type of the elements in the input vector.
@@ -490,8 +399,8 @@ inline void combinations(const std::vector<T> &elements, int k, std::vector<std:
  * @brief Selects the indices of the highest coefficients from a given vector.
  *
  * This function takes a vector of doubles and an integer specifying the maximum number of nodes to select.
- * It filters out elements with coefficients less than or equal to 1e-2, sorts the remaining elements in 
- * descending order based on their coefficients, and returns the indices of the top elements up to the 
+ * It filters out elements with coefficients less than or equal to 1e-2, sorts the remaining elements in
+ * descending order based on their coefficients, and returns the indices of the top elements up to the
  * specified maximum number of nodes.
  *
  * @param x A vector of doubles representing the coefficients.
@@ -520,12 +429,12 @@ inline std::vector<int> selectHighestCoefficients(const std::vector<double> &x, 
  * @brief Finds the visiting nodes in a sparse model based on selected nodes.
  *
  * This function processes a sparse model to identify and return the visiting nodes
- * for the given selected nodes. It filters the columns of the sparse model and 
+ * for the given selected nodes. It filters the columns of the sparse model and
  * returns only those that are relevant to the selected nodes.
  *
  * @param A The sparse model represented by the SparseModel structure.
  * @param selectedNodes A vector of integers representing the selected nodes.
- * @return A vector of vectors of integers, where each inner vector contains the 
+ * @return A vector of vectors of integers, where each inner vector contains the
  *         visiting nodes corresponding to a selected node.
  */
 inline std::vector<std::vector<int>> findVisitingNodes(const SparseModel &A, const std::vector<int> &selectedNodes) {
@@ -594,18 +503,15 @@ inline std::string vectorToString(const std::vector<double> &vec) {
  * @param subsetSize The size of the subset.
  */
 template <CutType T>
-void LimitedMemoryRank1Cuts::the45Heuristic(const SparseModel &A, const std::vector<double> &x, int numNodes,
-                                            int subsetSize) {
-    double primal_violation    = 0.0;
+void LimitedMemoryRank1Cuts::the45Heuristic(const SparseModel &A, const std::vector<double> &x, int numNodes) {
     int    max_number_of_cuts  = 1; // Max number of cuts to generate
     double violation_threshold = 1e-3;
-    int    max_important_nodes = 50;
+    int    max_important_nodes = 10;
 
     auto cuts         = VRPTW_SRC();
     auto coefficients = std::vector<std::vector<double>>();
 
     int m_max = std::min(cuts.S_n, max_number_of_cuts);
-    coefficients.resize(m_max, std::vector<double>(numNodes, 0.0));
 
     // Ensure selectedNodes is valid
     std::vector<int> selectedNodes = selectHighestCoefficients(x, max_important_nodes);
@@ -650,8 +556,7 @@ void LimitedMemoryRank1Cuts::the45Heuristic(const SparseModel &A, const std::vec
     auto bulk_sender = stdexec::bulk(
         input_sender, tasks.size(),
         [this, &permutations, &processedSetsCache, &processedPermutationsCache, &cuts_mutex, &cuts_count, &cuts, &x,
-         &selectedNodes, &coefficients_aux, &numNodes, max_number_of_cuts, violation_threshold,
-         subsetSize](std::size_t task_idx) {
+         &selectedNodes, &coefficients_aux, &numNodes, max_number_of_cuts, violation_threshold](std::size_t task_idx) {
             auto &consumer = allPaths[selectedNodes[task_idx]].route;
 
             std::vector<std::vector<int>> setsOf45;
@@ -660,6 +565,10 @@ void LimitedMemoryRank1Cuts::the45Heuristic(const SparseModel &A, const std::vec
             } else if constexpr (T == CutType::FiveRow) {
                 combinations(consumer, 5, setsOf45);
             }
+
+            // limit the number of sets to process
+            // fmt::print("setsOf45.size(): {}\n", setsOf45.size());
+            if (setsOf45.size() > 5000) { setsOf45.resize(5000); }
 
             std::array<uint64_t, num_words> AM      = {};
             std::array<uint64_t, num_words> baseSet = {};

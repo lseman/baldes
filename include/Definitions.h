@@ -27,7 +27,9 @@
 #include <stdexec/execution.hpp>
 
 #include <execution>
+#ifdef AVX
 #include <immintrin.h>
+#endif
 
 #include <algorithm>
 #include <array>
@@ -42,8 +44,8 @@
 #include <unordered_map>
 #include <vector>
 
-#include <fmt/core.h>
 #include <fmt/color.h>
+#include <fmt/core.h>
 
 enum class Direction { Forward, Backward };
 enum class Stage { One, Two, Three, Four, Enumerate, Fix };
@@ -587,6 +589,7 @@ struct Label {
         return true;
     }
 
+#ifdef AVX
     template <Direction D, Stage S>
     inline bool check_dominance_against_vector(const std::vector<Label *> &labels) noexcept {
         size_t       size      = labels.size();
@@ -715,6 +718,7 @@ struct Label {
 
         return false;
     }
+#endif
 
     bool operator>(const Label &other) const { return cost > other.cost; }
 
@@ -1028,9 +1032,23 @@ struct Bucket {
         }
     }
 
-    std::vector<BucketArc> &get_bucket_arcs(bool fw) { return fw ? fw_bucket_arcs : bw_bucket_arcs; }
+    template <Direction dir>
+    std::vector<BucketArc> &get_bucket_arcs() {
+        if constexpr (dir == Direction::Forward) {
+            return fw_bucket_arcs;
+        } else {
+            return bw_bucket_arcs;
+        }
+    }
 
-    std::vector<JumpArc> &get_jump_arcs(bool fw) { return fw ? fw_jump_arcs : bw_jump_arcs; }
+    template <Direction dir>
+    std::vector<JumpArc> &get_jump_arcs() {
+        if constexpr (dir == Direction::Forward) {
+            return fw_jump_arcs;
+        } else {
+            return bw_jump_arcs;
+        }
+    }
 
     Bucket(int job_id, std::vector<int> lb, std::vector<int> ub)
         : job_id(job_id), lb(std::move(lb)), ub(std::move(ub)) {

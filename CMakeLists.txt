@@ -25,6 +25,8 @@ option(UNREACHABLE_DOMINANCE "Enable Unreachable Dominance compilation option"
        OFF)
 option(SORTED_LABELS "Enable Sorted Labels compilation option" OFF)
 option(MCD "Enable MCD compilation option" OFF)
+option(FIX_BUCKETS "Enable Fixed Buckets compilation option" OFF)
+option(AVX "Enable AVX compilation option" OFF)
 
 # Define an option to specify the size of resources
 set(R_SIZE
@@ -78,6 +80,14 @@ endif()
 
 if(MCD)
   add_definitions(-DMCD)
+endif()
+
+if (FIX_BUCKETS)
+  add_definitions(-DFIX_BUCKETS)
+endif()
+
+if (AVX)
+  add_definitions(-DAVX)
 endif()
 
 # Attempt to include CPM.cmake from provided path

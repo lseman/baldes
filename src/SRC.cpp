@@ -2,25 +2,28 @@
  * @file SRC.cpp
  * @brief Implementation of functions and classes for solving VRP problems using Limited Memory Rank-1 Cuts.
  *
- * This file contains the implementation of various functions and classes used for solving Vehicle Routing Problems (VRP)
- * using Limited Memory Rank-1 Cuts. The main functionalities include computing unique cut keys, adding cuts to storage,
- * separating solution vectors into cuts, and generating cut coefficients.
+ * This file contains the implementation of various functions and classes used for solving Vehicle Routing Problems
+ * (VRP) using Limited Memory Rank-1 Cuts. The main functionalities include computing unique cut keys, adding cuts to
+ * storage, separating solution vectors into cuts, and generating cut coefficients.
  *
  * The file includes the following main components:
  * - `hash_double`: A function to hash double values with high precision.
  * - `hash_combine`: A function to combine hash values robustly.
  * - `compute_cut_key`: A function to compute a unique cut key based on base sets and multipliers.
  * - `CutStorage::addCut`: A method to add a cut to the CutStorage.
- * - `LimitedMemoryRank1Cuts::separate`: A method to separate solution vectors into cuts using Limited Memory Rank-1 Cuts.
- * - `LimitedMemoryRank1Cuts::insertSet`: A method to insert a set of indices and associated data into the VRPTW_SRC cuts structure.
+ * - `LimitedMemoryRank1Cuts::separate`: A method to separate solution vectors into cuts using Limited Memory Rank-1
+ * Cuts.
+ * - `LimitedMemoryRank1Cuts::insertSet`: A method to insert a set of indices and associated data into the VRPTW_SRC
+ * cuts structure.
  * - `findRoutesVisitingNodes`: A function to find routes that visit specified nodes in a sparse model.
  * - `LimitedMemoryRank1Cuts::generateCutCoefficients`: A method to generate cut coefficients for VRPTW_SRC cuts.
  *
- * The implementation leverages parallel processing using thread pools and schedulers to efficiently handle large datasets
- * and complex computations.
+ * The implementation leverages parallel processing using thread pools and schedulers to efficiently handle large
+ * datasets and complex computations.
  *
- * @note The code assumes the existence of certain external structures and constants such as `num_words`, `N_SIZE`, `VRPTW_SRC`,
- *       `VRPTW_SRC_max_S_n`, `SparseModel`, `VRPJob`, `CutType`, `exec::static_thread_pool`, `stdexec::bulk`, and `stdexec::sync_wait`.
+ * @note The code assumes the existence of certain external structures and constants such as `num_words`, `N_SIZE`,
+ * `VRPTW_SRC`, `VRPTW_SRC_max_S_n`, `SparseModel`, `VRPJob`, `CutType`, `exec::static_thread_pool`, `stdexec::bulk`,
+ * and `stdexec::sync_wait`.
  */
 
 #include "../cuts/SRC.h"
@@ -28,14 +31,24 @@
 #include "Definitions.h"
 
 #include <bitset>
+#include <cstddef>
+#include <functional>
 #include <iomanip>
 #include <mutex>
-#include <cstddef> 
-#include <functional>
 #include <vector>
 
 using Cuts = std::vector<Cut>;
 
+/**
+ * @brief Generates a hash value for a given double and index.
+ *
+ * This function converts a double value to a string with 17 decimal places of precision,
+ * then hashes the resulting string and combines it with the provided index using a bitwise XOR operation.
+ *
+ * @param value The double value to be hashed.
+ * @param index The index to combine with the hash of the double value.
+ * @return A size_t representing the combined hash value.
+ */
 inline std::size_t hash_double(double value, std::size_t index) {
     std::ostringstream oss;
     oss << std::fixed << std::setprecision(17) << value; // 17 decimal places precision
@@ -43,14 +56,23 @@ inline std::size_t hash_double(double value, std::size_t index) {
     return std::hash<std::string>{}(double_str) ^ (index * 0x9e3779b9); // Combine with index
 }
 
-// Function to combine hash values robustly
+/**
+ * @brief Combines a hash value with an existing seed.
+ *
+ * This function takes an existing seed and a value, computes the hash of the value,
+ * and combines it with the seed to produce a new hash value. This is useful for
+ * creating composite hash values from multiple inputs.
+ *
+ * @tparam T The type of the value to be hashed.
+ * @param seed A reference to the existing seed to be combined with the hash of the value.
+ * @param value The value to be hashed and combined with the seed.
+ */
 template <typename T>
 inline void hash_combine(std::size_t &seed, const T &value) {
     std::hash<T> hasher;
     seed ^= hasher(value) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
 }
 
-// Function to compute a robust cut_key with ordering taken into account
 /**
  * @brief Computes a unique cut key based on the provided base set and multipliers.
  *
@@ -118,8 +140,7 @@ void CutStorage::addCut(Cut &cut) {
 }
 
 LimitedMemoryRank1Cuts::LimitedMemoryRank1Cuts(std::vector<VRPJob> &jobs, CutType cutType)
-    : jobs(jobs), cutType(cutType) {
-}
+    : jobs(jobs), cutType(cutType) {}
 
 /**
  * @brief Separates the given solution vector into cuts using Limited Memory Rank-1 Cuts.
@@ -214,9 +235,9 @@ std::vector<std::vector<double>> LimitedMemoryRank1Cuts::separate(const SparseMo
 /**
  * @brief Inserts a set of indices and associated data into the VRPTW_SRC cuts structure.
  *
- * This function inserts a set of indices (i, j, k) and additional buffer data into the 
- * VRPTW_SRC cuts structure. It ensures that the underlying storage has enough capacity 
- * to accommodate the new data and resizes it if necessary. The function also updates 
+ * This function inserts a set of indices (i, j, k) and additional buffer data into the
+ * VRPTW_SRC cuts structure. It ensures that the underlying storage has enough capacity
+ * to accommodate the new data and resizes it if necessary. The function also updates
  * the best sets and the S_C_P vector with the new data.
  *
  * @param cuts The VRPTW_SRC cuts structure to insert data into.

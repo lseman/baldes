@@ -2,8 +2,8 @@
  * @file BucketJump.h
  * @brief Header file for the Bucket Graph's arc elimination and jump arc utilities in Vehicle Routing Problems (VRP).
  *
- * This file provides functions for managing and eliminating arcs in the Bucket Graph based on cost thresholds and 
- * other resource constraints. It includes utilities for updating the set of visited buckets, performing arc 
+ * This file provides functions for managing and eliminating arcs in the Bucket Graph based on cost thresholds and
+ * other resource constraints. It includes utilities for updating the set of visited buckets, performing arc
  * elimination, and eliminating jump arcs that do not contribute to improving solutions.
  *
  * Key components:
@@ -11,8 +11,8 @@
  * - `BucketArcElimination`: Eliminates non-improving arcs from the Bucket Graph based on a threshold (theta).
  * - `std::hash` specializations: Custom hash functions for `std::pair` to enable their use in unordered containers.
  *
- * The utilities use template parameters for direction (`Forward` or `Backward`) to handle the arc elimination 
- * process in both directions of the Bucket Graph. It leverages parallel processing using Intel's Threading 
+ * The utilities use template parameters for direction (`Forward` or `Backward`) to handle the arc elimination
+ * process in both directions of the Bucket Graph. It leverages parallel processing using Intel's Threading
  * Building Blocks (TBB) for efficient computation.
  */
 
@@ -117,10 +117,10 @@ namespace std {
 
 /**
  * @brief Specialization of the std::hash template for std::pair<int, int>.
- * 
+ *
  * This struct provides a hash function for pairs of integers, allowing them
  * to be used as keys in unordered containers such as std::unordered_map.
- * 
+ *
  * @tparam std::pair<int, int> The type of the pair to be hashed.
  */
 template <>
@@ -156,7 +156,6 @@ struct hash<std::pair<std::pair<int, int>, int>> {
 
 } // namespace std
 
-
 /**
  * @brief Eliminates bucket arcs based on a given threshold.
  *
@@ -170,7 +169,7 @@ struct hash<std::pair<std::pair<int, int>, int>> {
  * @param Gamma A vector of `BucketArc` objects.
  */
 template <Direction D>
-void BucketGraph::BucketArcElimination(double theta, std::vector<BucketArc> &Gamma) {
+void BucketGraph::BucketArcElimination(double theta) {
     auto &buckets       = assign_buckets<D>(fw_buckets, bw_buckets);
     auto &Phi           = assign_buckets<D>(Phi_fw, Phi_bw);
     auto &Phi_opposite  = assign_buckets<D>(Phi_bw, Phi_fw);
@@ -214,25 +213,23 @@ void BucketGraph::BucketArcElimination(double theta, std::vector<BucketArc> &Gam
             }
         }
 
-        /*
-                    auto jump_arcs = buckets[b].get_jump_arcs(D == Direction::Forward);
-                    if (!jump_arcs.empty()) {
-                        for (const auto &a : jump_arcs) {
-                            auto  a_index    = std::make_pair(b, a.jump_bucket);
-                            auto  b_opposite = get_opposite_bucket_number<D>(a.jump_bucket);
-                            auto &labels     = buckets[b].get_labels();
+        auto jump_arcs = buckets[b].template get_jump_arcs<D>();
+        if (!jump_arcs.empty()) {
+            for (const auto &a : jump_arcs) {
+                auto  a_index    = std::make_pair(std::make_pair(a.base_bucket, a.jump_bucket), b);
+                auto  b_opposite = get_opposite_bucket_number<D>(a.jump_bucket);
+                auto &labels     = buckets[b].get_labels();
 
-                            std::unordered_set<int> Bvisited;
-                            for (auto &L_item : labels) {
-                                auto &Bidi_map = local_B_Ba_b[a_index];
-                                Bidi_map.insert(b);
-                                Bvisited.clear();
-                                UpdateBucketsSet<D>(theta, L_item, Bidi_map, b_opposite, Bvisited);
-                            }
-                        }
-                    }
-        */
-        auto bucket_arcs = buckets[b].get_bucket_arcs(D == Direction::Forward);
+                std::unordered_set<int> Bvisited;
+                for (auto &L_item : labels) {
+                    auto &Bidi_map = local_B_Ba_b[a_index];
+                    Bidi_map.insert(b);
+                    Bvisited.clear();
+                    UpdateBucketsSet<D>(theta, L_item, Bidi_map, b_opposite, Bvisited);
+                }
+            }
+        }
+        auto bucket_arcs = buckets[b].template get_bucket_arcs<D>();
         for (const auto &a : bucket_arcs) {
             auto a_index =
                 std::make_pair(std::make_pair(buckets[a.from_bucket].job_id, buckets[a.to_bucket].job_id), b);
@@ -270,5 +267,5 @@ void BucketGraph::BucketArcElimination(double theta, std::vector<BucketArc> &Gam
         }
     }
 
-    fmt::print("Removed arcs: {}\n", removed_arcs.load());
+    print_info("Removed arcs: {}\n", removed_arcs.load());
 }

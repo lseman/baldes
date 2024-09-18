@@ -22,6 +22,7 @@
 
 #pragma once
 
+#include "BucketJump.h"
 #include "Definitions.h"
 
 #include "../cuts/SRC.h"
@@ -265,6 +266,8 @@ void BucketGraph::generate_arcs() {
         bw_bucket_graph.clear();
     }
 
+    auto fixed_buckets = assign_buckets<D>(fw_fixed_buckets, bw_fixed_buckets);
+
     auto &buckets           = assign_buckets<D>(fw_buckets, bw_buckets);
     auto &num_buckets       = assign_buckets<D>(num_buckets_fw, num_buckets_bw);
     auto &num_buckets_index = assign_buckets<D>(num_buckets_index_fw, num_buckets_index_bw);
@@ -298,6 +301,8 @@ void BucketGraph::generate_arcs() {
             for (int j = 0; j < num_buckets[next_job.id]; ++j) {
                 int to_bucket = j + num_buckets_index[next_job.id];
                 if (from_bucket == to_bucket) continue;
+
+                if (fixed_buckets[from_bucket][to_bucket] == 1) continue;
 
                 bool valid_arc = true;
                 for (int r = 0; r < res_inc.size(); ++r) {
@@ -416,8 +421,9 @@ std::vector<double> BucketGraph::labeling_algorithm(std::vector<double> q_point,
 
                     if (!domin_smaller) {
 
-                        const auto &arcs = jobs[label->job_id].get_arcs<D>(scc_index);
-
+                        const auto &arcs      = jobs[label->job_id].get_arcs<D>(scc_index);
+                        const auto &jump_arcs = buckets[bucket].template get_jump_arcs<D>();
+                        // if (jump_arcs.size() > 0) { fmt::print("Jump arcs: {}\n", jump_arcs.size()); }
                         for (const auto &arc : arcs) {
                             Label *new_label = Extend<D, S, ArcType::Job, Mutability::Mut>(label, arc);
                             if (!new_label) {
@@ -456,7 +462,7 @@ std::vector<double> BucketGraph::labeling_algorithm(std::vector<double> q_point,
                                         break;
                                     }
                                 }
-                                dominated = new_label->check_dominance_against_vector<D, S>(to_bucket_labels);
+                                // dominated = new_label->check_dominance_against_vector<D, S>(to_bucket_labels);
                             }
 
                             if (!dominated) {
@@ -518,7 +524,8 @@ std::vector<double> BucketGraph::labeling_algorithm(std::vector<double> q_point,
  * @tparam S The stage of the extension (Stage::One, Stage::Two, or Stage::Three).
  * @param L_prime The label to be extended.
  * @param gamma The BucketArc to extend the label with.
- * @return A tuple containing a boolean indicating if the extension was successful and a pointer to the new label.
+ * @return A tuple containing a boolean indicating if the extension was successful and a pointer to the new
+ * label.
  */
 
 template <Direction D, Stage S, ArcType A, Mutability M>
@@ -678,7 +685,7 @@ inline Label *BucketGraph::Extend(const std::conditional_t<M == Mutability::Mut,
             std::advance(it, idx);
             const auto &cut = *it;
 
-            const auto &baseSet = cut.baseSet;
+            const auto &baseSet      = cut.baseSet;
             const auto &baseSetorder = cut.baseSetOrder;
             const auto &neighbors    = cut.neighbors;
             const auto &multipliers  = cut.multipliers;
@@ -937,141 +944,17 @@ inline bool BucketGraph::DominatedInCompWiseSmallerBuckets(Label *L, int bucket,
 template <Stage S>
 std::vector<Label *> BucketGraph::bi_labeling_algorithm(std::vector<double> q_star) {
 
-    auto run_labeling_algorithms = [&]<Stage state, Full fullness>(std::vector<double> &forward_cbar,
-                                                                   std::vector<double> &backward_cbar) {
-        // Create tasks for forward and backward labeling algorithms
-
-        auto forward_task = stdexec::schedule(bi_sched) | stdexec::then([&]() {
-                                return labeling_algorithm<Direction::Forward, state, fullness>(q_star);
-                            });
-
-        auto backward_task = stdexec::schedule(bi_sched) | stdexec::then([&]() {
-                                 return labeling_algorithm<Direction::Backward, state, fullness>(q_star);
-                             });
-        // Execute the tasks in parallel and synchronize
-        auto work = stdexec::when_all(std::move(forward_task), std::move(backward_task)) |
-                    stdexec::then([&](auto forward_result, auto backward_result) {
-                        forward_cbar  = std::move(forward_result);
-                        backward_cbar = std::move(backward_result);
-                    });
-
-        stdexec::sync_wait(std::move(work));
-    };
-
-#ifndef BUCKET_FIXING
-    if constexpr (S == Stage::Three || S == Stage::Enumerate) {
-        reset_pool();
-        reset_fixed();
-        common_initialization();
-
-        std::vector<double> forward_cbar(fw_buckets.size(), std::numeric_limits<double>::infinity());
-        std::vector<double> backward_cbar(bw_buckets.size(), std::numeric_limits<double>::infinity());
-
-        if constexpr (S == Stage::Three) {
-            run_labeling_algorithms.template operator()<Stage::Two, Full::Full>(forward_cbar, backward_cbar);
-        } else {
-            run_labeling_algorithms.template operator()<Stage::Three, Full::Full>(forward_cbar, backward_cbar);
-        }
-        std::vector<std::vector<Label *>> fw_labels_map(jobs.size());
-        std::vector<std::vector<Label *>> bw_labels_map(jobs.size());
-
-        auto group_labels = [&](auto &buckets, auto &labels_map) {
-            for (auto &bucket : buckets) {
-                for (auto &label : bucket.get_labels()) {
-                    labels_map[label->job_id].push_back(label); // Directly index using job_id
-                }
-            }
-        };
-
-        // Create tasks for forward and backward labels grouping
-        auto forward_task =
-            stdexec::schedule(bi_sched) | stdexec::then([&]() { group_labels(fw_buckets, fw_labels_map); });
-        auto backward_task =
-            stdexec::schedule(bi_sched) | stdexec::then([&]() { group_labels(bw_buckets, bw_labels_map); });
-
-        // Execute the tasks in parallel
-        auto work = stdexec::when_all(std::move(forward_task), std::move(backward_task));
-
-        stdexec::sync_wait(std::move(work));
-
-        auto num_fixes = 0;
-        //  Function to find the minimum cost label in a vector of labels
-        auto find_min_cost_label = [](const std::vector<Label *> &labels) -> const Label * {
-            return *std::min_element(labels.begin(), labels.end(),
-                                     [](const Label *a, const Label *b) { return a->cost < b->cost; });
-        };
-        for (const auto &job_I : jobs) {
-            const auto &fw_labels = fw_labels_map[job_I.id];
-            if (fw_labels.empty()) continue; // Skip if no labels for this job_id
-
-            for (const auto &job_J : jobs) {
-                if (job_I.id == job_J.id) continue; // Compare based on id (or other key field)
-                const auto &bw_labels = bw_labels_map[job_J.id];
-                if (bw_labels.empty()) continue; // Skip if no labels for this job_id
-
-                const Label *min_fw_label = find_min_cost_label(fw_labels);
-                const Label *min_bw_label = find_min_cost_label(bw_labels);
-
-                if (!min_fw_label || !min_bw_label) continue;
-
-                const VRPJob &L_last_job = jobs[min_fw_label->job_id];
-                auto          cost       = getcij(min_fw_label->job_id, min_bw_label->job_id);
-
-                // Check for infeasibility
-                if (min_fw_label->resources[0] + cost + L_last_job.duration > min_bw_label->resources[0]) { continue; }
-
-                if (min_fw_label->cost + cost + L_last_job.duration + min_bw_label->cost > gap) {
-                    fixed_arcs[job_I.id][job_J.id] = 1; // Index with job ids
-                    num_fixes++;
-                }
-            }
-        }
-    } else {
-        reset_fixed();
-    }
-#else
     if constexpr (S == Stage::Three) {
-        if (fixed == false) {
-            fmt::print("Setting fixed to true\n");
-            fixed = true;
-            common_initialization();
-
-            std::vector<double> forward_cbar(fw_buckets.size(), std::numeric_limits<double>::infinity());
-            std::vector<double> backward_cbar(bw_buckets.size(), std::numeric_limits<double>::infinity());
-
-            // if constexpr (S == Stage::Two) {
-            run_labeling_algorithms.template operator()<Stage::Four>(forward_cbar, backward_cbar, true);
-
-            auto best_label = label_pool_fw.acquire();
-
-            if (check_feasibility(fw_best_label, bw_best_label)) {
-                best_label = compute_label(fw_best_label, bw_best_label);
-            } else {
-                best_label->cost         = std::numeric_limits<double>::infinity();
-                best_label->real_cost    = std::numeric_limits<double>::infinity();
-                best_label->jobs_covered = {};
-            }
-
-            gap = incumbent - (relaxation + std::min(0.0, best_label->cost));
-            fmt::print("Gap: {}\n", gap);
-            fw_c_bar = forward_cbar;
-            bw_c_bar = backward_cbar;
-            std::vector<BucketArc> arcos;
-
-#pragma omp parallel sections
-            {
-#pragma omp section
-                { BucketArcElimination<Direction::Forward>(gap, arcos); }
-#pragma omp section
-                { BucketArcElimination<Direction::Backward>(gap, arcos); }
-            }
-
-            fmt::print("Arcs to eliminate: {}\n", arcos.size());
-            ObtainJumpBucketArcs(arcos);
-            fmt::print("Jump arcs obtained\n");
+        heuristic_fixing<S>(q_star);
+    } else if constexpr (S == Stage::Four) {
+        if (first_reset) {
+            reset_fixed();
+            first_reset = false;
         }
     }
-    // reset_fixed();
+
+#ifdef FIX_BUCKETS
+    if constexpr (S == Stage::Four) { bucket_fixing<S>(q_star); }
 #endif
 
     reset_pool();
@@ -1080,7 +963,7 @@ std::vector<Label *> BucketGraph::bi_labeling_algorithm(std::vector<double> q_st
     std::vector<double> forward_cbar(fw_buckets.size(), std::numeric_limits<double>::infinity());
     std::vector<double> backward_cbar(bw_buckets.size(), std::numeric_limits<double>::infinity());
 
-    run_labeling_algorithms.template operator()<S, Full::Partial>(forward_cbar, backward_cbar);
+    run_labeling_algorithms<S, Full::Partial>(forward_cbar, backward_cbar, q_star);
 
     // Best complete path obtained in the two algorithms above
     auto best_label = label_pool_fw.acquire();
@@ -1389,7 +1272,7 @@ void BucketGraph::SCC_handler() {
                 std::vector<Arc> &filtered_fw_arcs = jobs[from_job_id].fw_arcs_scc[scc_ctr]; // For forward direction
 
                 // Iterate over the arcs from the current bucket
-                const auto &bucket_arcs = buckets[bucket].get_bucket_arcs(true);
+                const auto &bucket_arcs = buckets[bucket].template get_bucket_arcs<Direction::Forward>();
                 for (const auto &arc : bucket_arcs) {
                     int to_job_id = buckets[arc.to_bucket].job_id; // Get the destination job ID
 
@@ -1407,7 +1290,7 @@ void BucketGraph::SCC_handler() {
                 std::vector<Arc> &filtered_bw_arcs = jobs[from_job_id].bw_arcs_scc[scc_ctr]; // For forward direction
 
                 // Iterate over the arcs from the current bucket
-                const auto &bucket_arcs = buckets[bucket].get_bucket_arcs(false);
+                const auto &bucket_arcs = buckets[bucket].template get_bucket_arcs<Direction::Backward>();
                 for (const auto &arc : bucket_arcs) {
                     int to_job_id = buckets[arc.to_bucket].job_id; // Get the destination job ID
 

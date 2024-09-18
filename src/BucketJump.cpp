@@ -21,8 +21,8 @@
  * vehicle routing optimization framework.
  */
 
-#include "../include/Definitions.h"
 #include "../include/BucketGraph.h"
+#include "../include/Definitions.h"
 #include <algorithm>
 #include <cmath>
 
@@ -40,47 +40,55 @@
  *
  * @param Gamma The vector of BucketArcs to check for each bucket.
  */
-void BucketGraph::ObtainJumpBucketArcs(const std::vector<BucketArc> &Gamma) {
-    auto               &buckets = fw_buckets; // Assuming fw_buckets is a global or accessible variable
-    std::vector<double> res     = {0.0};
-    auto                cost    = 0.0;
+void BucketGraph::ObtainJumpBucketArcs() {
+    auto               &buckets         = fw_buckets; // Assuming fw_buckets is a global or accessible variable
+    std::vector<double> res             = {0.0};
+    auto                cost            = 0.0;
+    auto                missing_counter = 0;
 
+    int arc_counter = 0;
     for (auto b = 0; b < fw_buckets_size; ++b) {
         std::vector<int> B_bar;
-        // Iterate over Gamma
-        auto arcs = buckets[b].get_bucket_arcs(true);
+
+        // Retrieve the arcs from the current bucket
+        auto arcs          = buckets[b].template get_bucket_arcs<Direction::Forward>();
+        auto original_arcs = jobs[buckets[b].job_id].template get_arcs<Direction::Forward>();
+        if (arcs.empty()) { continue; }
+
         for (const auto &gamma : arcs) {
             if (fw_fixed_buckets[gamma.from_bucket][gamma.to_bucket] == 0) { continue; }
+            auto from_job  = buckets[gamma.from_bucket].job_id;
+            auto to_job    = buckets[gamma.to_bucket].job_id;
+            bool have_path = false;
+            for (const auto &gamma_prime : arcs) {
+                if (fw_fixed_buckets[gamma.from_bucket][gamma.to_bucket] == 1) { continue; }
 
-            auto b_from = gamma.from_bucket;
-            auto b_to   = gamma.to_bucket;
+                auto prime_from_job = buckets[gamma_prime.from_bucket].job_id;
+                auto prime_to_job   = buckets[gamma_prime.to_bucket].job_id;
 
-            auto from_job = buckets[b_from].job_id;
-            auto to_job   = buckets[b_to].job_id;
-
-            auto job_start = to_job * num_buckets_per_job;
-            for (auto b_prime = job_start; b_prime < job_start + num_buckets_per_job; ++b_prime) {
-                // fmt::print("Adding bucket {} to B_bar\n", b_prime);
-                B_bar.push_back(b_prime);
-            }
-            cost = gamma.cost_increment;
-            res  = gamma.resource_increment;
-
-            for (auto it = B_bar.begin(); it != B_bar.end();) {
-                // check if element is in Phi[b]
-                if (std::find(Phi_fw[b].begin(), Phi_fw[b].end(), *it) == Phi_fw[b].end()) {
-                    it = B_bar.erase(it);
-                } else {
-                    ++it;
+                if (from_job == prime_from_job && to_job == prime_to_job) {
+                    have_path = true;
+                    break;
                 }
             }
-
-            for (const auto &b_prime : B_bar) {
-                fmt::print("Adding jump arc from {} to {}\n", b, b_prime);
-                buckets[b_from].add_jump_arc(b_from, b_prime, res, cost, true);
+            if (!have_path) {
+                // fmt::print("Path missing from {} to {}\n", from_job, to_job);
+                missing_counter++;
             }
         }
+        // if (!have_path) {
+        //     // print path missing from b to b_prime
+        //     fmt::print("Path missing from {} to {}\n", from_job, to_job);
+        // }
+
+        // remove from B_bar buckets that are not component-wise minimal
+
+        // Add jump arcs for the remaining elements in B_bar
+        for (const auto &b_prime : B_bar) { arc_counter++; }
     }
+    fmt::print("Missing paths: {}\n", missing_counter);
+
+    print_info("Added {} jump arcs\n", arc_counter);
 }
 
 /**
