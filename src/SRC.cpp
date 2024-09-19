@@ -325,7 +325,7 @@ inline std::vector<std::vector<int>> findRoutesVisitingNodes(const SparseModel  
 void LimitedMemoryRank1Cuts::generateCutCoefficients(VRPTW_SRC &cuts, std::vector<std::vector<double>> &coefficients,
                                                      int numNodes, const SparseModel &A, const std::vector<double> &x) {
     double primal_violation    = 0.0;
-    int    max_number_of_cuts  = 2;
+    int    max_number_of_cuts  = 15;
     double violation_threshold = 1e-2;
 
     if (cuts.S_n > 0) {

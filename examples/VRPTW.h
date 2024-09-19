@@ -20,6 +20,7 @@
 
 #include "../include/BucketGraph.h"
 #include "../include/BucketUtils.h"
+#include "../include/BucketSolve.h"
 
 #include "../extra/Stabilization.h"
 
@@ -564,7 +565,8 @@ public:
         bool                 can_add = true;
 
         Stabilization stab(0.9, jobDuals);
-        double        split   = time_horizon * 0.5;
+        std::vector<double>        split   = {time_horizon * 0.5};
+        bucket_graph.setSplit(split);
         bool          changed = false;
         // set start timer
         auto start_timer = std::chrono::high_resolution_clock::now();
@@ -586,6 +588,10 @@ public:
             cuts    = r1c.cutStorage;
             changed = cutHandler(r1c, node, constraints);
 
+            //////////////////////////////////////////////////////////////////////
+            // PREPARING DUALS
+            //////////////////////////////////////////////////////////////////////
+
             if (changed) {
                 node->update();
                 node->optimize();
@@ -602,88 +608,18 @@ public:
             bucket_graph.setDuals(onlyJobDuals);
 
             //////////////////////////////////////////////////////////////////////
-            // ADAPTIVE TERMINAL TIME
+            // CALLING BALDES
             //////////////////////////////////////////////////////////////////////
-            double n_fw_labels = bucket_graph.n_fw_labels;
-            double n_bw_labels = bucket_graph.n_bw_labels;
-
-            if (((n_bw_labels - n_fw_labels) / n_fw_labels) > 0.05) {
-                split += 0.05 * time_horizon;
-            } else if (((n_fw_labels - n_bw_labels) / n_bw_labels) > 0.05) {
-                split -= 0.05 * time_horizon;
-            }
-            std::vector<double> q_star = {split};
 
             bucket_graph.cut_storage = &cuts;
 
-            //////////////////////////////////////////////////////////////////////
-            // ADAPTIVE STAGE HANDLING
-            //////////////////////////////////////////////////////////////////////
-            if (s1) {
-                stage = 1;
-                paths = bucket_graph.bi_labeling_algorithm<Stage::One>(q_star);
+            paths = bucket_graph.solve();
+            inner_obj = paths[0]->cost;
+            stage = bucket_graph.getStage();
 
-                inner_obj = paths[0]->cost;
-
-                if (inner_obj >= -1 || iter >= 10) {
-                    s1 = false;
-                    s2 = true;
-                }
-            } else if (s2) {
-                s2        = true;
-                stage     = 2;
-                paths     = bucket_graph.bi_labeling_algorithm<Stage::Two>(q_star);
-                inner_obj = paths[0]->cost;
-                if (inner_obj >= -100 || iter > 800) {
-                    s2 = false;
-                    s3 = true;
-                }
-            } else if (s3) {
-                stage     = 3;
-                paths     = bucket_graph.bi_labeling_algorithm<Stage::Three>(q_star);
-                inner_obj = paths[0]->cost;
-
-                if (inner_obj >= -1e-2) {
-                    s4         = true;
-                    s3         = false;
-                    transition = true;
-                }
-            } else if (s4) {
-                stage = 4;
-#ifdef RCC
-                rccManager.computeDualsDeleteAndCache(node);
-#endif
-
-#ifdef FIX_BUCKETS
-                if (transition) {
-                    print_cut("Transitioning to stage 4\n");
-                    bucket_graph.fixed = true;
-                    paths     = bucket_graph.bi_labeling_algorithm<Stage::Four>(q_star);
-                    transition = false;
-                    bucket_graph.fixed = false;
-                    bucket_graph.min_red_cost = paths[0]->cost;
-                    auto colAdded = addColumn(node, paths, cuts, false);
-                    node->optimize();
-                    bucket_graph.relaxation = node->get(GRB_DoubleAttr_ObjVal);
-                    fmt::print("Relaxation: {}\n", bucket_graph.relaxation);
-                }
-#endif
-                paths     = bucket_graph.bi_labeling_algorithm<Stage::Four>(q_star);
-                inner_obj = paths[0]->cost;
-                if (inner_obj >= -1e-1) {
-                    ss = true;
-#ifndef SRC
-                    break;
-#endif
-                    print_cut("Going into separation mode..\n");
-
-#ifdef RCC
-                    print_cut("Testing RCC feasibility..\n");
-                    rcc                      = RCCsep(node, solution, cvrsep_ctrs);
-                    bucket_graph.rcc_manager = &rccManager;
-                    if (rcc) { duals = getDuals(node); }
-#endif
-                }
+            if (bucket_graph.getStatus() == Status::Optimal) {
+                fmt::print("Optimal solution found\n");
+                break;
             }
 
             //////////////////////////////////////////////////////////////////////
@@ -706,6 +642,8 @@ public:
             auto matrixSparse = extractModelDataSparse(node);
             jobDuals          = stab.run(matrixSparse, jobDuals);
             solution          = extractSolution(node);
+
+            bucket_graph.relaxation = highs_obj;
 
 #ifdef RCC
             if (rcc) {
@@ -733,7 +671,7 @@ public:
             bucket_graph.gap = lag_gap;
             bucket_graph.augment_ng_memories(solution, allPaths, true, 5, 100, 16, N_SIZE);
 
-            //bucket_graph.relaxation = highs_obj;
+            // bucket_graph.relaxation = highs_obj;
 
 #if defined(SRC3) || defined(SRC)
             if (ss && !rcc) {
@@ -748,8 +686,8 @@ public:
                 r1c.separate(matrixSparse.A_sparse, solution, N_SIZE - 2, 1e-3);
                 fmt::print("Separating cuts..\n");
 #ifdef SRC
-                r1c.the45Heuristic<CutType::FourRow>(matrixSparse.A_sparse, solution, N_SIZE - 2);
-                r1c.the45Heuristic<CutType::FiveRow>(matrixSparse.A_sparse, solution, N_SIZE - 2);
+                // r1c.the45Heuristic<CutType::FourRow>(matrixSparse.A_sparse, solution, N_SIZE - 2);
+                // r1c.the45Heuristic<CutType::FiveRow>(matrixSparse.A_sparse, solution, N_SIZE - 2);
 #endif
                 cuts = r1c.cutStorage;
                 if (cuts_before == cuts.size()) {

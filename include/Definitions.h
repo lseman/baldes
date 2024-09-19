@@ -53,6 +53,7 @@ enum class Stage { One, Two, Three, Four, Enumerate, Fix };
 enum class ArcType { Job, Bucket, Jump };
 enum class Mutability { Const, Mut };
 enum class Full { Full, Partial };
+enum class Status { Optimal, Separation, NotOptimal, Error };
 
 // Comparator function for Stage enum
 constexpr bool operator<(Stage lhs, Stage rhs) { return static_cast<int>(lhs) < static_cast<int>(rhs); }

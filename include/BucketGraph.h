@@ -68,6 +68,24 @@ class BucketGraph {
     using NGRouteBitmap = uint64_t;
 
 public:
+    bool                s1    = true;
+    bool                s2    = false;
+    bool                s3    = false;
+    bool                s4    = false;
+    bool                s5    = false;
+    bool                ss    = false;
+    int                 stage = 1;
+    std::vector<double> q_star;
+    int                 iter       = 0;
+    bool                transition = true;
+    bool                converged  = false;
+    Status                status     = Status::NotOptimal;
+
+    void                 setSplit(std::vector<double> q_star) { this->q_star = q_star; }
+    int                  getStage() { return stage; }
+    Status                 getStatus() { return status; }
+    std::vector<Label *> solve();
+
     RCCmanager *rcc_manager = nullptr;
     /**
      * @brief Prints the configuration information of the BucketGraph.
@@ -166,120 +184,12 @@ public:
 
     double min_red_cost = std::numeric_limits<double>::infinity();
     bool   first_reset  = true;
-    /**
-     * @brief Applies heuristic fixing to the current solution.
-     *
-     * This function modifies the current solution based on the heuristic
-     * fixing strategy using the provided vector of values.
-     *
-     * @param q_star A vector of double values representing the heuristic
-     *               fixing parameters.
-     */
-    template <Stage S>
-    void heuristic_fixing(const std::vector<double> &q_star) {
-        // Stage 3 fixing heuristic
-        reset_pool();
-        reset_fixed();
-        common_initialization();
-
-        std::vector<double> forward_cbar(fw_buckets.size(), std::numeric_limits<double>::infinity());
-        std::vector<double> backward_cbar(bw_buckets.size(), std::numeric_limits<double>::infinity());
-
-        if constexpr (S == Stage::Three) {
-            run_labeling_algorithms<Stage::Two, Full::Full>(forward_cbar, backward_cbar, q_star);
-        } else {
-            run_labeling_algorithms<Stage::Three, Full::Full>(forward_cbar, backward_cbar, q_star);
-        }
-        std::vector<std::vector<Label *>> fw_labels_map(jobs.size());
-        std::vector<std::vector<Label *>> bw_labels_map(jobs.size());
-
-        auto group_labels = [&](auto &buckets, auto &labels_map) {
-            for (auto &bucket : buckets) {
-                for (auto &label : bucket.get_labels()) {
-                    labels_map[label->job_id].push_back(label); // Directly index using job_id
-                }
-            }
-        };
-
-        // Create tasks for forward and backward labels grouping
-        auto forward_task =
-            stdexec::schedule(bi_sched) | stdexec::then([&]() { group_labels(fw_buckets, fw_labels_map); });
-        auto backward_task =
-            stdexec::schedule(bi_sched) | stdexec::then([&]() { group_labels(bw_buckets, bw_labels_map); });
-
-        // Execute the tasks in parallel
-        auto work = stdexec::when_all(std::move(forward_task), std::move(backward_task));
-
-        stdexec::sync_wait(std::move(work));
-
-        auto num_fixes = 0;
-        //  Function to find the minimum cost label in a vector of labels
-        auto find_min_cost_label = [](const std::vector<Label *> &labels) -> const Label * {
-            return *std::min_element(labels.begin(), labels.end(),
-                                     [](const Label *a, const Label *b) { return a->cost < b->cost; });
-        };
-        for (const auto &job_I : jobs) {
-            const auto &fw_labels = fw_labels_map[job_I.id];
-            if (fw_labels.empty()) continue; // Skip if no labels for this job_id
-
-            for (const auto &job_J : jobs) {
-                if (job_I.id == job_J.id) continue; // Compare based on id (or other key field)
-                const auto &bw_labels = bw_labels_map[job_J.id];
-                if (bw_labels.empty()) continue; // Skip if no labels for this job_id
-
-                const Label *min_fw_label = find_min_cost_label(fw_labels);
-                const Label *min_bw_label = find_min_cost_label(bw_labels);
-
-                if (!min_fw_label || !min_bw_label) continue;
-
-                const VRPJob &L_last_job = jobs[min_fw_label->job_id];
-                auto          cost       = getcij(min_fw_label->job_id, min_bw_label->job_id);
-
-                // Check for infeasibility
-                if (min_fw_label->resources[0] + cost + L_last_job.duration > min_bw_label->resources[0]) { continue; }
-
-                if (min_fw_label->cost + cost + L_last_job.duration + min_bw_label->cost > gap) {
-                    fixed_arcs[job_I.id][job_J.id] = 1; // Index with job ids
-                    num_fixes++;
-                }
-            }
-        }
-    }
 
     template <Stage S>
-    void bucket_fixing(const std::vector<double> &q_star) {
-        // Stage 4 bucket arc fixing
-        if (fixed == false) {
-            fixed = true;
-            common_initialization();
+    void bucket_fixing(const std::vector<double> &q_star);
 
-            std::vector<double> forward_cbar(fw_buckets.size(), std::numeric_limits<double>::infinity());
-            std::vector<double> backward_cbar(bw_buckets.size(), std::numeric_limits<double>::infinity());
-
-            // if constexpr (S == Stage::Two) {
-            run_labeling_algorithms<Stage::Four, Full::Full>(forward_cbar, backward_cbar, q_star);
-
-            gap = incumbent - (relaxation + std::min(0.0, min_red_cost));
-            // print_info("Running arc elimination with gap: {}\n", gap);
-            fw_c_bar = forward_cbar;
-            bw_c_bar = backward_cbar;
-
-#pragma omp parallel sections
-            {
-#pragma omp section
-                {
-                    BucketArcElimination<Direction::Forward>(gap);
-                    ObtainJumpBucketArcs<Direction::Forward>();
-                }
-#pragma omp section
-                {
-                    BucketArcElimination<Direction::Backward>(gap);
-                    ObtainJumpBucketArcs<Direction::Backward>();
-                }
-            }
-            generate_arcs();
-        }
-    }
+    template <Stage S>
+    void heuristic_fixing(const std::vector<double> &q_star);
 
     /**
      * @brief Checks if a job has been visited based on a bitmap.
@@ -567,7 +477,6 @@ public:
     BucketGraph(const std::vector<VRPJob> &jobs, int time_horizon, int bucket_interval);
 
     BucketGraph(const std::vector<VRPJob> &jobs, std::vector<int> &bounds, std::vector<int> &bucket_intervals);
-
 
     template <Direction D>
     void add_arc(int from_bucket, int to_bucket, const std::vector<double> &res_inc, double cost_inc);

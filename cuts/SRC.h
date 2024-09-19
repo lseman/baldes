@@ -544,6 +544,8 @@ void LimitedMemoryRank1Cuts::the45Heuristic(const SparseModel &A, const std::vec
     double violation_threshold = 1e-3;
     int    max_important_nodes = 10;
 
+    int max_generated_cuts = 10;
+
     auto cuts         = VRPTW_SRC();
     auto coefficients = std::vector<std::vector<double>>();
 
@@ -596,7 +598,7 @@ void LimitedMemoryRank1Cuts::the45Heuristic(const SparseModel &A, const std::vec
     auto bulk_sender = stdexec::bulk(
         input_sender, tasks.size(),
         [this, &permutations, &processedSetsCache, &processedPermutationsCache, &cuts_mutex, &cuts_count, &cuts, &x,
-         &selectedNodes, &coefficients_aux, &numNodes, &cutQueue, max_number_of_cuts,
+         &selectedNodes, &coefficients_aux, &numNodes, &cutQueue, &max_number_of_cuts, &max_generated_cuts,
          violation_threshold](std::size_t task_idx) {
             auto &consumer = allPaths[selectedNodes[task_idx]].route;
 
@@ -608,7 +610,7 @@ void LimitedMemoryRank1Cuts::the45Heuristic(const SparseModel &A, const std::vec
             }
 
             // limit the number of sets to process
-            if (setsOf45.size() > 1000) { setsOf45.resize(1000); }
+            if (setsOf45.size() > 2000) { setsOf45.resize(2000); }
 
             std::vector<Cut> threadCuts;
 
@@ -758,6 +760,7 @@ void LimitedMemoryRank1Cuts::the45Heuristic(const SparseModel &A, const std::vec
                                 cutQueue.pop();                             // Remove the least violated cut
                                 cutQueue.push(vCut);
                             }
+                            if (cuts_count.load() > max_generated_cuts) { break; }
                             // break;
                         }
                     }

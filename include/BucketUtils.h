@@ -12,7 +12,6 @@
  * - `get_bucket_number`: Computes the bucket number for a given job and resource values.
  * - `define_buckets`: Defines the structure and intervals for the buckets based on resource bounds.
  * - `generate_arcs`: Generates arcs between buckets based on resource constraints and feasibility.
- * - `labeling_algorithm`: Solves labeling algorithms in both forward and backward directions for resource constraints.
  * - `SCC_handler`: Identifies and processes SCCs in the bucket graph.
  * - `Extend`: Extends a label with a given arc, checking for feasibility based on resources.
  *
@@ -371,392 +370,6 @@ void BucketGraph::generate_arcs() {
 }
 
 /**
- * Performs the labeling algorithm on the BucketGraph.
- *
- * @tparam D The direction of the algorithm (Forward or Backward).
- * @tparam S The stage of the algorithm (One or Two).
- * @param q_point The q-point used in the algorithm.
- * @return A vector of doubles representing the c_bar values for each bucket.
- */
-template <Direction D, Stage S, Full F>
-std::vector<double> BucketGraph::labeling_algorithm(std::vector<double> q_point, bool full) noexcept {
-
-    auto &buckets = assign_buckets<D>(fw_buckets, bw_buckets);
-    // auto &label_pool                 = assign_buckets<D>(label_pool_fw, label_pool_bw);
-    auto &ordered_sccs      = assign_buckets<D>(fw_ordered_sccs, bw_ordered_sccs);
-    auto &topological_order = assign_buckets<D>(fw_topological_order, bw_topological_order);
-    auto &sccs              = assign_buckets<D>(fw_sccs, bw_sccs);
-    auto &Phi               = assign_buckets<D>(Phi_fw, Phi_bw);
-    auto &c_bar             = assign_buckets<D>(fw_c_bar, bw_c_bar);
-    auto &fixed_buckets     = assign_buckets<D>(fw_fixed_buckets, bw_fixed_buckets);
-    auto &n_labels          = assign_buckets<D>(n_fw_labels, n_bw_labels);
-    auto &sorted_sccs       = assign_buckets<D>(fw_sccs_sorted, bw_sccs_sorted);
-    auto &n_buckets         = assign_buckets<D>(fw_buckets_size, bw_buckets_size);
-    auto &stat_n_labels     = assign_buckets<D>(stat_n_labels_fw, stat_n_labels_bw);
-    auto &stat_n_dom        = assign_buckets<D>(stat_n_dom_fw, stat_n_dom_bw);
-
-    n_labels                         = 0;
-    const size_t          n_segments = n_buckets / 64 + 1;
-    std::vector<uint64_t> Bvisited(n_segments, 0);
-
-    bool all_ext;
-    bool dominated;
-    bool domin_smaller;
-    for (const auto &scc_index : topological_order) {
-        do {
-            all_ext = true;
-            for (const auto bucket : sorted_sccs[scc_index]) {
-                auto bucket_labels = buckets[bucket].get_unextended_labels();
-                for (Label *label : bucket_labels) {
-
-                    domin_smaller = false;
-
-                    if constexpr ((S != Stage::Enumerate)) {
-                        std::memset(Bvisited.data(), 0, Bvisited.size() * sizeof(uint64_t));
-                        domin_smaller =
-                            DominatedInCompWiseSmallerBuckets<D, S>(label, bucket, c_bar, Bvisited, ordered_sccs);
-                    }
-
-                    if (!domin_smaller) {
-
-                        // Lambda to process new labels
-                        auto process_new_label = [&](Label *new_label) {
-                            if constexpr (F == Full::Partial) {
-                                if constexpr (D == Direction::Forward) {
-                                    if (label->resources[0] > q_point[0]) return;
-                                } else {
-                                    if (label->resources[0] <= q_point[0]) return;
-                                }
-                            }
-                            stat_n_labels++;
-
-                            int &to_bucket               = new_label->vertex;
-                            dominated                    = false;
-                            const auto &to_bucket_labels = buckets[to_bucket].get_labels();
-
-                            if constexpr (S == Stage::One) {
-                                for (auto *existing_label : to_bucket_labels) {
-                                    stat_n_dom++;
-                                    if (label->cost < existing_label->cost) {
-                                        buckets[to_bucket].remove_label(existing_label);
-                                    } else {
-                                        dominated = true;
-                                        break;
-                                    }
-                                }
-                            } else {
-                                for (auto *existing_label : to_bucket_labels) {
-                                    if (is_dominated<D, S>(new_label, existing_label)) {
-                                        dominated = true;
-                                        break;
-                                    }
-                                }
-                            }
-
-                            if (!dominated) {
-                                if constexpr (S != Stage::Enumerate) {
-                                    for (auto *existing_label : to_bucket_labels) {
-                                        if (is_dominated<D, S>(existing_label, new_label)) {
-                                            buckets[to_bucket].remove_label(existing_label);
-                                        }
-                                    }
-                                }
-
-                                n_labels++;
-#ifdef SORTED_LABELS
-                                buckets[to_bucket].add_sorted_label(new_label);
-#elif LIMITED_BUCKETS
-                                buckets[to_bucket].add_label_lim(new_label, BUCKET_CAPACITY);
-#else
-                                buckets[to_bucket].add_label(new_label);
-#endif
-                                all_ext = false;
-                            }
-                        };
-
-                        // Process normal arcs
-                        const auto &arcs = jobs[label->job_id].get_arcs<D>(scc_index);
-                        for (const auto &arc : arcs) {
-                            Label *new_label = Extend<D, S, ArcType::Job, Mutability::Mut>(label, arc);
-                            if (!new_label) {
-#ifdef UNREACHABLE_DOMINANCE
-                                set_job_unreachable(label->unreachable_bitmap, arc.to);
-#endif
-                                continue;
-                            }
-                            process_new_label(new_label);
-                        }
-
-#ifdef FIX_BUCKETS
-                        if constexpr (S == Stage::Four) {
-                            // Process jump arcs
-                            const auto &jump_arcs = buckets[bucket].template get_jump_arcs<D>();
-                            for (const auto &jump_arc : jump_arcs) {
-                                Label *new_label = Extend<D, S, ArcType::Jump, Mutability::Const>(label, jump_arc);
-                                if (!new_label) {
-#ifdef UNREACHABLE_DOMINANCE
-                                    set_job_unreachable(label->unreachable_bitmap, jump_arc.to);
-#endif
-                                    continue;
-                                }
-                                process_new_label(new_label);
-                            }
-                        }
-#endif
-                    }
-
-                    label->set_extended(true);
-                }
-            }
-        } while (!all_ext);
-
-        for (int bucket : sorted_sccs[scc_index]) {
-            const auto &labels = buckets[bucket].get_labels();
-
-            if (!labels.empty()) {
-                // Use std::min_element to find the label with the minimum cost
-                auto   min_label = std::min_element(labels.begin(), labels.end(),
-                                                    [](const Label *a, const Label *b) { return a->cost < b->cost; });
-                double min_cost  = (*min_label)->cost;
-                c_bar[bucket]    = std::min(c_bar[bucket], min_cost);
-            }
-
-            for (auto phi_bucket : Phi[bucket]) { c_bar[bucket] = std::min(c_bar[bucket], c_bar[phi_bucket]); }
-        }
-    }
-
-    Label *best_label = get_best_label<D>(topological_order, c_bar, sccs);
-
-    if constexpr (D == Direction::Forward) {
-        fw_best_label = best_label;
-    } else {
-        bw_best_label = best_label;
-    }
-
-    return c_bar;
-}
-
-/**
- * Extends the label L_prime with the given BucketArc gamma.
- *
- * @tparam D The direction of the extension (Forward or Backward).
- * @tparam S The stage of the extension (Stage::One, Stage::Two, or Stage::Three).
- * @param L_prime The label to be extended.
- * @param gamma The BucketArc to extend the label with.
- * @return A tuple containing a boolean indicating if the extension was successful and a pointer to the new
- * label.
- */
-
-template <Direction D, Stage S, ArcType A, Mutability M>
-inline Label *
-BucketGraph::Extend(const std::conditional_t<M == Mutability::Mut, Label *, const Label *>          L_prime,
-                    const std::conditional_t<A == ArcType::Bucket, BucketArc,
-                                             std::conditional_t<A == ArcType::Jump, JumpArc, Arc>> &gamma) noexcept {
-    auto &buckets       = assign_buckets<D>(fw_buckets, bw_buckets);
-    auto &label_pool    = assign_buckets<D>(label_pool_fw, label_pool_bw);
-    auto &fixed_buckets = assign_buckets<D>(fw_fixed_buckets, bw_fixed_buckets);
-    // Precompute some values to avoid recalculating inside the loop
-    const int    initial_job_id    = L_prime->job_id;
-    auto         initial_resources = L_prime->resources;
-    const double initial_cost      = L_prime->cost;
-
-    int job_id = -1;
-    if constexpr (A == ArcType::Bucket) {
-        job_id = buckets[gamma.to_bucket].job_id;
-    } else if constexpr (A == ArcType::Job) {
-        job_id = gamma.to;
-    } else if constexpr (A == ArcType::Jump) {
-        job_id = buckets[gamma.jump_bucket].job_id;
-        // iterate over initial resources
-        for (size_t i = 0; i < initial_resources.size(); ++i) {
-            if constexpr (D == Direction::Forward) {
-                initial_resources[i] =
-                    std::max(initial_resources[i], static_cast<double>(buckets[gamma.jump_bucket].lb[i]));
-            } else {
-                initial_resources[i] =
-                    std::min(initial_resources[i], static_cast<double>(buckets[gamma.jump_bucket].ub[i]));
-            }
-        }
-    }
-
-    // Early exit if the arc is fixed
-    if constexpr (S == Stage::Three || S == Stage::Four || S == Stage::Enumerate) {
-        if constexpr (Direction::Forward == D) {
-            if (fixed_arcs[initial_job_id][job_id] == 1) { return nullptr; }
-        } else {
-            if (fixed_arcs[job_id][initial_job_id] == 1) { return nullptr; }
-        }
-    }
-
-    // Early exit for enumeration
-    if constexpr (S == Stage::Enumerate) {
-        fmt::print("Job id: {}\n", job_id);
-        if (is_job_visited(L_prime->visited_bitmap, job_id)) { return nullptr; }
-    }
-
-    // Perform 2-cycle elimination
-    if (job_id == L_prime->job_id) { return nullptr; }
-
-    // Check if job_id is in the neighborhood of initial_job_id and is visited
-    size_t segment      = job_id / 64;
-    size_t bit_position = job_id % 64;
-
-    if constexpr (S != Stage::Enumerate) {
-        if ((neighborhoods_bitmap[initial_job_id][segment] & (1ULL << bit_position)) &&
-            is_job_visited(L_prime->visited_bitmap, job_id)) {
-            return nullptr;
-        }
-    }
-
-    const VRPJob &VRPJob = jobs[job_id];
-
-    std::vector<double> new_resources(initial_resources.size());
-    // print initial resources size
-    for (size_t i = 0; i < initial_resources.size(); ++i) {
-        if constexpr (D == Direction::Forward) {
-            new_resources[i] =
-                std::max(initial_resources[i] + gamma.resource_increment[i], static_cast<double>(VRPJob.lb[i]));
-        } else {
-            new_resources[i] =
-                std::min(initial_resources[i] - gamma.resource_increment[i], static_cast<double>(VRPJob.ub[i]));
-        }
-    }
-
-    for (size_t i = 0; i < new_resources.size(); ++i) {
-        if constexpr (D == Direction::Forward) {
-            if (new_resources[i] > VRPJob.ub[i]) { return nullptr; }
-        } else {
-            if (new_resources[i] < VRPJob.lb[i]) { return nullptr; }
-        }
-    }
-
-    int to_bucket = get_bucket_number<D>(job_id, new_resources);
-
-#ifdef FIX_BUCKETS
-    if constexpr (S == Stage::Four && A != ArcType::Jump) {
-        if (fixed_buckets[L_prime->vertex][to_bucket] == 1) { return nullptr; }
-    }
-#endif
-
-#ifdef RCC
-    ////////////////////////////////////////////
-    /* CVRPSEP */
-    double cvrpsep_dual = 0.0;
-    if constexpr (D == Direction::Forward) {
-        cvrpsep_dual = rcc_manager->getCachedDualSumForArc(initial_job_id, job_id);
-    } else {
-        cvrpsep_dual = rcc_manager->getCachedDualSumForArc(job_id, initial_job_id);
-    }
-    ////////////////////////////////////////////
-#endif
-    double travel_cost = getcij(initial_job_id, job_id);
-    double new_cost    = initial_cost + travel_cost - VRPJob.cost;
-
-#ifdef RCC
-    new_cost -= cvrpsep_dual;
-#endif
-
-#ifdef KP_BOUND
-    if constexpr (D == Direction::Forward) {
-        auto kpBound = knapsackBound(L_prime);
-        // fmt::print("Knapsack bound: {}\n", kpBound);
-
-        if (kpBound > 0.0) {
-            fmt::print("new_cost/kpBound: {}/{}\n", new_cost, kpBound);
-            // fmt::print("Knapsack bound exceeded\n");
-            return nullptr;
-        }
-    }
-#endif
-
-    auto new_label = label_pool.acquire();
-    new_label->initialize(to_bucket, new_cost, new_resources, job_id);
-    new_label->visited_bitmap = L_prime->visited_bitmap;
-    set_job_visited(new_label->visited_bitmap, job_id);
-
-#ifdef UNREACHABLE_DOMINANCE
-    new_label->unreachable_bitmap = L_prime->unreachable_bitmap;
-#endif
-    new_label->real_cost = L_prime->real_cost + travel_cost;
-    if constexpr (M == Mutability::Mut) {
-        new_label->parent = static_cast<const Label *>(L_prime);
-    } else {
-        new_label->parent = L_prime;
-    }
-
-#ifdef SRC
-    new_label->SRCmap  = L_prime->SRCmap;
-    new_label->SRCcost = L_prime->SRCcost;
-#endif
-#ifdef SRC3
-    new_label->SRCmap = L_prime->SRCmap;
-#endif
-
-    if constexpr (S != Stage::Enumerate) {
-        for (size_t i = 0; i < new_label->visited_bitmap.size(); ++i) {
-            uint64_t current_visited = new_label->visited_bitmap[i];
-
-            if (current_visited == 0) continue;
-
-            uint64_t neighborhood_mask = neighborhoods_bitmap[job_id][i];
-            uint64_t bits_to_clear     = current_visited & ~neighborhood_mask;
-
-            if (i == job_id / 64) { bits_to_clear &= ~(1ULL << (job_id % 64)); }
-
-            new_label->visited_bitmap[i] &= ~bits_to_clear;
-        }
-    }
-
-#if defined(SRC3) || defined(SRC)
-
-    if constexpr (S == Stage::Three || S == Stage::Four || S == Stage::Enumerate) {
-        auto &cutter   = cut_storage;
-        auto &SRCDuals = cutter->SRCDuals;
-
-        for (std::size_t idx = 0; idx < cutter->size(); ++idx) {
-            auto it = cutter->begin();
-            std::advance(it, idx);
-            const auto &cut = *it;
-
-            const auto &baseSet      = cut.baseSet;
-            const auto &baseSetorder = cut.baseSetOrder;
-            const auto &neighbors    = cut.neighbors;
-            const auto &multipliers  = cut.multipliers;
-
-#if defined(SRC3)
-            bool bitIsSet3 = baseSet[segment] & (1 << bit_position);
-            if (bitIsSet3) {
-                new_label->SRCmap[idx]++;
-                if (new_label->SRCmap[idx] % 2 == 0) { new_label->cost -= SRCDuals[idx]; }
-            }
-#endif
-
-#if defined(SRC)
-            bool bitIsSet  = neighbors[segment] & (1ULL << bit_position);
-            bool bitIsSet2 = baseSet[segment] & (1ULL << bit_position);
-            if (bitIsSet) {
-                new_label->SRCmap[idx] = L_prime->SRCmap[idx];
-            } else {
-                new_label->SRCmap[idx] = 0.0;
-            }
-            if (bitIsSet2) {
-                double &value = new_label->SRCmap[idx];
-                value += multipliers[baseSetorder[job_id]];
-                if (value >= 1) {
-                    new_label->SRCmap[idx] -= 1;
-                    new_label->cost -= SRCDuals[idx];
-                    new_label->SRCcost += SRCDuals[idx];
-                }
-            }
-#endif
-        }
-    }
-#endif
-
-    return new_label;
-}
-
-/**
  * @brief Retrieves the best label from the bucket graph based on the given topological order, c_bar values, and
  * strongly connected components.
  *
@@ -792,305 +405,6 @@ Label *BucketGraph::get_best_label(const std::vector<int> &topological_order, co
     }
 
     return best_label;
-}
-
-/**
- * @brief Checks if a label is dominated by a new label based on cost and resource conditions.
- *
- * @tparam D The direction of the graph traversal (Forward or Backward).
- * @tparam S The stage of the algorithm (One, Two, or Three).
- * @param new_label A pointer to the new label.
- * @param label A pointer to the label to be checked.
- * @return True if the label is dominated by the new label, false otherwise.
- */
-template <Direction D, Stage S>
-inline bool BucketGraph::is_dominated(Label *&new_label, Label *&label) noexcept {
-    // Early return if the cost condition is not met
-    if (label->cost > new_label->cost) { return false; }
-
-    // Check resource conditions based on direction
-    const auto &new_resources   = new_label->resources;
-    const auto &label_resources = label->resources;
-
-    if constexpr (D == Direction::Forward) {
-        for (size_t i = 0; i < new_resources.size(); ++i) {
-            if (label_resources[i] > new_resources[i]) { return false; }
-        }
-    } else if constexpr (D == Direction::Backward) {
-        for (size_t i = 0; i < new_resources.size(); ++i) {
-            if (label_resources[i] < new_resources[i]) { return false; }
-        }
-    }
-
-#ifndef UNREACHABLE_DOMINANCE
-    if constexpr (S == Stage::Three || S == Stage::Four || S == Stage::Enumerate) {
-        for (size_t i = 0; i < label->visited_bitmap.size(); ++i) {
-            // Check if there is any client visited in label but not in new_label
-            if ((label->visited_bitmap[i] & ~new_label->visited_bitmap[i]) != 0) { return false; }
-        }
-    }
-#else
-    if constexpr (S == Stage::Three || S == Stage::Four || S == Stage::Enumerate) {
-        for (size_t i = 0; i < label->visited_bitmap.size(); ++i) {
-            // Combine unreachable and visited in the same check
-            auto combined_label_bitmap = label->visited_bitmap[i] | label->unreachable_bitmap[i];
-            // Check if there is any client visited or unreachable in label but not in new_label
-            if ((combined_label_bitmap & ~new_label->unreachable_bitmap[i]) != 0) { return false; }
-        }
-    }
-#endif
-#ifdef SRC3
-    // Check SRCDuals condition for specific stages
-    if constexpr (S == Stage::Three || S == Stage::Four || S == Stage::Enumerate) {
-        const auto &SRCDuals = cut_storage->SRCDuals;
-        if (!SRCDuals.empty()) {
-            double sumSRC = 0;
-            for (size_t i = 0; i < SRCDuals.size(); ++i) {
-                if ((label->SRCmap[i]) % 2 > (new_label->SRCmap[i] % 2)) { sumSRC += SRCDuals[i]; }
-            }
-            if (label->cost - sumSRC > new_label->cost) { return false; }
-        }
-    }
-#endif
-#ifdef SRC
-    // Check SRCDuals condition for specific stages
-    if constexpr (S == Stage::Three || S == Stage::Four || S == Stage::Enumerate) {
-        const auto &SRCDuals = cut_storage->SRCDuals;
-        if (!SRCDuals.empty()) {
-            double sumSRC = 0;
-            for (size_t i = 0; i < SRCDuals.size(); ++i) {
-                if (label->SRCmap[i] > new_label->SRCmap[i]) { sumSRC += SRCDuals[i]; }
-            }
-            if (label->cost - sumSRC > new_label->cost) { return false; }
-        }
-    }
-#endif
-    return true;
-}
-
-/**
- * @brief Checks if element 'a' precedes element 'b' in the given strongly connected components (SCCs).
- *
- * This function takes a vector of SCCs and two elements 'a' and 'b' as input. It searches for 'a' and 'b' in
- * the SCCs and determines if 'a' precedes 'b' in the SCC list.
- *
- * @tparam T The type of elements in the SCCs.
- * @param sccs The vector of SCCs.
- * @param a The element 'a' to check.
- * @param b The element 'b' to check.
- * @return True if 'a' precedes 'b' in the SCC list, false otherwise.
- */
-template <typename T>
-inline bool precedes(const std::vector<std::vector<T>> &sccs, const T &a, const T &b) {
-    auto it_scc_a = sccs.end();
-    auto it_scc_b = sccs.end();
-
-    for (auto it = sccs.begin(); it != sccs.end(); ++it) {
-        const auto &scc = *it;
-
-        // Use std::find once for each SCC, checking both a and b in the same iteration
-        auto it_a = std::find(scc.begin(), scc.end(), a);
-        auto it_b = std::find(scc.begin(), scc.end(), b);
-
-        if (it_a != scc.end()) { it_scc_a = it; }
-        if (it_b != scc.end()) { it_scc_b = it; }
-
-        // If both are found in the same SCC, return false
-        if (it_scc_a == it_scc_b && it_scc_a != sccs.end()) { return false; }
-
-        // Early exit if both are found in different SCCs
-        if (it_scc_a != sccs.end() && it_scc_b != sccs.end()) { return it_scc_a < it_scc_b; }
-    }
-
-    // If a and/or b are not found, return false
-    return false;
-}
-
-/**
- * @brief Determines if a label is dominated in component-wise smaller buckets.
- *
- * This function checks if a given label is dominated by any other label in component-wise smaller buckets.
- * The dominance is determined based on the cost and order of the buckets.
- *
- * @tparam D The direction of the buckets.
- * @tparam S The stage of the buckets.
- * @param L A pointer to the label to be checked.
- * @param bucket The index of the current bucket.
- * @param c_bar The vector of cost values for each bucket.
- * @param Bvisited The set of visited buckets.
- * @param bucket_order The order of the buckets.
- * @return True if the label is dominated, false otherwise.
- */
-template <Direction D, Stage S>
-inline bool BucketGraph::DominatedInCompWiseSmallerBuckets(Label *L, int bucket, std::vector<double> &c_bar,
-                                                           std::vector<uint64_t>               &Bvisited,
-                                                           const std::vector<std::vector<int>> &bucket_order) noexcept {
-    auto &buckets = assign_buckets<D>(fw_buckets, bw_buckets);
-    auto &Phi     = assign_buckets<D>(Phi_fw, Phi_bw);
-
-    const int       b_L = L->vertex;
-    std::stack<int> bucketStack;
-    bucketStack.push(bucket);
-
-    while (!bucketStack.empty()) {
-        int currentBucket = bucketStack.top();
-        bucketStack.pop();
-
-        // Mark the bucket as visited
-        const size_t segment      = currentBucket / 64;
-        const size_t bit_position = currentBucket % 64;
-        Bvisited[segment] |= (1ULL << bit_position);
-
-        // Check cost and precedence
-        if (L->cost < c_bar[currentBucket] && ::precedes<int>(bucket_order, currentBucket, b_L)) { return false; }
-
-        if (b_L != currentBucket) {
-            const auto &bucket_labels = buckets[currentBucket].get_labels();
-            for (auto *label : bucket_labels) {
-                if (is_dominated<D, S>(L, label)) { return true; }
-            }
-        }
-
-        // Add unvisited neighboring buckets to the stack
-        for (const int b_prime : Phi[currentBucket]) {
-            const size_t segment_prime      = b_prime / 64;
-            const size_t bit_position_prime = b_prime % 64;
-
-            if ((Bvisited[segment_prime] & (1ULL << bit_position_prime)) == 0) { bucketStack.push(b_prime); }
-        }
-    }
-
-    return false;
-}
-
-/**
- * Performs the bi-labeling algorithm on the BucketGraph.
- *
- * @param q_star The vector of doubles representing the resource constraints.
- * @param S The stage of the algorithm to run (Stage::One, Stage::Two, or Stage::Three).
- * @return A vector of Label pointers representing the best labels obtained from the algorithm.
- */
-
-template <Stage S>
-std::vector<Label *> BucketGraph::bi_labeling_algorithm(std::vector<double> q_star) {
-
-    if constexpr (S == Stage::Three) {
-        heuristic_fixing<S>(q_star);
-    } else if constexpr (S == Stage::Four) {
-        if (first_reset) {
-            reset_fixed();
-            first_reset = false;
-        }
-    }
-
-#ifdef FIX_BUCKETS
-    if constexpr (S == Stage::Four) { bucket_fixing<S>(q_star); }
-#endif
-
-    reset_pool();
-    common_initialization();
-
-    std::vector<double> forward_cbar(fw_buckets.size(), std::numeric_limits<double>::infinity());
-    std::vector<double> backward_cbar(bw_buckets.size(), std::numeric_limits<double>::infinity());
-
-    run_labeling_algorithms<S, Full::Partial>(forward_cbar, backward_cbar, q_star);
-
-    // Best complete path obtained in the two algorithms above
-    auto best_label = label_pool_fw.acquire();
-
-    if (check_feasibility(fw_best_label, bw_best_label)) {
-        best_label = compute_label(fw_best_label, bw_best_label);
-    } else {
-        best_label->cost         = 0.0;
-        best_label->real_cost    = std::numeric_limits<double>::infinity();
-        best_label->jobs_covered = {};
-    }
-
-    merged_labels.push_back(best_label);
-
-    if constexpr (S == Stage::Enumerate) { fmt::print("Labels generated, concatenating...\n"); }
-
-    const size_t          n_segments = fw_buckets_size / 64 + 1;
-    std::vector<uint64_t> Bvisited(n_segments, 0);
-
-    for (auto bucket = 0; bucket < fw_buckets_size; ++bucket) {
-        auto       &current_bucket = fw_buckets[bucket];
-        const auto &labels         = current_bucket.get_labels();
-        for (const Label *L : labels) {
-
-#ifndef ORIGINAL_ARCS
-            const auto &to_arcs = jobs[L->job_id].get_arcs<Direction::Forward>();
-#else
-            const auto &to_arcs = fw_buckets[bucket].get_bucket_arcs(true);
-#endif
-            for (const auto &arc : to_arcs) {
-                auto &to_job = arc.to;
-                if constexpr (S == Stage::Three) {
-                    if (fixed_arcs[L->job_id][to_job] == 1) { continue; }
-                }
-
-                // Extend the current label based on the current stage
-                auto L_prime = Extend<Direction::Forward, S, ArcType::Job, Mutability::Const>(L, arc);
-                if (!L_prime || L_prime->resources[0] < q_star[0]) continue;
-                auto b_prime = L_prime->vertex;
-
-#ifndef BUCKET_FIXING
-                // if (fw_fixed_buckets[bucket][b_prime] == 1) { continue; }
-#endif
-                std::memset(Bvisited.data(), 0, Bvisited.size() * sizeof(uint64_t));
-                ConcatenateLabel<S>(L, b_prime, best_label, Bvisited, q_star);
-            }
-        }
-    }
-
-    std::sort(merged_labels.begin(), merged_labels.end(),
-              [](const Label *a, const Label *b) { return a->cost < b->cost; });
-
-#ifdef RIH
-    if constexpr (S == Stage::Two || S == Stage::Three) {
-        // Call the labeling heuristic improvement function
-        std::priority_queue<Label *, std::vector<Label *>, LabelComparator> best_labels_in;
-        std::priority_queue<Label *, std::vector<Label *>, LabelComparator> best_labels_out;
-
-        auto LABELS_MAX = 2;
-        // Populate the best_labels_in queue with the final merged_labels
-        auto label_count = 0;
-        for (auto &label : merged_labels) {
-            best_labels_in.push(label);
-            if (++label_count >= LABELS_MAX) break;
-        }
-
-        RIH2(best_labels_in, best_labels_out, LABELS_MAX);
-
-        while (!best_labels_out.empty()) {
-            best_labels_in.push(best_labels_out.top());
-            best_labels_out.pop();
-        }
-
-        /*
-        RIH1(best_labels_in, best_labels_out, LABELS_MAX);
-        while (!best_labels_out.empty()) {
-             best_labels_in.push(best_labels_out.top());
-             best_labels_out.pop();
-        }
-*/
-
-        RIH3(best_labels_in, best_labels_out, LABELS_MAX);
-        while (!best_labels_out.empty()) {
-            best_labels_in.push(best_labels_out.top());
-            best_labels_out.pop();
-        }
-
-        RIH4(best_labels_in, best_labels_out, LABELS_MAX);
-
-        while (!best_labels_in.empty()) {
-            merged_labels.push_back(best_labels_in.top());
-            best_labels_in.pop();
-        }
-    }
-#endif
-
-    return merged_labels;
 }
 
 /**
@@ -1417,4 +731,118 @@ int BucketGraph::get_opposite_bucket_number(int current_bucket_index) {
     }
 
     return opposite_bucket_index;
+}
+
+template <Stage S>
+void BucketGraph::bucket_fixing(const std::vector<double> &q_star) {
+    // Stage 4 bucket arc fixing
+    if (fixed == false) {
+        fixed = true;
+        common_initialization();
+
+        std::vector<double> forward_cbar(fw_buckets.size(), std::numeric_limits<double>::infinity());
+        std::vector<double> backward_cbar(bw_buckets.size(), std::numeric_limits<double>::infinity());
+
+        // if constexpr (S == Stage::Two) {
+        run_labeling_algorithms<Stage::Four, Full::Full>(forward_cbar, backward_cbar, q_star);
+
+        gap = incumbent - (relaxation + std::min(0.0, min_red_cost));
+        // print_info("Running arc elimination with gap: {}\n", gap);
+        fw_c_bar = forward_cbar;
+        bw_c_bar = backward_cbar;
+
+#pragma omp parallel sections
+        {
+#pragma omp section
+            {
+                BucketArcElimination<Direction::Forward>(gap);
+                ObtainJumpBucketArcs<Direction::Forward>();
+            }
+#pragma omp section
+            {
+                BucketArcElimination<Direction::Backward>(gap);
+                ObtainJumpBucketArcs<Direction::Backward>();
+            }
+        }
+        generate_arcs();
+    }
+}
+
+/**
+ * @brief Applies heuristic fixing to the current solution.
+ *
+ * This function modifies the current solution based on the heuristic
+ * fixing strategy using the provided vector of values.
+ *
+ * @param q_star A vector of double values representing the heuristic
+ *               fixing parameters.
+ */
+template <Stage S>
+void BucketGraph::heuristic_fixing(const std::vector<double> &q_star) {
+    // Stage 3 fixing heuristic
+    reset_pool();
+    reset_fixed();
+    common_initialization();
+
+    std::vector<double> forward_cbar(fw_buckets.size(), std::numeric_limits<double>::infinity());
+    std::vector<double> backward_cbar(bw_buckets.size(), std::numeric_limits<double>::infinity());
+
+    if constexpr (S == Stage::Three) {
+        run_labeling_algorithms<Stage::Two, Full::Full>(forward_cbar, backward_cbar, q_star);
+    } else {
+        run_labeling_algorithms<Stage::Three, Full::Full>(forward_cbar, backward_cbar, q_star);
+    }
+    std::vector<std::vector<Label *>> fw_labels_map(jobs.size());
+    std::vector<std::vector<Label *>> bw_labels_map(jobs.size());
+
+    auto group_labels = [&](auto &buckets, auto &labels_map) {
+        for (auto &bucket : buckets) {
+            for (auto &label : bucket.get_labels()) {
+                labels_map[label->job_id].push_back(label); // Directly index using job_id
+            }
+        }
+    };
+
+    // Create tasks for forward and backward labels grouping
+    auto forward_task = stdexec::schedule(bi_sched) | stdexec::then([&]() { group_labels(fw_buckets, fw_labels_map); });
+    auto backward_task =
+        stdexec::schedule(bi_sched) | stdexec::then([&]() { group_labels(bw_buckets, bw_labels_map); });
+
+    // Execute the tasks in parallel
+    auto work = stdexec::when_all(std::move(forward_task), std::move(backward_task));
+
+    stdexec::sync_wait(std::move(work));
+
+    auto num_fixes = 0;
+    //  Function to find the minimum cost label in a vector of labels
+    auto find_min_cost_label = [](const std::vector<Label *> &labels) -> const Label * {
+        return *std::min_element(labels.begin(), labels.end(),
+                                 [](const Label *a, const Label *b) { return a->cost < b->cost; });
+    };
+    for (const auto &job_I : jobs) {
+        const auto &fw_labels = fw_labels_map[job_I.id];
+        if (fw_labels.empty()) continue; // Skip if no labels for this job_id
+
+        for (const auto &job_J : jobs) {
+            if (job_I.id == job_J.id) continue; // Compare based on id (or other key field)
+            const auto &bw_labels = bw_labels_map[job_J.id];
+            if (bw_labels.empty()) continue; // Skip if no labels for this job_id
+
+            const Label *min_fw_label = find_min_cost_label(fw_labels);
+            const Label *min_bw_label = find_min_cost_label(bw_labels);
+
+            if (!min_fw_label || !min_bw_label) continue;
+
+            const VRPJob &L_last_job = jobs[min_fw_label->job_id];
+            auto          cost       = getcij(min_fw_label->job_id, min_bw_label->job_id);
+
+            // Check for infeasibility
+            if (min_fw_label->resources[0] + cost + L_last_job.duration > min_bw_label->resources[0]) { continue; }
+
+            if (min_fw_label->cost + cost + L_last_job.duration + min_bw_label->cost > gap) {
+                fixed_arcs[job_I.id][job_J.id] = 1; // Index with job ids
+                num_fixes++;
+            }
+        }
+    }
 }
