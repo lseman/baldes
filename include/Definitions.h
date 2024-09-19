@@ -433,13 +433,10 @@ struct Label {
     const Label               *parent       = nullptr;
     int                        status       = 0;
 #ifdef SRC3
-    std::array<std::uint16_t, MAX_SRC_CUTS> SRCmap  = {};
-    double                                  SRCcost = 0.0;
-
+    std::array<std::uint16_t, MAX_SRC_CUTS> SRCmap = {};
 #endif
 #ifdef SRC
-    std::array<double, MAX_SRC_CUTS> SRCmap  = {};
-    double                           SRCcost = 0.0;
+    std::vector<double> SRCmap;
 #endif
     // uint64_t             visited_bitmap; // Bitmap for visited jobs
     std::array<uint64_t, num_words> visited_bitmap = {0};
@@ -502,9 +499,7 @@ struct Label {
         this->is_extended = false;
         this->status      = 0;
         this->jobs_covered.clear();
-#ifdef SRC
-        this->SRCcost = 0.0;
-#endif
+
         std::memset(visited_bitmap.data(), 0, visited_bitmap.size() * sizeof(uint64_t));
 #ifdef UNREACHABLE_DOMINANCE
         std::memset(unreachable_bitmap.data(), 0, unreachable_bitmap.size() * sizeof(uint64_t));
@@ -513,7 +508,7 @@ struct Label {
         std::memset(SRCmap.data(), 0, SRCmap.size() * sizeof(std::uint16_t));
 #endif
 #ifdef SRC
-        std::memset(SRCmap.data(), 0, SRCmap.size() * sizeof(double));
+        SRCmap.clear();
 #endif
     }
 

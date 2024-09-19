@@ -158,7 +158,6 @@ Label *BucketGraph::compute_label(const Label *L, const Label *L_prime) {
     if (!SRCDuals.empty()) {
         for (size_t i = 0; i < SRCDuals.size(); ++i) {
             if (L->SRCmap[i] + L_prime->SRCmap[i] >= 1) {
-                // fmt::print("SRC: ", SRCDuals[i]);
                 sumSRC += SRCDuals[i];
             }
         }
@@ -523,7 +522,7 @@ void BucketGraph::set_adjacency_list() {
             }
             if (!feasible) continue;
 
-            // if (job.lb[TIME_INDEX] + res_inc[TIME_INDEX] > next_job.ub[TIME_INDEX]) continue;
+            //if (job.lb[TIME_INDEX] + res_inc[TIME_INDEX] > next_job.ub[TIME_INDEX]) continue;
 
             double aux_double = 1.E-5 * next_job.start_time;
             best_arcs.emplace_back(aux_double, next_job.id, res_inc, cost_inc);
@@ -649,6 +648,9 @@ void BucketGraph::common_initialization() {
         depot->initialize(calculated_index, 0.0, interval_starts, 0);
         depot->is_extended = false;
         set_job_visited(depot->visited_bitmap, 0);
+#ifdef SRC
+        depot->SRCmap.assign(cut_storage->SRCDuals.size(), 0);
+#endif
         fw_buckets[calculated_index].add_label(depot);
         fw_buckets[calculated_index].job_id = 0;
 
@@ -674,6 +676,9 @@ void BucketGraph::common_initialization() {
         end_depot->initialize(calculated_index, 0.0, interval_ends, N_SIZE - 1);
         end_depot->is_extended = false;
         set_job_visited(end_depot->visited_bitmap, N_SIZE - 1);
+#ifdef SRC
+        end_depot->SRCmap.assign(cut_storage->SRCDuals.size(), 0);
+#endif
         bw_buckets[calculated_index].add_label(end_depot);
         bw_buckets[calculated_index].job_id = N_SIZE - 1;
 

@@ -78,7 +78,6 @@ public:
     std::vector<double> q_star;
     int                 iter       = 0;
     bool                transition = true;
-    bool                converged  = false;
     Status                status     = Status::NotOptimal;
 
     void                 setSplit(std::vector<double> q_star) { this->q_star = q_star; }
@@ -674,8 +673,8 @@ public:
         if (!fw_label || !bw_label) return false;
         // print bw_label->job_id
         const struct VRPJob &VRPJob = jobs[fw_label->job_id];
-        if (fw_label->resources[0] + getcij(fw_label->job_id, bw_label->job_id) + VRPJob.duration >
-            bw_label->resources[0]) {
+        if (fw_label->resources[TIME_INDEX] + getcij(fw_label->job_id, bw_label->job_id) + VRPJob.duration >
+            bw_label->resources[TIME_INDEX]) {
             return false;
         }
         if constexpr (R_SIZE > 1) {

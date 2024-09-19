@@ -377,7 +377,7 @@ int BucketGraph::RIH3(std::priority_queue<Label *, std::vector<Label *>, LabelCo
             if (job1 == job2) { continue; }
 
             Label *new_label = label_pool_fw.acquire();
-            new_label->initialize(current_label->vertex, current_label->cost, {current_label->resources[0]},
+            new_label->initialize(current_label->vertex, current_label->cost, {current_label->resources[TIME_INDEX]},
                                   current_label->job_id);
 
             // Copy jobs covered and swap neighboring jobs i and i+1

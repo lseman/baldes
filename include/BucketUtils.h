@@ -462,7 +462,7 @@ void BucketGraph::ConcatenateLabel(const Label *&L, int &b, Label *&pbest, std::
             if (L_bw->job_id == L->job_id) { continue; }
 
             // Loop through the resource dimensions
-            if (L->resources[0] + cost + L_last_job.duration > L_bw->resources[0]) { continue; }
+            if (L->resources[TIME_INDEX] + cost + L_last_job.duration > L_bw->resources[TIME_INDEX]) { continue; }
 
             if constexpr (R_SIZE > 1) {
                 bool valid = true;
@@ -837,7 +837,7 @@ void BucketGraph::heuristic_fixing(const std::vector<double> &q_star) {
             auto          cost       = getcij(min_fw_label->job_id, min_bw_label->job_id);
 
             // Check for infeasibility
-            if (min_fw_label->resources[0] + cost + L_last_job.duration > min_bw_label->resources[0]) { continue; }
+            if (min_fw_label->resources[TIME_INDEX] + cost + L_last_job.consumption[TIME_INDEX] > min_bw_label->resources[TIME_INDEX]) { continue; }
 
             if (min_fw_label->cost + cost + L_last_job.duration + min_bw_label->cost > gap) {
                 fixed_arcs[job_I.id][job_J.id] = 1; // Index with job ids

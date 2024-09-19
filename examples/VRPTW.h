@@ -19,8 +19,8 @@
 #include "../include/Definitions.h"
 
 #include "../include/BucketGraph.h"
-#include "../include/BucketUtils.h"
 #include "../include/BucketSolve.h"
+#include "../include/BucketUtils.h"
 
 #include "../extra/Stabilization.h"
 
@@ -94,10 +94,7 @@ public:
             auto vec = r1c.computeLimitedMemoryCoefficients(label->jobs_covered);
             if (vec.size() > 0) {
                 for (int i = 0; i < vec.size(); i++) {
-                    if (vec[i] != 0) {
-                        auto ctr = r1c.getCtr(i);
-                        col.addTerms(&vec[i], &constrs[N_SIZE - 1 + i], 1);
-                    }
+                    if (vec[i] != 0) { col.addTerms(&vec[i], &constrs[N_SIZE - 1 + i], 1); }
                 }
             }
 #endif
@@ -564,10 +561,10 @@ public:
         std::vector<double>  solution;
         bool                 can_add = true;
 
-        Stabilization stab(0.9, jobDuals);
-        std::vector<double>        split   = {time_horizon * 0.5};
+        Stabilization       stab(0.9, jobDuals);
+        std::vector<double> split = {time_horizon * 0.5};
         bucket_graph.setSplit(split);
-        bool          changed = false;
+        bool changed = false;
         // set start timer
         auto start_timer = std::chrono::high_resolution_clock::now();
 
@@ -585,73 +582,59 @@ public:
 #endif
         bool rcc = false;
         for (int iter = 0; iter < 1000; ++iter) {
-            cuts    = r1c.cutStorage;
-            changed = cutHandler(r1c, node, constraints);
-
             //////////////////////////////////////////////////////////////////////
             // PREPARING DUALS
             //////////////////////////////////////////////////////////////////////
 
-            if (changed) {
-                node->update();
-                node->optimize();
-            }
-            if (cuts.size() > 0) {
-                jobDuals          = getDuals(node);
-                auto matrixSparse = extractModelDataSparse(node);
-                auto numJobs      = bucket_graph.getJobs().size() - 1;
-                cutDuals          = std::vector<double>(jobDuals.begin() + numJobs, jobDuals.end());
-                cuts.setDuals(cutDuals);
-            }
-
-            auto onlyJobDuals = std::vector<double>(jobDuals.begin(), jobDuals.begin() + bucket_graph.getJobs().size());
-            bucket_graph.setDuals(onlyJobDuals);
-
-            //////////////////////////////////////////////////////////////////////
-            // CALLING BALDES
-            //////////////////////////////////////////////////////////////////////
-
-            bucket_graph.cut_storage = &cuts;
-
-            paths = bucket_graph.solve();
-            inner_obj = paths[0]->cost;
-            stage = bucket_graph.getStage();
-
-            if (bucket_graph.getStatus() == Status::Optimal) {
-                fmt::print("Optimal solution found\n");
-                break;
-            }
-
-            //////////////////////////////////////////////////////////////////////
-            bidi_relation = bucket_graph.bidi_relation;
-
-            auto colAdded = addColumn(node, paths, cuts, false);
-
-            if (colAdded == 0) {
-                stab.add_misprice();
-            } else {
-                stab.reset_misprices();
-            }
-
             double obj;
 
+#if defined(SRC3) || defined(SRC)
+            if (ss && !rcc) {
+#ifdef RCC
+                print_cut("Testing RCC feasibility..\n");
+                rcc                      = RCCsep(node, solution, cvrsep_ctrs);
+                bucket_graph.rcc_manager = &rccManager;
+                if (rcc) { duals = getDuals(node); }
+
+#endif
+                auto cuts_before = cuts.size();
+                print_info("Removing most negative reduced cost variables\n");
+                // removeNegativeReducedCostVarsAndPaths(node);
+                node->optimize();
+                highs_obj         = node->get(GRB_DoubleAttr_ObjVal);
+                solution          = extractSolution(node);
+                auto matrixSparse = extractModelDataSparse(node);
+                r1c.allPaths      = allPaths;
+                r1c.separate(matrixSparse.A_sparse, solution, N_SIZE - 2, 1e-3);
+                fmt::print("Separating cuts..\n");
+#ifdef SRC
+                // r1c.the45Heuristic<CutType::FourRow>(matrixSparse.A_sparse, solution, N_SIZE - 2);
+                // r1c.the45Heuristic<CutType::FiveRow>(matrixSparse.A_sparse, solution, N_SIZE - 2);
+#endif
+                cuts = r1c.cutStorage;
+                if (cuts_before == cuts.size()) {
+                    print_info("No violations found, calling it a day\n");
+                    break;
+                }
+                fmt::print("Found {} violated cuts\n", cuts.size());
+                bucket_graph.ss = false;
+            }
+#endif
+
+            changed = cutHandler(r1c, node, constraints);
+            cuts    = r1c.cutStorage;
             node->optimize();
-            highs_obj         = node->get(GRB_DoubleAttr_ObjVal);
-            auto dual_obj     = node->get(GRB_DoubleAttr_ObjBound);
-            jobDuals          = getDuals(node);
+            highs_obj     = node->get(GRB_DoubleAttr_ObjVal);
+            auto dual_obj = node->get(GRB_DoubleAttr_ObjBound);
+            jobDuals      = getDuals(node);
+            // print jobDuals size
+            // fmt::print("Job duals size: {}\n", jobDuals.size());
+            auto originDuals = jobDuals;
+            // print jobDuals size
             auto matrixSparse = extractModelDataSparse(node);
             jobDuals          = stab.run(matrixSparse, jobDuals);
             solution          = extractSolution(node);
-
-            bucket_graph.relaxation = highs_obj;
-
-#ifdef RCC
-            if (rcc) {
-                rcc = RCCsep(node, solution, cvrsep_ctrs);
-                rccManager.computeDualsDeleteAndCache(node);
-            }
-#endif
-            bool integer = true;
+            bool integer      = true;
             // Check integrality of the solution
             for (auto &sol : solution) {
                 if (sol > 1e-1 && sol < 1 - 1e-1) {
@@ -666,38 +649,49 @@ public:
                     bucket_graph.incumbent = integer_solution;
                 }
             }
-
             lag_gap          = integer_solution - (highs_obj + std::min(0.0, inner_obj));
             bucket_graph.gap = lag_gap;
             bucket_graph.augment_ng_memories(solution, allPaths, true, 5, 100, 16, N_SIZE);
+            bucket_graph.relaxation = highs_obj;
 
-            // bucket_graph.relaxation = highs_obj;
-
-#if defined(SRC3) || defined(SRC)
-            if (ss && !rcc) {
-                auto cuts_before = cuts.size();
-                print_info("Removing most negative reduced cost variables\n");
-                removeNegativeReducedCostVarsAndPaths(node);
-                node->optimize();
-                highs_obj    = node->get(GRB_DoubleAttr_ObjVal);
-                solution     = extractSolution(node);
-                matrixSparse = extractModelDataSparse(node);
-                r1c.allPaths = allPaths;
-                r1c.separate(matrixSparse.A_sparse, solution, N_SIZE - 2, 1e-3);
-                fmt::print("Separating cuts..\n");
-#ifdef SRC
-                // r1c.the45Heuristic<CutType::FourRow>(matrixSparse.A_sparse, solution, N_SIZE - 2);
-                // r1c.the45Heuristic<CutType::FiveRow>(matrixSparse.A_sparse, solution, N_SIZE - 2);
-#endif
-                cuts = r1c.cutStorage;
-                if (cuts_before == cuts.size()) {
-                    print_info("No violations found, calling it a day\n");
-                    break;
-                }
-                fmt::print("Found {} violated cuts\n", cuts.size());
-                ss = false;
+            if (cuts.size() > 0) {
+                // jobDuals          = getDuals(node);
+                // auto matrixSparse = extractModelDataSparse(node);
+                auto numJobs = bucket_graph.getJobs().size() - 1;
+                cutDuals     = std::vector<double>(originDuals.begin() + numJobs, originDuals.end());
+                cuts.setDuals(cutDuals);
             }
-#endif
+
+            auto onlyJobDuals = std::vector<double>(jobDuals.begin(), jobDuals.begin() + bucket_graph.getJobs().size());
+            bucket_graph.setDuals(onlyJobDuals);
+
+            //////////////////////////////////////////////////////////////////////
+            // CALLING BALDES
+            //////////////////////////////////////////////////////////////////////
+
+            bucket_graph.cut_storage = &cuts;
+            paths                    = bucket_graph.solve();
+
+            inner_obj = paths[0]->cost;
+            stage     = bucket_graph.getStage();
+
+            if (bucket_graph.getStatus() == Status::Optimal) {
+                print_info("Optimal solution found\n");
+                break;
+            }
+
+            ss = bucket_graph.ss;
+
+            //////////////////////////////////////////////////////////////////////
+            bidi_relation = bucket_graph.bidi_relation;
+
+            auto colAdded = addColumn(node, paths, cuts, false);
+
+            if (colAdded == 0) {
+                stab.add_misprice();
+            } else {
+                stab.reset_misprices();
+            }
 
             if (iter % 10 == 0)
                 fmt::print("| It.: {:4} | Obj.: {:8.2f} | Pricing: {:10.2f} | Cuts: {:4} | Paths: {:4} | "
@@ -718,6 +712,18 @@ public:
         binarizeNode(node);
         node->optimize();
         auto ip_result = node->get(GRB_DoubleAttr_ObjVal);
+
+        // get solution in which x > 0.5 and print the corresponding allPaths
+        std::vector<int> sol;
+        for (int i = 0; i < allPaths.size(); i++) {
+            if (node->getVar(i).get(GRB_DoubleAttr_X) > 0.5) { sol.push_back(i); }
+        }
+
+        for (auto s : sol) {
+            fmt::print("Path: ");
+            for (auto j : allPaths[s].route) { fmt::print("{} ", j); }
+            fmt::print("\n");
+        }
 
         // ANSI escape code for blue text
         constexpr auto blue  = "\033[34m";

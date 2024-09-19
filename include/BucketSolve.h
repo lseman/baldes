@@ -82,9 +82,6 @@ inline std::vector<Label *> BucketGraph::solve() {
         }
     } else if (s4) {
         stage = 4;
-#ifdef RCC
-        rccManager.computeDualsDeleteAndCache(node);
-#endif
 
 #ifdef FIX_BUCKETS
         if (transition) {
@@ -109,12 +106,6 @@ inline std::vector<Label *> BucketGraph::solve() {
             print_cut("Going into separation mode..\n");
             status = Status::Separation;
 
-#ifdef RCC
-            print_cut("Testing RCC feasibility..\n");
-            rcc                      = RCCsep(node, solution, cvrsep_ctrs);
-            bucket_graph.rcc_manager = &rccManager;
-            if (rcc) { duals = getDuals(node); }
-#endif
         }
     }
     iter++;
@@ -175,9 +166,9 @@ std::vector<double> BucketGraph::labeling_algorithm(std::vector<double> q_point,
                         auto process_new_label = [&](Label *new_label) {
                             if constexpr (F == Full::Partial) {
                                 if constexpr (D == Direction::Forward) {
-                                    if (label->resources[0] > q_point[0]) return;
+                                    if (label->resources[TIME_INDEX] > q_point[TIME_INDEX]) return;
                                 } else {
-                                    if (label->resources[0] <= q_point[0]) return;
+                                    if (label->resources[TIME_INDEX] <= q_point[TIME_INDEX]) return;
                                 }
                             }
                             stat_n_labels++;
@@ -356,7 +347,7 @@ std::vector<Label *> BucketGraph::bi_labeling_algorithm(std::vector<double> q_st
 
                 // Extend the current label based on the current stage
                 auto L_prime = Extend<Direction::Forward, S, ArcType::Job, Mutability::Const>(L, arc);
-                if (!L_prime || L_prime->resources[0] <= q_star[0]) continue;
+                if (!L_prime || L_prime->resources[TIME_INDEX] <= q_star[TIME_INDEX]) continue;
                 auto b_prime = L_prime->vertex;
 
 #ifdef FIX_BUCKETS
@@ -566,13 +557,10 @@ BucketGraph::Extend(const std::conditional_t<M == Mutability::Mut, Label *, cons
         new_label->parent = L_prime;
     }
 
-#ifdef SRC
+#if defined(SRC3) || defined(SRC)
     new_label->SRCmap  = L_prime->SRCmap;
-    new_label->SRCcost = L_prime->SRCcost;
 #endif
-#ifdef SRC3
-    new_label->SRCmap = L_prime->SRCmap;
-#endif
+
 
     if constexpr (S != Stage::Enumerate) {
         for (size_t i = 0; i < new_label->visited_bitmap.size(); ++i) {
@@ -625,10 +613,10 @@ BucketGraph::Extend(const std::conditional_t<M == Mutability::Mut, Label *, cons
                 double &value = new_label->SRCmap[idx];
                 value += multipliers[baseSetorder[job_id]];
                 if (value >= 1) {
-                    new_label->SRCmap[idx] -= 1;
+                    value -= 1;
                     new_label->cost -= SRCDuals[idx];
-                    new_label->SRCcost += SRCDuals[idx];
                 }
+                new_label->SRCmap[idx] = value;
             }
 #endif
         }
