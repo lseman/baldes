@@ -581,7 +581,7 @@ public:
         CMGR_CreateCMgr(&oldCutsCMP, 100); // For old cuts, if needed
 #endif
         bool rcc = false;
-        for (int iter = 0; iter < 1000; ++iter) {
+        for (int iter = 0; iter < 2000; ++iter) {
             //////////////////////////////////////////////////////////////////////
             // PREPARING DUALS
             //////////////////////////////////////////////////////////////////////
@@ -608,8 +608,8 @@ public:
                 r1c.separate(matrixSparse.A_sparse, solution, N_SIZE - 2, 1e-3);
                 fmt::print("Separating cuts..\n");
 #ifdef SRC
-                // r1c.the45Heuristic<CutType::FourRow>(matrixSparse.A_sparse, solution, N_SIZE - 2);
-                // r1c.the45Heuristic<CutType::FiveRow>(matrixSparse.A_sparse, solution, N_SIZE - 2);
+                //r1c.the45Heuristic<CutType::FourRow>(matrixSparse.A_sparse, solution, N_SIZE - 2);
+                //r1c.the45Heuristic<CutType::FiveRow>(matrixSparse.A_sparse, solution, N_SIZE - 2);
 #endif
                 cuts = r1c.cutStorage;
                 if (cuts_before == cuts.size()) {
@@ -689,6 +689,7 @@ public:
 
             if (colAdded == 0) {
                 stab.add_misprice();
+                fmt::print("No columns added, mispricing detected\n");
             } else {
                 stab.reset_misprices();
             }
@@ -724,6 +725,7 @@ public:
             for (auto j : allPaths[s].route) { fmt::print("{} ", j); }
             fmt::print("\n");
         }
+        fmt::print("\n");
 
         // ANSI escape code for blue text
         constexpr auto blue  = "\033[34m";

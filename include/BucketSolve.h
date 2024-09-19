@@ -2,16 +2,16 @@
  * @file BucketSolve.h
  * @brief Defines the BucketGraph class and its solving methods for optimization problems.
  *
- * This file contains the implementation of the `BucketGraph` class, which solves a multi-stage bi-labeling 
+ * This file contains the implementation of the `BucketGraph` class, which solves a multi-stage bi-labeling
  * optimization problem using bucket graphs. The `BucketGraph` class handles:
- * 
+ *
  * - Solving bucket graph optimization problems using multi-stage labeling algorithms.
  * - Adaptive handling of terminal time adjustments based on label distribution.
  * - Adaptive stage transitions to refine solutions based on inner objectives and iteration counts.
  * - Integration of different arc types (standard, jump, fixed) during label extensions.
  * - Dual management and RCC separation for handling advanced routing optimization constraints.
- * 
- * The `BucketGraph` class is designed to solve complex routing problems, leveraging multiple stages, parallelism, 
+ *
+ * The `BucketGraph` class is designed to solve complex routing problems, leveraging multiple stages, parallelism,
  * and adaptive heuristics to optimize paths while respecting resource constraints.
  */
 
@@ -66,7 +66,7 @@ inline std::vector<Label *> BucketGraph::solve() {
         stage     = 2;
         paths     = bi_labeling_algorithm<Stage::Two>(q_star);
         inner_obj = paths[0]->cost;
-        if (inner_obj >= -100 || iter > 800) {
+        if (inner_obj >= -100 || iter > 500) {
             s2 = false;
             s3 = true;
         }
@@ -105,7 +105,6 @@ inline std::vector<Label *> BucketGraph::solve() {
 #endif
             print_cut("Going into separation mode..\n");
             status = Status::Separation;
-
         }
     }
     iter++;
@@ -558,9 +557,8 @@ BucketGraph::Extend(const std::conditional_t<M == Mutability::Mut, Label *, cons
     }
 
 #if defined(SRC3) || defined(SRC)
-    new_label->SRCmap  = L_prime->SRCmap;
+    new_label->SRCmap = L_prime->SRCmap;
 #endif
-
 
     if constexpr (S != Stage::Enumerate) {
         for (size_t i = 0; i < new_label->visited_bitmap.size(); ++i) {

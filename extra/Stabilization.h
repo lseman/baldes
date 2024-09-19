@@ -5,7 +5,7 @@
  * This file implements the Stabilization class, which is responsible for handling the
  * stabilization process during column generation in large-scale optimization problems,
  * such as vehicle routing and resource-constrained shortest path problems (RCSPP).
- * 
+ *
  * The class maintains various dual solution parameters, including stability centers and
  * misprice sequences, and it adjusts dual values based on a set of rules to improve
  * convergence and avoid oscillations during the optimization process.
@@ -72,11 +72,12 @@ public:
      */
     void add_misprice() {
         if (alpha > 0) { nb_misprices++; }
+        cur_alpha = _misprice_schedule(nb_misprices, base_alpha);
     }
 
     /**
      * @brief Resets the mispricing counter to zero.
-     * 
+     *
      * This function sets the number of misprices (`nb_misprices`) to zero,
      * effectively resetting any previously recorded mispricing events.
      */
@@ -87,7 +88,8 @@ public:
      *
      * @param nb_misprices The number of misprices encountered.
      * @param base_alpha The base alpha value used for calculation.
-     * @return The calculated alpha value. If the number of misprices is greater than 10 or the calculated alpha is less than or equal to 0.001, stabilization is deactivated and alpha is set to 0.0.
+     * @return The calculated alpha value. If the number of misprices is greater than 10 or the calculated alpha is less
+     * than or equal to 0.001, stabilization is deactivated and alpha is set to 0.0.
      */
     double _misprice_schedule(int nb_misprices, double base_alpha) {
         double alpha = 1.0 - (nb_misprices + 1) * (1 - base_alpha);
@@ -109,14 +111,14 @@ public:
     /**
      * @brief Computes the norm of a subset of elements from a given vector.
      *
-     * This function calculates the Euclidean norm (L2 norm) of the elements in the 
-     * provided vector that are indexed by the values in the new_rows vector. It 
-     * adds a small epsilon value (1e-6) to the result to avoid issues with zero 
+     * This function calculates the Euclidean norm (L2 norm) of the elements in the
+     * provided vector that are indexed by the values in the new_rows vector. It
+     * adds a small epsilon value (1e-6) to the result to avoid issues with zero
      * norms.
      *
-     * @param new_rows A vector of indices specifying which elements of the vector 
+     * @param new_rows A vector of indices specifying which elements of the vector
      *                 to include in the norm calculation.
-     * @param vector   The vector containing the elements to be used in the norm 
+     * @param vector   The vector containing the elements to be used in the norm
      *                 calculation.
      * @return The Euclidean norm of the specified elements in the vector.
      */
@@ -153,8 +155,8 @@ public:
     /**
      * @brief Computes the stabilized dual solution.
      *
-     * This function calculates a stabilized dual solution by combining the 
-     * input and output dual values using a weighted average. The weights are 
+     * This function calculates a stabilized dual solution by combining the
+     * input and output dual values using a weighted average. The weights are
      * determined by the current alpha value (`cur_alpha`).
      *
      * @return DualSolution The stabilized dual solution.
@@ -207,7 +209,7 @@ public:
 
         // Calculate the cosine of the angle
         if (norm_a > 0 && norm_b > 0) {
-            beta = dot_product / (norm_a * norm_b);
+            beta = dot_product / norm_a / norm_b;
         } else {
             beta = 0.0; // Handle the case where one of the norms is zero to avoid division by zero
         }
@@ -219,11 +221,11 @@ public:
      * @brief Computes the rho values for the given new rows.
      *
      * This function updates the `rho` vector by applying a transformation to each element
-     * in the `new_rows` vector. The transformation is defined as a weighted sum of the 
-     * corresponding elements in the `duals_g` and `duals_out` vectors, where the weights 
+     * in the `new_rows` vector. The transformation is defined as a weighted sum of the
+     * corresponding elements in the `duals_g` and `duals_out` vectors, where the weights
      * are given by `beta` and `1 - beta`, respectively.
      *
-     * @param new_rows A vector of integers representing the new row indices for which 
+     * @param new_rows A vector of integers representing the new row indices for which
      *                 the rho values need to be computed.
      */
     void compute_rho(const std::vector<int> &new_rows) {
@@ -234,7 +236,7 @@ public:
     /**
      * @brief Computes the subgradient for the given model data and updates the Lagrangian constraint values.
      *
-     * This function calculates the subgradient for the provided model data (`dados`) and updates the 
+     * This function calculates the subgradient for the provided model data (`dados`) and updates the
      * Lagrangian constraint values based on the new rows and the sparse matrix representation of the constraints.
      *
      * @param dados The model data containing the constraint information and sparse matrix representation.
@@ -269,7 +271,7 @@ public:
         for (size_t idx = 0; idx < dados.A_sparse.values.size(); ++idx) {
             int row_id = dados.A_sparse.row_indices[idx];
             int col_id = dados.A_sparse.col_indices[idx];
-            lagrangian_constraint_values[row_id] += dados.A_sparse.values[idx] * duals_sep[row_id];
+            lagrangian_constraint_values[row_id] += dados.A_sparse.values[idx] * duals_in[row_id];
         }
 
         std::transform(new_rows.begin(), new_rows.end(), subgradient.begin(),
@@ -283,7 +285,7 @@ public:
      * @brief Executes the stabilization algorithm for dual solutions.
      *
      * This function performs a series of operations to stabilize the dual solutions
-     * for a given model. It adjusts the dual solutions based on subgradients and 
+     * for a given model. It adjusts the dual solutions based on subgradients and
      * other parameters to ensure convergence and stability.
      *
      * @param dados The model data containing necessary information for the algorithm.
@@ -317,6 +319,8 @@ public:
         std::vector<int>    new_rows(number_of_rows);
         std::iota(new_rows.begin(), new_rows.end(), 0);
 
+        subgradient_call(dados, new_rows, lagrangian_constraint_values, subgradient);
+
         auto   duals_tilde = getStabDualSol();
         double coef_g      = norm(new_rows, duals_in, duals_out);
         double coef_g_sub  = norm(new_rows, subgradient);
@@ -335,56 +339,30 @@ public:
         double coef_sep_den = norm(new_rows, duals_in, rho);
         coef_sep            = coef_sep / coef_sep_den;
 
-        if (std::isnan(coef_sep)) { coef_sep = 0.0; }
+        std::transform(new_rows.begin(), new_rows.end(), duals_sep.begin(), [this, coef_sep](int row_id) {
+            return std::max(0.0, duals_in[row_id] + coef_sep * (rho[row_id] - duals_in[row_id]));
+        });
 
-        if (coef_sep == 0.0) {
-            std::copy(duals_in.begin(), duals_in.end(), duals_sep.begin());
-        } else {
-            std::transform(new_rows.begin(), new_rows.end(), duals_sep.begin(), [this, coef_sep](int row_id) {
-                return std::max(0.0, duals_in[row_id] + coef_sep * (rho[row_id] - duals_in[row_id]));
-            });
-        }
+        // calculate out - in
+        std::vector<double> out_in(duals_out.size());
+        std::transform(duals_out.begin(), duals_out.end(), duals_in.begin(), out_in.begin(),
+                       [](double out, double in) { return out - in; });
 
-        subgradient_call(dados, new_rows, lagrangian_constraint_values, subgradient);
-        // Calculate the in-sep direction
-        std::vector<double> in_sep_direction(duals_sep.size());
-        std::transform(duals_sep.begin(), duals_sep.end(), duals_in.begin(), in_sep_direction.begin(),
-                       [](double sep, double in) { return sep - in; });
-        /*
-        // Calculate the norms
-        double in_sep_norm      = norm(new_rows, in_sep_direction);
-        double subgradient_norm = norm(new_rows, subgradient);
+        // calculate g - in
+        std::vector<double> g_in(duals_g.size());
+        std::transform(duals_g.begin(), duals_g.end(), duals_in.begin(), g_in.begin(),
+                       [](double g, double in) { return g - in; });
 
-        // Compute the cosine of the angle between in-sep direction and subgradient
-        double cos_angle =
-            std::inner_product(in_sep_direction.begin(), in_sep_direction.end(), subgradient.begin(), 0.0) /
-            (in_sep_norm * subgradient_norm);
+        // calculate the angle between out - in and g - in
+        double cos_angle = std::inner_product(out_in.begin(), out_in.end(), g_in.begin(), 0.0) /
+                           (norm(new_rows, out_in) * norm(new_rows, g_in));
 
         // Check if cos_angle is less than threshold (1e-12), and adjust cur_alpha accordingly
         if (cos_angle < 1e-12) {
-            cur_alpha = std::min(0.99, cur_alpha + (1.0 - cur_alpha) * 0.1);
+            cur_alpha = std::min(0.9, cur_alpha + (1.0 - cur_alpha) * 0.1);
         } else {
             cur_alpha = std::max(0.0, cur_alpha - 0.1);
         }
-
-        cur_alpha = _misprice_schedule(nb_misprices, base_alpha);
-
-        return duals_sep;
-*/
-        double v = std::transform_reduce(
-            new_rows.begin(), new_rows.end(), 0.0, std::plus<>(),
-            [&subgradient, this](int row_id) { return subgradient[row_id] * (duals_out[row_id] - duals_in[row_id]); });
-
-        if (v > 0) {
-            // inc
-            cur_alpha = std::min(0.99, cur_alpha + (1.0 - cur_alpha) * 0.1);
-
-        } else {
-            // dec
-            cur_alpha = std::max(0.0, cur_alpha - 0.1);
-        }
-        // fmt::print(fg(fmt::color::yellow), "alpha: {}\n", cur_alpha);
-        cur_alpha = _misprice_schedule(nb_misprices, base_alpha);
 
         return duals_sep;
     }
