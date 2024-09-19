@@ -1,3 +1,19 @@
+/**
+ * @file BucketSolve.h
+ * @brief Defines the BucketGraph class and its solving methods for optimization problems.
+ *
+ * This file contains the implementation of the `BucketGraph` class, which solves a multi-stage bi-labeling 
+ * optimization problem using bucket graphs. The `BucketGraph` class handles:
+ * 
+ * - Solving bucket graph optimization problems using multi-stage labeling algorithms.
+ * - Adaptive handling of terminal time adjustments based on label distribution.
+ * - Adaptive stage transitions to refine solutions based on inner objectives and iteration counts.
+ * - Integration of different arc types (standard, jump, fixed) during label extensions.
+ * - Dual management and RCC separation for handling advanced routing optimization constraints.
+ * 
+ * The `BucketGraph` class is designed to solve complex routing problems, leveraging multiple stages, parallelism, 
+ * and adaptive heuristics to optimize paths while respecting resource constraints.
+ */
 
 #pragma once
 
@@ -7,7 +23,16 @@
 #include "../cuts/SRC.h"
 #include <cstring>
 
-std::vector<Label *> BucketGraph::solve() {
+/**
+ * Solves the bucket graph optimization problem using a multi-stage bi-labeling algorithm.
+ *
+ * The function iteratively adjusts the terminal time and handles different stages of the
+ * bi-labeling algorithm to find the optimal paths. The stages are adaptive and transition
+ * based on the inner objective values and iteration counts.
+ *
+ * @return A vector of pointers to Label objects representing the optimal paths.
+ */
+inline std::vector<Label *> BucketGraph::solve() {
     status = Status::NotOptimal;
     //////////////////////////////////////////////////////////////////////
     // ADAPTIVE TERMINAL TIME
@@ -331,11 +356,11 @@ std::vector<Label *> BucketGraph::bi_labeling_algorithm(std::vector<double> q_st
 
                 // Extend the current label based on the current stage
                 auto L_prime = Extend<Direction::Forward, S, ArcType::Job, Mutability::Const>(L, arc);
-                if (!L_prime || L_prime->resources[0] < q_star[0]) continue;
+                if (!L_prime || L_prime->resources[0] <= q_star[0]) continue;
                 auto b_prime = L_prime->vertex;
 
-#ifndef BUCKET_FIXING
-                // if (fw_fixed_buckets[bucket][b_prime] == 1) { continue; }
+#ifdef FIX_BUCKETS
+                if (fw_fixed_buckets[bucket][b_prime] == 1) { continue; }
 #endif
                 std::memset(Bvisited.data(), 0, Bvisited.size() * sizeof(uint64_t));
                 ConcatenateLabel<S>(L, b_prime, best_label, Bvisited, q_star);
