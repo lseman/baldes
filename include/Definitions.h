@@ -17,6 +17,7 @@
  * The structures and methods are documented with detailed descriptions, parameters, and return values.
  */
 #pragma once
+#include "config.h"
 
 #include "gurobi_c++.h"
 #include "gurobi_c.h"
@@ -49,7 +50,7 @@
 
 enum class Direction { Forward, Backward };
 enum class Stage { One, Two, Three, Four, Enumerate, Fix };
-enum class ArcType { Job, Bucket , Jump};
+enum class ArcType { Job, Bucket, Jump };
 enum class Mutability { Const, Mut };
 enum class Full { Full, Partial };
 
@@ -430,12 +431,12 @@ struct Label {
     int                        job_id       = -1; // Add job_id to Label
     const Label               *parent       = nullptr;
     int                        status       = 0;
-#if SRC3
+#ifdef SRC3
     std::array<std::uint16_t, MAX_SRC_CUTS> SRCmap  = {};
     double                                  SRCcost = 0.0;
 
 #endif
-#if SRC
+#ifdef SRC
     std::array<double, MAX_SRC_CUTS> SRCmap  = {};
     double                           SRCcost = 0.0;
 #endif
@@ -507,10 +508,10 @@ struct Label {
 #ifdef UNREACHABLE_DOMINANCE
         std::memset(unreachable_bitmap.data(), 0, unreachable_bitmap.size() * sizeof(uint64_t));
 #endif
-#if SRC3
+#ifdef SRC3
         std::memset(SRCmap.data(), 0, SRCmap.size() * sizeof(std::uint16_t));
 #endif
-#if SRC
+#ifdef SRC
         std::memset(SRCmap.data(), 0, SRCmap.size() * sizeof(double));
 #endif
     }

@@ -16,6 +16,12 @@ set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3")
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
+# Define a config.h.in template
+configure_file("config.h.in" "config.h")
+
+# Include the generated config.h file
+include_directories("${CMAKE_CURRENT_BINARY_DIR}")
+
 option(RIH "Enable RIH compilation option" OFF)
 option(RCC "Enable RCC compilation option" OFF)
 option(SRC3 "Enable 3SRC compilation option" OFF)
@@ -41,9 +47,26 @@ set(MAX_SRC_CUTS
 set(BUCKET_CAPACITY
     50
     CACHE STRING "Bucket max capacity")
-set(TIME_INDEX 0 CACHE STRING "Time index")
-set(DEMAND_INDEX 1 CACHE STRING "Demand index")
-set(MAIN_RESOURCES 1 CACHE STRING "Main resources")
+set(TIME_INDEX
+    0
+    CACHE STRING "Time index")
+set(DEMAND_INDEX
+    1
+    CACHE STRING "Demand index")
+set(MAIN_RESOURCES
+    1
+    CACHE STRING "Main resources")
+
+# Define resources and whether they are disposable or not
+set(RESOURCES
+    "Time"
+    CACHE STRING "List of resources")
+set(RESOURCES_DISPOSABLE
+    "1"
+    CACHE
+      STRING
+      "List of flags indicating if each resource is disposable (1 for disposable, 0 for non-disposable)"
+)
 
 # Ensure that both SRC3 and SRC are not selected at the same time
 if(SRC AND SRC3)
@@ -51,46 +74,6 @@ if(SRC AND SRC3)
     FATAL_ERROR
       "Both SRC and SRC3 cannot be enabled at the same time. Please choose only one."
   )
-endif()
-
-if(RIH)
-  add_definitions(-DRIH)
-endif()
-
-if(RCC)
-  add_definitions(-DRCC)
-endif()
-
-if(SRC)
-  add_definitions(-DSRC)
-endif()
-
-if(SRC3)
-  add_definitions(-DSRC3)
-endif()
-
-if(LIMITED_BUCKETS)
-  add_definitions(-DLIMITED_BUCKETS)
-endif()
-
-if(UNREACHABLE_DOMINANCE)
-  add_definitions(-DUNREACHABLE_DOMINANCE)
-endif()
-
-if(SORTED_LABELS)
-  add_definitions(-DSORTED_LABELS)
-endif()
-
-if(MCD)
-  add_definitions(-DMCD)
-endif()
-
-if (FIX_BUCKETS)
-  add_definitions(-DFIX_BUCKETS)
-endif()
-
-if (AVX)
-  add_definitions(-DAVX)
 endif()
 
 # Attempt to include CPM.cmake from provided path
@@ -208,3 +191,6 @@ target_compile_definitions(vrptw PUBLIC BUCKET_CAPACITY=${BUCKET_CAPACITY})
 target_compile_definitions(vrptw PUBLIC TIME_INDEX=${TIME_INDEX})
 target_compile_definitions(vrptw PUBLIC DEMAND_INDEX=${DEMAND_INDEX})
 target_compile_definitions(vrptw PUBLIC MAIN_RESOURCES=${MAIN_RESOURCES})
+target_compile_definitions(vrptw PUBLIC RESOURCES="${RESOURCES}")
+target_compile_definitions(
+  vrptw PUBLIC RESOURCES_DISPOSABLE="${RESOURCES_DISPOSABLE}")

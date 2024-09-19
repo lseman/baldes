@@ -368,8 +368,6 @@ void BucketGraph::generate_arcs() {
             add_arcs_for_job(VRPJob, from_bucket, res_inc, local_arcs);
         }
     });
-
-    // fmt::print("Generated arcs for {} jobs.\n", jobs.size());
 }
 
 /**
@@ -841,7 +839,7 @@ inline bool BucketGraph::is_dominated(Label *&new_label, Label *&label) noexcept
         }
     }
 #endif
-#if SRC3
+#ifdef SRC3
     // Check SRCDuals condition for specific stages
     if constexpr (S == Stage::Three || S == Stage::Four || S == Stage::Enumerate) {
         const auto &SRCDuals = cut_storage->SRCDuals;
@@ -1166,17 +1164,14 @@ void BucketGraph::ConcatenateLabel(const Label *&L, int &b, Label *&pbest, std::
 
             double candidate_cost = L_cost_plus_cost + L_bw->cost;
 
-            /*
-            #ifdef SRC
-                        auto counter = 0;
-                        for (auto it = cutter->begin(); it < cutter->end(); ++it) {
+#ifdef SRC
+            auto counter = 0;
+            for (auto it = cutter->begin(); it < cutter->end(); ++it) {
 
-                            if (SRCDuals[it->id] == 0) continue;
-                            if (L->SRCmap[it->id] + L_bw->SRCmap[it->id] >= 1) { candidate_cost += SRCDuals[it->id];
+                if (SRCDuals[it->id] == 0) continue;
+                if (L->SRCmap[it->id] + L_bw->SRCmap[it->id] >= 1) { candidate_cost -= SRCDuals[it->id]; }
             }
-                        }
-            #endif
-            */
+#endif
             // Use bitwise operations for the visited bitmap comparison
             if constexpr (S == Stage::Three || S == Stage::Four || S == Stage::Enumerate) {
                 bool visited_overlap = false;

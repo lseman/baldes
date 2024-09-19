@@ -1,0 +1,28 @@
+#ifndef CONFIG_H
+#define CONFIG_H
+
+// Enable or disable specific features based on CMake options
+#cmakedefine RIH
+#cmakedefine RCC
+#cmakedefine SRC3
+#cmakedefine SRC
+#cmakedefine GET_TBB
+#cmakedefine UNREACHABLE_DOMINANCE
+#cmakedefine SORTED_LABELS
+#cmakedefine MCD
+#cmakedefine FIX_BUCKETS
+#cmakedefine AVX
+
+// Define constants for resource sizes
+#define R_SIZE ${R_SIZE}
+#define N_SIZE ${N_SIZE}
+#define MAX_SRC_CUTS ${MAX_SRC_CUTS}
+#define BUCKET_CAPACITY ${BUCKET_CAPACITY}
+#define TIME_INDEX ${TIME_INDEX}
+#define DEMAND_INDEX ${DEMAND_INDEX}
+#define MAIN_RESOURCES ${MAIN_RESOURCES}
+
+#define RESOURCE_LIST { ${RESOURCES} }
+#define RESOURCE_DISPOSABLE_LIST { ${RESOURCES_DISPOSABLE} }
+
+#endif // CONFIG_H

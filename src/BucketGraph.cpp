@@ -494,8 +494,7 @@ void BucketGraph::forbidCycle(const std::vector<int> &cycle, bool aggressive) {
 void BucketGraph::set_adjacency_list() {
     for (auto &job : jobs) { job.clear_arcs(); }
 
-    auto add_arcs_for_job = [&](const VRPJob &job, int from_bucket, std::vector<double> &res_inc,
-                                bool prioritize_neighborhood) {
+    auto add_arcs_for_job = [&](const VRPJob &job, int from_bucket, std::vector<double> &res_inc) {
         using Arc = std::tuple<double, int, std::vector<double>, double>;
         std::vector<Arc> best_arcs;         // Use a flat container to store the best arcs
         best_arcs.reserve(jobs.size());     // Reserve space to avoid frequent reallocations
@@ -515,7 +514,16 @@ void BucketGraph::set_adjacency_list() {
             int to_bucket = next_job.id;
             if (from_bucket == to_bucket) continue;
 
-            if (job.lb[TIME_INDEX] + res_inc[TIME_INDEX] > next_job.ub[TIME_INDEX]) continue;
+            bool feasible = true;
+            for (int r = 0; r < R_SIZE; ++r) {
+                if (job.lb[r] + res_inc[r] > next_job.ub[r]) {
+                    feasible = false;
+                    break;
+                }
+            }
+            if (!feasible) continue;
+
+            // if (job.lb[TIME_INDEX] + res_inc[TIME_INDEX] > next_job.ub[TIME_INDEX]) continue;
 
             double aux_double = 1.E-5 * next_job.start_time;
             best_arcs.emplace_back(aux_double, next_job.id, res_inc, cost_inc);
@@ -540,7 +548,7 @@ void BucketGraph::set_adjacency_list() {
     for (const auto &VRPJob : jobs) {
         if (VRPJob.id == N_SIZE - 1) continue;
         std::vector<double> res_inc(intervals.size());
-        add_arcs_for_job(VRPJob, VRPJob.id, res_inc, true);
+        add_arcs_for_job(VRPJob, VRPJob.id, res_inc);
     }
 }
 
@@ -692,7 +700,9 @@ double BucketGraph::knapsackBound(const Label *l) {
     kp.setCapacity(rload);
 
     for (int i = 1; i < jobs.size(); ++i) {
-        if (!l->visits(i) && jobs[i].consumption[DEMAND_INDEX] <= rload) { kp.addItem(jobs[i].cost, jobs[i].consumption[DEMAND_INDEX]); }
+        if (!l->visits(i) && jobs[i].consumption[DEMAND_INDEX] <= rload) {
+            kp.addItem(jobs[i].cost, jobs[i].consumption[DEMAND_INDEX]);
+        }
     }
 
     return l->cost - kp.solve();

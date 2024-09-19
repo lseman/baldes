@@ -32,7 +32,7 @@
 /**
  * @struct VRPTW_SRC
  * @brief A structure to represent the Vehicle Routing Problem with Time Windows (VRPTW) source data.
- * 
+ *
  * This structure holds various vectors and integers that are used in the context of solving the VRPTW.
  */
 struct VRPTW_SRC {
@@ -105,11 +105,11 @@ public:
     // Add a cut to the storage
     /**
      * @brief Adds a cut to the current collection of cuts.
-     * 
-     * This function takes a reference to a Cut object and adds it to the 
-     * collection of cuts maintained by the solver. The cut is used to 
+     *
+     * This function takes a reference to a Cut object and adds it to the
+     * collection of cuts maintained by the solver. The cut is used to
      * refine the solution space and improve the efficiency of the solver.
-     * 
+     *
      * @param cut A reference to the Cut object to be added.
      */
     void addCut(Cut &cut);
@@ -382,6 +382,7 @@ inline std::vector<std::vector<double>> getPermutationsForSize4() {
  * @note The order of elements in each combination is determined by their order in the input vector.
  *       The function uses `std::prev_permutation` to generate the combinations.
  */
+/*
 template <typename T>
 inline void combinations(const std::vector<T> &elements, int k, std::vector<std::vector<T>> &result) {
     std::vector<bool> v(elements.size());
@@ -393,6 +394,32 @@ inline void combinations(const std::vector<T> &elements, int k, std::vector<std:
         }
         result.push_back(combination);
     } while (std::prev_permutation(v.begin(), v.end()));
+}
+*/
+template <typename T>
+inline void combinations(const std::vector<T> &elements, int k, std::vector<std::vector<T>> &result) {
+    std::vector<int> indices(k);
+    std::iota(indices.begin(), indices.end(), 0);
+
+    while (true) {
+        // Generate the current combination based on the selected indices
+        std::vector<T> combination;
+        for (int idx : indices) { combination.push_back(elements[idx]); }
+        result.push_back(combination);
+
+        // Find the rightmost index that can be incremented
+        int i = k - 1;
+        while (i >= 0 && indices[i] == elements.size() - k + i) { --i; }
+
+        // If no such index exists, all combinations are generated
+        if (i < 0) break;
+
+        // Increment this index
+        ++indices[i];
+
+        // Update the following indices
+        for (int j = i + 1; j < k; ++j) { indices[j] = indices[j - 1] + 1; }
+    }
 }
 
 /**
@@ -489,6 +516,15 @@ inline std::string vectorToString(const std::vector<double> &vec) {
     return result;
 }
 
+using ViolatedCut = std::pair<double, Cut>;
+
+// Custom comparator to compare only the first element (the violation)
+struct CompareCuts {
+    bool operator()(const ViolatedCut &a, const ViolatedCut &b) const {
+        return a.first < b.first; // Min-heap: smallest violation comes first
+    }
+};
+
 /**
  * @brief Implements the 45 Heuristic for generating limited memory rank-1 cuts.
  *
@@ -504,7 +540,7 @@ inline std::string vectorToString(const std::vector<double> &vec) {
  */
 template <CutType T>
 void LimitedMemoryRank1Cuts::the45Heuristic(const SparseModel &A, const std::vector<double> &x, int numNodes) {
-    int    max_number_of_cuts  = 1; // Max number of cuts to generate
+    int    max_number_of_cuts  = 5; // Max number of cuts to generate
     double violation_threshold = 1e-3;
     int    max_important_nodes = 10;
 
@@ -533,9 +569,9 @@ void LimitedMemoryRank1Cuts::the45Heuristic(const SparseModel &A, const std::vec
     // Shuffle permutations and limit to 3 for efficiency
     std::random_device rd;
     std::mt19937       g(rd());
-    if (permutations.size() > 3) {
+    if (permutations.size() > 4) {
         std::shuffle(permutations.begin(), permutations.end(), g);
-        permutations.resize(3);
+        permutations.resize(4);
     }
 
     std::unordered_set<std::string> processedSetsCache;
@@ -552,11 +588,16 @@ void LimitedMemoryRank1Cuts::the45Heuristic(const SparseModel &A, const std::vec
 
     auto input_sender = stdexec::just();
 
+    using CutPriorityQueue = std::priority_queue<ViolatedCut, std::vector<ViolatedCut>, CompareCuts>;
+
+    CutPriorityQueue cutQueue;
+
     // Define the bulk operation to process sets of customers
     auto bulk_sender = stdexec::bulk(
         input_sender, tasks.size(),
         [this, &permutations, &processedSetsCache, &processedPermutationsCache, &cuts_mutex, &cuts_count, &cuts, &x,
-         &selectedNodes, &coefficients_aux, &numNodes, max_number_of_cuts, violation_threshold](std::size_t task_idx) {
+         &selectedNodes, &coefficients_aux, &numNodes, &cutQueue, max_number_of_cuts,
+         violation_threshold](std::size_t task_idx) {
             auto &consumer = allPaths[selectedNodes[task_idx]].route;
 
             std::vector<std::vector<int>> setsOf45;
@@ -567,12 +608,9 @@ void LimitedMemoryRank1Cuts::the45Heuristic(const SparseModel &A, const std::vec
             }
 
             // limit the number of sets to process
-            // fmt::print("setsOf45.size(): {}\n", setsOf45.size());
-            if (setsOf45.size() > 5000) { setsOf45.resize(5000); }
+            if (setsOf45.size() > 1000) { setsOf45.resize(1000); }
 
-            std::array<uint64_t, num_words> AM      = {};
-            std::array<uint64_t, num_words> baseSet = {};
-            std::vector<Cut>                threadCuts;
+            std::vector<Cut> threadCuts;
 
             for (const auto &set45 : setsOf45) {
                 std::string setHash = vectorToString(set45);
@@ -711,25 +749,34 @@ void LimitedMemoryRank1Cuts::the45Heuristic(const SparseModel &A, const std::vec
                             cut.rhs          = rhs;
                             // threadCuts.push_back(cut);
 
-                            std::lock_guard<std::mutex> cut_lock(cuts_mutex);
-                            if (cuts_count.load() < max_number_of_cuts) {
-                                cutStorage.addCut(cut);
-                                cuts_count += 1;
-                            }
+                            ViolatedCut vCut{alpha, cut}; // Pair: first is the violation, second is the cut
 
-                            break;
+                            std::lock_guard<std::mutex> cut_lock(cuts_mutex);
+                            if (cutQueue.size() < max_number_of_cuts) {
+                                cutQueue.push(vCut);
+                            } else if (cutQueue.top().first < vCut.first) { // Compare violations
+                                cutQueue.pop();                             // Remove the least violated cut
+                                cutQueue.push(vCut);
+                            }
+                            // break;
                         }
                     }
 
                     // if (violation_found && cuts_count.load() < max_number_of_cuts) {}
 
-                    if (cuts_count.load() >= max_number_of_cuts) {
-                        return; // Stop processing further if the limit is reached
-                    }
+                    // if (cuts_count.load() >= max_number_of_cuts) {
+                    //     return; // Stop processing further if the limit is reached
+                    // }
                 }
             }
         });
 
     auto work = stdexec::on(sched, bulk_sender);
     stdexec::sync_wait(std::move(work));
+
+    while (!cutQueue.empty()) {
+        auto topCut = cutQueue.top();
+        cutStorage.addCut(topCut.second);
+        cutQueue.pop();
+    }
 }
