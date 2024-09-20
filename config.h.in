@@ -12,6 +12,10 @@
 #cmakedefine MCD
 #cmakedefine FIX_BUCKETS
 #cmakedefine AVX
+#cmakedefine IPM
+#cmakedefine TR
+#cmakedefine STAB
+#cmakedefine AUGMENTED
 
 // Define constants for resource sizes
 #define R_SIZE ${R_SIZE}

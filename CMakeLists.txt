@@ -9,6 +9,8 @@ set(CMAKE_CXX_STANDARD_REQUIRED True)
 
 # Include directories
 include_directories(include)
+include_directories(/usr/include/suitesparse/)
+include_directories(/usr/include/eigen3/)
 
 # Enable release build
 set(CMAKE_BUILD_TYPE Debug)
@@ -33,6 +35,10 @@ option(SORTED_LABELS "Enable Sorted Labels compilation option" OFF)
 option(MCD "Enable MCD compilation option" OFF)
 option(FIX_BUCKETS "Enable Fixed Buckets compilation option" OFF)
 option(AVX "Enable AVX compilation option" OFF)
+option(IPM "Enable IPM compilation option" OFF)
+option(TR "Enable TR compilation option" OFF)
+option(STAB "Enable STAB compilation option" ON)
+option(AUGMENTED "Enable Augmented compilation option" ON)
 
 # Define an option to specify the size of resources
 set(R_SIZE
@@ -73,6 +79,13 @@ if(SRC AND SRC3)
   message(
     FATAL_ERROR
       "Both SRC and SRC3 cannot be enabled at the same time. Please choose only one."
+  )
+endif()
+
+if(STAB AND IPM)
+  message(
+    FATAL_ERROR
+      "Both STAB and IPM cannot be enabled at the same time. Please choose only one."
   )
 endif()
 
@@ -163,18 +176,35 @@ set(CVRPSEP_SOURCES
     cvrpsep/blocks.cpp
     cvrpsep/sort.cpp)
 
-# Executable
+set(IPM_SOURCES ipm/IPSolver.cpp)
+
+# Define a list for the source files that will be included
+set(EXECUTABLE_SOURCES ${SOURCES})
+
+# Append sources based on the flags
 if(RCC)
-  add_executable(vrptw ${SOURCES} ${CVRPSEP_SOURCES})
-else()
-  add_executable(vrptw ${SOURCES})
+  message(STATUS "RCC is set, adding CVRPSEP_SOURCES.")
+  list(APPEND EXECUTABLE_SOURCES ${CVRPSEP_SOURCES})
 endif()
+
+if(IPM)
+  message(STATUS "IPM is set, adding IPM_SOURCES.")
+  list(APPEND EXECUTABLE_SOURCES ${IPM_SOURCES})
+endif()
+
+# Add the executable with the combined sources
+add_executable(vrptw ${EXECUTABLE_SOURCES})
 
 # Linking libraries
 target_link_libraries(vrptw PRIVATE STDEXEC::stdexec)
 target_link_libraries(vrptw PRIVATE fmt::fmt)
 if(GET_TBB)
   target_link_libraries(vrptw PRIVATE TBB::tbb)
+endif()
+if(IPM)
+  target_link_libraries(vrptw PRIVATE cholmod)
+  find_package(OpenMP)
+  target_link_libraries(vrptw PRIVATE OpenMP::OpenMP_CXX)
 endif()
 
 set(GUROBI_VERSION_MAJOR 110) # Adjust based on Gurobi version

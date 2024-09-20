@@ -774,7 +774,7 @@ void LimitedMemoryRank1Cuts::the45Heuristic(const SparseModel &A, const std::vec
             }
         });
 
-    auto work = stdexec::on(sched, bulk_sender);
+    auto work = stdexec::starts_on(sched, bulk_sender);
     stdexec::sync_wait(std::move(work));
 
     while (!cutQueue.empty()) {

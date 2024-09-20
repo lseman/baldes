@@ -747,6 +747,11 @@ void BucketGraph::bucket_fixing(const std::vector<double> &q_star) {
         run_labeling_algorithms<Stage::Four, Full::Full>(forward_cbar, backward_cbar, q_star);
 
         gap = incumbent - (relaxation + std::min(0.0, min_red_cost));
+        
+        // check if gap is -inf and early exit, due to IPM
+        if (gap < 0) {
+            return;
+        }
         // print_info("Running arc elimination with gap: {}\n", gap);
         fw_c_bar = forward_cbar;
         bw_c_bar = backward_cbar;

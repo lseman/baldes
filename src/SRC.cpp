@@ -220,7 +220,7 @@ std::vector<std::vector<double>> LimitedMemoryRank1Cuts::separate(const SparseMo
         });
 
     // Submit work to the thread pool
-    auto work = stdexec::on(sched, bulk_sender);
+    auto work = stdexec::starts_on(sched, bulk_sender);
     stdexec::sync_wait(std::move(work));
 
     // Generate cut coefficients
@@ -325,7 +325,7 @@ inline std::vector<std::vector<int>> findRoutesVisitingNodes(const SparseModel  
 void LimitedMemoryRank1Cuts::generateCutCoefficients(VRPTW_SRC &cuts, std::vector<std::vector<double>> &coefficients,
                                                      int numNodes, const SparseModel &A, const std::vector<double> &x) {
     double primal_violation    = 0.0;
-    int    max_number_of_cuts  = 15;
+    int    max_number_of_cuts  = 3;
     double violation_threshold = 1e-2;
 
     if (cuts.S_n > 0) {
@@ -437,7 +437,7 @@ void LimitedMemoryRank1Cuts::generateCutCoefficients(VRPTW_SRC &cuts, std::vecto
                 }
             });
 
-        auto work = stdexec::on(sched, bulk_sender);
+        auto work = stdexec::starts_on(sched, bulk_sender);
         stdexec::sync_wait(std::move(work));
     }
 }

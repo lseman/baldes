@@ -204,7 +204,7 @@ struct RCCmanager {
                                              }
                                          });
 
-        auto gather_work = stdexec::on(sched, gather_cuts);
+        auto gather_work = stdexec::starts_on(sched, gather_cuts);
         stdexec::sync_wait(std::move(gather_work));
 
         // Step 2: Parallel removal of cuts from the cache
@@ -223,7 +223,7 @@ struct RCCmanager {
                 }
             });
 
-        auto remove_work = stdexec::on(sched, remove_cuts);
+        auto remove_work = stdexec::starts_on(sched, remove_cuts);
         stdexec::sync_wait(std::move(remove_work));
 
         // Step 3: Bulk erasure of cuts from the cut vector
@@ -250,7 +250,7 @@ struct RCCmanager {
             dualCache[{arcKey.first, arcKey.second}] = dualSum;
         });
 
-        auto compute_duals_work = stdexec::on(sched, compute_duals);
+        auto compute_duals_work = stdexec::starts_on(sched, compute_duals);
         stdexec::sync_wait(std::move(compute_duals_work));
 
         // Step 5: Update the model

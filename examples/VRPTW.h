@@ -35,6 +35,7 @@
 #include "../cuts/RCC.h"
 #include "../include/Hashes.h"
 
+#include "../ipm/IPSolver.h"
 #include <tbb/concurrent_unordered_map.h>
 
 class VRProblem {
@@ -73,6 +74,9 @@ public:
             if (label->jobs_covered.size() == 0) { continue; }
             if (!enumerate && label->cost > 0) continue;
             counter += 1;
+#ifdef IPM
+            if (counter > 10) { break; }
+#endif
             labels_counter += 1;
             std::fill(coluna.begin(), coluna.end(), 0.0); // Reset for each iteration
 
@@ -147,6 +151,7 @@ public:
      * @param allPaths A reference to the vector of paths associated with the variables.
      */
     void removeNegativeReducedCostVarsAndPaths(GRBModel *model) {
+        model->optimize();
         int                 varNumber = model->get(GRB_IntAttr_NumVars);
         std::vector<GRBVar> vars(varNumber);
 
@@ -263,6 +268,7 @@ public:
 
             r1c.cutStorage = cuts;
         }
+        node->update();
         return changed;
     }
 
@@ -345,7 +351,7 @@ public:
             });
 
         // Define the work and run it synchronously
-        auto work = stdexec::on(sched, bulk_sender);
+        auto work = stdexec::starts_on(sched, bulk_sender);
         stdexec::sync_wait(std::move(work));
         std::vector<GRBConstr> newConstraints(cutExpressions.size());
 
@@ -476,7 +482,7 @@ public:
             });
 
         // Define the work and run it synchronously
-        auto work = stdexec::on(sched, bulk_sender);
+        auto work = stdexec::starts_on(sched, bulk_sender);
         stdexec::sync_wait(std::move(work));
 
         // Create a bulk sender to handle parallel execution of each constraint
@@ -498,7 +504,7 @@ public:
                                              });
 
         // Attach to the scheduler and run the work synchronously
-        auto work_ctr = stdexec::on(sched, bulk_sender_ctr);
+        auto work_ctr = stdexec::starts_on(sched, bulk_sender_ctr);
         stdexec::sync_wait(std::move(work_ctr)); // Wait for the tasks to complete
         model->update();
         model->optimize();
@@ -514,7 +520,7 @@ public:
         print_info("Column generation started...\n");
 
         node->optimize();
-        int bucket_interval = 20;
+        int bucket_interval = 25;
         int time_horizon    = instance.T_max;
 
         int                 numConstrs = node->get(GRB_IntAttr_NumConstrs);
@@ -535,7 +541,8 @@ public:
         r1c.cutStorage = cuts;
         std::vector<GRBConstr> constraints;
         std::vector<double>    cutDuals;
-        std::vector<double>    jobDuals = getDuals(node);
+        std::vector<double>    jobDuals  = getDuals(node);
+        auto                   sizeDuals = jobDuals.size();
 
         double highs_obj_dual = 0.0;
         double highs_obj      = 0.0;
@@ -577,6 +584,46 @@ public:
         std::vector<std::vector<std::vector<GRBConstr>>> cvrsep_ctrs(
             instance.nC + 3, std::vector<std::vector<GRBConstr>>(instance.nC + 3, std::vector<GRBConstr>()));
 
+#ifdef TR
+        std::vector<GRBVar> w(numConstrs);
+        std::vector<GRBVar> zeta(numConstrs);
+
+        auto epsilon1 = 10;
+        auto epsilon2 = 10;
+
+        // Create w_i and zeta_i variables for each constraint
+        for (int i = 0; i < numConstrs; i++) {
+            w[i]    = node->addVar(0, epsilon1, -1.0, GRB_CONTINUOUS, "w_" + std::to_string(i + 1));
+            zeta[i] = node->addVar(0, epsilon2, 1.0, GRB_CONTINUOUS, "zeta_" + std::to_string(i + 1));
+        }
+
+        const GRBConstr *constrs = node->getConstrs();
+        for (int i = 0; i < numConstrs; i++) {
+            node->chgCoeff(constrs[i], w[i], -1);
+            node->chgCoeff(constrs[i], zeta[i], 1);
+        }
+        double              v                   = 40;
+        bool                isInsideTrustRegion = false;
+        std::vector<double> delta1;
+        std::vector<double> delta2;
+        for (auto dual : jobDuals) {
+            delta1.push_back(dual - v);
+            delta2.push_back(dual + v);
+        }
+        for (int i = 0; i < numConstrs; i++) {
+            // Update coefficients for w[i] and zeta[i] in the objective function
+            w[i].set(GRB_DoubleAttr_Obj, std::max(0.0, jobDuals[i] - v)); // Set w[i]'s coefficient to -delta1
+            zeta[i].set(GRB_DoubleAttr_Obj, jobDuals[i] + v);             // Set zeta[i]'s coefficient to delta2
+            w[i].set(GRB_DoubleAttr_UB, epsilon1);
+            zeta[i].set(GRB_DoubleAttr_UB, epsilon2);
+        }
+        fmt::print("Starting trust region with v = {}\n", v);
+#endif
+
+#ifdef IPM
+        IPSolver solver;
+#endif
+
 #ifdef RCC
         CMGR_CreateCMgr(&oldCutsCMP, 100); // For old cuts, if needed
 #endif
@@ -608,8 +655,8 @@ public:
                 r1c.separate(matrixSparse.A_sparse, solution, N_SIZE - 2, 1e-3);
                 fmt::print("Separating cuts..\n");
 #ifdef SRC
-                //r1c.the45Heuristic<CutType::FourRow>(matrixSparse.A_sparse, solution, N_SIZE - 2);
-                //r1c.the45Heuristic<CutType::FiveRow>(matrixSparse.A_sparse, solution, N_SIZE - 2);
+                // r1c.the45Heuristic<CutType::FourRow>(matrixSparse.A_sparse, solution, N_SIZE - 2);
+                // r1c.the45Heuristic<CutType::FiveRow>(matrixSparse.A_sparse, solution, N_SIZE - 2);
 #endif
                 cuts = r1c.cutStorage;
                 if (cuts_before == cuts.size()) {
@@ -623,18 +670,65 @@ public:
 
             changed = cutHandler(r1c, node, constraints);
             cuts    = r1c.cutStorage;
-            node->optimize();
-            highs_obj     = node->get(GRB_DoubleAttr_ObjVal);
-            auto dual_obj = node->get(GRB_DoubleAttr_ObjBound);
-            jobDuals      = getDuals(node);
-            // print jobDuals size
-            // fmt::print("Job duals size: {}\n", jobDuals.size());
-            auto originDuals = jobDuals;
-            // print jobDuals size
+
+#ifdef TR
+            isInsideTrustRegion = true;
+            for (int i = 0; i < numConstrs; i++) {
+                if (jobDuals[i] < delta1[i] || jobDuals[i] > delta2[i]) { isInsideTrustRegion = false; }
+            }
+            if (isInsideTrustRegion) { fmt::print("Fall inside trust region\n"); }
+            if (isInsideTrustRegion) {
+                v -= 1;
+                epsilon1 += 100;
+                epsilon2 += 100;
+                for (int i = 0; i < numConstrs; i++) {
+                    // Update coefficients for w[i] and zeta[i] in the objective function
+                    w[i].set(GRB_DoubleAttr_Obj, jobDuals[i]);        // Set w[i]'s coefficient to -delta1
+                    zeta[i].set(GRB_DoubleAttr_Obj, jobDuals[i] + v); // Set zeta[i]'s coefficient to delta2
+                    w[i].set(GRB_DoubleAttr_UB, epsilon1);
+                    zeta[i].set(GRB_DoubleAttr_UB, epsilon2);
+                }
+            }
+            for (int i = 0; i < numConstrs; i++) {
+                delta1[i] = jobDuals[i] - v;
+                delta2[i] = jobDuals[i] + v;
+            }
+#endif
+
+#ifdef IPM
+            auto d            = 1.0;
             auto matrixSparse = extractModelDataSparse(node);
-            jobDuals          = stab.run(matrixSparse, jobDuals);
-            solution          = extractSolution(node);
-            bool integer      = true;
+            gap               = std::abs(highs_obj - (highs_obj + std::min(0.0, inner_obj))) / std::abs(highs_obj);
+            gap               = gap / d;
+            if (std::isnan(gap)) { gap = 1e-4; }
+            if (std::signbit(gap)) { gap = 1e-4; }
+
+            auto ip_result   = solver.run_optimization(matrixSparse, gap);
+            highs_obj        = std::get<0>(ip_result);
+            highs_obj_dual   = std::get<1>(ip_result);
+            solution         = std::get<2>(ip_result);
+            jobDuals         = std::get<3>(ip_result);
+            auto originDuals = jobDuals;
+            for (auto &dual : jobDuals) { dual = -dual; }
+#endif
+
+#ifdef STAB
+            auto matrixSparse = extractModelDataSparse(node);
+            node->optimize();
+            highs_obj        = node->get(GRB_DoubleAttr_ObjVal);
+            auto dual_obj    = node->get(GRB_DoubleAttr_ObjBound);
+            jobDuals         = getDuals(node);
+            auto originDuals = jobDuals;
+
+            // get from jobDuals only the first sizeDuals
+            jobDuals = std::vector<double>(jobDuals.begin(), jobDuals.begin() + sizeDuals);
+            stab.update_stabilization_after_master_optim(jobDuals);
+            jobDuals = stab.getStabDualSol(jobDuals);
+
+            solution = extractSolution(node);
+#endif
+
+            bool integer = true;
             // Check integrality of the solution
             for (auto &sol : solution) {
                 if (sol > 1e-1 && sol < 1 - 1e-1) {
@@ -655,8 +749,6 @@ public:
             bucket_graph.relaxation = highs_obj;
 
             if (cuts.size() > 0) {
-                // jobDuals          = getDuals(node);
-                // auto matrixSparse = extractModelDataSparse(node);
                 auto numJobs = bucket_graph.getJobs().size() - 1;
                 cutDuals     = std::vector<double>(originDuals.begin() + numJobs, originDuals.end());
                 cuts.setDuals(cutDuals);
@@ -687,18 +779,22 @@ public:
 
             auto colAdded = addColumn(node, paths, cuts, false);
 
+#ifdef STAB
             if (colAdded == 0) {
                 stab.add_misprice();
                 fmt::print("No columns added, mispricing detected\n");
             } else {
                 stab.reset_misprices();
             }
+            stab.updateAlpha(matrixSparse, jobDuals, solution, lag_gap, paths);
+            stab.update_stabilization_after_iter(jobDuals);
+#endif
 
             if (iter % 10 == 0)
                 fmt::print("| It.: {:4} | Obj.: {:8.2f} | Pricing: {:10.2f} | Cuts: {:4} | Paths: {:4} | "
                            "Stage: {:1} | "
-                           "Lag. Gap: {:10.4f} | RCC: {:4} |\n",
-                           iter, highs_obj, inner_obj, cuts.size(), paths.size(), stage, lag_gap, rcc);
+                           "Lag. Gap: {:10.4f} | RCC: {:4} | alpha: {:4.2f} | \n",
+                           iter, highs_obj, inner_obj, cuts.size(), paths.size(), stage, lag_gap, rcc, stab.cur_alpha);
         }
         auto end_timer        = std::chrono::high_resolution_clock::now();
         auto duration_ms      = std::chrono::duration_cast<std::chrono::milliseconds>(end_timer - start_timer).count();

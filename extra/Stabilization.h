@@ -63,6 +63,11 @@ public:
     DualSolution duals_g;
     double       beta;
     DualSolution rho;
+    DualSolution master_dual;
+    DualSolution smooth_dual_sol;
+
+    double lag_gap      = 0.0;
+    double lag_gap_prev = std::numeric_limits<double>::infinity();
 
     /**
      * @brief Increments the misprice counter if the alpha value is positive.
@@ -71,8 +76,49 @@ public:
      * the function increments the misprice counter (nb_misprices).
      */
     void add_misprice() {
-        if (alpha > 0) { nb_misprices++; }
+        nb_misprices++;
         cur_alpha = _misprice_schedule(nb_misprices, base_alpha);
+    }
+
+    /**
+     * @brief Updates the stabilization center after an iteration.
+     *
+     * This function updates the current stabilization center with the new center
+     * if the `stab_center_for_next_iteration` is not empty. After updating, it clears
+     * the `stab_center_for_next_iteration`.
+     *
+     * @param new_center The new dual solution center to be considered for stabilization.
+     */
+    void update_stabilization_after_iter(const DualSolution &new_center) {
+        if (!stab_center_for_next_iteration.empty()) {
+            cur_stab_center = stab_center_for_next_iteration;
+            stab_center_for_next_iteration.clear();
+        }
+    }
+
+    /**
+     * @brief Updates the stabilization parameters after the master optimization.
+     *
+     * This function updates the stabilization parameters based on the new center
+     * provided by the master optimization. It resets the mispricing counter and
+     * the current alpha value. If the current stabilization center is empty, it
+     * sets it to the new center and returns false. Otherwise, it updates the 
+     * current alpha to the base alpha and returns whether the current alpha is 
+     * greater than zero.
+     *
+     * @param new_center The new center provided by the master optimization.
+     * @return true if the current alpha is greater than zero, false otherwise.
+     */
+    bool update_stabilization_after_master_optim(const DualSolution &new_center) {
+        nb_misprices = 0;
+        cur_alpha    = 0;
+
+        if (cur_stab_center.empty()) {
+            cur_stab_center = new_center;
+            return false;
+        }
+        cur_alpha = base_alpha;
+        return cur_alpha > 0;
     }
 
     /**
@@ -100,56 +146,18 @@ public:
     }
 
     // Constructor
+    /**
+     * @brief Constructs a Stabilization object with the given base alpha value and master dual solution.
+     * 
+     * @param base_alpha The base alpha value used for stabilization.
+     * @param mast_dual_sol A reference to the master dual solution.
+     */
     Stabilization(double base_alpha, DualSolution &mast_dual_sol)
         : alpha(base_alpha), t(0), base_alpha(base_alpha), cur_alpha(base_alpha), nb_misprices(0),
           cur_stab_center(mast_dual_sol) {
         pseudo_dual_bound = std::numeric_limits<double>::infinity();
         valid_dual_bound  = std::numeric_limits<double>::infinity();
         beta              = 0.0;
-    }
-
-    /**
-     * @brief Computes the norm of a subset of elements from a given vector.
-     *
-     * This function calculates the Euclidean norm (L2 norm) of the elements in the
-     * provided vector that are indexed by the values in the new_rows vector. It
-     * adds a small epsilon value (1e-6) to the result to avoid issues with zero
-     * norms.
-     *
-     * @param new_rows A vector of indices specifying which elements of the vector
-     *                 to include in the norm calculation.
-     * @param vector   The vector containing the elements to be used in the norm
-     *                 calculation.
-     * @return The Euclidean norm of the specified elements in the vector.
-     */
-    double norm(const std::vector<int> &new_rows, const std::vector<double> &vector) const {
-        double res = std::transform_reduce(new_rows.begin(), new_rows.end(), 0.0, std::plus<>(),
-                                           [&vector](int i) { return vector[i] * vector[i]; });
-        return std::sqrt(res + 1e-6);
-    }
-
-    /**
-     * @brief Computes the Euclidean norm (L2 norm) of the difference between two vectors
-     *        for the specified indices.
-     *
-     * This function calculates the Euclidean norm of the difference between elements
-     * of two vectors, `vector_1` and `vector_2`, at the positions specified by `new_rows`.
-     * A small constant (1e-6) is added to the result to avoid division by zero or other
-     * numerical issues.
-     *
-     * @param new_rows A vector of indices specifying which elements to consider.
-     * @param vector_1 The first vector of double values.
-     * @param vector_2 The second vector of double values.
-     * @return The Euclidean norm of the difference between the specified elements of
-     *         `vector_1` and `vector_2`.
-     */
-    double norm(const std::vector<int> &new_rows, const std::vector<double> &vector_1,
-                const std::vector<double> &vector_2) const {
-        double res =
-            std::transform_reduce(new_rows.begin(), new_rows.end(), 0.0, std::plus<>(), [&vector_1, &vector_2](int i) {
-                return (vector_2[i] - vector_1[i]) * (vector_2[i] - vector_1[i]);
-            });
-        return std::sqrt(res + 1e-6);
     }
 
     /**
@@ -161,209 +169,112 @@ public:
      *
      * @return DualSolution The stabilized dual solution.
      */
-    DualSolution getStabDualSol() const {
-        DualSolution stab_dual_sol(duals_out.size());
-        std::transform(duals_out.begin(), duals_out.end(), duals_in.begin(), stab_dual_sol.begin(),
+    DualSolution getStabDualSol(const DualSolution &master_dual) {
+        if (cur_stab_center.empty()) { return master_dual; }
+        DualSolution stab_dual_sol(master_dual.size());
+        std::transform(master_dual.begin(), master_dual.end(), cur_stab_center.begin(), stab_dual_sol.begin(),
                        [this](double out, double in) { return cur_alpha * in + (1 - cur_alpha) * out; });
+        smooth_dual_sol = stab_dual_sol;
         return stab_dual_sol;
     }
 
+
     /**
-     * @brief Computes the value of beta based on the cosine of the angle between two vectors.
+     * @brief Updates the stabilization parameter alpha based on the provided model data, dual solutions, and lagrangian gap.
      *
-     * This function calculates the cosine of the angle between two vectors defined by the differences
-     * between `duals_out` and `duals_in`, and `duals_g` and `duals_in`. The result is stored in the
-     * member variable `beta`.
+     * This function performs several steps to update the stabilization parameter alpha:
+     * 1. Calculates the direction of separation between the smooth dual solution and the current stabilization center.
+     * 2. Computes the norm of the smooth dual solution.
+     * 3. Checks if the norm is zero and returns early if it is.
+     * 4. Calculates the subgradient as the difference between the right-hand side vector and the product of the constraint matrix and the primal solution.
+     * 5. Accumulates values of the constraint matrix multiplied by the primal solution.
+     * 6. Updates the subgradient based on the best pricing columns.
+     * 7. Computes the norm of the subgradient and normalizes it if non-zero.
+     * 8. Calculates the cosine of the angle between the separation direction and the subgradient.
+     * 9. Adjusts the current alpha based on the cosine angle and a threshold.
+     * 10. Updates the stabilization center for the next iteration if the lagrangian gap has decreased.
      *
-     * The steps involved are:
-     * 1. Calculate the dot product of the vectors (duals_out - duals_in) and (duals_g - duals_in).
-     * 2. Calculate the norm (magnitude) of the vector (duals_out - duals_in).
-     * 3. Calculate the norm (magnitude) of the vector (duals_g - duals_in).
-     * 4. Compute the cosine of the angle between the two vectors using the dot product and norms.
-     * 5. Ensure that `beta` is non-negative.
-     *
-     * @param new_rows A vector of integers representing the indices of the rows to be used in the calculations.
+     * @param dados The model data containing the constraint matrix and other relevant information.
+     * @param jobDuals The dual solution for the job constraints.
+     * @param master_primal The primal solution for the master problem.
+     * @param lag_gap The current lagrangian gap.
+     * @param best_pricing_cols A vector of pointers to the best pricing columns.
      */
-    void compute_b(const std::vector<int> &new_rows) {
-        // Calculate the dot product of (duals_out - duals_in) and (duals_g - duals_in)
-        double dot_product =
-            std::transform_reduce(new_rows.begin(), new_rows.end(), 0.0, std::plus<>(), [this](int row_id) {
-                double a = duals_out[row_id] - duals_in[row_id]; // Vector A component
-                double b = duals_g[row_id] - duals_in[row_id];   // Vector B component
-                return a * b;                                    // Dot product of A and B
-            });
+    void updateAlpha(const ModelData &dados, const DualSolution &jobDuals, const DualSolution &master_primal,
+                     const double &lag_gap, std::vector<Label *> best_pricing_cols) {
 
-        // Calculate the norm of (duals_out - duals_in) i.e., norm of vector A
-        double norm_a = std::transform_reduce(new_rows.begin(), new_rows.end(), 0.0, std::plus<>(), [this](int row_id) {
-            double a = duals_out[row_id] - duals_in[row_id];
-            return a * a;
-        });
-        norm_a        = std::sqrt(norm_a);
+        // calculate smooth_dual_sol - cur_stab_center
+        std::vector<double> in_sep_direction(jobDuals.size());
+        std::transform(smooth_dual_sol.begin(), smooth_dual_sol.end(), cur_stab_center.begin(),
+                       in_sep_direction.begin(), [](double a, double b) { return a - b; });
 
-        // Calculate the norm of (duals_g - duals_in) i.e., norm of vector B
-        double norm_b = std::transform_reduce(new_rows.begin(), new_rows.end(), 0.0, std::plus<>(), [this](int row_id) {
-            double b = duals_g[row_id] - duals_in[row_id];
-            return b * b;
-        });
-        norm_b        = std::sqrt(norm_b);
+        // calculate norm of smooth_dual_sol
+        double norm_smooth_dual_sol = std::transform_reduce(in_sep_direction.begin(), in_sep_direction.end(), 0.0,
+                                                            std::plus<>(), [](double a) { return a * a; });
 
-        // Calculate the cosine of the angle
-        if (norm_a > 0 && norm_b > 0) {
-            beta = dot_product / norm_a / norm_b;
-        } else {
-            beta = 0.0; // Handle the case where one of the norms is zero to avoid division by zero
+        // check if norm is 0, if so return
+        if (norm_smooth_dual_sol == 0) { return; }
+
+        // calculate subgradient as b - A * primal_sol
+        std::vector<double> subgradient(jobDuals.size());
+
+        // Step 5: Accumulate values of A * x in lagrangian_constraint_values
+        std::vector<double> lagrangian_constraint_values(jobDuals.size(), 0.0);
+        /*
+        for (size_t idx = 0; idx < dados.A_sparse.values.size(); ++idx) {
+            int row_id = dados.A_sparse.row_indices[idx];
+            if (row_id >= N_SIZE - 1) { continue; }
+            int col_id = dados.A_sparse.col_indices[idx];
+            lagrangian_constraint_values[row_id] = dados.A_sparse.values[idx] * master_primal[col_id];
         }
+        */
 
-        beta = std::max(0.0, beta); // Ensure beta is non-negative
-    }
+        // Update subgradient based on best_pricing_cols
+        for (size_t row_id = 0; row_id < subgradient.size(); ++row_id) {
+            char sense = dados.sense[row_id];
 
-    /**
-     * @brief Computes the rho values for the given new rows.
-     *
-     * This function updates the `rho` vector by applying a transformation to each element
-     * in the `new_rows` vector. The transformation is defined as a weighted sum of the
-     * corresponding elements in the `duals_g` and `duals_out` vectors, where the weights
-     * are given by `beta` and `1 - beta`, respectively.
-     *
-     * @param new_rows A vector of integers representing the new row indices for which
-     *                 the rho values need to be computed.
-     */
-    void compute_rho(const std::vector<int> &new_rows) {
-        std::transform(new_rows.begin(), new_rows.end(), rho.begin(),
-                       [this](int row_id) { return beta * duals_g[row_id] + (1 - beta) * duals_out[row_id]; });
-    }
+            // Apply contribution from best_pricing_col if non-zero
+            for (auto best_pricing_col : best_pricing_cols) {
+                if (best_pricing_col->cost > 0) { continue; }
+                for (auto row : best_pricing_col->jobs_covered) {
+                    if (row > 0 && row != N_SIZE - 1) { subgradient[row - 1] += 1; }
+                }
+            }
 
-    /**
-     * @brief Computes the subgradient for the given model data and updates the Lagrangian constraint values.
-     *
-     * This function calculates the subgradient for the provided model data (`dados`) and updates the
-     * Lagrangian constraint values based on the new rows and the sparse matrix representation of the constraints.
-     *
-     * @param dados The model data containing the constraint information and sparse matrix representation.
-     * @param new_rows A vector of indices representing the new rows to be considered.
-     * @param lagrangian_constraint_values A vector to be updated with the computed Lagrangian constraint values.
-     * @param subgradient A vector to be updated with the computed subgradient values.
-     */
-    void subgradient_call(const ModelData &dados, const std::vector<int> &new_rows,
-                          std::vector<double> &lagrangian_constraint_values, std::vector<double> &subgradient) const {
-
-        auto                number_of_rows = dados.b.size();
-        std::vector<double> new_row_lower_bounds(number_of_rows);
-        std::vector<double> new_row_upper_bounds(number_of_rows);
-
-        for (int row_id = 0; row_id < number_of_rows; ++row_id) {
-            if (dados.sense[row_id] == '<') {
-                new_row_upper_bounds[row_id] = dados.b[row_id];
-                new_row_lower_bounds[row_id] = -std::numeric_limits<double>::infinity();
-            } else if (dados.sense[row_id] == '>') {
-                new_row_upper_bounds[row_id] = std::numeric_limits<double>::infinity();
-                new_row_lower_bounds[row_id] = dados.b[row_id];
-            } else {
-                new_row_upper_bounds[row_id] = dados.b[row_id];
-                new_row_lower_bounds[row_id] = dados.b[row_id];
+            // Check participation in stabilization
+            if (sense == '<') {
+                subgradient[row_id] = std::min(
+                    0.0, subgradient[row_id] - lagrangian_constraint_values[row_id]); // For less-than constraints
+            } else if (sense == '>') {
+                subgradient[row_id] = std::max(
+                    0.0, subgradient[row_id] - lagrangian_constraint_values[row_id]); // For greater-than constraints
+            } else {                                                                  // For equality constraints
+                subgradient[row_id] = subgradient[row_id] - lagrangian_constraint_values[row_id];
             }
         }
 
-        // Initialize lagrangian_constraint_values to zero
-        std::fill(lagrangian_constraint_values.begin(), lagrangian_constraint_values.end(), 0.0);
+        // Compute the norm of the subgradient
+        double subgradient_norm = std::transform_reduce(subgradient.begin(), subgradient.end(), 0.0, std::plus<>(),
+                                                        [](double a) { return a * a; });
 
-        // Iterate over non-zero elements in the sparse matrix A
-        for (size_t idx = 0; idx < dados.A_sparse.values.size(); ++idx) {
-            int row_id = dados.A_sparse.row_indices[idx];
-            int col_id = dados.A_sparse.col_indices[idx];
-            lagrangian_constraint_values[row_id] += dados.A_sparse.values[idx] * duals_in[row_id];
+        // normalize subgradient if non-zero
+        if (subgradient_norm > 0) {
+            subgradient_norm = std::sqrt(subgradient_norm);
+            for (auto &value : subgradient) { value /= subgradient_norm; }
         }
+        double cos_angle =
+            std::inner_product(in_sep_direction.begin(), in_sep_direction.end(), subgradient.begin(), 0.0) /
+            (norm_smooth_dual_sol * subgradient_norm);
 
-        std::transform(new_rows.begin(), new_rows.end(), subgradient.begin(),
-                       [&new_row_upper_bounds, &new_row_lower_bounds, &lagrangian_constraint_values](int row_id) {
-                           return std::min(0.0, new_row_upper_bounds[row_id] - lagrangian_constraint_values[row_id]) +
-                                  std::max(0.0, new_row_lower_bounds[row_id] - lagrangian_constraint_values[row_id]);
-                       });
-    }
-
-    /**
-     * @brief Executes the stabilization algorithm for dual solutions.
-     *
-     * This function performs a series of operations to stabilize the dual solutions
-     * for a given model. It adjusts the dual solutions based on subgradients and
-     * other parameters to ensure convergence and stability.
-     *
-     * @param dados The model data containing necessary information for the algorithm.
-     * @param jobDuals The initial dual solutions to be stabilized.
-     * @return The stabilized dual solutions.
-     *
-     * The function follows these steps:
-     * 1. Initializes or resizes vectors for dual solutions and related parameters.
-     * 2. Computes coefficients for updating dual solutions.
-     * 3. Updates the dual solutions using the computed coefficients.
-     * 4. Computes subgradients and adjusts the stabilization parameters.
-     * 5. Returns the stabilized dual solutions.
-     */
-    DualSolution run(const ModelData &dados, const DualSolution &jobDuals) {
-        duals_out = jobDuals; // current stab center
-
-        if (duals_sep.empty()) {
-            duals_g.assign(dados.b.size(), 0);
-            duals_sep.assign(dados.b.size(), 0);
-            rho.assign(dados.b.size(), 0);
-        }
-        if (duals_sep.size() < duals_out.size()) { duals_sep.resize(duals_out.size(), 0); }
-        if (duals_g.size() < duals_out.size()) { duals_g.resize(duals_out.size(), 0); }
-        if (rho.size() < duals_out.size()) { rho.resize(duals_out.size(), 0); }
-        duals_in = duals_sep;
-
-        // print duals_out size and duals_in size
-        int                 number_of_rows = dados.b.size();
-        std::vector<double> lagrangian_constraint_values(number_of_rows, 0);
-        std::vector<double> subgradient(number_of_rows, 0);
-        std::vector<int>    new_rows(number_of_rows);
-        std::iota(new_rows.begin(), new_rows.end(), 0);
-
-        subgradient_call(dados, new_rows, lagrangian_constraint_values, subgradient);
-
-        auto   duals_tilde = getStabDualSol();
-        double coef_g      = norm(new_rows, duals_in, duals_out);
-        double coef_g_sub  = norm(new_rows, subgradient);
-        coef_g             = coef_g / coef_g_sub;
-
-        if (std::isnan(coef_g)) { coef_g = 0; }
-
-        std::transform(new_rows.begin(), new_rows.end(), duals_g.begin(), [this, &subgradient, coef_g](int row_id) {
-            return duals_in[row_id] + coef_g * subgradient[row_id];
-        });
-
-        compute_b(new_rows);
-        compute_rho(new_rows);
-
-        double coef_sep     = norm(new_rows, duals_in, duals_tilde);
-        double coef_sep_den = norm(new_rows, duals_in, rho);
-        coef_sep            = coef_sep / coef_sep_den;
-
-        std::transform(new_rows.begin(), new_rows.end(), duals_sep.begin(), [this, coef_sep](int row_id) {
-            return std::max(0.0, duals_in[row_id] + coef_sep * (rho[row_id] - duals_in[row_id]));
-        });
-
-        // calculate out - in
-        std::vector<double> out_in(duals_out.size());
-        std::transform(duals_out.begin(), duals_out.end(), duals_in.begin(), out_in.begin(),
-                       [](double out, double in) { return out - in; });
-
-        // calculate g - in
-        std::vector<double> g_in(duals_g.size());
-        std::transform(duals_g.begin(), duals_g.end(), duals_in.begin(), g_in.begin(),
-                       [](double g, double in) { return g - in; });
-
-        // calculate the angle between out - in and g - in
-        double cos_angle = std::inner_product(out_in.begin(), out_in.end(), g_in.begin(), 0.0) /
-                           (norm(new_rows, out_in) * norm(new_rows, g_in));
-
+        cos_angle = cos_angle * 1;
         // Check if cos_angle is less than threshold (1e-12), and adjust cur_alpha accordingly
-        if (cos_angle < 1e-12) {
-            cur_alpha = std::min(0.9, cur_alpha + (1.0 - cur_alpha) * 0.1);
+        if (cos_angle > 1e-12) {
+            cur_alpha = std::min(0.99, cur_alpha + (1.0 - cur_alpha) * 0.1);
         } else {
             cur_alpha = std::max(0.0, cur_alpha - 0.1);
         }
 
-        return duals_sep;
+        if (lag_gap < lag_gap_prev) { stab_center_for_next_iteration = smooth_dual_sol; }
+        base_alpha = cur_alpha;
     }
 };
