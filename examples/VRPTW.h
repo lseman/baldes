@@ -94,6 +94,7 @@ public:
                 if (coluna[i] == 0.0) { continue; }
                 col.addTerms(&coluna[i], &constrs[i], 1);
             }
+
 #ifdef SRC
             auto vec = r1c.computeLimitedMemoryCoefficients(label->jobs_covered);
             if (vec.size() > 0) {
@@ -102,6 +103,7 @@ public:
                 }
             }
 #endif
+
             node->addVar(0.0, 1.0, travel_cost, GRB_CONTINUOUS, col, name);
             Path path(label->jobs_covered, label->real_cost);
             allPaths.push_back(path);
@@ -520,7 +522,7 @@ public:
         print_info("Column generation started...\n");
 
         node->optimize();
-        int bucket_interval = 25;
+        int bucket_interval = 20;
         int time_horizon    = instance.T_max;
 
         int                 numConstrs = node->get(GRB_IntAttr_NumConstrs);
@@ -568,7 +570,9 @@ public:
         std::vector<double>  solution;
         bool                 can_add = true;
 
-        Stabilization       stab(0.9, jobDuals);
+#ifdef STAB
+        Stabilization stab(0.9, jobDuals);
+#endif
         std::vector<double> split = {time_horizon * 0.5};
         bucket_graph.setSplit(split);
         bool changed = false;
@@ -726,6 +730,7 @@ public:
             jobDuals = stab.getStabDualSol(jobDuals);
 
             solution = extractSolution(node);
+
 #endif
 
             bool integer = true;
@@ -790,11 +795,15 @@ public:
             stab.update_stabilization_after_iter(jobDuals);
 #endif
 
+            auto cur_alpha = 0.0;
+#ifdef STAB
+            // cur_alpha = stab.cur_alpha;
+#endif
             if (iter % 10 == 0)
                 fmt::print("| It.: {:4} | Obj.: {:8.2f} | Pricing: {:10.2f} | Cuts: {:4} | Paths: {:4} | "
                            "Stage: {:1} | "
                            "Lag. Gap: {:10.4f} | RCC: {:4} | alpha: {:4.2f} | \n",
-                           iter, highs_obj, inner_obj, cuts.size(), paths.size(), stage, lag_gap, rcc, stab.cur_alpha);
+                           iter, highs_obj, inner_obj, cuts.size(), paths.size(), stage, lag_gap, rcc, cur_alpha);
         }
         auto end_timer        = std::chrono::high_resolution_clock::now();
         auto duration_ms      = std::chrono::duration_cast<std::chrono::milliseconds>(end_timer - start_timer).count();

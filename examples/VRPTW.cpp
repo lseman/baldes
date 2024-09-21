@@ -56,8 +56,9 @@ using VRProblemPtr = std::shared_ptr<VRProblem>;
 void initRMP(GRBModel *model, VRProblemPtr problem, std::vector<Route> &heuristicRoutes) {
     // GRBModel model = node->getModel();
     model->set(GRB_IntParam_OutputFlag, 0);
-    // set method as 2
-    //model->set(GRB_IntParam_Method, 2);
+
+    // DO NOT REMOVE THIS LINE
+    model->set(GRB_IntParam_Method, 2);
 
     auto instance = problem->instance;
 

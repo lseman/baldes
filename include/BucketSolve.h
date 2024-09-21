@@ -66,7 +66,7 @@ inline std::vector<Label *> BucketGraph::solve() {
         stage     = 2;
         paths     = bi_labeling_algorithm<Stage::Two>(q_star);
         inner_obj = paths[0]->cost;
-        if (inner_obj >= -100 || iter > 500) {
+        if (inner_obj >= -100 || iter > 800) {
             s2 = false;
             s3 = true;
         }
@@ -236,9 +236,10 @@ std::vector<double> BucketGraph::labeling_algorithm(std::vector<double> q_point,
                             for (const auto &jump_arc : jump_arcs) {
                                 Label *new_label = Extend<D, S, ArcType::Jump, Mutability::Const>(label, jump_arc);
                                 if (!new_label) {
-#ifdef UNREACHABLE_DOMINANCE
-                                    set_job_unreachable(label->unreachable_bitmap, jump_arc.to);
-#endif
+                                    // #ifdef UNREACHABLE_DOMINANCE
+                                    //                                     set_job_unreachable(label->unreachable_bitmap,
+                                    //                                     jump_arc.to);
+                                    // #endif
                                     continue;
                                 }
                                 process_new_label(new_label);
@@ -462,7 +463,6 @@ BucketGraph::Extend(const std::conditional_t<M == Mutability::Mut, Label *, cons
 
     // Early exit for enumeration
     if constexpr (S == Stage::Enumerate) {
-        fmt::print("Job id: {}\n", job_id);
         if (is_job_visited(L_prime->visited_bitmap, job_id)) { return nullptr; }
     }
 
@@ -555,6 +555,7 @@ BucketGraph::Extend(const std::conditional_t<M == Mutability::Mut, Label *, cons
     } else {
         new_label->parent = L_prime;
     }
+    // if constexpr (M == Mutability::Mut) { L_prime->children.push_back(new_label); }
 
 #if defined(SRC3) || defined(SRC)
     new_label->SRCmap = L_prime->SRCmap;
@@ -665,7 +666,7 @@ inline bool BucketGraph::is_dominated(Label *&new_label, Label *&label) noexcept
             // Combine unreachable and visited in the same check
             auto combined_label_bitmap = label->visited_bitmap[i] | label->unreachable_bitmap[i];
             // Check if there is any client visited or unreachable in label but not in new_label
-            if ((combined_label_bitmap & ~new_label->unreachable_bitmap[i]) != 0) { return false; }
+            if ((label->unreachable_bitmap & ~new_label->unreachable_bitmap[i]) != 0) { return false; }
         }
     }
 #endif
@@ -686,13 +687,14 @@ inline bool BucketGraph::is_dominated(Label *&new_label, Label *&label) noexcept
     // Check SRCDuals condition for specific stages
     if constexpr (S == Stage::Three || S == Stage::Four || S == Stage::Enumerate) {
         const auto &SRCDuals = cut_storage->SRCDuals;
+        double      sumSRC   = 0;
+
         if (!SRCDuals.empty()) {
-            double sumSRC = 0;
             for (size_t i = 0; i < SRCDuals.size(); ++i) {
                 if (label->SRCmap[i] > new_label->SRCmap[i]) { sumSRC += SRCDuals[i]; }
             }
-            if (label->cost - sumSRC > new_label->cost) { return false; }
         }
+        if (label->cost - sumSRC > new_label->cost) { return false; }
     }
 #endif
     return true;

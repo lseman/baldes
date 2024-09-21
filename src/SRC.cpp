@@ -330,7 +330,6 @@ void LimitedMemoryRank1Cuts::generateCutCoefficients(VRPTW_SRC &cuts, std::vecto
 
     if (cuts.S_n > 0) {
         int m_max = std::min(cuts.S_n, max_number_of_cuts);
-        coefficients.resize(m_max, std::vector<double>(numNodes, 0.0));
 
         // Prepare thread pool and scheduler
         exec::static_thread_pool pool(std::thread::hardware_concurrency()); // Dynamically set based on system
@@ -385,7 +384,7 @@ void LimitedMemoryRank1Cuts::generateCutCoefficients(VRPTW_SRC &cuts, std::vecto
                     int first = -1, second = -1;
 
                     // Find the first and second appearances of any element in C_set within consumers
-                    for (size_t i = 0; i < consumers.size(); ++i) {
+                    for (size_t i = 1; i < consumers.size() - 1; ++i) {
                         if (C_set.find(consumers[i]) != C_set.end()) {
                             if (first == -1) {
                                 first = i;

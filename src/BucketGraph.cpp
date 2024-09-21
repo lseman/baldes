@@ -157,9 +157,7 @@ Label *BucketGraph::compute_label(const Label *L, const Label *L_prime) {
     const auto &SRCDuals = cut_storage->SRCDuals;
     if (!SRCDuals.empty()) {
         for (size_t i = 0; i < SRCDuals.size(); ++i) {
-            if (L->SRCmap[i] + L_prime->SRCmap[i] >= 1) {
-                sumSRC += SRCDuals[i];
-            }
+            if (L->SRCmap[i] + L_prime->SRCmap[i] >= 1) { sumSRC += SRCDuals[i]; }
         }
     }
     new_label->cost -= sumSRC;
@@ -522,7 +520,7 @@ void BucketGraph::set_adjacency_list() {
             }
             if (!feasible) continue;
 
-            //if (job.lb[TIME_INDEX] + res_inc[TIME_INDEX] > next_job.ub[TIME_INDEX]) continue;
+            // if (job.lb[TIME_INDEX] + res_inc[TIME_INDEX] > next_job.ub[TIME_INDEX]) continue;
 
             double aux_double = 1.E-5 * next_job.start_time;
             best_arcs.emplace_back(aux_double, next_job.id, res_inc, cost_inc);

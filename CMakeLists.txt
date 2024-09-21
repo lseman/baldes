@@ -39,6 +39,7 @@ option(IPM "Enable IPM compilation option" OFF)
 option(TR "Enable TR compilation option" OFF)
 option(STAB "Enable STAB compilation option" ON)
 option(AUGMENTED "Enable Augmented compilation option" ON)
+option(GET_SUITESPARSE "Enable SuiteSparse compilation option" OFF)
 
 # Define an option to specify the size of resources
 set(R_SIZE
@@ -123,6 +124,21 @@ cpmaddpackage(
 
 cpmaddpackage(NAME fmt GITHUB_REPOSITORY fmtlib/fmt GIT_TAG 11.0.2)
 
+if(GET_SUITESPARSE)
+  cpmaddpackage(
+    NAME
+    SuiteSparse
+    GITHUB_REPOSITORY
+    DrTimothyAldenDavis/SuiteSparse
+    GIT_TAG
+    v7.8.2
+    OPTIONS
+    "BUILD_METIS OFF")
+  # Specify only CHOLMOD build
+  set(SUITESPARSE_BUILDS "CHOLMOD")
+  set(SUITESPARSE_CONFIG_ONLY TRZUE)
+endif()
+
 find_package(TBB)
 if(TBB_FOUND)
   message(STATUS "TBB found: ${TBB_VERSION}")
@@ -144,6 +160,11 @@ if(GET_TBB)
     "TBB_TEST OFF"
     "TBB_EXAMPLES OFF"
     "TBB_BUILD_SHARED OFF")
+endif()
+
+if(IPM)
+  cpmaddpackage(NAME Eigen GIT_REPOSITORY https://gitlab.com/libeigen/eigen.git
+                GIT_TAG 3.4.0)
 endif()
 
 set(GUROBI_HOME $ENV{GUROBI_HOME})
@@ -204,7 +225,7 @@ endif()
 if(IPM)
   target_link_libraries(vrptw PRIVATE cholmod)
   find_package(OpenMP)
-  target_link_libraries(vrptw PRIVATE OpenMP::OpenMP_CXX)
+  # target_link_libraries(vrptw PRIVATE OpenMP::OpenMP_CXX)
 endif()
 
 set(GUROBI_VERSION_MAJOR 110) # Adjust based on Gurobi version

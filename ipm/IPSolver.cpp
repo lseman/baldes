@@ -15,7 +15,6 @@
 #include <tuple>
 #include <vector>
 
-
 #include "IPSolver.h"
 
 /**
@@ -114,6 +113,7 @@ void IPSolver::convert_to_standard_form(const Eigen::SparseMatrix<double> &A, co
 
                 ++free;
             } else if (std::isfinite(l) && std::isfinite(h)) {
+                // print l and h
                 // l <= x <= h
                 cs[j + free] = c[j];
                 bs[i] -= (v * l);
@@ -191,7 +191,7 @@ void IPSolver::update_residuals(Residuals &res, const Eigen::VectorXd &x, const 
     res.ru = -v; // Directly assigning -v to res.ru
     for (int i = 0; i < ubi.size(); ++i) { res.ru(ubi(i)) += tau * ubv(i); }
     for (int i = 0; i < ubi.size(); ++i) { res.ru(ubi(i)) -= x(ubi(i)); }
-    // for (int
+
     // Calculate rd and its norm (dual residual)
     res.rd.noalias() = c * tau - A.transpose() * lambda - s;
     for (int i = 0; i < ubi.size(); ++i) { res.rd(ubi(i)) += w(i); }
@@ -228,14 +228,48 @@ void IPSolver::solve_augmented_system(Eigen::VectorXd &dx, Eigen::VectorXd &dy, 
     dy = d.tail(xi_p.size()); // Gets the last m elements
     // Recover dx
 #else
-    Eigen::VectorXd d   = 1.0 / (ls.theta.array() + ls.regP.array());
-    Eigen::VectorXd xi_ = xi_p + ls.A * (d.asDiagonal() * xi_d);
+    Eigen::VectorXd d = 1.0 / (ls.theta.array() + ls.regP.array());
+    // Eigen::VectorXd xi_ = xi_p; // + ls.A * (d.asDiagonal() * xi_d);
+
+    Eigen::MatrixXd             dDense  = d.asDiagonal();
+    Eigen::SparseMatrix<double> dSparse = dDense.sparseView();
+    Eigen::SparseMatrix<double> AD(ls.A.rows(), dSparse.cols());
+    for (int k = 0; k < ls.A.outerSize(); ++k) {
+        for (Eigen::SparseMatrix<double>::InnerIterator it(ls.A, k); it; ++it) {
+            int row = it.row();
+            int col = it.col();
+            for (Eigen::SparseMatrix<double>::InnerIterator jt(dSparse, col); jt; ++jt) {
+                int target_col = jt.col();
+                AD.coeffRef(row, target_col) += it.value() * jt.value();
+            }
+        }
+    }
+
+    Eigen::VectorXd xi_ = xi_p + AD * xi_d;
 
     // Solve augmented system
     dy = ls.solve(xi_);
 
     // Recover dx
-    dx = d.asDiagonal() * (ls.A.transpose() * dy - xi_d);
+    // dx = d.asDiagonal() * (ls.A.transpose() * dy - xi_d);
+    dx = AD.transpose() * dy;
+
+    Eigen::SparseMatrix<double> ADxi_d(ls.A.cols(), xi_d.size()); // Adjust size for the transpose
+    for (int k = 0; k < ls.A.outerSize(); ++k) {
+        for (Eigen::SparseMatrix<double>::InnerIterator it(ls.A, k); it; ++it) {
+            // Now `it.col()` becomes the "row" in the transposed matrix
+            int row = it.col();
+            int col = it.row();
+            for (Eigen::SparseMatrix<double>::InnerIterator jt(dSparse, col); jt; ++jt) {
+                int target_col = jt.col();
+                ADxi_d.coeffRef(row, target_col) += it.value() * jt.value();
+            }
+        }
+    }
+
+    dx -= ADxi_d;
+    fmt::print("dx: {}\n", dx.size());
+
 #endif
 }
 
@@ -350,7 +384,6 @@ double IPSolver::max_alpha_single(const Eigen::VectorXd &v, const Eigen::VectorX
 
     return alpha;
 }
-
 
 /**
  * @brief Computes the maximum step size (alpha) that can be taken along the direction of the search vectors.
@@ -562,7 +595,7 @@ std::tuple<double, double, std::vector<double>, std::vector<double>> IPSolver::r
         // Check for optimality and infeasibility
         // print mu
         // fmt::print("mu: {}, p: {}, d: {}\n", mu, _p, _d);
-        if (_p <= 1e-4 && _d <= 1e-4 && _g <= tol) { break; }
+        if (_g <= tol) { break; }
         // Scaling factors
         theta_vw = w.cwiseQuotient(v);
         theta_xs = s.cwiseQuotient(x);

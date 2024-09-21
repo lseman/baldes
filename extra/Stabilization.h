@@ -102,8 +102,8 @@ public:
      * This function updates the stabilization parameters based on the new center
      * provided by the master optimization. It resets the mispricing counter and
      * the current alpha value. If the current stabilization center is empty, it
-     * sets it to the new center and returns false. Otherwise, it updates the 
-     * current alpha to the base alpha and returns whether the current alpha is 
+     * sets it to the new center and returns false. Otherwise, it updates the
+     * current alpha to the base alpha and returns whether the current alpha is
      * greater than zero.
      *
      * @param new_center The new center provided by the master optimization.
@@ -148,7 +148,7 @@ public:
     // Constructor
     /**
      * @brief Constructs a Stabilization object with the given base alpha value and master dual solution.
-     * 
+     *
      * @param base_alpha The base alpha value used for stabilization.
      * @param mast_dual_sol A reference to the master dual solution.
      */
@@ -178,15 +178,16 @@ public:
         return stab_dual_sol;
     }
 
-
     /**
-     * @brief Updates the stabilization parameter alpha based on the provided model data, dual solutions, and lagrangian gap.
+     * @brief Updates the stabilization parameter alpha based on the provided model data, dual solutions, and lagrangian
+     * gap.
      *
      * This function performs several steps to update the stabilization parameter alpha:
      * 1. Calculates the direction of separation between the smooth dual solution and the current stabilization center.
      * 2. Computes the norm of the smooth dual solution.
      * 3. Checks if the norm is zero and returns early if it is.
-     * 4. Calculates the subgradient as the difference between the right-hand side vector and the product of the constraint matrix and the primal solution.
+     * 4. Calculates the subgradient as the difference between the right-hand side vector and the product of the
+     * constraint matrix and the primal solution.
      * 5. Accumulates values of the constraint matrix multiplied by the primal solution.
      * 6. Updates the subgradient based on the best pricing columns.
      * 7. Computes the norm of the subgradient and normalizes it if non-zero.
@@ -229,17 +230,16 @@ public:
         }
         */
 
+        // Apply contribution from best_pricing_col if non-zero
+        for (auto best_pricing_col : best_pricing_cols) {
+            if (best_pricing_col->cost > 0) { continue; }
+            for (auto row : best_pricing_col->jobs_covered) {
+                if (row > 0 && row != N_SIZE - 1) { subgradient[row - 1] += 1; }
+            }
+        }
         // Update subgradient based on best_pricing_cols
         for (size_t row_id = 0; row_id < subgradient.size(); ++row_id) {
             char sense = dados.sense[row_id];
-
-            // Apply contribution from best_pricing_col if non-zero
-            for (auto best_pricing_col : best_pricing_cols) {
-                if (best_pricing_col->cost > 0) { continue; }
-                for (auto row : best_pricing_col->jobs_covered) {
-                    if (row > 0 && row != N_SIZE - 1) { subgradient[row - 1] += 1; }
-                }
-            }
 
             // Check participation in stabilization
             if (sense == '<') {

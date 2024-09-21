@@ -184,7 +184,7 @@ public:
         std::vector<double> alphas;
         alphas.reserve(cuts.size());
         for (auto c : cuts) {
-            double alpha = 0;
+            double alpha = 0.0;
             double S     = 0;
             auto   AM    = c.neighbors;
             auto   C     = c.baseSet;
@@ -197,7 +197,8 @@ public:
                 // Check if the node vj is in AM (bitwise check)
                 if (!(AM[vj / 64] & (1ULL << (vj % 64)))) {
                     S = 0; // Reset S if vj is not in AM
-                } else if (C[vj / 64] & (1ULL << (vj % 64))) {
+                }
+                if (C[vj / 64] & (1ULL << (vj % 64))) {
                     // Get the position of vj in C by counting the set bits up to vj
                     int pos = order[vj];
                     S += p[pos];

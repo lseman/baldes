@@ -6,12 +6,10 @@
 #include <Eigen/Dense>
 #include <Eigen/Sparse>
 #include <gurobi_c++.h>
-#include <vector>
-#include <stdexcept>
-#include <new>
 #include <iostream>
-
-#define AUGMENTED
+#include <new>
+#include <stdexcept>
+#include <vector>
 
 /**
  * @struct OptimizationData
@@ -76,7 +74,7 @@ public:
 
     CholmodSolver() {
         cholmod_start(&c);
-        c.useGPU             = 1;
+        c.useGPU             = 0;
         c.nmethods           = 1;
         c.method[0].ordering = CHOLMOD_METIS;
         c.postorder          = true;
@@ -217,14 +215,13 @@ private:
     SolverBase *solver;
 };
 
-
 /**
  * @class IPSolver
  * @brief A class for solving linear programming problems using an interior point method.
- * 
+ *
  * This class provides methods to convert linear programming problems to standard form,
  * update residuals, solve augmented systems, and run the optimization process.
- * 
+ *
  */
 class IPSolver {
 
