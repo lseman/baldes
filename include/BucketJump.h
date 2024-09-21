@@ -66,10 +66,14 @@ void BucketGraph::UpdateBucketsSet(const double theta, Label *&label, std::unord
 
                 if constexpr (D == Direction::Forward) {
                     const VRPJob &L_last_job = jobs[label->job_id];
-                    if (label->resources[TIME_INDEX] + cost + L_last_job.duration > L->resources[TIME_INDEX]) { continue; }
+                    if (label->resources[TIME_INDEX] + cost + L_last_job.duration > L->resources[TIME_INDEX]) {
+                        continue;
+                    }
                 } else {
                     const VRPJob &L_last_job = jobs[L->job_id];
-                    if (L->resources[TIME_INDEX] + cost + L_last_job.duration > label->resources[TIME_INDEX]) { continue; }
+                    if (L->resources[TIME_INDEX] + cost + L_last_job.duration > label->resources[TIME_INDEX]) {
+                        continue;
+                    }
                 }
 
                 // Insert into Bbidi if condition is met

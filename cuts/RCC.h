@@ -1,18 +1,19 @@
 /**
  * @file RCC.h
- * @brief Definitions for generating and separating Rounded Capacity Cuts (RCC) in the context of vehicle routing problems.
+ * @brief Definitions for generating and separating Rounded Capacity Cuts (RCC) in the context of vehicle routing
+ * problems.
  *
- * This header file contains the structure and function definitions required for separating Rounded Capacity Cuts (RCCs) 
- * using Gurobi's optimization model. RCC separation is an important aspect of optimization algorithms, particularly 
+ * This header file contains the structure and function definitions required for separating Rounded Capacity Cuts (RCCs)
+ * using Gurobi's optimization model. RCC separation is an important aspect of optimization algorithms, particularly
  * in vehicle routing problems where capacity constraints must be enforced.
  *
  * Key components of the file include:
- * - `separate_Rounded_Capacity_cuts`: A function that identifies and separates RCCs by solving the relaxed Gurobi model 
+ * - `separate_Rounded_Capacity_cuts`: A function that identifies and separates RCCs by solving the relaxed Gurobi model
  *   and searching for violated constraints in the solution space. The function generates multiple RCC solutions.
  *
  * The file leverages Gurobi for optimization and constraint management.
  *
- * @note Several parts of the function rely on setting up and solving a Gurobi optimization model to identify capacity 
+ * @note Several parts of the function rely on setting up and solving a Gurobi optimization model to identify capacity
  * violations and generate RCCs.
  */
 
@@ -35,9 +36,9 @@ using namespace std;
 /**
  * @brief Separates Rounded Capacity Cuts (RCC) for a given Gurobi model.
  *
- * This function identifies and separates RCCs from a given Gurobi model. It uses the solution from the LP or relaxed problem
- * and searches for multiple solutions that violate the RCC constraints. The function returns multiple sets of nodes corresponding
- * to the solutions found.
+ * This function identifies and separates RCCs from a given Gurobi model. It uses the solution from the LP or relaxed
+ * problem and searches for multiple solutions that violate the RCC constraints. The function returns multiple sets of
+ * nodes corresponding to the solutions found.
  *
  * @param gurobi_model Pointer to the Gurobi model.
  * @param Q Integer parameter representing the capacity.
@@ -75,7 +76,7 @@ std::vector<set<int>> separate_Rounded_Capacity_cuts(GRBModel *gurobi_model, int
 
     GRBVar alpha = m_separation.addVar(0, GRB_INFINITY, 0, GRB_INTEGER);
 
-    set<pair<int, int>>                             relevant_edges;
+    set<pair<int, int>>                              relevant_edges;
     unordered_map<pair<int, int>, double, pair_hash> edge_capacities;
 
     unordered_map<pair<int, int>, GRBVar, pair_hash> gamma;

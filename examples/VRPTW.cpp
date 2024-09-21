@@ -2,9 +2,9 @@
  * @file VRPTW.cpp
  * @brief Main implementation for solving the Vehicle Routing Problem with Time Windows (VRPTW).
  *
- * This file contains the implementation of the main function and supporting functions for solving the 
- * Vehicle Routing Problem with Time Windows (VRPTW). The VRPTW class is used to manage instance data, 
- * initialize the Restricted Master Problem (RMP), perform heuristic-based route generation, and apply column 
+ * This file contains the implementation of the main function and supporting functions for solving the
+ * Vehicle Routing Problem with Time Windows (VRPTW). The VRPTW class is used to manage instance data,
+ * initialize the Restricted Master Problem (RMP), perform heuristic-based route generation, and apply column
  * generation to iteratively solve the problem.
  *
  * The following steps are carried out:
@@ -14,7 +14,7 @@
  * 4. Initialize the Gurobi model and the Restricted Master Problem (RMP).
  * 5. Apply column generation with stabilization to solve the problem iteratively.
  *
- * The implementation relies on the Gurobi optimizer for solving linear programming relaxations, 
+ * The implementation relies on the Gurobi optimizer for solving linear programming relaxations,
  * and uses various heuristics such as Iterated Local Search and Savings Heuristic to generate initial solutions.
  *
  * @param argc The number of command line arguments.
@@ -95,9 +95,7 @@ void initRMP(GRBModel *model, VRProblemPtr problem, std::vector<Route> &heuristi
     for (int i = 1; i < instance.getNbVertices(); ++i) {
         lhs = 0;
         for (size_t j = 0; j < heuristicRoutes.size(); ++j) {
-            if (heuristicRoutes[j].contains(i)) {
-                lhs += lambda[j];
-            }
+            if (heuristicRoutes[j].contains(i)) { lhs += lambda[j]; }
         }
         model->addConstr(lhs >= 1, "visit(m" + std::to_string(i - 1) + ")");
     }
@@ -179,7 +177,7 @@ int main(int argc, char *argv[]) {
     auto             initialRoutesSavings = heuristic.get_solution();
 
     print_heur("Routes from saving heuristics: {}\n", initialRoutesSavings.size());
-    
+
     // merge initialRoutes and initialRoutesSaving amd put in initialRoutes
     initialRoutes.insert(initialRoutes.end(), initialRoutesSavings.begin(), initialRoutesSavings.end());
 
@@ -208,7 +206,7 @@ int main(int argc, char *argv[]) {
     problem->instance    = instance;
     problem->jobs        = jobs;
 
-    std::vector<Path> paths;
+    std::vector<Path>    paths;
     std::vector<Label *> labels;
 
     // convert initial routes to labels

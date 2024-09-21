@@ -1,21 +1,26 @@
 /**
  * @file Reader.h
- * @brief Header file for reading and processing problem instance data, specifically for Vehicle Routing Problem with Time Windows (VRPTW).
+ * @brief Header file for reading and processing problem instance data, specifically for Vehicle Routing Problem with
+ * Time Windows (VRPTW).
  *
- * This file defines the `InstanceData` structure, which holds various data related to a problem instance, such as distances, 
- * travel costs, demands, time windows, and other relevant information. It also includes several inline functions for manipulating 
- * and processing instance data, such as reducing time windows, deleting arcs, and reading an instance from a file.
+ * This file defines the `InstanceData` structure, which holds various data related to a problem instance, such as
+ * distances, travel costs, demands, time windows, and other relevant information. It also includes several inline
+ * functions for manipulating and processing instance data, such as reducing time windows, deleting arcs, and reading an
+ * instance from a file.
  *
  * The main components of this file include:
- * - The `InstanceData` structure: Contains all the relevant data for a VRPTW problem instance, such as distance matrices, demands, 
- *   time windows, service times, and other problem-specific information.
+ * - The `InstanceData` structure: Contains all the relevant data for a VRPTW problem instance, such as distance
+ * matrices, demands, time windows, service times, and other problem-specific information.
  * - `VRPTW_delete_arc`: An inline function for managing deleted arcs in the graph.
- * - `VRPTW_reduce_time_windows`: An inline function to iteratively reduce the time windows for vertices based on constraints.
- * - `VRPTW_mcd`: An inline function that calculates the greatest common divisor (GCD) of two integers, used for capacity and demand adjustments.
- * - `VRPTW_read_instance`: An inline function to read a VRPTW instance file and populate the `InstanceData` structure with relevant data.
+ * - `VRPTW_reduce_time_windows`: An inline function to iteratively reduce the time windows for vertices based on
+ * constraints.
+ * - `VRPTW_mcd`: An inline function that calculates the greatest common divisor (GCD) of two integers, used for
+ * capacity and demand adjustments.
+ * - `VRPTW_read_instance`: An inline function to read a VRPTW instance file and populate the `InstanceData` structure
+ * with relevant data.
  *
- * This file is essential for handling the input and initialization of problem instances, and it ensures that the data is 
- * formatted and processed correctly for further use in solving the VRPTW.
+ * This file is essential for handling the input and initialization of problem instances, and it ensures that the data
+ * is formatted and processed correctly for further use in solving the VRPTW.
  */
 
 #pragma once
@@ -29,11 +34,11 @@
 /**
  * @struct InstanceData
  * @brief A structure to hold various data related to an instance of a problem.
- * 
- * This structure contains multiple vectors and variables to store distances, 
- * travel costs, demands, time windows, service times, and other relevant data 
+ *
+ * This structure contains multiple vectors and variables to store distances,
+ * travel costs, demands, time windows, service times, and other relevant data
  * for solving a problem instance.
- * 
+ *
  */
 struct InstanceData {
     std::vector<std::vector<double>> distance;
@@ -80,18 +85,18 @@ struct InstanceData {
     // define getDistanceMatrix
     /**
      * @brief Retrieves the distance matrix.
-     * 
+     *
      * This function returns a 2D vector containing the distance matrix.
      * Each element in the outer vector represents a row in the matrix,
      * and each element in the inner vector represents a column in the matrix.
-     * 
+     *
      * @return std::vector<std::vector<double>> The distance matrix.
      */
     std::vector<std::vector<double>> getDistanceMatrix() const { return distance; }
 
     /**
      * @brief Retrieves the demand value for a given index.
-     * 
+     *
      * @param i The index for which the demand value is requested.
      * @return double The demand value at the specified index.
      */
@@ -99,9 +104,9 @@ struct InstanceData {
 
     /**
      * @brief Retrieves the capacity.
-     * 
+     *
      * This function returns the value of the capacity, which is stored in the member variable `q`.
-     * 
+     *
      * @return int The capacity value.
      */
     int getCapacity() const { return q; }
@@ -110,8 +115,8 @@ struct InstanceData {
 /**
  * @brief Deletes an arc between two vertices and stores the deleted arcs.
  *
- * This function deletes an arc between the specified vertices and stores the 
- * deleted arcs in the provided vector. It also manages the allocation and 
+ * This function deletes an arc between the specified vertices and stores the
+ * deleted arcs in the provided vector. It also manages the allocation and
  * resizing of the vector to accommodate new entries.
  *
  * @param vertex_from The starting vertex of the arc to be deleted. Must be non-negative.

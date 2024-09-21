@@ -2,16 +2,16 @@
  * @file Knapsack.h
  * @brief Header file for the Knapsack class, which implements the solution to the knapsack problem.
  *
- * This file defines the `Knapsack` class, which provides methods to solve the knapsack problem using a dynamic 
- * programming approach. The knapsack problem is a well-known combinatorial optimization problem where the goal 
+ * This file defines the `Knapsack` class, which provides methods to solve the knapsack problem using a dynamic
+ * programming approach. The knapsack problem is a well-known combinatorial optimization problem where the goal
  * is to maximize the total value of items that can be placed in a knapsack with a given weight capacity.
  *
  * The main components of this file include:
  * - The `Item` structure: Holds the value and weight of individual items that can be placed in the knapsack.
- * - Methods for adding items, setting the capacity of the knapsack, solving the problem using dynamic programming, 
+ * - Methods for adding items, setting the capacity of the knapsack, solving the problem using dynamic programming,
  *   and clearing the item list for reuse.
  *
- * The dynamic programming solution is implemented using a single-row DP array to save space. Additionally, items 
+ * The dynamic programming solution is implemented using a single-row DP array to save space. Additionally, items
  * can be optionally sorted by value-to-weight ratio for heuristic or greedy approaches.
  */
 
@@ -55,11 +55,10 @@ public:
     // Solve the knapsack problem and return the upper bound
     double solve() {
         int n = items.size();
-        
+
         // Sort items by value-to-weight ratio (optional, useful for heuristic or greedy approaches)
-        std::sort(items.begin(), items.end(), [](const Item &a, const Item &b) {
-            return (a.value / a.weight) > (b.value / b.weight);
-        });
+        std::sort(items.begin(), items.end(),
+                  [](const Item &a, const Item &b) { return (a.value / a.weight) > (b.value / b.weight); });
 
         // Use a single-row DP array to save space
         std::vector<double> dp(capacity + 1, 0.0);

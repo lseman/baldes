@@ -64,11 +64,11 @@ public:
     /**
      * @brief Converts an unordered map representation of a graph into an internal graph representation.
      *
-     * This function takes an unordered map where the keys are vertex identifiers and the values are 
-     * vectors of adjacent vertices. It iterates through the map and adds edges to the internal graph 
+     * This function takes an unordered map where the keys are vertex identifiers and the values are
+     * vectors of adjacent vertices. It iterates through the map and adds edges to the internal graph
      * representation using the addEdge function.
      *
-     * @param map An unordered map where each key is a vertex and the corresponding value is a vector 
+     * @param map An unordered map where each key is a vertex and the corresponding value is a vector
      *            of vertices that are adjacent to the key vertex.
      */
     void convertFromUnorderedMap(const std::unordered_map<int, std::vector<int>> &map) {
@@ -82,8 +82,8 @@ public:
      * @brief Finds and returns all Strongly Connected Components (SCCs) in the graph using Tarjan's algorithm.
      *
      * This function implements Tarjan's algorithm to find all SCCs in a directed graph. It iterates over all vertices
-     * and applies the strongConnect function to each vertex that has not been visited yet (indicated by an index of -1).
-     * The result is a vector of SCCs, where each SCC is represented as a vector of vertex indices.
+     * and applies the strongConnect function to each vertex that has not been visited yet (indicated by an index of
+     * -1). The result is a vector of SCCs, where each SCC is represented as a vector of vertex indices.
      *
      * @return A vector of vectors, where each inner vector represents a strongly connected component in the graph.
      */

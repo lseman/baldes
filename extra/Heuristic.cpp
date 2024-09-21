@@ -8,8 +8,8 @@
  * - `IteratedLocalSearch`: An iterated local search algorithm that applies perturbations to improve solutions.
  * - Route manipulation methods such as `two_opt`, `cross`, `insertion`, and `swap` for improving route efficiency.
  * - Calculation of route feasibility, total distance, and canonical representations.
- * 
- * These algorithms aim to generate and optimize solutions for VRPs, which involve assigning customers to vehicles 
+ *
+ * These algorithms aim to generate and optimize solutions for VRPs, which involve assigning customers to vehicles
  * while minimizing travel distance and adhering to constraints such as time windows and vehicle capacities.
  */
 

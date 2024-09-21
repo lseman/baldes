@@ -78,11 +78,11 @@ public:
     std::vector<double> q_star;
     int                 iter       = 0;
     bool                transition = true;
-    Status                status     = Status::NotOptimal;
+    Status              status     = Status::NotOptimal;
 
     void                 setSplit(std::vector<double> q_star) { this->q_star = q_star; }
     int                  getStage() { return stage; }
-    Status                 getStatus() { return status; }
+    Status               getStatus() { return status; }
     std::vector<Label *> solve();
 
     RCCmanager *rcc_manager = nullptr;

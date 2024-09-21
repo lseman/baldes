@@ -10,10 +10,12 @@
  * - RIH1: Refines the routes by inserting new customers into the existing routes and recalculating the costs.
  * - RIH2: Refines the routes by removing customers from the routes and recalculating the costs.
  * - RIH3: Improves routes by swapping neighboring customers within a route and recalculating the costs.
- * - RIH4: Applies the 2-opt local search heuristic, performing exchanges between non-neighboring customers to improve route costs.
+ * - RIH4: Applies the 2-opt local search heuristic, performing exchanges between non-neighboring customers to improve
+ * route costs.
  *
- * The functions make use of priority queues to manage the best labels (routes) and process them iteratively based on their costs.
- * The objective is to generate feasible solutions that minimize route costs while respecting problem-specific constraints.
+ * The functions make use of priority queues to manage the best labels (routes) and process them iteratively based on
+ * their costs. The objective is to generate feasible solutions that minimize route costs while respecting
+ * problem-specific constraints.
  *
  * The main methods implemented in this file provide functionality for:
  * - Inserting customers into routes, recalculating the cost and feasibility of the new routes.
@@ -25,8 +27,8 @@
  * the solution by making local modifications to the routes.
  */
 
-#include "../include/Definitions.h"
 #include "../include/BucketGraph.h"
+#include "../include/Definitions.h"
 
 /* Improvement heuristics based on the insertion/deletion of customers */
 /* Operation 1: modify the routes by adding one customer to each route */
