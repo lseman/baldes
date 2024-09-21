@@ -561,6 +561,8 @@ public:
         bool ss    = false;
         int  stage = 1;
 
+        bool misprice = true;
+
         double bidi_relation = bucket_graph.bidi_relation;
         double relation      = 0.5;
         double lag_gap       = std::numeric_limits<double>::max();
@@ -727,77 +729,82 @@ public:
             // get from jobDuals only the first sizeDuals
             jobDuals = std::vector<double>(jobDuals.begin(), jobDuals.begin() + sizeDuals);
             stab.update_stabilization_after_master_optim(jobDuals);
-            jobDuals = stab.getStabDualSol(jobDuals);
 
-            solution = extractSolution(node);
-
+            misprice = true;
+            while (misprice) {
+                jobDuals = stab.getStabDualSol(jobDuals);
+                solution = extractSolution(node);
 #endif
 
-            bool integer = true;
-            // Check integrality of the solution
-            for (auto &sol : solution) {
-                if (sol > 1e-1 && sol < 1 - 1e-1) {
-                    integer = false;
+                bool integer = true;
+                // Check integrality of the solution
+                for (auto &sol : solution) {
+                    if (sol > 1e-1 && sol < 1 - 1e-1) {
+                        integer = false;
+                        break;
+                    }
+                }
+                if (integer) {
+                    if (highs_obj < integer_solution) {
+                        print_info("Updating integer solution to {}\n", highs_obj);
+                        integer_solution       = highs_obj;
+                        bucket_graph.incumbent = integer_solution;
+                    }
+                }
+                lag_gap          = integer_solution - (highs_obj + std::min(0.0, inner_obj));
+                bucket_graph.gap = lag_gap;
+                bucket_graph.augment_ng_memories(solution, allPaths, true, 5, 100, 16, N_SIZE);
+                bucket_graph.relaxation = highs_obj;
+
+                if (cuts.size() > 0) {
+                    auto numJobs = bucket_graph.getJobs().size() - 1;
+                    cutDuals     = std::vector<double>(originDuals.begin() + numJobs, originDuals.end());
+                    cuts.setDuals(cutDuals);
+                }
+
+                auto onlyJobDuals =
+                    std::vector<double>(jobDuals.begin(), jobDuals.begin() + bucket_graph.getJobs().size());
+                bucket_graph.setDuals(onlyJobDuals);
+
+                //////////////////////////////////////////////////////////////////////
+                // CALLING BALDES
+                //////////////////////////////////////////////////////////////////////
+
+                bucket_graph.cut_storage = &cuts;
+                paths                    = bucket_graph.solve();
+
+                inner_obj = paths[0]->cost;
+                stage     = bucket_graph.getStage();
+
+                ss = bucket_graph.ss;
+
+                //////////////////////////////////////////////////////////////////////
+                bidi_relation = bucket_graph.bidi_relation;
+
+                auto colAdded = addColumn(node, paths, cuts, false);
+
+#ifdef STAB
+                stab.update_stabilization_after_pricing_optim(matrixSparse, jobDuals, lag_gap, paths);
+
+                if (colAdded == 0) {
+                    stab.update_stabilization_after_misprice();
+                    fmt::print("No columns added, mispricing detected\n");
+                    if (stab.shouldExit()) { misprice = false; }
+                } else {
+                    misprice = false;
+                }
+
+                if (bucket_graph.getStatus() == Status::Optimal) {
+                    print_info("Optimal solution found\n");
                     break;
                 }
             }
-            if (integer) {
-                if (highs_obj < integer_solution) {
-                    print_info("Updating integer solution to {}\n", highs_obj);
-                    integer_solution       = highs_obj;
-                    bucket_graph.incumbent = integer_solution;
-                }
-            }
-            lag_gap          = integer_solution - (highs_obj + std::min(0.0, inner_obj));
-            bucket_graph.gap = lag_gap;
-            bucket_graph.augment_ng_memories(solution, allPaths, true, 5, 100, 16, N_SIZE);
-            bucket_graph.relaxation = highs_obj;
-
-            if (cuts.size() > 0) {
-                auto numJobs = bucket_graph.getJobs().size() - 1;
-                cutDuals     = std::vector<double>(originDuals.begin() + numJobs, originDuals.end());
-                cuts.setDuals(cutDuals);
-            }
-
-            auto onlyJobDuals = std::vector<double>(jobDuals.begin(), jobDuals.begin() + bucket_graph.getJobs().size());
-            bucket_graph.setDuals(onlyJobDuals);
-
-            //////////////////////////////////////////////////////////////////////
-            // CALLING BALDES
-            //////////////////////////////////////////////////////////////////////
-
-            bucket_graph.cut_storage = &cuts;
-            paths                    = bucket_graph.solve();
-
-            inner_obj = paths[0]->cost;
-            stage     = bucket_graph.getStage();
-
-            if (bucket_graph.getStatus() == Status::Optimal) {
-                print_info("Optimal solution found\n");
-                break;
-            }
-
-            ss = bucket_graph.ss;
-
-            //////////////////////////////////////////////////////////////////////
-            bidi_relation = bucket_graph.bidi_relation;
-
-            auto colAdded = addColumn(node, paths, cuts, false);
-
-#ifdef STAB
-            if (colAdded == 0) {
-                stab.add_misprice();
-                fmt::print("No columns added, mispricing detected\n");
-            } else {
-                stab.reset_misprices();
-            }
-            stab.updateAlpha(matrixSparse, jobDuals, solution, lag_gap, paths);
             stab.update_stabilization_after_iter(jobDuals);
 #endif
 
             auto cur_alpha = 0.0;
 #ifdef STAB
-            // cur_alpha = stab.cur_alpha;
+            cur_alpha = stab.base_alpha;
 #endif
             if (iter % 10 == 0)
                 fmt::print("| It.: {:4} | Obj.: {:8.2f} | Pricing: {:10.2f} | Cuts: {:4} | Paths: {:4} | "

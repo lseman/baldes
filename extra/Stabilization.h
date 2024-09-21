@@ -75,7 +75,7 @@ public:
      * This function checks if the alpha value is greater than zero. If it is,
      * the function increments the misprice counter (nb_misprices).
      */
-    void add_misprice() {
+    void update_stabilization_after_misprice() {
         nb_misprices++;
         cur_alpha = _misprice_schedule(nb_misprices, base_alpha);
     }
@@ -145,7 +145,6 @@ public:
         return alpha;
     }
 
-    // Constructor
     /**
      * @brief Constructs a Stabilization object with the given base alpha value and master dual solution.
      *
@@ -179,31 +178,19 @@ public:
     }
 
     /**
-     * @brief Updates the stabilization parameter alpha based on the provided model data, dual solutions, and lagrangian
-     * gap.
+     * @brief Computes the dynamic alpha schedule for stabilization.
      *
-     * This function performs several steps to update the stabilization parameter alpha:
-     * 1. Calculates the direction of separation between the smooth dual solution and the current stabilization center.
-     * 2. Computes the norm of the smooth dual solution.
-     * 3. Checks if the norm is zero and returns early if it is.
-     * 4. Calculates the subgradient as the difference between the right-hand side vector and the product of the
-     * constraint matrix and the primal solution.
-     * 5. Accumulates values of the constraint matrix multiplied by the primal solution.
-     * 6. Updates the subgradient based on the best pricing columns.
-     * 7. Computes the norm of the subgradient and normalizes it if non-zero.
-     * 8. Calculates the cosine of the angle between the separation direction and the subgradient.
-     * 9. Adjusts the current alpha based on the cosine angle and a threshold.
-     * 10. Updates the stabilization center for the next iteration if the lagrangian gap has decreased.
+     * This function calculates the dynamic alpha schedule based on the provided model data, dual solution,
+     * and best pricing columns. It adjusts the current alpha value based on the angle between the
+     * separation direction and the subgradient.
      *
-     * @param dados The model data containing the constraint matrix and other relevant information.
-     * @param jobDuals The dual solution for the job constraints.
-     * @param master_primal The primal solution for the master problem.
-     * @param lag_gap The current lagrangian gap.
+     * @param dados The model data containing problem-specific information.
+     * @param jobDuals The dual solution vector.
      * @param best_pricing_cols A vector of pointers to the best pricing columns.
+     * @return The updated alpha value based on the dynamic schedule.
      */
-    void updateAlpha(const ModelData &dados, const DualSolution &jobDuals, const DualSolution &master_primal,
-                     const double &lag_gap, std::vector<Label *> best_pricing_cols) {
-
+    double dynamic_alpha_schedule(const ModelData &dados, const DualSolution &jobDuals,
+                                  std::vector<Label *> best_pricing_cols) {
         // calculate smooth_dual_sol - cur_stab_center
         std::vector<double> in_sep_direction(jobDuals.size());
         std::transform(smooth_dual_sol.begin(), smooth_dual_sol.end(), cur_stab_center.begin(),
@@ -214,21 +201,13 @@ public:
                                                             std::plus<>(), [](double a) { return a * a; });
 
         // check if norm is 0, if so return
-        if (norm_smooth_dual_sol == 0) { return; }
+        if (norm_smooth_dual_sol == 0) { return base_alpha; }
 
         // calculate subgradient as b - A * primal_sol
         std::vector<double> subgradient(jobDuals.size());
 
         // Step 5: Accumulate values of A * x in lagrangian_constraint_values
         std::vector<double> lagrangian_constraint_values(jobDuals.size(), 0.0);
-        /*
-        for (size_t idx = 0; idx < dados.A_sparse.values.size(); ++idx) {
-            int row_id = dados.A_sparse.row_indices[idx];
-            if (row_id >= N_SIZE - 1) { continue; }
-            int col_id = dados.A_sparse.col_indices[idx];
-            lagrangian_constraint_values[row_id] = dados.A_sparse.values[idx] * master_primal[col_id];
-        }
-        */
 
         // Apply contribution from best_pricing_col if non-zero
         for (auto best_pricing_col : best_pricing_cols) {
@@ -237,6 +216,7 @@ public:
                 if (row > 0 && row != N_SIZE - 1) { subgradient[row - 1] += 1; }
             }
         }
+
         // Update subgradient based on best_pricing_cols
         for (size_t row_id = 0; row_id < subgradient.size(); ++row_id) {
             char sense = dados.sense[row_id];
@@ -257,11 +237,14 @@ public:
         double subgradient_norm = std::transform_reduce(subgradient.begin(), subgradient.end(), 0.0, std::plus<>(),
                                                         [](double a) { return a * a; });
 
-        // normalize subgradient if non-zero
+        // normalize subgradient by its norm
+        /*
         if (subgradient_norm > 0) {
-            subgradient_norm = std::sqrt(subgradient_norm);
-            for (auto &value : subgradient) { value /= subgradient_norm; }
+            std::transform(subgradient.begin(), subgradient.end(), subgradient.begin(),
+                           [subgradient_norm](double a) { return a / subgradient_norm; });
         }
+        */
+
         double cos_angle =
             std::inner_product(in_sep_direction.begin(), in_sep_direction.end(), subgradient.begin(), 0.0) /
             (norm_smooth_dual_sol * subgradient_norm);
@@ -273,8 +256,39 @@ public:
         } else {
             cur_alpha = std::max(0.0, cur_alpha - 0.1);
         }
+        return cur_alpha;
+    }
 
+    /**
+     * @brief Updates the stabilization parameters after the pricing optimization step.
+     *
+     * This function adjusts the stabilization parameters based on the results of the
+     * pricing optimization. It updates the alpha value using a dynamic schedule if
+     * there have been no misprices. Additionally, it updates the stabilization center
+     * for the next iteration if the current lagrangian gap is smaller than the previous one.
+     *
+     * @param dados The model data containing relevant information for the optimization.
+     * @param jobDuals The dual solution obtained from the pricing optimization.
+     * @param lag_gap The current lagrangian gap.
+     * @param best_pricing_cols A vector of pointers to the best pricing columns.
+     */
+    void update_stabilization_after_pricing_optim(const ModelData &dados, const DualSolution &jobDuals,
+                                                  const double &lag_gap, std::vector<Label *> best_pricing_cols) {
+        if (nb_misprices == 0) { alpha = dynamic_alpha_schedule(dados, jobDuals, best_pricing_cols); }
         if (lag_gap < lag_gap_prev) { stab_center_for_next_iteration = smooth_dual_sol; }
-        base_alpha = cur_alpha;
+        base_alpha = alpha;
+    }
+
+    /**
+     * @brief Determines whether the process should exit based on the current alpha value.
+     *
+     * This function checks the value of `cur_alpha`. If `cur_alpha` is zero, it returns true,
+     * indicating that the process should exit. Otherwise, it returns false.
+     *
+     * @return true if `cur_alpha` is zero, otherwise false.
+     */
+    bool shouldExit() {
+        if (cur_alpha == 0) { return true; }
+        return false;
     }
 };
