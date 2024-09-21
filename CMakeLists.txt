@@ -10,10 +10,9 @@ set(CMAKE_CXX_STANDARD_REQUIRED True)
 # Include directories
 include_directories(include)
 include_directories(/usr/include/suitesparse/)
-include_directories(/usr/include/eigen3/)
 
 # Enable release build
-set(CMAKE_BUILD_TYPE Debug)
+set(CMAKE_BUILD_TYPE Release)
 set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3")
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
@@ -151,6 +150,7 @@ endif()
 if(IPM)
   cpmaddpackage(NAME Eigen GIT_REPOSITORY https://gitlab.com/libeigen/eigen.git
                 GIT_TAG 3.4.0)
+  include_directories(${EIGEN_SOURCE_DIR})
 endif()
 
 set(GUROBI_HOME $ENV{GUROBI_HOME})
@@ -209,6 +209,7 @@ if(GET_TBB)
   target_link_libraries(vrptw PRIVATE TBB::tbb)
 endif()
 if(IPM)
+target_link_libraries(vrptw PRIVATE Eigen3::Eigen)
   target_link_libraries(vrptw PRIVATE cholmod)
   find_package(OpenMP)
   # target_link_libraries(vrptw PRIVATE OpenMP::OpenMP_CXX)
