@@ -162,6 +162,18 @@ Label *BucketGraph::compute_label(const Label *L, const Label *L_prime) {
     }
     new_label->cost -= sumSRC;
 #endif
+#ifdef SRC3
+    //  Check SRCDuals condition for specific stages
+    auto        sumSRC   = 0.0;
+    const auto &SRCDuals = cut_storage->SRCDuals;
+    if (!SRCDuals.empty()) {
+        double sumSRC = 0;
+        for (size_t i = 0; i < SRCDuals.size(); ++i) {
+            if (SRCDuals[i] != 0 && (L->SRCmap[i] % 2 + L_prime->SRCmap[i] % 2 >= 1)) { sumSRC += SRCDuals[i]; }
+        }
+    }
+    new_label->cost += sumSRC;
+#endif
 
     // Reserve space for the combined jobs_covered vector in advance
     size_t total_size = 0;
@@ -186,20 +198,6 @@ Label *BucketGraph::compute_label(const Label *L, const Label *L_prime) {
 
     // Traverse backward list and insert elements normally
     for (auto L_bw = L_prime; L_bw != nullptr; L_bw = L_bw->parent) { new_label->jobs_covered.push_back(L_bw->job_id); }
-
-#ifdef SRC3
-    //  Check SRCDuals condition for specific stages
-    auto        sumSRC   = 0.0;
-    const auto &SRCDuals = cut_storage->SRCDuals;
-    if (!SRCDuals.empty()) {
-        double sumSRC = 0;
-        for (size_t i = 0; i < SRCDuals.size(); ++i) {
-            if (SRCDuals[i] != 0 && (L->SRCmap[i] % 2 + L_prime->SRCmap[i] % 2 >= 1)) { sumSRC += SRCDuals[i]; }
-        }
-    }
-    if (sumSRC != 0) { std::cout << "SRC3: " << sumSRC << std::endl; }
-    new_label->cost -= sumSRC;
-#endif
 
     return new_label;
 }

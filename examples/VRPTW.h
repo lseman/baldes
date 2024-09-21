@@ -101,7 +101,7 @@ public:
                 col.addTerms(&coluna[i], &constrs[i], 1);
             }
 
-#ifdef SRC
+#if defined(SRC3) || defined(SRC)
             auto vec = r1c.computeLimitedMemoryCoefficients(label->jobs_covered);
             if (vec.size() > 0) {
                 for (int i = 0; i < vec.size(); i++) {
@@ -570,7 +570,6 @@ public:
         bool misprice = true;
 
         double bidi_relation = bucket_graph.bidi_relation;
-        double relation      = 0.5;
         double lag_gap       = std::numeric_limits<double>::max();
 
         auto                 inner_obj = 0.0;
@@ -666,8 +665,8 @@ public:
                 r1c.allPaths      = allPaths;
                 r1c.separate(matrixSparse.A_sparse, solution, N_SIZE - 2, 1e-3);
 #ifdef SRC
-                r1c.the45Heuristic<CutType::FourRow>(matrixSparse.A_sparse, solution, N_SIZE - 2);
-                r1c.the45Heuristic<CutType::FiveRow>(matrixSparse.A_sparse, solution, N_SIZE - 2);
+                // r1c.the45Heuristic<CutType::FourRow>(matrixSparse.A_sparse, solution, N_SIZE - 2);
+                // r1c.the45Heuristic<CutType::FiveRow>(matrixSparse.A_sparse, solution, N_SIZE - 2);
 #endif
                 cuts = r1c.cutStorage;
                 if (cuts_before == cuts.size()) {
@@ -706,7 +705,7 @@ public:
 #endif
 
 #ifdef IPM
-            auto d            = 1.0;
+            auto d            = 0.5;
             auto matrixSparse = extractModelDataSparse(node);
             gap               = std::abs(highs_obj - (highs_obj + std::min(0.0, inner_obj))) / std::abs(highs_obj);
             gap               = gap / d;
@@ -736,7 +735,7 @@ public:
 
             misprice = true;
             while (misprice) {
-                jobDuals = stab.getStabDualSol(jobDuals);
+                jobDuals = stab.getStabDualSolAdvanced(jobDuals);
                 solution = extractSolution(node);
 #endif
 
@@ -783,8 +782,8 @@ public:
                 ss = bucket_graph.ss;
 
                 //////////////////////////////////////////////////////////////////////
-                bidi_relation = bucket_graph.bidi_relation;
 
+                // Adding cols
                 auto colAdded = addColumn(node, paths, cuts, false);
 
 #ifdef STAB

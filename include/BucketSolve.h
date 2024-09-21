@@ -99,7 +99,7 @@ inline std::vector<Label *> BucketGraph::solve() {
         inner_obj = paths[0]->cost;
         if (inner_obj >= -1e-1) {
             ss = true;
-#ifndef SRC
+#if !defined(SRC) && !defined(SRC3)
             status = Status::Optimal;
             return paths;
 #endif
@@ -344,7 +344,6 @@ std::vector<Label *> BucketGraph::bi_labeling_algorithm(std::vector<double> q_st
                 if constexpr (S == Stage::Three) {
                     if (fixed_arcs[L->job_id][to_job] == 1) { continue; }
                 }
-
                 // Extend the current label based on the current stage
                 auto L_prime = Extend<Direction::Forward, S, ArcType::Job, Mutability::Const>(L, arc);
                 if (!L_prime || L_prime->resources[TIME_INDEX] <= q_star[TIME_INDEX]) continue;
@@ -593,7 +592,7 @@ BucketGraph::Extend(const std::conditional_t<M == Mutability::Mut, Label *, cons
             const auto &multipliers  = cut.multipliers;
 
 #if defined(SRC3)
-            bool bitIsSet3 = baseSet[segment] & (1 << bit_position);
+            bool bitIsSet3 = baseSet[segment] & (1ULL << bit_position);
             if (bitIsSet3) {
                 new_label->SRCmap[idx]++;
                 if (new_label->SRCmap[idx] % 2 == 0) { new_label->cost -= SRCDuals[idx]; }
@@ -679,7 +678,7 @@ inline bool BucketGraph::is_dominated(Label *&new_label, Label *&label) noexcept
             for (size_t i = 0; i < SRCDuals.size(); ++i) {
                 if ((label->SRCmap[i]) % 2 > (new_label->SRCmap[i] % 2)) { sumSRC += SRCDuals[i]; }
             }
-            if (label->cost - sumSRC > new_label->cost) { return false; }
+            if (label->cost + sumSRC > new_label->cost) { return false; }
         }
     }
 #endif
