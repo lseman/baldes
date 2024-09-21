@@ -1404,7 +1404,7 @@ inline void print_info(fmt::format_string<Args...> format, Args &&...args) {
 template <typename... Args>
 inline void print_heur(fmt::format_string<Args...> format, Args &&...args) {
     // Print "[", then yellow "info", then reset color and print "] "
-    fmt::print(fg(fmt::color::blue), "[info] ");
+    fmt::print(fg(fmt::color::blue), "[heuristic] ");
     fmt::print(format, std::forward<Args>(args)...);
 }
 
@@ -1421,7 +1421,7 @@ inline void print_heur(fmt::format_string<Args...> format, Args &&...args) {
 template <typename... Args>
 inline void print_cut(fmt::format_string<Args...> format, Args &&...args) {
     // Print "[", then yellow "info", then reset color and print "] "
-    fmt::print(fg(fmt::color::green), "[info] ");
+    fmt::print(fg(fmt::color::green), "[cut] ");
     fmt::print(format, std::forward<Args>(args)...);
 }
 
@@ -1438,7 +1438,7 @@ inline void print_cut(fmt::format_string<Args...> format, Args &&...args) {
 template <typename... Args>
 inline void print_blue(fmt::format_string<Args...> format, Args &&...args) {
     // Print "[", then blue "info", then reset color and print "] "
-    fmt::print(fg(fmt::color::blue), "[info] ");
+    fmt::print(fg(fmt::color::blue), "[debug] ");
     fmt::print(format, std::forward<Args>(args)...);
 }
 

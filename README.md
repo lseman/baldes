@@ -8,7 +8,7 @@ The algorithm is based on the approach originally presented in the paper: **A Bu
 
 ## Overview
 
-The Bucket Graph-based labeling algorithm implements the state-of-the-art way of organizing labels into "buckets" based on both vertex and resource consumption intervals. This structure significantly reduces the number of dominance checks needed, making the algorithm more efficient, especially for large VRP instances with extensive resource constraints.
+The Bucket Graph-based labeling algorithm implements the state-of-the-art way of organizing labels into **buckets** based on both vertex and resource consumption intervals. This structure significantly reduces the number of dominance checks needed, making the algorithm more efficient, especially for large VRP instances with extensive resource constraints.
 
 ### Key Features
 
@@ -17,7 +17,7 @@ The Bucket Graph-based labeling algorithm implements the state-of-the-art way of
 - **Dominance Rules:** Efficient dominance checks using resource-based comparisons and optional integration of additional dominance criteria from Limited-Memory Subset Row Cuts (SRCs).
 - **Improvement Heuristics:** Fast improvement heuristics are optionally applied at the end of each labeling phase, in order to reach better labels.
 
-## Disclaimer
+## ⚠️ Disclaimer
 
 Some features are in the highly experimental stages and will evolve based on community feedback. The following features, in particular, are subject to ongoing improvements:
 
@@ -37,7 +37,7 @@ Some features are in the highly experimental stages and will evolve based on com
 ### Compiling
 
 ```bash
-cmake -S . -B build -DR_SIZE=1 -DSRC=OFF -DRIH=OFF
+cmake -S . -B build -DR_SIZE=1 -DSRC=OFF
 cd build
 make -j$nprocs
 ```
@@ -46,25 +46,29 @@ Make sure the GUROBI_HOME environment variable is set.
 
 #### Compilation Options
 
-| Option                    | Description                     | Default |
-|---------------------------|----------------------------------------------------|---------|
-| `R_SIZE`                  | Number of resources             | 1       |
-| `N_SIZE`$^1$                  | Number of customers   | 102     |
-| `RIH`                     | Enable improvement heuristics   | OFF     |
-| `RCC`$^2$                     | Enable RCC cuts                 | OFF     |
-| `SRC3`$^2$                    | Enable classical SRC cuts       | OFF     |
-| `SRC`                     | Enable limited memory SRC cuts  | OFF     |
-| `MAX_SRC_CUTS`            | Number of allowed SRC cuts      | 50      |
-| `UNREACHABLE_DOMINANCE`   | Enable unreachable dominance    | OFF     |
-| `MCD`                     | Perform MCD on instance capacities | OFF |
-| `LIMITED_BUCKETS`         | Limit the capacity of the buckets  | OFF |
-| `SORTED_LABELS`           | Sort labels on bucket insertion | OFF     |
-| `BUCKET_CAPACITY`         | The maximum capacity of the bucket if LIMITED_BUCKETS is enabled | 50 |
-| `GET_TBB`                 | Enable TBB compilation          | OFF (will use system lib)  |
+| Option                  | Description                                                      | Default                   |
+| ----------------------- | ---------------------------------------------------------------- | ------------------------- |
+| `R_SIZE`                | Number of resources                                              | 1                         |
+| `N_SIZE`$^1$            | Number of customers                                              | 102                       |
+| `RIH`                   | Enable improvement heuristics                                    | OFF                       |
+| `RCC`$^2$               | Enable RCC cuts                                                  | OFF                       |
+| `SRC3`$^2$              | Enable classical SRC cuts                                        | OFF                       |
+| `SRC`                   | Enable limited memory SRC cuts                                   | OFF                       |
+| `MAX_SRC_CUTS`          | Number of allowed SRC cuts                                       | 50                        |
+| `UNREACHABLE_DOMINANCE` | Enable unreachable dominance                                     | OFF                       |
+| `MCD`                   | Perform MCD on instance capacities                               | OFF                       |
+| `LIMITED_BUCKETS`       | Limit the capacity of the buckets                                | OFF                       |
+| `SORTED_LABELS`         | Sort labels on bucket insertion                                  | OFF                       |
+| `BUCKET_CAPACITY`       | The maximum capacity of the bucket if LIMITED_BUCKETS is enabled | 50                        |
+| `STAB`$^3$                  | Use dynamic-alpha stabilization                                  | ON                        |
+| `IPM`$^3$                   | Use interior point stabilization                                 | OFF                       |
+| `GET_TBB`               | Enable TBB compilation                                           | OFF (will use system lib) |
 
 > **Note 1**: Including depot and depot copy (end node).
 
 > **Note 2**: Both `SRC` and `SRC3` cannot be enabled simultaneously. Please ensure that only one is selected.
+
+> **Note 3**: Only one stabilization can be selected.
 
 ### Input File Format
 
@@ -103,7 +107,7 @@ A companion paper will be made available soon.
 
 ## Thank you notes
 
-We would like to thank you [Vladislav Nepogodin](https://github.com/vnepogodin) for his insigths about C++.
+We would like to thanks [Vladislav Nepogodin](https://github.com/vnepogodin) for his insigths about C++.
 
 ## References
 
