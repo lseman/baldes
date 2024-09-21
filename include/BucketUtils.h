@@ -791,9 +791,9 @@ void BucketGraph::heuristic_fixing(const std::vector<double> &q_star) {
     std::vector<double> backward_cbar(bw_buckets.size(), std::numeric_limits<double>::infinity());
 
     if constexpr (S == Stage::Three) {
-        run_labeling_algorithms<Stage::Two, Full::Full>(forward_cbar, backward_cbar, q_star);
+        run_labeling_algorithms<Stage::Two, Full::Partial>(forward_cbar, backward_cbar, q_star);
     } else {
-        run_labeling_algorithms<Stage::Three, Full::Full>(forward_cbar, backward_cbar, q_star);
+        run_labeling_algorithms<Stage::Three, Full::Partial>(forward_cbar, backward_cbar, q_star);
     }
     std::vector<std::vector<Label *>> fw_labels_map(jobs.size());
     std::vector<std::vector<Label *>> bw_labels_map(jobs.size());
@@ -845,7 +845,7 @@ void BucketGraph::heuristic_fixing(const std::vector<double> &q_star) {
                 continue;
             }
 
-            if (min_fw_label->cost + cost + L_last_job.duration + min_bw_label->cost > gap) {
+            if (min_fw_label->cost + cost + min_bw_label->cost > gap) {
                 fixed_arcs[job_I.id][job_J.id] = 1; // Index with job ids
                 num_fixes++;
             }

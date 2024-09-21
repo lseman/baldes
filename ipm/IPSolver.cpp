@@ -183,22 +183,21 @@ void IPSolver::update_residuals(Residuals &res, const Eigen::VectorXd &x, const 
                                 const Eigen::SparseMatrix<double> &A, const Eigen::VectorXd &b,
                                 const Eigen::VectorXd &c, const Eigen::VectorXd &ubv, const Eigen::VectorXi &ubi,
                                 const Eigen::VectorXd &vbv, const Eigen::VectorXi &vbi, double tau, double kappa) {
-    // Calculate rp and its norm (primal residual)
-    res.rp.noalias() = b * tau - A * x;
-    res.rpn          = res.rp.norm();
+    // Efficiently calculate rp (primal residual) using noalias to avoid unnecessary allocations
+    res.rp.noalias() = tau * b - A * x;
+    res.rpn          = res.rp.norm(); // Primal residual norm
 
-    // Calculate ru and its norm (upper bound residual)
-    res.ru = -v; // Directly assigning -v to res.ru
-    for (int i = 0; i < ubi.size(); ++i) { res.ru(ubi(i)) += tau * ubv(i); }
-    for (int i = 0; i < ubi.size(); ++i) { res.ru(ubi(i)) -= x(ubi(i)); }
+    // Calculate ru (upper bound residual) with fewer iterations by combining operations
+    res.ru = -v; // Directly assign -v to res.ru
+    for (int i = 0; i < ubi.size(); ++i) { res.ru(ubi(i)) += tau * ubv(i) - x(ubi(i)); }
 
-    // Calculate rd and its norm (dual residual)
-    res.rd.noalias() = c * tau - A.transpose() * lambda - s;
+    // Efficiently calculate rd (dual residual) using noalias to avoid temporary allocations
+    res.rd.noalias() = tau * c - A.transpose() * lambda - s;
     for (int i = 0; i < ubi.size(); ++i) { res.rd(ubi(i)) += w(i); }
 
-    // Calculate rg and its norm (gap residual)
+    // Efficiently calculate rg (gap residual) by combining dot products
     res.rg  = kappa + c.dot(x) - b.dot(lambda) + ubv.dot(w);
-    res.rgn = std::abs(res.rg); // Since rg is a scalar, its norm is the absolute value
+    res.rgn = std::abs(res.rg); // Since rg is scalar, its "norm" is just the absolute value
 }
 
 /**
@@ -276,21 +275,18 @@ void IPSolver::solve_augmented_system(Eigen::VectorXd &dx, Eigen::VectorXd &dy, 
 void IPSolver::solve_augsys(Eigen::VectorXd &delta_x, Eigen::VectorXd &delta_y, Eigen::VectorXd &delta_z,
                             SparseSolver &ls, const Eigen::VectorXd &theta_vw, const Eigen::VectorXi &ubi,
                             const Eigen::VectorXd &xi_p, const Eigen::VectorXd &xi_d, const Eigen::VectorXd &xi_u) {
-    // Efficiently initialize delta_z with the right size and set to zero
-    delta_z = Eigen::VectorXd::Zero(ubi.size());
+    // Initialize delta_z with zeros
+    delta_z.setZero(ubi.size());
 
-    // Efficient modification of xi_d using sparse operations
-    Eigen::SparseVector<double> _xi_d      = xi_d.sparseView();
-    Eigen::SparseVector<double> xi_u_theta = (xi_u.cwiseProduct(theta_vw)).sparseView();
-    for (int i = 0; i < ubi.size(); ++i) { _xi_d.coeffRef(ubi(i)) -= xi_u_theta.coeff(i); }
+    // Use a dense vector and avoid creating an extra SparseVector when unnecessary
+    Eigen::VectorXd xi_d_mod = xi_d;
+    for (int i = 0; i < ubi.size(); ++i) { xi_d_mod(ubi(i)) -= xi_u(ubi(i)) * theta_vw(i); }
 
     // Call the function to solve the augmented system
-    solve_augmented_system(delta_x, delta_y, ls, xi_p, _xi_d);
+    solve_augmented_system(delta_x, delta_y, ls, xi_p, xi_d_mod);
 
-    // Efficient update of delta_z
-    for (int i = 0; i < ubi.size(); ++i) {
-        delta_z.coeffRef(i) = (delta_x.coeff(ubi(i)) - xi_u.coeff(i)) * theta_vw.coeff(i);
-    }
+    // Update delta_z more efficiently with a direct access
+    for (int i = 0; i < ubi.size(); ++i) { delta_z(i) = (delta_x(ubi(i)) - xi_u(i)) * theta_vw(i); }
 }
 
 /**
@@ -347,15 +343,18 @@ void IPSolver::solve_newton_system(
     // Delta_w
     solve_augsys(Delta_x, Delta_lambda, Delta_w, ls, theta_vw, ubi, xi_p, xi_d_copy, xi_u_copy);
 
+    // Avoid redundant calculations and simplify expressions where possible
     Delta_tau = (xi_g + (xi_tau_kappa / iter_tau) + c.dot(Delta_x) - b.dot(Delta_lambda) + ubv.dot(Delta_w)) / delta_0;
     Delta_kappa = (xi_tau_kappa - iter_kappa * Delta_tau) / iter_tau;
 
+    // Use in-place operations to update Delta_x, Delta_lambda, and Delta_w
     Delta_x.array() += Delta_tau * delta_x.array();
     Delta_lambda.array() += Delta_tau * delta_y.array();
     Delta_w.array() += Delta_tau * delta_w.array();
 
-    Delta_s = (xi_xs - iter_s.cwiseProduct(Delta_x)).cwiseQuotient(iter_x);
-    Delta_v = (xi_vw - iter_v.cwiseProduct(Delta_w)).cwiseQuotient(iter_w);
+    // Simplify the Delta_s and Delta_v calculations
+    Delta_s = (xi_xs.array() - iter_s.array() * Delta_x.array()).cwiseQuotient(iter_x.array());
+    Delta_v = (xi_vw.array() - iter_v.array() * Delta_w.array()).cwiseQuotient(iter_w.array());
 }
 
 /**
@@ -580,17 +579,13 @@ std::tuple<double, double, std::vector<double>, std::vector<double>> IPSolver::r
         mu = (tau * kappa + x.dot(s) + v.dot(w)) / (n + ubi.size() + 1.0);
 
         // Calculate _p, _d, and _g in parallel
-        {
-            {
-                _p = std::fmax(res.rp.lpNorm<Eigen::Infinity>() / (tau * (1.0 + b.lpNorm<Eigen::Infinity>())),
-                               res.ru.lpNorm<Eigen::Infinity>() / (tau * (1.0 + ubv.lpNorm<Eigen::Infinity>())));
-            }
-            { _d = res.rd.lpNorm<Eigen::Infinity>() / (tau * (1.0 + c.lpNorm<Eigen::Infinity>())); }
-            {
-                bl_dot_lambda = b.dot(lambda) - ubv.dot(w);
-                _g            = std::abs(c.dot(x) - bl_dot_lambda) / (tau + std::abs(bl_dot_lambda));
-            }
-        }
+
+        //_p = std::fmax(res.rp.lpNorm<Eigen::Infinity>() / (tau * (1.0 + b.lpNorm<Eigen::Infinity>())),
+        //              res.ru.lpNorm<Eigen::Infinity>() / (tau * (1.0 + ubv.lpNorm<Eigen::Infinity>())));
+        //_d = res.rd.lpNorm<Eigen::Infinity>() / (tau * (1.0 + c.lpNorm<Eigen::Infinity>()));
+
+        bl_dot_lambda = b.dot(lambda) - ubv.dot(w);
+        _g            = std::abs(c.dot(x) - bl_dot_lambda) / (tau + std::abs(bl_dot_lambda));
 
         // Check for optimality and infeasibility
         // print mu
@@ -600,12 +595,7 @@ std::tuple<double, double, std::vector<double>, std::vector<double>> IPSolver::r
         theta_vw = w.cwiseQuotient(v);
         theta_xs = s.cwiseQuotient(x);
 
-        for (int i = 0; i < ubi.size(); ++i) {
-            int index = ubi[i];
-            theta_xs[index] += theta_vw[i];
-        }
-        // update_theta_xs(ubi, theta_xs, theta_vw);
-
+        for (int i = 0; i < ubi.size(); ++i) { theta_xs[ubi[i]] += theta_vw[i]; }
         // Update regularizations
         regP = (regP / 10.0).cwiseMax(r_min);
         regD = (regD / 10.0).cwiseMax(r_min);
@@ -658,17 +648,22 @@ std::tuple<double, double, std::vector<double>, std::vector<double>> IPSolver::r
             mu_l = beta * mu * gamma;
             mu_u = gamma * mu / beta;
 
+            // Perform in-place updates and avoid creating temporaries
             xs = x + alpha_ * Delta_x;
-            xs.array() *= (s + alpha_ * Delta_s).array();
+            xs.array() *= (s.array() + alpha_ * Delta_s.array());
+
             vw = v + alpha_ * Delta_v;
-            vw.array() *= (w + alpha_ * Delta_w).array();
+            vw.array() *= (w.array() + alpha_ * Delta_w.array());
 
-            t_xs = (xs.array() < mu_l).select(mu_l - xs.array(), 0) + (xs.array() > mu_u).select(mu_u - xs.array(), 0);
-            t_vw = (vw.array() < mu_l).select(mu_l - vw.array(), 0) + (vw.array() > mu_u).select(mu_u - vw.array(), 0);
+            // Use select only once to minimize temporary objects
+            t_xs = (xs.array() < mu_l).select(mu_l - xs.array(), (xs.array() > mu_u).select(mu_u - xs.array(), 0));
+            t_vw = (vw.array() < mu_l).select(mu_l - vw.array(), (vw.array() > mu_u).select(mu_u - vw.array(), 0));
 
+            // Direct calculation for taukappa and t0
             taukappa = (tau + alpha_ * Delta_tau) * (kappa + alpha_ * Delta_kappa);
             t0       = std::clamp(taukappa, mu_l, mu_u) - taukappa;
 
+            // Calculate sum_correction and subtract in-place
             double sum_correction = (t_xs.sum() + t_vw.sum() + t0) / (nv + nu + 1);
             t_xs.array() -= sum_correction;
             t_vw.array() -= sum_correction;

@@ -325,14 +325,14 @@ inline std::vector<std::vector<int>> findRoutesVisitingNodes(const SparseModel  
 void LimitedMemoryRank1Cuts::generateCutCoefficients(VRPTW_SRC &cuts, std::vector<std::vector<double>> &coefficients,
                                                      int numNodes, const SparseModel &A, const std::vector<double> &x) {
     double primal_violation    = 0.0;
-    int    max_number_of_cuts  = 5;
+    int    max_number_of_cuts  = 10;
     double violation_threshold = 1e-2;
 
     if (cuts.S_n > 0) {
         int m_max = std::min(cuts.S_n, max_number_of_cuts);
 
         // Prepare thread pool and scheduler
-        exec::static_thread_pool pool(std::thread::hardware_concurrency()); // Dynamically set based on system
+        exec::static_thread_pool pool(std::thread::hardware_concurrency());
         auto                     sched = pool.get_scheduler();
 
         std::mutex       cuts_mutex; // Mutex for cutStorage to ensure thread-safe access
