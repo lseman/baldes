@@ -462,7 +462,9 @@ void BucketGraph::ConcatenateLabel(const Label *&L, int &b, Label *&pbest, std::
             if (L_bw->job_id == L->job_id) { continue; }
 
             // Loop through the resource dimensions
-            if (L->resources[TIME_INDEX] + cost + L_last_job.duration > L_bw->resources[TIME_INDEX]) { continue; }
+            if (L->resources[TIME_INDEX] + cost + L_last_job.consumption[TIME_INDEX] > L_bw->resources[TIME_INDEX]) {
+                continue;
+            }
 
             if constexpr (R_SIZE > 1) {
                 bool valid = true;
@@ -579,9 +581,7 @@ void BucketGraph::SCC_handler() {
 
     std::vector<std::vector<int>> ordered_sccs;
     ordered_sccs.reserve(sccs.size()); // Reserve space for all SCCs
-    for (int i : topological_order) {
-        ordered_sccs.push_back(sccs[i]); // Use std::move to avoid copying
-    }
+    for (int i : topological_order) { ordered_sccs.push_back(sccs[i]); }
 
     auto sorted_sccs = sccs;
     for (auto &scc : sorted_sccs) {
@@ -643,7 +643,6 @@ void BucketGraph::SCC_handler() {
                     if (it != job.bw_arcs.end()) {
                         // Add the arc to the filtered arcs
                         filtered_bw_arcs.push_back(*it); // Forward arcs
-                        // fmt::print("Adding arc from {} to {}\n", from_job_id, to_job_id);
                     }
                 }
             }
