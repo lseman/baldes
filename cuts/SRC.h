@@ -586,7 +586,7 @@ void LimitedMemoryRank1Cuts::the45Heuristic(const SparseModel &A, const std::vec
     std::vector<int> tasks(selectedNodes.size());
     std::iota(tasks.begin(), tasks.end(), 0); // Filling tasks with indices 0 to selectedNodes.size()
 
-    exec::static_thread_pool pool(std::thread::hardware_concurrency()); // Dynamically set based on system
+    exec::static_thread_pool pool(std::thread::hardware_concurrency());
     auto                     sched = pool.get_scheduler();
 
     auto input_sender = stdexec::just();
@@ -603,6 +603,12 @@ void LimitedMemoryRank1Cuts::the45Heuristic(const SparseModel &A, const std::vec
          violation_threshold](std::size_t task_idx) {
             auto &consumer = allPaths[selectedNodes[task_idx]].route;
 
+            if constexpr (T == CutType::FourRow) {
+                if (consumer.size() < 4) { return; }
+            } else if constexpr (T == CutType::FiveRow) {
+                if (consumer.size() < 5) { return; }
+            }
+
             std::vector<std::vector<int>> setsOf45;
             if constexpr (T == CutType::FourRow) {
                 combinations(consumer, 4, setsOf45);
@@ -616,6 +622,7 @@ void LimitedMemoryRank1Cuts::the45Heuristic(const SparseModel &A, const std::vec
             std::vector<Cut> threadCuts;
 
             for (const auto &set45 : setsOf45) {
+
                 std::string setHash = vectorToString(set45);
 
                 {
