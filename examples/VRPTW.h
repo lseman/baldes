@@ -22,7 +22,9 @@
 #include "../include/BucketSolve.h"
 #include "../include/BucketUtils.h"
 
+#ifdef STAB
 #include "../extra/Stabilization.h"
+#endif
 
 #include "../include/Reader.h"
 
@@ -35,7 +37,10 @@
 #include "../cuts/RCC.h"
 #include "../include/Hashes.h"
 
+#ifdef IPM
 #include "../ipm/IPSolver.h"
+#endif
+
 #include <tbb/concurrent_unordered_map.h>
 
 class VRProblem {
@@ -651,18 +656,17 @@ public:
 
 #endif
                 auto cuts_before = cuts.size();
-                print_info("Removing most negative reduced cost variables\n");
-                // removeNegativeReducedCostVarsAndPaths(node);
+                // print_info("Removing most negative reduced cost variables\n");
+                //  removeNegativeReducedCostVarsAndPaths(node);
                 node->optimize();
                 highs_obj         = node->get(GRB_DoubleAttr_ObjVal);
                 solution          = extractSolution(node);
                 auto matrixSparse = extractModelDataSparse(node);
                 r1c.allPaths      = allPaths;
                 r1c.separate(matrixSparse.A_sparse, solution, N_SIZE - 2, 1e-3);
-                fmt::print("Separating cuts..\n");
 #ifdef SRC
-                // r1c.the45Heuristic<CutType::FourRow>(matrixSparse.A_sparse, solution, N_SIZE - 2);
-                // r1c.the45Heuristic<CutType::FiveRow>(matrixSparse.A_sparse, solution, N_SIZE - 2);
+                r1c.the45Heuristic<CutType::FourRow>(matrixSparse.A_sparse, solution, N_SIZE - 2);
+                r1c.the45Heuristic<CutType::FiveRow>(matrixSparse.A_sparse, solution, N_SIZE - 2);
 #endif
                 cuts = r1c.cutStorage;
                 if (cuts_before == cuts.size()) {
@@ -788,17 +792,17 @@ public:
 
                 if (colAdded == 0) {
                     stab.update_stabilization_after_misprice();
-                    fmt::print("No columns added, mispricing detected\n");
                     if (stab.shouldExit()) { misprice = false; }
                 } else {
                     misprice = false;
                 }
-
-                if (bucket_graph.getStatus() == Status::Optimal) {
-                    print_info("Optimal solution found\n");
-                    break;
-                }
             }
+
+            if (bucket_graph.getStatus() == Status::Optimal) {
+                print_info("Optimal solution found\n");
+                break;
+            }
+
             stab.update_stabilization_after_iter(jobDuals);
 #endif
 

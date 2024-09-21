@@ -325,7 +325,7 @@ inline std::vector<std::vector<int>> findRoutesVisitingNodes(const SparseModel  
 void LimitedMemoryRank1Cuts::generateCutCoefficients(VRPTW_SRC &cuts, std::vector<std::vector<double>> &coefficients,
                                                      int numNodes, const SparseModel &A, const std::vector<double> &x) {
     double primal_violation    = 0.0;
-    int    max_number_of_cuts  = 3;
+    int    max_number_of_cuts  = 5;
     double violation_threshold = 1e-2;
 
     if (cuts.S_n > 0) {
@@ -340,6 +340,9 @@ void LimitedMemoryRank1Cuts::generateCutCoefficients(VRPTW_SRC &cuts, std::vecto
         std::iota(tasks.begin(), tasks.end(), 0); // Filling tasks with indices 0 to m_max
 
         auto input_sender = stdexec::just();
+
+        // sort best_sets
+        std::sort(cuts.best_sets.begin(), cuts.best_sets.end(), std::greater<>());
 
         // Define the bulk operation to process each cut
         auto bulk_sender = stdexec::bulk(

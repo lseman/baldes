@@ -77,7 +77,7 @@ public:
      */
     void update_stabilization_after_misprice() {
         nb_misprices++;
-        cur_alpha = _misprice_schedule(nb_misprices, base_alpha);
+        alpha = _misprice_schedule(nb_misprices, base_alpha);
     }
 
     /**
@@ -288,7 +288,7 @@ public:
      * @return true if `cur_alpha` is zero, otherwise false.
      */
     bool shouldExit() {
-        if (cur_alpha == 0) { return true; }
+        if (base_alpha == 0) { return true; }
         return false;
     }
 };

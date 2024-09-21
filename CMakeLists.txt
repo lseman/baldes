@@ -41,28 +41,14 @@ option(STAB "Enable STAB compilation option" ON)
 option(AUGMENTED "Enable Augmented compilation option" ON)
 option(GET_SUITESPARSE "Enable SuiteSparse compilation option" OFF)
 
-# Define an option to specify the size of resources
-set(R_SIZE
-    1
-    CACHE STRING "Number of resources")
-set(N_SIZE
-    102
-    CACHE STRING "Number of customers")
-set(MAX_SRC_CUTS
-    50
-    CACHE STRING "Number of allowed SRC cuts")
-set(BUCKET_CAPACITY
-    50
-    CACHE STRING "Bucket max capacity")
-set(TIME_INDEX
-    0
-    CACHE STRING "Time index")
-set(DEMAND_INDEX
-    1
-    CACHE STRING "Demand index")
-set(MAIN_RESOURCES
-    1
-    CACHE STRING "Main resources")
+# Define the size of resources without using cache
+set(R_SIZE 1)
+set(N_SIZE 102)
+set(MAX_SRC_CUTS 50)
+set(BUCKET_CAPACITY 50)
+set(TIME_INDEX 0)
+set(DEMAND_INDEX 1)
+set(MAIN_RESOURCES 1)
 
 # Define resources and whether they are disposable or not
 set(RESOURCES
@@ -234,14 +220,3 @@ set(GUROBI_VERSION_MAJOR 110) # Adjust based on Gurobi version
 target_link_libraries(
   vrptw PRIVATE ${GUROBI_HOME}/lib/libgurobi_c++.a
                 ${GUROBI_HOME}/lib/libgurobi${GUROBI_VERSION_MAJOR}.so tbb)
-
-target_compile_definitions(vrptw PUBLIC R_SIZE=${R_SIZE})
-target_compile_definitions(vrptw PUBLIC N_SIZE=${N_SIZE})
-target_compile_definitions(vrptw PUBLIC MAX_SRC_CUTS=${MAX_SRC_CUTS})
-target_compile_definitions(vrptw PUBLIC BUCKET_CAPACITY=${BUCKET_CAPACITY})
-target_compile_definitions(vrptw PUBLIC TIME_INDEX=${TIME_INDEX})
-target_compile_definitions(vrptw PUBLIC DEMAND_INDEX=${DEMAND_INDEX})
-target_compile_definitions(vrptw PUBLIC MAIN_RESOURCES=${MAIN_RESOURCES})
-target_compile_definitions(vrptw PUBLIC RESOURCES="${RESOURCES}")
-target_compile_definitions(
-  vrptw PUBLIC RESOURCES_DISPOSABLE="${RESOURCES_DISPOSABLE}")
