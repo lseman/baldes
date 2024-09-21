@@ -84,10 +84,11 @@ public:
 #endif
             labels_counter += 1;
             std::fill(coluna.begin(), coluna.end(), 0.0); // Reset for each iteration
-
+            // print jobs_covered
             double      travel_cost = label->real_cost;
             std::string name        = "x[" + std::to_string(allPaths.size() - 1) + "]";
             GRBColumn   col;
+
             for (auto &job : label->jobs_covered) {
                 if (job > 0 && job != N_SIZE - 1) {
                     int constr_index = job - 1;
@@ -673,7 +674,6 @@ public:
                     print_info("No violations found, calling it a day\n");
                     break;
                 }
-                fmt::print("Found {} violated cuts\n", cuts.size());
                 bucket_graph.ss = false;
             }
 #endif
