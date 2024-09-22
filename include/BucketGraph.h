@@ -545,7 +545,7 @@ public:
     std::vector<double> labeling_algorithm(std::vector<double> q_point, bool full = false) noexcept;
 
     template <Direction D>
-    inline int get_bucket_number(int job, const std::vector<double> &values) noexcept;
+    int get_bucket_number(int job, const std::vector<double> &values) noexcept;
 
     template <Direction D>
     Label *get_best_label(const std::vector<int> &topological_order, const std::vector<double> &c_bar,
