@@ -362,76 +362,86 @@ int BucketGraph::RIH3(std::priority_queue<Label *, std::vector<Label *>, LabelCo
         Label *current_label = best_labels_in.top();
         best_labels_in.pop();
 
-        // Remove similar labels from the queue
+        // Remove similar labels from the queue based on cost tolerance
         while (!best_labels_in.empty() && best_labels_in.top()->cost < current_label->cost + RCESPP_TOL_ZERO) {
             best_labels_in.pop();
         }
 
-        // If the label has only depots covered, skip it (at least one job + two depots required)
+        // Skip labels that only cover depots (at least one job + two depots required)
         if (current_label->jobs_covered.size() <= 3) { continue; }
 
-        // Iterate over jobs, skipping the first and last (which are depots)
+        // Iterate over jobs, skipping depots (first and last)
         for (size_t i = 1; i < current_label->jobs_covered.size() - 2; ++i) {
             int job1 = current_label->jobs_covered[i];
             int job2 = current_label->jobs_covered[i + 1];
 
-            // Skip swapping if the jobs are the same (unnecessary)
+            // Skip if jobs are the same (no change in route)
             if (job1 == job2) { continue; }
 
+            // Acquire a new label for the swap
             Label *new_label = label_pool_fw.acquire();
             new_label->initialize(current_label->vertex, current_label->cost, {current_label->resources[TIME_INDEX]},
                                   current_label->job_id);
 
-            // Copy jobs covered and swap neighboring jobs i and i+1
+            // Copy and swap neighboring jobs i and i+1
             new_label->jobs_covered = current_label->jobs_covered;
             std::swap(new_label->jobs_covered[i], new_label->jobs_covered[i + 1]);
 
-            // Only recalculate the affected cost for the swapped part of the route
+            // Recalculate the cost for the affected part of the route (before, swapped jobs, after)
             new_label->cost      = current_label->cost;
             new_label->real_cost = current_label->real_cost;
 
-            // Recalculate the cost for just the swapped part (before and after the swap)
+            // Previous and next jobs (outside of swapped range)
             int prev = current_label->jobs_covered[i - 1];
             int next = current_label->jobs_covered[i + 2];
 
+            // Compute the original cost for the segment before the swap
             double original_cost = getcij(prev, job1) + getcij(job1, job2) + getcij(job2, next);
-            double new_cost      = getcij(prev, job2) + getcij(job2, job1) + getcij(job1, next);
 
+            // Compute the new cost after swapping job1 and job2
+            double new_cost = getcij(prev, job2) + getcij(job2, job1) + getcij(job1, next);
+
+            // Update the label's cost and real cost
             new_label->cost += new_cost - original_cost; // Adjust the cost
             new_label->real_cost += new_cost - original_cost;
 
-            // Check for feasibility: ensure the new route is within time constraints
+            // Feasibility check: ensure the new route satisfies time constraints
             double elapsed_time = 0.0;
             bool   feasible     = true;
-            for (size_t k = 0; k < new_label->jobs_covered.size() - 1; ++k) {
-                int    from           = new_label->jobs_covered[k];
-                int    to             = new_label->jobs_covered[k + 1];
-                double cost_increment = getcij(from, to);
 
-                double new_time = elapsed_time + cost_increment;
+            // Iterate through the jobs to check time windows and durations
+            for (size_t k = 0; k < new_label->jobs_covered.size() - 1; ++k) {
+                int from = new_label->jobs_covered[k];
+                int to   = new_label->jobs_covered[k + 1];
+
+                // Calculate the travel cost (time) between jobs
+                double cost_increment = getcij(from, to);
+                double new_time       = elapsed_time + cost_increment;
+
+                // Check if the new time violates the end time constraint
                 if (new_time > jobs[to].end_time) {
-                    feasible = false; // Infeasible if exceeding time windows
-                    break;
+                    feasible = false;
+                    break; // No need to continue if the time window is violated
                 }
-                if (new_time < jobs[to].start_time) { new_time = jobs[to].start_time; }
+
+                // Adjust for the job's start time
+                if (new_time < jobs[to].start_time) {
+                    new_time = jobs[to].start_time; // Move time forward to respect the start time
+                }
+
+                // Update elapsed time (including job duration)
                 elapsed_time = new_time + jobs[to].duration;
             }
 
-            if (!feasible) {
-                // label_pool_fw.release(new_label); // Release label if route is not feasible
-                continue;
-            }
+            // If the label is not feasible, release it and continue to the next iteration
+            if (!feasible) { continue; }
 
-            // Check if the new label is better and add it to the output queue
-            if (new_label->cost < current_label->cost) {
-                best_labels_out.push(new_label);
-            } else {
-                // label_pool_fw.release(new_label); // Release unused label
-            }
+            // Check if the new label is better (lower cost) and add it to the output queue
+            if (new_label->cost < current_label->cost) { best_labels_out.push(new_label); }
         }
     }
 
-    return 1;
+    return iter;
 }
 
 /* Improvement heuristics based on changing the position of customers */
@@ -459,51 +469,41 @@ int BucketGraph::RIH4(std::priority_queue<Label *, std::vector<Label *>, LabelCo
         Label *current_label = best_labels_in.top();
         best_labels_in.pop();
 
-        // Remove similar labels from the queue
+        // Remove similar labels
         while (!best_labels_in.empty() && best_labels_in.top()->cost < current_label->cost + RCESPP_TOL_ZERO) {
             best_labels_in.pop();
         }
 
-        // If the label has only depots covered, skip it
+        // Skip labels with only depots covered
         if (current_label->jobs_covered.size() <= 3) { continue; }
 
-        // Iterate over pairs of positions to perform 2-opt exchange
+        // Iterate over pairs of positions for 2-opt exchange
         for (size_t i = 1; i < current_label->jobs_covered.size() - 2; ++i) {
             for (size_t j = i + 1; j < current_label->jobs_covered.size() - 1; ++j) {
 
-                // Avoid creating a new label if i and j result in the same cost
                 if (i == j) { continue; }
 
-                // Reuse label instead of creating a new one every time
                 Label *new_label = label_pool_fw.acquire();
                 new_label->initialize(current_label->vertex, current_label->cost, {current_label->resources[0]},
                                       current_label->job_id);
 
-                // Perform 2-opt exchange: reverse the segment between i and j
                 new_label->jobs_covered.clear();
-                new_label->jobs_covered.reserve(current_label->jobs_covered.size()); // Reserve to avoid reallocations
+                new_label->jobs_covered.reserve(current_label->jobs_covered.size());
 
-                // Copy jobs before i
+                // Copy jobs before i, reverse between i and j, copy jobs after j
                 for (size_t k = 0; k < i; ++k) { new_label->jobs_covered.push_back(current_label->jobs_covered[k]); }
-
-                // Reverse jobs between i and j
                 for (size_t k = j; k >= i; --k) { new_label->jobs_covered.push_back(current_label->jobs_covered[k]); }
-
-                // Copy jobs after j
                 for (size_t k = j + 1; k < current_label->jobs_covered.size(); ++k) {
                     new_label->jobs_covered.push_back(current_label->jobs_covered[k]);
                 }
 
-                // Only recalculate the cost for the changed segments (between i-1 and j+1)
-                int prev = current_label->jobs_covered[i - 1]; // Before the 2-opt segment
-                int next = current_label->jobs_covered[j + 1]; // After the 2-opt segment
-
-                double original_cost =
-                    getcij(prev, current_label->jobs_covered[i]) + getcij(current_label->jobs_covered[j], next);
-                double new_cost = getcij(prev, new_label->jobs_covered[i]) + getcij(new_label->jobs_covered[j], next);
-
-                new_label->cost += new_cost - original_cost; // Adjust the cost
-                new_label->real_cost += new_cost - original_cost;
+                // Recalculate the entire cost
+                double total_cost = 0.0;
+                for (size_t k = 0; k < new_label->jobs_covered.size() - 1; ++k) {
+                    total_cost += getcij(new_label->jobs_covered[k], new_label->jobs_covered[k + 1]);
+                }
+                new_label->cost      = total_cost;
+                new_label->real_cost = total_cost;
 
                 // Feasibility check
                 double elapsed_time = 0.0;
@@ -514,28 +514,27 @@ int BucketGraph::RIH4(std::priority_queue<Label *, std::vector<Label *>, LabelCo
                     double cost_increment = getcij(from, to);
 
                     double new_time = elapsed_time + cost_increment;
-                    if (new_time > jobs[to].end_time) {
+                    if (new_time > jobs[to].end_time || new_time < jobs[to].start_time) {
                         feasible = false;
                         break;
                     }
-                    if (new_time < jobs[to].start_time) { new_time = jobs[to].start_time; }
+
                     elapsed_time = new_time + jobs[to].duration;
                 }
 
                 if (!feasible) {
-                    // label_pool_fw.release(new_label); // Release the label if not feasible
+                    // label_pool_fw.release(new_label);
                     continue;
                 }
 
-                // Check if the new label is better and add it to the output queue
+                // Add to output queue if better
                 if (new_label->cost < current_label->cost) {
                     best_labels_out.push(new_label);
                 } else {
-                    // label_pool_fw.release(new_label); // Release the label if it's not better
+                    // label_pool_fw.release(new_label);
                 }
             }
         }
     }
-
-    return 1;
+    return iter;
 }

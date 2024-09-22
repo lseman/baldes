@@ -86,6 +86,84 @@ public:
     std::vector<Label *> solve();
 
     RCCmanager *rcc_manager = nullptr;
+
+    std::vector<Label *> merged_labels_rih;
+
+    std::thread rih_thread;
+    std::mutex  mtx; // For thread-safe access to merged_labels_improved
+
+    std::vector<std::vector<int>> fw_ordered_sccs;
+    std::vector<std::vector<int>> bw_ordered_sccs;
+    std::vector<int>              fw_topological_order;
+    std::vector<int>              bw_topological_order;
+    std::vector<std::vector<int>> fw_sccs;
+    std::vector<std::vector<int>> bw_sccs;
+    std::vector<std::vector<int>> fw_sccs_sorted;
+    std::vector<std::vector<int>> bw_sccs_sorted;
+
+    double incumbent  = std::numeric_limits<double>::infinity();
+    double relaxation = std::numeric_limits<double>::infinity();
+    bool   fixed      = false;
+
+    exec::static_thread_pool            bi_pool  = exec::static_thread_pool(2);
+    exec::static_thread_pool::scheduler bi_sched = bi_pool.get_scheduler();
+
+    exec::static_thread_pool            cat_pool        = exec::static_thread_pool(4);
+    exec::static_thread_pool::scheduler cat_sched       = bi_pool.get_scheduler();
+    int                                 fw_buckets_size = 0;
+    int                                 bw_buckets_size = 0;
+
+    double bidi_relation = 1.0;
+
+    std::vector<std::vector<bool>> fixed_arcs;
+    std::vector<std::vector<bool>> fw_fixed_buckets;
+    std::vector<std::vector<bool>> bw_fixed_buckets;
+
+    double gap = std::numeric_limits<double>::infinity();
+
+    CutStorage          *cut_storage = nullptr;
+    static constexpr int max_buckets = 12000; // Define maximum number of buckets beforehand
+
+    std::array<Bucket, max_buckets> fw_buckets;
+    std::array<Bucket, max_buckets> bw_buckets;
+    LabelPool                       label_pool_fw = LabelPool(1000);
+    LabelPool                       label_pool_bw = LabelPool(1000);
+    std::vector<BucketArc>          fw_arcs;
+    std::vector<BucketArc>          bw_arcs;
+    std::vector<Label *>            merged_labels;
+    std::vector<std::vector<int>>   neighborhoods;
+
+    std::vector<std::vector<double>> distance_matrix;
+    std::vector<std::vector<int>>    Phi_fw;
+    std::vector<std::vector<int>>    Phi_bw;
+
+    std::unordered_map<int, std::vector<int>> fw_bucket_graph;
+    std::unordered_map<int, std::vector<int>> bw_bucket_graph;
+
+    std::vector<double> fw_c_bar;
+    std::vector<double> bw_c_bar;
+
+    int n_fw_labels = 0;
+    int n_bw_labels = 0;
+
+    std::vector<std::vector<double>> cvrsep_duals;
+    std::vector<std::vector<int>>    job_to_bit_map;
+    std::vector<int>                 num_buckets_fw;
+    std::vector<int>                 num_buckets_bw;
+    std::vector<int>                 num_buckets_index_fw;
+    std::vector<int>                 num_buckets_index_bw;
+
+    // Statistics
+    int stat_n_labels_fw = 0;
+    int stat_n_labels_bw = 0;
+    int stat_n_dom_fw    = 0;
+    int stat_n_dom_bw    = 0;
+
+    std::vector<double>                R_max;
+    std::vector<double>                R_min;
+    std::vector<std::vector<uint64_t>> neighborhoods_bitmap; // Bitmap for neighborhoods of each job
+    std::mutex                         label_pool_mutex;
+
     /**
      * @brief Prints the configuration information of the BucketGraph.
      *
@@ -139,11 +217,6 @@ public:
 
         fmt::print("\n");
     }
-
-    std::vector<double>                R_max;
-    std::vector<double>                R_min;
-    std::vector<std::vector<uint64_t>> neighborhoods_bitmap; // Bitmap for neighborhoods of each job
-    std::mutex                         label_pool_mutex;
 
     /**
      * @brief Runs forward and backward labeling algorithms in parallel and synchronizes the results.
@@ -255,19 +328,6 @@ public:
         bitmap[word_index] |= (1ULL << bit_position);
     }
 
-    std::vector<std::vector<double>> cvrsep_duals;
-    std::vector<std::vector<int>>    job_to_bit_map;
-    std::vector<int>                 num_buckets_fw;
-    std::vector<int>                 num_buckets_bw;
-    std::vector<int>                 num_buckets_index_fw;
-    std::vector<int>                 num_buckets_index_bw;
-
-    // Statistics
-    int stat_n_labels_fw = 0;
-    int stat_n_labels_bw = 0;
-    int stat_n_dom_fw    = 0;
-    int stat_n_dom_bw    = 0;
-
     /**
      * @brief Prints the statistics of the bucket graph.
      *
@@ -328,8 +388,6 @@ public:
     constexpr auto &assign_buckets(auto &FW, auto &BW) noexcept {
         return (D == Direction::Forward) ? FW : BW;
     }
-    int n_fw_labels = 0;
-    int n_bw_labels = 0;
 
     // Common Initialization for Stages
     void common_initialization();
@@ -406,55 +464,6 @@ public:
         for (auto &VRPJob : jobs) { VRPJob.sort_arcs(); }
     }
 
-    double incumbent  = std::numeric_limits<double>::infinity();
-    double relaxation = std::numeric_limits<double>::infinity();
-    bool   fixed      = false;
-
-    exec::static_thread_pool            bi_pool  = exec::static_thread_pool(2);
-    exec::static_thread_pool::scheduler bi_sched = bi_pool.get_scheduler();
-
-    exec::static_thread_pool            cat_pool        = exec::static_thread_pool(4);
-    exec::static_thread_pool::scheduler cat_sched       = bi_pool.get_scheduler();
-    int                                 fw_buckets_size = 0;
-    int                                 bw_buckets_size = 0;
-
-    int    A_MAX         = 1000;
-    int    B_MAX         = std::numeric_limits<int>::max();
-    int    S_MAX         = std::numeric_limits<int>::max();
-    double bidi_relation = 1.0;
-
-    std::vector<std::vector<bool>> fixed_arcs;
-    std::vector<std::vector<bool>> fw_fixed_buckets;
-    std::vector<std::vector<bool>> bw_fixed_buckets;
-
-    double gap = std::numeric_limits<double>::infinity();
-
-    CutStorage          *cut_storage = nullptr;
-    static constexpr int max_buckets = 12000; // Define maximum number of buckets beforehand
-
-    std::array<Bucket, max_buckets> fw_buckets;
-    std::array<Bucket, max_buckets> bw_buckets;
-    int                             T_max;
-    LabelPool                       label_pool_fw = LabelPool(1000);
-    LabelPool                       label_pool_bw = LabelPool(1000);
-    std::vector<BucketArc>          fw_arcs;
-    std::vector<BucketArc>          bw_arcs;
-    std::vector<Label *>            merged_labels;
-    std::vector<int>                num_buckets_per_interval;
-    int                             num_buckets_per_job;
-    std::vector<std::vector<int>>   neighborhoods;
-
-    std::vector<std::vector<double>> distance_matrix;
-    std::vector<std::vector<int>>    Phi_fw;
-    std::vector<std::vector<int>>    Phi_bw;
-
-    std::unordered_map<int, std::vector<int>> fw_bucket_graph;
-    std::unordered_map<int, std::vector<int>> bw_bucket_graph;
-
-    std::vector<Label>  global_labels;
-    std::vector<double> fw_c_bar;
-    std::vector<double> bw_c_bar;
-
     int RIH1(std::priority_queue<Label *, std::vector<Label *>, LabelComparator> &best_labels_in,
              std::priority_queue<Label *, std::vector<Label *>, LabelComparator> &best_labels_out, int max_n_labels);
 
@@ -489,14 +498,6 @@ public:
     template <Direction D>
     void generate_arcs();
 
-    std::vector<std::vector<int>> fw_ordered_sccs;
-    std::vector<std::vector<int>> bw_ordered_sccs;
-    std::vector<int>              fw_topological_order;
-    std::vector<int>              bw_topological_order;
-    std::vector<std::vector<int>> fw_sccs;
-    std::vector<std::vector<int>> bw_sccs;
-    std::vector<std::vector<int>> fw_sccs_sorted;
-    std::vector<std::vector<int>> bw_sccs_sorted;
     template <Direction D>
     void SCC_handler();
 
@@ -669,7 +670,7 @@ public:
      * - If the resource size is greater than 1, it iterates through the resources and checks
      *   if the forward label's resources plus the job's demand exceed the backward label's resources.
      */
-    bool check_feasibility(const Label *fw_label, const Label *bw_label) {
+    inline bool check_feasibility(const Label *fw_label, const Label *bw_label) {
         if (!fw_label || !bw_label) return false;
         // print bw_label->job_id
         const struct VRPJob &VRPJob = jobs[fw_label->job_id];
@@ -683,6 +684,10 @@ public:
         }
         return true;
     }
+
+    void async_rih_processing(std::vector<Label *> initial_labels, int LABELS_MAX);
+
+    std::vector<Label *> get_rih_labels() { return merged_labels_rih; }
 
     double knapsackBound(const Label *l);
 

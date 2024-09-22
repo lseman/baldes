@@ -22,6 +22,8 @@
 #include "gurobi_c++.h"
 #include "gurobi_c.h"
 
+#include "../external/pdqsort.h"
+
 #include "Hashes.h"
 
 #include <exec/static_thread_pool.hpp>
@@ -428,7 +430,6 @@ struct Label {
     std::vector<int>           jobs_covered = {}; // Add jobs_covered to Label
     int                        job_id       = -1; // Add job_id to Label
     const Label               *parent       = nullptr;
-    int                        status       = 0;
 #ifdef SRC3
     std::array<std::uint16_t, MAX_SRC_CUTS> SRCmap = {};
 #endif
@@ -487,15 +488,14 @@ struct Label {
      * If the SRC macro is defined, it also sets SRCcost to 0.0.
      */
     inline void reset() {
-        this->vertex      = -1;
-        this->cost        = 0.0;
-        this->resources   = {};
-        this->job_id      = -1;
+        this->vertex    = -1;
+        this->cost      = 0.0;
+        this->resources = {};
+        // this->job_id      = -1;
         this->real_cost   = 0.0;
         this->parent      = nullptr;
         this->is_extended = false;
-        this->status      = 0;
-        this->jobs_covered.clear();
+        // this->jobs_covered.clear();
 
         std::memset(visited_bitmap.data(), 0, visited_bitmap.size() * sizeof(uint64_t));
 #ifdef UNREACHABLE_DOMINANCE
