@@ -40,10 +40,10 @@ inline std::vector<Label *> BucketGraph::solve() {
     for (auto split : q_star) {
         if (((static_cast<double>(n_bw_labels) - static_cast<double>(n_fw_labels)) / static_cast<double>(n_fw_labels)) >
             0.05) {
-            split += 0.05 * R_max[TIME_INDEX];
+            split += 0.5 * R_max[TIME_INDEX];
         } else if (((static_cast<double>(n_fw_labels) - static_cast<double>(n_bw_labels)) /
                     static_cast<double>(n_bw_labels)) > 0.05) {
-            split -= 0.05 * R_max[TIME_INDEX];
+            split -= 0.5 * R_max[TIME_INDEX];
         }
     }
     // std::vector<double>  q_star = split;
@@ -98,12 +98,13 @@ inline std::vector<Label *> BucketGraph::solve() {
         paths     = bi_labeling_algorithm<Stage::Four>(q_star);
         inner_obj = paths[0]->cost;
         if (inner_obj >= -1e-1) {
+            // print_cut("Going into separation mode..\n");
+
             ss = true;
 #if !defined(SRC) && !defined(SRC3)
             status = Status::Optimal;
             return paths;
 #endif
-            print_cut("Going into separation mode..\n");
             status = Status::Separation;
         }
     }
@@ -635,8 +636,24 @@ BucketGraph::Extend(const std::conditional_t<M == Mutability::Mut, Label *, cons
  */
 template <Direction D, Stage S>
 inline bool BucketGraph::is_dominated(Label *&new_label, Label *&label) noexcept {
-    // Early return if the cost condition is not met
-    if (label->cost > new_label->cost) { return false; }
+
+    // Check SRCDuals condition for specific stages
+    if constexpr (S == Stage::Three || S == Stage::Four || S == Stage::Enumerate) {
+        double sumSRC = 0;
+#ifdef SRC
+        const auto &SRCDuals = cut_storage->SRCDuals;
+
+        if (!SRCDuals.empty()) {
+            for (size_t i = 0; i < SRCDuals.size(); ++i) {
+                if (label->SRCmap[i] > new_label->SRCmap[i]) { sumSRC += SRCDuals[i]; }
+            }
+        }
+#endif
+
+        if (label->cost - sumSRC > new_label->cost) { return false; }
+    } else {
+        if (label->cost > new_label->cost) { return false; }
+    }
 
     // Check resource conditions based on direction
     const auto &new_resources   = new_label->resources;
@@ -665,7 +682,7 @@ inline bool BucketGraph::is_dominated(Label *&new_label, Label *&label) noexcept
             // Combine unreachable and visited in the same check
             auto combined_label_bitmap = label->visited_bitmap[i] | label->unreachable_bitmap[i];
             // Check if there is any client visited or unreachable in label but not in new_label
-            if ((label->unreachable_bitmap & ~new_label->unreachable_bitmap[i]) != 0) { return false; }
+            if ((label->unreachable_bitmap[i] & ~new_label->unreachable_bitmap[i]) != 0) { return false; }
         }
     }
 #endif
@@ -680,20 +697,6 @@ inline bool BucketGraph::is_dominated(Label *&new_label, Label *&label) noexcept
             }
             if (label->cost + sumSRC > new_label->cost) { return false; }
         }
-    }
-#endif
-#ifdef SRC
-    // Check SRCDuals condition for specific stages
-    if constexpr (S == Stage::Three || S == Stage::Four || S == Stage::Enumerate) {
-        const auto &SRCDuals = cut_storage->SRCDuals;
-        double      sumSRC   = 0;
-
-        if (!SRCDuals.empty()) {
-            for (size_t i = 0; i < SRCDuals.size(); ++i) {
-                if (label->SRCmap[i] > new_label->SRCmap[i]) { sumSRC += SRCDuals[i]; }
-            }
-        }
-        if (label->cost - sumSRC > new_label->cost) { return false; }
     }
 #endif
     return true;
@@ -759,35 +762,30 @@ inline bool BucketGraph::DominatedInCompWiseSmallerBuckets(Label *L, int bucket,
     auto &buckets = assign_buckets<D>(fw_buckets, bw_buckets);
     auto &Phi     = assign_buckets<D>(Phi_fw, Phi_bw);
 
-    const int       b_L = L->vertex;
-    std::stack<int> bucketStack;
-    bucketStack.push(bucket);
+    const int b_L           = L->vertex;
+    int       currentBucket = bucket;
 
-    while (!bucketStack.empty()) {
-        int currentBucket = bucketStack.top();
-        bucketStack.pop();
+    // Mark the bucket as visited
+    const size_t segment      = currentBucket / 64;
+    const size_t bit_position = currentBucket % 64;
+    Bvisited[segment] |= (1ULL << bit_position);
 
-        // Mark the bucket as visited
-        const size_t segment      = currentBucket / 64;
-        const size_t bit_position = currentBucket % 64;
-        Bvisited[segment] |= (1ULL << bit_position);
+    // Check cost and precedence
+    if (L->cost < c_bar[currentBucket] && ::precedes<int>(bucket_order, currentBucket, b_L)) { return false; }
 
-        // Check cost and precedence
-        if (L->cost < c_bar[currentBucket] && ::precedes<int>(bucket_order, currentBucket, b_L)) { return false; }
-
-        if (b_L != currentBucket) {
-            const auto &bucket_labels = buckets[currentBucket].get_labels();
-            for (auto *label : bucket_labels) {
-                if (is_dominated<D, S>(L, label)) { return true; }
-            }
+    if (b_L != currentBucket) {
+        const auto &bucket_labels = buckets[currentBucket].get_labels();
+        for (auto *label : bucket_labels) {
+            if (is_dominated<D, S>(L, label)) { return true; }
         }
+    }
 
-        // Add unvisited neighboring buckets to the stack
-        for (const int b_prime : Phi[currentBucket]) {
-            const size_t segment_prime      = b_prime / 64;
-            const size_t bit_position_prime = b_prime % 64;
-
-            if ((Bvisited[segment_prime] & (1ULL << bit_position_prime)) == 0) { bucketStack.push(b_prime); }
+    // Add unvisited neighboring buckets to the stack
+    for (const int b_prime : Phi[currentBucket]) {
+        const size_t segment_prime      = b_prime / 64;
+        const size_t bit_position_prime = b_prime % 64;
+        if ((Bvisited[segment_prime] & (1ULL << bit_position_prime)) == 0) {
+            DominatedInCompWiseSmallerBuckets<D, S>(L, b_prime, c_bar, Bvisited, bucket_order);
         }
     }
 

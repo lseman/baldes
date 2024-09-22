@@ -57,11 +57,8 @@ enum class Status { Optimal, Separation, NotOptimal, Error };
 
 // Comparator function for Stage enum
 constexpr bool operator<(Stage lhs, Stage rhs) { return static_cast<int>(lhs) < static_cast<int>(rhs); }
-
 constexpr bool operator>(Stage lhs, Stage rhs) { return rhs < lhs; }
-
 constexpr bool operator<=(Stage lhs, Stage rhs) { return !(lhs > rhs); }
-
 constexpr bool operator>=(Stage lhs, Stage rhs) { return !(lhs < rhs); }
 
 class CutStorage;
@@ -1130,7 +1127,7 @@ struct Bucket {
 
     inline auto &get_sorted_labels() {
         std::sort(labels_vec.begin(), labels_vec.end(),
-                  [](const Label *a, const Label *b) { return a->cost < b->cost; });
+                  [](const Label *a, const Label *b) { return a->cost > b->cost; });
         return labels_vec;
     }
 

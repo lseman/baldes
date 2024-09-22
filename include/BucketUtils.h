@@ -419,105 +419,98 @@ Label *BucketGraph::get_best_label(const std::vector<int> &topological_order, co
 template <Stage S>
 void BucketGraph::ConcatenateLabel(const Label *&L, int &b, Label *&pbest, std::vector<uint64_t> &Bvisited,
                                    const std::vector<double> &q_star) {
-    // Create a stack for iterative processing
-    std::stack<int> bucket_stack;
-    bucket_stack.push(b);
 
-    while (!bucket_stack.empty()) {
-        // Pop the next bucket from the stack
-        int current_bucket = bucket_stack.top();
-        bucket_stack.pop();
+    auto current_bucket = b;
 
-        // Mark the bucket as visited
-        const size_t segment      = current_bucket / 64;
-        const size_t bit_position = current_bucket % 64;
-        Bvisited[segment] |= (1ULL << bit_position);
+    // Mark the bucket as visited
+    const size_t segment      = current_bucket / 64;
+    const size_t bit_position = current_bucket % 64;
+    Bvisited[segment] |= (1ULL << bit_position);
 
-        int    bucketLjob      = L->job_id;
-        int    bucketLprimejob = bw_buckets[current_bucket].job_id;
-        double cost            = getcij(bucketLjob, bucketLprimejob);
+    int    bucketLjob      = L->job_id;
+    int    bucketLprimejob = bw_buckets[current_bucket].job_id;
+    double cost            = getcij(bucketLjob, bucketLprimejob);
 
 #ifdef RCC
-        cost -= rcc_manager->getCachedDualSumForArc(bucketLjob, bucketLprimejob);
+    cost -= rcc_manager->getCachedDualSumForArc(bucketLjob, bucketLprimejob);
 #endif
-        double L_cost_plus_cost = L->cost + cost;
+    double L_cost_plus_cost = L->cost + cost;
 
 #ifdef SRC
-        auto cutter   = cut_storage;
-        auto SRCDuals = cutter->SRCDuals;
+    auto cutter   = cut_storage;
+    auto SRCDuals = cutter->SRCDuals;
 #endif
 
-        // Early exit based on cost comparison
+    // Early exit based on cost comparison
+    if constexpr (S != Stage::Enumerate) {
+        if (L_cost_plus_cost + bw_c_bar[current_bucket] >= pbest->cost) { return; }
+    } else {
+        if (L_cost_plus_cost + bw_c_bar[current_bucket] >= gap) { return; }
+    }
+
+    const VRPJob &L_last_job = jobs[L->job_id];
+    auto         &bucket     = bw_buckets[current_bucket];
+    const auto   &labels     = bucket.get_labels(); // Assuming get_labels() returns a vector of Label*
+
+    for (auto &L_bw : labels) {
+        if (L_bw->job_id == L->job_id) { return; }
+
+        // Loop through the resource dimensions
+        if (L->resources[TIME_INDEX] + cost + L_last_job.consumption[TIME_INDEX] > L_bw->resources[TIME_INDEX]) {
+            continue;
+        }
+
+        if constexpr (R_SIZE > 1) {
+            bool valid = true;
+
+            for (int r = 1; r < intervals.size(); ++r) {
+                if (L->resources[r] + L_last_job.consumption[r] + (R_max[r] - L_bw->resources[r]) > R_max[r]) {
+                    valid = false;
+                    break;
+                }
+            }
+            if (!valid) { continue; }
+        }
+
+        double candidate_cost = L_cost_plus_cost + L_bw->cost;
+
+#ifdef SRC
+        auto counter = 0;
+        for (auto it = cutter->begin(); it < cutter->end(); ++it) {
+
+            if (SRCDuals[it->id] == 0) continue;
+            if (L->SRCmap[it->id] + L_bw->SRCmap[it->id] >= 1) { candidate_cost -= SRCDuals[it->id]; }
+        }
+#endif
+        // Use bitwise operations for the visited bitmap comparison
+        if constexpr (S == Stage::Three || S == Stage::Four || S == Stage::Enumerate) {
+            bool visited_overlap = false;
+            for (size_t i = 0; i < L->visited_bitmap.size(); ++i) {
+                if ((L->visited_bitmap[i] & L_bw->visited_bitmap[i]) != 0) {
+                    visited_overlap = true;
+                    break; // No need to check further if there's an overlap
+                }
+            }
+            if (visited_overlap) continue;
+        }
+        // Early exit based on candidate cost
         if constexpr (S != Stage::Enumerate) {
-            if (L_cost_plus_cost + bw_c_bar[current_bucket] >= pbest->cost) { continue; }
+            if (candidate_cost >= pbest->cost) continue;
         } else {
-            if (L_cost_plus_cost + bw_c_bar[current_bucket] >= gap) { continue; }
+            if (candidate_cost >= gap) continue;
         }
 
-        const VRPJob &L_last_job = jobs[L->job_id];
-        auto         &bucket     = bw_buckets[current_bucket];
-        const auto   &labels     = bucket.get_labels(); // Assuming get_labels() returns a vector of Label*
+        // Compute the new label and store it
+        pbest = compute_label(L, L_bw);
+        merged_labels.push_back(pbest);
+    }
 
-        for (auto &L_bw : labels) {
-            if (L_bw->job_id == L->job_id) { continue; }
-
-            // Loop through the resource dimensions
-            if (L->resources[TIME_INDEX] + cost + L_last_job.consumption[TIME_INDEX] > L_bw->resources[TIME_INDEX]) {
-                continue;
-            }
-
-            if constexpr (R_SIZE > 1) {
-                bool valid = true;
-
-                for (int r = 1; r < intervals.size(); ++r) {
-                    if (L->resources[r] + L_last_job.consumption[r] + (R_max[r] - L_bw->resources[r]) > R_max[r]) {
-                        valid = false;
-                        break;
-                    }
-                }
-                if (!valid) { continue; }
-            }
-
-            double candidate_cost = L_cost_plus_cost + L_bw->cost;
-
-#ifdef SRC
-            auto counter = 0;
-            for (auto it = cutter->begin(); it < cutter->end(); ++it) {
-
-                if (SRCDuals[it->id] == 0) continue;
-                if (L->SRCmap[it->id] + L_bw->SRCmap[it->id] >= 1) { candidate_cost -= SRCDuals[it->id]; }
-            }
-#endif
-            // Use bitwise operations for the visited bitmap comparison
-            if constexpr (S == Stage::Three || S == Stage::Four || S == Stage::Enumerate) {
-                bool visited_overlap = false;
-                for (size_t i = 0; i < L->visited_bitmap.size(); ++i) {
-                    if ((L->visited_bitmap[i] & L_bw->visited_bitmap[i]) != 0) {
-                        visited_overlap = true;
-                        break; // No need to check further if there's an overlap
-                    }
-                }
-                if (visited_overlap) continue;
-            }
-            // Early exit based on candidate cost
-            if constexpr (S != Stage::Enumerate) {
-                if (candidate_cost >= pbest->cost) continue;
-            } else {
-                if (candidate_cost >= gap) continue;
-            }
-
-            // Compute the new label and store it
-            pbest = compute_label(L, L_bw);
-            merged_labels.push_back(pbest); // Consider reserving space in merged_labels if frequently reallocating
-        }
-
-        // Push adjacent buckets onto the stack for further processing
-        for (int b_prime : Phi_bw[current_bucket]) {
-            const size_t segment_prime      = b_prime / 64;
-            const size_t bit_position_prime = b_prime % 64;
-            if ((Bvisited[segment_prime] & (1ULL << bit_position_prime)) == 0) {
-                bucket_stack.push(b_prime); // Push to the stack instead of recursive call
-            }
+    // Push adjacent buckets onto the stack for further processing
+    for (int b_prime : Phi_bw[current_bucket]) {
+        const size_t segment_prime      = b_prime / 64;
+        const size_t bit_position_prime = b_prime % 64;
+        if ((Bvisited[segment_prime] & (1ULL << bit_position_prime)) == 0) {
+            ConcatenateLabel<S>(L, b_prime, pbest, Bvisited, q_star);
         }
     }
 }

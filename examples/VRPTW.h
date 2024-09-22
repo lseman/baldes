@@ -657,7 +657,7 @@ public:
 #endif
                 auto cuts_before = cuts.size();
                 // print_info("Removing most negative reduced cost variables\n");
-                //  removeNegativeReducedCostVarsAndPaths(node);
+                //   removeNegativeReducedCostVarsAndPaths(node);
                 node->optimize();
                 highs_obj         = node->get(GRB_DoubleAttr_ObjVal);
                 solution          = extractSolution(node);

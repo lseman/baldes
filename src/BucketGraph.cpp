@@ -566,6 +566,7 @@ void BucketGraph::set_adjacency_list() {
 void BucketGraph::common_initialization() {
     // Clear previous data
     merged_labels.clear();
+    merged_labels.reserve(100);
     fw_c_bar.clear();
     bw_c_bar.clear();
 

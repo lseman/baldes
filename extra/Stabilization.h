@@ -227,7 +227,6 @@ public:
      */
     DualSolution getStabDualSolAdvanced(const DualSolution &jobDuals) {
         if (cur_stab_center.empty()) { return jobDuals; }
-        if (smooth_dual_sol.empty()) { smooth_dual_sol = jobDuals; }
         if (subgradient.empty()) { subgradient.assign(jobDuals.size(), 0.0); }
 
         if (duals_sep.empty()) {
@@ -235,7 +234,8 @@ public:
             smooth_dual_sol = duals_sep;
             return jobDuals;
         }
-        auto duals_in  = duals_sep;
+
+        auto duals_in  = cur_stab_center;
         auto duals_out = jobDuals;
         // Compute π_tilde (cur_alpha * duals_in + (1 - cur_alpha) * duals_out)
         std::vector<double> duals_tilde(jobDuals.size(), 0.0);
