@@ -485,62 +485,88 @@ void BucketGraph::forbidCycle(const std::vector<int> &cycle, bool aggressive) {
  * @note The function uses a lambda function to encapsulate the logic for adding arcs for a job.
  */
 void BucketGraph::set_adjacency_list() {
-    for (auto &job : jobs) { job.clear_arcs(); }
+    // Clear existing arcs for each job
+    for (auto &job : jobs) {
+        job.clear_arcs(); // Remove any existing arcs associated with the job
+    }
 
+    // Lambda function to add arcs for a specific job and bucket
     auto add_arcs_for_job = [&](const VRPJob &job, int from_bucket, std::vector<double> &res_inc) {
-        using Arc = std::tuple<double, int, std::vector<double>, double>;
-        std::vector<Arc> best_arcs;         // Use a flat container to store the best arcs
-        best_arcs.reserve(jobs.size());     // Reserve space to avoid frequent reallocations
-        std::vector<Arc> best_arcs_rev;     // Use a flat container to store the best arcs
-        best_arcs_rev.reserve(jobs.size()); // Reserve space to avoid frequent reallocations
+        using Arc =
+            std::tuple<double, int, std::vector<double>, double>; // Define an Arc as a tuple with priority value, job
+                                                                  // id, resource increments, and cost increment
 
+        // Containers to store the best arcs for forward and reverse directions
+        std::vector<Arc> best_arcs;
+        best_arcs.reserve(jobs.size()); // Reserve space for best arcs to avoid frequent memory reallocations
+
+        std::vector<Arc> best_arcs_rev;
+        best_arcs_rev.reserve(jobs.size()); // Reserve space for reverse arcs
+
+        // Iterate over all jobs to determine potential arcs
         for (const auto &next_job : jobs) {
-            if (next_job.id == 0) continue;
-            if (job.id == next_job.id) continue;
+            if (next_job.id == 0) continue;      // Skip the depot
+            if (job.id == next_job.id) continue; // Skip arcs to the same job
 
+            // Calculate the travel cost between the current job and the next job
             auto   travel_cost = getcij(job.id, next_job.id);
-            double cost_inc    = travel_cost - next_job.cost;
+            double cost_inc =
+                travel_cost - next_job.cost; // Adjust the cost increment by subtracting the next job's cost
 
+            // Initialize the resource increments based on the current job's consumption
             for (int r = 0; r < R_SIZE; ++r) { res_inc[r] = job.consumption[r]; }
-            res_inc[TIME_INDEX] += travel_cost;
+            res_inc[TIME_INDEX] += travel_cost; // Add travel time to the resource increment
 
             int to_bucket = next_job.id;
-            if (from_bucket == to_bucket) continue;
+            if (from_bucket == to_bucket) continue; // Skip arcs that loop back to the same bucket
 
+            // Check feasibility of the arc based on resource constraints
             bool feasible = true;
             for (int r = 0; r < R_SIZE; ++r) {
-                if (job.lb[r] + res_inc[r] > next_job.ub[r]) {
+                if (job.lb[r] + res_inc[r] >
+                    next_job.ub[r]) { // If resource exceeds the upper bound of the next job, the arc is infeasible
                     feasible = false;
                     break;
                 }
             }
-            if (!feasible) continue;
+            if (!feasible) continue; // Skip if the arc is not feasible
 
-            // if (job.lb[TIME_INDEX] + res_inc[TIME_INDEX] > next_job.ub[TIME_INDEX]) continue;
+            // Calculate priority values for forward and reverse arcs
+            double aux_double = next_job.cost + 1.E-5 * next_job.start_time;    // Small weight for start time
+            best_arcs.emplace_back(aux_double, next_job.id, res_inc, cost_inc); // Store the arc for forward direction
 
-            double aux_double = next_job.cost + 1.E-5 * next_job.start_time;
-            best_arcs.emplace_back(aux_double, next_job.id, res_inc, cost_inc);
-            double aux_double_rev = 1.E-5 * job.end_time;
-            best_arcs_rev.emplace_back(aux_double_rev, next_job.id, res_inc, cost_inc);
+            double aux_double_rev = 1.E-5 * job.end_time; // Small weight for end time
+            best_arcs_rev.emplace_back(aux_double_rev, next_job.id, res_inc,
+                                       cost_inc); // Store the arc for reverse direction
         }
 
+        // Add forward arcs from the current job to its neighbors
         for (const auto &arc : best_arcs) {
             auto [priority_value, to_bucket, res_inc_local, cost_inc] = arc;
 
             auto next_job = to_bucket;
-            jobs[job.id].add_arc(job.id, next_job, res_inc_local, cost_inc, true, priority_value);
+            jobs[job.id].add_arc(job.id, next_job, res_inc_local, cost_inc, true,
+                                 priority_value); // Add forward arc to the adjacency list
         }
+
+        // Add reverse arcs from neighboring jobs to the current job
         for (const auto &arc : best_arcs_rev) {
             auto [priority_value, to_bucket, res_inc_local, cost_inc] = arc;
             auto next_job                                             = to_bucket;
 
-            jobs[next_job].add_arc(next_job, job.id, res_inc_local, cost_inc, false, priority_value);
+            jobs[next_job].add_arc(next_job, job.id, res_inc_local, cost_inc, false,
+                                   priority_value); // Add reverse arc to the adjacency list
         }
     };
 
+    // Iterate over all jobs to set the adjacency list
     for (const auto &VRPJob : jobs) {
-        if (VRPJob.id == N_SIZE - 1) continue;
+        if (VRPJob.id == N_SIZE - 1) continue; // Skip the last job (depot)
+
+        // Initialize the resource increment vector based on the number of intervals
         std::vector<double> res_inc(intervals.size());
+
+        // Add arcs for the current job
         add_arcs_for_job(VRPJob, VRPJob.id, res_inc);
     }
 }
@@ -721,7 +747,7 @@ bool BucketGraph::BucketSetContains(const std::set<int> &bucket_set, const int &
 
 void BucketGraph::async_rih_processing(std::vector<Label *> initial_labels, int LABELS_MAX) {
     merged_labels_rih.clear();
-    const int                                                           LABELS_MAX_RIH = 5;
+    const int                                                           LABELS_MAX_RIH = 10;
     std::priority_queue<Label *, std::vector<Label *>, LabelComparator> best_labels_in;
     std::priority_queue<Label *, std::vector<Label *>, LabelComparator> best_labels_out;
 
@@ -739,8 +765,6 @@ void BucketGraph::async_rih_processing(std::vector<Label *> initial_labels, int 
     }
 
     RIH4(best_labels_in, best_labels_out, LABELS_MAX);
-
-    // RIH3(best_labels_in, best_labels_out, LABELS_MAX);
 
     // After processing, populate the merged_labels_improved vector
     while (!best_labels_out.empty()) {

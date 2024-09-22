@@ -252,69 +252,78 @@ void BucketGraph::define_buckets() {
  */
 template <Direction D>
 void BucketGraph::generate_arcs() {
+    // Mutex to synchronize access to shared resources
     auto buckets_mutex = std::mutex();
 
-    // Clear the appropriate bucket graph
+    // Clear the appropriate bucket graph (forward or backward)
     if constexpr (D == Direction::Forward) {
-        fw_bucket_graph.clear();
+        fw_bucket_graph.clear(); // Clear the forward bucket graph
     } else {
-        bw_bucket_graph.clear();
+        bw_bucket_graph.clear(); // Clear the backward bucket graph
     }
 
-    auto fixed_buckets = assign_buckets<D>(fw_fixed_buckets, bw_fixed_buckets);
-
+    // Assign the forward or backward fixed buckets and other bucket-related structures
+    auto  fixed_buckets     = assign_buckets<D>(fw_fixed_buckets, bw_fixed_buckets);
     auto &buckets           = assign_buckets<D>(fw_buckets, bw_buckets);
     auto &num_buckets       = assign_buckets<D>(num_buckets_fw, num_buckets_bw);
     auto &num_buckets_index = assign_buckets<D>(num_buckets_index_fw, num_buckets_index_bw);
 
-    // Determine base intervals for each resource dimension
+    // Compute base intervals for each resource dimension based on R_max and R_min
     std::vector<int> base_intervals(intervals.size());
     for (int r = 0; r < intervals.size(); ++r) {
         base_intervals[r] = std::floor((R_max[r] - R_min[r] + 1) / static_cast<int>(intervals[r].interval));
     }
 
-    // Clear arcs in each bucket
+    // Clear all buckets in parallel, removing any existing arcs
     std::for_each(std::execution::par_unseq, buckets.begin(), buckets.end(), [&](auto &bucket) {
-        bucket.clear();
-        bucket.clear_arcs(D == Direction::Forward);
+        bucket.clear();                             // Clear bucket data
+        bucket.clear_arcs(D == Direction::Forward); // Clear arcs in the bucket
     });
 
-    // Function to add arcs for a specific job and bucket
     auto add_arcs_for_job = [&](const VRPJob &job, int from_bucket, std::vector<double> &res_inc,
                                 std::vector<std::pair<int, int>> &local_arcs) {
+        // Retrieve the arcs for the job in the given direction (Forward/Backward)
         auto arcs = job.get_arcs<D>();
 
+        // Iterate over all arcs of the job
         for (const auto &arc : arcs) {
-            auto &next_job = jobs[arc.to];
+            auto &next_job = jobs[arc.to]; // Get the destination job of the arc
 
+            // Skip self-loops (no arc from a job to itself)
             if (job.id == next_job.id) continue;
 
+            // Calculate travel cost and cost increment based on job's properties
             auto   travel_cost = getcij(job.id, next_job.id);
             double cost_inc    = travel_cost - next_job.cost;
-            res_inc[0]         = travel_cost + job.duration; // Update based on job duration
+            res_inc[0]         = travel_cost + job.duration; // Update resource increment based on job duration
 
+            // Iterate over all possible destination buckets for the next job
             for (int j = 0; j < num_buckets[next_job.id]; ++j) {
                 int to_bucket = j + num_buckets_index[next_job.id];
-                if (from_bucket == to_bucket) continue;
+                if (from_bucket == to_bucket) continue; // Skip arcs that loop back to the same bucket
 
-                if (fixed_buckets[from_bucket][to_bucket] == 1) continue;
+                if (fixed_buckets[from_bucket][to_bucket] == 1) continue; // Skip fixed arcs
 
                 bool valid_arc = true;
                 for (int r = 0; r < res_inc.size(); ++r) {
+                    // Forward direction: Check that resource increment doesn't exceed upper bounds
                     if constexpr (D == Direction::Forward) {
                         if (buckets[from_bucket].lb[r] + res_inc[r] > buckets[to_bucket].ub[r]) {
                             valid_arc = false;
                             break;
                         }
-                    } else if constexpr (D == Direction::Backward) {
+                    }
+                    // Backward direction: Check that resource decrement doesn't drop below lower bounds
+                    else if constexpr (D == Direction::Backward) {
                         if (buckets[from_bucket].ub[r] - res_inc[r] < buckets[to_bucket].lb[r]) {
                             valid_arc = false;
                             break;
                         }
                     }
                 }
-                if (!valid_arc) continue;
+                if (!valid_arc) continue; // Skip invalid arcs
 
+                // Further refine arc validity based on the base intervals and job bounds
                 if constexpr (D == Direction::Forward) {
                     for (int r = 0; r < res_inc.size(); ++r) {
                         double max_calc =
@@ -336,31 +345,33 @@ void BucketGraph::generate_arcs() {
                         }
                     }
                 }
-                if (!valid_arc) continue;
+                if (!valid_arc) continue; // Skip invalid arcs
 
-                // Store arc data locally before committing to the global structure
+                // Store the arc data locally before committing it to the global structure
                 local_arcs.emplace_back(from_bucket, to_bucket);
                 double              local_cost_inc = cost_inc;
                 std::vector<double> local_res_inc  = res_inc;
 
+                // Add the arc to the global structure and the bucket
                 {
-                    std::lock_guard<std::mutex> lock(buckets_mutex);
-                    add_arc<D>(from_bucket, to_bucket, local_res_inc, local_cost_inc);
+                    std::lock_guard<std::mutex> lock(buckets_mutex); // Lock the mutex to ensure thread safety
+                    add_arc<D>(from_bucket, to_bucket, local_res_inc, local_cost_inc); // Add the arc globally
                     buckets[from_bucket].add_bucket_arc(from_bucket, to_bucket, local_res_inc, local_cost_inc,
-                                                        D == Direction::Forward, false);
+                                                        D == Direction::Forward, false); // Add the arc to the bucket
                 }
             }
         }
     };
 
-    // Parallelize the outer loop over jobs
+    // Iterate over all jobs in parallel, generating arcs for each
     std::for_each(std::execution::par_unseq, jobs.begin(), jobs.end(), [&](const VRPJob &VRPJob) {
-        std::vector<double>              res_inc = {static_cast<double>(VRPJob.duration)};
-        std::vector<std::pair<int, int>> local_arcs;
+        std::vector<double>              res_inc = {static_cast<double>(VRPJob.duration)}; // Resource increment vector
+        std::vector<std::pair<int, int>> local_arcs;                                       // Local storage for arcs
 
+        // Generate arcs for all buckets associated with the current job
         for (int i = 0; i < num_buckets[VRPJob.id]; ++i) {
-            int from_bucket = i + num_buckets_index[VRPJob.id];
-            add_arcs_for_job(VRPJob, from_bucket, res_inc, local_arcs);
+            int from_bucket = i + num_buckets_index[VRPJob.id];         // Determine the source bucket
+            add_arcs_for_job(VRPJob, from_bucket, res_inc, local_arcs); // Add arcs for this job and bucket
         }
     });
 }
