@@ -75,8 +75,14 @@ BucketGraph::BucketGraph(const std::vector<VRPJob> &jobs, int time_horizon, int 
     R_min     = {0, 0};
     R_max     = {static_cast<double>(time_horizon), static_cast<double>(capacity)};
 
-    define_buckets<Direction::Forward>();
-    define_buckets<Direction::Backward>();
+// TODO: convert to nvidia stdexec
+#pragma omp parallel sections
+    {
+#pragma omp section
+        define_buckets<Direction::Forward>();
+#pragma omp section
+        define_buckets<Direction::Backward>();
+    }
 }
 
 /**
@@ -103,8 +109,14 @@ BucketGraph::BucketGraph(const std::vector<VRPJob> &jobs, int time_horizon, int 
     R_min     = {0};
     R_max     = {static_cast<double>(time_horizon)};
 
-    define_buckets<Direction::Forward>();
-    define_buckets<Direction::Backward>();
+// TODO: convert to nvidia stdexec
+#pragma omp parallel sections
+    {
+#pragma omp section
+        define_buckets<Direction::Forward>();
+#pragma omp section
+        define_buckets<Direction::Backward>();
+    }
 }
 
 BucketGraph::BucketGraph(const std::vector<VRPJob> &jobs, std::vector<int> &bounds, std::vector<int> &bucket_intervals)
@@ -124,8 +136,14 @@ BucketGraph::BucketGraph(const std::vector<VRPJob> &jobs, std::vector<int> &boun
         R_max.push_back(static_cast<double>(bounds[i]));
     }
 
-    define_buckets<Direction::Forward>();
-    define_buckets<Direction::Backward>();
+// TODO: convert to nvidia stdexec
+#pragma omp parallel sections
+    {
+#pragma omp section
+        define_buckets<Direction::Forward>();
+#pragma omp section
+        define_buckets<Direction::Backward>();
+    }
 }
 
 /**
@@ -169,7 +187,7 @@ Label *BucketGraph::compute_label(const Label *L, const Label *L_prime) {
             if (SRCDuals[i] != 0 && (L->SRCmap[i] % 2 + L_prime->SRCmap[i] % 2 >= 1)) { sumSRC += SRCDuals[i]; }
         }
     }
-    new_label->cost += sumSRC;
+    new_label->cost -= sumSRC;
 #endif
 
     // Reserve space for the combined jobs_covered vector in advance

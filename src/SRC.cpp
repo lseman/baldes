@@ -105,8 +105,7 @@ void CutStorage::addCut(Cut &cut) {
     indexCuts[cut_key].push_back(cuts.size() - 1);
 }
 
-LimitedMemoryRank1Cuts::LimitedMemoryRank1Cuts(std::vector<VRPJob> &jobs, CutType cutType)
-    : jobs(jobs), cutType(cutType) {}
+LimitedMemoryRank1Cuts::LimitedMemoryRank1Cuts(std::vector<VRPJob> &jobs) : jobs(jobs) {}
 
 /**
  * @brief Separates the given solution vector into cuts using Limited Memory Rank-1 Cuts.
@@ -121,8 +120,7 @@ LimitedMemoryRank1Cuts::LimitedMemoryRank1Cuts(std::vector<VRPJob> &jobs, CutTyp
  * @param violation_threshold The threshold for identifying violations.
  * @return A vector of vectors containing the coefficients of the generated cuts.
  */
-std::vector<std::vector<double>> LimitedMemoryRank1Cuts::separate(const SparseModel &A, const std::vector<double> &x,
-                                                                  int nC, double violation_threshold) {
+std::vector<std::vector<double>> LimitedMemoryRank1Cuts::separate(const SparseModel &A, const std::vector<double> &x) {
     // Create a map for non-zero entries by rows
     std::vector<std::vector<int>> row_indices_map(A.num_rows + 1);
     for (int idx = 0; idx < A.row_indices.size(); ++idx) {
@@ -143,6 +141,7 @@ std::vector<std::vector<double>> LimitedMemoryRank1Cuts::separate(const SparseMo
 
     std::mutex cuts_mutex; // Mutex to protect shared resource
 
+    auto                                   nC = N_SIZE;
     std::vector<std::tuple<int, int, int>> tasks;
     tasks.reserve((nC * (nC - 1) * (nC - 2)) / 6); // Preallocate task space to avoid reallocations
 
@@ -153,35 +152,42 @@ std::vector<std::vector<double>> LimitedMemoryRank1Cuts::separate(const SparseMo
         }
     }
 
-    // Parallel execution
+    // Define chunk size to reduce parallelization overhead
+    const int chunk_size = 10; // Adjust chunk size based on performance experiments
+
+    // Parallel execution in chunks
     auto bulk_sender = stdexec::bulk(
-        stdexec::just(), tasks.size(),
-        [this, &row_indices_map, &A, &x, nC, violation_threshold, &cuts, &cuts_mutex, &tasks](std::size_t task_idx) {
-            const auto &[i, j, k] = tasks[task_idx];
-            std::vector<int> expanded(A.num_cols, 0);
-            std::vector<int> buffer_int(A.num_cols);
-            int              buffer_int_n = 0;
-            double           lhs          = 0.0;
+        stdexec::just(), (tasks.size() + chunk_size - 1) / chunk_size,
+        [this, &row_indices_map, &A, &x, nC, &cuts, &cuts_mutex, &tasks, chunk_size](std::size_t chunk_idx) {
+            size_t start_idx = chunk_idx * chunk_size;
+            size_t end_idx   = std::min(start_idx + chunk_size, tasks.size());
 
-            for (const auto &idx_set : {row_indices_map[i], row_indices_map[j], row_indices_map[k]}) {
-                for (int idx : idx_set) {
-                    int col_idx = A.col_indices[idx];
-                    expanded[col_idx] += 1;
+            // Process a chunk of tasks
+            for (size_t task_idx = start_idx; task_idx < end_idx; ++task_idx) {
+                const auto &[i, j, k] = tasks[task_idx];
+                std::vector<int> expanded(A.num_cols, 0);
+                std::vector<int> buffer_int(A.num_cols);
+                int              buffer_int_n = 0;
+                double           lhs          = 0.0;
+
+                // Combine the three updates into one loop for efficiency
+                for (int idx : row_indices_map[i]) expanded[A.col_indices[idx]] += 1;
+                for (int idx : row_indices_map[j]) expanded[A.col_indices[idx]] += 1;
+                for (int idx : row_indices_map[k]) expanded[A.col_indices[idx]] += 1;
+
+                // Accumulate LHS cut values
+                for (int idx = 0; idx < A.num_cols; ++idx) {
+                    if (expanded[idx] >= 2) {
+                        lhs += std::floor(expanded[idx] * 0.5) * x[idx];
+                        buffer_int[buffer_int_n++] = idx;
+                    }
                 }
-            }
 
-            // Accumulate LHS cut values
-            for (int idx = 0; idx < A.num_cols; ++idx) {
-                if (expanded[idx] >= 2) {
-                    lhs += std::floor(expanded[idx] * 0.5) * x[idx];
-                    buffer_int[buffer_int_n++] = idx;
+                // If lhs violation found, insert the cut
+                if (lhs > 1.0 + 1e-3) {
+                    std::lock_guard<std::mutex> lock(cuts_mutex);
+                    insertSet(cuts, i, j, k, buffer_int, buffer_int_n, lhs);
                 }
-            }
-
-            // If lhs violation found, insert the cut
-            if (lhs > 1.0 + 1e-3) {
-                std::lock_guard<std::mutex> lock(cuts_mutex);
-                insertSet(cuts, i, j, k, buffer_int, buffer_int_n, lhs, violation_threshold);
             }
         });
 
@@ -216,7 +222,7 @@ std::vector<std::vector<double>> LimitedMemoryRank1Cuts::separate(const SparseMo
  * @param violation_threshold The threshold value for determining significant violations.
  */
 void LimitedMemoryRank1Cuts::insertSet(VRPTW_SRC &cuts, int i, int j, int k, const std::vector<int> &buffer_int,
-                                       int buffer_int_n, double LHS_cut, double violation_threshold) {
+                                       int buffer_int_n, double LHS_cut) {
     if (cuts.S_C_P.size() + 3 + buffer_int_n > cuts.S_C_P.capacity()) {
         size_t new_size = static_cast<size_t>(std::ceil((cuts.S_C_P.size() + 3 + buffer_int_n) * 1.5));
         cuts.S_C_P.reserve(new_size);
@@ -367,6 +373,7 @@ void LimitedMemoryRank1Cuts::generateCutCoefficients(VRPTW_SRC &cuts, std::vecto
                     // If we found both the first and second indices, mark nodes in AM
                     if (first != -1 && second != -1) {
                         for (int i = first + 1; i < second; ++i) {
+                            // fmt::print("Node: {}\n", consumers[i]);
                             AM[consumers[i] / 64] |= (1ULL << (consumers[i] % 64)); // Set the bit for the consumer
                         }
                     }

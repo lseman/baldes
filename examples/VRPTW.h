@@ -29,7 +29,6 @@
 #include "../include/Reader.h"
 
 #ifdef RCC
-#include "../cvrpsep/basegrph.h"
 #include "../cvrpsep/capsep.h"
 #include "../cvrpsep/cnstrmgr.h"
 #endif
@@ -53,6 +52,10 @@ public:
     int                           labels_counter = 0;
     std::vector<std::vector<int>> labels;
     int                           numConstrs = 0;
+
+    std::vector<GRBConstr> SRCconstraints;
+    ModelData              matrix;
+
 #ifdef RCC
     CnstrMgrPointer oldCutsCMP = nullptr;
 #endif
@@ -86,7 +89,7 @@ public:
         auto counter = 0;
         for (auto &label : columns) {
             if (label->jobs_covered.empty()) continue;
-            if (!enumerate && label->cost > 0) continue;
+            // if (!enumerate && label->cost > 0) continue;
             counter += 1;
             if (counter > 20) break;
 
@@ -97,29 +100,55 @@ public:
             std::string name        = "x[" + std::to_string(allPaths.size()) + "]";
 
             GRBColumn col;
+
             // Fill coluna with coefficients
+            // Step 1: Accumulate the coefficients for each job
             for (auto &job : label->jobs_covered) {
                 if (job > 0 && job != N_SIZE - 1) {
                     int constr_index = job - 1;
-                    coluna[constr_index] += 1;
+                    coluna[constr_index] += 1; // Accumulate the coefficient for each job
                 }
             }
+
+            // Step 2: Add the non-zero entries to the sparse matrix
+            for (int i = 0; i < N_SIZE - 1; ++i) {
+                if (coluna[i] > 0) {
+                    matrix.A_sparse.row_indices.push_back(i);
+                    matrix.A_sparse.col_indices.push_back(matrix.A_sparse.num_cols);
+                    matrix.A_sparse.values.push_back(static_cast<double>(coluna[i]));
+                }
+            }
+
+            matrix.lb.push_back(0.0);
+            matrix.ub.push_back(1.0);
+            matrix.c.push_back(travel_cost);
             // Add terms to GRBColumn
             for (int i = 0; i < N_SIZE - 2; i++) {
                 if (coluna[i] == 0.0) continue;
                 col.addTerms(&coluna[i], &constrs[i], 1);
             }
+            // Add terms for total veicles constraint
+            double val = 1;
+            col.addTerms(&val, &constrs[N_SIZE - 2], 1);
 
+            // Add terms for the limited memory rank 1 cuts
 #if defined(SRC3) || defined(SRC)
             auto vec = r1c.computeLimitedMemoryCoefficients(label->jobs_covered);
             // print vec size
-            // print N_SIZE -2 + 1
             if (vec.size() > 0) {
                 for (int i = 0; i < vec.size(); i++) {
-                    if (vec[i] != 0) { col.addTerms(&vec[i], &constrs[numConstrs + i], 1); }
+                    if (vec[i] != 0) {
+                        col.addTerms(&vec[i], &SRCconstraints[i], 1);
+                        matrix.A_sparse.row_indices.push_back(N_SIZE - 2 + i);
+                        matrix.A_sparse.col_indices.push_back(matrix.A_sparse.num_cols);
+                        matrix.A_sparse.values.push_back(static_cast<double>(vec[i]));
+                    }
                 }
             }
+
 #endif
+
+            matrix.A_sparse.num_cols++;
 
             // Collect bounds, costs, columns, and names
             lb.push_back(0.0);
@@ -130,7 +159,7 @@ public:
             vtypes.push_back(GRB_CONTINUOUS);
 
             Path path(label->jobs_covered, label->real_cost);
-            allPaths.push_back(path);
+            allPaths.emplace_back(path);
         }
         // Add variables with bounds, objectives, and columns
         if (!lb.empty()) {
@@ -226,7 +255,7 @@ public:
      * @return A vector of double values representing the dual values of the constraints.
      */
     std::vector<double> getDuals(GRBModel *model) {
-        int                    numConstrs = model->get(GRB_IntAttr_NumConstrs);
+        // int                    numConstrs = model->get(GRB_IntAttr_NumConstrs);
         std::vector<GRBConstr> constraints;
         constraints.reserve(numConstrs);
 
@@ -252,8 +281,8 @@ public:
     std::vector<double> extractSolution(GRBModel *model) {
         std::vector<double> sol;
         auto                varNumber = model->get(GRB_IntAttr_NumVars);
-        for (int i = 0; i < varNumber; i++) { sol.push_back(model->getVar(i).get(GRB_DoubleAttr_X)); }
-
+        auto                vals      = model->get(GRB_DoubleAttr_X, model->getVars(), varNumber);
+        sol.assign(vals, vals + varNumber);
         return sol;
     }
 
@@ -539,7 +568,7 @@ public:
         auto work_ctr = stdexec::starts_on(sched, bulk_sender_ctr);
         stdexec::sync_wait(std::move(work_ctr)); // Wait for the tasks to complete
         model->update();
-        model->optimize();
+        // model->optimize();
 
         return true;
     }
@@ -564,18 +593,21 @@ public:
         bucket_graph.set_distance_matrix(instance.getDistanceMatrix(), 8);
 
         node->optimize();
+        matrix                 = extractModelDataSparse(node);
         auto integer_solution  = node->get(GRB_DoubleAttr_ObjVal);
         bucket_graph.incumbent = integer_solution;
 
-        auto                   allJobs = bucket_graph.getJobs();
-        LimitedMemoryRank1Cuts r1c(allJobs, CutType::ThreeRow);
+        auto allJobs = bucket_graph.getJobs();
+
+#ifdef SRC
+        LimitedMemoryRank1Cuts r1c(allJobs);
         CutStorage             cuts;
         r1c.cutStorage = cuts;
+#endif
 
-        std::vector<GRBConstr> constraints;
-        std::vector<double>    cutDuals;
-        std::vector<double>    jobDuals  = getDuals(node);
-        auto                   sizeDuals = jobDuals.size();
+        std::vector<double> cutDuals;
+        std::vector<double> jobDuals  = getDuals(node);
+        auto                sizeDuals = jobDuals.size();
 
         double highs_obj_dual = 0.0;
         double highs_obj      = 0.0;
@@ -591,6 +623,8 @@ public:
         bool s5    = false;
         bool ss    = false;
         int  stage = 1;
+
+        bool TRstop = false;
 
         bool misprice = true;
 
@@ -637,7 +671,7 @@ public:
             node->chgCoeff(constrs[i], w[i], -1);
             node->chgCoeff(constrs[i], zeta[i], 1);
         }
-        double              v                   = 40;
+        double              v                   = 100;
         bool                isInsideTrustRegion = false;
         std::vector<double> delta1;
         std::vector<double> delta2;
@@ -676,18 +710,15 @@ public:
                 print_cut("Testing RCC feasibility..\n");
                 rcc                      = RCCsep(node, solution, cvrsep_ctrs);
                 bucket_graph.rcc_manager = &rccManager;
-                if (rcc) { duals = getDuals(node); }
 
 #endif
                 auto cuts_before = cuts.size();
-                print_info("Removing most negative reduced cost variables\n");
-                //   removeNegativeReducedCostVarsAndPaths(node);
                 node->optimize();
-                highs_obj         = node->get(GRB_DoubleAttr_ObjVal);
-                solution          = extractSolution(node);
-                auto matrixSparse = extractModelDataSparse(node);
-                r1c.allPaths      = allPaths;
-                r1c.separate(matrixSparse.A_sparse, solution, N_SIZE - 2, 1e-3);
+                highs_obj = node->get(GRB_DoubleAttr_ObjVal);
+                solution  = extractSolution(node);
+                // auto matrixSparse = extractModelDataSparse(node);
+                r1c.allPaths = allPaths;
+                r1c.separate(matrix.A_sparse, solution);
 #ifdef SRC
                 // r1c.the45Heuristic<CutType::FourRow>(matrixSparse.A_sparse, solution, N_SIZE - 2);
                 // r1c.the45Heuristic<CutType::FiveRow>(matrixSparse.A_sparse, solution, N_SIZE - 2);
@@ -701,31 +732,46 @@ public:
             }
 #endif
 
-            changed = cutHandler(r1c, node, constraints);
-            cuts    = r1c.cutStorage;
+            changed = cutHandler(r1c, node, SRCconstraints);
+            if (changed) { matrix = extractModelDataSparse(node); }
+
+            cuts = r1c.cutStorage;
 
 #ifdef TR
-            isInsideTrustRegion = true;
-            for (int i = 0; i < numConstrs; i++) {
-                if (jobDuals[i] < delta1[i] || jobDuals[i] > delta2[i]) { isInsideTrustRegion = false; }
-            }
-            if (isInsideTrustRegion) { fmt::print("Fall inside trust region\n"); }
-            if (isInsideTrustRegion) {
-                v -= 1;
-                epsilon1 += 100;
-                epsilon2 += 100;
+            if (!TRstop) {
+                isInsideTrustRegion = true;
                 for (int i = 0; i < numConstrs; i++) {
-                    // Update coefficients for w[i] and zeta[i] in the objective function
-                    w[i].set(GRB_DoubleAttr_Obj, jobDuals[i]);        // Set w[i]'s coefficient to -delta1
-                    zeta[i].set(GRB_DoubleAttr_Obj, jobDuals[i] + v); // Set zeta[i]'s coefficient to delta2
-                    w[i].set(GRB_DoubleAttr_UB, epsilon1);
-                    zeta[i].set(GRB_DoubleAttr_UB, epsilon2);
+                    if (jobDuals[i] < delta1[i] || jobDuals[i] > delta2[i]) { isInsideTrustRegion = false; }
+                }
+                // if (isInsideTrustRegion) { fmt::print("Fall inside trust region\n"); }
+                if (isInsideTrustRegion) {
+                    v -= 1;
+                    // print v
+                    fmt::print("Reducing v to {}\n", v);
+                    epsilon1 += 100;
+                    epsilon2 += 100;
+                    for (int i = 0; i < numConstrs; i++) {
+                        // Update coefficients for w[i] and zeta[i] in the objective function
+                        w[i].set(GRB_DoubleAttr_Obj, jobDuals[i]);        // Set w[i]'s coefficient to -delta1
+                        zeta[i].set(GRB_DoubleAttr_Obj, jobDuals[i] + v); // Set zeta[i]'s coefficient to delta2
+                        w[i].set(GRB_DoubleAttr_UB, epsilon1);
+                        zeta[i].set(GRB_DoubleAttr_UB, epsilon2);
+                    }
+                }
+                for (int i = 0; i < numConstrs; i++) {
+                    delta1[i] = jobDuals[i] - v;
+                    delta2[i] = jobDuals[i] + v;
+                }
+                if (v <= 25) {
+                    for (int i = 0; i < w.size(); i++) {
+                        node->remove(w[i]);
+                        node->remove(zeta[i]);
+                    }
+                    TRstop = true;
+                    node->update();
                 }
             }
-            for (int i = 0; i < numConstrs; i++) {
-                delta1[i] = jobDuals[i] - v;
-                delta2[i] = jobDuals[i] + v;
-            }
+
 #endif
 
 #ifdef IPM
@@ -746,15 +792,12 @@ public:
 #endif
 
 #ifdef STAB
-            auto matrixSparse = extractModelDataSparse(node);
+            // auto matrixSparse = extractModelDataSparse(node);
             node->optimize();
-            highs_obj        = node->get(GRB_DoubleAttr_ObjVal);
-            auto dual_obj    = node->get(GRB_DoubleAttr_ObjBound);
-            jobDuals         = getDuals(node);
-            auto originDuals = jobDuals;
+            highs_obj     = node->get(GRB_DoubleAttr_ObjVal);
+            auto dual_obj = node->get(GRB_DoubleAttr_ObjBound);
+            jobDuals      = getDuals(node);
 
-            // get from jobDuals only the first sizeDuals
-            jobDuals = std::vector<double>(jobDuals.begin(), jobDuals.begin() + sizeDuals);
             stab.update_stabilization_after_master_optim(jobDuals);
 
             misprice = true;
@@ -784,13 +827,12 @@ public:
                 bucket_graph.relaxation = highs_obj;
 
                 if (cuts.size() > 0) {
-                    cutDuals = std::vector<double>(originDuals.begin() + numConstrs, originDuals.end());
+                    auto duals = node->get(GRB_DoubleAttr_Pi, SRCconstraints.data(), SRCconstraints.size());
+                    cutDuals.assign(duals, duals + SRCconstraints.size());
                     cuts.setDuals(cutDuals);
                 }
 
-                auto onlyJobDuals =
-                    std::vector<double>(jobDuals.begin(), jobDuals.begin() + bucket_graph.getJobs().size());
-                bucket_graph.setDuals(onlyJobDuals);
+                bucket_graph.setDuals(jobDuals);
 
                 //////////////////////////////////////////////////////////////////////
                 // CALLING BALDES
@@ -814,7 +856,7 @@ public:
 #endif
 
 #ifdef STAB
-                stab.update_stabilization_after_pricing_optim(matrixSparse, jobDuals, lag_gap, paths);
+                stab.update_stabilization_after_pricing_optim(matrix, jobDuals, lag_gap, paths);
 
                 if (colAdded == 0) {
                     stab.update_stabilization_after_misprice();
@@ -837,7 +879,7 @@ public:
             cur_alpha = stab.base_alpha;
 #endif
             if (iter % 10 == 0)
-                fmt::print("| It.: {:4} | Obj.: {:8.2f} | Pricing: {:10.2f} | Cuts: {:4} | Paths: {:4} | "
+                fmt::print("| It.: {:4} | Obj.: {:8.2f} | Price: {:9.2f} | Cuts: {:4} | Paths: {:4} | "
                            "Stage: {:1} | "
                            "Lag. Gap: {:10.4f} | RCC: {:4} | alpha: {:4.2f} | \n",
                            iter, highs_obj, inner_obj, cuts.size(), paths.size(), stage, lag_gap, rcc, cur_alpha);
