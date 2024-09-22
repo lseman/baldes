@@ -229,108 +229,11 @@ int BucketGraph::RIH2(std::priority_queue<Label *, std::vector<Label *>, LabelCo
                     elapsed_time = new_time + jobs[to].duration;
                 }
 
-                if (!feasible) {
-                    // label_pool_fw.release(new_label);
-                    continue;
-                }
+                if (!feasible) { continue; }
             }
 
             // If the new label's cost is better, push it to the output queue
-            if (new_label->cost < current_label->cost) {
-                best_labels_out.push(new_label);
-            } else {
-                // label_pool_fw.release(new_label); // Release unused labels to avoid memory leaks
-            }
-        }
-    }
-
-    return 1;
-}
-
-/* Improvement heuristics based on changing the position of customers */
-/* Operation 3: swap operator */
-/**2(std::priority_queue<Label *, std::vector<Label *>, LabelComparator> &best_labels_in,
-                      std::priority_queue<Label *, std::vector<Label *>, LabelComparator> &best_labels_out,
-                      int                                                                  max_n_labels) {
-
-    int iter = 0;
-
-    while (!best_labels_in.empty() && iter < max_n_labels && !merged_labels.empty()) {
-        iter++;
-
-        Label *current_label = best_labels_in.top();
-        best_labels_in.pop();
-
-        // Remove similar labels from the queue
-        while (!best_labels_in.empty() && best_labels_in.top()->cost < current_label->cost + RCESPP_TOL_ZERO) {
-            best_labels_in.pop();
-        }
-
-        // If the label has no jobs covered or only one job covered, skip it
-        if (current_label->jobs_covered.size() <= 3) { continue; }
-
-        // Iterate over each customer in the route, skipping the first and last (which are depots)
-        for (size_t i = 1; i < current_label->jobs_covered.size() - 1; ++i) {
-
-            // Reuse the current label to avoid full reinitialization
-            Label *new_label = label_pool_fw.acquire();
-            new_label->initialize(current_label->vertex, current_label->cost, {current_label->resources[0]},
-                                  current_label->job_id);
-
-            // Copy jobs covered except the i-th job (the customer to delete)
-            new_label->jobs_covered.clear();
-            new_label->jobs_covered.reserve(current_label->jobs_covered.size() -
-                                            1); // Reserve space to avoid reallocations
-            for (size_t j = 0; j < current_label->jobs_covered.size(); ++j) {
-                if (j != i) { new_label->jobs_covered.push_back(current_label->jobs_covered[j]); }
-            }
-
-            // Efficient recalculation of the route cost by only recalculating the affected segments
-            new_label->cost      = current_label->cost;
-            new_label->real_cost = current_label->real_cost;
-
-            // Handle the two affected segments (before and after the removed customer)
-            if (i > 0 && i < current_label->jobs_covered.size() - 1) {
-                int prev = current_label->jobs_covered[i - 1]; // Job before the removed one
-                int next = current_label->jobs_covered[i + 1]; // Job after the removed one
-
-                // Recalculate the cost difference from removing the i-th job
-                auto original_cost =
-                    getcij(prev, current_label->jobs_covered[i]) + getcij(current_label->jobs_covered[i], next);
-                auto new_cost = getcij(prev, next);
-
-                new_label->cost += new_cost - original_cost;      // Adjust the cost
-                new_label->real_cost += new_cost - original_cost; // Adjust the real cost
-
-                // Check for feasibility: ensure the new route is within time constraints
-                double elapsed_time = 0.0;
-                bool   feasible     = true;
-                for (size_t j = 0; j < new_label->jobs_covered.size() - 1; ++j) {
-                    int    from           = new_label->jobs_covered[j];
-                    int    to             = new_label->jobs_covered[j + 1];
-                    double cost_increment = getcij(from, to);
-
-                    double new_time = elapsed_time + cost_increment;
-                    if (new_time > jobs[to].end_time) {
-                        feasible = false; // Infeasible if exceeding time windows
-                        break;
-                    }
-                    if (new_time < jobs[to].start_time) { new_time = jobs[to].start_time; }
-                    elapsed_time = new_time + jobs[to].duration;
-                }
-
-                if (!feasible) {
-                    // label_pool_fw.release(new_label);
-                    continue;
-                }
-            }
-
-            // If the new label's cost is better, push it to the output queue
-            if (new_label->cost < current_label->cost) {
-                best_labels_out.push(new_label);
-            } else {
-                // label_pool_fw.release(new_label); // Release unused labels to avoid memory leaks
-            }
+            if (new_label->cost < current_label->cost) { best_labels_out.push(new_label); }
         }
     }
 
