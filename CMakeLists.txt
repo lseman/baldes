@@ -7,13 +7,21 @@ project(BALDES)
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
 
+# Enable Interprocedural Optimization (Link Time Optimization)
+set(CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE ON)
+
 # Include directories
 include_directories(include)
-include_directories(/usr/include/suitesparse/)
 
-# Enable release build
-set(CMAKE_BUILD_TYPE Debug)
-set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3")
+# Build types and flags
+if(NOT CMAKE_BUILD_TYPE)
+  set(CMAKE_BUILD_TYPE
+      "RelWithDebInfo"
+      CACHE STRING "Choose the type of build." FORCE)
+endif()
+set(CMAKE_CXX_FLAGS_RELEASE "-O3 -march=native -flto -funroll-loops")
+set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "-O3 -g -march=native -flto -funroll-loops")
+set(CMAKE_CXX_FLAGS_DEBUG "-Og -g -Wall -Wextra")
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
@@ -121,7 +129,7 @@ if(GET_SUITESPARSE)
     "BUILD_METIS OFF")
   # Specify only CHOLMOD build
   set(SUITESPARSE_BUILDS "CHOLMOD")
-  set(SUITESPARSE_CONFIG_ONLY TRZUE)
+  set(SUITESPARSE_CONFIG_ONLY TRUE)
 endif()
 
 find_package(TBB)
@@ -148,6 +156,8 @@ if(GET_TBB)
 endif()
 
 if(IPM)
+  include_directories(/usr/include/suitesparse/)
+
   cpmaddpackage(NAME Eigen GIT_REPOSITORY https://gitlab.com/libeigen/eigen.git
                 GIT_TAG 3.4.0)
   include_directories(${EIGEN_SOURCE_DIR})
@@ -216,6 +226,7 @@ if(IPM)
 endif()
 
 set(GUROBI_VERSION_MAJOR 110) # Adjust based on Gurobi version
+message(STATUS "Gurobi version: ${GUROBI_VERSION_MAJOR}")
 
 # Link Gurobi libraries
 target_link_libraries(

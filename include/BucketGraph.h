@@ -185,6 +185,7 @@ public:
      * SRC: <enabled/disabled>
      * +----------------------------------+
      */
+    // TODO: add more configuration details
     void initInfo() {
 
         // Print header
@@ -407,20 +408,9 @@ public:
         fixed_arcs.resize(getJobs().size());
         for (int i = 0; i < getJobs().size(); ++i) { fixed_arcs[i].resize(getJobs().size()); }
 
-        // make every fixed_buckets also have size buckets.size()
-        fw_fixed_buckets.resize(fw_buckets.size());
-        bw_fixed_buckets.resize(fw_buckets.size());
-
-        for (auto &fb : fw_fixed_buckets) { fb.resize(fw_buckets.size()); }
-        for (auto &bb : bw_fixed_buckets) { bb.resize(bw_buckets.size()); }
-        // set fixed_buckets to 0
-        for (auto &fb : fw_fixed_buckets) {
-            for (std::size_t i = 0; i < fb.size(); ++i) { fb[i] = 0; }
-        }
-        for (auto &bb : bw_fixed_buckets) {
-            for (std::size_t i = 0; i < bb.size(); ++i) { bb[i] = 0; }
-        }
-
+        // Resize and initialize fw_fixed_buckets and bw_fixed_buckets for std::vector<bool>
+        fw_fixed_buckets.assign(fw_buckets.size(), std::vector<bool>(fw_buckets.size(), false));
+        bw_fixed_buckets.assign(fw_buckets.size(), std::vector<bool>(fw_buckets.size(), false));
         // define initial relationships
         set_adjacency_list();
         generate_arcs();

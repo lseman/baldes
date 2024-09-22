@@ -1352,27 +1352,25 @@ inline ModelData extractModelDataSparse(GRBModel *model) {
         // Variables
         int     numVars = model->get(GRB_IntAttr_NumVars);
         GRBVar *vars    = model->getVars();
+
+        // Reserve memory to avoid frequent reallocations
+        data.ub.reserve(numVars);
+        data.lb.reserve(numVars);
+        data.c.reserve(numVars);
+        data.vtype.reserve(numVars);
+        data.name.reserve(numVars);
+
         for (int i = 0; i < numVars; ++i) {
-            if (vars[i].get(GRB_DoubleAttr_UB) > 1e10) {
-                data.ub.push_back(std::numeric_limits<double>::infinity());
-            } else {
-                data.ub.push_back(vars[i].get(GRB_DoubleAttr_UB));
-            }
-            if (vars[i].get(GRB_DoubleAttr_LB) < -1e10) {
-                data.lb.push_back(-std::numeric_limits<double>::infinity());
-            } else {
-                data.lb.push_back(vars[i].get(GRB_DoubleAttr_LB));
-            }
+            double ub = vars[i].get(GRB_DoubleAttr_UB);
+            data.ub.push_back(ub > 1e10 ? std::numeric_limits<double>::infinity() : ub);
+
+            double lb = vars[i].get(GRB_DoubleAttr_LB);
+            data.lb.push_back(lb < -1e10 ? -std::numeric_limits<double>::infinity() : lb);
+
             data.c.push_back(vars[i].get(GRB_DoubleAttr_Obj));
 
-            auto type = vars[i].get(GRB_CharAttr_VType);
-            if (type == GRB_BINARY) {
-                data.vtype.push_back('B');
-            } else if (type == GRB_INTEGER) {
-                data.vtype.push_back('I');
-            } else {
-                data.vtype.push_back('C');
-            }
+            char type = vars[i].get(GRB_CharAttr_VType);
+            data.vtype.push_back(type);
 
             data.name.push_back(vars[i].get(GRB_StringAttr_VarName));
         }
@@ -1380,23 +1378,32 @@ inline ModelData extractModelDataSparse(GRBModel *model) {
         // Constraints
         int         numConstrs = model->get(GRB_IntAttr_NumConstrs);
         SparseModel A_sparse;
+
+        // Reserve memory for constraint matrices
+        A_sparse.row_indices.reserve(numConstrs * 10); // Estimate 10 non-zeros per row
+        A_sparse.col_indices.reserve(numConstrs * 10);
+        A_sparse.values.reserve(numConstrs * 10);
+        data.b.reserve(numConstrs);
+        data.cname.reserve(numConstrs);
+        data.sense.reserve(numConstrs);
+
         for (int i = 0; i < numConstrs; ++i) {
             GRBConstr  constr = model->getConstr(i);
             GRBLinExpr expr   = model->getRow(constr);
-            for (int j = 0; j < expr.size(); ++j) {
+
+            int exprSize = expr.size();
+            for (int j = 0; j < exprSize; ++j) {
                 GRBVar var      = expr.getVar(j);
                 double coeff    = expr.getCoeff(j);
                 int    varIndex = var.index();
                 A_sparse.row_indices.push_back(i);
                 A_sparse.col_indices.push_back(varIndex);
                 A_sparse.values.push_back(coeff);
-                // Debug print for row, col, value
             }
 
             data.cname.push_back(constr.get(GRB_StringAttr_ConstrName));
+            data.b.push_back(constr.get(GRB_DoubleAttr_RHS));
 
-            double rhs = constr.get(GRB_DoubleAttr_RHS);
-            data.b.push_back(rhs);
             char sense = constr.get(GRB_CharAttr_Sense);
             data.sense.push_back(sense == GRB_LESS_EQUAL ? '<' : (sense == GRB_GREATER_EQUAL ? '>' : '='));
         }

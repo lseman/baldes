@@ -40,40 +40,6 @@
 using Cuts = std::vector<Cut>;
 
 /**
- * @brief Generates a hash value for a given double and index.
- *
- * This function converts a double value to a string with 17 decimal places of precision,
- * then hashes the resulting string and combines it with the provided index using a bitwise XOR operation.
- *
- * @param value The double value to be hashed.
- * @param index The index to combine with the hash of the double value.
- * @return A size_t representing the combined hash value.
- */
-inline std::size_t hash_double(double value, std::size_t index) {
-    std::ostringstream oss;
-    oss << std::fixed << std::setprecision(17) << value; // 17 decimal places precision
-    std::string double_str = oss.str();
-    return std::hash<std::string>{}(double_str) ^ (index * 0x9e3779b9); // Combine with index
-}
-
-/**
- * @brief Combines a hash value with an existing seed.
- *
- * This function takes an existing seed and a value, computes the hash of the value,
- * and combines it with the seed to produce a new hash value. This is useful for
- * creating composite hash values from multiple inputs.
- *
- * @tparam T The type of the value to be hashed.
- * @param seed A reference to the existing seed to be combined with the hash of the value.
- * @param value The value to be hashed and combined with the seed.
- */
-template <typename T>
-inline void hash_combine(std::size_t &seed, const T &value) {
-    std::hash<T> hasher;
-    seed ^= hasher(value) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
-}
-
-/**
  * @brief Computes a unique cut key based on the provided base set and multipliers.
  *
  * This function generates a hash value that uniquely identifies the combination
@@ -379,7 +345,6 @@ void LimitedMemoryRank1Cuts::generateCutCoefficients(VRPTW_SRC &cuts, std::vecto
                 }
 #else
 
-                // Process violated nodes to update AM
                 std::unordered_set<int> C_set(C_index.begin(), C_index.end());
                 for (auto node : remainingNodes) {
                     auto &consumers = allPaths[node]; // Reference to the consumers for in-place modification
@@ -387,7 +352,8 @@ void LimitedMemoryRank1Cuts::generateCutCoefficients(VRPTW_SRC &cuts, std::vecto
                     int first = -1, second = -1;
 
                     // Find the first and second appearances of any element in C_set within consumers
-                    for (size_t i = 1; i < consumers.size() - 1; ++i) {
+                    for (size_t i = 1; i < consumers.size() - 1;
+                         ++i) { // Adjusted to start from 0 and iterate through the entire vector
                         if (C_set.find(consumers[i]) != C_set.end()) {
                             if (first == -1) {
                                 first = i;

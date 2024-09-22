@@ -95,7 +95,7 @@ inline std::vector<Label *> BucketGraph::solve() {
         inner_obj = paths[0]->cost;
 
         // Transition from Stage 3 to Stage 4 if the objective improves significantly
-        if (inner_obj >= -1e-2) {
+        if (inner_obj >= -0.5) {
             s4         = true;
             s3         = false;
             transition = true; // Prepare for transition to Stage 4
@@ -240,11 +240,14 @@ std::vector<double> BucketGraph::labeling_algorithm(std::vector<double> q_point,
                             if (!dominated) {
                                 // Remove dominated labels from the bucket
                                 if constexpr (S != Stage::Enumerate) {
+                                    std::vector<Label *> labels_to_remove;
                                     for (auto *existing_label : to_bucket_labels) {
                                         if (is_dominated<D, S>(existing_label, new_label)) {
-                                            buckets[to_bucket].remove_label(existing_label);
+                                            labels_to_remove.push_back(existing_label);
                                         }
                                     }
+                                    // Now remove all marked labels in one pass
+                                    for (auto *label : labels_to_remove) { buckets[to_bucket].remove_label(label); }
                                 }
 
                                 n_labels++; // Increment the count of labels added
@@ -423,15 +426,6 @@ std::vector<Label *> BucketGraph::bi_labeling_algorithm(std::vector<double> q_st
                 // Get the bucket for the extended label
                 auto b_prime = L_prime->vertex;
 
-#ifdef FIX_BUCKETS
-                // If in Stage 4, skip labels in fixed buckets
-                if constexpr (S == Stage::Four) {
-                    if (fw_fixed_buckets[bucket][b_prime] == 1) {
-                        continue; // Skip if the bucket is fixed
-                    }
-                }
-#endif
-
                 // Clear visited buckets tracking for this new label extension
                 std::memset(Bvisited.data(), 0, Bvisited.size() * sizeof(uint64_t));
 
@@ -449,7 +443,7 @@ std::vector<Label *> BucketGraph::bi_labeling_algorithm(std::vector<double> q_st
     // If we are in Stage 2 or above, we run the RIH (Route Improvement Heuristic) in the background
     const int LABELS_MAX = 2; // Set a maximum of 2 labels to be improved
 
-    if constexpr (S >= Stage::Two) {
+    if constexpr (S > Stage::Two) {
         // Launch the RIH process asynchronously on a separate thread
         rih_thread = std::thread(&BucketGraph::async_rih_processing, this, merged_labels, LABELS_MAX);
         rih_thread.detach(); // Detach the thread so it runs in the background
@@ -536,24 +530,21 @@ BucketGraph::Extend(const std::conditional_t<M == Mutability::Mut, Label *, cons
     // Get the VRP job corresponding to job_id
     const VRPJob &VRPJob = jobs[job_id];
 
-    // Initialize new resources based on the arc's resource increments
+    // Initialize new resources based on the arc's resource increments and check feasibility
     std::vector<double> new_resources(initial_resources.size());
     for (size_t i = 0; i < initial_resources.size(); ++i) {
         if constexpr (D == Direction::Forward) {
             new_resources[i] =
                 std::max(initial_resources[i] + gamma.resource_increment[i], static_cast<double>(VRPJob.lb[i]));
+            if (new_resources[i] > VRPJob.ub[i]) {
+                return nullptr; // Forward: Exceeds upper bound
+            }
         } else {
             new_resources[i] =
                 std::min(initial_resources[i] - gamma.resource_increment[i], static_cast<double>(VRPJob.ub[i]));
-        }
-    }
-
-    // Ensure the new resources are within the job's resource bounds
-    for (size_t i = 0; i < new_resources.size(); ++i) {
-        if constexpr (D == Direction::Forward) {
-            if (new_resources[i] > VRPJob.ub[i]) { return nullptr; } // Forward: Exceeds upper bound
-        } else {
-            if (new_resources[i] < VRPJob.lb[i]) { return nullptr; } // Backward: Below lower bound
+            if (new_resources[i] < VRPJob.lb[i]) {
+                return nullptr; // Backward: Below lower bound
+            }
         }
     }
 
@@ -740,6 +731,7 @@ inline bool BucketGraph::is_dominated(Label *&new_label, Label *&label) noexcept
         }
     }
 
+    // TODO:: check again this unreachable dominance
 #ifndef UNREACHABLE_DOMINANCE
     // Check visited jobs (bitmap comparison) for Stages 3, 4, and Enumerate
     if constexpr (S == Stage::Three || S == Stage::Four || S == Stage::Enumerate) {
@@ -803,21 +795,18 @@ inline bool precedes(const std::vector<std::vector<T>> &sccs, const T &a, const 
     for (auto it = sccs.begin(); it != sccs.end(); ++it) {
         const auto &scc = *it;
 
-        // Use std::find once for each SCC, checking both a and b in the same iteration
-        auto it_a = std::find(scc.begin(), scc.end(), a);
-        auto it_b = std::find(scc.begin(), scc.end(), b);
+        // Check if both `a` and `b` are in the current SCC
+        bool found_a = (std::find(scc.begin(), scc.end(), a) != scc.end());
+        bool found_b = (std::find(scc.begin(), scc.end(), b) != scc.end());
 
-        if (it_a != scc.end()) { it_scc_a = it; }
-        if (it_b != scc.end()) { it_scc_b = it; }
+        if (found_a) it_scc_a = it;
+        if (found_b) it_scc_b = it;
 
-        // If both are found in the same SCC, return false
-        if (it_scc_a == it_scc_b && it_scc_a != sccs.end()) { return false; }
-
-        // Early exit if both are found in different SCCs
+        // If both are found in different SCCs, determine precedence
         if (it_scc_a != sccs.end() && it_scc_b != sccs.end()) { return it_scc_a < it_scc_b; }
     }
 
-    // If a and/or b are not found, return false
+    // Return false if a and b are in the same SCC or not found
     return false;
 }
 
@@ -868,11 +857,17 @@ inline bool BucketGraph::DominatedInCompWiseSmallerBuckets(Label *L, int bucket,
         if (b_L != currentBucket) {
             const auto &bucket_labels = buckets[currentBucket].get_labels(); // Get the labels in the current bucket
             // Iterate over each label in the current bucket and check if it dominates L
+
+#ifndef AVX
+
             for (auto *label : bucket_labels) {
                 if (is_dominated<D, S>(L, label)) {
                     return true; // If any label dominates L, return true
                 }
             }
+#else
+            if (check_dominance_against_vector<D, S>(L, bucket_labels)) { return true; }
+#endif
         }
 
         // Add the neighboring buckets (from Phi) to the stack if they haven't been visited yet

@@ -1,18 +1,13 @@
 #include "../include/Definitions.h"
 
-#include "cholmod.h"
-#include "gurobi_c++.h"
-
 #define EIGEN_INITIALIZE_MATRICES_BY_ZERO
 
 #include <Eigen/Dense>
 #include <Eigen/Sparse>
 #include <algorithm>
-#include <iostream>
 #include <limits>
 #include <omp.h>
 #include <stdexcept>
-#include <tuple>
 #include <vector>
 
 #include "IPSolver.h"

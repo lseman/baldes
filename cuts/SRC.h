@@ -245,8 +245,6 @@ struct SparseModel;
  */
 class LimitedMemoryRank1Cuts {
 public:
-    std::vector<std::vector<double>> separateByEnumeration(const SparseModel &A, const std::vector<double> &x, int nC,
-                                                           double violation_threshold);
     LimitedMemoryRank1Cuts(std::vector<VRPJob> &jobs, CutType cutType);
 
     CutStorage cutStorage;

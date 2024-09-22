@@ -14,6 +14,8 @@
 #pragma once
 
 #include <functional>
+#include <iomanip>
+#include <sstream>
 #include <utility>
 
 /**
@@ -71,3 +73,37 @@ struct std::hash<std::pair<std::pair<int, int>, int>> {
         return inner_hash ^ (b_hash << 1);
     }
 };
+
+/**
+ * @brief Generates a hash value for a given double and index.
+ *
+ * This function converts a double value to a string with 17 decimal places of precision,
+ * then hashes the resulting string and combines it with the provided index using a bitwise XOR operation.
+ *
+ * @param value The double value to be hashed.
+ * @param index The index to combine with the hash of the double value.
+ * @return A size_t representing the combined hash value.
+ */
+inline std::size_t hash_double(double value, std::size_t index) {
+    std::ostringstream oss;
+    oss << std::fixed << std::setprecision(17) << value; // 17 decimal places precision
+    std::string double_str = oss.str();
+    return std::hash<std::string>{}(double_str) ^ (index * 0x9e3779b9); // Combine with index
+}
+
+/**
+ * @brief Combines a hash value with an existing seed.
+ *
+ * This function takes an existing seed and a value, computes the hash of the value,
+ * and combines it with the seed to produce a new hash value. This is useful for
+ * creating composite hash values from multiple inputs.
+ *
+ * @tparam T The type of the value to be hashed.
+ * @param seed A reference to the existing seed to be combined with the hash of the value.
+ * @param value The value to be hashed and combined with the seed.
+ */
+template <typename T>
+inline void hash_combine(std::size_t &seed, const T &value) {
+    std::hash<T> hasher;
+    seed ^= hasher(value) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+}
