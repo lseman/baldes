@@ -599,7 +599,7 @@ public:
      * @param duals A vector of double values representing the duals to be set.
      */
     void setDuals(const std::vector<double> &duals) {
-        for (size_t i = 1; i < duals.size(); ++i) { jobs[i].setDuals(duals[i - 1]); }
+        for (size_t i = 1; i < N_SIZE - 1; ++i) { jobs[i].setDuals(duals[i - 1]); }
     }
 
     /**

@@ -245,7 +245,7 @@ struct SparseModel;
  */
 class LimitedMemoryRank1Cuts {
 public:
-    LimitedMemoryRank1Cuts(std::vector<VRPJob> &jobs, CutType cutType);
+    LimitedMemoryRank1Cuts(std::vector<VRPJob> &jobs);
 
     CutStorage cutStorage;
 
@@ -254,10 +254,9 @@ public:
 
     std::vector<std::vector<int>>    labels;
     int                              labels_counter = 0;
-    std::vector<std::vector<double>> separate(const SparseModel &A, const std::vector<double> &x, int nC,
-                                              double violation_threshold);
+    std::vector<std::vector<double>> separate(const SparseModel &A, const std::vector<double> &x);
     void insertSet(VRPTW_SRC &cuts, int i, int j, int k, const std::vector<int> &buffer_int, int buffer_int_n,
-                   double LHS_cut, double violation_threshold);
+                   double LHS_cut);
 
     void generateCutCoefficients(VRPTW_SRC &cuts, std::vector<std::vector<double>> &coefficients, int numNodes,
                                  const SparseModel &A, const std::vector<double> &x);

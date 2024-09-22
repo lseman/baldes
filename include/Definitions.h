@@ -1421,5 +1421,69 @@ inline ModelData extractModelDataSparse(GRBModel *model) {
     return data;
 }
 
+inline GRBModel createDualModel(GRBEnv *env, const ModelData &primalData) {
+    try {
+        // Create new model for the dual problem
+        GRBModel dualModel = GRBModel(*env);
+
+        // Dual variables: These correspond to the primal constraints
+        std::vector<GRBVar> y;
+        y.reserve(primalData.b.size());
+
+        // Create dual variables and set their bounds based on primal constraint senses
+        for (size_t i = 0; i < primalData.b.size(); ++i) {
+            GRBVar dualVar;
+            char   sense = primalData.sense[i];
+            if (sense == '<') {
+                // Dual variable for primal <= constraint, non-negative
+                dualVar = dualModel.addVar(0.0, GRB_INFINITY, primalData.b[i], GRB_CONTINUOUS,
+                                           "y[" + std::to_string(i) + "]");
+            } else if (sense == '>') {
+                // Dual variable for primal >= constraint, non-positive
+                dualVar = dualModel.addVar(-GRB_INFINITY, 0.0, primalData.b[i], GRB_CONTINUOUS,
+                                           "y[" + std::to_string(i) + "]");
+            } else if (sense == '=') {
+                // Dual variable for primal = constraint, free
+                dualVar = dualModel.addVar(-GRB_INFINITY, GRB_INFINITY, primalData.b[i], GRB_CONTINUOUS,
+                                           "y[" + std::to_string(i) + "]");
+            }
+            y.push_back(dualVar);
+        }
+
+        dualModel.update();
+
+        // Dual objective: Maximize b^T y
+        GRBLinExpr dualObjective = 0;
+        for (size_t i = 0; i < primalData.b.size(); ++i) { dualObjective += primalData.b[i] * y[i]; }
+        dualModel.setObjective(dualObjective, GRB_MAXIMIZE);
+
+        // Dual constraints: These correspond to primal variables
+        for (int j = 0; j < primalData.A_sparse.num_cols; ++j) {
+            GRBLinExpr lhs = 0;
+            // Iterate over the rows (constraints) that involve variable x_j
+            for (size_t i = 0; i < primalData.A_sparse.row_indices.size(); ++i) {
+                if (primalData.A_sparse.col_indices[i] == j) {
+                    lhs += primalData.A_sparse.values[i] * y[primalData.A_sparse.row_indices[i]];
+                }
+            }
+            // Add dual constraint: lhs >= primalData.c[j] for primal variable x_j
+            char vtype = primalData.vtype[j];
+            if (vtype == GRB_CONTINUOUS) {
+                dualModel.addConstr(lhs == primalData.c[j], "dual_constr[" + std::to_string(j) + "]");
+            } else if (vtype == GRB_BINARY || vtype == GRB_INTEGER) {
+                // Handle integer/binary variables accordingly (if necessary)
+                dualModel.addConstr(lhs >= primalData.c[j], "dual_constr[" + std::to_string(j) + "]");
+            }
+        }
+
+        dualModel.update();
+        return dualModel;
+
+    } catch (GRBException &e) {
+        std::cerr << "Error: " << e.getErrorCode() << " - " << e.getMessage() << std::endl;
+        throw;
+    }
+}
+
 using DualSolution = std::vector<double>;
 using ArcVariant   = std::variant<Arc, BucketArc>;

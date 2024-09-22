@@ -43,7 +43,8 @@ inline std::vector<Label *> BucketGraph::solve() {
     // ADAPTIVE TERMINAL TIME
     //////////////////////////////////////////////////////////////////////
     // Adjust the terminal time dynamically based on the difference between the number of forward and backward labels
-    for (auto split : q_star) {
+    for (auto &split : q_star) {
+        // print n_fw_labels and n_bw_labels
         // If there are more backward labels than forward labels, increase the terminal time slightly
         if (((static_cast<double>(n_bw_labels) - static_cast<double>(n_fw_labels)) / static_cast<double>(n_fw_labels)) >
             0.05) {
@@ -559,6 +560,7 @@ BucketGraph::Extend(const std::conditional_t<M == Mutability::Mut, Label *, cons
 #endif
 
 #ifdef RCC
+    /*
     // Get dual sum from RCC manager if available
     double cvrpsep_dual = 0.0;
     if constexpr (D == Direction::Forward) {
@@ -566,6 +568,7 @@ BucketGraph::Extend(const std::conditional_t<M == Mutability::Mut, Label *, cons
     } else {
         cvrpsep_dual = rcc_manager->getCachedDualSumForArc(job_id, initial_job_id);
     }
+    */
 #endif
 
     // Compute travel cost between the initial and current jobs
@@ -574,7 +577,7 @@ BucketGraph::Extend(const std::conditional_t<M == Mutability::Mut, Label *, cons
 
 #ifdef RCC
     // Adjust the cost using the cached dual sum from RCC (if applicable)
-    new_cost -= cvrpsep_dual;
+    // new_cost -= cvrpsep_dual;
 #endif
 
 #ifdef KP_BOUND
