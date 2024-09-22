@@ -183,12 +183,12 @@ public:
 
     void factorizeMatrix(const Eigen::SparseMatrix<double, Eigen::ColMajor, int> &matrix) {
         if (firstFactorization) {
-            A = matrix;
-            solver->factorizeMatrix(A);
+            // A = matrix;
+            solver->factorizeMatrix(matrix);
             firstFactorization = false;
         } else {
-            A = matrix;
-            solver->factorizeMatrix(A);
+            // A = matrix;
+            solver->factorizeMatrix(matrix);
         }
     }
 

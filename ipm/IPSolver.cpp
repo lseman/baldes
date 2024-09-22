@@ -230,6 +230,7 @@ void IPSolver::solve_augmented_system(Eigen::VectorXd &dx, Eigen::VectorXd &dy, 
     Eigen::VectorXd d = 1.0 / (ls.theta.array() + ls.regP.array());
     // Eigen::VectorXd xi_ = xi_p; // + ls.A * (d.asDiagonal() * xi_d);
 
+    // print ls.A size
     Eigen::MatrixXd             dDense  = d.asDiagonal();
     Eigen::SparseMatrix<double> dSparse = dDense.sparseView();
     Eigen::SparseMatrix<double> AD(ls.A.rows(), dSparse.cols());
@@ -250,24 +251,10 @@ void IPSolver::solve_augmented_system(Eigen::VectorXd &dx, Eigen::VectorXd &dy, 
     dy = ls.solve(xi_);
 
     // Recover dx
-    // dx = d.asDiagonal() * (ls.A.transpose() * dy - xi_d);
-    dx = AD.transpose() * dy;
-
-    Eigen::SparseMatrix<double> ADxi_d(ls.A.cols(), xi_d.size()); // Adjust size for the transpose
-    for (int k = 0; k < ls.A.outerSize(); ++k) {
-        for (Eigen::SparseMatrix<double>::InnerIterator it(ls.A, k); it; ++it) {
-            // Now `it.col()` becomes the "row" in the transposed matrix
-            int row = it.col();
-            int col = it.row();
-            for (Eigen::SparseMatrix<double>::InnerIterator jt(dSparse, col); jt; ++jt) {
-                int target_col = jt.col();
-                ADxi_d.coeffRef(row, target_col) += it.value() * jt.value();
-            }
-        }
-    }
-
-    dx -= ADxi_d;
-    fmt::print("dx: {}\n", dx.size());
+    dx = d.asDiagonal() * (ls.A.transpose() * dy - xi_d);
+    // Eigen::VectorXd ADy = ls.A.transpose() * dy; // AD will be of size A.cols() x 1
+    // Eigen::VectorXd ADxi_d = ADy - xi_d; // Assuming xi_d is already of size A.cols() x 1
+    // dx = d.asDiagonal() * ADxi_d; // dx will be of size A.cols() x 1
 
 #endif
 }
@@ -277,11 +264,10 @@ void IPSolver::solve_augsys(Eigen::VectorXd &delta_x, Eigen::VectorXd &delta_y, 
                             const Eigen::VectorXd &xi_p, const Eigen::VectorXd &xi_d, const Eigen::VectorXd &xi_u) {
     // Initialize delta_z with zeros
     delta_z.setZero(ubi.size());
-
+    // print xi_d size
     // Use a dense vector and avoid creating an extra SparseVector when unnecessary
     Eigen::VectorXd xi_d_mod = xi_d;
     for (int i = 0; i < ubi.size(); ++i) { xi_d_mod(ubi(i)) -= xi_u(ubi(i)) * theta_vw(i); }
-
     // Call the function to solve the augmented system
     solve_augmented_system(delta_x, delta_y, ls, xi_p, xi_d_mod);
 
@@ -448,7 +434,7 @@ std::tuple<double, double, std::vector<double>, std::vector<double>> IPSolver::r
     Eigen::VectorXd             hi    = componentes.hi;
     Eigen::VectorXd             sense = componentes.sense;
 
-    //  Convert to standard form
+    //  Convert to standard form;
     Eigen::SparseMatrix<double> A;
     Eigen::VectorXd             b;
     Eigen::VectorXd             c;
@@ -613,11 +599,9 @@ std::tuple<double, double, std::vector<double>, std::vector<double>> IPSolver::r
                 regG *= 100.0;
             }
         }
-
         // Solve the augmented system
         solve_augsys(delta_x, delta_y, delta_z, ls, theta_vw, ubi, b, c, ubv);
         delta_0 = regG + kappa / tau - delta_x.dot(c) + delta_y.dot(b) - delta_z.dot(ubv);
-
         // Solve the Newton system
         solve_newton_system(Delta_x, Delta_lambda, Delta_w, Delta_s, Delta_v, Delta_tau, Delta_kappa, ls, theta_vw, b,
                             c, ubi, ubv, delta_x, delta_y, delta_z, delta_0, x, lambda, w, s, v, tau, kappa, res.rp,
@@ -869,29 +853,21 @@ void IPSolver::update_linear_solver(SparseSolver &ls, const Eigen::VectorXd &the
     ls.factorizeMatrix(S);
 #else
 
+    // define lhs for normal equations
     Eigen::SparseMatrix<double> lhs(ls.n + ls.m, ls.n + ls.m);
-    Eigen::VectorXd             d       = 1.0 / (ls.theta.array() + ls.regP.array());
+    // define lhs as   A (\Theta^{-1} + R_{p})^{-1} A^{\top} + R_{d}
+    Eigen::VectorXd d = 1.0 / (ls.theta.array() + ls.regP.array());
+    // set rhs as \xi_{p} + A (Θ^{-1} + R_{p})^{-1} \xi_{d}
     Eigen::MatrixXd             dDense  = d.asDiagonal();
     Eigen::SparseMatrix<double> dSparse = dDense.sparseView();
 
     Eigen::MatrixXd             regDDense  = regD.asDiagonal();
     Eigen::SparseMatrix<double> regDSparse = regDDense.sparseView();
-    Eigen::MatrixXd             AD_dense   = ls.A * dDense;
-    // Eigen::SparseMatrix<double> AD         = ls.A * dSparse;
-    Eigen::SparseMatrix<double> AD(ls.A.rows(), dSparse.cols());
-    for (int k = 0; k < ls.A.outerSize(); ++k) {
-        for (Eigen::SparseMatrix<double>::InnerIterator it(ls.A, k); it; ++it) {
-            int row = it.row();
-            int col = it.col();
-            for (Eigen::SparseMatrix<double>::InnerIterator jt(dSparse, col); jt; ++jt) {
-                int target_col = jt.col();
-                AD.coeffRef(row, target_col) += it.value() * jt.value();
-            }
-        }
-    }
-    Eigen::SparseMatrix<double> ADA = AD * ls.A.transpose();
-    lhs                             = ADA + regDSparse;
+    Eigen::SparseMatrix<double> AD         = ls.A * dSparse;
+    Eigen::SparseMatrix<double> ADA        = AD * ls.A.transpose();
+    lhs                                    = ADA + regDSparse;
     ls.factorizeMatrix(lhs);
+
 #endif
 }
 
@@ -904,6 +880,7 @@ void IPSolver::start_linear_solver(SparseSolver &ls, const Eigen::SparseMatrix<d
     ls.A = A;
     ls.m = A.rows();
     ls.n = A.cols();
+    // print ls.A size
 
 #ifdef AUGMENTED
     ls.theta = Eigen::VectorXd::Ones(ls.n);
