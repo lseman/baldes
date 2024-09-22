@@ -213,7 +213,8 @@ std::vector<int> BucketGraph::computePhi(int &bucket_id, bool fw) {
     std::vector<int> phi;
 
     // Ensure bucket_id is within valid bounds
-    auto &buckets = fw ? fw_buckets : bw_buckets;
+    auto &buckets       = fw ? fw_buckets : bw_buckets;
+    auto &fixed_buckets = fw ? fw_fixed_buckets : fw_fixed_buckets;
 
     if constexpr (R_SIZE > 1) {
         if (bucket_id >= buckets.size() || bucket_id < 0) return phi;
@@ -250,7 +251,14 @@ std::vector<int> BucketGraph::computePhi(int &bucket_id, bool fw) {
                                     break;
                                 }
                             }
-                            if (same_for_other_dims) { phi.push_back(i); }
+                            if (same_for_other_dims) {
+#ifdef FIX_BUCKETS
+                                if (fixed_buckets[i][bucket_id] == 0)
+#endif
+                                {
+                                    phi.push_back(i);
+                                }
+                            }
                         }
                     } else { // Handle generic resource dimensions
                         if (buckets[i].job_id == job_id &&
@@ -262,7 +270,14 @@ std::vector<int> BucketGraph::computePhi(int &bucket_id, bool fw) {
                                     break;
                                 }
                             }
-                            if (same_for_other_dims) { phi.push_back(i); }
+                            if (same_for_other_dims) {
+#ifdef FIX_BUCKETS
+                                if (fixed_buckets[i][bucket_id] == 0)
+#endif
+                                {
+                                    phi.push_back(i);
+                                }
+                            }
                         }
                     }
                 }
@@ -282,7 +297,14 @@ std::vector<int> BucketGraph::computePhi(int &bucket_id, bool fw) {
                                     break;
                                 }
                             }
-                            if (same_for_other_dims) { phi.push_back(i); }
+                            if (same_for_other_dims) {
+#ifdef FIX_BUCKETS
+                                if (fixed_buckets[i][bucket_id] == 0)
+#endif
+                                {
+                                    phi.push_back(i);
+                                }
+                            }
                         }
                     } else { // Handle generic resource dimensions
                         if (buckets[i].job_id == job_id &&
@@ -294,7 +316,14 @@ std::vector<int> BucketGraph::computePhi(int &bucket_id, bool fw) {
                                     break;
                                 }
                             }
-                            if (same_for_other_dims) { phi.push_back(i); }
+                            if (same_for_other_dims) {
+#ifdef FIX_BUCKETS
+                                if (fixed_buckets[i][bucket_id] == 0)
+#endif
+                                {
+                                    phi.push_back(i);
+                                }
+                            }
                         }
                     }
                 }
@@ -302,13 +331,20 @@ std::vector<int> BucketGraph::computePhi(int &bucket_id, bool fw) {
         }
     } else {
         auto smaller = 0;
-        smaller      = fw ? bucket_id - 1 : bucket_id - 1;
+        smaller      = bucket_id - 1;
 
         if (smaller >= buckets.size() || smaller < 0) return phi;
 
         //  check if smalller has the same job_id as vertex
-        if (buckets[smaller].job_id == buckets[bucket_id].job_id) { phi.push_back(smaller); }
-        // phi.push_back(bucket_id);
+        if (buckets[smaller].job_id == buckets[bucket_id].job_id) {
+
+#ifdef FIX_BUCKETS
+            if (fixed_buckets[smaller][bucket_id] == 0)
+#endif
+            {
+                phi.push_back(smaller);
+            }
+        }
         return phi;
     }
     return phi;
@@ -493,8 +529,8 @@ void BucketGraph::set_adjacency_list() {
     // Lambda function to add arcs for a specific job and bucket
     auto add_arcs_for_job = [&](const VRPJob &job, int from_bucket, std::vector<double> &res_inc) {
         using Arc =
-            std::tuple<double, int, std::vector<double>, double>; // Define an Arc as a tuple with priority value, job
-                                                                  // id, resource increments, and cost increment
+            std::tuple<double, int, std::vector<double>, double>; // Define an Arc as a tuple with priority value,
+                                                                  // job id, resource increments, and cost increment
 
         // Containers to store the best arcs for forward and reverse directions
         std::vector<Arc> best_arcs;
@@ -532,8 +568,9 @@ void BucketGraph::set_adjacency_list() {
             if (!feasible) continue; // Skip if the arc is not feasible
 
             // Calculate priority values for forward and reverse arcs
-            double aux_double = next_job.cost + 1.E-5 * next_job.start_time;    // Small weight for start time
-            best_arcs.emplace_back(aux_double, next_job.id, res_inc, cost_inc); // Store the arc for forward direction
+            double aux_double = next_job.cost + 1.E-5 * next_job.start_time; // Small weight for start time
+            best_arcs.emplace_back(aux_double, next_job.id, res_inc,
+                                   cost_inc); // Store the arc for forward direction
 
             double aux_double_rev = 1.E-5 * job.end_time; // Small weight for end time
             best_arcs_rev.emplace_back(aux_double_rev, next_job.id, res_inc,

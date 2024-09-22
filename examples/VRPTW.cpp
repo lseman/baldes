@@ -62,7 +62,7 @@ void initRMP(GRBModel *model, VRProblemPtr problem, std::vector<Route> &heuristi
 
     auto instance = problem->instance;
 
-    int Um = 25;
+    int Um = problem->instance.nV;
 
     std::vector<GRBVar> lambda;
 

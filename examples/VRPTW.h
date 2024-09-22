@@ -52,12 +52,17 @@ public:
 
     int                           labels_counter = 0;
     std::vector<std::vector<int>> labels;
+    int                           numConstrs = 0;
 #ifdef RCC
     CnstrMgrPointer oldCutsCMP = nullptr;
 #endif
     RCCmanager rccManager;
 
     tbb::concurrent_unordered_map<std::pair<int, int>, std::vector<GRBLinExpr>, pair_hash, pair_equal> arcCache;
+
+    void addVars(GRBModel *node, auto lb, auto ub, auto obj, auto vtype, auto name, auto col, auto row) {
+        node->addVars(lb, ub, obj, vtype, name, col, row);
+    }
 
     /*
      * Adds a column to the GRBModel.
@@ -68,53 +73,71 @@ public:
      * @return The number of columns added.
      */
     int addColumn(GRBModel *node, const auto &columns, CutStorage &r1c, bool enumerate = false) {
+        int                 numConstrsLocal = node->get(GRB_IntAttr_NumConstrs);
+        const GRBConstr    *constrs         = node->getConstrs();
+        std::vector<double> coluna(numConstrsLocal, 0.0); // Declare outside the loop
 
-        int                 numConstrs = node->get(GRB_IntAttr_NumConstrs);
-        const GRBConstr    *constrs    = node->getConstrs();
-        std::vector<double> coluna(numConstrs, 0.0); // Declare outside the loop
+        // Collect the bounds, costs, names, and columns
+        std::vector<double>      lb, ub, obj;
+        std::vector<GRBColumn>   cols;
+        std::vector<std::string> names;
+        std::vector<char>        vtypes;
 
-        // iterate over columns
         auto counter = 0;
         for (auto &label : columns) {
-            if (label->jobs_covered.size() == 0) { continue; }
+            if (label->jobs_covered.empty()) continue;
             if (!enumerate && label->cost > 0) continue;
             counter += 1;
-#ifdef IPM
-            if (counter > 10) { break; }
-#endif
+            if (counter > 20) break;
+
             labels_counter += 1;
             std::fill(coluna.begin(), coluna.end(), 0.0); // Reset for each iteration
-            // print jobs_covered
-            double      travel_cost = label->real_cost;
-            std::string name        = "x[" + std::to_string(allPaths.size() - 1) + "]";
-            GRBColumn   col;
 
+            double      travel_cost = label->real_cost;
+            std::string name        = "x[" + std::to_string(allPaths.size()) + "]";
+
+            GRBColumn col;
+            // Fill coluna with coefficients
             for (auto &job : label->jobs_covered) {
                 if (job > 0 && job != N_SIZE - 1) {
                     int constr_index = job - 1;
                     coluna[constr_index] += 1;
                 }
             }
-
-            for (int i = 0; i < N_SIZE - 1; i++) {
-                if (coluna[i] == 0.0) { continue; }
+            // Add terms to GRBColumn
+            for (int i = 0; i < N_SIZE - 2; i++) {
+                if (coluna[i] == 0.0) continue;
                 col.addTerms(&coluna[i], &constrs[i], 1);
             }
 
 #if defined(SRC3) || defined(SRC)
             auto vec = r1c.computeLimitedMemoryCoefficients(label->jobs_covered);
+            // print vec size
+            // print N_SIZE -2 + 1
             if (vec.size() > 0) {
                 for (int i = 0; i < vec.size(); i++) {
-                    if (vec[i] != 0) { col.addTerms(&vec[i], &constrs[N_SIZE - 1 + i], 1); }
+                    if (vec[i] != 0) { col.addTerms(&vec[i], &constrs[numConstrs + i], 1); }
                 }
             }
 #endif
 
-            node->addVar(0.0, 1.0, travel_cost, GRB_CONTINUOUS, col, name);
+            // Collect bounds, costs, columns, and names
+            lb.push_back(0.0);
+            ub.push_back(1.0);
+            obj.push_back(travel_cost);
+            cols.push_back(col);
+            names.push_back(name);
+            vtypes.push_back(GRB_CONTINUOUS);
+
             Path path(label->jobs_covered, label->real_cost);
             allPaths.push_back(path);
         }
-        node->update();
+        // Add variables with bounds, objectives, and columns
+        if (!lb.empty()) {
+            addVars(node, lb.data(), ub.data(), obj.data(), vtypes.data(), names.data(), cols.data(), lb.size());
+            node->update();
+        }
+
         return counter;
     }
 
@@ -245,37 +268,38 @@ public:
     bool cutHandler(LimitedMemoryRank1Cuts &r1c, GRBModel *node, std::vector<GRBConstr> &constraints) {
         auto &cuts    = r1c.cutStorage;
         bool  changed = false;
-        if (cuts.size() > 0) {
-            for (Cut &cut : cuts) {
-                bool added   = cut.added;
-                bool updated = cut.updated;
-                if (added && !updated) { continue; }
 
-                changed                     = true;
-                int         z               = cut.id;
-                std::string constraint_name = "cuts(z" + std::to_string(z) + ")";
-                auto        coeffs          = cut.coefficients;
-                if (added && updated) {
+        if (!cuts.empty()) {
+            for (auto &cut : cuts) {
+                if (cut.added && !cut.updated) { continue; }
+
+                changed            = true;
+                const int   z      = cut.id;
+                const auto &coeffs = cut.coefficients;
+
+                if (cut.added && cut.updated) {
                     cut.updated = false;
                     if (z >= constraints.size()) { continue; }
-                    auto constraint = constraints[z];
-                    chgCoeff(node, constraint, coeffs);
+                    chgCoeff(node, constraints[z], coeffs);
                 } else {
                     GRBLinExpr lhs;
-                    for (int i = 0; i < coeffs.size(); i++) {
+                    for (size_t i = 0; i < coeffs.size(); ++i) {
                         if (coeffs[i] == 0) { continue; }
-                        auto v = node->getVar(i);
-                        lhs += v * coeffs[i];
+                        lhs += node->getVar(i) * coeffs[i];
                     }
+
+                    std::string constraint_name = "cuts(z" + std::to_string(z) + ")";
+                    // constraint_name << "cuts(z" << z << ")";
+
                     auto ctr = node->addConstr(lhs <= cut.rhs, constraint_name);
-                    constraints.push_back(ctr);
+                    constraints.emplace_back(ctr);
                 }
+
                 cut.added   = true;
                 cut.updated = false;
             }
-
-            r1c.cutStorage = cuts;
         }
+
         node->update();
         return changed;
     }
@@ -531,8 +555,8 @@ public:
         int bucket_interval = 20;
         int time_horizon    = instance.T_max;
 
-        int                 numConstrs = node->get(GRB_IntAttr_NumConstrs);
-        std::vector<double> duals      = std::vector<double>(numConstrs, 0.0);
+        numConstrs                = node->get(GRB_IntAttr_NumConstrs);
+        std::vector<double> duals = std::vector<double>(numConstrs, 0.0);
 
         // BucketGraph bucket_graph(jobs, time_horizon, bucket_interval, instance.q, bucket_interval);
         BucketGraph bucket_graph(jobs, time_horizon, bucket_interval);
@@ -540,13 +564,14 @@ public:
         bucket_graph.set_distance_matrix(instance.getDistanceMatrix(), 8);
 
         node->optimize();
-        auto integer_solution               = node->get(GRB_DoubleAttr_ObjVal);
-        bucket_graph.incumbent              = integer_solution;
-        int                    num_veihcles = labels_counter;
-        auto                   allJobs      = bucket_graph.getJobs();
+        auto integer_solution  = node->get(GRB_DoubleAttr_ObjVal);
+        bucket_graph.incumbent = integer_solution;
+
+        auto                   allJobs = bucket_graph.getJobs();
         LimitedMemoryRank1Cuts r1c(allJobs, CutType::ThreeRow);
         CutStorage             cuts;
         r1c.cutStorage = cuts;
+
         std::vector<GRBConstr> constraints;
         std::vector<double>    cutDuals;
         std::vector<double>    jobDuals  = getDuals(node);
@@ -569,8 +594,7 @@ public:
 
         bool misprice = true;
 
-        double bidi_relation = bucket_graph.bidi_relation;
-        double lag_gap       = std::numeric_limits<double>::max();
+        double lag_gap = std::numeric_limits<double>::max();
 
         auto                 inner_obj = 0.0;
         std::vector<Label *> paths;
@@ -656,7 +680,7 @@ public:
 
 #endif
                 auto cuts_before = cuts.size();
-                // print_info("Removing most negative reduced cost variables\n");
+                print_info("Removing most negative reduced cost variables\n");
                 //   removeNegativeReducedCostVarsAndPaths(node);
                 node->optimize();
                 highs_obj         = node->get(GRB_DoubleAttr_ObjVal);
@@ -760,8 +784,7 @@ public:
                 bucket_graph.relaxation = highs_obj;
 
                 if (cuts.size() > 0) {
-                    auto numJobs = bucket_graph.getJobs().size() - 1;
-                    cutDuals     = std::vector<double>(originDuals.begin() + numJobs, originDuals.end());
+                    cutDuals = std::vector<double>(originDuals.begin() + numConstrs, originDuals.end());
                     cuts.setDuals(cutDuals);
                 }
 
@@ -772,7 +795,6 @@ public:
                 //////////////////////////////////////////////////////////////////////
                 // CALLING BALDES
                 //////////////////////////////////////////////////////////////////////
-
                 bucket_graph.cut_storage = &cuts;
                 paths                    = bucket_graph.solve();
 
