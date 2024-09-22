@@ -23,6 +23,9 @@
 #include "../cuts/SRC.h"
 #include <cstring>
 
+#ifdef AVX
+#include "BucketAVX.h"
+#endif
 /**
  * Solves the bucket graph optimization problem using a multi-stage bi-labeling algorithm.
  *
@@ -188,8 +191,8 @@ std::vector<double> BucketGraph::labeling_algorithm(std::vector<double> q_point,
                         DominatedInCompWiseSmallerBuckets<D, S>(label, bucket, c_bar, Bvisited, ordered_sccs);
 
                     if (!domin_smaller) {
-                    // Lambda function to process new labels after extension
-                    auto process_new_label = [&](Label *new_label) {
+                        // Lambda function to process new labels after extension
+                        auto process_new_label = [&](Label *new_label) {
                             // Partial mode: Skip if the label does not meet q_point requirements
                             if constexpr (F == Full::Partial) {
                                 if constexpr (D == Direction::Forward) {
@@ -217,8 +220,8 @@ std::vector<double> BucketGraph::labeling_algorithm(std::vector<double> q_point,
                                     }
                                 }
                             } else {
-// General dominance check
 #ifndef AVX
+                                // General dominance check
                                 for (auto *existing_label : to_bucket_labels) {
                                     if (is_dominated<D, S>(new_label, existing_label)) {
                                         stat_n_dom++; // Increment dominated labels count
@@ -227,11 +230,11 @@ std::vector<double> BucketGraph::labeling_algorithm(std::vector<double> q_point,
                                     }
                                 }
 #else
-                                if (new_label->check_dominance_against_vector<D, S>(to_bucket_labels)) {
+                                if (check_dominance_against_vector<D, S>(new_label, to_bucket_labels)) {
                                     stat_n_dom++; // Increment dominated labels count
                                     dominated = true;
                                 }
-#
+#endif
                             }
 
                             if (!dominated) {
