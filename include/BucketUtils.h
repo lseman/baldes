@@ -126,19 +126,16 @@ inline int BucketGraph::get_bucket_number(int job, const std::vector<double> &re
         const int   start_index       = num_buckets_index[job];
         const int   base_interval     = (R_max[0] - R_min[0] + 1) / intervals[0].interval;
         int         value             = static_cast<int>(resource_values_vec[0]);
-        // print number of buckets for job
 
-        auto &vrpjob = jobs[job];
+        const auto &vrpjob = jobs[job];
+
         if constexpr (D == Direction::Forward) {
-            const int first_lb     = vrpjob.lb[0];
-            int       bucket_index = (value - first_lb) / base_interval + start_index;
-            return bucket_index; // Return the computed bucket index
+            const int first_lb = vrpjob.lb[0];
+            return (value - first_lb) / base_interval + start_index;
         } else if constexpr (D == Direction::Backward) {
-            const int first_ub     = vrpjob.ub[0];
-            int       bucket_index = (first_ub - value) / base_interval + start_index;
-            return bucket_index; // Correct bucket
+            const int first_ub = vrpjob.ub[0];
+            return (first_ub - value) / base_interval + start_index;
         }
-        std::throw_with_nested(std::runtime_error("Invalid direction"));
         return -1; // If no bucket is found
     }
 }
@@ -256,7 +253,6 @@ void BucketGraph::define_buckets() {
 template <Direction D>
 void BucketGraph::generate_arcs() {
     auto buckets_mutex = std::mutex();
-    num_buckets_per_interval.clear();
 
     // Clear the appropriate bucket graph
     if constexpr (D == Direction::Forward) {
@@ -395,7 +391,7 @@ Label *BucketGraph::get_best_label(const std::vector<int> &topological_order, co
 
         for (int bucket : component_buckets) {
             const auto &label = buckets[bucket].get_best_label();
-            if (!label || label->status == -1) continue;
+            if (!label) continue;
 
             if (label->cost < best_cost) {
                 best_cost  = label->cost;
@@ -419,98 +415,88 @@ Label *BucketGraph::get_best_label(const std::vector<int> &topological_order, co
 template <Stage S>
 void BucketGraph::ConcatenateLabel(const Label *&L, int &b, Label *&pbest, std::vector<uint64_t> &Bvisited,
                                    const std::vector<double> &q_star) {
+    // Create a stack for iterative processing
+    std::stack<int> bucket_stack;
+    bucket_stack.push(b);
 
-    auto current_bucket = b;
+    const auto  L_job_id    = L->job_id;
+    const auto  L_resources = L->resources;
+    const auto &L_last_job  = jobs[L_job_id];
 
-    // Mark the bucket as visited
-    const size_t segment      = current_bucket / 64;
-    const size_t bit_position = current_bucket % 64;
-    Bvisited[segment] |= (1ULL << bit_position);
+    while (!bucket_stack.empty()) {
+        // Pop the next bucket from the stack
+        int current_bucket = bucket_stack.top();
+        bucket_stack.pop();
 
-    int    bucketLjob      = L->job_id;
-    int    bucketLprimejob = bw_buckets[current_bucket].job_id;
-    double cost            = getcij(bucketLjob, bucketLprimejob);
+        // Mark the bucket as visited
+        const size_t segment      = current_bucket / 64;
+        const size_t bit_position = current_bucket % 64;
+        Bvisited[segment] |= (1ULL << bit_position);
+
+        const auto bucketLprimejob = bw_buckets[current_bucket].job_id;
+        double     cost            = getcij(L_job_id, bucketLprimejob);
 
 #ifdef RCC
-    cost -= rcc_manager->getCachedDualSumForArc(bucketLjob, bucketLprimejob);
+        cost -= rcc_manager->getCachedDualSumForArc(L_job_id, bucketLprimejob);
 #endif
-    double L_cost_plus_cost = L->cost + cost;
 
 #ifdef SRC
-    auto cutter   = cut_storage;
-    auto SRCDuals = cutter->SRCDuals;
+        auto &cutter   = cut_storage;
+        auto &SRCDuals = cutter->SRCDuals;
 #endif
+        double L_cost_plus_cost = L->cost + cost;
 
-    // Early exit based on cost comparison
-    if constexpr (S != Stage::Enumerate) {
-        if (L_cost_plus_cost + bw_c_bar[current_bucket] >= pbest->cost) { return; }
-    } else {
-        if (L_cost_plus_cost + bw_c_bar[current_bucket] >= gap) { return; }
-    }
-
-    const VRPJob &L_last_job = jobs[L->job_id];
-    auto         &bucket     = bw_buckets[current_bucket];
-    const auto   &labels     = bucket.get_labels(); // Assuming get_labels() returns a vector of Label*
-
-    for (auto &L_bw : labels) {
-        if (L_bw->job_id == L->job_id) { return; }
-
-        // Loop through the resource dimensions
-        if (L->resources[TIME_INDEX] + cost + L_last_job.consumption[TIME_INDEX] > L_bw->resources[TIME_INDEX]) {
+        // Early exit based on cost comparison
+        if ((S != Stage::Enumerate && L_cost_plus_cost + bw_c_bar[current_bucket] >= pbest->cost) ||
+            (S == Stage::Enumerate && L_cost_plus_cost + bw_c_bar[current_bucket] >= gap)) {
             continue;
         }
 
-        if constexpr (R_SIZE > 1) {
-            bool valid = true;
+        // Get the labels for the current bucket
+        auto       &bucket = bw_buckets[current_bucket];
+        const auto &labels = bucket.get_labels();
 
-            for (int r = 1; r < intervals.size(); ++r) {
-                if (L->resources[r] + L_last_job.consumption[r] + (R_max[r] - L_bw->resources[r]) > R_max[r]) {
-                    valid = false;
-                    break;
-                }
-            }
-            if (!valid) { continue; }
-        }
+        for (const auto &L_bw : labels) {
+            if (L_bw->job_id == L_job_id) continue;
 
-        double candidate_cost = L_cost_plus_cost + L_bw->cost;
+            if (!check_feasibility(L, L_bw)) continue;
+            double candidate_cost = L_cost_plus_cost + L_bw->cost;
 
 #ifdef SRC
-        auto counter = 0;
-        for (auto it = cutter->begin(); it < cutter->end(); ++it) {
-
-            if (SRCDuals[it->id] == 0) continue;
-            if (L->SRCmap[it->id] + L_bw->SRCmap[it->id] >= 1) { candidate_cost -= SRCDuals[it->id]; }
-        }
-#endif
-        // Use bitwise operations for the visited bitmap comparison
-        if constexpr (S == Stage::Three || S == Stage::Four || S == Stage::Enumerate) {
-            bool visited_overlap = false;
-            for (size_t i = 0; i < L->visited_bitmap.size(); ++i) {
-                if ((L->visited_bitmap[i] & L_bw->visited_bitmap[i]) != 0) {
-                    visited_overlap = true;
-                    break; // No need to check further if there's an overlap
-                }
+            for (auto it = cutter->begin(); it < cutter->end(); ++it) {
+                if (SRCDuals[it->id] == 0) continue;
+                if (L->SRCmap[it->id] + L_bw->SRCmap[it->id] >= 1) { candidate_cost -= SRCDuals[it->id]; }
             }
-            if (visited_overlap) continue;
-        }
-        // Early exit based on candidate cost
-        if constexpr (S != Stage::Enumerate) {
-            if (candidate_cost >= pbest->cost) continue;
-        } else {
-            if (candidate_cost >= gap) continue;
+#endif
+
+            // Check for visited overlap and skip if true
+            if constexpr (S == Stage::Three || S == Stage::Four || S == Stage::Enumerate) {
+                bool visited_overlap = false;
+                for (size_t i = 0; i < L->visited_bitmap.size(); ++i) {
+                    if (L->visited_bitmap[i] & L_bw->visited_bitmap[i]) {
+                        visited_overlap = true;
+                        break;
+                    }
+                }
+                if (visited_overlap) continue;
+            }
+
+            // Early exit based on candidate cost
+            if ((S != Stage::Enumerate && candidate_cost >= pbest->cost) ||
+                (S == Stage::Enumerate && candidate_cost >= gap)) {
+                continue;
+            }
+
+            // Compute and store the new label
+            pbest = compute_label(L, L_bw);
+            merged_labels.push_back(pbest);
         }
 
-        // Compute the new label and store it
-        pbest = compute_label(L, L_bw);
-        merged_labels.push_back(pbest);
-    }
-
-    // Push adjacent buckets onto the stack for further processing
-    for (int b_prime : Phi_bw[current_bucket]) {
-        const size_t segment_prime      = b_prime / 64;
-        const size_t bit_position_prime = b_prime % 64;
-        if ((Bvisited[segment_prime] & (1ULL << bit_position_prime)) == 0) {
-            ConcatenateLabel<S>(L, b_prime, pbest, Bvisited, q_star);
+        // Add unvisited neighboring buckets to the stack
+        for (int b_prime : Phi_bw[current_bucket]) {
+            const size_t segment_prime      = b_prime / 64;
+            const size_t bit_position_prime = b_prime % 64;
+            if (!(Bvisited[segment_prime] & (1ULL << bit_position_prime))) { bucket_stack.push(b_prime); }
         }
     }
 }
@@ -534,18 +520,10 @@ void BucketGraph::SCC_handler() {
     std::unordered_map<int, std::vector<int>> extended_bucket_graph = bucket_graph;
 
     // Extend the bucket graph with arcs defined by the Phi sets
-    if constexpr (D == Direction::Forward) {
-        for (auto i = 0; i < extended_bucket_graph.size(); ++i) {
-            auto phi_set = Phi[i];
-            if (phi_set.empty()) continue;
-            for (auto &phi_bucket : phi_set) { extended_bucket_graph[phi_bucket].push_back(i); }
-        }
-    } else {
-        for (auto i = 0; i < extended_bucket_graph.size(); ++i) {
-            auto phi_set = Phi[i];
-            if (phi_set.empty()) continue;
-            for (auto &phi_bucket : phi_set) { extended_bucket_graph[phi_bucket].push_back(i); }
-        }
+    for (auto i = 0; i < extended_bucket_graph.size(); ++i) {
+        auto phi_set = Phi[i];
+        if (phi_set.empty()) continue;
+        for (auto &phi_bucket : phi_set) { extended_bucket_graph[phi_bucket].push_back(i); }
     }
 
     SCC scc_finder;
@@ -606,7 +584,7 @@ void BucketGraph::SCC_handler() {
                 std::vector<Arc> &filtered_fw_arcs = jobs[from_job_id].fw_arcs_scc[scc_ctr]; // For forward direction
 
                 // Iterate over the arcs from the current bucket
-                const auto &bucket_arcs = buckets[bucket].template get_bucket_arcs<Direction::Forward>();
+                const auto &bucket_arcs = buckets[bucket].template get_bucket_arcs<D>();
                 for (const auto &arc : bucket_arcs) {
                     int to_job_id = buckets[arc.to_bucket].job_id; // Get the destination job ID
 
@@ -624,7 +602,7 @@ void BucketGraph::SCC_handler() {
                 std::vector<Arc> &filtered_bw_arcs = jobs[from_job_id].bw_arcs_scc[scc_ctr]; // For forward direction
 
                 // Iterate over the arcs from the current bucket
-                const auto &bucket_arcs = buckets[bucket].template get_bucket_arcs<Direction::Backward>();
+                const auto &bucket_arcs = buckets[bucket].template get_bucket_arcs<D>();
                 for (const auto &arc : bucket_arcs) {
                     int to_job_id = buckets[arc.to_bucket].job_id; // Get the destination job ID
 

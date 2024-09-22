@@ -786,6 +786,11 @@ public:
                 // Adding cols
                 auto colAdded = addColumn(node, paths, cuts, false);
 
+#ifdef RIH
+                auto rih_paths = bucket_graph.get_rih_labels();
+                colAdded += addColumn(node, rih_paths, cuts, true);
+#endif
+
 #ifdef STAB
                 stab.update_stabilization_after_pricing_optim(matrixSparse, jobDuals, lag_gap, paths);
 

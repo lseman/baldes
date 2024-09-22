@@ -72,7 +72,6 @@ BucketGraph::BucketGraph(const std::vector<VRPJob> &jobs, int time_horizon, int 
     Interval intervalCap(capacity_interval, capacity);
 
     intervals = {intervalTime, intervalCap};
-    T_max     = time_horizon;
     R_min     = {0, 0};
     R_max     = {static_cast<double>(time_horizon), static_cast<double>(capacity)};
 
@@ -99,7 +98,6 @@ BucketGraph::BucketGraph(const std::vector<VRPJob> &jobs, int time_horizon, int 
 
     initInfo();
     Interval intervalTime(bucket_interval, time_horizon);
-    T_max = time_horizon;
 
     intervals = {intervalTime};
     R_min     = {0};
@@ -121,7 +119,6 @@ BucketGraph::BucketGraph(const std::vector<VRPJob> &jobs, std::vector<int> &boun
         intervals.push_back(interval);
     }
 
-    T_max = bounds[0];
     for (int i = 1; i < bounds.size(); ++i) {
         R_min.push_back(0);
         R_max.push_back(static_cast<double>(bounds[i]));
@@ -185,6 +182,7 @@ Label *BucketGraph::compute_label(const Label *L, const Label *L_prime) {
     for (auto L_bw = L_prime; L_bw != nullptr; L_bw = L_bw->parent) { total_size++; }
 
     // Reserve space in new_label->jobs_covered
+    new_label->jobs_covered.clear();
     new_label->jobs_covered.reserve(total_size);
 
     // Traverse forward list and insert elements directly in reverse order
@@ -520,7 +518,7 @@ void BucketGraph::set_adjacency_list() {
 
             // if (job.lb[TIME_INDEX] + res_inc[TIME_INDEX] > next_job.ub[TIME_INDEX]) continue;
 
-            double aux_double = 1.E-5 * next_job.start_time;
+            double aux_double = next_job.cost + 1.E-5 * next_job.start_time;
             best_arcs.emplace_back(aux_double, next_job.id, res_inc, cost_inc);
             double aux_double_rev = 1.E-5 * job.end_time;
             best_arcs_rev.emplace_back(aux_double_rev, next_job.id, res_inc, cost_inc);
@@ -719,4 +717,40 @@ double BucketGraph::knapsackBound(const Label *l) {
  */
 bool BucketGraph::BucketSetContains(const std::set<int> &bucket_set, const int &bucket) {
     return bucket_set.find(bucket) != bucket_set.end();
+}
+
+void BucketGraph::async_rih_processing(std::vector<Label *> initial_labels, int LABELS_MAX) {
+    merged_labels_rih.clear();
+    const int                                                           LABELS_MAX_RIH = 5;
+    std::priority_queue<Label *, std::vector<Label *>, LabelComparator> best_labels_in;
+    std::priority_queue<Label *, std::vector<Label *>, LabelComparator> best_labels_out;
+
+    for (auto &label : initial_labels) {
+        best_labels_in.push(label);
+        if (best_labels_in.size() >= LABELS_MAX) break;
+    }
+
+    // RIH2, RIH3 etc. processing here...
+    RIH2(best_labels_in, best_labels_out, LABELS_MAX);
+
+    while (!best_labels_out.empty()) {
+        best_labels_in.push(best_labels_out.top());
+        best_labels_out.pop();
+    }
+
+    RIH4(best_labels_in, best_labels_out, LABELS_MAX);
+
+    // RIH3(best_labels_in, best_labels_out, LABELS_MAX);
+
+    // After processing, populate the merged_labels_improved vector
+    while (!best_labels_out.empty()) {
+        merged_labels_rih.push_back(best_labels_out.top());
+        best_labels_out.pop();
+    }
+
+    if (merged_labels_rih.size() > LABELS_MAX_RIH) { merged_labels_rih.resize(LABELS_MAX_RIH); }
+
+    // Sort or further process if needed
+    std::sort(merged_labels_rih.begin(), merged_labels_rih.end(),
+              [](const Label *a, const Label *b) { return a->cost < b->cost; });
 }
