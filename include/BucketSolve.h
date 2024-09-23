@@ -201,7 +201,8 @@ std::vector<double> BucketGraph::labeling_algorithm(std::vector<double> q_point,
 
                     domin_smaller = false;
 
-                    // Clear the visited buckets vector for the current label
+                    // if constexpr (S >= Stage::Three) {
+                    //  Clear the visited buckets vector for the current label
                     std::memset(Bvisited.data(), 0, Bvisited.size() * sizeof(uint64_t));
 
                     // Check if the label is dominated by any labels in smaller buckets
@@ -232,13 +233,23 @@ std::vector<double> BucketGraph::labeling_algorithm(std::vector<double> q_point,
                             } else {
 #ifndef AVX
                                 // General dominance check
-                                for (auto *existing_label : to_bucket_labels) {
+
+                                // General dominance check
+                                for (size_t j = 0; j < to_bucket_labels.size(); ++j) {
+                                    Label *existing_label = to_bucket_labels[j];
+
+                                    // Prefetch the next label for comparison
+                                    if (j + 1 < to_bucket_labels.size()) {
+                                        __builtin_prefetch(to_bucket_labels[j + 1]);
+                                    }
+
                                     if (is_dominated<D, S>(new_label, existing_label)) {
                                         stat_n_dom++; // Increment dominated labels count
                                         dominated = true;
                                         break;
                                     }
                                 }
+
 #else
                                 if (check_dominance_against_vector<D, S>(new_label, to_bucket_labels)) {
                                     stat_n_dom++; // Increment dominated labels count
@@ -406,15 +417,10 @@ std::vector<Label *> BucketGraph::bi_labeling_algorithm(std::vector<double> q_st
 
         // Process each label in the bucket
         for (const Label *L : labels) {
-            // if (L->resources[TIME_INDEX] > q_star[TIME_INDEX]) { continue; } // Skip if label exceeds q_star
+            if (L->resources[TIME_INDEX] > q_star[TIME_INDEX]) { continue; } // Skip if label exceeds q_star
 
-#ifndef ORIGINAL_ARCS
             // Get arcs corresponding to jobs for this label (Forward direction)
             const auto &to_arcs = jobs[L->job_id].get_arcs<Direction::Forward>();
-#else
-            // Alternative: Get arcs stored directly in the bucket
-            const auto &to_arcs = fw_buckets[bucket].get_bucket_arcs(true);
-#endif
             // Iterate over each arc from the current job
             for (const auto &arc : to_arcs) {
                 const auto &to_job = arc.to;
@@ -429,6 +435,7 @@ std::vector<Label *> BucketGraph::bi_labeling_algorithm(std::vector<double> q_st
                 // Attempt to extend the current label using this arc
                 auto L_prime = Extend<Direction::Forward, S, ArcType::Job, Mutability::Const, Full::Reverse>(L, arc);
 
+                // Note: apparently without the second condition it work better in some cases
                 // Check if the new label is valid and respects the q_star constraints
                 if (!L_prime) { // || L_prime->resources[TIME_INDEX] <= q_star[TIME_INDEX]) {
                     continue;   // Skip invalid labels or those that exceed q_star
@@ -543,7 +550,9 @@ BucketGraph::Extend(const std::conditional_t<M == Mutability::Mut, Label *, cons
 
     // Initialize new resources based on the arc's resource increments and check feasibility
     std::vector<double> new_resources(initial_resources.size());
+    /*
     for (size_t i = 0; i < initial_resources.size(); ++i) {
+
         if constexpr (D == Direction::Forward) {
             new_resources[i] =
                 std::max(initial_resources[i] + gamma.resource_increment[i], static_cast<double>(VRPJob.lb[i]));
@@ -557,6 +566,13 @@ BucketGraph::Extend(const std::conditional_t<M == Mutability::Mut, Label *, cons
                 return nullptr; // Backward: Below lower bound
             }
         }
+    }
+    */
+
+    // Note: workaround
+    constexpr size_t N = R_SIZE;
+    if (!process_all_resources<D, 0, N>(new_resources, initial_resources, gamma, VRPJob)) {
+        return nullptr; // Handle failure case (constraint violation)
     }
 
     // Get the bucket number for the new job and resource state
@@ -601,6 +617,11 @@ BucketGraph::Extend(const std::conditional_t<M == Mutability::Mut, Label *, cons
     // Acquire a new label from the pool and initialize it with the new state
     auto new_label = label_pool.acquire();
     new_label->initialize(to_bucket, new_cost, new_resources, job_id);
+
+    if constexpr (F == Full::Reverse) {
+        return new_label; // Return the new label early if in reverse mode
+    }
+
     new_label->visited_bitmap = L_prime->visited_bitmap; // Copy visited bitmap from the original label
     set_job_visited(new_label->visited_bitmap, job_id);  // Mark the new job as visited
 
@@ -613,7 +634,7 @@ BucketGraph::Extend(const std::conditional_t<M == Mutability::Mut, Label *, cons
     new_label->real_cost = L_prime->real_cost + travel_cost;
 
     // Set the parent label, depending on mutability
-    if constexpr (M == Mutability::Mut) { new_label->parent = static_cast<const Label *>(L_prime); }
+    if constexpr (M == Mutability::Mut) { new_label->parent = L_prime; }
 
 #if defined(SRC3) || defined(SRC)
     // Copy the SRC map from the original label (for SRC cuts)
@@ -641,7 +662,7 @@ BucketGraph::Extend(const std::conditional_t<M == Mutability::Mut, Label *, cons
 
 #if defined(SRC3) || defined(SRC)
     // Apply SRC (Subset Row Cuts) logic in Stages 3, 4, and Enumerate
-    if constexpr (S == Stage::Three || S == Stage::Four || S == Stage::Enumerate) {
+    if constexpr (S == Stage::Four || S == Stage::Enumerate) {
         auto          &cutter   = cut_storage;          // Access the cut storage manager
         auto          &SRCDuals = cutter->SRCDuals;     // Access the dual values for the SRC cuts
         const uint64_t bit_mask = 1ULL << bit_position; // Precompute bit shift for the job's position
@@ -670,9 +691,7 @@ BucketGraph::Extend(const std::conditional_t<M == Mutability::Mut, Label *, cons
             bool bitIsSet2 = baseSet[segment] & bit_mask;
 
             double &src_map_value = new_label->SRCmap[idx]; // Use reference to avoid multiple accesses
-            if (bitIsSet) {
-                src_map_value = L_prime->SRCmap[idx]; // Copy the original label's SRC map value
-            } else {
+            if (!bitIsSet) {
                 src_map_value = 0.0; // Reset the SRC map value
             }
 
@@ -712,7 +731,7 @@ inline bool BucketGraph::is_dominated(Label *&new_label, Label *&label) noexcept
 
 #ifdef SRC
     // SRC logic (Subset Row Cuts) for Stage 3, 4, or Enumerate
-    if constexpr (S == Stage::Three || S == Stage::Four || S == Stage::Enumerate) {
+    if constexpr (S == Stage::Four || S == Stage::Enumerate) {
         const auto &SRCDuals = cut_storage->SRCDuals;
         // Check if the SRC dual values exist
         if (!SRCDuals.empty()) {
@@ -767,7 +786,7 @@ inline bool BucketGraph::is_dominated(Label *&new_label, Label *&label) noexcept
 
 #ifdef SRC3
     // Additional SRC3 logic for Stages 3, 4, and Enumerate
-    if constexpr (S == Stage::Three || S == Stage::Four || S == Stage::Enumerate) {
+    if constexpr (S == Stage::Four || S == Stage::Enumerate) {
         const auto &SRCDuals = cut_storage->SRCDuals;
         if (!SRCDuals.empty()) {
             sumSRC = 0; // Reset sumSRC for SRC3 logic
@@ -844,14 +863,15 @@ inline bool BucketGraph::DominatedInCompWiseSmallerBuckets(Label *L, int bucket,
     auto &buckets = assign_buckets<D>(fw_buckets, bw_buckets);
     auto &Phi     = assign_buckets<D>(Phi_fw, Phi_bw);
 
-    const int       b_L = L->vertex; // The vertex (bucket) associated with the label L
-    std::stack<int> bucketStack;     // Stack to manage the traversal of buckets
-    bucketStack.push(bucket);        // Start with the input bucket
+    const int        b_L = L->vertex; // The vertex (bucket) associated with the label L
+    std::vector<int> bucketStack;     // Stack to manage the traversal of buckets
+    bucketStack.reserve(10);
+    bucketStack.push_back(bucket); // Start with the input bucket
 
     // Traverse the graph of buckets in a depth-first manner
     while (!bucketStack.empty()) {
-        int currentBucket = bucketStack.top(); // Get the bucket at the top of the stack
-        bucketStack.pop();                     // Remove it from the stack
+        int currentBucket = bucketStack.back(); // Get the bucket at the top of the stack
+        bucketStack.pop_back();                 // Remove it from the stack
 
         // Mark the current bucket as visited by updating the Bvisited bitmask
         const size_t segment      = currentBucket / 64; // Determine the segment for the current bucket
@@ -887,7 +907,7 @@ inline bool BucketGraph::DominatedInCompWiseSmallerBuckets(Label *L, int bucket,
             const size_t bit_position_prime = b_prime % 64; // Determine the bit position within the segment
 
             // If the neighboring bucket hasn't been visited, push it onto the stack
-            if ((Bvisited[segment_prime] & (1ULL << bit_position_prime)) == 0) { bucketStack.push(b_prime); }
+            if ((Bvisited[segment_prime] & (1ULL << bit_position_prime)) == 0) { bucketStack.push_back(b_prime); }
         }
     }
 
