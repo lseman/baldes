@@ -20,8 +20,8 @@
 
 #pragma once
 
-#include "Definitions.h"
 #include "DataClasses.h"
+#include "Definitions.h"
 
 #include <queue>
 #include <set>

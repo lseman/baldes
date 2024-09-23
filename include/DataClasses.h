@@ -6,7 +6,6 @@
 
 #include "Definitions.h"
 
-
 // Label structure to hold the details of each label in the graph
 /**
  * @struct Label
@@ -410,7 +409,6 @@ struct Bucket {
     bool empty() const { return labels_vec.empty(); }
 };
 
-
 /**
  * @struct Path
  * @brief Represents a path with a route and its associated cost.
@@ -544,7 +542,6 @@ struct Path {
         return (arcMap.find(arcPair) != arcMap.end()) ? arcMap.at(arcPair) : 0;
     }
 };
-
 
 // TODO: Add SRC and RCC penalty to the path cost
 class SchrodingerPool {
