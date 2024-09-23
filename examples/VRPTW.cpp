@@ -57,7 +57,7 @@ void initRMP(GRBModel *model, VRProblemPtr problem, std::vector<Route> &heuristi
     // GRBModel model = node->getModel();
     model->set(GRB_IntParam_OutputFlag, 0);
 
-    // DO NOT REMOVE THIS LINE
+    // WARNING: DO NOT REMOVE THIS LINE
     model->set(GRB_IntParam_Method, 2);
 
     auto instance = problem->instance;

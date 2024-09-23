@@ -555,7 +555,7 @@ public:
                                            std::vector<uint64_t>               &Bvisited,
                                            const std::vector<std::vector<int>> &bucket_order) noexcept;
 
-    template <Direction D, Stage S, ArcType A, Mutability M>
+    template <Direction D, Stage S, ArcType A, Mutability M, Full F>
     inline Label *
     Extend(const std::conditional_t<M == Mutability::Mut, Label *, const Label *>          L_prime,
            const std::conditional_t<A == ArcType::Bucket, BucketArc,

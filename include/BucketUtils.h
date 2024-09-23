@@ -448,7 +448,7 @@ void BucketGraph::ConcatenateLabel(const Label *&L, int &b, Label *&pbest, std::
         double     cost            = getcij(L_job_id, bucketLprimejob);
 
 #ifdef RCC
-        // cost -= rcc_manager->getCachedDualSumForArc(L_job_id, bucketLprimejob);
+        cost -= rcc_manager->getCachedDualSumForArc(L_job_id, bucketLprimejob);
 #endif
 
 #ifdef SRC
@@ -735,7 +735,7 @@ void BucketGraph::bucket_fixing(const std::vector<double> &q_star) {
         fw_c_bar = forward_cbar;
         bw_c_bar = backward_cbar;
 
-// TODO: change to nvidia stdexec
+        // TODO: change to nvidia stdexec
 #pragma omp parallel sections
         {
 #pragma omp section

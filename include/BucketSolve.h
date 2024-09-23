@@ -55,6 +55,7 @@ inline std::vector<Label *> BucketGraph::solve() {
                   static_cast<double>(n_bw_labels)) > 0.05) {
             split -= 0.05 * R_max[TIME_INDEX];
         }
+        // fmt::print("Split: {}\n", split);
     }
 
     // Placeholder for the final paths (labels) and inner objective value
@@ -194,14 +195,6 @@ std::vector<double> BucketGraph::labeling_algorithm(std::vector<double> q_point,
                     if (!domin_smaller) {
                         // Lambda function to process new labels after extension
                         auto process_new_label = [&](Label *new_label) {
-                            // Partial mode: Skip if the label does not meet q_point requirements
-                            if constexpr (F == Full::Partial) {
-                                if constexpr (D == Direction::Forward) {
-                                    if (label->resources[TIME_INDEX] > q_point[TIME_INDEX]) return;
-                                } else {
-                                    if (label->resources[TIME_INDEX] <= q_point[TIME_INDEX]) return;
-                                }
-                            }
                             stat_n_labels++; // Increment number of labels processed
 
                             int &to_bucket = new_label->vertex; // Get the bucket to which the new label belongs
@@ -268,7 +261,7 @@ std::vector<double> BucketGraph::labeling_algorithm(std::vector<double> q_point,
                         // Process regular arcs for label extension
                         const auto &arcs = jobs[label->job_id].get_arcs<D>(scc_index);
                         for (const auto &arc : arcs) {
-                            Label *new_label = Extend<D, S, ArcType::Job, Mutability::Mut>(label, arc);
+                            Label *new_label = Extend<D, S, ArcType::Job, Mutability::Mut, F>(label, arc);
                             if (!new_label) {
 #ifdef UNREACHABLE_DOMINANCE
                                 set_job_unreachable(label->unreachable_bitmap, arc.to);
@@ -283,7 +276,7 @@ std::vector<double> BucketGraph::labeling_algorithm(std::vector<double> q_point,
                         if constexpr (S == Stage::Four) {
                             const auto &jump_arcs = buckets[bucket].template get_jump_arcs<D>();
                             for (const auto &jump_arc : jump_arcs) {
-                                Label *new_label = Extend<D, S, ArcType::Jump, Mutability::Const>(label, jump_arc);
+                                Label *new_label = Extend<D, S, ArcType::Jump, Mutability::Const, F>(label, jump_arc);
                                 if (!new_label) { continue; } // Skip if label extension failed
                                 process_new_label(new_label); // Process the new label
                             }
@@ -417,10 +410,10 @@ std::vector<Label *> BucketGraph::bi_labeling_algorithm(std::vector<double> q_st
                 }
 
                 // Attempt to extend the current label using this arc
-                auto L_prime = Extend<Direction::Forward, S, ArcType::Job, Mutability::Const>(L, arc);
+                auto L_prime = Extend<Direction::Forward, S, ArcType::Job, Mutability::Const, Full::Reverse>(L, arc);
 
                 // Check if the new label is valid and respects the q_star constraints
-                if (!L_prime || L_prime->resources[TIME_INDEX] <= q_star[TIME_INDEX]) {
+                if (!L_prime) {
                     continue; // Skip invalid labels or those that exceed q_star
                 }
 
@@ -466,7 +459,7 @@ std::vector<Label *> BucketGraph::bi_labeling_algorithm(std::vector<double> q_st
  * label.
  */
 
-template <Direction D, Stage S, ArcType A, Mutability M>
+template <Direction D, Stage S, ArcType A, Mutability M, Full F>
 inline Label *
 BucketGraph::Extend(const std::conditional_t<M == Mutability::Mut, Label *, const Label *>          L_prime,
                     const std::conditional_t<A == ArcType::Bucket, BucketArc,
@@ -547,6 +540,18 @@ BucketGraph::Extend(const std::conditional_t<M == Mutability::Mut, Label *, cons
                 return nullptr; // Backward: Below lower bound
             }
         }
+    }
+
+    // Check if the new resources exceed the q_star constraints and skip if so
+    if constexpr (F == Full::Partial) {
+        if constexpr (D == Direction::Forward) {
+            // print q_star[time_index]
+            if (new_resources[TIME_INDEX] > q_star[TIME_INDEX]) return nullptr;
+        } else if constexpr (D == Direction::Backward) {
+            if (new_resources[TIME_INDEX] <= q_star[TIME_INDEX]) return nullptr;
+        }
+    } else if constexpr (F == Full::Reverse) {
+        if (new_resources[TIME_INDEX] <= q_star[TIME_INDEX]) return nullptr;
     }
 
     // Get the bucket number for the new job and resource state

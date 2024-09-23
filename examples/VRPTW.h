@@ -59,6 +59,8 @@ public:
     std::vector<GRBConstr> SRCconstraints;
     ModelData              matrix;
 
+    LimitedMemoryRank1Cuts r1c;
+
 #ifdef RCC
     CnstrMgrPointer oldCutsCMP = nullptr;
 #endif
@@ -78,7 +80,9 @@ public:
      * @param enumerate Flag indicating whether to enumerate the columns.
      * @return The number of columns added.
      */
-    int addColumn(GRBModel *node, const auto &columns, CutStorage &r1c, bool enumerate = false) {
+    int addColumn(GRBModel *node, const auto &columns, bool enumerate = false) {
+        auto &cuts = r1c.cutStorage;
+
         int                 numConstrsLocal = node->get(GRB_IntAttr_NumConstrs);
         const GRBConstr    *constrs         = node->getConstrs();
         std::vector<double> coluna(numConstrsLocal, 0.0); // Declare outside the loop
@@ -136,7 +140,7 @@ public:
 
             // Add terms for the limited memory rank 1 cuts
 #if defined(SRC3) || defined(SRC)
-            auto vec = r1c.computeLimitedMemoryCoefficients(label->jobs_covered);
+            auto vec = cuts.computeLimitedMemoryCoefficients(label->jobs_covered);
             // print vec size
             if (vec.size() > 0) {
                 for (int i = 0; i < vec.size(); i++) {
@@ -605,8 +609,9 @@ public:
         auto allJobs = bucket_graph.getJobs();
 
 #ifdef SRC
-        LimitedMemoryRank1Cuts r1c(allJobs);
-        CutStorage             cuts;
+        r1c = LimitedMemoryRank1Cuts(allJobs);
+
+        CutStorage cuts;
         r1c.cutStorage = cuts;
 #endif
 
@@ -741,11 +746,11 @@ public:
                         break;
                     }
 
-#endif
                     changed = cutHandler(r1c, node, SRCconstraints);
                     if (changed) { matrix = extractModelDataSparse(node); }
                     cuts = r1c.cutStorage;
                 }
+#endif
                 bucket_graph.ss = false;
             }
 
@@ -821,7 +826,8 @@ public:
                 bool integer = true;
                 // Check integrality of the solution
                 for (auto &sol : solution) {
-                    if (sol > 1e-1 && sol < 1 - 1e-1) {
+                    // NOTE: 1e-1 is not enough
+                    if (sol > 1e-2 && sol < 1 - 1e-2) {
                         integer = false;
                         break;
                     }
@@ -838,19 +844,22 @@ public:
                 bucket_graph.augment_ng_memories(solution, allPaths, true, 5, 100, 16, N_SIZE);
                 bucket_graph.relaxation = highs_obj;
 
+#if defined(SRC3) || defined(SRC)
                 if (cuts.size() > 0) {
                     auto duals = node->get(GRB_DoubleAttr_Pi, SRCconstraints.data(), SRCconstraints.size());
                     cutDuals.assign(duals, duals + SRCconstraints.size());
                     cuts.setDuals(cutDuals);
                 }
+                bucket_graph.cut_storage = &cuts;
+
+#endif
 
                 bucket_graph.setDuals(jobDuals);
 
                 //////////////////////////////////////////////////////////////////////
                 // CALLING BALDES
                 //////////////////////////////////////////////////////////////////////
-                bucket_graph.cut_storage = &cuts;
-                paths                    = bucket_graph.solve();
+                paths = bucket_graph.solve();
 
                 inner_obj = paths[0]->cost;
                 stage     = bucket_graph.getStage();
@@ -860,11 +869,11 @@ public:
                 //////////////////////////////////////////////////////////////////////
 
                 // Adding cols
-                auto colAdded = addColumn(node, paths, cuts, false);
+                auto colAdded = addColumn(node, paths, false);
 
 #ifdef RIH
                 auto rih_paths = bucket_graph.get_rih_labels();
-                colAdded += addColumn(node, rih_paths, cuts, true);
+                colAdded += addColumn(node, rih_paths, true);
 #endif
 
 #ifdef STAB
@@ -890,11 +899,16 @@ public:
 #ifdef STAB
             cur_alpha = stab.base_alpha;
 #endif
+
+            auto n_cuts = 0;
+#ifdef SRC
+            n_cuts = cuts.size();
+#endif
             if (iter % 10 == 0)
                 fmt::print("| It.: {:4} | Obj.: {:8.2f} | Price: {:9.2f} | Cuts: {:4} | Paths: {:4} | "
                            "Stage: {:1} | "
                            "Lag. Gap: {:10.4f} | RCC: {:4} | alpha: {:4.2f} | \n",
-                           iter, highs_obj, inner_obj, cuts.size(), paths.size(), stage, lag_gap, rcc, cur_alpha);
+                           iter, highs_obj, inner_obj, n_cuts, paths.size(), stage, lag_gap, rcc, cur_alpha);
         }
         auto end_timer        = std::chrono::high_resolution_clock::now();
         auto duration_ms      = std::chrono::duration_cast<std::chrono::milliseconds>(end_timer - start_timer).count();

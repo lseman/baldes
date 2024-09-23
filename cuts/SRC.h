@@ -247,6 +247,9 @@ class LimitedMemoryRank1Cuts {
 public:
     LimitedMemoryRank1Cuts(std::vector<VRPJob> &jobs);
 
+    // default constructor
+    LimitedMemoryRank1Cuts() = default;
+
     CutStorage cutStorage;
 
     void              printBaseSets();
