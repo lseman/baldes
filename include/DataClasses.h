@@ -1,10 +1,10 @@
 #pragma once
-#include <deque>
-#include <iostream>
-#include <tuple>
-#include <vector>
 
 #include "Definitions.h"
+
+#include <deque>
+#include <tuple>
+#include <vector>
 
 // Label structure to hold the details of each label in the graph
 /**
@@ -22,7 +22,6 @@
  *
  * The struct overloads the equality and greater than operators for comparison.
  */
-const size_t num_words = (N_SIZE + 63) / 64; // This will be 2 for 100 clients
 struct Label {
     // int                   id;
     bool                       is_extended = false;
@@ -410,147 +409,24 @@ struct Bucket {
 };
 
 /**
- * @struct Path
- * @brief Represents a path with a route and its associated cost.
+ * @class SchrodingerPool
+ * @brief Manages a pool of paths with a limited lifespan, computes reduced costs, and filters paths based on their
+ * reduced costs.
  *
- * The Path struct encapsulates a route represented as a vector of integers and a cost associated with the
- * route. It provides various utility methods to interact with the route, such as checking for the presence of
- * elements, counting occurrences, and managing arcs between route points.
+ * This class is designed to manage a collection of paths, each associated with an iteration when it was added.
+ * Paths have a limited lifespan, defined by `max_live_time`, after which they are removed from the pool.
+ * The class also provides functionality to compute reduced costs for paths and filter paths based on their reduced
+ * costs.
  *
  */
-struct Path {
-    std::vector<int> route;
-    double           cost;
-    double           red_cost = std::numeric_limits<double>::max();
-
-    // default constructor
-    Path() : route({}), cost(0.0) {}
-    Path(const std::vector<int> &route, double cost) : route(route), cost(cost) {
-        (void)std::async(std::launch::async, &Path::precomputeArcs, this); // Ignore the future
-    }
-
-    // define begin and end methods linking to route
-    auto begin() { return route.begin(); }
-    auto end() { return route.end(); }
-    // define size
-    auto size() { return route.size(); }
-    // make the [] operator available
-    int operator[](int i) const { return route[i]; }
-
-    /**
-     * @brief Checks if the given integer is present in the route.
-     *
-     * This function searches for the specified integer within the route
-     * and returns true if the integer is found, otherwise false.
-     *
-     * @param i The integer to search for in the route.
-     * @return true if the integer is found in the route, false otherwise.
-     */
-    bool contains(int i) { return std::find(route.begin(), route.end(), i) != route.end(); }
-
-    /**
-     * @brief Counts the occurrences of a given integer in the route.
-     *
-     * This function iterates through the 'route' container and counts how many times
-     * the specified integer 'i' appears in it.
-     *
-     * @param i The integer value to count within the route.
-     * @return int The number of times the integer 'i' appears in the route.
-     */
-    int countOccurrences(int i) { return std::count(route.begin(), route.end(), i); }
-
-    /**
-     * @brief Counts the number of times an arc (i, j) appears in the route.
-     *
-     * This function iterates through the route and counts how many times the arc
-     * from node i to node j appears consecutively.
-     *
-     * @param i The starting node of the arc.
-     * @param j The ending node of the arc.
-     * @return The number of times the arc (i, j) appears in the route.
-     */
-    int timesArc(int i, int j) const {
-        int       times = 0;
-        const int size  = route.size();
-        for (int n = 1; n < size; ++n) {
-            if ((route[n - 1] == i && route[n] == j)) { times++; }
-        }
-
-        return times;
-    }
-
-    std::unordered_map<std::pair<int, int>, int, pair_hash> arcMap; // Maps arcs to their counts
-
-    /**
-     * @brief Adds an arc between two nodes and increments its count in the arc map.
-     *
-     * This function creates a pair representing an arc between nodes `i` and `j`,
-     * and increments the count of this arc in the `arcMap`. If the arc does not
-     * already exist in the map, it is added with an initial count of 1.
-     *
-     * @param i The starting node of the arc.
-     * @param j The ending node of the arc.
-     */
-    void addArc(int i, int j) {
-        std::pair<int, int> arc = std::make_pair(i, j);
-        arcMap[arc]++; // Increment the count of the arc
-    }
-
-    /**
-     * @brief Precomputes arcs for the given route.
-     *
-     * This function iterates through the route and adds arcs between consecutive nodes.
-     * It assumes that the route is a valid sequence of nodes and that the addArc function
-     * is defined to handle the addition of arcs between nodes.
-     */
-    void precomputeArcs() {
-        for (int n = 0; n < route.size() - 1; ++n) { addArc(route[n], route[n + 1]); }
-    }
-
-    /**
-     * @brief Retrieves the count of arcs between two nodes.
-     *
-     * This function takes two integers representing nodes and returns the count
-     * of arcs between them. If the arc pair (i, j) exists in the arcMap, the
-     * function returns the associated count. Otherwise, it returns 0.
-     *
-     * @param i The first node of the arc.
-     * @param j The second node of the arc.
-     * @return The count of arcs between node i and node j. Returns 0 if the arc
-     *         does not exist in the arcMap.
-     */
-    auto getArcCount(int i, int j) const {
-        // Construct the arc pair
-        std::pair<int, int> arc = std::make_pair(i, j);
-        return (arcMap.find(arc) != arcMap.end()) ? arcMap.at(arc) : 0;
-    }
-
-    /**
-     * @brief Retrieves the count of a specified arc.
-     *
-     * This function takes an arc represented by an RCCarc object and constructs
-     * a pair from its 'from' and 'to' members. It then checks if this pair exists
-     * in the arcMap. If the pair is found, the function returns the count associated
-     * with the arc. If the pair is not found, it returns 0.
-     *
-     * @param arc The RCCarc object representing the arc whose count is to be retrieved.
-     * @return The count of the specified arc if it exists in the arcMap, otherwise 0.
-     */
-    auto getArcCount(RCCarc arc) const {
-        // Construct the arc pair
-        std::pair<int, int> arcPair = std::make_pair(arc.from, arc.to);
-        return (arcMap.find(arcPair) != arcMap.end()) ? arcMap.at(arcPair) : 0;
-    }
-};
-
-// TODO: Add SRC and RCC penalty to the path cost
 class SchrodingerPool {
 private:
     std::deque<std::tuple<int, Path>> paths; // Stores tuples of (iteration added, Path)
     int                               current_iteration = 0;
     int                               max_live_time; // Max iterations a Path can stay active
     std::vector<double>               duals;         // Dual variables for each path
-    std::vector<VRPJob>              *jobs = nullptr;
+    std::vector<VRPJob>              *jobs        = nullptr;
+    CutStorage                       *cut_storage = nullptr;
 
 public:
     std::vector<std::vector<double>> distance_matrix; // Distance matrix for the graph
@@ -579,7 +455,16 @@ public:
         computeRC();
     }
 
+    void setCutStorage(CutStorage *cut_storage) { this->cut_storage = cut_storage; }
+
     void computeRC() {
+
+#ifdef SRC
+        auto &cutter   = cut_storage;      // Access the cut storage manager
+        auto &SRCDuals = cutter->SRCDuals; // Access the dual values for the SRC cuts
+#endif
+
+        std::vector<double> SRCmap(cutter->size(), 0.0); // Initialize the SRC map with zeros
         for (auto &path : paths) {
             int iteration_added = std::get<0>(path); // Get the iteration when the path was added
 
@@ -591,8 +476,42 @@ public:
 
             if (p.size() > 1) {
                 for (int i = 0; i < p.size() - 1; i++) {
-                    auto &job = (*jobs)[p[i]]; // Dereference jobs and access element
+                    auto  job_id = p[i];
+                    auto &job    = (*jobs)[job_id]; // Dereference jobs and access element once
                     p.red_cost -= job.cost;
+
+#ifdef SRC
+                    size_t         segment      = job_id / 64;          // Precompute segment in the bitmap
+                    size_t         bit_position = job_id % 64;          // Precompute bit position in the segment
+                    const uint64_t bit_mask     = 1ULL << bit_position; // Precompute bit shift
+
+                    for (std::size_t idx = 0; idx < cutter->size(); ++idx) {
+
+                        auto it = cutter->begin();
+                        std::advance(it, idx);
+                        const auto &cut          = *it;
+                        const auto &baseSet      = cut.baseSet;
+                        const auto &baseSetorder = cut.baseSetOrder;
+                        const auto &neighbors    = cut.neighbors;
+                        const auto &multipliers  = cut.multipliers;
+
+                        bool bitIsSet  = neighbors[segment] & bit_mask;
+                        bool bitIsSet2 = baseSet[segment] & bit_mask;
+
+                        double &src_map_value = SRCmap[idx]; // Use reference to avoid multiple accesses
+                        if (!bitIsSet) {
+                            src_map_value = 0.0; // Reset the SRC map value
+                        }
+
+                        if (bitIsSet2) {
+                            src_map_value += multipliers[baseSetorder[job_id]];
+                            if (src_map_value >= 1) {
+                                src_map_value -= 1;
+                                p.red_cost -= SRCDuals[idx]; // Apply the SRC dual value if threshold is exceeded
+                            }
+                        }
+                    }
+#endif
                 }
             }
         }

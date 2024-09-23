@@ -718,6 +718,7 @@ public:
         double highs_obj_dual = 0.0;
         double highs_obj      = 0.0;
 
+        bucket_graph.cut_storage = &cuts;
         bucket_graph.setup();
 
         double gap = 1e-6;
@@ -948,8 +949,6 @@ public:
                     cutDuals.assign(duals, duals + SRCconstraints.size());
                     cuts.setDuals(cutDuals);
                 }
-                bucket_graph.cut_storage = &cuts;
-
 #endif
 
                 bucket_graph.setDuals(jobDuals);

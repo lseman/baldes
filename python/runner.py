@@ -1,20 +1,13 @@
-import sys
 import os
-
-class VRPJob:
-    def __init__(self, num_intervals):
-        # Initialize lower and upper bounds as lists with size num_intervals
-        self.lb = [0] * num_intervals  # Lower bounds for each resource
-        self.ub = [0] * num_intervals  # Upper bounds for each resource
-        self.id = None  # You can add an id as in the C++ code if needed
-
+import random
+import sys
 
 # Add the build directory to the Python path
 sys.path.append(os.path.abspath('../build'))
 
 # Now you can import the bucket_graph module
 import bucket_graph
-import random
+
 # Define jobs
 jobs = [bucket_graph.VRPJob() for _ in range(102)]
 num_intervals = 1
@@ -47,5 +40,5 @@ print(duals)
 
 bg.set_distance_matrix(distances)
 bg.set_adjacency_list()
-#bg.set_duals(duals)
+bg.set_duals(duals)
 bg.setup()
