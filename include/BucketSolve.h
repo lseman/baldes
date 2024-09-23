@@ -437,8 +437,8 @@ std::vector<Label *> BucketGraph::bi_labeling_algorithm(std::vector<double> q_st
 
                 // Note: apparently without the second condition it work better in some cases
                 // Check if the new label is valid and respects the q_star constraints
-                if (!L_prime || L_prime->resources[TIME_INDEX] <= q_star[TIME_INDEX]) {
-                    continue; // Skip invalid labels or those that exceed q_star
+                if (!L_prime || L_prime->resources[TIME_INDEX] < q_star[TIME_INDEX]) {
+                    continue;   // Skip invalid labels or those that exceed q_star
                 }
 
                 // Get the bucket for the extended label

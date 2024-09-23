@@ -332,11 +332,11 @@ public:
 
         // Identify variables with negative reduced costs
         for (int i = 0; i < varNumber; ++i) {
-            if (reducedCosts[i] < 0) { indicesToRemove.push_back(i); }
+            if (reducedCosts[i] > 0) { indicesToRemove.push_back(i); }
         }
 
         // Limit the number of variables to remove to 30% of the total
-        size_t maxRemoval = static_cast<size_t>(0.3 * varNumber);
+        size_t maxRemoval = static_cast<size_t>(0.1 * varNumber);
         if (indicesToRemove.size() > maxRemoval) {
             indicesToRemove.resize(maxRemoval); // Only keep the first 30%
         }
@@ -828,6 +828,8 @@ public:
                 if (!rcc) {
 
                     auto cuts_before = cuts.size();
+                    removeNegativeReducedCostVarsAndPaths(node);
+                    matrix = extractModelDataSparse(node);
                     node->optimize();
                     solution     = extractSolution(node);
                     r1c.allPaths = allPaths;
