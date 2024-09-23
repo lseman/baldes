@@ -426,18 +426,19 @@ Label *BucketGraph::get_best_label(const std::vector<int> &topological_order, co
 template <Stage S>
 void BucketGraph::ConcatenateLabel(const Label *&L, int &b, Label *&pbest, std::vector<uint64_t> &Bvisited,
                                    const std::vector<double> &q_star) {
-    // Create a stack for iterative processing
-    std::stack<int> bucket_stack;
-    bucket_stack.push(b);
+    // Use a vector for iterative processing as a stack
+    std::vector<int> bucket_stack;
+    bucket_stack.reserve(10);
+    bucket_stack.push_back(b);
 
     const auto  L_job_id    = L->job_id;
     const auto  L_resources = L->resources;
     const auto &L_last_job  = jobs[L_job_id];
 
     while (!bucket_stack.empty()) {
-        // Pop the next bucket from the stack
-        int current_bucket = bucket_stack.top();
-        bucket_stack.pop();
+        // Pop the next bucket from the stack (vector back)
+        int current_bucket = bucket_stack.back();
+        bucket_stack.pop_back();
 
         // Mark the bucket as visited
         const size_t segment      = current_bucket / 64;
@@ -452,9 +453,15 @@ void BucketGraph::ConcatenateLabel(const Label *&L, int &b, Label *&pbest, std::
 #endif
 
 #ifdef SRC
-        auto &cutter   = cut_storage;
-        auto &SRCDuals = cutter->SRCDuals;
+        decltype(cut_storage)            cutter   = nullptr;
+        decltype(cut_storage->SRCDuals) *SRCDuals = nullptr;
+
+        if constexpr (S > Stage::Three) {
+            cutter   = cut_storage;       // Initialize cutter
+            SRCDuals = &cutter->SRCDuals; // Initialize SRCDuals
+        }
 #endif
+
         double L_cost_plus_cost = L->cost + cost;
 
         // Early exit based on cost comparison
@@ -474,14 +481,16 @@ void BucketGraph::ConcatenateLabel(const Label *&L, int &b, Label *&pbest, std::
             double candidate_cost = L_cost_plus_cost + L_bw->cost;
 
 #ifdef SRC
-            for (auto it = cutter->begin(); it < cutter->end(); ++it) {
-                if (SRCDuals[it->id] == 0) continue;
-                if (L->SRCmap[it->id] + L_bw->SRCmap[it->id] >= 1) { candidate_cost -= SRCDuals[it->id]; }
+            if constexpr (S > Stage::Three) {
+                for (auto it = cutter->begin(); it < cutter->end(); ++it) {
+                    if ((*SRCDuals)[it->id] == 0) continue;
+                    if (L->SRCmap[it->id] + L_bw->SRCmap[it->id] >= 1) { candidate_cost -= (*SRCDuals)[it->id]; }
+                }
             }
 #endif
 
             // Check for visited overlap and skip if true
-            if constexpr (S == Stage::Three || S == Stage::Four || S == Stage::Enumerate) {
+            if constexpr (S >= Stage::Three) {
                 bool visited_overlap = false;
                 for (size_t i = 0; i < L->visited_bitmap.size(); ++i) {
                     if (L->visited_bitmap[i] & L_bw->visited_bitmap[i]) {
@@ -503,11 +512,13 @@ void BucketGraph::ConcatenateLabel(const Label *&L, int &b, Label *&pbest, std::
             merged_labels.push_back(pbest);
         }
 
-        // Add unvisited neighboring buckets to the stack
+        // Add unvisited neighboring buckets to the stack (vector back)
         for (int b_prime : Phi_bw[current_bucket]) {
             const size_t segment_prime      = b_prime / 64;
             const size_t bit_position_prime = b_prime % 64;
-            if (!(Bvisited[segment_prime] & (1ULL << bit_position_prime))) { bucket_stack.push(b_prime); }
+            if (!(Bvisited[segment_prime] & (1ULL << bit_position_prime))) {
+                bucket_stack.push_back(b_prime); // Add to the vector stack
+            }
         }
     }
 }

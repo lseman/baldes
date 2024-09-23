@@ -69,8 +69,8 @@ class CutStorage;
  * @struct Interval
  * @brief Represents an interval with a duration and a horizon.
  *
- * The Interval struct is used to store information about an interval, which consists of a duration and a horizon.
- * The duration is represented by a double value, while the horizon is represented by an integer value.
+ * The Interval struct is used to store information about an interval, which consists of a duration and a
+ * horizon. The duration is represented by a double value, while the horizon is represented by an integer value.
  */
 struct Interval {
     int interval;
@@ -275,9 +275,9 @@ struct RCCmanager {
  * @struct Path
  * @brief Represents a path with a route and its associated cost.
  *
- * The Path struct encapsulates a route represented as a vector of integers and a cost associated with the route.
- * It provides various utility methods to interact with the route, such as checking for the presence of elements,
- * counting occurrences, and managing arcs between route points.
+ * The Path struct encapsulates a route represented as a vector of integers and a cost associated with the
+ * route. It provides various utility methods to interact with the route, such as checking for the presence of
+ * elements, counting occurrences, and managing arcs between route points.
  *
  */
 struct Path {
@@ -429,7 +429,7 @@ struct Label {
     std::array<double, R_SIZE> resources    = {};
     std::vector<int>           jobs_covered = {}; // Add jobs_covered to Label
     int                        job_id       = -1; // Add job_id to Label
-    const Label               *parent       = nullptr;
+    Label               *parent       = nullptr;
 #ifdef SRC3
     std::array<std::uint16_t, MAX_SRC_CUTS> SRCmap = {};
 #endif
@@ -618,12 +618,12 @@ struct JumpArc {
  * The LabelPool class is responsible for managing a pool of Label objects. It provides methods to acquire and
  * release labels from the pool, as well as resetting the pool to its initial state.
  *
- * The pool size is determined during construction and can be optionally limited to a maximum size. Labels can be
- * acquired from the pool using the `acquire()` method, and released back to the pool using the `release()` method.
- * If the pool is full, a new label will be allocated.
+ * The pool size is determined during construction and can be optionally limited to a maximum size. Labels can
+ * be acquired from the pool using the `acquire()` method, and released back to the pool using the `release()`
+ * method. If the pool is full, a new label will be allocated.
  *
- * The `reset()` method can be used to reset the pool to its initial state. This will delete all labels in the pool
- * and reallocate labels to match the initial pool size.
+ * The `reset()` method can be used to reset the pool to its initial state. This will delete all labels in the
+ * pool and reallocate labels to match the initial pool size.
  *
  * @note The LabelPool class is not thread-safe by default. If thread safety is required, appropriate
  * synchronization mechanisms should be used when accessing the pool.
@@ -731,8 +731,8 @@ private:
  * @brief Represents a bucket.
  *
  * A bucket is a data structure that contains labels, job ID, lower bounds, upper bounds, forward arcs, backward
- * arcs, forward jump arcs, and backward jump arcs. It provides methods to add arcs, add jump arcs, get arcs, get
- * jump arcs, add labels, remove labels, get labels, clear labels, reset labels, and clear arcs.
+ * arcs, forward jump arcs, and backward jump arcs. It provides methods to add arcs, add jump arcs, get arcs,
+ * get jump arcs, add labels, remove labels, get labels, clear labels, reset labels, and clear arcs.
  */
 struct Bucket {
     // std::vector<Label *>   labels_vec;
@@ -747,6 +747,38 @@ struct Bucket {
     std::vector<BucketArc> bw_bucket_arcs;
     std::vector<JumpArc>   fw_jump_arcs;
     std::vector<JumpArc>   bw_jump_arcs;
+
+    Bucket(const Bucket &other) {
+        // Perform deep copy of all relevant members
+        labels_vec     = other.labels_vec;
+        job_id         = other.job_id;
+        lb             = other.lb;
+        ub             = other.ub;
+        fw_arcs        = other.fw_arcs;
+        bw_arcs        = other.bw_arcs;
+        fw_bucket_arcs = other.fw_bucket_arcs;
+        bw_bucket_arcs = other.bw_bucket_arcs;
+        fw_jump_arcs   = other.fw_jump_arcs;
+        bw_jump_arcs   = other.bw_jump_arcs;
+    }
+
+    Bucket &operator=(const Bucket &other) {
+        if (this == &other) return *this; // Handle self-assignment
+
+        // Perform deep copy of all relevant members
+        labels_vec     = other.labels_vec;
+        job_id         = other.job_id;
+        lb             = other.lb;
+        ub             = other.ub;
+        fw_arcs        = other.fw_arcs;
+        bw_arcs        = other.bw_arcs;
+        fw_bucket_arcs = other.fw_bucket_arcs;
+        bw_bucket_arcs = other.bw_bucket_arcs;
+        fw_jump_arcs   = other.fw_jump_arcs;
+        bw_jump_arcs   = other.bw_jump_arcs;
+
+        return *this;
+    }
 
     /**
      * @brief Deletes a bucket arc from the specified direction.
@@ -787,7 +819,8 @@ struct Bucket {
      * @param to_bucket The index of the destination bucket.
      * @param res_inc A vector of resource increments associated with the arc.
      * @param cost_inc The cost increment associated with the arc.
-     * @param fw A boolean indicating the direction of the arc. If true, the arc is forward; otherwise, it is backward.
+     * @param fw A boolean indicating the direction of the arc. If true, the arc is forward; otherwise, it is
+     * backward.
      * @param fixed A boolean indicating whether the arc is fixed.
      */
     void add_bucket_arc(int from_bucket, int to_bucket, std::vector<double> res_inc, double cost_inc, bool fw,
@@ -809,8 +842,8 @@ struct Bucket {
      * @param to_bucket The index of the destination bucket.
      * @param res_inc A vector of resource increments associated with the jump arc.
      * @param cost_inc The cost increment associated with the jump arc.
-     * @param fw A boolean indicating the direction of the jump arc. If true, the arc is added to the forward jump arcs;
-     *           otherwise, it is added to the backward jump arcs.
+     * @param fw A boolean indicating the direction of the jump arc. If true, the arc is added to the forward
+     * jump arcs; otherwise, it is added to the backward jump arcs.
      */
     void add_jump_arc(int from_bucket, int to_bucket, std::vector<double> res_inc, double cost_inc, bool fw) {
         if (fw) {
@@ -912,7 +945,7 @@ struct Bucket {
             labels_vec.push_back(label);
         } else {
             auto it = std::max_element(labels_vec.begin(), labels_vec.end(),
-                                       [](const Label *a, const Label *b) { return a->cost < b->cost; });
+                                       [](const Label *a, const Label *b) { return a->cost > b->cost; });
             if (label->cost < (*it)->cost) { *it = label; }
         }
     }
@@ -939,8 +972,7 @@ struct Bucket {
     inline auto &get_labels() { return labels_vec; }
 
     inline auto &get_sorted_labels() {
-        std::sort(labels_vec.begin(), labels_vec.end(),
-                  [](const Label *a, const Label *b) { return a->cost > b->cost; });
+        pdqsort(labels_vec.begin(), labels_vec.end(), [](const Label *a, const Label *b) { return a->cost < b->cost; });
         return labels_vec;
     }
 
@@ -998,9 +1030,9 @@ struct ViewPeriod {
  * @struct VRPJob
  * @brief Represents a job in a Vehicle Routing Problem.
  *
- * This struct contains information about a job, such as its ID, start time, end time, duration, cost, demand, and
- * capacity constraints. It provides constructors to initialize the job with different sets of parameters. The
- * `setDuals` method allows updating the cost of the job.
+ * This struct contains information about a job, such as its ID, start time, end time, duration, cost, demand,
+ * and capacity constraints. It provides constructors to initialize the job with different sets of parameters.
+ * The `setDuals` method allows updating the cost of the job.
  */
 struct VRPJob {
     double                        x;
@@ -1135,11 +1167,14 @@ struct VRPJob {
     }
 
     /**
-     * @brief Retrieves the arcs associated with a given strongly connected component (SCC) in the specified direction.
+     * @brief Retrieves the arcs associated with a given strongly connected component (SCC) in the specified
+     * direction.
      *
-     * @tparam dir The direction of the arcs to retrieve. It can be either Direction::Forward or Direction::Backward.
+     * @tparam dir The direction of the arcs to retrieve. It can be either Direction::Forward or
+     * Direction::Backward.
      * @param scc The index of the strongly connected component.
-     * @return const std::vector<Arc>& A reference to the vector of arcs in the specified direction for the given SCC.
+     * @return const std::vector<Arc>& A reference to the vector of arcs in the specified direction for the
+     * given SCC.
      */
     template <Direction dir>
     inline const std::vector<Arc> &get_arcs(int scc) const {

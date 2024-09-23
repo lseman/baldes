@@ -43,6 +43,9 @@ public:
     bool operator()(Label *a, Label *b) { return a->cost > b->cost; }
 };
 
+#include <array>
+#include <string_view>
+
 /**
  * @class BucketGraph
  * @brief Represents a graph structure used for bucket-based optimization in a solver.
@@ -68,6 +71,57 @@ class BucketGraph {
     using NGRouteBitmap = uint64_t;
 
 public:
+
+    // Note: very tricky way to unroll the loop at compile time and check for disposability
+    static constexpr std::string_view resources[] = {RESOURCES}; // RESOURCES will expand to your string list
+    static constexpr bool             resource_disposability[] = {
+        RESOURCES_DISPOSABLE}; // RESOURCES_DISPOSABLE expands to disposability list
+
+    template <Direction D, size_t I, size_t N, typename Gamma, typename VRPJob>
+    constexpr bool process_all_resources(std::vector<double>              &new_resources,
+                                         const std::array<double, R_SIZE> &initial_resources, const Gamma &gamma,
+                                         const VRPJob &theJob) {
+        if constexpr (I < N) {
+            // Process the resource at index I
+            if (!process_resource<D, I, N>(new_resources[I], initial_resources, gamma, theJob)) {
+                return false; // Constraint violated, return false
+            }
+            // Recur to process the next resource
+            return process_all_resources<D, I + 1, N>(new_resources, initial_resources, gamma, theJob);
+        }
+        return true; // All resources processed successfully
+    }
+
+    // Template recursion for compile-time unrolling
+    template <Direction D, size_t I, size_t N, typename Gamma, typename VRPJob>
+    constexpr bool process_resource(double &new_resource, const std::array<double, R_SIZE> &initial_resources,
+                                    const Gamma &gamma, const VRPJob &theJob) {
+        if constexpr (resource_disposability[I]) { // Checked at compile-time
+            if constexpr (D == Direction::Forward) {
+                new_resource =
+                    std::max(initial_resources[I] + gamma.resource_increment[I], static_cast<double>(theJob.lb[I]));
+                if (new_resource > theJob.ub[I]) {
+                    return false; // Exceeds upper bound, return false to stop processing
+                }
+            } else {
+                new_resource =
+                    std::min(initial_resources[I] - gamma.resource_increment[I], static_cast<double>(theJob.ub[I]));
+                if (new_resource < theJob.lb[I]) {
+                    return false; // Below lower bound, return false to stop processing
+                }
+            }
+        } else {
+            // TODO: Add specific handling for non-disposable resources
+        }
+
+        return true; // Successfully processed all resources
+    }
+    // Function to automatically get the size
+    template <typename T, std::size_t N>
+    constexpr std::size_t array_size(const T (&)[N]) {
+        return N;
+    }
+
     bool                s1    = true;
     bool                s2    = false;
     bool                s3    = false;
@@ -88,6 +142,9 @@ public:
     RCCmanager *rcc_manager = nullptr;
 
     std::vector<Label *> merged_labels_rih;
+
+    // std::shared_ptr<ThreadPool> fw_thread_pool = std::make_shared<ThreadPool>(1);
+    // std::shared_ptr<ThreadPool> bw_thread_pool = std::make_shared<ThreadPool>(1);
 
     std::thread rih_thread;
     std::mutex  mtx; // For thread-safe access to merged_labels_improved
