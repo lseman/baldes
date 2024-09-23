@@ -17,6 +17,7 @@
 #cmakedefine STAB
 #cmakedefine AUGMENTED
 #cmakedefine EXACT_RCC
+#cmakedefine WITH_PYTHON
 
 // Define constants for resource sizes
 #define R_SIZE @R_SIZE@

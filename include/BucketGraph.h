@@ -20,8 +20,9 @@
 
 #pragma once
 
-#include "DataClasses.h"
 #include "Definitions.h"
+
+#include "DataClasses.h"
 
 #include <queue>
 #include <set>
@@ -134,8 +135,8 @@ public:
     Status              status     = Status::NotOptimal;
 
     void                 setSplit(std::vector<double> q_star) { this->q_star = q_star; }
-    int                  getStage() { return stage; }
-    Status               getStatus() { return status; }
+    int                  getStage() const { return stage; }
+    Status               getStatus() const { return status; }
     std::vector<Label *> solve();
 
     RCCmanager *rcc_manager = nullptr;
@@ -223,66 +224,13 @@ public:
     std::vector<std::vector<uint64_t>> neighborhoods_bitmap; // Bitmap for neighborhoods of each job
     std::mutex                         label_pool_mutex;
 
-    std::vector<Path> getSchrodinger() {
+    std::vector<Path> getSchrodinger() const {
         std::vector<Path> negative_cost_paths = sPool.get_paths_with_negative_red_cost();
         if (negative_cost_paths.size() > N_ADD) { negative_cost_paths.resize(N_ADD); }
         return negative_cost_paths;
     }
 
-    /**
-     * @brief Prints the configuration information of the BucketGraph.
-     *
-     * This function outputs the configuration details including resource size,
-     * number of clients, and maximum SRC cuts. It also conditionally prints
-     * whether RIH, RCC, and SRC are enabled or disabled based on the preprocessor
-     * directives.
-     *
-     * The output format is as follows:
-     *
-     * +----------------------------------+
-     * |        CONFIGURATION INFO        |
-     * +----------------------------------+
-     * Resources: <R_SIZE>
-     * Number of Clients: <N_SIZE>
-     * Maximum SRC cuts: <MAX_SRC_CUTS>
-     * RIH: <enabled/disabled>
-     * RCC: <enabled/disabled>
-     * SRC: <enabled/disabled>
-     * +----------------------------------+
-     */
-    // TODO: add more configuration details
-    void initInfo() {
-
-        // Print header
-        fmt::print("\n+----------------------------------+\n");
-        fmt::print("|        CONFIGURATION INFO     |\n");
-        fmt::print("+----------------------------------+\n");
-
-        // Print Resource size
-        fmt::print("Resources: {}\n", R_SIZE);
-        fmt::print("Number of Clients: {}\n", N_SIZE);
-        fmt::print("Maximum SRC cuts: {}\n", MAX_SRC_CUTS);
-
-        // Conditional configuration (RIH enabled/disabled)
-#ifdef RIH
-        fmt::print("RIH: enabled\n");
-#else
-        fmt::print("RIH: disabled\n");
-#endif
-#ifdef RCC
-        fmt::print("RCC: enabled\n");
-#else
-        fmt::print("RCC: disabled\n");
-#endif
-#ifdef SRC
-        fmt::print("SRC: enabled\n");
-#else
-        fmt::print("SRC: disabled\n");
-#endif
-        fmt::print("+----------------------------------+\n");
-
-        fmt::print("\n");
-    }
+    static void initInfo();
 
     /**
      * @brief Runs forward and backward labeling algorithms in parallel and synchronizes the results.
@@ -340,11 +288,12 @@ public:
      * @param job_id An integer representing the ID of the job to check.
      * @return true if the job has been visited (i.e., the corresponding bit is set to 1), false otherwise.
      */
-    inline bool is_job_visited(const std::array<uint64_t, num_words> &bitmap, int job_id) {
+    static inline bool is_job_visited(const std::array<uint64_t, num_words> &bitmap, int job_id) {
         int word_index   = job_id / 64; // Determine which 64-bit segment contains the job_id
         int bit_position = job_id % 64; // Determine the bit position within that segment
         return (bitmap[word_index] & (1ULL << bit_position)) != 0;
     }
+
     /**
      * @brief Marks a job as visited in the bitmap.
      *
@@ -354,7 +303,7 @@ public:
      * @param bitmap A reference to an array of 64-bit unsigned integers representing the bitmap.
      * @param job_id The ID of the job to be marked as visited.
      */
-    inline void set_job_visited(std::array<uint64_t, num_words> &bitmap, int job_id) {
+    static inline void set_job_visited(std::array<uint64_t, num_words> &bitmap, int job_id) {
         int word_index   = job_id / 64; // Determine which 64-bit segment contains the job_id
         int bit_position = job_id % 64; // Determine the bit position within that segment
         bitmap[word_index] |= (1ULL << bit_position);
@@ -373,7 +322,7 @@ public:
      * @return true if the job is unreachable (i.e., the corresponding bit in the
      *         bitmap is set), false otherwise.
      */
-    inline bool is_job_unreachable(const std::array<uint64_t, num_words> &bitmap, int job_id) {
+    static inline bool is_job_unreachable(const std::array<uint64_t, num_words> &bitmap, int job_id) {
         int word_index   = job_id / 64; // Determine which 64-bit segment contains the job_id
         int bit_position = job_id % 64; // Determine the bit position within that segment
         return (bitmap[word_index] & (1ULL << bit_position)) != 0;
@@ -388,55 +337,13 @@ public:
      * @param bitmap A reference to an array of 64-bit unsigned integers representing the bitmap.
      * @param job_id The ID of the job to be marked as unreachable.
      */
-    inline void set_job_unreachable(std::array<uint64_t, num_words> &bitmap, int job_id) {
+    static inline void set_job_unreachable(std::array<uint64_t, num_words> &bitmap, int job_id) {
         int word_index   = job_id / 64; // Determine which 64-bit segment contains the job_id
         int bit_position = job_id % 64; // Determine the bit position within that segment
         bitmap[word_index] |= (1ULL << bit_position);
     }
 
-    /**
-     * @brief Prints the statistics of the bucket graph.
-     *
-     * This function outputs a formatted table displaying various metrics related to the bucket graph.
-     * The table includes headers and values for forward and backward labels, as well as dominance checks.
-     * The output is color-coded for better readability:
-     * - Bold blue for metric names
-     * - Green for values (backward labels)
-     * - Reset color to default after each line
-     *
-     * The table structure:
-     * +----------------------+-----------------+-----------------+
-     * | Metric               | Forward         | Backward        |
-     * +----------------------+-----------------+-----------------+
-     * | Labels               | <stat_n_labels_fw> | <stat_n_labels_bw> |
-     * | Dominance Check      | <stat_n_dom_fw> | <stat_n_dom_bw> |
-     * +----------------------+-----------------+-----------------+
-     *
-     * Note: The actual values for the metrics (e.g., stat_n_labels_fw, stat_n_labels_bw, etc.) should be
-     *       provided by the corresponding member variables or functions.
-     */
-    void print_statistics() {
-        const char *blue_bold = "\033[1;34m"; // Bold blue for metrics
-        const char *green     = "\033[32m";   // Green for values (backward labels)
-        const char *reset     = "\033[0m";    // Reset color
-
-        // Print table header with horizontal line and separators
-        fmt::print("\n+----------------------+-----------------+-----------------+\n");
-        fmt::print("|{}{:<20}{}| {:<15} | {:<15} |\n", blue_bold, " Metric", reset, " Forward", " Backward");
-        fmt::print("+----------------------+-----------------+-----------------+\n");
-
-        // Print labels for forward and backward with bold blue metric
-        fmt::print("|{}{:<20}{}| {:<15} | {:<15} |\n", blue_bold, " Labels", reset, stat_n_labels_fw, stat_n_labels_bw);
-
-        // Print dominated forward and backward labels with bold blue metric
-        fmt::print("|{}{:<20}{}| {:<15} | {:<15} |\n", blue_bold, " Dominance Check", reset, stat_n_dom_fw,
-                   stat_n_dom_bw);
-
-        // Print the final horizontal line
-        fmt::print("+----------------------+-----------------+-----------------+\n");
-
-        fmt::print("\n");
-    }
+    void print_statistics();
 
     /**
      * @brief Assigns the buckets based on the specified direction.
@@ -458,33 +365,7 @@ public:
     // Common Initialization for Stages
     void common_initialization();
 
-    /**
-     * @brief Sets up the initial configuration for the BucketGraph.
-     *
-     * This function performs the following steps:
-     * 1. Initializes the sizes of `fixed_arcs` based on the number of jobs.
-     * 2. Resizes `fw_fixed_buckets` and `bw_fixed_buckets` to match the size of `fw_buckets`.
-     * 3. Sets all elements in `fw_fixed_buckets` and `bw_fixed_buckets` to 0.
-     * 4. Defines the initial relationships by calling `set_adjacency_list()` and `generate_arcs()`.
-     * 5. Sorts the arcs for each job in the `jobs` list.
-     */
-    void setup() {
-        // Initialize the sizes
-        fixed_arcs.resize(getJobs().size());
-        for (int i = 0; i < getJobs().size(); ++i) { fixed_arcs[i].resize(getJobs().size()); }
-
-        // Resize and initialize fw_fixed_buckets and bw_fixed_buckets for std::vector<bool>
-        fw_fixed_buckets.assign(fw_buckets.size(), std::vector<bool>(fw_buckets.size(), false));
-        bw_fixed_buckets.assign(fw_buckets.size(), std::vector<bool>(fw_buckets.size(), false));
-        // define initial relationships
-        set_adjacency_list();
-        generate_arcs();
-        for (auto &VRPJob : jobs) { VRPJob.sort_arcs(); }
-
-        sPool.distance_matrix = distance_matrix;
-        sPool.setJobs(&jobs);
-        fmt::print("Setup done\n");
-    }
+    void setup();
 
     /**
      * @brief Redefines the bucket intervals and reinitializes various data structures.
@@ -492,12 +373,12 @@ public:
      * This function updates the bucket interval and reinitializes the intervals, buckets,
      * fixed arcs, and fixed buckets. It also generates arcs and sorts them for each job.
      *
-     * @param bucket_interval The new interval for the buckets.
+     * @param bucketInterval The new interval for the buckets.
      */
-    void redefine(int bucket_interval) {
-        this->bucket_interval = bucket_interval;
+    void redefine(int bucketInterval) {
+        this->bucket_interval = bucketInterval;
         intervals.clear();
-        for (int i = 0; i < R_SIZE; ++i) { intervals.push_back(Interval(bucket_interval, 0)); }
+        for (int i = 0; i < R_SIZE; ++i) { intervals.push_back(Interval(bucketInterval, 0)); }
 
         define_buckets<Direction::Forward>();
         define_buckets<Direction::Backward>();
@@ -549,54 +430,12 @@ public:
     void add_arc(int from_bucket, int to_bucket, const std::vector<double> &res_inc, double cost_inc);
 
     template <Direction D>
-    bool is_feasible(const std::vector<double> &resources, const VRPJob &VRPJob, Bucket &bucket);
-
-    template <Direction D>
-    const BucketArc &find_arc(int from_bucket, int to_bucket) const;
-
-    template <Direction D>
     void generate_arcs();
 
     template <Direction D>
     void SCC_handler();
 
-    /**
-     * @brief Generates arcs in both forward and backward directions in parallel.
-     *
-     * This function uses OpenMP to parallelize the generation of arcs in both
-     * forward and backward directions. It performs the following steps for each
-     * direction:
-     * - Calls the generate_arcs function template with the appropriate direction.
-     * - Clears and resizes the Phi vector for the respective direction.
-     * - Computes the Phi values for each bucket and stores them in the Phi vector.
-     * - Calls the SCC_handler function template with the appropriate direction.
-     *
-     * The forward direction operations are performed in one OpenMP section, and
-     * the backward direction operations are performed in another OpenMP section.
-     */
-    void generate_arcs() {
-
-        PARALLEL_SECTIONS(
-            bi_sched,
-            SECTION {
-                // Task for Forward Direction
-                generate_arcs<Direction::Forward>();
-                Phi_fw.clear();
-                Phi_fw.resize(fw_buckets_size);
-                for (int i = 0; i < fw_buckets_size; ++i) { Phi_fw[i] = computePhi(i, true); }
-                SCC_handler<Direction::Forward>();
-            },
-            SECTION {
-                // Task for Backward Direction
-                generate_arcs<Direction::Backward>();
-                Phi_bw.clear();
-                Phi_bw.resize(bw_buckets_size);
-                for (int i = 0; i < bw_buckets_size; ++i) { Phi_bw[i] = computePhi(i, false); }
-                SCC_handler<Direction::Backward>();
-            });
-    }
-    template <Direction D>
-    Label &get_best_label();
+    void generate_arcs();
 
     template <Direction D, Stage S, Full F>
     std::vector<double> labeling_algorithm(std::vector<double> q_point, bool full = false) noexcept;
@@ -620,7 +459,7 @@ public:
 
     template <Direction D, Stage S, ArcType A, Mutability M, Full F>
     inline Label *
-    Extend(const std::conditional_t<M == Mutability::Mut, Label *, const Label *>          L_prime,
+    Extend(std::conditional_t<M == Mutability::Mut, Label *, const Label *>                L_prime,
            const std::conditional_t<A == ArcType::Bucket, BucketArc,
                                     std::conditional_t<A == ArcType::Jump, JumpArc, Arc>> &gamma) noexcept;
     template <Direction D, Stage S>
@@ -649,7 +488,6 @@ public:
     void ConcatenateLabel(const Label *&L, int &b, Label *&pbest, std::vector<uint64_t> &Bvisited,
                           const std::vector<double> &q_star);
 
-    Label               get_best_path();
     inline double       getcij(int i, int j) const { return distance_matrix[i][j]; }
     void                calculate_neighborhoods(size_t num_closest);
     std::vector<VRPJob> getJobs() const { return jobs; }
@@ -675,17 +513,17 @@ public:
      * distance matrix of the class and then calculates the neighborhoods
      * based on the given number of nearest neighbors.
      *
-     * @param distance_matrix A 2D vector representing the distance matrix.
+     * @param distanceMatrix A 2D vector representing the distance matrix.
      * @param n_ng The number of nearest neighbors to consider when calculating
      *             neighborhoods. Default value is 8.
      */
-    void set_distance_matrix(const std::vector<std::vector<double>> &distance_matrix, int n_ng = 8) {
-        this->distance_matrix = distance_matrix;
+    void set_distance_matrix(const std::vector<std::vector<double>> &distanceMatrix, int n_ng = 8) {
+        this->distance_matrix = distanceMatrix;
         calculate_neighborhoods(n_ng);
     }
 
     template <Direction D>
-    void UpdateBucketsSet(const double theta, Label *&label, std::unordered_set<int> &Bbidi, int &current_bucket,
+    void UpdateBucketsSet(double theta, Label *&label, std::unordered_set<int> &Bbidi, int &current_bucket,
                           std::unordered_set<int> &Bvisited);
 
     template <Direction D>
@@ -743,23 +581,20 @@ public:
 
     void async_rih_processing(std::vector<Label *> initial_labels, int LABELS_MAX);
 
-    std::vector<Label *> get_rih_labels() { return merged_labels_rih; }
+    std::vector<Label *> get_rih_labels() const { return merged_labels_rih; }
 
     double knapsackBound(const Label *l);
 
 private:
     std::vector<Interval> intervals;
     std::vector<VRPJob>   jobs;
-    int                   time_horizon;
-    int                   capacity;
-    int                   bucket_interval;
+    int                   time_horizon{};
+    int                   capacity{};
+    int                   bucket_interval{};
 
-    double best_cost;
-    Label *fw_best_label;
-    Label *bw_best_label;
-
-    template <Direction D, Stage S>
-    bool is_dominated(const Label &new_label, const std::vector<Label> &labels) noexcept;
+    double best_cost{};
+    Label *fw_best_label{};
+    Label *bw_best_label{};
 
     Label *compute_label(const Label *L, const Label *L_prime);
 };

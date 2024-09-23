@@ -9,10 +9,10 @@ set(CMAKE_CXX_STANDARD_REQUIRED True)
 
 # Enable Interprocedural Optimization (Link Time Optimization)
 set(CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE ON)
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 # Include directories
 include_directories(include)
-
 
 # Build types and flags
 if(NOT CMAKE_BUILD_TYPE)
@@ -50,6 +50,7 @@ option(AUGMENTED "Enable Augmented compilation option" ON)
 option(GET_SUITESPARSE "Enable SuiteSparse compilation option" OFF)
 option(EXACT_RCC "Enable Exact RCC compilation option" OFF)
 option(EVRP "Enable EVRPTW compilation option" OFF)
+option(WITH_PYTHON "Enable Python bindings" OFF)
 
 # Define the size of resources without using cache
 set(R_SIZE 1)
@@ -74,8 +75,8 @@ set(RESOURCES_DISPOSABLE
 
 # Configure the config.h file
 configure_file(
-  ${CMAKE_CURRENT_SOURCE_DIR}/config.h.in  # Input file (config.h.in)
-  ${CMAKE_CURRENT_BINARY_DIR}/config.h     # Output file (config.h)
+  ${CMAKE_CURRENT_SOURCE_DIR}/config.h.in # Input file (config.h.in)
+  ${CMAKE_CURRENT_BINARY_DIR}/config.h # Output file (config.h)
 )
 
 # Ensure that both SRC3 and SRC are not selected at the same time
@@ -165,6 +166,10 @@ if(GET_TBB)
     "TBB_BUILD_SHARED OFF")
 endif()
 
+if(WITH_PYTHON)
+  cpmaddpackage(NAME pybind11 GITHUB_REPOSITORY pybind/pybind11 GIT_TAG v2.13.6)
+endif()
+
 if(IPM)
   include_directories(/usr/include/suitesparse/)
 
@@ -239,3 +244,13 @@ message(STATUS "Gurobi version: ${GUROBI_VERSION_MAJOR}")
 target_link_libraries(
   vrptw PRIVATE ${GUROBI_HOME}/lib/libgurobi_c++.a
                 ${GUROBI_HOME}/lib/libgurobi${GUROBI_VERSION_MAJOR}.so tbb)
+
+if(WITH_PYTHON)
+  pybind11_add_module(bucket_graph python/BucketBindings.cpp
+                      ${EXECUTABLE_SOURCES})
+  target_link_libraries(bucket_graph PRIVATE pybind11::module)
+  target_link_libraries(bucket_graph PRIVATE fmt::fmt)
+  target_link_libraries(bucket_graph PRIVATE TBB::tbb)
+  target_link_libraries(bucket_graph PRIVATE STDEXEC::stdexec)
+  set_target_properties(bucket_graph PROPERTIES POSITION_INDEPENDENT_CODE ON)
+endif()

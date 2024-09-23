@@ -56,6 +56,7 @@ enum class ArcType { Job, Bucket, Jump };
 enum class Mutability { Const, Mut };
 enum class Full { Full, Partial, Reverse };
 enum class Status { Optimal, Separation, NotOptimal, Error };
+enum class CutType { ThreeRow, FourRow, FiveRow };
 
 // Comparator function for Stage enum
 constexpr bool operator<(Stage lhs, Stage rhs) { return static_cast<int>(lhs) < static_cast<int>(rhs); }
@@ -63,7 +64,179 @@ constexpr bool operator>(Stage lhs, Stage rhs) { return rhs < lhs; }
 constexpr bool operator<=(Stage lhs, Stage rhs) { return !(lhs > rhs); }
 constexpr bool operator>=(Stage lhs, Stage rhs) { return !(lhs < rhs); }
 
-class CutStorage;
+const size_t num_words = (N_SIZE + 63) / 64; // This will be 2 for 100 clients
+
+/**
+ * @struct Cut
+ * @brief Represents a cut in the optimization problem.
+ *
+ * The Cut structure holds information about a specific cut, including its base set,
+ * neighbors, coefficients, multipliers, and other properties.
+ *
+ */
+struct Cut {
+    int                             cutMaster;
+    std::array<uint64_t, num_words> baseSet;      // Bit-level baseSet
+    std::array<uint64_t, num_words> neighbors;    // Bit-level neighbors
+    std::vector<int>                baseSetOrder; // Order for baseSet
+    std::vector<double>             coefficients; // Cut coefficients
+    std::vector<double>             multipliers = {0.5, 0.5, 0.5};
+    double                          rhs         = 1;
+    int                             id          = -1;
+    bool                            added       = false;
+    bool                            updated     = false;
+    CutType                         type        = CutType::ThreeRow;
+    GRBConstr                       grbConstr;
+
+    // Default constructor
+    Cut() = default;
+
+    // constructor to receive array
+    Cut(const std::array<uint64_t, num_words> baseSetInput, const std::array<uint64_t, num_words> &neighborsInput,
+        const std::vector<double> &coefficients)
+        : baseSet(baseSetInput), neighbors(neighborsInput), coefficients(coefficients) {}
+
+    Cut(const std::array<uint64_t, num_words> baseSetInput, const std::array<uint64_t, num_words> &neighborsInput,
+        const std::vector<double> &coefficients, const std::vector<double> &multipliers)
+        : baseSet(baseSetInput), neighbors(neighborsInput), coefficients(coefficients), multipliers(multipliers) {}
+
+    // Define size of the cut
+    size_t size() const { return coefficients.size(); }
+};
+
+using Cuts = std::vector<Cut>;
+
+/**
+ * @class CutStorage
+ * @brief Manages the storage and operations related to cuts in a solver.
+ *
+ * The CutStorage class provides functionalities to add, manage, and query cuts.
+ * It also allows setting dual values and computing coefficients with limited memory.
+ *
+ */
+class CutStorage {
+public:
+    int latest_column = 0;
+
+    // Add a cut to the storage
+    /**
+     * @brief Adds a cut to the current collection of cuts.
+     *
+     * This function takes a reference to a Cut object and adds it to the
+     * collection of cuts maintained by the solver. The cut is used to
+     * refine the solution space and improve the efficiency of the solver.
+     *
+     * @param cut A reference to the Cut object to be added.
+     */
+    void addCut(Cut &cut);
+
+    std::vector<double> SRCDuals = {};
+
+    /**
+     * @brief Sets the dual values for the SRC.
+     *
+     * This function assigns the provided vector of dual values to the SRCDuals member.
+     *
+     * @param duals A vector of double values representing the duals to be set.
+     */
+    void setDuals(const std::vector<double> &duals) { SRCDuals = duals; }
+
+    // Define size method
+    size_t size() const noexcept { return cuts.size(); }
+
+    // Define begin and end
+    auto begin() const noexcept { return cuts.begin(); }
+    auto end() const noexcept { return cuts.end(); }
+    auto begin() noexcept { return cuts.begin(); }
+    auto end() noexcept { return cuts.end(); }
+
+    // Define empty method
+    bool empty() const noexcept { return cuts.empty(); }
+
+    /**
+     * @brief Checks if a cut exists for the given cut key and returns its size and coefficients.
+     *
+     * This function searches for the specified cut key in the cutMaster_to_cut_map. If the cut key
+     * is found, it retrieves the size and coefficients of the corresponding cut from the cuts vector.
+     * If the cut key is not found, it returns a pair with -1 and an empty vector.
+     *
+     * @param cut_key The key of the cut to search for.
+     * @return A pair where the first element is the size of the cut (or -1 if not found) and the second
+     *         element is a vector of coefficients (empty if not found).
+     */
+    std::pair<int, std::vector<double>> cutExists(const std::size_t &cut_key) const {
+        auto it = cutMaster_to_cut_map.find(cut_key);
+        if (it != cutMaster_to_cut_map.end()) {
+            auto tam    = cuts[it->second].size();
+            auto coeffs = cuts[it->second].coefficients;
+            return {tam, coeffs};
+        }
+        return {-1, {}};
+    }
+
+    /**
+     * @brief Retrieves the constraint at the specified index.
+     *
+     * This function returns the Gurobi constraint object associated with the
+     * cut at the given index.
+     *
+     * @param i The index of the cut whose constraint is to be retrieved.
+     * @return The Gurobi constraint object at the specified index.
+     */
+    auto getCtr(int i) const { return cuts[i].grbConstr; }
+
+    /**
+     * @brief Computes limited memory coefficients for a given set of cuts.
+     *
+     * This function iterates over a collection of cuts and computes a set of coefficients
+     * based on the provided vector P. The computation involves checking membership of nodes
+     * in specific sets and updating coefficients accordingly.
+     *
+     * @param P A vector of integers representing the nodes to be processed.
+     * @return A vector of doubles containing the computed coefficients for each cut.
+     */
+    auto computeLimitedMemoryCoefficients(const std::vector<int> &P) {
+        // iterate over cuts
+        std::vector<double> alphas;
+        alphas.reserve(cuts.size());
+        for (auto c : cuts) {
+            double alpha = 0.0;
+            double S     = 0;
+            auto   AM    = c.neighbors;
+            auto   C     = c.baseSet;
+            auto   p     = c.multipliers;
+            auto   order = c.baseSetOrder;
+
+            for (size_t j = 1; j < P.size() - 1; ++j) {
+                int vj = P[j];
+
+                // Check if the node vj is in AM (bitwise check)
+                if (!(AM[vj / 64] & (1ULL << (vj % 64)))) {
+                    S = 0; // Reset S if vj is not in AM
+                }
+                if (C[vj / 64] & (1ULL << (vj % 64))) {
+                    // Get the position of vj in C by counting the set bits up to vj
+                    int pos = order[vj];
+                    S += p[pos];
+                    if (S >= 1) {
+                        S -= 1;
+                        alpha += 1;
+                    }
+                }
+            }
+
+            alphas.push_back(alpha);
+        }
+        return alphas;
+    }
+
+    std::size_t generateCutKey(const int &cutMaster, const std::vector<bool> &baseSetStr) const;
+
+private:
+    std::unordered_map<std::size_t, int>              cutMaster_to_cut_map;
+    Cuts                                              cuts;
+    std::unordered_map<std::size_t, std::vector<int>> indexCuts;
+};
 
 /**
  * @struct Interval
@@ -152,6 +325,140 @@ struct Arc {
     Arc(int from, int to, const std::vector<double> &res_inc, double cost_inc, bool fixed);
 
     Arc(int from, int to, const std::vector<double> &res_inc, double cost_inc, double priority);
+};
+
+/**
+ * @struct Path
+ * @brief Represents a path with a route and its associated cost.
+ *
+ * The Path struct encapsulates a route represented as a vector of integers and a cost associated with the
+ * route. It provides various utility methods to interact with the route, such as checking for the presence of
+ * elements, counting occurrences, and managing arcs between route points.
+ *
+ */
+struct Path {
+    std::vector<int> route;
+    double           cost;
+    double           red_cost = std::numeric_limits<double>::max();
+
+    // default constructor
+    Path() : route({}), cost(0.0) {}
+    Path(const std::vector<int> &route, double cost) : route(route), cost(cost) {
+        (void)std::async(std::launch::async, &Path::precomputeArcs, this); // Ignore the future
+    }
+
+    // define begin and end methods linking to route
+    auto begin() { return route.begin(); }
+    auto end() { return route.end(); }
+    // define size
+    auto size() { return route.size(); }
+    // make the [] operator available
+    int operator[](int i) const { return route[i]; }
+
+    /**
+     * @brief Checks if the given integer is present in the route.
+     *
+     * This function searches for the specified integer within the route
+     * and returns true if the integer is found, otherwise false.
+     *
+     * @param i The integer to search for in the route.
+     * @return true if the integer is found in the route, false otherwise.
+     */
+    bool contains(int i) { return std::find(route.begin(), route.end(), i) != route.end(); }
+
+    /**
+     * @brief Counts the occurrences of a given integer in the route.
+     *
+     * This function iterates through the 'route' container and counts how many times
+     * the specified integer 'i' appears in it.
+     *
+     * @param i The integer value to count within the route.
+     * @return int The number of times the integer 'i' appears in the route.
+     */
+    int countOccurrences(int i) { return std::count(route.begin(), route.end(), i); }
+
+    /**
+     * @brief Counts the number of times an arc (i, j) appears in the route.
+     *
+     * This function iterates through the route and counts how many times the arc
+     * from node i to node j appears consecutively.
+     *
+     * @param i The starting node of the arc.
+     * @param j The ending node of the arc.
+     * @return The number of times the arc (i, j) appears in the route.
+     */
+    int timesArc(int i, int j) const {
+        int       times = 0;
+        const int size  = route.size();
+        for (int n = 1; n < size; ++n) {
+            if ((route[n - 1] == i && route[n] == j)) { times++; }
+        }
+
+        return times;
+    }
+
+    std::unordered_map<std::pair<int, int>, int, pair_hash> arcMap; // Maps arcs to their counts
+
+    /**
+     * @brief Adds an arc between two nodes and increments its count in the arc map.
+     *
+     * This function creates a pair representing an arc between nodes `i` and `j`,
+     * and increments the count of this arc in the `arcMap`. If the arc does not
+     * already exist in the map, it is added with an initial count of 1.
+     *
+     * @param i The starting node of the arc.
+     * @param j The ending node of the arc.
+     */
+    void addArc(int i, int j) {
+        std::pair<int, int> arc = std::make_pair(i, j);
+        arcMap[arc]++; // Increment the count of the arc
+    }
+
+    /**
+     * @brief Precomputes arcs for the given route.
+     *
+     * This function iterates through the route and adds arcs between consecutive nodes.
+     * It assumes that the route is a valid sequence of nodes and that the addArc function
+     * is defined to handle the addition of arcs between nodes.
+     */
+    void precomputeArcs() {
+        for (int n = 0; n < route.size() - 1; ++n) { addArc(route[n], route[n + 1]); }
+    }
+
+    /**
+     * @brief Retrieves the count of arcs between two nodes.
+     *
+     * This function takes two integers representing nodes and returns the count
+     * of arcs between them. If the arc pair (i, j) exists in the arcMap, the
+     * function returns the associated count. Otherwise, it returns 0.
+     *
+     * @param i The first node of the arc.
+     * @param j The second node of the arc.
+     * @return The count of arcs between node i and node j. Returns 0 if the arc
+     *         does not exist in the arcMap.
+     */
+    auto getArcCount(int i, int j) const {
+        // Construct the arc pair
+        std::pair<int, int> arc = std::make_pair(i, j);
+        return (arcMap.find(arc) != arcMap.end()) ? arcMap.at(arc) : 0;
+    }
+
+    /**
+     * @brief Retrieves the count of a specified arc.
+     *
+     * This function takes an arc represented by an RCCarc object and constructs
+     * a pair from its 'from' and 'to' members. It then checks if this pair exists
+     * in the arcMap. If the pair is found, the function returns the count associated
+     * with the arc. If the pair is not found, it returns 0.
+     *
+     * @param arc The RCCarc object representing the arc whose count is to be retrieved.
+     * @return The count of the specified arc if it exists in the arcMap, otherwise 0.
+     */
+    auto getArcCount(RCCarc arc) const {
+        // Construct the arc pair
+        std::pair<int, int> arcPair = std::make_pair(arc.from, arc.to);
+        return (arcMap.find(arcPair) != arcMap.end()) ? arcMap.at(arcPair) : 0;
+    }
 };
 
 // Bucket structure to hold a collection of labels

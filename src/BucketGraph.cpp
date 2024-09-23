@@ -571,7 +571,7 @@ void BucketGraph::set_adjacency_list() {
                     break;
                 }
             }
-            // if (!feasible) continue; // Skip if the arc is not feasible
+            if (!feasible) continue; // Skip if the arc is not feasible
 
             // Calculate priority values for forward and reverse arcs
             double aux_double = 1.E-5 * next_job.start_time; // Small weight for start time
@@ -820,4 +820,167 @@ void BucketGraph::async_rih_processing(std::vector<Label *> initial_labels, int 
     // Sort or further process if needed
     std::sort(merged_labels_rih.begin(), merged_labels_rih.end(),
               [](const Label *a, const Label *b) { return a->cost < b->cost; });
+}
+
+/**
+     * @brief Prints the statistics of the bucket graph.
+     *
+     * This function outputs a formatted table displaying various metrics related to the bucket graph.
+     * The table includes headers and values for forward and backward labels, as well as dominance checks.
+     * The output is color-coded for better readability:
+     * - Bold blue for metric names
+     * - Green for values (backward labels)
+     * - Reset color to default after each line
+     *
+     * The table structure:
+     * +----------------------+-----------------+-----------------+
+     * | Metric               | Forward         | Backward        |
+     * +----------------------+-----------------+-----------------+
+     * | Labels               | <stat_n_labels_fw> | <stat_n_labels_bw> |
+     * | Dominance Check      | <stat_n_dom_fw> | <stat_n_dom_bw> |
+     * +----------------------+-----------------+-----------------+
+     *
+     * Note: The actual values for the metrics (e.g., stat_n_labels_fw, stat_n_labels_bw, etc.) should be
+     *       provided by the corresponding member variables or functions.
+ */
+void BucketGraph::print_statistics() {
+    const char *blue_bold = "\033[1;34m"; // Bold blue for metrics
+    const char *green     = "\033[32m";   // Green for values (backward labels)
+    const char *reset     = "\033[0m";    // Reset color
+
+    // Print table header with horizontal line and separators
+    fmt::print("\n+----------------------+-----------------+-----------------+\n");
+    fmt::print("|{}{:<20}{}| {:<15} | {:<15} |\n", blue_bold, " Metric", reset, " Forward", " Backward");
+    fmt::print("+----------------------+-----------------+-----------------+\n");
+
+    // Print labels for forward and backward with bold blue metric
+    fmt::print("|{}{:<20}{}| {:<15} | {:<15} |\n", blue_bold, " Labels", reset, stat_n_labels_fw, stat_n_labels_bw);
+
+    // Print dominated forward and backward labels with bold blue metric
+    fmt::print("|{}{:<20}{}| {:<15} | {:<15} |\n", blue_bold, " Dominance Check", reset, stat_n_dom_fw,
+               stat_n_dom_bw);
+
+    // Print the final horizontal line
+    fmt::print("+----------------------+-----------------+-----------------+\n");
+
+    fmt::print("\n");
+}
+
+/**
+     * @brief Generates arcs in both forward and backward directions in parallel.
+     *
+     * This function uses OpenMP to parallelize the generation of arcs in both
+     * forward and backward directions. It performs the following steps for each
+     * direction:
+     * - Calls the generate_arcs function template with the appropriate direction.
+     * - Clears and resizes the Phi vector for the respective direction.
+     * - Computes the Phi values for each bucket and stores them in the Phi vector.
+     * - Calls the SCC_handler function template with the appropriate direction.
+     *
+     * The forward direction operations are performed in one OpenMP section, and
+     * the backward direction operations are performed in another OpenMP section.
+ */
+void BucketGraph::generate_arcs() {
+
+    PARALLEL_SECTIONS(
+        bi_sched,
+        SECTION {
+            // Task for Forward Direction
+            generate_arcs<Direction::Forward>();
+            Phi_fw.clear();
+            Phi_fw.resize(fw_buckets_size);
+            for (int i = 0; i < fw_buckets_size; ++i) { Phi_fw[i] = computePhi(i, true); }
+            SCC_handler<Direction::Forward>();
+        },
+        SECTION {
+            // Task for Backward Direction
+            generate_arcs<Direction::Backward>();
+            Phi_bw.clear();
+            Phi_bw.resize(bw_buckets_size);
+            for (int i = 0; i < bw_buckets_size; ++i) { Phi_bw[i] = computePhi(i, false); }
+            SCC_handler<Direction::Backward>();
+        });
+}
+
+/**
+     * @brief Sets up the initial configuration for the BucketGraph.
+     *
+     * This function performs the following steps:
+     * 1. Initializes the sizes of `fixed_arcs` based on the number of jobs.
+     * 2. Resizes `fw_fixed_buckets` and `bw_fixed_buckets` to match the size of `fw_buckets`.
+     * 3. Sets all elements in `fw_fixed_buckets` and `bw_fixed_buckets` to 0.
+     * 4. Defines the initial relationships by calling `set_adjacency_list()` and `generate_arcs()`.
+     * 5. Sorts the arcs for each job in the `jobs` list.
+ */
+void BucketGraph::setup() {
+    // Initialize the sizes
+    fixed_arcs.resize(getJobs().size());
+    for (int i = 0; i < getJobs().size(); ++i) { fixed_arcs[i].resize(getJobs().size()); }
+
+    // Resize and initialize fw_fixed_buckets and bw_fixed_buckets for std::vector<bool>
+    fw_fixed_buckets.assign(fw_buckets.size(), std::vector<bool>(fw_buckets.size(), false));
+    bw_fixed_buckets.assign(fw_buckets.size(), std::vector<bool>(fw_buckets.size(), false));
+    // define initial relationships
+    set_adjacency_list();
+    generate_arcs();
+    for (auto &VRPJob : jobs) { VRPJob.sort_arcs(); }
+
+    sPool.distance_matrix = distance_matrix;
+    sPool.setJobs(&jobs);
+    sPool.setCutStorage(cut_storage);
+}
+
+/**
+     * @brief Prints the configuration information of the BucketGraph.
+     *
+     * This function outputs the configuration details including resource size,
+     * number of clients, and maximum SRC cuts. It also conditionally prints
+     * whether RIH, RCC, and SRC are enabled or disabled based on the preprocessor
+     * directives.
+     *
+     * The output format is as follows:
+     *
+     * +----------------------------------+
+     * |        CONFIGURATION INFO        |
+     * +----------------------------------+
+     * Resources: <R_SIZE>
+     * Number of Clients: <N_SIZE>
+     * Maximum SRC cuts: <MAX_SRC_CUTS>
+     * RIH: <enabled/disabled>
+     * RCC: <enabled/disabled>
+     * SRC: <enabled/disabled>
+     * +----------------------------------+
+ */
+// TODO: add more configuration details
+void BucketGraph::initInfo() {
+
+    // Print header
+    fmt::print("\n+----------------------------------+\n");
+    fmt::print("|        CONFIGURATION INFO     |\n");
+    fmt::print("+----------------------------------+\n");
+
+    // Print Resource size
+    fmt::print("Resources: {}\n", R_SIZE);
+    fmt::print("Number of Clients: {}\n", N_SIZE);
+    fmt::print("Maximum SRC cuts: {}\n", MAX_SRC_CUTS);
+
+    // Conditional configuration (RIH enabled/disabled)
+#ifdef RIH
+    fmt::print("RIH: enabled\n");
+#else
+    fmt::print("RIH: disabled\n");
+#endif
+#ifdef RCC
+    fmt::print("RCC: enabled\n");
+#else
+    fmt::print("RCC: disabled\n");
+#endif
+#ifdef SRC
+    fmt::print("SRC: enabled\n");
+#else
+    fmt::print("SRC: disabled\n");
+#endif
+    fmt::print("+----------------------------------+\n");
+
+    fmt::print("\n");
 }
