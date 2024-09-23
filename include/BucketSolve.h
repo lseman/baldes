@@ -417,7 +417,7 @@ std::vector<Label *> BucketGraph::bi_labeling_algorithm(std::vector<double> q_st
 
         // Process each label in the bucket
         for (const Label *L : labels) {
-            if (L->resources[TIME_INDEX] > q_star[TIME_INDEX]) { continue; } // Skip if label exceeds q_star
+            // if (L->resources[TIME_INDEX] > q_star[TIME_INDEX]) { continue; } // Skip if label exceeds q_star
 
             // Get arcs corresponding to jobs for this label (Forward direction)
             const auto &to_arcs = jobs[L->job_id].get_arcs<Direction::Forward>();
@@ -437,8 +437,8 @@ std::vector<Label *> BucketGraph::bi_labeling_algorithm(std::vector<double> q_st
 
                 // Note: apparently without the second condition it work better in some cases
                 // Check if the new label is valid and respects the q_star constraints
-                if (!L_prime) { // || L_prime->resources[TIME_INDEX] <= q_star[TIME_INDEX]) {
-                    continue;   // Skip invalid labels or those that exceed q_star
+                if (!L_prime || L_prime->resources[TIME_INDEX] <= q_star[TIME_INDEX]) {
+                    continue; // Skip invalid labels or those that exceed q_star
                 }
 
                 // Get the bucket for the extended label
@@ -467,6 +467,20 @@ std::vector<Label *> BucketGraph::bi_labeling_algorithm(std::vector<double> q_st
         rih_thread.detach(); // Detach the thread so it runs in the background
     }
 #endif
+
+    // if merged_labels is bigger than 10, create Path related to the remaining ones
+    // and add them to a std::vector<Path>
+    if (merged_labels.size() > N_ADD) {
+        std::vector<Path> paths;
+        int               labels_size = merged_labels.size();
+        for (size_t i = N_ADD; i < std::min(N_ADD + N_ADD, labels_size); ++i) {
+            if (merged_labels[i]->jobs_covered.size() <= 3) { continue; }
+            Path path = Path(merged_labels[i]->jobs_covered, merged_labels[i]->real_cost);
+            paths.push_back(path);
+        }
+        sPool.add_paths(paths);
+        sPool.iterate();
+    }
 
     // Return the final list of merged labels after processing
     return merged_labels;

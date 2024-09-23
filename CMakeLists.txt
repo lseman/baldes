@@ -57,6 +57,7 @@ set(BUCKET_CAPACITY 50)
 set(TIME_INDEX 0)
 set(DEMAND_INDEX 1)
 set(MAIN_RESOURCES 1)
+set(N_ADD 10)
 
 # Define resources and whether they are disposable or not
 set(RESOURCES

@@ -20,11 +20,12 @@
 
 #pragma once
 
+#include "DataClass.h"
 #include "Definitions.h"
 
 #include <queue>
 #include <set>
-#include <variant>
+#include <string_view>
 
 #include "../include/SCCFinder.h"
 
@@ -42,9 +43,6 @@ class LabelComparator {
 public:
     bool operator()(Label *a, Label *b) { return a->cost > b->cost; }
 };
-
-#include <array>
-#include <string_view>
 
 /**
  * @class BucketGraph
@@ -71,6 +69,7 @@ class BucketGraph {
     using NGRouteBitmap = uint64_t;
 
 public:
+    SchrodingerPool sPool = SchrodingerPool(200);
 
     // Note: very tricky way to unroll the loop at compile time and check for disposability
     static constexpr std::string_view resources[] = {RESOURCES}; // RESOURCES will expand to your string list
@@ -223,6 +222,12 @@ public:
     std::vector<double>                R_min;
     std::vector<std::vector<uint64_t>> neighborhoods_bitmap; // Bitmap for neighborhoods of each job
     std::mutex                         label_pool_mutex;
+
+    std::vector<Path> getSchrodinger() {
+        std::vector<Path> negative_cost_paths = sPool.get_paths_with_negative_red_cost();
+        if (negative_cost_paths.size() > N_ADD) { negative_cost_paths.resize(N_ADD); }
+        return negative_cost_paths;
+    }
 
     /**
      * @brief Prints the configuration information of the BucketGraph.
@@ -475,6 +480,10 @@ public:
         set_adjacency_list();
         generate_arcs();
         for (auto &VRPJob : jobs) { VRPJob.sort_arcs(); }
+
+        sPool.distance_matrix = distance_matrix;
+        sPool.setJobs(&jobs);
+        fmt::print("Setup done\n");
     }
 
     /**
