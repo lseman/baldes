@@ -20,8 +20,8 @@
 
 #pragma once
 
-#include "DataClass.h"
 #include "Definitions.h"
+#include "DataClasses.h"
 
 #include <queue>
 #include <set>
@@ -69,7 +69,7 @@ class BucketGraph {
     using NGRouteBitmap = uint64_t;
 
 public:
-    SchrodingerPool sPool = SchrodingerPool(200);
+    SchrodingerPool sPool = SchrodingerPool(100);
 
     // Note: very tricky way to unroll the loop at compile time and check for disposability
     static constexpr std::string_view resources[] = {RESOURCES}; // RESOURCES will expand to your string list
