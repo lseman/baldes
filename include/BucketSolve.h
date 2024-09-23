@@ -183,6 +183,22 @@ std::vector<double> BucketGraph::labeling_algorithm(std::vector<double> q_point,
             for (const auto bucket : sorted_sccs[scc_index]) {
                 auto bucket_labels = buckets[bucket].get_unextended_labels(); // Get unextended labels from this bucket
                 for (Label *label : bucket_labels) {
+
+                    // NOTE: double check if this is the best way to handle this
+                    if constexpr (F == Full::Partial) {
+                        if constexpr (D == Direction::Forward) {
+                            if (label->resources[TIME_INDEX] > q_star[TIME_INDEX]) {
+                                label->set_extended(true);
+                                continue;
+                            }
+                        } else if constexpr (D == Direction::Backward) {
+                            if (label->resources[TIME_INDEX] <= q_star[TIME_INDEX]) {
+                                label->set_extended(true);
+                                continue;
+                            }
+                        }
+                    }
+
                     domin_smaller = false;
 
                     // Clear the visited buckets vector for the current label
@@ -266,9 +282,9 @@ std::vector<double> BucketGraph::labeling_algorithm(std::vector<double> q_point,
 #ifdef UNREACHABLE_DOMINANCE
                                 set_job_unreachable(label->unreachable_bitmap, arc.to);
 #endif
-                                continue; // Skip if label extension failed
+                            } else {
+                                process_new_label(new_label); // Process the new label
                             }
-                            process_new_label(new_label); // Process the new label
                         }
 
 #ifdef FIX_BUCKETS
@@ -540,18 +556,6 @@ BucketGraph::Extend(const std::conditional_t<M == Mutability::Mut, Label *, cons
                 return nullptr; // Backward: Below lower bound
             }
         }
-    }
-
-    // Check if the new resources exceed the q_star constraints and skip if so
-    if constexpr (F == Full::Partial) {
-        if constexpr (D == Direction::Forward) {
-            // print q_star[time_index]
-            if (new_resources[TIME_INDEX] > q_star[TIME_INDEX]) return nullptr;
-        } else if constexpr (D == Direction::Backward) {
-            if (new_resources[TIME_INDEX] <= q_star[TIME_INDEX]) return nullptr;
-        }
-    } else if constexpr (F == Full::Reverse) {
-        if (new_resources[TIME_INDEX] <= q_star[TIME_INDEX]) return nullptr;
     }
 
     // Get the bucket number for the new job and resource state

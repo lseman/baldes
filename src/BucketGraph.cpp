@@ -586,10 +586,10 @@ void BucketGraph::set_adjacency_list() {
                     break;
                 }
             }
-            if (!feasible) continue; // Skip if the arc is not feasible
+            // if (!feasible) continue; // Skip if the arc is not feasible
 
             // Calculate priority values for forward and reverse arcs
-            double aux_double = next_job.cost + 1.E-5 * next_job.start_time; // Small weight for start time
+            double aux_double = 1.E-5 * next_job.start_time; // Small weight for start time
             best_arcs.emplace_back(aux_double, next_job.id, res_inc,
                                    cost_inc); // Store the arc for forward direction
 

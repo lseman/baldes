@@ -692,7 +692,8 @@ void BucketGraph::SCC_handler() {
  */
 template <Direction D>
 int BucketGraph::get_opposite_bucket_number(int current_bucket_index) {
-    // Get the current bucket's job and bounds
+
+    // TODO: adjust to multi-resource case
     auto &current_bucket =
         (D == Direction::Forward) ? fw_buckets[current_bucket_index] : bw_buckets[current_bucket_index];
     int job = current_bucket.job_id;
