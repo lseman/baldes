@@ -510,27 +510,24 @@ public:
      */
     void generate_arcs() {
 
-        auto forward_task = stdexec::schedule(bi_sched) | stdexec::then([&]() {
-                                generate_arcs<Direction::Forward>();
-                                Phi_fw.clear();
-                                Phi_fw.resize(fw_buckets_size);
-                                for (int i = 0; i < fw_buckets_size; ++i) { Phi_fw[i] = computePhi(i, true); }
-                                SCC_handler<Direction::Forward>();
-                            });
-
-        auto backward_task = stdexec::schedule(bi_sched) | stdexec::then([&]() {
-                                 generate_arcs<Direction::Backward>();
-                                 Phi_bw.clear();
-                                 Phi_bw.resize(bw_buckets_size);
-                                 for (int i = 0; i < bw_buckets_size; ++i) { Phi_bw[i] = computePhi(i, false); }
-                                 SCC_handler<Direction::Backward>();
-                             });
-
-        // Use when_all to combine forward_task and backward_task
-        auto work = stdexec::when_all(std::move(forward_task), std::move(backward_task));
-
-        // Synchronize and wait for completion
-        stdexec::sync_wait(std::move(work));
+        PARALLEL_SECTIONS(
+            bi_sched,
+            SECTION {
+                // Task for Forward Direction
+                generate_arcs<Direction::Forward>();
+                Phi_fw.clear();
+                Phi_fw.resize(fw_buckets_size);
+                for (int i = 0; i < fw_buckets_size; ++i) { Phi_fw[i] = computePhi(i, true); }
+                SCC_handler<Direction::Forward>();
+            },
+            SECTION {
+                // Task for Backward Direction
+                generate_arcs<Direction::Backward>();
+                Phi_bw.clear();
+                Phi_bw.resize(bw_buckets_size);
+                for (int i = 0; i < bw_buckets_size; ++i) { Phi_bw[i] = computePhi(i, false); }
+                SCC_handler<Direction::Backward>();
+            });
     }
     template <Direction D>
     Label &get_best_label();

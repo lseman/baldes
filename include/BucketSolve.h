@@ -406,6 +406,7 @@ std::vector<Label *> BucketGraph::bi_labeling_algorithm(std::vector<double> q_st
 
         // Process each label in the bucket
         for (const Label *L : labels) {
+            // if (L->resources[TIME_INDEX] > q_star[TIME_INDEX]) { continue; } // Skip if label exceeds q_star
 
 #ifndef ORIGINAL_ARCS
             // Get arcs corresponding to jobs for this label (Forward direction)
@@ -429,8 +430,8 @@ std::vector<Label *> BucketGraph::bi_labeling_algorithm(std::vector<double> q_st
                 auto L_prime = Extend<Direction::Forward, S, ArcType::Job, Mutability::Const, Full::Reverse>(L, arc);
 
                 // Check if the new label is valid and respects the q_star constraints
-                if (!L_prime) {
-                    continue; // Skip invalid labels or those that exceed q_star
+                if (!L_prime) { // || L_prime->resources[TIME_INDEX] <= q_star[TIME_INDEX]) {
+                    continue;   // Skip invalid labels or those that exceed q_star
                 }
 
                 // Get the bucket for the extended label
