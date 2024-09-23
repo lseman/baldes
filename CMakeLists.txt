@@ -19,9 +19,9 @@ if(NOT CMAKE_BUILD_TYPE)
       "RelWithDebInfo"
       CACHE STRING "Choose the type of build." FORCE)
 endif()
-set(CMAKE_CXX_FLAGS_RELEASE "-O3 -march=native -flto -funroll-loops")
-set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "-O3 -g -march=native -flto -funroll-loops")
-set(CMAKE_CXX_FLAGS_DEBUG "-Og -g -Wall -Wextra")
+set(CMAKE_CXX_FLAGS_RELEASE "-O3 -march=native -flto -fopenmp")
+set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "-O3 -g -march=native -flto -fopenmp")
+set(CMAKE_CXX_FLAGS_DEBUG "-Og -g -Wall -Wextra -fopenmp")
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
@@ -215,14 +215,11 @@ add_executable(vrptw ${EXECUTABLE_SOURCES})
 # Linking libraries
 target_link_libraries(vrptw PRIVATE STDEXEC::stdexec)
 target_link_libraries(vrptw PRIVATE fmt::fmt)
-if(GET_TBB)
-  target_link_libraries(vrptw PRIVATE TBB::tbb)
-endif()
+target_link_libraries(vrptw PRIVATE TBB::tbb)
+
 if(IPM)
   target_link_libraries(vrptw PRIVATE Eigen3::Eigen)
   target_link_libraries(vrptw PRIVATE cholmod)
-  find_package(OpenMP)
-  # target_link_libraries(vrptw PRIVATE OpenMP::OpenMP_CXX)
 endif()
 
 set(GUROBI_VERSION_MAJOR 110) # Adjust based on Gurobi version

@@ -359,7 +359,9 @@ std::vector<int> BucketGraph::computePhi(int &bucket_id, bool fw) {
         //  check if smalller has the same job_id as vertex
         if (buckets[smaller].job_id == buckets[bucket_id].job_id) {
 
-
+#ifdef FIX_BUCKETS
+            if (fixed_buckets[smaller][bucket_id] == 0)
+#endif
             {
                 phi.push_back(smaller);
             }
