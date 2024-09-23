@@ -13,15 +13,16 @@ set(CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE ON)
 # Include directories
 include_directories(include)
 
+
 # Build types and flags
 if(NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE
       "RelWithDebInfo"
       CACHE STRING "Choose the type of build." FORCE)
 endif()
-set(CMAKE_CXX_FLAGS_RELEASE "-O3 -march=native -flto -fopenmp")
-set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "-O3 -g -march=native -flto -fopenmp")
-set(CMAKE_CXX_FLAGS_DEBUG "-Og -g -Wall -Wextra -fopenmp")
+set(CMAKE_CXX_FLAGS_RELEASE "-O3 -march=native -flto")
+set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "-O3 -g -march=native -flto")
+set(CMAKE_CXX_FLAGS_DEBUG "-Og -g -Wall -Wextra")
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
@@ -66,6 +67,12 @@ set(RESOURCES_DISPOSABLE
     CACHE
       STRING
       "List of flags indicating if each resource is disposable (1 for disposable, 0 for non-disposable)"
+)
+
+# Configure the config.h file
+configure_file(
+  ${CMAKE_CURRENT_SOURCE_DIR}/config.h.in  # Input file (config.h.in)
+  ${CMAKE_CURRENT_BINARY_DIR}/config.h     # Output file (config.h)
 )
 
 # Ensure that both SRC3 and SRC are not selected at the same time
@@ -163,7 +170,7 @@ if(IPM)
   include_directories(${EIGEN_SOURCE_DIR})
 endif()
 
-set(GUROBI_HOME $ENV{GUROBI_HOME})
+set(GUROBI_HOME /home/seman/gurobi1101/linux64)
 
 include_directories(${GUROBI_HOME}/include)
 

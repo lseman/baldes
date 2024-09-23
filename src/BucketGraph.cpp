@@ -75,14 +75,9 @@ BucketGraph::BucketGraph(const std::vector<VRPJob> &jobs, int time_horizon, int 
     R_min     = {0, 0};
     R_max     = {static_cast<double>(time_horizon), static_cast<double>(capacity)};
 
-// TODO: convert to nvidia stdexec
-#pragma omp parallel sections
-    {
-#pragma omp section
-        define_buckets<Direction::Forward>();
-#pragma omp section
-        define_buckets<Direction::Backward>();
-    }
+    PARALLEL_SECTIONS(
+        bi_sched, SECTION { define_buckets<Direction::Forward>(); },
+        SECTION { define_buckets<Direction::Backward>(); });
 }
 
 /**
@@ -110,14 +105,9 @@ BucketGraph::BucketGraph(const std::vector<VRPJob> &jobs, int time_horizon, int 
     R_min     = {0};
     R_max     = {static_cast<double>(time_horizon)};
 
-// TODO: convert to nvidia stdexec
-#pragma omp parallel sections
-    {
-#pragma omp section
-        define_buckets<Direction::Forward>();
-#pragma omp section
-        define_buckets<Direction::Backward>();
-    }
+    PARALLEL_SECTIONS(
+        bi_sched, SECTION { define_buckets<Direction::Forward>(); },
+        SECTION { define_buckets<Direction::Backward>(); });
 }
 
 BucketGraph::BucketGraph(const std::vector<VRPJob> &jobs, std::vector<int> &bounds, std::vector<int> &bucket_intervals)
@@ -139,14 +129,9 @@ BucketGraph::BucketGraph(const std::vector<VRPJob> &jobs, std::vector<int> &boun
         R_max.push_back(static_cast<double>(bounds[i]));
     }
 
-// TODO: convert to nvidia stdexec
-#pragma omp parallel sections
-    {
-#pragma omp section
-        define_buckets<Direction::Forward>();
-#pragma omp section
-        define_buckets<Direction::Backward>();
-    }
+    PARALLEL_SECTIONS(
+        bi_sched, SECTION { define_buckets<Direction::Forward>(); },
+        SECTION { define_buckets<Direction::Backward>(); });
 }
 
 /**

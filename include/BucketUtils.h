@@ -736,20 +736,19 @@ void BucketGraph::bucket_fixing(const std::vector<double> &q_star) {
         fw_c_bar = forward_cbar;
         bw_c_bar = backward_cbar;
 
-        // TODO: change to nvidia stdexec
-#pragma omp parallel sections
-        {
-#pragma omp section
-            {
+        PARALLEL_SECTIONS(
+            bi_sched,
+            SECTION {
+                // Section 1: Forward direction
                 BucketArcElimination<Direction::Forward>(gap);
                 ObtainJumpBucketArcs<Direction::Forward>();
-            }
-#pragma omp section
-            {
+            },
+            SECTION {
+                // Section 2: Backward direction
                 BucketArcElimination<Direction::Backward>(gap);
                 ObtainJumpBucketArcs<Direction::Backward>();
-            }
-        }
+            });
+
         generate_arcs();
     }
 }

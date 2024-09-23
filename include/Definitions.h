@@ -1487,3 +1487,20 @@ inline GRBModel createDualModel(GRBEnv *env, const ModelData &primalData) {
 
 using DualSolution = std::vector<double>;
 using ArcVariant   = std::variant<Arc, BucketArc>;
+
+// Paralell sections
+
+// Macro to define parallel sections
+#define PARALLEL_SECTIONS(SCHEDULER, ...)                  \
+    auto work = parallel_sections(SCHEDULER, __VA_ARGS__); \
+    stdexec::sync_wait(std::move(work));
+
+// Macro to define individual sections (tasks)
+#define SECTION [this]() -> void
+
+// Template for scheduling parallel sections
+template <typename Scheduler, typename... Tasks>
+auto parallel_sections(Scheduler &scheduler, Tasks &&...tasks) {
+    // Schedule and combine all tasks using stdexec::when_all
+    return stdexec::when_all((stdexec::schedule(scheduler) | stdexec::then(std::forward<Tasks>(tasks)))...);
+}
