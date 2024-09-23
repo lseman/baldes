@@ -19,6 +19,7 @@
 
 #pragma once
 
+#include "Definitions.h"
 #include "gurobi_c++.h"
 #include "gurobi_c.h"
 
@@ -26,6 +27,7 @@
 
 #include <cmath>
 #include <iostream>
+#include <numeric>
 #include <set>
 #include <unordered_map>
 #include <vector>
@@ -48,21 +50,20 @@ using namespace std;
  * @param allPaths Vector of Path objects representing all paths.
  * @return std::vector<std::set<int>> A vector of sets, where each set contains nodes corresponding to a solution.
  */
-std::vector<set<int>> separate_Rounded_Capacity_cuts(GRBModel *gurobi_model, int Q, const std::vector<int> &demand,
-                                                     double opt_obj, bool verbose, const std::vector<Path> &allPaths) {
-
-    double epsilon_1 = 0.5;
-    double epsilon_2 = 1e-2;
-    double epsilon_3 = 1e-3;
-
+inline std::vector<set<int>> separate_Rounded_Capacity_cuts(GRBModel *gurobi_model, int Q,
+                                                            const std::vector<int>    &demand,
+                                                            const std::vector<Path>   &allPaths,
+                                                            const std::vector<double> &sol) {
+    double                     epsilon_1         = 0.5;
+    double                     epsilon_2         = 1e-2;
+    double                     epsilon_3         = 1e-3;
     int                        iteration_counter = 0;
     unordered_map<int, GRBVar> delta;
     bool                       need_to_run_RCC_separation = true;
-
     // Solution from the LP or relaxed problem
-    std::vector<double> sol;
-    int                 varNumber = gurobi_model->get(GRB_IntAttr_NumVars);
-    for (int i = 0; i < varNumber; i++) { sol.push_back(gurobi_model->getVar(i).get(GRB_DoubleAttr_X)); }
+    // std::vector<double> sol;
+    // int                 varNumber = gurobi_model->get(GRB_IntAttr_NumVars);
+    // for (int i = 0; i < varNumber; i++) { sol.push_back(gurobi_model->getVar(i).get(GRB_DoubleAttr_X)); }
 
     vector<double> x_values     = sol;
     GRBModel       m_separation = GRBModel(gurobi_model->getEnv());
@@ -92,7 +93,6 @@ std::vector<set<int>> separate_Rounded_Capacity_cuts(GRBModel *gurobi_model, int
             aijs[source][target] += sol[counter];
         }
     }
-
     for (int i = 1; i < N_SIZE - 1; ++i) {
         delta[i] = m_separation.addVar(0, 1, 0, GRB_BINARY);
         for (int j = 1; j < N_SIZE - 1; ++j) {
@@ -105,7 +105,6 @@ std::vector<set<int>> separate_Rounded_Capacity_cuts(GRBModel *gurobi_model, int
         }
     }
     m_separation.update();
-
     // compute gcd of demands
     auto gcd = 1;
     for (int i = 1; i < N_SIZE - 1; ++i) { gcd = std::gcd(gcd, demand[i]); }
@@ -137,7 +136,6 @@ std::vector<set<int>> separate_Rounded_Capacity_cuts(GRBModel *gurobi_model, int
                                                                                edge_capacities[{i, j}];
                                                           }),
                               GRB_MAXIMIZE);
-
     m_separation.optimize();
 
     std::vector<std::set<int>> multiple_solutions; // Store multiple sets of nodes
@@ -149,8 +147,11 @@ std::vector<set<int>> separate_Rounded_Capacity_cuts(GRBModel *gurobi_model, int
         m_separation.set(GRB_IntParam_SolutionNumber, solIndex); // Set the solution number
         auto solution = m_separation.get(GRB_DoubleAttr_ObjVal); // Get the objective value for this solution
         if (m_separation.get(GRB_DoubleAttr_PoolObjVal) >= eps_for_violation) {
+
+#ifdef VERBOSE
             fmt::print("RCC Violation {}; Objective value - {}\n", solIndex + 1,
                        m_separation.get(GRB_DoubleAttr_ObjVal));
+#endif
 
             std::set<int> S; // Store nodes for this solution
 

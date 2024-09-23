@@ -146,12 +146,15 @@ public:
     int n_fw_labels = 0;
     int n_bw_labels = 0;
 
+#if defined(RCC) || defined(EXACT_RCC)
     std::vector<std::vector<double>> cvrsep_duals;
-    std::vector<std::vector<int>>    job_to_bit_map;
-    std::vector<int>                 num_buckets_fw;
-    std::vector<int>                 num_buckets_bw;
-    std::vector<int>                 num_buckets_index_fw;
-    std::vector<int>                 num_buckets_index_bw;
+#endif
+
+    std::vector<std::vector<int>> job_to_bit_map;
+    std::vector<int>              num_buckets_fw;
+    std::vector<int>              num_buckets_bw;
+    std::vector<int>              num_buckets_index_fw;
+    std::vector<int>              num_buckets_index_bw;
 
     // Statistics
     int stat_n_labels_fw = 0;

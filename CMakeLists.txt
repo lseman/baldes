@@ -47,7 +47,7 @@ option(TR "Enable TR compilation option" OFF)
 option(STAB "Enable STAB compilation option" ON)
 option(AUGMENTED "Enable Augmented compilation option" ON)
 option(GET_SUITESPARSE "Enable SuiteSparse compilation option" OFF)
-
+option(EXACT_RCC "Enable Exact RCC compilation option" OFF)
 # Define the size of resources without using cache
 set(R_SIZE 1)
 set(N_SIZE 102)

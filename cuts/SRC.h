@@ -262,7 +262,7 @@ public:
                                  const SparseModel &A, const std::vector<double> &x);
 
     template <CutType T>
-    void the45Heuristic(const SparseModel &A, const std::vector<double> &x, int numNodes);
+    void the45Heuristic(const SparseModel &A, const std::vector<double> &x);
 
     /**
      * @brief Computes the limited memory coefficient based on the given parameters.
@@ -537,12 +537,12 @@ struct CompareCuts {
  * @param subsetSize The size of the subset.
  */
 template <CutType T>
-void LimitedMemoryRank1Cuts::the45Heuristic(const SparseModel &A, const std::vector<double> &x, int numNodes) {
+void LimitedMemoryRank1Cuts::the45Heuristic(const SparseModel &A, const std::vector<double> &x) {
     int    max_number_of_cuts  = 5; // Max number of cuts to generate
     double violation_threshold = 1e-3;
     int    max_important_nodes = 10;
 
-    int max_generated_cuts = 10;
+    int max_generated_cuts = 15;
 
     auto cuts         = VRPTW_SRC();
     auto coefficients = std::vector<std::vector<double>>();
@@ -596,7 +596,7 @@ void LimitedMemoryRank1Cuts::the45Heuristic(const SparseModel &A, const std::vec
     auto bulk_sender = stdexec::bulk(
         input_sender, tasks.size(),
         [this, &permutations, &processedSetsCache, &processedPermutationsCache, &cuts_mutex, &cuts_count, &cuts, &x,
-         &selectedNodes, &coefficients_aux, &numNodes, &cutQueue, &max_number_of_cuts, &max_generated_cuts,
+         &selectedNodes, &coefficients_aux, &cutQueue, &max_number_of_cuts, &max_generated_cuts,
          violation_threshold](std::size_t task_idx) {
             auto &consumer = allPaths[selectedNodes[task_idx]].route;
 
@@ -694,7 +694,7 @@ void LimitedMemoryRank1Cuts::the45Heuristic(const SparseModel &A, const std::vec
                         if (alpha > rhs + violation_threshold) { violation_found = true; }
 
                         if (violation_found) {
-                            for (int i = 0; i < numNodes; ++i) {
+                            for (int i = 1; i < N_SIZE - 2; ++i) {
                                 // Skip nodes that are part of baseSet (i.e., cannot be removed from AM)
                                 if (!(baseSet[i / 64] & (1ULL << (i % 64)))) {
 

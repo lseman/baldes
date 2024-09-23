@@ -437,8 +437,8 @@ std::vector<Label *> BucketGraph::bi_labeling_algorithm(std::vector<double> q_st
     }
 
     // Sort the merged labels by cost, to prioritize cheaper labels
-    pdqsort(merged_labels.begin(), merged_labels.end(),
-            [](const Label *a, const Label *b) { return a->cost < b->cost; });
+    std::sort(merged_labels.begin(), merged_labels.end(),
+              [](const Label *a, const Label *b) { return a->cost < b->cost; });
 
 #ifdef RIH
     // If we are in Stage 2 or above, we run the RIH (Route Improvement Heuristic) in the background
@@ -560,7 +560,6 @@ BucketGraph::Extend(const std::conditional_t<M == Mutability::Mut, Label *, cons
 #endif
 
 #ifdef RCC
-    /*
     // Get dual sum from RCC manager if available
     double cvrpsep_dual = 0.0;
     if constexpr (D == Direction::Forward) {
@@ -568,7 +567,6 @@ BucketGraph::Extend(const std::conditional_t<M == Mutability::Mut, Label *, cons
     } else {
         cvrpsep_dual = rcc_manager->getCachedDualSumForArc(job_id, initial_job_id);
     }
-    */
 #endif
 
     // Compute travel cost between the initial and current jobs
@@ -577,7 +575,7 @@ BucketGraph::Extend(const std::conditional_t<M == Mutability::Mut, Label *, cons
 
 #ifdef RCC
     // Adjust the cost using the cached dual sum from RCC (if applicable)
-    // new_cost -= cvrpsep_dual;
+    new_cost -= cvrpsep_dual;
 #endif
 
 #ifdef KP_BOUND
