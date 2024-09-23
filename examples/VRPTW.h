@@ -33,7 +33,10 @@
 #include "../cvrpsep/cnstrmgr.h"
 #endif
 
+#ifdef EXACT_RCC
 #include "../cuts/RCC.h"
+#endif
+
 #include "../include/Hashes.h"
 
 #ifdef IPM
@@ -89,7 +92,7 @@ public:
         auto counter = 0;
         for (auto &label : columns) {
             if (label->jobs_covered.empty()) continue;
-            // if (!enumerate && label->cost > 0) continue;
+            if (!enumerate && label->cost > 0) continue;
             counter += 1;
             if (counter > 20) break;
 
@@ -333,6 +336,7 @@ public:
         return changed;
     }
 
+#ifdef EXACT_RCC
     /**
      * @brief Separates Rounded Capacity Cuts (RCC) for the given model and solution.
      *
@@ -347,14 +351,15 @@ public:
      */
     bool exactRCCsep(GRBModel *model, const std::vector<double> &solution,
                      std::vector<std::vector<std::vector<GRBConstr>>> &constraints) {
-        auto Ss = separate_Rounded_Capacity_cuts(model, instance.q, instance.demand, model->get(GRB_DoubleAttr_ObjVal),
-                                                 true, allPaths);
+
+        auto Ss = separate_Rounded_Capacity_cuts(model, instance.q, instance.demand, allPaths, solution);
 
         if (Ss.size() == 0) return false;
 
         // Define the tasks that need to be executed in parallel
         std::vector<int> tasks(Ss.size());
-        std::iota(tasks.begin(), tasks.end(), 0); // Filling tasks with [0, 1, ..., cutsCMP->Size-1]
+        std::iota(tasks.begin(), tasks.end(),
+                  0); // Filling tasks with [0, 1, ..., cutsCMP->Size-1]
 
         std::vector<GRBLinExpr>          cutExpressions(Ss.size());
         std::vector<int>                 rhsValues(Ss.size());
@@ -415,7 +420,6 @@ public:
         auto work = stdexec::starts_on(sched, bulk_sender);
         stdexec::sync_wait(std::move(work));
         std::vector<GRBConstr> newConstraints(cutExpressions.size());
-
         for (size_t i = 0; i < cutExpressions.size(); ++i) {
             newConstraints[i] = model->addConstr(cutExpressions[i] <= rhsValues[i]);
         }
@@ -427,6 +431,7 @@ public:
 
         return true;
     }
+#endif
 
 #ifdef RCC
     /**
@@ -650,8 +655,10 @@ public:
 
         bucket_graph.rcc_manager = &rccManager;
 
+#if defined(RCC) || defined(EXACT_RCC)
         std::vector<std::vector<std::vector<GRBConstr>>> cvrsep_ctrs(
             instance.nC + 3, std::vector<std::vector<GRBConstr>>(instance.nC + 3, std::vector<GRBConstr>()));
+#endif
 
 #ifdef TR
         std::vector<GRBVar> w(numConstrs);
@@ -704,38 +711,43 @@ public:
 
             double obj;
 
-#if defined(SRC3) || defined(SRC)
-            if (ss && !rcc) {
+            if (ss) {
 #ifdef RCC
                 print_cut("Testing RCC feasibility..\n");
                 rcc                      = RCCsep(node, solution, cvrsep_ctrs);
                 bucket_graph.rcc_manager = &rccManager;
 
 #endif
-                auto cuts_before = cuts.size();
-                node->optimize();
-                highs_obj = node->get(GRB_DoubleAttr_ObjVal);
-                solution  = extractSolution(node);
-                // auto matrixSparse = extractModelDataSparse(node);
-                r1c.allPaths = allPaths;
-                r1c.separate(matrix.A_sparse, solution);
-#ifdef SRC
-                // r1c.the45Heuristic<CutType::FourRow>(matrixSparse.A_sparse, solution, N_SIZE - 2);
-                // r1c.the45Heuristic<CutType::FiveRow>(matrixSparse.A_sparse, solution, N_SIZE - 2);
+#ifdef EXACT_RCC
+                print_cut("Testing RCC feasibility..\n");
+                rcc = exactRCCsep(node, solution, cvrsep_ctrs);
 #endif
-                cuts = r1c.cutStorage;
-                if (cuts_before == cuts.size()) {
-                    print_info("No violations found, calling it a day\n");
-                    break;
+
+#if defined(SRC3) || defined(SRC)
+                if (!rcc) {
+
+                    auto cuts_before = cuts.size();
+                    node->optimize();
+                    solution     = extractSolution(node);
+                    r1c.allPaths = allPaths;
+                    r1c.separate(matrix.A_sparse, solution);
+#ifdef SRC
+                    // r1c.the45Heuristic<CutType::FourRow>(matrix.A_sparse, solution);
+                    // r1c.the45Heuristic<CutType::FiveRow>(matrix.A_sparse, solution);
+#endif
+                    cuts = r1c.cutStorage;
+                    if (cuts_before == cuts.size()) {
+                        print_info("No violations found, calling it a day\n");
+                        break;
+                    }
+
+#endif
+                    changed = cutHandler(r1c, node, SRCconstraints);
+                    if (changed) { matrix = extractModelDataSparse(node); }
+                    cuts = r1c.cutStorage;
                 }
                 bucket_graph.ss = false;
             }
-#endif
-
-            changed = cutHandler(r1c, node, SRCconstraints);
-            if (changed) { matrix = extractModelDataSparse(node); }
-
-            cuts = r1c.cutStorage;
 
 #ifdef TR
             if (!TRstop) {

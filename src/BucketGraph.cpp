@@ -100,8 +100,9 @@ BucketGraph::BucketGraph(const std::vector<VRPJob> &jobs, int time_horizon, int 
     : fw_buckets(), bw_buckets(), jobs(jobs), time_horizon(time_horizon), bucket_interval(bucket_interval),
       best_cost(std::numeric_limits<double>::infinity()), fw_best_label() {
 
+#if defined(RCC) || defined(EXACT_RCC)
     cvrsep_duals.assign(jobs.size() + 2, std::vector<double>(jobs.size() + 2, 0.0));
-
+#endif
     initInfo();
     Interval intervalTime(bucket_interval, time_horizon);
 
@@ -123,7 +124,9 @@ BucketGraph::BucketGraph(const std::vector<VRPJob> &jobs, std::vector<int> &boun
     : fw_buckets(), bw_buckets(), jobs(jobs), time_horizon(bounds[0]), bucket_interval(bucket_intervals[0]),
       best_cost(std::numeric_limits<double>::infinity()), fw_best_label() {
 
+#if defined(RCC) || defined(EXACT_RCC)
     cvrsep_duals.assign(jobs.size() + 2, std::vector<double>(jobs.size() + 2, 0.0));
+#endif
 
     initInfo();
     for (int i = 0; i < bounds.size(); ++i) {
@@ -159,7 +162,7 @@ Label *BucketGraph::compute_label(const Label *L, const Label *L_prime) {
 
     double real_cost = L->real_cost + L_prime->real_cost + cij_cost;
 #ifdef RCC
-    // new_cost -= rcc_manager->getCachedDualSumForArc(L->job_id, L_prime->job_id);
+    new_cost -= rcc_manager->getCachedDualSumForArc(L->job_id, L_prime->job_id);
 #endif
     // Directly acquire new_label and set the cost
     auto new_label       = label_pool_fw.acquire();
@@ -356,9 +359,7 @@ std::vector<int> BucketGraph::computePhi(int &bucket_id, bool fw) {
         //  check if smalller has the same job_id as vertex
         if (buckets[smaller].job_id == buckets[bucket_id].job_id) {
 
-#ifdef FIX_BUCKETS
-            if (fixed_buckets[smaller][bucket_id] == 0)
-#endif
+
             {
                 phi.push_back(smaller);
             }

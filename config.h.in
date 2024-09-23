@@ -16,17 +16,18 @@
 #cmakedefine TR
 #cmakedefine STAB
 #cmakedefine AUGMENTED
+#cmakedefine EXACT_RCC
 
 // Define constants for resource sizes
-#define R_SIZE ${R_SIZE}
-#define N_SIZE ${N_SIZE}
-#define MAX_SRC_CUTS ${MAX_SRC_CUTS}
-#define BUCKET_CAPACITY ${BUCKET_CAPACITY}
-#define TIME_INDEX ${TIME_INDEX}
-#define DEMAND_INDEX ${DEMAND_INDEX}
-#define MAIN_RESOURCES ${MAIN_RESOURCES}
+#define R_SIZE @R_SIZE@
+#define N_SIZE @N_SIZE@
+#define MAX_SRC_CUTS @MAX_SRC_CUTS@
+#define BUCKET_CAPACITY @BUCKET_CAPACITY@
+#define TIME_INDEX @TIME_INDEX@
+#define DEMAND_INDEX @DEMAND_INDEX@
+#define MAIN_RESOURCES @MAIN_RESOURCES@
 
-#define RESOURCE_LIST { ${RESOURCES} }
-#define RESOURCE_DISPOSABLE_LIST { ${RESOURCES_DISPOSABLE} }
+#define RESOURCES "@RESOURCES@"
+#define RESOURCES_DISPOSABLE "@RESOURCES_DISPOSABLE@"
 
-#endif // CONFIG_H
+#endif
