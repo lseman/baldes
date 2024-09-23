@@ -60,6 +60,7 @@ public:
     ModelData              matrix;
 
     LimitedMemoryRank1Cuts r1c;
+    std::vector<Path>      toMerge;
 
 #ifdef RCC
     CnstrMgrPointer oldCutsCMP = nullptr;
@@ -70,6 +71,101 @@ public:
 
     void addVars(GRBModel *node, auto lb, auto ub, auto obj, auto vtype, auto name, auto col, auto row) {
         node->addVars(lb, ub, obj, vtype, name, col, row);
+    }
+
+    int addPath(GRBModel *node, const std::vector<Path> paths, bool enumerate = false) {
+        auto &cuts = r1c.cutStorage;
+
+        int                 numConstrsLocal = node->get(GRB_IntAttr_NumConstrs);
+        const GRBConstr    *constrs         = node->getConstrs();
+        std::vector<double> coluna(numConstrsLocal, 0.0); // Declare outside the loop
+
+        // Collect the bounds, costs, names, and columns
+        std::vector<double>      lb, ub, obj;
+        std::vector<GRBColumn>   cols;
+        std::vector<std::string> names;
+        std::vector<char>        vtypes;
+
+        auto counter = 0;
+        for (auto &label : paths) {
+            counter += 1;
+            if (counter > 10) break;
+
+            labels_counter += 1;
+            std::fill(coluna.begin(), coluna.end(), 0.0); // Reset for each iteration
+
+            double      travel_cost = label.cost;
+            std::string name        = "x[" + std::to_string(allPaths.size()) + "]";
+
+            GRBColumn col;
+
+            // Fill coluna with coefficients
+            // Step 1: Accumulate the coefficients for each job
+            for (auto &job : label.route) {
+                if (job > 0 && job != N_SIZE - 1) {
+                    int constr_index = job - 1;
+                    coluna[constr_index] += 1; // Accumulate the coefficient for each job
+                }
+            }
+
+            // Step 2: Add the non-zero entries to the sparse matrix
+            for (int i = 0; i < N_SIZE - 1; ++i) {
+                if (coluna[i] > 0) {
+                    matrix.A_sparse.row_indices.push_back(i);
+                    matrix.A_sparse.col_indices.push_back(matrix.A_sparse.num_cols);
+                    matrix.A_sparse.values.push_back(static_cast<double>(coluna[i]));
+                }
+            }
+
+            matrix.lb.push_back(0.0);
+            matrix.ub.push_back(1.0);
+            matrix.c.push_back(travel_cost);
+            // Add terms to GRBColumn
+            for (int i = 0; i < N_SIZE - 2; i++) {
+                if (coluna[i] == 0.0) continue;
+                col.addTerms(&coluna[i], &constrs[i], 1);
+            }
+            // Add terms for total veicles constraint
+            double val = 1;
+            col.addTerms(&val, &constrs[N_SIZE - 2], 1);
+
+            // Add terms for the limited memory rank 1 cuts
+#if defined(SRC3) || defined(SRC)
+            auto vec = cuts.computeLimitedMemoryCoefficients(label.route);
+            // print vec size
+            if (vec.size() > 0) {
+                for (int i = 0; i < vec.size(); i++) {
+                    if (vec[i] != 0) {
+                        col.addTerms(&vec[i], &SRCconstraints[i], 1);
+                        matrix.A_sparse.row_indices.push_back(N_SIZE - 2 + i);
+                        matrix.A_sparse.col_indices.push_back(matrix.A_sparse.num_cols);
+                        matrix.A_sparse.values.push_back(static_cast<double>(vec[i]));
+                    }
+                }
+            }
+
+#endif
+
+            matrix.A_sparse.num_cols++;
+
+            // Collect bounds, costs, columns, and names
+            lb.push_back(0.0);
+            ub.push_back(1.0);
+            obj.push_back(travel_cost);
+            cols.push_back(col);
+            names.push_back(name);
+            vtypes.push_back(GRB_CONTINUOUS);
+
+            Path path(label.route, label.cost);
+            allPaths.emplace_back(path);
+        }
+        // Add variables with bounds, objectives, and columns
+        if (!lb.empty()) {
+            addVars(node, lb.data(), ub.data(), obj.data(), vtypes.data(), names.data(), cols.data(), lb.size());
+            node->update();
+        }
+
+        return counter;
     }
 
     /*
@@ -98,7 +194,7 @@ public:
             if (label->jobs_covered.empty()) continue;
             if (!enumerate && label->cost > 0) continue;
             counter += 1;
-            if (counter > 20) break;
+            if (counter > 10) break;
 
             labels_counter += 1;
             std::fill(coluna.begin(), coluna.end(), 0.0); // Reset for each iteration
@@ -870,6 +966,10 @@ public:
 
                 // Adding cols
                 auto colAdded = addColumn(node, paths, false);
+
+                // Adding schrodinger paths
+                auto sch_paths = bucket_graph.getSchrodinger();
+                colAdded += addPath(node, sch_paths, true);
 
 #ifdef RIH
                 auto rih_paths = bucket_graph.get_rih_labels();
