@@ -125,7 +125,7 @@ inline std::vector<Label *> BucketGraph::solve() {
         inner_obj = paths[0]->cost;
 
         // If the objective improves sufficiently, set the status to separation or optimal
-        if (inner_obj >= -1e-1) {
+        if (inner_obj >= -1) {
             ss = true; // Enter separation mode (for SRC handling)
 #if !defined(SRC) && !defined(SRC3)
             status = Status::Optimal; // If SRC is not defined, set status to optimal
@@ -438,7 +438,7 @@ std::vector<Label *> BucketGraph::bi_labeling_algorithm(std::vector<double> q_st
                 // Note: apparently without the second condition it work better in some cases
                 // Check if the new label is valid and respects the q_star constraints
                 if (!L_prime || L_prime->resources[TIME_INDEX] < q_star[TIME_INDEX]) {
-                    continue;   // Skip invalid labels or those that exceed q_star
+                    continue; // Skip invalid labels or those that exceed q_star
                 }
 
                 // Get the bucket for the extended label

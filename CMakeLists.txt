@@ -49,6 +49,8 @@ option(STAB "Enable STAB compilation option" ON)
 option(AUGMENTED "Enable Augmented compilation option" ON)
 option(GET_SUITESPARSE "Enable SuiteSparse compilation option" OFF)
 option(EXACT_RCC "Enable Exact RCC compilation option" OFF)
+option(EVRP "Enable EVRPTW compilation option" OFF)
+
 # Define the size of resources without using cache
 set(R_SIZE 1)
 set(N_SIZE 102)
@@ -171,7 +173,7 @@ if(IPM)
   include_directories(${EIGEN_SOURCE_DIR})
 endif()
 
-set(GUROBI_HOME /home/seman/gurobi1101/linux64)
+set(GUROBI_HOME $ENV{GUROBI_HOME})
 
 include_directories(${GUROBI_HOME}/include)
 
