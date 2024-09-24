@@ -18,6 +18,9 @@
 #cmakedefine AUGMENTED
 #cmakedefine EXACT_RCC
 #cmakedefine WITH_PYTHON
+#cmakedefine EVRP
+#cmakedefine MTW
+#cmakedefine PSTEP
 
 // Define constants for resource sizes
 #define R_SIZE @R_SIZE@
@@ -31,6 +34,7 @@
 
 #define RESOURCES { "@RESOURCES@" }
 #define RESOURCES_DISPOSABLE { @RESOURCES_DISPOSABLE@ }
+#define OR_RESOURCES { "@OR_RESOURCES@" }
 
 #endif // CONFIG_H
 

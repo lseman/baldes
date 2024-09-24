@@ -51,10 +51,12 @@ option(GET_SUITESPARSE "Enable SuiteSparse compilation option" OFF)
 option(EXACT_RCC "Enable Exact RCC compilation option" OFF)
 option(EVRP "Enable EVRPTW compilation option" OFF)
 option(WITH_PYTHON "Enable Python bindings" OFF)
+option(MTW "Enable MTW compilation option" OFF)
+option(PSTEP "Enable PSTEP compilation option" OFF)
 
 # Define the size of resources without using cache
 set(R_SIZE 1)
-set(N_SIZE 102)
+set(N_SIZE 12)
 set(MAX_SRC_CUTS 50)
 set(BUCKET_CAPACITY 50)
 set(TIME_INDEX 0)
@@ -72,6 +74,9 @@ set(RESOURCES_DISPOSABLE
       STRING
       "List of flags indicating if each resource is disposable (1 for disposable, 0 for non-disposable)"
 )
+set(OR_RESOURCES
+    "1"
+    CACHE STRING "List of resources that are OR resources")
 
 # Configure the config.h file
 configure_file(
@@ -246,8 +251,7 @@ target_link_libraries(
                 ${GUROBI_HOME}/lib/libgurobi${GUROBI_VERSION_MAJOR}.so tbb)
 
 if(WITH_PYTHON)
-  pybind11_add_module(baldes python/BucketBindings.cpp
-                      ${EXECUTABLE_SOURCES})
+  pybind11_add_module(baldes python/BucketBindings.cpp ${EXECUTABLE_SOURCES})
   target_link_libraries(baldes PRIVATE pybind11::module)
   target_link_libraries(baldes PRIVATE fmt::fmt)
   target_link_libraries(baldes PRIVATE TBB::tbb)

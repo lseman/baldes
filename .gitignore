@@ -11,6 +11,8 @@ rapids-cmake
 *.pkl
 *.json
 
+vrpsolve/
+
 cmake/
 CPM_modules/
 reports/

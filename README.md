@@ -57,30 +57,31 @@ Make sure the `GUROBI_HOME` environment variable is set.
 
 | Option                  | Description                            | Default                   |
 | ----------------------- | -------------------------------------- | ------------------------- |
-| `RIH` | Enable improvement heuristics          | OFF                       |
+| `RIH`                   | Enable improvement heuristics          | OFF                       |
 | `RCC`$^2$               | Enable RCC cuts                        | OFF                       |
 | `SRC3`$^2$              | Enable classical SRC cuts              | OFF                       |
-| `SRC` | Enable limited memory SRC cuts         | OFF                       |
+| `SRC`                   | Enable limited memory SRC cuts         | OFF                       |
 | `UNREACHABLE_DOMINANCE` | Enable unreachable dominance           | OFF                       |
-| `MCD` | Perform MCD on instance capacities     | OFF                       |
-| `LIMITED_BUCKETS` | Limit the capacity of the buckets      | OFF                       |
-| `SORTED_LABELS` | Sort labels on bucket insertion        | OFF                       |
+| `MCD`                   | Perform MCD on instance capacities     | OFF                       |
+| `LIMITED_BUCKETS`       | Limit the capacity of the buckets      | OFF                       |
+| `SORTED_LABELS`         | Sort labels on bucket insertion        | OFF                       |
 | `STAB`$^3$              | Use dynamic-alpha smooth stabilization | ON                        |
 | `IPM`$^3$               | Use interior point stabilization       | OFF                       |
-| `TR` | Use trust region stabilization         | OFF                       |
-| `WITH_PYTHON` | Enable the python wrapper              | OFF                       |
-| `GET_TBB` | Enable TBB compilation                 | OFF (will use system lib) |
+| `TR`                    | Use trust region stabilization         | OFF                       |
+| `WITH_PYTHON`           | Enable the python wrapper              | OFF                       |
+| `SCHRODINGER`           | Enable schrodinger pool                | OFF                       |
+| `GET_TBB`               | Enable TBB compilation                 | OFF (will use system lib) |
 
 **Numerical and Other Definitions**
 
 | Option            | Description                                             | Default |
 | ----------------- | ------------------------------------------------------- | ------- |
-| `R_SIZE` | Number of resources                                     | 1       |
+| `R_SIZE`          | Number of resources                                     | 1       |
 | `N_SIZE`$^1$      | Number of customers                                     | 102     |
-| `MAX_SRC_CUTS` | Number of allowed SRC cuts                              | 50      |
+| `MAX_SRC_CUTS`    | Number of allowed SRC cuts                              | 50      |
 | `BUCKET_CAPACITY` | Maximum bucket capacity if `LIMITED_BUCKETS` is enabled | 50      |
-| `N_ADD` | Number of columns to be added for each pricing              | 10      |
-| `MAIN_RESOURCES` | Define the number of main resources                     | 1       |
+| `N_ADD`           | Number of columns to be added for each pricing          | 10      |
+| `MAIN_RESOURCES`  | Define the number of main resources                     | 1       |
 
 **Resource Disposability Definition**
 
@@ -120,7 +121,6 @@ We also provide a Python wrapper, which can be used to instantiate the bucket gr
 
 ```python
 import random
-
 
 # Now you can import the BALDES module
 import baldes

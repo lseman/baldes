@@ -50,6 +50,12 @@
 #include <fmt/color.h>
 #include <fmt/core.h>
 
+struct BucketOptions {
+    int depot         = 0;
+    int end_depot     = N_SIZE - 1;
+    int max_path_size = 5;
+};
+
 enum class Direction { Forward, Backward };
 enum class Stage { One, Two, Three, Four, Enumerate, Fix };
 enum class ArcType { Job, Bucket, Jump };
@@ -553,6 +559,8 @@ struct VRPJob {
     double                        demand;
     std::vector<int>              lb;
     std::vector<int>              ub;
+    std::vector<int>              mtw_lb;
+    std::vector<int>              mtw_ub;
     std::vector<Arc>              fw_arcs;
     std::vector<Arc>              bw_arcs;
     std::vector<std::vector<Arc>> fw_arcs_scc;

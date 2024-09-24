@@ -1,3 +1,21 @@
+/**
+ * @file DataClasses.h
+ * @brief Defines the core structures and classes for managing labels, arcs, and buckets in a graph-based solver.
+ *
+ * This file includes definitions for handling labels, buckets, and related resources in optimization problems, 
+ * specifically for applications like Vehicle Routing Problems (VRP) or other resource-constrained path-finding algorithms.
+ * 
+ * The key components defined in this file include:
+ *  - `Label`: Represents a node in the solution space with properties like cost, resources, and job coverage.
+ *  - `Bucket`: A container managing labels and arcs for efficient graph traversal and label extension.
+ *  - `SchrodingerPool`: Manages paths with a limited lifespan, reducing costs and filtering based on dual values.
+ *  - `LabelPool`: Manages a pool of reusable labels, facilitating efficient memory management and recycling of labels.
+ *  - `RCCmanager`: Handles the management of RCC cuts, dual cache, and arc-to-cut mappings with thread safety.
+ *  - `PSTEPDuals`: Manages the dual values for arcs and nodes in a network.
+ *
+ * Each of these components is designed to operate efficiently in a graph-based solver and support parallel processing where applicable.
+ */
+
 #pragma once
 
 #include "Definitions.h"
@@ -5,6 +23,10 @@
 #include <deque>
 #include <tuple>
 #include <vector>
+#include <unordered_map>
+#include <utility>
+#include <vector>
+
 
 // Label structure to hold the details of each label in the graph
 /**
@@ -214,12 +236,12 @@ struct Bucket {
      * backward.
      * @param fixed A boolean indicating whether the arc is fixed.
      */
-    void add_bucket_arc(int from_bucket, int to_bucket, std::vector<double> res_inc, double cost_inc, bool fw,
+    void add_bucket_arc(int from_bucket, int to_bucket, const std::vector<double> &res_inc, double cost_inc, bool fw,
                         bool fixed) {
         if (fw) {
-            fw_bucket_arcs.push_back({from_bucket, to_bucket, std::move(res_inc), cost_inc, fixed});
+            fw_bucket_arcs.emplace_back(from_bucket, to_bucket, res_inc, cost_inc, fixed);
         } else {
-            bw_bucket_arcs.push_back({from_bucket, to_bucket, std::move(res_inc), cost_inc, fixed});
+            bw_bucket_arcs.emplace_back(from_bucket, to_bucket, res_inc, cost_inc, fixed);
         }
     }
 
@@ -236,11 +258,11 @@ struct Bucket {
      * @param fw A boolean indicating the direction of the jump arc. If true, the arc is added to the forward
      * jump arcs; otherwise, it is added to the backward jump arcs.
      */
-    void add_jump_arc(int from_bucket, int to_bucket, std::vector<double> res_inc, double cost_inc, bool fw) {
+    void add_jump_arc(int from_bucket, int to_bucket, const std::vector<double> &res_inc, double cost_inc, bool fw) {
         if (fw) {
-            fw_jump_arcs.push_back({from_bucket, to_bucket, std::move(res_inc), cost_inc});
+            fw_jump_arcs.emplace_back(from_bucket, to_bucket, res_inc, cost_inc);
         } else {
-            bw_jump_arcs.push_back({from_bucket, to_bucket, std::move(res_inc), cost_inc});
+            bw_jump_arcs.emplace_back(from_bucket, to_bucket, res_inc, cost_inc);
         }
     }
 
@@ -354,7 +376,7 @@ struct Bucket {
         auto it = std::find(labels_vec.begin(), labels_vec.end(), label);
         if (it != labels_vec.end()) {
             // Move the last element to the position of the element to remove
-            *it = std::move(labels_vec.back());
+            *it = labels_vec.back();
             labels_vec.pop_back(); // Remove the last element
         }
     }
@@ -367,7 +389,7 @@ struct Bucket {
         return labels_vec;
     }
 
-    inline const auto get_unextended_labels() {
+    inline auto get_unextended_labels() {
         return labels_vec | std::views::filter([](Label *label) { return !label->is_extended; });
     }
 
@@ -405,7 +427,7 @@ struct Bucket {
         return labels_vec.front();
     }
 
-    bool empty() const { return labels_vec.empty(); }
+    [[nodiscard]] bool empty() const { return labels_vec.empty(); }
 };
 
 /**
@@ -787,4 +809,63 @@ struct RCCmanager {
 
     // Method to retrieve all cuts (if needed)
     std::vector<RCCcut> getAllCuts() const { return cuts; }
+};
+
+/**
+ * @struct PSTEPDuals
+ * @brief A structure to manage dual values for arcs and nodes in a network.
+ *
+ * This structure provides methods to set, get, and clear dual values for arcs and nodes.
+ * Dual values are stored in unordered maps for efficient access.
+ *
+ */
+struct PSTEPDuals {
+    using Arc = std::pair<int, int>; // Represents an arc as a pair (from, to)
+
+    std::unordered_map<Arc, double, pair_hash> arcDuals;          // Stores dual values for arcs
+    std::unordered_map<int, double>           three_two_Duals;   // Stores dual values for nodes
+    std::unordered_map<int, double>           three_three_Duals; // Stores dual values for nodes
+
+    // Set dual values for arcs
+    void setArcDualValues(const std::vector<std::pair<Arc, double>> &values) {
+        for (const auto &[arc, value] : values) { arcDuals[arc] = value; }
+    }
+
+    // Set dual values for nodes
+    void setThreeTwoDualValues(const std::vector<std::pair<int, double>> &values) {
+        for (const auto &[node, value] : values) { three_two_Duals[node] = value; }
+    }
+
+    void setThreeThreeDualValues(const std::vector<std::pair<int, double>> &values) {
+        for (const auto &[node, value] : values) { three_three_Duals[node] = value; }
+    }
+
+    // Clear all dual values (arcs and nodes)
+    void clearDualValues() {
+        arcDuals.clear();
+        three_two_Duals.clear();
+        three_three_Duals.clear();
+    }
+
+    // Get dual value for arcs (from, to)
+    double getArcDualValue(int from, int to) const {
+        Arc  arc   = {from, to};
+        auto arcIt = arcDuals.find(arc);
+        if (arcIt != arcDuals.end()) { return arcIt->second; }
+        return 0.0; // Default value if arc is not found
+    }
+
+    // Get dual value from three_two_Duals for nodes
+    double getThreeTwoDualValue(int node) const {
+        auto it = three_two_Duals.find(node);
+        if (it != three_two_Duals.end()) { return it->second; }
+        return 0.0; // Default value if node is not found
+    }
+
+    // Get dual value from three_three_Duals for nodes
+    double getThreeThreeDualValue(int node) const {
+        auto it = three_three_Duals.find(node);
+        if (it != three_three_Duals.end()) { return it->second; }
+        return 0.0; // Default value if node is not found
+    }
 };

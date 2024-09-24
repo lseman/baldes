@@ -76,5 +76,16 @@ PYBIND11_MODULE(baldes, m) {
         .def("phaseOne", &BucketGraph::run_labeling_algorithms<Stage::One, Full::Partial>)
         .def("phaseTwo", &BucketGraph::run_labeling_algorithms<Stage::Two, Full::Partial>)
         .def("phaseThree", &BucketGraph::run_labeling_algorithms<Stage::Three, Full::Partial>)
+        .def("setArcDuals", &BucketGraph::setArcDuals, "duals"_a)
+        .def("solvePSTEP", &BucketGraph::solvePSTEP)
         .def("phaseFour", &BucketGraph::run_labeling_algorithms<Stage::Four, Full::Partial>);
+
+    // Expose PSTEPDuals class
+    py::class_<PSTEPDuals>(m, "PSTEPDuals")
+        .def(py::init<>())                                                                   // Default constructor
+        .def("set_arc_dual_values", &PSTEPDuals::setArcDualValues, "values"_a)               // Set arc dual values
+        .def("set_threetwo_dual_values", &PSTEPDuals::setThreeTwoDualValues, "values"_a)     // Set node dual values
+        .def("set_threethree_dual_values", &PSTEPDuals::setThreeThreeDualValues, "values"_a) // Set node dual values
+        .def("clear_dual_values", &PSTEPDuals::clearDualValues)                              // Clear all dual values
+        .def("__repr__", [](const PSTEPDuals &pstepDuals) { return "<PSTEPDuals with arc and node dual values>"; });
 }
