@@ -26,7 +26,7 @@
 
 #include "../include/DataClasses.h"
 
-#include "../include/BucketGraph.h"
+#include "../bucket/BucketGraph.h"
 
 #include <queue>
 #include <random>

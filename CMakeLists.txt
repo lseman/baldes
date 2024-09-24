@@ -13,6 +13,7 @@ set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 # Include directories
 include_directories(include)
+include_directories(bucket)
 
 # Build types and flags
 if(NOT CMAKE_BUILD_TYPE)
