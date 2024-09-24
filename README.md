@@ -76,6 +76,18 @@ Make sure the `GUROBI_HOME` environment variable is set.
 | `N_ADD`           | Number of columns to be added each pricing              | 10      |
 | `MAIN_RESOURCES`  | Define the number of main resources                     | 1       |
 
+**Resource Disposability Definition**
+
+To control how each resource is treated (whether disposable, non-disposable, or binary), it is necessary to define a vector using the `#define RESOURCES_DISPOSABLE` directive. Each position in this vector corresponds to a specific resource and should be assigned a value of `0`, `1`, or `2` to indicate the disposability type:
+
+- **0**: Disposable resource – the resource can be consumed or reset during the routing process.
+- **1**: Non-disposable resource – the resource is conserved and cannot be disposed of.
+- **2**: Binary resource – the resource toggles between two states (e.g., `0` for off and `1` for on).
+
+```cpp
+#define RESOURCES_DISPOSABLE {0, 1, 2, 1}
+```
+
 > **Note 1**: Including depot and depot copy (end node).
  
 > **Note 2**: Both `SRC` and `SRC3` cannot be enabled simultaneously. Ensure only one is selected.
