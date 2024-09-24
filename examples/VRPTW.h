@@ -717,8 +717,11 @@ public:
 
         double highs_obj_dual = 0.0;
         double highs_obj      = 0.0;
-
+        
+        #ifdef SRC
         bucket_graph.cut_storage = &cuts;
+        #endif
+        
         bucket_graph.setup();
 
         double gap = 1e-6;
@@ -745,8 +748,6 @@ public:
 #ifdef STAB
         Stabilization stab(0.9, jobDuals);
 #endif
-        std::vector<double> split = {time_horizon * 0.5};
-        bucket_graph.setSplit(split);
         bool changed = false;
         // set start timer
         auto start_timer = std::chrono::high_resolution_clock::now();

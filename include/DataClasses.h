@@ -462,9 +462,10 @@ public:
 #ifdef SRC
         auto &cutter   = cut_storage;      // Access the cut storage manager
         auto &SRCDuals = cutter->SRCDuals; // Access the dual values for the SRC cuts
-#endif
 
         std::vector<double> SRCmap(cutter->size(), 0.0); // Initialize the SRC map with zeros
+#endif
+
         for (auto &path : paths) {
             int iteration_added = std::get<0>(path); // Get the iteration when the path was added
 

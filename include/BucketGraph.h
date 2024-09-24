@@ -74,7 +74,7 @@ public:
 
     // Note: very tricky way to unroll the loop at compile time and check for disposability
     static constexpr std::string_view resources[] = {RESOURCES}; // RESOURCES will expand to your string list
-    static constexpr bool             resource_disposability[] = {
+    static constexpr int              resource_disposability[] = {
         RESOURCES_DISPOSABLE}; // RESOURCES_DISPOSABLE expands to disposability list
 
     template <Direction D, size_t I, size_t N, typename Gamma, typename VRPJob>
@@ -96,7 +96,7 @@ public:
     template <Direction D, size_t I, size_t N, typename Gamma, typename VRPJob>
     constexpr bool process_resource(double &new_resource, const std::array<double, R_SIZE> &initial_resources,
                                     const Gamma &gamma, const VRPJob &theJob) {
-        if constexpr (resource_disposability[I]) { // Checked at compile-time
+        if constexpr (resource_disposability[I] == 1) { // Checked at compile-time
             if constexpr (D == Direction::Forward) {
                 new_resource =
                     std::max(initial_resources[I] + gamma.resource_increment[I], static_cast<double>(theJob.lb[I]));
@@ -110,12 +110,45 @@ public:
                     return false; // Below lower bound, return false to stop processing
                 }
             }
-        } else {
-            // TODO: Add specific handling for non-disposable resources
+        } else if constexpr (resource_disposability[I] == 0) {
+            // TODO: Non-disposable resource handling, check if it is right
+            if constexpr (D == Direction::Forward) {
+                new_resource = initial_resources[I] + gamma.resource_increment[I];
+                if (new_resource > theJob.ub[I]) {
+                    return false; // Exceeds upper bound, return false to stop processing
+                } else if (new_resource < theJob.lb[I]) {
+                    return false; // Below lower bound, return false to stop processing
+                }
+            } else {
+                new_resource = initial_resources[I] - gamma.resource_increment[I];
+                if (new_resource > theJob.ub[I]) {
+                    return false; // Exceeds upper bound, return false to stop processing
+                } else if (new_resource < theJob.lb[I]) {
+                    return false; // Below lower bound, return false to stop processing
+                }
+            }
+        } else if constexpr (resource_disposability[I] == 2) {
+            // TODO:: Binary resource handling, check if logic is right
+            if constexpr (D == Direction::Forward) {
+                // For binary resources, flip between 0 and 1 based on gamma.resource_increment[I]
+                if (gamma.resource_increment[I] > 0) {
+                    new_resource = 1.0; // Switch "on"
+                } else {
+                    new_resource = 0.0; // Switch "off"
+                }
+            } else {
+                // In reverse, toggle as well
+                if (gamma.resource_increment[I] > 0) {
+                    new_resource = 0.0; // Reverse logic: turn "off"
+                } else {
+                    new_resource = 1.0; // Reverse logic: turn "on"
+                }
+            }
         }
 
         return true; // Successfully processed all resources
     }
+
     // Function to automatically get the size
     template <typename T, std::size_t N>
     constexpr std::size_t array_size(const T (&)[N]) {
@@ -453,7 +486,7 @@ public:
     void define_buckets();
 
     template <Direction D, Stage S>
-    bool DominatedInCompWiseSmallerBuckets(Label *L, int bucket, std::vector<double> &c_bar,
+    bool DominatedInCompWiseSmallerBuckets(Label *L, int bucket, const std::vector<double> &c_bar,
                                            std::vector<uint64_t>               &Bvisited,
                                            const std::vector<std::vector<int>> &bucket_order) noexcept;
 

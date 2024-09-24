@@ -246,11 +246,11 @@ target_link_libraries(
                 ${GUROBI_HOME}/lib/libgurobi${GUROBI_VERSION_MAJOR}.so tbb)
 
 if(WITH_PYTHON)
-  pybind11_add_module(bucket_graph python/BucketBindings.cpp
+  pybind11_add_module(baldes python/BucketBindings.cpp
                       ${EXECUTABLE_SOURCES})
-  target_link_libraries(bucket_graph PRIVATE pybind11::module)
-  target_link_libraries(bucket_graph PRIVATE fmt::fmt)
-  target_link_libraries(bucket_graph PRIVATE TBB::tbb)
-  target_link_libraries(bucket_graph PRIVATE STDEXEC::stdexec)
-  set_target_properties(bucket_graph PROPERTIES POSITION_INDEPENDENT_CODE ON)
+  target_link_libraries(baldes PRIVATE pybind11::module)
+  target_link_libraries(baldes PRIVATE fmt::fmt)
+  target_link_libraries(baldes PRIVATE TBB::tbb)
+  target_link_libraries(baldes PRIVATE STDEXEC::stdexec)
+  set_target_properties(baldes PROPERTIES POSITION_INDEPENDENT_CODE ON)
 endif()

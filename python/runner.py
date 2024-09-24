@@ -5,12 +5,13 @@ import sys
 # Add the build directory to the Python path
 sys.path.append(os.path.abspath('../build'))
 
-# Now you can import the bucket_graph module
-import bucket_graph
+# Now you can import the BALDES module
+import baldes
 
 # Define jobs
-jobs = [bucket_graph.VRPJob() for _ in range(102)]
+jobs = [baldes.VRPJob() for _ in range(102)]
 num_intervals = 1
+
 # Set random bounds for each job
 id = 0
 for job in jobs:
@@ -30,15 +31,16 @@ for job in jobs:
 distances = [[random.randint(1, 100) for _ in range(len(jobs))] for _ in range(len(jobs))]
 
 # Initialize BucketGraph using these jobs
-bg = bucket_graph.BucketGraph(jobs, 10000, 10)
+bg = baldes.BucketGraph(jobs, 12000, 1)
 
 # Create random duals with size equal to the number of jobs
 duals = [random.random() for _ in range(len(jobs))]
 
-print("Duals before setting them in the BucketGraph:")
-print(duals)
-
+# Set the distance matrix, adjacency list, and duals
 bg.set_distance_matrix(distances)
 bg.set_adjacency_list()
 bg.set_duals(duals)
 bg.setup()
+
+# Call the solve method
+labels = bg.solve()
