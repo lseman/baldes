@@ -469,6 +469,7 @@ std::vector<Label *> BucketGraph::bi_labeling_algorithm(std::vector<double> q_st
     }
 #endif
 
+#ifdef SCHRODINGER
     // if merged_labels is bigger than 10, create Path related to the remaining ones
     // and add them to a std::vector<Path>
     if (merged_labels.size() > N_ADD) {
@@ -482,6 +483,7 @@ std::vector<Label *> BucketGraph::bi_labeling_algorithm(std::vector<double> q_st
         sPool.add_paths(paths);
         sPool.iterate();
     }
+#endif
 
     // Return the final list of merged labels after processing
     return merged_labels;
@@ -560,6 +562,15 @@ BucketGraph::Extend(const std::conditional_t<M == Mutability::Mut, Label *, cons
         }
     }
 
+#ifdef PSTEP
+    // counter the number of bits set in L_prime->visited_bitmap
+    size_t n_visited = 0;
+    for (size_t i = 0; i < L_prime->visited_bitmap.size(); ++i) {
+        n_visited += __builtin_popcountll(L_prime->visited_bitmap[i]);
+    }
+    if (n_visited >= options.max_path_size) { return nullptr; }
+#endif
+
     // Get the VRP job corresponding to job_id
     const VRPJob &VRPJob = jobs[job_id];
 
@@ -584,7 +595,12 @@ BucketGraph::Extend(const std::conditional_t<M == Mutability::Mut, Label *, cons
     }
     */
 
-    // Note: workaround
+#ifdef MTW
+    // TODO:: handle multiple time windows
+
+#endif
+
+    // NOTE: beautiful function for compile time unrolling
     constexpr size_t N = R_SIZE;
     if (!process_all_resources<D, 0, N>(new_resources, initial_resources, gamma, VRPJob)) {
         return nullptr; // Handle failure case (constraint violation)
@@ -612,7 +628,19 @@ BucketGraph::Extend(const std::conditional_t<M == Mutability::Mut, Label *, cons
 
     // Compute travel cost between the initial and current jobs
     const double travel_cost = getcij(initial_job_id, job_id);
-    double       new_cost    = initial_cost + travel_cost - VRPJob.cost;
+
+#ifndef PSTEP
+    double new_cost = initial_cost + travel_cost - VRPJob.cost;
+#else
+    double new_cost = initial_cost + travel_cost;
+
+    // if there were more, give back the dual
+    new_cost += pstep_duals.getThreeTwoDualValue(initial_job_id) + pstep_duals.getThreeThreeDualValue(initial_job_id);
+
+    // assume the last in the route
+    new_cost += -pstep_duals.getThreeTwoDualValue(job_id);
+    new_cost += pstep_duals.getArcDualValue(initial_job_id, job_id);
+#endif
 
 #ifdef RCC
     // Adjust the cost using the cached dual sum from RCC (if applicable)

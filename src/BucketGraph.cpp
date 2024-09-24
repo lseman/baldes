@@ -30,7 +30,6 @@
 #include "../include/BucketUtils.h"
 
 // Implementation of Arc constructors
-
 Arc::Arc(int from, int to, const std::vector<double> &res_inc, double cost_inc)
     : from(from), to(to), resource_increment(res_inc), cost_increment(cost_inc) {}
 
@@ -706,20 +705,21 @@ void BucketGraph::common_initialization() {
         }
 
         // Adjust to calculate index using `num_buckets[0]`, which is likely multi-dimensional for the depot
-        int calculated_index =
-            calculate_index(current_pos, num_buckets[0]) + num_bucket_index[0]; // Calculate index once
-        depot->initialize(calculated_index, 0.0, interval_starts, 0);
+        int calculated_index = calculate_index(current_pos, num_buckets[options.depot]) +
+                               num_bucket_index[options.depot]; // Calculate index once
+        depot->initialize(calculated_index, 0.0, interval_starts, options.depot);
         depot->is_extended = false;
-        set_job_visited(depot->visited_bitmap, 0);
+        set_job_visited(depot->visited_bitmap, options.depot);
 #ifdef SRC
         depot->SRCmap.assign(cut_storage->SRCDuals.size(), 0);
 #endif
         fw_buckets[calculated_index].add_label(depot);
-        fw_buckets[calculated_index].job_id = 0;
+        fw_buckets[calculated_index].job_id = options.depot;
 
         if (update_position(current_pos)) break; // Update position and break if done
     }
 
+    fmt::print("num_intervals: {}\n", num_intervals);
     // Initialize backward buckets (generic for multiple dimensions)
     current_pos.assign(num_intervals, 0);
 
@@ -733,17 +733,107 @@ void BucketGraph::common_initialization() {
         }
 
         // Calculate index for backward direction
-        int calculated_index = calculate_index(current_pos, num_buckets[N_SIZE - 1]) +
-                               num_bucket_index[N_SIZE - 1]; // Use num_buckets[0] for consistency
+        int calculated_index = calculate_index(current_pos, num_buckets[options.end_depot]) +
+                               num_bucket_index[options.end_depot]; // Use num_buckets[0] for consistency
         // print interval_ends size
-        end_depot->initialize(calculated_index, 0.0, interval_ends, N_SIZE - 1);
+        end_depot->initialize(calculated_index, 0.0, interval_ends, options.end_depot);
         end_depot->is_extended = false;
-        set_job_visited(end_depot->visited_bitmap, N_SIZE - 1);
+        set_job_visited(end_depot->visited_bitmap, options.end_depot);
 #ifdef SRC
         end_depot->SRCmap.assign(cut_storage->SRCDuals.size(), 0);
 #endif
         bw_buckets[calculated_index].add_label(end_depot);
-        bw_buckets[calculated_index].job_id = N_SIZE - 1;
+        bw_buckets[calculated_index].job_id = options.end_depot;
+
+        if (update_position(current_pos)) break; // Update position and break if done
+    }
+}
+
+/**
+ * @brief Initializes the BucketGraph for the mono-directional case.
+ */
+void BucketGraph::mono_initialization() {
+    // Clear previous data
+    merged_labels.clear();
+    merged_labels.reserve(100);
+    fw_c_bar.clear();
+
+    // Resize cost vectors to match the number of buckets
+    fw_c_bar.resize(fw_buckets.size(), std::numeric_limits<double>::infinity());
+
+    auto &num_buckets      = assign_buckets<Direction::Forward>(num_buckets_fw, num_buckets_bw);
+    auto &num_bucket_index = assign_buckets<Direction::Forward>(num_buckets_index_fw, num_buckets_index_bw);
+
+    int              num_intervals = intervals.size(); // Determine how many resources we have (number of intervals)
+    std::vector<int> total_ranges(num_intervals);
+    std::vector<int> base_intervals(num_intervals);
+    std::vector<int> remainders(num_intervals);
+
+    // Calculate base intervals and total ranges for each resource dimension
+    for (int r = 0; r < intervals.size(); ++r) {
+        total_ranges[r]   = R_max[r] - R_min[r] + 1;
+        base_intervals[r] = total_ranges[r] / intervals[r].interval;
+        remainders[r]     = total_ranges[r] % intervals[r].interval; // Use std::fmod for floating-point modulo
+    }
+
+    // Clear forward and backward buckets
+    for (auto b = 0; b < fw_buckets_size; b++) { fw_buckets[b].clear(); }
+
+    auto &VRPJob = jobs[0]; // Example for the first job
+
+    std::vector<int> job_total_ranges(num_intervals);
+    for (int r = 0; r < num_intervals; ++r) { job_total_ranges[r] = VRPJob.ub[r] - VRPJob.lb[r]; }
+
+    // Helper lambda to update current position of the intervals
+    auto update_position = [&](std::vector<int> &current_pos) -> bool {
+        bool done = true;
+        for (int r = num_intervals - 1; r >= 0; --r) {
+            current_pos[r]++;
+            if (current_pos[r] * base_intervals[r] < job_total_ranges[r]) {
+                done = false;
+                break;
+            } else {
+                current_pos[r] = 0;
+            }
+        }
+        return done;
+    };
+
+    auto calculate_index = [&](const std::vector<int> &current_pos, int &total_buckets) -> int {
+        int index = 0;
+
+        // Loop through each interval (dimension) and compute the index
+        for (int r = 0; r < current_pos.size(); ++r) {
+            index += current_pos[r]; // Accumulate the positional index across intervals
+        }
+
+        return index;
+    };
+
+    // Initialize forward buckets (generic for multiple dimensions)
+    std::vector<int> current_pos(num_intervals, 0);
+
+    // Iterate over all intervals for the forward direction
+    while (true) {
+        auto depot = label_pool_fw.acquire();
+        // print num_intervals
+        std::vector<double> interval_starts(num_intervals);
+        for (int r = 0; r < num_intervals; ++r) {
+            interval_starts[r] =
+                std::min(static_cast<int>(R_max[r]), VRPJob.lb[r] + current_pos[r] * base_intervals[r]);
+        }
+
+        // Adjust to calculate index using `num_buckets[0]`, which is likely multi-dimensional for the depot
+        int calculated_index = calculate_index(current_pos, num_buckets[options.depot]) +
+                               num_bucket_index[options.depot]; // Calculate index once
+        depot->initialize(calculated_index, 0.0, interval_starts, options.depot);
+        depot->is_extended = false;
+        set_job_visited(depot->visited_bitmap, options.depot);
+#ifdef SRC
+        depot->SRCmap.assign(cut_storage->SRCDuals.size(), 0);
+#endif
+        fw_buckets[calculated_index].add_label(depot);
+        fw_buckets[calculated_index].job_id = options.depot;
 
         if (update_position(current_pos)) break; // Update position and break if done
     }
@@ -923,14 +1013,14 @@ void BucketGraph::setup() {
     generate_arcs();
     for (auto &VRPJob : jobs) { VRPJob.sort_arcs(); }
 
+#ifdef SCHRODINGER
     sPool.distance_matrix = distance_matrix;
     sPool.setJobs(&jobs);
     sPool.setCutStorage(cut_storage);
+#endif
 
     // Initialize the split
-    for (int i = 0; i < MAIN_RESOURCES; ++i) {
-        q_star.push_back((R_max[i] - R_min[i] + 1) / 2);
-    }
+    for (int i = 0; i < MAIN_RESOURCES; ++i) { q_star.push_back((R_max[i] - R_min[i] + 1) / 2); }
 }
 
 /**
@@ -986,4 +1076,28 @@ void BucketGraph::initInfo() {
     fmt::print("+----------------------------------+\n");
 
     fmt::print("\n");
+}
+
+Label *BucketGraph::compute_mono_label(const Label *L) {
+    // Directly acquire new_label and set the cost
+    auto new_label       = label_pool_fw.acquire();
+    new_label->cost      = L->cost;      // Use the cost from L
+    new_label->real_cost = L->real_cost; // Use the real cost from L
+
+    // Calculate the number of jobs covered by the label (its ancestors)
+    size_t label_size = 0;
+    for (auto current_label = L; current_label != nullptr; current_label = current_label->parent) { label_size++; }
+
+    // Reserve space in one go
+    new_label->jobs_covered.clear();
+    new_label->jobs_covered.reserve(label_size);
+
+    // Insert the jobs from the label and its ancestors
+    for (auto current_label = L; current_label != nullptr; current_label = current_label->parent) {
+        new_label->jobs_covered.push_back(current_label->job_id);
+    }
+
+    std::reverse(new_label->jobs_covered.begin(), new_label->jobs_covered.end());
+
+    return new_label;
 }

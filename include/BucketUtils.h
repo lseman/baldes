@@ -727,7 +727,7 @@ int BucketGraph::get_opposite_bucket_number(int current_bucket_index) {
 template <Stage S>
 void BucketGraph::bucket_fixing(const std::vector<double> &q_star) {
     // Stage 4 bucket arc fixing
-    if (fixed == false) {
+    if (!fixed) {
         fixed = true;
         common_initialization();
 

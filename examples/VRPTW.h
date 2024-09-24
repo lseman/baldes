@@ -717,11 +717,11 @@ public:
 
         double highs_obj_dual = 0.0;
         double highs_obj      = 0.0;
-        
-        #ifdef SRC
+
+#ifdef SRC
         bucket_graph.cut_storage = &cuts;
-        #endif
-        
+#endif
+
         bucket_graph.setup();
 
         double gap = 1e-6;
@@ -969,9 +969,11 @@ public:
                 // Adding cols
                 auto colAdded = addColumn(node, paths, false);
 
+#ifdef SCHRODINGER
                 // Adding schrodinger paths
                 auto sch_paths = bucket_graph.getSchrodinger();
                 colAdded += addPath(node, sch_paths, true);
+#endif
 
 #ifdef RIH
                 auto rih_paths = bucket_graph.get_rih_labels();

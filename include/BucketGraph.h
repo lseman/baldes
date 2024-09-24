@@ -70,13 +70,68 @@ class BucketGraph {
     using NGRouteBitmap = uint64_t;
 
 public:
-    SchrodingerPool sPool = SchrodingerPool(100);
+    BucketOptions options;
+    void          mono_initialization();
 
+#ifdef PSTEP
+    PSTEPDuals pstep_duals;
+    void       setArcDuals(const PSTEPDuals &arc_duals) { this->pstep_duals = arc_duals; }
+    Label     *compute_mono_label(const Label *L);
+    /**
+     * @brief Solves the PSTEP problem and returns a vector of labels representing paths.
+     *
+     * This function performs the following steps:
+     * 1. Resets the pool.
+     * 2. Initializes the mono algorithm.
+     * 3. Runs a labeling algorithm in the forward direction.
+     * 4. Iterates through the forward buckets and computes new labels.
+     * 5. Filters and collects labels that meet the criteria.
+     *
+     * @return std::vector<Label*> A vector of pointers to Label objects representing the paths.
+     */
+    std::vector<Label *> solvePSTEP() {
+        std::vector<Label *> paths;
+        double               inner_obj;
+
+        reset_pool();
+        mono_initialization();
+
+        std::vector<double> forward_cbar(fw_buckets.size());
+
+        forward_cbar = labeling_algorithm<Direction::Forward, Stage::Four, Full::Full>(q_star);
+
+        for (auto bucket : std::ranges::iota_view(0, fw_buckets_size)) {
+            auto bucket_labels = fw_buckets[bucket].get_labels();
+            for (auto label : bucket_labels) {
+                auto new_label = compute_mono_label(label);
+                if (new_label->jobs_covered.size() < options.max_path_size) { continue; }
+                paths.push_back(new_label);
+            }
+        }
+
+        return paths;
+    }
+
+#endif
+    void setOptions(const BucketOptions &options) { this->options = options; }
+
+#ifdef SCHRODINGER
+    SchrodingerPool sPool = SchrodingerPool(100);
+#endif
     // Note: very tricky way to unroll the loop at compile time and check for disposability
     static constexpr std::string_view resources[] = {RESOURCES}; // RESOURCES will expand to your string list
     static constexpr int              resource_disposability[] = {
-        RESOURCES_DISPOSABLE}; // RESOURCES_DISPOSABLE expands to disposability list
+        RESOURCES_DISPOSABLE}; // Ensure RESOURCES_DISPOSABLE expands to a list of integers
 
+    /**
+     * @brief Processes all resources by iterating through them and applying constraints.
+     *
+     * This function recursively processes each resource in the `new_resources` vector by calling
+     * `process_resource` for each index from `I` to `N-1`. If any resource processing fails (i.e.,
+     * `process_resource` returns false), the function returns false immediately. If all resources
+     * are processed successfully, the function returns true.
+     *
+     */
     template <Direction D, size_t I, size_t N, typename Gamma, typename VRPJob>
     constexpr bool process_all_resources(std::vector<double>              &new_resources,
                                          const std::array<double, R_SIZE> &initial_resources, const Gamma &gamma,
@@ -93,6 +148,14 @@ public:
     }
 
     // Template recursion for compile-time unrolling
+    /**
+     * @brief Processes a resource based on its disposability type and direction.
+     *
+     * This function updates the `new_resource` value based on the initial resources,
+     * the increment provided by `gamma`, and the constraints defined by `theJob`.
+     * The behavior varies depending on the disposability type of the resource.
+     *
+     */
     template <Direction D, size_t I, size_t N, typename Gamma, typename VRPJob>
     constexpr bool process_resource(double &new_resource, const std::array<double, R_SIZE> &initial_resources,
                                     const Gamma &gamma, const VRPJob &theJob) {
@@ -144,8 +207,42 @@ public:
                     new_resource = 1.0; // Reverse logic: turn "on"
                 }
             }
-        }
+        } else if constexpr (resource_disposability[I] == 3) {
+            // TODO: handling multiple time windows case
+            // "OR" resource case using mtw_lb and mtw_ub vectors for multiple time windows
+            if constexpr (D == Direction::Forward) {
+                bool is_feasible = false;
+                for (size_t i = 0; i < theJob.mtw_lb.size(); ++i) {
+                    new_resource = std::max(initial_resources[I] + gamma.resource_increment[I], theJob.mtw_lb[i]);
+                    if (new_resource > theJob.ub[I]) {
+                        continue; // Exceeds upper bound, try next time window
+                    } else {
+                        is_feasible = true; // Feasible in this time window
+                        break;
+                    }
+                }
 
+                if (!is_feasible) {
+                    return false; // Not feasible in any of the ranges
+                }
+
+                return true; // Successfully processed all resources
+            } else {
+                bool is_feasible = false;
+                for (size_t i = 0; i < theJob.mtw_ub.size(); ++i) {
+                    new_resource = std::min(initial_resources[I] - gamma.resource_increment[I], theJob.mtw_ub[i]);
+                    if (new_resource < theJob.lb[I]) {
+                        continue; // Below lower bound, try next time window }
+                    } else {
+                        is_feasible = true; // Feasible in this time window break;
+                    }
+                }
+
+                if (!is_feasible) {
+                    return false; // Not feasible in any of the ranges
+                }
+            }
+        }
         return true; // Successfully processed all resources
     }
 
@@ -257,11 +354,21 @@ public:
     std::vector<std::vector<uint64_t>> neighborhoods_bitmap; // Bitmap for neighborhoods of each job
     std::mutex                         label_pool_mutex;
 
+#ifdef SCHRODINGER
+    /**
+     * @brief Retrieves a list of paths with negative reduced costs.
+     *
+     * This function fetches paths from the sPool that have negative reduced costs.
+     * If the number of such paths exceeds a predefined limit (N_ADD), the list is
+     * truncated to contain only the first N_ADD paths.
+     *
+     */
     std::vector<Path> getSchrodinger() const {
         std::vector<Path> negative_cost_paths = sPool.get_paths_with_negative_red_cost();
         if (negative_cost_paths.size() > N_ADD) { negative_cost_paths.resize(N_ADD); }
         return negative_cost_paths;
     }
+#endif
 
     static void initInfo();
 
@@ -274,8 +381,10 @@ public:
      *
      * @tparam state The stage of the algorithm.
      * @tparam fullness The fullness state of the algorithm.
-     * @param forward_cbar A reference to a vector where the results of the forward labeling algorithm will be stored.
-     * @param backward_cbar A reference to a vector where the results of the backward labeling algorithm will be stored.
+     * @param forward_cbar A reference to a vector where the results of the forward labeling algorithm will be
+     * stored.
+     * @param backward_cbar A reference to a vector where the results of the backward labeling algorithm will be
+     * stored.
      * @param q_star A constant reference to a vector used as input for the labeling algorithms.
      */
     template <Stage state, Full fullness>
@@ -599,7 +708,6 @@ public:
      */
     inline bool check_feasibility(const Label *fw_label, const Label *bw_label) {
         if (!fw_label || !bw_label) return false;
-        // print bw_label->job_id
         const struct VRPJob &VRPJob = jobs[fw_label->job_id];
         if (fw_label->resources[TIME_INDEX] + getcij(fw_label->job_id, bw_label->job_id) + VRPJob.duration >
             bw_label->resources[TIME_INDEX]) {
