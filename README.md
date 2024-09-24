@@ -76,8 +76,6 @@ Make sure the `GUROBI_HOME` environment variable is set.
 | `N_ADD`           | Number of columns to be added each pricing              | 10      |
 | `MAIN_RESOURCES`  | Define the number of main resources                     | 1       |
 
-This structure helps to better differentiate between the boolean options and other numerical parameters or settings in the configuration.
-
 > **Note 1**: Including depot and depot copy (end node).
  
 > **Note 2**: Both `SRC` and `SRC3` cannot be enabled simultaneously. Ensure only one is selected.
