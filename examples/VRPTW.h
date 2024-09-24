@@ -18,9 +18,9 @@
 
 #include "../include/Definitions.h"
 
-#include "../include/BucketGraph.h"
-#include "../include/BucketSolve.h"
-#include "../include/BucketUtils.h"
+#include "../bucket/BucketGraph.h"
+#include "../bucket/BucketSolve.h"
+#include "../bucket/BucketUtils.h"
 
 #ifdef STAB
 #include "../extra/Stabilization.h"
