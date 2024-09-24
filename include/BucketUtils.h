@@ -400,7 +400,7 @@ Label *BucketGraph::get_best_label(const std::vector<int> &topological_order, co
     for (int component_index : topological_order) {
         const auto &component_buckets = sccs[component_index];
 
-        for (int bucket : component_buckets) {
+        for (const int bucket : component_buckets) {
             const auto &label = buckets[bucket].get_best_label();
             if (!label) continue;
 
@@ -431,8 +431,8 @@ void BucketGraph::ConcatenateLabel(const Label *&L, int &b, Label *&pbest, std::
     bucket_stack.reserve(10);
     bucket_stack.push_back(b);
 
-    const auto  L_job_id    = L->job_id;
-    const auto  L_resources = L->resources;
+    const auto &L_job_id    = L->job_id;
+    const auto &L_resources = L->resources;
     const auto &L_last_job  = jobs[L_job_id];
 
     while (!bucket_stack.empty()) {
@@ -445,8 +445,8 @@ void BucketGraph::ConcatenateLabel(const Label *&L, int &b, Label *&pbest, std::
         const size_t bit_position = current_bucket % 64;
         Bvisited[segment] |= (1ULL << bit_position);
 
-        const auto bucketLprimejob = bw_buckets[current_bucket].job_id;
-        double     cost            = getcij(L_job_id, bucketLprimejob);
+        const auto &bucketLprimejob = bw_buckets[current_bucket].job_id;
+        double      cost            = getcij(L_job_id, bucketLprimejob);
 
 #ifdef RCC
         cost -= rcc_manager->getCachedDualSumForArc(L_job_id, bucketLprimejob);
@@ -475,9 +475,7 @@ void BucketGraph::ConcatenateLabel(const Label *&L, int &b, Label *&pbest, std::
         const auto &labels = bucket.get_labels();
 
         for (const auto &L_bw : labels) {
-            if (L_bw->job_id == L_job_id) continue;
-
-            if (!check_feasibility(L, L_bw)) continue;
+            if (L_bw->job_id == L_job_id || !check_feasibility(L, L_bw)) continue;
             double candidate_cost = L_cost_plus_cost + L_bw->cost;
 
 #ifdef SRC
@@ -489,6 +487,12 @@ void BucketGraph::ConcatenateLabel(const Label *&L, int &b, Label *&pbest, std::
             }
 #endif
 
+            // Early exit based on candidate cost
+            if ((S != Stage::Enumerate && candidate_cost >= pbest->cost) ||
+                (S == Stage::Enumerate && candidate_cost >= gap)) {
+                continue;
+            }
+
             // Check for visited overlap and skip if true
             if constexpr (S >= Stage::Three) {
                 bool visited_overlap = false;
@@ -499,12 +503,6 @@ void BucketGraph::ConcatenateLabel(const Label *&L, int &b, Label *&pbest, std::
                     }
                 }
                 if (visited_overlap) continue;
-            }
-
-            // Early exit based on candidate cost
-            if ((S != Stage::Enumerate && candidate_cost >= pbest->cost) ||
-                (S == Stage::Enumerate && candidate_cost >= gap)) {
-                continue;
             }
 
             // Compute and store the new label

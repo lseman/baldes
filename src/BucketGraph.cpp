@@ -159,11 +159,14 @@ Label *BucketGraph::compute_label(const Label *L, const Label *L_prime) {
     auto        sumSRC   = 0.0;
     const auto &SRCDuals = cut_storage->SRCDuals;
     if (!SRCDuals.empty()) {
-        for (size_t i = 0; i < SRCDuals.size(); ++i) {
-            if (L->SRCmap[i] + L_prime->SRCmap[i] >= 1) { sumSRC += SRCDuals[i]; }
-        }
+        size_t idx = 0;
+        auto   sumSRC =
+            std::transform_reduce(SRCDuals.begin(), SRCDuals.end(), 0.0, std::plus<>(), [&](const auto &dual) {
+                return (L->SRCmap[idx] + L_prime->SRCmap[idx++] >= 1) ? dual : 0.0;
+            });
+        new_label->cost -= sumSRC;
     }
-    new_label->cost -= sumSRC;
+
 #endif
 #ifdef SRC3
     //  Check SRCDuals condition for specific stages
@@ -178,29 +181,25 @@ Label *BucketGraph::compute_label(const Label *L, const Label *L_prime) {
     new_label->cost -= sumSRC;
 #endif
 
-    // Reserve space for the combined jobs_covered vector in advance
-    size_t total_size = 0;
+    size_t forward_size = 0, backward_size = 0;
 
-    // Traverse forward list to calculate size
-    for (auto L_fw = L; L_fw != nullptr; L_fw = L_fw->parent) { total_size++; }
+    // Calculate sizes for forward and backward lists
+    for (auto L_fw = L; L_fw != nullptr; L_fw = L_fw->parent) { forward_size++; }
+    for (auto L_bw = L_prime; L_bw != nullptr; L_bw = L_bw->parent) { backward_size++; }
 
-    // Traverse backward list to calculate size
-    for (auto L_bw = L_prime; L_bw != nullptr; L_bw = L_bw->parent) { total_size++; }
-
-    // Reserve space in new_label->jobs_covered
+    // Reserve space in one go
     new_label->jobs_covered.clear();
-    new_label->jobs_covered.reserve(total_size);
+    new_label->jobs_covered.reserve(forward_size + backward_size);
 
-    // Traverse forward list and insert elements directly in reverse order
+    // Insert forward list in reverse order
     auto L_fw = L;
     while (L_fw != nullptr) {
-        new_label->jobs_covered.push_back(L_fw->job_id); // Add job_id to jobs_covered
-        if (L_fw->parent == nullptr) { break; }
-        L_fw = L_fw->parent; // Move to the parent
+        new_label->jobs_covered.push_back(L_fw->job_id);
+        L_fw = L_fw->parent;
     }
-    std::reverse(new_label->jobs_covered.begin(), new_label->jobs_covered.end());
+    std::reverse(new_label->jobs_covered.begin(), new_label->jobs_covered.end()); // Reverse in place
 
-    // Traverse backward list and insert elements normally
+    // Insert backward list normally
     for (auto L_bw = L_prime; L_bw != nullptr; L_bw = L_bw->parent) { new_label->jobs_covered.push_back(L_bw->job_id); }
 
     return new_label;
@@ -823,25 +822,25 @@ void BucketGraph::async_rih_processing(std::vector<Label *> initial_labels, int 
 }
 
 /**
-     * @brief Prints the statistics of the bucket graph.
-     *
-     * This function outputs a formatted table displaying various metrics related to the bucket graph.
-     * The table includes headers and values for forward and backward labels, as well as dominance checks.
-     * The output is color-coded for better readability:
-     * - Bold blue for metric names
-     * - Green for values (backward labels)
-     * - Reset color to default after each line
-     *
-     * The table structure:
-     * +----------------------+-----------------+-----------------+
-     * | Metric               | Forward         | Backward        |
-     * +----------------------+-----------------+-----------------+
-     * | Labels               | <stat_n_labels_fw> | <stat_n_labels_bw> |
-     * | Dominance Check      | <stat_n_dom_fw> | <stat_n_dom_bw> |
-     * +----------------------+-----------------+-----------------+
-     *
-     * Note: The actual values for the metrics (e.g., stat_n_labels_fw, stat_n_labels_bw, etc.) should be
-     *       provided by the corresponding member variables or functions.
+ * @brief Prints the statistics of the bucket graph.
+ *
+ * This function outputs a formatted table displaying various metrics related to the bucket graph.
+ * The table includes headers and values for forward and backward labels, as well as dominance checks.
+ * The output is color-coded for better readability:
+ * - Bold blue for metric names
+ * - Green for values (backward labels)
+ * - Reset color to default after each line
+ *
+ * The table structure:
+ * +----------------------+-----------------+-----------------+
+ * | Metric               | Forward         | Backward        |
+ * +----------------------+-----------------+-----------------+
+ * | Labels               | <stat_n_labels_fw> | <stat_n_labels_bw> |
+ * | Dominance Check      | <stat_n_dom_fw> | <stat_n_dom_bw> |
+ * +----------------------+-----------------+-----------------+
+ *
+ * Note: The actual values for the metrics (e.g., stat_n_labels_fw, stat_n_labels_bw, etc.) should be
+ *       provided by the corresponding member variables or functions.
  */
 void BucketGraph::print_statistics() {
     const char *blue_bold = "\033[1;34m"; // Bold blue for metrics
@@ -857,8 +856,7 @@ void BucketGraph::print_statistics() {
     fmt::print("|{}{:<20}{}| {:<15} | {:<15} |\n", blue_bold, " Labels", reset, stat_n_labels_fw, stat_n_labels_bw);
 
     // Print dominated forward and backward labels with bold blue metric
-    fmt::print("|{}{:<20}{}| {:<15} | {:<15} |\n", blue_bold, " Dominance Check", reset, stat_n_dom_fw,
-               stat_n_dom_bw);
+    fmt::print("|{}{:<20}{}| {:<15} | {:<15} |\n", blue_bold, " Dominance Check", reset, stat_n_dom_fw, stat_n_dom_bw);
 
     // Print the final horizontal line
     fmt::print("+----------------------+-----------------+-----------------+\n");
@@ -867,18 +865,18 @@ void BucketGraph::print_statistics() {
 }
 
 /**
-     * @brief Generates arcs in both forward and backward directions in parallel.
-     *
-     * This function uses OpenMP to parallelize the generation of arcs in both
-     * forward and backward directions. It performs the following steps for each
-     * direction:
-     * - Calls the generate_arcs function template with the appropriate direction.
-     * - Clears and resizes the Phi vector for the respective direction.
-     * - Computes the Phi values for each bucket and stores them in the Phi vector.
-     * - Calls the SCC_handler function template with the appropriate direction.
-     *
-     * The forward direction operations are performed in one OpenMP section, and
-     * the backward direction operations are performed in another OpenMP section.
+ * @brief Generates arcs in both forward and backward directions in parallel.
+ *
+ * This function uses OpenMP to parallelize the generation of arcs in both
+ * forward and backward directions. It performs the following steps for each
+ * direction:
+ * - Calls the generate_arcs function template with the appropriate direction.
+ * - Clears and resizes the Phi vector for the respective direction.
+ * - Computes the Phi values for each bucket and stores them in the Phi vector.
+ * - Calls the SCC_handler function template with the appropriate direction.
+ *
+ * The forward direction operations are performed in one OpenMP section, and
+ * the backward direction operations are performed in another OpenMP section.
  */
 void BucketGraph::generate_arcs() {
 
@@ -903,14 +901,14 @@ void BucketGraph::generate_arcs() {
 }
 
 /**
-     * @brief Sets up the initial configuration for the BucketGraph.
-     *
-     * This function performs the following steps:
-     * 1. Initializes the sizes of `fixed_arcs` based on the number of jobs.
-     * 2. Resizes `fw_fixed_buckets` and `bw_fixed_buckets` to match the size of `fw_buckets`.
-     * 3. Sets all elements in `fw_fixed_buckets` and `bw_fixed_buckets` to 0.
-     * 4. Defines the initial relationships by calling `set_adjacency_list()` and `generate_arcs()`.
-     * 5. Sorts the arcs for each job in the `jobs` list.
+ * @brief Sets up the initial configuration for the BucketGraph.
+ *
+ * This function performs the following steps:
+ * 1. Initializes the sizes of `fixed_arcs` based on the number of jobs.
+ * 2. Resizes `fw_fixed_buckets` and `bw_fixed_buckets` to match the size of `fw_buckets`.
+ * 3. Sets all elements in `fw_fixed_buckets` and `bw_fixed_buckets` to 0.
+ * 4. Defines the initial relationships by calling `set_adjacency_list()` and `generate_arcs()`.
+ * 5. Sorts the arcs for each job in the `jobs` list.
  */
 void BucketGraph::setup() {
     // Initialize the sizes
@@ -928,28 +926,33 @@ void BucketGraph::setup() {
     sPool.distance_matrix = distance_matrix;
     sPool.setJobs(&jobs);
     sPool.setCutStorage(cut_storage);
+
+    // Initialize the split
+    for (int i = 0; i < MAIN_RESOURCES; ++i) {
+        q_star.push_back((R_max[i] - R_min[i] + 1) / 2);
+    }
 }
 
 /**
-     * @brief Prints the configuration information of the BucketGraph.
-     *
-     * This function outputs the configuration details including resource size,
-     * number of clients, and maximum SRC cuts. It also conditionally prints
-     * whether RIH, RCC, and SRC are enabled or disabled based on the preprocessor
-     * directives.
-     *
-     * The output format is as follows:
-     *
-     * +----------------------------------+
-     * |        CONFIGURATION INFO        |
-     * +----------------------------------+
-     * Resources: <R_SIZE>
-     * Number of Clients: <N_SIZE>
-     * Maximum SRC cuts: <MAX_SRC_CUTS>
-     * RIH: <enabled/disabled>
-     * RCC: <enabled/disabled>
-     * SRC: <enabled/disabled>
-     * +----------------------------------+
+ * @brief Prints the configuration information of the BucketGraph.
+ *
+ * This function outputs the configuration details including resource size,
+ * number of clients, and maximum SRC cuts. It also conditionally prints
+ * whether RIH, RCC, and SRC are enabled or disabled based on the preprocessor
+ * directives.
+ *
+ * The output format is as follows:
+ *
+ * +----------------------------------+
+ * |        CONFIGURATION INFO        |
+ * +----------------------------------+
+ * Resources: <R_SIZE>
+ * Number of Clients: <N_SIZE>
+ * Maximum SRC cuts: <MAX_SRC_CUTS>
+ * RIH: <enabled/disabled>
+ * RCC: <enabled/disabled>
+ * SRC: <enabled/disabled>
+ * +----------------------------------+
  */
 // TODO: add more configuration details
 void BucketGraph::initInfo() {

@@ -5,7 +5,7 @@
 namespace py = pybind11;
 using namespace pybind11::literals; // Enables _a suffix for named arguments
 
-PYBIND11_MODULE(bucket_graph, m) {
+PYBIND11_MODULE(baldes, m) {
     py::class_<VRPJob>(m, "VRPJob")
         .def(py::init<>())                                  // Default constructor
         .def(py::init<int, int, int, int, double>())        // Constructor with multiple arguments
@@ -25,6 +25,40 @@ PYBIND11_MODULE(bucket_graph, m) {
                             &VRPJob::add_arc))  // Expose add_arc with one version
         .def("clear_arcs", &VRPJob::clear_arcs) // Expose clear_arcs function
         .def("sort_arcs", &VRPJob::sort_arcs);  // Expose sort_arcs function
+
+    py::class_<Label>(m, "Label")
+        .def(py::init<>()) // Default constructor
+        .def(py::init<int, double, const std::vector<double> &, int, int>(), py::arg("vertex"), py::arg("cost"),
+             py::arg("resources"), py::arg("pred"), py::arg("job_id"))
+        .def(py::init<int, double, const std::vector<double> &, int>(), py::arg("vertex"), py::arg("cost"),
+             py::arg("resources"), py::arg("pred"))
+        .def_readwrite("is_extended", &Label::is_extended)
+        .def_readwrite("vertex", &Label::vertex)
+        .def_readwrite("cost", &Label::cost)
+        .def_readwrite("real_cost", &Label::real_cost)
+        .def_readwrite("resources", &Label::resources)
+        .def_readwrite("jobs_covered", &Label::jobs_covered)
+        .def_readwrite("job_id", &Label::job_id)
+        .def_readwrite("parent", &Label::parent)
+        .def_readwrite("visited_bitmap", &Label::visited_bitmap)
+#ifdef UNREACHABLE_DOMINANCE
+        .def_readwrite("unreachable_bitmap", &Label::unreachable_bitmap)
+#endif
+#ifdef SRC3
+        .def_readwrite("SRCmap", &Label::SRCmap)
+#endif
+#ifdef SRC
+        .def_readwrite("SRCmap", &Label::SRCmap)
+#endif
+        .def("set_extended", &Label::set_extended)
+        .def("visits", &Label::visits)
+        .def("reset", &Label::reset)
+        .def("addJob", &Label::addJob)
+        .def("initialize", &Label::initialize)
+        .def("__repr__", [](const Label &label) {
+            return "<bucket_graph.Label vertex=" + std::to_string(label.vertex) +
+                   " cost=" + std::to_string(label.cost) + ">";
+        });
 
     py::class_<BucketGraph>(m, "BucketGraph")
         .def(py::init<>()) // Default constructor

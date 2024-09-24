@@ -372,9 +372,9 @@ struct CompareCuts {
  */
 template <CutType T>
 void LimitedMemoryRank1Cuts::the45Heuristic(const SparseModel &A, const std::vector<double> &x) {
-    int    max_number_of_cuts  = 5; // Max number of cuts to generate
+    int    max_number_of_cuts  = 2; // Max number of cuts to generate
     double violation_threshold = 1e-3;
-    int    max_important_nodes = 10;
+    int    max_important_nodes = 5;
 
     int max_generated_cuts = 15;
 
