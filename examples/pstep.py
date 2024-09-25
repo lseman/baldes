@@ -368,6 +368,12 @@ for i in range(len(three_five)):
 
 pstep_duals.set_arc_dual_values(arc_duals_tuples)
 
+options = baldes.BucketOptions()
+options.depot = 3
+options.end_depot = 11
+options.max_path_size = 5
+
+
 # %%
 jobs = [baldes.VRPJob() for _ in range(11)]
 num_intervals = 1
@@ -390,19 +396,20 @@ for job in jobs:
 # %%
 # Initialize BucketGraph using these jobs
 bg = baldes.BucketGraph(jobs, 100, 1)
+bg.setOptions(options)
+
 
 # Create random duals with size equal to the number of jobs
 duals = [0 for _ in range(len(jobs))]
 print(duals)
 
 # Set the distance matrix, adjacency list, and duals
+print("Setting distance matrix")
 bg.set_distance_matrix(instancia["distance_matrix"])
 bg.set_duals(duals)
 
 bg.set_adjacency_list()
 bg.setup()
-
-bg.setArcDuals(pstep_duals)
 
 bg.set_duals(duals)
 print("Duals set")

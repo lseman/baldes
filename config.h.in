@@ -21,6 +21,7 @@
 #cmakedefine EVRP
 #cmakedefine MTW
 #cmakedefine PSTEP
+#cmakedefine SCHRODINGER
 
 // Define constants for resource sizes
 #define R_SIZE @R_SIZE@

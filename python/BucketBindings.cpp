@@ -80,6 +80,7 @@ PYBIND11_MODULE(baldes, m) {
         .def("setArcDuals", &BucketGraph::setArcDuals, "duals"_a)
         .def("solvePSTEP", &BucketGraph::solvePSTEP)
 #endif
+        .def("setOptions", &BucketGraph::setOptions, "options"_a)
         .def("phaseFour", &BucketGraph::run_labeling_algorithms<Stage::Four, Full::Partial>);
 
     // Expose PSTEPDuals class
@@ -90,4 +91,15 @@ PYBIND11_MODULE(baldes, m) {
         .def("set_threethree_dual_values", &PSTEPDuals::setThreeThreeDualValues, "values"_a) // Set node dual values
         .def("clear_dual_values", &PSTEPDuals::clearDualValues)                              // Clear all dual values
         .def("__repr__", [](const PSTEPDuals &pstepDuals) { return "<PSTEPDuals with arc and node dual values>"; });
+
+    py::class_<BucketOptions>(m, "BucketOptions")
+        .def(py::init<>())                                             // Default constructor
+        .def_readwrite("depot", &BucketOptions::depot)                 // Expose depot field
+        .def_readwrite("end_depot", &BucketOptions::end_depot)         // Expose end_depot field
+        .def_readwrite("max_path_size", &BucketOptions::max_path_size) // Expose max_path_size field
+        .def("__repr__", [](const BucketOptions &options) {
+            return "<BucketOptions depot=" + std::to_string(options.depot) +
+                   " end_depot=" + std::to_string(options.end_depot) +
+                   " max_path_size=" + std::to_string(options.max_path_size) + ">";
+        });
 }

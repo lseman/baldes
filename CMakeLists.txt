@@ -54,6 +54,9 @@ option(EVRP "Enable EVRPTW compilation option" OFF)
 option(WITH_PYTHON "Enable Python bindings" OFF)
 option(MTW "Enable MTW compilation option" OFF)
 option(PSTEP "Enable PSTEP compilation option" OFF)
+option(SCHRODINGER "Enable Schrodinger compilation option" OFF)
+option(CLIQUER "Enable Cliquer compilation option" OFF)
+option(VERBOSE "Enable verbose output" OFF)
 
 # Define the size of resources without using cache
 set(R_SIZE
@@ -201,13 +204,13 @@ if(WITH_PYTHON)
   cpmaddpackage(NAME pybind11 GITHUB_REPOSITORY pybind/pybind11 GIT_TAG v2.13.6)
 endif()
 
-if(IPM)
-  include_directories(/usr/include/suitesparse/)
-
+if(IPM OR CLIQUER)
   cpmaddpackage(NAME Eigen GIT_REPOSITORY https://gitlab.com/libeigen/eigen.git
                 GIT_TAG 3.4.0)
   include_directories(${EIGEN_SOURCE_DIR})
+
 endif()
+include_directories(/usr/include/suitesparse/)
 
 set(GUROBI_HOME $ENV{GUROBI_HOME})
 
@@ -299,3 +302,14 @@ target_compile_options(vrptw PRIVATE -Wno-c++26-extensions
                                      -Wno-deprecated-declarations)
 target_compile_options(baldes PRIVATE -Wno-c++26-extensions
                                       -Wno-deprecated-declarations)
+if(CLIQUER)
+  add_executable(cliquer src/Original.cpp src/BucketGraph.cpp
+                         extra/Heuristic.cpp)
+  target_link_libraries(cliquer PRIVATE STDEXEC::stdexec)
+  target_link_libraries(cliquer PRIVATE fmt::fmt)
+  target_link_libraries(cliquer PRIVATE TBB::tbb)
+  target_link_libraries(
+    cliquer PRIVATE ${GUROBI_HOME}/lib/libgurobi_c++.a
+                    ${GUROBI_HOME}/lib/libgurobi${GUROBI_VERSION_MAJOR}.so tbb)
+  target_link_libraries(cliquer PRIVATE Eigen3::Eigen)
+endif()
