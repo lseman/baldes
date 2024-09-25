@@ -212,7 +212,7 @@ if(IPM OR CLIQUER)
 endif()
 include_directories(/usr/include/suitesparse/)
 
-set(GUROBI_HOME $ENV{GUROBI_HOME})
+set(GUROBI_HOME /home/seman/gurobi1101/linux64)
 
 include_directories(${GUROBI_HOME}/include)
 

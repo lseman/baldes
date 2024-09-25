@@ -180,26 +180,22 @@ Label *BucketGraph::compute_label(const Label *L, const Label *L_prime) {
     new_label->cost -= sumSRC;
 #endif
 
-    size_t forward_size = 0, backward_size = 0;
-
-    // Calculate sizes for forward and backward lists
-    for (auto L_fw = L; L_fw != nullptr; L_fw = L_fw->parent) { forward_size++; }
-    for (auto L_bw = L_prime; L_bw != nullptr; L_bw = L_bw->parent) { backward_size++; }
-
-    // Reserve space in one go
     new_label->jobs_covered.clear();
-    new_label->jobs_covered.reserve(forward_size + backward_size);
 
-    // Insert forward list in reverse order
-    auto L_fw = L;
-    while (L_fw != nullptr) {
-        new_label->jobs_covered.push_back(L_fw->job_id);
-        L_fw = L_fw->parent;
+    // Start by inserting backward list elements
+    size_t forward_size = 0;
+    auto   L_bw         = L_prime;
+    for (; L_bw != nullptr; L_bw = L_bw->parent) {
+        new_label->jobs_covered.push_back(L_bw->job_id); // Insert backward elements directly
     }
-    std::reverse(new_label->jobs_covered.begin(), new_label->jobs_covered.end()); // Reverse in place
 
-    // Insert backward list normally
-    for (auto L_bw = L_prime; L_bw != nullptr; L_bw = L_bw->parent) { new_label->jobs_covered.push_back(L_bw->job_id); }
+    // Now insert forward list elements in reverse order without using std::reverse
+    auto L_fw = L;
+    for (; L_fw != nullptr; L_fw = L_fw->parent) {
+        new_label->jobs_covered.insert(new_label->jobs_covered.begin(),
+                                       L_fw->job_id); // Insert forward elements at the front
+        forward_size++;
+    }
 
     return new_label;
 }
@@ -545,7 +541,7 @@ void BucketGraph::set_adjacency_list() {
 
         // Iterate over all jobs to determine potential arcs
         for (const auto &next_job : jobs) {
-            if (next_job.id == 0) continue;      // Skip the depot
+            if (next_job.id == options.depot) continue;      // Skip the depot
             if (job.id == next_job.id) continue; // Skip arcs to the same job
 
             // Calculate the travel cost between the current job and the next job
@@ -602,7 +598,7 @@ void BucketGraph::set_adjacency_list() {
 
     // Iterate over all jobs to set the adjacency list
     for (const auto &VRPJob : jobs) {
-        if (VRPJob.id == N_SIZE - 1) continue; // Skip the last job (depot)
+        if (VRPJob.id == options.end_depot) continue; // Skip the last job (depot)
 
         // Initialize the resource increment vector based on the number of intervals
         std::vector<double> res_inc(intervals.size());
@@ -876,6 +872,7 @@ bool BucketGraph::BucketSetContains(const std::set<int> &bucket_set, const int &
     return bucket_set.find(bucket) != bucket_set.end();
 }
 
+#ifdef RIH
 /** Async RIH Processing
  * @brief Performs the RIH processing asynchronously.
  * @param initial_labels The initial labels to start the processing with.
@@ -935,6 +932,7 @@ void BucketGraph::async_rih_processing(std::vector<Label *> initial_labels, int 
     std::sort(merged_labels_rih.begin(), merged_labels_rih.end(),
               [](const Label *a, const Label *b) { return a->cost < b->cost; });
 }
+#endif
 
 /**
  * @brief Prints the statistics of the bucket graph.

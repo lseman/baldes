@@ -2,9 +2,10 @@
  * @file DataClasses.h
  * @brief Defines the core structures and classes for managing labels, arcs, and buckets in a graph-based solver.
  *
- * This file includes definitions for handling labels, buckets, and related resources in optimization problems, 
- * specifically for applications like Vehicle Routing Problems (VRP) or other resource-constrained path-finding algorithms.
- * 
+ * This file includes definitions for handling labels, buckets, and related resources in optimization problems,
+ * specifically for applications like Vehicle Routing Problems (VRP) or other resource-constrained path-finding
+ * algorithms.
+ *
  * The key components defined in this file include:
  *  - `Label`: Represents a node in the solution space with properties like cost, resources, and job coverage.
  *  - `Bucket`: A container managing labels and arcs for efficient graph traversal and label extension.
@@ -13,7 +14,8 @@
  *  - `RCCmanager`: Handles the management of RCC cuts, dual cache, and arc-to-cut mappings with thread safety.
  *  - `PSTEPDuals`: Manages the dual values for arcs and nodes in a network.
  *
- * Each of these components is designed to operate efficiently in a graph-based solver and support parallel processing where applicable.
+ * Each of these components is designed to operate efficiently in a graph-based solver and support parallel processing
+ * where applicable.
  */
 
 #pragma once
@@ -22,11 +24,9 @@
 
 #include <deque>
 #include <tuple>
-#include <vector>
 #include <unordered_map>
 #include <utility>
 #include <vector>
-
 
 // Label structure to hold the details of each label in the graph
 /**
@@ -472,9 +472,10 @@ public:
     }
 
     void add_paths(const std::vector<Path> &new_paths) {
-        remove_old_paths();
+        //remove_old_paths();
         for (const Path &path : new_paths) { add_path(path); }
         computeRC();
+        //(void)std::async(std::launch::async, &SchrodingerPool::computeRC, this); // Ignore the future
     }
 
     void setCutStorage(CutStorage *cut_storage) { this->cut_storage = cut_storage; }
@@ -488,6 +489,7 @@ public:
         std::vector<double> SRCmap(cutter->size(), 0.0); // Initialize the SRC map with zeros
 #endif
 
+        auto jobs = *this->jobs; // Dereference jobs and access element once
         for (auto &path : paths) {
             int iteration_added = std::get<0>(path); // Get the iteration when the path was added
 
@@ -498,9 +500,9 @@ public:
             p.red_cost = p.cost;
 
             if (p.size() > 1) {
-                for (int i = 0; i < p.size() - 1; i++) {
+                for (int i = 1; i < p.size() - 1; i++) {
                     auto  job_id = p[i];
-                    auto &job    = (*jobs)[job_id]; // Dereference jobs and access element once
+                    auto &job    = jobs[job_id]; // Dereference jobs and access element once
                     p.red_cost -= job.cost;
 
 #ifdef SRC
@@ -547,12 +549,14 @@ public:
             int iteration_added = std::get<0>(path_tuple); // Get the iteration when the path was added
 
             // Stop processing if the path is older than current_iteration + max_life
-            if (iteration_added + max_live_time < current_iteration) { break; }
+            // if (iteration_added + max_live_time < current_iteration) { break; }
 
             const Path &p = std::get<1>(path_tuple);
 
             // Add paths with negative red_cost to the result
-            if (p.red_cost < 0) { result.push_back(p); }
+            if (p.red_cost < 0) {
+                result.push_back(p);
+            }
         }
 
         // Sort the result based on red_cost
@@ -823,8 +827,8 @@ struct PSTEPDuals {
     using Arc = std::pair<int, int>; // Represents an arc as a pair (from, to)
 
     std::unordered_map<Arc, double, pair_hash> arcDuals;          // Stores dual values for arcs
-    std::unordered_map<int, double>           three_two_Duals;   // Stores dual values for nodes
-    std::unordered_map<int, double>           three_three_Duals; // Stores dual values for nodes
+    std::unordered_map<int, double>            three_two_Duals;   // Stores dual values for nodes
+    std::unordered_map<int, double>            three_three_Duals; // Stores dual values for nodes
 
     // Set dual values for arcs
     void setArcDualValues(const std::vector<std::pair<Arc, double>> &values) {
