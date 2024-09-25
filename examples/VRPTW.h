@@ -31,6 +31,7 @@
 #ifdef RCC
 #include "../external/cvrpsep/capsep.h"
 #include "../external/cvrpsep/cnstrmgr.h"
+#include <tbb/concurrent_unordered_map.h>
 #endif
 
 #ifdef EXACT_RCC
@@ -43,7 +44,6 @@
 #include "../ipm/IPSolver.h"
 #endif
 
-#include <tbb/concurrent_unordered_map.h>
 
 class VRProblem {
 public:
@@ -64,10 +64,11 @@ public:
 
 #ifdef RCC
     CnstrMgrPointer oldCutsCMP = nullptr;
-#endif
-    RCCmanager rccManager;
 
     tbb::concurrent_unordered_map<std::pair<int, int>, std::vector<GRBLinExpr>, pair_hash, pair_equal> arcCache;
+
+#endif
+    RCCmanager rccManager;
 
     void addVars(GRBModel *node, auto lb, auto ub, auto obj, auto vtype, auto name, auto col, auto row) {
         node->addVars(lb, ub, obj, vtype, name, col, row);
@@ -89,7 +90,7 @@ public:
         auto counter = 0;
         for (auto &label : paths) {
             counter += 1;
-            if (counter > 10) break;
+            // if (counter > 10) break;
 
             labels_counter += 1;
             std::fill(coluna.begin(), coluna.end(), 0.0); // Reset for each iteration
@@ -830,7 +831,7 @@ public:
                 if (!rcc) {
 
                     auto cuts_before = cuts.size();
-                    removeNegativeReducedCostVarsAndPaths(node);
+                    // removeNegativeReducedCostVarsAndPaths(node);
                     matrix = extractModelDataSparse(node);
                     node->optimize();
                     solution     = extractSolution(node);
@@ -911,9 +912,9 @@ public:
 #ifdef STAB
             // auto matrixSparse = extractModelDataSparse(node);
             node->optimize();
-            highs_obj     = node->get(GRB_DoubleAttr_ObjVal);
-            auto dual_obj = node->get(GRB_DoubleAttr_ObjBound);
-            jobDuals      = getDuals(node);
+            highs_obj = node->get(GRB_DoubleAttr_ObjVal);
+            // auto dual_obj = node->get(GRB_DoubleAttr_ObjBound);
+            jobDuals = getDuals(node);
 
             stab.update_stabilization_after_master_optim(jobDuals);
 

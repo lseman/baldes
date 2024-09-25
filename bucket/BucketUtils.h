@@ -263,7 +263,7 @@ void BucketGraph::generate_arcs() {
     }
 
     // Assign the forward or backward fixed buckets and other bucket-related structures
-    auto  fixed_buckets     = assign_buckets<D>(fw_fixed_buckets, bw_fixed_buckets);
+    auto &fixed_buckets     = assign_buckets<D>(fw_fixed_buckets, bw_fixed_buckets);
     auto &buckets           = assign_buckets<D>(fw_buckets, bw_buckets);
     auto &num_buckets       = assign_buckets<D>(num_buckets_fw, num_buckets_bw);
     auto &num_buckets_index = assign_buckets<D>(num_buckets_index_fw, num_buckets_index_bw);
@@ -441,12 +441,13 @@ void BucketGraph::ConcatenateLabel(const Label *&L, int &b, Label *&pbest, std::
         bucket_stack.pop_back();
 
         // Mark the bucket as visited
-        const size_t segment      = current_bucket / 64;
-        const size_t bit_position = current_bucket % 64;
+        const size_t segment      = current_bucket >> 6; // Equivalent to current_bucket / 64
+        const size_t bit_position = current_bucket & 63; // Equivalent to current_bucket % 64
+
         Bvisited[segment] |= (1ULL << bit_position);
 
-        const auto &bucketLprimejob = bw_buckets[current_bucket].job_id;
-        double      cost            = getcij(L_job_id, bucketLprimejob);
+        const auto  &bucketLprimejob = bw_buckets[current_bucket].job_id;
+        const double cost            = getcij(L_job_id, bucketLprimejob);
 
 #ifdef RCC
         cost -= rcc_manager->getCachedDualSumForArc(L_job_id, bucketLprimejob);
@@ -512,8 +513,8 @@ void BucketGraph::ConcatenateLabel(const Label *&L, int &b, Label *&pbest, std::
 
         // Add unvisited neighboring buckets to the stack (vector back)
         for (int b_prime : Phi_bw[current_bucket]) {
-            const size_t segment_prime      = b_prime / 64;
-            const size_t bit_position_prime = b_prime % 64;
+            const size_t segment_prime      = b_prime >> 6;
+            const size_t bit_position_prime = b_prime & 63;
             if (!(Bvisited[segment_prime] & (1ULL << bit_position_prime))) {
                 bucket_stack.push_back(b_prime); // Add to the vector stack
             }
