@@ -76,8 +76,10 @@ PYBIND11_MODULE(baldes, m) {
         .def("phaseOne", &BucketGraph::run_labeling_algorithms<Stage::One, Full::Partial>)
         .def("phaseTwo", &BucketGraph::run_labeling_algorithms<Stage::Two, Full::Partial>)
         .def("phaseThree", &BucketGraph::run_labeling_algorithms<Stage::Three, Full::Partial>)
+#ifdef PSTEP
         .def("setArcDuals", &BucketGraph::setArcDuals, "duals"_a)
         .def("solvePSTEP", &BucketGraph::solvePSTEP)
+#endif
         .def("phaseFour", &BucketGraph::run_labeling_algorithms<Stage::Four, Full::Partial>);
 
     // Expose PSTEPDuals class

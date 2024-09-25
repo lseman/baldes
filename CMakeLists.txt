@@ -56,14 +56,39 @@ option(MTW "Enable MTW compilation option" OFF)
 option(PSTEP "Enable PSTEP compilation option" OFF)
 
 # Define the size of resources without using cache
-set(R_SIZE 1)
-set(N_SIZE 12)
-set(MAX_SRC_CUTS 50)
-set(BUCKET_CAPACITY 50)
-set(TIME_INDEX 0)
-set(DEMAND_INDEX 1)
-set(MAIN_RESOURCES 1)
-set(N_ADD 10)
+set(R_SIZE
+    1
+    CACHE STRING "Number of resources")
+set(N_SIZE
+    102
+    CACHE STRING "Number of nodes")
+set(MAX_SRC_CUTS
+    50
+    CACHE STRING "Maximum number of SRC cuts")
+set(BUCKET_CAPACITY
+    50
+    CACHE STRING "Bucket capacity")
+set(TIME_INDEX
+    0
+    CACHE STRING "Time index")
+set(DEMAND_INDEX
+    1
+    CACHE STRING "Demand index")
+set(MAIN_RESOURCES
+    1
+    CACHE STRING "Main resources")
+set(N_ADD
+    10
+    CACHE STRING "Number of additional nodes")
+
+add_definitions(-DN_SIZE=${N_SIZE})
+add_definitions(-DR_SIZE=${R_SIZE})
+add_definitions(-DMAX_SRC_CUTS=${MAX_SRC_CUTS})
+add_definitions(-DBUCKET_CAPACITY=${BUCKET_CAPACITY})
+add_definitions(-DTIME_INDEX=${TIME_INDEX})
+add_definitions(-DDEMAND_INDEX=${DEMAND_INDEX})
+add_definitions(-DMAIN_RESOURCES=${MAIN_RESOURCES})
+add_definitions(-DN_ADD=${N_ADD})
 
 # Define resources and whether they are disposable or not
 set(RESOURCES
@@ -189,8 +214,7 @@ set(GUROBI_HOME $ENV{GUROBI_HOME})
 include_directories(${GUROBI_HOME}/include)
 
 # Source files
-set(SOURCES examples/VRPTW.cpp src/BucketGraph.cpp src/SRC.cpp
-            extra/Heuristic.cpp src/RIH.cpp)
+set(SOURCES examples/VRPTW.cpp src/BucketGraph.cpp extra/Heuristic.cpp)
 
 set(CVRPSEP_SOURCES
     cvrpsep/basegrph.cpp
@@ -215,6 +239,8 @@ set(CVRPSEP_SOURCES
     cvrpsep/sort.cpp)
 
 set(IPM_SOURCES ipm/IPSolver.cpp)
+set(SRC_SOURCES src/SRC.cpp)
+set(RIH_SOURCES src/RIH.cpp)
 
 # Define a list for the source files that will be included
 set(EXECUTABLE_SOURCES ${SOURCES})
@@ -230,6 +256,15 @@ if(IPM)
   list(APPEND EXECUTABLE_SOURCES ${IPM_SOURCES})
 endif()
 
+if(SRC)
+  message(STATUS "SRC is set, adding SRC_SOURCES.")
+  list(APPEND EXECUTABLE_SOURCES ${SRC_SOURCES})
+endif()
+
+if(RIH)
+  message(STATUS "RIH is set, adding RIH_SOURCES.")
+  list(APPEND EXECUTABLE_SOURCES ${RIH_SOURCES})
+endif()
 # Add the executable with the combined sources
 add_executable(vrptw ${EXECUTABLE_SOURCES})
 
@@ -259,3 +294,8 @@ if(WITH_PYTHON)
   target_link_libraries(baldes PRIVATE STDEXEC::stdexec)
   set_target_properties(baldes PROPERTIES POSITION_INDEPENDENT_CODE ON)
 endif()
+
+target_compile_options(vrptw PRIVATE -Wno-c++26-extensions
+                                     -Wno-deprecated-declarations)
+target_compile_options(baldes PRIVATE -Wno-c++26-extensions
+                                      -Wno-deprecated-declarations)
