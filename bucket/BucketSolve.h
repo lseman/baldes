@@ -460,7 +460,7 @@ std::vector<Label *> BucketGraph::bi_labeling_algorithm(std::vector<double> q_st
 
 #ifdef RIH
     // If we are in Stage 2 or above, we run the RIH (Route Improvement Heuristic) in the background
-    const int LABELS_MAX = 2; // Set a maximum of 2 labels to be improved
+    const int LABELS_MAX = 5; // Set a maximum of 2 labels to be improved
 
     if constexpr (S > Stage::Two) {
         // Launch the RIH process asynchronously on a separate thread

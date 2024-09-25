@@ -876,6 +876,11 @@ bool BucketGraph::BucketSetContains(const std::set<int> &bucket_set, const int &
     return bucket_set.find(bucket) != bucket_set.end();
 }
 
+/** Async RIH Processing
+ * @brief Performs the RIH processing asynchronously.
+ * @param initial_labels The initial labels to start the processing with.
+ * @param LABELS_MAX The maximum number of labels to keep.
+ */
 void BucketGraph::async_rih_processing(std::vector<Label *> initial_labels, int LABELS_MAX) {
     merged_labels_rih.clear();
     const int                                                           LABELS_MAX_RIH = 10;
@@ -895,7 +900,28 @@ void BucketGraph::async_rih_processing(std::vector<Label *> initial_labels, int 
         best_labels_out.pop();
     }
 
+    RIH1(best_labels_in, best_labels_out, LABELS_MAX);
+
+    while (!best_labels_out.empty()) {
+        best_labels_in.push(best_labels_out.top());
+        best_labels_out.pop();
+    }
+
     RIH4(best_labels_in, best_labels_out, LABELS_MAX);
+
+    while (!best_labels_out.empty()) {
+        best_labels_in.push(best_labels_out.top());
+        best_labels_out.pop();
+    }
+
+    RIH3(best_labels_in, best_labels_out, LABELS_MAX);
+
+    while (!best_labels_out.empty()) {
+        best_labels_in.push(best_labels_out.top());
+        best_labels_out.pop();
+    }
+
+    RIH5(best_labels_in, best_labels_out, LABELS_MAX);
 
     // After processing, populate the merged_labels_improved vector
     while (!best_labels_out.empty()) {
@@ -1077,6 +1103,14 @@ void BucketGraph::initInfo() {
     fmt::print("\n");
 }
 
+/**
+ * @brief Computes the mono label for the BucketGraph.
+ *
+ * This function computes the mono label for the BucketGraph by acquiring a new label from the label pool
+ * and setting the cost and real cost values from the given label `L`. It then calculates the number of jobs
+ * covered by the label and its ancestors, reserves space for the jobs covered, and inserts the jobs from the
+ *
+ */
 Label *BucketGraph::compute_mono_label(const Label *L) {
     // Directly acquire new_label and set the cost
     auto new_label       = label_pool_fw.acquire();

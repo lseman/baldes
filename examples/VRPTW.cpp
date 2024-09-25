@@ -222,7 +222,9 @@ int main(int argc, char *argv[]) {
 
         Path path;
         path.route = route.clients();
-        path.cost  = route.total_distance();
+        // change last element of the route
+        path.route[path.route.size() - 1] = N_SIZE - 1;
+        path.cost                         = route.total_distance();
         paths.push_back(path);
     };
     std::for_each(initialRoutes.begin(), initialRoutes.end(), process_route);
