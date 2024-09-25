@@ -72,11 +72,11 @@ class BucketGraph {
 public:
     BucketOptions options;
     void          mono_initialization();
+    Label        *compute_mono_label(const Label *L);
 
 #ifdef PSTEP
     PSTEPDuals pstep_duals;
     void       setArcDuals(const PSTEPDuals &arc_duals) { this->pstep_duals = arc_duals; }
-    Label     *compute_mono_label(const Label *L);
     /**
      * @brief Solves the PSTEP problem and returns a vector of labels representing paths.
      *
@@ -120,9 +120,7 @@ public:
 #endif
     // Note: very tricky way to unroll the loop at compile time and check for disposability
     static constexpr std::string_view resources[] = {RESOURCES}; // RESOURCES will expand to your string list
-    static constexpr int              resource_disposability[] = {
-        RESOURCES_DISPOSABLE}; // Ensure RESOURCES_DISPOSABLE expands to a list of integers
-
+    static constexpr int              resource_disposability[] = {RESOURCES_DISPOSABLE};
     /**
      * @brief Processes all resources by iterating through them and applying constraints.
      *

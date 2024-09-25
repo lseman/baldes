@@ -719,7 +719,6 @@ void BucketGraph::common_initialization() {
         if (update_position(current_pos)) break; // Update position and break if done
     }
 
-    fmt::print("num_intervals: {}\n", num_intervals);
     // Initialize backward buckets (generic for multiple dimensions)
     current_pos.assign(num_intervals, 0);
 

@@ -597,7 +597,6 @@ BucketGraph::Extend(const std::conditional_t<M == Mutability::Mut, Label *, cons
 
 #ifdef MTW
     // TODO:: handle multiple time windows
-
 #endif
 
     // NOTE: beautiful function for compile time unrolling
