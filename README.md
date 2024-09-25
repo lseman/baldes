@@ -101,6 +101,16 @@ To control how each resource is treated (whether disposable, non-disposable, or 
 
 > **Note 3**: Only one stabilization can be selected.
 
+**TUI**
+
+If you prefer, you can run the configurer tool, which provides a TUI for configuring BALDES.
+
+```sh
+./configurer.sh
+```
+
+![configurer](docs/configure.png)
+![configurer](docs/on_off.png)
 
 ## 📂 Input File Format
 
