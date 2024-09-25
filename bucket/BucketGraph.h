@@ -74,6 +74,14 @@ public:
     void          mono_initialization();
     Label        *compute_mono_label(const Label *L);
 
+    int RIH5(std::priority_queue<Label *, std::vector<Label *>, LabelComparator> &best_labels_in,
+             std::priority_queue<Label *, std::vector<Label *>, LabelComparator> &best_labels_out, int max_n_labels);
+
+    inline std::vector<size_t> findBestInsertionPositions(const std::vector<int> &route, int &customer);
+
+    double calculateInsertionCost(const std::vector<int> &route, int &customer, size_t pos);
+    void   performSwap(std::vector<int> &new_route, const std::vector<int> &current_route, size_t pos_i, size_t pos_j,
+                       size_t best_pos_v, size_t best_pos_v_prime);
 #ifdef PSTEP
     PSTEPDuals pstep_duals;
     void       setArcDuals(const PSTEPDuals &arc_duals) { this->pstep_duals = arc_duals; }

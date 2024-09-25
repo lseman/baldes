@@ -29,8 +29,8 @@
 #include "../include/Reader.h"
 
 #ifdef RCC
-#include "../cvrpsep/capsep.h"
-#include "../cvrpsep/cnstrmgr.h"
+#include "../external/cvrpsep/capsep.h"
+#include "../external/cvrpsep/cnstrmgr.h"
 #endif
 
 #ifdef EXACT_RCC
