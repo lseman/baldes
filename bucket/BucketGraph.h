@@ -124,7 +124,7 @@ public:
     void setOptions(const BucketOptions &options) { this->options = options; }
 
 #ifdef SCHRODINGER
-    SchrodingerPool sPool = SchrodingerPool(100);
+    SchrodingerPool sPool = SchrodingerPool(150);
 #endif
     // Note: very tricky way to unroll the loop at compile time and check for disposability
     static constexpr std::string_view resources[] = {RESOURCES}; // RESOURCES will expand to your string list

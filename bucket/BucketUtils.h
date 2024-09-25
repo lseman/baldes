@@ -552,6 +552,7 @@ void BucketGraph::SCC_handler() {
     auto sccs              = scc_finder.tarjanSCC();
     auto topological_order = scc_finder.topologicalOrderOfSCCs(sccs);
 
+#ifdef VERBOSE
     // print SCCs and buckets in it
     constexpr auto blue  = "\033[34m";
     constexpr auto reset = "\033[0m";
@@ -569,6 +570,7 @@ void BucketGraph::SCC_handler() {
         for (auto &bucket : sccs[scc]) { fmt::print("{} ", bucket); }
     }
     fmt::print("\n");
+#endif
 
     std::vector<std::vector<int>> ordered_sccs;
     ordered_sccs.reserve(sccs.size()); // Reserve space for all SCCs
