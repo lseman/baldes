@@ -296,12 +296,13 @@ if(WITH_PYTHON)
   target_link_libraries(baldes PRIVATE TBB::tbb)
   target_link_libraries(baldes PRIVATE STDEXEC::stdexec)
   set_target_properties(baldes PROPERTIES POSITION_INDEPENDENT_CODE ON)
+  target_compile_options(baldes PRIVATE -Wno-c++26-extensions
+                                      -Wno-deprecated-declarations)
 endif()
 
 target_compile_options(vrptw PRIVATE -Wno-c++26-extensions
                                      -Wno-deprecated-declarations)
-target_compile_options(baldes PRIVATE -Wno-c++26-extensions
-                                      -Wno-deprecated-declarations)
+
 if(CLIQUER)
   add_executable(cliquer src/Original.cpp src/BucketGraph.cpp
                          extra/Heuristic.cpp)
