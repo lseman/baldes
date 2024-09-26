@@ -1,5 +1,18 @@
 cmake_minimum_required(VERSION 3.10)
 
+# Check if Clang is available
+find_program(CLANG_C_COMPILER clang)
+find_program(CLANG_CXX_COMPILER clang++)
+
+if(CLANG_C_COMPILER AND CLANG_CXX_COMPILER)
+    # Set Clang as the default compiler
+    set(CMAKE_C_COMPILER "${CLANG_C_COMPILER}" CACHE STRING "" FORCE)
+    set(CMAKE_CXX_COMPILER "${CLANG_CXX_COMPILER}" CACHE STRING "" FORCE)
+    message(STATUS "Clang found: using Clang as the default compiler")
+else()
+    message(STATUS "Clang not found: using default compiler")
+endif()
+
 # Project name
 project(BALDES)
 

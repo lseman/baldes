@@ -50,6 +50,8 @@
 #include <fmt/color.h>
 #include <fmt/core.h>
 
+
+
 struct BucketOptions {
     int depot         = 0;
     int end_depot     = N_SIZE - 1;
@@ -350,7 +352,7 @@ struct Path {
     // default constructor
     Path() : route({}), cost(0.0) {}
     Path(const std::vector<int> &route, double cost) : route(route), cost(cost) {
-        (void)std::async(std::launch::async, &Path::precomputeArcs, this); // Ignore the future
+        [[maybe_unused]] auto future = std::async(std::launch::async, &Path::precomputeArcs, this); // Ignore the future
     }
 
     // define begin and end methods linking to route

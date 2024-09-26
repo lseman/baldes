@@ -129,8 +129,10 @@ struct Label {
     inline void initialize(int vertex, double cost, const std::vector<double> &resources, int job_id) {
         this->vertex = vertex;
         this->cost   = cost;
-        for (size_t i = 0; i < resources.size(); ++i) { this->resources[i] = resources[i]; }
-        // this->resources = {resources[0], resources[1]};
+
+        // Assuming `resources` is a vector or array-like structure with the same size as the input
+        std::copy(resources.begin(), resources.end(), this->resources.begin());
+
         this->job_id = job_id;
     }
 
@@ -447,8 +449,7 @@ private:
     int                               current_iteration = 0;
     int                               max_live_time; // Max iterations a Path can stay active
     std::vector<double>               duals;         // Dual variables for each path
-    std::vector<VRPJob>              *jobs        = nullptr;
-    CutStorage                       *cut_storage = nullptr;
+    std::vector<VRPJob>              *jobs = nullptr;
 
 public:
     std::vector<std::vector<double>> distance_matrix; // Distance matrix for the graph
@@ -472,24 +473,12 @@ public:
     }
 
     void add_paths(const std::vector<Path> &new_paths) {
-        //remove_old_paths();
+        remove_old_paths();
         for (const Path &path : new_paths) { add_path(path); }
         computeRC();
-        //(void)std::async(std::launch::async, &SchrodingerPool::computeRC, this); // Ignore the future
     }
 
-    void setCutStorage(CutStorage *cut_storage) { this->cut_storage = cut_storage; }
-
     void computeRC() {
-
-#ifdef SRC
-        auto &cutter   = cut_storage;      // Access the cut storage manager
-        auto &SRCDuals = cutter->SRCDuals; // Access the dual values for the SRC cuts
-
-        std::vector<double> SRCmap(cutter->size(), 0.0); // Initialize the SRC map with zeros
-#endif
-
-        auto jobs = *this->jobs; // Dereference jobs and access element once
         for (auto &path : paths) {
             int iteration_added = std::get<0>(path); // Get the iteration when the path was added
 
@@ -500,43 +489,9 @@ public:
             p.red_cost = p.cost;
 
             if (p.size() > 1) {
-                for (int i = 1; i < p.size() - 1; i++) {
-                    auto  job_id = p[i];
-                    auto &job    = jobs[job_id]; // Dereference jobs and access element once
+                for (int i = 0; i < p.size() - 1; i++) {
+                    auto &job = (*jobs)[p[i]]; // Dereference jobs and access element
                     p.red_cost -= job.cost;
-
-#ifdef SRC
-                    size_t         segment      = job_id / 64;          // Precompute segment in the bitmap
-                    size_t         bit_position = job_id % 64;          // Precompute bit position in the segment
-                    const uint64_t bit_mask     = 1ULL << bit_position; // Precompute bit shift
-
-                    for (std::size_t idx = 0; idx < cutter->size(); ++idx) {
-
-                        auto it = cutter->begin();
-                        std::advance(it, idx);
-                        const auto &cut          = *it;
-                        const auto &baseSet      = cut.baseSet;
-                        const auto &baseSetorder = cut.baseSetOrder;
-                        const auto &neighbors    = cut.neighbors;
-                        const auto &multipliers  = cut.multipliers;
-
-                        bool bitIsSet  = neighbors[segment] & bit_mask;
-                        bool bitIsSet2 = baseSet[segment] & bit_mask;
-
-                        double &src_map_value = SRCmap[idx]; // Use reference to avoid multiple accesses
-                        if (!bitIsSet) {
-                            src_map_value = 0.0; // Reset the SRC map value
-                        }
-
-                        if (bitIsSet2) {
-                            src_map_value += multipliers[baseSetorder[job_id]];
-                            if (src_map_value >= 1) {
-                                src_map_value -= 1;
-                                p.red_cost -= SRCDuals[idx]; // Apply the SRC dual value if threshold is exceeded
-                            }
-                        }
-                    }
-#endif
                 }
             }
         }
@@ -549,14 +504,12 @@ public:
             int iteration_added = std::get<0>(path_tuple); // Get the iteration when the path was added
 
             // Stop processing if the path is older than current_iteration + max_life
-            // if (iteration_added + max_live_time < current_iteration) { break; }
+            if (iteration_added + max_live_time < current_iteration) { break; }
 
             const Path &p = std::get<1>(path_tuple);
 
             // Add paths with negative red_cost to the result
-            if (p.red_cost < 0) {
-                result.push_back(p);
-            }
+            if (p.red_cost < 0) { result.push_back(p); }
         }
 
         // Sort the result based on red_cost

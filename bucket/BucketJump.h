@@ -19,7 +19,6 @@
 #include "BucketGraph.h"
 #include "Hashes.h"
 
-
 /**
  * Updates the set of buckets based on the given parameters.
  *
@@ -33,17 +32,18 @@
  * @param Bvisited A reference to the set of integers representing the visited buckets.
  */
 template <Direction D>
-void BucketGraph::UpdateBucketsSet(const double theta, Label *&label, std::unordered_set<int> &Bbidi,
+void BucketGraph::UpdateBucketsSet(const double theta, const Label *label, std::unordered_set<int> &Bbidi,
                                    int &current_bucket, std::unordered_set<int> &Bvisited) {
     // Initialize a stack for bucket traversal and push the current bucket onto it
-    std::stack<int> bucket_stack;
-    bucket_stack.push(current_bucket);
+    std::vector<int> bucket_stack;
+    bucket_stack.reserve(10);
+    bucket_stack.push_back(current_bucket);
 
     // Traverse buckets using a depth-first approach with the stack
     while (!bucket_stack.empty()) {
-        int curr_bucket = bucket_stack.top();
-        bucket_stack.pop();           // Pop the top bucket from the stack
-        Bvisited.insert(curr_bucket); // Mark the current bucket as visited
+        int curr_bucket = bucket_stack.back(); // Get the top bucket from the stack
+        bucket_stack.pop_back();               // Pop the top bucket from the stack
+        Bvisited.insert(curr_bucket);          // Mark the current bucket as visited
 
         // Get the opposite direction's Phi, bucket list, and cost bounds (c_bar)
         auto &Phi_opposite     = assign_buckets<D>(Phi_bw, Phi_fw);
@@ -51,18 +51,18 @@ void BucketGraph::UpdateBucketsSet(const double theta, Label *&label, std::unord
         auto &c_bar_opposite   = assign_buckets<D>(bw_c_bar, fw_c_bar);
 
         // Get the job IDs for the label and the current bucket in the opposite direction
-        int bucketLjob      = label->job_id;
-        int bucketLprimejob = buckets_opposite[curr_bucket].job_id;
+        const int bucketLjob      = label->job_id;
+        const int bucketLprimejob = buckets_opposite[curr_bucket].job_id;
 
         // Compute the cost between the current label's job and the opposite bucket's job
-        double cost = getcij(bucketLjob, bucketLprimejob);
+        const double cost = getcij(bucketLjob, bucketLprimejob);
 
         // If the label's total cost exceeds theta, stop exploring this path
         if (label->cost + cost + c_bar_opposite[curr_bucket] >= theta) { return; }
 
         // If the current bucket is not already in Bbidi, check labels in the opposite bucket
         if (Bbidi.find(curr_bucket) == Bbidi.end()) {
-            for (auto &L : buckets_opposite[curr_bucket].get_labels()) {
+            for (const auto &L : buckets_opposite[curr_bucket].get_labels()) {
                 if (label->job_id == L->job_id) continue; // Skip labels with the same job ID
 
                 // Check if there are any conflicts in the visited bitmaps of the two labels
@@ -92,7 +92,7 @@ void BucketGraph::UpdateBucketsSet(const double theta, Label *&label, std::unord
 
         // Push neighboring buckets (from Phi_opposite) onto the stack if they haven't been visited
         for (int b_prime : Phi_opposite[curr_bucket]) {
-            if (Bvisited.find(b_prime) == Bvisited.end()) { bucket_stack.push(b_prime); }
+            if (Bvisited.find(b_prime) == Bvisited.end()) { bucket_stack.push_back(b_prime); }
         }
     }
 }
@@ -139,9 +139,9 @@ void BucketGraph::BucketArcElimination(double theta) {
     std::atomic<int> removed_arcs{}; // Counter for the number of removed arcs
 
     // Iterate through all backward buckets (can be forward if direction changes)
-    for (auto b = 0; b < bw_buckets_size; ++b) {
+    for (auto b = 0; b < fw_buckets_size; ++b) {
         // Get the forward arcs for the job associated with the current bucket
-        auto arcs = jobs[buckets[b].job_id].template get_arcs<Direction::Forward>();
+        const auto arcs = jobs[buckets[b].job_id].template get_arcs<D>();
 
         // Process each arc for the current bucket
         for (const auto &a : arcs) {
@@ -263,15 +263,15 @@ void BucketGraph::ObtainJumpBucketArcs() {
         std::vector<int> B_bar; // Temporary storage for valid bucket indices
 
         // Retrieve the current bucket arcs and the original arcs for the job
-        auto arcs          = buckets[b].template get_bucket_arcs<D>();
-        auto original_arcs = jobs[buckets[b].job_id].template get_arcs<D>();
+        const auto arcs          = buckets[b].template get_bucket_arcs<D>();
+        const auto original_arcs = jobs[buckets[b].job_id].template get_arcs<D>();
         if (arcs.empty()) { continue; } // Skip if no arcs in the current bucket
 
         // Process each original arc (from the job's perspective)
         for (const auto orig_arc : original_arcs) {
-            auto from_job  = orig_arc.from; // Source job for the arc
-            auto to_job    = orig_arc.to;   // Destination job for the arc
-            bool have_path = false;         // Flag to check if the path exists
+            const auto from_job  = orig_arc.from; // Source job for the arc
+            const auto to_job    = orig_arc.to;   // Destination job for the arc
+            bool       have_path = false;         // Flag to check if the path exists
 
             // Check if the path exists in the current bucket arcs
             for (const auto &gamma : arcs) {

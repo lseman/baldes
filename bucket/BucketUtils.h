@@ -287,15 +287,15 @@ void BucketGraph::generate_arcs() {
 
         // Iterate over all arcs of the job
         for (const auto &arc : arcs) {
-            auto &next_job = jobs[arc.to]; // Get the destination job of the arc
+            const auto &next_job = jobs[arc.to]; // Get the destination job of the arc
 
             // Skip self-loops (no arc from a job to itself)
             if (job.id == next_job.id) continue;
 
             // Calculate travel cost and cost increment based on job's properties
-            auto   travel_cost = getcij(job.id, next_job.id);
-            double cost_inc    = travel_cost - next_job.cost;
-            res_inc[0]         = travel_cost + job.duration; // Update resource increment based on job duration
+            const auto travel_cost = getcij(job.id, next_job.id);
+            double     cost_inc    = travel_cost - next_job.cost;
+            res_inc[0]             = travel_cost + job.duration; // Update resource increment based on job duration
 
             // Iterate over all possible destination buckets for the next job
             for (int j = 0; j < num_buckets[next_job.id]; ++j) {
@@ -397,7 +397,7 @@ Label *BucketGraph::get_best_label(const std::vector<int> &topological_order, co
     Label *best_label = nullptr; // Ensure this is initialized
     auto  &buckets    = assign_buckets<D>(fw_buckets, bw_buckets);
 
-    for (int component_index : topological_order) {
+    for (const int component_index : topological_order) {
         const auto &component_buckets = sccs[component_index];
 
         for (const int bucket : component_buckets) {
@@ -424,8 +424,7 @@ Label *BucketGraph::get_best_label(const std::vector<int> &topological_order, co
  * @param q_star The vector of costs.
  */
 template <Stage S>
-void BucketGraph::ConcatenateLabel(const Label *&L, int &b, Label *&pbest, std::vector<uint64_t> &Bvisited,
-                                   const std::vector<double> &q_star) {
+void BucketGraph::ConcatenateLabel(const Label *L, int &b, Label *&pbest, std::vector<uint64_t> &Bvisited) {
     // Use a vector for iterative processing as a stack
     std::vector<int> bucket_stack;
     bucket_stack.reserve(10);
@@ -488,12 +487,6 @@ void BucketGraph::ConcatenateLabel(const Label *&L, int &b, Label *&pbest, std::
             }
 #endif
 
-            // Early exit based on candidate cost
-            if ((S != Stage::Enumerate && candidate_cost >= pbest->cost) ||
-                (S == Stage::Enumerate && candidate_cost >= gap)) {
-                continue;
-            }
-
             // Check for visited overlap and skip if true
             if constexpr (S >= Stage::Three) {
                 bool visited_overlap = false;
@@ -504,6 +497,12 @@ void BucketGraph::ConcatenateLabel(const Label *&L, int &b, Label *&pbest, std::
                     }
                 }
                 if (visited_overlap) continue;
+            }
+
+            // Early exit based on candidate cost
+            if ((S != Stage::Enumerate && candidate_cost >= pbest->cost) ||
+                (S == Stage::Enumerate && candidate_cost >= gap)) {
+                continue;
             }
 
             // Compute and store the new label

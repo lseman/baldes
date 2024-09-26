@@ -44,7 +44,6 @@
 #include "../ipm/IPSolver.h"
 #endif
 
-
 class VRProblem {
 public:
     InstanceData instance;
@@ -177,7 +176,7 @@ public:
      * @param enumerate Flag indicating whether to enumerate the columns.
      * @return The number of columns added.
      */
-    int addColumn(GRBModel *node, const auto &columns, bool enumerate = false) {
+    inline int addColumn(GRBModel *node, const auto &columns, bool enumerate = false) {
         auto &cuts = r1c.cutStorage;
 
         int                 numConstrsLocal = node->get(GRB_IntAttr_NumConstrs);
@@ -207,10 +206,9 @@ public:
 
             // Fill coluna with coefficients
             // Step 1: Accumulate the coefficients for each job
-            for (auto &job : label->jobs_covered) {
-                if (job > 0 && job != N_SIZE - 1) {
-                    int constr_index = job - 1;
-                    coluna[constr_index] += 1; // Accumulate the coefficient for each job
+            for (const auto &job : label->jobs_covered) {
+                if (likely(job > 0 && job != N_SIZE - 1)) { // Use likely() if this condition is almost always true
+                    coluna[job - 1]++;                      // Simplified increment operation
                 }
             }
 
@@ -832,7 +830,7 @@ public:
 
                     auto cuts_before = cuts.size();
                     // removeNegativeReducedCostVarsAndPaths(node);
-                    matrix = extractModelDataSparse(node);
+                    // matrix = extractModelDataSparse(node);
                     node->optimize();
                     solution     = extractSolution(node);
                     r1c.allPaths = allPaths;
@@ -913,8 +911,7 @@ public:
             // auto matrixSparse = extractModelDataSparse(node);
             node->optimize();
             highs_obj = node->get(GRB_DoubleAttr_ObjVal);
-            // auto dual_obj = node->get(GRB_DoubleAttr_ObjBound);
-            jobDuals = getDuals(node);
+            jobDuals  = getDuals(node);
 
             stab.update_stabilization_after_master_optim(jobDuals);
 
