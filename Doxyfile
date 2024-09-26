@@ -51,3 +51,10 @@ SHOW_INCLUDE_FILES     = YES
 SHOW_USED_FILES        = YES
 BRIEF_MEMBER_DESC      = YES
 FULL_PATH_NAMES        = NO
+
+GENERATE_TREEVIEW      = YES # required!
+DISABLE_INDEX          = NO
+FULL_SIDEBAR           = NO
+HTML_EXTRA_STYLESHEET  = ./docs/doxygen-awesome.css \
+                        ./docs/doxygen-awesome-sidebar-only.css
+HTML_COLORSTYLE        = LIGHT # required with Doxygen >= 1.9.5
