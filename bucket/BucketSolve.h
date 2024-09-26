@@ -317,7 +317,7 @@ std::vector<double> BucketGraph::labeling_algorithm(std::vector<double> q_point,
         } while (!all_ext); // Continue until all labels have been extended
 
         // Update the cost bounds (c_bar) for the current SCC's buckets
-        for (int bucket : sorted_sccs[scc_index]) {
+        for (const int bucket : sorted_sccs[scc_index]) {
             const auto &labels = buckets[bucket].get_labels();
 
             // Find the label with the minimum cost in the bucket
@@ -468,6 +468,7 @@ std::vector<Label *> BucketGraph::bi_labeling_algorithm(std::vector<double> q_st
     }
 #endif
 
+#ifdef SCHRODINGER
     // if merged_labels is bigger than 10, create Path related to the remaining ones
     // and add them to a std::vector<Path>
     if (merged_labels.size() > N_ADD) {
@@ -481,6 +482,7 @@ std::vector<Label *> BucketGraph::bi_labeling_algorithm(std::vector<double> q_st
         sPool.add_paths(paths);
         sPool.iterate();
     }
+#endif
 
     // Return the final list of merged labels after processing
     return merged_labels;
@@ -550,8 +552,8 @@ BucketGraph::Extend(const std::conditional_t<M == Mutability::Mut, Label *, cons
     if (job_id == L_prime->job_id) { return nullptr; }
 
     // Check if job_id is in the neighborhood of initial_job_id and has already been visited
-    size_t segment      = job_id / 64; // Determine the segment in the bitmap
-    size_t bit_position = job_id % 64; // Determine the bit position in the segment
+    size_t segment      = job_id >> 6; // Determine the segment in the bitmap
+    size_t bit_position = job_id & 63; // Determine the bit position in the segment
     if constexpr (S != Stage::Enumerate) {
         if ((neighborhoods_bitmap[initial_job_id][segment] & (1ULL << bit_position)) &&
             is_job_visited(L_prime->visited_bitmap, job_id)) {
@@ -589,6 +591,15 @@ BucketGraph::Extend(const std::conditional_t<M == Mutability::Mut, Label *, cons
         return nullptr; // Handle failure case (constraint violation)
     }
 
+#ifdef PSTEP
+    // counter the number of bits set in L_prime->visited_bitmap
+    size_t n_visited = 0;
+    for (size_t i = 0; i < L_prime->visited_bitmap.size(); ++i) {
+        n_visited += __builtin_popcountll(L_prime->visited_bitmap[i]);
+    }
+    if (n_visited >= options.max_path_size) { return nullptr; }
+#endif
+
     // Get the bucket number for the new job and resource state
     int to_bucket = get_bucket_number<D>(job_id, new_resources);
 
@@ -611,7 +622,11 @@ BucketGraph::Extend(const std::conditional_t<M == Mutability::Mut, Label *, cons
 
     // Compute travel cost between the initial and current jobs
     double travel_cost = getcij(initial_job_id, job_id);
-    double new_cost    = initial_cost + travel_cost - VRPJob.cost;
+#ifndef PSTEP
+    double new_cost = initial_cost + travel_cost - VRPJob.cost;
+#else
+    double new_cost = initial_cost + travel_cost;
+#endif
 
 #ifdef RCC
     // Adjust the cost using the cached dual sum from RCC (if applicable)
@@ -636,7 +651,9 @@ BucketGraph::Extend(const std::conditional_t<M == Mutability::Mut, Label *, cons
         return new_label; // Return the new label early if in reverse mode
     }
 
-    new_label->visited_bitmap = L_prime->visited_bitmap; // Copy visited bitmap from the original label
+    //new_label->visited_bitmap = L_prime->visited_bitmap; // Copy visited bitmap from the original label
+    std::memcpy(new_label->visited_bitmap.data(), L_prime->visited_bitmap.data(),
+                new_label->visited_bitmap.size() * sizeof(uint64_t));
     set_job_visited(new_label->visited_bitmap, job_id);  // Mark the new job as visited
 
 #ifdef UNREACHABLE_DOMINANCE
@@ -667,7 +684,7 @@ BucketGraph::Extend(const std::conditional_t<M == Mutability::Mut, Label *, cons
             uint64_t bits_to_clear     = current_visited & ~neighborhood_mask; // Determine which bits to clear
 
             if (i == job_id / 64) {
-                bits_to_clear &= ~(1ULL << (job_id % 64)); // Ensure current job remains visited
+                bits_to_clear &= ~(1ULL << (job_id & 63)); // Ensure current job remains visited
             }
 
             new_label->visited_bitmap[i] &= ~bits_to_clear; // Clear irrelevant visited jobs
@@ -765,7 +782,7 @@ inline bool BucketGraph::is_dominated(const Label *new_label, const Label *label
     }
 
     // Check resource conditions based on the direction (Forward or Backward)
-    for (size_t i = 0; i < new_resources.size(); ++i) {
+    for (size_t i = 0; i < R_SIZE; ++i) {
         if constexpr (D == Direction::Forward) {
             // In Forward direction: the comparison label must not have more resources than the new label
             if (label_resources[i] > new_resources[i]) { return false; }
@@ -917,8 +934,8 @@ inline bool BucketGraph::DominatedInCompWiseSmallerBuckets(const Label *L, int b
 
         // Add the neighboring buckets (from Phi) to the stack if they haven't been visited yet
         for (const int b_prime : Phi[currentBucket]) {
-            const size_t segment_prime      = b_prime / 64; // Determine the segment for the neighboring bucket
-            const size_t bit_position_prime = b_prime % 64; // Determine the bit position within the segment
+            const size_t segment_prime      = b_prime >> 6; // Determine the segment for the neighboring bucket
+            const size_t bit_position_prime = b_prime & 63; // Determine the bit position within the segment
 
             // If the neighboring bucket hasn't been visited, push it onto the stack
             if ((Bvisited[segment_prime] & (1ULL << bit_position_prime)) == 0) { bucketStack.push_back(b_prime); }
