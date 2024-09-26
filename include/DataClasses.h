@@ -488,8 +488,8 @@ public:
             Path &p    = std::get<1>(path);
             p.red_cost = p.cost;
 
-            if (p.size() > 1) {
-                for (int i = 0; i < p.size() - 1; i++) {
+            if (p.size() > 3) {
+                for (int i = 1; i < p.size() - 1; i++) {
                     auto &job = (*jobs)[p[i]]; // Dereference jobs and access element
                     p.red_cost -= job.cost;
                 }
@@ -497,19 +497,24 @@ public:
         }
     }
 
-    std::vector<Path> get_paths_with_negative_red_cost() const {
+    std::vector<Path> get_paths_with_negative_red_cost() {
         std::vector<Path> result;
 
-        for (const auto &path_tuple : paths) {
-            int iteration_added = std::get<0>(path_tuple); // Get the iteration when the path was added
+        // Remove the paths that are older than current_iteration + max_life or have a negative red_cost
+        auto it = paths.begin();
+        while (it != paths.end()) {
+            int         iteration_added = std::get<0>(*it); // Get the iteration when the path was added
+            const Path &p               = std::get<1>(*it);
 
-            // Stop processing if the path is older than current_iteration + max_life
-            if (iteration_added + max_live_time < current_iteration) { break; }
-
-            const Path &p = std::get<1>(path_tuple);
-
-            // Add paths with negative red_cost to the result
-            if (p.red_cost < 0) { result.push_back(p); }
+            // If the path is older than max_live_time, or has a negative red_cost
+            if (iteration_added + max_live_time < current_iteration || p.red_cost < 0) {
+                if (p.red_cost < 0) {
+                    result.push_back(p); // Add paths with negative red_cost to the result
+                }
+                it = paths.erase(it); // Remove from paths and move iterator to the next element
+            } else {
+                ++it; // Only move the iterator if not erasing
+            }
         }
 
         // Sort the result based on red_cost
@@ -825,4 +830,17 @@ struct PSTEPDuals {
         if (it != three_three_Duals.end()) { return it->second; }
         return 0.0; // Default value if node is not found
     }
+};
+
+/**
+ * @class LabelComparator
+ * @brief Comparator class for comparing two Label objects based on their cost.
+ *
+ * This class provides an overloaded operator() that allows for comparison
+ * between two Label pointers. The comparison is based on the cost attribute
+ * of the Label objects, with the comparison being in descending order.
+ */
+class LabelComparator {
+public:
+    bool operator()(Label *a, Label *b) { return a->cost > b->cost; }
 };

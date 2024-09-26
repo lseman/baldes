@@ -188,18 +188,16 @@ std::vector<double> BucketGraph::labeling_algorithm(std::vector<double> q_point,
                     if constexpr (F == Full::Partial) {
                         if constexpr (D == Direction::Forward) {
                             if (label->resources[TIME_INDEX] > q_star[TIME_INDEX]) {
-                                label->set_extended(true);
+                                //label->set_extended(true);
                                 continue;
                             }
                         } else if constexpr (D == Direction::Backward) {
                             if (label->resources[TIME_INDEX] <= q_star[TIME_INDEX]) {
-                                label->set_extended(true);
+                                //label->set_extended(true);
                                 continue;
                             }
                         }
                     }
-
-                    domin_smaller = false;
 
                     // if constexpr (S >= Stage::Three) {
                     //  Clear the visited buckets vector for the current label
@@ -251,7 +249,7 @@ std::vector<double> BucketGraph::labeling_algorithm(std::vector<double> q_point,
                                 }
 
 #else
-                                if (check_dominance_against_vector<D, S>(new_label, to_bucket_labels)) {
+                                if (likely((check_dominance_against_vector<D, S>(new_label, to_bucket_labels)))) {
                                     stat_n_dom++; // Increment dominated labels count
                                     dominated = true;
                                 }
@@ -263,7 +261,7 @@ std::vector<double> BucketGraph::labeling_algorithm(std::vector<double> q_point,
                                 if constexpr (S != Stage::Enumerate) {
                                     std::vector<Label *> labels_to_remove;
                                     for (auto *existing_label : to_bucket_labels) {
-                                        if (is_dominated<D, S>(existing_label, new_label)) {
+                                        if (likely((is_dominated<D, S>(existing_label, new_label)))) {
                                             labels_to_remove.push_back(existing_label);
                                         }
                                     }
@@ -329,7 +327,7 @@ std::vector<double> BucketGraph::labeling_algorithm(std::vector<double> q_point,
             }
 
             // Update the cost bound for the bucket's dependencies (Phi buckets)
-            for (auto phi_bucket : Phi[bucket]) { c_bar[bucket] = std::min(c_bar[bucket], c_bar[phi_bucket]); }
+            for (const auto &phi_bucket : Phi[bucket]) { c_bar[bucket] = std::min(c_bar[bucket], c_bar[phi_bucket]); }
         }
     }
 
@@ -416,7 +414,7 @@ std::vector<Label *> BucketGraph::bi_labeling_algorithm(std::vector<double> q_st
         const auto &labels         = current_bucket.get_labels(); // Get labels in the current bucket
 
         // Process each label in the bucket
-        for (const Label *L : labels) {
+        for (const auto L : labels) {
             // if (L->resources[TIME_INDEX] > q_star[TIME_INDEX]) { continue; } // Skip if label exceeds q_star
 
             // Get arcs corresponding to jobs for this label (Forward direction)
@@ -433,11 +431,12 @@ std::vector<Label *> BucketGraph::bi_labeling_algorithm(std::vector<double> q_st
                 }
 
                 // Attempt to extend the current label using this arc
-                auto L_prime = Extend<Direction::Forward, S, ArcType::Job, Mutability::Const, Full::Reverse>(L, arc);
+                const auto L_prime =
+                    Extend<Direction::Forward, S, ArcType::Job, Mutability::Const, Full::Reverse>(L, arc);
 
                 // Note: apparently without the second condition it work better in some cases
                 // Check if the new label is valid and respects the q_star constraints
-                if (!L_prime || L_prime->resources[TIME_INDEX] <= q_star[TIME_INDEX]) {
+                if (!L_prime || L_prime->resources[TIME_INDEX] < q_star[TIME_INDEX]) {
                     continue; // Skip invalid labels or those that exceed q_star
                 }
 
@@ -565,7 +564,7 @@ BucketGraph::Extend(const std::conditional_t<M == Mutability::Mut, Label *, cons
     const VRPJob &VRPJob = jobs[job_id];
 
     // Initialize new resources based on the arc's resource increments and check feasibility
-    std::vector<double> new_resources(initial_resources.size());
+    std::vector<double> new_resources(R_SIZE);
     /*
     for (size_t i = 0; i < initial_resources.size(); ++i) {
 
@@ -651,10 +650,10 @@ BucketGraph::Extend(const std::conditional_t<M == Mutability::Mut, Label *, cons
         return new_label; // Return the new label early if in reverse mode
     }
 
-    //new_label->visited_bitmap = L_prime->visited_bitmap; // Copy visited bitmap from the original label
+    // new_label->visited_bitmap = L_prime->visited_bitmap; // Copy visited bitmap from the original label
     std::memcpy(new_label->visited_bitmap.data(), L_prime->visited_bitmap.data(),
                 new_label->visited_bitmap.size() * sizeof(uint64_t));
-    set_job_visited(new_label->visited_bitmap, job_id);  // Mark the new job as visited
+    set_job_visited(new_label->visited_bitmap, job_id); // Mark the new job as visited
 
 #ifdef UNREACHABLE_DOMINANCE
     // Copy unreachable bitmap (if applicable)
@@ -683,7 +682,7 @@ BucketGraph::Extend(const std::conditional_t<M == Mutability::Mut, Label *, cons
             uint64_t neighborhood_mask = neighborhoods_bitmap[job_id][i]; // Get neighborhood mask for the current job
             uint64_t bits_to_clear     = current_visited & ~neighborhood_mask; // Determine which bits to clear
 
-            if (i == job_id / 64) {
+            if (i == (job_id & 63)) {
                 bits_to_clear &= ~(1ULL << (job_id & 63)); // Ensure current job remains visited
             }
 
@@ -944,4 +943,42 @@ inline bool BucketGraph::DominatedInCompWiseSmallerBuckets(const Label *L, int b
 
     // If no domination was found in any smaller bucket, return false
     return false;
+}
+
+/**
+ * @brief Runs forward and backward labeling algorithms in parallel and synchronizes the results.
+ *
+ * This function creates tasks for forward and backward labeling algorithms using the provided
+ * scheduling mechanism. The tasks are executed in parallel, and the results are synchronized
+ * and stored in the provided vectors.
+ *
+ * @tparam state The stage of the algorithm.
+ * @tparam fullness The fullness state of the algorithm.
+ * @param forward_cbar A reference to a vector where the results of the forward labeling algorithm will be
+ * stored.
+ * @param backward_cbar A reference to a vector where the results of the backward labeling algorithm will be
+ * stored.
+ * @param q_star A constant reference to a vector used as input for the labeling algorithms.
+ */
+template <Stage state, Full fullness>
+void BucketGraph::run_labeling_algorithms(std::vector<double> &forward_cbar, std::vector<double> &backward_cbar,
+                                          const std::vector<double> &q_star) {
+    // Create tasks for forward and backward labeling algorithms
+
+    auto forward_task = stdexec::schedule(bi_sched) | stdexec::then([&]() {
+                            return labeling_algorithm<Direction::Forward, state, fullness>(q_star);
+                        });
+
+    auto backward_task = stdexec::schedule(bi_sched) | stdexec::then([&]() {
+                             return labeling_algorithm<Direction::Backward, state, fullness>(q_star);
+                         });
+
+    // Execute the tasks in parallel and synchronize
+    auto work = stdexec::when_all(std::move(forward_task), std::move(backward_task)) |
+                stdexec::then([&](auto forward_result, auto backward_result) {
+                    forward_cbar  = std::move(forward_result);
+                    backward_cbar = std::move(backward_result);
+                });
+
+    stdexec::sync_wait(std::move(work));
 }
