@@ -124,7 +124,7 @@ public:
     void setOptions(const BucketOptions &options) { this->options = options; }
 
 #ifdef SCHRODINGER
-    SchrodingerPool sPool = SchrodingerPool(150);
+    SchrodingerPool sPool = SchrodingerPool(200);
 #endif
     // Note: very tricky way to unroll the loop at compile time and check for disposability
     static constexpr std::string_view resources[] = {RESOURCES}; // RESOURCES will expand to your string list
@@ -139,9 +139,9 @@ public:
      *
      */
     template <Direction D, size_t I, size_t N, typename Gamma, typename VRPJob>
-    constexpr bool process_all_resources(std::vector<double>              &new_resources,
-                                         const std::array<double, R_SIZE> &initial_resources, const Gamma &gamma,
-                                         const VRPJob &theJob) {
+    inline constexpr bool process_all_resources(std::vector<double>              &new_resources,
+                                                const std::array<double, R_SIZE> &initial_resources, const Gamma &gamma,
+                                                const VRPJob &theJob) {
         if constexpr (I < N) {
             // Process the resource at index I
             if (!process_resource<D, I, N>(new_resources[I], initial_resources, gamma, theJob)) {
@@ -163,8 +163,8 @@ public:
      *
      */
     template <Direction D, size_t I, size_t N, typename Gamma, typename VRPJob>
-    constexpr bool process_resource(double &new_resource, const std::array<double, R_SIZE> &initial_resources,
-                                    const Gamma &gamma, const VRPJob &theJob) {
+    inline constexpr bool process_resource(double &new_resource, const std::array<double, R_SIZE> &initial_resources,
+                                           const Gamma &gamma, const VRPJob &theJob) {
         if constexpr (resource_disposability[I] == 1) { // Checked at compile-time
             if constexpr (D == Direction::Forward) {
                 new_resource =
@@ -252,12 +252,6 @@ public:
         return true; // Successfully processed all resources
     }
 
-    // Function to automatically get the size
-    template <typename T, std::size_t N>
-    constexpr std::size_t array_size(const T (&)[N]) {
-        return N;
-    }
-
     bool                s1    = true;
     bool                s2    = false;
     bool                s3    = false;
@@ -301,10 +295,10 @@ public:
     exec::static_thread_pool            bi_pool  = exec::static_thread_pool(2);
     exec::static_thread_pool::scheduler bi_sched = bi_pool.get_scheduler();
 
-    exec::static_thread_pool            cat_pool        = exec::static_thread_pool(4);
-    exec::static_thread_pool::scheduler cat_sched       = bi_pool.get_scheduler();
-    int                                 fw_buckets_size = 0;
-    int                                 bw_buckets_size = 0;
+    // exec::static_thread_pool            cat_pool        = exec::static_thread_pool(4);
+    // exec::static_thread_pool::scheduler cat_sched       = cat_pool.get_scheduler();
+    int fw_buckets_size = 0;
+    int bw_buckets_size = 0;
 
     double bidi_relation = 1.0;
 
@@ -319,8 +313,8 @@ public:
 
     std::array<Bucket, max_buckets> fw_buckets;
     std::array<Bucket, max_buckets> bw_buckets;
-    LabelPool                       label_pool_fw = LabelPool(1000);
-    LabelPool                       label_pool_bw = LabelPool(1000);
+    LabelPool                       label_pool_fw = LabelPool(100);
+    LabelPool                       label_pool_bw = LabelPool(100);
     std::vector<BucketArc>          fw_arcs;
     std::vector<BucketArc>          bw_arcs;
     std::vector<Label *>            merged_labels;
@@ -369,7 +363,7 @@ public:
      * truncated to contain only the first N_ADD paths.
      *
      */
-    std::vector<Path> getSchrodinger() const {
+    std::vector<Path> getSchrodinger() {
         std::vector<Path> negative_cost_paths = sPool.get_paths_with_negative_red_cost();
         if (negative_cost_paths.size() > N_ADD) { negative_cost_paths.resize(N_ADD); }
         return negative_cost_paths;
@@ -601,7 +595,7 @@ public:
     void define_buckets();
 
     template <Direction D, Stage S>
-    bool DominatedInCompWiseSmallerBuckets(Label *L, int bucket, const std::vector<double> &c_bar,
+    bool DominatedInCompWiseSmallerBuckets(const Label *L, int bucket, const std::vector<double> &c_bar,
                                            std::vector<uint64_t>               &Bvisited,
                                            const std::vector<std::vector<int>> &bucket_order) noexcept;
 
@@ -611,7 +605,7 @@ public:
            const std::conditional_t<A == ArcType::Bucket, BucketArc,
                                     std::conditional_t<A == ArcType::Jump, JumpArc, Arc>> &gamma) noexcept;
     template <Direction D, Stage S>
-    bool is_dominated(Label *&new_label, Label *&labels) noexcept;
+    bool is_dominated(const Label *new_label, const Label *labels) noexcept;
 
     /**
      * @brief Resets the forward and backward label pools.
@@ -633,8 +627,7 @@ public:
     std::vector<Label *> bi_labeling_algorithm(std::vector<double> q_start);
 
     template <Stage S>
-    void ConcatenateLabel(const Label *&L, int &b, Label *&pbest, std::vector<uint64_t> &Bvisited,
-                          const std::vector<double> &q_star);
+    void ConcatenateLabel(const Label *L, int &b, Label *&pbest, std::vector<uint64_t> &Bvisited);
 
     inline double       getcij(int i, int j) const { return distance_matrix[i][j]; }
     void                calculate_neighborhoods(size_t num_closest);
@@ -671,7 +664,7 @@ public:
     }
 
     template <Direction D>
-    void UpdateBucketsSet(double theta, Label *&label, std::unordered_set<int> &Bbidi, int &current_bucket,
+    void UpdateBucketsSet(double theta, const Label *label, std::unordered_set<int> &Bbidi, int &current_bucket,
                           std::unordered_set<int> &Bvisited);
 
     template <Direction D>
@@ -714,15 +707,29 @@ public:
      */
     inline bool check_feasibility(const Label *fw_label, const Label *bw_label) {
         if (!fw_label || !bw_label) return false;
-        const struct VRPJob &VRPJob = jobs[fw_label->job_id];
-        if (fw_label->resources[TIME_INDEX] + getcij(fw_label->job_id, bw_label->job_id) + VRPJob.duration >
-            bw_label->resources[TIME_INDEX]) {
-            return false;
-        }
+
+        // Cache resources and job data
+        const auto          &fw_resources = fw_label->resources;
+        const auto          &bw_resources = bw_label->resources;
+        const struct VRPJob &VRPJob       = jobs[fw_label->job_id];
+
+        // Time feasibility check
+        const auto time_fw     = fw_resources[TIME_INDEX];
+        const auto time_bw     = bw_resources[TIME_INDEX];
+        const auto travel_time = getcij(fw_label->job_id, bw_label->job_id);
+        if (time_fw + travel_time + VRPJob.duration > time_bw) { return false; }
+
+        // Resource feasibility check (if applicable)
         if constexpr (R_SIZE > 1) {
-            for (size_t r = 1; r < fw_label->resources.size(); r++)
-                if (fw_label->resources[1] + VRPJob.demand > bw_label->resources[1]) { return false; }
+            for (size_t i = 1; i < R_SIZE; ++i) {
+                const auto resource_fw = fw_resources[i];
+                const auto resource_bw = bw_resources[i];
+                const auto demand      = VRPJob.demand;
+
+                if (resource_fw + demand > resource_bw) { return false; }
+            }
         }
+
         return true;
     }
 
@@ -731,6 +738,7 @@ public:
     std::vector<Label *> get_rih_labels() const { return merged_labels_rih; }
 
     double knapsackBound(const Label *l);
+    Label *compute_label(const Label *L, const Label *L_prime);
 
 private:
     std::vector<Interval> intervals;
@@ -742,6 +750,4 @@ private:
     double best_cost{};
     Label *fw_best_label{};
     Label *bw_best_label{};
-
-    Label *compute_label(const Label *L, const Label *L_prime);
 };

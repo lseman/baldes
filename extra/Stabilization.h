@@ -23,6 +23,7 @@
 
 #pragma once
 
+#include "DataClasses.h"
 #include "Definitions.h"
 #include "gurobi_c++.h"
 #include <algorithm> // For std::transform
@@ -241,52 +242,54 @@ public:
         }
 
         // Get the current stabilization center (duals_in) and the current job duals (duals_out)
-        auto duals_in  = cur_stab_center;
-        auto duals_out = jobDuals;
+        const auto &duals_in  = cur_stab_center;
+        const auto &duals_out = jobDuals;
+
+        const size_t        n = jobDuals.size();
+        std::vector<double> duals_tilde(n, 0.0);
+        std::vector<double> duals_g(n, 0.0);
+        std::vector<double> rho(n, 0.0);
+
+        // Precompute norms that are used multiple times
+        double norm_in_out      = norm(duals_in, duals_out);
+        double norm_subgradient = norm(subgradient);
 
         // Compute π_tilde: a convex combination of duals_in and duals_out
-        std::vector<double> duals_tilde(jobDuals.size(), 0.0);
-        for (auto row_id = 0; row_id < jobDuals.size(); ++row_id) {
-            duals_tilde[row_id] = base_alpha * duals_in[row_id] + (1 - base_alpha) * duals_out[row_id];
+        double one_minus_alpha = 1 - base_alpha;
+        for (size_t row_id = 0; row_id < n; ++row_id) {
+            duals_tilde[row_id] = base_alpha * duals_in[row_id] + one_minus_alpha * duals_out[row_id];
         }
 
         // Compute the coefficient for π_g based on the norm of duals_in and duals_out
-        double coef_g = norm(duals_in, duals_out); // Norm between current duals_in and duals_out
-        coef_g /= norm(subgradient);               // Normalize by the subgradient norm
-        if (std::isnan(coef_g)) {
-            coef_g = 0; // Handle the case where coef_g becomes NaN
-        }
+        double coef_g = (norm_subgradient != 0.0) ? norm_in_out / norm_subgradient : 0.0;
 
         // Compute π_g: duals_in + coef_g * subgradient
-        std::vector<double> duals_g(jobDuals.size(), 0.0);
-        for (auto row_id = 0; row_id < jobDuals.size(); row_id++) {
+        for (size_t row_id = 0; row_id < n; ++row_id) {
             duals_g[row_id] = duals_in[row_id] + coef_g * subgradient[row_id];
         }
 
         // Compute β: a weight factor that depends on the alignment of duals_g and duals_out
-        double dot_product = 0;
-        for (auto row_id = 0; row_id < jobDuals.size(); row_id++) {
+        double dot_product = 0.0;
+        for (size_t row_id = 0; row_id < n; ++row_id) {
             dot_product += (duals_out[row_id] - duals_in[row_id]) * (duals_g[row_id] - duals_in[row_id]);
         }
-        beta = dot_product /
-               (norm(duals_in, duals_out) * norm(duals_in, duals_g)); // Compute β using norms and dot product
-        beta = std::max(0.0, beta);                                   // Ensure β is non-negative
+
+        double norm_in_g = norm(duals_in, duals_g);
+        beta = (norm_in_out * norm_in_g != 0.0) ? std::max(0.0, dot_product / (norm_in_out * norm_in_g)) : 0.0;
 
         // Compute ρ: a combination of duals_g and duals_out based on β
-        std::vector<double> rho(jobDuals.size(), 0.0);
-        for (auto row_id = 0; row_id < jobDuals.size(); ++row_id) {
-            rho[row_id] = beta * duals_g[row_id] + (1 - beta) * duals_out[row_id];
+        double one_minus_beta = 1 - beta;
+        for (size_t row_id = 0; row_id < n; ++row_id) {
+            rho[row_id] = beta * duals_g[row_id] + one_minus_beta * duals_out[row_id];
         }
 
         // Compute the coefficient for dual separation (coef_sep)
-        double coef_sep = norm(duals_in, duals_tilde) / norm(duals_in, rho);
-        if (std::isnan(coef_sep)) {
-            coef_sep = 0; // Handle the case where coef_sep becomes NaN
-        }
+        double norm_in_tilde = norm(duals_in, duals_tilde);
+        double norm_in_rho   = norm(duals_in, rho);
+        double coef_sep      = (norm_in_rho != 0.0) ? norm_in_tilde / norm_in_rho : 0.0;
 
         // Update the duals_sep by adjusting duals_in towards ρ
-        duals_sep.assign(jobDuals.size(), 0.0);
-        for (auto row_id = 0; row_id < jobDuals.size(); ++row_id) {
+        for (size_t row_id = 0; row_id < n; ++row_id) {
             duals_sep[row_id] = duals_in[row_id] + coef_sep * (rho[row_id] - duals_in[row_id]);
         }
 
@@ -308,60 +311,59 @@ public:
      * @return The updated alpha value based on the dynamic schedule.
      */
     double dynamic_alpha_schedule(const ModelData &dados, const DualSolution &jobDuals,
-                                  std::vector<Label *> best_pricing_cols) {
+                                  const std::vector<Label *> &best_pricing_cols) {
 
         // Get the number of rows from the size of the jobDuals
-        auto number_of_rows = jobDuals.size();
+        size_t number_of_rows = jobDuals.size();
 
         // Calculate the direction of separation between the current smoothed dual solution and stabilization center
-        std::vector<double> in_sep_direction(jobDuals.size());
+        std::vector<double> in_sep_direction(number_of_rows);
         std::transform(smooth_dual_sol.begin(), smooth_dual_sol.end(), cur_stab_center.begin(),
-                       in_sep_direction.begin(), [](double a, double b) { return a - b; });
+                       in_sep_direction.begin(), std::minus<>());
 
-        // Calculate the norm of the smoothed dual solution (using transform_reduce to accumulate squared differences)
+        // Calculate the norm of the smoothed dual solution (accumulating squared differences)
         double norm_smooth_dual_sol = std::transform_reduce(in_sep_direction.begin(), in_sep_direction.end(), 0.0,
                                                             std::plus<>(), [](double a) { return a * a; });
 
         // If the norm is zero, return the base alpha (no adjustment necessary)
-        if (norm_smooth_dual_sol == 0) { return base_alpha; }
+        if (norm_smooth_dual_sol == 0.0) { return base_alpha; }
 
-        // Initialize new_rows to store the contribution from best_pricing_cols
-        new_rows.assign(jobDuals.size(), 0.0);
-
-        // Apply contributions from best_pricing_cols to new_rows, ignoring columns with positive cost
-        for (auto best_pricing_col : best_pricing_cols) {
-            if (best_pricing_col->cost > 0) { continue; } // Skip if the cost is positive
-            for (auto row : best_pricing_col->jobs_covered) {
-                if (row > 0 && row != N_SIZE - 1) { // Ignore the last job and invalid rows
-                    new_rows[row - 1] += 1;         // Increment the row contribution
+        // Initialize new_rows and apply contributions from best_pricing_cols, skipping positive-cost columns
+        new_rows.assign(number_of_rows, 0.0);
+        for (const auto *best_pricing_col : best_pricing_cols) {
+            if (best_pricing_col->cost > 0) { continue; }
+            for (const auto &row : best_pricing_col->jobs_covered) {
+                if (row > 0 && row != N_SIZE - 1) { // Ignore invalid rows and the last job
+                    new_rows[row - 1] += 1;
                 }
             }
         }
 
-        // Define row bounds based on the problem constraints (dados.sense)
-        // TODO: Consider moving this initialization to the class constructor
-        std::vector<double> new_row_lower_bounds(number_of_rows);
-        std::vector<double> new_row_upper_bounds(number_of_rows);
+        // Define and set row bounds based on the problem constraints (dados.sense)
+        // Reuse vectors to avoid reallocations
+        static std::vector<double> new_row_lower_bounds, new_row_upper_bounds;
+        if (new_row_lower_bounds.size() != number_of_rows) {
+            new_row_lower_bounds.resize(number_of_rows);
+            new_row_upper_bounds.resize(number_of_rows);
+        }
 
-        // Set row bounds based on the constraint sense ('<', '>', or '=')
-        for (int row_id = 0; row_id < number_of_rows; ++row_id) {
+        // Set row bounds
+        for (size_t row_id = 0; row_id < number_of_rows; ++row_id) {
             if (dados.sense[row_id] == '<') {
                 new_row_upper_bounds[row_id] = dados.b[row_id];
-                new_row_lower_bounds[row_id] = -std::numeric_limits<double>::infinity(); // No lower bound for '<'
+                new_row_lower_bounds[row_id] = -std::numeric_limits<double>::infinity();
             } else if (dados.sense[row_id] == '>') {
-                new_row_upper_bounds[row_id] = std::numeric_limits<double>::infinity(); // No upper bound for '>'
+                new_row_upper_bounds[row_id] = std::numeric_limits<double>::infinity();
                 new_row_lower_bounds[row_id] = dados.b[row_id];
             } else {
                 new_row_upper_bounds[row_id] = dados.b[row_id];
-                new_row_lower_bounds[row_id] = dados.b[row_id]; // Equality constraint
+                new_row_lower_bounds[row_id] = dados.b[row_id];
             }
         }
 
-        // Initialize subgradient vector
-        subgradient.assign(jobDuals.size(), 0.0);
-
-        // Update the subgradient based on the new row values and bounds
-        for (size_t row_id = 0; row_id < subgradient.size(); ++row_id) {
+        // Update the subgradient based on new row values and bounds
+        subgradient.assign(number_of_rows, 0.0);
+        for (size_t row_id = 0; row_id < number_of_rows; ++row_id) {
             subgradient[row_id] = std::min(0.0, new_row_upper_bounds[row_id] - new_rows[row_id]) +
                                   std::max(0.0, new_row_lower_bounds[row_id] - new_rows[row_id]);
         }
@@ -375,15 +377,13 @@ public:
             (norm_smooth_dual_sol * subgradient_norm);
 
         // Negate the cosine angle to invert the direction
-        cos_angle = cos_angle * -1;
+        cos_angle = -cos_angle;
 
         // Adjust cur_alpha based on the cosine angle and a threshold
         if (cos_angle > 1e-12) {
-            // If the angle is sufficiently aligned, increase cur_alpha towards 1.0
-            cur_alpha = std::min(0.99, cur_alpha + (1.0 - cur_alpha) * 0.1);
+            cur_alpha = std::min(0.99, cur_alpha + (1.0 - cur_alpha) * 0.1); // Increase cur_alpha
         } else {
-            // Otherwise, reduce cur_alpha to slow down the stabilization
-            cur_alpha = std::max(0.0, cur_alpha - 0.1);
+            cur_alpha = std::max(0.0, cur_alpha - 0.1); // Decrease cur_alpha
         }
 
         // Return the updated cur_alpha

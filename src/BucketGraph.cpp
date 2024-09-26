@@ -445,7 +445,6 @@ void BucketGraph::augment_ng_memories(std::vector<double> &solution, std::vector
     // Sort cycles by size to prioritize smaller cycles
     std::sort(cycles.begin(), cycles.end(),
               [](const std::vector<int> &a, const std::vector<int> &b) { return a.size() < b.size(); });
-
     int forbidden_count = 0;
 
     for (const auto &cycle : cycles) {
@@ -541,8 +540,8 @@ void BucketGraph::set_adjacency_list() {
 
         // Iterate over all jobs to determine potential arcs
         for (const auto &next_job : jobs) {
-            if (next_job.id == options.depot) continue;      // Skip the depot
-            if (job.id == next_job.id) continue; // Skip arcs to the same job
+            if (next_job.id == options.depot) continue; // Skip the depot
+            if (job.id == next_job.id) continue;        // Skip arcs to the same job
 
             // Calculate the travel cost between the current job and the next job
             auto   travel_cost = getcij(job.id, next_job.id);
@@ -912,13 +911,14 @@ void BucketGraph::async_rih_processing(std::vector<Label *> initial_labels, int 
     }
 
     RIH3(best_labels_in, best_labels_out, LABELS_MAX);
-
+    /*
     while (!best_labels_out.empty()) {
         best_labels_in.push(best_labels_out.top());
         best_labels_out.pop();
     }
+    */
 
-    RIH5(best_labels_in, best_labels_out, LABELS_MAX);
+    // RIH5(best_labels_in, best_labels_out, LABELS_MAX);
 
     // After processing, populate the merged_labels_improved vector
     while (!best_labels_out.empty()) {
@@ -1039,7 +1039,7 @@ void BucketGraph::setup() {
 #ifdef SCHRODINGER
     sPool.distance_matrix = distance_matrix;
     sPool.setJobs(&jobs);
-    sPool.setCutStorage(cut_storage);
+    //sPool.setCutStorage(cut_storage);
 #endif
 
     // Initialize the split

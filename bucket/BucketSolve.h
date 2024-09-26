@@ -19,6 +19,8 @@
 
 #include "BucketJump.h"
 #include "Definitions.h"
+
+#include "../cuts/SRC.h"
 #include <cstring>
 
 #ifdef AVX
@@ -123,7 +125,7 @@ inline std::vector<Label *> BucketGraph::solve() {
         inner_obj = paths[0]->cost;
 
         // If the objective improves sufficiently, set the status to separation or optimal
-        if (inner_obj >= -1) {
+        if (inner_obj >= -1e-1) {
             ss = true; // Enter separation mode (for SRC handling)
 #if !defined(SRC) && !defined(SRC3)
             status = Status::Optimal; // If SRC is not defined, set status to optimal
@@ -186,12 +188,12 @@ std::vector<double> BucketGraph::labeling_algorithm(std::vector<double> q_point,
                     if constexpr (F == Full::Partial) {
                         if constexpr (D == Direction::Forward) {
                             if (label->resources[TIME_INDEX] > q_star[TIME_INDEX]) {
-                                //label->set_extended(true);
+                                label->set_extended(true);
                                 continue;
                             }
                         } else if constexpr (D == Direction::Backward) {
                             if (label->resources[TIME_INDEX] <= q_star[TIME_INDEX]) {
-                                //label->set_extended(true);
+                                label->set_extended(true);
                                 continue;
                             }
                         }
@@ -231,9 +233,9 @@ std::vector<double> BucketGraph::labeling_algorithm(std::vector<double> q_point,
                             } else {
 #ifndef AVX
                                 // General dominance check
-                                for (auto j :
-                                     std::ranges::iota_view(static_cast<std::size_t>(0), to_bucket_labels.size())) {
 
+                                // General dominance check
+                                for (size_t j = 0; j < to_bucket_labels.size(); ++j) {
                                     Label *existing_label = to_bucket_labels[j];
 
                                     // Prefetch the next label for comparison
@@ -260,7 +262,6 @@ std::vector<double> BucketGraph::labeling_algorithm(std::vector<double> q_point,
                                 // Remove dominated labels from the bucket
                                 if constexpr (S != Stage::Enumerate) {
                                     std::vector<Label *> labels_to_remove;
-                                    labels_to_remove.reserve(to_bucket_labels.size());
                                     for (auto *existing_label : to_bucket_labels) {
                                         if (is_dominated<D, S>(existing_label, new_label)) {
                                             labels_to_remove.push_back(existing_label);
@@ -316,7 +317,7 @@ std::vector<double> BucketGraph::labeling_algorithm(std::vector<double> q_point,
         } while (!all_ext); // Continue until all labels have been extended
 
         // Update the cost bounds (c_bar) for the current SCC's buckets
-        for (const int bucket : sorted_sccs[scc_index]) {
+        for (int bucket : sorted_sccs[scc_index]) {
             const auto &labels = buckets[bucket].get_labels();
 
             // Find the label with the minimum cost in the bucket
@@ -410,8 +411,7 @@ std::vector<Label *> BucketGraph::bi_labeling_algorithm(std::vector<double> q_st
     std::vector<uint64_t> Bvisited(n_segments, 0);
 
     // Iterate over all forward buckets
-    for (auto bucket : std::ranges::iota_view(0, fw_buckets_size)) {
-
+    for (auto bucket = 0; bucket < fw_buckets_size; ++bucket) {
         auto       &current_bucket = fw_buckets[bucket];          // Get the current bucket
         const auto &labels         = current_bucket.get_labels(); // Get labels in the current bucket
 
@@ -448,7 +448,7 @@ std::vector<Label *> BucketGraph::bi_labeling_algorithm(std::vector<double> q_st
                 std::memset(Bvisited.data(), 0, Bvisited.size() * sizeof(uint64_t));
 
                 // Concatenate this new label with the best label found so far
-                ConcatenateLabel<S>(L, b_prime, best_label, Bvisited, q_star);
+                ConcatenateLabel<S>(L, b_prime, best_label, Bvisited);
             }
         }
     }
@@ -459,7 +459,7 @@ std::vector<Label *> BucketGraph::bi_labeling_algorithm(std::vector<double> q_st
 
 #ifdef RIH
     // If we are in Stage 2 or above, we run the RIH (Route Improvement Heuristic) in the background
-    const int LABELS_MAX = 5; // Set a maximum of 2 labels to be improved
+    const int LABELS_MAX = 2; // Set a maximum of 2 labels to be improved
 
     if constexpr (S > Stage::Two) {
         // Launch the RIH process asynchronously on a separate thread
@@ -468,7 +468,6 @@ std::vector<Label *> BucketGraph::bi_labeling_algorithm(std::vector<double> q_st
     }
 #endif
 
-#ifdef SCHRODINGER
     // if merged_labels is bigger than 10, create Path related to the remaining ones
     // and add them to a std::vector<Path>
     if (merged_labels.size() > N_ADD) {
@@ -482,7 +481,6 @@ std::vector<Label *> BucketGraph::bi_labeling_algorithm(std::vector<double> q_st
         sPool.add_paths(paths);
         sPool.iterate();
     }
-#endif
 
     // Return the final list of merged labels after processing
     return merged_labels;
@@ -543,33 +541,23 @@ BucketGraph::Extend(const std::conditional_t<M == Mutability::Mut, Label *, cons
         }
     }
 
-    // Perform 2-cycle elimination: if the job ID is the same as the current label's job, skip
-    // if (job_id == L_prime->job_id) { return nullptr; }
-
     // Check if the job has already been visited for enumeration (Stage Enumerate)
     if constexpr (S == Stage::Enumerate) {
         if (is_job_visited(L_prime->visited_bitmap, job_id)) { return nullptr; }
     }
 
-    // Check if job_id is in the neighborhood of initial_job_id and has already been visited
-    const size_t segment      = job_id >> 6; // Equivalent to current_bucket / 64
-    const size_t bit_position = job_id & 63; // Equivalent to current_bucket % 64
+    // Perform 2-cycle elimination: if the job ID is the same as the current label's job, skip
+    if (job_id == L_prime->job_id) { return nullptr; }
 
+    // Check if job_id is in the neighborhood of initial_job_id and has already been visited
+    size_t segment      = job_id / 64; // Determine the segment in the bitmap
+    size_t bit_position = job_id % 64; // Determine the bit position in the segment
     if constexpr (S != Stage::Enumerate) {
         if ((neighborhoods_bitmap[initial_job_id][segment] & (1ULL << bit_position)) &&
             is_job_visited(L_prime->visited_bitmap, job_id)) {
             return nullptr; // Skip if the job is in the neighborhood and has been visited
         }
     }
-
-#ifdef PSTEP
-    // counter the number of bits set in L_prime->visited_bitmap
-    size_t n_visited = 0;
-    for (size_t i = 0; i < L_prime->visited_bitmap.size(); ++i) {
-        n_visited += __builtin_popcountll(L_prime->visited_bitmap[i]);
-    }
-    if (n_visited >= options.max_path_size) { return nullptr; }
-#endif
 
     // Get the VRP job corresponding to job_id
     const VRPJob &VRPJob = jobs[job_id];
@@ -595,18 +583,14 @@ BucketGraph::Extend(const std::conditional_t<M == Mutability::Mut, Label *, cons
     }
     */
 
-#ifdef MTW
-    // TODO:: handle multiple time windows
-#endif
-
-    // NOTE: beautiful function for compile time unrolling
+    // Note: workaround
     constexpr size_t N = R_SIZE;
     if (!process_all_resources<D, 0, N>(new_resources, initial_resources, gamma, VRPJob)) {
         return nullptr; // Handle failure case (constraint violation)
     }
 
     // Get the bucket number for the new job and resource state
-    const int to_bucket = get_bucket_number<D>(job_id, new_resources);
+    int to_bucket = get_bucket_number<D>(job_id, new_resources);
 
 #ifdef FIX_BUCKETS
     // Skip if the bucket is fixed (in Stage 4) and not a jump arc
@@ -626,20 +610,8 @@ BucketGraph::Extend(const std::conditional_t<M == Mutability::Mut, Label *, cons
 #endif
 
     // Compute travel cost between the initial and current jobs
-    const double travel_cost = getcij(initial_job_id, job_id);
-
-#ifndef PSTEP
-    double new_cost = initial_cost + travel_cost - VRPJob.cost;
-#else
-    double new_cost = initial_cost + travel_cost;
-
-    // if there were more, give back the dual
-    new_cost += pstep_duals.getThreeTwoDualValue(initial_job_id) + pstep_duals.getThreeThreeDualValue(initial_job_id);
-
-    // assume the last in the route
-    new_cost += -pstep_duals.getThreeTwoDualValue(job_id);
-    new_cost += pstep_duals.getArcDualValue(initial_job_id, job_id);
-#endif
+    double travel_cost = getcij(initial_job_id, job_id);
+    double new_cost    = initial_cost + travel_cost - VRPJob.cost;
 
 #ifdef RCC
     // Adjust the cost using the cached dual sum from RCC (if applicable)
@@ -664,10 +636,8 @@ BucketGraph::Extend(const std::conditional_t<M == Mutability::Mut, Label *, cons
         return new_label; // Return the new label early if in reverse mode
     }
 
-    // new_label->visited_bitmap = L_prime->visited_bitmap; // Copy visited bitmap from the original label
-    std::memcpy(new_label->visited_bitmap.data(), L_prime->visited_bitmap.data(),
-                new_label->visited_bitmap.size() * sizeof(uint64_t));
-    set_job_visited(new_label->visited_bitmap, job_id); // Mark the new job as visited
+    new_label->visited_bitmap = L_prime->visited_bitmap; // Copy visited bitmap from the original label
+    set_job_visited(new_label->visited_bitmap, job_id);  // Mark the new job as visited
 
 #ifdef UNREACHABLE_DOMINANCE
     // Copy unreachable bitmap (if applicable)
@@ -687,18 +657,17 @@ BucketGraph::Extend(const std::conditional_t<M == Mutability::Mut, Label *, cons
 
     // If not in enumeration stage, update visited bitmap to avoid redundant labels
     if constexpr (S != Stage::Enumerate) {
-        size_t   limit            = new_label->visited_bitmap.size();
-        uint64_t mask_for_segment = ~(1ULL << bit_position); // Precompute the mask outside the loop
+        size_t limit = new_label->visited_bitmap.size();
         for (size_t i = 0; i < limit; ++i) {
             uint64_t current_visited = new_label->visited_bitmap[i];
+
             if (!current_visited) continue; // Skip if no jobs were visited in this segment
 
-            uint64_t neighborhood_mask = neighborhoods_bitmap[job_id][i];      // Get neighborhood mask
-            uint64_t bits_to_clear     = current_visited & ~neighborhood_mask; // Determine bits to clear
+            uint64_t neighborhood_mask = neighborhoods_bitmap[job_id][i]; // Get neighborhood mask for the current job
+            uint64_t bits_to_clear     = current_visited & ~neighborhood_mask; // Determine which bits to clear
 
-            // Avoid branching inside the loop for this case
-            if (i == segment) {
-                bits_to_clear &= mask_for_segment; // Ensure current job remains visited
+            if (i == job_id / 64) {
+                bits_to_clear &= ~(1ULL << (job_id % 64)); // Ensure current job remains visited
             }
 
             new_label->visited_bitmap[i] &= ~bits_to_clear; // Clear irrelevant visited jobs
@@ -766,15 +735,15 @@ BucketGraph::Extend(const std::conditional_t<M == Mutability::Mut, Label *, cons
  * @return True if the label is dominated by the new label, false otherwise.
  */
 template <Direction D, Stage S>
-inline bool BucketGraph::is_dominated(Label *&new_label, Label *&label) noexcept {
+inline bool BucketGraph::is_dominated(const Label *new_label, const Label *label) noexcept {
 
     // Extract resources for the new label and the comparison label
     const auto &new_resources   = new_label->resources;
     const auto &label_resources = label->resources;
 
-#ifdef SRC
     double sumSRC = 0; // Variable to accumulate SRC dual values if applicable
 
+#ifdef SRC
     // SRC logic (Subset Row Cuts) for Stage 3, 4, or Enumerate
     if constexpr (S == Stage::Four || S == Stage::Enumerate) {
         const auto &SRCDuals = cut_storage->SRCDuals;
@@ -796,7 +765,7 @@ inline bool BucketGraph::is_dominated(Label *&new_label, Label *&label) noexcept
     }
 
     // Check resource conditions based on the direction (Forward or Backward)
-    for (size_t i = 0; i < R_SIZE; ++i) {
+    for (size_t i = 0; i < new_resources.size(); ++i) {
         if constexpr (D == Direction::Forward) {
             // In Forward direction: the comparison label must not have more resources than the new label
             if (label_resources[i] > new_resources[i]) { return false; }
@@ -901,7 +870,7 @@ inline bool precedes(const std::vector<std::vector<T>> &sccs, const T &a, const 
  * @return True if the label is dominated, false otherwise.
  */
 template <Direction D, Stage S>
-inline bool BucketGraph::DominatedInCompWiseSmallerBuckets(Label *L, int bucket, const std::vector<double> &c_bar,
+inline bool BucketGraph::DominatedInCompWiseSmallerBuckets(const Label *L, int bucket, const std::vector<double> &c_bar,
                                                            std::vector<uint64_t>               &Bvisited,
                                                            const std::vector<std::vector<int>> &bucket_order) noexcept {
     // Assign the appropriate buckets and Phi structures based on direction (D)
@@ -928,6 +897,7 @@ inline bool BucketGraph::DominatedInCompWiseSmallerBuckets(Label *L, int bucket,
         if (L->cost < c_bar[currentBucket] && ::precedes<int>(bucket_order, currentBucket, b_L)) {
             return false; // The label is not dominated, return false early
         }
+
         // If the current bucket is different from the label's bucket, compare the labels in this bucket
         if (b_L != currentBucket) {
             const auto &bucket_labels = buckets[currentBucket].get_labels(); // Get the labels in the current bucket
@@ -947,8 +917,8 @@ inline bool BucketGraph::DominatedInCompWiseSmallerBuckets(Label *L, int bucket,
 
         // Add the neighboring buckets (from Phi) to the stack if they haven't been visited yet
         for (const int b_prime : Phi[currentBucket]) {
-            const size_t segment_prime      = b_prime >> 6; // Determine the segment for the neighboring bucket
-            const size_t bit_position_prime = b_prime & 63; // Determine the bit position within the segment
+            const size_t segment_prime      = b_prime / 64; // Determine the segment for the neighboring bucket
+            const size_t bit_position_prime = b_prime % 64; // Determine the bit position within the segment
 
             // If the neighboring bucket hasn't been visited, push it onto the stack
             if ((Bvisited[segment_prime] & (1ULL << bit_position_prime)) == 0) { bucketStack.push_back(b_prime); }

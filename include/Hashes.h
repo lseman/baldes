@@ -19,7 +19,7 @@
 #include <utility>
 
 /**
- * @struct pair_hash_b
+ * @struct pair_hash
  * @brief A hash function object for hashing std::pair objects.
  *
  * This struct provides a custom hash function for std::pair objects,

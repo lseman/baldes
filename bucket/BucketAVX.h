@@ -7,7 +7,7 @@
 #include <experimental/simd>
 
 template <Direction D, Stage S>
-inline bool check_dominance_against_vector(Label *&new_label, const std::vector<Label *> &labels) noexcept {
+inline bool check_dominance_against_vector(const Label *new_label, const std::vector<Label *> &labels) noexcept {
     using namespace std::experimental;
     size_t       size      = labels.size();
     const size_t simd_size = simd<double>::size(); // SIMD size based on hardware
