@@ -976,12 +976,14 @@ public:
 #ifdef RIH
                 auto rih_paths = bucket_graph.get_rih_labels();
                 colAdded += addColumn(node, rih_paths, true);
+
 #endif
 
 #ifdef STAB
                 stab.update_stabilization_after_pricing_optim(matrix, jobDuals, lag_gap, paths);
 
                 if (colAdded == 0) {
+                    fmt::print("No columns added, updating mispricing\n");
                     stab.update_stabilization_after_misprice();
                     if (stab.shouldExit()) { misprice = false; }
                 } else {

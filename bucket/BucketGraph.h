@@ -33,19 +33,6 @@
 #define RCESPP_TOL_ZERO 1.E-6
 
 /**
- * @class LabelComparator
- * @brief Comparator class for comparing two Label objects based on their cost.
- *
- * This class provides an overloaded operator() that allows for comparison
- * between two Label pointers. The comparison is based on the cost attribute
- * of the Label objects, with the comparison being in descending order.
- */
-class LabelComparator {
-public:
-    bool operator()(Label *a, Label *b) { return a->cost > b->cost; }
-};
-
-/**
  * @class BucketGraph
  * @brief Represents a graph structure used for bucket-based optimization in a solver.
  *
@@ -74,14 +61,6 @@ public:
     void          mono_initialization();
     Label        *compute_mono_label(const Label *L);
 
-    int RIH5(std::priority_queue<Label *, std::vector<Label *>, LabelComparator> &best_labels_in,
-             std::priority_queue<Label *, std::vector<Label *>, LabelComparator> &best_labels_out, int max_n_labels);
-
-    inline std::vector<size_t> findBestInsertionPositions(const std::vector<int> &route, int &customer);
-
-    double calculateInsertionCost(const std::vector<int> &route, int &customer, size_t pos);
-    void   performSwap(std::vector<int> &new_route, const std::vector<int> &current_route, size_t pos_i, size_t pos_j,
-                       size_t best_pos_v, size_t best_pos_v_prime);
 #ifdef PSTEP
     PSTEPDuals pstep_duals;
     void       setArcDuals(const PSTEPDuals &arc_duals) { this->pstep_duals = arc_duals; }
@@ -127,130 +106,17 @@ public:
     SchrodingerPool sPool = SchrodingerPool(200);
 #endif
     // Note: very tricky way to unroll the loop at compile time and check for disposability
-    static constexpr std::string_view resources[] = {RESOURCES}; // RESOURCES will expand to your string list
-    static constexpr int              resource_disposability[] = {RESOURCES_DISPOSABLE};
-    /**
-     * @brief Processes all resources by iterating through them and applying constraints.
-     *
-     * This function recursively processes each resource in the `new_resources` vector by calling
-     * `process_resource` for each index from `I` to `N-1`. If any resource processing fails (i.e.,
-     * `process_resource` returns false), the function returns false immediately. If all resources
-     * are processed successfully, the function returns true.
-     *
-     */
+    inline static constexpr std::string_view resources[] = {RESOURCES}; // RESOURCES will expand to your string list
+    inline static constexpr int              resource_disposability[] = {RESOURCES_DISPOSABLE};
+
     template <Direction D, size_t I, size_t N, typename Gamma, typename VRPJob>
     inline constexpr bool process_all_resources(std::vector<double>              &new_resources,
                                                 const std::array<double, R_SIZE> &initial_resources, const Gamma &gamma,
-                                                const VRPJob &theJob) {
-        if constexpr (I < N) {
-            // Process the resource at index I
-            if (!process_resource<D, I, N>(new_resources[I], initial_resources, gamma, theJob)) {
-                return false; // Constraint violated, return false
-            }
-            // Recur to process the next resource
-            return process_all_resources<D, I + 1, N>(new_resources, initial_resources, gamma, theJob);
-        }
-        return true; // All resources processed successfully
-    }
+                                                const VRPJob &theJob);
 
-    // Template recursion for compile-time unrolling
-    /**
-     * @brief Processes a resource based on its disposability type and direction.
-     *
-     * This function updates the `new_resource` value based on the initial resources,
-     * the increment provided by `gamma`, and the constraints defined by `theJob`.
-     * The behavior varies depending on the disposability type of the resource.
-     *
-     */
     template <Direction D, size_t I, size_t N, typename Gamma, typename VRPJob>
     inline constexpr bool process_resource(double &new_resource, const std::array<double, R_SIZE> &initial_resources,
-                                           const Gamma &gamma, const VRPJob &theJob) {
-        if constexpr (resource_disposability[I] == 1) { // Checked at compile-time
-            if constexpr (D == Direction::Forward) {
-                new_resource =
-                    std::max(initial_resources[I] + gamma.resource_increment[I], static_cast<double>(theJob.lb[I]));
-                if (new_resource > theJob.ub[I]) {
-                    return false; // Exceeds upper bound, return false to stop processing
-                }
-            } else {
-                new_resource =
-                    std::min(initial_resources[I] - gamma.resource_increment[I], static_cast<double>(theJob.ub[I]));
-                if (new_resource < theJob.lb[I]) {
-                    return false; // Below lower bound, return false to stop processing
-                }
-            }
-        } else if constexpr (resource_disposability[I] == 0) {
-            // TODO: Non-disposable resource handling, check if it is right
-            if constexpr (D == Direction::Forward) {
-                new_resource = initial_resources[I] + gamma.resource_increment[I];
-                if (new_resource > theJob.ub[I]) {
-                    return false; // Exceeds upper bound, return false to stop processing
-                } else if (new_resource < theJob.lb[I]) {
-                    return false; // Below lower bound, return false to stop processing
-                }
-            } else {
-                new_resource = initial_resources[I] - gamma.resource_increment[I];
-                if (new_resource > theJob.ub[I]) {
-                    return false; // Exceeds upper bound, return false to stop processing
-                } else if (new_resource < theJob.lb[I]) {
-                    return false; // Below lower bound, return false to stop processing
-                }
-            }
-        } else if constexpr (resource_disposability[I] == 2) {
-            // TODO:: Binary resource handling, check if logic is right
-            if constexpr (D == Direction::Forward) {
-                // For binary resources, flip between 0 and 1 based on gamma.resource_increment[I]
-                if (gamma.resource_increment[I] > 0) {
-                    new_resource = 1.0; // Switch "on"
-                } else {
-                    new_resource = 0.0; // Switch "off"
-                }
-            } else {
-                // In reverse, toggle as well
-                if (gamma.resource_increment[I] > 0) {
-                    new_resource = 0.0; // Reverse logic: turn "off"
-                } else {
-                    new_resource = 1.0; // Reverse logic: turn "on"
-                }
-            }
-        } else if constexpr (resource_disposability[I] == 3) {
-            // TODO: handling multiple time windows case
-            // "OR" resource case using mtw_lb and mtw_ub vectors for multiple time windows
-            if constexpr (D == Direction::Forward) {
-                bool is_feasible = false;
-                for (size_t i = 0; i < theJob.mtw_lb.size(); ++i) {
-                    new_resource = std::max(initial_resources[I] + gamma.resource_increment[I], theJob.mtw_lb[i]);
-                    if (new_resource > theJob.ub[I]) {
-                        continue; // Exceeds upper bound, try next time window
-                    } else {
-                        is_feasible = true; // Feasible in this time window
-                        break;
-                    }
-                }
-
-                if (!is_feasible) {
-                    return false; // Not feasible in any of the ranges
-                }
-
-                return true; // Successfully processed all resources
-            } else {
-                bool is_feasible = false;
-                for (size_t i = 0; i < theJob.mtw_ub.size(); ++i) {
-                    new_resource = std::min(initial_resources[I] - gamma.resource_increment[I], theJob.mtw_ub[i]);
-                    if (new_resource < theJob.lb[I]) {
-                        continue; // Below lower bound, try next time window }
-                    } else {
-                        is_feasible = true; // Feasible in this time window break;
-                    }
-                }
-
-                if (!is_feasible) {
-                    return false; // Not feasible in any of the ranges
-                }
-            }
-        }
-        return true; // Successfully processed all resources
-    }
+                                           const Gamma &gamma, const VRPJob &theJob);
 
     bool                s1    = true;
     bool                s2    = false;
@@ -260,24 +126,14 @@ public:
     bool                ss    = false;
     int                 stage = 1;
     std::vector<double> q_star;
-    int                 iter       = 0;
-    bool                transition = true;
-    Status              status     = Status::NotOptimal;
-
-    void                 setSplit(std::vector<double> q_star) { this->q_star = q_star; }
-    int                  getStage() const { return stage; }
-    Status               getStatus() const { return status; }
-    std::vector<Label *> solve();
-
-    RCCmanager *rcc_manager = nullptr;
+    int                 iter        = 0;
+    bool                transition  = true;
+    Status              status      = Status::NotOptimal;
+    RCCmanager         *rcc_manager = nullptr;
 
     std::vector<Label *> merged_labels_rih;
 
-    // std::shared_ptr<ThreadPool> fw_thread_pool = std::make_shared<ThreadPool>(1);
-    // std::shared_ptr<ThreadPool> bw_thread_pool = std::make_shared<ThreadPool>(1);
-
     std::thread rih_thread;
-    std::mutex  mtx; // For thread-safe access to merged_labels_improved
 
     std::vector<std::vector<int>> fw_ordered_sccs;
     std::vector<std::vector<int>> bw_ordered_sccs;
@@ -295,12 +151,8 @@ public:
     exec::static_thread_pool            bi_pool  = exec::static_thread_pool(2);
     exec::static_thread_pool::scheduler bi_sched = bi_pool.get_scheduler();
 
-    // exec::static_thread_pool            cat_pool        = exec::static_thread_pool(4);
-    // exec::static_thread_pool::scheduler cat_sched       = cat_pool.get_scheduler();
     int fw_buckets_size = 0;
     int bw_buckets_size = 0;
-
-    double bidi_relation = 1.0;
 
     std::vector<std::vector<bool>> fixed_arcs;
     std::vector<std::vector<bool>> fw_fixed_buckets;
@@ -308,8 +160,8 @@ public:
 
     double gap = std::numeric_limits<double>::infinity();
 
-    CutStorage          *cut_storage = nullptr;
-    static constexpr int max_buckets = 12000; // Define maximum number of buckets beforehand
+    CutStorage                 *cut_storage = nullptr;
+    inline static constexpr int max_buckets = 12000; // Define maximum number of buckets beforehand
 
     std::array<Bucket, max_buckets> fw_buckets;
     std::array<Bucket, max_buckets> bw_buckets;
@@ -329,6 +181,9 @@ public:
 
     std::vector<double> fw_c_bar;
     std::vector<double> bw_c_bar;
+
+    double min_red_cost = std::numeric_limits<double>::infinity();
+    bool   first_reset  = true;
 
     int n_fw_labels = 0;
     int n_bw_labels = 0;
@@ -370,48 +225,40 @@ public:
     }
 #endif
 
-    static void initInfo();
+#ifdef RIH
+    void async_rih_processing(std::vector<Label *> initial_labels, int LABELS_MAX);
 
-    /**
-     * @brief Runs forward and backward labeling algorithms in parallel and synchronizes the results.
-     *
-     * This function creates tasks for forward and backward labeling algorithms using the provided
-     * scheduling mechanism. The tasks are executed in parallel, and the results are synchronized
-     * and stored in the provided vectors.
-     *
-     * @tparam state The stage of the algorithm.
-     * @tparam fullness The fullness state of the algorithm.
-     * @param forward_cbar A reference to a vector where the results of the forward labeling algorithm will be
-     * stored.
-     * @param backward_cbar A reference to a vector where the results of the backward labeling algorithm will be
-     * stored.
-     * @param q_star A constant reference to a vector used as input for the labeling algorithms.
-     */
+    int RIH1(std::priority_queue<Label *, std::vector<Label *>, LabelComparator> &best_labels_in,
+             std::priority_queue<Label *, std::vector<Label *>, LabelComparator> &best_labels_out, int max_n_labels);
+
+    int RIH2(std::priority_queue<Label *, std::vector<Label *>, LabelComparator> &best_labels_in,
+             std::priority_queue<Label *, std::vector<Label *>, LabelComparator> &best_labels_out, int max_n_labels);
+
+    int RIH3(std::priority_queue<Label *, std::vector<Label *>, LabelComparator> &best_labels_in,
+             std::priority_queue<Label *, std::vector<Label *>, LabelComparator> &best_labels_out, int max_n_labels);
+
+    int RIH4(std::priority_queue<Label *, std::vector<Label *>, LabelComparator> &best_labels_in,
+             std::priority_queue<Label *, std::vector<Label *>, LabelComparator> &best_labels_out, int max_n_labels);
+
+    int RIH5(std::priority_queue<Label *, std::vector<Label *>, LabelComparator> &best_labels_in,
+             std::priority_queue<Label *, std::vector<Label *>, LabelComparator> &best_labels_out, int max_n_labels);
+
+    inline std::vector<size_t> findBestInsertionPositions(const std::vector<int> &route, int &customer);
+
+    double calculateInsertionCost(const std::vector<int> &route, int &customer, size_t pos);
+    void   performSwap(std::vector<int> &new_route, const std::vector<int> &current_route, size_t pos_i, size_t pos_j,
+                       size_t best_pos_v, size_t best_pos_v_prime);
+#endif
+
+    static void          initInfo();
+    void                 setSplit(std::vector<double> q_star) { this->q_star = q_star; }
+    int                  getStage() const { return stage; }
+    Status               getStatus() const { return status; }
+    std::vector<Label *> solve();
+
     template <Stage state, Full fullness>
     void run_labeling_algorithms(std::vector<double> &forward_cbar, std::vector<double> &backward_cbar,
-                                 const std::vector<double> &q_star) {
-        // Create tasks for forward and backward labeling algorithms
-
-        auto forward_task = stdexec::schedule(bi_sched) | stdexec::then([&]() {
-                                return labeling_algorithm<Direction::Forward, state, fullness>(q_star);
-                            });
-
-        auto backward_task = stdexec::schedule(bi_sched) | stdexec::then([&]() {
-                                 return labeling_algorithm<Direction::Backward, state, fullness>(q_star);
-                             });
-
-        // Execute the tasks in parallel and synchronize
-        auto work = stdexec::when_all(std::move(forward_task), std::move(backward_task)) |
-                    stdexec::then([&](auto forward_result, auto backward_result) {
-                        forward_cbar  = std::move(forward_result);
-                        backward_cbar = std::move(backward_result);
-                    });
-
-        stdexec::sync_wait(std::move(work));
-    }
-
-    double min_red_cost = std::numeric_limits<double>::infinity();
-    bool   first_reset  = true;
+                                 const std::vector<double> &q_star);
 
     template <Stage S>
     void bucket_fixing(const std::vector<double> &q_star);
@@ -419,71 +266,10 @@ public:
     template <Stage S>
     void heuristic_fixing(const std::vector<double> &q_star);
 
-    /**
-     * @brief Checks if a job has been visited based on a bitmap.
-     *
-     * This function determines if a specific job, identified by job_id, has been visited
-     * by checking the corresponding bit in a bitmap array. The bitmap is an array of
-     * 64-bit unsigned integers, where each bit represents the visited status of a job.
-     *
-     * @param bitmap A constant reference to an array of 64-bit unsigned integers representing the bitmap.
-     * @param job_id An integer representing the ID of the job to check.
-     * @return true if the job has been visited (i.e., the corresponding bit is set to 1), false otherwise.
-     */
-    static inline bool is_job_visited(const std::array<uint64_t, num_words> &bitmap, int job_id) {
-        int word_index   = job_id / 64; // Determine which 64-bit segment contains the job_id
-        int bit_position = job_id % 64; // Determine the bit position within that segment
-        return (bitmap[word_index] & (1ULL << bit_position)) != 0;
-    }
-
-    /**
-     * @brief Marks a job as visited in the bitmap.
-     *
-     * This function sets the bit corresponding to the given job_id in the provided bitmap,
-     * indicating that the job has been visited.
-     *
-     * @param bitmap A reference to an array of 64-bit unsigned integers representing the bitmap.
-     * @param job_id The ID of the job to be marked as visited.
-     */
-    static inline void set_job_visited(std::array<uint64_t, num_words> &bitmap, int job_id) {
-        int word_index   = job_id / 64; // Determine which 64-bit segment contains the job_id
-        int bit_position = job_id % 64; // Determine the bit position within that segment
-        bitmap[word_index] |= (1ULL << bit_position);
-    }
-
-    /**
-     * @brief Checks if a job is unreachable based on a bitmap.
-     *
-     * This function determines if a job, identified by its job_id, is unreachable
-     * by checking a specific bit in a bitmap. The bitmap is represented as an
-     * array of 64-bit unsigned integers.
-     *
-     * @param bitmap A constant reference to an array of 64-bit unsigned integers
-     *               representing the bitmap.
-     * @param job_id An integer representing the job identifier.
-     * @return true if the job is unreachable (i.e., the corresponding bit in the
-     *         bitmap is set), false otherwise.
-     */
-    static inline bool is_job_unreachable(const std::array<uint64_t, num_words> &bitmap, int job_id) {
-        int word_index   = job_id / 64; // Determine which 64-bit segment contains the job_id
-        int bit_position = job_id % 64; // Determine the bit position within that segment
-        return (bitmap[word_index] & (1ULL << bit_position)) != 0;
-    }
-
-    /**
-     * @brief Marks a job as unreachable in the given bitmap.
-     *
-     * This function sets the bit corresponding to the specified job_id in the bitmap,
-     * indicating that the job is unreachable.
-     *
-     * @param bitmap A reference to an array of 64-bit unsigned integers representing the bitmap.
-     * @param job_id The ID of the job to be marked as unreachable.
-     */
-    static inline void set_job_unreachable(std::array<uint64_t, num_words> &bitmap, int job_id) {
-        int word_index   = job_id / 64; // Determine which 64-bit segment contains the job_id
-        int bit_position = job_id % 64; // Determine the bit position within that segment
-        bitmap[word_index] |= (1ULL << bit_position);
-    }
+    static bool is_job_visited(const std::array<uint64_t, num_words> &bitmap, int job_id);
+    static void set_job_visited(std::array<uint64_t, num_words> &bitmap, int job_id);
+    static bool is_job_unreachable(const std::array<uint64_t, num_words> &bitmap, int job_id);
+    static void set_job_unreachable(std::array<uint64_t, num_words> &bitmap, int job_id);
 
     void print_statistics();
 
@@ -500,7 +286,7 @@ public:
      * @return A reference to the buckets based on the specified direction.
      */
     template <Direction D>
-    constexpr auto &assign_buckets(auto &FW, auto &BW) noexcept {
+    inline constexpr auto &assign_buckets(auto &FW, auto &BW) noexcept {
         return (D == Direction::Forward) ? FW : BW;
     }
 
@@ -509,63 +295,12 @@ public:
 
     void setup();
 
-    /**
-     * @brief Redefines the bucket intervals and reinitializes various data structures.
-     *
-     * This function updates the bucket interval and reinitializes the intervals, buckets,
-     * fixed arcs, and fixed buckets. It also generates arcs and sorts them for each job.
-     *
-     * @param bucketInterval The new interval for the buckets.
-     */
-    void redefine(int bucketInterval) {
-        this->bucket_interval = bucketInterval;
-        intervals.clear();
-        for (int i = 0; i < R_SIZE; ++i) { intervals.push_back(Interval(bucketInterval, 0)); }
+    [[maybe_unused]] void redefine(int bucketInterval);
 
-        define_buckets<Direction::Forward>();
-        define_buckets<Direction::Backward>();
-
-        fixed_arcs.resize(getJobs().size());
-        for (int i = 0; i < getJobs().size(); ++i) { fixed_arcs[i].resize(getJobs().size()); }
-
-        // make every fixed_buckets also have size buckets.size()
-        fw_fixed_buckets.resize(fw_buckets.size());
-        bw_fixed_buckets.resize(fw_buckets.size());
-
-        for (auto &fb : fw_fixed_buckets) { fb.resize(fw_buckets.size()); }
-        for (auto &bb : bw_fixed_buckets) { bb.resize(bw_buckets.size()); }
-        // set fixed_buckets to 0
-        for (auto &fb : fw_fixed_buckets) {
-            for (std::size_t i = 0; i < fb.size(); ++i) { fb[i] = 0; }
-        }
-        for (auto &bb : bw_fixed_buckets) {
-            for (std::size_t i = 0; i < bb.size(); ++i) { bb[i] = 0; }
-        }
-
-        generate_arcs();
-        for (auto &VRPJob : jobs) { VRPJob.sort_arcs(); }
-    }
-
-    int RIH1(std::priority_queue<Label *, std::vector<Label *>, LabelComparator> &best_labels_in,
-             std::priority_queue<Label *, std::vector<Label *>, LabelComparator> &best_labels_out, int max_n_labels);
-
-    int RIH2(std::priority_queue<Label *, std::vector<Label *>, LabelComparator> &best_labels_in,
-             std::priority_queue<Label *, std::vector<Label *>, LabelComparator> &best_labels_out, int max_n_labels);
-
-    int RIH3(std::priority_queue<Label *, std::vector<Label *>, LabelComparator> &best_labels_in,
-             std::priority_queue<Label *, std::vector<Label *>, LabelComparator> &best_labels_out, int max_n_labels);
-
-    int RIH4(std::priority_queue<Label *, std::vector<Label *>, LabelComparator> &best_labels_in,
-             std::priority_queue<Label *, std::vector<Label *>, LabelComparator> &best_labels_out, int max_n_labels);
-
-    // define default
     BucketGraph() = default;
-
     BucketGraph(const std::vector<VRPJob> &jobs, int time_horizon, int bucket_interval, int capacity,
                 int capacity_interval);
-
     BucketGraph(const std::vector<VRPJob> &jobs, int time_horizon, int bucket_interval);
-
     BucketGraph(const std::vector<VRPJob> &jobs, std::vector<int> &bounds, std::vector<int> &bucket_intervals);
 
     template <Direction D>
@@ -577,8 +312,6 @@ public:
     template <Direction D>
     void SCC_handler();
 
-    void generate_arcs();
-
     template <Direction D, Stage S, Full F>
     std::vector<double> labeling_algorithm(std::vector<double> q_point, bool full = false) noexcept;
 
@@ -589,15 +322,19 @@ public:
     Label *get_best_label(const std::vector<int> &topological_order, const std::vector<double> &c_bar,
                           std::vector<std::vector<int>> &sccs);
 
-    void set_adjacency_list();
-
     template <Direction D>
     void define_buckets();
 
     template <Direction D, Stage S>
-    bool DominatedInCompWiseSmallerBuckets(const Label *L, int bucket, const std::vector<double> &c_bar,
-                                           std::vector<uint64_t>               &Bvisited,
-                                           const std::vector<std::vector<int>> &bucket_order) noexcept;
+    inline bool DominatedInCompWiseSmallerBuckets(const Label *L, int bucket, const std::vector<double> &c_bar,
+                                                  std::vector<uint64_t>               &Bvisited,
+                                                  const std::vector<std::vector<int>> &bucket_order) noexcept;
+
+    template <Stage S>
+    std::vector<Label *> bi_labeling_algorithm(std::vector<double> q_start);
+
+    template <Stage S>
+    void ConcatenateLabel(const Label *L, int &b, Label *&pbest, std::vector<uint64_t> &Bvisited);
 
     template <Direction D, Stage S, ArcType A, Mutability M, Full F>
     inline Label *
@@ -607,69 +344,12 @@ public:
     template <Direction D, Stage S>
     bool is_dominated(const Label *new_label, const Label *labels) noexcept;
 
-    /**
-     * @brief Resets the forward and backward label pools.
-     *
-     * This function resets both the forward (label_pool_fw) and backward
-     * (label_pool_bw) label pools to their initial states. It is typically
-     * used to clear any existing labels and prepare the pools for reuse.
-     */
-    void reset_pool() {
-        label_pool_fw.reset();
-        label_pool_bw.reset();
-    }
-
-    void forbidCycle(const std::vector<int> &cycle, bool aggressive);
-    void augment_ng_memories(std::vector<double> &solution, std::vector<Path> &paths, bool aggressive, int eta1,
-                             int eta2, int eta_max, int nC);
-
-    template <Stage S>
-    std::vector<Label *> bi_labeling_algorithm(std::vector<double> q_start);
-
-    template <Stage S>
-    void ConcatenateLabel(const Label *L, int &b, Label *&pbest, std::vector<uint64_t> &Bvisited);
-
-    inline double       getcij(int i, int j) const { return distance_matrix[i][j]; }
-    void                calculate_neighborhoods(size_t num_closest);
-    std::vector<VRPJob> getJobs() const { return jobs; }
-    std::vector<int>    computePhi(int &bucket, bool fw);
-
-    /**
-     * @brief Sets the dual values for the jobs.
-     *
-     * This function assigns the provided dual values to the jobs. It iterates
-     * through the given vector of duals and sets each job's dual value to the
-     * corresponding value from the vector.
-     *
-     * @param duals A vector of double values representing the duals to be set.
-     */
-    void setDuals(const std::vector<double> &duals) {
-        for (size_t i = 1; i < N_SIZE - 1; ++i) { jobs[i].setDuals(duals[i - 1]); }
-    }
-
-    /**
-     * @brief Sets the distance matrix and calculates neighborhoods.
-     *
-     * This function assigns the provided distance matrix to the internal
-     * distance matrix of the class and then calculates the neighborhoods
-     * based on the given number of nearest neighbors.
-     *
-     * @param distanceMatrix A 2D vector representing the distance matrix.
-     * @param n_ng The number of nearest neighbors to consider when calculating
-     *             neighborhoods. Default value is 8.
-     */
-    void set_distance_matrix(const std::vector<std::vector<double>> &distanceMatrix, int n_ng = 8) {
-        this->distance_matrix = distanceMatrix;
-        calculate_neighborhoods(n_ng);
-    }
-
     template <Direction D>
     void UpdateBucketsSet(double theta, const Label *label, std::unordered_set<int> &Bbidi, int &current_bucket,
                           std::unordered_set<int> &Bvisited);
 
     template <Direction D>
     void ObtainJumpBucketArcs();
-    bool BucketSetContains(const std::set<int> &bucket_set, const int &bucket);
 
     template <Direction D>
     void BucketArcElimination(double theta);
@@ -677,68 +357,24 @@ public:
     template <Direction D>
     int get_opposite_bucket_number(int current_bucket_index);
 
-    /**
-     * @brief Resets all fixed arcs in the graph.
-     *
-     * This function iterates over each row in the fixed_arcs matrix and sets all elements to 0.
-     * It effectively clears any fixed arc constraints that may have been previously set.
-     */
-    void reset_fixed() {
-        for (auto &row : fixed_arcs) { std::fill(row.begin(), row.end(), 0); }
-    }
-
-    /**
-     * @brief Checks the feasibility of a given forward and backward label.
-     *
-     * This function determines if the transition from a forward label to a backward label
-     * is feasible based on resource constraints and job durations.
-     *
-     * @param fw_label Pointer to the forward label.
-     * @param bw_label Pointer to the backward label.
-     * @return true if the transition is feasible, false otherwise.
-     *
-     * The function performs the following checks:
-     * - If either of the labels is null, it returns false.
-     * - It retrieves the job associated with the forward label and checks if the sum of the
-     *   forward label's resources, the cost between the jobs, and the job's duration exceeds
-     *   the backward label's resources.
-     * - If the resource size is greater than 1, it iterates through the resources and checks
-     *   if the forward label's resources plus the job's demand exceed the backward label's resources.
-     */
-    inline bool check_feasibility(const Label *fw_label, const Label *bw_label) {
-        if (!fw_label || !bw_label) return false;
-
-        // Cache resources and job data
-        const auto          &fw_resources = fw_label->resources;
-        const auto          &bw_resources = bw_label->resources;
-        const struct VRPJob &VRPJob       = jobs[fw_label->job_id];
-
-        // Time feasibility check
-        const auto time_fw     = fw_resources[TIME_INDEX];
-        const auto time_bw     = bw_resources[TIME_INDEX];
-        const auto travel_time = getcij(fw_label->job_id, bw_label->job_id);
-        if (time_fw + travel_time + VRPJob.duration > time_bw) { return false; }
-
-        // Resource feasibility check (if applicable)
-        if constexpr (R_SIZE > 1) {
-            for (size_t i = 1; i < R_SIZE; ++i) {
-                const auto resource_fw = fw_resources[i];
-                const auto resource_bw = bw_resources[i];
-                const auto demand      = VRPJob.demand;
-
-                if (resource_fw + demand > resource_bw) { return false; }
-            }
-        }
-
-        return true;
-    }
-
-    void async_rih_processing(std::vector<Label *> initial_labels, int LABELS_MAX);
-
+    void reset_pool();
+    void set_adjacency_list();
+    void generate_arcs();
+    void forbidCycle(const std::vector<int> &cycle, bool aggressive);
+    void augment_ng_memories(std::vector<double> &solution, std::vector<Path> &paths, bool aggressive, int eta1,
+                             int eta2, int eta_max, int nC);
+    inline double        getcij(int i, int j) const { return distance_matrix[i][j]; }
+    void                 calculate_neighborhoods(size_t num_closest);
+    std::vector<VRPJob>  getJobs() const { return jobs; }
+    std::vector<int>     computePhi(int &bucket, bool fw);
+    void                 setDuals(const std::vector<double> &duals);
+    void                 set_distance_matrix(const std::vector<std::vector<double>> &distanceMatrix, int n_ng = 8);
+    bool                 BucketSetContains(const std::set<int> &bucket_set, const int &bucket);
+    void                 reset_fixed();
+    bool                 check_feasibility(const Label *fw_label, const Label *bw_label);
     std::vector<Label *> get_rih_labels() const { return merged_labels_rih; }
-
-    double knapsackBound(const Label *l);
-    Label *compute_label(const Label *L, const Label *L_prime);
+    double               knapsackBound(const Label *l);
+    Label               *compute_label(const Label *L, const Label *L_prime);
 
 private:
     std::vector<Interval> intervals;
