@@ -267,6 +267,8 @@ public:
 
     std::thread rih_thread;
     std::mutex  mtx; // For thread-safe access to merged_labels_improved
+    //
+    int redefine_counter = 0;
 
     std::vector<std::vector<int>> fw_ordered_sccs;
     std::vector<std::vector<int>> bw_ordered_sccs;
@@ -337,6 +339,13 @@ public:
 
     double min_red_cost = std::numeric_limits<double>::infinity();
     bool   first_reset  = true;
+
+    std::vector<int> dominance_checks_per_bucket;
+    int              non_dominated_labels_per_bucket;
+
+    // Interval tree to store bucket intervals
+    std::unordered_map<int, SplayTree> fw_job_interval_trees;
+    std::unordered_map<int, SplayTree> bw_job_interval_trees;
 
 #ifdef SCHRODINGER
     /**
@@ -495,30 +504,30 @@ public:
      *
      * @param bucketInterval The new interval for the buckets.
      */
-    [[maybe_unused]] void redefine(int bucketInterval) {
+    void redefine(int bucketInterval) {
         this->bucket_interval = bucketInterval;
         intervals.clear();
         for (int i = 0; i < R_SIZE; ++i) { intervals.push_back(Interval(bucketInterval, 0)); }
 
-        define_buckets<Direction::Forward>();
-        define_buckets<Direction::Backward>();
+        reset_fixed();
+        reset_fixed_buckets();
 
-        fixed_arcs.resize(getJobs().size());
-        for (int i = 0; i < getJobs().size(); ++i) { fixed_arcs[i].resize(getJobs().size()); }
-
-        // make every fixed_buckets also have size buckets.size()
-        fw_fixed_buckets.resize(fw_buckets.size());
-        bw_fixed_buckets.resize(fw_buckets.size());
-
-        for (auto &fb : fw_fixed_buckets) { fb.resize(fw_buckets.size()); }
-        for (auto &bb : bw_fixed_buckets) { bb.resize(bw_buckets.size()); }
-        // set fixed_buckets to 0
-        for (auto &fb : fw_fixed_buckets) {
-            for (std::size_t i = 0; i < fb.size(); ++i) { fb[i] = 0; }
-        }
-        for (auto &bb : bw_fixed_buckets) {
-            for (std::size_t i = 0; i < bb.size(); ++i) { bb[i] = 0; }
-        }
+        PARALLEL_SECTIONS(
+            bi_sched,
+            SECTION {
+                // Section 1: Forward direction
+                define_buckets<Direction::Forward>();
+                fw_fixed_buckets.clear();
+                fw_fixed_buckets.resize(fw_buckets_size);
+                for (auto &fb : fw_fixed_buckets) { fb.assign(fw_buckets_size, 0); }
+            },
+            SECTION {
+                // Section 2: Backward direction
+                define_buckets<Direction::Backward>();
+                bw_fixed_buckets.clear();
+                bw_fixed_buckets.resize(bw_buckets_size);
+                for (auto &bb : bw_fixed_buckets) { bb.assign(bw_buckets_size, 0); }
+            });
 
         generate_arcs();
         for (auto &VRPJob : jobs) { VRPJob.sort_arcs(); }
@@ -573,6 +582,11 @@ public:
      */
     void reset_fixed() {
         for (auto &row : fixed_arcs) { std::fill(row.begin(), row.end(), 0); }
+    }
+
+    void reset_fixed_buckets() {
+        for (auto &fb : fw_fixed_buckets) { std::fill(fb.begin(), fb.end(), 0); }
+        for (auto &bb : bw_fixed_buckets) { std::fill(bb.begin(), bb.end(), 0); }
     }
 
     /**

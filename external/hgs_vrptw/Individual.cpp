@@ -303,8 +303,8 @@ Individual::Individual(Params *params, bool rcws, std::vector<std::vector<int>> 
                             }
                             chromR[nextEmptyRoute].push_back(tournamentSavings[i].c1);
                             chromR[nextEmptyRoute].push_back(tournamentSavings[i].c2);
-                            load[nextEmptyRoute] +=
-                                params->cli[tournamentSavings[i].c1].demand + params->cli[tournamentSavings[i].c2].demand;
+                            load[nextEmptyRoute] += params->cli[tournamentSavings[i].c1].demand +
+                                                    params->cli[tournamentSavings[i].c2].demand;
                             inRoute[tournamentSavings[i].c1] = true;
                             inRoute[tournamentSavings[i].c2] = true;
                             while (nextEmptyRoute < nbVehicles && !chromR[nextEmptyRoute].empty()) nextEmptyRoute++;

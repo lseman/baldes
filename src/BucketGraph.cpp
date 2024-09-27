@@ -357,7 +357,7 @@ void BucketGraph::calculate_neighborhoods(size_t num_closest) {
     size_t num_jobs = jobs.size();
 
     // Initialize the neighborhood bitmaps as vectors of uint64_t for forward and backward neighborhoods
-    neighborhoods_bitmap.resize(num_jobs);                           // Forward neighborhood
+    neighborhoods_bitmap.resize(num_jobs); // Forward neighborhood
 
     for (size_t i = 0; i < num_jobs; ++i) {
         std::vector<std::pair<double, size_t>> forward_distances; // Distances for forward neighbors
@@ -627,9 +627,15 @@ void BucketGraph::common_initialization() {
     fw_c_bar.clear();
     bw_c_bar.clear();
 
+    // print fw_buckets size
+    // fmt::print("fw_buckets size: {}\n", fw_buckets.size());
+    // fmt::print("fw_buckets size: {}\n", bw_buckets_size);
+    dominance_checks_per_bucket.assign(fw_buckets_size + 1, 0);
+    non_dominated_labels_per_bucket = 0;
+
     // Resize cost vectors to match the number of buckets
-    fw_c_bar.resize(fw_buckets.size(), std::numeric_limits<double>::infinity());
-    bw_c_bar.resize(bw_buckets.size(), std::numeric_limits<double>::infinity());
+    fw_c_bar.resize(fw_buckets_size, std::numeric_limits<double>::infinity());
+    bw_c_bar.resize(bw_buckets_size, std::numeric_limits<double>::infinity());
 
     auto &num_buckets      = assign_buckets<Direction::Forward>(num_buckets_fw, num_buckets_bw);
     auto &num_bucket_index = assign_buckets<Direction::Forward>(num_buckets_index_fw, num_buckets_index_bw);
@@ -647,7 +653,7 @@ void BucketGraph::common_initialization() {
     }
 
     // Clear forward and backward buckets
-    for (auto b = 0; b < fw_buckets_size; b++) {
+    for (auto b = 0; b < fw_buckets.size(); b++) {
         fw_buckets[b].clear();
         bw_buckets[b].clear();
     }
@@ -1129,4 +1135,3 @@ Label *BucketGraph::compute_mono_label(const Label *L) {
 
     return new_label;
 }
-

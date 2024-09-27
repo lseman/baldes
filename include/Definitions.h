@@ -1096,3 +1096,353 @@ inline ModelData extractModelData(GRBModel &model) {
 
     return data;
 }
+
+class IntervalTreeNode {
+public:
+    int               low, high;    // Interval [low, high]
+    int               bucket_index; // Associated bucket index
+    int               job_id;       // Job ID associated with this interval
+    int               max;          // Max endpoint in the subtree
+    IntervalTreeNode *left;
+    IntervalTreeNode *right;
+
+    // Constructor
+    IntervalTreeNode(int l, int h, int idx, int job)
+        : low(l), high(h), bucket_index(idx), job_id(job), max(h), left(nullptr), right(nullptr) {}
+};
+
+class IntervalTree {
+public:
+    IntervalTreeNode *root;
+
+    IntervalTree() : root(nullptr) {}
+
+    // Insert interval [low, high] with bucket_index and job_id
+    IntervalTreeNode *insert(IntervalTreeNode *node, int low, int high, int bucket_index, int job_id) {
+        if (!node) { return new IntervalTreeNode(low, high, bucket_index, job_id); }
+
+        // Inserting based on the low value
+        if (low < node->low) {
+            node->left = insert(node->left, low, high, bucket_index, job_id);
+        } else if (low > node->low) {
+            node->right = insert(node->right, low, high, bucket_index, job_id);
+        } else {
+            // Handle the case where two intervals have the same 'low' value.
+            // We might choose to insert this to the right if 'high' values differ.
+            if (high > node->high) {
+                node->right = insert(node->right, low, high, bucket_index, job_id);
+            } else {
+                node->left = insert(node->left, low, high, bucket_index, job_id);
+            }
+        }
+
+        // Update the max value of this node
+        node->max = std::max(node->max, high);
+
+        return node;
+    }
+
+    // Query to find the bucket index for a given resource value
+    int query(IntervalTreeNode *node, int value) {
+        if (!node) {
+            std::cout << "Query failed: no matching node for value " << value << std::endl;
+            // print the tree
+            for (int i = 0; i < 10; ++i) {
+                std::cout << "Node " << i << ": ";
+                if (node) {
+                    std::cout << "[" << node->low << ", " << node->high << "] with max " << node->max << std::endl;
+                } else {
+                    std::cout << "NULL" << std::endl;
+                }
+            }
+            return -1;
+        }
+
+        // Check if the value lies within or is exactly on the boundary of this interval
+        if (value >= node->low && value <= node->high) { return node->bucket_index; }
+
+        // Move to left subtree if the value is less than or equal to the max of the left subtree
+        if (node->left && value <= node->left->max) { return query(node->left, value); }
+
+        // Otherwise, move to the right subtree
+        return query(node->right, value);
+    }
+
+    // Helper to insert interval into the tree
+    void insert(int low, int high, int bucket_index, int job_id) {
+        root = insert(root, low, high, bucket_index, job_id);
+    }
+
+    // Helper to query the tree
+    int query(int value) { return query(root, value); }
+};
+
+/**
+ * @class SplayTree
+ * @brief A class representing a Splay Tree, which is a self-adjusting binary search tree.
+ *
+ * The Splay Tree supports efficient insertion, deletion, and search operations by performing
+ * splay operations that move accessed nodes closer to the root, thereby improving access times
+ * for frequently accessed nodes.
+ *
+ * The tree nodes store intervals [low, high] and a bucket index associated with each interval.
+ *
+ * @note This implementation assumes that the TreeNode class is defined elsewhere with the
+ *       necessary members: low, high, bucket_index, left, right, and parent.
+
+ */
+class TreeNode {
+public:
+    std::vector<int> low;          // Lower bounds for each dimension
+    std::vector<int> high;         // Upper bounds for each dimension
+    int              bucket_index; // Bucket index for this node
+    TreeNode        *left;
+    TreeNode        *right;
+    TreeNode        *parent;
+
+    TreeNode(const std::vector<int> &low, const std::vector<int> &high, int bucket_index)
+        : low(low), high(high), bucket_index(bucket_index), left(nullptr), right(nullptr), parent(nullptr) {}
+
+    bool contains(const std::vector<int> &point) const {
+        for (size_t i = 0; i < low.size(); ++i) {
+            if (point[i] < low[i] || point[i] > high[i]) { return false; }
+        }
+        return true;
+    }
+
+    bool is_less_than(const std::vector<int> &point) const {
+        for (size_t i = 0; i < low.size(); ++i) {
+            if (high[i] < point[i]) {
+                return true;
+            } else if (low[i] > point[i]) {
+                return false;
+            }
+        }
+        return false; // This case shouldn't be reached if comparing proper intervals
+    }
+};
+
+class SplayTree {
+    TreeNode *root;
+
+    void zig(TreeNode *x) {
+        TreeNode *p = x->parent;
+        TreeNode *B = (p->left == x) ? x->right : x->left;
+
+        x->parent = p->parent;
+        p->parent = x;
+
+        if (p->left == x) {
+            x->right = p;
+            p->left  = B;
+        } else {
+            x->left  = p;
+            p->right = B;
+        }
+
+        if (B != nullptr) B->parent = p;
+    }
+
+    void zig_zig(TreeNode *x) {
+        TreeNode *p = x->parent;
+        TreeNode *g = p->parent;
+        if (p->left == x) {
+            TreeNode *B = x->right;
+            TreeNode *C = p->right;
+
+            x->parent = g->parent;
+            x->right  = p;
+
+            p->parent = x;
+            p->left   = B;
+            p->right  = g;
+
+            g->parent = p;
+            g->left   = C;
+
+            if (x->parent != nullptr) {
+                if (x->parent->left == g)
+                    x->parent->left = x;
+                else
+                    x->parent->right = x;
+            }
+
+            if (B != nullptr) B->parent = p;
+            if (C != nullptr) C->parent = g;
+        } else {
+            TreeNode *B = p->left;
+            TreeNode *C = x->left;
+
+            x->parent = g->parent;
+            x->left   = p;
+
+            p->parent = x;
+            p->left   = g;
+            p->right  = C;
+
+            g->parent = p;
+            g->right  = B;
+
+            if (x->parent != nullptr) {
+                if (x->parent->left == g)
+                    x->parent->left = x;
+                else
+                    x->parent->right = x;
+            }
+
+            if (B != nullptr) B->parent = g;
+            if (C != nullptr) C->parent = p;
+        }
+    }
+
+    void zig_zag(TreeNode *x) {
+        TreeNode *p = x->parent;
+        TreeNode *g = p->parent;
+
+        if (p->right == x) {
+            TreeNode *B = x->left;
+            TreeNode *C = x->right;
+
+            x->parent = g->parent;
+            x->left   = p;
+            x->right  = g;
+
+            p->parent = x;
+            p->right  = B;
+
+            g->parent = x;
+            g->left   = C;
+
+            if (x->parent != nullptr) {
+                if (x->parent->left == g)
+                    x->parent->left = x;
+                else
+                    x->parent->right = x;
+            }
+
+            if (B != nullptr) B->parent = p;
+            if (C != nullptr) C->parent = g;
+        } else {
+            TreeNode *B = x->left;
+            TreeNode *C = x->right;
+
+            x->parent = g->parent;
+            x->left   = g;
+            x->right  = p;
+
+            p->parent = x;
+            p->left   = C;
+
+            g->parent = x;
+            g->right  = B;
+
+            if (x->parent != nullptr) {
+                if (x->parent->left == g)
+                    x->parent->left = x;
+                else
+                    x->parent->right = x;
+            }
+
+            if (B != nullptr) B->parent = g;
+            if (C != nullptr) C->parent = p;
+        }
+    }
+
+    void splay(TreeNode *x) {
+        while (x->parent != nullptr) {
+            TreeNode *p = x->parent;
+            TreeNode *g = p->parent;
+
+            if (g == nullptr) {
+                zig(x);
+            } else if (g->left == p && p->left == x) {
+                zig_zig(x);
+            } else if (g->right == p && p->right == x) {
+                zig_zig(x);
+            } else {
+                zig_zag(x);
+            }
+        }
+        root = x;
+    }
+
+public:
+    SplayTree() : root(nullptr) {}
+
+    TreeNode *find(const std::vector<int> &point) {
+        TreeNode *curr = root;
+        TreeNode *prev = nullptr;
+
+        while (curr != nullptr) {
+            prev = curr;
+            if (curr->contains(point)) {
+                splay(curr);
+                return curr;
+            } else if (curr->is_less_than(point)) {
+                curr = curr->right;
+            } else {
+                curr = curr->left;
+            }
+        }
+
+        if (prev != nullptr) splay(prev);
+        return nullptr;
+    }
+
+    int query(const std::vector<int> &point) {
+        TreeNode *node = find(point);
+        if (node != nullptr) return node->bucket_index;
+        return -1;
+    }
+
+    // Insert a new multidimensional interval
+    void insert(const std::vector<int> &low, const std::vector<int> &high, int bucket_index) {
+
+        if (root == nullptr) {
+            root = new TreeNode(low, high, bucket_index);
+            return;
+        }
+
+        TreeNode *curr = root;
+        while (curr != nullptr) {
+            if (low < curr->low) {
+                if (curr->left == nullptr) {
+                    TreeNode *newNode = new TreeNode(low, high, bucket_index);
+                    curr->left        = newNode;
+                    newNode->parent   = curr;
+                    splay(newNode);
+                    return;
+                } else {
+                    curr = curr->left;
+                }
+            } else if (low > curr->low) {
+                if (curr->right == nullptr) {
+                    TreeNode *newNode = new TreeNode(low, high, bucket_index);
+                    curr->right       = newNode;
+                    newNode->parent   = curr;
+                    splay(newNode);
+                    return;
+                } else {
+                    curr = curr->right;
+                }
+            } else {
+                splay(curr);
+                return; // Duplicate interval
+            }
+        }
+    }
+
+    void inOrderPrint(TreeNode *node) {
+        if (node == nullptr) return;
+        inOrderPrint(node->left);
+        std::cout << "Bucket " << node->bucket_index << ": [";
+        for (size_t i = 0; i < node->low.size(); ++i) {
+            std::cout << "[" << node->low[i] << ", " << node->high[i] << "]";
+            if (i != node->low.size() - 1) std::cout << ", ";
+        }
+        std::cout << "]\n";
+        inOrderPrint(node->right);
+    }
+
+    void print() { inOrderPrint(root); }
+};

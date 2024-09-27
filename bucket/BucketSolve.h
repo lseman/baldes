@@ -219,6 +219,12 @@ std::vector<double> BucketGraph::labeling_algorithm() noexcept {
                             const auto &to_bucket_labels =
                                 buckets[to_bucket].get_labels(); // Get existing labels in the destination bucket
 
+                            if constexpr (S == Stage::Four) {
+                                // Track dominance checks for this bucket
+                                if constexpr (D == Direction::Forward) {
+                                    dominance_checks_per_bucket[to_bucket] += to_bucket_labels.size();
+                                }
+                            }
                             // Stage-specific dominance check
                             if constexpr (S == Stage::One) {
                                 // If the new label has lower cost, remove dominated labels
@@ -414,7 +420,10 @@ std::vector<Label *> BucketGraph::bi_labeling_algorithm() {
     for (auto bucket = 0; bucket < fw_buckets_size; ++bucket) {
         auto       &current_bucket = fw_buckets[bucket];          // Get the current bucket
         const auto &labels         = current_bucket.get_labels(); // Get labels in the current bucket
-
+        //
+        if constexpr (S == Stage::Four) {
+            non_dominated_labels_per_bucket += labels.size(); // Track non-dominated labels
+        }
         // Process each label in the bucket
         for (const Label *L : labels) {
             // if (L->resources[TIME_INDEX] > q_star[TIME_INDEX]) { continue; } // Skip if label exceeds q_star
@@ -483,7 +492,30 @@ std::vector<Label *> BucketGraph::bi_labeling_algorithm() {
         sPool.iterate();
     }
 #endif
+    if constexpr (S == Stage::Four) {
+        // compute the mean of dominance_checks_per_bucket
+        double mean_dominance_checks = 0.0;
+        for (size_t i = 0; i < dominance_checks_per_bucket.size(); ++i) {
+            mean_dominance_checks += dominance_checks_per_bucket[i];
+        }
+        auto step_calc = mean_dominance_checks / non_dominated_labels_per_bucket;
+        if (step_calc > 500) {
 
+            fmt::print("Increment redefinition counter\n");
+            if (redefine_counter % 5 == 0) {
+                redefine_counter = 0;
+                print_info("Step size is high, should increment step size - {}\n", step_calc);
+                fmt::print("Current step size bucket_interval: {}\n", bucket_interval);
+                redefine(bucket_interval + 20);
+                fmt::print("New step size bucket_interval: {}\n", bucket_interval);
+                reset_fixed_buckets();
+                fixed = false;
+            }
+            redefine_counter++;
+        }
+
+        // redefine_counter++;
+    }
     // Return the final list of merged labels after processing
     return merged_labels;
 }
@@ -786,8 +818,8 @@ inline bool BucketGraph::is_dominated(const Label *new_label, const Label *label
 #ifndef UNREACHABLE_DOMINANCE
     // Check visited jobs (bitmap comparison) for Stages 3, 4, and Enumerate
     if constexpr (S == Stage::Three || S == Stage::Four || S == Stage::Enumerate) {
-        // Iterate through the visited bitmap and ensure that the new label visits all jobs that the comparison label
-        // visits
+        // Iterate through the visited bitmap and ensure that the new label visits all jobs that the comparison
+        // label visits
         for (size_t i = 0; i < label->visited_bitmap.size(); ++i) {
             // If the comparison label visits a job that the new label does not, it is not dominated
             if ((label->visited_bitmap[i] & ~new_label->visited_bitmap[i]) != 0) { return false; }
