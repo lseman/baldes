@@ -67,8 +67,6 @@ public:
     tbb::concurrent_unordered_map<std::pair<int, int>, std::vector<GRBLinExpr>, pair_hash, pair_equal> arcCache;
 
 #endif
-    RCCmanager rccManager;
-
     void addVars(GRBModel *node, auto lb, auto ub, auto obj, auto vtype, auto name, auto col, auto row) {
         node->addVars(lb, ub, obj, vtype, name, col, row);
     }
@@ -755,8 +753,6 @@ public:
         print_info("Starting column generation..\n\n");
         bool transition = false;
 
-        bucket_graph.rcc_manager = &rccManager;
-
 #if defined(RCC) || defined(EXACT_RCC)
         std::vector<std::vector<std::vector<GRBConstr>>> cvrsep_ctrs(
             instance.nC + 3, std::vector<std::vector<GRBConstr>>(instance.nC + 3, std::vector<GRBConstr>()));
@@ -816,8 +812,7 @@ public:
             if (ss) {
 #ifdef RCC
                 print_cut("Testing RCC feasibility..\n");
-                rcc                      = RCCsep(node, solution, cvrsep_ctrs);
-                bucket_graph.rcc_manager = &rccManager;
+                rcc = RCCsep(node, solution, cvrsep_ctrs);
 
 #endif
 #ifdef EXACT_RCC
@@ -829,15 +824,15 @@ public:
                 if (!rcc) {
 
                     auto cuts_before = cuts.size();
-                    // removeNegativeReducedCostVarsAndPaths(node);
-                    // matrix = extractModelDataSparse(node);
+                    removeNegativeReducedCostVarsAndPaths(node);
+                    matrix = extractModelDataSparse(node);
                     node->optimize();
                     solution     = extractSolution(node);
                     r1c.allPaths = allPaths;
                     r1c.separate(matrix.A_sparse, solution);
 #ifdef SRC
-                    // r1c.the45Heuristic<CutType::FourRow>(matrix.A_sparse, solution);
-                    // r1c.the45Heuristic<CutType::FiveRow>(matrix.A_sparse, solution);
+                    r1c.the45Heuristic<CutType::FourRow>(matrix.A_sparse, solution);
+                    r1c.the45Heuristic<CutType::FiveRow>(matrix.A_sparse, solution);
 #endif
                     cuts = r1c.cutStorage;
                     if (cuts_before == cuts.size()) {
@@ -983,7 +978,6 @@ public:
                 stab.update_stabilization_after_pricing_optim(matrix, jobDuals, lag_gap, paths);
 
                 if (colAdded == 0) {
-                    fmt::print("No columns added, updating mispricing\n");
                     stab.update_stabilization_after_misprice();
                     if (stab.shouldExit()) { misprice = false; }
                 } else {

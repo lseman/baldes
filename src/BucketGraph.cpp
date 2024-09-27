@@ -145,9 +145,7 @@ Label *BucketGraph::compute_label(const Label *L, const Label *L_prime) {
     double new_cost = L->cost + L_prime->cost + cij_cost;
 
     double real_cost = L->real_cost + L_prime->real_cost + cij_cost;
-#ifdef RCC
-    new_cost -= rcc_manager->getCachedDualSumForArc(L->job_id, L_prime->job_id);
-#endif
+
     // Directly acquire new_label and set the cost
     auto new_label       = label_pool_fw.acquire();
     new_label->cost      = new_cost;
@@ -360,7 +358,6 @@ void BucketGraph::calculate_neighborhoods(size_t num_closest) {
 
     // Initialize the neighborhood bitmaps as vectors of uint64_t for forward and backward neighborhoods
     neighborhoods_bitmap.resize(num_jobs);                           // Forward neighborhood
-    job_to_bit_map.resize(num_jobs, std::vector<int>(num_jobs, -1)); // Map job IDs to bit positions
 
     for (size_t i = 0; i < num_jobs; ++i) {
         std::vector<std::pair<double, size_t>> forward_distances; // Distances for forward neighbors
@@ -1039,7 +1036,7 @@ void BucketGraph::setup() {
 #ifdef SCHRODINGER
     sPool.distance_matrix = distance_matrix;
     sPool.setJobs(&jobs);
-    //sPool.setCutStorage(cut_storage);
+    // sPool.setCutStorage(cut_storage);
 #endif
 
     // Initialize the split
@@ -1133,202 +1130,3 @@ Label *BucketGraph::compute_mono_label(const Label *L) {
     return new_label;
 }
 
-/**
-     * @brief Checks if a job has been visited based on a bitmap.
-     *
-     * This function determines if a specific job, identified by job_id, has been visited
-     * by checking the corresponding bit in a bitmap array. The bitmap is an array of
-     * 64-bit unsigned integers, where each bit represents the visited status of a job.
-     *
-     * @param bitmap A constant reference to an array of 64-bit unsigned integers representing the bitmap.
-     * @param job_id An integer representing the ID of the job to check.
-     * @return true if the job has been visited (i.e., the corresponding bit is set to 1), false otherwise.
- */
-bool BucketGraph::is_job_visited(const std::array<uint64_t, num_words> &bitmap, int job_id) {
-    int word_index   = job_id / 64; // Determine which 64-bit segment contains the job_id
-    int bit_position = job_id % 64; // Determine the bit position within that segment
-    return (bitmap[word_index] & (1ULL << bit_position)) != 0;
-}
-
-/**
-     * @brief Marks a job as visited in the bitmap.
-     *
-     * This function sets the bit corresponding to the given job_id in the provided bitmap,
-     * indicating that the job has been visited.
-     *
-     * @param bitmap A reference to an array of 64-bit unsigned integers representing the bitmap.
-     * @param job_id The ID of the job to be marked as visited.
- */
-void BucketGraph::set_job_visited(std::array<uint64_t, num_words> &bitmap, int job_id) {
-    int word_index   = job_id / 64; // Determine which 64-bit segment contains the job_id
-    int bit_position = job_id % 64; // Determine the bit position within that segment
-    bitmap[word_index] |= (1ULL << bit_position);
-}
-
-/**
-     * @brief Redefines the bucket intervals and reinitializes various data structures.
-     *
-     * This function updates the bucket interval and reinitializes the intervals, buckets,
-     * fixed arcs, and fixed buckets. It also generates arcs and sorts them for each job.
-     *
-     * @param bucketInterval The new interval for the buckets.
- */
-void BucketGraph::redefine(int bucketInterval) {
-    this->bucket_interval = bucketInterval;
-    intervals.clear();
-    for (int i = 0; i < R_SIZE; ++i) { intervals.push_back(Interval(bucketInterval, 0)); }
-
-    define_buckets<Direction::Forward>();
-    define_buckets<Direction::Backward>();
-
-    fixed_arcs.resize(getJobs().size());
-    for (int i = 0; i < getJobs().size(); ++i) { fixed_arcs[i].resize(getJobs().size()); }
-
-    // make every fixed_buckets also have size buckets.size()
-    fw_fixed_buckets.resize(fw_buckets.size());
-    bw_fixed_buckets.resize(fw_buckets.size());
-
-    for (auto &fb : fw_fixed_buckets) { fb.resize(fw_buckets.size()); }
-    for (auto &bb : bw_fixed_buckets) { bb.resize(bw_buckets.size()); }
-    // set fixed_buckets to 0
-    for (auto &fb : fw_fixed_buckets) {
-        for (std::size_t i = 0; i < fb.size(); ++i) { fb[i] = 0; }
-    }
-    for (auto &bb : bw_fixed_buckets) {
-        for (std::size_t i = 0; i < bb.size(); ++i) { bb[i] = 0; }
-    }
-
-    generate_arcs();
-    for (auto &VRPJob : jobs) { VRPJob.sort_arcs(); }
-}
-
-/**
-     * @brief Resets the forward and backward label pools.
-     *
-     * This function resets both the forward (label_pool_fw) and backward
-     * (label_pool_bw) label pools to their initial states. It is typically
-     * used to clear any existing labels and prepare the pools for reuse.
- */
-void BucketGraph::reset_pool() {
-    label_pool_fw.reset();
-    label_pool_bw.reset();
-}
-
-/**
-     * @brief Sets the dual values for the jobs.
-     *
-     * This function assigns the provided dual values to the jobs. It iterates
-     * through the given vector of duals and sets each job's dual value to the
-     * corresponding value from the vector.
-     *
-     * @param duals A vector of double values representing the duals to be set.
- */
-void BucketGraph::setDuals(const std::vector<double> &duals) {
-    for (size_t i = 1; i < N_SIZE - 1; ++i) { jobs[i].setDuals(duals[i - 1]); }
-}
-
-/**
-     * @brief Sets the distance matrix and calculates neighborhoods.
-     *
-     * This function assigns the provided distance matrix to the internal
-     * distance matrix of the class and then calculates the neighborhoods
-     * based on the given number of nearest neighbors.
-     *
-     * @param distanceMatrix A 2D vector representing the distance matrix.
-     * @param n_ng The number of nearest neighbors to consider when calculating
-     *             neighborhoods. Default value is 8.
- */
-void BucketGraph::set_distance_matrix(const std::vector<std::vector<double>> &distanceMatrix, int n_ng) {
-    this->distance_matrix = distanceMatrix;
-    calculate_neighborhoods(n_ng);
-}
-
-/**
-     * @brief Resets all fixed arcs in the graph.
-     *
-     * This function iterates over each row in the fixed_arcs matrix and sets all elements to 0.
-     * It effectively clears any fixed arc constraints that may have been previously set.
- */
-void BucketGraph::reset_fixed() {
-    for (auto &row : fixed_arcs) { std::fill(row.begin(), row.end(), 0); }
-}
-
-/**
-     * @brief Checks the feasibility of a given forward and backward label.
-     *
-     * This function determines if the transition from a forward label to a backward label
-     * is feasible based on resource constraints and job durations.
-     *
-     * @param fw_label Pointer to the forward label.
-     * @param bw_label Pointer to the backward label.
-     * @return true if the transition is feasible, false otherwise.
-     *
-     * The function performs the following checks:
-     * - If either of the labels is null, it returns false.
-     * - It retrieves the job associated with the forward label and checks if the sum of the
-     *   forward label's resources, the cost between the jobs, and the job's duration exceeds
-     *   the backward label's resources.
-     * - If the resource size is greater than 1, it iterates through the resources and checks
-     *   if the forward label's resources plus the job's demand exceed the backward label's resources.
- */
-bool BucketGraph::check_feasibility(const Label *fw_label, const Label *bw_label) {
-    if (!fw_label || !bw_label) return false;
-
-    // Cache resources and job data
-    const auto          &fw_resources = fw_label->resources;
-    const auto          &bw_resources = bw_label->resources;
-    const struct VRPJob &VRPJob       = jobs[fw_label->job_id];
-
-    // Time feasibility check
-    const auto time_fw     = fw_resources[TIME_INDEX];
-    const auto time_bw     = bw_resources[TIME_INDEX];
-    const auto travel_time = getcij(fw_label->job_id, bw_label->job_id);
-    if (time_fw + travel_time + VRPJob.duration > time_bw) { return false; }
-
-    // Resource feasibility check (if applicable)
-    if constexpr (R_SIZE > 1) {
-        for (size_t i = 1; i < R_SIZE; ++i) {
-            const auto resource_fw = fw_resources[i];
-            const auto resource_bw = bw_resources[i];
-            const auto demand      = VRPJob.demand;
-
-            if (resource_fw + demand > resource_bw) { return false; }
-        }
-    }
-
-    return true;
-}
-
-/**
-     * @brief Marks a job as unreachable in the given bitmap.
-     *
-     * This function sets the bit corresponding to the specified job_id in the bitmap,
-     * indicating that the job is unreachable.
-     *
-     * @param bitmap A reference to an array of 64-bit unsigned integers representing the bitmap.
-     * @param job_id The ID of the job to be marked as unreachable.
- */
-void BucketGraph::set_job_unreachable(std::array<uint64_t, num_words> &bitmap, int job_id) {
-    int word_index   = job_id / 64; // Determine which 64-bit segment contains the job_id
-    int bit_position = job_id % 64; // Determine the bit position within that segment
-    bitmap[word_index] |= (1ULL << bit_position);
-}
-
-/**
-     * @brief Checks if a job is unreachable based on a bitmap.
-     *
-     * This function determines if a job, identified by its job_id, is unreachable
-     * by checking a specific bit in a bitmap. The bitmap is represented as an
-     * array of 64-bit unsigned integers.
-     *
-     * @param bitmap A constant reference to an array of 64-bit unsigned integers
-     *               representing the bitmap.
-     * @param job_id An integer representing the job identifier.
-     * @return true if the job is unreachable (i.e., the corresponding bit in the
-     *         bitmap is set), false otherwise.
- */
-bool BucketGraph::is_job_unreachable(const std::array<uint64_t, num_words> &bitmap, int job_id) {
-    int word_index   = job_id / 64; // Determine which 64-bit segment contains the job_id
-    int bit_position = job_id % 64; // Determine the bit position within that segment
-    return (bitmap[word_index] & (1ULL << bit_position)) != 0;
-}

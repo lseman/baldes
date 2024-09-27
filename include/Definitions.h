@@ -10,7 +10,7 @@
  * The file includes the following:
  * - Enumerations for Direction, Stage, ArcType, Mutability, and Full.
  * - Comparator functions for the Stage enumeration.
- * - Structures for Interval, RCCarc, RCCcut, RCCmanager, Path, and Label.
+ * - Structures for Interval, Path, and Label.
  * - Hash functions for RCCarc and std::pair<int, int>.
  * - Methods for managing cuts, computing duals, and handling paths and labels.
  *
@@ -49,8 +49,6 @@
 
 #include <fmt/color.h>
 #include <fmt/core.h>
-
-
 
 struct BucketOptions {
     int depot         = 0;
@@ -260,66 +258,6 @@ struct Interval {
     Interval(double interval, int horizon) : interval(interval), horizon(horizon) {}
 };
 
-/**
- * @struct RCCarc
- * @brief Represents an arc with two endpoints.
- *
- * The RCCarc struct is used to represent an arc with two endpoints, `from` and `to`.
- * It provides a constructor for initializing these endpoints and an equality operator
- * to compare two RCCarc objects.
- *
- */
-struct RCCarc {
-    int from;
-    int to;
-
-    RCCarc(int from, int to) : from(from), to(to) {}
-
-    // Define operator== to compare two RCCarc objects
-    bool operator==(const RCCarc &other) const {
-        return (from == other.from && to == other.to) || (from == other.to && to == other.from);
-    }
-};
-
-/**
- * @struct RCCcut
- * @brief Represents a cut in the RCC (Resource Constrained Cut) problem.
- *
- * The RCCcut structure holds information about a specific cut, including its arcs,
- * right-hand side value, identifier, associated constraint, and dual value.
- *
- */
-struct RCCcut {
-    std::vector<RCCarc> arcs;
-    double              rhs;
-    int                 id;
-    GRBConstr           constr;
-    double              dual = 0.0;
-
-    RCCcut(const std::vector<RCCarc> &arcs, double rhs) : arcs(arcs), rhs(rhs) {}
-    RCCcut(const std::vector<RCCarc> &arcs, double rhs, GRBConstr constr) : arcs(arcs), rhs(rhs), constr(constr) {}
-    RCCcut(const std::vector<RCCarc> &arcs, double rhs, int id) : arcs(arcs), rhs(rhs), id(id) {}
-    RCCcut(const std::vector<RCCarc> &arcs, double rhs, int id, GRBConstr constr)
-        : arcs(arcs), rhs(rhs), id(id), constr(constr) {}
-};
-
-/**
- * @struct RCCarcHash
- * @brief A hash function object for RCCarc structures.
- *
- * This struct defines a custom hash function for RCCarc objects, which can be used
- * in hash-based containers like std::unordered_map or std::unordered_set.
- *
- * @note The hash function combines the hash values of the 'from' and 'to' members
- *       of the RCCarc structure using the XOR (^) operator.
- *
- * @param arc The RCCarc object to be hashed.
- * @return A std::size_t value representing the hash of the given RCCarc object.
- */
-struct RCCarcHash {
-    std::size_t operator()(const RCCarc &arc) const { return std::hash<int>()(arc.from) ^ std::hash<int>()(arc.to); }
-};
-
 struct Arc {
     int                 from;
     int                 to;
@@ -462,11 +400,10 @@ struct Path {
      * @param arc The RCCarc object representing the arc whose count is to be retrieved.
      * @return The count of the specified arc if it exists in the arcMap, otherwise 0.
      */
-    auto getArcCount(RCCarc arc) const {
-        // Construct the arc pair
-        std::pair<int, int> arcPair = std::make_pair(arc.from, arc.to);
-        return (arcMap.find(arcPair) != arcMap.end()) ? arcMap.at(arcPair) : 0;
-    }
+    // auto getArcCount(RCCarc arc) const {
+    //  Construct the arc pair
+    //    std::pair<int, int> arcPair = std::make_pair(arc.from, arc.to);
+    //    return (arcMap.find(arcPair) != arcMap.end()) ? arcMap.at(arcPair) : 0;
 };
 
 // Bucket structure to hold a collection of labels

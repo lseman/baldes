@@ -22,6 +22,8 @@
  * @return int Returns 0 on successful execution.
  */
 
+// #include "../external/lkh/include/lkh_tsp.hpp"
+
 #include "VRPTW.h"
 
 #include <string>
@@ -29,6 +31,7 @@
 
 #include "../extra/Heuristic.h"
 #include "../include/Definitions.h"
+#include "../include/HGS.h"
 #include "../include/Reader.h"
 
 using VRProblemPtr = std::shared_ptr<VRProblem>;
@@ -53,7 +56,7 @@ using VRProblemPtr = std::shared_ptr<VRProblem>;
  * 9. Solves the model.
  * 10. Stores and returns the model data including constraint matrix, bounds, variable types, and names.
  */
-void initRMP(GRBModel *model, VRProblemPtr problem, std::vector<Route> &heuristicRoutes) {
+void initRMP(GRBModel *model, VRProblemPtr problem, std::vector<std::vector<int>> &heuristicRoutes) {
     // GRBModel model = node->getModel();
     model->set(GRB_IntParam_OutputFlag, 0);
 
@@ -67,14 +70,14 @@ void initRMP(GRBModel *model, VRProblemPtr problem, std::vector<Route> &heuristi
     std::vector<GRBVar> lambda;
 
     // lambda function to compute the cost of a route
-    auto costCalc = [&](const Route &route) {
+    auto costCalc = [&](const std::vector<int> &route) {
         double distance = 0.0;
-        for (size_t i = 0; i < route.customers.size() - 1; ++i) {
-            const auto &source = route.customers[i].number;
-            const auto &target = route.customers[i + 1].number;
+        for (size_t i = 0; i < route.size() - 1; ++i) {
+            const auto &source = route[i];
+            const auto &target = route[i + 1];
             distance += instance.getcij(source, target);
         }
-        distance += instance.getcij(route.customers.back().number, 0);
+        distance += instance.getcij(route.back(), 0);
         return distance;
     };
 
@@ -95,7 +98,10 @@ void initRMP(GRBModel *model, VRProblemPtr problem, std::vector<Route> &heuristi
     for (int i = 1; i < instance.getNbVertices(); ++i) {
         lhs = 0;
         for (size_t j = 0; j < heuristicRoutes.size(); ++j) {
-            if (heuristicRoutes[j].contains(i)) { lhs += lambda[j]; }
+            // if (heuristicRoutes[j].contains(i)) { lhs += lambda[j]; }
+            if (std::find(heuristicRoutes[j].begin(), heuristicRoutes[j].end(), i) != heuristicRoutes[j].end()) {
+                { lhs += lambda[j]; }
+            }
         }
         model->addConstr(lhs >= 1, "visit(m" + std::to_string(i - 1) + ")");
     }
@@ -135,7 +141,8 @@ void printDistanceMatrix(const std::vector<std::vector<double>> &distance) {
 
 /**
  * @file vrptw.cpp
- * @brief This file contains the main function for solving the Vehicle Routing Problem with Time Windows (VRPTW).
+ * @brief This file contains the main function for solving the Vehicle Routing Problem with Time Windows
+ * (VRPTW).
  *
  * The main function performs the following steps:
  * 1. Reads the instance name from the command line arguments.
@@ -157,7 +164,13 @@ int main(int argc, char *argv[]) {
     printBaldes();
 
     // get instance name as the first arg
-    std::string  instance_name = argv[1];
+    std::string instance_name = argv[1];
+
+    print_heur("Initializing heuristic solver for initial solution\n");
+
+    HGS  hgs;
+    auto initialRoutesHGS = hgs.run(instance_name);
+
     InstanceData instance;
     if (VRPTW_read_instance(instance_name, instance)) {
         print_info("Instance read successfully.\n");
@@ -165,8 +178,7 @@ int main(int argc, char *argv[]) {
         std::cerr << "Error reading instance\n";
     }
 
-    print_heur("Initializing heuristic solver for initial solution\n");
-
+    /*
     SolomonFormatParser parser;
     HProblem            hproblem = parser.get_problem(instance_name);
 
@@ -180,6 +192,7 @@ int main(int argc, char *argv[]) {
 
     // merge initialRoutes and initialRoutesSaving amd put in initialRoutes
     initialRoutes.insert(initialRoutes.end(), initialRoutesSavings.begin(), initialRoutesSavings.end());
+    */
 
     std::vector<VRPJob> jobs;
     jobs.clear();
@@ -212,27 +225,29 @@ int main(int argc, char *argv[]) {
     // convert initial routes to labels
     int  labelID        = 0;
     int  labels_counter = 0;
-    auto process_route  = [&](const Route &route) {
+    auto process_route  = [&](const std::vector<int> &route) {
         auto label          = new Label();
-        label->jobs_covered = route.clients();
-        label->cost         = route.total_distance();
+        label->jobs_covered = route;
+        // calculate total distance
+        for (int i = 0; i < route.size() - 1; i++) { label->cost += instance.getcij(route[i], route[i + 1]); }
+        // label->cost         = route.total_distance();
         labelID++;
         labels.push_back(label);
         labels_counter++;
 
         Path path;
-        path.route = route.clients();
+        path.route = route;
         // change last element of the route
         path.route[path.route.size() - 1] = N_SIZE - 1;
-        path.cost                         = route.total_distance();
+        path.cost                         = label->cost;
         paths.push_back(path);
     };
-    std::for_each(initialRoutes.begin(), initialRoutes.end(), process_route);
+    std::for_each(initialRoutesHGS.begin(), initialRoutesHGS.end(), process_route);
 
     problem->allPaths       = paths;
     problem->labels_counter = labels_counter;
 
-    initRMP(&model, problem, initialRoutes);
+    initRMP(&model, problem, initialRoutesHGS);
 
     problem->CG(&model);
 
