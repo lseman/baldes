@@ -24,14 +24,12 @@ public:
 
         InstanceData instance;
 
-        std::cout << "Instance name: " << instance_name << std::endl;
-
         // Reading the data file and initializing some data structures
         Params params(instance_name);
         auto   config = params.config;
 
         // Creating the Split and Local Search structures
-        Split       split(&params);
+        Split          split(&params);
         HGSLocalSearch localSearch(&params);
 
         // Initial population
@@ -40,17 +38,15 @@ public:
         std::cout << "----- BUILDING INITIAL POPULATION" << std::endl;
         Population population(&params, &split, &localSearch);
 
-        auto sol = population.extractFeasibleRoutes();
-
-        /*
+        
         // Genetic algorithm
         std::cout << "----- STARTING GENETIC ALGORITHM" << std::endl;
         Genetic solver(&params, &split, &population, &localSearch);
         solver.run(config.nbIter, config.timeLimit);
-        std::cout << "----- GENETIC ALGORITHM FINISHED, TIME SPENT: " << params.getTimeElapsedSeconds() <<
-        std::endl;
-        */
+        std::cout << "----- GENETIC ALGORITHM FINISHED, TIME SPENT: " << params.getTimeElapsedSeconds() << std::endl;
 
+        auto sol = population.extractFeasibleRoutes();
+        
         // Return 0 if the program execution was successfull
         return sol;
     }

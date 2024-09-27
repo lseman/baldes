@@ -5,12 +5,16 @@ find_program(CLANG_C_COMPILER clang)
 find_program(CLANG_CXX_COMPILER clang++)
 
 if(CLANG_C_COMPILER AND CLANG_CXX_COMPILER)
-    # Set Clang as the default compiler
-    set(CMAKE_C_COMPILER "${CLANG_C_COMPILER}" CACHE STRING "" FORCE)
-    set(CMAKE_CXX_COMPILER "${CLANG_CXX_COMPILER}" CACHE STRING "" FORCE)
-    message(STATUS "Clang found: using Clang as the default compiler")
+  # Set Clang as the default compiler
+  set(CMAKE_C_COMPILER
+      "${CLANG_C_COMPILER}"
+      CACHE STRING "" FORCE)
+  set(CMAKE_CXX_COMPILER
+      "${CLANG_CXX_COMPILER}"
+      CACHE STRING "" FORCE)
+  message(STATUS "Clang found: using Clang as the default compiler")
 else()
-    message(STATUS "Clang not found: using default compiler")
+  message(STATUS "Clang not found: using default compiler")
 endif()
 
 # Project name
@@ -97,6 +101,9 @@ set(MAIN_RESOURCES
 set(N_ADD
     10
     CACHE STRING "Number of additional nodes")
+set(HGS_TIME
+    5
+    CACHE STRING "HGS max running time")
 
 add_definitions(-DN_SIZE=${N_SIZE})
 add_definitions(-DR_SIZE=${R_SIZE})
@@ -231,7 +238,7 @@ set(GUROBI_HOME /home/seman/gurobi1101/linux64)
 include_directories(${GUROBI_HOME}/include)
 
 # Source files
-set(SOURCES examples/VRPTW.cpp src/BucketGraph.cpp extra/Heuristic.cpp)
+set(SOURCES examples/VRPTW.cpp src/BucketGraph.cpp)
 
 set(CVRPSEP_SOURCES
     cvrpsep/basegrph.cpp
@@ -255,14 +262,10 @@ set(CVRPSEP_SOURCES
     cvrpsep/blocks.cpp
     cvrpsep/sort.cpp)
 
-    set (HGS_SOURCES
-    external/hgs_vrptw/Genetic.cpp
-    external/hgs_vrptw/Individual.cpp
-    external/hgs_vrptw/LocalSearch.cpp
-    external/hgs_vrptw/Params.cpp
-    external/hgs_vrptw/Population.cpp
-    external/hgs_vrptw/Split.cpp
-    )
+set(HGS_SOURCES
+    external/hgs_vrptw/Genetic.cpp external/hgs_vrptw/Individual.cpp
+    external/hgs_vrptw/LocalSearch.cpp external/hgs_vrptw/Params.cpp
+    external/hgs_vrptw/Population.cpp external/hgs_vrptw/Split.cpp)
 
 set(IPM_SOURCES ipm/IPSolver.cpp)
 set(SRC_SOURCES src/SRC.cpp)
@@ -470,7 +473,6 @@ if(WITH_LKH)
     ext/lkh/include/Sequence.h)
 endif()
 
-
 # Add the executable with the combined sources
 add_executable(vrptw ${EXECUTABLE_SOURCES})
 
@@ -500,15 +502,14 @@ if(WITH_PYTHON)
   target_link_libraries(baldes PRIVATE STDEXEC::stdexec)
   set_target_properties(baldes PROPERTIES POSITION_INDEPENDENT_CODE ON)
   target_compile_options(baldes PRIVATE -Wno-c++26-extensions
-                                      -Wno-deprecated-declarations)
+                                        -Wno-deprecated-declarations)
 endif()
 
 target_compile_options(vrptw PRIVATE -Wno-c++26-extensions
                                      -Wno-deprecated-declarations)
 
 if(CLIQUER)
-  add_executable(cliquer src/Original.cpp src/BucketGraph.cpp
-                         extra/Heuristic.cpp)
+  add_executable(cliquer src/Original.cpp src/BucketGraph.cpp)
   target_link_libraries(cliquer PRIVATE STDEXEC::stdexec)
   target_link_libraries(cliquer PRIVATE fmt::fmt)
   target_link_libraries(cliquer PRIVATE TBB::tbb)

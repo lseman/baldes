@@ -17,6 +17,8 @@ The Bucket Graph-based labeling algorithm organizes labels into **buckets** base
 - **Parallel Bi-Directional Labeling:** Supports forward and backward search strategies.
 - **Dominance Rules:** Efficient dominance checks using resource-based comparisons and integration of additional criteria from Limited-Memory Subset Row Cuts (SRCs).
 - **Improvement Heuristics:** Optional fast improvement heuristics are applied at the end of each labeling phase to enhance label quality.
+- **Good initial solutions** Our algorithm uses the HGS-VRPTW algorithm for generating the initial bounds and routes. This approach is an extension of HGS-CVRP, which was recently employed by the ORTEC team to win the VRPTW track of the DIMACS implementation challenge. It incorporates time-window evaluation strategies, along with the SREX crossover, dynamic population and neighborhood size parameters, and further code optimizations.
+
 
 ## ⚠️ Disclaimer
 

@@ -329,11 +329,11 @@ public:
 
         // Identify variables with negative reduced costs
         for (int i = 0; i < varNumber; ++i) {
-            if (reducedCosts[i] > 0) { indicesToRemove.push_back(i); }
+            if (reducedCosts[i] < 0) { indicesToRemove.push_back(i); }
         }
 
         // Limit the number of variables to remove to 30% of the total
-        size_t maxRemoval = static_cast<size_t>(0.1 * varNumber);
+        size_t maxRemoval = static_cast<size_t>(0.3 * varNumber);
         if (indicesToRemove.size() > maxRemoval) {
             indicesToRemove.resize(maxRemoval); // Only keep the first 30%
         }
@@ -823,19 +823,54 @@ public:
 #if defined(SRC3) || defined(SRC)
                 if (!rcc) {
 
-                    auto cuts_before = cuts.size();
-                    removeNegativeReducedCostVarsAndPaths(node);
-                    matrix = extractModelDataSparse(node);
+                    // removeNegativeReducedCostVarsAndPaths(node);
+                    // matrix = extractModelDataSparse(node);
                     node->optimize();
-                    solution     = extractSolution(node);
-                    r1c.allPaths = allPaths;
+
+                    auto cuts_before = cuts.size();
+                    ////////////////////////////////////////////////////
+                    // Handle non-violated cuts in a single pass
+                    ////////////////////////////////////////////////////
+                    bool cleared     = false;
+                    auto n_cuts_removed = 0;
+                    // Iterate over the constraints in reverse order to remove non-violated cuts
+                    for (int i = SRCconstraints.size() - 1; i >= 0; --i) {
+                        GRBConstr constr = SRCconstraints[i];
+
+                        // Get the slack value of the constraint
+                        double slack = constr.get(GRB_DoubleAttr_Slack);
+
+                        // If the slack is positive, it means the constraint is not violated
+                        if (slack > 1e-3) {
+                            cleared = true;
+
+                            // Remove the constraint from the model and cut storage
+                            node->remove(constr);
+                            cuts.removeCut(cuts[i].id);
+                            n_cuts_removed++;
+
+                            // Remove from SRCconstraints
+                            SRCconstraints.erase(SRCconstraints.begin() + i);
+                        }
+                    }
+
+                    if (cleared) {
+                        node->update();                        // Update the model to reflect the removals
+                        node->optimize();                      // Re-optimize the model
+                        matrix = extractModelDataSparse(node); // Extract model data
+                    }
+
+                    // print cuts size
+                    solution       = extractSolution(node);
+                    r1c.cutStorage = cuts;
+                    r1c.allPaths   = allPaths;
                     r1c.separate(matrix.A_sparse, solution);
 #ifdef SRC
-                    r1c.the45Heuristic<CutType::FourRow>(matrix.A_sparse, solution);
-                    r1c.the45Heuristic<CutType::FiveRow>(matrix.A_sparse, solution);
+                    // r1c.the45Heuristic<CutType::FourRow>(matrix.A_sparse, solution);
+                    // r1c.the45Heuristic<CutType::FiveRow>(matrix.A_sparse, solution);
 #endif
                     cuts = r1c.cutStorage;
-                    if (cuts_before == cuts.size()) {
+                    if (cuts_before == cuts.size() + n_cuts_removed) {
                         print_info("No violations found, calling it a day\n");
                         break;
                     }
@@ -941,6 +976,7 @@ public:
                 if (cuts.size() > 0) {
                     auto duals = node->get(GRB_DoubleAttr_Pi, SRCconstraints.data(), SRCconstraints.size());
                     cutDuals.assign(duals, duals + SRCconstraints.size());
+                    // print cutDuals size
                     cuts.setDuals(cutDuals);
                 }
 #endif

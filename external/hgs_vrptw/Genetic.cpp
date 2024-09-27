@@ -113,32 +113,34 @@ void Genetic::doOXcrossover(Individual *result, std::pair<const Individual *, co
     std::vector<bool> freqClient(params->nbClients + 1, false);
 
     // Copy in place the elements from start to end
-    int j = start;
+    int j         = start;
     int nbClients = params->nbClients;
-    int idxEnd = (end + 1) % nbClients;
+    int idxEnd    = (end + 1 == nbClients) ? 0 : end + 1; // Pre-compute the modulo result once
 
     // First loop: directly copy the segment from parent A
     while (j != idxEnd) {
-        result->chromT[j] = parents.first->chromT[j];
+        result->chromT[j]             = parents.first->chromT[j];
         freqClient[result->chromT[j]] = true;
-        j = (j + 1 == nbClients) ? 0 : j + 1; // Reduce modulo operations
+        j++;
+        if (j == nbClients) j = 0; // Avoid modulo, just reset to 0 when reaching the end
     }
 
     // Fill the remaining elements from parent B, skipping already copied ones
-    int i = (end + 1) % nbClients;
+    int i = idxEnd; // Start right after the end
     while (j != start) {
         int temp = parents.second->chromT[i];
         if (!freqClient[temp]) {
             result->chromT[j] = temp;
-            j = (j + 1 == nbClients) ? 0 : j + 1; // Reduce modulo operations
+            j++;
+            if (j == nbClients) j = 0; // Avoid modulo
         }
-        i = (i + 1 == nbClients) ? 0 : i + 1; // Reduce modulo operations
+        i++;
+        if (i == nbClients) i = 0; // Avoid modulo
     }
 
     // Completing the individual with the Split algorithm
     split->generalSplit(result, params->nbVehicles);
 }
-
 
 Individual *Genetic::crossoverSREX(std::pair<const Individual *, const Individual *> parents) {
     // Get the number of routes of both parents
@@ -246,15 +248,25 @@ Individual *Genetic::crossoverSREX(std::pair<const Individual *, const Individua
     }
 
     // Identify differences between route sets
-    std::unordered_set<int> clientsInSelectedANotB;
-    std::copy_if(clientsInSelectedA.begin(), clientsInSelectedA.end(),
-                 std::inserter(clientsInSelectedANotB, clientsInSelectedANotB.end()),
-                 [&clientsInSelectedB](int c) { return clientsInSelectedB.find(c) == clientsInSelectedB.end(); });
+    std::vector<int> clientsInSelectedANotBVec;
+    clientsInSelectedANotBVec.reserve(clientsInSelectedA.size()); // Reserve space to avoid reallocations
+    for (int client : clientsInSelectedA) {
+        if (clientsInSelectedB.find(client) == clientsInSelectedB.end()) {
+            clientsInSelectedANotBVec.push_back(client);
+        }
+    }
 
-    std::unordered_set<int> clientsInSelectedBNotA;
-    std::copy_if(clientsInSelectedB.begin(), clientsInSelectedB.end(),
-                 std::inserter(clientsInSelectedBNotA, clientsInSelectedBNotA.end()),
-                 [&clientsInSelectedA](int c) { return clientsInSelectedA.find(c) == clientsInSelectedA.end(); });
+    std::vector<int> clientsInSelectedBNotAVec;
+    clientsInSelectedBNotAVec.reserve(clientsInSelectedB.size()); // Reserve space to avoid reallocations
+    for (int client : clientsInSelectedB) {
+        if (clientsInSelectedA.find(client) == clientsInSelectedA.end()) {
+            clientsInSelectedBNotAVec.push_back(client);
+        }
+    }
+
+    // Convert vector to unordered_set
+    std::unordered_set<int> clientsInSelectedANotB(clientsInSelectedANotBVec.begin(), clientsInSelectedANotBVec.end());
+    std::unordered_set<int> clientsInSelectedBNotA(clientsInSelectedBNotAVec.begin(), clientsInSelectedBNotAVec.end());
 
     // Replace selected routes from parent B into parent A
     for (int r = 0; r < nOfMovedRoutes; r++) {
@@ -264,14 +276,15 @@ Individual *Genetic::crossoverSREX(std::pair<const Individual *, const Individua
         auto &offspring0Route = candidateOffsprings[0]->chromR[indexA];
         auto &offspring1Route = candidateOffsprings[1]->chromR[indexA];
 
-        offspring0Route.clear();
+        offspring0Route.clear(); // Clears but retains capacity
         offspring1Route.clear();
 
+        // Batch lookup: Make the lookup set cache-friendly by processing the route once
         for (int c : parents.second->chromR[indexB]) {
             offspring0Route.push_back(c); // Always copy into offspring 0
 
-            if (!clientsInSelectedBNotA.count(c)) // More cache-friendly lookup
-            {
+            // Efficiently check presence in clientsInSelectedBNotA and copy into offspring 1 if absent
+            if (!clientsInSelectedBNotA.contains(c)) { // `contains` is cleaner and faster in modern C++20
                 offspring1Route.push_back(c);
             }
         }
@@ -284,15 +297,15 @@ Individual *Genetic::crossoverSREX(std::pair<const Individual *, const Individua
         auto &offspring0Route = candidateOffsprings[0]->chromR[indexA];
         auto &offspring1Route = candidateOffsprings[1]->chromR[indexA];
 
-        offspring0Route.clear();
+        offspring0Route.clear(); // Keeps capacity
         offspring1Route.clear();
 
+        // Iterate over the route in parent A
         for (int c : parents.first->chromR[indexA]) {
-            if (!clientsInSelectedBNotA.count(c)) // More cache-friendly lookup
-            {
-                offspring0Route.push_back(c);
+            if (!clientsInSelectedBNotA.contains(c)) { // Use contains() in C++20
+                offspring0Route.push_back(c);          // Only add to offspring 0 if not in set
             }
-            offspring1Route.push_back(c); // Always copy into offspring 1
+            offspring1Route.push_back(c); // Always add to offspring 1
         }
     }
 

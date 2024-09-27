@@ -36,8 +36,10 @@ SOFTWARE.*/
 #include "Matrix.h"
 #include "xorshift128.h"
 
-#include "CircleSector.h"
 #include "../../include/Reader.h"
+#include "CircleSector.h"
+
+#include "config.h"
 
 #define MY_EPSILON 0.00001 // Precision parameter, used to avoid numerical instabilities
 #define PI 3.14159265359   // Number pi, with 11 decimal precision
@@ -67,9 +69,9 @@ public:
     struct Config {
         int nbIter =
             20000; // Number of iterations without improvement until termination. Default value: 20,000 iterations
-        int         timeLimit        = INT_MAX; // CPU time limit until termination in seconds. Default value: infinity
-        bool        useWallClockTime = false;   // If True, measure wall clock time rather than CPU time
-        std::string pathBKS          = "";      // Path to Best Known Solution
+        const int   timeLimit        = HGS_TIME; // CPU time limit until termination in seconds. Default value: infinity
+        bool        useWallClockTime = false;    // If True, measure wall clock time rather than CPU time
+        std::string pathBKS          = "";       // Path to Best Known Solution
 
         // Parameters for the Construction Heuristics
         double fractionGeneratedNearest  = 0.05; // Proportion of individuals constructed by nearest-first
