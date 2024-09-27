@@ -56,6 +56,15 @@ private:
     Individual bestSolutionRestart; // Best solution found during the current restart of the algorthm
     Individual bestSolutionOverall; // Best solution found during the complete execution of the algorithm
 
+    std::set<Individual, bool (*)(Individual, Individual)>
+         mdmElite;        // MDM elite set, kept ordered by increasing penalized cost
+    bool mdmEliteUpdated; // Flag to indicate if the MDM elite set has been updated since the last call to mineElite()
+    int  mdmEliteNonUpdatingRestarts; // Number of restarts since the last time the MDM elite set was updated
+    std::vector<std::vector<std::vector<int>>> mdmPatterns;    // Patterns mined from the MDM elite set
+    int                                        mdmNextPattern; // Index of the next pattern to be used
+
+    std::vector<std::vector<int>> *nextMDMPattern();
+
     // Evaluates the biased fitness of all individuals in the population
     void updateBiasedFitnesses(SubPopulation &pop);
 
@@ -154,6 +163,9 @@ public:
         return feasibleRoutes;
     }
 
+    int mdmEliteMaxNonUpdatingRestarts; // Maximum number of restarts since the last update of the MDM elite set
+
+    void mineElite();
     // Destructor
     ~Population();
 };

@@ -11,6 +11,17 @@
 #include "Population.h"
 #include "Split.h"
 
+#include "../../external/fpmax/fpmax.h"
+
+std::vector<std::vector<int>> *Population::nextMDMPattern() {
+    if (mdmPatterns.empty()) return NULL;
+
+    std::vector<std::vector<int>> *pattern = &(mdmPatterns[mdmNextPattern]);
+    mdmNextPattern                         = (mdmNextPattern + 1) % mdmPatterns.size();
+
+    return pattern;
+}
+
 void Population::doHGSLocalSearchAndAddIndividual(Individual *indiv) {
     // Do a Local Search
     localSearch->run(indiv, params->penaltyCapacity, params->penaltyTimeWarp);
@@ -31,7 +42,9 @@ void Population::doHGSLocalSearchAndAddIndividual(Individual *indiv) {
 void Population::generatePopulation() {
     if (params->nbClients == 1) {
         // Quickly generate the one solution
-        Individual randomIndiv(params);
+        Individual randomIndiv(params, true, nextMDMPattern());
+        // Individual randomIndiv(params);
+
         split->generalSplit(&randomIndiv, params->nbVehicles);
         addIndividual(&randomIndiv, true);
         return;
@@ -552,4 +565,82 @@ Population::~Population() {
 
     // Delete all information from the infeasibleSubpopulation
     for (int i = 0; i < static_cast<int>(infeasibleSubpopulation.size()); i++) { delete infeasibleSubpopulation[i]; }
+}
+
+void Population::mineElite() {
+    auto mdmNbElite    = -1;
+    auto mdmNbPatterns = 5;
+    auto mdmNURestarts = 0.05;
+    auto mdmMinSup     = 0.8;
+    if (mdmEliteUpdated && mdmEliteNonUpdatingRestarts >= mdmEliteMaxNonUpdatingRestarts && mdmElite.size() > 1) {
+        if (params->verbose) std::cout << "----- MINING PATTERNS FROM MDM ELITE SET" << std::endl;
+
+        int minSup      = std::max(2, (int)(mdmMinSup * mdmElite.size()));
+        int numPatterns = mdmNbPatterns;
+
+        int nbNodes = params->nbClients + 1; // all clients + depot
+
+        Dataset *dataset = new Dataset;
+        for (auto it = mdmElite.begin(); it != mdmElite.end(); ++it) {
+            Individual    indiv = *it;
+            std::set<int> transaction;
+            for (int r = 0; r < params->nbVehicles; r++)
+                for (int c = 0; c < (int)indiv.chromR[r].size() - 1; c++) {
+                    int index = indiv.chromR[r][c] * nbNodes +
+                                indiv.chromR[r][c + 1]; // maps 2D matrix cell indices to vector index
+                    transaction.insert(index);
+                }
+            dataset->push_back(transaction);
+        }
+
+        FISet *frequentItemsets = fpmax(dataset, minSup, numPatterns);
+
+        mdmPatterns.clear();
+        for (FISet::iterator it = frequentItemsets->begin(); it != frequentItemsets->end(); ++it) {
+            std::vector<std::vector<int>> tempPattern;
+            std::list<std::vector<int> *> routes;
+
+            for (std::set<int>::iterator it2 = it->begin(); it2 != it->end(); ++it2) {
+                unsigned index = *it2;
+
+                int n1 = index / nbNodes;
+                int n2 = index % nbNodes;
+
+                std::vector<int> *lhs = NULL;
+                std::vector<int> *rhs = NULL;
+                std::vector<int> *tempRoute;
+                for (std::list<std::vector<int> *>::iterator r = routes.begin(); r != routes.end(); r++)
+                    if (n1 && n1 == (*r)->back())
+                        lhs = *r;
+                    else if (n2 && n2 == (*r)->front())
+                        rhs = *r;
+                if (lhs)
+                    if (rhs) {
+                        for (std::vector<int>::iterator n = rhs->begin(); n != rhs->end(); n++) lhs->push_back(*n);
+                        routes.remove(rhs);
+                        delete rhs;
+                    } else
+                        lhs->push_back(n2);
+                else if (rhs)
+                    rhs->insert(rhs->begin(), n1);
+                else {
+                    tempRoute = new std::vector<int>;
+                    tempRoute->push_back(n1);
+                    tempRoute->push_back(n2);
+                    routes.push_back(tempRoute);
+                }
+            }
+
+            for (std::list<std::vector<int> *>::iterator r = routes.begin(); r != routes.end(); r++)
+                tempPattern.push_back(**r);
+
+            mdmPatterns.push_back(tempPattern);
+        }
+
+        delete dataset;
+        delete frequentItemsets;
+
+        mdmEliteUpdated = false;
+        mdmNextPattern  = 0;
+    }
 }
