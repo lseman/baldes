@@ -68,7 +68,7 @@ inline std::vector<Label *> BucketGraph::solve() {
     // Stage 1: Apply a light heuristic (Stage::One)
     if (s1) {
         stage     = 1;
-        paths     = bi_labeling_algorithm<Stage::One>(q_star); // Solve the problem with Stage 1 heuristic
+        paths     = bi_labeling_algorithm<Stage::One>(); // Solve the problem with Stage 1 heuristic
         inner_obj = paths[0]->cost;
 
         // Transition from Stage 1 to Stage 2 if the objective improves or after 10 iterations
@@ -81,7 +81,7 @@ inline std::vector<Label *> BucketGraph::solve() {
     else if (s2) {
         s2        = true;
         stage     = 2;
-        paths     = bi_labeling_algorithm<Stage::Two>(q_star); // Solve the problem with Stage 2 heuristic
+        paths     = bi_labeling_algorithm<Stage::Two>(); // Solve the problem with Stage 2 heuristic
         inner_obj = paths[0]->cost;
 
         // Transition from Stage 2 to Stage 3 if the objective improves or after 800 iterations
@@ -93,7 +93,7 @@ inline std::vector<Label *> BucketGraph::solve() {
     // Stage 3: Apply a heuristic fixing approach (Stage::Three)
     else if (s3) {
         stage     = 3;
-        paths     = bi_labeling_algorithm<Stage::Three>(q_star); // Solve the problem with Stage 3 heuristic
+        paths     = bi_labeling_algorithm<Stage::Three>(); // Solve the problem with Stage 3 heuristic
         inner_obj = paths[0]->cost;
 
         // Transition from Stage 3 to Stage 4 if the objective improves significantly
@@ -111,9 +111,9 @@ inline std::vector<Label *> BucketGraph::solve() {
         // If transitioning to Stage 4, print a message and apply fixing
         if (transition) {
             print_cut("Transitioning to stage 4\n");
-            fixed        = true;                                       // Enable fixing of buckets in Stage 4
-            paths        = bi_labeling_algorithm<Stage::Four>(q_star); // Solve the problem with Stage 4
-            transition   = false;                                      // End the transition period
+            fixed        = true;                                 // Enable fixing of buckets in Stage 4
+            paths        = bi_labeling_algorithm<Stage::Four>(); // Solve the problem with Stage 4
+            transition   = false;                                // End the transition period
             fixed        = false;
             min_red_cost = paths[0]->cost; // Update the minimum reduced cost
             iter++;
@@ -121,7 +121,7 @@ inline std::vector<Label *> BucketGraph::solve() {
         }
 #endif
         // If not transitioning, continue with Stage 4 algorithm
-        paths     = bi_labeling_algorithm<Stage::Four>(q_star);
+        paths     = bi_labeling_algorithm<Stage::Four>();
         inner_obj = paths[0]->cost;
 
         // If the objective improves sufficiently, set the status to separation or optimal
@@ -149,7 +149,7 @@ inline std::vector<Label *> BucketGraph::solve() {
  * @return A vector of doubles representing the c_bar values for each bucket.
  */
 template <Direction D, Stage S, Full F>
-std::vector<double> BucketGraph::labeling_algorithm(std::vector<double> q_point, bool full) noexcept {
+std::vector<double> BucketGraph::labeling_algorithm() noexcept {
 
     // Assign the correct direction buckets, ordered SCCs, and other related structures depending on the direction D
     auto &buckets           = assign_buckets<D>(fw_buckets, bw_buckets);
@@ -188,16 +188,18 @@ std::vector<double> BucketGraph::labeling_algorithm(std::vector<double> q_point,
                     if constexpr (F == Full::Partial) {
                         if constexpr (D == Direction::Forward) {
                             if (label->resources[TIME_INDEX] > q_star[TIME_INDEX]) {
-                                //label->set_extended(true);
+                                label->set_extended(true);
                                 continue;
                             }
                         } else if constexpr (D == Direction::Backward) {
                             if (label->resources[TIME_INDEX] <= q_star[TIME_INDEX]) {
-                                //label->set_extended(true);
+                                label->set_extended(true);
                                 continue;
                             }
                         }
                     }
+
+                    domin_smaller = false;
 
                     // if constexpr (S >= Stage::Three) {
                     //  Clear the visited buckets vector for the current label
@@ -249,7 +251,7 @@ std::vector<double> BucketGraph::labeling_algorithm(std::vector<double> q_point,
                                 }
 
 #else
-                                if (likely((check_dominance_against_vector<D, S>(new_label, to_bucket_labels)))) {
+                                if (check_dominance_against_vector<D, S>(new_label, to_bucket_labels)) {
                                     stat_n_dom++; // Increment dominated labels count
                                     dominated = true;
                                 }
@@ -261,7 +263,7 @@ std::vector<double> BucketGraph::labeling_algorithm(std::vector<double> q_point,
                                 if constexpr (S != Stage::Enumerate) {
                                     std::vector<Label *> labels_to_remove;
                                     for (auto *existing_label : to_bucket_labels) {
-                                        if (likely((is_dominated<D, S>(existing_label, new_label)))) {
+                                        if (is_dominated<D, S>(existing_label, new_label)) {
                                             labels_to_remove.push_back(existing_label);
                                         }
                                     }
@@ -327,7 +329,7 @@ std::vector<double> BucketGraph::labeling_algorithm(std::vector<double> q_point,
             }
 
             // Update the cost bound for the bucket's dependencies (Phi buckets)
-            for (const auto &phi_bucket : Phi[bucket]) { c_bar[bucket] = std::min(c_bar[bucket], c_bar[phi_bucket]); }
+            for (auto phi_bucket : Phi[bucket]) { c_bar[bucket] = std::min(c_bar[bucket], c_bar[phi_bucket]); }
         }
     }
 
@@ -353,11 +355,11 @@ std::vector<double> BucketGraph::labeling_algorithm(std::vector<double> q_point,
  */
 
 template <Stage S>
-std::vector<Label *> BucketGraph::bi_labeling_algorithm(std::vector<double> q_star) {
+std::vector<Label *> BucketGraph::bi_labeling_algorithm() {
 
     // If in Stage 3, apply heuristic fixing based on q_star
     if constexpr (S == Stage::Three) {
-        heuristic_fixing<S>(q_star);
+        heuristic_fixing<S>();
     }
     // If in Stage 4, reset fixed buckets if it's the first reset
     else if constexpr (S == Stage::Four) {
@@ -369,7 +371,7 @@ std::vector<Label *> BucketGraph::bi_labeling_algorithm(std::vector<double> q_st
 
 #ifdef FIX_BUCKETS
     // If in Stage 4, apply bucket fixing based on q_star
-    if constexpr (S == Stage::Four) { bucket_fixing<S>(q_star); }
+    if constexpr (S == Stage::Four) { bucket_fixing<S>(); }
 #endif
 
     // Reset the label pool to ensure no leftover labels from previous runs
@@ -382,7 +384,7 @@ std::vector<Label *> BucketGraph::bi_labeling_algorithm(std::vector<double> q_st
     std::vector<double> backward_cbar(bw_buckets.size());
 
     // Run the labeling algorithm in both directions, but only partially (Full::Partial)
-    run_labeling_algorithms<S, Full::Partial>(forward_cbar, backward_cbar, q_star);
+    run_labeling_algorithms<S, Full::Partial>(forward_cbar, backward_cbar);
 
     // Acquire the best label from the forward label pool (will later combine with backward)
     auto best_label = label_pool_fw.acquire();
@@ -414,7 +416,7 @@ std::vector<Label *> BucketGraph::bi_labeling_algorithm(std::vector<double> q_st
         const auto &labels         = current_bucket.get_labels(); // Get labels in the current bucket
 
         // Process each label in the bucket
-        for (const auto L : labels) {
+        for (const Label *L : labels) {
             // if (L->resources[TIME_INDEX] > q_star[TIME_INDEX]) { continue; } // Skip if label exceeds q_star
 
             // Get arcs corresponding to jobs for this label (Forward direction)
@@ -431,12 +433,11 @@ std::vector<Label *> BucketGraph::bi_labeling_algorithm(std::vector<double> q_st
                 }
 
                 // Attempt to extend the current label using this arc
-                const auto L_prime =
-                    Extend<Direction::Forward, S, ArcType::Job, Mutability::Const, Full::Reverse>(L, arc);
+                auto L_prime = Extend<Direction::Forward, S, ArcType::Job, Mutability::Const, Full::Reverse>(L, arc);
 
                 // Note: apparently without the second condition it work better in some cases
                 // Check if the new label is valid and respects the q_star constraints
-                if (!L_prime || L_prime->resources[TIME_INDEX] < q_star[TIME_INDEX]) {
+                if (!L_prime || L_prime->resources[TIME_INDEX] <= q_star[TIME_INDEX]) {
                     continue; // Skip invalid labels or those that exceed q_star
                 }
 
@@ -564,7 +565,7 @@ BucketGraph::Extend(const std::conditional_t<M == Mutability::Mut, Label *, cons
     const VRPJob &VRPJob = jobs[job_id];
 
     // Initialize new resources based on the arc's resource increments and check feasibility
-    std::vector<double> new_resources(R_SIZE);
+    std::vector<double> new_resources(initial_resources.size());
     /*
     for (size_t i = 0; i < initial_resources.size(); ++i) {
 
@@ -609,18 +610,8 @@ BucketGraph::Extend(const std::conditional_t<M == Mutability::Mut, Label *, cons
     }
 #endif
 
-#ifdef RCC
-    // Get dual sum from RCC manager if available
-    double cvrpsep_dual = 0.0;
-    if constexpr (D == Direction::Forward) {
-        cvrpsep_dual = rcc_manager->getCachedDualSumForArc(initial_job_id, job_id);
-    } else {
-        cvrpsep_dual = rcc_manager->getCachedDualSumForArc(job_id, initial_job_id);
-    }
-#endif
-
     // Compute travel cost between the initial and current jobs
-    double travel_cost = getcij(initial_job_id, job_id);
+    const double travel_cost = getcij(initial_job_id, job_id);
 #ifndef PSTEP
     double new_cost = initial_cost + travel_cost - VRPJob.cost;
 #else
@@ -682,7 +673,7 @@ BucketGraph::Extend(const std::conditional_t<M == Mutability::Mut, Label *, cons
             uint64_t neighborhood_mask = neighborhoods_bitmap[job_id][i]; // Get neighborhood mask for the current job
             uint64_t bits_to_clear     = current_visited & ~neighborhood_mask; // Determine which bits to clear
 
-            if (i == (job_id & 63)) {
+            if (i == job_id / 64) {
                 bits_to_clear &= ~(1ULL << (job_id & 63)); // Ensure current job remains visited
             }
 
@@ -961,17 +952,14 @@ inline bool BucketGraph::DominatedInCompWiseSmallerBuckets(const Label *L, int b
  * @param q_star A constant reference to a vector used as input for the labeling algorithms.
  */
 template <Stage state, Full fullness>
-void BucketGraph::run_labeling_algorithms(std::vector<double> &forward_cbar, std::vector<double> &backward_cbar,
-                                          const std::vector<double> &q_star) {
+void BucketGraph::run_labeling_algorithms(std::vector<double> &forward_cbar, std::vector<double> &backward_cbar) {
     // Create tasks for forward and backward labeling algorithms
 
-    auto forward_task = stdexec::schedule(bi_sched) | stdexec::then([&]() {
-                            return labeling_algorithm<Direction::Forward, state, fullness>(q_star);
-                        });
+    auto forward_task = stdexec::schedule(bi_sched) |
+                        stdexec::then([&]() { return labeling_algorithm<Direction::Forward, state, fullness>(); });
 
-    auto backward_task = stdexec::schedule(bi_sched) | stdexec::then([&]() {
-                             return labeling_algorithm<Direction::Backward, state, fullness>(q_star);
-                         });
+    auto backward_task = stdexec::schedule(bi_sched) |
+                         stdexec::then([&]() { return labeling_algorithm<Direction::Backward, state, fullness>(); });
 
     // Execute the tasks in parallel and synchronize
     auto work = stdexec::when_all(std::move(forward_task), std::move(backward_task)) |

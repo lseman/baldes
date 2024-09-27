@@ -392,7 +392,7 @@ void BucketGraph::generate_arcs() {
  */
 template <Direction D>
 Label *BucketGraph::get_best_label(const std::vector<int> &topological_order, const std::vector<double> &c_bar,
-                                   std::vector<std::vector<int>> &sccs) {
+                                   const std::vector<std::vector<int>> &sccs) {
     double best_cost  = std::numeric_limits<double>::infinity();
     Label *best_label = nullptr; // Ensure this is initialized
     auto  &buckets    = assign_buckets<D>(fw_buckets, bw_buckets);
@@ -447,10 +447,6 @@ void BucketGraph::ConcatenateLabel(const Label *L, int &b, Label *&pbest, std::v
 
         const auto  &bucketLprimejob = bw_buckets[current_bucket].job_id;
         const double cost            = getcij(L_job_id, bucketLprimejob);
-
-#ifdef RCC
-        cost -= rcc_manager->getCachedDualSumForArc(L_job_id, bucketLprimejob);
-#endif
 
 #ifdef SRC
         decltype(cut_storage)            cutter   = nullptr;
@@ -727,7 +723,7 @@ int BucketGraph::get_opposite_bucket_number(int current_bucket_index) {
 }
 
 template <Stage S>
-void BucketGraph::bucket_fixing(const std::vector<double> &q_star) {
+void BucketGraph::bucket_fixing() {
     // Stage 4 bucket arc fixing
     if (!fixed) {
         fixed = true;
@@ -737,7 +733,7 @@ void BucketGraph::bucket_fixing(const std::vector<double> &q_star) {
         std::vector<double> backward_cbar(bw_buckets.size(), std::numeric_limits<double>::infinity());
 
         // if constexpr (S == Stage::Two) {
-        run_labeling_algorithms<Stage::Four, Full::Full>(forward_cbar, backward_cbar, q_star);
+        run_labeling_algorithms<Stage::Four, Full::Full>(forward_cbar, backward_cbar);
 
         gap = incumbent - (relaxation + std::min(0.0, min_red_cost));
 
@@ -774,7 +770,7 @@ void BucketGraph::bucket_fixing(const std::vector<double> &q_star) {
  *               fixing parameters.
  */
 template <Stage S>
-void BucketGraph::heuristic_fixing(const std::vector<double> &q_star) {
+void BucketGraph::heuristic_fixing() {
     // Stage 3 fixing heuristic
     reset_pool();
     reset_fixed();
@@ -784,9 +780,9 @@ void BucketGraph::heuristic_fixing(const std::vector<double> &q_star) {
     std::vector<double> backward_cbar(bw_buckets.size(), std::numeric_limits<double>::infinity());
 
     if constexpr (S == Stage::Three) {
-        run_labeling_algorithms<Stage::Two, Full::Partial>(forward_cbar, backward_cbar, q_star);
+        run_labeling_algorithms<Stage::Two, Full::Partial>(forward_cbar, backward_cbar);
     } else {
-        run_labeling_algorithms<Stage::Three, Full::Partial>(forward_cbar, backward_cbar, q_star);
+        run_labeling_algorithms<Stage::Three, Full::Partial>(forward_cbar, backward_cbar);
     }
     std::vector<std::vector<Label *>> fw_labels_map(jobs.size());
     std::vector<std::vector<Label *>> bw_labels_map(jobs.size());
@@ -844,128 +840,4 @@ void BucketGraph::heuristic_fixing(const std::vector<double> &q_star) {
             }
         }
     }
-}
-
-// Template recursion for compile-time unrolling
-/**
- * @brief Processes a resource based on its disposability type and direction.
- *
- * This function updates the `new_resource` value based on the initial resources,
- * the increment provided by `gamma`, and the constraints defined by `theJob`.
- * The behavior varies depending on the disposability type of the resource.
- *
- */
-template <Direction D, size_t I, size_t N, typename Gamma, typename VRPJob>
-inline constexpr bool BucketGraph::process_resource(double                      &new_resource,
-                                                    const std::array<double, 1> &initial_resources, const Gamma &gamma,
-                                                    const VRPJob &theJob) {
-    if constexpr (resource_disposability[I] == 1) { // Checked at compile-time
-        if constexpr (D == Direction::Forward) {
-            new_resource =
-                std::max(initial_resources[I] + gamma.resource_increment[I], static_cast<double>(theJob.lb[I]));
-            if (new_resource > theJob.ub[I]) {
-                return false; // Exceeds upper bound, return false to stop processing
-            }
-        } else {
-            new_resource =
-                std::min(initial_resources[I] - gamma.resource_increment[I], static_cast<double>(theJob.ub[I]));
-            if (new_resource < theJob.lb[I]) {
-                return false; // Below lower bound, return false to stop processing
-            }
-        }
-    } else if constexpr (resource_disposability[I] == 0) {
-        // TODO: Non-disposable resource handling, check if it is right
-        if constexpr (D == Direction::Forward) {
-            new_resource = initial_resources[I] + gamma.resource_increment[I];
-            if (new_resource > theJob.ub[I]) {
-                return false; // Exceeds upper bound, return false to stop processing
-            } else if (new_resource < theJob.lb[I]) {
-                return false; // Below lower bound, return false to stop processing
-            }
-        } else {
-            new_resource = initial_resources[I] - gamma.resource_increment[I];
-            if (new_resource > theJob.ub[I]) {
-                return false; // Exceeds upper bound, return false to stop processing
-            } else if (new_resource < theJob.lb[I]) {
-                return false; // Below lower bound, return false to stop processing
-            }
-        }
-    } else if constexpr (resource_disposability[I] == 2) {
-        // TODO:: Binary resource handling, check if logic is right
-        if constexpr (D == Direction::Forward) {
-            // For binary resources, flip between 0 and 1 based on gamma.resource_increment[I]
-            if (gamma.resource_increment[I] > 0) {
-                new_resource = 1.0; // Switch "on"
-            } else {
-                new_resource = 0.0; // Switch "off"
-            }
-        } else {
-            // In reverse, toggle as well
-            if (gamma.resource_increment[I] > 0) {
-                new_resource = 0.0; // Reverse logic: turn "off"
-            } else {
-                new_resource = 1.0; // Reverse logic: turn "on"
-            }
-        }
-    } else if constexpr (resource_disposability[I] == 3) {
-        // TODO: handling multiple time windows case
-        // "OR" resource case using mtw_lb and mtw_ub vectors for multiple time windows
-        if constexpr (D == Direction::Forward) {
-            bool is_feasible = false;
-            for (size_t i = 0; i < theJob.mtw_lb.size(); ++i) {
-                new_resource = std::max(initial_resources[I] + gamma.resource_increment[I], theJob.mtw_lb[i]);
-                if (new_resource > theJob.ub[I]) {
-                    continue; // Exceeds upper bound, try next time window
-                } else {
-                    is_feasible = true; // Feasible in this time window
-                    break;
-                }
-            }
-
-            if (!is_feasible) {
-                return false; // Not feasible in any of the ranges
-            }
-
-            return true; // Successfully processed all resources
-        } else {
-            bool is_feasible = false;
-            for (size_t i = 0; i < theJob.mtw_ub.size(); ++i) {
-                new_resource = std::min(initial_resources[I] - gamma.resource_increment[I], theJob.mtw_ub[i]);
-                if (new_resource < theJob.lb[I]) {
-                    continue; // Below lower bound, try next time window }
-                } else {
-                    is_feasible = true; // Feasible in this time window break;
-                }
-            }
-
-            if (!is_feasible) {
-                return false; // Not feasible in any of the ranges
-            }
-        }
-    }
-    return true; // Successfully processed all resources
-}
-
-/**
- * @brief Processes all resources by iterating through them and applying constraints.
- *
- * This function recursively processes each resource in the `new_resources` vector by calling
- * `process_resource` for each index from `I` to `N-1`. If any resource processing fails (i.e.,
- * `process_resource` returns false), the function returns false immediately. If all resources
- * are processed successfully, the function returns true.
- *
- */
-template <Direction D, size_t I, size_t N, typename Gamma, typename VRPJob>
-inline constexpr bool BucketGraph::process_all_resources(std::vector<double>         &new_resources,
-                                                         const std::array<double, 1> &initial_resources,
-                                                         const Gamma &gamma, const VRPJob &theJob) {
-    if constexpr (I < N) {
-        // Process the resource at index I
-        if (!process_resource<D, I, N>(new_resources[I], initial_resources, gamma, theJob)) {
-            return false; // Constraint violated, return false
-        }
-        // Recur to process the next resource
-        return process_all_resources<D, I + 1, N>(new_resources, initial_resources, gamma, theJob);
-    }
-    return true; // All resources processed successfully
 }

@@ -223,25 +223,35 @@ std::vector<std::vector<double>> LimitedMemoryRank1Cuts::separate(const SparseMo
  */
 void LimitedMemoryRank1Cuts::insertSet(VRPTW_SRC &cuts, int i, int j, int k, const std::vector<int> &buffer_int,
                                        int buffer_int_n, double LHS_cut) {
-    if (cuts.S_C_P.size() + 3 + buffer_int_n > cuts.S_C_P.capacity()) {
-        size_t new_size = static_cast<size_t>(std::ceil((cuts.S_C_P.size() + 3 + buffer_int_n) * 1.5));
+    // Estimate size to avoid frequent reallocations
+    size_t required_size = cuts.S_C_P.size() + 3 + buffer_int_n;
+    if (required_size > cuts.S_C_P.capacity()) {
+        size_t new_size =
+            static_cast<size_t>(std::ceil(required_size * 2.0)); // Double the size to avoid frequent reallocations
         cuts.S_C_P.reserve(new_size);
         cuts.S_C_P_max = new_size;
     }
 
-    auto mypair = std::make_pair(LHS_cut, cuts.S_n);
-    cuts.best_sets.emplace_back(mypair);
+    // Insert best set with emplace_back to avoid extra copies
+    cuts.best_sets.emplace_back(LHS_cut, cuts.S_n);
 
-    if (cuts.S.size() <= cuts.S_n) { cuts.S.resize(cuts.S_n + 1); }
+    // Resize cuts.S only if needed and in larger chunks
+    if (cuts.S.size() <= cuts.S_n) {
+        cuts.S.resize(cuts.S_n + 10); // Resize in larger chunks to reduce frequent resizing
+    }
 
+    // Store the current index of cuts.S_C_P for this set
     cuts.S[cuts.S_n] = cuts.S_C_P.size();
 
+    // Directly insert the values into S_C_P
     cuts.S_C_P.push_back(i);
     cuts.S_C_P.push_back(j);
     cuts.S_C_P.push_back(k);
 
-    for (int r = 0; r < buffer_int_n; ++r) { cuts.S_C_P.push_back(buffer_int[r]); }
+    // Use bulk insert for buffer_int to reduce loop overhead
+    cuts.S_C_P.insert(cuts.S_C_P.end(), buffer_int.begin(), buffer_int.begin() + buffer_int_n);
 
+    // Increment the set counter
     cuts.S_n++;
 }
 
@@ -306,18 +316,16 @@ void LimitedMemoryRank1Cuts::generateCutCoefficients(VRPTW_SRC &cuts, std::vecto
         exec::static_thread_pool pool(std::thread::hardware_concurrency());
         auto                     sched = pool.get_scheduler();
 
-        std::mutex       cuts_mutex; // Mutex for cutStorage to ensure thread-safe access
-        std::vector<int> tasks(m_max);
-        std::iota(tasks.begin(), tasks.end(), 0); // Filling tasks with indices 0 to m_max
+        std::mutex cuts_mutex; // Mutex for cutStorage to ensure thread-safe access
 
         auto input_sender = stdexec::just();
 
-        // sort best_sets
+        // Sort best_sets
         std::sort(cuts.best_sets.begin(), cuts.best_sets.end(), std::greater<>());
 
         // Define the bulk operation to process each cut
         auto bulk_sender = stdexec::bulk(
-            input_sender, tasks.size(), [this, &cuts, &coefficients, &x, &numNodes, &cuts_mutex](std::size_t ii) {
+            input_sender, m_max, [this, &cuts, &coefficients, &x, &numNodes, &cuts_mutex](std::size_t ii) {
                 if (cuts.best_sets.empty()) return;
 
                 int aux_int = cuts.best_sets[ii].second;
@@ -326,6 +334,7 @@ void LimitedMemoryRank1Cuts::generateCutCoefficients(VRPTW_SRC &cuts, std::vecto
                 int end   = cuts.S[aux_int + 1];
                 if (end == 0) return;
 
+                // Set up data for each thread
                 std::array<uint64_t, num_words> C  = {}; // Reset C for each cut
                 std::array<uint64_t, num_words> AM = {};
                 std::vector<int>                order(N_SIZE, 0);
@@ -356,8 +365,7 @@ void LimitedMemoryRank1Cuts::generateCutCoefficients(VRPTW_SRC &cuts, std::vecto
                     int first = -1, second = -1;
 
                     // Find the first and second appearances of any element in C_set within consumers
-                    for (size_t i = 1; i < consumers.size() - 1;
-                         ++i) { // Adjusted to start from 0 and iterate through the entire vector
+                    for (size_t i = 1; i < consumers.size() - 1; ++i) {
                         if (C_set.find(consumers[i]) != C_set.end()) {
                             if (first == -1) {
                                 first = i;
@@ -371,7 +379,6 @@ void LimitedMemoryRank1Cuts::generateCutCoefficients(VRPTW_SRC &cuts, std::vecto
                     // If we found both the first and second indices, mark nodes in AM
                     if (first != -1 && second != -1) {
                         for (int i = first + 1; i < second; ++i) {
-                            // fmt::print("Node: {}\n", consumers[i]);
                             AM[consumers[i] / 64] |= (1ULL << (consumers[i] % 64)); // Set the bit for the consumer
                         }
                     }
@@ -399,11 +406,11 @@ void LimitedMemoryRank1Cuts::generateCutCoefficients(VRPTW_SRC &cuts, std::vecto
 #endif
                 }
 
-                // Add the cut with the computed AM and coefficients_aux
+                // Create and store the cut
                 Cut cut(C, AM, coefficients_aux);
                 cut.baseSetOrder = order;
 
-                // Ensure thread-safe addition to cutStorage
+                // Thread-safe addition of the cut
                 {
                     std::lock_guard<std::mutex> lock(cuts_mutex);
                     cutStorage.addCut(cut);

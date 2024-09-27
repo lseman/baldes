@@ -11,6 +11,7 @@ rapids-cmake
 *.pkl
 *.json
 
+external/lkh/
 vrpsolve/
 
 cmake/
