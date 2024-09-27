@@ -30,6 +30,16 @@ SOFTWARE.*/
 
 #include "Params.h"
 
+struct EvalIndiv
+{
+	double penalizedCost = 0.;		// Penalized cost of the solution
+	int nbRoutes = 0;				// Number of routes
+	double distance = 0.;			// Total distance
+	double capacityExcess = 0.;		// Sum of excess load in all routes
+	double durationExcess = 0.;		// Sum of excess duration in all routes
+	bool isFeasible = false;		// Feasibility status of the individual
+};
+
 // Object to store all relevant information that may be needed to calculate some cost corresponding to a solution
 struct CostSol {
     double penalizedCost;  // Penalized cost of the solution
@@ -64,6 +74,8 @@ public:
     bool   isFeasible;      // Feasibility status of the individual
     double biasedFitness;   // Biased fitness of the solution
 
+    EvalIndiv eval;
+
     // Measuring cost of a solution from the information of chromR
     void evaluateCompleteCost();
 
@@ -95,6 +107,8 @@ public:
 
     // Constructor: create an individual from a giant tour representation including 0 for depot
     Individual(Params *params, std::string solutionStr);
+
+    Individual(Params *params, bool rcws, std::vector<std::vector<int>> *pattern);
 
     // Constructor: create an empty individual
     Individual();

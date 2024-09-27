@@ -30,6 +30,7 @@ SOFTWARE.*/
 #include <iostream>
 #include <limits.h>
 #include <numeric>
+#include <random>
 #include <string>
 #include <vector>
 
@@ -43,6 +44,13 @@ SOFTWARE.*/
 
 #define MY_EPSILON 0.00001 // Precision parameter, used to avoid numerical instabilities
 #define PI 3.14159265359   // Number pi, with 11 decimal precision
+
+struct Savings // Savins structure for the Clarke & Wright heuristic
+{
+    int    c1;    // Client 1
+    int    c2;    // Client 2
+    double value; // Cost savings if two routes are concatenated through edge (c1, c2)
+};
 
 // Structure of a Client, including its index, position, and all other variables and parameters
 struct Client {
@@ -135,6 +143,7 @@ public:
             true; // When to repeat the algorithm when max nr of iter is reached, but time limit is not
     };
 
+    bool verbose = true;
     Config      config; // Stores all the parameter values
     XorShift128 rng;    // Fast random number generator
     std::chrono::system_clock::time_point
@@ -170,6 +179,9 @@ public:
                                                       // clients (size nbClients + 1, but nothing stored for the depot!)
     int circleSectorOverlapTolerance;                 // Tolerance when determining circle sector overlap (0 - 65536)
     int minCircleSectorSize; // Minimum circle sector size to enforce (for nonempty routes) (0 - 65536)
+
+    std::vector<Savings> savingsList; // Savings list used in the Clarke & Wright heuristic
+	std::minstd_rand ran;               // Using the fastest and simplest LCG. The quality of random numbers is not critical for the LS, but speed is
 
     // Initialization from a given data set
     Params(const std::string &path_location);

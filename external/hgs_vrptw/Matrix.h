@@ -1,12 +1,8 @@
-
 #ifndef MATRIX_H
 #define MATRIX_H
 
 #include <vector>
 
-// Implementation of a matrix in a C++ vector
-// This class is used because a flat vector is faster than a vector of vectors which requires two lookup operations
-// rather than one to index a matrix element
 class Matrix {
     int              cols_; // The number of columns of the matrix
     std::vector<int> data_; // The vector where all the data is stored (this represents the matrix)
@@ -23,6 +19,16 @@ public:
 
     // Get the value at position (row, col) in the matrix
     int get(const int row, const int col) const { return data_[cols_ * row + col]; }
+
+    // Overload the subscript operator to access matrix rows
+    int* operator[](const int row) {
+        return &data_[cols_ * row]; // Return a pointer to the start of the row
+    }
+
+    // Const version for read-only access
+    const int* operator[](const int row) const {
+        return &data_[cols_ * row]; // Return a pointer to the start of the row (const version)
+    }
 };
 
 #endif

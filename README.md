@@ -44,7 +44,7 @@ Some features are experimental and subject to ongoing improvements:
 ### ⚙️ Compiling
 
 ```bash
-cmake -S . -B build -DR_SIZE=1 -DSRC=OFF
+cmake -S . -B build -DR_SIZE=1 -DN_SIZE=102 -DSRC=ON -DHGS=5
 cd build
 make -j$nprocs
 ```
@@ -84,6 +84,7 @@ Make sure the `GUROBI_HOME` environment variable is set.
 | `BUCKET_CAPACITY` | Maximum bucket capacity if `LIMITED_BUCKETS` is enabled | 50      |
 | `N_ADD`           | Number of columns to be added for each pricing          | 10      |
 | `MAIN_RESOURCES`  | Define the number of main resources                     | 1       |
+| `HGS`             | Maximum HGS running time                                | 5       |
 
 **Resource Disposability Definition**
 
