@@ -42,8 +42,8 @@ typedef std::vector<Individual *> SubPopulation;
 // tournaments, update fitness values etc.
 class Population {
 private:
-    Params      *params;      // Problem parameters
-    Split       *split;       // Split algorithm
+    Params         *params;      // Problem parameters
+    Split          *split;       // Split algorithm
     HGSLocalSearch *localSearch; // Local search structure
     SubPopulation
         feasibleSubpopulation; // Feasible subpopulation (called a 'pool'), kept ordered by increasing penalized cost
@@ -127,7 +127,8 @@ public:
     std::vector<std::vector<int>> extractFeasibleRoutes() {
         std::vector<std::vector<int>> feasibleRoutes; // Stores all feasible routes with nodes
 
-        // Iterate over all feasible individuals
+        // auto indiv = getBestFound();
+        //  Iterate over all feasible individuals
         for (Individual *indiv : feasibleSubpopulation) {
             // Loop over all routes/vehicles of the solution
             for (int k = 0; k < params->nbVehicles; k++) {
@@ -148,6 +149,7 @@ public:
                 }
             }
         }
+        //}
 
         return feasibleRoutes;
     }

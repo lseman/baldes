@@ -17,7 +17,7 @@
 
 Params::Params(const std::string &path_location) {
     // Read and create some parameter values from the commandline
-    //config             = cl.config;
+    // config             = cl.config;
     nbVehicles         = config.nbVeh;
     rng                = XorShift128(config.seed);
     startWallClockTime = std::chrono::system_clock::now();

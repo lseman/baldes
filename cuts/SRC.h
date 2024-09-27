@@ -618,7 +618,7 @@ void LimitedMemoryRank1Cuts::the45Heuristic(const SparseModel &A, const std::vec
 
     while (!cutQueue.empty()) {
         auto topCut = cutQueue.top();
-        cutStorage.addCut(topCut.second);
+    cutStorage.addCut(topCut.second);
         cutQueue.pop();
     }
 }

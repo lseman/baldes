@@ -93,7 +93,7 @@ struct Cut {
     bool                            updated     = false;
     CutType                         type        = CutType::ThreeRow;
     GRBConstr                       grbConstr;
-
+    size_t                          key;
     // Default constructor
     Cut() = default;
 
@@ -124,6 +124,8 @@ class CutStorage {
 public:
     int latest_column = 0;
 
+    Cut &operator[](std::size_t index) { return cuts[index]; }
+
     // Add a cut to the storage
     /**
      * @brief Adds a cut to the current collection of cuts.
@@ -135,6 +137,42 @@ public:
      * @param cut A reference to the Cut object to be added.
      */
     void addCut(Cut &cut);
+
+    void removeCut(int cutIndex) {
+        // Ensure the cutIndex is within bounds
+        if (cutIndex < 0 || cutIndex >= cuts.size()) {
+            std::cerr << "Cut index " << cutIndex << " is out of bounds." << std::endl;
+            return;
+        }
+
+        // Erase the cut from the cuts vector
+        cuts.erase(cuts.begin() + cutIndex);
+
+        for (auto &entry : cuts) {
+            if (entry.id > cutIndex) {
+                entry.id--; // Decrement index to account for the removed cut
+            }
+        }
+
+        // Find the corresponding entry in the map
+        auto it = std::find_if(cutMaster_to_cut_map.begin(), cutMaster_to_cut_map.end(),
+                               [cutIndex](const auto &pair) { return pair.second == cutIndex; });
+
+        if (it != cutMaster_to_cut_map.end()) {
+            // Remove the entry for the removed cut
+            cutMaster_to_cut_map.erase(it);
+        } else {
+            std::cerr << "Cut index " << cutIndex << " not found in cutMaster_to_cut_map." << std::endl;
+            return; // No need to continue if the cut wasn't found in the map
+        }
+
+        // Reorganize the indices in the map for all subsequent cuts
+        for (auto &entry : cutMaster_to_cut_map) {
+            if (entry.second > cutIndex) {
+                entry.second--; // Decrement index to account for the removed cut
+            }
+        }
+    }
 
     std::vector<double> SRCDuals = {};
 
@@ -148,7 +186,7 @@ public:
     void setDuals(const std::vector<double> &duals) { SRCDuals = duals; }
 
     // Define size method
-    size_t size() const noexcept { return cuts.size(); }
+    size_t size() noexcept { return cuts.size(); }
 
     // Define begin and end
     auto begin() const noexcept { return cuts.begin(); }
@@ -817,6 +855,9 @@ inline void printBaldes() {
     fmt::print("| {:<52} |\n", "Branch-Cut-and-Price algorithms for various");
     fmt::print("| {:<52} |\n", "Vehicle Routing Problems (VRPs).");
     fmt::print("| {:<52} |\n", " ");
+    fmt::print("| {:<52} |\n", "https://github.com/lseman/baldes");
+    fmt::print("| {:<52} |\n", " ");
+
     fmt::print("+------------------------------------------------------+\n");
     fmt::print("\n");
 }
