@@ -64,80 +64,18 @@ void BucketGraph::add_arc(int from_bucket, int to_bucket, const std::vector<doub
  */
 template <Direction D>
 inline int BucketGraph::get_bucket_number(int job, const std::vector<double> &resource_values_vec) noexcept {
-    const auto &num_buckets_index = assign_buckets<D>(num_buckets_index_fw, num_buckets_index_bw);
-    const int   start_index       = num_buckets_index[job];
 
-    if constexpr (R_SIZE > 1) {
-        auto            &vrpjob = jobs[job];
-        std::vector<int> base_intervals(MAIN_RESOURCES);
-        std::vector<int> first_lb(MAIN_RESOURCES);
-        std::vector<int> first_ub(MAIN_RESOURCES);
-        std::vector<int> remainders(MAIN_RESOURCES);
-
-        // Compute base intervals, remainders, and bounds for each dimension
-        for (int r = 0; r < MAIN_RESOURCES; ++r) {
-            base_intervals[r] = (R_max[r] - R_min[r] + 1) / intervals[r].interval;
-            remainders[r]     = static_cast<int>(R_max[r] - R_min[r] + 1) % intervals[r].interval;
-            first_lb[r]       = vrpjob.lb[r]; // Lower bound for each dimension
-            first_ub[r]       = vrpjob.ub[r]; // Upper bound for each dimension
-        }
-
-        int bucket_index = 0;
-        int multiplier   = 1; // This will be used to compute the final bucket index across dimensions
-
-        if constexpr (D == Direction::Forward) {
-            // Iterate over each resource value and compute the bucket index for forward direction
-            for (int r = MAIN_RESOURCES - 1; r >= 0; --r) {
-                int resource_value_int = static_cast<int>(resource_values_vec[r]);
-                int bucket_dim_index;
-
-                // Handle uneven divisions by accounting for remainders
-                if (resource_value_int < first_lb[r] + base_intervals[r] * (remainders[r] > 0)) {
-                    bucket_dim_index = (resource_value_int - first_lb[r]) / base_intervals[r];
-                } else {
-                    bucket_dim_index = (resource_value_int - first_lb[r] - remainders[r]) / base_intervals[r];
-                }
-
-                bucket_index += bucket_dim_index * multiplier;
-                multiplier *=
-                    (R_max[r] - R_min[r] + 1) / base_intervals[r]; // Update the multiplier for the next dimension
-            }
-        } else if constexpr (D == Direction::Backward) {
-            // Iterate over each resource value and compute the bucket index for backward direction
-            for (int r = MAIN_RESOURCES - 1; r >= 0; --r) {
-                int resource_value_int = static_cast<int>(resource_values_vec[r]);
-                int bucket_dim_index;
-
-                // Handle uneven divisions by accounting for remainders
-                if (resource_value_int > first_ub[r] - base_intervals[r] * (remainders[r] > 0)) {
-                    bucket_dim_index = (first_ub[r] - resource_value_int) / base_intervals[r];
-                } else {
-                    bucket_dim_index = (first_ub[r] - resource_value_int - remainders[r]) / base_intervals[r];
-                }
-
-                bucket_index += bucket_dim_index * multiplier;
-                multiplier *=
-                    (R_max[r] - R_min[r] + 1) / base_intervals[r]; // Update the multiplier for the next dimension
-            }
-        }
-        return bucket_index + start_index; // Add the starting index to get the final bucket index
-    } else {
-        const auto &num_buckets_index = assign_buckets<D>(num_buckets_index_fw, num_buckets_index_bw);
-        const int   start_index       = num_buckets_index[job];
-        const int   base_interval     = (R_max[0] - R_min[0] + 1) / intervals[0].interval;
-        int         value             = static_cast<int>(resource_values_vec[0]);
-
-        const auto &vrpjob = jobs[job];
-
-        if constexpr (D == Direction::Forward) {
-            const int first_lb = vrpjob.lb[0];
-            return (value - first_lb) / base_interval + start_index;
-        } else if constexpr (D == Direction::Backward) {
-            const int first_ub = vrpjob.ub[0];
-            return (first_ub - value) / base_interval + start_index;
-        }
-        return -1; // If no bucket is found
+    std::vector<int> resource_vec_int(resource_values_vec.data(),
+                                      resource_values_vec.data() + resource_values_vec.size());
+    if constexpr (D == Direction::Forward) {
+        auto val = fw_job_interval_trees[job].query(resource_vec_int);
+        return val;
+    } else if constexpr (D == Direction::Backward) {
+        auto val = bw_job_interval_trees[job].query(resource_vec_int);
+        return val;
     }
+    std::throw_with_nested(std::runtime_error("BucketGraph::get_bucket_number: Invalid direction"));
+    return -1; // If no bucket is found
 }
 
 /**
@@ -159,67 +97,95 @@ void BucketGraph::define_buckets() {
     for (int r = 0; r < num_intervals; ++r) {
         total_ranges[r]   = R_max[r] - R_min[r] + 1;
         base_intervals[r] = total_ranges[r] / intervals[r].interval;
-        remainders[r]     = total_ranges[r] % intervals[r].interval; // Use std::fmod for floating-point modulo
+        remainders[r]     = total_ranges[r] % intervals[r].interval;
     }
+
     auto &buckets           = assign_buckets<D>(fw_buckets, bw_buckets);
     auto &num_buckets       = assign_buckets<D>(num_buckets_fw, num_buckets_bw);
     auto &num_buckets_index = assign_buckets<D>(num_buckets_index_fw, num_buckets_index_bw);
     num_buckets.resize(jobs.size());
     num_buckets_index.resize(jobs.size());
 
-    int cum_sum      = 0; // Keeps track of the global bucket index
-    int bucket_index = 0; // Keeps track of where to insert the next bucket
+    int cum_sum      = 0; // Tracks global bucket index
+    int bucket_index = 0;
+
+    // Helper function to check if the job can fit in a single bucket
+    auto fits_single_bucket = [&](const auto &job_total_ranges) {
+        for (int r = 0; r < num_intervals; ++r) {
+            if (job_total_ranges[r] > base_intervals[r]) { return false; }
+        }
+        return true;
+    };
 
     // Loop through each job to define its specific buckets
     for (const auto &VRPJob : jobs) {
         std::vector<int> job_total_ranges(num_intervals);
         for (int r = 0; r < num_intervals; ++r) { job_total_ranges[r] = VRPJob.ub[r] - VRPJob.lb[r]; }
-        // Check if the job's range fits within a single base interval for all dimensions
-        bool fits_single_bucket = true;
-        for (int r = 0; r < num_intervals; ++r) {
-            if (job_total_ranges[r] > base_intervals[r]) {
-                fits_single_bucket = false;
-                break;
-            }
-        }
 
-        if (fits_single_bucket) {
-            // Single bucket case for all resources
-            std::vector<int> lb(num_intervals), ub(num_intervals);
-            for (int r = 0; r < num_intervals; ++r) {
-                lb[r] = VRPJob.lb[r];
-                ub[r] = VRPJob.ub[r];
+        SplayTree job_tree;
+
+        if (fits_single_bucket(job_total_ranges)) {
+            // Single bucket case
+            std::vector<int> lb = VRPJob.lb, ub = VRPJob.ub;
+            buckets[bucket_index] = Bucket(VRPJob.id, lb, ub);
+
+            if constexpr (D == Direction::Forward) {
+                job_tree.insert(lb, ub, bucket_index);
+            } else {
+                job_tree.insert(lb, ub, bucket_index);
             }
-            buckets[bucket_index]        = Bucket(VRPJob.id, lb, ub);
+
             num_buckets[VRPJob.id]       = 1;
             num_buckets_index[VRPJob.id] = cum_sum;
             bucket_index++;
             cum_sum++;
+
         } else {
-            // Multiple bucket case, need to consider intervals for each resource dimension
+            // Multiple buckets case
             int              n_buckets = 0;
             std::vector<int> current_pos(num_intervals, 0);
 
-            // Nested loop over all intervals in each resource dimension
             while (true) {
                 std::vector<int> interval_start(num_intervals), interval_end(num_intervals);
 
+                // Calculate the start and end for each interval dimension
                 for (int r = 0; r < num_intervals; ++r) {
                     interval_start[r] = VRPJob.lb[r] + current_pos[r] * base_intervals[r];
                     interval_end[r]   = VRPJob.ub[r] - current_pos[r] * base_intervals[r];
 
+                    // Ensure intervals align with direction (forward/backward)
                     if constexpr (D == Direction::Forward) {
                         interval_end[r] = VRPJob.ub[r];
                     } else if constexpr (D == Direction::Backward) {
                         interval_start[r] = VRPJob.lb[r];
                     }
                 }
+
+                // Create a new bucket for this job
                 buckets[bucket_index] = Bucket(VRPJob.id, interval_start, interval_end);
+
+                if constexpr (D == Direction::Forward) {
+                    std::vector<int> interval_fw_end(interval_start.size());
+                    for (int r = 0; r < interval_start.size(); ++r) {
+                        interval_fw_end[r] = interval_start[r] + base_intervals[r];
+                    }
+
+                    job_tree.insert(interval_start, interval_fw_end, bucket_index);
+                } else {
+                    std::vector<int> interval_bw_end(interval_start.size());
+
+                    for (int r = 0; r < interval_start.size(); ++r) {
+                        interval_bw_end[r] = interval_end[r] - base_intervals[r];
+                    }
+
+                    job_tree.insert(interval_bw_end, interval_end, bucket_index);
+                }
+
                 bucket_index++;
                 n_buckets++;
                 cum_sum++;
 
-                // Update the position of intervals
+                // Check if we need to exit the loop (all intervals covered)
                 bool done = true;
                 for (int r = num_intervals - 1; r >= 0; --r) {
                     current_pos[r]++;
@@ -233,11 +199,18 @@ void BucketGraph::define_buckets() {
                 if (done) break;
             }
 
+            // Update job-specific bucket data
             num_buckets[VRPJob.id]       = n_buckets;
             num_buckets_index[VRPJob.id] = cum_sum - n_buckets;
         }
+        if constexpr (D == Direction::Forward) {
+            fw_job_interval_trees[VRPJob.id] = job_tree;
+        } else {
+            bw_job_interval_trees[VRPJob.id] = job_tree;
+        }
     }
 
+    // Update global bucket sizes based on direction
     if constexpr (D == Direction::Forward) {
         fw_buckets_size = cum_sum;
     } else {
@@ -357,7 +330,8 @@ void BucketGraph::generate_arcs() {
                     std::lock_guard<std::mutex> lock(buckets_mutex); // Lock the mutex to ensure thread safety
                     add_arc<D>(from_bucket, to_bucket, local_res_inc, local_cost_inc); // Add the arc globally
                     buckets[from_bucket].add_bucket_arc(from_bucket, to_bucket, local_res_inc, local_cost_inc,
-                                                        D == Direction::Forward, false); // Add the arc to the bucket
+                                                        D == Direction::Forward,
+                                                        false); // Add the arc to the bucket
                 }
             }
         }

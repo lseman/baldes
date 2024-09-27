@@ -831,7 +831,7 @@ public:
                     ////////////////////////////////////////////////////
                     // Handle non-violated cuts in a single pass
                     ////////////////////////////////////////////////////
-                    bool cleared     = false;
+                    bool cleared        = false;
                     auto n_cuts_removed = 0;
                     // Iterate over the constraints in reverse order to remove non-violated cuts
                     for (int i = SRCconstraints.size() - 1; i >= 0; --i) {

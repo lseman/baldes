@@ -37,16 +37,16 @@ public:
                   << " VEHICLES" << std::endl;
         std::cout << "----- BUILDING INITIAL POPULATION" << std::endl;
         Population population(&params, &split, &localSearch);
-
-        
-        // Genetic algorithm
-        std::cout << "----- STARTING GENETIC ALGORITHM" << std::endl;
-        Genetic solver(&params, &split, &population, &localSearch);
-        solver.run(config.nbIter, config.timeLimit);
-        std::cout << "----- GENETIC ALGORITHM FINISHED, TIME SPENT: " << params.getTimeElapsedSeconds() << std::endl;
-
+        /*
+                // Genetic algorithm
+                std::cout << "----- STARTING GENETIC ALGORITHM" << std::endl;
+                Genetic solver(&params, &split, &population, &localSearch);
+                solver.run(config.nbIter, config.timeLimit);
+                std::cout << "----- GENETIC ALGORITHM FINISHED, TIME SPENT: " << params.getTimeElapsedSeconds() <<
+           std::endl;
+                */
         auto sol = population.extractFeasibleRoutes();
-        
+
         // Return 0 if the program execution was successfull
         return sol;
     }
