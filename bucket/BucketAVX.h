@@ -1,3 +1,9 @@
+/**
+ * @file BucketAVX.h
+ * @brief SIMD-based dominance check for label comparison.
+ *
+ * This file contains the implementation of a SIMD-based dominance check for label comparison.
+ */
 #pragma once
 
 #include "Definitions.h"
@@ -6,6 +12,13 @@
 
 #include <experimental/simd>
 
+/**
+ * @brief Checks if a new label is dominated by any label in a given vector using SIMD operations.
+ *
+ * This function performs dominance checks between a new label and a vector of existing labels.
+ * It utilizes SIMD operations to process multiple labels simultaneously for efficiency.
+ *
+ */
 template <Direction D, Stage S>
 inline bool check_dominance_against_vector(const Label *new_label, const std::vector<Label *> &labels) noexcept {
     using namespace std::experimental;

@@ -39,10 +39,6 @@
  * into the routes, and pushes the refined labels into the output priority queue if they are feasible and
  * have a lower cost than the current label.
  *
- * @param best_labels_in  A priority queue containing the best labels to be refined.
- * @param best_labels_out A priority queue to store the refined labels.
- * @param max_n_labels    The maximum number of labels to process.
- * @return int            Returns 1 upon completion.
  */
 int BucketGraph::RIH1(std::priority_queue<Label *, std::vector<Label *>, LabelComparator> &best_labels_in,
                       std::priority_queue<Label *, std::vector<Label *>, LabelComparator> &best_labels_out,
@@ -161,10 +157,6 @@ int BucketGraph::RIH1(std::priority_queue<Label *, std::vector<Label *>, LabelCo
  * recalculates the costs, and pushes improved labels to an output priority queue. The process is
  * repeated until a maximum number of iterations is reached or the input queue is empty.
  *
- * @param best_labels_in  A priority queue of labels to be processed.
- * @param best_labels_out A priority queue to store the improved labels.
- * @param max_n_labels    The maximum number of labels to process.
- * @return int            Returns 1 upon completion.
  */
 int BucketGraph::RIH2(std::priority_queue<Label *, std::vector<Label *>, LabelComparator> &best_labels_in,
                       std::priority_queue<Label *, std::vector<Label *>, LabelComparator> &best_labels_out,
@@ -266,10 +258,6 @@ int BucketGraph::RIH2(std::priority_queue<Label *, std::vector<Label *>, LabelCo
  * neighboring jobs and recalculating the cost. If the new label is feasible and has a lower cost, it is added
  * to the output priority queue.
  *
- * @param best_labels_in  A priority queue of labels to be processed.
- * @param best_labels_out A priority queue where improved labels are stored.
- * @param max_n_labels    The maximum number of labels to process.
- * @return int            Returns 1 upon completion.
  */
 int BucketGraph::RIH3(std::priority_queue<Label *, std::vector<Label *>, LabelComparator> &best_labels_in,
                       std::priority_queue<Label *, std::vector<Label *>, LabelComparator> &best_labels_out,
@@ -382,10 +370,6 @@ int BucketGraph::RIH3(std::priority_queue<Label *, std::vector<Label *>, LabelCo
  * to generate new labels with potentially lower costs. The new labels are then checked for feasibility
  * and added to the output priority queue if they are better than the current label.
  *
- * @param best_labels_in  A priority queue of labels to be processed.
- * @param best_labels_out A priority queue to store the resulting labels after processing.
- * @param max_n_labels    The maximum number of labels to process.
- * @return int            Returns 1 upon completion.
  */
 int BucketGraph::RIH4(std::priority_queue<Label *, std::vector<Label *>, LabelComparator> &best_labels_in,
                       std::priority_queue<Label *, std::vector<Label *>, LabelComparator> &best_labels_out,
@@ -498,12 +482,9 @@ inline std::vector<size_t> BucketGraph::findBestInsertionPositions(const std::ve
     return best_positions;
 }
 
-/** Calculate the cost of inserting a customer at a given position in a route
- * @brief Calculates the cost of inserting a customer at a given position in a route.
- * @param route     The current route to insert the customer into.
- * @param customer  The customer to insert into the route.
- * @param pos       The position in the route to insert the customer.
- * @return double   Returns the cost of inserting the customer at the given position.
+/** 
+ * @brief Calculate the cost of inserting a customer at a given position in a route
+ *
  */
 double BucketGraph::calculateInsertionCost(const std::vector<int> &route, int &customer, size_t pos) {
     double cost = 0.0;
@@ -524,10 +505,6 @@ double BucketGraph::calculateInsertionCost(const std::vector<int> &route, int &c
  * This function processes the input priority queue of labels, attempts to improve each label by swapping pairs of jobs
  * and recalculating the cost. If the new label is feasible and has a lower cost, it is added to the output priority
  * queue.
- * @param best_labels_in  A priority queue of labels to be processed.
- * @param best_labels_out A priority queue where improved labels are stored.
- * @param max_n_labels    The maximum number of labels to process.
- * @return int            Returns the number of iterations completed.
  */
 
 int BucketGraph::RIH5(std::priority_queue<Label *, std::vector<Label *>, LabelComparator> &best_labels_in,

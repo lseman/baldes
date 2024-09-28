@@ -47,9 +47,6 @@ using Cuts = std::vector<Cut>;
  * and the multipliers are a vector of double values. The order of elements in
  * both the base set and multipliers is preserved during hashing.
  *
- * @param baseSet An array of uint64_t values representing the base set.
- * @param multipliers A vector of double values representing the multipliers.
- * @return A std::size_t value representing the computed cut key.
  */
 std::size_t compute_cut_key(const std::array<uint64_t, num_words> &baseSet, const std::vector<double> &multipliers) {
     std::size_t cut_key = 0;
@@ -76,7 +73,6 @@ std::size_t compute_cut_key(const std::array<uint64_t, num_words> &baseSet, cons
  * it updates the existing cut. Otherwise, it adds the new cut to the storage and updates the
  * necessary mappings.
  *
- * @param cut The cut to be added to the storage.
  */
 void CutStorage::addCut(Cut &cut) {
 
@@ -116,11 +112,6 @@ LimitedMemoryRank1Cuts::LimitedMemoryRank1Cuts(std::vector<VRPJob> &jobs) : jobs
  * It uses a parallel approach to evaluate combinations of indices and identify violations
  * that exceed the specified threshold.
  *
- * @param A The sparse model containing the problem matrix.
- * @param x The solution vector to be separated into cuts.
- * @param nC The number of columns in the sparse model.
- * @param violation_threshold The threshold for identifying violations.
- * @return A vector of vectors containing the coefficients of the generated cuts.
  */
 std::vector<std::vector<double>> LimitedMemoryRank1Cuts::separate(const SparseModel &A, const std::vector<double> &x) {
     // Create a map for non-zero entries by rows
@@ -214,14 +205,6 @@ std::vector<std::vector<double>> LimitedMemoryRank1Cuts::separate(const SparseMo
  * to accommodate the new data and resizes it if necessary. The function also updates
  * the best sets and the S_C_P vector with the new data.
  *
- * @param cuts The VRPTW_SRC cuts structure to insert data into.
- * @param i The first index to insert.
- * @param j The second index to insert.
- * @param k The third index to insert.
- * @param buffer_int A vector containing additional integer data to insert.
- * @param buffer_int_n The number of elements in buffer_int to insert.
- * @param LHS_cut The left-hand side cut value associated with the set.
- * @param violation_threshold The threshold value for determining significant violations.
  */
 void LimitedMemoryRank1Cuts::insertSet(VRPTW_SRC &cuts, int i, int j, int k, const std::vector<int> &buffer_int,
                                        int buffer_int_n, double LHS_cut) {
@@ -265,10 +248,6 @@ void LimitedMemoryRank1Cuts::insertSet(VRPTW_SRC &cuts, int i, int j, int k, con
  * Each route is represented as a vector of integers, where each integer corresponds
  * to a node index.
  *
- * @param A The sparse model represented by the SparseModel structure.
- * @param selectedNodes A vector of integers representing the nodes to be visited.
- * @return A vector of vectors, where each inner vector represents a route visiting
- *         the specified nodes.
  */
 inline std::vector<std::vector<int>> findRoutesVisitingNodes(const SparseModel      &A,
                                                              const std::vector<int> &selectedNodes) {
@@ -300,11 +279,6 @@ inline std::vector<std::vector<int>> findRoutesVisitingNodes(const SparseModel  
  * This function generates cut coefficients for the given VRPTW_SRC cuts using a limited memory rank-1 approach.
  * It processes the cuts in parallel using a thread pool and scheduler, ensuring thread-safe access to shared resources.
  *
- * @param cuts Reference to the VRPTW_SRC cuts.
- * @param coefficients Reference to a 2D vector to store the generated coefficients.
- * @param numNodes Number of nodes in the problem.
- * @param A Reference to the SparseModel.
- * @param x Reference to the vector of decision variables.
  */
 void LimitedMemoryRank1Cuts::generateCutCoefficients(VRPTW_SRC &cuts, std::vector<std::vector<double>> &coefficients,
                                                      int numNodes, const SparseModel &A, const std::vector<double> &x) {

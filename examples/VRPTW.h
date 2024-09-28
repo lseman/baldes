@@ -169,10 +169,6 @@ public:
     /*
      * Adds a column to the GRBModel.
      *
-     * @param node A pointer to the GRBModel object.
-     * @param columns The columns to be added.
-     * @param enumerate Flag indicating whether to enumerate the columns.
-     * @return The number of columns added.
      */
     inline int addColumn(GRBModel *node, const auto &columns, bool enumerate = false) {
         auto &cuts = r1c.cutStorage;
@@ -276,9 +272,6 @@ public:
      * This function modifies the coefficients of a constraint in the specified GRBModel
      * by iterating over the variables and updating their coefficients using the provided values.
      *
-     * @param model A pointer to the GRBModel object.
-     * @param constrName The name of the constraint to modify.
-     * @param value A vector containing the new coefficients for each variable.
      */
     void chgCoeff(GRBModel *model, const GRBConstr &constrName, std::vector<double> value) {
         auto varNames = model->getVars();
@@ -293,7 +286,6 @@ public:
      * It iterates over all variables in the model and sets their variable type to GRB_BINARY.
      * After updating the model, all variables will be binary variables.
      *
-     * @param model A pointer to the GRBModel to be modified.
      */
     void binarizeNode(GRBModel *model) {
         auto varNumber = model->get(GRB_IntAttr_NumVars);
@@ -303,12 +295,11 @@ public:
         }
         model->update();
     }
+
     /**
      * Removes variables with negative reduced costs, up to a maximum of 30% of the total variables,
      * and also removes corresponding elements from the allPaths vector.
      *
-     * @param model A pointer to the GRBModel object.
-     * @param allPaths A reference to the vector of paths associated with the variables.
      */
     void removeNegativeReducedCostVarsAndPaths(GRBModel *model) {
         model->optimize();
@@ -351,8 +342,6 @@ public:
     /**
      * Retrieves the dual values of the constraints in the given GRBModel.
      *
-     * @param model A pointer to the GRBModel object.
-     * @return A vector of double values representing the dual values of the constraints.
      */
     std::vector<double> getDuals(GRBModel *model) {
         // int                    numConstrs = model->get(GRB_IntAttr_NumConstrs);
@@ -375,8 +364,6 @@ public:
     /**
      * Extracts the solution from a given GRBModel object.
      *
-     * @param model A pointer to the GRBModel object.
-     * @return A vector of doubles representing the solution.
      */
     std::vector<double> extractSolution(GRBModel *model) {
         std::vector<double> sol;
@@ -389,10 +376,6 @@ public:
     /**
      * Handles the cuts for the VRPTW problem.
      *
-     * @param r1c The LimitedMemoryRank1Cuts object.
-     * @param node The GRBModel pointer.
-     * @param constraints The vector of GRBConstr objects.
-     * @return A boolean indicating whether any changes were made.
      */
     bool cutHandler(LimitedMemoryRank1Cuts &r1c, GRBModel *node, std::vector<GRBConstr> &constraints) {
         auto &cuts    = r1c.cutStorage;
@@ -537,18 +520,6 @@ public:
      * This function identifies and adds violated RCC cuts to the model to improve the solution.
      * It uses parallel execution to handle the separation and constraint addition efficiently.
      *
-     * @param model Pointer to the Gurobi model.
-     * @param solution Vector containing the current solution values.
-     * @param constraints 3D vector to store the generated constraints.
-     * @return True if violated RCC cuts were found and added to the model, false otherwise.
-     *
-     * The function follows these steps:
-     * 1. Initializes the constraint manager and precomputes edge values from the LP solution.
-     * 2. Identifies edges with significant values and prepares data for RCC separation.
-     * 3. Performs RCC separation to find violated cuts.
-     * 4. If no violated cuts are found, returns false indicating an optimal solution.
-     * 5. If violated cuts are found, processes them in parallel to generate constraints.
-     * 6. Adds the generated constraints to the model and updates the model.
      */
 
     bool RCCsep(GRBModel *model, const std::vector<double> &solution,
@@ -683,7 +654,7 @@ public:
         print_info("Column generation started...\n");
 
         node->optimize();
-        int bucket_interval = 20;
+        int bucket_interval = 150;
         int time_horizon    = instance.T_max;
 
         numConstrs                = node->get(GRB_IntAttr_NumConstrs);

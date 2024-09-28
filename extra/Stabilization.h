@@ -6,17 +6,6 @@
  * stabilization process during column generation in large-scale optimization problems,
  * such as vehicle routing and resource-constrained shortest path problems (RCSPP).
  *
- * The class maintains various dual solution parameters, including stability centers and
- * misprice sequences, and it adjusts dual values based on a set of rules to improve
- * convergence and avoid oscillations during the optimization process.
- *
- * Key Features:
- * - Maintains and updates dual solutions during the optimization.
- * - Handles the stabilization of dual values by adjusting the alpha parameter.
- * - Provides methods for computing the norms and updates for misprice sequences.
- * - Calculates subgradients and adjusts duals using norms and angles between vectors.
- * - Implements a misprice schedule to control the alpha value during stabilization.
- *
  * The Stabilization class is crucial for improving the convergence of column generation
  * algorithms by stabilizing the dual values and avoiding large oscillations in the dual space.
  */

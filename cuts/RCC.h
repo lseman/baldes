@@ -42,13 +42,6 @@ using namespace std;
  * problem and searches for multiple solutions that violate the RCC constraints. The function returns multiple sets of
  * nodes corresponding to the solutions found.
  *
- * @param gurobi_model Pointer to the Gurobi model.
- * @param Q Integer parameter representing the capacity.
- * @param demand Vector of integers representing the demand.
- * @param opt_obj Double representing the optimal objective value.
- * @param verbose Boolean flag to enable verbose output.
- * @param allPaths Vector of Path objects representing all paths.
- * @return std::vector<std::set<int>> A vector of sets, where each set contains nodes corresponding to a solution.
  */
 inline std::vector<set<int>> separate_Rounded_Capacity_cuts(GRBModel *gurobi_model, int Q,
                                                             const std::vector<int>    &demand,

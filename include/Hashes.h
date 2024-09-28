@@ -26,8 +26,6 @@
  * allowing them to be used as keys in unordered containers such as
  * std::unordered_map or std::unordered_set.
  *
- * @tparam T1 The type of the first element in the pair.
- * @tparam T2 The type of the second element in the pair.
  */
 struct pair_hash {
     template <class T1, class T2>
@@ -43,8 +41,6 @@ struct pair_hash {
  * This struct defines an operator() that compares two pairs of the same type
  * and returns true if both the first and second elements of the pairs are equal.
  *
- * @tparam T1 The type of the first element in the pair.
- * @tparam T2 The type of the second element in the pair.
  */
 struct pair_equal {
     template <class T1, class T2>
@@ -60,7 +56,6 @@ struct pair_equal {
  * and an integer. It combines the hash values of the inner pair and the integer to produce
  * a single hash value.
  *
- * @tparam None Template specialization for std::pair<std::pair<int, int>, int>.
  */
 template <>
 struct std::hash<std::pair<std::pair<int, int>, int>> {
@@ -80,9 +75,6 @@ struct std::hash<std::pair<std::pair<int, int>, int>> {
  * This function converts a double value to a string with 17 decimal places of precision,
  * then hashes the resulting string and combines it with the provided index using a bitwise XOR operation.
  *
- * @param value The double value to be hashed.
- * @param index The index to combine with the hash of the double value.
- * @return A size_t representing the combined hash value.
  */
 inline std::size_t hash_double(double value, std::size_t index) {
     std::ostringstream oss;
@@ -98,9 +90,6 @@ inline std::size_t hash_double(double value, std::size_t index) {
  * and combines it with the seed to produce a new hash value. This is useful for
  * creating composite hash values from multiple inputs.
  *
- * @tparam T The type of the value to be hashed.
- * @param seed A reference to the existing seed to be combined with the hash of the value.
- * @param value The value to be hashed and combined with the seed.
  */
 template <typename T>
 inline void hash_combine(std::size_t &seed, const T &value) {

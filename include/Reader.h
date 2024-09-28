@@ -113,48 +113,12 @@ struct InstanceData {
 };
 
 /**
- * @brief Deletes an arc between two vertices and stores the deleted arcs.
- *
- * This function deletes an arc between the specified vertices and stores the
- * deleted arcs in the provided vector. It also manages the allocation and
- * resizing of the vector to accommodate new entries.
- *
- * @param vertex_from The starting vertex of the arc to be deleted. Must be non-negative.
- * @param vertex_to The ending vertex of the arc to be deleted. Must be non-negative.
- * @param deleted_arcs A reference to a vector that stores the deleted arcs.
- * @param deleted_arcs_n A reference to an integer that keeps track of the number of deleted arcs.
- * @param deleted_arcs_n_max A reference to an integer that specifies the maximum capacity of the deleted_arcs vector.
- * @return Returns 1 if the arc is successfully deleted and stored, -1 if either vertex_from or vertex_to is negative.
- */
-inline int VRPTW_delete_arc(int vertex_from, int vertex_to, std::vector<int> &deleted_arcs, int &deleted_arcs_n,
-                            int &deleted_arcs_n_max) {
-    if (vertex_from < 0 || vertex_to < 0) return -1;
-
-    if (deleted_arcs.empty()) {
-        std::cout << "\n ### Allocation on RCESPP_delete_arc() ### ";
-        deleted_arcs_n_max = 500;
-        deleted_arcs_n     = 0;
-        deleted_arcs.resize(deleted_arcs_n_max);
-    } else if (deleted_arcs_n + 2 >= deleted_arcs_n_max) {
-        deleted_arcs_n_max *= 2;
-        deleted_arcs.resize(deleted_arcs_n_max);
-    }
-
-    deleted_arcs[deleted_arcs_n++] = vertex_from;
-    deleted_arcs[deleted_arcs_n++] = vertex_to;
-
-    return 1;
-}
-
-/**
  * @brief Reduces the time windows for the vertices in the VRPTW instance.
  *
  * This function iteratively reduces the time windows for the vertices in the VRPTW (Vehicle Routing Problem with Time
  * Windows) instance. The reduction is performed based on the distances, service times, and existing time windows of the
  * vertices. The function stops iterating if no further reduction is possible or after a maximum number of iterations.
  *
- * @param instance The VRPTW instance data.
- * @return int Returns 1 upon successful reduction of time windows.
  */
 inline int VRPTW_reduce_time_windows(InstanceData &instance) {
     int    it      = 0;
@@ -229,9 +193,6 @@ inline int VRPTW_reduce_time_windows(InstanceData &instance) {
 /**
  * Calculates the greatest common divisor (GCD) of two integers using the Euclidean algorithm.
  *
- * @param m The first integer.
- * @param n The second integer.
- * @return The greatest common divisor of m and n.
  */
 inline int VRPTW_mcd(int m, int n) {
     int aux;
@@ -256,10 +217,6 @@ inline int VRPTW_mcd(int m, int n) {
 /**
  * Reads an instance file and populates the provided `InstanceData` object with the data.
  *
- * @param file_name The path to the instance file.
- * @param instance The `InstanceData` object to populate with the data.
- * @return Returns 1 if the instance file was successfully read and the `InstanceData` object was populated, 0
- * otherwise.
  */
 inline int VRPTW_read_instance(const std::string &file_name, InstanceData &instance) {
     std::ifstream myfile(file_name);

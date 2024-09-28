@@ -55,11 +55,6 @@ JumpArc::JumpArc(int base, int jump, const std::vector<double> &res_inc, double 
  * It sets up the forward and backward buckets, initializes the dual values for the CVRP separation,
  * and defines the intervals and resource limits.
  *
- * @param jobs A vector of VRPJob objects representing the jobs to be scheduled.
- * @param time_horizon An integer representing the total time horizon for the scheduling.
- * @param bucket_interval An integer representing the interval for the buckets.
- * @param capacity An integer representing the total capacity for the scheduling.
- * @param capacity_interval An integer representing the interval for the capacity buckets.
  */
 BucketGraph::BucketGraph(const std::vector<VRPJob> &jobs, int time_horizon, int bucket_interval, int capacity,
                          int capacity_interval)
@@ -86,9 +81,6 @@ BucketGraph::BucketGraph(const std::vector<VRPJob> &jobs, int time_horizon, int 
  * It sets up the forward and backward buckets, initializes the dual values for the CVRP separation,
  * and defines the intervals and resource limits.
  *
- * @param jobs A vector of VRPJob objects representing the jobs to be scheduled.
- * @param time_horizon An integer representing the total time horizon for the scheduling.
- * @param bucket_interval An integer representing the interval for the buckets.
  */
 BucketGraph::BucketGraph(const std::vector<VRPJob> &jobs, int time_horizon, int bucket_interval)
     : fw_buckets(), bw_buckets(), jobs(jobs), time_horizon(time_horizon), bucket_interval(bucket_interval),
@@ -201,11 +193,6 @@ Label *BucketGraph::compute_label(const Label *L, const Label *L_prime) {
 /**
  * Computes the phi values for a given bucket ID and direction.
  *
- * @param bucket_id The ID of the bucket for which to compute the phi values.
- * @param fw        A boolean indicating the direction of the computation. If true, computes phi values in the
- * forward direction; otherwise, computes phi values in the backward direction.
- *
- * @return A vector of integers representing the computed phi values.
  */
 std::vector<int> BucketGraph::computePhi(int &bucket_id, bool fw) {
     std::vector<int> phi;
@@ -351,7 +338,6 @@ std::vector<int> BucketGraph::computePhi(int &bucket_id, bool fw) {
 /**
  * Calculates the neighborhoods for each job for the ng-routes.
  *
- * @param num_closest The number of closest jobs to consider for each job.
  */
 void BucketGraph::calculate_neighborhoods(size_t num_closest) {
     size_t num_jobs = jobs.size();
@@ -477,8 +463,6 @@ void BucketGraph::augment_ng_memories(std::vector<double> &solution, std::vector
  * corresponding to the cycle. If the 'aggressive' flag is set to true, it also forbids
  * additional edges between the vertices of the cycle.
  *
- * @param cycle The vector representing the cycle in the graph.
- * @param aggressive Flag indicating whether to forbid additional edges between the vertices of the cycle.
  */
 void BucketGraph::forbidCycle(const std::vector<int> &cycle, bool aggressive) {
     for (size_t i = 0; i < cycle.size() - 1; ++i) {
@@ -504,17 +488,6 @@ void BucketGraph::forbidCycle(const std::vector<int> &cycle, bool aggressive) {
  * This function initializes the adjacency list for each job in the graph by clearing existing arcs
  * and then adding new arcs based on the travel cost and resource consumption between jobs.
  *
- * The function iterates over all jobs and for each job, it calculates the travel cost and resource
- * increments to other jobs. It then adds arcs to the adjacency list of the current job and the
- * reverse arcs to the adjacency list of the next job.
- *
- * The arcs are stored in flat containers to optimize for performance by reducing frequent reallocations.
- *
- * @note The function skips jobs with id 0 and jobs that are the same as the current job.
- *
- * @note The function also skips adding arcs if the resource increment exceeds the upper bound of the next job.
- *
- * @note The function uses a lambda function to encapsulate the logic for adding arcs for a job.
  */
 void BucketGraph::set_adjacency_list() {
     // Clear existing arcs for each job
@@ -607,18 +580,6 @@ void BucketGraph::set_adjacency_list() {
 /**
  * @brief Initializes the BucketGraph by clearing previous data and setting up forward and backward buckets.
  *
- * This function performs the following steps:
- * - Clears previous data from merged_labels, fw_c_bar, and bw_c_bar.
- * - Resizes the cost vectors fw_c_bar and bw_c_bar to match the number of forward and backward buckets,
- * respectively.
- * - Assigns the number of buckets and bucket indices for the forward direction.
- * - Calculates base intervals and total ranges for each resource dimension.
- * - Clears the forward and backward buckets.
- * - Initializes forward buckets by iterating over all intervals and setting up labels for each bucket.
- * - Initializes backward buckets by iterating over all intervals and setting up labels for each bucket.
- *
- * The function uses helper lambdas to update the current position of the intervals and to calculate the index
- * for each bucket.
  */
 void BucketGraph::common_initialization() {
     // Clear previous data
@@ -1019,12 +980,6 @@ void BucketGraph::generate_arcs() {
 /**
  * @brief Sets up the initial configuration for the BucketGraph.
  *
- * This function performs the following steps:
- * 1. Initializes the sizes of `fixed_arcs` based on the number of jobs.
- * 2. Resizes `fw_fixed_buckets` and `bw_fixed_buckets` to match the size of `fw_buckets`.
- * 3. Sets all elements in `fw_fixed_buckets` and `bw_fixed_buckets` to 0.
- * 4. Defines the initial relationships by calling `set_adjacency_list()` and `generate_arcs()`.
- * 5. Sorts the arcs for each job in the `jobs` list.
  */
 void BucketGraph::setup() {
     // Initialize the sizes
