@@ -2,6 +2,8 @@
 
 **BALDES**: A Bucket Graph Labeling Algorithm for Vehicle Routing
 
+![configurer](docs/logo.png)
+
 This repository contains a C++ implementation of a Bucket Graph-based labeling algorithm designed to solve the Resource-Constrained Shortest Path Problem (RSCPP), commonly used as a subproblem in state-of-the-art Branch-Cut-and-Price algorithms for various Vehicle Routing Problems (VRPs).
 
 The algorithm is based on the approach presented in the paper:  
@@ -72,6 +74,7 @@ Make sure the `GUROBI_HOME` environment variable is set.
 | `TR`                    | Use trust region stabilization         | OFF                       |
 | `WITH_PYTHON`           | Enable the python wrapper              | OFF                       |
 | `SCHRODINGER`           | Enable schrodinger pool                | OFF                       |
+| `PSTEP`                   | Enable PStep compilation                 | OFF                       |
 | `GET_TBB`               | Enable TBB compilation                 | OFF (will use system lib) |
 
 **Numerical and Other Definitions**
