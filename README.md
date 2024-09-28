@@ -15,20 +15,19 @@ The Bucket Graph-based labeling algorithm organizes labels into **buckets** base
 
 ### 🚀 Key Features
 
-- **Bucket Graph Organization:** Grouping labels by vertex and resource consumption to minimize dominance checks.
+- **Bucket Graph Organization:** Grouping labels by vertex and resource consumption to minimize dominance checks, using n-dimensional Splay Trees to keep the most acessed buckets easier to reach.
 - **Parallel Bi-Directional Labeling:** Supports forward and backward search strategies.
-- **Dominance Rules:** Efficient dominance checks using resource-based comparisons and integration of additional criteria from Limited-Memory Subset Row Cuts (SRCs).
+- **Dominance Rules:** Efficient dominance checks using resource-based comparisons and integration of additional criteria from Limited-Memory Subset Row Cuts (SRCs) for enhanced speed.
+- **Multi-phase solving:** Out-of-the-box multi-phase solving that begins with heuristics and dynamically guides the algorithm towards an exact solution.
+- **Good initial solutions** Utilizes the state-of-the-art HGS-VRPTW algorithm to generate high-quality initial bounds and routes, an extension of the HGS-CVRP method employed by the ORTEC team to win the VRPTW track at the DIMACS Implementation Challenge. We also enchanced the HGS-VRPTW with the concepts proposed in [MDM-HGS-CVRP](https://github.com/marcelorhmaia/MDM-HGS-CVRP/).
 - **Improvement Heuristics:** Optional fast improvement heuristics are applied at the end of each labeling phase to enhance label quality.
-- **Good initial solutions** Our algorithm uses the HGS-VRPTW algorithm for generating the initial bounds and routes. This approach is an extension of HGS-CVRP, which was recently employed by the ORTEC team to win the VRPTW track of the DIMACS implementation challenge. It incorporates time-window evaluation strategies, along with the SREX crossover, dynamic population and neighborhood size parameters, and further code optimizations. We also enchanced the HGS-VRPTW with the concepts proposed in [MDM-HGS-CVRP](https://github.com/marcelorhmaia/MDM-HGS-CVRP/).
-
 
 ## ⚠️ Disclaimer
 
 Some features are experimental and subject to ongoing improvements:
 
-- **[experimental]** Limited-Memory Subset Row Cuts
 - **[experimental]** Knapsack Completion Bounds for Capacity Constraints
-- **[experimental]** Bucket Arc Elimination
+- **[experimental]** Bucket Arc Fixing
 
 ## 🛠️ Building
 

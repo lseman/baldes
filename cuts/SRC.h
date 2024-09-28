@@ -71,7 +71,7 @@ public:
     // default constructor
     LimitedMemoryRank1Cuts() = default;
 
-    CutStorage cutStorage;
+    CutStorage cutStorage = CutStorage();
 
     void              printBaseSets();
     std::vector<Path> allPaths;

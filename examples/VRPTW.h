@@ -675,8 +675,7 @@ public:
 #ifdef SRC
         r1c = LimitedMemoryRank1Cuts(allJobs);
 
-        CutStorage cuts;
-        r1c.cutStorage = cuts;
+        CutStorage *cuts = &r1c.cutStorage;
 #endif
 
         std::vector<double> cutDuals;
@@ -687,7 +686,7 @@ public:
         double highs_obj      = 0.0;
 
 #ifdef SRC
-        bucket_graph.cut_storage = &cuts;
+        bucket_graph.cut_storage = cuts;
 #endif
 
         bucket_graph.setup();
@@ -798,7 +797,7 @@ public:
                     // matrix = extractModelDataSparse(node);
                     node->optimize();
 
-                    auto cuts_before = cuts.size();
+                    auto cuts_before = cuts->size();
                     ////////////////////////////////////////////////////
                     // Handle non-violated cuts in a single pass
                     ////////////////////////////////////////////////////
@@ -817,7 +816,7 @@ public:
 
                             // Remove the constraint from the model and cut storage
                             node->remove(constr);
-                            cuts.removeCut(cuts[i].id);
+                            cuts->removeCut(cuts->getID(i));
                             n_cuts_removed++;
 
                             // Remove from SRCconstraints
@@ -832,23 +831,23 @@ public:
                     }
 
                     // print cuts size
-                    solution       = extractSolution(node);
-                    r1c.cutStorage = cuts;
-                    r1c.allPaths   = allPaths;
+                    solution = extractSolution(node);
+                    // r1c.cutStorage = cuts;
+                    r1c.allPaths = allPaths;
                     r1c.separate(matrix.A_sparse, solution);
 #ifdef SRC
                     // r1c.the45Heuristic<CutType::FourRow>(matrix.A_sparse, solution);
                     // r1c.the45Heuristic<CutType::FiveRow>(matrix.A_sparse, solution);
 #endif
-                    cuts = r1c.cutStorage;
-                    if (cuts_before == cuts.size() + n_cuts_removed) {
+                    // cuts = &r1c.cutStorage;
+                    if (cuts_before == cuts->size() + n_cuts_removed) {
                         print_info("No violations found, calling it a day\n");
                         break;
                     }
 
                     changed = cutHandler(r1c, node, SRCconstraints);
                     if (changed) { matrix = extractModelDataSparse(node); }
-                    cuts = r1c.cutStorage;
+                    // cuts = &r1c.cutStorage;
                 }
 #endif
                 bucket_graph.ss = false;
@@ -945,11 +944,11 @@ public:
 
 #if defined(SRC3) || defined(SRC)
                 // print cuts.size
-                if (cuts.size() > 0) {
+                if (cuts->size() > 0) {
                     auto duals = node->get(GRB_DoubleAttr_Pi, SRCconstraints.data(), SRCconstraints.size());
                     cutDuals.assign(duals, duals + SRCconstraints.size());
                     // print cutDuals size
-                    cuts.setDuals(cutDuals);
+                    cuts->setDuals(cutDuals);
                 }
 #endif
 
@@ -978,9 +977,9 @@ public:
                     SRCconstraints = std::vector<GRBConstr>();
                     node->update();
                     node->optimize();
-                    cuts.reset();
-                    r1c.cutStorage = cuts;
-                    matrix         = extractModelDataSparse(node);
+                    cuts->reset();
+                    // r1c.cutStorage = cuts;
+                    matrix = extractModelDataSparse(node);
                 }
 
 #ifdef SCHRODINGER
@@ -1021,7 +1020,7 @@ public:
 
             auto n_cuts = 0;
 #ifdef SRC
-            n_cuts = cuts.size();
+            n_cuts = cuts->size();
 #endif
             if (iter % 10 == 0)
                 fmt::print("| It.: {:4} | Obj.: {:8.2f} | Price: {:9.2f} | Cuts: {:4} | Paths: {:4} | "

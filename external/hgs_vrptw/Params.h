@@ -143,7 +143,7 @@ public:
             true; // When to repeat the algorithm when max nr of iter is reached, but time limit is not
     };
 
-    bool verbose = true;
+    bool        verbose = true;
     Config      config; // Stores all the parameter values
     XorShift128 rng;    // Fast random number generator
     std::chrono::system_clock::time_point
@@ -181,10 +181,13 @@ public:
     int minCircleSectorSize; // Minimum circle sector size to enforce (for nonempty routes) (0 - 65536)
 
     std::vector<Savings> savingsList; // Savings list used in the Clarke & Wright heuristic
-	std::minstd_rand ran;               // Using the fastest and simplest LCG. The quality of random numbers is not critical for the LS, but speed is
+    std::minstd_rand ran; // Using the fastest and simplest LCG. The quality of random numbers is not critical for the
+                          // LS, but speed is
 
     // Initialization from a given data set
     Params(const std::string &path_location);
+
+    Params(const InstanceData &instance);
 
     // Get time elapsed since start of program
     double getTimeElapsedSeconds();
