@@ -2,6 +2,8 @@
 
 <img src="docs/top_logo.png" width="400"/>
 
+<br>
+
   <img src="https://img.shields.io/badge/build-passing-green">
   <img src="https://img.shields.io/badge/doxygen-generated-blue">
   <img src="https://img.shields.io/github/license/lseman/baldes.svg" alt="License" />
