@@ -29,8 +29,8 @@
 #include "../include/Reader.h"
 
 #ifdef RCC
-#include "../external/cvrpsep/capsep.h"
-#include "../external/cvrpsep/cnstrmgr.h"
+#include "../third_party/cvrpsep/capsep.h"
+#include "../third_party/cvrpsep/cnstrmgr.h"
 #include <tbb/concurrent_unordered_map.h>
 #endif
 

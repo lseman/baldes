@@ -22,7 +22,7 @@
 #include "gurobi_c++.h"
 #include "gurobi_c.h"
 
-#include "../external/pdqsort.h"
+#include "../third_party/pdqsort.h"
 
 #include "Hashes.h"
 

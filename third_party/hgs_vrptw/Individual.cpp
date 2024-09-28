@@ -10,7 +10,6 @@
 
 void Individual::evaluateCompleteCost() {
     // Create an object to store all information regarding solution costs
-    eval = EvalIndiv();
 
     myCostSol = CostSol();
     // Loop over all routes that are not empty
@@ -496,7 +495,7 @@ Individual::Individual(Params *params, bool rcws, std::vector<std::vector<int>> 
     {
         for (int i = 0; i < params->nbClients; i++) chromT[i] = i + 1;
         std::shuffle(chromT.begin(), chromT.end(), params->ran);
-        eval.penalizedCost = 1.e30;
+        myCostSol.penalizedCost = 1.e30;
     }
 }
 
