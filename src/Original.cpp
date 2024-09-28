@@ -1,5 +1,5 @@
-#include "../presolve/Activities.h"
-#include "../presolve/Clique.h"
+#include "presolve/Activities.h"
+#include "presolve/Clique.h"
 #include "Definitions.h"
 #include "Reader.h"
 #include "gurobi_c++.h"

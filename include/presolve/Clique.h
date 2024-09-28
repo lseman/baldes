@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../include/Definitions.h"
+#include "Definitions.h"
 #include <algorithm>
 #include <execution>
 #include <mutex>

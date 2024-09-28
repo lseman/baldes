@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../include/Definitions.h"
+#include "Definitions.h"
 #include <Eigen/Dense>
 #include <Eigen/Sparse>
 #include <bitset>

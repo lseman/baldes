@@ -22,11 +22,11 @@
 
 #pragma once
 
-#include "../include/Definitions.h"
+#include "Definitions.h"
 
-#include "../include/DataClasses.h"
+#include "DataClasses.h"
 
-#include "../bucket/BucketGraph.h"
+#include "bucket/BucketGraph.h"
 
 #include <queue>
 #include <random>

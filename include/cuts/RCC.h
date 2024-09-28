@@ -23,7 +23,7 @@
 #include "gurobi_c++.h"
 #include "gurobi_c.h"
 
-#include "../include/Hashes.h"
+#include "Hashes.h"
 
 #include <cmath>
 #include <iostream>

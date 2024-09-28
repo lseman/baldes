@@ -12,7 +12,7 @@
  * Each class is exposed with its constructors, member variables, and member functions.
  * Conditional compilation is used to expose additional fields and methods based on defined macros.
  */
-#include "../bucket/BucketGraph.h"
+#include "bucket/BucketGraph.h"
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 

@@ -28,7 +28,7 @@
 #include <set>
 #include <string_view>
 
-#include "../include/SCCFinder.h"
+#include "SCCFinder.h"
 
 #define RCESPP_TOL_ZERO 1.E-6
 

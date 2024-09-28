@@ -4,7 +4,7 @@
 
 <br>
 
-  <img src="https://img.shields.io/badge/build-passing-green">
+  <img src="https://img.shields.io/badge/build-on_my_computer-green">
     <img src="https://img.shields.io/github/actions/workflow/status/lseman/baldes/docs.yaml?branch=main&label=docgen" alt="doc status" />
   <img src="https://img.shields.io/github/license/lseman/baldes.svg" alt="License" />
 
