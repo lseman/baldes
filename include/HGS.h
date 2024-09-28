@@ -25,12 +25,12 @@ public:
     // default constructor
     HGS() = default;
 
-    std::vector<std::vector<int>> run(const std::string &instance_name) {
+    std::vector<std::vector<int>> run(const InstanceData &instance) {
 
-        InstanceData instance;
+        // InstanceData instance;
 
         // Reading the data file and initializing some data structures
-        Params params(instance_name);
+        Params params(instance);
         auto   config = params.config;
 
         // Creating the Split and Local Search structures

@@ -28,6 +28,7 @@
 #include <cstring>
 
 /**
+ * @brief Represents a bucket in the Bucket Graph.
  * Adds an arc to the bucket graph.
  *
  */
@@ -208,6 +209,8 @@ void BucketGraph::define_buckets() {
 }
 
 /**
+ * @brief Generates arcs in the bucket graph based on the specified direction.
+ *
  * Generates arcs in the bucket graph based on the specified direction.
  *
  */

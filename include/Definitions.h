@@ -144,6 +144,10 @@ public:
         SRCDuals = {};
     }
 
+    Cut &getCut(int cutIndex) { return cuts[cutIndex]; }
+
+    int getID(int cutIndex) { return cuts[cutIndex].id; }
+
     void removeCut(int cutIndex) {
         // Ensure the cutIndex is within bounds
         if (cutIndex < 0 || cutIndex >= cuts.size()) {
@@ -780,14 +784,9 @@ inline void printBaldes() {
     fmt::print("| {}{:<52}{} |\n", blue, "BALDES, a Bucket Graph Labeling Algorithm", reset); // Blue text
     fmt::print("| {:<52} |\n", "for Vehicle Routing");
     fmt::print("| {:<52} |\n", " ");
-    fmt::print("| {:<52} |\n", "a C++ implementation");
-    fmt::print("| {:<52} |\n", "of a Bucket Graph-based labeling algorithm");
-    fmt::print("| {:<52} |\n", "designed to solve the Resource-Constrained");
-    fmt::print("| {:<52} |\n", "Shortest Path Problem (RSCPP), which commonly");
-    fmt::print("| {:<52} |\n", "arises as a subproblem in state-of-the-art");
-    fmt::print("| {:<52} |\n", "Branch-Cut-and-Price algorithms for various");
-    fmt::print("| {:<52} |\n", "Vehicle Routing Problems (VRPs).");
-    fmt::print("| {:<52} |\n", " ");
+    fmt::print("| {:<52} |\n", "a modern C++ implementation");
+    fmt::print("| {:<52} |\n", "of the Bucket Graph-based labeling algorithm");
+    fmt::print("| {:<52} |\n", "for the Resource-Constrained Shortest Path Problem");
     fmt::print("| {:<52} |\n", "https://github.com/lseman/baldes");
     fmt::print("| {:<52} |\n", " ");
 
@@ -878,6 +877,10 @@ inline ModelData extractModelDataSparse(GRBModel *model) {
     return data;
 }
 
+/**
+ * @brief Extracts model data from a given Gurobi model.
+ *
+ */
 inline GRBModel createDualModel(GRBEnv *env, const ModelData &primalData) {
     try {
         // Create new model for the dual problem
@@ -1022,86 +1025,6 @@ inline ModelData extractModelData(GRBModel &model) {
 
     return data;
 }
-
-class IntervalTreeNode {
-public:
-    int               low, high;    // Interval [low, high]
-    int               bucket_index; // Associated bucket index
-    int               job_id;       // Job ID associated with this interval
-    int               max;          // Max endpoint in the subtree
-    IntervalTreeNode *left;
-    IntervalTreeNode *right;
-
-    // Constructor
-    IntervalTreeNode(int l, int h, int idx, int job)
-        : low(l), high(h), bucket_index(idx), job_id(job), max(h), left(nullptr), right(nullptr) {}
-};
-
-class IntervalTree {
-public:
-    IntervalTreeNode *root;
-
-    IntervalTree() : root(nullptr) {}
-
-    // Insert interval [low, high] with bucket_index and job_id
-    IntervalTreeNode *insert(IntervalTreeNode *node, int low, int high, int bucket_index, int job_id) {
-        if (!node) { return new IntervalTreeNode(low, high, bucket_index, job_id); }
-
-        // Inserting based on the low value
-        if (low < node->low) {
-            node->left = insert(node->left, low, high, bucket_index, job_id);
-        } else if (low > node->low) {
-            node->right = insert(node->right, low, high, bucket_index, job_id);
-        } else {
-            // Handle the case where two intervals have the same 'low' value.
-            // We might choose to insert this to the right if 'high' values differ.
-            if (high > node->high) {
-                node->right = insert(node->right, low, high, bucket_index, job_id);
-            } else {
-                node->left = insert(node->left, low, high, bucket_index, job_id);
-            }
-        }
-
-        // Update the max value of this node
-        node->max = std::max(node->max, high);
-
-        return node;
-    }
-
-    // Query to find the bucket index for a given resource value
-    int query(IntervalTreeNode *node, int value) {
-        if (!node) {
-            std::cout << "Query failed: no matching node for value " << value << std::endl;
-            // print the tree
-            for (int i = 0; i < 10; ++i) {
-                std::cout << "Node " << i << ": ";
-                if (node) {
-                    std::cout << "[" << node->low << ", " << node->high << "] with max " << node->max << std::endl;
-                } else {
-                    std::cout << "NULL" << std::endl;
-                }
-            }
-            return -1;
-        }
-
-        // Check if the value lies within or is exactly on the boundary of this interval
-        if (value >= node->low && value <= node->high) { return node->bucket_index; }
-
-        // Move to left subtree if the value is less than or equal to the max of the left subtree
-        if (node->left && value <= node->left->max) { return query(node->left, value); }
-
-        // Otherwise, move to the right subtree
-        return query(node->right, value);
-    }
-
-    // Helper to insert interval into the tree
-    void insert(int low, int high, int bucket_index, int job_id) {
-        root = insert(root, low, high, bucket_index, job_id);
-    }
-
-    // Helper to query the tree
-    int query(int value) { return query(root, value); }
-};
 
 /**
  * @class TreeNode
@@ -1400,3 +1323,10 @@ public:
 
     void print() { inOrderPrint(root); }
 };
+
+#define CONDITIONAL(D, FW_ACTION, BW_ACTION)         \
+    if constexpr (D == Direction::Forward) {         \
+        FW_ACTION;                                   \
+    } else if constexpr (D == Direction::Backward) { \
+        BW_ACTION;                                   \
+    }

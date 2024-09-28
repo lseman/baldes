@@ -168,15 +168,15 @@ int main(int argc, char *argv[]) {
 
     print_heur("Initializing heuristic solver for initial solution\n");
 
-    HGS  hgs;
-    auto initialRoutesHGS = hgs.run(instance_name);
-
     InstanceData instance;
     if (VRPTW_read_instance(instance_name, instance)) {
         print_info("Instance read successfully.\n");
     } else {
         std::cerr << "Error reading instance\n";
     }
+
+    HGS  hgs;
+    auto initialRoutesHGS = hgs.run(instance);
 
     /*
     SolomonFormatParser parser;
