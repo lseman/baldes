@@ -36,7 +36,7 @@ struct CostSol {
     int    nbRoutes;       // Number of routes
     int    distance;       // Total Distance
     int    capacityExcess; // Total excess load over all routes
-    int    durationExcess; // Total excess duration over all routes
+    //int    durationExcess; // Total excess duration over all routes
     int    waitTime;       // Total wait time (time to wait to meet earliest possible arrival) over all routes
     int    timeWarp;       // Total time warp (going back in time to meet latest possible arrival) over all routes
     bool   isFeasible;     // Feasibility status of the individual
