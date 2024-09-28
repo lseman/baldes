@@ -111,9 +111,9 @@ void BucketGraph::BucketArcElimination(double theta) {
 
     // Print direction of arc elimination
     if constexpr (D == Direction::Forward) {
-        print_info("Performing forward bucket arc elimination with theta = {}\n", theta);
+        print_info("[FW] performing bucket arc elimination with theta = {}\n", theta);
     } else {
-        print_info("Performing backward bucket arc elimination with theta = {}\n", theta);
+        print_info("[Bw] performing bucket arc elimination with theta = {}\n", theta);
     }
 
     // Map to store arcs and corresponding bucket sets
@@ -206,7 +206,8 @@ void BucketGraph::BucketArcElimination(double theta) {
     }
 
     // Print the number of arcs removed
-    print_info("Removed arcs: {}\n", removed_arcs.load());
+    CONDITIONAL(D, print_info("[Fw] removed arcs: {}\n", removed_arcs.load()),
+                print_info("[Bw] removed arcs: {}\n", removed_arcs.load()));
 }
 
 /**
@@ -304,7 +305,6 @@ void BucketGraph::ObtainJumpBucketArcs() {
             }
         }
     }
-
-    // Print the number of jump arcs added and missing paths (for debugging or logging purposes)
-    print_info("Added {} jump arcs\n", arc_counter);
+    CONDITIONAL(D, print_info("[Fw] added {} jump arcs\n", arc_counter),
+                print_info("[Bw] added {} jump arcs\n", arc_counter));
 }

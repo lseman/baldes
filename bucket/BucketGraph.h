@@ -638,18 +638,14 @@ public:
         auto step_calc = mean_dominance_checks / non_dominated_labels_per_bucket;
         if (step_calc > 1000) {
 
-            fmt::print("Increment redefinition counter\n");
-            if (redefine_counter % 3 == 0) {
-                redefine_counter = 0;
-                print_info("Step size is high, should increment step size - {}\n", step_calc);
-                fmt::print("Current step size bucket_interval: {}\n", bucket_interval);
-                redefine(bucket_interval * 2);
-                fmt::print("New step size bucket_interval: {}\n", bucket_interval);
-                reset_fixed_buckets();
-                fixed   = true;
-                updated = true;
-            }
-            redefine_counter++;
+            redefine_counter = 0;
+            print_info("Increasing bucket interval to {}\n", bucket_interval * 2);
+            redefine(bucket_interval * 2);
+            // fmt::print("New step size bucket_interval: {}\n", bucket_interval);
+            reset_fixed_buckets();
+            fixed   = true;
+            updated = true;
+            // redefine_counter++;
         }
         return updated;
     }

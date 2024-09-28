@@ -719,7 +719,6 @@ public:
         // set start timer
         auto start_timer = std::chrono::high_resolution_clock::now();
 
-        fmt::print("\n");
         print_info("Starting column generation..\n\n");
         bool transition = false;
 
@@ -836,8 +835,8 @@ public:
                     r1c.allPaths = allPaths;
                     r1c.separate(matrix.A_sparse, solution);
 #ifdef SRC
-                    // r1c.the45Heuristic<CutType::FourRow>(matrix.A_sparse, solution);
-                    // r1c.the45Heuristic<CutType::FiveRow>(matrix.A_sparse, solution);
+                    r1c.the45Heuristic<CutType::FourRow>(matrix.A_sparse, solution);
+                    r1c.the45Heuristic<CutType::FiveRow>(matrix.A_sparse, solution);
 #endif
                     // cuts = &r1c.cutStorage;
                     if (cuts_before == cuts->size() + n_cuts_removed) {

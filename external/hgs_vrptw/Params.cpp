@@ -8,6 +8,8 @@
 #include <vector>
 
 #include "../../include/Reader.h"
+#include "../../include/Definitions.h"
+
 #include "CircleSector.h"
 #include "Matrix.h"
 
@@ -81,10 +83,11 @@ Params::Params(const InstanceData &instance) {
     // Set default fleet size if not provided by the user
     if (nbVehicles == INT_MAX) {
         nbVehicles = static_cast<int>(std::ceil(1.3 * totalDemand / vehicleCapacity) + 3.);
-        std::cout << "----- FLEET SIZE WAS NOT SPECIFIED: DEFAULT INITIALIZATION TO " << nbVehicles << " VEHICLES"
-                  << std::endl;
+        //std::cout << "----- FLEET SIZE WAS NOT SPECIFIED: DEFAULT INITIALIZATION TO " << nbVehicles << " VEHICLES"
+        //          << std::endl;
+        print_info("Fleet size was not specified: default initialization to {} vehicles \n", nbVehicles);
     } else {
-        std::cout << "----- FLEET SIZE SPECIFIED IN THE COMMANDLINE: SET TO " << nbVehicles << " VEHICLES" << std::endl;
+        print_info("Fleet size specified in the commandline: set to {} vehicles \n", nbVehicles);
     }
 
     // For DIMACS runs, or when dynamic parameters have to be used, set more parameter values

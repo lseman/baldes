@@ -14,6 +14,7 @@
 #include "../../external/fpmax/fpmax.h"
 #include "../../external/fpmax/fitemset.cpp"
 
+#include "Definitions.h"
 
 std::vector<std::vector<int>> *Population::nextMDMPattern() {
     if (mdmPatterns.empty()) return NULL;
@@ -100,7 +101,8 @@ void Population::generatePopulation() {
     }
 
     // Output that some individuals have been created
-    std::cout << "Generated " << nofNearestIndividualsToGenerate << " individuals using Nearest" << std::endl;
+    //std::cout << "Generated " << nofNearestIndividualsToGenerate << " individuals using Nearest" << std::endl;
+    print_info("Generated {} individuals using Nearest\n", nofNearestIndividualsToGenerate);
     printState(-1, -1);
 
     // Generate some individuals using the FURHEST construction heuristic
@@ -119,7 +121,8 @@ void Population::generatePopulation() {
     }
 
     // Output that some individuals have been created
-    std::cout << "Generated " << nofFurthestIndividualsToGenerate << " individuals using Furthest" << std::endl;
+    //std::cout << "Generated " << nofFurthestIndividualsToGenerate << " individuals using Furthest" << std::endl;
+    print_info("Generated {} individuals using Furthest\n", nofFurthestIndividualsToGenerate);
     printState(-1, -1);
 
     // Generate some individuals using the SWEEP construction heuristic
@@ -137,7 +140,8 @@ void Population::generatePopulation() {
     }
 
     // Output that some individuals have been created
-    std::cout << "Generated " << nofSweepIndividualsToGenerate << " individuals using Sweep" << std::endl;
+    //std::cout << "Generated " << nofSweepIndividualsToGenerate << " individuals using Sweep" << std::endl;
+    print_info("Generated {} individuals using Sweep\n", nofSweepIndividualsToGenerate);
     printState(-1, -1);
 
     // Generate some individuals using a RANDOM strategy
@@ -153,7 +157,8 @@ void Population::generatePopulation() {
     }
 
     // Output that some individuals have been created
-    std::cout << "Generated " << nofRandomIndividualsToGenerate << " individuals Randomly" << std::endl;
+    //std::cout << "Generated " << nofRandomIndividualsToGenerate << " individuals Randomly" << std::endl;
+    print_info("Generated {} individuals Randomly\n", nofRandomIndividualsToGenerate);
     printState(-1, -1);
 }
 
@@ -415,7 +420,7 @@ Individual *Population::getBestFound() {
 
 void Population::printState(int nbIter, int nbIterNoImprovement) {
     // Print the number of iterations, the number of iterations since the last improvement, and the running time
-    std::printf("It %6d %6d | T(s) %.2f", nbIter, nbIterNoImprovement, params->getTimeElapsedSeconds());
+    std::printf("| It %6d %6d | T(s) %.2f", nbIter, nbIterNoImprovement, params->getTimeElapsedSeconds());
 
     // If there is at least one feasible solution, print the number of feasible solutions, the cost of the best feasible
     // solution, and the average cost of the feasible solutions
@@ -443,7 +448,7 @@ void Population::printState(int nbIter, int nbIterNoImprovement) {
                     static_cast<double>(listFeasibilityLoad.size()),
                 static_cast<double>(std::count(listFeasibilityTimeWarp.begin(), listFeasibilityTimeWarp.end(), true)) /
                     static_cast<double>(listFeasibilityTimeWarp.size()));
-    std::printf(" | Pen %.2f %.2f", params->penaltyCapacity, params->penaltyTimeWarp);
+    std::printf(" | Pen %.2f %.2f |", params->penaltyCapacity, params->penaltyTimeWarp);
     std::cout << std::endl;
 }
 
