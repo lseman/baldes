@@ -1,6 +1,6 @@
 <div align="center">
 
-![top](docs/top_logo_small_small.png)
+<img src="docs/top_logo.png" width="400"/>
 
   <img src="https://img.shields.io/badge/build-passing-green">
   <img src="https://img.shields.io/badge/doxygen-generated-blue">
@@ -14,7 +14,7 @@
 <table>
   <tr>
     <td>
-      <img src="docs/logo.png" alt="BALDES" width="600"/>
+      <img src="docs/logo.png" alt="BALDES" width="300"/>
     </td>
     <td>
       This repository contains a C++ implementation of a Bucket Graph-based labeling algorithm designed to solve the Resource-Constrained Shortest Path Problem (RSCPP), commonly used as a subproblem in state-of-the-art Branch-Cut-and-Price algorithms for various Vehicle Routing Problems (VRPs).
