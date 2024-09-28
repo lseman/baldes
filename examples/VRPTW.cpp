@@ -22,7 +22,7 @@
  * @return int Returns 0 on successful execution.
  */
 
-// #include "../external/lkh/include/lkh_tsp.hpp"
+// #include "../third_party/lkh/include/lkh_tsp.hpp"
 
 #include "VRPTW.h"
 

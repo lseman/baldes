@@ -4,12 +4,12 @@
 #include <time.h>
 #include <vector>
 
-#include "../external/hgs_vrptw/Genetic.h"
-#include "../external/hgs_vrptw/Individual.h"
-#include "../external/hgs_vrptw/LocalSearch.h"
-#include "../external/hgs_vrptw/Params.h"
-#include "../external/hgs_vrptw/Population.h"
-#include "../external/hgs_vrptw/Split.h"
+#include "../third_party/hgs_vrptw/Genetic.h"
+#include "../third_party/hgs_vrptw/Individual.h"
+#include "../third_party/hgs_vrptw/LocalSearch.h"
+#include "../third_party/hgs_vrptw/Params.h"
+#include "../third_party/hgs_vrptw/Population.h"
+#include "../third_party/hgs_vrptw/Split.h"
 
 #include "Reader.h"
 #include "Definitions.h"

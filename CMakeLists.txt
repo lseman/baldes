@@ -31,7 +31,7 @@ set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 # Include directories
 include_directories(include)
 include_directories(bucket)
-include_directories(external/hgs_vrptw)
+include_directories(third_party/hgs_vrptw)
 
 # Build types and flags
 if(NOT CMAKE_BUILD_TYPE)
@@ -263,14 +263,14 @@ set(CVRPSEP_SOURCES
     cvrpsep/sort.cpp)
 
 set(HGS_SOURCES
-    external/hgs_vrptw/Genetic.cpp external/hgs_vrptw/Individual.cpp
-    external/hgs_vrptw/LocalSearch.cpp external/hgs_vrptw/Params.cpp
-    external/hgs_vrptw/Population.cpp external/hgs_vrptw/Split.cpp)
+    third_party/hgs_vrptw/Genetic.cpp third_party/hgs_vrptw/Individual.cpp
+    third_party/hgs_vrptw/LocalSearch.cpp third_party/hgs_vrptw/Params.cpp
+    third_party/hgs_vrptw/Population.cpp third_party/hgs_vrptw/Split.cpp)
 
 set(FPSOURCE
-    external/fpmax/fpmax.cpp external/fpmax/buffer.cpp external/fpmax/data.cpp
-    external/fpmax/fsout.cpp external/fpmax/fp_tree.cpp
-    external/fpmax/fp_node.cpp)
+    third_party/fpmax/fpmax.cpp third_party/fpmax/buffer.cpp third_party/fpmax/data.cpp
+    third_party/fpmax/fsout.cpp third_party/fpmax/fp_tree.cpp
+    third_party/fpmax/fp_node.cpp)
 
 set(IPM_SOURCES ipm/IPSolver.cpp)
 set(SRC_SOURCES src/SRC.cpp)

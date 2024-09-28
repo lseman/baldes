@@ -24,6 +24,7 @@ SOFTWARE.*/
 #ifndef POPULATION_H
 #define POPULATION_H
 
+#include <functional>
 #include <iosfwd>
 #include <list>
 #include <string>
@@ -56,10 +57,19 @@ private:
     Individual bestSolutionRestart; // Best solution found during the current restart of the algorthm
     Individual bestSolutionOverall; // Best solution found during the complete execution of the algorithm
 
-    std::set<Individual, bool (*)(Individual, Individual)>
-         mdmElite;        // MDM elite set, kept ordered by increasing penalized cost
-    bool mdmEliteUpdated; // Flag to indicate if the MDM elite set has been updated since the last call to mineElite()
-    int  mdmEliteNonUpdatingRestarts; // Number of restarts since the last time the MDM elite set was updated
+    static bool compareIndiv(const Individual *a, const Individual *b) {
+        if (a == nullptr || b == nullptr) { throw std::invalid_argument("Null pointer comparison"); }
+        return a->myCostSol.penalizedCost < b->myCostSol.penalizedCost;
+    }
+
+    std::set<const Individual *, std::function<bool(const Individual *, const Individual *)>> mdmElite;
+
+    // std::set<Individual, bool (*)(Individual, Individual)>
+    //      mdmElite;        // MDM elite set, kept ordered by increasing penalized cost
+    bool mdmEliteUpdated;            // Flag to indicate if the MDM elite set has been updated since the last call to
+                                     // mineElite()
+    int mdmEliteNonUpdatingRestarts; // Number of restarts since the last timete
+    // the MDM elite set was updated
     std::vector<std::vector<std::vector<int>>> mdmPatterns;    // Patterns mined from the MDM elite set
     int                                        mdmNextPattern; // Index of the next pattern to be used
 
@@ -163,8 +173,8 @@ public:
         return feasibleRoutes;
     }
 
-    int mdmEliteMaxNonUpdatingRestarts; // Maximum number of restarts since the last update of the MDM elite set
-
+    int  mdmEliteMaxNonUpdatingRestarts; // Maximum number of restarts since the last update of the MDM elite set
+    void updateMDMElite(const Individual *indiv);
     void mineElite();
     // Destructor
     ~Population();
