@@ -19,6 +19,20 @@
 #include <utility>
 
 /**
+ * @brief Combines a hash value with an existing seed.
+ *
+ * This function takes an existing seed and a value, computes the hash of the value,
+ * and combines it with the seed to produce a new hash value. This is useful for
+ * creating composite hash values from multiple inputs.
+ *
+ */
+template <typename T>
+inline void hash_combine(std::size_t &seed, const T &value) {
+    std::hash<T> hasher;
+    seed ^= hasher(value) + 0x9e3779b9 + (seed << 6) + (seed >> 2); // More robust combining method
+}
+
+/**
  * @struct pair_hash
  * @brief A hash function object for hashing std::pair objects.
  *
@@ -30,7 +44,10 @@
 struct pair_hash {
     template <class T1, class T2>
     std::size_t operator()(const std::pair<T1, T2> &pair) const {
-        return std::hash<T1>()(pair.first) ^ std::hash<T2>()(pair.second);
+        std::size_t seed = 0;
+        hash_combine(seed, pair.first);
+        hash_combine(seed, pair.second);
+        return seed;
     }
 };
 
@@ -57,15 +74,14 @@ struct pair_equal {
  * a single hash value.
  *
  */
-template <>
-struct std::hash<std::pair<std::pair<int, int>, int>> {
+// Hash function for std::pair<std::pair<int, int>, int>
+struct arc_map_hash {
     std::size_t operator()(const std::pair<std::pair<int, int>, int> &p) const noexcept {
-        // Use pair_hash for the inner pair
-        std::size_t inner_hash = pair_hash()(p.first);
-        std::size_t b_hash     = std::hash<int>()(p.second);
-
-        // Combine the hashes
-        return inner_hash ^ (b_hash << 1);
+        std::size_t seed = 0;
+        hash_combine(seed, p.first.first);
+        hash_combine(seed, p.first.second);
+        hash_combine(seed, p.second);
+        return seed;
     }
 };
 
@@ -81,18 +97,4 @@ inline std::size_t hash_double(double value, std::size_t index) {
     oss << std::fixed << std::setprecision(17) << value; // 17 decimal places precision
     std::string double_str = oss.str();
     return std::hash<std::string>{}(double_str) ^ (index * 0x9e3779b9); // Combine with index
-}
-
-/**
- * @brief Combines a hash value with an existing seed.
- *
- * This function takes an existing seed and a value, computes the hash of the value,
- * and combines it with the seed to produce a new hash value. This is useful for
- * creating composite hash values from multiple inputs.
- *
- */
-template <typename T>
-inline void hash_combine(std::size_t &seed, const T &value) {
-    std::hash<T> hasher;
-    seed ^= hasher(value) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
 }

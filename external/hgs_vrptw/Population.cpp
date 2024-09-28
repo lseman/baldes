@@ -12,6 +12,8 @@
 #include "Split.h"
 
 #include "../../external/fpmax/fpmax.h"
+#include "../../external/fpmax/fitemset.cpp"
+
 
 std::vector<std::vector<int>> *Population::nextMDMPattern() {
     if (mdmPatterns.empty()) return NULL;
