@@ -1,12 +1,27 @@
 <div align="center">
+
 ![top](docs/top_logo_small_small.png)
+
+  <img src="https://img.shields.io/badge/build-passing-green">
+  <img src="https://img.shields.io/badge/doxygen-generated-blue">
+  <img src="https://img.shields.io/github/license/lseman/baldes.svg" alt="License" />
+
 </div>
+<br>
 
 **BALDES**: A Bucket Graph Labeling Algorithm for Vehicle Routing
 
-![configurer](docs/wide_logo.png)
+<table>
+  <tr>
+    <td>
+      <img src="docs/logo.png" alt="BALDES" width="600"/>
+    </td>
+    <td>
+      This repository contains a C++ implementation of a Bucket Graph-based labeling algorithm designed to solve the Resource-Constrained Shortest Path Problem (RSCPP), commonly used as a subproblem in state-of-the-art Branch-Cut-and-Price algorithms for various Vehicle Routing Problems (VRPs).
+    </td>
+  </tr>
+</table>
 
-This repository contains a C++ implementation of a Bucket Graph-based labeling algorithm designed to solve the Resource-Constrained Shortest Path Problem (RSCPP), commonly used as a subproblem in state-of-the-art Branch-Cut-and-Price algorithms for various Vehicle Routing Problems (VRPs).
 
 The algorithm is based on the approach presented in the paper:  
 **A Bucket Graph Based Labeling Algorithm for Vehicle Routing** by Sadykov et al.
