@@ -15,6 +15,9 @@ void Genetic::run(int maxIterNonProd, int timeLimit) {
         // Edge case: with 1 client, crossover will fail, genetic algorithm makes no sense
         return;
     }
+
+    auto mdmNURestarts = 0.05;
+    int  nbRestarts    = 0;
     // Do iterations of the Genetic Algorithm, until more then maxIterNonProd consecutive iterations without improvement
     // or a time limit (in seconds) is reached
     int nbIterNonProd = 1;
@@ -59,6 +62,14 @@ void Genetic::run(int maxIterNonProd, int timeLimit) {
         /* FOR TESTS INVOLVING SUCCESSIVE RUNS UNTIL A TIME LIMIT: WE RESET THE ALGORITHM/POPULATION EACH TIME
          * maxIterNonProd IS ATTAINED*/
         if (timeLimit != INT_MAX && nbIterNonProd == maxIterNonProd && params->config.doRepeatUntilTimeLimit) {
+            nbRestarts++;
+
+            double elapsedTime = (double)(clock() - params->startCPUTime) / (double)CLOCKS_PER_SEC;
+
+            int estimatedRestarts = std::min((int)(params->config.timeLimit / (elapsedTime / nbRestarts)), 1000);
+
+            population->mdmEliteMaxNonUpdatingRestarts = (int)(mdmNURestarts * estimatedRestarts);
+            population->mineElite();
             population->restart();
             nbIterNonProd = 1;
         }

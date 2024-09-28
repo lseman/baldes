@@ -117,7 +117,9 @@ void BucketGraph::BucketArcElimination(double theta) {
     }
 
     // Map to store arcs and corresponding bucket sets
-    using ArcMap = std::unordered_map<std::pair<std::pair<int, int>, int>, std::unordered_set<int>>;
+    // using ArcMap = std::unordered_map<std::pair<std::pair<int, int>, int>, std::unordered_set<int>>;
+    using ArcMap = std::unordered_map<std::pair<std::pair<int, int>, int>, std::unordered_set<int>, arc_map_hash>;
+
     ArcMap           local_B_Ba_b;
     std::atomic<int> removed_arcs{0};
 
