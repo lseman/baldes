@@ -30,7 +30,10 @@ set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 # Include directories
 include_directories(include)
-include_directories(bucket)
+include_directories(include/bucket)
+include_directories(include/cuts)
+include_directories(include/extra)
+
 include_directories(third_party/hgs_vrptw)
 
 # Build types and flags
@@ -272,7 +275,7 @@ set(FPSOURCE
     third_party/fpmax/fsout.cpp third_party/fpmax/fp_tree.cpp
     third_party/fpmax/fp_node.cpp)
 
-set(IPM_SOURCES ipm/IPSolver.cpp)
+set(IPM_SOURCES src/IPSolver.cpp)
 set(SRC_SOURCES src/SRC.cpp)
 set(RIH_SOURCES src/RIH.cpp)
 
@@ -331,7 +334,7 @@ else()
 endif()
 
 if(WITH_PYTHON)
-  pybind11_add_module(baldes python/BucketBindings.cpp ${EXECUTABLE_SOURCES})
+  pybind11_add_module(baldes src/BucketBindings.cpp ${EXECUTABLE_SOURCES})
   target_link_libraries(baldes PRIVATE pybind11::module)
   target_link_libraries(baldes PRIVATE fmt::fmt)
   target_link_libraries(baldes PRIVATE TBB::tbb)

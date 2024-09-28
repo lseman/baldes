@@ -29,10 +29,10 @@
 #include <string>
 #include <vector>
 
-#include "../extra/Heuristic.h"
-#include "../include/Definitions.h"
-#include "../include/HGS.h"
-#include "../include/Reader.h"
+#include "extra/Heuristic.h"
+#include "Definitions.h"
+#include "HGS.h"
+#include "Reader.h"
 
 using VRProblemPtr = std::shared_ptr<VRProblem>;
 

@@ -26,8 +26,8 @@
  * return values.
  */
 
-#include "../bucket/BucketGraph.h"
-#include "../bucket/BucketUtils.h"
+#include "bucket/BucketGraph.h"
+#include "bucket/BucketUtils.h"
 
 // Implementation of Arc constructors
 Arc::Arc(int from, int to, const std::vector<double> &res_inc, double cost_inc)

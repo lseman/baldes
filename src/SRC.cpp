@@ -26,7 +26,7 @@
  * and `stdexec::sync_wait`.
  */
 
-#include "../cuts/SRC.h"
+#include "cuts/SRC.h"
 
 #include "Definitions.h"
 

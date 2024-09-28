@@ -37,7 +37,7 @@ SOFTWARE.*/
 #include "Matrix.h"
 #include "xorshift128.h"
 
-#include "../../include/Reader.h"
+#include "../Reader.h"
 #include "CircleSector.h"
 
 #include "config.h"

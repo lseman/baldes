@@ -13,9 +13,9 @@
  * while minimizing travel distance and adhering to constraints such as time windows and vehicle capacities.
  */
 
-#include "../include/Definitions.h"
+#include "Definitions.h"
 
-#include "Heuristic.h"
+#include "extra/Heuristic.h"
 
 #include <algorithm>
 #include <cmath>

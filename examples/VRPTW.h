@@ -16,17 +16,17 @@
 
 #pragma once
 
-#include "../include/Definitions.h"
+#include "Definitions.h"
 
-#include "../bucket/BucketGraph.h"
-#include "../bucket/BucketSolve.h"
-#include "../bucket/BucketUtils.h"
+#include "bucket/BucketGraph.h"
+#include "bucket/BucketSolve.h"
+#include "bucket/BucketUtils.h"
 
 #ifdef STAB
-#include "../extra/Stabilization.h"
+#include "extra/Stabilization.h"
 #endif
 
-#include "../include/Reader.h"
+#include "Reader.h"
 
 #ifdef RCC
 #include "../third_party/cvrpsep/capsep.h"
@@ -35,13 +35,13 @@
 #endif
 
 #ifdef EXACT_RCC
-#include "../cuts/RCC.h"
+#include "cuts/RCC.h"
 #endif
 
-#include "../include/Hashes.h"
+#include "Hashes.h"
 
 #ifdef IPM
-#include "../ipm/IPSolver.h"
+#include "ipm/IPSolver.h"
 #endif
 
 class VRProblem {

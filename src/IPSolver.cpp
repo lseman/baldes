@@ -1,4 +1,4 @@
-#include "../include/Definitions.h"
+#include "Definitions.h"
 
 #define EIGEN_INITIALIZE_MATRICES_BY_ZERO
 
@@ -10,7 +10,7 @@
 #include <stdexcept>
 #include <vector>
 
-#include "IPSolver.h"
+#include "ipm/IPSolver.h"
 
 /**
  * @brief Converts a dense vector to a sparse diagonal matrix.
