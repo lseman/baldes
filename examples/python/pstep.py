@@ -6,7 +6,7 @@ import os
 import sys
 
 # Add the build directory to the Python path
-sys.path.append(os.path.abspath("../build"))
+sys.path.append(os.path.abspath("../../build"))
 
 # %%
 

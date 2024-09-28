@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <bitset>
 #include <iterator>
 #include <time.h>
 #include <unordered_set>
@@ -120,33 +121,31 @@ Individual *Genetic::crossoverOX(std::pair<const Individual *, const Individual 
 
 void Genetic::doOXcrossover(Individual *result, std::pair<const Individual *, const Individual *> parents, int start,
                             int end) {
-    // Frequency vector to track the clients which have been inserted already
-    std::vector<bool> freqClient(params->nbClients + 1, false);
+    std::bitset<N_SIZE> freqClient; // Use bitset for better performance if MAX_NB_CLIENTS is known at compile-time
+    freqClient.reset();             // Clear the bitset
 
-    // Copy in place the elements from start to end
-    int j         = start;
-    int nbClients = params->nbClients;
-    int idxEnd    = (end + 1 == nbClients) ? 0 : end + 1; // Pre-compute the modulo result once
+    // Pre-compute the constants
+    const int nbClients = params->nbClients;
+    const int idxEnd    = (end + 1 == nbClients) ? 0 : end + 1;
 
     // First loop: directly copy the segment from parent A
+    int j = start;
     while (j != idxEnd) {
-        result->chromT[j]             = parents.first->chromT[j];
-        freqClient[result->chromT[j]] = true;
-        j++;
-        if (j == nbClients) j = 0; // Avoid modulo, just reset to 0 when reaching the end
+        int elem          = parents.first->chromT[j];
+        result->chromT[j] = elem;
+        freqClient.set(elem);
+        if (++j == nbClients) j = 0;
     }
 
     // Fill the remaining elements from parent B, skipping already copied ones
-    int i = idxEnd; // Start right after the end
+    int i = idxEnd;
     while (j != start) {
         int temp = parents.second->chromT[i];
-        if (!freqClient[temp]) {
+        if (!freqClient.test(temp)) {
             result->chromT[j] = temp;
-            j++;
-            if (j == nbClients) j = 0; // Avoid modulo
+            if (++j == nbClients) j = 0;
         }
-        i++;
-        if (i == nbClients) i = 0; // Avoid modulo
+        if (++i == nbClients) i = 0;
     }
 
     // Completing the individual with the Split algorithm
@@ -183,71 +182,71 @@ Individual *Genetic::crossoverSREX(std::pair<const Individual *, const Individua
 
     bool improved = true;
     while (improved) {
+        const int idxALeft      = (startA - 1 + nOfRoutesA) % nOfRoutesA;
+        const int idxARight     = (startA + nOfMovedRoutes) % nOfRoutesA;
+        const int idxALastMoved = (startA + nOfMovedRoutes - 1) % nOfRoutesA;
+        const int idxBLeft      = (startB - 1 + nOfRoutesB) % nOfRoutesB;
+        const int idxBRight     = (startB + nOfMovedRoutes) % nOfRoutesB;
+        const int idxBLastMoved = (startB - 1 + nOfMovedRoutes) % nOfRoutesB;
+
+        // Cache counts for A and B
+        const auto countClientsOut = [](const std::vector<int> &route, const std::unordered_set<int> &clientsSet) {
+            return std::count_if(route.begin(), route.end(),
+                                 [&clientsSet](int c) { return clientsSet.find(c) == clientsSet.end(); });
+        };
+
+        const auto countClientsIn = [](const std::vector<int> &route, const std::unordered_set<int> &clientsSet) {
+            return std::count_if(route.begin(), route.end(),
+                                 [&clientsSet](int c) { return clientsSet.find(c) != clientsSet.end(); });
+        };
+
         // Difference for moving 'left' in parent A
-        const int differenceALeft =
-            static_cast<int>(std::count_if(
-                parents.first->chromR[(startA - 1 + nOfRoutesA) % nOfRoutesA].begin(),
-                parents.first->chromR[(startA - 1 + nOfRoutesA) % nOfRoutesA].end(),
-                [&clientsInSelectedB](int c) { return clientsInSelectedB.find(c) == clientsInSelectedB.end(); })) -
-            static_cast<int>(std::count_if(
-                parents.first->chromR[(startA + nOfMovedRoutes - 1) % nOfRoutesA].begin(),
-                parents.first->chromR[(startA + nOfMovedRoutes - 1) % nOfRoutesA].end(),
-                [&clientsInSelectedB](int c) { return clientsInSelectedB.find(c) == clientsInSelectedB.end(); }));
+        const int differenceALeft = countClientsOut(parents.first->chromR[idxALeft], clientsInSelectedB) -
+                                    countClientsOut(parents.first->chromR[idxALastMoved], clientsInSelectedB);
 
         // Difference for moving 'right' in parent A
-        const int differenceARight =
-            static_cast<int>(std::count_if(
-                parents.first->chromR[(startA + nOfMovedRoutes) % nOfRoutesA].begin(),
-                parents.first->chromR[(startA + nOfMovedRoutes) % nOfRoutesA].end(),
-                [&clientsInSelectedB](int c) { return clientsInSelectedB.find(c) == clientsInSelectedB.end(); })) -
-            static_cast<int>(std::count_if(
-                parents.first->chromR[startA].begin(), parents.first->chromR[startA].end(),
-                [&clientsInSelectedB](int c) { return clientsInSelectedB.find(c) == clientsInSelectedB.end(); }));
+        const int differenceARight = countClientsOut(parents.first->chromR[idxARight], clientsInSelectedB) -
+                                     countClientsOut(parents.first->chromR[startA], clientsInSelectedB);
 
         // Difference for moving 'left' in parent B
-        const int differenceBLeft =
-            static_cast<int>(std::count_if(
-                parents.second->chromR[(startB - 1 + nOfMovedRoutes) % nOfRoutesB].begin(),
-                parents.second->chromR[(startB - 1 + nOfMovedRoutes) % nOfRoutesB].end(),
-                [&clientsInSelectedA](int c) { return clientsInSelectedA.find(c) != clientsInSelectedA.end(); })) -
-            static_cast<int>(std::count_if(
-                parents.second->chromR[(startB - 1 + nOfRoutesB) % nOfRoutesB].begin(),
-                parents.second->chromR[(startB - 1 + nOfRoutesB) % nOfRoutesB].end(),
-                [&clientsInSelectedA](int c) { return clientsInSelectedA.find(c) != clientsInSelectedA.end(); }));
+        const int differenceBLeft = countClientsIn(parents.second->chromR[idxBLastMoved], clientsInSelectedA) -
+                                    countClientsIn(parents.second->chromR[idxBLeft], clientsInSelectedA);
 
         // Difference for moving 'right' in parent B
-        const int differenceBRight =
-            static_cast<int>(std::count_if(
-                parents.second->chromR[startB].begin(), parents.second->chromR[startB].end(),
-                [&clientsInSelectedA](int c) { return clientsInSelectedA.find(c) != clientsInSelectedA.end(); })) -
-            static_cast<int>(std::count_if(
-                parents.second->chromR[(startB + nOfMovedRoutes) % nOfRoutesB].begin(),
-                parents.second->chromR[(startB + nOfMovedRoutes) % nOfRoutesB].end(),
-                [&clientsInSelectedA](int c) { return clientsInSelectedA.find(c) != clientsInSelectedA.end(); }));
+        const int differenceBRight = countClientsIn(parents.second->chromR[startB], clientsInSelectedA) -
+                                     countClientsIn(parents.second->chromR[idxBRight], clientsInSelectedA);
 
         const int bestDifference = std::min({differenceALeft, differenceARight, differenceBLeft, differenceBRight});
-
+        // Avoiding infinite loop by adding a guard in case nothing changes
         if (bestDifference < 0) {
             if (bestDifference == differenceALeft) {
                 for (int c : parents.first->chromR[(startA + nOfMovedRoutes - 1) % nOfRoutesA]) {
-                    clientsInSelectedA.erase(clientsInSelectedA.find(c));
+                    auto it = clientsInSelectedA.find(c);
+                    if (it != clientsInSelectedA.end()) clientsInSelectedA.erase(it);
                 }
                 startA = (startA - 1 + nOfRoutesA) % nOfRoutesA;
                 for (int c : parents.first->chromR[startA]) { clientsInSelectedA.insert(c); }
             } else if (bestDifference == differenceARight) {
-                for (int c : parents.first->chromR[startA]) { clientsInSelectedA.erase(clientsInSelectedA.find(c)); }
+                for (int c : parents.first->chromR[startA]) {
+                    auto it = clientsInSelectedA.find(c);
+                    if (it != clientsInSelectedA.end()) clientsInSelectedA.erase(it);
+                }
                 startA = (startA + 1) % nOfRoutesA;
                 for (int c : parents.first->chromR[(startA + nOfMovedRoutes - 1) % nOfRoutesA]) {
                     clientsInSelectedA.insert(c);
                 }
             } else if (bestDifference == differenceBLeft) {
                 for (int c : parents.second->chromR[(startB + nOfMovedRoutes - 1) % nOfRoutesB]) {
-                    clientsInSelectedB.erase(clientsInSelectedB.find(c));
+                    auto it = clientsInSelectedB.find(c);
+                    if (it != clientsInSelectedB.end()) clientsInSelectedB.erase(it);
                 }
                 startB = (startB - 1 + nOfRoutesB) % nOfRoutesB;
                 for (int c : parents.second->chromR[startB]) { clientsInSelectedB.insert(c); }
             } else if (bestDifference == differenceBRight) {
-                for (int c : parents.second->chromR[startB]) { clientsInSelectedB.erase(clientsInSelectedB.find(c)); }
+                for (int c : parents.second->chromR[startB]) {
+                    auto it = clientsInSelectedB.find(c);
+                    if (it != clientsInSelectedB.end()) clientsInSelectedB.erase(it);
+                }
                 startB = (startB + 1) % nOfRoutesB;
                 for (int c : parents.second->chromR[(startB + nOfMovedRoutes - 1) % nOfRoutesB]) {
                     clientsInSelectedB.insert(c);

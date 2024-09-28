@@ -6,24 +6,32 @@
 #include "Individual.h"
 #include "Params.h"
 #include "Split.h"
-
 void Split::generalSplit(Individual *indiv, int nbMaxVehicles) {
     // Do not apply Split with fewer vehicles than the trivial (LP) bin packing bound
     maxVehicles = std::max(nbMaxVehicles, static_cast<int>(std::ceil(params->totalDemand / params->vehicleCapacity)));
 
-    // Initialization of the data structures for the Linear Split algorithm
-    // Direct application of the code located at https://github.com/vidalt/Split-Library
+    // Pre-fetch some useful values
+    //const int nbClients = params->nbClients;
+
+    // Ensure vectors are resized properly to accommodate index 1 to nbClients
+    //cliSplit.resize(nbClients + 1); // cliSplit should be resized before access
+    //sumLoad.resize(nbClients + 1, 0);
+    //sumService.resize(nbClients + 1, 0);
+    //sumDistance.resize(nbClients + 1, 0);
+
     // Loop over all clients, excluding the depot
     for (int i = 1; i <= params->nbClients; i++) {
-        // Store all information on clientSplits (use chromT[i-1] since the depot is not included in chromT)
-        cliSplit[i].demand      = params->cli[indiv->chromT[i - 1]].demand;
-        cliSplit[i].serviceTime = params->cli[indiv->chromT[i - 1]].serviceDuration;
-        cliSplit[i].d0_x        = params->timeCost.get(0, indiv->chromT[i - 1]);
-        cliSplit[i].dx_0        = params->timeCost.get(indiv->chromT[i - 1], 0);
+        int chromIdx = indiv->chromT[i - 1];
+
+        // Store all information on clientSplits
+        cliSplit[i].demand      = params->cli[chromIdx].demand;
+        cliSplit[i].serviceTime = params->cli[chromIdx].serviceDuration;
+        cliSplit[i].d0_x        = params->timeCost.get(0, chromIdx);
+        cliSplit[i].dx_0        = params->timeCost.get(chromIdx, 0);
 
         // The distance to the next client is INT_MIN for the last client
         if (i < params->nbClients) {
-            cliSplit[i].dnext = params->timeCost.get(indiv->chromT[i - 1], indiv->chromT[i]);
+            cliSplit[i].dnext = params->timeCost.get(chromIdx, indiv->chromT[i]);
         } else {
             cliSplit[i].dnext = INT_MIN;
         }
@@ -34,12 +42,15 @@ void Split::generalSplit(Individual *indiv, int nbMaxVehicles) {
         sumDistance[i] = sumDistance[i - 1] + cliSplit[i - 1].dnext;
     }
 
-    // We first try the Simple Split, and then the Split with Limited Fleet if this is not successful
-    if (splitSimple(indiv) == 0) { splitLF(indiv); }
+    // Try Simple Split, then fall back to Split with Limited Fleet if needed
+    if (splitSimple(indiv) == 0) {
+        splitLF(indiv);
+    }
 
     // Build up the rest of the Individual structure
     indiv->evaluateCompleteCost();
 }
+
 
 int Split::splitSimple(Individual *indiv) {
     // Reinitialize the potential structure

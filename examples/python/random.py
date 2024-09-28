@@ -3,7 +3,7 @@ import random
 import sys
 
 # Add the build directory to the Python path
-sys.path.append(os.path.abspath('../build'))
+sys.path.append(os.path.abspath('../../build'))
 
 # Now you can import the BALDES module
 import baldes
