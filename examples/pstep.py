@@ -3,17 +3,12 @@
 
 # %%
 import os
-import random
 import sys
-import gurobipy as gp
-from gurobipy import GRB
-
 
 # Add the build directory to the Python path
 sys.path.append(os.path.abspath("../build"))
 
 # %%
-import numpy as np
 
 
 class ATSPInstance:
@@ -138,7 +133,6 @@ def solve_atsp(instance):
 
 
 # %%
-import numpy as np
 
 
 def generate_tsp_instance(num_nodes):
@@ -167,19 +161,17 @@ instancia = {}
 instancia["dimension"] = num_nodes
 instancia["distance_matrix"] = cost_matrix
 
-
 # %%
 # instancia.print_instance()
 # x = solve_atsp(instancia)
 
 
 # %%
-import random
 import numpy as np
 
 
 def generate_initial_paths(
-    n, p1, p2, paths, path_costs, firsts, lasts, cost_matrix, num_paths
+        n, p1, p2, paths, path_costs, firsts, lasts, cost_matrix, num_paths
 ):
     for i in range(num_paths):
         p = p1 if i % 2 == 0 else p2  # Alternate between p1 and p2
@@ -223,7 +215,6 @@ def generate_initial_paths(
 # %%
 import gurobipy as gp
 from gurobipy import GRB
-import random
 
 
 def solve_tsp(paths, nodes, path_costs, firsts, lasts, cost_matrix, first_time=False):
@@ -342,7 +333,6 @@ three_two, three_three, three_five = solve_tsp(
     paths, nodes, path_costs, firsts, lasts, cost_matrix, first_time=True
 )
 
-
 # %%
 import os
 import random
@@ -373,7 +363,6 @@ options.depot = 3
 options.end_depot = 11
 options.max_path_size = 5
 
-
 # %%
 jobs = [baldes.VRPJob() for _ in range(11)]
 num_intervals = 1
@@ -397,7 +386,6 @@ for job in jobs:
 # Initialize BucketGraph using these jobs
 bg = baldes.BucketGraph(jobs, 100, 1)
 bg.setOptions(options)
-
 
 # Create random duals with size equal to the number of jobs
 duals = [0 for _ in range(len(jobs))]

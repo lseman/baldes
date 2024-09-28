@@ -95,7 +95,7 @@ void CutStorage::addCut(Cut &cut) {
         cuts[cut.id] = cut;
     } else {
         //   If the cut does not exist, add it to the cuts vector and update the map
-        cut.id = cuts.size();
+        cut.id  = cuts.size();
         cut.key = cut_key;
         cuts.push_back(cut);
         cutMaster_to_cut_map[cut_key] = cut.id;

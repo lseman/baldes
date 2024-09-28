@@ -13,7 +13,6 @@
 
 #include "Reader.h"
 
-
 /**
  * @class HGS
  * @brief A class that implements a Hybrid Genetic Search (HGS) algorithm.
@@ -43,6 +42,7 @@ public:
                   << " VEHICLES" << std::endl;
         std::cout << "----- BUILDING INITIAL POPULATION" << std::endl;
         Population population(&params, &split, &localSearch);
+
         // Genetic algorithm
         std::cout << "----- STARTING GENETIC ALGORITHM" << std::endl;
         Genetic solver(&params, &split, &population, &localSearch);

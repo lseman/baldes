@@ -27,11 +27,11 @@
  */
 class CliqueManager {
 private:
-    const ModelData &modelData;
-    std::vector<std::vector<int>> cliques; // Stores all detected cliques
-    std::vector<std::unordered_set<int>> conflictGraph; // Conflict graph for binary variables
-    std::mutex clique_mutex; // For thread safety when adding cliques
-    std::mutex conflictGraph_mutex; // For thread safety in conflict graph updates
+    const ModelData                     &modelData;
+    std::vector<std::vector<int>>        cliques;             // Stores all detected cliques
+    std::vector<std::unordered_set<int>> conflictGraph;       // Conflict graph for binary variables
+    std::mutex                           clique_mutex;        // For thread safety when adding cliques
+    std::mutex                           conflictGraph_mutex; // For thread safety in conflict graph updates
 
 public:
     explicit CliqueManager(const ModelData &mData) : modelData(mData) {}
@@ -76,8 +76,8 @@ public:
 
         // Populate rowToElements for efficient row-wise access
         for (size_t nz_idx = 0; nz_idx < modelData.A_sparse.row_indices.size(); ++nz_idx) {
-            int row = modelData.A_sparse.row_indices[nz_idx];
-            int col = modelData.A_sparse.col_indices[nz_idx];
+            int    row   = modelData.A_sparse.row_indices[nz_idx];
+            int    col   = modelData.A_sparse.col_indices[nz_idx];
             double coeff = modelData.A_sparse.values[nz_idx];
 
             rowToElements[row].emplace_back(coeff, col);
@@ -85,7 +85,7 @@ public:
 
         // Parallel processing of rows
         std::for_each(std::execution::par, modelData.b.begin(), modelData.b.end(), [&](const auto &rhs_value) {
-            int row = &rhs_value - &modelData.b[0]; // Get row index
+            int    row = &rhs_value - &modelData.b[0]; // Get row index
             double rhs = rhs_value;
 
             std::vector<std::pair<double, int>> binCoeffs;
@@ -96,7 +96,7 @@ public:
             // Adjust RHS and collect binary variable coefficients
             for (const auto &elem : rowElements) {
                 double coeff = elem.first;
-                int col = elem.second;
+                int    col   = elem.second;
 
                 if (modelData.vtype[col] != 'B') {
                     rhs -= (coeff > 0 ? coeff * modelData.ub[col] : 0);
@@ -126,7 +126,7 @@ public:
         while (left <= right) {
             int mid = left + (right - left) / 2;
             if (binCoeffs[mid].first + binCoeffs[mid + 1].first > rhs) {
-                k = mid;
+                k     = mid;
                 right = mid - 1;
             } else {
                 left = mid + 1;
@@ -139,9 +139,7 @@ public:
     void addCliqueFromIndex(const std::vector<std::pair<double, int>> &binCoeffs, int k) {
         std::vector<int> clique;
         clique.reserve(binCoeffs.size() - k);
-        for (int j = k; j < binCoeffs.size(); ++j) {
-            clique.push_back(binCoeffs[j].second);
-        }
+        for (int j = k; j < binCoeffs.size(); ++j) { clique.push_back(binCoeffs[j].second); }
         addClique(clique);
     }
 
@@ -152,9 +150,7 @@ public:
             if (f != -1) {
                 std::vector<int> clique_f;
                 clique_f.push_back(binCoeffs[o].second);
-                for (int j = f; j < binCoeffs.size(); ++j) {
-                    clique_f.push_back(binCoeffs[j].second);
-                }
+                for (int j = f; j < binCoeffs.size(); ++j) { clique_f.push_back(binCoeffs[j].second); }
                 addClique(clique_f);
             }
         }
@@ -166,7 +162,7 @@ public:
         while (left <= right) {
             int mid = left + (right - left) / 2;
             if (binCoeffs[o].first + binCoeffs[mid].first > rhs) {
-                f = mid;
+                f     = mid;
                 right = mid - 1;
             } else {
                 left = mid + 1;
@@ -179,9 +175,7 @@ public:
     void printCliques() {
         for (const auto &clique : cliques) {
             fmt::print("Clique: ");
-            for (const auto &c : clique) {
-                fmt::print("{} ", c);
-            }
+            for (const auto &c : clique) { fmt::print("{} ", c); }
             fmt::print("\n");
         }
     }
@@ -190,9 +184,7 @@ public:
     void printCg() {
         for (size_t i = 0; i < conflictGraph.size(); ++i) {
             fmt::print("Variable {} conflicts with: ", i);
-            for (const auto &c : conflictGraph[i]) {
-                fmt::print("{} ", c);
-            }
+            for (const auto &c : conflictGraph[i]) { fmt::print("{} ", c); }
             fmt::print("\n");
         }
     }

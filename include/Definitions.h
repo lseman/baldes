@@ -61,7 +61,7 @@ enum class Stage { One, Two, Three, Four, Enumerate, Fix };
 enum class ArcType { Job, Bucket, Jump };
 enum class Mutability { Const, Mut };
 enum class Full { Full, Partial, Reverse };
-enum class Status { Optimal, Separation, NotOptimal, Error };
+enum class Status { Optimal, Separation, NotOptimal, Error, Rollback };
 enum class CutType { ThreeRow, FourRow, FiveRow };
 
 // Comparator function for Stage enum
@@ -136,6 +136,13 @@ public:
      *
      */
     void addCut(Cut &cut);
+
+    void reset() {
+        cuts.clear();
+        cutMaster_to_cut_map.clear();
+        indexCuts.clear();
+        SRCDuals = {};
+    }
 
     void removeCut(int cutIndex) {
         // Ensure the cutIndex is within bounds
@@ -1096,7 +1103,6 @@ public:
     int query(int value) { return query(root, value); }
 };
 
-
 /**
  * @class TreeNode
  * @brief Represents a node in a multi-dimensional tree structure.
@@ -1270,19 +1276,47 @@ class SplayTree {
         }
     }
 
+    void rotate(TreeNode *x) {
+        TreeNode *p = x->parent;
+        TreeNode *g = p->parent;
+
+        if (p->left == x) { // Left child
+            p->left = x->right;
+            if (x->right) x->right->parent = p;
+            x->right = p;
+        } else { // Right child
+            p->right = x->left;
+            if (x->left) x->left->parent = p;
+            x->left = p;
+        }
+
+        x->parent = g;
+        p->parent = x;
+
+        if (g) {
+            if (g->left == p)
+                g->left = x;
+            else
+                g->right = x;
+        }
+    }
+
     void splay(TreeNode *x) {
         while (x->parent != nullptr) {
             TreeNode *p = x->parent;
             TreeNode *g = p->parent;
 
             if (g == nullptr) {
-                zig(x);
-            } else if (g->left == p && p->left == x) {
-                zig_zig(x);
-            } else if (g->right == p && p->right == x) {
-                zig_zig(x);
+                // Zig step (single rotation)
+                rotate(x);
+            } else if ((g->left == p && p->left == x) || (g->right == p && p->right == x)) {
+                // Zig-zig step (double rotation)
+                rotate(p); // First rotate parent
+                rotate(x); // Then rotate x
             } else {
-                zig_zag(x);
+                // Zig-zag step (rotating x twice in different directions)
+                rotate(x); // Rotate x first
+                rotate(x); // Then rotate x again
             }
         }
         root = x;
@@ -1293,12 +1327,10 @@ public:
 
     TreeNode *find(const std::vector<int> &point) {
         TreeNode *curr = root;
-        TreeNode *prev = nullptr;
 
         while (curr != nullptr) {
-            prev = curr;
             if (curr->contains(point)) {
-                splay(curr);
+                splay(curr); // Splay only if we find the node
                 return curr;
             } else if (curr->is_less_than(point)) {
                 curr = curr->right;
@@ -1307,7 +1339,7 @@ public:
             }
         }
 
-        if (prev != nullptr) splay(prev);
+        // If not found, no splaying needed for the closest node
         return nullptr;
     }
 

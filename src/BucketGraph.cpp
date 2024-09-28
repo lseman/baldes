@@ -364,8 +364,8 @@ void BucketGraph::calculate_neighborhoods(size_t num_closest) {
         neighborhoods_bitmap[i].resize(num_segments, 0); // Resizing for forward bitmap
 
         // Include the job itself in both forward and backward neighborhoods
-        size_t segment_self      = i / 64;
-        size_t bit_position_self = i % 64;
+        size_t segment_self      = i >> 6;
+        size_t bit_position_self = i & 63;
         neighborhoods_bitmap[i][segment_self] |= (1ULL << bit_position_self); // Forward
 
         // Map the top 'num_closest' closest jobs for forward and set them in the backward neighborhoods
@@ -373,8 +373,8 @@ void BucketGraph::calculate_neighborhoods(size_t num_closest) {
             size_t job_index = forward_distances[k].second;
 
             // Determine the segment and the bit within the segment for the job_index (forward)
-            size_t segment      = job_index / 64;
-            size_t bit_position = job_index % 64;
+            size_t segment      = job_index >> 6;
+            size_t bit_position = job_index & 63;
             neighborhoods_bitmap[i][segment] |= (1ULL << bit_position); // Forward neighbor
         }
     }
@@ -470,13 +470,13 @@ void BucketGraph::forbidCycle(const std::vector<int> &cycle, bool aggressive) {
         int v2 = cycle[i + 1];
 
         // Update the bitmap to forbid v2 in the neighborhood of v1
-        size_t segment      = v2 / 64;
-        size_t bit_position = v2 % 64;
+        size_t segment      = v2 >> 6;
+        size_t bit_position = v2 & 63;
         neighborhoods_bitmap[v1][segment] |= (1ULL << bit_position);
 
         if (aggressive) {
-            segment      = v1 / 64;
-            bit_position = v1 % 64;
+            segment      = v1 >> 6;
+            bit_position = v1 & 63;
             neighborhoods_bitmap[v2][segment] |= (1ULL << bit_position);
         }
     }

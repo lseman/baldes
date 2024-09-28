@@ -206,8 +206,8 @@ int main(int argc, char *argv[]) {
         jobs[k].set_location(instance.x_coord[k], instance.y_coord[k]);
         jobs[k].lb.push_back(start_time);
         jobs[k].ub.push_back(end_time);
-        //jobs[k].lb.push_back(0);
-        //jobs[k].ub.push_back(instance.q);
+        // jobs[k].lb.push_back(0);
+        // jobs[k].ub.push_back(instance.q);
         jobs[k].consumption.push_back(duration);
         jobs[k].consumption.push_back(demand);
     }

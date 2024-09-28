@@ -126,7 +126,7 @@ int main(int argc, char *argv[]) {
     // Get the number of constraints
     int num_constrs = model.get(GRB_IntAttr_NumConstrs);
     std::cout << "Number of constraints: " << num_constrs << std::endl;
-    
+
     print_info("Extracting model data\n");
     auto modelData = extractModelDataSparse(&model);
 

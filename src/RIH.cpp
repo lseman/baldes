@@ -482,7 +482,7 @@ inline std::vector<size_t> BucketGraph::findBestInsertionPositions(const std::ve
     return best_positions;
 }
 
-/** 
+/**
  * @brief Calculate the cost of inserting a customer at a given position in a route
  *
  */

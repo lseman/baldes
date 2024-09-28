@@ -607,6 +607,52 @@ public:
         return true;
     }
 
+    void updateSplit() {
+        //////////////////////////////////////////////////////////////////////
+        // ADAPTIVE TERMINAL TIME
+        //////////////////////////////////////////////////////////////////////
+        // Adjust the terminal time dynamically based on the difference between the number of forward and backward
+        // labels
+        for (auto &split : q_star) {
+            // print n_fw_labels and n_bw_labels
+            // If there are more backward labels than forward labels, increase the terminal time slightly
+            if (((static_cast<double>(n_bw_labels) - static_cast<double>(n_fw_labels)) /
+                 static_cast<double>(n_fw_labels)) > 0.05) {
+                split += 0.05 * R_max[TIME_INDEX];
+            }
+            // If there are more forward labels than backward labels, decrease the terminal time slightly
+            else if (((static_cast<double>(n_fw_labels) - static_cast<double>(n_bw_labels)) /
+                      static_cast<double>(n_bw_labels)) > 0.05) {
+                split -= 0.05 * R_max[TIME_INDEX];
+            }
+        }
+    }
+
+    bool updateStepSize() {
+        bool updated = false;
+        // compute the mean of dominance_checks_per_bucket
+        double mean_dominance_checks = 0.0;
+        for (size_t i = 0; i < dominance_checks_per_bucket.size(); ++i) {
+            mean_dominance_checks += dominance_checks_per_bucket[i];
+        }
+        auto step_calc = mean_dominance_checks / non_dominated_labels_per_bucket;
+        if (step_calc > 1000) {
+
+            fmt::print("Increment redefinition counter\n");
+            if (redefine_counter % 3 == 0) {
+                redefine_counter = 0;
+                print_info("Step size is high, should increment step size - {}\n", step_calc);
+                fmt::print("Current step size bucket_interval: {}\n", bucket_interval);
+                redefine(bucket_interval * 2);
+                fmt::print("New step size bucket_interval: {}\n", bucket_interval);
+                reset_fixed_buckets();
+                fixed   = true;
+                updated = true;
+            }
+            redefine_counter++;
+        }
+        return updated;
+    }
     template <Direction D>
     void add_arc(int from_bucket, int to_bucket, const std::vector<double> &res_inc, double cost_inc);
 

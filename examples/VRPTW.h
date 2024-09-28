@@ -654,7 +654,7 @@ public:
         print_info("Column generation started...\n");
 
         node->optimize();
-        int bucket_interval = 150;
+        int bucket_interval = 20;
         int time_horizon    = instance.T_max;
 
         numConstrs                = node->get(GRB_IntAttr_NumConstrs);
@@ -944,6 +944,7 @@ public:
                 bucket_graph.relaxation = highs_obj;
 
 #if defined(SRC3) || defined(SRC)
+                // print cuts.size
                 if (cuts.size() > 0) {
                     auto duals = node->get(GRB_DoubleAttr_Pi, SRCconstraints.data(), SRCconstraints.size());
                     cutDuals.assign(duals, duals + SRCconstraints.size());
@@ -968,6 +969,19 @@ public:
 
                 // Adding cols
                 auto colAdded = addColumn(node, paths, false);
+                // remove all cuts
+                if (bucket_graph.getStatus() == Status::Rollback) {
+                    for (int i = SRCconstraints.size() - 1; i >= 0; --i) {
+                        GRBConstr constr = SRCconstraints[i];
+                        node->remove(constr);
+                    }
+                    SRCconstraints = std::vector<GRBConstr>();
+                    node->update();
+                    node->optimize();
+                    cuts.reset();
+                    r1c.cutStorage = cuts;
+                    matrix         = extractModelDataSparse(node);
+                }
 
 #ifdef SCHRODINGER
                 // Adding schrodinger paths
