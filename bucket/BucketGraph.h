@@ -437,9 +437,6 @@ public:
      * by checking the corresponding bit in a bitmap array. The bitmap is an array of
      * 64-bit unsigned integers, where each bit represents the visited status of a job.
      *
-     * @param bitmap A constant reference to an array of 64-bit unsigned integers representing the bitmap.
-     * @param job_id An integer representing the ID of the job to check.
-     * @return true if the job has been visited (i.e., the corresponding bit is set to 1), false otherwise.
      */
     static inline bool is_job_visited(const std::array<uint64_t, num_words> &bitmap, int job_id) {
         int word_index   = job_id >> 6; // Determine which 64-bit segment contains the job_id
@@ -453,8 +450,6 @@ public:
      * This function sets the bit corresponding to the given job_id in the provided bitmap,
      * indicating that the job has been visited.
      *
-     * @param bitmap A reference to an array of 64-bit unsigned integers representing the bitmap.
-     * @param job_id The ID of the job to be marked as visited.
      */
     static inline void set_job_visited(std::array<uint64_t, num_words> &bitmap, int job_id) {
         int word_index   = job_id >> 6; // Determine which 64-bit segment contains the job_id
@@ -469,11 +464,6 @@ public:
      * by checking a specific bit in a bitmap. The bitmap is represented as an
      * array of 64-bit unsigned integers.
      *
-     * @param bitmap A constant reference to an array of 64-bit unsigned integers
-     *               representing the bitmap.
-     * @param job_id An integer representing the job identifier.
-     * @return true if the job is unreachable (i.e., the corresponding bit in the
-     *         bitmap is set), false otherwise.
      */
     static inline bool is_job_unreachable(const std::array<uint64_t, num_words> &bitmap, int job_id) {
         int word_index   = job_id >> 6; // Determine which 64-bit segment contains the job_id
@@ -487,8 +477,6 @@ public:
      * This function sets the bit corresponding to the specified job_id in the bitmap,
      * indicating that the job is unreachable.
      *
-     * @param bitmap A reference to an array of 64-bit unsigned integers representing the bitmap.
-     * @param job_id The ID of the job to be marked as unreachable.
      */
     static inline void set_job_unreachable(std::array<uint64_t, num_words> &bitmap, int job_id) {
         int word_index   = job_id >> 6; // Determine which 64-bit segment contains the job_id
@@ -502,7 +490,6 @@ public:
      * This function updates the bucket interval and reinitializes the intervals, buckets,
      * fixed arcs, and fixed buckets. It also generates arcs and sorts them for each job.
      *
-     * @param bucketInterval The new interval for the buckets.
      */
     void redefine(int bucketInterval) {
         this->bucket_interval = bucketInterval;
@@ -552,7 +539,6 @@ public:
      * through the given vector of duals and sets each job's dual value to the
      * corresponding value from the vector.
      *
-     * @param duals A vector of double values representing the duals to be set.
      */
     void setDuals(const std::vector<double> &duals) {
         for (size_t i = 1; i < N_SIZE - 1; ++i) { jobs[i].setDuals(duals[i - 1]); }
@@ -565,9 +551,6 @@ public:
      * distance matrix of the class and then calculates the neighborhoods
      * based on the given number of nearest neighbors.
      *
-     * @param distanceMatrix A 2D vector representing the distance matrix.
-     * @param n_ng The number of nearest neighbors to consider when calculating
-     *             neighborhoods. Default value is 8.
      */
     void set_distance_matrix(const std::vector<std::vector<double>> &distanceMatrix, int n_ng = 8) {
         this->distance_matrix = distanceMatrix;
@@ -595,17 +578,6 @@ public:
      * This function determines if the transition from a forward label to a backward label
      * is feasible based on resource constraints and job durations.
      *
-     * @param fw_label Pointer to the forward label.
-     * @param bw_label Pointer to the backward label.
-     * @return true if the transition is feasible, false otherwise.
-     *
-     * The function performs the following checks:
-     * - If either of the labels is null, it returns false.
-     * - It retrieves the job associated with the forward label and checks if the sum of the
-     *   forward label's resources, the cost between the jobs, and the job's duration exceeds
-     *   the backward label's resources.
-     * - If the resource size is greater than 1, it iterates through the resources and checks
-     *   if the forward label's resources plus the job's demand exceed the backward label's resources.
      */
     inline bool check_feasibility(const Label *fw_label, const Label *bw_label) {
         if (!fw_label || !bw_label) return false;

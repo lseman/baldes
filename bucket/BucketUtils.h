@@ -30,11 +30,6 @@
 /**
  * Adds an arc to the bucket graph.
  *
- * @tparam D The direction of the arc (Forward or Backward).
- * @param from_bucket The index of the source bucket.
- * @param to_bucket The index of the destination bucket.
- * @param res_inc The vector of resource increments.
- * @param cost_inc The cost increment.
  */
 template <Direction D>
 void BucketGraph::add_arc(int from_bucket, int to_bucket, const std::vector<double> &res_inc, double cost_inc) {
@@ -56,11 +51,6 @@ void BucketGraph::add_arc(int from_bucket, int to_bucket, const std::vector<doub
  * This function returns the bucket number for a given job and value in the bucket graph.
  * The bucket graph is represented by the `buckets` vector, which contains intervals of buckets.
  * The direction of the bucket graph is specified by the template parameter `D`.
- *
- * @tparam D The direction of the bucket graph.
- * @param job The job index.
- * @param value The value to search for in the bucket graph.
- * @return The bucket number if found, -1 otherwise.
  */
 template <Direction D>
 inline int BucketGraph::get_bucket_number(int job, const std::vector<double> &resource_values_vec) noexcept {
@@ -84,7 +74,6 @@ inline int BucketGraph::get_bucket_number(int job, const std::vector<double> &re
  * This function determines the number of buckets based on the time intervals and assigns buckets to the graph.
  * It computes resource bounds for each vertex and defines the bounds of each bucket.
  *
- * @tparam D The direction of the buckets (Forward or Backward).
  */
 template <Direction D>
 void BucketGraph::define_buckets() {
@@ -221,7 +210,6 @@ void BucketGraph::define_buckets() {
 /**
  * Generates arcs in the bucket graph based on the specified direction.
  *
- * @tparam D The direction of the arcs (Forward or Backward).
  */
 template <Direction D>
 void BucketGraph::generate_arcs() {
@@ -358,11 +346,6 @@ void BucketGraph::generate_arcs() {
  * from the corresponding buckets in the bucket graph. It then compares the cost of each label and keeps track
  * of the label with the lowest cost. The best label, along with its associated bucket, is returned.
  *
- * @tparam D The direction of the bucket graph.
- * @param topological_order The topological order of the components.
- * @param c_bar The c_bar values.
- * @param sccs The strongly connected components.
- * @return The best label from the bucket graph.
  */
 template <Direction D>
 Label *BucketGraph::get_best_label(const std::vector<int> &topological_order, const std::vector<double> &c_bar,
@@ -391,11 +374,6 @@ Label *BucketGraph::get_best_label(const std::vector<int> &topological_order, co
 /**
  * Concatenates the label L with the bucket b and updates the best label pbest.
  *
- * @param L The label to be concatenated.
- * @param b The bucket index.
- * @param pbest The best label found so far.
- * @param Bvisited The set of visited buckets.
- * @param q_star The vector of costs.
  */
 template <Stage S>
 void BucketGraph::ConcatenateLabel(const Label *L, int &b, Label *&pbest, std::vector<uint64_t> &Bvisited) {
@@ -499,7 +477,6 @@ void BucketGraph::ConcatenateLabel(const Label *L, int &b, Label *&pbest, std::v
  * buckets within each SCC based on their lower or upper bounds, depending on the direction. Finally, it splits
  * the arcs for each SCC and removes duplicates.
  *
- * @tparam D The direction of the graph traversal, either Forward or Backward.
  */
 template <Direction D>
 void BucketGraph::SCC_handler() {
@@ -667,9 +644,6 @@ void BucketGraph::SCC_handler() {
  * and the specified direction. It determines the job and bounds of the current bucket,
  * then calculates the opposite bucket index using the appropriate direction.
  *
- * @tparam D The direction (Forward or Backward) to determine the opposite bucket.
- * @param current_bucket_index The index of the current bucket.
- * @return The index of the opposite bucket.
  */
 template <Direction D>
 int BucketGraph::get_opposite_bucket_number(int current_bucket_index) {
@@ -696,6 +670,15 @@ int BucketGraph::get_opposite_bucket_number(int current_bucket_index) {
     return opposite_bucket_index;
 }
 
+/**
+ * @brief Fixes the bucket arcs for the specified stage.
+ *
+ * This function performs the bucket arc fixing for the given stage. It initializes
+ * necessary variables and runs labeling algorithms to compute forward and backward
+ * reduced costs. Based on the computed gap, it performs arc elimination in both
+ * forward and backward directions and generates the necessary arcs.
+ *
+ */
 template <Stage S>
 void BucketGraph::bucket_fixing() {
     // Stage 4 bucket arc fixing
@@ -740,8 +723,6 @@ void BucketGraph::bucket_fixing() {
  * This function modifies the current solution based on the heuristic
  * fixing strategy using the provided vector of values.
  *
- * @param q_star A vector of double values representing the heuristic
- *               fixing parameters.
  */
 template <Stage S>
 void BucketGraph::heuristic_fixing() {

@@ -28,9 +28,6 @@
  * add items with specific values and weights, solve the knapsack problem
  * using a dynamic programming approach, and clear the items for reuse.
  *
- * @note The knapsack problem is a combinatorial optimization problem where
- *       the goal is to maximize the total value of items that can be placed
- *       in a knapsack with a given capacity.
  */
 class Knapsack {
 private:

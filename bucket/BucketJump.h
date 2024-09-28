@@ -25,11 +25,6 @@
  * This function inserts the current bucket into the visited set and then performs various checks and updates
  * based on the provided theta, label, Bbidi, current_bucket, and Bvisited parameters.
  *
- * @param theta The threshold value for the cost calculation.
- * @param label A pointer to the Label object.
- * @param Bbidi A reference to the set of integers representing the Bbidi set.
- * @param current_bucket The current bucket being processed.
- * @param Bvisited A reference to the set of integers representing the visited buckets.
  */
 template <Direction D>
 void BucketGraph::UpdateBucketsSet(const double theta, const Label *label, std::unordered_set<int> &Bbidi,
@@ -105,9 +100,6 @@ void BucketGraph::UpdateBucketsSet(const double theta, const Label *label, std::
  * prints information about the direction of elimination, and processes arcs to update the
  * local bucket arc map and fixed buckets.
  *
- * @tparam D The direction of elimination (either `Direction::Forward` or `Direction::Backward`).
- * @param theta The threshold value used for bucket arc elimination.
- * @param Gamma A vector of `BucketArc` objects.
  */
 template <Direction D>
 void BucketGraph::BucketArcElimination(double theta) {
@@ -240,7 +232,6 @@ void BucketGraph::BucketArcElimination(double theta) {
  * It then removes the non-component-wise minimal buckets from the set.
  * Finally, it adds jump arcs from the current bucket to each bucket in the set.
  *
- * @param Gamma The vector of BucketArcs to check for each bucket.
  */
 template <Direction D>
 void BucketGraph::ObtainJumpBucketArcs() {

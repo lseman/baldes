@@ -33,7 +33,6 @@
  * bi-labeling algorithm to find the optimal paths. The stages are adaptive and transition
  * based on the inner objective values and iteration counts.
  *
- * @return A vector of pointers to Label objects representing the optimal paths.
  */
 inline std::vector<Label *> BucketGraph::solve() {
     // Initialize the status as not optimal at the start
@@ -143,10 +142,6 @@ inline std::vector<Label *> BucketGraph::solve() {
 /**
  * Performs the labeling algorithm on the BucketGraph.
  *
- * @tparam D The direction of the algorithm (Forward or Backward).
- * @tparam S The stage of the algorithm (One or Two).
- * @param q_point The q-point used in the algorithm.
- * @return A vector of doubles representing the c_bar values for each bucket.
  */
 template <Direction D, Stage S, Full F>
 std::vector<double> BucketGraph::labeling_algorithm() noexcept {
@@ -355,11 +350,7 @@ std::vector<double> BucketGraph::labeling_algorithm() noexcept {
 /**
  * Performs the bi-labeling algorithm on the BucketGraph.
  *
- * @param q_star The vector of doubles representing the resource constraints.
- * @param S The stage of the algorithm to run (Stage::One, Stage::Two, or Stage::Three).
- * @return A vector of Label pointers representing the best labels obtained from the algorithm.
  */
-
 template <Stage S>
 std::vector<Label *> BucketGraph::bi_labeling_algorithm() {
 
@@ -492,30 +483,32 @@ std::vector<Label *> BucketGraph::bi_labeling_algorithm() {
         sPool.iterate();
     }
 #endif
-    if constexpr (S == Stage::Four) {
-        // compute the mean of dominance_checks_per_bucket
-        double mean_dominance_checks = 0.0;
-        for (size_t i = 0; i < dominance_checks_per_bucket.size(); ++i) {
-            mean_dominance_checks += dominance_checks_per_bucket[i];
-        }
-        auto step_calc = mean_dominance_checks / non_dominated_labels_per_bucket;
-        if (step_calc > 500) {
-
-            fmt::print("Increment redefinition counter\n");
-            if (redefine_counter % 5 == 0) {
-                redefine_counter = 0;
-                print_info("Step size is high, should increment step size - {}\n", step_calc);
-                fmt::print("Current step size bucket_interval: {}\n", bucket_interval);
-                redefine(bucket_interval + 20);
-                fmt::print("New step size bucket_interval: {}\n", bucket_interval);
-                reset_fixed_buckets();
-                fixed = false;
+    /*
+        if constexpr (S == Stage::Four) {
+            // compute the mean of dominance_checks_per_bucket
+            double mean_dominance_checks = 0.0;
+            for (size_t i = 0; i < dominance_checks_per_bucket.size(); ++i) {
+                mean_dominance_checks += dominance_checks_per_bucket[i];
             }
-            redefine_counter++;
-        }
+            auto step_calc = mean_dominance_checks / non_dominated_labels_per_bucket;
+            if (step_calc > 500) {
 
-        // redefine_counter++;
-    }
+                fmt::print("Increment redefinition counter\n");
+                if (redefine_counter % 5 == 0) {
+                    redefine_counter = 0;
+                    print_info("Step size is high, should increment step size - {}\n", step_calc);
+                    fmt::print("Current step size bucket_interval: {}\n", bucket_interval);
+                    redefine(bucket_interval + 20);
+                    fmt::print("New step size bucket_interval: {}\n", bucket_interval);
+                    reset_fixed_buckets();
+                    fixed = false;
+                }
+                redefine_counter++;
+            }
+
+            // redefine_counter++;
+        }
+        */
     // Return the final list of merged labels after processing
     return merged_labels;
 }
@@ -523,14 +516,7 @@ std::vector<Label *> BucketGraph::bi_labeling_algorithm() {
 /**
  * Extends the label L_prime with the given BucketArc gamma.
  *
- * @tparam D The direction of the extension (Forward or Backward).
- * @tparam S The stage of the extension (Stage::One, Stage::Two, or Stage::Three).
- * @param L_prime The label to be extended.
- * @param gamma The BucketArc to extend the label with.
- * @return A tuple containing a boolean indicating if the extension was successful and a pointer to the new
- * label.
  */
-
 template <Direction D, Stage S, ArcType A, Mutability M, Full F>
 inline Label *
 BucketGraph::Extend(const std::conditional_t<M == Mutability::Mut, Label *, const Label *>          L_prime,
@@ -767,11 +753,6 @@ BucketGraph::Extend(const std::conditional_t<M == Mutability::Mut, Label *, cons
 /**
  * @brief Checks if a label is dominated by a new label based on cost and resource conditions.
  *
- * @tparam D The direction of the graph traversal (Forward or Backward).
- * @tparam S The stage of the algorithm (One, Two, or Three).
- * @param new_label A pointer to the new label.
- * @param label A pointer to the label to be checked.
- * @return True if the label is dominated by the new label, false otherwise.
  */
 template <Direction D, Stage S>
 inline bool BucketGraph::is_dominated(const Label *new_label, const Label *label) noexcept {
@@ -864,11 +845,6 @@ inline bool BucketGraph::is_dominated(const Label *new_label, const Label *label
  * This function takes a vector of SCCs and two elements 'a' and 'b' as input. It searches for 'a' and 'b' in
  * the SCCs and determines if 'a' precedes 'b' in the SCC list.
  *
- * @tparam T The type of elements in the SCCs.
- * @param sccs The vector of SCCs.
- * @param a The element 'a' to check.
- * @param b The element 'b' to check.
- * @return True if 'a' precedes 'b' in the SCC list, false otherwise.
  */
 template <typename T>
 inline bool precedes(const std::vector<std::vector<T>> &sccs, const T &a, const T &b) {
@@ -899,14 +875,6 @@ inline bool precedes(const std::vector<std::vector<T>> &sccs, const T &a, const 
  * This function checks if a given label is dominated by any other label in component-wise smaller buckets.
  * The dominance is determined based on the cost and order of the buckets.
  *
- * @tparam D The direction of the buckets.
- * @tparam S The stage of the buckets.
- * @param L A pointer to the label to be checked.
- * @param bucket The index of the current bucket.
- * @param c_bar The vector of cost values for each bucket.
- * @param Bvisited The set of visited buckets.
- * @param bucket_order The order of the buckets.
- * @return True if the label is dominated, false otherwise.
  */
 template <Direction D, Stage S>
 inline bool BucketGraph::DominatedInCompWiseSmallerBuckets(const Label *L, int bucket, const std::vector<double> &c_bar,
@@ -975,13 +943,6 @@ inline bool BucketGraph::DominatedInCompWiseSmallerBuckets(const Label *L, int b
  * scheduling mechanism. The tasks are executed in parallel, and the results are synchronized
  * and stored in the provided vectors.
  *
- * @tparam state The stage of the algorithm.
- * @tparam fullness The fullness state of the algorithm.
- * @param forward_cbar A reference to a vector where the results of the forward labeling algorithm will be
- * stored.
- * @param backward_cbar A reference to a vector where the results of the backward labeling algorithm will be
- * stored.
- * @param q_star A constant reference to a vector used as input for the labeling algorithms.
  */
 template <Stage state, Full fullness>
 void BucketGraph::run_labeling_algorithms(std::vector<double> &forward_cbar, std::vector<double> &backward_cbar) {

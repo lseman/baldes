@@ -134,7 +134,6 @@ public:
      * collection of cuts maintained by the solver. The cut is used to
      * refine the solution space and improve the efficiency of the solver.
      *
-     * @param cut A reference to the Cut object to be added.
      */
     void addCut(Cut &cut);
 
@@ -181,7 +180,6 @@ public:
      *
      * This function assigns the provided vector of dual values to the SRCDuals member.
      *
-     * @param duals A vector of double values representing the duals to be set.
      */
     void setDuals(const std::vector<double> &duals) { SRCDuals = duals; }
 
@@ -204,9 +202,6 @@ public:
      * is found, it retrieves the size and coefficients of the corresponding cut from the cuts vector.
      * If the cut key is not found, it returns a pair with -1 and an empty vector.
      *
-     * @param cut_key The key of the cut to search for.
-     * @return A pair where the first element is the size of the cut (or -1 if not found) and the second
-     *         element is a vector of coefficients (empty if not found).
      */
     std::pair<int, std::vector<double>> cutExists(const std::size_t &cut_key) const {
         auto it = cutMaster_to_cut_map.find(cut_key);
@@ -224,8 +219,6 @@ public:
      * This function returns the Gurobi constraint object associated with the
      * cut at the given index.
      *
-     * @param i The index of the cut whose constraint is to be retrieved.
-     * @return The Gurobi constraint object at the specified index.
      */
     auto getCtr(int i) const { return cuts[i].grbConstr; }
 
@@ -236,8 +229,6 @@ public:
      * based on the provided vector P. The computation involves checking membership of nodes
      * in specific sets and updating coefficients accordingly.
      *
-     * @param P A vector of integers representing the nodes to be processed.
-     * @return A vector of doubles containing the computed coefficients for each cut.
      */
     auto computeLimitedMemoryCoefficients(const std::vector<int> &P) {
         // iterate over cuts
@@ -345,8 +336,6 @@ struct Path {
      * This function searches for the specified integer within the route
      * and returns true if the integer is found, otherwise false.
      *
-     * @param i The integer to search for in the route.
-     * @return true if the integer is found in the route, false otherwise.
      */
     bool contains(int i) { return std::find(route.begin(), route.end(), i) != route.end(); }
 
@@ -356,8 +345,6 @@ struct Path {
      * This function iterates through the 'route' container and counts how many times
      * the specified integer 'i' appears in it.
      *
-     * @param i The integer value to count within the route.
-     * @return int The number of times the integer 'i' appears in the route.
      */
     int countOccurrences(int i) { return std::count(route.begin(), route.end(), i); }
 
@@ -367,9 +354,6 @@ struct Path {
      * This function iterates through the route and counts how many times the arc
      * from node i to node j appears consecutively.
      *
-     * @param i The starting node of the arc.
-     * @param j The ending node of the arc.
-     * @return The number of times the arc (i, j) appears in the route.
      */
     int timesArc(int i, int j) const {
         int       times = 0;
@@ -390,8 +374,6 @@ struct Path {
      * and increments the count of this arc in the `arcMap`. If the arc does not
      * already exist in the map, it is added with an initial count of 1.
      *
-     * @param i The starting node of the arc.
-     * @param j The ending node of the arc.
      */
     void addArc(int i, int j) {
         std::pair<int, int> arc = std::make_pair(i, j);
@@ -416,10 +398,6 @@ struct Path {
      * of arcs between them. If the arc pair (i, j) exists in the arcMap, the
      * function returns the associated count. Otherwise, it returns 0.
      *
-     * @param i The first node of the arc.
-     * @param j The second node of the arc.
-     * @return The count of arcs between node i and node j. Returns 0 if the arc
-     *         does not exist in the arcMap.
      */
     auto getArcCount(int i, int j) const {
         // Construct the arc pair
@@ -435,13 +413,7 @@ struct Path {
      * in the arcMap. If the pair is found, the function returns the count associated
      * with the arc. If the pair is not found, it returns 0.
      *
-     * @param arc The RCCarc object representing the arc whose count is to be retrieved.
-     * @return The count of the specified arc if it exists in the arcMap, otherwise 0.
      */
-    // auto getArcCount(RCCarc arc) const {
-    //  Construct the arc pair
-    //    std::pair<int, int> arcPair = std::make_pair(arc.from, arc.to);
-    //    return (arcMap.find(arcPair) != arcMap.end()) ? arcMap.at(arcPair) : 0;
 };
 
 // Bucket structure to hold a collection of labels
@@ -455,11 +427,6 @@ struct Path {
  * the resource increments associated with the arc, the cost increment,
  * and a flag indicating whether the arc is fixed.
  *
- * @param from_bucket The index of the source bucket.
- * @param to_bucket The index of the target bucket.
- * @param resource_increment The resource increments associated with the arc.
- * @param cost_increment The cost increment associated with the arc.
- * @param fixed A flag indicating whether the arc is fixed.
  */
 struct BucketArc {
     int                 from_bucket;
@@ -494,10 +461,6 @@ struct BucketArc {
  * This struct contains information about a jump arc, including the base bucket, jump bucket,
  * resource increment, and cost increment.
  *
- * @param base_bucket The index of the base bucket.
- * @param jump_bucket The index of the jump bucket.
- * @param resource_increment The vector of resource increments.
- * @param cost_increment The cost increment.
  */
 struct JumpArc {
     int                 base_bucket;
@@ -570,11 +533,6 @@ struct VRPJob {
      * This function adds a forward or backward arc between the specified buckets.
      * The arc is characterized by resource increments and a cost increment.
      *
-     * @param from_bucket The starting bucket of the arc.
-     * @param to_bucket The ending bucket of the arc.
-     * @param res_inc A vector of resource increments associated with the arc.
-     * @param cost_inc The cost increment associated with the arc.
-     * @param fw A boolean flag indicating whether the arc is forward (true) or backward (false).
      */
     void add_arc(int from_bucket, int to_bucket, std::vector<double> res_inc, double cost_inc, bool fw) {
         if (fw) {
@@ -590,13 +548,6 @@ struct VRPJob {
      * This function adds an arc between two buckets, either to the forward arc list
      * or the backward arc list, based on the direction specified by the `fw` parameter.
      *
-     * @param from_bucket The index of the source bucket.
-     * @param to_bucket The index of the destination bucket.
-     * @param res_inc A vector of resource increments associated with the arc.
-     * @param cost_inc The cost increment associated with the arc.
-     * @param fw A boolean indicating the direction of the arc. If true, the arc is added
-     *           to the forward arc list; otherwise, it is added to the backward arc list.
-     * @param fixed A boolean indicating whether the arc is fixed.
      */
     void add_arc(int from_bucket, int to_bucket, std::vector<double> res_inc, double cost_inc, bool fw, bool fixed) {
         if (fw) {
@@ -630,9 +581,6 @@ struct VRPJob {
      * @brief Sets the location coordinates.
      *
      * This function sets the x and y coordinates for the location.
-     *
-     * @param x The x-coordinate to set.
-     * @param y The y-coordinate to set.
      */
     void set_location(double x, double y) {
         this->x = x;
@@ -645,10 +593,6 @@ struct VRPJob {
      * This function template returns a constant reference to either the forward arcs or backward arcs
      * vector, depending on the direction specified by the template parameter.
      *
-     * @tparam dir The direction for which to retrieve the arcs. It can be either Direction::Forward or
-     * Direction::Backward.
-     * @return const std::vector<Arc>& A constant reference to the vector of arcs corresponding to the specified
-     * direction.
      */
     template <Direction dir>
     inline const std::vector<Arc> &get_arcs() const {
@@ -663,11 +607,6 @@ struct VRPJob {
      * @brief Retrieves the arcs associated with a given strongly connected component (SCC) in the specified
      * direction.
      *
-     * @tparam dir The direction of the arcs to retrieve. It can be either Direction::Forward or
-     * Direction::Backward.
-     * @param scc The index of the strongly connected component.
-     * @return const std::vector<Arc>& A reference to the vector of arcs in the specified direction for the
-     * given SCC.
      */
     template <Direction dir>
     inline const std::vector<Arc> &get_arcs(int scc) const {
@@ -700,7 +639,6 @@ struct VRPJob {
  * If the file does not exist, it will be created. If the file is already open, the
  * information will be appended to the end of the file.
  *
- * @param info The debug information to be logged.
  */
 inline void log_debug_info(const std::string &info) {
     std::ofstream debug_file("debug_info.txt", std::ios_base::app);
@@ -723,9 +661,6 @@ constexpr const char *dark_yellow  = "\033[93m";
  * This function prints a message prefixed with "[info] " where "info" is colored yellow.
  * The message format and arguments are specified by the caller.
  *
- * @tparam Args Variadic template parameter pack for the format arguments.
- * @param format The format string for the message.
- * @param args The arguments to be formatted and printed according to the format string.
  */
 template <typename... Args>
 inline void print_info(fmt::format_string<Args...> format, Args &&...args) {
@@ -741,9 +676,6 @@ inline void print_info(fmt::format_string<Args...> format, Args &&...args) {
  * is displayed in a vivid blue color. The rest of the message is formatted
  * according to the provided format string and arguments.
  *
- * @tparam Args Variadic template parameter pack for the format arguments.
- * @param format The format string for the message.
- * @param args The arguments to be formatted and printed according to the format string.
  */
 template <typename... Args>
 inline void print_heur(fmt::format_string<Args...> format, Args &&...args) {
@@ -758,9 +690,6 @@ inline void print_heur(fmt::format_string<Args...> format, Args &&...args) {
  * This function prints a message prefixed with "[cut]" in green color.
  * The message is formatted according to the provided format string and arguments.
  *
- * @tparam Args The types of the arguments to be formatted.
- * @param format The format string.
- * @param args The arguments to be formatted according to the format string.
  */
 template <typename... Args>
 inline void print_cut(fmt::format_string<Args...> format, Args &&...args) {
@@ -775,9 +704,6 @@ inline void print_cut(fmt::format_string<Args...> format, Args &&...args) {
  * This function prints a message prefixed with a blue "info" tag enclosed in square brackets.
  * The message is formatted according to the provided format string and arguments.
  *
- * @tparam Args The types of the arguments to be formatted.
- * @param format The format string.
- * @param args The arguments to be formatted according to the format string.
  */
 template <typename... Args>
 inline void print_blue(fmt::format_string<Args...> format, Args &&...args) {
@@ -869,13 +795,6 @@ inline void printBaldes() {
  * and stores them in a ModelData structure. It handles variable bounds, objective coefficients,
  * variable types, and constraint information including the sparse representation of the constraint matrix.
  *
- * @param model Pointer to the Gurobi model (GRBModel) from which data is to be extracted.
- * @return ModelData structure containing the extracted model data.
- *
- * @note The function assumes that the model is already created and populated with variables and constraints.
- *       It also handles cases where variable bounds are set to very large values by treating them as infinity.
- *
- * @throws GRBException if there is an error during the extraction process.
  */
 inline ModelData extractModelDataSparse(GRBModel *model) {
     ModelData data;
@@ -1177,19 +1096,11 @@ public:
     int query(int value) { return query(root, value); }
 };
 
-/**
- * @class SplayTree
- * @brief A class representing a Splay Tree, which is a self-adjusting binary search tree.
- *
- * The Splay Tree supports efficient insertion, deletion, and search operations by performing
- * splay operations that move accessed nodes closer to the root, thereby improving access times
- * for frequently accessed nodes.
- *
- * The tree nodes store intervals [low, high] and a bucket index associated with each interval.
- *
- * @note This implementation assumes that the TreeNode class is defined elsewhere with the
- *       necessary members: low, high, bucket_index, left, right, and parent.
 
+/**
+ * @class TreeNode
+ * @brief Represents a node in a multi-dimensional tree structure.
+ *
  */
 class TreeNode {
 public:
@@ -1222,6 +1133,17 @@ public:
     }
 };
 
+/**
+ * @class SplayTree
+ * @brief A class representing a Splay Tree, which is a self-adjusting binary search tree.
+ *
+ * The Splay Tree supports efficient insertion, deletion, and search operations by performing
+ * splay operations that move accessed nodes closer to the root, thereby improving access times
+ * for frequently accessed nodes.
+ *
+ * The tree nodes store intervals [low, high] and a bucket index associated with each interval.
+ *
+ */
 class SplayTree {
     TreeNode *root;
 

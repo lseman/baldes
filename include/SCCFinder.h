@@ -34,7 +34,6 @@
  * This class provides methods to add edges to the graph, convert from an unordered map representation,
  * find SCCs using Tarjan's algorithm, determine the topological order of SCCs, and export the graph to a DOT file.
  *
- * @note The graph is represented using an adjacency list.
  */
 class SCC {
 public:
@@ -47,8 +46,6 @@ public:
      * are resized appropriately if the vertices v or w exceed the current size.
      * It then adds w to the adjacency list of v.
      *
-     * @param v The starting vertex of the directed edge.
-     * @param w The ending vertex of the directed edge.
      */
     void addEdge(int v, int w) {
         if (v >= adj.size() || w >= adj.size()) {
@@ -68,8 +65,6 @@ public:
      * vectors of adjacent vertices. It iterates through the map and adds edges to the internal graph
      * representation using the addEdge function.
      *
-     * @param map An unordered map where each key is a vertex and the corresponding value is a vector
-     *            of vertices that are adjacent to the key vertex.
      */
     void convertFromUnorderedMap(const std::unordered_map<int, std::vector<int>> &map) {
         for (const auto &pair : map) {
@@ -85,7 +80,6 @@ public:
      * and applies the strongConnect function to each vertex that has not been visited yet (indicated by an index of
      * -1). The result is a vector of SCCs, where each SCC is represented as a vector of vertex indices.
      *
-     * @return A vector of vectors, where each inner vector represents a strongly connected component in the graph.
      */
     std::vector<std::vector<int>> tarjanSCC() {
         std::vector<std::vector<int>> sccs;
@@ -103,14 +97,6 @@ public:
      * This function takes a list of SCCs and computes a topological ordering of these components.
      * The input is a vector of vectors, where each inner vector represents a SCC containing node indices.
      *
-     * @param sccs A vector of vectors, where each inner vector represents a SCC.
-     * @return A vector of integers representing the topological order of the SCCs.
-     *
-     * The function performs the following steps:
-     * 1. Maps each node to its corresponding SCC.
-     * 2. Constructs a directed graph where each node represents a SCC and edges represent dependencies between SCCs.
-     * 3. Computes the in-degree of each SCC in the component graph.
-     * 4. Uses Kahn's algorithm to find a topological order of the SCCs.
      */
     std::vector<int> topologicalOrderOfSCCs(const std::vector<std::vector<int>> &sccs) {
         std::unordered_map<int, int> nodeToScc;
@@ -159,9 +145,6 @@ public:
      * according to their SCC. Each SCC is assigned a different color from a predefined
      * set of colors.
      *
-     * @param filename The name of the file to which the DOT representation will be written.
-     * @param sccs A vector of vectors, where each inner vector represents a strongly connected component
-     *             and contains the nodes belonging to that SCC.
      */
     void exportToDot(const std::string &filename, const std::vector<std::vector<int>> &sccs) {
         std::ofstream dotFile(filename);
@@ -216,8 +199,6 @@ private:
      * It updates the indices and lowlink values of the vertices, and uses a stack to keep track of the vertices
      * in the current SCC. When an SCC is found, it is added to the list of SCCs.
      *
-     * @param v The current vertex being processed.
-     * @param sccs A reference to a vector of vectors, where each inner vector represents an SCC found in the graph.
      */
     void strongConnect(int v, std::vector<std::vector<int>> &sccs) {
         index[v]   = currentIndex;

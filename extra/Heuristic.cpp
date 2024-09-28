@@ -33,7 +33,6 @@
  * This function generates a solution for the problem by iteratively selecting
  * available customers and forming feasible routes until all customers are serviced.
  *
- * @return std::vector<Route> A vector of routes representing the solution.
  */
 std::vector<Route> DummyHeuristic::get_solution() {
     // std::cout << "Dummy heuristic\n";
@@ -79,10 +78,6 @@ std::vector<Route> DummyHeuristic::get_solution() {
  * two indices, i and j. It reverses the segment of the route between these
  * two indices (inclusive) to potentially improve the route.
  *
- * @param a A vector of Customer objects representing the route.
- * @param i The starting index of the segment to be reversed.
- * @param j The ending index of the segment to be reversed.
- * @return A new vector of Customer objects with the specified segment reversed.
  */
 std::vector<Customer> two_opt(std::vector<Customer> a, int i, int j) {
     std::reverse(a.begin() + i, a.begin() + j + 1);
@@ -99,13 +94,6 @@ std::vector<Customer> two_opt(std::vector<Customer> a, int i, int j) {
  * The second new vector is formed by taking the first 'j' elements from vector
  * 'b' and appending the elements from vector 'a' starting from index 'i' to the end.
  *
- * @param a The first vector of Customer objects.
- * @param b The second vector of Customer objects.
- * @param i The index in vector 'a' up to which elements are taken for the first new vector.
- * @param j The index in vector 'b' up to which elements are taken for the second new vector.
- * @return A pair of vectors of Customer objects, where the first vector is the result of
- *         combining parts of 'a' and 'b', and the second vector is the result of combining
- *         parts of 'b' and 'a'.
  */
 std::pair<std::vector<Customer>, std::vector<Customer>> cross(const std::vector<Customer> &a,
                                                               const std::vector<Customer> &b, int i, int j) {
@@ -124,12 +112,6 @@ std::pair<std::vector<Customer>, std::vector<Customer>> cross(const std::vector<
  * is then removed from the copied vector `a`. If the vector `a` is empty or the
  * index `i` is out of bounds, the function returns the original vectors.
  *
- * @param a The source vector of customers.
- * @param b The destination vector of customers.
- * @param i The index of the customer in vector `a` to be inserted into vector `b`.
- * @param j The index in vector `b` where the customer from vector `a` will be inserted.
- * @return A pair of vectors where the first element is the modified vector `a` and
- *         the second element is the modified vector `b`.
  */
 std::pair<std::vector<Customer>, std::vector<Customer>> insertion(const std::vector<Customer> &a,
                                                                   const std::vector<Customer> &b, int i, int j) {
@@ -148,11 +130,6 @@ std::pair<std::vector<Customer>, std::vector<Customer>> insertion(const std::vec
  * This function takes two vectors of Customers and swaps the elements at the
  * specified indices if the indices are within the bounds of their respective vectors.
  *
- * @param a The first vector of Customers.
- * @param b The second vector of Customers.
- * @param i The index in the first vector to swap.
- * @param j The index in the second vector to swap.
- * @return A pair of vectors of Customers with the elements at the specified indices swapped.
  */
 std::pair<std::vector<Customer>, std::vector<Customer>> swap(std::vector<Customer> a, std::vector<Customer> b, int i,
                                                              int j) {
@@ -167,8 +144,6 @@ std::pair<std::vector<Customer>, std::vector<Customer>> swap(std::vector<Custome
  * using a 2-opt local search algorithm. The optimization process continues
  * until no further improvements can be made to the route.
  *
- * @param solution A constant reference to a vector of Route objects representing the initial solution.
- * @return A vector of Route objects representing the optimized solution.
  */
 std::vector<Route> LocalSearch::optimize(const std::vector<Route> &solution) const {
     std::vector<Route> new_solution = solution;
@@ -199,8 +174,6 @@ std::vector<Route> LocalSearch::optimize(const std::vector<Route> &solution) con
  * swap operations to generate new routes and selects the best feasible routes
  * based on total distance.
  *
- * @param routes The initial set of routes to perturb.
- * @return A vector of routes after applying perturbation.
  */
 std::vector<Route> IteratedLocalSearch::perturbation(const std::vector<Route> &routes) {
     std::vector<Route> best       = routes;
@@ -251,7 +224,6 @@ std::vector<Route> IteratedLocalSearch::perturbation(const std::vector<Route> &r
  * the current best solution, it replaces the best solution. This process continues until
  * no better solution is found.
  *
- * @return A vector of Route objects representing the best solution found.
  */
 std::vector<Route> IteratedLocalSearch::execute() {
     std::vector<Route> best = optimize(initial_solution);
@@ -285,7 +257,6 @@ std::vector<Route> IteratedLocalSearch::execute() {
  * This function iterates through the list of customers in the route and sums up the distances
  * between consecutive customers to compute the total distance of the route.
  *
- * @return The total distance of the route as a double.
  */
 double Route::total_distance() const {
     double distance = 0.0;
@@ -305,7 +276,6 @@ double Route::total_distance() const {
  * reach each customer. The format of the returned string is:
  * "0 0.0 <customer_number> <cumulative_distance> ...".
  *
- * @return A string representing the canonical view of the route.
  */
 std::string Route::canonical_view() const {
     double             time = 0.0;
@@ -334,7 +304,6 @@ std::string Route::canonical_view() const {
  * for any customer, the route is deemed infeasible. Additionally, it checks if
  * the total demand of the customers exceeds the vehicle capacity.
  *
- * @return true if the route is feasible, false otherwise.
  */
 bool Route::is_feasible() const {
     double time        = 0.0;
@@ -364,8 +333,6 @@ bool Route::is_feasible() const {
  * This function computes the total distance of all routes by summing up the
  * total distance of each individual route in the provided vector of routes.
  *
- * @param routes A vector of Route objects representing the routes to be evaluated.
- * @return The total distance of all routes combined.
  */
 double HProblem::obj_func(const std::vector<Route> &routes) const {
     return std::accumulate(routes.begin(), routes.end(), 0.0,
@@ -378,9 +345,6 @@ double HProblem::obj_func(const std::vector<Route> &routes) const {
  * This function iterates over a vector of Route objects and appends their
  * canonical views to an output string stream, each followed by a newline character.
  *
- * @param routes A vector of Route objects to be represented in canonical form.
- * @return A string containing the canonical representations of the routes,
- *         each separated by a newline.
  */
 std::string HProblem::print_canonical(const std::vector<Route> &routes) const {
     std::ostringstream oss;

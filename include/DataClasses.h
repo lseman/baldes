@@ -84,8 +84,6 @@ struct Label {
      * This function determines whether a job, identified by its job_id, has been visited.
      * It uses a bitmask (visited_bitmap) where each bit represents the visit status of a job.
      *
-     * @param job_id The identifier of the job to check.
-     * @return true if the job has been visited, false otherwise.
      */
     bool visits(int job_id) const { return visited_bitmap[job_id / 64] & (1ULL << (job_id % 64)); }
 
@@ -120,10 +118,6 @@ struct Label {
     /**
      * @brief Initializes the object with the given parameters.
      *
-     * @param vertex The vertex identifier.
-     * @param cost The cost associated with the vertex.
-     * @param resources A vector of resource values.
-     * @param job_id The job identifier.
      */
     inline void initialize(int vertex, double cost, const std::vector<double> &resources, int job_id) {
         this->vertex = vertex;
@@ -201,11 +195,6 @@ struct Bucket {
      * depending on the value of the `fw` parameter. The arc to be removed is identified by the
      * `from_bucket` and `to_bucket` parameters.
      *
-     * @param from_bucket The starting bucket of the arc to be deleted.
-     * @param to_bucket The ending bucket of the arc to be deleted.
-     * @param fw A boolean indicating the direction of the arc. If true, the arc is removed from
-     *           the forward bucket arcs list. If false, the arc is removed from the backward
-     *           bucket arcs list.
      */
     void delete_bucket_arc(int from_bucket, int to_bucket, bool fw) {
         if (fw) {
@@ -229,13 +218,6 @@ struct Bucket {
      * This function adds an arc from one bucket to another, either in the forward or backward direction.
      * The arc is characterized by resource increments, cost increment, and whether it is fixed or not.
      *
-     * @param from_bucket The index of the source bucket.
-     * @param to_bucket The index of the destination bucket.
-     * @param res_inc A vector of resource increments associated with the arc.
-     * @param cost_inc The cost increment associated with the arc.
-     * @param fw A boolean indicating the direction of the arc. If true, the arc is forward; otherwise, it is
-     * backward.
-     * @param fixed A boolean indicating whether the arc is fixed.
      */
     void add_bucket_arc(int from_bucket, int to_bucket, const std::vector<double> &res_inc, double cost_inc, bool fw,
                         bool fixed) {
@@ -252,12 +234,6 @@ struct Bucket {
      * This function adds a jump arc from one bucket to another with the specified resource increment and cost
      * increment. The direction of the jump arc is determined by the `fw` parameter.
      *
-     * @param from_bucket The index of the source bucket.
-     * @param to_bucket The index of the destination bucket.
-     * @param res_inc A vector of resource increments associated with the jump arc.
-     * @param cost_inc The cost increment associated with the jump arc.
-     * @param fw A boolean indicating the direction of the jump arc. If true, the arc is added to the forward
-     * jump arcs; otherwise, it is added to the backward jump arcs.
      */
     void add_jump_arc(int from_bucket, int to_bucket, const std::vector<double> &res_inc, double cost_inc, bool fw) {
         if (fw) {
@@ -273,9 +249,6 @@ struct Bucket {
      * This function template returns a reference to either the forward arcs (fw_arcs)
      * or the backward arcs (bw_arcs) depending on the template parameter `dir`.
      *
-     * @tparam dir The direction for which to retrieve the arcs. It can be either
-     *             Direction::Forward or Direction::Backward.
-     * @return std::vector<Arc>& A reference to the vector of arcs corresponding to the specified direction.
      */
     template <Direction dir>
     std::vector<Arc> &get_arcs() {
@@ -318,7 +291,6 @@ struct Bucket {
      *
      * This function adds a label to the labels vector. The label is currently added to the end of the vector.
      *
-     * @param label Pointer to the Label object to be added.
      */
     void add_label(Label *label) noexcept { labels_vec.push_back(label); }
 
@@ -329,7 +301,6 @@ struct Bucket {
      * remains sorted in ascending order of the label's cost. The insertion is done
      * using binary search to find the appropriate position, ensuring efficient insertion.
      *
-     * @param label Pointer to the Label object to be added.
      */
     void add_sorted_label(Label *label) noexcept {
         if (labels_vec.empty() || label->cost >= labels_vec.back()->cost) {
@@ -351,8 +322,6 @@ struct Bucket {
      * has reached the limit, the function will replace the label with the highest cost
      * if the new label has a lower cost.
      *
-     * @param label Pointer to the label to be added.
-     * @param limit The maximum number of labels allowed in the vector.
      */
     void add_label_lim(Label *label, size_t limit) noexcept {
         if (labels_vec.size() < limit) {
@@ -371,7 +340,6 @@ struct Bucket {
      * If found, it replaces the label with the last element in the vector
      * and then removes the last element, effectively removing the specified label.
      *
-     * @param label Pointer to the label to be removed.
      */
     void remove_label(Label *label) noexcept {
         auto it = std::find(labels_vec.begin(), labels_vec.end(), label);
@@ -404,9 +372,6 @@ struct Bucket {
      * This function clears the arcs in either the forward or backward direction
      * based on the input parameter.
      *
-     * @param fw A boolean value indicating the direction of arcs to clear.
-     *           - If true, clears the forward bucket arcs.
-     *           - If false, clears the backward bucket arcs.
      */
     void clear_arcs(bool fw) {
         if (fw) {
@@ -421,7 +386,6 @@ struct Bucket {
      * This function returns the first label in the labels vector if it is not empty.
      * If the vector is empty, it returns a nullptr.
      *
-     * @return A pointer to the best label, or nullptr if the labels vector is empty.
      */
     Label *get_best_label() {
         if (labels_vec.empty()) return nullptr;
@@ -536,11 +500,6 @@ public:
  * be acquired from the pool using the `acquire()` method, and released back to the pool using the `release()`
  * method. If the pool is full, a new label will be allocated.
  *
- * The `reset()` method can be used to reset the pool to its initial state. This will delete all labels in the
- * pool and reallocate labels to match the initial pool size.
- *
- * @note The LabelPool class is not thread-safe by default. If thread safety is required, appropriate
- * synchronization mechanisms should be used when accessing the pool.
  */
 class LabelPool {
 public:
@@ -575,12 +534,6 @@ public:
     /**
      * @brief Resets the state by moving all labels from in-use to available.
      *
-     * This function performs the following operations:
-     * 1. Reserves additional space in the `available_labels` vector to prevent multiple reallocations.
-     * 2. Moves all labels from the `in_use_labels` vector to the `available_labels` vector.
-     * 3. Clears the `in_use_labels` vector after moving the labels.
-     *
-     * Note: The parallel reset of labels is commented out and not currently in use.
      */
     void reset() {
         // Reserve space in available_labels to prevent multiple reallocations
@@ -607,7 +560,6 @@ private:
      * available_labels container and initializes each label by creating
      * a new Label object.
      *
-     * @param count The number of labels to allocate.
      */
     void allocate_labels(size_t count) {
         available_labels.reserve(count);

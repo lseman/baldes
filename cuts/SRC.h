@@ -63,16 +63,6 @@ struct SparseModel;
  * and computing limited memory coefficients. It also includes various utility functions for
  * managing and printing base sets, inserting sets, and performing heuristics.
  *
- * @public
- * @fn std::vector<std::vector<double>> separateByEnumeration(const SparseModel &A, const std::vector<double> &x, int
- * nC, double violation_threshold)
- * @brief Separates cuts by enumeration.
- * @param A The sparse model.
- * @param x The vector of variables.
- * @param nC The number of constraints.
- * @param violation_threshold The threshold for violation.
- * @return A vector of vectors containing the separated cuts.
- *
  */
 class LimitedMemoryRank1Cuts {
 public:
@@ -181,7 +171,6 @@ inline std::vector<std::vector<double>> getPermutationsForSize5() {
     return permutations;
 }
 
-// Function to get all permutations of multipliers for size 4
 /**
  * @brief Generates all unique permutations of a fixed-size vector.
  *
@@ -189,8 +178,6 @@ inline std::vector<std::vector<double>> getPermutationsForSize5() {
  * containing the elements {2.0/3.0, 1.0/3.0, 1.0/3.0, 1.0/3.0}. The permutations
  * are generated in lexicographical order.
  *
- * @return A vector of vectors, where each inner vector is a unique permutation
- *         of the original vector.
  */
 inline std::vector<std::vector<double>> getPermutationsForSize4() {
     std::vector<std::vector<double>> permutations;
@@ -206,13 +193,6 @@ inline std::vector<std::vector<double>> getPermutationsForSize4() {
  * This function computes all possible combinations of `k` elements from the
  * input vector `elements` and stores them in the `result` vector.
  *
- * @tparam T The type of the elements in the input vector.
- * @param elements The input vector containing the elements to combine.
- * @param k The number of elements in each combination.
- * @param result A reference to a vector where the resulting combinations will be stored.
- *
- * @note The order of elements in each combination is determined by their order in the input vector.
- *       The function uses `std::prev_permutation` to generate the combinations.
  */
 /*
 template <typename T>
@@ -262,9 +242,6 @@ inline void combinations(const std::vector<T> &elements, int k, std::vector<std:
  * descending order based on their coefficients, and returns the indices of the top elements up to the
  * specified maximum number of nodes.
  *
- * @param x A vector of doubles representing the coefficients.
- * @param maxNodes An integer specifying the maximum number of nodes to select.
- * @return A vector of integers containing the indices of the selected nodes with the highest coefficients.
  */
 inline std::vector<int> selectHighestCoefficients(const std::vector<double> &x, int maxNodes) {
     std::vector<std::pair<int, double>> nodeCoefficients;
@@ -291,10 +268,6 @@ inline std::vector<int> selectHighestCoefficients(const std::vector<double> &x, 
  * for the given selected nodes. It filters the columns of the sparse model and
  * returns only those that are relevant to the selected nodes.
  *
- * @param A The sparse model represented by the SparseModel structure.
- * @param selectedNodes A vector of integers representing the selected nodes.
- * @return A vector of vectors of integers, where each inner vector contains the
- *         visiting nodes corresponding to a selected node.
  */
 inline std::vector<std::vector<int>> findVisitingNodes(const SparseModel &A, const std::vector<int> &selectedNodes) {
     std::vector<std::vector<int>> consumers;
@@ -324,8 +297,6 @@ inline std::vector<std::vector<int>> findVisitingNodes(const SparseModel &A, con
  * This function takes a vector of integers and concatenates each integer
  * into a single string, separated by commas.
  *
- * @param vec The vector of integers to be converted.
- * @return A string representation of the vector, with each integer separated by a comma.
  */
 inline std::string vectorToString(const std::vector<int> &vec) {
     std::string result;
@@ -339,8 +310,6 @@ inline std::string vectorToString(const std::vector<int> &vec) {
  * This function takes a vector of doubles and concatenates each element
  * into a single string, with each number separated by a comma.
  *
- * @param vec The vector of doubles to be converted.
- * @return A string representation of the vector, with elements separated by commas.
  */
 inline std::string vectorToString(const std::vector<double> &vec) {
     std::string result;
@@ -364,11 +333,6 @@ struct CompareCuts {
  * It processes sets of customers and permutations to identify violations and generate cuts.
  * The function is parallelized to improve efficiency.
  *
- * @tparam T The type of cut to generate (FourRow or FiveRow).
- * @param A The sparse model.
- * @param x The vector of coefficients.
- * @param numNodes The number of nodes.
- * @param subsetSize The size of the subset.
  */
 template <CutType T>
 void LimitedMemoryRank1Cuts::the45Heuristic(const SparseModel &A, const std::vector<double> &x) {

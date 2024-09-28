@@ -1,3 +1,17 @@
+/**
+ * @file BucketBindings.cpp
+ * @brief Python bindings for the BucketGraph, VRPJob, Label, PSTEPDuals, and BucketOptions classes using pybind11.
+ *
+ * This file defines the Python module `baldes` and exposes the following classes:
+ * - VRPJob: Represents a job in the VRP (Vehicle Routing Problem).
+ * - Label: Represents a label used in the labeling algorithm.
+ * - BucketGraph: Represents the graph structure used in the bucket-based VRP solver.
+ * - PSTEPDuals: Represents dual values used in the PSTEP algorithm.
+ * - BucketOptions: Represents configuration options for the bucket-based VRP solver.
+ *
+ * Each class is exposed with its constructors, member variables, and member functions.
+ * Conditional compilation is used to expose additional fields and methods based on defined macros.
+ */
 #include "../bucket/BucketGraph.h"
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
