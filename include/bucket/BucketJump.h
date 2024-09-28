@@ -19,6 +19,9 @@
 #include "BucketGraph.h"
 #include "Hashes.h"
 
+#include "VRPJob.h"
+
+
 #include <execution>
 /**
  * Updates the set of buckets based on the given parameters.

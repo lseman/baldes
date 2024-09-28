@@ -22,11 +22,18 @@
 
 #include "Definitions.h"
 
+#include "Cut.h"
+
 #include "DataClasses.h"
+
+#include "Trees.h"
 
 #include <queue>
 #include <set>
 #include <string_view>
+
+#include "VRPJob.h"
+#include "Bucket.h"
 
 #include "SCCFinder.h"
 
@@ -104,6 +111,13 @@ public:
 #ifdef SCHRODINGER
     SchrodingerPool sPool = SchrodingerPool(200);
 #endif
+
+    std::unordered_map<int, BucketIntervalTree> fw_interval_trees;
+    std::unordered_map<int, BucketIntervalTree> bw_interval_trees;
+
+    inline bool is_within_bounds(const BucketRange &new_range, const BucketRange &fixed_range) {
+        return (new_range.lower_bound >= fixed_range.lower_bound && new_range.upper_bound <= fixed_range.upper_bound);
+    }
 
     // Note: very tricky way to unroll the loop at compile time and check for disposability
     static constexpr std::string_view resources[] = {RESOURCES}; // RESOURCES will expand to your string list
@@ -346,6 +360,42 @@ public:
     // Interval tree to store bucket intervals
     std::unordered_map<int, SplayTree> fw_job_interval_trees;
     std::unordered_map<int, SplayTree> bw_job_interval_trees;
+
+    template <Direction D>
+    void rebuild_buckets() {
+        fmt::print("Rebuilding buckets\n");
+        // References to the forward or backward fixed buckets and ranges
+        auto &fixed_buckets = assign_buckets<D>(fw_fixed_buckets, bw_fixed_buckets);
+        auto &buckets       = assign_buckets<D>(fw_buckets, bw_buckets);
+        auto &interval_tree = assign_buckets<D>(fw_interval_trees, bw_interval_trees);
+
+        // Iterate over all fixed arcs (fixed_buckets[from][to])
+        for (int from_bucket = 0; from_bucket < fw_buckets_size; ++from_bucket) {
+            auto from_job = buckets[from_bucket].job_id;
+            for (int to_bucket = 0; to_bucket < fw_buckets_size; ++to_bucket) {
+                auto to_job = buckets[to_bucket].job_id;
+                // Check if there is a fixed arc between from_bucket and to_bucket
+                // if (fixed_buckets[from_bucket][to_bucket] == 1) {
+
+                // Get the range for from_bucket
+                BucketRange from_range = {buckets[from_bucket].lb[0], buckets[from_bucket].ub[0]};
+
+                // Get the range for to_bucket
+                BucketRange to_range = {buckets[to_bucket].lb[0], buckets[to_bucket].ub[0]};
+
+                // check if interval_tree[from_job] exists
+                if (interval_tree.find(from_job) == interval_tree.end()) {
+                    interval_tree[from_job] = BucketIntervalTree();
+                }
+                interval_tree[from_job].insert(from_range, to_range, to_job);
+            }
+        }
+        // print trees, iterate over interval_tree and plot each
+        for (auto &tree : interval_tree) {
+            fmt::print("Tree for job: {}\n", tree.first);
+            tree.second.print();
+        }
+    }
 
 #ifdef SCHRODINGER
     /**

@@ -197,6 +197,10 @@ bg.setup()
 labels = bg.solve()
 ```
 
+## 📖 Documentation
+
+You can access the doxygen documentation [here](https://lseman.github.io/baldes).
+
 ## 📜 License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.

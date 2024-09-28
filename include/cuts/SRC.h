@@ -24,6 +24,8 @@
 
 #include "Definitions.h"
 
+#include "Cut.h"
+
 #include "DataClasses.h"
 
 #include "bucket/BucketGraph.h"
