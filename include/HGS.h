@@ -12,6 +12,7 @@
 #include "../external/hgs_vrptw/Split.h"
 
 #include "Reader.h"
+#include "Definitions.h"
 
 /**
  * @class HGS
@@ -38,16 +39,15 @@ public:
         HGSLocalSearch localSearch(&params);
 
         // Initial population
-        std::cout << "----- INSTANCE LOADED WITH " << params.nbClients << " CLIENTS AND " << params.nbVehicles
-                  << " VEHICLES" << std::endl;
-        std::cout << "----- BUILDING INITIAL POPULATION" << std::endl;
+        print_info("Creating initial population\n");
         Population population(&params, &split, &localSearch);
 
         // Genetic algorithm
-        std::cout << "----- STARTING GENETIC ALGORITHM" << std::endl;
+        print_info("Running genetic algorithm\n");
         Genetic solver(&params, &split, &population, &localSearch);
         solver.run(config.nbIter, config.timeLimit);
-        std::cout << "----- GENETIC ALGORITHM FINISHED, TIME SPENT: " << params.getTimeElapsedSeconds() << std::endl;
+        //std::cout << "----- GENETIC ALGORITHM FINISHED, TIME SPENT: " << params.getTimeElapsedSeconds() << std::endl;
+        print_info("Genetic algorithm finished in {:.2f} seconds\n", params.getTimeElapsedSeconds());
         auto sol = population.extractFeasibleRoutes();
 
         // Return 0 if the program execution was successfull

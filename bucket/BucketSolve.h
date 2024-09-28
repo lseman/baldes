@@ -92,7 +92,7 @@ inline std::vector<Label *> BucketGraph::solve() {
 #ifdef FIX_BUCKETS
         // If transitioning to Stage 4, print a message and apply fixing
         if (transition) {
-            print_cut("Transitioning to stage 4\n");
+            // print_cut("Transitioning to stage 4\n");
             fixed        = true;                                 // Enable fixing of buckets in Stage 4
             paths        = bi_labeling_algorithm<Stage::Four>(); // Solve the problem with Stage 4
             transition   = false;                                // End the transition period

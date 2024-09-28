@@ -787,6 +787,7 @@ inline void printBaldes() {
     fmt::print("| {:<52} |\n", "a modern C++ implementation");
     fmt::print("| {:<52} |\n", "of the Bucket Graph-based labeling algorithm");
     fmt::print("| {:<52} |\n", "for the Resource-Constrained Shortest Path Problem");
+    fmt::print("| {:<52} |\n", " ");
     fmt::print("| {:<52} |\n", "https://github.com/lseman/baldes");
     fmt::print("| {:<52} |\n", " ");
 

@@ -113,9 +113,9 @@ public:
             int vj = P[j];
 
             // Check if the node vj is in AM (bitwise check)
-            if (!(AM[vj / 64] & (1ULL << (vj % 64)))) {
+            if (!(AM[vj >> 6] & (1ULL << (vj & 63)))) {
                 S = 0; // Reset S if vj is not in AM
-            } else if (C[vj / 64] & (1ULL << (vj % 64))) {
+            } else if (C[vj >> 6] & (1ULL << (vj & 63))) {
                 // Get the position of vj in C by counting the set bits up to vj
                 int pos = order[vj];
 
@@ -291,30 +291,32 @@ inline std::vector<std::vector<int>> findVisitingNodes(const SparseModel &A, con
     return consumers;
 }
 
-/**
- * @brief Converts a vector of integers to a comma-separated string.
- *
- * This function takes a vector of integers and concatenates each integer
- * into a single string, separated by commas.
- *
- */
-inline std::string vectorToString(const std::vector<int> &vec) {
-    std::string result;
-    for (int num : vec) { result += std::to_string(num) + ","; }
-    return result;
+// Hash function for a vector of integers
+inline uint64_t hashVector(const std::vector<int> &vec) {
+    uint64_t       hash = 0;
+    std::hash<int> hasher;
+
+    for (const int &elem : vec) {
+        // Combine the current element's hash with the running hash value
+        // A prime number is used to minimize hash collisions
+        hash ^= hasher(elem) + 0x9e3779b9 + (hash << 6) + (hash >> 2);
+    }
+
+    return hash;
 }
 
-/**
- * @brief Converts a vector of doubles to a comma-separated string.
- *
- * This function takes a vector of doubles and concatenates each element
- * into a single string, with each number separated by a comma.
- *
- */
-inline std::string vectorToString(const std::vector<double> &vec) {
-    std::string result;
-    for (double num : vec) { result += std::to_string(num) + ","; }
-    return result;
+// Hash function for a vector of doubles
+inline uint64_t hashVector(const std::vector<double> &vec) {
+    uint64_t          hash = 0;
+    std::hash<double> hasher;
+
+    for (const double &elem : vec) {
+        // Combine the current element's hash with the running hash value
+        // A prime number is used to minimize hash collisions
+        hash ^= hasher(elem) + 0x9e3779b9 + (hash << 6) + (hash >> 2);
+    }
+
+    return hash;
 }
 
 using ViolatedCut = std::pair<double, Cut>;
@@ -349,13 +351,6 @@ void LimitedMemoryRank1Cuts::the45Heuristic(const SparseModel &A, const std::vec
 
     // Ensure selectedNodes is valid
     std::vector<int> selectedNodes = selectHighestCoefficients(x, max_important_nodes);
-    if (selectedNodes.empty()) {
-        std::cerr << "Error: No selected nodes found!" << std::endl;
-        return;
-    }
-
-    // Initialize coefficients_aux based on the size of x
-    std::vector<double> coefficients_aux(x.size(), 0.0);
 
     std::vector<std::vector<double>> permutations;
     if constexpr (T == CutType::FourRow) {
@@ -372,10 +367,10 @@ void LimitedMemoryRank1Cuts::the45Heuristic(const SparseModel &A, const std::vec
         permutations.resize(4);
     }
 
-    std::unordered_set<std::string> processedSetsCache;
-    std::unordered_set<std::string> processedPermutationsCache;
-    std::mutex                      cuts_mutex;    // Protect access to shared resources
-    std::atomic<int>                cuts_count(0); // Thread-safe counter for cuts
+    std::unordered_set<uint64_t> processedSetsCache;
+    std::unordered_set<uint64_t> processedPermutationsCache;
+    std::mutex                   cuts_mutex;    // Protect access to shared resources
+    std::atomic<int>             cuts_count(0); // Thread-safe counter for cuts
 
     // Create tasks for each selected node to parallelize
     std::vector<int> tasks(selectedNodes.size());
@@ -394,8 +389,10 @@ void LimitedMemoryRank1Cuts::the45Heuristic(const SparseModel &A, const std::vec
     auto bulk_sender = stdexec::bulk(
         input_sender, tasks.size(),
         [this, &permutations, &processedSetsCache, &processedPermutationsCache, &cuts_mutex, &cuts_count, &cuts, &x,
-         &selectedNodes, &coefficients_aux, &cutQueue, &max_number_of_cuts, &max_generated_cuts,
+         &selectedNodes, &cutQueue, &max_number_of_cuts, &max_generated_cuts,
          violation_threshold](std::size_t task_idx) {
+            std::vector<double> coefficients_aux(x.size(), 0.0);
+
             auto &consumer = allPaths[selectedNodes[task_idx]].route;
 
             if constexpr (T == CutType::FourRow) {
@@ -418,8 +415,7 @@ void LimitedMemoryRank1Cuts::the45Heuristic(const SparseModel &A, const std::vec
 
             for (const auto &set45 : setsOf45) {
 
-                std::string setHash = vectorToString(set45);
-
+                uint64_t setHash = hashVector(set45);
                 {
                     std::lock_guard<std::mutex> cache_lock(cuts_mutex);
                     if (processedSetsCache.find(setHash) != processedSetsCache.end()) {
@@ -427,15 +423,14 @@ void LimitedMemoryRank1Cuts::the45Heuristic(const SparseModel &A, const std::vec
                     }
                     processedSetsCache.insert(setHash);
                 }
-
                 std::array<uint64_t, num_words> AM      = {};
                 std::array<uint64_t, num_words> baseSet = {};
                 std::vector<int>                order(N_SIZE, 0);
 
                 for (const auto &p : permutations) {
-                    std::string pHash = vectorToString(p);
+                    uint64_t pHash = hashVector(p);
                     // concatenate processed set and permutation
-                    std::string setPermutationHash = setHash + pHash;
+                    uint64_t setPermutationHash = setHash ^ pHash;
 
                     {
                         std::lock_guard<std::mutex> cache_lock(cuts_mutex);
@@ -449,10 +444,10 @@ void LimitedMemoryRank1Cuts::the45Heuristic(const SparseModel &A, const std::vec
                     baseSet.fill(0);
                     std::fill(order.begin(), order.end(), 0);
 
-                    for (auto c : set45) { baseSet[c / 64] |= (1ULL << (c % 64)); }
+                    for (auto c : set45) { baseSet[c >> 6] |= (1ULL << (c & 63)); }
                     int ordering = 0;
                     for (auto node : set45) {
-                        AM[node / 64] |= (1ULL << (node % 64)); // Set the bit for node in AM
+                        AM[node >> 6] |= (1ULL << (node & 63)); // Set the bit for node in AM
                         order[node] = ordering++;
                     }
 
@@ -463,14 +458,9 @@ void LimitedMemoryRank1Cuts::the45Heuristic(const SparseModel &A, const std::vec
 
                     for (auto j = 0; j < selectedNodes.size(); ++j) {
                         if (selectedNodes[j] == selectedNodes[task_idx]) {}
-                        auto &consumer_inner = allPaths[selectedNodes[j]];
+                        auto &consumer_inner = allPaths[selectedNodes[j]].route;
 
-                        int max_limit = 0;
-                        if constexpr (T == CutType::FourRow) {
-                            max_limit = 3;
-                        } else if constexpr (T == CutType::FiveRow) {
-                            max_limit = 4;
-                        }
+                        int max_limit = (T == CutType::FourRow) ? 3 : 4;
 
                         int match_count = 0;
                         for (auto &job : set45) {
@@ -481,10 +471,9 @@ void LimitedMemoryRank1Cuts::the45Heuristic(const SparseModel &A, const std::vec
 
                         if (match_count < max_limit) continue;
 
-                        std::vector<int> thePath(consumer_inner.begin(), consumer_inner.end());
-                        for (auto c : thePath) { AM[c / 64] |= (1ULL << (c % 64)); }
+                        for (auto c : consumer_inner) { AM[c >> 6] |= (1ULL << (c & 63)); }
 
-                        double alpha_inner = computeLimitedMemoryCoefficient(baseSet, AM, p, thePath, order);
+                        double alpha_inner = computeLimitedMemoryCoefficient(baseSet, AM, p, consumer_inner, order);
                         alpha += alpha_inner;
 
                         coefficients_aux[selectedNodes[j]] = alpha_inner;
@@ -494,27 +483,26 @@ void LimitedMemoryRank1Cuts::the45Heuristic(const SparseModel &A, const std::vec
                         if (violation_found) {
                             for (int i = 1; i < N_SIZE - 2; ++i) {
                                 // Skip nodes that are part of baseSet (i.e., cannot be removed from AM)
-                                if (!(baseSet[i / 64] & (1ULL << (i % 64)))) {
+                                if (!(baseSet[i >> 6] & (1ULL << (i & 63)))) {
 
                                     // Check if the node is currently in AM
-                                    if (AM[i / 64] & (1ULL << (i % 64))) {
+                                    if (AM[i >> 6] & (1ULL << (i & 63))) {
 
                                         // Temporarily remove node i from AM
-                                        AM[i / 64] &= ~(1ULL << (i % 64));
+                                        uint64_t tempAM = AM[i >> 6];
+                                        AM[i >> 6] &= ~(1ULL << (i & 63));
 
-                                        // Recompute the alpha value with the reduced AM
+                                        // Use a local variable for the reduced alpha to avoid data races
                                         double reduced_alpha = 0;
                                         for (auto j = 0; j < selectedNodes.size(); ++j) {
-                                            auto            &consumer_inner = allPaths[selectedNodes[j]];
-                                            std::vector<int> thePath(consumer_inner.begin(), consumer_inner.end());
-
+                                            auto &consumer_inner = allPaths[selectedNodes[j]].route;
                                             reduced_alpha +=
-                                                computeLimitedMemoryCoefficient(baseSet, AM, p, thePath, order);
+                                                computeLimitedMemoryCoefficient(baseSet, AM, p, consumer_inner, order);
                                         }
 
                                         // If the violation no longer holds, restore the node in AM
                                         if (reduced_alpha <= rhs + violation_threshold) {
-                                            AM[i / 64] |= (1ULL << (i % 64)); // Restore node i in AM
+                                            AM[i >> 6] = tempAM; // Restore node i in AM
                                         } else {
                                             // The violation still holds, update alpha to reduced_alpha
                                             alpha = reduced_alpha;
