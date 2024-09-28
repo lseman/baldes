@@ -151,8 +151,10 @@ Label *BucketGraph::compute_label(const Label *L, const Label *L_prime) {
         size_t idx = 0;
         auto   sumSRC =
             std::transform_reduce(SRCDuals.begin(), SRCDuals.end(), 0.0, std::plus<>(), [&](const auto &dual) {
-                return (L->SRCmap[idx] + L_prime->SRCmap[idx++] >= 1) ? dual : 0.0;
+                size_t curr_idx = idx++;
+                return (L->SRCmap[curr_idx] + L_prime->SRCmap[curr_idx] >= 1) ? dual : 0.0;
             });
+
         new_label->cost -= sumSRC;
     }
 
@@ -1035,8 +1037,7 @@ void BucketGraph::initInfo() {
 
     // Print Resource size
     fmt::print("Resources: {}\n", R_SIZE);
-    fmt::print("Number of Clients: {}\n", N_SIZE);
-    fmt::print("Maximum SRC cuts: {}\n", MAX_SRC_CUTS);
+    fmt::print("Number of Clients: {}\n", N_SIZE - 2);
 
     // Conditional configuration (RIH enabled/disabled)
 #ifdef RIH

@@ -19,7 +19,7 @@
       <img src="docs/logo.png" alt="BALDES" width="300"/>
     </td>
     <td>
-      This repository contains a C++ implementation of a Bucket Graph-based labeling algorithm designed to solve the Resource-Constrained Shortest Path Problem (RSCPP), commonly used as a subproblem in state-of-the-art Branch-Cut-and-Price algorithms for various Vehicle Routing Problems (VRPs).
+      BALDES (pronounced /'baw-dɨs/) is a C++ implementation of a Bucket Graph-based labeling algorithm designed to solve the Resource-Constrained Shortest Path Problem (RSCPP), commonly used as a subproblem in state-of-the-art Branch-Cut-and-Price algorithms for various Vehicle Routing Problems (VRPs).
     </td>
   </tr>
 </table>
@@ -52,7 +52,7 @@ Some features are experimental and subject to ongoing improvements:
 
 ### 📋 Prerequisites
 
-- C++23 compliant compiler (tested with GCC 14.*)
+- C++23 compliant compiler (tested with GCC 14.* and Clang 19.*)
 - [NVIDIA/stdexec](https://github.com/NVIDIA/stdexec) for parallel tasks
 - [fmt](https://github.com/fmtlib/fmt) for console output formatting
 - [TBB](https://github.com/oneapi-src/oneTBB) for concurrent maps

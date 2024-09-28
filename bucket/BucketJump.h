@@ -111,7 +111,7 @@ void BucketGraph::BucketArcElimination(double theta) {
 
     // Print direction of arc elimination
     if constexpr (D == Direction::Forward) {
-        print_info("[FW] performing bucket arc elimination with theta = {}\n", theta);
+        print_info("[Fw] performing bucket arc elimination with theta = {}\n", theta);
     } else {
         print_info("[Bw] performing bucket arc elimination with theta = {}\n", theta);
     }

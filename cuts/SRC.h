@@ -131,6 +131,39 @@ public:
         return alpha;
     }
 
+    /**
+     * @brief Selects the indices of the highest coefficients from a given vector.
+     *
+     * This function takes a vector of doubles and an integer specifying the maximum number of nodes to select.
+     * It filters out elements with coefficients less than or equal to 1e-2, sorts the remaining elements in
+     * descending order based on their coefficients, and returns the indices of the top elements up to the
+     * specified maximum number of nodes.
+     *
+     */
+    inline std::vector<int> selectHighestCoefficients(const std::vector<double> &x, int maxNodes) {
+        std::vector<std::pair<int, double>> nodeCoefficients;
+        for (int i = 0; i < x.size(); ++i) {
+            if (x[i] > 1e-2) { nodeCoefficients.push_back({i, x[i]}); }
+        }
+
+        // Sort nodes by coefficient in descending order
+        std::sort(nodeCoefficients.begin(), nodeCoefficients.end(),
+                  [](const auto &a, const auto &b) { return a.second > b.second; });
+
+        std::vector<int> selectedNodes;
+        for (int i = 0; i < std::min(maxNodes, (int)nodeCoefficients.size()); ++i) {
+            selectedNodes.push_back(nodeCoefficients[i].first);
+        }
+
+        return selectedNodes;
+    }
+
+    std::vector<int> the45selectedNodes;
+    void             prepare45Heuristic(const SparseModel &A, const std::vector<double> &x) {
+        int max_important_nodes = 5;
+        the45selectedNodes      = selectHighestCoefficients(x, max_important_nodes);
+    }
+
 private:
     static std::mutex cache_mutex;
 
@@ -235,33 +268,6 @@ inline void combinations(const std::vector<T> &elements, int k, std::vector<std:
 }
 
 /**
- * @brief Selects the indices of the highest coefficients from a given vector.
- *
- * This function takes a vector of doubles and an integer specifying the maximum number of nodes to select.
- * It filters out elements with coefficients less than or equal to 1e-2, sorts the remaining elements in
- * descending order based on their coefficients, and returns the indices of the top elements up to the
- * specified maximum number of nodes.
- *
- */
-inline std::vector<int> selectHighestCoefficients(const std::vector<double> &x, int maxNodes) {
-    std::vector<std::pair<int, double>> nodeCoefficients;
-    for (int i = 0; i < x.size(); ++i) {
-        if (x[i] > 1e-2) { nodeCoefficients.push_back({i, x[i]}); }
-    }
-
-    // Sort nodes by coefficient in descending order
-    std::sort(nodeCoefficients.begin(), nodeCoefficients.end(),
-              [](const auto &a, const auto &b) { return a.second > b.second; });
-
-    std::vector<int> selectedNodes;
-    for (int i = 0; i < std::min(maxNodes, (int)nodeCoefficients.size()); ++i) {
-        selectedNodes.push_back(nodeCoefficients[i].first);
-    }
-
-    return selectedNodes;
-}
-
-/**
  * @brief Finds the visiting nodes in a sparse model based on selected nodes.
  *
  * This function processes a sparse model to identify and return the visiting nodes
@@ -340,17 +346,10 @@ template <CutType T>
 void LimitedMemoryRank1Cuts::the45Heuristic(const SparseModel &A, const std::vector<double> &x) {
     int    max_number_of_cuts  = 2; // Max number of cuts to generate
     double violation_threshold = 1e-3;
-    int    max_important_nodes = 5;
+    int    max_generated_cuts  = 15;
 
-    int max_generated_cuts = 15;
-
-    auto cuts         = VRPTW_SRC();
-    auto coefficients = std::vector<std::vector<double>>();
-
-    int m_max = std::min(cuts.S_n, max_number_of_cuts);
-
+    auto &selectedNodes = the45selectedNodes;
     // Ensure selectedNodes is valid
-    std::vector<int> selectedNodes = selectHighestCoefficients(x, max_important_nodes);
 
     std::vector<std::vector<double>> permutations;
     if constexpr (T == CutType::FourRow) {
@@ -388,7 +387,7 @@ void LimitedMemoryRank1Cuts::the45Heuristic(const SparseModel &A, const std::vec
     // Define the bulk operation to process sets of customers
     auto bulk_sender = stdexec::bulk(
         input_sender, tasks.size(),
-        [this, &permutations, &processedSetsCache, &processedPermutationsCache, &cuts_mutex, &cuts_count, &cuts, &x,
+        [this, &permutations, &processedSetsCache, &processedPermutationsCache, &cuts_mutex, &cuts_count, &x,
          &selectedNodes, &cutQueue, &max_number_of_cuts, &max_generated_cuts,
          violation_threshold](std::size_t task_idx) {
             std::vector<double> coefficients_aux(x.size(), 0.0);
