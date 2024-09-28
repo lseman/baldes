@@ -23,9 +23,11 @@
 
 #include "BucketJump.h"
 #include "Definitions.h"
-
+#include "Trees.h"
 #include "cuts/SRC.h"
 #include <cstring>
+
+#include "Bucket.h"
 
 /**
  * @brief Represents a bucket in the Bucket Graph.

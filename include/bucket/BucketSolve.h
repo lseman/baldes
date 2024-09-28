@@ -20,9 +20,9 @@
 #include "BucketJump.h"
 #include "Definitions.h"
 
+#include "Trees.h"
 #include "cuts/SRC.h"
 #include <cstring>
-
 #ifdef AVX
 #include "BucketAVX.h"
 #endif

@@ -1005,7 +1005,7 @@ public:
                 }
             }
 
-            if (bucket_graph.getStatus() == Status::Optimal) {
+            if (bucket_graph.getStatus() == Status::Optimal && stab.shouldExit()) {
                 print_info("Optimal solution found\n");
                 break;
             }
