@@ -38,24 +38,7 @@ inline std::vector<Label *> BucketGraph::solve() {
     // Initialize the status as not optimal at the start
     status = Status::NotOptimal;
 
-    //////////////////////////////////////////////////////////////////////
-    // ADAPTIVE TERMINAL TIME
-    //////////////////////////////////////////////////////////////////////
-    // Adjust the terminal time dynamically based on the difference between the number of forward and backward labels
-    for (auto &split : q_star) {
-        // print n_fw_labels and n_bw_labels
-        // If there are more backward labels than forward labels, increase the terminal time slightly
-        if (((static_cast<double>(n_bw_labels) - static_cast<double>(n_fw_labels)) / static_cast<double>(n_fw_labels)) >
-            0.05) {
-            split += 0.05 * R_max[TIME_INDEX];
-        }
-        // If there are more forward labels than backward labels, decrease the terminal time slightly
-        else if (((static_cast<double>(n_fw_labels) - static_cast<double>(n_bw_labels)) /
-                  static_cast<double>(n_bw_labels)) > 0.05) {
-            split -= 0.05 * R_max[TIME_INDEX];
-        }
-        // fmt::print("Split: {}\n", split);
-    }
+    updateSplit(); // Update the split values for the bucket graph
 
     // Placeholder for the final paths (labels) and inner objective value
     std::vector<Label *> paths;
@@ -123,6 +106,13 @@ inline std::vector<Label *> BucketGraph::solve() {
         paths     = bi_labeling_algorithm<Stage::Four>();
         inner_obj = paths[0]->cost;
 
+        auto rollback = updateStepSize(); // Update the step size for the bucket graph
+        if (rollback) {
+            s4     = false; // Rollback to Stage 3 if necessary
+            s3     = true;
+            status = Status::Rollback; // Set status to rollback
+            return paths;              // Return the paths after rollback
+        }
         // If the objective improves sufficiently, set the status to separation or optimal
         if (inner_obj >= -1e-1) {
             ss = true; // Enter separation mode (for SRC handling)
@@ -483,32 +473,7 @@ std::vector<Label *> BucketGraph::bi_labeling_algorithm() {
         sPool.iterate();
     }
 #endif
-    /*
-        if constexpr (S == Stage::Four) {
-            // compute the mean of dominance_checks_per_bucket
-            double mean_dominance_checks = 0.0;
-            for (size_t i = 0; i < dominance_checks_per_bucket.size(); ++i) {
-                mean_dominance_checks += dominance_checks_per_bucket[i];
-            }
-            auto step_calc = mean_dominance_checks / non_dominated_labels_per_bucket;
-            if (step_calc > 500) {
 
-                fmt::print("Increment redefinition counter\n");
-                if (redefine_counter % 5 == 0) {
-                    redefine_counter = 0;
-                    print_info("Step size is high, should increment step size - {}\n", step_calc);
-                    fmt::print("Current step size bucket_interval: {}\n", bucket_interval);
-                    redefine(bucket_interval + 20);
-                    fmt::print("New step size bucket_interval: {}\n", bucket_interval);
-                    reset_fixed_buckets();
-                    fixed = false;
-                }
-                redefine_counter++;
-            }
-
-            // redefine_counter++;
-        }
-        */
     // Return the final list of merged labels after processing
     return merged_labels;
 }

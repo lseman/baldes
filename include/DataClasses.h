@@ -376,8 +376,10 @@ struct Bucket {
     void clear_arcs(bool fw) {
         if (fw) {
             fw_bucket_arcs.clear();
+            fw_jump_arcs.clear();
         } else {
             bw_bucket_arcs.clear();
+            bw_jump_arcs.clear();
         }
     }
     /**

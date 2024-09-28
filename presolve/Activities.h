@@ -3,10 +3,10 @@
 #include "../include/Definitions.h"
 #include <Eigen/Dense>
 #include <Eigen/Sparse>
-#include <vector>
-#include <execution>
 #include <bitset>
+#include <execution>
 #include <mutex>
+#include <vector>
 
 struct RowActivity {
     double min     = 0.0;
@@ -17,11 +17,10 @@ struct RowActivity {
 
 enum class BoundChange { kLower, kUpper };
 
-
 /**
  * @struct RowInfo
- * @brief Stores information about a row in a matrix, including flags for 
- *        infinite bounds, left-hand side (LHS) and right-hand side (RHS) values, 
+ * @brief Stores information about a row in a matrix, including flags for
+ *        infinite bounds, left-hand side (LHS) and right-hand side (RHS) values,
  *        and a scaling factor.
  */
 struct RowInfo {
@@ -50,7 +49,7 @@ struct PresolveResult {
     std::map<int, std::tuple<int, double, int>> fixCol;
     std::map<int, std::tuple<int, double, int>> changeColLB;
     std::map<int, std::tuple<int, double, int>> changeColUB;
-    std::map<int, int> redundantRow;
+    std::map<int, int>                          redundantRow;
 
     void clear() {
         fixCol.clear();
@@ -97,16 +96,16 @@ struct NumericUtils {
  */
 class Preprocessor {
 public:
-    std::vector<double> lhs_values;
-    std::vector<double> rhs_values;
-    std::vector<RowInfo> rowInfoVector;
+    std::vector<double>      lhs_values;
+    std::vector<double>      rhs_values;
+    std::vector<RowInfo>     rowInfoVector;
     std::vector<RowActivity> activities;
 
     Eigen::SparseMatrix<double> A;
-    Eigen::VectorXd b;
-    Eigen::VectorXd c;
-    Eigen::VectorXd ub;
-    Eigen::VectorXd lb;
+    Eigen::VectorXd             b;
+    Eigen::VectorXd             c;
+    Eigen::VectorXd             ub;
+    Eigen::VectorXd             lb;
 
     std::vector<char> sense;
     std::vector<char> vtype;
@@ -115,11 +114,11 @@ public:
 
     // Constructor initializes the class by converting the input ModelData
     Preprocessor(ModelData &modelData) {
-        A = convertToEigenSparseMatrix(modelData.A_sparse);
-        b = Eigen::Map<Eigen::VectorXd>(modelData.b.data(), modelData.b.size());
-        c = Eigen::Map<Eigen::VectorXd>(modelData.c.data(), modelData.c.size());
-        ub = Eigen::Map<Eigen::VectorXd>(modelData.ub.data(), modelData.ub.size());
-        lb = Eigen::Map<Eigen::VectorXd>(modelData.lb.data(), modelData.lb.size());
+        A     = convertToEigenSparseMatrix(modelData.A_sparse);
+        b     = Eigen::Map<Eigen::VectorXd>(modelData.b.data(), modelData.b.size());
+        c     = Eigen::Map<Eigen::VectorXd>(modelData.c.data(), modelData.c.size());
+        ub    = Eigen::Map<Eigen::VectorXd>(modelData.ub.data(), modelData.ub.size());
+        lb    = Eigen::Map<Eigen::VectorXd>(modelData.lb.data(), modelData.lb.size());
         sense = modelData.sense;
         vtype = modelData.vtype;
     }
@@ -133,7 +132,7 @@ public:
             size_t i = &activity - &activities[0]; // Calculate row index
             for (Eigen::SparseMatrix<double>::InnerIterator it(A, i); it; ++it) {
                 double coef = it.value();
-                int j = it.col();
+                int    j    = it.col();
 
                 if (ub[j] != NumericUtils::infty) {
                     if (coef < 0) {
@@ -180,16 +179,12 @@ public:
                 lhs_values.push_back(value);
                 rhs_values.push_back(value);
                 break;
-            default:
-                std::cerr << "Invalid sense: " << sense << std::endl;
-                return false;
+            default: std::cerr << "Invalid sense: " << sense << std::endl; return false;
             }
             return true;
         };
 
-        for (size_t i = 0; i < sense.size(); ++i) {
-            processBound(sense[i], b[i]);
-        }
+        for (size_t i = 0; i < sense.size(); ++i) { processBound(sense[i], b[i]); }
     }
 
     // Convert inequality constraints to less-than-or-equal-to form
@@ -198,7 +193,7 @@ public:
             if (sense[i] == '>') {
                 lhs_values[i] = -NumericUtils::infty;
                 rhs_values[i] = -lhs_values[i];
-                sense[i] = '<';
+                sense[i]      = '<';
                 A.row(i) *= -1; // Flip the row's sign to convert '>' to '<'
             }
         }
@@ -207,7 +202,7 @@ public:
     // Convert a row to a knapsack form
     void convert2Knapsack(int row) {
         fmt::print("Converting row {} to knapsack\n", row);
-        Eigen::VectorXd rowCoeffs = A.row(row);
+        Eigen::VectorXd     rowCoeffs = A.row(row);
         std::vector<double> binCoeffs;
 
         if (sense[row] != '<') {
@@ -241,9 +236,9 @@ public:
 
     void bboundTightening() {
         std::for_each(std::execution::par, rowInfoVector.begin(), rowInfoVector.end(), [&](const RowInfo &rowInfo) {
-            size_t i = &rowInfo - &rowInfoVector[0]; // Get row index
+            size_t                 i         = &rowInfo - &rowInfoVector[0]; // Get row index
             const Eigen::VectorXd &rowCoeffs = A.row(i);
-            double alphaMax = 0.0, alphaMin = 0.0;
+            double                 alphaMax = 0.0, alphaMin = 0.0;
 
             // Calculate min/max activities
             for (int j = 0; j < rowCoeffs.size(); ++j) {
@@ -264,8 +259,8 @@ public:
         std::for_each(std::execution::par, rowInfoVector.begin(), rowInfoVector.end(), [&](const RowInfo &rowInfo) {
             if (rowInfo.rowFlag[static_cast<int>(RowInfo::RowFlag::kLhsInf)] &&
                 !rowInfo.rowFlag[static_cast<int>(RowInfo::RowFlag::kRhsInf)]) {
-                size_t rowIndex = &rowInfo - &rowInfoVector[0];
-                int nbinaries = 0;
+                size_t rowIndex  = &rowInfo - &rowInfoVector[0];
+                int    nbinaries = 0;
 
                 for (Eigen::SparseMatrix<double>::InnerIterator it(A, rowIndex); it; ++it) {
                     if (vtype[it.col()] == 'B') ++nbinaries;
@@ -282,7 +277,7 @@ public:
 
     // Conversion and helper functions
     Eigen::SparseMatrix<double> convertToEigenSparseMatrix(const SparseModel &sparseModel) {
-        Eigen::SparseMatrix<double> eigenSparseMatrix(sparseModel.num_rows, sparseModel.num_cols);
+        Eigen::SparseMatrix<double>         eigenSparseMatrix(sparseModel.num_rows, sparseModel.num_cols);
         std::vector<Eigen::Triplet<double>> triplets;
         triplets.reserve(sparseModel.values.size());
 
@@ -313,13 +308,11 @@ public:
         ModelData data;
         data.A_sparse = convertToSparseModel(A);
 
-        for (int i = 0; i < sense.size(); ++i) {
-            data.b.push_back(sense[i] == '<' ? rhs_values[i] : lhs_values[i]);
-        }
+        for (int i = 0; i < sense.size(); ++i) { data.b.push_back(sense[i] == '<' ? rhs_values[i] : lhs_values[i]); }
 
-        data.c = std::vector<double>(c.data(), c.data() + c.size());
-        data.ub = std::vector<double>(ub.data(), ub.data() + ub.size());
-        data.lb = std::vector<double>(lb.data(), lb.data() + lb.size());
+        data.c     = std::vector<double>(c.data(), c.data() + c.size());
+        data.ub    = std::vector<double>(ub.data(), ub.data() + ub.size());
+        data.lb    = std::vector<double>(lb.data(), lb.data() + lb.size());
         data.sense = sense;
         data.vtype = vtype;
         return data;
