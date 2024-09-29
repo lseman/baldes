@@ -1,35 +1,26 @@
 /**
- * @file DataClasses.h
- * @brief Defines the core structures and classes for managing labels, arcs, and buckets in a graph-based solver.
+ * @file Pools.h
+ * @brief Defines classes to manage pools of paths and labels.
  *
- * This file includes definitions for handling labels, buckets, and related resources in optimization problems,
- * specifically for applications like Vehicle Routing Problems (VRP) or other resource-constrained path-finding
- * algorithms.
+ * This file defines the SchrodingerPool and LabelPool classes, which manage pools of paths and labels, respectively.
+ * The SchrodingerPool class manages a collection of paths with a limited lifespan, computes reduced costs, and filters
+ * paths based on their reduced costs. The LabelPool class manages a pool of Label objects, providing methods to acquire
+ * and release labels from the pool, as well as resetting the pool to its initial state.
  *
- * The key components defined in this file include:
- *  - `Label`: Represents a node in the solution space with properties like cost, resources, and job coverage.
- *  - `Bucket`: A container managing labels and arcs for efficient graph traversal and label extension.
- *  - `SchrodingerPool`: Manages paths with a limited lifespan, reducing costs and filtering based on dual values.
- *  - `LabelPool`: Manages a pool of reusable labels, facilitating efficient memory management and recycling of labels.
- *  - `PSTEPDuals`: Manages the dual values for arcs and nodes in a network.
- *
- * Each of these components is designed to operate efficiently in a graph-based solver and support parallel processing
- * where applicable.
  */
 
 #pragma once
 
 #include "Definitions.h"
 #include "Label.h"
-#include "VRPJob.h"
 #include "Path.h"
+#include "VRPJob.h"
 
 #include <deque>
 #include <tuple>
 #include <unordered_map>
 #include <utility>
 #include <vector>
-
 
 /**
  * @class SchrodingerPool
@@ -285,17 +276,4 @@ struct PSTEPDuals {
         if (it != three_three_Duals.end()) { return it->second; }
         return 0.0; // Default value if node is not found
     }
-};
-
-/**
- * @class LabelComparator
- * @brief Comparator class for comparing two Label objects based on their cost.
- *
- * This class provides an overloaded operator() that allows for comparison
- * between two Label pointers. The comparison is based on the cost attribute
- * of the Label objects, with the comparison being in descending order.
- */
-class LabelComparator {
-public:
-    bool operator()(Label *a, Label *b) { return a->cost > b->cost; }
 };

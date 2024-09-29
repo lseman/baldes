@@ -24,7 +24,7 @@
 
 #include "Cut.h"
 
-#include "DataClasses.h"
+#include "Pools.h"
 
 #include "Trees.h"
 
@@ -32,8 +32,8 @@
 #include <set>
 #include <string_view>
 
-#include "VRPJob.h"
 #include "Bucket.h"
+#include "VRPJob.h"
 
 #include "SCCFinder.h"
 
@@ -363,11 +363,11 @@ public:
 
     template <Direction D>
     void rebuild_buckets() {
-        fmt::print("Rebuilding buckets\n");
         // References to the forward or backward fixed buckets and ranges
         auto &fixed_buckets = assign_buckets<D>(fw_fixed_buckets, bw_fixed_buckets);
         auto &buckets       = assign_buckets<D>(fw_buckets, bw_buckets);
         auto &interval_tree = assign_buckets<D>(fw_interval_trees, bw_interval_trees);
+        interval_tree.clear();
 
         // Iterate over all fixed arcs (fixed_buckets[from][to])
         for (int from_bucket = 0; from_bucket < fw_buckets_size; ++from_bucket) {

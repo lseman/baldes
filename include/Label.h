@@ -1,3 +1,8 @@
+/**
+ * @file Label.h
+ * @brief This file contains the definition of the Label struct and LabelComparator class.
+ */
+
 #pragma once
 #include "Common.h"
 
@@ -105,4 +110,17 @@ struct Label {
     bool operator>(const Label &other) const { return cost > other.cost; }
 
     bool operator<(const Label &other) const { return cost < other.cost; }
+};
+
+/**
+ * @class LabelComparator
+ * @brief Comparator class for comparing two Label objects based on their cost.
+ *
+ * This class provides an overloaded operator() that allows for comparison
+ * between two Label pointers. The comparison is based on the cost attribute
+ * of the Label objects, with the comparison being in descending order.
+ */
+class LabelComparator {
+public:
+    bool operator()(Label *a, Label *b) { return a->cost > b->cost; }
 };

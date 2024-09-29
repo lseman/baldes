@@ -1,3 +1,7 @@
+/**
+ * @file Cut.h
+ * @brief This file contains the definition of the Cut struct and CutStorage class.
+ */
 #pragma once
 #include "Common.h"
 #include "Definitions.h"
