@@ -109,7 +109,7 @@ void BucketGraph::BucketArcElimination(double theta) {
     auto &buckets_size  = assign_buckets<D>(fw_buckets_size, bw_buckets_size);
 
     // Reset fixed_buckets in parallel
-    std::for_each(std::execution::par, fixed_buckets.begin(), fixed_buckets.end(),
+    std::for_each(fixed_buckets.begin(), fixed_buckets.end(),
                   [](auto &fb) { std::fill(fb.begin(), fb.end(), 0); });
 
     // Print direction of arc elimination
