@@ -46,7 +46,14 @@ set(CMAKE_CXX_FLAGS_RELEASE "-O3 -march=native -flto")
 set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "-O3 -g -march=native -flto")
 set(CMAKE_CXX_FLAGS_DEBUG "-Og -g -Wall -Wextra")
 
+if(APPLE)
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -stdlib=libc++")
+endif()
+
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+if(APPLE)
+    set(CMAKE_OSX_ARCHITECTURES "arm64")  # Or "arm64" for Apple Silicon (M1/M2 chips)
+endif()
 
 # Define a config.h.in template
 configure_file("config.h.in" "config.h")
@@ -58,7 +65,7 @@ option(RIH "Enable RIH compilation option" OFF)
 option(RCC "Enable RCC compilation option" OFF)
 option(SRC3 "Enable 3SRC compilation option" OFF)
 option(SRC "Enable SRC compilation option" OFF)
-option(GET_TBB "Enable TBB compilation option" OFF)
+#option(GET_TBB "Enable TBB compilation option" OFF)
 option(UNREACHABLE_DOMINANCE "Enable Unreachable Dominance compilation option"
        OFF)
 option(SORTED_LABELS "Enable Sorted Labels compilation option" OFF)
@@ -184,7 +191,11 @@ cpmaddpackage(
   "STDEXEC_BUILD_DOCS OFF"
   "BUILD_TESTING OFF")
 
-cpmaddpackage(NAME fmt GITHUB_REPOSITORY fmtlib/fmt GIT_TAG 11.0.2)
+find_package(FMT)
+if (NOT FMT_FOUND)
+  message(STATUS "FMT not found, using bundled version")
+  cpmaddpackage(NAME fmt GITHUB_REPOSITORY fmtlib/fmt GIT_TAG 11.0.2)
+endif()
 
 if(GET_SUITESPARSE)
   cpmaddpackage(
@@ -201,28 +212,6 @@ if(GET_SUITESPARSE)
   set(SUITESPARSE_CONFIG_ONLY TRUE)
 endif()
 
-find_package(TBB)
-if(TBB_FOUND)
-  message(STATUS "TBB found: ${TBB_VERSION}")
-else()
-  message(STATUS "TBB not found, will download it")
-  # set GET_TBB to true
-  set(GET_TBB ON)
-endif()
-
-if(GET_TBB)
-  cpmaddpackage(
-    NAME
-    TBB
-    GITHUB_REPOSITORY
-    oneapi-src/oneTBB
-    GIT_TAG
-    v2021.13.0
-    OPTIONS
-    "TBB_TEST OFF"
-    "TBB_EXAMPLES OFF"
-    "TBB_BUILD_SHARED OFF")
-endif()
 
 if(WITH_PYTHON)
   cpmaddpackage(NAME pybind11 GITHUB_REPOSITORY pybind/pybind11 GIT_TAG v2.13.6)
@@ -236,7 +225,7 @@ if(IPM OR CLIQUER)
 endif()
 include_directories(/usr/include/suitesparse/)
 
-set(GUROBI_HOME /home/seman/gurobi1101/linux64)
+set(GUROBI_HOME $ENV{GUROBI_HOME})
 
 include_directories(${GUROBI_HOME}/include)
 
@@ -308,8 +297,14 @@ add_executable(vrptw ${EXECUTABLE_SOURCES})
 
 # Linking libraries
 target_link_libraries(vrptw PRIVATE STDEXEC::stdexec)
+
+find_package(FMT)
+if (NOT FMT_FOUND)
+  message(STATUS "FMT not found, using bundled version")
 target_link_libraries(vrptw PRIVATE fmt::fmt)
-target_link_libraries(vrptw PRIVATE TBB::tbb)
+else()
+  target_link_libraries(vrptw PRIVATE fmt::fmt)
+endif()
 
 if(IPM)
   target_link_libraries(vrptw PRIVATE Eigen3::Eigen)
@@ -320,9 +315,25 @@ set(GUROBI_VERSION_MAJOR 110) # Adjust based on Gurobi version
 message(STATUS "Gurobi version: ${GUROBI_VERSION_MAJOR}")
 
 # Link Gurobi libraries
-target_link_libraries(
-  vrptw PRIVATE ${GUROBI_HOME}/lib/libgurobi_c++.a
-                ${GUROBI_HOME}/lib/libgurobi${GUROBI_VERSION_MAJOR}.so tbb)
+if(APPLE)
+  # macOS detected, use .dylib for linking
+  target_link_libraries(
+    vrptw PRIVATE ${GUROBI_HOME}/lib/libgurobi_c++.a
+                    ${GUROBI_HOME}/lib/libgurobi100.dylib
+                    )
+else()
+  # Non-macOS (Linux or other platforms), use .so and .a files
+  target_link_libraries(
+    vrptw PRIVATE ${GUROBI_HOME}/lib/libgurobi_c++.a
+                    ${GUROBI_HOME}/lib/libgurobi${GUROBI_VERSION_MAJOR}.so
+                    )
+endif()
+
+if(APPLE)
+    find_package(OpenMP REQUIRED)
+    target_link_libraries(vrptw PRIVATE OpenMP::OpenMP_CXX)
+endif()
+
 
 # Find jemalloc
 find_library(JEMALLOC_LIBRARY jemalloc)
@@ -337,7 +348,6 @@ if(WITH_PYTHON)
   pybind11_add_module(baldes src/BucketBindings.cpp ${EXECUTABLE_SOURCES})
   target_link_libraries(baldes PRIVATE pybind11::module)
   target_link_libraries(baldes PRIVATE fmt::fmt)
-  target_link_libraries(baldes PRIVATE TBB::tbb)
   target_link_libraries(baldes PRIVATE STDEXEC::stdexec)
   set_target_properties(baldes PROPERTIES POSITION_INDEPENDENT_CODE ON)
   target_compile_options(baldes PRIVATE -Wno-c++26-extensions
@@ -351,7 +361,6 @@ if(CLIQUER)
   add_executable(cliquer src/Original.cpp src/BucketGraph.cpp)
   target_link_libraries(cliquer PRIVATE STDEXEC::stdexec)
   target_link_libraries(cliquer PRIVATE fmt::fmt)
-  target_link_libraries(cliquer PRIVATE TBB::tbb)
   target_link_libraries(
     cliquer PRIVATE ${GUROBI_HOME}/lib/libgurobi_c++.a
                     ${GUROBI_HOME}/lib/libgurobi${GUROBI_VERSION_MAJOR}.so tbb)

@@ -241,7 +241,7 @@ void BucketGraph::generate_arcs() {
     }
 
     // Clear all buckets in parallel, removing any existing arcs
-    std::for_each(std::execution::par_unseq, buckets.begin(), buckets.end(), [&](auto &bucket) {
+    std::for_each(buckets.begin(), buckets.end(), [&](auto &bucket) {
         bucket.clear();                             // Clear bucket data
         bucket.clear_arcs(D == Direction::Forward); // Clear arcs in the bucket
     });
@@ -331,7 +331,7 @@ void BucketGraph::generate_arcs() {
     };
 
     // Iterate over all jobs in parallel, generating arcs for each
-    std::for_each(std::execution::par_unseq, jobs.begin(), jobs.end(), [&](const VRPJob &VRPJob) {
+    std::for_each(jobs.begin(), jobs.end(), [&](const VRPJob &VRPJob) {
         std::vector<double>              res_inc = {static_cast<double>(VRPJob.duration)}; // Resource increment vector
         std::vector<std::pair<int, int>> local_arcs;                                       // Local storage for arcs
 
