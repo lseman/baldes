@@ -1,3 +1,7 @@
+/**
+ * @file HGS.h
+ * @brief This file contains the definition of the HGS class.
+ */
 #pragma once
 
 #include <iostream>
@@ -11,8 +15,8 @@
 #include "../third_party/hgs_vrptw/Population.h"
 #include "../third_party/hgs_vrptw/Split.h"
 
-#include "Reader.h"
 #include "Definitions.h"
+#include "Reader.h"
 
 /**
  * @class HGS
@@ -46,7 +50,7 @@ public:
         print_info("Running genetic algorithm\n");
         Genetic solver(&params, &split, &population, &localSearch);
         solver.run(config.nbIter, config.timeLimit);
-        //std::cout << "----- GENETIC ALGORITHM FINISHED, TIME SPENT: " << params.getTimeElapsedSeconds() << std::endl;
+        // std::cout << "----- GENETIC ALGORITHM FINISHED, TIME SPENT: " << params.getTimeElapsedSeconds() << std::endl;
         print_info("Genetic algorithm finished in {:.2f} seconds\n", params.getTimeElapsedSeconds());
         auto sol = population.extractFeasibleRoutes();
 

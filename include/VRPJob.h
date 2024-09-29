@@ -1,7 +1,11 @@
+/**
+ * @file VRPJob.h
+ * @brief This file contains the definition of the VRPJob struct.
+ */
 #pragma once
+#include "Arc.h"
 #include "Common.h"
 #include "Definitions.h"
-#include "Arc.h"
 /**
  * @struct VRPJob
  * @brief Represents a job in a Vehicle Routing Problem.
@@ -28,15 +32,15 @@ struct VRPJob {
     std::vector<std::vector<Arc>> fw_arcs_scc;
     std::vector<std::vector<Arc>> bw_arcs_scc;
 
-    std::string                                              track_id;
-    int                                                      subject;
-    int                                                      week;
-    int                                                      year;
-    double                                                   duration_min;
-    int                                                      setup_time;
-    int                                                      teardown_time;
-    long long                                                time_window_start;
-    long long                                                time_window_end;
+    std::string track_id;
+    int         subject;
+    int         week;
+    int         year;
+    double      duration_min;
+    int         setup_time;
+    int         teardown_time;
+    long long   time_window_start;
+    long long   time_window_end;
 
     std::vector<double> consumption;
 
