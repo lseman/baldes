@@ -36,7 +36,12 @@ THE POSSIBILITY OF SUCH DAMAGE.
 #include <stdlib.h>
 #include "buffer.h"
 #include "common.h"
-#include <malloc.h>
+#ifdef __APPLE__
+   #include <stdlib.h>
+#else
+   #include <malloc.h>
+#endif
+
 
 memory::memory()
 {

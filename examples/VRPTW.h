@@ -16,6 +16,7 @@
 
 #pragma once
 
+#include "Cut.h"
 #include "Definitions.h"
 
 #include "bucket/BucketGraph.h"
@@ -968,7 +969,8 @@ public:
 
                 // Adding cols
                 auto colAdded = addColumn(node, paths, false);
-                // remove all cuts
+// remove all cuts
+#ifdef SRC
                 if (bucket_graph.getStatus() == Status::Rollback) {
                     for (int i = SRCconstraints.size() - 1; i >= 0; --i) {
                         GRBConstr constr = SRCconstraints[i];
@@ -981,6 +983,7 @@ public:
                     // r1c.cutStorage = cuts;
                     matrix = extractModelDataSparse(node);
                 }
+#endif
 
 #ifdef SCHRODINGER
                 // Adding schrodinger paths

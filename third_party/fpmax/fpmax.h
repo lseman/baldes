@@ -24,7 +24,7 @@ class FPmax
 		MFI_tree** mfitrees;
 		CFI_tree** cfitrees;
 
-		stack* list;
+		fpstack::stack* list;
 		int TRANSACTION_NO=0;
 		int ITEM_NO=100;
 		int THRESHOLD;
