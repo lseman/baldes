@@ -47,7 +47,7 @@ set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "-O3 -g -march=native -flto")
 set(CMAKE_CXX_FLAGS_DEBUG "-Og -g -Wall -Wextra")
 
 if(APPLE)
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -stdlib=libc++")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -stdlib=libc++")
 endif()
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
@@ -62,7 +62,7 @@ option(RIH "Enable RIH compilation option" OFF)
 option(RCC "Enable RCC compilation option" OFF)
 option(SRC3 "Enable 3SRC compilation option" OFF)
 option(SRC "Enable SRC compilation option" ON)
-#option(GET_TBB "Enable TBB compilation option" OFF)
+# option(GET_TBB "Enable TBB compilation option" OFF)
 option(UNREACHABLE_DOMINANCE "Enable Unreachable Dominance compilation option"
        OFF)
 option(SORTED_LABELS "Enable Sorted Labels compilation option" OFF)
@@ -82,6 +82,7 @@ option(PSTEP "Enable PSTEP compilation option" OFF)
 option(SCHRODINGER "Enable Schrodinger compilation option" OFF)
 option(CLIQUER "Enable Cliquer compilation option" OFF)
 option(VERBOSE "Enable verbose output" OFF)
+option(JEMALLOC "Enable jemalloc" ON)
 
 # Define the size of resources without using cache
 set(R_SIZE
@@ -189,7 +190,7 @@ cpmaddpackage(
   "BUILD_TESTING OFF")
 
 find_package(FMT)
-if (NOT FMT_FOUND)
+if(NOT FMT_FOUND)
   message(STATUS "FMT not found, using bundled version")
   cpmaddpackage(NAME fmt GITHUB_REPOSITORY fmtlib/fmt GIT_TAG 11.0.2)
 endif()
@@ -209,12 +210,11 @@ if(GET_SUITESPARSE)
   set(SUITESPARSE_CONFIG_ONLY TRUE)
 endif()
 
-
 if(WITH_PYTHON)
   cpmaddpackage(NAME pybind11 GITHUB_REPOSITORY pybind/pybind11 GIT_TAG v2.13.6)
 endif()
 
-if(IPM OR CLIQUER)
+if(IPM)
   cpmaddpackage(NAME Eigen GIT_REPOSITORY https://gitlab.com/libeigen/eigen.git
                 GIT_TAG 3.4.0)
   include_directories(${EIGEN_SOURCE_DIR})
@@ -257,9 +257,9 @@ set(HGS_SOURCES
     third_party/hgs_vrptw/Population.cpp third_party/hgs_vrptw/Split.cpp)
 
 set(FPSOURCE
-    third_party/fpmax/fpmax.cpp third_party/fpmax/buffer.cpp third_party/fpmax/data.cpp
-    third_party/fpmax/fsout.cpp third_party/fpmax/fp_tree.cpp
-    third_party/fpmax/fp_node.cpp)
+    third_party/fpmax/fpmax.cpp third_party/fpmax/buffer.cpp
+    third_party/fpmax/data.cpp third_party/fpmax/fsout.cpp
+    third_party/fpmax/fp_tree.cpp third_party/fpmax/fp_node.cpp)
 
 set(IPM_SOURCES src/IPSolver.cpp)
 set(SRC_SOURCES src/SRC.cpp)
@@ -296,9 +296,9 @@ add_executable(vrptw ${EXECUTABLE_SOURCES})
 target_link_libraries(vrptw PRIVATE STDEXEC::stdexec)
 
 find_package(FMT)
-if (NOT FMT_FOUND)
+if(NOT FMT_FOUND)
   message(STATUS "FMT not found, using bundled version")
-target_link_libraries(vrptw PRIVATE fmt::fmt)
+  target_link_libraries(vrptw PRIVATE fmt::fmt)
 else()
   target_link_libraries(vrptw PRIVATE fmt::fmt)
 endif()
@@ -314,31 +314,28 @@ message(STATUS "Gurobi version: ${GUROBI_VERSION_MAJOR}")
 # Link Gurobi libraries
 if(APPLE)
   # macOS detected, use .dylib for linking
-  target_link_libraries(
-    vrptw PRIVATE ${GUROBI_HOME}/lib/libgurobi_c++.a
-                    ${GUROBI_HOME}/lib/libgurobi100.dylib
-                    )
+  target_link_libraries(vrptw PRIVATE ${GUROBI_HOME}/lib/libgurobi_c++.a
+                                      ${GUROBI_HOME}/lib/libgurobi100.dylib)
 else()
   # Non-macOS (Linux or other platforms), use .so and .a files
   target_link_libraries(
     vrptw PRIVATE ${GUROBI_HOME}/lib/libgurobi_c++.a
-                    ${GUROBI_HOME}/lib/libgurobi${GUROBI_VERSION_MAJOR}.so
-                    )
+                  ${GUROBI_HOME}/lib/libgurobi${GUROBI_VERSION_MAJOR}.so)
 endif()
 
 if(APPLE)
-    find_package(OpenMP REQUIRED)
-    target_link_libraries(vrptw PRIVATE OpenMP::OpenMP_CXX)
+  find_package(OpenMP REQUIRED)
+  target_link_libraries(vrptw PRIVATE OpenMP::OpenMP_CXX)
 endif()
 
-
-# Find jemalloc
-find_library(JEMALLOC_LIBRARY jemalloc)
-if(JEMALLOC_LIBRARY)
-  message(STATUS "jemalloc found: ${JEMALLOC_LIBRARY}")
-  target_link_libraries(vrptw PRIVATE ${JEMALLOC_LIBRARY})
-else()
-  message(STATUS "jemalloc not found")
+if(JEMALLOC)
+  find_library(JEMALLOC_LIBRARY jemalloc)
+  if(JEMALLOC_LIBRARY)
+    message(STATUS "jemalloc found: ${JEMALLOC_LIBRARY}")
+    target_link_libraries(vrptw PRIVATE ${JEMALLOC_LIBRARY})
+  else()
+    message(STATUS "jemalloc not found")
+  endif()
 endif()
 
 if(WITH_PYTHON)
@@ -359,27 +356,25 @@ if(CLIQUER)
   target_link_libraries(cliquer PRIVATE STDEXEC::stdexec)
   target_link_libraries(cliquer PRIVATE fmt::fmt)
 
-  find_library(JEMALLOC_LIBRARY jemalloc)
-  if(JEMALLOC_LIBRARY)
-    message(STATUS "jemalloc found: ${JEMALLOC_LIBRARY}")
-    target_link_libraries(cliquer PRIVATE ${JEMALLOC_LIBRARY})
+  if(APPLE)
+    # macOS detected, use .dylib for linking
+    target_link_libraries(cliquer PRIVATE ${GUROBI_HOME}/lib/libgurobi_c++.a
+                                          ${GUROBI_HOME}/lib/libgurobi100.dylib)
   else()
-    message(STATUS "jemalloc not found")
+    # Non-macOS (Linux or other platforms), use .so and .a files
+    target_link_libraries(
+      cliquer PRIVATE ${GUROBI_HOME}/lib/libgurobi_c++.a
+                      ${GUROBI_HOME}/lib/libgurobi${GUROBI_VERSION_MAJOR}.so)
   endif()
 
-  if(APPLE)
-  # macOS detected, use .dylib for linking
-  target_link_libraries(
-    cliquer PRIVATE ${GUROBI_HOME}/lib/libgurobi_c++.a
-                    ${GUROBI_HOME}/lib/libgurobi100.dylib
-                    )
-else()
-  # Non-macOS (Linux or other platforms), use .so and .a files
-  target_link_libraries(
-    cliquer PRIVATE ${GUROBI_HOME}/lib/libgurobi_c++.a
-                    ${GUROBI_HOME}/lib/libgurobi${GUROBI_VERSION_MAJOR}.so
-                    )
-endif()
+  if(JEMALLOC)
+    find_library(JEMALLOC_LIBRARY jemalloc)
+    if(JEMALLOC_LIBRARY)
+      message(STATUS "jemalloc found: ${JEMALLOC_LIBRARY}")
+      target_link_libraries(cliquer PRIVATE ${JEMALLOC_LIBRARY})
+    else()
+      message(STATUS "jemalloc not found")
+    endif()
+  endif()
 
-  target_link_libraries(cliquer PRIVATE Eigen3::Eigen)
 endif()
