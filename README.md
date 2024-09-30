@@ -77,23 +77,23 @@ Make sure the `GUROBI_HOME` environment variable is set.
 
 **Boolean Options**
 
-| Option                  | Description                            | Default                   |
-| ----------------------- | -------------------------------------- | ------------------------- |
-| `RIH`                   | Enable improvement heuristics          | OFF                       |
-| `RCC`$^2$               | Enable RCC cuts                        | OFF                       |
-| `SRC3`$^2$              | Enable classical SRC cuts              | OFF                       |
-| `SRC`                   | Enable limited memory SRC cuts         | OFF                       |
-| `UNREACHABLE_DOMINANCE` | Enable unreachable dominance           | OFF                       |
-| `MCD`                   | Perform MCD on instance capacities     | OFF                       |
-| `LIMITED_BUCKETS`       | Limit the capacity of the buckets      | OFF                       |
-| `SORTED_LABELS`         | Sort labels on bucket insertion        | OFF                       |
-| `STAB`$^3$              | Use dynamic-alpha smooth stabilization | ON                        |
-| `IPM`$^3$               | Use interior point stabilization       | OFF                       |
-| `TR`                    | Use trust region stabilization         | OFF                       |
-| `WITH_PYTHON`           | Enable the python wrapper              | OFF                       |
-| `SCHRODINGER`           | Enable schrodinger pool                | OFF                       |
-| `PSTEP`                   | Enable PStep compilation                 | OFF                       |
-| `GET_TBB`               | Enable TBB compilation                 | OFF (will use system lib) |
+| Option                  | Description                            | Default |
+| ----------------------- | -------------------------------------- | ------- |
+| `RIH`                   | Enable improvement heuristics          | OFF     |
+| `RCC`$^2$               | Enable RCC cuts                        | OFF     |
+| `SRC3`$^2$              | Enable classical SRC cuts              | OFF     |
+| `SRC`                   | Enable limited memory SRC cuts         | ON      |
+| `UNREACHABLE_DOMINANCE` | Enable unreachable dominance           | OFF     |
+| `MCD`                   | Perform MCD on instance capacities     | OFF     |
+| `LIMITED_BUCKETS`       | Limit the capacity of the buckets      | OFF     |
+| `SORTED_LABELS`         | Sort labels on bucket insertion        | OFF     |
+| `STAB`$^3$              | Use dynamic-alpha smooth stabilization | ON      |
+| `IPM`$^3$               | Use interior point stabilization       | OFF     |
+| `TR`                    | Use trust region stabilization         | OFF     |
+| `WITH_PYTHON`           | Enable the python wrapper              | OFF     |
+| `SCHRODINGER`           | Enable schrodinger pool                | OFF     |
+| `PSTEP`                 | Enable PStep compilation               | OFF     |
+| `FIXED_BUCKETS`         | Enable bucket arc fixing               | ON      |
 
 **Numerical and Other Definitions**
 
