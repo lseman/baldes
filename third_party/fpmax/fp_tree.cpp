@@ -113,7 +113,7 @@ void update_cfi_trees(int treeno, int Count)
 	}
 }
 
-stack::stack(int length, bool close)
+fpstack::stack::stack(int length, bool close)
 {
 	top= 0; 
 	FS = new int[length];
@@ -123,12 +123,12 @@ stack::stack(int length, bool close)
 		counts = NULL;
 }
 
-stack::~stack()
+fpstack::stack::~stack()
 {
 	delete []FS;
 }
 
-void stack::insert(FI_tree* fptree)
+void fpstack::stack::insert(FI_tree* fptree)
 {
 	for(Fnode* node=fptree->Root->leftchild; node!=NULL; node=node->leftchild)
 	{

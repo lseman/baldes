@@ -214,7 +214,7 @@ void BucketGraph::generate_arcs() {
     }
 
     // Clear all buckets in parallel, removing any existing arcs
-    std::for_each(std::execution::par_unseq, buckets.begin(), buckets.end(), [&](auto &bucket) {
+    std::for_each(buckets.begin(), buckets.end(), [&](auto &bucket) {
         bucket.clear();                             // Clear bucket data
         bucket.clear_arcs(D == Direction::Forward); // Clear arcs in the bucket
     });
@@ -303,17 +303,49 @@ void BucketGraph::generate_arcs() {
         }
     };
 
-    // Iterate over all jobs in parallel, generating arcs for each
-    std::for_each(std::execution::par_unseq, jobs.begin(), jobs.end(), [&](const VRPJob &VRPJob) {
-        std::vector<double>              res_inc = {static_cast<double>(VRPJob.duration)}; // Resource increment vector
-        std::vector<std::pair<int, int>> local_arcs;                                       // Local storage for arcs
+    unsigned int total_threads = std::thread::hardware_concurrency();
+    // Divide by 2 to use only half of the available threads
+    unsigned int half_threads = total_threads / 2;
 
-        // Generate arcs for all buckets associated with the current job
-        for (int i = 0; i < num_buckets[VRPJob.id]; ++i) {
-            int from_bucket = i + num_buckets_index[VRPJob.id];         // Determine the source bucket
-            add_arcs_for_job(VRPJob, from_bucket, res_inc, local_arcs); // Add arcs for this job and bucket
-        }
-    });
+    const int                JOBS = half_threads;
+    exec::static_thread_pool pool(JOBS);
+    auto                     sched = pool.get_scheduler();
+
+    // Iterate over all jobs in parallel, generating arcs for each
+    std::vector<int> tasks; // Tasks will store job ids
+    for (int job_id = 0; job_id < jobs.size(); ++job_id) {
+        tasks.push_back(job_id); // Store the job id to be processed
+    }
+
+    // Define chunk size to reduce parallelization overhead
+    const int chunk_size = 10; // Adjust based on your performance needs
+
+    // Parallel execution in chunks
+    auto bulk_sender = stdexec::bulk(
+        stdexec::just(), (tasks.size() + chunk_size - 1) / chunk_size,
+        [this, &tasks, &num_buckets, &num_buckets_index, &add_arcs_for_job, chunk_size](std::size_t chunk_idx) {
+            size_t start_idx = chunk_idx * chunk_size;
+            size_t end_idx   = std::min(start_idx + chunk_size, tasks.size());
+
+            // Process a chunk of tasks (i.e., a group of jobs)
+            for (size_t task_idx = start_idx; task_idx < end_idx; ++task_idx) {
+                int           job_id = tasks[task_idx]; // Get the job id
+                const VRPJob &VRPJob = jobs[job_id];
+
+                std::vector<double> res_inc = {static_cast<double>(VRPJob.duration)}; // Resource increment vector
+                std::vector<std::pair<int, int>> local_arcs;                          // Local storage for arcs
+
+                // Generate arcs for all buckets associated with the current job
+                for (int i = 0; i < num_buckets[VRPJob.id]; ++i) {
+                    int from_bucket = i + num_buckets_index[VRPJob.id];         // Determine the source bucket
+                    add_arcs_for_job(VRPJob, from_bucket, res_inc, local_arcs); // Add arcs for this job and bucket
+                }
+            }
+        });
+
+    // Submit work to the thread pool
+    auto work = stdexec::starts_on(sched, bulk_sender);
+    stdexec::sync_wait(std::move(work));
 }
 
 /**

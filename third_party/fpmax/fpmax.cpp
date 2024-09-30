@@ -102,7 +102,8 @@ FPmax::~FPmax()
 void FPmax::printLen()
 {
 	int i, j, sum=0;
-	for(i=ITEM_NO-1; i>=0&&ITlen[i]==0; i--);
+	for(i=ITEM_NO-1; i>=0&&ITlen[i]==0; i--)
+	;
         for(j=0; j<=i; j++)sum+=ITlen[j];
 	printf("%d\n", sum);
 	for(j=0; j<=i; j++) 
@@ -130,7 +131,7 @@ FISet* FPmax::run()
 #ifdef CFI
 		list=new stack(fptree->itemno, true); 
 #else
-		list=new stack(fptree->itemno); 
+		list=new fpstack::stack(fptree->itemno); 
 #endif
 
 	assert(list!=NULL && bran!=NULL && compact!=NULL && ITlen!=NULL && prefix!=NULL);

@@ -3,73 +3,143 @@
 #include "Definitions.h"
 #include <algorithm>
 #include <execution>
+#include <jemalloc/jemalloc.h> // jemalloc for efficient memory management
 #include <mutex>
 #include <unordered_map>
-#include <unordered_set>
 #include <vector>
 
-/**
- * @class CliqueManager
- * @brief Manages cliques and conflict graphs for binary variables in a model.
- *
- * This class is responsible for detecting and managing cliques within a given model.
- * It also builds and updates conflict graphs for binary variables to facilitate
- * efficient clique detection and management.
- *
- * @details
- * The CliqueManager class provides functionalities to:
- * - Add cliques to the internal storage.
- * - Initialize and update conflict graphs for binary variables.
- * - Detect cliques in a sparse matrix representation of the model.
- * - Print detected cliques and conflict graphs.
- *
- * @note This class is designed to be thread-safe.
- */
+// define enum CoinBronKerbosch
+namespace CoinBronKerbosch {
+enum class PivotingStrategy { First, Random, Weight };
+}
 class CliqueManager {
 private:
-    const ModelData                     &modelData;
-    std::vector<std::vector<int>>        cliques;             // Stores all detected cliques
-    std::vector<std::unordered_set<int>> conflictGraph;       // Conflict graph for binary variables
-    std::mutex                           clique_mutex;        // For thread safety when adding cliques
-    std::mutex                           conflictGraph_mutex; // For thread safety in conflict graph updates
+    const ModelData              &modelData;
+    std::vector<std::vector<int>> cliques; // Stores all detected cliques
+    std::vector<std::vector<bool>>
+               conflictGraph;       // Conflict graph for binary variables (using bools for memory efficiency)
+    std::mutex clique_mutex;        // For thread safety when adding cliques
+    std::mutex conflictGraph_mutex; // For thread safety in conflict graph updates
+    size_t     maxCallsBK;          // Limit for clique detection calls
+    double     minFrac;             // Minimum value to consider in clique detection
+    double     minViol;             // Minimum violation to store a clique
+    double     BKCLQ_MULTIPLIER;    // Multiplier for scaling
+    double     BKCLQ_EPS;           // Small tolerance for numerical stability
+    size_t     cap_;                // Capacity for clique storage (dynamic resizing)
+    CoinBronKerbosch::PivotingStrategy pivotingStrategy; // Pivoting strategy for clique detection
+    double                            *vertexWeight_;    // Vertex weights for cliques
+    double                            *rc_;              // Reduced costs of variables
 
 public:
-    explicit CliqueManager(const ModelData &mData) : modelData(mData) {}
+    explicit CliqueManager(const ModelData &mData)
+        : modelData(mData), maxCallsBK(1000), minFrac(0.001), minViol(0.02), BKCLQ_MULTIPLIER(1000.0), BKCLQ_EPS(1e-6),
+          cap_(0), pivotingStrategy(CoinBronKerbosch::PivotingStrategy::Weight), vertexWeight_(nullptr), rc_(nullptr) {
+        preallocateMemory(modelData.b.size());
+    }
+
+    // Memory management using jemalloc
+    static void *jemalloc_alloc(size_t size) {
+        void *ptr = je_malloc(size);
+        if (!ptr) {
+            fprintf(stderr, "jemalloc failed to allocate %zu bytes.\n", size);
+            abort();
+        }
+        return ptr;
+    }
+
+    static void jemalloc_free(void *ptr) { je_free(ptr); }
+
+    // Dynamically check memory capacity and reallocate if necessary
+    void checkMemory(size_t newNumCols) {
+        if (cap_ < newNumCols) {
+            if (cap_ > 0) {
+                jemalloc_free(vertexWeight_);
+                jemalloc_free(rc_);
+            }
+            vertexWeight_ = (double *)jemalloc_alloc(sizeof(double) * newNumCols * 2);
+            rc_           = (double *)jemalloc_alloc(sizeof(double) * newNumCols * 2);
+            cap_          = newNumCols;
+        }
+    }
 
     void addClique(const std::vector<int> &clique) {
         std::lock_guard<std::mutex> lock(clique_mutex);
         cliques.push_back(clique);
     }
 
-    // Initialize the conflict graph for binary variables
-    void initCg(int binary_number) {
-        conflictGraph.clear();
-        conflictGraph.resize(binary_number); // Resize only for binary variables
+    // Preallocate memory for conflictGraph and cliques
+    void preallocateMemory(size_t size) {
+        conflictGraph.resize(size, std::vector<bool>(size, false)); // Initialize conflict graph as a matrix of bools
+        cliques.reserve(4096);                                      // Preallocate space for 4096 cliques initially
     }
+
+    // Set the minimum fractional value to consider variables in clique detection
+    void setMinFrac(const double minFrac) { this->minFrac = minFrac; }
+
+    // Set the minimum violation for cliques to be stored
+    void setMinViol(const double minViol) { this->minViol = minViol; }
+
+    // Set the maximum number of recursive calls in Bron-Kerbosch algorithm
+    void setMaxCallsBK(size_t maxCallsBK) { this->maxCallsBK = maxCallsBK; }
+
+    // Set pivoting strategy for clique detection
+    void setPivotingStrategy(const CoinBronKerbosch::PivotingStrategy strategy) { this->pivotingStrategy = strategy; }
 
     // Build and update the conflict graph using binary variables
     void buildUpdateCg(const std::vector<std::vector<int>> &set, int binary_number) {
         initCg(binary_number); // Initialize conflict graph for binary variables
 
-        // Parallel processing of cliques to build the conflict graph
-        std::for_each(std::execution::par_unseq, set.begin(), set.end(), [&](const std::vector<int> &clique) {
+        // Create tasks for each combination of clique[i] and clique[j] for all cliques in `set`
+        std::vector<std::tuple<int, int>> tasks;
+        tasks.reserve(set.size() * (binary_number * (binary_number - 1)) / 2); // Preallocate task space for conflicts
+
+        for (const auto &clique : set) {
             for (size_t i = 0; i < clique.size(); ++i) {
                 for (size_t j = i + 1; j < clique.size(); ++j) {
                     int var_i = clique[i];
                     int var_j = clique[j];
 
                     // Only process binary variables
-                    if (var_i < binary_number && var_j < binary_number) {
-                        std::lock_guard<std::mutex> lock(conflictGraph_mutex);
-                        conflictGraph[var_i].insert(var_j);
-                        conflictGraph[var_j].insert(var_i);
-                    }
+                    if (var_i < binary_number && var_j < binary_number) { tasks.emplace_back(var_i, var_j); }
                 }
             }
-        });
+        }
+
+        // Define chunk size for processing tasks in batches
+        const int chunk_size = 100; // Adjust based on performance needs
+
+        // Define a bulk sender to process tasks in parallel
+        auto bulk_sender =
+            stdexec::bulk(stdexec::just(), (tasks.size() + chunk_size - 1) / chunk_size,
+                          [this, &tasks, chunk_size](std::size_t chunk_idx) {
+                              size_t start_idx = chunk_idx * chunk_size;
+                              size_t end_idx   = std::min(start_idx + chunk_size, tasks.size());
+
+                              // Process a chunk of tasks
+                              for (size_t task_idx = start_idx; task_idx < end_idx; ++task_idx) {
+                                  const auto &[var_i, var_j] = tasks[task_idx];
+
+                                  // Mark conflict between var_i and var_j (and vice versa) in the conflict graph
+                                  {
+                                      std::lock_guard<std::mutex> lock(conflictGraph_mutex);
+                                      conflictGraph[var_i][var_j] = true; // Mark conflict between var_i and var_j
+                                      conflictGraph[var_j][var_i] = true; // Mark conflict between var_j and var_i
+                                  }
+                              }
+                          });
+
+        // Submit work to the scheduler for parallel execution
+        auto work = stdexec::starts_on(sched, bulk_sender);
+        stdexec::sync_wait(std::move(work));
     }
 
-    // Function to find cliques in the sparse matrix
+#include <algorithm>
+#include <execution>
+#include <mutex>
+#include <stdexec/execution.hpp>
+#include <tuple>
+#include <vector>
+
     void findCliques() {
         cliques.clear(); // Clear previous cliques
         std::unordered_map<int, std::vector<std::pair<double, int>>> rowToElements;
@@ -83,56 +153,115 @@ public:
             rowToElements[row].emplace_back(coeff, col);
         }
 
-        // Parallel processing of rows
-        std::for_each(std::execution::par, modelData.b.begin(), modelData.b.end(), [&](const auto &rhs_value) {
-            int    row = &rhs_value - &modelData.b[0]; // Get row index
-            double rhs = rhs_value;
+        // Prepare tasks for parallel processing. Each task represents a row to process.
+        std::vector<int> tasks(modelData.b.size());
+        std::iota(tasks.begin(), tasks.end(), 0); // Populate tasks with row indices
 
-            std::vector<std::pair<double, int>> binCoeffs;
-            binCoeffs.reserve(100); // Reserve space for binary coefficients
+        // Define chunk size for processing tasks in batches
+        const int chunk_size = 100; // Adjust based on performance needs
 
-            auto &rowElements = rowToElements[row];
+        // Define a bulk sender to process tasks in parallel
+        auto bulk_sender =
+            stdexec::bulk(stdexec::just(), (tasks.size() + chunk_size - 1) / chunk_size,
+                          [this, &tasks, &rowToElements, chunk_size](std::size_t chunk_idx) {
+                              size_t start_idx = chunk_idx * chunk_size;
+                              size_t end_idx   = std::min(start_idx + chunk_size, tasks.size());
 
-            // Adjust RHS and collect binary variable coefficients
-            for (const auto &elem : rowElements) {
-                double coeff = elem.first;
-                int    col   = elem.second;
+                              // Process a chunk of tasks (i.e., rows)
+                              for (size_t task_idx = start_idx; task_idx < end_idx; ++task_idx) {
+                                  int    row = tasks[task_idx]; // Get the row index
+                                  double rhs = modelData.b[row];
 
-                if (modelData.vtype[col] != 'B') {
-                    rhs -= (coeff > 0 ? coeff * modelData.ub[col] : 0);
+                                  std::vector<std::pair<double, int>> binCoeffs;
+                                  binCoeffs.reserve(100); // Reserve space for binary coefficients
+
+                                  auto &rowElements = rowToElements[row];
+
+                                  // Adjust RHS and collect binary variable coefficients
+                                  for (const auto &elem : rowElements) {
+                                      double coeff = elem.first;
+                                      int    col   = elem.second;
+
+                                      if (modelData.vtype[col] != 'B') {
+                                          rhs -= (coeff > 0 ? coeff * modelData.ub[col] : 0);
+                                      } else {
+                                          binCoeffs.emplace_back(coeff, col);
+                                      }
+                                  }
+
+                                  if (binCoeffs.size() < 2) continue; // Skip rows with fewer than 2 binary coefficients
+
+                                  std::sort(binCoeffs.begin(), binCoeffs.end());
+
+                                  if (binCoeffs.back().first + binCoeffs[binCoeffs.size() - 2].first < rhs) continue;
+
+                                  int k = findFirstClique(binCoeffs, rhs);
+                                  if (k == -1) continue;
+
+                                  addCliqueFromIndex(binCoeffs, k);
+
+                                  processRemainingCliques(binCoeffs, k, rhs);
+                              }
+                          });
+
+        // Submit work to the scheduler for parallel execution
+        auto work = stdexec::starts_on(sched, bulk_sender);
+        stdexec::sync_wait(std::move(work));
+    }
+
+    int findFirstClique(const std::vector<std::pair<double, int>> &binCoeffs, double rhs) {
+        int left  = 0;
+        int right = binCoeffs.size() - 2; // We are comparing two elements, hence size - 2.
+        int k     = -1;
+
+        // Binary search for the first index where the sum of binCoeffs[mid] and binCoeffs[mid + 1] > rhs
+        while (left <= right) {
+            int mid = left + (right - left) / 2;
+
+            // Check if the sum of two consecutive coefficients exceeds rhs
+            if (binCoeffs[mid].first + binCoeffs[mid + 1].first > rhs) {
+                k     = mid;     // Found a valid clique start index
+                right = mid - 1; // Narrow down the search to find the earliest such index
+            } else {
+                left = mid + 1; // Move the search to the right
+            }
+        }
+
+        return k; // If no valid clique is found, k will remain -1.
+    }
+
+    void processRemainingCliques(const std::vector<std::pair<double, int>> &binCoeffs, int k, double rhs) {
+        // Process cliques starting from earlier indices before k
+        for (int o = k - 1; o >= 0; --o) {
+            // Find the smallest index f such that binCoeffs[o] + binCoeffs[f] > rhs
+            int left  = o + 1;
+            int right = binCoeffs.size() - 1;
+            int f     = -1;
+
+            while (left <= right) {
+                int mid = left + (right - left) / 2;
+
+                // If the sum of the two coefficients exceeds rhs, try to find the smallest valid f
+                if (binCoeffs[o].first + binCoeffs[mid].first > rhs) {
+                    f     = mid;
+                    right = mid - 1;
                 } else {
-                    binCoeffs.emplace_back(coeff, col);
+                    left = mid + 1;
                 }
             }
 
-            if (binCoeffs.size() < 2) return; // Skip rows with fewer than 2 binary coefficients
+            // If a valid f was found, we can form another clique
+            if (f != -1) {
+                std::vector<int> clique;
+                clique.push_back(binCoeffs[o].second); // Add the element at index o
+                for (int j = f; j < binCoeffs.size(); ++j) {
+                    clique.push_back(binCoeffs[j].second); // Add elements starting from index f
+                }
 
-            std::sort(binCoeffs.begin(), binCoeffs.end());
-
-            if (binCoeffs.back().first + binCoeffs[binCoeffs.size() - 2].first < rhs) return;
-
-            int k = findFirstClique(binCoeffs, rhs);
-            if (k == -1) return;
-
-            addCliqueFromIndex(binCoeffs, k);
-
-            processRemainingCliques(binCoeffs, k, rhs);
-        });
-    }
-
-    // Helper function to find the first clique index
-    int findFirstClique(const std::vector<std::pair<double, int>> &binCoeffs, double rhs) {
-        int left = 0, right = binCoeffs.size() - 2, k = -1;
-        while (left <= right) {
-            int mid = left + (right - left) / 2;
-            if (binCoeffs[mid].first + binCoeffs[mid + 1].first > rhs) {
-                k     = mid;
-                right = mid - 1;
-            } else {
-                left = mid + 1;
+                // Add this new clique (assuming addClique is a function that stores the clique)
+                addClique(clique);
             }
         }
-        return k;
     }
 
     // Add cliques from index k
@@ -141,34 +270,6 @@ public:
         clique.reserve(binCoeffs.size() - k);
         for (int j = k; j < binCoeffs.size(); ++j) { clique.push_back(binCoeffs[j].second); }
         addClique(clique);
-    }
-
-    // Process remaining cliques after the first one is added
-    void processRemainingCliques(const std::vector<std::pair<double, int>> &binCoeffs, int k, double rhs) {
-        for (int o = k - 1; o >= 0; --o) {
-            int f = findSmallestF(binCoeffs, o, rhs);
-            if (f != -1) {
-                std::vector<int> clique_f;
-                clique_f.push_back(binCoeffs[o].second);
-                for (int j = f; j < binCoeffs.size(); ++j) { clique_f.push_back(binCoeffs[j].second); }
-                addClique(clique_f);
-            }
-        }
-    }
-
-    // Helper function to find the smallest f index
-    int findSmallestF(const std::vector<std::pair<double, int>> &binCoeffs, int o, double rhs) {
-        int left = o + 1, right = binCoeffs.size() - 1, f = -1;
-        while (left <= right) {
-            int mid = left + (right - left) / 2;
-            if (binCoeffs[o].first + binCoeffs[mid].first > rhs) {
-                f     = mid;
-                right = mid - 1;
-            } else {
-                left = mid + 1;
-            }
-        }
-        return f;
     }
 
     // Function to print cliques
@@ -184,8 +285,56 @@ public:
     void printCg() {
         for (size_t i = 0; i < conflictGraph.size(); ++i) {
             fmt::print("Variable {} conflicts with: ", i);
-            for (const auto &c : conflictGraph[i]) { fmt::print("{} ", c); }
+            for (size_t j = 0; j < conflictGraph[i].size(); ++j) {
+                if (conflictGraph[i][j]) { fmt::print("{} ", j); }
+            }
             fmt::print("\n");
+        }
+    }
+
+    void extendCliques(const std::vector<std::vector<int>> &initialCliques, std::vector<std::vector<int>> &extCliques) {
+        // Iterate over each initial clique and attempt to extend it
+        for (const auto &clique : initialCliques) {
+            std::unordered_set<int> cliqueSet(clique.begin(), clique.end()); // Store the clique for easy lookup
+            std::vector<int>        extendedClique = clique;                 // Start with the current clique
+
+            bool extended = false; // Keep track if we successfully extend the clique
+
+            // Create a list of candidate vertices (not in the clique) and sort them by degree
+            std::vector<int> candidates;
+            for (size_t v = 0; v < conflictGraph.size(); ++v) {
+                if (cliqueSet.find(v) == cliqueSet.end()) { candidates.push_back(v); }
+            }
+
+            // Sort candidates by their degree (most connections to other vertices first)
+            std::sort(candidates.begin(), candidates.end(), [&](int a, int b) {
+                return std::count(conflictGraph[a].begin(), conflictGraph[a].end(), true) >
+                       std::count(conflictGraph[b].begin(), conflictGraph[b].end(), true);
+            });
+
+            // Try to extend the clique with vertices sorted by their degree
+            for (int v : candidates) {
+                bool canExtend = true;
+                for (int u : clique) {
+                    if (!conflictGraph[v][u]) {
+                        canExtend = false; // If v is not connected to any member of the clique, break out
+                        break;
+                    }
+                }
+
+                if (canExtend) {
+                    extendedClique.push_back(v);
+                    cliqueSet.insert(v); // Add v to the clique set
+                    extended = true;
+                }
+            }
+
+            // Add the extended clique to the result
+            if (extended) {
+                extCliques.push_back(extendedClique);
+            } else {
+                extCliques.push_back(clique); // If no extension was possible, keep the original clique
+            }
         }
     }
 };
