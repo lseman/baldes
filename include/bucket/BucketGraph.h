@@ -350,6 +350,44 @@ public:
     std::vector<double>                R_max;
     std::vector<double>                R_min;
     std::vector<std::vector<uint64_t>> neighborhoods_bitmap; // Bitmap for neighborhoods of each job
+    std::vector<std::vector<uint64_t>> elementarity_bitmap;  // Bitmap for elementarity sets
+    std::vector<std::vector<uint64_t>> packing_bitmap;      // Bitmap for packing sets
+
+    void define_elementarity_sets() {
+        size_t num_jobs = jobs.size();
+
+        // Initialize elementarity sets
+        elementarity_bitmap.resize(num_jobs); // Bitmap for elementarity sets
+
+        for (size_t i = 0; i < num_jobs; ++i) {
+            // Each customer should appear in its own elementarity set
+            size_t num_segments = (num_jobs + 63) / 64;
+            elementarity_bitmap[i].resize(num_segments, 0);
+
+            // Mark the job itself in the elementarity set
+            size_t segment_self      = i >> 6;
+            size_t bit_position_self = i & 63;
+            elementarity_bitmap[i][segment_self] |= (1ULL << bit_position_self);
+        }
+    }
+
+    void define_packing_sets() {
+        size_t num_jobs = jobs.size();
+
+        // Initialize packing sets
+        packing_bitmap.resize(num_jobs); // Bitmap for packing sets
+
+        for (size_t i = 0; i < num_jobs; ++i) {
+            // Each customer should appear in its own packing set
+            size_t num_segments = (num_jobs + 63) / 64;
+            packing_bitmap[i].resize(num_segments, 0);
+
+            // Mark the job itself in the packing set
+            size_t segment_self      = i >> 6;
+            size_t bit_position_self = i & 63;
+            packing_bitmap[i][segment_self] |= (1ULL << bit_position_self);
+        }
+    }
 
     double min_red_cost = std::numeric_limits<double>::infinity();
     bool   first_reset  = true;

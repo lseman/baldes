@@ -29,6 +29,7 @@
 #include "cuts/SRC.h"
 
 #include "Definitions.h"
+#include <stdexec/execution.hpp>
 
 #include <bitset>
 #include <cstddef>

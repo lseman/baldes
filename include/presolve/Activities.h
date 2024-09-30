@@ -128,7 +128,7 @@ public:
         size_t rows = A.rows();
         activities.resize(rows); // Resize once for all rows
 
-        std::for_each(std::execution::par, activities.begin(), activities.end(), [&](RowActivity &activity) {
+        std::for_each(activities.begin(), activities.end(), [&](RowActivity &activity) {
             size_t i = &activity - &activities[0]; // Calculate row index
             for (Eigen::SparseMatrix<double>::InnerIterator it(A, i); it; ++it) {
                 double coef = it.value();
@@ -235,7 +235,7 @@ public:
     }
 
     void bboundTightening() {
-        std::for_each(std::execution::par, rowInfoVector.begin(), rowInfoVector.end(), [&](const RowInfo &rowInfo) {
+        std::for_each(rowInfoVector.begin(), rowInfoVector.end(), [&](const RowInfo &rowInfo) {
             size_t                 i         = &rowInfo - &rowInfoVector[0]; // Get row index
             const Eigen::VectorXd &rowCoeffs = A.row(i);
             double                 alphaMax = 0.0, alphaMin = 0.0;
@@ -256,7 +256,7 @@ public:
     void findKnapSackRows() {
         std::mutex knapsack_mutex;
 
-        std::for_each(std::execution::par, rowInfoVector.begin(), rowInfoVector.end(), [&](const RowInfo &rowInfo) {
+        std::for_each(rowInfoVector.begin(), rowInfoVector.end(), [&](const RowInfo &rowInfo) {
             if (rowInfo.rowFlag[static_cast<int>(RowInfo::RowFlag::kLhsInf)] &&
                 !rowInfo.rowFlag[static_cast<int>(RowInfo::RowFlag::kRhsInf)]) {
                 size_t rowIndex  = &rowInfo - &rowInfoVector[0];
