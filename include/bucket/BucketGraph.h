@@ -112,8 +112,8 @@ public:
     SchrodingerPool sPool = SchrodingerPool(200);
 #endif
 
-    std::unordered_map<int, BucketIntervalTree> fw_interval_trees;
-    std::unordered_map<int, BucketIntervalTree> bw_interval_trees;
+    //std::unordered_map<int, BucketIntervalTree> fw_interval_trees;
+    //std::unordered_map<int, BucketIntervalTree> bw_interval_trees;
 
     inline bool is_within_bounds(const BucketRange &new_range, const BucketRange &fixed_range) {
         return (new_range.lower_bound >= fixed_range.lower_bound && new_range.upper_bound <= fixed_range.upper_bound);
@@ -362,12 +362,13 @@ public:
     std::unordered_map<int, SplayTree> bw_job_interval_trees;
 
     template <Direction D>
-    void rebuild_buckets() {
+    std::unordered_map<int, BucketIntervalTree> rebuild_buckets() {
         // References to the forward or backward fixed buckets and ranges
         auto &fixed_buckets = assign_buckets<D>(fw_fixed_buckets, bw_fixed_buckets);
         auto &buckets       = assign_buckets<D>(fw_buckets, bw_buckets);
-        auto &interval_tree = assign_buckets<D>(fw_interval_trees, bw_interval_trees);
-        interval_tree.clear();
+        //auto &interval_tree = assign_buckets<D>(fw_interval_trees, bw_interval_trees);
+        std::unordered_map<int, BucketIntervalTree> interval_tree;
+        //interval_tree.clear();
 
         // Iterate over all fixed arcs (fixed_buckets[from][to])
         for (int from_bucket = 0; from_bucket < fw_buckets_size; ++from_bucket) {
@@ -391,10 +392,13 @@ public:
             }
         }
         // print trees, iterate over interval_tree and plot each
+        /*
         for (auto &tree : interval_tree) {
             fmt::print("Tree for job: {}\n", tree.first);
             tree.second.print();
         }
+        */
+        return interval_tree;
     }
 
 #ifdef SCHRODINGER
@@ -546,6 +550,9 @@ public:
         intervals.clear();
         for (int i = 0; i < R_SIZE; ++i) { intervals.push_back(Interval(bucketInterval, 0)); }
 
+        auto fw_save_rebuild = rebuild_buckets<Direction::Forward>();
+        auto bw_save_rebuild = rebuild_buckets<Direction::Backward>();
+
         reset_fixed();
         reset_fixed_buckets();
 
@@ -688,11 +695,11 @@ public:
         auto step_calc = mean_dominance_checks / non_dominated_labels_per_bucket;
         if (step_calc > 1000) {
 
-            redefine_counter = 0;
+            //redefine_counter = 0;
             print_info("Increasing bucket interval to {}\n", bucket_interval * 2);
             redefine(bucket_interval * 2);
             // fmt::print("New step size bucket_interval: {}\n", bucket_interval);
-            reset_fixed_buckets();
+            // reset_fixed_buckets();
             fixed   = true;
             updated = true;
             // redefine_counter++;
@@ -719,7 +726,7 @@ public:
                           const std::vector<std::vector<int>> &sccs);
 
     template <Direction D>
-    void define_buckets();
+    void define_buckets(bool rebuild = false);
 
     template <Direction D, Stage S>
     bool DominatedInCompWiseSmallerBuckets(const Label *L, int bucket, const std::vector<double> &c_bar,
