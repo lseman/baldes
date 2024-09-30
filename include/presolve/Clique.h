@@ -1,11 +1,15 @@
 #pragma once
 
 #include "Definitions.h"
+
+#include <exec/static_thread_pool.hpp>
+#include <stdexec/execution.hpp>
+
 #include <algorithm>
 #include <execution>
-#include <jemalloc/jemalloc.h> // jemalloc for efficient memory management
 #include <mutex>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 // define enum CoinBronKerbosch
@@ -35,31 +39,6 @@ public:
         : modelData(mData), maxCallsBK(1000), minFrac(0.001), minViol(0.02), BKCLQ_MULTIPLIER(1000.0), BKCLQ_EPS(1e-6),
           cap_(0), pivotingStrategy(CoinBronKerbosch::PivotingStrategy::Weight), vertexWeight_(nullptr), rc_(nullptr) {
         preallocateMemory(modelData.b.size());
-    }
-
-    // Memory management using jemalloc
-    static void *jemalloc_alloc(size_t size) {
-        void *ptr = je_malloc(size);
-        if (!ptr) {
-            fprintf(stderr, "jemalloc failed to allocate %zu bytes.\n", size);
-            abort();
-        }
-        return ptr;
-    }
-
-    static void jemalloc_free(void *ptr) { je_free(ptr); }
-
-    // Dynamically check memory capacity and reallocate if necessary
-    void checkMemory(size_t newNumCols) {
-        if (cap_ < newNumCols) {
-            if (cap_ > 0) {
-                jemalloc_free(vertexWeight_);
-                jemalloc_free(rc_);
-            }
-            vertexWeight_ = (double *)jemalloc_alloc(sizeof(double) * newNumCols * 2);
-            rc_           = (double *)jemalloc_alloc(sizeof(double) * newNumCols * 2);
-            cap_          = newNumCols;
-        }
     }
 
     void addClique(const std::vector<int> &clique) {
@@ -127,18 +106,12 @@ public:
                                   }
                               }
                           });
-
+        exec::static_thread_pool pool(std::thread::hardware_concurrency());
+        auto                     sched = pool.get_scheduler();
         // Submit work to the scheduler for parallel execution
         auto work = stdexec::starts_on(sched, bulk_sender);
         stdexec::sync_wait(std::move(work));
     }
-
-#include <algorithm>
-#include <execution>
-#include <mutex>
-#include <stdexec/execution.hpp>
-#include <tuple>
-#include <vector>
 
     void findCliques() {
         cliques.clear(); // Clear previous cliques
@@ -204,9 +177,17 @@ public:
                               }
                           });
 
+        exec::static_thread_pool pool(std::thread::hardware_concurrency());
+        auto                     sched = pool.get_scheduler();
         // Submit work to the scheduler for parallel execution
         auto work = stdexec::starts_on(sched, bulk_sender);
         stdexec::sync_wait(std::move(work));
+    }
+
+    void initCg(int binary_number) {
+        // Ensure that the conflict graph has the appropriate size based on the number of binary variables
+        conflictGraph.clear(); // Clear any existing graph
+        conflictGraph.resize(binary_number, std::vector<bool>(binary_number, false));
     }
 
     int findFirstClique(const std::vector<std::pair<double, int>> &binCoeffs, double rhs) {
@@ -292,6 +273,16 @@ public:
         }
     }
 
+    void printCg(std::map<int, std::string> varIndex2Name) {
+        for (size_t i = 0; i < conflictGraph.size(); ++i) {
+            fmt::print("Variable {} conflicts with: ", varIndex2Name[i]);
+            for (size_t j = 0; j < conflictGraph[i].size(); ++j) {
+                if (conflictGraph[i][j]) { fmt::print("{} ", varIndex2Name[j]); }
+            }
+            fmt::print("\n");
+        }
+    }
+
     void extendCliques(const std::vector<std::vector<int>> &initialCliques, std::vector<std::vector<int>> &extCliques) {
         // Iterate over each initial clique and attempt to extend it
         for (const auto &clique : initialCliques) {
@@ -337,4 +328,6 @@ public:
             }
         }
     }
+
+    auto getCliques() const -> const std::vector<std::vector<int>> & { return cliques; }
 };

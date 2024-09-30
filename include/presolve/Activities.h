@@ -1,12 +1,53 @@
 #pragma once
 
 #include "Definitions.h"
-#include <Eigen/Dense>
-#include <Eigen/Sparse>
+#include <algorithm>
 #include <bitset>
 #include <execution>
+#include <iostream>
+#include <limits>
+#include <map>
 #include <mutex>
+#include <tuple>
 #include <vector>
+
+// Custom Sparse Matrix structure
+struct SparseMatrix {
+    std::vector<int>    row_indices;
+    std::vector<int>    col_indices;
+    std::vector<double> values;
+    int                 num_rows;
+    int                 num_cols;
+
+    struct RowIterator {
+        const SparseMatrix &matrix;
+        int                 row;
+        size_t              index;
+
+        RowIterator(const SparseMatrix &matrix, int row) : matrix(matrix), row(row), index(0) {
+            while (index < matrix.row_indices.size() && matrix.row_indices[index] != row) { ++index; }
+        }
+
+        bool valid() const { return index < matrix.row_indices.size() && matrix.row_indices[index] == row; }
+
+        void next() {
+            ++index;
+            while (index < matrix.row_indices.size() && matrix.row_indices[index] != row) { ++index; }
+        }
+
+        double value() const { return matrix.values[index]; }
+        int    col() const { return matrix.col_indices[index]; }
+    };
+
+    RowIterator rowIterator(int row) const { return RowIterator(*this, row); }
+
+    void transpose() {
+        // Implement transposing logic if needed
+    }
+};
+
+// Custom dense vector replacement
+using DenseVector = std::vector<double>;
 
 struct RowActivity {
     double min     = 0.0;
@@ -17,12 +58,6 @@ struct RowActivity {
 
 enum class BoundChange { kLower, kUpper };
 
-/**
- * @struct RowInfo
- * @brief Stores information about a row in a matrix, including flags for
- *        infinite bounds, left-hand side (LHS) and right-hand side (RHS) values,
- *        and a scaling factor.
- */
 struct RowInfo {
     enum class RowFlag {
         kLhsInf, // Indicates LHS is -inf
@@ -30,21 +65,14 @@ struct RowInfo {
     };
 
     std::bitset<2> rowFlag; // Efficiently store boolean flags
+    double         lhs;
+    double         rhs;
+    double         scale = 1.0;
 
-    // Constructor
     RowInfo(std::bitset<2> flag, double lhs, double rhs, double scale = 1.0)
         : rowFlag(flag), lhs(lhs), rhs(rhs), scale(scale) {}
-
-    double lhs;
-    double rhs;
-    double scale = 1.0;
 };
 
-/**
- * @struct PresolveResult
- * @brief A structure to store the results of the presolve process.
- *
- */
 struct PresolveResult {
     std::map<int, std::tuple<int, double, int>> fixCol;
     std::map<int, std::tuple<int, double, int>> changeColLB;
@@ -59,15 +87,6 @@ struct PresolveResult {
     }
 };
 
-/**
- * @struct NumericUtils
- * @brief A utility structure for numeric operations and constants.
- *
- * This structure provides a set of constants and utility functions for
- * numerical operations, particularly useful in optimization and solver
- * contexts.
- *
- */
 struct NumericUtils {
     static constexpr double hugeval                 = 1e8;
     static constexpr double feastol                 = 1e-6;
@@ -83,17 +102,10 @@ struct NumericUtils {
 
     template <typename R1, typename R2>
     static bool isFeasGE(const R1 &a, const R2 &b) {
-        return a - b >= -feastol;
+        return a - b >= -NumericUtils::feastol;
     }
 };
 
-/**
- * @class Preprocessor
- * @brief A class for preprocessing optimization model data.
- *
- * The Preprocessor class is responsible for converting input model data into a format suitable for optimization,
- * calculating row activities, processing row information, converting constraints, and identifying knapsack rows.
- */
 class Preprocessor {
 public:
     std::vector<double>      lhs_values;
@@ -101,11 +113,11 @@ public:
     std::vector<RowInfo>     rowInfoVector;
     std::vector<RowActivity> activities;
 
-    Eigen::SparseMatrix<double> A;
-    Eigen::VectorXd             b;
-    Eigen::VectorXd             c;
-    Eigen::VectorXd             ub;
-    Eigen::VectorXd             lb;
+    SparseMatrix A; // Custom sparse matrix
+    DenseVector  b;
+    DenseVector  c;
+    DenseVector  ub;
+    DenseVector  lb;
 
     std::vector<char> sense;
     std::vector<char> vtype;
@@ -114,23 +126,22 @@ public:
 
     // Constructor initializes the class by converting the input ModelData
     Preprocessor(ModelData &modelData) {
-        A     = convertToEigenSparseMatrix(modelData.A_sparse);
-        b     = Eigen::Map<Eigen::VectorXd>(modelData.b.data(), modelData.b.size());
-        c     = Eigen::Map<Eigen::VectorXd>(modelData.c.data(), modelData.c.size());
-        ub    = Eigen::Map<Eigen::VectorXd>(modelData.ub.data(), modelData.ub.size());
-        lb    = Eigen::Map<Eigen::VectorXd>(modelData.lb.data(), modelData.lb.size());
+        A     = convertToSparseMatrix(modelData.A_sparse);
+        b     = modelData.b;
+        c     = modelData.c;
+        ub    = modelData.ub;
+        lb    = modelData.lb;
         sense = modelData.sense;
         vtype = modelData.vtype;
     }
 
-    // Optimized row activity calculation
     void calculateRowActivities() {
-        size_t rows = A.rows();
-        activities.resize(rows); // Resize once for all rows
+        size_t rows = A.num_rows;
+        activities.resize(rows);
 
         std::for_each(activities.begin(), activities.end(), [&](RowActivity &activity) {
-            size_t i = &activity - &activities[0]; // Calculate row index
-            for (Eigen::SparseMatrix<double>::InnerIterator it(A, i); it; ++it) {
+            size_t i = &activity - &activities[0];
+            for (SparseMatrix::RowIterator it = A.rowIterator(i); it.valid(); it.next()) {
                 double coef = it.value();
                 int    j    = it.col();
 
@@ -165,17 +176,17 @@ public:
         auto processBound = [&](char sense, double value) {
             switch (sense) {
             case '<':
-                rowInfoVector.emplace_back(std::bitset<2>(std::string("01")), -NumericUtils::infty, value);
+                rowInfoVector.emplace_back(std::bitset<2>("01"), -NumericUtils::infty, value);
                 lhs_values.push_back(-NumericUtils::infty);
                 rhs_values.push_back(value);
                 break;
             case '>':
-                rowInfoVector.emplace_back(std::bitset<2>(std::string("10")), value, NumericUtils::infty);
+                rowInfoVector.emplace_back(std::bitset<2>("10"), value, NumericUtils::infty);
                 lhs_values.push_back(value);
                 rhs_values.push_back(NumericUtils::infty);
                 break;
             case '=':
-                rowInfoVector.emplace_back(std::bitset<2>(std::string("00")), value, value);
+                rowInfoVector.emplace_back(std::bitset<2>("00"), value, value);
                 lhs_values.push_back(value);
                 rhs_values.push_back(value);
                 break;
@@ -189,71 +200,78 @@ public:
 
     // Convert inequality constraints to less-than-or-equal-to form
     void convert2LE() {
-        for (int i = 0; i < A.rows(); ++i) {
+        for (int i = 0; i < A.num_rows; ++i) {
             if (sense[i] == '>') {
                 lhs_values[i] = -NumericUtils::infty;
                 rhs_values[i] = -lhs_values[i];
                 sense[i]      = '<';
-                A.row(i) *= -1; // Flip the row's sign to convert '>' to '<'
+
+                for (SparseMatrix::RowIterator it = A.rowIterator(i); it.valid(); it.next()) {
+                    A.values[it.index] *= -1; // Flip the row's sign to convert '>' to '<'
+                }
             }
         }
     }
 
     // Convert a row to a knapsack form
     void convert2Knapsack(int row) {
-        fmt::print("Converting row {} to knapsack\n", row);
-        Eigen::VectorXd     rowCoeffs = A.row(row);
-        std::vector<double> binCoeffs;
+        std::cout << "Converting row " << row << " to knapsack\n";
+        SparseMatrix::RowIterator rowIter = A.rowIterator(row);
+        std::vector<double>       binCoeffs;
 
         if (sense[row] != '<') {
             return; // Only convert if the constraint is less-than-or-equal-to
         }
 
-        fmt::print("Row {} has rhs {}\n", row, rhs_values[row]);
+        std::cout << "Row " << row << " has rhs " << rhs_values[row] << "\n";
 
-        for (int j = 0; j < A.cols(); ++j) {
+        for (; rowIter.valid(); rowIter.next()) {
+            int    j     = rowIter.col();
+            double coeff = rowIter.value();
+
             if (vtype[j] != 'B') {
                 // Move non-binary variables to the RHS
-                if (rowCoeffs[j] < 0 && lb[j] != -NumericUtils::infty) {
-                    rhs_values[row] -= rowCoeffs[j] * lb[j];
+                if (coeff < 0 && lb[j] != -NumericUtils::infty) {
+                    rhs_values[row] -= coeff * lb[j];
                 } else if (ub[j] != NumericUtils::infty) {
-                    rhs_values[row] -= rowCoeffs[j] * ub[j];
+                    rhs_values[row] -= coeff * ub[j];
                 }
             } else {
                 // Handle binary variables
-                if (rowCoeffs[j] > 0) {
-                    binCoeffs.push_back(rowCoeffs[j]);
+                if (coeff > 0) {
+                    binCoeffs.push_back(coeff);
                 } else {
-                    A.row(row) *= -1;
-                    rhs_values[row] -= rowCoeffs[j];
-                    binCoeffs.push_back(-rowCoeffs[j]);
+                    rhs_values[row] -= coeff;
+                    binCoeffs.push_back(-coeff);
                 }
             }
         }
 
-        fmt::print("Row {} has new rhs {}\n", row, rhs_values[row]);
+        std::cout << "Row " << row << " has new rhs " << rhs_values[row] << "\n";
     }
 
-    void bboundTightening() {
+    void boundTightening() {
         std::for_each(rowInfoVector.begin(), rowInfoVector.end(), [&](const RowInfo &rowInfo) {
-            size_t                 i         = &rowInfo - &rowInfoVector[0]; // Get row index
-            const Eigen::VectorXd &rowCoeffs = A.row(i);
-            double                 alphaMax = 0.0, alphaMin = 0.0;
+            size_t                    i        = &rowInfo - &rowInfoVector[0]; // Get row index
+            SparseMatrix::RowIterator rowIter  = A.rowIterator(i);
+            double                    alphaMax = 0.0, alphaMin = 0.0;
 
             // Calculate min/max activities
-            for (int j = 0; j < rowCoeffs.size(); ++j) {
-                double coeff = rowCoeffs[j];
+            for (; rowIter.valid(); rowIter.next()) {
+                double coeff = rowIter.value();
+                int    j     = rowIter.col();
                 alphaMin += coeff > 0 ? coeff * lb[j] : coeff * ub[j];
                 alphaMax += coeff > 0 ? coeff * ub[j] : coeff * lb[j];
             }
 
             if (lhs_values[i] > alphaMax || alphaMin > rhs_values[i]) {
-                fmt::print("Constraint {} is infeasible.\n", i);
+                std::cout << "Constraint " << i << " is infeasible.\n";
             }
         });
     }
 
-    void findKnapSackRows() {
+    // The method you requested to include:
+    void findKnapsackRows() {
         std::mutex knapsack_mutex;
 
         std::for_each(rowInfoVector.begin(), rowInfoVector.end(), [&](const RowInfo &rowInfo) {
@@ -262,7 +280,7 @@ public:
                 size_t rowIndex  = &rowInfo - &rowInfoVector[0];
                 int    nbinaries = 0;
 
-                for (Eigen::SparseMatrix<double>::InnerIterator it(A, rowIndex); it; ++it) {
+                for (SparseMatrix::RowIterator it = A.rowIterator(rowIndex); it.valid(); it.next()) {
                     if (vtype[it.col()] == 'B') ++nbinaries;
                 }
 
@@ -272,35 +290,26 @@ public:
                 }
             }
         });
-        fmt::print("Number of knapsack rows: {}\n", knapsackRows.size());
+        std::cout << "Number of knapsack rows: " << knapsackRows.size() << "\n";
     }
 
-    // Conversion and helper functions
-    Eigen::SparseMatrix<double> convertToEigenSparseMatrix(const SparseModel &sparseModel) {
-        Eigen::SparseMatrix<double>         eigenSparseMatrix(sparseModel.num_rows, sparseModel.num_cols);
-        std::vector<Eigen::Triplet<double>> triplets;
-        triplets.reserve(sparseModel.values.size());
-
-        for (size_t i = 0; i < sparseModel.values.size(); ++i) {
-            triplets.emplace_back(sparseModel.row_indices[i], sparseModel.col_indices[i], sparseModel.values[i]);
-        }
-
-        eigenSparseMatrix.setFromTriplets(triplets.begin(), triplets.end());
-        return eigenSparseMatrix;
+    SparseMatrix convertToSparseMatrix(const SparseModel &sparseModel) {
+        SparseMatrix sparseMatrix;
+        sparseMatrix.num_rows    = sparseModel.num_rows;
+        sparseMatrix.num_cols    = sparseModel.num_cols;
+        sparseMatrix.row_indices = sparseModel.row_indices;
+        sparseMatrix.col_indices = sparseModel.col_indices;
+        sparseMatrix.values      = sparseModel.values;
+        return sparseMatrix;
     }
 
-    SparseModel convertToSparseModel(const Eigen::SparseMatrix<double> &eigenSparseMatrix) {
+    SparseModel convertToSparseModel(const SparseMatrix &sparseMatrix) {
         SparseModel sparseModel;
-        sparseModel.num_rows = eigenSparseMatrix.rows();
-        sparseModel.num_cols = eigenSparseMatrix.cols();
-
-        for (int k = 0; k < eigenSparseMatrix.outerSize(); ++k) {
-            for (Eigen::SparseMatrix<double>::InnerIterator it(eigenSparseMatrix, k); it; ++it) {
-                sparseModel.row_indices.push_back(it.row());
-                sparseModel.col_indices.push_back(it.col());
-                sparseModel.values.push_back(it.value());
-            }
-        }
+        sparseModel.num_rows    = sparseMatrix.num_rows;
+        sparseModel.num_cols    = sparseMatrix.num_cols;
+        sparseModel.row_indices = sparseMatrix.row_indices;
+        sparseModel.col_indices = sparseMatrix.col_indices;
+        sparseModel.values      = sparseMatrix.values;
         return sparseModel;
     }
 
@@ -310,9 +319,9 @@ public:
 
         for (int i = 0; i < sense.size(); ++i) { data.b.push_back(sense[i] == '<' ? rhs_values[i] : lhs_values[i]); }
 
-        data.c     = std::vector<double>(c.data(), c.data() + c.size());
-        data.ub    = std::vector<double>(ub.data(), ub.data() + ub.size());
-        data.lb    = std::vector<double>(lb.data(), lb.data() + lb.size());
+        data.c     = c;
+        data.ub    = ub;
+        data.lb    = lb;
         data.sense = sense;
         data.vtype = vtype;
         return data;

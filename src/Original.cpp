@@ -1,8 +1,8 @@
-#include "presolve/Activities.h"
-#include "presolve/Clique.h"
 #include "Definitions.h"
 #include "Reader.h"
 #include "gurobi_c++.h"
+#include "presolve/Activities.h"
+#include "presolve/Clique.h"
 
 GRBModel solve_vrp(const InstanceData &instance) {
     GRBEnv env = GRBEnv(true);
@@ -12,7 +12,7 @@ GRBModel solve_vrp(const InstanceData &instance) {
     GRBModel model = GRBModel(env);
 
     int num_customers = instance.nC;
-    int num_vehicles  = instance.nV;
+    int num_vehicles  = 1; // instance.nV;
     int depot         = 0; // Assume depot is node 0
 
     // Decision variables
@@ -135,7 +135,7 @@ int main(int argc, char *argv[]) {
 
     preprocessor.processRowInformation();
     print_info("Finding knapsack rows\n");
-    preprocessor.findKnapSackRows();
+    preprocessor.findKnapsackRows();
     print_info("Converting to LE\n");
     preprocessor.convert2LE();
     print_info("Converting to knapsack\n");
@@ -144,8 +144,22 @@ int main(int argc, char *argv[]) {
         print_info("Constraint: {}\n", i);
         preprocessor.convert2Knapsack(i);
     }
+
+    // create map with variable index and name
+    std::map<int, std::string> varIndex2Name;
+    GRBVar                    *vars    = model.getVars();
+    int                        numVars = model.get(GRB_IntAttr_NumVars);
+    for (int i = 0; i < numVars; ++i) { varIndex2Name[vars[i].index()] = vars[i].get(GRB_StringAttr_VarName); }
+
     auto          convertedModel = preprocessor.getModelData();
     CliqueManager cm(convertedModel);
+
     cm.findCliques();
-    cm.printCliques();
+    // cm.printCliques();
+
+    auto cliques = cm.getCliques();
+    // Build the conflict graph
+    auto binary_number = (N_SIZE - 1) * (N_SIZE - 1);
+    cm.buildUpdateCg(cliques, binary_number);
+    // cm.printCg(varIndex2Name);
 };

@@ -55,6 +55,7 @@ Some features are experimental and subject to ongoing improvements:
 - C++23 compliant compiler (tested with GCC 14.* and Clang 19.*)
 - [NVIDIA/stdexec](https://github.com/NVIDIA/stdexec) for parallel tasks
 - [fmt](https://github.com/fmtlib/fmt) for console output formatting
+- [jemalloc](https://jemalloc.net/) for better memory allocation
 
 *Optional*
 - [pybind11](https://github.com/pybind/pybind11) for optional python wrapper
@@ -93,6 +94,7 @@ Make sure the `GUROBI_HOME` environment variable is set.
 | `SCHRODINGER`           | Enable schrodinger pool                | OFF     |
 | `PSTEP`                 | Enable PStep compilation               | OFF     |
 | `FIXED_BUCKETS`         | Enable bucket arc fixing               | ON      |
+| `JEMALLOC`              | Enable jemalloc                        | ON     |
 
 **Numerical and Other Definitions**
 

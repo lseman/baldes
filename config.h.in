@@ -30,6 +30,7 @@
 #cmakedefine MTW
 #cmakedefine PSTEP
 #cmakedefine SCHRODINGER
+#cmakedefine JEMALLOC
 
 // Define constants for resource sizes
 #define R_SIZE @R_SIZE@
