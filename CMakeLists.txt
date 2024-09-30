@@ -336,7 +336,7 @@ endif()
 find_library(JEMALLOC_LIBRARY jemalloc)
 if(JEMALLOC_LIBRARY)
   message(STATUS "jemalloc found: ${JEMALLOC_LIBRARY}")
-  target_link_libraries(vrptw PRIVATE jemalloc)
+  target_link_libraries(vrptw PRIVATE ${JEMALLOC_LIBRARY})
 else()
   message(STATUS "jemalloc not found")
 endif()
@@ -358,8 +358,28 @@ if(CLIQUER)
   add_executable(cliquer src/Original.cpp src/BucketGraph.cpp)
   target_link_libraries(cliquer PRIVATE STDEXEC::stdexec)
   target_link_libraries(cliquer PRIVATE fmt::fmt)
+
+  find_library(JEMALLOC_LIBRARY jemalloc)
+  if(JEMALLOC_LIBRARY)
+    message(STATUS "jemalloc found: ${JEMALLOC_LIBRARY}")
+    target_link_libraries(cliquer PRIVATE ${JEMALLOC_LIBRARY})
+  else()
+    message(STATUS "jemalloc not found")
+  endif()
+
+  if(APPLE)
+  # macOS detected, use .dylib for linking
   target_link_libraries(
     cliquer PRIVATE ${GUROBI_HOME}/lib/libgurobi_c++.a
-                    ${GUROBI_HOME}/lib/libgurobi${GUROBI_VERSION_MAJOR}.so tbb)
+                    ${GUROBI_HOME}/lib/libgurobi100.dylib
+                    )
+else()
+  # Non-macOS (Linux or other platforms), use .so and .a files
+  target_link_libraries(
+    cliquer PRIVATE ${GUROBI_HOME}/lib/libgurobi_c++.a
+                    ${GUROBI_HOME}/lib/libgurobi${GUROBI_VERSION_MAJOR}.so
+                    )
+endif()
+
   target_link_libraries(cliquer PRIVATE Eigen3::Eigen)
 endif()
