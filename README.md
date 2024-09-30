@@ -38,7 +38,7 @@ The Bucket Graph-based labeling algorithm organizes labels into **buckets** base
 - **Parallel Bi-Directional Labeling:** Supports forward and backward search strategies.
 - **Dominance Rules:** Efficient dominance checks using resource-based comparisons and integration of additional criteria from Limited-Memory Subset Row Cuts (SRCs) for enhanced speed.
 - **Multi-phase solving:** Out-of-the-box multi-phase solving that begins with heuristics and dynamically guides the algorithm towards an exact solution.
-- **Good initial solutions** Utilizes the state-of-the-art HGS-VRPTW algorithm to generate high-quality initial bounds and routes, an extension of the HGS-CVRP method employed by the ORTEC team to win the VRPTW track at the DIMACS Implementation Challenge. We also enchanced the HGS-VRPTW with the concepts proposed in [MDM-HGS-CVRP](https://github.com/marcelorhmaia/MDM-HGS-CVRP/).
+- **Good initial solutions** Utilizes the state-of-the-art HGS-VRPTW algorithm to generate high-quality initial bounds and routes, an extension of the HGS-CVRP method employed by the ORTEC team to win the VRPTW track at the DIMACS Implementation Challenge. We also enchanced the HGS-VRPTW with the concepts proposed in [MDM-HGS-CVRP](https://github.com/marcelorhmaia/MDM-HGS-CVRP/), resulting in what we call the **MDM-HGS-VRPTW**.
 - **Improvement Heuristics:** Optional fast improvement heuristics are applied at the end of each labeling phase to enhance label quality.
 
 ## ⚠️ Disclaimer
@@ -55,7 +55,6 @@ Some features are experimental and subject to ongoing improvements:
 - C++23 compliant compiler (tested with GCC 14.* and Clang 19.*)
 - [NVIDIA/stdexec](https://github.com/NVIDIA/stdexec) for parallel tasks
 - [fmt](https://github.com/fmtlib/fmt) for console output formatting
-- [TBB](https://github.com/oneapi-src/oneTBB) for concurrent maps
 
 *Optional*
 - [pybind11](https://github.com/pybind/pybind11) for optional python wrapper
