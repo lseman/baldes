@@ -30,14 +30,13 @@ private:
     double     BKCLQ_MULTIPLIER;    // Multiplier for scaling
     double     BKCLQ_EPS;           // Small tolerance for numerical stability
     size_t     cap_;                // Capacity for clique storage (dynamic resizing)
-    CoinBronKerbosch::PivotingStrategy pivotingStrategy; // Pivoting strategy for clique detection
-    double                            *vertexWeight_;    // Vertex weights for cliques
-    double                            *rc_;              // Reduced costs of variables
+    double    *vertexWeight_;       // Vertex weights for cliques
+    double    *rc_;                 // Reduced costs of variables
 
 public:
     explicit CliqueManager(const ModelData &mData)
         : modelData(mData), maxCallsBK(1000), minFrac(0.001), minViol(0.02), BKCLQ_MULTIPLIER(1000.0), BKCLQ_EPS(1e-6),
-          cap_(0), pivotingStrategy(CoinBronKerbosch::PivotingStrategy::Weight), vertexWeight_(nullptr), rc_(nullptr) {
+          cap_(0), vertexWeight_(nullptr), rc_(nullptr) {
         preallocateMemory(modelData.b.size());
     }
 
@@ -60,9 +59,6 @@ public:
 
     // Set the maximum number of recursive calls in Bron-Kerbosch algorithm
     void setMaxCallsBK(size_t maxCallsBK) { this->maxCallsBK = maxCallsBK; }
-
-    // Set pivoting strategy for clique detection
-    void setPivotingStrategy(const CoinBronKerbosch::PivotingStrategy strategy) { this->pivotingStrategy = strategy; }
 
     // Build and update the conflict graph using binary variables
     void buildUpdateCg(const std::vector<std::vector<int>> &set, int binary_number) {
@@ -117,11 +113,11 @@ public:
         cliques.clear(); // Clear previous cliques
         std::unordered_map<int, std::vector<std::pair<double, int>>> rowToElements;
 
-        // Populate rowToElements for efficient row-wise access
-        for (size_t nz_idx = 0; nz_idx < modelData.A_sparse.row_indices.size(); ++nz_idx) {
-            int    row   = modelData.A_sparse.row_indices[nz_idx];
-            int    col   = modelData.A_sparse.col_indices[nz_idx];
-            double coeff = modelData.A_sparse.values[nz_idx];
+        // Populate rowToElements for efficient row-wise access from SparseMatrix elements
+        for (const auto &elem : modelData.A_sparse.elements) {
+            int    row   = elem.row;
+            int    col   = elem.col;
+            double coeff = elem.value;
 
             rowToElements[row].emplace_back(coeff, col);
         }

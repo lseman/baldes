@@ -390,12 +390,6 @@ void BucketGraph::calculate_neighborhoods(size_t num_closest) {
  * BucketGraph. The function prioritizes smaller cycles and limits the number of forbidden cycles based on the
  * given parameters.
  *
- * @param solution The solution vector.
- * @param A The SparseModel.
- * @param aggressive Flag indicating whether to use aggressive augmentation.
- * @param eta1 The threshold for cycle size to be forbidden.
- * @param eta2 The maximum number of cycles to be forbidden.
- * @param eta_max The maximum size of neighborhoods involved in the cycle.
  */
 void BucketGraph::augment_ng_memories(std::vector<double> &solution, std::vector<Path> &paths, bool aggressive,
                                       int eta1, int eta2, int eta_max, int nC) {
