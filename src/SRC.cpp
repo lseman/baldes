@@ -114,11 +114,11 @@ LimitedMemoryRank1Cuts::LimitedMemoryRank1Cuts(std::vector<VRPJob> &jobs) : jobs
  * that exceed the specified threshold.
  *
  */
-std::vector<std::vector<double>> LimitedMemoryRank1Cuts::separate(const SparseModel &A, const std::vector<double> &x) {
+std::vector<std::vector<double>> LimitedMemoryRank1Cuts::separate(const SparseMatrix &A, const std::vector<double> &x) {
     // Create a map for non-zero entries by rows
     std::vector<std::vector<int>> row_indices_map(A.num_rows + 1);
-    for (int idx = 0; idx < A.row_indices.size(); ++idx) {
-        int row = A.row_indices[idx];
+    for (int idx = 0; idx < A.elements.size(); ++idx) {
+        int row = A.elements[idx].row;
         row_indices_map[row + 1].push_back(idx);
     }
 
@@ -165,9 +165,9 @@ std::vector<std::vector<double>> LimitedMemoryRank1Cuts::separate(const SparseMo
                 double           lhs          = 0.0;
 
                 // Combine the three updates into one loop for efficiency
-                for (int idx : row_indices_map[i]) expanded[A.col_indices[idx]] += 1;
-                for (int idx : row_indices_map[j]) expanded[A.col_indices[idx]] += 1;
-                for (int idx : row_indices_map[k]) expanded[A.col_indices[idx]] += 1;
+                for (int idx : row_indices_map[i]) expanded[A.elements[idx].col] += 1;
+                for (int idx : row_indices_map[j]) expanded[A.elements[idx].col] += 1;
+                for (int idx : row_indices_map[k]) expanded[A.elements[idx].col] += 1;
 
                 // Accumulate LHS cut values
                 for (int idx = 0; idx < A.num_cols; ++idx) {
@@ -242,39 +242,6 @@ void LimitedMemoryRank1Cuts::insertSet(VRPTW_SRC &cuts, int i, int j, int k, con
 }
 
 /**
- * @brief Finds routes that visit the specified nodes in a sparse model.
- *
- * This function processes a sparse model represented by the SparseModel structure
- * and identifies routes that visit the nodes specified in the selectedNodes vector.
- * Each route is represented as a vector of integers, where each integer corresponds
- * to a node index.
- *
- */
-inline std::vector<std::vector<int>> findRoutesVisitingNodes(const SparseModel      &A,
-                                                             const std::vector<int> &selectedNodes) {
-    std::vector<std::vector<int>> routes;
-    std::unordered_set<int>       selectedNodeSet(selectedNodes.begin(), selectedNodes.end());
-
-    // Reserve space for routes to prevent multiple allocations
-    routes.reserve(selectedNodes.size());
-
-    // Preprocess the selected columns
-    std::vector<std::vector<int>> col_to_rows(A.num_cols);
-    for (int j = 0; j < A.row_indices.size(); ++j) {
-        if (A.values[j] == 1 && A.row_indices[j] <= N_SIZE - 1) {
-            col_to_rows[A.col_indices[j]].push_back(A.row_indices[j]);
-        }
-    }
-
-    // Filter only the selected nodes
-    for (int col : selectedNodes) {
-        if (!col_to_rows[col].empty()) { routes.push_back(std::move(col_to_rows[col])); }
-    }
-
-    return routes;
-}
-
-/**
  * @brief Generates cut coefficients for the given VRPTW_SRC cuts.
  *
  * This function generates cut coefficients for the given VRPTW_SRC cuts using a limited memory rank-1 approach.
@@ -282,7 +249,8 @@ inline std::vector<std::vector<int>> findRoutesVisitingNodes(const SparseModel  
  *
  */
 void LimitedMemoryRank1Cuts::generateCutCoefficients(VRPTW_SRC &cuts, std::vector<std::vector<double>> &coefficients,
-                                                     int numNodes, const SparseModel &A, const std::vector<double> &x) {
+                                                     int numNodes, const SparseMatrix &A,
+                                                     const std::vector<double> &x) {
     double primal_violation   = 0.0;
     int    max_number_of_cuts = 3;
 

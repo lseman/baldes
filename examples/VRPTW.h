@@ -110,9 +110,7 @@ public:
             // Step 2: Add the non-zero entries to the sparse matrix
             for (int i = 0; i < N_SIZE - 1; ++i) {
                 if (coluna[i] > 0) {
-                    matrix.A_sparse.row_indices.push_back(i);
-                    matrix.A_sparse.col_indices.push_back(matrix.A_sparse.num_cols);
-                    matrix.A_sparse.values.push_back(static_cast<double>(coluna[i]));
+                    matrix.A_sparse.elements.push_back({i, matrix.A_sparse.num_cols, static_cast<double>(coluna[i])});
                 }
             }
 
@@ -136,9 +134,10 @@ public:
                 for (int i = 0; i < vec.size(); i++) {
                     if (vec[i] != 0) {
                         col.addTerms(&vec[i], &SRCconstraints[i], 1);
-                        matrix.A_sparse.row_indices.push_back(N_SIZE - 2 + i);
-                        matrix.A_sparse.col_indices.push_back(matrix.A_sparse.num_cols);
-                        matrix.A_sparse.values.push_back(static_cast<double>(vec[i]));
+                        //matrix.A_sparse.row_indices.push_back(N_SIZE - 2 + i);
+                        //matrix.A_sparse.col_indices.push_back(matrix.A_sparse.num_cols);
+                        //matrix.A_sparse.values.push_back(static_cast<double>(vec[i]));
+                        matrix.A_sparse.elements.push_back({N_SIZE - 2 + i, matrix.A_sparse.num_cols, static_cast<double>(vec[i])});
                     }
                 }
             }
@@ -210,9 +209,10 @@ public:
             // Step 2: Add the non-zero entries to the sparse matrix
             for (int i = 0; i < N_SIZE - 1; ++i) {
                 if (coluna[i] > 0) {
-                    matrix.A_sparse.row_indices.push_back(i);
-                    matrix.A_sparse.col_indices.push_back(matrix.A_sparse.num_cols);
-                    matrix.A_sparse.values.push_back(static_cast<double>(coluna[i]));
+                    //matrix.A_sparse.row_indices.push_back(i);
+                    //matrix.A_sparse.col_indices.push_back(matrix.A_sparse.num_cols);
+                    //matrix.A_sparse.values.push_back(static_cast<double>(coluna[i]));
+                    matrix.A_sparse.elements.push_back({i, matrix.A_sparse.num_cols, static_cast<double>(coluna[i])});
                 }
             }
 
@@ -236,9 +236,10 @@ public:
                 for (int i = 0; i < vec.size(); i++) {
                     if (vec[i] != 0) {
                         col.addTerms(&vec[i], &SRCconstraints[i], 1);
-                        matrix.A_sparse.row_indices.push_back(N_SIZE - 2 + i);
-                        matrix.A_sparse.col_indices.push_back(matrix.A_sparse.num_cols);
-                        matrix.A_sparse.values.push_back(static_cast<double>(vec[i]));
+                        //matrix.A_sparse.row_indices.push_back(N_SIZE - 2 + i);
+                        //matrix.A_sparse.col_indices.push_back(matrix.A_sparse.num_cols);
+                        //matrix.A_sparse.values.push_back(static_cast<double>(vec[i]));
+                        matrix.A_sparse.elements.push_back({N_SIZE - 2 + i, matrix.A_sparse.num_cols, static_cast<double>(vec[i])});
                     }
                 }
             }

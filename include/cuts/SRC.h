@@ -23,6 +23,7 @@
 #pragma once
 
 #include "Definitions.h"
+#include "SparseMatrix.h"
 
 #include "Cut.h"
 
@@ -55,7 +56,7 @@ struct VectorStringHash;
 struct UnorderedSetStringHash;
 struct PairHash;
 
-struct SparseModel;
+struct SparseMatrix;
 
 /**
  * @class LimitedMemoryRank1Cuts
@@ -80,15 +81,15 @@ public:
 
     std::vector<std::vector<int>>    labels;
     int                              labels_counter = 0;
-    std::vector<std::vector<double>> separate(const SparseModel &A, const std::vector<double> &x);
+    std::vector<std::vector<double>> separate(const SparseMatrix &A, const std::vector<double> &x);
     void insertSet(VRPTW_SRC &cuts, int i, int j, int k, const std::vector<int> &buffer_int, int buffer_int_n,
                    double LHS_cut);
 
     void generateCutCoefficients(VRPTW_SRC &cuts, std::vector<std::vector<double>> &coefficients, int numNodes,
-                                 const SparseModel &A, const std::vector<double> &x);
+                                 const SparseMatrix &A, const std::vector<double> &x);
 
     template <CutType T>
-    void the45Heuristic(const SparseModel &A, const std::vector<double> &x);
+    void the45Heuristic(const SparseMatrix &A, const std::vector<double> &x);
 
     /**
      * @brief Computes the limited memory coefficient based on the given parameters.
@@ -161,7 +162,7 @@ public:
     }
 
     std::vector<int> the45selectedNodes;
-    void             prepare45Heuristic(const SparseModel &A, const std::vector<double> &x) {
+    void             prepare45Heuristic(const SparseMatrix &A, const std::vector<double> &x) {
         int max_important_nodes = 5;
         the45selectedNodes      = selectHighestCoefficients(x, max_important_nodes);
     }
@@ -277,7 +278,7 @@ inline void combinations(const std::vector<T> &elements, int k, std::vector<std:
  * returns only those that are relevant to the selected nodes.
  *
  */
-inline std::vector<std::vector<int>> findVisitingNodes(const SparseModel &A, const std::vector<int> &selectedNodes) {
+inline std::vector<std::vector<int>> findVisitingNodes(const SparseMatrix &A, const std::vector<int> &selectedNodes) {
     std::vector<std::vector<int>> consumers;
     std::unordered_set<int>       selectedNodeSet(selectedNodes.begin(), selectedNodes.end());
 
@@ -286,11 +287,13 @@ inline std::vector<std::vector<int>> findVisitingNodes(const SparseModel &A, con
 
     // Preprocess the selected columns
     std::vector<std::vector<int>> col_to_rows(A.num_cols);
-    for (int j = 0; j < A.row_indices.size(); ++j) {
-        // print A.values[j]
-        // fmt::print("A.values[j]: {}\n", A.values[j]);
-        if (A.values[j] == -1) { col_to_rows[A.col_indices[j]].push_back(A.row_indices[j]); }
+    for (const auto &elem : A.elements) {
+        // print A.elements' value
+        // fmt::print("A.elements.value: {}\n", elem.value);
+
+        if (elem.value == -1) { col_to_rows[elem.col].push_back(elem.row); }
     }
+
     // Filter only the selected nodes
     for (int col : selectedNodes) {
         if (!col_to_rows[col].empty()) { consumers.push_back(std::move(col_to_rows[col])); }
@@ -345,7 +348,7 @@ struct CompareCuts {
  *
  */
 template <CutType T>
-void LimitedMemoryRank1Cuts::the45Heuristic(const SparseModel &A, const std::vector<double> &x) {
+void LimitedMemoryRank1Cuts::the45Heuristic(const SparseMatrix &A, const std::vector<double> &x) {
     int    max_number_of_cuts  = 2; // Max number of cuts to generate
     double violation_threshold = 1e-3;
     int    max_generated_cuts  = 15;

@@ -11,41 +11,6 @@
 #include <tuple>
 #include <vector>
 
-// Custom Sparse Matrix structure
-struct SparseMatrix {
-    std::vector<int>    row_indices;
-    std::vector<int>    col_indices;
-    std::vector<double> values;
-    int                 num_rows;
-    int                 num_cols;
-
-    struct RowIterator {
-        const SparseMatrix &matrix;
-        int                 row;
-        size_t              index;
-
-        RowIterator(const SparseMatrix &matrix, int row) : matrix(matrix), row(row), index(0) {
-            while (index < matrix.row_indices.size() && matrix.row_indices[index] != row) { ++index; }
-        }
-
-        bool valid() const { return index < matrix.row_indices.size() && matrix.row_indices[index] == row; }
-
-        void next() {
-            ++index;
-            while (index < matrix.row_indices.size() && matrix.row_indices[index] != row) { ++index; }
-        }
-
-        double value() const { return matrix.values[index]; }
-        int    col() const { return matrix.col_indices[index]; }
-    };
-
-    RowIterator rowIterator(int row) const { return RowIterator(*this, row); }
-
-    void transpose() {
-        // Implement transposing logic if needed
-    }
-};
-
 // Custom dense vector replacement
 using DenseVector = std::vector<double>;
 
@@ -126,7 +91,7 @@ public:
 
     // Constructor initializes the class by converting the input ModelData
     Preprocessor(ModelData &modelData) {
-        A     = convertToSparseMatrix(modelData.A_sparse);
+        A     = modelData.A_sparse;
         b     = modelData.b;
         c     = modelData.c;
         ub    = modelData.ub;
@@ -207,7 +172,9 @@ public:
                 sense[i]      = '<';
 
                 for (SparseMatrix::RowIterator it = A.rowIterator(i); it.valid(); it.next()) {
-                    A.values[it.index] *= -1; // Flip the row's sign to convert '>' to '<'
+                    //A.values[it.index] *= -1; // Flip the row's sign to convert '>' to '<'
+                A.elements[it.index].value *= -1; // Flip the row's sign to convert '>' to '<'
+
                 }
             }
         }
@@ -285,7 +252,7 @@ public:
                 }
 
                 if (nbinaries > 2) {
-                    std::lock_guard<std::mutex> lock(knapsack_mutex);
+                    // std::lock_guard<std::mutex> lock(knapsack_mutex);
                     knapsackRows.push_back(rowIndex);
                 }
             }
@@ -293,29 +260,10 @@ public:
         std::cout << "Number of knapsack rows: " << knapsackRows.size() << "\n";
     }
 
-    SparseMatrix convertToSparseMatrix(const SparseModel &sparseModel) {
-        SparseMatrix sparseMatrix;
-        sparseMatrix.num_rows    = sparseModel.num_rows;
-        sparseMatrix.num_cols    = sparseModel.num_cols;
-        sparseMatrix.row_indices = sparseModel.row_indices;
-        sparseMatrix.col_indices = sparseModel.col_indices;
-        sparseMatrix.values      = sparseModel.values;
-        return sparseMatrix;
-    }
-
-    SparseModel convertToSparseModel(const SparseMatrix &sparseMatrix) {
-        SparseModel sparseModel;
-        sparseModel.num_rows    = sparseMatrix.num_rows;
-        sparseModel.num_cols    = sparseMatrix.num_cols;
-        sparseModel.row_indices = sparseMatrix.row_indices;
-        sparseModel.col_indices = sparseMatrix.col_indices;
-        sparseModel.values      = sparseMatrix.values;
-        return sparseModel;
-    }
 
     ModelData getModelData() {
         ModelData data;
-        data.A_sparse = convertToSparseModel(A);
+        data.A_sparse = A;
 
         for (int i = 0; i < sense.size(); ++i) { data.b.push_back(sense[i] == '<' ? rhs_values[i] : lhs_values[i]); }
 

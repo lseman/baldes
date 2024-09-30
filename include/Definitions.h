@@ -10,6 +10,7 @@
 #pragma once
 
 #include "Common.h"
+#include "SparseMatrix.h"
 
 struct BucketOptions {
     int depot         = 0;
@@ -32,7 +33,6 @@ constexpr bool operator<=(Stage lhs, Stage rhs) { return !(lhs > rhs); }
 constexpr bool operator>=(Stage lhs, Stage rhs) { return !(lhs < rhs); }
 
 const size_t num_words = (N_SIZE + 63) / 64; // This will be 2 for 100 clients
-
 
 /**
  * @struct Interval
@@ -116,22 +116,6 @@ inline void print_blue(fmt::format_string<Args...> format, Args &&...args) {
 }
 
 /**
- * @struct SparseModel
- * @brief Represents a sparse matrix model.
- *
- * This structure is used to store a sparse matrix in a compressed format.
- * It contains vectors for row indices, column indices, and values, as well
- * as the number of rows and columns in the matrix.
- */
-struct SparseModel {
-    std::vector<int>    row_indices;
-    std::vector<int>    col_indices;
-    std::vector<double> values;
-    int                 num_rows = 0;
-    int                 num_cols = 0;
-};
-
-/**
  * @struct ModelData
  * @brief Represents the data structure for a mathematical model.
  *
@@ -141,7 +125,7 @@ struct SparseModel {
  *
  */
 struct ModelData {
-    SparseModel                      A_sparse;
+    SparseMatrix                     A_sparse;
     std::vector<std::vector<double>> A;     // Coefficient matrix for constraints
     std::vector<double>              b;     // Right-hand side coefficients for constraints
     std::vector<char>                sense; // Sense of each constraint ('<', '=', '>')
@@ -225,13 +209,11 @@ inline ModelData extractModelDataSparse(GRBModel *model) {
         }
 
         // Constraints
-        int         numConstrs = model->get(GRB_IntAttr_NumConstrs);
-        SparseModel A_sparse;
+        int          numConstrs = model->get(GRB_IntAttr_NumConstrs);
+        SparseMatrix A_sparse;
 
-        // Reserve memory for constraint matrices
-        A_sparse.row_indices.reserve(numConstrs * 10); // Estimate 10 non-zeros per row
-        A_sparse.col_indices.reserve(numConstrs * 10);
-        A_sparse.values.reserve(numConstrs * 10);
+        // Reserve memory for constraint matrices, estimate 10 non-zeros per row
+        A_sparse.elements.reserve(numConstrs * 10);
         data.b.reserve(numConstrs);
         data.cname.reserve(numConstrs);
         data.sense.reserve(numConstrs);
@@ -245,9 +227,9 @@ inline ModelData extractModelDataSparse(GRBModel *model) {
                 GRBVar var      = expr.getVar(j);
                 double coeff    = expr.getCoeff(j);
                 int    varIndex = var.index();
-                A_sparse.row_indices.push_back(i);
-                A_sparse.col_indices.push_back(varIndex);
-                A_sparse.values.push_back(coeff);
+
+                // Populate SparseElement for A_sparse
+                A_sparse.elements.push_back({i, varIndex, coeff});
             }
 
             data.cname.push_back(constr.get(GRB_StringAttr_ConstrName));
@@ -257,10 +239,13 @@ inline ModelData extractModelDataSparse(GRBModel *model) {
             data.sense.push_back(sense == GRB_LESS_EQUAL ? '<' : (sense == GRB_GREATER_EQUAL ? '>' : '='));
         }
 
-        // Store the sparse matrix in data
+        // Set matrix dimensions and build row_start
         A_sparse.num_cols = numVars;
         A_sparse.num_rows = numConstrs;
-        data.A_sparse     = A_sparse;
+        A_sparse.buildRowStart();
+
+        // Store the sparse matrix in data
+        data.A_sparse = A_sparse;
 
     } catch (GRBException &e) {
         std::cerr << "Error code = " << e.getErrorCode() << std::endl;
@@ -268,74 +253,6 @@ inline ModelData extractModelDataSparse(GRBModel *model) {
     }
 
     return data;
-}
-
-/**
- * @brief Extracts model data from a given Gurobi model.
- *
- */
-inline GRBModel createDualModel(GRBEnv *env, const ModelData &primalData) {
-    try {
-        // Create new model for the dual problem
-        GRBModel dualModel = GRBModel(*env);
-
-        // Dual variables: These correspond to the primal constraints
-        std::vector<GRBVar> y;
-        y.reserve(primalData.b.size());
-
-        // Create dual variables and set their bounds based on primal constraint senses
-        for (size_t i = 0; i < primalData.b.size(); ++i) {
-            GRBVar dualVar;
-            char   sense = primalData.sense[i];
-            if (sense == '<') {
-                // Dual variable for primal <= constraint, non-negative
-                dualVar = dualModel.addVar(0.0, GRB_INFINITY, primalData.b[i], GRB_CONTINUOUS,
-                                           "y[" + std::to_string(i) + "]");
-            } else if (sense == '>') {
-                // Dual variable for primal >= constraint, non-positive
-                dualVar = dualModel.addVar(-GRB_INFINITY, 0.0, primalData.b[i], GRB_CONTINUOUS,
-                                           "y[" + std::to_string(i) + "]");
-            } else if (sense == '=') {
-                // Dual variable for primal = constraint, free
-                dualVar = dualModel.addVar(-GRB_INFINITY, GRB_INFINITY, primalData.b[i], GRB_CONTINUOUS,
-                                           "y[" + std::to_string(i) + "]");
-            }
-            y.push_back(dualVar);
-        }
-
-        dualModel.update();
-
-        // Dual objective: Maximize b^T y
-        GRBLinExpr dualObjective = 0;
-        for (size_t i = 0; i < primalData.b.size(); ++i) { dualObjective += primalData.b[i] * y[i]; }
-        dualModel.setObjective(dualObjective, GRB_MAXIMIZE);
-
-        // Dual constraints: These correspond to primal variables
-        for (int j = 0; j < primalData.A_sparse.num_cols; ++j) {
-            GRBLinExpr lhs = 0;
-            // Iterate over the rows (constraints) that involve variable x_j
-            for (size_t i = 0; i < primalData.A_sparse.row_indices.size(); ++i) {
-                if (primalData.A_sparse.col_indices[i] == j) {
-                    lhs += primalData.A_sparse.values[i] * y[primalData.A_sparse.row_indices[i]];
-                }
-            }
-            // Add dual constraint: lhs >= primalData.c[j] for primal variable x_j
-            char vtype = primalData.vtype[j];
-            if (vtype == GRB_CONTINUOUS) {
-                dualModel.addConstr(lhs == primalData.c[j], "dual_constr[" + std::to_string(j) + "]");
-            } else if (vtype == GRB_BINARY || vtype == GRB_INTEGER) {
-                // Handle integer/binary variables accordingly (if necessary)
-                dualModel.addConstr(lhs >= primalData.c[j], "dual_constr[" + std::to_string(j) + "]");
-            }
-        }
-
-        dualModel.update();
-        return dualModel;
-
-    } catch (GRBException &e) {
-        std::cerr << "Error: " << e.getErrorCode() << " - " << e.getMessage() << std::endl;
-        throw;
-    }
 }
 
 using DualSolution = std::vector<double>;
@@ -417,4 +334,3 @@ inline ModelData extractModelData(GRBModel &model) {
 
     return data;
 }
-
