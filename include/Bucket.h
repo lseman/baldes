@@ -18,6 +18,8 @@ struct Bucket {
     int                    job_id = -1;
     std::vector<int>       lb;
     std::vector<int>       ub;
+    std::vector<int>       real_lb;
+    std::vector<int>       real_ub;
     std::vector<Arc>       fw_arcs;
     std::vector<Arc>       bw_arcs;
     std::vector<BucketArc> fw_bucket_arcs;

@@ -414,13 +414,13 @@ public:
             for (int to_bucket = 0; to_bucket < fw_buckets_size; ++to_bucket) {
                 auto to_job = buckets[to_bucket].job_id;
                 // Check if there is a fixed arc between from_bucket and to_bucket
-                // if (fixed_buckets[from_bucket][to_bucket] == 1) {
+                if (fixed_buckets[from_bucket][to_bucket] == 0) { continue; }
 
                 // Get the range for from_bucket
-                BucketRange from_range = {buckets[from_bucket].lb, buckets[from_bucket].ub};
+                BucketRange from_range = {buckets[from_bucket].real_lb, buckets[from_bucket].real_ub};
 
                 // Get the range for to_bucket
-                BucketRange to_range = {buckets[to_bucket].lb, buckets[to_bucket].ub};
+                BucketRange to_range = {buckets[to_bucket].real_lb, buckets[to_bucket].real_ub};
 
                 // check if interval_tree[from_job] exists
                 if (interval_tree.find(from_job) == interval_tree.end()) {
@@ -615,7 +615,7 @@ public:
                     int         bucket      = tasks[task_idx];
                     auto       &bucket_arcs = buckets[bucket].template get_bucket_arcs<D>();
                     auto       &from_bucket = buckets[bucket];
-                    BucketRange from_range  = {from_bucket.lb, from_bucket.ub};
+                    BucketRange from_range  = {from_bucket.real_lb, from_bucket.real_ub};
                     auto        from_job    = from_bucket.job_id;
 
                     // Check if the job exists in the save_rebuild map (only once per bucket)
@@ -626,7 +626,7 @@ public:
                         for (auto &arc : bucket_arcs) {
                             auto        to_bucket = arc.to_bucket;
                             auto        to_job    = buckets[to_bucket].job_id;
-                            BucketRange to_range  = {buckets[to_bucket].lb, buckets[to_bucket].ub};
+                            BucketRange to_range  = {buckets[to_bucket].real_lb, buckets[to_bucket].real_ub};
 
                             // Perform the search and update fixed buckets
                             auto is_contained = save_tree.search(from_range, to_range, to_job);
@@ -665,8 +665,8 @@ public:
         intervals.clear();
         for (int i = 0; i < R_SIZE; ++i) { intervals.push_back(Interval(bucketInterval, 0)); }
 
-        auto fw_save_rebuild = rebuild_buckets<Direction::Forward>();
-        auto bw_save_rebuild = rebuild_buckets<Direction::Backward>();
+        // auto fw_save_rebuild = rebuild_buckets<Direction::Forward>();
+        // auto bw_save_rebuild = rebuild_buckets<Direction::Backward>();
 
         reset_fixed();
         reset_fixed_buckets();
@@ -689,7 +689,7 @@ public:
             });
 
         generate_arcs();
-
+        /*
         PARALLEL_SECTIONS(
             workB, bi_sched,
             [&, this, fw_save_rebuild]() -> void {
@@ -700,6 +700,7 @@ public:
                 // Backward direction processing
                 process_buckets<Direction::Backward>(bw_buckets_size, bw_buckets, bw_save_rebuild, bw_fixed_buckets);
             });
+            */
     }
 
     /**
@@ -824,6 +825,7 @@ public:
             print_info("Increasing bucket interval to {}\n", bucket_interval * 2);
             redefine(bucket_interval * 2);
             updated = true;
+            fixed   = false;
         }
         return updated;
     }

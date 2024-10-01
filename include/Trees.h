@@ -26,14 +26,53 @@ struct BucketRange {
 
     // Lexicographical comparison for ordering ranges by their lower bound
     bool operator<(const BucketRange &other) const {
-        return std::lexicographical_compare(lower_bound.begin(), lower_bound.end(), other.lower_bound.begin(),
-                                            other.lower_bound.end());
+        // Compare lower bounds first
+        for (size_t i = 0; i < lower_bound.size(); ++i) {
+            if (lower_bound[i] < other.lower_bound[i]) {
+                return true; // This `BucketRange` is smaller based on lower_bound
+            }
+            if (lower_bound[i] > other.lower_bound[i]) {
+                return false; // This `BucketRange` is larger based on lower_bound
+            }
+        }
+
+        // If lower bounds are the same, compare upper bounds
+        for (size_t i = 0; i < upper_bound.size(); ++i) {
+            if (upper_bound[i] < other.upper_bound[i]) {
+                return true; // This `BucketRange` is smaller based on upper_bound
+            }
+            if (upper_bound[i] > other.upper_bound[i]) {
+                return false; // This `BucketRange` is larger based on upper_bound
+            }
+        }
+
+        // If both lower and upper bounds are the same, they are equal, so return false
+        return false;
     }
 
-    // Define operator> based on the correct comparison logic
     bool operator>(const BucketRange &other) const {
-        return std::lexicographical_compare(other.upper_bound.begin(), other.upper_bound.end(), upper_bound.begin(),
-                                            upper_bound.end());
+        // Compare lower bounds first
+        for (size_t i = 0; i < lower_bound.size(); ++i) {
+            if (lower_bound[i] > other.lower_bound[i]) {
+                return true; // This `BucketRange` is larger based on lower_bound
+            }
+            if (lower_bound[i] < other.lower_bound[i]) {
+                return false; // This `BucketRange` is smaller based on lower_bound
+            }
+        }
+
+        // If lower bounds are the same, compare upper bounds
+        for (size_t i = 0; i < upper_bound.size(); ++i) {
+            if (upper_bound[i] > other.upper_bound[i]) {
+                return true; // This `BucketRange` is larger based on upper_bound
+            }
+            if (upper_bound[i] < other.upper_bound[i]) {
+                return false; // This `BucketRange` is smaller based on upper_bound
+            }
+        }
+
+        // If both lower and upper bounds are the same, they are equal, so return false
+        return false;
     }
 
     // Optional: Define operator== and operator!= for completeness
@@ -42,9 +81,16 @@ struct BucketRange {
     }
 
     bool operator!=(const BucketRange &other) const { return !(*this == other); }
+
+    bool contained_in(const BucketRange &other) const {
+        for (size_t i = 0; i < lower_bound.size(); ++i) {
+            if (!(lower_bound[i] >= other.lower_bound[i] && upper_bound[i] <= other.upper_bound[i])) { return false; }
+        }
+        return true;
+    }
 };
 
-// TODO: make the tree self-balancing
+// TODO: better check the balancing and the comparisons
 struct IntervalNode {
     BucketRange      from_range;
     BucketRange      to_range;
@@ -131,15 +177,27 @@ private:
         // Insert as in the original, unbalanced version
         if (node == nullptr) { return new IntervalNode(from_range, to_range, to_job); }
 
-        // Compare based on lower_bound
+        // Compare based on `from_range.lower_bound` first
         if (from_range < node->from_range) {
             node->left = insert(node->left, from_range, to_range, to_job);
         } else if (from_range > node->from_range) {
             node->right = insert(node->right, from_range, to_range, to_job);
-        } else { // Handles equality case based on lower_bound
-            if (doOverlap(node->to_range, to_range) && node->to_job == to_job) {
+        } else {
+            // If `from_range` is the same, check `to_range` and `to_job`
+            bool toRangeEqual = true;
+            for (size_t i = 0; i < to_range.lower_bound.size(); ++i) {
+                if (to_range.lower_bound[i] != node->to_range.lower_bound[i] ||
+                    to_range.upper_bound[i] != node->to_range.upper_bound[i]) {
+                    toRangeEqual = false;
+                    break;
+                }
+            }
+
+            // If `to_range` and `to_job` match, mark for merging
+            if (toRangeEqual && node->to_job == to_job) {
                 node->merge_pending = true; // Mark for merging
             } else {
+                // Insert as a new node if `to_range` or `to_job` differs
                 node->right = insert(node->right, from_range, to_range, to_job);
             }
         }
@@ -151,52 +209,61 @@ private:
 
         // Update height of this node
         node->height = std::max(height(node->left), height(node->right)) + 1;
-
-        // Get balance factor to check if the node is unbalanced
+        /*
+        // Balance the node if necessary (AVL rotations)
         int balance = getBalance(node);
 
-        // Left Left Case (unbalanced on the left side)
+        // Left Left Case
         if (balance > 1 && from_range < node->left->from_range) { return rightRotate(node); }
 
-        // Right Right Case (unbalanced on the right side)
+        // Right Right Case
         if (balance < -1 && from_range > node->right->from_range) { return leftRotate(node); }
 
-        // Left Right Case (unbalanced on the left side, but insertion on the right of left child)
+        // Left Right Case
         if (balance > 1 && from_range > node->left->from_range) {
             node->left = leftRotate(node->left);
             return rightRotate(node);
         }
 
-        // Right Left Case (unbalanced on the right side, but insertion on the left of right child)
+        // Right Left Case
         if (balance < -1 && from_range < node->right->from_range) {
             node->right = rightRotate(node->right);
             return leftRotate(node);
         }
-
-        // Return the (unchanged) node pointer
+*/
         return node;
     }
 
     void applyPendingMerges(IntervalNode *node) const {
         if (node != nullptr && node->merge_pending) {
-            node->to_range      = mergeRanges(node->to_range, node->from_range);
+            if (node->left && doOverlap(node->to_range, node->left->to_range)) {
+                node->to_range = mergeRanges(node->to_range, node->left->to_range);
+            }
+            if (node->right && doOverlap(node->to_range, node->right->to_range)) {
+                node->to_range = mergeRanges(node->to_range, node->right->to_range);
+            }
             node->merge_pending = false;
         }
     }
 
-    // Helper function to check if two intervals overlap and then search
     bool searchCombination(IntervalNode *node, const BucketRange &from_range, const BucketRange &to_range,
                            int to_job) const {
         if (node == nullptr) return false;
 
+        // Apply any pending merges to ensure node's `to_range` is up-to-date
         applyPendingMerges(node);
 
-        if (doOverlap(node->from_range, from_range)) {
-            if (doOverlap(node->to_range, to_range) && node->to_job == to_job) { return true; }
-        }
+        // Check if `from_range` is contained within `node->from_range`
+        bool fromRangeContained = from_range.contained_in(node->from_range);
 
-        if (std::lexicographical_compare(from_range.lower_bound.begin(), from_range.lower_bound.end(),
-                                         node->from_range.lower_bound.begin(), node->from_range.lower_bound.end())) {
+        // Check if `to_range` is contained within `node->to_range` and the job matches
+        bool toRangeContained = to_range.contained_in(node->to_range);
+
+        // If both ranges are contained and the job matches, return true
+        if (fromRangeContained && toRangeContained && node->to_job == to_job) { return true; }
+
+        // Use updated comparison for traversing the tree
+        if (from_range < node->from_range) {
             return searchCombination(node->left, from_range, to_range, to_job);
         } else {
             return searchCombination(node->right, from_range, to_range, to_job);
@@ -255,10 +322,22 @@ private:
 
     FromBucketNode *insert(FromBucketNode *node, const BucketRange &from_range, const BucketRange &to_range,
                            int to_job) {
-        if (node == nullptr) { node = new FromBucketNode(from_range); }
+        if (node == nullptr) {
+            // Create a new FromBucketNode for this range
+            return new FromBucketNode(from_range);
+        }
 
-        node->to_tree->insert(from_range, to_range, to_job);
+        // Compare based on `from_range`
+        if (from_range < node->from_range) {
+            node->left = insert(node->left, from_range, to_range, to_job);
+        } else if (from_range > node->from_range) {
+            node->right = insert(node->right, from_range, to_range, to_job);
+        } else {
+            // If `from_range` matches exactly, insert into the `to_tree`
+            node->to_tree->insert(from_range, to_range, to_job);
+        }
 
+        // Update max values (assuming the upper_bound size matches)
         for (size_t i = 0; i < node->max.size(); ++i) {
             node->max[i] = std::max(node->max[i], from_range.upper_bound[i]);
         }
@@ -270,23 +349,18 @@ private:
                            int to_job) const {
         if (node == nullptr) return false;
 
-        if (doOverlap(node->from_range, from_range)) {
+        // Check if `from_range` is completely contained within `node->from_range`
+        if (from_range.contained_in(node->from_range)) {
+            // If `from_range` is contained, search in `to_tree` for `to_range` and `to_job`
             if (node->to_tree->search(from_range, to_range, to_job)) { return true; }
         }
 
-        if (std::lexicographical_compare(from_range.lower_bound.begin(), from_range.lower_bound.end(),
-                                         node->from_range.lower_bound.begin(), node->from_range.lower_bound.end())) {
+        // Use updated comparison for traversing the tree
+        if (from_range < node->from_range) {
             return searchCombination(node->left, from_range, to_range, to_job);
+        } else {
+            return searchCombination(node->right, from_range, to_range, to_job);
         }
-
-        return searchCombination(node->right, from_range, to_range, to_job);
-    }
-
-    bool doOverlap(const BucketRange &i1, const BucketRange &i2) const {
-        for (size_t i = 0; i < i1.lower_bound.size(); ++i) {
-            if (!(i1.lower_bound[i] <= i2.upper_bound[i] && i2.lower_bound[i] <= i1.upper_bound[i])) { return false; }
-        }
-        return true;
     }
 
     void printTree(FromBucketNode *node) const {
