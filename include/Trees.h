@@ -20,80 +20,61 @@
 #pragma once
 #include "Definitions.h"
 
+template <Direction D>
 struct BucketRange {
     std::vector<int> lower_bound;
     std::vector<int> upper_bound;
 
-    // Lexicographical comparison for ordering ranges by their lower bound
+    // Lexicographical comparison for ordering ranges
     bool operator<(const BucketRange &other) const {
-        // Compare lower bounds first
-        for (size_t i = 0; i < lower_bound.size(); ++i) {
-            if (lower_bound[i] < other.lower_bound[i]) {
-                return true; // This `BucketRange` is smaller based on lower_bound
-            }
-            if (lower_bound[i] > other.lower_bound[i]) {
-                return false; // This `BucketRange` is larger based on lower_bound
-            }
+        if constexpr (D == Direction::Forward) {
+            return std::lexicographical_compare(lower_bound.begin(), lower_bound.end(), other.lower_bound.begin(),
+                                                other.lower_bound.end());
+        } else if constexpr (D == Direction::Backward) {
+            return std::lexicographical_compare(upper_bound.begin(), upper_bound.end(), other.upper_bound.begin(),
+                                                other.upper_bound.end());
         }
-
-        // If lower bounds are the same, compare upper bounds
-        for (size_t i = 0; i < upper_bound.size(); ++i) {
-            if (upper_bound[i] < other.upper_bound[i]) {
-                return true; // This `BucketRange` is smaller based on upper_bound
-            }
-            if (upper_bound[i] > other.upper_bound[i]) {
-                return false; // This `BucketRange` is larger based on upper_bound
-            }
-        }
-
-        // If both lower and upper bounds are the same, they are equal, so return false
-        return false;
     }
 
     bool operator>(const BucketRange &other) const {
-        // Compare lower bounds first
-        for (size_t i = 0; i < lower_bound.size(); ++i) {
-            if (lower_bound[i] > other.lower_bound[i]) {
-                return true; // This `BucketRange` is larger based on lower_bound
-            }
-            if (lower_bound[i] < other.lower_bound[i]) {
-                return false; // This `BucketRange` is smaller based on lower_bound
-            }
+        if constexpr (D == Direction::Forward) {
+            return std::lexicographical_compare(other.lower_bound.begin(), other.lower_bound.end(), lower_bound.begin(),
+                                                lower_bound.end());
+        } else if constexpr (D == Direction::Backward) {
+            return std::lexicographical_compare(other.upper_bound.begin(), other.upper_bound.end(), upper_bound.begin(),
+                                                upper_bound.end());
         }
-
-        // If lower bounds are the same, compare upper bounds
-        for (size_t i = 0; i < upper_bound.size(); ++i) {
-            if (upper_bound[i] > other.upper_bound[i]) {
-                return true; // This `BucketRange` is larger based on upper_bound
-            }
-            if (upper_bound[i] < other.upper_bound[i]) {
-                return false; // This `BucketRange` is smaller based on upper_bound
-            }
-        }
-
-        // If both lower and upper bounds are the same, they are equal, so return false
-        return false;
     }
 
     // Optional: Define operator== and operator!= for completeness
     bool operator==(const BucketRange &other) const {
-        return lower_bound == other.lower_bound && upper_bound == other.upper_bound;
+        if constexpr (D == Direction::Forward) {
+            return lower_bound == other.lower_bound && upper_bound == other.upper_bound;
+        } else if constexpr (D == Direction::Backward) {
+            return upper_bound == other.upper_bound && lower_bound == other.lower_bound;
+        }
     }
 
     bool operator!=(const BucketRange &other) const { return !(*this == other); }
 
     bool contained_in(const BucketRange &other) const {
-        for (size_t i = 0; i < lower_bound.size(); ++i) {
-            if (!(lower_bound[i] >= other.lower_bound[i] && upper_bound[i] <= other.upper_bound[i])) { return false; }
+        if constexpr (D == Direction::Forward) {
+            for (size_t i = 0; i < lower_bound.size(); ++i) {
+                if (!(lower_bound[i] >= other.lower_bound[i])) { return false; }
+            }
+        } else if constexpr (D == Direction::Backward) {
+            for (size_t i = 0; i < upper_bound.size(); ++i) {
+                if (!(upper_bound[i] <= other.upper_bound[i])) { return false; }
+            }
         }
         return true;
     }
 };
 
-// TODO: better check the balancing and the comparisons
+template <Direction D>
 struct IntervalNode {
-    BucketRange      from_range;
-    BucketRange      to_range;
+    BucketRange<D>   from_range;
+    BucketRange<D>   to_range;
     int              to_job;
     std::vector<int> max;
     IntervalNode    *left;
@@ -101,26 +82,27 @@ struct IntervalNode {
     mutable bool     merge_pending;
     int              height; // New: Height of the node
 
-    IntervalNode(const BucketRange &f_range, const BucketRange &t_range, int to_job)
+    IntervalNode(const BucketRange<D> &f_range, const BucketRange<D> &t_range, int to_job)
         : from_range(f_range), to_range(t_range), to_job(to_job), max(f_range.upper_bound), left(nullptr),
           right(nullptr), merge_pending(false), height(1) {} // Height is initialized to 1
 };
 
+template <Direction D>
 class IntervalTree {
 private:
-    IntervalNode *root;
+    IntervalNode<D> *root;
 
-    int height(IntervalNode *node) { return node ? node->height : 0; }
+    int height(IntervalNode<D> *node) { return node ? node->height : 0; }
 
-    int getBalance(IntervalNode *node) { return node ? height(node->left) - height(node->right) : 0; }
+    int getBalance(IntervalNode<D> *node) { return node ? height(node->left) - height(node->right) : 0; }
 
-    IntervalNode *rightRotate(IntervalNode *y) {
+    IntervalNode<D> *rightRotate(IntervalNode<D> *y) {
         if (y == nullptr || y->left == nullptr) {
             return y; // Return the node itself if rotation can't be performed
         }
 
-        IntervalNode *x  = y->left;  // x becomes the new root of the subtree
-        IntervalNode *T2 = x->right; // T2 will be the right child of x after rotation
+        IntervalNode<D> *x  = y->left;  // x becomes the new root of the subtree
+        IntervalNode<D> *T2 = x->right; // T2 will be the right child of x after rotation
 
         // Perform rotation
         x->right = y;
@@ -134,13 +116,13 @@ private:
         return x;
     }
 
-    IntervalNode *leftRotate(IntervalNode *x) {
+    IntervalNode<D> *leftRotate(IntervalNode<D> *x) {
         if (x == nullptr || x->right == nullptr) {
             return x; // Return the node itself if rotation can't be performed
         }
 
-        IntervalNode *y  = x->right; // y becomes the new root of the subtree
-        IntervalNode *T2 = y->left;  // T2 will be the left child of x after rotation
+        IntervalNode<D> *y  = x->right; // y becomes the new root of the subtree
+        IntervalNode<D> *T2 = y->left;  // T2 will be the left child of x after rotation
 
         // Perform rotation
         y->left  = x;
@@ -155,16 +137,24 @@ private:
     }
 
     // Helper function to check if two intervals overlap
-    bool doOverlap(const BucketRange &i1, const BucketRange &i2) const {
-        for (size_t i = 0; i < i1.lower_bound.size(); ++i) {
-            if (!(i1.lower_bound[i] <= i2.upper_bound[i] && i2.lower_bound[i] <= i1.upper_bound[i])) { return false; }
+    bool doOverlap(const BucketRange<D> &i1, const BucketRange<D> &i2) const {
+        if constexpr (D == Direction::Forward) {
+            for (size_t i = 0; i < i1.lower_bound.size(); ++i) {
+                if (!(i1.lower_bound[i] <= i2.lower_bound[i])) { return false; }
+            }
+            return true;
+        } else if constexpr (D == Direction::Backward) {
+            for (size_t i = 0; i < i1.upper_bound.size(); ++i) {
+                if (!(i1.upper_bound[i] <= i2.upper_bound[i])) { return false; }
+            }
+            return true;
         }
         return true;
     }
 
     // Helper function to merge two overlapping ranges
-    BucketRange mergeRanges(const BucketRange &i1, const BucketRange &i2) const {
-        BucketRange merged;
+    BucketRange<D> mergeRanges(const BucketRange<D> &i1, const BucketRange<D> &i2) const {
+        BucketRange<D> merged;
         for (size_t i = 0; i < i1.lower_bound.size(); ++i) {
             merged.lower_bound.push_back(std::min(i1.lower_bound[i], i2.lower_bound[i]));
             merged.upper_bound.push_back(std::max(i1.upper_bound[i], i2.upper_bound[i]));
@@ -173,32 +163,31 @@ private:
     }
 
     // Helper function to insert a new range into the tree, with merging of overlapping to_ranges
-    IntervalNode *insert(IntervalNode *node, const BucketRange &from_range, const BucketRange &to_range, int to_job) {
+    // Helper function to insert a new range into the tree, with merging of overlapping to_ranges
+    IntervalNode<D> *insert(IntervalNode<D> *node, const BucketRange<D> &from_range, const BucketRange<D> &to_range,
+                            int to_job) {
         // Insert as in the original, unbalanced version
         if (node == nullptr) { return new IntervalNode(from_range, to_range, to_job); }
 
-        // Compare based on `from_range.lower_bound` first
+        // Compare based on from_range.lower_bound first
         if (from_range < node->from_range) {
             node->left = insert(node->left, from_range, to_range, to_job);
         } else if (from_range > node->from_range) {
             node->right = insert(node->right, from_range, to_range, to_job);
         } else {
-            // If `from_range` is the same, check `to_range` and `to_job`
-            bool toRangeEqual = true;
-            for (size_t i = 0; i < to_range.lower_bound.size(); ++i) {
-                if (to_range.lower_bound[i] != node->to_range.lower_bound[i] ||
-                    to_range.upper_bound[i] != node->to_range.upper_bound[i]) {
-                    toRangeEqual = false;
-                    break;
-                }
-            }
+            // If from_range is the same, check to_range and to_job
+            bool toRangeEqual = to_range == node->to_range;
 
-            // If `to_range` and `to_job` match, mark for merging
+            // If to_range and to_job match, mark for merging
             if (toRangeEqual && node->to_job == to_job) {
                 node->merge_pending = true; // Mark for merging
             } else {
-                // Insert as a new node if `to_range` or `to_job` differs
-                node->right = insert(node->right, from_range, to_range, to_job);
+                // Insert as a new node if to_range or to_job differs
+                if constexpr (D == Direction::Forward) {
+                    node->right = insert(node->right, from_range, to_range, to_job);
+                } else if constexpr (D == Direction::Backward) {
+                    node->left = insert(node->left, from_range, to_range, to_job);
+                }
             }
         }
 
@@ -209,32 +198,10 @@ private:
 
         // Update height of this node
         node->height = std::max(height(node->left), height(node->right)) + 1;
-        /*
-        // Balance the node if necessary (AVL rotations)
-        int balance = getBalance(node);
-
-        // Left Left Case
-        if (balance > 1 && from_range < node->left->from_range) { return rightRotate(node); }
-
-        // Right Right Case
-        if (balance < -1 && from_range > node->right->from_range) { return leftRotate(node); }
-
-        // Left Right Case
-        if (balance > 1 && from_range > node->left->from_range) {
-            node->left = leftRotate(node->left);
-            return rightRotate(node);
-        }
-
-        // Right Left Case
-        if (balance < -1 && from_range < node->right->from_range) {
-            node->right = rightRotate(node->right);
-            return leftRotate(node);
-        }
-*/
         return node;
     }
 
-    void applyPendingMerges(IntervalNode *node) const {
+    void applyPendingMerges(IntervalNode<D> *node) const {
         if (node != nullptr && node->merge_pending) {
             if (node->left && doOverlap(node->to_range, node->left->to_range)) {
                 node->to_range = mergeRanges(node->to_range, node->left->to_range);
@@ -246,44 +213,43 @@ private:
         }
     }
 
-    bool searchCombination(IntervalNode *node, const BucketRange &from_range, const BucketRange &to_range,
+    bool searchCombination(IntervalNode<D> *node, const BucketRange<D> &from_range, const BucketRange<D> &to_range,
                            int to_job) const {
         if (node == nullptr) return false;
 
         // Apply any pending merges to ensure node's `to_range` is up-to-date
         applyPendingMerges(node);
-
-        // Check if `from_range` is contained within `node->from_range`
-        bool fromRangeContained = from_range.contained_in(node->from_range);
-
-        // Check if `to_range` is contained within `node->to_range` and the job matches
+        
+        // Check if `to_range` is contained within `node->to_range`
         bool toRangeContained = to_range.contained_in(node->to_range);
 
+        // Debug output for `to_range` containment check
         // If both ranges are contained and the job matches, return true
-        if (fromRangeContained && toRangeContained && node->to_job == to_job) { return true; }
+        if (toRangeContained && node->to_job == to_job) { return true; }
 
         // Use updated comparison for traversing the tree
         if (from_range < node->from_range) {
             return searchCombination(node->left, from_range, to_range, to_job);
-        } else {
+        } else if (from_range > node->from_range) {
             return searchCombination(node->right, from_range, to_range, to_job);
         }
+        return true;
     }
 
 public:
     IntervalTree() : root(nullptr) {}
 
-    void insert(const BucketRange &from_range, const BucketRange &to_range, int to_job) {
+    void insert(const BucketRange<D> &from_range, const BucketRange<D> &to_range, int to_job) {
         root = insert(root, from_range, to_range, to_job);
     }
 
-    bool search(const BucketRange &from_range, const BucketRange &to_range, int to_job) const {
+    bool search(const BucketRange<D> &from_range, const BucketRange<D> &to_range, int to_job) const {
         return searchCombination(root, from_range, to_range, to_job);
     }
 
     void print() const { printTree(root); }
 
-    void printTree(IntervalNode *node) const {
+    void printTree(IntervalNode<D> *node) const {
         if (node == nullptr) return;
 
         printTree(node->left);
@@ -302,17 +268,18 @@ public:
     }
 };
 
+template <Direction D>
 class BucketIntervalTree {
 private:
     struct FromBucketNode {
-        BucketRange      from_range;
-        IntervalTree    *to_tree;
+        BucketRange<D>   from_range;
+        IntervalTree<D> *to_tree;
         std::vector<int> max;
         FromBucketNode  *left;
         FromBucketNode  *right;
 
-        FromBucketNode(const BucketRange &r) : from_range(r), max(r.upper_bound), left(nullptr), right(nullptr) {
-            to_tree = new IntervalTree();
+        FromBucketNode(const BucketRange<D> &r) : from_range(r), max(r.upper_bound), left(nullptr), right(nullptr) {
+            to_tree = new IntervalTree<D>();
         }
 
         ~FromBucketNode() { delete to_tree; }
@@ -320,7 +287,7 @@ private:
 
     FromBucketNode *root;
 
-    FromBucketNode *insert(FromBucketNode *node, const BucketRange &from_range, const BucketRange &to_range,
+    FromBucketNode *insert(FromBucketNode *node, const BucketRange<D> &from_range, const BucketRange<D> &to_range,
                            int to_job) {
         if (node == nullptr) {
             // Create a new FromBucketNode for this range
@@ -332,7 +299,7 @@ private:
             node->left = insert(node->left, from_range, to_range, to_job);
         } else if (from_range > node->from_range) {
             node->right = insert(node->right, from_range, to_range, to_job);
-        } else {
+        } else if (from_range == node->from_range) {
             // If `from_range` matches exactly, insert into the `to_tree`
             node->to_tree->insert(from_range, to_range, to_job);
         }
@@ -345,7 +312,7 @@ private:
         return node;
     }
 
-    bool searchCombination(FromBucketNode *node, const BucketRange &from_range, const BucketRange &to_range,
+    bool searchCombination(FromBucketNode *node, const BucketRange<D> &from_range, const BucketRange<D> &to_range,
                            int to_job) const {
         if (node == nullptr) return false;
 
@@ -358,8 +325,10 @@ private:
         // Use updated comparison for traversing the tree
         if (from_range < node->from_range) {
             return searchCombination(node->left, from_range, to_range, to_job);
-        } else {
+        } else if (from_range > node->from_range) {
             return searchCombination(node->right, from_range, to_range, to_job);
+        } else {
+            return true;
         }
     }
 
@@ -380,11 +349,11 @@ private:
 public:
     BucketIntervalTree() : root(nullptr) {}
 
-    void insert(const BucketRange &from_range, const BucketRange &to_range, int to_job) {
+    void insert(const BucketRange<D> &from_range, const BucketRange<D> &to_range, int to_job) {
         root = insert(root, from_range, to_range, to_job);
     }
 
-    bool search(const BucketRange &from_range, const BucketRange &to_range, int to_job) const {
+    bool search(const BucketRange<D> &from_range, const BucketRange<D> &to_range, int to_job) const {
         return searchCombination(root, from_range, to_range, to_job);
     }
 

@@ -115,7 +115,8 @@ public:
     // std::unordered_map<int, BucketIntervalTree> fw_interval_trees;
     // std::unordered_map<int, BucketIntervalTree> bw_interval_trees;
 
-    inline bool is_within_bounds(const BucketRange &new_range, const BucketRange &fixed_range) {
+    template <Direction D>
+    inline bool is_within_bounds(const BucketRange<D> &new_range, const BucketRange<D> &fixed_range) {
         return (new_range.lower_bound >= fixed_range.lower_bound && new_range.upper_bound <= fixed_range.upper_bound);
     }
 
@@ -400,12 +401,12 @@ public:
     std::unordered_map<int, SplayTree> bw_job_interval_trees;
 
     template <Direction D>
-    std::unordered_map<int, BucketIntervalTree> rebuild_buckets() {
+    std::unordered_map<int, BucketIntervalTree<D>> rebuild_buckets() {
         // References to the forward or backward fixed buckets and ranges
         auto &fixed_buckets = assign_buckets<D>(fw_fixed_buckets, bw_fixed_buckets);
         auto &buckets       = assign_buckets<D>(fw_buckets, bw_buckets);
         // auto &interval_tree = assign_buckets<D>(fw_interval_trees, bw_interval_trees);
-        std::unordered_map<int, BucketIntervalTree> interval_tree;
+        std::unordered_map<int, BucketIntervalTree<D>> interval_tree;
         // interval_tree.clear();
 
         // Iterate over all fixed arcs (fixed_buckets[from][to])
@@ -417,14 +418,14 @@ public:
                 if (fixed_buckets[from_bucket][to_bucket] == 0) { continue; }
 
                 // Get the range for from_bucket
-                BucketRange from_range = {buckets[from_bucket].real_lb, buckets[from_bucket].real_ub};
+                BucketRange<D> from_range = {buckets[from_bucket].lb, buckets[from_bucket].ub};
 
                 // Get the range for to_bucket
-                BucketRange to_range = {buckets[to_bucket].real_lb, buckets[to_bucket].real_ub};
+                BucketRange<D> to_range = {buckets[to_bucket].lb, buckets[to_bucket].ub};
 
                 // check if interval_tree[from_job] exists
                 if (interval_tree.find(from_job) == interval_tree.end()) {
-                    interval_tree[from_job] = BucketIntervalTree();
+                    interval_tree[from_job] = BucketIntervalTree<D>();
                 }
                 interval_tree[from_job].insert(from_range, to_range, to_job);
             }
@@ -592,7 +593,7 @@ public:
 
         unsigned int total_threads = std::thread::hardware_concurrency();
         // Divide by 2 to use only half of the available threads
-        unsigned int half_threads = total_threads / 2;
+        unsigned int half_threads = 1;
 
         const int                JOBS = half_threads;
         exec::static_thread_pool pool(JOBS);
@@ -612,11 +613,11 @@ public:
 
                 // Process a chunk of tasks (buckets)
                 for (size_t task_idx = start_idx; task_idx < end_idx; ++task_idx) {
-                    int         bucket      = tasks[task_idx];
-                    auto       &bucket_arcs = buckets[bucket].template get_bucket_arcs<D>();
-                    auto       &from_bucket = buckets[bucket];
-                    BucketRange from_range  = {from_bucket.real_lb, from_bucket.real_ub};
-                    auto        from_job    = from_bucket.job_id;
+                    int            bucket      = tasks[task_idx];
+                    auto          &bucket_arcs = buckets[bucket].template get_bucket_arcs<D>();
+                    auto          &from_bucket = buckets[bucket];
+                    BucketRange<D> from_range  = {from_bucket.lb, from_bucket.ub};
+                    auto           from_job    = from_bucket.job_id;
 
                     // Check if the job exists in the save_rebuild map (only once per bucket)
                     auto it = save_rebuild.find(from_job);
@@ -624,9 +625,9 @@ public:
                         const auto &save_tree = it->second;
 
                         for (auto &arc : bucket_arcs) {
-                            auto        to_bucket = arc.to_bucket;
-                            auto        to_job    = buckets[to_bucket].job_id;
-                            BucketRange to_range  = {buckets[to_bucket].real_lb, buckets[to_bucket].real_ub};
+                            auto           to_bucket = arc.to_bucket;
+                            auto           to_job    = buckets[to_bucket].job_id;
+                            BucketRange<D> to_range  = {buckets[to_bucket].lb, buckets[to_bucket].ub};
 
                             // Perform the search and update fixed buckets
                             auto is_contained = save_tree.search(from_range, to_range, to_job);
@@ -665,8 +666,8 @@ public:
         intervals.clear();
         for (int i = 0; i < R_SIZE; ++i) { intervals.push_back(Interval(bucketInterval, 0)); }
 
-        // auto fw_save_rebuild = rebuild_buckets<Direction::Forward>();
-        // auto bw_save_rebuild = rebuild_buckets<Direction::Backward>();
+        auto fw_save_rebuild = rebuild_buckets<Direction::Forward>();
+        auto bw_save_rebuild = rebuild_buckets<Direction::Backward>();
 
         reset_fixed();
         reset_fixed_buckets();
@@ -689,7 +690,6 @@ public:
             });
 
         generate_arcs();
-        /*
         PARALLEL_SECTIONS(
             workB, bi_sched,
             [&, this, fw_save_rebuild]() -> void {
@@ -700,7 +700,6 @@ public:
                 // Backward direction processing
                 process_buckets<Direction::Backward>(bw_buckets_size, bw_buckets, bw_save_rebuild, bw_fixed_buckets);
             });
-            */
     }
 
     /**
@@ -825,7 +824,7 @@ public:
             print_info("Increasing bucket interval to {}\n", bucket_interval * 2);
             redefine(bucket_interval * 2);
             updated = true;
-            fixed   = false;
+            // fixed   = false;
         }
         return updated;
     }

@@ -157,8 +157,8 @@ void BucketGraph::define_buckets() {
                 job_tree.insert((D == Direction::Forward) ? interval_start : interval_adjusted,
                                 (D == Direction::Forward) ? interval_adjusted : interval_end, bucket_index);
 
-                buckets[bucket_index].real_lb = (D == Direction::Forward) ? interval_start : interval_adjusted;
-                buckets[bucket_index].real_ub = (D == Direction::Forward) ? interval_adjusted : interval_end;
+                buckets[bucket_index].real_lb = interval_start;
+                buckets[bucket_index].real_ub = interval_end;
 
                 bucket_index++;
                 n_buckets++;
