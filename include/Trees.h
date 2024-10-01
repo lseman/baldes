@@ -198,6 +198,28 @@ private:
 
         // Update height of this node
         node->height = std::max(height(node->left), height(node->right)) + 1;
+
+        // Get the balance factor of this node
+        int balance = getBalance(node);
+
+        // Left Left Case
+        if (balance > 1 && from_range < node->left->from_range) { return rightRotate(node); }
+
+        // Right Right Case
+        if (balance < -1 && from_range > node->right->from_range) { return leftRotate(node); }
+
+        // Left Right Case
+        if (balance > 1 && from_range > node->left->from_range) {
+            node->left = leftRotate(node->left);
+            return rightRotate(node);
+        }
+
+        // Right Left Case
+        if (balance < -1 && from_range < node->right->from_range) {
+            node->right = rightRotate(node->right);
+            return leftRotate(node);
+        }
+
         return node;
     }
 
@@ -219,7 +241,7 @@ private:
 
         // Apply any pending merges to ensure node's `to_range` is up-to-date
         applyPendingMerges(node);
-        
+
         // Check if `to_range` is contained within `node->to_range`
         bool toRangeContained = to_range.contained_in(node->to_range);
 
