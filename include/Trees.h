@@ -20,6 +20,13 @@
 #pragma once
 #include "Definitions.h"
 
+/**
+ * @struct BucketRange
+ * @brief Represents a range with lower and upper bounds.
+ *
+ * The BucketRange structure stores the lower and upper bounds for a range of buckets.
+ * The structure also provides comparison operators for ordering ranges based on the lower bounds.
+ */
 template <Direction D>
 struct BucketRange {
     std::vector<int> lower_bound;
@@ -71,6 +78,13 @@ struct BucketRange {
     }
 };
 
+/**
+ * @struct IntervalNode
+ * @brief Represents a node in an interval tree structure.
+ *
+ * The IntervalNode structure stores the from_range, to_range, to_job, max values, and pointers to left and right
+ * children.
+ */
 template <Direction D>
 struct IntervalNode {
     BucketRange<D>   from_range;
@@ -87,6 +101,18 @@ struct IntervalNode {
           right(nullptr), merge_pending(false), height(1) {} // Height is initialized to 1
 };
 
+/**
+ * @class IntervalTree
+ * @brief A class representing an interval tree structure for managing and querying intervals.
+ *
+ * The IntervalTree class is used to store and query intervals, where each node in the tree represents
+ * an interval with a corresponding to_job. The tree structure is used to efficiently search for overlapping
+ * intervals based on the from_range and to_range of the intervals.
+ * The tree supports insertion and search operations for intervals.
+ * The tree is balanced using AVL rotations to maintain a balanced tree structure.
+ * The tree nodes store the from_range, to_range, to_job, and max values for each node.
+ *
+ */
 template <Direction D>
 class IntervalTree {
 private:
@@ -162,7 +188,6 @@ private:
         return merged;
     }
 
-    // Helper function to insert a new range into the tree, with merging of overlapping to_ranges
     // Helper function to insert a new range into the tree, with merging of overlapping to_ranges
     IntervalNode<D> *insert(IntervalNode<D> *node, const BucketRange<D> &from_range, const BucketRange<D> &to_range,
                             int to_job) {
@@ -290,6 +315,16 @@ public:
     }
 };
 
+/**
+ * @class BucketIntervalTree
+ * @brief A class representing a tree structure for managing and querying bucket intervals.
+ *
+ * The BucketIntervalTree class is used to store and query bucket intervals, where each node in the tree
+ * represents a range of buckets and the corresponding intervals associated with those buckets.
+ * The tree structure is used to efficiently search for overlapping intervals based on the bucket ranges.
+ * The tree supports insertion and search operations for bucket intervals.
+ *
+ */
 template <Direction D>
 class BucketIntervalTree {
 private:
@@ -679,10 +714,3 @@ public:
 
     void print() { inOrderPrint(root); }
 };
-
-#define CONDITIONAL(D, FW_ACTION, BW_ACTION)         \
-    if constexpr (D == Direction::Forward) {         \
-        FW_ACTION;                                   \
-    } else if constexpr (D == Direction::Backward) { \
-        BW_ACTION;                                   \
-    }

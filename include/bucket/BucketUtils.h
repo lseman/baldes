@@ -119,7 +119,7 @@ void BucketGraph::define_buckets() {
 
         if (fits_single_bucket(job_total_ranges)) {
             // Single bucket case
-            buckets[bucket_index] = Bucket(VRPJob.id, VRPJob.lb, VRPJob.ub);
+            buckets[bucket_index]         = Bucket(VRPJob.id, VRPJob.lb, VRPJob.ub);
             buckets[bucket_index].real_lb = VRPJob.lb;
             buckets[bucket_index].real_ub = VRPJob.ub;
             job_tree.insert(VRPJob.lb, VRPJob.ub, bucket_index);
@@ -147,7 +147,6 @@ void BucketGraph::define_buckets() {
 
                 // Create a new bucket for this job
                 buckets[bucket_index] = Bucket(VRPJob.id, interval_start, interval_end);
-
 
                 std::vector<int> interval_adjusted(interval_start.size());
                 for (int r = 0; r < interval_start.size(); ++r) {
