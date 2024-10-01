@@ -1,7 +1,7 @@
 /**
-* @file Path.h
-* @brief This file contains the definition of the Path struct.
-*/
+ * @file Path.h
+ * @brief This file contains the definition of the Path struct.
+ */
 #pragma once
 #include "Common.h"
 

@@ -79,7 +79,7 @@ inline int BucketGraph::get_bucket_number(int job, const std::vector<double> &re
  *
  */
 template <Direction D>
-void BucketGraph::define_buckets(bool rebuild) {
+void BucketGraph::define_buckets() {
     int              num_intervals = MAIN_RESOURCES;
     std::vector<int> total_ranges(num_intervals);
     std::vector<int> base_intervals(num_intervals);
@@ -711,7 +711,7 @@ void BucketGraph::bucket_fixing() {
         bw_c_bar = backward_cbar;
 
         PARALLEL_SECTIONS(
-            bi_sched,
+            work, bi_sched,
             SECTION {
                 // Section 1: Forward direction
                 BucketArcElimination<Direction::Forward>(gap);

@@ -24,19 +24,35 @@ struct RowActivity {
 enum class BoundChange { kLower, kUpper };
 
 struct RowInfo {
-    enum class RowFlag {
-        kLhsInf, // Indicates LHS is -inf
-        kRhsInf  // Indicates RHS is +inf
+    enum class RowFlag : uint8_t {
+        None    = 0,
+        kLhsInf = 1 << 0, // 0b00000001
+        kRhsInf = 1 << 1  // 0b00000010
     };
 
-    std::bitset<2> rowFlag; // Efficiently store boolean flags
-    double         lhs;
-    double         rhs;
-    double         scale = 1.0;
+    uint8_t rowFlag; // Store flags as a bitmask using uint8_t
+    double  lhs;
+    double  rhs;
+    double  scale = 1.0;
 
-    RowInfo(std::bitset<2> flag, double lhs, double rhs, double scale = 1.0)
-        : rowFlag(flag), lhs(lhs), rhs(rhs), scale(scale) {}
+    // Constructor accepting flags directly as bitmask or combined flags
+    RowInfo(RowFlag flag, double lhs, double rhs, double scale = 1.0)
+        : rowFlag(static_cast<uint8_t>(flag)), lhs(lhs), rhs(rhs), scale(scale) {}
+
+    // Helper function to set a flag
+    void setFlag(RowFlag flag) { rowFlag |= static_cast<uint8_t>(flag); }
+
+    // Helper function to check if a specific flag is set
+    bool hasFlag(RowFlag flag) const { return rowFlag & static_cast<uint8_t>(flag); }
+
+    // Helper function to clear a flag
+    void clearFlag(RowFlag flag) { rowFlag &= ~static_cast<uint8_t>(flag); }
 };
+
+// Operator overloads to combine flags
+inline RowInfo::RowFlag operator|(RowInfo::RowFlag lhs, RowInfo::RowFlag rhs) {
+    return static_cast<RowInfo::RowFlag>(static_cast<uint8_t>(lhs) | static_cast<uint8_t>(rhs));
+}
 
 struct PresolveResult {
     std::map<int, std::tuple<int, double, int>> fixCol;
@@ -99,38 +115,27 @@ public:
         sense = modelData.sense;
         vtype = modelData.vtype;
     }
-
     void calculateRowActivities() {
-        size_t rows = A.num_rows;
-        activities.resize(rows);
-
-        std::for_each(activities.begin(), activities.end(), [&](RowActivity &activity) {
-            size_t i = &activity - &activities[0];
+        activities.resize(A.num_rows);
+        for (size_t i = 0; i < activities.size(); ++i) {
+            RowActivity &activity = activities[i];
             for (SparseMatrix::RowIterator it = A.rowIterator(i); it.valid(); it.next()) {
                 double coef = it.value();
                 int    j    = it.col();
 
                 if (ub[j] != NumericUtils::infty) {
-                    if (coef < 0) {
-                        activity.min += coef * ub[j];
-                    } else {
-                        activity.max += coef * ub[j];
-                    }
+                    coef < 0 ? activity.min += coef * ub[j] : activity.max += coef * ub[j];
                 } else {
                     coef < 0 ? ++activity.ninfmin : ++activity.ninfmax;
                 }
 
                 if (lb[j] != -NumericUtils::infty) {
-                    if (coef < 0) {
-                        activity.max += coef * lb[j];
-                    } else {
-                        activity.min += coef * lb[j];
-                    }
+                    coef < 0 ? activity.max += coef * lb[j] : activity.min += coef * lb[j];
                 } else {
                     coef < 0 ? ++activity.ninfmax : ++activity.ninfmin;
                 }
             }
-        });
+        }
     }
 
     void processRowInformation() {
@@ -141,17 +146,20 @@ public:
         auto processBound = [&](char sense, double value) {
             switch (sense) {
             case '<':
-                rowInfoVector.emplace_back(std::bitset<2>("01"), -NumericUtils::infty, value);
+                // LHS is -inf, so set the kLhsInf flag
+                rowInfoVector.emplace_back(RowInfo::RowFlag::kLhsInf, -NumericUtils::infty, value);
                 lhs_values.push_back(-NumericUtils::infty);
                 rhs_values.push_back(value);
                 break;
             case '>':
-                rowInfoVector.emplace_back(std::bitset<2>("10"), value, NumericUtils::infty);
+                // RHS is +inf, so set the kRhsInf flag
+                rowInfoVector.emplace_back(RowInfo::RowFlag::kRhsInf, value, NumericUtils::infty);
                 lhs_values.push_back(value);
                 rhs_values.push_back(NumericUtils::infty);
                 break;
             case '=':
-                rowInfoVector.emplace_back(std::bitset<2>("00"), value, value);
+                // Neither LHS nor RHS are infinite, so no flags
+                rowInfoVector.emplace_back(RowInfo::RowFlag::None, value, value);
                 lhs_values.push_back(value);
                 rhs_values.push_back(value);
                 break;
@@ -160,22 +168,23 @@ public:
             return true;
         };
 
+        // Iterate through the sense vector and process each bound
         for (size_t i = 0; i < sense.size(); ++i) { processBound(sense[i], b[i]); }
     }
 
-    // Convert inequality constraints to less-than-or-equal-to form
+    void flipRowSigns(int row) {
+        for (SparseMatrix::RowIterator it = A.rowIterator(row); it.valid(); it.next()) {
+            A.elements[it.index].value *= -1;
+        }
+    }
+
     void convert2LE() {
         for (int i = 0; i < A.num_rows; ++i) {
             if (sense[i] == '>') {
                 lhs_values[i] = -NumericUtils::infty;
                 rhs_values[i] = -lhs_values[i];
                 sense[i]      = '<';
-
-                for (SparseMatrix::RowIterator it = A.rowIterator(i); it.valid(); it.next()) {
-                    //A.values[it.index] *= -1; // Flip the row's sign to convert '>' to '<'
-                A.elements[it.index].value *= -1; // Flip the row's sign to convert '>' to '<'
-
-                }
+                flipRowSigns(i);
             }
         }
     }
@@ -242,8 +251,7 @@ public:
         std::mutex knapsack_mutex;
 
         std::for_each(rowInfoVector.begin(), rowInfoVector.end(), [&](const RowInfo &rowInfo) {
-            if (rowInfo.rowFlag[static_cast<int>(RowInfo::RowFlag::kLhsInf)] &&
-                !rowInfo.rowFlag[static_cast<int>(RowInfo::RowFlag::kRhsInf)]) {
+            if (rowInfo.hasFlag(RowInfo::RowFlag::kLhsInf) && !rowInfo.hasFlag(RowInfo::RowFlag::kRhsInf)) {
                 size_t rowIndex  = &rowInfo - &rowInfoVector[0];
                 int    nbinaries = 0;
 
@@ -259,7 +267,6 @@ public:
         });
         std::cout << "Number of knapsack rows: " << knapsackRows.size() << "\n";
     }
-
 
     ModelData getModelData() {
         ModelData data;

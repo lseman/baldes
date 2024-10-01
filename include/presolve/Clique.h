@@ -12,10 +12,6 @@
 #include <unordered_set>
 #include <vector>
 
-// define enum CoinBronKerbosch
-namespace CoinBronKerbosch {
-enum class PivotingStrategy { First, Random, Weight };
-}
 class CliqueManager {
 private:
     const ModelData              &modelData;

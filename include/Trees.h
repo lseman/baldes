@@ -1,6 +1,7 @@
 /**
  * @file Trees.h
- * @brief Header file containing the implementation of various tree structures used for interval and multidimensional range queries.
+ * @brief Header file containing the implementation of various tree structures used for interval and multidimensional
+ * range queries.
  *
  * This file includes the following classes:
  * - BucketRange: Represents a range with lower and upper bounds.
@@ -91,9 +92,7 @@ private:
         // Check if the current node's from_range matches the query's from_range
         if (doOverlap(node->from_range, from_range)) {
             // Now check if the to_range and to_job match or overlap
-            if (doOverlap(node->to_range, to_range) && node->to_job == to_job) {
-                return true;
-            }
+            if (doOverlap(node->to_range, to_range) && node->to_job == to_job) { return true; }
         }
 
         // Decide which subtree to search based on the from_range
@@ -119,9 +118,7 @@ public:
     }
 
     // Print the intervals (for debugging)
-    void print() const {
-        printTree(root);
-    }
+    void print() const { printTree(root); }
 
     // Helper function to print intervals (for debugging)
     void printTree(IntervalNode *node) const {

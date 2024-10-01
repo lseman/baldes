@@ -12,8 +12,8 @@
 
 #pragma once
 
-#include "Pools.h"
 #include "Definitions.h"
+#include "Pools.h"
 #include "gurobi_c++.h"
 #include <algorithm> // For std::transform
 #include <cmath>

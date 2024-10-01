@@ -46,14 +46,13 @@ public:
         print_info("Creating initial population\n");
         Population population(&params, &split, &localSearch);
 
-        /*
         // Genetic algorithm
         print_info("Running genetic algorithm\n");
         Genetic solver(&params, &split, &population, &localSearch);
         solver.run(config.nbIter, config.timeLimit);
         // std::cout << "----- GENETIC ALGORITHM FINISHED, TIME SPENT: " << params.getTimeElapsedSeconds() << std::endl;
         print_info("Genetic algorithm finished in {:.2f} seconds\n", params.getTimeElapsedSeconds());
-        */
+
         auto sol = population.extractFeasibleRoutes();
 
         // Return 0 if the program execution was successfull

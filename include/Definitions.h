@@ -260,77 +260,19 @@ using DualSolution = std::vector<double>;
 // Paralell sections
 
 // Macro to define parallel sections
-#define PARALLEL_SECTIONS(SCHEDULER, ...)                  \
-    auto work = parallel_sections(SCHEDULER, __VA_ARGS__); \
-    stdexec::sync_wait(std::move(work));
+#define PARALLEL_SECTIONS(NAME, SCHEDULER, ...)            \
+    auto NAME = parallel_sections(SCHEDULER, __VA_ARGS__); \
+    stdexec::sync_wait(std::move(NAME));
 
 // Macro to define individual sections (tasks)
 #define SECTION [this]() -> void
+
+// #define SECTION_CUSTOM(capture_list) [capture_list]() -> void
+#define SECTION_CUSTOM(capture_list) [capture_list]() -> void
 
 // Template for scheduling parallel sections
 template <typename Scheduler, typename... Tasks>
 auto parallel_sections(Scheduler &scheduler, Tasks &&...tasks) {
     // Schedule and combine all tasks using stdexec::when_all
     return stdexec::when_all((stdexec::schedule(scheduler) | stdexec::then(std::forward<Tasks>(tasks)))...);
-}
-
-inline ModelData extractModelData(GRBModel &model) {
-    ModelData data;
-    try {
-        // Variables
-        int     numVars = model.get(GRB_IntAttr_NumVars);
-        GRBVar *vars    = model.getVars();
-        for (int i = 0; i < numVars; ++i) {
-
-            if (vars[i].get(GRB_DoubleAttr_UB) > 1e10) {
-                data.ub.push_back(std::numeric_limits<double>::infinity());
-            } else {
-                data.ub.push_back(vars[i].get(GRB_DoubleAttr_UB));
-            }
-            if (vars[i].get(GRB_DoubleAttr_LB) < -1e10) {
-                data.lb.push_back(-std::numeric_limits<double>::infinity());
-            } else {
-                data.lb.push_back(vars[i].get(GRB_DoubleAttr_LB));
-            }
-            data.c.push_back(vars[i].get(GRB_DoubleAttr_Obj));
-
-            auto type = vars[i].get(GRB_CharAttr_VType);
-            if (type == GRB_BINARY) {
-                data.vtype.push_back('B');
-            } else if (type == GRB_INTEGER) {
-                data.vtype.push_back('I');
-            } else {
-                data.vtype.push_back('C');
-            }
-
-            data.name.push_back(vars[i].get(GRB_StringAttr_VarName));
-        }
-
-        // Constraints
-        int numConstrs = model.get(GRB_IntAttr_NumConstrs);
-        for (int i = 0; i < numConstrs; ++i) {
-            GRBConstr           constr = model.getConstr(i);
-            GRBLinExpr          expr   = model.getRow(constr);
-            std::vector<double> aRow(numVars, 0.0);
-            for (int j = 0; j < expr.size(); ++j) {
-                GRBVar var      = expr.getVar(j);
-                double coeff    = expr.getCoeff(j);
-                int    varIndex = var.index();
-                aRow[varIndex]  = coeff;
-            }
-
-            data.cname.push_back(constr.get(GRB_StringAttr_ConstrName));
-
-            data.A.push_back(aRow);
-            double rhs = constr.get(GRB_DoubleAttr_RHS);
-            data.b.push_back(rhs);
-            char sense = constr.get(GRB_CharAttr_Sense);
-            data.sense.push_back(sense == GRB_LESS_EQUAL ? '<' : (sense == GRB_GREATER_EQUAL ? '>' : '='));
-        }
-    } catch (GRBException &e) {
-        std::cerr << "Error code = " << e.getErrorCode() << std::endl;
-        std::cerr << e.getMessage() << std::endl;
-    }
-
-    return data;
 }

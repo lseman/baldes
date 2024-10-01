@@ -21,7 +21,6 @@
 
 #include "VRPJob.h"
 
-
 #include <execution>
 /**
  * Updates the set of buckets based on the given parameters.
@@ -109,8 +108,7 @@ void BucketGraph::BucketArcElimination(double theta) {
     auto &buckets_size  = assign_buckets<D>(fw_buckets_size, bw_buckets_size);
 
     // Reset fixed_buckets in parallel
-    std::for_each(fixed_buckets.begin(), fixed_buckets.end(),
-                  [](auto &fb) { std::fill(fb.begin(), fb.end(), 0); });
+    std::for_each(fixed_buckets.begin(), fixed_buckets.end(), [](auto &fb) { std::fill(fb.begin(), fb.end(), 0); });
 
     // Print direction of arc elimination
     if constexpr (D == Direction::Forward) {

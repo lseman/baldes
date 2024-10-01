@@ -69,4 +69,4 @@ struct JumpArc {
     JumpArc(int base, int jump, const std::vector<double> &res_inc, double cost_inc);
 };
 
-using ArcVariant   = std::variant<Arc, BucketArc>;
+using ArcVariant = std::variant<Arc, BucketArc>;

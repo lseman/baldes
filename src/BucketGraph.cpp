@@ -70,7 +70,7 @@ BucketGraph::BucketGraph(const std::vector<VRPJob> &jobs, int time_horizon, int 
     R_max     = {static_cast<double>(time_horizon), static_cast<double>(capacity)};
 
     PARALLEL_SECTIONS(
-        bi_sched, SECTION { define_buckets<Direction::Forward>(); },
+        work, bi_sched, SECTION { define_buckets<Direction::Forward>(); },
         SECTION { define_buckets<Direction::Backward>(); });
 }
 
@@ -97,7 +97,7 @@ BucketGraph::BucketGraph(const std::vector<VRPJob> &jobs, int time_horizon, int 
     R_max     = {static_cast<double>(time_horizon)};
 
     PARALLEL_SECTIONS(
-        bi_sched, SECTION { define_buckets<Direction::Forward>(); },
+        work, bi_sched, SECTION { define_buckets<Direction::Forward>(); },
         SECTION { define_buckets<Direction::Backward>(); });
 }
 
@@ -121,7 +121,7 @@ BucketGraph::BucketGraph(const std::vector<VRPJob> &jobs, std::vector<int> &boun
     }
 
     PARALLEL_SECTIONS(
-        bi_sched, SECTION { define_buckets<Direction::Forward>(); },
+        work, bi_sched, SECTION { define_buckets<Direction::Forward>(); },
         SECTION { define_buckets<Direction::Backward>(); });
 }
 
@@ -954,7 +954,7 @@ void BucketGraph::print_statistics() {
 void BucketGraph::generate_arcs() {
 
     PARALLEL_SECTIONS(
-        bi_sched,
+        work, bi_sched,
         SECTION {
             // Task for Forward Direction
             generate_arcs<Direction::Forward>();
