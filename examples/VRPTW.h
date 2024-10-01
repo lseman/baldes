@@ -134,10 +134,11 @@ public:
                 for (int i = 0; i < vec.size(); i++) {
                     if (vec[i] != 0) {
                         col.addTerms(&vec[i], &SRCconstraints[i], 1);
-                        //matrix.A_sparse.row_indices.push_back(N_SIZE - 2 + i);
-                        //matrix.A_sparse.col_indices.push_back(matrix.A_sparse.num_cols);
-                        //matrix.A_sparse.values.push_back(static_cast<double>(vec[i]));
-                        matrix.A_sparse.elements.push_back({N_SIZE - 2 + i, matrix.A_sparse.num_cols, static_cast<double>(vec[i])});
+                        // matrix.A_sparse.row_indices.push_back(N_SIZE - 2 + i);
+                        // matrix.A_sparse.col_indices.push_back(matrix.A_sparse.num_cols);
+                        // matrix.A_sparse.values.push_back(static_cast<double>(vec[i]));
+                        matrix.A_sparse.elements.push_back(
+                            {N_SIZE - 2 + i, matrix.A_sparse.num_cols, static_cast<double>(vec[i])});
                     }
                 }
             }
@@ -209,9 +210,9 @@ public:
             // Step 2: Add the non-zero entries to the sparse matrix
             for (int i = 0; i < N_SIZE - 1; ++i) {
                 if (coluna[i] > 0) {
-                    //matrix.A_sparse.row_indices.push_back(i);
-                    //matrix.A_sparse.col_indices.push_back(matrix.A_sparse.num_cols);
-                    //matrix.A_sparse.values.push_back(static_cast<double>(coluna[i]));
+                    // matrix.A_sparse.row_indices.push_back(i);
+                    // matrix.A_sparse.col_indices.push_back(matrix.A_sparse.num_cols);
+                    // matrix.A_sparse.values.push_back(static_cast<double>(coluna[i]));
                     matrix.A_sparse.elements.push_back({i, matrix.A_sparse.num_cols, static_cast<double>(coluna[i])});
                 }
             }
@@ -236,10 +237,11 @@ public:
                 for (int i = 0; i < vec.size(); i++) {
                     if (vec[i] != 0) {
                         col.addTerms(&vec[i], &SRCconstraints[i], 1);
-                        //matrix.A_sparse.row_indices.push_back(N_SIZE - 2 + i);
-                        //matrix.A_sparse.col_indices.push_back(matrix.A_sparse.num_cols);
-                        //matrix.A_sparse.values.push_back(static_cast<double>(vec[i]));
-                        matrix.A_sparse.elements.push_back({N_SIZE - 2 + i, matrix.A_sparse.num_cols, static_cast<double>(vec[i])});
+                        // matrix.A_sparse.row_indices.push_back(N_SIZE - 2 + i);
+                        // matrix.A_sparse.col_indices.push_back(matrix.A_sparse.num_cols);
+                        // matrix.A_sparse.values.push_back(static_cast<double>(vec[i]));
+                        matrix.A_sparse.elements.push_back(
+                            {N_SIZE - 2 + i, matrix.A_sparse.num_cols, static_cast<double>(vec[i])});
                     }
                 }
             }
@@ -1029,7 +1031,7 @@ public:
             if (iter % 10 == 0)
                 fmt::print("| It.: {:4} | Obj.: {:8.2f} | Price: {:9.2f} | Cuts: {:4} | Paths: {:4} | "
                            "Stage: {:1} | "
-                           "Lag. Gap: {:10.4f} | RCC: {:4} | alpha: {:4.2f} | \n",
+                           "Lag.: {:10.4f} | RCC: {:4} | alpha: {:4.2f} | \n",
                            iter, highs_obj, inner_obj, n_cuts, paths.size(), stage, lag_gap, rcc, cur_alpha);
         }
         auto end_timer        = std::chrono::high_resolution_clock::now();
