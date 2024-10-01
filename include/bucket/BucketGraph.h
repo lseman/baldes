@@ -576,10 +576,27 @@ public:
         bitmap[word_index] |= (1ULL << bit_position);
     }
 
+    /**
+     * @brief Processes the buckets in a specific direction for heritages.
+     *
+     * This function processes the buckets in the specified direction (Forward or Backward)
+     * to identify fixed arcs based on heritages. It iterates through each bucket and checks
+     * if the job exists in the save_rebuild map. If the job is found, it searches for arcs
+     * and updates the fixed buckets accordingly.
+     *
+     */
     template <Direction D>
     void process_buckets(auto buckets_size, auto &buckets, auto &save_rebuild, auto &fixed_buckets) {
         std::vector<int> tasks;
         std::atomic<int> n_fixed = 0; // Declare n_fixed as atomic for thread safety
+
+        unsigned int total_threads = std::thread::hardware_concurrency();
+        // Divide by 2 to use only half of the available threads
+        unsigned int half_threads = total_threads / 2;
+
+        const int                JOBS = half_threads;
+        exec::static_thread_pool pool(JOBS);
+        auto                     sched = pool.get_scheduler();
 
         // Create tasks for each bucket
         for (int bucket = 0; bucket < buckets_size; ++bucket) { tasks.push_back(bucket); }
@@ -623,8 +640,9 @@ public:
                 }
             });
 
+        auto work = stdexec::starts_on(sched, bulk_sender);
         // Execute the bulk sender
-        stdexec::sync_wait(std::move(bulk_sender));
+        stdexec::sync_wait(std::move(work));
 
         if constexpr (D == Direction::Forward) {
             print_info("[Fw] {} arcs fixed from heritages\n", n_fixed.load());
