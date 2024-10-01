@@ -602,7 +602,7 @@ public:
         for (int bucket = 0; bucket < buckets_size; ++bucket) { tasks.push_back(bucket); }
 
         // Define chunk size to reduce parallelization overhead
-        const int chunk_size = 10; // You can adjust this based on performance experiments
+        const int chunk_size = 50; // You can adjust this based on performance experiments
 
         // Parallel execution in chunks using NVIDIA stdexec
         auto bulk_sender = stdexec::bulk(

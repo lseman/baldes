@@ -36,10 +36,10 @@ struct CostSol {
     int    nbRoutes;       // Number of routes
     int    distance;       // Total Distance
     int    capacityExcess; // Total excess load over all routes
-    //int    durationExcess; // Total excess duration over all routes
-    int    waitTime;       // Total wait time (time to wait to meet earliest possible arrival) over all routes
-    int    timeWarp;       // Total time warp (going back in time to meet latest possible arrival) over all routes
-    bool   isFeasible;     // Feasibility status of the individual
+    // int    durationExcess; // Total excess duration over all routes
+    int  waitTime;   // Total wait time (time to wait to meet earliest possible arrival) over all routes
+    int  timeWarp;   // Total time warp (going back in time to meet latest possible arrival) over all routes
+    bool isFeasible; // Feasibility status of the individual
 
     // Constructor, initialize everything with 0
     CostSol() : penalizedCost(0.), nbRoutes(0), distance(0), capacityExcess(0), waitTime(0), timeWarp(0) {}
@@ -50,7 +50,8 @@ class Individual {
 public:
     bool compareIndividuals(const Individual *a, const Individual *b);
 
-    Params          *params;    // Problem parameters
+    Params          *params; // Problem parameters
+    int              nbVehicles;
     CostSol          myCostSol; // Information on the cost of the solution
     std::vector<int> chromT; // Giant tour representing the individual: list of integers representing clients (can not
                              // be the depot 0). Size is nbClients

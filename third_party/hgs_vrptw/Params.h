@@ -52,6 +52,8 @@ struct Savings // Savins structure for the Clarke & Wright heuristic
     double value; // Cost savings if two routes are concatenated through edge (c1, c2)
 };
 
+inline bool compSavings(const Savings &s1, const Savings &s2) { return s1.value > s2.value; }
+
 // Structure of a Client, including its index, position, and all other variables and parameters
 struct Client {
     int custNum;         // Index of the client
@@ -85,7 +87,8 @@ public:
         double fractionGeneratedNearest  = 0.05; // Proportion of individuals constructed by nearest-first
         double fractionGeneratedFurthest = 0.05; // Proportion of individuals constructed by furthest-first
         double fractionGeneratedSweep    = 0.05; // Proportion of individuals constructed by sweep
-        double fractionGeneratedRandomly = 0.85; // Proportion of individuals constructed randomly
+        double fractionGeneratedRandomly = 0.60; // Proportion of individuals constructed randomly
+        double fractionGeneratedMDM      = 0.25; // Proportion of individuals constructed by the MDM heuristic
         int    minSweepFillPercentage =
             60; // Fill rate in BKS is always more than 40%, so I don't think less than this would make sense.
                 // The maximum vehicle usage is 40% (100/250 routes, see SINTEF BKS),

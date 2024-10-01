@@ -7,11 +7,14 @@
 
 #include "Individual.h"
 #include "Params.h"
+#include "fmt/core.h"
 
 void Individual::evaluateCompleteCost() {
     // Create an object to store all information regarding solution costs
 
     myCostSol = CostSol();
+    // print params->nbVehicles
+    // check if params is nullptr
     // Loop over all routes that are not empty
     for (int r = 0; r < params->nbVehicles; r++) {
         if (!chromR[r].empty()) {
@@ -237,6 +240,8 @@ Individual::Individual(Params *params, bool rcws, std::vector<std::vector<int>> 
     predecessors = std::vector<int>(params->nbClients + 1);
     chromR       = std::vector<std::vector<int>>(params->nbVehicles);
     chromT       = std::vector<int>(params->nbClients);
+    nbVehicles   = params->nbVehicles;
+    this->params = params;
 
     if (rcws) // initialize the individual with a randomized version of the Clarke & Wright savings heuristic
     {

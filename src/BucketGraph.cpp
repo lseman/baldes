@@ -200,131 +200,70 @@ std::vector<int> BucketGraph::computePhi(int &bucket_id, bool fw) {
     std::vector<int> phi;
 
     // Ensure bucket_id is within valid bounds
-    auto &buckets       = fw ? fw_buckets : bw_buckets;
-    auto &fixed_buckets = fw ? fw_fixed_buckets : fw_fixed_buckets;
+    auto &buckets            = fw ? fw_buckets : bw_buckets;
+    auto &fixed_buckets      = fw ? fw_fixed_buckets : bw_fixed_buckets;
+    auto &job_interval_trees = fw ? fw_job_interval_trees : bw_job_interval_trees;
 
     if constexpr (R_SIZE > 1) {
         if (bucket_id >= buckets.size() || bucket_id < 0) return phi;
 
-        // Determine the base intervals for all resource dimensions
         std::vector<int> total_ranges(intervals.size());
         std::vector<int> base_intervals(intervals.size());
-        std::vector<int> remainders(intervals.size());
 
         for (int r = 0; r < intervals.size(); ++r) {
             total_ranges[r]   = static_cast<int>(R_max[r] - R_min[r] + 1); // Ensure integer type for total range
             base_intervals[r] = total_ranges[r] / static_cast<int>(intervals[r].interval);
-            remainders[r]     = total_ranges[r] % static_cast<int>(intervals[r].interval);
         }
-
-        auto &num_buckets       = fw ? num_buckets_fw : num_buckets_bw;
-        auto &num_buckets_index = fw ? num_buckets_index_fw : num_buckets_index_bw;
 
         // Get the job ID and current bucket
         int   job_id         = buckets[bucket_id].job_id;
         auto &current_bucket = buckets[bucket_id];
 
-        // Forward search: find buckets with -1 interval for each dimension
+        // Retrieve the pre-built Splay Tree for this job
+        auto &job_tree = job_interval_trees[job_id];
+
+        // Search for matching intervals using the existing Splay Tree
         if (fw) {
-            for (int i = num_buckets_index[job_id]; i < num_buckets_index[job_id] + num_buckets[job_id]; ++i) {
-                for (int r = 0; r < intervals.size(); ++r) {
-                    if (r == 0) { // Special case for time dimension
-                        if (buckets[i].job_id == job_id &&
-                            buckets[i].lb[r] == current_bucket.lb[r] - base_intervals[r]) {
-                            bool same_for_other_dims = true;
-                            for (int other_r = 1; other_r < intervals.size(); ++other_r) {
-                                if (buckets[i].lb[other_r] != current_bucket.lb[other_r]) {
-                                    same_for_other_dims = false;
-                                    break;
-                                }
-                            }
-                            if (same_for_other_dims) {
+            // Forward search: find the interval just below the current bucket
+            std::vector<int> target_low = current_bucket.lb;
+            for (int r = 0; r < intervals.size(); ++r) {
+                target_low[r] -= base_intervals[r]; // Adjust for the base intervals
+            }
+
+            TreeNode *found_node = job_tree.find(target_low);
+            if (found_node != nullptr && buckets[found_node->bucket_index].job_id == job_id) {
+                // Check if the found bucket is fixed
 #ifdef FIX_BUCKETS
-                                if (fixed_buckets[i][bucket_id] == 0)
+                if (fixed_buckets[found_node->bucket_index][bucket_id] == 0)
 #endif
-                                {
-                                    phi.push_back(i);
-                                }
-                            }
-                        }
-                    } else { // Handle generic resource dimensions
-                        if (buckets[i].job_id == job_id &&
-                            buckets[i].lb[r] == current_bucket.lb[r] - base_intervals[r]) {
-                            bool same_for_other_dims = true;
-                            for (int other_r = 0; other_r < intervals.size(); ++other_r) {
-                                if (other_r != r && buckets[i].lb[other_r] != current_bucket.lb[other_r]) {
-                                    same_for_other_dims = false;
-                                    break;
-                                }
-                            }
-                            if (same_for_other_dims) {
+                {
+                    phi.push_back(found_node->bucket_index);
+                }
+            }
+        } else {
+            // Backward search: find the interval just above the current bucket
+            std::vector<int> target_high = current_bucket.ub;
+            for (int r = 0; r < intervals.size(); ++r) {
+                target_high[r] += base_intervals[r]; // Adjust for the base intervals
+            }
+
+            TreeNode *found_node = job_tree.find(target_high);
+            if (found_node != nullptr && buckets[found_node->bucket_index].job_id == job_id) {
+                // Check if the found bucket is fixed
 #ifdef FIX_BUCKETS
-                                if (fixed_buckets[i][bucket_id] == 0)
+                if (fixed_buckets[found_node->bucket_index][bucket_id] == 0)
 #endif
-                                {
-                                    phi.push_back(i);
-                                }
-                            }
-                        }
-                    }
+                {
+                    phi.push_back(found_node->bucket_index);
                 }
             }
         }
-        // Backward search: find buckets with +1 interval for each dimension
-        else {
-            for (int i = num_buckets_index[job_id]; i < num_buckets_index[job_id] + num_buckets[job_id]; ++i) {
-                for (int r = 0; r < intervals.size(); ++r) {
-                    if (r == 0) { // Special case for time dimension
-                        if (buckets[i].job_id == job_id &&
-                            buckets[i].ub[r] == current_bucket.ub[r] + base_intervals[r]) {
-                            bool same_for_other_dims = true;
-                            for (int other_r = 1; other_r < intervals.size(); ++other_r) {
-                                if (buckets[i].ub[other_r] != current_bucket.ub[other_r]) {
-                                    same_for_other_dims = false;
-                                    break;
-                                }
-                            }
-                            if (same_for_other_dims) {
-#ifdef FIX_BUCKETS
-                                if (fixed_buckets[i][bucket_id] == 0)
-#endif
-                                {
-                                    phi.push_back(i);
-                                }
-                            }
-                        }
-                    } else { // Handle generic resource dimensions
-                        if (buckets[i].job_id == job_id &&
-                            buckets[i].ub[r] == current_bucket.ub[r] + base_intervals[r]) {
-                            bool same_for_other_dims = true;
-                            for (int other_r = 0; other_r < intervals.size(); ++other_r) {
-                                if (other_r != r && buckets[i].ub[other_r] != current_bucket.ub[other_r]) {
-                                    same_for_other_dims = false;
-                                    break;
-                                }
-                            }
-                            if (same_for_other_dims) {
-#ifdef FIX_BUCKETS
-                                if (fixed_buckets[i][bucket_id] == 0)
-#endif
-                                {
-                                    phi.push_back(i);
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
+
     } else {
-        auto smaller = 0;
-        smaller      = bucket_id - 1;
+        // Handle the case where R_SIZE == 1 with a simpler approach
+        int smaller = bucket_id - 1;
 
-        if (smaller >= buckets.size() || smaller < 0) return phi;
-
-        //  check if smalller has the same job_id as vertex
-        if (buckets[smaller].job_id == buckets[bucket_id].job_id) {
-
+        if (smaller >= 0 && buckets[smaller].job_id == buckets[bucket_id].job_id) {
 #ifdef FIX_BUCKETS
             if (fixed_buckets[smaller][bucket_id] == 0)
 #endif
@@ -332,7 +271,6 @@ std::vector<int> BucketGraph::computePhi(int &bucket_id, bool fw) {
                 phi.push_back(smaller);
             }
         }
-        return phi;
     }
     return phi;
 }
