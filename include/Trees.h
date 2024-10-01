@@ -30,8 +30,11 @@ struct BucketRange {
                                             other.lower_bound.end());
     }
 
-    // Define operator> based on operator< to avoid ambiguity
-    bool operator>(const BucketRange &other) const { return other < *this; }
+    // Define operator> based on the correct comparison logic
+    bool operator>(const BucketRange &other) const {
+        return std::lexicographical_compare(other.upper_bound.begin(), other.upper_bound.end(), upper_bound.begin(),
+                                            upper_bound.end());
+    }
 
     // Optional: Define operator== and operator!= for completeness
     bool operator==(const BucketRange &other) const {
@@ -70,16 +73,16 @@ private:
             return y; // Return the node itself if rotation can't be performed
         }
 
-        IntervalNode *x  = y->left;
-        IntervalNode *T2 = x->right;
+        IntervalNode *x  = y->left;  // x becomes the new root of the subtree
+        IntervalNode *T2 = x->right; // T2 will be the right child of x after rotation
 
         // Perform rotation
         x->right = y;
         y->left  = T2;
 
         // Update heights
-        y->height = std::max(height(y->left), height(y->right)) + 1;
-        x->height = std::max(height(x->left), height(x->right)) + 1;
+        y->height = std::max(height(y->left), height(y->right)) + 1; // y's height depends on its new children
+        x->height = std::max(height(x->left), height(x->right)) + 1; // x's height depends on its new children
 
         // Return new root
         return x;
@@ -90,16 +93,16 @@ private:
             return x; // Return the node itself if rotation can't be performed
         }
 
-        IntervalNode *y  = x->right;
-        IntervalNode *T2 = y->left;
+        IntervalNode *y  = x->right; // y becomes the new root of the subtree
+        IntervalNode *T2 = y->left;  // T2 will be the left child of x after rotation
 
         // Perform rotation
         y->left  = x;
         x->right = T2;
 
         // Update heights
-        x->height = std::max(height(x->left), height(x->right)) + 1;
-        y->height = std::max(height(y->left), height(y->right)) + 1;
+        x->height = std::max(height(x->left), height(x->right)) + 1; // x's height depends on its new children
+        y->height = std::max(height(y->left), height(y->right)) + 1; // y's height depends on its new children
 
         // Return new root
         return y;
@@ -124,38 +127,55 @@ private:
     }
 
     // Helper function to insert a new range into the tree, with merging of overlapping to_ranges
-IntervalNode *insert(IntervalNode *node, const BucketRange &from_range, const BucketRange &to_range, int to_job) {
-    // Insert as in the original, unbalanced version
-    if (node == nullptr) {
-        return new IntervalNode(from_range, to_range, to_job);
-    }
+    IntervalNode *insert(IntervalNode *node, const BucketRange &from_range, const BucketRange &to_range, int to_job) {
+        // Insert as in the original, unbalanced version
+        if (node == nullptr) { return new IntervalNode(from_range, to_range, to_job); }
 
-    // Compare based on lower_bound
-    if (from_range.lower_bound < node->from_range.lower_bound) {
-        node->left = insert(node->left, from_range, to_range, to_job);
-    } else if (from_range.lower_bound > node->from_range.lower_bound) {
-        node->right = insert(node->right, from_range, to_range, to_job);
-    } else { // Handles equality case based on lower_bound
-        if (doOverlap(node->to_range, to_range) && node->to_job == to_job) {
-            node->merge_pending = true; // Mark for merging
-        } else {
+        // Compare based on lower_bound
+        if (from_range < node->from_range) {
+            node->left = insert(node->left, from_range, to_range, to_job);
+        } else if (from_range > node->from_range) {
             node->right = insert(node->right, from_range, to_range, to_job);
+        } else { // Handles equality case based on lower_bound
+            if (doOverlap(node->to_range, to_range) && node->to_job == to_job) {
+                node->merge_pending = true; // Mark for merging
+            } else {
+                node->right = insert(node->right, from_range, to_range, to_job);
+            }
         }
+
+        // Update max values (assuming the upper_bound size matches)
+        for (size_t i = 0; i < node->max.size(); ++i) {
+            node->max[i] = std::max({node->max[i], from_range.upper_bound[i], node->to_range.upper_bound[i]});
+        }
+
+        // Update height of this node
+        node->height = std::max(height(node->left), height(node->right)) + 1;
+
+        // Get balance factor to check if the node is unbalanced
+        int balance = getBalance(node);
+
+        // Left Left Case (unbalanced on the left side)
+        if (balance > 1 && from_range < node->left->from_range) { return rightRotate(node); }
+
+        // Right Right Case (unbalanced on the right side)
+        if (balance < -1 && from_range > node->right->from_range) { return leftRotate(node); }
+
+        // Left Right Case (unbalanced on the left side, but insertion on the right of left child)
+        if (balance > 1 && from_range > node->left->from_range) {
+            node->left = leftRotate(node->left);
+            return rightRotate(node);
+        }
+
+        // Right Left Case (unbalanced on the right side, but insertion on the left of right child)
+        if (balance < -1 && from_range < node->right->from_range) {
+            node->right = rightRotate(node->right);
+            return leftRotate(node);
+        }
+
+        // Return the (unchanged) node pointer
+        return node;
     }
-
-    // Update max values (assuming the upper_bound size matches)
-    for (size_t i = 0; i < node->max.size(); ++i) {
-        node->max[i] = std::max({node->max[i], from_range.upper_bound[i], node->to_range.upper_bound[i]});
-    }
-
-    // Apply AVL balancing ONLY if imbalance is critical (i.e., |balance| > 1)
-    node->height = std::max(height(node->left), height(node->right)) + 1;
-    int balance = getBalance(node);
-
-    // Return the current node if no rotation was required
-    return node;
-}
-
 
     void applyPendingMerges(IntervalNode *node) const {
         if (node != nullptr && node->merge_pending) {

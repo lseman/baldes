@@ -240,7 +240,6 @@ Individual::Individual(Params *params, bool rcws, std::vector<std::vector<int>> 
     predecessors = std::vector<int>(params->nbClients + 1);
     chromR       = std::vector<std::vector<int>>(params->nbVehicles);
     chromT       = std::vector<int>(params->nbClients);
-    nbVehicles   = params->nbVehicles;
     this->params = params;
 
     if (rcws) // initialize the individual with a randomized version of the Clarke & Wright savings heuristic
