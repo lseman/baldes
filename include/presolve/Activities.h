@@ -123,6 +123,8 @@ public:
                 double coef = it.value();
                 int    j    = it.col();
 
+                // print lb and ub
+                fmt::print("lb[{}] = {}, ub[{}] = {}\n", j, lb[j], j, ub[j]);
                 if (ub[j] != NumericUtils::infty) {
                     coef < 0 ? activity.min += coef * ub[j] : activity.max += coef * ub[j];
                 } else {
@@ -252,12 +254,14 @@ public:
 
         std::for_each(rowInfoVector.begin(), rowInfoVector.end(), [&](const RowInfo &rowInfo) {
             if (rowInfo.hasFlag(RowInfo::RowFlag::kLhsInf) && !rowInfo.hasFlag(RowInfo::RowFlag::kRhsInf)) {
+                // fmt::print("Row {} has LHS infinite\n", &rowInfo - &rowInfoVector[0]);
                 size_t rowIndex  = &rowInfo - &rowInfoVector[0];
                 int    nbinaries = 0;
 
                 for (SparseMatrix::RowIterator it = A.rowIterator(rowIndex); it.valid(); it.next()) {
                     if (vtype[it.col()] == 'B') ++nbinaries;
                 }
+                fmt::print("Row {} has {} binary variables\n", rowIndex, nbinaries);
 
                 if (nbinaries > 2) {
                     // std::lock_guard<std::mutex> lock(knapsack_mutex);

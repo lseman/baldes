@@ -160,8 +160,8 @@ inline void printBaldes() {
     fmt::print("| {}{:<52}{} |\n", blue, "BALDES, a Bucket Graph Labeling Algorithm", reset); // Blue text
     fmt::print("| {:<52} |\n", "for Vehicle Routing");
     fmt::print("| {:<52} |\n", " ");
-    fmt::print("| {:<52} |\n", "a modern C++ implementation");
-    fmt::print("| {:<52} |\n", "of the Bucket Graph-based labeling algorithm");
+    fmt::print("| {:<52} |\n", "a modern C++ implementation of the");
+    fmt::print("| {:<52} |\n", "Bucket Graph-based Labeling Algorithm");
     fmt::print("| {:<52} |\n", "for the Resource-Constrained Shortest Path Problem");
     fmt::print("| {:<52} |\n", " ");
     fmt::print("| {:<52} |\n", "https://github.com/lseman/baldes");

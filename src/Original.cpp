@@ -161,5 +161,5 @@ int main(int argc, char *argv[]) {
     // Build the conflict graph
     auto binary_number = (N_SIZE - 1) * (N_SIZE - 1);
     cm.buildUpdateCg(cliques, binary_number);
-    cm.printCg(varIndex2Name);
+    // cm.printCg(varIndex2Name);
 };

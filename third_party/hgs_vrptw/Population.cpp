@@ -54,6 +54,7 @@ void Population::generatePopulation() {
     }
 
     if (params->config.initialSolution != "") {
+        fmt::print("Adding initial solution to population\n");
         Individual initialIndiv(params, params->config.initialSolution);
         addIndividual(&initialIndiv, true);
         std::cout << "Added initial solution to population" << std::endl;
@@ -64,6 +65,7 @@ void Population::generatePopulation() {
     double fractionGeneratedFurthest     = params->config.fractionGeneratedFurthest;
     double fractionGeneratedSweep        = params->config.fractionGeneratedSweep;
     double fractionGeneratedRandomly     = params->config.fractionGeneratedRandomly;
+    double fractionGeneratedMDM          = params->config.fractionGeneratedMDM;
     int    minSweepFillPercentage        = params->config.minSweepFillPercentage;
     int    maxToleratedCapacityViolation = params->config.maxToleratedCapacityViolation;
     int    maxToleratedTimeWarp          = params->config.maxToleratedTimeWarp;
@@ -84,7 +86,17 @@ void Population::generatePopulation() {
     int nofFurthestIndividualsToGenerate = round(fractionGeneratedFurthest * nofIndividuals);
     int nofSweepIndividualsToGenerate    = round(fractionGeneratedSweep * nofIndividuals);
     int nofRandomIndividualsToGenerate   = round(fractionGeneratedRandomly * nofIndividuals);
+    int noOfMDMIndividualsToGenerate     = round(fractionGeneratedMDM * nofIndividuals);
 
+    // Generate some individuals using the MDMPatterns
+    for (int i = 0; i < noOfMDMIndividualsToGenerate; i++) {
+        Individual indiv(params, true, nextMDMPattern());
+        doHGSLocalSearchAndAddIndividual(&indiv);
+        // addIndividual(&indiv, true);
+    }
+
+    print_info("Generated {} individuals using MDMPatterns\n", noOfMDMIndividualsToGenerate);
+    printState(-1, -1);
     // Generate some individuals using the NEAREST construction heuristic
     for (int i = 0; i < nofNearestIndividualsToGenerate; i++) {
         if (params->isTimeLimitExceeded()) {

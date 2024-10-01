@@ -7,8 +7,8 @@
 #include <string>
 #include <vector>
 
-#include "../Reader.h"
 #include "../Definitions.h"
+#include "../Reader.h"
 
 #include "CircleSector.h"
 #include "Matrix.h"
@@ -83,8 +83,8 @@ Params::Params(const InstanceData &instance) {
     // Set default fleet size if not provided by the user
     if (nbVehicles == INT_MAX) {
         nbVehicles = static_cast<int>(std::ceil(1.3 * totalDemand / vehicleCapacity) + 3.);
-        //std::cout << "----- FLEET SIZE WAS NOT SPECIFIED: DEFAULT INITIALIZATION TO " << nbVehicles << " VEHICLES"
-        //          << std::endl;
+        // std::cout << "----- FLEET SIZE WAS NOT SPECIFIED: DEFAULT INITIALIZATION TO " << nbVehicles << " VEHICLES"
+        //           << std::endl;
         print_info("Fleet size was not specified: default initialization to {} vehicles \n", nbVehicles);
     } else {
         print_info("Fleet size specified in the commandline: set to {} vehicles \n", nbVehicles);
@@ -226,6 +226,19 @@ Params::Params(const InstanceData &instance) {
     // See Vidal 2012, HGS for VRPTW
     proximityWeightWaitTime = 0.2;
     proximityWeightTimeWarp = 1;
+
+    savingsList = std::vector<Savings>(nbClients * (nbClients - 1) / 2); // Assuming the distance matrix is symmetric
+
+    int savingsCount = 0;
+    for (int i = 1; i <= nbClients; i++)
+        for (int j = 1; j < i; j++) {
+            savingsList[savingsCount].c1    = i;
+            savingsList[savingsCount].c2    = j;
+            savingsList[savingsCount].value = timeCost[0][i] + timeCost[0][j] - timeCost[i][j];
+            savingsCount++;
+        }
+
+    std::sort(savingsList.begin(), savingsList.end(), compSavings);
 }
 
 Params::Params(const std::string &path_location) {
