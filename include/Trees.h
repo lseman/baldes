@@ -21,25 +21,29 @@
 #include "Definitions.h"
 
 struct BucketRange {
-    int lower_bound;
-    int upper_bound;
+    std::vector<int> lower_bound;
+    std::vector<int> upper_bound;
 
-    // Comparator for ordering ranges by their lower bound
-    bool operator<(const BucketRange &other) const { return lower_bound < other.lower_bound; }
+    // Comparator for ordering ranges by their lower bound (lexicographical comparison)
+    bool operator<(const BucketRange &other) const { 
+        return std::lexicographical_compare(lower_bound.begin(), lower_bound.end(), other.lower_bound.begin(), other.lower_bound.end());
+    }
 };
 
+// TODO: make the tree self-balancing
 struct IntervalNode {
     BucketRange   from_range; // Interval representing from_bucket range
     BucketRange   to_range;   // Interval representing to_bucket range
     int           to_job;     // The to_job associated with this range
-    int           max;        // Maximum upper bound of this subtree
+    std::vector<int> max;     // Maximum upper bounds of this subtree (as vector)
     IntervalNode *left;
     IntervalNode *right;
+    mutable bool  merge_pending; // Indicates if the node has pending merges
 
     // Constructor
     IntervalNode(const BucketRange &f_range, const BucketRange &t_range, int to_job)
         : from_range(f_range), to_range(t_range), to_job(to_job), max(f_range.upper_bound), left(nullptr),
-          right(nullptr) {}
+          right(nullptr), merge_pending(false) {}
 };
 
 class IntervalTree {
@@ -48,40 +52,51 @@ private:
 
     // Helper function to check if two intervals overlap
     bool doOverlap(const BucketRange &i1, const BucketRange &i2) const {
-        return i1.lower_bound <= i2.upper_bound && i2.lower_bound <= i1.upper_bound;
+        for (size_t i = 0; i < i1.lower_bound.size(); ++i) {
+            if (!(i1.lower_bound[i] <= i2.upper_bound[i] && i2.lower_bound[i] <= i1.upper_bound[i])) {
+                return false;
+            }
+        }
+        return true;
     }
 
     // Helper function to merge two overlapping ranges
     BucketRange mergeRanges(const BucketRange &i1, const BucketRange &i2) const {
-        return {std::min(i1.lower_bound, i2.lower_bound), std::max(i1.upper_bound, i2.upper_bound)};
+        BucketRange merged;
+        for (size_t i = 0; i < i1.lower_bound.size(); ++i) {
+            merged.lower_bound.push_back(std::min(i1.lower_bound[i], i2.lower_bound[i]));
+            merged.upper_bound.push_back(std::max(i1.upper_bound[i], i2.upper_bound[i]));
+        }
+        return merged;
     }
 
     // Helper function to insert a new range into the tree, with merging of overlapping to_ranges
     IntervalNode *insert(IntervalNode *node, const BucketRange &from_range, const BucketRange &to_range, int to_job) {
-        if (node == nullptr) {
-            // Insert the new interval node
-            return new IntervalNode(from_range, to_range, to_job);
-        }
+        if (node == nullptr) { return new IntervalNode(from_range, to_range, to_job); }
 
-        // Insert based on the lower bound of the from_range
         if (from_range < node->from_range) {
             node->left = insert(node->left, from_range, to_range, to_job);
         } else if (from_range.lower_bound > node->from_range.lower_bound) {
             node->right = insert(node->right, from_range, to_range, to_job);
         } else {
-            // If the from_range matches, we need to merge to_ranges if they overlap
             if (doOverlap(node->to_range, to_range) && node->to_job == to_job) {
-                // Merge the overlapping to_ranges
-                node->to_range = mergeRanges(node->to_range, to_range);
+                node->merge_pending = true;
             } else {
-                // If no overlap or different to_job, insert in right subtree (arbitrary choice)
                 node->right = insert(node->right, from_range, to_range, to_job);
             }
         }
 
-        // Update the max value at this node
-        node->max = std::max({node->max, from_range.upper_bound, node->to_range.upper_bound});
+        for (size_t i = 0; i < node->max.size(); ++i) {
+            node->max[i] = std::max({node->max[i], from_range.upper_bound[i], node->to_range.upper_bound[i]});
+        }
         return node;
+    }
+
+    void applyPendingMerges(IntervalNode *node) const {
+        if (node != nullptr && node->merge_pending) {
+            node->to_range = mergeRanges(node->to_range, node->from_range);
+            node->merge_pending = false;
+        }
     }
 
     // Helper function to check if two intervals overlap and then search
@@ -89,14 +104,14 @@ private:
                            int to_job) const {
         if (node == nullptr) return false;
 
-        // Check if the current node's from_range matches the query's from_range
+        applyPendingMerges(node);
+
         if (doOverlap(node->from_range, from_range)) {
-            // Now check if the to_range and to_job match or overlap
             if (doOverlap(node->to_range, to_range) && node->to_job == to_job) { return true; }
         }
 
-        // Decide which subtree to search based on the from_range
-        if (from_range.lower_bound < node->from_range.lower_bound) {
+        if (std::lexicographical_compare(from_range.lower_bound.begin(), from_range.lower_bound.end(),
+                                         node->from_range.lower_bound.begin(), node->from_range.lower_bound.end())) {
             return searchCombination(node->left, from_range, to_range, to_job);
         } else {
             return searchCombination(node->right, from_range, to_range, to_job);
@@ -104,30 +119,33 @@ private:
     }
 
 public:
-    // Constructor
     IntervalTree() : root(nullptr) {}
 
-    // Insert a new range, merging if necessary
     void insert(const BucketRange &from_range, const BucketRange &to_range, int to_job) {
         root = insert(root, from_range, to_range, to_job);
     }
 
-    // Search for any match with the given from_range, to_range, and to_job
     bool search(const BucketRange &from_range, const BucketRange &to_range, int to_job) const {
         return searchCombination(root, from_range, to_range, to_job);
     }
 
-    // Print the intervals (for debugging)
     void print() const { printTree(root); }
 
-    // Helper function to print intervals (for debugging)
     void printTree(IntervalNode *node) const {
         if (node == nullptr) return;
 
         printTree(node->left);
-        std::cout << "From range: [" << node->from_range.lower_bound << ", " << node->from_range.upper_bound << "] "
-                  << "To range: [" << node->to_range.lower_bound << ", " << node->to_range.upper_bound
-                  << "] with to_job: " << node->to_job << " max = " << node->max << "\n";
+        std::cout << "From range: [";
+        for (size_t i = 0; i < node->from_range.lower_bound.size(); ++i) {
+            std::cout << node->from_range.lower_bound[i] << ", " << node->from_range.upper_bound[i];
+            if (i < node->from_range.lower_bound.size() - 1) std::cout << "; ";
+        }
+        std::cout << "] To range: [";
+        for (size_t i = 0; i < node->to_range.lower_bound.size(); ++i) {
+            std::cout << node->to_range.lower_bound[i] << ", " << node->to_range.upper_bound[i];
+            if (i < node->to_range.lower_bound.size() - 1) std::cout << "; ";
+        }
+        std::cout << "] with to_job: " << node->to_job << "\n";
         printTree(node->right);
     }
 };
@@ -135,15 +153,14 @@ public:
 class BucketIntervalTree {
 private:
     struct FromBucketNode {
-        BucketRange     from_range; // Interval for from_bucket
-        IntervalTree   *to_tree;    // Interval tree for to_bucket ranges
-        int             max;        // Max upper bound of from_bucket interval
+        BucketRange     from_range;
+        IntervalTree   *to_tree;
+        std::vector<int> max;
         FromBucketNode *left;
         FromBucketNode *right;
 
-        // Constructor
         FromBucketNode(const BucketRange &r) : from_range(r), max(r.upper_bound), left(nullptr), right(nullptr) {
-            to_tree = new IntervalTree(); // Create a new interval tree for to_bucket ranges
+            to_tree = new IntervalTree();
         }
 
         ~FromBucketNode() { delete to_tree; }
@@ -151,64 +168,69 @@ private:
 
     FromBucketNode *root;
 
-    // Insert a new from_bucket range with a to_bucket range
     FromBucketNode *insert(FromBucketNode *node, const BucketRange &from_range, const BucketRange &to_range,
                            int to_job) {
         if (node == nullptr) { node = new FromBucketNode(from_range); }
 
-        // Insert the to_bucket range into the associated to_tree
         node->to_tree->insert(from_range, to_range, to_job);
 
-        // Update the max value at this node
-        node->max = std::max(node->max, from_range.upper_bound);
+        for (size_t i = 0; i < node->max.size(); ++i) {
+            node->max[i] = std::max(node->max[i], from_range.upper_bound[i]);
+        }
 
         return node;
     }
 
-    // Search for any combination of from_range and to_range
     bool searchCombination(FromBucketNode *node, const BucketRange &from_range, const BucketRange &to_range,
                            int to_job) const {
         if (node == nullptr) return false;
 
         if (doOverlap(node->from_range, from_range)) {
-            // Now check if the to_bucket range and to_job match
             if (node->to_tree->search(from_range, to_range, to_job)) { return true; }
         }
 
-        if (node->left != nullptr && node->left->max >= from_range.lower_bound)
+        if (std::lexicographical_compare(from_range.lower_bound.begin(), from_range.lower_bound.end(),
+                                         node->from_range.lower_bound.begin(), node->from_range.lower_bound.end())) {
             return searchCombination(node->left, from_range, to_range, to_job);
+        }
 
         return searchCombination(node->right, from_range, to_range, to_job);
     }
 
     bool doOverlap(const BucketRange &i1, const BucketRange &i2) const {
-        return i1.lower_bound <= i2.upper_bound && i2.lower_bound <= i1.upper_bound;
+        for (size_t i = 0; i < i1.lower_bound.size(); ++i) {
+            if (!(i1.lower_bound[i] <= i2.upper_bound[i] && i2.lower_bound[i] <= i1.upper_bound[i])) {
+                return false;
+            }
+        }
+        return true;
     }
 
     void printTree(FromBucketNode *node) const {
         if (node == nullptr) return;
 
         printTree(node->left);
-        std::cout << "From range: [" << node->from_range.lower_bound << ", " << node->from_range.upper_bound << "]\n";
-        node->to_tree->print(); // Print to_bucket ranges
+        std::cout << "From range: [";
+        for (size_t i = 0; i < node->from_range.lower_bound.size(); ++i) {
+            std::cout << node->from_range.lower_bound[i] << ", " << node->from_range.upper_bound[i];
+            if (i < node->from_range.lower_bound.size() - 1) std::cout << "; ";
+        }
+        std::cout << "]\n";
+        node->to_tree->print();
         printTree(node->right);
     }
 
 public:
-    // Constructor
     BucketIntervalTree() : root(nullptr) {}
 
-    // Insert a from_bucket and to_bucket combination
     void insert(const BucketRange &from_range, const BucketRange &to_range, int to_job) {
         root = insert(root, from_range, to_range, to_job);
     }
 
-    // Search for a from_bucket and to_bucket combination
     bool search(const BucketRange &from_range, const BucketRange &to_range, int to_job) const {
         return searchCombination(root, from_range, to_range, to_job);
     }
 
-    // Print the intervals (for debugging)
     void print() const { printTree(root); }
 };
 

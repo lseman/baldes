@@ -33,7 +33,6 @@ include_directories(include)
 include_directories(include/bucket)
 include_directories(include/cuts)
 include_directories(include/extra)
-
 include_directories(third_party/hgs_vrptw)
 
 # Build types and flags
@@ -51,9 +50,6 @@ if(APPLE)
 endif()
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
-
-# Define a config.h.in template
-configure_file("config.h.in" "config.h")
 
 # Include the generated config.h file
 include_directories("${CMAKE_CURRENT_BINARY_DIR}")
@@ -220,10 +216,10 @@ if(IPM)
   include_directories(${EIGEN_SOURCE_DIR})
 
 endif()
+
 include_directories(/usr/include/suitesparse/)
 
 set(GUROBI_HOME $ENV{GUROBI_HOME})
-
 include_directories(${GUROBI_HOME}/include)
 
 # Source files

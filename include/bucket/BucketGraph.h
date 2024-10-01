@@ -417,10 +417,10 @@ public:
                 // if (fixed_buckets[from_bucket][to_bucket] == 1) {
 
                 // Get the range for from_bucket
-                BucketRange from_range = {buckets[from_bucket].lb[0], buckets[from_bucket].ub[0]};
+                BucketRange from_range = {buckets[from_bucket].lb, buckets[from_bucket].ub};
 
                 // Get the range for to_bucket
-                BucketRange to_range = {buckets[to_bucket].lb[0], buckets[to_bucket].ub[0]};
+                BucketRange to_range = {buckets[to_bucket].lb, buckets[to_bucket].ub};
 
                 // check if interval_tree[from_job] exists
                 if (interval_tree.find(from_job) == interval_tree.end()) {
@@ -615,7 +615,7 @@ public:
                     int         bucket      = tasks[task_idx];
                     auto       &bucket_arcs = buckets[bucket].template get_bucket_arcs<D>();
                     auto       &from_bucket = buckets[bucket];
-                    BucketRange from_range  = {from_bucket.lb[0], from_bucket.ub[0]};
+                    BucketRange from_range  = {from_bucket.lb, from_bucket.ub};
                     auto        from_job    = from_bucket.job_id;
 
                     // Check if the job exists in the save_rebuild map (only once per bucket)
@@ -626,7 +626,7 @@ public:
                         for (auto &arc : bucket_arcs) {
                             auto        to_bucket = arc.to_bucket;
                             auto        to_job    = buckets[to_bucket].job_id;
-                            BucketRange to_range  = {buckets[to_bucket].lb[0], buckets[to_bucket].ub[0]};
+                            BucketRange to_range  = {buckets[to_bucket].lb, buckets[to_bucket].ub};
 
                             // Perform the search and update fixed buckets
                             auto is_contained = save_tree.search(from_range, to_range, to_job);

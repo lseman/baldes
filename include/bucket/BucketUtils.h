@@ -699,7 +699,6 @@ void BucketGraph::bucket_fixing() {
         std::vector<double> forward_cbar(fw_buckets.size(), std::numeric_limits<double>::infinity());
         std::vector<double> backward_cbar(bw_buckets.size(), std::numeric_limits<double>::infinity());
 
-        // if constexpr (S == Stage::Two) {
         run_labeling_algorithms<Stage::Four, Full::Full>(forward_cbar, backward_cbar);
 
         gap = incumbent - (relaxation + std::min(0.0, min_red_cost));
@@ -744,11 +743,8 @@ void BucketGraph::heuristic_fixing() {
     std::vector<double> forward_cbar(fw_buckets.size(), std::numeric_limits<double>::infinity());
     std::vector<double> backward_cbar(bw_buckets.size(), std::numeric_limits<double>::infinity());
 
-    if constexpr (S == Stage::Three) {
-        run_labeling_algorithms<Stage::Two, Full::Partial>(forward_cbar, backward_cbar);
-    } else {
-        run_labeling_algorithms<Stage::Three, Full::Partial>(forward_cbar, backward_cbar);
-    }
+    run_labeling_algorithms<Stage::Two, Full::Partial>(forward_cbar, backward_cbar);
+
     std::vector<std::vector<Label *>> fw_labels_map(jobs.size());
     std::vector<std::vector<Label *>> bw_labels_map(jobs.size());
 
