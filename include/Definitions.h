@@ -276,3 +276,10 @@ auto parallel_sections(Scheduler &scheduler, Tasks &&...tasks) {
     // Schedule and combine all tasks using stdexec::when_all
     return stdexec::when_all((stdexec::schedule(scheduler) | stdexec::then(std::forward<Tasks>(tasks)))...);
 }
+
+#define CONDITIONAL(D, FW_ACTION, BW_ACTION)         \
+    if constexpr (D == Direction::Forward) {         \
+        FW_ACTION;                                   \
+    } else if constexpr (D == Direction::Backward) { \
+        BW_ACTION;                                   \
+    }
