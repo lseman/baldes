@@ -93,10 +93,10 @@ inline std::vector<Label *> BucketGraph::solve() {
         // If transitioning to Stage 4, print a message and apply fixing
         if (transition) {
             // print_cut("Transitioning to stage 4\n");
-            fixed        = true;                                 // Enable fixing of buckets in Stage 4
-            paths        = bi_labeling_algorithm<Stage::Four>(); // Solve the problem with Stage 4
-            transition   = false;                                // End the transition period
-            fixed        = false;
+            fixed      = true;                                 // Enable fixing of buckets in Stage 4
+            paths      = bi_labeling_algorithm<Stage::Four>(); // Solve the problem with Stage 4
+            transition = false;                                // End the transition period
+            // fixed        = false;
             min_red_cost = paths[0]->cost; // Update the minimum reduced cost
             iter++;
             return paths; // Return the final paths

@@ -1,8 +1,8 @@
 
 #pragma once
+#include "Arc.h"
 #include "Common.h"
 #include "Label.h"
-#include "Arc.h"
 /**
  * @struct Bucket
  * @brief Represents a bucket.

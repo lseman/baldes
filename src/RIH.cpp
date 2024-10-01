@@ -27,8 +27,8 @@
  * the solution by making local modifications to the routes.
  */
 
-#include "bucket/BucketGraph.h"
 #include "Definitions.h"
+#include "bucket/BucketGraph.h"
 
 /* Improvement heuristics based on the insertion/deletion of customers */
 /* Operation 1: modify the routes by adding one customer to each route */

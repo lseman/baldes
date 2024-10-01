@@ -112,8 +112,8 @@ public:
     SchrodingerPool sPool = SchrodingerPool(200);
 #endif
 
-    //std::unordered_map<int, BucketIntervalTree> fw_interval_trees;
-    //std::unordered_map<int, BucketIntervalTree> bw_interval_trees;
+    // std::unordered_map<int, BucketIntervalTree> fw_interval_trees;
+    // std::unordered_map<int, BucketIntervalTree> bw_interval_trees;
 
     inline bool is_within_bounds(const BucketRange &new_range, const BucketRange &fixed_range) {
         return (new_range.lower_bound >= fixed_range.lower_bound && new_range.upper_bound <= fixed_range.upper_bound);
@@ -351,7 +351,7 @@ public:
     std::vector<double>                R_min;
     std::vector<std::vector<uint64_t>> neighborhoods_bitmap; // Bitmap for neighborhoods of each job
     std::vector<std::vector<uint64_t>> elementarity_bitmap;  // Bitmap for elementarity sets
-    std::vector<std::vector<uint64_t>> packing_bitmap;      // Bitmap for packing sets
+    std::vector<std::vector<uint64_t>> packing_bitmap;       // Bitmap for packing sets
 
     void define_elementarity_sets() {
         size_t num_jobs = jobs.size();
@@ -404,9 +404,9 @@ public:
         // References to the forward or backward fixed buckets and ranges
         auto &fixed_buckets = assign_buckets<D>(fw_fixed_buckets, bw_fixed_buckets);
         auto &buckets       = assign_buckets<D>(fw_buckets, bw_buckets);
-        //auto &interval_tree = assign_buckets<D>(fw_interval_trees, bw_interval_trees);
+        // auto &interval_tree = assign_buckets<D>(fw_interval_trees, bw_interval_trees);
         std::unordered_map<int, BucketIntervalTree> interval_tree;
-        //interval_tree.clear();
+        // interval_tree.clear();
 
         // Iterate over all fixed arcs (fixed_buckets[from][to])
         for (int from_bucket = 0; from_bucket < fw_buckets_size; ++from_bucket) {
@@ -576,6 +576,65 @@ public:
         bitmap[word_index] |= (1ULL << bit_position);
     }
 
+    template <Direction D>
+    void process_buckets(auto buckets_size, auto &buckets, auto &save_rebuild, auto &fixed_buckets) {
+        std::vector<int> tasks;
+        std::atomic<int> n_fixed = 0; // Declare n_fixed as atomic for thread safety
+
+        // Create tasks for each bucket
+        for (int bucket = 0; bucket < buckets_size; ++bucket) { tasks.push_back(bucket); }
+
+        // Define chunk size to reduce parallelization overhead
+        const int chunk_size = 10; // You can adjust this based on performance experiments
+
+        // Parallel execution in chunks using NVIDIA stdexec
+        auto bulk_sender = stdexec::bulk(
+            stdexec::just(), (tasks.size() + chunk_size - 1) / chunk_size, [&, chunk_size](std::size_t chunk_idx) {
+                size_t start_idx = chunk_idx * chunk_size;
+                size_t end_idx   = std::min(start_idx + chunk_size, tasks.size());
+
+                // Process a chunk of tasks (buckets)
+                for (size_t task_idx = start_idx; task_idx < end_idx; ++task_idx) {
+                    int         bucket      = tasks[task_idx];
+                    auto       &bucket_arcs = buckets[bucket].template get_bucket_arcs<D>();
+                    auto       &from_bucket = buckets[bucket];
+                    BucketRange from_range  = {from_bucket.lb[0], from_bucket.ub[0]};
+                    auto        from_job    = from_bucket.job_id;
+
+                    // Check if the job exists in the save_rebuild map (only once per bucket)
+                    auto it = save_rebuild.find(from_job);
+                    if (it != save_rebuild.end()) {
+                        const auto &save_tree = it->second;
+
+                        for (auto &arc : bucket_arcs) {
+                            auto        to_bucket = arc.to_bucket;
+                            auto        to_job    = buckets[to_bucket].job_id;
+                            BucketRange to_range  = {buckets[to_bucket].lb[0], buckets[to_bucket].ub[0]};
+
+                            // Perform the search and update fixed buckets
+                            auto is_contained = save_tree.search(from_range, to_range, to_job);
+                            if (is_contained) {
+                                fixed_buckets[bucket][to_bucket] = 1;
+                                // Update fixed count in a thread-safe manner
+                                std::atomic_fetch_add(&n_fixed, 1);
+                            }
+                        }
+                    }
+                }
+            });
+
+        // Execute the bulk sender
+        stdexec::sync_wait(std::move(bulk_sender));
+
+        if constexpr (D == Direction::Forward) {
+            print_info("[Fw] {} arcs fixed from heritages\n", n_fixed.load());
+        } else {
+            print_info("[Bw] {} arcs fixed from heritages\n", n_fixed.load());
+        }
+
+        ObtainJumpBucketArcs<D>();
+    }
+
     /**
      * @brief Redefines the bucket intervals and reinitializes various data structures.
      *
@@ -595,7 +654,7 @@ public:
         reset_fixed_buckets();
 
         PARALLEL_SECTIONS(
-            bi_sched,
+            work, bi_sched,
             SECTION {
                 // Section 1: Forward direction
                 define_buckets<Direction::Forward>();
@@ -612,7 +671,17 @@ public:
             });
 
         generate_arcs();
-        for (auto &VRPJob : jobs) { VRPJob.sort_arcs(); }
+
+        PARALLEL_SECTIONS(
+            workB, bi_sched,
+            [&, this, fw_save_rebuild]() -> void {
+                // Forward direction processing
+                process_buckets<Direction::Forward>(fw_buckets_size, fw_buckets, fw_save_rebuild, fw_fixed_buckets);
+            },
+            [&, this, bw_save_rebuild]() -> void {
+                // Backward direction processing
+                process_buckets<Direction::Backward>(bw_buckets_size, bw_buckets, bw_save_rebuild, bw_fixed_buckets);
+            });
     }
 
     /**
@@ -706,8 +775,8 @@ public:
         //////////////////////////////////////////////////////////////////////
         // ADAPTIVE TERMINAL TIME
         //////////////////////////////////////////////////////////////////////
-        // Adjust the terminal time dynamically based on the difference between the number of forward and backward
-        // labels
+        // Adjust the terminal time dynamically based on the difference between the number of forward and
+        // backward labels
         for (auto &split : q_star) {
             // print n_fw_labels and n_bw_labels
             // If there are more backward labels than forward labels, increase the terminal time slightly
@@ -733,14 +802,10 @@ public:
         auto step_calc = mean_dominance_checks / non_dominated_labels_per_bucket;
         if (step_calc > 1000) {
 
-            //redefine_counter = 0;
+            // redefine_counter = 0;
             print_info("Increasing bucket interval to {}\n", bucket_interval * 2);
             redefine(bucket_interval * 2);
-            // fmt::print("New step size bucket_interval: {}\n", bucket_interval);
-            // reset_fixed_buckets();
-            fixed   = true;
             updated = true;
-            // redefine_counter++;
         }
         return updated;
     }
@@ -764,7 +829,7 @@ public:
                           const std::vector<std::vector<int>> &sccs);
 
     template <Direction D>
-    void define_buckets(bool rebuild = false);
+    void define_buckets();
 
     template <Direction D, Stage S>
     bool DominatedInCompWiseSmallerBuckets(const Label *L, int bucket, const std::vector<double> &c_bar,
