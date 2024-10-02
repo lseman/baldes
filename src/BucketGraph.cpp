@@ -207,12 +207,12 @@ std::vector<int> BucketGraph::computePhi(int &bucket_id, bool fw) {
     if constexpr (R_SIZE > 1) {
         if (bucket_id >= buckets.size() || bucket_id < 0) return phi;
 
-        std::vector<int> total_ranges(intervals.size());
-        std::vector<int> base_intervals(intervals.size());
+        std::vector<double> total_ranges(intervals.size());
+        std::vector<double> base_intervals(intervals.size());
 
         for (int r = 0; r < intervals.size(); ++r) {
-            total_ranges[r]   = static_cast<int>(R_max[r] - R_min[r] + 1); // Ensure integer type for total range
-            base_intervals[r] = total_ranges[r] / static_cast<int>(intervals[r].interval);
+            total_ranges[r]   = R_max[r] - R_min[r]; // Ensure integer type for total range
+            base_intervals[r] = total_ranges[r] / intervals[r].interval;
         }
 
         // Get the node ID and current bucket
@@ -536,15 +536,13 @@ void BucketGraph::common_initialization() {
     auto &num_bucket_index = assign_buckets<Direction::Forward>(num_buckets_index_fw, num_buckets_index_bw);
 
     int              num_intervals = intervals.size(); // Determine how many resources we have (number of intervals)
-    std::vector<int> total_ranges(num_intervals);
-    std::vector<int> base_intervals(num_intervals);
-    std::vector<int> remainders(num_intervals);
+    std::vector<double> total_ranges(num_intervals);
+    std::vector<double> base_intervals(num_intervals);
 
     // Calculate base intervals and total ranges for each resource dimension
     for (int r = 0; r < intervals.size(); ++r) {
-        total_ranges[r]   = R_max[r] - R_min[r] + 1;
+        total_ranges[r]   = R_max[r] - R_min[r];
         base_intervals[r] = total_ranges[r] / intervals[r].interval;
-        remainders[r]     = total_ranges[r] % intervals[r].interval; // Use std::fmod for floating-point modulo
     }
 
     // Clear forward and backward buckets
@@ -657,15 +655,13 @@ void BucketGraph::mono_initialization() {
     auto &num_bucket_index = assign_buckets<Direction::Forward>(num_buckets_index_fw, num_buckets_index_bw);
 
     int              num_intervals = intervals.size(); // Determine how many resources we have (number of intervals)
-    std::vector<int> total_ranges(num_intervals);
-    std::vector<int> base_intervals(num_intervals);
-    std::vector<int> remainders(num_intervals);
+    std::vector<double> total_ranges(num_intervals);
+    std::vector<double> base_intervals(num_intervals);
 
     // Calculate base intervals and total ranges for each resource dimension
     for (int r = 0; r < intervals.size(); ++r) {
-        total_ranges[r]   = R_max[r] - R_min[r] + 1;
+        total_ranges[r]   = R_max[r] - R_min[r];
         base_intervals[r] = total_ranges[r] / intervals[r].interval;
-        remainders[r]     = total_ranges[r] % intervals[r].interval; // Use std::fmod for floating-point modulo
     }
 
     // Clear forward and backward buckets
