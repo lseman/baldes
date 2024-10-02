@@ -225,7 +225,7 @@ std::vector<int> BucketGraph::computePhi(int &bucket_id, bool fw) {
         // Search for matching intervals using the existing Splay Tree
         if (fw) {
             // Forward search: find the interval just below the current bucket
-            std::vector<int> target_low = current_bucket.lb;
+            std::vector<double> target_low = current_bucket.lb;
             for (int r = 0; r < intervals.size(); ++r) {
                 target_low[r] -= base_intervals[r]; // Adjust for the base intervals
             }
@@ -242,7 +242,7 @@ std::vector<int> BucketGraph::computePhi(int &bucket_id, bool fw) {
             }
         } else {
             // Backward search: find the interval just above the current bucket
-            std::vector<int> target_high = current_bucket.ub;
+            std::vector<double> target_high = current_bucket.ub;
             for (int r = 0; r < intervals.size(); ++r) {
                 target_high[r] += base_intervals[r]; // Adjust for the base intervals
             }
@@ -594,7 +594,7 @@ void BucketGraph::common_initialization() {
         std::vector<double> interval_starts(num_intervals);
         for (int r = 0; r < num_intervals; ++r) {
             interval_starts[r] =
-                std::min(static_cast<int>(R_max[r]), VRPNode.lb[r] + current_pos[r] * base_intervals[r]);
+                std::min(R_max[r], VRPNode.lb[r] + current_pos[r] * base_intervals[r]);
         }
 
         // Adjust to calculate index using `num_buckets[0]`, which is likely multi-dimensional for the depot
@@ -621,7 +621,7 @@ void BucketGraph::common_initialization() {
 
         std::vector<double> interval_ends(num_intervals);
         for (int r = 0; r < num_intervals; ++r) {
-            interval_ends[r] = std::max(static_cast<int>(R_min[r]), VRPNode.ub[r] - current_pos[r] * base_intervals[r]);
+            interval_ends[r] = std::max(R_min[r], VRPNode.ub[r] - current_pos[r] * base_intervals[r]);
         }
 
         // Calculate index for backward direction
@@ -712,7 +712,7 @@ void BucketGraph::mono_initialization() {
         std::vector<double> interval_starts(num_intervals);
         for (int r = 0; r < num_intervals; ++r) {
             interval_starts[r] =
-                std::min(static_cast<int>(R_max[r]), VRPNode.lb[r] + current_pos[r] * base_intervals[r]);
+                std::min(R_max[r], VRPNode.lb[r] + current_pos[r] * base_intervals[r]);
         }
 
         // Adjust to calculate index using `num_buckets[0]`, which is likely multi-dimensional for the depot

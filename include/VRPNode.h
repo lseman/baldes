@@ -23,8 +23,8 @@ struct VRPNode {
     int                           duration;
     double                        cost = 0.0;
     double                        demand;
-    std::vector<int>              lb;
-    std::vector<int>              ub;
+    std::vector<double>           lb;
+    std::vector<double>           ub;
     std::vector<int>              mtw_lb;
     std::vector<int>              mtw_ub;
     std::vector<Arc>              fw_arcs;

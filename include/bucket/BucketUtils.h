@@ -58,13 +58,11 @@ void BucketGraph::add_arc(int from_bucket, int to_bucket, const std::vector<doub
 template <Direction D>
 inline int BucketGraph::get_bucket_number(int node, const std::vector<double> &resource_values_vec) noexcept {
 
-    std::vector<int> resource_vec_int(resource_values_vec.data(),
-                                      resource_values_vec.data() + resource_values_vec.size());
     if constexpr (D == Direction::Forward) {
-        auto val = fw_node_interval_trees[node].query(resource_vec_int);
+        auto val = fw_node_interval_trees[node].query(resource_values_vec);
         return val;
     } else if constexpr (D == Direction::Backward) {
-        auto val = bw_node_interval_trees[node].query(resource_vec_int);
+        auto val = bw_node_interval_trees[node].query(resource_values_vec);
         return val;
     }
     std::throw_with_nested(std::runtime_error("BucketGraph::get_bucket_number: Invalid direction"));
@@ -81,15 +79,15 @@ inline int BucketGraph::get_bucket_number(int node, const std::vector<double> &r
 template <Direction D>
 void BucketGraph::define_buckets() {
     int              num_intervals = MAIN_RESOURCES;
-    std::vector<int> total_ranges(num_intervals);
-    std::vector<int> base_intervals(num_intervals);
-    std::vector<int> remainders(num_intervals);
+    std::vector<double> total_ranges(num_intervals);
+    std::vector<double> base_intervals(num_intervals);
+    //std::vector<int> remainders(num_intervals);
 
     // Determine the base interval and other relevant values for each resource
     for (int r = 0; r < num_intervals; ++r) {
-        total_ranges[r]   = R_max[r] - R_min[r] + 1;
+        total_ranges[r]   = R_max[r] - R_min[r];
         base_intervals[r] = total_ranges[r] / intervals[r].interval;
-        remainders[r]     = total_ranges[r] % intervals[r].interval;
+        //remainders[r]     = total_ranges[r] % intervals[r].interval;
     }
 
     auto &buckets            = assign_buckets<D>(fw_buckets, bw_buckets);
@@ -120,8 +118,6 @@ void BucketGraph::define_buckets() {
         if (fits_single_bucket(node_total_ranges)) {
             // Single bucket case
             buckets[bucket_index]         = Bucket(VRPNode.id, VRPNode.lb, VRPNode.ub);
-            buckets[bucket_index].real_lb = VRPNode.lb;
-            buckets[bucket_index].real_ub = VRPNode.ub;
             node_tree.insert(VRPNode.lb, VRPNode.ub, bucket_index);
 
             num_buckets[VRPNode.id]       = 1;
@@ -135,7 +131,7 @@ void BucketGraph::define_buckets() {
             std::vector<int> current_pos(num_intervals, 0);
 
             while (true) {
-                std::vector<int> interval_start(num_intervals), interval_end(num_intervals);
+                std::vector<double> interval_start(num_intervals), interval_end(num_intervals);
 
                 // Calculate the start and end for each interval dimension
                 for (int r = 0; r < num_intervals; ++r) {
@@ -148,16 +144,13 @@ void BucketGraph::define_buckets() {
                 // Create a new bucket for this node
                 buckets[bucket_index] = Bucket(VRPNode.id, interval_start, interval_end);
 
-                std::vector<int> interval_adjusted(interval_start.size());
+                std::vector<double> interval_adjusted(interval_start.size());
                 for (int r = 0; r < interval_start.size(); ++r) {
                     interval_adjusted[r] = (D == Direction::Forward) ? interval_start[r] + base_intervals[r]
                                                                      : interval_end[r] - base_intervals[r];
                 }
                 node_tree.insert((D == Direction::Forward) ? interval_start : interval_adjusted,
                                 (D == Direction::Forward) ? interval_adjusted : interval_end, bucket_index);
-
-                buckets[bucket_index].real_lb = interval_start;
-                buckets[bucket_index].real_ub = interval_end;
 
                 bucket_index++;
                 n_buckets++;

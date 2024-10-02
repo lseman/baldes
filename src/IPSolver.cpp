@@ -780,39 +780,41 @@ OptimizationData IPSolver::extractOptimizationComponents(GRBModel &model) {
     return data;
 }
 
-OptimizationData IPSolver::convertToOptimizationData(const ModelData &modelData) {
+OptimizationData IPSolver::convertToOptimizationData(const SparseMatrix &sparseMatrix, const ModelData &modelData) {
     OptimizationData optData;
 
-    // Convert SparseModel to Eigen::SparseMatrix
+    // Convert SparseMatrix to Eigen::SparseMatrix using Eigen::Triplet
     std::vector<Eigen::Triplet<double>> triplets;
-    for (size_t i = 0; i < modelData.A_sparse.values.size(); ++i) {
-        triplets.emplace_back(modelData.A_sparse.row_indices[i], modelData.A_sparse.col_indices[i],
-                              modelData.A_sparse.values[i]);
-    }
+
+    // Iterate over the CRS format of SparseMatrix to build triplets
+    sparseMatrix.forEachRow([&triplets](int row, int col, double value) {
+        triplets.emplace_back(row, col, value);
+    });
 
     // Resize the Eigen sparse matrix
-    optData.As.resize(modelData.A_sparse.num_rows, modelData.A_sparse.num_cols);
+    optData.As.resize(sparseMatrix.num_rows, sparseMatrix.num_cols);
 
     // Set the values from the triplets
     optData.As.setFromTriplets(triplets.begin(), triplets.end());
 
     // Make the matrix compressed for efficient operations
     optData.As.makeCompressed();
+
     // Convert b to Eigen::VectorXd
     optData.bs = Eigen::VectorXd::Map(modelData.b.data(), modelData.b.size());
+
     // Convert c to Eigen::VectorXd
     optData.cs = Eigen::VectorXd::Map(modelData.c.data(), modelData.c.size());
+
     // Convert lb to Eigen::VectorXd
     optData.lo = Eigen::VectorXd::Map(modelData.lb.data(), modelData.lb.size());
+
     // Convert ub to Eigen::VectorXd
     optData.hi = Eigen::VectorXd::Map(modelData.ub.data(), modelData.ub.size());
 
-    // print ize of ub and lb
-    // Convert sense to Eigen::VectorXd (mapping '<' to -1, '=' to 0, '>' to 1)
+    // Convert sense to Eigen::VectorXd (mapping '<' to 0, '=' to 1, '>' to 0 and flipping the corresponding row)
     optData.sense.resize(modelData.sense.size());
-    // print len sense
     for (size_t i = 0; i < modelData.sense.size(); ++i) {
-
         if (modelData.sense[i] == '<') {
             optData.sense[i] = 0.0;
         } else if (modelData.sense[i] == '=') {
@@ -820,7 +822,7 @@ OptimizationData IPSolver::convertToOptimizationData(const ModelData &modelData)
         } else if (modelData.sense[i] == '>') {
             optData.sense[i] = 0.0;
             optData.bs[i]    = -optData.bs[i];
-            optData.As.row(i) *= -1;
+            optData.As.row(i) *= -1; // Flip the row for '>'
         }
     }
 
