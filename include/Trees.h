@@ -29,8 +29,8 @@
  */
 template <Direction D>
 struct BucketRange {
-    std::vector<int> lower_bound;
-    std::vector<int> upper_bound;
+    std::vector<double> lower_bound;
+    std::vector<double> upper_bound;
 
     // Lexicographical comparison for ordering ranges
     bool operator<(const BucketRange &other) const {
@@ -90,7 +90,7 @@ struct IntervalNode {
     BucketRange<D>   from_range;
     BucketRange<D>   to_range;
     int              to_node;
-    std::vector<int> max;
+    std::vector<double> max;
     IntervalNode    *left;
     IntervalNode    *right;
     mutable bool     merge_pending;
@@ -331,7 +331,7 @@ private:
     struct FromBucketNode {
         BucketRange<D>   from_range;
         IntervalTree<D> *to_tree;
-        std::vector<int> max;
+        std::vector<double> max;
         FromBucketNode  *left;
         FromBucketNode  *right;
 
@@ -424,24 +424,24 @@ public:
  */
 class TreeNode {
 public:
-    std::vector<int> low;          // Lower bounds for each dimension
-    std::vector<int> high;         // Upper bounds for each dimension
+    std::vector<double> low;          // Lower bounds for each dimension
+    std::vector<double> high;         // Upper bounds for each dimension
     int              bucket_index; // Bucket index for this node
     TreeNode        *left;
     TreeNode        *right;
     TreeNode        *parent;
 
-    TreeNode(const std::vector<int> &low, const std::vector<int> &high, int bucket_index)
+    TreeNode(const std::vector<double> &low, const std::vector<double> &high, int bucket_index)
         : low(low), high(high), bucket_index(bucket_index), left(nullptr), right(nullptr), parent(nullptr) {}
 
-    bool contains(const std::vector<int> &point) const {
+    bool contains(const std::vector<double> &point) const {
         for (size_t i = 0; i < low.size(); ++i) {
             if (point[i] < low[i] || point[i] > high[i]) { return false; }
         }
         return true;
     }
 
-    bool is_less_than(const std::vector<int> &point) const {
+    bool is_less_than(const std::vector<double> &point) const {
         for (size_t i = 0; i < low.size(); ++i) {
             if (high[i] < point[i]) {
                 return true;
@@ -639,7 +639,7 @@ class SplayTree {
 public:
     SplayTree() : root(nullptr) {}
 
-    TreeNode *find(const std::vector<int> &point) {
+    TreeNode *find(const std::vector<double> &point) {
         TreeNode *curr = root;
 
         while (curr != nullptr) {
@@ -657,14 +657,14 @@ public:
         return nullptr;
     }
 
-    int query(const std::vector<int> &point) {
+    int query(const std::vector<double> &point) {
         TreeNode *node = find(point);
         if (node != nullptr) return node->bucket_index;
         return -1;
     }
 
     // Insert a new multidimensional interval
-    void insert(const std::vector<int> &low, const std::vector<int> &high, int bucket_index) {
+    void insert(const std::vector<double> &low, const std::vector<double> &high, int bucket_index) {
 
         if (root == nullptr) {
             root = new TreeNode(low, high, bucket_index);

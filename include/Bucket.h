@@ -16,10 +16,8 @@ struct Bucket {
     std::vector<Label *> labels_vec; // Use deque for efficient insertion/removal
 
     int                    node_id = -1;
-    std::vector<int>       lb;
-    std::vector<int>       ub;
-    std::vector<int>       real_lb;
-    std::vector<int>       real_ub;
+    std::vector<double>       lb;
+    std::vector<double>       ub;
     std::vector<Arc>       fw_arcs;
     std::vector<Arc>       bw_arcs;
     std::vector<BucketArc> fw_bucket_arcs;
@@ -148,7 +146,7 @@ struct Bucket {
         }
     }
 
-    Bucket(int node_id, std::vector<int> lb, std::vector<int> ub)
+    Bucket(int node_id, std::vector<double> lb, std::vector<double> ub)
         : node_id(node_id), lb(std::move(lb)), ub(std::move(ub)) {
 
         labels_vec.reserve(250);
