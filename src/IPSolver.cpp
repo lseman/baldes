@@ -780,11 +780,12 @@ OptimizationData IPSolver::extractOptimizationComponents(GRBModel &model) {
     return data;
 }
 
-OptimizationData IPSolver::convertToOptimizationData(const SparseMatrix &sparseMatrix, const ModelData &modelData) {
+OptimizationData IPSolver::convertToOptimizationData(const ModelData &modelData) {
     OptimizationData optData;
 
     // Convert SparseMatrix to Eigen::SparseMatrix using Eigen::Triplet
     std::vector<Eigen::Triplet<double>> triplets;
+    auto sparseMatrix = modelData.A_sparse;
 
     // Iterate over the CRS format of SparseMatrix to build triplets
     sparseMatrix.forEachRow([&triplets](int row, int col, double value) {

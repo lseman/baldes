@@ -509,10 +509,10 @@ public:
     void augment_ng_memories(std::vector<double> &solution, std::vector<Path> &paths, bool aggressive, int eta1,
                              int eta2, int eta_max, int nC);
 
-    inline double       getcij(int i, int j) const { return distance_matrix[i][j]; }
-    void                calculate_neighborhoods(size_t num_closest);
+    inline double        getcij(int i, int j) const { return distance_matrix[i][j]; }
+    void                 calculate_neighborhoods(size_t num_closest);
     std::vector<VRPNode> getNodes() const { return nodes; }
-    std::vector<int>    computePhi(int &bucket, bool fw);
+    std::vector<int>     computePhi(int &bucket, bool fw);
 
     template <Stage state, Full fullness>
     void run_labeling_algorithms(std::vector<double> &forward_cbar, std::vector<double> &backward_cbar);
@@ -617,7 +617,7 @@ public:
                     auto          &bucket_arcs = buckets[bucket].template get_bucket_arcs<D>();
                     auto          &from_bucket = buckets[bucket];
                     BucketRange<D> from_range  = {from_bucket.lb, from_bucket.ub};
-                    auto           from_node    = from_bucket.node_id;
+                    auto           from_node   = from_bucket.node_id;
 
                     // Check if the node exists in the save_rebuild map (only once per bucket)
                     auto it = save_rebuild.find(from_node);
@@ -626,7 +626,7 @@ public:
 
                         for (auto &arc : bucket_arcs) {
                             auto           to_bucket = arc.to_bucket;
-                            auto           to_node    = buckets[to_bucket].node_id;
+                            auto           to_node   = buckets[to_bucket].node_id;
                             BucketRange<D> to_range  = {buckets[to_bucket].lb, buckets[to_bucket].ub};
 
                             // Perform the search and update fixed buckets
@@ -702,6 +702,63 @@ public:
             });
     }
 
+    template <Direction D>
+    void split_buckets() {
+
+        auto &buckets           = assign_buckets<D>(fw_buckets, bw_buckets);
+        auto &buckets_size      = assign_buckets<D>(fw_buckets_size, bw_buckets_size);
+        auto &num_buckets       = assign_buckets<D>(num_buckets_fw, num_buckets_bw);
+        auto &num_buckets_index = assign_buckets<D>(num_buckets_index_fw, num_buckets_index_bw);
+
+        int original_num_buckets = buckets_size.size();
+
+        // Reserve space to avoid reallocation during insertion
+        buckets.reserve(2 * original_num_buckets);
+
+        for (int i = 0; i < original_num_buckets; ++i) {
+            // Get the current bucket
+            const auto &bucket      = buckets[i];
+            const auto &next_bucket = buckets[i + 1];
+
+            // Calculate mid-point for each dimension
+            std::vector<double> mid_point(bucket.lb.size());
+            if constexpr (D == Direction::Forward) {
+
+                for (int r = 0; r < bucket.lb.size(); ++r) { mid_point[r] = (bucket.lb[r] + next_bucket.lb[r]) / 2.0; }
+            } else {
+                for (int r = 0; r < bucket.lb.size(); ++r) { mid_point[r] = (bucket.ub[r] + next_bucket.ub[r]) / 2.0; }
+            }
+
+            Bucket bucket1;
+            Bucket bucket2;
+            if constexpr (D == Direction::Forward) {
+                // Create two new buckets by splitting at the mid-point
+                bucket1 = Bucket(bucket.node_id, bucket.lb, bucket.ub);
+                bucket2 = Bucket(bucket.node_id, mid_point, bucket.ub);
+            } else {
+                // Create two new buckets by splitting at the mid-point
+                bucket1 = Bucket(bucket.node_id, bucket.lb, bucket.ub);
+                bucket2 = Bucket(bucket.node_id, bucket.lb, mid_point);
+            }
+
+            // Insert the second half (bucket2) at position i+1
+            buckets.insert(buckets.begin() + i + 1, bucket2);
+
+            // Replace the current bucket with the first half (bucket1)
+            buckets[i] = bucket1;
+
+            // Update the bucket count and indices for this node
+            num_buckets[bucket.node_id]++;
+            num_buckets_index[bucket.node_id] = i;
+
+            // Since we added a new bucket at i+1, we need to skip over it on the next iteration
+            ++i;
+        }
+
+        // Update the global bucket size
+        buckets_size = buckets.size();
+    }
+
     /**
      * @brief Resets the forward and backward label pools.
      *
@@ -765,9 +822,9 @@ public:
         if (!fw_label || !bw_label) return false;
 
         // Cache resources and node data
-        const auto          &fw_resources = fw_label->resources;
-        const auto          &bw_resources = bw_label->resources;
-        const struct VRPNode &VRPNode       = nodes[fw_label->node_id];
+        const auto           &fw_resources = fw_label->resources;
+        const auto           &bw_resources = bw_label->resources;
+        const struct VRPNode &VRPNode      = nodes[fw_label->node_id];
 
         // Time feasibility check
         const auto time_fw     = fw_resources[TIME_INDEX];
@@ -885,7 +942,7 @@ public:
 
 private:
     std::vector<Interval> intervals;
-    std::vector<VRPNode>   nodes;
+    std::vector<VRPNode>  nodes;
     int                   time_horizon{};
     int                   capacity{};
     int                   bucket_interval{};

@@ -81,13 +81,11 @@ void BucketGraph::define_buckets() {
     int              num_intervals = MAIN_RESOURCES;
     std::vector<double> total_ranges(num_intervals);
     std::vector<double> base_intervals(num_intervals);
-    //std::vector<int> remainders(num_intervals);
 
     // Determine the base interval and other relevant values for each resource
     for (int r = 0; r < num_intervals; ++r) {
         total_ranges[r]   = R_max[r] - R_min[r];
         base_intervals[r] = total_ranges[r] / intervals[r].interval;
-        //remainders[r]     = total_ranges[r] % intervals[r].interval;
     }
 
     auto &buckets            = assign_buckets<D>(fw_buckets, bw_buckets);
@@ -206,9 +204,9 @@ void BucketGraph::generate_arcs() {
     auto &num_buckets_index = assign_buckets<D>(num_buckets_index_fw, num_buckets_index_bw);
 
     // Compute base intervals for each resource dimension based on R_max and R_min
-    std::vector<int> base_intervals(intervals.size());
+    std::vector<double> base_intervals(intervals.size());
     for (int r = 0; r < intervals.size(); ++r) {
-        base_intervals[r] = std::floor((R_max[r] - R_min[r] + 1) / static_cast<int>(intervals[r].interval));
+        base_intervals[r] = (R_max[r] - R_min[r]) / intervals[r].interval;
     }
 
     // Clear all buckets in parallel, removing any existing arcs
