@@ -11,10 +11,10 @@
  * Key Components:
  * - `LabelComparator`: A utility class for comparing Label objects based on cost.
  * - `BucketGraph`: The primary class implementing bucket-based graph management.
- * - Functions for parallel arc generation, feasibility checks, and job visitation management.
+ * - Functions for parallel arc generation, feasibility checks, and node visitation management.
  * - Support for multiple stages of optimization and various arc types.
  *
- * Additionally, this file includes specialized bitmap operations for tracking visited and unreachable jobs, and
+ * Additionally, this file includes specialized bitmap operations for tracking visited and unreachable nodes, and
  * provides multiple templates to handle direction (`Forward`/`Backward`) and stage-specific optimization.
  */
 
@@ -33,7 +33,7 @@
 #include <string_view>
 
 #include "Bucket.h"
-#include "VRPJob.h"
+#include "VRPNode.h"
 
 #include "SCCFinder.h"
 
@@ -45,7 +45,7 @@
  *
  * The BucketGraph class provides various functionalities for managing and optimizing
  * a graph structure using buckets. It includes methods for initialization, configuration
- * printing, job visitation checks, statistics printing, bucket assignment, and more.
+ * printing, node visitation checks, statistics printing, bucket assignment, and more.
  *
  * The class also supports parallel arc generation, label management, and feasibility checks.
  * It is designed to work with different directions (Forward and Backward) and stages of
@@ -98,7 +98,7 @@ public:
             auto bucket_labels = fw_buckets[bucket].get_labels();
             for (auto label : bucket_labels) {
                 auto new_label = compute_mono_label(label);
-                if (new_label->jobs_covered.size() < options.max_path_size) { continue; }
+                if (new_label->nodes_covered.size() < options.max_path_size) { continue; }
                 paths.push_back(new_label);
             }
         }
@@ -150,17 +150,17 @@ public:
      * are processed successfully, the function returns true.
      *
      */
-    template <Direction D, size_t I, size_t N, typename Gamma, typename VRPJob>
+    template <Direction D, size_t I, size_t N, typename Gamma, typename VRPNode>
     inline constexpr bool process_all_resources(std::vector<double>              &new_resources,
                                                 const std::array<double, R_SIZE> &initial_resources, const Gamma &gamma,
-                                                const VRPJob &theJob) {
+                                                const VRPNode &theNode) {
         if constexpr (I < N) {
             // Process the resource at index I
-            if (!process_resource<D, I, N>(new_resources[I], initial_resources, gamma, theJob)) {
+            if (!process_resource<D, I, N>(new_resources[I], initial_resources, gamma, theNode)) {
                 return false; // Constraint violated, return false
             }
             // Recur to process the next resource
-            return process_all_resources<D, I + 1, N>(new_resources, initial_resources, gamma, theJob);
+            return process_all_resources<D, I + 1, N>(new_resources, initial_resources, gamma, theNode);
         }
         return true; // All resources processed successfully
     }
@@ -170,24 +170,24 @@ public:
      * @brief Processes a resource based on its disposability type and direction.
      *
      * This function updates the `new_resource` value based on the initial resources,
-     * the increment provided by `gamma`, and the constraints defined by `theJob`.
+     * the increment provided by `gamma`, and the constraints defined by `theNode`.
      * The behavior varies depending on the disposability type of the resource.
      *
      */
-    template <Direction D, size_t I, size_t N, typename Gamma, typename VRPJob>
+    template <Direction D, size_t I, size_t N, typename Gamma, typename VRPNode>
     inline constexpr bool process_resource(double &new_resource, const std::array<double, R_SIZE> &initial_resources,
-                                           const Gamma &gamma, const VRPJob &theJob) {
+                                           const Gamma &gamma, const VRPNode &theNode) {
         if constexpr (resource_disposability[I] == 1) { // Checked at compile-time
             if constexpr (D == Direction::Forward) {
                 new_resource =
-                    std::max(initial_resources[I] + gamma.resource_increment[I], static_cast<double>(theJob.lb[I]));
-                if (new_resource > theJob.ub[I]) {
+                    std::max(initial_resources[I] + gamma.resource_increment[I], static_cast<double>(theNode.lb[I]));
+                if (new_resource > theNode.ub[I]) {
                     return false; // Exceeds upper bound, return false to stop processing
                 }
             } else {
                 new_resource =
-                    std::min(initial_resources[I] - gamma.resource_increment[I], static_cast<double>(theJob.ub[I]));
-                if (new_resource < theJob.lb[I]) {
+                    std::min(initial_resources[I] - gamma.resource_increment[I], static_cast<double>(theNode.ub[I]));
+                if (new_resource < theNode.lb[I]) {
                     return false; // Below lower bound, return false to stop processing
                 }
             }
@@ -195,16 +195,16 @@ public:
             // TODO: Non-disposable resource handling, check if it is right
             if constexpr (D == Direction::Forward) {
                 new_resource = initial_resources[I] + gamma.resource_increment[I];
-                if (new_resource > theJob.ub[I]) {
+                if (new_resource > theNode.ub[I]) {
                     return false; // Exceeds upper bound, return false to stop processing
-                } else if (new_resource < theJob.lb[I]) {
+                } else if (new_resource < theNode.lb[I]) {
                     return false; // Below lower bound, return false to stop processing
                 }
             } else {
                 new_resource = initial_resources[I] - gamma.resource_increment[I];
-                if (new_resource > theJob.ub[I]) {
+                if (new_resource > theNode.ub[I]) {
                     return false; // Exceeds upper bound, return false to stop processing
-                } else if (new_resource < theJob.lb[I]) {
+                } else if (new_resource < theNode.lb[I]) {
                     return false; // Below lower bound, return false to stop processing
                 }
             }
@@ -230,9 +230,9 @@ public:
             // "OR" resource case using mtw_lb and mtw_ub vectors for multiple time windows
             if constexpr (D == Direction::Forward) {
                 bool is_feasible = false;
-                for (size_t i = 0; i < theJob.mtw_lb.size(); ++i) {
-                    new_resource = std::max(initial_resources[I] + gamma.resource_increment[I], theJob.mtw_lb[i]);
-                    if (new_resource > theJob.ub[I]) {
+                for (size_t i = 0; i < theNode.mtw_lb.size(); ++i) {
+                    new_resource = std::max(initial_resources[I] + gamma.resource_increment[I], theNode.mtw_lb[i]);
+                    if (new_resource > theNode.ub[I]) {
                         continue; // Exceeds upper bound, try next time window
                     } else {
                         is_feasible = true; // Feasible in this time window
@@ -247,9 +247,9 @@ public:
                 return true; // Successfully processed all resources
             } else {
                 bool is_feasible = false;
-                for (size_t i = 0; i < theJob.mtw_ub.size(); ++i) {
-                    new_resource = std::min(initial_resources[I] - gamma.resource_increment[I], theJob.mtw_ub[i]);
-                    if (new_resource < theJob.lb[I]) {
+                for (size_t i = 0; i < theNode.mtw_ub.size(); ++i) {
+                    new_resource = std::min(initial_resources[I] - gamma.resource_increment[I], theNode.mtw_ub[i]);
+                    if (new_resource < theNode.lb[I]) {
                         continue; // Below lower bound, try next time window }
                     } else {
                         is_feasible = true; // Feasible in this time window break;
@@ -350,22 +350,22 @@ public:
 
     std::vector<double>                R_max;
     std::vector<double>                R_min;
-    std::vector<std::vector<uint64_t>> neighborhoods_bitmap; // Bitmap for neighborhoods of each job
+    std::vector<std::vector<uint64_t>> neighborhoods_bitmap; // Bitmap for neighborhoods of each node
     std::vector<std::vector<uint64_t>> elementarity_bitmap;  // Bitmap for elementarity sets
     std::vector<std::vector<uint64_t>> packing_bitmap;       // Bitmap for packing sets
 
     void define_elementarity_sets() {
-        size_t num_jobs = jobs.size();
+        size_t num_nodes = nodes.size();
 
         // Initialize elementarity sets
-        elementarity_bitmap.resize(num_jobs); // Bitmap for elementarity sets
+        elementarity_bitmap.resize(num_nodes); // Bitmap for elementarity sets
 
-        for (size_t i = 0; i < num_jobs; ++i) {
+        for (size_t i = 0; i < num_nodes; ++i) {
             // Each customer should appear in its own elementarity set
-            size_t num_segments = (num_jobs + 63) / 64;
+            size_t num_segments = (num_nodes + 63) / 64;
             elementarity_bitmap[i].resize(num_segments, 0);
 
-            // Mark the job itself in the elementarity set
+            // Mark the node itself in the elementarity set
             size_t segment_self      = i >> 6;
             size_t bit_position_self = i & 63;
             elementarity_bitmap[i][segment_self] |= (1ULL << bit_position_self);
@@ -373,17 +373,17 @@ public:
     }
 
     void define_packing_sets() {
-        size_t num_jobs = jobs.size();
+        size_t num_nodes = nodes.size();
 
         // Initialize packing sets
-        packing_bitmap.resize(num_jobs); // Bitmap for packing sets
+        packing_bitmap.resize(num_nodes); // Bitmap for packing sets
 
-        for (size_t i = 0; i < num_jobs; ++i) {
+        for (size_t i = 0; i < num_nodes; ++i) {
             // Each customer should appear in its own packing set
-            size_t num_segments = (num_jobs + 63) / 64;
+            size_t num_segments = (num_nodes + 63) / 64;
             packing_bitmap[i].resize(num_segments, 0);
 
-            // Mark the job itself in the packing set
+            // Mark the node itself in the packing set
             size_t segment_self      = i >> 6;
             size_t bit_position_self = i & 63;
             packing_bitmap[i][segment_self] |= (1ULL << bit_position_self);
@@ -397,8 +397,8 @@ public:
     int              non_dominated_labels_per_bucket;
 
     // Interval tree to store bucket intervals
-    std::unordered_map<int, SplayTree> fw_job_interval_trees;
-    std::unordered_map<int, SplayTree> bw_job_interval_trees;
+    std::unordered_map<int, SplayTree> fw_node_interval_trees;
+    std::unordered_map<int, SplayTree> bw_node_interval_trees;
 
     template <Direction D>
     std::unordered_map<int, BucketIntervalTree<D>> rebuild_buckets() {
@@ -411,9 +411,9 @@ public:
 
         // Iterate over all fixed arcs (fixed_buckets[from][to])
         for (int from_bucket = 0; from_bucket < fw_buckets_size; ++from_bucket) {
-            auto from_job = buckets[from_bucket].job_id;
+            auto from_node = buckets[from_bucket].node_id;
             for (int to_bucket = 0; to_bucket < fw_buckets_size; ++to_bucket) {
-                auto to_job = buckets[to_bucket].job_id;
+                auto to_node = buckets[to_bucket].node_id;
                 // Check if there is a fixed arc between from_bucket and to_bucket
                 if (fixed_buckets[from_bucket][to_bucket] == 0) { continue; }
 
@@ -423,17 +423,17 @@ public:
                 // Get the range for to_bucket
                 BucketRange<D> to_range = {buckets[to_bucket].lb, buckets[to_bucket].ub};
 
-                // check if interval_tree[from_job] exists
-                if (interval_tree.find(from_job) == interval_tree.end()) {
-                    interval_tree[from_job] = BucketIntervalTree<D>();
+                // check if interval_tree[from_node] exists
+                if (interval_tree.find(from_node) == interval_tree.end()) {
+                    interval_tree[from_node] = BucketIntervalTree<D>();
                 }
-                interval_tree[from_job].insert(from_range, to_range, to_job);
+                interval_tree[from_node].insert(from_range, to_range, to_node);
             }
         }
         // print trees, iterate over interval_tree and plot each
         /*
         for (auto &tree : interval_tree) {
-            fmt::print("Tree for job: {}\n", tree.first);
+            fmt::print("Tree for node: {}\n", tree.first);
             tree.second.print();
         }
         */
@@ -485,10 +485,10 @@ public:
 
     // define default
     BucketGraph() = default;
-    BucketGraph(const std::vector<VRPJob> &jobs, int time_horizon, int bucket_interval, int capacity,
+    BucketGraph(const std::vector<VRPNode> &nodes, int time_horizon, int bucket_interval, int capacity,
                 int capacity_interval);
-    BucketGraph(const std::vector<VRPJob> &jobs, int time_horizon, int bucket_interval);
-    BucketGraph(const std::vector<VRPJob> &jobs, std::vector<int> &bounds, std::vector<int> &bucket_intervals);
+    BucketGraph(const std::vector<VRPNode> &nodes, int time_horizon, int bucket_interval);
+    BucketGraph(const std::vector<VRPNode> &nodes, std::vector<int> &bounds, std::vector<int> &bucket_intervals);
 
     // Common Tools
     static void          initInfo();
@@ -511,7 +511,7 @@ public:
 
     inline double       getcij(int i, int j) const { return distance_matrix[i][j]; }
     void                calculate_neighborhoods(size_t num_closest);
-    std::vector<VRPJob> getJobs() const { return jobs; }
+    std::vector<VRPNode> getNodes() const { return nodes; }
     std::vector<int>    computePhi(int &bucket, bool fw);
 
     template <Stage state, Full fullness>
@@ -524,56 +524,56 @@ public:
     void heuristic_fixing();
 
     /**
-     * @brief Checks if a job has been visited based on a bitmap.
+     * @brief Checks if a node has been visited based on a bitmap.
      *
-     * This function determines if a specific job, identified by job_id, has been visited
+     * This function determines if a specific node, identified by node_id, has been visited
      * by checking the corresponding bit in a bitmap array. The bitmap is an array of
-     * 64-bit unsigned integers, where each bit represents the visited status of a job.
+     * 64-bit unsigned integers, where each bit represents the visited status of a node.
      *
      */
-    static inline bool is_job_visited(const std::array<uint64_t, num_words> &bitmap, int job_id) {
-        int word_index   = job_id >> 6; // Determine which 64-bit segment contains the job_id
-        int bit_position = job_id & 63; // Determine the bit position within that segment
+    static inline bool is_node_visited(const std::array<uint64_t, num_words> &bitmap, int node_id) {
+        int word_index   = node_id >> 6; // Determine which 64-bit segment contains the node_id
+        int bit_position = node_id & 63; // Determine the bit position within that segment
         return (bitmap[word_index] & (1ULL << bit_position)) != 0;
     }
 
     /**
-     * @brief Marks a job as visited in the bitmap.
+     * @brief Marks a node as visited in the bitmap.
      *
-     * This function sets the bit corresponding to the given job_id in the provided bitmap,
-     * indicating that the job has been visited.
+     * This function sets the bit corresponding to the given node_id in the provided bitmap,
+     * indicating that the node has been visited.
      *
      */
-    static inline void set_job_visited(std::array<uint64_t, num_words> &bitmap, int job_id) {
-        int word_index   = job_id >> 6; // Determine which 64-bit segment contains the job_id
-        int bit_position = job_id & 63; // Determine the bit position within that segment
+    static inline void set_node_visited(std::array<uint64_t, num_words> &bitmap, int node_id) {
+        int word_index   = node_id >> 6; // Determine which 64-bit segment contains the node_id
+        int bit_position = node_id & 63; // Determine the bit position within that segment
         bitmap[word_index] |= (1ULL << bit_position);
     }
 
     /**
-     * @brief Checks if a job is unreachable based on a bitmap.
+     * @brief Checks if a node is unreachable based on a bitmap.
      *
-     * This function determines if a job, identified by its job_id, is unreachable
+     * This function determines if a node, identified by its node_id, is unreachable
      * by checking a specific bit in a bitmap. The bitmap is represented as an
      * array of 64-bit unsigned integers.
      *
      */
-    static inline bool is_job_unreachable(const std::array<uint64_t, num_words> &bitmap, int job_id) {
-        int word_index   = job_id >> 6; // Determine which 64-bit segment contains the job_id
-        int bit_position = job_id & 63; // Determine the bit position within that segment
+    static inline bool is_node_unreachable(const std::array<uint64_t, num_words> &bitmap, int node_id) {
+        int word_index   = node_id >> 6; // Determine which 64-bit segment contains the node_id
+        int bit_position = node_id & 63; // Determine the bit position within that segment
         return (bitmap[word_index] & (1ULL << bit_position)) != 0;
     }
 
     /**
-     * @brief Marks a job as unreachable in the given bitmap.
+     * @brief Marks a node as unreachable in the given bitmap.
      *
-     * This function sets the bit corresponding to the specified job_id in the bitmap,
-     * indicating that the job is unreachable.
+     * This function sets the bit corresponding to the specified node_id in the bitmap,
+     * indicating that the node is unreachable.
      *
      */
-    static inline void set_job_unreachable(std::array<uint64_t, num_words> &bitmap, int job_id) {
-        int word_index   = job_id >> 6; // Determine which 64-bit segment contains the job_id
-        int bit_position = job_id & 63; // Determine the bit position within that segment
+    static inline void set_node_unreachable(std::array<uint64_t, num_words> &bitmap, int node_id) {
+        int word_index   = node_id >> 6; // Determine which 64-bit segment contains the node_id
+        int bit_position = node_id & 63; // Determine the bit position within that segment
         bitmap[word_index] |= (1ULL << bit_position);
     }
 
@@ -582,7 +582,7 @@ public:
      *
      * This function processes the buckets in the specified direction (Forward or Backward)
      * to identify fixed arcs based on heritages. It iterates through each bucket and checks
-     * if the job exists in the save_rebuild map. If the job is found, it searches for arcs
+     * if the node exists in the save_rebuild map. If the node is found, it searches for arcs
      * and updates the fixed buckets accordingly.
      *
      */
@@ -617,20 +617,20 @@ public:
                     auto          &bucket_arcs = buckets[bucket].template get_bucket_arcs<D>();
                     auto          &from_bucket = buckets[bucket];
                     BucketRange<D> from_range  = {from_bucket.lb, from_bucket.ub};
-                    auto           from_job    = from_bucket.job_id;
+                    auto           from_node    = from_bucket.node_id;
 
-                    // Check if the job exists in the save_rebuild map (only once per bucket)
-                    auto it = save_rebuild.find(from_job);
+                    // Check if the node exists in the save_rebuild map (only once per bucket)
+                    auto it = save_rebuild.find(from_node);
                     if (it != save_rebuild.end()) {
                         const auto &save_tree = it->second;
 
                         for (auto &arc : bucket_arcs) {
                             auto           to_bucket = arc.to_bucket;
-                            auto           to_job    = buckets[to_bucket].job_id;
+                            auto           to_node    = buckets[to_bucket].node_id;
                             BucketRange<D> to_range  = {buckets[to_bucket].lb, buckets[to_bucket].ub};
 
                             // Perform the search and update fixed buckets
-                            auto is_contained = save_tree.search(from_range, to_range, to_job);
+                            auto is_contained = save_tree.search(from_range, to_range, to_node);
                             if (is_contained) {
                                 fixed_buckets[bucket][to_bucket] = 1;
                                 // Update fixed count in a thread-safe manner
@@ -658,7 +658,7 @@ public:
      * @brief Redefines the bucket intervals and reinitializes various data structures.
      *
      * This function updates the bucket interval and reinitializes the intervals, buckets,
-     * fixed arcs, and fixed buckets. It also generates arcs and sorts them for each job.
+     * fixed arcs, and fixed buckets. It also generates arcs and sorts them for each node.
      *
      */
     void redefine(int bucketInterval) {
@@ -715,15 +715,15 @@ public:
     }
 
     /**
-     * @brief Sets the dual values for the jobs.
+     * @brief Sets the dual values for the nodes.
      *
-     * This function assigns the provided dual values to the jobs. It iterates
-     * through the given vector of duals and sets each job's dual value to the
+     * This function assigns the provided dual values to the nodes. It iterates
+     * through the given vector of duals and sets each node's dual value to the
      * corresponding value from the vector.
      *
      */
     void setDuals(const std::vector<double> &duals) {
-        for (size_t i = 1; i < N_SIZE - 1; ++i) { jobs[i].setDuals(duals[i - 1]); }
+        for (size_t i = 1; i < N_SIZE - 1; ++i) { nodes[i].setDuals(duals[i - 1]); }
     }
 
     /**
@@ -758,29 +758,29 @@ public:
      * @brief Checks the feasibility of a given forward and backward label.
      *
      * This function determines if the transition from a forward label to a backward label
-     * is feasible based on resource constraints and job durations.
+     * is feasible based on resource constraints and node durations.
      *
      */
     inline bool check_feasibility(const Label *fw_label, const Label *bw_label) {
         if (!fw_label || !bw_label) return false;
 
-        // Cache resources and job data
+        // Cache resources and node data
         const auto          &fw_resources = fw_label->resources;
         const auto          &bw_resources = bw_label->resources;
-        const struct VRPJob &VRPJob       = jobs[fw_label->job_id];
+        const struct VRPNode &VRPNode       = nodes[fw_label->node_id];
 
         // Time feasibility check
         const auto time_fw     = fw_resources[TIME_INDEX];
         const auto time_bw     = bw_resources[TIME_INDEX];
-        const auto travel_time = getcij(fw_label->job_id, bw_label->job_id);
-        if (time_fw + travel_time + VRPJob.duration > time_bw) { return false; }
+        const auto travel_time = getcij(fw_label->node_id, bw_label->node_id);
+        if (time_fw + travel_time + VRPNode.duration > time_bw) { return false; }
 
         // Resource feasibility check (if applicable)
         if constexpr (R_SIZE > 1) {
             for (size_t i = 1; i < R_SIZE; ++i) {
                 const auto resource_fw = fw_resources[i];
                 const auto resource_bw = bw_resources[i];
-                const auto demand      = VRPJob.demand;
+                const auto demand      = VRPNode.demand;
 
                 if (resource_fw + demand > resource_bw) { return false; }
             }
@@ -841,7 +841,7 @@ public:
     std::vector<double> labeling_algorithm() noexcept;
 
     template <Direction D>
-    int get_bucket_number(int job, const std::vector<double> &values) noexcept;
+    int get_bucket_number(int node, const std::vector<double> &values) noexcept;
 
     template <Direction D>
     Label *get_best_label(const std::vector<int> &topological_order, const std::vector<double> &c_bar,
@@ -885,7 +885,7 @@ public:
 
 private:
     std::vector<Interval> intervals;
-    std::vector<VRPJob>   jobs;
+    std::vector<VRPNode>   nodes;
     int                   time_horizon{};
     int                   capacity{};
     int                   bucket_interval{};

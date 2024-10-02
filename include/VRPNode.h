@@ -1,20 +1,20 @@
 /**
- * @file VRPJob.h
- * @brief This file contains the definition of the VRPJob struct.
+ * @file VRPNode.h
+ * @brief This file contains the definition of the VRPNode struct.
  */
 #pragma once
 #include "Arc.h"
 #include "Common.h"
 #include "Definitions.h"
 /**
- * @struct VRPJob
- * @brief Represents a job in a Vehicle Routing Problem.
+ * @struct VRPNode
+ * @brief Represents a node in a Vehicle Routing Problem.
  *
- * This struct contains information about a job, such as its ID, start time, end time, duration, cost, demand,
- * and capacity constraints. It provides constructors to initialize the job with different sets of parameters.
- * The `setDuals` method allows updating the cost of the job.
+ * This struct contains information about a node, such as its ID, start time, end time, duration, cost, demand,
+ * and capacity constraints. It provides constructors to initialize the node with different sets of parameters.
+ * The `setDuals` method allows updating the cost of the node.
  */
-struct VRPJob {
+struct VRPNode {
     double                        x;
     double                        y;
     int                           id;
@@ -45,11 +45,11 @@ struct VRPJob {
     std::vector<double> consumption;
 
     // default constructor
-    VRPJob() = default;
+    VRPNode() = default;
 
-    VRPJob(int i, int st, int et, int dur, double c) : id(i), start_time(st), end_time(et), duration(dur), cost(c) {}
+    VRPNode(int i, int st, int et, int dur, double c) : id(i), start_time(st), end_time(et), duration(dur), cost(c) {}
 
-    VRPJob(int i, int st, int et, int dur, double c, double d)
+    VRPNode(int i, int st, int et, int dur, double c, double d)
         : id(i), start_time(st), end_time(et), duration(dur), cost(c), demand(d) {}
 
     /**

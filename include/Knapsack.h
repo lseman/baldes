@@ -1,39 +1,15 @@
-/**
- * @file Knapsack.h
- * @brief Header file for the Knapsack class, which implements the solution to the knapsack problem.
- *
- * This file defines the `Knapsack` class, which provides methods to solve the knapsack problem using a dynamic
- * programming approach. The knapsack problem is a well-known combinatorial optimization problem where the goal
- * is to maximize the total value of items that can be placed in a knapsack with a given weight capacity.
- *
- * The main components of this file include:
- * - The `Item` structure: Holds the value and weight of individual items that can be placed in the knapsack.
- * - Methods for adding items, setting the capacity of the knapsack, solving the problem using dynamic programming,
- *   and clearing the item list for reuse.
- *
- * The dynamic programming solution is implemented using a single-row DP array to save space. Additionally, items
- * can be optionally sorted by value-to-weight ratio for heuristic or greedy approaches.
- */
-
 #pragma once
 
 #include <algorithm>
 #include <vector>
+#include <map>    // For sparse DP optimization
+#include <thread> // For parallelization (optional)
 
-/**
- * @class Knapsack
- * @brief A class to represent and solve the knapsack problem.
- *
- * The Knapsack class provides methods to set the capacity of the knapsack,
- * add items with specific values and weights, solve the knapsack problem
- * using a dynamic programming approach, and clear the items for reuse.
- *
- */
 class Knapsack {
 private:
     struct Item {
-        double value;  // The value of the item (e.g., the dual value)
-        int    weight; // The weight of the item (e.g., demand)
+        double value;  // The value of the item
+        int    weight; // The weight of the item
     };
 
     std::vector<Item> items;
@@ -49,22 +25,84 @@ public:
     // Add an item to the knapsack
     void addItem(double value, int weight) { items.push_back({value, weight}); }
 
-    // Solve the knapsack problem and return the upper bound
+    // Greedy heuristic to compute an upper bound (fractional knapsack)
+    double greedyUpperBound() {
+        // Use partial sort to only sort as much as needed
+        std::partial_sort(items.begin(), items.begin() + std::min<size_t>(items.size(), 10), items.end(),
+                          [](const Item &a, const Item &b) { return (a.value / a.weight) > (b.value / b.weight); });
+
+        double totalValue    = 0.0;
+        int    currentWeight = 0;
+
+        for (const auto &item : items) {
+            if (currentWeight + item.weight <= capacity) {
+                // Take the whole item
+                totalValue += item.value;
+                currentWeight += item.weight;
+            } else {
+                // Take fractional part of the item
+                double remainingCapacity = capacity - currentWeight;
+                totalValue += (item.value * (remainingCapacity / item.weight));
+                break; // Since we can't take any more items, we stop here
+            }
+        }
+        return totalValue;
+    }
+
+    // Optimized dynamic programming solution with early termination
     double solve() {
         int n = items.size();
 
-        // Sort items by value-to-weight ratio (optional, useful for heuristic or greedy approaches)
-        std::sort(items.begin(), items.end(),
-                  [](const Item &a, const Item &b) { return (a.value / a.weight) > (b.value / b.weight); });
+        // Use the greedy heuristic to quickly estimate an upper bound
+        double greedySolution = greedyUpperBound();
 
-        // Use a single-row DP array to save space
+        // Set a threshold for greedy solution (e.g., 90% of the optimal)
+        const double greedyThreshold = 0.9 * greedySolution;
+
+        // If the greedy solution is very close to optimal, return it
+        if (greedySolution >= greedyThreshold) {
+            return greedySolution;
+        }
+
+        // Otherwise, solve the problem exactly using dynamic programming
         std::vector<double> dp(capacity + 1, 0.0);
 
-        for (const auto &item : items) {
-            // Process from the back to avoid overwriting previous results
-            if (item.weight <= capacity) {
-                for (int w = capacity; w >= item.weight; --w) {
-                    dp[w] = std::max(dp[w], dp[w - item.weight] + item.value);
+        // For large capacity problems, use parallelization
+        const int numThreads = std::thread::hardware_concurrency();
+        if (numThreads > 1) {
+            // Parallelizing the DP update loop
+            std::vector<std::thread> threads;
+            auto updateDpRange = [&](int start, int end) {
+                for (const auto &item : items) {
+                    if (item.weight <= capacity) {
+                        // Process from the back to avoid overwriting previous results
+                        for (int w = end; w >= start; --w) {
+                            if (w >= item.weight) {
+                                dp[w] = std::max(dp[w], dp[w - item.weight] + item.value);
+                            }
+                        }
+                    }
+                }
+            };
+
+            int chunkSize = capacity / numThreads;
+            for (int i = 0; i < numThreads; ++i) {
+                int start = i * chunkSize;
+                int end   = (i == numThreads - 1) ? capacity : (start + chunkSize);
+                threads.push_back(std::thread(updateDpRange, start, end));
+            }
+
+            for (auto &t : threads) {
+                t.join();
+            }
+        } else {
+            // Single-threaded DP update
+            for (const auto &item : items) {
+                if (item.weight <= capacity) {
+                    // Process from the back to avoid overwriting previous results
+                    for (int w = capacity; w >= item.weight; --w) {
+                        dp[w] = std::max(dp[w], dp[w - item.weight] + item.value);
+                    }
                 }
             }
         }

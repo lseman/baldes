@@ -7,7 +7,7 @@
  * @struct Bucket
  * @brief Represents a bucket.
  *
- * A bucket is a data structure that contains labels, job ID, lower bounds, upper bounds, forward arcs, backward
+ * A bucket is a data structure that contains labels, node ID, lower bounds, upper bounds, forward arcs, backward
  * arcs, forward jump arcs, and backward jump arcs. It provides methods to add arcs, add jump arcs, get arcs,
  * get jump arcs, add labels, remove labels, get labels, clear labels, reset labels, and clear arcs.
  */
@@ -15,7 +15,7 @@ struct Bucket {
     // std::vector<Label *>   labels_vec;
     std::vector<Label *> labels_vec; // Use deque for efficient insertion/removal
 
-    int                    job_id = -1;
+    int                    node_id = -1;
     std::vector<int>       lb;
     std::vector<int>       ub;
     std::vector<int>       real_lb;
@@ -30,7 +30,7 @@ struct Bucket {
     Bucket(const Bucket &other) {
         // Perform deep copy of all relevant members
         labels_vec     = other.labels_vec;
-        job_id         = other.job_id;
+        node_id         = other.node_id;
         lb             = other.lb;
         ub             = other.ub;
         fw_arcs        = other.fw_arcs;
@@ -46,7 +46,7 @@ struct Bucket {
 
         // Perform deep copy of all relevant members
         labels_vec     = other.labels_vec;
-        job_id         = other.job_id;
+        node_id         = other.node_id;
         lb             = other.lb;
         ub             = other.ub;
         fw_arcs        = other.fw_arcs;
@@ -148,8 +148,8 @@ struct Bucket {
         }
     }
 
-    Bucket(int job_id, std::vector<int> lb, std::vector<int> ub)
-        : job_id(job_id), lb(std::move(lb)), ub(std::move(ub)) {
+    Bucket(int node_id, std::vector<int> lb, std::vector<int> ub)
+        : node_id(node_id), lb(std::move(lb)), ub(std::move(ub)) {
 
         labels_vec.reserve(250);
     }

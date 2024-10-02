@@ -278,12 +278,12 @@ std::vector<double> BucketGraph::labeling_algorithm() noexcept {
                         };
 
                         // Process regular arcs for label extension
-                        const auto &arcs = jobs[label->job_id].get_arcs<D>(scc_index);
+                        const auto &arcs = nodes[label->node_id].get_arcs<D>(scc_index);
                         for (const auto &arc : arcs) {
-                            Label *new_label = Extend<D, S, ArcType::Job, Mutability::Mut, F>(label, arc);
+                            Label *new_label = Extend<D, S, ArcType::Node, Mutability::Mut, F>(label, arc);
                             if (!new_label) {
 #ifdef UNREACHABLE_DOMINANCE
-                                set_job_unreachable(label->unreachable_bitmap, arc.to);
+                                set_node_unreachable(label->unreachable_bitmap, arc.to);
 #endif
                             } else {
                                 process_new_label(new_label); // Process the new label
@@ -385,7 +385,7 @@ std::vector<Label *> BucketGraph::bi_labeling_algorithm() {
         // If not feasible, set the best label to have infinite cost (not usable)
         best_label->cost         = 0.0;
         best_label->real_cost    = std::numeric_limits<double>::infinity();
-        best_label->jobs_covered = {};
+        best_label->nodes_covered = {};
     }
 
     // Add the best label (combined forward/backward path) to the merged label list
@@ -410,21 +410,21 @@ std::vector<Label *> BucketGraph::bi_labeling_algorithm() {
         for (const Label *L : labels) {
             // if (L->resources[TIME_INDEX] > q_star[TIME_INDEX]) { continue; } // Skip if label exceeds q_star
 
-            // Get arcs corresponding to jobs for this label (Forward direction)
-            const auto &to_arcs = jobs[L->job_id].get_arcs<Direction::Forward>();
-            // Iterate over each arc from the current job
+            // Get arcs corresponding to nodes for this label (Forward direction)
+            const auto &to_arcs = nodes[L->node_id].get_arcs<Direction::Forward>();
+            // Iterate over each arc from the current node
             for (const auto &arc : to_arcs) {
-                const auto &to_job = arc.to;
+                const auto &to_node = arc.to;
 
                 // Skip fixed arcs in Stage 3 if necessary
                 if constexpr (S == Stage::Three) {
-                    if (fixed_arcs[L->job_id][to_job] == 1) {
+                    if (fixed_arcs[L->node_id][to_node] == 1) {
                         continue; // Skip if the arc is fixed
                     }
                 }
 
                 // Attempt to extend the current label using this arc
-                auto L_prime = Extend<Direction::Forward, S, ArcType::Job, Mutability::Const, Full::Reverse>(L, arc);
+                auto L_prime = Extend<Direction::Forward, S, ArcType::Node, Mutability::Const, Full::Reverse>(L, arc);
 
                 // Note: apparently without the second condition it work better in some cases
                 // Check if the new label is valid and respects the q_star constraints
@@ -466,8 +466,8 @@ std::vector<Label *> BucketGraph::bi_labeling_algorithm() {
         std::vector<Path> paths;
         int               labels_size = merged_labels.size();
         for (size_t i = N_ADD; i < std::min(N_ADD + N_ADD, labels_size); ++i) {
-            if (merged_labels[i]->jobs_covered.size() <= 3) { continue; }
-            Path path = Path(merged_labels[i]->jobs_covered, merged_labels[i]->real_cost);
+            if (merged_labels[i]->nodes_covered.size() <= 3) { continue; }
+            Path path = Path(merged_labels[i]->nodes_covered, merged_labels[i]->real_cost);
             paths.push_back(path);
         }
         sPool.add_paths(paths);
@@ -494,18 +494,18 @@ BucketGraph::Extend(const std::conditional_t<M == Mutability::Mut, Label *, cons
     auto &fixed_buckets = assign_buckets<D>(fw_fixed_buckets, bw_fixed_buckets);
 
     // Precompute some values from the current label (L_prime) to avoid recalculating inside the loop
-    const int    initial_job_id    = L_prime->job_id;
+    const int    initial_node_id    = L_prime->node_id;
     auto         initial_resources = L_prime->resources; // Copy the current label's resources
     const double initial_cost      = L_prime->cost;      // Store the initial cost of the label
 
-    int job_id = -1; // Initialize job ID
-    // Determine the target job based on the arc type (Bucket, Job, or Jump)
+    int node_id = -1; // Initialize node ID
+    // Determine the target node based on the arc type (Bucket, Node, or Jump)
     if constexpr (A == ArcType::Bucket) {
-        job_id = buckets[gamma.to_bucket].job_id; // Use the job ID from the bucket
-    } else if constexpr (A == ArcType::Job) {
-        job_id = gamma.to; // Use the job ID from the arc
+        node_id = buckets[gamma.to_bucket].node_id; // Use the node ID from the bucket
+    } else if constexpr (A == ArcType::Node) {
+        node_id = gamma.to; // Use the node ID from the arc
     } else if constexpr (A == ArcType::Jump) {
-        job_id = buckets[gamma.jump_bucket].job_id; // Use the job ID from the jump bucket
+        node_id = buckets[gamma.jump_bucket].node_id; // Use the node ID from the jump bucket
         // Update resources based on jump bucket bounds
         for (size_t i = 0; i < initial_resources.size(); ++i) {
             if constexpr (D == Direction::Forward) {
@@ -518,35 +518,35 @@ BucketGraph::Extend(const std::conditional_t<M == Mutability::Mut, Label *, cons
         }
     }
 
-    // Check if the arc between initial_job_id and job_id is fixed, and skip if so (in Stage 3)
+    // Check if the arc between initial_node_id and node_id is fixed, and skip if so (in Stage 3)
     if constexpr (S == Stage::Three) {
         if constexpr (D == Direction::Forward) {
-            if (fixed_arcs[initial_job_id][job_id] == 1) { return nullptr; }
+            if (fixed_arcs[initial_node_id][node_id] == 1) { return nullptr; }
         } else {
-            if (fixed_arcs[job_id][initial_job_id] == 1) { return nullptr; }
+            if (fixed_arcs[node_id][initial_node_id] == 1) { return nullptr; }
         }
     }
 
-    // Check if the job has already been visited for enumeration (Stage Enumerate)
+    // Check if the node has already been visited for enumeration (Stage Enumerate)
     if constexpr (S == Stage::Enumerate) {
-        if (is_job_visited(L_prime->visited_bitmap, job_id)) { return nullptr; }
+        if (is_node_visited(L_prime->visited_bitmap, node_id)) { return nullptr; }
     }
 
-    // Perform 2-cycle elimination: if the job ID is the same as the current label's job, skip
-    if (job_id == L_prime->job_id) { return nullptr; }
+    // Perform 2-cycle elimination: if the node ID is the same as the current label's node, skip
+    if (node_id == L_prime->node_id) { return nullptr; }
 
-    // Check if job_id is in the neighborhood of initial_job_id and has already been visited
-    size_t segment      = job_id >> 6; // Determine the segment in the bitmap
-    size_t bit_position = job_id & 63; // Determine the bit position in the segment
+    // Check if node_id is in the neighborhood of initial_node_id and has already been visited
+    size_t segment      = node_id >> 6; // Determine the segment in the bitmap
+    size_t bit_position = node_id & 63; // Determine the bit position in the segment
     if constexpr (S != Stage::Enumerate) {
-        if ((neighborhoods_bitmap[initial_job_id][segment] & (1ULL << bit_position)) &&
-            is_job_visited(L_prime->visited_bitmap, job_id)) {
-            return nullptr; // Skip if the job is in the neighborhood and has been visited
+        if ((neighborhoods_bitmap[initial_node_id][segment] & (1ULL << bit_position)) &&
+            is_node_visited(L_prime->visited_bitmap, node_id)) {
+            return nullptr; // Skip if the node is in the neighborhood and has been visited
         }
     }
 
-    // Get the VRP job corresponding to job_id
-    const VRPJob &VRPJob = jobs[job_id];
+    // Get the VRP node corresponding to node_id
+    const VRPNode &VRPNode = nodes[node_id];
 
     // Initialize new resources based on the arc's resource increments and check feasibility
     std::vector<double> new_resources(initial_resources.size());
@@ -555,14 +555,14 @@ BucketGraph::Extend(const std::conditional_t<M == Mutability::Mut, Label *, cons
 
         if constexpr (D == Direction::Forward) {
             new_resources[i] =
-                std::max(initial_resources[i] + gamma.resource_increment[i], static_cast<double>(VRPJob.lb[i]));
-            if (new_resources[i] > VRPJob.ub[i]) {
+                std::max(initial_resources[i] + gamma.resource_increment[i], static_cast<double>(VRPNode.lb[i]));
+            if (new_resources[i] > VRPNode.ub[i]) {
                 return nullptr; // Forward: Exceeds upper bound
             }
         } else {
             new_resources[i] =
-                std::min(initial_resources[i] - gamma.resource_increment[i], static_cast<double>(VRPJob.ub[i]));
-            if (new_resources[i] < VRPJob.lb[i]) {
+                std::min(initial_resources[i] - gamma.resource_increment[i], static_cast<double>(VRPNode.ub[i]));
+            if (new_resources[i] < VRPNode.lb[i]) {
                 return nullptr; // Backward: Below lower bound
             }
         }
@@ -571,7 +571,7 @@ BucketGraph::Extend(const std::conditional_t<M == Mutability::Mut, Label *, cons
 
     // Note: workaround
     constexpr size_t N = R_SIZE;
-    if (!process_all_resources<D, 0, N>(new_resources, initial_resources, gamma, VRPJob)) {
+    if (!process_all_resources<D, 0, N>(new_resources, initial_resources, gamma, VRPNode)) {
         return nullptr; // Handle failure case (constraint violation)
     }
 
@@ -584,8 +584,8 @@ BucketGraph::Extend(const std::conditional_t<M == Mutability::Mut, Label *, cons
     if (n_visited >= options.max_path_size) { return nullptr; }
 #endif
 
-    // Get the bucket number for the new job and resource state
-    int to_bucket = get_bucket_number<D>(job_id, new_resources);
+    // Get the bucket number for the new node and resource state
+    int to_bucket = get_bucket_number<D>(node_id, new_resources);
 
 #ifdef FIX_BUCKETS
     // Skip if the bucket is fixed (in Stage 4) and not a jump arc
@@ -594,10 +594,10 @@ BucketGraph::Extend(const std::conditional_t<M == Mutability::Mut, Label *, cons
     }
 #endif
 
-    // Compute travel cost between the initial and current jobs
-    const double travel_cost = getcij(initial_job_id, job_id);
+    // Compute travel cost between the initial and current nodes
+    const double travel_cost = getcij(initial_node_id, node_id);
 #ifndef PSTEP
-    double new_cost = initial_cost + travel_cost - VRPJob.cost;
+    double new_cost = initial_cost + travel_cost - VRPNode.cost;
 #else
     double new_cost = initial_cost + travel_cost;
 #endif
@@ -619,7 +619,7 @@ BucketGraph::Extend(const std::conditional_t<M == Mutability::Mut, Label *, cons
 
     // Acquire a new label from the pool and initialize it with the new state
     auto new_label = label_pool.acquire();
-    new_label->initialize(to_bucket, new_cost, new_resources, job_id);
+    new_label->initialize(to_bucket, new_cost, new_resources, node_id);
 
     if constexpr (F == Full::Reverse) {
         return new_label; // Return the new label early if in reverse mode
@@ -628,7 +628,7 @@ BucketGraph::Extend(const std::conditional_t<M == Mutability::Mut, Label *, cons
     // new_label->visited_bitmap = L_prime->visited_bitmap; // Copy visited bitmap from the original label
     std::memcpy(new_label->visited_bitmap.data(), L_prime->visited_bitmap.data(),
                 new_label->visited_bitmap.size() * sizeof(uint64_t));
-    set_job_visited(new_label->visited_bitmap, job_id); // Mark the new job as visited
+    set_node_visited(new_label->visited_bitmap, node_id); // Mark the new node as visited
 
 #ifdef UNREACHABLE_DOMINANCE
     // Copy unreachable bitmap (if applicable)
@@ -652,16 +652,16 @@ BucketGraph::Extend(const std::conditional_t<M == Mutability::Mut, Label *, cons
         for (size_t i = 0; i < limit; ++i) {
             uint64_t current_visited = new_label->visited_bitmap[i];
 
-            if (!current_visited) continue; // Skip if no jobs were visited in this segment
+            if (!current_visited) continue; // Skip if no nodes were visited in this segment
 
-            uint64_t neighborhood_mask = neighborhoods_bitmap[job_id][i]; // Get neighborhood mask for the current job
+            uint64_t neighborhood_mask = neighborhoods_bitmap[node_id][i]; // Get neighborhood mask for the current node
             uint64_t bits_to_clear     = current_visited & ~neighborhood_mask; // Determine which bits to clear
 
-            if (i == job_id / 64) {
-                bits_to_clear &= ~(1ULL << (job_id & 63)); // Ensure current job remains visited
+            if (i == node_id / 64) {
+                bits_to_clear &= ~(1ULL << (node_id & 63)); // Ensure current node remains visited
             }
 
-            new_label->visited_bitmap[i] &= ~bits_to_clear; // Clear irrelevant visited jobs
+            new_label->visited_bitmap[i] &= ~bits_to_clear; // Clear irrelevant visited nodes
         }
     }
 
@@ -670,7 +670,7 @@ BucketGraph::Extend(const std::conditional_t<M == Mutability::Mut, Label *, cons
     if constexpr (S == Stage::Four || S == Stage::Enumerate) {
         auto          &cutter   = cut_storage;          // Access the cut storage manager
         auto          &SRCDuals = cutter->SRCDuals;     // Access the dual values for the SRC cuts
-        const uint64_t bit_mask = 1ULL << bit_position; // Precompute bit shift for the job's position
+        const uint64_t bit_mask = 1ULL << bit_position; // Precompute bit shift for the node's position
 
         for (std::size_t idx = 0; idx < cutter->size(); ++idx) {
             auto it = cutter->begin();
@@ -682,7 +682,7 @@ BucketGraph::Extend(const std::conditional_t<M == Mutability::Mut, Label *, cons
             const auto &multipliers  = cut.multipliers;
 
 #if defined(SRC3)
-            // Apply SRC3 logic: if the job is in the base set, increment the SRC map
+            // Apply SRC3 logic: if the node is in the base set, increment the SRC map
             bool bitIsSet3 = baseSet[segment] & bit_mask;
             if (bitIsSet3) {
                 new_label->SRCmap[idx]++;
@@ -701,7 +701,7 @@ BucketGraph::Extend(const std::conditional_t<M == Mutability::Mut, Label *, cons
             }
 
             if (bitIsSet2) {
-                src_map_value += multipliers[baseSetorder[job_id]];
+                src_map_value += multipliers[baseSetorder[node_id]];
                 if (src_map_value >= 1) {
                     src_map_value -= 1;
                     new_label->cost -= SRCDuals[idx]; // Apply the SRC dual value if threshold is exceeded
@@ -763,22 +763,22 @@ inline bool BucketGraph::is_dominated(const Label *new_label, const Label *label
 
     // TODO:: check again this unreachable dominance
 #ifndef UNREACHABLE_DOMINANCE
-    // Check visited jobs (bitmap comparison) for Stages 3, 4, and Enumerate
+    // Check visited nodes (bitmap comparison) for Stages 3, 4, and Enumerate
     if constexpr (S == Stage::Three || S == Stage::Four || S == Stage::Enumerate) {
-        // Iterate through the visited bitmap and ensure that the new label visits all jobs that the comparison
+        // Iterate through the visited bitmap and ensure that the new label visits all nodes that the comparison
         // label visits
         for (size_t i = 0; i < label->visited_bitmap.size(); ++i) {
-            // If the comparison label visits a job that the new label does not, it is not dominated
+            // If the comparison label visits a node that the new label does not, it is not dominated
             if ((label->visited_bitmap[i] & ~new_label->visited_bitmap[i]) != 0) { return false; }
         }
     }
 #else
-    // Unreachable dominance logic: check visited and unreachable jobs in Stages 3, 4, and Enumerate
+    // Unreachable dominance logic: check visited and unreachable nodes in Stages 3, 4, and Enumerate
     if constexpr (S == Stage::Three || S == Stage::Four || S == Stage::Enumerate) {
         for (size_t i = 0; i < label->visited_bitmap.size(); ++i) {
-            // Combine visited and unreachable jobs in the comparison label's bitmap
+            // Combine visited and unreachable nodes in the comparison label's bitmap
             auto combined_label_bitmap = label->visited_bitmap[i] | label->unreachable_bitmap[i];
-            // Ensure the new label visits all jobs that the comparison label (or its unreachable jobs) visits
+            // Ensure the new label visits all nodes that the comparison label (or its unreachable nodes) visits
             if ((combined_label_bitmap & ~new_label->visited_bitmap[i]) != 0) { return false; }
         }
     }

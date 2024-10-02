@@ -14,10 +14,10 @@
  *   label computation, adjacency list setup, and neighborhood calculations.
  *
  * The BucketGraph class provides methods for:
- * - Initializing the graph with jobs, time horizon, and bucket intervals.
+ * - Initializing the graph with nodes, time horizon, and bucket intervals.
  * - Computing new labels based on existing labels.
  * - Computing phi values for buckets in forward and backward directions.
- * - Calculating neighborhoods for jobs based on the number of closest jobs.
+ * - Calculating neighborhoods for nodes based on the number of closest nodes.
  * - Augmenting memories in the graph by identifying and forbidding cycles.
  * - Setting the adjacency list for the graph based on travel costs and resource consumption.
  * - Common initialization tasks for setting up forward and backward buckets.
@@ -51,14 +51,14 @@ JumpArc::JumpArc(int base, int jump, const std::vector<double> &res_inc, double 
 /**
  * @brief Constructs a BucketGraph object.
  *
- * This constructor initializes a BucketGraph with the given jobs, time horizon, and bucket interval.
+ * This constructor initializes a BucketGraph with the given nodes, time horizon, and bucket interval.
  * It sets up the forward and backward buckets, initializes the dual values for the CVRP separation,
  * and defines the intervals and resource limits.
  *
  */
-BucketGraph::BucketGraph(const std::vector<VRPJob> &jobs, int time_horizon, int bucket_interval, int capacity,
+BucketGraph::BucketGraph(const std::vector<VRPNode> &nodes, int time_horizon, int bucket_interval, int capacity,
                          int capacity_interval)
-    : fw_buckets(), bw_buckets(), jobs(jobs), time_horizon(time_horizon), capacity(capacity),
+    : fw_buckets(), bw_buckets(), nodes(nodes), time_horizon(time_horizon), capacity(capacity),
       bucket_interval(bucket_interval), best_cost(std::numeric_limits<double>::infinity()), fw_best_label() {
 
     initInfo();
@@ -77,17 +77,17 @@ BucketGraph::BucketGraph(const std::vector<VRPJob> &jobs, int time_horizon, int 
 /**
  * @brief Constructs a BucketGraph object.
  *
- * This constructor initializes a BucketGraph with the given jobs, time horizon, and bucket interval.
+ * This constructor initializes a BucketGraph with the given nodes, time horizon, and bucket interval.
  * It sets up the forward and backward buckets, initializes the dual values for the CVRP separation,
  * and defines the intervals and resource limits.
  *
  */
-BucketGraph::BucketGraph(const std::vector<VRPJob> &jobs, int time_horizon, int bucket_interval)
-    : fw_buckets(), bw_buckets(), jobs(jobs), time_horizon(time_horizon), bucket_interval(bucket_interval),
+BucketGraph::BucketGraph(const std::vector<VRPNode> &nodes, int time_horizon, int bucket_interval)
+    : fw_buckets(), bw_buckets(), nodes(nodes), time_horizon(time_horizon), bucket_interval(bucket_interval),
       best_cost(std::numeric_limits<double>::infinity()), fw_best_label() {
 
 #if defined(RCC) || defined(EXACT_RCC)
-    cvrsep_duals.assign(jobs.size() + 2, std::vector<double>(jobs.size() + 2, 0.0));
+    cvrsep_duals.assign(nodes.size() + 2, std::vector<double>(nodes.size() + 2, 0.0));
 #endif
     initInfo();
     Interval intervalTime(bucket_interval, time_horizon);
@@ -101,12 +101,12 @@ BucketGraph::BucketGraph(const std::vector<VRPJob> &jobs, int time_horizon, int 
         SECTION { define_buckets<Direction::Backward>(); });
 }
 
-BucketGraph::BucketGraph(const std::vector<VRPJob> &jobs, std::vector<int> &bounds, std::vector<int> &bucket_intervals)
-    : fw_buckets(), bw_buckets(), jobs(jobs), time_horizon(bounds[0]), bucket_interval(bucket_intervals[0]),
+BucketGraph::BucketGraph(const std::vector<VRPNode> &nodes, std::vector<int> &bounds, std::vector<int> &bucket_intervals)
+    : fw_buckets(), bw_buckets(), nodes(nodes), time_horizon(bounds[0]), bucket_interval(bucket_intervals[0]),
       best_cost(std::numeric_limits<double>::infinity()), fw_best_label() {
 
 #if defined(RCC) || defined(EXACT_RCC)
-    cvrsep_duals.assign(jobs.size() + 2, std::vector<double>(jobs.size() + 2, 0.0));
+    cvrsep_duals.assign(nodes.size() + 2, std::vector<double>(nodes.size() + 2, 0.0));
 #endif
 
     initInfo();
@@ -133,7 +133,7 @@ BucketGraph::BucketGraph(const std::vector<VRPJob> &jobs, std::vector<int> &boun
  * @return A new label computed from L and L_prime.
  */
 Label *BucketGraph::compute_label(const Label *L, const Label *L_prime) {
-    double cij_cost = getcij(L->job_id, L_prime->job_id);
+    double cij_cost = getcij(L->node_id, L_prime->node_id);
     double new_cost = L->cost + L_prime->cost + cij_cost;
 
     double real_cost = L->real_cost + L_prime->real_cost + cij_cost;
@@ -172,20 +172,20 @@ Label *BucketGraph::compute_label(const Label *L, const Label *L_prime) {
     new_label->cost -= sumSRC;
 #endif
 
-    new_label->jobs_covered.clear();
+    new_label->nodes_covered.clear();
 
     // Start by inserting backward list elements
     size_t forward_size = 0;
     auto   L_bw         = L_prime;
     for (; L_bw != nullptr; L_bw = L_bw->parent) {
-        new_label->jobs_covered.push_back(L_bw->job_id); // Insert backward elements directly
+        new_label->nodes_covered.push_back(L_bw->node_id); // Insert backward elements directly
     }
 
     // Now insert forward list elements in reverse order without using std::reverse
     auto L_fw = L;
     for (; L_fw != nullptr; L_fw = L_fw->parent) {
-        new_label->jobs_covered.insert(new_label->jobs_covered.begin(),
-                                       L_fw->job_id); // Insert forward elements at the front
+        new_label->nodes_covered.insert(new_label->nodes_covered.begin(),
+                                       L_fw->node_id); // Insert forward elements at the front
         forward_size++;
     }
 
@@ -202,7 +202,7 @@ std::vector<int> BucketGraph::computePhi(int &bucket_id, bool fw) {
     // Ensure bucket_id is within valid bounds
     auto &buckets            = fw ? fw_buckets : bw_buckets;
     auto &fixed_buckets      = fw ? fw_fixed_buckets : bw_fixed_buckets;
-    auto &job_interval_trees = fw ? fw_job_interval_trees : bw_job_interval_trees;
+    auto &node_interval_trees = fw ? fw_node_interval_trees : bw_node_interval_trees;
 
     if constexpr (R_SIZE > 1) {
         if (bucket_id >= buckets.size() || bucket_id < 0) return phi;
@@ -215,12 +215,12 @@ std::vector<int> BucketGraph::computePhi(int &bucket_id, bool fw) {
             base_intervals[r] = total_ranges[r] / static_cast<int>(intervals[r].interval);
         }
 
-        // Get the job ID and current bucket
-        int   job_id         = buckets[bucket_id].job_id;
+        // Get the node ID and current bucket
+        int   node_id         = buckets[bucket_id].node_id;
         auto &current_bucket = buckets[bucket_id];
 
-        // Retrieve the pre-built Splay Tree for this job
-        auto &job_tree = job_interval_trees[job_id];
+        // Retrieve the pre-built Splay Tree for this node
+        auto &node_tree = node_interval_trees[node_id];
 
         // Search for matching intervals using the existing Splay Tree
         if (fw) {
@@ -230,8 +230,8 @@ std::vector<int> BucketGraph::computePhi(int &bucket_id, bool fw) {
                 target_low[r] -= base_intervals[r]; // Adjust for the base intervals
             }
 
-            TreeNode *found_node = job_tree.find(target_low);
-            if (found_node != nullptr && buckets[found_node->bucket_index].job_id == job_id) {
+            TreeNode *found_node = node_tree.find(target_low);
+            if (found_node != nullptr && buckets[found_node->bucket_index].node_id == node_id) {
                 // Check if the found bucket is fixed
 #ifdef FIX_BUCKETS
                 if (fixed_buckets[found_node->bucket_index][bucket_id] == 0)
@@ -247,8 +247,8 @@ std::vector<int> BucketGraph::computePhi(int &bucket_id, bool fw) {
                 target_high[r] += base_intervals[r]; // Adjust for the base intervals
             }
 
-            TreeNode *found_node = job_tree.find(target_high);
-            if (found_node != nullptr && buckets[found_node->bucket_index].job_id == job_id) {
+            TreeNode *found_node = node_tree.find(target_high);
+            if (found_node != nullptr && buckets[found_node->bucket_index].node_id == node_id) {
                 // Check if the found bucket is fixed
 #ifdef FIX_BUCKETS
                 if (fixed_buckets[found_node->bucket_index][bucket_id] == 0)
@@ -263,7 +263,7 @@ std::vector<int> BucketGraph::computePhi(int &bucket_id, bool fw) {
         // Handle the case where R_SIZE == 1 with a simpler approach
         int smaller = bucket_id - 1;
 
-        if (smaller >= 0 && buckets[smaller].job_id == buckets[bucket_id].job_id) {
+        if (smaller >= 0 && buckets[smaller].node_id == buckets[bucket_id].node_id) {
 #ifdef FIX_BUCKETS
             if (fixed_buckets[smaller][bucket_id] == 0)
 #endif
@@ -276,19 +276,19 @@ std::vector<int> BucketGraph::computePhi(int &bucket_id, bool fw) {
 }
 
 /**
- * Calculates the neighborhoods for each job for the ng-routes.
+ * Calculates the neighborhoods for each node for the ng-routes.
  *
  */
 void BucketGraph::calculate_neighborhoods(size_t num_closest) {
-    size_t num_jobs = jobs.size();
+    size_t num_nodes = nodes.size();
 
     // Initialize the neighborhood bitmaps as vectors of uint64_t for forward and backward neighborhoods
-    neighborhoods_bitmap.resize(num_jobs); // Forward neighborhood
+    neighborhoods_bitmap.resize(num_nodes); // Forward neighborhood
 
-    for (size_t i = 0; i < num_jobs; ++i) {
+    for (size_t i = 0; i < num_nodes; ++i) {
         std::vector<std::pair<double, size_t>> forward_distances; // Distances for forward neighbors
 
-        for (size_t j = 0; j < num_jobs; ++j) {
+        for (size_t j = 0; j < num_nodes; ++j) {
             if (i != j) {
                 // Forward distance (i -> j)
                 double forward_distance = getcij(i, j);
@@ -296,25 +296,25 @@ void BucketGraph::calculate_neighborhoods(size_t num_closest) {
             }
         }
 
-        // Sort distances to find the closest jobs
+        // Sort distances to find the closest nodes
         std::sort(forward_distances.begin(), forward_distances.end());
 
-        // Initialize the neighborhood bitmap vector for job i (forward and backward)
-        size_t num_segments = (num_jobs + 63) / 64;
+        // Initialize the neighborhood bitmap vector for node i (forward and backward)
+        size_t num_segments = (num_nodes + 63) / 64;
         neighborhoods_bitmap[i].resize(num_segments, 0); // Resizing for forward bitmap
 
-        // Include the job itself in both forward and backward neighborhoods
+        // Include the node itself in both forward and backward neighborhoods
         size_t segment_self      = i >> 6;
         size_t bit_position_self = i & 63;
         neighborhoods_bitmap[i][segment_self] |= (1ULL << bit_position_self); // Forward
 
-        // Map the top 'num_closest' closest jobs for forward and set them in the backward neighborhoods
+        // Map the top 'num_closest' closest nodes for forward and set them in the backward neighborhoods
         for (size_t k = 0; k < num_closest && k < forward_distances.size(); ++k) {
-            size_t job_index = forward_distances[k].second;
+            size_t node_index = forward_distances[k].second;
 
-            // Determine the segment and the bit within the segment for the job_index (forward)
-            size_t segment      = job_index >> 6;
-            size_t bit_position = job_index & 63;
+            // Determine the segment and the bit within the segment for the node_index (forward)
+            size_t segment      = node_index >> 6;
+            size_t bit_position = node_index & 63;
             neighborhoods_bitmap[i][segment] |= (1ULL << bit_position); // Forward neighbor
         }
     }
@@ -419,51 +419,51 @@ void BucketGraph::forbidCycle(const std::vector<int> &cycle, bool aggressive) {
 /**
  * @brief Sets the adjacency list for the BucketGraph.
  *
- * This function initializes the adjacency list for each job in the graph by clearing existing arcs
- * and then adding new arcs based on the travel cost and resource consumption between jobs.
+ * This function initializes the adjacency list for each node in the graph by clearing existing arcs
+ * and then adding new arcs based on the travel cost and resource consumption between nodes.
  *
  */
 void BucketGraph::set_adjacency_list() {
-    // Clear existing arcs for each job
-    for (auto &job : jobs) {
-        job.clear_arcs(); // Remove any existing arcs associated with the job
+    // Clear existing arcs for each node
+    for (auto &node : nodes) {
+        node.clear_arcs(); // Remove any existing arcs associated with the node
     }
 
-    // Lambda function to add arcs for a specific job and bucket
-    auto add_arcs_for_job = [&](const VRPJob &job, int from_bucket, std::vector<double> &res_inc) {
+    // Lambda function to add arcs for a specific node and bucket
+    auto add_arcs_for_node = [&](const VRPNode &node, int from_bucket, std::vector<double> &res_inc) {
         using Arc =
             std::tuple<double, int, std::vector<double>, double>; // Define an Arc as a tuple with priority value,
-                                                                  // job id, resource increments, and cost increment
+                                                                  // node id, resource increments, and cost increment
 
         // Containers to store the best arcs for forward and reverse directions
         std::vector<Arc> best_arcs;
-        best_arcs.reserve(jobs.size()); // Reserve space for best arcs to avoid frequent memory reallocations
+        best_arcs.reserve(nodes.size()); // Reserve space for best arcs to avoid frequent memory reallocations
 
         std::vector<Arc> best_arcs_rev;
-        best_arcs_rev.reserve(jobs.size()); // Reserve space for reverse arcs
+        best_arcs_rev.reserve(nodes.size()); // Reserve space for reverse arcs
 
-        // Iterate over all jobs to determine potential arcs
-        for (const auto &next_job : jobs) {
-            if (next_job.id == options.depot) continue; // Skip the depot
-            if (job.id == next_job.id) continue;        // Skip arcs to the same job
+        // Iterate over all nodes to determine potential arcs
+        for (const auto &next_node : nodes) {
+            if (next_node.id == options.depot) continue; // Skip the depot
+            if (node.id == next_node.id) continue;        // Skip arcs to the same node
 
-            // Calculate the travel cost between the current job and the next job
-            auto   travel_cost = getcij(job.id, next_job.id);
+            // Calculate the travel cost between the current node and the next node
+            auto   travel_cost = getcij(node.id, next_node.id);
             double cost_inc =
-                travel_cost - next_job.cost; // Adjust the cost increment by subtracting the next job's cost
+                travel_cost - next_node.cost; // Adjust the cost increment by subtracting the next node's cost
 
-            // Initialize the resource increments based on the current job's consumption
-            for (int r = 0; r < R_SIZE; ++r) { res_inc[r] = job.consumption[r]; }
+            // Initialize the resource increments based on the current node's consumption
+            for (int r = 0; r < R_SIZE; ++r) { res_inc[r] = node.consumption[r]; }
             res_inc[TIME_INDEX] += travel_cost; // Add travel time to the resource increment
 
-            int to_bucket = next_job.id;
+            int to_bucket = next_node.id;
             if (from_bucket == to_bucket) continue; // Skip arcs that loop back to the same bucket
 
             // Check feasibility of the arc based on resource constraints
             bool feasible = true;
             for (int r = 0; r < R_SIZE; ++r) {
-                if (job.lb[r] + res_inc[r] >
-                    next_job.ub[r]) { // If resource exceeds the upper bound of the next job, the arc is infeasible
+                if (node.lb[r] + res_inc[r] >
+                    next_node.ub[r]) { // If resource exceeds the upper bound of the next node, the arc is infeasible
                     feasible = false;
                     break;
                 }
@@ -471,43 +471,43 @@ void BucketGraph::set_adjacency_list() {
             if (!feasible) continue; // Skip if the arc is not feasible
 
             // Calculate priority values for forward and reverse arcs
-            double aux_double = 1.E-5 * next_job.start_time; // Small weight for start time
-            best_arcs.emplace_back(aux_double, next_job.id, res_inc,
+            double aux_double = 1.E-5 * next_node.start_time; // Small weight for start time
+            best_arcs.emplace_back(aux_double, next_node.id, res_inc,
                                    cost_inc); // Store the arc for forward direction
 
-            double aux_double_rev = 1.E-5 * job.end_time; // Small weight for end time
-            best_arcs_rev.emplace_back(aux_double_rev, next_job.id, res_inc,
+            double aux_double_rev = 1.E-5 * node.end_time; // Small weight for end time
+            best_arcs_rev.emplace_back(aux_double_rev, next_node.id, res_inc,
                                        cost_inc); // Store the arc for reverse direction
         }
 
-        // Add forward arcs from the current job to its neighbors
+        // Add forward arcs from the current node to its neighbors
         for (const auto &arc : best_arcs) {
             auto [priority_value, to_bucket, res_inc_local, cost_inc] = arc;
 
-            auto next_job = to_bucket;
-            jobs[job.id].add_arc(job.id, next_job, res_inc_local, cost_inc, true,
+            auto next_node = to_bucket;
+            nodes[node.id].add_arc(node.id, next_node, res_inc_local, cost_inc, true,
                                  priority_value); // Add forward arc to the adjacency list
         }
 
-        // Add reverse arcs from neighboring jobs to the current job
+        // Add reverse arcs from neighboring nodes to the current node
         for (const auto &arc : best_arcs_rev) {
             auto [priority_value, to_bucket, res_inc_local, cost_inc] = arc;
-            auto next_job                                             = to_bucket;
+            auto next_node                                             = to_bucket;
 
-            jobs[next_job].add_arc(next_job, job.id, res_inc_local, cost_inc, false,
+            nodes[next_node].add_arc(next_node, node.id, res_inc_local, cost_inc, false,
                                    priority_value); // Add reverse arc to the adjacency list
         }
     };
 
-    // Iterate over all jobs to set the adjacency list
-    for (const auto &VRPJob : jobs) {
-        if (VRPJob.id == options.end_depot) continue; // Skip the last job (depot)
+    // Iterate over all nodes to set the adjacency list
+    for (const auto &VRPNode : nodes) {
+        if (VRPNode.id == options.end_depot) continue; // Skip the last node (depot)
 
         // Initialize the resource increment vector based on the number of intervals
         std::vector<double> res_inc(intervals.size());
 
-        // Add arcs for the current job
-        add_arcs_for_job(VRPJob, VRPJob.id, res_inc);
+        // Add arcs for the current node
+        add_arcs_for_node(VRPNode, VRPNode.id, res_inc);
     }
 }
 
@@ -553,17 +553,17 @@ void BucketGraph::common_initialization() {
         bw_buckets[b].clear();
     }
 
-    auto &VRPJob = jobs[0]; // Example for the first job
+    auto &VRPNode = nodes[0]; // Example for the first node
 
-    std::vector<int> job_total_ranges(num_intervals);
-    for (int r = 0; r < num_intervals; ++r) { job_total_ranges[r] = VRPJob.ub[r] - VRPJob.lb[r]; }
+    std::vector<int> node_total_ranges(num_intervals);
+    for (int r = 0; r < num_intervals; ++r) { node_total_ranges[r] = VRPNode.ub[r] - VRPNode.lb[r]; }
 
     // Helper lambda to update current position of the intervals
     auto update_position = [&](std::vector<int> &current_pos) -> bool {
         bool done = true;
         for (int r = num_intervals - 1; r >= 0; --r) {
             current_pos[r]++;
-            if (current_pos[r] * base_intervals[r] < job_total_ranges[r]) {
+            if (current_pos[r] * base_intervals[r] < node_total_ranges[r]) {
                 done = false;
                 break;
             } else {
@@ -594,7 +594,7 @@ void BucketGraph::common_initialization() {
         std::vector<double> interval_starts(num_intervals);
         for (int r = 0; r < num_intervals; ++r) {
             interval_starts[r] =
-                std::min(static_cast<int>(R_max[r]), VRPJob.lb[r] + current_pos[r] * base_intervals[r]);
+                std::min(static_cast<int>(R_max[r]), VRPNode.lb[r] + current_pos[r] * base_intervals[r]);
         }
 
         // Adjust to calculate index using `num_buckets[0]`, which is likely multi-dimensional for the depot
@@ -602,12 +602,12 @@ void BucketGraph::common_initialization() {
                                num_bucket_index[options.depot]; // Calculate index once
         depot->initialize(calculated_index, 0.0, interval_starts, options.depot);
         depot->is_extended = false;
-        set_job_visited(depot->visited_bitmap, options.depot);
+        set_node_visited(depot->visited_bitmap, options.depot);
 #ifdef SRC
         depot->SRCmap.assign(cut_storage->SRCDuals.size(), 0);
 #endif
         fw_buckets[calculated_index].add_label(depot);
-        fw_buckets[calculated_index].job_id = options.depot;
+        fw_buckets[calculated_index].node_id = options.depot;
 
         if (update_position(current_pos)) break; // Update position and break if done
     }
@@ -621,7 +621,7 @@ void BucketGraph::common_initialization() {
 
         std::vector<double> interval_ends(num_intervals);
         for (int r = 0; r < num_intervals; ++r) {
-            interval_ends[r] = std::max(static_cast<int>(R_min[r]), VRPJob.ub[r] - current_pos[r] * base_intervals[r]);
+            interval_ends[r] = std::max(static_cast<int>(R_min[r]), VRPNode.ub[r] - current_pos[r] * base_intervals[r]);
         }
 
         // Calculate index for backward direction
@@ -630,12 +630,12 @@ void BucketGraph::common_initialization() {
         // print interval_ends size
         end_depot->initialize(calculated_index, 0.0, interval_ends, options.end_depot);
         end_depot->is_extended = false;
-        set_job_visited(end_depot->visited_bitmap, options.end_depot);
+        set_node_visited(end_depot->visited_bitmap, options.end_depot);
 #ifdef SRC
         end_depot->SRCmap.assign(cut_storage->SRCDuals.size(), 0);
 #endif
         bw_buckets[calculated_index].add_label(end_depot);
-        bw_buckets[calculated_index].job_id = options.end_depot;
+        bw_buckets[calculated_index].node_id = options.end_depot;
 
         if (update_position(current_pos)) break; // Update position and break if done
     }
@@ -671,17 +671,17 @@ void BucketGraph::mono_initialization() {
     // Clear forward and backward buckets
     for (auto b = 0; b < fw_buckets_size; b++) { fw_buckets[b].clear(); }
 
-    auto &VRPJob = jobs[0]; // Example for the first job
+    auto &VRPNode = nodes[0]; // Example for the first node
 
-    std::vector<int> job_total_ranges(num_intervals);
-    for (int r = 0; r < num_intervals; ++r) { job_total_ranges[r] = VRPJob.ub[r] - VRPJob.lb[r]; }
+    std::vector<int> node_total_ranges(num_intervals);
+    for (int r = 0; r < num_intervals; ++r) { node_total_ranges[r] = VRPNode.ub[r] - VRPNode.lb[r]; }
 
     // Helper lambda to update current position of the intervals
     auto update_position = [&](std::vector<int> &current_pos) -> bool {
         bool done = true;
         for (int r = num_intervals - 1; r >= 0; --r) {
             current_pos[r]++;
-            if (current_pos[r] * base_intervals[r] < job_total_ranges[r]) {
+            if (current_pos[r] * base_intervals[r] < node_total_ranges[r]) {
                 done = false;
                 break;
             } else {
@@ -712,7 +712,7 @@ void BucketGraph::mono_initialization() {
         std::vector<double> interval_starts(num_intervals);
         for (int r = 0; r < num_intervals; ++r) {
             interval_starts[r] =
-                std::min(static_cast<int>(R_max[r]), VRPJob.lb[r] + current_pos[r] * base_intervals[r]);
+                std::min(static_cast<int>(R_max[r]), VRPNode.lb[r] + current_pos[r] * base_intervals[r]);
         }
 
         // Adjust to calculate index using `num_buckets[0]`, which is likely multi-dimensional for the depot
@@ -720,12 +720,12 @@ void BucketGraph::mono_initialization() {
                                num_bucket_index[options.depot]; // Calculate index once
         depot->initialize(calculated_index, 0.0, interval_starts, options.depot);
         depot->is_extended = false;
-        set_job_visited(depot->visited_bitmap, options.depot);
+        set_node_visited(depot->visited_bitmap, options.depot);
 #ifdef SRC
         depot->SRCmap.assign(cut_storage->SRCDuals.size(), 0);
 #endif
         fw_buckets[calculated_index].add_label(depot);
-        fw_buckets[calculated_index].job_id = options.depot;
+        fw_buckets[calculated_index].node_id = options.depot;
 
         if (update_position(current_pos)) break; // Update position and break if done
     }
@@ -737,7 +737,7 @@ void BucketGraph::mono_initialization() {
  * Computes the knapsack bound for a given label.
  *
  * This function calculates the upper bound of the knapsack problem for a given label `l`.
- * It initializes a knapsack with the remaining capacity and iterates through the jobs to add
+ * It initializes a knapsack with the remaining capacity and iterates through the nodes to add
  * items that have not been visited and fit within the remaining capacity.
  * The function returns the difference between the label's cost and the solution to the knapsack problem.
  *
@@ -749,9 +749,9 @@ double BucketGraph::knapsackBound(const Label *l) {
     int      rload = R_max[DEMAND_INDEX] - l->resources[DEMAND_INDEX];
     kp.setCapacity(rload);
 
-    for (int i = 1; i < jobs.size(); ++i) {
-        if (!l->visits(i) && jobs[i].consumption[DEMAND_INDEX] <= rload) {
-            kp.addItem(jobs[i].cost, jobs[i].consumption[DEMAND_INDEX]);
+    for (int i = 1; i < nodes.size(); ++i) {
+        if (!l->visits(i) && nodes[i].consumption[DEMAND_INDEX] <= rload) {
+            kp.addItem(nodes[i].cost, nodes[i].consumption[DEMAND_INDEX]);
         }
     }
 
@@ -917,8 +917,8 @@ void BucketGraph::generate_arcs() {
  */
 void BucketGraph::setup() {
     // Initialize the sizes
-    fixed_arcs.resize(getJobs().size());
-    for (int i = 0; i < getJobs().size(); ++i) { fixed_arcs[i].resize(getJobs().size()); }
+    fixed_arcs.resize(getNodes().size());
+    for (int i = 0; i < getNodes().size(); ++i) { fixed_arcs[i].resize(getNodes().size()); }
 
     // Resize and initialize fw_fixed_buckets and bw_fixed_buckets for std::vector<bool>
     fw_fixed_buckets.assign(fw_buckets.size(), std::vector<bool>(fw_buckets.size(), false));
@@ -926,11 +926,11 @@ void BucketGraph::setup() {
     // define initial relationships
     set_adjacency_list();
     generate_arcs();
-    for (auto &VRPJob : jobs) { VRPJob.sort_arcs(); }
+    for (auto &VRPNode : nodes) { VRPNode.sort_arcs(); }
 
 #ifdef SCHRODINGER
     sPool.distance_matrix = distance_matrix;
-    sPool.setJobs(&jobs);
+    sPool.setNodes(&nodes);
     // sPool.setCutStorage(cut_storage);
 #endif
 
@@ -996,8 +996,8 @@ void BucketGraph::initInfo() {
  * @brief Computes the mono label for the BucketGraph.
  *
  * This function computes the mono label for the BucketGraph by acquiring a new label from the label pool
- * and setting the cost and real cost values from the given label `L`. It then calculates the number of jobs
- * covered by the label and its ancestors, reserves space for the jobs covered, and inserts the jobs from the
+ * and setting the cost and real cost values from the given label `L`. It then calculates the number of nodes
+ * covered by the label and its ancestors, reserves space for the nodes covered, and inserts the nodes from the
  *
  */
 Label *BucketGraph::compute_mono_label(const Label *L) {
@@ -1006,20 +1006,20 @@ Label *BucketGraph::compute_mono_label(const Label *L) {
     new_label->cost      = L->cost;      // Use the cost from L
     new_label->real_cost = L->real_cost; // Use the real cost from L
 
-    // Calculate the number of jobs covered by the label (its ancestors)
+    // Calculate the number of nodes covered by the label (its ancestors)
     size_t label_size = 0;
     for (auto current_label = L; current_label != nullptr; current_label = current_label->parent) { label_size++; }
 
     // Reserve space in one go
-    new_label->jobs_covered.clear();
-    new_label->jobs_covered.reserve(label_size);
+    new_label->nodes_covered.clear();
+    new_label->nodes_covered.reserve(label_size);
 
-    // Insert the jobs from the label and its ancestors
+    // Insert the nodes from the label and its ancestors
     for (auto current_label = L; current_label != nullptr; current_label = current_label->parent) {
-        new_label->jobs_covered.push_back(current_label->job_id);
+        new_label->nodes_covered.push_back(current_label->node_id);
     }
 
-    std::reverse(new_label->jobs_covered.begin(), new_label->jobs_covered.end());
+    std::reverse(new_label->nodes_covered.begin(), new_label->nodes_covered.end());
 
     return new_label;
 }

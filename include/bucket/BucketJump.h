@@ -19,7 +19,7 @@
 #include "BucketGraph.h"
 #include "Hashes.h"
 
-#include "VRPJob.h"
+#include "VRPNode.h"
 
 #include <execution>
 /**
@@ -37,7 +37,7 @@ void BucketGraph::UpdateBucketsSet(const double theta, const Label *label, std::
     auto &buckets_opposite = assign_buckets<D>(bw_buckets, fw_buckets);
     auto &c_bar_opposite   = assign_buckets<D>(bw_c_bar, fw_c_bar);
 
-    const int        bucketLjob = label->job_id;
+    const int        bucketLnode = label->node_id;
     std::vector<int> bucket_stack;
     bucket_stack.reserve(10); // Pre-allocate space for the stack
     bucket_stack.push_back(current_bucket);
@@ -55,22 +55,22 @@ void BucketGraph::UpdateBucketsSet(const double theta, const Label *label, std::
         bucket_stack.pop_back();
         Bvisited.insert(curr_bucket); // Mark the current bucket as visited
 
-        const int    bucketLprimejob = buckets_opposite[curr_bucket].job_id;
-        const double cost            = getcij(bucketLjob, bucketLprimejob);
+        const int    bucketLprimenode = buckets_opposite[curr_bucket].node_id;
+        const double cost            = getcij(bucketLnode, bucketLprimenode);
 
         // Stop exploring if the cost exceeds the threshold
         if (label->cost + cost + c_bar_opposite[curr_bucket] >= theta) { continue; }
 
         if (Bbidi.find(curr_bucket) == Bbidi.end()) {
             for (const auto &L : buckets_opposite[curr_bucket].get_labels()) {
-                if (label->job_id == L->job_id || bitmaps_conflict(label, L)) {
-                    continue; // Skip labels with the same job ID or conflicting bitmaps
+                if (label->node_id == L->node_id || bitmaps_conflict(label, L)) {
+                    continue; // Skip labels with the same node ID or conflicting bitmaps
                 }
 
-                const VRPJob &L_last_job      = (D == Direction::Forward) ? jobs[label->job_id] : jobs[L->job_id];
+                const VRPNode &L_last_node      = (D == Direction::Forward) ? nodes[label->node_id] : nodes[L->node_id];
                 const double  time_constraint = (D == Direction::Forward)
-                                                    ? label->resources[TIME_INDEX] + cost + L_last_job.duration
-                                                    : L->resources[TIME_INDEX] + cost + L_last_job.duration;
+                                                    ? label->resources[TIME_INDEX] + cost + L_last_node.duration
+                                                    : L->resources[TIME_INDEX] + cost + L_last_node.duration;
 
                 if (time_constraint >
                     ((D == Direction::Forward) ? L->resources[TIME_INDEX] : label->resources[TIME_INDEX])) {
@@ -150,7 +150,7 @@ void BucketGraph::BucketArcElimination(double theta) {
 
         for (const auto &a : bucket_arcs) {
             auto arc_key =
-                std::make_pair(std::make_pair(buckets[a.from_bucket].job_id, buckets[a.to_bucket].job_id), b);
+                std::make_pair(std::make_pair(buckets[a.from_bucket].node_id, buckets[a.to_bucket].node_id), b);
             int   b_opposite = get_opposite_bucket_number<D>(a.to_bucket);
             auto &labels     = buckets[b].get_labels();
 
@@ -183,10 +183,10 @@ void BucketGraph::BucketArcElimination(double theta) {
 
     // Process each bucket
     for (int b = 0; b < buckets_size; ++b) {
-        const auto &job_arcs = jobs[buckets[b].job_id].template get_arcs<D>();
+        const auto &node_arcs = nodes[buckets[b].node_id].template get_arcs<D>();
 
         // Process arcs
-        for (const auto &a : job_arcs) {
+        for (const auto &a : node_arcs) {
             auto  arc_key  = std::make_pair(std::make_pair(a.from, a.to), b);
             auto &Bidi_map = local_B_Ba_b[arc_key];
 
@@ -238,27 +238,27 @@ void BucketGraph::ObtainJumpBucketArcs() {
     for (int b = 0; b < buckets_size; ++b) {
         std::vector<int> B_bar; // Temporary storage for valid bucket indices
 
-        // Cache the current bucket's job ID and arcs
-        const int   current_job_id = buckets[b].job_id;
+        // Cache the current bucket's node ID and arcs
+        const int   current_node_id = buckets[b].node_id;
         const auto &arcs           = buckets[b].template get_bucket_arcs<D>();
-        const auto &original_arcs  = jobs[current_job_id].template get_arcs<D>();
+        const auto &original_arcs  = nodes[current_node_id].template get_arcs<D>();
 
         if (arcs.empty()) { continue; } // Skip if no arcs in the current bucket
 
-        // Process each original arc for the current job
+        // Process each original arc for the current node
         for (const auto &orig_arc : original_arcs) {
-            const int from_job  = orig_arc.from;
-            const int to_job    = orig_arc.to;
+            const int from_node  = orig_arc.from;
+            const int to_node    = orig_arc.to;
             bool      have_path = false;
 
             // Check if the path exists in the current bucket arcs
             for (const auto &gamma : arcs) {
                 if (fixed_buckets[gamma.from_bucket][gamma.to_bucket] == 1) { continue; }
 
-                const int from_job_b = buckets[gamma.from_bucket].job_id;
-                const int to_job_b   = buckets[gamma.to_bucket].job_id;
+                const int from_node_b = buckets[gamma.from_bucket].node_id;
+                const int to_node_b   = buckets[gamma.to_bucket].node_id;
 
-                if (from_job == from_job_b && to_job == to_job_b) {
+                if (from_node == from_node_b && to_node == to_node_b) {
                     have_path = true;
                     break; // Path found, exit early
                 }
@@ -268,12 +268,12 @@ void BucketGraph::ObtainJumpBucketArcs() {
             if (!have_path) {
                 ++missing_counter; // Increment missing path counter
 
-                // Cache the starting bucket and the number of buckets for this job
-                const int start_bucket = num_buckets_index[current_job_id];
-                const int job_buckets  = num_buckets[current_job_id];
+                // Cache the starting bucket and the number of buckets for this node
+                const int start_bucket = num_buckets_index[current_node_id];
+                const int node_buckets  = num_buckets[current_node_id];
 
                 // Look through adjacent buckets
-                for (int b_prime = b + 1; b_prime < start_bucket + job_buckets; ++b_prime) {
+                for (int b_prime = b + 1; b_prime < start_bucket + node_buckets; ++b_prime) {
                     // Check if b_prime is adjacent to b in Phi
                     const auto &phi_b_prime = Phi[b_prime];
                     if (std::find(phi_b_prime.begin(), phi_b_prime.end(), b) == phi_b_prime.end()) {
@@ -285,11 +285,11 @@ void BucketGraph::ObtainJumpBucketArcs() {
                     for (const auto &gamma_prime : arcs_prime) {
                         if (fixed_buckets[gamma_prime.from_bucket][gamma_prime.to_bucket] == 1) { continue; }
 
-                        const int from_job_prime = buckets[gamma_prime.from_bucket].job_id;
-                        const int to_job_prime   = buckets[gamma_prime.to_bucket].job_id;
+                        const int from_node_prime = buckets[gamma_prime.from_bucket].node_id;
+                        const int to_node_prime   = buckets[gamma_prime.to_bucket].node_id;
 
                         // If the arc matches, add a jump arc
-                        if (from_job == from_job_prime && to_job == to_job_prime) {
+                        if (from_node == from_node_prime && to_node == to_node_prime) {
                             B_bar.push_back(b_prime); // Add the valid bucket to B_bar
 
                             // Add the jump arc with the resource and cost increments
