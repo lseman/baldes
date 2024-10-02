@@ -206,35 +206,35 @@ public:
     /**
      * @brief Computes an advanced stabilized dual solution.
      *
-     * This function computes a stabilized dual solution based on the provided dual solution (`jobDuals`).
+     * This function computes a stabilized dual solution based on the provided dual solution (`nodeDuals`).
      * It uses various internal states and parameters to compute the stabilized solution, including
      * `cur_stab_center`, `smooth_dual_sol`, `subgradient`, and `duals_sep`. The function follows a series
      * of steps to compute intermediate values such as `duals_tilde`, `duals_g`, and `rho`, and uses these
      * to update the `duals_sep` and `smooth_dual_sol`.
      *
-     * @param jobDuals The input dual solution to be stabilized.
+     * @param nodeDuals The input dual solution to be stabilized.
      * @return The stabilized dual solution.
      */
     // TODO: we need to check the implementation of this method
-    DualSolution getStabDualSolAdvanced(const DualSolution &jobDuals) {
+    DualSolution getStabDualSolAdvanced(const DualSolution &nodeDuals) {
         // If there's no stabilization center, return the input duals
-        if (cur_stab_center.empty()) { return jobDuals; }
+        if (cur_stab_center.empty()) { return nodeDuals; }
 
         // Initialize subgradient if it hasn't been initialized yet
-        if (subgradient.empty()) { subgradient.assign(jobDuals.size(), 0.0); }
+        if (subgradient.empty()) { subgradient.assign(nodeDuals.size(), 0.0); }
 
         // Initialize the separation duals and smooth dual solution if they are empty
         if (duals_sep.empty()) {
-            duals_sep       = jobDuals;  // Start with the input duals
+            duals_sep       = nodeDuals;  // Start with the input duals
             smooth_dual_sol = duals_sep; // Initialize the smoothed dual solution
-            return jobDuals;             // Return the input duals for now
+            return nodeDuals;             // Return the input duals for now
         }
 
-        // Get the current stabilization center (duals_in) and the current job duals (duals_out)
+        // Get the current stabilization center (duals_in) and the current node duals (duals_out)
         const auto &duals_in  = cur_stab_center;
-        const auto &duals_out = jobDuals;
+        const auto &duals_out = nodeDuals;
 
-        const size_t        n = jobDuals.size();
+        const size_t        n = nodeDuals.size();
         std::vector<double> duals_tilde(n, 0.0);
         std::vector<double> duals_g(n, 0.0);
         std::vector<double> rho(n, 0.0);
@@ -295,15 +295,15 @@ public:
      * separation direction and the subgradient.
      *
      * @param dados The model data containing problem-specific information.
-     * @param jobDuals The dual solution vector.
+     * @param nodeDuals The dual solution vector.
      * @param best_pricing_cols A vector of pointers to the best pricing columns.
      * @return The updated alpha value based on the dynamic schedule.
      */
-    double dynamic_alpha_schedule(const ModelData &dados, const DualSolution &jobDuals,
+    double dynamic_alpha_schedule(const ModelData &dados, const DualSolution &nodeDuals,
                                   const std::vector<Label *> &best_pricing_cols) {
 
-        // Get the number of rows from the size of the jobDuals
-        size_t number_of_rows = jobDuals.size();
+        // Get the number of rows from the size of the nodeDuals
+        size_t number_of_rows = nodeDuals.size();
 
         // Calculate the direction of separation between the current smoothed dual solution and stabilization center
         std::vector<double> in_sep_direction(number_of_rows);
@@ -321,8 +321,8 @@ public:
         new_rows.assign(number_of_rows, 0.0);
         for (const auto *best_pricing_col : best_pricing_cols) {
             if (best_pricing_col->cost > 0) { continue; }
-            for (const auto &row : best_pricing_col->jobs_covered) {
-                if (row > 0 && row != N_SIZE - 1) { // Ignore invalid rows and the last job
+            for (const auto &row : best_pricing_col->nodes_covered) {
+                if (row > 0 && row != N_SIZE - 1) { // Ignore invalid rows and the last node
                     new_rows[row - 1] += 1;
                 }
             }
@@ -388,13 +388,13 @@ public:
      * for the next iteration if the current lagrangian gap is smaller than the previous one.
      *
      * @param dados The model data containing relevant information for the optimization.
-     * @param jobDuals The dual solution obtained from the pricing optimization.
+     * @param nodeDuals The dual solution obtained from the pricing optimization.
      * @param lag_gap The current lagrangian gap.
      * @param best_pricing_cols A vector of pointers to the best pricing columns.
      */
-    void update_stabilization_after_pricing_optim(const ModelData &dados, const DualSolution &jobDuals,
+    void update_stabilization_after_pricing_optim(const ModelData &dados, const DualSolution &nodeDuals,
                                                   const double &lag_gap, std::vector<Label *> best_pricing_cols) {
-        if (nb_misprices == 0) { alpha = dynamic_alpha_schedule(dados, jobDuals, best_pricing_cols); }
+        if (nb_misprices == 0) { alpha = dynamic_alpha_schedule(dados, nodeDuals, best_pricing_cols); }
         if (lag_gap < lag_gap_prev) { stab_center_for_next_iteration = smooth_dual_sol; }
         base_alpha = alpha;
     }

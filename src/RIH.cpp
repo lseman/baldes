@@ -57,16 +57,16 @@ int BucketGraph::RIH1(std::priority_queue<Label *, std::vector<Label *>, LabelCo
         }
 
         // If the label has only the depots covered, skip it
-        if (current_label->jobs_covered.size() <= 3) { // Depot at start and end + at least one job
+        if (current_label->nodes_covered.size() <= 3) { // Depot at start and end + at least one node
             continue;
         }
 
         // Iterate over positions to insert a new customer
-        for (size_t i = 1; i < current_label->jobs_covered.size() - 1; ++i) { // Skip the first and last depot
-            for (size_t new_customer = 1; new_customer <= jobs.size() - 2;
+        for (size_t i = 1; i < current_label->nodes_covered.size() - 1; ++i) { // Skip the first and last depot
+            for (size_t new_customer = 1; new_customer <= nodes.size() - 2;
                  ++new_customer) { // Iterate over all possible new customers
-                if (std::find(current_label->jobs_covered.begin(), current_label->jobs_covered.end(), new_customer) !=
-                    current_label->jobs_covered.end()) {
+                if (std::find(current_label->nodes_covered.begin(), current_label->nodes_covered.end(), new_customer) !=
+                    current_label->nodes_covered.end()) {
                     continue; // Skip if the customer is already in the route
                 }
 
@@ -77,16 +77,16 @@ int BucketGraph::RIH1(std::priority_queue<Label *, std::vector<Label *>, LabelCo
                 }
 
                 new_label->initialize(current_label->vertex, current_label->cost, {current_label->resources[0]},
-                                      current_label->job_id);
+                                      current_label->node_id);
 
-                // Copy jobs covered up to the insertion point
-                new_label->jobs_covered.assign(current_label->jobs_covered.begin(),
-                                               current_label->jobs_covered.begin() + i);
+                // Copy nodes covered up to the insertion point
+                new_label->nodes_covered.assign(current_label->nodes_covered.begin(),
+                                               current_label->nodes_covered.begin() + i);
                 // Insert the new customer
-                new_label->jobs_covered.push_back(new_customer);
-                // Copy the remaining jobs covered
-                new_label->jobs_covered.insert(new_label->jobs_covered.end(), current_label->jobs_covered.begin() + i,
-                                               current_label->jobs_covered.end());
+                new_label->nodes_covered.push_back(new_customer);
+                // Copy the remaining nodes covered
+                new_label->nodes_covered.insert(new_label->nodes_covered.end(), current_label->nodes_covered.begin() + i,
+                                               current_label->nodes_covered.end());
 
                 // Reset costs and real cost
                 new_label->cost      = 0.0;
@@ -95,41 +95,41 @@ int BucketGraph::RIH1(std::priority_queue<Label *, std::vector<Label *>, LabelCo
                 bool   feasible     = true;
                 double elapsed_time = 0.0;
 
-                // Calculate the new cost and check feasibility for each job in the new route
-                for (size_t j = 0; j < new_label->jobs_covered.size() - 1; ++j) {
-                    int  from           = new_label->jobs_covered[j];
-                    int  to             = new_label->jobs_covered[j + 1];
+                // Calculate the new cost and check feasibility for each node in the new route
+                for (size_t j = 0; j < new_label->nodes_covered.size() - 1; ++j) {
+                    int  from           = new_label->nodes_covered[j];
+                    int  to             = new_label->nodes_covered[j + 1];
                     auto cost_increment = getcij(to, from);
 
                     // Check for time window constraints
                     double new_time = elapsed_time + cost_increment;
-                    if (new_time > jobs[to].end_time) {
+                    if (new_time > nodes[to].end_time) {
                         feasible = false;
                         break;
                     }
-                    if (new_time < jobs[to].start_time) { new_time = jobs[to].start_time; }
-                    elapsed_time = new_time + jobs[to].duration;
+                    if (new_time < nodes[to].start_time) { new_time = nodes[to].start_time; }
+                    elapsed_time = new_time + nodes[to].duration;
 
                     // Update costs
-                    new_label->cost += cost_increment + jobs[to].cost; // Ensure that job cost is correctly added
+                    new_label->cost += cost_increment + nodes[to].cost; // Ensure that node cost is correctly added
                     new_label->real_cost += cost_increment;
                 }
 
                 if (!feasible) { continue; }
 
-                // Check feasibility of remaining route, ensure valid time windows for remaining jobs
-                int last_customer = new_label->jobs_covered.back();
+                // Check feasibility of remaining route, ensure valid time windows for remaining nodes
+                int last_customer = new_label->nodes_covered.back();
                 while (last_customer != N_SIZE - 1) { // Until the last depot
                     int next_customer = last_customer + 1;
-                    if (next_customer >= new_label->jobs_covered.size()) break;
+                    if (next_customer >= new_label->nodes_covered.size()) break;
 
                     double new_time = elapsed_time + getcij(last_customer, next_customer);
-                    if (new_time > jobs[next_customer].end_time) {
+                    if (new_time > nodes[next_customer].end_time) {
                         feasible = false;
                         break;
                     }
-                    if (new_time < jobs[next_customer].start_time) { new_time = jobs[next_customer].start_time; }
-                    elapsed_time  = new_time + jobs[next_customer].duration;
+                    if (new_time < nodes[next_customer].start_time) { new_time = nodes[next_customer].start_time; }
+                    elapsed_time  = new_time + nodes[next_customer].duration;
                     last_customer = next_customer;
                 }
 
@@ -175,13 +175,13 @@ int BucketGraph::RIH2(std::priority_queue<Label *, std::vector<Label *>, LabelCo
             best_labels_in.pop();
         }
 
-        // If the label has no jobs covered or only one job covered, skip it
-        if (current_label->jobs_covered.size() <= 3) { // Depot at start and end + at least one job
+        // If the label has no nodes covered or only one node covered, skip it
+        if (current_label->nodes_covered.size() <= 3) { // Depot at start and end + at least one node
             continue;
         }
 
         // Iterate over each customer in the route, skipping the first and last (which are depots)
-        for (size_t i = 1; i < current_label->jobs_covered.size() - 1; ++i) {
+        for (size_t i = 1; i < current_label->nodes_covered.size() - 1; ++i) {
 
             // Reuse the current label to avoid full reinitialization
             Label *new_label = label_pool_fw.acquire();
@@ -191,13 +191,13 @@ int BucketGraph::RIH2(std::priority_queue<Label *, std::vector<Label *>, LabelCo
             }
 
             new_label->initialize(current_label->vertex, current_label->cost, {current_label->resources[0]},
-                                  current_label->job_id);
+                                  current_label->node_id);
 
-            // Copy jobs covered except the i-th job (the customer to delete)
-            new_label->jobs_covered.clear();
-            new_label->jobs_covered.reserve(current_label->jobs_covered.size() - 1); // Reserve space
-            for (size_t j = 0; j < current_label->jobs_covered.size(); ++j) {
-                if (j != i) { new_label->jobs_covered.push_back(current_label->jobs_covered[j]); }
+            // Copy nodes covered except the i-th node (the customer to delete)
+            new_label->nodes_covered.clear();
+            new_label->nodes_covered.reserve(current_label->nodes_covered.size() - 1); // Reserve space
+            for (size_t j = 0; j < current_label->nodes_covered.size(); ++j) {
+                if (j != i) { new_label->nodes_covered.push_back(current_label->nodes_covered[j]); }
             }
 
             // Efficient recalculation of the route cost by only recalculating the affected segments
@@ -205,13 +205,13 @@ int BucketGraph::RIH2(std::priority_queue<Label *, std::vector<Label *>, LabelCo
             new_label->real_cost = current_label->real_cost;
 
             // Handle the two affected segments (before and after the removed customer)
-            if (i > 0 && i < current_label->jobs_covered.size() - 1) {
-                int prev = current_label->jobs_covered[i - 1]; // Job before the removed one
-                int next = current_label->jobs_covered[i + 1]; // Job after the removed one
+            if (i > 0 && i < current_label->nodes_covered.size() - 1) {
+                int prev = current_label->nodes_covered[i - 1]; // Node before the removed one
+                int next = current_label->nodes_covered[i + 1]; // Node after the removed one
 
-                // Recalculate the cost difference from removing the i-th job
+                // Recalculate the cost difference from removing the i-th node
                 auto original_cost =
-                    getcij(prev, current_label->jobs_covered[i]) + getcij(current_label->jobs_covered[i], next);
+                    getcij(prev, current_label->nodes_covered[i]) + getcij(current_label->nodes_covered[i], next);
                 auto new_cost = getcij(prev, next);
 
                 // Adjust the cost and real cost
@@ -221,18 +221,18 @@ int BucketGraph::RIH2(std::priority_queue<Label *, std::vector<Label *>, LabelCo
                 // Check for feasibility: ensure the new route is within time constraints
                 double elapsed_time = 0.0;
                 bool   feasible     = true;
-                for (size_t j = 0; j < new_label->jobs_covered.size() - 1; ++j) {
-                    int    from           = new_label->jobs_covered[j];
-                    int    to             = new_label->jobs_covered[j + 1];
+                for (size_t j = 0; j < new_label->nodes_covered.size() - 1; ++j) {
+                    int    from           = new_label->nodes_covered[j];
+                    int    to             = new_label->nodes_covered[j + 1];
                     double cost_increment = getcij(from, to);
 
                     double new_time = elapsed_time + cost_increment;
-                    if (new_time > jobs[to].end_time) {
+                    if (new_time > nodes[to].end_time) {
                         feasible = false; // Infeasible if exceeding time windows
                         break;
                     }
-                    if (new_time < jobs[to].start_time) { new_time = jobs[to].start_time; }
-                    elapsed_time = new_time + jobs[to].duration;
+                    if (new_time < nodes[to].start_time) { new_time = nodes[to].start_time; }
+                    elapsed_time = new_time + nodes[to].duration;
                 }
 
                 if (!feasible) { continue; }
@@ -252,10 +252,10 @@ int BucketGraph::RIH2(std::priority_queue<Label *, std::vector<Label *>, LabelCo
 /* Improvement heuristics based on changing the position of customers */
 /* Operation 3: swap operator */
 /**
- * @brief Refines the input labels by swapping neighboring jobs and checking feasibility.
+ * @brief Refines the input labels by swapping neighboring nodes and checking feasibility.
  *
  * This function processes the input priority queue of labels, attempting to improve each label by swapping
- * neighboring jobs and recalculating the cost. If the new label is feasible and has a lower cost, it is added
+ * neighboring nodes and recalculating the cost. If the new label is feasible and has a lower cost, it is added
  * to the output priority queue.
  *
  */
@@ -275,16 +275,16 @@ int BucketGraph::RIH3(std::priority_queue<Label *, std::vector<Label *>, LabelCo
             best_labels_in.pop();
         }
 
-        // Skip labels that only cover depots (at least one job + two depots required)
-        if (current_label->jobs_covered.size() <= 3) { continue; }
+        // Skip labels that only cover depots (at least one node + two depots required)
+        if (current_label->nodes_covered.size() <= 3) { continue; }
 
-        // Iterate over jobs, skipping depots (first and last)
-        for (size_t i = 1; i < current_label->jobs_covered.size() - 2; ++i) {
-            int job1 = current_label->jobs_covered[i];
-            int job2 = current_label->jobs_covered[i + 1];
+        // Iterate over nodes, skipping depots (first and last)
+        for (size_t i = 1; i < current_label->nodes_covered.size() - 2; ++i) {
+            int node1 = current_label->nodes_covered[i];
+            int node2 = current_label->nodes_covered[i + 1];
 
-            // Skip if jobs are the same (no change in route)
-            if (job1 == job2) { continue; }
+            // Skip if nodes are the same (no change in route)
+            if (node1 == node2) { continue; }
 
             // Acquire a new label for the swap
             Label *new_label = label_pool_fw.acquire();
@@ -294,25 +294,25 @@ int BucketGraph::RIH3(std::priority_queue<Label *, std::vector<Label *>, LabelCo
             }
 
             new_label->initialize(current_label->vertex, current_label->cost, {current_label->resources[TIME_INDEX]},
-                                  current_label->job_id);
+                                  current_label->node_id);
 
-            // Copy and swap neighboring jobs i and i+1
-            new_label->jobs_covered = current_label->jobs_covered;
-            std::swap(new_label->jobs_covered[i], new_label->jobs_covered[i + 1]);
+            // Copy and swap neighboring nodes i and i+1
+            new_label->nodes_covered = current_label->nodes_covered;
+            std::swap(new_label->nodes_covered[i], new_label->nodes_covered[i + 1]);
 
-            // Recalculate the cost for the affected part of the route (before, swapped jobs, after)
+            // Recalculate the cost for the affected part of the route (before, swapped nodes, after)
             new_label->cost      = current_label->cost;
             new_label->real_cost = current_label->real_cost;
 
-            // Previous and next jobs (outside of swapped range)
-            int prev = current_label->jobs_covered[i - 1];
-            int next = current_label->jobs_covered[i + 2];
+            // Previous and next nodes (outside of swapped range)
+            int prev = current_label->nodes_covered[i - 1];
+            int next = current_label->nodes_covered[i + 2];
 
             // Compute the original cost for the segment before the swap
-            double original_cost = getcij(prev, job1) + getcij(job1, job2) + getcij(job2, next);
+            double original_cost = getcij(prev, node1) + getcij(node1, node2) + getcij(node2, next);
 
-            // Compute the new cost after swapping job1 and job2
-            double new_cost = getcij(prev, job2) + getcij(job2, job1) + getcij(job1, next);
+            // Compute the new cost after swapping node1 and node2
+            double new_cost = getcij(prev, node2) + getcij(node2, node1) + getcij(node1, next);
 
             // Update the label's cost and real cost
             new_label->cost += new_cost - original_cost;
@@ -322,28 +322,28 @@ int BucketGraph::RIH3(std::priority_queue<Label *, std::vector<Label *>, LabelCo
             double elapsed_time = 0.0;
             bool   feasible     = true;
 
-            // Iterate through the jobs to check time windows and durations
-            for (size_t k = 0; k < new_label->jobs_covered.size() - 1; ++k) {
-                int from = new_label->jobs_covered[k];
-                int to   = new_label->jobs_covered[k + 1];
+            // Iterate through the nodes to check time windows and durations
+            for (size_t k = 0; k < new_label->nodes_covered.size() - 1; ++k) {
+                int from = new_label->nodes_covered[k];
+                int to   = new_label->nodes_covered[k + 1];
 
-                // Calculate the travel cost (time) between jobs
+                // Calculate the travel cost (time) between nodes
                 double cost_increment = getcij(from, to);
                 double new_time       = elapsed_time + cost_increment;
 
                 // Check if the new time violates the end time constraint
-                if (new_time > jobs[to].end_time) {
+                if (new_time > nodes[to].end_time) {
                     feasible = false;
                     break; // No need to continue if the time window is violated
                 }
 
-                // Adjust for the job's start time
-                if (new_time < jobs[to].start_time) {
-                    new_time = jobs[to].start_time; // Move time forward to respect the start time
+                // Adjust for the node's start time
+                if (new_time < nodes[to].start_time) {
+                    new_time = nodes[to].start_time; // Move time forward to respect the start time
                 }
 
-                // Update elapsed time (including job duration)
-                elapsed_time = new_time + jobs[to].duration;
+                // Update elapsed time (including node duration)
+                elapsed_time = new_time + nodes[to].duration;
             }
 
             // If the label is not feasible, release it and continue to the next iteration
@@ -387,12 +387,12 @@ int BucketGraph::RIH4(std::priority_queue<Label *, std::vector<Label *>, LabelCo
             best_labels_in.pop();
         }
 
-        // Skip labels with only depots covered (at least one job + two depots required)
-        if (current_label->jobs_covered.size() <= 3) { continue; }
+        // Skip labels with only depots covered (at least one node + two depots required)
+        if (current_label->nodes_covered.size() <= 3) { continue; }
 
         // Iterate over pairs of positions for 2-opt exchange
-        for (size_t i = 1; i < current_label->jobs_covered.size() - 2; ++i) {
-            for (size_t j = i + 1; j < current_label->jobs_covered.size() - 1; ++j) {
+        for (size_t i = 1; i < current_label->nodes_covered.size() - 2; ++i) {
+            for (size_t j = i + 1; j < current_label->nodes_covered.size() - 1; ++j) {
 
                 // Acquire a new label for the 2-opt exchange
                 Label *new_label = label_pool_fw.acquire();
@@ -402,22 +402,22 @@ int BucketGraph::RIH4(std::priority_queue<Label *, std::vector<Label *>, LabelCo
                 }
 
                 new_label->initialize(current_label->vertex, current_label->cost, {current_label->resources[0]},
-                                      current_label->job_id);
+                                      current_label->node_id);
 
-                new_label->jobs_covered.clear();
-                new_label->jobs_covered.reserve(current_label->jobs_covered.size());
+                new_label->nodes_covered.clear();
+                new_label->nodes_covered.reserve(current_label->nodes_covered.size());
 
-                // Copy jobs before i, reverse between i and j, and copy jobs after j
-                for (size_t k = 0; k < i; ++k) { new_label->jobs_covered.push_back(current_label->jobs_covered[k]); }
-                for (size_t k = j; k >= i; --k) { new_label->jobs_covered.push_back(current_label->jobs_covered[k]); }
-                for (size_t k = j + 1; k < current_label->jobs_covered.size(); ++k) {
-                    new_label->jobs_covered.push_back(current_label->jobs_covered[k]);
+                // Copy nodes before i, reverse between i and j, and copy nodes after j
+                for (size_t k = 0; k < i; ++k) { new_label->nodes_covered.push_back(current_label->nodes_covered[k]); }
+                for (size_t k = j; k >= i; --k) { new_label->nodes_covered.push_back(current_label->nodes_covered[k]); }
+                for (size_t k = j + 1; k < current_label->nodes_covered.size(); ++k) {
+                    new_label->nodes_covered.push_back(current_label->nodes_covered[k]);
                 }
 
                 // Recalculate the entire cost
                 double total_cost = 0.0;
-                for (size_t k = 0; k < new_label->jobs_covered.size() - 1; ++k) {
-                    total_cost += getcij(new_label->jobs_covered[k], new_label->jobs_covered[k + 1]);
+                for (size_t k = 0; k < new_label->nodes_covered.size() - 1; ++k) {
+                    total_cost += getcij(new_label->nodes_covered[k], new_label->nodes_covered[k + 1]);
                 }
                 new_label->cost      = total_cost;
                 new_label->real_cost = total_cost;
@@ -425,19 +425,19 @@ int BucketGraph::RIH4(std::priority_queue<Label *, std::vector<Label *>, LabelCo
                 // Feasibility check: ensure time constraints are satisfied
                 double elapsed_time = 0.0;
                 bool   feasible     = true;
-                for (size_t k = 0; k < new_label->jobs_covered.size() - 1; ++k) {
-                    int    from           = new_label->jobs_covered[k];
-                    int    to             = new_label->jobs_covered[k + 1];
+                for (size_t k = 0; k < new_label->nodes_covered.size() - 1; ++k) {
+                    int    from           = new_label->nodes_covered[k];
+                    int    to             = new_label->nodes_covered[k + 1];
                     double cost_increment = getcij(from, to);
 
                     double new_time = elapsed_time + cost_increment;
                     // Check time window constraints
-                    if (new_time > jobs[to].end_time || new_time < jobs[to].start_time) {
+                    if (new_time > nodes[to].end_time || new_time < nodes[to].start_time) {
                         feasible = false;
                         break;
                     }
 
-                    elapsed_time = new_time + jobs[to].duration;
+                    elapsed_time = new_time + nodes[to].duration;
                 }
 
                 if (!feasible) { continue; }
@@ -501,8 +501,8 @@ double BucketGraph::calculateInsertionCost(const std::vector<int> &route, int &c
 }
 
 /** Swap* operator
- * @brief Refines the input labels by swapping pairs of jobs and checking feasibility.
- * This function processes the input priority queue of labels, attempts to improve each label by swapping pairs of jobs
+ * @brief Refines the input labels by swapping pairs of nodes and checking feasibility.
+ * This function processes the input priority queue of labels, attempts to improve each label by swapping pairs of nodes
  * and recalculating the cost. If the new label is feasible and has a lower cost, it is added to the output priority
  * queue.
  */
@@ -523,20 +523,20 @@ int BucketGraph::RIH5(std::priority_queue<Label *, std::vector<Label *>, LabelCo
             best_labels_in.pop();
         }
 
-        // Skip labels with only depots covered (at least one job + two depots required)
-        if (current_label->jobs_covered.size() <= 3) { continue; }
+        // Skip labels with only depots covered (at least one node + two depots required)
+        if (current_label->nodes_covered.size() <= 3) { continue; }
 
-        // Iterate over all pairs of jobs for the Swap* operation
-        for (size_t i = 1; i < current_label->jobs_covered.size() - 2; ++i) {
-            for (size_t j = i + 1; j < current_label->jobs_covered.size() - 1; ++j) {
+        // Iterate over all pairs of nodes for the Swap* operation
+        for (size_t i = 1; i < current_label->nodes_covered.size() - 2; ++i) {
+            for (size_t j = i + 1; j < current_label->nodes_covered.size() - 1; ++j) {
 
-                int v       = current_label->jobs_covered[i]; // Job index i
-                int v_prime = current_label->jobs_covered[j]; // Job index j
+                int v       = current_label->nodes_covered[i]; // Node index i
+                int v_prime = current_label->nodes_covered[j]; // Node index j
 
                 // Step 1: Find best insertion positions for v and v_prime
                 std::vector<size_t> best_insertion_pos_v_prime =
-                    findBestInsertionPositions(current_label->jobs_covered, v_prime);
-                std::vector<size_t> best_insertion_pos_v = findBestInsertionPositions(current_label->jobs_covered, v);
+                    findBestInsertionPositions(current_label->nodes_covered, v_prime);
+                std::vector<size_t> best_insertion_pos_v = findBestInsertionPositions(current_label->nodes_covered, v);
 
                 // Step 2: Perform Swap* and evaluate the move
                 for (size_t pos_v_prime : best_insertion_pos_v_prime) {
@@ -549,18 +549,18 @@ int BucketGraph::RIH5(std::priority_queue<Label *, std::vector<Label *>, LabelCo
                         }
 
                         new_label->initialize(current_label->vertex, current_label->cost, {current_label->resources[0]},
-                                              current_label->job_id);
+                                              current_label->node_id);
 
-                        new_label->jobs_covered.clear();
-                        new_label->jobs_covered.reserve(current_label->jobs_covered.size());
+                        new_label->nodes_covered.clear();
+                        new_label->nodes_covered.reserve(current_label->nodes_covered.size());
 
                         // Step 3: Swap and insert at the best positions
-                        performSwap(new_label->jobs_covered, current_label->jobs_covered, i, j, pos_v, pos_v_prime);
+                        performSwap(new_label->nodes_covered, current_label->nodes_covered, i, j, pos_v, pos_v_prime);
 
                         // Step 4: Recalculate the entire cost
                         double total_cost = 0.0;
-                        for (size_t k = 0; k < new_label->jobs_covered.size() - 1; ++k) {
-                            total_cost += getcij(new_label->jobs_covered[k], new_label->jobs_covered[k + 1]);
+                        for (size_t k = 0; k < new_label->nodes_covered.size() - 1; ++k) {
+                            total_cost += getcij(new_label->nodes_covered[k], new_label->nodes_covered[k + 1]);
                         }
                         new_label->cost      = total_cost;
                         new_label->real_cost = total_cost;
@@ -568,19 +568,19 @@ int BucketGraph::RIH5(std::priority_queue<Label *, std::vector<Label *>, LabelCo
                         // Step 5: Feasibility check: ensure time constraints are satisfied
                         double elapsed_time = 0.0;
                         bool   feasible     = true;
-                        for (size_t k = 0; k < new_label->jobs_covered.size() - 1; ++k) {
-                            int    from           = new_label->jobs_covered[k];
-                            int    to             = new_label->jobs_covered[k + 1];
+                        for (size_t k = 0; k < new_label->nodes_covered.size() - 1; ++k) {
+                            int    from           = new_label->nodes_covered[k];
+                            int    to             = new_label->nodes_covered[k + 1];
                             double cost_increment = getcij(from, to);
 
                             double new_time = elapsed_time + cost_increment;
                             // Check time window constraints
-                            if (new_time > jobs[to].end_time || new_time < jobs[to].start_time) {
+                            if (new_time > nodes[to].end_time || new_time < nodes[to].start_time) {
                                 feasible = false;
                                 break;
                             }
 
-                            elapsed_time = new_time + jobs[to].duration;
+                            elapsed_time = new_time + nodes[to].duration;
                         }
 
                         // Add to the output queue if feasible and better
@@ -598,15 +598,15 @@ int BucketGraph::RIH5(std::priority_queue<Label *, std::vector<Label *>, LabelCo
 
 void BucketGraph::performSwap(std::vector<int> &new_route, const std::vector<int> &current_route, size_t pos_i,
                               size_t pos_j, size_t best_pos_v, size_t best_pos_v_prime) {
-    // Copy the jobs before the first swap position
+    // Copy the nodes before the first swap position
     new_route.insert(new_route.end(), current_route.begin(), current_route.begin() + pos_i);
 
-    // Insert job at position j (v_prime) at the best position in the new route
+    // Insert node at position j (v_prime) at the best position in the new route
     new_route.insert(new_route.begin() + best_pos_v, current_route[pos_j]);
 
-    // Insert job at position i (v) at the best position in the new route
+    // Insert node at position i (v) at the best position in the new route
     new_route.insert(new_route.begin() + best_pos_v_prime, current_route[pos_i]);
 
-    // Copy the remaining jobs after the second swap position
+    // Copy the remaining nodes after the second swap position
     new_route.insert(new_route.end(), current_route.begin() + pos_j + 1, current_route.end());
 }

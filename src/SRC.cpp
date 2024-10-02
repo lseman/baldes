@@ -22,7 +22,7 @@
  * datasets and complex computations.
  *
  * @note The code assumes the existence of certain external structures and constants such as `num_words`, `N_SIZE`,
- * `VRPTW_SRC`, `VRPTW_SRC_max_S_n`, `SparseModel`, `VRPJob`, `CutType`, `exec::static_thread_pool`, `stdexec::bulk`,
+ * `VRPTW_SRC`, `VRPTW_SRC_max_S_n`, `SparseModel`, `VRPNode`, `CutType`, `exec::static_thread_pool`, `stdexec::bulk`,
  * and `stdexec::sync_wait`.
  */
 
@@ -104,7 +104,7 @@ void CutStorage::addCut(Cut &cut) {
     indexCuts[cut_key].push_back(cuts.size() - 1);
 }
 
-LimitedMemoryRank1Cuts::LimitedMemoryRank1Cuts(std::vector<VRPJob> &jobs) : jobs(jobs) {}
+LimitedMemoryRank1Cuts::LimitedMemoryRank1Cuts(std::vector<VRPNode> &nodes) : nodes(nodes) {}
 
 /**
  * @brief Separates the given solution vector into cuts using Limited Memory Rank-1 Cuts.

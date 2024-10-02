@@ -9,7 +9,7 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
   cancel-in-progress: true
 
-jobs:
+nodes:
   doxygen:
     name: "Doxygen"
     runs-on: ubuntu-22.04

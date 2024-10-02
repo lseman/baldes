@@ -14,7 +14,7 @@
 #include "Definitions.h"
 #include "Label.h"
 #include "Path.h"
-#include "VRPJob.h"
+#include "VRPNode.h"
 
 #include <deque>
 #include <tuple>
@@ -39,14 +39,14 @@ private:
     int                               current_iteration = 0;
     int                               max_live_time; // Max iterations a Path can stay active
     std::vector<double>               duals;         // Dual variables for each path
-    std::vector<VRPJob>              *jobs = nullptr;
+    std::vector<VRPNode>              *nodes = nullptr;
 
 public:
     std::vector<std::vector<double>> distance_matrix; // Distance matrix for the graph
 
     SchrodingerPool(int live_time) : max_live_time(live_time) {}
 
-    void setJobs(std::vector<VRPJob> *jobs) { this->jobs = jobs; }
+    void setNodes(std::vector<VRPNode> *nodes) { this->nodes = nodes; }
 
     int getcij(int i, int j) { return distance_matrix[i][j]; }
 
@@ -80,8 +80,8 @@ public:
 
             if (p.size() > 3) {
                 for (int i = 1; i < p.size() - 1; i++) {
-                    auto &job = (*jobs)[p[i]]; // Dereference jobs and access element
-                    p.red_cost -= job.cost;
+                    auto &node = (*nodes)[p[i]]; // Dereference nodes and access element
+                    p.red_cost -= node.cost;
                 }
             }
         }

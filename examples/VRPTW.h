@@ -49,7 +49,7 @@ class VRProblem {
 public:
     InstanceData instance;
 
-    std::vector<VRPJob> jobs;
+    std::vector<VRPNode> nodes;
     std::vector<Path>   allPaths;
 
     int                           labels_counter = 0;
@@ -99,11 +99,11 @@ public:
             GRBColumn col;
 
             // Fill coluna with coefficients
-            // Step 1: Accumulate the coefficients for each job
-            for (auto &job : label.route) {
-                if (job > 0 && job != N_SIZE - 1) {
-                    int constr_index = job - 1;
-                    coluna[constr_index] += 1; // Accumulate the coefficient for each job
+            // Step 1: Accumulate the coefficients for each node
+            for (auto &node : label.route) {
+                if (node > 0 && node != N_SIZE - 1) {
+                    int constr_index = node - 1;
+                    coluna[constr_index] += 1; // Accumulate the coefficient for each node
                 }
             }
 
@@ -186,7 +186,7 @@ public:
 
         auto counter = 0;
         for (auto &label : columns) {
-            if (label->jobs_covered.empty()) continue;
+            if (label->nodes_covered.empty()) continue;
             if (!enumerate && label->cost > 0) continue;
             counter += 1;
             if (counter > 10) break;
@@ -200,10 +200,10 @@ public:
             GRBColumn col;
 
             // Fill coluna with coefficients
-            // Step 1: Accumulate the coefficients for each job
-            for (const auto &job : label->jobs_covered) {
-                if (likely(job > 0 && job != N_SIZE - 1)) { // Use likely() if this condition is almost always true
-                    coluna[job - 1]++;                      // Simplified increment operation
+            // Step 1: Accumulate the coefficients for each node
+            for (const auto &node : label->nodes_covered) {
+                if (likely(node > 0 && node != N_SIZE - 1)) { // Use likely() if this condition is almost always true
+                    coluna[node - 1]++;                      // Simplified increment operation
                 }
             }
 
@@ -231,7 +231,7 @@ public:
 
             // Add terms for the limited memory rank 1 cuts
 #if defined(SRC3) || defined(SRC)
-            auto vec = cuts.computeLimitedMemoryCoefficients(label->jobs_covered);
+            auto vec = cuts.computeLimitedMemoryCoefficients(label->nodes_covered);
             // print vec size
             if (vec.size() > 0) {
                 for (int i = 0; i < vec.size(); i++) {
@@ -258,7 +258,7 @@ public:
             names.push_back(name);
             vtypes.push_back(GRB_CONTINUOUS);
 
-            Path path(label->jobs_covered, label->real_cost);
+            Path path(label->nodes_covered, label->real_cost);
             allPaths.emplace_back(path);
         }
         // Add variables with bounds, objectives, and columns
@@ -664,8 +664,8 @@ public:
         numConstrs                = node->get(GRB_IntAttr_NumConstrs);
         std::vector<double> duals = std::vector<double>(numConstrs, 0.0);
 
-        // BucketGraph bucket_graph(jobs, time_horizon, bucket_interval, instance.q, bucket_interval);
-        BucketGraph bucket_graph(jobs, time_horizon, bucket_interval);
+        // BucketGraph bucket_graph(nodes, time_horizon, bucket_interval, instance.q, bucket_interval);
+        BucketGraph bucket_graph(nodes, time_horizon, bucket_interval);
 
         bucket_graph.set_distance_matrix(instance.getDistanceMatrix(), 8);
 
@@ -674,17 +674,17 @@ public:
         auto integer_solution  = node->get(GRB_DoubleAttr_ObjVal);
         bucket_graph.incumbent = integer_solution;
 
-        auto allJobs = bucket_graph.getJobs();
+        auto allNodes = bucket_graph.getNodes();
 
 #ifdef SRC
-        r1c = LimitedMemoryRank1Cuts(allJobs);
+        r1c = LimitedMemoryRank1Cuts(allNodes);
 
         CutStorage *cuts = &r1c.cutStorage;
 #endif
 
         std::vector<double> cutDuals;
-        std::vector<double> jobDuals  = getDuals(node);
-        auto                sizeDuals = jobDuals.size();
+        std::vector<double> nodeDuals  = getDuals(node);
+        auto                sizeDuals = nodeDuals.size();
 
         double highs_obj_dual = 0.0;
         double highs_obj      = 0.0;
@@ -717,7 +717,7 @@ public:
         bool                 can_add = true;
 
 #ifdef STAB
-        Stabilization stab(0.9, jobDuals);
+        Stabilization stab(0.9, nodeDuals);
 #endif
         bool changed = false;
         // set start timer
@@ -753,14 +753,14 @@ public:
         bool                isInsideTrustRegion = false;
         std::vector<double> delta1;
         std::vector<double> delta2;
-        for (auto dual : jobDuals) {
+        for (auto dual : nodeDuals) {
             delta1.push_back(dual - v);
             delta2.push_back(dual + v);
         }
         for (int i = 0; i < numConstrs; i++) {
             // Update coefficients for w[i] and zeta[i] in the objective function
-            w[i].set(GRB_DoubleAttr_Obj, std::max(0.0, jobDuals[i] - v)); // Set w[i]'s coefficient to -delta1
-            zeta[i].set(GRB_DoubleAttr_Obj, jobDuals[i] + v);             // Set zeta[i]'s coefficient to delta2
+            w[i].set(GRB_DoubleAttr_Obj, std::max(0.0, nodeDuals[i] - v)); // Set w[i]'s coefficient to -delta1
+            zeta[i].set(GRB_DoubleAttr_Obj, nodeDuals[i] + v);             // Set zeta[i]'s coefficient to delta2
             w[i].set(GRB_DoubleAttr_UB, epsilon1);
             zeta[i].set(GRB_DoubleAttr_UB, epsilon2);
         }
@@ -861,7 +861,7 @@ public:
             if (!TRstop) {
                 isInsideTrustRegion = true;
                 for (int i = 0; i < numConstrs; i++) {
-                    if (jobDuals[i] < delta1[i] || jobDuals[i] > delta2[i]) { isInsideTrustRegion = false; }
+                    if (nodeDuals[i] < delta1[i] || nodeDuals[i] > delta2[i]) { isInsideTrustRegion = false; }
                 }
                 // if (isInsideTrustRegion) { fmt::print("Fall inside trust region\n"); }
                 if (isInsideTrustRegion) {
@@ -872,15 +872,15 @@ public:
                     epsilon2 += 100;
                     for (int i = 0; i < numConstrs; i++) {
                         // Update coefficients for w[i] and zeta[i] in the objective function
-                        w[i].set(GRB_DoubleAttr_Obj, jobDuals[i]);        // Set w[i]'s coefficient to -delta1
-                        zeta[i].set(GRB_DoubleAttr_Obj, jobDuals[i] + v); // Set zeta[i]'s coefficient to delta2
+                        w[i].set(GRB_DoubleAttr_Obj, nodeDuals[i]);        // Set w[i]'s coefficient to -delta1
+                        zeta[i].set(GRB_DoubleAttr_Obj, nodeDuals[i] + v); // Set zeta[i]'s coefficient to delta2
                         w[i].set(GRB_DoubleAttr_UB, epsilon1);
                         zeta[i].set(GRB_DoubleAttr_UB, epsilon2);
                     }
                 }
                 for (int i = 0; i < numConstrs; i++) {
-                    delta1[i] = jobDuals[i] - v;
-                    delta2[i] = jobDuals[i] + v;
+                    delta1[i] = nodeDuals[i] - v;
+                    delta2[i] = nodeDuals[i] + v;
                 }
                 if (v <= 25) {
                     for (int i = 0; i < w.size(); i++) {
@@ -906,22 +906,22 @@ public:
             highs_obj        = std::get<0>(ip_result);
             highs_obj_dual   = std::get<1>(ip_result);
             solution         = std::get<2>(ip_result);
-            jobDuals         = std::get<3>(ip_result);
-            auto originDuals = jobDuals;
-            for (auto &dual : jobDuals) { dual = -dual; }
+            nodeDuals         = std::get<3>(ip_result);
+            auto originDuals = nodeDuals;
+            for (auto &dual : nodeDuals) { dual = -dual; }
 #endif
 
 #ifdef STAB
             // auto matrixSparse = extractModelDataSparse(node);
             node->optimize();
             highs_obj = node->get(GRB_DoubleAttr_ObjVal);
-            jobDuals  = getDuals(node);
+            nodeDuals  = getDuals(node);
 
-            stab.update_stabilization_after_master_optim(jobDuals);
+            stab.update_stabilization_after_master_optim(nodeDuals);
 
             misprice = true;
             while (misprice) {
-                jobDuals = stab.getStabDualSolAdvanced(jobDuals);
+                nodeDuals = stab.getStabDualSolAdvanced(nodeDuals);
                 solution = extractSolution(node);
 #endif
 
@@ -956,7 +956,7 @@ public:
                 }
 #endif
 
-                bucket_graph.setDuals(jobDuals);
+                bucket_graph.setDuals(nodeDuals);
 
                 //////////////////////////////////////////////////////////////////////
                 // CALLING BALDES
@@ -1001,7 +1001,7 @@ public:
 #endif
 
 #ifdef STAB
-                stab.update_stabilization_after_pricing_optim(matrix, jobDuals, lag_gap, paths);
+                stab.update_stabilization_after_pricing_optim(matrix, nodeDuals, lag_gap, paths);
 
                 if (colAdded == 0) {
                     stab.update_stabilization_after_misprice();
@@ -1016,7 +1016,7 @@ public:
                 break;
             }
 
-            stab.update_stabilization_after_iter(jobDuals);
+            stab.update_stabilization_after_iter(nodeDuals);
 #endif
 
             auto cur_alpha = 0.0;

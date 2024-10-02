@@ -82,22 +82,22 @@ struct BucketRange {
  * @struct IntervalNode
  * @brief Represents a node in an interval tree structure.
  *
- * The IntervalNode structure stores the from_range, to_range, to_job, max values, and pointers to left and right
+ * The IntervalNode structure stores the from_range, to_range, to_node, max values, and pointers to left and right
  * children.
  */
 template <Direction D>
 struct IntervalNode {
     BucketRange<D>   from_range;
     BucketRange<D>   to_range;
-    int              to_job;
+    int              to_node;
     std::vector<int> max;
     IntervalNode    *left;
     IntervalNode    *right;
     mutable bool     merge_pending;
     int              height; // New: Height of the node
 
-    IntervalNode(const BucketRange<D> &f_range, const BucketRange<D> &t_range, int to_job)
-        : from_range(f_range), to_range(t_range), to_job(to_job), max(f_range.upper_bound), left(nullptr),
+    IntervalNode(const BucketRange<D> &f_range, const BucketRange<D> &t_range, int to_node)
+        : from_range(f_range), to_range(t_range), to_node(to_node), max(f_range.upper_bound), left(nullptr),
           right(nullptr), merge_pending(false), height(1) {} // Height is initialized to 1
 };
 
@@ -106,11 +106,11 @@ struct IntervalNode {
  * @brief A class representing an interval tree structure for managing and querying intervals.
  *
  * The IntervalTree class is used to store and query intervals, where each node in the tree represents
- * an interval with a corresponding to_job. The tree structure is used to efficiently search for overlapping
+ * an interval with a corresponding to_node. The tree structure is used to efficiently search for overlapping
  * intervals based on the from_range and to_range of the intervals.
  * The tree supports insertion and search operations for intervals.
  * The tree is balanced using AVL rotations to maintain a balanced tree structure.
- * The tree nodes store the from_range, to_range, to_job, and max values for each node.
+ * The tree nodes store the from_range, to_range, to_node, and max values for each node.
  *
  */
 template <Direction D>
@@ -190,28 +190,28 @@ private:
 
     // Helper function to insert a new range into the tree, with merging of overlapping to_ranges
     IntervalNode<D> *insert(IntervalNode<D> *node, const BucketRange<D> &from_range, const BucketRange<D> &to_range,
-                            int to_job) {
+                            int to_node) {
         // Insert as in the original, unbalanced version
-        if (node == nullptr) { return new IntervalNode(from_range, to_range, to_job); }
+        if (node == nullptr) { return new IntervalNode(from_range, to_range, to_node); }
 
         // Compare based on from_range.lower_bound first
         if (from_range < node->from_range) {
-            node->left = insert(node->left, from_range, to_range, to_job);
+            node->left = insert(node->left, from_range, to_range, to_node);
         } else if (from_range > node->from_range) {
-            node->right = insert(node->right, from_range, to_range, to_job);
+            node->right = insert(node->right, from_range, to_range, to_node);
         } else {
-            // If from_range is the same, check to_range and to_job
+            // If from_range is the same, check to_range and to_node
             bool toRangeEqual = to_range == node->to_range;
 
-            // If to_range and to_job match, mark for merging
-            if (toRangeEqual && node->to_job == to_job) {
+            // If to_range and to_node match, mark for merging
+            if (toRangeEqual && node->to_node == to_node) {
                 node->merge_pending = true; // Mark for merging
             } else {
-                // Insert as a new node if to_range or to_job differs
+                // Insert as a new node if to_range or to_node differs
                 if constexpr (D == Direction::Forward) {
-                    node->right = insert(node->right, from_range, to_range, to_job);
+                    node->right = insert(node->right, from_range, to_range, to_node);
                 } else if constexpr (D == Direction::Backward) {
-                    node->left = insert(node->left, from_range, to_range, to_job);
+                    node->left = insert(node->left, from_range, to_range, to_node);
                 }
             }
         }
@@ -261,7 +261,7 @@ private:
     }
 
     bool searchCombination(IntervalNode<D> *node, const BucketRange<D> &from_range, const BucketRange<D> &to_range,
-                           int to_job) const {
+                           int to_node) const {
         if (node == nullptr) return false;
 
         // Apply any pending merges to ensure node's `to_range` is up-to-date
@@ -271,14 +271,14 @@ private:
         bool toRangeContained = to_range.contained_in(node->to_range);
 
         // Debug output for `to_range` containment check
-        // If both ranges are contained and the job matches, return true
-        if (toRangeContained && node->to_job == to_job) { return true; }
+        // If both ranges are contained and the node matches, return true
+        if (toRangeContained && node->to_node == to_node) { return true; }
 
         // Use updated comparison for traversing the tree
         if (from_range < node->from_range) {
-            return searchCombination(node->left, from_range, to_range, to_job);
+            return searchCombination(node->left, from_range, to_range, to_node);
         } else if (from_range > node->from_range) {
-            return searchCombination(node->right, from_range, to_range, to_job);
+            return searchCombination(node->right, from_range, to_range, to_node);
         }
         return true;
     }
@@ -286,12 +286,12 @@ private:
 public:
     IntervalTree() : root(nullptr) {}
 
-    void insert(const BucketRange<D> &from_range, const BucketRange<D> &to_range, int to_job) {
-        root = insert(root, from_range, to_range, to_job);
+    void insert(const BucketRange<D> &from_range, const BucketRange<D> &to_range, int to_node) {
+        root = insert(root, from_range, to_range, to_node);
     }
 
-    bool search(const BucketRange<D> &from_range, const BucketRange<D> &to_range, int to_job) const {
-        return searchCombination(root, from_range, to_range, to_job);
+    bool search(const BucketRange<D> &from_range, const BucketRange<D> &to_range, int to_node) const {
+        return searchCombination(root, from_range, to_range, to_node);
     }
 
     void print() const { printTree(root); }
@@ -310,7 +310,7 @@ public:
             std::cout << node->to_range.lower_bound[i] << ", " << node->to_range.upper_bound[i];
             if (i < node->to_range.lower_bound.size() - 1) std::cout << "; ";
         }
-        std::cout << "] with to_job: " << node->to_job << "\n";
+        std::cout << "] with to_node: " << node->to_node << "\n";
         printTree(node->right);
     }
 };
@@ -345,7 +345,7 @@ private:
     FromBucketNode *root;
 
     FromBucketNode *insert(FromBucketNode *node, const BucketRange<D> &from_range, const BucketRange<D> &to_range,
-                           int to_job) {
+                           int to_node) {
         if (node == nullptr) {
             // Create a new FromBucketNode for this range
             return new FromBucketNode(from_range);
@@ -353,12 +353,12 @@ private:
 
         // Compare based on `from_range`
         if (from_range < node->from_range) {
-            node->left = insert(node->left, from_range, to_range, to_job);
+            node->left = insert(node->left, from_range, to_range, to_node);
         } else if (from_range > node->from_range) {
-            node->right = insert(node->right, from_range, to_range, to_job);
+            node->right = insert(node->right, from_range, to_range, to_node);
         } else if (from_range == node->from_range) {
             // If `from_range` matches exactly, insert into the `to_tree`
-            node->to_tree->insert(from_range, to_range, to_job);
+            node->to_tree->insert(from_range, to_range, to_node);
         }
 
         // Update max values (assuming the upper_bound size matches)
@@ -370,20 +370,20 @@ private:
     }
 
     bool searchCombination(FromBucketNode *node, const BucketRange<D> &from_range, const BucketRange<D> &to_range,
-                           int to_job) const {
+                           int to_node) const {
         if (node == nullptr) return false;
 
         // Check if `from_range` is completely contained within `node->from_range`
         if (from_range.contained_in(node->from_range)) {
-            // If `from_range` is contained, search in `to_tree` for `to_range` and `to_job`
-            if (node->to_tree->search(from_range, to_range, to_job)) { return true; }
+            // If `from_range` is contained, search in `to_tree` for `to_range` and `to_node`
+            if (node->to_tree->search(from_range, to_range, to_node)) { return true; }
         }
 
         // Use updated comparison for traversing the tree
         if (from_range < node->from_range) {
-            return searchCombination(node->left, from_range, to_range, to_job);
+            return searchCombination(node->left, from_range, to_range, to_node);
         } else if (from_range > node->from_range) {
-            return searchCombination(node->right, from_range, to_range, to_job);
+            return searchCombination(node->right, from_range, to_range, to_node);
         } else {
             return true;
         }
@@ -406,12 +406,12 @@ private:
 public:
     BucketIntervalTree() : root(nullptr) {}
 
-    void insert(const BucketRange<D> &from_range, const BucketRange<D> &to_range, int to_job) {
-        root = insert(root, from_range, to_range, to_job);
+    void insert(const BucketRange<D> &from_range, const BucketRange<D> &to_range, int to_node) {
+        root = insert(root, from_range, to_range, to_node);
     }
 
-    bool search(const BucketRange<D> &from_range, const BucketRange<D> &to_range, int to_job) const {
-        return searchCombination(root, from_range, to_range, to_job);
+    bool search(const BucketRange<D> &from_range, const BucketRange<D> &to_range, int to_node) const {
+        return searchCombination(root, from_range, to_range, to_node);
     }
 
     void print() const { printTree(root); }

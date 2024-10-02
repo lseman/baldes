@@ -364,31 +364,31 @@ options.end_depot = 11
 options.max_path_size = 5
 
 # %%
-jobs = [baldes.VRPJob() for _ in range(11)]
+nodes = [baldes.VRPNode() for _ in range(11)]
 num_intervals = 1
 
-# Set random bounds for each job
+# Set random bounds for each node
 id = 0
-for job in jobs:
-    job.lb = [0]  # Set random lower bounds
-    job.ub = [100]  # Set random upper bounds greater than lb
-    job.duration = 0  # Set random duration
-    job.cost = 0
-    job.demand = 0
-    job.consumption = [0]  # Set random consumption
-    job.set_location(
+for node in nodes:
+    node.lb = [0]  # Set random lower bounds
+    node.ub = [100]  # Set random upper bounds greater than lb
+    node.duration = 0  # Set random duration
+    node.cost = 0
+    node.demand = 0
+    node.consumption = [0]  # Set random consumption
+    node.set_location(
         random.randint(0, 100), random.randint(0, 100)
     )  # Set random location
-    job.id = id
+    node.id = id
     id += 1
 
 # %%
-# Initialize BucketGraph using these jobs
-bg = baldes.BucketGraph(jobs, 100, 1)
+# Initialize BucketGraph using these nodes
+bg = baldes.BucketGraph(nodes, 100, 1)
 bg.setOptions(options)
 
-# Create random duals with size equal to the number of jobs
-duals = [0 for _ in range(len(jobs))]
+# Create random duals with size equal to the number of nodes
+duals = [0 for _ in range(len(nodes))]
 print(duals)
 
 # Set the distance matrix, adjacency list, and duals
@@ -409,4 +409,4 @@ paths = bg.solvePSTEP()
 print("Number of paths:", len(paths))
 
 for path in paths:
-    print("Path:", path.jobs_covered)
+    print("Path:", path.nodes_covered)

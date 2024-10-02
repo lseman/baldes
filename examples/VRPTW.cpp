@@ -194,22 +194,22 @@ int main(int argc, char *argv[]) {
     initialRoutes.insert(initialRoutes.end(), initialRoutesSavings.begin(), initialRoutesSavings.end());
     */
 
-    std::vector<VRPJob> jobs;
-    jobs.clear();
+    std::vector<VRPNode> nodes;
+    nodes.clear();
     for (int k = 0; k < instance.nN; ++k) {
         int    start_time = static_cast<int>(instance.window_open[k]);
         int    end_time   = static_cast<int>(instance.window_close[k]);
         double duration   = instance.service_time[k];
         double demand     = instance.demand[k];
         double cost       = 0; // Assuming cost can be derived or set as needed
-        jobs.emplace_back(k, start_time, end_time, duration, cost, demand);
-        jobs[k].set_location(instance.x_coord[k], instance.y_coord[k]);
-        jobs[k].lb.push_back(start_time);
-        jobs[k].ub.push_back(end_time);
-        // jobs[k].lb.push_back(0);
-        // jobs[k].ub.push_back(instance.q);
-        jobs[k].consumption.push_back(duration);
-        jobs[k].consumption.push_back(demand);
+        nodes.emplace_back(k, start_time, end_time, duration, cost, demand);
+        nodes[k].set_location(instance.x_coord[k], instance.y_coord[k]);
+        nodes[k].lb.push_back(start_time);
+        nodes[k].ub.push_back(end_time);
+        // nodes[k].lb.push_back(0);
+        // nodes[k].ub.push_back(instance.q);
+        nodes[k].consumption.push_back(duration);
+        nodes[k].consumption.push_back(demand);
     }
     GRBEnv env = GRBEnv();
     env.start();
@@ -217,7 +217,7 @@ int main(int argc, char *argv[]) {
 
     VRProblemPtr problem = std::make_shared<VRProblem>();
     problem->instance    = instance;
-    problem->jobs        = jobs;
+    problem->nodes        = nodes;
 
     std::vector<Path>    paths;
     std::vector<Label *> labels;
@@ -227,7 +227,7 @@ int main(int argc, char *argv[]) {
     int  labels_counter = 0;
     auto process_route  = [&](const std::vector<int> &route) {
         auto label          = new Label();
-        label->jobs_covered = route;
+        label->nodes_covered = route;
         // calculate total distance
         for (int i = 0; i < route.size() - 1; i++) { label->cost += instance.getcij(route[i], route[i + 1]); }
         // label->cost         = route.total_distance();

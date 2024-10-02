@@ -69,7 +69,7 @@ struct SparseMatrix;
  */
 class LimitedMemoryRank1Cuts {
 public:
-    LimitedMemoryRank1Cuts(std::vector<VRPJob> &jobs);
+    LimitedMemoryRank1Cuts(std::vector<VRPNode> &nodes);
 
     // default constructor
     LimitedMemoryRank1Cuts() = default;
@@ -172,7 +172,7 @@ private:
 
     static std::unordered_map<int, std::pair<std::vector<int>, std::vector<int>>> column_cache;
 
-    std::vector<VRPJob>                       jobs;
+    std::vector<VRPNode>                       nodes;
     std::vector<std::vector<int>>             baseSets;
     std::unordered_map<int, std::vector<int>> neighborSets;
     CutType                                   cutType;
@@ -467,8 +467,8 @@ void LimitedMemoryRank1Cuts::the45Heuristic(const SparseMatrix &A, const std::ve
                         int max_limit = (T == CutType::FourRow) ? 3 : 4;
 
                         int match_count = 0;
-                        for (auto &job : set45) {
-                            if (std::ranges::find(consumer_inner, job) != consumer_inner.end()) {
+                        for (auto &node : set45) {
+                            if (std::ranges::find(consumer_inner, node) != consumer_inner.end()) {
                                 if (++match_count == max_limit) { break; }
                             }
                         }
@@ -527,8 +527,8 @@ void LimitedMemoryRank1Cuts::the45Heuristic(const SparseMatrix &A, const std::ve
                                     max_limit = 4;
                                 }
                                 int match_count = 0;
-                                for (auto &job : set45) {
-                                    if (std::ranges::find(consumer_inner, job) != consumer_inner.end()) {
+                                for (auto &node : set45) {
+                                    if (std::ranges::find(consumer_inner, node) != consumer_inner.end()) {
                                         if (++match_count == max_limit) { break; }
                                     }
                                 }

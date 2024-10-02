@@ -12,7 +12,10 @@
 #pragma once
 
 #include <algorithm>
+#include <functional>
 #include <numeric> // for std::partial_sum
+#include <ranges>  // for C++23 range algorithms
+#include <utility> // for std::move
 #include <vector>
 
 /**
@@ -50,7 +53,7 @@ struct SparseMatrix {
      * @param col The column index of the element.
      * @param value The value of the element.
      */
-    void insert(int row, int col, double value) { elements.push_back({row, col, value}); }
+    void insert(int row, int col, double value) { elements.emplace_back(SparseElement{row, col, value}); }
 
     /**
      * @brief Build the CRS structure by computing row start positions.
@@ -59,18 +62,17 @@ struct SparseMatrix {
      * each row in the `elements` vector. This enables efficient row-wise traversal.
      */
     void buildRowStart() {
-        // Initialize row_start to size num_rows + 1, filled with zeros
         row_start.assign(num_rows + 1, 0);
 
-        // Sort elements by row first, then by column within the same row
-        std::sort(elements.begin(), elements.end(), [](const SparseElement &a, const SparseElement &b) {
-            return (a.row < b.row) || (a.row == b.row && a.col < b.col);
+        // Use C++23 range-based algorithms for concise sorting
+        std::ranges::sort(elements, {}, [](const SparseElement &a) {
+            return std::pair(a.row, a.col); // Compare row and column as a tuple
         });
 
-        // Count occurrences of non-zero elements in each row
+        // Count non-zero elements per row
         for (const auto &el : elements) { ++row_start[el.row + 1]; }
 
-        // Compute row_start by accumulating the counts to get the starting index for each row
+        // Accumulate the counts to get the starting index for each row
         std::partial_sum(row_start.begin(), row_start.end(), row_start.begin());
     }
 
@@ -124,7 +126,7 @@ struct SparseMatrix {
      */
     RowIterator rowIterator(int row) const {
         if (row_start.empty()) {
-            const_cast<SparseMatrix *>(this)->buildRowStart(); // build it lazily if not done yet
+            const_cast<SparseMatrix *>(this)->buildRowStart(); // Lazy build if not yet done
         }
         return RowIterator(*this, row);
     }
@@ -135,19 +137,19 @@ struct SparseMatrix {
      * This function iterates over each row in the matrix and applies the given function
      * to each non-zero element in the row.
      *
-     * @tparam Func A callable that accepts two arguments: column index and value of the element.
+     * @tparam Func A callable that accepts three arguments: row index, column index, and value of the element.
      * @param func The function to apply to each non-zero element.
      */
     template <typename Func>
-    void forEachRow(Func func) const {
+    void forEachRow(Func &&func) const {
         if (row_start.empty()) {
-            const_cast<SparseMatrix *>(this)->buildRowStart(); // ensure row_start is built
+            const_cast<SparseMatrix *>(this)->buildRowStart(); // Ensure row_start is built
         }
+
+        // Use modern C++ range-based loop
         for (int row_idx = 0; row_idx < num_rows; ++row_idx) {
-            RowIterator it = rowIterator(row_idx);
-            while (it.valid()) {
-                func(row_idx, it.col(), it.value());
-                it.next();
+            for (RowIterator it = rowIterator(row_idx); it.valid(); it.next()) {
+                std::invoke(std::forward<Func>(func), row_idx, it.col(), it.value());
             }
         }
     }
