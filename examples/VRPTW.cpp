@@ -29,7 +29,6 @@
 #include <string>
 #include <vector>
 
-#include "extra/Heuristic.h"
 #include "Definitions.h"
 #include "HGS.h"
 #include "Reader.h"

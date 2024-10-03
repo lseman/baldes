@@ -691,9 +691,7 @@ public:
                 for (auto &bb : bw_fixed_buckets) { bb.assign(bw_buckets_size, 0); }
             });
 
-        fmt::print("Redefinition counter: {}\n", redefine_counter);
         generate_arcs();
-        fmt::print("Arcs generated\n");
         PARALLEL_SECTIONS(
             workB, bi_sched,
             [&, this, fw_save_rebuild]() -> void {
