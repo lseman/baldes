@@ -87,7 +87,7 @@ BucketGraph::BucketGraph(const std::vector<VRPNode> &nodes, int time_horizon, in
       best_cost(std::numeric_limits<double>::infinity()), fw_best_label() {
 
 #if defined(RCC) || defined(EXACT_RCC)
-    cvrsep_duals.assign(nodes.size() + 2, std::vector<double>(nodes.size() + 2, 0.0));
+    // cvrsep_duals.assign(nodes.size() + 2, std::vector<double>(nodes.size() + 2, 0.0));
 #endif
     initInfo();
     Interval intervalTime(bucket_interval, time_horizon);
@@ -101,12 +101,13 @@ BucketGraph::BucketGraph(const std::vector<VRPNode> &nodes, int time_horizon, in
         SECTION { define_buckets<Direction::Backward>(); });
 }
 
-BucketGraph::BucketGraph(const std::vector<VRPNode> &nodes, std::vector<int> &bounds, std::vector<int> &bucket_intervals)
+BucketGraph::BucketGraph(const std::vector<VRPNode> &nodes, std::vector<int> &bounds,
+                         std::vector<int> &bucket_intervals)
     : fw_buckets(), bw_buckets(), nodes(nodes), time_horizon(bounds[0]), bucket_interval(bucket_intervals[0]),
       best_cost(std::numeric_limits<double>::infinity()), fw_best_label() {
 
 #if defined(RCC) || defined(EXACT_RCC)
-    cvrsep_duals.assign(nodes.size() + 2, std::vector<double>(nodes.size() + 2, 0.0));
+    // cvrsep_duals.assign(nodes.size() + 2, std::vector<double>(nodes.size() + 2, 0.0));
 #endif
 
     initInfo();
@@ -137,6 +138,11 @@ Label *BucketGraph::compute_label(const Label *L, const Label *L_prime) {
     double new_cost = L->cost + L_prime->cost + cij_cost;
 
     double real_cost = L->real_cost + L_prime->real_cost + cij_cost;
+
+#ifdef RCC
+    auto arc_dual = arc_duals.getDual(L->node_id, L_prime->node_id);
+    new_cost -= arc_dual;
+#endif
 
     // Directly acquire new_label and set the cost
     auto new_label       = label_pool_fw.acquire();
@@ -185,7 +191,7 @@ Label *BucketGraph::compute_label(const Label *L, const Label *L_prime) {
     auto L_fw = L;
     for (; L_fw != nullptr; L_fw = L_fw->parent) {
         new_label->nodes_covered.insert(new_label->nodes_covered.begin(),
-                                       L_fw->node_id); // Insert forward elements at the front
+                                        L_fw->node_id); // Insert forward elements at the front
         forward_size++;
     }
 
@@ -200,8 +206,8 @@ std::vector<int> BucketGraph::computePhi(int &bucket_id, bool fw) {
     std::vector<int> phi;
 
     // Ensure bucket_id is within valid bounds
-    auto &buckets            = fw ? fw_buckets : bw_buckets;
-    auto &fixed_buckets      = fw ? fw_fixed_buckets : bw_fixed_buckets;
+    auto &buckets             = fw ? fw_buckets : bw_buckets;
+    auto &fixed_buckets       = fw ? fw_fixed_buckets : bw_fixed_buckets;
     auto &node_interval_trees = fw ? fw_node_interval_trees : bw_node_interval_trees;
 
     if constexpr (R_SIZE > 1) {
@@ -216,7 +222,7 @@ std::vector<int> BucketGraph::computePhi(int &bucket_id, bool fw) {
         }
 
         // Get the node ID and current bucket
-        int   node_id         = buckets[bucket_id].node_id;
+        int   node_id        = buckets[bucket_id].node_id;
         auto &current_bucket = buckets[bucket_id];
 
         // Retrieve the pre-built Splay Tree for this node
@@ -445,7 +451,7 @@ void BucketGraph::set_adjacency_list() {
         // Iterate over all nodes to determine potential arcs
         for (const auto &next_node : nodes) {
             if (next_node.id == options.depot) continue; // Skip the depot
-            if (node.id == next_node.id) continue;        // Skip arcs to the same node
+            if (node.id == next_node.id) continue;       // Skip arcs to the same node
 
             // Calculate the travel cost between the current node and the next node
             auto   travel_cost = getcij(node.id, next_node.id);
@@ -486,16 +492,16 @@ void BucketGraph::set_adjacency_list() {
 
             auto next_node = to_bucket;
             nodes[node.id].add_arc(node.id, next_node, res_inc_local, cost_inc, true,
-                                 priority_value); // Add forward arc to the adjacency list
+                                   priority_value); // Add forward arc to the adjacency list
         }
 
         // Add reverse arcs from neighboring nodes to the current node
         for (const auto &arc : best_arcs_rev) {
             auto [priority_value, to_bucket, res_inc_local, cost_inc] = arc;
-            auto next_node                                             = to_bucket;
+            auto next_node                                            = to_bucket;
 
             nodes[next_node].add_arc(next_node, node.id, res_inc_local, cost_inc, false,
-                                   priority_value); // Add reverse arc to the adjacency list
+                                     priority_value); // Add reverse arc to the adjacency list
         }
     };
 
@@ -535,7 +541,7 @@ void BucketGraph::common_initialization() {
     auto &num_buckets      = assign_buckets<Direction::Forward>(num_buckets_fw, num_buckets_bw);
     auto &num_bucket_index = assign_buckets<Direction::Forward>(num_buckets_index_fw, num_buckets_index_bw);
 
-    int              num_intervals = intervals.size(); // Determine how many resources we have (number of intervals)
+    int                 num_intervals = intervals.size(); // Determine how many resources we have (number of intervals)
     std::vector<double> total_ranges(num_intervals);
     std::vector<double> base_intervals(num_intervals);
 
@@ -591,8 +597,7 @@ void BucketGraph::common_initialization() {
         // print num_intervals
         std::vector<double> interval_starts(num_intervals);
         for (int r = 0; r < num_intervals; ++r) {
-            interval_starts[r] =
-                std::min(R_max[r], VRPNode.lb[r] + current_pos[r] * base_intervals[r]);
+            interval_starts[r] = std::min(R_max[r], VRPNode.lb[r] + current_pos[r] * base_intervals[r]);
         }
 
         // Adjust to calculate index using `num_buckets[0]`, which is likely multi-dimensional for the depot
@@ -654,7 +659,7 @@ void BucketGraph::mono_initialization() {
     auto &num_buckets      = assign_buckets<Direction::Forward>(num_buckets_fw, num_buckets_bw);
     auto &num_bucket_index = assign_buckets<Direction::Forward>(num_buckets_index_fw, num_buckets_index_bw);
 
-    int              num_intervals = intervals.size(); // Determine how many resources we have (number of intervals)
+    int                 num_intervals = intervals.size(); // Determine how many resources we have (number of intervals)
     std::vector<double> total_ranges(num_intervals);
     std::vector<double> base_intervals(num_intervals);
 
@@ -707,8 +712,7 @@ void BucketGraph::mono_initialization() {
         // print num_intervals
         std::vector<double> interval_starts(num_intervals);
         for (int r = 0; r < num_intervals; ++r) {
-            interval_starts[r] =
-                std::min(R_max[r], VRPNode.lb[r] + current_pos[r] * base_intervals[r]);
+            interval_starts[r] = std::min(R_max[r], VRPNode.lb[r] + current_pos[r] * base_intervals[r]);
         }
 
         // Adjust to calculate index using `num_buckets[0]`, which is likely multi-dimensional for the depot

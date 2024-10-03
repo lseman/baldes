@@ -226,26 +226,26 @@ include_directories(${GUROBI_HOME}/include)
 set(SOURCES examples/VRPTW.cpp src/BucketGraph.cpp)
 
 set(CVRPSEP_SOURCES
-    cvrpsep/basegrph.cpp
-    cvrpsep/capsep.cpp
-    cvrpsep/cnstrmgr.cpp
-    cvrpsep/memmod.cpp
-    cvrpsep/compcuts.cpp
-    cvrpsep/strngcmp.cpp
-    cvrpsep/compress.cpp
-    cvrpsep/cutbase.cpp
-    cvrpsep/fcapfix.cpp
-    cvrpsep/mxf.cpp
-    cvrpsep/twomatch.cpp
-    cvrpsep/glmsep.cpp
-    cvrpsep/binpack.cpp
-    cvrpsep/combsep.cpp
-    cvrpsep/fcits.cpp
-    cvrpsep/grsearch.cpp
-    cvrpsep/hpmstar.cpp
-    cvrpsep/strcomb.cpp
-    cvrpsep/blocks.cpp
-    cvrpsep/sort.cpp)
+    third_party/cvrpsep/basegrph.cpp
+    third_party/cvrpsep/capsep.cpp
+    third_party/cvrpsep/cnstrmgr.cpp
+    third_party/cvrpsep/memmod.cpp
+    third_party/cvrpsep/compcuts.cpp
+    third_party/cvrpsep/strngcmp.cpp
+    third_party/cvrpsep/compress.cpp
+    third_party/cvrpsep/cutbase.cpp
+    third_party/cvrpsep/fcapfix.cpp
+    third_party/cvrpsep/mxf.cpp
+    third_party/cvrpsep/twomatch.cpp
+    third_party/cvrpsep/glmsep.cpp
+    third_party/cvrpsep/binpack.cpp
+    third_party/cvrpsep/combsep.cpp
+    third_party/cvrpsep/fcits.cpp
+    third_party/cvrpsep/grsearch.cpp
+    third_party/cvrpsep/hpmstar.cpp
+    third_party/cvrpsep/strcomb.cpp
+    third_party/cvrpsep/blocks.cpp
+    third_party/cvrpsep/sort.cpp)
 
 set(HGS_SOURCES
     third_party/hgs_vrptw/Genetic.cpp third_party/hgs_vrptw/Individual.cpp
@@ -316,7 +316,7 @@ else()
   # Non-macOS (Linux or other platforms), use .so and .a files
   target_link_libraries(
     vrptw PRIVATE ${GUROBI_HOME}/lib/libgurobi_c++.a
-                  ${GUROBI_HOME}/lib/libgurobi${GUROBI_VERSION_MAJOR}.so)
+                  ${GUROBI_HOME}/lib/libgurobi${GUROBI_VERSION_MAJOR}.so tbb)
 endif()
 
 if(JEMALLOC)

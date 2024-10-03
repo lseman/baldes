@@ -216,7 +216,7 @@ int main(int argc, char *argv[]) {
 
     VRProblemPtr problem = std::make_shared<VRProblem>();
     problem->instance    = instance;
-    problem->nodes        = nodes;
+    problem->nodes       = nodes;
 
     std::vector<Path>    paths;
     std::vector<Label *> labels;
@@ -225,7 +225,7 @@ int main(int argc, char *argv[]) {
     int  labelID        = 0;
     int  labels_counter = 0;
     auto process_route  = [&](const std::vector<int> &route) {
-        auto label          = new Label();
+        auto label           = new Label();
         label->nodes_covered = route;
         // calculate total distance
         for (int i = 0; i < route.size() - 1; i++) { label->cost += instance.getcij(route[i], route[i + 1]); }

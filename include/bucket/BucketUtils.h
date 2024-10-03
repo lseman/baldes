@@ -400,8 +400,12 @@ void BucketGraph::ConcatenateLabel(const Label *L, int &b, Label *&pbest, std::v
 
         Bvisited[segment] |= (1ULL << bit_position);
 
-        const auto  &bucketLprimenode = bw_buckets[current_bucket].node_id;
-        const double cost             = getcij(L_node_id, bucketLprimenode);
+        const auto &bucketLprimenode = bw_buckets[current_bucket].node_id;
+        double      cost             = getcij(L_node_id, bucketLprimenode);
+
+#ifdef RCC
+        if constexpr (S == Stage::Four) { cost -= arc_duals.getDual(L_node_id, bucketLprimenode); }
+#endif
 
 #ifdef SRC
         decltype(cut_storage)            cutter   = nullptr;

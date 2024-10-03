@@ -16,7 +16,8 @@
 #include <functional>
 #include <iomanip>
 #include <sstream>
-#include <utility>
+#include <bit>         // for std::rotr (C++20)
+#include <utility>     // for std::pair
 
 /**
  * @brief Combines a hash value with an existing seed.
@@ -27,29 +28,34 @@
  *
  */
 template <typename T>
-inline void hash_combine(std::size_t &seed, const T &value) {
+void hash_combine(std::size_t &seed, const T &value) {
     std::hash<T> hasher;
-    seed ^= hasher(value) + 0x9e3779b9 + (seed << 6) + (seed >> 2); // More robust combining method
+    seed ^= hasher(value) + 0x9e3779b9 + std::rotr(seed, 6);  // Using std::rotr instead of manual bit shifts
 }
 
 /**
  * @struct pair_hash
- * @brief A hash function object for hashing std::pair objects.
+ * @brief A custom hash function object for hashing std::pair objects.
  *
- * This struct provides a custom hash function for std::pair objects,
- * allowing them to be used as keys in unordered containers such as
- * std::unordered_map or std::unordered_set.
+ * This struct provides a hash function that combines the hashes of both elements
+ * of a std::pair. It is used to allow std::pair to be a key in unordered containers
+ * such as std::unordered_map or std::unordered_set.
  *
+ * @tparam T1 Type of the first element in the pair.
+ * @tparam T2 Type of the second element in the pair.
+ * 
+ * @exception noexcept Ensures exception safety, as hashing typically does not throw.
  */
 struct pair_hash {
     template <class T1, class T2>
-    std::size_t operator()(const std::pair<T1, T2> &pair) const {
+    std::size_t operator()(const std::pair<T1, T2> &pair) const noexcept {
         std::size_t seed = 0;
         hash_combine(seed, pair.first);
         hash_combine(seed, pair.second);
         return seed;
     }
 };
+
 
 /**
  * @struct pair_equal

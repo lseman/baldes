@@ -3,8 +3,11 @@
  * @brief This file contains the definition of the Path struct.
  */
 #pragma once
+#include "Arc.h"
 #include "Common.h"
+#include "config.h"
 
+#include <future>
 /**
  * @struct Path
  * @brief Represents a path with a route and its associated cost.
@@ -22,7 +25,7 @@ struct Path {
     // default constructor
     Path() : route({}), cost(0.0) {}
     Path(const std::vector<int> &route, double cost) : route(route), cost(cost) {
-        [[maybe_unused]] auto future = std::async(std::launch::async, &Path::precomputeArcs, this); // Ignore the future
+        // auto future = std::async(std::launch::async, &Path::precomputeArcs, this); // Ignore the future
     }
 
     // define begin and end methods linking to route
@@ -80,7 +83,12 @@ struct Path {
      */
     void addArc(int i, int j) {
         std::pair<int, int> arc = std::make_pair(i, j);
-        arcMap[arc]++; // Increment the count of the arc
+        // check if the arc exists in the map
+        if (arcMap.find(arc) != arcMap.end()) {
+            arcMap[arc]++; // Increment the count if the arc exists
+        } else {
+            arcMap[arc] = 1; // Add the arc with a count of 1 if it does not exist
+        }
     }
 
     /**
@@ -117,4 +125,9 @@ struct Path {
      * with the arc. If the pair is not found, it returns 0.
      *
      */
+    auto getArcCount(RCCArc arc) const {
+        // Construct the arc pair
+        std::pair<int, int> arcPair = std::make_pair(arc.from, arc.to);
+        return (arcMap.find(arcPair) != arcMap.end()) ? arcMap.at(arcPair) : 0;
+    }
 };

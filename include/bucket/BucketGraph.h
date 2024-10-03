@@ -26,6 +26,7 @@
 
 #include "Pools.h"
 
+#include "RCC.h"
 #include "Trees.h"
 
 #include <queue>
@@ -67,6 +68,11 @@ public:
     BucketOptions options;
     void          mono_initialization();
     Label        *compute_mono_label(const Label *L);
+
+#ifdef RCC
+    ArcDuals arc_duals;
+    void    setArcDuals(const ArcDuals &arc_duals) { this->arc_duals = arc_duals; }
+#endif
 
 #ifdef PSTEP
     PSTEPDuals pstep_duals;
