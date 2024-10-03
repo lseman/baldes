@@ -677,6 +677,7 @@ public:
             SECTION {
                 // Section 1: Forward direction
                 define_buckets<Direction::Forward>();
+                //split_buckets<Direction::Forward>();
                 fw_fixed_buckets.clear();
                 fw_fixed_buckets.resize(fw_buckets_size);
                 for (auto &fb : fw_fixed_buckets) { fb.assign(fw_buckets_size, 0); }
@@ -684,12 +685,15 @@ public:
             SECTION {
                 // Section 2: Backward direction
                 define_buckets<Direction::Backward>();
+                //split_buckets<Direction::Backward>();
                 bw_fixed_buckets.clear();
                 bw_fixed_buckets.resize(bw_buckets_size);
                 for (auto &bb : bw_fixed_buckets) { bb.assign(bw_buckets_size, 0); }
             });
 
+        fmt::print("Redefinition counter: {}\n", redefine_counter);
         generate_arcs();
+        fmt::print("Arcs generated\n");
         PARALLEL_SECTIONS(
             workB, bi_sched,
             [&, this, fw_save_rebuild]() -> void {
@@ -704,59 +708,75 @@ public:
 
     template <Direction D>
     void split_buckets() {
-
         auto &buckets           = assign_buckets<D>(fw_buckets, bw_buckets);
         auto &buckets_size      = assign_buckets<D>(fw_buckets_size, bw_buckets_size);
         auto &num_buckets       = assign_buckets<D>(num_buckets_fw, num_buckets_bw);
         auto &num_buckets_index = assign_buckets<D>(num_buckets_index_fw, num_buckets_index_bw);
 
-        int original_num_buckets = buckets_size.size();
+        int                 num_intervals = MAIN_RESOURCES;
+        std::vector<double> total_ranges(num_intervals);
+        std::vector<double> base_intervals(num_intervals);
 
-        // Reserve space to avoid reallocation during insertion
-        buckets.reserve(2 * original_num_buckets);
+        // Determine the base interval and other relevant values for each resource
+        for (int r = 0; r < num_intervals; ++r) {
+            total_ranges[r]   = R_max[r] - R_min[r];
+            base_intervals[r] = total_ranges[r] / intervals[r].interval;
+        }
 
-        for (int i = 0; i < original_num_buckets; ++i) {
-            // Get the current bucket
-            const auto &bucket      = buckets[i];
-            const auto &next_bucket = buckets[i + 1];
+        int original_num_buckets = buckets_size;
+
+        // To track splits per node_id
+        std::unordered_map<int, int> splits_per_node;
+
+        // Loop until the second-to-last bucket to avoid out-of-bounds access
+        for (int i = 0; i < original_num_buckets - 1; ++i) {
+            const auto &bucket = buckets[i];
 
             // Calculate mid-point for each dimension
             std::vector<double> mid_point(bucket.lb.size());
             if constexpr (D == Direction::Forward) {
-
-                for (int r = 0; r < bucket.lb.size(); ++r) { mid_point[r] = (bucket.lb[r] + next_bucket.lb[r]) / 2.0; }
+                for (int r = 0; r < bucket.lb.size(); ++r) { mid_point[r] = (bucket.lb[r] + base_intervals[r]) / 2.0; }
             } else {
-                for (int r = 0; r < bucket.lb.size(); ++r) { mid_point[r] = (bucket.ub[r] + next_bucket.ub[r]) / 2.0; }
+                for (int r = 0; r < bucket.lb.size(); ++r) { mid_point[r] = (bucket.ub[r] - base_intervals[r]) / 2.0; }
             }
 
-            Bucket bucket1;
-            Bucket bucket2;
+            // Create two new buckets by splitting at the mid-point
+            Bucket bucket1, bucket2;
             if constexpr (D == Direction::Forward) {
-                // Create two new buckets by splitting at the mid-point
                 bucket1 = Bucket(bucket.node_id, bucket.lb, bucket.ub);
                 bucket2 = Bucket(bucket.node_id, mid_point, bucket.ub);
             } else {
-                // Create two new buckets by splitting at the mid-point
                 bucket1 = Bucket(bucket.node_id, bucket.lb, bucket.ub);
                 bucket2 = Bucket(bucket.node_id, bucket.lb, mid_point);
             }
 
-            // Insert the second half (bucket2) at position i+1
-            buckets.insert(buckets.begin() + i + 1, bucket2);
+            // Manually shift elements to the right to make space for the new bucket
+            for (int j = original_num_buckets; j > i + 1; --j) { buckets[j] = buckets[j - 1]; }
+
+            // Insert the new bucket at position i+1
+            buckets[i + 1] = bucket2;
 
             // Replace the current bucket with the first half (bucket1)
             buckets[i] = bucket1;
 
-            // Update the bucket count and indices for this node
-            num_buckets[bucket.node_id]++;
-            num_buckets_index[bucket.node_id] = i;
+            // Track the number of splits for this node_id
+            splits_per_node[bucket.node_id]++;
 
-            // Since we added a new bucket at i+1, we need to skip over it on the next iteration
+            // Since we added a new bucket at i+1, increment i to skip over the new bucket
             ++i;
+            ++original_num_buckets; // Adjust the count to account for the new bucket
         }
 
         // Update the global bucket size
-        buckets_size = buckets.size();
+        buckets_size = original_num_buckets;
+
+        // Now update the num_buckets_index for each node_id based on the final positions
+        int current_index = 0;
+        for (int i = 0; i < original_num_buckets; ++i) {
+            const auto &bucket = buckets[i];
+            if (num_buckets_index[bucket.node_id] == -1) { num_buckets_index[bucket.node_id] = current_index; }
+            current_index++;
+        }
     }
 
     /**

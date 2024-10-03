@@ -72,6 +72,7 @@ public:
     void update_stabilization_after_misprice() {
         nb_misprices++;
         alpha = _misprice_schedule(nb_misprices, base_alpha);
+        cur_alpha = alpha;
     }
 
     /**
@@ -370,13 +371,13 @@ public:
 
         // Adjust cur_alpha based on the cosine angle and a threshold
         if (cos_angle > 1e-12) {
-            cur_alpha = std::min(0.99, cur_alpha + (1.0 - cur_alpha) * 0.1); // Increase cur_alpha
+            alpha = std::min(0.99, base_alpha + (1.0 - base_alpha) * 0.1); // Increase cur_alpha
         } else {
-            cur_alpha = std::max(0.0, cur_alpha - 0.1); // Decrease cur_alpha
+            alpha = std::max(0.0, base_alpha - 0.1); // Decrease cur_alpha
         }
 
         // Return the updated cur_alpha
-        return cur_alpha;
+        return alpha;
     }
 
     /**
