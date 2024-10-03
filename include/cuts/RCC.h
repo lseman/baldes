@@ -23,6 +23,7 @@
 #include "gurobi_c++.h"
 #include "gurobi_c.h"
 
+#include "Arc.h"
 #include "Hashes.h"
 
 #include <cmath>
@@ -32,133 +33,132 @@
 #include <unordered_map>
 #include <vector>
 
-using namespace std;
+#include <iostream>
+#include <unordered_map>
 
-// Isolated RC cut generation process that returns multiple solutions
-/**
- * @brief Separates Rounded Capacity Cuts (RCC) for a given Gurobi model.
- *
- * This function identifies and separates RCCs from a given Gurobi model. It uses the solution from the LP or relaxed
- * problem and searches for multiple solutions that violate the RCC constraints. The function returns multiple sets of
- * nodes corresponding to the solutions found.
- *
- */
-inline std::vector<set<int>> separate_Rounded_Capacity_cuts(GRBModel *gurobi_model, int Q,
-                                                            const std::vector<int>    &demand,
-                                                            const std::vector<Path>   &allPaths,
-                                                            const std::vector<double> &sol) {
-    double                     epsilon_1         = 0.5;
-    double                     epsilon_2         = 1e-2;
-    double                     epsilon_3         = 1e-3;
-    int                        iteration_counter = 0;
-    unordered_map<int, GRBVar> delta;
-    bool                       need_to_run_RCC_separation = true;
-    // Solution from the LP or relaxed problem
-    // std::vector<double> sol;
-    // int                 varNumber = gurobi_model->get(GRB_IntAttr_NumVars);
-    // for (int i = 0; i < varNumber; i++) { sol.push_back(gurobi_model->getVar(i).get(GRB_DoubleAttr_X)); }
+// Define the RCCArc struct
+struct RCCut {
+    std::vector<RCCArc> arcs; // Stores the arcs involved in the cut
+    int                 rhs;  // Right-hand side value of the constraint
+    GRBConstr           ctr;  // Gurobi constraint object
+};
 
-    vector<double> x_values     = sol;
-    GRBModel       m_separation = GRBModel(gurobi_model->getEnv());
-    m_separation.set(GRB_IntParam_OutputFlag, 0);
+// Structure to store and manage dual values for arcs
+class ArcDuals {
+public:
+    // Add or update the dual value for an arc
+    void setDual(const RCCArc &arc, double dualValue) { arcDuals_[arc] = dualValue; }
 
-    // Enable Gurobi to search for multiple solutions
-    m_separation.set(GRB_IntParam_PoolSearchMode, 2);
+    // Retrieve the dual value for an arc; returns 0 if the arc does not have a dual
+    double getDual(int i, int j) const {
+        RCCArc arc(i, j);
+        auto   it = arcDuals_.find(arc);
+        if (it != arcDuals_.end()) {
+            return it->second; // Return the dual if found
+        }
+        return 0.0; // Default to 0 if not found
+    }
 
-    // Set the number of solutions to be found
-    m_separation.set(GRB_IntParam_PoolSolutions, 5);
+    double getDual(RCCArc arc) const {
+        auto it = arcDuals_.find(arc);
+        if (it != arcDuals_.end()) {
+            return it->second; // Return the dual if found
+        }
+        return 0.0; // Default to 0 if not found
+    }
 
-    GRBVar alpha = m_separation.addVar(0, GRB_INFINITY, 0, GRB_INTEGER);
-
-    set<pair<int, int>>                              relevant_edges;
-    unordered_map<pair<int, int>, double, pair_hash> edge_capacities;
-
-    unordered_map<pair<int, int>, GRBVar, pair_hash> gamma;
-
-    std::vector<std::vector<double>> aijs(N_SIZE + 2, std::vector<double>(N_SIZE + 2, 0.0));
-
-    for (int counter = 0; counter < sol.size(); ++counter) {
-        auto &nodes = allPaths[counter].route;
-        for (int k = 1; k < nodes.size(); ++k) {
-
-            int source = nodes[k - 1];
-            int target = (nodes[k] == N_SIZE - 1) ? 0 : nodes[k];
-            aijs[source][target] += sol[counter];
+    void setOrIncrementDual(const RCCArc &arc, double dualValue) {
+        auto it = arcDuals_.find(arc);
+        if (it != arcDuals_.end()) {
+            it->second += dualValue; // Increment the dual if the arc already has a dual
+        } else {
+            arcDuals_[arc] = dualValue; // Set the dual if the arc does not have a dual
         }
     }
-    for (int i = 1; i < N_SIZE - 1; ++i) {
-        delta[i] = m_separation.addVar(0, 1, 0, GRB_BINARY);
-        for (int j = 1; j < N_SIZE - 1; ++j) {
-            double edge_capacity = aijs[i][j];
-            if (edge_capacity >= epsilon_2) {
-                relevant_edges.insert({i, j});
-                edge_capacities[{i, j}] = edge_capacity;
-                gamma[{i, j}]           = m_separation.addVar(0, GRB_INFINITY, 0, GRB_CONTINUOUS);
-            }
-        }
-    }
-    m_separation.update();
-    // compute gcd of demands
-    auto gcd = 1;
-    for (int i = 1; i < N_SIZE - 1; ++i) { gcd = std::gcd(gcd, demand[i]); }
-    GRBLinExpr lhs = GRBLinExpr(0.3 + alpha * Q);
-    GRBLinExpr rhs = 0.0;
-    for (int i = 1; i < N_SIZE - 1; ++i) { rhs += delta[i] * demand[i]; }
-    m_separation.addConstr(lhs <= rhs);
 
-    GRBLinExpr obj_separation = 2 * alpha + 2;
+private:
+    std::unordered_map<RCCArc, double, RCCArcHash> arcDuals_; // Map for storing arc duals
+};
 
-    for (int i = 1; i < N_SIZE - 1; ++i) {
-        double edge_capacity = aijs[i][0] + aijs[0][i];
-        if (edge_capacity >= epsilon_2) { obj_separation += -delta[i] * edge_capacity; }
+class RCCManager {
+public:
+    RCCManager() = default;
+    int cut_ctr  = 0;
+
+    std::vector<GRBConstr> getConstraints() {
+        std::vector<GRBConstr> constraints;
+        for (const auto &cut : cuts_) { constraints.push_back(cut.ctr); }
+        return constraints;
     }
 
-    for (const auto &[i, j] : relevant_edges) {
-        m_separation.addConstr(gamma[{i, j}] <= delta[i]);
-        m_separation.addConstr(gamma[{i, j}] <= delta[j]);
-    }
-
-    m_separation.addConstr(
-        std::accumulate(delta.begin(), delta.end(), GRBLinExpr(0),
-                        [](GRBLinExpr sum, const std::pair<const int, GRBVar> &p) { return sum + p.second; }) >= 2);
-
-    m_separation.setObjective(obj_separation - accumulate(relevant_edges.begin(), relevant_edges.end(), GRBLinExpr(0),
-                                                          [&](GRBLinExpr sum, const auto &edge) {
-                                                              int i = edge.first, j = edge.second;
-                                                              return sum + (delta[i] + delta[j] - 2 * gamma[{i, j}]) *
-                                                                               edge_capacities[{i, j}];
-                                                          }),
-                              GRB_MAXIMIZE);
-    m_separation.optimize();
-
-    std::vector<std::set<int>> multiple_solutions; // Store multiple sets of nodes
-
-    int    solCount          = m_separation.get(GRB_IntAttr_SolCount); // Number of solutions found
-    double eps_for_violation = 1e-3;
-    // Retrieve multiple solutions
-    for (int solIndex = 0; solIndex < solCount; ++solIndex) {
-        m_separation.set(GRB_IntParam_SolutionNumber, solIndex); // Set the solution number
-        auto solution = m_separation.get(GRB_DoubleAttr_ObjVal); // Get the objective value for this solution
-        if (m_separation.get(GRB_DoubleAttr_PoolObjVal) >= eps_for_violation) {
-
-#ifdef VERBOSE
-            fmt::print("RCC Violation {}; Objective value - {}\n", solIndex + 1,
-                       m_separation.get(GRB_DoubleAttr_ObjVal));
-#endif
-
-            std::set<int> S; // Store nodes for this solution
-
-            // Extract solution for this specific delta configuration
-            for (int i = 1; i < N_SIZE - 1; ++i) {
-                if (delta[i].get(GRB_DoubleAttr_Xn) > 0.5) { // Get solution value for this node in the current solution
-                    S.insert(i);
+    std::vector<double> computeRCCCoefficients(std::vector<int> label) {
+        std::vector<double> coeffs(cuts_.size(), 0);
+        // iterate over cuts
+        for (int i = 0; i < cuts_.size(); i++) {
+            auto coeff = 0;
+            // check if the label is in the cut
+            // iterate over arcs in label
+            for (int j = 0; j < label.size() - 1; j++) {
+                // iterate over arcs in cut
+                for (int k = 0; k < cuts_[i].arcs.size(); k++) {
+                    // print label[j] and label[j+1]
+                    if (label[j] == cuts_[i].arcs[k].from && label[j + 1] == cuts_[i].arcs[k].to) { coeff++; }
                 }
             }
-
-            // Store the set of nodes for this solution
-            multiple_solutions.push_back(S);
+            coeffs[i] = coeff;
         }
+        return coeffs;
     }
 
-    return multiple_solutions; // Return all sets of nodes corresponding to the solutions
-}
+    // Method to add a new cut
+    void addCut(const std::vector<RCCArc> &arcs, int rhs, GRBConstr &ctr) {
+        // std::lock_guard<std::mutex> lock(mutex_);
+        cuts_.emplace_back(RCCut{arcs, rhs, ctr});
+        cut_ctr++;
+    }
+
+    // Retrieve all the cuts for further processing
+    const std::vector<RCCut> &getCuts() const { return cuts_; }
+
+    // Optionally, clear cuts if needed
+    void clearCuts() {
+        // std::lock_guard<std::mutex> lock(mutex_);
+        cuts_.clear();
+    }
+
+    // Compute the dual values for each arc by summing the duals of cuts passing through the arc
+    ArcDuals computeDuals(GRBModel *model, double threshold = 1e-3) {
+        ArcDuals            arcDuals;
+        std::vector<double> dualValues(cuts_.size()); // Precompute dual values for each cut
+
+        // First pass: Compute dual values and store them
+        for (int i = 0; i < cuts_.size(); ++i) {
+            const auto &cut       = cuts_[i];
+            double      dualValue = cut.ctr.get(GRB_DoubleAttr_Pi);
+            dualValues[i]         = dualValue; // Store the dual value
+
+            // Sum the dual values for all arcs in this cut
+            for (const auto &arc : cut.arcs) {
+                arcDuals.setOrIncrementDual(arc, dualValue); // Update arc duals
+            }
+        }
+
+        // Second pass: Remove cuts with dual values near zero
+        cuts_.erase(std::remove_if(cuts_.begin(), cuts_.end(),
+                                   [&](const RCCut &cut, size_t i = 0) mutable {
+                                       if (std::abs(dualValues[i]) < threshold) {
+                                           model->remove(cut.ctr); // Remove the constraint from the model
+                                           return true;            // Mark this cut for removal
+                                       }
+                                       ++i;
+                                       return false; // Keep this cut
+                                   }),
+                    cuts_.end());
+
+        return arcDuals;
+    }
+
+private:
+    std::vector<RCCut> cuts_; // Vector to hold all the RCCuts
+    // std::mutex         mutex_; // Mutex to protect access to the cuts
+};

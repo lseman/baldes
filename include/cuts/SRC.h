@@ -172,7 +172,7 @@ private:
 
     static std::unordered_map<int, std::pair<std::vector<int>, std::vector<int>>> column_cache;
 
-    std::vector<VRPNode>                       nodes;
+    std::vector<VRPNode>                      nodes;
     std::vector<std::vector<int>>             baseSets;
     std::unordered_map<int, std::vector<int>> neighborSets;
     CutType                                   cutType;
@@ -349,7 +349,7 @@ struct CompareCuts {
  */
 template <CutType T>
 void LimitedMemoryRank1Cuts::the45Heuristic(const SparseMatrix &A, const std::vector<double> &x) {
-    int    max_number_of_cuts  = 2; // Max number of cuts to generate
+    int    max_number_of_cuts  = 3; // Max number of cuts to generate
     double violation_threshold = 1e-3;
     int    max_generated_cuts  = 15;
 

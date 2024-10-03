@@ -93,12 +93,12 @@ inline std::vector<Label *> BucketGraph::solve() {
         // If transitioning to Stage 4, print a message and apply fixing
         if (transition) {
             // print_cut("Transitioning to stage 4\n");
-            bool original_fixed = fixed; // Store the original fixed status
-            fixed      = true;                                 // Enable fixing of buckets in Stage 4
-            paths      = bi_labeling_algorithm<Stage::Four>(); // Solve the problem with Stage 4
-            transition = false;                                // End the transition period
-            fixed        = original_fixed;                      // Restore the original fixed status
-            min_red_cost = paths[0]->cost; // Update the minimum reduced cost
+            bool original_fixed = fixed;                                // Store the original fixed status
+            fixed               = true;                                 // Enable fixing of buckets in Stage 4
+            paths               = bi_labeling_algorithm<Stage::Four>(); // Solve the problem with Stage 4
+            transition          = false;                                // End the transition period
+            fixed               = original_fixed;                       // Restore the original fixed status
+            min_red_cost        = paths[0]->cost;                       // Update the minimum reduced cost
             iter++;
             return paths; // Return the final paths
         }
@@ -383,8 +383,8 @@ std::vector<Label *> BucketGraph::bi_labeling_algorithm() {
         best_label = compute_label(fw_best_label, bw_best_label);
     } else {
         // If not feasible, set the best label to have infinite cost (not usable)
-        best_label->cost         = 0.0;
-        best_label->real_cost    = std::numeric_limits<double>::infinity();
+        best_label->cost          = 0.0;
+        best_label->real_cost     = std::numeric_limits<double>::infinity();
         best_label->nodes_covered = {};
     }
 
@@ -494,7 +494,7 @@ BucketGraph::Extend(const std::conditional_t<M == Mutability::Mut, Label *, cons
     auto &fixed_buckets = assign_buckets<D>(fw_fixed_buckets, bw_fixed_buckets);
 
     // Precompute some values from the current label (L_prime) to avoid recalculating inside the loop
-    const int    initial_node_id    = L_prime->node_id;
+    const int    initial_node_id   = L_prime->node_id;
     auto         initial_resources = L_prime->resources; // Copy the current label's resources
     const double initial_cost      = L_prime->cost;      // Store the initial cost of the label
 
@@ -550,24 +550,6 @@ BucketGraph::Extend(const std::conditional_t<M == Mutability::Mut, Label *, cons
 
     // Initialize new resources based on the arc's resource increments and check feasibility
     std::vector<double> new_resources(initial_resources.size());
-    /*
-    for (size_t i = 0; i < initial_resources.size(); ++i) {
-
-        if constexpr (D == Direction::Forward) {
-            new_resources[i] =
-                std::max(initial_resources[i] + gamma.resource_increment[i], static_cast<double>(VRPNode.lb[i]));
-            if (new_resources[i] > VRPNode.ub[i]) {
-                return nullptr; // Forward: Exceeds upper bound
-            }
-        } else {
-            new_resources[i] =
-                std::min(initial_resources[i] - gamma.resource_increment[i], static_cast<double>(VRPNode.ub[i]));
-            if (new_resources[i] < VRPNode.lb[i]) {
-                return nullptr; // Backward: Below lower bound
-            }
-        }
-    }
-    */
 
     // Note: workaround
     constexpr size_t N = R_SIZE;
@@ -603,8 +585,15 @@ BucketGraph::Extend(const std::conditional_t<M == Mutability::Mut, Label *, cons
 #endif
 
 #ifdef RCC
-    // Adjust the cost using the cached dual sum from RCC (if applicable)
-    new_cost -= cvrpsep_dual;
+    if constexpr (S == Stage::Four) {
+        if constexpr (D == Direction::Forward) {
+            auto arc_dual = arc_duals.getDual(initial_node_id, node_id);
+            new_cost -= arc_dual;
+        } else if constexpr (D == Direction::Backward) {
+            auto arc_dual = arc_duals.getDual(node_id, initial_node_id);
+            new_cost -= arc_dual;
+        }
+    }
 #endif
 
 #ifdef KP_BOUND

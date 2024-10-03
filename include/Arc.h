@@ -70,3 +70,26 @@ struct JumpArc {
 };
 
 using ArcVariant = std::variant<Arc, BucketArc>;
+
+#include <functional>
+
+struct RCCArc {
+    int from;
+    int to;
+
+    // Constructor with member initializer list
+    RCCArc(int from, int to) : from(from), to(to) {}
+
+    // Equality operator for comparisons
+    bool operator==(const RCCArc &other) const { return std::tie(from, to) == std::tie(other.from, other.to); }
+};
+
+// Hash function for RCCArc
+struct RCCArcHash {
+    std::size_t operator()(const RCCArc &arc) const {
+        std::size_t h1 = std::hash<int>{}(arc.from);
+        std::size_t h2 = std::hash<int>{}(arc.to);
+        // Use a more robust combination method
+        return h1 ^ (h2 + 0x9e3779b9 + (h1 << 6) + (h1 >> 2));
+    }
+};

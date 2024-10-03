@@ -16,9 +16,11 @@
 
 #pragma once
 
+#include "Arc.h"
 #include "Cut.h"
 #include "Definitions.h"
 
+#include "RCC.h"
 #include "bucket/BucketGraph.h"
 #include "bucket/BucketSolve.h"
 #include "bucket/BucketUtils.h"
@@ -50,7 +52,7 @@ public:
     InstanceData instance;
 
     std::vector<VRPNode> nodes;
-    std::vector<Path>   allPaths;
+    std::vector<Path>    allPaths;
 
     int                           labels_counter = 0;
     std::vector<std::vector<int>> labels;
@@ -66,6 +68,8 @@ public:
     CnstrMgrPointer oldCutsCMP = nullptr;
 
     tbb::concurrent_unordered_map<std::pair<int, int>, std::vector<GRBLinExpr>, pair_hash, pair_equal> arcCache;
+
+    RCCManager rccManager;
 
 #endif
     void addVars(GRBModel *node, auto lb, auto ub, auto obj, auto vtype, auto name, auto col, auto row) {
@@ -203,7 +207,7 @@ public:
             // Step 1: Accumulate the coefficients for each node
             for (const auto &node : label->nodes_covered) {
                 if (likely(node > 0 && node != N_SIZE - 1)) { // Use likely() if this condition is almost always true
-                    coluna[node - 1]++;                      // Simplified increment operation
+                    coluna[node - 1]++;                       // Simplified increment operation
                 }
             }
 
@@ -237,15 +241,30 @@ public:
                 for (int i = 0; i < vec.size(); i++) {
                     if (vec[i] != 0) {
                         col.addTerms(&vec[i], &SRCconstraints[i], 1);
-                        // matrix.A_sparse.row_indices.push_back(N_SIZE - 2 + i);
-                        // matrix.A_sparse.col_indices.push_back(matrix.A_sparse.num_cols);
-                        // matrix.A_sparse.values.push_back(static_cast<double>(vec[i]));
+                        //  matrix.A_sparse.row_indices.push_back(N_SIZE - 2 + i);
+                        //  matrix.A_sparse.col_indices.push_back(matrix.A_sparse.num_cols);
+                        //  matrix.A_sparse.values.push_back(static_cast<double>(vec[i]));
                         matrix.A_sparse.elements.push_back(
                             {N_SIZE - 2 + i, matrix.A_sparse.num_cols, static_cast<double>(vec[i])});
                     }
                 }
             }
+#endif
 
+#ifdef RCC
+            auto RCCvec         = rccManager.computeRCCCoefficients(label->nodes_covered);
+            auto RCCconstraints = rccManager.getConstraints();
+            if (RCCvec.size() > 0) {
+                for (int i = 0; i < RCCvec.size(); i++) {
+                    if (RCCvec[i] != 0) {
+                        // col.addTerms(&RCCvec[i], &RCCconstraints[i], 1);
+                        //  matrix.A_sparse.elements.push_back({N_SIZE - 2 + static_cast<int>(SRCconstraints.size()) +
+                        //  i,
+                        //                                      matrix.A_sparse.num_cols,
+                        //                                      static_cast<double>(RCCvec[i])});
+                    }
+                }
+            }
 #endif
 
             matrix.A_sparse.num_cols++;
@@ -349,6 +368,24 @@ public:
      */
     std::vector<double> getDuals(GRBModel *model) {
         // int                    numConstrs = model->get(GRB_IntAttr_NumConstrs);
+        std::vector<GRBConstr> constraints;
+        constraints.reserve(numConstrs);
+
+        // Collect all constraints
+        for (int i = 0; i < numConstrs; ++i) { constraints.push_back(model->getConstr(i)); }
+
+        // Prepare the duals vector
+        std::vector<double> duals(numConstrs);
+
+        // Retrieve all dual values in one call
+        auto dualArray = model->get(GRB_DoubleAttr_Pi, constraints.data(), constraints.size());
+
+        duals.assign(dualArray, dualArray + numConstrs);
+        return duals;
+    }
+
+    std::vector<double> getAllDuals(GRBModel *model) {
+        int                    numConstrs = model->get(GRB_IntAttr_NumConstrs);
         std::vector<GRBConstr> constraints;
         constraints.reserve(numConstrs);
 
@@ -538,13 +575,13 @@ public:
         std::mutex       arcCache_mutex; // Mutex to protect arcCache
 
         // Precompute edge values from LP solution
-        std::vector<std::vector<double>> aijs(N_SIZE + 2, std::vector<double>(N_SIZE + 2, 0.0));
+        std::vector<std::vector<double>> aijs(N_SIZE + 1, std::vector<double>(N_SIZE + 1, 0.0));
 
         for (int counter = 0; counter < solution.size(); ++counter) {
             const auto &nodes = allPaths[counter].route;
             for (size_t k = 1; k < nodes.size(); ++k) {
                 int source = nodes[k - 1];
-                int target = (nodes[k] == N_SIZE - 1) ? 0 : nodes[k];
+                int target = (nodes[k] == nVertices) ? 0 : nodes[k];
                 aijs[source][target] += solution[counter];
             }
         }
@@ -561,7 +598,7 @@ public:
                 double xij = aijs[i][j] + aijs[j][i];
                 if (xij > 1e-4) {
                     {
-                        edgex.push_back((i == 0) ? N_SIZE - 1 : i);
+                        edgex.push_back((i == 0) ? nVertices : i);
                         edgey.push_back(j);
                         edgeval.push_back(xij);
                     }
@@ -571,9 +608,9 @@ public:
 
         // RCC Separation
         char   intAndFeasible;
-        double maxViolation = 0.0;
+        double maxViolation;
         CAPSEP_SeparateCapCuts(nVertices - 1, demands.data(), instance.q, edgex.size() - 1, edgex.data(), edgey.data(),
-                               edgeval.data(), oldCutsCMP, 20, 1e-4, &intAndFeasible, &maxViolation, cutsCMP);
+                               edgeval.data(), oldCutsCMP, 5, 1e-4, &intAndFeasible, &maxViolation, cutsCMP);
 
         if (intAndFeasible) return false; /* Optimal solution found */
 
@@ -586,65 +623,67 @@ public:
         print_cut("Found {} violated RCC cuts, max violation: {}\n", cutsCMP->Size, maxViolation);
 
         std::vector<int>                 rhsValues(cutsCMP->Size);
-        std::vector<std::vector<RCCarc>> arcGroups(cutsCMP->Size);
+        std::vector<std::vector<RCCArc>> arcGroups(cutsCMP->Size);
         std::mutex                       cuts_mutex;
 
-        const int                JOBS = 10;
+        const int                JOBS = 1;
         exec::static_thread_pool pool(JOBS);
         auto                     sched = pool.get_scheduler();
 
         // Create a bulk sender to handle parallel execution of tasks
-        auto bulk_sender = stdexec::bulk(
-            stdexec::just(), tasks.size(),
-            [this, &cutsCMP, &model, &cuts_mutex, &tasks, &rhsValues, &arcGroups,
+        auto bulk_sender =
+            stdexec::bulk(stdexec::just(), tasks.size(),
+                          [this, &cutsCMP, &model, &cuts_mutex, &tasks, &rhsValues, &arcGroups,
 
-             &arcCache_mutex](std::size_t task_idx) {
-                // Get the current task (cut index)
-                int              cutIdx = tasks[task_idx];
-                std::vector<int> S(cutsCMP->CPL[cutIdx]->IntList + 1,
-                                   cutsCMP->CPL[cutIdx]->IntList + cutsCMP->CPL[cutIdx]->IntListSize + 1);
+                           &arcCache_mutex](std::size_t task_idx) {
+                              // Get the current task (cut index)
+                              int              cutIdx = tasks[task_idx];
+                              std::vector<int> S(cutsCMP->CPL[cutIdx]->IntList + 1,
+                                                 cutsCMP->CPL[cutIdx]->IntList + cutsCMP->CPL[cutIdx]->IntListSize + 1);
 
-                GRBLinExpr                                                                 cutExpr = 0.0;
-                std::vector<RCCarc>                                                        arcs;
-                std::unordered_map<std::pair<int, int>, GRBLinExpr, pair_hash, pair_equal> localContributions;
+                              GRBLinExpr          cutExpr = 0.0;
+                              std::vector<RCCArc> arcs;
 
-                // Generate all possible arc pairs from nodes in S
-                for (int i : S) {
-                    for (int j : S) {
-                        if (i != j) { arcs.emplace_back(i, j); }
-                    }
-                }
+                              // Generate all possible arc pairs from nodes in S
+                              for (int i : S) {
+                                  for (int j : S) {
+                                      if (i != j) { arcs.emplace_back(i, j); }
+                                  }
+                              }
 
-                rhsValues[cutIdx] = cutsCMP->CPL[cutIdx]->RHS;
-                arcGroups[cutIdx] = std::move(arcs);
-            });
+                              rhsValues[cutIdx] = cutsCMP->CPL[cutIdx]->RHS;
+                              arcGroups[cutIdx] = std::move(arcs);
+                          });
 
         // Define the work and run it synchronously
         auto work = stdexec::starts_on(sched, bulk_sender);
         stdexec::sync_wait(std::move(work));
 
         // Create a bulk sender to handle parallel execution of each constraint
-        auto bulk_sender_ctr = stdexec::bulk(stdexec::just(), rhsValues.size(), // We want rhsValues.size() tasks
-                                             [&](std::size_t i) { // Lambda function for each task (constraint index i)
-                                                 GRBLinExpr cutExpr = 0.0;
+        auto bulk_sender_ctr =
+            stdexec::bulk(stdexec::just(), rhsValues.size(), // We want rhsValues.size() tasks
+                          [&](std::size_t i) {               // Lambda function for each task (constraint index i)
+                              GRBLinExpr cutExpr = 0.0;
 
-                                                 // For each arc in arcGroups[i], compute the cut expression
-                                                 for (const auto &arc : arcGroups[i]) {
-                                                     for (size_t ctr = 0; ctr < allPaths.size(); ++ctr) {
-                                                         cutExpr += allPaths[ctr].getArcCount(arc) * model->getVar(ctr);
-                                                     }
-                                                 }
-
-                                                 // Add the constraint to the model
-                                                 auto ctr = model->addConstr(cutExpr <= rhsValues[i]);
-                                                 rccManager.addCut(arcGroups[i], rhsValues[i], ctr);
-
-                                             });
+                              // For each arc in arcGroups[i], compute the cut expression
+                              for (const auto &arc : arcGroups[i]) {
+                                  for (size_t ctr = 0; ctr < allPaths.size(); ++ctr) {
+                                      cutExpr += allPaths[ctr].timesArc(arc.from, arc.to) * model->getVar(ctr);
+                                  }
+                              }
+                              // Add the constraint to the model
+                              auto ctr_name = "RCC_cut_" + std::to_string(rccManager.cut_ctr);
+                              auto ctr      = model->addConstr(cutExpr <= rhsValues[i], ctr_name);
+                              rccManager.addCut(arcGroups[i], rhsValues[i], ctr);
+                          });
 
         // Attach to the scheduler and run the work synchronously
         auto work_ctr = stdexec::starts_on(sched, bulk_sender_ctr);
         stdexec::sync_wait(std::move(work_ctr)); // Wait for the tasks to complete
         model->update();
+
+        // print number of model constraints
+        // fmt::print("Number of constraints: {}\n", model->get(GRB_IntAttr_NumConstrs));
         // model->optimize();
 
         return true;
@@ -683,7 +722,7 @@ public:
 #endif
 
         std::vector<double> cutDuals;
-        std::vector<double> nodeDuals  = getDuals(node);
+        std::vector<double> nodeDuals = getDuals(node);
         auto                sizeDuals = nodeDuals.size();
 
         double highs_obj_dual = 0.0;
@@ -782,10 +821,24 @@ public:
 
             double obj;
 
-            if (ss) {
 #ifdef RCC
-                print_cut("Testing RCC feasibility..\n");
-                rcc = RCCsep(node, solution, cvrsep_ctrs);
+            if (rcc) {
+                node->optimize();
+                solution = extractSolution(node);
+                rcc      = RCCsep(node, solution, cvrsep_ctrs);
+                if (rcc) { matrix = extractModelDataSparse(node); }
+                node->optimize();
+                auto arc_duals = rccManager.computeDuals(node);
+                bucket_graph.setArcDuals(arc_duals);
+            }
+#endif
+
+            if (ss && !rcc) {
+#ifdef RCC
+                node->optimize();
+                solution = extractSolution(node);
+                rcc      = RCCsep(node, solution, cvrsep_ctrs);
+                matrix   = extractModelDataSparse(node);
 
 #endif
 #ifdef EXACT_RCC
@@ -906,7 +959,7 @@ public:
             highs_obj        = std::get<0>(ip_result);
             highs_obj_dual   = std::get<1>(ip_result);
             solution         = std::get<2>(ip_result);
-            nodeDuals         = std::get<3>(ip_result);
+            nodeDuals        = std::get<3>(ip_result);
             auto originDuals = nodeDuals;
             for (auto &dual : nodeDuals) { dual = -dual; }
 #endif
@@ -915,14 +968,13 @@ public:
             // auto matrixSparse = extractModelDataSparse(node);
             node->optimize();
             highs_obj = node->get(GRB_DoubleAttr_ObjVal);
-            nodeDuals  = getDuals(node);
-
+            nodeDuals = getDuals(node);
             stab.update_stabilization_after_master_optim(nodeDuals);
 
             misprice = true;
             while (misprice) {
                 nodeDuals = stab.getStabDualSolAdvanced(nodeDuals);
-                solution = extractSolution(node);
+                solution  = extractSolution(node);
 #endif
 
                 bool integer = true;
