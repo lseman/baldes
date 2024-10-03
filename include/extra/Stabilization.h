@@ -245,9 +245,9 @@ public:
         double norm_subgradient = norm(subgradient);
 
         // Compute π_tilde: a convex combination of duals_in and duals_out
-        double one_minus_alpha = 1 - base_alpha;
+        //double one_minus_alpha = 1 - base_alpha;
         for (size_t row_id = 0; row_id < n; ++row_id) {
-            duals_tilde[row_id] = base_alpha * duals_in[row_id] + one_minus_alpha * duals_out[row_id];
+            duals_tilde[row_id] = cur_alpha * duals_in[row_id] + (1 - cur_alpha) * duals_out[row_id];
         }
 
         // Compute the coefficient for π_g based on the norm of duals_in and duals_out
@@ -268,9 +268,8 @@ public:
         beta = (norm_in_out * norm_in_g != 0.0) ? std::max(0.0, dot_product / (norm_in_out * norm_in_g)) : 0.0;
 
         // Compute ρ: a combination of duals_g and duals_out based on β
-        double one_minus_beta = 1 - beta;
         for (size_t row_id = 0; row_id < n; ++row_id) {
-            rho[row_id] = beta * duals_g[row_id] + one_minus_beta * duals_out[row_id];
+            rho[row_id] = beta * duals_g[row_id] + (1 - beta) * duals_out[row_id];
         }
 
         // Compute the coefficient for dual separation (coef_sep)
