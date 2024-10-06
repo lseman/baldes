@@ -5,8 +5,13 @@
 #include "Problem.h"
 
 #include "../third_party/concurrentqueue.h"
+#include <cmath>
 #include <deque>
+#include <limits>
+#include <mutex>
 #include <queue>
+#include <shared_mutex>
+#include <thread>
 
 enum class BNBNodeSelectionStrategy {
     DFS,      // Depth-First Search
@@ -26,38 +31,38 @@ class BranchAndBound {
 private:
     Problem                                                               *problem;
     std::priority_queue<BNBNode *, std::vector<BNBNode *>, BNBNodeCompare> bestFirstBNBNodes;
-    // std::deque<BNBNode*> otherBNBNodes;
-    moodycamel::ConcurrentQueue<BNBNode *> otherBNBNodes;
+    moodycamel::ConcurrentQueue<BNBNode *>                                 otherBNBNodes;
 
-    BNBNodeSelectionStrategy strategy;
-    mutable std::mutex       mutex; // Protects below shared states
+    BNBNodeSelectionStrategy  strategy;
+    mutable std::shared_mutex mutex; // Protects below shared states
 
     void addBNBNode(BNBNode *&node) {
-        switch (strategy) {
-        case BNBNodeSelectionStrategy::DFS: otherBNBNodes.enqueue(node); break;
-        case BNBNodeSelectionStrategy::BFS: otherBNBNodes.enqueue(node); break;
-        case BNBNodeSelectionStrategy::BestFirst: bestFirstBNBNodes.push(std::move(node)); break;
+        if (strategy == BNBNodeSelectionStrategy::BestFirst) {
+            bestFirstBNBNodes.push(std::move(node));
+        } else {
+            otherBNBNodes.enqueue(node);
         }
     }
 
     BNBNode *getNextBNBNode() {
-        BNBNode *node;
+        BNBNode *node = nullptr;
         if (strategy == BNBNodeSelectionStrategy::BestFirst && !bestFirstBNBNodes.empty()) {
             node = bestFirstBNBNodes.top();
             bestFirstBNBNodes.pop();
+            return node;
         } else if (otherBNBNodes.try_dequeue(node)) {
-            // Successfully dequeued a node
+            return node;
         }
-        return node;
+        return nullptr;
     }
 
 public:
-    double     globalBestObjective = std::numeric_limits<double>::lowest();
-    BNBNode   *globalBestBNBNode   = nullptr;
-    bool       optimal             = false;
-    BNBNode   *rootBNBNode         = nullptr;
-    bool       solutionFound       = false;
-    std::mutex solutionFoundMutex;
+    double            globalBestObjective = std::numeric_limits<double>::lowest();
+    BNBNode          *globalBestBNBNode   = nullptr;
+    bool              optimal             = false;
+    BNBNode          *rootBNBNode         = nullptr;
+    bool              solutionFound       = false;
+    std::shared_mutex solutionFoundMutex;
 
     explicit BranchAndBound(Problem *problem, BNBNodeSelectionStrategy strategy = BNBNodeSelectionStrategy::BestFirst)
         : problem(problem), strategy(strategy) {}
@@ -68,18 +73,18 @@ public:
     void setProblem(Problem *problem) { this->problem = problem; }
 
     void markSolutionFound() {
-        std::lock_guard<std::mutex> lock(solutionFoundMutex);
+        std::lock_guard lock(solutionFoundMutex);
         solutionFound = true;
     }
 
     void setRootNode(BNBNode *rootBNBNode) {
         this->rootBNBNode = rootBNBNode;
-        std::lock_guard<std::mutex> lock(mutex);
+        std::lock_guard lock(mutex);
         addBNBNode(rootBNBNode);
     }
 
     void updateGlobalBest(double objectiveValue, BNBNode *currentBNBNode, double boundValue) {
-        std::lock_guard<std::mutex> lock(solutionFoundMutex); // Assuming same mutex can be used for simplicity
+        std::scoped_lock lock(mutex, solutionFoundMutex);
         if (objectiveValue > globalBestObjective) {
             globalBestObjective = objectiveValue;
             globalBestBNBNode   = currentBNBNode;
@@ -88,7 +93,7 @@ public:
     }
 
     bool isSolutionFound() {
-        std::lock_guard<std::mutex> lock(solutionFoundMutex);
+        std::shared_lock lock(solutionFoundMutex);
         return solutionFound;
     }
 
@@ -114,32 +119,25 @@ public:
     }
 
     void solveParallel(size_t numThreads) {
-        std::vector<std::thread> threads;
+        std::vector<std::jthread> threads;
         for (size_t i = 0; i < numThreads; ++i) {
             threads.emplace_back([this]() {
                 while (!isSolutionFound()) {
-                    BNBNode *currentBNBNode;
-                    if (!otherBNBNodes.try_dequeue(currentBNBNode))
-                        break; // Exit if queue is empty or no more nodes to process
-
-                    if (isSolutionFound()) break; // Check again before processing, for immediate exit if solution found
-
-                    processBNBNode(currentBNBNode);
+                    BNBNode *currentBNBNode = getNextBNBNode();
+                    if (currentBNBNode) {
+                        processBNBNode(currentBNBNode);
+                    } else {
+                        break; // Exit if no more nodes to process
+                    }
                 }
             });
-        }
-        for (auto &thread : threads) {
-            if (thread.joinable()) thread.join();
         }
     }
 
     void solve() {
-
-        while (auto currentBNBNode = getNextBNBNode()) {
-
+        while (BNBNode *currentBNBNode = getNextBNBNode()) {
             currentBNBNode->start();
             currentBNBNode->enforceBranching();
-            // currentBNBNode->enforceVRPBranching();
             print_info("Current node id: {}\n", currentBNBNode->getUUID());
             double boundValue = problem->bound(currentBNBNode);
             print_info("Bound value: {}\n", boundValue);
@@ -151,11 +149,10 @@ public:
 
             if (boundValue < globalBestObjective) continue;
 
-            // auto objectiveValue = currentBNBNode->objectiveValue;
             auto objectiveValue = problem->objective(currentBNBNode);
             print_info("Objective value: {}\n", objectiveValue);
 
-            if ((std::floor(boundValue) == objectiveValue)) {
+            if (std::abs(boundValue - objectiveValue) < 1e-2) {
                 print_info("SOLUTION FOUND\n");
                 print_info("Objective value: {}\n", objectiveValue);
                 print_info("Solution is optimal: {}\n", objectiveValue);
@@ -166,7 +163,7 @@ public:
                 break;
             }
 
-            std::lock_guard<std::mutex> lock(mutex); // Protect shared state modifications
+            std::lock_guard lock(mutex); // Protect shared state modifications
             if (objectiveValue > globalBestObjective) {
                 globalBestObjective = objectiveValue;
                 globalBestBNBNode   = currentBNBNode;

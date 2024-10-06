@@ -67,8 +67,7 @@ public:
     std::vector<std::vector<int>> labels;
     int                           numConstrs = 0;
 
-    LimitedMemoryRank1Cuts r1c;
-    std::vector<Path>      toMerge;
+    std::vector<Path> toMerge;
 
 #ifdef RCC
     CnstrMgrPointer oldCutsCMP = nullptr;
@@ -79,6 +78,7 @@ public:
 #endif
 
     int addPath(BNBNode *node, const std::vector<Path> paths, bool enumerate = false) {
+        auto &r1c  = node->r1c;
         auto &cuts = r1c.cutStorage;
 
         int              numConstrsLocal = node->get(GRB_IntAttr_NumConstrs);
@@ -183,6 +183,7 @@ public:
      *
      */
     inline int addColumn(BNBNode *node, const auto &columns, bool enumerate = false) {
+        auto &r1c  = node->r1c;
         auto &cuts = r1c.cutStorage;
 
         int                 numConstrsLocal = node->get(GRB_IntAttr_NumConstrs);
@@ -579,6 +580,7 @@ public:
         auto &matrix         = node->matrix;
         auto &SRCconstraints = node->SRCconstraints;
         auto &allPaths       = node->paths;
+        auto &r1c            = node->r1c;
 
         int bucket_interval = 20;
         int time_horizon    = instance.T_max;

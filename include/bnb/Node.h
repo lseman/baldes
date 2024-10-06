@@ -15,6 +15,7 @@
 #include <sstream>
 
 #include "Path.h"
+#include "SRC.h"
 
 #include "VRPCandidate.h"
 
@@ -57,6 +58,7 @@ public:
     std::vector<GRBConstr> SRCconstraints;
     ModelData              matrix;
     std::vector<Path>      paths;
+    LimitedMemoryRank1Cuts r1c;
 
     void addPath(Path path) { paths.emplace_back(path); }
 
