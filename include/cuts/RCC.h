@@ -20,8 +20,6 @@
 #pragma once
 
 #include "Definitions.h"
-#include "gurobi_c++.h"
-#include "gurobi_c.h"
 
 #include "Arc.h"
 #include "Hashes.h"
@@ -84,6 +82,9 @@ class RCCManager {
 public:
     RCCManager() = default;
     int cut_ctr  = 0;
+
+    // define size as the size of the cuts vector
+    int size() { return cuts_.size(); }
 
     std::vector<GRBConstr> getConstraints() {
         std::vector<GRBConstr> constraints;

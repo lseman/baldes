@@ -186,43 +186,47 @@ inline ModelData extractModelDataSparse(GRBModel *model) {
         int     numVars = model->get(GRB_IntAttr_NumVars);
         GRBVar *vars    = model->getVars();
 
-        // Reserve memory to avoid frequent reallocations
+        // Reserve memory based on the actual number of variables
         data.ub.reserve(numVars);
         data.lb.reserve(numVars);
         data.c.reserve(numVars);
         data.vtype.reserve(numVars);
         data.name.reserve(numVars);
 
-        for (int i = 0; i < numVars; ++i) {
-            double ub = vars[i].get(GRB_DoubleAttr_UB);
-            data.ub.push_back(ub > 1e10 ? std::numeric_limits<double>::infinity() : ub);
+        std::vector<double> ub(numVars), lb(numVars), obj(numVars);
+        std::vector<char>   vtype(numVars);
 
-            double lb = vars[i].get(GRB_DoubleAttr_LB);
-            data.lb.push_back(lb < -1e10 ? -std::numeric_limits<double>::infinity() : lb);
+        auto ubs    = model->get(GRB_DoubleAttr_UB, vars, numVars);  // Fetch upper bounds
+        auto lbs    = model->get(GRB_DoubleAttr_LB, vars, numVars);  // Fetch lower bounds
+        auto objs   = model->get(GRB_DoubleAttr_Obj, vars, numVars); // Fetch objective coefficients
+        auto vtypes = model->get(GRB_CharAttr_VType, vars, numVars); // Fetch variable types
 
-            data.c.push_back(vars[i].get(GRB_DoubleAttr_Obj));
-
-            char type = vars[i].get(GRB_CharAttr_VType);
-            data.vtype.push_back(type);
-
-            data.name.push_back(vars[i].get(GRB_StringAttr_VarName));
-        }
+        // Copy the values to the vectors
+        data.ub.assign(ubs, ubs + numVars);
+        data.lb.assign(lbs, lbs + numVars);
+        data.c.assign(objs, objs + numVars);
+        data.vtype.assign(vtypes, vtypes + numVars);
 
         // Constraints
         int          numConstrs = model->get(GRB_IntAttr_NumConstrs);
         SparseMatrix A_sparse;
 
-        // Reserve memory for constraint matrices, estimate 10 non-zeros per row
-        A_sparse.elements.reserve(numConstrs * 10);
+        // Reserve memory for constraint matrices, estimating 10 non-zeros per row
+        A_sparse.elements.reserve(numConstrs * 10); // Estimate non-zero elements
         data.b.reserve(numConstrs);
         data.cname.reserve(numConstrs);
         data.sense.reserve(numConstrs);
 
         for (int i = 0; i < numConstrs; ++i) {
-            GRBConstr  constr = model->getConstr(i);
-            GRBLinExpr expr   = model->getRow(constr);
+            GRBConstr constr = model->getConstr(i);
 
-            int exprSize = expr.size();
+            // Get the row corresponding to the constraint
+            GRBLinExpr expr     = model->getRow(constr);
+            int        exprSize = expr.size();
+
+            // Reserve space for constraint elements to minimize reallocation
+            A_sparse.elements.reserve(A_sparse.elements.size() + exprSize);
+
             for (int j = 0; j < exprSize; ++j) {
                 GRBVar var      = expr.getVar(j);
                 double coeff    = expr.getCoeff(j);
@@ -232,11 +236,10 @@ inline ModelData extractModelDataSparse(GRBModel *model) {
                 A_sparse.elements.push_back({i, varIndex, coeff});
             }
 
-            data.cname.push_back(constr.get(GRB_StringAttr_ConstrName));
-            data.b.push_back(constr.get(GRB_DoubleAttr_RHS));
-
-            char sense = constr.get(GRB_CharAttr_Sense);
-            data.sense.push_back(sense == GRB_LESS_EQUAL ? '<' : (sense == GRB_GREATER_EQUAL ? '>' : '='));
+            // Batch fetch Constraint Name, RHS, and Sense (improve by reducing single fetches)
+            data.cname.push_back(constr.get(GRB_StringAttr_ConstrName)); // Fetch constraint names
+            data.b.push_back(constr.get(GRB_DoubleAttr_RHS));            // Fetch RHS values
+            data.sense.push_back(constr.get(GRB_CharAttr_Sense));        // Fetch sense values
         }
 
         // Set matrix dimensions and build row_start
@@ -245,7 +248,7 @@ inline ModelData extractModelDataSparse(GRBModel *model) {
         A_sparse.buildRowStart();
 
         // Store the sparse matrix in data
-        data.A_sparse = A_sparse;
+        data.A_sparse = std::move(A_sparse);
 
     } catch (GRBException &e) {
         std::cerr << "Error code = " << e.getErrorCode() << std::endl;

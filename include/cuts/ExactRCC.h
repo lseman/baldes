@@ -70,10 +70,10 @@ inline std::vector<set<int>> separate_Rounded_Capacity_cuts(GRBModel *gurobi_mod
 
     GRBVar alpha = m_separation.addVar(0, GRB_INFINITY, 0, GRB_INTEGER);
 
-    set<pair<int, int>>                              relevant_edges;
-    unordered_map<pair<int, int>, double, pair_hash> edge_capacities;
+    set<pair<int, int>>                   relevant_edges;
+    unordered_map<pair<int, int>, double> edge_capacities;
 
-    unordered_map<pair<int, int>, GRBVar, pair_hash> gamma;
+    unordered_map<pair<int, int>, GRBVar> gamma;
 
     std::vector<std::vector<double>> aijs(N_SIZE + 2, std::vector<double>(N_SIZE + 2, 0.0));
 

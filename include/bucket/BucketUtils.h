@@ -382,7 +382,7 @@ template <Stage S>
 void BucketGraph::ConcatenateLabel(const Label *L, int &b, Label *&pbest, std::vector<uint64_t> &Bvisited) {
     // Use a vector for iterative processing as a stack
     std::vector<int> bucket_stack;
-    bucket_stack.reserve(10);
+    bucket_stack.reserve(50);
     bucket_stack.push_back(b);
 
     const auto &L_node_id   = L->node_id;
@@ -403,7 +403,7 @@ void BucketGraph::ConcatenateLabel(const Label *L, int &b, Label *&pbest, std::v
         const auto &bucketLprimenode = bw_buckets[current_bucket].node_id;
         double      cost             = getcij(L_node_id, bucketLprimenode);
 
-#ifdef RCC
+#if defined(RCC) || defined(EXACT_RCC)
         if constexpr (S == Stage::Four) { cost -= arc_duals.getDual(L_node_id, bucketLprimenode); }
 #endif
 

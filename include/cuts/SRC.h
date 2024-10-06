@@ -112,13 +112,16 @@ public:
         double S     = 0;
 
         for (size_t j = 1; j < P.size() - 1; ++j) {
-            // fmt::print("P[j]: {}\n", P[j]);
             int vj = P[j];
 
-            // Check if the node vj is in AM (bitwise check)
-            if (!(AM[vj >> 6] & (1ULL << (vj & 63)))) {
+            // Precompute bitshift values for reuse
+            uint64_t am_mask  = (1ULL << (vj & 63));
+            uint64_t am_index = vj >> 6;
+
+            // Check if vj is in AM using precomputed values
+            if (!(AM[am_index] & am_mask)) {
                 S = 0; // Reset S if vj is not in AM
-            } else if (C[vj >> 6] & (1ULL << (vj & 63))) {
+            } else if (C[am_index] & am_mask) {
                 // Get the position of vj in C by counting the set bits up to vj
                 int pos = order[vj];
 

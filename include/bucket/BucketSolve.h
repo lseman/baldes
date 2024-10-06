@@ -584,7 +584,7 @@ BucketGraph::Extend(const std::conditional_t<M == Mutability::Mut, Label *, cons
     double new_cost = initial_cost + travel_cost;
 #endif
 
-#ifdef RCC
+#if defined(RCC) || defined(EXACT_RCC)
     if constexpr (S == Stage::Four) {
         if constexpr (D == Direction::Forward) {
             auto arc_dual = arc_duals.getDual(initial_node_id, node_id);

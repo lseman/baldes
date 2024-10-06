@@ -139,7 +139,7 @@ Label *BucketGraph::compute_label(const Label *L, const Label *L_prime) {
 
     double real_cost = L->real_cost + L_prime->real_cost + cij_cost;
 
-#ifdef RCC
+#if defined(RCC) || defined(EXACT_RCC)
     auto arc_dual = arc_duals.getDual(L->node_id, L_prime->node_id);
     new_cost -= arc_dual;
 #endif

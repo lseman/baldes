@@ -21,6 +21,7 @@
 #include "Definitions.h"
 
 #include "RCC.h"
+#include "bnb/Node.h"
 #include "bucket/BucketGraph.h"
 #include "bucket/BucketSolve.h"
 #include "bucket/BucketUtils.h"
@@ -30,15 +31,16 @@
 #endif
 
 #include "Reader.h"
+#include "bnb/Problem.h"
 
 #ifdef RCC
 #include "../third_party/cvrpsep/capsep.h"
 #include "../third_party/cvrpsep/cnstrmgr.h"
-#include <tbb/concurrent_unordered_map.h>
+// #include "ModernRCC.h"
 #endif
 
 #ifdef EXACT_RCC
-#include "cuts/RCC.h"
+#include "cuts/ExactRCC.h"
 #endif
 
 #include "Hashes.h"
@@ -47,9 +49,12 @@
 #include "ipm/IPSolver.h"
 #endif
 
-class VRProblem {
+class VRProblem : public Problem {
 public:
     InstanceData instance;
+
+    double ip_result;
+    double relaxed_result;
 
     std::vector<VRPNode> nodes;
     std::vector<Path>    allPaths;
@@ -66,15 +71,11 @@ public:
 
 #ifdef RCC
     CnstrMgrPointer oldCutsCMP = nullptr;
-
-    tbb::concurrent_unordered_map<std::pair<int, int>, std::vector<GRBLinExpr>, pair_hash, pair_equal> arcCache;
-
-    RCCManager rccManager;
-
+    RCCManager      rccManager;
 #endif
-    void addVars(GRBModel *node, auto lb, auto ub, auto obj, auto vtype, auto name, auto col, auto row) {
-        node->addVars(lb, ub, obj, vtype, name, col, row);
-    }
+#ifdef EXACT_RCC
+    RCCManager rccManager;
+#endif
 
     int addPath(GRBModel *node, const std::vector<Path> paths, bool enumerate = false) {
         auto &cuts = r1c.cutStorage;
@@ -164,7 +165,7 @@ public:
         }
         // Add variables with bounds, objectives, and columns
         if (!lb.empty()) {
-            addVars(node, lb.data(), ub.data(), obj.data(), vtypes.data(), names.data(), cols.data(), lb.size());
+            node->addVars(lb.data(), ub.data(), obj.data(), vtypes.data(), names.data(), cols.data(), lb.size());
             node->update();
         }
 
@@ -175,7 +176,7 @@ public:
      * Adds a column to the GRBModel.
      *
      */
-    inline int addColumn(GRBModel *node, const auto &columns, bool enumerate = false) {
+    inline int addColumn(BNBNode *node, const auto &columns, bool enumerate = false) {
         auto &cuts = r1c.cutStorage;
 
         int                 numConstrsLocal = node->get(GRB_IntAttr_NumConstrs);
@@ -251,7 +252,7 @@ public:
             }
 #endif
 
-#ifdef RCC
+#if defined(RCC) || defined(EXACT_RCC)
             auto RCCvec         = rccManager.computeRCCCoefficients(label->nodes_covered);
             auto RCCconstraints = rccManager.getConstraints();
             if (RCCvec.size() > 0) {
@@ -282,41 +283,11 @@ public:
         }
         // Add variables with bounds, objectives, and columns
         if (!lb.empty()) {
-            addVars(node, lb.data(), ub.data(), obj.data(), vtypes.data(), names.data(), cols.data(), lb.size());
+            node->addVars(lb.data(), ub.data(), obj.data(), vtypes.data(), names.data(), cols.data(), lb.size());
             node->update();
         }
 
         return counter;
-    }
-
-    /**
-     * @brief Changes the coefficients of a constraint in the given GRBModel.
-     *
-     * This function modifies the coefficients of a constraint in the specified GRBModel
-     * by iterating over the variables and updating their coefficients using the provided values.
-     *
-     */
-    void chgCoeff(GRBModel *model, const GRBConstr &constrName, std::vector<double> value) {
-        auto varNames = model->getVars();
-        int  numVars  = model->get(GRB_IntAttr_NumVars);
-        for (int i = 0; i < numVars; i++) { model->chgCoeff(constrName, varNames[i], value[i]); }
-    }
-
-    /**
-     * Binarizes the variables in the given GRBModel.
-     *
-     * This function sets the variable type of each variable in the model to binary.
-     * It iterates over all variables in the model and sets their variable type to GRB_BINARY.
-     * After updating the model, all variables will be binary variables.
-     *
-     */
-    void binarizeNode(GRBModel *model) {
-        auto varNumber = model->get(GRB_IntAttr_NumVars);
-        for (int i = 0; i < varNumber; i++) {
-            GRBVar var = model->getVar(i);
-            var.set(GRB_CharAttr_VType, GRB_BINARY);
-        }
-        model->update();
     }
 
     /**
@@ -363,62 +334,10 @@ public:
     }
 
     /**
-     * Retrieves the dual values of the constraints in the given GRBModel.
-     *
-     */
-    std::vector<double> getDuals(GRBModel *model) {
-        // int                    numConstrs = model->get(GRB_IntAttr_NumConstrs);
-        std::vector<GRBConstr> constraints;
-        constraints.reserve(numConstrs);
-
-        // Collect all constraints
-        for (int i = 0; i < numConstrs; ++i) { constraints.push_back(model->getConstr(i)); }
-
-        // Prepare the duals vector
-        std::vector<double> duals(numConstrs);
-
-        // Retrieve all dual values in one call
-        auto dualArray = model->get(GRB_DoubleAttr_Pi, constraints.data(), constraints.size());
-
-        duals.assign(dualArray, dualArray + numConstrs);
-        return duals;
-    }
-
-    std::vector<double> getAllDuals(GRBModel *model) {
-        int                    numConstrs = model->get(GRB_IntAttr_NumConstrs);
-        std::vector<GRBConstr> constraints;
-        constraints.reserve(numConstrs);
-
-        // Collect all constraints
-        for (int i = 0; i < numConstrs; ++i) { constraints.push_back(model->getConstr(i)); }
-
-        // Prepare the duals vector
-        std::vector<double> duals(numConstrs);
-
-        // Retrieve all dual values in one call
-        auto dualArray = model->get(GRB_DoubleAttr_Pi, constraints.data(), constraints.size());
-
-        duals.assign(dualArray, dualArray + numConstrs);
-        return duals;
-    }
-
-    /**
-     * Extracts the solution from a given GRBModel object.
-     *
-     */
-    std::vector<double> extractSolution(GRBModel *model) {
-        std::vector<double> sol;
-        auto                varNumber = model->get(GRB_IntAttr_NumVars);
-        auto                vals      = model->get(GRB_DoubleAttr_X, model->getVars(), varNumber);
-        sol.assign(vals, vals + varNumber);
-        return sol;
-    }
-
-    /**
      * Handles the cuts for the VRPTW problem.
      *
      */
-    bool cutHandler(LimitedMemoryRank1Cuts &r1c, GRBModel *node, std::vector<GRBConstr> &constraints) {
+    bool cutHandler(LimitedMemoryRank1Cuts &r1c, BNBNode *node, std::vector<GRBConstr> &constraints) {
         auto &cuts    = r1c.cutStorage;
         bool  changed = false;
 
@@ -433,7 +352,7 @@ public:
                 if (cut.added && cut.updated) {
                     cut.updated = false;
                     if (z >= constraints.size()) { continue; }
-                    chgCoeff(node, constraints[z], coeffs);
+                    node->chgCoeff(constraints[z], coeffs);
                 } else {
                     GRBLinExpr lhs;
                     for (size_t i = 0; i < coeffs.size(); ++i) {
@@ -477,75 +396,46 @@ public:
 
         if (Ss.size() == 0) return false;
 
-        // Define the tasks that need to be executed in parallel
-        std::vector<int> tasks(Ss.size());
-        std::iota(tasks.begin(), tasks.end(),
-                  0); // Filling tasks with [0, 1, ..., cutsCMP->Size-1]
-
+        // Define the tasks to be executed sequentially
         std::vector<GRBLinExpr>          cutExpressions(Ss.size());
         std::vector<int>                 rhsValues(Ss.size());
-        std::vector<std::vector<RCCarc>> arcGroups(Ss.size());
-        std::mutex                       cuts_mutex;
-        std::mutex                       arcCache_mutex; // Mutex to protect arcCache
+        std::vector<std::vector<RCCArc>> arcGroups(Ss.size());
 
-        const int                JOBS = 10;
-        exec::static_thread_pool pool(JOBS);
-        auto                     sched = pool.get_scheduler();
+        for (size_t c = 0; c < Ss.size(); ++c) {
+            auto S = Ss[c];
 
-        //  Create a bulk sender to handle parallel execution of tasks
-        auto bulk_sender = stdexec::bulk(
-            stdexec::just(), tasks.size(),
-            [this, &Ss, &arcCache_mutex, &model, &cuts_mutex, &tasks, &cutExpressions, &rhsValues,
-             &arcGroups](std::size_t task_idx) {
-                int c = tasks[task_idx];
+            GRBLinExpr          cutExpr = 0.0;
+            std::vector<RCCArc> arcs;
 
-                auto S = Ss[c];
+            // Generate all possible arc pairs from nodes in S
+            for (int i : S) {
+                for (int j : S) {
+                    if (i != j) {
 
-                GRBLinExpr          cutExpr = 0.0;
-                std::vector<RCCarc> arcs;
-
-                std::unordered_map<std::pair<int, int>, GRBLinExpr, pair_hash, pair_equal> localContributions;
-
-                // Generate all possible arc pairs from nodes in S
-                for (int i : S) {
-                    for (int j : S) {
-                        if (i != j) {
-                            arcs.emplace_back(i, j);
-                            auto cache_key = std::make_pair(i, j);
-
-                            if (localContributions.find(cache_key) == localContributions.end()) {
-                                GRBLinExpr contributionSum = 0.0;
-                                for (size_t ctr = 0; ctr < allPaths.size(); ++ctr) {
-                                    contributionSum += allPaths[ctr].timesArc(i, j) * model->getVar(ctr);
-                                }
-                                localContributions[cache_key] = contributionSum;
-                                cutExpr += contributionSum;
-                            } else {
-                                cutExpr += localContributions[cache_key];
-                            }
+                        GRBLinExpr contributionSum = 0.0;
+                        for (size_t ctr = 0; ctr < allPaths.size(); ++ctr) {
+                            contributionSum += allPaths[ctr].timesArc(i, j) * model->getVar(ctr);
                         }
+                        cutExpr += contributionSum;
                     }
                 }
-                auto target_no_vehicles = ceil(
-                    std::accumulate(S.begin(), S.end(), 0, [&](int sum, int i) { return sum + instance.demand[i]; }) /
-                    instance.q);
-                {
-                    cutExpressions[c] = cutExpr;
-                    rhsValues[c]      = S.size() - target_no_vehicles;
+            }
 
-                    arcGroups[c] = std::move(arcs);
-                }
-            });
+            auto target_no_vehicles =
+                ceil(std::accumulate(S.begin(), S.end(), 0, [&](int sum, int i) { return sum + instance.demand[i]; }) /
+                     instance.q);
 
-        // Define the work and run it synchronously
-        auto work = stdexec::starts_on(sched, bulk_sender);
-        stdexec::sync_wait(std::move(work));
-        std::vector<GRBConstr> newConstraints(cutExpressions.size());
-        for (size_t i = 0; i < cutExpressions.size(); ++i) {
-            newConstraints[i] = model->addConstr(cutExpressions[i] <= rhsValues[i]);
+            cutExpressions[c] = cutExpr;
+            rhsValues[c]      = S.size() - target_no_vehicles;
+            arcGroups[c]      = std::move(arcs);
         }
 
-        rccManager.addCutBulk(arcGroups, rhsValues, newConstraints);
+        // std::vector<GRBConstr> newConstraints(cutExpressions.size());
+        for (size_t i = 0; i < cutExpressions.size(); ++i) {
+            auto ctr = model->addConstr(cutExpressions[i] <= rhsValues[i]);
+            rccManager.addCut(arcGroups[i], rhsValues[i], ctr);
+        }
+
         fmt::print("Added {} RCC cuts\n", cutExpressions.size());
         model->update();
         model->optimize();
@@ -562,9 +452,7 @@ public:
      * It uses parallel execution to handle the separation and constraint addition efficiently.
      *
      */
-
-    bool RCCsep(GRBModel *model, const std::vector<double> &solution,
-                std::vector<std::vector<std::vector<GRBConstr>>> &constraints) {
+    bool RCCsep(BNBNode *model, const std::vector<double> &solution) {
 
         // Constraint manager to store cuts
         CnstrMgrPointer cutsCMP = nullptr;
@@ -572,7 +460,6 @@ public:
 
         auto             nVertices = N_SIZE - 1;
         std::vector<int> demands   = instance.demand;
-        std::mutex       arcCache_mutex; // Mutex to protect arcCache
 
         // Precompute edge values from LP solution
         std::vector<std::vector<double>> aijs(N_SIZE + 1, std::vector<double>(N_SIZE + 1, 0.0));
@@ -597,11 +484,9 @@ public:
             for (int j = i + 1; j < nVertices; ++j) {
                 double xij = aijs[i][j] + aijs[j][i];
                 if (xij > 1e-4) {
-                    {
-                        edgex.push_back((i == 0) ? nVertices : i);
-                        edgey.push_back(j);
-                        edgeval.push_back(xij);
-                    }
+                    edgex.push_back((i == 0) ? nVertices : i);
+                    edgey.push_back(j);
+                    edgeval.push_back(xij);
                 }
             }
         }
@@ -613,87 +498,60 @@ public:
                                edgeval.data(), oldCutsCMP, 5, 1e-4, &intAndFeasible, &maxViolation, cutsCMP);
 
         if (intAndFeasible) return false; /* Optimal solution found */
-
         if (cutsCMP->Size == 0) return false;
-        // Define the tasks that need to be executed in parallel
-        auto tasks = std::vector<int>(cutsCMP->Size);
-
-        std::iota(tasks.begin(), tasks.end(), 0); // Filling tasks with [0, 1, ..., cutsCMP->Size-1]
 
         print_cut("Found {} violated RCC cuts, max violation: {}\n", cutsCMP->Size, maxViolation);
 
         std::vector<int>                 rhsValues(cutsCMP->Size);
         std::vector<std::vector<RCCArc>> arcGroups(cutsCMP->Size);
-        std::mutex                       cuts_mutex;
 
-        const int                JOBS = 1;
-        exec::static_thread_pool pool(JOBS);
-        auto                     sched = pool.get_scheduler();
+        // Instead of parallel execution, use a simple for-loop to process each cut
+        for (int cutIdx = 0; cutIdx < cutsCMP->Size; ++cutIdx) {
+            std::vector<int> S(cutsCMP->CPL[cutIdx]->IntList + 1,
+                               cutsCMP->CPL[cutIdx]->IntList + cutsCMP->CPL[cutIdx]->IntListSize + 1);
 
-        // Create a bulk sender to handle parallel execution of tasks
-        auto bulk_sender =
-            stdexec::bulk(stdexec::just(), tasks.size(),
-                          [this, &cutsCMP, &model, &cuts_mutex, &tasks, &rhsValues, &arcGroups,
+            GRBLinExpr          cutExpr = 0.0;
+            std::vector<RCCArc> arcs;
 
-                           &arcCache_mutex](std::size_t task_idx) {
-                              // Get the current task (cut index)
-                              int              cutIdx = tasks[task_idx];
-                              std::vector<int> S(cutsCMP->CPL[cutIdx]->IntList + 1,
-                                                 cutsCMP->CPL[cutIdx]->IntList + cutsCMP->CPL[cutIdx]->IntListSize + 1);
+            // Generate all possible arc pairs from nodes in S
+            for (int i : S) {
+                for (int j : S) {
+                    if (i != j) { arcs.emplace_back(i, j); }
+                }
+            }
 
-                              GRBLinExpr          cutExpr = 0.0;
-                              std::vector<RCCArc> arcs;
+            rhsValues[cutIdx] = cutsCMP->CPL[cutIdx]->RHS;
+            arcGroups[cutIdx] = std::move(arcs);
+        }
 
-                              // Generate all possible arc pairs from nodes in S
-                              for (int i : S) {
-                                  for (int j : S) {
-                                      if (i != j) { arcs.emplace_back(i, j); }
-                                  }
-                              }
+        // Instead of parallel execution, use a simple for-loop to add each constraint
+        for (std::size_t i = 0; i < rhsValues.size(); ++i) {
+            GRBLinExpr cutExpr = 0.0;
 
-                              rhsValues[cutIdx] = cutsCMP->CPL[cutIdx]->RHS;
-                              arcGroups[cutIdx] = std::move(arcs);
-                          });
+            // For each arc in arcGroups[i], compute the cut expression
+            for (const auto &arc : arcGroups[i]) {
+                for (size_t ctr = 0; ctr < allPaths.size(); ++ctr) {
+                    cutExpr += allPaths[ctr].timesArc(arc.from, arc.to) * model->getVar(ctr);
+                }
+            }
 
-        // Define the work and run it synchronously
-        auto work = stdexec::starts_on(sched, bulk_sender);
-        stdexec::sync_wait(std::move(work));
+            // Add the constraint to the model
+            auto ctr_name = "RCC_cut_" + std::to_string(rccManager.cut_ctr);
+            auto ctr      = model->addConstr(cutExpr <= rhsValues[i], ctr_name);
+            rccManager.addCut(arcGroups[i], rhsValues[i], ctr);
+        }
 
-        // Create a bulk sender to handle parallel execution of each constraint
-        auto bulk_sender_ctr =
-            stdexec::bulk(stdexec::just(), rhsValues.size(), // We want rhsValues.size() tasks
-                          [&](std::size_t i) {               // Lambda function for each task (constraint index i)
-                              GRBLinExpr cutExpr = 0.0;
-
-                              // For each arc in arcGroups[i], compute the cut expression
-                              for (const auto &arc : arcGroups[i]) {
-                                  for (size_t ctr = 0; ctr < allPaths.size(); ++ctr) {
-                                      cutExpr += allPaths[ctr].timesArc(arc.from, arc.to) * model->getVar(ctr);
-                                  }
-                              }
-                              // Add the constraint to the model
-                              auto ctr_name = "RCC_cut_" + std::to_string(rccManager.cut_ctr);
-                              auto ctr      = model->addConstr(cutExpr <= rhsValues[i], ctr_name);
-                              rccManager.addCut(arcGroups[i], rhsValues[i], ctr);
-                          });
-
-        // Attach to the scheduler and run the work synchronously
-        auto work_ctr = stdexec::starts_on(sched, bulk_sender_ctr);
-        stdexec::sync_wait(std::move(work_ctr)); // Wait for the tasks to complete
+        for (auto i = 0; i < cutsCMP->Size; i++) { CMGR_MoveCnstr(cutsCMP, oldCutsCMP, i, 0); }
         model->update();
-
-        // print number of model constraints
-        // fmt::print("Number of constraints: {}\n", model->get(GRB_IntAttr_NumConstrs));
-        // model->optimize();
-
         return true;
     }
+
 #endif
 
     /**
      * Column generation algorithm.
      */
-    void CG(GRBModel *node) {
+    void CG(BNBNode *node) {
         print_info("Column generation started...\n");
 
         node->optimize();
@@ -701,6 +559,7 @@ public:
         int time_horizon    = instance.T_max;
 
         numConstrs                = node->get(GRB_IntAttr_NumConstrs);
+        node->numConstrs          = numConstrs;
         std::vector<double> duals = std::vector<double>(numConstrs, 0.0);
 
         // BucketGraph bucket_graph(nodes, time_horizon, bucket_interval, instance.q, bucket_interval);
@@ -709,7 +568,7 @@ public:
         bucket_graph.set_distance_matrix(instance.getDistanceMatrix(), 8);
 
         node->optimize();
-        matrix                 = extractModelDataSparse(node);
+        matrix                 = node->extractModelDataSparse();
         auto integer_solution  = node->get(GRB_DoubleAttr_ObjVal);
         bucket_graph.incumbent = integer_solution;
 
@@ -722,7 +581,7 @@ public:
 #endif
 
         std::vector<double> cutDuals;
-        std::vector<double> nodeDuals = getDuals(node);
+        std::vector<double> nodeDuals = node->getDuals();
         auto                sizeDuals = nodeDuals.size();
 
         double highs_obj_dual = 0.0;
@@ -764,11 +623,6 @@ public:
 
         print_info("Starting column generation..\n\n");
         bool transition = false;
-
-#if defined(RCC) || defined(EXACT_RCC)
-        std::vector<std::vector<std::vector<GRBConstr>>> cvrsep_ctrs(
-            instance.nC + 3, std::vector<std::vector<GRBConstr>>(instance.nC + 3, std::vector<GRBConstr>()));
-#endif
 
 #ifdef TR
         std::vector<GRBVar> w(numConstrs);
@@ -813,44 +667,53 @@ public:
 #ifdef RCC
         CMGR_CreateCMgr(&oldCutsCMP, 100); // For old cuts, if needed
 #endif
-        bool rcc = false;
+        bool   rcc         = false;
+        bool   reoptimized = false;
+        double obj;
+
         for (int iter = 0; iter < 2000; ++iter) {
-            //////////////////////////////////////////////////////////////////////
-            // PREPARING DUALS
-            //////////////////////////////////////////////////////////////////////
+            reoptimized = false;
 
-            double obj;
-
-#ifdef RCC
+#if defined(RCC) || defined(EXACT_RCC)
             if (rcc) {
                 node->optimize();
-                solution = extractSolution(node);
-                rcc      = RCCsep(node, solution, cvrsep_ctrs);
-                if (rcc) { matrix = extractModelDataSparse(node); }
-                node->optimize();
-                auto arc_duals = rccManager.computeDuals(node);
+                solution = node->extractSolution();
+#ifdef RCC
+                rcc = RCCsep(node, solution);
+#endif
+#ifdef EXACT_RCC
+                rcc = exactRCCsep(node, solution);
+#endif
+                if (rcc) {
+                    matrix = node->extractModelDataSparse();
+                    node->optimize();
+                }
+                auto arc_duals = rccManager.computeDuals(node->getModel());
                 bucket_graph.setArcDuals(arc_duals);
+                reoptimized = true;
             }
 #endif
 
             if (ss && !rcc) {
-#ifdef RCC
-                node->optimize();
-                solution = extractSolution(node);
-                rcc      = RCCsep(node, solution, cvrsep_ctrs);
-                matrix   = extractModelDataSparse(node);
+#if defined(RCC) || defined(EXACT_RCC)
 
+                if (!reoptimized) { node->optimize(); }
+                solution = node->extractSolution();
+#ifdef RCC
+                rcc = RCCsep(node, solution);
 #endif
 #ifdef EXACT_RCC
-                print_cut("Testing RCC feasibility..\n");
                 rcc = exactRCCsep(node, solution, cvrsep_ctrs);
+#endif
+                matrix = node->extractModelDataSparse();
+
 #endif
 
 #if defined(SRC3) || defined(SRC)
                 if (!rcc) {
 
-                    // removeNegativeReducedCostVarsAndPaths(node);
-                    // matrix = extractModelDataSparse(node);
+                    removeNegativeReducedCostVarsAndPaths(node->getModel());
+                    matrix = node->extractModelDataSparse();
                     node->optimize();
 
                     auto cuts_before = cuts->size();
@@ -881,13 +744,13 @@ public:
                     }
 
                     if (cleared) {
-                        node->update();                        // Update the model to reflect the removals
-                        node->optimize();                      // Re-optimize the model
-                        matrix = extractModelDataSparse(node); // Extract model data
+                        node->update();                          // Update the model to reflect the removals
+                        node->optimize();                        // Re-optimize the model
+                        matrix = node->extractModelDataSparse(); // Extract model data
                     }
 
                     // print cuts size
-                    solution = extractSolution(node);
+                    solution = node->extractSolution();
                     // r1c.cutStorage = cuts;
                     r1c.allPaths = allPaths;
                     r1c.separate(matrix.A_sparse, solution);
@@ -903,7 +766,7 @@ public:
                     }
 
                     changed = cutHandler(r1c, node, SRCconstraints);
-                    if (changed) { matrix = extractModelDataSparse(node); }
+                    if (changed) { matrix = node->extractModelDataSparse(); }
                     // cuts = &r1c.cutStorage;
                 }
 #endif
@@ -949,7 +812,7 @@ public:
 
 #ifdef IPM
             auto d            = 0.5;
-            auto matrixSparse = extractModelDataSparse(node);
+            auto matrixSparse = node->extractModelDataSparse();
             gap               = std::abs(highs_obj - (highs_obj + std::min(0.0, inner_obj))) / std::abs(highs_obj);
             gap               = gap / d;
             if (std::isnan(gap)) { gap = 1e-4; }
@@ -965,16 +828,16 @@ public:
 #endif
 
 #ifdef STAB
-            // auto matrixSparse = extractModelDataSparse(node);
+            // auto matrixSparse = node->extractModelDataSparse();
             node->optimize();
             highs_obj = node->get(GRB_DoubleAttr_ObjVal);
-            nodeDuals = getDuals(node);
+            nodeDuals = node->getDuals();
             stab.update_stabilization_after_master_optim(nodeDuals);
 
             misprice = true;
             while (misprice) {
                 nodeDuals = stab.getStabDualSolAdvanced(nodeDuals);
-                solution  = extractSolution(node);
+                solution  = node->extractSolution();
 #endif
 
                 bool integer = true;
@@ -1036,7 +899,7 @@ public:
                     node->optimize();
                     cuts->reset();
                     // r1c.cutStorage = cuts;
-                    matrix = extractModelDataSparse(node);
+                    matrix = node->extractModelDataSparse();
                 }
 #endif
 
@@ -1080,11 +943,17 @@ public:
 #ifdef SRC
             n_cuts = cuts->size();
 #endif
+
+            auto n_rcc_cuts = 0;
+#ifdef RCC
+            n_rcc_cuts = rccManager.size();
+#endif
             if (iter % 10 == 0)
-                fmt::print("| It.: {:4} | Obj.: {:8.2f} | Price: {:9.2f} | Cuts: {:4} | Paths: {:4} | "
+                fmt::print("| It.: {:4} | Obj.: {:8.2f} | Price: {:9.2f} | SRC: {:4} | RCC: {:4} | Paths: {:4} | "
                            "Stage: {:1} | "
                            "Lag.: {:10.4f} | RCC: {:4} | alpha: {:4.2f} | \n",
-                           iter, highs_obj, inner_obj, n_cuts, paths.size(), stage, lag_gap, rcc, cur_alpha);
+                           iter, highs_obj, inner_obj, n_cuts, n_rcc_cuts, paths.size(), stage, lag_gap, rcc,
+                           cur_alpha);
         }
         auto end_timer        = std::chrono::high_resolution_clock::now();
         auto duration_ms      = std::chrono::duration_cast<std::chrono::milliseconds>(end_timer - start_timer).count();
@@ -1094,11 +963,11 @@ public:
         bucket_graph.print_statistics();
 
         node->optimize();
-        auto relaxed_result = node->get(GRB_DoubleAttr_ObjVal);
+        relaxed_result = node->get(GRB_DoubleAttr_ObjVal);
 
-        binarizeNode(node);
+        node->binarizeNode();
         node->optimize();
-        auto ip_result = node->get(GRB_DoubleAttr_ObjVal);
+        ip_result = node->get(GRB_DoubleAttr_ObjVal);
 
         // get solution in which x > 0.5 and print the corresponding allPaths
         std::vector<int> sol;
@@ -1124,4 +993,13 @@ public:
                    reset);
         fmt::print("+----------------------+----------------+\n");
     }
+
+    double objective(BNBNode *node) { return ip_result; }
+
+    double bound(BNBNode *node) {
+        CG(node);
+        return relaxed_result;
+    }
+
+    void branch(BNBNode *node) {}
 };
