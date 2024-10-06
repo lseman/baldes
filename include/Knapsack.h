@@ -1,9 +1,9 @@
 #pragma once
 
 #include <algorithm>
-#include <vector>
 #include <map>    // For sparse DP optimization
 #include <thread> // For parallelization (optional)
+#include <vector>
 
 class Knapsack {
 private:
@@ -60,9 +60,7 @@ public:
         const double greedyThreshold = 0.9 * greedySolution;
 
         // If the greedy solution is very close to optimal, return it
-        if (greedySolution >= greedyThreshold) {
-            return greedySolution;
-        }
+        if (greedySolution >= greedyThreshold) { return greedySolution; }
 
         // Otherwise, solve the problem exactly using dynamic programming
         std::vector<double> dp(capacity + 1, 0.0);
@@ -72,14 +70,12 @@ public:
         if (numThreads > 1) {
             // Parallelizing the DP update loop
             std::vector<std::thread> threads;
-            auto updateDpRange = [&](int start, int end) {
+            auto                     updateDpRange = [&](int start, int end) {
                 for (const auto &item : items) {
                     if (item.weight <= capacity) {
                         // Process from the back to avoid overwriting previous results
                         for (int w = end; w >= start; --w) {
-                            if (w >= item.weight) {
-                                dp[w] = std::max(dp[w], dp[w - item.weight] + item.value);
-                            }
+                            if (w >= item.weight) { dp[w] = std::max(dp[w], dp[w - item.weight] + item.value); }
                         }
                     }
                 }
@@ -92,9 +88,7 @@ public:
                 threads.push_back(std::thread(updateDpRange, start, end));
             }
 
-            for (auto &t : threads) {
-                t.join();
-            }
+            for (auto &t : threads) { t.join(); }
         } else {
             // Single-threaded DP update
             for (const auto &item : items) {

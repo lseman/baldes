@@ -39,7 +39,7 @@ private:
     int                               current_iteration = 0;
     int                               max_live_time; // Max iterations a Path can stay active
     std::vector<double>               duals;         // Dual variables for each path
-    std::vector<VRPNode>              *nodes = nullptr;
+    std::vector<VRPNode>             *nodes = nullptr;
 
 public:
     std::vector<std::vector<double>> distance_matrix; // Distance matrix for the graph
@@ -231,8 +231,8 @@ struct PSTEPDuals {
     using Arc = std::pair<int, int>; // Represents an arc as a pair (from, to)
 
     std::unordered_map<Arc, double> arcDuals;          // Stores dual values for arcs
-    std::unordered_map<int, double>            three_two_Duals;   // Stores dual values for nodes
-    std::unordered_map<int, double>            three_three_Duals; // Stores dual values for nodes
+    std::unordered_map<int, double> three_two_Duals;   // Stores dual values for nodes
+    std::unordered_map<int, double> three_three_Duals; // Stores dual values for nodes
 
     // Set dual values for arcs
     void setArcDualValues(const std::vector<std::pair<Arc, double>> &values) {

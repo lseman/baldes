@@ -45,7 +45,7 @@ public:
         // Initial population
         print_info("Creating initial population\n");
         Population population(&params, &split, &localSearch);
-        
+
         // Genetic algorithm
         print_info("Running genetic algorithm\n");
         Genetic solver(&params, &split, &population, &localSearch);

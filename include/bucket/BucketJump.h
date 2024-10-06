@@ -56,7 +56,7 @@ void BucketGraph::UpdateBucketsSet(const double theta, const Label *label, std::
         Bvisited.insert(curr_bucket); // Mark the current bucket as visited
 
         const int    bucketLprimenode = buckets_opposite[curr_bucket].node_id;
-        const double cost            = getcij(bucketLnode, bucketLprimenode);
+        const double cost             = getcij(bucketLnode, bucketLprimenode);
 
         // Stop exploring if the cost exceeds the threshold
         if (label->cost + cost + c_bar_opposite[curr_bucket] >= theta) { continue; }
@@ -67,10 +67,10 @@ void BucketGraph::UpdateBucketsSet(const double theta, const Label *label, std::
                     continue; // Skip labels with the same node ID or conflicting bitmaps
                 }
 
-                const VRPNode &L_last_node      = (D == Direction::Forward) ? nodes[label->node_id] : nodes[L->node_id];
-                const double  time_constraint = (D == Direction::Forward)
-                                                    ? label->resources[TIME_INDEX] + cost + L_last_node.duration
-                                                    : L->resources[TIME_INDEX] + cost + L_last_node.duration;
+                const VRPNode &L_last_node     = (D == Direction::Forward) ? nodes[label->node_id] : nodes[L->node_id];
+                const double   time_constraint = (D == Direction::Forward)
+                                                     ? label->resources[TIME_INDEX] + cost + L_last_node.duration
+                                                     : L->resources[TIME_INDEX] + cost + L_last_node.duration;
 
                 if (time_constraint >
                     ((D == Direction::Forward) ? L->resources[TIME_INDEX] : label->resources[TIME_INDEX])) {
@@ -240,15 +240,15 @@ void BucketGraph::ObtainJumpBucketArcs() {
 
         // Cache the current bucket's node ID and arcs
         const int   current_node_id = buckets[b].node_id;
-        const auto &arcs           = buckets[b].template get_bucket_arcs<D>();
-        const auto &original_arcs  = nodes[current_node_id].template get_arcs<D>();
+        const auto &arcs            = buckets[b].template get_bucket_arcs<D>();
+        const auto &original_arcs   = nodes[current_node_id].template get_arcs<D>();
 
         if (arcs.empty()) { continue; } // Skip if no arcs in the current bucket
 
         // Process each original arc for the current node
         for (const auto &orig_arc : original_arcs) {
-            const int from_node  = orig_arc.from;
-            const int to_node    = orig_arc.to;
+            const int from_node = orig_arc.from;
+            const int to_node   = orig_arc.to;
             bool      have_path = false;
 
             // Check if the path exists in the current bucket arcs
@@ -270,7 +270,7 @@ void BucketGraph::ObtainJumpBucketArcs() {
 
                 // Cache the starting bucket and the number of buckets for this node
                 const int start_bucket = num_buckets_index[current_node_id];
-                const int node_buckets  = num_buckets[current_node_id];
+                const int node_buckets = num_buckets[current_node_id];
 
                 // Look through adjacent buckets
                 for (int b_prime = b + 1; b_prime < start_bucket + node_buckets; ++b_prime) {

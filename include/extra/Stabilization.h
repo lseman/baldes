@@ -71,7 +71,7 @@ public:
      */
     void update_stabilization_after_misprice() {
         nb_misprices++;
-        alpha = _misprice_schedule(nb_misprices, base_alpha);
+        alpha     = _misprice_schedule(nb_misprices, base_alpha);
         cur_alpha = alpha;
     }
 
@@ -226,9 +226,9 @@ public:
 
         // Initialize the separation duals and smooth dual solution if they are empty
         if (duals_sep.empty()) {
-            duals_sep       = nodeDuals;  // Start with the input duals
+            duals_sep       = nodeDuals; // Start with the input duals
             smooth_dual_sol = duals_sep; // Initialize the smoothed dual solution
-            return nodeDuals;             // Return the input duals for now
+            return nodeDuals;            // Return the input duals for now
         }
 
         // Get the current stabilization center (duals_in) and the current node duals (duals_out)
@@ -245,7 +245,7 @@ public:
         double norm_subgradient = norm(subgradient);
 
         // Compute π_tilde: a convex combination of duals_in and duals_out
-        //double one_minus_alpha = 1 - base_alpha;
+        // double one_minus_alpha = 1 - base_alpha;
         for (size_t row_id = 0; row_id < n; ++row_id) {
             duals_tilde[row_id] = cur_alpha * duals_in[row_id] + (1 - cur_alpha) * duals_out[row_id];
         }
