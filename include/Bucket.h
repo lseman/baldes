@@ -16,8 +16,8 @@ struct Bucket {
     std::vector<Label *> labels_vec; // Use deque for efficient insertion/removal
 
     int                    node_id = -1;
-    std::vector<double>       lb;
-    std::vector<double>       ub;
+    std::vector<double>    lb;
+    std::vector<double>    ub;
     std::vector<Arc>       fw_arcs;
     std::vector<Arc>       bw_arcs;
     std::vector<BucketArc> fw_bucket_arcs;
@@ -28,7 +28,7 @@ struct Bucket {
     Bucket(const Bucket &other) {
         // Perform deep copy of all relevant members
         labels_vec     = other.labels_vec;
-        node_id         = other.node_id;
+        node_id        = other.node_id;
         lb             = other.lb;
         ub             = other.ub;
         fw_arcs        = other.fw_arcs;
@@ -44,7 +44,7 @@ struct Bucket {
 
         // Perform deep copy of all relevant members
         labels_vec     = other.labels_vec;
-        node_id         = other.node_id;
+        node_id        = other.node_id;
         lb             = other.lb;
         ub             = other.ub;
         fw_arcs        = other.fw_arcs;

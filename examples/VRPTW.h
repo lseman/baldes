@@ -21,7 +21,10 @@
 #include "Definitions.h"
 
 #include "RCC.h"
+
+#include "bnb/Branching.h"
 #include "bnb/Node.h"
+
 #include "bucket/BucketGraph.h"
 #include "bucket/BucketSolve.h"
 #include "bucket/BucketUtils.h"
@@ -49,22 +52,20 @@
 #include "ipm/IPSolver.h"
 #endif
 
+#define NUMERO_CANDIDATOS 10
+
 class VRProblem : public Problem {
 public:
     InstanceData instance;
 
-    double ip_result;
-    double relaxed_result;
+    double ip_result      = std::numeric_limits<double>::max();
+    double relaxed_result = std::numeric_limits<double>::max();
 
     std::vector<VRPNode> nodes;
-    std::vector<Path>    allPaths;
 
     int                           labels_counter = 0;
     std::vector<std::vector<int>> labels;
     int                           numConstrs = 0;
-
-    std::vector<GRBConstr> SRCconstraints;
-    ModelData              matrix;
 
     LimitedMemoryRank1Cuts r1c;
     std::vector<Path>      toMerge;
@@ -77,11 +78,16 @@ public:
     RCCManager rccManager;
 #endif
 
-    int addPath(GRBModel *node, const std::vector<Path> paths, bool enumerate = false) {
+    int addPath(BNBNode *node, const std::vector<Path> paths, bool enumerate = false) {
         auto &cuts = r1c.cutStorage;
 
-        int                 numConstrsLocal = node->get(GRB_IntAttr_NumConstrs);
-        const GRBConstr    *constrs         = node->getConstrs();
+        int              numConstrsLocal = node->get(GRB_IntAttr_NumConstrs);
+        const GRBConstr *constrs         = node->getConstrs();
+
+        auto &matrix         = node->matrix;
+        auto &allPaths       = node->paths;
+        auto &SRCconstraints = node->SRCconstraints;
+
         std::vector<double> coluna(numConstrsLocal, 0.0); // Declare outside the loop
 
         // Collect the bounds, costs, names, and columns
@@ -161,7 +167,7 @@ public:
             vtypes.push_back(GRB_CONTINUOUS);
 
             Path path(label.route, label.cost);
-            allPaths.emplace_back(path);
+            node->addPath(path);
         }
         // Add variables with bounds, objectives, and columns
         if (!lb.empty()) {
@@ -182,6 +188,10 @@ public:
         int                 numConstrsLocal = node->get(GRB_IntAttr_NumConstrs);
         const GRBConstr    *constrs         = node->getConstrs();
         std::vector<double> coluna(numConstrsLocal, 0.0); // Declare outside the loop
+
+        auto &matrix         = node->matrix;
+        auto &allPaths       = node->paths;
+        auto &SRCconstraints = node->SRCconstraints;
 
         // Collect the bounds, costs, names, and columns
         std::vector<double>      lb, ub, obj;
@@ -279,7 +289,7 @@ public:
             vtypes.push_back(GRB_CONTINUOUS);
 
             Path path(label->nodes_covered, label->real_cost);
-            allPaths.emplace_back(path);
+            node->addPath(path);
         }
         // Add variables with bounds, objectives, and columns
         if (!lb.empty()) {
@@ -295,7 +305,7 @@ public:
      * and also removes corresponding elements from the allPaths vector.
      *
      */
-    void removeNegativeReducedCostVarsAndPaths(GRBModel *model) {
+    void removeNegativeReducedCostVarsAndPaths(BNBNode *model) {
         model->optimize();
         int                 varNumber = model->get(GRB_IntAttr_NumVars);
         std::vector<GRBVar> vars(varNumber);
@@ -326,8 +336,8 @@ public:
         // Remove the selected variables from the model and corresponding paths from allPaths
         for (int i = indicesToRemove.size() - 1; i >= 0; --i) {
             int index = indicesToRemove[i];
-            model->remove(vars[index]);               // Remove the variable from the model
-            allPaths.erase(allPaths.begin() + index); // Remove the corresponding path from allPaths
+            // model->remove(vars[index]);               // Remove the variable from the model
+            // allPaths.erase(allPaths.begin() + index); // Remove the corresponding path from allPaths
         }
 
         model->update(); // Apply changes to the model
@@ -464,6 +474,8 @@ public:
         // Precompute edge values from LP solution
         std::vector<std::vector<double>> aijs(N_SIZE + 1, std::vector<double>(N_SIZE + 1, 0.0));
 
+        auto &allPaths = model->paths;
+
         for (int counter = 0; counter < solution.size(); ++counter) {
             const auto &nodes = allPaths[counter].route;
             for (size_t k = 1; k < nodes.size(); ++k) {
@@ -554,7 +566,20 @@ public:
     void CG(BNBNode *node) {
         print_info("Column generation started...\n");
 
+        node->relaxNode();
         node->optimize();
+
+        // check if feasible
+        if (node->get(GRB_IntAttr_Status) != GRB_OPTIMAL) {
+            print_info("Model is infeasible, pruning node.\n");
+            node->setPrune(true);
+            return;
+        }
+
+        auto &matrix         = node->matrix;
+        auto &SRCconstraints = node->SRCconstraints;
+        auto &allPaths       = node->paths;
+
         int bucket_interval = 20;
         int time_horizon    = instance.T_max;
 
@@ -712,7 +737,7 @@ public:
 #if defined(SRC3) || defined(SRC)
                 if (!rcc) {
 
-                    removeNegativeReducedCostVarsAndPaths(node->getModel());
+                    removeNegativeReducedCostVarsAndPaths(node);
                     matrix = node->extractModelDataSparse();
                     node->optimize();
 
@@ -858,6 +883,7 @@ public:
                 }
                 lag_gap          = integer_solution - (highs_obj + std::min(0.0, inner_obj));
                 bucket_graph.gap = lag_gap;
+                // print solution size
                 bucket_graph.augment_ng_memories(solution, allPaths, true, 5, 100, 16, N_SIZE);
                 bucket_graph.relaxation = highs_obj;
 
@@ -967,6 +993,14 @@ public:
 
         node->binarizeNode();
         node->optimize();
+
+        // check if optimal
+        if (node->get(GRB_IntAttr_Status) != GRB_OPTIMAL) {
+            ip_result = std::numeric_limits<double>::max();
+            // node->setPrune(true);
+            print_info("No optimal solution found.\n");
+            return;
+        }
         ip_result = node->get(GRB_DoubleAttr_ObjVal);
 
         // get solution in which x > 0.5 and print the corresponding allPaths
@@ -1001,5 +1035,37 @@ public:
         return relaxed_result;
     }
 
-    void branch(BNBNode *node) {}
+    void branch(BNBNode *node) {
+        fmt::print("\033[34mSTARTING BRANCH PROCEDURE \033[0m");
+        fmt::print("\n");
+
+        node->update();
+        node->relaxNode();
+
+        // print node->paths size
+        fmt::print("Node has {} paths\n", node->paths.size());
+        // node->setPaths(allPaths);
+        //  instance.nN = labels.size();
+
+        auto candidates = Branching::VRPTWStandardBranching(node, &instance);
+        fmt::print("Candidates size: {}\n", candidates.size());
+        auto candidateCounter = 0;
+
+        for (auto &candidate : candidates) {
+
+            if (node->hasCandidate(candidate)) continue;
+            if (node->hasRaisedChild(candidate)) continue;
+
+            auto candidatosNode = node->getCandidatos();
+            auto childNode      = node->newChild();
+            childNode->setCandidatos(candidatosNode);
+            childNode->addCandidate(candidate);
+            node->addRaisedChildren(candidate);
+
+            candidateCounter++;
+            if (candidateCounter >= NUMERO_CANDIDATOS) break;
+        }
+
+        fmt::print("\033[34mFINISHED BRANCH PROCEDURE \033[0m");
+    }
 };

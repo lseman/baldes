@@ -87,14 +87,14 @@ struct BucketRange {
  */
 template <Direction D>
 struct IntervalNode {
-    BucketRange<D>   from_range;
-    BucketRange<D>   to_range;
-    int              to_node;
+    BucketRange<D>      from_range;
+    BucketRange<D>      to_range;
+    int                 to_node;
     std::vector<double> max;
-    IntervalNode    *left;
-    IntervalNode    *right;
-    mutable bool     merge_pending;
-    int              height; // New: Height of the node
+    IntervalNode       *left;
+    IntervalNode       *right;
+    mutable bool        merge_pending;
+    int                 height; // New: Height of the node
 
     IntervalNode(const BucketRange<D> &f_range, const BucketRange<D> &t_range, int to_node)
         : from_range(f_range), to_range(t_range), to_node(to_node), max(f_range.upper_bound), left(nullptr),
@@ -329,11 +329,11 @@ template <Direction D>
 class BucketIntervalTree {
 private:
     struct FromBucketNode {
-        BucketRange<D>   from_range;
-        IntervalTree<D> *to_tree;
+        BucketRange<D>      from_range;
+        IntervalTree<D>    *to_tree;
         std::vector<double> max;
-        FromBucketNode  *left;
-        FromBucketNode  *right;
+        FromBucketNode     *left;
+        FromBucketNode     *right;
 
         FromBucketNode(const BucketRange<D> &r) : from_range(r), max(r.upper_bound), left(nullptr), right(nullptr) {
             to_tree = new IntervalTree<D>();
@@ -426,10 +426,10 @@ class TreeNode {
 public:
     std::vector<double> low;          // Lower bounds for each dimension
     std::vector<double> high;         // Upper bounds for each dimension
-    int              bucket_index; // Bucket index for this node
-    TreeNode        *left;
-    TreeNode        *right;
-    TreeNode        *parent;
+    int                 bucket_index; // Bucket index for this node
+    TreeNode           *left;
+    TreeNode           *right;
+    TreeNode           *parent;
 
     TreeNode(const std::vector<double> &low, const std::vector<double> &high, int bucket_index)
         : low(low), high(high), bucket_index(bucket_index), left(nullptr), right(nullptr), parent(nullptr) {}

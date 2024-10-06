@@ -35,8 +35,6 @@
 #include "bnb/BNB.h"
 #include "bnb/Node.h"
 
-using VRProblemPtr = std::shared_ptr<VRProblem>;
-
 /**
  * Initializes the Restricted Master Problem (RMP) for the Vehicle Routing Problem with Time Windows (VRPTW).
  *
@@ -57,7 +55,7 @@ using VRProblemPtr = std::shared_ptr<VRProblem>;
  * 9. Solves the model.
  * 10. Stores and returns the model data including constraint matrix, bounds, variable types, and names.
  */
-void initRMP(GRBModel *model, VRProblem* problem, std::vector<std::vector<int>> &heuristicRoutes) {
+void initRMP(BNBNode *model, VRProblem *problem, std::vector<std::vector<int>> &heuristicRoutes) {
     // GRBModel model = node->getModel();
     model->set(GRB_IntParam_OutputFlag, 0);
 
@@ -216,13 +214,12 @@ int main(int argc, char *argv[]) {
     env.start();
     GRBModel model = GRBModel(env);
 
-    VRProblem* problem = new VRProblem();
-    problem->instance    = instance;
-    problem->nodes       = nodes;
+    VRProblem *problem = new VRProblem();
+    problem->instance  = instance;
+    problem->nodes     = nodes;
 
     std::vector<Path>    paths;
     std::vector<Label *> labels;
-
 
     // convert initial routes to labels
     int  labelID        = 0;
@@ -246,11 +243,11 @@ int main(int argc, char *argv[]) {
     };
     std::for_each(initialRoutesHGS.begin(), initialRoutesHGS.end(), process_route);
 
-    problem->allPaths       = paths;
     problem->labels_counter = labels_counter;
 
-    initRMP(&model, problem, initialRoutesHGS);
-    BNBNode* node = new BNBNode(model);
+    BNBNode *node = new BNBNode(model);
+    node->paths   = paths;
+    initRMP(node, problem, initialRoutesHGS);
 
     node->problem = problem;
 
@@ -258,7 +255,7 @@ int main(int argc, char *argv[]) {
     solver.setRootNode(node);
     solver.solve();
 
-    //problem->CG(&model);
+    // problem->CG(&model);
 
     return 0;
 }

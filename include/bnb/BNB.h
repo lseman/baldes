@@ -59,8 +59,7 @@ public:
     bool       solutionFound       = false;
     std::mutex solutionFoundMutex;
 
-    explicit BranchAndBound(Problem* problem,
-                            BNBNodeSelectionStrategy        strategy = BNBNodeSelectionStrategy::BestFirst)
+    explicit BranchAndBound(Problem *problem, BNBNodeSelectionStrategy strategy = BNBNodeSelectionStrategy::BestFirst)
         : problem(problem), strategy(strategy) {}
 
     explicit BranchAndBound(BNBNodeSelectionStrategy strategy = BNBNodeSelectionStrategy::BestFirst)

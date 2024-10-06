@@ -25,12 +25,12 @@ struct Label {
     // int                   id;
     bool                       is_extended = false;
     int                        vertex;
-    double                     cost         = 0.0;
-    double                     real_cost    = 0.0;
-    std::array<double, R_SIZE> resources    = {};
+    double                     cost          = 0.0;
+    double                     real_cost     = 0.0;
+    std::array<double, R_SIZE> resources     = {};
     std::vector<int>           nodes_covered = {}; // Add nodes_covered to Label
     int                        node_id       = -1; // Add node_id to Label
-    Label                     *parent       = nullptr;
+    Label                     *parent        = nullptr;
 #ifdef SRC3
     std::array<std::uint16_t, MAX_SRC_CUTS> SRCmap = {};
 #endif
