@@ -46,7 +46,7 @@ The Bucket Graph-based labeling algorithm organizes labels into **buckets** base
 Some features are experimental and subject to ongoing improvements:
 
 - **[experimental]** Knapsack Completion Bounds for Capacity Constraints
-- **[experimental]** Bucket Arc Fixing
+- **[experimental]** Branching (Branch-Cut-and-Price) for the VRPTW
 
 ## 🛠️ Building
 
