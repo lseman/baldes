@@ -32,6 +32,8 @@
 #include "Definitions.h"
 #include "HGS.h"
 #include "Reader.h"
+#include "bnb/BNB.h"
+#include "bnb/Node.h"
 
 using VRProblemPtr = std::shared_ptr<VRProblem>;
 
@@ -55,7 +57,7 @@ using VRProblemPtr = std::shared_ptr<VRProblem>;
  * 9. Solves the model.
  * 10. Stores and returns the model data including constraint matrix, bounds, variable types, and names.
  */
-void initRMP(GRBModel *model, VRProblemPtr problem, std::vector<std::vector<int>> &heuristicRoutes) {
+void initRMP(GRBModel *model, VRProblem* problem, std::vector<std::vector<int>> &heuristicRoutes) {
     // GRBModel model = node->getModel();
     model->set(GRB_IntParam_OutputFlag, 0);
 
@@ -214,12 +216,13 @@ int main(int argc, char *argv[]) {
     env.start();
     GRBModel model = GRBModel(env);
 
-    VRProblemPtr problem = std::make_shared<VRProblem>();
+    VRProblem* problem = new VRProblem();
     problem->instance    = instance;
     problem->nodes       = nodes;
 
     std::vector<Path>    paths;
     std::vector<Label *> labels;
+
 
     // convert initial routes to labels
     int  labelID        = 0;
@@ -247,8 +250,15 @@ int main(int argc, char *argv[]) {
     problem->labels_counter = labels_counter;
 
     initRMP(&model, problem, initialRoutesHGS);
+    BNBNode* node = new BNBNode(model);
 
-    problem->CG(&model);
+    node->problem = problem;
+
+    BranchAndBound solver(std::move(problem), BNBNodeSelectionStrategy::DFS); // Choose
+    solver.setRootNode(node);
+    solver.solve();
+
+    //problem->CG(&model);
 
     return 0;
 }

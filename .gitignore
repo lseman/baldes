@@ -13,6 +13,7 @@ rapids-cmake
 
 third_party/lkh/
 vrpsolve/
+testing/
 
 cmake/
 CPM_modules/

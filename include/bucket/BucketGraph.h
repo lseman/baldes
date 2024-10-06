@@ -69,9 +69,9 @@ public:
     void          mono_initialization();
     Label        *compute_mono_label(const Label *L);
 
-#ifdef RCC
+#if defined(RCC) || defined(EXACT_RCC)
     ArcDuals arc_duals;
-    void    setArcDuals(const ArcDuals &arc_duals) { this->arc_duals = arc_duals; }
+    void     setArcDuals(const ArcDuals &arc_duals) { this->arc_duals = arc_duals; }
 #endif
 
 #ifdef PSTEP
@@ -683,7 +683,7 @@ public:
             SECTION {
                 // Section 1: Forward direction
                 define_buckets<Direction::Forward>();
-                //split_buckets<Direction::Forward>();
+                // split_buckets<Direction::Forward>();
                 fw_fixed_buckets.clear();
                 fw_fixed_buckets.resize(fw_buckets_size);
                 for (auto &fb : fw_fixed_buckets) { fb.assign(fw_buckets_size, 0); }
@@ -691,7 +691,7 @@ public:
             SECTION {
                 // Section 2: Backward direction
                 define_buckets<Direction::Backward>();
-                //split_buckets<Direction::Backward>();
+                // split_buckets<Direction::Backward>();
                 bw_fixed_buckets.clear();
                 bw_fixed_buckets.resize(bw_buckets_size);
                 for (auto &bb : bw_fixed_buckets) { bb.assign(bw_buckets_size, 0); }

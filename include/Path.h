@@ -25,6 +25,8 @@ struct Path {
     // default constructor
     Path() : route({}), cost(0.0) {}
     Path(const std::vector<int> &route, double cost) : route(route), cost(cost) {
+        precomputeArcs(); // Precompute the arcs once the route is initialized
+
         // auto future = std::async(std::launch::async, &Path::precomputeArcs, this); // Ignore the future
     }
 
@@ -71,7 +73,7 @@ struct Path {
         return times;
     }
 
-    std::unordered_map<std::pair<int, int>, int, pair_hash> arcMap; // Maps arcs to their counts
+    std::unordered_map<std::pair<int, int>, int> arcMap; // Maps arcs to their counts
 
     /**
      * @brief Adds an arc between two nodes and increments its count in the arc map.
@@ -100,34 +102,5 @@ struct Path {
      */
     void precomputeArcs() {
         for (int n = 0; n < route.size() - 1; ++n) { addArc(route[n], route[n + 1]); }
-    }
-
-    /**
-     * @brief Retrieves the count of arcs between two nodes.
-     *
-     * This function takes two integers representing nodes and returns the count
-     * of arcs between them. If the arc pair (i, j) exists in the arcMap, the
-     * function returns the associated count. Otherwise, it returns 0.
-     *
-     */
-    auto getArcCount(int i, int j) const {
-        // Construct the arc pair
-        std::pair<int, int> arc = std::make_pair(i, j);
-        return (arcMap.find(arc) != arcMap.end()) ? arcMap.at(arc) : 0;
-    }
-
-    /**
-     * @brief Retrieves the count of a specified arc.
-     *
-     * This function takes an arc represented by an RCCarc object and constructs
-     * a pair from its 'from' and 'to' members. It then checks if this pair exists
-     * in the arcMap. If the pair is found, the function returns the count associated
-     * with the arc. If the pair is not found, it returns 0.
-     *
-     */
-    auto getArcCount(RCCArc arc) const {
-        // Construct the arc pair
-        std::pair<int, int> arcPair = std::make_pair(arc.from, arc.to);
-        return (arcMap.find(arcPair) != arcMap.end()) ? arcMap.at(arcPair) : 0;
     }
 };

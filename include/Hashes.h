@@ -1,106 +1,51 @@
-/**
- * @file Hashes.h
- * @brief Custom hash and equality comparison functions for std::pair objects.
- *
- * This file defines two utility structs: `pair_hash` and `pair_equal`.
- * These are designed to allow `std::pair` objects to be used as keys
- * in unordered containers such as `std::unordered_map` or `std::unordered_set`.
- *
- * - `pair_hash`: Provides a custom hash function for hashing `std::pair` objects.
- * - `pair_equal`: Defines a comparison function for checking equality of two `std::pair` objects.
- *
- */
-
 #pragma once
 
+#include <bit> // for std::rotr (C++20)
+#include <cstdint>
+#include <cstring> // for std::memcpy
 #include <functional>
-#include <iomanip>
-#include <sstream>
-#include <bit>         // for std::rotr (C++20)
-#include <utility>     // for std::pair
+#include <utility> // for std::pair
 
 /**
- * @brief Combines a hash value with an existing seed.
- *
- * This function takes an existing seed and a value, computes the hash of the value,
- * and combines it with the seed to produce a new hash value. This is useful for
- * creating composite hash values from multiple inputs.
- *
+ * @brief Combines hash values for multiple values using C++20, without recursion.
  */
-template <typename T>
-void hash_combine(std::size_t &seed, const T &value) {
+template <typename T, typename... Rest>
+constexpr void hash_combine(std::size_t &seed, const T &value, const Rest &...rest) noexcept {
     std::hash<T> hasher;
-    seed ^= hasher(value) + 0x9e3779b9 + std::rotr(seed, 6);  // Using std::rotr instead of manual bit shifts
+    seed ^= hasher(value) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+    // Process the remaining values iteratively rather than recursively
+    (..., (seed ^= std::hash<Rest>{}(rest) + 0x9e3779b9 + (seed << 6) + (seed >> 2)));
 }
 
 /**
- * @struct pair_hash
- * @brief A custom hash function object for hashing std::pair objects.
- *
- * This struct provides a hash function that combines the hashes of both elements
- * of a std::pair. It is used to allow std::pair to be a key in unordered containers
- * such as std::unordered_map or std::unordered_set.
- *
- * @tparam T1 Type of the first element in the pair.
- * @tparam T2 Type of the second element in the pair.
- * 
- * @exception noexcept Ensures exception safety, as hashing typically does not throw.
+ * @struct arc_map_hash
+ * @brief Optimized hash for std::pair<std::pair<int, int>, int>.
  */
-struct pair_hash {
-    template <class T1, class T2>
-    std::size_t operator()(const std::pair<T1, T2> &pair) const noexcept {
-        std::size_t seed = 0;
-        hash_combine(seed, pair.first);
-        hash_combine(seed, pair.second);
-        return seed;
-    }
-};
-
-
-/**
- * @struct pair_equal
- * @brief A functor for comparing two pairs for equality.
- *
- * This struct defines an operator() that compares two pairs of the same type
- * and returns true if both the first and second elements of the pairs are equal.
- *
- */
-struct pair_equal {
-    template <class T1, class T2>
-    bool operator()(const std::pair<T1, T2> &lhs, const std::pair<T1, T2> &rhs) const {
-        return lhs.first == rhs.first && lhs.second == rhs.second;
-    }
-};
-
-/**
- * @brief Specialization of std::hash for std::pair<std::pair<int, int>, int>.
- *
- * This struct provides a hash function for a pair consisting of another pair of integers
- * and an integer. It combines the hash values of the inner pair and the integer to produce
- * a single hash value.
- *
- */
-// Hash function for std::pair<std::pair<int, int>, int>
 struct arc_map_hash {
-    std::size_t operator()(const std::pair<std::pair<int, int>, int> &p) const noexcept {
+    constexpr std::size_t operator()(const std::pair<std::pair<int, int>, int> &p) const noexcept {
         std::size_t seed = 0;
-        hash_combine(seed, p.first.first);
-        hash_combine(seed, p.first.second);
-        hash_combine(seed, p.second);
+        hash_combine(seed, p.first.first, p.first.second, p.second);
         return seed;
     }
 };
 
 /**
- * @brief Generates a hash value for a given double and index.
- *
- * This function converts a double value to a string with 17 decimal places of precision,
- * then hashes the resulting string and combines it with the provided index using a bitwise XOR operation.
- *
+ * @brief Generates a hash value for a double using std::bit_cast for efficiency.
  */
-inline std::size_t hash_double(double value, std::size_t index) {
-    std::ostringstream oss;
-    oss << std::fixed << std::setprecision(17) << value; // 17 decimal places precision
-    std::string double_str = oss.str();
-    return std::hash<std::string>{}(double_str) ^ (index * 0x9e3779b9); // Combine with index
+constexpr std::size_t hash_double(double value, std::size_t index) noexcept {
+    // Direct bit manipulation and XOR with index
+    std::uint64_t bit_rep = std::bit_cast<std::uint64_t>(value);
+    return bit_rep ^ (index * 0x9e3779b9);
 }
+
+// Specialize std::hash for std::pair<int, int>
+namespace std {
+template <>
+struct hash<std::pair<int, int>> {
+    constexpr std::size_t operator()(const std::pair<int, int> &pair) const noexcept {
+        std::size_t h1 = std::hash<int>{}(pair.first);
+        std::size_t h2 = std::hash<int>{}(pair.second);
+        return h1 ^ (h2 + 0x9e3779b9 + (h1 << 6) + (h1 >> 2));
+    }
+};
+} // namespace std
