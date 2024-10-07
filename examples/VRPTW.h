@@ -63,7 +63,6 @@ public:
 
     std::vector<VRPNode> nodes;
 
-    int                           labels_counter = 0;
     std::vector<std::vector<int>> labels;
     int                           numConstrs = 0;
 
@@ -71,7 +70,6 @@ public:
 
 #ifdef RCC
     CnstrMgrPointer oldCutsCMP = nullptr;
-    RCCManager      rccManager;
 #endif
 #ifdef EXACT_RCC
     RCCManager rccManager;
@@ -101,7 +99,6 @@ public:
             counter += 1;
             // if (counter > 10) break;
 
-            labels_counter += 1;
             std::fill(coluna.begin(), coluna.end(), 0.0); // Reset for each iteration
 
             double      travel_cost = label.cost;
@@ -183,8 +180,9 @@ public:
      *
      */
     inline int addColumn(BNBNode *node, const auto &columns, bool enumerate = false) {
-        auto &r1c  = node->r1c;
-        auto &cuts = r1c.cutStorage;
+        auto &r1c        = node->r1c;
+        auto &cuts       = r1c.cutStorage;
+        auto &rccManager = node->rccManager;
 
         int                 numConstrsLocal = node->get(GRB_IntAttr_NumConstrs);
         const GRBConstr    *constrs         = node->getConstrs();
@@ -207,7 +205,6 @@ public:
             counter += 1;
             if (counter > 10) break;
 
-            labels_counter += 1;
             std::fill(coluna.begin(), coluna.end(), 0.0); // Reset for each iteration
 
             double      travel_cost = label->real_cost;
@@ -307,6 +304,7 @@ public:
      *
      */
     void removeNegativeReducedCostVarsAndPaths(BNBNode *model) {
+        auto &allPaths = model->paths;
         model->optimize();
         int                 varNumber = model->get(GRB_IntAttr_NumVars);
         std::vector<GRBVar> vars(varNumber);
@@ -337,8 +335,8 @@ public:
         // Remove the selected variables from the model and corresponding paths from allPaths
         for (int i = indicesToRemove.size() - 1; i >= 0; --i) {
             int index = indicesToRemove[i];
-            // model->remove(vars[index]);               // Remove the variable from the model
-            // allPaths.erase(allPaths.begin() + index); // Remove the corresponding path from allPaths
+            model->remove(vars[index]);               // Remove the variable from the model
+            allPaths.erase(allPaths.begin() + index); // Remove the corresponding path from allPaths
         }
 
         model->update(); // Apply changes to the model
@@ -465,6 +463,7 @@ public:
      */
     bool RCCsep(BNBNode *model, const std::vector<double> &solution) {
 
+        auto &rccManager = model->rccManager;
         // Constraint manager to store cuts
         CnstrMgrPointer cutsCMP = nullptr;
         CMGR_CreateCMgr(&cutsCMP, 100);
@@ -581,6 +580,7 @@ public:
         auto &SRCconstraints = node->SRCconstraints;
         auto &allPaths       = node->paths;
         auto &r1c            = node->r1c;
+        auto &rccManager     = node->rccManager;
 
         int bucket_interval = 20;
         int time_horizon    = instance.T_max;

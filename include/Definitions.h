@@ -25,6 +25,21 @@ enum class Mutability { Const, Mut };
 enum class Full { Full, Partial, Reverse };
 enum class Status { Optimal, Separation, NotOptimal, Error, Rollback };
 enum class CutType { ThreeRow, FourRow, FiveRow };
+enum class BranchingDirection { Greater, Less, Equal };
+enum class CandidateType { Vehicle, Node, Edge };
+
+// Step 1: Implement Aggregated Variables for Branching Constraints
+struct BranchingQueueItem {
+    int                                             sourceNode;      // route index (or source node for edges)
+    int                                             targetNode;      // source node or customer for edges
+    double                                          fractionalValue; // Fractionality of the route/variable
+    double                                          productValue;    // Additional score or weight
+    std::unordered_map<int, double>                 g_m;             // Vehicle type aggregation
+    std::unordered_map<int, double>                 g_m_v;           // Customer-service aggregation
+    std::unordered_map<std::pair<int, int>, double> g_v_vp;          // Edge usage aggregation
+    CandidateType                                   candidateType;   // Type of the candidate (Vehicle, Node, or Edge)
+    double                                          score = 0.0;     // Pseudo-cost or score for the candidate
+};
 
 // Comparator function for Stage enum
 constexpr bool operator<(Stage lhs, Stage rhs) { return static_cast<int>(lhs) < static_cast<int>(rhs); }
@@ -286,4 +301,3 @@ auto parallel_sections(Scheduler &scheduler, Tasks &&...tasks) {
     } else if constexpr (D == Direction::Backward) { \
         BW_ACTION;                                   \
     }
-
