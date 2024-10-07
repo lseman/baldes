@@ -144,6 +144,7 @@ public:
         }
 
         // Second pass: Remove cuts with dual values near zero
+        /*
         cuts_.erase(std::remove_if(cuts_.begin(), cuts_.end(),
                                    [&](const RCCut &cut, size_t i = 0) mutable {
                                        if (std::abs(dualValues[i]) < threshold) {
@@ -154,7 +155,7 @@ public:
                                        return false; // Keep this cut
                                    }),
                     cuts_.end());
-
+        */
         return arcDuals;
     }
 

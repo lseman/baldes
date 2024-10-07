@@ -61,8 +61,10 @@ void BucketGraph::UpdateBucketsSet(const double theta, const Label *label, std::
         // Stop exploring if the cost exceeds the threshold
         if (label->cost + cost + c_bar_opposite[curr_bucket] >= theta) { continue; }
 
-        if (Bbidi.find(curr_bucket) == Bbidi.end()) {
-            for (const auto &L : buckets_opposite[curr_bucket].get_labels()) {
+        // Only process if bucket is not already in Bbidi
+        if (Bbidi.insert(curr_bucket).second) {
+            const auto &opposite_labels = buckets_opposite[curr_bucket].get_labels();
+            for (const auto &L : opposite_labels) {
                 if (label->node_id == L->node_id || bitmaps_conflict(label, L)) {
                     continue; // Skip labels with the same node ID or conflicting bitmaps
                 }
@@ -82,9 +84,9 @@ void BucketGraph::UpdateBucketsSet(const double theta, const Label *label, std::
             }
         }
 
-        // Add neighboring buckets to the stack
+        // Add neighboring buckets to the stack, only if not visited
         for (int b_prime : Phi_opposite[curr_bucket]) {
-            if (Bvisited.find(b_prime) == Bvisited.end()) { bucket_stack.push_back(b_prime); }
+            if (Bvisited.insert(b_prime).second) { bucket_stack.push_back(b_prime); }
         }
     }
 }
@@ -107,8 +109,8 @@ void BucketGraph::BucketArcElimination(double theta) {
     auto &fixed_buckets = assign_buckets<D>(fw_fixed_buckets, bw_fixed_buckets);
     auto &buckets_size  = assign_buckets<D>(fw_buckets_size, bw_buckets_size);
 
-    // Reset fixed_buckets in parallel
-    std::for_each(fixed_buckets.begin(), fixed_buckets.end(), [](auto &fb) { std::fill(fb.begin(), fb.end(), 0); });
+    // Reset fixed_buckets
+    for (auto &fb : fixed_buckets) { std::fill(fb.begin(), fb.end(), 0); }
 
     // Print direction of arc elimination
     if constexpr (D == Direction::Forward) {
@@ -117,25 +119,24 @@ void BucketGraph::BucketArcElimination(double theta) {
         print_info("[Bw] performing bucket arc elimination with theta = {}\n", theta);
     }
 
-    // Map to store arcs and corresponding bucket sets
-    // using ArcMap = std::unordered_map<std::pair<std::pair<int, int>, int>, std::unordered_set<int>>;
     using ArcMap = std::unordered_map<std::pair<std::pair<int, int>, int>, std::unordered_set<int>, arc_map_hash>;
 
-    ArcMap           local_B_Ba_b;
-    std::atomic<int> removed_arcs{0};
+    ArcMap local_B_Ba_b;
+    int    removed_arcs = 0;
 
-    // Lambda for processing jump arcs
+    // Function to process jump arcs
     auto process_jump_arcs = [&](int b) {
         const auto &jump_arcs = buckets[b].template get_jump_arcs<D>();
         if (!jump_arcs.empty()) {
+            auto &labels = buckets[b].get_labels();
             for (const auto &a : jump_arcs) {
-                auto  arc_key    = std::make_pair(std::make_pair(a.base_bucket, a.jump_bucket), b);
-                int   b_opposite = get_opposite_bucket_number<D>(a.jump_bucket);
-                auto &labels     = buckets[b].get_labels();
+                auto arc_key    = std::make_pair(std::make_pair(a.base_bucket, a.jump_bucket), b);
+                int  b_opposite = get_opposite_bucket_number<D>(a.jump_bucket);
 
                 std::unordered_set<int> Bvisited;
+                auto                   &Bidi_map = local_B_Ba_b[arc_key];
+
                 for (auto &L_item : labels) {
-                    auto &Bidi_map = local_B_Ba_b[arc_key];
                     Bidi_map.insert(b);
                     Bvisited.clear();
                     UpdateBucketsSet<D>(theta, L_item, Bidi_map, b_opposite, Bvisited);
@@ -144,36 +145,34 @@ void BucketGraph::BucketArcElimination(double theta) {
         }
     };
 
-    // Lambda for processing bucket arcs
+    // Function to process bucket arcs
     auto process_bucket_arcs = [&](int b) {
         const auto &bucket_arcs = buckets[b].template get_bucket_arcs<D>();
+        auto       &labels      = buckets[b].get_labels();
 
         for (const auto &a : bucket_arcs) {
             auto arc_key =
                 std::make_pair(std::make_pair(buckets[a.from_bucket].node_id, buckets[a.to_bucket].node_id), b);
-            int   b_opposite = get_opposite_bucket_number<D>(a.to_bucket);
-            auto &labels     = buckets[b].get_labels();
+            int b_opposite = get_opposite_bucket_number<D>(a.to_bucket);
 
             std::unordered_set<int> Bvisited;
+            auto                   &Bidi_map = local_B_Ba_b[arc_key];
+
             for (auto &L_item : labels) {
-                auto &Bidi_map = local_B_Ba_b[arc_key];
                 Bidi_map.insert(b);
                 Bvisited.clear();
                 UpdateBucketsSet<D>(theta, L_item, Bidi_map, b_opposite, Bvisited);
             }
 
-            // Check if the arc exists in the opposite direction
+            // Check for opposite direction arcs
             if (auto it = local_B_Ba_b.find(arc_key); it != local_B_Ba_b.end()) {
-                auto &Bidi_map = it->second;
-                bool  contains = false;
-                for (const auto &b_prime : Phi_opposite[b_opposite]) {
-                    if (Bidi_map.find(b_prime) != Bidi_map.end()) {
-                        contains = true;
-                        break;
-                    }
-                }
-                if (!contains && Bidi_map.find(b_opposite) != Bidi_map.end()) { contains = true; }
-                if (!contains) {
+                auto &Bidi_map_opposite = it->second;
+                bool  contains =
+                    std::any_of(Phi_opposite[b_opposite].begin(), Phi_opposite[b_opposite].end(), [&](int b_prime) {
+                        return Bidi_map_opposite.find(b_prime) != Bidi_map_opposite.end();
+                    });
+
+                if (!contains && Bidi_map_opposite.find(b_opposite) == Bidi_map_opposite.end()) {
                     fixed_buckets[a.from_bucket][a.to_bucket] = 1;
                     ++removed_arcs;
                 }
@@ -185,7 +184,7 @@ void BucketGraph::BucketArcElimination(double theta) {
     for (int b = 0; b < buckets_size; ++b) {
         const auto &node_arcs = nodes[buckets[b].node_id].template get_arcs<D>();
 
-        // Process arcs
+        // Process node arcs
         for (const auto &a : node_arcs) {
             auto  arc_key  = std::make_pair(std::make_pair(a.from, a.to), b);
             auto &Bidi_map = local_B_Ba_b[arc_key];
@@ -201,14 +200,17 @@ void BucketGraph::BucketArcElimination(double theta) {
             }
         }
 
-        // Process jump arcs and regular bucket arcs using the lambdas
+        // Process jump and bucket arcs using separate functions
         process_jump_arcs(b);
         process_bucket_arcs(b);
     }
 
     // Print the number of arcs removed
-    CONDITIONAL(D, print_info("[Fw] removed arcs: {}\n", removed_arcs.load()),
-                print_info("[Bw] removed arcs: {}\n", removed_arcs.load()));
+    if constexpr (D == Direction::Forward) {
+        print_info("[Fw] removed arcs: {}\n", removed_arcs);
+    } else {
+        print_info("[Bw] removed arcs: {}\n", removed_arcs);
+    }
 }
 
 /**

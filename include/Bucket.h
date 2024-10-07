@@ -1,5 +1,8 @@
 
 #pragma once
+
+#include "Definitions.h"
+
 #include "Arc.h"
 #include "Common.h"
 #include "Label.h"

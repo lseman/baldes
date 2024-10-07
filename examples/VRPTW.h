@@ -217,20 +217,7 @@ public:
                 }
             }
 
-            // Step 2: Add the non-zero entries to the sparse matrix
-            for (int i = 0; i < N_SIZE - 1; ++i) {
-                if (coluna[i] > 0) {
-                    // matrix.A_sparse.row_indices.push_back(i);
-                    // matrix.A_sparse.col_indices.push_back(matrix.A_sparse.num_cols);
-                    // matrix.A_sparse.values.push_back(static_cast<double>(coluna[i]));
-                    matrix.A_sparse.elements.push_back({i, matrix.A_sparse.num_cols, static_cast<double>(coluna[i])});
-                }
-            }
-
-            matrix.lb.push_back(0.0);
-            matrix.ub.push_back(1.0);
-            matrix.c.push_back(travel_cost);
-            // Add terms to GRBColumn
+            //  Add terms to GRBColumn
             for (int i = 0; i < N_SIZE - 2; i++) {
                 if (coluna[i] == 0.0) continue;
                 col.addTerms(&coluna[i], &constrs[i], 1);
@@ -245,14 +232,7 @@ public:
             // print vec size
             if (vec.size() > 0) {
                 for (int i = 0; i < vec.size(); i++) {
-                    if (vec[i] != 0) {
-                        col.addTerms(&vec[i], &SRCconstraints[i], 1);
-                        //  matrix.A_sparse.row_indices.push_back(N_SIZE - 2 + i);
-                        //  matrix.A_sparse.col_indices.push_back(matrix.A_sparse.num_cols);
-                        //  matrix.A_sparse.values.push_back(static_cast<double>(vec[i]));
-                        matrix.A_sparse.elements.push_back(
-                            {N_SIZE - 2 + i, matrix.A_sparse.num_cols, static_cast<double>(vec[i])});
-                    }
+                    if (vec[i] != 0) { col.addTerms(&vec[i], &SRCconstraints[i], 1); }
                 }
             }
 #endif
@@ -262,18 +242,12 @@ public:
             auto RCCconstraints = rccManager.getConstraints();
             if (RCCvec.size() > 0) {
                 for (int i = 0; i < RCCvec.size(); i++) {
-                    if (RCCvec[i] != 0) {
-                        // col.addTerms(&RCCvec[i], &RCCconstraints[i], 1);
-                        //  matrix.A_sparse.elements.push_back({N_SIZE - 2 + static_cast<int>(SRCconstraints.size()) +
-                        //  i,
-                        //                                      matrix.A_sparse.num_cols,
-                        //                                      static_cast<double>(RCCvec[i])});
-                    }
+                    if (RCCvec[i] != 0) { col.addTerms(&RCCvec[i], &RCCconstraints[i], 1); }
                 }
             }
 #endif
 
-            matrix.A_sparse.num_cols++;
+            // matrix.A_sparse.num_cols++;
 
             // Collect bounds, costs, columns, and names
             lb.push_back(0.0);
@@ -904,6 +878,7 @@ public:
 
                 // Adding cols
                 auto colAdded = addColumn(node, paths, false);
+                matrix        = node->extractModelDataSparse();
 // remove all cuts
 #ifdef SRC
                 if (bucket_graph.getStatus() == Status::Rollback) {
