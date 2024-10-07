@@ -74,6 +74,7 @@ constexpr const char *vivid_blue   = "\033[38;5;27m";  // Bright blue
 constexpr const char *reset_color  = "\033[0m";
 constexpr const char *blue         = "\033[34m";
 constexpr const char *dark_yellow  = "\033[93m";
+constexpr auto        reset        = "\033[0m";
 
 /**
  * @brief Prints an informational message with a specific format.
@@ -100,7 +101,7 @@ inline void print_info(fmt::format_string<Args...> format, Args &&...args) {
 template <typename... Args>
 inline void print_heur(fmt::format_string<Args...> format, Args &&...args) {
     // Print "[", then yellow "info", then reset color and print "] "
-    fmt::print(fg(fmt::color::blue), "[heuristic] ");
+    fmt::print("{}{}{}", blue, "[heur] ", reset);
     fmt::print(format, std::forward<Args>(args)...);
 }
 
