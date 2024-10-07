@@ -101,10 +101,7 @@ public:
             // iterate over arcs in label
             for (int j = 0; j < label.size() - 1; j++) {
                 // iterate over arcs in cut
-                for (int k = 0; k < cuts_[i].arcs.size(); k++) {
-                    // print label[j] and label[j+1]
-                    if (label[j] == cuts_[i].arcs[k].from && label[j + 1] == cuts_[i].arcs[k].to) { coeff++; }
-                }
+                for (auto arc : cuts_[i].arcs) { coeff += label[j] == arc.from && label[j + 1] == arc.to; }
             }
             coeffs[i] = coeff;
         }
@@ -144,7 +141,7 @@ public:
         }
 
         // Second pass: Remove cuts with dual values near zero
-        /*
+
         cuts_.erase(std::remove_if(cuts_.begin(), cuts_.end(),
                                    [&](const RCCut &cut, size_t i = 0) mutable {
                                        if (std::abs(dualValues[i]) < threshold) {
@@ -155,7 +152,7 @@ public:
                                        return false; // Keep this cut
                                    }),
                     cuts_.end());
-        */
+
         return arcDuals;
     }
 

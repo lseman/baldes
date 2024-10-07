@@ -232,7 +232,7 @@ public:
             // print vec size
             if (vec.size() > 0) {
                 for (int i = 0; i < vec.size(); i++) {
-                    if (vec[i] != 0) { col.addTerms(&vec[i], &SRCconstraints[i], 1); }
+                    if (abs(vec[i]) > 1e-3) { col.addTerms(&vec[i], &SRCconstraints[i], 1); }
                 }
             }
 #endif
@@ -242,7 +242,7 @@ public:
             auto RCCconstraints = rccManager.getConstraints();
             if (RCCvec.size() > 0) {
                 for (int i = 0; i < RCCvec.size(); i++) {
-                    if (RCCvec[i] != 0) { col.addTerms(&RCCvec[i], &RCCconstraints[i], 1); }
+                    if (abs(RCCvec[i]) > 1e-3) { col.addTerms(&RCCvec[i], &RCCconstraints[i], 1); }
                 }
             }
 #endif
