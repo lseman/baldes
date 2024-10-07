@@ -22,6 +22,12 @@
 #include <optional>
 #include <variant>
 
+#ifdef RCC
+#include "../third_party/cvrpsep/capsep.h"
+#include "../third_party/cvrpsep/cnstrmgr.h"
+// #include "ModernRCC.h"
+#endif
+
 class Problem;
 /**
  * @class BNBNode
@@ -62,6 +68,10 @@ public:
     std::vector<Path>      paths;
     LimitedMemoryRank1Cuts r1c;
 
+#ifdef RCC
+    CnstrMgrPointer oldCutsCMP = nullptr;
+#endif
+
     void addPath(Path path) { paths.emplace_back(path); }
 
     std::vector<VRPCandidate *> candidates;
@@ -74,6 +84,7 @@ public:
         model = new GRBModel(eModel);
         generateUUID();
         this->initialized = true;
+        CMGR_CreateCMgr(&oldCutsCMP, 100); // For old cuts, if needed
     };
 
     void setPaths(std::vector<Path> paths) { this->paths = paths; }
