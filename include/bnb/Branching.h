@@ -1,7 +1,9 @@
 #pragma once
 
 #include "../third_party/pdqsort.h"
+
 #include "Definitions.h"
+
 #include "Node.h"
 #include "Reader.h"
 #include "VRPCandidate.h"
@@ -154,9 +156,7 @@ public:
 
     /**
      * Evaluate candidates with branching and return the results
-     * @param node: Current BNB node
-     * @param phase0Candidates: Selected candidates for Phase 0
-     * @return List of evaluated candidates
+     * @brief This function evaluates the candidates with branching and returns the results
      */
     static std::vector<BranchingQueueItem>
     evaluateWithBranching(BNBNode *node, const std::vector<BranchingQueueItem> &phase0Candidates) {
@@ -184,9 +184,7 @@ public:
 
     /**
      * Generate VRP candidates based on the selected branching candidates
-     * @param node: Current BNB node
-     * @param phase1Candidates: Selected candidates for Phase 1
-     * @return List of VRP candidates for branching
+     * @brief This function generates VRP candidates based on the selected branching candidates
      */
     static std::vector<VRPCandidate *> generateVRPCandidates(BNBNode                               *node,
                                                              const std::vector<BranchingQueueItem> &phase1Candidates) {
@@ -200,14 +198,16 @@ public:
             if (!item.g_m.empty()) {
                 VRPCandidate *vehicleCandidate1 =
                     new VRPCandidate(item.sourceNode, item.targetNode, BranchingDirection::Greater,
-                                     std::floor(item.fractionalValue), CandidateType::Vehicle, 0);
+                                     std::floor(item.fractionalValue), CandidateType::Vehicle, std::nullopt);
                 VRPCandidate *vehicleCandidate2 =
                     new VRPCandidate(item.sourceNode, item.targetNode, BranchingDirection::Less,
-                                     std::ceil(item.fractionalValue), CandidateType::Vehicle, 0);
+                                     std::ceil(item.fractionalValue), CandidateType::Vehicle, std::nullopt);
 
                 candidates.push_back(vehicleCandidate1);
                 candidates.push_back(vehicleCandidate2);
             }
+            fmt::print("Item: {} {} {} {} {} {} {} \n", item.sourceNode, item.targetNode, item.fractionalValue,
+                       item.productValue, item.g_m.size(), item.g_m_v.size(), item.g_v_vp.size());
 
             // Add Node candidates
             if (!item.g_m_v.empty()) {
@@ -242,29 +242,41 @@ public:
 
     /**
      * Create two child nodes based on the selected branching candidate
-     * @param parentNode: Parent BNB node
-     * @param candidate: Selected branching candidate
-     * @return Pair of child nodes
+     * @brief This function creates two child nodes based on the selected branching candidate
      */
     static std::pair<BNBNode *, BNBNode *> createChildNodes(BNBNode *parentNode, const BranchingQueueItem &candidate) {
         BNBNode *childNode1 = parentNode->newChild();
         BNBNode *childNode2 = parentNode->newChild();
 
-        double lowerBound = std::floor(candidate.fractionalValue);
-        childNode1->addBranchingConstraint(lowerBound, BranchingDirection::Less, candidate.candidateType);
+        if (candidate.candidateType == CandidateType::Vehicle) {
+            double lowerBound = std::floor(candidate.fractionalValue);
+            childNode1->addBranchingConstraint(lowerBound, BranchingDirection::Less, candidate.candidateType);
 
-        double upperBound = std::ceil(candidate.fractionalValue);
-        childNode2->addBranchingConstraint(upperBound, BranchingDirection::Greater, candidate.candidateType);
+            double upperBound = std::ceil(candidate.fractionalValue);
+            childNode2->addBranchingConstraint(upperBound, BranchingDirection::Greater, candidate.candidateType);
+        } else if (candidate.candidateType == CandidateType::Node) {
+            double lowerBound = std::floor(candidate.fractionalValue);
+            childNode1->addBranchingConstraint(lowerBound, BranchingDirection::Less, candidate.candidateType,
+                                               candidate.targetNode);
+
+            double upperBound = std::ceil(candidate.fractionalValue);
+            childNode2->addBranchingConstraint(upperBound, BranchingDirection::Greater, candidate.candidateType,
+                                               candidate.targetNode);
+        } else {
+            std::pair<int, int> edge       = {candidate.sourceNode, candidate.targetNode};
+            double              lowerBound = std::floor(candidate.fractionalValue);
+            childNode1->addBranchingConstraint(lowerBound, BranchingDirection::Less, candidate.candidateType, edge);
+
+            double upperBound = std::ceil(candidate.fractionalValue);
+            childNode2->addBranchingConstraint(upperBound, BranchingDirection::Greater, candidate.candidateType, edge);
+        }
 
         return {childNode1, childNode2};
     }
 
     /**
      * Select candidates for Phase 0 using the new branching logic
-     * @param allCandidates: All candidates available for branching
-     * @param historyCandidates: Candidates from previous iterations
-     * @param maxCandidatesPhase0: Maximum number of candidates to select in Phase 0
-     * @return Selected candidates for Phase 0
+     * @brief This function implements the new branching logic for selecting candidates in Phase 0
      */
     static std::vector<BranchingQueueItem>
     selectCandidatesPhase0(const std::vector<BranchingQueueItem> &allCandidates,
@@ -332,27 +344,34 @@ public:
 
     /**
      * VRPTW Standard Branching Strategy
-     * @param node: Current BNB node
-     * @param instance: Instance data
-     * @return List of VRP candidates for branching
+     * @brief This function implements the standard branching strategy for the VRPTW problem
+     *
      */
     static std::vector<VRPCandidate *> VRPTWStandardBranching(BNBNode *node, InstanceData *instance) {
         std::vector<VRPCandidate *> candidates;
 
         node->optimize();
+
+        fmt::print("Node solution \n");
         auto aggregatedCandidates = calculateAggregatedVariables(node, instance);
 
+        fmt::print("Aggregated candidates: {}\n", aggregatedCandidates.size());
         // Select candidates based on the new Phase 0 logic
         auto phase0Candidates =
             selectCandidatesPhase0(aggregatedCandidates, node->historyCandidates, maxCandidatesPhase0, instance);
 
+        fmt::print("Phase 0 candidates: {}\n", phase0Candidates.size());
+
         // Store selected candidates in the node for future iterations
         node->historyCandidates = phase0Candidates;
 
+        fmt::print("Selected candidates: {}\n", phase0Candidates.size());
         // Evaluate candidates and apply branching constraints
         auto phase1Candidates = evaluateWithBranching(node, phase0Candidates);
+        fmt::print("Phase 1 candidates: {}\n", phase1Candidates.size());
 
         auto generatedCandidates = generateVRPCandidates(node, phase1Candidates);
+        fmt::print("Generated candidates: {}\n", generatedCandidates.size());
         candidates.insert(candidates.end(), generatedCandidates.begin(), generatedCandidates.end());
 
         return candidates;

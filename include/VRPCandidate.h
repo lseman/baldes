@@ -1,3 +1,14 @@
+/**
+ * @file VRPCandidate.h
+ * @brief Header file for the VRPCandidate class
+ *
+ * This file contains the definition of the VRPCandidate class, which is used to represent a candidate for branching in
+ * the branch-and-bound algorithm. The class contains fields to store the source and target nodes of the candidate, the
+ * bound value, the bound type (upper or lower bound), and the type of the candidate (Vehicle, Node, or Edge). The class
+ * also contains a variant to store different types of data based on the candidate type. The class also contains
+ * functions to compute the hash value and equality operator for use in unordered containers, and a print function to
+ * display the candidate information.
+ */
 #pragma once
 
 #include "Definitions.h"
@@ -37,13 +48,18 @@ public:
         : sourceNode(sourceNode), targetNode(targetNode), boundType(boundType), boundValue(boundValue),
           candidateType(candidateType), payload(std::forward<T>(payloadData)) {}
 
+    VRPCandidate(int sourceNode, int targetNode, BranchingDirection boundType, double boundValue,
+                 CandidateType candidateType)
+        : sourceNode(sourceNode), targetNode(targetNode), boundType(boundType), boundValue(boundValue),
+          candidateType(candidateType) {}
+
     // Compute hash value (for use in unordered containers)
     size_t computeHash() const {
         size_t seed = 0;
         seed ^= std::hash<int>{}(sourceNode) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
         seed ^= std::hash<int>{}(static_cast<int>(boundType)) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
         seed ^= std::hash<int>{}(static_cast<int>(candidateType)) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
-        if (payload) {
+        if (payload.has_value()) {
             std::visit(
                 [&](auto &&arg) {
                     using T = std::decay_t<decltype(arg)>;
@@ -61,8 +77,12 @@ public:
 
     // Equality operator (for use in unordered containers)
     bool operator==(const VRPCandidate &other) const {
-        return sourceNode == other.sourceNode && boundType == other.boundType && boundValue == other.boundValue &&
-               candidateType == other.candidateType && payload == other.payload;
+        bool equal = sourceNode == other.sourceNode && boundType == other.boundType && boundValue == other.boundValue &&
+                     candidateType == other.candidateType;
+
+        if (equal && payload.has_value() && other.payload.has_value()) { equal = equal && payload == other.payload; }
+
+        return equal;
     }
 
     // Print function to display the candidate information
