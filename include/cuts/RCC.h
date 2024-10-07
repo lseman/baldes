@@ -99,7 +99,7 @@ public:
             auto coeff = 0;
             // check if the label is in the cut
             // iterate over arcs in label
-            for (int j = 0; j < label.size() - 1; j++) {
+            for (int j = 1; j < label.size() - 1; j++) {
                 // iterate over arcs in cut
                 for (auto arc : cuts_[i].arcs) { coeff += label[j] == arc.from && label[j + 1] == arc.to; }
             }

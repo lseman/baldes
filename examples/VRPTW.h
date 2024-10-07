@@ -195,10 +195,17 @@ public:
         std::vector<std::string> names;
         std::vector<char>        vtypes;
 
+        auto &pathSet = node->pathSet;
+
         auto counter = 0;
         for (auto &label : columns) {
             if (label->nodes_covered.empty()) continue;
             if (!enumerate && label->cost > 0) continue;
+
+            Path path(label->nodes_covered, label->real_cost);
+            if (pathSet.find(path) != pathSet.end()) { continue; }
+            pathSet.insert(path);
+
             counter += 1;
             if (counter > 10) break;
 
@@ -257,7 +264,6 @@ public:
             names.push_back(name);
             vtypes.push_back(GRB_CONTINUOUS);
 
-            Path path(label->nodes_covered, label->real_cost);
             node->addPath(path);
         }
         // Add variables with bounds, objectives, and columns
@@ -878,7 +884,7 @@ public:
 
                 // Adding cols
                 auto colAdded = addColumn(node, paths, false);
-                matrix        = node->extractModelDataSparse();
+                // matrix        = node->extractModelDataSparse();
 // remove all cuts
 #ifdef SRC
                 if (bucket_graph.getStatus() == Status::Rollback) {
@@ -908,6 +914,12 @@ public:
 #endif
 
 #ifdef STAB
+                // TODO: check if we should update this before running the stab update
+                node->optimize();
+                lp_obj    = node->get(GRB_DoubleAttr_ObjVal);
+                nodeDuals = node->getDuals();
+                lag_gap   = integer_solution - (lp_obj + std::min(0.0, inner_obj));
+                matrix    = node->extractModelDataSparse();
                 stab.update_stabilization_after_pricing_optim(matrix, nodeDuals, lag_gap, paths);
 
                 if (colAdded == 0) {

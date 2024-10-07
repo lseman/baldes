@@ -8,6 +8,7 @@
 #include "config.h"
 
 #include <future>
+
 /**
  * @struct Path
  * @brief Represents a path with a route and its associated cost.
@@ -21,6 +22,8 @@ struct Path {
     std::vector<int> route;
     double           cost;
     double           red_cost = std::numeric_limits<double>::max();
+
+    bool operator==(const Path &other) const { return route == other.route && cost == other.cost; }
 
     // default constructor
     Path() : route({}), cost(0.0) {}
@@ -102,5 +105,24 @@ struct Path {
      */
     void precomputeArcs() {
         for (int n = 0; n < route.size() - 1; ++n) { addArc(route[n], route[n + 1]); }
+    }
+};
+
+struct PathHash {
+    std::size_t operator()(const Path &p) const {
+        std::size_t hash_val = 0xcbf29ce484222325; // Use FNV-1a hash starting value
+
+        // Faster hash combination with fewer operations
+        for (const auto &node : p.route) {
+            hash_val ^= std::hash<int>()(node); // XOR the node's hash directly
+            hash_val *= 0x100000001b3;          // FNV-1a multiplier for better mixing
+        }
+
+        // Combine the cost more efficiently, cast the double to int64_t
+        std::size_t cost_hash = std::hash<int64_t>()(reinterpret_cast<const int64_t &>(p.cost));
+        hash_val ^= cost_hash;
+        hash_val *= 0x100000001b3;
+
+        return hash_val;
     }
 };
