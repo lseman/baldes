@@ -698,7 +698,7 @@ public:
         bool   reoptimized = false;
         double obj;
 
-        for (int iter = 0; iter < 2000; ++iter) {
+        for (int iter = 0; iter < 150; ++iter) {
             reoptimized = false;
 
 #if defined(RCC) || defined(EXACT_RCC)
@@ -1045,7 +1045,6 @@ public:
         node->relaxNode();
 
         // print node->paths size
-        fmt::print("Node has {} paths\n", node->paths.size());
         // node->setPaths(allPaths);
         //  instance.nN = labels.size();
 
@@ -1060,7 +1059,7 @@ public:
 
             auto candidatosNode = node->getCandidatos();
             auto childNode      = node->newChild();
-            childNode->setCandidatos(candidatosNode);
+            // childNode->setCandidatos(candidatosNode);
             childNode->addCandidate(candidate);
             node->addRaisedChildren(candidate);
 

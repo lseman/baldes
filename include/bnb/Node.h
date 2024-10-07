@@ -261,7 +261,7 @@ public:
 
     void addRaisedChildren(VRPCandidate *candidate) {
         // Add the candidate to the list of candidates
-        candidates.push_back(candidate);
+        raisedVRPChildren.push_back(candidate);
     }
 
     void setCandidatos(std::vector<VRPCandidate *> candidatos) { candidates = candidatos; }
@@ -278,6 +278,7 @@ public:
         child->parent            = this;
         child->paths             = paths;
         child->historyCandidates = historyCandidates;
+        child->candidates        = candidates;
 
         // Add the child node to the list of children
         children.push_back(child);
@@ -299,7 +300,11 @@ public:
     double solveRestrictedMasterLP() {
         relaxNode();
         model->optimize();
-        return model->get(GRB_DoubleAttr_ObjVal);
+        if (model->get(GRB_IntAttr_Status) == GRB_OPTIMAL) {
+            return model->get(GRB_DoubleAttr_ObjVal);
+        } else {
+            return std::numeric_limits<double>::infinity();
+        }
     }
 
     ///////////////////////////////////////////////
@@ -317,9 +322,6 @@ public:
         auto vars = std::vector<GRBVar>(varsPtr, varsPtr + model->get(GRB_IntAttr_NumVars));
 
         GRBLinExpr linExpr; // Initialize linExpr
-
-        // Ensure that payload is provided, otherwise return or throw an error
-        if (!payload.has_value()) { throw std::invalid_argument("Payload is required for Node and Edge types."); }
 
         if (ctype == CandidateType::Vehicle) {
             for (auto i = 0; i < vars.size(); i++) { linExpr += vars[i]; }
