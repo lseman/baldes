@@ -111,12 +111,22 @@ public:
         return queueItems;
     }
 
+    // Helper function for adding constraints
+    static void addBranchingConstraint(BNBNode *child, double bound, BranchingDirection direction, CandidateType type,
+                                       std::optional<int>                 node = std::nullopt,
+                                       std::optional<std::pair<int, int>> edge = std::nullopt) {
+        if (type == CandidateType::Vehicle) {
+            child->addBranchingConstraint(bound, direction, type);
+        } else if (type == CandidateType::Node && node) {
+            child->addBranchingConstraint(bound, direction, type, *node);
+        } else if (type == CandidateType::Edge && edge) {
+            child->addBranchingConstraint(bound, direction, type, *edge);
+        }
+    }
+
     /**
      * Apply branching constraints based on the fractional value of the candidate
-     * @param parentNode: Parent BNB node
-     * @param item: Branching candidate
-     * @param fractionalValue: Fractional value of the candidate
-     * @return Pair of child nodes
+     * @brief This function applies branching constraints based on the fractional value of the candidate
      */
     static std::pair<BNBNode *, BNBNode *>
     applyBranchingConstraints(BNBNode *parentNode, const BranchingQueueItem &item, double fractionalValue) {
@@ -127,28 +137,21 @@ public:
         double lowerBound = std::floor(fractionalValue);
         double upperBound = std::ceil(fractionalValue);
 
-        // check the branching type
+        // Use the helper function to add branching constraints
         if (item.candidateType == CandidateType::Vehicle) {
-            // Add constraint g_m <= ⌊f⌋ for the first child node
-            childNode1->addBranchingConstraint(lowerBound, BranchingDirection::Less, CandidateType::Vehicle);
-
-            // Add constraint g_m >= ⌈f⌉ for the second child node
-            childNode2->addBranchingConstraint(upperBound, BranchingDirection::Greater, CandidateType::Vehicle);
+            addBranchingConstraint(childNode1, lowerBound, BranchingDirection::Less, CandidateType::Vehicle);
+            addBranchingConstraint(childNode2, upperBound, BranchingDirection::Greater, CandidateType::Vehicle);
         } else if (item.candidateType == CandidateType::Node) {
-            // Add constraint g_m_v <= ⌊f⌋ for the first child node
-            childNode1->addBranchingConstraint(lowerBound, BranchingDirection::Less, CandidateType::Node,
-                                               item.targetNode);
-
-            // Add constraint g_m_v >= ⌈f⌉ for the second child node
-            childNode2->addBranchingConstraint(upperBound, BranchingDirection::Greater, CandidateType::Node,
-                                               item.targetNode);
+            addBranchingConstraint(childNode1, lowerBound, BranchingDirection::Less, CandidateType::Node,
+                                   item.targetNode);
+            addBranchingConstraint(childNode2, upperBound, BranchingDirection::Greater, CandidateType::Node,
+                                   item.targetNode);
         } else {
             auto edge = std::make_pair(item.sourceNode, item.targetNode);
-            // Add constraint g_v_vp <= ⌊f⌋ for the first child node
-            childNode1->addBranchingConstraint(lowerBound, BranchingDirection::Less, CandidateType::Edge, edge);
-
-            // Add constraint g_v_vp >= ⌈f⌉ for the second child node
-            childNode2->addBranchingConstraint(upperBound, BranchingDirection::Greater, CandidateType::Edge, edge);
+            addBranchingConstraint(childNode1, lowerBound, BranchingDirection::Less, CandidateType::Edge, std::nullopt,
+                                   edge);
+            addBranchingConstraint(childNode2, upperBound, BranchingDirection::Greater, CandidateType::Edge,
+                                   std::nullopt, edge);
         }
 
         return {childNode1, childNode2};
@@ -190,50 +193,46 @@ public:
                                                              const std::vector<BranchingQueueItem> &phase1Candidates) {
         std::vector<VRPCandidate *> candidates;
 
-        for (const auto &item : phase1Candidates) {
-            // Create two child nodes based on the selected branching candidate
-            auto [childNode1, childNode2] = createChildNodes(node, item);
+        // Helper function to create and add VRPCandidates
+        auto addCandidates = [&](int sourceNode, int targetNode, double fractionalValue, CandidateType type,
+                                 std::optional<int>                 node = std::nullopt,
+                                 std::optional<std::pair<int, int>> edge = std::nullopt) {
+            if (type == CandidateType::Vehicle) {
+                candidates.push_back(new VRPCandidate(sourceNode, targetNode, BranchingDirection::Greater,
+                                                      std::floor(fractionalValue), type, std::nullopt));
+                candidates.push_back(new VRPCandidate(sourceNode, targetNode, BranchingDirection::Less,
+                                                      std::ceil(fractionalValue), type, std::nullopt));
+            } else if (type == CandidateType::Node) {
+                candidates.push_back(new VRPCandidate(sourceNode, targetNode, BranchingDirection::Greater,
+                                                      std::floor(fractionalValue), type, node));
+                candidates.push_back(new VRPCandidate(sourceNode, targetNode, BranchingDirection::Less,
+                                                      std::ceil(fractionalValue), type, node));
+            } else {
 
+                candidates.push_back(new VRPCandidate(sourceNode, targetNode, BranchingDirection::Greater,
+                                                      std::floor(fractionalValue), type, edge));
+                candidates.push_back(new VRPCandidate(sourceNode, targetNode, BranchingDirection::Less,
+                                                      std::ceil(fractionalValue), type, edge));
+            }
+        };
+
+        for (const auto &item : phase1Candidates) {
             // Add Vehicle candidates
             if (!item.g_m.empty()) {
-                VRPCandidate *vehicleCandidate1 =
-                    new VRPCandidate(item.sourceNode, item.targetNode, BranchingDirection::Greater,
-                                     std::floor(item.fractionalValue), CandidateType::Vehicle, std::nullopt);
-                VRPCandidate *vehicleCandidate2 =
-                    new VRPCandidate(item.sourceNode, item.targetNode, BranchingDirection::Less,
-                                     std::ceil(item.fractionalValue), CandidateType::Vehicle, std::nullopt);
-
-                candidates.push_back(vehicleCandidate1);
-                candidates.push_back(vehicleCandidate2);
+                addCandidates(item.sourceNode, item.targetNode, item.fractionalValue, CandidateType::Vehicle);
             }
-            fmt::print("Item: {} {} {} {} {} {} {} \n", item.sourceNode, item.targetNode, item.fractionalValue,
-                       item.productValue, item.g_m.size(), item.g_m_v.size(), item.g_v_vp.size());
 
             // Add Node candidates
             if (!item.g_m_v.empty()) {
-                VRPCandidate *nodeCandidate1 =
-                    new VRPCandidate(item.sourceNode, item.targetNode, BranchingDirection::Greater,
-                                     std::floor(item.fractionalValue), CandidateType::Node, item.targetNode);
-                VRPCandidate *nodeCandidate2 =
-                    new VRPCandidate(item.sourceNode, item.targetNode, BranchingDirection::Less,
-                                     std::ceil(item.fractionalValue), CandidateType::Node, item.targetNode);
-
-                candidates.push_back(nodeCandidate1);
-                candidates.push_back(nodeCandidate2);
+                addCandidates(item.sourceNode, item.targetNode, item.fractionalValue, CandidateType::Node,
+                              item.targetNode);
             }
 
             // Add Edge candidates
             if (!item.g_v_vp.empty()) {
                 std::pair<int, int> edge = {item.sourceNode, item.targetNode};
-                VRPCandidate       *edgeCandidate1 =
-                    new VRPCandidate(item.sourceNode, item.targetNode, BranchingDirection::Greater,
-                                     std::floor(item.fractionalValue), CandidateType::Edge, edge);
-                VRPCandidate *edgeCandidate2 =
-                    new VRPCandidate(item.sourceNode, item.targetNode, BranchingDirection::Less,
-                                     std::ceil(item.fractionalValue), CandidateType::Edge, edge);
-
-                candidates.push_back(edgeCandidate1);
-                candidates.push_back(edgeCandidate2);
+                addCandidates(item.sourceNode, item.targetNode, item.fractionalValue, CandidateType::Edge, std::nullopt,
+                              edge);
             }
         }
 
@@ -248,28 +247,24 @@ public:
         BNBNode *childNode1 = parentNode->newChild();
         BNBNode *childNode2 = parentNode->newChild();
 
-        if (candidate.candidateType == CandidateType::Vehicle) {
-            double lowerBound = std::floor(candidate.fractionalValue);
-            childNode1->addBranchingConstraint(lowerBound, BranchingDirection::Less, candidate.candidateType);
+        // Helper to add branching constraint
+        auto addConstraints = [&](double bound, BranchingDirection direction, BNBNode *child) {
+            if (candidate.candidateType == CandidateType::Vehicle) {
+                child->addBranchingConstraint(bound, direction, candidate.candidateType);
+            } else if (candidate.candidateType == CandidateType::Node) {
+                child->addBranchingConstraint(bound, direction, candidate.candidateType, candidate.targetNode);
+            } else { // CandidateType::Edge
+                std::pair<int, int> edge = {candidate.sourceNode, candidate.targetNode};
+                child->addBranchingConstraint(bound, direction, candidate.candidateType, edge);
+            }
+        };
 
-            double upperBound = std::ceil(candidate.fractionalValue);
-            childNode2->addBranchingConstraint(upperBound, BranchingDirection::Greater, candidate.candidateType);
-        } else if (candidate.candidateType == CandidateType::Node) {
-            double lowerBound = std::floor(candidate.fractionalValue);
-            childNode1->addBranchingConstraint(lowerBound, BranchingDirection::Less, candidate.candidateType,
-                                               candidate.targetNode);
+        double lowerBound = std::floor(candidate.fractionalValue);
+        double upperBound = std::ceil(candidate.fractionalValue);
 
-            double upperBound = std::ceil(candidate.fractionalValue);
-            childNode2->addBranchingConstraint(upperBound, BranchingDirection::Greater, candidate.candidateType,
-                                               candidate.targetNode);
-        } else {
-            std::pair<int, int> edge       = {candidate.sourceNode, candidate.targetNode};
-            double              lowerBound = std::floor(candidate.fractionalValue);
-            childNode1->addBranchingConstraint(lowerBound, BranchingDirection::Less, candidate.candidateType, edge);
-
-            double upperBound = std::ceil(candidate.fractionalValue);
-            childNode2->addBranchingConstraint(upperBound, BranchingDirection::Greater, candidate.candidateType, edge);
-        }
+        // Add constraints to both child nodes
+        addConstraints(lowerBound, BranchingDirection::Less, childNode1);
+        addConstraints(upperBound, BranchingDirection::Greater, childNode2);
 
         return {childNode1, childNode2};
     }
@@ -352,26 +347,19 @@ public:
 
         node->optimize();
 
-        fmt::print("Node solution \n");
         auto aggregatedCandidates = calculateAggregatedVariables(node, instance);
 
-        fmt::print("Aggregated candidates: {}\n", aggregatedCandidates.size());
         // Select candidates based on the new Phase 0 logic
         auto phase0Candidates =
             selectCandidatesPhase0(aggregatedCandidates, node->historyCandidates, maxCandidatesPhase0, instance);
 
-        fmt::print("Phase 0 candidates: {}\n", phase0Candidates.size());
-
         // Store selected candidates in the node for future iterations
         node->historyCandidates = phase0Candidates;
 
-        fmt::print("Selected candidates: {}\n", phase0Candidates.size());
         // Evaluate candidates and apply branching constraints
         auto phase1Candidates = evaluateWithBranching(node, phase0Candidates);
-        fmt::print("Phase 1 candidates: {}\n", phase1Candidates.size());
 
         auto generatedCandidates = generateVRPCandidates(node, phase1Candidates);
-        fmt::print("Generated candidates: {}\n", generatedCandidates.size());
         candidates.insert(candidates.end(), generatedCandidates.begin(), generatedCandidates.end());
 
         return candidates;
