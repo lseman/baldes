@@ -1044,12 +1044,7 @@ public:
         node->update();
         node->relaxNode();
 
-        // print node->paths size
-        // node->setPaths(allPaths);
-        //  instance.nN = labels.size();
-
-        auto candidates = Branching::VRPTWStandardBranching(node, &instance);
-        fmt::print("Candidates size: {}\n", candidates.size());
+        auto candidates       = Branching::VRPTWStandardBranching(node, &instance);
         auto candidateCounter = 0;
 
         for (auto &candidate : candidates) {
@@ -1068,5 +1063,6 @@ public:
         }
 
         fmt::print("\033[34mFINISHED BRANCH PROCEDURE \033[0m");
+        fmt::print("\n");
     }
 };
