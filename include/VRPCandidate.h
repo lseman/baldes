@@ -1,47 +1,93 @@
 #pragma once
 
+#include "Definitions.h"
+
 #include <functional>
-#include <string>
+#include <iostream>
+#include <unordered_map>
 #include <utility>
+#include <variant>
 
-#include <functional>
-#include <string>
+class VRPCandidate {
+public:
+    // Enum to represent the type of the candidate
 
-struct VRPCandidate {
-    int    routeIndex; // Route index for the VRP candidate
-    int    sourceNode; // Source node in the VRP path
-    double boundValue; // Bound value for the candidate (floor or ceil of fractional value)
+    // Fields common to all candidates
+    int                sourceNode;    // Source node in the candidate
+    int                targetNode;    // Target node in the candidate
+    double             boundValue;    // Bound value for the candidate
+    BranchingDirection boundType;     // Upper or lower bound type
+    CandidateType      candidateType; // Type of the candidate (Vehicle, Node, or Edge)
 
-    enum class BoundType { Upper, Lower }; // Type of bound (upper or lower)
-    BoundType boundType;                   // Upper or lower bound type
+    // Variant to hold different types of data based on candidate type
+    std::optional<std::variant<int, std::pair<int, int>>> payload = std::nullopt;
 
-    std::string name; // Candidate name (optional for debugging or output)
-    size_t      hash; // Hash value for the candidate
+    // Disable copy constructor and copy assignment
+    VRPCandidate(const VRPCandidate &)            = delete;
+    VRPCandidate &operator=(const VRPCandidate &) = delete;
 
-    // Constructor
-    VRPCandidate(int routeIndex, int sourceNode, BoundType boundType, double boundValue)
-        : routeIndex(routeIndex), sourceNode(sourceNode), boundType(boundType), boundValue(boundValue) {
-        name = "x[" + std::to_string(routeIndex) + "," + std::to_string(sourceNode) + "]";
-        hash = hash_value();
-    }
+    // Allow move constructor and move assignment
+    VRPCandidate(VRPCandidate &&)            = default;
+    VRPCandidate &operator=(VRPCandidate &&) = default;
 
-    // Hash function
-    size_t hash_value() const {
+    // Constructor with correct variant initialization
+    template <typename T>
+    VRPCandidate(int sourceNode, int targetNode, BranchingDirection boundType, double boundValue,
+                 CandidateType candidateType, T &&payloadData)
+        : sourceNode(sourceNode), targetNode(targetNode), boundType(boundType), boundValue(boundValue),
+          candidateType(candidateType), payload(std::forward<T>(payloadData)) {}
+
+    // Compute hash value (for use in unordered containers)
+    size_t computeHash() const {
         size_t seed = 0;
-        seed ^= std::hash<int>{}(routeIndex) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
         seed ^= std::hash<int>{}(sourceNode) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
         seed ^= std::hash<int>{}(static_cast<int>(boundType)) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+        seed ^= std::hash<int>{}(static_cast<int>(candidateType)) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+        if (payload) {
+            std::visit(
+                [&](auto &&arg) {
+                    using T = std::decay_t<decltype(arg)>;
+                    if constexpr (std::is_same_v<T, int>) {
+                        seed ^= std::hash<int>{}(arg) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+                    } else if constexpr (std::is_same_v<T, std::pair<int, int>>) {
+                        seed ^= std::hash<int>{}(arg.first) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+                        seed ^= std::hash<int>{}(arg.second) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+                    }
+                },
+                *payload);
+        }
         return seed;
     }
 
-    // Equality operator (needed for hash maps/sets)
+    // Equality operator (for use in unordered containers)
     bool operator==(const VRPCandidate &other) const {
-        return routeIndex == other.routeIndex && sourceNode == other.sourceNode && boundType == other.boundType &&
-               boundValue == other.boundValue;
+        return sourceNode == other.sourceNode && boundType == other.boundType && boundValue == other.boundValue &&
+               candidateType == other.candidateType && payload == other.payload;
     }
 
-    // Optional: Custom hasher for unordered maps/sets
-    struct Hasher {
-        size_t operator()(const VRPCandidate &candidate) const { return candidate.hash_value(); }
-    };
+    // Print function to display the candidate information
+    void print() const {
+        std::cout << "Candidate type: ";
+        switch (candidateType) {
+        case CandidateType::Vehicle: std::cout << "VehicleCandidate, "; break;
+        case CandidateType::Node: std::cout << "NodeCandidate, "; break;
+        case CandidateType::Edge: std::cout << "EdgeCandidate, "; break;
+        }
+        std::cout << "Source node: " << sourceNode << ", Bound value: " << boundValue << ", Payload: ";
+        if (payload) {
+            std::visit(
+                [](auto &&arg) {
+                    using T = std::decay_t<decltype(arg)>;
+                    if constexpr (std::is_same_v<T, int>) {
+                        std::cout << arg;
+                    } else if constexpr (std::is_same_v<T, std::pair<int, int>>) {
+                        std::cout << "(" << arg.first << ", " << arg.second << ")";
+                    }
+                },
+                *payload);
+        } else {
+            std::cout << "None";
+        }
+        std::cout << std::endl;
+    }
 };

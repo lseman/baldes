@@ -19,8 +19,10 @@
 
 #include "VRPCandidate.h"
 
-class Problem;
+#include <optional>
+#include <variant>
 
+class Problem;
 /**
  * @class BNBNode
  * @brief Represents a node in a tree structure.
@@ -62,10 +64,11 @@ public:
 
     void addPath(Path path) { paths.emplace_back(path); }
 
-    std::vector<VRPCandidate> candidates;
-    std::vector<BNBNode *>    children;
-    BNBNode                  *parent = nullptr;
-    std::vector<VRPCandidate> raisedVRPChildren;
+    std::vector<VRPCandidate *> candidates;
+    std::vector<BNBNode *>      children;
+    BNBNode                    *parent = nullptr;
+    std::vector<VRPCandidate *> raisedVRPChildren;
+    RCCManager                  rccManager;
 
     [[nodiscard]] explicit BNBNode(const GRBModel &eModel) : model(nullptr) {
         model = new GRBModel(eModel);
@@ -82,8 +85,6 @@ public:
     void optimize() { model->optimize(); }
 
     void start() {}
-
-    void enforceBranching() {}
 
     bool getPrune() { return prune; }
 
@@ -251,21 +252,21 @@ public:
     }
 
     // define hasCandidate to see if the candidate already exists
-    bool hasCandidate(const VRPCandidate &candidate) {
-        for (const auto &c : candidates) {
+    bool hasCandidate(VRPCandidate *candidate) {
+        for (const auto *c : candidates) {
             if (c == candidate) { return true; }
         }
         return false;
     }
 
-    void addRaisedChildren(const VRPCandidate &candidate) {
+    void addRaisedChildren(VRPCandidate *candidate) {
         // Add the candidate to the list of candidates
         candidates.push_back(candidate);
     }
 
-    void setCandidatos(std::vector<VRPCandidate> candidatos) { candidates = candidatos; }
+    void setCandidatos(std::vector<VRPCandidate *> candidatos) { candidates = candidatos; }
 
-    void addCandidate(const VRPCandidate &candidate) {
+    void addCandidate(VRPCandidate *candidate) {
         // Add the candidate to the list of candidates
         candidates.push_back(candidate);
     }
@@ -274,8 +275,9 @@ public:
         // Create a new child node
         auto child = new BNBNode(*model);
         // Set the parent of the child node to this node
-        child->parent = this;
-        child->paths  = paths;
+        child->parent            = this;
+        child->paths             = paths;
+        child->historyCandidates = historyCandidates;
 
         // Add the child node to the list of children
         children.push_back(child);
@@ -283,10 +285,10 @@ public:
         return child;
     }
 
-    bool hasRaisedChild(const VRPCandidate &strongCandidate) {
+    bool hasRaisedChild(VRPCandidate *strongCandidate) {
         // std::lock_guard<std::mutex> lock(mtx);
 
-        for (const auto &c : raisedVRPChildren) {
+        for (const auto *c : raisedVRPChildren) {
             if (c == strongCandidate) { return true; }
         }
         return false;
@@ -300,20 +302,80 @@ public:
         return model->get(GRB_DoubleAttr_ObjVal);
     }
 
-    void addBranchingConstraint(const std::vector<double> &coeffs, double rhs) {
+    ///////////////////////////////////////////////
+    // Branching
+    ///////////////////////////////////////////////
+
+    std::vector<BranchingQueueItem> historyCandidates;
+
+    void addBranchingConstraint(double rhs, const BranchingDirection &sense, const CandidateType &ctype,
+                                std::optional<std::variant<int, std::pair<int, int>>> payload = std::nullopt) {
+
         // Get the decision variables from the model
-        auto vars = model->getVars(); // Assumes model is a pointer to GRBModel
+        auto varsPtr = model->getVars(); // Assumes model is a pointer to GRBModel
+        // deference the pointer
+        auto vars = std::vector<GRBVar>(varsPtr, varsPtr + model->get(GRB_IntAttr_NumVars));
 
-        // Create a linear expression for the constraint
-        GRBLinExpr linExpr;
-        for (size_t i = 0; i < coeffs.size(); ++i) { linExpr += coeffs[i] * vars[i]; }
+        GRBLinExpr linExpr; // Initialize linExpr
 
-        // Add the constraint to the model: linExpr <= rhs
-        model->addConstr(linExpr, GRB_LESS_EQUAL, rhs);
+        // Ensure that payload is provided, otherwise return or throw an error
+        if (!payload.has_value()) { throw std::invalid_argument("Payload is required for Node and Edge types."); }
+
+        if (ctype == CandidateType::Vehicle) {
+            for (auto i = 0; i < vars.size(); i++) { linExpr += vars[i]; }
+        } else if (ctype == CandidateType::Node) {
+            for (auto i = 0; i < vars.size(); i++) {
+                // Use the payload as int for Node
+                std::visit(
+                    [&](auto &&arg) {
+                        using T = std::decay_t<decltype(arg)>;
+                        if constexpr (std::is_same_v<T, int>) {
+                            linExpr += vars[i] * paths[i].contains(arg); // Use the int payload
+                        } else {
+                            throw std::invalid_argument("Payload for Node must be an int.");
+                        }
+                    },
+                    *payload);
+            }
+        } else if (ctype == CandidateType::Edge) {
+            for (auto i = 0; i < vars.size(); i++) {
+                // Use the payload as std::pair<int, int> for Edge
+                std::visit(
+                    [&](auto &&arg) {
+                        using T = std::decay_t<decltype(arg)>;
+                        if constexpr (std::is_same_v<T, std::pair<int, int>>) {
+                            linExpr += vars[i] * paths[i].timesArc(arg.first, arg.second); // Use the std::pair payload
+                        } else {
+                            throw std::invalid_argument("Payload for Edge must be a std::pair<int, int>.");
+                        }
+                    },
+                    *payload);
+            }
+        }
+
+        // Add the constraint based on the sense
+        if (sense == BranchingDirection::Greater) {
+            model->addConstr(linExpr, GRB_GREATER_EQUAL, rhs);
+        } else if (sense == BranchingDirection::Less) {
+            model->addConstr(linExpr, GRB_LESS_EQUAL, rhs);
+        } else {
+            model->addConstr(linExpr, GRB_EQUAL, rhs);
+        }
 
         // Update the model to reflect the changes
         model->update();
     }
 
+    void enforceBranching() {
+        // Iterate over the candidates and enforce the branching constraints
+        for (const auto &candidate : candidates) {
+            addBranchingConstraint(candidate->boundValue, candidate->boundType, candidate->candidateType,
+                                   candidate->payload);
+        }
+    }
+
     int getNumVariables() { return model->get(GRB_IntAttr_NumVars); }
+
+    // define remove for var
+    void remove(GRBVar var) { model->remove(var); }
 };

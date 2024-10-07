@@ -243,8 +243,6 @@ int main(int argc, char *argv[]) {
     };
     std::for_each(initialRoutesHGS.begin(), initialRoutesHGS.end(), process_route);
 
-    problem->labels_counter = labels_counter;
-
     BNBNode *node = new BNBNode(model);
     node->paths   = paths;
     initRMP(node, problem, initialRoutesHGS);
