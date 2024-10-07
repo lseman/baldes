@@ -32,6 +32,9 @@ public:
     explicit Branching(BranchingStrategy strat) : strategy(strat) {}
     Branching() = default;
 
+    // Helper function to check if a value is fractional
+    inline static bool isFractional(double value) { return std::fabs(value - std::round(value)) > TOLERANCE_INTEGER; }
+
     /**
      * Calculate aggregated variables for branching constraints
      * @param node: Current BNB node
@@ -53,9 +56,11 @@ public:
             if (LPSolution[i] == 0) continue; // Skip if no solution for this route
 
             // Fractionality calculation
-            double fractionality = std::fabs(LPSolution[i] - std::round(LPSolution[i]));
+            // double fractionality = std::fabs(LPSolution[i] - std::round(LPSolution[i]));
 
-            if (LPSolution[i] > TOLERANCE_ZERO && fractionality > TOLERANCE_INTEGER) {
+            // if (LPSolution[i] > TOLERANCE_ZERO && fractionality > TOLERANCE_INTEGER) {
+            if (LPSolution[i] > TOLERANCE_ZERO && isFractional(LPSolution[i])) {
+
                 double totalWindowDifference = 0.0;
 
                 // Assuming vehicleType is stored in the instance for each route
@@ -110,49 +115,29 @@ public:
 
         return queueItems;
     }
-
-    // Helper function for adding constraints
-    static void addBranchingConstraint(BNBNode *child, double bound, BranchingDirection direction, CandidateType type,
-                                       std::optional<int>                 node = std::nullopt,
-                                       std::optional<std::pair<int, int>> edge = std::nullopt) {
-        if (type == CandidateType::Vehicle) {
-            child->addBranchingConstraint(bound, direction, type);
-        } else if (type == CandidateType::Node && node) {
-            child->addBranchingConstraint(bound, direction, type, *node);
-        } else if (type == CandidateType::Edge && edge) {
-            child->addBranchingConstraint(bound, direction, type, *edge);
+    static void addConstraintForCandidate(BNBNode *childNode, const BranchingQueueItem &item, double bound,
+                                          BranchingDirection direction) {
+        if (item.candidateType == CandidateType::Vehicle) {
+            childNode->addBranchingConstraint(bound, direction, CandidateType::Vehicle);
+        } else if (item.candidateType == CandidateType::Node) {
+            childNode->addBranchingConstraint(bound, direction, CandidateType::Node, item.targetNode);
+        } else if (item.candidateType == CandidateType::Edge) {
+            std::pair<int, int> edge = {item.sourceNode, item.targetNode};
+            childNode->addBranchingConstraint(bound, direction, CandidateType::Edge, edge);
         }
     }
 
-    /**
-     * Apply branching constraints based on the fractional value of the candidate
-     * @brief This function applies branching constraints based on the fractional value of the candidate
-     */
+    // Apply branching constraints based on the fractional value of the candidate
     static std::pair<BNBNode *, BNBNode *>
     applyBranchingConstraints(BNBNode *parentNode, const BranchingQueueItem &item, double fractionalValue) {
         BNBNode *childNode1 = parentNode->newChild();
         BNBNode *childNode2 = parentNode->newChild();
 
-        // Create constraints based on fractional value f
         double lowerBound = std::floor(fractionalValue);
         double upperBound = std::ceil(fractionalValue);
 
-        // Use the helper function to add branching constraints
-        if (item.candidateType == CandidateType::Vehicle) {
-            addBranchingConstraint(childNode1, lowerBound, BranchingDirection::Less, CandidateType::Vehicle);
-            addBranchingConstraint(childNode2, upperBound, BranchingDirection::Greater, CandidateType::Vehicle);
-        } else if (item.candidateType == CandidateType::Node) {
-            addBranchingConstraint(childNode1, lowerBound, BranchingDirection::Less, CandidateType::Node,
-                                   item.targetNode);
-            addBranchingConstraint(childNode2, upperBound, BranchingDirection::Greater, CandidateType::Node,
-                                   item.targetNode);
-        } else {
-            auto edge = std::make_pair(item.sourceNode, item.targetNode);
-            addBranchingConstraint(childNode1, lowerBound, BranchingDirection::Less, CandidateType::Edge, std::nullopt,
-                                   edge);
-            addBranchingConstraint(childNode2, upperBound, BranchingDirection::Greater, CandidateType::Edge,
-                                   std::nullopt, edge);
-        }
+        addConstraintForCandidate(childNode1, item, lowerBound, BranchingDirection::Less);
+        addConstraintForCandidate(childNode2, item, upperBound, BranchingDirection::Greater);
 
         return {childNode1, childNode2};
     }
@@ -193,46 +178,28 @@ public:
                                                              const std::vector<BranchingQueueItem> &phase1Candidates) {
         std::vector<VRPCandidate *> candidates;
 
-        // Helper function to create and add VRPCandidates
-        auto addCandidates = [&](int sourceNode, int targetNode, double fractionalValue, CandidateType type,
-                                 std::optional<int>                 node = std::nullopt,
-                                 std::optional<std::pair<int, int>> edge = std::nullopt) {
-            if (type == CandidateType::Vehicle) {
-                candidates.push_back(new VRPCandidate(sourceNode, targetNode, BranchingDirection::Greater,
-                                                      std::floor(fractionalValue), type, std::nullopt));
-                candidates.push_back(new VRPCandidate(sourceNode, targetNode, BranchingDirection::Less,
-                                                      std::ceil(fractionalValue), type, std::nullopt));
-            } else if (type == CandidateType::Node) {
-                candidates.push_back(new VRPCandidate(sourceNode, targetNode, BranchingDirection::Greater,
-                                                      std::floor(fractionalValue), type, node));
-                candidates.push_back(new VRPCandidate(sourceNode, targetNode, BranchingDirection::Less,
-                                                      std::ceil(fractionalValue), type, node));
-            } else {
-
-                candidates.push_back(new VRPCandidate(sourceNode, targetNode, BranchingDirection::Greater,
-                                                      std::floor(fractionalValue), type, edge));
-                candidates.push_back(new VRPCandidate(sourceNode, targetNode, BranchingDirection::Less,
-                                                      std::ceil(fractionalValue), type, edge));
-            }
+        // Lambda to generate candidates
+        auto generateCandidates = [&](CandidateType type, int sourceNode, int targetNode, double fractionalValue,
+                                      std::optional<std::variant<int, std::pair<int, int>>> payload = std::nullopt) {
+            candidates.emplace_back(new VRPCandidate(sourceNode, targetNode, BranchingDirection::Greater,
+                                                     std::floor(fractionalValue), type, payload));
+            candidates.emplace_back(new VRPCandidate(sourceNode, targetNode, BranchingDirection::Less,
+                                                     std::ceil(fractionalValue), type, payload));
         };
 
         for (const auto &item : phase1Candidates) {
-            // Add Vehicle candidates
             if (!item.g_m.empty()) {
-                addCandidates(item.sourceNode, item.targetNode, item.fractionalValue, CandidateType::Vehicle);
+                generateCandidates(CandidateType::Vehicle, item.sourceNode, item.targetNode, item.fractionalValue,
+                                   std::nullopt); // No payload for vehicles
             }
-
-            // Add Node candidates
             if (!item.g_m_v.empty()) {
-                addCandidates(item.sourceNode, item.targetNode, item.fractionalValue, CandidateType::Node,
-                              item.targetNode);
+                generateCandidates(CandidateType::Node, item.sourceNode, item.targetNode, item.fractionalValue,
+                                   item.targetNode); // Node as payload
             }
-
-            // Add Edge candidates
             if (!item.g_v_vp.empty()) {
                 std::pair<int, int> edge = {item.sourceNode, item.targetNode};
-                addCandidates(item.sourceNode, item.targetNode, item.fractionalValue, CandidateType::Edge, std::nullopt,
-                              edge);
+                generateCandidates(CandidateType::Edge, item.sourceNode, item.targetNode, item.fractionalValue,
+                                   edge); // Edge as payload
             }
         }
 

@@ -62,14 +62,18 @@ public:
     Problem *problem;
     int      numConstrs = 0;
 
-    // node specific
+// node specific
+#ifdef SRC
     std::vector<GRBConstr> SRCconstraints;
-    ModelData              matrix;
-    std::vector<Path>      paths;
     LimitedMemoryRank1Cuts r1c;
+#endif
+
+    ModelData         matrix;
+    std::vector<Path> paths;
 
 #ifdef RCC
     CnstrMgrPointer oldCutsCMP = nullptr;
+    RCCManager      rccManager;
 #endif
 
     void addPath(Path path) { paths.emplace_back(path); }
@@ -78,7 +82,6 @@ public:
     std::vector<BNBNode *>      children;
     BNBNode                    *parent = nullptr;
     std::vector<VRPCandidate *> raisedVRPChildren;
-    RCCManager                  rccManager;
 
     [[nodiscard]] explicit BNBNode(const GRBModel &eModel) : model(nullptr) {
         model = new GRBModel(eModel);
@@ -230,7 +233,10 @@ public:
     // define get for auto duals = node->get(GRB_DoubleAttr_Pi, SRCconstraints.data(), SRCconstraints.size());
     auto get(GRB_DoubleAttr attr, const GRBConstr *constrs, int size) { return model->get(attr, constrs, size); }
 
-    ModelData extractModelDataSparse() { return ::extractModelDataSparse(model); }
+    ModelData extractModelDataSparse() {
+        model->update();
+        return ::extractModelDataSparse(model);
+    }
 
     GRBModel *getModel() { return model; }
 
