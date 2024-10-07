@@ -68,8 +68,9 @@ public:
     LimitedMemoryRank1Cuts r1c;
 #endif
 
-    ModelData         matrix;
-    std::vector<Path> paths;
+    ModelData                          matrix;
+    std::vector<Path>                  paths;
+    std::unordered_set<Path, PathHash> pathSet;
 
 #ifdef RCC
     CnstrMgrPointer oldCutsCMP = nullptr;
