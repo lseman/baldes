@@ -68,9 +68,6 @@ public:
 
     std::vector<Path> toMerge;
 
-#ifdef RCC
-    CnstrMgrPointer oldCutsCMP = nullptr;
-#endif
 #ifdef EXACT_RCC
     RCCManager rccManager;
 #endif
@@ -474,7 +471,8 @@ public:
         // Precompute edge values from LP solution
         std::vector<std::vector<double>> aijs(N_SIZE + 1, std::vector<double>(N_SIZE + 1, 0.0));
 
-        auto &allPaths = model->paths;
+        auto &allPaths   = model->paths;
+        auto &oldCutsCMP = model->oldCutsCMP;
 
         for (int counter = 0; counter < solution.size(); ++counter) {
             const auto &nodes = allPaths[counter].route;
@@ -512,7 +510,7 @@ public:
         if (intAndFeasible) return false; /* Optimal solution found */
         if (cutsCMP->Size == 0) return false;
 
-        print_cut("Found {} violated RCC cuts, max violation: {}\n", cutsCMP->Size, maxViolation);
+        // print_cut("Found {} violated RCC cuts, max violation: {}\n", cutsCMP->Size, maxViolation);
 
         std::vector<int>                 rhsValues(cutsCMP->Size);
         std::vector<std::vector<RCCArc>> arcGroups(cutsCMP->Size);
@@ -691,14 +689,11 @@ public:
         IPSolver solver;
 #endif
 
-#ifdef RCC
-        CMGR_CreateCMgr(&oldCutsCMP, 100); // For old cuts, if needed
-#endif
         bool   rcc         = false;
         bool   reoptimized = false;
         double obj;
 
-        for (int iter = 0; iter < 150; ++iter) {
+        for (int iter = 0; iter < 2000; ++iter) {
             reoptimized = false;
 
 #if defined(RCC) || defined(EXACT_RCC)
@@ -739,7 +734,7 @@ public:
 #if defined(SRC3) || defined(SRC)
                 if (!rcc) {
 
-                    removeNegativeReducedCostVarsAndPaths(node);
+                    // removeNegativeReducedCostVarsAndPaths(node);
                     matrix = node->extractModelDataSparse();
                     node->optimize();
 
@@ -976,7 +971,7 @@ public:
 #ifdef RCC
             n_rcc_cuts = rccManager.size();
 #endif
-            if (iter % 10 == 0)
+            if (iter % 50 == 0)
                 fmt::print("| It.: {:4} | Obj.: {:8.2f} | Price: {:9.2f} | SRC: {:4} | RCC: {:4} | Paths: {:4} | "
                            "Stage: {:1} | "
                            "Lag.: {:10.4f} | RCC: {:4} | alpha: {:4.2f} | \n",

@@ -61,7 +61,7 @@ BucketGraph::BucketGraph(const std::vector<VRPNode> &nodes, int time_horizon, in
     : fw_buckets(), bw_buckets(), nodes(nodes), time_horizon(time_horizon), capacity(capacity),
       bucket_interval(bucket_interval), best_cost(std::numeric_limits<double>::infinity()), fw_best_label() {
 
-    initInfo();
+    //initInfo();
     Interval intervalTime(bucket_interval, time_horizon);
     Interval intervalCap(capacity_interval, capacity);
 
@@ -89,7 +89,7 @@ BucketGraph::BucketGraph(const std::vector<VRPNode> &nodes, int time_horizon, in
 #if defined(RCC) || defined(EXACT_RCC)
     // cvrsep_duals.assign(nodes.size() + 2, std::vector<double>(nodes.size() + 2, 0.0));
 #endif
-    initInfo();
+    //initInfo();
     Interval intervalTime(bucket_interval, time_horizon);
 
     intervals = {intervalTime};
@@ -110,7 +110,7 @@ BucketGraph::BucketGraph(const std::vector<VRPNode> &nodes, std::vector<int> &bo
     // cvrsep_duals.assign(nodes.size() + 2, std::vector<double>(nodes.size() + 2, 0.0));
 #endif
 
-    initInfo();
+    //initInfo();
     for (int i = 0; i < bounds.size(); ++i) {
         Interval interval(bucket_intervals[i], bounds[i]);
         intervals.push_back(interval);
