@@ -561,7 +561,7 @@ public:
     /**
      * Column generation algorithm.
      */
-    void CG(BNBNode *node) {
+    void CG(BNBNode *node, int max_iter = 2000) {
         print_info("Column generation preparation...\n");
 
         node->relaxNode();
@@ -692,7 +692,7 @@ public:
         bool   reoptimized = false;
         double obj;
 
-        for (int iter = 0; iter < 2000; ++iter) {
+        for (int iter = 0; iter < max_iter; ++iter) {
             reoptimized = false;
 
 #if defined(RCC) || defined(EXACT_RCC)
@@ -718,7 +718,6 @@ public:
 
             if (ss && !rcc) {
 #if defined(RCC) || defined(EXACT_RCC)
-
                 if (!reoptimized) { node->optimize(); }
                 solution = node->extractSolution();
 #ifdef RCC
@@ -727,9 +726,9 @@ public:
 #ifdef EXACT_RCC
                 rcc = exactRCCsep(node, solution, cvrsep_ctrs);
 #endif
-                matrix = node->extractModelDataSparse();
 
                 if (rcc) {
+                    matrix = node->extractModelDataSparse();
                     node->optimize();
                     reoptimized = true;
                 }
@@ -740,7 +739,6 @@ public:
                 if (!rcc) {
 
                     // removeNegativeReducedCostVarsAndPaths(node);
-                    // matrix = node->extractModelDataSparse();
                     node->optimize();
 
                     auto cuts_before = cuts->size();
@@ -776,9 +774,7 @@ public:
                         matrix = node->extractModelDataSparse(); // Extract model data
                     }
 
-                    // print cuts size
-                    solution = node->extractSolution();
-                    // r1c.cutStorage = cuts;
+                    solution     = node->extractSolution();
                     r1c.allPaths = allPaths;
                     r1c.separate(matrix.A_sparse, solution);
 #ifdef SRC
@@ -786,7 +782,6 @@ public:
                     r1c.the45Heuristic<CutType::FourRow>(matrix.A_sparse, solution);
                     r1c.the45Heuristic<CutType::FiveRow>(matrix.A_sparse, solution);
 #endif
-                    // cuts = &r1c.cutStorage;
                     if (cuts_before == cuts->size() + n_cuts_removed) {
                         print_info("No violations found, calling it a day\n");
                         break;
@@ -794,7 +789,6 @@ public:
 
                     changed = cutHandler(r1c, node, SRCconstraints);
                     if (changed) { matrix = node->extractModelDataSparse(); }
-                    // cuts = &r1c.cutStorage;
                 }
 #endif
                 bucket_graph.ss = false;
@@ -855,7 +849,6 @@ public:
 #endif
 
 #ifdef STAB
-            // auto matrixSparse = node->extractModelDataSparse();
             node->optimize();
             lp_obj    = node->get(GRB_DoubleAttr_ObjVal);
             nodeDuals = node->getDuals();
@@ -885,13 +878,12 @@ public:
                 }
                 lag_gap          = integer_solution - (lp_obj + std::min(0.0, inner_obj));
                 bucket_graph.gap = lag_gap;
-                // print solution size
                 bucket_graph.augment_ng_memories(solution, allPaths, true, 5, 100, 16, N_SIZE);
                 bucket_graph.relaxation = lp_obj;
 
 #if defined(SRC3) || defined(SRC)
                 // print cuts.size
-                if (cuts->size() > 0) {
+                if (!SRCconstraints.empty()) {
                     auto duals = node->get(GRB_DoubleAttr_Pi, SRCconstraints.data(), SRCconstraints.size());
                     cutDuals.assign(duals, duals + SRCconstraints.size());
                     // print cutDuals size
@@ -904,13 +896,10 @@ public:
                 //////////////////////////////////////////////////////////////////////
                 // CALLING BALDES
                 //////////////////////////////////////////////////////////////////////
-                paths = bucket_graph.solve();
-
+                paths     = bucket_graph.solve();
                 inner_obj = paths[0]->cost;
                 stage     = bucket_graph.getStage();
-
-                ss = bucket_graph.ss;
-
+                ss        = bucket_graph.ss;
                 //////////////////////////////////////////////////////////////////////
 
                 // Adding cols
@@ -979,8 +968,8 @@ public:
             if (iter % 50 == 0)
                 fmt::print("| It.: {:4} | Obj.: {:8.2f} | Price: {:9.2f} | SRC: {:4} | RCC: {:4} | Paths: {:4} | "
                            "Stage: {:1} | "
-                           "Lag.: {:10.4f} | RCC: {:4} | alpha: {:4.2f} | \n",
-                           iter, lp_obj, inner_obj, n_cuts, n_rcc_cuts, paths.size(), stage, lag_gap, rcc, cur_alpha);
+                           "Lag.: {:10.4f} | alpha: {:4.2f} | \n",
+                           iter, lp_obj, inner_obj, n_cuts, n_rcc_cuts, paths.size(), stage, lag_gap, cur_alpha);
         }
         auto end_timer        = std::chrono::high_resolution_clock::now();
         auto duration_ms      = std::chrono::duration_cast<std::chrono::milliseconds>(end_timer - start_timer).count();

@@ -95,7 +95,7 @@ void Population::generatePopulation() {
         // addIndividual(&indiv, true);
     }
 
-    print_info("Generated {} individuals using MDMPatterns\n", noOfMDMIndividualsToGenerate);
+    print_heur("Generated {} individuals using MDMPatterns\n", noOfMDMIndividualsToGenerate);
     printState(-1, -1);
     // Generate some individuals using the NEAREST construction heuristic
     for (int i = 0; i < nofNearestIndividualsToGenerate; i++) {
@@ -114,7 +114,7 @@ void Population::generatePopulation() {
 
     // Output that some individuals have been created
     // std::cout << "Generated " << nofNearestIndividualsToGenerate << " individuals using Nearest" << std::endl;
-    print_info("Generated {} individuals using Nearest\n", nofNearestIndividualsToGenerate);
+    print_heur("Generated {} individuals using Nearest\n", nofNearestIndividualsToGenerate);
     printState(-1, -1);
 
     // Generate some individuals using the FURHEST construction heuristic
@@ -134,7 +134,7 @@ void Population::generatePopulation() {
 
     // Output that some individuals have been created
     // std::cout << "Generated " << nofFurthestIndividualsToGenerate << " individuals using Furthest" << std::endl;
-    print_info("Generated {} individuals using Furthest\n", nofFurthestIndividualsToGenerate);
+    print_heur("Generated {} individuals using Furthest\n", nofFurthestIndividualsToGenerate);
     printState(-1, -1);
 
     // Generate some individuals using the SWEEP construction heuristic
@@ -153,7 +153,7 @@ void Population::generatePopulation() {
 
     // Output that some individuals have been created
     // std::cout << "Generated " << nofSweepIndividualsToGenerate << " individuals using Sweep" << std::endl;
-    print_info("Generated {} individuals using Sweep\n", nofSweepIndividualsToGenerate);
+    print_heur("Generated {} individuals using Sweep\n", nofSweepIndividualsToGenerate);
     printState(-1, -1);
 
     // Generate some individuals using a RANDOM strategy
@@ -170,7 +170,7 @@ void Population::generatePopulation() {
 
     // Output that some individuals have been created
     // std::cout << "Generated " << nofRandomIndividualsToGenerate << " individuals Randomly" << std::endl;
-    print_info("Generated {} individuals Randomly\n", nofRandomIndividualsToGenerate);
+    print_heur("Generated {} individuals Randomly\n", nofRandomIndividualsToGenerate);
     printState(-1, -1);
 }
 
