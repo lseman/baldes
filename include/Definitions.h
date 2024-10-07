@@ -28,6 +28,8 @@ enum class CutType { ThreeRow, FourRow, FiveRow };
 enum class BranchingDirection { Greater, Less, Equal };
 enum class CandidateType { Vehicle, Node, Edge };
 
+using Payload = std::optional<std::variant<int, std::pair<int, int>>>; // Optional variant for payload data
+                                                                       //
 // Step 1: Implement Aggregated Variables for Branching Constraints
 struct BranchingQueueItem {
     int                                             sourceNode;      // route index (or source node for edges)

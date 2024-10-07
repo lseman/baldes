@@ -131,7 +131,6 @@ public:
     ArcDuals computeDuals(GRBModel *model, double threshold = 1e-3) {
         ArcDuals            arcDuals;
         std::vector<double> dualValues(cuts_.size()); // Precompute dual values for each cut
-
         // First pass: Compute dual values and store them
         for (int i = 0; i < cuts_.size(); ++i) {
             const auto &cut       = cuts_[i];

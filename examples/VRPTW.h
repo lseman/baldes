@@ -562,7 +562,7 @@ public:
      * Column generation algorithm.
      */
     void CG(BNBNode *node) {
-        print_info("Column generation started...\n");
+        print_info("Column generation preparation...\n");
 
         node->relaxNode();
         node->optimize();
@@ -592,7 +592,7 @@ public:
 
         bucket_graph.set_distance_matrix(instance.getDistanceMatrix(), 8);
 
-        node->optimize();
+        // node->optimize();
         matrix                 = node->extractModelDataSparse();
         auto integer_solution  = node->get(GRB_DoubleAttr_ObjVal);
         bucket_graph.incumbent = integer_solution;
@@ -600,8 +600,7 @@ public:
         auto allNodes = bucket_graph.getNodes();
 
 #ifdef SRC
-        r1c = LimitedMemoryRank1Cuts(allNodes);
-
+        r1c              = LimitedMemoryRank1Cuts(allNodes);
         CutStorage *cuts = &r1c.cutStorage;
 #endif
 
@@ -609,8 +608,8 @@ public:
         std::vector<double> nodeDuals = node->getDuals();
         auto                sizeDuals = nodeDuals.size();
 
-        double highs_obj_dual = 0.0;
-        double highs_obj      = 0.0;
+        double lp_obj_dual = 0.0;
+        double lp_obj      = 0.0;
 
 #ifdef SRC
         bucket_graph.cut_storage = cuts;
@@ -710,7 +709,8 @@ public:
                     matrix = node->extractModelDataSparse();
                     node->optimize();
                 }
-                auto arc_duals = rccManager.computeDuals(node->getModel());
+                auto model     = node->getModel();
+                auto arc_duals = rccManager.computeDuals(model);
                 bucket_graph.setArcDuals(arc_duals);
                 reoptimized = true;
             }
@@ -729,13 +729,18 @@ public:
 #endif
                 matrix = node->extractModelDataSparse();
 
+                if (rcc) {
+                    node->optimize();
+                    reoptimized = true;
+                }
+
 #endif
 
 #if defined(SRC3) || defined(SRC)
                 if (!rcc) {
 
                     // removeNegativeReducedCostVarsAndPaths(node);
-                    matrix = node->extractModelDataSparse();
+                    // matrix = node->extractModelDataSparse();
                     node->optimize();
 
                     auto cuts_before = cuts->size();
@@ -835,14 +840,14 @@ public:
 #ifdef IPM
             auto d            = 0.5;
             auto matrixSparse = node->extractModelDataSparse();
-            gap               = std::abs(highs_obj - (highs_obj + std::min(0.0, inner_obj))) / std::abs(highs_obj);
+            gap               = std::abs(lp_obj - (lp_obj + std::min(0.0, inner_obj))) / std::abs(lp_obj);
             gap               = gap / d;
             if (std::isnan(gap)) { gap = 1e-4; }
             if (std::signbit(gap)) { gap = 1e-4; }
 
             auto ip_result   = solver.run_optimization(matrixSparse, gap);
-            highs_obj        = std::get<0>(ip_result);
-            highs_obj_dual   = std::get<1>(ip_result);
+            lp_obj           = std::get<0>(ip_result);
+            lp_obj_dual      = std::get<1>(ip_result);
             solution         = std::get<2>(ip_result);
             nodeDuals        = std::get<3>(ip_result);
             auto originDuals = nodeDuals;
@@ -852,7 +857,7 @@ public:
 #ifdef STAB
             // auto matrixSparse = node->extractModelDataSparse();
             node->optimize();
-            highs_obj = node->get(GRB_DoubleAttr_ObjVal);
+            lp_obj    = node->get(GRB_DoubleAttr_ObjVal);
             nodeDuals = node->getDuals();
             stab.update_stabilization_after_master_optim(nodeDuals);
 
@@ -872,17 +877,17 @@ public:
                     }
                 }
                 if (integer) {
-                    if (highs_obj < integer_solution) {
-                        print_info("Updating integer solution to {}\n", highs_obj);
-                        integer_solution       = highs_obj;
+                    if (lp_obj < integer_solution) {
+                        print_info("Updating integer solution to {}\n", lp_obj);
+                        integer_solution       = lp_obj;
                         bucket_graph.incumbent = integer_solution;
                     }
                 }
-                lag_gap          = integer_solution - (highs_obj + std::min(0.0, inner_obj));
+                lag_gap          = integer_solution - (lp_obj + std::min(0.0, inner_obj));
                 bucket_graph.gap = lag_gap;
                 // print solution size
                 bucket_graph.augment_ng_memories(solution, allPaths, true, 5, 100, 16, N_SIZE);
-                bucket_graph.relaxation = highs_obj;
+                bucket_graph.relaxation = lp_obj;
 
 #if defined(SRC3) || defined(SRC)
                 // print cuts.size
@@ -917,7 +922,7 @@ public:
                         GRBConstr constr = SRCconstraints[i];
                         node->remove(constr);
                     }
-                    SRCconstraints = std::vector<GRBConstr>();
+                    node->SRCconstraints = std::vector<GRBConstr>();
                     node->update();
                     node->optimize();
                     cuts->reset();
@@ -975,8 +980,7 @@ public:
                 fmt::print("| It.: {:4} | Obj.: {:8.2f} | Price: {:9.2f} | SRC: {:4} | RCC: {:4} | Paths: {:4} | "
                            "Stage: {:1} | "
                            "Lag.: {:10.4f} | RCC: {:4} | alpha: {:4.2f} | \n",
-                           iter, highs_obj, inner_obj, n_cuts, n_rcc_cuts, paths.size(), stage, lag_gap, rcc,
-                           cur_alpha);
+                           iter, lp_obj, inner_obj, n_cuts, n_rcc_cuts, paths.size(), stage, lag_gap, rcc, cur_alpha);
         }
         auto end_timer        = std::chrono::high_resolution_clock::now();
         auto duration_ms      = std::chrono::duration_cast<std::chrono::milliseconds>(end_timer - start_timer).count();
@@ -1049,7 +1053,6 @@ public:
 
             auto candidatosNode = node->getCandidatos();
             auto childNode      = node->newChild();
-            // childNode->setCandidatos(candidatosNode);
             childNode->addCandidate(candidate);
             node->addRaisedChildren(candidate);
 
