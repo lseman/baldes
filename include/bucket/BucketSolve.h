@@ -107,7 +107,8 @@ inline std::vector<Label *> BucketGraph::solve() {
         paths     = bi_labeling_algorithm<Stage::Four>();
         inner_obj = paths[0]->cost;
 
-        auto rollback = updateStepSize(); // Update the step size for the bucket graph
+        //auto rollback = updateStepSize(); // Update the step size for the bucket graph
+        auto rollback = false;
         if (rollback) {
             s4     = false; // Rollback to Stage 3 if necessary
             s3     = true;

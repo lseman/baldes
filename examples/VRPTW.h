@@ -177,9 +177,11 @@ public:
      *
      */
     inline int addColumn(BNBNode *node, const auto &columns, bool enumerate = false) {
-        auto &r1c        = node->r1c;
-        auto &cuts       = r1c.cutStorage;
+        auto &r1c  = node->r1c;
+        auto &cuts = r1c.cutStorage;
+#ifdef RCC
         auto &rccManager = node->rccManager;
+#endif
 
         int                 numConstrsLocal = node->get(GRB_IntAttr_NumConstrs);
         const GRBConstr    *constrs         = node->getConstrs();
@@ -253,8 +255,6 @@ public:
                 }
             }
 #endif
-
-            // matrix.A_sparse.num_cols++;
 
             // Collect bounds, costs, columns, and names
             lb.push_back(0.0);
@@ -541,7 +541,7 @@ public:
     /**
      * Column generation algorithm.
      */
-    void CG(BNBNode *node, int max_iter = 2000) {
+    bool CG(BNBNode *node, int max_iter = 2000) {
         print_info("Column generation preparation...\n");
 
         node->relaxNode();
@@ -551,14 +551,17 @@ public:
         if (node->get(GRB_IntAttr_Status) != GRB_OPTIMAL) {
             print_info("Model is infeasible, pruning node.\n");
             node->setPrune(true);
-            return;
+            return false;
         }
 
         auto &matrix         = node->matrix;
         auto &SRCconstraints = node->SRCconstraints;
         auto &allPaths       = node->paths;
         auto &r1c            = node->r1c;
-        auto &rccManager     = node->rccManager;
+
+#ifdef RCC
+        auto &rccManager = node->rccManager;
+#endif
 
         int bucket_interval = 20;
         int time_horizon    = instance.T_max;
@@ -622,8 +625,6 @@ public:
         Stabilization stab(0.9, nodeDuals);
 #endif
         bool changed = false;
-        // set start timer
-        auto start_timer = std::chrono::high_resolution_clock::now();
 
         print_info("Starting column generation..\n\n");
         bool transition = false;
@@ -671,6 +672,7 @@ public:
         bool   rcc         = false;
         bool   reoptimized = false;
         double obj;
+        auto   colAdded = 0;
 
         for (int iter = 0; iter < max_iter; ++iter) {
             reoptimized = false;
@@ -689,9 +691,6 @@ public:
                     matrix = node->extractModelDataSparse();
                     node->optimize();
                 }
-                auto model     = node->getModel();
-                auto arc_duals = rccManager.computeDuals(model);
-                bucket_graph.setArcDuals(arc_duals);
                 reoptimized = true;
             }
 #endif
@@ -836,7 +835,9 @@ public:
 
             misprice = true;
             while (misprice) {
-                nodeDuals = stab.getStabDualSolAdvanced(nodeDuals);
+                // TODO: check if we should get rcc and src duals here
+                node->update();
+                nodeDuals = stab.getStabDualSol(nodeDuals);
                 solution  = node->extractSolution();
 #endif
 
@@ -862,7 +863,7 @@ public:
                 bucket_graph.relaxation = lp_obj;
 
 #if defined(SRC3) || defined(SRC)
-                // print cuts.size
+                // SRC cuts
                 if (!SRCconstraints.empty()) {
                     auto duals = node->get(GRB_DoubleAttr_Pi, SRCconstraints.data(), SRCconstraints.size());
                     cutDuals.assign(duals, duals + SRCconstraints.size());
@@ -871,6 +872,14 @@ public:
                 }
 #endif
 
+#ifdef RCC
+                // RCC cuts
+                if (rccManager.size() > 0) {
+                    auto model     = node->getModel();
+                    auto arc_duals = rccManager.computeDuals(model);
+                    bucket_graph.setArcDuals(arc_duals);
+                }
+#endif
                 bucket_graph.setDuals(nodeDuals);
 
                 //////////////////////////////////////////////////////////////////////
@@ -883,10 +892,11 @@ public:
                 //////////////////////////////////////////////////////////////////////
 
                 // Adding cols
-                auto colAdded = addColumn(node, paths, false);
+                colAdded = addColumn(node, paths, false);
                 // matrix        = node->extractModelDataSparse();
 // remove all cuts
 #ifdef SRC
+                // Define rollback procedure
                 if (bucket_graph.getStatus() == Status::Rollback) {
                     for (int i = SRCconstraints.size() - 1; i >= 0; --i) {
                         GRBConstr constr = SRCconstraints[i];
@@ -920,6 +930,7 @@ public:
                 nodeDuals = node->getDuals();
                 lag_gap   = integer_solution - (lp_obj + std::min(0.0, inner_obj));
                 matrix    = node->extractModelDataSparse();
+
                 stab.update_stabilization_after_pricing_optim(matrix, nodeDuals, lag_gap, paths);
 
                 if (colAdded == 0) {
@@ -956,29 +967,27 @@ public:
                 fmt::print("| It.: {:4} | Obj.: {:8.2f} | Price: {:9.2f} | SRC: {:4} | RCC: {:4} | Paths: {:4} | "
                            "Stage: {:1} | "
                            "Lag.: {:10.4f} | alpha: {:4.2f} | \n",
-                           iter, lp_obj, inner_obj, n_cuts, n_rcc_cuts, paths.size(), stage, lag_gap, cur_alpha);
+                           iter, lp_obj, inner_obj, n_cuts, n_rcc_cuts, colAdded, stage, lag_gap, cur_alpha);
         }
+        bucket_graph.print_statistics();
+        return true;
+    }
+
+    double objective(BNBNode *node) { return ip_result; }
+
+    double bound(BNBNode *node) {
+        auto start_timer = std::chrono::high_resolution_clock::now();
+        auto cg          = CG(node);
+        if (!cg) { return std::numeric_limits<double>::max(); }
         auto end_timer        = std::chrono::high_resolution_clock::now();
         auto duration_ms      = std::chrono::duration_cast<std::chrono::milliseconds>(end_timer - start_timer).count();
         auto duration_seconds = duration_ms / 1000;
         auto duration_milliseconds = duration_ms % 1000;
 
-        bucket_graph.print_statistics();
-
         node->optimize();
         relaxed_result = node->get(GRB_DoubleAttr_ObjVal);
 
-        node->binarizeNode();
-        node->optimize();
-
-        // check if optimal
-        if (node->get(GRB_IntAttr_Status) != GRB_OPTIMAL) {
-            ip_result = std::numeric_limits<double>::max();
-            // node->setPrune(true);
-            print_info("No optimal solution found.\n");
-            return;
-        }
-        ip_result = node->get(GRB_DoubleAttr_ObjVal);
+        auto &allPaths = node->paths;
 
         // get solution in which x > 0.5 and print the corresponding allPaths
         std::vector<int> sol;
@@ -993,6 +1002,18 @@ public:
         }
         fmt::print("\n");
 
+        node->binarizeNode();
+        node->optimize();
+
+        // check if optimal
+        if (node->get(GRB_IntAttr_Status) != GRB_OPTIMAL) {
+            ip_result = std::numeric_limits<double>::max();
+            // node->setPrune(true);
+            print_info("No optimal solution found.\n");
+        } else {
+            ip_result = node->get(GRB_DoubleAttr_ObjVal);
+        }
+
         // ANSI escape code for blue text
         constexpr auto blue  = "\033[34m";
         constexpr auto reset = "\033[0m";
@@ -1003,12 +1024,7 @@ public:
         fmt::print("| {:<14} | {}{:>16}.{:03}{} |\n", "VRP Duration", blue, duration_seconds, duration_milliseconds,
                    reset);
         fmt::print("+----------------------+----------------+\n");
-    }
 
-    double objective(BNBNode *node) { return ip_result; }
-
-    double bound(BNBNode *node) {
-        CG(node);
         return relaxed_result;
     }
 

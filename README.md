@@ -56,6 +56,7 @@ Some features are experimental and subject to ongoing improvements:
 - [NVIDIA/stdexec](https://github.com/NVIDIA/stdexec) for parallel tasks
 - [fmt](https://github.com/fmtlib/fmt) for console output formatting
 - [jemalloc](https://jemalloc.net/) for better memory allocation (can be disabled, but it is highly recommended)
+- [xxHash](https://github.com/Cyan4973/xxHash) for improved hash functions
 - [Gurobi](https://www.gurobi.com/) for solving the VRPTW example instances
 
 *Optional*

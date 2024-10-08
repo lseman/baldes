@@ -185,6 +185,12 @@ cpmaddpackage(
   "STDEXEC_BUILD_DOCS OFF"
   "BUILD_TESTING OFF")
 
+cpmaddpackage(
+    NAME xxhash
+    GIT_REPOSITORY https://github.com/Cyan4973/xxHash.git
+    GIT_TAG v0.8.2
+)
+
 find_package(FMT)
 if(NOT FMT_FOUND)
   message(STATUS "FMT not found, using bundled version")
@@ -342,6 +348,9 @@ endif()
 target_compile_options(vrptw PRIVATE -Wno-c++26-extensions
                                      -Wno-deprecated-declarations)
 
+# link with xxhash
+target_link_libraries(vrptw PRIVATE xxhash)
+
 if(CLIQUER)
   add_executable(cliquer src/Original.cpp src/BucketGraph.cpp)
   target_link_libraries(cliquer PRIVATE STDEXEC::stdexec)
@@ -370,3 +379,4 @@ if(CLIQUER)
   target_compile_options(cliquer PRIVATE -Wno-c++26-extensions
                                          -Wno-deprecated-declarations)
 endif()
+

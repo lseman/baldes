@@ -12,9 +12,11 @@
 
 #include "Definitions.h"
 #include "bnb/Problem.h"
+
 #include <sstream>
 
 #include "Path.h"
+#include "Hashes.h"
 #include "SRC.h"
 
 #include "VRPCandidate.h"
@@ -88,7 +90,9 @@ public:
         model = new GRBModel(eModel);
         generateUUID();
         this->initialized = true;
+        #ifdef RCC
         CMGR_CreateCMgr(&oldCutsCMP, 100); // For old cuts, if needed
+        #endif
     };
 
     void setPaths(std::vector<Path> paths) { this->paths = paths; }

@@ -5,9 +5,8 @@
 #pragma once
 #include "Arc.h"
 #include "Common.h"
-#include "config.h"
 
-#include <future>
+#include "xxhash.h"  // Include the header file for xxhash
 
 /**
  * @struct Path
@@ -108,21 +107,32 @@ struct Path {
     }
 };
 
+inline int random_seed() {
+    std::random_device rd;
+    std::mt19937 gen(rd());
+    std::uniform_int_distribution<> dis(0, 1000000);
+    return dis(gen);
+}
+
 struct PathHash {
     std::size_t operator()(const Path &p) const {
-        std::size_t hash_val = 0xcbf29ce484222325; // Use FNV-1a hash starting value
+        // Initialize the seed for the xxhash function randomly
+        const uint64_t seed = random_seed();
+        XXH64_state_t* state = XXH64_createState();
+        XXH64_reset(state, seed);
 
-        // Faster hash combination with fewer operations
-        for (const auto &node : p.route) {
-            hash_val ^= std::hash<int>()(node); // XOR the node's hash directly
-            hash_val *= 0x100000001b3;          // FNV-1a multiplier for better mixing
+        // Hash the entire route vector
+        for (const auto& node : p.route) {
+            XXH64_update(state, &node, sizeof(node));
         }
 
-        // Combine the cost more efficiently, cast the double to int64_t
-        std::size_t cost_hash = std::hash<int64_t>()(reinterpret_cast<const int64_t &>(p.cost));
-        hash_val ^= cost_hash;
-        hash_val *= 0x100000001b3;
+        // Convert double cost to hash safely
+        XXH64_update(state, &p.cost, sizeof(p.cost));
 
+        // Finalize the hash
+        std::size_t hash_val = XXH64_digest(state);
+        
+        XXH64_freeState(state);
         return hash_val;
     }
 };
