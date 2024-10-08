@@ -191,6 +191,17 @@ cpmaddpackage(
     GIT_TAG v0.8.2
 )
 
+# add https://github.com/martinus/unordered_dense
+CPMAddPackage(
+  NAME ankerl_unordered_dense
+  GITHUB_REPOSITORY martinus/unordered_dense
+  GIT_TAG origin/main  # or a specific version/tag
+)
+
+# include ankerl
+include_directories(${ankerl_unordered_dense_SOURCE_DIR}/include)
+
+
 find_package(FMT)
 if(NOT FMT_FOUND)
   message(STATUS "FMT not found, using bundled version")
@@ -350,6 +361,8 @@ target_compile_options(vrptw PRIVATE -Wno-c++26-extensions
 
 # link with xxhash
 target_link_libraries(vrptw PRIVATE xxhash)
+# link with unordered_dense
+target_link_libraries(vrptw PRIVATE unordered_dense)
 
 if(CLIQUER)
   add_executable(cliquer src/Original.cpp src/BucketGraph.cpp)

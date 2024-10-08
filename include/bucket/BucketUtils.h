@@ -491,7 +491,7 @@ void BucketGraph::SCC_handler() {
     auto &buckets      = assign_buckets<D>(fw_buckets, bw_buckets);
     auto &bucket_graph = assign_buckets<D>(fw_bucket_graph, bw_bucket_graph);
 
-    std::unordered_map<int, std::vector<int>> extended_bucket_graph = bucket_graph;
+    ankerl::unordered_dense::map<int, std::vector<int>> extended_bucket_graph = bucket_graph;
 
     // Extend the bucket graph with arcs defined by the Phi sets
     for (auto i = 0; i < extended_bucket_graph.size(); ++i) {
@@ -690,7 +690,7 @@ template <Stage S>
 void BucketGraph::bucket_fixing() {
     // Stage 4 bucket arc fixing
     if (!fixed) {
-        fmt::print("\033[34mSTARTING BUCKET FIXING PROCEDURE \033[0m");
+        fmt::print("\033[34m_STARTING BUCKET FIXING PROCEDURE \033[0m");
         fmt::print("\n");
         fixed = true;
         common_initialization();
@@ -721,7 +721,7 @@ void BucketGraph::bucket_fixing() {
             });
 
         generate_arcs();
-        fmt::print("\033[34mBUCKET FIXING PROCEDURE FINISHED\033[0m");
+        fmt::print("\033[34m_BUCKET FIXING PROCEDURE FINISHED\033[0m");
         fmt::print("\n");
     }
 }

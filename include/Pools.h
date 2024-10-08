@@ -18,9 +18,10 @@
 
 #include <deque>
 #include <tuple>
-#include <unordered_map>
 #include <utility>
 #include <vector>
+
+#include "ankerl/unordered_dense.h"
 
 /**
  * @class SchrodingerPool
@@ -230,9 +231,9 @@ private:
 struct PSTEPDuals {
     using Arc = std::pair<int, int>; // Represents an arc as a pair (from, to)
 
-    std::unordered_map<Arc, double> arcDuals;          // Stores dual values for arcs
-    std::unordered_map<int, double> three_two_Duals;   // Stores dual values for nodes
-    std::unordered_map<int, double> three_three_Duals; // Stores dual values for nodes
+    ankerl::unordered_dense::map<Arc, double> arcDuals;          // Stores dual values for arcs
+    ankerl::unordered_dense::map<int, double> three_two_Duals;   // Stores dual values for nodes
+    ankerl::unordered_dense::map<int, double> three_three_Duals; // Stores dual values for nodes
 
     // Set dual values for arcs
     void setArcDualValues(const std::vector<std::pair<Arc, double>> &values) {

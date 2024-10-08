@@ -1021,7 +1021,7 @@ public:
         fmt::print("+----------------------+----------------+\n");
         fmt::print("| {:<14} | {}{:>20}{} |\n", "Bound", blue, relaxed_result, reset);
         fmt::print("| {:<14} | {}{:>20}{} |\n", "Incumbent", blue, ip_result, reset);
-        fmt::print("| {:<14} | {}{:>16}.{:03}{} |\n", "VRP Duration", blue, duration_seconds, duration_milliseconds,
+        fmt::print("| {:<14} | {}{:>16}.{:03}{} |\n", "CG Duration", blue, duration_seconds, duration_milliseconds,
                    reset);
         fmt::print("+----------------------+----------------+\n");
 
@@ -1029,7 +1029,7 @@ public:
     }
 
     void branch(BNBNode *node) {
-        fmt::print("\033[34mSTARTING BRANCH PROCEDURE \033[0m");
+        fmt::print("\033[34m_STARTING BRANCH PROCEDURE \033[0m");
         fmt::print("\n");
 
         node->update();
@@ -1038,6 +1038,7 @@ public:
         auto candidates       = Branching::VRPTWStandardBranching(node, &instance);
         auto candidateCounter = 0;
 
+        print_info("Candidates generated: {}\n", candidates.size());
         for (auto &candidate : candidates) {
 
             if (node->hasCandidate(candidate)) continue;
@@ -1052,7 +1053,7 @@ public:
             if (candidateCounter >= NUMERO_CANDIDATOS) break;
         }
 
-        fmt::print("\033[34mFINISHED BRANCH PROCEDURE \033[0m");
+        fmt::print("\033[34m_FINISHED BRANCH PROCEDURE \033[0m");
         fmt::print("\n");
     }
 };

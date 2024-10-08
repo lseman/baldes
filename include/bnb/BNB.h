@@ -143,7 +143,7 @@ public:
     void solve() {
         // init timer
         fmt::print("\n");
-        fmt::print("\033[34mSTARTING BnB \033[0m");
+        fmt::print("\033[34m_STARTING BnB \033[0m");
         fmt::print("\n");
         auto start = std::chrono::high_resolution_clock::now();
         while (BNBNode *currentBNBNode = getNextBNBNode()) {
@@ -166,7 +166,7 @@ public:
 
             if (std::abs(boundValue - objectiveValue) < 1e-2) {
                 fmt::print("\n");
-                print_info("SOLUTION FOUND: {}\n", objectiveValue);
+                fmt::print("\033[34m_SOLUTION FOUND \033[0m: {}\n", objectiveValue);
 
                 globalBestObjective.store(objectiveValue, std::memory_order_release);
                 markSolutionFound();
@@ -181,7 +181,7 @@ public:
         }
         auto                          end     = std::chrono::high_resolution_clock::now();
         std::chrono::duration<double> elapsed = end - start;
-        print_info("Elapsed time: {}\n", elapsed.count());
+        print_info("Elapsed time: {:.2f}\n", elapsed.count());
     }
 
     void branch(BNBNode *&node) {

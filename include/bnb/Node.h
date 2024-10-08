@@ -15,14 +15,17 @@
 
 #include <sstream>
 
-#include "Path.h"
 #include "Hashes.h"
+#include "Path.h"
 #include "SRC.h"
 
 #include "VRPCandidate.h"
 
 #include <optional>
 #include <variant>
+
+// include unordered_dense_map
+#include "ankerl/unordered_dense.h"
 
 #ifdef RCC
 #include "../third_party/cvrpsep/capsep.h"
@@ -70,9 +73,10 @@ public:
     LimitedMemoryRank1Cuts r1c;
 #endif
 
-    ModelData                          matrix;
-    std::vector<Path>                  paths;
-    std::unordered_set<Path, PathHash> pathSet;
+    ModelData         matrix;
+    std::vector<Path> paths;
+    // std::unordered_set<Path, PathHash> pathSet;
+    ankerl::unordered_dense::set<Path, PathHash> pathSet;
 
 #ifdef RCC
     CnstrMgrPointer oldCutsCMP = nullptr;
@@ -90,9 +94,9 @@ public:
         model = new GRBModel(eModel);
         generateUUID();
         this->initialized = true;
-        #ifdef RCC
+#ifdef RCC
         CMGR_CreateCMgr(&oldCutsCMP, 100); // For old cuts, if needed
-        #endif
+#endif
     };
 
     void setPaths(std::vector<Path> paths) { this->paths = paths; }

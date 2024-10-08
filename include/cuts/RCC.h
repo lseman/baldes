@@ -28,12 +28,11 @@
 #include <iostream>
 #include <numeric>
 #include <set>
-#include <unordered_map>
-#include <unordered_set>
 #include <vector>
 
 #include <iostream>
-#include <unordered_map>
+
+#include "ankerl/unordered_dense.h"
 
 // Define the RCCArc struct
 struct RCCut {
@@ -76,7 +75,7 @@ public:
     }
 
 private:
-    std::unordered_map<RCCArc, double, RCCArcHash> arcDuals_; // Map for storing arc duals
+    ankerl::unordered_dense::map<RCCArc, double, RCCArcHash> arcDuals_; // Map for storing arc duals
 };
 
 class RCCManager {
@@ -97,7 +96,7 @@ public:
         std::vector<double> coeffs(cuts_.size(), 0);
 
         // Precompute the pairs of consecutive nodes in the label
-        std::unordered_set<std::pair<int, int>> label_arcs;
+        ankerl::unordered_dense::set<std::pair<int, int>> label_arcs;
         for (int j = 0; j < label.size() - 1; j++) { label_arcs.insert({label[j], label[j + 1]}); }
 
         // Iterate over cuts

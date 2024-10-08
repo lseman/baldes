@@ -25,7 +25,8 @@ SOFTWARE.*/
 #define GENETIC_H
 
 #include <array>
-#include <unordered_set>
+
+#include "ankerl/unordered_dense.h"
 
 #include "Individual.h"
 #include "LocalSearch.h"
@@ -73,7 +74,7 @@ private:
     Individual *crossoverSREX(std::pair<const Individual *, const Individual *> parents);
     // Insert unplanned tasks (those that were in the removed routes of A but not the inserted routes of B or vice
     // versa)
-    void insertUnplannedTasks(Individual *offspring, const std::unordered_set<int> &unplanned);
+    void insertUnplannedTasks(Individual *offspring, const ankerl::unordered_dense::set<int> &unplanned);
 
     // Function to do one OX and one SREX Crossover for a pair of individuals (the two parents), and get the best result
     // based on penalizedCost

@@ -12,6 +12,8 @@
 #include "Common.h"
 #include "SparseMatrix.h"
 
+#include "ankerl/unordered_dense.h"
+
 struct BucketOptions {
     int depot         = 0;
     int end_depot     = N_SIZE - 1;
@@ -32,15 +34,15 @@ using Payload = std::optional<std::variant<int, std::pair<int, int>>>; // Option
                                                                        //
 // Step 1: Implement Aggregated Variables for Branching Constraints
 struct BranchingQueueItem {
-    int                                             sourceNode;      // route index (or source node for edges)
-    int                                             targetNode;      // source node or customer for edges
-    double                                          fractionalValue; // Fractionality of the route/variable
-    double                                          productValue;    // Additional score or weight
-    std::unordered_map<int, double>                 g_m;             // Vehicle type aggregation
-    std::unordered_map<int, double>                 g_m_v;           // Customer-service aggregation
-    std::unordered_map<std::pair<int, int>, double> g_v_vp;          // Edge usage aggregation
-    CandidateType                                   candidateType;   // Type of the candidate (Vehicle, Node, or Edge)
-    double                                          score = 0.0;     // Pseudo-cost or score for the candidate
+    int                                                       sourceNode;      // route index (or source node for edges)
+    int                                                       targetNode;      // source node or customer for edges
+    double                                                    fractionalValue; // Fractionality of the route/variable
+    double                                                    productValue;    // Additional score or weight
+    ankerl::unordered_dense::map<int, double>                 g_m;             // Vehicle type aggregation
+    ankerl::unordered_dense::map<int, double>                 g_m_v;           // Customer-service aggregation
+    ankerl::unordered_dense::map<std::pair<int, int>, double> g_v_vp;          // Edge usage aggregation
+    CandidateType candidateType; // Type of the candidate (Vehicle, Node, or Edge)
+    double        score = 0.0;   // Pseudo-cost or score for the candidate
 };
 
 // Comparator function for Stage enum

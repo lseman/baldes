@@ -61,7 +61,8 @@ Some features are experimental and subject to ongoing improvements:
 - [NVIDIA/stdexec](https://github.com/NVIDIA/stdexec) for parallel tasks
 - [fmt](https://github.com/fmtlib/fmt) for console output formatting
 - [jemalloc](https://jemalloc.net/) for better memory allocation (can be disabled, but it is highly recommended)
-- [xxHash](https://github.com/Cyan4973/xxHash) for improved hash functions
+- [xxHash](https://github.com/Cyan4973/xxHash) for improved hash calculations
+- [ankerl::unordered_dense](https://github.com/martinus/unordered_dense) for improved hash map and set
 - [Gurobi](https://www.gurobi.com/) for solving the VRPTW example instances
 
 *Optional*
@@ -101,7 +102,7 @@ Make sure the `GUROBI_HOME` environment variable is set.
 | `SCHRODINGER`           | Enable schrodinger pool                | OFF     |
 | `PSTEP`                 | Enable PStep compilation               | OFF     |
 | `FIXED_BUCKETS`         | Enable bucket arc fixing               | ON      |
-| `JEMALLOC`              | Enable jemalloc                        | ON     |
+| `JEMALLOC`              | Enable jemalloc                        | ON      |
 
 **Numerical and Other Definitions**
 

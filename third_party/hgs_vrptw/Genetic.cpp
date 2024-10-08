@@ -1,8 +1,8 @@
+#include "ankerl/unordered_dense.h"
 #include <algorithm>
 #include <bitset>
 #include <iterator>
 #include <time.h>
-#include <unordered_set>
 
 #include "Genetic.h"
 #include "Individual.h"
@@ -167,14 +167,14 @@ Individual *Genetic::crossoverSREX(std::pair<const Individual *, const Individua
             : params->rng() % (std::min(nOfRoutesA - 1, nOfRoutesB - 1)) + 1; // Prevent not moving any routes
     int startB = startA < nOfRoutesB ? startA : 0;
 
-    std::unordered_set<int> clientsInSelectedA;
+    ankerl::unordered_dense::set<int> clientsInSelectedA;
     for (int r = 0; r < nOfMovedRoutes; r++) {
         // Insert the first
         clientsInSelectedA.insert(parents.first->chromR[(startA + r) % nOfRoutesA].begin(),
                                   parents.first->chromR[(startA + r) % nOfRoutesA].end());
     }
 
-    std::unordered_set<int> clientsInSelectedB;
+    ankerl::unordered_dense::set<int> clientsInSelectedB;
     for (int r = 0; r < nOfMovedRoutes; r++) {
         clientsInSelectedB.insert(parents.second->chromR[(startB + r) % nOfRoutesB].begin(),
                                   parents.second->chromR[(startB + r) % nOfRoutesB].end());
@@ -190,12 +190,14 @@ Individual *Genetic::crossoverSREX(std::pair<const Individual *, const Individua
         const int idxBLastMoved = (startB - 1 + nOfMovedRoutes) % nOfRoutesB;
 
         // Cache counts for A and B
-        const auto countClientsOut = [](const std::vector<int> &route, const std::unordered_set<int> &clientsSet) {
+        const auto countClientsOut = [](const std::vector<int>                  &route,
+                                        const ankerl::unordered_dense::set<int> &clientsSet) {
             return std::count_if(route.begin(), route.end(),
                                  [&clientsSet](int c) { return clientsSet.find(c) == clientsSet.end(); });
         };
 
-        const auto countClientsIn = [](const std::vector<int> &route, const std::unordered_set<int> &clientsSet) {
+        const auto countClientsIn = [](const std::vector<int>                  &route,
+                                       const ankerl::unordered_dense::set<int> &clientsSet) {
             return std::count_if(route.begin(), route.end(),
                                  [&clientsSet](int c) { return clientsSet.find(c) != clientsSet.end(); });
         };
@@ -275,8 +277,10 @@ Individual *Genetic::crossoverSREX(std::pair<const Individual *, const Individua
     }
 
     // Convert vector to unordered_set
-    std::unordered_set<int> clientsInSelectedANotB(clientsInSelectedANotBVec.begin(), clientsInSelectedANotBVec.end());
-    std::unordered_set<int> clientsInSelectedBNotA(clientsInSelectedBNotAVec.begin(), clientsInSelectedBNotAVec.end());
+    ankerl::unordered_dense::set<int> clientsInSelectedANotB(clientsInSelectedANotBVec.begin(),
+                                                             clientsInSelectedANotBVec.end());
+    ankerl::unordered_dense::set<int> clientsInSelectedBNotA(clientsInSelectedBNotAVec.begin(),
+                                                             clientsInSelectedBNotAVec.end());
 
     // Replace selected routes from parent B into parent A
     for (int r = 0; r < nOfMovedRoutes; r++) {
@@ -337,7 +341,7 @@ Individual *Genetic::crossoverSREX(std::pair<const Individual *, const Individua
                : candidateOffsprings[1];
 }
 
-void Genetic::insertUnplannedTasks(Individual *offspring, const std::unordered_set<int> &unplannedTasks) {
+void Genetic::insertUnplannedTasks(Individual *offspring, const ankerl::unordered_dense::set<int> &unplannedTasks) {
     // Loop over all unplannedTasks
     for (int c : unplannedTasks) {
         // Get the earliest and latest possible arrival at the client

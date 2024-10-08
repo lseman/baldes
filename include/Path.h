@@ -6,7 +6,7 @@
 #include "Arc.h"
 #include "Common.h"
 
-#include "xxhash.h"  // Include the header file for xxhash
+#include "xxhash.h" // Include the header file for xxhash
 
 /**
  * @struct Path
@@ -75,7 +75,7 @@ struct Path {
         return times;
     }
 
-    std::unordered_map<std::pair<int, int>, int> arcMap; // Maps arcs to their counts
+    ankerl::unordered_dense::map<std::pair<int, int>, int> arcMap; // Maps arcs to their counts
 
     /**
      * @brief Adds an arc between two nodes and increments its count in the arc map.
@@ -108,31 +108,32 @@ struct Path {
 };
 
 inline int random_seed() {
-    std::random_device rd;
-    std::mt19937 gen(rd());
+    std::random_device              rd;
+    std::mt19937                    gen(rd());
     std::uniform_int_distribution<> dis(0, 1000000);
     return dis(gen);
 }
 
 struct PathHash {
     std::size_t operator()(const Path &p) const {
-        // Initialize the seed for the xxhash function randomly
+        // Initialize the seed for the xxhash function
         const uint64_t seed = random_seed();
-        XXH64_state_t* state = XXH64_createState();
-        XXH64_reset(state, seed);
+
+        // Use XXH3_64bits for hashing instead of XXH64
+        XXH3_state_t *state = XXH3_createState();
+        XXH3_64bits_reset_withSeed(state, seed);
 
         // Hash the entire route vector
-        for (const auto& node : p.route) {
-            XXH64_update(state, &node, sizeof(node));
-        }
+        for (const auto &node : p.route) { XXH3_64bits_update(state, &node, sizeof(node)); }
 
-        // Convert double cost to hash safely
-        XXH64_update(state, &p.cost, sizeof(p.cost));
+        // Hash the cost (assuming it's a double, which is 8 bytes)
+        XXH3_64bits_update(state, &p.cost, sizeof(p.cost));
 
         // Finalize the hash
-        std::size_t hash_val = XXH64_digest(state);
-        
-        XXH64_freeState(state);
+        std::size_t hash_val = XXH3_64bits_digest(state);
+
+        // Clean up the state
+        XXH3_freeState(state);
         return hash_val;
     }
 };

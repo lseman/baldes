@@ -118,8 +118,8 @@ public:
     SchrodingerPool sPool = SchrodingerPool(200);
 #endif
 
-    // std::unordered_map<int, BucketIntervalTree> fw_interval_trees;
-    // std::unordered_map<int, BucketIntervalTree> bw_interval_trees;
+    // ankerl::unordered_dense::map<int, BucketIntervalTree> fw_interval_trees;
+    // ankerl::unordered_dense::map<int, BucketIntervalTree> bw_interval_trees;
 
     template <Direction D>
     inline bool is_within_bounds(const BucketRange<D> &new_range, const BucketRange<D> &fixed_range) {
@@ -334,8 +334,8 @@ public:
     std::vector<std::vector<int>>    Phi_fw;
     std::vector<std::vector<int>>    Phi_bw;
 
-    std::unordered_map<int, std::vector<int>> fw_bucket_graph;
-    std::unordered_map<int, std::vector<int>> bw_bucket_graph;
+    ankerl::unordered_dense::map<int, std::vector<int>> fw_bucket_graph;
+    ankerl::unordered_dense::map<int, std::vector<int>> bw_bucket_graph;
 
     std::vector<double> fw_c_bar;
     std::vector<double> bw_c_bar;
@@ -403,16 +403,16 @@ public:
     int              non_dominated_labels_per_bucket;
 
     // Interval tree to store bucket intervals
-    std::unordered_map<int, SplayTree> fw_node_interval_trees;
-    std::unordered_map<int, SplayTree> bw_node_interval_trees;
+    ankerl::unordered_dense::map<int, SplayTree> fw_node_interval_trees;
+    ankerl::unordered_dense::map<int, SplayTree> bw_node_interval_trees;
 
     template <Direction D>
-    std::unordered_map<int, BucketIntervalTree<D>> rebuild_buckets() {
+    ankerl::unordered_dense::map<int, BucketIntervalTree<D>> rebuild_buckets() {
         // References to the forward or backward fixed buckets and ranges
         auto &fixed_buckets = assign_buckets<D>(fw_fixed_buckets, bw_fixed_buckets);
         auto &buckets       = assign_buckets<D>(fw_buckets, bw_buckets);
         // auto &interval_tree = assign_buckets<D>(fw_interval_trees, bw_interval_trees);
-        std::unordered_map<int, BucketIntervalTree<D>> interval_tree;
+        ankerl::unordered_dense::map<int, BucketIntervalTree<D>> interval_tree;
         // interval_tree.clear();
 
         // Iterate over all fixed arcs (fixed_buckets[from][to])
@@ -730,7 +730,7 @@ public:
         int original_num_buckets = buckets_size;
 
         // To track splits per node_id
-        std::unordered_map<int, int> splits_per_node;
+        ankerl::unordered_dense::map<int, int> splits_per_node;
 
         // Loop until the second-to-last bucket to avoid out-of-bounds access
         for (int i = 0; i < original_num_buckets - 1; ++i) {
@@ -952,8 +952,8 @@ public:
     void ConcatenateLabel(const Label *L, int &b, Label *&pbest, std::vector<uint64_t> &Bvisited);
 
     template <Direction D>
-    void UpdateBucketsSet(double theta, const Label *label, std::unordered_set<int> &Bbidi, int &current_bucket,
-                          std::unordered_set<int> &Bvisited);
+    void UpdateBucketsSet(double theta, const Label *label, ankerl::unordered_dense::set<int> &Bbidi,
+                          int &current_bucket, ankerl::unordered_dense::set<int> &Bvisited);
 
     template <Direction D>
     void ObtainJumpBucketArcs();

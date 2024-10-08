@@ -21,6 +21,8 @@
 
 #include "VRPNode.h"
 
+#include "ankerl/unordered_dense.h"
+
 #include <execution>
 /**
  * Updates the set of buckets based on the given parameters.
@@ -30,8 +32,8 @@
  *
  */
 template <Direction D>
-void BucketGraph::UpdateBucketsSet(const double theta, const Label *label, std::unordered_set<int> &Bbidi,
-                                   int &current_bucket, std::unordered_set<int> &Bvisited) {
+void BucketGraph::UpdateBucketsSet(const double theta, const Label *label, ankerl::unordered_dense::set<int> &Bbidi,
+                                   int &current_bucket, ankerl::unordered_dense::set<int> &Bvisited) {
     // Precompute values and assign references for the direction-specific data
     auto &Phi_opposite     = assign_buckets<D>(Phi_bw, Phi_fw);
     auto &buckets_opposite = assign_buckets<D>(bw_buckets, fw_buckets);
@@ -119,7 +121,8 @@ void BucketGraph::BucketArcElimination(double theta) {
         print_info("[Bw] performing bucket arc elimination with theta = {}\n", theta);
     }
 
-    using ArcMap = std::unordered_map<std::pair<std::pair<int, int>, int>, std::unordered_set<int>, arc_map_hash>;
+    using ArcMap = ankerl::unordered_dense::map<std::pair<std::pair<int, int>, int>, ankerl::unordered_dense::set<int>,
+                                                arc_map_hash>;
 
     ArcMap local_B_Ba_b;
     int    removed_arcs = 0;
@@ -133,8 +136,8 @@ void BucketGraph::BucketArcElimination(double theta) {
                 auto arc_key    = std::make_pair(std::make_pair(a.base_bucket, a.jump_bucket), b);
                 int  b_opposite = get_opposite_bucket_number<D>(a.jump_bucket);
 
-                std::unordered_set<int> Bvisited;
-                auto                   &Bidi_map = local_B_Ba_b[arc_key];
+                ankerl::unordered_dense::set<int> Bvisited;
+                auto                             &Bidi_map = local_B_Ba_b[arc_key];
 
                 for (auto &L_item : labels) {
                     Bidi_map.insert(b);
@@ -155,8 +158,8 @@ void BucketGraph::BucketArcElimination(double theta) {
                 std::make_pair(std::make_pair(buckets[a.from_bucket].node_id, buckets[a.to_bucket].node_id), b);
             int b_opposite = get_opposite_bucket_number<D>(a.to_bucket);
 
-            std::unordered_set<int> Bvisited;
-            auto                   &Bidi_map = local_B_Ba_b[arc_key];
+            ankerl::unordered_dense::set<int> Bvisited;
+            auto                             &Bidi_map = local_B_Ba_b[arc_key];
 
             for (auto &L_item : labels) {
                 Bidi_map.insert(b);

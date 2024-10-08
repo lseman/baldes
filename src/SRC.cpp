@@ -303,7 +303,7 @@ void LimitedMemoryRank1Cuts::generateCutCoefficients(VRPTW_SRC &cuts, std::vecto
                 }
 #else
 
-                std::unordered_set<int> C_set(C_index.begin(), C_index.end());
+                ankerl::unordered_dense::set<int> C_set(C_index.begin(), C_index.end());
                 for (auto node : remainingNodes) {
                     auto &consumers = allPaths[node]; // Reference to the consumers for in-place modification
 
