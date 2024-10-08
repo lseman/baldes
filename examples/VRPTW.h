@@ -837,7 +837,7 @@ public:
             while (misprice) {
                 // TODO: check if we should get rcc and src duals here
                 node->update();
-                nodeDuals = stab.getStabDualSol(nodeDuals);
+                nodeDuals = stab.getStabDualSolAdvanced(nodeDuals);
                 solution  = node->extractSolution();
 #endif
 
@@ -893,8 +893,7 @@ public:
 
                 // Adding cols
                 colAdded = addColumn(node, paths, false);
-                // matrix        = node->extractModelDataSparse();
-// remove all cuts
+
 #ifdef SRC
                 // Define rollback procedure
                 if (bucket_graph.getStatus() == Status::Rollback) {
@@ -949,17 +948,18 @@ public:
             stab.update_stabilization_after_iter(nodeDuals);
 #endif
 
-            auto cur_alpha = 0.0;
+            auto cur_alpha  = 0.0;
+            auto n_cuts     = 0;
+            auto n_rcc_cuts = 0;
+
 #ifdef STAB
             cur_alpha = stab.base_alpha;
 #endif
 
-            auto n_cuts = 0;
 #ifdef SRC
             n_cuts = cuts->size();
 #endif
 
-            auto n_rcc_cuts = 0;
 #ifdef RCC
             n_rcc_cuts = rccManager.size();
 #endif
