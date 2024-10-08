@@ -48,6 +48,11 @@ Some features are experimental and subject to ongoing improvements:
 - **[experimental]** Knapsack Completion Bounds for Capacity Constraints
 - **[experimental]** Branching (Branch-Cut-and-Price) for the VRPTW
 
+## 📋 TODO
+
+- [ ] Consider branching constraints duals
+- [ ] Improve branching decisions
+
 ## 🛠️ Building
 
 ### 📋 Prerequisites
