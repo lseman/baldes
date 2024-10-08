@@ -23,8 +23,6 @@
 #include <fstream>
 #include <iostream>
 #include <stack>
-#include <unordered_map>
-#include <unordered_set>
 #include <vector>
 
 /**
@@ -66,7 +64,7 @@ public:
      * representation using the addEdge function.
      *
      */
-    void convertFromUnorderedMap(const std::unordered_map<int, std::vector<int>> &map) {
+    void convertFromUnorderedMap(const ankerl::unordered_dense::map<int, std::vector<int>> &map) {
         for (const auto &pair : map) {
             int v = pair.first;
             for (int w : pair.second) { addEdge(v, w); }
@@ -99,12 +97,12 @@ public:
      *
      */
     std::vector<int> topologicalOrderOfSCCs(const std::vector<std::vector<int>> &sccs) {
-        std::unordered_map<int, int> nodeToScc;
+        ankerl::unordered_dense::map<int, int> nodeToScc;
         for (int i = 0; i < sccs.size(); ++i) {
             for (int node : sccs[i]) { nodeToScc[node] = i; }
         }
 
-        std::vector<std::unordered_set<int>> componentGraph(sccs.size());
+        std::vector<ankerl::unordered_dense::set<int>> componentGraph(sccs.size());
         for (int v = 0; v < adj.size(); ++v) {
             for (int w : adj[v]) {
                 int sccV = nodeToScc[v];
@@ -161,7 +159,7 @@ public:
                                            "purple", "cyan",  "magenta", "lime",   "pink"};
 
         // Create a mapping from node to SCC index
-        std::unordered_map<int, int> nodeToScc;
+        ankerl::unordered_dense::map<int, int> nodeToScc;
         for (int i = 0; i < sccs.size(); ++i) {
             for (int node : sccs[i]) { nodeToScc[node] = i; }
         }

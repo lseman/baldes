@@ -213,7 +213,7 @@ public:
     std::size_t generateCutKey(const int &cutMaster, const std::vector<bool> &baseSetStr) const;
 
 private:
-    std::unordered_map<std::size_t, int>              cutMaster_to_cut_map;
-    Cuts                                              cuts;
-    std::unordered_map<std::size_t, std::vector<int>> indexCuts;
+    ankerl::unordered_dense::map<std::size_t, int>              cutMaster_to_cut_map;
+    Cuts                                                        cuts;
+    ankerl::unordered_dense::map<std::size_t, std::vector<int>> indexCuts;
 };

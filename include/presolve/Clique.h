@@ -8,9 +8,9 @@
 #include <algorithm>
 #include <execution>
 #include <mutex>
-#include <unordered_map>
-#include <unordered_set>
 #include <vector>
+
+#include "ankerl/unordered_dense.h"
 
 class CliqueManager {
 private:
@@ -107,7 +107,7 @@ public:
 
     void findCliques() {
         cliques.clear(); // Clear previous cliques
-        std::unordered_map<int, std::vector<std::pair<double, int>>> rowToElements;
+        ankerl::unordered_dense::map<int, std::vector<std::pair<double, int>>> rowToElements;
 
         // Populate rowToElements for efficient row-wise access from SparseMatrix elements
         for (const auto &elem : modelData.A_sparse.elements) {

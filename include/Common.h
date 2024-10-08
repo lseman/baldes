@@ -26,8 +26,8 @@
 #include <memory>
 #include <mutex>
 #include <ranges>
-#include <unordered_map>
 #include <vector>
 
+#include "ankerl/unordered_dense.h"
 #include <fmt/color.h>
 #include <fmt/core.h>

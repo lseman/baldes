@@ -8,6 +8,8 @@
 #include "Reader.h"
 #include "VRPCandidate.h"
 
+#include "ankerl/unordered_dense.h"
+
 #include <optional>
 #include <variant>
 
@@ -47,9 +49,11 @@ public:
         auto                            routes     = node->getPaths();
 
         // Aggregated variables for all vehicle types and routes
-        std::unordered_map<int, double> g_m;   // Aggregated g_m (number of vehicles of type m used)
-        std::unordered_map<int, double> g_m_v; // Aggregated g_m_v (whether customer v is served by a vehicle of type m)
-        std::unordered_map<std::pair<int, int>, double> g_v_vp; // Aggregated g_{v,v'} (whether edge (v, v') is used)
+        ankerl::unordered_dense::map<int, double> g_m; // Aggregated g_m (number of vehicles of type m used)
+        ankerl::unordered_dense::map<int, double>
+            g_m_v; // Aggregated g_m_v (whether customer v is served by a vehicle of type m)
+        ankerl::unordered_dense::map<std::pair<int, int>, double>
+            g_v_vp; // Aggregated g_{v,v'} (whether edge (v, v') is used)
 
         // Iterate over all routes in the LPSolution
         for (int i = 0; i < LPSolution.size(); ++i) {

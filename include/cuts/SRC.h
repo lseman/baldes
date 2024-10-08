@@ -29,11 +29,11 @@
 
 #include "Pools.h"
 
+#include "ankerl/unordered_dense.h"
 #include "bucket/BucketGraph.h"
 
 #include <queue>
 #include <random>
-#include <unordered_set>
 
 #include "xxhash.h"
 
@@ -175,15 +175,15 @@ public:
 private:
     static std::mutex cache_mutex;
 
-    static std::unordered_map<int, std::pair<std::vector<int>, std::vector<int>>> column_cache;
+    static ankerl::unordered_dense::map<int, std::pair<std::vector<int>, std::vector<int>>> column_cache;
 
-    std::vector<VRPNode>                      nodes;
-    std::vector<std::vector<int>>             baseSets;
-    std::unordered_map<int, std::vector<int>> neighborSets;
-    CutType                                   cutType;
+    std::vector<VRPNode>                                nodes;
+    std::vector<std::vector<int>>                       baseSets;
+    ankerl::unordered_dense::map<int, std::vector<int>> neighborSets;
+    CutType                                             cutType;
 
     // Function to create a unique key from an unordered set of strings
-    std::string createKey(const std::unordered_set<std::string> &set);
+    std::string createKey(const ankerl::unordered_dense::set<std::string> &set);
 
     int alpha(const std::vector<int> &C, const std::vector<int> &M, const std::vector<double> &p,
               const std::vector<int> &r);
@@ -284,8 +284,8 @@ inline void combinations(const std::vector<T> &elements, int k, std::vector<std:
  *
  */
 inline std::vector<std::vector<int>> findVisitingNodes(const SparseMatrix &A, const std::vector<int> &selectedNodes) {
-    std::vector<std::vector<int>> consumers;
-    std::unordered_set<int>       selectedNodeSet(selectedNodes.begin(), selectedNodes.end());
+    std::vector<std::vector<int>>     consumers;
+    ankerl::unordered_dense::set<int> selectedNodeSet(selectedNodes.begin(), selectedNodes.end());
 
     // Reserve space for consumers to prevent multiple allocations
     consumers.reserve(selectedNodes.size());
@@ -309,7 +309,7 @@ inline std::vector<std::vector<int>> findVisitingNodes(const SparseMatrix &A, co
 
 // Hash function for a vector of integers
 inline uint64_t hashVector(const std::vector<int> &vec) {
-    uint64_t hash = 0;  // Initialize seed for XXHash
+    uint64_t hash = 0; // Initialize seed for XXHash
 
     for (const int &elem : vec) {
         // Combine each element's hash using XXHash and XOR it with the running hash value
@@ -321,7 +321,7 @@ inline uint64_t hashVector(const std::vector<int> &vec) {
 
 // Hash function for a vector of doubles
 inline uint64_t hashVector(const std::vector<double> &vec) {
-    uint64_t hash = 0;  // Initialize seed for XXHash
+    uint64_t hash = 0; // Initialize seed for XXHash
 
     for (const double &elem : vec) {
         // Convert the double to uint64_t for hashing
@@ -373,10 +373,10 @@ void LimitedMemoryRank1Cuts::the45Heuristic(const SparseMatrix &A, const std::ve
         permutations.resize(4);
     }
 
-    std::unordered_set<uint64_t> processedSetsCache;
-    std::unordered_set<uint64_t> processedPermutationsCache;
-    std::mutex                   cuts_mutex;    // Protect access to shared resources
-    std::atomic<int>             cuts_count(0); // Thread-safe counter for cuts
+    ankerl::unordered_dense::set<uint64_t> processedSetsCache;
+    ankerl::unordered_dense::set<uint64_t> processedPermutationsCache;
+    std::mutex                             cuts_mutex;    // Protect access to shared resources
+    std::atomic<int>                       cuts_count(0); // Thread-safe counter for cuts
 
     // Create tasks for each selected node to parallelize
     std::vector<int> tasks(selectedNodes.size());

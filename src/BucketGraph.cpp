@@ -343,9 +343,9 @@ void BucketGraph::augment_ng_memories(std::vector<double> &solution, std::vector
     for (int col = 0; col < paths.size(); ++col) {
 
         if (solution[col] > 1e-2 && solution[col] < 1 - 1e-2) {
-            std::unordered_map<int, int> visited_clients;
-            std::vector<int>             cycle;
-            bool                         has_cycle = false;
+            ankerl::unordered_dense::map<int, int> visited_clients;
+            std::vector<int>                       cycle;
+            bool                                   has_cycle = false;
 
             for (int i = 0; i < paths[col].size(); ++i) {
                 int client = paths[col][i];
