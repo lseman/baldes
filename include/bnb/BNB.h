@@ -142,7 +142,9 @@ public:
     // Non-parallel version of solve
     void solve() {
         // init timer
-        print_info("Starting BNB\n");
+        fmt::print("\n");
+        fmt::print("\033[34mSTARTING BnB \033[0m");
+        fmt::print("\n");
         auto start = std::chrono::high_resolution_clock::now();
         while (BNBNode *currentBNBNode = getNextBNBNode()) {
             currentBNBNode->start();

@@ -29,6 +29,7 @@
 #include <numeric>
 #include <set>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 #include <iostream>
@@ -92,19 +93,23 @@ public:
         return constraints;
     }
 
-    std::vector<double> computeRCCCoefficients(std::vector<int> label) {
+    std::vector<double> computeRCCCoefficients(const std::vector<int> &label) {
         std::vector<double> coeffs(cuts_.size(), 0);
-        // iterate over cuts
-        for (int i = 0; i < cuts_.size(); i++) {
-            auto coeff = 0;
-            // check if the label is in the cut
-            // iterate over arcs in label
-            for (int j = 0; j < label.size() - 1; j++) {
-                // iterate over arcs in cut
-                for (auto arc : cuts_[i].arcs) { coeff += label[j] == arc.from && label[j + 1] == arc.to; }
-            }
+
+        // Precompute the pairs of consecutive nodes in the label
+        std::unordered_set<std::pair<int, int>> label_arcs;
+        for (int j = 0; j < label.size() - 1; j++) { label_arcs.insert({label[j], label[j + 1]}); }
+
+        // Iterate over cuts
+        for (int i = 0, n_cuts = cuts_.size(); i < n_cuts; i++) {
+            int coeff = 0;
+
+            // Iterate over arcs in the cut and check if they exist in the precomputed label arcs
+            for (const auto &arc : cuts_[i].arcs) { coeff += label_arcs.count({arc.from, arc.to}); }
+
             coeffs[i] = coeff;
         }
+
         return coeffs;
     }
 
@@ -131,7 +136,7 @@ public:
         for (int i = 0; i < cuts_.size(); ++i) {
             const auto &cut       = cuts_[i];
             double      dualValue = cut.ctr.get(GRB_DoubleAttr_Pi);
-            //fmt::print("Dual value for cut {}: {}\n", i, dualValue);
+            // fmt::print("Dual value for cut {}: {}\n", i, dualValue);
 
             if (std::abs(dualValue) < 1e-3) { continue; }
 

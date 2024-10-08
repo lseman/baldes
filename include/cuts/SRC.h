@@ -35,6 +35,8 @@
 #include <random>
 #include <unordered_set>
 
+#include "xxhash.h"
+
 #define VRPTW_SRC_max_S_n 10000
 
 /**
@@ -307,13 +309,11 @@ inline std::vector<std::vector<int>> findVisitingNodes(const SparseMatrix &A, co
 
 // Hash function for a vector of integers
 inline uint64_t hashVector(const std::vector<int> &vec) {
-    uint64_t       hash = 0;
-    std::hash<int> hasher;
+    uint64_t hash = 0;  // Initialize seed for XXHash
 
     for (const int &elem : vec) {
-        // Combine the current element's hash with the running hash value
-        // A prime number is used to minimize hash collisions
-        hash ^= hasher(elem) + 0x9e3779b9 + (hash << 6) + (hash >> 2);
+        // Combine each element's hash using XXHash and XOR it with the running hash value
+        hash ^= XXH64(&elem, sizeof(elem), hash);
     }
 
     return hash;
@@ -321,18 +321,17 @@ inline uint64_t hashVector(const std::vector<int> &vec) {
 
 // Hash function for a vector of doubles
 inline uint64_t hashVector(const std::vector<double> &vec) {
-    uint64_t          hash = 0;
-    std::hash<double> hasher;
+    uint64_t hash = 0;  // Initialize seed for XXHash
 
     for (const double &elem : vec) {
-        // Combine the current element's hash with the running hash value
-        // A prime number is used to minimize hash collisions
-        hash ^= hasher(elem) + 0x9e3779b9 + (hash << 6) + (hash >> 2);
+        // Convert the double to uint64_t for hashing
+        std::uint64_t bit_rep = std::bit_cast<std::uint64_t>(elem);
+        // Combine each element's hash using XXHash and XOR it with the running hash value
+        hash ^= XXH64(&bit_rep, sizeof(bit_rep), hash);
     }
 
     return hash;
 }
-
 using ViolatedCut = std::pair<double, Cut>;
 
 // Custom comparator to compare only the first element (the violation)

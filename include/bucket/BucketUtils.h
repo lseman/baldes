@@ -690,6 +690,8 @@ template <Stage S>
 void BucketGraph::bucket_fixing() {
     // Stage 4 bucket arc fixing
     if (!fixed) {
+        fmt::print("\033[34mSTARTING BUCKET FIXING PROCEDURE \033[0m");
+        fmt::print("\n");
         fixed = true;
         common_initialization();
 
@@ -719,6 +721,8 @@ void BucketGraph::bucket_fixing() {
             });
 
         generate_arcs();
+        fmt::print("\033[34mBUCKET FIXING PROCEDURE FINISHED\033[0m");
+        fmt::print("\n");
     }
 }
 
