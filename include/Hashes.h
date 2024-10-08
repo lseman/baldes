@@ -6,15 +6,17 @@
 #include <functional>
 #include <utility> // for std::pair
 
+#include <xxhash.h>  // Include XXHash header
+
+
 /**
  * @brief Combines hash values for multiple values using C++20, without recursion.
  */
 template <typename T, typename... Rest>
 constexpr void hash_combine(std::size_t &seed, const T &value, const Rest &...rest) noexcept {
-    std::hash<T> hasher;
-    seed ^= hasher(value) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
-    // Process the remaining values iteratively rather than recursively
-    (..., (seed ^= std::hash<Rest>{}(rest) + 0x9e3779b9 + (seed << 6) + (seed >> 2)));
+    // Use XXHash instead of std::hash for faster hashing
+    seed ^= XXH64(&value, sizeof(T), seed); 
+    (..., (seed ^= XXH64(&rest, sizeof(Rest), seed)));
 }
 
 /**
@@ -33,19 +35,20 @@ struct arc_map_hash {
  * @brief Generates a hash value for a double using std::bit_cast for efficiency.
  */
 constexpr std::size_t hash_double(double value, std::size_t index) noexcept {
-    // Direct bit manipulation and XOR with index
+    // Convert double to uint64_t using bit_cast and hash it with XXHash
     std::uint64_t bit_rep = std::bit_cast<std::uint64_t>(value);
-    return bit_rep ^ (index * 0x9e3779b9);
+    return XXH64(&bit_rep, sizeof(bit_rep), index);
 }
+
 
 // Specialize std::hash for std::pair<int, int>
 namespace std {
 template <>
 struct hash<std::pair<int, int>> {
     constexpr std::size_t operator()(const std::pair<int, int> &pair) const noexcept {
-        std::size_t h1 = std::hash<int>{}(pair.first);
-        std::size_t h2 = std::hash<int>{}(pair.second);
+        std::size_t h1 = XXH64(&pair.first, sizeof(int), 0);
+        std::size_t h2 = XXH64(&pair.second, sizeof(int), h1);
         return h1 ^ (h2 + 0x9e3779b9 + (h1 << 6) + (h1 >> 2));
     }
 };
-} // namespace std
+}  // namespace std

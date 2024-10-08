@@ -99,7 +99,7 @@ public:
             auto coeff = 0;
             // check if the label is in the cut
             // iterate over arcs in label
-            for (int j = 1; j < label.size() - 1; j++) {
+            for (int j = 0; j < label.size() - 1; j++) {
                 // iterate over arcs in cut
                 for (auto arc : cuts_[i].arcs) { coeff += label[j] == arc.from && label[j + 1] == arc.to; }
             }
@@ -126,13 +126,14 @@ public:
 
     // Compute the dual values for each arc by summing the duals of cuts passing through the arc
     ArcDuals computeDuals(GRBModel *model, double threshold = 1e-3) {
-        ArcDuals            arcDuals;
-        std::vector<double> dualValues(cuts_.size()); // Precompute dual values for each cut
+        ArcDuals arcDuals;
         // First pass: Compute dual values and store them
         for (int i = 0; i < cuts_.size(); ++i) {
             const auto &cut       = cuts_[i];
             double      dualValue = cut.ctr.get(GRB_DoubleAttr_Pi);
-            dualValues[i]         = dualValue; // Store the dual value
+            //fmt::print("Dual value for cut {}: {}\n", i, dualValue);
+
+            if (std::abs(dualValue) < 1e-3) { continue; }
 
             // Sum the dual values for all arcs in this cut
             for (const auto &arc : cut.arcs) {
@@ -141,7 +142,7 @@ public:
         }
 
         // Second pass: Remove cuts with dual values near zero
-
+        /*
         cuts_.erase(std::remove_if(cuts_.begin(), cuts_.end(),
                                    [&](const RCCut &cut, size_t i = 0) mutable {
                                        if (std::abs(dualValues[i]) < threshold) {
@@ -152,7 +153,7 @@ public:
                                        return false; // Keep this cut
                                    }),
                     cuts_.end());
-
+*/
         return arcDuals;
     }
 
