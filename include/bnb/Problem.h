@@ -29,7 +29,7 @@ public:
      * @param node A shared pointer to the Node object.
      * @return double The bound for the given node.
      */
-    virtual double bound(BNBNode *node) = 0;
+    virtual void evaluate(BNBNode *node) {};
 
     /**
      * @brief Calculates the objective value for the given node.
@@ -38,6 +38,10 @@ public:
      * @return double The objective value for the given node.
      */
     virtual double objective(BNBNode *node) = 0;
+
+    virtual bool CG(BNBNode *node, int max_iter = 2000) { return false; }
+
+    virtual double bound(BNBNode *node) = 0;
 
     /**
      * @brief Virtual destructor for proper cleanup of derived classes.

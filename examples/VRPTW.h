@@ -137,20 +137,11 @@ public:
             // print vec size
             if (vec.size() > 0) {
                 for (int i = 0; i < vec.size(); i++) {
-                    if (vec[i] != 0) {
-                        col.addTerms(&vec[i], &SRCconstraints[i], 1);
-                        // matrix.A_sparse.row_indices.push_back(N_SIZE - 2 + i);
-                        // matrix.A_sparse.col_indices.push_back(matrix.A_sparse.num_cols);
-                        // matrix.A_sparse.values.push_back(static_cast<double>(vec[i]));
-                        matrix.A_sparse.elements.push_back(
-                            {N_SIZE - 2 + i, matrix.A_sparse.num_cols, static_cast<double>(vec[i])});
-                    }
+                    if (vec[i] != 0) { col.addTerms(&vec[i], &SRCconstraints[i], 1); }
                 }
             }
 
 #endif
-
-            matrix.A_sparse.num_cols++;
 
             // Collect bounds, costs, columns, and names
             lb.push_back(0.0);
@@ -546,6 +537,8 @@ public:
 
         node->relaxNode();
         node->optimize();
+
+        relaxed_result = std::numeric_limits<double>::max();
 
         // check if feasible
         if (node->get(GRB_IntAttr_Status) != GRB_OPTIMAL) {
@@ -970,22 +963,28 @@ public:
                            iter, lp_obj, inner_obj, n_cuts, n_rcc_cuts, colAdded, stage, lag_gap, cur_alpha);
         }
         bucket_graph.print_statistics();
+
+        node->optimize();
+        relaxed_result = node->get(GRB_DoubleAttr_ObjVal);
+
         return true;
     }
 
     double objective(BNBNode *node) { return ip_result; }
 
-    double bound(BNBNode *node) {
+    double bound(BNBNode *node) { return relaxed_result; }
+
+    void evaluate(BNBNode *node) {
         auto start_timer = std::chrono::high_resolution_clock::now();
         auto cg          = CG(node);
-        if (!cg) { return std::numeric_limits<double>::max(); }
+        if (!cg) {
+            relaxed_result = std::numeric_limits<double>::max();
+            return;
+        }
         auto end_timer        = std::chrono::high_resolution_clock::now();
         auto duration_ms      = std::chrono::duration_cast<std::chrono::milliseconds>(end_timer - start_timer).count();
         auto duration_seconds = duration_ms / 1000;
         auto duration_milliseconds = duration_ms % 1000;
-
-        node->optimize();
-        relaxed_result = node->get(GRB_DoubleAttr_ObjVal);
 
         auto &allPaths = node->paths;
 
@@ -1024,8 +1023,6 @@ public:
         fmt::print("| {:<14} | {}{:>16}.{:03}{} |\n", "CG Duration", blue, duration_seconds, duration_milliseconds,
                    reset);
         fmt::print("+----------------------+----------------+\n");
-
-        return relaxed_result;
     }
 
     void branch(BNBNode *node) {
@@ -1035,7 +1032,7 @@ public:
         node->update();
         node->relaxNode();
 
-        auto candidates       = Branching::VRPTWStandardBranching(node, &instance);
+        auto candidates       = Branching::VRPTWStandardBranching(node, &instance, this);
         auto candidateCounter = 0;
 
         print_info("Candidates generated: {}\n", candidates.size());

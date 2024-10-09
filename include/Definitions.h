@@ -41,8 +41,9 @@ struct BranchingQueueItem {
     ankerl::unordered_dense::map<int, double>                 g_m;             // Vehicle type aggregation
     ankerl::unordered_dense::map<int, double>                 g_m_v;           // Customer-service aggregation
     ankerl::unordered_dense::map<std::pair<int, int>, double> g_v_vp;          // Edge usage aggregation
-    CandidateType candidateType; // Type of the candidate (Vehicle, Node, or Edge)
-    double        score = 0.0;   // Pseudo-cost or score for the candidate
+    CandidateType         candidateType; // Type of the candidate (Vehicle, Node, or Edge)
+    std::pair<bool, bool> flags;         // Flags for additional information
+    double                score = 0.0;   // Pseudo-cost or score for the candidate
 };
 
 // Comparator function for Stage enum

@@ -188,7 +188,7 @@ cpmaddpackage(
 cpmaddpackage(
     NAME xxhash
     GIT_REPOSITORY https://github.com/Cyan4973/xxHash.git
-    GIT_TAG v0.8.2
+    GIT_TAG origin/dev
 )
 
 # add https://github.com/martinus/unordered_dense

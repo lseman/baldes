@@ -323,13 +323,15 @@ public:
 
     auto getCandidatos() { return candidates; }
 
-    double solveRestrictedMasterLP() {
+    std::pair<bool, double> solveRestrictedMasterLP() {
+        bool feasible = false;
         relaxNode();
         model->optimize();
         if (model->get(GRB_IntAttr_Status) == GRB_OPTIMAL) {
-            return model->get(GRB_DoubleAttr_ObjVal);
+            feasible = true;
+            return std::make_pair(feasible, model->get(GRB_DoubleAttr_ObjVal));
         } else {
-            return std::numeric_limits<double>::infinity();
+            return std::make_pair(feasible, 0.0);
         }
     }
 

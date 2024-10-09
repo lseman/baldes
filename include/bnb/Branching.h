@@ -158,13 +158,16 @@ public:
             // Add branching constraints and create two child nodes
             auto [childNode1, childNode2] = applyBranchingConstraints(node, candidate, candidate.fractionalValue);
 
-            double deltaLB1 = childNode1->solveRestrictedMasterLP();
-            double deltaLB2 = childNode2->solveRestrictedMasterLP();
+            double deltaLB1, deltaLB2;
+            double feasLB1, feasLB2;
+            std::tie(feasLB1, deltaLB1) = childNode1->solveRestrictedMasterLP();
+            std::tie(feasLB2, deltaLB2) = childNode2->solveRestrictedMasterLP();
 
             double productValue = deltaLB1 * deltaLB2;
 
             results.push_back({candidate.sourceNode, candidate.targetNode, candidate.fractionalValue, productValue,
-                               candidate.g_m, candidate.g_m_v, candidate.g_v_vp, candidate.candidateType});
+                               candidate.g_m, candidate.g_m_v, candidate.g_v_vp, candidate.candidateType,
+                               std::make_pair(feasLB1, feasLB2)});
         }
 
         pdqsort(results.begin(), results.end(), [](const BranchingQueueItem &a, const BranchingQueueItem &b) {
@@ -184,25 +187,34 @@ public:
 
         // Lambda to generate candidates
         auto generateCandidates = [&](CandidateType type, int sourceNode, int targetNode, double fractionalValue,
+                                      std::pair<bool, bool>                                 flags,
                                       std::optional<std::variant<int, std::pair<int, int>>> payload = std::nullopt) {
-            candidates.emplace_back(new VRPCandidate(sourceNode, targetNode, BranchingDirection::Greater,
-                                                     std::floor(fractionalValue), type, payload));
-            candidates.emplace_back(new VRPCandidate(sourceNode, targetNode, BranchingDirection::Less,
-                                                     std::ceil(fractionalValue), type, payload));
+            // check if flag first is true
+            if (flags.first) {
+                candidates.emplace_back(new VRPCandidate(sourceNode, targetNode, BranchingDirection::Greater,
+                                                         std::floor(fractionalValue), type, payload));
+            }
+            if (flags.second) {
+                candidates.emplace_back(new VRPCandidate(sourceNode, targetNode, BranchingDirection::Less,
+                                                         std::ceil(fractionalValue), type, payload));
+            }
         };
 
         for (const auto &item : phase1Candidates) {
             if (!item.g_m.empty()) {
                 generateCandidates(CandidateType::Vehicle, item.sourceNode, item.targetNode, item.fractionalValue,
+                                   item.flags,
                                    std::nullopt); // No payload for vehicles
             }
             if (!item.g_m_v.empty()) {
                 generateCandidates(CandidateType::Node, item.sourceNode, item.targetNode, item.fractionalValue,
+                                   item.flags,
                                    item.targetNode); // Node as payload
             }
             if (!item.g_v_vp.empty()) {
                 std::pair<int, int> edge = {item.sourceNode, item.targetNode};
                 generateCandidates(CandidateType::Edge, item.sourceNode, item.targetNode, item.fractionalValue,
+                                   item.flags,
                                    edge); // Edge as payload
             }
         }
@@ -259,7 +271,7 @@ public:
         std::vector<BranchingQueueItem> sortedHistoryCandidates = historyCandidates;
         pdqsort(sortedHistoryCandidates.begin(), sortedHistoryCandidates.end(),
                 [](const BranchingQueueItem &a, const BranchingQueueItem &b) {
-                    return a.score > b.score; // Higher pseudo-cost first
+                    return a.productValue > b.productValue; // Higher pseudo-cost first
                 });
 
         // Select top candidates from history
@@ -308,12 +320,41 @@ public:
         return selectedCandidates;
     }
 
+    static std::vector<BranchingQueueItem>
+    evaluateWithCG(BNBNode *node, const std::vector<BranchingQueueItem> &phase1Candidates, Problem *problem) {
+        std::vector<BranchingQueueItem> results;
+
+        for (const auto &candidate : phase1Candidates) {
+            // Add branching constraints and create two child nodes
+            auto [childNode1, childNode2] = applyBranchingConstraints(node, candidate, candidate.fractionalValue);
+
+            double deltaLB1, deltaLB2;
+            double feasLB1, feasLB2;
+            feasLB1  = problem->CG(childNode1, 50);
+            deltaLB1 = problem->bound(childNode1);
+            feasLB1  = problem->CG(childNode2, 50);
+            deltaLB2 = problem->bound(childNode2);
+
+            double productValue = deltaLB1 * deltaLB2;
+
+            results.push_back({candidate.sourceNode, candidate.targetNode, candidate.fractionalValue, productValue,
+                               candidate.g_m, candidate.g_m_v, candidate.g_v_vp, candidate.candidateType,
+                               std::make_pair(feasLB1, feasLB2)});
+        }
+
+        pdqsort(results.begin(), results.end(), [](const BranchingQueueItem &a, const BranchingQueueItem &b) {
+            return a.productValue > b.productValue; // Higher product value first
+        });
+
+        return results;
+    }
+
     /**
      * VRPTW Standard Branching Strategy
      * @brief This function implements the standard branching strategy for the VRPTW problem
      *
      */
-    static std::vector<VRPCandidate *> VRPTWStandardBranching(BNBNode *node, InstanceData *instance) {
+    static std::vector<VRPCandidate *> VRPTWStandardBranching(BNBNode *node, InstanceData *instance, Problem *problem) {
         std::vector<VRPCandidate *> candidates;
 
         node->optimize();
@@ -329,6 +370,9 @@ public:
 
         // Evaluate candidates and apply branching constraints
         auto phase1Candidates = evaluateWithBranching(node, phase0Candidates);
+
+        // TODO: add logic to select the best candidates from phase1Candidates
+        auto phase2Candidates = evaluateWithCG(node, phase1Candidates, problem);
 
         auto generatedCandidates = generateVRPCandidates(node, phase1Candidates);
         candidates.insert(candidates.end(), generatedCandidates.begin(), generatedCandidates.end());
