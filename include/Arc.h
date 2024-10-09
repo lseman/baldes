@@ -1,5 +1,17 @@
+/*
+ * @file Arc.h
+ * @brief This file contains the definition of the Arc struct and related structures.
+ *
+ * This file contains the definition of the Arc struct, which represents an arc between two nodes in a graph.
+ * The Arc struct contains information about the source node, target node, resource increments, cost increment,
+ * and other properties of the arc. It also includes related structures such as BucketArc and JumpArc.
+ *
+ */
 #pragma once
 #include "Common.h"
+#include <functional>
+
+#include "xxhash.h"
 
 struct Arc {
     int                 from;
@@ -51,7 +63,6 @@ struct BucketArc {
     }
 };
 
-// Structure to represent a jump arc
 /**
  * @struct JumpArc
  * @brief Represents a jump arc between two buckets.
@@ -71,8 +82,6 @@ struct JumpArc {
 
 using ArcVariant = std::variant<Arc, BucketArc>;
 
-#include <functional>
-
 struct RCCArc {
     int from;
     int to;
@@ -87,9 +96,10 @@ struct RCCArc {
 // Hash function for RCCArc
 struct RCCArcHash {
     std::size_t operator()(const RCCArc &arc) const {
-        std::size_t h1 = std::hash<int>{}(arc.from);
-        std::size_t h2 = std::hash<int>{}(arc.to);
-        // Use a more robust combination method
-        return h1 ^ (h2 + 0x9e3779b9 + (h1 << 6) + (h1 >> 2));
+        // Take the address of 'arc.from' and 'arc.to' for hashing
+        XXH64_hash_t hash_value = XXH3_64bits(&arc.from, sizeof(arc.from));                  // Hash the 'from' field
+        hash_value              = XXH3_64bits_withSeed(&arc.to, sizeof(arc.to), hash_value); // Combine with 'to' field
+
+        return static_cast<std::size_t>(hash_value); // Return the final hash value
     }
 };

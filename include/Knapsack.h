@@ -1,3 +1,11 @@
+/*
+ * @file Knapsack.h
+ * @brief Header file for the Knapsack class.
+ *
+ * This file contains the definition of the Knapsack class, which is used to solve the 0-1 knapsack problem.
+ * The class provides methods to add items to the knapsack, set the capacity, and solve the problem using
+ * dynamic programming with optional parallelization.
+ */
 #pragma once
 
 #include <algorithm>

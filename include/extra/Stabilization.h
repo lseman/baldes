@@ -8,6 +8,7 @@
  *
  * The Stabilization class is crucial for improving the convergence of column generation
  * algorithms by stabilizing the dual values and avoiding large oscillations in the dual space.
+ *
  */
 
 #pragma once

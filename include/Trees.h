@@ -3,14 +3,6 @@
  * @brief Header file containing the implementation of various tree structures used for interval and multidimensional
  * range queries.
  *
- * This file includes the following classes:
- * - BucketRange: Represents a range with lower and upper bounds.
- * - IntervalNode: Represents a node in an interval tree.
- * - IntervalTree: A tree structure for managing and querying intervals.
- * - BucketIntervalTree: A tree structure for managing and querying bucket intervals.
- * - TreeNode: Represents a node in a multi-dimensional tree structure.
- * - SplayTree: A self-adjusting binary search tree for efficient interval queries.
- *
  * The classes provide functionalities for inserting intervals, searching for overlapping intervals,
  * and printing the tree structures for debugging purposes.
  *

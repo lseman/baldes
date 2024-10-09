@@ -1,6 +1,12 @@
 /**
  * @file VRPNode.h
  * @brief This file contains the definition of the VRPNode struct.
+ *
+ * This file contains the definition of the VRPNode struct, which represents a node in a Vehicle Routing Problem.
+ * The struct contains information about a node, such as its ID, start time, end time, duration, cost, demand,
+ * and capacity constraints. It provides constructors to initialize the node with different sets of parameters.
+ * The `setDuals` method allows updating the cost of the node.
+ *
  */
 #pragma once
 #include "Arc.h"

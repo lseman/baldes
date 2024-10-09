@@ -7,6 +7,7 @@
  *
  * The struct uses an optimized build function to convert a list of sparse elements into CRS format, enabling
  * fast row-wise traversal using an iterator.
+ *
  */
 
 #pragma once

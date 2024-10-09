@@ -7,14 +7,9 @@
  * other graph representations, find SCCs using Tarjan's algorithm, determine the topological order of SCCs, and export
  * the graph and its SCCs to a DOT file for visualization.
  *
- * The main components of this file include:
- * - The SCC class: Implements Tarjan's algorithm to detect SCCs in a directed graph.
- * - Methods for adding directed edges and converting from an unordered map representation.
- * - Methods for finding SCCs and determining their topological order.
- * - A method for exporting the graph and SCCs to a DOT file with visual distinctions for SCCs.
- *
  * The SCC class uses an internal stack, low-link values, and vertex indices to efficiently identify SCCs in a graph.
  * It also supports exporting the results in a format suitable for visualization using Graphviz.
+ *
  */
 
 #pragma once

@@ -1,3 +1,14 @@
+/*
+ * @file Clique.h
+ * @brief Header file for clique detection and conflict graph management.
+ *
+ * This file provides functions for detecting cliques in the conflict graph and managing the conflict graph for binary
+ * variables. The CliqueManager class contains methods for adding cliques, building and updating the conflict graph,
+ * and finding cliques using the Bron-Kerbosch algorithm. The class also provides options to set parameters such as
+ * minimum fractional value, minimum violation, and maximum number of recursive calls.
+ *
+ */
+
 #pragma once
 
 #include "Definitions.h"

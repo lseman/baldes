@@ -129,9 +129,6 @@ BucketGraph::BucketGraph(const std::vector<VRPNode> &nodes, std::vector<int> &bo
 /**
  * Computes a new label based on the given labels L and L_prime.
  *
- * @param L - The first label.
- * @param L_prime - The second label.
- * @return A new label computed from L and L_prime.
  */
 Label *BucketGraph::compute_label(const Label *L, const Label *L_prime) {
     double cij_cost = getcij(L->node_id, L_prime->node_id);

@@ -1,3 +1,10 @@
+/*
+ * @file Common.h
+ * @brief Header file containing common includes and definitions used across the project.
+ *
+ * This file contains common includes and definitions used across the project, such as standard library headers,
+ * definitions for constants, and utility functions.
+ */
 #pragma once
 #include "config.h"
 

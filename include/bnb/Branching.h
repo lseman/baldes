@@ -1,3 +1,12 @@
+/*
+ * @file Branching.h
+ * @brief Branching strategy for the BNB algorithm.
+ *
+ * This file contains the definition of the Branching class, which implements the branching strategy
+ * for the Branch-and-Bound (BNB) algorithm. The class provides methods to calculate aggregated variables
+ * for branching constraints, generate branching candidates, and apply branching constraints to the BNB nodes.
+ *
+ */
 #pragma once
 
 #include "../third_party/pdqsort.h"

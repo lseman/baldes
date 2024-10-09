@@ -6,24 +6,9 @@
  * (VRP) using Limited Memory Rank-1 Cuts. The main functionalities include computing unique cut keys, adding cuts to
  * storage, separating solution vectors into cuts, and generating cut coefficients.
  *
- * The file includes the following main components:
- * - `hash_double`: A function to hash double values with high precision.
- * - `hash_combine`: A function to combine hash values robustly.
- * - `compute_cut_key`: A function to compute a unique cut key based on base sets and multipliers.
- * - `CutStorage::addCut`: A method to add a cut to the CutStorage.
- * - `LimitedMemoryRank1Cuts::separate`: A method to separate solution vectors into cuts using Limited Memory Rank-1
- * Cuts.
- * - `LimitedMemoryRank1Cuts::insertSet`: A method to insert a set of indices and associated data into the VRPTW_SRC
- * cuts structure.
- * - `findRoutesVisitingNodes`: A function to find routes that visit specified nodes in a sparse model.
- * - `LimitedMemoryRank1Cuts::generateCutCoefficients`: A method to generate cut coefficients for VRPTW_SRC cuts.
- *
  * The implementation leverages parallel processing using thread pools and schedulers to efficiently handle large
  * datasets and complex computations.
  *
- * @note The code assumes the existence of certain external structures and constants such as `num_words`, `N_SIZE`,
- * `VRPTW_SRC`, `VRPTW_SRC_max_S_n`, `SparseModel`, `VRPNode`, `CutType`, `exec::static_thread_pool`, `stdexec::bulk`,
- * and `stdexec::sync_wait`.
  */
 
 #include "cuts/SRC.h"
@@ -50,18 +35,23 @@ using Cuts = std::vector<Cut>;
  *
  */
 std::size_t compute_cut_key(const std::array<uint64_t, num_words> &baseSet, const std::vector<double> &multipliers) {
-    std::size_t cut_key = 0;
+    XXH3_state_t *state = XXH3_createState(); // Initialize the XXH3 state
+    XXH3_64bits_reset(state);                 // Reset the hashing state
 
     // Hash the baseSet (uint64_t values) while preserving order
     for (std::size_t i = 0; i < baseSet.size(); ++i) {
-        hash_combine(cut_key, baseSet[i]); // Combine both the value and the index
+        XXH3_64bits_update(state, &baseSet[i], sizeof(uint64_t)); // Hash each element in the baseSet
     }
 
     // Hash the multipliers (double values) while preserving order
     for (std::size_t i = 0; i < multipliers.size(); ++i) {
-        std::size_t multiplier_hash = hash_double(multipliers[i], i); // Hash with precision and index
-        hash_combine(cut_key, multiplier_hash);
+        XXH3_64bits_update(state, &multipliers[i], sizeof(double)); // Hash each multiplier
     }
+
+    // Finalize the hash
+    std::size_t cut_key = XXH3_64bits_digest(state);
+
+    XXH3_freeState(state); // Free the state
 
     return cut_key;
 }

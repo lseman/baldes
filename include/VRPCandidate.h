@@ -8,6 +8,7 @@
  * also contains a variant to store different types of data based on the candidate type. The class also contains
  * functions to compute the hash value and equality operator for use in unordered containers, and a print function to
  * display the candidate information.
+ *
  */
 #pragma once
 
