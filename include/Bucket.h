@@ -12,6 +12,7 @@
 
 #include "Definitions.h"
 
+#include "Allocator.h"
 #include "Arc.h"
 #include "Common.h"
 #include "Label.h"
@@ -25,7 +26,7 @@
  */
 struct Bucket {
     // std::vector<Label *>   labels_vec;
-    std::vector<Label *> labels_vec; // Use deque for efficient insertion/removal
+    std::vector<Label *, PoolAllocator<Label *>> labels_vec;
 
     int                    node_id = -1;
     std::vector<double>    lb;
@@ -37,7 +38,8 @@ struct Bucket {
     std::vector<JumpArc>   fw_jump_arcs;
     std::vector<JumpArc>   bw_jump_arcs;
 
-    Bucket(const Bucket &other) {
+    Bucket(const Bucket &other) : labels_vec(other.labels_vec) {
+        // Deep copy or other operations, if needed
         // Perform deep copy of all relevant members
         labels_vec     = other.labels_vec;
         node_id        = other.node_id;

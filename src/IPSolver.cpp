@@ -785,12 +785,10 @@ OptimizationData IPSolver::convertToOptimizationData(const ModelData &modelData)
 
     // Convert SparseMatrix to Eigen::SparseMatrix using Eigen::Triplet
     std::vector<Eigen::Triplet<double>> triplets;
-    auto sparseMatrix = modelData.A_sparse;
+    auto                                sparseMatrix = modelData.A_sparse;
 
     // Iterate over the CRS format of SparseMatrix to build triplets
-    sparseMatrix.forEachRow([&triplets](int row, int col, double value) {
-        triplets.emplace_back(row, col, value);
-    });
+    sparseMatrix.forEachRow([&triplets](int row, int col, double value) { triplets.emplace_back(row, col, value); });
 
     // Resize the Eigen sparse matrix
     optData.As.resize(sparseMatrix.num_rows, sparseMatrix.num_cols);

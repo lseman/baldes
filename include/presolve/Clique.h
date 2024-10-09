@@ -289,8 +289,9 @@ public:
     void extendCliques(const std::vector<std::vector<int>> &initialCliques, std::vector<std::vector<int>> &extCliques) {
         // Iterate over each initial clique and attempt to extend it
         for (const auto &clique : initialCliques) {
-            std::unordered_set<int> cliqueSet(clique.begin(), clique.end()); // Store the clique for easy lookup
-            std::vector<int>        extendedClique = clique;                 // Start with the current clique
+            ankerl::unordered_dense::set<int> cliqueSet(clique.begin(),
+                                                        clique.end()); // Store the clique for easy lookup
+            std::vector<int>                  extendedClique = clique; // Start with the current clique
 
             bool extended = false; // Keep track if we successfully extend the clique
 

@@ -27,6 +27,7 @@ SOFTWARE.*/
 #include <array>
 
 #include "ankerl/unordered_dense.h"
+#include <unordered_set>
 
 #include "Individual.h"
 #include "LocalSearch.h"
