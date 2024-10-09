@@ -50,7 +50,7 @@ Some features are experimental and subject to ongoing improvements:
 
 ## 📋 TODO
 
-- [ ] Consider branching constraints duals
+- [x] Consider branching constraints duals
 - [ ] Improve branching decisions
 
 ## 🛠️ Building

@@ -85,6 +85,8 @@ public:
         return equal;
     }
 
+    CandidateType getCandidateType() const { return candidateType; }
+
     // Print function to display the candidate information
     void print() const {
         std::cout << "Candidate type: ";

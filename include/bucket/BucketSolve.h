@@ -107,7 +107,7 @@ inline std::vector<Label *> BucketGraph::solve() {
         paths     = bi_labeling_algorithm<Stage::Four>();
         inner_obj = paths[0]->cost;
 
-        //auto rollback = updateStepSize(); // Update the step size for the bucket graph
+        // auto rollback = updateStepSize(); // Update the step size for the bucket graph
         auto rollback = false;
         if (rollback) {
             s4     = false; // Rollback to Stage 3 if necessary
@@ -584,6 +584,16 @@ BucketGraph::Extend(const std::conditional_t<M == Mutability::Mut, Label *, cons
 #else
     double new_cost = initial_cost + travel_cost;
 #endif
+
+    // Compute branching duals
+    if (branching_duals->size() > 0) {
+        if constexpr (D == Direction::Forward) {
+            new_cost -= branching_duals->getDual(initial_node_id, node_id);
+        } else {
+            new_cost -= branching_duals->getDual(node_id, initial_node_id);
+        }
+        new_cost -= branching_duals->getDual(node_id);
+    }
 
 #if defined(RCC) || defined(EXACT_RCC)
     if constexpr (S == Stage::Four) {

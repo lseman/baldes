@@ -7,6 +7,7 @@
  * backward arcs, forward jump arcs, backward jump arcs, and labels associated with the bucket.
  * It provides methods to add arcs, add jump arcs, get arcs, get jump arcs, add labels, remove labels,
  * get labels, clear labels, reset labels, and clear arcs.
+ *
  */
 #pragma once
 

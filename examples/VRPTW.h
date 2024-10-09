@@ -378,13 +378,13 @@ public:
         // Define the tasks to be executed sequentially
         std::vector<GRBLinExpr>          cutExpressions(Ss.size());
         std::vector<int>                 rhsValues(Ss.size());
-        std::vector<std::vector<RCCArc>> arcGroups(Ss.size());
+        std::vector<std::vector<RawArc>> arcGroups(Ss.size());
 
         for (size_t c = 0; c < Ss.size(); ++c) {
             auto S = Ss[c];
 
             GRBLinExpr          cutExpr = 0.0;
-            std::vector<RCCArc> arcs;
+            std::vector<RawArc> arcs;
 
             // Generate all possible arc pairs from nodes in S
             for (int i : S) {
@@ -486,7 +486,7 @@ public:
         // print_cut("Found {} violated RCC cuts, max violation: {}\n", cutsCMP->Size, maxViolation);
 
         std::vector<int>                 rhsValues(cutsCMP->Size);
-        std::vector<std::vector<RCCArc>> arcGroups(cutsCMP->Size);
+        std::vector<std::vector<RawArc>> arcGroups(cutsCMP->Size);
 
         // Instead of parallel execution, use a simple for-loop to process each cut
         for (int cutIdx = 0; cutIdx < cutsCMP->Size; ++cutIdx) {
@@ -494,7 +494,7 @@ public:
                                cutsCMP->CPL[cutIdx]->IntList + cutsCMP->CPL[cutIdx]->IntListSize + 1);
 
             GRBLinExpr          cutExpr = 0.0;
-            std::vector<RCCArc> arcs;
+            std::vector<RawArc> arcs;
 
             // Generate all possible arc pairs from nodes in S
             for (int i : S) {
@@ -553,6 +553,7 @@ public:
         auto &SRCconstraints = node->SRCconstraints;
         auto &allPaths       = node->paths;
         auto &r1c            = node->r1c;
+        auto &branchingDuals = node->branchingDuals;
 
 #ifdef RCC
         auto &rccManager = node->rccManager;
@@ -569,6 +570,7 @@ public:
         BucketGraph bucket_graph(nodes, time_horizon, bucket_interval);
 
         bucket_graph.set_distance_matrix(instance.getDistanceMatrix(), 8);
+        bucket_graph.branching_duals = &branchingDuals;
 
         // node->optimize();
         matrix                 = node->extractModelDataSparse();
@@ -875,6 +877,10 @@ public:
                     bucket_graph.setArcDuals(arc_duals);
                 }
 #endif
+
+                // Branching duals
+                if (branchingDuals.size() > 0) { branchingDuals.computeDuals(node->getModel()); }
+
                 bucket_graph.setDuals(nodeDuals);
 
                 //////////////////////////////////////////////////////////////////////

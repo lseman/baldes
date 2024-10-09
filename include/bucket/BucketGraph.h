@@ -38,6 +38,8 @@
 
 #include "SCCFinder.h"
 
+#include "Dual.h"
+
 #define RCESPP_TOL_ZERO 1.E-6
 
 /**
@@ -68,6 +70,8 @@ public:
     BucketOptions options;
     void          mono_initialization();
     Label        *compute_mono_label(const Label *L);
+
+    BranchingDuals *branching_duals = nullptr;
 
 #if defined(RCC) || defined(EXACT_RCC)
     ArcDuals arc_duals;
