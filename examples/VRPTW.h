@@ -200,7 +200,7 @@ public:
             pathSet.insert(path);
 
             counter += 1;
-            if (counter > 10) break;
+            if (counter >= 10) break;
 
             std::fill(coluna.begin(), coluna.end(), 0.0); // Reset for each iteration
 

@@ -114,13 +114,6 @@ void BucketGraph::BucketArcElimination(double theta) {
     // Reset fixed_buckets
     for (auto &fb : fixed_buckets) { std::fill(fb.begin(), fb.end(), 0); }
 
-    // Print direction of arc elimination
-    if constexpr (D == Direction::Forward) {
-        print_info("[Fw] performing bucket arc elimination with theta = {}\n", theta);
-    } else {
-        print_info("[Bw] performing bucket arc elimination with theta = {}\n", theta);
-    }
-
     using ArcMap = ankerl::unordered_dense::map<std::pair<std::pair<int, int>, int>, ankerl::unordered_dense::set<int>,
                                                 arc_map_hash>;
 
