@@ -24,52 +24,17 @@
 #include <set>
 #include <vector>
 
+#include "Dual.h"
+
 #include <iostream>
 
 #include "ankerl/unordered_dense.h"
 
-// Define the RCCArc struct
+// Define the RawArc struct
 struct RCCut {
-    std::vector<RCCArc> arcs; // Stores the arcs involved in the cut
+    std::vector<RawArc> arcs; // Stores the arcs involved in the cut
     int                 rhs;  // Right-hand side value of the constraint
     GRBConstr           ctr;  // Gurobi constraint object
-};
-
-// Structure to store and manage dual values for arcs
-class ArcDuals {
-public:
-    // Add or update the dual value for an arc
-    void setDual(const RCCArc &arc, double dualValue) { arcDuals_[arc] = dualValue; }
-
-    // Retrieve the dual value for an arc; returns 0 if the arc does not have a dual
-    double getDual(int i, int j) const {
-        RCCArc arc(i, j);
-        auto   it = arcDuals_.find(arc);
-        if (it != arcDuals_.end()) {
-            return it->second; // Return the dual if found
-        }
-        return 0.0; // Default to 0 if not found
-    }
-
-    double getDual(RCCArc arc) const {
-        auto it = arcDuals_.find(arc);
-        if (it != arcDuals_.end()) {
-            return it->second; // Return the dual if found
-        }
-        return 0.0; // Default to 0 if not found
-    }
-
-    void setOrIncrementDual(const RCCArc &arc, double dualValue) {
-        auto it = arcDuals_.find(arc);
-        if (it != arcDuals_.end()) {
-            it->second += dualValue; // Increment the dual if the arc already has a dual
-        } else {
-            arcDuals_[arc] = dualValue; // Set the dual if the arc does not have a dual
-        }
-    }
-
-private:
-    ankerl::unordered_dense::map<RCCArc, double, RCCArcHash> arcDuals_; // Map for storing arc duals
 };
 
 class RCCManager {
@@ -107,7 +72,7 @@ public:
     }
 
     // Method to add a new cut
-    void addCut(const std::vector<RCCArc> &arcs, int rhs, GRBConstr &ctr) {
+    void addCut(const std::vector<RawArc> &arcs, int rhs, GRBConstr &ctr) {
         // std::lock_guard<std::mutex> lock(mutex_);
         cuts_.emplace_back(RCCut{arcs, rhs, ctr});
         cut_ctr++;
@@ -129,7 +94,6 @@ public:
         for (int i = 0; i < cuts_.size(); ++i) {
             const auto &cut       = cuts_[i];
             double      dualValue = cut.ctr.get(GRB_DoubleAttr_Pi);
-            // fmt::print("Dual value for cut {}: {}\n", i, dualValue);
 
             if (std::abs(dualValue) < 1e-3) { continue; }
 

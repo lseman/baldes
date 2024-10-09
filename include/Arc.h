@@ -82,20 +82,20 @@ struct JumpArc {
 
 using ArcVariant = std::variant<Arc, BucketArc>;
 
-struct RCCArc {
+struct RawArc {
     int from;
     int to;
 
     // Constructor with member initializer list
-    RCCArc(int from, int to) : from(from), to(to) {}
+    RawArc(int from, int to) : from(from), to(to) {}
 
     // Equality operator for comparisons
-    bool operator==(const RCCArc &other) const { return std::tie(from, to) == std::tie(other.from, other.to); }
+    bool operator==(const RawArc &other) const { return std::tie(from, to) == std::tie(other.from, other.to); }
 };
 
-// Hash function for RCCArc
-struct RCCArcHash {
-    std::size_t operator()(const RCCArc &arc) const {
+// Hash function for RawArc
+struct RawArcHash {
+    std::size_t operator()(const RawArc &arc) const {
         // Take the address of 'arc.from' and 'arc.to' for hashing
         XXH64_hash_t hash_value = XXH3_64bits(&arc.from, sizeof(arc.from));                  // Hash the 'from' field
         hash_value              = XXH3_64bits_withSeed(&arc.to, sizeof(arc.to), hash_value); // Combine with 'to' field

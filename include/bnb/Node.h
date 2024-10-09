@@ -19,6 +19,8 @@
 #include "Path.h"
 #include "SRC.h"
 
+#include "Dual.h"
+
 #include "VRPCandidate.h"
 
 #include <optional>
@@ -341,7 +343,7 @@ public:
 
     std::vector<BranchingQueueItem> historyCandidates;
 
-    void addBranchingConstraint(double rhs, const BranchingDirection &sense, const CandidateType &ctype,
+    auto addBranchingConstraint(double rhs, const BranchingDirection &sense, const CandidateType &ctype,
                                 std::optional<std::variant<int, std::pair<int, int>>> payload = std::nullopt) {
 
         // Get the decision variables from the model
@@ -384,23 +386,29 @@ public:
         }
 
         // Add the constraint based on the sense
+        GRBConstr constraint;
         if (sense == BranchingDirection::Greater) {
-            model->addConstr(linExpr, GRB_GREATER_EQUAL, rhs);
+            constraint = model->addConstr(linExpr, GRB_GREATER_EQUAL, rhs);
         } else if (sense == BranchingDirection::Less) {
-            model->addConstr(linExpr, GRB_LESS_EQUAL, rhs);
+            constraint = model->addConstr(linExpr, GRB_LESS_EQUAL, rhs);
         } else {
-            model->addConstr(linExpr, GRB_EQUAL, rhs);
+            constraint = model->addConstr(linExpr, GRB_EQUAL, rhs);
         }
 
         // Update the model to reflect the changes
         model->update();
+
+        return constraint;
     }
+
+    BranchingDuals branchingDuals;
 
     void enforceBranching() {
         // Iterate over the candidates and enforce the branching constraints
         for (const auto &candidate : candidates) {
-            addBranchingConstraint(candidate->boundValue, candidate->boundType, candidate->candidateType,
-                                   candidate->payload);
+            auto ctr = addBranchingConstraint(candidate->boundValue, candidate->boundType, candidate->candidateType,
+                                              candidate->payload);
+            branchingDuals.addCandidate(candidate, ctr);
         }
     }
 

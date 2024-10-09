@@ -407,6 +407,9 @@ void BucketGraph::ConcatenateLabel(const Label *L, int &b, Label *&pbest, std::v
         if constexpr (S == Stage::Four) { cost -= arc_duals.getDual(L_node_id, bucketLprimenode); }
 #endif
 
+        // Branching duals
+        if (branching_duals->size() > 0) { cost -= branching_duals->getDual(L_node_id, bucketLprimenode); }
+
 #ifdef SRC
         decltype(cut_storage)            cutter   = nullptr;
         decltype(cut_storage->SRCDuals) *SRCDuals = nullptr;

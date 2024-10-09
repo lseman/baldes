@@ -141,6 +141,9 @@ Label *BucketGraph::compute_label(const Label *L, const Label *L_prime) {
     new_cost -= arc_dual;
 #endif
 
+    // Branching duals
+    if (branching_duals->size() > 0) { new_cost -= branching_duals->getDual(L->node_id, L_prime->node_id); }
+
     // Directly acquire new_label and set the cost
     auto new_label       = label_pool_fw.acquire();
     new_label->cost      = new_cost;

@@ -1,20 +1,36 @@
-#include <cstddef>
-#include <iostream>
-#include <memory_resource> // For polymorphic memory resources
-#include <new>             // For std::bad_alloc
-#include <vector>
+/*
+ * @file Allocator.h
+ * @brief This file contains the definition of the MemoryPool class and the PoolAllocator class.
+ *
+ * This file contains the definition of the MemoryPool class, which is a custom memory pool
+ * that provides memory allocation and deallocation services. The MemoryPool class is derived
+ * from std::pmr::memory_resource and overrides the do_allocate and do_deallocate functions to
+ * provide custom memory allocation and deallocation. The MemoryPool class also provides a
+ * register_deferred_action function to register deferred actions and an invoke_deferred_actions
+ * function to invoke all deferred actions.
+ *
+ */
+#pragma once
 
+#include <cstddef>
 #include <functional>
 #include <iostream>
+#include <memory_resource> // For polymorphic memory resources
 #include <memory_resource>
+#include <new> // For std::bad_alloc
 #include <utility>
 #include <vector>
 
-#include <functional>
-#include <iostream>
-#include <memory_resource>
-#include <vector>
-
+/*
+ * @class MemoryPool
+ * @brief A custom memory pool for memory allocation and deallocation.
+ *
+ * The MemoryPool class is a custom
+ * memory pool that provides memory allocation and deallocation services. The MemoryPool class is derived
+ * from std::pmr::memory_resource and overrides the do_allocate and do_deallocate functions to provide custom
+ * memory allocation and deallocation. The MemoryPool class also provides a register_deferred_action function
+ * to register deferred actions and an invoke_deferred_actions function to invoke all deferred actions.
+ */
 class MemoryPool : public std::pmr::memory_resource {
 public:
     MemoryPool(std::size_t block_size, std::size_t block_count)
@@ -42,7 +58,9 @@ public:
 protected:
     // Allocate memory from the pool
     void *do_allocate(std::size_t bytes, std::size_t alignment) override {
-        if (bytes > block_size || free_list.empty()) { throw std::bad_alloc(); }
+        if (bytes > block_size || free_list.empty()) {
+            throw std::bad_alloc(); // Throw std::bad_alloc if allocation fails
+        }
 
         // Pop the last available block from the free list
         void *result = free_list.back();
@@ -80,6 +98,17 @@ private:
     }
 };
 
+/*
+ * @class PoolAllocator
+ * @brief A custom pool allocator for memory allocation and deallocation.
+ *
+ * The PoolAllocator class is a custom
+ * pool allocator that provides memory allocation and deallocation services. The PoolAllocator class is a
+ * template class that takes a type T as a template parameter and provides the allocate and deallocate
+ * functions to allocate and deallocate memory for objects of type T. The PoolAllocator class is used to
+ * allocate memory from a custom memory pool, such as the MemoryPool class, and is compatible with standard
+ * containers that require an allocator, such as std::vector, std::list, and std::map.
+ */
 template <typename T>
 class PoolAllocator {
 public:
@@ -99,7 +128,6 @@ public:
 
     void deallocate(T *p, std::size_t n) noexcept { resource_->deallocate(p, n * sizeof(T), alignof(T)); }
 
-    // Manually defined comparison operators
     template <typename U>
     bool operator==(const PoolAllocator<U> &other) const noexcept {
         return resource_ == other.resource();
