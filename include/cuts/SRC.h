@@ -313,7 +313,7 @@ inline uint64_t hashVector(const std::vector<int> &vec) {
 
     for (const int &elem : vec) {
         // Combine each element's hash using XXHash and XOR it with the running hash value
-        hash ^= XXH64(&elem, sizeof(elem), hash);
+        hash ^= XXH3_64bits_withSeed(&elem, sizeof(elem), hash);
     }
 
     return hash;
@@ -327,7 +327,7 @@ inline uint64_t hashVector(const std::vector<double> &vec) {
         // Convert the double to uint64_t for hashing
         std::uint64_t bit_rep = std::bit_cast<std::uint64_t>(elem);
         // Combine each element's hash using XXHash and XOR it with the running hash value
-        hash ^= XXH64(&bit_rep, sizeof(bit_rep), hash);
+        hash ^= XXH3_64bits_withSeed(&bit_rep, sizeof(bit_rep), hash);
     }
 
     return hash;
@@ -351,7 +351,7 @@ struct CompareCuts {
  */
 template <CutType T>
 void LimitedMemoryRank1Cuts::the45Heuristic(const SparseMatrix &A, const std::vector<double> &x) {
-    int    max_number_of_cuts  = 3; // Max number of cuts to generate
+    int    max_number_of_cuts  = 5; // Max number of cuts to generate
     double violation_threshold = 1e-3;
     int    max_generated_cuts  = 15;
 
@@ -546,7 +546,6 @@ void LimitedMemoryRank1Cuts::the45Heuristic(const SparseMatrix &A, const std::ve
                             Cut cut(baseSet, AM, coefficients_aux, p);
                             cut.baseSetOrder = order;
                             cut.rhs          = rhs;
-                            // threadCuts.push_back(cut);
 
                             ViolatedCut vCut{alpha, cut}; // Pair: first is the violation, second is the cut
 
@@ -558,15 +557,8 @@ void LimitedMemoryRank1Cuts::the45Heuristic(const SparseMatrix &A, const std::ve
                                 cutQueue.push(vCut);
                             }
                             if (cuts_count.load() > max_generated_cuts) { break; }
-                            // break;
                         }
                     }
-
-                    // if (violation_found && cuts_count.load() < max_number_of_cuts) {}
-
-                    // if (cuts_count.load() >= max_number_of_cuts) {
-                    //     return; // Stop processing further if the limit is reached
-                    // }
                 }
             }
         });

@@ -707,6 +707,8 @@ void BucketGraph::bucket_fixing() {
         fw_c_bar = forward_cbar;
         bw_c_bar = backward_cbar;
 
+        print_info("performing bucket arc elimination with theta = {}\n", gap);
+
         PARALLEL_SECTIONS(
             work, bi_sched,
             SECTION {
