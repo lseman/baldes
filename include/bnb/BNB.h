@@ -106,6 +106,7 @@ public:
 
         currentBNBNode->start();
         currentBNBNode->enforceBranching();
+        problem->evaluate(currentBNBNode);
         double boundValue = problem->bound(currentBNBNode);
 
         if (isSolutionFound()) return; // Check again after a potentially long operation
@@ -151,6 +152,7 @@ public:
             currentBNBNode->enforceBranching();
             print_info("Current node id: {}\n", currentBNBNode->getUUID());
 
+            problem->evaluate(currentBNBNode);
             double boundValue = problem->bound(currentBNBNode);
             print_info("Bound value: {}\n", boundValue);
 
