@@ -29,6 +29,8 @@
 #include <queue>
 #include <random>
 
+#include <unordered_set>
+
 #include "xxhash.h"
 
 #define VRPTW_SRC_max_S_n 10000

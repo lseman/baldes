@@ -81,12 +81,13 @@ int BucketGraph::RIH1(std::priority_queue<Label *, std::vector<Label *>, LabelCo
 
                 // Copy nodes covered up to the insertion point
                 new_label->nodes_covered.assign(current_label->nodes_covered.begin(),
-                                               current_label->nodes_covered.begin() + i);
+                                                current_label->nodes_covered.begin() + i);
                 // Insert the new customer
                 new_label->nodes_covered.push_back(new_customer);
                 // Copy the remaining nodes covered
-                new_label->nodes_covered.insert(new_label->nodes_covered.end(), current_label->nodes_covered.begin() + i,
-                                               current_label->nodes_covered.end());
+                new_label->nodes_covered.insert(new_label->nodes_covered.end(),
+                                                current_label->nodes_covered.begin() + i,
+                                                current_label->nodes_covered.end());
 
                 // Reset costs and real cost
                 new_label->cost      = 0.0;

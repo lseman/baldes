@@ -36,5 +36,8 @@
 #include <vector>
 
 #include "ankerl/unordered_dense.h"
+
+#include <unordered_set>
+
 #include <fmt/color.h>
 #include <fmt/core.h>

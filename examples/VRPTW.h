@@ -196,6 +196,8 @@ public:
             if (!enumerate && label->cost > 0) continue;
 
             Path path(label->nodes_covered, label->real_cost);
+
+            // TODO: check if its better to use a set or simply insert the path in the vector
             if (pathSet.find(path) != pathSet.end()) { continue; }
             pathSet.insert(path);
 

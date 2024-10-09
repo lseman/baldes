@@ -21,8 +21,8 @@ using namespace pybind11::literals; // Enables _a suffix for named arguments
 
 PYBIND11_MODULE(baldes, m) {
     py::class_<VRPNode>(m, "VRPNode")
-        .def(py::init<>())                                  // Default constructor
-        .def(py::init<int, int, int, int, double>())        // Constructor with multiple arguments
+        .def(py::init<>())                                   // Default constructor
+        .def(py::init<int, int, int, int, double>())         // Constructor with multiple arguments
         .def_readwrite("x", &VRPNode::x)                     // Expose x
         .def_readwrite("y", &VRPNode::y)                     // Expose y
         .def_readwrite("id", &VRPNode::id)                   // Expose id
@@ -81,7 +81,7 @@ PYBIND11_MODULE(baldes, m) {
         .def("redefine", &BucketGraph::redefine, "bucket_interval"_a) // Bind redefine method
         .def("solve", &BucketGraph::solve)                            // Bind solve method
         .def("set_adjacency_list", &BucketGraph::set_adjacency_list)  // Bind adjacency list setup
-        .def("get_nodes", &BucketGraph::getNodes)                       // Get the nodes in the graph
+        .def("get_nodes", &BucketGraph::getNodes)                     // Get the nodes in the graph
         .def("print_statistics", &BucketGraph::print_statistics)      // Print stats
         .def("set_duals", &BucketGraph::setDuals, "duals"_a)          // Set dual values
         .def("set_distance_matrix", &BucketGraph::set_distance_matrix, "distance_matrix"_a,

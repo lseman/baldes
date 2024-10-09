@@ -75,7 +75,7 @@ public:
 
     ModelData         matrix;
     std::vector<Path> paths;
-    // std::unordered_set<Path, PathHash> pathSet;
+    // ankerl::unordered_dense::set<Path, PathHash> pathSet;
     ankerl::unordered_dense::set<Path, PathHash> pathSet;
 
 #ifdef RCC

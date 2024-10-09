@@ -22,6 +22,7 @@
 #include "VRPNode.h"
 
 #include "ankerl/unordered_dense.h"
+#include <unordered_set>
 
 #include <execution>
 /**
