@@ -8,19 +8,10 @@
  * functions for manipulating and processing instance data, such as reducing time windows, deleting arcs, and reading an
  * instance from a file.
  *
- * The main components of this file include:
- * - The `InstanceData` structure: Contains all the relevant data for a VRPTW problem instance, such as distance
- * matrices, demands, time windows, service times, and other problem-specific information.
- * - `VRPTW_delete_arc`: An inline function for managing deleted arcs in the graph.
- * - `VRPTW_reduce_time_windows`: An inline function to iteratively reduce the time windows for vertices based on
- * constraints.
- * - `VRPTW_mcd`: An inline function that calculates the greatest common divisor (GCD) of two integers, used for
- * capacity and demand adjustments.
- * - `VRPTW_read_instance`: An inline function to read a VRPTW instance file and populate the `InstanceData` structure
- * with relevant data.
  *
  * This file is essential for handling the input and initialization of problem instances, and it ensures that the data
  * is formatted and processed correctly for further use in solving the VRPTW.
+ *
  */
 
 #pragma once

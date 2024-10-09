@@ -7,14 +7,8 @@
  * using Gurobi's optimization model. RCC separation is an important aspect of optimization algorithms, particularly
  * in vehicle routing problems where capacity constraints must be enforced.
  *
- * Key components of the file include:
- * - `separate_Rounded_Capacity_cuts`: A function that identifies and separates RCCs by solving the relaxed Gurobi model
- *   and searching for violated constraints in the solution space. The function generates multiple RCC solutions.
- *
  * The file leverages Gurobi for optimization and constraint management.
  *
- * @note Several parts of the function rely on setting up and solving a Gurobi optimization model to identify capacity
- * violations and generate RCCs.
  */
 
 #pragma once

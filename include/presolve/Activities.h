@@ -1,3 +1,12 @@
+/*
+ * @file Activities.h
+ * @brief Header file for the Preprocessor class, which preprocesses the input data for the presolver.
+ *
+ * This file contains the definition of the Preprocessor class, which preprocesses the input data for the presolver.
+ * The class contains methods to calculate row activities, process row information, convert constraints to
+ * less-than-or-equal-to form, convert constraints to knapsack form, perform bound tightening, and find knapsack rows.
+ *
+ */
 #pragma once
 
 #include "Definitions.h"

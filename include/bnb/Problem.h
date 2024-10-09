@@ -1,3 +1,13 @@
+/*
+ * @file Problem.h
+ * @brief Header file for the Problem class.
+ *
+ * This file contains the definition of the Problem class, which represents an abstract base class for defining
+ * optimization problems. The class provides the interface for branching, bounding, and calculating the objective value
+ * for a given node in the optimization problem. Derived classes must implement these methods based on the specific
+ * problem's requirements.
+ *
+ */
 #pragma once
 
 #include "Definitions.h"

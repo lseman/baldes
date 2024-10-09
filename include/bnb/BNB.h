@@ -1,3 +1,11 @@
+/*
+ * @file BNB.h
+ * @brief Branch-and-Bound algorithm implementation.
+ *
+ * This file contains the implementation of the Branch-and-Bound (BNB) algorithm for solving optimization problems.
+ * The algorithm uses a tree search strategy to explore the solution space and find the optimal solution.
+ *
+ */
 #pragma once
 
 #include "Definitions.h"

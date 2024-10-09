@@ -1,7 +1,14 @@
 /**
  * @file Path.h
  * @brief This file contains the definition of the Path struct.
+ *
+ * This file contains the definition of the Path struct, which represents a path with a route and its associated cost.
+ * The Path struct encapsulates a route represented as a vector of integers and a cost associated with the route.
+ * It provides various utility methods to interact with the route, such as checking for the presence of elements,
+ * counting occurrences, and managing arcs between route points.
+ *
  */
+
 #pragma once
 #include "Arc.h"
 #include "Common.h"

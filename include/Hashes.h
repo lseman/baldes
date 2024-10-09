@@ -1,3 +1,14 @@
+/*
+ * @file Hashes.h
+ * @brief Hash functions for various data types and structures.
+ *
+ * This file contains hash functions for various data types and structures, including:
+ * - Hash functions for vectors of integers and doubles.
+ * - Hash functions for pairs and unordered sets.
+ * - Specialized hash functions for specific data types.
+ *
+ */
+
 #pragma once
 
 #include <bit> // for std::bit_cast (C++20)

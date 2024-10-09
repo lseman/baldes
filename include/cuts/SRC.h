@@ -6,12 +6,6 @@
  * including the handling of cuts for optimization algorithms used in the Vehicle Routing Problem with Time Windows
  * (VRPTW).
  *
- * The file defines the following key structures and classes:
- * 1. `VRPTW_SRC`: Holds the state and best sets for processing cuts.
- * 2. `Cut`: Represents an individual cut with coefficients and multipliers.
- * 3. `CutStorage`: Manages storage and operations related to cuts in the solver.
- * 4. `LimitedMemoryRank1Cuts`: Provides methods for separating and generating cuts, including heuristics like the 45
- * Heuristic.
  *
  * It also includes utility functions to compute coefficients, generate cuts, and work with sparse models.
  * The file facilitates the optimization process by allowing computation of limited memory coefficients and
@@ -195,7 +189,6 @@ private:
  * This function creates permutations for a predefined set of vectors, each containing
  * five double values. The permutations are generated in lexicographical order.
  *
- * @return A vector containing all unique permutations of the predefined vectors.
  */
 inline std::vector<std::vector<double>> getPermutationsForSize5() {
     std::vector<std::vector<double>> permutations;

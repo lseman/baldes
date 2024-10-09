@@ -1,4 +1,13 @@
-
+/*
+ * @file Bucket.h
+ * @brief This file contains the definition of the Bucket struct.
+ *
+ * This file contains the definition of the Bucket struct, which represents a bucket in a solver.
+ * The Bucket struct contains information about the node ID, lower bounds, upper bounds, forward arcs,
+ * backward arcs, forward jump arcs, backward jump arcs, and labels associated with the bucket.
+ * It provides methods to add arcs, add jump arcs, get arcs, get jump arcs, add labels, remove labels,
+ * get labels, clear labels, reset labels, and clear arcs.
+ */
 #pragma once
 
 #include "Definitions.h"
