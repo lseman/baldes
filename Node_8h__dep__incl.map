@@ -1,0 +1,11 @@
+<map id="Node.h" name="Node.h">
+<area shape="rect" id="Node000001" title="Node class implementation." alt="" coords="89,5,152,31"/>
+<area shape="rect" id="Node000002" href="$BNB_8h.html" title=" " alt="" coords="49,153,109,178"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="76,34,40,52,24,65,12,80,9,90,9,99,19,119,38,136,58,150,55,154,34,140,15,122,4,101,3,89,7,78,21,61,37,48,73,29"/>
+<area shape="rect" id="Node000003" href="$Branching_8h.html" title=" " alt="" coords="22,79,112,105"/>
+<area shape="poly" id="edge2_Node000001_Node000003" title=" " alt="" coords="105,45,78,80,74,77,100,42"/>
+<area shape="rect" id="Node000004" href="$Problem_8h.html" title=" " alt="" coords="135,79,215,105"/>
+<area shape="poly" id="edge3_Node000001_Node000004" title=" " alt="" coords="133,42,161,77,157,80,129,45"/>
+<area shape="poly" id="edge5_Node000004_Node000001" title=" " alt="" coords="163,68,134,33,138,30,167,64"/>
+<area shape="poly" id="edge4_Node000004_Node000002" title=" " alt="" coords="148,116,97,154,94,150,145,112"/>
+</map>

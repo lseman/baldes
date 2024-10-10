@@ -1,0 +1,27 @@
+<map id="Bucket.h" name="Bucket.h">
+<area shape="rect" id="Node000001" title=" " alt="" coords="53,5,126,31"/>
+<area shape="rect" id="Node000002" href="$BucketGraph_8h.html" title="Defines the BucketGraph class and associated functionalities used in solving vehicle routing problems..." alt="" coords="208,79,315,105"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="133,35,233,76,231,81,131,40"/>
+<area shape="rect" id="Node000007" href="$BucketUtils_8h.html" title="Header file for utilities related to the Bucket Graph in the Vehicle Routing Problem (VRP)." alt="" coords="153,226,252,252"/>
+<area shape="poly" id="edge14_Node000001_Node000007" title=" " alt="" coords="67,44,41,72,19,107,11,125,8,143,10,160,18,177,46,203,80,220,118,230,153,235,152,240,117,235,79,225,43,207,14,180,5,162,3,143,6,124,14,105,37,69,63,40"/>
+<area shape="rect" id="Node000003" href="$BucketBindings_8cpp.html" title="Python bindings for the BucketGraph, VRPNode, Label, PSTEPDuals, and BucketOptions classes using pybi..." alt="" coords="121,153,258,178"/>
+<area shape="poly" id="edge2_Node000002_Node000003" title=" " alt="" coords="241,117,203,154,200,150,237,114"/>
+<area shape="rect" id="Node000004" href="$BucketGraph_8cpp.html" title="Implementation of the BucketGraph class and related structures for solving vehicle routing problems (..." alt="" coords="342,300,463,326"/>
+<area shape="poly" id="edge3_Node000002_Node000004" title=" " alt="" coords="331,95,396,106,467,129,502,146,533,167,559,194,580,225,585,244,581,260,570,273,553,284,511,299,464,308,463,303,509,294,551,279,566,269,576,257,579,244,575,227,555,197,529,172,499,151,465,134,395,112,330,100"/>
+<area shape="rect" id="Node000005" href="$BucketJump_8h.html" title="Header file for the Bucket Graph&#39;s arc elimination and jump arc utilities in Vehicle Routing Problems..." alt="" coords="281,153,386,178"/>
+<area shape="poly" id="edge4_Node000002_Node000005" title=" " alt="" coords="286,114,323,150,319,154,282,117"/>
+<area shape="rect" id="Node000008" href="$RIH_8cpp.html" title="Implementation of Route Improvement Heuristics (RIH) for Vehicle Routing Problems (VRP)." alt="" coords="29,153,97,178"/>
+<area shape="poly" id="edge8_Node000002_Node000008" title=" " alt="" coords="214,113,97,155,96,150,213,108"/>
+<area shape="rect" id="Node000009" href="$SRC_8h.html" title="Definitions for handling cuts and optimizations for the Vehicle Routing Problem with Time Windows (VR..." alt="" coords="410,153,468,178"/>
+<area shape="poly" id="edge9_Node000002_Node000009" title=" " alt="" coords="306,108,410,150,408,155,304,113"/>
+<area shape="rect" id="Node000006" href="$BucketSolve_8h.html" title="Defines the BucketGraph class and its solving methods for optimization problems." alt="" coords="277,226,382,252"/>
+<area shape="poly" id="edge5_Node000005_Node000006" title=" " alt="" coords="335,194,333,226,327,226,329,194"/>
+<area shape="poly" id="edge6_Node000005_Node000007" title=" " alt="" coords="300,188,226,228,224,223,297,184"/>
+<area shape="poly" id="edge7_Node000007_Node000004" title=" " alt="" coords="252,255,370,297,368,302,250,260"/>
+<area shape="poly" id="edge10_Node000009_Node000006" title=" " alt="" coords="409,189,349,228,347,223,406,185"/>
+<area shape="poly" id="edge11_Node000009_Node000007" title=" " alt="" coords="396,183,244,228,242,223,394,177"/>
+<area shape="rect" id="Node000010" href="$Node_8h.html" title="Node class implementation." alt="" coords="504,226,566,252"/>
+<area shape="poly" id="edge12_Node000009_Node000010" title=" " alt="" coords="469,186,520,224,517,228,465,190"/>
+<area shape="rect" id="Node000014" href="$SRC_8cpp.html" title="Implementation of functions and classes for solving VRP problems using Limited Memory Rank&#45;1 Cuts." alt="" coords="407,226,479,252"/>
+<area shape="poly" id="edge13_Node000009_Node000014" title=" " alt="" coords="443,194,445,226,439,226,438,194"/>
+</map>

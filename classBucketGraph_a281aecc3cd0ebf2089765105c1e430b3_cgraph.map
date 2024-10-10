@@ -1,0 +1,7 @@
+<map id="BucketGraph::DominatedInCompWiseSmallerBuckets" name="BucketGraph::DominatedInCompWiseSmallerBuckets">
+<area shape="rect" id="Node000001" title="Determines if a label is dominated in component&#45;wise smaller buckets." alt="" coords="5,35,182,75"/>
+<area shape="rect" id="Node000002" href="$BucketAVX_8h.html#abfb8a86d40957ca5a1669210b3ef01b3" title="Checks if a new label is dominated by any label in a given vector using SIMD operations." alt="" coords="230,5,405,46"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="182,41,214,37,215,42,183,46"/>
+<area shape="rect" id="Node000003" href="$BucketSolve_8h.html#a19811a89f68c557464964eef83a60448" title="Checks if element &#39;a&#39; precedes element &#39;b&#39; in the given strongly connected components (SCCs)." alt="" coords="280,70,354,96"/>
+<area shape="poly" id="edge2_Node000001_Node000003" title=" " alt="" coords="183,63,265,74,264,79,182,69"/>
+</map>

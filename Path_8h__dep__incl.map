@@ -1,0 +1,33 @@
+<map id="Path.h" name="Path.h">
+<area shape="rect" id="Node000001" title="This file contains the definition of the Path struct." alt="" coords="165,5,223,31"/>
+<area shape="rect" id="Node000002" href="$Node_8h.html" title="Node class implementation." alt="" coords="263,300,325,326"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="161,42,103,81,72,106,45,134,23,163,11,193,10,222,15,236,24,250,40,263,64,273,130,290,202,301,263,307,262,312,201,306,129,295,62,278,37,267,20,254,10,239,5,223,6,192,19,161,41,131,69,102,100,77,158,37"/>
+<area shape="rect" id="Node000006" href="$Pools_8h.html" title="Defines classes to manage pools of paths and labels." alt="" coords="360,79,425,105"/>
+<area shape="poly" id="edge7_Node000001_Node000006" title=" " alt="" coords="239,33,361,76,359,81,237,38"/>
+<area shape="rect" id="Node000003" href="$BNB_8h.html" title=" " alt="" coords="223,447,282,473"/>
+<area shape="poly" id="edge2_Node000002_Node000003" title=" " alt="" coords="249,329,214,347,199,360,187,375,183,385,184,394,194,413,212,431,232,445,229,449,209,435,190,417,179,396,178,384,182,372,195,356,211,343,247,324"/>
+<area shape="rect" id="Node000004" href="$Branching_8h.html" title=" " alt="" coords="196,374,285,399"/>
+<area shape="poly" id="edge3_Node000002_Node000004" title=" " alt="" coords="278,340,252,375,247,372,274,336"/>
+<area shape="rect" id="Node000005" href="$Problem_8h.html" title=" " alt="" coords="309,374,388,399"/>
+<area shape="poly" id="edge4_Node000002_Node000005" title=" " alt="" coords="306,337,335,372,330,375,302,340"/>
+<area shape="poly" id="edge6_Node000005_Node000002" title=" " alt="" coords="336,362,308,328,312,324,340,359"/>
+<area shape="poly" id="edge5_Node000005_Node000003" title=" " alt="" coords="322,411,270,449,267,445,319,407"/>
+<area shape="rect" id="Node000007" href="$BucketAVX_8h.html" title="SIMD&#45;based dominance check for label comparison." alt="" coords="215,153,314,178"/>
+<area shape="poly" id="edge8_Node000006_Node000007" title=" " alt="" coords="359,115,288,154,285,150,356,110"/>
+<area shape="rect" id="Node000008" href="$BucketGraph_8h.html" title="Defines the BucketGraph class and associated functionalities used in solving vehicle routing problems..." alt="" coords="339,153,446,178"/>
+<area shape="poly" id="edge9_Node000006_Node000008" title=" " alt="" coords="395,120,395,152,390,152,390,120"/>
+<area shape="rect" id="Node000015" href="$SRC_8h.html" title="Definitions for handling cuts and optimizations for the Vehicle Routing Problem with Time Windows (VR..." alt="" coords="562,226,620,252"/>
+<area shape="poly" id="edge16_Node000006_Node000015" title=" " alt="" coords="422,112,510,176,576,224,573,228,507,180,419,116"/>
+<area shape="rect" id="Node000017" href="$Stabilization_8h.html" title="Defines the Stabilization class for dual stabilization in column generation." alt="" coords="521,153,622,178"/>
+<area shape="poly" id="edge17_Node000006_Node000017" title=" " alt="" coords="438,108,542,150,540,155,436,113"/>
+<area shape="rect" id="Node000009" href="$BucketBindings_8cpp.html" title="Python bindings for the BucketGraph, VRPNode, Label, PSTEPDuals, and BucketOptions classes using pybi..." alt="" coords="34,226,170,252"/>
+<area shape="poly" id="edge10_Node000008_Node000009" title=" " alt="" coords="329,185,152,228,151,223,328,180"/>
+<area shape="rect" id="Node000010" href="$BucketGraph_8cpp.html" title="Implementation of the BucketGraph class and related structures for solving vehicle routing problems (..." alt="" coords="195,226,316,252"/>
+<area shape="poly" id="edge11_Node000008_Node000010" title=" " alt="" coords="357,188,280,228,277,223,355,183"/>
+<area shape="rect" id="Node000011" href="$BucketJump_8h.html" title="Header file for the Bucket Graph&#39;s arc elimination and jump arc utilities in Vehicle Routing Problems..." alt="" coords="340,226,445,252"/>
+<area shape="poly" id="edge12_Node000008_Node000011" title=" " alt="" coords="395,194,395,226,390,226,390,194"/>
+<area shape="rect" id="Node000014" href="$RIH_8cpp.html" title="Implementation of Route Improvement Heuristics (RIH) for Vehicle Routing Problems (VRP)." alt="" coords="469,226,537,252"/>
+<area shape="poly" id="edge13_Node000008_Node000014" title=" " alt="" coords="425,185,486,223,483,228,422,189"/>
+<area shape="poly" id="edge14_Node000008_Node000015" title=" " alt="" coords="441,181,563,225,561,230,440,186"/>
+<area shape="poly" id="edge15_Node000015_Node000002" title=" " alt="" coords="548,255,326,307,325,302,546,250"/>
+</map>

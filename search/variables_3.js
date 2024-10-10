@@ -1,0 +1,23 @@
+var searchData=
+[
+  ['d_0',['D',['../classSparseSolver.html#a89269567877ece0db949ac3fc1bb7972',1,'SparseSolver']]],
+  ['dark_5fyellow_1',['dark_yellow',['../Definitions_8h.html#a46e060b6efcd1457b031faf795a047a2',1,'Definitions.h']]],
+  ['deleted_5farcs_2',['deleted_arcs',['../structInstanceData.html#a21d73ee5c7ed05ed0dd4fcadb94c6552',1,'InstanceData']]],
+  ['deleted_5farcs_5fn_3',['deleted_arcs_n',['../structInstanceData.html#a9ddbf8c96391724e9761b3b1bd27b323',1,'InstanceData']]],
+  ['deleted_5farcs_5fn_5fmax_4',['deleted_arcs_n_max',['../structInstanceData.html#a5e5025a9d1d61cb7a9e9a046cb9f6829',1,'InstanceData']]],
+  ['demand_5',['demand',['../structInstanceData.html#a206f4a29b78fda40e222d4aa33b2bdb5',1,'InstanceData::demand'],['../structVRPNode.html#adf2e2da83bfd55ed6d12f0c78c963e73',1,'VRPNode::demand']]],
+  ['demand_5fadditional_6',['demand_additional',['../structInstanceData.html#adab807a0dd5fd5949b87a3657d641545',1,'InstanceData']]],
+  ['demand_5fsum_7',['demand_sum',['../structInstanceData.html#a76213f759f3f3989a16705bcf459fdf1',1,'InstanceData']]],
+  ['depot_8',['depot',['../structBucketOptions.html#abdd9cd44f4323b48948c1476a58e4890',1,'BucketOptions']]],
+  ['depot_5fdistance_5fthreshold_9',['DEPOT_DISTANCE_THRESHOLD',['../Branching_8h.html#a2d20315f6578c43429da317337c451a1',1,'Branching.h']]],
+  ['distance_10',['distance',['../structInstanceData.html#a41b5939f16110d0870d76f04a4af1097',1,'InstanceData']]],
+  ['distance_5fadditional_11',['distance_additional',['../structInstanceData.html#a2a823db70caf0e3f5ea7f47660d6d781',1,'InstanceData']]],
+  ['distance_5fmatrix_12',['distance_matrix',['../classBucketGraph.html#a2f8ba4399d8ff94a6e29b27e84dfa58e',1,'BucketGraph::distance_matrix'],['../classSchrodingerPool.html#ad58894e2553a4d68311ad8a49bd9b106',1,'SchrodingerPool::distance_matrix']]],
+  ['dominance_5fchecks_5fper_5fbucket_13',['dominance_checks_per_bucket',['../classBucketGraph.html#a0337f4eec91163935cea2b512e508586',1,'BucketGraph']]],
+  ['duals_5fg_14',['duals_g',['../classStabilization.html#ace27b1c2782c9346382bd8f645d97a5a',1,'Stabilization']]],
+  ['duals_5fin_15',['duals_in',['../classStabilization.html#a4d4c83ea0cfe9d7c7a3904a165e1f2cc',1,'Stabilization']]],
+  ['duals_5fout_16',['duals_out',['../classStabilization.html#adf30d7009aa5f17ded6852b35e0ad323',1,'Stabilization']]],
+  ['duals_5fsep_17',['duals_sep',['../classStabilization.html#af4daf812a8380b3b392978645e1ae30e',1,'Stabilization']]],
+  ['duration_18',['duration',['../structVRPNode.html#a73b1bbecffce500c115c4f544d8b9de8',1,'VRPNode']]],
+  ['duration_5fmin_19',['duration_min',['../structVRPNode.html#a5c2b93103864a483c0f4936d8152881d',1,'VRPNode']]]
+];

@@ -1,0 +1,30 @@
+<map id="Dual.h" name="Dual.h">
+<area shape="rect" id="Node000001" title=" " alt="" coords="300,5,357,31"/>
+<area shape="rect" id="Node000002" href="$BucketGraph_8h.html" title="Defines the BucketGraph class and associated functionalities used in solving vehicle routing problems..." alt="" coords="208,153,316,178"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="312,45,290,80,275,119,267,153,262,152,270,118,285,78,307,42"/>
+<area shape="rect" id="Node000010" href="$Node_8h.html" title="Node class implementation." alt="" coords="502,300,564,326"/>
+<area shape="poly" id="edge14_Node000001_Node000010" title=" " alt="" coords="349,41,410,122,483,225,528,298,524,301,478,228,406,125,345,45"/>
+<area shape="rect" id="Node000015" href="$RCC_8h.html" title="Definitions for generating and separating Rounded Capacity Cuts (RCC) in the context of vehicle routi..." alt="" coords="300,79,358,105"/>
+<area shape="poly" id="edge15_Node000001_Node000015" title=" " alt="" coords="331,46,331,79,326,79,326,46"/>
+<area shape="rect" id="Node000003" href="$BucketBindings_8cpp.html" title="Python bindings for the BucketGraph, VRPNode, Label, PSTEPDuals, and BucketOptions classes using pybi..." alt="" coords="122,226,258,252"/>
+<area shape="poly" id="edge2_Node000002_Node000003" title=" " alt="" coords="241,191,204,228,200,224,237,187"/>
+<area shape="rect" id="Node000004" href="$BucketGraph_8cpp.html" title="Implementation of the BucketGraph class and related structures for solving vehicle routing problems (..." alt="" coords="100,374,221,399"/>
+<area shape="poly" id="edge3_Node000002_Node000004" title=" " alt="" coords="194,177,89,196,45,210,29,219,19,228,9,249,11,269,22,290,41,310,89,345,136,371,133,375,86,350,37,314,18,293,6,271,4,248,15,225,26,214,43,205,88,190,193,171"/>
+<area shape="rect" id="Node000005" href="$BucketJump_8h.html" title="Header file for the Bucket Graph&#39;s arc elimination and jump arc utilities in Vehicle Routing Problems..." alt="" coords="282,226,386,252"/>
+<area shape="poly" id="edge4_Node000002_Node000005" title=" " alt="" coords="287,187,324,224,320,228,283,191"/>
+<area shape="rect" id="Node000008" href="$RIH_8cpp.html" title="Implementation of Route Improvement Heuristics (RIH) for Vehicle Routing Problems (VRP)." alt="" coords="29,226,98,252"/>
+<area shape="poly" id="edge8_Node000002_Node000008" title=" " alt="" coords="215,186,98,228,96,223,213,181"/>
+<area shape="rect" id="Node000009" href="$SRC_8h.html" title="Definitions for handling cuts and optimizations for the Vehicle Routing Problem with Time Windows (VR..." alt="" coords="410,226,469,252"/>
+<area shape="poly" id="edge9_Node000002_Node000009" title=" " alt="" coords="307,182,411,223,409,228,305,187"/>
+<area shape="rect" id="Node000006" href="$BucketSolve_8h.html" title="Defines the BucketGraph class and its solving methods for optimization problems." alt="" coords="152,300,257,326"/>
+<area shape="poly" id="edge5_Node000005_Node000006" title=" " alt="" coords="300,262,228,302,225,297,297,258"/>
+<area shape="rect" id="Node000007" href="$BucketUtils_8h.html" title="Header file for utilities related to the Bucket Graph in the Vehicle Routing Problem (VRP)." alt="" coords="282,300,381,326"/>
+<area shape="poly" id="edge6_Node000005_Node000007" title=" " alt="" coords="336,268,334,300,329,299,330,267"/>
+<area shape="poly" id="edge7_Node000007_Node000004" title=" " alt="" coords="290,334,191,376,189,371,288,329"/>
+<area shape="poly" id="edge10_Node000009_Node000006" title=" " alt="" coords="396,256,246,302,244,297,395,251"/>
+<area shape="poly" id="edge11_Node000009_Node000007" title=" " alt="" coords="410,263,351,302,348,297,407,259"/>
+<area shape="poly" id="edge12_Node000009_Node000010" title=" " alt="" coords="469,260,519,298,516,302,466,264"/>
+<area shape="rect" id="Node000014" href="$SRC_8cpp.html" title="Implementation of functions and classes for solving VRP problems using Limited Memory Rank&#45;1 Cuts." alt="" coords="405,300,477,326"/>
+<area shape="poly" id="edge13_Node000009_Node000014" title=" " alt="" coords="443,267,443,299,438,300,437,268"/>
+<area shape="poly" id="edge16_Node000015_Node000002" title=" " alt="" coords="309,118,275,154,271,150,305,114"/>
+</map>

@@ -1,0 +1,5 @@
+<map id="SparseMatrix::rowIterator" name="SparseMatrix::rowIterator">
+<area shape="rect" id="Node000001" title="Get an iterator for a specific row." alt="" coords="5,5,171,31"/>
+<area shape="rect" id="Node000002" href="$structSparseMatrix.html#a9fab556384dcef91755ab89de98f1a49" title="Build the CRS structure by computing row start positions." alt="" coords="219,5,403,31"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="171,16,203,16,203,21,171,21"/>
+</map>

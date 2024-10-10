@@ -1,0 +1,12 @@
+<map id="SparseMatrix::toDense" name="SparseMatrix::toDense">
+<area shape="rect" id="Node000001" title="Convert the sparse matrix to a dense matrix format." alt="" coords="5,31,157,56"/>
+<area shape="rect" id="Node000002" href="$structSparseMatrix.html#ac791ee3ea5cadfb9dbb3fe69aee16b18" title="Perform a function for each non&#45;zero element in every row." alt="" coords="205,31,378,56"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="157,41,189,41,189,46,157,46"/>
+<area shape="rect" id="Node000003" href="$structSparseMatrix.html#a9fab556384dcef91755ab89de98f1a49" title="Build the CRS structure by computing row start positions." alt="" coords="644,5,829,31"/>
+<area shape="poly" id="edge2_Node000002_Node000003" title=" " alt="" coords="350,27,426,16,530,10,629,11,629,16,530,15,426,21,351,33"/>
+<area shape="rect" id="Node000004" href="$structSparseMatrix.html#adfbb5b38a05bc9688ca60b1f30aa44b1" title="Get an iterator for a specific row." alt="" coords="428,31,594,56"/>
+<area shape="poly" id="edge3_Node000002_Node000004" title=" " alt="" coords="378,41,413,41,413,46,378,46"/>
+<area shape="rect" id="Node000005" href="$structSparseMatrix_1_1RowIterator.html#a9bcb08fd6bd3d20ca050dba4c96c0435" title="Check if the iterator is valid (i.e., it has more elements to traverse)." alt="" coords="426,80,596,121"/>
+<area shape="poly" id="edge5_Node000002_Node000005" title=" " alt="" coords="344,54,416,73,415,79,343,60"/>
+<area shape="poly" id="edge4_Node000004_Node000003" title=" " alt="" coords="594,32,628,28,629,33,594,37"/>
+</map>

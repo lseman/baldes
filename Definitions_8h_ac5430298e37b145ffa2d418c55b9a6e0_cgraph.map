@@ -1,0 +1,5 @@
+<map id="extractModelDataSparse" name="extractModelDataSparse">
+<area shape="rect" id="Node000001" title="Extracts model data from a given Gurobi model in a sparse format." alt="" coords="5,5,169,31"/>
+<area shape="rect" id="Node000002" href="$structSparseMatrix.html#a9fab556384dcef91755ab89de98f1a49" title="Build the CRS structure by computing row start positions." alt="" coords="217,5,401,31"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="169,16,201,16,201,21,169,21"/>
+</map>

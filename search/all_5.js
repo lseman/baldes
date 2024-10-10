@@ -1,0 +1,27 @@
+var searchData=
+[
+  ['e_0',['E',['../classCholmodSolver.html#a083c2287e5a7c471f939871f47e538dd',1,'CholmodSolver']]],
+  ['edge_1',['Edge',['../Definitions_8h.html#ac42c2e9f0bdd51b56ae955b2f5c35004ae4a297a0f76119a442c2595ac040673e',1,'Definitions.h']]],
+  ['eigen_5finitialize_5fmatrices_5fby_5fzero_2',['EIGEN_INITIALIZE_MATRICES_BY_ZERO',['../IPSolver_8cpp.html#add32a3101843e4b782d8f5d2d92b97ab',1,'IPSolver.cpp']]],
+  ['elementarity_5fbitmap_3',['elementarity_bitmap',['../classBucketGraph.html#a47e48b3401a5611676526b47489c9afc',1,'BucketGraph']]],
+  ['elements_4',['elements',['../structSparseMatrix.html#a9d4607fbb7fcb884094abf8097810b32',1,'SparseMatrix']]],
+  ['empty_5',['empty',['../structBucket.html#ae1e437ec6f79b79d0899e0e85e738c1d',1,'Bucket::empty()'],['../classCutStorage.html#afac7a6d98021d88d8e81cc57edf953f8',1,'CutStorage::empty()']]],
+  ['end_6',['end',['../structSparseMatrix_1_1RowIterator.html#a0f94912c7907a51dd2e4e06d1104996b',1,'SparseMatrix::RowIterator::end'],['../classCutStorage.html#ac113a5bdf82d37db850f019a409461e0',1,'CutStorage::end() const noexcept'],['../classCutStorage.html#a6cd31f40190828e3e8b7c9928e4eb958',1,'CutStorage::end() noexcept'],['../structPath.html#a4578c974badf77436e3a3fec064872d4',1,'Path::end()']]],
+  ['end_5fdepot_7',['end_depot',['../structBucketOptions.html#a1464a17337f37b76cd77fbcd80095685',1,'BucketOptions']]],
+  ['end_5ftime_8',['end_time',['../structVRPNode.html#a1e7d0dd5e37c4785585721d110863ffe',1,'VRPNode']]],
+  ['enforcebranching_9',['enforceBranching',['../classBNBNode.html#aac35166d36684e32a7bdfa6c4c4ef41b',1,'BNBNode']]],
+  ['enumerate_10',['Enumerate',['../Definitions_8h.html#aca8133200c1122e29b87b314d82604eba81999728593fbd0249e73b02f3d7ad74',1,'Definitions.h']]],
+  ['epsilon_11',['epsilon',['../structNumericUtils.html#a52e4a40a5a871a8f0fb8fa8bcfe949ba',1,'NumericUtils']]],
+  ['equal_12',['Equal',['../Definitions_8h.html#ac8f82cde0cdfcbb1cdf96754f01dc008af5f286e73bda105e538310b3190f75c5',1,'Definitions.h']]],
+  ['error_13',['Error',['../Definitions_8h.html#a67a0db04d321a74b7e7fcfd3f1a3f70ba902b0d55fddef6f8d651fe1035b7d4bd',1,'Definitions.h']]],
+  ['evaluate_14',['evaluate',['../classProblem.html#a62735857d60d0bd41a8747c72a855356',1,'Problem']]],
+  ['evaluatewithbranching_15',['evaluateWithBranching',['../classBranching.html#a2432915701eeaaef5fee8889ec791382',1,'Branching']]],
+  ['evaluatewithcg_16',['evaluateWithCG',['../classBranching.html#aea63cd9a90ca079b11b31187d3902358',1,'Branching']]],
+  ['exactrcc_2eh_17',['ExactRCC.h',['../ExactRCC_8h.html',1,'']]],
+  ['exporttodot_18',['exportToDot',['../classSCC.html#a78e3e2a990c029246c02689742ba915c',1,'SCC']]],
+  ['extend_19',['Extend',['../classBucketGraph.html#a2095bb4e07ffe9285ee1c2143a5a9dec',1,'BucketGraph::Extend(std::conditional_t&lt; M==Mutability::Mut, Label *, const Label * &gt; L_prime, const std::conditional_t&lt; A==ArcType::Bucket, BucketArc, std::conditional_t&lt; A==ArcType::Jump, JumpArc, Arc &gt; &gt; &amp;gamma) noexcept'],['../classBucketGraph.html#a3e6ef524675b82e1dfddb5346a0db775',1,'BucketGraph::Extend(const std::conditional_t&lt; M==Mutability::Mut, Label *, const Label * &gt; L_prime, const std::conditional_t&lt; A==ArcType::Bucket, BucketArc, std::conditional_t&lt; A==ArcType::Jump, JumpArc, Arc &gt; &gt; &amp;gamma) noexcept']]],
+  ['extendcliques_20',['extendCliques',['../classCliqueManager.html#a98cf1d510d76418788660a863d9f3193',1,'CliqueManager']]],
+  ['extractmodeldatasparse_21',['extractModelDataSparse',['../classBNBNode.html#a234c0a33d282f8ec5d1017de8c99a037',1,'BNBNode::extractModelDataSparse()'],['../Definitions_8h.html#ac5430298e37b145ffa2d418c55b9a6e0',1,'extractModelDataSparse():&#160;Definitions.h']]],
+  ['extractoptimizationcomponents_22',['extractOptimizationComponents',['../classIPSolver.html#ac6c79f0b350245256cb7046b94dcbc45',1,'IPSolver::extractOptimizationComponents()'],['../IPSolver_8h.html#ac8876e705bd592bdfbc2db1e88b61afc',1,'extractOptimizationComponents():&#160;IPSolver.h']]],
+  ['extractsolution_23',['extractSolution',['../classBNBNode.html#ac5cdf235b03dab790bc9ec7222592375',1,'BNBNode']]]
+];

@@ -1,0 +1,23 @@
+var searchData=
+[
+  ['c_0',['c',['../structModelData.html#a9524df699303a08928c2424e50f0c212',1,'ModelData::c'],['../classCholmodSolver.html#a2042fc4c7d5cf80dd7d59126dda6a409',1,'CholmodSolver::c'],['../classIPSolver.html#a67fa60eef489fae25f29eb885b781f38',1,'IPSolver::c'],['../classPreprocessor.html#a343d2a8621c01cd0fcc3a5dd7b61d896',1,'Preprocessor::c']]],
+  ['candidates_1',['candidates',['../classBNBNode.html#aa691c25fbeac00ab65f59ba4d5b3e640',1,'BNBNode']]],
+  ['candidatetype_2',['candidateType',['../structBranchingQueueItem.html#acf040ea67cd77417ffa50cef05fcd2eb',1,'BranchingQueueItem::candidateType'],['../classVRPCandidate.html#a637d2d1d384015d02c30a61568a2f9c7',1,'VRPCandidate::candidateType']]],
+  ['changecollb_3',['changeColLB',['../structPresolveResult.html#a0b23739b8faafd4ea234d4488112e033',1,'PresolveResult']]],
+  ['changecolub_4',['changeColUB',['../structPresolveResult.html#a12db1e5c5c0f1dfdc85e30e5b8d37897',1,'PresolveResult']]],
+  ['children_5',['children',['../classBNBNode.html#a32d6a10ebd4e6d5ad3e0e459239b1f6c',1,'BNBNode']]],
+  ['cname_6',['cname',['../structModelData.html#a72635fc8840db033fc065f5a606513f2',1,'ModelData']]],
+  ['coefficients_7',['coefficients',['../structCut.html#a053573462a7391e455de56f91fbc7d66',1,'Cut']]],
+  ['col_8',['col',['../structSparseElement.html#aa9b24df3779f75dc6aa1ee3994bbc2dc',1,'SparseElement']]],
+  ['consumption_9',['consumption',['../structVRPNode.html#a9c7840a24952797c86482424e207666c',1,'VRPNode']]],
+  ['cost_10',['cost',['../structLabel.html#a1da1930412e730692277e75a94da77c2',1,'Label::cost'],['../structPath.html#a4d54acc172b9690ba67bebec88c9d2c6',1,'Path::cost'],['../structVRPNode.html#aeb1c250c9c28b3481302296bf642248f',1,'VRPNode::cost']]],
+  ['cost_5fincrement_11',['cost_increment',['../structArc.html#a39418aa5ffc3097cb8529a063c796de9',1,'Arc::cost_increment'],['../structBucketArc.html#aa8a9327361182f8ff88987a2e378d4de',1,'BucketArc::cost_increment'],['../structJumpArc.html#a7cd8d28f39396f7c6b968e0681467f85',1,'JumpArc::cost_increment']]],
+  ['cs_12',['cs',['../structOptimizationData.html#a5b82c8604e7c30d49e34be2b83f84705',1,'OptimizationData::cs'],['../classIPSolver.html#a1b6472ff0cd336af6471f553485b5ddc',1,'IPSolver::cs']]],
+  ['ctr_13',['ctr',['../structRCCut.html#ae8a0204ff9d566f1d5c7c8e167e092ff',1,'RCCut']]],
+  ['cur_5falpha_14',['cur_alpha',['../classStabilization.html#a3993b8b7d2b7ba34b5659a465f7c86df',1,'Stabilization']]],
+  ['cur_5fstab_5fcenter_15',['cur_stab_center',['../classStabilization.html#a28cf2ea457b84f4ea34e1720f6a35a2c',1,'Stabilization']]],
+  ['cut_5fctr_16',['cut_ctr',['../classRCCManager.html#a8d5e01244953a4b43ff2d74297ff7078',1,'RCCManager']]],
+  ['cut_5fstorage_17',['cut_storage',['../classBucketGraph.html#a9142869eb3212337ffb092a14e0e0079',1,'BucketGraph']]],
+  ['cutmaster_18',['cutMaster',['../structCut.html#add614b2c2deafe2ea6d7cddaa8100b1c',1,'Cut']]],
+  ['cutstorage_19',['cutStorage',['../classLimitedMemoryRank1Cuts.html#a582069540ed19e7a5ec234bd7a0fa4d3',1,'LimitedMemoryRank1Cuts']]]
+];

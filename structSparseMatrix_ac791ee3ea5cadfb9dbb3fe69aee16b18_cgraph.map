@@ -1,0 +1,10 @@
+<map id="SparseMatrix::forEachRow" name="SparseMatrix::forEachRow">
+<area shape="rect" id="Node000001" title="Perform a function for each non&#45;zero element in every row." alt="" coords="5,31,179,56"/>
+<area shape="rect" id="Node000002" href="$structSparseMatrix.html#a9fab556384dcef91755ab89de98f1a49" title="Build the CRS structure by computing row start positions." alt="" coords="445,5,629,31"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="151,27,226,16,331,10,429,11,429,16,331,15,227,21,152,33"/>
+<area shape="rect" id="Node000003" href="$structSparseMatrix.html#adfbb5b38a05bc9688ca60b1f30aa44b1" title="Get an iterator for a specific row." alt="" coords="229,31,394,56"/>
+<area shape="poly" id="edge2_Node000001_Node000003" title=" " alt="" coords="179,41,214,41,214,46,179,46"/>
+<area shape="rect" id="Node000004" href="$structSparseMatrix_1_1RowIterator.html#a9bcb08fd6bd3d20ca050dba4c96c0435" title="Check if the iterator is valid (i.e., it has more elements to traverse)." alt="" coords="227,80,397,121"/>
+<area shape="poly" id="edge4_Node000001_Node000004" title=" " alt="" coords="145,54,217,73,216,79,144,60"/>
+<area shape="poly" id="edge3_Node000003_Node000002" title=" " alt="" coords="395,32,429,28,430,33,395,37"/>
+</map>

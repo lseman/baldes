@@ -1,0 +1,28 @@
+<map id="Trees.h" name="Trees.h">
+<area shape="rect" id="Node000001" title="Header file containing the implementation of various tree structures used for interval and multidimen..." alt="" coords="470,5,534,31"/>
+<area shape="rect" id="Node000002" href="$BucketGraph_8h.html" title="Defines the BucketGraph class and associated functionalities used in solving vehicle routing problems..." alt="" coords="194,79,301,105"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="456,35,292,81,290,76,454,30"/>
+<area shape="rect" id="Node000006" href="$BucketSolve_8h.html" title="Defines the BucketGraph class and its solving methods for optimization problems." alt="" coords="360,226,466,252"/>
+<area shape="poly" id="edge14_Node000001_Node000006" title=" " alt="" coords="506,47,501,110,493,146,479,180,458,208,433,228,430,224,454,204,475,177,488,144,496,109,501,47"/>
+<area shape="rect" id="Node000007" href="$BucketUtils_8h.html" title="Header file for utilities related to the Bucket Graph in the Vehicle Routing Problem (VRP)." alt="" coords="490,226,589,252"/>
+<area shape="poly" id="edge15_Node000001_Node000007" title=" " alt="" coords="514,45,524,78,536,162,542,226,536,226,531,163,518,80,509,47"/>
+<area shape="rect" id="Node000003" href="$BucketBindings_8cpp.html" title="Python bindings for the BucketGraph, VRPNode, Label, PSTEPDuals, and BucketOptions classes using pybi..." alt="" coords="118,153,254,178"/>
+<area shape="poly" id="edge2_Node000002_Node000003" title=" " alt="" coords="230,118,199,154,195,150,226,115"/>
+<area shape="rect" id="Node000004" href="$BucketGraph_8cpp.html" title="Implementation of the BucketGraph class and related structures for solving vehicle routing problems (..." alt="" coords="203,300,324,326"/>
+<area shape="poly" id="edge3_Node000002_Node000004" title=" " alt="" coords="179,97,113,102,51,116,28,126,13,140,8,156,15,177,33,201,54,222,104,257,158,281,208,297,206,302,156,286,102,261,51,226,29,205,11,180,3,156,9,137,25,122,49,111,112,97,178,91"/>
+<area shape="rect" id="Node000005" href="$BucketJump_8h.html" title="Header file for the Bucket Graph&#39;s arc elimination and jump arc utilities in Vehicle Routing Problems..." alt="" coords="361,153,465,178"/>
+<area shape="poly" id="edge4_Node000002_Node000005" title=" " alt="" coords="291,109,386,150,384,155,288,114"/>
+<area shape="rect" id="Node000008" href="$RIH_8cpp.html" title="Implementation of Route Improvement Heuristics (RIH) for Vehicle Routing Problems (VRP)." alt="" coords="25,153,94,178"/>
+<area shape="poly" id="edge8_Node000002_Node000008" title=" " alt="" coords="202,113,93,155,91,150,200,108"/>
+<area shape="rect" id="Node000009" href="$SRC_8h.html" title="Definitions for handling cuts and optimizations for the Vehicle Routing Problem with Time Windows (VR..." alt="" coords="278,153,337,178"/>
+<area shape="poly" id="edge9_Node000002_Node000009" title=" " alt="" coords="269,115,300,150,295,154,265,118"/>
+<area shape="poly" id="edge5_Node000005_Node000006" title=" " alt="" coords="416,194,416,226,410,226,410,194"/>
+<area shape="poly" id="edge6_Node000005_Node000007" title=" " alt="" coords="449,184,519,223,517,228,446,189"/>
+<area shape="poly" id="edge7_Node000007_Node000004" title=" " alt="" coords="479,259,311,302,310,297,478,254"/>
+<area shape="poly" id="edge10_Node000009_Node000006" title=" " alt="" coords="339,185,396,224,394,228,336,190"/>
+<area shape="poly" id="edge11_Node000009_Node000007" title=" " alt="" coords="352,178,501,223,499,228,350,183"/>
+<area shape="rect" id="Node000010" href="$Node_8h.html" title="Node class implementation." alt="" coords="176,226,239,252"/>
+<area shape="poly" id="edge12_Node000009_Node000010" title=" " alt="" coords="280,190,226,228,223,224,277,185"/>
+<area shape="rect" id="Node000014" href="$SRC_8cpp.html" title="Implementation of functions and classes for solving VRP problems using Limited Memory Rank&#45;1 Cuts." alt="" coords="263,226,336,252"/>
+<area shape="poly" id="edge13_Node000009_Node000014" title=" " alt="" coords="307,194,304,226,298,226,302,193"/>
+</map>

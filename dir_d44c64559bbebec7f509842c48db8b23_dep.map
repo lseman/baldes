@@ -1,0 +1,15 @@
+<map id="include" name="include">
+<area shape="rect" id="node2" href="dir_03e27830cd00740e88c13726f2839f37.html" title="bnb" alt="" coords="112,27,154,52"/>
+<area shape="rect" id="node4" href="dir_eb848a6d5577302b475c9b576c58ba0d.html" title="cuts" alt="" coords="110,100,156,126"/>
+<area shape="poly" id="edge1" href="dir_000000_000002.html" alt="" coords="136,53,136,85,131,85,131,53"/>
+<area shape="rect" id="edge1-headlabel" href="dir_000000_000002.html" title="1" alt="" coords="138,74,145,89"/>
+<area shape="rect" id="node3" href="dir_0675ec9ffdc9f53223662e8ef3b56071.html" title="bucket" alt="" coords="103,174,164,200"/>
+<area shape="poly" id="edge2" href="dir_000001_000002.html" alt="" coords="138,173,139,141,145,141,143,174"/>
+<area shape="rect" id="edge2-headlabel" href="dir_000001_000002.html" title="3" alt="" coords="131,138,138,153"/>
+<area shape="poly" id="edge3" href="dir_000002_000001.html" alt="" coords="129,126,127,159,122,158,124,126"/>
+<area shape="rect" id="edge3-headlabel" href="dir_000002_000001.html" title="1" alt="" coords="129,147,136,162"/>
+<area shape="rect" id="node5" href="dir_19c6994ae8f47c929da9d9850f36dcd3.html" title="extra" alt="" coords="178,27,227,52"/>
+<area shape="rect" id="node6" href="dir_74a7a717cafb2aae048163b3ce2b6252.html" title="ipm" alt="" coords="251,27,293,52"/>
+<area shape="rect" id="node7" href="dir_a708f70755e7ced422062073446d41e6.html" title="presolve" alt="" coords="317,27,387,52"/>
+<area shape="rect" id="clust1" href="dir_d44c64559bbebec7f509842c48db8b23.html" alt="" coords="16,16,397,210"/>
+</map>

@@ -1,0 +1,31 @@
+<map id="BranchAndBound::processBNBNode" name="BranchAndBound::processBNBNode">
+<area shape="rect" id="Node000001" title=" " alt="" coords="5,203,239,228"/>
+<area shape="rect" id="Node000002" href="$classProblem.html#ab23bf266eab275b14032439516743b35" title=" " alt="" coords="347,5,458,31"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="130,201,152,167,188,123,233,78,285,40,331,23,333,28,288,45,236,82,192,127,157,171,134,204"/>
+<area shape="rect" id="Node000003" href="$classBranchAndBound.html#a64aba410e797f0c10c4918ecb140c728" title=" " alt="" coords="319,55,486,80"/>
+<area shape="poly" id="edge2_Node000001_Node000003" title=" " alt="" coords="135,200,196,146,239,115,286,89,303,82,305,87,288,94,242,120,199,150,138,204"/>
+<area shape="rect" id="Node000006" href="$classBNBNode.html#aac35166d36684e32a7bdfa6c4c4ef41b" title=" " alt="" coords="309,104,496,130"/>
+<area shape="poly" id="edge5_Node000001_Node000006" title=" " alt="" coords="147,200,209,169,286,138,310,131,311,136,288,143,211,174,149,204"/>
+<area shape="rect" id="Node000009" href="$classProblem.html#a62735857d60d0bd41a8747c72a855356" title="Calculates the bound for the given node." alt="" coords="340,153,464,179"/>
+<area shape="poly" id="edge8_Node000001_Node000009" title=" " alt="" coords="199,199,324,177,325,182,200,205"/>
+<area shape="rect" id="Node000010" href="$classBNBNode.html#aea7c19032bda3aaa1d5002a506b22f70" title=" " alt="" coords="333,203,472,228"/>
+<area shape="poly" id="edge9_Node000001_Node000010" title=" " alt="" coords="239,213,317,213,317,218,239,218"/>
+<area shape="rect" id="Node000011" href="$classBranchAndBound.html#a4aee56d21009ae41bc9d1a25331ce63f" title=" " alt="" coords="310,252,495,293"/>
+<area shape="poly" id="edge10_Node000001_Node000011" title=" " alt="" coords="189,226,295,248,294,254,188,232"/>
+<area shape="rect" id="Node000012" href="$classProblem.html#ae434b9a5b6c12d0f0aa8ddede5ab0302" title="Calculates the objective value for the given node." alt="" coords="339,317,466,343"/>
+<area shape="poly" id="edge11_Node000001_Node000012" title=" " alt="" coords="144,226,207,264,288,302,325,314,323,319,286,307,204,269,142,231"/>
+<area shape="rect" id="Node000013" href="$classBNBNode.html#ab885178fe3620191190f1b166016b7c5" title=" " alt="" coords="346,367,458,392"/>
+<area shape="poly" id="edge12_Node000001_Node000013" title=" " alt="" coords="136,227,197,288,240,324,288,353,332,368,330,373,286,358,237,328,193,292,133,231"/>
+<area shape="rect" id="Node000014" href="$classBranchAndBound.html#aa1ff580eba5f8fdfce63d3c5223dc4d4" title=" " alt="" coords="287,416,518,442"/>
+<area shape="poly" id="edge13_Node000001_Node000014" title=" " alt="" coords="133,227,155,263,189,311,234,361,260,383,288,403,297,407,294,412,285,407,257,388,231,365,185,314,150,266,128,230"/>
+<area shape="rect" id="Node000004" href="$classProblem.html#abf5c91a364cfc4eb9e22d5aafe6fd50f" title="Branches the given node." alt="" coords="621,5,735,31"/>
+<area shape="poly" id="edge3_Node000003_Node000004" title=" " alt="" coords="478,51,605,28,606,34,479,57"/>
+<area shape="rect" id="Node000005" href="$classBNBNode.html#af5035c88619967009f8a770fb8e18c57" title=" " alt="" coords="602,55,754,80"/>
+<area shape="poly" id="edge4_Node000003_Node000005" title=" " alt="" coords="486,65,587,65,587,70,486,70"/>
+<area shape="rect" id="Node000007" href="$classBNBNode.html#a3730c072c20ad3fcde8237203dc53750" title=" " alt="" coords="566,104,790,130"/>
+<area shape="poly" id="edge6_Node000006_Node000007" title=" " alt="" coords="497,114,551,114,551,120,497,120"/>
+<area shape="rect" id="Node000008" href="$classBranchingDuals.html#a62306eafdf50a39a7ec46e5ea199903e" title=" " alt="" coords="580,153,777,179"/>
+<area shape="poly" id="edge7_Node000006_Node000008" title=" " alt="" coords="479,128,588,147,587,153,478,133"/>
+<area shape="rect" id="Node000015" href="$classBranchAndBound.html#a0d57f6ba3e906c77cfadae558cf8bad5" title=" " alt="" coords="576,408,780,449"/>
+<area shape="poly" id="edge14_Node000014_Node000015" title=" " alt="" coords="518,426,560,426,560,432,518,432"/>
+</map>

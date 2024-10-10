@@ -1,0 +1,23 @@
+<map id="BucketGraph::run_labeling_algorithms" name="BucketGraph::run_labeling_algorithms">
+<area shape="rect" id="Node000001" title="Runs forward and backward labeling algorithms in parallel and synchronizes the results." alt="" coords="5,164,178,205"/>
+<area shape="rect" id="Node000002" href="$classBucketGraph.html#a82666ba5c89a565cc9e58f1d66f61119" title=" " alt="" coords="226,164,373,205"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="178,182,210,182,210,187,178,187"/>
+<area shape="rect" id="Node000003" href="$classBucketGraph.html#af129eff306551dc7cc7fe00b919bbbd0" title="Assigns the buckets based on the specified direction." alt="" coords="666,47,808,87"/>
+<area shape="poly" id="edge2_Node000002_Node000003" title=" " alt="" coords="345,161,420,132,540,101,651,78,652,84,541,106,422,138,347,166"/>
+<area shape="rect" id="Node000004" href="$BucketAVX_8h.html#abfb8a86d40957ca5a1669210b3ef01b3" title="Checks if a new label is dominated by any label in a given vector using SIMD operations." alt="" coords="649,129,825,170"/>
+<area shape="poly" id="edge3_Node000002_Node000004" title=" " alt="" coords="373,164,421,156,531,148,634,145,634,151,531,153,421,162,374,169"/>
+<area shape="rect" id="Node000005" href="$classBucketGraph.html#a281aecc3cd0ebf2089765105c1e430b3" title="Determines if a label is dominated in component&#45;wise smaller buckets." alt="" coords="423,221,599,262"/>
+<area shape="poly" id="edge4_Node000002_Node000005" title=" " alt="" coords="374,202,420,214,418,219,373,207"/>
+<area shape="rect" id="Node000007" href="$classBucketGraph.html#a2095bb4e07ffe9285ee1c2143a5a9dec" title=" " alt="" coords="440,172,582,197"/>
+<area shape="poly" id="edge7_Node000002_Node000007" title=" " alt="" coords="373,182,424,182,424,187,373,187"/>
+<area shape="rect" id="Node000008" href="$classBucketGraph.html#abc324fb45e794482eb642adb8b0f664d" title="Retrieves the best label from the bucket graph based on the given topological order,..." alt="" coords="434,5,588,46"/>
+<area shape="poly" id="edge8_Node000002_Node000008" title=" " alt="" coords="315,162,359,113,388,86,419,62,438,51,441,55,423,67,392,90,363,117,319,166"/>
+<area shape="rect" id="Node000009" href="$classBucketGraph.html#a469baec04539f3c8ae984f5558fbfc25" title="Checks if a label is dominated by a new label based on cost and resource conditions." alt="" coords="421,286,601,312"/>
+<area shape="poly" id="edge10_Node000002_Node000009" title=" " alt="" coords="325,203,368,238,422,271,438,278,436,283,420,276,365,242,322,207"/>
+<area shape="rect" id="Node000010" href="$classBucketGraph.html#acb7b845b8a4d452a0ac15daad1df3927" title="Marks a node as unreachable in the given bitmap." alt="" coords="433,336,589,377"/>
+<area shape="poly" id="edge11_Node000002_Node000010" title=" " alt="" coords="315,203,359,262,389,294,423,322,429,326,426,331,419,326,385,298,355,265,311,206"/>
+<area shape="poly" id="edge5_Node000005_Node000004" title=" " alt="" coords="572,218,600,207,677,174,679,179,602,212,573,223"/>
+<area shape="rect" id="Node000006" href="$BucketSolve_8h.html#a19811a89f68c557464964eef83a60448" title="Checks if element &#39;a&#39; precedes element &#39;b&#39; in the given strongly connected components (SCCs)." alt="" coords="700,229,774,254"/>
+<area shape="poly" id="edge6_Node000005_Node000006" title=" " alt="" coords="599,239,684,239,684,244,599,244"/>
+<area shape="poly" id="edge9_Node000008_Node000003" title=" " alt="" coords="589,37,652,49,651,54,588,42"/>
+</map>

@@ -1,0 +1,5 @@
+<map id="SparseMatrix::RowIterator" name="SparseMatrix::RowIterator">
+<area shape="rect" id="Node000001" title="Iterator for efficiently traversing non&#45;zero elements of a specific row." alt="" coords="5,94,176,120"/>
+<area shape="rect" id="Node000002" href="$structSparseMatrix.html" title="A sparse matrix in Compressed Row Storage (CRS) format." alt="" coords="42,5,139,31"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="93,47,93,94,88,94,88,47"/>
+</map>

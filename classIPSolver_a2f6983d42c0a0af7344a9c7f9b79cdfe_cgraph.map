@@ -1,0 +1,12 @@
+<map id="IPSolver::convertToOptimizationData" name="IPSolver::convertToOptimizationData">
+<area shape="rect" id="Node000001" title=" " alt="" coords="5,31,240,56"/>
+<area shape="rect" id="Node000002" href="$structSparseMatrix.html#ac791ee3ea5cadfb9dbb3fe69aee16b18" title="Perform a function for each non&#45;zero element in every row." alt="" coords="288,31,461,56"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="240,41,272,41,272,46,240,46"/>
+<area shape="rect" id="Node000003" href="$structSparseMatrix.html#a9fab556384dcef91755ab89de98f1a49" title="Build the CRS structure by computing row start positions." alt="" coords="727,5,912,31"/>
+<area shape="poly" id="edge2_Node000002_Node000003" title=" " alt="" coords="433,27,509,16,613,10,712,11,712,16,613,15,509,21,434,33"/>
+<area shape="rect" id="Node000004" href="$structSparseMatrix.html#adfbb5b38a05bc9688ca60b1f30aa44b1" title="Get an iterator for a specific row." alt="" coords="512,31,677,56"/>
+<area shape="poly" id="edge3_Node000002_Node000004" title=" " alt="" coords="461,41,496,41,496,46,461,46"/>
+<area shape="rect" id="Node000005" href="$structSparseMatrix_1_1RowIterator.html#a9bcb08fd6bd3d20ca050dba4c96c0435" title="Check if the iterator is valid (i.e., it has more elements to traverse)." alt="" coords="509,80,679,121"/>
+<area shape="poly" id="edge5_Node000002_Node000005" title=" " alt="" coords="427,54,499,73,498,79,426,60"/>
+<area shape="poly" id="edge4_Node000004_Node000003" title=" " alt="" coords="677,32,711,28,712,33,677,37"/>
+</map>

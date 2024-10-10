@@ -1,0 +1,5 @@
+<map id="Path::timesArc" name="Path::timesArc">
+<area shape="rect" id="Node000001" title="Counts the number of times an arc (i, j) appears in the route." alt="" coords="5,5,112,31"/>
+<area shape="rect" id="Node000002" href="$structPath.html#ab567fad23de3e1cee485fe9b07142981" title=" " alt="" coords="160,5,237,31"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="112,16,144,16,144,21,112,21"/>
+</map>

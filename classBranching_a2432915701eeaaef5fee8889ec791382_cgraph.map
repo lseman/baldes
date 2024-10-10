@@ -1,0 +1,13 @@
+<map id="Branching::evaluateWithBranching" name="Branching::evaluateWithBranching">
+<area shape="rect" id="Node000001" title="This function evaluates the candidates with branching and returns the results." alt="" coords="5,42,224,68"/>
+<area shape="rect" id="Node000002" href="$classBranching.html#ac18e91a2fc252c89e548b0865031cd87" title=" " alt="" coords="272,35,445,75"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="224,52,256,52,256,58,224,58"/>
+<area shape="rect" id="Node000003" href="$classBranching.html#a566795d3ba0ec5046b3621454b1ce2ef" title=" " alt="" coords="493,5,658,46"/>
+<area shape="poly" id="edge2_Node000002_Node000003" title=" " alt="" coords="445,41,477,36,478,42,445,46"/>
+<area shape="rect" id="Node000005" href="$classBNBNode.html#a836f57043aee50b30ca1bb91e15a31f6" title=" " alt="" coords="506,70,645,96"/>
+<area shape="poly" id="edge4_Node000002_Node000005" title=" " alt="" coords="445,64,491,69,490,75,445,69"/>
+<area shape="rect" id="Node000004" href="$classBNBNode.html#a3730c072c20ad3fcde8237203dc53750" title=" " alt="" coords="706,13,931,38"/>
+<area shape="poly" id="edge3_Node000003_Node000004" title=" " alt="" coords="659,23,691,23,691,28,659,28"/>
+<area shape="rect" id="Node000006" href="$classBNBNode.html#a61c4c8f846886581d63998b235a70a70" title=" " alt="" coords="746,70,891,96"/>
+<area shape="poly" id="edge5_Node000005_Node000006" title=" " alt="" coords="646,80,730,80,730,86,646,86"/>
+</map>

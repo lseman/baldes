@@ -1,0 +1,14 @@
+<map id="BNBNode" name="BNBNode">
+<area shape="rect" id="Node000001" title="Represents a node in a tree structure." alt="" coords="232,198,312,223"/>
+<area shape="poly" id="edge5_Node000001_Node000001" title=" " alt="" coords="330,202,339,210,331,219,313,221,313,216,329,214,334,211,326,206"/>
+<area shape="rect" id="Node000002" title=" " alt="" coords="5,94,169,135"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="141,140,249,195,247,199,138,145"/>
+<area shape="rect" id="Node000003" href="$classProblem.html" title="The Problem class represents an abstract base class for defining optimization problems." alt="" coords="192,102,262,127"/>
+<area shape="poly" id="edge2_Node000001_Node000003" title=" " alt="" coords="232,142,242,172,260,195,256,199,237,175,227,143"/>
+<area shape="rect" id="Node000004" href="$structModelData.html" title="Represents the data structure for a mathematical model." alt="" coords="285,102,369,127"/>
+<area shape="poly" id="edge3_Node000001_Node000004" title=" " alt="" coords="315,142,282,198,277,196,310,139"/>
+<area shape="rect" id="Node000005" href="$structSparseMatrix.html" title="A sparse matrix in Compressed Row Storage (CRS) format." alt="" coords="278,5,376,31"/>
+<area shape="poly" id="edge4_Node000004_Node000005" title=" " alt="" coords="330,47,330,101,324,101,324,47"/>
+<area shape="rect" id="Node000006" href="$classBranchingDuals.html" title=" " alt="" coords="392,102,504,127"/>
+<area shape="poly" id="edge6_Node000001_Node000006" title=" " alt="" coords="416,137,346,176,299,200,296,195,343,171,413,133"/>
+</map>

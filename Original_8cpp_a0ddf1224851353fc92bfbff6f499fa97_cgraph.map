@@ -1,0 +1,50 @@
+<map id="main" name="main">
+<area shape="rect" id="Node000001" title=" " alt="" coords="5,413,55,439"/>
+<area shape="rect" id="Node000002" href="$classPreprocessor.html#a4ffbbc1d87daaa906841bb8436979f75" title=" " alt="" coords="366,129,578,155"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="28,413,30,371,40,313,49,282,61,251,79,223,101,199,128,179,158,163,221,141,287,131,350,128,350,134,288,136,223,146,160,168,131,183,104,203,83,226,66,254,54,283,45,314,36,372,34,413"/>
+<area shape="rect" id="Node000009" href="$classPreprocessor.html#afe50cda7db2a25c596eda916d5a1098b" title=" " alt="" coords="125,213,296,239"/>
+<area shape="poly" id="edge8_Node000001_Node000009" title=" " alt="" coords="30,413,37,381,49,339,70,295,101,256,119,244,122,248,104,260,75,297,54,341,42,382,36,414"/>
+<area shape="rect" id="Node000011" href="$Definitions_8h.html#ac5430298e37b145ffa2d418c55b9a6e0" title="Extracts model data from a given Gurobi model in a sparse format." alt="" coords="641,300,805,326"/>
+<area shape="poly" id="edge12_Node000001_Node000011" title=" " alt="" coords="32,412,39,387,53,355,73,324,101,300,143,284,199,275,266,272,340,272,493,282,626,297,626,302,492,287,340,278,266,277,200,281,144,290,104,304,77,328,58,358,44,389,37,414"/>
+<area shape="rect" id="Node000012" href="$classCliqueManager.html#a92dcd8ed006c6f1b444b17b68fe5760c" title=" " alt="" coords="122,315,298,340"/>
+<area shape="poly" id="edge14_Node000001_Node000012" title=" " alt="" coords="38,411,64,380,101,349,111,344,114,349,104,354,68,383,42,415"/>
+<area shape="rect" id="Node000013" href="$classPreprocessor.html#a493dc257c87f1dcff452ce36ec73fe73" title=" " alt="" coords="103,364,318,390"/>
+<area shape="poly" id="edge15_Node000001_Node000013" title=" " alt="" coords="54,414,102,398,129,391,130,396,103,403,56,420"/>
+<area shape="rect" id="Node000014" href="$classCliqueManager.html#ad2b6311af96d58a561ca5c05182660ba" title=" " alt="" coords="123,413,298,439"/>
+<area shape="poly" id="edge16_Node000001_Node000014" title=" " alt="" coords="55,424,108,424,108,429,55,429"/>
+<area shape="rect" id="Node000015" href="$classPreprocessor.html#a78c47387cfd9228e5f0e2293831eb796" title=" " alt="" coords="118,463,302,488"/>
+<area shape="poly" id="edge17_Node000001_Node000015" title=" " alt="" coords="56,433,103,449,130,456,129,461,102,454,54,438"/>
+<area shape="rect" id="Node000016" href="$Definitions_8h.html#a086546d06aa565cdd48f436973ebc496" title="Prints an informational message with a specific format." alt="" coords="173,512,248,538"/>
+<area shape="poly" id="edge18_Node000001_Node000016" title=" " alt="" coords="42,438,68,469,104,499,131,510,159,517,157,522,129,515,101,503,64,473,38,441"/>
+<area shape="rect" id="Node000017" href="$classPreprocessor.html#a5d8bbb54831549949e2a208a4763eaf9" title=" " alt="" coords="122,562,298,602"/>
+<area shape="poly" id="edge19_Node000001_Node000017" title=" " alt="" coords="38,439,60,492,80,522,104,548,111,553,107,557,101,552,75,526,56,494,33,441"/>
+<area shape="rect" id="Node000018" href="$Original_8cpp.html#a75941a35f269fa1e060ca66059eff51d" title=" " alt="" coords="172,627,249,652"/>
+<area shape="poly" id="edge20_Node000001_Node000018" title=" " alt="" coords="35,439,40,474,51,521,72,570,86,593,104,612,129,627,157,634,156,640,127,632,101,616,82,596,67,573,46,523,34,475,30,440"/>
+<area shape="rect" id="Node000021" href="$Reader_8h.html#aa609fd8e9fe0e5c687273a27834e9c14" title=" " alt="" coords="132,676,288,702"/>
+<area shape="poly" id="edge23_Node000001_Node000021" title=" " alt="" coords="34,439,35,483,44,543,53,576,66,608,83,637,104,663,119,673,116,678,101,667,78,640,61,610,48,577,39,544,30,483,28,439"/>
+<area shape="rect" id="Node000003" href="$structSparseMatrix_1_1RowIterator.html#a738ba7db10d2730bc58cfe4196defe48" title="Get the column index of the current element." alt="" coords="626,5,820,31"/>
+<area shape="poly" id="edge2_Node000002_Node000003" title=" " alt="" coords="489,127,547,85,585,61,625,41,644,34,646,39,627,46,588,66,550,89,492,131"/>
+<area shape="rect" id="Node000004" href="$structSparseMatrix_1_1RowIterator.html#a5d02c4e36f6daa3923bdd9e8b77026ee" title="Move to the next element in the row." alt="" coords="638,55,808,96"/>
+<area shape="poly" id="edge3_Node000002_Node000004" title=" " alt="" coords="523,126,628,98,630,103,524,131"/>
+<area shape="rect" id="Node000005" href="$structSparseMatrix.html#adfbb5b38a05bc9688ca60b1f30aa44b1" title="Get an iterator for a specific row." alt="" coords="640,185,806,211"/>
+<area shape="poly" id="edge4_Node000002_Node000005" title=" " alt="" coords="534,153,648,179,647,184,532,158"/>
+<area shape="rect" id="Node000007" href="$structSparseMatrix_1_1RowIterator.html#a9bcb08fd6bd3d20ca050dba4c96c0435" title="Check if the iterator is valid (i.e., it has more elements to traverse)." alt="" coords="638,235,808,276"/>
+<area shape="poly" id="edge6_Node000002_Node000007" title=" " alt="" coords="499,153,627,221,641,227,639,232,625,226,496,158"/>
+<area shape="rect" id="Node000008" href="$structSparseMatrix_1_1RowIterator.html#ab217d7cab2877a7b2c436c2d00df950c" title="Get the value of the current element." alt="" coords="638,120,808,161"/>
+<area shape="poly" id="edge7_Node000002_Node000008" title=" " alt="" coords="579,139,622,139,622,144,579,144"/>
+<area shape="rect" id="Node000006" href="$structSparseMatrix.html#a9fab556384dcef91755ab89de98f1a49" title="Build the CRS structure by computing row start positions." alt="" coords="868,243,1052,268"/>
+<area shape="poly" id="edge5_Node000005_Node000006" title=" " alt="" coords="780,209,890,236,888,241,779,214"/>
+<area shape="rect" id="Node000010" href="$classPreprocessor.html#a7fa169496cadeb6c1e6893fcc4720410" title=" " alt="" coords="382,213,562,239"/>
+<area shape="poly" id="edge9_Node000009_Node000010" title=" " alt="" coords="296,224,367,224,367,229,296,229"/>
+<area shape="poly" id="edge10_Node000010_Node000005" title=" " alt="" coords="562,213,625,206,625,212,563,219"/>
+<area shape="poly" id="edge11_Node000010_Node000007" title=" " alt="" coords="563,234,623,241,622,246,562,239"/>
+<area shape="poly" id="edge13_Node000011_Node000006" title=" " alt="" coords="779,297,888,270,890,275,780,302"/>
+<area shape="rect" id="Node000019" href="$structInstanceData.html#a8a0f43a637f6846c4a3103f0ec4160bc" title="Retrieves the capacity." alt="" coords="386,627,558,652"/>
+<area shape="poly" id="edge21_Node000018_Node000019" title=" " alt="" coords="249,637,371,637,371,642,249,642"/>
+<area shape="rect" id="Node000020" href="$structInstanceData.html#af8952d73a9d4d1c091450ec8802490d3" title="Retrieves the demand value for a given index." alt="" coords="387,577,557,603"/>
+<area shape="poly" id="edge22_Node000018_Node000020" title=" " alt="" coords="249,630,385,604,386,609,250,635"/>
+<area shape="rect" id="Node000022" href="$Reader_8h.html#aba12fb635d3f4c4fe794fa18cbda98ca" title=" " alt="" coords="422,725,522,751"/>
+<area shape="poly" id="edge24_Node000021_Node000022" title=" " alt="" coords="283,700,407,723,406,729,282,705"/>
+<area shape="rect" id="Node000023" href="$Reader_8h.html#aef54cee0a50255ed1a50ed2fbefadf74" title="Reduces the time windows for the vertices in the VRPTW instance." alt="" coords="370,676,574,702"/>
+<area shape="poly" id="edge25_Node000021_Node000023" title=" " alt="" coords="289,686,354,686,354,692,289,692"/>
+</map>
