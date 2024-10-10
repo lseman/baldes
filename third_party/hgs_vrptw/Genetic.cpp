@@ -12,91 +12,68 @@
 #include "Split.h"
 
 void Genetic::run(int maxIterNonProd, int timeLimit) {
-    if (params->nbClients == 1) {
-        // Edge case: with 1 client, crossover will fail, genetic algorithm makes no sense
-        return;
-    }
+    if (params->nbClients == 1) return; // Edge case: 1 client, GA makes no sense
 
     auto mdmNURestarts = 0.05;
-    int  nbRestarts    = 0;
-    // Do iterations of the Genetic Algorithm, until more then maxIterNonProd consecutive iterations without improvement
-    // or a time limit (in seconds) is reached
-    int nbIterNonProd = 1;
-    for (int nbIter = 0; nbIterNonProd <= maxIterNonProd && !params->isTimeLimitExceeded(); nbIter++) {
+    int  nbRestarts = 0, nbIterNonProd = 1;
+
+    for (int nbIter = 0; nbIterNonProd <= maxIterNonProd && !params->isTimeLimitExceeded(); ++nbIter) {
         /* SELECTION AND CROSSOVER */
-        // First select parents using getNonIdenticalParentsBinaryTournament
-        // Then use the selected parents to create new individuals using OX and SREX
-        // Finally select the best new individual based on bestOfSREXAndOXCrossovers
         Individual *offspring = bestOfSREXAndOXCrossovers(population->getNonIdenticalParentsBinaryTournament());
 
         /* LOCAL SEARCH */
-        // Run the Local Search on the new individual
         localSearch->run(offspring, params->penaltyCapacity, params->penaltyTimeWarp);
-        // Check if the new individual is the best feasible individual of the population, based on penalizedCost
         bool isNewBest = population->addIndividual(offspring, true);
-        // In case of infeasibility, repair the individual with a certain probability
-        if (!offspring->isFeasible && params->rng() % 100 < (unsigned int)params->config.repairProbability) {
-            // Run the Local Search again, but with penalties for infeasibilities multiplied by 10
-            localSearch->run(offspring, params->penaltyCapacity * 10., params->penaltyTimeWarp * 10.);
-            // If the individual is feasible now, check if it is the best feasible individual of the population, based
-            // on penalizedCost and add it to the population If the individual is not feasible now, it is not added to
-            // the population
-            if (offspring->isFeasible) { isNewBest = (population->addIndividual(offspring, false) || isNewBest); }
+
+        // Repair infeasible individual with some probability
+        if (!offspring->isFeasible &&
+            params->rng() % 100 < static_cast<unsigned int>(params->config.repairProbability)) {
+            localSearch->run(offspring, params->penaltyCapacity * 10.0, params->penaltyTimeWarp * 10.0);
+            if (offspring->isFeasible) { isNewBest = population->addIndividual(offspring, false) || isNewBest; }
         }
 
-        /* TRACKING THE NUMBER OF ITERATIONS SINCE LAST SOLUTION IMPROVEMENT */
-        if (isNewBest) {
-            nbIterNonProd = 1;
-        } else
-            nbIterNonProd++;
+        /* TRACKING IMPROVEMENT */
+        nbIterNonProd = isNewBest ? 1 : nbIterNonProd + 1;
 
-        /* DIVERSIFICATION, PENALTY MANAGEMENT AND TRACES */
-        // Update the penaltyTimeWarp and penaltyCapacity every 100 iterations
-        if (nbIter % 100 == 0) { population->managePenalties(); }
-        // Print the state of the population every 500 iterations
-        if (nbIter % 500 == 0) { population->printState(nbIter, nbIterNonProd); }
-        // Log the current population to a .csv file every logPoolInterval iterations (if logPoolInterval is not 0)
+        /* DIVERSIFICATION, PENALTY MANAGEMENT, AND LOGGING */
+        if (nbIter % 100 == 0) population->managePenalties();
+        if (nbIter % 500 == 0) population->printState(nbIter, nbIterNonProd);
+
         if (params->config.logPoolInterval > 0 && nbIter % params->config.logPoolInterval == 0) {
             population->exportPopulation(nbIter, params->config.pathSolution + ".log.csv");
         }
 
-        /* FOR TESTS INVOLVING SUCCESSIVE RUNS UNTIL A TIME LIMIT: WE RESET THE ALGORITHM/POPULATION EACH TIME
-         * maxIterNonProd IS ATTAINED*/
+        /* RESTART LOGIC */
         if (timeLimit != INT_MAX && nbIterNonProd == maxIterNonProd && params->config.doRepeatUntilTimeLimit) {
-            nbRestarts++;
-
-            double elapsedTime = (double)(clock() - params->startCPUTime) / (double)CLOCKS_PER_SEC;
-
-            int estimatedRestarts = std::min((int)(params->config.timeLimit / (elapsedTime / nbRestarts)), 1000);
-
-            population->mdmEliteMaxNonUpdatingRestarts = (int)(mdmNURestarts * estimatedRestarts);
+            ++nbRestarts;
+            double elapsedTime = (double)(clock() - params->startCPUTime) / CLOCKS_PER_SEC;
+            int    estimatedRestarts =
+                std::min(static_cast<int>(params->config.timeLimit / (elapsedTime / nbRestarts)), 1000);
+            population->mdmEliteMaxNonUpdatingRestarts = static_cast<int>(mdmNURestarts * estimatedRestarts);
             population->mineElite();
             population->restart();
             nbIterNonProd = 1;
         }
 
-        /* OTHER PARAMETER CHANGES*/
-        // Increase the nbGranular by growNbGranularSize (and set the correlated vertices again) every certain number of
-        // iterations, if growNbGranularSize is greater than 0
-        if (nbIter > 0 && params->config.growNbGranularSize != 0 &&
-            ((params->config.growNbGranularAfterIterations > 0 &&
-              nbIter % params->config.growNbGranularAfterIterations == 0) ||
-             (params->config.growNbGranularAfterNonImprovementIterations > 0 &&
-              nbIterNonProd % params->config.growNbGranularAfterNonImprovementIterations == 0))) {
-            // Note: changing nbGranular also changes how often the order is reshuffled
-            params->config.nbGranular += params->config.growNbGranularSize;
-            params->SetCorrelatedVertices();
+        /* PARAMETER ADJUSTMENTS */
+        if (params->config.growNbGranularSize != 0) {
+            bool shouldGrowGranular = (params->config.growNbGranularAfterIterations > 0 &&
+                                       nbIter % params->config.growNbGranularAfterIterations == 0) ||
+                                      (params->config.growNbGranularAfterNonImprovementIterations > 0 &&
+                                       nbIterNonProd % params->config.growNbGranularAfterNonImprovementIterations == 0);
+            if (shouldGrowGranular) {
+                params->config.nbGranular += params->config.growNbGranularSize;
+                params->SetCorrelatedVertices();
+            }
         }
 
-        // Increase the minimumPopulationSize by growPopulationSize every certain number of iterations, if
-        // growPopulationSize is greater than 0
-        if (nbIter > 0 && params->config.growPopulationSize != 0 &&
-            ((params->config.growPopulationAfterIterations > 0 &&
-              nbIter % params->config.growPopulationAfterIterations == 0) ||
-             (params->config.growPopulationAfterNonImprovementIterations > 0 &&
-              nbIterNonProd % params->config.growPopulationAfterNonImprovementIterations == 0))) {
-            // This will automatically adjust after some iterations
-            params->config.minimumPopulationSize += params->config.growPopulationSize;
+        if (params->config.growPopulationSize != 0) {
+            bool shouldGrowPopulation =
+                (params->config.growPopulationAfterIterations > 0 &&
+                 nbIter % params->config.growPopulationAfterIterations == 0) ||
+                (params->config.growPopulationAfterNonImprovementIterations > 0 &&
+                 nbIterNonProd % params->config.growPopulationAfterNonImprovementIterations == 0);
+            if (shouldGrowPopulation) { params->config.minimumPopulationSize += params->config.growPopulationSize; }
         }
     }
 }
@@ -121,34 +98,29 @@ Individual *Genetic::crossoverOX(std::pair<const Individual *, const Individual 
 
 void Genetic::doOXcrossover(Individual *result, std::pair<const Individual *, const Individual *> parents, int start,
                             int end) {
-    std::bitset<N_SIZE> freqClient; // Use bitset for better performance if MAX_NB_CLIENTS is known at compile-time
-    freqClient.reset();             // Clear the bitset
+    std::bitset<N_SIZE> freqClient; // Use bitset for fast lookup
+    freqClient.reset();
 
-    // Pre-compute the constants
     const int nbClients = params->nbClients;
     const int idxEnd    = (end + 1 == nbClients) ? 0 : end + 1;
 
-    // First loop: directly copy the segment from parent A
-    int j = start;
-    while (j != idxEnd) {
+    // First loop: copy the segment from parent A
+    for (int j = start; j != idxEnd; j = (j + 1) % nbClients) {
         int elem          = parents.first->chromT[j];
         result->chromT[j] = elem;
         freqClient.set(elem);
-        if (++j == nbClients) j = 0;
     }
 
-    // Fill the remaining elements from parent B, skipping already copied ones
-    int i = idxEnd;
-    while (j != start) {
+    // Second loop: fill remaining elements from parent B
+    for (int i = idxEnd, j = idxEnd; j != start; i = (i + 1) % nbClients) {
         int temp = parents.second->chromT[i];
         if (!freqClient.test(temp)) {
             result->chromT[j] = temp;
-            if (++j == nbClients) j = 0;
+            j                 = (j + 1) % nbClients;
         }
-        if (++i == nbClients) i = 0;
     }
 
-    // Completing the individual with the Split algorithm
+    // Call Split algorithm to complete the individual
     split->generalSplit(result, params->nbVehicles);
 }
 

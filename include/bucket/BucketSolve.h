@@ -23,9 +23,11 @@
 #include "Trees.h"
 #include "cuts/SRC.h"
 #include <cstring>
+
 #ifdef AVX
 #include "BucketAVX.h"
 #endif
+
 /**
  * Solves the bucket graph optimization problem using a multi-stage bi-labeling algorithm.
  *
@@ -446,8 +448,8 @@ std::vector<Label *> BucketGraph::bi_labeling_algorithm() {
     }
 
     // Sort the merged labels by cost, to prioritize cheaper labels
-    std::sort(merged_labels.begin(), merged_labels.end(),
-              [](const Label *a, const Label *b) { return a->cost < b->cost; });
+    pdqsort(merged_labels.begin(), merged_labels.end(),
+            [](const Label *a, const Label *b) { return a->cost < b->cost; });
 
 #ifdef RIH
     // If we are in Stage 2 or above, we run the RIH (Route Improvement Heuristic) in the background

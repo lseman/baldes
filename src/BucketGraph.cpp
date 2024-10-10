@@ -29,6 +29,8 @@
 #include "bucket/BucketGraph.h"
 #include "bucket/BucketUtils.h"
 
+#include "../third_party/pdqsort.h"
+
 // Implementation of Arc constructors
 Arc::Arc(int from, int to, const std::vector<double> &res_inc, double cost_inc)
     : from(from), to(to), resource_increment(res_inc), cost_increment(cost_inc) {}
@@ -303,7 +305,7 @@ void BucketGraph::calculate_neighborhoods(size_t num_closest) {
         }
 
         // Sort distances to find the closest nodes
-        std::sort(forward_distances.begin(), forward_distances.end());
+        pdqsort(forward_distances.begin(), forward_distances.end());
 
         // Initialize the neighborhood bitmap vector for node i (forward and backward)
         size_t num_segments = (num_nodes + 63) / 64;
@@ -366,8 +368,8 @@ void BucketGraph::augment_ng_memories(std::vector<double> &solution, std::vector
     }
 
     // Sort cycles by size to prioritize smaller cycles
-    std::sort(cycles.begin(), cycles.end(),
-              [](const std::vector<int> &a, const std::vector<int> &b) { return a.size() < b.size(); });
+    pdqsort(cycles.begin(), cycles.end(),
+            [](const std::vector<int> &a, const std::vector<int> &b) { return a.size() < b.size(); });
     int forbidden_count = 0;
 
     for (const auto &cycle : cycles) {
@@ -376,6 +378,7 @@ void BucketGraph::augment_ng_memories(std::vector<double> &solution, std::vector
         for (const auto &node : cycle) {
             // Count the number of 1s in neighborhoods_bitmap[node]
             int count = 0;
+            // print size of neighborhoods_bitmap
             for (const auto &segment : neighborhoods_bitmap[node]) {
                 count += __builtin_popcountll(segment); // Counts the number of set bits (1s)
                 if (count >= eta_max) {
@@ -827,8 +830,8 @@ void BucketGraph::async_rih_processing(std::vector<Label *> initial_labels, int 
     if (merged_labels_rih.size() > LABELS_MAX_RIH) { merged_labels_rih.resize(LABELS_MAX_RIH); }
 
     // Sort or further process if needed
-    std::sort(merged_labels_rih.begin(), merged_labels_rih.end(),
-              [](const Label *a, const Label *b) { return a->cost < b->cost; });
+    pdqsort(merged_labels_rih.begin(), merged_labels_rih.end(),
+            [](const Label *a, const Label *b) { return a->cost < b->cost; });
 }
 #endif
 

@@ -8,6 +8,8 @@
 #include "LocalSearch.h"
 #include "Params.h"
 
+#include "../third_party/pdqsort.h"
+
 bool operator==(const TimeWindowData &twData1, const TimeWindowData &twData2) {
     return twData1.firstNodeIndex == twData2.firstNodeIndex && twData1.lastNodeIndex == twData2.lastNodeIndex &&
            twData1.duration == twData2.duration && twData1.timeWarp == twData2.timeWarp &&
@@ -78,8 +80,8 @@ void HGSLocalSearch::constructIndividualBySweep(int fillPercentage, Individual *
     std::vector<std::vector<int>> nodeIndicesPerRoute;
 
     // Sort nodes according to angle with depot.
-    std::sort(std::begin(nodesToInsert), std::end(nodesToInsert),
-              [](NodeToInsert a, NodeToInsert b) { return a.angleFromDepot < b.angleFromDepot; });
+    pdqsort(std::begin(nodesToInsert), std::end(nodesToInsert),
+            [](NodeToInsert a, NodeToInsert b) { return a.angleFromDepot < b.angleFromDepot; });
 
     // Distribute clients over routes.
     int              load = 0;
@@ -114,10 +116,10 @@ void HGSLocalSearch::constructIndividualBySweep(int fillPercentage, Individual *
         }
 
         // Sort routes with short time window in increasing end of time window.
-        std::sort(std::begin(nodeIndicesToInsertShortTw), std::end(nodeIndicesToInsertShortTw),
-                  [&nodesToInsert](int a, int b) {
-                      return nodesToInsert[a].twData.latestArrival < nodesToInsert[b].twData.latestArrival;
-                  });
+        pdqsort(std::begin(nodeIndicesToInsertShortTw), std::end(nodeIndicesToInsertShortTw),
+                [&nodesToInsert](int a, int b) {
+                    return nodesToInsert[a].twData.latestArrival < nodesToInsert[b].twData.latestArrival;
+                });
 
         // Insert nodes with short time window in order in the route.
         Node *prev = routes[r].depot;
@@ -999,21 +1001,28 @@ bool HGSLocalSearch::RelocateStar() {
     for (nodeU = routeU->depot->next; !nodeU->isDepot; nodeU = nodeU->next) {
         setLocalVariablesRouteU();
 
+        // Precompute nodeU related values that don't change within inner loop
         const TimeWindowData routeUTwData = MergeTWDataRecursive(nodeU->prev->prefixTwData, nodeX->postfixTwData);
-        const double         costSuppU =
-            params->timeCost.get(nodeUPrevIndex, nodeXIndex) - params->timeCost.get(nodeUPrevIndex, nodeUIndex) -
-            params->timeCost.get(nodeUIndex, nodeXIndex) + penaltyExcessLoad(routeU->load - loadU) +
-            penaltyTimeWindows(routeUTwData) - routeU->penalty;
+        const double         penaltyU     = penaltyExcessLoad(routeU->load - loadU) + penaltyTimeWindows(routeUTwData);
+
+        const double baseCostU = params->timeCost.get(nodeUPrevIndex, nodeXIndex) -
+                                 params->timeCost.get(nodeUPrevIndex, nodeUIndex) -
+                                 params->timeCost.get(nodeUIndex, nodeXIndex);
+        const double costSuppU = baseCostU + penaltyU - routeU->penalty;
 
         for (Node *V = routeV->depot->next; !V->isDepot; V = V->next) {
+            // Precompute time window and penalty only when necessary
             const TimeWindowData routeVTwData =
                 MergeTWDataRecursive(V->prefixTwData, nodeU->twData, V->next->postfixTwData);
-            double costSuppV = params->timeCost.get(V->cour, nodeUIndex) +
-                               params->timeCost.get(nodeUIndex, V->next->cour) -
-                               params->timeCost.get(V->cour, V->next->cour) + penaltyExcessLoad(routeV->load + loadU) +
-                               penaltyTimeWindows(routeVTwData) - routeV->penalty;
-            if (costSuppU + costSuppV < bestCost - MY_EPSILON) {
-                bestCost       = costSuppU + costSuppV;
+            const double penaltyV = penaltyExcessLoad(routeV->load + loadU) + penaltyTimeWindows(routeVTwData);
+
+            const double costSuppV = params->timeCost.get(V->cour, nodeUIndex) +
+                                     params->timeCost.get(nodeUIndex, V->next->cour) -
+                                     params->timeCost.get(V->cour, V->next->cour) + penaltyV - routeV->penalty;
+
+            const double totalCost = costSuppU + costSuppV;
+            if (totalCost < bestCost - MY_EPSILON) {
+                bestCost       = totalCost;
                 insertionPoint = V;
                 nodeToInsert   = nodeU;
             }
@@ -1310,14 +1319,20 @@ void HGSLocalSearch::updateRouteData(HGSRoute *myRoute) {
         myRoute->polarAngleBarycenter = 1.e30;
         emptyRoutes.insert(myRoute->cour);
     } else {
-        myRoute->polarAngleBarycenter =
-            atan2(cumulatedY / static_cast<double>(myRoute->nbCustomers) - params->cli[0].coordY,
-                  cumulatedX / static_cast<double>(myRoute->nbCustomers) - params->cli[0].coordX);
+        // Precompute nbCustomers inverse for reuse
+        const double invNbCustomers = 1.0 / static_cast<double>(myRoute->nbCustomers);
+
+        // Calculate differences once
+        const double diffX = (cumulatedX * invNbCustomers) - params->cli[0].coordX;
+        const double diffY = (cumulatedY * invNbCustomers) - params->cli[0].coordY;
+
+        myRoute->polarAngleBarycenter = atan2(diffY, diffX);
+
         // Enforce minimum size of circle sector
         if (params->minCircleSectorSize > 0) {
-            const int growSectorBy = (params->minCircleSectorSize -
-                                      myRoute->sector.positive_mod(myRoute->sector.end - myRoute->sector.start) + 1) /
-                                     2;
+            int sectorSize   = myRoute->sector.positive_mod(myRoute->sector.end - myRoute->sector.start);
+            int growSectorBy = (params->minCircleSectorSize - sectorSize + 1) / 2;
+
             if (growSectorBy > 0) {
                 myRoute->sector.extend(myRoute->sector.start - growSectorBy);
                 myRoute->sector.extend(myRoute->sector.end + growSectorBy);
@@ -1425,9 +1440,9 @@ void HGSLocalSearch::exportIndividual(Individual *indiv) {
     std::vector<std::pair<double, int>> routePolarAngles;
     for (int r = 0; r < params->nbVehicles; r++)
         routePolarAngles.push_back(std::pair<double, int>(routes[r].polarAngleBarycenter, r));
-    std::sort(routePolarAngles.begin(),
-              routePolarAngles
-                  .end()); // empty routes have a polar angle of 1.e30, and therefore will always appear at the end
+    pdqsort(routePolarAngles.begin(),
+            routePolarAngles
+                .end()); // empty routes have a polar angle of 1.e30, and therefore will always appear at the end
 
     int pos = 0;
     for (int r = 0; r < params->nbVehicles; r++) {
