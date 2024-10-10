@@ -336,6 +336,7 @@ inline int VRPTW_read_instance(const std::string &file_name, InstanceData &insta
     instance.window_open[instance.nN - 1]  = instance.window_open[0];
     instance.window_close[instance.nN - 1] = instance.window_close[0];
     instance.service_time[instance.nN - 1] = instance.service_time[0];
+    instance.time_windows[instance.nN - 1] = instance.time_windows[0];
 
     instance.x_coord.resize(instance.nN);
     instance.y_coord.resize(instance.nN);
@@ -351,10 +352,18 @@ inline int VRPTW_read_instance(const std::string &file_name, InstanceData &insta
         instance.x_coord[i] = xcoord[i];
         instance.y_coord[i] = ycoord[i];
         for (int j = 0; j < instance.nN; ++j) {
-            int  x                  = xcoord[i] - xcoord[j];
-            int  y                  = ycoord[i] - ycoord[j];
-            auto aux                = (int)(10 * sqrt(x * x + y * y));
-            instance.distance[i][j] = 1.0 * aux;
+            if (!mtw) {
+                int  x                  = xcoord[i] - xcoord[j];
+                int  y                  = ycoord[i] - ycoord[j];
+                auto aux                = (int)(10 * sqrt(x * x + y * y));
+                instance.distance[i][j] = 1.0 * aux;
+
+            } else {
+                double x                = xcoord[i] - xcoord[j];
+                double y                = ycoord[i] - ycoord[j];
+                auto   aux              = (double)(10 * sqrt(x * x + y * y));
+                instance.distance[i][j] = 1.0 * aux;
+            }
         }
         instance.window_open[i] *= 10;
         instance.window_close[i] *= 10;

@@ -185,22 +185,17 @@ cpmaddpackage(
   "STDEXEC_BUILD_DOCS OFF"
   "BUILD_TESTING OFF")
 
-cpmaddpackage(
-    NAME xxhash
-    GIT_REPOSITORY https://github.com/Cyan4973/xxHash.git
-    GIT_TAG origin/dev
-)
+cpmaddpackage(NAME xxhash GIT_REPOSITORY https://github.com/Cyan4973/xxHash.git
+              GIT_TAG origin/dev)
 
 # add https://github.com/martinus/unordered_dense
-CPMAddPackage(
-  NAME ankerl_unordered_dense
-  GITHUB_REPOSITORY martinus/unordered_dense
-  GIT_TAG origin/main  # or a specific version/tag
+cpmaddpackage(
+  NAME ankerl_unordered_dense GITHUB_REPOSITORY martinus/unordered_dense
+  GIT_TAG origin/main # or a specific version/tag
 )
 
 # include ankerl
 include_directories(${ankerl_unordered_dense_SOURCE_DIR}/include)
-
 
 find_package(FMT)
 if(NOT FMT_FOUND)
@@ -393,36 +388,39 @@ if(CLIQUER)
                                          -Wno-deprecated-declarations)
 endif()
 
+if(MTW)
 
-add_executable(vrpmtw mtw/VRPMTW.cpp ${EXECUTABLE_SOURCES} ${HGS_SOURCES} ${FPSOURCE})
-# Link Gurobi libraries
-if(APPLE)
-  # macOS detected, use .dylib for linking
-  target_link_libraries(vrpmtw PRIVATE ${GUROBI_HOME}/lib/libgurobi_c++.a
-                                      ${GUROBI_HOME}/lib/libgurobi100.dylib)
-else()
-  # Non-macOS (Linux or other platforms), use .so and .a files
-  target_link_libraries(
-    vrpmtw PRIVATE ${GUROBI_HOME}/lib/libgurobi_c++.a
-                  ${GUROBI_HOME}/lib/libgurobi${GUROBI_VERSION_MAJOR}.so tbb)
-endif()
-
-if(JEMALLOC)
-  find_library(JEMALLOC_LIBRARY jemalloc)
-  if(JEMALLOC_LIBRARY)
-    message(STATUS "jemalloc found: ${JEMALLOC_LIBRARY}")
-    target_link_libraries(vrpmtw PRIVATE ${JEMALLOC_LIBRARY})
+  add_executable(vrpmtw mtw/VRPMTW.cpp ${EXECUTABLE_SOURCES} ${HGS_SOURCES}
+                        ${FPSOURCE})
+  # Link Gurobi libraries
+  if(APPLE)
+    # macOS detected, use .dylib for linking
+    target_link_libraries(vrpmtw PRIVATE ${GUROBI_HOME}/lib/libgurobi_c++.a
+                                         ${GUROBI_HOME}/lib/libgurobi100.dylib)
   else()
-    message(STATUS "jemalloc not found")
+    # Non-macOS (Linux or other platforms), use .so and .a files
+    target_link_libraries(
+      vrpmtw PRIVATE ${GUROBI_HOME}/lib/libgurobi_c++.a
+                     ${GUROBI_HOME}/lib/libgurobi${GUROBI_VERSION_MAJOR}.so tbb)
   endif()
+
+  if(JEMALLOC)
+    find_library(JEMALLOC_LIBRARY jemalloc)
+    if(JEMALLOC_LIBRARY)
+      message(STATUS "jemalloc found: ${JEMALLOC_LIBRARY}")
+      target_link_libraries(vrpmtw PRIVATE ${JEMALLOC_LIBRARY})
+    else()
+      message(STATUS "jemalloc not found")
+    endif()
+  endif()
+
+  target_compile_options(vrpmtw PRIVATE -Wno-c++26-extensions
+                                        -Wno-deprecated-declarations)
+
+  # link with xxhash
+  target_link_libraries(vrpmtw PRIVATE xxhash)
+  # link with unordered_dense
+  target_link_libraries(vrpmtw PRIVATE unordered_dense)
+  target_link_libraries(vrpmtw PRIVATE STDEXEC::stdexec)
+  target_link_libraries(vrpmtw PRIVATE fmt::fmt)
 endif()
-
-target_compile_options(vrpmtw PRIVATE -Wno-c++26-extensions
--Wno-deprecated-declarations)
-
-# link with xxhash
-target_link_libraries(vrpmtw PRIVATE xxhash)
-# link with unordered_dense
-target_link_libraries(vrpmtw PRIVATE unordered_dense)
-target_link_libraries(vrpmtw PRIVATE STDEXEC::stdexec)
-target_link_libraries(vrpmtw PRIVATE fmt::fmt)
