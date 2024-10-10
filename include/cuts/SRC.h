@@ -230,20 +230,6 @@ inline std::vector<std::vector<double>> getPermutationsForSize4() {
  * input vector `elements` and stores them in the `result` vector.
  *
  */
-/*
-template <typename T>
-inline void combinations(const std::vector<T> &elements, int k, std::vector<std::vector<T>> &result) {
-    std::vector<bool> v(elements.size());
-    std::fill(v.begin(), v.begin() + k, true);
-    do {
-        std::vector<T> combination;
-        for (size_t i = 0; i < elements.size(); ++i) {
-            if (v[i]) { combination.push_back(elements[i]); }
-        }
-        result.push_back(combination);
-    } while (std::prev_permutation(v.begin(), v.end()));
-}
-*/
 template <typename T>
 inline void combinations(const std::vector<T> &elements, int k, std::vector<std::vector<T>> &result) {
     std::vector<int> indices(k);

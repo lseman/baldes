@@ -188,7 +188,6 @@ public:
         std::vector<GRBConstr> constraints;
         constraints.reserve(numConstrs);
 
-        // Collect all constraints
         for (int i = 0; i < numConstrs; ++i) { constraints.push_back(model->getConstr(i)); }
 
         // Prepare the duals vector

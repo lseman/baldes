@@ -569,6 +569,7 @@ public:
         // BucketGraph bucket_graph(nodes, time_horizon, bucket_interval, instance.q, bucket_interval);
         BucketGraph bucket_graph(nodes, time_horizon, bucket_interval);
 
+        // print distance matrix size
         bucket_graph.set_distance_matrix(instance.getDistanceMatrix(), 8);
         bucket_graph.branching_duals = &branchingDuals;
 
@@ -589,7 +590,7 @@ public:
         auto                sizeDuals = nodeDuals.size();
 
         double lp_obj_dual = 0.0;
-        double lp_obj      = 0.0;
+        double lp_obj      = node->get(GRB_DoubleAttr_ObjVal);
 
 #ifdef SRC
         bucket_graph.cut_storage = cuts;
@@ -764,7 +765,10 @@ public:
                     }
 
                     changed = cutHandler(r1c, node, SRCconstraints);
-                    if (changed) { matrix = node->extractModelDataSparse(); }
+                    if (changed) {
+                        matrix = node->extractModelDataSparse();
+                        node->optimize();
+                    }
                 }
 #endif
                 bucket_graph.ss = false;
@@ -825,15 +829,10 @@ public:
 #endif
 
 #ifdef STAB
-            node->optimize();
-            lp_obj    = node->get(GRB_DoubleAttr_ObjVal);
-            nodeDuals = node->getDuals();
             stab.update_stabilization_after_master_optim(nodeDuals);
 
             misprice = true;
             while (misprice) {
-                // TODO: check if we should get rcc and src duals here
-                node->update();
                 nodeDuals = stab.getStabDualSolAdvanced(nodeDuals);
                 solution  = node->extractSolution();
 #endif
@@ -854,17 +853,15 @@ public:
                         bucket_graph.incumbent = integer_solution;
                     }
                 }
-                lag_gap          = integer_solution - (lp_obj + std::min(0.0, inner_obj));
-                bucket_graph.gap = lag_gap;
-                bucket_graph.augment_ng_memories(solution, allPaths, true, 5, 100, 16, N_SIZE);
+
                 bucket_graph.relaxation = lp_obj;
+                bucket_graph.augment_ng_memories(solution, allPaths, true, 5, 100, 16, N_SIZE);
 
 #if defined(SRC3) || defined(SRC)
                 // SRC cuts
                 if (!SRCconstraints.empty()) {
                     auto duals = node->get(GRB_DoubleAttr_Pi, SRCconstraints.data(), SRCconstraints.size());
                     cutDuals.assign(duals, duals + SRCconstraints.size());
-                    // print cutDuals size
                     cuts->setDuals(cutDuals);
                 }
 #endif
@@ -880,7 +877,6 @@ public:
 
                 // Branching duals
                 if (branchingDuals.size() > 0) { branchingDuals.computeDuals(node->getModel()); }
-
                 bucket_graph.setDuals(nodeDuals);
 
                 //////////////////////////////////////////////////////////////////////
@@ -928,8 +924,11 @@ public:
                 node->optimize();
                 lp_obj    = node->get(GRB_DoubleAttr_ObjVal);
                 nodeDuals = node->getDuals();
-                lag_gap   = integer_solution - (lp_obj + std::min(0.0, inner_obj));
-                matrix    = node->extractModelDataSparse();
+
+                lag_gap          = integer_solution - (lp_obj + std::min(0.0, inner_obj));
+                bucket_graph.gap = lag_gap;
+
+                matrix = node->extractModelDataSparse();
 
                 stab.update_stabilization_after_pricing_optim(matrix, nodeDuals, lag_gap, paths);
 
@@ -1060,5 +1059,13 @@ public:
 
         fmt::print("\033[34m_FINISHED BRANCH PROCEDURE \033[0m");
         fmt::print("\n");
+    }
+
+    // implement clone method for virtual std::unique_ptr<Problem> clone() const = 0;
+    std::unique_ptr<Problem> clone() const {
+        auto newProblem      = std::make_unique<VRProblem>();
+        newProblem->instance = instance;
+        newProblem->nodes    = nodes;
+        return newProblem;
     }
 };

@@ -53,6 +53,9 @@ public:
 
     virtual double bound(BNBNode *node) = 0;
 
+    // define clone method
+    virtual std::unique_ptr<Problem> clone() const = 0;
+
     /**
      * @brief Virtual destructor for proper cleanup of derived classes.
      */

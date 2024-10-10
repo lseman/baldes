@@ -236,7 +236,7 @@ void Population::updateBiasedFitnesses(SubPopulation &pop) {
     for (int i = 0; i < static_cast<int>(pop.size()); i++) {
         ranking.push_back({-pop[i]->averageBrokenPairsDistanceClosest(params->config.nbClose), i});
     }
-    std::sort(ranking.begin(), ranking.end());
+    pdqsort(ranking.begin(), ranking.end());
 
     // Updating the biased fitness values. If there is only one individual, its biasedFitness is 0
     if (pop.size() == 1) {
@@ -613,79 +613,86 @@ void Population::updateMDMElite(const Individual *indiv) {
     }
 }
 
+/*
+ * Returns the next pattern to be used in the MDM construction heuristic
+ */
 void Population::mineElite() {
-    auto mdmNbElite    = -1;
     auto mdmNbPatterns = 5;
-    auto mdmNURestarts = 0.05;
     auto mdmMinSup     = 0.8;
+
     if (mdmEliteUpdated && mdmEliteNonUpdatingRestarts >= mdmEliteMaxNonUpdatingRestarts && mdmElite.size() > 1) {
         if (params->verbose) std::cout << "----- MINING PATTERNS FROM MDM ELITE SET" << std::endl;
 
-        int minSup      = std::max(2, (int)(mdmMinSup * mdmElite.size()));
+        int minSup      = std::max(2, static_cast<int>(mdmMinSup * mdmElite.size()));
         int numPatterns = mdmNbPatterns;
+        int nbNodes     = params->nbClients + 1; // all clients + depot
 
-        int nbNodes = params->nbClients + 1; // all clients + depot
+        // Allocate Dataset on stack to avoid manual deletion later
+        Dataset dataset;
 
-        Dataset *dataset = new Dataset;
-        for (auto it = mdmElite.begin(); it != mdmElite.end(); ++it) {
-            auto          indiv = *it;
+        for (const auto &indiv : mdmElite) {
             std::set<int> transaction;
-            for (int r = 0; r < params->nbVehicles; r++)
-                for (int c = 0; c < (int)indiv->chromR[r].size() - 1; c++) {
-                    int index = indiv->chromR[r][c] * nbNodes +
-                                indiv->chromR[r][c + 1]; // maps 2D matrix cell indices to vector index
+            for (int r = 0; r < params->nbVehicles; r++) {
+                const auto &chromR = indiv->chromR[r];
+                for (int c = 0; c < static_cast<int>(chromR.size()) - 1; ++c) {
+                    int index = chromR[c] * nbNodes + chromR[c + 1]; // map 2D matrix to vector index
                     transaction.insert(index);
                 }
-            dataset->push_back(transaction);
+            }
+            dataset.push_back(transaction);
         }
 
-        FISet *frequentItemsets = fpmax(dataset, minSup, numPatterns);
+        // Execute fpmax to get frequent itemsets
+        FISet *frequentItemsets = fpmax(&dataset, minSup, numPatterns);
 
+        // Clear previous patterns and mine new ones
         mdmPatterns.clear();
-        for (FISet::iterator it = frequentItemsets->begin(); it != frequentItemsets->end(); ++it) {
+        for (const auto &itemset : *frequentItemsets) {
             std::vector<std::vector<int>> tempPattern;
             std::list<std::vector<int> *> routes;
 
-            for (std::set<int>::iterator it2 = it->begin(); it2 != it->end(); ++it2) {
-                unsigned index = *it2;
-
+            for (int index : itemset) {
                 int n1 = index / nbNodes;
                 int n2 = index % nbNodes;
 
-                std::vector<int> *lhs = NULL;
-                std::vector<int> *rhs = NULL;
-                std::vector<int> *tempRoute;
-                for (std::list<std::vector<int> *>::iterator r = routes.begin(); r != routes.end(); r++)
-                    if (n1 && n1 == (*r)->back())
-                        lhs = *r;
-                    else if (n2 && n2 == (*r)->front())
-                        rhs = *r;
-                if (lhs)
+                std::vector<int> *lhs = nullptr;
+                std::vector<int> *rhs = nullptr;
+
+                // Find the routes that need to be merged or extended
+                for (auto &route : routes) {
+                    if (n1 && n1 == route->back()) lhs = route;
+                    if (n2 && n2 == route->front()) rhs = route;
+                }
+
+                if (lhs) {
                     if (rhs) {
-                        for (std::vector<int>::iterator n = rhs->begin(); n != rhs->end(); n++) lhs->push_back(*n);
+                        // Merge rhs into lhs and remove rhs from routes
+                        lhs->insert(lhs->end(), rhs->begin(), rhs->end());
                         routes.remove(rhs);
                         delete rhs;
-                    } else
+                    } else {
                         lhs->push_back(n2);
-                else if (rhs)
+                    }
+                } else if (rhs) {
                     rhs->insert(rhs->begin(), n1);
-                else {
-                    tempRoute = new std::vector<int>;
-                    tempRoute->push_back(n1);
-                    tempRoute->push_back(n2);
+                } else {
+                    // Create a new route with n1 and n2
+                    auto *tempRoute = new std::vector<int>{n1, n2};
                     routes.push_back(tempRoute);
                 }
             }
 
-            for (std::list<std::vector<int> *>::iterator r = routes.begin(); r != routes.end(); r++)
-                tempPattern.push_back(**r);
+            for (auto &route : routes) {
+                tempPattern.push_back(std::move(*route));
+                delete route; // Clean up after moving
+            }
 
-            mdmPatterns.push_back(tempPattern);
+            mdmPatterns.push_back(std::move(tempPattern));
         }
 
-        delete dataset;
         delete frequentItemsets;
 
+        // Reset flags
         mdmEliteUpdated = false;
         mdmNextPattern  = 0;
     }

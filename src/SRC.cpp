@@ -254,7 +254,7 @@ void LimitedMemoryRank1Cuts::generateCutCoefficients(VRPTW_SRC &cuts, std::vecto
         auto input_sender = stdexec::just();
 
         // Sort best_sets
-        std::sort(cuts.best_sets.begin(), cuts.best_sets.end(), std::greater<>());
+        pdqsort(cuts.best_sets.begin(), cuts.best_sets.end(), std::greater<>());
 
         // Define the bulk operation to process each cut
         auto bulk_sender = stdexec::bulk(

@@ -27,7 +27,9 @@
  */
 struct Bucket {
     // std::vector<Label *>   labels_vec;
-    std::vector<Label *, PoolAllocator<Label *>> labels_vec;
+    // std::vector<Label *, PoolAllocator<Label *>> labels_vec;
+    std::pmr::unsynchronized_pool_resource pool;
+    std::pmr::vector<Label *>              labels_vec; // Declare the vector here
 
     int                    node_id = -1;
     std::vector<double>    lb;
@@ -162,13 +164,13 @@ struct Bucket {
     }
 
     Bucket(int node_id, std::vector<double> lb, std::vector<double> ub)
-        : node_id(node_id), lb(std::move(lb)), ub(std::move(ub)) {
+        : node_id(node_id), lb(std::move(lb)), ub(std::move(ub)), labels_vec(&pool) {
 
         labels_vec.reserve(250);
     }
 
     // create default constructor
-    Bucket() { labels_vec.reserve(250); }
+    Bucket() {}
 
     /**
      * @brief Adds a label to the labels vector.

@@ -10,91 +10,67 @@
 #include "fmt/core.h"
 
 void Individual::evaluateCompleteCost() {
-    // Create an object to store all information regarding solution costs
-
     myCostSol = CostSol();
-    // print params->nbVehicles
-    // check if params is nullptr
-    // Loop over all routes that are not empty
-    for (int r = 0; r < params->nbVehicles; r++) {
-        if (!chromR[r].empty()) {
-            int latestReleaseTime = params->cli[chromR[r][0]].releaseTime;
-            for (int i = 1; i < static_cast<int>(chromR[r].size()); i++) {
-                latestReleaseTime = std::max(latestReleaseTime, params->cli[chromR[r][i]].releaseTime);
-            }
-            // Get the distance, load, serviceDuration and time associated with the vehicle traveling from the depot to
-            // the first client Assume depot has service time 0 and earliestArrival 0
-            int distance = params->timeCost.get(0, chromR[r][0]);
-            int load     = params->cli[chromR[r][0]].demand;
-            int service  = params->cli[chromR[r][0]].serviceDuration;
-            // Running time excludes service of current node. This is the time that runs with the vehicle traveling
-            // We start the route at the latest release time (or later but then we can just wait and there is no penalty
-            // for waiting)
-            int time     = latestReleaseTime + distance;
-            int waitTime = 0;
-            int timeWarp = 0;
-            // Add possible waiting time
-            if (time < params->cli[chromR[r][0]].earliestArrival) {
-                // Don't add wait time since we can start route later
-                // (doesn't really matter since there is no penalty anyway)
-                // waitTime += params->cli[chromR[r][0]].earliestArrival - time;
-                time = params->cli[chromR[r][0]].earliestArrival;
-            }
-            // Add possible time warp
-            else if (time > params->cli[chromR[r][0]].latestArrival) {
-                timeWarp += time - params->cli[chromR[r][0]].latestArrival;
-                time = params->cli[chromR[r][0]].latestArrival;
-            }
-            predecessors[chromR[r][0]] = 0;
 
-            // Loop over all clients for this vehicle
-            for (int i = 1; i < static_cast<int>(chromR[r].size()); i++) {
-                // Sum the distance, load, serviceDuration and time associated with the vehicle traveling from the depot
-                // to the next client
-                distance += params->timeCost.get(chromR[r][i - 1], chromR[r][i]);
-                load += params->cli[chromR[r][i]].demand;
-                service += params->cli[chromR[r][i]].serviceDuration;
-                time = time + params->cli[chromR[r][i - 1]].serviceDuration +
-                       params->timeCost.get(chromR[r][i - 1], chromR[r][i]);
+    for (int r = 0; r < params->nbVehicles; ++r) {
+        if (chromR[r].empty()) continue;
 
-                // Add possible waiting time
-                if (time < params->cli[chromR[r][i]].earliestArrival) {
-                    waitTime += params->cli[chromR[r][i]].earliestArrival - time;
-                    time = params->cli[chromR[r][i]].earliestArrival;
-                }
-                // Add possible time warp
-                else if (time > params->cli[chromR[r][i]].latestArrival) {
-                    timeWarp += time - params->cli[chromR[r][i]].latestArrival;
-                    time = params->cli[chromR[r][i]].latestArrival;
-                }
-
-                // Update predecessors and successors
-                predecessors[chromR[r][i]]   = chromR[r][i - 1];
-                successors[chromR[r][i - 1]] = chromR[r][i];
-            }
-
-            // For the last client, the successors is the depot. Also update the distance and time
-            successors[chromR[r][chromR[r].size() - 1]] = 0;
-            distance += params->timeCost.get(chromR[r][chromR[r].size() - 1], 0);
-            time = time + params->cli[chromR[r][chromR[r].size() - 1]].serviceDuration +
-                   params->timeCost.get(chromR[r][chromR[r].size() - 1], 0);
-
-            // For the depot, we only need to check the end of the time window (add possible time warp)
-            if (time > params->cli[0].latestArrival) {
-                timeWarp += time - params->cli[0].latestArrival;
-                time = params->cli[0].latestArrival;
-            }
-            // Update variables that track stats on the whole solution (all vehicles combined)
-            myCostSol.distance += distance;
-            myCostSol.waitTime += waitTime;
-            myCostSol.timeWarp += timeWarp;
-            myCostSol.nbRoutes++;
-            if (load > params->vehicleCapacity) { myCostSol.capacityExcess += load - params->vehicleCapacity; }
+        int latestReleaseTime = params->cli[chromR[r][0]].releaseTime;
+        for (int i = 1; i < static_cast<int>(chromR[r].size()); ++i) {
+            latestReleaseTime = std::max(latestReleaseTime, params->cli[chromR[r][i]].releaseTime);
         }
+
+        int distance = params->timeCost.get(0, chromR[r][0]);
+        int load     = params->cli[chromR[r][0]].demand;
+        int service  = params->cli[chromR[r][0]].serviceDuration;
+        int time     = latestReleaseTime + distance;
+        int waitTime = 0, timeWarp = 0;
+
+        if (time < params->cli[chromR[r][0]].earliestArrival) {
+            time = params->cli[chromR[r][0]].earliestArrival;
+        } else if (time > params->cli[chromR[r][0]].latestArrival) {
+            timeWarp += time - params->cli[chromR[r][0]].latestArrival;
+            time = params->cli[chromR[r][0]].latestArrival;
+        }
+
+        predecessors[chromR[r][0]] = 0;
+
+        for (int i = 1; i < static_cast<int>(chromR[r].size()); ++i) {
+            int prev = chromR[r][i - 1], curr = chromR[r][i];
+            distance += params->timeCost.get(prev, curr);
+            load += params->cli[curr].demand;
+            service += params->cli[curr].serviceDuration;
+            time += params->cli[prev].serviceDuration + params->timeCost.get(prev, curr);
+
+            if (time < params->cli[curr].earliestArrival) {
+                waitTime += params->cli[curr].earliestArrival - time;
+                time = params->cli[curr].earliestArrival;
+            } else if (time > params->cli[curr].latestArrival) {
+                timeWarp += time - params->cli[curr].latestArrival;
+                time = params->cli[curr].latestArrival;
+            }
+
+            predecessors[curr] = prev;
+            successors[prev]   = curr;
+        }
+
+        successors[chromR[r].back()] = 0;
+        distance += params->timeCost.get(chromR[r].back(), 0);
+        time += params->cli[chromR[r].back()].serviceDuration + params->timeCost.get(chromR[r].back(), 0);
+
+        if (time > params->cli[0].latestArrival) {
+            timeWarp += time - params->cli[0].latestArrival;
+            time = params->cli[0].latestArrival;
+        }
+
+        myCostSol.distance += distance;
+        myCostSol.waitTime += waitTime;
+        myCostSol.timeWarp += timeWarp;
+        myCostSol.nbRoutes++;
+
+        if (load > params->vehicleCapacity) { myCostSol.capacityExcess += load - params->vehicleCapacity; }
     }
 
-    // When all vehicles are dealt with, calculated total penalized cost and check if the solution is feasible. (Wait
-    // time does not affect feasibility)
     myCostSol.penalizedCost = myCostSol.distance + myCostSol.capacityExcess * params->penaltyCapacity +
                               myCostSol.timeWarp * params->penaltyTimeWarp +
                               myCostSol.waitTime * params->penaltyWaitTime;

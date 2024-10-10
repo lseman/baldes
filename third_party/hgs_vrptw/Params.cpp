@@ -196,7 +196,7 @@ Params::Params(const InstanceData &instance) {
         }
 
         // Sort orderProximity (for the specific client)
-        std::sort(orderProximity.begin(), orderProximity.end());
+        pdqsort(orderProximity.begin(), orderProximity.end());
     }
 
     // Calculate, for all vertices, the correlation for the nbGranular closest vertices
@@ -238,7 +238,7 @@ Params::Params(const InstanceData &instance) {
             savingsCount++;
         }
 
-    std::sort(savingsList.begin(), savingsList.end(), compSavings);
+    pdqsort(savingsList.begin(), savingsList.end(), compSavings);
 }
 
 Params::Params(const std::string &path_location) {
@@ -448,7 +448,7 @@ Params::Params(const std::string &path_location) {
         }
 
         // Sort orderProximity (for the specific client)
-        std::sort(orderProximity.begin(), orderProximity.end());
+        pdqsort(orderProximity.begin(), orderProximity.end());
     }
 
     // Calculate, for all vertices, the correlation for the nbGranular closest vertices

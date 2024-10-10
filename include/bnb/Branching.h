@@ -22,6 +22,8 @@
 #include <optional>
 #include <variant>
 
+#include <stdexec/execution.hpp>
+
 constexpr double TOLERANCE_ZERO    = 1E-6;
 constexpr double TOLERANCE_INTEGER = 1E-2;
 constexpr double SCORE_INCREMENT   = 0.0001;
@@ -68,10 +70,6 @@ public:
         for (int i = 0; i < LPSolution.size(); ++i) {
             if (LPSolution[i] == 0) continue; // Skip if no solution for this route
 
-            // Fractionality calculation
-            // double fractionality = std::fabs(LPSolution[i] - std::round(LPSolution[i]));
-
-            // if (LPSolution[i] > TOLERANCE_ZERO && fractionality > TOLERANCE_INTEGER) {
             if (LPSolution[i] > TOLERANCE_ZERO && isFractional(LPSolution[i])) {
 
                 double totalWindowDifference = 0.0;
@@ -149,8 +147,8 @@ public:
         double lowerBound = std::floor(fractionalValue);
         double upperBound = std::ceil(fractionalValue);
 
-        addConstraintForCandidate(childNode1, item, lowerBound, BranchingDirection::Less);
-        addConstraintForCandidate(childNode2, item, upperBound, BranchingDirection::Greater);
+        addConstraintForCandidate(childNode1, item, upperBound, BranchingDirection::Greater);
+        addConstraintForCandidate(childNode2, item, lowerBound, BranchingDirection::Less);
 
         return {childNode1, childNode2};
     }
@@ -162,25 +160,61 @@ public:
     static std::vector<BranchingQueueItem>
     evaluateWithBranching(BNBNode *node, const std::vector<BranchingQueueItem> &phase0Candidates) {
         std::vector<BranchingQueueItem> results;
+        std::mutex                      results_mutex; // Mutex to protect shared results
 
-        for (const auto &candidate : phase0Candidates) {
-            // Add branching constraints and create two child nodes
-            auto [childNode1, childNode2] = applyBranchingConstraints(node, candidate, candidate.fractionalValue);
+        const int                JOBS = std::thread::hardware_concurrency();
+        exec::static_thread_pool pool(JOBS); // Pool with concurrent threads
+        auto                     sched = pool.get_scheduler();
 
-            double deltaLB1, deltaLB2;
-            double feasLB1, feasLB2;
-            std::tie(feasLB1, deltaLB1) = childNode1->solveRestrictedMasterLP();
-            std::tie(feasLB2, deltaLB2) = childNode2->solveRestrictedMasterLP();
+        // Define chunk size based on performance tuning (adjust as needed)
+        const int chunk_size   = 10;
+        auto      total_chunks = (phase0Candidates.size() + chunk_size - 1) / chunk_size;
 
-            double productValue = deltaLB1 * deltaLB2;
+        // Parallel bulk execution
+        auto bulk_sender = stdexec::bulk(
+            stdexec::just(), total_chunks,
+            [&results, &results_mutex, node, &phase0Candidates, chunk_size](std::size_t chunk_idx) {
+                size_t start_idx = chunk_idx * chunk_size;
+                size_t end_idx   = std::min(start_idx + chunk_size, phase0Candidates.size());
 
-            results.push_back({candidate.sourceNode, candidate.targetNode, candidate.fractionalValue, productValue,
-                               candidate.g_m, candidate.g_m_v, candidate.g_v_vp, candidate.candidateType,
-                               std::make_pair(feasLB1, feasLB2)});
-        }
+                std::vector<BranchingQueueItem> local_results; // Local storage to avoid locking too often
 
+                // Process the chunk of candidates
+                for (size_t idx = start_idx; idx < end_idx; ++idx) {
+                    const auto &candidate = phase0Candidates[idx];
+
+                    // Add branching constraints and create two child nodes
+                    auto [childNode1, childNode2] =
+                        applyBranchingConstraints(node, candidate, candidate.fractionalValue);
+
+                    // Solve the Restricted Master LP for each child node
+                    double deltaLB1, deltaLB2;
+                    double feasLB1, feasLB2;
+                    std::tie(feasLB1, deltaLB1) = childNode1->solveRestrictedMasterLP();
+                    std::tie(feasLB2, deltaLB2) = childNode2->solveRestrictedMasterLP();
+
+                    // Calculate product value for branching
+                    double productValue = deltaLB1 * deltaLB2;
+
+                    // Store the result locally
+                    local_results.push_back({candidate.sourceNode, candidate.targetNode, candidate.fractionalValue,
+                                             productValue, candidate.g_m, candidate.g_m_v, candidate.g_v_vp,
+                                             candidate.candidateType, std::make_pair(feasLB1, feasLB2)});
+                }
+
+                // Add local results to shared results with mutex protection
+                {
+                    std::lock_guard<std::mutex> lock(results_mutex);
+                    results.insert(results.end(), local_results.begin(), local_results.end());
+                }
+            });
+
+        // Execute bulk task using stdexec
+        stdexec::sync_wait(stdexec::when_all(bulk_sender));
+
+        // Sort results by product value in descending order (highest product value first)
         pdqsort(results.begin(), results.end(), [](const BranchingQueueItem &a, const BranchingQueueItem &b) {
-            return a.productValue > b.productValue; // Higher product value first
+            return a.productValue > b.productValue;
         });
 
         return results;
@@ -332,27 +366,66 @@ public:
     static std::vector<BranchingQueueItem>
     evaluateWithCG(BNBNode *node, const std::vector<BranchingQueueItem> &phase1Candidates, Problem *problem) {
         std::vector<BranchingQueueItem> results;
+        std::mutex                      results_mutex; // Mutex to protect shared results
 
-        for (const auto &candidate : phase1Candidates) {
-            // Add branching constraints and create two child nodes
-            auto [childNode1, childNode2] = applyBranchingConstraints(node, candidate, candidate.fractionalValue);
+        const int                JOBS = std::thread::hardware_concurrency();
+        exec::static_thread_pool pool(JOBS); // Pool with concurrent threads
+        auto                     sched = pool.get_scheduler();
 
-            double deltaLB1, deltaLB2;
-            double feasLB1, feasLB2;
-            feasLB1  = problem->CG(childNode1, 50);
-            deltaLB1 = problem->bound(childNode1);
-            feasLB1  = problem->CG(childNode2, 50);
-            deltaLB2 = problem->bound(childNode2);
+        // Define chunk size based on performance tuning (adjust as needed)
+        const int chunk_size   = 10;
+        auto      total_chunks = (phase1Candidates.size() + chunk_size - 1) / chunk_size;
 
-            double productValue = deltaLB1 * deltaLB2;
+        // Parallel bulk execution
+        auto bulk_sender = stdexec::bulk(
+            stdexec::just(), total_chunks,
+            [&results, &results_mutex, node, &phase1Candidates, problem, chunk_size](std::size_t chunk_idx) {
+                size_t start_idx = chunk_idx * chunk_size;
+                size_t end_idx   = std::min(start_idx + chunk_size, phase1Candidates.size());
 
-            results.push_back({candidate.sourceNode, candidate.targetNode, candidate.fractionalValue, productValue,
-                               candidate.g_m, candidate.g_m_v, candidate.g_v_vp, candidate.candidateType,
-                               std::make_pair(feasLB1, feasLB2)});
-        }
+                // Clone the problem for this thread
+                std::unique_ptr<Problem> problem_copy(problem->clone()); // Assuming clone method is available
 
+                std::vector<BranchingQueueItem> local_results; // Local storage to avoid locking too often
+
+                // Process the chunk of candidates
+                for (size_t idx = start_idx; idx < end_idx; ++idx) {
+                    const auto &candidate = phase1Candidates[idx];
+
+                    // Add branching constraints and create two child nodes
+                    auto [childNode1, childNode2] =
+                        applyBranchingConstraints(node, candidate, candidate.fractionalValue);
+
+                    // Solve CG and bound for each child node using the cloned problem
+                    double deltaLB1, deltaLB2;
+                    double feasLB1, feasLB2;
+                    feasLB1  = problem_copy->CG(childNode1, 50); // Use the copy
+                    deltaLB1 = problem_copy->bound(childNode1);  // Use the copy
+                    feasLB2  = problem_copy->CG(childNode2, 50); // Use the copy
+                    deltaLB2 = problem_copy->bound(childNode2);  // Use the copy
+
+                    // Calculate product value for branching
+                    double productValue = deltaLB1 * deltaLB2;
+
+                    // Store the result locally
+                    local_results.push_back({candidate.sourceNode, candidate.targetNode, candidate.fractionalValue,
+                                             productValue, candidate.g_m, candidate.g_m_v, candidate.g_v_vp,
+                                             candidate.candidateType, std::make_pair(feasLB1, feasLB2)});
+                }
+
+                // Add local results to shared results with mutex protection
+                {
+                    std::lock_guard<std::mutex> lock(results_mutex);
+                    results.insert(results.end(), local_results.begin(), local_results.end());
+                }
+            });
+
+        // Execute bulk task using stdexec
+        stdexec::sync_wait(stdexec::when_all(bulk_sender));
+
+        // Sort results by product value in descending order (highest product value first)
         pdqsort(results.begin(), results.end(), [](const BranchingQueueItem &a, const BranchingQueueItem &b) {
-            return a.productValue > b.productValue; // Higher product value first
+            return a.productValue > b.productValue;
         });
 
         return results;
@@ -371,6 +444,7 @@ public:
         auto aggregatedCandidates = calculateAggregatedVariables(node, instance);
 
         // Select candidates based on the new Phase 0 logic
+        print_info("Phase 0: selecting candidates for branching...\n");
         auto phase0Candidates =
             selectCandidatesPhase0(aggregatedCandidates, node->historyCandidates, maxCandidatesPhase0, instance);
 
@@ -378,11 +452,14 @@ public:
         node->historyCandidates = phase0Candidates;
 
         // Evaluate candidates and apply branching constraints
+        print_info("Phase 1: evaluating candidates for branching...\n");
         auto phase1Candidates = evaluateWithBranching(node, phase0Candidates);
 
         // TODO: add logic to select the best candidates from phase1Candidates
+        print_info("Phase 2: selecting best candidates from Phase 1...\n");
         auto phase2Candidates = evaluateWithCG(node, phase1Candidates, problem);
 
+        print_info("Phase 3: generating VRP candidates...\n");
         auto generatedCandidates = generateVRPCandidates(node, phase1Candidates);
         candidates.insert(candidates.end(), generatedCandidates.begin(), generatedCandidates.end());
 
