@@ -22,6 +22,7 @@
 #include <optional>
 #include <variant>
 
+#include <exec/static_thread_pool.hpp>
 #include <stdexec/execution.hpp>
 
 constexpr double TOLERANCE_ZERO    = 1E-6;
@@ -373,7 +374,7 @@ public:
         auto                     sched = pool.get_scheduler();
 
         // Define chunk size based on performance tuning (adjust as needed)
-        const int chunk_size   = 10;
+        const int chunk_size   = 1;
         auto      total_chunks = (phase1Candidates.size() + chunk_size - 1) / chunk_size;
 
         // Parallel bulk execution
@@ -399,10 +400,10 @@ public:
                     // Solve CG and bound for each child node using the cloned problem
                     double deltaLB1, deltaLB2;
                     double feasLB1, feasLB2;
-                    feasLB1  = problem_copy->CG(childNode1, 50); // Use the copy
-                    deltaLB1 = problem_copy->bound(childNode1);  // Use the copy
-                    feasLB2  = problem_copy->CG(childNode2, 50); // Use the copy
-                    deltaLB2 = problem_copy->bound(childNode2);  // Use the copy
+                    feasLB1  = problem_copy->heuristicCG(childNode1, 50); // Use the copy
+                    deltaLB1 = problem_copy->bound(childNode1);           // Use the copy
+                    feasLB2  = problem_copy->heuristicCG(childNode2, 50); // Use the copy
+                    deltaLB2 = problem_copy->bound(childNode2);           // Use the copy
 
                     // Calculate product value for branching
                     double productValue = deltaLB1 * deltaLB2;

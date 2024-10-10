@@ -6,7 +6,7 @@
 
 GRBModel solve_vrp(const InstanceData &instance) {
     GRBEnv env = GRBEnv(true);
-    env.set(GRB_IntParam_OutputFlag, 1);
+    // env.set(GRB_IntParam_OutputFlag, 1);
     env.start();
 
     GRBModel model = GRBModel(env);
@@ -105,6 +105,7 @@ GRBModel solve_vrp(const InstanceData &instance) {
 
     // Optimize the model
     model.update();
+    model.optimize();
     return model;
 }
 
@@ -119,8 +120,10 @@ int main(int argc, char *argv[]) {
         std::cerr << "Error reading instance\n";
     }
 
-    auto model    = solve_vrp(instance);
-    int  num_vars = model.get(GRB_IntAttr_NumVars);
+    auto model = solve_vrp(instance);
+
+    return 1;
+    int num_vars = model.get(GRB_IntAttr_NumVars);
     std::cout << "Number of variables: " << num_vars << std::endl;
 
     // Get the number of constraints
@@ -160,6 +163,6 @@ int main(int argc, char *argv[]) {
     auto cliques = cm.getCliques();
     // Build the conflict graph
     auto binary_number = (N_SIZE - 1) * (N_SIZE - 1);
-    cm.buildUpdateCg(cliques, binary_number);
-    // cm.printCg(varIndex2Name);
+    // cm.buildUpdateCg(cliques, binary_number);
+    //  cm.printCg(varIndex2Name);
 };

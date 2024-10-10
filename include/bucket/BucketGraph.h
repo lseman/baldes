@@ -503,6 +503,7 @@ public:
     // Common Tools
     static void          initInfo();
     std::vector<Label *> solve();
+    std::vector<Label *> solveHeuristic();
     void                 common_initialization();
     void                 setup();
     void                 print_statistics();

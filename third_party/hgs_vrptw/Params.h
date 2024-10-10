@@ -54,19 +54,28 @@ struct Savings // Savins structure for the Clarke & Wright heuristic
 
 inline bool compSavings(const Savings &s1, const Savings &s2) { return s1.value > s2.value; }
 
+struct TimeWindow {
+    int earliestArrival;
+    int latestArrival;
+
+    TimeWindow(int earliest, int latest) : earliestArrival(earliest), latestArrival(latest) {}
+};
+
 // Structure of a Client, including its index, position, and all other variables and parameters
 struct Client {
-    int custNum;         // Index of the client
-    int coordX;          // Coordinate X
-    int coordY;          // Coordinate Y
-    int serviceDuration; // Service duration
-    int demand;          // Demand
-    int earliestArrival; // Earliest arrival (when using time windows)
-    int latestArrival;   // Latest arrival (when using time windows)
+    int    custNum;         // Index of the client
+    double coordX;          // Coordinate X
+    double coordY;          // Coordinate Y
+    int    serviceDuration; // Service duration
+    int    demand;          // Demand
+    int    earliestArrival; // Earliest arrival (when using time windows)
+    int    latestArrival;   // Latest arrival (when using time windows)
     int releaseTime; // Release time (when using time windows, route containing this customer cannot depart before this
                      // time)
     int polarAngle; // Polar angle of the client around the depot (starting at east, moving counter-clockwise), measured
                     // in degrees and truncated for convenience
+    std::vector<TimeWindow> timeWindows; // Multiple time windows
+    int                     n_tw;
 };
 
 // This is needed for the initialization of a Params variable

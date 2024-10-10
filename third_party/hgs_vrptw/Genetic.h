@@ -49,6 +49,10 @@ public:
     // Destructor
     ~Genetic();
 
+    // define populationMutex
+    std::mutex populationMutex;
+    std::mutex iterationMutex;
+
 private:
     // The number of new potential offspring created from one individual
     static const int numberOfCandidateOffsprings = 4;

@@ -50,6 +50,7 @@ public:
     virtual double objective(BNBNode *node) = 0;
 
     virtual bool CG(BNBNode *node, int max_iter = 2000) { return false; }
+    virtual bool heuristicCG(BNBNode *node, int max_iter = 2000) { return false; }
 
     virtual double bound(BNBNode *node) = 0;
 

@@ -17,7 +17,6 @@ bool operator==(const TimeWindowData &twData1, const TimeWindowData &twData2) {
 }
 
 bool cmpd(double a, double b, double eps = 1e-5) { return std::fabs(a - b) < eps; }
-
 void HGSLocalSearch::initializeConstruction(Individual *indiv, std::vector<NodeToInsert> *nodesToInsert) {
     // Initialize datastructures relevant for constructions.
     // Local search-related data structures are not initialized.
@@ -32,12 +31,32 @@ void HGSLocalSearch::initializeConstruction(Individual *indiv, std::vector<NodeT
 
     // Initializing time window data for clients
     for (int i = 1; i <= params->nbClients; i++) {
-        TimeWindowData *myTwData  = &clients[i].twData;
-        myTwData->firstNodeIndex  = i;
-        myTwData->lastNodeIndex   = i;
-        myTwData->duration        = params->cli[i].serviceDuration;
-        myTwData->earliestArrival = params->cli[i].earliestArrival;
-        myTwData->latestArrival   = params->cli[i].latestArrival;
+        // clients[i].twDataList.clear(); // Clear previous time window data (if any)
+
+        /*
+                if (params->cli[i].n_tw > 0) {
+                    // If the client has multiple time windows, initialize all of them
+                    for (int twIdx = 0; twIdx < params->cli[i].n_tw; twIdx++) {
+                        TimeWindowData myTwData;
+                        myTwData.firstNodeIndex  = i;
+                        myTwData.lastNodeIndex   = i;
+                        myTwData.duration        = params->cli[i].serviceDuration;
+                        myTwData.earliestArrival = params->cli[i].timeWindows[twIdx].earliestArrival;
+                        myTwData.latestArrival   = params->cli[i].timeWindows[twIdx].latestArrival;
+
+                        clients[i].twDataList.push_back(myTwData); // Store the multiple time windows
+                    }
+                } else {
+                */
+        // Initializing time window data for clients
+        for (int i = 1; i <= params->nbClients; i++) {
+            TimeWindowData *myTwData  = &clients[i].twData;
+            myTwData->firstNodeIndex  = i;
+            myTwData->lastNodeIndex   = i;
+            myTwData->duration        = params->cli[i].serviceDuration;
+            myTwData->earliestArrival = params->cli[i].earliestArrival;
+            myTwData->latestArrival   = params->cli[i].latestArrival;
+        }
     }
 
     // Initialize routes
@@ -60,15 +79,21 @@ void HGSLocalSearch::initializeConstruction(Individual *indiv, std::vector<NodeT
         updateRouteData(&routes[r]);
     }
 
-    // Initialize clients.
+    // Initialize clients with their time window data
     for (int i = 1; i <= params->nbClients; i++) {
         NodeToInsert nodeToInsert;
         nodeToInsert.clientIdx = i;
-        nodeToInsert.twData    = clients[i].twData;
         nodeToInsert.load      = params->cli[i].demand;
         nodeToInsert.angleFromDepot =
             atan2(params->cli[i].coordY - params->cli[0].coordY, params->cli[i].coordX - params->cli[0].coordX);
         nodeToInsert.serviceDuration = params->cli[i].serviceDuration;
+
+        // Store the time windows in NodeToInsert
+        // if (params->cli[i].n_tw > 0)
+        //    nodeToInsert.twDataList = clients[i].twDataList;
+        // else
+        nodeToInsert.twData = clients[i].twData;
+
         nodesToInsert->push_back(nodeToInsert);
     }
 }
@@ -313,12 +338,12 @@ void HGSLocalSearch::run(Individual *indiv, double penaltyCapacityLS, double pen
             for (const auto &v : correlated) {
                 nodeV = &clients[v];
                 if (loopID == 0 || std::max(nodeU->route->whenLastModified, nodeV->route->whenLastModified) >
-                                       lastTestRINodeU) // only evaluate moves involving routes that have been modified
-                                                        // since last move evaluations for nodeU
+                                       lastTestRINodeU) // only evaluate moves involving routes that have been
+                                                        // modified since last move evaluations for nodeU
                 {
                     // Randomizing the order of the neighborhoods within this loop does not matter much as we are
-                    // already randomizing the order of the node pairs (and it's not very common to find improving moves
-                    // of different types for the same node pair)
+                    // already randomizing the order of the node pairs (and it's not very common to find improving
+                    // moves of different types for the same node pair)
                     setLocalVariablesRouteU();
                     setLocalVariablesRouteV();
                     if (MoveSingleClient()) continue;                                  // RELOCATE
@@ -1131,9 +1156,9 @@ void HGSLocalSearch::preprocessInsertionsWithTW(HGSRoute *R1, HGSRoute *R2) {
     TimeWindowData twData;
     for (Node *U = R1->depot->next; !U->isDepot; U = U->next) {
         // Performs the preprocessing
-        // Note: when removing U and adding V to a route, the timewarp penalties may interact, however in most cases it
-        // will hold that the reduced timewarp from removing U + added timewarp from adding V will be bigger than the
-        // actual delta timewarp such that assuming independence gives a conservative estimate
+        // Note: when removing U and adding V to a route, the timewarp penalties may interact, however in most cases
+        // it will hold that the reduced timewarp from removing U + added timewarp from adding V will be bigger than
+        // the actual delta timewarp such that assuming independence gives a conservative estimate
 
         if (R1->isDeltaRemovalTWOutdated) {
             twData = MergeTWDataRecursive(U->prev->prefixTwData, U->next->postfixTwData);
@@ -1146,8 +1171,8 @@ void HGSLocalSearch::preprocessInsertionsWithTW(HGSRoute *R1, HGSRoute *R2) {
             currentOption.reset();
             currentOption.whenLastCalculated = nbMoves;
 
-            // Compute additional timewarp we get when inserting U in R2, this may be actually less if we remove U but
-            // we ignore this to have a conservative estimate
+            // Compute additional timewarp we get when inserting U in R2, this may be actually less if we remove U
+            // but we ignore this to have a conservative estimate
             twData = MergeTWDataRecursive(R2->depot->prefixTwData, U->twData, R2->depot->next->postfixTwData);
 
             currentOption.bestCost[0] =
