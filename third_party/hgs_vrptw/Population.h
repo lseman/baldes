@@ -27,6 +27,7 @@ SOFTWARE.*/
 #include <functional>
 #include <iosfwd>
 #include <list>
+#include <queue>
 #include <string>
 #include <time.h>
 #include <vector>
@@ -38,6 +39,13 @@ SOFTWARE.*/
 
 // Create the alias SubPopulation for an object of type std::vector<Individual*>
 typedef std::vector<Individual *> SubPopulation;
+
+struct CompareIndividual {
+    bool operator()(const Individual *lhs, const Individual *rhs) const {
+        // We want the priority queue to prioritize individuals with higher penalizedCost
+        return lhs->myCostSol.penalizedCost > rhs->myCostSol.penalizedCost;
+    }
+};
 
 // Class representing the population of a Genetic Algorithm with functionality to write information to files, do binary
 // tournaments, update fitness values etc.
@@ -62,7 +70,7 @@ private:
         return a->myCostSol.penalizedCost < b->myCostSol.penalizedCost;
     }
 
-    std::set<const Individual *, std::function<bool(const Individual *, const Individual *)>> mdmElite;
+    std::priority_queue<const Individual *, std::vector<const Individual *>, CompareIndividual> mdmElite;
 
     // std::set<Individual, bool (*)(Individual, Individual)>
     //      mdmElite;        // MDM elite set, kept ordered by increasing penalized cost

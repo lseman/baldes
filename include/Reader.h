@@ -16,12 +16,14 @@
 
 #pragma once
 
+#include "config.h"
 #include <cmath>
 #include <cstring>
+#include <fmt/core.h>
 #include <fstream>
 #include <iostream>
+#include <sstream> // This is where std::istringstream is defined
 #include <vector>
-
 /**
  * @struct InstanceData
  * @brief A structure to hold various data related to an instance of a problem.
@@ -32,29 +34,31 @@
  *
  */
 struct InstanceData {
-    std::vector<std::vector<double>> distance;
-    std::vector<std::vector<double>> travel_cost;
-    std::vector<int>                 demand;
-    std::vector<double>              window_open;
-    std::vector<double>              window_close;
-    std::vector<double>              service_time;
-    std::vector<double>              demand_additional;
-    std::vector<std::vector<double>> distance_additional;
-    int                              q          = 0;
-    int                              nC         = 0;
-    int                              nV         = 0;
-    int                              nN         = 0;
-    int                              nR         = 0;
-    double                           T_max      = 0.0;
-    double                           T_avg      = 0.0;
-    double                           demand_sum = 0.0;
-    int                              nV_min     = 0;
-    int                              nV_max     = 0;
-    int                              nD_min     = 0;
-    int                              nD_max     = 0;
-    std::vector<int>                 deleted_arcs;
-    int                              deleted_arcs_n     = 0;
-    int                              deleted_arcs_n_max = 0;
+    std::vector<std::vector<double>>                    distance;
+    std::vector<std::vector<double>>                    travel_cost;
+    std::vector<int>                                    demand;
+    std::vector<double>                                 window_open;
+    std::vector<double>                                 window_close;
+    std::vector<std::vector<std::pair<double, double>>> time_windows; // New field for multiple time windows
+    std::vector<int>                                    n_tw;
+    std::vector<double>                                 service_time;
+    std::vector<double>                                 demand_additional;
+    std::vector<std::vector<double>>                    distance_additional;
+    int                                                 q          = 0;
+    int                                                 nC         = 0;
+    int                                                 nV         = 0;
+    int                                                 nN         = 0;
+    int                                                 nR         = 0;
+    double                                              T_max      = 0.0;
+    double                                              T_avg      = 0.0;
+    double                                              demand_sum = 0.0;
+    int                                                 nV_min     = 0;
+    int                                                 nV_max     = 0;
+    int                                                 nD_min     = 0;
+    int                                                 nD_max     = 0;
+    std::vector<int>                                    deleted_arcs;
+    int                                                 deleted_arcs_n     = 0;
+    int                                                 deleted_arcs_n_max = 0;
 
     std::vector<double> x_coord;
     std::vector<double> y_coord;
@@ -209,47 +213,122 @@ inline int VRPTW_mcd(int m, int n) {
  * Reads an instance file and populates the provided `InstanceData` object with the data.
  *
  */
-inline int VRPTW_read_instance(const std::string &file_name, InstanceData &instance) {
+inline int VRPTW_read_instance(const std::string &file_name, InstanceData &instance, bool mtw = false) {
     std::ifstream myfile(file_name);
     if (!myfile.is_open()) { return 0; }
 
     std::string current_line;
-    for (int i = 0; i < 4; ++i) { std::getline(myfile, current_line); }
+    if (!mtw)
+        for (int i = 0; i < 4; ++i) { std::getline(myfile, current_line); }
 
-    myfile >> instance.nV >> instance.q;
+    if (!mtw) myfile >> instance.nV >> instance.q;
     std::cout << "nV: " << instance.nV << " q: " << instance.q << std::endl;
     instance.nN = 102;
 
-    std::vector<int> xcoord(instance.nN);
-    std::vector<int> ycoord(instance.nN);
+    std::vector<double> xcoord(instance.nN);
+    std::vector<double> ycoord(instance.nN);
     instance.demand.resize(instance.nN);
     instance.demand_additional.resize(instance.nN);
     instance.window_open.resize(instance.nN);
     instance.window_close.resize(instance.nN);
     instance.service_time.resize(instance.nN);
+    instance.n_tw.resize(instance.nN);
 
-    for (int i = 0; i < 4; ++i) { std::getline(myfile, current_line); }
+    // Initialize time windows vector only if mtw is enabled
+    if (mtw) { instance.time_windows.resize(instance.nN); }
+
+    if (!mtw)
+        for (int i = 0; i < 4; ++i) { std::getline(myfile, current_line); }
+
+    if (mtw)
+        for (int i = 0; i < 1; ++i) { std::getline(myfile, current_line); }
 
     int i = 0;
-    ;
-    while (myfile >> i >> xcoord[i] >> ycoord[i] >> instance.demand[i] >> instance.window_open[i] >>
-           instance.window_close[i] >> instance.service_time[i]) {
-        //++i;
-        if (i >= instance.nN) {
-            instance.nN *= 2;
-            xcoord.resize(instance.nN);
-            ycoord.resize(instance.nN);
-            instance.demand.resize(instance.nN);
-            instance.window_open.resize(instance.nN);
-            instance.window_close.resize(instance.nN);
-            instance.service_time.resize(instance.nN);
+
+    if (!mtw) {
+        while (myfile >> i >> xcoord[i] >> ycoord[i] >> instance.demand[i] >> instance.window_open[i] >>
+               instance.window_close[i] >> instance.service_time[i]) {
+            instance.n_tw[i] = 0;
+            // Check if we need to resize
+            if (i >= instance.nN) {
+                instance.nN *= 2;
+                xcoord.resize(instance.nN);
+                ycoord.resize(instance.nN);
+                instance.demand.resize(instance.nN);
+                instance.window_open.resize(instance.nN);
+                instance.window_close.resize(instance.nN);
+                instance.service_time.resize(instance.nN);
+            }
+        }
+    } else {
+        instance.nV = 25;
+        instance.q  = 100;
+        std::string tws;
+        fmt::print("{}\n", instance.nN);
+
+        // Ensure the file is open
+        if (!myfile.is_open()) {
+            fmt::print("Error: File could not be opened.\n");
+            std::throw_with_nested(std::runtime_error("Error: File could not be opened."));
+        }
+
+        // Read the lines manually first to ensure the format is correct
+        std::string line;
+        while (std::getline(myfile, line)) {
+            std::istringstream iss(line);
+
+            // Skip the extra whitespace manually for each field
+            if (!(iss >> i)) {
+                fmt::print("Error parsing CUST NO.\n");
+                continue;
+            }
+
+            // Extract the remaining fields manually, skipping whitespace
+            double x, y;
+            int    demand, n_tw;
+
+            iss >> x >> y >> demand >> n_tw >> tws; // Read coordinates, demand, and number of time windows
+            if (iss.fail()) {
+                fmt::print("Error parsing fields.\n");
+                continue;
+            }
+
+            fmt::print("i: {}, x: {}, y: {}, demand: {}, n_tw: {}\n", i, x, y, demand, n_tw);
+
+            xcoord[i]          = x;
+            ycoord[i]          = y;
+            instance.demand[i] = demand;
+            instance.n_tw[i]   = n_tw;
+            if (i != 0)
+                instance.service_time[i] = 1; // Assuming service time is 10 for all nodes
+            else
+                instance.service_time[i] = 0;
+            // Parsing multiple time windows (e.g., "45,105;113,174;188,250")
+            std::replace(tws.begin(), tws.end(), ';', ' '); // Replace semicolons with spaces
+            std::replace(tws.begin(), tws.end(), ',', ' '); // Replace commas with spaces
+
+            std::istringstream tw_stream(tws);
+            int                start, end;
+
+            // Parse each start, end pair from the stream
+            while (tw_stream >> start >> end) {
+                fmt::print("start: {}, end: {}\n", start, end);
+                instance.time_windows[i].emplace_back(start, end);
+            }
+
+            instance.window_open[i]  = instance.time_windows[i][0].first;
+            instance.window_close[i] = instance.time_windows[i][0].second;
+
+            fmt::print("window_open: {}, window_close: {}\n", instance.window_open[i], instance.window_close[i]);
         }
     }
 
     // Example output to verify the data
     instance.nN = i + 2;
     instance.nC = i;
-    // instance.nV = instance.nC;
+
+    // print instance.nN
+    fmt::print("nN: {}\n", instance.nN);
 
     xcoord[instance.nN - 1]                = xcoord[0];
     ycoord[instance.nN - 1]                = ycoord[0];
@@ -258,17 +337,13 @@ inline int VRPTW_read_instance(const std::string &file_name, InstanceData &insta
     instance.window_close[instance.nN - 1] = instance.window_close[0];
     instance.service_time[instance.nN - 1] = instance.service_time[0];
 
-    xcoord.resize(instance.nN);
-    ycoord.resize(instance.nN);
+    instance.x_coord.resize(instance.nN);
+    instance.y_coord.resize(instance.nN);
     instance.demand.resize(instance.nN);
     instance.window_open.resize(instance.nN);
     instance.window_close.resize(instance.nN);
     instance.service_time.resize(instance.nN);
-
-    instance.x_coord.resize(instance.nN);
-    instance.y_coord.resize(instance.nN);
-
-    myfile.close();
+    if (mtw) { instance.time_windows.resize(instance.nN); }
 
     instance.distance.resize(instance.nN, std::vector<double>(instance.nN));
 
@@ -284,6 +359,10 @@ inline int VRPTW_read_instance(const std::string &file_name, InstanceData &insta
         instance.window_open[i] *= 10;
         instance.window_close[i] *= 10;
         instance.service_time[i] *= 10;
+        // print window_open and window_close
+        fmt::print("i: {}, x: {}, y: {}, demand: {}, window_open: {}, window_close: {}, service_time: {}\n", i,
+                   instance.x_coord[i], instance.y_coord[i], instance.demand[i], instance.window_open[i],
+                   instance.window_close[i], instance.service_time[i]);
     }
 
     // Presolve for the time windows
@@ -305,6 +384,9 @@ inline int VRPTW_read_instance(const std::string &file_name, InstanceData &insta
         }
     }
     instance.T_max = instance.window_close[0];
+
+    if (mtw) { instance.T_max = instance.time_windows[0][0].second; }
+
     std::cout << "T_max: " << instance.T_max << std::endl;
     instance.T_avg /= static_cast<double>(instance.nC);
 

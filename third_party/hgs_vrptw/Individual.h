@@ -49,6 +49,7 @@ struct CostSol {
 class Individual {
 public:
     bool compareIndividuals(const Individual *a, const Individual *b);
+    int  adjustToTimeWindow(int time, const std::vector<TimeWindow> &timeWindows, int &waitTime, int &timeWarp);
 
     Params          *params; // Problem parameters
     int              nbVehicles;

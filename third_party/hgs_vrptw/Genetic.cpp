@@ -39,9 +39,9 @@ void Genetic::run(int maxIterNonProd, int timeLimit) {
         if (nbIter % 100 == 0) population->managePenalties();
         if (nbIter % 500 == 0) population->printState(nbIter, nbIterNonProd);
 
-        if (params->config.logPoolInterval > 0 && nbIter % params->config.logPoolInterval == 0) {
-            population->exportPopulation(nbIter, params->config.pathSolution + ".log.csv");
-        }
+        // if (params->config.logPoolInterval > 0 && nbIter % params->config.logPoolInterval == 0) {
+        //     population->exportPopulation(nbIter, params->config.pathSolution + ".log.csv");
+        // }
 
         /* RESTART LOGIC */
         if (timeLimit != INT_MAX && nbIterNonProd == maxIterNonProd && params->config.doRepeatUntilTimeLimit) {

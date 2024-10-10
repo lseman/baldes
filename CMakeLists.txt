@@ -240,7 +240,7 @@ set(GUROBI_HOME $ENV{GUROBI_HOME})
 include_directories(${GUROBI_HOME}/include)
 
 # Source files
-set(SOURCES examples/VRPTW.cpp src/BucketGraph.cpp)
+set(SOURCES src/BucketGraph.cpp)
 
 set(CVRPSEP_SOURCES
     third_party/cvrpsep/basegrph.cpp
@@ -303,7 +303,7 @@ if(RIH)
 endif()
 
 # Add the executable with the combined sources
-add_executable(vrptw ${EXECUTABLE_SOURCES})
+add_executable(vrptw examples/VRPTW.cpp ${EXECUTABLE_SOURCES})
 
 # Linking libraries
 target_link_libraries(vrptw PRIVATE STDEXEC::stdexec)
@@ -393,3 +393,36 @@ if(CLIQUER)
                                          -Wno-deprecated-declarations)
 endif()
 
+
+add_executable(vrpmtw mtw/VRPMTW.cpp ${EXECUTABLE_SOURCES} ${HGS_SOURCES} ${FPSOURCE})
+# Link Gurobi libraries
+if(APPLE)
+  # macOS detected, use .dylib for linking
+  target_link_libraries(vrpmtw PRIVATE ${GUROBI_HOME}/lib/libgurobi_c++.a
+                                      ${GUROBI_HOME}/lib/libgurobi100.dylib)
+else()
+  # Non-macOS (Linux or other platforms), use .so and .a files
+  target_link_libraries(
+    vrpmtw PRIVATE ${GUROBI_HOME}/lib/libgurobi_c++.a
+                  ${GUROBI_HOME}/lib/libgurobi${GUROBI_VERSION_MAJOR}.so tbb)
+endif()
+
+if(JEMALLOC)
+  find_library(JEMALLOC_LIBRARY jemalloc)
+  if(JEMALLOC_LIBRARY)
+    message(STATUS "jemalloc found: ${JEMALLOC_LIBRARY}")
+    target_link_libraries(vrpmtw PRIVATE ${JEMALLOC_LIBRARY})
+  else()
+    message(STATUS "jemalloc not found")
+  endif()
+endif()
+
+target_compile_options(vrpmtw PRIVATE -Wno-c++26-extensions
+-Wno-deprecated-declarations)
+
+# link with xxhash
+target_link_libraries(vrpmtw PRIVATE xxhash)
+# link with unordered_dense
+target_link_libraries(vrpmtw PRIVATE unordered_dense)
+target_link_libraries(vrpmtw PRIVATE STDEXEC::stdexec)
+target_link_libraries(vrpmtw PRIVATE fmt::fmt)

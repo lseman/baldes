@@ -133,6 +133,47 @@ inline std::vector<Label *> BucketGraph::solve() {
     return paths; // Return the final paths after processing
 }
 
+inline std::vector<Label *> BucketGraph::solveHeuristic() {
+    // Initialize the status as not optimal at the start
+    status = Status::NotOptimal;
+
+    updateSplit(); // Update the split values for the bucket graph
+
+    // Placeholder for the final paths (labels) and inner objective value
+    std::vector<Label *> paths;
+    double               inner_obj;
+
+    //////////////////////////////////////////////////////////////////////
+    // ADAPTIVE STAGE HANDLING
+    //////////////////////////////////////////////////////////////////////
+    // Stage 1: Apply a light heuristic (Stage::One)
+    if (s1) {
+        stage     = 1;
+        paths     = bi_labeling_algorithm<Stage::One>(); // Solve the problem with Stage 1 heuristic
+        inner_obj = paths[0]->cost;
+
+        // Transition from Stage 1 to Stage 2 if the objective improves or after 10 iterations
+        if (inner_obj >= -1 || iter >= 10) {
+            s1 = false;
+            s2 = true; // Move to Stage 2
+        }
+    }
+    // Stage 2: Apply a more expensive pricing heuristic (Stage::Two)
+    else if (s2) {
+        s2        = true;
+        stage     = 2;
+        paths     = bi_labeling_algorithm<Stage::Two>(); // Solve the problem with Stage 2 heuristic
+        inner_obj = paths[0]->cost;
+
+        // Transition from Stage 2 to Stage 3 if the objective improves or after 800 iterations
+        if (inner_obj >= -100 || iter > 800) { status = Status::Optimal; }
+    }
+
+    iter++; // Increment the iteration counter
+
+    return paths; // Return the final paths after processing
+}
+
 /**
  * Performs the labeling algorithm on the BucketGraph.
  *

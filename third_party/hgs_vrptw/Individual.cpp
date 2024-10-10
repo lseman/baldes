@@ -26,11 +26,19 @@ void Individual::evaluateCompleteCost() {
         int time     = latestReleaseTime + distance;
         int waitTime = 0, timeWarp = 0;
 
-        if (time < params->cli[chromR[r][0]].earliestArrival) {
-            time = params->cli[chromR[r][0]].earliestArrival;
-        } else if (time > params->cli[chromR[r][0]].latestArrival) {
-            timeWarp += time - params->cli[chromR[r][0]].latestArrival;
-            time = params->cli[chromR[r][0]].latestArrival;
+        // Handle time windows if n_tw > 0
+        if (params->cli[chromR[r][0]].n_tw > 0) {
+            // Use multiple time windows
+            auto &firstTimeWindows = params->cli[chromR[r][0]].timeWindows;
+            time                   = adjustToTimeWindow(time, firstTimeWindows, waitTime, timeWarp);
+        } else {
+            // Single time window logic
+            if (time < params->cli[chromR[r][0]].earliestArrival) {
+                time = params->cli[chromR[r][0]].earliestArrival;
+            } else if (time > params->cli[chromR[r][0]].latestArrival) {
+                timeWarp += time - params->cli[chromR[r][0]].latestArrival;
+                time = params->cli[chromR[r][0]].latestArrival;
+            }
         }
 
         predecessors[chromR[r][0]] = 0;
@@ -42,12 +50,19 @@ void Individual::evaluateCompleteCost() {
             service += params->cli[curr].serviceDuration;
             time += params->cli[prev].serviceDuration + params->timeCost.get(prev, curr);
 
-            if (time < params->cli[curr].earliestArrival) {
-                waitTime += params->cli[curr].earliestArrival - time;
-                time = params->cli[curr].earliestArrival;
-            } else if (time > params->cli[curr].latestArrival) {
-                timeWarp += time - params->cli[curr].latestArrival;
-                time = params->cli[curr].latestArrival;
+            // Handle time windows if n_tw > 0
+            if (params->cli[curr].n_tw > 0) {
+                auto &currTimeWindows = params->cli[curr].timeWindows;
+                time                  = adjustToTimeWindow(time, currTimeWindows, waitTime, timeWarp);
+            } else {
+                // Single time window logic
+                if (time < params->cli[curr].earliestArrival) {
+                    waitTime += params->cli[curr].earliestArrival - time;
+                    time = params->cli[curr].earliestArrival;
+                } else if (time > params->cli[curr].latestArrival) {
+                    timeWarp += time - params->cli[curr].latestArrival;
+                    time = params->cli[curr].latestArrival;
+                }
             }
 
             predecessors[curr] = prev;
@@ -58,6 +73,7 @@ void Individual::evaluateCompleteCost() {
         distance += params->timeCost.get(chromR[r].back(), 0);
         time += params->cli[chromR[r].back()].serviceDuration + params->timeCost.get(chromR[r].back(), 0);
 
+        // Final depot logic (assuming depot time window)
         if (time > params->cli[0].latestArrival) {
             timeWarp += time - params->cli[0].latestArrival;
             time = params->cli[0].latestArrival;
@@ -75,6 +91,21 @@ void Individual::evaluateCompleteCost() {
                               myCostSol.timeWarp * params->penaltyTimeWarp +
                               myCostSol.waitTime * params->penaltyWaitTime;
     isFeasible = (myCostSol.capacityExcess < MY_EPSILON && myCostSol.timeWarp < MY_EPSILON);
+}
+
+// Helper function to adjust time based on multiple time windows
+int Individual::adjustToTimeWindow(int time, const std::vector<TimeWindow> &timeWindows, int &waitTime, int &timeWarp) {
+    for (const auto &window : timeWindows) {
+        if (time < window.earliestArrival) {
+            waitTime += window.earliestArrival - time;
+            return window.earliestArrival;
+        } else if (time <= window.latestArrival) {
+            return time;
+        }
+    }
+    // If no valid time window, apply time warp to the latest one
+    timeWarp += time - timeWindows.back().latestArrival;
+    return timeWindows.back().latestArrival;
 }
 
 void Individual::shuffleChromT() {

@@ -58,6 +58,14 @@ Params::Params(const InstanceData &instance) {
         cli[nbClients].earliestArrival = instance.window_open[i];
         cli[nbClients].latestArrival   = instance.window_close[i];
         cli[nbClients].serviceDuration = instance.service_time[i];
+        cli[nbClients].n_tw            = instance.n_tw[i];
+
+        if (instance.n_tw[i] > 0) {
+            for (int j = 0; j < instance.n_tw[i]; j++) {
+                cli[nbClients].timeWindows.push_back(
+                    TimeWindow(instance.time_windows[i][j].first, instance.time_windows[i][j].second));
+            }
+        }
 
         // Scale coordinates and times by a factor of 10
         cli[nbClients].coordX *= 10;
@@ -83,7 +91,8 @@ Params::Params(const InstanceData &instance) {
     // Set default fleet size if not provided by the user
     if (nbVehicles == INT_MAX) {
         nbVehicles = static_cast<int>(std::ceil(1.3 * totalDemand / vehicleCapacity) + 3.);
-        // std::cout << "----- FLEET SIZE WAS NOT SPECIFIED: DEFAULT INITIALIZATION TO " << nbVehicles << " VEHICLES"
+        // std::cout << "----- FLEET SIZE WAS NOT SPECIFIED: DEFAULT INITIALIZATION TO " << nbVehicles << "
+        // VEHICLES"
         //           << std::endl;
         // print_info("Fleet size was not specified: default initialization to {} vehicles \n", nbVehicles);
     } else {
@@ -271,7 +280,8 @@ Params::Params(const std::string &path_location) {
     if (inputFile.is_open()) {
         // Read and skip any metadata lines until we find the VEHICLE section
         while (getline(inputFile, content)) {
-            content.erase(std::remove(content.begin(), content.end(), '\r'), content.end()); // Remove any \r characters
+            content.erase(std::remove(content.begin(), content.end(), '\r'),
+                          content.end()); // Remove any \r characters
 
             // If the content includes VEHICLE, stop skipping lines
             if (content == "VEHICLE") { break; }
@@ -504,8 +514,8 @@ void Params::SetCorrelatedVertices() {
         // Loop over all clients (taking into account the max number of clients and the granular restriction)
         for (int j = 0; j < std::min(config.nbGranular, nbClients - 1); j++) {
             // If i is correlated with j, then j should be correlated with i (unless we have asymmetric problem with
-            // time windows) Insert vertices in setCorrelatedVertices, in the order of orderProximity, where .second is
-            // used since the first index correponds to the depot
+            // time windows) Insert vertices in setCorrelatedVertices, in the order of orderProximity, where .second
+            // is used since the first index correponds to the depot
             setCorrelatedVertices[i].insert(orderProximity[j].second);
 
             // For symmetric problems, set the other entry to the same value

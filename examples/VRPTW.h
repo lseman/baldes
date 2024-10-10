@@ -600,11 +600,6 @@ public:
 
         double gap = 1e-6;
 
-        bool s1    = true;
-        bool s2    = false;
-        bool s3    = false;
-        bool s4    = false;
-        bool s5    = false;
         bool ss    = false;
         int  stage = 1;
 
@@ -1067,5 +1062,180 @@ public:
         newProblem->instance = instance;
         newProblem->nodes    = nodes;
         return newProblem;
+    }
+
+    /**
+     * Column generation algorithm.
+     */
+    bool heuristicCG(BNBNode *node, int max_iter = 2000) {
+        node->relaxNode();
+        node->optimize();
+
+        relaxed_result = std::numeric_limits<double>::max();
+
+        // check if feasible
+        if (node->get(GRB_IntAttr_Status) != GRB_OPTIMAL) {
+            node->setPrune(true);
+            return false;
+        }
+
+        auto &matrix         = node->matrix;
+        auto &allPaths       = node->paths;
+        auto &branchingDuals = node->branchingDuals;
+
+        int bucket_interval = 20;
+        int time_horizon    = instance.T_max;
+
+        numConstrs                = node->get(GRB_IntAttr_NumConstrs);
+        node->numConstrs          = numConstrs;
+        std::vector<double> duals = std::vector<double>(numConstrs, 0.0);
+
+        // BucketGraph bucket_graph(nodes, time_horizon, bucket_interval, instance.q, bucket_interval);
+        BucketGraph bucket_graph(nodes, time_horizon, bucket_interval);
+
+        // print distance matrix size
+        bucket_graph.set_distance_matrix(instance.getDistanceMatrix(), 8);
+        bucket_graph.branching_duals = &branchingDuals;
+
+        // node->optimize();
+        matrix                 = node->extractModelDataSparse();
+        auto integer_solution  = node->get(GRB_DoubleAttr_ObjVal);
+        bucket_graph.incumbent = integer_solution;
+
+        auto allNodes = bucket_graph.getNodes();
+
+        std::vector<double> cutDuals;
+        std::vector<double> nodeDuals = node->getDuals();
+        auto                sizeDuals = nodeDuals.size();
+
+        double lp_obj_dual = 0.0;
+        double lp_obj      = node->get(GRB_DoubleAttr_ObjVal);
+
+        bucket_graph.setup();
+
+        double gap = 1e-6;
+
+        bool ss    = false;
+        int  stage = 1;
+
+        bool TRstop = false;
+
+        bool misprice = true;
+
+        double lag_gap = std::numeric_limits<double>::max();
+
+        auto                 inner_obj = 0.0;
+        std::vector<Label *> paths;
+        std::vector<double>  solution;
+        bool                 can_add = true;
+
+#ifdef STAB
+        Stabilization stab(0.9, nodeDuals);
+#endif
+        bool changed = false;
+
+        bool transition = false;
+
+        bool   rcc         = false;
+        bool   reoptimized = false;
+        double obj;
+        auto   colAdded = 0;
+
+        auto &r1c = node->r1c;
+#ifdef RCC
+        auto &rccManager = node->rccManager;
+#endif
+
+#ifdef SRC
+        r1c              = LimitedMemoryRank1Cuts(allNodes);
+        CutStorage *cuts = &r1c.cutStorage;
+#endif
+
+#ifdef SRC
+        bucket_graph.cut_storage = cuts;
+#endif
+
+        for (int iter = 0; iter < max_iter; ++iter) {
+            reoptimized = false;
+
+#ifdef STAB
+            stab.update_stabilization_after_master_optim(nodeDuals);
+            misprice = true;
+            while (misprice) {
+                nodeDuals = stab.getStabDualSolAdvanced(nodeDuals);
+                solution  = node->extractSolution();
+#endif
+
+                bool integer = true;
+                // Check integrality of the solution
+                for (auto &sol : solution) {
+                    // NOTE: 1e-1 is not enough
+                    if (sol > 1e-2 && sol < 1 - 1e-2) {
+                        integer = false;
+                        break;
+                    }
+                }
+                if (integer) {
+                    if (lp_obj < integer_solution) {
+                        print_info("Updating integer solution to {}\n", lp_obj);
+                        integer_solution       = lp_obj;
+                        bucket_graph.incumbent = integer_solution;
+                    }
+                }
+
+                bucket_graph.relaxation = lp_obj;
+                bucket_graph.augment_ng_memories(solution, allPaths, true, 5, 100, 16, N_SIZE);
+
+                // Branching duals
+                if (branchingDuals.size() > 0) { branchingDuals.computeDuals(node->getModel()); }
+                bucket_graph.setDuals(nodeDuals);
+
+                //////////////////////////////////////////////////////////////////////
+                // CALLING BALDES
+                //////////////////////////////////////////////////////////////////////
+                paths     = bucket_graph.solveHeuristic();
+                inner_obj = paths[0]->cost;
+                stage     = bucket_graph.getStage();
+                ss        = bucket_graph.ss;
+                //////////////////////////////////////////////////////////////////////
+
+                // Adding cols
+                colAdded = addColumn(node, paths, false);
+
+#ifdef STAB
+                // TODO: check if we should update this before running the stab update
+                node->optimize();
+                lp_obj    = node->get(GRB_DoubleAttr_ObjVal);
+                nodeDuals = node->getDuals();
+
+                lag_gap          = integer_solution - (lp_obj + std::min(0.0, inner_obj));
+                bucket_graph.gap = lag_gap;
+
+                matrix = node->extractModelDataSparse();
+
+                stab.update_stabilization_after_pricing_optim(matrix, nodeDuals, lag_gap, paths);
+
+                if (colAdded == 0) {
+                    stab.update_stabilization_after_misprice();
+                    if (stab.shouldExit()) { misprice = false; }
+                } else {
+                    misprice = false;
+                }
+            }
+
+            if (bucket_graph.getStatus() == Status::Optimal && stab.shouldExit()) {
+                print_info("Optimal solution found\n");
+                break;
+            }
+
+            stab.update_stabilization_after_iter(nodeDuals);
+#endif
+        }
+        // bucket_graph.print_statistics();
+
+        node->optimize();
+        relaxed_result = node->get(GRB_DoubleAttr_ObjVal);
+
+        return true;
     }
 };

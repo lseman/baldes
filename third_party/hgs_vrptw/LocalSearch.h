@@ -80,7 +80,9 @@ struct Node {
     int deltaRemoval;              // Difference of cost in the current route if the node is removed (used in SWAP*)
     int deltaRemovalTW; // Difference of cost in the current route if the node is removed, including TimeWarp (used in
                         // SWAP*)
-    TimeWindowData twData;        // TimeWindowData for individual node (cour)
+    TimeWindowData              twData;     // TimeWindowData for individual node (cour)
+    std::vector<TimeWindowData> twDataList; // Time window data of the route
+
     TimeWindowData prefixTwData;  // TimeWindowData for subsequence (0...cour) including self
     TimeWindowData postfixTwData; // TimeWindowData for subsequence (cour...0) including self
     bool           isSeed;        // Tells whether a nextSeed is available (faster twData calculations)
@@ -90,11 +92,12 @@ struct Node {
 
 // This struct is used for grouping all node data that is relevant during the construction heuristics.
 struct NodeToInsert {
-    int            clientIdx;       // Index in the clients vector
-    int            load;            // Load of the node.
-    int            serviceDuration; // Service duration of the Node
-    double         angleFromDepot;  // The angle of the node relative to the depot (between -PI and PI)
-    TimeWindowData twData;          // TimeWindowData for the Node
+    int                         clientIdx;       // Index in the clients vector
+    int                         load;            // Load of the node.
+    int                         serviceDuration; // Service duration of the Node
+    double                      angleFromDepot;  // The angle of the node relative to the depot (between -PI and PI)
+    TimeWindowData              twData;          // TimeWindowData for the Node
+    std::vector<TimeWindowData> twDataList;      // TimeWindowData for the Node
 };
 
 // Structure used in SWAP* to remember the three best insertion positions of a client in a given route

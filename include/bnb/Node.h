@@ -306,6 +306,9 @@ public:
         child->paths             = paths;
         child->historyCandidates = historyCandidates;
         child->candidates        = candidates;
+        child->r1c               = r1c;
+        child->matrix            = matrix;
+        child->rccManager        = rccManager;
 
         // Add the child node to the list of children
         children.push_back(child);
