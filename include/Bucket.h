@@ -195,7 +195,7 @@ struct Bucket {
             labels_vec.insert(labels_vec.begin(), label); // Direct insertion at the beginning
         } else {
             auto it = std::lower_bound(labels_vec.begin(), labels_vec.end(), label,
-                                       [](const Label *a, const Label *b) { return a->cost > b->cost; });
+                                       [](const Label *a, const Label *b) { return a->cost < b->cost; });
             labels_vec.insert(it, label); // Insertion in the middle
         }
     }

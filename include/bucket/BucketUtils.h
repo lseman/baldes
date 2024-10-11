@@ -57,16 +57,40 @@ void BucketGraph::add_arc(int from_bucket, int to_bucket, const std::vector<doub
  */
 template <Direction D>
 inline int BucketGraph::get_bucket_number(int node, const std::vector<double> &resource_values_vec) noexcept {
+    const int num_intervals = MAIN_RESOURCES; // Number of resources
+    auto     &theNode       = nodes[node];    // Get the node
 
-    if constexpr (D == Direction::Forward) {
-        auto val = fw_node_interval_trees[node].query(resource_values_vec);
-        return val;
-    } else if constexpr (D == Direction::Backward) {
-        auto val = bw_node_interval_trees[node].query(resource_values_vec);
-        return val;
+    // Assume base_intervals have been precomputed and stored during bucket definition
+    auto &base_intervals    = assign_buckets<D>(fw_base_intervals, bw_base_intervals);
+    auto &num_buckets_index = assign_buckets<D>(num_buckets_index_fw, num_buckets_index_bw);
+
+    // Compute the multi-bucket case
+    int bucket_offset   = 0;
+    int cumulative_base = 1;
+
+    for (int r = 0; r < num_intervals; ++r) {
+        double value = resource_values_vec[r];
+
+        // Use lb for Forward, ub for Backward as reference points
+        double reference_point = (D == Direction::Forward) ? theNode.lb[r] : theNode.ub[r];
+
+        // Compute position of value in the current bucket range
+        int pos = (D == Direction::Forward) ? static_cast<int>((value - reference_point) / base_intervals[r])
+                                            : static_cast<int>((reference_point - value) / base_intervals[r]);
+
+        // Clamp position to ensure it stays within valid bounds
+        int max_pos = static_cast<int>((theNode.ub[r] - theNode.lb[r]) / base_intervals[r]);
+        pos         = std::clamp(pos, 0, max_pos);
+
+        // Combine position into the overall bucket offset
+        bucket_offset += pos * cumulative_base;
+
+        // Update cumulative base for the next resource
+        cumulative_base *= (max_pos + 1);
     }
-    std::throw_with_nested(std::runtime_error("BucketGraph::get_bucket_number: Invalid direction"));
-    return -1; // If no bucket is found
+
+    // Return the absolute bucket number
+    return num_buckets_index[node] + bucket_offset;
 }
 
 /**
@@ -82,10 +106,23 @@ void BucketGraph::define_buckets() {
     std::vector<double> total_ranges(num_intervals);
     std::vector<double> base_intervals(num_intervals);
 
+    // Ensure the base_intervals storage is resized for all nodes
+    if constexpr (D == Direction::Forward) {
+        fw_base_intervals.resize(num_intervals);
+    } else {
+        bw_base_intervals.resize(num_intervals);
+    }
+
     // Determine the base interval and other relevant values for each resource
     for (int r = 0; r < num_intervals; ++r) {
         total_ranges[r]   = R_max[r] - R_min[r];
         base_intervals[r] = total_ranges[r] / intervals[r].interval;
+    }
+
+    if constexpr (D == Direction::Forward) {
+        fw_base_intervals = base_intervals;
+    } else {
+        bw_base_intervals = base_intervals;
     }
 
     auto &buckets             = assign_buckets<D>(fw_buckets, bw_buckets);
@@ -98,6 +135,8 @@ void BucketGraph::define_buckets() {
 
     int cum_sum      = 0; // Tracks global bucket index
     int bucket_index = 0;
+
+    node_interval_trees.assign(nodes.size(), SplayTree());
 
     // Helper function to check if the node can fit in a single bucket
     auto fits_single_bucket = [&](const auto &node_total_ranges) {
@@ -116,7 +155,7 @@ void BucketGraph::define_buckets() {
         if (fits_single_bucket(node_total_ranges)) {
             // Single bucket case
             buckets[bucket_index] = Bucket(VRPNode.id, VRPNode.lb, VRPNode.ub);
-            node_tree.insert(VRPNode.lb, VRPNode.ub, bucket_index);
+            // node_tree.insert(VRPNode.lb, VRPNode.ub, bucket_index);
 
             num_buckets[VRPNode.id]       = 1;
             num_buckets_index[VRPNode.id] = cum_sum;
@@ -143,12 +182,12 @@ void BucketGraph::define_buckets() {
                 buckets[bucket_index] = Bucket(VRPNode.id, interval_start, interval_end);
 
                 std::vector<double> interval_adjusted(interval_start.size());
-                for (int r = 0; r < interval_start.size(); ++r) {
-                    interval_adjusted[r] = (D == Direction::Forward) ? interval_start[r] + base_intervals[r]
-                                                                     : interval_end[r] - base_intervals[r];
-                }
-                node_tree.insert((D == Direction::Forward) ? interval_start : interval_adjusted,
-                                 (D == Direction::Forward) ? interval_adjusted : interval_end, bucket_index);
+                // for (int r = 0; r < interval_start.size(); ++r) {
+                //     interval_adjusted[r] = (D == Direction::Forward) ? interval_start[r] + base_intervals[r]
+                //                                                      : interval_end[r] - base_intervals[r];
+                // }
+                //  node_tree.insert((D == Direction::Forward) ? interval_start : interval_adjusted,
+                //                   (D == Direction::Forward) ? interval_adjusted : interval_end, bucket_index);
 
                 bucket_index++;
                 n_buckets++;
@@ -379,7 +418,7 @@ Label *BucketGraph::get_best_label(const std::vector<int> &topological_order, co
  *
  */
 template <Stage S>
-void BucketGraph::ConcatenateLabel(const Label *L, int &b, Label *&pbest, std::vector<uint64_t> &Bvisited) {
+void BucketGraph::ConcatenateLabel(const Label *L, int &b, Label *&pbest, gch::small_vector<uint64_t> &Bvisited) {
     // Use a vector for iterative processing as a stack
     std::vector<int> bucket_stack;
     bucket_stack.reserve(50);

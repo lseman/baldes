@@ -494,53 +494,54 @@ bool HGSLocalSearch::MoveSingleClient() {
 
     return true;
 }
-
 bool HGSLocalSearch::MoveTwoClients() {
     if (nodeU == nodeY || nodeV == nodeX || nodeX->isDepot) return false;
 
-    double costSuppU = params->timeCost.get(nodeUPrevIndex, nodeXNextIndex) -
-                       params->timeCost.get(nodeUPrevIndex, nodeUIndex) -
+    // Cache timeCost results
+    double costBeforeU = params->timeCost.get(nodeUPrevIndex, nodeXNextIndex);
+    double costBeforeV = params->timeCost.get(nodeVIndex, nodeYIndex);
+
+    double costSuppU = costBeforeU - params->timeCost.get(nodeUPrevIndex, nodeUIndex) -
                        params->timeCost.get(nodeXIndex, nodeXNextIndex);
-    double costSuppV = params->timeCost.get(nodeVIndex, nodeUIndex) + params->timeCost.get(nodeXIndex, nodeYIndex) -
-                       params->timeCost.get(nodeVIndex, nodeYIndex);
+    double costSuppV =
+        params->timeCost.get(nodeVIndex, nodeUIndex) + params->timeCost.get(nodeXIndex, nodeYIndex) - costBeforeV;
+
     TimeWindowData routeUTwData, routeVTwData;
 
     if (routeU != routeV) {
-        if (!routeULoadPenalty && !routeUTimeWarp && costSuppU + costSuppV > -MY_EPSILON) { return false; }
+        if (!routeULoadPenalty && !routeUTimeWarp && (costSuppU + costSuppV > -MY_EPSILON)) return false;
 
+        // Cache merged TW data
         routeUTwData = MergeTWDataRecursive(nodeU->prev->prefixTwData, nodeX->next->postfixTwData);
         routeVTwData = MergeTWDataRecursive(nodeV->prefixTwData, getEdgeTwData(nodeU, nodeX), nodeY->postfixTwData);
 
+        // Adjust costSuppU and costSuppV
         costSuppU +=
             penaltyExcessLoad(routeU->load - loadU - loadX) + penaltyTimeWindows(routeUTwData) - routeU->penalty;
-
         costSuppV +=
             penaltyExcessLoad(routeV->load + loadU + loadX) + penaltyTimeWindows(routeVTwData) - routeV->penalty;
     } else {
-        if (!routeUTimeWarp && costSuppU + costSuppV > -MY_EPSILON) { return false; }
+        if (!routeUTimeWarp && (costSuppU + costSuppV > -MY_EPSILON)) return false;
 
         // Move within the same route
         if (nodeU->position < nodeV->position) {
-            // Edge case V directly after U, so X == V is excluded, V directly after X so XNext == V works
-            // start - ... - UPrev - XNext - ... - V - U - X - Y - ... - end
             routeUTwData = MergeTWDataRecursive(nodeU->prev->prefixTwData, getRouteSegmentTwData(nodeX->next, nodeV),
                                                 getEdgeTwData(nodeU, nodeX), nodeY->postfixTwData);
         } else {
-            // Edge case U directly after V is excluded from beginning of function
-            // start - ... - V - U - X - Y - ... - UPrev - XNext - ... - end
             routeUTwData = MergeTWDataRecursive(nodeV->prefixTwData, getEdgeTwData(nodeU, nodeX),
                                                 getRouteSegmentTwData(nodeY, nodeU->prev), nodeX->next->postfixTwData);
         }
 
-        // Compute new total penalty
         costSuppU += penaltyExcessLoad(routeU->load) + penaltyTimeWindows(routeUTwData) - routeU->penalty;
     }
 
+    // Final cost comparison
     if (costSuppU + costSuppV > -MY_EPSILON) return false;
 
+    // Perform node insertion and update route data
     insertNode(nodeU, nodeV);
     insertNode(nodeX, nodeU);
-    nbMoves++; // Increment move counter before updating route data
+    nbMoves++;
     searchCompleted = false;
     updateRouteData(routeU);
     if (routeU != routeV) updateRouteData(routeV);
@@ -1201,21 +1202,21 @@ TimeWindowData HGSLocalSearch::getRouteSegmentTwData(Node *U, Node *V) {
     if (U->isDepot) return V->prefixTwData;
     if (V->isDepot) return U->postfixTwData;
 
-    // Struct so this makes a copy
-    TimeWindowData twData = U->twData;
+    TimeWindowData twData    = U->twData; // Retain initial twData from U
+    Node          *mynode    = U;
+    const int      targetPos = V->position;
 
-    Node     *mynode    = U;
-    const int targetPos = V->position;
-    while (!(mynode == V)) {
+    while (mynode != V) {
         if (mynode->isSeed && mynode->position + 4 <= targetPos) {
             twData = MergeTWDataRecursive(twData, mynode->toNextSeedTwD);
             mynode = mynode->nextSeed;
         } else {
-            mynode = mynode->next;
+            mynode = mynode->next; // Move to the next node
             twData = MergeTWDataRecursive(twData, mynode->twData);
         }
     }
-    return twData;
+
+    return twData; // Return the merged result
 }
 
 TimeWindowData HGSLocalSearch::MergeTWDataRecursive(const TimeWindowData &twData1, const TimeWindowData &twData2) {

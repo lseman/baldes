@@ -248,9 +248,6 @@ inline int VRPTW_read_instance(const std::string &file_name, InstanceData &insta
     if (!mtw) {
         while (myfile >> i >> xcoord[i] >> ycoord[i] >> instance.demand[i] >> instance.window_open[i] >>
                instance.window_close[i] >> instance.service_time[i]) {
-            fmt::print("i: {}, x: {}, y: {}, demand: {}, window_open: {}, window_close: {}, service_time: {}\n", i,
-                       xcoord[i], ycoord[i], instance.demand[i], instance.window_open[i], instance.window_close[i],
-                       instance.service_time[i]);
             instance.n_tw[i] = 0;
             // Check if we need to resize
             if (i >= instance.nN) {
@@ -372,10 +369,6 @@ inline int VRPTW_read_instance(const std::string &file_name, InstanceData &insta
         instance.window_open[i] *= 10;
         instance.window_close[i] *= 10;
         instance.service_time[i] *= 10;
-        // print window_open and window_close
-        fmt::print("i: {}, x: {}, y: {}, demand: {}, window_open: {}, window_close: {}, service_time: {}\n", i,
-                   instance.x_coord[i], instance.y_coord[i], instance.demand[i], instance.window_open[i],
-                   instance.window_close[i], instance.service_time[i]);
     }
 
     // Presolve for the time windows

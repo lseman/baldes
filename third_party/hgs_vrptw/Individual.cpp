@@ -116,12 +116,11 @@ void Individual::shuffleChromT() {
 }
 
 void Individual::removeProximity(Individual *indiv) {
-    // Get the first individual in indivsPerProximity
-    auto it = indivsPerProximity.begin();
-    // Loop over all individuals in indivsPerProximity until indiv is found
-    while (it->second != indiv) { ++it; }
-    // Remove indiv from indivsPerProximity
-    indivsPerProximity.erase(it);
+    // Find indiv in indivsPerProximity
+    auto it = std::find_if(indivsPerProximity.begin(), indivsPerProximity.end(),
+                           [indiv](const auto &pair) { return pair.second == indiv; });
+    // Remove if found
+    if (it != indivsPerProximity.end()) { indivsPerProximity.erase(it); }
 }
 
 double Individual::brokenPairsDistance(Individual *indiv2) {
@@ -146,65 +145,6 @@ double Individual::averageBrokenPairsDistanceClosest(int nbClosest) {
         ++it;
     }
     return result / maxSize;
-}
-
-void Individual::exportCVRPLibFormat(std::string fileName) {
-    std::cout << "----- WRITING SOLUTION WITH VALUE " << myCostSol.penalizedCost << " IN : " << fileName << std::endl;
-    std::ofstream myfile(fileName);
-    if (myfile.is_open()) {
-        for (int k = 0; k < params->nbVehicles; k++) {
-            if (!chromR[k].empty()) {
-                myfile << "Route #" << k + 1 << ":"; // Route IDs start at 1 in the file format
-                for (int i : chromR[k]) { myfile << " " << i; }
-                myfile << std::endl;
-            }
-        }
-        myfile << "Cost " << (int)myCostSol.penalizedCost << std::endl;
-        myfile << "Time " << params->getTimeElapsedSeconds() << std::endl;
-    } else
-        std::cout << "----- IMPOSSIBLE TO OPEN: " << fileName << std::endl;
-}
-
-void Individual::printCVRPLibFormat() {
-    std::cout << "----- PRINTING SOLUTION WITH VALUE " << myCostSol.penalizedCost << std::endl;
-    for (int k = 0; k < params->nbVehicles; k++) {
-        if (!chromR[k].empty()) {
-            std::cout << "Route #" << k + 1 << ":"; // Route IDs start at 1 in the file format
-            for (int i : chromR[k]) { std::cout << " " << i; }
-            std::cout << std::endl;
-        }
-    }
-    std::cout << "Cost " << (int)myCostSol.penalizedCost << std::endl;
-    std::cout << "Time " << params->getTimeElapsedSeconds() << std::endl;
-    fflush(stdout);
-}
-
-bool Individual::readCVRPLibFormat(std::string fileName, std::vector<std::vector<int>> &readSolution,
-                                   double &readCost) {
-    readSolution.clear();
-    std::ifstream inputFile(fileName);
-    if (inputFile.is_open()) {
-        std::string inputString;
-        inputFile >> inputString;
-        // Loops as long as the first line keyword is "Route"
-        for (int r = 0; inputString == "Route"; r++) {
-            readSolution.push_back(std::vector<int>());
-            inputFile >> inputString;
-            getline(inputFile, inputString);
-            std::stringstream ss(inputString);
-            int               inputCustomer;
-            // Loops as long as there is an integer to read
-            while (ss >> inputCustomer) { readSolution[r].push_back(inputCustomer); }
-            inputFile >> inputString;
-        }
-        if (inputString == "Cost") {
-            inputFile >> readCost;
-            return true;
-        } else
-            std::cout << "----- UNEXPECTED WORD IN SOLUTION FORMAT: " << inputString << std::endl;
-    } else
-        std::cout << "----- IMPOSSIBLE TO OPEN: " << fileName << std::endl;
-    return false;
 }
 
 Individual::Individual(Params *params, bool initializeChromTAndShuffle)

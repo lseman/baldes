@@ -129,21 +129,18 @@ public:
  * method. If the pool is full, a new label will be allocated.
  *
  */
+#include <deque>
+#include <memory_resource>
+
 class LabelPool {
 public:
     explicit LabelPool(size_t initial_pool_size, size_t max_pool_size = 5000000)
-        : pool_size(initial_pool_size), max_pool_size(max_pool_size) {
+        : pool_size(initial_pool_size), max_pool_size(max_pool_size),
+          pool(std::pmr::get_default_resource()) // Default memory resource
+    {
         allocate_labels(pool_size);
     }
-    /**
-     * @brief Acquires a Label object for use.
-     *
-     * This function retrieves a Label object from the pool of available labels if any are present.
-     * If the pool is empty, it creates a new Label object. The acquired Label is reset and moved
-     * to the in-use list.
-     *
-     * @return A pointer to the acquired Label object.
-     */
+
     Label *acquire() {
         if (!available_labels.empty()) {
             Label *new_label = available_labels.back();
@@ -153,71 +150,54 @@ public:
             return new_label;
         }
 
-        auto *new_label = new Label();
+        // Allocate label using the pool resource
+        auto *new_label = new (pool.allocate(sizeof(Label))) Label();
         in_use_labels.push_back(new_label);
         return new_label;
     }
 
-    // Reserve space in available_labels to prevent multiple reallocations
-    /**
-     * @brief Resets the state by moving all labels from in-use to available.
-     *
-     */
     void reset() {
-        // Reserve space in available_labels to prevent multiple reallocations
         available_labels.reserve(available_labels.size() + in_use_labels.size());
 
-        // Parallel reset of labels
-        // std::for_each(std::execution::par, in_use_labels.begin(), in_use_labels.end(), [](Label *label) {
-        //    label->reset(); // Reset each label in parallel
-        //});
-
-        // Move labels from in_use_labels to available_labels in bulk
         available_labels.insert(available_labels.end(), std::make_move_iterator(in_use_labels.begin()),
                                 std::make_move_iterator(in_use_labels.end()));
 
-        // Clear in-use labels after moving
         in_use_labels.clear();
     }
 
 private:
-    /**
-     * @brief Allocates a specified number of labels.
-     *
-     * This function reserves space for a given number of labels in the
-     * available_labels container and initializes each label by creating
-     * a new Label object.
-     *
-     */
     void allocate_labels(size_t count) {
         available_labels.reserve(count);
-        for (size_t i = 0; i < count; ++i) { available_labels.push_back(new Label()); }
+        for (size_t i = 0; i < count; ++i) { available_labels.push_back(new (pool.allocate(sizeof(Label))) Label()); }
     }
 
-    /**
-     * @brief Cleans up and deallocates memory for all labels and states.
-     *
-     * This function iterates through the containers `available_labels`,
-     * `in_use_labels`, and `deleted_states`, deleting each label and
-     * clearing the containers to free up memory.
-     */
     void cleanup() {
-        for (auto &label : available_labels) { delete label; }
+        for (auto &label : available_labels) {
+            label->~Label();
+            pool.deallocate(label, sizeof(Label));
+        }
         available_labels.clear();
 
-        for (auto &label : in_use_labels) { delete label; }
+        for (auto &label : in_use_labels) {
+            label->~Label();
+            pool.deallocate(label, sizeof(Label));
+        }
         in_use_labels.clear();
 
-        for (auto &label : deleted_states) { delete label; }
+        for (auto &label : deleted_states) {
+            label->~Label();
+            pool.deallocate(label, sizeof(Label));
+        }
         deleted_states.clear();
     }
 
     size_t pool_size;
     size_t max_pool_size;
 
-    std::vector<Label *> available_labels; // Labels ready to be acquired
-    std::vector<Label *> in_use_labels;    // Labels currently in use
-    std::deque<Label *>  deleted_states;   // Labels available for recycling
+    std::pmr::unsynchronized_pool_resource pool;                    // Memory pool
+    std::pmr::vector<Label *>              available_labels{&pool}; // Labels ready to be acquired
+    std::pmr::vector<Label *>              in_use_labels{&pool};    // Labels currently in use
+    std::vector<Label *>                   deleted_states;          // Labels available for recycling
 };
 
 /**

@@ -34,7 +34,7 @@
  */
 template <Direction D>
 void BucketGraph::UpdateBucketsSet(const double theta, const Label *label, ankerl::unordered_dense::set<int> &Bbidi,
-                                   int &current_bucket, ankerl::unordered_dense::set<int> &Bvisited) {
+                                   int &current_bucket, std::vector<uint64_t> &Bvisited) {
     // Precompute values and assign references for the direction-specific data
     auto &Phi_opposite     = assign_buckets<D>(Phi_bw, Phi_fw);
     auto &buckets_opposite = assign_buckets<D>(bw_buckets, fw_buckets);
@@ -56,7 +56,9 @@ void BucketGraph::UpdateBucketsSet(const double theta, const Label *label, anker
     while (!bucket_stack.empty()) {
         int curr_bucket = bucket_stack.back();
         bucket_stack.pop_back();
-        Bvisited.insert(curr_bucket); // Mark the current bucket as visited
+        const size_t segment      = curr_bucket >> 6; // Determine the segment for the current bucket
+        const size_t bit_position = curr_bucket & 63; // Determine the bit position within the segment
+        Bvisited[segment] |= (1ULL << bit_position);  // Set the bit corresponding to the current bucket as visited
 
         const int    bucketLprimenode = buckets_opposite[curr_bucket].node_id;
         const double cost             = getcij(bucketLnode, bucketLprimenode);
@@ -89,7 +91,11 @@ void BucketGraph::UpdateBucketsSet(const double theta, const Label *label, anker
 
         // Add neighboring buckets to the stack, only if not visited
         for (int b_prime : Phi_opposite[curr_bucket]) {
-            if (Bvisited.insert(b_prime).second) { bucket_stack.push_back(b_prime); }
+            const size_t segment_prime      = b_prime >> 6; // Determine the segment for the neighboring bucket
+            const size_t bit_position_prime = b_prime & 63; // Determine the bit position within the segment
+
+            // If the neighboring bucket hasn't been visited, push it onto the stack
+            if ((Bvisited[segment_prime] & (1ULL << bit_position_prime)) == 0) { bucket_stack.push_back(b_prime); }
         }
     }
 }
@@ -130,12 +136,14 @@ void BucketGraph::BucketArcElimination(double theta) {
                 auto arc_key    = std::make_pair(std::make_pair(a.base_bucket, a.jump_bucket), b);
                 int  b_opposite = get_opposite_bucket_number<D>(a.jump_bucket);
 
-                ankerl::unordered_dense::set<int> Bvisited;
-                auto                             &Bidi_map = local_B_Ba_b[arc_key];
+                const size_t          n_segments = buckets_size / 64 + 1;
+                std::vector<uint64_t> Bvisited(n_segments, 0);
+
+                auto &Bidi_map = local_B_Ba_b[arc_key];
 
                 for (auto &L_item : labels) {
                     Bidi_map.insert(b);
-                    Bvisited.clear();
+                    std::memset(Bvisited.data(), 0, Bvisited.size() * sizeof(uint64_t));
                     UpdateBucketsSet<D>(theta, L_item, Bidi_map, b_opposite, Bvisited);
                 }
             }
@@ -152,12 +160,14 @@ void BucketGraph::BucketArcElimination(double theta) {
                 std::make_pair(std::make_pair(buckets[a.from_bucket].node_id, buckets[a.to_bucket].node_id), b);
             int b_opposite = get_opposite_bucket_number<D>(a.to_bucket);
 
-            ankerl::unordered_dense::set<int> Bvisited;
-            auto                             &Bidi_map = local_B_Ba_b[arc_key];
+            const size_t          n_segments = buckets_size / 64 + 1;
+            std::vector<uint64_t> Bvisited(n_segments, 0);
+
+            auto &Bidi_map = local_B_Ba_b[arc_key];
 
             for (auto &L_item : labels) {
                 Bidi_map.insert(b);
-                Bvisited.clear();
+                std::memset(Bvisited.data(), 0, Bvisited.size() * sizeof(uint64_t));
                 UpdateBucketsSet<D>(theta, L_item, Bidi_map, b_opposite, Bvisited);
             }
 
