@@ -270,7 +270,6 @@ set(FPSOURCE
 
 set(IPM_SOURCES src/IPSolver.cpp)
 set(SRC_SOURCES src/SRC.cpp)
-set(RIH_SOURCES src/RIH.cpp)
 
 # Define a list for the source files that will be included
 set(EXECUTABLE_SOURCES ${SOURCES} ${HGS_SOURCES} ${FPSOURCE})
@@ -289,11 +288,6 @@ endif()
 if(SRC)
   message(STATUS "SRC is set, adding SRC_SOURCES.")
   list(APPEND EXECUTABLE_SOURCES ${SRC_SOURCES})
-endif()
-
-if(RIH)
-  message(STATUS "RIH is set, adding RIH_SOURCES.")
-  list(APPEND EXECUTABLE_SOURCES ${RIH_SOURCES})
 endif()
 
 # Add the executable with the combined sources

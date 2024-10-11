@@ -106,6 +106,61 @@ public:
 
     // Constructor: create an empty individual
     Individual();
+
+    bool is_time_window_feasible(int customer, const std::vector<int> &route, const Params &params) {
+        double arrival_time = 0.0;
+
+        // Initial vehicle departure time
+        arrival_time = params.cli[0].earliestArrival; // assuming depot has readyTime as start
+
+        // Compute the arrival times at each customer in the route
+        for (int i = 0; i < route.size(); ++i) {
+            int    current_customer = route[i];
+            double travel_time      = params.timeCost[customer][current_customer];
+
+            // Update arrival time
+            arrival_time += travel_time;
+
+            // Check if arrival time exceeds the latest allowable time window for this customer
+            if (arrival_time > params.cli[current_customer].latestArrival) { return false; }
+
+            // If arrival is too early, wait until the customer's readyTime
+            if (arrival_time < params.cli[current_customer].earliestArrival) {
+                arrival_time = params.cli[current_customer].earliestArrival;
+            }
+
+            // Add service time at the current customer
+            arrival_time += params.cli[current_customer].serviceDuration;
+        }
+
+        return true;
+    }
+
+    void update_arrival_times(const std::vector<int> &route, std::vector<double> &arrival_times, const Params &params) {
+        if (arrival_times.size() < route.size()) { arrival_times.resize(route.size()); }
+
+        double arrival_time = params.cli[0].earliestArrival; // Start from the depot
+
+        for (int i = 0; i < route.size(); ++i) {
+            int current_customer = route[i];
+
+            // Compute travel time from the previous customer (or depot)
+            double travel_time =
+                (i == 0) ? params.timeCost[0][current_customer] : params.timeCost[route[i - 1]][current_customer];
+            arrival_time += travel_time;
+
+            // Check if we arrive too early, and adjust arrival time accordingly
+            if (arrival_time < params.cli[current_customer].earliestArrival) {
+                arrival_time = params.cli[current_customer].earliestArrival;
+            }
+
+            // Update the arrival time for this customer
+            arrival_times[i] = arrival_time;
+
+            // Add service time at the current customer
+            arrival_time += params.cli[current_customer].serviceDuration;
+        }
+    }
 };
 
 #endif

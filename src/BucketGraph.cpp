@@ -772,69 +772,6 @@ bool BucketGraph::BucketSetContains(const std::set<int> &bucket_set, const int &
     return bucket_set.find(bucket) != bucket_set.end();
 }
 
-#ifdef RIH
-/** Async RIH Processing
- * @brief Performs the RIH processing asynchronously.
- * @param initial_labels The initial labels to start the processing with.
- * @param LABELS_MAX The maximum number of labels to keep.
- */
-void BucketGraph::async_rih_processing(std::vector<Label *> initial_labels, int LABELS_MAX) {
-    merged_labels_rih.clear();
-    const int                                                           LABELS_MAX_RIH = 10;
-    std::priority_queue<Label *, std::vector<Label *>, LabelComparator> best_labels_in;
-    std::priority_queue<Label *, std::vector<Label *>, LabelComparator> best_labels_out;
-
-    for (auto &label : initial_labels) {
-        best_labels_in.push(label);
-        if (best_labels_in.size() >= LABELS_MAX) break;
-    }
-
-    // RIH2, RIH3 etc. processing here...
-    RIH2(best_labels_in, best_labels_out, LABELS_MAX);
-
-    while (!best_labels_out.empty()) {
-        best_labels_in.push(best_labels_out.top());
-        best_labels_out.pop();
-    }
-
-    RIH1(best_labels_in, best_labels_out, LABELS_MAX);
-
-    while (!best_labels_out.empty()) {
-        best_labels_in.push(best_labels_out.top());
-        best_labels_out.pop();
-    }
-
-    RIH4(best_labels_in, best_labels_out, LABELS_MAX);
-
-    while (!best_labels_out.empty()) {
-        best_labels_in.push(best_labels_out.top());
-        best_labels_out.pop();
-    }
-
-    RIH3(best_labels_in, best_labels_out, LABELS_MAX);
-    /*
-    while (!best_labels_out.empty()) {
-        best_labels_in.push(best_labels_out.top());
-        best_labels_out.pop();
-    }
-    */
-
-    // RIH5(best_labels_in, best_labels_out, LABELS_MAX);
-
-    // After processing, populate the merged_labels_improved vector
-    while (!best_labels_out.empty()) {
-        merged_labels_rih.push_back(best_labels_out.top());
-        best_labels_out.pop();
-    }
-
-    if (merged_labels_rih.size() > LABELS_MAX_RIH) { merged_labels_rih.resize(LABELS_MAX_RIH); }
-
-    // Sort or further process if needed
-    pdqsort(merged_labels_rih.begin(), merged_labels_rih.end(),
-            [](const Label *a, const Label *b) { return a->cost < b->cost; });
-}
-#endif
-
 /**
  * @brief Prints the statistics of the bucket graph.
  *

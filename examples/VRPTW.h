@@ -620,9 +620,12 @@ public:
         Stabilization stab(0.9, nodeDuals);
 #endif
 
+#ifdef RIH
         IteratedLocalSearch ils(instance);
         bucket_graph.ils = &ils;
-        bool changed     = false;
+#endif
+
+        bool changed = false;
 
         print_info("Starting column generation..\n\n");
         bool transition = false;
@@ -911,12 +914,6 @@ public:
                 // Adding schrodinger paths
                 auto sch_paths = bucket_graph.getSchrodinger();
                 colAdded += addPath(node, sch_paths, true);
-#endif
-
-#ifdef RIH
-                auto rih_paths = bucket_graph.get_rih_labels();
-                colAdded += addColumn(node, rih_paths, true);
-
 #endif
 
 #ifdef STAB

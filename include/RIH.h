@@ -48,8 +48,8 @@ public:
      * no changes are made and the original routes are returned.
      *
      */
-    static std::pair<std::vector<int>, std::vector<int>> relocate_star(const std::vector<int> &route1,
-                                                                       const std::vector<int> &route2, int i, int j) {
+    std::pair<std::vector<int>, std::vector<int>> relocate_star(const std::vector<int> &route1,
+                                                                const std::vector<int> &route2, int i, int j) {
         // Relocate customer at position i in route1 to position j in route2
         if (i == 0 || i == route1.size() - 1 || j == 0 || j == route2.size() - 1) {
             return {route1, route2}; // No changes if depots are involved
@@ -73,8 +73,8 @@ public:
      * no changes are made to avoid swapping depot nodes.
      *
      */
-    static std::pair<std::vector<int>, std::vector<int>> enhanced_swap(const std::vector<int> &route1,
-                                                                       const std::vector<int> &route2, int i, int j) {
+    std::pair<std::vector<int>, std::vector<int>> enhanced_swap(const std::vector<int> &route1,
+                                                                const std::vector<int> &route2, int i, int j) {
         // Swap segments of varying lengths between two routes
         if (i == 0 || i == route1.size() - 1 || j == 0 || j == route2.size() - 1) {
             return {route1, route2}; // No changes if depots are selected
@@ -98,8 +98,8 @@ public:
      * crossover points.
      *
      */
-    static std::pair<std::vector<int>, std::vector<int>> cross(const std::vector<int> &route1,
-                                                               const std::vector<int> &route2, int k, int l) {
+    std::pair<std::vector<int>, std::vector<int>> cross(const std::vector<int> &route1, const std::vector<int> &route2,
+                                                        int k, int l) {
         // Ensure we don't cross depots (first and last elements)
         if (k == 0 || k == route1.size() - 1 || l == 0 || l == route2.size() - 1) {
             return {route1, route2}; // No changes if depots are selected
@@ -123,8 +123,8 @@ public:
      * depots (first and last positions) are not involved in the insertion process.
      *
      */
-    static std::pair<std::vector<int>, std::vector<int>> insertion(const std::vector<int> &route1,
-                                                                   const std::vector<int> &route2, int k, int l) {
+    std::pair<std::vector<int>, std::vector<int>> insertion(const std::vector<int> &route1,
+                                                            const std::vector<int> &route2, int k, int l) {
         // Ensure we are not moving or inserting into depots
         if (k == 0 || k == route1.size() - 1 || l == 0 || l == route2.size() - 1) {
             return {route1, route2}; // No changes if depots are involved
@@ -151,8 +151,8 @@ public:
      * are not swapped.
      *
      */
-    static std::pair<std::vector<int>, std::vector<int>> swap(const std::vector<int> &route1,
-                                                              const std::vector<int> &route2, int k, int l) {
+    std::pair<std::vector<int>, std::vector<int>> swap(const std::vector<int> &route1, const std::vector<int> &route2,
+                                                       int k, int l) {
         // Ensure we are not swapping depots
         if (k == 0 || k == route1.size() - 1 || l == 0 || l == route2.size() - 1) {
             return {route1, route2}; // No changes if depots are selected
@@ -167,10 +167,119 @@ public:
         return {new_route1, new_route2};
     }
 
+    /**
+     * @brief Swaps sequences of customers between two routes and inserts them at optimal positions.
+     *
+     * This operator swaps a chain of 2 or 3 consecutive customers between two routes, and inserts
+     * each chain into the best possible position in the opposite route, ensuring depots are not involved.
+     */
+    std::pair<std::vector<int>, std::vector<int>> extended_swap_star(const std::vector<int> &route1,
+                                                                     const std::vector<int> &route2, int i, int j,
+                                                                     int chain_length = 2) {
+        // Ensure we are not swapping depot nodes or exceeding bounds
+        if (i == 0 || i + chain_length > route1.size() - 1 || j == 0 || j + chain_length > route2.size() - 1) {
+            return {route1, route2}; // No changes if depots or out-of-bound indices are involved
+        }
+
+        // Swap a chain of customers between route1 and route2
+        std::vector<int> new_route1 = route1;
+        std::vector<int> new_route2 = route2;
+
+        // Extract the chains of customers
+        std::vector<int> chain1(new_route1.begin() + i, new_route1.begin() + i + chain_length);
+        std::vector<int> chain2(new_route2.begin() + j, new_route2.begin() + j + chain_length);
+
+        // Remove the chains from their respective routes
+        new_route1.erase(new_route1.begin() + i, new_route1.begin() + i + chain_length);
+        new_route2.erase(new_route2.begin() + j, new_route2.begin() + j + chain_length);
+
+        // Insert the chains at the best positions in the opposite routes
+        auto best_pos_route1 = find_best_insertion_position(new_route1, chain2);
+        auto best_pos_route2 = find_best_insertion_position(new_route2, chain1);
+
+        new_route1.insert(new_route1.begin() + best_pos_route1, chain2.begin(), chain2.end());
+        new_route2.insert(new_route2.begin() + best_pos_route2, chain1.begin(), chain1.end());
+
+        return {new_route1, new_route2};
+    }
+
+    /**
+     * @brief Finds the best position to insert a chain of customers into a route.
+     *
+     * This helper function evaluates the cost of inserting a chain into each possible position
+     * in the route and returns the index of the best insertion point.
+     */
+    int find_best_insertion_position(const std::vector<int> &route, const std::vector<int> &chain) {
+        int    best_pos  = 1;
+        double best_cost = std::numeric_limits<double>::max();
+
+        // Iterate over each possible insertion point (ignoring depot nodes)
+        for (int pos = 1; pos < route.size(); ++pos) {
+            std::vector<int> new_route = route;
+            new_route.insert(new_route.begin() + pos, chain.begin(), chain.end());
+
+            // Compute the cost of this insertion
+            double cost = this->compute_cost(new_route).second;
+
+            if (cost < best_cost) {
+                best_cost = cost;
+                best_pos  = pos;
+            }
+        }
+        return best_pos;
+    }
+
+    /**
+     * @brief Relocates a sequence of customers from one route to another.
+     *
+     * This operator moves a chain of 2 or 3 consecutive customers from one route
+     * to another. The depots (first and last elements) are not involved.
+     */
+    std::pair<std::vector<int>, std::vector<int>> extended_relocate_star(const std::vector<int> &route1,
+                                                                         const std::vector<int> &route2, int i, int j,
+                                                                         int chain_length = 2) {
+        // Ensure we are not relocating depot nodes or exceeding bounds
+        if (i == 0 || i + chain_length > route1.size() - 1 || j == 0 || j == route2.size() - 1) {
+            return {route1, route2}; // No changes if depots or out-of-bound indices are involved
+        }
+
+        // Relocate a chain of customers from route1 to route2
+        std::vector<int> new_route1 = route1;
+        std::vector<int> new_route2 = route2;
+
+        // Extract the chain of customers to relocate
+        std::vector<int> chain(new_route1.begin() + i, new_route1.begin() + i + chain_length);
+
+        // Remove the chain from route1
+        new_route1.erase(new_route1.begin() + i, new_route1.begin() + i + chain_length);
+
+        // Insert the chain into route2 at position j
+        new_route2.insert(new_route2.begin() + j, chain.begin(), chain.end());
+
+        return {new_route1, new_route2};
+    }
+
+    ///////////////////////////////////////
+    // End operators
+    ///////////////////////////////////////
     // Adaptive operator selection
     std::vector<std::function<std::pair<std::vector<int>, std::vector<int>>(const std::vector<int> &,
                                                                             const std::vector<int> &, int, int)>>
-        operators = {cross, insertion, swap, relocate_star, enhanced_swap};
+        operators = {[this](const std::vector<int> &route1, const std::vector<int> &route2, int k, int l) {
+                         return this->cross(route1, route2, k, l);
+                     },
+                     [this](const std::vector<int> &route1, const std::vector<int> &route2, int k, int l) {
+                         return this->insertion(route1, route2, k, l);
+                     },
+                     [this](const std::vector<int> &route1, const std::vector<int> &route2, int k, int l) {
+                         return this->swap(route1, route2, k, l);
+                     },
+                     [this](const std::vector<int> &route1, const std::vector<int> &route2, int k, int l) {
+                         return this->extended_relocate_star(route1, route2, k, l);
+                     },
+                     [this](const std::vector<int> &route1, const std::vector<int> &route2, int k, int l) {
+                         return this->enhanced_swap(route1, route2, k, l);
+                     }};
 
     std::vector<double> operator_weights      = {1.0, 1.0, 1.0}; // Start with equal weights
     std::vector<double> operator_improvements = {0.0, 0.0, 0.0};
@@ -199,6 +308,9 @@ public:
         }
     }
 
+    exec::static_thread_pool            pool  = exec::static_thread_pool(5);
+    exec::static_thread_pool::scheduler sched = pool.get_scheduler();
+
     std::vector<Label *> perturbation(const std::vector<Label *> &paths, std::vector<VRPNode> &nodes) {
         this->nodes               = nodes;
         std::vector<Label *> best = paths;
@@ -208,7 +320,9 @@ public:
 
         std::vector<double> best_costs(paths.size(), std::numeric_limits<double>::max());
 
-        // Parallelization of outer loops using std::execution::par
+        // Store tasks for parallel processing
+        std::vector<std::tuple<const Label *, const Label *, size_t, size_t>> tasks;
+
         for (const Label *label_i : best) {
             for (const Label *label_j : best) {
                 if (label_i == label_j) continue;
@@ -218,51 +332,79 @@ public:
                 if (route_i.size() < 3 || route_j.size() < 3) continue;
 
                 for (size_t k = 1; k < route_i.size() - 1; ++k) {
-                    for (size_t l = 1; l < route_j.size() - 1; ++l) {
-                        int op_idx                      = select_operator(rng); // Select operator based on weights
-                        auto [new_route_i, new_route_j] = operators[op_idx](route_i, route_j, k, l);
-                        if (new_route_i.empty() || new_route_j.empty()) continue;
+                    for (size_t l = 1; l < route_j.size() - 1; ++l) { tasks.emplace_back(label_i, label_j, k, l); }
+                }
+            }
+        }
 
-                        auto cost_i     = compute_cost(new_route_i);
-                        auto cost_j     = compute_cost(new_route_j);
-                        Path new_path_i = Path{new_route_i, cost_i.first};
-                        Path new_path_j = Path{new_route_j, cost_j.first};
+        // Parallelize the task processing
+        std::mutex best_new_mutex; // Mutex to protect access to best_new and operator_improvements
+        std::mutex operator_mutex; // Mutex to protect operator improvements
 
-                        if (is_feasible(new_path_i) && is_feasible(new_path_j)) {
-                            double new_cost     = cost_i.second + cost_j.second;
-                            double current_cost = label_i->cost + label_j->cost;
+        // Define chunk size to balance load
+        const int chunk_size = 1; // Adjust chunk size based on performance experiments
 
-                            if (new_cost < current_cost) {
-                                // Update operator performance
+        // Parallel execution in chunks
+        auto bulk_sender = stdexec::bulk(
+            stdexec::just(), (tasks.size() + chunk_size - 1) / chunk_size,
+            [&best_new, &best_new_mutex, &operator_mutex, &tasks, chunk_size, &rng, this](std::size_t chunk_idx) {
+                size_t start_idx = chunk_idx * chunk_size;
+                size_t end_idx   = std::min(start_idx + chunk_size, tasks.size());
+
+                for (size_t task_idx = start_idx; task_idx < end_idx; ++task_idx) {
+                    const auto &[label_i, label_j, k, l] = tasks[task_idx];
+                    const auto &route_i                  = label_i->nodes_covered;
+                    const auto &route_j                  = label_j->nodes_covered;
+
+                    int op_idx                      = select_operator(rng); // Select operator based on weights
+                    auto [new_route_i, new_route_j] = operators[op_idx](route_i, route_j, k, l);
+                    if (new_route_i.empty() || new_route_j.empty()) continue;
+
+                    auto cost_i     = compute_cost(new_route_i);
+                    auto cost_j     = compute_cost(new_route_j);
+                    Path new_path_i = Path{new_route_i, cost_i.first};
+                    Path new_path_j = Path{new_route_j, cost_j.first};
+
+                    if (is_feasible(new_path_i) && is_feasible(new_path_j)) {
+                        double new_cost     = cost_i.second + cost_j.second;
+                        double current_cost = label_i->cost + label_j->cost;
+
+                        if (new_cost < current_cost) {
+                            // Lock to update operator performance and best_new
+                            {
+                                std::lock_guard<std::mutex> lock(operator_mutex);
                                 operator_improvements[op_idx] += current_cost - new_cost;
+                            }
 
-                                // Update best solution
-                                auto best_new_i_label           = new Label();
-                                best_new_i_label->nodes_covered = new_path_i.route;
-                                best_new_i_label->real_cost     = cost_i.first;
-                                best_new_i_label->cost          = cost_i.second;
+                            auto best_new_i_label           = new Label();
+                            best_new_i_label->nodes_covered = new_path_i.route;
+                            best_new_i_label->real_cost     = cost_i.first;
+                            best_new_i_label->cost          = cost_i.second;
 
-                                auto best_new_j_label           = new Label();
-                                best_new_j_label->nodes_covered = new_path_j.route;
-                                best_new_j_label->real_cost     = cost_j.first;
-                                best_new_j_label->cost          = cost_j.second;
+                            auto best_new_j_label           = new Label();
+                            best_new_j_label->nodes_covered = new_path_j.route;
+                            best_new_j_label->real_cost     = cost_j.first;
+                            best_new_j_label->cost          = cost_j.second;
 
+                            {
+                                std::lock_guard<std::mutex> lock(best_new_mutex);
                                 best_new.push_back(best_new_i_label);
                                 best_new.push_back(best_new_j_label);
-
-                                is_stuck = false;
                             }
                         }
                     }
                 }
-            }
-        }
+            });
+
+        // Submit work to the thread pool
+        auto work = stdexec::starts_on(sched, bulk_sender);
+        stdexec::sync_wait(std::move(work));
 
         // Update operator weights based on performance
         update_operator_weights();
 
         // Sort and limit to top solutions
-        std::sort(best_new.begin(), best_new.end(), [](const Label *a, const Label *b) { return a->cost < b->cost; });
+        pdqsort(best_new.begin(), best_new.end(), [](const Label *a, const Label *b) { return a->cost < b->cost; });
         if (best_new.size() > 5) { best_new.erase(best_new.begin() + 5, best_new.end()); }
 
         return best_new;

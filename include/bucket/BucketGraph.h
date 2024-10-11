@@ -320,8 +320,6 @@ public:
     exec::static_thread_pool            bi_pool  = exec::static_thread_pool(2);
     exec::static_thread_pool::scheduler bi_sched = bi_pool.get_scheduler();
 
-    // exec::static_thread_pool            cat_pool        = exec::static_thread_pool(4);
-    // exec::static_thread_pool::scheduler cat_sched       = cat_pool.get_scheduler();
     int fw_buckets_size = 0;
     int bw_buckets_size = 0;
 
@@ -473,33 +471,6 @@ public:
         if (negative_cost_paths.size() > N_ADD) { negative_cost_paths.resize(N_ADD); }
         return negative_cost_paths;
     }
-#endif
-
-#ifdef RIH
-    int RIH1(std::priority_queue<Label *, std::vector<Label *>, LabelComparator> &best_labels_in,
-             std::priority_queue<Label *, std::vector<Label *>, LabelComparator> &best_labels_out, int max_n_labels);
-
-    int RIH2(std::priority_queue<Label *, std::vector<Label *>, LabelComparator> &best_labels_in,
-             std::priority_queue<Label *, std::vector<Label *>, LabelComparator> &best_labels_out, int max_n_labels);
-
-    int RIH3(std::priority_queue<Label *, std::vector<Label *>, LabelComparator> &best_labels_in,
-             std::priority_queue<Label *, std::vector<Label *>, LabelComparator> &best_labels_out, int max_n_labels);
-
-    int RIH4(std::priority_queue<Label *, std::vector<Label *>, LabelComparator> &best_labels_in,
-             std::priority_queue<Label *, std::vector<Label *>, LabelComparator> &best_labels_out, int max_n_labels);
-
-    int RIH5(std::priority_queue<Label *, std::vector<Label *>, LabelComparator> &best_labels_in,
-             std::priority_queue<Label *, std::vector<Label *>, LabelComparator> &best_labels_out, int max_n_labels);
-
-    inline std::vector<size_t> findBestInsertionPositions(const std::vector<int> &route, int &customer);
-
-    double calculateInsertionCost(const std::vector<int> &route, int &customer, size_t pos);
-    void   performSwap(std::vector<int> &new_route, const std::vector<int> &current_route, size_t pos_i, size_t pos_j,
-                       size_t best_pos_v, size_t best_pos_v_prime);
-
-    std::vector<Label *> get_rih_labels() const { return merged_labels_rih; }
-    void                 async_rih_processing(std::vector<Label *> initial_labels, int LABELS_MAX);
-
 #endif
 
     // define default
