@@ -127,16 +127,20 @@ public:
      * @return The generated UUID as a string.
      */
     std::string generateUUID() {
-        std::random_device              rd;
-        std::mt19937                    gen(rd());
-        std::uniform_int_distribution<> dis(0, 15);
-        std::stringstream               ss;
+        // Create an instance of Xoroshiro128Plus with a seed
+        Xoroshiro128Plus rng(42); // You can use any seed you prefer
+
+        std::stringstream ss;
         ss << std::hex;
+
+        // Generate 8 random hexadecimal characters (0-15)
         for (int i = 0; i < 8; i++) {
-            int number = dis(gen);
+            // Generate a random number between 0 and 15 by taking the result of rng() % 16
+            int number = rng() % 16;
             ss << number;
         }
-        uuid = ss.str();
+
+        std::string uuid = ss.str();
         return uuid;
     }
 

@@ -205,7 +205,37 @@ public:
                 feasibleRoutes.push_back(route);
             }
         }
-        //}
+
+        return feasibleRoutes;
+    }
+
+    std::vector<std::vector<int>> extractTopBestFeasibleRoutes(int n) {
+        std::vector<std::vector<int>> feasibleRoutes; // Stores all feasible routes with nodes
+
+        // auto indiv = getBestFound();
+        //  Iterate over all feasible individuals
+        int nFeasible = std::min(n, (int)feasibleSubpopulation.size());
+        for (int i = 0; i < nFeasible; i++) {
+            Individual *indiv = feasibleSubpopulation[i];
+            // Loop over all routes/vehicles of the solution
+            for (int k = 0; k < params->nbVehicles; k++) {
+                // If the route is not empty, store it
+                if (!indiv->chromR[k].empty()) {
+                    std::vector<int> route;
+                    // Add depot at the beginning (assuming 0 is the depot)
+                    route.push_back(0);
+
+                    // Add all customer nodes in the route
+                    for (int i : indiv->chromR[k]) { route.push_back(i); }
+
+                    // Add depot at the end
+                    route.push_back(0);
+
+                    // Add this route to the collection of feasible routes
+                    feasibleRoutes.push_back(route);
+                }
+            }
+        }
 
         return feasibleRoutes;
     }

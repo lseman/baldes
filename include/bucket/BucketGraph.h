@@ -40,6 +40,8 @@
 
 #include "Dual.h"
 
+#include "RIH.h"
+
 #include "../third_party/small_vector.hpp"
 
 #define RCESPP_TOL_ZERO 1.E-6
@@ -297,6 +299,8 @@ public:
     //
     int redefine_counter = 0;
 
+    IteratedLocalSearch *ils = nullptr;
+
     std::vector<std::vector<int>> fw_ordered_sccs;
     std::vector<std::vector<int>> bw_ordered_sccs;
     std::vector<int>              fw_topological_order;
@@ -328,7 +332,7 @@ public:
     double gap = std::numeric_limits<double>::infinity();
 
     CutStorage          *cut_storage = nullptr;
-    static constexpr int max_buckets = 12000; // Define maximum number of buckets beforehand
+    static constexpr int max_buckets = 10000; // Define maximum number of buckets beforehand
 
     std::array<Bucket, max_buckets> fw_buckets;
     std::array<Bucket, max_buckets> bw_buckets;
@@ -972,7 +976,7 @@ public:
     void BucketArcElimination(double theta);
 
     template <Direction D>
-    int get_opposite_bucket_number(int current_bucket_index);
+    int get_opposite_bucket_number(int current_bucket_index, std::vector<double> &inc);
 
 private:
     std::vector<Interval> intervals;

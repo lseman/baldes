@@ -43,6 +43,8 @@ public:
     // seconds) is reached
     void run(int maxIterNonProd, int timeLimit);
 
+    void run_smart(int maxIterNonProd, int timeLimit);
+
     // Constructor
     Genetic(Params *params, Split *split, Population *population, HGSLocalSearch *localSearch);
 

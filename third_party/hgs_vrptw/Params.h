@@ -40,8 +40,7 @@ SOFTWARE.*/
 #include "../Reader.h"
 #include "CircleSector.h"
 
-#include "../third_party/pcg/pcg_random.hpp"
-
+#include "../include/RNG.h"
 #include "config.h"
 
 #define MY_EPSILON 0.00001 // Precision parameter, used to avoid numerical instabilities
@@ -157,13 +156,13 @@ public:
             true; // When to repeat the algorithm when max nr of iter is reached, but time limit is not
     };
 
-    bool   verbose = true;
-    Config config; // Stores all the parameter values
-    // XorShift128 rng;    // Fast random number generator
+    bool             verbose = true;
+    Config           config; // Stores all the parameter values
+    Xoroshiro128Plus rng;    // Fast random number generator
     // Seed with a real random value, if available
 
     // Make a random number engine
-    pcg32 rng;
+    // pcg32 rng;
 
     std::chrono::system_clock::time_point
                  startWallClockTime; // Start wall clock time of this object (should be constructed at start of program)

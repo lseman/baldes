@@ -226,7 +226,6 @@ if(IPM)
   cpmaddpackage(NAME Eigen GIT_REPOSITORY https://gitlab.com/libeigen/eigen.git
                 GIT_TAG 3.4.0)
   include_directories(${EIGEN_SOURCE_DIR})
-
 endif()
 
 include_directories(/usr/include/suitesparse/)

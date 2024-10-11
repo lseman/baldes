@@ -111,8 +111,8 @@ inline std::vector<Label *> BucketGraph::solve() {
         paths     = bi_labeling_algorithm<Stage::Four>();
         inner_obj = paths[0]->cost;
 
-        // auto rollback = updateStepSize(); // Update the step size for the bucket graph
-        auto rollback = false;
+        auto rollback = updateStepSize(); // Update the step size for the bucket graph
+        // auto rollback = false;
         if (rollback) {
             s4     = false; // Rollback to Stage 3 if necessary
             s3     = true;
@@ -213,8 +213,10 @@ std::vector<double> BucketGraph::labeling_algorithm() noexcept {
         do {
             all_ext = true; // Assume all labels have been extended at the start
             for (const auto bucket : sorted_sccs[scc_index]) {
-                auto bucket_labels = buckets[bucket].get_unextended_labels(); // Get unextended labels from this bucket
+                auto &bucket_labels = buckets[bucket].get_labels(); // Get unextended labels from this bucket
+                if (bucket_labels.empty()) { continue; }            // Skip empty buckets
                 for (Label *label : bucket_labels) {
+                    if (label->is_extended) { continue; } // Skip labels that have already been extended
 
                     // NOTE: double check if this is the best way to handle this
                     if constexpr (F == Full::Partial) {
@@ -312,7 +314,7 @@ std::vector<double> BucketGraph::labeling_algorithm() noexcept {
                                 n_labels++; // Increment the count of labels added
 
                                 // Add the new label to the bucket
-#ifndef SORTED_LABELS
+#ifdef SORTED_LABELS
                                 buckets[to_bucket].add_sorted_label(new_label);
 #elif LIMITED_BUCKETS
                                 buckets[to_bucket].add_label_lim(new_label, BUCKET_CAPACITY);
@@ -522,6 +524,18 @@ std::vector<Label *> BucketGraph::bi_labeling_algorithm() {
 #endif
 
     // Return the final list of merged labels after processing
+
+    // get first 5 labels
+    std::vector<Label *> top_labels;
+    for (size_t i = 0; i < std::min(5, static_cast<int>(merged_labels.size())); ++i) {
+        top_labels.push_back(merged_labels[i]);
+    }
+    auto new_labels = ils->perturbation(top_labels, nodes);
+    // print size of new_labels
+    // insert new labels in merged_labels and sort again
+    for (auto label : new_labels) { merged_labels.push_back(label); }
+    pdqsort(merged_labels.begin(), merged_labels.end(),
+            [](const Label *a, const Label *b) { return a->cost < b->cost; });
     return merged_labels;
 }
 

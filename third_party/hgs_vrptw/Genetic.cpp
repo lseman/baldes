@@ -11,6 +11,10 @@
 #include "Population.h"
 #include "Split.h"
 
+// #include "SmartHGS.h"
+
+#define FITNESS_THRESHOLD 0.5
+
 void Genetic::run(int maxIterNonProd, int timeLimit) {
     if (params->nbClients == 1) return; // Edge case: 1 client, GA makes no sense
 

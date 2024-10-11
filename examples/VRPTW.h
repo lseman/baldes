@@ -54,6 +54,8 @@
 
 #define NUMERO_CANDIDATOS 10
 
+#include "RIH.h"
+
 class VRProblem : public Problem {
 public:
     InstanceData instance;
@@ -617,7 +619,10 @@ public:
 #ifdef STAB
         Stabilization stab(0.9, nodeDuals);
 #endif
-        bool changed = false;
+
+        IteratedLocalSearch ils(instance);
+        bucket_graph.ils = &ils;
+        bool changed     = false;
 
         print_info("Starting column generation..\n\n");
         bool transition = false;
@@ -828,7 +833,7 @@ public:
 
             misprice = true;
             while (misprice) {
-                nodeDuals = stab.getStabDualSolAdvanced(nodeDuals);
+                nodeDuals = stab.getStabDualSol(nodeDuals);
                 solution  = node->extractSolution();
 #endif
 

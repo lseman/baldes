@@ -26,7 +26,7 @@
  * get jump arcs, add labels, remove labels, get labels, clear labels, reset labels, and clear arcs.
  */
 struct Bucket {
-    // std::vector<Label *>   labels_vec;
+    // std::vector<Label *> labels_vec;
     // std::vector<Label *, PoolAllocator<Label *>> labels_vec;
     std::pmr::unsynchronized_pool_resource pool;
     std::pmr::vector<Label *>              labels_vec; // Declare the vector here
@@ -245,9 +245,18 @@ struct Bucket {
     }
 
     inline auto get_unextended_labels() {
-        return labels_vec | std::views::filter([](Label *label) { return !label->is_extended; });
-    }
+        // Define the lambda once to ensure consistency between both branches
+        auto filter_lambda = [](Label *label) { return !label->is_extended; };
 
+        if (!labels_vec.empty()) {
+            return labels_vec | std::views::filter(filter_lambda);
+        } else {
+            fmt::print("Empty vector\n");
+            // Use a static empty vector with the same pool resource
+            static std::pmr::vector<Label *> empty_vec{&pool};    // Use the same pool
+            return empty_vec | std::views::filter(filter_lambda); // Same lambda applied to the empty case
+        }
+    }
     void clear() { labels_vec.clear(); }
 
     void reset() { labels_vec.clear(); }
