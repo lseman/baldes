@@ -15,6 +15,8 @@
 
 #include "xxhash.h" // Include the header file for xxhash
 
+#include "RNG.h"
+
 /**
  * @struct Path
  * @brief Represents a path with a route and its associated cost.
@@ -115,10 +117,11 @@ struct Path {
 };
 
 inline int random_seed() {
-    std::random_device              rd;
-    std::mt19937                    gen(rd());
-    std::uniform_int_distribution<> dis(0, 1000000);
-    return dis(gen);
+    // Create an instance of Xoroshiro128Plus with a seed
+    Xoroshiro128Plus rng(42); // You can set your seed here
+
+    // Generate a random number and fit it into the desired range [0, 1000000]
+    return rng() % 1000001; // Use modulo to constrain the value
 }
 
 struct PathHash {

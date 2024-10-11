@@ -33,6 +33,8 @@
 
 #include "xxhash.h"
 
+#include "RNG.h"
+
 #define VRPTW_SRC_max_S_n 10000
 
 /**
@@ -347,10 +349,11 @@ void LimitedMemoryRank1Cuts::the45Heuristic(const SparseMatrix &A, const std::ve
     }
 
     // Shuffle permutations and limit to 3 for efficiency
-    std::random_device rd;
-    std::mt19937       g(rd());
+    Xoroshiro128Plus rng(42); // Seed it (you can change the seed)
+
     if (permutations.size() > 4) {
-        std::shuffle(permutations.begin(), permutations.end(), g);
+        // Use std::shuffle with the Xoroshiro128Plus generator
+        std::shuffle(permutations.begin(), permutations.end(), rng);
         permutations.resize(4);
     }
 

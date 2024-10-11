@@ -185,7 +185,7 @@ public:
     inline double norm(const std::vector<double> &vector) {
         double res = 0;
         for (int i = 0; i < vector.size(); ++i) { res += vector[i] * vector[i]; }
-        return std::sqrt(res + 1e-6);
+        return std::sqrt(res);
     }
 
     /**
@@ -202,7 +202,7 @@ public:
     inline double norm(const std::vector<double> &vector_1, const std::vector<double> &vector_2) {
         double res = 0.0;
         for (auto i = 0; i < vector_1.size(); ++i) { res += (vector_2[i] - vector_1[i]) * (vector_2[i] - vector_1[i]); }
-        return std::sqrt(res + 1e-6);
+        return std::sqrt(res);
     }
 
     /**
@@ -248,7 +248,7 @@ public:
         // Compute π_tilde: a convex combination of duals_in and duals_out
         // double one_minus_alpha = 1 - base_alpha;
         for (size_t row_id = 0; row_id < n; ++row_id) {
-            duals_tilde[row_id] = cur_alpha * duals_in[row_id] + (1 - cur_alpha) * duals_out[row_id];
+            duals_tilde[row_id] = duals_in[row_id] + (1 - cur_alpha) * (duals_out[row_id] - duals_in[row_id]);
         }
 
         // Compute the coefficient for π_g based on the norm of duals_in and duals_out
@@ -260,14 +260,8 @@ public:
         }
 
         // Compute β: a weight factor that depends on the alignment of duals_g and duals_out
-        double dot_product = 0.0;
-        for (size_t row_id = 0; row_id < n; ++row_id) {
-            dot_product += (duals_out[row_id] - duals_in[row_id]) * (duals_g[row_id] - duals_in[row_id]);
-        }
-
-        double norm_in_g = norm(duals_in, duals_g);
-        beta = (norm_in_out * norm_in_g != 0.0) ? std::max(0.0, dot_product / (norm_in_out * norm_in_g)) : 0.0;
-
+        beta = compute_angle(duals_out, duals_in, duals_g);
+        fmt::print("beta: {}\n", beta);
         // Compute ρ: a combination of duals_g and duals_out based on β
         for (size_t row_id = 0; row_id < n; ++row_id) {
             rho[row_id] = beta * duals_g[row_id] + (1 - beta) * duals_out[row_id];
@@ -280,12 +274,42 @@ public:
 
         // Update the duals_sep by adjusting duals_in towards ρ
         for (size_t row_id = 0; row_id < n; ++row_id) {
-            duals_sep[row_id] = duals_in[row_id] + coef_sep * (rho[row_id] - duals_in[row_id]);
+            duals_sep[row_id] = std::max(duals_in[row_id] + coef_sep * (rho[row_id] - duals_in[row_id]), 0.0);
         }
 
         // Update the smooth dual solution and return it
         smooth_dual_sol = duals_sep;
         return duals_sep;
+    }
+
+    double compute_angle(const std::vector<double> &duals_out, const std::vector<double> &duals_in,
+                         const std::vector<double> &duals_g) {
+        double dot_product = 0.0;
+        double norm_u      = 0.0;
+        double norm_v      = 0.0;
+
+        // Compute magnitudes (norms) of the vectors
+        std::vector<double> u(duals_out.size());
+        std::transform(duals_out.begin(), duals_out.end(), duals_in.begin(), u.begin(), std::minus<>());
+
+        std::vector<double> v(duals_g.size());
+        std::transform(duals_g.begin(), duals_g.end(), duals_in.begin(), v.begin(), std::minus<>());
+        norm_u = norm(u);
+        norm_v = norm(v);
+
+        // Avoid division by zero
+        if (norm_u == 0.0 || norm_v == 0.0) {
+            return 1.0; // If either vector is zero, set β = 1 as a default
+        }
+
+        // Compute cos(γ) using the dot product and norms
+        double cos_gamma = dot_product / (norm_u * norm_v);
+
+        // Clamp cos_gamma to the range [-1, 1] to avoid precision errors
+        cos_gamma = std::max(0.0, std::min(1.0, cos_gamma));
+        fmt::print("cos_gamma: {}\n", cos_gamma);
+        // Since β = cos(γ), and cos(γ) is already computed, we return cos_gamma as β
+        return cos_gamma;
     }
 
     /**
@@ -312,11 +336,13 @@ public:
                        in_sep_direction.begin(), std::minus<>());
 
         // Calculate the norm of the smoothed dual solution (accumulating squared differences)
-        double norm_smooth_dual_sol = std::transform_reduce(in_sep_direction.begin(), in_sep_direction.end(), 0.0,
-                                                            std::plus<>(), [](double a) { return a * a; });
+        double norm_smooth_dual_sol = norm(in_sep_direction);
 
         // If the norm is zero, return the base alpha (no adjustment necessary)
-        if (norm_smooth_dual_sol == 0.0) { return base_alpha; }
+        if (norm_smooth_dual_sol == 0.0) {
+            alpha = std::max(0.0, base_alpha - 0.1); // Decrease cur_alpha
+            return alpha;
+        }
 
         // Initialize new_rows and apply contributions from best_pricing_cols, skipping positive-cost columns
         new_rows.assign(number_of_rows, 0.0);

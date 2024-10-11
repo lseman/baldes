@@ -127,17 +127,21 @@ void BucketGraph::BucketArcElimination(double theta) {
     ArcMap local_B_Ba_b;
     int    removed_arcs = 0;
 
+    auto create_arc_key = [](int from, int to, int b) { return std::make_pair(std::make_pair(from, to), b); };
+
     // Function to process jump arcs
     auto process_jump_arcs = [&](int b) {
         const auto &jump_arcs = buckets[b].template get_jump_arcs<D>();
         if (!jump_arcs.empty()) {
-            auto &labels = buckets[b].get_labels();
+            const size_t          n_segments = buckets_size / 64 + 1;
+            std::vector<uint64_t> Bvisited(n_segments, 0);
+            auto                 &labels = buckets[b].get_labels();
             for (const auto &a : jump_arcs) {
-                auto arc_key    = std::make_pair(std::make_pair(a.base_bucket, a.jump_bucket), b);
-                int  b_opposite = get_opposite_bucket_number<D>(a.jump_bucket);
+                auto increment = a.resource_increment;
 
-                const size_t          n_segments = buckets_size / 64 + 1;
-                std::vector<uint64_t> Bvisited(n_segments, 0);
+                // auto arc_key    = std::make_pair(std::make_pair(a.base_bucket, a.jump_bucket), b);
+                auto arc_key    = create_arc_key(a.base_bucket, a.jump_bucket, b);
+                int  b_opposite = get_opposite_bucket_number<D>(a.jump_bucket, increment);
 
                 auto &Bidi_map = local_B_Ba_b[arc_key];
 
@@ -155,14 +159,23 @@ void BucketGraph::BucketArcElimination(double theta) {
         const auto &bucket_arcs = buckets[b].template get_bucket_arcs<D>();
         auto       &labels      = buckets[b].get_labels();
 
+        const size_t          n_segments = buckets_size / 64 + 1;
+        std::vector<uint64_t> Bvisited(n_segments, 0);
+
         for (const auto &a : bucket_arcs) {
-            auto arc_key =
-                std::make_pair(std::make_pair(buckets[a.from_bucket].node_id, buckets[a.to_bucket].node_id), b);
-            int b_opposite = get_opposite_bucket_number<D>(a.to_bucket);
+            std::vector<double> increment(MAIN_RESOURCES, 0);
+            for (int r = 0; r < MAIN_RESOURCES; ++r) {
 
-            const size_t          n_segments = buckets_size / 64 + 1;
-            std::vector<uint64_t> Bvisited(n_segments, 0);
-
+                if constexpr (D == Direction::Forward) {
+                    increment[r] = buckets[b].lb[r] + a.resource_increment[r];
+                } else {
+                    increment[r] = buckets[b].ub[r] - a.resource_increment[r];
+                }
+            }
+            // print b
+            auto arc_key    = create_arc_key(buckets[a.from_bucket].node_id, buckets[a.to_bucket].node_id, b);
+            int  b_opposite = get_opposite_bucket_number<D>(a.to_bucket, increment);
+            // print b_opposite
             auto &Bidi_map = local_B_Ba_b[arc_key];
 
             for (auto &L_item : labels) {
@@ -232,7 +245,8 @@ void BucketGraph::BucketArcElimination(double theta) {
  */
 template <Direction D>
 void BucketGraph::ObtainJumpBucketArcs() {
-    // Assign forward or backward buckets, fixed buckets, bucket indices, and Phi (adjacency list) based on direction
+    // Assign forward or backward buckets, fixed buckets, bucket indices, and Phi (adjacency list) based on
+    // direction
     auto &buckets           = assign_buckets<D>(fw_buckets, bw_buckets);
     auto &fixed_buckets     = assign_buckets<D>(fw_fixed_buckets, bw_fixed_buckets);
     auto &num_buckets_index = assign_buckets<D>(num_buckets_index_fw, num_buckets_index_bw);

@@ -55,42 +55,58 @@ void BucketGraph::add_arc(int from_bucket, int to_bucket, const std::vector<doub
  * The bucket graph is represented by the `buckets` vector, which contains intervals of buckets.
  * The direction of the bucket graph is specified by the template parameter `D`.
  */
+/*
 template <Direction D>
 inline int BucketGraph::get_bucket_number(int node, const std::vector<double> &resource_values_vec) noexcept {
-    const int num_intervals = MAIN_RESOURCES; // Number of resources
-    auto     &theNode       = nodes[node];    // Get the node
+   const int num_intervals = MAIN_RESOURCES; // Number of resources
+   auto     &theNode       = nodes[node];    // Get the node
 
-    // Assume base_intervals have been precomputed and stored during bucket definition
-    auto &base_intervals    = assign_buckets<D>(fw_base_intervals, bw_base_intervals);
-    auto &num_buckets_index = assign_buckets<D>(num_buckets_index_fw, num_buckets_index_bw);
+   // Precomputed base intervals stored during bucket definition
+   auto &base_intervals    = assign_buckets<D>(fw_base_intervals, bw_base_intervals);
+   auto &num_buckets_index = assign_buckets<D>(num_buckets_index_fw, num_buckets_index_bw);
+   auto &num_buckets       = assign_buckets<D>(num_buckets_fw, num_buckets_bw);
+   int   bucket_offset     = 0;
+   int   cumulative_base   = 1;
 
-    // Compute the multi-bucket case
-    int bucket_offset   = 0;
-    int cumulative_base = 1;
+   for (int r = 0; r < num_intervals; ++r) {
+       double value = resource_values_vec[r];
 
-    for (int r = 0; r < num_intervals; ++r) {
-        double value = resource_values_vec[r];
+       // Use lb for Forward, ub for Backward as reference points
+       double reference_point = (D == Direction::Forward) ? theNode.lb[r] : theNode.ub[r];
 
-        // Use lb for Forward, ub for Backward as reference points
-        double reference_point = (D == Direction::Forward) ? theNode.lb[r] : theNode.ub[r];
+       // Compute position of value in the current bucket range
+       // double relative_value = (D == Direction::Forward) ? (value - reference_point) : (reference_point - value);
+       // double epsilon = 0.0001; // Adjust as needed for your precision requirements
+       double relative_value = (D == Direction::Forward) ? (value - reference_point) : (reference_point - value);
 
-        // Compute position of value in the current bucket range
-        int pos = (D == Direction::Forward) ? static_cast<int>((value - reference_point) / base_intervals[r])
-                                            : static_cast<int>((reference_point - value) / base_intervals[r]);
+       int pos = static_cast<int>(relative_value / base_intervals[r]);
 
-        // Clamp position to ensure it stays within valid bounds
-        int max_pos = static_cast<int>((theNode.ub[r] - theNode.lb[r]) / base_intervals[r]);
-        pos         = std::clamp(pos, 0, max_pos);
+       // Clamp position to ensure it stays within valid bounds
+       int max_pos = static_cast<int>((theNode.ub[r] - theNode.lb[r]) / base_intervals[r]);
+       pos         = std::clamp(pos, 0, num_buckets[node] - 1);
+       // Combine position into the overall bucket offset
+       bucket_offset += pos * cumulative_base;
 
-        // Combine position into the overall bucket offset
-        bucket_offset += pos * cumulative_base;
+       // Update cumulative base for the next resource
+       cumulative_base *= (max_pos + 1);
+   }
 
-        // Update cumulative base for the next resource
-        cumulative_base *= (max_pos + 1);
+   // Return the absolute bucket number
+   return num_buckets_index[node] + bucket_offset;
+}
+*/
+template <Direction D>
+inline int BucketGraph::get_bucket_number(int node, const std::vector<double> &resource_values_vec) noexcept {
+
+    if constexpr (D == Direction::Forward) {
+        auto val = fw_node_interval_trees[node].query(resource_values_vec);
+        return val;
+    } else if constexpr (D == Direction::Backward) {
+        auto val = bw_node_interval_trees[node].query(resource_values_vec);
+        return val;
     }
-
-    // Return the absolute bucket number
-    return num_buckets_index[node] + bucket_offset;
+    std::throw_with_nested(std::runtime_error("BucketGraph::get_bucket_number: Invalid direction"));
+    return -1; // If no bucket is found
 }
 
 /**
@@ -155,7 +171,7 @@ void BucketGraph::define_buckets() {
         if (fits_single_bucket(node_total_ranges)) {
             // Single bucket case
             buckets[bucket_index] = Bucket(VRPNode.id, VRPNode.lb, VRPNode.ub);
-            // node_tree.insert(VRPNode.lb, VRPNode.ub, bucket_index);
+            node_tree.insert(VRPNode.lb, VRPNode.ub, bucket_index);
 
             num_buckets[VRPNode.id]       = 1;
             num_buckets_index[VRPNode.id] = cum_sum;
@@ -182,12 +198,12 @@ void BucketGraph::define_buckets() {
                 buckets[bucket_index] = Bucket(VRPNode.id, interval_start, interval_end);
 
                 std::vector<double> interval_adjusted(interval_start.size());
-                // for (int r = 0; r < interval_start.size(); ++r) {
-                //     interval_adjusted[r] = (D == Direction::Forward) ? interval_start[r] + base_intervals[r]
-                //                                                      : interval_end[r] - base_intervals[r];
-                // }
-                //  node_tree.insert((D == Direction::Forward) ? interval_start : interval_adjusted,
-                //                   (D == Direction::Forward) ? interval_adjusted : interval_end, bucket_index);
+                for (int r = 0; r < interval_start.size(); ++r) {
+                    interval_adjusted[r] = (D == Direction::Forward) ? interval_start[r] + base_intervals[r]
+                                                                     : interval_end[r] - base_intervals[r];
+                }
+                node_tree.insert((D == Direction::Forward) ? interval_start : interval_adjusted,
+                                 (D == Direction::Forward) ? interval_adjusted : interval_end, bucket_index);
 
                 bucket_index++;
                 n_buckets++;
@@ -695,25 +711,31 @@ void BucketGraph::SCC_handler() {
  *
  */
 template <Direction D>
-int BucketGraph::get_opposite_bucket_number(int current_bucket_index) {
+int BucketGraph::get_opposite_bucket_number(int current_bucket_index, std::vector<double> &inc) {
 
     // TODO: adjust to multi-resource case
     auto &current_bucket =
         (D == Direction::Forward) ? fw_buckets[current_bucket_index] : bw_buckets[current_bucket_index];
-    int node = current_bucket.node_id;
-    int lb   = current_bucket.lb[0];
-    int ub   = current_bucket.ub[0];
-
+    int  &node    = current_bucket.node_id;
+    auto &lb      = current_bucket.lb;
+    auto &ub      = current_bucket.ub;
     auto &theNode = nodes[node];
 
     // Find the opposite bucket using the appropriate direction
-    int opposite_bucket_index = -1;
+    int                 opposite_bucket_index = -1;
+    std::vector<double> reference_point(MAIN_RESOURCES);
+    double              epsilon = 0.0001;
+    for (int r = 0; r < MAIN_RESOURCES; ++r) {
+        if constexpr (D == Direction::Forward) {
+            reference_point[r] = std::max(inc[r], theNode.lb[r]);
+        } else {
+            reference_point[r] = std::min(inc[r], theNode.ub[r]);
+        }
+    }
     if constexpr (D == Direction::Forward) {
-        std::vector<double> value = {static_cast<double>(std::max(ub, theNode.start_time))};
-        opposite_bucket_index     = get_bucket_number<Direction::Backward>(node, value);
+        opposite_bucket_index = get_bucket_number<Direction::Backward>(node, reference_point);
     } else {
-        std::vector<double> value = {static_cast<double>(std::min(lb, theNode.end_time))};
-        opposite_bucket_index     = get_bucket_number<Direction::Forward>(node, value);
+        opposite_bucket_index = get_bucket_number<Direction::Forward>(node, reference_point);
     }
 
     return opposite_bucket_index;
