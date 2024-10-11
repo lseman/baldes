@@ -40,6 +40,8 @@
 
 #include "Dual.h"
 
+#include "../third_party/small_vector.hpp"
+
 #define RCESPP_TOL_ZERO 1.E-6
 
 /**
@@ -304,6 +306,9 @@ public:
     std::vector<std::vector<int>> fw_sccs_sorted;
     std::vector<std::vector<int>> bw_sccs_sorted;
 
+    std::vector<double> fw_base_intervals; // Forward base intervals for each node
+    std::vector<double> bw_base_intervals; // Backward base intervals for each node
+
     double incumbent  = std::numeric_limits<double>::infinity();
     double relaxation = std::numeric_limits<double>::infinity();
     bool   fixed      = false;
@@ -407,8 +412,8 @@ public:
     int              non_dominated_labels_per_bucket;
 
     // Interval tree to store bucket intervals
-    ankerl::unordered_dense::map<int, SplayTree> fw_node_interval_trees;
-    ankerl::unordered_dense::map<int, SplayTree> bw_node_interval_trees;
+    std::vector<SplayTree> fw_node_interval_trees;
+    std::vector<SplayTree> bw_node_interval_trees;
 
     template <Direction D>
     ankerl::unordered_dense::map<int, BucketIntervalTree<D>> rebuild_buckets() {
@@ -954,11 +959,11 @@ public:
     std::vector<Label *> bi_labeling_algorithm();
 
     template <Stage S>
-    void ConcatenateLabel(const Label *L, int &b, Label *&pbest, std::vector<uint64_t> &Bvisited);
+    void ConcatenateLabel(const Label *L, int &b, Label *&pbest, gch::small_vector<uint64_t> &Bvisited);
 
     template <Direction D>
     void UpdateBucketsSet(double theta, const Label *label, ankerl::unordered_dense::set<int> &Bbidi,
-                          int &current_bucket, ankerl::unordered_dense::set<int> &Bvisited);
+                          int &current_bucket, std::vector<uint64_t> &Bvisited);
 
     template <Direction D>
     void ObtainJumpBucketArcs();

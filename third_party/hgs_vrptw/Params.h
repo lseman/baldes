@@ -35,10 +35,12 @@ SOFTWARE.*/
 #include <vector>
 
 #include "Matrix.h"
-#include "xorshift128.h"
+// #include "xorshift128.h"
 
 #include "../Reader.h"
 #include "CircleSector.h"
+
+#include "../third_party/pcg/pcg_random.hpp"
 
 #include "config.h"
 
@@ -155,9 +157,14 @@ public:
             true; // When to repeat the algorithm when max nr of iter is reached, but time limit is not
     };
 
-    bool        verbose = true;
-    Config      config; // Stores all the parameter values
-    XorShift128 rng;    // Fast random number generator
+    bool   verbose = true;
+    Config config; // Stores all the parameter values
+    // XorShift128 rng;    // Fast random number generator
+    // Seed with a real random value, if available
+
+    // Make a random number engine
+    pcg32 rng;
+
     std::chrono::system_clock::time_point
                  startWallClockTime; // Start wall clock time of this object (should be constructed at start of program)
     std::clock_t startCPUTime;       // Start CPU time of this object

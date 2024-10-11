@@ -41,7 +41,6 @@ struct ClientSplit {
     ClientSplit() : demand(0), serviceTime(0), d0_x(0), dx_0(0), dnext(0) {}
 };
 
-// Simple Deque which is used for all Linear Split algorithms
 struct Trivial_Deque {
     std::vector<int> myDeque;    // Vector structure to keep the elements of the queue
     int              indexFront; // Index of the front element
@@ -50,13 +49,16 @@ struct Trivial_Deque {
     // Removes the front element of the queue
     inline void pop_front() { indexFront++; }
 
-    // Removes the back element of the queue D
+    // Removes the back element of the queue
     inline void pop_back() { indexBack--; }
 
-    // Appends a new element to the back of the queue D
+    // Appends a new element to the back of the queue
     inline void push_back(int i) {
-        indexBack++;
-        myDeque[indexBack] = i;
+        // Resize the deque if indexBack exceeds the current size
+        if (indexBack + 1 >= myDeque.size()) {
+            myDeque.resize(myDeque.size() * 2); // Double the capacity
+        }
+        myDeque[++indexBack] = i;
     }
 
     // Returns the front element of the queue
@@ -78,10 +80,10 @@ struct Trivial_Deque {
     // Returns the size of the queue
     inline int size() { return indexBack - indexFront + 1; }
 
-    // Constructor, to creata a queue with place for nbElements elements, where firstNode is the first node
+    // Constructor, to create a queue with space for nbElements elements, where firstNode is the first node
     Trivial_Deque(int nbElements, int firstNode) {
-        myDeque    = std::vector<int>(nbElements);
-        myDeque[0] = firstNode;
+        myDeque.reserve(nbElements);  // Reserve initial capacity to avoid frequent reallocations
+        myDeque.push_back(firstNode); // Initialize with the first node
         indexBack  = 0;
         indexFront = 0;
     }
@@ -109,23 +111,29 @@ private:
     // To be called with i < j only
     // Computes the cost of propagating the label i until j
     inline double propagate(int i, int j, int k) {
-        return potential[k][i] + sumDistance[j] - sumDistance[i + 1] + cliSplit[i + 1].d0_x + cliSplit[j].dx_0 +
-               params->penaltyCapacity * std::max(sumLoad[j] - sumLoad[i] - params->vehicleCapacity, 0);
+        double distDiff = sumDistance[j] - sumDistance[i + 1];
+        double loadDiff = sumLoad[j] - sumLoad[i];
+
+        return potential[k][i] + distDiff + cliSplit[i + 1].d0_x + cliSplit[j].dx_0 +
+               params->penaltyCapacity * std::max(loadDiff - params->vehicleCapacity, 0.0); // Explicitly using 0.0
     }
 
     // Tests if i dominates j as a predecessor for all nodes x >= j+1
     // We assume that i < j
     inline bool dominates(int i, int j, int k) {
-        return potential[k][j] + cliSplit[j + 1].d0_x > potential[k][i] + cliSplit[i + 1].d0_x + sumDistance[j + 1] -
-                                                            sumDistance[i + 1] +
-                                                            params->penaltyCapacity * (sumLoad[j] - sumLoad[i]);
+        double distDiff = sumDistance[j + 1] - sumDistance[i + 1];
+        double loadDiff = sumLoad[j] - sumLoad[i];
+
+        return potential[k][j] + cliSplit[j + 1].d0_x >
+               potential[k][i] + cliSplit[i + 1].d0_x + distDiff + params->penaltyCapacity * loadDiff;
     }
 
     // Tests if j dominates i as a predecessor for all nodes x >= j+1
     // We assume that i < j
     inline bool dominatesRight(int i, int j, int k) {
-        return potential[k][j] + cliSplit[j + 1].d0_x <
-               potential[k][i] + cliSplit[i + 1].d0_x + sumDistance[j + 1] - sumDistance[i + 1] + MY_EPSILON;
+        double distDiff = sumDistance[j + 1] - sumDistance[i + 1];
+
+        return potential[k][j] + cliSplit[j + 1].d0_x < potential[k][i] + cliSplit[i + 1].d0_x + distDiff + MY_EPSILON;
     }
 
     // Split for unlimited fleet

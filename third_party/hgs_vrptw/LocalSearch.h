@@ -251,8 +251,11 @@ private:
     template <typename... Args>
     inline TimeWindowData MergeTWDataRecursive(const TimeWindowData &first, const TimeWindowData &second,
                                                Args... args) {
+        // Use a fold expression to merge all arguments
         TimeWindowData result = MergeTWDataRecursive(first, second);
-        return MergeTWDataRecursive(result, args...);
+        // Apply MergeTWDataRecursive to the result with the remaining arguments in the parameter pack
+        ((result = MergeTWDataRecursive(result, args)), ...);
+        return result;
     }
 
     /* ROUTINES TO UPDATE THE SOLUTIONS */

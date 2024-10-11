@@ -28,6 +28,8 @@
 #include "BucketAVX.h"
 #endif
 
+#include "../third_party/small_vector.hpp"
+
 /**
  * Solves the bucket graph optimization problem using a multi-stage bi-labeling algorithm.
  *
@@ -310,7 +312,7 @@ std::vector<double> BucketGraph::labeling_algorithm() noexcept {
                                 n_labels++; // Increment the count of labels added
 
                                 // Add the new label to the bucket
-#ifdef SORTED_LABELS
+#ifndef SORTED_LABELS
                                 buckets[to_bucket].add_sorted_label(new_label);
 #elif LIMITED_BUCKETS
                                 buckets[to_bucket].add_label_lim(new_label, BUCKET_CAPACITY);
@@ -439,8 +441,8 @@ std::vector<Label *> BucketGraph::bi_labeling_algorithm() {
     if constexpr (S == Stage::Enumerate) { fmt::print("Labels generated, concatenating...\n"); }
 
     // Setup visited buckets tracking for forward buckets
-    const size_t          n_segments = fw_buckets_size / 64 + 1;
-    std::vector<uint64_t> Bvisited(n_segments, 0);
+    const size_t                n_segments = fw_buckets_size / 64 + 1;
+    gch::small_vector<uint64_t> Bvisited(n_segments, 0);
 
     // Iterate over all forward buckets
     for (auto bucket = 0; bucket < fw_buckets_size; ++bucket) {
