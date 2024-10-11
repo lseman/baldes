@@ -496,17 +496,6 @@ std::vector<Label *> BucketGraph::bi_labeling_algorithm() {
     pdqsort(merged_labels.begin(), merged_labels.end(),
             [](const Label *a, const Label *b) { return a->cost < b->cost; });
 
-#ifdef RIH
-    // If we are in Stage 2 or above, we run the RIH (Route Improvement Heuristic) in the background
-    const int LABELS_MAX = 2; // Set a maximum of 2 labels to be improved
-
-    if constexpr (S > Stage::Two) {
-        // Launch the RIH process asynchronously on a separate thread
-        rih_thread = std::thread(&BucketGraph::async_rih_processing, this, merged_labels, LABELS_MAX);
-        rih_thread.detach(); // Detach the thread so it runs in the background
-    }
-#endif
-
 #ifdef SCHRODINGER
     // if merged_labels is bigger than 10, create Path related to the remaining ones
     // and add them to a std::vector<Path>
@@ -525,17 +514,16 @@ std::vector<Label *> BucketGraph::bi_labeling_algorithm() {
 
     // Return the final list of merged labels after processing
 
-    // get first 5 labels
+#ifdef RIH
     std::vector<Label *> top_labels;
     for (size_t i = 0; i < std::min(5, static_cast<int>(merged_labels.size())); ++i) {
         top_labels.push_back(merged_labels[i]);
     }
     auto new_labels = ils->perturbation(top_labels, nodes);
-    // print size of new_labels
-    // insert new labels in merged_labels and sort again
     for (auto label : new_labels) { merged_labels.push_back(label); }
     pdqsort(merged_labels.begin(), merged_labels.end(),
             [](const Label *a, const Label *b) { return a->cost < b->cost; });
+#endif
     return merged_labels;
 }
 
