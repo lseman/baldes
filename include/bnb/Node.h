@@ -157,6 +157,11 @@ public:
         for (int i = 0; i < numVars; i++) { model->chgCoeff(constrName, varNames[i], value[i]); }
     }
 
+    // define for >chgCoeff(constrs[i], w[i], -1);
+    void chgCoeff(const GRBConstr &constrName, const GRBVar &varName, double value) {
+        model->chgCoeff(constrName, varName, value);
+    }
+
     /**
      * Binarizes the variables in the given GRBModel.
      *

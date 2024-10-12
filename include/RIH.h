@@ -275,7 +275,7 @@ public:
                          return this->swap(route1, route2, k, l);
                      },
                      [this](const std::vector<int> &route1, const std::vector<int> &route2, int k, int l) {
-                         return this->extended_relocate_star(route1, route2, k, l);
+                         return this->relocate_star(route1, route2, k, l);
                      },
                      [this](const std::vector<int> &route1, const std::vector<int> &route2, int k, int l) {
                          return this->enhanced_swap(route1, route2, k, l);

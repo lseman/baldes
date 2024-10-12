@@ -657,8 +657,8 @@ public:
         intervals.clear();
         for (int i = 0; i < R_SIZE; ++i) { intervals.push_back(Interval(bucketInterval, 0)); }
 
-        auto fw_save_rebuild = rebuild_buckets<Direction::Forward>();
-        auto bw_save_rebuild = rebuild_buckets<Direction::Backward>();
+        // auto fw_save_rebuild = rebuild_buckets<Direction::Forward>();
+        // auto bw_save_rebuild = rebuild_buckets<Direction::Backward>();
 
         reset_fixed();
         reset_fixed_buckets();
@@ -683,6 +683,7 @@ public:
             });
 
         generate_arcs();
+        /*
         PARALLEL_SECTIONS(
             workB, bi_sched,
             [&, this, fw_save_rebuild]() -> void {
@@ -693,6 +694,7 @@ public:
                 // Backward direction processing
                 process_buckets<Direction::Backward>(bw_buckets_size, bw_buckets, bw_save_rebuild, bw_fixed_buckets);
             });
+            */
     }
 
     template <Direction D>
@@ -890,7 +892,7 @@ public:
             print_info("Increasing bucket interval to {}\n", bucket_interval * 2);
             redefine(bucket_interval * 2);
             updated = true;
-            // fixed   = false;
+            fixed   = false;
         }
         return updated;
     }

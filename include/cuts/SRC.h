@@ -349,8 +349,9 @@ void LimitedMemoryRank1Cuts::the45Heuristic(const SparseMatrix &A, const std::ve
     }
 
     // Shuffle permutations and limit to 3 for efficiency
-    Xoroshiro128Plus rng(42); // Seed it (you can change the seed)
+    int seed = std::chrono::system_clock::now().time_since_epoch().count(); // Use current time as a seed
 
+    Xoroshiro128Plus rng(seed); // Seed it (you can change the seed)
     if (permutations.size() > 4) {
         // Use std::shuffle with the Xoroshiro128Plus generator
         std::shuffle(permutations.begin(), permutations.end(), rng);
@@ -399,7 +400,7 @@ void LimitedMemoryRank1Cuts::the45Heuristic(const SparseMatrix &A, const std::ve
             }
 
             // limit the number of sets to process
-            if (setsOf45.size() > 2000) { setsOf45.resize(2000); }
+            if (setsOf45.size() > 3000) { setsOf45.resize(3000); }
 
             std::vector<Cut> threadCuts;
 

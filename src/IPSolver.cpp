@@ -561,9 +561,9 @@ std::tuple<double, double, std::vector<double>, std::vector<double>> IPSolver::r
 
         // Calculate _p, _d, and _g in parallel
 
-        //_p = std::fmax(res.rp.lpNorm<Eigen::Infinity>() / (tau * (1.0 + b.lpNorm<Eigen::Infinity>())),
-        //              res.ru.lpNorm<Eigen::Infinity>() / (tau * (1.0 + ubv.lpNorm<Eigen::Infinity>())));
-        //_d = res.rd.lpNorm<Eigen::Infinity>() / (tau * (1.0 + c.lpNorm<Eigen::Infinity>()));
+        _p = std::fmax(res.rp.lpNorm<Eigen::Infinity>() / (tau * (1.0 + b.lpNorm<Eigen::Infinity>())),
+                       res.ru.lpNorm<Eigen::Infinity>() / (tau * (1.0 + ubv.lpNorm<Eigen::Infinity>())));
+        _d = res.rd.lpNorm<Eigen::Infinity>() / (tau * (1.0 + c.lpNorm<Eigen::Infinity>()));
 
         bl_dot_lambda = b.dot(lambda) - ubv.dot(w);
         _g            = std::abs(c.dot(x) - bl_dot_lambda) / (tau + std::abs(bl_dot_lambda));
@@ -571,7 +571,7 @@ std::tuple<double, double, std::vector<double>, std::vector<double>> IPSolver::r
         // Check for optimality and infeasibility
         // print mu
         // fmt::print("mu: {}, p: {}, d: {}\n", mu, _p, _d);
-        if (_g <= tol) { break; }
+        if (_p <= 1e-4 && _d <= 1e-4 && _g <= tol) { break; }
         // Scaling factors
         theta_vw = w.cwiseQuotient(v);
         theta_xs = s.cwiseQuotient(x);

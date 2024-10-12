@@ -146,16 +146,15 @@ inline void print_blue(fmt::format_string<Args...> format, Args &&...args) {
  *
  */
 struct ModelData {
-    SparseMatrix                     A_sparse;
-    std::vector<std::vector<double>> A;     // Coefficient matrix for constraints
-    std::vector<double>              b;     // Right-hand side coefficients for constraints
-    std::vector<char>                sense; // Sense of each constraint ('<', '=', '>')
-    std::vector<double>              c;     // Coefficients for the objective function
-    std::vector<double>              lb;    // Lower bounds for variables
-    std::vector<double>              ub;    // Upper bounds for variables
-    std::vector<char>                vtype; // Variable types ('C', 'I', 'B')
-    std::vector<std::string>         name;
-    std::vector<std::string>         cname;
+    SparseMatrix             A_sparse;
+    std::vector<double>      b;     // Right-hand side coefficients for constraints
+    std::vector<char>        sense; // Sense of each constraint ('<', '=', '>')
+    std::vector<double>      c;     // Coefficients for the objective function
+    std::vector<double>      lb;    // Lower bounds for variables
+    std::vector<double>      ub;    // Upper bounds for variables
+    std::vector<char>        vtype; // Variable types ('C', 'I', 'B')
+    std::vector<std::string> name;
+    std::vector<std::string> cname;
 };
 
 /**
