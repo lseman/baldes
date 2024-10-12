@@ -60,9 +60,13 @@ void BucketGraph::UpdateBucketsSet(const double theta, const Label *label, anker
         const size_t bit_position = curr_bucket & 63; // Determine the bit position within the segment
         Bvisited[segment] |= (1ULL << bit_position);  // Set the bit corresponding to the current bucket as visited
 
-        const int    bucketLprimenode = buckets_opposite[curr_bucket].node_id;
-        const double cost             = getcij(bucketLnode, bucketLprimenode);
+        const int bucketLprimenode = buckets_opposite[curr_bucket].node_id;
+        double    cost             = getcij(bucketLnode, bucketLprimenode);
 
+#ifdef RCC
+        auto arc_dual = arc_duals.getDual(bucketLnode, bucketLprimenode);
+        cost -= arc_dual;
+#endif
         // Stop exploring if the cost exceeds the threshold
         if (label->cost + cost + c_bar_opposite[curr_bucket] >= theta) { continue; }
 

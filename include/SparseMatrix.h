@@ -168,4 +168,24 @@ struct SparseMatrix {
         forEachRow([&dense](int row, int col, double value) { dense[row][col] = value; });
         return dense;
     }
+    std::vector<double> multiply(const std::vector<double> &x) const {
+        // Ensure the input vector size matches the number of columns in the matrix
+        if (x.size() != static_cast<size_t>(num_cols)) {
+            throw std::invalid_argument(
+                "The size of the input vector does not match the number of columns in the matrix.");
+        }
+
+        // Initialize the result vector with zeros
+        std::vector<double> result(num_rows, 0.0);
+
+        // Perform the matrix-vector multiplication
+        for (int row = 0; row < num_rows; ++row) {
+            for (RowIterator it = rowIterator(row); it.valid(); it.next()) {
+                // Multiply the value in row 'row' and column 'it.col()' by x[it.col()]
+                result[row] += it.value() * x[it.col()];
+            }
+        }
+
+        return result;
+    }
 };

@@ -60,6 +60,19 @@ struct Label {
 
     void set_extended(bool extended) { is_extended = extended; }
 
+    std::vector<int> get_multiplicities() const {
+        // fmt::print("nodes_covered starting\n");
+        std::vector<int> multiplicities(N_SIZE - 2);
+        if (nodes_covered.size() == 0) return multiplicities;
+        for (int i = 1; i < nodes_covered.size() - 1; i++) {
+            if (nodes_covered[i] == 0 || nodes_covered[i] == N_SIZE - 1) continue;
+            multiplicities[nodes_covered[i] - 1]++;
+            // fmt::print("nodes_covered[i]: {}\n", nodes_covered[i]);
+        }
+        // fmt::print("nodes_covered ending\n");
+        return multiplicities;
+    }
+
     /**
      * @brief Checks if a node has been visited.
      *

@@ -62,7 +62,7 @@ public:
     std::vector<double> new_rows;
 
     double lag_gap      = 0.0;
-    double lag_gap_prev = std::numeric_limits<double>::infinity();
+    double lag_gap_prev = -std::numeric_limits<double>::infinity();
 
     /**
      * @brief Increments the misprice counter if the alpha value is positive.
@@ -74,6 +74,7 @@ public:
         nb_misprices++;
         alpha     = _misprice_schedule(nb_misprices, base_alpha);
         cur_alpha = alpha;
+        beta      = 0.0;
     }
 
     /**
@@ -138,6 +139,7 @@ public:
         if (nb_misprices > 10 || alpha <= 1e-3) {
             alpha = 0.0; // Deactivate stabilization
         }
+        duals_in = duals_sep;
         return alpha;
     }
 
@@ -167,8 +169,9 @@ public:
     DualSolution getStabDualSol(const DualSolution &master_dual) {
         if (cur_stab_center.empty()) { return master_dual; }
         DualSolution stab_dual_sol(master_dual.size());
-        std::transform(master_dual.begin(), master_dual.end(), cur_stab_center.begin(), stab_dual_sol.begin(),
-                       [this](double out, double in) { return cur_alpha * in + (1 - cur_alpha) * out; });
+        for (size_t i = 0; i < master_dual.size(); ++i) {
+            stab_dual_sol[i] = cur_alpha * cur_stab_center[i] + (1 - cur_alpha) * master_dual[i];
+        }
         smooth_dual_sol = stab_dual_sol;
         return stab_dual_sol;
     }
@@ -185,7 +188,7 @@ public:
     inline double norm(const std::vector<double> &vector) {
         double res = 0;
         for (int i = 0; i < vector.size(); ++i) { res += vector[i] * vector[i]; }
-        return std::sqrt(res);
+        return std::sqrt(res + 1e-6);
     }
 
     /**
@@ -202,7 +205,7 @@ public:
     inline double norm(const std::vector<double> &vector_1, const std::vector<double> &vector_2) {
         double res = 0.0;
         for (auto i = 0; i < vector_1.size(); ++i) { res += (vector_2[i] - vector_1[i]) * (vector_2[i] - vector_1[i]); }
-        return std::sqrt(res);
+        return std::sqrt(res + 1e-12);
     }
 
     /**
@@ -223,12 +226,14 @@ public:
         if (cur_stab_center.empty()) { return nodeDuals; }
 
         // Initialize subgradient if it hasn't been initialized yet
-        if (subgradient.empty()) { subgradient.assign(nodeDuals.size(), 0.0); }
+        if (subgradient.empty()) {
+            subgradient.assign(nodeDuals.size(), 0.0); // Placeholder: Replace with real subgradient initialization
+        }
 
         // Initialize the separation duals and smooth dual solution if they are empty
         if (duals_sep.empty()) {
-            duals_sep       = nodeDuals; // Start with the input duals
-            smooth_dual_sol = duals_sep; // Initialize the smoothed dual solution
+            duals_sep       = nodeDuals; // Initialize with the node duals
+            smooth_dual_sol = duals_sep; // Also initialize smooth_dual_sol with the same
             return nodeDuals;            // Return the input duals for now
         }
 
@@ -242,74 +247,45 @@ public:
         std::vector<double> rho(n, 0.0);
 
         // Precompute norms that are used multiple times
-        double norm_in_out      = norm(duals_in, duals_out);
-        double norm_subgradient = norm(subgradient);
+        double norm_in_out      = norm(duals_in, duals_out); // Norm of (duals_out - duals_in)
+        double norm_subgradient = norm(subgradient);         // Norm of the subgradient
 
-        // Compute π_tilde: a convex combination of duals_in and duals_out
-        // double one_minus_alpha = 1 - base_alpha;
         for (size_t row_id = 0; row_id < n; ++row_id) {
-            duals_tilde[row_id] = duals_in[row_id] + (1 - cur_alpha) * (duals_out[row_id] - duals_in[row_id]);
+            duals_tilde[row_id] = cur_alpha * duals_in[row_id] + (1 - cur_alpha) * duals_out[row_id];
         }
-
         // Compute the coefficient for π_g based on the norm of duals_in and duals_out
-        double coef_g = (norm_subgradient != 0.0) ? norm_in_out / norm_subgradient : 0.0;
+        double coef_g = norm(duals_in, duals_out) / norm(subgradient);
 
         // Compute π_g: duals_in + coef_g * subgradient
         for (size_t row_id = 0; row_id < n; ++row_id) {
             duals_g[row_id] = duals_in[row_id] + coef_g * subgradient[row_id];
         }
 
-        // Compute β: a weight factor that depends on the alignment of duals_g and duals_out
-        beta = compute_angle(duals_out, duals_in, duals_g);
-        fmt::print("beta: {}\n", beta);
+        if (nb_misprices > 0) {
+            beta = 0.0;
+        } else {
+            double dot_product = 0;
+            for (auto row_id = 0; row_id < duals_out.size(); ++row_id) {
+                dot_product += (duals_out[row_id] - duals_in[row_id]) * (duals_g[row_id] - duals_in[row_id]);
+            }
+            beta = dot_product / norm(duals_in, duals_out) / norm(duals_in, duals_g);
+        }
+        beta = std::max(0.0, beta);
+
         // Compute ρ: a combination of duals_g and duals_out based on β
         for (size_t row_id = 0; row_id < n; ++row_id) {
-            rho[row_id] = beta * duals_g[row_id] + (1 - beta) * duals_out[row_id];
+            rho[row_id] = beta * duals_g[row_id] + (1 - beta) * duals_out[row_id]; // Weighted sum
         }
-
-        // Compute the coefficient for dual separation (coef_sep)
-        double norm_in_tilde = norm(duals_in, duals_tilde);
-        double norm_in_rho   = norm(duals_in, rho);
-        double coef_sep      = (norm_in_rho != 0.0) ? norm_in_tilde / norm_in_rho : 0.0;
+        double coef_sep = norm(duals_in, duals_tilde) / norm(duals_in, rho);
 
         // Update the duals_sep by adjusting duals_in towards ρ
         for (size_t row_id = 0; row_id < n; ++row_id) {
-            duals_sep[row_id] = std::max(duals_in[row_id] + coef_sep * (rho[row_id] - duals_in[row_id]), 0.0);
+            duals_sep[row_id] = duals_in[row_id] + coef_sep * (rho[row_id] - duals_in[row_id]);
         }
 
         // Update the smooth dual solution and return it
         smooth_dual_sol = duals_sep;
         return duals_sep;
-    }
-
-    double compute_angle(const std::vector<double> &duals_out, const std::vector<double> &duals_in,
-                         const std::vector<double> &duals_g) {
-        double dot_product = 0.0;
-        double norm_u      = 0.0;
-        double norm_v      = 0.0;
-
-        // Compute magnitudes (norms) of the vectors
-        std::vector<double> u(duals_out.size());
-        std::transform(duals_out.begin(), duals_out.end(), duals_in.begin(), u.begin(), std::minus<>());
-
-        std::vector<double> v(duals_g.size());
-        std::transform(duals_g.begin(), duals_g.end(), duals_in.begin(), v.begin(), std::minus<>());
-        norm_u = norm(u);
-        norm_v = norm(v);
-
-        // Avoid division by zero
-        if (norm_u == 0.0 || norm_v == 0.0) {
-            return 1.0; // If either vector is zero, set β = 1 as a default
-        }
-
-        // Compute cos(γ) using the dot product and norms
-        double cos_gamma = dot_product / (norm_u * norm_v);
-
-        // Clamp cos_gamma to the range [-1, 1] to avoid precision errors
-        cos_gamma = std::max(0.0, std::min(1.0, cos_gamma));
-        fmt::print("cos_gamma: {}\n", cos_gamma);
-        // Since β = cos(γ), and cos(γ) is already computed, we return cos_gamma as β
-        return cos_gamma;
     }
 
     /**
@@ -324,54 +300,81 @@ public:
      * @param best_pricing_cols A vector of pointers to the best pricing columns.
      * @return The updated alpha value based on the dynamic schedule.
      */
-    double dynamic_alpha_schedule(const ModelData &dados, const DualSolution &nodeDuals,
-                                  const std::vector<Label *> &best_pricing_cols) {
+    bool dynamic_alpha_schedule(const ModelData &dados, const DualSolution &nodeDuals) {
 
         // Get the number of rows from the size of the nodeDuals
         size_t number_of_rows = nodeDuals.size();
 
-        // Calculate the direction of separation between the current smoothed dual solution and stabilization center
-        std::vector<double> in_sep_direction(number_of_rows);
-        std::transform(smooth_dual_sol.begin(), smooth_dual_sol.end(), cur_stab_center.begin(),
-                       in_sep_direction.begin(), std::minus<>());
+        duals_in = nodeDuals;
 
-        // Calculate the norm of the smoothed dual solution (accumulating squared differences)
-        double norm_smooth_dual_sol = norm(in_sep_direction);
-
-        // If the norm is zero, return the base alpha (no adjustment necessary)
-        if (norm_smooth_dual_sol == 0.0) {
-            alpha = std::max(0.0, base_alpha - 0.1); // Decrease cur_alpha
-            return alpha;
+        std::vector<double> in_sep_direction(number_of_rows, 0.0);
+        for (size_t row_id = 0; row_id < number_of_rows; ++row_id) {
+            in_sep_direction[row_id] = cur_stab_center[row_id] - duals_in[row_id];
         }
+        double in_sep_dir_norm = norm(in_sep_direction);
+        // fmt::print("in_sep_dir_norm: {}\n", in_sep_dir_norm);
+
+        if (in_sep_dir_norm == 0) { return false; }
+
+        // Compute dot product of in_sep_direction and subgradient
+        double dot_product = 0.0;
+        for (size_t row_id = 0; row_id < number_of_rows; ++row_id) {
+            dot_product += subgradient[row_id] * in_sep_direction[row_id];
+        }
+        // fmt::print("dot_product: {}\n", dot_product);
+
+        // Compute cosine of the angle
+        double cos_angle = dot_product / (in_sep_dir_norm * subgradient_norm);
+        cos_angle        = -cos_angle; // Invert the cosine to be positive
+
+        // Return the updated cur_alpha
+        return cos_angle > 1e-12;
+    }
+
+    void update_subgradient(const ModelData &dados, const DualSolution &nodeDuals,
+                            const std::vector<Label *> &best_pricing_cols) {
+        size_t number_of_rows = nodeDuals.size();
 
         // Initialize new_rows and apply contributions from best_pricing_cols, skipping positive-cost columns
         new_rows.assign(number_of_rows, 0.0);
+
+        // Iterate through the columns brought by the pricing step
         for (const auto *best_pricing_col : best_pricing_cols) {
+            // Skip columns with positive cost, as they won't improve the solution
             if (best_pricing_col->cost > 0) { continue; }
+
+            // Update rows based on the nodes covered by this column
             for (const auto &row : best_pricing_col->nodes_covered) {
-                if (row > 0 && row != N_SIZE - 1) { // Ignore invalid rows and the last node
-                    new_rows[row - 1] += 1;
+                // Ensure valid row indices (ignore invalid rows and the last node)
+                if (row > 0 && row != N_SIZE - 1) {
+                    new_rows[row - 1] += 1; // Apply contribution of the column to the row
                 }
             }
         }
 
         // Define and set row bounds based on the problem constraints (dados.sense)
-        // Reuse vectors to avoid reallocations
+        // Reuse vectors to avoid reallocations (optimize performance)
         static std::vector<double> new_row_lower_bounds, new_row_upper_bounds;
+
+        // Resize bounds vectors if needed
         if (new_row_lower_bounds.size() != number_of_rows) {
             new_row_lower_bounds.resize(number_of_rows);
             new_row_upper_bounds.resize(number_of_rows);
         }
 
-        // Set row bounds
+        // Set row bounds based on the constraint sense ('<', '>', '=')
         for (size_t row_id = 0; row_id < number_of_rows; ++row_id) {
+            // Check the constraint type in dados.sense
             if (dados.sense[row_id] == '<') {
+                // If sense is '<', set upper bound and negative infinity lower bound
                 new_row_upper_bounds[row_id] = dados.b[row_id];
                 new_row_lower_bounds[row_id] = -std::numeric_limits<double>::infinity();
             } else if (dados.sense[row_id] == '>') {
+                // If sense is '>', set lower bound and positive infinity upper bound
                 new_row_upper_bounds[row_id] = std::numeric_limits<double>::infinity();
                 new_row_lower_bounds[row_id] = dados.b[row_id];
             } else {
+                // If sense is '=', set both lower and upper bounds to be equal to dados.b[row_id]
                 new_row_upper_bounds[row_id] = dados.b[row_id];
                 new_row_lower_bounds[row_id] = dados.b[row_id];
             }
@@ -379,31 +382,26 @@ public:
 
         // Update the subgradient based on new row values and bounds
         subgradient.assign(number_of_rows, 0.0);
+
         for (size_t row_id = 0; row_id < number_of_rows; ++row_id) {
             subgradient[row_id] = std::min(0.0, new_row_upper_bounds[row_id] - new_rows[row_id]) +
                                   std::max(0.0, new_row_lower_bounds[row_id] - new_rows[row_id]);
         }
-
-        // Compute the norm of the subgradient
         subgradient_norm = norm(subgradient);
+    }
 
-        // Compute the cosine of the angle between in_sep_direction and subgradient
-        double cos_angle =
-            std::inner_product(in_sep_direction.begin(), in_sep_direction.end(), subgradient.begin(), 0.0) /
-            (norm_smooth_dual_sol * subgradient_norm);
+    double compute_pseudo_dual_bound(const ModelData &dados, const DualSolution &nodeDuals,
+                                     const std::vector<Label *> &best_pricing_cols) {
+        double pseudo_dual_bound = 0.0;
 
-        // Negate the cosine angle to invert the direction
-        cos_angle = -cos_angle;
+        auto violation_threshold = 0.0; // Set the threshold for dual constraint violations
 
-        // Adjust cur_alpha based on the cosine angle and a threshold
-        if (cos_angle > 1e-12) {
-            alpha = std::min(0.99, base_alpha + (1.0 - base_alpha) * 0.1); // Increase cur_alpha
-        } else {
-            alpha = std::max(0.0, base_alpha - 0.1); // Decrease cur_alpha
+        // Step 1: Compute the contribution from the master dual solution
+        for (size_t row_id = 0; row_id < nodeDuals.size(); ++row_id) {
+            pseudo_dual_bound += dados.b[row_id] * nodeDuals[row_id];
         }
-
-        // Return the updated cur_alpha
-        return alpha;
+        // fmt::print("Pseudo dual bound: {}\n", pseudo_dual_bound);
+        return pseudo_dual_bound;
     }
 
     /**
@@ -421,8 +419,22 @@ public:
      */
     void update_stabilization_after_pricing_optim(const ModelData &dados, const DualSolution &nodeDuals,
                                                   const double &lag_gap, std::vector<Label *> best_pricing_cols) {
-        if (nb_misprices == 0) { alpha = dynamic_alpha_schedule(dados, nodeDuals, best_pricing_cols); }
-        if (lag_gap < lag_gap_prev) { stab_center_for_next_iteration = smooth_dual_sol; }
+        if (nb_misprices == 0) {
+            update_subgradient(dados, nodeDuals, best_pricing_cols);
+            auto alpha_dir = dynamic_alpha_schedule(dados, nodeDuals);
+            if (alpha_dir) {
+                alpha = std::min(0.99, base_alpha + (1.0 - base_alpha) * 0.1); // Increase cur_alpha
+            } else {
+                alpha = std::max(0.0, base_alpha - 0.1); // Decrease cur_alpha
+            }
+        }
+        // print lag_gap
+        // fmt::print("Lag gap: {}\n", lag_gap);
+        // if (lag_gap > lag_gap_prev) {
+        stab_center_for_next_iteration = smooth_dual_sol;
+        lag_gap_prev                   = lag_gap;
+        //}
+        // stab_center_for_next_iteration = smooth_dual_sol;
         base_alpha = alpha;
     }
 

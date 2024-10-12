@@ -114,8 +114,8 @@ inline std::vector<Label *> BucketGraph::solve() {
         auto rollback = updateStepSize(); // Update the step size for the bucket graph
         // auto rollback = false;
         if (rollback) {
-            s4     = false; // Rollback to Stage 3 if necessary
-            s3     = true;
+            //    s4     = false; // Rollback to Stage 3 if necessary
+            //    s3     = true;
             status = Status::Rollback; // Set status to rollback
             return paths;              // Return the paths after rollback
         }
@@ -314,7 +314,7 @@ std::vector<double> BucketGraph::labeling_algorithm() noexcept {
                                 n_labels++; // Increment the count of labels added
 
                                 // Add the new label to the bucket
-#ifdef SORTED_LABELS
+#ifndef SORTED_LABELS
                                 buckets[to_bucket].add_sorted_label(new_label);
 #elif LIMITED_BUCKETS
                                 buckets[to_bucket].add_label_lim(new_label, BUCKET_CAPACITY);
@@ -516,13 +516,22 @@ std::vector<Label *> BucketGraph::bi_labeling_algorithm() {
 
 #ifdef RIH
     std::vector<Label *> top_labels;
+    top_labels.reserve(5); // Reserve memory for 5 elements
     for (size_t i = 0; i < std::min(5, static_cast<int>(merged_labels.size())); ++i) {
         top_labels.push_back(merged_labels[i]);
     }
+
     auto new_labels = ils->perturbation(top_labels, nodes);
-    for (auto label : new_labels) { merged_labels.push_back(label); }
-    pdqsort(merged_labels.begin(), merged_labels.end(),
-            [](const Label *a, const Label *b) { return a->cost < b->cost; });
+
+    // Use move semantics to avoid unnecessary copying of new_labels
+    merged_labels.insert(merged_labels.end(), std::make_move_iterator(new_labels.begin()),
+                         std::make_move_iterator(new_labels.end()));
+
+    // Sort with inplace_merge to minimize sorting overhead
+    auto mid = merged_labels.end() - new_labels.size();
+    std::inplace_merge(merged_labels.begin(), mid, merged_labels.end(),
+                       [](const Label *a, const Label *b) { return a->cost < b->cost; });
+
 #endif
     return merged_labels;
 }

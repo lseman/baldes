@@ -22,6 +22,7 @@
 
 #include "RCC.h"
 
+#include "TR.h"
 #include "bnb/Branching.h"
 #include "bnb/Node.h"
 
@@ -200,7 +201,7 @@ public:
             Path path(label->nodes_covered, label->real_cost);
 
             // TODO: check if its better to use a set or simply insert the path in the vector
-            if (pathSet.find(path) != pathSet.end()) { continue; }
+            // if (pathSet.find(path) != pathSet.end()) { continue; }
             pathSet.insert(path);
 
             counter += 1;
@@ -611,7 +612,7 @@ public:
 
         double lag_gap = std::numeric_limits<double>::max();
 
-        auto                 inner_obj = 0.0;
+        auto                 inner_obj = -std::numeric_limits<double>::max();
         std::vector<Label *> paths;
         std::vector<double>  solution;
         bool                 can_add = true;
@@ -626,44 +627,13 @@ public:
 #endif
 
         bool changed = false;
-
         print_info("Starting column generation..\n\n");
         bool transition = false;
 
 #ifdef TR
-        std::vector<GRBVar> w(numConstrs);
-        std::vector<GRBVar> zeta(numConstrs);
-
-        auto epsilon1 = 10;
-        auto epsilon2 = 10;
-
-        // Create w_i and zeta_i variables for each constraint
-        for (int i = 0; i < numConstrs; i++) {
-            w[i]    = node->addVar(0, epsilon1, -1.0, GRB_CONTINUOUS, "w_" + std::to_string(i + 1));
-            zeta[i] = node->addVar(0, epsilon2, 1.0, GRB_CONTINUOUS, "zeta_" + std::to_string(i + 1));
-        }
-
-        const GRBConstr *constrs = node->getConstrs();
-        for (int i = 0; i < numConstrs; i++) {
-            node->chgCoeff(constrs[i], w[i], -1);
-            node->chgCoeff(constrs[i], zeta[i], 1);
-        }
-        double              v                   = 100;
-        bool                isInsideTrustRegion = false;
-        std::vector<double> delta1;
-        std::vector<double> delta2;
-        for (auto dual : nodeDuals) {
-            delta1.push_back(dual - v);
-            delta2.push_back(dual + v);
-        }
-        for (int i = 0; i < numConstrs; i++) {
-            // Update coefficients for w[i] and zeta[i] in the objective function
-            w[i].set(GRB_DoubleAttr_Obj, std::max(0.0, nodeDuals[i] - v)); // Set w[i]'s coefficient to -delta1
-            zeta[i].set(GRB_DoubleAttr_Obj, nodeDuals[i] + v);             // Set zeta[i]'s coefficient to delta2
-            w[i].set(GRB_DoubleAttr_UB, epsilon1);
-            zeta[i].set(GRB_DoubleAttr_UB, epsilon2);
-        }
-        fmt::print("Starting trust region with v = {}\n", v);
+        TrustRegion tr(numConstrs);
+        tr.setup(node, nodeDuals);
+        int v = 0;
 #endif
 
 #ifdef IPM
@@ -779,81 +749,54 @@ public:
 
 #ifdef TR
             if (!TRstop) {
-                isInsideTrustRegion = true;
-                for (int i = 0; i < numConstrs; i++) {
-                    if (nodeDuals[i] < delta1[i] || nodeDuals[i] > delta2[i]) { isInsideTrustRegion = false; }
-                }
-                // if (isInsideTrustRegion) { fmt::print("Fall inside trust region\n"); }
-                if (isInsideTrustRegion) {
-                    v -= 1;
-                    // print v
-                    fmt::print("Reducing v to {}\n", v);
-                    epsilon1 += 100;
-                    epsilon2 += 100;
-                    for (int i = 0; i < numConstrs; i++) {
-                        // Update coefficients for w[i] and zeta[i] in the objective function
-                        w[i].set(GRB_DoubleAttr_Obj, nodeDuals[i]);        // Set w[i]'s coefficient to -delta1
-                        zeta[i].set(GRB_DoubleAttr_Obj, nodeDuals[i] + v); // Set zeta[i]'s coefficient to delta2
-                        w[i].set(GRB_DoubleAttr_UB, epsilon1);
-                        zeta[i].set(GRB_DoubleAttr_UB, epsilon2);
-                    }
-                }
-                for (int i = 0; i < numConstrs; i++) {
-                    delta1[i] = nodeDuals[i] - v;
-                    delta2[i] = nodeDuals[i] + v;
-                }
-                if (v <= 25) {
-                    for (int i = 0; i < w.size(); i++) {
-                        node->remove(w[i]);
-                        node->remove(zeta[i]);
-                    }
-                    TRstop = true;
-                    node->update();
-                }
+                v      = tr.iterate(node, nodeDuals, inner_obj);
+                TRstop = tr.stop();
             }
-
 #endif
 
 #ifdef IPM
-            auto d            = 0.5;
-            auto matrixSparse = node->extractModelDataSparse();
-            gap               = std::abs(lp_obj - (lp_obj + std::min(0.0, inner_obj))) / std::abs(lp_obj);
-            gap               = gap / d;
+            auto d = 1;
+            matrix = node->extractModelDataSparse();
+            gap    = std::abs(lp_obj - (lp_obj + std::min(0.0, inner_obj))) / std::abs(lp_obj);
+            gap    = gap / d;
             if (std::isnan(gap)) { gap = 1e-4; }
             if (std::signbit(gap)) { gap = 1e-4; }
-
-            auto ip_result   = solver.run_optimization(matrixSparse, gap);
+            if (gap < 1e-2) { gap = 1e-2; }
+            auto ip_result   = solver.run_optimization(matrix, gap);
             lp_obj           = std::get<0>(ip_result);
             lp_obj_dual      = std::get<1>(ip_result);
             solution         = std::get<2>(ip_result);
             nodeDuals        = std::get<3>(ip_result);
             auto originDuals = nodeDuals;
             for (auto &dual : nodeDuals) { dual = -dual; }
+
+            lag_gap          = integer_solution - (lp_obj + std::min(0.0, inner_obj));
+            bucket_graph.gap = lag_gap;
 #endif
 
 #ifdef STAB
             stab.update_stabilization_after_master_optim(nodeDuals);
+            nodeDuals = stab.getStabDualSol(nodeDuals);
 
             misprice = true;
             while (misprice) {
-                nodeDuals = stab.getStabDualSol(nodeDuals);
-                solution  = node->extractSolution();
+                solution = node->extractSolution();
 #endif
+                // fmt::print("Iteration: {}\n", iter);
 
                 bool integer = true;
-                // Check integrality of the solution
-                for (auto &sol : solution) {
-                    // NOTE: 1e-1 is not enough
-                    if (sol > 1e-2 && sol < 1 - 1e-2) {
-                        integer = false;
-                        break;
+                if (TRstop) {
+                    for (auto sol : solution) {
+                        if (sol > 1e-2 && sol < 1 - 1e-2) {
+                            integer = false;
+                            break;
+                        }
                     }
-                }
-                if (integer) {
-                    if (lp_obj < integer_solution) {
-                        print_info("Updating integer solution to {}\n", lp_obj);
-                        integer_solution       = lp_obj;
-                        bucket_graph.incumbent = integer_solution;
+                    if (integer) {
+                        if (lp_obj > integer_solution) {
+                            print_info("Updating integer solution to {}\n", lp_obj);
+                            integer_solution = lp_obj;
+                        }
                     }
                 }
 
@@ -863,8 +806,24 @@ public:
 #if defined(SRC3) || defined(SRC)
                 // SRC cuts
                 if (!SRCconstraints.empty()) {
+#ifdef IPM
+                    std::vector<int> SRCindices;
+                    for (int i = 0; i < SRCconstraints.size(); i++) {
+                        GRBConstr constr = SRCconstraints[i];
+                        auto      index  = constr.index();
+                        SRCindices.push_back(index);
+                    }
+#endif
+
+#ifndef IPM
                     auto duals = node->get(GRB_DoubleAttr_Pi, SRCconstraints.data(), SRCconstraints.size());
                     cutDuals.assign(duals, duals + SRCconstraints.size());
+#else
+                    // get jobDuals on the SRCindices
+                    std::vector<double> cutDuals;
+                    for (auto &index : SRCindices) { cutDuals.push_back(-nodeDuals[index]); }
+
+#endif
                     cuts->setDuals(cutDuals);
                 }
 #endif
@@ -872,8 +831,12 @@ public:
 #ifdef RCC
                 // RCC cuts
                 if (rccManager.size() > 0) {
-                    auto model     = node->getModel();
+                    auto model = node->getModel();
+#ifndef IPM
                     auto arc_duals = rccManager.computeDuals(model);
+#else
+                    auto arc_duals = rccManager.computeDuals(nodeDuals);
+#endif
                     bucket_graph.setArcDuals(arc_duals);
                 }
 #endif
@@ -897,6 +860,7 @@ public:
 #ifdef SRC
                 // Define rollback procedure
                 if (bucket_graph.getStatus() == Status::Rollback) {
+                    /*
                     for (int i = SRCconstraints.size() - 1; i >= 0; --i) {
                         GRBConstr constr = SRCconstraints[i];
                         node->remove(constr);
@@ -907,6 +871,7 @@ public:
                     cuts->reset();
                     // r1c.cutStorage = cuts;
                     matrix = node->extractModelDataSparse();
+                    */
                 }
 #endif
 
@@ -917,21 +882,24 @@ public:
 #endif
 
 #ifdef STAB
+
+                auto pseudo_bound = stab.compute_pseudo_dual_bound(matrix, nodeDuals, paths);
+                lag_gap           = integer_solution - (lp_obj + std::min(0.0, inner_obj));
+
                 // TODO: check if we should update this before running the stab update
                 node->optimize();
                 lp_obj    = node->get(GRB_DoubleAttr_ObjVal);
                 nodeDuals = node->getDuals();
 
-                lag_gap          = integer_solution - (lp_obj + std::min(0.0, inner_obj));
                 bucket_graph.gap = lag_gap;
 
                 matrix = node->extractModelDataSparse();
 
                 stab.update_stabilization_after_pricing_optim(matrix, nodeDuals, lag_gap, paths);
-
+                if (stab.shouldExit()) { misprice = false; }
                 if (colAdded == 0) {
                     stab.update_stabilization_after_misprice();
-                    if (stab.shouldExit()) { misprice = false; }
+                    nodeDuals = stab.getStabDualSol(nodeDuals);
                 } else {
                     misprice = false;
                 }
@@ -948,6 +916,7 @@ public:
             auto cur_alpha  = 0.0;
             auto n_cuts     = 0;
             auto n_rcc_cuts = 0;
+            auto tr_val     = 0;
 
 #ifdef STAB
             cur_alpha = stab.base_alpha;
@@ -960,11 +929,15 @@ public:
 #ifdef RCC
             n_rcc_cuts = rccManager.size();
 #endif
+
+#ifdef TR
+            tr_val = v;
+#endif
             if (iter % 50 == 0)
                 fmt::print("| It.: {:4} | Obj.: {:8.2f} | Price: {:9.2f} | SRC: {:4} | RCC: {:4} | Paths: {:4} | "
                            "Stage: {:1} | "
-                           "Lag.: {:10.4f} | alpha: {:4.2f} | \n",
-                           iter, lp_obj, inner_obj, n_cuts, n_rcc_cuts, colAdded, stage, lag_gap, cur_alpha);
+                           "Lag.: {:10.4f} | alpha: {:4.2f} | TR: {:1} | \n",
+                           iter, lp_obj, inner_obj, n_cuts, n_rcc_cuts, colAdded, stage, lag_gap, cur_alpha, tr_val);
         }
         bucket_graph.print_statistics();
 
@@ -1126,13 +1099,13 @@ public:
 
         double lag_gap = std::numeric_limits<double>::max();
 
-        auto                 inner_obj = 0.0;
+        auto                 inner_obj = -std::numeric_limits<double>::max();
         std::vector<Label *> paths;
         std::vector<double>  solution;
         bool                 can_add = true;
 
 #ifdef STAB
-        Stabilization stab(0.9, nodeDuals);
+        Stabilization stab(0.5, nodeDuals);
 #endif
         bool changed = false;
 
