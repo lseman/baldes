@@ -269,7 +269,12 @@ std::vector<int> BucketGraph::computePhi(int &bucket_id, bool fw) {
 
     } else {
         // Handle the case where R_SIZE == 1 with a simpler approach
-        int smaller = bucket_id - 1;
+        int smaller;
+        if (fw) {
+            smaller = bucket_id - 1;
+        } else {
+            smaller = bucket_id - 1;
+        }
 
         if (smaller >= 0 && buckets[smaller].node_id == buckets[bucket_id].node_id) {
 #ifdef FIX_BUCKETS

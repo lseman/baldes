@@ -301,6 +301,8 @@ public:
 
     IteratedLocalSearch *ils = nullptr;
 
+    double inner_obj = -std::numeric_limits<double>::infinity();
+
     std::vector<std::vector<int>> fw_ordered_sccs;
     std::vector<std::vector<int>> bw_ordered_sccs;
     std::vector<int>              fw_topological_order;

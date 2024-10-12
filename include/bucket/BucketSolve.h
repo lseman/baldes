@@ -46,16 +46,15 @@ inline std::vector<Label *> BucketGraph::solve() {
 
     // Placeholder for the final paths (labels) and inner objective value
     std::vector<Label *> paths;
-    double               inner_obj;
 
     //////////////////////////////////////////////////////////////////////
     // ADAPTIVE STAGE HANDLING
     //////////////////////////////////////////////////////////////////////
     // Stage 1: Apply a light heuristic (Stage::One)
     if (s1) {
-        stage     = 1;
-        paths     = bi_labeling_algorithm<Stage::One>(); // Solve the problem with Stage 1 heuristic
-        inner_obj = paths[0]->cost;
+        stage = 1;
+        paths = bi_labeling_algorithm<Stage::One>(); // Solve the problem with Stage 1 heuristic
+        // inner_obj = paths[0]->cost;
 
         // Transition from Stage 1 to Stage 2 if the objective improves or after 10 iterations
         if (inner_obj >= -1 || iter >= 10) {
@@ -65,10 +64,10 @@ inline std::vector<Label *> BucketGraph::solve() {
     }
     // Stage 2: Apply a more expensive pricing heuristic (Stage::Two)
     else if (s2) {
-        s2        = true;
-        stage     = 2;
-        paths     = bi_labeling_algorithm<Stage::Two>(); // Solve the problem with Stage 2 heuristic
-        inner_obj = paths[0]->cost;
+        s2    = true;
+        stage = 2;
+        paths = bi_labeling_algorithm<Stage::Two>(); // Solve the problem with Stage 2 heuristic
+        // inner_obj = paths[0]->cost;
 
         // Transition from Stage 2 to Stage 3 if the objective improves or after 800 iterations
         if (inner_obj >= -100 || iter > 800) {
@@ -78,9 +77,9 @@ inline std::vector<Label *> BucketGraph::solve() {
     }
     // Stage 3: Apply a heuristic fixing approach (Stage::Three)
     else if (s3) {
-        stage     = 3;
-        paths     = bi_labeling_algorithm<Stage::Three>(); // Solve the problem with Stage 3 heuristic
-        inner_obj = paths[0]->cost;
+        stage = 3;
+        paths = bi_labeling_algorithm<Stage::Three>(); // Solve the problem with Stage 3 heuristic
+        // inner_obj = paths[0]->cost;
 
         // Transition from Stage 3 to Stage 4 if the objective improves significantly
         if (inner_obj >= -0.5) {
@@ -108,8 +107,8 @@ inline std::vector<Label *> BucketGraph::solve() {
         }
 #endif
         // If not transitioning, continue with Stage 4 algorithm
-        paths     = bi_labeling_algorithm<Stage::Four>();
-        inner_obj = paths[0]->cost;
+        paths = bi_labeling_algorithm<Stage::Four>();
+        // inner_obj = paths[0]->cost;
 
         auto rollback = updateStepSize(); // Update the step size for the bucket graph
         // auto rollback = false;
@@ -314,7 +313,7 @@ std::vector<double> BucketGraph::labeling_algorithm() noexcept {
                                 n_labels++; // Increment the count of labels added
 
                                 // Add the new label to the bucket
-#ifndef SORTED_LABELS
+#ifdef SORTED_LABELS
                                 buckets[to_bucket].add_sorted_label(new_label);
 #elif LIMITED_BUCKETS
                                 buckets[to_bucket].add_label_lim(new_label, BUCKET_CAPACITY);
@@ -495,6 +494,8 @@ std::vector<Label *> BucketGraph::bi_labeling_algorithm() {
     // Sort the merged labels by cost, to prioritize cheaper labels
     pdqsort(merged_labels.begin(), merged_labels.end(),
             [](const Label *a, const Label *b) { return a->cost < b->cost; });
+
+    inner_obj = merged_labels[0]->cost;
 
 #ifdef SCHRODINGER
     // if merged_labels is bigger than 10, create Path related to the remaining ones

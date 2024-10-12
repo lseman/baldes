@@ -169,7 +169,6 @@ void BucketGraph::BucketArcElimination(double theta) {
         for (const auto &a : bucket_arcs) {
             std::vector<double> increment(MAIN_RESOURCES, 0);
             for (int r = 0; r < MAIN_RESOURCES; ++r) {
-
                 if constexpr (D == Direction::Forward) {
                     increment[r] = buckets[b].lb[r] + a.resource_increment[r];
                 } else {
@@ -299,12 +298,11 @@ void BucketGraph::ObtainJumpBucketArcs() {
                 const int start_bucket = num_buckets_index[current_node_id];
                 const int node_buckets = num_buckets[current_node_id];
 
-                // Look through adjacent buckets
-                for (int b_prime = b + 1; b_prime < start_bucket + node_buckets; ++b_prime) {
+                auto process_bucket = [&](int b, int b_prime) {
                     // Check if b_prime is adjacent to b in Phi
                     const auto &phi_b_prime = Phi[b_prime];
                     if (std::find(phi_b_prime.begin(), phi_b_prime.end(), b) == phi_b_prime.end()) {
-                        continue; // Not adjacent, skip
+                        return; // Not adjacent, skip
                     }
 
                     // Check arcs in the adjacent bucket b_prime
@@ -319,15 +317,26 @@ void BucketGraph::ObtainJumpBucketArcs() {
                         if (from_node == from_node_prime && to_node == to_node_prime) {
                             B_bar.push_back(b_prime); // Add the valid bucket to B_bar
 
-                            // Add the jump arc with the resource and cost increments
-                            // const double        res = gamma_prime.resource_increment;
-                            const std::vector<double> res =
-                                gamma_prime.resource_increment; // Wrap the value in a vector
-                            const double cost = gamma_prime.cost_increment;
+                            // Wrap the resource increment in a vector
+                            const std::vector<double> res  = gamma_prime.resource_increment;
+                            const double              cost = gamma_prime.cost_increment;
 
                             buckets[b].add_jump_arc(b, b_prime, res, cost, true);
                             ++arc_counter; // Increment the jump arc counter
                         }
+                    }
+                };
+
+                if constexpr (D == Direction::Forward) {
+                    // Forward direction: incrementing buckets
+                    for (int b_prime = b + 1; b_prime < start_bucket + node_buckets; ++b_prime) {
+                        process_bucket(b, b_prime);
+                    }
+                } else {
+                    // Backward direction: decrementing buckets
+                    // for (int b_prime = b - 1; b_prime >= start_bucket; --b_prime) { process_bucket(b, b_prime); }
+                    for (int b_prime = b + 1; b_prime < start_bucket + node_buckets; ++b_prime) {
+                        process_bucket(b, b_prime);
                     }
                 }
             }

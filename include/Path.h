@@ -117,10 +117,8 @@ struct Path {
 };
 
 inline int random_seed() {
-    int seed = std::chrono::system_clock::now().time_since_epoch().count(); // Use current time as a seed
-
     // Create an instance of Xoroshiro128Plus with a seed
-    Xoroshiro128Plus rng(seed); // You can set your seed here
+    Xoroshiro128Plus rng; // You can set your seed here
 
     // Generate a random number and fit it into the desired range [0, 1000000]
     return rng() % 1000001; // Use modulo to constrain the value

@@ -376,7 +376,7 @@ bool LimitedMemoryRank1Cuts::runSeparation(BNBNode *node, std::vector<GRBConstr>
         double slack = constr.get(GRB_DoubleAttr_Slack);
 
         // If the slack is positive, it means the constraint is not violated
-        if (slack > 1e-3) {
+        if (slack > 0) {
             cleared = true;
 
             // Remove the constraint from the model and cut storage
@@ -399,9 +399,6 @@ bool LimitedMemoryRank1Cuts::runSeparation(BNBNode *node, std::vector<GRBConstr>
     prepare45Heuristic(matrix.A_sparse, solution);
     the45Heuristic<CutType::FourRow>(matrix.A_sparse, solution);
     the45Heuristic<CutType::FiveRow>(matrix.A_sparse, solution);
-    if (cuts_before == cuts->size() + n_cuts_removed) {
-        print_info("No violations found, calling it a day\n");
-        return false;
-    }
+    if (cuts_before == cuts->size() + n_cuts_removed) { return false; }
     return true;
 }
