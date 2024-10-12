@@ -12,6 +12,8 @@
 #include "Label.h"
 #include "RNG.h"
 
+#include <exec/task.hpp>
+#include <queue>
 class IteratedLocalSearch {
 public:
     InstanceData         instance;
@@ -311,7 +313,7 @@ public:
     exec::static_thread_pool            pool  = exec::static_thread_pool(5);
     exec::static_thread_pool::scheduler sched = pool.get_scheduler();
 
-    std::vector<Label *> perturbation(const std::vector<Label *> &paths, std::vector<VRPNode> &nodes) {
+    std::vector<Label *> perturbation(const std::vector<Label *> &paths, const std::vector<VRPNode> &nodes) {
         this->nodes               = nodes;
         std::vector<Label *> best = paths;
         std::vector<Label *> best_new;
@@ -482,5 +484,65 @@ private:
         }
 
         return {cost, red_cost};
+    }
+    // Task queue and synchronization primitives
+    std::queue<std::pair<std::vector<Label *>, std::vector<VRPNode>>> task_queue;
+    std::mutex                                                        queue_mutex;
+    std::condition_variable                                           queue_condition;
+    bool                                                              shutdown = false;
+    const int task_threshold = 5; // The threshold for processing tasks
+
+    // Wait for enough tasks (5 tasks in the queue)
+    exec::task<void> wait_for_tasks() {
+        std::unique_lock<std::mutex> lock(queue_mutex);
+        queue_condition.wait(lock, [this] { return task_queue.size() >= task_threshold || shutdown; });
+        co_return;
+    }
+
+    // Process a batch of 5 tasks
+    exec::task<void> process_tasks(IteratedLocalSearch &ils) {
+        std::vector<std::pair<std::vector<Label *>, std::vector<VRPNode>>> tasks_to_process;
+        {
+            std::lock_guard<std::mutex> lock(queue_mutex);
+            for (int i = 0; i < task_threshold && !task_queue.empty(); ++i) {
+                tasks_to_process.push_back(std::move(task_queue.front()));
+                task_queue.pop();
+            }
+        }
+
+        // Process the batch of tasks
+        for (const auto &task : tasks_to_process) {
+            ils.perturbation(task.first, task.second);
+            std::cout << "Processed a task!" << std::endl;
+        }
+
+        co_return;
+    }
+
+    // Continuous task processing loop using stdexec coroutines
+    exec::task<void> task_worker(IteratedLocalSearch &ils) {
+        while (!shutdown) {
+            co_await wait_for_tasks();   // Wait until there are enough tasks
+            co_await process_tasks(ils); // Process the tasks
+        }
+        co_return;
+    }
+
+    // Function to submit new tasks to the queue
+    void submit_task(const std::vector<Label *> &paths, const std::vector<VRPNode> &nodes) {
+        {
+            std::lock_guard<std::mutex> lock(queue_mutex);
+            task_queue.emplace(paths, nodes); // Add new task to the queue
+        }
+        queue_condition.notify_one(); // Notify the worker that a new task is available
+    }
+
+    // Function to gracefully shut down the worker
+    void stop_worker() {
+        {
+            std::lock_guard<std::mutex> lock(queue_mutex);
+            shutdown = true; // Signal the worker to shut down
+        }
+        queue_condition.notify_all(); // Wake up the worker to shut it down
     }
 };

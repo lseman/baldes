@@ -1,8 +1,8 @@
 #ifndef XOROSHIRO128PLUS_H
 #define XOROSHIRO128PLUS_H
 
+#include <chrono>  // for std::chrono::high_resolution_clock
 #include <cstdint> // for std::uint64_t
-
 class Xoroshiro128Plus {
     std::uint64_t state0_;
     std::uint64_t state1_;
@@ -20,9 +20,16 @@ public:
     using result_type = std::uint64_t;
 
     // Constructor that initializes the state with a seed.
-    Xoroshiro128Plus(std::uint64_t seed = 42) {
+    Xoroshiro128Plus(std::uint64_t seed) {
         state0_ = splitmix64(seed);
         state1_ = splitmix64(state0_);
+    }
+
+    Xoroshiro128Plus() {
+        // get seed from clock
+        std::uint64_t seed = std::chrono::high_resolution_clock::now().time_since_epoch().count();
+        state0_            = splitmix64(seed);
+        state1_            = splitmix64(state0_);
     }
 
     // Return the minimum value this RNG can generate.

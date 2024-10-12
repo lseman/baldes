@@ -201,7 +201,7 @@ public:
             Path path(label->nodes_covered, label->real_cost);
 
             // TODO: check if its better to use a set or simply insert the path in the vector
-            if (pathSet.find(path) != pathSet.end()) { continue; }
+            // if (pathSet.find(path) != pathSet.end()) { continue; }
             pathSet.insert(path);
 
             counter += 1;
@@ -621,7 +621,7 @@ public:
         bool        TRstop = false;
         TrustRegion tr(numConstrs);
         tr.setup(node, nodeDuals);
-        int v = 0;
+        double v = 0;
 #endif
 
 #ifdef IPM
@@ -678,7 +678,7 @@ public:
                     r1c.allPaths  = allPaths;
                     bool violated = r1c.runSeparation(node, SRCconstraints);
                     if (!violated) {
-                        fmt::print("No violated cuts found\n");
+                        print_info("No violated cuts found, calling it a day\n");
                         break;
                     }
 
@@ -694,7 +694,7 @@ public:
 
 #ifdef TR
             if (!TRstop) {
-                v      = tr.iterate(node, nodeDuals, inner_obj);
+                v      = tr.iterate(node, nodeDuals, inner_obj, bucket_graph.getStage());
                 TRstop = tr.stop();
             }
 #endif
@@ -729,7 +729,10 @@ public:
 #endif
 
                 bool integer = true;
-                if (TRstop) {
+#ifdef TR
+                if (TRstop)
+#endif
+                {
                     for (auto sol : solution) {
                         if (sol > 1e-2 && sol < 1 - 1e-2) {
                             integer = false;
@@ -793,7 +796,7 @@ public:
                 // CALLING BALDES
                 //////////////////////////////////////////////////////////////////////
                 paths     = bucket_graph.solve();
-                inner_obj = paths[0]->cost;
+                inner_obj = bucket_graph.inner_obj;
                 stage     = bucket_graph.getStage();
                 ss        = bucket_graph.ss;
                 //////////////////////////////////////////////////////////////////////
@@ -839,10 +842,10 @@ public:
             stab.update_stabilization_after_iter(nodeDuals);
 #endif
 
-            auto cur_alpha  = 0.0;
-            auto n_cuts     = 0;
-            auto n_rcc_cuts = 0;
-            auto tr_val     = 0;
+            auto   cur_alpha  = 0.0;
+            auto   n_cuts     = 0;
+            auto   n_rcc_cuts = 0;
+            double tr_val     = 0;
 
 #ifdef STAB
             cur_alpha = stab.base_alpha;
@@ -860,9 +863,9 @@ public:
             tr_val = v;
 #endif
             if (iter % 50 == 0)
-                fmt::print("| It.: {:4} | Obj.: {:8.2f} | Price: {:9.2f} | SRC: {:4} | RCC: {:4} | Paths: {:4} | "
+                fmt::print("| It.: {:4} | Obj.: {:8.2f} | Price: {:9.2f} | SRC: {:3} | RCC: {:3} | Paths: {:3} | "
                            "Stage: {:1} | "
-                           "Lag.: {:10.4f} | α: {:4.2f} | tr: {:1} | \n",
+                           "Lag.: {:10.4f} | α: {:4.2f} | tr: {:2.2f} | \n",
                            iter, lp_obj, inner_obj, n_cuts, n_rcc_cuts, colAdded, stage, lag_gap, cur_alpha, tr_val);
         }
         bucket_graph.print_statistics();

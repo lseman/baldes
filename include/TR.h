@@ -17,6 +17,8 @@ public:
     int                 epsilon2 = 10;
     double              v        = 100;
     bool                TRstop   = false;
+    std::vector<double> prevDuals;
+    double              c = 0;
 
     TrustRegion(int numConstrs) : numConstrs(numConstrs) {}
 
@@ -26,7 +28,8 @@ public:
 
         w.resize(numConstrs);
         zeta.resize(numConstrs);
-
+        v = std::accumulate(nodeDuals.begin(), nodeDuals.end(), 0.0) / numConstrs;
+        c = v / 100;
         std::vector<int> tr_vars_idx;
         // Create w_i and zeta_i variables for each constraint
         for (int i = 0; i < numConstrs; i++) {
@@ -56,20 +59,31 @@ public:
         }
         fmt::print("Starting trust region with v = {}\n", v);
         node->optimize();
+        prevDuals.assign(nodeDuals.size(), 0.0);
     }
 
-    int iterate(BNBNode *node, std::vector<double> nodeDuals, double inner_obj) {
+    double update_v(std::vector<double> &nodeDuals) {
+
+        double dualDiffSum = 0.0;
+        for (int i = 0; i < numConstrs; i++) { dualDiffSum += std::abs(nodeDuals[i] - prevDuals[i]); }
+
+        double avgDualDiff = dualDiffSum / numConstrs;
+        prevDuals          = nodeDuals;
+        return avgDualDiff;
+    }
+    double iterate(BNBNode *node, std::vector<double> nodeDuals, double inner_obj, int stage) {
         isInsideTrustRegion = true;
         TRstop              = false;
+        auto kappa          = 10;
 
         for (int i = 0; i < numConstrs; i++) {
             if (nodeDuals[i] < delta1[i] || nodeDuals[i] > delta2[i]) { isInsideTrustRegion = false; }
         }
-        // if (isInsideTrustRegion) { fmt::print("Fall inside trust region\n"); }
         if (isInsideTrustRegion) {
-            v -= 1;
-            // print v
-            // fmt::print("Reducing v to {}\n", v);
+            // v -= 1;
+            v            = update_v(nodeDuals);
+            auto new_eps = v / c;
+
             if (v >= 80) {
                 epsilon1 += 100;
                 epsilon2 += 100;
@@ -87,10 +101,10 @@ public:
             }
         }
         for (int i = 0; i < numConstrs; i++) {
-            delta1[i] = nodeDuals[i] - v;
-            delta2[i] = nodeDuals[i] + v;
+            delta1[i] = nodeDuals[i] - v / 2;
+            delta2[i] = nodeDuals[i] + v / 2;
         }
-        if (v <= 25 || inner_obj > -10) {
+        if (v <= 25 || stage == 4) {
             v = 0;
             for (int i = 0; i < w.size(); i++) {
                 node->remove(w[i]);

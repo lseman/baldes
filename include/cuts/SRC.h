@@ -11,7 +11,6 @@
  * The file facilitates the optimization process by allowing computation of limited memory coefficients and
  * the generation of cuts via heuristics. The file makes use of Gurobi for handling constraints in the solver.
  *
- * @note Several methods are optimized for parallel execution using thread pools.
  */
 
 #pragma once
@@ -30,7 +29,7 @@
 
 #include <unordered_set>
 
-#include "xxhash.h"
+// #include "xxhash.h"
 
 #include "RNG.h"
 
@@ -229,16 +228,37 @@ inline std::vector<std::vector<double>> getPermutationsForSize4() {
  * input vector `elements` and stores them in the `result` vector.
  *
  */
+#include <algorithm>
+#include <random>
+
 template <typename T>
-inline void combinations(const std::vector<T> &elements, int k, std::vector<std::vector<T>> &result) {
+inline void combinations(const std::vector<T> &elements, int k, int max_combinations,
+                         std::vector<std::vector<T>> &result) {
     std::vector<int> indices(k);
     std::iota(indices.begin(), indices.end(), 0);
+
+    // Random number generator
+    Xoroshiro128Plus                 rng; // Seed it (you can change the seed)
+    std::uniform_real_distribution<> dis(0.0, 1.0);
+
+    int total_combinations = 0; // Track total combinations generated
 
     while (true) {
         // Generate the current combination based on the selected indices
         std::vector<T> combination;
         for (int idx : indices) { combination.push_back(elements[idx]); }
-        result.push_back(combination);
+
+        // Randomly select this combination
+        ++total_combinations;
+        if (result.size() < max_combinations || dis(rng) < static_cast<double>(max_combinations) / total_combinations) {
+            if (result.size() < max_combinations) {
+                result.push_back(combination);
+            } else {
+                // Replace a random element in the result if the result is already full
+                std::uniform_int_distribution<> idx_dis(0, max_combinations - 1);
+                result[idx_dis(rng)] = combination;
+            }
+        }
 
         // Find the rightmost index that can be incremented
         int i = k - 1;
@@ -314,9 +334,9 @@ void LimitedMemoryRank1Cuts::the45Heuristic(const SparseMatrix &A, const std::ve
     }
 
     // Shuffle permutations and limit to 3 for efficiency
-    int seed = std::chrono::system_clock::now().time_since_epoch().count(); // Use current time as a seed
+    // int seed = std::chrono::system_clock::now().time_since_epoch().count(); // Use current time as a seed
 
-    Xoroshiro128Plus rng(seed); // Seed it (you can change the seed)
+    Xoroshiro128Plus rng; // Seed it (you can change the seed)
     if (permutations.size() > 4) {
         // Use std::shuffle with the Xoroshiro128Plus generator
         std::shuffle(permutations.begin(), permutations.end(), rng);
@@ -345,8 +365,8 @@ void LimitedMemoryRank1Cuts::the45Heuristic(const SparseMatrix &A, const std::ve
     auto bulk_sender = stdexec::bulk(
         input_sender, tasks.size(),
         [this, &permutations, &processedSetsCache, &processedPermutationsCache, &cuts_mutex, &cuts_count, &x,
-         &selectedNodes, &cutQueue, &max_number_of_cuts, &max_generated_cuts,
-         violation_threshold](std::size_t task_idx) {
+         &selectedNodes, &cutQueue, &max_number_of_cuts, &max_generated_cuts, violation_threshold,
+         &rng](std::size_t task_idx) {
             std::vector<double> coefficients_aux(x.size(), 0.0);
 
             auto &consumer = allPaths[selectedNodes[task_idx]].route;
@@ -358,14 +378,12 @@ void LimitedMemoryRank1Cuts::the45Heuristic(const SparseMatrix &A, const std::ve
             }
 
             std::vector<std::vector<int>> setsOf45;
-            if constexpr (T == CutType::FourRow) {
-                combinations(consumer, 4, setsOf45);
-            } else if constexpr (T == CutType::FiveRow) {
-                combinations(consumer, 5, setsOf45);
-            }
 
-            // limit the number of sets to process
-            if (setsOf45.size() > 3000) { setsOf45.resize(3000); }
+            if constexpr (T == CutType::FourRow) {
+                combinations(consumer, 4, 2000, setsOf45);
+            } else if constexpr (T == CutType::FiveRow) {
+                combinations(consumer, 5, 2000, setsOf45);
+            }
 
             std::vector<Cut> threadCuts;
 

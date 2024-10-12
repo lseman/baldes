@@ -128,7 +128,7 @@ public:
      */
     std::string generateUUID() {
         // Create an instance of Xoroshiro128Plus with a seed
-        Xoroshiro128Plus rng(42); // You can use any seed you prefer
+        Xoroshiro128Plus rng; // You can use any seed you prefer
 
         std::stringstream ss;
         ss << std::hex;
