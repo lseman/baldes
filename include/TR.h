@@ -60,6 +60,7 @@ public:
 
     int iterate(BNBNode *node, std::vector<double> nodeDuals, double inner_obj) {
         isInsideTrustRegion = true;
+        TRstop              = false;
 
         for (int i = 0; i < numConstrs; i++) {
             if (nodeDuals[i] < delta1[i] || nodeDuals[i] > delta2[i]) { isInsideTrustRegion = false; }
