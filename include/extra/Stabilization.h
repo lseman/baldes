@@ -208,6 +208,18 @@ public:
         return std::sqrt(res + 1e-12);
     }
 
+    inline std::vector<double> mult(const std::vector<double> &v, const std::vector<double> &w) {
+        std::vector<double> res(v.size(), 0.0);
+        for (size_t i = 0; i < v.size(); ++i) { res[i] = v[i] * w[i]; }
+        return res;
+    }
+
+    inline std::vector<double> sub(const std::vector<double> &v, const std::vector<double> &w) {
+        std::vector<double> res(v.size(), 0.0);
+        for (size_t i = 0; i < v.size(); ++i) { res[i] = v[i] - w[i]; }
+        return res;
+    }
+
     /**
      * @brief Computes an advanced stabilized dual solution.
      *
@@ -300,19 +312,15 @@ public:
      * @param best_pricing_cols A vector of pointers to the best pricing columns.
      * @return The updated alpha value based on the dynamic schedule.
      */
-    bool dynamic_alpha_schedule(const ModelData &dados, const DualSolution &nodeDuals) {
+    bool dynamic_alpha_schedule(const ModelData &dados) {
 
         // Get the number of rows from the size of the nodeDuals
-        size_t number_of_rows = nodeDuals.size();
-
-        duals_in = nodeDuals;
+        size_t number_of_rows = cur_stab_center.size();
 
         std::vector<double> in_sep_direction(number_of_rows, 0.0);
-        for (size_t row_id = 0; row_id < number_of_rows; ++row_id) {
-            in_sep_direction[row_id] = cur_stab_center[row_id] - duals_in[row_id];
-        }
-        double in_sep_dir_norm = norm(in_sep_direction);
-        // fmt::print("in_sep_dir_norm: {}\n", in_sep_dir_norm);
+        in_sep_direction = sub(smooth_dual_sol, cur_stab_center);
+
+        double in_sep_dir_norm = norm(cur_stab_center, smooth_dual_sol);
 
         if (in_sep_dir_norm == 0) { return false; }
 
@@ -321,14 +329,9 @@ public:
         for (size_t row_id = 0; row_id < number_of_rows; ++row_id) {
             dot_product += subgradient[row_id] * in_sep_direction[row_id];
         }
-        // fmt::print("dot_product: {}\n", dot_product);
-
-        // Compute cosine of the angle
         double cos_angle = dot_product / (in_sep_dir_norm * subgradient_norm);
-        cos_angle        = -cos_angle; // Invert the cosine to be positive
 
-        // Return the updated cur_alpha
-        return cos_angle > 1e-12;
+        return cos_angle < 1e-12;
     }
 
     void update_subgradient(const ModelData &dados, const DualSolution &nodeDuals,
@@ -421,21 +424,20 @@ public:
                                                   const double &lag_gap, std::vector<Label *> best_pricing_cols) {
         if (nb_misprices == 0) {
             update_subgradient(dados, nodeDuals, best_pricing_cols);
-            auto alpha_dir = dynamic_alpha_schedule(dados, nodeDuals);
+            auto alpha_dir = dynamic_alpha_schedule(dados);
             if (alpha_dir) {
                 alpha = std::min(0.99, base_alpha + (1.0 - base_alpha) * 0.1); // Increase cur_alpha
             } else {
                 alpha = std::max(0.0, base_alpha - 0.1); // Decrease cur_alpha
             }
         }
-        // print lag_gap
-        // fmt::print("Lag gap: {}\n", lag_gap);
-        // if (lag_gap > lag_gap_prev) {
-        stab_center_for_next_iteration = smooth_dual_sol;
-        lag_gap_prev                   = lag_gap;
-        //}
-        // stab_center_for_next_iteration = smooth_dual_sol;
-        base_alpha = alpha;
+        if (lag_gap < lag_gap_prev) {
+            stab_center_for_next_iteration = smooth_dual_sol;
+        } else {
+            stab_center_for_next_iteration = cur_stab_center;
+        }
+        lag_gap_prev = lag_gap;
+        base_alpha   = alpha;
     }
 
     /**

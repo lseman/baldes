@@ -20,7 +20,6 @@
 #include "SparseMatrix.h"
 
 #include "Cut.h"
-
 #include "Pools.h"
 
 #include "ankerl/unordered_dense.h"
@@ -36,6 +35,8 @@
 #include "RNG.h"
 
 #define VRPTW_SRC_max_S_n 10000
+
+class BNBNode;
 
 /**
  * @struct VRPTW_SRC
@@ -170,6 +171,8 @@ public:
         the45selectedNodes      = selectHighestCoefficients(x, max_important_nodes);
     }
 
+    bool runSeparation(BNBNode *node, std::vector<GRBConstr> &SRCconstraints);
+
 private:
     static std::mutex cache_mutex;
 
@@ -179,12 +182,6 @@ private:
     std::vector<std::vector<int>>                       baseSets;
     ankerl::unordered_dense::map<int, std::vector<int>> neighborSets;
     CutType                                             cutType;
-
-    // Function to create a unique key from an unordered set of strings
-    std::string createKey(const ankerl::unordered_dense::set<std::string> &set);
-
-    int alpha(const std::vector<int> &C, const std::vector<int> &M, const std::vector<double> &p,
-              const std::vector<int> &r);
 };
 
 /**
@@ -256,38 +253,6 @@ inline void combinations(const std::vector<T> &elements, int k, std::vector<std:
         // Update the following indices
         for (int j = i + 1; j < k; ++j) { indices[j] = indices[j - 1] + 1; }
     }
-}
-
-/**
- * @brief Finds the visiting nodes in a sparse model based on selected nodes.
- *
- * This function processes a sparse model to identify and return the visiting nodes
- * for the given selected nodes. It filters the columns of the sparse model and
- * returns only those that are relevant to the selected nodes.
- *
- */
-inline std::vector<std::vector<int>> findVisitingNodes(const SparseMatrix &A, const std::vector<int> &selectedNodes) {
-    std::vector<std::vector<int>>     consumers;
-    ankerl::unordered_dense::set<int> selectedNodeSet(selectedNodes.begin(), selectedNodes.end());
-
-    // Reserve space for consumers to prevent multiple allocations
-    consumers.reserve(selectedNodes.size());
-
-    // Preprocess the selected columns
-    std::vector<std::vector<int>> col_to_rows(A.num_cols);
-    for (const auto &elem : A.elements) {
-        // print A.elements' value
-        // fmt::print("A.elements.value: {}\n", elem.value);
-
-        if (elem.value == -1) { col_to_rows[elem.col].push_back(elem.row); }
-    }
-
-    // Filter only the selected nodes
-    for (int col : selectedNodes) {
-        if (!col_to_rows[col].empty()) { consumers.push_back(std::move(col_to_rows[col])); }
-    }
-
-    return consumers;
 }
 
 // Hash function for a vector of integers

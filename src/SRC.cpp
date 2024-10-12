@@ -21,6 +21,8 @@
 #include <mutex>
 #include <vector>
 
+#include "bnb/Node.h"
+
 using Cuts = std::vector<Cut>;
 
 /**
@@ -353,4 +355,53 @@ void LimitedMemoryRank1Cuts::generateCutCoefficients(VRPTW_SRC &cuts, std::vecto
         auto work = stdexec::starts_on(sched, bulk_sender);
         stdexec::sync_wait(std::move(work));
     }
+}
+
+bool LimitedMemoryRank1Cuts::runSeparation(BNBNode *node, std::vector<GRBConstr> &SRCconstraints) {
+    node->optimize();
+    auto      cuts = &cutStorage;
+    ModelData matrix;
+
+    auto cuts_before = cuts->size();
+    ////////////////////////////////////////////////////
+    // Handle non-violated cuts in a single pass
+    ////////////////////////////////////////////////////
+    bool cleared        = false;
+    auto n_cuts_removed = 0;
+    // Iterate over the constraints in reverse order to remove non-violated cuts
+    for (int i = SRCconstraints.size() - 1; i >= 0; --i) {
+        GRBConstr constr = SRCconstraints[i];
+
+        // Get the slack value of the constraint
+        double slack = constr.get(GRB_DoubleAttr_Slack);
+
+        // If the slack is positive, it means the constraint is not violated
+        if (slack > 1e-3) {
+            cleared = true;
+
+            // Remove the constraint from the model and cut storage
+            node->remove(constr);
+            cuts->removeCut(cuts->getID(i));
+            n_cuts_removed++;
+
+            // Remove from SRCconstraints
+            SRCconstraints.erase(SRCconstraints.begin() + i);
+        }
+    }
+
+    if (cleared) {
+        node->update();   // Update the model to reflect the removals
+        node->optimize(); // Re-optimize the model
+    }
+    matrix        = node->extractModelDataSparse(); // Extract model data
+    auto solution = node->extractSolution();
+    separate(matrix.A_sparse, solution);
+    prepare45Heuristic(matrix.A_sparse, solution);
+    the45Heuristic<CutType::FourRow>(matrix.A_sparse, solution);
+    the45Heuristic<CutType::FiveRow>(matrix.A_sparse, solution);
+    if (cuts_before == cuts->size() + n_cuts_removed) {
+        print_info("No violations found, calling it a day\n");
+        return false;
+    }
+    return true;
 }

@@ -201,7 +201,7 @@ public:
             Path path(label->nodes_covered, label->real_cost);
 
             // TODO: check if its better to use a set or simply insert the path in the vector
-            // if (pathSet.find(path) != pathSet.end()) { continue; }
+            if (pathSet.find(path) != pathSet.end()) { continue; }
             pathSet.insert(path);
 
             counter += 1;
@@ -542,7 +542,6 @@ public:
 
         node->relaxNode();
         node->optimize();
-
         relaxed_result = std::numeric_limits<double>::max();
 
         // check if feasible
@@ -555,37 +554,34 @@ public:
         auto &matrix         = node->matrix;
         auto &SRCconstraints = node->SRCconstraints;
         auto &allPaths       = node->paths;
-        auto &r1c            = node->r1c;
+#ifdef SRC
+        auto &r1c = node->r1c;
+#endif
         auto &branchingDuals = node->branchingDuals;
-
 #ifdef RCC
         auto &rccManager = node->rccManager;
 #endif
 
-        int bucket_interval = 20;
-        int time_horizon    = instance.T_max;
-
+        int bucket_interval       = 20;
+        int time_horizon          = instance.T_max;
         numConstrs                = node->get(GRB_IntAttr_NumConstrs);
         node->numConstrs          = numConstrs;
         std::vector<double> duals = std::vector<double>(numConstrs, 0.0);
 
         // BucketGraph bucket_graph(nodes, time_horizon, bucket_interval, instance.q, bucket_interval);
         BucketGraph bucket_graph(nodes, time_horizon, bucket_interval);
-
-        // print distance matrix size
         bucket_graph.set_distance_matrix(instance.getDistanceMatrix(), 8);
         bucket_graph.branching_duals = &branchingDuals;
 
-        // node->optimize();
         matrix                 = node->extractModelDataSparse();
         auto integer_solution  = node->get(GRB_DoubleAttr_ObjVal);
         bucket_graph.incumbent = integer_solution;
 
-        auto allNodes = bucket_graph.getNodes();
-
 #ifdef SRC
-        r1c              = LimitedMemoryRank1Cuts(allNodes);
-        CutStorage *cuts = &r1c.cutStorage;
+        r1c                      = LimitedMemoryRank1Cuts(nodes);
+        CutStorage *cuts         = &r1c.cutStorage;
+        bucket_graph.cut_storage = cuts;
+
 #endif
 
         std::vector<double> cutDuals;
@@ -595,22 +591,13 @@ public:
         double lp_obj_dual = 0.0;
         double lp_obj      = node->get(GRB_DoubleAttr_ObjVal);
 
-#ifdef SRC
-        bucket_graph.cut_storage = cuts;
-#endif
-
         bucket_graph.setup();
 
-        double gap = 1e-6;
-
-        bool ss    = false;
-        int  stage = 1;
-
-        bool TRstop = false;
-
-        bool misprice = true;
-
-        double lag_gap = std::numeric_limits<double>::max();
+        double gap      = 1e-6;
+        bool   ss       = false;
+        int    stage    = 1;
+        bool   misprice = true;
+        double lag_gap  = std::numeric_limits<double>::max();
 
         auto                 inner_obj = -std::numeric_limits<double>::max();
         std::vector<Label *> paths;
@@ -631,6 +618,7 @@ public:
         bool transition = false;
 
 #ifdef TR
+        bool        TRstop = false;
         TrustRegion tr(numConstrs);
         tr.setup(node, nodeDuals);
         int v = 0;
@@ -687,53 +675,10 @@ public:
 
 #if defined(SRC3) || defined(SRC)
                 if (!rcc) {
-
-                    // removeNegativeReducedCostVarsAndPaths(node);
-                    node->optimize();
-
-                    auto cuts_before = cuts->size();
-                    ////////////////////////////////////////////////////
-                    // Handle non-violated cuts in a single pass
-                    ////////////////////////////////////////////////////
-                    bool cleared        = false;
-                    auto n_cuts_removed = 0;
-                    // Iterate over the constraints in reverse order to remove non-violated cuts
-                    for (int i = SRCconstraints.size() - 1; i >= 0; --i) {
-                        GRBConstr constr = SRCconstraints[i];
-
-                        // Get the slack value of the constraint
-                        double slack = constr.get(GRB_DoubleAttr_Slack);
-
-                        // If the slack is positive, it means the constraint is not violated
-                        if (slack > 1e-3) {
-                            cleared = true;
-
-                            // Remove the constraint from the model and cut storage
-                            node->remove(constr);
-                            cuts->removeCut(cuts->getID(i));
-                            n_cuts_removed++;
-
-                            // Remove from SRCconstraints
-                            SRCconstraints.erase(SRCconstraints.begin() + i);
-                        }
-                    }
-
-                    if (cleared) {
-                        node->update();                          // Update the model to reflect the removals
-                        node->optimize();                        // Re-optimize the model
-                        matrix = node->extractModelDataSparse(); // Extract model data
-                    }
-
-                    solution     = node->extractSolution();
-                    r1c.allPaths = allPaths;
-                    r1c.separate(matrix.A_sparse, solution);
-#ifdef SRC
-                    r1c.prepare45Heuristic(matrix.A_sparse, solution);
-                    r1c.the45Heuristic<CutType::FourRow>(matrix.A_sparse, solution);
-                    r1c.the45Heuristic<CutType::FiveRow>(matrix.A_sparse, solution);
-#endif
-                    if (cuts_before == cuts->size() + n_cuts_removed) {
-                        print_info("No violations found, calling it a day\n");
+                    r1c.allPaths  = allPaths;
+                    bool violated = r1c.runSeparation(node, SRCconstraints);
+                    if (!violated) {
+                        fmt::print("No violated cuts found\n");
                         break;
                     }
 
@@ -782,7 +727,6 @@ public:
             while (misprice) {
                 solution = node->extractSolution();
 #endif
-                // fmt::print("Iteration: {}\n", iter);
 
                 bool integer = true;
                 if (TRstop) {
@@ -857,24 +801,6 @@ public:
                 // Adding cols
                 colAdded = addColumn(node, paths, false);
 
-#ifdef SRC
-                // Define rollback procedure
-                if (bucket_graph.getStatus() == Status::Rollback) {
-                    /*
-                    for (int i = SRCconstraints.size() - 1; i >= 0; --i) {
-                        GRBConstr constr = SRCconstraints[i];
-                        node->remove(constr);
-                    }
-                    node->SRCconstraints = std::vector<GRBConstr>();
-                    node->update();
-                    node->optimize();
-                    cuts->reset();
-                    // r1c.cutStorage = cuts;
-                    matrix = node->extractModelDataSparse();
-                    */
-                }
-#endif
-
 #ifdef SCHRODINGER
                 // Adding schrodinger paths
                 auto sch_paths = bucket_graph.getSchrodinger();
@@ -936,7 +862,7 @@ public:
             if (iter % 50 == 0)
                 fmt::print("| It.: {:4} | Obj.: {:8.2f} | Price: {:9.2f} | SRC: {:4} | RCC: {:4} | Paths: {:4} | "
                            "Stage: {:1} | "
-                           "Lag.: {:10.4f} | alpha: {:4.2f} | TR: {:1} | \n",
+                           "Lag.: {:10.4f} | α: {:4.2f} | tr: {:1} | \n",
                            iter, lp_obj, inner_obj, n_cuts, n_rcc_cuts, colAdded, stage, lag_gap, cur_alpha, tr_val);
         }
         bucket_graph.print_statistics();
