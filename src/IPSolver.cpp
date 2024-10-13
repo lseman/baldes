@@ -33,17 +33,6 @@ Eigen::SparseMatrix<double> IPSolver::convertToSparseDiagonal(const Eigen::Vecto
  * standard form is characterized by having all variables non-negative and all
  * constraints as equalities.
  *
- * @param A The constraint matrix of the original problem.
- * @param b The right-hand side vector of the original problem.
- * @param c The cost vector of the original problem.
- * @param lb The lower bounds for the variables.
- * @param ub The upper bounds for the variables.
- * @param sense The sense of the constraints (0 for equality, 1 for inequality).
- * @param As The constraint matrix of the problem in standard form (output).
- * @param bs The right-hand side vector of the problem in standard form (output).
- * @param cs The cost vector of the problem in standard form (output).
- *
- * @throws std::runtime_error If unexpected bounds are encountered.
  */
 void IPSolver::convert_to_standard_form(const Eigen::SparseMatrix<double> &A, const Eigen::VectorXd &b,
                                         const Eigen::VectorXd &c, const Eigen::VectorXd &lb, const Eigen::VectorXd &ub,
@@ -66,9 +55,9 @@ void IPSolver::convert_to_standard_form(const Eigen::SparseMatrix<double> &A, co
             ++n_free;
         } else if (std::isfinite(lo[i]) && std::isfinite(hi[i])) {
             ++n_ubounds;
-        } else if (lo[i] == -infty && std::isfinite(hi[i])) {
+            //} else if (lo[i] == -infty && std::isfinite(hi[i])) {
             // To be dealt with later
-        } else if (std::isfinite(lo[i]) && hi[i] == infty) {
+            //} else if (std::isfinite(lo[i]) && hi[i] == infty) {
             // To be dealt with later
         } else {
             throw std::runtime_error("unexpected bounds");
@@ -89,45 +78,50 @@ void IPSolver::convert_to_standard_form(const Eigen::SparseMatrix<double> &A, co
     std::vector<double> val_ub;
 
     int free = 0, ubi = 0;
-    for (int j = 0; j < lo.size(); ++j) {
+    // Cache the size of lo for the outer loop
+    int lo_size = lo.size();
+    triplets.reserve(lo_size * 2); // Estimate the triplet size more accurately
+
+    for (int j = 0; j < lo_size; ++j) {
         double l = lo[j];
         double h = hi[j];
+
+        bool is_free_var    = (l == -infty && h == infty);
+        bool is_bounded_var = (std::isfinite(l) && std::isfinite(h));
+        bool is_upper_bound = (l == -infty && std::isfinite(h));
+        bool is_lower_bound = (std::isfinite(l) && h == infty);
 
         for (Eigen::SparseMatrix<double>::InnerIterator it(A, j); it; ++it) {
             int    i = it.row();   // Row index
             double v = it.value(); // Value at A(i, j)
 
-            if (l == -infty && h == infty) {
+            if (is_free_var) {
                 // Free variable
                 cs[j]         = c[j];
                 cs[nv + free] = -c[j];
-                bs[i] -= 0; // No change to bs
-
                 triplets.emplace_back(i, j, v);          // Add original value
                 triplets.emplace_back(i, nv + free, -v); // Add negated value
-
                 ++free;
-            } else if (std::isfinite(l) && std::isfinite(h)) {
-                // print l and h
+            } else if (is_bounded_var) {
                 // l <= x <= h
                 cs[j + free] = c[j];
-                bs[i] -= (v * l);
+                bs[i] -= (v * l); // Compute once
 
                 triplets.emplace_back(i, j, v); // Add value
 
                 ind_ub.push_back(j);
                 val_ub.push_back(h - l);
                 ++ubi;
-            } else if (l == -infty && std::isfinite(h)) {
+            } else if (is_upper_bound) {
                 // x <= h
                 cs[j] = -c[j];
-                bs[i] -= (-v * h);
+                bs[i] -= (-v * h); // Compute once
 
                 triplets.emplace_back(i, j, -v); // Add negated value
-            } else if (std::isfinite(l) && h == infty) {
+            } else if (is_lower_bound) {
                 // l <= x
                 cs[j] = c[j];
-                bs[i] -= (v * l);
+                bs[i] -= (v * l); // Compute once
 
                 triplets.emplace_back(i, j, v); // Add value
             } else {
@@ -157,21 +151,6 @@ void IPSolver::convert_to_standard_form(const Eigen::SparseMatrix<double> &A, co
  * This function calculates and updates the primal residual (rp), upper bound residual (ru),
  * dual residual (rd), and gap residual (rg) along with their norms.
  *
- * @param res Reference to the Residuals structure to be updated.
- * @param x Current primal variable vector.
- * @param lambda Current dual variable vector associated with equality constraints.
- * @param s Current slack variable vector.
- * @param v Current dual variable vector associated with inequality constraints.
- * @param w Current dual variable vector associated with upper bounds.
- * @param A Sparse matrix representing the constraint coefficients.
- * @param b Vector representing the right-hand side of the equality constraints.
- * @param c Vector representing the coefficients of the objective function.
- * @param ubv Vector representing the upper bound values.
- * @param ubi Vector of indices corresponding to the upper bound constraints.
- * @param vbv Vector representing the values associated with the dual variables for bounds.
- * @param vbi Vector of indices corresponding to the dual variables for bounds.
- * @param tau Scalar parameter for the homotopy method.
- * @param kappa Scalar parameter representing the duality gap.
  */
 void IPSolver::update_residuals(Residuals &res, const Eigen::VectorXd &x, const Eigen::VectorXd &lambda,
                                 const Eigen::VectorXd &s, const Eigen::VectorXd &v, const Eigen::VectorXd &w,
@@ -184,11 +163,21 @@ void IPSolver::update_residuals(Residuals &res, const Eigen::VectorXd &x, const 
 
     // Calculate ru (upper bound residual) with fewer iterations by combining operations
     res.ru = -v; // Directly assign -v to res.ru
-    for (int i = 0; i < ubi.size(); ++i) { res.ru(ubi(i)) += tau * ubv(i) - x(ubi(i)); }
+
+    // Update res.ru more efficiently using Eigen's indexed operations
+    for (int i = 0; i < ubi.size(); ++i) {
+        int idx = ubi(i); // Cache index access
+        res.ru(idx) += tau * ubv(i) - x(idx);
+    }
 
     // Efficiently calculate rd (dual residual) using noalias to avoid temporary allocations
     res.rd.noalias() = tau * c - A.transpose() * lambda - s;
-    for (int i = 0; i < ubi.size(); ++i) { res.rd(ubi(i)) += w(i); }
+
+    // Update res.rd similarly to ru, using Eigen's indexed access
+    for (int i = 0; i < ubi.size(); ++i) {
+        int idx = ubi(i); // Cache index access
+        res.rd(idx) += w(i);
+    }
 
     // Efficiently calculate rg (gap residual) by combining dot products
     res.rg  = kappa + c.dot(x) - b.dot(lambda) + ubv.dot(w);
@@ -257,17 +246,23 @@ void IPSolver::solve_augmented_system(Eigen::VectorXd &dx, Eigen::VectorXd &dy, 
 void IPSolver::solve_augsys(Eigen::VectorXd &delta_x, Eigen::VectorXd &delta_y, Eigen::VectorXd &delta_z,
                             SparseSolver &ls, const Eigen::VectorXd &theta_vw, const Eigen::VectorXi &ubi,
                             const Eigen::VectorXd &xi_p, const Eigen::VectorXd &xi_d, const Eigen::VectorXd &xi_u) {
-    // Initialize delta_z with zeros
-    delta_z.setZero(ubi.size());
-    // print xi_d size
-    // Use a dense vector and avoid creating an extra SparseVector when unnecessary
+    // Create a modifiable copy of xi_d
     Eigen::VectorXd xi_d_mod = xi_d;
-    for (int i = 0; i < ubi.size(); ++i) { xi_d_mod(ubi(i)) -= xi_u(ubi(i)) * theta_vw(i); }
+
+    // Update the copy (xi_d_mod) instead of the original
+    for (int i = 0; i < ubi.size(); ++i) {
+        int idx = ubi(i);                                  // Cache the index
+        xi_d_mod.coeffRef(idx) -= xi_u(idx) * theta_vw(i); // Modify the copy
+    }
+
     // Call the function to solve the augmented system
     solve_augmented_system(delta_x, delta_y, ls, xi_p, xi_d_mod);
 
-    // Update delta_z more efficiently with a direct access
-    for (int i = 0; i < ubi.size(); ++i) { delta_z(i) = (delta_x(ubi(i)) - xi_u(i)) * theta_vw(i); }
+    // Update delta_z more efficiently with direct access
+    for (int i = 0; i < ubi.size(); ++i) {
+        int idx    = ubi(i); // Cache the index
+        delta_z(i) = (delta_x(idx) - xi_u(i)) * theta_vw(i);
+    }
 }
 
 /**
@@ -276,37 +271,6 @@ void IPSolver::solve_augsys(Eigen::VectorXd &delta_x, Eigen::VectorXd &delta_y, 
  * This function updates the provided solution vectors (Delta_x, Delta_lambda, Delta_w, Delta_s, Delta_v)
  * and scalars (Delta_tau, Delta_kappa) by solving the augmented system using the provided sparse solver.
  *
- * @param Delta_x Output vector for the change in x.
- * @param Delta_lambda Output vector for the change in lambda.
- * @param Delta_w Output vector for the change in w.
- * @param Delta_s Output vector for the change in s.
- * @param Delta_v Output vector for the change in v.
- * @param Delta_tau Output scalar for the change in tau.
- * @param Delta_kappa Output scalar for the change in kappa.
- * @param ls Sparse solver used to solve the augmented system.
- * @param theta_vw Vector of theta values for v and w.
- * @param b Vector b from the linear system.
- * @param c Vector c from the linear system.
- * @param ubi Vector of upper bounds indices.
- * @param ubv Vector of upper bounds values.
- * @param delta_x Vector of delta values for x.
- * @param delta_y Vector of delta values for y.
- * @param delta_w Vector of delta values for w.
- * @param delta_0 Scalar delta value.
- * @param iter_x Current iteration vector for x.
- * @param iter_lambda Current iteration vector for lambda.
- * @param iter_w Current iteration vector for w.
- * @param iter_s Current iteration vector for s.
- * @param iter_v Current iteration vector for v.
- * @param iter_tau Current iteration scalar for tau.
- * @param iter_kappa Current iteration scalar for kappa.
- * @param xi_p Vector of xi values for p.
- * @param xi_u Vector of xi values for u.
- * @param xi_d Vector of xi values for d.
- * @param xi_g Scalar xi value for g.
- * @param xi_xs Vector of xi values for xs.
- * @param xi_vw Vector of xi values for vw.
- * @param xi_tau_kappa Scalar xi value for tau and kappa.
  */
 void IPSolver::solve_newton_system(
     Eigen::VectorXd &Delta_x, Eigen::VectorXd &Delta_lambda, Eigen::VectorXd &Delta_w, Eigen::VectorXd &Delta_s,
@@ -347,9 +311,6 @@ void IPSolver::solve_newton_system(
  * in `dv`, it computes a potential alpha value. The minimum of these potential
  * alpha values is returned as the result.
  *
- * @param v The current vector.
- * @param dv The direction vector.
- * @return The maximum step size (alpha) that keeps the updated vector non-negative.
  */
 double IPSolver::max_alpha_single(const Eigen::VectorXd &v, const Eigen::VectorXd &dv) {
 
@@ -373,19 +334,6 @@ double IPSolver::max_alpha_single(const Eigen::VectorXd &v, const Eigen::VectorX
  * values of the variables (x, v, s, w) and their respective search directions. Additionally, it takes into
  * account the step sizes for tau and kappa.
  *
- * @param x The current value of the primal variable x.
- * @param dx The search direction for the primal variable x.
- * @param v The current value of the dual variable v.
- * @param dv The search direction for the dual variable v.
- * @param s The current value of the slack variable s.
- * @param ds The search direction for the slack variable s.
- * @param w The current value of the dual slack variable w.
- * @param dw The search direction for the dual slack variable w.
- * @param tau The current value of the barrier parameter tau.
- * @param dtau The search direction for the barrier parameter tau.
- * @param kappa The current value of the barrier parameter kappa.
- * @param dkappa The search direction for the barrier parameter kappa.
- * @return The maximum step size (alpha) that can be taken along the search directions without violating constraints.
  */
 double IPSolver::max_alpha(const Eigen::VectorXd &x, const Eigen::VectorXd &dx, const Eigen::VectorXd &v,
                            const Eigen::VectorXd &dv, const Eigen::VectorXd &s, const Eigen::VectorXd &ds,
@@ -407,13 +355,6 @@ double IPSolver::max_alpha(const Eigen::VectorXd &x, const Eigen::VectorXd &dx, 
  * It converts the model data to a standard form, initializes necessary variables, and iteratively solves
  * the optimization problem until convergence or the maximum number of iterations is reached.
  *
- * @param model The model data to be optimized.
- * @param tol The tolerance level for convergence.
- * @return A tuple containing:
- *         - The objective value of the primal solution.
- *         - The objective value of the dual solution.
- *         - A vector of the primal solution values.
- *         - A vector of the dual solution values.
  */
 std::tuple<double, double, std::vector<double>, std::vector<double>> IPSolver::run_optimization(ModelData   &model,
                                                                                                 const double tol) {
@@ -504,20 +445,15 @@ std::tuple<double, double, std::vector<double>, std::vector<double>> IPSolver::r
 
     // Dimensions and constants
     double r_min   = std::sqrt(std::numeric_limits<double>::epsilon()); // approx 1e-8
-    int    attempt = 0;
+    int    attempt = 0, ncor = 0;
     // Residual related variables
-    double _p, _d, _g;
-    double mu;
+    double _p, _d, _g, mu;
     // Step length and corrections
     double alpha, alpha_c, alpha_;
-    int    ncor;
-    double beta;
     // Damping factors
-    double gamma, damping;
-    double oneMinusAlpha;
+    double beta, gamma, damping, oneMinusAlpha;
     // Cross products and thresholds
-    double mu_l, mu_u;
-    double taukappa, t0;
+    double mu_l, mu_u, taukappa, t0;
     // Theta values
     Eigen::VectorXd theta_vw, theta_xs;
     // Xi values
@@ -531,9 +467,8 @@ std::tuple<double, double, std::vector<double>, std::vector<double>> IPSolver::r
         Delta_v_c(v.size());
     double Delta_tau_c, Delta_kappa_c;
     // Temporary values for corrections
-    Eigen::VectorXd xs, vw;
+    Eigen::VectorXd xs, vw, t_xs, t_vw;
     Eigen::ArrayXd  t_xs_lower, t_xs_upper, t_vw_lower, t_vw_upper;
-    Eigen::VectorXd t_xs, t_vw;
     // Delta calculations
     double delta_0, bl_dot_lambda, correction;
 
@@ -560,17 +495,23 @@ std::tuple<double, double, std::vector<double>, std::vector<double>> IPSolver::r
         mu = (tau * kappa + x.dot(s) + v.dot(w)) / (n + ubi.size() + 1.0);
 
         // Calculate _p, _d, and _g in parallel
+        // Calculate primal and dual residual norms using Infinity norm
+        double rp_norm  = res.rp.lpNorm<Eigen::Infinity>();
+        double ru_norm  = res.ru.lpNorm<Eigen::Infinity>();
+        double rd_norm  = res.rd.lpNorm<Eigen::Infinity>();
+        double b_norm   = b.lpNorm<Eigen::Infinity>();
+        double ubv_norm = ubv.lpNorm<Eigen::Infinity>();
+        double c_norm   = c.lpNorm<Eigen::Infinity>();
 
-        _p = std::fmax(res.rp.lpNorm<Eigen::Infinity>() / (tau * (1.0 + b.lpNorm<Eigen::Infinity>())),
-                       res.ru.lpNorm<Eigen::Infinity>() / (tau * (1.0 + ubv.lpNorm<Eigen::Infinity>())));
-        _d = res.rd.lpNorm<Eigen::Infinity>() / (tau * (1.0 + c.lpNorm<Eigen::Infinity>()));
+        // Avoid repeated calculations and improve readability
+        _p = std::fmax(rp_norm / (tau * (1.0 + b_norm)), ru_norm / (tau * (1.0 + ubv_norm)));
+        _d = rd_norm / (tau * (1.0 + c_norm));
 
-        bl_dot_lambda = b.dot(lambda) - ubv.dot(w);
-        _g            = std::abs(c.dot(x) - bl_dot_lambda) / (tau + std::abs(bl_dot_lambda));
+        // Calculate the dot product once for efficiency
+        double bl_dot_lambda = b.dot(lambda) - ubv.dot(w);
+        _g                   = std::abs(c.dot(x) - bl_dot_lambda) / (tau + std::abs(bl_dot_lambda));
 
         // Check for optimality and infeasibility
-        // print mu
-        // fmt::print("mu: {}, p: {}, d: {}\n", mu, _p, _d);
         if (_p <= 1e-4 && _d <= 1e-4 && _g <= tol) { break; }
         // Scaling factors
         theta_vw = w.cwiseQuotient(v);
@@ -594,6 +535,9 @@ std::tuple<double, double, std::vector<double>, std::vector<double>> IPSolver::r
                 regG *= 100.0;
             }
         }
+
+        update_linear_solver(ls, theta_xs, regP, regD);
+
         // Solve the augmented system
         solve_augsys(delta_x, delta_y, delta_z, ls, theta_vw, ubi, b, c, ubv);
         delta_0 = regG + kappa / tau - delta_x.dot(c) + delta_y.dot(b) - delta_z.dot(ubv);

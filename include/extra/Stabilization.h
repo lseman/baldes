@@ -264,6 +264,7 @@ public:
 
         for (size_t row_id = 0; row_id < n; ++row_id) {
             duals_tilde[row_id] = cur_alpha * duals_in[row_id] + (1 - cur_alpha) * duals_out[row_id];
+            // duals_tilde[row_id] = cur_alpha * cur_stab_center[row_id] + (1 - cur_alpha) * nodeDuals[row_id];
         }
         // Compute the coefficient for π_g based on the norm of duals_in and duals_out
         double coef_g = norm(duals_in, duals_out) / norm(subgradient);
@@ -280,9 +281,10 @@ public:
             for (auto row_id = 0; row_id < duals_out.size(); ++row_id) {
                 dot_product += (duals_out[row_id] - duals_in[row_id]) * (duals_g[row_id] - duals_in[row_id]);
             }
-            beta = dot_product / norm(duals_in, duals_out) / norm(duals_in, duals_g);
+            beta = dot_product / (norm(duals_in, duals_out) * norm(duals_in, duals_g));
         }
         beta = std::max(0.0, beta);
+        // fmt::print("beta: {}\n", beta);
 
         // Compute ρ: a combination of duals_g and duals_out based on β
         for (size_t row_id = 0; row_id < n; ++row_id) {
@@ -344,7 +346,7 @@ public:
         // Iterate through the columns brought by the pricing step
         for (const auto *best_pricing_col : best_pricing_cols) {
             // Skip columns with positive cost, as they won't improve the solution
-            if (best_pricing_col->cost > 0) { continue; }
+            if (best_pricing_col->cost >= 0) { continue; }
 
             // Update rows based on the nodes covered by this column
             for (const auto &row : best_pricing_col->nodes_covered) {
@@ -369,10 +371,16 @@ public:
         for (size_t row_id = 0; row_id < number_of_rows; ++row_id) {
             // Check the constraint type in dados.sense
             if (dados.sense[row_id] == '<') {
+                // ax < b
+                // ax - b < 0
+                // b - ax > 0
                 // If sense is '<', set upper bound and negative infinity lower bound
                 new_row_upper_bounds[row_id] = dados.b[row_id];
                 new_row_lower_bounds[row_id] = -std::numeric_limits<double>::infinity();
             } else if (dados.sense[row_id] == '>') {
+                // ax > b
+                // ax - b > 0
+                // b - ax < 0
                 // If sense is '>', set lower bound and positive infinity upper bound
                 new_row_upper_bounds[row_id] = std::numeric_limits<double>::infinity();
                 new_row_lower_bounds[row_id] = dados.b[row_id];
@@ -387,8 +395,15 @@ public:
         subgradient.assign(number_of_rows, 0.0);
 
         for (size_t row_id = 0; row_id < number_of_rows; ++row_id) {
-            subgradient[row_id] = std::min(0.0, new_row_upper_bounds[row_id] - new_rows[row_id]) +
-                                  std::max(0.0, new_row_lower_bounds[row_id] - new_rows[row_id]);
+            // subgradient[row_id] = std::min(0.0, new_row_upper_bounds[row_id] - new_rows[row_id]) +
+            //                       std::max(0.0, new_row_lower_bounds[row_id] - new_rows[row_id]);
+            if (dados.sense[row_id] == '<') {
+                subgradient[row_id] = new_rows[row_id] - new_row_upper_bounds[row_id];
+            } else if (dados.sense[row_id] == '>') {
+                subgradient[row_id] = new_row_lower_bounds[row_id] - new_rows[row_id];
+            } else if (dados.sense[row_id] == '=') {
+                subgradient[row_id] = new_row_upper_bounds[row_id] - new_rows[row_id];
+            }
         }
         subgradient_norm = norm(subgradient);
     }

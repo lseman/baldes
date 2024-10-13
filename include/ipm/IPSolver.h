@@ -1,15 +1,21 @@
 #pragma once
 
 #include "Definitions.h"
-#include "cholmod.h"
 #include "fmt/base.h"
 #include <Eigen/Dense>
 #include <Eigen/Sparse>
+#include <Eigen/SparseCholesky>
 #include <gurobi_c++.h>
 #include <iostream>
 #include <new>
 #include <stdexcept>
 #include <vector>
+
+#include "Solver.h"
+
+#ifdef CHOLMOD
+#include "cholmod.h"
+#endif
 
 /**
  * @struct OptimizationData
@@ -56,6 +62,7 @@ struct Residuals {
 OptimizationData extractOptimizationComponents(GRBModel &model);
 OptimizationData convertToOptimizationData(const ModelData &modelData);
 
+#ifdef CHOLMOD
 /**
  * @class CholmodSolver
  * @brief A solver class that utilizes CHOLMOD for sparse matrix factorization and solving linear systems.
@@ -147,6 +154,7 @@ private:
         return Eigen::VectorXd::Map(reinterpret_cast<double *>(vectorPtr->x), vectorPtr->nrow);
     }
 };
+#endif
 
 /**
  * @class SparseSolver
@@ -169,14 +177,22 @@ public:
     Eigen::SparseMatrix<double> D;
     bool                        firstFactorization = true;
 
-    enum SolverType { CHOLMOD };
+    enum SolverType {
+#ifdef CHOLMOD
+        CH,
+#endif
+        LDLT
+    };
 
-    SparseSolver() { solver = new SolverWrapper<CholmodSolver>(); }
+    // SparseSolver() { solver = new SolverWrapper<CholmodSolver>(); }
 
-    SparseSolver(SolverType type) {
-        // switch (type) {
-        // case CHOLMOD: solver = new SolverWrapper<ConjugateResidualSolver>(); break;
-        // }
+    SparseSolver(SolverType type = LDLT) {
+        switch (type) {
+#ifdef CHOLMOD
+        case CH: solver = new SolverWrapper<CholmodSolver>(); break;
+#endif
+        case LDLT: solver = new SolverWrapper<LDLTSolver>(); break;
+        }
     }
 
     ~SparseSolver() { delete solver; }
@@ -226,15 +242,21 @@ private:
 class IPSolver {
 
 public:
-    Eigen::SparseMatrix<double> A, As;
-    Eigen::VectorXd             b, bs, c, cs, lo, hi, sense;
-    Eigen::VectorXi             ubi, vbi;
-    Eigen::VectorXd             ubv, vbv;
-    Residuals                   res;
-    SparseSolver                ls;
-    double                      tau, kappa, tol;
-    int                         max_iter;
+    Residuals    res;
+    SparseSolver ls;
+    double       tau, kappa, tol;
+    int          max_iter;
+    double       infty = std::numeric_limits<double>::infinity();
 
+    // Create history of the old values
+    Eigen::VectorXd x_old;
+    Eigen::VectorXd lambda_old;
+    Eigen::VectorXd s_old;
+    Eigen::VectorXd v_old;
+    Eigen::VectorXd w_old;
+
+    // create default constructor
+    IPSolver() {}
     Eigen::SparseMatrix<double> convertToSparseDiagonal(const Eigen::VectorXd &vec);
 
     // Method to convert the given linear programming problem to standard form

@@ -27,6 +27,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED True)
 # Enable Interprocedural Optimization (Link Time Optimization)
 set(CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE ON)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+set(CMAKE_EXPERIMENTAL_CXX_MODULE_CMAKE_API_BOTH TRUE)
 
 # Include directories
 include_directories(include)
@@ -38,7 +39,7 @@ include_directories(third_party/hgs_vrptw)
 # Build types and flags
 if(NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE
-      "RelWithDebInfo"
+      "Release"
       CACHE STRING "Choose the type of build." FORCE)
 endif()
 set(CMAKE_CXX_FLAGS_RELEASE "-O3 -march=native -flto")
@@ -203,32 +204,18 @@ if(NOT FMT_FOUND)
   cpmaddpackage(NAME fmt GITHUB_REPOSITORY fmtlib/fmt GIT_TAG 11.0.2)
 endif()
 
-if(GET_SUITESPARSE)
-  cpmaddpackage(
-    NAME
-    SuiteSparse
-    GITHUB_REPOSITORY
-    DrTimothyAldenDavis/SuiteSparse
-    GIT_TAG
-    v7.8.2
-    OPTIONS
-    "BUILD_METIS OFF")
-  # Specify only CHOLMOD build
-  set(SUITESPARSE_BUILDS "CHOLMOD")
-  set(SUITESPARSE_CONFIG_ONLY TRUE)
-endif()
-
 if(WITH_PYTHON)
   cpmaddpackage(NAME pybind11 GITHUB_REPOSITORY pybind/pybind11 GIT_TAG v2.13.6)
 endif()
 
 if(IPM)
   cpmaddpackage(NAME Eigen GIT_REPOSITORY https://gitlab.com/libeigen/eigen.git
-                GIT_TAG 3.4.0)
-  include_directories(${EIGEN_SOURCE_DIR})
+                GIT_TAG 3.4.0
+                DOWNLOAD_ONLY YES  # Only download Eigen, don't configure or build it
+  )
+  include_directories(${Eigen_SOURCE_DIR})
 endif()
 
-include_directories(/usr/include/suitesparse/)
 
 set(GUROBI_HOME $ENV{GUROBI_HOME})
 include_directories(${GUROBI_HOME}/include)
@@ -305,8 +292,7 @@ else()
 endif()
 
 if(IPM)
-  target_link_libraries(vrptw PRIVATE Eigen3::Eigen)
-  target_link_libraries(vrptw PRIVATE cholmod)
+  target_include_directories(vrptw PRIVATE ${eigen_SOURCE_DIR})
 endif()
 
 set(GUROBI_VERSION_MAJOR 110) # Adjust based on Gurobi version
@@ -347,6 +333,7 @@ endif()
 target_compile_options(vrptw PRIVATE -Wno-c++26-extensions
                                      -Wno-deprecated-declarations)
 
+                                 
 # link with xxhash
 target_link_libraries(vrptw PRIVATE xxhash)
 # link with unordered_dense
