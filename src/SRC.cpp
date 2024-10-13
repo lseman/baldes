@@ -242,7 +242,7 @@ void LimitedMemoryRank1Cuts::generateCutCoefficients(VRPTW_SRC &cuts, std::vecto
                                                      int numNodes, const SparseMatrix &A,
                                                      const std::vector<double> &x) {
     double primal_violation   = 0.0;
-    int    max_number_of_cuts = 5;
+    int    max_number_of_cuts = 10;
 
     if (cuts.S_n > 0) {
         int m_max = std::min(cuts.S_n, max_number_of_cuts);
@@ -376,7 +376,7 @@ bool LimitedMemoryRank1Cuts::runSeparation(BNBNode *node, std::vector<GRBConstr>
         double slack = constr.get(GRB_DoubleAttr_Slack);
 
         // If the slack is positive, it means the constraint is not violated
-        if (slack > 0) {
+        if (slack > 1e-3) {
             cleared = true;
 
             // Remove the constraint from the model and cut storage

@@ -597,9 +597,9 @@ public:
         bool   ss       = false;
         int    stage    = 1;
         bool   misprice = true;
-        double lag_gap  = std::numeric_limits<double>::max();
+        double lag_gap  = 0.0;
 
-        auto                 inner_obj = -std::numeric_limits<double>::max();
+        auto                 inner_obj = 0.0;
         std::vector<Label *> paths;
         std::vector<double>  solution;
         bool                 can_add = true;
@@ -700,13 +700,15 @@ public:
 #endif
 
 #ifdef IPM
-            auto d = 1;
+            auto d = 0.05;
             matrix = node->extractModelDataSparse();
             gap    = std::abs(lp_obj - (lp_obj + std::min(0.0, inner_obj))) / std::abs(lp_obj);
             gap    = gap / d;
-            if (std::isnan(gap)) { gap = 1e-4; }
-            if (std::signbit(gap)) { gap = 1e-4; }
-            if (gap < 1e-2) { gap = 1e-2; }
+            if (std::isnan(gap)) { gap = 1e-2; }
+            if (std::signbit(gap)) { gap = 1e-2; }
+            if (gap > 1e-1) { gap = 1e-1; }
+            gap = 1e-2;
+            // print gap
             auto ip_result   = solver.run_optimization(matrix, gap);
             lp_obj           = std::get<0>(ip_result);
             lp_obj_dual      = std::get<1>(ip_result);
@@ -721,7 +723,7 @@ public:
 
 #ifdef STAB
             stab.update_stabilization_after_master_optim(nodeDuals);
-            nodeDuals = stab.getStabDualSol(nodeDuals);
+            nodeDuals = stab.getStabDualSolAdvanced(nodeDuals);
 
             misprice = true;
             while (misprice) {
@@ -1026,9 +1028,9 @@ public:
 
         bool misprice = true;
 
-        double lag_gap = std::numeric_limits<double>::max();
+        double lag_gap = 0.0;
 
-        auto                 inner_obj = -std::numeric_limits<double>::max();
+        auto                 inner_obj = 0.0;
         std::vector<Label *> paths;
         std::vector<double>  solution;
         bool                 can_add = true;
