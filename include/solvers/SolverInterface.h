@@ -10,11 +10,11 @@ public:
     virtual int    getStatus() const = 0;
     virtual double getObjVal() const = 0;
     // virtual double              getVarValue(int i) const = 0;
-    virtual std::vector<double> getDuals() const         = 0;
-    virtual std::vector<double> extractSolution() const  = 0;
-    virtual void                optimize()               = 0;
-    virtual double              getVarValue(int i) const = 0;
-    virtual double              getDualVal(int i) const  = 0;
+    virtual std::vector<double> getDuals() const            = 0;
+    virtual std::vector<double> extractSolution() const     = 0;
+    virtual void                optimize(double tol = 1e-6) = 0;
+    virtual double              getVarValue(int i) const    = 0;
+    virtual double              getDualVal(int i) const     = 0;
     // virtual void                update()                = 0;
 
     // Virtual method for setting a model, without a concrete type in the base class
