@@ -190,7 +190,7 @@ public:
         CH,
 #endif
         LDLT,
-        //CU
+        // CU
     };
 
     // SparseSolver() { solver = new SolverWrapper<CholmodSolver>(); }
@@ -269,7 +269,7 @@ public:
 
     std::vector<double> dual_vals;
     std::vector<double> primal_vals;
-    double objVal;
+    double              objVal;
 
     std::vector<double> getDuals() const { return dual_vals; }
     std::vector<double> getPrimals() const { return primal_vals; }

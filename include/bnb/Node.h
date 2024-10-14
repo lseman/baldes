@@ -28,7 +28,6 @@
 
 // include unordered_dense_map
 #include "ankerl/unordered_dense.h"
-#include "solvers/IPM.h"
 #include "solvers/SolverInterface.h"
 
 #ifdef RCC
@@ -47,6 +46,7 @@
 
 #ifdef IPM
 #include "ipm/IPSolver.h"
+#include "solvers/IPM.h"
 #endif
 
 #ifdef HIGHS
@@ -92,8 +92,8 @@ public:
 
 // node specific
 #ifdef SRC
-    std::vector<Constraint*> SRCconstraints;
-    LimitedMemoryRank1Cuts  r1c;
+    std::vector<Constraint *> SRCconstraints;
+    LimitedMemoryRank1Cuts    r1c;
 #endif
 
     ModelData         matrix;
@@ -256,9 +256,7 @@ public:
         for (auto &var : vars) { var.set_type(VarType::Continuous); }
     }
 
-    void remove(Constraint *ctr) {
-        mip.delete_constraint(ctr);
-    }
+    void remove(Constraint *ctr) { mip.delete_constraint(ctr); }
     void remove(Variable &var) { mip.delete_variable(var); }
 
     void addVars(const double *lb, const double *ub, const double *obj, const VarType *vtypes, const std::string *names,
@@ -283,12 +281,12 @@ public:
     void setDoubleAttr(const std::string &attr, double value) { throw std::invalid_argument("Unknown attribute"); }
 
     // Add a new constraint using a linear expression and name (placeholder)
-    Constraint* addConstr(const LinearExpression &expr, const std::string &name) {
+    Constraint *addConstr(const LinearExpression &expr, const std::string &name) {
         auto ctr = mip.add_constraint(expr, 0.0, '<'); // Placeholder for <= relation
         return ctr;
     }
 
-    Constraint* addConstr(Constraint *ctr, const std::string &name) {
+    Constraint *addConstr(Constraint *ctr, const std::string &name) {
         ctr = mip.add_constraint(ctr, name);
         return ctr;
     }
@@ -300,7 +298,7 @@ public:
     Variable &getVar(int i) { return mip.getVar(i); }
 
     // Get all constraints
-    std::vector<Constraint*> &getConstrs() { return mip.getConstraints(); }
+    std::vector<Constraint *> &getConstrs() { return mip.getConstraints(); }
 
     ModelData extractModelDataSparse() { return mip.extractModelDataSparse(); }
 

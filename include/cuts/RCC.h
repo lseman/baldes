@@ -35,7 +35,7 @@
 struct RCCut {
     std::vector<RawArc> arcs; // Stores the arcs involved in the cut
     int                 rhs;  // Right-hand side value of the constraint
-    Constraint*           ctr;  // Gurobi constraint object
+    Constraint         *ctr;  // Gurobi constraint object
 };
 
 class RCCManager {
@@ -46,8 +46,8 @@ public:
     // define size as the size of the cuts vector
     int size() { return cuts_.size(); }
 
-    std::vector<Constraint*> getConstraints() {
-        std::vector<Constraint*> constraints;
+    std::vector<Constraint *> getConstraints() {
+        std::vector<Constraint *> constraints;
         for (const auto &cut : cuts_) { constraints.push_back(cut.ctr); }
         return constraints;
     }
@@ -93,10 +93,10 @@ public:
         ArcDuals arcDuals;
         // First pass: Compute dual values and store them
         for (int i = 0; i < cuts_.size(); ++i) {
-            const auto &cut       = cuts_[i];
+            const auto &cut = cuts_[i];
 
             // TODO: adjust to new stuff
-            double      dualValue = 0;//cut.ctr.get(GRB_DoubleAttr_Pi);
+            double dualValue = 0; // cut.ctr.get(GRB_DoubleAttr_Pi);
 
             if (std::abs(dualValue) < 1e-3) { continue; }
 

@@ -13,7 +13,13 @@ public:
     HighsSolver(HighsModel &highsmodel) {
         model = new Highs();
         model->passModel(highsmodel);
-        model->setOptionValue("output_flag", "off");
+        model->setOptionValue("solver", "ipm");
+        model->setOptionValue("primal_feasibility_tolerance", 1e-6);
+        model->setOptionValue("dual_feasibility_tolerance", 1e-6);
+        //model->setOptionValue("run_crossover", "on");
+        // disable output to screen
+        highs.setOptionValue("ipm_optimality_tolerance", 1e-4);
+        model->setOptionValue("output_flag", "off");        model->setOptionValue("output_flag", "off");
     }
 
     void setModel(const std::any &modelData) override { // Type check and assign
