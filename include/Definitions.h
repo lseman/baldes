@@ -191,6 +191,7 @@ inline void printBaldes() {
     fmt::print("\n");
 }
 
+#ifdef GUROBI
 /**
  * @brief Extracts model data from a given Gurobi model in a sparse format.
  *
@@ -277,6 +278,7 @@ inline ModelData extractModelDataSparse(GRBModel *model) {
 
     return data;
 }
+#endif
 
 using DualSolution = std::vector<double>;
 

@@ -2,8 +2,15 @@
 
 #include "Arc.h"
 #include "Hashes.h"
+#include "MIPHandler/Constraint.h"
+#include "MIPHandler/MIPHandler.h"
 #include "ankerl/unordered_dense.h"
+
+#ifdef GUROBI
 #include "gurobi_c++.h"
+#include "gurobi_c.h"
+#endif
+
 #include <cmath>
 #include <iostream>
 #include <numeric>
@@ -80,7 +87,7 @@ class BranchingDuals {
 public:
     std::vector<VRPCandidate *> getBranchingCandidates() { return branchingCandidates_; }
 
-    void addCandidate(VRPCandidate *candidate, GRBConstr &constraint) {
+    void addCandidate(VRPCandidate *candidate, Constraint &constraint) {
         branchingCandidates_.push_back(candidate);
         branchingConstraints_.push_back(constraint);
     }
@@ -102,14 +109,15 @@ public:
 
     double getDual(int node) const { return nodeDuals_.getDual(node); }
 
-    void computeDuals(GRBModel *model, double threshold = 1e-3) {
+    void computeDuals(MIPProblem *model, double threshold = 1e-3) {
         arcDuals_  = ArcDuals();
         nodeDuals_ = NodeDuals();
 
         // First pass: Compute dual values and store them
         for (int i = 0; i < branchingCandidates_.size(); ++i) {
             const auto &candidate = branchingCandidates_[i];
-            double      dualValue = branchingConstraints_[i].get(GRB_DoubleAttr_Pi);
+            // TODO: Check if the constraint is violated
+            double dualValue = 0; // branchingConstraints_[i].get(GRB_DoubleAttr_Pi);
             if (std::abs(dualValue) < threshold) { continue; }
 
             if (candidate->getCandidateType() == CandidateType::Edge) {
@@ -126,7 +134,7 @@ public:
 
 private:
     std::vector<VRPCandidate *> branchingCandidates_;
-    std::vector<GRBConstr>      branchingConstraints_;
+    std::vector<Constraint>     branchingConstraints_;
     ArcDuals                    arcDuals_;
     NodeDuals                   nodeDuals_;
 };

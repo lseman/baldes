@@ -357,7 +357,7 @@ void LimitedMemoryRank1Cuts::generateCutCoefficients(VRPTW_SRC &cuts, std::vecto
     }
 }
 
-bool LimitedMemoryRank1Cuts::runSeparation(BNBNode *node, std::vector<GRBConstr> &SRCconstraints) {
+bool LimitedMemoryRank1Cuts::runSeparation(BNBNode *node, std::vector<Constraint> &SRCconstraints) {
     node->optimize();
     auto      cuts = &cutStorage;
     ModelData matrix;
@@ -370,10 +370,11 @@ bool LimitedMemoryRank1Cuts::runSeparation(BNBNode *node, std::vector<GRBConstr>
     auto n_cuts_removed = 0;
     // Iterate over the constraints in reverse order to remove non-violated cuts
     for (int i = SRCconstraints.size() - 1; i >= 0; --i) {
-        GRBConstr constr = SRCconstraints[i];
+        Constraint constr = SRCconstraints[i];
 
         // Get the slack value of the constraint
-        double slack = constr.get(GRB_DoubleAttr_Slack);
+        // TODO: fix
+        double slack = 0; // constr.get(GRB_DoubleAttr_Slack);
 
         // If the slack is positive, it means the constraint is not violated
         if (slack > 1e-3) {

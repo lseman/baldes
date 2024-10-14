@@ -28,11 +28,20 @@
 
 // include unordered_dense_map
 #include "ankerl/unordered_dense.h"
+#include "solvers/SolverInterface.h"
 
 #ifdef RCC
 #include "../third_party/cvrpsep/capsep.h"
 #include "../third_party/cvrpsep/cnstrmgr.h"
 // #include "ModernRCC.h"
+#endif
+
+#include "MIPHandler/MIPHandler.h"
+
+#ifdef GUROBI
+#include "gurobi_c++.h"
+#include "gurobi_c.h"
+#include "solvers/Gurobi.h"
 #endif
 
 class Problem;
@@ -62,17 +71,20 @@ private:
     // define uuid
     std::string uuid;
 
-    GRBModel *model;
-    int       bestLB = 0;
+    int bestLB = 0;
+
+    SolverInterface *solver = nullptr;
 
 public:
     Problem *problem;
     int      numConstrs = 0;
 
+    MIPProblem mip = MIPProblem("node", 0, 0);
+
 // node specific
 #ifdef SRC
-    std::vector<GRBConstr> SRCconstraints;
-    LimitedMemoryRank1Cuts r1c;
+    std::vector<Constraint> SRCconstraints;
+    LimitedMemoryRank1Cuts  r1c;
 #endif
 
     ModelData         matrix;
@@ -92,8 +104,20 @@ public:
     BNBNode                    *parent = nullptr;
     std::vector<VRPCandidate *> raisedVRPChildren;
 
-    [[nodiscard]] explicit BNBNode(const GRBModel &eModel) : model(nullptr) {
-        model = new GRBModel(eModel);
+#ifdef GUROBI
+    explicit BNBNode(GRBModel &eModel) {
+        solver = new GurobiSolver(&eModel);
+
+        generateUUID();
+        this->initialized = true;
+#ifdef RCC
+        CMGR_CreateCMgr(&oldCutsCMP, 100); // For old cuts, if needed
+#endif
+    };
+#endif
+
+    explicit BNBNode(const MIPProblem &eModel) {
+        // model = new GRBModel(eModel);
         generateUUID();
         this->initialized = true;
 #ifdef RCC
@@ -106,8 +130,6 @@ public:
     std::vector<Path> &getPaths() { return paths; }
 
     void initialize() { this->initialized = true; }
-
-    void optimize() { model->optimize(); }
 
     void start() {}
 
@@ -144,149 +166,6 @@ public:
         return uuid;
     }
 
-    /**
-     * @brief Changes the coefficients of a constraint in the given GRBModel.
-     *
-     * This function modifies the coefficients of a constraint in the specified GRBModel
-     * by iterating over the variables and updating their coefficients using the provided values.
-     *
-     */
-    void chgCoeff(const GRBConstr &constrName, std::vector<double> value) {
-        auto varNames = model->getVars();
-        int  numVars  = model->get(GRB_IntAttr_NumVars);
-        for (int i = 0; i < numVars; i++) { model->chgCoeff(constrName, varNames[i], value[i]); }
-    }
-
-    // define for >chgCoeff(constrs[i], w[i], -1);
-    void chgCoeff(const GRBConstr &constrName, const GRBVar &varName, double value) {
-        model->chgCoeff(constrName, varName, value);
-    }
-
-    /**
-     * Binarizes the variables in the given GRBModel.
-     *
-     * This function sets the variable type of each variable in the model to binary.
-     * It iterates over all variables in the model and sets their variable type to GRB_BINARY.
-     * After updating the model, all variables will be binary variables.
-     *
-     */
-    void binarizeNode() {
-        auto varNumber = model->get(GRB_IntAttr_NumVars);
-        for (int i = 0; i < varNumber; i++) {
-            GRBVar var = model->getVar(i);
-            var.set(GRB_CharAttr_VType, GRB_BINARY);
-        }
-        model->update();
-    }
-
-    void relaxNode() {
-        auto varNumber = model->get(GRB_IntAttr_NumVars);
-        for (int i = 0; i < varNumber; i++) {
-            GRBVar var = model->getVar(i);
-            var.set(GRB_CharAttr_VType, GRB_CONTINUOUS);
-        }
-        model->update();
-    }
-
-    /**
-     * Retrieves the dual values of the constraints in the given GRBModel.
-     *
-     */
-    std::vector<double> getDuals() {
-        // int                    numConstrs = model->get(GRB_IntAttr_NumConstrs);
-        std::vector<GRBConstr> constraints;
-        constraints.reserve(numConstrs);
-
-        for (int i = 0; i < numConstrs; ++i) { constraints.push_back(model->getConstr(i)); }
-
-        // Prepare the duals vector
-        std::vector<double> duals(numConstrs);
-
-        // Retrieve all dual values in one call
-        auto dualArray = model->get(GRB_DoubleAttr_Pi, constraints.data(), constraints.size());
-
-        duals.assign(dualArray, dualArray + numConstrs);
-        return duals;
-    }
-
-    std::vector<double> getAllDuals() {
-        int                    numConstrs = model->get(GRB_IntAttr_NumConstrs);
-        std::vector<GRBConstr> constraints;
-        constraints.reserve(numConstrs);
-
-        // Collect all constraints
-        for (int i = 0; i < numConstrs; ++i) { constraints.push_back(model->getConstr(i)); }
-
-        // Prepare the duals vector
-        std::vector<double> duals(numConstrs);
-
-        // Retrieve all dual values in one call
-        auto dualArray = model->get(GRB_DoubleAttr_Pi, constraints.data(), constraints.size());
-
-        duals.assign(dualArray, dualArray + numConstrs);
-        return duals;
-    }
-
-    /**
-     * Extracts the solution from a given GRBModel object.
-     *
-     */
-    std::vector<double> extractSolution() {
-        std::vector<double> sol;
-        auto                varNumber = model->get(GRB_IntAttr_NumVars);
-        auto                vals      = model->get(GRB_DoubleAttr_X, model->getVars(), varNumber);
-        sol.assign(vals, vals + varNumber);
-        return sol;
-    }
-
-    // define method get that run model->get
-    double get(GRB_IntAttr attr) { return model->get(attr); }
-
-    double get(GRB_DoubleAttr attr) { return model->get(attr); }
-
-    void set(GRB_IntAttr attr, int value) { model->set(attr, value); }
-    void set(GRB_DoubleAttr attr, double value) { model->set(attr, value); }
-    // set with GRB_IntParam
-    void set(GRB_IntParam attr, int value) { model->set(attr, value); }
-
-    // define get for auto duals = node->get(GRB_DoubleAttr_Pi, SRCconstraints.data(), SRCconstraints.size());
-    auto get(GRB_DoubleAttr attr, const GRBConstr *constrs, int size) { return model->get(attr, constrs, size); }
-
-    ModelData extractModelDataSparse() {
-        model->update();
-        return ::extractModelDataSparse(model);
-    }
-
-    GRBModel *getModel() { return model; }
-
-    // define addConstr
-    GRBConstr addConstr(auto expr, const std::string &name) { return model->addConstr(expr, name); }
-
-    // define getVar
-    GRBVar getVar(int i) { return model->getVar(i); }
-
-    // define update
-    void update() { model->update(); }
-
-    void remove(GRBConstr constr) { model->remove(constr); }
-
-    // define getConstrs
-    const GRBConstr *getConstrs() { return model->getConstrs(); }
-
-    // define addVar method
-    [[nodiscard]] GRBVar addVar(auto lb, auto ub, auto obj, auto vtype, auto name) {
-        return model->addVar(lb, ub, obj, vtype, name);
-    }
-
-    // define addVar with col input also
-    void addVar(auto lb, auto ub, double obj, auto vtype, auto col, auto name) {
-        model->addVar(lb, ub, obj, vtype, col, name);
-    }
-
-    void addVars(auto lb, auto ub, auto obj, auto vtype, auto name, auto col, auto row) {
-        model->addVars(lb, ub, obj, vtype, name, col, row);
-    }
-
     // define hasCandidate to see if the candidate already exists
     bool hasCandidate(VRPCandidate *candidate) {
         for (const auto *c : candidates) {
@@ -309,7 +188,7 @@ public:
 
     BNBNode *newChild() {
         // Create a new child node
-        auto child = new BNBNode(*model);
+        auto child = new BNBNode(mip);
         // Set the parent of the child node to this node
         child->parent            = this;
         child->paths             = paths;
@@ -336,16 +215,115 @@ public:
 
     auto getCandidatos() { return candidates; }
 
+    //////////////////////////////////////////////////
+    // Functions to deal with MIPProblem
+    //////////////////////////////////////////////////
+
+    // Change multiple coefficients for a specific constraint
+    void chgCoeff(int constraintIndex, const std::vector<double> &values) { mip.chgCoeff(constraintIndex, values); }
+    void chgCoeff(Constraint ctr, const std::vector<double> &values) { mip.chgCoeff(ctr, values); }
+
+    // Change a single coefficient for a specific constraint and variable
+    void chgCoeff(int constraintIndex, int variableIndex, double value) {
+        mip.chgCoeff(constraintIndex, variableIndex, value);
+    }
+
+    // Binarize all variables (set to binary type)
+    void binarizeNode() {
+        auto &vars = mip.getVars();
+        for (auto &var : vars) { var.set_type(VarType::Binary); }
+    }
+
+    // Relax all variables (set to continuous type)
+    void relaxNode() {
+        auto &vars = mip.getVars();
+        for (auto &var : vars) { var.set_type(VarType::Continuous); }
+    }
+
+    void remove(Constraint &ctr) { mip.delete_constraint(ctr); }
+    void remove(Variable &var) { mip.delete_variable(var); }
+
+    void addVars(const double *lb, const double *ub, const double *obj, const VarType *vtypes, const std::string *names,
+                 const MIPColumn *cols, size_t count) {
+        mip.addVars(lb, ub, obj, vtypes, names, cols, count);
+    }
+    void addVars(const double *lb, const double *ub, const double *obj, const VarType *vtypes, const std::string *names,
+                 size_t count) {
+        mip.addVars(lb, ub, obj, vtypes, names, count);
+    }
+    // Set and get attributes (emulating Gurobi's behavior)
+    double getIntAttr(const std::string &attr) {
+        if (attr == "NumVars") {
+            return mip.getVars().size();
+        } else if (attr == "NumConstrs") {
+            return mip.getConstraints().size();
+        }
+        throw std::invalid_argument("Unknown attribute");
+    }
+
+    void setIntAttr(const std::string &attr, int value) { throw std::invalid_argument("Unknown attribute"); }
+    void setDoubleAttr(const std::string &attr, double value) { throw std::invalid_argument("Unknown attribute"); }
+
+    // Add a new constraint using a linear expression and name (placeholder)
+    int addConstr(const LinearExpression &expr, const std::string &name) {
+        mip.add_constraint(expr, 0.0, '<'); // Placeholder for <= relation
+        return mip.getConstraints().size() - 1;
+    }
+
+    int addConstr(const Constraint ctr, const std::string &name) {
+        mip.addConstr(ctr, name);
+        return mip.getConstraints().size() - 1;
+    }
+
+    // Remove a constraint
+    void removeConstr(int constraintIndex) { mip.delete_constraint(constraintIndex); }
+
+    // Get a variable by index
+    Variable &getVar(int i) { return mip.getVar(i); }
+
+    // Get all constraints
+    const std::vector<Constraint> &getConstrs() { return mip.getConstraints(); }
+
+    ModelData extractModelDataSparse() { return mip.extractModelDataSparse(); }
+
+    /////////////////////////////////////////////////////
+    // Solver Interface
+    /////////////////////////////////////////////////////
+
+    int                 getStatus() { return solver->getStatus(); }
+    double              getObjVal() { return solver->getObjVal(); }
+    std::vector<double> getDuals() { return solver->getDuals(); }
+    std::vector<double> extractSolution() { return solver->extractSolution(); }
+    void                optimize() { solver->optimize(); }
+    double              getVarValue(int i) { return solver->getVarValue(i); }
+    auto                getModel() { return &mip; }
+
+#ifdef GUROBI
+    // Update
+    void update() {
+        // delete model; // Delete the old model to free memory
+        GRBEnv &env = GurobiEnvSingleton::getInstance();
+        // Create a new model with the existing environment
+        auto model = new GRBModel(mip.toGurobiModel(env)); // Pass the retrieved or new environment
+
+        solver = new GurobiSolver(model);
+        solver->optimize(); // Optimize the model
+        // set mute
+    }
+#else
+    void update() {}
+#endif
+
     std::pair<bool, double> solveRestrictedMasterLP() {
         bool feasible = false;
         relaxNode();
-        model->optimize();
-        if (model->get(GRB_IntAttr_Status) == GRB_OPTIMAL) {
-            feasible = true;
-            return std::make_pair(feasible, model->get(GRB_DoubleAttr_ObjVal));
-        } else {
-            return std::make_pair(feasible, 0.0);
-        }
+        // model->optimize();
+        // if (model->get(GRB_IntAttr_Status) == GRB_OPTIMAL) {
+        //    feasible = true;
+        //    return std::make_pair(feasible, model->get(GRB_DoubleAttr_ObjVal));
+        //} else {
+        //    return std::make_pair(feasible, 0.0);
+        //}
     }
 
     ///////////////////////////////////////////////
@@ -354,62 +332,65 @@ public:
 
     std::vector<BranchingQueueItem> historyCandidates;
 
-    auto addBranchingConstraint(double rhs, const BranchingDirection &sense, const CandidateType &ctype,
-                                std::optional<std::variant<int, std::pair<int, int>>> payload = std::nullopt) {
+    Constraint addBranchingConstraint(double rhs, const BranchingDirection &sense, const CandidateType &ctype,
+                                      std::optional<std::variant<int, std::pair<int, int>>> payload = std::nullopt) {
+        /*
+                // Get the decision variables from the model
+                auto varsPtr = model->getVars(); // Assumes model is a pointer to GRBModel
+                // deference the pointer
+                auto vars = std::vector<GRBVar>(varsPtr, varsPtr + model->get(GRB_IntAttr_NumVars));
 
-        // Get the decision variables from the model
-        auto varsPtr = model->getVars(); // Assumes model is a pointer to GRBModel
-        // deference the pointer
-        auto vars = std::vector<GRBVar>(varsPtr, varsPtr + model->get(GRB_IntAttr_NumVars));
+                GRBLinExpr linExpr; // Initialize linExpr
 
-        GRBLinExpr linExpr; // Initialize linExpr
+                if (ctype == CandidateType::Vehicle) {
+                    for (auto i = 0; i < vars.size(); i++) { linExpr += vars[i]; }
+                } else if (ctype == CandidateType::Node) {
+                    for (auto i = 0; i < vars.size(); i++) {
+                        // Use the payload as int for Node
+                        std::visit(
+                            [&](auto &&arg) {
+                                using T = std::decay_t<decltype(arg)>;
+                                if constexpr (std::is_same_v<T, int>) {
+                                    linExpr += vars[i] * paths[i].contains(arg); // Use the int payload
+                                } else {
+                                    throw std::invalid_argument("Payload for Node must be an int.");
+                                }
+                            },
+                            *payload);
+                    }
+                } else if (ctype == CandidateType::Edge) {
+                    for (auto i = 0; i < vars.size(); i++) {
+                        // Use the payload as std::pair<int, int> for Edge
+                        std::visit(
+                            [&](auto &&arg) {
+                                using T = std::decay_t<decltype(arg)>;
+                                if constexpr (std::is_same_v<T, std::pair<int, int>>) {
+                                    linExpr += vars[i] * paths[i].timesArc(arg.first, arg.second); // Use the std::pair
+                                    payload
+                                } else {
+                                    throw std::invalid_argument("Payload for Edge must be a std::pair<int, int>.");
+                                }
+                            },
+                            *payload);
+                    }
+                }
 
-        if (ctype == CandidateType::Vehicle) {
-            for (auto i = 0; i < vars.size(); i++) { linExpr += vars[i]; }
-        } else if (ctype == CandidateType::Node) {
-            for (auto i = 0; i < vars.size(); i++) {
-                // Use the payload as int for Node
-                std::visit(
-                    [&](auto &&arg) {
-                        using T = std::decay_t<decltype(arg)>;
-                        if constexpr (std::is_same_v<T, int>) {
-                            linExpr += vars[i] * paths[i].contains(arg); // Use the int payload
-                        } else {
-                            throw std::invalid_argument("Payload for Node must be an int.");
-                        }
-                    },
-                    *payload);
-            }
-        } else if (ctype == CandidateType::Edge) {
-            for (auto i = 0; i < vars.size(); i++) {
-                // Use the payload as std::pair<int, int> for Edge
-                std::visit(
-                    [&](auto &&arg) {
-                        using T = std::decay_t<decltype(arg)>;
-                        if constexpr (std::is_same_v<T, std::pair<int, int>>) {
-                            linExpr += vars[i] * paths[i].timesArc(arg.first, arg.second); // Use the std::pair payload
-                        } else {
-                            throw std::invalid_argument("Payload for Edge must be a std::pair<int, int>.");
-                        }
-                    },
-                    *payload);
-            }
-        }
+                // Add the constraint based on the sense
+                GRBConstr constraint;
+                if (sense == BranchingDirection::Greater) {
+                    constraint = model->addConstr(linExpr, GRB_GREATER_EQUAL, rhs);
+                } else if (sense == BranchingDirection::Less) {
+                    constraint = model->addConstr(linExpr, GRB_LESS_EQUAL, rhs);
+                } else {
+                    constraint = model->addConstr(linExpr, GRB_EQUAL, rhs);
+                }
 
-        // Add the constraint based on the sense
-        GRBConstr constraint;
-        if (sense == BranchingDirection::Greater) {
-            constraint = model->addConstr(linExpr, GRB_GREATER_EQUAL, rhs);
-        } else if (sense == BranchingDirection::Less) {
-            constraint = model->addConstr(linExpr, GRB_LESS_EQUAL, rhs);
-        } else {
-            constraint = model->addConstr(linExpr, GRB_EQUAL, rhs);
-        }
+                // Update the model to reflect the changes
+                model->update();
 
-        // Update the model to reflect the changes
-        model->update();
-
-        return constraint;
+                return constraint;
+                */
+        return Constraint();
     }
 
     BranchingDuals branchingDuals;
@@ -417,14 +398,9 @@ public:
     void enforceBranching() {
         // Iterate over the candidates and enforce the branching constraints
         for (const auto &candidate : candidates) {
-            auto ctr = addBranchingConstraint(candidate->boundValue, candidate->boundType, candidate->candidateType,
-                                              candidate->payload);
+            Constraint ctr = addBranchingConstraint(candidate->boundValue, candidate->boundType,
+                                                    candidate->candidateType, candidate->payload);
             branchingDuals.addCandidate(candidate, ctr);
         }
     }
-
-    int getNumVariables() { return model->get(GRB_IntAttr_NumVars); }
-
-    // define remove for var
-    void remove(GRBVar var) { model->remove(var); }
 };

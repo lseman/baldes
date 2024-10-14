@@ -28,13 +28,14 @@
 
 #include <iostream>
 
+#include "MIPHandler/MIPHandler.h"
 #include "ankerl/unordered_dense.h"
 
 // Define the RawArc struct
 struct RCCut {
     std::vector<RawArc> arcs; // Stores the arcs involved in the cut
     int                 rhs;  // Right-hand side value of the constraint
-    GRBConstr           ctr;  // Gurobi constraint object
+    Constraint           ctr;  // Gurobi constraint object
 };
 
 class RCCManager {
@@ -45,8 +46,8 @@ public:
     // define size as the size of the cuts vector
     int size() { return cuts_.size(); }
 
-    std::vector<GRBConstr> getConstraints() {
-        std::vector<GRBConstr> constraints;
+    std::vector<Constraint> getConstraints() {
+        std::vector<Constraint> constraints;
         for (const auto &cut : cuts_) { constraints.push_back(cut.ctr); }
         return constraints;
     }
@@ -72,7 +73,7 @@ public:
     }
 
     // Method to add a new cut
-    void addCut(const std::vector<RawArc> &arcs, int rhs, GRBConstr &ctr) {
+    void addCut(const std::vector<RawArc> &arcs, int rhs, Constraint &ctr) {
         // std::lock_guard<std::mutex> lock(mutex_);
         cuts_.emplace_back(RCCut{arcs, rhs, ctr});
         cut_ctr++;
@@ -88,12 +89,14 @@ public:
     }
 
     // Compute the dual values for each arc by summing the duals of cuts passing through the arc
-    ArcDuals computeDuals(GRBModel *model, double threshold = 1e-3) {
+    ArcDuals computeDuals(MIPProblem *model, double threshold = 1e-3) {
         ArcDuals arcDuals;
         // First pass: Compute dual values and store them
         for (int i = 0; i < cuts_.size(); ++i) {
             const auto &cut       = cuts_[i];
-            double      dualValue = cut.ctr.get(GRB_DoubleAttr_Pi);
+
+            // TODO: adjust to new stuff
+            double      dualValue = 0;//cut.ctr.get(GRB_DoubleAttr_Pi);
 
             if (std::abs(dualValue) < 1e-3) { continue; }
 

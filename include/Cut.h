@@ -10,6 +10,7 @@
 #pragma once
 #include "Common.h"
 #include "Definitions.h"
+#include "MIPHandler/Constraint.h"
 
 /**
  * @struct Cut
@@ -31,7 +32,7 @@ struct Cut {
     bool                            added       = false;
     bool                            updated     = false;
     CutType                         type        = CutType::ThreeRow;
-    GRBConstr                       grbConstr;
+    Constraint                       grbConstr;
     size_t                          key;
     // Default constructor
     Cut() = default;

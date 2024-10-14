@@ -1,4 +1,5 @@
 cmake_minimum_required(VERSION 3.10)
+project(BALDES LANGUAGES CXX)
 
 # Check if Clang is available
 find_program(CLANG_C_COMPILER clang)
@@ -23,6 +24,7 @@ project(BALDES)
 # C++ standard
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
+#set(CMAKE_CUDA_STANDARD 20)  # or CUDA11 if needed
 
 # Enable Interprocedural Optimization (Link Time Optimization)
 set(CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE ON)
@@ -80,6 +82,7 @@ option(SCHRODINGER "Enable Schrodinger compilation option" OFF)
 option(CLIQUER "Enable Cliquer compilation option" OFF)
 option(VERBOSE "Enable verbose output" OFF)
 option(JEMALLOC "Enable jemalloc" ON)
+option(GUROBI_HOME "Enable GUROBI" ON)
 
 # Define the size of resources without using cache
 set(R_SIZE
@@ -221,7 +224,7 @@ set(GUROBI_HOME $ENV{GUROBI_HOME})
 include_directories(${GUROBI_HOME}/include)
 
 # Source files
-set(SOURCES src/BucketGraph.cpp)
+set(SOURCES src/BucketGraph.cpp src/MIPHandler.cpp)
 
 set(CVRPSEP_SOURCES
     third_party/cvrpsep/basegrph.cpp
@@ -298,6 +301,7 @@ endif()
 set(GUROBI_VERSION_MAJOR 110) # Adjust based on Gurobi version
 message(STATUS "Gurobi version: ${GUROBI_VERSION_MAJOR}")
 
+if(GUROBI)
 # Link Gurobi libraries
 if(APPLE)
   # macOS detected, use .dylib for linking
@@ -308,6 +312,7 @@ else()
   target_link_libraries(
     vrptw PRIVATE ${GUROBI_HOME}/lib/libgurobi_c++.a
                   ${GUROBI_HOME}/lib/libgurobi${GUROBI_VERSION_MAJOR}.so tbb)
+endif()
 endif()
 
 if(JEMALLOC)
@@ -344,6 +349,7 @@ if(CLIQUER)
   target_link_libraries(cliquer PRIVATE STDEXEC::stdexec)
   target_link_libraries(cliquer PRIVATE fmt::fmt)
 
+  if(GUROBI)
   if(APPLE)
     # macOS detected, use .dylib for linking
     target_link_libraries(cliquer PRIVATE ${GUROBI_HOME}/lib/libgurobi_c++.a
@@ -354,7 +360,8 @@ if(CLIQUER)
       cliquer PRIVATE ${GUROBI_HOME}/lib/libgurobi_c++.a
                       ${GUROBI_HOME}/lib/libgurobi${GUROBI_VERSION_MAJOR}.so)
   endif()
-
+  endif()
+  
   if(JEMALLOC)
     find_library(JEMALLOC_LIBRARY jemalloc)
     if(JEMALLOC_LIBRARY)

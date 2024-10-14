@@ -15,7 +15,12 @@
 
 #include "Definitions.h"
 #include "Pools.h"
+
+#ifdef GUROBI
 #include "gurobi_c++.h"
+#include "gurobi_c.h"
+#endif
+
 #include <algorithm> // For std::transform
 #include <cmath>
 #include <iostream>

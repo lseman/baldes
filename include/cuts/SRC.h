@@ -27,6 +27,8 @@
 #include <queue>
 #include <random>
 
+#include "MIPHandler/MIPHandler.h"
+
 #include <unordered_set>
 
 // #include "xxhash.h"
@@ -170,7 +172,7 @@ public:
         the45selectedNodes      = selectHighestCoefficients(x, max_important_nodes);
     }
 
-    bool runSeparation(BNBNode *node, std::vector<GRBConstr> &SRCconstraints);
+    bool runSeparation(BNBNode *node, std::vector<Constraint> &SRCconstraints);
 
 private:
     static std::mutex cache_mutex;

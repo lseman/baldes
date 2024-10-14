@@ -1,0 +1,39 @@
+#pragma once
+#include "LinExp.h"
+#include "ankerl/unordered_dense.h"
+
+/**
+ * @class Constraint
+ * @brief Represents a linear constraint in a mathematical optimization problem.
+ *
+ * The Constraint class encapsulates a linear expression, a right-hand side value,
+ * and a relational operator to define a constraint in a mathematical optimization problem.
+ */
+class Constraint {
+public:
+    Constraint(const LinearExpression &expr, double rhs, char relation)
+        : expression(expr), rhs(rhs), relation(relation) {}
+
+    // default constructor
+    Constraint() : expression(), rhs(0.0), relation('=') {}
+
+    const LinearExpression &get_expression() const { return expression; }
+    double                  get_rhs() const { return rhs; }
+    char                    get_relation() const { return relation; }
+
+    int index() const { return indice; }
+
+    const ankerl::unordered_dense::map<std::string, double> &get_terms() const { return expression.get_terms(); }
+
+    void addTerm(const Variable &var, double coeff) { expression.addTerm(var, coeff); }
+
+    // define get_name
+    std::string get_name() const { return name; }
+
+private:
+    LinearExpression expression; // The linear expression of the constraint
+    double           rhs;        // The right-hand side of the constraint
+    char             relation;   // The relation: '<', '>', '='
+    int              indice;
+    std::string      name;
+};
