@@ -512,7 +512,7 @@ std::tuple<double, double, std::vector<double>, std::vector<double>> IPSolver::r
         _g                   = std::abs(c.dot(x) - bl_dot_lambda) / (tau + std::abs(bl_dot_lambda));
 
         // Check for optimality and infeasibility
-        if (_p <= 1e-4 && _d <= 1e-4 && _g <= tol) { break; }
+        if (_p <= 1e-10 && _d <= 1e-10 && _g <= tol) { break; }
         // Scaling factors
         theta_vw = w.cwiseQuotient(v);
         theta_xs = s.cwiseQuotient(x);

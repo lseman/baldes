@@ -151,7 +151,7 @@ public:
     inline std::vector<int> selectHighestCoefficients(const std::vector<double> &x, int maxNodes) {
         std::vector<std::pair<int, double>> nodeCoefficients;
         for (int i = 0; i < x.size(); ++i) {
-            if (x[i] > 1e-2) { nodeCoefficients.push_back({i, x[i]}); }
+            if (x[i] > 1e-1) { nodeCoefficients.push_back({i, x[i]}); }
         }
 
         // Sort nodes by coefficient in descending order
@@ -322,7 +322,7 @@ struct CompareCuts {
 template <CutType T>
 void LimitedMemoryRank1Cuts::the45Heuristic(const SparseMatrix &A, const std::vector<double> &x) {
     int    max_number_of_cuts  = 10; // Max number of cuts to generate
-    double violation_threshold = 1e-3;
+    double violation_threshold = 1e-1;
     int    max_generated_cuts  = 20;
 
     auto &selectedNodes = the45selectedNodes;

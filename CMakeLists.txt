@@ -18,9 +18,6 @@ else()
   message(STATUS "Clang not found: using default compiler")
 endif()
 
-# Project name
-project(BALDES)
-
 # C++ standard
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
@@ -47,8 +44,6 @@ endif()
 set(CMAKE_CXX_FLAGS_RELEASE "-O3 -march=native -flto")
 set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "-O3 -g -march=native -flto")
 set(CMAKE_CXX_FLAGS_DEBUG "-Og -g -Wall -Wextra")
-
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-unknown-warning-option")
 
 if(APPLE)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -stdlib=libc++")
@@ -84,7 +79,8 @@ option(SCHRODINGER "Enable Schrodinger compilation option" OFF)
 option(CLIQUER "Enable Cliquer compilation option" OFF)
 option(VERBOSE "Enable verbose output" OFF)
 option(JEMALLOC "Enable jemalloc" ON)
-option(GUROBI_HOME "Enable GUROBI" OFF)
+option(GUROBI "Enable GUROBI" OFF)
+option(HIGHS "Enable HIGHS" ON)
 
 # Define the size of resources without using cache
 set(R_SIZE
@@ -219,7 +215,22 @@ if(IPM)
                 DOWNLOAD_ONLY YES  # Only download Eigen, don't configure or build it
   )
   include_directories(${Eigen_SOURCE_DIR})
+  include_directories(${Eigen_SOURCE_DIR}/unsupported)
 endif()
+
+if(HIGHS)
+  cpmaddpackage(NAME Highs GITHUB_REPOSITORY ERGO-Code/HiGHS
+                GIT_TAG origin/master
+                OPTIONS
+                "BUILD_SHARED_LIBS OFF"
+                "BUILD_EXAMPLES OFF"
+                "BUILD_CXX_EXAMPLE OFF"
+                "BUILD_CSHARP_EXAMPLE OFF"
+                "BUILD_DOTNET OFF"
+                "USE_DOTNET_STD_21 OFF"
+  )
+  include_directories(${Highs_SOURCE_DIR}/src)
+  endif()
 
 
 set(GUROBI_HOME $ENV{GUROBI_HOME})
@@ -412,4 +423,8 @@ if(MTW)
   target_link_libraries(vrpmtw PRIVATE unordered_dense)
   target_link_libraries(vrpmtw PRIVATE STDEXEC::stdexec)
   target_link_libraries(vrpmtw PRIVATE fmt::fmt)
+endif()
+
+if(HIGHS)
+  target_link_libraries(vrptw PRIVATE highs::highs)
 endif()

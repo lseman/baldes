@@ -23,6 +23,10 @@ public:
 
     int index() const { return indice; }
 
+    void set_index(int i) { indice = i; }
+
+    void set_name(const std::string &n) { name = n; }
+
     const ankerl::unordered_dense::map<std::string, double> &get_terms() const { return expression.get_terms(); }
 
     void addTerm(const Variable &var, double coeff) { expression.addTerm(var, coeff); }
