@@ -46,28 +46,37 @@ public:
     const ankerl::unordered_dense::map<std::string, double> &get_terms() const { return terms; }
 
     void addTerm(const Variable &var, double coeff) {
-        auto var_name = var.get_name();
-        terms[var_name] += coeff;
+        if (coeff == 0.0) return; // Skip zero coefficients
+        auto &existing_coeff = terms[var.get_name()];
+        existing_coeff += coeff;
+        if (existing_coeff == 0.0) {
+            terms.erase(var.get_name()); // Remove terms that become zero
+        }
     }
 
     void clear_terms() { terms.clear(); }
-    void add_term(const std::string &var_name, double coeff) { terms[var_name] += coeff; }
+    void add_term(const std::string &var_name, double coeff) {
+        terms[var_name] += coeff;
+        if (terms[var_name] == 0.0) { terms.erase(var_name); }
+    }
     void remove_term(const std::string &var_name) { terms.erase(var_name); }
-    
+
     // Print the expression (for debugging)
     void print_expression() const {
         for (const auto &[var_name, coeff] : terms) { std::cout << coeff << "*" << var_name << " "; }
         std::cout << std::endl;
     }
 
+    void add_or_update_term(const std::string &var_name, double coeff) { terms[var_name] = coeff; }
+
     // Overload for <= operator
-    Constraint* operator<=(double rhs) const;
+    Constraint *operator<=(double rhs) const;
 
     // Overload for >= operator
-    Constraint* operator>=(double rhs) const;
+    Constraint *operator>=(double rhs) const;
 
     // Overload for == operator
-    Constraint* operator==(double rhs) const;
+    Constraint *operator==(double rhs) const;
 
 private:
     ankerl::unordered_dense::map<std::string, double> terms; // Map of variable name to coefficient

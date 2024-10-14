@@ -21,7 +21,7 @@
 #include <fmt/core.h>
 
 #ifdef HIGHS
-#include <Highs.h>
+#include "Highs.h"
 #endif
 
 std::pair<Variable, double> operator*(int coeff, Variable &var);
@@ -39,6 +39,7 @@ public:
     void add_variable(const std::string &var_name, VarType type, double lb = 0.0, double ub = 1.0,
                       double obj_coeff = 0.0) {
         variables.emplace_back(var_name, type, lb, ub, obj_coeff);
+        var_name_to_index[var_name] = variables.size() - 1;
     }
 
     // Set the objective function
@@ -80,19 +81,19 @@ public:
         // Convert the LinearExpression to sparse row format and add to the sparse matrix
         int row_index = sparse_matrix.num_rows;
 
+        // Assuming you have many variables, use a more efficient lookup like a map
         for (const auto &[var_name, coeff] : expression.get_terms()) {
-            // Find the variable index corresponding to var_name
-            auto var_it = std::find_if(variables.begin(), variables.end(),
-                                       [&var_name](const Variable &var) { return var.get_name() == var_name; });
-
-            if (var_it != variables.end()) {
-                int col_index = std::distance(variables.begin(), var_it);
+            auto it = var_name_to_index.find(var_name);
+            if (it != var_name_to_index.end()) {
+                int col_index = it->second;
                 sparse_matrix.insert(row_index, col_index, coeff);
+            } else {
+                fmt::print("Variable {} not found in the problem's variables list!\n", var_name);
             }
         }
 
         // Update row start for CRS
-        sparse_matrix.buildRowStart();
+        //sparse_matrix.buildRowStart();
         return new_constraint;
     }
 
@@ -103,72 +104,48 @@ public:
         constraint->set_index(constraint_index);
         constraint->set_name(name);
 
-        constraints.push_back(constraint); // Add the constraint to the list
-        auto relation = constraint->get_relation();
-        // print rhs
-        // Convert the LinearExpression inside the constraint to sparse row format and add it to the sparse matrix
-        int row_index = sparse_matrix.num_rows;
+        // Add the constraint to the list
+        constraints.push_back(constraint);
 
+        // Get the expression and relation (assuming it needs to be used later)
         const LinearExpression &expression = constraint->get_expression();
 
-        for (const auto &[var_name, coeff] : expression.get_terms()) {
-            // Find the variable index corresponding to var_name
-            auto var_it = std::find_if(variables.begin(), variables.end(),
-                                       [&var_name](const Variable &var) { return var.get_name() == var_name; });
+        // Add terms of the expression into the sparse matrix
+        int row_index = sparse_matrix.num_rows;
 
-            if (var_it != variables.end()) {
-                int col_index = std::distance(variables.begin(), var_it);
-                sparse_matrix.insert(row_index, col_index, coeff);
-            } else {
-                fmt::print("Variable {} not found in the problem's variables list!\n", var_name);
-            }
+        for (const auto &[var_name, coeff] : expression.get_terms()) {
+
+            int col_index = var_name_to_index[var_name];
+            sparse_matrix.insert(row_index, col_index, coeff);
         }
 
-        // Update row start for CRS
-        sparse_matrix.buildRowStart();
+        // Delay the CRS structure rebuild if batching is possible
+        //sparse_matrix.buildRowStart();
 
-        // Return reference to the constraint in the list
+        // Return reference to the added constraint
         return constraints.back();
     }
 
     // Delete a constraint (row) from the problem
     void delete_constraint(int constraint_index) {
-        // Get the row index of the constraint
-        int row_to_delete = constraint_index;
-        // Delete the row from the sparse matrix
-        sparse_matrix.delete_row(row_to_delete);
+        if (constraint_index < 0 || constraint_index >= constraints.size()) {
+            throw std::out_of_range("Invalid constraint index");
+        }
 
-        // Remove the constraint from the constraints list and the row index from the tracking vector
+        // Delete the row from the sparse matrix (assumed efficient row deletion)
+        sparse_matrix.delete_row(constraint_index);
+
+        // Erase the constraint from the list
         constraints.erase(constraints.begin() + constraint_index);
 
-        for (int i = constraint_index; i < constraints.size(); ++i) {
-            constraints[i]->set_index(i); // Update the index of the remaining constraints
-        }
-        // Rebuild the row structure
-        sparse_matrix.buildRowStart();
+        // Update the indices of the remaining constraints (this step can be costly if many constraints exist)
+        for (int i = constraint_index; i < constraints.size(); ++i) { constraints[i]->set_index(i); }
+
+        // Rebuild the row structure only if needed (if sparse_matrix requires full row structure rebuild)
+        //sparse_matrix.buildRowStart();
     }
 
-    void delete_constraint(Constraint *constraint) {
-        // print constraints.size
-        // Get the index of the given constraint in the constraints vector
-        int constraint_index = constraint->index();
-
-        // Get the corresponding row index in the sparse matrix
-        int row_to_delete = constraint_index;
-
-        // Delete the row from the sparse matrix
-        sparse_matrix.delete_row(row_to_delete);
-
-        // Remove the constraint from the constraints vector
-        constraints.erase(constraints.begin() + constraint_index);
-        // Rebuild the row structure for the CRS matrix
-        sparse_matrix.buildRowStart();
-
-        // Adjust the indices of remaining constraints
-        for (int i = constraint_index; i < constraints.size(); ++i) {
-            constraints[i]->set_index(i); // Update the index of the remaining constraints
-        }
-    }
+    void delete_constraint(Constraint *constraint) { delete_constraint(constraint->index()); }
 
     void delete_variable(const Variable &variable) {
         // Find the index of the given variable in the variables vector
@@ -188,12 +165,6 @@ public:
             throw std::invalid_argument("Variable not found.");
         }
     }
-
-    // Add a sparse coefficient to the constraint matrix
-    void add_sparse_coefficient(int row, int col, double value) { sparse_matrix.insert(row, col, value); }
-
-    // Build the CRS structure for the sparse matrix after all coefficients are added
-    void build_coefficient_matrix() { sparse_matrix.buildRowStart(); }
 
     // Multiply the sparse matrix by a vector
     std::vector<double> multiply_with_vector(const std::vector<double> &x) const { return sparse_matrix.multiply(x); }
@@ -217,10 +188,8 @@ public:
         return variables[index];
     }
 
-    // Change multiple coefficients for a specific constraint
     void chgCoeff(int constraintIndex, const std::vector<double> &values) {
         if (constraintIndex < 0 || constraintIndex >= constraints.size()) {
-            // print constraintIndex and constraints.size()
             throw std::out_of_range("Invalid constraint index");
         }
 
@@ -228,35 +197,34 @@ public:
         Constraint       *constraint = constraints[constraintIndex];
         LinearExpression &expression = constraint->get_expression();
 
-        // Clear the existing terms in the LinearExpression
-        expression.clear_terms();
-
-        // Iterate over the values and update both the sparse matrix and the constraint's expression
+        // Iterate over the values and only update changed entries
         for (int i = 0; i < values.size(); ++i) {
-            double value = values[i];
+            double new_value = values[i];
 
-            // Update the sparse matrix
-            sparse_matrix.modify_or_delete(constraintIndex, i, value);
+            // Update the sparse matrix only if the value has changed
+            sparse_matrix.modify_or_delete(constraintIndex, i, new_value);
 
-            // Update the LinearExpression in the Constraint
-            if (value != 0.0) {
-                const std::string &var_name = variables[i].get_name(); // Get variable name by index
-                expression.add_term(var_name, value); // Add the term (variable, coefficient) to the expression
+            const std::string &var_name = variables[i].get_name();
+
+            // Update or remove terms in the LinearExpression
+            if (new_value != 0.0) {
+                expression.add_or_update_term(var_name, new_value); // Optimized to add/update the term
+            } else {
+                expression.remove_term(var_name); // Remove the term if the value is 0
             }
         }
 
-        // Rebuild the CRS structure after updating
-        sparse_matrix.buildRowStart();
+        // Rebuild the CRS structure once after all updates
+        //sparse_matrix.buildRowStart();
     }
 
-    // Change a single coefficient for a specific constraint and variable
     void chgCoeff(int constraintIndex, int variableIndex, double value) {
         if (constraintIndex < 0 || constraintIndex >= constraints.size() || variableIndex < 0 ||
             variableIndex >= variables.size()) {
             throw std::out_of_range("Invalid constraint or variable index");
         }
 
-        // Update the sparse matrix
+        // Update the sparse matrix only if the value has changed
         sparse_matrix.modify_or_delete(constraintIndex, variableIndex, value);
 
         // Update the LinearExpression in the corresponding Constraint
@@ -265,15 +233,15 @@ public:
 
         const std::string &var_name = variables[variableIndex].get_name();
 
-        // Update the term in the LinearExpression
+        // Update or remove terms in the LinearExpression
         if (value != 0.0) {
-            expression.add_term(var_name, value); // Add or update the term (variable, coefficient)
+            expression.add_or_update_term(var_name, value); // Add or update the term (variable, coefficient)
         } else {
             expression.remove_term(var_name); // Remove the term if the value is 0
         }
 
-        // Rebuild the row start for CRS format
-        sparse_matrix.buildRowStart();
+        // Delay calling buildRowStart() until after all updates, if possible
+        // sparse_matrix.buildRowStart();
     }
 
     void addVars(const double *lb, const double *ub, const double *obj, const VarType *vtypes, const std::string *names,
@@ -285,36 +253,6 @@ public:
     std::vector<Variable> &getVars() { return variables; }
     // Get all constraints
     std::vector<Constraint *> &getConstraints() { return constraints; }
-
-    void add_variable_with_sparse_column(const std::string &var_name, VarType type, double lb, double ub,
-                                         const std::vector<std::pair<int, double>> &sparse_column) {
-        // Add the variable to the problem
-        variables.emplace_back(var_name, type, lb, ub);
-
-        // Get the index of the newly added variable (last variable)
-        int col_index = variables.size() - 1;
-
-        // Add each non-zero element from the sparse column into the sparse matrix
-        for (const auto &[row_index, value] : sparse_column) {
-            sparse_matrix.insert(row_index, col_index, value); // Insert (row, col, value) into the matrix
-        }
-
-        // Ensure the matrix structure is updated
-        sparse_matrix.buildRowStart(); // Rebuild row starts for CRS format
-    }
-
-    void add_constraint_with_sparse_row(const std::vector<std::pair<int, double>> &sparse_row) {
-        // Get the index of the newly added row (new constraint)
-        int row_index = sparse_matrix.num_rows; // The new row will be the current number of rows
-
-        // Add each non-zero element from the sparse row into the sparse matrix
-        for (const auto &[col_index, value] : sparse_row) {
-            sparse_matrix.insert(row_index, col_index, value); // Insert (row, col, value) into the matrix
-        }
-
-        // Ensure the matrix structure is updated
-        sparse_matrix.buildRowStart(); // Rebuild row starts for CRS format
-    }
 
     // Method to get the b vector (RHS values of all constraints)
     std::vector<double> get_b_vector() const {
@@ -400,10 +338,10 @@ public:
 #endif
 
 #ifdef HIGHS
-#include "Highs.h"
 
     // Function to populate a HiGHS model from this MIPProblem instance
     HighsModel toHighsModel() {
+        sparse_matrix.buildRowStart(); // Build the row start structure for CRS format
         // Create a new HiGHS model
         Highs      highs;
         HighsModel highsModel;
@@ -496,8 +434,11 @@ public:
 
 #endif
 
-    double getSlack(int row, const std::vector<double> &solution) const {
-
+    double getSlack(int row, const std::vector<double> &solution) {
+        
+        if (sparse_matrix.is_dirty) {
+            sparse_matrix.buildRowStart();
+        }
         auto rhs = constraints[row]->get_rhs();
         // Compute the dot product of the solution vector and the specified row
         double row_value = 0.0;
@@ -512,30 +453,39 @@ public:
 
     std::vector<double> get_lbs() const {
         std::vector<double> lbs;
-        for (const auto &var : variables) { lbs.push_back(var.get_lb()); }
+        lbs.reserve(variables.size()); // Reserve space upfront
+        std::transform(variables.begin(), variables.end(), std::back_inserter(lbs),
+                       [](const Variable &var) { return var.get_lb(); });
         return lbs;
     }
 
     std::vector<double> get_ubs() const {
         std::vector<double> ubs;
-        for (const auto &var : variables) { ubs.push_back(var.get_ub()); }
+        ubs.reserve(variables.size()); // Reserve space upfront
+        std::transform(variables.begin(), variables.end(), std::back_inserter(ubs),
+                       [](const Variable &var) { return var.get_ub(); });
         return ubs;
     }
 
     std::vector<double> get_c() const {
         std::vector<double> c;
-        for (const auto &var : variables) { c.push_back(var.get_objective_coefficient()); }
+        c.reserve(variables.size()); // Reserve space upfront
+        std::transform(variables.begin(), variables.end(), std::back_inserter(c),
+                       [](const Variable &var) { return var.get_objective_coefficient(); });
         return c;
     }
 
     std::vector<char> get_senses() const {
         std::vector<char> senses;
-        for (const auto &constraint : constraints) { senses.push_back(constraint->get_relation()); }
+        senses.reserve(constraints.size()); // Reserve space upfront
+        std::transform(constraints.begin(), constraints.end(), std::back_inserter(senses),
+                       [](const auto &constraint) { return constraint->get_relation(); });
         return senses;
     }
 
     std::vector<char> get_vtypes() const {
         std::vector<char> vtypes;
+        vtypes.reserve(variables.size()); // Reserve space upfront
         for (const auto &var : variables) {
             if (var.get_type() == VarType::Continuous) {
                 vtypes.push_back('C');
@@ -549,6 +499,7 @@ public:
     }
 
     ModelData extractModelDataSparse() {
+        sparse_matrix.buildRowStart(); // Build the row start structure for CRS format
         ModelData data;
         data.A_sparse = sparse_matrix;
         data.b        = get_b_vector();
@@ -562,12 +513,13 @@ public:
     }
 
 private:
-    std::string               name;
-    std::vector<Variable>     variables;
-    std::vector<Constraint *> constraints;    // Store the constraints
-    LinearExpression          objective;      // Store the objective function
-    ObjectiveType             objective_type; // Minimize or Maximize
-    SparseMatrix              sparse_matrix;  // Use SparseMatrix for coefficient storage
+    std::string                                    name;
+    std::vector<Variable>                          variables;
+    std::vector<Constraint *>                      constraints;    // Store the constraints
+    LinearExpression                               objective;      // Store the objective function
+    ObjectiveType                                  objective_type; // Minimize or Maximize
+    SparseMatrix                                   sparse_matrix;  // Use SparseMatrix for coefficient storage
+    ankerl::unordered_dense::map<std::string, int> var_name_to_index;
 };
 
 class MIPColumn {
@@ -575,11 +527,6 @@ public:
     // Add a term to the column (row index and coefficient)
     void addTerm(int row_index, double value) {
         if (value != 0.0) { terms.push_back({row_index, value}); }
-    }
-
-    // Add all terms from this column to the MIPProblem sparse matrix for the given variable index
-    void addToMatrix(MIPProblem &mip, int var_index) const {
-        for (const auto &[row_index, value] : terms) { mip.add_sparse_coefficient(row_index, var_index, value); }
     }
 
     // Clear the column for reuse

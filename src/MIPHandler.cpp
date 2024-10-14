@@ -24,7 +24,7 @@ void MIPProblem::addVars(const double *lb, const double *ub, const double *obj, 
     }
 
     // Rebuild the sparse matrix structure
-    sparse_matrix.buildRowStart();
+    //sparse_matrix.buildRowStart();
 }
 
 void MIPProblem::addVars(const double *lb, const double *ub, const double *obj, const VarType *vtypes,
@@ -35,7 +35,7 @@ void MIPProblem::addVars(const double *lb, const double *ub, const double *obj, 
     }
 
     // Rebuild the sparse matrix structure
-    sparse_matrix.buildRowStart();
+    //sparse_matrix.buildRowStart();
 }
 
 Constraint *LinearExpression::operator>=(double rhs) const {

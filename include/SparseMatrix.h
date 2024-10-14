@@ -19,6 +19,7 @@
 #include <utility> // for std::move
 #include <vector>
 
+#include "../third_party/pdqsort.h"
 /**
  * @struct SparseElement
  * @brief Represents a non-zero element in a sparse matrix.
@@ -44,6 +45,8 @@ struct SparseMatrix {
     std::vector<int>           row_start; ///< Starting index of each row in `elements`
     int                        num_rows;  ///< Total number of rows in the matrix
     int                        num_cols;  ///< Total number of columns in the matrix
+    bool                       is_dirty = true;
+
     // default constructor
     SparseMatrix() : num_rows(0), num_cols(0) {}
     // define default constructor which receive num_rows and num_cols
@@ -69,6 +72,8 @@ struct SparseMatrix {
         }
 
         elements.emplace_back(SparseElement{row, col, value});
+        // buildRowStart(); // Rebuild the CRS structure
+        is_dirty = true;
     }
 
     // Delete a column (variable) from the matrix
@@ -86,7 +91,8 @@ struct SparseMatrix {
         --num_cols;
 
         // Rebuild the row_start for CRS format
-        buildRowStart();
+        // buildRowStart();
+        is_dirty = true;
     }
 
     // Delete a row (constraint) from the matrix
@@ -104,7 +110,8 @@ struct SparseMatrix {
         --num_rows;
 
         // Rebuild the row_start for CRS format
-        buildRowStart();
+        // buildRowStart();
+        is_dirty = true;
     }
 
     /**
@@ -134,7 +141,8 @@ struct SparseMatrix {
         }
 
         // Rebuild the CRS structure to ensure consistency
-        buildRowStart();
+        // buildRowStart();
+        is_dirty = true;
     }
 
     /**
@@ -144,11 +152,12 @@ struct SparseMatrix {
      * each row in the `elements` vector. This enables efficient row-wise traversal.
      */
     void buildRowStart() {
+        if (!is_dirty) return;
         row_start.assign(num_rows + 1, 0);
 
         // Use C++23 range-based algorithms for concise sorting
-        std::ranges::sort(elements, {}, [](const SparseElement &a) {
-            return std::pair(a.row, a.col); // Compare row and column as a tuple
+        pdqsort(elements.begin(), elements.end(), [](const SparseElement &a, const SparseElement &b) {
+            return std::tie(a.row, a.col) < std::tie(b.row, b.col);
         });
 
         // Count non-zero elements per row
@@ -156,6 +165,8 @@ struct SparseMatrix {
 
         // Accumulate the counts to get the starting index for each row
         std::partial_sum(row_start.begin(), row_start.end(), row_start.begin());
+
+        is_dirty = false;
     }
 
     /**
