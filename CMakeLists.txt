@@ -252,10 +252,6 @@ if(HIGHS)
     RESULT_VARIABLE PATCH_RESULT
     ERROR_VARIABLE PATCH_ERROR)
 
-  if(NOT PATCH_RESULT EQUAL 0)
-    message(FATAL_ERROR "Failed to apply patch to Highs: ${PATCH_ERROR}")
-  endif()
-
 endif()
 
 set(GUROBI_HOME $ENV{GUROBI_HOME})

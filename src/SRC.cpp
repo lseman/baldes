@@ -401,7 +401,7 @@ bool LimitedMemoryRank1Cuts::runSeparation(BNBNode *node, std::vector<Constraint
     if (cleared) {
         node->optimize(); // Re-optimize the model
     }
-    matrix = node->extractModelDataSparse(); // Extract model data
+    matrix   = node->extractModelDataSparse(); // Extract model data
     solution = node->extractSolution();
 
     separate(matrix.A_sparse, solution);
