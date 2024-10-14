@@ -21,7 +21,7 @@ endif()
 # C++ standard
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
-#set(CMAKE_CUDA_STANDARD 20)  # or CUDA11 if needed
+# set(CMAKE_CUDA_STANDARD 20)  # or CUDA11 if needed
 
 # Enable Interprocedural Optimization (Link Time Optimization)
 set(CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE ON)
@@ -210,27 +210,53 @@ if(WITH_PYTHON)
 endif()
 
 if(IPM)
-  cpmaddpackage(NAME Eigen GIT_REPOSITORY https://gitlab.com/libeigen/eigen.git
-                GIT_TAG 3.4.0
-                DOWNLOAD_ONLY YES  # Only download Eigen, don't configure or build it
+  cpmaddpackage(
+    NAME
+    Eigen
+    GIT_REPOSITORY
+    https://gitlab.com/libeigen/eigen.git
+    GIT_TAG
+    3.4.0
+    DOWNLOAD_ONLY
+    YES # Only download Eigen, don't configure or build it
   )
   include_directories(${Eigen_SOURCE_DIR})
   include_directories(${Eigen_SOURCE_DIR}/unsupported)
 endif()
 
 if(HIGHS)
-  cpmaddpackage(NAME Highs GITHUB_REPOSITORY ERGO-Code/HiGHS
-                GIT_TAG origin/master
-                OPTIONS
-                "BUILD_SHARED_LIBS ON"
-                "BUILD_EXAMPLES OFF"
-                "BUILD_CXX_EXAMPLE OFF"
-                "BUILD_CSHARP_EXAMPLE OFF"
-                "BUILD_DOTNET OFF"
-  )
+  cpmaddpackage(
+    NAME
+    Highs
+    GITHUB_REPOSITORY
+    ERGO-Code/HiGHS
+    GIT_TAG
+    origin/master
+    OPTIONS
+    "BUILD_SHARED_LIBS ON"
+    "BUILD_EXAMPLES OFF"
+    "BUILD_CXX_EXAMPLE OFF"
+    "BUILD_CSHARP_EXAMPLE OFF"
+    "BUILD_DOTNET OFF")
   include_directories(${Highs_SOURCE_DIR}/src)
+
+  # Path to your patch file
+  set(PATCH_FILE "${CMAKE_CURRENT_LIST_DIR}/highs.patch")
+  # echo the patch file
+  message(STATUS "Patch file: ${PATCH_FILE}")
+
+  # Apply the patch using execute_process
+  execute_process(
+    COMMAND patch -p1 -i ${PATCH_FILE}
+    WORKING_DIRECTORY ${Highs_SOURCE_DIR}
+    RESULT_VARIABLE PATCH_RESULT
+    ERROR_VARIABLE PATCH_ERROR)
+
+  if(NOT PATCH_RESULT EQUAL 0)
+    message(FATAL_ERROR "Failed to apply patch to Highs: ${PATCH_ERROR}")
   endif()
 
+endif()
 
 set(GUROBI_HOME $ENV{GUROBI_HOME})
 include_directories(${GUROBI_HOME}/include)
@@ -314,17 +340,17 @@ set(GUROBI_VERSION_MAJOR 110) # Adjust based on Gurobi version
 message(STATUS "Gurobi version: ${GUROBI_VERSION_MAJOR}")
 
 if(GUROBI)
-# Link Gurobi libraries
-if(APPLE)
-  # macOS detected, use .dylib for linking
-  target_link_libraries(vrptw PRIVATE ${GUROBI_HOME}/lib/libgurobi_c++.a
-                                      ${GUROBI_HOME}/lib/libgurobi100.dylib)
-else()
-  # Non-macOS (Linux or other platforms), use .so and .a files
-  target_link_libraries(
-    vrptw PRIVATE ${GUROBI_HOME}/lib/libgurobi_c++.a
-                  ${GUROBI_HOME}/lib/libgurobi${GUROBI_VERSION_MAJOR}.so tbb)
-endif()
+  # Link Gurobi libraries
+  if(APPLE)
+    # macOS detected, use .dylib for linking
+    target_link_libraries(vrptw PRIVATE ${GUROBI_HOME}/lib/libgurobi_c++.a
+                                        ${GUROBI_HOME}/lib/libgurobi100.dylib)
+  else()
+    # Non-macOS (Linux or other platforms), use .so and .a files
+    target_link_libraries(
+      vrptw PRIVATE ${GUROBI_HOME}/lib/libgurobi_c++.a
+                    ${GUROBI_HOME}/lib/libgurobi${GUROBI_VERSION_MAJOR}.so tbb)
+  endif()
 endif()
 
 if(JEMALLOC)
@@ -350,7 +376,6 @@ endif()
 target_compile_options(vrptw PRIVATE -Wno-c++26-extensions
                                      -Wno-deprecated-declarations)
 
-                                 
 # link with xxhash
 target_link_libraries(vrptw PRIVATE xxhash)
 # link with unordered_dense
@@ -362,18 +387,19 @@ if(CLIQUER)
   target_link_libraries(cliquer PRIVATE fmt::fmt)
 
   if(GUROBI)
-  if(APPLE)
-    # macOS detected, use .dylib for linking
-    target_link_libraries(cliquer PRIVATE ${GUROBI_HOME}/lib/libgurobi_c++.a
-                                          ${GUROBI_HOME}/lib/libgurobi100.dylib)
-  else()
-    # Non-macOS (Linux or other platforms), use .so and .a files
-    target_link_libraries(
-      cliquer PRIVATE ${GUROBI_HOME}/lib/libgurobi_c++.a
-                      ${GUROBI_HOME}/lib/libgurobi${GUROBI_VERSION_MAJOR}.so)
+    if(APPLE)
+      # macOS detected, use .dylib for linking
+      target_link_libraries(
+        cliquer PRIVATE ${GUROBI_HOME}/lib/libgurobi_c++.a
+                        ${GUROBI_HOME}/lib/libgurobi100.dylib)
+    else()
+      # Non-macOS (Linux or other platforms), use .so and .a files
+      target_link_libraries(
+        cliquer PRIVATE ${GUROBI_HOME}/lib/libgurobi_c++.a
+                        ${GUROBI_HOME}/lib/libgurobi${GUROBI_VERSION_MAJOR}.so)
+    endif()
   endif()
-  endif()
-  
+
   if(JEMALLOC)
     find_library(JEMALLOC_LIBRARY jemalloc)
     if(JEMALLOC_LIBRARY)
