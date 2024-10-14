@@ -769,7 +769,13 @@ void BucketGraph::bucket_fixing() {
         gap = incumbent - (relaxation + std::min(0.0, min_red_cost));
 
         // check if gap is -inf and early exit, due to IPM
-        if (gap < 0) { return; }
+        if (gap < 0) {
+            fmt::print("\033[34m_BUCKET FIXING PROCEDURE CAN'T BE EXECUTED DUE TO GAP\033[0m");
+            fmt::print("\n");
+            // print the gap
+            fmt::print("gap: {}\n", gap);
+            return;
+        }
         fw_c_bar = forward_cbar;
         bw_c_bar = backward_cbar;
 

@@ -5,13 +5,19 @@
 #include <Eigen/Dense>
 #include <Eigen/Sparse>
 #include <Eigen/SparseCholesky>
-#include <gurobi_c++.h>
+
+#ifdef GUROBI
+#include "gurobi_c++.h"
+#include "gurobi_c.h"
+#endif
+
 #include <iostream>
 #include <new>
 #include <stdexcept>
 #include <vector>
 
-#include "Solver.h"
+// #include "CuSolver.h"
+#include "LDLT.h"
 
 #ifdef CHOLMOD
 #include "cholmod.h"
@@ -181,7 +187,8 @@ public:
 #ifdef CHOLMOD
         CH,
 #endif
-        LDLT
+        LDLT,
+        CU
     };
 
     // SparseSolver() { solver = new SolverWrapper<CholmodSolver>(); }
@@ -191,7 +198,10 @@ public:
 #ifdef CHOLMOD
         case CH: solver = new SolverWrapper<CholmodSolver>(); break;
 #endif
-        case LDLT: solver = new SolverWrapper<LDLTSolver>(); break;
+        case LDLT:
+            solver = new SolverWrapper<LDLTSolver>();
+            break;
+            // case CU: solver = new SolverWrapper<CuSolver>(); break;
         }
     }
 

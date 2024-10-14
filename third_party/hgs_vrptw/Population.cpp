@@ -215,16 +215,6 @@ bool Population::addIndividual(const Individual *indiv, bool updateFeasible) {
         updateMDMElite(indiv);
         bestSolutionRestart = *indiv;
         searchProgress.push_back({params->getTimeElapsedSeconds(), bestSolutionOverall.myCostSol.penalizedCost});
-        if (params->config.isDimacsRun) {
-            // Since the controller may kill the script at any time, directly write output
-            // bestSolutionOverall.exportCVRPLibFormat(params->config.pathSolution);
-            // exportSearchProgress(params->config.pathSolution + ".PG.csv", params->config.pathInstance,
-            // params->config.seed);
-
-            // Print solution for processing by the controller (after output is written since controller may
-            // terminate program!) Note: delay for writing is negligible
-            // bestSolutionOverall.printCVRPLibFormat();
-        }
         return true;
     } else
         return false;

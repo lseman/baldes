@@ -20,9 +20,10 @@
 #include "Cut.h"
 #include "Definitions.h"
 
+#include "MIPHandler/MIPHandler.h"
 #include "RCC.h"
 
-#include "TR.h"
+// #include "TR.h"
 #include "bnb/Branching.h"
 #include "bnb/Node.h"
 
@@ -78,9 +79,11 @@ public:
     int addPath(BNBNode *node, const std::vector<Path> paths, bool enumerate = false) {
         auto &r1c  = node->r1c;
         auto &cuts = r1c.cutStorage;
-
-        int              numConstrsLocal = node->get(GRB_IntAttr_NumConstrs);
-        const GRBConstr *constrs         = node->getConstrs();
+#ifdef RCC
+        auto &rccManager = node->rccManager;
+#endif
+        int   numConstrsLocal = node->getIntAttr("NumConstrs");
+        auto &constrs         = node->getConstrs();
 
         auto &matrix         = node->matrix;
         auto &allPaths       = node->paths;
@@ -90,77 +93,83 @@ public:
 
         // Collect the bounds, costs, names, and columns
         std::vector<double>      lb, ub, obj;
-        std::vector<GRBColumn>   cols;
+        std::vector<MIPColumn>   cols;
         std::vector<std::string> names;
-        std::vector<char>        vtypes;
+        std::vector<VarType>     vtypes;
 
         auto counter = 0;
         for (auto &label : paths) {
             counter += 1;
-            // if (counter > 10) break;
+            if (counter > 10) break;
+            // Insert the path into the set to avoid duplicates
+            // pathSet.insert(path);
 
-            std::fill(coluna.begin(), coluna.end(), 0.0); // Reset for each iteration
+            counter += 1;
+            if (counter >= 10) break;
+
+            std::fill(coluna.begin(), coluna.end(), 0.0); // Reset the coefficients
 
             double      travel_cost = label.cost;
             std::string name        = "x[" + std::to_string(allPaths.size()) + "]";
 
-            GRBColumn col;
+            MIPColumn col; // Use Column instead of GRBColumn
 
-            // Fill coluna with coefficients
             // Step 1: Accumulate the coefficients for each node
-            for (auto &node : label.route) {
-                if (node > 0 && node != N_SIZE - 1) {
-                    int constr_index = node - 1;
-                    coluna[constr_index] += 1; // Accumulate the coefficient for each node
+            for (const auto &node : label.route) {
+                if (likely(node > 0 && node != N_SIZE - 1)) { // Use likely() if applicable
+                    coluna[node - 1]++;                       // Simplified increment operation
                 }
             }
 
-            // Step 2: Add the non-zero entries to the sparse matrix
-            for (int i = 0; i < N_SIZE - 1; ++i) {
-                if (coluna[i] > 0) {
-                    matrix.A_sparse.elements.push_back({i, matrix.A_sparse.num_cols, static_cast<double>(coluna[i])});
-                }
-            }
-
-            matrix.lb.push_back(0.0);
-            matrix.ub.push_back(1.0);
-            matrix.c.push_back(travel_cost);
-            // Add terms to GRBColumn
+            // Add terms to the Column
             for (int i = 0; i < N_SIZE - 2; i++) {
                 if (coluna[i] == 0.0) continue;
-                col.addTerms(&coluna[i], &constrs[i], 1);
+                col.addTerm(i, coluna[i]); // Add term to the Column (row index and coefficient)
             }
-            // Add terms for total veicles constraint
-            double val = 1;
-            col.addTerms(&val, &constrs[N_SIZE - 2], 1);
+
+            // Add the term for total vehicles constraint
+            col.addTerm(N_SIZE - 2, 1.0); // Add term for the vehicle constraint
 
             // Add terms for the limited memory rank 1 cuts
 #if defined(SRC3) || defined(SRC)
             auto vec = cuts.computeLimitedMemoryCoefficients(label.route);
-            // print vec size
             if (vec.size() > 0) {
                 for (int i = 0; i < vec.size(); i++) {
-                    if (vec[i] != 0) { col.addTerms(&vec[i], &SRCconstraints[i], 1); }
+                    if (abs(vec[i]) > 1e-3) {
+                        col.addTerm(i, vec[i]); // Add to the appropriate constraint in Column
+                    }
                 }
             }
+#endif
 
+#if defined(RCC) || defined(EXACT_RCC)
+            auto RCCvec         = rccManager.computeRCCCoefficients(label.route);
+            auto RCCconstraints = rccManager.getConstraints();
+            if (RCCvec.size() > 0) {
+                for (int i = 0; i < RCCvec.size(); i++) {
+                    if (abs(RCCvec[i]) > 1e-3) {
+                        col.addTerm(i, RCCvec[i]); // Add RCC terms to the Column
+                    }
+                }
+            }
 #endif
 
             // Collect bounds, costs, columns, and names
             lb.push_back(0.0);
             ub.push_back(1.0);
             obj.push_back(travel_cost);
-            cols.push_back(col);
+            cols.push_back(col); // Add the populated Column
             names.push_back(name);
-            vtypes.push_back(GRB_CONTINUOUS);
+            vtypes.push_back(VarType::Continuous); // Assuming VarType::Continuous is the equivalent of GRB_CONTINUOUS
 
-            Path path(label.route, label.cost);
-            node->addPath(path);
+            node->addPath(label); // Store the path
         }
+
         // Add variables with bounds, objectives, and columns
         if (!lb.empty()) {
+            // Pass the data to the MIP problem
             node->addVars(lb.data(), ub.data(), obj.data(), vtypes.data(), names.data(), cols.data(), lb.size());
-            node->update();
+            node->update(); // Update the node (if applicable, similar to Gurobi's model update)
         }
 
         return counter;
@@ -177,19 +186,18 @@ public:
         auto &rccManager = node->rccManager;
 #endif
 
-        int                 numConstrsLocal = node->get(GRB_IntAttr_NumConstrs);
-        const GRBConstr    *constrs         = node->getConstrs();
+        int                 numConstrsLocal = node->getIntAttr("NumConstrs");
+        auto               &constrs         = node->getConstrs();
         std::vector<double> coluna(numConstrsLocal, 0.0); // Declare outside the loop
 
-        auto &matrix         = node->matrix;
         auto &allPaths       = node->paths;
         auto &SRCconstraints = node->SRCconstraints;
 
         // Collect the bounds, costs, names, and columns
         std::vector<double>      lb, ub, obj;
-        std::vector<GRBColumn>   cols;
+        std::vector<MIPColumn>   cols;
         std::vector<std::string> names;
-        std::vector<char>        vtypes;
+        std::vector<VarType>     vtypes;
 
         auto &pathSet = node->pathSet;
 
@@ -200,44 +208,43 @@ public:
 
             Path path(label->nodes_covered, label->real_cost);
 
-            // TODO: check if its better to use a set or simply insert the path in the vector
-            // if (pathSet.find(path) != pathSet.end()) { continue; }
+            // Insert the path into the set to avoid duplicates
             pathSet.insert(path);
 
             counter += 1;
-            if (counter >= 10) break;
+            if (counter > 1) break;
 
-            std::fill(coluna.begin(), coluna.end(), 0.0); // Reset for each iteration
+            std::fill(coluna.begin(), coluna.end(), 0.0); // Reset the coefficients
 
             double      travel_cost = label->real_cost;
             std::string name        = "x[" + std::to_string(allPaths.size()) + "]";
 
-            GRBColumn col;
+            MIPColumn col; // Use Column instead of GRBColumn
 
-            // Fill coluna with coefficients
             // Step 1: Accumulate the coefficients for each node
             for (const auto &node : label->nodes_covered) {
-                if (likely(node > 0 && node != N_SIZE - 1)) { // Use likely() if this condition is almost always true
+                if (likely(node > 0 && node != N_SIZE - 1)) { // Use likely() if applicable
                     coluna[node - 1]++;                       // Simplified increment operation
                 }
             }
 
-            //  Add terms to GRBColumn
+            // Add terms to the Column
             for (int i = 0; i < N_SIZE - 2; i++) {
                 if (coluna[i] == 0.0) continue;
-                col.addTerms(&coluna[i], &constrs[i], 1);
+                col.addTerm(i, coluna[i]); // Add term to the Column (row index and coefficient)
             }
-            // Add terms for total veicles constraint
-            double val = 1;
-            col.addTerms(&val, &constrs[N_SIZE - 2], 1);
+
+            // Add the term for total vehicles constraint
+            col.addTerm(N_SIZE - 2, 1.0); // Add term for the vehicle constraint
 
             // Add terms for the limited memory rank 1 cuts
 #if defined(SRC3) || defined(SRC)
             auto vec = cuts.computeLimitedMemoryCoefficients(label->nodes_covered);
-            // print vec size
             if (vec.size() > 0) {
                 for (int i = 0; i < vec.size(); i++) {
-                    if (abs(vec[i]) > 1e-3) { col.addTerms(&vec[i], &SRCconstraints[i], 1); }
+                    if (abs(vec[i]) > 1e-3) {
+                        col.addTerm(i, vec[i]); // Add to the appropriate constraint in Column
+                    }
                 }
             }
 #endif
@@ -247,7 +254,9 @@ public:
             auto RCCconstraints = rccManager.getConstraints();
             if (RCCvec.size() > 0) {
                 for (int i = 0; i < RCCvec.size(); i++) {
-                    if (abs(RCCvec[i]) > 1e-3) { col.addTerms(&RCCvec[i], &RCCconstraints[i], 1); }
+                    if (abs(RCCvec[i]) > 1e-3) {
+                        col.addTerm(i, RCCvec[i]); // Add RCC terms to the Column
+                    }
                 }
             }
 #endif
@@ -256,70 +265,28 @@ public:
             lb.push_back(0.0);
             ub.push_back(1.0);
             obj.push_back(travel_cost);
-            cols.push_back(col);
+            cols.push_back(col); // Add the populated Column
             names.push_back(name);
-            vtypes.push_back(GRB_CONTINUOUS);
+            vtypes.push_back(VarType::Continuous); // Assuming VarType::Continuous is the equivalent of GRB_CONTINUOUS
 
-            node->addPath(path);
+            node->addPath(path); // Store the path
         }
+
         // Add variables with bounds, objectives, and columns
         if (!lb.empty()) {
+            // Pass the data to the MIP problem
             node->addVars(lb.data(), ub.data(), obj.data(), vtypes.data(), names.data(), cols.data(), lb.size());
-            node->update();
+            // node->update(); // Update the node (if applicable, similar to Gurobi's model update)
         }
 
         return counter;
     }
 
     /**
-     * Removes variables with negative reduced costs, up to a maximum of 30% of the total variables,
-     * and also removes corresponding elements from the allPaths vector.
-     *
-     */
-    void removeNegativeReducedCostVarsAndPaths(BNBNode *model) {
-        auto &allPaths = model->paths;
-        model->optimize();
-        int                 varNumber = model->get(GRB_IntAttr_NumVars);
-        std::vector<GRBVar> vars(varNumber);
-
-        // Collect all variables
-        for (int i = 0; i < varNumber; ++i) { vars[i] = model->getVar(i); }
-
-        // Vector to store reduced costs
-        std::vector<double> reducedCosts(varNumber);
-
-        // Retrieve the reduced cost for each variable individually
-        for (int i = 0; i < varNumber; ++i) { reducedCosts[i] = vars[i].get(GRB_DoubleAttr_RC); }
-
-        // Vector to store indices of variables with negative reduced costs
-        std::vector<int> indicesToRemove;
-
-        // Identify variables with negative reduced costs
-        for (int i = 0; i < varNumber; ++i) {
-            if (reducedCosts[i] < 0) { indicesToRemove.push_back(i); }
-        }
-
-        // Limit the number of variables to remove to 30% of the total
-        size_t maxRemoval = static_cast<size_t>(0.3 * varNumber);
-        if (indicesToRemove.size() > maxRemoval) {
-            indicesToRemove.resize(maxRemoval); // Only keep the first 30%
-        }
-
-        // Remove the selected variables from the model and corresponding paths from allPaths
-        for (int i = indicesToRemove.size() - 1; i >= 0; --i) {
-            int index = indicesToRemove[i];
-            model->remove(vars[index]);               // Remove the variable from the model
-            allPaths.erase(allPaths.begin() + index); // Remove the corresponding path from allPaths
-        }
-
-        model->update(); // Apply changes to the model
-    }
-
-    /**
      * Handles the cuts for the VRPTW problem.
      *
      */
-    bool cutHandler(LimitedMemoryRank1Cuts &r1c, BNBNode *node, std::vector<GRBConstr> &constraints) {
+    bool cutHandler(LimitedMemoryRank1Cuts &r1c, BNBNode *node, std::vector<Constraint> &constraints) {
         auto &cuts    = r1c.cutStorage;
         bool  changed = false;
 
@@ -336,7 +303,7 @@ public:
                     if (z >= constraints.size()) { continue; }
                     node->chgCoeff(constraints[z], coeffs);
                 } else {
-                    GRBLinExpr lhs;
+                    LinearExpression lhs;
                     for (size_t i = 0; i < coeffs.size(); ++i) {
                         if (coeffs[i] == 0) { continue; }
                         lhs += node->getVar(i) * coeffs[i];
@@ -346,7 +313,8 @@ public:
                     // constraint_name << "cuts(z" << z << ")";
 
                     auto ctr = node->addConstr(lhs <= cut.rhs, constraint_name);
-                    constraints.emplace_back(ctr);
+                    // TODO: fix
+                    // constraints.emplace_back(ctr);
                 }
 
                 cut.added   = true;
@@ -372,7 +340,7 @@ public:
      * @return True if any RCCs were added, false otherwise.
      */
     bool exactRCCsep(GRBModel *model, const std::vector<double> &solution,
-                     std::vector<std::vector<std::vector<GRBConstr>>> &constraints) {
+                     std::vector<std::vector<std::vector<Constraint>>> &constraints) {
 
         auto Ss = separate_Rounded_Capacity_cuts(model, instance.q, instance.demand, allPaths, solution);
 
@@ -412,7 +380,7 @@ public:
             arcGroups[c]      = std::move(arcs);
         }
 
-        // std::vector<GRBConstr> newConstraints(cutExpressions.size());
+        // std::vector<Constraint> newConstraints(cutExpressions.size());
         for (size_t i = 0; i < cutExpressions.size(); ++i) {
             auto ctr = model->addConstr(cutExpressions[i] <= rhsValues[i]);
             rccManager.addCut(arcGroups[i], rhsValues[i], ctr);
@@ -496,7 +464,6 @@ public:
             std::vector<int> S(cutsCMP->CPL[cutIdx]->IntList + 1,
                                cutsCMP->CPL[cutIdx]->IntList + cutsCMP->CPL[cutIdx]->IntListSize + 1);
 
-            GRBLinExpr          cutExpr = 0.0;
             std::vector<RawArc> arcs;
 
             // Generate all possible arc pairs from nodes in S
@@ -512,7 +479,7 @@ public:
 
         // Instead of parallel execution, use a simple for-loop to add each constraint
         for (std::size_t i = 0; i < rhsValues.size(); ++i) {
-            GRBLinExpr cutExpr = 0.0;
+            LinearExpression cutExpr;
 
             // For each arc in arcGroups[i], compute the cut expression
             for (const auto &arc : arcGroups[i]) {
@@ -524,7 +491,8 @@ public:
             // Add the constraint to the model
             auto ctr_name = "RCC_cut_" + std::to_string(rccManager.cut_ctr);
             auto ctr      = model->addConstr(cutExpr <= rhsValues[i], ctr_name);
-            rccManager.addCut(arcGroups[i], rhsValues[i], ctr);
+            // TODO: fix
+            // rccManager.addCut(arcGroups[i], rhsValues[i], ctr);
         }
 
         for (auto i = 0; i < cutsCMP->Size; i++) { CMGR_MoveCnstr(cutsCMP, oldCutsCMP, i, 0); }
@@ -540,12 +508,12 @@ public:
     bool CG(BNBNode *node, int max_iter = 2000) {
         print_info("Column generation preparation...\n");
 
-        node->relaxNode();
+        // node->relaxNode();
         node->optimize();
         relaxed_result = std::numeric_limits<double>::max();
 
         // check if feasible
-        if (node->get(GRB_IntAttr_Status) != GRB_OPTIMAL) {
+        if (node->getStatus() != 2) {
             print_info("Model is infeasible, pruning node.\n");
             node->setPrune(true);
             return false;
@@ -562,9 +530,10 @@ public:
         auto &rccManager = node->rccManager;
 #endif
 
-        int bucket_interval       = 20;
-        int time_horizon          = instance.T_max;
-        numConstrs                = node->get(GRB_IntAttr_NumConstrs);
+        int bucket_interval = 20;
+        int time_horizon    = instance.T_max;
+        numConstrs          = node->getIntAttr("NumConstrs");
+        fmt::print("Number of constraints: {}\n", numConstrs);
         node->numConstrs          = numConstrs;
         std::vector<double> duals = std::vector<double>(numConstrs, 0.0);
 
@@ -573,8 +542,9 @@ public:
         bucket_graph.set_distance_matrix(instance.getDistanceMatrix(), 8);
         bucket_graph.branching_duals = &branchingDuals;
 
-        matrix                 = node->extractModelDataSparse();
-        auto integer_solution  = node->get(GRB_DoubleAttr_ObjVal);
+        matrix                = node->extractModelDataSparse();
+        auto integer_solution = node->getObjVal();
+        fmt::print("Integer solution: {}\n", integer_solution);
         bucket_graph.incumbent = integer_solution;
 
 #ifdef SRC
@@ -589,7 +559,8 @@ public:
         auto                sizeDuals = nodeDuals.size();
 
         double lp_obj_dual = 0.0;
-        double lp_obj      = node->get(GRB_DoubleAttr_ObjVal);
+        double lp_obj      = node->getObjVal();
+        ;
 
         bucket_graph.setup();
 
@@ -723,7 +694,7 @@ public:
 
 #ifdef STAB
             stab.update_stabilization_after_master_optim(nodeDuals);
-            nodeDuals = stab.getStabDualSolAdvanced(nodeDuals);
+            nodeDuals = stab.getStabDualSol(nodeDuals);
 
             misprice = true;
             while (misprice) {
@@ -758,15 +729,16 @@ public:
 #ifdef IPM
                     std::vector<int> SRCindices;
                     for (int i = 0; i < SRCconstraints.size(); i++) {
-                        GRBConstr constr = SRCconstraints[i];
-                        auto      index  = constr.index();
+                        Constraint constr = SRCconstraints[i];
+                        auto       index  = constr.index();
                         SRCindices.push_back(index);
                     }
 #endif
 
 #ifndef IPM
-                    auto duals = node->get(GRB_DoubleAttr_Pi, SRCconstraints.data(), SRCconstraints.size());
-                    cutDuals.assign(duals, duals + SRCconstraints.size());
+                    // TODO: fix this
+                    // auto duals = node->get(GRB_DoubleAttr_Pi, SRCconstraints.data(), SRCconstraints.size());
+                    // cutDuals.assign(duals, duals + SRCconstraints.size());
 #else
                     // get jobDuals on the SRCindices
                     std::vector<double> cutDuals;
@@ -803,23 +775,24 @@ public:
                 ss        = bucket_graph.ss;
                 //////////////////////////////////////////////////////////////////////
 
+                // print paths.size
                 // Adding cols
                 colAdded = addColumn(node, paths, false);
+                node->update();
 
 #ifdef SCHRODINGER
                 // Adding schrodinger paths
                 auto sch_paths = bucket_graph.getSchrodinger();
-                colAdded += addPath(node, sch_paths, true);
+                addPath(node, sch_paths, true);
 #endif
 
 #ifdef STAB
 
-                auto pseudo_bound = stab.compute_pseudo_dual_bound(matrix, nodeDuals, paths);
-                lag_gap           = integer_solution - (lp_obj + std::min(0.0, inner_obj));
+                // auto pseudo_bound = stab.compute_pseudo_dual_bound(matrix, nodeDuals, paths);
+                lag_gap = integer_solution - (lp_obj + std::min(0.0, inner_obj));
 
-                // TODO: check if we should update this before running the stab update
                 node->optimize();
-                lp_obj    = node->get(GRB_DoubleAttr_ObjVal);
+                lp_obj    = node->getObjVal();
                 nodeDuals = node->getDuals();
 
                 bucket_graph.gap = lag_gap;
@@ -873,7 +846,7 @@ public:
         bucket_graph.print_statistics();
 
         node->optimize();
-        relaxed_result = node->get(GRB_DoubleAttr_ObjVal);
+        relaxed_result = node->getObjVal();
 
         return true;
     }
@@ -899,7 +872,7 @@ public:
         // get solution in which x > 0.5 and print the corresponding allPaths
         std::vector<int> sol;
         for (int i = 0; i < allPaths.size(); i++) {
-            if (node->getVar(i).get(GRB_DoubleAttr_X) > 0.5) { sol.push_back(i); }
+            if (node->getVarValue(i) > 0.5) { sol.push_back(i); }
         }
 
         for (auto s : sol) {
@@ -913,12 +886,12 @@ public:
         node->optimize();
 
         // check if optimal
-        if (node->get(GRB_IntAttr_Status) != GRB_OPTIMAL) {
+        if (node->getStatus() != 2) {
             ip_result = std::numeric_limits<double>::max();
             // node->setPrune(true);
             print_info("No optimal solution found.\n");
         } else {
-            ip_result = node->get(GRB_DoubleAttr_ObjVal);
+            ip_result = node->getObjVal();
         }
 
         // ANSI escape code for blue text
@@ -980,7 +953,7 @@ public:
         relaxed_result = std::numeric_limits<double>::max();
 
         // check if feasible
-        if (node->get(GRB_IntAttr_Status) != GRB_OPTIMAL) {
+        if (node->getStatus() != 2) {
             node->setPrune(true);
             return false;
         }
@@ -992,7 +965,7 @@ public:
         int bucket_interval = 20;
         int time_horizon    = instance.T_max;
 
-        numConstrs                = node->get(GRB_IntAttr_NumConstrs);
+        numConstrs                = node->getIntAttr("NumConstrs");
         node->numConstrs          = numConstrs;
         std::vector<double> duals = std::vector<double>(numConstrs, 0.0);
 
@@ -1005,7 +978,7 @@ public:
 
         // node->optimize();
         matrix                 = node->extractModelDataSparse();
-        auto integer_solution  = node->get(GRB_DoubleAttr_ObjVal);
+        auto integer_solution  = node->getObjVal();
         bucket_graph.incumbent = integer_solution;
 
         auto allNodes = bucket_graph.getNodes();
@@ -1015,7 +988,7 @@ public:
         auto                sizeDuals = nodeDuals.size();
 
         double lp_obj_dual = 0.0;
-        double lp_obj      = node->get(GRB_DoubleAttr_ObjVal);
+        double lp_obj      = node->getObjVal();
 
         bucket_graph.setup();
 
@@ -1111,7 +1084,8 @@ public:
 #ifdef STAB
                 // TODO: check if we should update this before running the stab update
                 node->optimize();
-                lp_obj    = node->get(GRB_DoubleAttr_ObjVal);
+                lp_obj = node->getObjVal();
+
                 nodeDuals = node->getDuals();
 
                 lag_gap          = integer_solution - (lp_obj + std::min(0.0, inner_obj));
@@ -1140,7 +1114,7 @@ public:
         // bucket_graph.print_statistics();
 
         node->optimize();
-        relaxed_result = node->get(GRB_DoubleAttr_ObjVal);
+        relaxed_result = node->getObjVal();
 
         return true;
     }

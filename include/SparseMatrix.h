@@ -44,7 +44,10 @@ struct SparseMatrix {
     std::vector<int>           row_start; ///< Starting index of each row in `elements`
     int                        num_rows;  ///< Total number of rows in the matrix
     int                        num_cols;  ///< Total number of columns in the matrix
-
+    // default constructor
+    SparseMatrix() : num_rows(0), num_cols(0) {}
+    // define default constructor which receive num_rows and num_cols
+    SparseMatrix(int num_rows, int num_cols) : num_rows(num_rows), num_cols(num_cols) {}
     /**
      * @brief Insert a non-zero element into the sparse matrix.
      *
@@ -54,7 +57,55 @@ struct SparseMatrix {
      * @param col The column index of the element.
      * @param value The value of the element.
      */
-    void insert(int row, int col, double value) { elements.emplace_back(SparseElement{row, col, value}); }
+    void insert(int row, int col, double value) {
+        // Expand the number of rows if needed
+        if (row >= num_rows) {
+            num_rows = row + 1;
+            row_start.resize(num_rows + 1, 0); // Expand the row_start structure
+        }
+
+        if (col >= num_cols) {
+            num_cols = col + 1; // Expand the number of columns if necessary
+        }
+
+        elements.emplace_back(SparseElement{row, col, value});
+    }
+
+    // Delete a column (variable) from the matrix
+    void delete_column(int col_to_delete) {
+        elements.erase(std::remove_if(elements.begin(), elements.end(),
+                                      [col_to_delete](const SparseElement &el) { return el.col == col_to_delete; }),
+                       elements.end());
+
+        // Adjust column indices for remaining elements
+        for (auto &el : elements) {
+            if (el.col > col_to_delete) { --el.col; }
+        }
+
+        // Update the column count
+        --num_cols;
+
+        // Rebuild the row_start for CRS format
+        buildRowStart();
+    }
+
+    // Delete a row (constraint) from the matrix
+    void delete_row(int row_to_delete) {
+        elements.erase(std::remove_if(elements.begin(), elements.end(),
+                                      [row_to_delete](const SparseElement &el) { return el.row == row_to_delete; }),
+                       elements.end());
+
+        // Adjust row indices for remaining elements
+        for (auto &el : elements) {
+            if (el.row > row_to_delete) { --el.row; }
+        }
+
+        // Update the row count
+        --num_rows;
+
+        // Rebuild the row_start for CRS format
+        buildRowStart();
+    }
 
     /**
      * @brief Build the CRS structure by computing row start positions.
@@ -169,12 +220,6 @@ struct SparseMatrix {
         return dense;
     }
     std::vector<double> multiply(const std::vector<double> &x) const {
-        // Ensure the input vector size matches the number of columns in the matrix
-        if (x.size() != static_cast<size_t>(num_cols)) {
-            throw std::invalid_argument(
-                "The size of the input vector does not match the number of columns in the matrix.");
-        }
-
         // Initialize the result vector with zeros
         std::vector<double> result(num_rows, 0.0);
 

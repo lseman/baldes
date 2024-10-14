@@ -5,7 +5,6 @@
 #include <Eigen/Dense>
 #include <Eigen/Sparse>
 #include <Eigen/SparseCholesky>
-#include <gurobi_c++.h>
 #include <iostream>
 #include <new>
 #include <stdexcept>
@@ -26,13 +25,15 @@ class LDLTSolver {
     Eigen::Index                                       nonZeroElements      = 0;
     double                                             regularizationFactor = 1e-5; // Regularization factor
 
-    Eigen::SparseMatrix<double>                        preconditionerMatrix; // Preconditioner matrix
-    Eigen::SparseMatrix<double>                        Kpp, Kuu, Kup, Kpu;   // Submatrices for Schur complement
-    Eigen::SparseMatrix<double>                        schurComplement;      // Schur complement matrix
-    std::vector<char>                                  mask;
-    int                                                sizeKuu = 0, sizeKpp = 0;
-    Eigen::SimplicialLDLT<Eigen::SparseMatrix<double>> KuuSolver; // Cache the factorization
-    Eigen::SparseMatrix<double>                        matrixToFactorize;
+    Eigen::SparseMatrix<double>                              preconditionerMatrix; // Preconditioner matrix
+    Eigen::SparseMatrix<double>                              Kpp, Kuu, Kup, Kpu;   // Submatrices for Schur complement
+    Eigen::SparseMatrix<double>                              schurComplement;      // Schur complement matrix
+    std::vector<char>                                        mask;
+    int                                                      sizeKuu = 0, sizeKpp = 0;
+    Eigen::SimplicialLDLT<Eigen::SparseMatrix<double>>       KuuSolver; // Cache the factorization
+    Eigen::SparseMatrix<double>                              matrixToFactorize;
+    Eigen::PermutationMatrix<Eigen::Dynamic, Eigen::Dynamic> permAMD;
+    Eigen::VectorXi                                          perm;
 
 public:
     // Factorize the matrix using LDLT, which can handle indefinite matrices
@@ -41,18 +42,18 @@ public:
         if (matrix.rows() != matrix.cols()) { throw std::invalid_argument("Matrix must be square for decomposition."); }
 
         matrixToFactorize = matrix;
+        //  Perform AMD reordering
 
         // Apply Cuthill-McKee reordering if requested
         if (useReordering) {
-            Eigen::VectorXi perm;
             reorderCuthillMcKee(matrix, perm);
+            // print perm
             matrixToFactorize = applyPermutation(matrix, perm);
         }
 
         // Infer block sizes and create a mask dynamically if preconditioner is enabled
         if (usePreconditioner) {
-            std::vector<char> mask = createMaskFromSparsity(matrixToFactorize);
-
+            mask = createMaskFromSparsity(matrixToFactorize);
             // Infer block sizes using the mask
             auto sizesKs = inferBlockSizes(mask);
             sizeKuu      = sizesKs.first;
@@ -64,6 +65,9 @@ public:
 
         // Analyze sparsity pattern if needed
         if (!patternAnalyzed || matrixToFactorize.nonZeros() != nonZeroElements) {
+            // amdOrdering(matrixToFactorize, permAMD); // Compute the AMD ordering
+
+            // matrixToFactorize = permAMD.transpose() * matrix * permAMD;
             solver.analyzePattern(matrixToFactorize);
             patternAnalyzed = true;
             nonZeroElements = matrixToFactorize.nonZeros();
@@ -81,18 +85,49 @@ public:
         initialized = true;
     }
 
-    // Solve the system using the factorized matrix
-    Eigen::VectorXd solve(const Eigen::VectorXd &b, bool usePreconditioner = false) {
-        if (!initialized) { throw std::runtime_error("Matrix is not factorized."); }
+    Eigen::VectorXd adjustSolutionSize(const Eigen::VectorXd &reducedSolution, const Eigen::VectorXd &b,
+                                       Eigen::Index sizeKuu, Eigen::Index sizeKpp) {
+        // Split b into parts corresponding to Kuu and Kpp
+        Eigen::VectorXd bu = b.head(sizeKuu);
+        Eigen::VectorXd bp = b.tail(sizeKpp);
+        // Solve for u (Kuu-part) using the reduced Kpp solution (p)
+        Eigen::VectorXd u = KuuSolver.solve(bu - Kpu.transpose() * reducedSolution);
+        if (KuuSolver.info() != Eigen::Success) { throw std::runtime_error("Solving for Kuu part failed."); }
 
-        Eigen::VectorXd rhs = b;
+        // Combine the solutions for u (Kuu-part) and p (Kpp-part)
+        Eigen::VectorXd fullSolution(b.size());
+        fullSolution.head(sizeKuu) = u;
+        fullSolution.tail(sizeKpp) = reducedSolution;
+
+        return fullSolution;
+    }
+
+    // Solve the system using the factorized matrix
+    Eigen::VectorXd solve(const Eigen::VectorXd &b, bool usePreconditioner = false, bool useReordering = true) {
+        if (!initialized) { throw std::runtime_error("Matrix is not factorized."); }
+        Eigen::PermutationMatrix<Eigen::Dynamic, Eigen::Dynamic> p(perm);
+        Eigen::VectorXd                                          rhs;
+        if (useReordering) {
+            rhs = p * b;
+        } else {
+            rhs = b;
+        }
 
         // Apply Schur complement preconditioner if enabled
         if (usePreconditioner) { rhs = applySchurComplementPreconditioner(b, sizeKuu, sizeKpp); }
 
         Eigen::VectorXd x = solver.solve(rhs);
-        if (solver.info() != Eigen::Success) { throw std::runtime_error("Solving the system failed."); }
 
+        if (solver.info() != Eigen::Success) { throw std::runtime_error("Solving the system failed."); }
+        if (useReordering) {
+            Eigen::VectorXd x_perm = p * x;
+            return x_perm;
+        }
+        if (usePreconditioner) {
+            Eigen::VectorXd adjusted_x = adjustSolutionSize(x, b, sizeKuu, sizeKpp);
+            return adjusted_x;
+        }
+        // print adjusted_x size
         return x;
     }
 
@@ -221,7 +256,7 @@ private:
         }
 
         // Store the Schur complement as the preconditioner
-        preconditionerMatrix = schurComplement;
+        matrix = schurComplement;
     }
 
     // Decompose the matrix into the submatrices Kuu, Kup, Kpu, Kpp
@@ -258,7 +293,7 @@ private:
         // Compute rhs_p = bp - Kpu * u
         Eigen::VectorXd rhs_p = bp - Kpu * u;
 
-        // Solve the Schur complement system
+        // Solve the Schur complement system for the reduced part (p)
         Eigen::SimplicialLDLT<Eigen::SparseMatrix<double>> internal_solver;
         internal_solver.compute(schurComplement);
         if (internal_solver.info() != Eigen::Success) {
@@ -270,27 +305,49 @@ private:
             throw std::runtime_error("Solving Schur complement system failed.");
         }
 
-        // Reconstruct the full solution (combine u and p)
-        Eigen::VectorXd fullSolution(b.size());
-        fullSolution.head(sizeKuu) = u; // Assign solution for Kuu-part
-        fullSolution.tail(sizeKpp) = p; // Assign solution for Kpp-part
-
-        return fullSolution; // Return the full solution with the same size as the original system
+        // Return only the reduced solution (p), corresponding to the Kpp part
+        return p;
     }
 
     std::vector<char> createMaskFromSparsity(const Eigen::SparseMatrix<double> &matrix) {
         Eigen::Index      totalSize = matrix.rows();
-        std::vector<char> mask(totalSize, 0);       // Default to Kuu (0)
-        Eigen::Index      halfSize = totalSize / 2; // Assuming the split is roughly halfway
+        std::vector<char> mask(totalSize, 0); // Default to Kuu (0)
 
+        // Create a heuristic based on connectivity (density) of rows/columns to define the mask
+        Eigen::VectorXi rowNonZeros = Eigen::VectorXi::Zero(totalSize);
+        Eigen::VectorXi colNonZeros = Eigen::VectorXi::Zero(totalSize);
+
+        // Count the number of non-zero entries for each row and column
         for (Eigen::Index i = 0; i < totalSize; ++i) {
             for (Eigen::SparseMatrix<double>::InnerIterator it(matrix, i); it; ++it) {
-                if ((it.row() < halfSize && it.col() >= halfSize) || (it.row() >= halfSize && it.col() < halfSize)) {
-                    mask[it.row()] = 1; // Mark row for Kpp
-                    mask[it.col()] = 1; // Mark column for Kpp
-                }
+                rowNonZeros[i]++;
+                colNonZeros[it.col()]++;
             }
         }
+
+        // Compute the average number of non-zero entries to set a threshold
+        double rowAverage = rowNonZeros.mean();
+        double colAverage = colNonZeros.mean();
+
+        // Use the average non-zero count as a threshold to split rows/columns into blocks
+        for (Eigen::Index i = 0; i < totalSize; ++i) {
+            // If row or column has more non-zeros than the average, mark as Kpp (1)
+            if (rowNonZeros[i] > rowAverage || colNonZeros[i] > colAverage) {
+                mask[i] = 1; // Mark as Kpp
+            } else {
+                mask[i] = 0; // Mark as Kuu
+            }
+        }
+
+        // Ensure that at least some rows/columns are assigned to each block
+        Eigen::Index KuuCount = std::count(mask.begin(), mask.end(), 0);
+        Eigen::Index KppCount = std::count(mask.begin(), mask.end(), 1);
+
+        if (KuuCount == 0 || KppCount == 0) {
+            throw std::runtime_error(
+                "Invalid block sizes inferred from the mask. Both Kuu and Kpp must have non-zero sizes.");
+        }
+
         return mask;
     }
 };

@@ -67,7 +67,7 @@ Some features are experimental and subject to ongoing improvements:
 
 *Optional*
 - [pybind11](https://github.com/pybind/pybind11) for optional python wrapper
-- [SuiteSparse](https://github.com/DrTimothyAldenDavis/SuiteSparse) requisite for CHOLMOD when using the IPM stabilization
+- [SuiteSparse](https://github.com/DrTimothyAldenDavis/SuiteSparse) optional for using CHOLMOD as IPM solver instead of Eigen built-in solvers
 
 ### ⚙️ Compiling
 

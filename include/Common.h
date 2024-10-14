@@ -8,8 +8,10 @@
 #pragma once
 #include "config.h"
 
+#ifdef GUROBI
 #include "gurobi_c++.h"
 #include "gurobi_c.h"
+#endif
 
 #include "../third_party/pdqsort.h"
 

@@ -31,9 +31,15 @@
 
 #include "Definitions.h"
 #include "HGS.h"
+#include "MIPHandler/MIPHandler.h"
 #include "Reader.h"
 #include "bnb/BNB.h"
 #include "bnb/Node.h"
+
+#ifdef GUROBI
+#include "gurobi_c++.h"
+#include "solvers/Gurobi.h"
+#endif
 
 /**
  * Initializes the Restricted Master Problem (RMP) for the Vehicle Routing Problem with Time Windows (VRPTW).
@@ -55,20 +61,17 @@
  * 9. Solves the model.
  * 10. Stores and returns the model data including constraint matrix, bounds, variable types, and names.
  */
-void initRMP(BNBNode *model, VRProblem *problem, std::vector<std::vector<int>> &heuristicRoutes) {
-    // GRBModel model = node->getModel();
-    model->set(GRB_IntParam_OutputFlag, 0);
-
-    // WARNING: DO NOT REMOVE THIS LINE
-    model->set(GRB_IntParam_Method, 2);
+void initRMP(MIPProblem *model, VRProblem *problem, std::vector<std::vector<int>> &heuristicRoutes) {
 
     auto instance = problem->instance;
+    int  Um       = problem->instance.nV; // Max number of vehicles
 
-    int Um = problem->instance.nV;
+    std::vector<MIPColumn>   lambdaCols;
+    std::vector<double>      lb, ub, obj;
+    std::vector<std::string> names;
+    std::vector<VarType>     vtypes;
 
-    std::vector<GRBVar> lambda;
-
-    // lambda function to compute the cost of a route
+    // Lambda function to compute the cost of a route
     auto costCalc = [&](const std::vector<int> &route) {
         double distance = 0.0;
         for (size_t i = 0; i < route.size() - 1; ++i) {
@@ -76,7 +79,7 @@ void initRMP(BNBNode *model, VRProblem *problem, std::vector<std::vector<int>> &
             const auto &target = route[i + 1];
             distance += instance.getcij(source, target);
         }
-        distance += instance.getcij(route.back(), 0);
+        distance += instance.getcij(route.back(), 0); // Return to the depot
         return distance;
     };
 
@@ -86,40 +89,37 @@ void initRMP(BNBNode *model, VRProblem *problem, std::vector<std::vector<int>> &
         int         routeID = id;
         std::string name    = "x[" + std::to_string(routeID) + "]";
         double      cost    = costCalc(column);
-        lambda.push_back(model->addVar(0.0, 1.0, cost, GRB_CONTINUOUS, name));
+
+        // Store the column and variable data
+        lb.push_back(0.0);
+        ub.push_back(1.0);
+        obj.push_back(cost);
+        names.push_back(name);
+        vtypes.push_back(VarType::Continuous); // Assuming VarType::Continuous is used
+
         id++;
     }
-    model->update();
 
-    GRBLinExpr lhs;
-
-    // First part: Collect entries for each column based on heuristic routes
+    // Add variables to the model
+    model->addVars(lb.data(), ub.data(), obj.data(), vtypes.data(), names.data(), lb.size());
+    // First set of constraints: Each vertex should be visited at least once
     for (int i = 1; i < instance.getNbVertices(); ++i) {
-        lhs = 0;
+        LinearExpression lhs;
         for (size_t j = 0; j < heuristicRoutes.size(); ++j) {
-            // if (heuristicRoutes[j].contains(i)) { lhs += lambda[j]; }
             if (std::find(heuristicRoutes[j].begin(), heuristicRoutes[j].end(), i) != heuristicRoutes[j].end()) {
-                { lhs += lambda[j]; }
+                lhs += model->getVar(j) * 1.0; // Each lambda[j] contributes to visiting vertex i
             }
         }
-        model->addConstr(lhs >= 1, "visit(m" + std::to_string(i - 1) + ")");
+        model->add_constraint(lhs, 1.0, '>'); // Constraint: lhs >= 1 (visit the node)
     }
 
-    // Second part: Collect additional entries for the current column
-    lhs = 0;
-    std::vector<double> c;
-    for (size_t j = 0; j < heuristicRoutes.size(); ++j) {
-        int routeID = j;
-        lhs += lambda[routeID];
-    }
+    // Second part: Ensure the number of vehicles does not exceed the maximum
+    LinearExpression vehicle_constraint_lhs;
+    for (size_t j = 0; j < heuristicRoutes.size(); ++j) { vehicle_constraint_lhs += model->getVar(j) * 1.0; }
+    model->add_constraint(vehicle_constraint_lhs, static_cast<double>(Um), '<'); // Constraint: sum(lambda) <= Um
 
-    model->addConstr(lhs <= Um, "limit(l1)");
-
-    model->update();
-    model->set(GRB_IntAttr_ModelSense, GRB_MINIMIZE);
-
-    model->optimize();
-    return;
+    // Set the objective to minimize
+    model->setObjectiveSense(ObjectiveType::Minimize);
 }
 
 /**
@@ -177,22 +177,6 @@ int main(int argc, char *argv[]) {
     HGS  hgs;
     auto initialRoutesHGS = hgs.run(instance);
 
-    /*
-    SolomonFormatParser parser;
-    HProblem            hproblem = parser.get_problem(instance_name);
-
-    IteratedLocalSearch ils(hproblem);
-    auto                initialRoutes = ils.execute();
-
-    SavingsHeuristic heuristic(hproblem);
-    auto             initialRoutesSavings = heuristic.get_solution();
-
-    print_heur("Routes from saving heuristics: {}\n", initialRoutesSavings.size());
-
-    // merge initialRoutes and initialRoutesSaving amd put in initialRoutes
-    initialRoutes.insert(initialRoutes.end(), initialRoutesSavings.begin(), initialRoutesSavings.end());
-    */
-
     std::vector<VRPNode> nodes;
     nodes.clear();
     for (int k = 0; k < instance.nN; ++k) {
@@ -210,9 +194,8 @@ int main(int argc, char *argv[]) {
         nodes[k].consumption.push_back(duration);
         nodes[k].consumption.push_back(demand);
     }
-    GRBEnv env = GRBEnv();
-    env.start();
-    GRBModel model = GRBModel(env);
+
+    MIPProblem mip = MIPProblem("VRPTW", 0, 0);
 
     VRProblem *problem = new VRProblem();
     problem->instance  = instance;
@@ -243,11 +226,22 @@ int main(int argc, char *argv[]) {
     };
     std::for_each(initialRoutesHGS.begin(), initialRoutesHGS.end(), process_route);
 
-    BNBNode *node = new BNBNode(model);
-    node->paths   = paths;
-    initRMP(node, problem, initialRoutesHGS);
+    // print size of initialRoutesHGS
+    fmt::print("Initial routes from HGS: {}\n", initialRoutesHGS.size());
+    initRMP(&mip, problem, initialRoutesHGS);
 
+#ifdef GUROBI
+    GRBEnv &env   = GurobiEnvSingleton::getInstance();
+    auto    model = new GRBModel(mip.toGurobiModel(env)); // Allocate a new model and assign it to the pointer
+    model->update();
+    model->optimize();
+    BNBNode *node = new BNBNode(*model);
+#else
+    BNBNode *node = new BNBNode(mip);
+#endif
+    node->paths   = paths;
     node->problem = problem;
+    node->mip     = mip;
 
     BranchAndBound solver(std::move(problem), BNBNodeSelectionStrategy::DFS); // Choose
     solver.setRootNode(node);

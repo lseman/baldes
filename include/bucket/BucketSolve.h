@@ -239,8 +239,8 @@ std::vector<double> BucketGraph::labeling_algorithm() noexcept {
                     std::memset(Bvisited.data(), 0, Bvisited.size() * sizeof(uint64_t));
 
                     // Check if the label is dominated by any labels in smaller buckets
-                    domin_smaller =
-                        DominatedInCompWiseSmallerBuckets<D, S>(label, bucket, c_bar, Bvisited, ordered_sccs);
+                    // domin_smaller =
+                    //    DominatedInCompWiseSmallerBuckets<D, S>(label, bucket, c_bar, Bvisited, ordered_sccs);
 
                     if (!domin_smaller) {
                         // Lambda function to process new labels after extension
