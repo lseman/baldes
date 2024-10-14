@@ -63,11 +63,13 @@ Some features are experimental and subject to ongoing improvements:
 - [jemalloc](https://jemalloc.net/) for better memory allocation (can be disabled, but it is highly recommended)
 - [xxHash](https://github.com/Cyan4973/xxHash) for improved hash calculations
 - [ankerl::unordered_dense](https://github.com/martinus/unordered_dense) for improved hash map and set
-- [Gurobi](https://www.gurobi.com/) for solving the VRPTW example instances
+- [HiGHS](https://github.com/ERGO-Code/HiGHS/tree/master) for the MIP solver
 
 *Optional*
 - [pybind11](https://github.com/pybind/pybind11) for optional python wrapper
 - [SuiteSparse](https://github.com/DrTimothyAldenDavis/SuiteSparse) optional for using CHOLMOD as IPM solver instead of Eigen built-in solvers
+- [Gurobi](https://www.gurobi.com/) for using Gurobi as the MIP solver
+
 
 ### ⚙️ Compiling
 

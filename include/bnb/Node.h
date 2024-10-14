@@ -49,6 +49,10 @@
 #include "ipm/IPSolver.h"
 #endif
 
+#ifdef HIGHS
+#include "solvers/HighsSolver.h"
+#endif
+
 class Problem;
 /**
  * @class BNBNode
@@ -122,10 +126,10 @@ public:
 #endif
 
     explicit BNBNode(const MIPProblem &eModel) {
-        mip = eModel;
-        auto matrix = extractModelDataSparse();
+        mip             = eModel;
+        auto highsmodel = mip.toHighsModel();
         // print matrix.A_sparse.num_rows;
-        solver = new IPMSolver(matrix);
+        solver = new HighsSolver(highsmodel);
         generateUUID();
         this->initialized = true;
 #ifdef RCC
@@ -273,14 +277,14 @@ public:
     void setDoubleAttr(const std::string &attr, double value) { throw std::invalid_argument("Unknown attribute"); }
 
     // Add a new constraint using a linear expression and name (placeholder)
-    int addConstr(const LinearExpression &expr, const std::string &name) {
-        mip.add_constraint(expr, 0.0, '<'); // Placeholder for <= relation
-        return mip.getConstraints().size() - 1;
+    Constraint addConstr(const LinearExpression &expr, const std::string &name) {
+        Constraint ctr = mip.add_constraint(expr, 0.0, '<'); // Placeholder for <= relation
+        return ctr;
     }
 
-    int addConstr(const Constraint ctr, const std::string &name) {
-        mip.add_constraint(ctr, name);
-        return mip.getConstraints().size() - 1;
+    Constraint addConstr(Constraint &ctr, const std::string &name) {
+        ctr = mip.add_constraint(ctr, name);
+        return ctr;
     }
 
     // Remove a constraint
@@ -302,12 +306,15 @@ public:
     double              getObjVal() { return solver->getObjVal(); }
     std::vector<double> getDuals() { return solver->getDuals(); }
     std::vector<double> extractSolution() { return solver->extractSolution(); }
-    void                optimize() { 
-        solver->setModel(mip.extractModelDataSparse());
-        solver->optimize(); }
-    double              getVarValue(int i) { return solver->getVarValue(i); }
-    auto                getModel() { return &mip; }
-    auto getDualVal(int i) { return solver->getDualVal(i); }
+    void                optimize() {
+#ifdef HIGHS
+        solver->setModel(mip.toHighsModel());
+#endif
+        solver->optimize();
+    }
+    double getVarValue(int i) { return solver->getVarValue(i); }
+    auto   getModel() { return &mip; }
+    auto   getDualVal(int i) { return solver->getDualVal(i); }
 
 #ifdef GUROBI
     // Update
@@ -321,13 +328,20 @@ public:
         solver->optimize(); // Optimize the model
         // set mute
     }
+#elif defined(HIGHS)
+    void update() {
+        // delete model; // Delete the old model to free memory
+        auto highsmodel = mip.toHighsModel();
+        solver->setModel(highsmodel);
+        // solver->optimize(); // Optimize the model
+    }
 #else
     void update() {
         // delete model; // Delete the old model to free memory
         auto matrix = mip.extractModelDataSparse();
         solver->setModel(matrix);
-        //solver = model;
-        //solver->optimize(); // Optimize the model
+        // solver = model;
+        // solver->optimize(); // Optimize the model
     }
 #endif
 

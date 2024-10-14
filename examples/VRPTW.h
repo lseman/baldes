@@ -169,7 +169,6 @@ public:
         if (!lb.empty()) {
             // Pass the data to the MIP problem
             node->addVars(lb.data(), ub.data(), obj.data(), vtypes.data(), names.data(), cols.data(), lb.size());
-            node->update(); // Update the node (if applicable, similar to Gurobi's model update)
         }
 
         return counter;
@@ -276,7 +275,6 @@ public:
         if (!lb.empty()) {
             // Pass the data to the MIP problem
             node->addVars(lb.data(), ub.data(), obj.data(), vtypes.data(), names.data(), cols.data(), lb.size());
-            // node->update(); // Update the node (if applicable, similar to Gurobi's model update)
         }
 
         return counter;
@@ -299,6 +297,7 @@ public:
                 const auto &coeffs = cut.coefficients;
 
                 if (cut.added && cut.updated) {
+                    fmt::print("Updating cut {}\n", z);
                     cut.updated = false;
                     if (z >= constraints.size()) { continue; }
                     node->chgCoeff(constraints[z], coeffs);
@@ -311,10 +310,9 @@ public:
 
                     std::string constraint_name = "cuts(z" + std::to_string(z) + ")";
                     // constraint_name << "cuts(z" << z << ")";
-
-                    auto ctr = node->addConstr(lhs <= cut.rhs, constraint_name);
-                    // TODO: fix
-                    // constraints.emplace_back(ctr);
+                    auto ctr = lhs <= cut.rhs;
+                    ctr = node->addConstr(ctr, constraint_name);
+                    constraints.emplace_back(ctr);
                 }
 
                 cut.added   = true;
@@ -490,13 +488,13 @@ public:
 
             // Add the constraint to the model
             auto ctr_name = "RCC_cut_" + std::to_string(rccManager.cut_ctr);
-            auto ctr      = model->addConstr(cutExpr <= rhsValues[i], ctr_name);
+            auto ctr = cutExpr <= rhsValues[i];
+            ctr      = model->addConstr(ctr, ctr_name);
             // TODO: fix
-            // rccManager.addCut(arcGroups[i], rhsValues[i], ctr);
+            rccManager.addCut(arcGroups[i], rhsValues[i], ctr);
         }
 
         for (auto i = 0; i < cutsCMP->Size; i++) { CMGR_MoveCnstr(cutsCMP, oldCutsCMP, i, 0); }
-        model->update();
         return true;
     }
 
@@ -725,23 +723,32 @@ public:
 
 #if defined(SRC3) || defined(SRC)
                 // SRC cuts
+
+                // print SRCconstraints.size()
                 if (!SRCconstraints.empty()) {
 #ifdef IPM
+                // print SRCconstraints size
+                fmt::print("SRC constraints size: {}\n", SRCconstraints.size());
                     std::vector<int> SRCindices;
                     for (int i = 0; i < SRCconstraints.size(); i++) {
                         Constraint constr = SRCconstraints[i];
                         auto       index  = constr.index();
+                        fmt::print("{} ", index);
                         SRCindices.push_back(index);
                     }
 #endif
 
 #ifndef IPM
+#ifdef GUROBI
                     // TODO: fix this
                     // auto duals = node->get(GRB_DoubleAttr_Pi, SRCconstraints.data(), SRCconstraints.size());
                     // cutDuals.assign(duals, duals + SRCconstraints.size());
+#endif
 #else
                     // get jobDuals on the SRCindices
                     std::vector<double> cutDuals;
+                    // print nodeDuals size
+                    fmt::print("Node duals size: {}\n", nodeDuals.size());
                     for (auto &index : SRCindices) { cutDuals.push_back(-nodeDuals[index]); }
 
 #endif
@@ -773,7 +780,6 @@ public:
                 // print paths.size
                 // Adding cols
                 colAdded = addColumn(node, paths, false);
-                node->update();
 
 #ifdef SCHRODINGER
                 // Adding schrodinger paths

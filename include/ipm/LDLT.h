@@ -37,7 +37,7 @@ class LDLTSolver {
 
 public:
     // Factorize the matrix using LDLT, which can handle indefinite matrices
-    void factorizeMatrix(const Eigen::SparseMatrix<double> &matrix, bool useReordering = true,
+    void factorizeMatrix(const Eigen::SparseMatrix<double> &matrix, bool useReordering = false,
                          bool usePreconditioner = false) {
         if (matrix.rows() != matrix.cols()) { throw std::invalid_argument("Matrix must be square for decomposition."); }
 
@@ -103,7 +103,7 @@ public:
     }
 
     // Solve the system using the factorized matrix
-    Eigen::VectorXd solve(const Eigen::VectorXd &b, bool usePreconditioner = false, bool useReordering = true) {
+    Eigen::VectorXd solve(const Eigen::VectorXd &b, bool usePreconditioner = false, bool useReordering = false) {
         if (!initialized) { throw std::runtime_error("Matrix is not factorized."); }
         Eigen::PermutationMatrix<Eigen::Dynamic, Eigen::Dynamic> p(perm);
         Eigen::VectorXd                                          rhs;

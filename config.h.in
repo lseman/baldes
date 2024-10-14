@@ -32,6 +32,7 @@
 #cmakedefine SCHRODINGER
 #cmakedefine JEMALLOC
 #cmakedefine GUROBI
+#cmakedefine HIGHS
 
 // Define constants for resource sizes
 #define R_SIZE @R_SIZE@
