@@ -69,6 +69,8 @@ public:
     double lag_gap      = 0.0;
     double lag_gap_prev = -std::numeric_limits<double>::infinity();
 
+    int sizeDual;
+
     /**
      * @brief Increments the misprice counter if the alpha value is positive.
      *
@@ -160,6 +162,7 @@ public:
         pseudo_dual_bound = std::numeric_limits<double>::infinity();
         valid_dual_bound  = std::numeric_limits<double>::infinity();
         beta              = 0.0;
+        sizeDual          = mast_dual_sol.size();
     }
 
     /**
@@ -171,7 +174,9 @@ public:
      *
      * @return DualSolution The stabilized dual solution.
      */
-    DualSolution getStabDualSol(const DualSolution &master_dual) {
+    DualSolution getStabDualSol(const DualSolution &input_duals) {
+        std::vector<double> master_dual;
+        master_dual.assign(input_duals.begin(), input_duals.begin() + sizeDual);
         if (cur_stab_center.empty()) { return master_dual; }
         DualSolution stab_dual_sol(master_dual.size());
         for (size_t i = 0; i < master_dual.size(); ++i) {
@@ -238,7 +243,9 @@ public:
      * @return The stabilized dual solution.
      */
     // TODO: we need to check the implementation of this method
-    DualSolution getStabDualSolAdvanced(const DualSolution &nodeDuals) {
+    DualSolution getStabDualSolAdvanced(const DualSolution &input_duals) {
+        std::vector<double> nodeDuals;
+        nodeDuals.assign(input_duals.begin(), input_duals.begin() + sizeDual);
         // If there's no stabilization center, return the input duals
         if (cur_stab_center.empty()) { return nodeDuals; }
 
@@ -440,8 +447,10 @@ public:
      * @param lag_gap The current lagrangian gap.
      * @param best_pricing_cols A vector of pointers to the best pricing columns.
      */
-    void update_stabilization_after_pricing_optim(const ModelData &dados, const DualSolution &nodeDuals,
+    void update_stabilization_after_pricing_optim(const ModelData &dados, const DualSolution &input_duals,
                                                   const double &lag_gap, std::vector<Label *> best_pricing_cols) {
+        std::vector<double> nodeDuals;
+        nodeDuals.assign(input_duals.begin(), input_duals.begin() + sizeDual);
         if (nb_misprices == 0) {
             update_subgradient(dados, nodeDuals, best_pricing_cols);
             auto alpha_dir = dynamic_alpha_schedule(dados);

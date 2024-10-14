@@ -39,6 +39,9 @@ public:
     void add_variable(const std::string &var_name, VarType type, double lb = 0.0, double ub = 1.0,
                       double obj_coeff = 0.0) {
         variables.emplace_back(var_name, type, lb, ub, obj_coeff);
+        lb_vec.push_back(lb);
+        ub_vec.push_back(ub);
+        c_vec.push_back(obj_coeff);
         var_name_to_index[var_name] = variables.size() - 1;
     }
 
@@ -74,6 +77,7 @@ public:
 
         // Add the constraint to the list of constraints and set its index
         auto new_constraint = new Constraint(expression, rhs, relation);
+        b.push_back(rhs);
         new_constraint->set_index(constraint_index); // Set the constraint's index
 
         constraints.push_back(new_constraint); // Add to constraints list
@@ -106,7 +110,7 @@ public:
 
         // Add the constraint to the list
         constraints.push_back(constraint);
-
+        b.push_back(constraint->get_rhs());
         // Get the expression and relation (assuming it needs to be used later)
         const LinearExpression &expression = constraint->get_expression();
 
@@ -137,6 +141,7 @@ public:
 
         // Erase the constraint from the list
         constraints.erase(constraints.begin() + constraint_index);
+        b.erase(b.begin() + constraint_index);
 
         // Update the indices of the remaining constraints (this step can be costly if many constraints exist)
         for (int i = constraint_index; i < constraints.size(); ++i) { constraints[i]->set_index(i); }
@@ -340,15 +345,18 @@ public:
 #ifdef HIGHS
 
     // Function to populate a HiGHS model from this MIPProblem instance
+    // Function to populate a HiGHS model from this MIPProblem instance
     HighsModel toHighsModel() {
-        sparse_matrix.buildRowStart(); // Build the row start structure for CRS format
+        sparse_matrix.buildRowStart(); // Ensure CRS format is up-to-date
+
         // Create a new HiGHS model
         Highs      highs;
         HighsModel highsModel;
 
-        // Reserve space for variables and constraints
-        int numVars             = variables.size();
-        int numConstrs          = constraints.size();
+        int numVars    = variables.size();
+        int numConstrs = constraints.size();
+
+        // Set up the number of variables and constraints
         highsModel.lp_.num_col_ = numVars;
         highsModel.lp_.num_row_ = numConstrs;
 
@@ -357,73 +365,49 @@ public:
         highsModel.lp_.col_upper_.resize(numVars);
         highsModel.lp_.col_cost_.resize(numVars);
 
-        // Resize vectors for constraint bounds
-        highsModel.lp_.row_lower_.resize(numConstrs);
-        highsModel.lp_.row_upper_.resize(numConstrs);
-
-        // Sparse matrix format for constraints
-        std::vector<int>    startIndices; // For CSR format, holds the starting index of each constraint row
-        std::vector<int>    indices;      // Variable indices for each non-zero entry
-        std::vector<double> values;       // Coefficients for each non-zero entry
-        int                 nzCount = 0;  // Non-zero element counter
-
-        startIndices.push_back(nzCount); // First position should be zero
-
-        // Map to store variable index
-        ankerl::unordered_dense::map<std::string, int> highsVars;
-        int                                            var_index = 0;
-
-        // Step 1: Add variables to the HiGHS model
+        // Set variable bounds and cost
+        int var_index = 0;
         for (const auto &var : variables) {
             highsModel.lp_.col_lower_[var_index] = var.get_lb();
             highsModel.lp_.col_upper_[var_index] = var.get_ub();
             highsModel.lp_.col_cost_[var_index]  = var.get_objective_coefficient();
-            highsVars[var.get_name()]            = var_index;
             var_index++;
         }
 
-        // Step 2: Add constraints to the HiGHS model
+        // Resize vectors for constraint bounds
+        highsModel.lp_.row_lower_.resize(numConstrs);
+        highsModel.lp_.row_upper_.resize(numConstrs);
+
+        // Set constraint bounds
         int row_index = 0;
         for (const auto &constraint : constraints) {
             double lower_bound, upper_bound;
             char   relation = constraint->get_relation();
             double rhs      = constraint->get_rhs();
 
-            // Set the lower and upper bounds for each constraint based on its type
+            // Set lower and upper bounds for each constraint based on its type
             if (relation == '<') {
-                lower_bound = -kHighsInf; // Lower bound is negative infinity
-                upper_bound = rhs;        // Upper bound is the RHS of the constraint
+                lower_bound = -kHighsInf;
+                upper_bound = rhs;
             } else if (relation == '>') {
-                lower_bound = rhs;       // Lower bound is the RHS of the constraint
-                upper_bound = kHighsInf; // Upper bound is positive infinity
+                lower_bound = rhs;
+                upper_bound = kHighsInf;
             } else if (relation == '=') {
-                lower_bound = upper_bound = rhs; // Both bounds are equal for equality constraints
+                lower_bound = upper_bound = rhs;
             }
 
-            // Assign the bounds to the HiGHS model
             highsModel.lp_.row_lower_[row_index] = lower_bound;
             highsModel.lp_.row_upper_[row_index] = upper_bound;
-
-            // Add the terms (sparse matrix entries) for this constraint
-            for (const auto &term : constraint->get_terms()) {
-                int    varIndex = highsVars.at(term.first);
-                double coeff    = term.second;
-                indices.push_back(varIndex); // Store the variable index
-                values.push_back(coeff);     // Store the coefficient
-                nzCount++;
-            }
-
-            startIndices.push_back(nzCount); // Mark the start of the next row
             row_index++;
         }
 
-        // Step 3: Assign the sparse matrix values to the HiGHS model
-        highsModel.lp_.a_matrix_.start_  = startIndices;
-        highsModel.lp_.a_matrix_.index_  = indices;
-        highsModel.lp_.a_matrix_.value_  = values;
+        // Assign sparse matrix data directly from `sparse_matrix`
+        highsModel.lp_.a_matrix_.start_  = sparse_matrix.getRowStart();
+        highsModel.lp_.a_matrix_.index_  = sparse_matrix.getIndices();
+        highsModel.lp_.a_matrix_.value_  = sparse_matrix.getValues();
         highsModel.lp_.a_matrix_.format_ = MatrixFormat::kRowwise;
 
-        // Step 4: Set the objective direction (assuming minimization problem)
+        // Set the objective direction (assuming minimization)
         highsModel.lp_.sense_ = ObjSense::kMinimize;
 
         // Add the model to HiGHS
@@ -500,10 +484,10 @@ public:
         sparse_matrix.buildRowStart(); // Build the row start structure for CRS format
         ModelData data;
         data.A_sparse = sparse_matrix;
-        data.b        = get_b_vector();
-        data.c        = get_c();
-        data.lb       = get_lbs();
-        data.ub       = get_ubs();
+        data.b        = b;
+        data.c        = c_vec;
+        data.lb       = lb_vec;
+        data.ub       = ub_vec;
         data.vtype    = get_vtypes();
         data.sense    = get_senses();
 
@@ -518,6 +502,10 @@ private:
     ObjectiveType                                  objective_type; // Minimize or Maximize
     SparseMatrix                                   sparse_matrix;  // Use SparseMatrix for coefficient storage
     ankerl::unordered_dense::map<std::string, int> var_name_to_index;
+    std::vector<double>                            b;
+    std::vector<double>                            c_vec;
+    std::vector<double>                            lb_vec;
+    std::vector<double>                            ub_vec;
 };
 
 class MIPColumn {

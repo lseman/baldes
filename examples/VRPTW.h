@@ -649,6 +649,7 @@ public:
                     if (changed) {
                         matrix = node->extractModelDataSparse();
                         node->optimize();
+                        nodeDuals = node->getDuals();
                     }
                 }
 #endif
@@ -685,6 +686,7 @@ public:
 #endif
 
 #ifdef STAB
+            auto originDuals = nodeDuals;
             stab.update_stabilization_after_master_optim(nodeDuals);
             nodeDuals = stab.getStabDualSol(nodeDuals);
 
@@ -720,7 +722,7 @@ public:
 
                 // print SRCconstraints.size()
                 if (!SRCconstraints.empty()) {
-#ifdef IPM
+#ifndef GUROBI
                     // print SRCconstraints size
                     std::vector<int> SRCindices;
                     for (int i = 0; i < SRCconstraints.size(); i++) {
@@ -735,6 +737,10 @@ public:
                     // TODO: fix this
                     // auto duals = node->get(GRB_DoubleAttr_Pi, SRCconstraints.data(), SRCconstraints.size());
                     // cutDuals.assign(duals, duals + SRCconstraints.size());
+#else
+                    // get jobDuals on the SRCindices
+                    std::vector<double> cutDuals;
+                    for (auto &index : SRCindices) { cutDuals.push_back(originDuals[index]); }
 #endif
 #else
                     // get jobDuals on the SRCindices
