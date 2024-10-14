@@ -422,10 +422,17 @@ public:
 
         if (sparse_matrix.is_dirty) { sparse_matrix.buildRowStart(); }
         auto rhs = constraints[row]->get_rhs();
+
         // Compute the dot product of the solution vector and the specified row
-        double row_value = 0.0;
-        for (SparseMatrix::RowIterator it = sparse_matrix.rowIterator(row); it.valid(); it.next()) {
-            row_value += it.value() * solution[it.col()];
+        double                    row_value = 0.0;
+        SparseMatrix::RowIterator it        = sparse_matrix.rowIterator(row);
+
+        // Pre-fetch the values and reduce function calls
+        while (it.valid()) {
+            int    col_index = it.col();
+            double value     = it.value();
+            row_value += value * solution[col_index];
+            it.next();
         }
 
         // Compute the slack as: slack = rhs - row_value

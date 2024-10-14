@@ -12,6 +12,7 @@
 
 #pragma once
 
+#include "../third_party/small_vector.hpp"
 #include <algorithm>
 #include <functional>
 #include <numeric> // for std::partial_sum
@@ -41,27 +42,21 @@ struct SparseElement {
  * and convert the matrix to a dense representation.
  */
 struct SparseMatrix {
-    std::vector<int>    rows;      ///< Row indices of the matrix elements
-    std::vector<int>    cols;      ///< Column indices of the matrix elements
-    std::vector<double> values;    ///< Values of the matrix elements
-    std::vector<int>    row_start; ///< Starting index of each row in `elements`
-    int                 num_rows;  ///< Total number of rows in the matrix
-    int                 num_cols;  ///< Total number of columns in the matrix
-    bool                is_dirty = true;
+    gch::small_vector<int>    rows;      ///< Row indices of the matrix elements
+    gch::small_vector<int>    cols;      ///< Column indices of the matrix elements
+    gch::small_vector<double> values;    ///< Values of the matrix elements
+    gch::small_vector<int>    row_start; ///< Starting index of each row in `elements`
+    int                       num_rows;  ///< Total number of rows in the matrix
+    int                       num_cols;  ///< Total number of columns in the matrix
+    bool                      is_dirty = true;
 
-    // default constructor
+    // Default constructor
     SparseMatrix() : num_rows(0), num_cols(0) {}
-    // define default constructor which receive num_rows and num_cols
+
+    // Constructor with num_rows and num_cols
     SparseMatrix(int num_rows, int num_cols) : num_rows(num_rows), num_cols(num_cols) {}
-    /**
-     * @brief Insert a non-zero element into the sparse matrix.
-     *
-     * This method does not guarantee matrix consistency until `buildRowStart()` is called.
-     *
-     * @param row The row index of the element.
-     * @param col The column index of the element.
-     * @param value The value of the element.
-     */
+
+    // Insert a non-zero element into the sparse matrix
     void insert(int row, int col, double value) {
         // Expand the number of rows if needed
         if (row >= num_rows) {
@@ -76,17 +71,15 @@ struct SparseMatrix {
         rows.push_back(row);
         cols.push_back(col);
         values.push_back(value);
-
-        // buildRowStart(); // Rebuild the CRS structure
-        is_dirty = true;
+        is_dirty = true; // Mark as dirty to rebuild CRS later
     }
 
     // Delete a column (variable) from the matrix
     void delete_column(int col_to_delete) {
-        // Step 1: Remove elements with the specified column
         size_t write_index = 0;
         for (size_t i = 0; i < cols.size(); ++i) {
             if (cols[i] != col_to_delete) {
+                // Move the retained element to the new position
                 if (write_index != i) {
                     rows[write_index]   = rows[i];
                     cols[write_index]   = cols[i];
@@ -95,28 +88,28 @@ struct SparseMatrix {
                 ++write_index;
             }
         }
+
+        // Resize the vectors to remove the deleted column's elements
         rows.resize(write_index);
         cols.resize(write_index);
         values.resize(write_index);
 
-        // Step 2: Adjust column indices for remaining elements
+        // Adjust column indices for elements beyond the deleted column
         for (auto &col : cols) {
             if (col > col_to_delete) { --col; }
         }
 
         // Update the column count
         --num_cols;
-
-        // Mark as dirty to indicate CRS structure needs to be rebuilt
-        is_dirty = true;
+        is_dirty = true; // Mark as dirty to rebuild CRS later
     }
 
     // Delete a row (constraint) from the matrix
     void delete_row(int row_to_delete) {
-        // Step 1: Remove elements with the specified row
         size_t write_index = 0;
         for (size_t i = 0; i < rows.size(); ++i) {
             if (rows[i] != row_to_delete) {
+                // Move the retained element to the new position
                 if (write_index != i) {
                     rows[write_index]   = rows[i];
                     cols[write_index]   = cols[i];
@@ -125,60 +118,46 @@ struct SparseMatrix {
                 ++write_index;
             }
         }
+
+        // Resize the vectors to remove the deleted row's elements
         rows.resize(write_index);
         cols.resize(write_index);
         values.resize(write_index);
 
-        // Step 2: Adjust row indices for remaining elements
+        // Adjust row indices for elements beyond the deleted row
         for (auto &row : rows) {
             if (row > row_to_delete) { --row; }
         }
 
         // Update the row count
         --num_rows;
-
-        // Mark as dirty to indicate CRS structure needs to be rebuilt
-        is_dirty = true;
+        is_dirty = true; // Mark as dirty to rebuild CRS later
     }
 
-    /**
-     * @brief Modify or delete an element at a given row and column.
-     *
-     * This function finds the element at the specified row and column. If the value
-     * is non-zero, it modifies the element's value. If the value is zero, the element
-     * is deleted from the matrix.
-     *
-     */
+    // Modify or delete an element at a given row and column
     void modify_or_delete(int row, int col, double value) {
         // Find the element in the vectors
-        auto it = std::find_if(rows.begin(), rows.end(), [&](size_t i) { return rows[i] == row && cols[i] == col; });
-
-        if (it != rows.end()) {
-            size_t index = std::distance(rows.begin(), it);
-            if (value != 0.0) {
-                // Modify the element's value
-                values[index] = value;
-            } else {
-                // Remove the element if value is zero
-                rows.erase(rows.begin() + index);
-                cols.erase(cols.begin() + index);
-                values.erase(values.begin() + index);
+        for (size_t i = 0; i < rows.size(); ++i) {
+            if (rows[i] == row && cols[i] == col) {
+                if (value != 0.0) {
+                    // Modify the element's value
+                    values[i] = value;
+                } else {
+                    // Remove the element if value is zero
+                    rows.erase(rows.begin() + i);
+                    cols.erase(cols.begin() + i);
+                    values.erase(values.begin() + i);
+                }
+                is_dirty = true; // Mark as dirty to rebuild CRS later
+                return;
             }
-        } else if (value != 0.0) {
-            // If the element does not exist and the value is non-zero, insert a new element
-            insert(row, col, value);
         }
 
-        // Mark as dirty to indicate CRS structure needs to be rebuilt
-        is_dirty = true;
+        // If the element does not exist and the value is non-zero, insert a new element
+        if (value != 0.0) { insert(row, col, value); }
     }
 
-    /**
-     * @brief Build the CRS structure by computing row start positions.
-     *
-     * This function sorts the non-zero elements by row and column and then computes the starting index for
-     * each row in the `elements` vector. This enables efficient row-wise traversal.
-     */
+    // Build the CRS structure by computing row start positions
     void buildRowStart() {
         if (!is_dirty) return;
 
@@ -189,9 +168,9 @@ struct SparseMatrix {
         pdqsort(indices.begin(), indices.end(),
                 [&](size_t a, size_t b) { return std::tie(rows[a], cols[a]) < std::tie(rows[b], cols[b]); });
 
-        std::vector<int>    sorted_rows(rows.size());
-        std::vector<int>    sorted_cols(cols.size());
-        std::vector<double> sorted_values(values.size());
+        gch::small_vector<int>    sorted_rows(rows.size());
+        gch::small_vector<int>    sorted_cols(cols.size());
+        gch::small_vector<double> sorted_values(values.size());
 
         for (size_t i = 0; i < indices.size(); ++i) {
             sorted_rows[i]   = rows[indices[i]];
@@ -319,21 +298,28 @@ struct SparseMatrix {
         return result;
     }
 
-    const std::vector<int> &getRowStart() {
+    const std::vector<int> getRowStart() {
         if (is_dirty) { buildRowStart(); }
-        return row_start;
+        auto row_start_copy = std::vector<int>(row_start.begin(), row_start.end());
+        return row_start_copy;
     }
     /**
      * @brief Get the column indices of non-zero elements.
      *
      * @return A reference to the vector of column indices for the non-zero elements of the matrix.
      */
-    const std::vector<int> &getIndices() const { return cols; }
+    const std::vector<int> getIndices() const {
+        std::vector<int> indices(cols.begin(), cols.end());
+        return indices;
+    }
 
     /**
      * @brief Get the values of non-zero elements.
      *
      * @return A reference to the vector of values for the non-zero elements of the matrix.
      */
-    const std::vector<double> &getValues() const { return values; }
+    const std::vector<double> getValues() const {
+        std::vector<double> values(this->values.begin(), this->values.end());
+        return values;
+    }
 };

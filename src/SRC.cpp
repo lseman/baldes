@@ -246,7 +246,7 @@ void LimitedMemoryRank1Cuts::generateCutCoefficients(VRPTW_SRC &cuts, std::vecto
                                                      int numNodes, const SparseMatrix &A,
                                                      const std::vector<double> &x) {
     double primal_violation   = 0.0;
-    int    max_number_of_cuts = 3;
+    int    max_number_of_cuts = 2;
 
     if (cuts.S_n > 0) {
         int m_max = std::min(cuts.S_n, max_number_of_cuts);
