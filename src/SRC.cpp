@@ -110,8 +110,8 @@ LimitedMemoryRank1Cuts::LimitedMemoryRank1Cuts(std::vector<VRPNode> &nodes) : no
 std::vector<std::vector<double>> LimitedMemoryRank1Cuts::separate(const SparseMatrix &A, const std::vector<double> &x) {
     // Create a map for non-zero entries by rows
     std::vector<std::vector<int>> row_indices_map(A.num_rows + 1);
-    for (int idx = 0; idx < A.elements.size(); ++idx) {
-        int row = A.elements[idx].row;
+    for (int idx = 0; idx < A.values.size(); ++idx) {
+        int row = A.rows[idx];
         row_indices_map[row + 1].push_back(idx);
     }
 
@@ -158,9 +158,9 @@ std::vector<std::vector<double>> LimitedMemoryRank1Cuts::separate(const SparseMa
                 double           lhs          = 0.0;
 
                 // Combine the three updates into one loop for efficiency
-                for (int idx : row_indices_map[i]) expanded[A.elements[idx].col] += 1;
-                for (int idx : row_indices_map[j]) expanded[A.elements[idx].col] += 1;
-                for (int idx : row_indices_map[k]) expanded[A.elements[idx].col] += 1;
+                for (int idx : row_indices_map[i]) expanded[A.cols[idx]] += 1;
+                for (int idx : row_indices_map[j]) expanded[A.cols[idx]] += 1;
+                for (int idx : row_indices_map[k]) expanded[A.cols[idx]] += 1;
 
                 // Accumulate LHS cut values
                 for (int idx = 0; idx < A.num_cols; ++idx) {
