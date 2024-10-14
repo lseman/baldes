@@ -28,6 +28,7 @@
 
 // include unordered_dense_map
 #include "ankerl/unordered_dense.h"
+#include "solvers/IPM.h"
 #include "solvers/SolverInterface.h"
 
 #ifdef RCC
@@ -42,6 +43,10 @@
 #include "gurobi_c++.h"
 #include "gurobi_c.h"
 #include "solvers/Gurobi.h"
+#endif
+
+#ifdef IPM
+#include "ipm/IPSolver.h"
 #endif
 
 class Problem;
@@ -117,7 +122,10 @@ public:
 #endif
 
     explicit BNBNode(const MIPProblem &eModel) {
-        // model = new GRBModel(eModel);
+        mip = eModel;
+        auto matrix = extractModelDataSparse();
+        // print matrix.A_sparse.num_rows;
+        solver = new IPMSolver(matrix);
         generateUUID();
         this->initialized = true;
 #ifdef RCC
@@ -271,7 +279,7 @@ public:
     }
 
     int addConstr(const Constraint ctr, const std::string &name) {
-        mip.addConstr(ctr, name);
+        mip.add_constraint(ctr, name);
         return mip.getConstraints().size() - 1;
     }
 
@@ -294,9 +302,12 @@ public:
     double              getObjVal() { return solver->getObjVal(); }
     std::vector<double> getDuals() { return solver->getDuals(); }
     std::vector<double> extractSolution() { return solver->extractSolution(); }
-    void                optimize() { solver->optimize(); }
+    void                optimize() { 
+        solver->setModel(mip.extractModelDataSparse());
+        solver->optimize(); }
     double              getVarValue(int i) { return solver->getVarValue(i); }
     auto                getModel() { return &mip; }
+    auto getDualVal(int i) { return solver->getDualVal(i); }
 
 #ifdef GUROBI
     // Update
@@ -311,7 +322,13 @@ public:
         // set mute
     }
 #else
-    void update() {}
+    void update() {
+        // delete model; // Delete the old model to free memory
+        auto matrix = mip.extractModelDataSparse();
+        solver->setModel(matrix);
+        //solver = model;
+        //solver->optimize(); // Optimize the model
+    }
 #endif
 
     std::pair<bool, double> solveRestrictedMasterLP() {

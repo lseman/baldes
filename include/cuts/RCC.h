@@ -89,7 +89,7 @@ public:
     }
 
     // Compute the dual values for each arc by summing the duals of cuts passing through the arc
-    ArcDuals computeDuals(MIPProblem *model, double threshold = 1e-3) {
+    ArcDuals computeDuals(BNBNode *model, double threshold = 1e-3) {
         ArcDuals arcDuals;
         // First pass: Compute dual values and store them
         for (int i = 0; i < cuts_.size(); ++i) {

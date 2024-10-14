@@ -22,6 +22,8 @@
 // Forward declare NodeDuals class
 class NodeDuals;
 
+class BNBNode;
+
 // Structure to store and manage dual values for arcs
 class ArcDuals {
 public:
@@ -109,7 +111,7 @@ public:
 
     double getDual(int node) const { return nodeDuals_.getDual(node); }
 
-    void computeDuals(MIPProblem *model, double threshold = 1e-3) {
+    void computeDuals(BNBNode *model, double threshold = 1e-3) {
         arcDuals_  = ArcDuals();
         nodeDuals_ = NodeDuals();
 

@@ -169,6 +169,8 @@ std::vector<std::vector<double>> LimitedMemoryRank1Cuts::separate(const SparseMa
 
                 // If lhs violation found, insert the cut
                 if (lhs > 1.0 + 1e-3) {
+                    // print lhs
+                    fmt::print("lhs: {}\n", lhs);
                     std::lock_guard<std::mutex> lock(cuts_mutex);
                     insertSet(cuts, i, j, k, buffer_int, buffer_int_n, lhs);
                 }
@@ -396,10 +398,13 @@ bool LimitedMemoryRank1Cuts::runSeparation(BNBNode *node, std::vector<Constraint
     }
     matrix        = node->extractModelDataSparse(); // Extract model data
     auto solution = node->extractSolution();
+    auto obj = node->getObjVal();
+    fmt::print("Objective value: {}\n", obj);
     separate(matrix.A_sparse, solution);
     prepare45Heuristic(matrix.A_sparse, solution);
-    the45Heuristic<CutType::FourRow>(matrix.A_sparse, solution);
-    the45Heuristic<CutType::FiveRow>(matrix.A_sparse, solution);
+    //the45Heuristic<CutType::FourRow>(matrix.A_sparse, solution);
+    //the45Heuristic<CutType::FiveRow>(matrix.A_sparse, solution);
+    fmt::print("Cuts before: {}, Cuts after: {}\n", cuts_before, cuts->size() + n_cuts_removed);
     if (cuts_before == cuts->size() + n_cuts_removed) { return false; }
     return true;
 }

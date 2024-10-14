@@ -47,6 +47,8 @@ public:
 
     double getVarValue(int i) const override { return model->getVar(i).get(GRB_DoubleAttr_X); }
 
+    double getDualVal(int i) const override { return model->getConstr(i).get(GRB_DoubleAttr_Pi); }
+
     void                optimize() override { model->optimize(); }
     std::vector<double> getDuals() const override {
         int                    numConstrs = model->get(GRB_IntAttr_NumConstrs);

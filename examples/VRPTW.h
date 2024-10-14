@@ -752,18 +752,13 @@ public:
 #ifdef RCC
                 // RCC cuts
                 if (rccManager.size() > 0) {
-                    auto model = node->getModel();
-#ifndef IPM
-                    auto arc_duals = rccManager.computeDuals(model);
-#else
-                    auto arc_duals = rccManager.computeDuals(nodeDuals);
-#endif
+                    auto arc_duals = rccManager.computeDuals(node);
                     bucket_graph.setArcDuals(arc_duals);
                 }
 #endif
 
                 // Branching duals
-                if (branchingDuals.size() > 0) { branchingDuals.computeDuals(node->getModel()); }
+                if (branchingDuals.size() > 0) { branchingDuals.computeDuals(node); }
                 bucket_graph.setDuals(nodeDuals);
 
                 //////////////////////////////////////////////////////////////////////
@@ -1066,7 +1061,7 @@ public:
                 bucket_graph.augment_ng_memories(solution, allPaths, true, 5, 100, 16, N_SIZE);
 
                 // Branching duals
-                if (branchingDuals.size() > 0) { branchingDuals.computeDuals(node->getModel()); }
+                if (branchingDuals.size() > 0) { branchingDuals.computeDuals(node); }
                 bucket_graph.setDuals(nodeDuals);
 
                 //////////////////////////////////////////////////////////////////////
