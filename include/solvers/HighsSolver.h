@@ -14,9 +14,9 @@ public:
         model = new Highs();
         model->passModel(highsmodel);
         model->setOptionValue("solver", "ipm");
-        model->setOptionValue("primal_feasibility_tolerance", 1e-4);
-        model->setOptionValue("dual_feasibility_tolerance", 1e-4);
-        // model->setOptionValue("run_crossover", "on");
+        model->setOptionValue("primal_feasibility_tolerance", 1e-6);
+        model->setOptionValue("dual_feasibility_tolerance", 1e-6);
+        model->setOptionValue("run_crossover", "off");
         //  disable output to screen
         model->setOptionValue("ipm_optimality_tolerance", 1e-8);
         model->setOptionValue("output_flag", "off");
@@ -38,9 +38,9 @@ public:
 
     double getObjVal() const override { return model->getObjectiveValue(); }
 
-    double getVarValue(int i) const override { return 0.0; }
+    double getVarValue(int i) const override { return model->getSolution().col_value[i]; }
 
-    double getDualVal(int i) const override { return 0.0; }
+    double getDualVal(int i) const override { return model->getSolution().row_dual[i]; }
 
     void                optimize() override { model->run(); }
     std::vector<double> getDuals() const override { return model->getSolution().row_dual; }

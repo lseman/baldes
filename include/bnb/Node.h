@@ -350,13 +350,13 @@ public:
     std::pair<bool, double> solveRestrictedMasterLP() {
         bool feasible = false;
         relaxNode();
-        // model->optimize();
-        // if (model->get(GRB_IntAttr_Status) == GRB_OPTIMAL) {
-        //    feasible = true;
-        //    return std::make_pair(feasible, model->get(GRB_DoubleAttr_ObjVal));
-        //} else {
-        //    return std::make_pair(feasible, 0.0);
-        //}
+        optimize();
+        if (getStatus() == 2) {
+            feasible = true;
+            return std::make_pair(feasible, getObjVal());
+        } else {
+            return std::make_pair(feasible, 0.0);
+        }
     }
 
     ///////////////////////////////////////////////
@@ -398,10 +398,9 @@ public:
                             [&](auto &&arg) {
                                 using T = std::decay_t<decltype(arg)>;
                                 if constexpr (std::is_same_v<T, std::pair<int, int>>) {
-                                    linExpr += vars[i] * paths[i].timesArc(arg.first, arg.second); // Use the std::pair
-                                    payload
-                                } else {
-                                    throw std::invalid_argument("Payload for Edge must be a std::pair<int, int>.");
+                                    linExpr += vars[i] * paths[i].timesArc(arg.first, arg.second); // Use the
+           std::pair payload } else { throw std::invalid_argument("Payload for Edge must be a std::pair<int,
+           int>.");
                                 }
                             },
                             *payload);

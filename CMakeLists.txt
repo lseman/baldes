@@ -222,6 +222,7 @@ if(IPM)
   )
   include_directories(${Eigen_SOURCE_DIR})
   include_directories(${Eigen_SOURCE_DIR}/unsupported)
+
 endif()
 
 if(HIGHS)
