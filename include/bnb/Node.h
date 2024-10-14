@@ -337,8 +337,6 @@ public:
 #elif defined(HIGHS)
     void update() {
         // delete model; // Delete the old model to free memory
-        auto highsmodel = mip.toHighsModel();
-        solver->setModel(highsmodel);
         // solver->optimize(); // Optimize the model
     }
 #else

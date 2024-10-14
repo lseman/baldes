@@ -136,7 +136,7 @@ public:
             if (vec.size() > 0) {
                 for (int i = 0; i < vec.size(); i++) {
                     if (abs(vec[i]) > 1e-3) {
-                        col.addTerm(i, vec[i]); // Add to the appropriate constraint in Column
+                        col.addTerm(SRCconstraints[i]->index(), vec[i]); // Add to the appropriate constraint in Column
                     }
                 }
             }
@@ -148,7 +148,7 @@ public:
             if (RCCvec.size() > 0) {
                 for (int i = 0; i < RCCvec.size(); i++) {
                     if (abs(RCCvec[i]) > 1e-3) {
-                        col.addTerm(i, RCCvec[i]); // Add RCC terms to the Column
+                        col.addTerm(RCCconstraints[i]->index(), RCCvec[i]); // Add RCC terms to the Column
                     }
                 }
             }
@@ -316,8 +316,6 @@ public:
                 cut.updated = false;
             }
         }
-
-        node->update();
         return changed;
     }
 
@@ -382,7 +380,6 @@ public:
         }
 
         fmt::print("Added {} RCC cuts\n", cutExpressions.size());
-        model->update();
         model->optimize();
 
         return true;
@@ -905,7 +902,6 @@ public:
         fmt::print("\033[34m_STARTING BRANCH PROCEDURE \033[0m");
         fmt::print("\n");
 
-        node->update();
         node->relaxNode();
 
         auto candidates       = Branching::VRPTWStandardBranching(node, &instance, this);

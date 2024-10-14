@@ -13,8 +13,6 @@ public:
     HighsSolver(HighsModel &highsmodel) {
         model = new Highs();
         model->passModel(highsmodel);
-        //model->setOptionValue("solver", "ipm");
-        //model->setOptionValue("run_crossover", "off");
         model->setOptionValue("output_flag", "off");
     }
 
