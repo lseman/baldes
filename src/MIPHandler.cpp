@@ -18,8 +18,8 @@ void MIPProblem::addVars(const double *lb, const double *ub, const double *obj, 
             sparse_matrix.insert(row_index, col_index, value);
 
             // Update the corresponding constraint linear expression
-            constraints[row_index].addTerm(variables[col_index],
-                                           value); // Assuming constraints is a vector of linear expressions
+            constraints[row_index]->addTerm(variables[col_index],
+                                            value); // Assuming constraints is a vector of linear expressions
         }
     }
 
@@ -38,14 +38,17 @@ void MIPProblem::addVars(const double *lb, const double *ub, const double *obj, 
     sparse_matrix.buildRowStart();
 }
 
-Constraint LinearExpression::operator>=(double rhs) const {
-    return Constraint(*this, rhs, '>'); // '>' represents '>='
+Constraint *LinearExpression::operator>=(double rhs) const {
+    auto ctr = new Constraint(*this, rhs, '>'); // '>' represents '>='
+    return ctr;
 }
-Constraint LinearExpression::operator<=(double rhs) const {
-    return Constraint(*this, rhs, '<'); // '<' represents '<='
+Constraint *LinearExpression::operator<=(double rhs) const {
+    auto ctr = new Constraint(*this, rhs, '<'); // '<' represents '<='
+    return ctr;
 }
-Constraint LinearExpression::operator==(double rhs) const {
-    return Constraint(*this, rhs, '='); // '=' represents '=='
+Constraint *LinearExpression::operator==(double rhs) const {
+    auto ctr = new Constraint(*this, rhs, '='); // '=' represents '=='
+    return ctr;
 }
 
 // This overload allows an int to be multiplied by a Variable

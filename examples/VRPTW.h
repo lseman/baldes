@@ -211,7 +211,7 @@ public:
             pathSet.insert(path);
 
             counter += 1;
-            if (counter > 1) break;
+            if (counter > 10) break;
 
             std::fill(coluna.begin(), coluna.end(), 0.0); // Reset the coefficients
 
@@ -241,9 +241,7 @@ public:
             auto vec = cuts.computeLimitedMemoryCoefficients(label->nodes_covered);
             if (vec.size() > 0) {
                 for (int i = 0; i < vec.size(); i++) {
-                    if (abs(vec[i]) > 1e-3) {
-                        col.addTerm(i, vec[i]); // Add to the appropriate constraint in Column
-                    }
+                    if (abs(vec[i]) > 1e-3) { col.addTerm(SRCconstraints[i]->index(), vec[i]); }
                 }
             }
 #endif
@@ -254,7 +252,7 @@ public:
             if (RCCvec.size() > 0) {
                 for (int i = 0; i < RCCvec.size(); i++) {
                     if (abs(RCCvec[i]) > 1e-3) {
-                        col.addTerm(i, RCCvec[i]); // Add RCC terms to the Column
+                        col.addTerm(RCCconstraints[i]->index(), RCCvec[i]); // Add RCC terms to the Column
                     }
                 }
             }
@@ -284,7 +282,7 @@ public:
      * Handles the cuts for the VRPTW problem.
      *
      */
-    bool cutHandler(LimitedMemoryRank1Cuts &r1c, BNBNode *node, std::vector<Constraint> &constraints) {
+    bool cutHandler(LimitedMemoryRank1Cuts &r1c, BNBNode *node, std::vector<Constraint *> &constraints) {
         auto &cuts    = r1c.cutStorage;
         bool  changed = false;
 
@@ -297,7 +295,6 @@ public:
                 const auto &coeffs = cut.coefficients;
 
                 if (cut.added && cut.updated) {
-                    fmt::print("Updating cut {}\n", z);
                     cut.updated = false;
                     if (z >= constraints.size()) { continue; }
                     node->chgCoeff(constraints[z], coeffs);
@@ -311,7 +308,7 @@ public:
                     std::string constraint_name = "cuts(z" + std::to_string(z) + ")";
                     // constraint_name << "cuts(z" << z << ")";
                     auto ctr = lhs <= cut.rhs;
-                    ctr = node->addConstr(ctr, constraint_name);
+                    ctr      = node->addConstr(ctr, constraint_name);
                     constraints.emplace_back(ctr);
                 }
 
@@ -488,8 +485,8 @@ public:
 
             // Add the constraint to the model
             auto ctr_name = "RCC_cut_" + std::to_string(rccManager.cut_ctr);
-            auto ctr = cutExpr <= rhsValues[i];
-            ctr      = model->addConstr(ctr, ctr_name);
+            auto ctr      = cutExpr <= rhsValues[i];
+            ctr           = model->addConstr(ctr, ctr_name);
             // TODO: fix
             rccManager.addCut(arcGroups[i], rhsValues[i], ctr);
         }
@@ -727,13 +724,11 @@ public:
                 // print SRCconstraints.size()
                 if (!SRCconstraints.empty()) {
 #ifdef IPM
-                // print SRCconstraints size
-                fmt::print("SRC constraints size: {}\n", SRCconstraints.size());
+                    // print SRCconstraints size
                     std::vector<int> SRCindices;
                     for (int i = 0; i < SRCconstraints.size(); i++) {
-                        Constraint constr = SRCconstraints[i];
-                        auto       index  = constr.index();
-                        fmt::print("{} ", index);
+                        auto constr = SRCconstraints[i];
+                        auto index  = constr->index();
                         SRCindices.push_back(index);
                     }
 #endif
@@ -748,7 +743,6 @@ public:
                     // get jobDuals on the SRCindices
                     std::vector<double> cutDuals;
                     // print nodeDuals size
-                    fmt::print("Node duals size: {}\n", nodeDuals.size());
                     for (auto &index : SRCindices) { cutDuals.push_back(-nodeDuals[index]); }
 
 #endif

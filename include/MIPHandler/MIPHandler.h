@@ -68,18 +68,17 @@ public:
         }
     }
 
-    Constraint add_constraint(const LinearExpression &expression, double rhs, char relation) {
+    Constraint *add_constraint(const LinearExpression &expression, double rhs, char relation) {
         int constraint_index = constraints.size(); // Get the current index
 
         // Add the constraint to the list of constraints and set its index
-        Constraint new_constraint(expression, rhs, relation);
-        new_constraint.set_index(constraint_index); // Set the constraint's index
+        auto new_constraint = new Constraint(expression, rhs, relation);
+        new_constraint->set_index(constraint_index); // Set the constraint's index
 
         constraints.push_back(new_constraint); // Add to constraints list
 
         // Convert the LinearExpression to sparse row format and add to the sparse matrix
         int row_index = sparse_matrix.num_rows;
-        constraint_row_indices.push_back(row_index); // Track the new row index
 
         for (const auto &[var_name, coeff] : expression.get_terms()) {
             // Find the variable index corresponding to var_name
@@ -97,21 +96,20 @@ public:
         return new_constraint;
     }
 
-    Constraint &add_constraint(Constraint &constraint, const std::string &name) {
+    Constraint *add_constraint(Constraint *constraint, const std::string &name) {
         int constraint_index = constraints.size(); // Get the current index
 
         // Set the index and name of the constraint
-        constraint.set_index(constraint_index);
-        constraint.set_name(name);
+        constraint->set_index(constraint_index);
+        constraint->set_name(name);
 
         constraints.push_back(constraint); // Add the constraint to the list
-        auto relation = constraint.get_relation();
+        auto relation = constraint->get_relation();
         // print rhs
         // Convert the LinearExpression inside the constraint to sparse row format and add it to the sparse matrix
         int row_index = sparse_matrix.num_rows;
-        constraint_row_indices.push_back(row_index); // Track the new row index
 
-        const LinearExpression &expression = constraint.get_expression();
+        const LinearExpression &expression = constraint->get_expression();
 
         for (const auto &[var_name, coeff] : expression.get_terms()) {
             // Find the variable index corresponding to var_name
@@ -128,7 +126,6 @@ public:
 
         // Update row start for CRS
         sparse_matrix.buildRowStart();
-        fmt::print("Constraint '{}' added with index {} at row {}\n", name, constraint_index, row_index);
 
         // Return reference to the constraint in the list
         return constraints.back();
@@ -136,57 +133,40 @@ public:
 
     // Delete a constraint (row) from the problem
     void delete_constraint(int constraint_index) {
-        if (constraint_index >= 0 && constraint_index < constraints.size()) {
-            // Get the row index of the constraint
-            int row_to_delete = constraint_row_indices[constraint_index];
+        // Get the row index of the constraint
+        int row_to_delete = constraint_index;
+        // Delete the row from the sparse matrix
+        sparse_matrix.delete_row(row_to_delete);
 
-            // Delete the row from the sparse matrix
-            sparse_matrix.delete_row(row_to_delete);
+        // Remove the constraint from the constraints list and the row index from the tracking vector
+        constraints.erase(constraints.begin() + constraint_index);
 
-            // Remove the constraint from the constraints list and the row index from the tracking vector
-            constraints.erase(constraints.begin() + constraint_index);
-            constraint_row_indices.erase(constraint_row_indices.begin() + constraint_index);
-
-            // Update row indices of the remaining constraints
-            for (int i = constraint_index; i < constraint_row_indices.size(); ++i) {
-                constraint_row_indices[i]--; // Decrease each subsequent row index
-            }
-
-            // Rebuild the row structure
-            sparse_matrix.buildRowStart();
-        } else {
-            throw std::out_of_range("Invalid constraint index");
+        for (int i = constraint_index; i < constraints.size(); ++i) {
+            constraints[i]->set_index(i); // Update the index of the remaining constraints
         }
+        // Rebuild the row structure
+        sparse_matrix.buildRowStart();
     }
 
-    void delete_constraint(const Constraint &constraint) {
-        // Find the index of the given constraint in the constraints vector
-        auto it = std::find_if(constraints.begin(), constraints.end(),
-                               [&constraint](const Constraint &c) { return &c == &constraint; });
+    void delete_constraint(Constraint *constraint) {
+        // print constraints.size
+        // Get the index of the given constraint in the constraints vector
+        int constraint_index = constraint->index();
 
-        if (it != constraints.end()) {
-            // Get the index of the constraint
-            int constraintIndex = std::distance(constraints.begin(), it);
+        // Get the corresponding row index in the sparse matrix
+        int row_to_delete = constraint_index;
 
-            // Get the corresponding row index in the sparse matrix
-            int row_to_delete = constraint_row_indices[constraintIndex];
+        // Delete the row from the sparse matrix
+        sparse_matrix.delete_row(row_to_delete);
 
-            // Delete the row from the sparse matrix
-            sparse_matrix.delete_row(row_to_delete);
+        // Remove the constraint from the constraints vector
+        constraints.erase(constraints.begin() + constraint_index);
+        // Rebuild the row structure for the CRS matrix
+        sparse_matrix.buildRowStart();
 
-            // Remove the constraint from the constraints list and the row index from the tracking vector
-            constraints.erase(it);
-            constraint_row_indices.erase(constraint_row_indices.begin() + constraintIndex);
-
-            // Update the row indices for remaining constraints
-            for (int i = constraintIndex; i < constraint_row_indices.size(); ++i) {
-                constraint_row_indices[i]--; // Decrease each subsequent row index
-            }
-
-            // Rebuild the row structure
-            sparse_matrix.buildRowStart();
-        } else {
-            throw std::invalid_argument("Constraint not found.");
+        // Adjust the indices of remaining constraints
+        for (int i = constraint_index; i < constraints.size(); ++i) {
+            constraints[i]->set_index(i); // Update the index of the remaining constraints
         }
     }
 
@@ -240,9 +220,32 @@ public:
     // Change multiple coefficients for a specific constraint
     void chgCoeff(int constraintIndex, const std::vector<double> &values) {
         if (constraintIndex < 0 || constraintIndex >= constraints.size()) {
+            // print constraintIndex and constraints.size()
             throw std::out_of_range("Invalid constraint index");
         }
-        for (int i = 0; i < values.size(); ++i) { sparse_matrix.insert(constraintIndex, i, values[i]); }
+
+        // Get the constraint that is being modified
+        Constraint       *constraint = constraints[constraintIndex];
+        LinearExpression &expression = constraint->get_expression();
+
+        // Clear the existing terms in the LinearExpression
+        expression.clear_terms();
+
+        // Iterate over the values and update both the sparse matrix and the constraint's expression
+        for (int i = 0; i < values.size(); ++i) {
+            double value = values[i];
+
+            // Update the sparse matrix
+            sparse_matrix.modify_or_delete(constraintIndex, i, value);
+
+            // Update the LinearExpression in the Constraint
+            if (value != 0.0) {
+                const std::string &var_name = variables[i].get_name(); // Get variable name by index
+                expression.add_term(var_name, value); // Add the term (variable, coefficient) to the expression
+            }
+        }
+
+        // Rebuild the CRS structure after updating
         sparse_matrix.buildRowStart();
     }
 
@@ -252,7 +255,24 @@ public:
             variableIndex >= variables.size()) {
             throw std::out_of_range("Invalid constraint or variable index");
         }
-        sparse_matrix.insert(constraintIndex, variableIndex, value);
+
+        // Update the sparse matrix
+        sparse_matrix.modify_or_delete(constraintIndex, variableIndex, value);
+
+        // Update the LinearExpression in the corresponding Constraint
+        Constraint       *constraint = constraints[constraintIndex];
+        LinearExpression &expression = constraint->get_expression();
+
+        const std::string &var_name = variables[variableIndex].get_name();
+
+        // Update the term in the LinearExpression
+        if (value != 0.0) {
+            expression.add_term(var_name, value); // Add or update the term (variable, coefficient)
+        } else {
+            expression.remove_term(var_name); // Remove the term if the value is 0
+        }
+
+        // Rebuild the row start for CRS format
         sparse_matrix.buildRowStart();
     }
 
@@ -264,7 +284,7 @@ public:
     // Get all variables
     std::vector<Variable> &getVars() { return variables; }
     // Get all constraints
-    std::vector<Constraint> &getConstraints() { return constraints; }
+    std::vector<Constraint *> &getConstraints() { return constraints; }
 
     void add_variable_with_sparse_column(const std::string &var_name, VarType type, double lb, double ub,
                                          const std::vector<std::pair<int, double>> &sparse_column) {
@@ -299,24 +319,14 @@ public:
     // Method to get the b vector (RHS values of all constraints)
     std::vector<double> get_b_vector() const {
         std::vector<double> b;
-        for (const auto &constraint : constraints) { b.push_back(constraint.get_rhs()); }
+        for (const auto &constraint : constraints) { b.push_back(constraint->get_rhs()); }
         return b;
     }
 
-    void chgCoeff(const Constraint &constraint, const std::vector<double> &new_coeffs) {
-        // Find the index of the constraint
-        auto it = std::find_if(constraints.begin(), constraints.end(),
-                               [&constraint](const Constraint &c) { return &c == &constraint; });
-
-        if (it != constraints.end()) {
-            // Get the index of the constraint
-            int constraintIndex = std::distance(constraints.begin(), it);
-
-            // Change the coefficients for the constraint
-            chgCoeff(constraintIndex, new_coeffs);
-        } else {
-            throw std::invalid_argument("Constraint not found.");
-        }
+    void chgCoeff(Constraint *constraint, const std::vector<double> &new_coeffs) {
+        auto constraintIndex = constraint->index();
+        // Change the coefficients for the constraint
+        chgCoeff(constraintIndex, new_coeffs);
     }
 
 #ifdef GUROBI
@@ -349,12 +359,12 @@ public:
         // Step 2: Add constraints to the Gurobi model
         for (const auto &constraint : constraints) {
             GRBLinExpr gurobiExpr = convertToGurobiExpr(constraint, gurobiVars);
-            if (constraint.get_relation() == '<') {
-                gurobiModel.addConstr(gurobiExpr <= constraint.get_rhs(), constraint.get_name());
-            } else if (constraint.get_relation() == '>') {
-                gurobiModel.addConstr(gurobiExpr >= constraint.get_rhs(), constraint.get_name());
-            } else if (constraint.get_relation() == '=') {
-                gurobiModel.addConstr(gurobiExpr == constraint.get_rhs(), constraint.get_name());
+            if (constraint->get_relation() == '<') {
+                gurobiModel.addConstr(gurobiExpr <= constraint->get_rhs(), constraint->get_name());
+            } else if (constraint->get_relation() == '>') {
+                gurobiModel.addConstr(gurobiExpr >= constraint->get_rhs(), constraint->get_name());
+            } else if (constraint->get_relation() == '=') {
+                gurobiModel.addConstr(gurobiExpr == constraint->get_rhs(), constraint->get_name());
             }
         }
 
@@ -380,7 +390,7 @@ public:
     GRBLinExpr convertToGurobiExpr(const Constraint                                        &constraint,
                                    const ankerl::unordered_dense::map<std::string, GRBVar> &gurobiVars) {
         GRBLinExpr expr;
-        for (const auto &term : constraint.get_terms()) {
+        for (const auto &term : constraint->get_terms()) {
             const std::string &varName = term.first;
             double             coeff   = term.second;
             expr += gurobiVars.at(varName) * coeff;
@@ -438,8 +448,8 @@ public:
         int row_index = 0;
         for (const auto &constraint : constraints) {
             double lower_bound, upper_bound;
-            char   relation = constraint.get_relation();
-            double rhs      = constraint.get_rhs();
+            char   relation = constraint->get_relation();
+            double rhs      = constraint->get_rhs();
 
             // Set the lower and upper bounds for each constraint based on its type
             if (relation == '<') {
@@ -457,7 +467,7 @@ public:
             highsModel.lp_.row_upper_[row_index] = upper_bound;
 
             // Add the terms (sparse matrix entries) for this constraint
-            for (const auto &term : constraint.get_terms()) {
+            for (const auto &term : constraint->get_terms()) {
                 int    varIndex = highsVars.at(term.first);
                 double coeff    = term.second;
                 indices.push_back(varIndex); // Store the variable index
@@ -486,6 +496,20 @@ public:
 
 #endif
 
+    double getSlack(int row, const std::vector<double> &solution) const {
+
+        auto rhs = constraints[row]->get_rhs();
+        // Compute the dot product of the solution vector and the specified row
+        double row_value = 0.0;
+        for (SparseMatrix::RowIterator it = sparse_matrix.rowIterator(row); it.valid(); it.next()) {
+            row_value += it.value() * solution[it.col()];
+        }
+
+        // Compute the slack as: slack = rhs - row_value
+        double slack = rhs - row_value;
+        return slack;
+    }
+
     std::vector<double> get_lbs() const {
         std::vector<double> lbs;
         for (const auto &var : variables) { lbs.push_back(var.get_lb()); }
@@ -506,7 +530,7 @@ public:
 
     std::vector<char> get_senses() const {
         std::vector<char> senses;
-        for (const auto &constraint : constraints) { senses.push_back(constraint.get_relation()); }
+        for (const auto &constraint : constraints) { senses.push_back(constraint->get_relation()); }
         return senses;
     }
 
@@ -538,14 +562,12 @@ public:
     }
 
 private:
-    std::vector<int> constraint_row_indices; // Track the row index of each constraint
-
-    std::string             name;
-    std::vector<Variable>   variables;
-    std::vector<Constraint> constraints;    // Store the constraints
-    LinearExpression        objective;      // Store the objective function
-    ObjectiveType           objective_type; // Minimize or Maximize
-    SparseMatrix            sparse_matrix;  // Use SparseMatrix for coefficient storage
+    std::string               name;
+    std::vector<Variable>     variables;
+    std::vector<Constraint *> constraints;    // Store the constraints
+    LinearExpression          objective;      // Store the objective function
+    ObjectiveType             objective_type; // Minimize or Maximize
+    SparseMatrix              sparse_matrix;  // Use SparseMatrix for coefficient storage
 };
 
 class MIPColumn {

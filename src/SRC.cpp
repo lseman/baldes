@@ -171,7 +171,7 @@ std::vector<std::vector<double>> LimitedMemoryRank1Cuts::separate(const SparseMa
                 }
 
                 // If lhs violation found, insert the cut
-                if (lhs > 1.0 + 1e-1) {
+                if (lhs > 1.0 + 1e-3) {
                     // print lhs
                     std::lock_guard<std::mutex> lock(cuts_mutex);
                     insertSet(cuts, i, j, k, buffer_int, buffer_int_n, lhs);
@@ -361,9 +361,10 @@ void LimitedMemoryRank1Cuts::generateCutCoefficients(VRPTW_SRC &cuts, std::vecto
     }
 }
 
-bool LimitedMemoryRank1Cuts::runSeparation(BNBNode *node, std::vector<Constraint> &SRCconstraints) {
+bool LimitedMemoryRank1Cuts::runSeparation(BNBNode *node, std::vector<Constraint *> &SRCconstraints) {
     node->optimize();
-    auto      cuts = &cutStorage;
+    auto      solution = node->extractSolution();
+    auto      cuts     = &cutStorage;
     ModelData matrix;
 
     auto cuts_before = cuts->size();
@@ -373,12 +374,15 @@ bool LimitedMemoryRank1Cuts::runSeparation(BNBNode *node, std::vector<Constraint
     bool cleared        = false;
     auto n_cuts_removed = 0;
     // Iterate over the constraints in reverse order to remove non-violated cuts
+    // sort SRCconstraints by index
+    std::sort(SRCconstraints.begin(), SRCconstraints.end(),
+              [](const Constraint *a, const Constraint *b) { return a->index() < b->index(); });
     for (int i = SRCconstraints.size() - 1; i >= 0; --i) {
-        Constraint constr = SRCconstraints[i];
+        auto constr = SRCconstraints[i];
 
         // Get the slack value of the constraint
         // TODO: fix
-        double slack = 0; // constr.get(GRB_DoubleAttr_Slack);
+        double slack = node->getSlack(constr->index(), solution);
 
         // If the slack is positive, it means the constraint is not violated
         if (slack > 1e-3) {
@@ -395,11 +399,10 @@ bool LimitedMemoryRank1Cuts::runSeparation(BNBNode *node, std::vector<Constraint
     }
 
     if (cleared) {
-        node->update();   // Update the model to reflect the removals
         node->optimize(); // Re-optimize the model
     }
-    matrix        = node->extractModelDataSparse(); // Extract model data
-    auto solution = node->extractSolution();
+    matrix = node->extractModelDataSparse(); // Extract model data
+    solution = node->extractSolution();
 
     separate(matrix.A_sparse, solution);
     prepare45Heuristic(matrix.A_sparse, solution);

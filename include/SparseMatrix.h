@@ -108,6 +108,36 @@ struct SparseMatrix {
     }
 
     /**
+     * @brief Modify or delete an element at a given row and column.
+     *
+     * This function finds the element at the specified row and column. If the value
+     * is non-zero, it modifies the element's value. If the value is zero, the element
+     * is deleted from the matrix.
+     *
+     */
+    void modify_or_delete(int row, int col, double value) {
+        // Find the element in the elements vector
+        auto it = std::find_if(elements.begin(), elements.end(),
+                               [row, col](const SparseElement &el) { return el.row == row && el.col == col; });
+
+        if (it != elements.end()) {
+            if (value != 0.0) {
+                // Modify the element's value
+                it->value = value;
+            } else {
+                // Remove the element if value is zero
+                elements.erase(it);
+            }
+        } else if (value != 0.0) {
+            // If the element does not exist and the value is non-zero, insert a new element
+            insert(row, col, value);
+        }
+
+        // Rebuild the CRS structure to ensure consistency
+        buildRowStart();
+    }
+
+    /**
      * @brief Build the CRS structure by computing row start positions.
      *
      * This function sorts the non-zero elements by row and column and then computes the starting index for

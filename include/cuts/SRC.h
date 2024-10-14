@@ -172,7 +172,7 @@ public:
         the45selectedNodes      = selectHighestCoefficients(x, max_important_nodes);
     }
 
-    bool runSeparation(BNBNode *node, std::vector<Constraint> &SRCconstraints);
+    bool runSeparation(BNBNode *node, std::vector<Constraint*> &SRCconstraints);
 
 private:
     static std::mutex cache_mutex;
@@ -322,7 +322,7 @@ struct CompareCuts {
 template <CutType T>
 void LimitedMemoryRank1Cuts::the45Heuristic(const SparseMatrix &A, const std::vector<double> &x) {
     int    max_number_of_cuts  = 10; // Max number of cuts to generate
-    double violation_threshold = 1e-1;
+    double violation_threshold = 1e-3;
     int    max_generated_cuts  = 20;
 
     auto &selectedNodes = the45selectedNodes;

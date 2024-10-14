@@ -222,12 +222,11 @@ if(HIGHS)
   cpmaddpackage(NAME Highs GITHUB_REPOSITORY ERGO-Code/HiGHS
                 GIT_TAG origin/master
                 OPTIONS
-                "BUILD_SHARED_LIBS OFF"
+                "BUILD_SHARED_LIBS ON"
                 "BUILD_EXAMPLES OFF"
                 "BUILD_CXX_EXAMPLE OFF"
                 "BUILD_CSHARP_EXAMPLE OFF"
                 "BUILD_DOTNET OFF"
-                "USE_DOTNET_STD_21 OFF"
   )
   include_directories(${Highs_SOURCE_DIR}/src)
   endif()
