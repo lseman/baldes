@@ -17,7 +17,7 @@ public:
     // default constructor
     Constraint() : expression(), rhs(0.0), relation('=') {}
 
-    const LinearExpression &get_expression() const { return expression; }
+    LinearExpression &get_expression() { return expression; }
     double                  get_rhs() const { return rhs; }
     char                    get_relation() const { return relation; }
 

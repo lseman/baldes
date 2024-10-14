@@ -50,6 +50,10 @@ public:
         terms[var_name] += coeff;
     }
 
+    void clear_terms() { terms.clear(); }
+    void add_term(const std::string &var_name, double coeff) { terms[var_name] += coeff; }
+    void remove_term(const std::string &var_name) { terms.erase(var_name); }
+    
     // Print the expression (for debugging)
     void print_expression() const {
         for (const auto &[var_name, coeff] : terms) { std::cout << coeff << "*" << var_name << " "; }
@@ -57,13 +61,13 @@ public:
     }
 
     // Overload for <= operator
-    Constraint operator<=(double rhs) const;
+    Constraint* operator<=(double rhs) const;
 
     // Overload for >= operator
-    Constraint operator>=(double rhs) const;
+    Constraint* operator>=(double rhs) const;
 
     // Overload for == operator
-    Constraint operator==(double rhs) const;
+    Constraint* operator==(double rhs) const;
 
 private:
     ankerl::unordered_dense::map<std::string, double> terms; // Map of variable name to coefficient
