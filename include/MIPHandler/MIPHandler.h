@@ -71,6 +71,8 @@ public:
 
         // Convert the LinearExpression to sparse row format and add to the sparse matrix
         int row_index = sparse_matrix.num_rows;
+        constraint_row_indices.push_back(row_index); // Track the new row index
+
         for (const auto &[var_name, coeff] : expression.get_terms()) {
             // Find the variable index corresponding to var_name
             auto var_it = std::find_if(variables.begin(), variables.end(),
@@ -86,14 +88,52 @@ public:
         sparse_matrix.buildRowStart();
     }
 
+    void add_constraint(const Constraint &constraint, const std::string &name) {
+        // Add the constraint to the list of constraints
+        constraints.emplace_back(constraint); // Add the passed constraint
+
+        // Convert the LinearExpression inside the constraint to sparse row format and add it to the sparse matrix
+        int row_index = sparse_matrix.num_rows;
+        constraint_row_indices.push_back(row_index); // Track the new row index
+
+        const LinearExpression &expression = constraint.get_expression();
+
+        for (const auto &[var_name, coeff] : expression.get_terms()) {
+            // Find the variable index corresponding to var_name
+            auto var_it = std::find_if(variables.begin(), variables.end(),
+                                       [&var_name](const Variable &var) { return var.get_name() == var_name; });
+
+            if (var_it != variables.end()) {
+                int col_index = std::distance(variables.begin(), var_it);
+                sparse_matrix.insert(row_index, col_index, coeff);
+            }
+        }
+
+        // Update row start for CRS
+        sparse_matrix.buildRowStart();
+
+    }
+
     // Delete a constraint (row) from the problem
     void delete_constraint(int constraint_index) {
         if (constraint_index >= 0 && constraint_index < constraints.size()) {
-            // Delete the row from the sparse matrix
-            sparse_matrix.delete_row(constraint_index);
+            // Get the row index of the constraint
+            int row_to_delete = constraint_row_indices[constraint_index];
 
-            // Remove the constraint from the constraints list
+            // Delete the row from the sparse matrix
+            sparse_matrix.delete_row(row_to_delete);
+
+            // Remove the constraint from the constraints list and the row index from the tracking vector
             constraints.erase(constraints.begin() + constraint_index);
+            constraint_row_indices.erase(constraint_row_indices.begin() + constraint_index);
+
+            // Update row indices of the remaining constraints
+            for (int i = constraint_index; i < constraint_row_indices.size(); ++i) {
+                constraint_row_indices[i]--; // Decrease each subsequent row index
+            }
+
+            // Rebuild the row structure
+            sparse_matrix.buildRowStart();
         } else {
             throw std::out_of_range("Invalid constraint index");
         }
@@ -108,11 +148,23 @@ public:
             // Get the index of the constraint
             int constraintIndex = std::distance(constraints.begin(), it);
 
-            // Delete the row from the sparse matrix
-            sparse_matrix.delete_row(constraintIndex);
+            // Get the corresponding row index in the sparse matrix
+            int row_to_delete = constraint_row_indices[constraintIndex];
 
-            // Remove the constraint from the constraints list
+            // Delete the row from the sparse matrix
+            sparse_matrix.delete_row(row_to_delete);
+
+            // Remove the constraint from the constraints list and the row index from the tracking vector
             constraints.erase(it);
+            constraint_row_indices.erase(constraint_row_indices.begin() + constraintIndex);
+
+            // Update the row indices for remaining constraints
+            for (int i = constraintIndex; i < constraint_row_indices.size(); ++i) {
+                constraint_row_indices[i]--; // Decrease each subsequent row index
+            }
+
+            // Rebuild the row structure
+            sparse_matrix.buildRowStart();
         } else {
             throw std::invalid_argument("Constraint not found.");
         }
@@ -247,17 +299,6 @@ public:
         }
     }
 
-    Constraint &addConstr(const LinearExpression &lhs, char relation, double rhs, const std::string &name) {
-        Constraint new_constraint(lhs, rhs, relation);
-        constraints.emplace_back(new_constraint);
-        return constraints.back(); // Return a reference to the newly added constraint
-    }
-
-    Constraint &addConstr(const Constraint &constraint, const std::string &name) {
-        constraints.push_back(constraint);
-        return constraints.back(); // Return a reference to the newly added constraint
-    }
-
 #ifdef GUROBI
     // Function to populate a Gurobi model from this MIPProblem instance
     GRBModel toGurobiModel(GRBEnv &env) {
@@ -380,6 +421,8 @@ public:
     }
 
 private:
+    std::vector<int> constraint_row_indices; // Track the row index of each constraint
+
     std::string             name;
     std::vector<Variable>   variables;
     std::vector<Constraint> constraints;    // Store the constraints

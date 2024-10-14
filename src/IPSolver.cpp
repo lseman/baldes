@@ -663,10 +663,15 @@ std::tuple<double, double, std::vector<double>, std::vector<double>> IPSolver::r
     std::vector<double> lambda_vec(lambda.data(), lambda.data() + lambda.size());
     std::vector<double> original_x_vec(original_x.data(), original_x.data() + original_x.size());
 
+    dual_vals = lambda_vec;
+    primal_vals = original_x_vec;
+    objVal = objetivo;
+    
     // return std::make_tuple(x, lambda, s, objetivo);
     return std::make_tuple(objetivo, dual_obj, original_x_vec, lambda_vec);
 }
 
+#ifdef GUROBI
 OptimizationData IPSolver::extractOptimizationComponents(GRBModel &model) {
     OptimizationData data;
     int              numConstrs = model.get(GRB_IntAttr_NumConstrs);
@@ -723,6 +728,7 @@ OptimizationData IPSolver::extractOptimizationComponents(GRBModel &model) {
 
     return data;
 }
+#endif
 
 OptimizationData IPSolver::convertToOptimizationData(const ModelData &modelData) {
     OptimizationData optData;

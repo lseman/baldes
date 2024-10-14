@@ -65,7 +65,9 @@ struct Residuals {
     double          rpn, run, rdn, rgn, rg, rln;
 };
 
+#ifdef GUROBI
 OptimizationData extractOptimizationComponents(GRBModel &model);
+#endif
 OptimizationData convertToOptimizationData(const ModelData &modelData);
 
 #ifdef CHOLMOD
@@ -188,7 +190,7 @@ public:
         CH,
 #endif
         LDLT,
-        CU
+        //CU
     };
 
     // SparseSolver() { solver = new SolverWrapper<CholmodSolver>(); }
@@ -265,6 +267,14 @@ public:
     Eigen::VectorXd v_old;
     Eigen::VectorXd w_old;
 
+    std::vector<double> dual_vals;
+    std::vector<double> primal_vals;
+    double objVal;
+
+    std::vector<double> getDuals() const { return dual_vals; }
+    std::vector<double> getPrimals() const { return primal_vals; }
+    double              getObjective() const { return objVal; }
+
     // create default constructor
     IPSolver() {}
     Eigen::SparseMatrix<double> convertToSparseDiagonal(const Eigen::VectorXd &vec);
@@ -318,8 +328,10 @@ public:
     std::tuple<double, double, std::vector<double>, std::vector<double>> run_optimization(ModelData   &model,
                                                                                           const double tol);
 
+#ifdef GUROBI
     // Method to extract optimization components from a Gurobi model
     OptimizationData extractOptimizationComponents(GRBModel &model);
+#endif
 
     // Method to convert model data to optimization data
     OptimizationData convertToOptimizationData(const ModelData &modelData);

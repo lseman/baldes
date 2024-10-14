@@ -70,7 +70,7 @@ option(FIX_BUCKETS "Enable Fixed Buckets compilation option" ON)
 option(AVX "Enable AVX compilation option" OFF)
 option(IPM "Enable IPM compilation option" OFF)
 option(TR "Enable TR compilation option" OFF)
-option(STAB "Enable STAB compilation option" ON)
+option(STAB "Enable STAB compilation option" OFF)
 option(AUGMENTED "Enable Augmented compilation option" ON)
 option(GET_SUITESPARSE "Enable SuiteSparse compilation option" OFF)
 option(EXACT_RCC "Enable Exact RCC compilation option" OFF)
@@ -82,7 +82,7 @@ option(SCHRODINGER "Enable Schrodinger compilation option" OFF)
 option(CLIQUER "Enable Cliquer compilation option" OFF)
 option(VERBOSE "Enable verbose output" OFF)
 option(JEMALLOC "Enable jemalloc" ON)
-option(GUROBI_HOME "Enable GUROBI" ON)
+option(GUROBI_HOME "Enable GUROBI" OFF)
 
 # Define the size of resources without using cache
 set(R_SIZE

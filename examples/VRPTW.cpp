@@ -227,7 +227,6 @@ int main(int argc, char *argv[]) {
     std::for_each(initialRoutesHGS.begin(), initialRoutesHGS.end(), process_route);
 
     // print size of initialRoutesHGS
-    fmt::print("Initial routes from HGS: {}\n", initialRoutesHGS.size());
     initRMP(&mip, problem, initialRoutesHGS);
 
 #ifdef GUROBI
