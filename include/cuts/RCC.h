@@ -38,6 +38,8 @@ struct RCCut {
     Constraint         *ctr;  // Gurobi constraint object
 };
 
+class BNBNode;
+
 class RCCManager {
 public:
     RCCManager() = default;
@@ -89,38 +91,7 @@ public:
     }
 
     // Compute the dual values for each arc by summing the duals of cuts passing through the arc
-    ArcDuals computeDuals(BNBNode *model, double threshold = 1e-3) {
-        ArcDuals arcDuals;
-        // First pass: Compute dual values and store them
-        for (int i = 0; i < cuts_.size(); ++i) {
-            const auto &cut = cuts_[i];
-
-            // TODO: adjust to new stuff
-            double dualValue = 0; // cut.ctr.get(GRB_DoubleAttr_Pi);
-
-            if (std::abs(dualValue) < 1e-3) { continue; }
-
-            // Sum the dual values for all arcs in this cut
-            for (const auto &arc : cut.arcs) {
-                arcDuals.setOrIncrementDual(arc, dualValue); // Update arc duals
-            }
-        }
-
-        // Second pass: Remove cuts with dual values near zero
-        /*
-        cuts_.erase(std::remove_if(cuts_.begin(), cuts_.end(),
-                                   [&](const RCCut &cut, size_t i = 0) mutable {
-                                       if (std::abs(dualValues[i]) < threshold) {
-                                           model->remove(cut.ctr); // Remove the constraint from the model
-                                           return true;            // Mark this cut for removal
-                                       }
-                                       ++i;
-                                       return false; // Keep this cut
-                                   }),
-                    cuts_.end());
-*/
-        return arcDuals;
-    }
+    ArcDuals computeDuals(BNBNode *model, double threshold = 1e-3);
 
     ArcDuals computeDuals(std::vector<double> dualValues, double threshold = 1e-3) {
         ArcDuals arcDuals;
@@ -150,7 +121,7 @@ public:
                                        return false; // Keep this cut
                                    }),
                     cuts_.end());
-*/
+    */
         return arcDuals;
     }
 

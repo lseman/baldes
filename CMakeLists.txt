@@ -41,9 +41,9 @@ if(NOT CMAKE_BUILD_TYPE)
       "Release"
       CACHE STRING "Choose the type of build." FORCE)
 endif()
-set(CMAKE_CXX_FLAGS_RELEASE "-O3 -march=native -flto")
-set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "-O3 -g -march=native -flto")
-set(CMAKE_CXX_FLAGS_DEBUG "-Og -g -Wall -Wextra")
+set(CMAKE_CXX_FLAGS_RELEASE "-O3 -march=native -flto -Wno-subobject-linkage")
+set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "-O3 -g -march=native -flto -Wno-subobject-linkage")
+set(CMAKE_CXX_FLAGS_DEBUG "-Og -g -Wall -Wextra -Wno-subobject-linkage")
 
 if(APPLE)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -stdlib=libc++")
@@ -65,7 +65,7 @@ option(SORTED_LABELS "Enable Sorted Labels compilation option" OFF)
 option(MCD "Enable MCD compilation option" OFF)
 option(FIX_BUCKETS "Enable Fixed Buckets compilation option" ON)
 option(AVX "Enable AVX compilation option" OFF)
-option(IPM "Enable IPM compilation option" ON)
+option(IPM "Enable IPM compilation option" OFF)
 option(TR "Enable TR compilation option" OFF)
 option(STAB "Enable STAB compilation option" OFF)
 option(AUGMENTED "Enable Augmented compilation option" ON)
@@ -262,6 +262,7 @@ include_directories(${GUROBI_HOME}/include)
 set(SOURCES src/BucketGraph.cpp src/MIPHandler.cpp)
 
 set(CVRPSEP_SOURCES
+    src/RCC.cpp
     third_party/cvrpsep/basegrph.cpp
     third_party/cvrpsep/capsep.cpp
     third_party/cvrpsep/cnstrmgr.cpp

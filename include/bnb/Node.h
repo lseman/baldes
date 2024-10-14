@@ -310,11 +310,11 @@ public:
     double              getObjVal() { return solver->getObjVal(); }
     std::vector<double> getDuals() { return solver->getDuals(); }
     std::vector<double> extractSolution() { return solver->extractSolution(); }
-    void                optimize() {
+    void                optimize(double tol = 1e-8) {
 #ifdef HIGHS
         solver->setModel(mip.toHighsModel());
 #endif
-        solver->optimize();
+        solver->optimize(tol);
     }
     double getVarValue(int i) { return solver->getVarValue(i); }
     auto   getModel() { return &mip; }

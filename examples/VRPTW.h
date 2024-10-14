@@ -395,7 +395,6 @@ public:
      *
      */
     bool RCCsep(BNBNode *model, const std::vector<double> &solution) {
-
         auto &rccManager = model->rccManager;
         // Constraint manager to store cuts
         CnstrMgrPointer cutsCMP = nullptr;
@@ -484,7 +483,6 @@ public:
             auto ctr_name = "RCC_cut_" + std::to_string(rccManager.cut_ctr);
             auto ctr      = cutExpr <= rhsValues[i];
             ctr           = model->addConstr(ctr, ctr_name);
-            // TODO: fix
             rccManager.addCut(arcGroups[i], rhsValues[i], ctr);
         }
 
@@ -734,7 +732,6 @@ public:
 
 #ifndef IPM
 #ifdef GUROBI
-                    // TODO: fix this
                     // auto duals = node->get(GRB_DoubleAttr_Pi, SRCconstraints.data(), SRCconstraints.size());
                     // cutDuals.assign(duals, duals + SRCconstraints.size());
 #else
@@ -788,8 +785,16 @@ public:
 
                 // auto pseudo_bound = stab.compute_pseudo_dual_bound(matrix, nodeDuals, paths);
                 lag_gap = integer_solution - (lp_obj + std::min(0.0, inner_obj));
-
-                node->optimize();
+                auto d  = 50;
+#ifdef HIGHS
+                gap = std::abs(lp_obj - (lp_obj + std::min(0.0, inner_obj))) / std::abs(lp_obj);
+                gap = gap / d;
+                if (std::isnan(gap)) { gap = 1e-2; }
+                if (std::signbit(gap)) { gap = 1e-2; }
+                if (gap > 1e-4) { gap = 1e-4; }
+#endif
+                // fmt::print("Gap: {}\n", gap);
+                node->optimize(gap);
                 lp_obj    = node->getObjVal();
                 nodeDuals = node->getDuals();
 
