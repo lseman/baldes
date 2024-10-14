@@ -663,10 +663,10 @@ std::tuple<double, double, std::vector<double>, std::vector<double>> IPSolver::r
     std::vector<double> lambda_vec(lambda.data(), lambda.data() + lambda.size());
     std::vector<double> original_x_vec(original_x.data(), original_x.data() + original_x.size());
 
-    dual_vals = lambda_vec;
+    dual_vals   = lambda_vec;
     primal_vals = original_x_vec;
-    objVal = objetivo;
-    
+    objVal      = objetivo;
+
     // return std::make_tuple(x, lambda, s, objetivo);
     return std::make_tuple(objetivo, dual_obj, original_x_vec, lambda_vec);
 }

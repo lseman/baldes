@@ -93,7 +93,7 @@ public:
         }
 
         // Update row start for CRS
-        //sparse_matrix.buildRowStart();
+        // sparse_matrix.buildRowStart();
         return new_constraint;
     }
 
@@ -120,7 +120,7 @@ public:
         }
 
         // Delay the CRS structure rebuild if batching is possible
-        //sparse_matrix.buildRowStart();
+        // sparse_matrix.buildRowStart();
 
         // Return reference to the added constraint
         return constraints.back();
@@ -142,7 +142,7 @@ public:
         for (int i = constraint_index; i < constraints.size(); ++i) { constraints[i]->set_index(i); }
 
         // Rebuild the row structure only if needed (if sparse_matrix requires full row structure rebuild)
-        //sparse_matrix.buildRowStart();
+        // sparse_matrix.buildRowStart();
     }
 
     void delete_constraint(Constraint *constraint) { delete_constraint(constraint->index()); }
@@ -215,7 +215,7 @@ public:
         }
 
         // Rebuild the CRS structure once after all updates
-        //sparse_matrix.buildRowStart();
+        // sparse_matrix.buildRowStart();
     }
 
     void chgCoeff(int constraintIndex, int variableIndex, double value) {
@@ -435,10 +435,8 @@ public:
 #endif
 
     double getSlack(int row, const std::vector<double> &solution) {
-        
-        if (sparse_matrix.is_dirty) {
-            sparse_matrix.buildRowStart();
-        }
+
+        if (sparse_matrix.is_dirty) { sparse_matrix.buildRowStart(); }
         auto rhs = constraints[row]->get_rhs();
         // Compute the dot product of the solution vector and the specified row
         double row_value = 0.0;

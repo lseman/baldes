@@ -18,5 +18,5 @@ public:
     // virtual void                update()                = 0;
 
     // Virtual method for setting a model, without a concrete type in the base class
-    virtual void setModel(const std::any& model) = 0;
+    virtual void setModel(const std::any &model) = 0;
 };

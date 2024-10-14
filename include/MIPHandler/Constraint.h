@@ -18,8 +18,8 @@ public:
     Constraint() : expression(), rhs(0.0), relation('=') {}
 
     LinearExpression &get_expression() { return expression; }
-    double                  get_rhs() const { return rhs; }
-    char                    get_relation() const { return relation; }
+    double            get_rhs() const { return rhs; }
+    char              get_relation() const { return relation; }
 
     int index() const { return indice; }
 
