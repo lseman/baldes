@@ -13,6 +13,10 @@
  * Conditional compilation is used to expose additional fields and methods based on defined macros.
  */
 #include "bucket/BucketGraph.h"
+#include "bucket/BucketSolve.h"
+#include "bucket/BucketUtils.h"
+
+#include "Label.h"
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 
@@ -77,13 +81,13 @@ PYBIND11_MODULE(baldes, m) {
     py::class_<BucketGraph>(m, "BucketGraph")
         .def(py::init<>()) // Default constructor
         .def(py::init<const std::vector<VRPNode> &, int, int>(), "nodes"_a, "time_horizon"_a, "bucket_interval"_a)
-        .def("setup", &BucketGraph::setup)                            // Bind the setup method
-        .def("redefine", &BucketGraph::redefine, "bucket_interval"_a) // Bind redefine method
-        .def("solve", &BucketGraph::solve)                            // Bind solve method
-        .def("set_adjacency_list", &BucketGraph::set_adjacency_list)  // Bind adjacency list setup
-        .def("get_nodes", &BucketGraph::getNodes)                     // Get the nodes in the graph
-        .def("print_statistics", &BucketGraph::print_statistics)      // Print stats
-        .def("set_duals", &BucketGraph::setDuals, "duals"_a)          // Set dual values
+        .def("setup", &BucketGraph::setup)                                     // Bind the setup method
+        .def("redefine", &BucketGraph::redefine, "bucket_interval"_a)          // Bind redefine method
+        .def("solve", &BucketGraph::solve, py::return_value_policy::reference) // Bind solve method
+        .def("set_adjacency_list", &BucketGraph::set_adjacency_list)           // Bind adjacency list setup
+        .def("get_nodes", &BucketGraph::getNodes)                              // Get the nodes in the graph
+        .def("print_statistics", &BucketGraph::print_statistics)               // Print stats
+        .def("set_duals", &BucketGraph::setDuals, "duals"_a)                   // Set dual values
         .def("set_distance_matrix", &BucketGraph::set_distance_matrix, "distance_matrix"_a,
              "n_ng"_a = 8)                           // Set distance matrix
         .def("reset_pool", &BucketGraph::reset_pool) // Reset the label pools

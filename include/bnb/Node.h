@@ -123,28 +123,21 @@ public:
         CMGR_CreateCMgr(&oldCutsCMP, 100); // For old cuts, if needed
 #endif
     };
-#elif HIGHS
-    explicit BNBNode(const MIPProblem &eModel) {
-        mip             = eModel;
-        auto highsmodel = mip.toHighsModel();
-        // print matrix.A_sparse.num_rows;
-        solver = new HighsSolver(highsmodel);
-        generateUUID();
-        this->initialized = true;
-#ifdef RCC
-        CMGR_CreateCMgr(&oldCutsCMP, 100); // For old cuts, if needed
-#endif
-    };
-#endif
-
+#else
     explicit BNBNode(const MIPProblem &eModel) {
         mip = eModel;
+
+#ifdef HIGHS
+        auto highsmodel = mip.toHighsModel();
+        solver          = new HighsSolver(highsmodel);
+#endif
         generateUUID();
         this->initialized = true;
 #ifdef RCC
         CMGR_CreateCMgr(&oldCutsCMP, 100); // For old cuts, if needed
 #endif
     };
+#endif
 
     void setPaths(std::vector<Path> paths) { this->paths = paths; }
 
@@ -328,32 +321,8 @@ public:
     auto   getModel() { return &mip; }
     auto   getDualVal(int i) { return solver->getDualVal(i); }
 
-#ifdef GUROBI
     // Update
-    void update() {
-        // delete model; // Delete the old model to free memory
-        GRBEnv &env = GurobiEnvSingleton::getInstance();
-        // Create a new model with the existing environment
-        auto model = new GRBModel(mip.toGurobiModel(env)); // Pass the retrieved or new environment
-
-        solver = new GurobiSolver(model);
-        solver->optimize(); // Optimize the model
-        // set mute
-    }
-#elif defined(HIGHS)
-    void update() {
-        // delete model; // Delete the old model to free memory
-        // solver->optimize(); // Optimize the model
-    }
-#else
-    void update() {
-        // delete model; // Delete the old model to free memory
-        auto matrix = mip.extractModelDataSparse();
-        solver->setModel(matrix);
-        // solver = model;
-        // solver->optimize(); // Optimize the model
-    }
-#endif
+    void update() { mip.update(); }
 
     std::pair<bool, double> solveRestrictedMasterLP() {
         bool feasible = false;
