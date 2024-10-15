@@ -1,6 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(BALDES LANGUAGES C CXX CUDA)
-enable_language(CUDA)
+project(BALDES LANGUAGES C CXX)
 
 # Check if Clang is available
 find_program(CLANG_C_COMPILER clang)
@@ -27,7 +26,6 @@ set(CMAKE_CXX_STANDARD_REQUIRED True)
 # set CMAKE_CUDA_COMPILER to clang++
 
 # set CMAKE_CUDA_ARCHITECTURES=82
-set(CMAKE_CUDA_STANDARD 17)  # or CUDA11 if needed
 
 # Enable Interprocedural Optimization (Link Time Optimization)
 set(CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE ON)
@@ -201,8 +199,6 @@ cpmaddpackage(
   "STDEXEC_BUILD_EXAMPLES OFF"
   "STDEXEC_BUILD_BENCHMARKS OFF"
   "STDEXEC_BUILD_DOCS OFF"
-  "STDEXEC_ENABLE_CUDA ON"
-  "STDEXEC_ENABLE_IO_URING_TESTS OFF"
   "BUILD_TESTING OFF")
 
   
@@ -510,6 +506,5 @@ endif()
 # link nsync
 if (nsync_ADDED)
   target_link_libraries(vrptw PRIVATE nsync)
+  include_directories(${nsync_SOURCE_DIR}/public)
 endif()
-include_directories(${nsync_SOURCE_DIR})
-include_directories(${nsync_SOURCE_DIR}/src)
