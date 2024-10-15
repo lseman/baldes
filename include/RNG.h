@@ -8,13 +8,7 @@ class Xoroshiro128Plus {
     std::uint64_t state1_;
 
     // Rotate left helper function
-    static inline std::uint64_t rotl(const std::uint64_t x, int k) {
-#if defined(__GNUC__) || defined(__clang__)
-        return __builtin_rotateleft64(x, k);
-#else
-        return (x << k) | (x >> (64 - k));
-#endif
-    }
+    static inline std::uint64_t rotl(const std::uint64_t x, int k) { return (x << k) | (x >> (64 - k)); }
 
 public:
     using result_type = std::uint64_t;
