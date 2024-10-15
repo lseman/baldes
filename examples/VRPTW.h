@@ -273,6 +273,7 @@ public:
         if (!lb.empty()) {
             // Pass the data to the MIP problem
             node->addVars(lb.data(), ub.data(), obj.data(), vtypes.data(), names.data(), cols.data(), lb.size());
+            node->update();
         }
 
         return counter;

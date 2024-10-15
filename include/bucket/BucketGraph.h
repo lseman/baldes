@@ -75,7 +75,7 @@ public:
     void          mono_initialization();
     Label        *compute_mono_label(const Label *L);
 
-    BranchingDuals *branching_duals = nullptr;
+    BranchingDuals *branching_duals = new BranchingDuals();
 
 #if defined(RCC) || defined(EXACT_RCC)
     ArcDuals arc_duals;
@@ -331,7 +331,7 @@ public:
 
     double gap = std::numeric_limits<double>::infinity();
 
-    CutStorage          *cut_storage = nullptr;
+    CutStorage          *cut_storage = new CutStorage();
     static constexpr int max_buckets = 10000; // Define maximum number of buckets beforehand
 
     std::array<Bucket, max_buckets> fw_buckets;

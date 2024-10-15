@@ -84,7 +84,6 @@ public:
 
     Constraint *add_constraint(const LinearExpression &expression, double rhs, char relation) {
         int constraint_index = constraints.size(); // Get the current index
-
         // Add the constraint to the list of constraints and set its index
         auto new_constraint = new Constraint(expression, rhs, relation);
         b.push_back(rhs);
@@ -139,6 +138,7 @@ public:
 
     // Delete a constraint (row) from the problem
     void delete_constraint(int constraint_index) {
+        fmt::print("Deleting constraint at index {}\n", constraint_index);
         // Delete the row from the sparse matrix (assumed efficient row deletion)
         sparse_matrix.delete_row(constraint_index);
 
@@ -148,7 +148,7 @@ public:
 
         // Update the indices of the remaining constraints (this step can be costly if many constraints exist)
         for (int i = constraint_index; i < constraints.size(); ++i) { constraints[i]->set_index(i); }
-
+        fmt::print("Constraint deleted successfully.\n");
         // Rebuild the row structure only if needed (if sparse_matrix requires full row structure rebuild)
         // sparse_matrix.buildRowStart();
     }
@@ -426,8 +426,11 @@ public:
         return slacks;
     }
 
+    void update() { sparse_matrix.buildRowStart(); }
+
     double getSlack(int row, const std::vector<double> &solution) {
         // Ensure the sparse matrix row structure is built
+        fmt::print("Getting slack for row {}\n", row);
         if (sparse_matrix.is_dirty) { sparse_matrix.buildRowStart(); }
 
         // Get the right-hand side value for this row
@@ -441,7 +444,7 @@ public:
         while (it.valid()) {
             int    col_index = it.col();   // Get column index
             double value     = it.value(); // Get matrix value
-
+            fmt::print("Column index: {}, Value: {}\n", col_index, value);
             // Prefetch the next matrix value and column index for better cache locality
             // it.prefetch();
 
@@ -453,6 +456,7 @@ public:
         }
 
         // Compute the slack as: slack = rhs - row_value
+        fmt::print("Row value: {}\n", row_value);
         return rhs - row_value;
     }
 

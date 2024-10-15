@@ -42,13 +42,13 @@ struct SparseElement {
  * and convert the matrix to a dense representation.
  */
 struct SparseMatrix {
-    gch::small_vector<int>    rows;      ///< Row indices of the matrix elements
-    gch::small_vector<int>    cols;      ///< Column indices of the matrix elements
-    gch::small_vector<double> values;    ///< Values of the matrix elements
-    gch::small_vector<int>    row_start; ///< Starting index of each row in `elements`
-    int                       num_rows;  ///< Total number of rows in the matrix
-    int                       num_cols;  ///< Total number of columns in the matrix
-    bool                      is_dirty = true;
+    std::vector<int>    rows;      ///< Row indices of the matrix elements
+    std::vector<int>    cols;      ///< Column indices of the matrix elements
+    std::vector<double> values;    ///< Values of the matrix elements
+    std::vector<int>    row_start; ///< Starting index of each row in `elements`
+    int                 num_rows;  ///< Total number of rows in the matrix
+    int                 num_cols;  ///< Total number of columns in the matrix
+    bool                is_dirty = true;
 
     // Default constructor
     SparseMatrix() : num_rows(0), num_cols(0) {}
@@ -106,6 +106,9 @@ struct SparseMatrix {
 
     // Delete a row (constraint) from the matrix
     void delete_row(int row_to_delete) {
+
+        if (is_dirty) { buildRowStart(); }
+
         size_t write_index = 0;
         for (size_t i = 0; i < rows.size(); ++i) {
             if (rows[i] != row_to_delete) {
@@ -168,9 +171,9 @@ struct SparseMatrix {
         pdqsort(indices.begin(), indices.end(),
                 [&](size_t a, size_t b) { return std::tie(rows[a], cols[a]) < std::tie(rows[b], cols[b]); });
 
-        gch::small_vector<int>    sorted_rows(rows.size());
-        gch::small_vector<int>    sorted_cols(cols.size());
-        gch::small_vector<double> sorted_values(values.size());
+        std::vector<int>    sorted_rows(rows.size());
+        std::vector<int>    sorted_cols(cols.size());
+        std::vector<double> sorted_values(values.size());
 
         for (size_t i = 0; i < indices.size(); ++i) {
             sorted_rows[i]   = rows[indices[i]];

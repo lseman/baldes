@@ -42,7 +42,7 @@ include_directories(third_party/hgs_vrptw)
 # Build types and flags
 if(NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE
-      "Release"
+      "Debug"
       CACHE STRING "Choose the type of build." FORCE)
 endif()
 set(CMAKE_CXX_FLAGS_RELEASE "-O3 -march=native -flto")
@@ -234,9 +234,7 @@ if(NOT FMT_FOUND)
   cpmaddpackage(NAME fmt GITHUB_REPOSITORY fmtlib/fmt GIT_TAG 11.0.2)
 endif()
 
-if(WITH_PYTHON)
-  cpmaddpackage(NAME pybind11 GITHUB_REPOSITORY pybind/pybind11 GIT_TAG v2.13.6)
-endif()
+
 
 if(IPM)
   cpmaddpackage(
@@ -269,7 +267,8 @@ if(HIGHS)
     "BUILD_CSHARP_EXAMPLE OFF"
     "BUILD_TESTING OFF"
     "USE_DOTNET_STD_21 OFF")
-  include_directories(${Highs_SOURCE_DIR}/src)
+  include_directories(${Highs_SOURCE_DIR}/src
+                      ${Highs_INCLUDE_DIR})
 
   # Path to your patch file
   set(PATCH_FILE "${CMAKE_CURRENT_LIST_DIR}/highs.patch")
@@ -285,11 +284,9 @@ if(HIGHS)
 
 endif()
 
-message(STATUS "Available targets after CPM fetch:")
-get_property(_targets DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY BUILDSYSTEM_TARGETS)
-foreach(_target ${_targets})
-    message(STATUS "Target: ${_target}")
-endforeach()
+if(WITH_PYTHON)
+  cpmaddpackage(NAME pybind11 GITHUB_REPOSITORY pybind/pybind11 GIT_TAG v2.13.6)
+endif()
 
 set(GUROBI_HOME $ENV{GUROBI_HOME})
 include_directories(${GUROBI_HOME}/include)
@@ -397,28 +394,34 @@ if(JEMALLOC)
   endif()
 endif()
 
+if(HIGHS)
+  target_link_libraries(vrptw PRIVATE highs::highs)
+endif()
+
+find_package(xxhash REQUIRED)
+
+
 if(WITH_PYTHON)
-  pybind11_add_module(baldes src/BucketBindings.cpp ${EXECUTABLE_SOURCES})
+  pybind11_add_module(baldes src/BucketBindings.cpp src/BucketGraph.cpp ${EXECUTABLE_SOURCES})
   target_link_libraries(baldes PRIVATE pybind11::module)
   target_link_libraries(baldes PRIVATE fmt::fmt)
   target_link_libraries(baldes PRIVATE STDEXEC::stdexec)
+  target_link_libraries(baldes PRIVATE xxhash)
+  target_link_libraries(baldes PRIVATE unordered_dense)
+  target_include_directories(baldes PRIVATE nsync)
   set_target_properties(baldes PROPERTIES POSITION_INDEPENDENT_CODE ON)
   target_compile_options(baldes PRIVATE -Wno-c++26-extensions
                                         -Wno-deprecated-declarations)
+
+  if(HIGHS)
+    target_link_libraries(baldes PRIVATE highs::highs)
+  endif()
 endif()
-
-# Manually create a target if xxhash::xxhash is not defined by the library
-
-# Specify where the headers and the library are located (adjust paths if needed)
 
 target_compile_options(vrptw PRIVATE -Wno-c++26-extensions
                                      -Wno-deprecated-declarations)
 
-                                     find_package(xxhash REQUIRED)
-
-                                     target_link_libraries(vrptw PRIVATE xxhash)
-                                     
-# link with unordered_dense
+target_link_libraries(vrptw PRIVATE xxhash)
 target_link_libraries(vrptw PRIVATE unordered_dense)
 
 if(CLIQUER)
@@ -492,9 +495,6 @@ if(MTW)
   target_include_directories(vrpmtw PRIVATE ${eigen_SOURCE_DIR})
 endif()
 
-if(HIGHS)
-  target_link_libraries(vrptw PRIVATE highs::highs)
-endif()
 
 find_program(CCACHE_PROGRAM ccache)
 if(CCACHE_PROGRAM)
