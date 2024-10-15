@@ -5,8 +5,6 @@ project(BALDES LANGUAGES C CXX)
 find_program(CLANG_C_COMPILER clang)
 find_program(CLANG_CXX_COMPILER clang++)
 
-
-
 if(CLANG_C_COMPILER AND CLANG_CXX_COMPILER)
   # Set Clang as the default compiler
   set(CMAKE_C_COMPILER
@@ -23,14 +21,11 @@ endif()
 # C++ standard
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
-# set CMAKE_CUDA_COMPILER to clang++
-
-# set CMAKE_CUDA_ARCHITECTURES=82
 
 # Enable Interprocedural Optimization (Link Time Optimization)
 set(CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE ON)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
-#set(CMAKE_EXPERIMENTAL_CXX_MODULE_CMAKE_API_BOTH TRUE)
+set(CMAKE_EXPERIMENTAL_CXX_MODULE_CMAKE_API_BOTH TRUE)
 
 # Include directories
 include_directories(include)

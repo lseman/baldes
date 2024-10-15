@@ -28,8 +28,8 @@
 struct Bucket {
     // std::vector<Label *> labels_vec;
     // std::vector<Label *, PoolAllocator<Label *>> labels_vec;
-    // std::pmr::unsynchronized_pool_resource pool;
-    std::vector<Label *> labels_vec; // Declare the vector here
+    std::pmr::unsynchronized_pool_resource pool;
+    std::pmr::vector<Label *>              labels_vec; // Declare the vector here
 
     int                    node_id = -1;
     std::vector<double>    lb;
@@ -164,7 +164,7 @@ struct Bucket {
     }
 
     Bucket(int node_id, std::vector<double> lb, std::vector<double> ub)
-        : node_id(node_id), lb(std::move(lb)), ub(std::move(ub)) {
+        : node_id(node_id), lb(std::move(lb)), ub(std::move(ub)), labels_vec(&pool) {
 
         labels_vec.reserve(250);
     }
@@ -244,7 +244,6 @@ struct Bucket {
         return labels_vec;
     }
 
-    /*
     inline auto get_unextended_labels() {
         // Define the lambda once to ensure consistency between both branches
         auto filter_lambda = [](Label *label) { return !label->is_extended; };
@@ -258,7 +257,6 @@ struct Bucket {
             return empty_vec | std::views::filter(filter_lambda); // Same lambda applied to the empty case
         }
     }
-    */
     void clear() { labels_vec.clear(); }
 
     void reset() { labels_vec.clear(); }
