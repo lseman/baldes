@@ -1,3 +1,13 @@
+/*
+ * @file MIPHandler.h
+ * @brief MIP Problem class implementation
+ *
+ * This file contains the implementation of the MIPProblem class.
+ * The MIPProblem class represents a Mixed-Integer Programming (MIP) problem
+ * and provides methods to add variables, constraints, and objective functions.
+ *
+ */
+
 #pragma once
 #include "Definitions.h"
 #include "SparseMatrix.h" // Include your SparseMatrix class
@@ -123,19 +133,12 @@ public:
             sparse_matrix.insert(row_index, col_index, coeff);
         }
 
-        // Delay the CRS structure rebuild if batching is possible
-        // sparse_matrix.buildRowStart();
-
         // Return reference to the added constraint
         return constraints.back();
     }
 
     // Delete a constraint (row) from the problem
     void delete_constraint(int constraint_index) {
-        if (constraint_index < 0 || constraint_index >= constraints.size()) {
-            throw std::out_of_range("Invalid constraint index");
-        }
-
         // Delete the row from the sparse matrix (assumed efficient row deletion)
         sparse_matrix.delete_row(constraint_index);
 
@@ -170,9 +173,6 @@ public:
             throw std::invalid_argument("Variable not found.");
         }
     }
-
-    // Multiply the sparse matrix by a vector
-    std::vector<double> multiply_with_vector(const std::vector<double> &x) const { return sparse_matrix.multiply(x); }
 
     // Print sparse matrix as dense (for debugging)
     void print_dense_matrix() const {
@@ -330,7 +330,7 @@ public:
     }
 
     // Helper function to convert MIP constraints into a Gurobi linear expression
-    GRBLinExpr convertToGurobiExpr(const Constraint                                        &constraint,
+    GRBLinExpr convertToGurobiExpr(const Constraint                                        *constraint,
                                    const ankerl::unordered_dense::map<std::string, GRBVar> &gurobiVars) {
         GRBLinExpr expr;
         for (const auto &term : constraint->get_terms()) {
@@ -418,9 +418,19 @@ public:
 
 #endif
 
-    double getSlack(int row, const std::vector<double> &solution) {
+    std::vector<double> computeSlacks(const std::vector<double> &solution) {
+        std::vector<double> slacks;
+        slacks.reserve(constraints.size()); // Reserve space upfront
+        // print solution size and b size
+        slacks = sparse_matrix.violation(solution, b);
+        return slacks;
+    }
 
+    double getSlack(int row, const std::vector<double> &solution) {
+        // Ensure the sparse matrix row structure is built
         if (sparse_matrix.is_dirty) { sparse_matrix.buildRowStart(); }
+
+        // Get the right-hand side value for this row
         auto rhs = constraints[row]->get_rhs();
 
         // Compute the dot product of the solution vector and the specified row
@@ -429,15 +439,21 @@ public:
 
         // Pre-fetch the values and reduce function calls
         while (it.valid()) {
-            int    col_index = it.col();
-            double value     = it.value();
+            int    col_index = it.col();   // Get column index
+            double value     = it.value(); // Get matrix value
+
+            // Prefetch the next matrix value and column index for better cache locality
+            // it.prefetch();
+
+            // Perform the dot product in a single step
             row_value += value * solution[col_index];
+
+            // Move to the next element
             it.next();
         }
 
         // Compute the slack as: slack = rhs - row_value
-        double slack = rhs - row_value;
-        return slack;
+        return rhs - row_value;
     }
 
     std::vector<double> get_lbs() const {

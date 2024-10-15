@@ -1,3 +1,12 @@
+/*
+ * @file Variable.h
+ * @brief Variable class implementation
+ *
+ * This file contains the implementation of the Variable class.
+ * The Variable class represents a decision variable in a mathematical optimization problem.
+ * It encapsulates the name, type, bounds, and objective coefficient of a decision variable.
+ *
+ */
 #pragma once
 #include <string>
 

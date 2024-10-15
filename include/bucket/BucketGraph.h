@@ -882,6 +882,7 @@ public:
 
     bool updateStepSize() {
         bool updated = false;
+        if (bucket_interval > 100) { return false; }
         // compute the mean of dominance_checks_per_bucket
         double mean_dominance_checks = 0.0;
         for (size_t i = 0; i < dominance_checks_per_bucket.size(); ++i) {

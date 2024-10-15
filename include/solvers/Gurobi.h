@@ -9,6 +9,10 @@ private:
     GurobiEnvSingleton() {
         try {
             env.set(GRB_IntParam_OutputFlag, 0); // Set default parameters, if needed
+            // set method
+            env.set(GRB_IntParam_Method, 3);
+            // set ConcurrentMethod
+            env.set(GRB_IntParam_ConcurrentMIP, 3);
         } catch (GRBException &e) {
             std::cerr << "Error code = " << e.getErrorCode() << std::endl;
             std::cerr << e.getMessage() << std::endl;
@@ -39,7 +43,18 @@ public:
     GurobiSolver(GRBModel &model) : model(&model) { numConstrs = model.get(GRB_IntAttr_NumConstrs); }
 
     GurobiSolver(GRBModel *model, bool mute) : model(model) {}
-    void setModel(GRBModel *model) { this->model = model; }
+
+    void setModel(const std::any &modelData) override { // Type check and assign
+        // print the type of modelData
+        // fmt::print("ModelData type: {}\n", modelData.type().name());
+        if (modelData.type() == typeid(GRBModel *)) {
+            // print modelData.type().name();
+            auto grbmodel = std::any_cast<GRBModel *>(modelData);
+            model         = grbmodel;
+        } else {
+            throw std::invalid_argument("Invalid model type for Gurobi");
+        }
+    }
 
     int getStatus() const override { return model->get(GRB_IntAttr_Status); }
 
@@ -49,7 +64,7 @@ public:
 
     double getDualVal(int i) const override { return model->getConstr(i).get(GRB_DoubleAttr_Pi); }
 
-    void                optimize() override { model->optimize(); }
+    void                optimize(double tol = 1e-6) override { model->optimize(); }
     std::vector<double> getDuals() const override {
         int                    numConstrs = model->get(GRB_IntAttr_NumConstrs);
         std::vector<GRBConstr> constraints;

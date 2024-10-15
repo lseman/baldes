@@ -15,7 +15,7 @@ public:
 
     int getStatus() const override { return 2; }
 
-    void setModel(const std::any& modelData) override {
+    void setModel(const std::any &modelData) override {
         // Type check and assign
         if (modelData.type() == typeid(ModelData)) {
             matrices = std::any_cast<ModelData>(modelData);
@@ -24,14 +24,13 @@ public:
         }
     }
 
-
     double getObjVal() const override { return ipm.getObjective(); }
 
     double getVarValue(int i) const override { return ipm.getPrimals()[i]; }
 
     double getDualVal(int i) const override { return ipm.getDuals()[i]; }
 
-    void optimize() override { ipm.run_optimization(matrices, 1e-10); }
+    void optimize(double tol = 1e-6) override { ipm.run_optimization(matrices, tol); }
 
     std::vector<double> getDuals() const override { return ipm.getDuals(); }
 

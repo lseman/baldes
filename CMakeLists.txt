@@ -1,9 +1,12 @@
-cmake_minimum_required(VERSION 3.10)
-project(BALDES LANGUAGES CXX)
+cmake_minimum_required(VERSION 3.16)
+project(BALDES LANGUAGES C CXX CUDA)
+enable_language(CUDA)
 
 # Check if Clang is available
 find_program(CLANG_C_COMPILER clang)
 find_program(CLANG_CXX_COMPILER clang++)
+
+
 
 if(CLANG_C_COMPILER AND CLANG_CXX_COMPILER)
   # Set Clang as the default compiler
@@ -21,12 +24,15 @@ endif()
 # C++ standard
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
-# set(CMAKE_CUDA_STANDARD 20)  # or CUDA11 if needed
+# set CMAKE_CUDA_COMPILER to clang++
+
+# set CMAKE_CUDA_ARCHITECTURES=82
+set(CMAKE_CUDA_STANDARD 17)  # or CUDA11 if needed
 
 # Enable Interprocedural Optimization (Link Time Optimization)
 set(CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE ON)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
-set(CMAKE_EXPERIMENTAL_CXX_MODULE_CMAKE_API_BOTH TRUE)
+#set(CMAKE_EXPERIMENTAL_CXX_MODULE_CMAKE_API_BOTH TRUE)
 
 # Include directories
 include_directories(include)
@@ -41,9 +47,9 @@ if(NOT CMAKE_BUILD_TYPE)
       "Release"
       CACHE STRING "Choose the type of build." FORCE)
 endif()
-set(CMAKE_CXX_FLAGS_RELEASE "-O3 -march=native -flto -Wno-subobject-linkage")
-set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "-O3 -g -march=native -flto -Wno-subobject-linkage")
-set(CMAKE_CXX_FLAGS_DEBUG "-Og -g -Wall -Wextra -Wno-subobject-linkage")
+set(CMAKE_CXX_FLAGS_RELEASE "-O3 -march=native -flto")
+set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "-O3 -g -march=native -flto")
+set(CMAKE_CXX_FLAGS_DEBUG "-Og -g -Wall -Wextra")
 
 if(APPLE)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -stdlib=libc++")
@@ -67,7 +73,6 @@ option(FIX_BUCKETS "Enable Fixed Buckets compilation option" ON)
 option(AVX "Enable AVX compilation option" OFF)
 option(IPM "Enable IPM compilation option" OFF)
 option(TR "Enable TR compilation option" OFF)
-option(STAB "Enable STAB compilation option" OFF)
 option(AUGMENTED "Enable Augmented compilation option" ON)
 option(GET_SUITESPARSE "Enable SuiteSparse compilation option" OFF)
 option(EXACT_RCC "Enable Exact RCC compilation option" OFF)
@@ -80,7 +85,7 @@ option(CLIQUER "Enable Cliquer compilation option" OFF)
 option(VERBOSE "Enable verbose output" OFF)
 option(JEMALLOC "Enable jemalloc" ON)
 option(GUROBI "Enable GUROBI" OFF)
-option(HIGHS "Enable HIGHS" ON)
+option(HIGHS "Enable HIGHS" OFF)
 
 # Define the size of resources without using cache
 set(R_SIZE
@@ -134,6 +139,16 @@ set(OR_RESOURCES
     "1"
     CACHE STRING "List of resources that are OR resources")
 
+    # if IPM is disabled, force STAB to be enabled
+if(NOT IPM)
+message(STATUS "IPM is disabled, enabling STAB")
+set(STAB ON)
+else()
+message(STATUS "IPM is enabled, disabling STAB")
+set(STAB OFF)
+endif()
+
+
 # Configure the config.h file
 configure_file(
   ${CMAKE_CURRENT_SOURCE_DIR}/config.h.in # Input file (config.h.in)
@@ -173,6 +188,7 @@ if(NOT COMMAND CPMAddPackage)
   include(${cpm_SOURCE_DIR}/cmake/CPM.cmake)
 endif()
 
+
 cpmaddpackage(
   NAME
   stdexec
@@ -185,15 +201,32 @@ cpmaddpackage(
   "STDEXEC_BUILD_EXAMPLES OFF"
   "STDEXEC_BUILD_BENCHMARKS OFF"
   "STDEXEC_BUILD_DOCS OFF"
+  "STDEXEC_ENABLE_CUDA ON"
+  "STDEXEC_ENABLE_IO_URING_TESTS OFF"
   "BUILD_TESTING OFF")
 
-cpmaddpackage(NAME xxhash GIT_REPOSITORY https://github.com/Cyan4973/xxHash.git
-              GIT_TAG origin/dev)
+  
+cpmaddpackage(NAME xxhash GITHUB_REPOSITORY Cyan4973/xxHash
+              GIT_TAG origin/dev
+              SOURCE_SUBDIRECTORY cmake_unofficial  # Specify the folder with CMake configuration
+              )
+include_directories(${xxhash_SOURCE_DIR})
+# After fetching via CPM, manually add the cmake_unofficial folder
+add_subdirectory(${xxhash_SOURCE_DIR}/cmake_unofficial)
+
 
 # add https://github.com/martinus/unordered_dense
 cpmaddpackage(
   NAME ankerl_unordered_dense GITHUB_REPOSITORY martinus/unordered_dense
   GIT_TAG origin/main # or a specific version/tag
+)
+
+# add https://github.com/google/nsync.git
+cpmaddpackage(
+  NAME nsync GITHUB_REPOSITORY google/nsync
+  GIT_TAG origin/master # or a specific version/tag
+  OPTIONS
+  "NSYNC_ENABLE_TESTS OFF"
 )
 
 # include ankerl
@@ -238,7 +271,8 @@ if(HIGHS)
     "BUILD_EXAMPLES OFF"
     "BUILD_CXX_EXAMPLE OFF"
     "BUILD_CSHARP_EXAMPLE OFF"
-    "BUILD_DOTNET OFF")
+    "BUILD_TESTING OFF"
+    "USE_DOTNET_STD_21 OFF")
   include_directories(${Highs_SOURCE_DIR}/src)
 
   # Path to your patch file
@@ -254,6 +288,12 @@ if(HIGHS)
     ERROR_VARIABLE PATCH_ERROR)
 
 endif()
+
+message(STATUS "Available targets after CPM fetch:")
+get_property(_targets DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY BUILDSYSTEM_TARGETS)
+foreach(_target ${_targets})
+    message(STATUS "Target: ${_target}")
+endforeach()
 
 set(GUROBI_HOME $ENV{GUROBI_HOME})
 include_directories(${GUROBI_HOME}/include)
@@ -371,11 +411,17 @@ if(WITH_PYTHON)
                                         -Wno-deprecated-declarations)
 endif()
 
+# Manually create a target if xxhash::xxhash is not defined by the library
+
+# Specify where the headers and the library are located (adjust paths if needed)
+
 target_compile_options(vrptw PRIVATE -Wno-c++26-extensions
                                      -Wno-deprecated-declarations)
 
-# link with xxhash
-target_link_libraries(vrptw PRIVATE xxhash)
+                                     find_package(xxhash REQUIRED)
+
+                                     target_link_libraries(vrptw PRIVATE xxhash)
+                                     
 # link with unordered_dense
 target_link_libraries(vrptw PRIVATE unordered_dense)
 
@@ -460,3 +506,10 @@ if(CCACHE_PROGRAM)
   set_property(GLOBAL PROPERTY RULE_LAUNCH_COMPILE "${CCACHE_PROGRAM}")
   set_property(GLOBAL PROPERTY RULE_LAUNCH_LINK "${CCACHE_PROGRAM}")
 endif()
+
+# link nsync
+if (nsync_ADDED)
+  target_link_libraries(vrptw PRIVATE nsync)
+endif()
+include_directories(${nsync_SOURCE_DIR})
+include_directories(${nsync_SOURCE_DIR}/src)
