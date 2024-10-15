@@ -1,3 +1,12 @@
+/*
+ * @file Constraint.h
+ * @brief Constraint class implementation
+ *
+ * This file contains the implementation of the Constraint class.
+ * The Constraint class represents a linear constraint in a mathematical optimization problem.
+ * It encapsulates a linear expression, a right-hand side value, and a relational operator to define a constraint.
+ *
+ */
 #pragma once
 #include "LinExp.h"
 #include "ankerl/unordered_dense.h"

@@ -24,6 +24,8 @@
 #include "ankerl/unordered_dense.h"
 #include "bucket/BucketGraph.h"
 
+#include "../third_party/concurrentqueue.h"
+#include <bitset> // If N_SIZE is large, switch back to unordered_dense_set or std::unordered_set
 #include <queue>
 #include <random>
 
@@ -34,8 +36,17 @@
 // #include "xxhash.h"
 
 #include "RNG.h"
+// include nsync
+extern "C" {
+#include "nsync_mu.h"
+}
 
 #define VRPTW_SRC_max_S_n 10000
+
+struct CachedCut {
+    Cut    cut;
+    double violation;
+};
 
 class BNBNode;
 
@@ -71,6 +82,9 @@ struct SparseMatrix;
  */
 class LimitedMemoryRank1Cuts {
 public:
+    std::vector<CachedCut> cutCache4;
+    std::vector<CachedCut> cutCache5;
+
     LimitedMemoryRank1Cuts(std::vector<VRPNode> &nodes);
 
     // default constructor
@@ -100,44 +114,10 @@ public:
      * checking their presence in the bitwise arrays C and AM, and updating the coefficient based on
      * the values in the vector p and the order vector.
      *
-     * @param C A constant reference to an array of uint64_t representing the bitwise array C.
-     * @param AM A constant reference to an array of uint64_t representing the bitwise array AM.
-     * @param p A constant reference to a vector of doubles representing the values associated with each position.
-     * @param P A constant reference to a vector of integers representing the positions to be checked.
-     * @param order A reference to a vector of integers representing the order of positions in C.
-     * @return A double representing the computed limited memory coefficient.
      */
     double computeLimitedMemoryCoefficient(const std::array<uint64_t, num_words> &C,
                                            const std::array<uint64_t, num_words> &AM, const std::vector<double> &p,
-                                           const std::vector<int> &P, std::vector<int> &order) {
-        double alpha = 0;
-        double S     = 0;
-
-        for (size_t j = 1; j < P.size() - 1; ++j) {
-            int vj = P[j];
-
-            // Precompute bitshift values for reuse
-            uint64_t am_mask  = (1ULL << (vj & 63));
-            uint64_t am_index = vj >> 6;
-
-            // Check if vj is in AM using precomputed values
-            if (!(AM[am_index] & am_mask)) {
-                S = 0; // Reset S if vj is not in AM
-            } else if (C[am_index] & am_mask) {
-                // Get the position of vj in C by counting the set bits up to vj
-                int pos = order[vj];
-
-                S += p[pos];
-
-                if (S >= 1) {
-                    S -= 1;
-                    alpha += 1;
-                }
-            }
-        }
-
-        return alpha;
-    }
+                                           const std::vector<int> &P, std::vector<int> &order);
 
     /**
      * @brief Selects the indices of the highest coefficients from a given vector.
@@ -148,31 +128,28 @@ public:
      * specified maximum number of nodes.
      *
      */
-    inline std::vector<int> selectHighestCoefficients(const std::vector<double> &x, int maxNodes) {
-        std::vector<std::pair<int, double>> nodeCoefficients;
-        for (int i = 0; i < x.size(); ++i) {
-            if (x[i] > 1e-1) { nodeCoefficients.push_back({i, x[i]}); }
-        }
-
-        // Sort nodes by coefficient in descending order
-        std::sort(nodeCoefficients.begin(), nodeCoefficients.end(),
-                  [](const auto &a, const auto &b) { return a.second > b.second; });
-
-        std::vector<int> selectedNodes;
-        for (int i = 0; i < std::min(maxNodes, (int)nodeCoefficients.size()); ++i) {
-            selectedNodes.push_back(nodeCoefficients[i].first);
-        }
-
-        return selectedNodes;
-    }
+    std::vector<int> selectHighestCoefficients(const std::vector<double> &x, int maxNodes);
 
     std::vector<int> the45selectedNodes;
     void             prepare45Heuristic(const SparseMatrix &A, const std::vector<double> &x) {
-        int max_important_nodes = 5;
+        int max_important_nodes = 10;
         the45selectedNodes      = selectHighestCoefficients(x, max_important_nodes);
     }
 
     bool runSeparation(BNBNode *node, std::vector<Constraint *> &SRCconstraints);
+
+    using ViolatedCut = std::pair<double, Cut>;
+    // Custom comparator to compare only the first element (the violation)
+    struct CompareCuts {
+        bool operator()(const ViolatedCut &a, const ViolatedCut &b) const {
+            return a.first > b.first; // Min-heap: smallest violation comes first
+        }
+    };
+    using CutPriorityQueue = std::priority_queue<ViolatedCut, std::vector<ViolatedCut>, CompareCuts>;
+
+    void processCachedCuts(const SparseMatrix &A, const std::vector<double> &x, CutPriorityQueue &cutQueue,
+                           double violation_threshold, std::mutex &cuts_mutex, nsync::nsync_mu &mu,
+                           int max_number_of_cuts, std::vector<CachedCut> &cutCache);
 
 private:
     static std::mutex cache_mutex;
@@ -230,9 +207,6 @@ inline std::vector<std::vector<double>> getPermutationsForSize4() {
  * input vector `elements` and stores them in the `result` vector.
  *
  */
-#include <algorithm>
-#include <random>
-
 template <typename T>
 inline void combinations(const std::vector<T> &elements, int k, int max_combinations,
                          std::vector<std::vector<T>> &result) {
@@ -302,14 +276,6 @@ inline uint64_t hashVector(const std::vector<double> &vec) {
 
     return hash;
 }
-using ViolatedCut = std::pair<double, Cut>;
-
-// Custom comparator to compare only the first element (the violation)
-struct CompareCuts {
-    bool operator()(const ViolatedCut &a, const ViolatedCut &b) const {
-        return a.first < b.first; // Min-heap: smallest violation comes first
-    }
-};
 
 /**
  * @brief Implements the 45 Heuristic for generating limited memory rank-1 cuts.
@@ -321,7 +287,7 @@ struct CompareCuts {
  */
 template <CutType T>
 void LimitedMemoryRank1Cuts::the45Heuristic(const SparseMatrix &A, const std::vector<double> &x) {
-    int    max_number_of_cuts  = 5; // Max number of cuts to generate
+    int    max_number_of_cuts  = 10; // Max number of cuts to generate
     double violation_threshold = 1e-3;
     int    max_generated_cuts  = 20;
 
@@ -357,45 +323,65 @@ void LimitedMemoryRank1Cuts::the45Heuristic(const SparseMatrix &A, const std::ve
     exec::static_thread_pool pool(std::thread::hardware_concurrency());
     auto                     sched = pool.get_scheduler();
 
-    auto input_sender = stdexec::just();
-
-    using CutPriorityQueue = std::priority_queue<ViolatedCut, std::vector<ViolatedCut>, CompareCuts>;
-
+    auto             input_sender = stdexec::just();
+    nsync::nsync_mu  mu           = NSYNC_MU_INIT;
     CutPriorityQueue cutQueue;
+    auto            &cutCache = (T == CutType::FourRow) ? cutCache4 : cutCache5;
 
-    // Define the bulk operation to process sets of customers
+    // Process cached cuts
+    // processCachedCuts(A, x, cutQueue, violation_threshold, cuts_mutex, mu, max_number_of_cuts, cutCache);
+
+    std::vector<double>                            coefficients_aux(x.size(), 0.0);
+    std::vector<std::tuple<int, std::vector<int>>> task_data; // To hold task_id and setsOf45 for each task
+
+    const int chunk_size = 10; // Adjust chunk size based on performance experiments
+
+    // Emplace tasks and prepare setsOf45 for each task
+    for (auto task_id : tasks) {
+        auto &consumer = allPaths[selectedNodes[task_id]].route;
+
+        if constexpr (T == CutType::FourRow) {
+            if (consumer.size() < 4) { continue; } // Skip if not enough elements for CutType::FourRow
+        } else if constexpr (T == CutType::FiveRow) {
+            if (consumer.size() < 5) { continue; } // Skip if not enough elements for CutType::FiveRow
+        }
+
+        std::vector<std::vector<int>> setsOf45;
+
+        if constexpr (T == CutType::FourRow) {
+            combinations(consumer, 4, 10, setsOf45);
+        } else if constexpr (T == CutType::FiveRow) {
+            combinations(consumer, 5, 10, setsOf45);
+        }
+
+        for (auto set45 : setsOf45) {
+            // Emplace the task id and its setsOf45 into the task_data vector
+            task_data.emplace_back(task_id, set45);
+        }
+    }
+
+    // Parallel processing for setsOf45
     auto bulk_sender = stdexec::bulk(
-        input_sender, tasks.size(),
-        [this, &permutations, &processedSetsCache, &processedPermutationsCache, &cuts_mutex, &cuts_count, &x,
-         &selectedNodes, &cutQueue, &max_number_of_cuts, &max_generated_cuts, violation_threshold,
-         &rng](std::size_t task_idx) {
-            std::vector<double> coefficients_aux(x.size(), 0.0);
+        stdexec::just(), (task_data.size() + chunk_size - 1) / chunk_size, // Calculate number of chunks
+        [this, &permutations, &processedSetsCache, &processedPermutationsCache, &cuts_mutex, &x, &selectedNodes,
+         &cutQueue, &max_number_of_cuts, &max_generated_cuts, violation_threshold, &mu, &task_data,
+         &cuts_count](std::size_t chunk_idx) {
+            // Calculate the start and end index for this chunk
+            size_t           start_idx = chunk_idx * chunk_size;
+            size_t           end_idx   = std::min(start_idx + chunk_size, task_data.size());
+            Xoroshiro128Plus rng; // Seed it (you can change the seed)
 
-            auto &consumer = allPaths[selectedNodes[task_idx]].route;
-
-            if constexpr (T == CutType::FourRow) {
-                if (consumer.size() < 4) { return; }
-            } else if constexpr (T == CutType::FiveRow) {
-                if (consumer.size() < 5) { return; }
-            }
-
-            std::vector<std::vector<int>> setsOf45;
-
-            if constexpr (T == CutType::FourRow) {
-                combinations(consumer, 4, 2000, setsOf45);
-            } else if constexpr (T == CutType::FiveRow) {
-                combinations(consumer, 5, 2000, setsOf45);
-            }
-
-            std::vector<Cut> threadCuts;
-
-            for (const auto &set45 : setsOf45) {
+            // Process each task in the chunk
+            for (size_t idx = start_idx; idx < end_idx; ++idx) {
+                auto [task_id, set45] = task_data[idx];
+                std::vector<double> coefficients_aux(x.size(), 0.0);
 
                 uint64_t setHash = hashVector(set45);
+
                 {
                     std::lock_guard<std::mutex> cache_lock(cuts_mutex);
                     if (processedSetsCache.find(setHash) != processedSetsCache.end()) {
-                        continue; // Skip already processed sets
+                        return; // Skip already processed sets
                     }
                     processedSetsCache.insert(setHash);
                 }
@@ -433,7 +419,7 @@ void LimitedMemoryRank1Cuts::the45Heuristic(const SparseMatrix &A, const std::ve
                     bool   violation_found = false;
 
                     for (auto j = 0; j < selectedNodes.size(); ++j) {
-                        if (selectedNodes[j] == selectedNodes[task_idx]) {}
+                        // if (selectedNodes[j] == selectedNodes[task_idx]) {}
                         auto &consumer_inner = allPaths[selectedNodes[j]].route;
 
                         int max_limit = (T == CutType::FourRow) ? 3 : 4;
@@ -446,9 +432,7 @@ void LimitedMemoryRank1Cuts::the45Heuristic(const SparseMatrix &A, const std::ve
                         }
 
                         if (match_count < max_limit) continue;
-
                         for (auto c : consumer_inner) { AM[c >> 6] |= (1ULL << (c & 63)); }
-
                         double alpha_inner = computeLimitedMemoryCoefficient(baseSet, AM, p, consumer_inner, order);
                         alpha += alpha_inner;
 
@@ -457,34 +441,134 @@ void LimitedMemoryRank1Cuts::the45Heuristic(const SparseMatrix &A, const std::ve
                         if (alpha > rhs + violation_threshold) { violation_found = true; }
 
                         if (violation_found) {
-                            for (int i = 1; i < N_SIZE - 2; ++i) {
-                                // Skip nodes that are part of baseSet (i.e., cannot be removed from AM)
-                                if (!(baseSet[i >> 6] & (1ULL << (i & 63)))) {
+                            std::bitset<N_SIZE> minimal_bitset;
 
-                                    // Check if the node is currently in AM
-                                    if (AM[i >> 6] & (1ULL << (i & 63))) {
+                            // Function to check if removing a set of nodes still results in a violation
+                            auto is_violation = [&](const std::bitset<N_SIZE> &removal_set) -> bool {
+                                std::array<uint64_t, num_words> tempAM = AM; // Use direct initialization
 
-                                        // Temporarily remove node i from AM
-                                        uint64_t tempAM = AM[i >> 6];
-                                        AM[i >> 6] &= ~(1ULL << (i & 63));
-
-                                        // Use a local variable for the reduced alpha to avoid data races
-                                        double reduced_alpha = 0;
-                                        for (auto j = 0; j < selectedNodes.size(); ++j) {
-                                            auto &consumer_inner = allPaths[selectedNodes[j]].route;
-                                            reduced_alpha +=
-                                                computeLimitedMemoryCoefficient(baseSet, AM, p, consumer_inner, order);
-                                        }
-
-                                        // If the violation no longer holds, restore the node in AM
-                                        if (reduced_alpha <= rhs + violation_threshold) {
-                                            AM[i >> 6] = tempAM; // Restore node i in AM
-                                        } else {
-                                            // The violation still holds, update alpha to reduced_alpha
-                                            alpha = reduced_alpha;
-                                        }
+                                // Temporarily remove all nodes in removal_set from tempAM
+                                for (int i = 0; i < N_SIZE; ++i) {
+                                    if (removal_set[i]) {
+                                        tempAM[i >> 6] &= ~(1ULL << (i & 63)); // Use bit operations to unset nodes
                                     }
                                 }
+
+                                // Recalculate alpha with the modified tempAM, introduce early exit
+                                double reduced_alpha = 0;
+                                for (const auto &selected_node : selectedNodes) {
+                                    const auto &consumer_inner = allPaths[selected_node].route;
+                                    reduced_alpha +=
+                                        computeLimitedMemoryCoefficient(baseSet, tempAM, p, consumer_inner, order);
+                                    if (reduced_alpha > rhs + violation_threshold) { // Early exit
+                                        return true;
+                                    }
+                                }
+
+                                return (reduced_alpha > rhs + violation_threshold);
+                            };
+
+                            // Function to find the minimal violating set using genetic algorithm
+                            auto find_minimal_violation_set =
+                                [&](std::bitset<N_SIZE> &current_bitset) -> std::bitset<N_SIZE> {
+                                std::bitset<N_SIZE> minimal_bitset = current_bitset;
+
+                                int    population_size = 10;  // Number of candidates in each generation
+                                int    max_generations = 5;   // Number of generations
+                                double mutation_rate   = 0.3; // Probability of mutating a bit
+                                std::vector<std::bitset<N_SIZE>> population;
+
+                                int mutationCandidate = N_SIZE / 10; // Number of mutations in each candidate
+                                // Initialize the population with random mutations of the current bitset
+                                for (int i = 0; i < population_size; ++i) {
+                                    std::bitset<N_SIZE> candidate = current_bitset;
+                                    for (int j = 0; j < mutationCandidate; ++j) {
+                                        auto bit = rng() % N_SIZE;
+                                        if ((rng() / double(RAND_MAX)) < mutation_rate) {
+                                            candidate.reset(bit); // Mutate: remove random nodes
+                                        }
+                                    }
+                                    population.push_back(candidate);
+                                }
+
+                                // Main loop for genetic algorithm generations
+                                for (int gen = 0; gen < max_generations; ++gen) {
+                                    // Evaluate the population and store fitness (whether it causes a violation)
+                                    std::vector<std::pair<std::bitset<N_SIZE>, bool>> evaluated_population;
+                                    for (auto &candidate : population) {
+                                        evaluated_population.push_back({candidate, is_violation(candidate)});
+                                    }
+
+                                    // Select the best candidate from the population (the one that still violates)
+                                    pdqsort(evaluated_population.begin(), evaluated_population.end(),
+                                            [](const auto &lhs, const auto &rhs) { return lhs.second < rhs.second; });
+                                    minimal_bitset = evaluated_population.front().first;
+
+                                    // Perform crossover (combine two parents) to generate new population
+                                    std::vector<std::bitset<N_SIZE>> new_population;
+                                    for (int i = 0; i < population_size / 2; ++i) {
+                                        std::bitset<N_SIZE> parent1 = evaluated_population[i].first;
+                                        std::bitset<N_SIZE> parent2 = evaluated_population[i + 1].first;
+                                        std::bitset<N_SIZE> child1, child2;
+
+                                        // Crossover: mix bits from two parents
+                                        for (int j = 0; j < N_SIZE; ++j) {
+                                            if (rng() % 2) {
+                                                child1[j] = parent1[j];
+                                                child2[j] = parent2[j];
+                                            } else {
+                                                child1[j] = parent2[j];
+                                                child2[j] = parent1[j];
+                                            }
+                                        }
+
+                                        // Mutate the children
+                                        for (int j = 0; j < N_SIZE; ++j) {
+                                            if ((rand() / double(RAND_MAX)) < mutation_rate) {
+                                                child1.reset(j); // Mutate: remove random nodes
+                                            }
+                                            if ((rand() / double(RAND_MAX)) < mutation_rate) {
+                                                child2.reset(j); // Mutate: remove random nodes
+                                            }
+                                        }
+
+                                        // Add children to the new population
+                                        new_population.push_back(child1);
+                                        new_population.push_back(child2);
+                                    }
+
+                                    // Replace the old population with the new one
+                                    population = new_population;
+                                }
+
+                                return minimal_bitset;
+                            };
+
+                            // Build the initial set of nodes not in baseSet but in AM
+                            std::bitset<N_SIZE> current_bitset;
+                            for (int i = 1; i < N_SIZE - 2; ++i) {
+                                if (!(baseSet[i >> 6] & (1ULL << (i & 63))) && (AM[i >> 6] & (1ULL << (i & 63)))) {
+                                    current_bitset.set(i);
+                                }
+                            }
+
+                            // Find the minimal violating set using simulated annealing
+                            std::bitset<N_SIZE> minimalSet = find_minimal_violation_set(current_bitset);
+
+                            // Apply the minimal set to adjust AM
+                            for (int i = 0; i < N_SIZE; ++i) {
+                                if (!minimalSet[i]) {
+                                    AM[i >> 6] &= ~(1ULL << (i & 63)); // Clear bit if i not in minimalSet
+                                } else {
+                                    AM[i >> 6] |= (1ULL << (i & 63)); // Set bit if i in minimalSet
+                                }
+                            }
+
+                            // Recalculate alpha after applying the minimal set of nodes
+                            alpha = 0;
+                            for (auto j = 0; j < selectedNodes.size(); ++j) {
+                                const auto &consumer_inner = allPaths[selectedNodes[j]].route;
+                                alpha += computeLimitedMemoryCoefficient(baseSet, AM, p, consumer_inner, order);
                             }
 
                             // compute coefficients_aux for all the other nodes
@@ -519,14 +603,23 @@ void LimitedMemoryRank1Cuts::the45Heuristic(const SparseMatrix &A, const std::ve
 
                             ViolatedCut vCut{alpha, cut}; // Pair: first is the violation, second is the cut
 
-                            std::lock_guard<std::mutex> cut_lock(cuts_mutex);
-                            if (cutQueue.size() < max_number_of_cuts) {
-                                cutQueue.push(vCut);
-                            } else if (cutQueue.top().first < vCut.first) { // Compare violations
-                                cutQueue.pop();                             // Remove the least violated cut
-                                cutQueue.push(vCut);
+                            // std::lock_guard<std::mutex> cut_lock(cuts_mutex);
+                            {
+                                nsync::nsync_mu_lock(&mu);
+                                if (cutQueue.size() < max_number_of_cuts) {
+                                    cutQueue.push(vCut);
+                                } else if (cutQueue.top().first < vCut.first) { // Compare violations
+                                    cutQueue.pop();                             // Remove the least violated cut
+                                    cutQueue.push(vCut);
+                                }
+                                // CachedCut newCachedCut{cut, alpha};
+                                // cutCache.push_back(newCachedCut);
+                                nsync::nsync_mu_unlock(&mu);
                             }
-                            if (cuts_count.load() > max_generated_cuts) { break; }
+                            // increment the cuts_count
+                            cuts_count.fetch_add(1);
+
+                            if (cuts_count.load() > max_generated_cuts) { return; }
                         }
                     }
                 }

@@ -1,3 +1,13 @@
+/*
+ * @file LinExp.h
+ * @brief Linear expression class implementation
+ *
+ * This file contains the implementation of the LinearExpression class.
+ * The LinearExpression class represents a linear expression in a mathematical optimization problem.
+ * It encapsulates a collection of terms, each consisting of a variable and a coefficient.
+ * The class provides methods to add terms to the expression and create constraints using the expression.
+ *
+ */
 #pragma once
 #include "Variable.h"
 #include <iostream>

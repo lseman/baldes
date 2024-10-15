@@ -14,9 +14,11 @@ public:
         model = new Highs();
         model->passModel(highsmodel);
         model->setOptionValue("solver", "ipm");
-        model->setOptionValue("primal_feasibility_tolerance", 1e-8);
-        model->setOptionValue("dual_feasibility_tolerance", 1e-8);
+        // model->setOptionValue("primal_feasibility_tolerance", 1e-8);
+        // model->setOptionValue("dual_feasibility_tolerance", 1e-8);
         model->setOptionValue("run_crossover", "off");
+        // model->setOptionValue("run_centring", true);
+
         //  disable output to screen
         model->setOptionValue("output_flag", "off");
     }

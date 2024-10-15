@@ -227,7 +227,7 @@ public:
     // Factorize the matrix using LDLT, which can handle indefinite matrices
     void factorizeMatrix(const Eigen::SparseMatrix<double> &matrix, int maxIterations = 50, double tolerance = 1e-3) {
         matrixToFactorize = matrix;
-
+        /*
         if (!initialized) {
             preconditioner.setLDLTSolver(&solver);
             solverBackup.analyzePattern(matrixToFactorize);
@@ -237,15 +237,48 @@ public:
             initialized = true;
         }
         cr.compute(matrixToFactorize);
+        */
+
+        if (!patternAnalyzed) {
+            solver.analyzePattern(matrixToFactorize); // Analyze the sparsity pattern
+            patternAnalyzed = true;
+        }
+        // First try factorizing the matrix without modifying it
+        solver.factorize(matrixToFactorize);
+        if (solver.info() != Eigen::Success) {
+
+            // Convert the matrix to a modifiable SparseMatrix for regularization
+            Eigen::SparseMatrix<double> regMatrix      = matrixToFactorize; // Copy of the matrix
+            double                      regularization = 1e-5;              // Initial regularization term
+
+            // Attempt to regularize and factorize up to 3 times
+            const int maxAttempts = 1;
+            for (int attempt = 1; attempt <= maxAttempts; ++attempt) {
+                applySelectiveRegularization(regMatrix, regularization); // Apply increasing regularization
+
+                solver.factorize(matrixToFactorize); // Analyze the sparsity pattern and factorize
+
+                if (solver.info() == Eigen::Success) { return; }
+
+                // Increase the regularization term for the next attempt
+                regularization *= 100;
+            }
+
+            // If all attempts fail, throw an exception
+            throw std::runtime_error("Matrix factorization failed after 3 attempts with LDLT and regularization.");
+        }
+
+        initialized = true;
     }
 
     // Solve the system using the factorized matrix
     Eigen::VectorXd solve(const Eigen::VectorXd &b) {
         if (!initialized) { throw std::runtime_error("Matrix is not factorized."); }
 
+        Eigen::VectorXd rhs = b;
         // Perform CG solve using the LDLT-preconditioned system
         Eigen::VectorXd x;
-
+        /*
         try {
             x = cr.solve(matrixToFactorize, b);
 
@@ -261,7 +294,31 @@ public:
                 }
             }
         } catch (const std::exception &e) { throw std::runtime_error(fmt::format("Error during solve: {}", e.what())); }
-
+*/
+        x = solver.solve(rhs);
         return x;
+    }
+
+    void applySelectiveRegularization(Eigen::SparseMatrix<double> &matrix, double regularization,
+                                      double threshold = 1e-6) {
+        // Ensure the matrix is square
+        if (matrix.rows() != matrix.cols()) {
+            throw std::runtime_error("Matrix is not square, cannot apply regularization to the diagonal.");
+        }
+
+        for (int i = 0; i < matrix.outerSize(); ++i) {
+            if (i < matrix.outerSize()) {
+                // Check if the diagonal element is below the threshold
+                double diagValue = matrix.coeff(i, i);
+                if (std::abs(diagValue) < threshold) {
+                    matrix.coeffRef(i, i) += regularization; // Apply regularization if below threshold
+                }
+            } else {
+                throw std::runtime_error("Invalid diagonal index encountered during regularization.");
+            }
+        }
+
+        // Ensure the matrix is compressed after modifications
+        if (!matrix.isCompressed()) { matrix.makeCompressed(); }
     }
 };

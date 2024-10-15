@@ -215,24 +215,32 @@ struct SparseMatrix {
          * @brief Check if the iterator is valid (i.e., it has more elements to traverse).
          * @return True if there are more elements, false otherwise.
          */
-        bool valid() const { return index < end; }
+        inline bool valid() const { return index < end; }
 
         /**
          * @brief Move to the next element in the row.
          */
-        void next() { ++index; }
+        inline void next() { ++index; }
 
         /**
          * @brief Get the value of the current element.
          * @return The value of the current element.
          */
-        double value() const { return matrix.values[index]; }
+        inline double value() const { return matrix.values[index]; }
 
         /**
          * @brief Get the column index of the current element.
          * @return The column index of the current element.
          */
-        int col() const { return matrix.cols[index]; }
+        inline int col() const { return matrix.cols[index]; }
+
+        /**
+         * @brief Prefetch the next row's memory to improve cache locality.
+         */
+        inline void prefetch() const {
+            __builtin_prefetch(&matrix.values[index + 1], 0, 1);
+            __builtin_prefetch(&matrix.cols[index + 1], 0, 1);
+        }
     };
     /**
      * @brief Get an iterator for a specific row.
@@ -258,14 +266,13 @@ struct SparseMatrix {
      */
     template <typename Func>
     void forEachRow(Func &&func) const {
-        if (row_start.empty()) {
-            const_cast<SparseMatrix *>(this)->buildRowStart(); // Ensure row_start is built
-        }
+        // Assume row_start is already built for faster access; if not, ensure it's built once elsewhere.
+        assert(!row_start.empty());
 
-        // Use modern C++ range-based loop
+        // Iterate over rows and columns, directly invoking the callback for better inlining
         for (int row_idx = 0; row_idx < num_rows; ++row_idx) {
             for (RowIterator it = rowIterator(row_idx); it.valid(); it.next()) {
-                std::invoke(std::forward<Func>(func), row_idx, it.col(), it.value());
+                func(row_idx, it.col(), it.value()); // Directly call the function without std::invoke
             }
         }
     }
@@ -283,19 +290,47 @@ struct SparseMatrix {
         forEachRow([&dense](int row, int col, double value) { dense[row][col] = value; });
         return dense;
     }
-    std::vector<double> multiply(const std::vector<double> &x) const {
+    std::vector<double> multiply(const std::vector<double> &x) {
         // Initialize the result vector with zeros
         std::vector<double> result(num_rows, 0.0);
 
-        // Perform the matrix-vector multiplication
+        // Check if matrix is dirty and build row starts if necessary
+        if (is_dirty) {
+            buildRowStart(); // Ensure row start is built for CRS
+        }
+
+        // Perform the matrix-vector multiplication (A * x)
         for (int row = 0; row < num_rows; ++row) {
+            double row_value = 0.0; // Store the result of each row * x
             for (RowIterator it = rowIterator(row); it.valid(); it.next()) {
-                // Multiply the value in row 'row' and column 'it.col()' by x[it.col()]
-                result[row] += it.value() * x[it.col()];
+                int    col_index = it.col();   // Column index of the matrix element
+                double value     = it.value(); // Matrix value at (row, col_index)
+
+                row_value += value * x[col_index]; // Perform dot product for this row
             }
+            result[row] = row_value; // Store the result of the dot product in the result vector
         }
 
         return result;
+    }
+
+    std::vector<double> violation(const std::vector<double> &x, const std::vector<double> &b) {
+        // Initialize the result vector for violations
+        std::vector<double> violation_vec(num_rows, 0.0);
+
+        // Perform matrix-vector multiplication (A * x) and compute violation in a single step
+        forEachRow([&](int row_idx, int col_idx, double value) {
+            rowIterator(row_idx).prefetch();
+
+            violation_vec[row_idx] += value * x[col_idx]; // Perform dot product
+        });
+
+        // Compute violation: Ax - b in place
+        for (int row_idx = 0; row_idx < num_rows; ++row_idx) {
+            violation_vec[row_idx] -= b[row_idx]; // Compute Ax - b
+        }
+
+        return violation_vec;
     }
 
     const std::vector<int> getRowStart() {
@@ -322,4 +357,7 @@ struct SparseMatrix {
         std::vector<double> values(this->values.begin(), this->values.end());
         return values;
     }
+
+    // define getRowLength
+    int getRowLength(int row) const { return row_start[row + 1] - row_start[row]; }
 };

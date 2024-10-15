@@ -241,7 +241,7 @@ public:
             auto vec = cuts.computeLimitedMemoryCoefficients(label->nodes_covered);
             if (vec.size() > 0) {
                 for (int i = 0; i < vec.size(); i++) {
-                    if (abs(vec[i]) > 1e-3) { col.addTerm(SRCconstraints[i]->index(), vec[i]); }
+                    if (abs(vec[i]) > 1e-2) { col.addTerm(SRCconstraints[i]->index(), vec[i]); }
                 }
             }
 #endif
@@ -251,7 +251,7 @@ public:
             auto RCCconstraints = rccManager.getConstraints();
             if (RCCvec.size() > 0) {
                 for (int i = 0; i < RCCvec.size(); i++) {
-                    if (abs(RCCvec[i]) > 1e-3) {
+                    if (abs(RCCvec[i]) > 1e-2) {
                         col.addTerm(RCCconstraints[i]->index(), RCCvec[i]); // Add RCC terms to the Column
                     }
                 }
@@ -662,7 +662,7 @@ public:
 #endif
 
 #ifdef IPM
-            auto d = 0.05;
+            auto d = 1;
             matrix = node->extractModelDataSparse();
             gap    = std::abs(lp_obj - (lp_obj + std::min(0.0, inner_obj))) / std::abs(lp_obj);
             gap    = gap / d;
@@ -682,11 +682,12 @@ public:
             lag_gap          = integer_solution - (lp_obj + std::min(0.0, inner_obj));
             bucket_graph.gap = lag_gap;
 #endif
-
-#ifdef STAB
+#ifndef IPM
             auto originDuals = nodeDuals;
+#endif
+#ifdef STAB
             stab.update_stabilization_after_master_optim(nodeDuals);
-            nodeDuals = stab.getStabDualSol(nodeDuals);
+            nodeDuals = stab.getStabDualSolAdvanced(nodeDuals);
 
             misprice = true;
             while (misprice) {
@@ -720,7 +721,6 @@ public:
 
                 // print SRCconstraints.size()
                 if (!SRCconstraints.empty()) {
-#ifndef GUROBI
                     // print SRCconstraints size
                     std::vector<int> SRCindices;
                     for (int i = 0; i < SRCconstraints.size(); i++) {
@@ -728,24 +728,9 @@ public:
                         auto index  = constr->index();
                         SRCindices.push_back(index);
                     }
-#endif
 
-#ifndef IPM
-#ifdef GUROBI
-                    // auto duals = node->get(GRB_DoubleAttr_Pi, SRCconstraints.data(), SRCconstraints.size());
-                    // cutDuals.assign(duals, duals + SRCconstraints.size());
-#else
-                    // get jobDuals on the SRCindices
                     std::vector<double> cutDuals;
-                    for (auto &index : SRCindices) { cutDuals.push_back(originDuals[index]); }
-#endif
-#else
-                    // get jobDuals on the SRCindices
-                    std::vector<double> cutDuals;
-                    // print nodeDuals size
-                    for (auto &index : SRCindices) { cutDuals.push_back(-nodeDuals[index]); }
-
-#endif
+                    for (auto &index : SRCindices) { cutDuals.push_back(node->getDualVal(index)); }
                     cuts->setDuals(cutDuals);
                 }
 #endif
@@ -753,7 +738,11 @@ public:
 #ifdef RCC
                 // RCC cuts
                 if (rccManager.size() > 0) {
+#ifndef IPM
                     auto arc_duals = rccManager.computeDuals(node);
+#else
+                    auto arc_duals = rccManager.computeDuals(nodeDuals);
+#endif
                     bucket_graph.setArcDuals(arc_duals);
                 }
 #endif

@@ -233,7 +233,7 @@ inline ModelData extractModelDataSparse(GRBModel *model) {
         SparseMatrix A_sparse;
 
         // Reserve memory for constraint matrices, estimating 10 non-zeros per row
-        A_sparse.elements.reserve(numConstrs * 10); // Estimate non-zero elements
+        A_sparse.values.reserve(numConstrs * 10); // Estimate non-zero elements
         data.b.reserve(numConstrs);
         data.cname.reserve(numConstrs);
         data.sense.reserve(numConstrs);
@@ -246,7 +246,7 @@ inline ModelData extractModelDataSparse(GRBModel *model) {
             int        exprSize = expr.size();
 
             // Reserve space for constraint elements to minimize reallocation
-            A_sparse.elements.reserve(A_sparse.elements.size() + exprSize);
+            A_sparse.values.reserve(A_sparse.values.size() + exprSize);
 
             for (int j = 0; j < exprSize; ++j) {
                 GRBVar var      = expr.getVar(j);
@@ -254,7 +254,7 @@ inline ModelData extractModelDataSparse(GRBModel *model) {
                 int    varIndex = var.index();
 
                 // Populate SparseElement for A_sparse
-                A_sparse.elements.push_back({i, varIndex, coeff});
+                A_sparse.insert(i, varIndex, coeff);
             }
 
             // Batch fetch Constraint Name, RHS, and Sense (improve by reducing single fetches)

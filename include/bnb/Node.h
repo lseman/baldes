@@ -123,13 +123,22 @@ public:
         CMGR_CreateCMgr(&oldCutsCMP, 100); // For old cuts, if needed
 #endif
     };
-#endif
-
+#elif HIGHS
     explicit BNBNode(const MIPProblem &eModel) {
         mip             = eModel;
         auto highsmodel = mip.toHighsModel();
         // print matrix.A_sparse.num_rows;
         solver = new HighsSolver(highsmodel);
+        generateUUID();
+        this->initialized = true;
+#ifdef RCC
+        CMGR_CreateCMgr(&oldCutsCMP, 100); // For old cuts, if needed
+#endif
+    };
+#endif
+
+    explicit BNBNode(const MIPProblem &eModel) {
+        mip = eModel;
         generateUUID();
         this->initialized = true;
 #ifdef RCC
@@ -280,12 +289,6 @@ public:
     void setIntAttr(const std::string &attr, int value) { throw std::invalid_argument("Unknown attribute"); }
     void setDoubleAttr(const std::string &attr, double value) { throw std::invalid_argument("Unknown attribute"); }
 
-    // Add a new constraint using a linear expression and name (placeholder)
-    Constraint *addConstr(const LinearExpression &expr, const std::string &name) {
-        auto ctr = mip.add_constraint(expr, 0.0, '<'); // Placeholder for <= relation
-        return ctr;
-    }
-
     Constraint *addConstr(Constraint *ctr, const std::string &name) {
         ctr = mip.add_constraint(ctr, name);
         return ctr;
@@ -310,9 +313,14 @@ public:
     double              getObjVal() { return solver->getObjVal(); }
     std::vector<double> getDuals() { return solver->getDuals(); }
     std::vector<double> extractSolution() { return solver->extractSolution(); }
-    void                optimize(double tol = 1e-8) {
+    void                optimize(double tol = 1e-6) {
 #ifdef HIGHS
         solver->setModel(mip.toHighsModel());
+#endif
+#ifdef GUROBI
+        GRBEnv &env   = GurobiEnvSingleton::getInstance();
+        auto    model = new GRBModel(mip.toGurobiModel(env)); // Pass the retrieved or new environment
+        solver->setModel(model);
 #endif
         solver->optimize(tol);
     }
