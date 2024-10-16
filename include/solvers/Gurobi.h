@@ -64,6 +64,8 @@ public:
 
     double getDualVal(int i) const override { return model->getConstr(i).get(GRB_DoubleAttr_Pi); }
 
+    double getSlack(int i) const override { return model->getConstr(i).get(GRB_DoubleAttr_Slack); }
+
     void                optimize(double tol = 1e-6) override { model->optimize(); }
     std::vector<double> getDuals() const override {
         int                    numConstrs = model->get(GRB_IntAttr_NumConstrs);

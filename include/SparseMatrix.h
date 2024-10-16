@@ -6,6 +6,10 @@
 #include <numeric>
 #include <vector>
 
+#ifdef IPM
+#include <Eigen/Sparse>
+#endif
+
 struct SparseMatrix {
     // COO format (always the default)
     std::vector<int>    rows;   // Row indices of the matrix elements
@@ -13,19 +17,21 @@ struct SparseMatrix {
     std::vector<double> values; // Non-zero values of the matrix elements
 
     // CRS format (constructed on-demand)
-    std::vector<int>    crs_row_start;
-    std::vector<int>    crs_cols;
-    std::vector<double> crs_values;
+    mutable std::vector<int>    crs_row_start;
+    mutable std::vector<int>    crs_cols;
+    mutable std::vector<double> crs_values;
+    mutable bool                coo_mode = true; // Always starts in COO mode
 
-    int  num_rows = 0;
-    int  num_cols = 0;
-    bool coo_mode = true; // Always starts in COO mode
+    int num_rows = 0;
+    int num_cols = 0;
 
     SparseMatrix() = default;
     SparseMatrix(int num_rows, int num_cols) : num_rows(num_rows), num_cols(num_cols) {}
 
     // Insert a non-zero element into the sparse matrix (COO mode)
     void insert(int row, int col, double value) {
+        if (!coo_mode) switchToCOO(); // Ensure we're in COO mode
+
         // Dynamically resize rows and columns if the element is out of bounds
         if (row >= num_rows) {
             num_rows = row + 1; // Expand the number of rows
@@ -41,44 +47,47 @@ struct SparseMatrix {
 
     void insert_batch(const std::vector<int> &batch_rows, const std::vector<int> &batch_cols,
                       const std::vector<double> &batch_values) {
+        if (!coo_mode) switchToCOO(); // Ensure we're in COO mode
+
         assert(batch_rows.size() == batch_cols.size() && batch_cols.size() == batch_values.size());
 
         // Find the maximum row and column in the batch to resize if necessary
-        int max_row = *std::max_element(batch_rows.begin(), batch_rows.end());
-        int max_col = *std::max_element(batch_cols.begin(), batch_cols.end());
-
-        // Dynamically resize the matrix dimensions if needed
-        if (max_row >= num_rows) {
-            num_rows = max_row + 1; // Expand the number of rows
-        }
-        if (max_col >= num_cols) {
-            num_cols = max_col + 1; // Expand the number of columns
-        }
+        // Optimize by finding maximum row and col in one pass
+        for (const auto &row : batch_rows)
+            if (row >= num_rows) num_rows = row + 1;
+        for (const auto &col : batch_cols)
+            if (col >= num_cols) num_cols = col + 1;
 
         // Perform the batch insertion
-        rows.insert(rows.end(), batch_rows.begin(), batch_rows.end());
-        cols.insert(cols.end(), batch_cols.begin(), batch_cols.end());
-        values.insert(values.end(), batch_values.begin(), batch_values.end());
+        rows.reserve(rows.size() + batch_rows.size());
+        cols.reserve(cols.size() + batch_cols.size());
+        values.reserve(values.size() + batch_values.size());
+
+        // Insert using move semantics to avoid copying
+        rows.insert(rows.end(), std::make_move_iterator(batch_rows.begin()), std::make_move_iterator(batch_rows.end()));
+        cols.insert(cols.end(), std::make_move_iterator(batch_cols.begin()), std::make_move_iterator(batch_cols.end()));
+        values.insert(values.end(), std::make_move_iterator(batch_values.begin()),
+                      std::make_move_iterator(batch_values.end()));
     }
 
-    // Convert COO to CRS (on-demand)
-    void convertToCRS() {
-        if (!coo_mode) return; // Already in CRS mode, no need to convert
+    // Convert to CRS format (only if in COO mode)
+    void convertToCRS() const {
+        if (!coo_mode) return;
 
-        crs_row_start.assign(num_rows + 1, 0);
+        crs_row_start.assign(num_rows + 1, 0); // CRS row starts initialized
         crs_cols.resize(values.size());
         crs_values.resize(values.size());
 
         // Count non-zero elements per row
-        for (int row : rows) { ++crs_row_start[row + 1]; }
+        for (int row : rows) ++crs_row_start[row + 1];
 
         // Compute row start indices using cumulative sum
         std::partial_sum(crs_row_start.begin(), crs_row_start.end(), crs_row_start.begin());
 
-        // Temporary array to keep track of the position for each row
+        // Temporary row position tracker
         std::vector<int> row_position = crs_row_start;
 
-        // Fill CRS data from COO format
+        // Fill CRS data
         for (size_t i = 0; i < values.size(); ++i) {
             int row          = rows[i];
             int dest         = row_position[row]++;
@@ -89,10 +98,13 @@ struct SparseMatrix {
         coo_mode = false; // Conversion complete
     }
 
-    // Switch back to COO mode (clear CRS data)
+    // Switch to COO mode
     void switchToCOO() {
         if (coo_mode) return;
-        coo_mode = true; // Now ready for COO operations
+        coo_mode = true;
+        crs_row_start.clear();
+        crs_cols.clear();
+        crs_values.clear();
     }
 
     // RowIterator for CRS mode
@@ -123,53 +135,40 @@ struct SparseMatrix {
     // Delete a column in COO mode
     void delete_column(int col_to_delete) {
         if (!coo_mode) switchToCOO();
+
         size_t write_index = 0;
         for (size_t i = 0; i < cols.size(); ++i) {
             if (cols[i] != col_to_delete) {
                 rows[write_index]   = rows[i];
-                cols[write_index]   = cols[i];
+                cols[write_index]   = (cols[i] > col_to_delete) ? cols[i] - 1 : cols[i];
                 values[write_index] = values[i];
-
-                // Shift column indices to the left if greater than the deleted column
-                if (cols[i] > col_to_delete) {
-                    cols[write_index]--; // Shift left by one
-                }
-
                 ++write_index;
             }
         }
+
         rows.resize(write_index);
         cols.resize(write_index);
         values.resize(write_index);
-        --num_cols; // Decrement the number of columns
+        --num_cols;
     }
 
     // Delete a row in COO mode and shift subsequent rows
     void delete_row(int row_to_delete) {
-        if (!coo_mode) switchToCOO(); // Ensure we're in COO mode
+        if (!coo_mode) switchToCOO();
 
         size_t write_index = 0;
-
         for (size_t i = 0; i < rows.size(); ++i) {
             if (rows[i] != row_to_delete) {
-                // Copy non-deleted row information
-                rows[write_index]   = rows[i];
+                rows[write_index]   = (rows[i] > row_to_delete) ? rows[i] - 1 : rows[i];
                 cols[write_index]   = cols[i];
                 values[write_index] = values[i];
-
-                // If the row is greater than the deleted row, shift it down by 1
-                if (rows[i] > row_to_delete) { rows[write_index]--; }
-
                 ++write_index;
             }
         }
 
-        // Resize the vectors to remove the deleted row's entries
         rows.resize(write_index);
         cols.resize(write_index);
         values.resize(write_index);
-
-        // Decrement the total number of rows
         --num_rows;
     }
 
@@ -180,7 +179,10 @@ struct SparseMatrix {
         std::vector<double> result(num_rows, 0.0);
         for (int row = 0; row < num_rows; ++row) {
             double sum = 0.0;
-            for (int i = crs_row_start[row]; i < crs_row_start[row + 1]; ++i) { sum += crs_values[i] * x[crs_cols[i]]; }
+            for (int i = crs_row_start[row]; i < (row + 1 < num_rows) ? crs_row_start[row + 1] : crs_values.size();
+                 ++i) {
+                sum += crs_values[i] * x[crs_cols[i]];
+            }
             result[row] = sum;
         }
         return result;
@@ -190,22 +192,16 @@ struct SparseMatrix {
     void modify_or_delete(int row, int col, double value) {
         if (!coo_mode) switchToCOO(); // Ensure we're working in COO mode
 
-        // Modify or delete element in COO format
+        // Search for the element in the COO format
         for (size_t i = 0; i < values.size(); ++i) {
             if (rows[i] == row && cols[i] == col) {
                 if (value == 0.0) {
-                    // Delete element
+                    // Delete the element by removing it from rows, cols, and values
                     rows.erase(rows.begin() + i);
                     cols.erase(cols.begin() + i);
                     values.erase(values.begin() + i);
-
-                    // Check if we've deleted the last element from the matrix
-                    if (row == num_rows - 1 &&
-                        std::none_of(rows.begin(), rows.end(), [row](int r) { return r == row; })) {
-                        --num_rows; // Decrement num_rows if the last row is now empty
-                    }
                 } else {
-                    // Modify element
+                    // Modify the element value
                     values[i] = value;
                 }
                 return;
@@ -216,6 +212,60 @@ struct SparseMatrix {
         if (value != 0.0) insert(row, col, value);
     }
 
+    void modify_or_delete_batch(const std::vector<int> &rows, const std::vector<int> &cols,
+                                const std::vector<double> &values) {
+        if (rows.size() != cols.size() || cols.size() != values.size()) {
+            throw std::invalid_argument("The input vectors must have the same length.");
+        }
+
+        if (!coo_mode) switchToCOO(); // Ensure we're working in COO mode
+
+        // Iterate through the batch of values to modify or delete
+        for (size_t i = 0; i < values.size(); ++i) {
+            int    row   = rows[i];
+            int    col   = cols[i];
+            double value = values[i];
+
+            // Modify or delete the element in the sparse matrix
+            if (value != 0.0) {
+                // Update or insert the new value
+                insert(row, col, value);
+            } else {
+                // Delete the element if value is zero
+                for (size_t j = 0; j < this->rows.size(); ++j) {
+                    if (this->rows[j] == row && this->cols[j] == col) {
+                        this->rows.erase(this->rows.begin() + j);
+                        this->cols.erase(this->cols.begin() + j);
+                        this->values.erase(this->values.begin() + j);
+                        break; // Stop after deleting the entry
+                    }
+                }
+            }
+        }
+    }
+
+    // Compact function to clean up the marked deletions
+    void compact() {
+        if (!coo_mode) switchToCOO(); // Ensure we're in COO mode
+
+        size_t write_index = 0;
+        for (size_t i = 0; i < values.size(); ++i) {
+            if (rows[i] != -1) { // Skip marked deletions
+                if (write_index != i) {
+                    rows[write_index]   = rows[i];
+                    cols[write_index]   = cols[i];
+                    values[write_index] = values[i];
+                }
+                ++write_index;
+            }
+        }
+
+        // Resize vectors to remove the deleted elements
+        rows.resize(write_index);
+        cols.resize(write_index);
+        values.resize(write_index);
+    }
+
     // Convert to dense format (for testing/debugging purposes)
     std::vector<std::vector<double>> toDense() const {
         std::vector<std::vector<double>> dense(num_rows, std::vector<double>(num_cols, 0.0));
@@ -224,19 +274,111 @@ struct SparseMatrix {
     }
 
     // Inline accessors for row_start (const version)
-    const std::vector<int> &row_start() const {
+    const std::vector<int> &getRowStart() const {
         if (coo_mode) { throw std::runtime_error("row_start is only available in CRS mode."); }
         return crs_row_start;
     }
 
     // Inline accessors for row_start (non-const version)
-    std::vector<int> &row_start() {
+    std::vector<int> &getRowStart() {
         if (coo_mode) { throw std::runtime_error("row_start is only available in CRS mode."); }
         return crs_row_start;
+    }
+
+    std::vector<int> &getIndices() {
+        if (coo_mode) { throw std::runtime_error("indices are only available in CRS mode."); }
+        return crs_cols;
+    }
+
+    std::vector<double> &getValues() {
+        if (coo_mode) { throw std::runtime_error("values are only available in CRS mode."); }
+        return crs_values;
     }
 
     // Build the row start indices for CRS mode
     void buildRowStart() {
         if (coo_mode) convertToCRS();
     }
+
+    // Returns the outer size (number of rows)
+    int outerSize() const { return num_rows; }
+
+    void compress() {
+        if (!coo_mode) {
+            std::cerr << "Compress is only applicable in COO mode." << std::endl;
+            return;
+        }
+
+        // Check if the matrix has any elements to compress
+        if (values.empty()) { return; }
+
+        // Step 1: Create a vector of tuples (row, col, value) for sorting
+        std::vector<std::tuple<int, int, double>> triplets;
+        triplets.reserve(values.size());
+
+        for (size_t i = 0; i < values.size(); ++i) { triplets.emplace_back(rows[i], cols[i], values[i]); }
+
+        // Step 2: Sort the triplets by (row, col)
+        std::sort(triplets.begin(), triplets.end(), [](const auto &a, const auto &b) {
+            return std::tie(std::get<0>(a), std::get<1>(a)) < std::tie(std::get<0>(b), std::get<1>(b));
+        });
+
+        // Step 3: Remove duplicates by summing their values
+        size_t write_index = 0;
+        for (size_t i = 1; i < triplets.size(); ++i) {
+            if (std::get<0>(triplets[write_index]) == std::get<0>(triplets[i]) &&
+                std::get<1>(triplets[write_index]) == std::get<1>(triplets[i])) {
+                // Same (row, col) as the previous, sum the values
+                std::get<2>(triplets[write_index]) += std::get<2>(triplets[i]);
+            } else {
+                // Move the current triplet to the next position in the compressed result
+                ++write_index;
+                triplets[write_index] = triplets[i];
+            }
+        }
+
+        // Step 4: Resize the triplets to remove any unused space due to merging duplicates
+        triplets.resize(write_index + 1);
+
+        // Step 5: Rebuild the COO vectors from the compressed triplets
+        rows.clear();
+        cols.clear();
+        values.clear();
+        rows.reserve(triplets.size());
+        cols.reserve(triplets.size());
+        values.reserve(triplets.size());
+
+        for (const auto &triplet : triplets) {
+            rows.push_back(std::get<0>(triplet));
+            cols.push_back(std::get<1>(triplet));
+            values.push_back(std::get<2>(triplet));
+        }
+
+        // After compression, the matrix is now in an optimized state
+    }
+
+#ifdef IPM
+    // Modify convertToCRS to be const
+    Eigen::SparseMatrix<double> toEigenSparseMatrix() const {
+        Eigen::SparseMatrix<double>         eigenMatrix(num_rows, num_cols);
+        std::vector<Eigen::Triplet<double>> triplets;
+        triplets.reserve(values.size());
+
+        for (size_t i = 0; i < values.size(); ++i) {
+            // Check if row and column indices are within bounds
+            if (rows[i] < 0 || rows[i] >= num_rows || cols[i] < 0 || cols[i] >= num_cols) {
+                std::cerr << "Error: Index out of bounds - row: " << rows[i] << ", col: " << cols[i] << std::endl;
+                throw std::out_of_range("Row or column index out of bounds in COO matrix");
+            }
+
+            triplets.emplace_back(rows[i], cols[i], values[i]);
+        }
+
+        eigenMatrix.setFromTriplets(triplets.begin(), triplets.end(), [](double a, double b) { return a + b; });
+        return eigenMatrix;
+    }
+
+    // Declare mutable members that are modified in const functions
+
+#endif
 };
