@@ -49,25 +49,7 @@ struct SparseMatrix {
                       const std::vector<double> &batch_values) {
         if (!coo_mode) switchToCOO(); // Ensure we're in COO mode
 
-        assert(batch_rows.size() == batch_cols.size() && batch_cols.size() == batch_values.size());
-
-        // Find the maximum row and column in the batch to resize if necessary
-        // Optimize by finding maximum row and col in one pass
-        for (const auto &row : batch_rows)
-            if (row >= num_rows) num_rows = row + 1;
-        for (const auto &col : batch_cols)
-            if (col >= num_cols) num_cols = col + 1;
-
-        // Perform the batch insertion
-        rows.reserve(rows.size() + batch_rows.size());
-        cols.reserve(cols.size() + batch_cols.size());
-        values.reserve(values.size() + batch_values.size());
-
-        // Insert using move semantics to avoid copying
-        rows.insert(rows.end(), std::make_move_iterator(batch_rows.begin()), std::make_move_iterator(batch_rows.end()));
-        cols.insert(cols.end(), std::make_move_iterator(batch_cols.begin()), std::make_move_iterator(batch_cols.end()));
-        values.insert(values.end(), std::make_move_iterator(batch_values.begin()),
-                      std::make_move_iterator(batch_values.end()));
+        for (size_t i = 0; i < batch_values.size(); ++i) { insert(batch_rows[i], batch_cols[i], batch_values[i]); }
     }
 
     // Convert to CRS format (only if in COO mode)
@@ -154,21 +136,29 @@ struct SparseMatrix {
 
     // Delete a row in COO mode and shift subsequent rows
     void delete_row(int row_to_delete) {
-        if (!coo_mode) switchToCOO();
-
-        size_t write_index = 0;
-        for (size_t i = 0; i < rows.size(); ++i) {
-            if (rows[i] != row_to_delete) {
-                rows[write_index]   = (rows[i] > row_to_delete) ? rows[i] - 1 : rows[i];
-                cols[write_index]   = cols[i];
-                values[write_index] = values[i];
-                ++write_index;
-            }
+        if (!coo_mode) {
+            switchToCOO(); // Ensure the matrix is in COO mode
         }
 
+        // We use the write_index to overwrite the row being deleted and any subsequent rows.
+        size_t write_index = 0;
+        for (size_t i = 0; i < rows.size(); ++i) {
+            // Skip the row to be deleted
+            if (rows[i] == row_to_delete) { continue; }
+
+            // Copy valid rows to the new index, adjusting rows that are after the deleted row
+            rows[write_index]   = (rows[i] > row_to_delete) ? rows[i] - 1 : rows[i];
+            cols[write_index]   = cols[i];
+            values[write_index] = values[i];
+            ++write_index;
+        }
+
+        // Resize to shrink the containers to the actual new size after deletion
         rows.resize(write_index);
         cols.resize(write_index);
         values.resize(write_index);
+
+        // Decrease the number of rows in the matrix
         --num_rows;
     }
 
@@ -195,15 +185,10 @@ struct SparseMatrix {
         // Search for the element in the COO format
         for (size_t i = 0; i < values.size(); ++i) {
             if (rows[i] == row && cols[i] == col) {
-                if (value == 0.0) {
-                    // Delete the element by removing it from rows, cols, and values
-                    rows.erase(rows.begin() + i);
-                    cols.erase(cols.begin() + i);
-                    values.erase(values.begin() + i);
-                } else {
-                    // Modify the element value
-                    values[i] = value;
-                }
+
+                // Modify the element value
+                values[i] = value;
+
                 return;
             }
         }
@@ -221,27 +206,7 @@ struct SparseMatrix {
         if (!coo_mode) switchToCOO(); // Ensure we're working in COO mode
 
         // Iterate through the batch of values to modify or delete
-        for (size_t i = 0; i < values.size(); ++i) {
-            int    row   = rows[i];
-            int    col   = cols[i];
-            double value = values[i];
-
-            // Modify or delete the element in the sparse matrix
-            if (value != 0.0) {
-                // Update or insert the new value
-                insert(row, col, value);
-            } else {
-                // Delete the element if value is zero
-                for (size_t j = 0; j < this->rows.size(); ++j) {
-                    if (this->rows[j] == row && this->cols[j] == col) {
-                        this->rows.erase(this->rows.begin() + j);
-                        this->cols.erase(this->cols.begin() + j);
-                        this->values.erase(this->values.begin() + j);
-                        break; // Stop after deleting the entry
-                    }
-                }
-            }
-        }
+        for (size_t i = 0; i < values.size(); ++i) { modify_or_delete(rows[i], cols[i], values[i]); }
     }
 
     // Compact function to clean up the marked deletions
@@ -374,7 +339,7 @@ struct SparseMatrix {
             triplets.emplace_back(rows[i], cols[i], values[i]);
         }
 
-        eigenMatrix.setFromTriplets(triplets.begin(), triplets.end(), [](double a, double b) { return a + b; });
+        eigenMatrix.setFromTriplets(triplets.begin(), triplets.end());
         return eigenMatrix;
     }
 

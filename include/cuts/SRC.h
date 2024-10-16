@@ -37,9 +37,11 @@
 
 #include "RNG.h"
 // include nsync
+#ifdef NSYNC
 extern "C" {
 #include "nsync_mu.h"
 }
+#endif
 
 #define VRPTW_SRC_max_S_n 10000
 
@@ -146,10 +148,6 @@ public:
         }
     };
     using CutPriorityQueue = std::priority_queue<ViolatedCut, std::vector<ViolatedCut>, CompareCuts>;
-
-    void processCachedCuts(const SparseMatrix &A, const std::vector<double> &x, CutPriorityQueue &cutQueue,
-                           double violation_threshold, std::mutex &cuts_mutex, nsync::nsync_mu &mu,
-                           int max_number_of_cuts, std::vector<CachedCut> &cutCache);
 
 private:
     static std::mutex cache_mutex;
@@ -313,7 +311,6 @@ void LimitedMemoryRank1Cuts::the45Heuristic(const SparseMatrix &A, const std::ve
 
     ankerl::unordered_dense::set<uint64_t> processedSetsCache;
     ankerl::unordered_dense::set<uint64_t> processedPermutationsCache;
-    std::mutex                             cuts_mutex;    // Protect access to shared resources
     std::atomic<int>                       cuts_count(0); // Thread-safe counter for cuts
 
     // Create tasks for each selected node to parallelize
@@ -323,13 +320,14 @@ void LimitedMemoryRank1Cuts::the45Heuristic(const SparseMatrix &A, const std::ve
     exec::static_thread_pool pool(std::thread::hardware_concurrency());
     auto                     sched = pool.get_scheduler();
 
-    auto             input_sender = stdexec::just();
-    nsync::nsync_mu  mu           = NSYNC_MU_INIT;
+    auto input_sender = stdexec::just();
+#ifdef NSYNC
+    nsync::nsync_mu cuts_mutex = NSYNC_MU_INIT;
+#else
+    std::mutex cuts_mutex; // Protect access to shared resources
+#endif
     CutPriorityQueue cutQueue;
     auto            &cutCache = (T == CutType::FourRow) ? cutCache4 : cutCache5;
-
-    // Process cached cuts
-    // processCachedCuts(A, x, cutQueue, violation_threshold, cuts_mutex, mu, max_number_of_cuts, cutCache);
 
     std::vector<double>                            coefficients_aux(x.size(), 0.0);
     std::vector<std::tuple<int, std::vector<int>>> task_data; // To hold task_id and setsOf45 for each task
@@ -364,7 +362,7 @@ void LimitedMemoryRank1Cuts::the45Heuristic(const SparseMatrix &A, const std::ve
     auto bulk_sender = stdexec::bulk(
         stdexec::just(), (task_data.size() + chunk_size - 1) / chunk_size, // Calculate number of chunks
         [this, &permutations, &processedSetsCache, &processedPermutationsCache, &cuts_mutex, &x, &selectedNodes,
-         &cutQueue, &max_number_of_cuts, &max_generated_cuts, violation_threshold, &mu, &task_data,
+         &cutQueue, &max_number_of_cuts, &max_generated_cuts, violation_threshold, &task_data,
          &cuts_count](std::size_t chunk_idx) {
             // Calculate the start and end index for this chunk
             size_t           start_idx = chunk_idx * chunk_size;
@@ -602,19 +600,24 @@ void LimitedMemoryRank1Cuts::the45Heuristic(const SparseMatrix &A, const std::ve
                             cut.rhs          = rhs;
 
                             ViolatedCut vCut{alpha, cut}; // Pair: first is the violation, second is the cut
-
-                            // std::lock_guard<std::mutex> cut_lock(cuts_mutex);
+#ifndef NSYNC
+                            std::lock_guard<std::mutex> cut_lock(cuts_mutex);
+#endif
                             {
-                                nsync::nsync_mu_lock(&mu);
+#ifdef NSYNC
+                                nsync::nsync_mu_lock(&cuts_mutex);
+#endif
                                 if (cutQueue.size() < max_number_of_cuts) {
                                     cutQueue.push(vCut);
                                 } else if (cutQueue.top().first < vCut.first) { // Compare violations
                                     cutQueue.pop();                             // Remove the least violated cut
                                     cutQueue.push(vCut);
                                 }
-                                // CachedCut newCachedCut{cut, alpha};
-                                // cutCache.push_back(newCachedCut);
-                                nsync::nsync_mu_unlock(&mu);
+// CachedCut newCachedCut{cut, alpha};
+// cutCache.push_back(newCachedCut);
+#ifdef NSYNC
+                                nsync::nsync_mu_unlock(&cuts_mutex);
+#endif
                             }
                             // increment the cuts_count
                             cuts_count.fetch_add(1);

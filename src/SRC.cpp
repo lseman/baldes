@@ -130,8 +130,6 @@ std::vector<std::vector<double>> LimitedMemoryRank1Cuts::separate(const SparseMa
     exec::static_thread_pool pool(JOBS);
     auto                     sched = pool.get_scheduler();
 
-    std::mutex cuts_mutex; // Mutex to protect shared resource
-
     auto                                   nC = N_SIZE;
     std::vector<std::tuple<int, int, int>> tasks;
     tasks.reserve((nC * (nC - 1) * (nC - 2)) / 6); // Preallocate task space to avoid reallocations
@@ -144,13 +142,17 @@ std::vector<std::vector<double>> LimitedMemoryRank1Cuts::separate(const SparseMa
     }
 
     // Define chunk size to reduce parallelization overhead
-    const int       chunk_size = 10; // Adjust chunk size based on performance experiments
-    nsync::nsync_mu mu         = NSYNC_MU_INIT;
+    const int chunk_size = 10; // Adjust chunk size based on performance experiments
+#ifdef NSYNC
+    nsync::nsync_mu cuts_mutex = NSYNC_MU_INIT;
+#else
+    std::mutex cuts_mutex; // Protect access to shared resources
+#endif
 
     // Parallel execution in chunks
     auto bulk_sender = stdexec::bulk(
         stdexec::just(), (tasks.size() + chunk_size - 1) / chunk_size,
-        [this, &row_indices_map, &A, &x, nC, &cuts, &cuts_mutex, &tasks, chunk_size, &mu](std::size_t chunk_idx) {
+        [this, &row_indices_map, &A, &x, nC, &cuts, &cuts_mutex, &tasks, chunk_size](std::size_t chunk_idx) {
             size_t start_idx = chunk_idx * chunk_size;
             size_t end_idx   = std::min(start_idx + chunk_size, tasks.size());
 
@@ -177,10 +179,16 @@ std::vector<std::vector<double>> LimitedMemoryRank1Cuts::separate(const SparseMa
 
                 // If lhs violation found, insert the cut
                 if (lhs > 1.0 + 1e-3) {
-                    // print lhs
-                    nsync::nsync_mu_lock(&mu);
+// print lhs
+#ifdef NSYNC
+                    nsync::nsync_mu_lock(&cuts_mutex);
+#else
+                    std::lock_guard<std::mutex> lock(cuts_mutex);
+#endif
                     insertSet(cuts, i, j, k, buffer_int, buffer_int_n, lhs);
-                    nsync::nsync_mu_unlock(&mu);
+#ifdef NSYNC
+                    nsync::nsync_mu_unlock(&cuts_mutex);
+#endif
                 }
             }
         });
@@ -480,172 +488,4 @@ std::vector<int> LimitedMemoryRank1Cuts::selectHighestCoefficients(const std::ve
     std::reverse(selectedNodes.begin(), selectedNodes.end());
 
     return selectedNodes;
-}
-void LimitedMemoryRank1Cuts::processCachedCuts(const SparseMatrix &A, const std::vector<double> &x,
-                                               CutPriorityQueue &cutQueue, double violation_threshold,
-                                               std::mutex &cuts_mutex, nsync::nsync_mu &mu, int max_number_of_cuts,
-                                               std::vector<CachedCut> &cutCache) {
-    auto                           &selectedNodes = the45selectedNodes;
-    std::array<uint64_t, num_words> AM            = {};
-    std::array<uint64_t, num_words> baseSet       = {};
-    std::vector<int>                order(N_SIZE, 0);
-    // Iterate through the cached cuts and recompute their violations based on the new solution
-
-    for (auto &cachedCut : cutCache) {
-
-        auto &interestSet = cachedCut.cut.baseSet;
-        // define set45 as the positions where baseSet is 1
-        std::vector<int> set45;
-        int              bit_offset = 0; // This will keep track of the starting bit for each uint64_t element
-
-        // Iterate through each element of baseSet (which is a vector of uint64_t)
-        for (int i = 1; i < N_SIZE - 2; ++i) {
-            if (interestSet[i >> 6] & (1ULL << (i & 63))) { set45.push_back(i); }
-        }
-        // Recompute the violation using new results
-        double new_violation = 0;
-        for (auto j = 0; j < selectedNodes.size(); ++j) {
-            auto &consumer_inner = allPaths[selectedNodes[j]].route;
-            new_violation +=
-                computeLimitedMemoryCoefficient(cachedCut.cut.baseSet, cachedCut.cut.neighbors,
-                                                cachedCut.cut.multipliers, consumer_inner, cachedCut.cut.baseSetOrder);
-        }
-
-        // print new_violation
-        // If the violation is still above the threshold, process it further
-        if (new_violation != 0) { fmt::print("Violation: {}\n", new_violation); }
-        if (new_violation > cachedCut.cut.rhs + violation_threshold) {
-            auto               &p   = cachedCut.cut.multipliers;
-            auto               &rhs = cachedCut.cut.rhs;
-            std::vector<double> coefficients_aux(x.size(), 0.0);
-            auto               &baseSet = cachedCut.cut.baseSet;
-
-            double alpha = 0;
-
-            fmt::print("\n");
-
-            auto is_violation = [&](const ankerl::unordered_dense::set<int> &removal_set) -> bool {
-                std::array<uint64_t, num_words> tempAM; // Copy of AM to modify
-                tempAM = AM; // Use the assignment operator, as std::array supports element-wise copying.
-
-                // Temporarily remove all nodes in removal_set from AM
-                for (int node : removal_set) { tempAM[node >> 6] &= ~(1ULL << (node & 63)); }
-
-                // Recalculate alpha after removing the set of nodes
-                double reduced_alpha = 0;
-                for (auto j = 0; j < selectedNodes.size(); ++j) {
-                    const auto &consumer_inner = allPaths[selectedNodes[j]].route;
-                    reduced_alpha += computeLimitedMemoryCoefficient(baseSet, tempAM, p, consumer_inner,
-                                                                     order); // Pass tempAM by reference
-                }
-
-                return (reduced_alpha > rhs + violation_threshold); // Return true if violation remains
-            };
-
-            // Binary search to find the minimal violating set
-            auto find_minimal_violation_set =
-                [&](ankerl::unordered_dense::set<int> &current_set) -> ankerl::unordered_dense::set<int> {
-                ankerl::unordered_dense::set<int> minimal_set = current_set;
-
-                // Convert the current set to a vector to manipulate it
-                std::vector<int> nodes_vector(current_set.begin(), current_set.end());
-
-                // Shuffle the vector to ensure random element removal
-                Xoroshiro128Plus rd;
-                std::shuffle(nodes_vector.begin(), nodes_vector.end(), rd);
-
-                int low = 0, high = nodes_vector.size();
-
-                // Perform binary search with shuffled elements
-                while (low < high) {
-                    int mid = (low + high) / 2;
-
-                    // Check if removing the first half still causes a violation
-                    ankerl::unordered_dense::set<int> test_set(nodes_vector.begin() + mid, nodes_vector.end());
-                    if (is_violation(test_set)) {
-                        minimal_set = test_set;
-                        low         = mid + 1; // Narrow down search to this half
-                    } else {
-                        high = mid; // Try the smaller set
-                    }
-                }
-
-                return minimal_set;
-            };
-
-            // Start with all nodes not in the baseSet
-            ankerl::unordered_dense::set<int> current_set;
-            for (int i = 1; i < N_SIZE - 2; ++i) {
-                if (!(baseSet[i >> 6] & (1ULL << (i & 63))) && (AM[i >> 6] & (1ULL << (i & 63)))) {
-                    current_set.insert(i);
-                }
-            }
-
-            // Find the minimal violating set
-            ankerl::unordered_dense::set<int> minimalSet = find_minimal_violation_set(current_set);
-
-            // Apply the minimal set to remove nodes from AM
-            for (int i = 0; i < N_SIZE; ++i) {
-                if (minimalSet.find(i) == minimalSet.end()) {
-                    AM[i >> 6] &= ~(1ULL << (i & 63)); // Clear the bit if i is not in minimalSet
-                } else {
-                    AM[i >> 6] |= (1ULL << (i & 63)); // Set the bit if i is in minimalSet
-                }
-            }
-
-            // Recalculate alpha after applying the minimal set of nodes
-            alpha = 0;
-            for (auto j = 0; j < selectedNodes.size(); ++j) {
-                const auto &consumer_inner = allPaths[selectedNodes[j]].route;
-                alpha += computeLimitedMemoryCoefficient(baseSet, AM, p, consumer_inner, order);
-            }
-
-            // compute coefficients_aux for all the other nodes
-            for (auto k = 0; k < allPaths.size(); k++) {
-                auto &consumer_inner = allPaths[k];
-
-                int max_limit = 0;
-                if (p.size() == 4) {
-                    max_limit = 3;
-                } else if (p.size() == 5) {
-                    max_limit = 4;
-                }
-                int match_count = 0;
-                for (auto &node : set45) {
-                    if (std::ranges::find(consumer_inner, node) != consumer_inner.end()) {
-                        if (++match_count == max_limit) { break; }
-                    }
-                }
-
-                if (match_count < max_limit) continue;
-
-                std::vector<int> thePath(consumer_inner.begin(), consumer_inner.end());
-
-                double alpha_inner  = computeLimitedMemoryCoefficient(baseSet, AM, p, thePath, order);
-                coefficients_aux[k] = alpha_inner;
-            }
-
-            Cut cut(baseSet, AM, coefficients_aux, p);
-            cut.baseSetOrder = order;
-            cut.rhs          = rhs;
-
-            // Push the cut to the queue if it is violated
-            ViolatedCut vCut{new_violation, cut};
-
-            // Lock the mutex and update the priority queue
-            nsync::nsync_mu_lock(&mu);
-            if (cutQueue.size() < max_number_of_cuts) {
-                cutQueue.push(vCut);
-            } else if (cutQueue.top().first < vCut.first) { // Compare violations
-                cutQueue.pop();                             // Remove the least violated cut
-                cutQueue.push(vCut);
-            }
-            nsync::nsync_mu_unlock(&mu);
-
-            // Update the cache with the new violation value
-            std::lock_guard<std::mutex> cache_lock(cuts_mutex);
-            cachedCut.violation = new_violation;
-        }
-    }
-    cutCache.clear(); // Clear the cache after processing
 }

@@ -33,6 +33,7 @@
 #cmakedefine JEMALLOC
 #cmakedefine GUROBI
 #cmakedefine HIGHS
+#cmakedefine NSYNC
 
 // Define constants for resource sizes
 #define R_SIZE @R_SIZE@

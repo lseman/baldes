@@ -308,8 +308,8 @@ public:
 
                     std::string constraint_name = "cuts(z" + std::to_string(z) + ")";
                     // constraint_name << "cuts(z" << z << ")";
-                    auto ctr = lhs <= cut.rhs;
-                    ctr      = node->addConstr(ctr, constraint_name);
+                    // auto ctr = ;
+                    auto ctr = node->addConstr(lhs <= cut.rhs, constraint_name);
                     constraints.emplace_back(ctr);
                 }
 
@@ -724,17 +724,16 @@ public:
                 // print SRCconstraints.size()
                 if (!SRCconstraints.empty()) {
                     // print SRCconstraints size
-                    std::vector<int> SRCindices;
+                    std::vector<double> cutDuals;
+
                     for (int i = 0; i < SRCconstraints.size(); i++) {
                         auto constr = SRCconstraints[i];
                         auto index  = constr->index();
-                        SRCindices.push_back(index);
+                        cutDuals.push_back(originDuals[index]);
                     }
 
-                    std::vector<double> cutDuals;
                     // print originDuals size
                     // print cuts size
-                    for (auto &index : SRCindices) { cutDuals.push_back(originDuals[index]); }
                     cuts->setDuals(cutDuals);
                 }
 #endif

@@ -83,6 +83,7 @@ option(VERBOSE "Enable verbose output" OFF)
 option(JEMALLOC "Enable jemalloc" ON)
 option(GUROBI "Enable GUROBI" OFF)
 option(HIGHS "Enable HIGHS" OFF)
+option(NSYNC "Enable nsync" OFF)
 
 # Define the size of resources without using cache
 set(R_SIZE
@@ -217,12 +218,15 @@ cpmaddpackage(
 )
 
 # add https://github.com/google/nsync.git
+if(NSYNC)
+  set(nsync_ADDED ON)
 cpmaddpackage(
   NAME nsync GITHUB_REPOSITORY google/nsync
   GIT_TAG origin/master # or a specific version/tag
   OPTIONS
   "NSYNC_ENABLE_TESTS OFF"
 )
+endif()
 
 # include ankerl
 include_directories(${ankerl_unordered_dense_SOURCE_DIR}/include)
@@ -415,6 +419,8 @@ if(WITH_PYTHON)
   if(HIGHS)
     target_link_libraries(baldes PRIVATE highs::highs)
   endif()
+  target_link_libraries(vrptw PRIVATE nsync)
+  include_directories(${nsync_SOURCE_DIR}/public)
 endif()
 
 target_compile_options(vrptw PRIVATE -Wno-c++26-extensions
