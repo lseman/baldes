@@ -4,7 +4,8 @@
 # %%
 import os
 import sys
-
+import numpy as np
+import random
 # Add the build directory to the Python path
 sys.path.append(os.path.abspath("../../build"))
 
@@ -228,7 +229,7 @@ def solve_tsp(paths, nodes, path_costs, firsts, lasts, cost_matrix, first_time=F
             n, p1, p2, paths, path_costs, firsts, lasts, cost_matrix, num_paths
         )
 
-    print(paths)
+    #print(paths)
     # Create an environment and model
     env = gp.Env(empty=True)
     env.setParam("LogFile", "tsp.log")
@@ -383,24 +384,27 @@ for node in nodes:
     id += 1
 
 # %%
+print(nodes)
+print(len(nodes))
 # Initialize BucketGraph using these nodes
 bg = baldes.BucketGraph(nodes, 100, 1)
 bg.setOptions(options)
 
 # Create random duals with size equal to the number of nodes
-duals = [0 for _ in range(len(nodes))]
+duals = [0 for _ in range(len(nodes) + 2)]
 print(duals)
 
 # Set the distance matrix, adjacency list, and duals
 print("Setting distance matrix")
 bg.set_distance_matrix(instancia["distance_matrix"])
+bg.set_adjacency_list()
+
+print("Setting duals")
 bg.set_duals(duals)
 
-bg.set_adjacency_list()
+print("Setup")
 bg.setup()
 
-bg.set_duals(duals)
-print("Duals set")
 # %%
 
 print("Solving")

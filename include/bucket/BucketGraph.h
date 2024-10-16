@@ -106,7 +106,7 @@ public:
 
         std::vector<double> forward_cbar(fw_buckets.size());
 
-        forward_cbar = labeling_algorithm<Direction::Forward, Stage::Four, Full::Full>(q_star);
+        forward_cbar = labeling_algorithm<Direction::Forward, Stage::Four, Full::Full>();
 
         for (auto bucket : std::ranges::iota_view(0, fw_buckets_size)) {
             auto bucket_labels = fw_buckets[bucket].get_labels();
@@ -793,6 +793,7 @@ public:
      *
      */
     void setDuals(const std::vector<double> &duals) {
+        // print nodes.size
         for (size_t i = 1; i < N_SIZE - 1; ++i) { nodes[i].setDuals(duals[i - 1]); }
     }
 
