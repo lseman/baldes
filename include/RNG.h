@@ -1,14 +1,16 @@
 #ifndef XOROSHIRO128PLUS_H
 #define XOROSHIRO128PLUS_H
 
+#include <bit>
 #include <chrono>  // for std::chrono::high_resolution_clock
 #include <cstdint> // for std::uint64_t
+
 class Xoroshiro128Plus {
     std::uint64_t state0_;
     std::uint64_t state1_;
 
     // Rotate left helper function
-    static inline std::uint64_t rotl(const std::uint64_t x, int k) { return (x << k) | (x >> (64 - k)); }
+    static inline std::uint64_t rotl(const std::uint64_t x, int k) { return std::rotl(x, k); }
 
 public:
     using result_type = std::uint64_t;

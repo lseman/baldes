@@ -138,7 +138,6 @@ public:
 
     // Delete a constraint (row) from the problem
     void delete_constraint(int constraint_index) {
-        fmt::print("Deleting constraint at index {}\n", constraint_index);
         // Delete the row from the sparse matrix (assumed efficient row deletion)
         sparse_matrix.delete_row(constraint_index);
 
@@ -148,9 +147,6 @@ public:
 
         // Update the indices of the remaining constraints (this step can be costly if many constraints exist)
         for (int i = constraint_index; i < constraints.size(); ++i) { constraints[i]->set_index(i); }
-        fmt::print("Constraint deleted successfully.\n");
-        // Rebuild the row structure only if needed (if sparse_matrix requires full row structure rebuild)
-        // sparse_matrix.buildRowStart();
     }
 
     void delete_constraint(Constraint *constraint) { delete_constraint(constraint->index()); }
@@ -244,9 +240,6 @@ public:
         } else {
             expression.remove_term(var_name); // Remove the term if the value is 0
         }
-
-        // Delay calling buildRowStart() until after all updates, if possible
-        // sparse_matrix.buildRowStart();
     }
 
     void addVars(const double *lb, const double *ub, const double *obj, const VarType *vtypes, const std::string *names,
@@ -418,45 +411,27 @@ public:
 
 #endif
 
-    std::vector<double> computeSlacks(const std::vector<double> &solution) {
-        std::vector<double> slacks;
-        slacks.reserve(constraints.size()); // Reserve space upfront
-        // print solution size and b size
-        slacks = sparse_matrix.violation(solution, b);
-        return slacks;
-    }
-
     void update() { sparse_matrix.buildRowStart(); }
 
     double getSlack(int row, const std::vector<double> &solution) {
-        // Ensure the sparse matrix row structure is built
-        fmt::print("Getting slack for row {}\n", row);
-        if (sparse_matrix.is_dirty) { sparse_matrix.buildRowStart(); }
-
-        // Get the right-hand side value for this row
-        auto rhs = constraints[row]->get_rhs();
+        // Ensure the sparse matrix row structure is built (we stay in COO mode)
+        auto rhs = constraints[row]->get_rhs(); // Get the right-hand side value for this row
 
         // Compute the dot product of the solution vector and the specified row
-        double                    row_value = 0.0;
-        SparseMatrix::RowIterator it        = sparse_matrix.rowIterator(row);
+        double row_value = 0.0;
 
-        // Pre-fetch the values and reduce function calls
-        while (it.valid()) {
-            int    col_index = it.col();   // Get column index
-            double value     = it.value(); // Get matrix value
-            fmt::print("Column index: {}, Value: {}\n", col_index, value);
-            // Prefetch the next matrix value and column index for better cache locality
-            // it.prefetch();
+        // Iterate through the non-zero elements in COO format
+        for (size_t i = 0; i < sparse_matrix.rows.size(); ++i) {
+            if (sparse_matrix.rows[i] == row) {
+                int    col_index = sparse_matrix.cols[i];   // Get the column index for the current element
+                double value     = sparse_matrix.values[i]; // Get the value of the current element
 
-            // Perform the dot product in a single step
-            row_value += value * solution[col_index];
-
-            // Move to the next element
-            it.next();
+                // Perform the dot product with the corresponding element in the solution vector
+                row_value += value * solution[col_index];
+            }
         }
 
-        // Compute the slack as: slack = rhs - row_value
-        fmt::print("Row value: {}\n", row_value);
+        // Return the slack: rhs - (dot product of the row and solution)
         return rhs - row_value;
     }
 
@@ -508,7 +483,7 @@ public:
     }
 
     ModelData extractModelDataSparse() {
-        sparse_matrix.buildRowStart(); // Build the row start structure for CRS format
+        // sparse_matrix.buildRowStart(); // Build the row start structure for CRS format
         ModelData data;
         data.A_sparse = sparse_matrix;
         data.b        = b;
