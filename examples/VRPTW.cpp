@@ -229,15 +229,8 @@ int main(int argc, char *argv[]) {
     // print size of initialRoutesHGS
     initRMP(&mip, problem, initialRoutesHGS);
 
-#ifdef GUROBI
-    GRBEnv &env   = GurobiEnvSingleton::getInstance();
-    auto    model = new GRBModel(mip.toGurobiModel(env)); // Allocate a new model and assign it to the pointer
-    model->update();
-    model->optimize();
-    BNBNode *node = new BNBNode(*model);
-#else
     BNBNode *node = new BNBNode(mip);
-#endif
+
     node->paths   = paths;
     node->problem = problem;
     node->mip     = mip;

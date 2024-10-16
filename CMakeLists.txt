@@ -18,6 +18,10 @@ else()
   message(STATUS "Clang not found: using default compiler")
 endif()
 
+if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+    string(REPLACE "-fconcepts-diagnostics-depth=10" "" CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
+endif()
+
 # C++ standard
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED True)

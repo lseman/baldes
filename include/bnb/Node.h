@@ -113,23 +113,16 @@ public:
     BNBNode                    *parent = nullptr;
     std::vector<VRPCandidate *> raisedVRPChildren;
 
-#ifdef GUROBI
-    explicit BNBNode(GRBModel &eModel) {
-        solver = new GurobiSolver(&eModel);
-
-        generateUUID();
-        this->initialized = true;
-#ifdef RCC
-        CMGR_CreateCMgr(&oldCutsCMP, 100); // For old cuts, if needed
-#endif
-    };
-#else
     explicit BNBNode(const MIPProblem &eModel) {
         mip = eModel;
 
 #ifdef HIGHS
         auto highsmodel = mip.toHighsModel();
-        solver          = new HighsSolver(highsmodel);
+        solver          = new HighsSolver(mip.toHighsModel());
+#endif
+#ifdef GUROBI
+        auto gurobi_model = mip.toGurobiModel(GurobiEnvSingleton::getInstance());
+        solver            = new GurobiSolver(&gurobi_model);
 #endif
         generateUUID();
         this->initialized = true;
@@ -137,7 +130,6 @@ public:
         CMGR_CreateCMgr(&oldCutsCMP, 100); // For old cuts, if needed
 #endif
     };
-#endif
 
     void setPaths(std::vector<Path> paths) { this->paths = paths; }
 

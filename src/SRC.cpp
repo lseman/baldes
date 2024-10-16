@@ -109,9 +109,13 @@ LimitedMemoryRank1Cuts::LimitedMemoryRank1Cuts(std::vector<VRPNode> &nodes) : no
  */
 std::vector<std::vector<double>> LimitedMemoryRank1Cuts::separate(const SparseMatrix &A, const std::vector<double> &x) {
     // Create a map for non-zero entries by rows
-    std::vector<std::vector<int>> row_indices_map(A.num_rows + 1);
+    std::vector<std::vector<int>> row_indices_map(N_SIZE);
+    // print num_rows
+    // fmt::print("Num rows: {}\n", A.num_rows);
     for (int idx = 0; idx < A.values.size(); ++idx) {
         int row = A.rows[idx];
+        // fmt::print("Row: {}\n", row);
+        if (row > N_SIZE - 2) { continue; }
         row_indices_map[row + 1].push_back(idx);
     }
 
@@ -400,13 +404,11 @@ bool LimitedMemoryRank1Cuts::runSeparation(BNBNode *node, std::vector<Constraint
             SRCconstraints.erase(SRCconstraints.begin() + i);
         }
     }
-
     if (cleared) {
         node->optimize(); // Re-optimize the model
     }
     matrix   = node->extractModelDataSparse(); // Extract model data
     solution = node->extractSolution();
-
     separate(matrix.A_sparse, solution);
     prepare45Heuristic(matrix.A_sparse, solution);
     the45Heuristic<CutType::FourRow>(matrix.A_sparse, solution);
