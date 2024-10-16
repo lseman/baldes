@@ -30,6 +30,8 @@ public:
 
     double getDualVal(int i) const override { return ipm.getDuals()[i]; }
 
+    double getSlack(int i) const override { return 0.0; }
+
     void optimize(double tol = 1e-6) override { ipm.run_optimization(matrices, tol); }
 
     std::vector<double> getDuals() const override { return ipm.getDuals(); }

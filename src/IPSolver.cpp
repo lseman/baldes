@@ -38,10 +38,15 @@ void IPSolver::convert_to_standard_form(const Eigen::SparseMatrix<double> &A, co
                                         const Eigen::VectorXd &c, const Eigen::VectorXd &lb, const Eigen::VectorXd &ub,
                                         const Eigen::VectorXd &sense, Eigen::SparseMatrix<double> &As,
                                         Eigen::VectorXd &bs, Eigen::VectorXd &cs) {
-
     double infty = std::numeric_limits<double>::infinity();
     int    n     = A.rows();
     int    m     = A.cols();
+
+    if (b.size() != n || c.size() != m) {
+        // print b.size(), n, c.size(), m
+        fmt::print("b.size(): {}, n: {}, c.size(): {}, m: {}\n", b.size(), n, c.size(), m);
+        throw std::invalid_argument("Size of b or c does not match the matrix A dimensions.");
+    }
 
     // Operate directly on input vectors wherever possible to reduce copies
     Eigen::VectorXd lo = lb;
@@ -55,10 +60,6 @@ void IPSolver::convert_to_standard_form(const Eigen::SparseMatrix<double> &A, co
             ++n_free;
         } else if (std::isfinite(lo[i]) && std::isfinite(hi[i])) {
             ++n_ubounds;
-            //} else if (lo[i] == -infty && std::isfinite(hi[i])) {
-            // To be dealt with later
-            //} else if (std::isfinite(lo[i]) && hi[i] == infty) {
-            // To be dealt with later
         } else {
             throw std::runtime_error("unexpected bounds");
         }
@@ -78,7 +79,6 @@ void IPSolver::convert_to_standard_form(const Eigen::SparseMatrix<double> &A, co
     std::vector<double> val_ub;
 
     int free = 0, ubi = 0;
-    // Cache the size of lo for the outer loop
     int lo_size = lo.size();
     triplets.reserve(lo_size * 2); // Estimate the triplet size more accurately
 
@@ -95,7 +95,18 @@ void IPSolver::convert_to_standard_form(const Eigen::SparseMatrix<double> &A, co
             int    i = it.row();   // Row index
             double v = it.value(); // Value at A(i, j)
 
+            if (i < 0 || i >= n || j < 0 || j >= m) {
+                std::cerr << "Error: Invalid matrix index (i=" << i << ", j=" << j << "). Matrix dimensions are " << n
+                          << "x" << m << "." << std::endl;
+                throw std::out_of_range("Matrix index out of bounds");
+            }
+
             if (is_free_var) {
+                if (nv + free >= cs.size()) {
+                    std::cerr << "Error: Free variable index out of bounds. nv + free = " << nv + free
+                              << ", cs size = " << cs.size() << std::endl;
+                    throw std::out_of_range("Free variable index out of bounds");
+                }
                 // Free variable
                 cs[j]         = c[j];
                 cs[nv + free] = -c[j];
@@ -105,8 +116,7 @@ void IPSolver::convert_to_standard_form(const Eigen::SparseMatrix<double> &A, co
             } else if (is_bounded_var) {
                 // l <= x <= h
                 cs[j + free] = c[j];
-                bs[i] -= (v * l); // Compute once
-
+                bs[i] -= (v * l);               // Compute once
                 triplets.emplace_back(i, j, v); // Add value
 
                 ind_ub.push_back(j);
@@ -115,14 +125,12 @@ void IPSolver::convert_to_standard_form(const Eigen::SparseMatrix<double> &A, co
             } else if (is_upper_bound) {
                 // x <= h
                 cs[j] = -c[j];
-                bs[i] -= (-v * h); // Compute once
-
+                bs[i] -= (-v * h);               // Compute once
                 triplets.emplace_back(i, j, -v); // Add negated value
             } else if (is_lower_bound) {
                 // l <= x
                 cs[j] = c[j];
-                bs[i] -= (v * l); // Compute once
-
+                bs[i] -= (v * l);               // Compute once
                 triplets.emplace_back(i, j, v); // Add value
             } else {
                 throw std::runtime_error("Unexpected bounds");
@@ -134,6 +142,11 @@ void IPSolver::convert_to_standard_form(const Eigen::SparseMatrix<double> &A, co
     int slack_counter = 0;
     for (int i = 0; i < sense.size(); ++i) {
         if (sense(i) == 0) {
+            if (nv + n_free + slack_counter >= cs.size()) {
+                std::cerr << "Error: Slack variable index out of bounds. nv + n_free + slack_counter = "
+                          << nv + n_free + slack_counter << ", cs size = " << cs.size() << std::endl;
+                throw std::out_of_range("Slack variable index out of bounds");
+            }
             triplets.emplace_back(i, nv + n_free + slack_counter, 1.0);
             ++slack_counter;
         }
@@ -737,17 +750,22 @@ OptimizationData IPSolver::convertToOptimizationData(const ModelData &modelData)
     std::vector<Eigen::Triplet<double>> triplets;
     auto                                sparseMatrix = modelData.A_sparse;
 
-    // Iterate over the CRS format of SparseMatrix to build triplets
-    sparseMatrix.forEachRow([&triplets](int row, int col, double value) { triplets.emplace_back(row, col, value); });
+    optData.As = modelData.A_sparse.toEigenSparseMatrix();
 
+    // Iterate over the CRS format of SparseMatrix to build triplets
+    // for (int i = 0; i < sparseMatrix.outerSize(); ++i) {
+    //    for (Eigen::SparseMatrix<double>::InnerIterator it(sparseMatrix, i); it; ++it) {
+    //        triplets.push_back(Eigen::Triplet<double>(it.row(), it.col(), it.value()));
+    //    }
+    //}
     // Resize the Eigen sparse matrix
-    optData.As.resize(sparseMatrix.num_rows, sparseMatrix.num_cols);
+    // optData.As.resize(sparseMatrix.num_rows, sparseMatrix.num_cols);
 
     // Set the values from the triplets
-    optData.As.setFromTriplets(triplets.begin(), triplets.end());
+    // optData.As.setFromTriplets(triplets.begin(), triplets.end());
 
     // Make the matrix compressed for efficient operations
-    optData.As.makeCompressed();
+    // optData.As.makeCompressed();
 
     // Convert b to Eigen::VectorXd
     optData.bs = Eigen::VectorXd::Map(modelData.b.data(), modelData.b.size());

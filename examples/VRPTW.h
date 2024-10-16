@@ -678,6 +678,7 @@ public:
             solution         = std::get<2>(ip_result);
             nodeDuals        = std::get<3>(ip_result);
             auto originDuals = nodeDuals;
+            // print origin duals size
             for (auto &dual : nodeDuals) { dual = -dual; }
 
             lag_gap          = integer_solution - (lp_obj + std::min(0.0, inner_obj));
@@ -731,7 +732,9 @@ public:
                     }
 
                     std::vector<double> cutDuals;
-                    for (auto &index : SRCindices) { cutDuals.push_back(node->getDualVal(index)); }
+                    // print originDuals size
+                    // print cuts size
+                    for (auto &index : SRCindices) { cutDuals.push_back(originDuals[index]); }
                     cuts->setDuals(cutDuals);
                 }
 #endif

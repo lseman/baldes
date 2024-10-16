@@ -14,8 +14,8 @@ public:
         model = new Highs();
         model->passModel(highsmodel);
         model->setOptionValue("solver", "ipm");
-        // model->setOptionValue("primal_feasibility_tolerance", 1e-8);
-        // model->setOptionValue("dual_feasibility_tolerance", 1e-8);
+        //  model->setOptionValue("primal_feasibility_tolerance", 1e-8);
+        //  model->setOptionValue("dual_feasibility_tolerance", 1e-8);
         model->setOptionValue("run_crossover", "off");
         // model->setOptionValue("run_centring", true);
 
@@ -43,11 +43,14 @@ public:
 
     double getDualVal(int i) const override { return model->getSolution().row_dual[i]; }
 
+    double getSlack(int i) const override { return model->getSolution().row_value[i]; }
+
     void optimize(double tol = 1e-8) override {
         model->setOptionValue("ipm_optimality_tolerance", tol);
 
         model->run();
     }
+
     std::vector<double> getDuals() const override { return model->getSolution().row_dual; }
 
     std::vector<double> extractSolution() const override { return model->getSolution().col_value; }

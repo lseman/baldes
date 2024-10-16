@@ -118,7 +118,7 @@ public:
 
 #ifdef HIGHS
         auto highsmodel = mip.toHighsModel();
-        solver          = new HighsSolver(mip.toHighsModel());
+        solver          = new HighsSolver(highsmodel);
 #endif
 #ifdef GUROBI
         auto gurobi_model = mip.toGurobiModel(GurobiEnvSingleton::getInstance());
@@ -235,7 +235,12 @@ public:
     }
 
     double getSlack(int constraintIndex, const std::vector<double> &solution) {
+#if defined(GUROBI)
+        return solver->getSlack(constraintIndex);
+#else
         return mip.getSlack(constraintIndex, solution);
+
+#endif
     }
 
     // Binarize all variables (set to binary type)

@@ -86,7 +86,7 @@ public:
         int constraint_index = constraints.size(); // Get the current index
         // Add the constraint to the list of constraints and set its index
         auto new_constraint = new Constraint(expression, rhs, relation);
-        b.push_back(rhs);
+        b_vec.push_back(rhs);
         new_constraint->set_index(constraint_index); // Set the constraint's index
 
         constraints.push_back(new_constraint); // Add to constraints list
@@ -119,7 +119,7 @@ public:
 
         // Add the constraint to the list
         constraints.push_back(constraint);
-        b.push_back(constraint->get_rhs());
+        b_vec.push_back(constraint->get_rhs());
         // Get the expression and relation (assuming it needs to be used later)
         const LinearExpression &expression = constraint->get_expression();
 
@@ -143,7 +143,7 @@ public:
 
         // Erase the constraint from the list
         constraints.erase(constraints.begin() + constraint_index);
-        b.erase(b.begin() + constraint_index);
+        b_vec.erase(b_vec.begin() + constraint_index);
 
         // Update the indices of the remaining constraints (this step can be costly if many constraints exist)
         for (int i = constraint_index; i < constraints.size(); ++i) { constraints[i]->set_index(i); }
@@ -198,25 +198,31 @@ public:
         Constraint       *constraint = constraints[constraintIndex];
         LinearExpression &expression = constraint->get_expression();
 
-        // Iterate over the values and only update changed entries
+        // Vectors to hold batch updates for sparse matrix modification
+        std::vector<int>    batch_rows;
+        std::vector<int>    batch_cols;
+        std::vector<double> batch_values;
+
+        // Iterate over the values and accumulate batch updates
         for (int i = 0; i < values.size(); ++i) {
-            double new_value = values[i];
+            double             new_value = values[i];
+            const std::string &var_name  = variables[i].get_name();
 
-            // Update the sparse matrix only if the value has changed
-            sparse_matrix.modify_or_delete(constraintIndex, i, new_value);
-
-            const std::string &var_name = variables[i].get_name();
-
-            // Update or remove terms in the LinearExpression
+            // Update the LinearExpression
             if (new_value != 0.0) {
                 expression.add_or_update_term(var_name, new_value); // Optimized to add/update the term
             } else {
                 expression.remove_term(var_name); // Remove the term if the value is 0
             }
+
+            // Add the changes to the batch vectors
+            batch_rows.push_back(constraintIndex); // Row corresponds to the constraint index
+            batch_cols.push_back(i);               // Column corresponds to the variable index
+            batch_values.push_back(new_value);     // The new value (0.0 triggers a deletion)
         }
 
-        // Rebuild the CRS structure once after all updates
-        // sparse_matrix.buildRowStart();
+        // Perform the batch modification or deletion
+        sparse_matrix.modify_or_delete_batch(batch_rows, batch_cols, batch_values);
     }
 
     void chgCoeff(int constraintIndex, int variableIndex, double value) {
@@ -340,8 +346,6 @@ public:
     // Function to populate a HiGHS model from this MIPProblem instance
     // Function to populate a HiGHS model from this MIPProblem instance
     HighsModel toHighsModel() {
-        sparse_matrix.buildRowStart(); // Ensure CRS format is up-to-date
-
         // Create a new HiGHS model
         Highs      highs;
         HighsModel highsModel;
@@ -359,21 +363,28 @@ public:
         highsModel.lp_.col_cost_.resize(numVars);
 
         // Set variable bounds and cost
-        int var_index = 0;
-        for (const auto &var : variables) {
+        for (int var_index = 0; var_index < numVars; ++var_index) {
+            const auto &var                      = variables[var_index];
             highsModel.lp_.col_lower_[var_index] = var.get_lb();
             highsModel.lp_.col_upper_[var_index] = var.get_ub();
             highsModel.lp_.col_cost_[var_index]  = var.get_objective_coefficient();
-            var_index++;
         }
 
         // Resize vectors for constraint bounds
         highsModel.lp_.row_lower_.resize(numConstrs);
         highsModel.lp_.row_upper_.resize(numConstrs);
 
-        // Set constraint bounds
-        int row_index = 0;
-        for (const auto &constraint : constraints) {
+        // Prepare to build the constraint matrix
+        std::vector<int>    indices;                         // Indices of non-zero elements (column indices)
+        std::vector<double> values;                          // Non-zero values in the constraint matrix
+        std::vector<int>    startIndices(numConstrs + 1, 0); // Start of each row in the matrix
+
+        int nzCount = 0; // Counter for non-zero elements
+
+        // Set constraint bounds and fill in the matrix entries
+        for (int row_index = 0; row_index < numConstrs; ++row_index) {
+            const auto &constraint = constraints[row_index];
+
             double lower_bound, upper_bound;
             char   relation = constraint->get_relation();
             double rhs      = constraint->get_rhs();
@@ -391,19 +402,33 @@ public:
 
             highsModel.lp_.row_lower_[row_index] = lower_bound;
             highsModel.lp_.row_upper_[row_index] = upper_bound;
-            row_index++;
+
+            // Get the expression (sparse representation) for the constraint
+            const LinearExpression &expr = constraint->get_expression();
+
+            // Extract non-zero coefficients from LinearExpression
+            for (const auto &[var_name, coef] : expr.get_terms()) {
+                int var_index = var_name_to_index[var_name]; // You will need a helper to get the variable index
+                if (var_index >= 0) {
+                    indices.push_back(var_index); // Store column index (variable index)
+                    values.push_back(coef);       // Store coefficient value
+                    nzCount++;
+                }
+            }
+
+            startIndices[row_index + 1] = nzCount; // End index for this row
         }
 
-        // Assign sparse matrix data directly from `sparse_matrix`
-        highsModel.lp_.a_matrix_.start_  = sparse_matrix.getRowStart();
-        highsModel.lp_.a_matrix_.index_  = sparse_matrix.getIndices();
-        highsModel.lp_.a_matrix_.value_  = sparse_matrix.getValues();
-        highsModel.lp_.a_matrix_.format_ = MatrixFormat::kRowwise;
+        // Assign the matrix values to the HiGHS model
+        highsModel.lp_.a_matrix_.start_  = std::move(startIndices);
+        highsModel.lp_.a_matrix_.index_  = std::move(indices);
+        highsModel.lp_.a_matrix_.value_  = std::move(values);
+        highsModel.lp_.a_matrix_.format_ = MatrixFormat::kRowwise; // Assuming row-wise format
 
         // Set the objective direction (assuming minimization)
         highsModel.lp_.sense_ = ObjSense::kMinimize;
 
-        // Add the model to HiGHS
+        // Pass the model to HiGHS
         highs.passModel(highsModel);
 
         return highsModel;
@@ -486,7 +511,7 @@ public:
         // sparse_matrix.buildRowStart(); // Build the row start structure for CRS format
         ModelData data;
         data.A_sparse = sparse_matrix;
-        data.b        = b;
+        data.b        = b_vec;
         data.c        = c_vec;
         data.lb       = lb_vec;
         data.ub       = ub_vec;
@@ -504,7 +529,7 @@ private:
     ObjectiveType                                  objective_type; // Minimize or Maximize
     SparseMatrix                                   sparse_matrix;  // Use SparseMatrix for coefficient storage
     ankerl::unordered_dense::map<std::string, int> var_name_to_index;
-    std::vector<double>                            b;
+    std::vector<double>                            b_vec;
     std::vector<double>                            c_vec;
     std::vector<double>                            lb_vec;
     std::vector<double>                            ub_vec;
