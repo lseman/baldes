@@ -16,9 +16,17 @@
 #include "bucket/BucketSolve.h"
 #include "bucket/BucketUtils.h"
 
+#include "Arc.h"
+#include "Dual.h"
 #include "Label.h"
+#include "VRPNode.h"
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
+
+#ifdef GUROBI
+#include "gurobi_c++.h"
+#include "gurobi_c.h"
+#endif
 
 namespace py = pybind11;
 using namespace pybind11::literals; // Enables _a suffix for named arguments
@@ -95,8 +103,8 @@ PYBIND11_MODULE(baldes, m) {
         .def("phaseTwo", &BucketGraph::run_labeling_algorithms<Stage::Two, Full::Partial>)
         .def("phaseThree", &BucketGraph::run_labeling_algorithms<Stage::Three, Full::Partial>)
 #ifdef PSTEP
-        .def("setArcDuals", &BucketGraph::setArcDuals, "duals"_a)
-        .def("solvePSTEP", &BucketGraph::solvePSTEP)
+        //.def("setArcDuals", &BucketGraph::setArcDuals, "duals"_a)
+        .def("solvePSTEP", &BucketGraph::solvePSTEP, py::return_value_policy::reference)
 #endif
         .def("setOptions", &BucketGraph::setOptions, "options"_a)
         .def("phaseFour", &BucketGraph::run_labeling_algorithms<Stage::Four, Full::Partial>);

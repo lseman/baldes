@@ -138,6 +138,7 @@ void printDistanceMatrix(const std::vector<std::vector<double>> &distance) {
     }
 }
 
+#include "Simplex.h"
 /**
  * @file vrptw.cpp
  * @brief This file contains the main function for solving the Vehicle Routing Problem with Time Windows
@@ -229,8 +230,33 @@ int main(int argc, char *argv[]) {
     // print size of initialRoutesHGS
     initRMP(&mip, problem, initialRoutesHGS);
 
-    BNBNode *node = new BNBNode(mip);
+    auto data = mip.extractModelDataSparse();
+    auto A    = data.A_sparse.toEigenSparseMatrix();
+    auto b    = data.b;
+    auto c    = data.c;
 
+    // convert b to Eigen::VectorXd
+    Eigen::VectorXd b_vec = Eigen::Map<Eigen::VectorXd>(b.data(), b.size());
+    Eigen::VectorXd c_vec = Eigen::Map<Eigen::VectorXd>(c.data(), c.size());
+    // change c sign
+    c_vec = -c_vec;
+
+    // remove last row of A
+    A = A.topRows(A.rows() - 1);
+    // remove last element of b
+    b_vec.conservativeResize(b_vec.size() - 1);
+
+    // flip signs of A
+    A     = -A;
+    b_vec = -b_vec;
+    // A.conservativeResize(A.rows() - 1, Eigen::NoChange);
+    // b_vec.conservativeResize(b_vec.size() - 1);
+    // c_vec.conservativeResize(c_vec.size() - 1);
+    SimplexRevised solver(A, b_vec, c_vec);
+    solver.solve();
+
+    /*
+BNBNode *node = new BNBNode(mip);
     node->paths   = paths;
     node->problem = problem;
     node->mip     = mip;
@@ -238,6 +264,7 @@ int main(int argc, char *argv[]) {
     BranchAndBound solver(std::move(problem), BNBNodeSelectionStrategy::DFS); // Choose
     solver.setRootNode(node);
     solver.solve();
+    */
 
     // problem->CG(&model);
 

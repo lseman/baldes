@@ -252,12 +252,14 @@ std::vector<double> BucketGraph::labeling_algorithm() noexcept {
                             const auto &to_bucket_labels =
                                 buckets[to_bucket].get_labels(); // Get existing labels in the destination bucket
 
+#ifndef PSTEP
                             if constexpr (S == Stage::Four) {
                                 // Track dominance checks for this bucket
                                 if constexpr (D == Direction::Forward) {
                                     dominance_checks_per_bucket[to_bucket] += to_bucket_labels.size();
                                 }
                             }
+#endif
                             // Stage-specific dominance check
                             if constexpr (S == Stage::One) {
                                 // If the new label has lower cost, remove dominated labels
