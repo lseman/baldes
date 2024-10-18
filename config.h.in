@@ -34,6 +34,7 @@
 #cmakedefine GUROBI
 #cmakedefine HIGHS
 #cmakedefine NSYNC
+#cmakedefine CHOLMOD
 
 // Define constants for resource sizes
 #define R_SIZE @R_SIZE@

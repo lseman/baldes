@@ -12,9 +12,12 @@
 #include <stdexcept>
 #include <vector>
 
+#include "LDLTSimp.h"
+
+
 // Custom preconditioner using LDLT factorization (use a pointer to avoid reference issues)
 class LDLTPreconditioner {
-    Eigen::SimplicialLDLT<Eigen::SparseMatrix<double>, Eigen::Lower, Eigen::AMDOrdering<int>> *ldltSolver;
+    Eigen::CustomSimplicialLDLT<Eigen::SparseMatrix<double>, Eigen::Lower, Eigen::AMDOrdering<int>> *ldltSolver;
     Eigen::ComputationInfo                                                                     m_info;
     bool                                                                                       patternAnalyzed = false;
     int                                                                                        nonZeroElements = 0;
@@ -25,12 +28,12 @@ public:
 
     // Constructor with LDLT solver pointer
     LDLTPreconditioner(
-        Eigen::SimplicialLDLT<Eigen::SparseMatrix<double>, Eigen::Lower, Eigen::AMDOrdering<int>> *solver)
+        Eigen::CustomSimplicialLDLT<Eigen::SparseMatrix<double>, Eigen::Lower, Eigen::AMDOrdering<int>> *solver)
         : ldltSolver(solver), m_info(Eigen::Success) {}
 
     // Set the LDLT solver (in case we use the default constructor)
     void
-    setLDLTSolver(Eigen::SimplicialLDLT<Eigen::SparseMatrix<double>, Eigen::Lower, Eigen::AMDOrdering<int>> *solver) {
+    setLDLTSolver(Eigen::CustomSimplicialLDLT<Eigen::SparseMatrix<double>, Eigen::Lower, Eigen::AMDOrdering<int>> *solver) {
         ldltSolver = solver;
     }
 
@@ -51,11 +54,11 @@ public:
             double                      regularization = 1e-5;   // Initial regularization term
 
             // Attempt to regularize and factorize up to 3 times
-            const int maxAttempts = 1;
+            const int maxAttempts = 3;
             for (int attempt = 1; attempt <= maxAttempts; ++attempt) {
                 applySelectiveRegularization(regMatrix, regularization); // Apply increasing regularization
 
-                ldltSolver->factorize(matrix); // Analyze the sparsity pattern and factorize
+                ldltSolver->factorize(regMatrix); // Analyze the sparsity pattern and factorize
 
                 if (ldltSolver->info() == Eigen::Success) {
                     m_info = Eigen::Success; // Successfully factorized after regularization
@@ -207,12 +210,12 @@ public:
  * @brief A class to perform sparse Cholesky factorization.
  *
  * This class provides an interface to perform sparse Cholesky factorization
- * on a given sparse matrix. It uses Eigen's SimplicialLDLT decomposition
+ * on a given sparse matrix. It uses Eigen's CustomSimplicialLDLT decomposition
  * to factorize the matrix and solve linear systems efficiently.
  */
 class LDLTSolver {
-    Eigen::SimplicialLDLT<Eigen::SparseMatrix<double>, Eigen::Lower, Eigen::AMDOrdering<int>> solver;
-    Eigen::SimplicialLDLT<Eigen::SparseMatrix<double>, Eigen::Lower, Eigen::AMDOrdering<int>> solverBackup;
+    Eigen::CustomSimplicialLDLT<Eigen::SparseMatrix<double>, Eigen::Lower, Eigen::AMDOrdering<int>> solver;
+    Eigen::CustomSimplicialLDLT<Eigen::SparseMatrix<double>, Eigen::Lower, Eigen::AMDOrdering<int>> solverBackup;
 
     bool                        initialized          = false;
     bool                        patternAnalyzed      = false;
@@ -252,7 +255,7 @@ public:
             double                      regularization = 1e-5;              // Initial regularization term
 
             // Attempt to regularize and factorize up to 3 times
-            const int maxAttempts = 1;
+            const int maxAttempts = 3;
             for (int attempt = 1; attempt <= maxAttempts; ++attempt) {
                 applySelectiveRegularization(regMatrix, regularization); // Apply increasing regularization
 

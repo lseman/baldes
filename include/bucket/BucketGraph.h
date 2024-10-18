@@ -20,6 +20,8 @@
 
 #pragma once
 
+#include "UnionFind.h"
+
 #include "Definitions.h"
 
 #include "Cut.h"
@@ -484,7 +486,7 @@ public:
 
     // Common Tools
     static void          initInfo();
-    std::vector<Label *> solve();
+    std::vector<Label *> solve(bool trigger = false);
     std::vector<Label *> solveHeuristic();
     void                 common_initialization();
     void                 setup();
@@ -912,6 +914,8 @@ public:
     template <Direction D, Stage S, Full F>
     std::vector<double> labeling_algorithm() noexcept;
 
+    UnionFind fw_union_find;
+    UnionFind bw_union_find;
     template <Direction D>
     int get_bucket_number(int node, const std::vector<double> &values) noexcept;
 

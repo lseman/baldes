@@ -471,7 +471,7 @@ void LimitedMemoryRank1Cuts::the45Heuristic(const SparseMatrix &A, const std::ve
                                 [&](std::bitset<N_SIZE> &current_bitset) -> std::bitset<N_SIZE> {
                                 std::bitset<N_SIZE> minimal_bitset = current_bitset;
 
-                                int    population_size = 10;  // Number of candidates in each generation
+                                int    population_size = 20;  // Number of candidates in each generation
                                 int    max_generations = 5;   // Number of generations
                                 double mutation_rate   = 0.3; // Probability of mutating a bit
                                 std::vector<std::bitset<N_SIZE>> population;

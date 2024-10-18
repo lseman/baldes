@@ -663,7 +663,7 @@ public:
 #endif
 
 #ifdef IPM
-            auto d = 1;
+            auto d = 10;
             matrix = node->extractModelDataSparse();
             gap    = std::abs(lp_obj - (lp_obj + std::min(0.0, inner_obj))) / std::abs(lp_obj);
             gap    = gap / d;
@@ -689,7 +689,7 @@ public:
 #endif
 #ifdef STAB
             stab.update_stabilization_after_master_optim(nodeDuals);
-            nodeDuals = stab.getStabDualSolAdvanced(nodeDuals);
+            nodeDuals = stab.getStabDualSol(nodeDuals);
 
             misprice = true;
             while (misprice) {
@@ -757,7 +757,11 @@ public:
                 //////////////////////////////////////////////////////////////////////
                 // CALLING BALDES
                 //////////////////////////////////////////////////////////////////////
-                paths     = bucket_graph.solve();
+                if (bucket_graph.s4 && iter % 250 == 0) {
+                    paths = bucket_graph.solve(true);
+                } else {
+                    paths = bucket_graph.solve();
+                }
                 inner_obj = bucket_graph.inner_obj;
                 stage     = bucket_graph.getStage();
                 ss        = bucket_graph.ss;
@@ -1035,7 +1039,7 @@ public:
             stab.update_stabilization_after_master_optim(nodeDuals);
             misprice = true;
             while (misprice) {
-                nodeDuals = stab.getStabDualSolAdvanced(nodeDuals);
+                nodeDuals = stab.getStabDualSol(nodeDuals);
                 solution  = node->extractSolution();
 #endif
 
