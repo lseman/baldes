@@ -1,0 +1,26 @@
+<map id="BucketGraph::setup" name="BucketGraph::setup">
+<area shape="rect" id="Node000001" title="Sets up the initial configuration for the BucketGraph." alt="" coords="5,145,141,170"/>
+<area shape="rect" id="Node000002" href="$classBucketGraph.html#a78afa4d3e7c6078f874480c68f43caff" title="Generates arcs in both forward and backward directions in parallel." alt="" coords="201,70,386,96"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="100,142,188,104,211,98,212,103,190,110,102,147"/>
+<area shape="rect" id="Node000010" href="$classBucketGraph.html#a32da6366cb0593f095b3e74c5dd545e9" title=" " alt="" coords="214,120,374,145"/>
+<area shape="poly" id="edge9_Node000001_Node000010" title=" " alt="" coords="141,147,199,141,199,146,141,153"/>
+<area shape="rect" id="Node000011" href="$classBucketGraph.html#a58056ca20a0ce8faec01ee264cc85b85" title="Sets the adjacency list for the BucketGraph." alt="" coords="189,169,399,194"/>
+<area shape="poly" id="edge10_Node000001_Node000011" title=" " alt="" coords="141,162,173,166,173,171,141,168"/>
+<area shape="rect" id="Node000013" href="$structVRPNode.html#ab20eeca7f8098a35c08c7bd743e5798a" title="Sorts the forward and backward arcs based on their priority." alt="" coords="224,218,364,244"/>
+<area shape="poly" id="edge12_Node000001_Node000013" title=" " alt="" coords="103,169,190,204,212,211,211,216,188,210,101,174"/>
+<area shape="poly" id="edge3_Node000002_Node000002" title=" " alt="" coords="257,71,250,62,254,52,269,46,294,44,321,46,335,53,332,58,319,51,294,49,270,51,258,56,255,61,261,68"/>
+<area shape="rect" id="Node000003" href="$classBucketGraph.html#aa9eea9800ea6652e736b960a729f2c14" title=" " alt="" coords="450,46,623,72"/>
+<area shape="poly" id="edge2_Node000002_Node000003" title=" " alt="" coords="387,71,435,66,435,72,387,76"/>
+<area shape="rect" id="Node000004" href="$classBucketGraph.html#a2925857b35aa31c3c5af4a2795840b98" title="Handles the computation of Strongly Connected Components (SCCs) for the BucketGraph." alt="" coords="447,96,626,121"/>
+<area shape="poly" id="edge4_Node000002_Node000004" title=" " alt="" coords="387,90,432,95,431,100,387,95"/>
+<area shape="rect" id="Node000005" href="$classBucketGraph.html#af129eff306551dc7cc7fe00b919bbbd0" title="Assigns the buckets based on the specified direction." alt="" coords="710,5,851,46"/>
+<area shape="poly" id="edge5_Node000004_Node000005" title=" " alt="" coords="594,92,625,82,649,69,673,55,695,47,697,52,675,60,652,73,627,87,596,97"/>
+<area shape="rect" id="Node000006" href="$classSCC.html#a1c3c0a300e9234ccf344072b1f2c949b" title="Converts an unordered map representation of a graph into an internal graph representation." alt="" coords="674,70,887,96"/>
+<area shape="poly" id="edge6_Node000004_Node000006" title=" " alt="" coords="626,96,658,93,659,98,627,102"/>
+<area shape="rect" id="Node000008" href="$classSCC.html#afdc7bf9b9ebc6853227b86fe4cb151ea" title="Finds and returns all Strongly Connected Components (SCCs) in the graph using Tarjan&#39;s algorithm." alt="" coords="724,120,837,145"/>
+<area shape="poly" id="edge7_Node000004_Node000008" title=" " alt="" coords="627,115,709,123,708,128,627,120"/>
+<area shape="rect" id="Node000009" href="$classSCC.html#a62703561fe2b0e0a6f7961b09778ff6e" title="Computes the topological order of Strongly Connected Components (SCCs) in a directed graph." alt="" coords="682,169,879,194"/>
+<area shape="poly" id="edge8_Node000004_Node000009" title=" " alt="" coords="572,119,675,155,701,162,699,167,674,160,570,124"/>
+<area shape="rect" id="Node000012" href="$classBucketGraph.html#ad15267e0cffaa8dc5222028409c9e082" title=" " alt="" coords="470,169,604,194"/>
+<area shape="poly" id="edge11_Node000011_Node000012" title=" " alt="" coords="399,179,454,179,454,184,399,184"/>
+</map>

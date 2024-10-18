@@ -1,0 +1,11 @@
+<map id="Branching::createChildNodes" name="Branching::createChildNodes">
+<area shape="rect" id="Node000001" title="This function creates two child nodes based on the selected branching candidate." alt="" coords="5,35,194,60"/>
+<area shape="rect" id="Node000002" href="$classBNBNode.html#a836f57043aee50b30ca1bb91e15a31f6" title=" " alt="" coords="242,35,381,60"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="194,45,226,45,226,50,194,50"/>
+<area shape="rect" id="Node000003" href="$classBNBNode.html#afdb4b4b2044c2c229b1b3536d6e83af5" title=" " alt="" coords="429,35,574,60"/>
+<area shape="poly" id="edge2_Node000002_Node000003" title=" " alt="" coords="381,45,413,45,413,50,381,50"/>
+<area shape="rect" id="Node000004" href="$classBNBNode.html#a17edf3264d46bd38e762a445c9500bee" title=" " alt="" coords="622,5,792,31"/>
+<area shape="poly" id="edge3_Node000003_Node000004" title=" " alt="" coords="574,35,606,30,607,35,575,40"/>
+<area shape="rect" id="Node000005" href="$classGurobiEnvSingleton.html#a49c3ce63088629c2246dec252a73df16" title=" " alt="" coords="639,55,775,96"/>
+<area shape="poly" id="edge4_Node000003_Node000005" title=" " alt="" coords="575,55,624,62,624,67,574,60"/>
+</map>

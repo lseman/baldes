@@ -1,0 +1,6 @@
+<map id="BucketGraph::process_all_resources" name="BucketGraph::process_all_resources">
+<area shape="rect" id="Node000001" title="Processes all resources by iterating through them and applying constraints." alt="" coords="5,29,155,70"/>
+<area shape="poly" id="edge1_Node000001_Node000001" title=" " alt="" coords="42,29,41,19,47,10,60,5,80,3,102,5,114,11,112,16,100,10,80,8,61,10,50,15,46,20,48,28"/>
+<area shape="rect" id="Node000002" href="$classBucketGraph.html#a8c8aa714321bd215f33c331fdd34f0e0" title="Processes a resource based on its disposability type and direction." alt="" coords="203,29,352,70"/>
+<area shape="poly" id="edge2_Node000001_Node000002" title=" " alt="" coords="155,47,187,47,187,52,155,52"/>
+</map>

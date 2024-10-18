@@ -1,0 +1,25 @@
+<map id="SolverInterface.h" name="SolverInterface.h">
+<area shape="rect" id="Node000001" title=" " alt="" coords="140,5,260,31"/>
+<area shape="rect" id="Node000002" href="$Gurobi_8h.html" title=" " alt="" coords="5,79,75,105"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="160,40,68,81,66,76,158,35"/>
+<area shape="rect" id="Node000003" href="$HighsSolver_8h.html" title=" " alt="" coords="98,79,200,105"/>
+<area shape="poly" id="edge2_Node000001_Node000003" title=" " alt="" coords="185,45,160,80,156,77,181,42"/>
+<area shape="rect" id="Node000004" href="$IPM_8h.html" title=" " alt="" coords="224,79,280,105"/>
+<area shape="poly" id="edge3_Node000001_Node000004" title=" " alt="" coords="220,42,245,77,241,80,215,45"/>
+<area shape="rect" id="Node000005" href="$Node_8h.html" title="Node class implementation." alt="" coords="304,79,366,105"/>
+<area shape="poly" id="edge4_Node000001_Node000005" title=" " alt="" coords="238,36,313,76,310,81,235,41"/>
+<area shape="rect" id="Node000006" href="$BNB_8h.html" title=" " alt="" coords="209,226,268,252"/>
+<area shape="poly" id="edge5_Node000005_Node000006" title=" " alt="" coords="290,109,215,134,186,146,171,154,167,164,167,173,178,192,197,209,218,224,215,228,193,214,174,195,162,174,162,162,167,151,183,141,214,129,288,104"/>
+<area shape="rect" id="Node000007" href="$Branching_8h.html" title=" " alt="" coords="182,153,271,178"/>
+<area shape="poly" id="edge6_Node000005_Node000007" title=" " alt="" coords="305,116,247,154,244,150,302,111"/>
+<area shape="rect" id="Node000008" href="$Problem_8h.html" title=" " alt="" coords="295,153,374,178"/>
+<area shape="poly" id="edge7_Node000005_Node000008" title=" " alt="" coords="329,120,330,152,325,152,323,120"/>
+<area shape="rect" id="Node000009" href="$RCC_8cpp.html" title=" " alt="" coords="398,153,471,178"/>
+<area shape="poly" id="edge10_Node000005_Node000009" title=" " alt="" coords="366,112,419,150,416,154,362,116"/>
+<area shape="rect" id="Node000010" href="$SRC_8cpp.html" title="Implementation of functions and classes for solving VRP problems using Limited Memory Rank&#45;1 Cuts." alt="" coords="494,153,567,178"/>
+<area shape="poly" id="edge11_Node000005_Node000010" title=" " alt="" coords="381,107,498,150,496,155,379,112"/>
+<area shape="rect" id="Node000011" href="$TR_8h.html" title=" " alt="" coords="590,153,639,178"/>
+<area shape="poly" id="edge12_Node000005_Node000011" title=" " alt="" coords="382,101,579,150,591,153,589,159,578,155,381,106"/>
+<area shape="poly" id="edge9_Node000008_Node000005" title=" " alt="" coords="341,137,339,105,344,105,346,137"/>
+<area shape="poly" id="edge8_Node000008_Node000006" title=" " alt="" coords="308,190,256,228,253,224,305,186"/>
+</map>

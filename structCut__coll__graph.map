@@ -1,0 +1,5 @@
+<map id="Cut" name="Cut">
+<area shape="rect" id="Node000001" title="Represents a cut in the optimization problem." alt="" coords="25,94,66,120"/>
+<area shape="rect" id="Node000002" href="$classConstraint.html" title="Represents a linear constraint in a mathematical optimization problem." alt="" coords="5,5,86,31"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="48,47,48,94,43,94,43,47"/>
+</map>

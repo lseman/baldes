@@ -1,0 +1,7 @@
+<map id="Stabilization::dynamic_alpha_schedule" name="Stabilization::dynamic_alpha_schedule">
+<area shape="rect" id="Node000001" title="Computes the dynamic alpha schedule for stabilization." alt="" coords="5,23,151,64"/>
+<area shape="rect" id="Node000002" href="$classStabilization.html#a4f4e3b43fbae641f421179c3519a7ff7" title="Computes the Euclidean norm (L2 norm) of a given vector." alt="" coords="199,5,325,31"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="151,31,183,26,184,32,151,36"/>
+<area shape="rect" id="Node000003" href="$classStabilization.html#a0cce2fc1c13a1c8f7ef75bcd99ffc9f0" title=" " alt="" coords="203,55,321,80"/>
+<area shape="poly" id="edge2_Node000001_Node000003" title=" " alt="" coords="151,50,188,55,187,60,151,56"/>
+</map>

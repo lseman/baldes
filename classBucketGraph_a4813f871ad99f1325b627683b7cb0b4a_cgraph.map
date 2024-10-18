@@ -1,0 +1,15 @@
+<map id="BucketGraph::compute_label" name="BucketGraph::compute_label">
+<area shape="rect" id="Node000001" title=" " alt="" coords="5,72,159,113"/>
+<area shape="rect" id="Node000002" href="$classLabelPool.html#aedbe90cd72089f2c41bc4d430735a41a" title=" " alt="" coords="224,5,352,31"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="130,70,206,40,224,34,226,39,208,45,132,74"/>
+<area shape="rect" id="Node000004" href="$classBucketGraph.html#ad15267e0cffaa8dc5222028409c9e082" title=" " alt="" coords="221,55,355,80"/>
+<area shape="poly" id="edge3_Node000001_Node000004" title=" " alt="" coords="159,81,205,75,205,80,159,86"/>
+<area shape="rect" id="Node000005" href="$classBranchingDuals.html#a6f05e954c84d95a9f62a00b8edb1d8a4" title=" " alt="" coords="207,104,369,130"/>
+<area shape="poly" id="edge4_Node000001_Node000005" title=" " alt="" coords="159,99,191,103,191,108,159,104"/>
+<area shape="rect" id="Node000007" href="$classBranchingDuals.html#a8cfa95af83dab193f7dfd2ffee2b841a" title=" " alt="" coords="217,153,358,179"/>
+<area shape="poly" id="edge6_Node000001_Node000007" title=" " alt="" coords="134,111,208,140,226,146,224,151,206,145,132,116"/>
+<area shape="rect" id="Node000003" href="$structLabel.html#a6653f9b3efc57ca65e4c92b9eb6dbb46" title="Resets the state of the object to its initial values." alt="" coords="435,5,523,31"/>
+<area shape="poly" id="edge2_Node000002_Node000003" title=" " alt="" coords="352,16,419,16,419,21,352,21"/>
+<area shape="rect" id="Node000006" href="$classArcDuals.html#ac75e53f0c4f24e6aca539c544e9f8109" title=" " alt="" coords="417,104,541,130"/>
+<area shape="poly" id="edge5_Node000005_Node000006" title=" " alt="" coords="369,114,401,114,401,120,369,120"/>
+</map>

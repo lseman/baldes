@@ -1,0 +1,15 @@
+<map id="Branching::applyBranchingConstraints" name="Branching::applyBranchingConstraints">
+<area shape="rect" id="Node000001" title=" " alt="" coords="5,35,179,75"/>
+<area shape="rect" id="Node000002" href="$classBranching.html#a566795d3ba0ec5046b3621454b1ce2ef" title=" " alt="" coords="227,5,392,46"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="178,41,211,36,212,42,179,46"/>
+<area shape="rect" id="Node000004" href="$classBNBNode.html#a836f57043aee50b30ca1bb91e15a31f6" title=" " alt="" coords="240,70,379,96"/>
+<area shape="poly" id="edge3_Node000001_Node000004" title=" " alt="" coords="179,64,224,69,224,75,178,69"/>
+<area shape="rect" id="Node000003" href="$classBNBNode.html#a89a72572aa75070eeb3d23589131f3ff" title=" " alt="" coords="440,13,664,38"/>
+<area shape="poly" id="edge2_Node000002_Node000003" title=" " alt="" coords="393,23,424,23,424,28,393,28"/>
+<area shape="rect" id="Node000005" href="$classBNBNode.html#afdb4b4b2044c2c229b1b3536d6e83af5" title=" " alt="" coords="480,70,625,96"/>
+<area shape="poly" id="edge4_Node000004_Node000005" title=" " alt="" coords="379,80,464,80,464,86,379,86"/>
+<area shape="rect" id="Node000006" href="$classBNBNode.html#a17edf3264d46bd38e762a445c9500bee" title=" " alt="" coords="712,41,882,66"/>
+<area shape="poly" id="edge5_Node000005_Node000006" title=" " alt="" coords="625,72,696,63,697,68,625,77"/>
+<area shape="rect" id="Node000007" href="$classGurobiEnvSingleton.html#a49c3ce63088629c2246dec252a73df16" title=" " alt="" coords="729,91,865,131"/>
+<area shape="poly" id="edge6_Node000005_Node000007" title=" " alt="" coords="625,89,714,99,713,104,625,94"/>
+</map>

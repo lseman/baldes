@@ -1,0 +1,40 @@
+<map id="BucketGraph::heuristic_fixing" name="BucketGraph::heuristic_fixing">
+<area shape="rect" id="Node000001" title="Applies heuristic fixing to the current solution." alt="" coords="5,163,158,204"/>
+<area shape="rect" id="Node000002" href="$classBucketGraph.html#ae66be852d4827d04e368e208b63f9240" title="Initializes the BucketGraph by clearing previous data and setting up forward and backward buckets." alt="" coords="215,48,368,89"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="108,160,152,129,204,98,215,93,217,98,207,103,155,134,112,165"/>
+<area shape="rect" id="Node000007" href="$classBucketGraph.html#ad15267e0cffaa8dc5222028409c9e082" title=" " alt="" coords="225,113,359,139"/>
+<area shape="poly" id="edge6_Node000001_Node000007" title=" " alt="" coords="157,160,227,141,228,146,159,165"/>
+<area shape="rect" id="Node000008" href="$classBucketGraph.html#a2379392ccc37be9a4a27800b116465d2" title="Resets all fixed arcs in the graph." alt="" coords="226,163,358,204"/>
+<area shape="poly" id="edge7_Node000001_Node000008" title=" " alt="" coords="158,181,210,181,210,186,158,186"/>
+<area shape="rect" id="Node000009" href="$classBucketGraph.html#a3e1492bb1589d5edb06e80a753d000dd" title="Resets the forward and backward label pools." alt="" coords="210,228,374,254"/>
+<area shape="poly" id="edge8_Node000001_Node000009" title=" " alt="" coords="159,202,228,221,227,226,157,207"/>
+<area shape="rect" id="Node000011" href="$classBucketGraph.html#a66484f0fb3c999584f77880b3dd54f7c" title="Runs forward and backward labeling algorithms in parallel and synchronizes the results." alt="" coords="206,278,378,318"/>
+<area shape="poly" id="edge10_Node000001_Node000011" title=" " alt="" coords="112,202,155,233,207,264,217,269,215,274,204,268,152,237,108,207"/>
+<area shape="rect" id="Node000003" href="$classLabelPool.html#aedbe90cd72089f2c41bc4d430735a41a" title=" " alt="" coords="440,113,568,139"/>
+<area shape="poly" id="edge2_Node000002_Node000003" title=" " alt="" coords="370,87,441,106,439,111,368,92"/>
+<area shape="rect" id="Node000005" href="$classBucketGraph.html#af129eff306551dc7cc7fe00b919bbbd0" title="Assigns the buckets based on the specified direction." alt="" coords="876,220,1017,261"/>
+<area shape="poly" id="edge4_Node000002_Node000005" title=" " alt="" coords="353,45,447,21,504,11,565,4,628,3,692,9,754,24,812,49,855,82,889,124,916,167,934,205,929,208,911,169,885,127,851,86,809,54,752,29,691,15,628,9,565,10,505,16,448,26,354,50"/>
+<area shape="rect" id="Node000006" href="$classBucketGraph.html#ad36a543a58c7d3cd4ded313dd5069f03" title="Marks a node as visited in the bitmap." alt="" coords="426,48,582,89"/>
+<area shape="poly" id="edge5_Node000002_Node000006" title=" " alt="" coords="369,66,411,66,411,71,369,71"/>
+<area shape="rect" id="Node000004" href="$structLabel.html#a6653f9b3efc57ca65e4c92b9eb6dbb46" title="Resets the state of the object to its initial values." alt="" coords="676,64,765,90"/>
+<area shape="poly" id="edge3_Node000003_Node000004" title=" " alt="" coords="563,110,660,88,662,93,564,115"/>
+<area shape="rect" id="Node000010" href="$classLabelPool.html#a8bb7cc6c649e13a657a840ca96ab133e" title=" " alt="" coords="447,228,561,254"/>
+<area shape="poly" id="edge9_Node000009_Node000010" title=" " alt="" coords="374,238,432,238,432,243,374,243"/>
+<area shape="rect" id="Node000012" href="$classBucketGraph.html#a82666ba5c89a565cc9e58f1d66f61119" title=" " alt="" coords="430,278,578,318"/>
+<area shape="poly" id="edge11_Node000011_Node000012" title=" " alt="" coords="378,295,415,295,415,301,378,301"/>
+<area shape="poly" id="edge12_Node000012_Node000005" title=" " alt="" coords="578,275,630,263,750,249,860,241,860,246,751,254,631,269,579,280"/>
+<area shape="rect" id="Node000013" href="$BucketAVX_8h.html#abfb8a86d40957ca5a1669210b3ef01b3" title="Checks if a new label is dominated by any label in a given vector using SIMD operations." alt="" coords="859,388,1034,429"/>
+<area shape="poly" id="edge13_Node000012_Node000013" title=" " alt="" coords="579,314,631,327,847,382,846,387,630,333,577,319"/>
+<area shape="rect" id="Node000014" href="$classBucketGraph.html#a281aecc3cd0ebf2089765105c1e430b3" title="Determines if a label is dominated in component&#45;wise smaller buckets." alt="" coords="632,443,809,484"/>
+<area shape="poly" id="edge14_Node000012_Node000014" title=" " alt="" coords="522,317,567,373,598,403,632,429,638,433,636,438,629,434,594,407,563,376,518,321"/>
+<area shape="rect" id="Node000017" href="$classBucketGraph.html#a2095bb4e07ffe9285ee1c2143a5a9dec" title=" " alt="" coords="649,393,792,419"/>
+<area shape="poly" id="edge16_Node000012_Node000017" title=" " alt="" coords="537,317,581,344,631,372,663,385,661,390,629,376,578,349,534,321"/>
+<area shape="rect" id="Node000018" href="$classBucketGraph.html#abc324fb45e794482eb642adb8b0f664d" title="Retrieves the best label from the bucket graph based on the given topological order,..." alt="" coords="644,278,797,318"/>
+<area shape="poly" id="edge17_Node000012_Node000018" title=" " alt="" coords="578,295,628,295,628,301,578,301"/>
+<area shape="rect" id="Node000019" href="$classBucketGraph.html#a469baec04539f3c8ae984f5558fbfc25" title="Checks if a label is dominated by a new label based on cost and resource conditions." alt="" coords="630,113,811,139"/>
+<area shape="poly" id="edge19_Node000012_Node000019" title=" " alt="" coords="567,275,580,264,592,250,598,236,603,207,608,178,616,164,628,149,634,145,637,149,632,153,620,167,613,180,608,208,603,238,596,253,584,268,570,279"/>
+<area shape="rect" id="Node000020" href="$classBucketGraph.html#acb7b845b8a4d452a0ac15daad1df3927" title="Marks a node as unreachable in the given bitmap." alt="" coords="642,163,799,204"/>
+<area shape="poly" id="edge20_Node000012_Node000020" title=" " alt="" coords="561,275,581,264,605,242,629,220,648,209,651,213,632,224,608,246,584,268,563,280"/>
+<area shape="poly" id="edge15_Node000014_Node000013" title=" " alt="" coords="807,440,844,431,846,436,808,445"/>
+<area shape="poly" id="edge18_Node000018_Node000005" title=" " alt="" coords="797,276,860,260,861,265,798,281"/>
+</map>

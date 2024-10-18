@@ -1,0 +1,5 @@
+<map id="Path::precomputeArcs" name="Path::precomputeArcs">
+<area shape="rect" id="Node000001" title="Precomputes arcs for the given route." alt="" coords="5,5,155,31"/>
+<area shape="rect" id="Node000002" href="$structPath.html#a9bfe312035b311ca48547527da66d614" title="Adds an arc between two nodes and increments its count in the arc map." alt="" coords="203,5,298,31"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="155,16,187,16,187,21,155,21"/>
+</map>

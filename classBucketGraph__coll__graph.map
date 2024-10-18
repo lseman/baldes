@@ -1,0 +1,17 @@
+<map id="BucketGraph" name="BucketGraph">
+<area shape="rect" id="Node000001" title="Represents a graph structure used for bucket&#45;based optimization in a solver." alt="" coords="394,198,492,223"/>
+<area shape="rect" id="Node000002" href="$structBucketOptions.html" title=" " alt="" coords="5,94,113,120"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="90,126,132,150,180,171,236,186,294,196,394,205,393,211,293,201,235,191,178,176,130,155,88,131"/>
+<area shape="rect" id="Node000003" href="$classBranchingDuals.html" title=" " alt="" coords="136,94,248,120"/>
+<area shape="poly" id="edge2_Node000001_Node000003" title=" " alt="" coords="216,128,244,151,276,171,336,192,394,202,393,207,335,197,274,176,241,156,213,133"/>
+<area shape="rect" id="Node000004" href="$classIteratedLocalSearch.html" title=" " alt="" coords="272,94,411,120"/>
+<area shape="poly" id="edge3_Node000001_Node000004" title=" " alt="" coords="366,129,433,195,429,199,362,132"/>
+<area shape="rect" id="Node000005" href="$structInstanceData.html" title="A structure to hold various data related to an instance of a problem." alt="" coords="292,5,391,31"/>
+<area shape="poly" id="edge4_Node000004_Node000005" title=" " alt="" coords="344,47,344,94,339,94,339,47"/>
+<area shape="rect" id="Node000006" href="$classCutStorage.html" title="Manages the storage and operations related to cuts in a solver." alt="" coords="434,94,521,120"/>
+<area shape="poly" id="edge5_Node000001_Node000006" title=" " alt="" coords="471,135,450,198,445,196,466,134"/>
+<area shape="rect" id="Node000007" href="$classLabelPool.html" title="A class that manages a pool of Label objects." alt="" coords="545,94,624,120"/>
+<area shape="poly" id="edge6_Node000001_Node000007" title=" " alt="" coords="575,135,562,156,543,176,519,191,493,201,491,196,517,186,540,172,558,153,571,132"/>
+<area shape="rect" id="Node000008" href="$classUnionFind.html" title=" " alt="" coords="658,94,738,120"/>
+<area shape="poly" id="edge7_Node000001_Node000008" title=" " alt="" coords="690,135,677,157,658,176,628,188,585,197,492,208,492,203,584,192,626,183,655,171,673,154,685,132"/>
+</map>

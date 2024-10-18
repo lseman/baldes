@@ -1,0 +1,9 @@
+<map id="BNBNode::extractModelDataSparse" name="BNBNode::extractModelDataSparse">
+<area shape="rect" id="Node000001" title=" " alt="" coords="5,23,193,64"/>
+<area shape="rect" id="Node000002" href="$classMIPProblem.html#ae1444b927d088a4f9d35dfe604aeb7d9" title=" " alt="" coords="241,23,414,64"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="193,41,225,41,225,46,193,46"/>
+<area shape="rect" id="Node000003" href="$classMIPProblem.html#a00841d8835fad12f1b35e83d7b5cf9a5" title=" " alt="" coords="462,5,628,31"/>
+<area shape="poly" id="edge2_Node000002_Node000003" title=" " alt="" coords="414,31,446,27,447,32,415,36"/>
+<area shape="rect" id="Node000004" href="$classMIPProblem.html#a29674f674d7f14b118a031cdf734611e" title=" " alt="" coords="464,55,626,80"/>
+<area shape="poly" id="edge3_Node000002_Node000004" title=" " alt="" coords="415,50,448,54,448,59,414,56"/>
+</map>

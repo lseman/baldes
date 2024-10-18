@@ -1,0 +1,17 @@
+<map id="Node.h" name="Node.h">
+<area shape="rect" id="Node000001" title="Node class implementation." alt="" coords="145,5,207,31"/>
+<area shape="rect" id="Node000002" href="$BNB_8h.html" title=" " alt="" coords="50,153,110,178"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="130,25,99,30,66,41,36,57,13,81,9,90,9,99,19,118,38,136,59,150,56,154,35,140,15,121,4,100,3,89,8,77,33,53,64,36,97,25,129,20"/>
+<area shape="rect" id="Node000003" href="$Branching_8h.html" title=" " alt="" coords="23,79,113,105"/>
+<area shape="poly" id="edge2_Node000001_Node000003" title=" " alt="" coords="146,42,88,81,85,76,143,38"/>
+<area shape="rect" id="Node000004" href="$Problem_8h.html" title=" " alt="" coords="136,79,216,105"/>
+<area shape="poly" id="edge3_Node000001_Node000004" title=" " alt="" coords="170,46,172,78,166,79,165,46"/>
+<area shape="rect" id="Node000005" href="$RCC_8cpp.html" title=" " alt="" coords="240,79,312,105"/>
+<area shape="poly" id="edge6_Node000001_Node000005" title=" " alt="" coords="207,38,260,76,257,81,204,42"/>
+<area shape="rect" id="Node000006" href="$SRC_8cpp.html" title="Implementation of functions and classes for solving VRP problems using Limited Memory Rank&#45;1 Cuts." alt="" coords="336,79,408,105"/>
+<area shape="poly" id="edge7_Node000001_Node000006" title=" " alt="" coords="222,33,339,76,338,81,221,38"/>
+<area shape="rect" id="Node000007" href="$TR_8h.html" title=" " alt="" coords="432,79,480,105"/>
+<area shape="poly" id="edge8_Node000001_Node000007" title=" " alt="" coords="223,27,421,76,432,80,430,85,419,82,222,32"/>
+<area shape="poly" id="edge5_Node000004_Node000001" title=" " alt="" coords="182,64,180,31,186,31,187,63"/>
+<area shape="poly" id="edge4_Node000004_Node000002" title=" " alt="" coords="149,116,98,154,94,150,146,112"/>
+</map>

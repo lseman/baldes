@@ -1,0 +1,16 @@
+<map id="BNBNode" name="BNBNode">
+<area shape="rect" id="Node000001" title="Represents a node in a tree structure." alt="" coords="292,198,372,223"/>
+<area shape="poly" id="edge6_Node000001_Node000001" title=" " alt="" coords="390,202,399,210,391,219,373,221,373,216,389,214,394,211,386,206"/>
+<area shape="rect" id="Node000002" title=" " alt="" coords="5,94,169,135"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="154,138,301,195,299,200,152,143"/>
+<area shape="rect" id="Node000003" href="$classProblem.html" title="The Problem class represents an abstract base class for defining optimization problems." alt="" coords="192,102,262,127"/>
+<area shape="poly" id="edge2_Node000001_Node000003" title=" " alt="" coords="247,138,280,172,313,195,310,199,276,176,243,141"/>
+<area shape="rect" id="Node000004" href="$classMIPProblem.html" title=" " alt="" coords="286,102,379,127"/>
+<area shape="poly" id="edge3_Node000001_Node000004" title=" " alt="" coords="335,143,335,197,330,197,330,143"/>
+<area shape="rect" id="Node000005" href="$structModelData.html" title="Represents the data structure for a mathematical model." alt="" coords="403,102,486,127"/>
+<area shape="poly" id="edge4_Node000001_Node000005" title=" " alt="" coords="421,139,348,199,345,195,417,135"/>
+<area shape="rect" id="Node000006" href="$structSparseMatrix.html" title=" " alt="" coords="396,5,493,31"/>
+<area shape="poly" id="edge5_Node000005_Node000006" title=" " alt="" coords="447,47,447,101,442,101,442,47"/>
+<area shape="rect" id="Node000007" href="$classBranchingDuals.html" title=" " alt="" coords="510,102,622,127"/>
+<area shape="poly" id="edge7_Node000001_Node000007" title=" " alt="" coords="528,136,436,176,371,200,369,195,434,171,526,132"/>
+</map>

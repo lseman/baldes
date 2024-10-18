@@ -1,0 +1,13 @@
+<map id="BucketGraph::knapsackBound" name="BucketGraph::knapsackBound">
+<area shape="rect" id="Node000001" title=" " alt="" coords="5,80,202,106"/>
+<area shape="rect" id="Node000002" href="$classKnapsack.html#ad0d13a81a2bc6f1d0f6795eea1f48691" title=" " alt="" coords="260,5,392,31"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="141,77,249,40,267,34,269,39,251,45,143,82"/>
+<area shape="rect" id="Node000003" href="$classKnapsack.html#a2f64af1396af1fadf89fcf7062bf749e" title=" " alt="" coords="250,55,403,80"/>
+<area shape="poly" id="edge2_Node000001_Node000003" title=" " alt="" coords="202,79,234,75,235,81,202,84"/>
+<area shape="rect" id="Node000004" href="$classKnapsack.html#ac332f1aaf32f8ef680a704d0d4a4ac36" title=" " alt="" coords="268,104,384,130"/>
+<area shape="poly" id="edge3_Node000001_Node000004" title=" " alt="" coords="202,101,253,106,253,112,202,106"/>
+<area shape="rect" id="Node000006" href="$structLabel.html#a052cd90d574feeb9dfd97c4ac6f36412" title="Checks if a node has been visited." alt="" coords="281,153,372,179"/>
+<area shape="poly" id="edge5_Node000001_Node000006" title=" " alt="" coords="144,104,251,140,269,146,267,151,249,145,143,109"/>
+<area shape="rect" id="Node000005" href="$classKnapsack.html#af875f761c9baa1bc78399d7eaf23b269" title=" " alt="" coords="451,104,646,130"/>
+<area shape="poly" id="edge4_Node000004_Node000005" title=" " alt="" coords="385,114,435,114,435,120,385,120"/>
+</map>

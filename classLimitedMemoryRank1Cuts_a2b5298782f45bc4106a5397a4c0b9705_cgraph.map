@@ -1,0 +1,5 @@
+<map id="LimitedMemoryRank1Cuts::prepare45Heuristic" name="LimitedMemoryRank1Cuts::prepare45Heuristic">
+<area shape="rect" id="Node000001" title=" " alt="" coords="5,5,180,46"/>
+<area shape="rect" id="Node000002" href="$classLimitedMemoryRank1Cuts.html#a29f6f1ce5f46f80b1e8840ccd5b0521a" title="Selects the indices of the highest coefficients from a given vector." alt="" coords="228,5,402,46"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="180,23,212,23,212,28,180,28"/>
+</map>

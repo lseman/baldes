@@ -1,0 +1,33 @@
+<map id="Label.h" name="Label.h">
+<area shape="rect" id="Node000001" title="This file contains the definition of the Label struct and LabelComparator class." alt="" coords="139,5,202,31"/>
+<area shape="rect" id="Node000002" href="$Bucket_8h.html" title=" " alt="" coords="91,79,163,105"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="158,46,137,80,132,77,153,43"/>
+<area shape="rect" id="Node000004" href="$BucketBindings_8cpp.html" title="Python bindings for the BucketGraph, VRPNode, Label, PSTEPDuals, and BucketOptions classes using pybi..." alt="" coords="5,374,142,399"/>
+<area shape="poly" id="edge12_Node000001_Node000004" title=" " alt="" coords="131,41,96,61,62,89,36,124,28,143,25,164,25,240,30,279,42,316,69,372,64,374,37,318,25,280,20,241,20,164,23,142,31,121,58,86,93,57,128,36"/>
+<area shape="rect" id="Node000017" href="$Pools_8h.html" title="Defines classes to manage pools of paths and labels." alt="" coords="311,79,375,105"/>
+<area shape="poly" id="edge13_Node000001_Node000017" title=" " alt="" coords="215,35,315,76,312,81,213,40"/>
+<area shape="rect" id="Node000020" href="$RIH_8h.html" title=" " alt="" coords="188,79,242,105"/>
+<area shape="poly" id="edge18_Node000001_Node000020" title=" " alt="" coords="188,43,210,77,205,80,184,46"/>
+<area shape="rect" id="Node000003" href="$BucketGraph_8h.html" title="Defines the BucketGraph class and associated functionalities used in solving vehicle routing problems..." alt="" coords="161,153,268,178"/>
+<area shape="poly" id="edge2_Node000002_Node000003" title=" " alt="" coords="155,113,202,150,198,154,152,117"/>
+<area shape="rect" id="Node000008" href="$BucketUtils_8h.html" title="Header file for utilities related to the Bucket Graph in the Vehicle Routing Problem (VRP)." alt="" coords="164,300,263,326"/>
+<area shape="poly" id="edge11_Node000002_Node000008" title=" " alt="" coords="128,120,132,183,139,218,152,251,173,278,197,298,193,302,169,281,147,253,134,219,126,183,123,121"/>
+<area shape="poly" id="edge3_Node000003_Node000004" title=" " alt="" coords="189,190,152,228,126,267,106,309,80,374,75,372,101,307,122,265,147,225,185,186"/>
+<area shape="rect" id="Node000005" href="$BucketGraph_8cpp.html" title="Implementation of the BucketGraph class and related structures for solving vehicle routing problems (..." alt="" coords="245,374,366,399"/>
+<area shape="poly" id="edge4_Node000003_Node000005" title=" " alt="" coords="274,181,327,201,349,213,362,225,371,245,373,266,370,287,362,309,340,347,319,375,314,371,336,344,357,306,364,286,368,266,366,246,358,228,346,217,325,206,272,186"/>
+<area shape="rect" id="Node000006" href="$BucketJump_8h.html" title="Header file for the Bucket Graph&#39;s arc elimination and jump arc utilities in Vehicle Routing Problems..." alt="" coords="161,226,266,252"/>
+<area shape="poly" id="edge5_Node000003_Node000006" title=" " alt="" coords="217,194,216,226,211,226,212,194"/>
+<area shape="rect" id="Node000009" href="$SRC_8h.html" title="Definitions for handling cuts and optimizations for the Vehicle Routing Problem with Time Windows (VR..." alt="" coords="290,226,348,252"/>
+<area shape="poly" id="edge9_Node000003_Node000009" title=" " alt="" coords="246,185,303,224,300,228,243,189"/>
+<area shape="poly" id="edge6_Node000006_Node000008" title=" " alt="" coords="216,267,216,300,211,300,211,267"/>
+<area shape="poly" id="edge7_Node000008_Node000004" title=" " alt="" coords="178,335,99,375,96,371,175,331"/>
+<area shape="poly" id="edge8_Node000008_Node000005" title=" " alt="" coords="243,333,292,371,288,375,239,338"/>
+<area shape="poly" id="edge10_Node000009_Node000008" title=" " alt="" coords="290,263,233,302,230,297,287,259"/>
+<area shape="poly" id="edge15_Node000017_Node000003" title=" " alt="" coords="309,115,238,154,235,150,307,110"/>
+<area shape="poly" id="edge16_Node000017_Node000009" title=" " alt="" coords="390,95,446,104,501,119,522,130,536,144,540,161,532,180,519,191,500,201,451,217,349,236,348,231,450,211,498,196,516,187,527,177,535,160,531,146,519,134,499,124,445,109,390,100"/>
+<area shape="rect" id="Node000018" href="$BucketAVX_8h.html" title="SIMD&#45;based dominance check for label comparison." alt="" coords="293,153,392,178"/>
+<area shape="poly" id="edge14_Node000017_Node000018" title=" " alt="" coords="346,120,346,152,340,152,340,120"/>
+<area shape="rect" id="Node000019" href="$Stabilization_8h.html" title="Defines the Stabilization class for dual stabilization in column generation." alt="" coords="416,153,518,178"/>
+<area shape="poly" id="edge17_Node000017_Node000019" title=" " alt="" coords="378,110,447,150,444,154,375,115"/>
+<area shape="poly" id="edge19_Node000020_Node000003" title=" " alt="" coords="218,120,218,152,212,152,212,120"/>
+</map>
