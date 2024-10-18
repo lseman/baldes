@@ -195,7 +195,11 @@ public:
 
     // SparseSolver() { solver = new SolverWrapper<CholmodSolver>(); }
 
+#ifdef CHOLMOD
+    SparseSolver(SolverType type = CH) {
+#else
     SparseSolver(SolverType type = LDLT) {
+#endif
         switch (type) {
 #ifdef CHOLMOD
         case CH: solver = new SolverWrapper<CholmodSolver>(); break;

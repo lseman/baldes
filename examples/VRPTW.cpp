@@ -128,7 +128,6 @@ void initRMP(MIPProblem *model, VRProblem *problem, std::vector<std::vector<int>
  * This function takes a 2D vector representing a distance matrix and prints
  * it in a formatted manner. Each element is printed with a width of 10 characters.
  *
- * @param distance A 2D vector of doubles representing the distance matrix.
  */
 void printDistanceMatrix(const std::vector<std::vector<double>> &distance) {
     print_info("Printing distance matrix");
@@ -228,9 +227,9 @@ int main(int argc, char *argv[]) {
 
     // print size of initialRoutesHGS
     initRMP(&mip, problem, initialRoutesHGS);
+    auto gurobi_model = mip.toGurobiModel(GurobiEnvSingleton::getInstance());
 
     BNBNode *node = new BNBNode(mip);
-
     node->paths   = paths;
     node->problem = problem;
     node->mip     = mip;

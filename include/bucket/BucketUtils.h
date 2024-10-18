@@ -553,7 +553,6 @@ void BucketGraph::SCC_handler() {
     auto &Phi          = assign_buckets<D>(Phi_fw, Phi_bw);
     auto &buckets      = assign_buckets<D>(fw_buckets, bw_buckets);
     auto &bucket_graph = assign_buckets<D>(fw_bucket_graph, bw_bucket_graph);
-
     ankerl::unordered_dense::map<int, std::vector<int>> extended_bucket_graph = bucket_graph;
 
     // Extend the bucket graph with arcs defined by the Phi sets
@@ -568,6 +567,8 @@ void BucketGraph::SCC_handler() {
 
     auto sccs              = scc_finder.tarjanSCC();
     auto topological_order = scc_finder.topologicalOrderOfSCCs(sccs);
+
+    
 
 #ifdef VERBOSE
     // print SCCs and buckets in it
@@ -694,16 +695,19 @@ void BucketGraph::SCC_handler() {
         }
     }
 
+    UnionFind uf(ordered_sccs);
     if constexpr (D == Direction::Forward) {
         fw_ordered_sccs      = ordered_sccs;
         fw_topological_order = topological_order;
         fw_sccs              = sccs;
         fw_sccs_sorted       = sorted_sccs;
+        fw_union_find        = uf;
     } else {
         bw_ordered_sccs      = ordered_sccs;
         bw_topological_order = topological_order;
         bw_sccs              = sccs;
         bw_sccs_sorted       = sorted_sccs;
+        bw_union_find        = uf;
     }
 }
 

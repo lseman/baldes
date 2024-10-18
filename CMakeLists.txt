@@ -84,6 +84,7 @@ option(JEMALLOC "Enable jemalloc" ON)
 option(GUROBI "Enable GUROBI" OFF)
 option(HIGHS "Enable HIGHS" OFF)
 option(NSYNC "Enable nsync" OFF)
+option(CHOLMOD "Enable cholmod" OFF)
 
 # Define the size of resources without using cache
 set(R_SIZE
@@ -240,18 +241,7 @@ endif()
 
 
 if(IPM)
-  cpmaddpackage(
-    NAME
-    Eigen
-    GIT_REPOSITORY
-    https://gitlab.com/libeigen/eigen.git
-    GIT_TAG
-    3.4.0
-    DOWNLOAD_ONLY
-    YES # Only download Eigen, don't configure or build it
-  )
-  include_directories(${Eigen_SOURCE_DIR})
-  include_directories(${Eigen_SOURCE_DIR}/unsupported)
+ 
 
 endif()
 
@@ -367,7 +357,19 @@ else()
 endif()
 
 if(IPM)
-  target_include_directories(vrptw PRIVATE ${eigen_SOURCE_DIR})
+  cpmaddpackage(
+    NAME
+    Eigen
+    GIT_REPOSITORY
+    https://gitlab.com/libeigen/eigen.git
+    GIT_TAG
+    3.4.0
+    DOWNLOAD_ONLY
+    YES # Only download Eigen, don't configure or build it
+  )
+  include_directories(${Eigen_SOURCE_DIR})
+  include_directories(${Eigen_SOURCE_DIR}/unsupported)
+
 endif()
 
 set(GUROBI_VERSION_MAJOR 110) # Adjust based on Gurobi version
@@ -498,7 +500,7 @@ if(MTW)
   target_link_libraries(vrpmtw PRIVATE STDEXEC::stdexec)
   target_link_libraries(vrpmtw PRIVATE fmt::fmt)
   # link eigen
-  target_include_directories(vrpmtw PRIVATE ${eigen_SOURCE_DIR})
+  #target_include_directories(vrpmtw PRIVATE ${eigen_SOURCE_DIR})
 endif()
 
 
@@ -513,4 +515,12 @@ endif()
 if (nsync_ADDED)
   target_link_libraries(vrptw PRIVATE nsync)
   include_directories(${nsync_SOURCE_DIR}/public)
+endif()
+
+if (CHOLMOD)
+  message(STATUS "SuiteSparse is enabled, linking with cholmod")
+  find_package(SuiteSparse)
+  include_directories(${SuiteSparse_INCLUDE_DIRS})
+  include_directories(/usr/include/suitesparse/)
+  target_link_libraries(vrptw PRIVATE cholmod)
 endif()

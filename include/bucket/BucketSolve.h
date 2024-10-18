@@ -38,9 +38,13 @@
  * based on the inner objective values and iteration counts.
  *
  */
-inline std::vector<Label *> BucketGraph::solve() {
+inline std::vector<Label *> BucketGraph::solve(bool trigger) {
     // Initialize the status as not optimal at the start
     status = Status::NotOptimal;
+    if (trigger) {
+        transition = true;
+        fixed      = false;
+    }
 
     updateSplit(); // Update the split values for the bucket graph
 
@@ -273,7 +277,6 @@ std::vector<double> BucketGraph::labeling_algorithm() noexcept {
                                 }
                             } else {
 #ifndef AVX
-                                // General dominance check
 
                                 // General dominance check
                                 for (size_t j = 0; j < to_bucket_labels.size(); ++j) {
@@ -872,28 +875,14 @@ inline bool BucketGraph::is_dominated(const Label *new_label, const Label *label
  *
  */
 template <typename T>
-inline bool precedes(const std::vector<std::vector<T>> &sccs, const T &a, const T &b) {
-    auto it_scc_a = sccs.end();
-    auto it_scc_b = sccs.end();
+bool precedes(const std::vector<std::vector<int>> &sccs, const T a, const T b, UnionFind &uf) {
+    // Step 2: Check if element `a`'s SCC precedes element `b`'s SCC
+    size_t rootA = uf.find(a);
+    size_t rootB = uf.find(b);
 
-    for (auto it = sccs.begin(); it != sccs.end(); ++it) {
-        const auto &scc = *it;
-
-        // Check if both `a` and `b` are in the current SCC
-        bool found_a = (std::find(scc.begin(), scc.end(), a) != scc.end());
-        bool found_b = (std::find(scc.begin(), scc.end(), b) != scc.end());
-
-        if (found_a) it_scc_a = it;
-        if (found_b) it_scc_b = it;
-
-        // If both are found in different SCCs, determine precedence
-        if (it_scc_a != sccs.end() && it_scc_b != sccs.end()) { return it_scc_a < it_scc_b; }
-    }
-
-    // Return false if a and b are in the same SCC or not found
-    return false;
+    // You can define precedence based on the comparison of the root components
+    return rootA < rootB;
 }
-
 /**
  * @brief Determines if a label is dominated in component-wise smaller buckets.
  *
@@ -914,6 +903,7 @@ inline bool BucketGraph::DominatedInCompWiseSmallerBuckets(const Label *L, int b
     bucketStack.reserve(10);
     bucketStack.push_back(bucket); // Start with the input bucket
 
+    auto &uf = assign_buckets<D>(fw_union_find, bw_union_find);
     // Traverse the graph of buckets in a depth-first manner
     while (!bucketStack.empty()) {
         int currentBucket = bucketStack.back(); // Get the bucket at the top of the stack
@@ -926,7 +916,7 @@ inline bool BucketGraph::DominatedInCompWiseSmallerBuckets(const Label *L, int b
 
         // Check if the label's cost is lower than the cost bound (c_bar) for the current bucket
         // and if the current bucket precedes the label's bucket according to the bucket order
-        if (L->cost < c_bar[currentBucket] && ::precedes<int>(bucket_order, currentBucket, b_L)) {
+        if (L->cost < c_bar[currentBucket] && ::precedes<int>(bucket_order, currentBucket, b_L, uf)) {
             return false; // The label is not dominated, return false early
         }
 
