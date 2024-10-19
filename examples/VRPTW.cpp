@@ -31,7 +31,7 @@
 
 #include "Definitions.h"
 #include "HGS.h"
-#include "MIPHandler/MIPHandler.h"
+#include "miphandler/MIPHandler.h"
 #include "Reader.h"
 #include "bnb/BNB.h"
 #include "bnb/Node.h"

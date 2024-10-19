@@ -1,3 +1,12 @@
+/**
+ * @file UnionFind.h
+ * @brief This file contains the definition of the UnionFind class.
+ *
+ * This file contains the definition of the UnionFind class, which implements the Union-Find data structure
+ * for finding connected components in a graph. The class provides methods for finding the root of a set,
+ * uniting two sets, and getting the subset index of an element.
+ *
+ */
 #pragma once
 
 #include <algorithm>

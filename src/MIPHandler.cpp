@@ -1,4 +1,4 @@
-#include "../include/MIPHandler/MIPHandler.h"
+#include "../include/miphandler/MIPHandler.h"
 #include <iostream>
 
 void MIPProblem::addVars(const double *lb, const double *ub, const double *obj, const VarType *vtypes,

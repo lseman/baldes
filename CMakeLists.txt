@@ -37,6 +37,7 @@ include_directories(include/bucket)
 include_directories(include/algebra)
 include_directories(include/cuts)
 include_directories(include/extra)
+include_directories(include/utils)
 include_directories(third_party/hgs_vrptw)
 
 # Build types and flags

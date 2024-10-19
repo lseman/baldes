@@ -33,10 +33,10 @@ public:
         std::vector<int> tr_vars_idx;
         // Create w_i and zeta_i variables for each constraint
         for (int i = 0; i < numConstrs; i++) {
-            auto w_name   = std::string("w_") + std::to_string(i + 1);
+            auto w_name    = std::string("w_") + std::to_string(i + 1);
             auto zeta_name = std::string("zeta_") + std::to_string(i + 1);
-            w[i]    = node->addVar(w_name, VarType::Continuous, 0, epsilon1, -1.0);
-            zeta[i] = node->addVar(zeta_name, VarType::Continuous, 0, epsilon2, 1.0);
+            w[i]           = node->addVar(w_name, VarType::Continuous, 0, epsilon1, -1.0);
+            zeta[i]        = node->addVar(zeta_name, VarType::Continuous, 0, epsilon2, 1.0);
 
             tr_vars_idx.push_back(w[i]->index());
             tr_vars_idx.push_back(zeta[i]->index());
@@ -107,7 +107,7 @@ public:
             delta1[i] = nodeDuals[i] - v / 2;
             delta2[i] = nodeDuals[i] + v / 2;
         }
-        if (v <= 25) {
+        if (v <= 5) {
             v = 0;
             for (int i = 0; i < w.size(); i++) {
                 node->remove(w[i]);

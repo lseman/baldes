@@ -2,8 +2,8 @@
 
 #include "Arc.h"
 #include "Hashes.h"
-#include "MIPHandler/Constraint.h"
-#include "MIPHandler/MIPHandler.h"
+#include "miphandler/Constraint.h"
+#include "miphandler/MIPHandler.h"
 #include "ankerl/unordered_dense.h"
 
 #ifdef GUROBI

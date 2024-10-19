@@ -28,7 +28,7 @@
 
 #include <iostream>
 
-#include "MIPHandler/MIPHandler.h"
+#include "miphandler/MIPHandler.h"
 #include "ankerl/unordered_dense.h"
 
 // Define the RawArc struct

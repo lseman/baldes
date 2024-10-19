@@ -383,7 +383,7 @@ void LimitedMemoryRank1Cuts::generateCutCoefficients(VRPTW_SRC &cuts, std::vecto
     }
 }
 
-bool LimitedMemoryRank1Cuts::runSeparation(BNBNode *node, std::vector<Constraint *> &SRCconstraints) {
+std::pair<bool, bool> LimitedMemoryRank1Cuts::runSeparation(BNBNode *node, std::vector<Constraint *> &SRCconstraints) {
     node->optimize();
     auto      solution = node->extractSolution();
     auto      cuts     = &cutStorage;
@@ -429,8 +429,9 @@ bool LimitedMemoryRank1Cuts::runSeparation(BNBNode *node, std::vector<Constraint
         }
     }
     
-    if (cuts_before == cuts->size() + n_cuts_removed) { return false; }
-    return true;
+    if (cuts_before == cuts->size() + n_cuts_removed) { return std::make_pair(false, cleared); }
+
+    return std::make_pair(true, cleared);
 }
 
 /*
@@ -473,7 +474,7 @@ std::vector<int> LimitedMemoryRank1Cuts::selectHighestCoefficients(const std::ve
     // Min-heap to store the top maxNodes elements
     std::priority_queue<std::pair<double, int>, std::vector<std::pair<double, int>>, std::greater<>> minHeap;
 
-    for (int i = 0; i < x.size(); ++i) {
+    for (int i = 0; i < allPaths.size(); ++i) {
         if (x[i] > 1e-2) {
             if (minHeap.size() < maxNodes) {
                 minHeap.push({x[i], i});

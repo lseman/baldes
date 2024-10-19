@@ -8,7 +8,7 @@
 #include <vector>
 
 #include "../Definitions.h"
-#include "../Reader.h"
+#include "Reader.h"
 
 #include "CircleSector.h"
 #include "Matrix.h"
