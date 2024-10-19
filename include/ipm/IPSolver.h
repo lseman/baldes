@@ -185,7 +185,6 @@ public:
     Eigen::SparseMatrix<double> D;
     bool                        firstFactorization = true;
 
-
     enum SolverType {
 #ifdef CHOLMOD
         CH,
@@ -215,14 +214,11 @@ public:
     ~SparseSolver() { delete solver; }
 
     void factorizeMatrix(const Eigen::SparseMatrix<double, Eigen::ColMajor, int> &matrix) {
-        if (firstFactorization) {
-            // A = matrix;
-            solver->factorizeMatrix(matrix);
-            firstFactorization = false;
-        } else {
-            // A = matrix;
-            solver->factorizeMatrix(matrix);
-        }
+        solver->factorizeMatrix(matrix);
+    }
+
+    void updateFactorization(const Eigen::SparseMatrix<double, Eigen::ColMajor, int> &matrix, const Eigen::VectorXd &updatedDiag) {
+        solver->updateFactorization(matrix, updatedDiag);
     }
 
     Eigen::VectorXd solve(const Eigen::VectorXd &rhs) { return solver->solve(rhs); }
@@ -233,6 +229,7 @@ private:
     struct SolverBase {
         virtual void            factorizeMatrix(const Eigen::SparseMatrix<double, Eigen::ColMajor, int> &matrix) = 0;
         virtual Eigen::VectorXd solve(const Eigen::VectorXd &rhs)                                                = 0;
+        virtual void            updateFactorization(const Eigen::SparseMatrix<double, Eigen::ColMajor, int> &matrix, const Eigen::VectorXd &updatedDiag) = 0;
         virtual ~SolverBase() = default;
     };
 
@@ -243,6 +240,10 @@ private:
             solver.factorizeMatrix(matrix);
         }
         Eigen::VectorXd solve(const Eigen::VectorXd &rhs) override { return solver.solve(rhs); }
+
+        void updateFactorization(const Eigen::SparseMatrix<double, Eigen::ColMajor, int> &matrix, const Eigen::VectorXd &updatedDiag) override {
+            solver.updateFactorization(matrix, updatedDiag);
+        }
     };
 
     SolverBase *solver;
@@ -271,11 +272,11 @@ public:
     Eigen::VectorXd s_old;
     Eigen::VectorXd v_old;
     Eigen::VectorXd w_old;
-    double tau_old;
-    double kappa_old;
-    int n_slacks_old = 0;
-    int n_slacks = 0;
-    bool warm_start = false;
+    double          tau_old;
+    double          kappa_old;
+    int             n_slacks_old = 0;
+    int             n_slacks     = 0;
+    bool            warm_start   = false;
 
     std::vector<double> dual_vals;
     std::vector<double> primal_vals;
@@ -335,8 +336,7 @@ public:
                      double dkappa);
 
     // Method to run the optimization process
-    void run_optimization(ModelData   &model,
-                                                                                          const double tol);
+    void run_optimization(ModelData &model, const double tol);
 
 #ifdef GUROBI
     // Method to extract optimization components from a Gurobi model

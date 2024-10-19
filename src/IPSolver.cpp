@@ -571,7 +571,7 @@ void IPSolver::run_optimization(ModelData &model, const double tol) {
             }
         }
 
-        update_linear_solver(ls, theta_xs, regP, regD);
+        // update_linear_solver(ls, theta_xs, regP, regD);
 
         // Solve the augmented system
         solve_augsys(delta_x, delta_y, delta_z, ls, theta_vw, ubi, b, c, ubv);
@@ -828,12 +828,17 @@ void IPSolver::update_linear_solver(SparseSolver &ls, const Eigen::VectorXd &the
     combinedValues.head(ls.n) = -theta - regP;
     combinedValues.tail(ls.m) = regD;
 
+    auto Sold = ls.S;
+
     // Efficiently update diagonal elements
     for (int i = 0; i < combinedValues.size(); i++) { ls.S.coeffRef(i, i) = combinedValues[i]; }
 
     // Refactorize
-    auto S = ls.S;
-    ls.factorizeMatrix(S);
+    // get diagonal of S
+    //Eigen::VectorXd diag = S.diagonal();
+    ls.factorizeMatrix(ls.S);
+    //auto S = ls.S;
+
 #else
 
     // define lhs for normal equations

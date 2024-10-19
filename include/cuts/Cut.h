@@ -10,7 +10,7 @@
 #pragma once
 #include "Common.h"
 #include "Definitions.h"
-#include "MIPHandler/Constraint.h"
+#include "miphandler/Constraint.h"
 
 struct SRCPermutation {
     std::vector<int> num;

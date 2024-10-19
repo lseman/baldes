@@ -24,11 +24,11 @@ for param in "${!config_params[@]}"; do
 done
 
 declare -A options=(
-  ["RIH"]="OFF" ["RCC"]="OFF" ["SRC3"]="OFF" ["SRC"]="OFF" ["GET_TBB"]="OFF"
+  ["RIH"]="OFF" ["RCC"]="ON" ["SRC3"]="OFF" ["SRC"]="ON" ["GET_TBB"]="OFF"
   ["UNREACHABLE_DOMINANCE"]="OFF" ["SORTED_LABELS"]="OFF" ["MCD"]="OFF" ["FIX_BUCKETS"]="OFF"
   ["AVX"]="OFF" ["IPM"]="OFF" ["TR"]="OFF" ["STAB"]="ON" ["AUGMENTED"]="ON"
   ["GET_SUITESPARSE"]="OFF" ["EXACT_RCC"]="OFF" ["EVRP"]="OFF" ["WITH_PYTHON"]="OFF"
-  ["MTW"]="OFF" ["PSTEP"]="OFF"
+  ["MTW"]="OFF" ["PSTEP"]="OFF" ["GUROBI"]="ON" ["HIGHS"]="OFF"
 )
 
 for opt in "${!options[@]}"; do

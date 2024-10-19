@@ -36,7 +36,7 @@
 // #include "ModernRCC.h"
 #endif
 
-#include "MIPHandler/MIPHandler.h"
+#include "miphandler/MIPHandler.h"
 
 #ifdef GUROBI
 #include "gurobi_c++.h"

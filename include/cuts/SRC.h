@@ -29,7 +29,7 @@
 #include <queue>
 #include <random>
 
-#include "MIPHandler/MIPHandler.h"
+#include "miphandler/MIPHandler.h"
 
 #include <unordered_set>
 
@@ -142,7 +142,7 @@ public:
         the45selectedNodes      = selectHighestCoefficients(x, max_important_nodes);
     }
 
-    bool runSeparation(BNBNode *node, std::vector<Constraint *> &SRCconstraints);
+    std::pair<bool, bool> runSeparation(BNBNode *node, std::vector<Constraint *> &SRCconstraints);
 
     using ViolatedCut = std::pair<double, Cut>;
     // Custom comparator to compare only the first element (the violation)
@@ -362,7 +362,7 @@ void LimitedMemoryRank1Cuts::the45Heuristic(const SparseMatrix &A, const std::ve
     CutPriorityQueue cutQueue;
     auto            &cutCache = (T == CutType::FourRow) ? cutCache4 : cutCache5;
 
-    std::vector<double>                            coefficients_aux(x.size(), 0.0);
+    std::vector<double>                            coefficients_aux(allPaths.size(), 0.0);
     std::vector<std::tuple<int, std::vector<int>>> task_data; // To hold task_id and setsOf45 for each task
 
     const int chunk_size = 10; // Adjust chunk size based on performance experiments
@@ -405,7 +405,7 @@ void LimitedMemoryRank1Cuts::the45Heuristic(const SparseMatrix &A, const std::ve
             // Process each task in the chunk
             for (size_t idx = start_idx; idx < end_idx; ++idx) {
                 auto [task_id, set45] = task_data[idx];
-                std::vector<double> coefficients_aux(x.size(), 0.0);
+                std::vector<double> coefficients_aux(allPaths.size(), 0.0);
 
                 uint64_t setHash = hashVector(set45);
 

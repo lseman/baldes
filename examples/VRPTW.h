@@ -20,8 +20,8 @@
 #include "Cut.h"
 #include "Definitions.h"
 
-#include "MIPHandler/MIPHandler.h"
 #include "RCC.h"
+#include "miphandler/MIPHandler.h"
 
 // #include "TR.h"
 #include "bnb/Branching.h"
@@ -418,7 +418,7 @@ public:
         auto &allPaths   = model->paths;
         auto &oldCutsCMP = model->oldCutsCMP;
 
-        for (int counter = 0; counter < solution.size(); ++counter) {
+        for (int counter = 0; counter < allPaths.size(); ++counter) {
             const auto &nodes = allPaths[counter].route;
             for (size_t k = 1; k < nodes.size(); ++k) {
                 int source = nodes[k - 1];
@@ -643,24 +643,37 @@ public:
 
 #if defined(SRC3) || defined(SRC)
                 if (!rcc) {
-                    r1c.allPaths  = allPaths;
-                    bool violated = r1c.runSeparation(node, SRCconstraints);
+                    r1c.allPaths     = allPaths;
+                    auto start_time_ = std::chrono::high_resolution_clock::now();
+                    auto srcResult   = r1c.runSeparation(node, SRCconstraints);
+                    auto end_time_   = std::chrono::high_resolution_clock::now();
+                    auto duration_microseconds =
+                        std::chrono::duration_cast<std::chrono::microseconds>(end_time_ - start_time_).count();
+                    fmt::print("SRC time: {:.6f} seconds\n", duration_microseconds / 1e6);
+                    bool violated = srcResult.first;
+                    bool cleared  = srcResult.second;
                     if (!violated) {
                         if (bucket_graph.A_MAX == N_SIZE) {
                             print_info("No violated cuts found, calling it a day\n");
                             break;
                         } else {
                             auto new_relaxation = std::min(bucket_graph.A_MAX + 5, N_SIZE);
-                            print_info("Reducing relaxation size to {}\n", new_relaxation);
+                            print_info("Increasing A_MAX to {}\n", new_relaxation);
                             bucket_graph.A_MAX = new_relaxation;
-                        }
-                    }
 
-                    changed = cutHandler(r1c, node, SRCconstraints);
-                    if (changed) {
-                        matrix = node->extractModelDataSparse();
-                        node->optimize();
-                        nodeDuals = node->getDuals();
+                            // TODO: see why this is necessary here
+                            matrix = node->extractModelDataSparse();
+                            node->optimize();
+                            nodeDuals = node->getDuals();
+                        }
+
+                    } else {
+                        changed = cutHandler(r1c, node, SRCconstraints);
+                        if (changed) {
+                            matrix = node->extractModelDataSparse();
+                            node->optimize();
+                            nodeDuals = node->getDuals();
+                        }
                     }
                 }
 #endif
@@ -684,7 +697,18 @@ public:
             if (gap > 1e-1) { gap = 1e-1; }
             gap = 1e-2;
             // print gap
+            auto start_time_ipm = std::chrono::high_resolution_clock::now();
+
             solver.run_optimization(matrix, gap);
+            auto end_time_ipm = std::chrono::high_resolution_clock::now();
+
+            // Calculate duration in microseconds
+            auto duration_microseconds =
+                std::chrono::duration_cast<std::chrono::microseconds>(end_time_ipm - start_time_ipm).count();
+
+            // Print the time in seconds with microsecond precision
+            fmt::print("IPM time: {:.6f} seconds\n", duration_microseconds / 1e6);
+
             lp_obj           = solver.getObjective();
             solution         = solver.getPrimals();
             nodeDuals        = solver.getDuals();
@@ -728,7 +752,6 @@ public:
 
                 bucket_graph.relaxation = lp_obj;
                 bucket_graph.augment_ng_memories(solution, allPaths, true, 5, 100, 16, N_SIZE);
-
 #if defined(SRC3) || defined(SRC)
                 // SRC cuts
 
@@ -743,8 +766,6 @@ public:
                         cutDuals.push_back(originDuals[index]);
                     }
 
-                    // print originDuals size
-                    // print cuts size
                     cuts->setDuals(cutDuals);
                 }
 #endif
@@ -771,7 +792,17 @@ public:
                 // if (bucket_graph.s4 && iter % 500 == 0) {
                 //     paths = bucket_graph.solve(true);
                 // } else {
-                paths = bucket_graph.solve();
+                auto start_time_bucket = std::chrono::high_resolution_clock::now();
+                paths                  = bucket_graph.solve();
+                auto end_time_bucket   = std::chrono::high_resolution_clock::now();
+
+                // Calculate duration in microseconds
+                duration_microseconds =
+                    std::chrono::duration_cast<std::chrono::microseconds>(end_time_bucket - start_time_bucket).count();
+
+                // Print the time in seconds with microsecond precision
+                fmt::print("Bucket time: {:.6f} seconds\n", duration_microseconds / 1e6);
+
                 //}
                 inner_obj = bucket_graph.inner_obj;
                 stage     = bucket_graph.getStage();
