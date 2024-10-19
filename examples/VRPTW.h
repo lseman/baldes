@@ -539,6 +539,7 @@ public:
         BucketGraph bucket_graph(nodes, time_horizon, bucket_interval);
         bucket_graph.set_distance_matrix(instance.getDistanceMatrix(), 8);
         bucket_graph.branching_duals = &branchingDuals;
+        bucket_graph.A_MAX           = N_SIZE * 0.3;
 
         matrix                 = node->extractModelDataSparse();
         auto integer_solution  = node->getObjVal();
@@ -644,12 +645,12 @@ public:
 #if defined(SRC3) || defined(SRC)
                 if (!rcc) {
                     r1c.allPaths     = allPaths;
-                    auto start_time_ = std::chrono::high_resolution_clock::now();
+                    // auto start_time_ = std::chrono::high_resolution_clock::now();
                     auto srcResult   = r1c.runSeparation(node, SRCconstraints);
-                    auto end_time_   = std::chrono::high_resolution_clock::now();
-                    auto duration_microseconds =
-                        std::chrono::duration_cast<std::chrono::microseconds>(end_time_ - start_time_).count();
-                    fmt::print("SRC time: {:.6f} seconds\n", duration_microseconds / 1e6);
+                    // auto end_time_   = std::chrono::high_resolution_clock::now();
+                    // auto duration_microseconds =
+                    //     std::chrono::duration_cast<std::chrono::microseconds>(end_time_ - start_time_).count();
+                    // fmt::print("SRC time: {:.6f} seconds\n", duration_microseconds / 1e6);
                     bool violated = srcResult.first;
                     bool cleared  = srcResult.second;
                     if (!violated) {
@@ -697,17 +698,17 @@ public:
             if (gap > 1e-1) { gap = 1e-1; }
             gap = 1e-2;
             // print gap
-            auto start_time_ipm = std::chrono::high_resolution_clock::now();
+            // auto start_time_ipm = std::chrono::high_resolution_clock::now();
 
             solver.run_optimization(matrix, gap);
-            auto end_time_ipm = std::chrono::high_resolution_clock::now();
+            // auto end_time_ipm = std::chrono::high_resolution_clock::now();
 
             // Calculate duration in microseconds
-            auto duration_microseconds =
-                std::chrono::duration_cast<std::chrono::microseconds>(end_time_ipm - start_time_ipm).count();
+            // auto duration_microseconds =
+            //    std::chrono::duration_cast<std::chrono::microseconds>(end_time_ipm - start_time_ipm).count();
 
             // Print the time in seconds with microsecond precision
-            fmt::print("IPM time: {:.6f} seconds\n", duration_microseconds / 1e6);
+            // fmt::print("IPM time: {:.6f} seconds\n", duration_microseconds / 1e6);
 
             lp_obj           = solver.getObjective();
             solution         = solver.getPrimals();
@@ -792,16 +793,16 @@ public:
                 // if (bucket_graph.s4 && iter % 500 == 0) {
                 //     paths = bucket_graph.solve(true);
                 // } else {
-                auto start_time_bucket = std::chrono::high_resolution_clock::now();
+                //auto start_time_bucket = std::chrono::high_resolution_clock::now();
                 paths                  = bucket_graph.solve();
-                auto end_time_bucket   = std::chrono::high_resolution_clock::now();
+                //auto end_time_bucket   = std::chrono::high_resolution_clock::now();
 
                 // Calculate duration in microseconds
-                duration_microseconds =
-                    std::chrono::duration_cast<std::chrono::microseconds>(end_time_bucket - start_time_bucket).count();
+                //duration_microseconds =
+                //    std::chrono::duration_cast<std::chrono::microseconds>(end_time_bucket - start_time_bucket).count();
 
                 // Print the time in seconds with microsecond precision
-                fmt::print("Bucket time: {:.6f} seconds\n", duration_microseconds / 1e6);
+                // fmt::print("Bucket time: {:.6f} seconds\n", duration_microseconds / 1e6);
 
                 //}
                 inner_obj = bucket_graph.inner_obj;
