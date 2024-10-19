@@ -500,7 +500,9 @@ void BucketGraph::ConcatenateLabel(const Label *L, int &b, Label *&pbest, gch::s
             if constexpr (S > Stage::Three) {
                 for (auto it = cutter->begin(); it < cutter->end(); ++it) {
                     if ((*SRCDuals)[it->id] == 0) continue;
-                    if (L->SRCmap[it->id] + L_bw->SRCmap[it->id] >= 1) { candidate_cost -= (*SRCDuals)[it->id]; }
+                    auto den = it->p.den;
+                    auto sum = (L->SRCmap[it->id] + L_bw->SRCmap[it->id]);
+                    if (sum >= den) { candidate_cost -= (*SRCDuals)[it->id]; }
                 }
             }
 #endif

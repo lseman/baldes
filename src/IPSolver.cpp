@@ -38,35 +38,41 @@ void IPSolver::convert_to_standard_form(const Eigen::SparseMatrix<double> &A, co
                                         const Eigen::VectorXd &c, const Eigen::VectorXd &lb, const Eigen::VectorXd &ub,
                                         const Eigen::VectorXd &sense, Eigen::SparseMatrix<double> &As,
                                         Eigen::VectorXd &bs, Eigen::VectorXd &cs) {
-    double infty = std::numeric_limits<double>::infinity();
-    int    n     = A.rows();
-    int    m     = A.cols();
+    const double infty = std::numeric_limits<double>::infinity();
+    const int    n     = A.rows();
+    const int    m     = A.cols();
 
     if (b.size() != n || c.size() != m) {
-        // print b.size(), n, c.size(), m
         fmt::print("b.size(): {}, n: {}, c.size(): {}, m: {}\n", b.size(), n, c.size(), m);
         throw std::invalid_argument("Size of b or c does not match the matrix A dimensions.");
     }
 
-    // Operate directly on input vectors wherever possible to reduce copies
     Eigen::VectorXd lo = lb;
     Eigen::VectorXd hi = ub;
 
     int n_free = 0, n_ubounds = 0, nv = A.cols();
 
-    // Counting bounds
+    // Precompute bound categories
+    std::vector<bool> is_free(lo.size()), is_bounded(lo.size()), is_upper(lo.size()), is_lower(lo.size());
     for (int i = 0; i < lo.size(); ++i) {
         if (lo[i] == -infty && hi[i] == infty) {
+            is_free[i] = true;
             ++n_free;
         } else if (std::isfinite(lo[i]) && std::isfinite(hi[i])) {
+            is_bounded[i] = true;
             ++n_ubounds;
+        } else if (lo[i] == -infty && std::isfinite(hi[i])) {
+            is_upper[i] = true;
+        } else if (std::isfinite(lo[i]) && hi[i] == infty) {
+            is_lower[i] = true;
         } else {
             throw std::runtime_error("unexpected bounds");
         }
     }
 
+    // Precompute slack variables and reserve memory
     int num_slacks = n - sense.sum();
-    cs.conservativeResize(c.size() + n_free + num_slacks);
+    cs.resize(c.size() + n_free + num_slacks);
     cs.setZero();
     cs.head(m) = c;
 
@@ -78,84 +84,67 @@ void IPSolver::convert_to_standard_form(const Eigen::SparseMatrix<double> &A, co
     std::vector<int>    ind_ub;
     std::vector<double> val_ub;
 
-    int free = 0, ubi = 0;
-    int lo_size = lo.size();
-    triplets.reserve(lo_size * 2); // Estimate the triplet size more accurately
+    auto lb_extended = lb;
+    auto ub_extended = ub;
+    lb_extended.conservativeResize(nv + num_slacks + n_free);
+    ub_extended.conservativeResize(nv + num_slacks + n_free);
+    lb_extended.tail(num_slacks + n_free).setZero();
+    ub_extended.tail(num_slacks + n_free).setConstant(1.0);
 
-    for (int j = 0; j < lo_size; ++j) {
+    int free = 0, ubi = 0;
+    for (int j = 0; j < lo.size(); ++j) {
         double l = lo[j];
         double h = hi[j];
 
-        bool is_free_var    = (l == -infty && h == infty);
-        bool is_bounded_var = (std::isfinite(l) && std::isfinite(h));
-        bool is_upper_bound = (l == -infty && std::isfinite(h));
-        bool is_lower_bound = (std::isfinite(l) && h == infty);
-
         for (Eigen::SparseMatrix<double>::InnerIterator it(A, j); it; ++it) {
-            int    i = it.row();   // Row index
-            double v = it.value(); // Value at A(i, j)
+            int    i = it.row();
+            double v = it.value();
 
-            if (i < 0 || i >= n || j < 0 || j >= m) {
-                std::cerr << "Error: Invalid matrix index (i=" << i << ", j=" << j << "). Matrix dimensions are " << n
-                          << "x" << m << "." << std::endl;
-                throw std::out_of_range("Matrix index out of bounds");
-            }
-
-            if (is_free_var) {
-                if (nv + free >= cs.size()) {
-                    std::cerr << "Error: Free variable index out of bounds. nv + free = " << nv + free
-                              << ", cs size = " << cs.size() << std::endl;
-                    throw std::out_of_range("Free variable index out of bounds");
-                }
-                // Free variable
+            if (is_free[j]) {
                 cs[j]         = c[j];
                 cs[nv + free] = -c[j];
-                triplets.emplace_back(i, j, v);          // Add original value
-                triplets.emplace_back(i, nv + free, -v); // Add negated value
+                triplets.emplace_back(i, j, v);
+                triplets.emplace_back(i, nv + free, -v);
+                lb_extended[nv + free] = lb[j];
+                ub_extended[nv + free] = ub[j];
                 ++free;
-            } else if (is_bounded_var) {
-                // l <= x <= h
-                cs[j + free] = c[j];
-                bs[i] -= (v * l);               // Compute once
-                triplets.emplace_back(i, j, v); // Add value
-
+            } else if (is_bounded[j]) {
+                cs[j] = c[j];
+                bs[i] -= v * l;
+                triplets.emplace_back(i, j, v);
                 ind_ub.push_back(j);
                 val_ub.push_back(h - l);
                 ++ubi;
-            } else if (is_upper_bound) {
-                // x <= h
+            } else if (is_upper[j]) {
                 cs[j] = -c[j];
-                bs[i] -= (-v * h);               // Compute once
-                triplets.emplace_back(i, j, -v); // Add negated value
-            } else if (is_lower_bound) {
-                // l <= x
+                bs[i] -= (-v * h);
+                triplets.emplace_back(i, j, -v);
+            } else if (is_lower[j]) {
                 cs[j] = c[j];
-                bs[i] -= (v * l);               // Compute once
-                triplets.emplace_back(i, j, v); // Add value
-            } else {
-                throw std::runtime_error("Unexpected bounds");
+                bs[i] -= v * l;
+                triplets.emplace_back(i, j, v);
             }
         }
     }
 
-    // Adding slack variables
+    // Add slack variables
     int slack_counter = 0;
     for (int i = 0; i < sense.size(); ++i) {
         if (sense(i) == 0) {
-            if (nv + n_free + slack_counter >= cs.size()) {
-                std::cerr << "Error: Slack variable index out of bounds. nv + n_free + slack_counter = "
-                          << nv + n_free + slack_counter << ", cs size = " << cs.size() << std::endl;
-                throw std::out_of_range("Slack variable index out of bounds");
-            }
+            // print nv + n_free + slack_counter
             triplets.emplace_back(i, nv + n_free + slack_counter, 1.0);
+            lb_extended[nv + n_free + slack_counter] = 0.0;
+            ub_extended[nv + n_free + slack_counter] = infty;
             ++slack_counter;
         }
     }
 
-    // Construct As from triplets
+    // Construct sparse matrix As
     As.resize(bs.size(), cs.size());
     As.setFromTriplets(triplets.begin(), triplets.end());
     As.makeCompressed();
+
+    n_slacks = num_slacks;
 }
 
 /**
@@ -369,8 +358,7 @@ double IPSolver::max_alpha(const Eigen::VectorXd &x, const Eigen::VectorXd &dx, 
  * the optimization problem until convergence or the maximum number of iterations is reached.
  *
  */
-std::tuple<double, double, std::vector<double>, std::vector<double>> IPSolver::run_optimization(ModelData   &model,
-                                                                                                const double tol) {
+void IPSolver::run_optimization(ModelData &model, const double tol) {
 
     // auto componentes = extractOptimizationComponents(model);
 
@@ -382,6 +370,8 @@ std::tuple<double, double, std::vector<double>, std::vector<double>> IPSolver::r
     Eigen::VectorXd             lo    = componentes.lo;
     Eigen::VectorXd             hi    = componentes.hi;
     Eigen::VectorXd             sense = componentes.sense;
+
+    auto n_vars_origin = As.cols();
 
     //  Convert to standard form;
     Eigen::SparseMatrix<double> A;
@@ -405,7 +395,23 @@ std::tuple<double, double, std::vector<double>, std::vector<double>> IPSolver::r
     Eigen::VectorXd x      = Eigen::VectorXd::Ones(n);
     Eigen::VectorXd lambda = Eigen::VectorXd::Zero(m);
     Eigen::VectorXd s      = Eigen::VectorXd::Ones(n);
+    /*
+    if (x_old.size() > 0 && warm_start) {
+        int nv_old = x_old.size(); // Original number of variables
+        int nv_new = x.size();     // New number of variables
+        int mv_old = lambda_old.size();
+        int mv_new = lambda.size();
 
+        // Copy old values to new positions in x
+        // As free variables and slack variables are added, the original variables move down
+        int original_counter          = 0;
+        x.head(nv_old - n_slacks_old) = x_old.head(nv_old - n_slacks_old);
+
+        lambda.head(N_SIZE - 1) = lambda_old.head(N_SIZE - 1);
+    }
+    */
+    warm_start   = false;
+    n_slacks_old = n_slacks;
     // initialize ubi and ubv as empty vectors
     Eigen::VectorXi ubi;
     Eigen::VectorXd ubv;
@@ -484,7 +490,7 @@ std::tuple<double, double, std::vector<double>, std::vector<double>> IPSolver::r
     Eigen::ArrayXd  t_xs_lower, t_xs_upper, t_vw_lower, t_vw_upper;
     // Delta calculations
     double delta_0, bl_dot_lambda, correction;
-
+    bool   saved_interior_solution = false;
     for (int k = 0; k < max_iter; ++k) {
         // fmt::print("Iteration {}\n", k);
         //  Zero the necessary variables
@@ -523,6 +529,22 @@ std::tuple<double, double, std::vector<double>, std::vector<double>> IPSolver::r
         // Calculate the dot product once for efficiency
         double bl_dot_lambda = b.dot(lambda) - ubv.dot(w);
         _g                   = std::abs(c.dot(x) - bl_dot_lambda) / (tau + std::abs(bl_dot_lambda));
+
+        if (k % 5 == 0 || (k == max_iter - 1)) {
+            // Save intermediate solution every 5 iterations or at the last iteration
+            // Save only if the current solution is reasonably "central"
+            if (!saved_interior_solution && (_g <= tol * 2)) {
+                x_old                   = x;
+                lambda_old              = lambda;
+                s_old                   = s;
+                v_old                   = v;
+                w_old                   = w;
+                tau_old                 = tau;
+                kappa_old               = kappa;
+                saved_interior_solution = true;
+                warm_start              = true;
+            }
+        }
 
         // Check for optimality and infeasibility
         if (_p <= 1e-10 && _d <= 1e-10 && _g <= tol) { break; }
@@ -577,7 +599,7 @@ std::tuple<double, double, std::vector<double>, std::vector<double>> IPSolver::r
         alpha = max_alpha(x, Delta_x, v, Delta_v, s, Delta_s, w, Delta_w, tau, Delta_tau, kappa, Delta_kappa);
 
         // High order corrections like Tulip
-        while ((ncor <= 3) && (alpha < 0.9995)) {
+        while ((ncor <= 1) && (alpha < 0.9995)) {
             ncor += 1;
             alpha_ = std::min(1.0, 2.0 * alpha);
 
@@ -679,9 +701,6 @@ std::tuple<double, double, std::vector<double>, std::vector<double>> IPSolver::r
     dual_vals   = lambda_vec;
     primal_vals = original_x_vec;
     objVal      = objetivo;
-
-    // return std::make_tuple(x, lambda, s, objetivo);
-    return std::make_tuple(objetivo, dual_obj, original_x_vec, lambda_vec);
 }
 
 #ifdef GUROBI

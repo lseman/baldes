@@ -38,7 +38,7 @@ public:
 
     const ankerl::unordered_dense::map<std::string, double> &get_terms() const { return expression.get_terms(); }
 
-    void addTerm(const Variable &var, double coeff) { expression.addTerm(var, coeff); }
+    void addTerm(const Variable *var, double coeff) { expression.addTerm(var, coeff); }
 
     // define get_name
     std::string get_name() const { return name; }

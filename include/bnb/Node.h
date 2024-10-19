@@ -246,17 +246,21 @@ public:
     // Binarize all variables (set to binary type)
     void binarizeNode() {
         auto &vars = mip.getVars();
-        for (auto &var : vars) { var.set_type(VarType::Binary); }
+        for (auto *var : vars) { var->set_type(VarType::Binary); }
     }
 
     // Relax all variables (set to continuous type)
     void relaxNode() {
         auto &vars = mip.getVars();
-        for (auto &var : vars) { var.set_type(VarType::Continuous); }
+        for (auto *var : vars) { var->set_type(VarType::Continuous); }
     }
 
     void remove(Constraint *ctr) { mip.delete_constraint(ctr); }
-    void remove(Variable &var) { mip.delete_variable(var); }
+    void remove(Variable *var) { mip.delete_variable(var); }
+
+    Variable *addVar(const std::string &name, VarType type, double lb, double ub, double obj) {
+        return mip.add_variable(name, type, lb, ub, obj);
+    }
 
     void addVars(const double *lb, const double *ub, const double *obj, const VarType *vtypes, const std::string *names,
                  const MIPColumn *cols, size_t count) {
@@ -288,7 +292,7 @@ public:
     void removeConstr(int constraintIndex) { mip.delete_constraint(constraintIndex); }
 
     // Get a variable by index
-    Variable &getVar(int i) { return mip.getVar(i); }
+    Variable *getVar(int i) { return mip.getVar(i); }
 
     // Get all constraints
     std::vector<Constraint *> &getConstrs() { return mip.getConstraints(); }

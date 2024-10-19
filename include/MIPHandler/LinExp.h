@@ -32,35 +32,35 @@ public:
     LinearExpression() = default;
 
     // Add a term to the expression
-    LinearExpression &operator+=(const std::pair<Variable, double> &term) {
+    LinearExpression &operator+=(const std::pair<Variable *, double> &term) {
         if (term.second != 0.0) {                        // Skip zero coefficients
-            terms[term.first.get_name()] += term.second; // Accumulate coefficients for the same variable
+            terms[term.first->get_name()] += term.second; // Accumulate coefficients for the same variable
         }
         return *this;
     }
 
     // Add a term to the expression
-    LinearExpression &operator+=(const std::pair<Variable, int> &term) {
+    LinearExpression &operator+=(const std::pair<Variable *, int> &term) {
         if (term.second != 0.0) {                        // Skip zero coefficients
-            terms[term.first.get_name()] += term.second; // Accumulate coefficients for the same variable
+            terms[term.first->get_name()] += term.second; // Accumulate coefficients for the same variable
         }
         return *this;
     }
 
     // Add a Variable with an implicit coefficient of 1.0
-    LinearExpression &operator+=(const Variable &var) {
-        terms[var.get_name()] += 1.0; // Add the variable with coefficient 1.0
+    LinearExpression &operator+=(const Variable *var) {
+        terms[var->get_name()] += 1.0; // Add the variable with coefficient 1.0
         return *this;
     }
 
     const ankerl::unordered_dense::map<std::string, double> &get_terms() const { return terms; }
 
-    void addTerm(const Variable &var, double coeff) {
+    void addTerm(const Variable *var, double coeff) {
         if (coeff == 0.0) return; // Skip zero coefficients
-        auto &existing_coeff = terms[var.get_name()];
+        auto &existing_coeff = terms[var->get_name()];
         existing_coeff += coeff;
         if (existing_coeff == 0.0) {
-            terms.erase(var.get_name()); // Remove terms that become zero
+            terms.erase(var->get_name()); // Remove terms that become zero
         }
     }
 
