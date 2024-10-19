@@ -160,7 +160,9 @@ Label *BucketGraph::compute_label(const Label *L, const Label *L_prime) {
         auto   sumSRC =
             std::transform_reduce(SRCDuals.begin(), SRCDuals.end(), 0.0, std::plus<>(), [&](const auto &dual) {
                 size_t curr_idx = idx++;
-                return (L->SRCmap[curr_idx] + L_prime->SRCmap[curr_idx] >= 1) ? dual : 0.0;
+                auto   den      = cut_storage->getCut(curr_idx).p.den;
+                auto   sum      = (L->SRCmap[curr_idx] + L_prime->SRCmap[curr_idx]);
+                return (sum >= den) ? dual : 0.0;
             });
 
         new_label->cost -= sumSRC;
@@ -484,7 +486,7 @@ void BucketGraph::set_adjacency_list() {
             best_arcs.emplace_back(aux_double, next_node.id, res_inc,
                                    cost_inc); // Store the arc for forward direction
 
-            double aux_double_rev = 1.E-5 * node.end_time; // Small weight for end time
+            double aux_double_rev = 1.E-5 * node.start_time; // Small weight for end time
             best_arcs_rev.emplace_back(aux_double_rev, next_node.id, res_inc,
                                        cost_inc); // Store the arc for reverse direction
         }

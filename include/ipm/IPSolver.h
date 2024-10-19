@@ -185,6 +185,7 @@ public:
     Eigen::SparseMatrix<double> D;
     bool                        firstFactorization = true;
 
+
     enum SolverType {
 #ifdef CHOLMOD
         CH,
@@ -270,6 +271,11 @@ public:
     Eigen::VectorXd s_old;
     Eigen::VectorXd v_old;
     Eigen::VectorXd w_old;
+    double tau_old;
+    double kappa_old;
+    int n_slacks_old = 0;
+    int n_slacks = 0;
+    bool warm_start = false;
 
     std::vector<double> dual_vals;
     std::vector<double> primal_vals;
@@ -329,7 +335,7 @@ public:
                      double dkappa);
 
     // Method to run the optimization process
-    std::tuple<double, double, std::vector<double>, std::vector<double>> run_optimization(ModelData   &model,
+    void run_optimization(ModelData   &model,
                                                                                           const double tol);
 
 #ifdef GUROBI

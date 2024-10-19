@@ -34,6 +34,7 @@ set(CMAKE_EXPERIMENTAL_CXX_MODULE_CMAKE_API_BOTH TRUE)
 # Include directories
 include_directories(include)
 include_directories(include/bucket)
+include_directories(include/algebra)
 include_directories(include/cuts)
 include_directories(include/extra)
 include_directories(third_party/hgs_vrptw)
@@ -114,6 +115,17 @@ set(N_ADD
 set(HGS_TIME
     5
     CACHE STRING "HGS max running time")
+
+    # Get the latest Git commit hash
+execute_process(
+  COMMAND git rev-parse --short HEAD
+  OUTPUT_VARIABLE GIT_COMMIT_HASH
+  OUTPUT_STRIP_TRAILING_WHITESPACE
+)
+
+# Pass the commit hash as a preprocessor definition
+add_definitions(-DGIT_COMMIT_HASH="${GIT_COMMIT_HASH}")
+
 
 add_definitions(-DN_SIZE=${N_SIZE})
 add_definitions(-DR_SIZE=${R_SIZE})

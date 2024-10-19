@@ -1,11 +1,43 @@
 #ifndef EIGEN_CUSTOM_SIMPLICIAL_LDLT_H
 #define EIGEN_CUSTOM_SIMPLICIAL_LDLT_H
 
+#include <vector>
 #define EIGEN_USE_MKL_ALL
 
+#include "Evaluator.h"
 #include <Eigen/Sparse>
 #include <Eigen/SparseCholesky>
+#include <experimental/simd>
 #include <limits>
+#include <omp.h> // For OpenMP parallelization if desired
+#include <set>
+
+template <typename T>
+using BVector = std::vector<T>;
+
+class Permutation {
+public:
+    std::vector<int> perm;
+
+    Permutation(int size) : perm(size) {
+        for (int i = 0; i < size; ++i) perm[i] = i;
+    }
+
+    // Apply the permutation to a vector
+    template <typename T>
+    std::vector<T> apply(const std::vector<T> &vec) const {
+        std::vector<T> result(vec.size());
+        for (int i = 0; i < vec.size(); ++i) { result[i] = vec[perm[i]]; }
+        return result;
+    }
+
+    // Invert the permutation
+    Permutation inverse() const {
+        Permutation inv_perm(perm.size());
+        for (int i = 0; i < perm.size(); ++i) { inv_perm.perm[perm[i]] = i; }
+        return inv_perm;
+    }
+};
 
 namespace Eigen {
 
@@ -32,124 +64,8 @@ public:
     template <typename Lhs, typename Rhs, int Mode, bool IsLower, bool IsRowMajor>
     struct SparseSolveTriangular;
 
-    template <typename Scalar>
-    static typename std::enable_if<std::is_floating_point<Scalar>::value, bool>::type is_exactly_zero(Scalar value) {
-        return std::abs(value) < std::numeric_limits<Scalar>::epsilon();
-    }
-
-    // For integral types, check for exact zero.
-    template <typename Scalar>
-    static typename std::enable_if<std::is_integral<Scalar>::value, bool>::type is_exactly_zero(Scalar value) {
-        return value == Scalar(0);
-    }
-
-    template <typename Lhs, typename Rhs, int Mode, bool IsLower, bool IsRowMajor>
-    struct SparseSolveTriangular {
-        typedef typename Rhs::Scalar                             Scalar;
-        typedef internal::evaluator<Lhs>                         LhsEval;
-        typedef typename internal::evaluator<Lhs>::InnerIterator LhsIterator;
-
-        static void run(const Lhs &lhs, Rhs &other, Scalar regularizationFactor) {
-            LhsEval lhsEval(lhs);
-
-            for (Index col = 0; col < other.cols(); ++col) {
-                if constexpr (IsRowMajor) {
-                    if constexpr (IsLower) {
-                        for (Index i = 0; i < lhs.rows(); ++i) {
-                            Scalar tmp       = other.coeff(i, col);
-                            Scalar lastVal   = 0;
-                            Index  lastIndex = 0;
-
-                            for (LhsIterator it(lhsEval, i); it; ++it) {
-                                lastVal   = it.value();
-                                lastIndex = it.index();
-                                if (lastIndex == i) break;
-                                tmp -= lastVal * other.coeff(lastIndex, col);
-                            }
-
-                            if (Mode & UnitDiag)
-                                other.coeffRef(i, col) = tmp;
-                            else {
-                                eigen_assert(lastIndex == i);
-                                if (std::abs(lastVal) < regularizationFactor) {
-                                    lastVal = (lastVal >= 0 ? regularizationFactor : -regularizationFactor);
-                                }
-                                other.coeffRef(i, col) = tmp / lastVal;
-                            }
-                        }
-                    } else {
-                        for (Index i = lhs.rows() - 1; i >= 0; --i) {
-                            Scalar tmp  = other.coeff(i, col);
-                            Scalar l_ii = 0;
-
-                            LhsIterator it(lhsEval, i);
-                            while (it && it.index() < i) ++it;
-                            if (!(Mode & UnitDiag)) {
-                                eigen_assert(it && it.index() == i);
-                                l_ii = it.value();
-                                ++it;
-                            } else if (it && it.index() == i)
-                                ++it;
-
-                            for (; it; ++it) { tmp -= it.value() * other.coeff(it.index(), col); }
-
-                            if (Mode & UnitDiag)
-                                other.coeffRef(i, col) = tmp;
-                            else {
-                                if (std::abs(l_ii) < regularizationFactor) {
-                                    l_ii = (l_ii >= 0 ? regularizationFactor : -regularizationFactor);
-                                }
-                                other.coeffRef(i, col) = tmp / l_ii;
-                            }
-                        }
-                    }
-                } else { // Column-major case
-                    if constexpr (IsLower) {
-                        for (Index i = 0; i < lhs.cols(); ++i) {
-                            Scalar &tmp = other.coeffRef(i, col);
-                            if (!is_exactly_zero(tmp)) {
-                                LhsIterator it(lhsEval, i);
-                                while (it && it.index() < i) ++it;
-                                if (!(Mode & UnitDiag)) {
-                                    eigen_assert(it && it.index() == i);
-                                    tmp /= it.value();
-                                }
-                                if (it && it.index() == i) ++it;
-                                for (; it; ++it) { other.coeffRef(it.index(), col) -= tmp * it.value(); }
-                            }
-                        }
-                    } else {
-                        for (Index i = lhs.cols() - 1; i >= 0; --i) {
-                            Scalar &tmp = other.coeffRef(i, col);
-                            if (!is_exactly_zero(tmp)) {
-                                LhsIterator it(lhsEval, i);
-                                if (!(Mode & UnitDiag)) {
-                                    while (it && it.index() != i) ++it;
-                                    eigen_assert(it && it.index() == i);
-                                    tmp /= it.value();
-                                }
-                                for (; it && it.index() < i; ++it) {
-                                    other.coeffRef(it.index(), col) -= tmp * it.value();
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    };
-
-    // Dispatch to the correct specialization
-    template <typename Lhs, typename Rhs, int Mode>
-    void solveTriangular(const Lhs &lhs, Rhs &other, typename Lhs::Scalar regularizationFactor) const {
-        constexpr bool isLower    = (Mode & Lower) != 0;
-        constexpr bool isRowMajor = (int(Lhs::Flags) & RowMajorBit) != 0;
-
-        SparseSolveTriangular<Lhs, Rhs, Mode, isLower, isRowMajor>::run(lhs, other, regularizationFactor);
-    }
-
     explicit CustomSimplicialLDLT(const MatrixType &matrix) : m_isInitialized(false), m_info(Success), m_epsilon(1e-9) {
-        compute(matrix);
+        // compute(matrix);
     }
 
     CustomSimplicialLDLT &compute(const MatrixType &matrix) {
@@ -188,7 +104,7 @@ public:
         // Construct Lp index array from m_nonZerosPerCol column counts
         StorageIndex *Lp = m_matrix.outerIndexPtr();
         Lp[0]            = 0;
-        for (StorageIndex k = 0; k < size; ++k) { Lp[k + 1] = Lp[k] + m_nonZerosPerCol[k] + (doLDLT ? 0 : 1); }
+        for (StorageIndex k = 0; k < size; ++k) { Lp[k + 1] = Lp[k] + m_nonZerosPerCol[k]; }
 
         // Resize non-zeros for the matrix
         m_matrix.resizeNonZeros(Lp[size]);
@@ -202,14 +118,9 @@ public:
     typedef typename MatrixType::RealScalar DiagonalScalar;
     static inline DiagonalScalar            getDiag(Scalar x) { return numext::real(x); }
     static inline Scalar                    getSymm(Scalar x) { return numext::conj(x); }
+
     template <bool DoLDLT, bool NonHermitian>
     void factorize_preordered(const CholMatrixType &ap) {
-        using std::sqrt;
-
-        eigen_assert(m_analysisIsOk && "You must first call analyzePattern()");
-        eigen_assert(ap.rows() == ap.cols());
-        eigen_assert(m_parent.size() == ap.rows());
-        eigen_assert(m_nonZerosPerCol.size() == ap.rows());
 
         const StorageIndex  size = StorageIndex(ap.rows());
         const StorageIndex *Lp   = m_matrix.outerIndexPtr();
@@ -222,10 +133,8 @@ public:
         std::vector<StorageIndex, Eigen::aligned_allocator<StorageIndex>> tags(size, 0);
 
         bool ok = true;
-        m_diag.resize(DoLDLT ? size : 0);
+        m_diag.resize(size);
 
-// Parallelization strategy (optional, but experiment carefully)
-#pragma omp parallel for
         for (StorageIndex k = 0; k < size; ++k) {
             y[k]                = Scalar(0);
             StorageIndex top    = size;
@@ -238,7 +147,6 @@ public:
                     y[i] += getSymm(it.value());
 
                     Index len;
-#pragma GCC unroll 4 // Unroll the loop for cache-friendly access
                     for (len = 0; tags[i] != k; i = m_parent[i]) {
                         pattern[len++] = i;
                         tags[i]        = k;
@@ -248,17 +156,11 @@ public:
                 }
             }
 
-            // Prefetch next iteration for y, Li, Lx
-            if (k + 1 < size) {
-                __builtin_prefetch(&y[k + 1], 1, 1);
-                __builtin_prefetch(&Li[Lp[k + 1]], 1, 1);
-                __builtin_prefetch(&Lx[Lp[k + 1]], 1, 1);
-            }
-
             // Numerical solve for the current row
             DiagonalScalar d = getDiag(y[k]) * m_shiftScale + m_shiftOffset;
             y[k]             = Scalar(0); // Reset Y(k)
 
+            // SIMD on dense vector y, but avoid SIMD for sparse indices in Li
             for (; top < size; ++top) {
                 Index  i  = pattern[top];
                 Scalar yi = y[i];
@@ -267,6 +169,8 @@ public:
                 Scalar l_ki = yi / getDiag(m_diag[i]);
 
                 Index p2 = Lp[i] + m_nonZerosPerCol[i];
+
+                // Handle the sparse reductions using regular loops (since Li and Lx are not contiguous)
                 for (Index p = Lp[i]; p < p2; ++p) { y[Li[p]] -= getSymm(Lx[p]) * yi; }
 
                 d -= getDiag(l_ki * getSymm(yi));
@@ -311,19 +215,29 @@ public:
         count.setZero();
         dest.resize(size, size);
 
+        const bool isLower    = int(SrcMode) == int(Lower);
+        const bool isUpper    = int(SrcMode) == int(Upper);
+        const bool isDstLower = int(DstMode) == int(Lower);
+
+        // Precompute permutation
+        std::vector<StorageIndex> perm_cache(size);
+        for (StorageIndex j = 0; j < size; ++j) { perm_cache[j] = perm ? perm[j] : j; }
+
         // First pass: Count the non-zero elements for each column/row
         for (StorageIndex j = 0; j < size; ++j) {
-            StorageIndex jp = perm ? perm[j] : j;
-            __builtin_prefetch(&jp, 0, 1); // Prefetch the index for permutation
+            StorageIndex jp = perm_cache[j];
 
             for (MatIterator it(matEval, j); it; ++it) {
                 StorageIndex i = it.index();
-                if ((int(SrcMode) == int(Lower) && i < j) || (int(SrcMode) == int(Upper) && i > j)) continue;
+                if ((isLower && i < j) || (isUpper && i > j)) continue;
 
-                StorageIndex ip = perm ? perm[i] : i;
-                __builtin_prefetch(&ip, 0, 1); // Prefetch the index for permutation
+                StorageIndex ip = perm_cache[i];
 
-                count[int(DstMode) == int(Lower) ? std::min(ip, jp) : std::max(ip, jp)]++;
+                // Minimize conditional checks
+                StorageIndex min_ip_jp = std::min(ip, jp);
+                StorageIndex max_ip_jp = std::max(ip, jp);
+
+                count[isDstLower ? min_ip_jp : max_ip_jp]++;
             }
         }
 
@@ -337,24 +251,27 @@ public:
 
         // Main loop: Populate the destination sparse matrix
         for (StorageIndex j = 0; j < size; ++j) {
-            StorageIndex jp = perm ? perm[j] : j;
-            __builtin_prefetch(&dest.innerIndexPtr()[count[j]], 1, 1); // Prefetch for insertion
+            StorageIndex jp = perm_cache[j];
+            //__builtin_prefetch(&dest.innerIndexPtr()[count[j]], 1, 1); // Prefetch for insertion
 
             for (MatIterator it(matEval, j); it; ++it) {
                 StorageIndex i = it.index();
-                if ((int(SrcMode) == int(Lower) && i < j) || (int(SrcMode) == int(Upper) && i > j)) continue;
+                if ((isLower && i < j) || (isUpper && i > j)) continue;
 
-                StorageIndex jp = perm ? perm[j] : j;
-                StorageIndex ip = perm ? perm[i] : i;
+                StorageIndex ip = perm_cache[i];
 
-                Index k                 = count[int(DstMode) == int(Lower) ? std::min(ip, jp) : std::max(ip, jp)]++;
-                dest.innerIndexPtr()[k] = int(DstMode) == int(Lower) ? std::max(ip, jp) : std::min(ip, jp);
+                // Minimize conditional checks
+                StorageIndex min_ip_jp = std::min(ip, jp);
+                StorageIndex max_ip_jp = std::max(ip, jp);
+
+                Index k                 = count[isDstLower ? min_ip_jp : max_ip_jp]++;
+                dest.innerIndexPtr()[k] = isDstLower ? max_ip_jp : min_ip_jp;
 
                 // Prefetch values for efficient memory access
-                __builtin_prefetch(&dest.valuePtr()[k], 1, 1);
+                //__builtin_prefetch(&dest.valuePtr()[k], 1, 1);
 
                 if (!StorageOrderMatch) std::swap(ip, jp);
-                if ((int(DstMode) == int(Lower) && ip < jp) || (int(DstMode) == int(Upper) && ip > jp)) {
+                if ((isDstLower && ip < jp) || (!isDstLower && ip > jp)) {
                     dest.valuePtr()[k] = NonHermitian ? it.value() : numext::conj(it.value());
                 } else {
                     dest.valuePtr()[k] = it.value();
@@ -386,24 +303,26 @@ public:
         count.setZero();
         dest.resize(size, size);
 
-        // Cache-aligned iteration and prefetching for optimal memory access
+        // First pass: Count non-zeros for each column
         for (Index j = 0; j < size; ++j) {
             Index jp = perm ? perm[j] : j;
-            __builtin_prefetch(&jp, 0, 1); // Prefetch perm[j]
 
             for (MatIterator it(matEval, j); it; ++it) {
                 Index i  = it.index();
                 Index r  = it.row();
                 Index c  = it.col();
                 Index ip = perm ? perm[i] : i;
-                __builtin_prefetch(&ip, 0, 1); // Prefetch perm[i]
 
                 if (Mode == int(Upper | Lower)) {
+#pragma omp atomic
                     count[StorageOrderMatch ? jp : ip]++;
                 } else if (r == c) {
+#pragma omp atomic
                     count[ip]++;
                 } else if ((Mode == Lower && r > c) || (Mode == Upper && r < c)) {
+#pragma omp atomic
                     count[ip]++;
+#pragma omp atomic
                     count[jp]++;
                 }
             }
@@ -411,15 +330,17 @@ public:
 
         Index nnz = count.sum();
 
-        // Reserve space and fill the outer index
+        // Resize for non-zeros and fill outer index
         dest.resizeNonZeros(nnz);
         dest.outerIndexPtr()[0] = 0;
+
+        // Unrolling this loop for small loop performance gain
         for (Index j = 0; j < size; ++j) { dest.outerIndexPtr()[j + 1] = dest.outerIndexPtr()[j] + count[j]; }
 
         // Reset count for actual insertion
         for (Index j = 0; j < size; ++j) { count[j] = dest.outerIndexPtr()[j]; }
 
-        // Copy data into destination matrix
+        // Second pass: Copy data into destination matrix
         for (StorageIndex j = 0; j < size; ++j) {
             for (MatIterator it(matEval, j); it; ++it) {
                 StorageIndex i = internal::convert_index<StorageIndex>(it.index());
@@ -433,12 +354,10 @@ public:
                     Index k                 = count[StorageOrderMatch ? jp : ip]++;
                     dest.innerIndexPtr()[k] = StorageOrderMatch ? ip : jp;
                     dest.valuePtr()[k]      = it.value();
-                    __builtin_prefetch(&dest.innerIndexPtr()[k + 1], 1, 1); // Prefetch next insertion
                 } else if (r == c) {
                     Index k                 = count[ip]++;
                     dest.innerIndexPtr()[k] = ip;
                     dest.valuePtr()[k]      = it.value();
-                    __builtin_prefetch(&dest.innerIndexPtr()[k + 1], 1, 1); // Prefetch next insertion
                 } else if (((Mode & Lower) == Lower && r > c) || ((Mode & Upper) == Upper && r < c)) {
                     if (!StorageOrderMatch) std::swap(ip, jp);
                     Index k                 = count[jp]++;
@@ -447,7 +366,6 @@ public:
                     k                       = count[ip]++;
                     dest.innerIndexPtr()[k] = jp;
                     dest.valuePtr()[k]      = (NonHermitian ? it.value() : numext::conj(it.value()));
-                    __builtin_prefetch(&dest.innerIndexPtr()[k + 1], 1, 1); // Prefetch next insertion
                 }
             }
         }
@@ -459,22 +377,24 @@ public:
         const Index size = a.rows();
         pmat             = &ap;
         // Note that ordering methods compute the inverse permutation
-        if (!internal::is_same<Ordering_, NaturalOrdering<Index>>::value) {
-            {
-                CholMatrixType C;
-                permute_symm_to_fullsymm<UpLo, NonHermitian>(a, C, NULL);
+        // if (!internal::is_same<Ordering_, NaturalOrdering<Index>>::value) {
+        {
+            CholMatrixType C;
+            permute_symm_to_fullsymm<UpLo, NonHermitian>(a, C, NULL);
 
-                Ordering_ ordering;
-                ordering(C, m_Pinv);
-            }
+            Ordering_ ordering;
+            ordering(C, m_Pinv);
+        }
 
-            if (m_Pinv.size() > 0)
-                m_P = m_Pinv.inverse();
-            else
-                m_P.resize(0);
+        if (m_Pinv.size() > 0)
+            m_P = m_Pinv.inverse();
+        else
+            m_P.resize(0);
 
-            ap.resize(size, size);
-            permute_symm_to_symm<UpLo, Upper, false>(a, ap, m_P.indices().data());
+        ap.resize(size, size);
+        permute_symm_to_symm<UpLo, Upper, false>(a, ap, m_P.indices().data());
+
+        /*
         } else {
             m_Pinv.resize(0);
             m_P.resize(0);
@@ -485,6 +405,7 @@ public:
             } else
                 internal::simplicial_cholesky_grab_input<CholMatrixType, MatrixType>::run(a, pmat, ap);
         }
+        */
     }
 
     void analyzePattern(const MatrixType &a) {
@@ -501,6 +422,12 @@ public:
     const MatrixL matrixL() const { return m_L; }
 
     const MatrixU matrixU() const { return m_U; }
+
+    template <typename T>
+    void elementwise_divide(BVector<T> &vec, const BVector<T> &diag) {
+        for (int i = 0; i < vec.size(); ++i) { vec[i] /= diag[i]; }
+    }
+
     template <typename Rhs>
     Eigen::VectorXd solve(const MatrixBase<Rhs> &b) const {
         eigen_assert(m_isInitialized && "Decomposition not initialized");
@@ -521,8 +448,7 @@ public:
 
         // Solve D * z = y (element-wise division)
         // Use Eigen's array-based division for vectorized operations
-        dest.array() /= m_diag.array();
-
+        for (Index i = 0; i < dest.size(); ++i) { dest(i) /= m_diag(i); }
         // Solve U * x = z using SparseSolveTriangular for upper triangular matrix
         solveTriangular<decltype(matrixU()), decltype(dest), Upper>(matrixU(), dest, regularizationFactor);
 
@@ -546,7 +472,117 @@ public:
 
     void setRegularization(Scalar epsilon) { m_epsilon = epsilon; }
 
-    void factorize(const MatrixType &a) {
+    void mergeSubmatrix(Eigen::SparseMatrix<Scalar> &L, Eigen::VectorXd &D, const Eigen::SparseMatrix<Scalar> &L_sub,
+                        const Eigen::VectorXd &D_sub, const std::vector<StorageIndex> &mapping) {
+        int subSize = L_sub.rows();
+
+        // Merge back the values in L_sub into the corresponding locations in L
+        for (int rowIdx = 0; rowIdx < subSize; ++rowIdx) {
+            int globalRowIdx = mapping[rowIdx];
+            for (typename Eigen::SparseMatrix<Scalar>::InnerIterator it(L_sub, rowIdx); it; ++it) {
+                int globalColIdx                       = mapping[it.index()];
+                L.coeffRef(globalRowIdx, globalColIdx) = it.value(); // Update the global matrix L
+            }
+        }
+
+        // Merge back the diagonal values D_sub into D
+        for (int i = 0; i < subSize; ++i) { D[mapping[i]] = D_sub[i]; }
+    }
+
+    void extractSubmatrix(const Eigen::SparseMatrix<Scalar> &L, const Eigen::VectorXd &D,
+                          Eigen::SparseMatrix<Scalar> &L_sub, Eigen::VectorXd &D_sub,
+                          const Eigen::SparseMatrix<Scalar> &U, std::vector<StorageIndex> &mapping) {
+        std::set<StorageIndex> affectedIndices;
+        for (int k = 0; k < U.outerSize(); ++k) {
+            for (typename Eigen::SparseMatrix<Scalar>::InnerIterator it(U, k); it; ++it) {
+                affectedIndices.insert(it.index());
+            }
+        }
+
+        int subSize = affectedIndices.size();
+        L_sub.resize(subSize, subSize);
+        D_sub.resize(subSize);
+        mapping.resize(subSize); // Resize mapping
+
+        int idx = 0;
+        for (auto i : affectedIndices) {
+            mapping[idx] = i;
+            ++idx;
+        }
+
+        L_sub.reserve(subSize);
+        for (int rowIdx = 0; rowIdx < subSize; ++rowIdx) {
+            int globalRowIdx = mapping[rowIdx];
+            for (typename Eigen::SparseMatrix<Scalar>::InnerIterator it(L, globalRowIdx); it; ++it) {
+                if (affectedIndices.count(it.index())) {
+                    L_sub.insert(rowIdx, std::distance(affectedIndices.begin(), affectedIndices.find(it.index()))) =
+                        it.value();
+                }
+            }
+        }
+
+        for (int i = 0; i < subSize; ++i) { D_sub[i] = D[mapping[i]]; }
+    }
+
+    void forestTomlinUpdate(Eigen::SparseMatrix<Scalar> &L, Eigen::VectorXd &D, const Eigen::SparseMatrix<Scalar> &U,
+                            const Eigen::SparseMatrix<Scalar> &W) {
+        Eigen::SparseMatrix<Scalar> L_sub;
+        Eigen::VectorXd             D_sub;
+        std::vector<StorageIndex>   mapping;
+        extractSubmatrix(L, D, L_sub, D_sub, U, mapping);
+
+        for (int k = 0; k < U.outerSize(); ++k) {
+            for (typename Eigen::SparseMatrix<Scalar>::InnerIterator it(U, k); it; ++it) {
+                int    i    = it.index();
+                Scalar u_ik = it.value();
+                for (typename Eigen::SparseMatrix<Scalar>::InnerIterator jt(W, k); jt; ++jt) {
+                    int    j     = jt.index();
+                    Scalar w_jk  = jt.value();
+                    Scalar delta = u_ik * w_jk;
+                    L_sub.coeffRef(mapping[i], mapping[j]) += delta;
+                    D_sub[mapping[i]] += delta;
+                }
+            }
+        }
+
+        mergeSubmatrix(L, D, L_sub, D_sub, mapping);
+    }
+
+    void computeUpdateMatrices(const Eigen::SparseMatrix<Scalar> &A_old, const Eigen::SparseMatrix<Scalar> &A_new,
+                               Eigen::SparseMatrix<Scalar> &U, Eigen::SparseMatrix<Scalar> &W) const {
+        std::vector<Eigen::Triplet<Scalar>> tripletListU, tripletListW;
+        auto                                tolerance = 1e-6;
+
+        // Ensure U and W are properly resized
+        U.resize(A_new.rows(), A_new.cols());
+        W.resize(A_new.cols(), A_new.cols()); // Assuming W is square
+
+        // Compare A_new with A_old
+        for (int k = 0; k < A_new.outerSize(); ++k) {
+            for (typename Eigen::SparseMatrix<Scalar>::InnerIterator it(A_new, k); it; ++it) {
+                StorageIndex i        = it.row(); // Row index
+                StorageIndex j        = it.col(); // Column index
+                Scalar       newValue = it.value();
+                Scalar       oldValue = A_old.coeff(i, j); // Retrieve the corresponding value from A_old
+
+                if (std::abs(newValue - oldValue) > tolerance) {
+                    if (i >= 0 && i < A_old.rows() && j >= 0 && j < A_old.cols()) {
+                        // Add to triplet lists only if indices are valid
+                        tripletListU.emplace_back(i, j, newValue - oldValue); // Low-rank update for U
+                        tripletListW.emplace_back(j, j, 1.0);                 // Corresponding column in W
+                    }
+                }
+            }
+        }
+
+        // Construct U and W from the triplet lists, summing duplicates
+        U.setFromTriplets(tripletListU.begin(), tripletListU.end(), [](Scalar a, Scalar b) { return a + b; });
+        W.setFromTriplets(tripletListW.begin(), tripletListW.end(), [](Scalar a, Scalar b) { return a + b; });
+    }
+
+    Eigen::SparseMatrix<Scalar> matrixOld;
+    bool                        isFactorized = false;
+    void                        factorize(const MatrixType &a) {
         bool DoLDLT       = true;
         bool NonHermitian = false;
         eigen_assert(a.rows() == a.cols());
@@ -554,15 +590,20 @@ public:
         CholMatrixType     tmp(size, size);
         ConstCholMatrixPtr pmat;
 
-        if (m_P.size() == 0 && (int(UpLo) & int(Upper)) == Upper) {
-            // If there is no ordering, try to directly use the input matrix without any copy
-            internal::simplicial_cholesky_grab_input<CholMatrixType, MatrixType>::run(a, pmat, tmp);
-        } else {
-            permute_symm_to_symm<UpLo, Upper, false>(a, tmp, m_P.indices().data());
-            pmat = &tmp;
-        }
+        permute_symm_to_symm<UpLo, Upper, false>(a, tmp, m_P.indices().data());
+        pmat = &tmp;
 
+        // if (!isFactorized) {
         factorize_preordered<true, false>(*pmat);
+        matrixOld = a;
+        // m_diag = m_matrix.diagonal();  // Ensure this is stored
+
+        //} else {
+        //    Eigen::SparseMatrix<Scalar> U, W;
+        //    computeUpdateMatrices(matrixOld, a, U, W);
+        //    forestTomlinUpdate(matrixOld, m_diag, U, W);
+        //}
+        isFactorized = true;
     }
 
 private:

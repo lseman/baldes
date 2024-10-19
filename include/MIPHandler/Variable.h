@@ -35,14 +35,22 @@ public:
 
     void set_type(VarType var_type) { type = var_type; }
 
+    void setLB(double lower) { lb = lower; }
+    void setUB(double upper) { ub = upper; }
+    void setOBJ(double obj) { objective_coefficient = obj; }
+
     // Overload operator * to create a (var, coeff) pair for LinearExpression
-    std::pair<Variable, double> operator*(double coeff) const { return std::make_pair(*this, coeff); }
+    std::pair<Variable *, double> operator*(double coeff) { return {this, coeff}; }
+    std::pair<Variable *, double> operator*(int coeff) { return {this, static_cast<double>(coeff)}; }
 
     double get_objective_coefficient() const { return objective_coefficient; }
+    int    index() const { return index_val; }
+    void   set_index(int index) { index_val = index; }
 
 private:
     std::string name;
     VarType     type;
     double      lb, ub;
     double      objective_coefficient = 0.0;
+    int         index_val             = -1;
 };

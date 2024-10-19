@@ -175,7 +175,7 @@ inline void printBaldes() {
 
     fmt::print("\n");
     fmt::print("+------------------------------------------------------+\n");
-    fmt::print("| {}{:<52}{} |\n", bold, "BALDES", reset); // Bold "BALDES"
+    fmt::print("| {}{:<52}{} |\n", bold, fmt::format("BALDES (commit {})", GIT_COMMIT_HASH), reset);
     fmt::print("| {:<52} |\n", " ");
     fmt::print("| {}{:<52}{} |\n", blue, "BALDES, a Bucket Graph Labeling Algorithm", reset); // Blue text
     fmt::print("| {:<52} |\n", "for Vehicle Routing");
@@ -186,7 +186,6 @@ inline void printBaldes() {
     fmt::print("| {:<52} |\n", " ");
     fmt::print("| {:<52} |\n", "https://github.com/lseman/baldes");
     fmt::print("| {:<52} |\n", " ");
-
     fmt::print("+------------------------------------------------------+\n");
     fmt::print("\n");
 }

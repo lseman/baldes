@@ -54,6 +54,10 @@
 #include "ipm/IPSolver.h"
 #endif
 
+#ifdef TR
+#include "TR.h"
+#endif
+
 #define NUMERO_CANDIDATOS 10
 
 #include "RIH.h"
@@ -77,8 +81,10 @@ public:
 #endif
 
     int addPath(BNBNode *node, const std::vector<Path> paths, bool enumerate = false) {
+#ifdef SRC
         auto &r1c  = node->r1c;
         auto &cuts = r1c.cutStorage;
+#endif
 #ifdef RCC
         auto &rccManager = node->rccManager;
 #endif
@@ -179,8 +185,10 @@ public:
      *
      */
     inline int addColumn(BNBNode *node, const auto &columns, bool enumerate = false) {
+#ifdef SRC
         auto &r1c  = node->r1c;
         auto &cuts = r1c.cutStorage;
+#endif
 #ifdef RCC
         auto &rccManager = node->rccManager;
 #endif
@@ -211,7 +219,7 @@ public:
             pathSet.insert(path);
 
             counter += 1;
-            if (counter > 10) break;
+            if (counter > 20) break;
 
             std::fill(coluna.begin(), coluna.end(), 0.0); // Reset the coefficients
 
@@ -303,7 +311,7 @@ public:
                     LinearExpression lhs;
                     for (size_t i = 0; i < coeffs.size(); ++i) {
                         if (coeffs[i] == 0) { continue; }
-                        lhs += node->getVar(i) * coeffs[i];
+                        lhs.addTerm(node->getVar(i), coeffs[i]);
                     }
 
                     std::string constraint_name = "cuts(z" + std::to_string(z) + ")";
@@ -476,7 +484,7 @@ public:
             // For each arc in arcGroups[i], compute the cut expression
             for (const auto &arc : arcGroups[i]) {
                 for (size_t ctr = 0; ctr < allPaths.size(); ++ctr) {
-                    cutExpr += allPaths[ctr].timesArc(arc.from, arc.to) * model->getVar(ctr);
+                    cutExpr.addTerm(model->getVar(ctr), allPaths[ctr].timesArc(arc.from, arc.to));
                 }
             }
 
@@ -521,10 +529,9 @@ public:
         auto &rccManager = node->rccManager;
 #endif
 
-        int bucket_interval = 20;
-        int time_horizon    = instance.T_max;
-        numConstrs          = node->getIntAttr("NumConstrs");
-        fmt::print("Number of constraints: {}\n", numConstrs);
+        int bucket_interval       = 20;
+        int time_horizon          = instance.T_max;
+        numConstrs                = node->getIntAttr("NumConstrs");
         node->numConstrs          = numConstrs;
         std::vector<double> duals = std::vector<double>(numConstrs, 0.0);
 
@@ -533,9 +540,8 @@ public:
         bucket_graph.set_distance_matrix(instance.getDistanceMatrix(), 8);
         bucket_graph.branching_duals = &branchingDuals;
 
-        matrix                = node->extractModelDataSparse();
-        auto integer_solution = node->getObjVal();
-        fmt::print("Integer solution: {}\n", integer_solution);
+        matrix                 = node->extractModelDataSparse();
+        auto integer_solution  = node->getObjVal();
         bucket_graph.incumbent = integer_solution;
 
 #ifdef SRC
@@ -640,8 +646,14 @@ public:
                     r1c.allPaths  = allPaths;
                     bool violated = r1c.runSeparation(node, SRCconstraints);
                     if (!violated) {
-                        print_info("No violated cuts found, calling it a day\n");
-                        break;
+                        if (bucket_graph.A_MAX == N_SIZE) {
+                            print_info("No violated cuts found, calling it a day\n");
+                            break;
+                        } else {
+                            auto new_relaxation = std::min(bucket_graph.A_MAX + 5, N_SIZE);
+                            print_info("Reducing relaxation size to {}\n", new_relaxation);
+                            bucket_graph.A_MAX = new_relaxation;
+                        }
                     }
 
                     changed = cutHandler(r1c, node, SRCconstraints);
@@ -663,7 +675,7 @@ public:
 #endif
 
 #ifdef IPM
-            auto d = 10;
+            auto d = 1;
             matrix = node->extractModelDataSparse();
             gap    = std::abs(lp_obj - (lp_obj + std::min(0.0, inner_obj))) / std::abs(lp_obj);
             gap    = gap / d;
@@ -672,11 +684,10 @@ public:
             if (gap > 1e-1) { gap = 1e-1; }
             gap = 1e-2;
             // print gap
-            auto ip_result   = solver.run_optimization(matrix, gap);
-            lp_obj           = std::get<0>(ip_result);
-            lp_obj_dual      = std::get<1>(ip_result);
-            solution         = std::get<2>(ip_result);
-            nodeDuals        = std::get<3>(ip_result);
+            solver.run_optimization(matrix, gap);
+            lp_obj           = solver.getObjective();
+            solution         = solver.getPrimals();
+            nodeDuals        = solver.getDuals();
             auto originDuals = nodeDuals;
             // print origin duals size
             for (auto &dual : nodeDuals) { dual = -dual; }
@@ -757,11 +768,11 @@ public:
                 //////////////////////////////////////////////////////////////////////
                 // CALLING BALDES
                 //////////////////////////////////////////////////////////////////////
-                if (bucket_graph.s4 && iter % 250 == 0) {
-                    paths = bucket_graph.solve(true);
-                } else {
-                    paths = bucket_graph.solve();
-                }
+                // if (bucket_graph.s4 && iter % 500 == 0) {
+                //     paths = bucket_graph.solve(true);
+                // } else {
+                paths = bucket_graph.solve();
+                //}
                 inner_obj = bucket_graph.inner_obj;
                 stage     = bucket_graph.getStage();
                 ss        = bucket_graph.ss;

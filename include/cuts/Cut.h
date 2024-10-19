@@ -12,6 +12,41 @@
 #include "Definitions.h"
 #include "MIPHandler/Constraint.h"
 
+struct SRCPermutation {
+    std::vector<int> num;
+    int              den;
+    // Default constructor
+    SRCPermutation() = default;
+
+    // Constructor with two vectors
+    SRCPermutation(std::vector<int> num, int den) : num(num), den(den) {}
+
+    // Function to compute RHS
+    double getRHS() const {
+        double rhs = 0;
+        for (size_t i = 0; i < num.size(); ++i) { rhs += static_cast<double>(num[i]) / static_cast<double>(den); }
+        return rhs;
+    }
+
+    // Begin and end (non-const to allow modification)
+    auto begin() noexcept { return num.begin(); }
+    auto end() noexcept { return num.end(); }
+
+    // Swap function for SRCPermutation
+    // Swap function for SRCPermutation
+    void swap(SRCPermutation &other) {
+
+        // Swap each corresponding element in the num and den vectors
+        for (size_t i = 0; i < num.size(); ++i) {
+            std::swap(num[i], other.num[i]);
+        }
+        std::swap(den, other.den);
+    }
+
+    // Support next_permutation for the 'num' vector
+    bool next_permutation() { return std::next_permutation(num.begin(), num.end()); }
+};
+
 /**
  * @struct Cut
  * @brief Represents a cut in the optimization problem.
@@ -26,14 +61,15 @@ struct Cut {
     std::array<uint64_t, num_words> neighbors;    // Bit-level neighbors
     std::vector<int>                baseSetOrder; // Order for baseSet
     std::vector<double>             coefficients; // Cut coefficients
-    std::vector<double>             multipliers = {0.5, 0.5, 0.5};
-    double                          rhs         = 1;
-    int                             id          = -1;
-    bool                            added       = false;
-    bool                            updated     = false;
-    CutType                         type        = CutType::ThreeRow;
-    Constraint                     *grbConstr;
-    size_t                          key;
+    SRCPermutation                  p = {{1, 1, 1, 1, 1}, 2};
+
+    double      rhs     = 1;
+    int         id      = -1;
+    bool        added   = false;
+    bool        updated = false;
+    CutType     type    = CutType::ThreeRow;
+    Constraint *grbConstr;
+    size_t      key;
     // Default constructor
     Cut() = default;
 
@@ -43,8 +79,8 @@ struct Cut {
         : baseSet(baseSetInput), neighbors(neighborsInput), coefficients(coefficients) {}
 
     Cut(const std::array<uint64_t, num_words> baseSetInput, const std::array<uint64_t, num_words> &neighborsInput,
-        const std::vector<double> &coefficients, const std::vector<double> &multipliers)
-        : baseSet(baseSetInput), neighbors(neighborsInput), coefficients(coefficients), multipliers(multipliers) {}
+        const std::vector<double> &coefficients, const SRCPermutation &multipliers)
+        : baseSet(baseSetInput), neighbors(neighborsInput), coefficients(coefficients), p(multipliers) {}
 
     // Define size of the cut
     size_t size() const { return coefficients.size(); }
@@ -187,10 +223,10 @@ public:
         alphas.reserve(cuts.size());
         for (auto c : cuts) {
             double alpha = 0.0;
-            double S     = 0;
+            int    S     = 0;
             auto   AM    = c.neighbors;
             auto   C     = c.baseSet;
-            auto   p     = c.multipliers;
+            auto   p     = c.p;
             auto   order = c.baseSetOrder;
 
             for (size_t j = 1; j < P.size() - 1; ++j) {
@@ -203,9 +239,9 @@ public:
                 if (C[vj / 64] & (1ULL << (vj % 64))) {
                     // Get the position of vj in C by counting the set bits up to vj
                     int pos = order[vj];
-                    S += p[pos];
-                    if (S >= 1) {
-                        S -= 1;
+                    S += p.num[pos];
+                    if (S % p.den == 0) {
+                        // S -= 1;
                         alpha += 1;
                     }
                 }

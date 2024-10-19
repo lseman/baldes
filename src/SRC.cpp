@@ -13,6 +13,7 @@
 
 #include "cuts/SRC.h"
 
+#include "Cut.h"
 #include "Definitions.h"
 #include <stdexec/execution.hpp>
 
@@ -37,7 +38,7 @@ using Cuts = std::vector<Cut>;
  * both the base set and multipliers is preserved during hashing.
  *
  */
-std::size_t compute_cut_key(const std::array<uint64_t, num_words> &baseSet, const std::vector<double> &multipliers) {
+std::size_t compute_cut_key(const std::array<uint64_t, num_words> &baseSet, const std::vector<int> &multipliers) {
     XXH3_state_t *state = XXH3_createState(); // Initialize the XXH3 state
     XXH3_64bits_reset(state);                 // Reset the hashing state
 
@@ -70,11 +71,16 @@ std::size_t compute_cut_key(const std::array<uint64_t, num_words> &baseSet, cons
  */
 void CutStorage::addCut(Cut &cut) {
 
-    auto baseSet     = cut.baseSet;
-    auto neighbors   = cut.neighbors;
-    auto multipliers = cut.multipliers;
+    auto baseSet   = cut.baseSet;
+    auto neighbors = cut.neighbors;
+    auto p_num     = cut.p.num;
+    auto p_dem     = cut.p.den;
 
-    std::size_t cut_key = compute_cut_key(baseSet, multipliers);
+    // concatenate p_num and p_dem in a single vector
+    auto p_cat = p_num;
+    p_cat.push_back(p_dem);
+
+    std::size_t cut_key = compute_cut_key(baseSet, p_cat);
 
     auto it = cutMaster_to_cut_map.find(cut_key);
     if (it != cutMaster_to_cut_map.end()) {
@@ -260,7 +266,7 @@ void LimitedMemoryRank1Cuts::generateCutCoefficients(VRPTW_SRC &cuts, std::vecto
                                                      int numNodes, const SparseMatrix &A,
                                                      const std::vector<double> &x) {
     double primal_violation   = 0.0;
-    int    max_number_of_cuts = 3;
+    int    max_number_of_cuts = 2;
 
     if (cuts.S_n > 0) {
         int m_max = std::min(cuts.S_n, max_number_of_cuts);
@@ -345,7 +351,9 @@ void LimitedMemoryRank1Cuts::generateCutCoefficients(VRPTW_SRC &cuts, std::vecto
                     order[node] = ordering++;
                 }
 
-                auto p = {0.5, 0.5, 0.5}; // Example
+                SRCPermutation p;
+                p.num = {1, 1, 1};
+                p.den = 2;
 
                 // Iterate over remaining nodes and calculate the coefficients_aux
                 for (auto node : remainingNodes) {
@@ -392,6 +400,14 @@ bool LimitedMemoryRank1Cuts::runSeparation(BNBNode *node, std::vector<Constraint
     std::sort(SRCconstraints.begin(), SRCconstraints.end(),
               [](const Constraint *a, const Constraint *b) { return a->index() < b->index(); });
 
+    //if (cleared) node->optimize();
+    matrix   = node->extractModelDataSparse(); // Extract model data
+    solution = node->extractSolution();
+    separate(matrix.A_sparse, solution);
+    prepare45Heuristic(matrix.A_sparse, solution);
+    the45Heuristic<CutType::FourRow>(matrix.A_sparse, solution);
+    the45Heuristic<CutType::FiveRow>(matrix.A_sparse, solution);
+
     for (int i = SRCconstraints.size() - 1; i >= 0; --i) {
         auto constr = SRCconstraints[i];
 
@@ -412,15 +428,7 @@ bool LimitedMemoryRank1Cuts::runSeparation(BNBNode *node, std::vector<Constraint
             SRCconstraints.erase(SRCconstraints.begin() + i);
         }
     }
-    if (cleared) {
-        node->optimize(); // Re-optimize the model
-    }
-    matrix   = node->extractModelDataSparse(); // Extract model data
-    solution = node->extractSolution();
-    separate(matrix.A_sparse, solution);
-    prepare45Heuristic(matrix.A_sparse, solution);
-    the45Heuristic<CutType::FourRow>(matrix.A_sparse, solution);
-    the45Heuristic<CutType::FiveRow>(matrix.A_sparse, solution);
+    
     if (cuts_before == cuts->size() + n_cuts_removed) { return false; }
     return true;
 }
@@ -431,10 +439,10 @@ bool LimitedMemoryRank1Cuts::runSeparation(BNBNode *node, std::vector<Constraint
  */
 double LimitedMemoryRank1Cuts::computeLimitedMemoryCoefficient(const std::array<uint64_t, num_words> &C,
                                                                const std::array<uint64_t, num_words> &AM,
-                                                               const std::vector<double> &p, const std::vector<int> &P,
+                                                               const SRCPermutation &p, const std::vector<int> &P,
                                                                std::vector<int> &order) {
     double alpha = 0;
-    double S     = 0;
+    int    S     = 0;
 
     for (size_t j = 1; j < P.size() - 1; ++j) {
         int vj = P[j];
@@ -450,10 +458,10 @@ double LimitedMemoryRank1Cuts::computeLimitedMemoryCoefficient(const std::array<
             // Get the position of vj in C by counting the set bits up to vj
             int pos = order[vj];
 
-            S += p[pos];
+            S += p.num[pos];
 
-            if (S >= 1) {
-                S -= 1;
+            if (S % p.den == 0) {
+                // S -= 1;
                 alpha += 1;
             }
         }

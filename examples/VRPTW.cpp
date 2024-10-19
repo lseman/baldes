@@ -107,7 +107,7 @@ void initRMP(MIPProblem *model, VRProblem *problem, std::vector<std::vector<int>
         LinearExpression lhs;
         for (size_t j = 0; j < heuristicRoutes.size(); ++j) {
             if (std::find(heuristicRoutes[j].begin(), heuristicRoutes[j].end(), i) != heuristicRoutes[j].end()) {
-                lhs += model->getVar(j) * 1.0; // Each lambda[j] contributes to visiting vertex i
+                lhs.addTerm(model->getVar(j), 1.0);
             }
         }
         model->add_constraint(lhs, 1.0, '>'); // Constraint: lhs >= 1 (visit the node)
@@ -115,7 +115,7 @@ void initRMP(MIPProblem *model, VRProblem *problem, std::vector<std::vector<int>
 
     // Second part: Ensure the number of vehicles does not exceed the maximum
     LinearExpression vehicle_constraint_lhs;
-    for (size_t j = 0; j < heuristicRoutes.size(); ++j) { vehicle_constraint_lhs += model->getVar(j) * 1.0; }
+    for (size_t j = 0; j < heuristicRoutes.size(); ++j) { vehicle_constraint_lhs.addTerm(model->getVar(j), 1.0); }
     model->add_constraint(vehicle_constraint_lhs, static_cast<double>(Um), '<'); // Constraint: sum(lambda) <= Um
 
     // Set the objective to minimize
@@ -227,8 +227,9 @@ int main(int argc, char *argv[]) {
 
     // print size of initialRoutesHGS
     initRMP(&mip, problem, initialRoutesHGS);
-    auto gurobi_model = mip.toGurobiModel(GurobiEnvSingleton::getInstance());
-
+#ifdef GUROBI
+    //auto gurobi_model = mip.toGurobiModel(GurobiEnvSingleton::getInstance());
+#endif
     BNBNode *node = new BNBNode(mip);
     node->paths   = paths;
     node->problem = problem;

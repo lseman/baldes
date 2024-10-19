@@ -219,6 +219,21 @@ struct Bucket {
         }
     }
 
+    void add_sorted_with_limit(Label *label, size_t limit) noexcept {
+        if (labels_vec.empty() || label->cost >= labels_vec.back()->cost) {
+            labels_vec.push_back(label); // Direct insertion at the end
+        } else if (label->cost <= labels_vec.front()->cost) {
+            labels_vec.insert(labels_vec.begin(), label); // Direct insertion at the beginning
+        } else {
+            auto it = std::lower_bound(labels_vec.begin(), labels_vec.end(), label,
+                                       [](const Label *a, const Label *b) { return a->cost < b->cost; });
+            labels_vec.insert(it, label); // Insertion
+            // Check if the vector has reached the limit
+            // If so, remove the last element
+            if (labels_vec.size() > limit) { labels_vec.pop_back(); }
+        }
+    }
+
     /**
      * @brief Removes a label from the labels vector.
      *

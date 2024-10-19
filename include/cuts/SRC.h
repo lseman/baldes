@@ -73,6 +73,8 @@ struct PairHash;
 
 struct SparseMatrix;
 
+#include "RNG.h"
+
 /**
  * @class LimitedMemoryRank1Cuts
  * @brief A class for handling limited memory rank-1 cuts in optimization problems.
@@ -86,6 +88,8 @@ class LimitedMemoryRank1Cuts {
 public:
     std::vector<CachedCut> cutCache4;
     std::vector<CachedCut> cutCache5;
+
+    Xoroshiro128Plus rp; // Seed it (you can change the seed)
 
     LimitedMemoryRank1Cuts(std::vector<VRPNode> &nodes);
 
@@ -118,7 +122,7 @@ public:
      *
      */
     double computeLimitedMemoryCoefficient(const std::array<uint64_t, num_words> &C,
-                                           const std::array<uint64_t, num_words> &AM, const std::vector<double> &p,
+                                           const std::array<uint64_t, num_words> &AM, const SRCPermutation &p,
                                            const std::vector<int> &P, std::vector<int> &order);
 
     /**
@@ -167,18 +171,37 @@ private:
  * five double values. The permutations are generated in lexicographical order.
  *
  */
-inline std::vector<std::vector<double>> getPermutationsForSize5() {
-    std::vector<std::vector<double>> permutations;
-    std::vector<std::vector<double>> p_all = {{0.5, 0.5, 0.25, 0.25, 0.25},
-                                              {0.75, 0.25, 0.25, 0.25, 0.25},
-                                              {0.6, 0.4, 0.4, 0.2, 0.2},
-                                              {0.6667, 0.6667, 0.3333, 0.3333, 0.3333},
-                                              {0.75, 0.75, 0.5, 0.5, 0.25}};
+inline std::vector<SRCPermutation> getPermutationsForSize5() {
+    std::vector<SRCPermutation>   permutations;
+    std::vector<std::vector<int>> p_num = {{1, 1, 1, 1, 1}, {1, 1, 1, 1, 1}, {3, 1, 1, 1, 1}, {3, 2, 2, 1, 1},
+                                           {2, 2, 1, 1, 1}, {3, 3, 2, 2, 1}, {2, 2, 2, 1, 1}};
+    std::vector<int>              p_dem = {2, 3, 4, 5, 4, 4, 3};
 
-    for (auto &p : p_all) {
-        std::sort(p.begin(), p.end()); // Ensure we start with the lowest lexicographical order
-        do { permutations.push_back(p); } while (std::next_permutation(p.begin(), p.end()));
+    // random get 10 p_num vectors, and create 10 SRCPermutation vectors with shufle p_num[i] and the same p_dem
+    // Shuffle indices to randomly access p_num and p_dem
+    int              permutation_count = p_num.size();
+    std::vector<int> indices(permutation_count);
+    std::iota(indices.begin(), indices.end(), 0); // Fill indices with 0, 1, 2, ..., permutation_count-1
+                                                  //
+    Xoroshiro128Plus rng;                         // Seed it (you can change the seed)
+
+    // Shuffle the indices to access random p_num and p_dem vectors
+    std::shuffle(indices.begin(), indices.end(), rng);
+
+    for (int i = 0; i < permutation_count; ++i) { // Get 10 random p_num vectors
+        SRCPermutation perm;
+
+        // Use shuffled index to randomly select p_num and p_dem vectors
+        int random_index = indices[i];
+        perm.num         = p_num[random_index];
+        perm.den         = p_dem[random_index];
+
+        // Optionally shuffle perm.num again if you want to shuffle within the vector
+        std::shuffle(perm.num.begin(), perm.num.end(), rng);
+
+        permutations.push_back(perm);
     }
+
     return permutations;
 }
 
@@ -190,11 +213,22 @@ inline std::vector<std::vector<double>> getPermutationsForSize5() {
  * are generated in lexicographical order.
  *
  */
-inline std::vector<std::vector<double>> getPermutationsForSize4() {
-    std::vector<std::vector<double>> permutations;
-    std::vector<double>              p = {2.0 / 3.0, 1.0 / 3.0, 1.0 / 3.0, 1.0 / 3.0};
-    std::sort(p.begin(), p.end()); // Ensure we start with the lowest lexicographical order
-    do { permutations.push_back(p); } while (std::next_permutation(p.begin(), p.end()));
+inline std::vector<SRCPermutation> getPermutationsForSize4() {
+    std::vector<SRCPermutation> permutations;
+    std::vector<int>            p_num = {2, 1, 1, 1};
+    int                         p_den = 3;
+
+    Xoroshiro128Plus rng; // Seed it (you can change the seed)
+
+    // random permute p_num and create 4 SRCPermutation vectors
+    for (int i = 0; i < 4; ++i) {
+        SRCPermutation perm;
+        perm.num = p_num;
+        std::shuffle(perm.num.begin(), perm.num.end(), rng);
+        perm.den = p_den;
+        permutations.push_back(perm);
+    }
+
     return permutations;
 }
 
@@ -287,12 +321,12 @@ template <CutType T>
 void LimitedMemoryRank1Cuts::the45Heuristic(const SparseMatrix &A, const std::vector<double> &x) {
     int    max_number_of_cuts  = 10; // Max number of cuts to generate
     double violation_threshold = 1e-3;
-    int    max_generated_cuts  = 20;
+    int    max_generated_cuts  = 15;
 
     auto &selectedNodes = the45selectedNodes;
     // Ensure selectedNodes is valid
 
-    std::vector<std::vector<double>> permutations;
+    std::vector<SRCPermutation> permutations;
     if constexpr (T == CutType::FourRow) {
         permutations = getPermutationsForSize4();
     } else if constexpr (T == CutType::FiveRow) {
@@ -305,7 +339,6 @@ void LimitedMemoryRank1Cuts::the45Heuristic(const SparseMatrix &A, const std::ve
     Xoroshiro128Plus rng; // Seed it (you can change the seed)
     if (permutations.size() > 4) {
         // Use std::shuffle with the Xoroshiro128Plus generator
-        std::shuffle(permutations.begin(), permutations.end(), rng);
         permutations.resize(4);
     }
 
@@ -388,7 +421,9 @@ void LimitedMemoryRank1Cuts::the45Heuristic(const SparseMatrix &A, const std::ve
                 std::vector<int>                order(N_SIZE, 0);
 
                 for (const auto &p : permutations) {
-                    uint64_t pHash = hashVector(p);
+                    auto p_cat = p.num;
+                    p_cat.push_back(p.den);
+                    uint64_t pHash = hashVector(p_cat);
                     // concatenate processed set and permutation
                     uint64_t setPermutationHash = setHash ^ pHash;
 
@@ -412,7 +447,7 @@ void LimitedMemoryRank1Cuts::the45Heuristic(const SparseMatrix &A, const std::ve
                     }
 
                     std::fill(coefficients_aux.begin(), coefficients_aux.end(), 0.0);
-                    int    rhs             = std::floor(std::accumulate(p.begin(), p.end(), 0.0));
+                    int    rhs             = p.getRHS();
                     double alpha           = 0;
                     bool   violation_found = false;
 
@@ -471,7 +506,7 @@ void LimitedMemoryRank1Cuts::the45Heuristic(const SparseMatrix &A, const std::ve
                                 [&](std::bitset<N_SIZE> &current_bitset) -> std::bitset<N_SIZE> {
                                 std::bitset<N_SIZE> minimal_bitset = current_bitset;
 
-                                int    population_size = 20;  // Number of candidates in each generation
+                                int    population_size = 10;  // Number of candidates in each generation
                                 int    max_generations = 5;   // Number of generations
                                 double mutation_rate   = 0.3; // Probability of mutating a bit
                                 std::vector<std::bitset<N_SIZE>> population;

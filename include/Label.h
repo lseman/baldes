@@ -39,7 +39,7 @@ struct Label {
     std::array<std::uint16_t, MAX_SRC_CUTS> SRCmap = {};
 #endif
 #ifdef SRC
-    std::vector<double> SRCmap;
+    std::vector<int> SRCmap;
 #endif
     // uint64_t             visited_bitmap; // Bitmap for visited nodes
     std::array<uint64_t, num_words> visited_bitmap = {0};

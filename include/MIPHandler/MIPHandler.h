@@ -46,13 +46,14 @@ public:
     MIPProblem(const std::string &name, int num_rows, int num_cols) : name(name), sparse_matrix(num_rows, num_cols) {}
 
     // Add a variable to the problem
-    void add_variable(const std::string &var_name, VarType type, double lb = 0.0, double ub = 1.0,
-                      double obj_coeff = 0.0) {
-        variables.emplace_back(var_name, type, lb, ub, obj_coeff);
-        lb_vec.push_back(lb);
-        ub_vec.push_back(ub);
-        c_vec.push_back(obj_coeff);
+    Variable *add_variable(const std::string &var_name, VarType type, double lb = 0.0, double ub = 1.0,
+                           double obj_coeff = 0.0) {
+        auto  index  = variables.size();
+        auto *newVar = new Variable(var_name, type, lb, ub, obj_coeff);
+        newVar->set_index(index);
+        variables.emplace_back(newVar);
         var_name_to_index[var_name] = variables.size() - 1;
+        return newVar;
     }
 
     // Set the objective function
@@ -75,8 +76,17 @@ public:
             // Delete the column from the sparse matrix
             sparse_matrix.delete_column(var_index);
 
+            // delete the variable from the constraint linear expressions
+            for (auto &constraint : constraints) {
+                constraint->get_expression().remove_term(variables[var_index]->get_name());
+            }
+
             // Remove the variable from the variables list
             variables.erase(variables.begin() + var_index);
+
+            // reduce index of variables after the deleted variable
+            for (int i = var_index; i < variables.size(); ++i) { variables[i]->set_index(i); }
+
         } else {
             throw std::out_of_range("Invalid variable index");
         }
@@ -150,23 +160,19 @@ public:
 
     void delete_constraint(Constraint *constraint) { delete_constraint(constraint->index()); }
 
-    void delete_variable(const Variable &variable) {
+    void delete_variable(const Variable *variable) {
         // Find the index of the given variable in the variables vector
-        auto it = std::find_if(variables.begin(), variables.end(),
-                               [&variable](const Variable &v) { return &v == &variable; });
-
-        if (it != variables.end()) {
-            // Get the index of the variable
-            int variableIndex = std::distance(variables.begin(), it);
-
-            // Delete the column from the sparse matrix
-            sparse_matrix.delete_column(variableIndex);
-
-            // Remove the variable from the variables list
-            variables.erase(it);
-        } else {
-            throw std::invalid_argument("Variable not found.");
+        auto var_index = variable->index();
+        // Delete the column from the sparse matrix
+        sparse_matrix.delete_column(var_index);
+        // Remove the variable from the variables list
+        for (auto &constraint : constraints) {
+            constraint->get_expression().remove_term(variables[var_index]->get_name());
         }
+
+        variables.erase(variables.begin() + var_index);
+
+        for (int i = var_index; i < variables.size(); ++i) { variables[i]->set_index(i); }
     }
 
     // Print sparse matrix as dense (for debugging)
@@ -183,7 +189,7 @@ public:
     }
 
     // Get a variable by index
-    Variable &getVar(size_t index) {
+    Variable *getVar(size_t index) {
         if (index >= variables.size()) { throw std::out_of_range("Variable index out of range"); }
         return variables[index];
     }
@@ -204,7 +210,7 @@ public:
             // Update the sparse matrix only if the value has changed
             sparse_matrix.modify_or_delete(constraintIndex, i, new_value);
 
-            const std::string &var_name = variables[i].get_name();
+            const std::string &var_name = variables[i]->get_name();
 
             // Update or remove terms in the LinearExpression
             if (new_value != 0.0) {
@@ -231,7 +237,7 @@ public:
         Constraint       *constraint = constraints[constraintIndex];
         LinearExpression &expression = constraint->get_expression();
 
-        const std::string &var_name = variables[variableIndex].get_name();
+        const std::string &var_name = variables[variableIndex]->get_name();
 
         // Update or remove terms in the LinearExpression
         if (value != 0.0) {
@@ -247,7 +253,7 @@ public:
     void addVars(const double *lb, const double *ub, const double *obj, const VarType *vtypes, const std::string *names,
                  size_t count);
     // Get all variables
-    std::vector<Variable> &getVars() { return variables; }
+    std::vector<Variable *> &getVars() { return variables; }
     // Get all constraints
     std::vector<Constraint *> &getConstraints() { return constraints; }
 
@@ -275,20 +281,12 @@ public:
 
         // check if we have repeted variable name
         std::unordered_map<std::string, int> var_count;
-        for (const auto &var : variables) {
-            if (var_count.find(var.get_name()) == var_count.end()) {
-                var_count[var.get_name()] = 1;
-            } else {
-                var_count[var.get_name()]++;
-                fmt::print("Variable name {} is repeated {} times\n", var.get_name(), var_count[var.get_name()]);
-            }
-        }
         // Step 1: Add variables to the Gurobi model
         for (const auto &var : variables) {
             // Add each variable to the Gurobi model, according to its type and bounds
-            GRBVar gurobiVar           = gurobiModel.addVar(var.get_lb(), var.get_ub(), var.get_objective_coefficient(),
-                                                            toGRBVarType(var.get_type()), var.get_name());
-            gurobiVars[var.get_name()] = gurobiVar;
+            GRBVar gurobiVar = gurobiModel.addVar(var->get_lb(), var->get_ub(), var->get_objective_coefficient(),
+                                                  toGRBVarType(var->get_type()), var->get_name());
+            gurobiVars[var->get_name()] = gurobiVar;
         }
 
         // Step 2: Add constraints to the Gurobi model
@@ -305,7 +303,9 @@ public:
 
         // Step 3: Set objective if needed (assuming a linear objective function)
         GRBLinExpr objective;
-        for (const auto &var : variables) { objective += gurobiVars[var.get_name()] * var.get_objective_coefficient(); }
+        for (const auto &var : variables) {
+            objective += gurobiVars[var->get_name()] * var->get_objective_coefficient();
+        }
         gurobiModel.setObjective(objective, GRB_MINIMIZE); // Assume minimization problem
         gurobiModel.update();
         return gurobiModel;
@@ -360,9 +360,9 @@ public:
         // Set variable bounds and cost
         int var_index = 0;
         for (const auto &var : variables) {
-            highsModel.lp_.col_lower_[var_index] = var.get_lb();
-            highsModel.lp_.col_upper_[var_index] = var.get_ub();
-            highsModel.lp_.col_cost_[var_index]  = var.get_objective_coefficient();
+            highsModel.lp_.col_lower_[var_index] = var->get_lb();
+            highsModel.lp_.col_upper_[var_index] = var->get_ub();
+            highsModel.lp_.col_cost_[var_index]  = var->get_objective_coefficient();
             var_index++;
         }
 
@@ -434,27 +434,11 @@ public:
         return rhs - row_value;
     }
 
-    std::vector<double> get_lbs() const {
-        std::vector<double> lbs;
-        lbs.reserve(variables.size()); // Reserve space upfront
-        std::transform(variables.begin(), variables.end(), std::back_inserter(lbs),
-                       [](const Variable &var) { return var.get_lb(); });
-        return lbs;
-    }
-
-    std::vector<double> get_ubs() const {
-        std::vector<double> ubs;
-        ubs.reserve(variables.size()); // Reserve space upfront
-        std::transform(variables.begin(), variables.end(), std::back_inserter(ubs),
-                       [](const Variable &var) { return var.get_ub(); });
-        return ubs;
-    }
-
     std::vector<double> get_c() const {
         std::vector<double> c;
         c.reserve(variables.size()); // Reserve space upfront
         std::transform(variables.begin(), variables.end(), std::back_inserter(c),
-                       [](const Variable &var) { return var.get_objective_coefficient(); });
+                       [](const Variable *var) { return var->get_objective_coefficient(); });
         return c;
     }
 
@@ -470,15 +454,31 @@ public:
         std::vector<char> vtypes;
         vtypes.reserve(variables.size()); // Reserve space upfront
         for (const auto &var : variables) {
-            if (var.get_type() == VarType::Continuous) {
+            if (var->get_type() == VarType::Continuous) {
                 vtypes.push_back('C');
-            } else if (var.get_type() == VarType::Integer) {
+            } else if (var->get_type() == VarType::Integer) {
                 vtypes.push_back('I');
-            } else if (var.get_type() == VarType::Binary) {
+            } else if (var->get_type() == VarType::Binary) {
                 vtypes.push_back('B');
             }
         }
         return vtypes;
+    }
+
+    std::vector<double> get_lb() const {
+        std::vector<double> lb;
+        lb.reserve(variables.size()); // Reserve space upfront
+        std::transform(variables.begin(), variables.end(), std::back_inserter(lb),
+                       [](const Variable *var) { return var->get_lb(); });
+        return lb;
+    }
+
+    std::vector<double> get_ub() const {
+        std::vector<double> ub;
+        ub.reserve(variables.size()); // Reserve space upfront
+        std::transform(variables.begin(), variables.end(), std::back_inserter(ub),
+                       [](const Variable *var) { return var->get_ub(); });
+        return ub;
     }
 
     ModelData extractModelDataSparse() {
@@ -486,9 +486,9 @@ public:
         ModelData data;
         data.A_sparse = sparse_matrix;
         data.b        = b_vec;
-        data.c        = c_vec;
-        data.lb       = lb_vec;
-        data.ub       = ub_vec;
+        data.c        = get_c();
+        data.lb       = get_lb();
+        data.ub       = get_ub();
         data.vtype    = get_vtypes();
         data.sense    = get_senses();
 
@@ -497,16 +497,13 @@ public:
 
 private:
     std::string                                    name;
-    std::vector<Variable>                          variables;
+    std::vector<Variable *>                        variables;
     std::vector<Constraint *>                      constraints;    // Store the constraints
     LinearExpression                               objective;      // Store the objective function
     ObjectiveType                                  objective_type; // Minimize or Maximize
     SparseMatrix                                   sparse_matrix;  // Use SparseMatrix for coefficient storage
     ankerl::unordered_dense::map<std::string, int> var_name_to_index;
     std::vector<double>                            b_vec;
-    std::vector<double>                            c_vec;
-    std::vector<double>                            lb_vec;
-    std::vector<double>                            ub_vec;
 };
 
 class MIPColumn {

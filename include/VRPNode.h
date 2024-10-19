@@ -104,8 +104,9 @@ struct VRPNode {
      * the `bw_arcs` in ascending order of priority.
      */
     void sort_arcs() {
-        std::sort(fw_arcs.begin(), fw_arcs.end(), [](const Arc &a, const Arc &b) { return a.priority > b.priority; });
-        std::sort(bw_arcs.begin(), bw_arcs.end(), [](const Arc &a, const Arc &b) { return a.priority < b.priority; });
+        pdqsort(fw_arcs.begin(), fw_arcs.end(), [](const Arc &a, const Arc &b) { return a.priority > b.priority; });
+
+        pdqsort(bw_arcs.begin(), bw_arcs.end(), [](const Arc &a, const Arc &b) { return a.priority < b.priority; });
     }
 
     /**

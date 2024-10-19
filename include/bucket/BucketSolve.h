@@ -116,6 +116,7 @@ inline std::vector<Label *> BucketGraph::solve(bool trigger) {
 
         auto rollback = updateStepSize(); // Update the step size for the bucket graph
         // auto rollback = false;
+        //  auto rollback = false;
         if (rollback) {
             //    s4     = false; // Rollback to Stage 3 if necessary
             //    s3     = true;
@@ -211,6 +212,7 @@ std::vector<double> BucketGraph::labeling_algorithm() noexcept {
     bool dominated;     // Flag to check if a label is dominated
     bool domin_smaller; // Flag to check if a label is dominated by a smaller bucket
 
+    auto a_ctr = 0;
     // Iterate through each strongly connected component (SCC) in topological order
     for (const auto &scc_index : topological_order) {
         do {
@@ -243,8 +245,8 @@ std::vector<double> BucketGraph::labeling_algorithm() noexcept {
                     std::memset(Bvisited.data(), 0, Bvisited.size() * sizeof(uint64_t));
 
                     // Check if the label is dominated by any labels in smaller buckets
-                    domin_smaller =
-                        DominatedInCompWiseSmallerBuckets<D, S>(label, bucket, c_bar, Bvisited, ordered_sccs);
+                    // domin_smaller =
+                    //    DominatedInCompWiseSmallerBuckets<D, S>(label, bucket, c_bar, Bvisited, ordered_sccs);
 
                     if (!domin_smaller) {
                         // Lambda function to process new labels after extension
@@ -319,7 +321,7 @@ std::vector<double> BucketGraph::labeling_algorithm() noexcept {
 
                                 // Add the new label to the bucket
 #ifndef SORTED_LABELS
-                                buckets[to_bucket].add_sorted_label(new_label);
+                                buckets[to_bucket].add_label_lim(new_label, 10);
 #elif LIMITED_BUCKETS
                                 buckets[to_bucket].add_label_lim(new_label, BUCKET_CAPACITY);
 #else
@@ -329,9 +331,14 @@ std::vector<double> BucketGraph::labeling_algorithm() noexcept {
                             }
                         };
 
+                        a_ctr = 0;
                         // Process regular arcs for label extension
                         const auto &arcs = nodes[label->node_id].get_arcs<D>(scc_index);
                         for (const auto &arc : arcs) {
+                            if constexpr (S == Stage::Four && F == Full::Partial) {
+                                a_ctr++;
+                                if (a_ctr > A_MAX) { break; }
+                            }
                             Label *new_label = Extend<D, S, ArcType::Node, Mutability::Mut, F>(label, arc);
                             if (!new_label) {
 #ifdef UNREACHABLE_DOMINANCE
@@ -741,7 +748,7 @@ BucketGraph::Extend(const std::conditional_t<M == Mutability::Mut, Label *, cons
             const auto &baseSet      = cut.baseSet;
             const auto &baseSetorder = cut.baseSetOrder;
             const auto &neighbors    = cut.neighbors;
-            const auto &multipliers  = cut.multipliers;
+            const auto &multipliers  = cut.p;
 
 #if defined(SRC3)
             // Apply SRC3 logic: if the node is in the base set, increment the SRC map
@@ -757,15 +764,14 @@ BucketGraph::Extend(const std::conditional_t<M == Mutability::Mut, Label *, cons
             bool bitIsSet  = neighbors[segment] & bit_mask;
             bool bitIsSet2 = baseSet[segment] & bit_mask;
 
-            double &src_map_value = new_label->SRCmap[idx]; // Use reference to avoid multiple accesses
+            auto &src_map_value = new_label->SRCmap[idx]; // Use reference to avoid multiple accesses
             if (!bitIsSet) {
                 src_map_value = 0.0; // Reset the SRC map value
             }
 
             if (bitIsSet2) {
-                src_map_value += multipliers[baseSetorder[node_id]];
-                if (src_map_value >= 1) {
-                    src_map_value -= 1;
+                src_map_value += multipliers.num[baseSetorder[node_id]];
+                if (src_map_value % multipliers.den == 0) {
                     new_label->cost -= SRCDuals[idx]; // Apply the SRC dual value if threshold is exceeded
                 }
             }
@@ -789,21 +795,21 @@ inline bool BucketGraph::is_dominated(const Label *new_label, const Label *label
     const auto &new_resources   = new_label->resources;
     const auto &label_resources = label->resources;
 
-    double sumSRC = 0; // Variable to accumulate SRC dual values if applicable
+    double sumSRC = 0;
 
 #ifdef SRC
-    // SRC logic (Subset Row Cuts) for Stage 3, 4, or Enumerate
     if constexpr (S == Stage::Four || S == Stage::Enumerate) {
         const auto &SRCDuals = cut_storage->SRCDuals;
-        // Check if the SRC dual values exist
         if (!SRCDuals.empty()) {
-            // Iterate over the SRC dual values
+            const auto &labelSRCMap    = label->SRCmap;
+            const auto &newLabelSRCMap = new_label->SRCmap;
             for (size_t i = 0; i < SRCDuals.size(); ++i) {
-                // Add to sumSRC if the comparison label's SRC map is greater than the new label's SRC map
-                if (label->SRCmap[i] > new_label->SRCmap[i]) { sumSRC += SRCDuals[i]; }
+                const auto &den         = cut_storage->getCut(i).p.den;
+                const auto  labelMod    = labelSRCMap[i] % den;
+                const auto  newLabelMod = newLabelSRCMap[i] % den;
+                if (labelMod > newLabelMod) { sumSRC += SRCDuals[i]; }
             }
         }
-        // If the label's adjusted cost (cost - sumSRC) is greater than the new label's cost, it is not dominated
         if (label->cost - sumSRC > new_label->cost) { return false; }
     } else
 #endif
@@ -875,10 +881,10 @@ inline bool BucketGraph::is_dominated(const Label *new_label, const Label *label
  *
  */
 template <typename T>
-bool precedes(const std::vector<std::vector<int>> &sccs, const T a, const T b, UnionFind &uf) {
+inline bool precedes(const std::vector<std::vector<int>> &sccs, const T a, const T b, UnionFind &uf) {
     // Step 2: Check if element `a`'s SCC precedes element `b`'s SCC
-    size_t rootA = uf.find(a);
-    size_t rootB = uf.find(b);
+    size_t rootA = uf.getSubset(a);
+    size_t rootB = uf.getSubset(b);
 
     // You can define precedence based on the comparison of the root components
     return rootA < rootB;

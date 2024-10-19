@@ -66,9 +66,3 @@ Constraint *LinearExpression::operator==(double rhs) const {
     auto ctr = new Constraint(*this, rhs, '='); // '=' represents '=='
     return ctr;
 }
-
-// This overload allows an int to be multiplied by a Variable
-std::pair<Variable, double> operator*(int coeff, Variable &var) {
-    return {var, static_cast<double>(coeff)}; // Convert int to double if necessary
-}
-std::pair<Variable, double> operator*(double coeff, const Variable &var) { return {var, coeff}; }
