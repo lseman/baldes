@@ -292,7 +292,7 @@ public:
     bool                 transition = true;
     Status               status     = Status::NotOptimal;
     std::vector<Label *> merged_labels_rih;
-    int                  A_MAX = N_SIZE * 0.2;
+    int                  A_MAX = N_SIZE;
 
     // std::shared_ptr<ThreadPool> fw_thread_pool = std::make_shared<ThreadPool>(1);
     // std::shared_ptr<ThreadPool> bw_thread_pool = std::make_shared<ThreadPool>(1);
