@@ -36,6 +36,7 @@ template <Direction D>
 void BucketGraph::UpdateBucketsSet(const double theta, const Label *label, ankerl::unordered_dense::set<int> &Bbidi,
                                    int &current_bucket, std::vector<uint64_t> &Bvisited) {
     // Precompute values and assign references for the direction-specific data
+    
     auto &Phi_opposite     = assign_buckets<D>(Phi_bw, Phi_fw);
     auto &buckets_opposite = assign_buckets<D>(bw_buckets, fw_buckets);
     auto &c_bar_opposite   = assign_buckets<D>(bw_c_bar, fw_c_bar);
@@ -59,7 +60,7 @@ void BucketGraph::UpdateBucketsSet(const double theta, const Label *label, anker
         const size_t segment      = curr_bucket >> 6; // Determine the segment for the current bucket
         const size_t bit_position = curr_bucket & 63; // Determine the bit position within the segment
         Bvisited[segment] |= (1ULL << bit_position);  // Set the bit corresponding to the current bucket as visited
-
+        // print current bucket
         const int bucketLprimenode = buckets_opposite[curr_bucket].node_id;
         double    cost             = getcij(bucketLnode, bucketLprimenode);
 
@@ -276,7 +277,7 @@ void BucketGraph::ObtainJumpBucketArcs() {
             const int from_node = orig_arc.from;
             const int to_node   = orig_arc.to;
             bool      have_path = false;
-
+            
             // Check if the path exists in the current bucket arcs
             for (const auto &gamma : arcs) {
                 if (fixed_buckets[gamma.from_bucket][gamma.to_bucket] == 1) { continue; }

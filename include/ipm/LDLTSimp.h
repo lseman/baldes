@@ -9,7 +9,6 @@
 #include <Eigen/SparseCholesky>
 #include <experimental/simd>
 #include <limits>
-#include <omp.h> // For OpenMP parallelization if desired
 #include <set>
 
 template <typename T>
@@ -314,15 +313,11 @@ public:
                 Index ip = perm ? perm[i] : i;
 
                 if (Mode == int(Upper | Lower)) {
-#pragma omp atomic
                     count[StorageOrderMatch ? jp : ip]++;
                 } else if (r == c) {
-#pragma omp atomic
                     count[ip]++;
                 } else if ((Mode == Lower && r > c) || (Mode == Upper && r < c)) {
-#pragma omp atomic
                     count[ip]++;
-#pragma omp atomic
                     count[jp]++;
                 }
             }
@@ -394,18 +389,6 @@ public:
         ap.resize(size, size);
         permute_symm_to_symm<UpLo, Upper, false>(a, ap, m_P.indices().data());
 
-        /*
-        } else {
-            m_Pinv.resize(0);
-            m_P.resize(0);
-            if (int(UpLo) == int(Lower) || MatrixType::IsRowMajor) {
-                // we have to transpose the lower part to to the upper one
-                ap.resize(size, size);
-                permute_symm_to_symm<UpLo, Upper, false>(a, ap, NULL);
-            } else
-                internal::simplicial_cholesky_grab_input<CholMatrixType, MatrixType>::run(a, pmat, ap);
-        }
-        */
     }
 
     void analyzePattern(const MatrixType &a) {
@@ -458,21 +441,8 @@ public:
         return dest;
     }
 
-    Scalar determinant() const {
-        eigen_assert(m_isInitialized && "Decomposition not initialized");
-        Scalar det = Scalar(1);
-        for (int i = 0; i < m_diag.size(); ++i) {
-            det *= m_diag(i);
-            if (std::abs(m_diag(i)) < m_epsilon) {
-                throw std::runtime_error("Near-zero value encountered while computing determinant.");
-            }
-        }
-        return det;
-    }
-
     void setRegularization(Scalar epsilon) { m_epsilon = epsilon; }
 
-    Eigen::SparseMatrix<Scalar> matrixOld;
     bool                        isFactorized = false;
     void                        factorize(const MatrixType &a) {
         bool DoLDLT       = true;
@@ -487,104 +457,7 @@ public:
 
         // if (!isFactorized) {
         factorize_preordered<true, false>(*pmat);
-        matrixOld    = a;
         isFactorized = true;
-    }
-
-    void update_factorization(const MatrixType &a, const Eigen::VectorXd &updatedDiag) {
-        eigen_assert(a.rows() == a.cols());
-        Index              size = a.cols();
-        CholMatrixType     tmp(size, size);
-        ConstCholMatrixPtr pmat;
-
-        permute_symm_to_symm<UpLo, Upper, false>(a, tmp, m_P.indices().data());
-        pmat = &tmp;
-
-        update_factorize_preordered<true, false>(*pmat, updatedDiag);
-    }
-
-    template <bool DoLDLT, bool NonHermitian>
-    void update_factorize_preordered(const CholMatrixType &ap, const Eigen::VectorXd &updatedDiag) {
-
-        const StorageIndex  size = StorageIndex(ap.rows());
-        const StorageIndex *Lp   = m_matrix.outerIndexPtr();
-        StorageIndex       *Li   = m_matrix.innerIndexPtr();
-        Scalar             *Lx   = m_matrix.valuePtr();
-
-        // Use aligned arrays for SIMD optimization
-        std::vector<Scalar, Eigen::aligned_allocator<Scalar>>             y(size, Scalar(0));
-        std::vector<StorageIndex, Eigen::aligned_allocator<StorageIndex>> pattern(size, 0);
-        std::vector<StorageIndex, Eigen::aligned_allocator<StorageIndex>> tags(size, 0);
-
-        bool ok = true;
-        m_diag.resize(size);
-
-        for (StorageIndex k = 0; k < size; ++k) {
-            // Check if diagonal has changed significantly
-            if (std::abs(m_diag[k] - updatedDiag[k]) < 1e-10) {
-                continue; // Skip this row if diagonal has not changed
-            }
-
-            // Proceed with refactorization only for changed diagonal elements
-            y[k]                = getDiag(updatedDiag[k]); // Initialize y[k] with updated diagonal
-            StorageIndex top    = size;
-            tags[k]             = k;
-            m_nonZerosPerCol[k] = 0;
-
-            for (typename CholMatrixType::InnerIterator it(ap, k); it; ++it) {
-                StorageIndex i = it.index();
-                if (i <= k) {
-                    y[i] += getSymm(it.value());
-
-                    Index len;
-                    for (len = 0; tags[i] != k; i = m_parent[i]) {
-                        pattern[len++] = i;
-                        tags[i]        = k;
-                    }
-
-                    while (len > 0) { pattern[--top] = pattern[--len]; }
-                }
-            }
-
-            // Numerical solve for the current row
-            DiagonalScalar d = getDiag(y[k]) * m_shiftScale + m_shiftOffset;
-            y[k]             = Scalar(0); // Reset Y(k)
-
-            // Update only the affected rows and columns
-            for (; top < size; ++top) {
-                Index  i  = pattern[top];
-                Scalar yi = y[i];
-                y[i]      = Scalar(0);
-
-                // Prevent division by zero or very small diagonal entries
-                Scalar diag_i = getDiag(m_diag[i]);
-                if (std::abs(diag_i) < 1e-12) {
-                    diag_i    = 1e-5;   // Regularize small diagonal
-                    m_diag[i] = diag_i; // Update the diagonal with regularization
-                }
-
-                Scalar l_ki = yi / diag_i;
-
-                Index p2 = Lp[i] + m_nonZerosPerCol[i];
-
-                // Update sparse entries in Li and Lx for the affected columns
-                for (Index p = Lp[i]; p < p2; ++p) { y[Li[p]] -= getSymm(Lx[p]) * yi; }
-
-                d -= getDiag(l_ki * getSymm(yi));
-                Li[p2] = k;
-                Lx[p2] = l_ki;
-                ++m_nonZerosPerCol[i];
-            }
-
-            if (d <= 1e-12 || std::isnan(d)) { // Regularize d if it's too small or NaN
-                d = 1e-5;                      // Apply regularization
-            }
-
-            m_diag[k] = d; // Update the diagonal with the new value
-        }
-
-        m_info              = ok ? Success : NumericalIssue;
-        m_factorizationIsOk = true;
     }
 
 private:

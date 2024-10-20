@@ -307,3 +307,7 @@ auto parallel_sections(Scheduler &scheduler, Tasks &&...tasks) {
     } else if constexpr (D == Direction::Backward) { \
         BW_ACTION;                                   \
     }
+
+inline double roundToTwoDecimalPlaces(double value) {
+    return std::round(value * 100.0) / 100.0;
+}

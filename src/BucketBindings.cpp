@@ -89,13 +89,14 @@ PYBIND11_MODULE(baldes, m) {
     py::class_<BucketGraph>(m, "BucketGraph")
         .def(py::init<>()) // Default constructor
         .def(py::init<const std::vector<VRPNode> &, int, int>(), "nodes"_a, "time_horizon"_a, "bucket_interval"_a)
-        .def("setup", &BucketGraph::setup)                                     // Bind the setup method
-        .def("redefine", &BucketGraph::redefine, "bucket_interval"_a)          // Bind redefine method
-        .def("solve", &BucketGraph::solve, py::return_value_policy::reference) // Bind solve method
-        .def("set_adjacency_list", &BucketGraph::set_adjacency_list)           // Bind adjacency list setup
-        .def("get_nodes", &BucketGraph::getNodes)                              // Get the nodes in the graph
-        .def("print_statistics", &BucketGraph::print_statistics)               // Print stats
-        .def("set_duals", &BucketGraph::setDuals, "duals"_a)                   // Set dual values
+        .def("setup", &BucketGraph::setup)                            // Bind the setup method
+        .def("redefine", &BucketGraph::redefine, "bucket_interval"_a) // Bind redefine method
+        .def("solve", &BucketGraph::solve, py::arg("arg0") = false, py::return_value_policy::reference)
+
+        .def("set_adjacency_list", &BucketGraph::set_adjacency_list) // Bind adjacency list setup
+        .def("get_nodes", &BucketGraph::getNodes)                    // Get the nodes in the graph
+        .def("print_statistics", &BucketGraph::print_statistics)     // Print stats
+        .def("set_duals", &BucketGraph::setDuals, "duals"_a)         // Set dual values
         .def("set_distance_matrix", &BucketGraph::set_distance_matrix, "distance_matrix"_a,
              "n_ng"_a = 8)                           // Set distance matrix
         .def("reset_pool", &BucketGraph::reset_pool) // Reset the label pools
@@ -128,4 +129,22 @@ PYBIND11_MODULE(baldes, m) {
                    " end_depot=" + std::to_string(options.end_depot) +
                    " max_path_size=" + std::to_string(options.max_path_size) + ">";
         });
+
+    py::class_<Arc>(m, "Arc")
+        .def(py::init<int, int, const std::vector<double> &, double>())
+        .def(py::init<int, int, const std::vector<double> &, double, bool>())
+        .def(py::init<int, int, const std::vector<double> &, double, double>())
+        .def_readonly("from", &Arc::from)
+        .def_readonly("to", &Arc::to)
+        .def_readonly("resource_increment", &Arc::resource_increment)
+        .def_readonly("cost_increment", &Arc::cost_increment)
+        .def_readonly("fixed", &Arc::fixed)
+        .def_readonly("priority", &Arc::priority);
+
+    py::class_<ArcList>(m, "ArcList")
+        .def(py::init<>())
+        .def("add_connections", &ArcList::add_connections, py::arg("connections"),
+             py::arg("default_resource_increment") = std::vector<double>{1.0}, py::arg("default_cost_increment") = 0.0,
+             py::arg("default_priority") = 1.0)
+        .def("get_arcs", &ArcList::get_arcs);
 }

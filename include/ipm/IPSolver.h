@@ -217,10 +217,6 @@ public:
         solver->factorizeMatrix(matrix);
     }
 
-    void updateFactorization(const Eigen::SparseMatrix<double, Eigen::ColMajor, int> &matrix, const Eigen::VectorXd &updatedDiag) {
-        solver->updateFactorization(matrix, updatedDiag);
-    }
-
     Eigen::VectorXd solve(const Eigen::VectorXd &rhs) { return solver->solve(rhs); }
 
 private:
@@ -229,7 +225,6 @@ private:
     struct SolverBase {
         virtual void            factorizeMatrix(const Eigen::SparseMatrix<double, Eigen::ColMajor, int> &matrix) = 0;
         virtual Eigen::VectorXd solve(const Eigen::VectorXd &rhs)                                                = 0;
-        virtual void            updateFactorization(const Eigen::SparseMatrix<double, Eigen::ColMajor, int> &matrix, const Eigen::VectorXd &updatedDiag) = 0;
         virtual ~SolverBase() = default;
     };
 
@@ -240,10 +235,6 @@ private:
             solver.factorizeMatrix(matrix);
         }
         Eigen::VectorXd solve(const Eigen::VectorXd &rhs) override { return solver.solve(rhs); }
-
-        void updateFactorization(const Eigen::SparseMatrix<double, Eigen::ColMajor, int> &matrix, const Eigen::VectorXd &updatedDiag) override {
-            solver.updateFactorization(matrix, updatedDiag);
-        }
     };
 
     SolverBase *solver;
