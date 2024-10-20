@@ -13,6 +13,8 @@ private:
             // env.set(GRB_IntParam_Method, 2);
             // set gurobi multicore
             env.set(GRB_IntParam_Threads, std::thread::hardware_concurrency());
+
+            // reduce gurobi tolerance to 1e-4
             // set ConcurrentMethod
             // env.set(GRB_IntParam_ConcurrentMIP, 3);
         } catch (GRBException &e) {

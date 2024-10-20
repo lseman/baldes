@@ -28,6 +28,7 @@
 #include <cstring>
 
 #include "Bucket.h"
+#include "utils/NumericUtils.h"
 
 /**
  * @brief Represents a bucket in the Bucket Graph.
@@ -96,8 +97,11 @@ inline int BucketGraph::get_bucket_number(int node, const std::vector<double> &r
 }
 */
 template <Direction D>
-inline int BucketGraph::get_bucket_number(int node, const std::vector<double> &resource_values_vec) noexcept {
+inline int BucketGraph::get_bucket_number(int node, std::vector<double> &resource_values_vec) noexcept {
 
+    for (int r = 0; r < MAIN_RESOURCES; ++r) {
+        resource_values_vec[r] = roundToTwoDecimalPlaces(resource_values_vec[r]);
+    }
     if constexpr (D == Direction::Forward) {
         auto val = fw_node_interval_trees[node].query(resource_values_vec);
         return val;
@@ -105,8 +109,8 @@ inline int BucketGraph::get_bucket_number(int node, const std::vector<double> &r
         auto val = bw_node_interval_trees[node].query(resource_values_vec);
         return val;
     }
-    std::throw_with_nested(std::runtime_error("BucketGraph::get_bucket_number: Invalid direction"));
-    return -1; // If no bucket is found
+    // std::throw_with_nested(std::runtime_error("BucketGraph::get_bucket_number: Invalid direction"));
+    return -100; // If no bucket is found
 }
 
 /**
@@ -154,58 +158,52 @@ void BucketGraph::define_buckets() {
 
     node_interval_trees.assign(nodes.size(), SplayTree());
 
-    // Helper function to check if the node can fit in a single bucket
-    auto fits_single_bucket = [&](const auto &node_total_ranges) {
-        for (int r = 0; r < num_intervals; ++r) {
-            if (node_total_ranges[r] > base_intervals[r]) { return false; }
-        }
-        return true;
-    };
-
     // Loop through each node to define its specific buckets
     for (const auto &VRPNode : nodes) {
-        std::vector<int> node_total_ranges(num_intervals);
-        for (int r = 0; r < num_intervals; ++r) { node_total_ranges[r] = VRPNode.ub[r] - VRPNode.lb[r]; }
+        std::vector<double> node_base_interval(num_intervals);
+        for (int r = 0; r < num_intervals; ++r) {
+            node_base_interval[r] = (VRPNode.ub[r] - VRPNode.lb[r]) / intervals[r].interval;
+        }
         SplayTree node_tree;
 
-        if (fits_single_bucket(node_total_ranges)) {
-            // Single bucket case
-            buckets[bucket_index] = Bucket(VRPNode.id, VRPNode.lb, VRPNode.ub);
-            node_tree.insert(VRPNode.lb, VRPNode.ub, bucket_index);
+        // Multiple buckets case
+        int                 n_buckets = 0;
+        std::vector<int>    current_pos(num_intervals, 0);
+        std::vector<double> interval_start(num_intervals), interval_end(num_intervals);
 
-            num_buckets[VRPNode.id]       = 1;
-            num_buckets_index[VRPNode.id] = cum_sum;
-            bucket_index++;
-            cum_sum++;
+        // Calculate the start and end for each interval dimension
+        for (int r = 0; r < num_intervals; ++r) {
+            for (auto j = 0; j < intervals[r].interval; ++j) {
 
-        } else {
-            // Multiple buckets case
-            int              n_buckets = 0;
-            std::vector<int> current_pos(num_intervals, 0);
+                if constexpr (D == Direction::Forward) {
+                    interval_start[r] = VRPNode.lb[r] + current_pos[r] * node_base_interval[r];
 
-            while (true) {
-                std::vector<double> interval_start(num_intervals), interval_end(num_intervals);
-
-                // Calculate the start and end for each interval dimension
-                for (int r = 0; r < num_intervals; ++r) {
-                    if constexpr (D == Direction::Forward) {
-                        interval_start[r] = VRPNode.lb[r] + current_pos[r] * base_intervals[r];
-                        interval_end[r]   = VRPNode.lb[r] + (current_pos[r] + 1) * base_intervals[r];
+                    if (j == intervals[r].interval - 1) {
+                        interval_end[r] = VRPNode.ub[r];
                     } else {
-                        interval_start[r] = VRPNode.ub[r] - (current_pos[r] + 1) * base_intervals[r];
-                        interval_end[r]   = VRPNode.ub[r] - current_pos[r] * base_intervals[r];
+                        interval_end[r] = VRPNode.lb[r] + (current_pos[r] + 1) * node_base_interval[r];
                     }
-
-                    if constexpr (D == Direction::Backward) {
-                        interval_start[r] = std::max(interval_start[r], R_min[r]);
+                } else {
+                    if (j == intervals[r].interval - 1) {
+                        interval_start[r] = VRPNode.lb[r];
                     } else {
-                        interval_end[r] = std::min(interval_end[r], R_max[r]);
+                        interval_start[r] = VRPNode.ub[r] - (current_pos[r] + 1) * node_base_interval[r];
                     }
-                    // fmt::print("interval_start/r: {}, interval_end/r: {}\n", interval_start[r], interval_end[r]);
+                    //interval_start[r] = VRPNode.ub[r] - (current_pos[r] + 1) * node_base_interval[r];
+                    interval_end[r]   = VRPNode.ub[r] - current_pos[r] * node_base_interval[r];
                 }
 
-                // Create a new bucket for this node
-                buckets[bucket_index] = Bucket(VRPNode.id, interval_start, interval_end);
+                // Apply rounding to two decimal places before using values
+                interval_start[r] = roundToTwoDecimalPlaces(interval_start[r]);
+                interval_end[r]   = roundToTwoDecimalPlaces(interval_end[r]);
+
+                if constexpr (D == Direction::Backward) {
+                    interval_start[r] = std::max(interval_start[r], R_min[r]);
+                } else {
+                    interval_end[r] = std::min(interval_end[r], R_max[r]);
+                }
+
+                buckets.push_back(Bucket(VRPNode.id, interval_start, interval_end));
 
                 node_tree.insert(interval_start, interval_end, bucket_index);
 
@@ -213,24 +211,14 @@ void BucketGraph::define_buckets() {
                 n_buckets++;
                 cum_sum++;
 
-                // Check if we need to exit the loop (all intervals covered)
-                bool done = true;
-                for (int r = num_intervals - 1; r >= 0; --r) {
-                    current_pos[r]++;
-                    if (current_pos[r] * base_intervals[r] < node_total_ranges[r]) {
-                        done = false;
-                        break;
-                    } else {
-                        current_pos[r] = 0;
-                    }
-                }
-                if (done) break;
+                current_pos[r]++;
             }
-
-            // Update node-specific bucket data
-            num_buckets[VRPNode.id]       = n_buckets;
-            num_buckets_index[VRPNode.id] = cum_sum - n_buckets;
         }
+
+        // Update node-specific bucket data
+        num_buckets[VRPNode.id]       = n_buckets;
+        num_buckets_index[VRPNode.id] = cum_sum - n_buckets;
+
         node_interval_trees[VRPNode.id] = node_tree;
     }
 
@@ -262,10 +250,6 @@ void BucketGraph::generate_arcs() {
     auto &num_buckets       = assign_buckets<D>(num_buckets_fw, num_buckets_bw);
     auto &num_buckets_index = assign_buckets<D>(num_buckets_index_fw, num_buckets_index_bw);
 
-    // Compute base intervals for each resource dimension based on R_max and R_min
-    std::vector<double> base_intervals(intervals.size());
-    for (int r = 0; r < intervals.size(); ++r) { base_intervals[r] = (R_max[r] - R_min[r]) / intervals[r].interval; }
-
     // Clear all buckets in parallel, removing any existing arcs
     std::for_each(buckets.begin(), buckets.end(), [&](auto &bucket) {
         bucket.clear();                             // Clear bucket data
@@ -276,11 +260,20 @@ void BucketGraph::generate_arcs() {
                                  std::vector<std::pair<int, int>> &local_arcs) {
         // Retrieve the arcs for the node in the given direction (Forward/Backward)
         auto arcs = node.get_arcs<D>();
+        // Compute base intervals for each resource dimension based on R_max and R_min
+        std::vector<double> node_intervals(intervals.size());
+        for (int r = 0; r < intervals.size(); ++r) {
+            node_intervals[r] = (node.ub[r] - node.lb[r]) / intervals[r].interval;
+        }
 
         // Iterate over all arcs of the node
         for (const auto &arc : arcs) {
             const auto &next_node = nodes[arc.to]; // Get the destination node of the arc
 
+            std::vector<double> next_node_intervals(intervals.size());
+            for (int r = 0; r < intervals.size(); ++r) {
+                next_node_intervals[r] = (next_node.ub[r] - next_node.lb[r]) / intervals[r].interval;
+            }
             // Skip self-loops (no arc from a node to itself)
             if (node.id == next_node.id) continue;
 
@@ -288,27 +281,26 @@ void BucketGraph::generate_arcs() {
             const auto travel_cost = getcij(node.id, next_node.id);
             double     cost_inc    = travel_cost - next_node.cost;
             res_inc[0]             = travel_cost + node.duration; // Update resource increment based on node duration
-
             // Iterate over all possible destination buckets for the next node
+
             for (int j = 0; j < num_buckets[next_node.id]; ++j) {
                 int to_bucket = j + num_buckets_index[next_node.id];
                 if (from_bucket == to_bucket) continue; // Skip arcs that loop back to the same bucket
 
                 if (fixed_buckets[from_bucket][to_bucket] == 1) continue; // Skip fixed arcs
 
-                bool  valid_arc = true;
-                auto &dest_node = nodes[buckets[to_bucket].node_id]; // Get the destination node of the bucket
+                bool valid_arc = true;
                 for (int r = 0; r < res_inc.size(); ++r) {
                     // Forward direction: Check that resource increment doesn't exceed upper bounds
                     if constexpr (D == Direction::Forward) {
-                        if (buckets[from_bucket].lb[r] + res_inc[r] > dest_node.ub[r]) {
+                        if (buckets[from_bucket].lb[r] + res_inc[r] > next_node.ub[r]) {
                             valid_arc = false;
                             break;
                         }
                     }
                     // Backward direction: Check that resource decrement doesn't drop below lower bounds
                     else if constexpr (D == Direction::Backward) {
-                        if (buckets[from_bucket].ub[r] - res_inc[r] < dest_node.lb[r]) {
+                        if (buckets[from_bucket].ub[r] - res_inc[r] < next_node.lb[r]) {
                             valid_arc = false;
                             break;
                         }
@@ -321,7 +313,7 @@ void BucketGraph::generate_arcs() {
                     for (int r = 0; r < res_inc.size(); ++r) {
                         double max_calc = std::max(buckets[from_bucket].lb[r] + res_inc[r], next_node.lb[r]);
                         if (max_calc < buckets[to_bucket].lb[r] ||
-                            max_calc >= buckets[to_bucket].lb[r] + base_intervals[r]) {
+                            max_calc >= buckets[to_bucket].lb[r] + next_node_intervals[r] + numericutils::eps) {
                             valid_arc = false;
                             break;
                         }
@@ -330,7 +322,7 @@ void BucketGraph::generate_arcs() {
                     for (int r = 0; r < res_inc.size(); ++r) {
                         double min_calc = std::min(buckets[from_bucket].ub[r] - res_inc[r], next_node.ub[r]);
                         if (min_calc > buckets[to_bucket].ub[r] ||
-                            min_calc <= buckets[to_bucket].ub[r] - base_intervals[r]) {
+                            min_calc <= buckets[to_bucket].ub[r] - next_node_intervals[r] - numericutils::eps) {
                             valid_arc = false;
                             break;
                         }
@@ -439,7 +431,7 @@ Label *BucketGraph::get_best_label(const std::vector<int> &topological_order, co
  *
  */
 template <Stage S>
-void BucketGraph::ConcatenateLabel(const Label *L, int &b, Label *&pbest, gch::small_vector<uint64_t> &Bvisited) {
+void BucketGraph::ConcatenateLabel(const Label *L, int &b, Label *&pbest, std::vector<uint64_t> &Bvisited) {
     // Use a vector for iterative processing as a stack
     std::vector<int> bucket_stack;
     bucket_stack.reserve(50);
@@ -508,6 +500,7 @@ void BucketGraph::ConcatenateLabel(const Label *L, int &b, Label *&pbest, gch::s
 #endif
 
             // Check for visited overlap and skip if true
+
             if constexpr (S >= Stage::Three) {
                 bool visited_overlap = false;
                 for (size_t i = 0; i < L->visited_bitmap.size(); ++i) {
@@ -569,8 +562,6 @@ void BucketGraph::SCC_handler() {
 
     auto sccs              = scc_finder.tarjanSCC();
     auto topological_order = scc_finder.topologicalOrderOfSCCs(sccs);
-
-    
 
 #ifdef VERBOSE
     // print SCCs and buckets in it

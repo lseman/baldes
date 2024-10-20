@@ -208,7 +208,7 @@ struct Bucket {
      * has reached the limit, the function will replace the label with the highest cost
      * if the new label has a lower cost.
      *
-     */
+    */
     void add_label_lim(Label *label, size_t limit) noexcept {
         if (labels_vec.size() < limit) {
             labels_vec.push_back(label);
@@ -266,15 +266,13 @@ struct Bucket {
         if (!labels_vec.empty()) {
             return labels_vec | std::views::filter(filter_lambda);
         } else {
-            fmt::print("Empty vector\n");
+            //fmt::print("Empty vector\n");
             // Use a static empty vector with the same pool resource
             static std::pmr::vector<Label *> empty_vec{&pool};    // Use the same pool
             return empty_vec | std::views::filter(filter_lambda); // Same lambda applied to the empty case
         }
     }
     void clear() { labels_vec.clear(); }
-
-    void reset() { labels_vec.clear(); }
 
     /**
      * @brief Clears the arcs in the specified direction.
@@ -291,6 +289,15 @@ struct Bucket {
             bw_bucket_arcs.clear();
             bw_jump_arcs.clear();
         }
+    }
+
+    // define reset method
+    void reset() {
+        fw_bucket_arcs.clear();
+        bw_bucket_arcs.clear();
+        fw_jump_arcs.clear();
+        bw_jump_arcs.clear();
+        labels_vec.clear();
     }
     /**
      * @brief Retrieves the best label from the labels vector.

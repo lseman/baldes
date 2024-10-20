@@ -121,6 +121,7 @@ public:
     }
 
     Cut &getCut(int cutIndex) { return cuts[cutIndex]; }
+    const Cut &getCut(int cutIndex) const { return cuts[cutIndex]; }
 
     int getID(int cutIndex) { return cuts[cutIndex].id; }
 

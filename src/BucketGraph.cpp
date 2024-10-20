@@ -27,6 +27,7 @@
  */
 
 #include "bucket/BucketGraph.h"
+#include "Definitions.h"
 #include "bucket/BucketUtils.h"
 
 #include "../third_party/pdqsort.h"
@@ -534,7 +535,7 @@ void BucketGraph::set_adjacency_list() {
 
     // Step 1: Compute the clusters using MST-based clustering
     MST    mst_solver(nodes, [&](int from, int to) { return this->getcij(from, to); });
-    double theta    = 0.5; // Experiment with different values of θ
+    double theta    = 1.0; // Experiment with different values of θ
     auto   clusters = mst_solver.cluster(theta);
 
     // Create a job-to-cluster mapping (cluster ID for each job/node)
@@ -580,16 +581,17 @@ void BucketGraph::set_adjacency_list() {
             double reverse_priority_value;
             if (job_to_cluster[node.id] == job_to_cluster[next_node.id]) {
                 // Higher priority if both nodes are in the same cluster
-                priority_value = 10.0 + 1.E-5 * next_node.start_time; // Adjust weight for same-cluster priority
-                reverse_priority_value = 1.0 + 1.E-5 * node.start_time; // Adjust weight for same-cluster priority
+                priority_value         = 1.0 + 1.E-5 * next_node.start_time; // Adjust weight for same-cluster priority
+                reverse_priority_value = 1.0 + 1.E-5 * node.start_time;      // Adjust weight for same-cluster priority
             } else {
                 // Lower priority for cross-cluster arcs
-                priority_value = 1.0 + 1.E-5 * next_node.start_time; // Higher base value for cross-cluster arcs
-                reverse_priority_value = 10.0 + 1.E-5 * node.start_time; // Higher base value for cross-cluster arcs
+                priority_value         = 1.0 + 1.E-5 * next_node.start_time; // Higher base value for cross-cluster arcs
+                reverse_priority_value = 1.0 + 1.E-5 * node.start_time;      // Higher base value for cross-cluster arcs
             }
 
-            best_arcs.emplace_back(priority_value, next_node.id, res_inc, cost_inc);     // Store the forward arc
-            best_arcs_rev.emplace_back(reverse_priority_value, next_node.id, res_inc, cost_inc); // Store the reverse arc
+            best_arcs.emplace_back(priority_value, next_node.id, res_inc, cost_inc); // Store the forward arc
+            best_arcs_rev.emplace_back(reverse_priority_value, next_node.id, res_inc,
+                                       cost_inc); // Store the reverse arc
         }
 
         // Add forward arcs from the current node to its neighbors
@@ -644,10 +646,11 @@ void BucketGraph::common_initialization() {
     std::vector<double> total_ranges(num_intervals);
     std::vector<double> base_intervals(num_intervals);
 
+    auto &VRPNode = nodes[0]; // Example for the first node
+
     // Calculate base intervals and total ranges for each resource dimension
     for (int r = 0; r < intervals.size(); ++r) {
-        total_ranges[r]   = R_max[r] - R_min[r];
-        base_intervals[r] = total_ranges[r] / intervals[r].interval;
+        base_intervals[r] = (VRPNode.ub[r] - VRPNode.lb[r]) / intervals[r].interval;
     }
 
     // Clear forward and backward buckets
@@ -656,90 +659,49 @@ void BucketGraph::common_initialization() {
         bw_buckets[b].clear();
     }
 
-    auto &VRPNode = nodes[0]; // Example for the first node
-
-    std::vector<int> node_total_ranges(num_intervals);
-    for (int r = 0; r < num_intervals; ++r) { node_total_ranges[r] = VRPNode.ub[r] - VRPNode.lb[r]; }
-
-    // Helper lambda to update current position of the intervals
-    auto update_position = [&](std::vector<int> &current_pos) -> bool {
-        bool done = true;
-        for (int r = num_intervals - 1; r >= 0; --r) {
-            current_pos[r]++;
-            if (current_pos[r] * base_intervals[r] < node_total_ranges[r]) {
-                done = false;
-                break;
-            } else {
-                current_pos[r] = 0;
-            }
-        }
-        return done;
-    };
-
-    auto calculate_index = [&](const std::vector<int> &current_pos, int &total_buckets) -> int {
-        int index = 0;
-
-        // Loop through each interval (dimension) and compute the index
-        for (int r = 0; r < current_pos.size(); ++r) {
-            index += current_pos[r]; // Accumulate the positional index across intervals
-        }
-
-        return index;
-    };
-
     // Initialize forward buckets (generic for multiple dimensions)
     std::vector<int> current_pos(num_intervals, 0);
 
+    std::vector<double> interval_starts(num_intervals);
+    std::vector<double> interval_ends(num_intervals);
+
+    for (int r = 0; r < num_intervals; ++r) { interval_starts[r] = VRPNode.lb[r]; }
     // Iterate over all intervals for the forward direction
-    while (true) {
-        auto depot = label_pool_fw.acquire();
-        // print num_intervals
-        std::vector<double> interval_starts(num_intervals);
-        for (int r = 0; r < num_intervals; ++r) {
-            interval_starts[r] = std::min(R_max[r], VRPNode.lb[r] + current_pos[r] * base_intervals[r]);
-        }
 
-        // Adjust to calculate index using `num_buckets[0]`, which is likely multi-dimensional for the depot
-        int calculated_index = calculate_index(current_pos, num_buckets[options.depot]) +
-                               num_bucket_index[options.depot]; // Calculate index once
-        depot->initialize(calculated_index, 0.0, interval_starts, options.depot);
-        depot->is_extended = false;
-        set_node_visited(depot->visited_bitmap, options.depot);
+    for (int r = 0; r < num_intervals; ++r) {
+        for (auto k = 0; k < intervals[r].interval; ++k) {
+            auto depot            = label_pool_fw.acquire();
+            auto calculated_index = r * MAIN_RESOURCES + k;
+
+            depot->initialize(calculated_index, 0.0, interval_starts, options.depot);
+            depot->is_extended = false;
+            set_node_visited(depot->visited_bitmap, options.depot);
 #ifdef SRC
-        depot->SRCmap.assign(cut_storage->SRCDuals.size(), 0);
+            depot->SRCmap.assign(cut_storage->SRCDuals.size(), 0);
 #endif
-        fw_buckets[calculated_index].add_label(depot);
-        fw_buckets[calculated_index].node_id = options.depot;
-
-        if (update_position(current_pos)) break; // Update position and break if done
+            fw_buckets[calculated_index].add_label(depot);
+            fw_buckets[calculated_index].node_id = options.depot;
+            interval_starts[r] += roundToTwoDecimalPlaces(base_intervals[r]);
+        }
     }
 
-    // Initialize backward buckets (generic for multiple dimensions)
-    current_pos.assign(num_intervals, 0);
+    for (int r = 0; r < num_intervals; ++r) { interval_ends[r] = VRPNode.ub[r]; }
 
-    // Iterate over all intervals for the backward direction
-    while (true) {
-        auto end_depot = label_pool_bw.acquire();
-
-        std::vector<double> interval_ends(num_intervals);
-        for (int r = 0; r < num_intervals; ++r) {
-            interval_ends[r] = std::max(R_min[r], VRPNode.ub[r] - current_pos[r] * base_intervals[r]);
-        }
-
-        // Calculate index for backward direction
-        int calculated_index = calculate_index(current_pos, num_buckets[options.end_depot]) +
-                               num_bucket_index[options.end_depot]; // Use num_buckets[0] for consistency
-        // print interval_ends size
-        end_depot->initialize(calculated_index, 0.0, interval_ends, options.end_depot);
-        end_depot->is_extended = false;
-        set_node_visited(end_depot->visited_bitmap, options.end_depot);
+    for (int r = 0; r < num_intervals; ++r) {
+        for (auto k = 0; k < intervals[r].interval; ++k) {
+            auto end_depot        = label_pool_bw.acquire();
+            auto calculated_index = num_buckets_index_bw[N_SIZE - 1] + r * MAIN_RESOURCES + k;
+            // print interval_ends size
+            end_depot->initialize(calculated_index, 0.0, interval_ends, options.end_depot);
+            end_depot->is_extended = false;
+            set_node_visited(end_depot->visited_bitmap, options.end_depot);
 #ifdef SRC
-        end_depot->SRCmap.assign(cut_storage->SRCDuals.size(), 0);
+            end_depot->SRCmap.assign(cut_storage->SRCDuals.size(), 0);
 #endif
-        bw_buckets[calculated_index].add_label(end_depot);
-        bw_buckets[calculated_index].node_id = options.end_depot;
-
-        if (update_position(current_pos)) break; // Update position and break if done
+            bw_buckets[calculated_index].add_label(end_depot);
+            bw_buckets[calculated_index].node_id = options.end_depot;
+            interval_ends[r] -= roundToTwoDecimalPlaces(base_intervals[r]);
+        }
     }
 }
 

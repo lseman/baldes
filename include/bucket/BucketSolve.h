@@ -284,9 +284,9 @@ std::vector<double> BucketGraph::labeling_algorithm() noexcept {
                                     Label *existing_label = to_bucket_labels[j];
 
                                     // Prefetch the next label for comparison
-                                    if (j + 1 < to_bucket_labels.size()) {
-                                        __builtin_prefetch(to_bucket_labels[j + 1]);
-                                    }
+                                    //if (j + 1 < to_bucket_labels.size()) {
+                                    //    __builtin_prefetch(to_bucket_labels[j + 1]);
+                                    //}
 
                                     if (is_dominated<D, S>(new_label, existing_label)) {
                                         stat_n_dom++; // Increment dominated labels count
@@ -296,7 +296,7 @@ std::vector<double> BucketGraph::labeling_algorithm() noexcept {
                                 }
 
 #else
-                                if (check_dominance_against_vector<D, S>(new_label, to_bucket_labels)) {
+                                if (check_dominance_against_vector<D, S>(new_label, to_bucket_labels, cut_storage)) {
                                     stat_n_dom++; // Increment dominated labels count
                                     dominated = true;
                                 }
@@ -319,10 +319,10 @@ std::vector<double> BucketGraph::labeling_algorithm() noexcept {
                                 n_labels++; // Increment the count of labels added
 
                                 // Add the new label to the bucket
-#ifdef LIMITED_BUCKETS
-                                buckets[to_bucket].add_label_lim(new_label, 10);
-#elif SORTED_LABELS
-                                buckets[to_bucket].add_label_lim(new_label, BUCKET_CAPACITY);
+#ifdef SORTED_LABELS
+                                buckets[to_bucket].add_sorted_label(new_label);
+#elif LIMITED_BUCKETS
+                                buckets[to_bucket].sorted_label(new_label, BUCKET_CAPACITY);
 #else
                                 buckets[to_bucket].add_label(new_label);
 #endif
@@ -453,8 +453,8 @@ std::vector<Label *> BucketGraph::bi_labeling_algorithm() {
     if constexpr (S == Stage::Enumerate) { fmt::print("Labels generated, concatenating...\n"); }
 
     // Setup visited buckets tracking for forward buckets
-    const size_t                n_segments = fw_buckets_size / 64 + 1;
-    gch::small_vector<uint64_t> Bvisited(n_segments, 0);
+    const size_t          n_segments = fw_buckets_size / 64 + 1;
+    std::vector<uint64_t> Bvisited(n_segments, 0);
 
     // Iterate over all forward buckets
     for (auto bucket = 0; bucket < fw_buckets_size; ++bucket) {
@@ -938,7 +938,9 @@ inline bool BucketGraph::DominatedInCompWiseSmallerBuckets(const Label *L, int b
                 }
             }
 #else
-            if (check_dominance_against_vector<D, S>(L, bucket_labels)) { return true; }
+            if (check_dominance_against_vector<D, S>(L, bucket_labels, cut_storage)) {
+                return true; // If any label dominates L, return true
+            }
 #endif
         }
 

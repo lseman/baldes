@@ -13,6 +13,8 @@
 #include "Definitions.h"
 #include "bnb/Problem.h"
 
+#include "miphandler/Constraint.h"
+
 #include <sstream>
 
 #include "Hashes.h"

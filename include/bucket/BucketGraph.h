@@ -337,8 +337,8 @@ public:
     CutStorage          *cut_storage = new CutStorage();
     static constexpr int max_buckets = 10000; // Define maximum number of buckets beforehand
 
-    std::array<Bucket, max_buckets> fw_buckets;
-    std::array<Bucket, max_buckets> bw_buckets;
+    std::vector<Bucket> fw_buckets;
+    std::vector<Bucket> bw_buckets;
     LabelPool                       label_pool_fw = LabelPool(100);
     LabelPool                       label_pool_bw = LabelPool(100);
     std::vector<BucketArc>          fw_arcs;
@@ -667,10 +667,14 @@ public:
 
         reset_fixed();
         reset_fixed_buckets();
+        
 
         PARALLEL_SECTIONS(
             work, bi_sched,
             SECTION {
+                fw_buckets_size = 0;
+                // clear the array
+                fw_buckets.clear();
                 // Section 1: Forward direction
                 define_buckets<Direction::Forward>();
                 // split_buckets<Direction::Forward>();
@@ -680,6 +684,8 @@ public:
             },
             SECTION {
                 // Section 2: Backward direction
+                bw_buckets_size = 0;
+                bw_buckets.clear();
                 define_buckets<Direction::Backward>();
                 // split_buckets<Direction::Backward>();
                 bw_fixed_buckets.clear();
@@ -897,7 +903,8 @@ public:
 
             // redefine_counter = 0;
             print_info("Increasing bucket interval to {}\n", bucket_interval * 2);
-            redefine(bucket_interval * 2);
+            bucket_interval = bucket_interval * 2;
+            redefine(bucket_interval);
             updated = true;
             fixed   = false;
         }
@@ -918,7 +925,7 @@ public:
     UnionFind fw_union_find;
     UnionFind bw_union_find;
     template <Direction D>
-    int get_bucket_number(int node, const std::vector<double> &values) noexcept;
+    int get_bucket_number(int node, std::vector<double> &values) noexcept;
 
     template <Direction D>
     Label *get_best_label(const std::vector<int> &topological_order, const std::vector<double> &c_bar,
@@ -945,7 +952,7 @@ public:
     std::vector<Label *> bi_labeling_algorithm();
 
     template <Stage S>
-    void ConcatenateLabel(const Label *L, int &b, Label *&pbest, gch::small_vector<uint64_t> &Bvisited);
+    void ConcatenateLabel(const Label *L, int &b, Label *&pbest, std::vector<uint64_t> &Bvisited);
 
     template <Direction D>
     void UpdateBucketsSet(double theta, const Label *label, ankerl::unordered_dense::set<int> &Bbidi,

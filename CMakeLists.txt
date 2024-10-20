@@ -87,7 +87,6 @@ option(GUROBI "Enable GUROBI" OFF)
 option(HIGHS "Enable HIGHS" ON)
 option(NSYNC "Enable nsync" OFF)
 option(CHOLMOD "Enable cholmod" OFF)
-option(LIMITED_BUCKETS "Enable max labels per bucket" ON)
 
 # Define the size of resources without using cache
 set(R_SIZE

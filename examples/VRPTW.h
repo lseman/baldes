@@ -219,7 +219,7 @@ public:
             pathSet.insert(path);
 
             counter += 1;
-            if (counter > 20) break;
+            if (counter > 9) break;
 
             std::fill(coluna.begin(), coluna.end(), 0.0); // Reset the coefficients
 
@@ -539,7 +539,7 @@ public:
         BucketGraph bucket_graph(nodes, time_horizon, bucket_interval);
         bucket_graph.set_distance_matrix(instance.getDistanceMatrix(), 8);
         bucket_graph.branching_duals = &branchingDuals;
-        bucket_graph.A_MAX           = N_SIZE * 0.3;
+        bucket_graph.A_MAX           = N_SIZE;
 
         matrix                 = node->extractModelDataSparse();
         auto integer_solution  = node->getObjVal();
@@ -616,7 +616,7 @@ public:
                 rcc = exactRCCsep(node, solution);
 #endif
                 if (rcc) {
-                    matrix = node->extractModelDataSparse();
+                    // matrix = node->extractModelDataSparse();
                     node->optimize();
                 }
                 reoptimized = true;
@@ -635,7 +635,7 @@ public:
 #endif
 
                 if (rcc) {
-                    matrix = node->extractModelDataSparse();
+                    // matrix = node->extractModelDataSparse();
                     node->optimize();
                     reoptimized = true;
                 }
@@ -644,9 +644,9 @@ public:
 
 #if defined(SRC3) || defined(SRC)
                 if (!rcc) {
-                    r1c.allPaths     = allPaths;
+                    r1c.allPaths = allPaths;
                     // auto start_time_ = std::chrono::high_resolution_clock::now();
-                    auto srcResult   = r1c.runSeparation(node, SRCconstraints);
+                    auto srcResult = r1c.runSeparation(node, SRCconstraints);
                     // auto end_time_   = std::chrono::high_resolution_clock::now();
                     // auto duration_microseconds =
                     //     std::chrono::duration_cast<std::chrono::microseconds>(end_time_ - start_time_).count();
@@ -663,7 +663,7 @@ public:
                             bucket_graph.A_MAX = new_relaxation;
 
                             // TODO: see why this is necessary here
-                            matrix = node->extractModelDataSparse();
+                            //matrix = node->extractModelDataSparse();
                             node->optimize();
                             nodeDuals = node->getDuals();
                         }
@@ -671,7 +671,7 @@ public:
                     } else {
                         changed = cutHandler(r1c, node, SRCconstraints);
                         if (changed) {
-                            matrix = node->extractModelDataSparse();
+                            //matrix = node->extractModelDataSparse();
                             node->optimize();
                             nodeDuals = node->getDuals();
                         }
@@ -689,14 +689,15 @@ public:
 #endif
 
 #ifdef IPM
-            auto d = 1;
+            auto d = 0.1;
             matrix = node->extractModelDataSparse();
             gap    = std::abs(lp_obj - (lp_obj + std::min(0.0, inner_obj))) / std::abs(lp_obj);
             gap    = gap / d;
-            if (std::isnan(gap)) { gap = 1e-2; }
-            if (std::signbit(gap)) { gap = 1e-2; }
+            if (std::isnan(gap)) { gap = 1e-1; }
+            if (std::signbit(gap)) { gap = 1e-1; }
             if (gap > 1e-1) { gap = 1e-1; }
-            gap = 1e-2;
+            if (gap < 1e-6) { gap = 1e-6; }
+            //gap = 1e-2;
             // print gap
             // auto start_time_ipm = std::chrono::high_resolution_clock::now();
 
@@ -721,6 +722,7 @@ public:
             bucket_graph.gap = lag_gap;
 #endif
 #ifndef IPM
+            nodeDuals        = node->getDuals();
             auto originDuals = nodeDuals;
 #endif
 #ifdef STAB
@@ -793,13 +795,14 @@ public:
                 // if (bucket_graph.s4 && iter % 500 == 0) {
                 //     paths = bucket_graph.solve(true);
                 // } else {
-                //auto start_time_bucket = std::chrono::high_resolution_clock::now();
-                paths                  = bucket_graph.solve();
-                //auto end_time_bucket   = std::chrono::high_resolution_clock::now();
+                // auto start_time_bucket = std::chrono::high_resolution_clock::now();
+                paths = bucket_graph.solve();
+                // auto end_time_bucket   = std::chrono::high_resolution_clock::now();
 
                 // Calculate duration in microseconds
-                //duration_microseconds =
-                //    std::chrono::duration_cast<std::chrono::microseconds>(end_time_bucket - start_time_bucket).count();
+                // duration_microseconds =
+                //    std::chrono::duration_cast<std::chrono::microseconds>(end_time_bucket -
+                //    start_time_bucket).count();
 
                 // Print the time in seconds with microsecond precision
                 // fmt::print("Bucket time: {:.6f} seconds\n", duration_microseconds / 1e6);
@@ -1003,7 +1006,7 @@ public:
         auto &allPaths       = node->paths;
         auto &branchingDuals = node->branchingDuals;
 
-        int bucket_interval = 20;
+        int bucket_interval = 100;
         int time_horizon    = instance.T_max;
 
         numConstrs                = node->getIntAttr("NumConstrs");

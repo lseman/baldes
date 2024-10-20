@@ -530,6 +530,7 @@ void IPSolver::run_optimization(ModelData &model, const double tol) {
         double bl_dot_lambda = b.dot(lambda) - ubv.dot(w);
         _g                   = std::abs(c.dot(x) - bl_dot_lambda) / (tau + std::abs(bl_dot_lambda));
 
+        /*
         if (k % 5 == 0 || (k == max_iter - 1)) {
             // Save intermediate solution every 5 iterations or at the last iteration
             // Save only if the current solution is reasonably "central"
@@ -545,6 +546,7 @@ void IPSolver::run_optimization(ModelData &model, const double tol) {
                 warm_start              = true;
             }
         }
+        */
 
         // Check for optimality and infeasibility
         if (_p <= 1e-10 && _d <= 1e-10 && _g <= tol) { break; }
@@ -828,16 +830,11 @@ void IPSolver::update_linear_solver(SparseSolver &ls, const Eigen::VectorXd &the
     combinedValues.head(ls.n) = -theta - regP;
     combinedValues.tail(ls.m) = regD;
 
-    auto Sold = ls.S;
-
     // Efficiently update diagonal elements
     for (int i = 0; i < combinedValues.size(); i++) { ls.S.coeffRef(i, i) = combinedValues[i]; }
 
     // Refactorize
-    // get diagonal of S
-    //Eigen::VectorXd diag = S.diagonal();
     ls.factorizeMatrix(ls.S);
-    //auto S = ls.S;
 
 #else
 

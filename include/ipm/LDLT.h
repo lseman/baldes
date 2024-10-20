@@ -73,55 +73,6 @@ public:
         initialized = true;
     }
 
-    void updateFactorization(const Eigen::SparseMatrix<double> &matrix, const Eigen::VectorXd &updatedDiag) {
-        if (!initialized) { throw std::runtime_error("Matrix is not factorized."); }
-
-        matrixToFactorize = matrix;
-        // Attempt to update the factorization
-        solver.update_factorization(matrixToFactorize, updatedDiag);
-        if (solver.info() != Eigen::Success) {
-
-            // Use a reference to the original matrix to avoid copying unnecessarily
-            Eigen::SparseMatrix<double> &regMatrix       = matrixToFactorize;
-            Eigen::VectorXd              updatedDiagCopy = updatedDiag;
-            double                       regularization  = 1e-5; // Initial regularization term
-
-            // Attempt to regularize and factorize up to 3 times
-            const int maxAttempts = 3;
-            for (int attempt = 1; attempt <= maxAttempts; ++attempt) {
-                // Apply increasing regularization to the diagonal selectively
-                applySelectiveRegularizationDiag(regMatrix, regularization, updatedDiagCopy); // Regularize diagonal
-
-                solver.update_factorization(regMatrix, updatedDiagCopy); // Factorize the modified matrix
-                if (solver.info() == Eigen::Success) {
-                    initialized = true;
-                    return; // Exit early if successful
-                }
-
-                // Increase the regularization term for the next attempt
-                regularization *= 10;
-            }
-
-            // If all attempts fail, throw an exception
-            throw std::runtime_error("Matrix factorization failed after 3 attempts with LDLT and regularization.");
-        }
-    }
-
-    void applySelectiveRegularizationDiag(Eigen::SparseMatrix<double> &matrix, double regularization,
-                                          Eigen::VectorXd &updatedDiag, double threshold = 1e-6) {
-        // Ensure the matrix is square
-        if (matrix.rows() != matrix.cols()) {
-            throw std::runtime_error("Matrix is not square, cannot apply regularization to the diagonal.");
-        }
-
-        for (int i = 0; i < matrix.rows(); ++i) {
-
-            // Additionally, add regularization to the updatedDiag as well
-            if (std::abs(updatedDiag[i]) < threshold) { updatedDiag[i] += regularization; }
-        }
-
-        // Ensure the matrix is compressed after modifications
-    }
     // Solve the system using the factorized matrix
     Eigen::VectorXd solve(const Eigen::VectorXd &b) {
         if (!initialized) { throw std::runtime_error("Matrix is not factorized."); }

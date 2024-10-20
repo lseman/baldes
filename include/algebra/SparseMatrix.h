@@ -268,6 +268,13 @@ struct SparseMatrix {
     // Returns the outer size (number of rows)
     int outerSize() const { return num_rows; }
 
+    double sparsity() const {
+        if (coo_mode) convertToCRS(); // Convert to CRS before computing sparsity
+
+        int num_zeros = num_rows * num_cols - values.size();
+        return 1.0 - (static_cast<double>(num_zeros) / (num_rows * num_cols));
+    }
+
     void compress() {
         if (!coo_mode) {
             std::cerr << "Compress is only applicable in COO mode." << std::endl;

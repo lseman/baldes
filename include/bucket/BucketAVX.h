@@ -12,6 +12,16 @@
 
 #include <experimental/simd>
 
+template <typename T, typename Container>
+inline std::experimental::simd<T> load_simd(const Container &source, size_t start_index, size_t simd_size) {
+    std::experimental::simd<T> result;
+    for (size_t i = 0; i < simd_size; ++i) {
+        result[i] = source[start_index + i]->cost;  // Load the cost from each Label
+    }
+    return result;
+}
+
+
 /**
  * @brief Checks if a new label is dominated by any label in a given vector using SIMD operations.
  *
@@ -20,7 +30,8 @@
  *
  */
 template <Direction D, Stage S>
-inline bool check_dominance_against_vector(const Label *new_label, const std::vector<Label *> &labels) noexcept {
+inline bool check_dominance_against_vector(const Label *new_label, const std::pmr::vector<Label *> &labels,
+                                           const CutStorage *cut_storage) noexcept {
     using namespace std::experimental;
     size_t       size      = labels.size();
     const size_t simd_size = simd<double>::size(); // SIMD size based on hardware
@@ -33,10 +44,8 @@ inline bool check_dominance_against_vector(const Label *new_label, const std::ve
     // Process the labels in SIMD batches
     for (; i + simd_size <= size; i += simd_size) {
         // Load the costs of `simd_size` labels
-        simd<double> label_costs;
-        for (std::size_t j = 0; j < simd_size; ++j) {
-            label_costs[j] = labels[i + j]->cost; // Load individual elements
-        }
+        simd<double> label_costs = load_simd<double>(labels, i, simd_size);
+
         // Compare the costs
         auto cmp_result = (label_costs <= current_cost);
 
@@ -45,8 +54,7 @@ inline bool check_dominance_against_vector(const Label *new_label, const std::ve
             for (size_t j = 0; j < simd_size; ++j) {
                 if (cmp_result[j]) {
                     const auto &label_resources = labels[i + j]->resources;
-
-                    bool dominated = true;
+                    bool        dominated       = true;
 
                     // Perform resource checks element-wise
                     if constexpr (D == Direction::Forward) {
@@ -65,8 +73,35 @@ inline bool check_dominance_against_vector(const Label *new_label, const std::ve
                         }
                     }
 
+                    // Additional check for Stage::Four and Stage::Enumerate
+                    double sumSRC = 0.0;
+                    if constexpr (S == Stage::Four || S == Stage::Enumerate) {
+                        const auto &SRCDuals = cut_storage->SRCDuals;
+                        if (!SRCDuals.empty()) {
+                            const auto &labelSRCMap    = labels[i + j]->SRCmap;
+                            const auto &newLabelSRCMap = new_label->SRCmap;
+
+                            for (size_t k = 0; k < SRCDuals.size(); ++k) {
+                                const auto &den         = cut_storage->getCut(k).p.den;
+                                const auto  labelMod    = labelSRCMap[k] % den;
+                                const auto  newLabelMod = newLabelSRCMap[k] % den;
+                                if (labelMod > newLabelMod) { sumSRC += SRCDuals[k]; }
+                            }
+                        }
+
+                        // SIMD cost comparison after adjusting for SRC Duals
+                        if (labels[i + j]->cost - sumSRC > new_label->cost) {
+                            continue; // Label is not dominated, skip
+                        }
+                    } else {
+                        // Simple cost check
+                        if (labels[i + j]->cost > new_label->cost) {
+                            continue; // Label is not dominated, skip
+                        }
+                    }
+
                     // Bitmap comparison for dominance
-                    if (dominated && (S == Stage::Three || S == Stage::Four || S == Stage::Enumerate)) {
+                    if constexpr (S == Stage::Three || S == Stage::Four || S == Stage::Enumerate) {
                         const size_t bitmap_size = new_label->visited_bitmap.size();
                         for (size_t k = 0; k < bitmap_size; ++k) {
                             if ((labels[i + j]->visited_bitmap[k] & ~new_label->visited_bitmap[k]) != 0) {
@@ -88,8 +123,7 @@ inline bool check_dominance_against_vector(const Label *new_label, const std::ve
     for (; i < size; ++i) {
         if (labels[i]->cost <= new_label->cost) {
             const auto &label_resources = labels[i]->resources;
-
-            bool dominated = true;
+            bool        dominated       = true;
 
             if constexpr (D == Direction::Forward) {
                 for (size_t k = 0; k < new_label->resources.size(); ++k) {
@@ -107,7 +141,30 @@ inline bool check_dominance_against_vector(const Label *new_label, const std::ve
                 }
             }
 
-            if (!dominated) continue;
+            // Check for SRC Duals (if Stage Four or Enumerate)
+            double sumSRC = 0.0;
+            if constexpr (S == Stage::Four || S == Stage::Enumerate) {
+                const auto &SRCDuals = cut_storage->SRCDuals;
+                if (!SRCDuals.empty()) {
+                    const auto &labelSRCMap    = labels[i]->SRCmap;
+                    const auto &newLabelSRCMap = new_label->SRCmap;
+
+                    for (size_t k = 0; k < SRCDuals.size(); ++k) {
+                        const auto &den         = cut_storage->getCut(k).p.den;
+                        const auto  labelMod    = labelSRCMap[k] % den;
+                        const auto  newLabelMod = newLabelSRCMap[k] % den;
+                        if (labelMod > newLabelMod) { sumSRC += SRCDuals[k]; }
+                    }
+                }
+
+                if (labels[i]->cost - sumSRC > new_label->cost) {
+                    continue; // Label is not dominated, skip
+                }
+            } else {
+                if (labels[i]->cost > new_label->cost) {
+                    continue; // Label is not dominated, skip
+                }
+            }
 
             if constexpr (S == Stage::Three || S == Stage::Four || S == Stage::Enumerate) {
                 const size_t bitmap_size = new_label->visited_bitmap.size();
@@ -119,7 +176,9 @@ inline bool check_dominance_against_vector(const Label *new_label, const std::ve
                 }
             }
 
-            if (dominated) { return true; }
+            if (dominated) {
+                return true; // Current label is dominated
+            }
         }
     }
 

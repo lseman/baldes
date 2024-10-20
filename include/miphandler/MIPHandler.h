@@ -492,6 +492,9 @@ public:
         data.vtype    = get_vtypes();
         data.sense    = get_senses();
 
+        // print sparse matrix sparsity
+        // fmt::print("Sparsity of the sparse matrix: {:.2f}%\n", sparse_matrix.sparsity() * 100);
+
         return data;
     }
 
