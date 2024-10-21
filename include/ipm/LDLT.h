@@ -76,6 +76,11 @@ public:
         initialized = true;
     }
 
+    void reset() {
+        initialized     = false;
+        patternAnalyzed = false;
+        solver.reset();
+    }
     // Solve the system using the factorized matrix
     Eigen::VectorXd solve(const Eigen::VectorXd &b) {
         if (!initialized) { throw std::runtime_error("Matrix is not factorized."); }
