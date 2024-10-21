@@ -1,0 +1,15 @@
+<map id="Preprocessor::convert2Knapsack" name="Preprocessor::convert2Knapsack">
+<area shape="rect" id="Node000001" title=" " alt="" coords="5,120,218,146"/>
+<area shape="rect" id="Node000002" href="$structSparseMatrix_1_1RowIterator.html#a738ba7db10d2730bc58cfe4196defe48" title=" " alt="" coords="266,5,459,31"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="130,117,189,80,265,41,285,33,287,38,267,46,191,85,133,122"/>
+<area shape="rect" id="Node000003" href="$structSparseMatrix_1_1RowIterator.html#a5d02c4e36f6daa3923bdd9e8b77026ee" title=" " alt="" coords="277,55,448,96"/>
+<area shape="poly" id="edge2_Node000001_Node000003" title=" " alt="" coords="170,117,261,96,263,101,172,122"/>
+<area shape="rect" id="Node000004" href="$structSparseMatrix.html#adfbb5b38a05bc9688ca60b1f30aa44b1" title=" " alt="" coords="280,120,445,146"/>
+<area shape="poly" id="edge3_Node000001_Node000004" title=" " alt="" coords="218,130,264,130,264,136,218,136"/>
+<area shape="rect" id="Node000006" href="$structSparseMatrix_1_1RowIterator.html#a9bcb08fd6bd3d20ca050dba4c96c0435" title=" " alt="" coords="277,170,448,210"/>
+<area shape="poly" id="edge5_Node000001_Node000006" title=" " alt="" coords="172,144,263,165,261,170,170,149"/>
+<area shape="rect" id="Node000007" href="$structSparseMatrix_1_1RowIterator.html#ab217d7cab2877a7b2c436c2d00df950c" title=" " alt="" coords="277,235,448,276"/>
+<area shape="poly" id="edge6_Node000001_Node000007" title=" " alt="" coords="134,144,193,180,267,220,283,227,281,232,265,225,190,185,132,149"/>
+<area shape="rect" id="Node000005" href="$structSparseMatrix.html#ab6105b24882356f5c3b462bed1d658af" title=" " alt="" coords="507,120,695,146"/>
+<area shape="poly" id="edge4_Node000004_Node000005" title=" " alt="" coords="446,130,491,130,491,136,446,136"/>
+</map>

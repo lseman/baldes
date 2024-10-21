@@ -1,0 +1,9 @@
+<map id="LimitedMemoryRank1Cuts::generateCutCoefficients" name="LimitedMemoryRank1Cuts::generateCutCoefficients">
+<area shape="rect" id="Node000001" title="Generates cut coefficients for the given VRPTW_SRC cuts." alt="" coords="5,27,180,68"/>
+<area shape="rect" id="Node000002" href="$classCutStorage.html#aa59db0e52f4d6d9007f46fdc47324e6c" title="Adds a cut to the current collection of cuts." alt="" coords="274,5,408,31"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="180,35,258,25,259,31,180,40"/>
+<area shape="rect" id="Node000004" href="$classLimitedMemoryRank1Cuts.html#a1b5f8095d331b58224e2e36a985aabb8" title="Computes the limited memory coefficient based on the given parameters." alt="" coords="228,55,454,96"/>
+<area shape="poly" id="edge3_Node000001_Node000004" title=" " alt="" coords="180,55,212,58,212,64,180,60"/>
+<area shape="rect" id="Node000003" href="$SRC_8cpp.html#a221ddfa4aa7f40ac52f772b73a3b50ce" title="Computes a unique cut key based on the provided base set and multipliers." alt="" coords="502,5,625,31"/>
+<area shape="poly" id="edge2_Node000002_Node000003" title=" " alt="" coords="408,16,486,16,486,21,408,21"/>
+</map>

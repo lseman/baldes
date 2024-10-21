@@ -1,0 +1,19 @@
+<map id="MST.h" name="MST.h">
+<area shape="rect" id="Node000001" title="This file contains the implementation of the Minimum Spanning Tree (MST) algorithm for clustering." alt="" coords="325,5,384,31"/>
+<area shape="rect" id="Node000002" title=" " alt="" coords="5,79,80,105"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="325,29,95,81,94,75,324,24"/>
+<area shape="rect" id="Node000003" title=" " alt="" coords="103,79,160,105"/>
+<area shape="poly" id="edge2_Node000001_Node000003" title=" " alt="" coords="325,32,176,79,175,74,324,27"/>
+<area shape="rect" id="Node000004" title=" " alt="" coords="185,79,262,105"/>
+<area shape="poly" id="edge3_Node000001_Node000004" title=" " alt="" coords="334,34,260,74,258,69,331,29"/>
+<area shape="rect" id="Node000005" title=" " alt="" coords="287,79,339,105"/>
+<area shape="poly" id="edge4_Node000001_Node000005" title=" " alt="" coords="350,33,330,67,325,64,345,30"/>
+<area shape="rect" id="Node000006" title=" " alt="" coords="364,79,431,105"/>
+<area shape="poly" id="edge5_Node000001_Node000006" title=" " alt="" coords="364,30,384,64,380,67,359,33"/>
+<area shape="rect" id="Node000007" title=" " alt="" coords="454,79,511,105"/>
+<area shape="poly" id="edge6_Node000001_Node000007" title=" " alt="" coords="378,29,449,69,446,73,375,34"/>
+<area shape="rect" id="Node000008" title=" " alt="" coords="535,79,584,105"/>
+<area shape="poly" id="edge7_Node000001_Node000008" title=" " alt="" coords="386,27,521,74,520,79,384,32"/>
+<area shape="rect" id="Node000009" title=" " alt="" coords="608,79,666,105"/>
+<area shape="poly" id="edge8_Node000001_Node000009" title=" " alt="" coords="385,24,594,75,592,81,384,29"/>
+</map>

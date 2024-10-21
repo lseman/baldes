@@ -1,0 +1,9 @@
+<map id="BNBNode::newChild" name="BNBNode::newChild">
+<area shape="rect" id="Node000001" title=" " alt="" coords="5,35,145,60"/>
+<area shape="rect" id="Node000002" href="$classBNBNode.html#afdb4b4b2044c2c229b1b3536d6e83af5" title=" " alt="" coords="193,35,338,60"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="145,45,177,45,177,50,145,50"/>
+<area shape="rect" id="Node000003" href="$classBNBNode.html#a17edf3264d46bd38e762a445c9500bee" title=" " alt="" coords="386,5,555,31"/>
+<area shape="poly" id="edge2_Node000002_Node000003" title=" " alt="" coords="338,35,370,30,371,35,339,40"/>
+<area shape="rect" id="Node000004" href="$classGurobiEnvSingleton.html#a49c3ce63088629c2246dec252a73df16" title=" " alt="" coords="403,55,538,96"/>
+<area shape="poly" id="edge3_Node000002_Node000004" title=" " alt="" coords="338,55,388,62,387,67,338,60"/>
+</map>

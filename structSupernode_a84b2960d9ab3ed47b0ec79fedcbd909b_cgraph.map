@@ -1,0 +1,12 @@
+<map id="Supernode::factorize" name="Supernode::factorize">
+<area shape="rect" id="Node000001" title=" " alt="" coords="5,70,144,96"/>
+<area shape="rect" id="Node000002" href="$structSupernode.html#a0969a6f93ea016042454beafe97ab762" title=" " alt="" coords="192,63,327,103"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="144,80,176,80,176,86,144,86"/>
+<area shape="poly" id="edge5_Node000002_Node000002" title=" " alt="" coords="224,63,222,53,228,44,241,38,259,36,280,38,292,45,289,49,278,44,259,41,242,43,231,48,227,54,229,62"/>
+<area shape="rect" id="Node000003" href="$structSupernode.html#a3da00c49fe363aae5c3d201b29775f01" title=" " alt="" coords="382,5,571,46"/>
+<area shape="poly" id="edge2_Node000002_Node000003" title=" " alt="" coords="327,63,381,48,383,53,328,68"/>
+<area shape="rect" id="Node000004" href="$structSupernode.html#a7ff6d5af84925f05769a2f7380d17bc6" title=" " alt="" coords="375,70,577,96"/>
+<area shape="poly" id="edge3_Node000002_Node000004" title=" " alt="" coords="327,80,359,80,359,86,327,86"/>
+<area shape="rect" id="Node000005" href="$structSupernode.html#a1ce3cad20940fab7eca9a5b2fa276981" title=" " alt="" coords="412,120,540,161"/>
+<area shape="poly" id="edge4_Node000002_Node000005" title=" " alt="" coords="328,98,398,117,396,122,327,103"/>
+</map>

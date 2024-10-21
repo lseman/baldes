@@ -1,0 +1,5 @@
+<map id="check_dominance_against_vector" name="check_dominance_against_vector">
+<area shape="rect" id="Node000001" title="Checks if a new label is dominated by any label in a given vector using SIMD operations." alt="" coords="5,5,181,46"/>
+<area shape="rect" id="Node000002" href="$BucketAVX_8h.html#a8c7a6a470d522e77dd5004c27eefcd1c" title=" " alt="" coords="229,13,309,38"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="181,23,213,23,213,28,181,28"/>
+</map>

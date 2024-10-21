@@ -1,0 +1,22 @@
+<map id="BucketGraph::ConcatenateLabel" name="BucketGraph::ConcatenateLabel">
+<area shape="rect" id="Node000001" title=" " alt="" coords="5,120,182,161"/>
+<area shape="rect" id="Node000002" href="$classBucketGraph.html#a858b68317a9a0a60723698509d78d575" title="Checks the feasibility of a given forward and backward label." alt="" coords="237,5,376,46"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="129,117,228,62,249,51,251,56,231,67,132,122"/>
+<area shape="rect" id="Node000003" href="$classBucketGraph.html#a4813f871ad99f1325b627683b7cb0b4a" title=" " alt="" coords="230,120,383,161"/>
+<area shape="poly" id="edge2_Node000001_Node000003" title=" " alt="" coords="182,138,214,138,214,143,182,143"/>
+<area shape="rect" id="Node000006" href="$classBucketGraph.html#ad15267e0cffaa8dc5222028409c9e082" title=" " alt="" coords="445,74,579,100"/>
+<area shape="poly" id="edge9_Node000001_Node000006" title=" " alt="" coords="173,117,229,106,333,94,429,87,429,92,334,99,230,111,174,122"/>
+<area shape="rect" id="Node000007" href="$classBranchingDuals.html#a6f05e954c84d95a9f62a00b8edb1d8a4" title=" " alt="" coords="431,180,593,205"/>
+<area shape="poly" id="edge10_Node000001_Node000007" title=" " alt="" coords="174,159,230,170,325,181,416,187,415,192,325,186,229,175,173,164"/>
+<area shape="rect" id="Node000009" href="$classBranchingDuals.html#a8cfa95af83dab193f7dfd2ffee2b841a" title=" " alt="" coords="442,233,583,258"/>
+<area shape="poly" id="edge11_Node000001_Node000009" title=" " alt="" coords="144,159,230,190,332,214,427,231,426,236,331,219,229,195,142,164"/>
+<area shape="rect" id="Node000004" href="$classLabelPool.html#aedbe90cd72089f2c41bc4d430735a41a" title=" " alt="" coords="448,128,576,153"/>
+<area shape="poly" id="edge3_Node000003_Node000004" title=" " alt="" coords="383,138,433,138,433,143,383,143"/>
+<area shape="poly" id="edge5_Node000003_Node000006" title=" " alt="" coords="383,118,444,102,446,107,384,123"/>
+<area shape="poly" id="edge6_Node000003_Node000007" title=" " alt="" coords="384,157,445,173,443,178,383,162"/>
+<area shape="poly" id="edge8_Node000003_Node000009" title=" " alt="" coords="338,159,382,187,432,215,454,225,452,229,430,220,379,192,335,163"/>
+<area shape="rect" id="Node000005" href="$structLabel.html#a6653f9b3efc57ca65e4c92b9eb6dbb46" title="Resets the state of the object to its initial values." alt="" coords="659,128,748,153"/>
+<area shape="poly" id="edge4_Node000004_Node000005" title=" " alt="" coords="576,138,644,138,644,143,576,143"/>
+<area shape="rect" id="Node000008" href="$classArcDuals.html#ac75e53f0c4f24e6aca539c544e9f8109" title=" " alt="" coords="641,180,766,205"/>
+<area shape="poly" id="edge7_Node000007_Node000008" title=" " alt="" coords="594,190,626,190,626,195,594,195"/>
+</map>

@@ -1,0 +1,7 @@
+<map id="BranchAndBound::branch" name="BranchAndBound::branch">
+<area shape="rect" id="Node000001" title=" " alt="" coords="5,31,173,56"/>
+<area shape="rect" id="Node000002" href="$classProblem.html#abf5c91a364cfc4eb9e22d5aafe6fd50f" title="Branches the given node." alt="" coords="239,5,354,31"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="173,31,224,24,225,30,173,36"/>
+<area shape="rect" id="Node000003" href="$classBNBNode.html#af5035c88619967009f8a770fb8e18c57" title=" " alt="" coords="221,55,372,80"/>
+<area shape="poly" id="edge2_Node000001_Node000003" title=" " alt="" coords="173,51,206,54,205,60,173,56"/>
+</map>

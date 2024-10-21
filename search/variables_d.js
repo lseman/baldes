@@ -1,0 +1,22 @@
+var searchData=
+[
+  ['m_0',['m',['../classCuSolver.html#a2d7da290cd67f6fe6142585cddb00d23',1,'CuSolver::m'],['../classSparseSolver.html#ae1cfad5820b75edef371654b580f6050',1,'SparseSolver::m']]],
+  ['master_5fdual_1',['master_dual',['../classStabilization.html#a4416f7ee443617818c4d3e6690e8115d',1,'Stabilization']]],
+  ['matrix_2',['matrix',['../structSparseMatrix_1_1RowIterator.html#a581daa1e6e13b57fe4c2d806b33cef0a',1,'SparseMatrix::RowIterator::matrix'],['../classBNBNode.html#a2aba54ac70a989701b112a3b7743b488',1,'BNBNode::matrix']]],
+  ['max_3',['max',['../structRowActivity.html#a7dd9a382585a2c0524905ab0902a6b85',1,'RowActivity::max'],['../structIntervalNode.html#a7a8634d51e48138254bfea16346b2c4a',1,'IntervalNode::max']]],
+  ['max_5fbuckets_4',['max_buckets',['../classBucketGraph.html#a7f782296f0e3aeac272b3260f752d768',1,'BucketGraph']]],
+  ['max_5fiter_5',['max_iter',['../classIPSolver.html#ad0c2594ea4f46d9be99f18a27b34a7d8',1,'IPSolver']]],
+  ['max_5fpath_5fsize_6',['max_path_size',['../structBucketOptions.html#ac58e549feb8958cc88c3fbfd594459e8',1,'BucketOptions']]],
+  ['maxcandidatesphase0_7',['maxCandidatesPhase0',['../Branching_8h.html#a5a1a3bc5055c81bfa0ad026742066ef4',1,'Branching.h']]],
+  ['maxcandidatesphase1_8',['maxCandidatesPhase1',['../Branching_8h.html#a50c0b8d37e9aeab5125a14c31ab166aa',1,'Branching.h']]],
+  ['merge_5fpending_9',['merge_pending',['../structIntervalNode.html#a9279ef987d1db69b8e4c3f8578ba6977',1,'IntervalNode']]],
+  ['merged_5flabels_10',['merged_labels',['../classBucketGraph.html#aa72258eba03facf9417104e9377c8aa1',1,'BucketGraph']]],
+  ['merged_5flabels_5frih_11',['merged_labels_rih',['../classBucketGraph.html#a8bcf04cf7b8f393823e99dd7dbd1d5b2',1,'BucketGraph']]],
+  ['min_12',['min',['../structRowActivity.html#a3c27a277d67fbb34f390aa3be98bd231',1,'RowActivity']]],
+  ['min_5fred_5fcost_13',['min_red_cost',['../classBucketGraph.html#a0aff433ba355139b060e4f97ed90510e',1,'BucketGraph']]],
+  ['mip_14',['mip',['../classBNBNode.html#a7553327a6526826882bb1c4cfeb086aa',1,'BNBNode']]],
+  ['misprice_15',['misprice',['../classStabilization.html#acd6652fc765940c1fb7b65772853d147',1,'Stabilization']]],
+  ['mtw_5flb_16',['mtw_lb',['../structVRPNode.html#ae4dda09540801cb39e8918c098de7ee6',1,'VRPNode']]],
+  ['mtw_5fub_17',['mtw_ub',['../structVRPNode.html#a930ec603b89063efd081ada1c3307449',1,'VRPNode']]],
+  ['mtx_18',['mtx',['../classBucketGraph.html#a1819bbff013d7997c46507619adb3d37',1,'BucketGraph']]]
+];

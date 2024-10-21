@@ -1,0 +1,9 @@
+<map id="BucketGraph::set_adjacency_list" name="BucketGraph::set_adjacency_list">
+<area shape="rect" id="Node000001" title="Sets the adjacency list for the BucketGraph." alt="" coords="5,31,216,56"/>
+<area shape="rect" id="Node000002" href="$classMST.html#aab20166a0b84167db616699bcaf02360" title=" " alt="" coords="284,5,378,31"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="216,29,268,23,269,28,217,34"/>
+<area shape="rect" id="Node000004" href="$classBucketGraph.html#ad15267e0cffaa8dc5222028409c9e082" title=" " alt="" coords="264,55,398,80"/>
+<area shape="poly" id="edge3_Node000001_Node000004" title=" " alt="" coords="216,52,248,56,248,61,216,58"/>
+<area shape="rect" id="Node000003" href="$classMST.html#ae8f38e66bc8580c27c85f2455a6a4d2d" title=" " alt="" coords="446,5,580,31"/>
+<area shape="poly" id="edge2_Node000002_Node000003" title=" " alt="" coords="378,16,431,16,431,21,378,21"/>
+</map>

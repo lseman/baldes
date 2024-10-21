@@ -1,0 +1,55 @@
+<map id="LimitedMemoryRank1Cuts::runSeparation" name="LimitedMemoryRank1Cuts::runSeparation">
+<area shape="rect" id="Node000001" title=" " alt="" coords="5,412,180,453"/>
+<area shape="rect" id="Node000002" href="$classBNBNode.html#a234c0a33d282f8ec5d1017de8c99a037" title=" " alt="" coords="228,115,415,156"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="98,411,115,366,142,307,179,243,226,184,255,162,258,166,230,188,183,246,147,309,120,368,103,413"/>
+<area shape="rect" id="Node000009" href="$classBNBNode.html#ac5cdf235b03dab790bc9ec7222592375" title=" " alt="" coords="235,199,408,224"/>
+<area shape="poly" id="edge8_Node000001_Node000009" title=" " alt="" coords="104,410,153,340,187,299,226,261,274,230,277,234,229,266,191,303,157,343,109,413"/>
+<area shape="rect" id="Node000011" href="$classBNBNode.html#ac4a92f0a90b0517dda3eb0e08c1ffe72" title=" " alt="" coords="253,276,390,302"/>
+<area shape="poly" id="edge10_Node000001_Node000011" title=" " alt="" coords="125,410,285,308,288,312,128,414"/>
+<area shape="rect" id="Node000014" href="$classBNBNode.html#abb76f5afa8990290b262a0750cede865" title=" " alt="" coords="254,391,388,416"/>
+<area shape="poly" id="edge13_Node000001_Node000014" title=" " alt="" coords="180,419,238,411,239,417,180,424"/>
+<area shape="rect" id="Node000018" href="$classLimitedMemoryRank1Cuts.html#a2b5298782f45bc4106a5397a4c0b9705" title=" " alt="" coords="234,440,408,481"/>
+<area shape="poly" id="edge17_Node000001_Node000018" title=" " alt="" coords="180,441,219,446,218,451,180,446"/>
+<area shape="rect" id="Node000020" href="$classBNBNode.html#ae5662c516282b17e13f100d36e5e5f63" title=" " alt="" coords="257,505,386,531"/>
+<area shape="poly" id="edge19_Node000001_Node000020" title=" " alt="" coords="137,451,229,490,252,498,250,503,227,495,135,456"/>
+<area shape="rect" id="Node000024" href="$classLimitedMemoryRank1Cuts.html#a34eb8134a3b061fc6e19ae25f6fa3599" title="Separates the given solution vector into cuts using Limited Memory Rank&#45;1 Cuts." alt="" coords="234,555,408,596"/>
+<area shape="poly" id="edge22_Node000001_Node000024" title=" " alt="" coords="116,451,165,496,229,541,238,546,236,551,226,546,162,500,112,455"/>
+<area shape="rect" id="Node000025" href="$classLimitedMemoryRank1Cuts.html#a7b3eba87af98185081086c5f5b34c5ce" title="Implements the 45 Heuristic for generating limited memory rank&#45;1 cuts." alt="" coords="234,640,408,681"/>
+<area shape="poly" id="edge23_Node000001_Node000025" title=" " alt="" coords="108,452,157,525,191,567,229,605,264,630,261,635,226,610,187,570,153,528,104,455"/>
+<area shape="rect" id="Node000003" href="$classMIPProblem.html#ae1444b927d088a4f9d35dfe604aeb7d9" title=" " alt="" coords="464,96,637,137"/>
+<area shape="poly" id="edge2_Node000002_Node000003" title=" " alt="" coords="415,125,448,123,448,128,416,131"/>
+<area shape="rect" id="Node000004" href="$classMIPProblem.html#ab90d73fab03bc3983fe3b263c447eb9b" title=" " alt="" coords="703,5,834,31"/>
+<area shape="poly" id="edge3_Node000003_Node000004" title=" " alt="" coords="583,94,630,66,684,40,700,34,702,39,686,45,632,71,585,98"/>
+<area shape="rect" id="Node000005" href="$classMIPProblem.html#a5f3fa530fb8a6061e1d294a1857dd250" title=" " alt="" coords="701,55,836,80"/>
+<area shape="poly" id="edge4_Node000003_Node000005" title=" " alt="" coords="637,95,693,82,694,87,638,100"/>
+<area shape="rect" id="Node000006" href="$classMIPProblem.html#a00841d8835fad12f1b35e83d7b5cf9a5" title=" " alt="" coords="685,104,852,130"/>
+<area shape="poly" id="edge5_Node000003_Node000006" title=" " alt="" coords="637,114,670,114,670,120,637,120"/>
+<area shape="rect" id="Node000007" href="$classMIPProblem.html#a94d7739fb700ed6194d73ddea3a870e8" title=" " alt="" coords="699,153,838,179"/>
+<area shape="poly" id="edge6_Node000003_Node000007" title=" " alt="" coords="638,134,694,147,693,152,637,139"/>
+<area shape="rect" id="Node000008" href="$classMIPProblem.html#a29674f674d7f14b118a031cdf734611e" title=" " alt="" coords="687,203,850,228"/>
+<area shape="poly" id="edge7_Node000003_Node000008" title=" " alt="" coords="614,135,639,148,663,169,673,179,687,189,697,194,694,199,684,194,669,183,659,173,636,152,612,140"/>
+<area shape="rect" id="Node000010" href="$classSolverInterface.html#a2bd025d0a840837c01533e10fbfb7571" title=" " alt="" coords="473,162,627,202"/>
+<area shape="poly" id="edge9_Node000009_Node000010" title=" " alt="" coords="407,198,457,191,458,197,408,203"/>
+<area shape="rect" id="Node000012" href="$classMIPProblem.html#a819af412ba3883842beb711ce69e92fa" title=" " alt="" coords="475,227,625,252"/>
+<area shape="poly" id="edge11_Node000011_Node000012" title=" " alt="" coords="384,273,472,254,473,259,385,278"/>
+<area shape="rect" id="Node000013" href="$classSolverInterface.html#ac588d11a5e7e692e748a064e612e4059" title=" " alt="" coords="467,276,633,302"/>
+<area shape="poly" id="edge12_Node000011_Node000013" title=" " alt="" coords="391,286,452,286,452,292,391,292"/>
+<area shape="rect" id="Node000015" href="$classGurobiEnvSingleton.html#a49c3ce63088629c2246dec252a73df16" title=" " alt="" coords="482,326,618,366"/>
+<area shape="poly" id="edge14_Node000014_Node000015" title=" " alt="" coords="375,387,467,364,468,369,376,393"/>
+<area shape="rect" id="Node000016" href="$classSolverInterface.html#aeaac9dd85da0f259e9804a9970a7f54f" title=" " alt="" coords="468,391,632,416"/>
+<area shape="poly" id="edge15_Node000014_Node000016" title=" " alt="" coords="389,401,453,401,453,406,389,406"/>
+<area shape="rect" id="Node000017" href="$classSolverInterface.html#afc4cb03aa6a487dd87a2a2d3090a5577" title=" " alt="" coords="466,440,634,466"/>
+<area shape="poly" id="edge16_Node000014_Node000017" title=" " alt="" coords="385,414,473,434,472,439,384,420"/>
+<area shape="rect" id="Node000019" href="$classLimitedMemoryRank1Cuts.html#a29f6f1ce5f46f80b1e8840ccd5b0521a" title="Selects the indices of the highest coefficients from a given vector." alt="" coords="463,490,637,530"/>
+<area shape="poly" id="edge18_Node000018_Node000019" title=" " alt="" coords="409,477,449,486,447,491,408,482"/>
+<area shape="rect" id="Node000021" href="$classMIPProblem.html#a4e55c60ce1b0dfd21733f9fbbc157891" title=" " alt="" coords="483,555,617,596"/>
+<area shape="poly" id="edge20_Node000020_Node000021" title=" " alt="" coords="376,529,468,552,467,558,375,534"/>
+<area shape="rect" id="Node000022" href="$structSparseMatrix.html#ac25e8f241cd1de61244dcff74c474799" title=" " alt="" coords="685,563,852,588"/>
+<area shape="poly" id="edge21_Node000021_Node000022" title=" " alt="" coords="618,573,670,573,670,578,618,578"/>
+<area shape="rect" id="Node000026" href="$SRC_8h.html#ac1e86f60f149c469a628f58f3e595221" title="Generates all combinations of a given size from a set of elements." alt="" coords="501,620,599,646"/>
+<area shape="poly" id="edge24_Node000025_Node000026" title=" " alt="" coords="408,648,485,638,486,643,409,653"/>
+<area shape="rect" id="Node000027" href="$SRC_8h.html#abd5d9a806975ce95efb3b8ce3e6fe2e5" title="Generates all unique permutations of a fixed&#45;size vector." alt="" coords="466,669,634,695"/>
+<area shape="poly" id="edge25_Node000025_Node000027" title=" " alt="" coords="409,666,451,670,451,676,409,672"/>
+<area shape="rect" id="Node000028" href="$SRC_8h.html#a0ec7e413b362fcfa33e475b88198ff9b" title="Generates all unique permutations for a predefined set of vectors of size 5." alt="" coords="466,719,634,744"/>
+<area shape="poly" id="edge26_Node000025_Node000028" title=" " alt="" coords="384,679,464,705,485,711,484,716,462,710,383,684"/>
+</map>

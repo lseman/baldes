@@ -1,0 +1,11 @@
+<map id="SparseMatrix::modify_or_delete_batch" name="SparseMatrix::modify_or_delete_batch">
+<area shape="rect" id="Node000001" title=" " alt="" coords="5,71,147,112"/>
+<area shape="rect" id="Node000002" href="$structSparseMatrix.html#adc8a18b61890921ed7f6321ff48a791d" title=" " alt="" coords="195,42,336,82"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="146,78,179,73,180,78,147,83"/>
+<area shape="rect" id="Node000004" href="$structSparseMatrix.html#ad1a2ceb5c4b1170f4ba4219200066004" title=" " alt="" coords="567,56,753,82"/>
+<area shape="poly" id="edge5_Node000001_Node000004" title=" " alt="" coords="147,91,195,92,336,92,552,77,552,82,336,97,195,97,147,96"/>
+<area shape="rect" id="Node000003" href="$structSparseMatrix.html#ab07cd94bee1d7f2387e8abe437478cdf" title=" " alt="" coords="384,5,519,31"/>
+<area shape="poly" id="edge2_Node000002_Node000003" title=" " alt="" coords="336,43,379,33,380,38,337,48"/>
+<area shape="poly" id="edge4_Node000002_Node000004" title=" " alt="" coords="336,61,552,64,552,70,336,66"/>
+<area shape="poly" id="edge3_Node000003_Node000004" title=" " alt="" coords="508,29,590,49,589,54,507,34"/>
+</map>

@@ -1,0 +1,11 @@
+<map id="Branching::calculateAggregatedVariables" name="Branching::calculateAggregatedVariables">
+<area shape="rect" id="Node000001" title=" " alt="" coords="5,55,209,95"/>
+<area shape="rect" id="Node000002" href="$classBNBNode.html#ac5cdf235b03dab790bc9ec7222592375" title=" " alt="" coords="257,13,429,38"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="207,51,263,40,264,45,208,57"/>
+<area shape="rect" id="Node000004" href="$classBNBNode.html#aca6f8d009954c8444675f8ce69cbfaad" title=" " alt="" coords="274,62,412,88"/>
+<area shape="poly" id="edge3_Node000001_Node000004" title=" " alt="" coords="209,72,258,72,258,78,209,78"/>
+<area shape="rect" id="Node000005" href="$classBranching.html#af826a4553e1c487058a28192bc07a181" title=" " alt="" coords="267,112,419,137"/>
+<area shape="poly" id="edge4_Node000001_Node000005" title=" " alt="" coords="208,93,264,105,263,110,207,99"/>
+<area shape="rect" id="Node000003" href="$classSolverInterface.html#a2bd025d0a840837c01533e10fbfb7571" title=" " alt="" coords="477,5,631,46"/>
+<area shape="poly" id="edge2_Node000002_Node000003" title=" " alt="" coords="430,23,461,23,461,28,430,28"/>
+</map>

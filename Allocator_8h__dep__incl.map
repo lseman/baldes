@@ -1,0 +1,21 @@
+<map id="Allocator.h" name="Allocator.h">
+<area shape="rect" id="Node000001" title=" " alt="" coords="5,5,88,31"/>
+<area shape="rect" id="Node000002" href="$Bucket_8h.html" title=" " alt="" coords="10,79,83,105"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="49,46,49,79,44,79,44,46"/>
+<area shape="rect" id="Node000003" href="$BucketGraph_8h.html" title="Defines the BucketGraph class and associated functionalities used in solving vehicle routing problems..." alt="" coords="52,153,159,178"/>
+<area shape="poly" id="edge2_Node000002_Node000003" title=" " alt="" coords="68,115,97,150,93,154,64,118"/>
+<area shape="rect" id="Node000008" href="$BucketUtils_8h.html" title="Header file for utilities related to the Bucket Graph in the Vehicle Routing Problem (VRP)." alt="" coords="76,300,175,326"/>
+<area shape="poly" id="edge11_Node000002_Node000008" title=" " alt="" coords="46,120,42,153,42,182,44,204,52,225,66,250,88,277,111,297,107,301,84,281,62,254,47,228,39,205,36,182,37,153,40,120"/>
+<area shape="rect" id="Node000004" href="$BucketBindings_8cpp.html" title="Python bindings for the BucketGraph, VRPNode, Label, PSTEPDuals, and BucketOptions classes using pybi..." alt="" coords="198,374,335,399"/>
+<area shape="poly" id="edge3_Node000003_Node000004" title=" " alt="" coords="175,170,203,177,231,188,256,203,277,225,287,244,292,264,292,306,284,345,274,374,269,372,279,344,287,306,287,265,282,245,272,228,253,207,228,192,201,182,174,175"/>
+<area shape="rect" id="Node000005" href="$BucketGraph_8cpp.html" title="Implementation of the BucketGraph class and related structures for solving vehicle routing problems (..." alt="" coords="20,374,142,399"/>
+<area shape="poly" id="edge4_Node000003_Node000005" title=" " alt="" coords="86,192,75,209,66,227,60,268,63,309,79,373,74,374,58,310,55,268,61,226,70,206,82,189"/>
+<area shape="rect" id="Node000006" href="$BucketJump_8h.html" title="Header file for the Bucket Graph&#39;s arc elimination and jump arc utilities in Vehicle Routing Problems..." alt="" coords="158,226,263,252"/>
+<area shape="poly" id="edge5_Node000003_Node000006" title=" " alt="" coords="137,185,194,224,191,228,134,190"/>
+<area shape="rect" id="Node000009" href="$SRC_8h.html" title="Definitions for handling cuts and optimizations for the Vehicle Routing Problem with Time Windows (VR..." alt="" coords="76,226,134,252"/>
+<area shape="poly" id="edge9_Node000003_Node000009" title=" " alt="" coords="108,194,108,226,102,226,102,194"/>
+<area shape="poly" id="edge6_Node000006_Node000008" title=" " alt="" coords="186,264,141,302,138,298,183,260"/>
+<area shape="poly" id="edge7_Node000008_Node000004" title=" " alt="" coords="164,331,244,371,241,375,161,335"/>
+<area shape="poly" id="edge8_Node000008_Node000005" title=" " alt="" coords="112,340,91,375,86,372,108,337"/>
+<area shape="poly" id="edge10_Node000009_Node000008" title=" " alt="" coords="115,266,124,299,119,300,110,267"/>
+</map>

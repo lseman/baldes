@@ -1,0 +1,24 @@
+var searchData=
+[
+  ['p_0',['P',['../structSupernode.html#a3d52ba120ca18f7751a2f4531451057e',1,'Supernode']]],
+  ['p_1',['p',['../structCut.html#a6d855f0932d06073efa0a9b2c28bc74a',1,'Cut']]],
+  ['packing_5fbitmap_2',['packing_bitmap',['../classBucketGraph.html#a77972ca77209a8fad937cc84bf616eb8',1,'BucketGraph']]],
+  ['parent_3',['parent',['../classBNBNode.html#a7e395e08c384f92fb032390046dd4869',1,'BNBNode::parent'],['../structSupernode.html#a978a63f3c06fc9bd5ce887a934a744aa',1,'Supernode::parent'],['../structLabel.html#a4e21ca08d2080506ea9f86062af72f6d',1,'Label::parent'],['../classTreeNode.html#a77ccf52dc11528bf6cff26e9fa857fce',1,'TreeNode::parent']]],
+  ['paths_4',['paths',['../classBNBNode.html#af37b13c0c7bda39871ee1e82cfe6b535',1,'BNBNode']]],
+  ['pathset_5',['pathSet',['../classBNBNode.html#a1348b259d8f335c277554e8cfec08251',1,'BNBNode']]],
+  ['payload_6',['payload',['../classVRPCandidate.html#a5f4f4ea187c844210af4fad77b2372fe',1,'VRPCandidate']]],
+  ['perm_7',['perm',['../classPermutation.html#acf30777279732c1a47f942f5561338a8',1,'Permutation::perm'],['../classLU__Decomposition.html#a8a478ef47efda2379978de1897a14ab7',1,'LU_Decomposition::perm']]],
+  ['phi_5fbw_8',['Phi_bw',['../classBucketGraph.html#a72a56b4c54f68ce0c2dd988f6f9eba41',1,'BucketGraph']]],
+  ['phi_5ffw_9',['Phi_fw',['../classBucketGraph.html#ac521196275222e2de1486bff051f1c9d',1,'BucketGraph']]],
+  ['phi_5fin_10',['phi_in',['../classStabilization.html#af259bd82d78795eb65ce205e1c24c166',1,'Stabilization']]],
+  ['phi_5fout_11',['phi_out',['../classStabilization.html#a78ffd00155fa471cd193f6de1744a4fe',1,'Stabilization']]],
+  ['pivottolerance_12',['pivotTolerance',['../classSimplexRevised.html#a30edaf70e2ef12d1e85d8104ec35c923',1,'SimplexRevised']]],
+  ['pool_13',['pool',['../structBucket.html#a6bc9655ff8c493a46eccb45e6bb1e849',1,'Bucket::pool'],['../classEigen_1_1CustomSimplicialLDLT.html#ab074f9e0d1f24b7ad4f7f55a45e917ed',1,'Eigen::CustomSimplicialLDLT::pool'],['../classLabelPool.html#af885d0a251baf690580aed229c4125bd',1,'LabelPool::pool'],['../classIteratedLocalSearch.html#a82a79b16f83e5f0809583b1be374af6b',1,'IteratedLocalSearch::pool']]],
+  ['prev_5fdual_14',['prev_dual',['../classStabilization.html#af1f6b2f148da16b56dba37c364b11f71',1,'Stabilization']]],
+  ['prevduals_15',['prevDuals',['../classTrustRegion.html#a0c6a5a24c2d8dc6b866c9ef1659c6338',1,'TrustRegion']]],
+  ['primal_5fvals_16',['primal_vals',['../classIPSolver.html#a77a138d4376f21d730e110d0547af83b',1,'IPSolver']]],
+  ['priority_17',['priority',['../structArc.html#a1f9078b8f29193518c236f45add8a77c',1,'Arc']]],
+  ['problem_18',['problem',['../classBNBNode.html#a709e41b49f2a17abb2f404967c4df898',1,'BNBNode']]],
+  ['productvalue_19',['productValue',['../structBranchingQueueItem.html#a5be7cf2eea5bdd0cfa035849b126c9f3',1,'BranchingQueueItem']]],
+  ['pseudo_5fdual_5fbound_20',['pseudo_dual_bound',['../classStabilization.html#a7147f5ffb0ab16dd5f303235f6ea811b',1,'Stabilization']]]
+];

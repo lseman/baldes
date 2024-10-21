@@ -1,0 +1,13 @@
+<map id="BucketGraph::DominatedInCompWiseSmallerBuckets" name="BucketGraph::DominatedInCompWiseSmallerBuckets">
+<area shape="rect" id="Node000001" title="Determines if a label is dominated in component&#45;wise smaller buckets." alt="" coords="5,35,182,75"/>
+<area shape="rect" id="Node000002" href="$BucketAVX_8h.html#acdd9f3f1a6ec0dbdfb5aadaa97ab878e" title="Checks if a new label is dominated by any label in a given vector using SIMD operations." alt="" coords="230,5,405,46"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="182,41,214,37,215,42,183,46"/>
+<area shape="rect" id="Node000004" href="$BucketSolve_8h.html#a6d1ee39d7f8cb4976dffcff3c41dc8e8" title="Checks if element &#39;a&#39; precedes element &#39;b&#39; in the given strongly connected components (SCCs)." alt="" coords="280,70,354,96"/>
+<area shape="poly" id="edge3_Node000001_Node000004" title=" " alt="" coords="183,63,265,74,264,79,182,69"/>
+<area shape="rect" id="Node000003" href="$BucketAVX_8h.html#a8c7a6a470d522e77dd5004c27eefcd1c" title=" " alt="" coords="486,13,566,38"/>
+<area shape="poly" id="edge2_Node000002_Node000003" title=" " alt="" coords="405,23,470,23,470,28,405,28"/>
+<area shape="rect" id="Node000005" href="$classUnionFind.html#aaa3a5c908d3546b89c4262beb9cbfde9" title=" " alt="" coords="453,70,598,96"/>
+<area shape="poly" id="edge4_Node000004_Node000005" title=" " alt="" coords="355,80,437,80,437,86,355,86"/>
+<area shape="rect" id="Node000006" href="$classUnionFind.html#aa3fe04bfd2e9ce2e33c3edf8c91c3aea" title=" " alt="" coords="646,70,753,96"/>
+<area shape="poly" id="edge5_Node000005_Node000006" title=" " alt="" coords="599,80,631,80,631,86,599,86"/>
+</map>

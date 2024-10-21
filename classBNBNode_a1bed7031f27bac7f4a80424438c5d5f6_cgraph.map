@@ -1,0 +1,18 @@
+<map id="BNBNode::chgCoeff" name="BNBNode::chgCoeff">
+<area shape="rect" id="Node000001" title=" " alt="" coords="5,100,143,125"/>
+<area shape="rect" id="Node000002" href="$classMIPProblem.html#af77d84a36fde97467ad7069ea2a230f8" title=" " alt="" coords="191,100,341,125"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="143,110,175,110,175,115,143,115"/>
+<area shape="rect" id="Node000003" href="$classLinearExpression.html#a931036cafcd17fe3553ffd79468da49e" title=" " alt="" coords="416,5,564,46"/>
+<area shape="poly" id="edge2_Node000002_Node000003" title=" " alt="" coords="294,96,388,55,405,49,407,54,390,60,296,101"/>
+<area shape="rect" id="Node000004" href="$classConstraint.html#a08a118cfd63fcb5e2617d7006294cb3c" title=" " alt="" coords="404,70,577,96"/>
+<area shape="poly" id="edge3_Node000002_Node000004" title=" " alt="" coords="341,100,388,94,389,99,342,105"/>
+<area shape="rect" id="Node000005" href="$structSparseMatrix.html#adc8a18b61890921ed7f6321ff48a791d" title=" " alt="" coords="420,120,561,161"/>
+<area shape="poly" id="edge4_Node000002_Node000005" title=" " alt="" coords="342,119,405,127,404,132,341,124"/>
+<area shape="rect" id="Node000008" href="$classLinearExpression.html#a055d01a2c6ce59aad0e6ec6595159ed8" title=" " alt="" coords="389,185,591,210"/>
+<area shape="poly" id="edge8_Node000002_Node000008" title=" " alt="" coords="292,123,337,147,390,170,414,178,412,183,388,175,334,152,290,128"/>
+<area shape="rect" id="Node000006" href="$structSparseMatrix.html#ab07cd94bee1d7f2387e8abe437478cdf" title=" " alt="" coords="639,102,775,128"/>
+<area shape="poly" id="edge5_Node000005_Node000006" title=" " alt="" coords="561,129,624,122,624,127,561,135"/>
+<area shape="rect" id="Node000007" href="$structSparseMatrix.html#ad1a2ceb5c4b1170f4ba4219200066004" title=" " alt="" coords="823,128,1008,153"/>
+<area shape="poly" id="edge7_Node000005_Node000007" title=" " alt="" coords="561,138,807,138,807,143,561,143"/>
+<area shape="poly" id="edge6_Node000006_Node000007" title=" " alt="" coords="775,121,808,125,807,130,775,126"/>
+</map>

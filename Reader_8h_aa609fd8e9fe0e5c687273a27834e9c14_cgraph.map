@@ -1,0 +1,7 @@
+<map id="VRPTW_read_instance" name="VRPTW_read_instance">
+<area shape="rect" id="Node000001" title=" " alt="" coords="5,31,162,56"/>
+<area shape="rect" id="Node000002" href="$Reader_8h.html#aba12fb635d3f4c4fe794fa18cbda98ca" title=" " alt="" coords="262,5,362,31"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="162,32,246,23,246,28,162,38"/>
+<area shape="rect" id="Node000003" href="$Reader_8h.html#aef54cee0a50255ed1a50ed2fbefadf74" title="Reduces the time windows for the vertices in the VRPTW instance." alt="" coords="210,55,414,80"/>
+<area shape="poly" id="edge2_Node000001_Node000003" title=" " alt="" coords="162,49,194,52,194,58,162,54"/>
+</map>

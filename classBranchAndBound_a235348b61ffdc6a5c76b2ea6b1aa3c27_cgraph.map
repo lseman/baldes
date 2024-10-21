@@ -1,0 +1,34 @@
+<map id="BranchAndBound::solveParallel" name="BranchAndBound::solveParallel">
+<area shape="rect" id="Node000001" title=" " alt="" coords="5,169,208,194"/>
+<area shape="rect" id="Node000002" href="$classBranchAndBound.html#a4aee56d21009ae41bc9d1a25331ce63f" title=" " alt="" coords="560,5,745,46"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="153,166,536,55,561,48,563,53,538,60,154,171"/>
+<area shape="rect" id="Node000003" href="$classBranchAndBound.html#a4dd8752ac1cb1d3457408d9415edb073" title=" " alt="" coords="256,194,489,220"/>
+<area shape="poly" id="edge2_Node000001_Node000003" title=" " alt="" coords="208,189,240,192,240,197,208,194"/>
+<area shape="poly" id="edge12_Node000003_Node000002" title=" " alt="" coords="389,192,487,108,509,80,520,68,536,55,545,50,547,55,538,60,523,72,514,83,491,112,392,196"/>
+<area shape="rect" id="Node000004" href="$classProblem.html#ab23bf266eab275b14032439516743b35" title=" " alt="" coords="598,70,708,96"/>
+<area shape="poly" id="edge3_Node000003_Node000004" title=" " alt="" coords="389,192,452,149,493,125,536,105,582,91,583,96,538,109,495,130,454,153,392,196"/>
+<area shape="rect" id="Node000005" href="$classBranchAndBound.html#a64aba410e797f0c10c4918ecb140c728" title=" " alt="" coords="569,120,736,145"/>
+<area shape="poly" id="edge4_Node000003_Node000005" title=" " alt="" coords="412,191,536,154,567,146,568,152,538,159,414,196"/>
+<area shape="rect" id="Node000008" href="$classBNBNode.html#aac35166d36684e32a7bdfa6c4c4ef41b" title=" " alt="" coords="559,169,746,194"/>
+<area shape="poly" id="edge7_Node000003_Node000008" title=" " alt="" coords="489,194,544,189,544,194,490,199"/>
+<area shape="rect" id="Node000011" href="$classProblem.html#a62735857d60d0bd41a8747c72a855356" title="Calculates the bound for the given node." alt="" coords="590,218,715,244"/>
+<area shape="poly" id="edge10_Node000003_Node000011" title=" " alt="" coords="490,214,575,222,575,227,489,220"/>
+<area shape="rect" id="Node000012" href="$classBNBNode.html#aea7c19032bda3aaa1d5002a506b22f70" title=" " alt="" coords="584,268,722,293"/>
+<area shape="poly" id="edge11_Node000003_Node000012" title=" " alt="" coords="415,218,538,254,569,261,568,266,536,259,414,223"/>
+<area shape="rect" id="Node000013" href="$classProblem.html#ae434b9a5b6c12d0f0aa8ddede5ab0302" title="Calculates the objective value for the given node." alt="" coords="589,317,716,342"/>
+<area shape="poly" id="edge13_Node000003_Node000013" title=" " alt="" coords="393,218,455,260,495,283,538,303,575,315,573,320,536,308,493,288,452,265,390,223"/>
+<area shape="rect" id="Node000014" href="$classBNBNode.html#ab885178fe3620191190f1b166016b7c5" title=" " alt="" coords="596,366,709,392"/>
+<area shape="poly" id="edge14_Node000003_Node000014" title=" " alt="" coords="386,218,446,284,489,321,538,353,582,368,580,373,536,357,486,326,442,287,382,222"/>
+<area shape="rect" id="Node000015" href="$classBranchAndBound.html#aa1ff580eba5f8fdfce63d3c5223dc4d4" title=" " alt="" coords="537,416,768,441"/>
+<area shape="poly" id="edge15_Node000003_Node000015" title=" " alt="" coords="383,219,404,256,438,306,484,359,510,382,538,402,547,407,544,411,536,407,507,386,480,362,434,309,400,259,378,221"/>
+<area shape="rect" id="Node000006" href="$classProblem.html#abf5c91a364cfc4eb9e22d5aafe6fd50f" title="Branches the given node." alt="" coords="871,70,986,96"/>
+<area shape="poly" id="edge5_Node000005_Node000006" title=" " alt="" coords="728,116,855,93,856,99,729,121"/>
+<area shape="rect" id="Node000007" href="$classBNBNode.html#af5035c88619967009f8a770fb8e18c57" title=" " alt="" coords="853,120,1004,145"/>
+<area shape="poly" id="edge6_Node000005_Node000007" title=" " alt="" coords="737,130,837,130,837,135,737,135"/>
+<area shape="rect" id="Node000009" href="$classBNBNode.html#a89a72572aa75070eeb3d23589131f3ff" title=" " alt="" coords="816,169,1041,194"/>
+<area shape="poly" id="edge8_Node000008_Node000009" title=" " alt="" coords="747,179,801,179,801,184,747,184"/>
+<area shape="rect" id="Node000010" href="$classBranchingDuals.html#a9686368ed3499b28abf79492c604e090" title=" " alt="" coords="830,218,1027,244"/>
+<area shape="poly" id="edge9_Node000008_Node000010" title=" " alt="" coords="729,193,838,212,837,217,728,198"/>
+<area shape="rect" id="Node000016" href="$classBranchAndBound.html#a0d57f6ba3e906c77cfadae558cf8bad5" title=" " alt="" coords="826,408,1031,449"/>
+<area shape="poly" id="edge16_Node000015_Node000016" title=" " alt="" coords="769,426,811,426,811,431,769,431"/>
+</map>

@@ -1,0 +1,17 @@
+<map id="Supernode::analyzePattern" name="Supernode::analyzePattern">
+<area shape="rect" id="Node000001" title=" " alt="" coords="5,125,180,151"/>
+<area shape="rect" id="Node000002" href="$structSupernode.html#a1a060ce19dcd935a942ab2b7df45eaa3" title=" " alt="" coords="236,84,360,110"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="159,122,220,110,221,115,160,127"/>
+<area shape="rect" id="Node000007" href="$structSupernode.html#a75d49e8843123e5c1fb35b6886daf2d2" title=" " alt="" coords="228,158,368,198"/>
+<area shape="poly" id="edge7_Node000001_Node000007" title=" " alt="" coords="162,149,213,159,212,164,161,154"/>
+<area shape="poly" id="edge3_Node000002_Node000002" title=" " alt="" coords="264,85,258,75,262,66,275,59,298,57,322,60,335,67,332,72,321,65,298,63,277,65,265,69,263,75,269,82"/>
+<area shape="rect" id="Node000003" href="$structSupernode.html#a3a6dea829f9b98c109e6f6355961c5c3" title=" " alt="" coords="426,5,570,31"/>
+<area shape="poly" id="edge2_Node000002_Node000003" title=" " alt="" coords="324,81,415,40,432,34,434,39,417,45,326,86"/>
+<area shape="rect" id="Node000004" href="$structSupernode.html#a7cf6c30db1451d075c3a3bff07fc8434" title=" " alt="" coords="416,55,580,80"/>
+<area shape="poly" id="edge4_Node000002_Node000004" title=" " alt="" coords="360,85,400,79,401,84,361,90"/>
+<area shape="rect" id="Node000005" href="$structSupernode.html#a1ce3cad20940fab7eca9a5b2fa276981" title=" " alt="" coords="434,104,562,145"/>
+<area shape="poly" id="edge5_Node000002_Node000005" title=" " alt="" coords="361,103,419,111,418,116,360,108"/>
+<area shape="rect" id="Node000006" href="$structSupernode.html#a82ab95b8b132e0201d5bcff2eef1307d" title=" " alt="" coords="422,169,574,195"/>
+<area shape="poly" id="edge6_Node000002_Node000006" title=" " alt="" coords="343,108,369,120,393,138,417,155,432,161,430,166,415,159,390,142,367,124,340,113"/>
+<area shape="poly" id="edge8_Node000007_Node000007" title=" " alt="" coords="260,158,258,148,264,139,278,133,298,131,320,134,333,140,330,145,318,139,298,136,279,138,267,143,263,149,265,157"/>
+</map>

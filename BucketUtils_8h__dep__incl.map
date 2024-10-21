@@ -1,0 +1,7 @@
+<map id="BucketUtils.h" name="BucketUtils.h">
+<area shape="rect" id="Node000001" title="Header file for utilities related to the Bucket Graph in the Vehicle Routing Problem (VRP)." alt="" coords="100,5,199,31"/>
+<area shape="rect" id="Node000002" href="$BucketBindings_8cpp.html" title="Python bindings for the BucketGraph, VRPNode, Label, PSTEPDuals, and BucketOptions classes using pybi..." alt="" coords="5,79,142,105"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="127,44,88,81,84,77,124,40"/>
+<area shape="rect" id="Node000003" href="$BucketGraph_8cpp.html" title="Implementation of the BucketGraph class and related structures for solving vehicle routing problems (..." alt="" coords="166,79,288,105"/>
+<area shape="poly" id="edge2_Node000001_Node000003" title=" " alt="" coords="176,40,216,77,212,81,172,44"/>
+</map>

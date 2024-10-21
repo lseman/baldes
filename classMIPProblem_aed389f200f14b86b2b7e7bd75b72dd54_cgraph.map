@@ -1,0 +1,20 @@
+<map id="MIPProblem::chgCoeff" name="MIPProblem::chgCoeff">
+<area shape="rect" id="Node000001" title=" " alt="" coords="5,125,156,150"/>
+<area shape="rect" id="Node000002" href="$classMIPProblem.html#af77d84a36fde97467ad7069ea2a230f8" title=" " alt="" coords="204,100,354,125"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="155,125,188,121,189,127,156,131"/>
+<area shape="rect" id="Node000009" href="$classConstraint.html#a9df04cfac361b42a27d58abedc1661f1" title=" " alt="" coords="221,149,337,174"/>
+<area shape="poly" id="edge9_Node000001_Node000009" title=" " alt="" coords="156,144,206,150,205,155,155,149"/>
+<area shape="rect" id="Node000003" href="$classLinearExpression.html#a931036cafcd17fe3553ffd79468da49e" title=" " alt="" coords="430,5,577,46"/>
+<area shape="poly" id="edge2_Node000002_Node000003" title=" " alt="" coords="307,96,401,55,418,49,420,54,403,60,309,101"/>
+<area shape="rect" id="Node000004" href="$classConstraint.html#a08a118cfd63fcb5e2617d7006294cb3c" title=" " alt="" coords="416,70,590,96"/>
+<area shape="poly" id="edge3_Node000002_Node000004" title=" " alt="" coords="354,100,401,94,402,99,355,105"/>
+<area shape="rect" id="Node000005" href="$structSparseMatrix.html#adc8a18b61890921ed7f6321ff48a791d" title=" " alt="" coords="432,120,574,161"/>
+<area shape="poly" id="edge4_Node000002_Node000005" title=" " alt="" coords="355,119,418,127,417,132,354,124"/>
+<area shape="rect" id="Node000008" href="$classLinearExpression.html#a055d01a2c6ce59aad0e6ec6595159ed8" title=" " alt="" coords="402,185,604,210"/>
+<area shape="poly" id="edge8_Node000002_Node000008" title=" " alt="" coords="330,123,355,134,379,152,403,170,421,177,419,182,401,175,376,157,353,139,328,128"/>
+<area shape="rect" id="Node000006" href="$structSparseMatrix.html#ab07cd94bee1d7f2387e8abe437478cdf" title=" " alt="" coords="652,102,788,128"/>
+<area shape="poly" id="edge5_Node000005_Node000006" title=" " alt="" coords="574,129,637,122,637,127,574,135"/>
+<area shape="rect" id="Node000007" href="$structSparseMatrix.html#ad1a2ceb5c4b1170f4ba4219200066004" title=" " alt="" coords="836,128,1021,153"/>
+<area shape="poly" id="edge7_Node000005_Node000007" title=" " alt="" coords="574,138,820,138,820,143,574,143"/>
+<area shape="poly" id="edge6_Node000006_Node000007" title=" " alt="" coords="788,121,821,125,820,130,788,126"/>
+</map>

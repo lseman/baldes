@@ -1,0 +1,12 @@
+<map id="Stabilization::update_stabilization_after_pricing_optim" name="Stabilization::update_stabilization_after_pricing_optim">
+<area shape="rect" id="Node000001" title="Updates the stabilization parameters after the pricing optimization step." alt="" coords="5,31,142,87"/>
+<area shape="rect" id="Node000002" href="$classStabilization.html#ae9092a933972d2d35d8196975e66e555" title="Computes the dynamic alpha schedule for stabilization." alt="" coords="190,71,335,111"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="142,68,175,74,174,79,142,73"/>
+<area shape="rect" id="Node000005" href="$classStabilization.html#a79c5b5f1f4dbd1511c28f8b6a64ef0d1" title=" " alt="" coords="194,5,330,46"/>
+<area shape="poly" id="edge4_Node000001_Node000005" title=" " alt="" coords="142,44,179,38,179,43,143,50"/>
+<area shape="rect" id="Node000003" href="$classStabilization.html#a4f4e3b43fbae641f421179c3519a7ff7" title="Computes the Euclidean norm (L2 norm) of a given vector." alt="" coords="383,21,509,46"/>
+<area shape="poly" id="edge2_Node000002_Node000003" title=" " alt="" coords="329,68,387,49,389,54,330,73"/>
+<area shape="rect" id="Node000004" href="$classStabilization.html#a0cce2fc1c13a1c8f7ef75bcd99ffc9f0" title=" " alt="" coords="387,78,505,104"/>
+<area shape="poly" id="edge3_Node000002_Node000004" title=" " alt="" coords="335,88,371,88,371,94,335,94"/>
+<area shape="poly" id="edge5_Node000005_Node000003" title=" " alt="" coords="331,26,368,28,367,33,331,31"/>
+</map>

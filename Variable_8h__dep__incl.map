@@ -1,0 +1,20 @@
+<map id="Variable.h" name="Variable.h">
+<area shape="rect" id="Node000001" title=" " alt="" coords="180,5,258,31"/>
+<area shape="rect" id="Node000002" href="$LinExp_8h.html" title=" " alt="" coords="148,79,218,105"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="209,46,191,80,187,77,204,43"/>
+<area shape="rect" id="Node000021" href="$MIPHandler_8h.html" title=" " alt="" coords="182,226,282,252"/>
+<area shape="poly" id="edge11_Node000001_Node000021" title=" " alt="" coords="227,46,232,79,236,163,235,226,230,226,231,163,227,79,222,47"/>
+<area shape="rect" id="Node000003" href="$Constraint_8h.html" title=" " alt="" coords="76,153,167,178"/>
+<area shape="poly" id="edge2_Node000002_Node000003" title=" " alt="" coords="165,118,134,154,130,150,161,115"/>
+<area shape="poly" id="edge10_Node000002_Node000021" title=" " alt="" coords="194,119,231,225,226,227,189,120"/>
+<area shape="rect" id="Node000004" href="$Cut_8h.html" title="This file contains the definition of the Cut struct and CutStorage class." alt="" coords="5,226,57,252"/>
+<area shape="poly" id="edge3_Node000003_Node000004" title=" " alt="" coords="96,190,48,228,45,224,93,186"/>
+<area shape="rect" id="Node000019" href="$Dual_8h.html" title=" " alt="" coords="134,300,192,326"/>
+<area shape="poly" id="edge4_Node000003_Node000019" title=" " alt="" coords="132,192,162,299,157,300,127,194"/>
+<area shape="rect" id="Node000012" href="$Node_8h.html" title="Node class implementation." alt="" coords="132,374,194,399"/>
+<area shape="poly" id="edge9_Node000003_Node000012" title=" " alt="" coords="120,194,116,255,118,290,126,325,138,351,154,371,150,375,134,353,120,327,113,291,111,255,115,193"/>
+<area shape="poly" id="edge6_Node000003_Node000021" title=" " alt="" coords="154,185,215,223,212,228,152,189"/>
+<area shape="poly" id="edge5_Node000019_Node000012" title=" " alt="" coords="166,341,166,373,160,373,160,341"/>
+<area shape="poly" id="edge7_Node000021_Node000019" title=" " alt="" coords="212,265,177,301,173,298,209,261"/>
+<area shape="poly" id="edge8_Node000021_Node000012" title=" " alt="" coords="228,268,207,327,175,375,171,372,202,324,223,266"/>
+</map>

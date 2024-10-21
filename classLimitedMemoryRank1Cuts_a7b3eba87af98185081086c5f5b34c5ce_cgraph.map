@@ -1,0 +1,9 @@
+<map id="LimitedMemoryRank1Cuts::the45Heuristic" name="LimitedMemoryRank1Cuts::the45Heuristic">
+<area shape="rect" id="Node000001" title="Implements the 45 Heuristic for generating limited memory rank&#45;1 cuts." alt="" coords="5,47,180,88"/>
+<area shape="rect" id="Node000002" href="$SRC_8h.html#ac1e86f60f149c469a628f58f3e595221" title="Generates all combinations of a given size from a set of elements." alt="" coords="262,5,360,31"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="179,45,246,30,247,35,180,50"/>
+<area shape="rect" id="Node000003" href="$SRC_8h.html#abd5d9a806975ce95efb3b8ce3e6fe2e5" title="Generates all unique permutations of a fixed&#45;size vector." alt="" coords="228,55,395,80"/>
+<area shape="poly" id="edge2_Node000001_Node000003" title=" " alt="" coords="180,65,212,65,212,70,180,70"/>
+<area shape="rect" id="Node000004" href="$SRC_8h.html#a0ec7e413b362fcfa33e475b88198ff9b" title="Generates all unique permutations for a predefined set of vectors of size 5." alt="" coords="228,104,395,130"/>
+<area shape="poly" id="edge3_Node000001_Node000004" title=" " alt="" coords="180,85,237,97,236,103,179,90"/>
+</map>

@@ -1,0 +1,14 @@
+<map id="MIPProblem::addVars" name="MIPProblem::addVars">
+<area shape="rect" id="Node000001" title=" " alt="" coords="5,55,153,80"/>
+<area shape="rect" id="Node000002" href="$classMIPProblem.html#ae45e6776311d829441bfd51a9abf6948" title=" " alt="" coords="201,5,373,31"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="136,51,214,33,215,38,137,57"/>
+<area shape="rect" id="Node000003" href="$classMIPColumn.html#a6cdb097e73df4f28024436d31cf15171" title=" " alt="" coords="212,55,362,80"/>
+<area shape="poly" id="edge2_Node000001_Node000003" title=" " alt="" coords="153,65,196,65,196,70,153,70"/>
+<area shape="rect" id="Node000004" href="$structSparseMatrix.html#a91d925348a3a7d26839cbf7de084f498" title=" " alt="" coords="219,104,354,145"/>
+<area shape="poly" id="edge3_Node000001_Node000004" title=" " alt="" coords="129,78,205,100,204,105,128,84"/>
+<area shape="rect" id="Node000005" href="$structSparseMatrix.html#ab07cd94bee1d7f2387e8abe437478cdf" title=" " alt="" coords="421,87,556,112"/>
+<area shape="poly" id="edge4_Node000004_Node000005" title=" " alt="" coords="355,114,405,107,406,113,355,119"/>
+<area shape="rect" id="Node000006" href="$structSparseMatrix.html#ad1a2ceb5c4b1170f4ba4219200066004" title=" " alt="" coords="604,112,790,138"/>
+<area shape="poly" id="edge6_Node000004_Node000006" title=" " alt="" coords="355,122,589,122,589,128,355,128"/>
+<area shape="poly" id="edge5_Node000005_Node000006" title=" " alt="" coords="557,105,589,109,589,114,556,110"/>
+</map>

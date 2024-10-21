@@ -1,0 +1,30 @@
+<map id="MIPHandler.h" name="MIPHandler.h">
+<area shape="rect" id="Node000001" title=" " alt="" coords="519,5,620,31"/>
+<area shape="rect" id="Node000002" href="$Dual_8h.html" title=" " alt="" coords="369,79,426,105"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="528,40,428,81,426,76,525,35"/>
+<area shape="rect" id="Node000009" href="$SRC_8h.html" title="Definitions for handling cuts and optimizations for the Vehicle Routing Problem with Time Windows (VR..." alt="" coords="474,300,532,326"/>
+<area shape="poly" id="edge17_Node000001_Node000009" title=" " alt="" coords="566,47,508,300,503,299,561,46"/>
+<area shape="rect" id="Node000010" href="$Node_8h.html" title="Node class implementation." alt="" coords="470,374,533,399"/>
+<area shape="poly" id="edge15_Node000001_Node000010" title=" " alt="" coords="587,43,610,98,619,130,623,164,623,241,620,264,612,285,586,323,553,354,523,375,520,371,550,350,582,320,607,283,615,262,618,240,618,164,614,131,605,99,582,46"/>
+<area shape="rect" id="Node000017" href="$RCC_8h.html" title="Definitions for generating and separating Rounded Capacity Cuts (RCC) in the context of vehicle routi..." alt="" coords="455,153,513,178"/>
+<area shape="poly" id="edge16_Node000001_Node000017" title=" " alt="" coords="557,46,494,154,489,151,553,43"/>
+<area shape="rect" id="Node000018" href="$MIPHandler_8cpp.html" title=" " alt="" coords="658,79,772,105"/>
+<area shape="poly" id="edge14_Node000001_Node000018" title=" " alt="" coords="609,36,691,76,689,81,607,41"/>
+<area shape="rect" id="Node000003" href="$BucketBindings_8cpp.html" title="Python bindings for the BucketGraph, VRPNode, Label, PSTEPDuals, and BucketOptions classes using pybi..." alt="" coords="39,300,175,326"/>
+<area shape="poly" id="edge2_Node000002_Node000003" title=" " alt="" coords="371,117,125,302,121,297,368,112"/>
+<area shape="rect" id="Node000004" href="$BucketGraph_8h.html" title="Defines the BucketGraph class and associated functionalities used in solving vehicle routing problems..." alt="" coords="344,226,451,252"/>
+<area shape="poly" id="edge3_Node000002_Node000004" title=" " alt="" coords="400,120,400,226,395,226,395,120"/>
+<area shape="poly" id="edge10_Node000002_Node000010" title=" " alt="" coords="354,104,238,133,171,155,107,181,54,212,34,228,19,246,10,264,9,283,14,303,29,324,51,335,95,345,222,362,470,381,470,386,221,368,94,351,49,340,25,328,10,305,3,283,5,262,15,243,30,224,51,207,105,176,169,150,237,128,353,99"/>
+<area shape="poly" id="edge11_Node000002_Node000017" title=" " alt="" coords="426,113,471,150,468,154,422,117"/>
+<area shape="poly" id="edge4_Node000004_Node000003" title=" " alt="" coords="334,259,157,302,156,297,333,254"/>
+<area shape="rect" id="Node000005" href="$BucketGraph_8cpp.html" title="Implementation of the BucketGraph class and related structures for solving vehicle routing problems (..." alt="" coords="200,300,321,326"/>
+<area shape="poly" id="edge5_Node000004_Node000005" title=" " alt="" coords="362,262,285,302,282,297,360,257"/>
+<area shape="rect" id="Node000006" href="$BucketJump_8h.html" title="Header file for the Bucket Graph&#39;s arc elimination and jump arc utilities in Vehicle Routing Problems..." alt="" coords="345,300,450,326"/>
+<area shape="poly" id="edge6_Node000004_Node000006" title=" " alt="" coords="400,267,400,300,395,300,395,267"/>
+<area shape="poly" id="edge7_Node000004_Node000009" title=" " alt="" coords="429,259,486,297,483,302,426,263"/>
+<area shape="poly" id="edge8_Node000009_Node000010" title=" " alt="" coords="505,341,504,373,499,373,500,341"/>
+<area shape="rect" id="Node000014" href="$RCC_8cpp.html" title=" " alt="" coords="499,447,571,473"/>
+<area shape="poly" id="edge9_Node000010_Node000014" title=" " alt="" coords="516,412,532,446,527,448,511,414"/>
+<area shape="poly" id="edge12_Node000017_Node000004" title=" " alt="" coords="460,191,414,228,410,224,456,186"/>
+<area shape="poly" id="edge13_Node000017_Node000014" title=" " alt="" coords="502,190,527,240,547,299,552,342,550,384,540,447,535,446,545,383,546,342,542,301,522,242,497,193"/>
+</map>

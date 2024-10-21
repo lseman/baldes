@@ -1,0 +1,12 @@
+<map id="Supernode::solve" name="Supernode::solve">
+<area shape="rect" id="Node000001" title=" " alt="" coords="5,46,126,72"/>
+<area shape="rect" id="Node000002" href="$structSupernode.html#a74183f0aa80d135b9fffef5dcc171580" title=" " alt="" coords="174,46,385,72"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="126,56,158,56,158,62,126,62"/>
+<area shape="rect" id="Node000003" href="$structSupernode.html#aa559d1cebc730b31e3efada643a2009c" title=" " alt="" coords="433,5,578,46"/>
+<area shape="poly" id="edge2_Node000002_Node000003" title=" " alt="" coords="371,43,417,36,418,41,371,48"/>
+<area shape="rect" id="Node000007" href="$structSupernode.html#a9ee92e5eb87b070afcf0a00af3c2189d" title=" " alt="" coords="440,71,572,111"/>
+<area shape="poly" id="edge4_Node000002_Node000007" title=" " alt="" coords="375,70,425,77,424,82,374,75"/>
+<area shape="rect" id="Node000004" href="$Evaluator_8h.html#ac1ad2a066e8de67c1833a8367c625b1e" title=" " alt="" coords="626,46,736,72"/>
+<area shape="poly" id="edge3_Node000003_Node000004" title=" " alt="" coords="579,37,612,43,611,48,578,42"/>
+<area shape="poly" id="edge5_Node000007_Node000004" title=" " alt="" coords="572,76,611,69,612,74,573,82"/>
+</map>
