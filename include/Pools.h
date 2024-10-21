@@ -156,6 +156,12 @@ public:
         return new_label;
     }
 
+    Label **acquire_array(size_t count) {
+        // Allocate space for count + 1 elements (to allow for null-termination)
+        Label **label_array = static_cast<Label **>(pool.allocate(sizeof(Label *) * (count + 1)));
+        return label_array;
+    }
+
     void reset() {
         available_labels.reserve(available_labels.size() + in_use_labels.size());
 
@@ -164,6 +170,7 @@ public:
 
         in_use_labels.clear();
     }
+    std::pmr::unsynchronized_pool_resource pool; // Memory pool
 
 private:
     void allocate_labels(size_t count) {
@@ -194,10 +201,9 @@ private:
     size_t pool_size;
     size_t max_pool_size;
 
-    std::pmr::unsynchronized_pool_resource pool;                    // Memory pool
-    std::pmr::vector<Label *>              available_labels{&pool}; // Labels ready to be acquired
-    std::pmr::vector<Label *>              in_use_labels{&pool};    // Labels currently in use
-    std::vector<Label *>                   deleted_states;          // Labels available for recycling
+    std::pmr::vector<Label *> available_labels{&pool}; // Labels ready to be acquired
+    std::pmr::vector<Label *> in_use_labels{&pool};    // Labels currently in use
+    std::vector<Label *>      deleted_states;          // Labels available for recycling
 };
 
 /**

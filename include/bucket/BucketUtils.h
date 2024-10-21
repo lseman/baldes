@@ -58,44 +58,48 @@ void BucketGraph::add_arc(int from_bucket, int to_bucket, const std::vector<doub
  */
 /*
 template <Direction D>
-inline int BucketGraph::get_bucket_number(int node, const std::vector<double> &resource_values_vec) noexcept {
-   const int num_intervals = MAIN_RESOURCES; // Number of resources
-   auto     &theNode       = nodes[node];    // Get the node
+inline int BucketGraph::get_bucket_number(int node, std::vector<double> &resource_values_vec) noexcept {
+    const int num_intervals = MAIN_RESOURCES; // Number of resources
+    auto     &theNode       = nodes[node];    // Get the node
 
-   // Precomputed base intervals stored during bucket definition
-   auto &base_intervals    = assign_buckets<D>(fw_base_intervals, bw_base_intervals);
-   auto &num_buckets_index = assign_buckets<D>(num_buckets_index_fw, num_buckets_index_bw);
-   auto &num_buckets       = assign_buckets<D>(num_buckets_fw, num_buckets_bw);
-   int   bucket_offset     = 0;
-   int   cumulative_base   = 1;
+    auto &base_intervals    = assign_buckets<D>(fw_base_intervals, bw_base_intervals);
+    auto &num_buckets_index = assign_buckets<D>(num_buckets_index_fw, num_buckets_index_bw);
+    auto &num_buckets       = assign_buckets<D>(num_buckets_fw, num_buckets_bw);
 
-   for (int r = 0; r < num_intervals; ++r) {
-       double value = resource_values_vec[r];
+    int bucket_offset = num_buckets_index[node];
+    int cumulative_base = 1;
 
-       // Use lb for Forward, ub for Backward as reference points
-       double reference_point = (D == Direction::Forward) ? theNode.lb[r] : theNode.ub[r];
+    // Precompute base intervals only once
+    std::array<double, MAIN_RESOURCES> node_base_interval;
+    for (int r = 0; r < num_intervals; ++r) {
+        node_base_interval[r] = (theNode.ub[r] - theNode.lb[r]) / intervals[r].interval;
+    }
 
-       // Compute position of value in the current bucket range
-       // double relative_value = (D == Direction::Forward) ? (value - reference_point) : (reference_point - value);
-       // double epsilon = 0.0001; // Adjust as needed for your precision requirements
-       double relative_value = (D == Direction::Forward) ? (value - reference_point) : (reference_point - value);
+    for (int r = 0; r < num_intervals; ++r) {
+        double value = roundToTwoDecimalPlaces(resource_values_vec[r]);
+        int i = 0;
 
-       int pos = static_cast<int>(relative_value / base_intervals[r]);
+        if constexpr (D == Direction::Forward) {
+            // Forward: map value to bucket based on lb
+            i = static_cast<int>((value - theNode.lb[r]) / node_base_interval[r]);
+        } else if constexpr (D == Direction::Backward) {
+            // Backward: map value to bucket based on ub
+            i = static_cast<int>((theNode.ub[r] - value) / node_base_interval[r]);
+        }
 
-       // Clamp position to ensure it stays within valid bounds
-       int max_pos = static_cast<int>((theNode.ub[r] - theNode.lb[r]) / base_intervals[r]);
-       pos         = std::clamp(pos, 0, num_buckets[node] - 1);
-       // Combine position into the overall bucket offset
-       bucket_offset += pos * cumulative_base;
+        // Bound the index to valid intervals
+        i = std::clamp(i, 0, intervals[r].interval - 1);
 
-       // Update cumulative base for the next resource
-       cumulative_base *= (max_pos + 1);
-   }
+        // Update bucket offset and cumulative base
+        bucket_offset += cumulative_base * i;
+        cumulative_base *= intervals[r].interval; // Update base for the next dimension
+    }
 
-   // Return the absolute bucket number
-   return num_buckets_index[node] + bucket_offset;
+    return bucket_offset;
 }
+
 */
+
 template <Direction D>
 inline int BucketGraph::get_bucket_number(int node, std::vector<double> &resource_values_vec) noexcept {
 
@@ -189,8 +193,8 @@ void BucketGraph::define_buckets() {
                     } else {
                         interval_start[r] = VRPNode.ub[r] - (current_pos[r] + 1) * node_base_interval[r];
                     }
-                    //interval_start[r] = VRPNode.ub[r] - (current_pos[r] + 1) * node_base_interval[r];
-                    interval_end[r]   = VRPNode.ub[r] - current_pos[r] * node_base_interval[r];
+                    // interval_start[r] = VRPNode.ub[r] - (current_pos[r] + 1) * node_base_interval[r];
+                    interval_end[r] = VRPNode.ub[r] - current_pos[r] * node_base_interval[r];
                 }
 
                 // Apply rounding to two decimal places before using values

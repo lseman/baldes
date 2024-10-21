@@ -14,6 +14,9 @@
 
 #include "LDLTSimp.h"
 
+#include <queue>
+#include <algorithm>
+
 /*
  * @class SparseCholesky
  * @brief A class to perform sparse Cholesky factorization.
@@ -90,13 +93,14 @@ public:
             throw std::runtime_error("Matrix is not square, cannot apply regularization to the diagonal.");
         }
 
-        // Directly access and modify diagonal elements
-        for (int i = 0; i < matrix.rows(); ++i) {
-            double &diagValue = matrix.coeffRef(i, i);
-            if (std::abs(diagValue) < threshold) {
-                diagValue += regularization; // Apply regularization if below threshold
+        // Faster diagonal regularization
+        Eigen::VectorXd diagonal = matrix.diagonal();
+        for (int i = 0; i < diagonal.size(); ++i) {
+            if (std::abs(diagonal[i]) < threshold) {
+                diagonal[i] += regularization; // Apply regularization if below threshold
             }
         }
+        matrix.diagonal() = diagonal; // Set the modified diagonal back to the matrix
 
         // Only compress if significant changes were made (optional, depending on matrix structure)
         // matrix.makeCompressed();

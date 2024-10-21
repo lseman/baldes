@@ -539,7 +539,7 @@ public:
         BucketGraph bucket_graph(nodes, time_horizon, bucket_interval);
         bucket_graph.set_distance_matrix(instance.getDistanceMatrix(), 8);
         bucket_graph.branching_duals = &branchingDuals;
-        bucket_graph.A_MAX           = N_SIZE;
+        bucket_graph.A_MAX           = N_SIZE; // * 0.3;
 
         matrix                 = node->extractModelDataSparse();
         auto integer_solution  = node->getObjVal();
@@ -554,6 +554,7 @@ public:
 
         std::vector<double> cutDuals;
         std::vector<double> nodeDuals = node->getDuals();
+        bucket_graph.setDuals(nodeDuals);
         auto                sizeDuals = nodeDuals.size();
 
         double lp_obj_dual = 0.0;
@@ -663,7 +664,7 @@ public:
                             bucket_graph.A_MAX = new_relaxation;
 
                             // TODO: see why this is necessary here
-                            //matrix = node->extractModelDataSparse();
+                            // matrix = node->extractModelDataSparse();
                             node->optimize();
                             nodeDuals = node->getDuals();
                         }
@@ -671,7 +672,7 @@ public:
                     } else {
                         changed = cutHandler(r1c, node, SRCconstraints);
                         if (changed) {
-                            //matrix = node->extractModelDataSparse();
+                            // matrix = node->extractModelDataSparse();
                             node->optimize();
                             nodeDuals = node->getDuals();
                         }
@@ -697,9 +698,9 @@ public:
             if (std::signbit(gap)) { gap = 1e-1; }
             if (gap > 1e-1) { gap = 1e-1; }
             if (gap < 1e-6) { gap = 1e-6; }
-            //gap = 1e-2;
-            // print gap
-            // auto start_time_ipm = std::chrono::high_resolution_clock::now();
+            // gap = 1e-2;
+            //  print gap
+            //  auto start_time_ipm = std::chrono::high_resolution_clock::now();
 
             solver.run_optimization(matrix, gap);
             // auto end_time_ipm = std::chrono::high_resolution_clock::now();

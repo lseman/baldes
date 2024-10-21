@@ -284,7 +284,7 @@ std::vector<double> BucketGraph::labeling_algorithm() noexcept {
                                     Label *existing_label = to_bucket_labels[j];
 
                                     // Prefetch the next label for comparison
-                                    //if (j + 1 < to_bucket_labels.size()) {
+                                    // if (j + 1 < to_bucket_labels.size()) {
                                     //    __builtin_prefetch(to_bucket_labels[j + 1]);
                                     //}
 
@@ -338,27 +338,18 @@ std::vector<double> BucketGraph::labeling_algorithm() noexcept {
                                 a_ctr++;
                                 if (a_ctr > A_MAX) { break; }
                             }
-                            Label *new_label = Extend<D, S, ArcType::Node, Mutability::Mut, F>(label, arc);
-                            if (!new_label) {
+                            auto new_labels = Extend<D, S, ArcType::Node, Mutability::Mut, F>(label, arc);
+                            if (new_labels.empty()) {
 #ifdef UNREACHABLE_DOMINANCE
                                 set_node_unreachable(label->unreachable_bitmap, arc.to);
 #endif
                             } else {
-                                process_new_label(new_label); // Process the new label
-                            }
-                        }
+                                for (auto label_ptr : new_labels) {
 
-#ifdef FIX_BUCKETS
-                        // Process jump arcs if in Stage 4
-                        if constexpr (S == Stage::Four) {
-                            const auto &jump_arcs = buckets[bucket].template get_jump_arcs<D>();
-                            for (const auto &jump_arc : jump_arcs) {
-                                Label *new_label = Extend<D, S, ArcType::Jump, Mutability::Const, F>(label, jump_arc);
-                                if (!new_label) { continue; } // Skip if label extension failed
-                                process_new_label(new_label); // Process the new label
+                                    process_new_label(label_ptr); // Process the new label
+                                }
                             }
                         }
-#endif
                     }
 
                     label->set_extended(true); // Mark the label as extended
@@ -482,22 +473,31 @@ std::vector<Label *> BucketGraph::bi_labeling_algorithm() {
                 }
 
                 // Attempt to extend the current label using this arc
-                auto L_prime = Extend<Direction::Forward, S, ArcType::Node, Mutability::Const, Full::Reverse>(L, arc);
+                auto extended_labels =
+                    Extend<Direction::Forward, S, ArcType::Node, Mutability::Const, Full::Reverse>(L, arc);
 
                 // Note: apparently without the second condition it work better in some cases
                 // Check if the new label is valid and respects the q_star constraints
-                if (!L_prime || L_prime->resources[TIME_INDEX] <= q_star[TIME_INDEX]) {
+                if (extended_labels.empty()) {
                     continue; // Skip invalid labels or those that exceed q_star
                 }
 
-                // Get the bucket for the extended label
-                auto b_prime = L_prime->vertex;
+                // Iterate over the returned Label** array and add each valid label to the vector
+                for (auto L_prime : extended_labels) {
+                    // auto L_prime = *label_ptr; // Get the current label from the array
+                    if (L_prime->resources[TIME_INDEX] <= q_star[TIME_INDEX]) {
+                        continue; // Skip if the label exceeds q_star
+                    }
 
-                // Clear visited buckets tracking for this new label extension
-                std::memset(Bvisited.data(), 0, Bvisited.size() * sizeof(uint64_t));
+                    // Get the bucket for the extended label
+                    auto b_prime = L_prime->vertex;
 
-                // Concatenate this new label with the best label found so far
-                ConcatenateLabel<S>(L, b_prime, best_label, Bvisited);
+                    // Clear visited buckets tracking for this new label extension
+                    std::memset(Bvisited.data(), 0, Bvisited.size() * sizeof(uint64_t));
+
+                    // Concatenate this new label with the best label found so far
+                    ConcatenateLabel<S>(L, b_prime, best_label, Bvisited);
+                }
             }
         }
     }
@@ -553,10 +553,11 @@ std::vector<Label *> BucketGraph::bi_labeling_algorithm() {
  *
  */
 template <Direction D, Stage S, ArcType A, Mutability M, Full F>
-inline Label *
+inline std::vector<Label *>
 BucketGraph::Extend(const std::conditional_t<M == Mutability::Mut, Label *, const Label *>          L_prime,
                     const std::conditional_t<A == ArcType::Bucket, BucketArc,
-                                             std::conditional_t<A == ArcType::Jump, JumpArc, Arc>> &gamma) noexcept {
+                                             std::conditional_t<A == ArcType::Jump, JumpArc, Arc>> &gamma,
+                    int                                                                             depth) noexcept {
     // Get the forward or backward bucket structures, depending on the direction (D)
     auto &buckets       = assign_buckets<D>(fw_buckets, bw_buckets);
     auto &label_pool    = assign_buckets<D>(label_pool_fw, label_pool_bw);
@@ -590,19 +591,19 @@ BucketGraph::Extend(const std::conditional_t<M == Mutability::Mut, Label *, cons
     // Check if the arc between initial_node_id and node_id is fixed, and skip if so (in Stage 3)
     if constexpr (S == Stage::Three) {
         if constexpr (D == Direction::Forward) {
-            if (fixed_arcs[initial_node_id][node_id] == 1) { return nullptr; }
+            if (fixed_arcs[initial_node_id][node_id] == 1) { return std::vector<Label *>(); }
         } else {
-            if (fixed_arcs[node_id][initial_node_id] == 1) { return nullptr; }
+            if (fixed_arcs[node_id][initial_node_id] == 1) { return std::vector<Label *>(); }
         }
     }
 
     // Check if the node has already been visited for enumeration (Stage Enumerate)
     if constexpr (S == Stage::Enumerate) {
-        if (is_node_visited(L_prime->visited_bitmap, node_id)) { return nullptr; }
+        if (is_node_visited(L_prime->visited_bitmap, node_id)) { return std::vector<Label *>(); }
     }
 
     // Perform 2-cycle elimination: if the node ID is the same as the current label's node, skip
-    if (node_id == L_prime->node_id) { return nullptr; }
+    if (node_id == L_prime->node_id) { return std::vector<Label *>(); }
 
     // Check if node_id is in the neighborhood of initial_node_id and has already been visited
     size_t segment      = node_id >> 6; // Determine the segment in the bitmap
@@ -610,7 +611,7 @@ BucketGraph::Extend(const std::conditional_t<M == Mutability::Mut, Label *, cons
     if constexpr (S != Stage::Enumerate) {
         if ((neighborhoods_bitmap[initial_node_id][segment] & (1ULL << bit_position)) &&
             is_node_visited(L_prime->visited_bitmap, node_id)) {
-            return nullptr; // Skip if the node is in the neighborhood and has been visited
+            return std::vector<Label *>(); // Skip if the node is in the neighborhood and has been visited
         }
     }
 
@@ -623,7 +624,7 @@ BucketGraph::Extend(const std::conditional_t<M == Mutability::Mut, Label *, cons
     // Note: workaround
     constexpr size_t N = R_SIZE;
     if (!process_all_resources<D, 0, N>(new_resources, initial_resources, gamma, VRPNode)) {
-        return nullptr; // Handle failure case (constraint violation)
+        return std::vector<Label *>(); // Handle failure case (constraint violation)
     }
 
 #ifdef PSTEP
@@ -641,7 +642,32 @@ BucketGraph::Extend(const std::conditional_t<M == Mutability::Mut, Label *, cons
 #ifdef FIX_BUCKETS
     // Skip if the bucket is fixed (in Stage 4) and not a jump arc
     if constexpr (S == Stage::Four && A != ArcType::Jump) {
-        if (fixed_buckets[L_prime->vertex][to_bucket] == 1) { return nullptr; }
+        if (fixed_buckets[L_prime->vertex][to_bucket] == 1) {
+            if (depth > 1) { return std::vector<Label *>(); } // Skip if the bucket is fixed
+
+            // Get jump arcs for the current node
+            auto jump_arcs = nodes[L_prime->node_id].template get_jump_arcs<D>(node_id);
+
+            // Use std::vector for dynamic label handling
+            std::vector<Label *> label_vector;
+
+            // Process each jump arc
+            for (const auto &jump_arc : jump_arcs) {
+                // Try to extend the label
+                auto extended_labels = Extend<D, S, ArcType::Jump, Mutability::Const, F>(L_prime, jump_arc, depth + 1);
+
+                if (extended_labels.empty()) {
+                    // If extension fails, continue to the next arc
+                    continue;
+                }
+                for (auto label_ptr : extended_labels) { label_vector.push_back(label_ptr); }
+            }
+
+            if (label_vector.empty()) { return std::vector<Label *>(); }
+
+            // Return the vector as a dynamically sized array
+            return label_vector; // std::vector provides direct access to its underlying array
+        }
     }
 #endif
 
@@ -689,8 +715,17 @@ BucketGraph::Extend(const std::conditional_t<M == Mutability::Mut, Label *, cons
     auto new_label = label_pool.acquire();
     new_label->initialize(to_bucket, new_cost, new_resources, node_id);
 
+    // Lambda to create a Label** array with null-termination using the label pool
+    // Lambda to create a Label** array with null-termination using the label pool
+    // Function returning a single Label* in a vector (which can act like a Label**)
+    auto create_label_array = [](Label *label) -> std::vector<Label *> {
+        std::vector<Label *> label_array(1, nullptr); // Creates a vector with 1 element, initialized to nullptr
+        label_array[0] = label;                       // Add the single label to the vector
+        return label_array;
+    };
+
     if constexpr (F == Full::Reverse) {
-        return new_label; // Return the new label early if in reverse mode
+        return create_label_array(new_label); // Return the array (as Label**)
     }
 
     // new_label->visited_bitmap = L_prime->visited_bitmap; // Copy visited bitmap from the original label
@@ -779,8 +814,11 @@ BucketGraph::Extend(const std::conditional_t<M == Mutability::Mut, Label *, cons
     }
 #endif
 
-    // Return the newly created and initialized label
-    return new_label;
+    // Usage of the lambda function
+    auto result = create_label_array(new_label);
+
+    // Return the array (as Label**)
+    return result;
 }
 
 /**

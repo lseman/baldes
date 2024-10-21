@@ -5,6 +5,8 @@
 #define EIGEN_USE_MKL_ALL
 
 #include "Evaluator.h"
+#include "EvaluatorGPU.h"
+
 #include <Eigen/Sparse>
 #include <Eigen/SparseCholesky>
 #include <experimental/simd>
@@ -388,7 +390,6 @@ public:
 
         ap.resize(size, size);
         permute_symm_to_symm<UpLo, Upper, false>(a, ap, m_P.indices().data());
-
     }
 
     void analyzePattern(const MatrixType &a) {
@@ -443,8 +444,8 @@ public:
 
     void setRegularization(Scalar epsilon) { m_epsilon = epsilon; }
 
-    bool                        isFactorized = false;
-    void                        factorize(const MatrixType &a) {
+    bool isFactorized = false;
+    void factorize(const MatrixType &a) {
         bool DoLDLT       = true;
         bool NonHermitian = false;
         eigen_assert(a.rows() == a.cols());
