@@ -297,6 +297,9 @@ endif()
 set(GUROBI_HOME $ENV{GUROBI_HOME})
 include_directories(${GUROBI_HOME}/include)
 
+set(CMAKE_CUDA_STANDARD 17)
+set(CMAKE_CUDA_STANDARD_REQUIRED TRUE)
+
 # Source files
 set(SOURCES src/BucketGraph.cpp src/MIPHandler.cpp)
 

@@ -37,6 +37,8 @@ struct VRPNode {
     std::vector<Arc>              bw_arcs;
     std::vector<std::vector<Arc>> fw_arcs_scc;
     std::vector<std::vector<Arc>> bw_arcs_scc;
+    std::vector<JumpArc>          fw_jump_arcs;
+    std::vector<JumpArc>          bw_jump_arcs;
 
     std::string track_id;
     int         subject;
@@ -97,6 +99,15 @@ struct VRPNode {
         }
     }
 
+    void add_jump_arc(int from_bucket, int to_bucket, const std::vector<double> &res_inc, double cost_inc, bool fw,
+                      int to_job = -1) {
+        if (fw) {
+            fw_jump_arcs.emplace_back(from_bucket, to_bucket, res_inc, cost_inc, to_job);
+        } else {
+            bw_jump_arcs.emplace_back(from_bucket, to_bucket, res_inc, cost_inc, to_job);
+        }
+    }
+
     /**
      * @brief Sorts the forward and backward arcs based on their priority.
      *
@@ -104,9 +115,9 @@ struct VRPNode {
      * the `bw_arcs` in ascending order of priority.
      */
     void sort_arcs() {
-        pdqsort(fw_arcs.begin(), fw_arcs.end(), [](const Arc &a, const Arc &b) { return a.priority > b.priority; });
+        std::sort(fw_arcs.begin(), fw_arcs.end(), [](const Arc &a, const Arc &b) { return a.priority > b.priority; });
 
-        pdqsort(bw_arcs.begin(), bw_arcs.end(), [](const Arc &a, const Arc &b) { return a.priority < b.priority; });
+        std::sort(bw_arcs.begin(), bw_arcs.end(), [](const Arc &a, const Arc &b) { return a.priority < b.priority; });
     }
 
     /**
@@ -133,6 +144,17 @@ struct VRPNode {
         } else {
             return bw_arcs;
         }
+    }
+
+    template <Direction dir>
+    inline auto get_jump_arcs(int to_job) const {
+        const auto &jump_arcs = (dir == Direction::Forward) ? fw_jump_arcs : bw_jump_arcs;
+
+        // Create a filter view for arcs where arc.to_job == to_job
+        auto filtered_view =
+            jump_arcs | std::ranges::views::filter([to_job](const JumpArc &arc) { return arc.to_job == to_job; });
+
+        return filtered_view; // Returns a view, no need for copies
     }
 
     /**

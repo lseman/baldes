@@ -294,6 +294,8 @@ public:
     std::vector<Label *> merged_labels_rih;
     int                  A_MAX = N_SIZE;
 
+    std::pmr::unsynchronized_pool_resource label_pool_memory_resource;
+
     // std::shared_ptr<ThreadPool> fw_thread_pool = std::make_shared<ThreadPool>(1);
     // std::shared_ptr<ThreadPool> bw_thread_pool = std::make_shared<ThreadPool>(1);
 
@@ -337,14 +339,14 @@ public:
     CutStorage          *cut_storage = new CutStorage();
     static constexpr int max_buckets = 10000; // Define maximum number of buckets beforehand
 
-    std::vector<Bucket> fw_buckets;
-    std::vector<Bucket> bw_buckets;
-    LabelPool                       label_pool_fw = LabelPool(100);
-    LabelPool                       label_pool_bw = LabelPool(100);
-    std::vector<BucketArc>          fw_arcs;
-    std::vector<BucketArc>          bw_arcs;
-    std::vector<Label *>            merged_labels;
-    std::vector<std::vector<int>>   neighborhoods;
+    std::vector<Bucket>           fw_buckets;
+    std::vector<Bucket>           bw_buckets;
+    LabelPool                     label_pool_fw = LabelPool(100);
+    LabelPool                     label_pool_bw = LabelPool(100);
+    std::vector<BucketArc>        fw_arcs;
+    std::vector<BucketArc>        bw_arcs;
+    std::vector<Label *>          merged_labels;
+    std::vector<std::vector<int>> neighborhoods;
 
     std::vector<std::vector<double>> distance_matrix;
     std::vector<std::vector<int>>    Phi_fw;
@@ -667,7 +669,6 @@ public:
 
         reset_fixed();
         reset_fixed_buckets();
-        
 
         PARALLEL_SECTIONS(
             work, bi_sched,
@@ -940,10 +941,11 @@ public:
                                            const std::vector<std::vector<int>> &bucket_order) noexcept;
 
     template <Direction D, Stage S, ArcType A, Mutability M, Full F>
-    inline Label *
+    inline std::vector<Label *>
     Extend(std::conditional_t<M == Mutability::Mut, Label *, const Label *>                L_prime,
            const std::conditional_t<A == ArcType::Bucket, BucketArc,
-                                    std::conditional_t<A == ArcType::Jump, JumpArc, Arc>> &gamma) noexcept;
+                                    std::conditional_t<A == ArcType::Jump, JumpArc, Arc>> &gamma,
+           int                                                                             depth = 0) noexcept;
 
     template <Direction D, Stage S>
     bool is_dominated(const Label *new_label, const Label *labels) noexcept;

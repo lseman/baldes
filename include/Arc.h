@@ -76,8 +76,10 @@ struct JumpArc {
     int                 jump_bucket;
     std::vector<double> resource_increment;
     double              cost_increment;
+    int                 to_job = -1;
 
     JumpArc(int base, int jump, const std::vector<double> &res_inc, double cost_inc);
+    JumpArc(int base, int jump, const std::vector<double> &res_inc, double cost_inc, int to_job);
 };
 
 using ArcVariant = std::variant<Arc, BucketArc>;
@@ -107,18 +109,15 @@ struct RawArcHash {
 class ArcList {
 public:
     // Add a predefined arc to the list
-    void add_arc(const Arc& arc) {
-        predefined_arcs.emplace_back(arc);
-    }
+    void add_arc(const Arc &arc) { predefined_arcs.emplace_back(arc); }
 
     // Method to add arcs using int -> int format, with optional resource increment and cost
-    void add_connections(const std::vector<std::pair<int, int>>& connections,
-                         const std::vector<double>& default_resource_increment = {1.0}, // Default increment
-                         double default_cost_increment = 0.0,
-                         double default_priority = 1.0) {
-        for (const auto& conn : connections) {
+    void add_connections(const std::vector<std::pair<int, int>> &connections,
+                         const std::vector<double> &default_resource_increment = {1.0}, // Default increment
+                         double default_cost_increment = 0.0, double default_priority = 1.0) {
+        for (const auto &conn : connections) {
             int from = conn.first;
-            int to = conn.second;
+            int to   = conn.second;
 
             // Create an Arc with the provided default resource increment and cost increment
             Arc arc(from, to, default_resource_increment, default_cost_increment, default_priority);
@@ -128,28 +127,22 @@ public:
 
     // Check if an arc exists between two nodes
     bool has_arc(int from, int to) const {
-        for (const auto& arc : predefined_arcs) {
-            if (arc.from == from && arc.to == to) {
-                return true;
-            }
+        for (const auto &arc : predefined_arcs) {
+            if (arc.from == from && arc.to == to) { return true; }
         }
         return false;
     }
 
     // Retrieve the arc if it exists, otherwise return nullptr
-    const Arc* get_arc(int from, int to) const {
-        for (const auto& arc : predefined_arcs) {
-            if (arc.from == from && arc.to == to) {
-                return &arc;
-            }
+    const Arc *get_arc(int from, int to) const {
+        for (const auto &arc : predefined_arcs) {
+            if (arc.from == from && arc.to == to) { return &arc; }
         }
         return nullptr;
     }
 
     // define get_arcs
-    const std::vector<Arc>& get_arcs() const {
-        return predefined_arcs;
-    }
+    const std::vector<Arc> &get_arcs() const { return predefined_arcs; }
 
 private:
     std::vector<Arc> predefined_arcs; // List of predefined arcs

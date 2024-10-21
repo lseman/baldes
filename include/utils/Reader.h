@@ -222,7 +222,6 @@ inline int VRPTW_read_instance(const std::string &file_name, InstanceData &insta
         for (int i = 0; i < 4; ++i) { std::getline(myfile, current_line); }
 
     if (!mtw) myfile >> instance.nV >> instance.q;
-    std::cout << "nV: " << instance.nV << " q: " << instance.q << std::endl;
     instance.nN = N_SIZE;
 
     std::vector<double> xcoord(instance.nN);
