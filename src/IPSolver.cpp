@@ -451,7 +451,7 @@ void IPSolver::run_optimization(ModelData &model, const double tol) {
     Eigen::VectorXd regD = Eigen::VectorXd::Ones(m);
     double          regG = 1.0;
 
-    SparseSolver ls;
+    ls.reset();
     start_linear_solver(ls, A);
 
     int nc = A.rows(); // Assuming ls is the sparse matrix

@@ -5,13 +5,16 @@
 #define EIGEN_USE_MKL_ALL
 
 #include "Evaluator.h"
-#include "EvaluatorGPU.h"
+// #include "EvaluatorGPU.h"
 
 #include <Eigen/Sparse>
 #include <Eigen/SparseCholesky>
 #include <experimental/simd>
 #include <limits>
 #include <set>
+
+#include <execution>
+#include <stdexec/execution.hpp>
 
 template <typename T>
 using BVector = std::vector<T>;
@@ -69,6 +72,9 @@ public:
         // compute(matrix);
     }
 
+    exec::static_thread_pool            pool  = exec::static_thread_pool(std::thread::hardware_concurrency());
+    exec::static_thread_pool::scheduler sched = pool.get_scheduler();
+
     CustomSimplicialLDLT &compute(const MatrixType &matrix) {
         analyzePattern(matrix);
         factorize_preordered<true, false>(m_matrix);
@@ -120,9 +126,15 @@ public:
     static inline DiagonalScalar            getDiag(Scalar x) { return numext::real(x); }
     static inline Scalar                    getSymm(Scalar x) { return numext::conj(x); }
 
+    void reset() {
+        m_isInitialized     = false;
+        m_analysisIsOk      = false;
+        m_factorizationIsOk = false;
+        m_info              = Success;
+    }
+
     template <bool DoLDLT, bool NonHermitian>
     void factorize_preordered(const CholMatrixType &ap) {
-
         const StorageIndex  size = StorageIndex(ap.rows());
         const StorageIndex *Lp   = m_matrix.outerIndexPtr();
         StorageIndex       *Li   = m_matrix.innerIndexPtr();
@@ -136,61 +148,266 @@ public:
         bool ok = true;
         m_diag.resize(size);
 
-        for (StorageIndex k = 0; k < size; ++k) {
-            y[k]                = Scalar(0);
-            StorageIndex top    = size;
-            tags[k]             = k;
-            m_nonZerosPerCol[k] = 0;
+        std::mutex                            diag_mutex;
+        std::vector<std::tuple<StorageIndex>> tasks(size); // Task vector for each k value
 
-            for (typename CholMatrixType::InnerIterator it(ap, k); it; ++it) {
-                StorageIndex i = it.index();
-                if (i <= k) {
-                    y[i] += getSymm(it.value());
+        // Create tasks for each k
+        for (StorageIndex k = 0; k < size; ++k) { tasks.emplace_back(k); }
 
-                    Index len;
-                    for (len = 0; tags[i] != k; i = m_parent[i]) {
-                        pattern[len++] = i;
-                        tags[i]        = k;
-                    }
+        // Define chunk size to reduce parallelization overhead
+        const int chunk_size = 20;
 
-                    while (len > 0) { pattern[--top] = pattern[--len]; }
-                }
-            }
+        // Parallel execution in chunks
+        auto bulk_sender = stdexec::bulk(stdexec::just(), (tasks.size() + chunk_size - 1) / chunk_size,
+                                         [this, &y, &pattern, &tags, &Lp, &Li, &Lx, size, &ap, &diag_mutex, &tasks, &ok,
+                                          chunk_size](std::size_t chunk_idx) {
+                                             size_t start_idx = chunk_idx * chunk_size;
+                                             size_t end_idx   = std::min(start_idx + chunk_size, tasks.size());
 
-            // Numerical solve for the current row
-            DiagonalScalar d = getDiag(y[k]) * m_shiftScale + m_shiftOffset;
-            y[k]             = Scalar(0); // Reset Y(k)
+                                             // Process a chunk of tasks
+                                             for (size_t task_idx = start_idx; task_idx < end_idx; ++task_idx) {
+                                                 const auto &[k] = tasks[task_idx];
 
-            // SIMD on dense vector y, but avoid SIMD for sparse indices in Li
-            for (; top < size; ++top) {
-                Index  i  = pattern[top];
-                Scalar yi = y[i];
-                y[i]      = Scalar(0);
+                                                 y[k]                = Scalar(0);
+                                                 StorageIndex top    = size;
+                                                 tags[k]             = k;
+                                                 m_nonZerosPerCol[k] = 0;
 
-                Scalar l_ki = yi / getDiag(m_diag[i]);
+                                                 // Iterate over non-zero elements in column k
+                                                 for (typename CholMatrixType::InnerIterator it(ap, k); it; ++it) {
+                                                     StorageIndex i = it.index();
+                                                     if (i <= k) {
+                                                         y[i] += getSymm(it.value());
 
-                Index p2 = Lp[i] + m_nonZerosPerCol[i];
+                                                         Index len;
+                                                         for (len = 0; tags[i] != k; i = m_parent[i]) {
+                                                             pattern[len++] = i;
+                                                             tags[i]        = k;
+                                                         }
 
-                // Handle the sparse reductions using regular loops (since Li and Lx are not contiguous)
-                for (Index p = Lp[i]; p < p2; ++p) { y[Li[p]] -= getSymm(Lx[p]) * yi; }
+                                                         while (len > 0) { pattern[--top] = pattern[--len]; }
+                                                     }
+                                                 }
 
-                d -= getDiag(l_ki * getSymm(yi));
-                Li[p2] = k;
-                Lx[p2] = l_ki;
-                ++m_nonZerosPerCol[i];
-            }
+                                                 DiagonalScalar d = getDiag(y[k]) * m_shiftScale + m_shiftOffset;
+                                                 y[k]             = Scalar(0); // Reset y[k]
 
-            m_diag[k] = d;
-            if (d == RealScalar(0)) {
-                ok = false;
-                break;
-            }
-        }
+                                                 // SIMD on dense vector y, but avoid SIMD for sparse indices in Li
+                                                 for (; top < size; ++top) {
+                                                     Index  i  = pattern[top];
+                                                     Scalar yi = y[i];
+                                                     y[i]      = Scalar(0);
 
+                                                     Scalar l_ki = yi / getDiag(m_diag[i]);
+
+                                                     Index p2 = Lp[i] + m_nonZerosPerCol[i];
+
+                                                     // Sparse reductions
+                                                     for (Index p = Lp[i]; p < p2; ++p) {
+                                                         y[Li[p]] -= getSymm(Lx[p]) * yi;
+                                                     }
+
+                                                     d -= getDiag(l_ki * getSymm(yi));
+                                                     Li[p2] = k;
+                                                     Lx[p2] = l_ki;
+                                                     ++m_nonZerosPerCol[i];
+                                                 }
+
+                                                 std::lock_guard<std::mutex> lock(diag_mutex);
+                                                 m_diag[k] = d;
+                                                 if (d == RealScalar(0)) {
+                                                     ok = false;
+                                                     break;
+                                                 }
+                                             }
+                                         });
+
+        // Synchronize execution
+        stdexec::sync_wait(stdexec::when_all(bulk_sender));
         m_info              = ok ? Success : NumericalIssue;
         m_factorizationIsOk = true;
     }
 
+/*
+    template <typename Lhs, typename Rhs, int Mode, bool IsLower, bool IsRowMajor>
+    struct SparseSolveTriangular {
+        typedef typename Rhs::Scalar                                    Scalar;
+        typedef Eigen::internal::evaluator<Lhs>                         LhsEval;
+        typedef typename Eigen::internal::evaluator<Lhs>::InnerIterator LhsIterator;
+        typedef typename Lhs::Index                                     Index;
+
+        template <typename Scalar>
+        static typename std::enable_if<std::is_floating_point<Scalar>::value, bool>::type
+        is_exactly_zero(Scalar value) {
+            return std::abs(value) < std::numeric_limits<Scalar>::epsilon();
+        }
+
+        template <typename Scalar>
+        static typename std::enable_if<std::is_integral<Scalar>::value, bool>::type is_exactly_zero(Scalar value) {
+            return value == Scalar(0);
+        }
+
+        // Adding parallelism using stdexec for task execution
+        static void run(const Lhs &lhs, Rhs &other, Scalar regularizationFactor) {
+            LhsEval lhsEval(lhs);
+
+            std::mutex other_mutex;
+
+            // Iterate over columns sequentially (because of dependencies)
+            for (Index col = 0; col < other.cols(); ++col) {
+                if constexpr (IsRowMajor) {
+                    if constexpr (IsLower) {
+                        for (Index i = 0; i < lhs.rows(); ++i) {
+                            Scalar tmp       = other.coeff(i, col);
+                            Scalar lastVal   = 0;
+                            Index  lastIndex = 0;
+
+                            // Sequentially process LHS values up to the diagonal
+                            for (LhsIterator it(lhsEval, i); it; ++it) {
+                                lastVal   = it.value();
+                                lastIndex = it.index();
+                                if (lastIndex == i) break; // Stop at the diagonal
+                                tmp -= lastVal * other.coeff(lastIndex, col);
+                            }
+
+                            // Create a list of tasks for the remaining operations (after the diagonal)
+                            std::vector<LhsIterator> inner_tasks;
+                            for (LhsIterator it(lhsEval, i); it; ++it) {
+                                inner_tasks.push_back(it); // Push remaining tasks after diagonal
+                            }
+
+                            // Execute the remaining operations in parallel using stdexec
+                            auto bulk_sender = stdexec::bulk(
+                                stdexec::just(), inner_tasks.size(),
+                                [&inner_tasks, &tmp, &other, &lastVal, &lastIndex, &col](std::size_t idx) {
+                                    LhsIterator it = inner_tasks[idx];
+                                    lastVal        = it.value();
+                                    lastIndex      = it.index();
+                                    if (lastIndex != i) { tmp -= lastVal * other.coeff(lastIndex, col); }
+                                });
+
+                            stdexec::sync_wait(bulk_sender); // Ensure parallel tasks complete
+
+                            // Apply regularization and update result
+                            std::lock_guard<std::mutex> lock(other_mutex);
+                            if (Mode & Eigen::UnitDiag) {
+                                other.coeffRef(i, col) = tmp;
+                            } else {
+                                if (std::abs(lastVal) < regularizationFactor) {
+                                    lastVal = (lastVal >= 0 ? regularizationFactor : -regularizationFactor);
+                                }
+                                other.coeffRef(i, col) = tmp / lastVal;
+                            }
+                        }
+                    } else { // Upper triangular, row-major case
+                        for (Index i = lhs.rows() - 1; i >= 0; --i) {
+                            Scalar tmp  = other.coeff(i, col);
+                            Scalar l_ii = 0;
+
+                            LhsIterator it(lhsEval, i);
+
+                            // Process the diagonal element sequentially
+                            while (it && it.index() < i) ++it;
+                            if (!(Mode & Eigen::UnitDiag)) {
+                                eigen_assert(it && it.index() == i);
+                                l_ii = it.value(); // Update l_ii
+                                ++it;
+                            } else if (it && it.index() == i) {
+                                ++it;
+                            }
+
+                            // Parallelize the remaining operations
+                            std::vector<LhsIterator> inner_tasks;
+                            for (; it; ++it) { inner_tasks.push_back(it); }
+
+                            auto bulk_sender = stdexec::bulk(stdexec::just(), inner_tasks.size(),
+                                                             [&inner_tasks, &tmp, &other, &col](std::size_t idx) {
+                                                                 LhsIterator it = inner_tasks[idx];
+                                                                 tmp -= it.value() * other.coeff(it.index(), col);
+                                                             });
+
+                            stdexec::sync_wait(bulk_sender); // Ensure parallel tasks complete
+
+                            // Lock the mutex before updating shared memory (i.e., the other matrix)
+                            std::lock_guard<std::mutex> lock(other_mutex);
+                            if (Mode & Eigen::UnitDiag) {
+                                other.coeffRef(i, col) = tmp;
+                            } else {
+                                if (std::abs(l_ii) < regularizationFactor) {
+                                    l_ii = (l_ii >= 0 ? regularizationFactor : -regularizationFactor);
+                                }
+                                other.coeffRef(i, col) = tmp / l_ii;
+                            }
+                        }
+                    }
+                } else { // Column-major case
+                    if constexpr (IsLower) {
+                        for (Index i = 0; i < lhs.cols(); ++i) {
+                            Scalar &tmp = other.coeffRef(i, col);
+                            if (!is_exactly_zero(tmp)) {
+                                LhsIterator it(lhsEval, i);
+                                // Sequentially process LHS values up to the diagonal
+                                while (it && it.index() < i) ++it;
+
+                                if (!(Mode & Eigen::UnitDiag)) {
+                                    constexpr Scalar epsilon = Scalar(1e-12); // Regularization threshold
+                                    tmp /= (std::abs(it.value()) < epsilon) ? it.value() + epsilon : it.value();
+                                }
+                                if (it && it.index() == i) ++it;
+
+                                // Parallelize the remaining operations
+                                std::vector<LhsIterator> inner_tasks;
+                                for (; it; ++it) { inner_tasks.push_back(it); }
+
+                                auto bulk_sender = stdexec::bulk(stdexec::just(), inner_tasks.size(),
+                                                                 [&inner_tasks, &tmp, &other, &col](std::size_t idx) {
+                                                                     LhsIterator it = inner_tasks[idx];
+                                                                     other.coeffRef(it.index(), col) -= tmp * it.value();
+                                                                 });
+
+                                stdexec::sync_wait(bulk_sender); // Ensure parallel tasks complete
+                            }
+                        }
+                    } else { // Upper triangular, column-major case
+                        for (Index i = lhs.cols() - 1; i >= 0; --i) {
+                            Scalar &tmp = other.coeffRef(i, col);
+                            if (!is_exactly_zero(tmp)) {
+                                LhsIterator it(lhsEval, i);
+                                // Sequentially process LHS values up to the diagonal
+                                if (!(Mode & Eigen::UnitDiag)) {
+                                    constexpr Scalar epsilon = Scalar(1e-12); // Regularization threshold
+                                    while (it && it.index() != i) ++it;
+                                    tmp /= (std::abs(it.value()) < epsilon) ? it.value() + epsilon : it.value();
+                                }
+
+                                // Parallelize the remaining operations
+                                std::vector<LhsIterator> inner_tasks;
+                                for (; it && it.index() < i; ++it) { inner_tasks.push_back(it); }
+
+                                auto bulk_sender = stdexec::bulk(stdexec::just(), inner_tasks.size(),
+                                                                 [&inner_tasks, &tmp, &other, &col](std::size_t idx) {
+                                                                     LhsIterator it = inner_tasks[idx];
+                                                                     other.coeffRef(it.index(), col) -= tmp * it.value();
+                                                                 });
+
+                                stdexec::sync_wait(bulk_sender); // Ensure parallel tasks complete
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    };
+
+    // Dispatch to the correct specialization
+    template <typename Lhs, typename Rhs, int Mode>
+    void solveTriangular(const Lhs &lhs, Rhs &other, typename Lhs::Scalar regularizationFactor) const {
+        constexpr bool isLower    = (Mode & Eigen::Lower) != 0;
+        constexpr bool isRowMajor = (int(Lhs::Flags) & Eigen::RowMajorBit) != 0;
+
+        SparseSolveTriangular<Lhs, Rhs, Mode, isLower, isRowMajor>::run(lhs, other, regularizationFactor);
+    }
+*/
     template <int SrcMode_, int DstMode_, bool NonHermitian, typename MatrixType, int DstOrder>
     void
     permute_symm_to_symm(const MatrixType                                                                       &mat,

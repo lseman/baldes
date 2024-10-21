@@ -217,6 +217,8 @@ public:
         solver->factorizeMatrix(matrix);
     }
 
+    void reset() { solver->reset(); }
+
     Eigen::VectorXd solve(const Eigen::VectorXd &rhs) { return solver->solve(rhs); }
 
 private:
@@ -226,6 +228,7 @@ private:
         virtual void            factorizeMatrix(const Eigen::SparseMatrix<double, Eigen::ColMajor, int> &matrix) = 0;
         virtual Eigen::VectorXd solve(const Eigen::VectorXd &rhs)                                                = 0;
         virtual ~SolverBase() = default;
+        virtual void reset()   = 0;
     };
 
     template <typename Solver>
@@ -235,6 +238,7 @@ private:
             solver.factorizeMatrix(matrix);
         }
         Eigen::VectorXd solve(const Eigen::VectorXd &rhs) override { return solver.solve(rhs); }
+        void            reset() override { solver.reset(); }
     };
 
     SolverBase *solver;

@@ -261,6 +261,8 @@ struct Bucket {
 
     inline auto get_unextended_labels() {
         // Define the lambda once to ensure consistency between both branches
+        auto filtered_view = labels_vec | std::ranges::views::filter([](Label *label) { return !label->is_extended; });
+        /*
         auto filter_lambda = [](Label *label) { return !label->is_extended; };
 
         if (!labels_vec.empty()) {
@@ -271,6 +273,8 @@ struct Bucket {
             static std::pmr::vector<Label *> empty_vec{&pool};    // Use the same pool
             return empty_vec | std::views::filter(filter_lambda); // Same lambda applied to the empty case
         }
+        */
+        return filtered_view;
     }
     void clear() { labels_vec.clear(); }
 
