@@ -537,7 +537,7 @@ void BucketGraph::set_adjacency_list() {
 
     // Step 1: Compute the clusters using MST-based clustering
     MST    mst_solver(nodes, [&](int from, int to) { return this->getcij(from, to); });
-    double theta    = 0.5; // Experiment with different values of θ
+    double theta    = 1.0; // Experiment with different values of θ
     auto   clusters = mst_solver.cluster(theta);
 
     // Create a job-to-cluster mapping (cluster ID for each job/node)
@@ -583,12 +583,12 @@ void BucketGraph::set_adjacency_list() {
             double reverse_priority_value;
             if (job_to_cluster[node.id] == job_to_cluster[next_node.id]) {
                 // Higher priority if both nodes are in the same cluster
-                priority_value         = 1.0 + 1.E-5 * next_node.start_time; // Adjust weight for same-cluster priority
-                reverse_priority_value = 1.0 + 1.E-5 * next_node.start_time;      // Adjust weight for same-cluster priority
+                priority_value         = 5.0 + 1.E-5 * next_node.start_time; // Adjust weight for same-cluster priority
+                reverse_priority_value = 1.0 + 1.E-5 * node.start_time;      // Adjust weight for same-cluster priority
             } else {
                 // Lower priority for cross-cluster arcs
                 priority_value         = 1.0 + 1.E-5 * next_node.start_time; // Higher base value for cross-cluster arcs
-                reverse_priority_value = 1.0 + 1.E-5 * next_node.start_time;      // Higher base value for cross-cluster arcs
+                reverse_priority_value = 5.0 + 1.E-5 * node.start_time;      // Higher base value for cross-cluster arcs
             }
 
             best_arcs.emplace_back(priority_value, next_node.id, res_inc, cost_inc); // Store the forward arc

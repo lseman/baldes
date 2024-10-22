@@ -26,6 +26,9 @@ endif()
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
 
+# set cuda standard to 17
+set(CMAKE_CUDA_STANDARD 17)
+
 # Enable Interprocedural Optimization (Link Time Optimization)
 set(CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE ON)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
@@ -297,11 +300,8 @@ endif()
 set(GUROBI_HOME $ENV{GUROBI_HOME})
 include_directories(${GUROBI_HOME}/include)
 
-set(CMAKE_CUDA_STANDARD 17)
-set(CMAKE_CUDA_STANDARD_REQUIRED TRUE)
-
 # Source files
-set(SOURCES src/BucketGraph.cpp src/MIPHandler.cpp)
+set(SOURCES src/BucketGraph.cpp src/MIPHandler.cpp include/algebra/LDLT.cu)
 
 set(CVRPSEP_SOURCES
     src/RCC.cpp
@@ -540,3 +540,6 @@ if (CHOLMOD)
   include_directories(/usr/include/suitesparse/)
   target_link_libraries(vrptw PRIVATE cholmod)
 endif()
+
+# include /opt/cuda/targets/x86_64-linux/include/cuda_runtime.h
+target_include_directories(vrptw PRIVATE /opt/cuda/targets/x86_64-linux/include)

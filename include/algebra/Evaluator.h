@@ -3,6 +3,64 @@
 #include <Eigen/SparseCholesky>
 #include <queue>
 
+
+template <typename MatrixType>
+class CustomMatIterator {
+public:
+    using Scalar = typename MatrixType::Scalar;
+    using StorageIndex = typename MatrixType::StorageIndex;
+
+    // Constructor: takes the matrix and the column to iterate over
+    CustomMatIterator(const MatrixType& mat, StorageIndex col)
+        : matrix_(mat),
+          outerIndex_(matrix_.outerIndexPtr()[col]),  // Start of the column in outer index
+          end_(matrix_.outerIndexPtr()[col + 1]),    // End of the column in outer index
+          innerIndex_(matrix_.innerIndexPtr() + outerIndex_),  // Inner indices start for the column
+          valuePtr_(matrix_.valuePtr() + outerIndex_)  // Non-zero values start for the column
+    {}
+
+    // Moves to the next non-zero element
+    CustomMatIterator& operator++() {
+        ++outerIndex_;
+        ++innerIndex_;
+        ++valuePtr_;
+
+        // Prefetch a few steps ahead to improve cache performance
+        __builtin_prefetch(innerIndex_ + 4);
+        __builtin_prefetch(valuePtr_ + 4);
+
+        return *this;
+    }
+
+    // Returns true if there are more elements in the current column
+    operator bool() const {
+        return outerIndex_ < end_;
+    }
+
+    // Access to the current non-zero element's row index
+    StorageIndex row() const {
+        return *innerIndex_;
+    }
+
+    // Access to the current non-zero element's value
+    Scalar value() const {
+        return *valuePtr_;
+    }
+
+    // Access to the current element's index
+    StorageIndex index() const {
+        return *innerIndex_;
+    }
+
+private:
+    const MatrixType& matrix_;   // Reference to the matrix
+    StorageIndex outerIndex_;    // Current element in the column
+    StorageIndex end_;           // End of the current column
+    const StorageIndex* innerIndex_; // Pointer to the current inner index
+    const Scalar* valuePtr_;         // Pointer to the current value
+};
+
+
 template <typename Lhs, typename Rhs, int Mode, bool IsLower, bool IsRowMajor>
 struct SparseSolveTriangular {
     typedef typename Rhs::Scalar                                    Scalar;

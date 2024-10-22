@@ -767,7 +767,7 @@ void BucketGraph::bucket_fixing() {
 
         run_labeling_algorithms<Stage::Four, Full::Full>(forward_cbar, backward_cbar);
 
-        gap = incumbent - (relaxation + std::min(0.0, min_red_cost));
+        gap = std::ceil(incumbent - (relaxation + std::min(0.0, min_red_cost)));
 
         // check if gap is -inf and early exit, due to IPM
         if (gap < 0) {

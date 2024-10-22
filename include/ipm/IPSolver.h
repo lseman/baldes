@@ -19,10 +19,6 @@
 // #include "CuSolver.h"
 #include "LDLT.h"
 
-#ifdef CHOLMOD
-#include "cholmod.h"
-#endif
-
 /**
  * @struct OptimizationData
  * @brief A structure to hold data for an optimization problem.
@@ -70,100 +66,6 @@ OptimizationData extractOptimizationComponents(GRBModel &model);
 #endif
 OptimizationData convertToOptimizationData(const ModelData &modelData);
 
-#ifdef CHOLMOD
-/**
- * @class CholmodSolver
- * @brief A solver class that utilizes CHOLMOD for sparse matrix factorization and solving linear systems.
- *
- * This class provides an interface to the CHOLMOD library for performing sparse matrix factorization
- * and solving linear systems using the factorized matrix. It supports both GPU and CPU computations.
- *
- * @note This class requires Eigen library for matrix and vector representations.
- */
-class CholmodSolver {
-public:
-    cholmod_common  c;
-    cholmod_factor *L;
-    cholmod_dense  *X = NULL, *Y = NULL, *E = NULL;
-    bool            firstFactorization = true;
-
-    CholmodSolver() {
-        cholmod_start(&c);
-        c.useGPU             = 0;
-        c.nmethods           = 1;
-        c.method[0].ordering = CHOLMOD_METIS;
-        c.postorder          = true;
-
-#ifdef AUGMENTED
-        c.supernodal = CHOLMOD_SIMPLICIAL;
-#else
-        c.supernodal = CHOLMOD_SUPERNODAL;
-#endif
-
-        L = nullptr;
-    }
-
-    ~CholmodSolver() {
-        if (L) { cholmod_free_factor(&L, &c); }
-        cholmod_finish(&c);
-    }
-
-    void factorizeMatrix(const Eigen::SparseMatrix<double, Eigen::RowMajor, int> &matrix) {
-        cholmod_sparse *A = viewAsCholmod(matrix);
-
-        if (firstFactorization) {
-            if (L) { cholmod_free_factor(&L, &c); }
-            L                  = cholmod_analyze(A, &c);
-            firstFactorization = false;
-        }
-
-        cholmod_factorize(A, L, &c);
-    }
-
-    Eigen::VectorXd solve(const Eigen::VectorXd &rhs) {
-        cholmod_dense *b = viewAsCholmod(rhs);
-        cholmod_solve2(CHOLMOD_A, L, b, NULL, &X, NULL, &Y, &E, &c);
-        Eigen::VectorXd result = viewAsEigen(X);
-        return result;
-    }
-
-private:
-    static cholmod_sparse *viewAsCholmod(const Eigen::SparseMatrix<double, Eigen::RowMajor, int> &matrix) {
-        cholmod_sparse *result = new cholmod_sparse;
-        result->nrow           = matrix.rows();
-        result->ncol           = matrix.cols();
-        result->p              = const_cast<int *>(matrix.outerIndexPtr());
-        result->i              = const_cast<int *>(matrix.innerIndexPtr());
-        result->x              = const_cast<double *>(matrix.valuePtr());
-        result->z              = nullptr;
-        result->stype          = -1;
-        result->itype          = CHOLMOD_INT;
-        result->xtype          = CHOLMOD_REAL;
-        result->dtype          = CHOLMOD_DOUBLE;
-        result->sorted         = 1;
-        result->packed         = 1;
-        return result;
-    }
-
-    static cholmod_dense *viewAsCholmod(const Eigen::VectorXd &vector) {
-        cholmod_dense *result = new cholmod_dense;
-        result->nrow          = vector.size();
-        result->ncol          = 1;
-        result->nzmax         = vector.size();
-        result->d             = vector.size();
-        result->x             = const_cast<double *>(vector.data());
-        result->z             = nullptr;
-        result->xtype         = CHOLMOD_REAL;
-        result->dtype         = CHOLMOD_DOUBLE;
-        return result;
-    }
-
-    static Eigen::VectorXd viewAsEigen(cholmod_dense *vectorPtr) {
-        return Eigen::VectorXd::Map(reinterpret_cast<double *>(vectorPtr->x), vectorPtr->nrow);
-    }
-};
-#endif
-
 /**
  * @class SparseSolver
  * @brief A class for solving sparse linear systems using various solver types.
@@ -186,28 +88,15 @@ public:
     bool                        firstFactorization = true;
 
     enum SolverType {
-#ifdef CHOLMOD
-        CH,
-#endif
         LDLT,
-        // CU
     };
 
-    // SparseSolver() { solver = new SolverWrapper<CholmodSolver>(); }
-
-#ifdef CHOLMOD
-    SparseSolver(SolverType type = CH) {
-#else
     SparseSolver(SolverType type = LDLT) {
-#endif
         switch (type) {
-#ifdef CHOLMOD
-        case CH: solver = new SolverWrapper<CholmodSolver>(); break;
-#endif
         case LDLT:
-            solver = new SolverWrapper<LDLTSolver>();
+            solver = new SolverWrapper<
+                Eigen::CustomSimplicialLDLT<Eigen::SparseMatrix<double>, Eigen::Lower, Eigen::AMDOrdering<int>>>();
             break;
-            // case CU: solver = new SolverWrapper<CuSolver>(); break;
         }
     }
 
@@ -219,6 +108,8 @@ public:
 
     void reset() { solver->reset(); }
 
+    int info() { return solver->info(); }
+
     Eigen::VectorXd solve(const Eigen::VectorXd &rhs) { return solver->solve(rhs); }
 
 private:
@@ -228,7 +119,8 @@ private:
         virtual void            factorizeMatrix(const Eigen::SparseMatrix<double, Eigen::ColMajor, int> &matrix) = 0;
         virtual Eigen::VectorXd solve(const Eigen::VectorXd &rhs)                                                = 0;
         virtual ~SolverBase() = default;
-        virtual void reset()   = 0;
+        virtual void reset()  = 0;
+        virtual int  info()   = 0;
     };
 
     template <typename Solver>
@@ -239,6 +131,7 @@ private:
         }
         Eigen::VectorXd solve(const Eigen::VectorXd &rhs) override { return solver.solve(rhs); }
         void            reset() override { solver.reset(); }
+        int             info() override { return solver.info(); }
     };
 
     SolverBase *solver;
@@ -284,6 +177,18 @@ public:
     // create default constructor
     IPSolver() {}
     Eigen::SparseMatrix<double> convertToSparseDiagonal(const Eigen::VectorXd &vec);
+
+    
+    void save_interior_solution(const Eigen::VectorXd &x, const Eigen::VectorXd &lambda, const Eigen::VectorXd &s,
+                                const Eigen::VectorXd &v, const Eigen::VectorXd &w, double tau, double kappa) {
+        x_old                   = x;
+        lambda_old              = lambda;
+        s_old                   = s;
+        v_old                   = v;
+        w_old                   = w;
+        tau_old                 = tau;
+        kappa_old               = kappa;
+    }
 
     // Method to convert the given linear programming problem to standard form
     void convert_to_standard_form(const Eigen::SparseMatrix<double> &A, const Eigen::VectorXd &b,
@@ -342,8 +247,8 @@ public:
     OptimizationData convertToOptimizationData(const ModelData &modelData);
 
     // Method to update the linear solver with new theta and regularization parameters
-    void update_linear_solver(SparseSolver &ls, const Eigen::VectorXd &theta, const Eigen::VectorXd &regP,
-                              const Eigen::VectorXd &regD);
+    int update_linear_solver(SparseSolver &ls, const Eigen::VectorXd &theta, const Eigen::VectorXd &regP,
+                             const Eigen::VectorXd &regD);
 
     // Method to start the linear solver by initializing necessary data structures and performing factorization
     void start_linear_solver(SparseSolver &ls, const Eigen::SparseMatrix<double> A);

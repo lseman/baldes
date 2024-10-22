@@ -539,7 +539,7 @@ public:
         BucketGraph bucket_graph(nodes, time_horizon, bucket_interval);
         bucket_graph.set_distance_matrix(instance.getDistanceMatrix(), 8);
         bucket_graph.branching_duals = &branchingDuals;
-        bucket_graph.A_MAX           = N_SIZE; // * 0.3;
+        bucket_graph.A_MAX           = N_SIZE;
 
         matrix                 = node->extractModelDataSparse();
         auto integer_solution  = node->getObjVal();
@@ -555,7 +555,7 @@ public:
         std::vector<double> cutDuals;
         std::vector<double> nodeDuals = node->getDuals();
         bucket_graph.setDuals(nodeDuals);
-        auto                sizeDuals = nodeDuals.size();
+        auto sizeDuals = nodeDuals.size();
 
         double lp_obj_dual = 0.0;
         double lp_obj      = node->getObjVal();
@@ -659,7 +659,7 @@ public:
                             print_info("No violated cuts found, calling it a day\n");
                             break;
                         } else {
-                            auto new_relaxation = std::min(bucket_graph.A_MAX + 5, N_SIZE);
+                            auto new_relaxation = std::min(bucket_graph.A_MAX + 10, N_SIZE);
                             print_info("Increasing A_MAX to {}\n", new_relaxation);
                             bucket_graph.A_MAX = new_relaxation;
 
@@ -690,19 +690,20 @@ public:
 #endif
 
 #ifdef IPM
-            auto d = 0.1;
-            matrix = node->extractModelDataSparse();
-            gap    = std::abs(lp_obj - (lp_obj + std::min(0.0, inner_obj))) / std::abs(lp_obj);
-            gap    = gap / d;
-            if (std::isnan(gap)) { gap = 1e-1; }
-            if (std::signbit(gap)) { gap = 1e-1; }
-            if (gap > 1e-1) { gap = 1e-1; }
-            if (gap < 1e-6) { gap = 1e-6; }
-            // gap = 1e-2;
-            //  print gap
-            //  auto start_time_ipm = std::chrono::high_resolution_clock::now();
+            auto d                 = 0.1;
+            matrix                 = node->extractModelDataSparse();
+            double obj_change      = std::abs(lp_obj - inner_obj);
+            double adaptive_factor = std::min(1.0, std::max(1e-1, obj_change / std::abs(lp_obj + 1e-6)));
 
+            // Compute gap based on current objective difference and adaptive factor
+            gap = std::abs(lp_obj - (lp_obj + std::min(0.0, inner_obj))) / std::abs(lp_obj + 1e-6);
+            gap = (gap / d) * adaptive_factor;
+
+            // Enforce upper and lower bounds on gap
+            if (std::isnan(gap) || std::signbit(gap)) { gap = 1e-1; }
+            gap = std::clamp(gap, 1e-8, 1e-1); // Clamping gap to be between 1e-6 and 1e-2
             solver.run_optimization(matrix, gap);
+
             // auto end_time_ipm = std::chrono::high_resolution_clock::now();
 
             // Calculate duration in microseconds

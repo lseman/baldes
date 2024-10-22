@@ -11,6 +11,7 @@
 #include <vector>
 
 #include "ipm/IPSolver.h"
+#include "ipm/MaxVolume.h"
 
 /**
  * @brief Converts a dense vector to a sparse diagonal matrix.
@@ -38,9 +39,9 @@ void IPSolver::convert_to_standard_form(const Eigen::SparseMatrix<double> &A, co
                                         const Eigen::VectorXd &c, const Eigen::VectorXd &lb, const Eigen::VectorXd &ub,
                                         const Eigen::VectorXd &sense, Eigen::SparseMatrix<double> &As,
                                         Eigen::VectorXd &bs, Eigen::VectorXd &cs) {
-    const double infty = std::numeric_limits<double>::infinity();
-    const int    n     = A.rows();
-    const int    m     = A.cols();
+    constexpr double infty = std::numeric_limits<double>::infinity();
+    const int        n     = A.rows();
+    const int        m     = A.cols();
 
     if (b.size() != n || c.size() != m) {
         fmt::print("b.size(): {}, n: {}, c.size(): {}, m: {}\n", b.size(), n, c.size(), m);
@@ -395,7 +396,7 @@ void IPSolver::run_optimization(ModelData &model, const double tol) {
     Eigen::VectorXd x      = Eigen::VectorXd::Ones(n);
     Eigen::VectorXd lambda = Eigen::VectorXd::Zero(m);
     Eigen::VectorXd s      = Eigen::VectorXd::Ones(n);
-    /*
+
     if (x_old.size() > 0 && warm_start) {
         int nv_old = x_old.size(); // Original number of variables
         int nv_new = x.size();     // New number of variables
@@ -409,7 +410,7 @@ void IPSolver::run_optimization(ModelData &model, const double tol) {
 
         lambda.head(N_SIZE - 1) = lambda_old.head(N_SIZE - 1);
     }
-    */
+
     warm_start   = false;
     n_slacks_old = n_slacks;
     // initialize ubi and ubv as empty vectors
@@ -490,7 +491,14 @@ void IPSolver::run_optimization(ModelData &model, const double tol) {
     Eigen::ArrayXd  t_xs_lower, t_xs_upper, t_vw_lower, t_vw_upper;
     // Delta calculations
     double delta_0, bl_dot_lambda, correction;
-    bool   saved_interior_solution = false;
+    bool   saved_interior_solution_bool = false;
+
+    // Initialize the ADMM variables
+    Eigen::VectorXd z           = Eigen::VectorXd::Zero(n); // Auxiliary variable for ADMM
+    Eigen::VectorXd lambda_admm = Eigen::VectorXd::Zero(n); // Dual variable for ADMM
+
+    double rho = 1.0; // Penalty parameter for ADMM
+
     for (int k = 0; k < max_iter; ++k) {
         // fmt::print("Iteration {}\n", k);
         //  Zero the necessary variables
@@ -530,23 +538,15 @@ void IPSolver::run_optimization(ModelData &model, const double tol) {
         double bl_dot_lambda = b.dot(lambda) - ubv.dot(w);
         _g                   = std::abs(c.dot(x) - bl_dot_lambda) / (tau + std::abs(bl_dot_lambda));
 
-        /*
         if (k % 5 == 0 || (k == max_iter - 1)) {
             // Save intermediate solution every 5 iterations or at the last iteration
             // Save only if the current solution is reasonably "central"
-            if (!saved_interior_solution && (_g <= tol * 2)) {
-                x_old                   = x;
-                lambda_old              = lambda;
-                s_old                   = s;
-                v_old                   = v;
-                w_old                   = w;
-                tau_old                 = tau;
-                kappa_old               = kappa;
-                saved_interior_solution = true;
+            if (!saved_interior_solution_bool && (_g <= tol * 2)) {
+                save_interior_solution(x, lambda, w, s, v, tau, kappa);
+                saved_interior_solution_bool = true;
                 warm_start              = true;
             }
         }
-        */
 
         // Check for optimality and infeasibility
         if (_p <= 1e-10 && _d <= 1e-10 && _g <= tol) { break; }
@@ -561,19 +561,19 @@ void IPSolver::run_optimization(ModelData &model, const double tol) {
         regG = std::max(r_min, regG / 10.0);
 
         // Factorization with retries
-        for (int attempt = 0; attempt < 5; ++attempt) {
-            try {
-                // fmt::print("Attempt {}\n", attempt);
-                update_linear_solver(ls, theta_xs, regP, regD);
+        for (int attempt = 0; attempt < 3; ++attempt) {
+            // fmt::print("Attempt {}\n", attempt);
+            auto update_status = update_linear_solver(ls, theta_xs, regP, regD);
+
+            if (update_status == 0) {
                 break;
-            } catch (std::runtime_error &) {
+            } else {
                 regP *= 100.0;
                 regD *= 100.0;
                 regG *= 100.0;
             }
         }
 
-        // update_linear_solver(ls, theta_xs, regP, regD);
 
         // Solve the augmented system
         solve_augsys(delta_x, delta_y, delta_z, ls, theta_vw, ubi, b, c, ubv);
@@ -669,6 +669,7 @@ void IPSolver::run_optimization(ModelData &model, const double tol) {
         w += alpha * Delta_w;
         tau += alpha * Delta_tau;
         kappa += alpha * Delta_kappa;
+        // maxVolume.RunIPM(A, x, lambda, s, v, w, ubi, ubv, tau, kappa);
     }
 
     int    free_var = 0;
@@ -817,8 +818,8 @@ OptimizationData IPSolver::convertToOptimizationData(const ModelData &modelData)
     return optData;
 }
 
-void IPSolver::update_linear_solver(SparseSolver &ls, const Eigen::VectorXd &theta, const Eigen::VectorXd &regP,
-                                    const Eigen::VectorXd &regD) {
+int IPSolver::update_linear_solver(SparseSolver &ls, const Eigen::VectorXd &theta, const Eigen::VectorXd &regP,
+                                   const Eigen::VectorXd &regD) {
     // Update internal data
     ls.theta = theta;
     ls.regP  = regP;
@@ -835,6 +836,8 @@ void IPSolver::update_linear_solver(SparseSolver &ls, const Eigen::VectorXd &the
 
     // Refactorize
     ls.factorizeMatrix(ls.S);
+
+    return ls.info();
 
 #else
 
