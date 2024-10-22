@@ -6,6 +6,8 @@ namespace numericutils {
     // Define the epsilon value for floating-point comparisons
     constexpr double eps = 1e-6;
 
+    constexpr double half = 0.5;
+
     // Define a function to compare two floating-point values within a threshold
     inline bool compare_within_threshold(double a, double b, double threshold = eps) {
         return std::abs(a - b) < threshold;

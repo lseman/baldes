@@ -10,7 +10,7 @@ private:
         try {
             env.set(GRB_IntParam_OutputFlag, 0); // Set default parameters, if needed
             // set method
-            env.set(GRB_IntParam_Method, 2);
+            // env.set(GRB_IntParam_Method, 2);
             // set gurobi multicore
             env.set(GRB_IntParam_Threads, std::thread::hardware_concurrency());
 

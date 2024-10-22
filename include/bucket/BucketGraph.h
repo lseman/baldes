@@ -296,9 +296,6 @@ public:
 
     std::pmr::unsynchronized_pool_resource label_pool_memory_resource;
 
-    // std::shared_ptr<ThreadPool> fw_thread_pool = std::make_shared<ThreadPool>(1);
-    // std::shared_ptr<ThreadPool> bw_thread_pool = std::make_shared<ThreadPool>(1);
-
     std::thread rih_thread;
     std::mutex  mtx; // For thread-safe access to merged_labels_improved
     //
