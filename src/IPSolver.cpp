@@ -11,7 +11,6 @@
 #include <vector>
 
 #include "ipm/IPSolver.h"
-#include "ipm/MaxVolume.h"
 
 /**
  * @brief Converts a dense vector to a sparse diagonal matrix.
@@ -549,7 +548,7 @@ void IPSolver::run_optimization(ModelData &model, const double tol) {
         }
 
         // Check for optimality and infeasibility
-        if (_p <= 1e-10 && _d <= 1e-10 && _g <= tol) { break; }
+        if (_d <= 1e-10 && _g <= tol) { break; }
         // Scaling factors
         theta_vw = w.cwiseQuotient(v);
         theta_xs = s.cwiseQuotient(x);

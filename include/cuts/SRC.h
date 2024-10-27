@@ -33,6 +33,7 @@
 
 #include <unordered_set>
 
+#include "SRCHelper.h"
 // #include "xxhash.h"
 
 #include "RNG.h"
@@ -89,9 +90,19 @@ public:
     std::vector<CachedCut> cutCache4;
     std::vector<CachedCut> cutCache5;
 
-    Xoroshiro128Plus rp; // Seed it (you can change the seed)
+    Xoroshiro128Plus      rp; // Seed it (you can change the seed)
+    HighDimCutsGenerator *generator = new HighDimCutsGenerator(N_SIZE, 5, 1e-6);
 
+    void setDistanceMatrix(const std::vector<std::vector<double>> &distances) {
+        generator->cost_mat4_vertex = distances;
+        generator->generateSepHeurMem4Vertex();
+    }
     LimitedMemoryRank1Cuts(std::vector<VRPNode> &nodes);
+
+    void setDuals(const std::vector<double> &duals) {
+        // print nodes.size
+        for (size_t i = 1; i < N_SIZE - 1; ++i) { nodes[i].setDuals(duals[i - 1]); }
+    }
 
     // default constructor
     LimitedMemoryRank1Cuts() = default;
@@ -138,7 +149,7 @@ public:
 
     std::vector<int> the45selectedNodes;
     void             prepare45Heuristic(const SparseMatrix &A, const std::vector<double> &x) {
-        int max_important_nodes = 10;
+        int max_important_nodes = 20;
         the45selectedNodes      = selectHighestCoefficients(x, max_important_nodes);
     }
 
@@ -176,25 +187,33 @@ inline std::vector<SRCPermutation> getPermutationsForSize5() {
     std::vector<std::vector<int>> p_num = {{1, 1, 1, 1, 1}, {1, 1, 1, 1, 1}, {3, 1, 1, 1, 1}, {3, 2, 2, 1, 1},
                                            {2, 2, 1, 1, 1}, {3, 3, 2, 2, 1}, {2, 2, 2, 1, 1}};
     std::vector<int>              p_dem = {2, 3, 4, 5, 4, 4, 3};
+    /*
+    std::vector<std::vector<double>> p_frac = {
+        {1.0 / 2.0, 1.0 / 2.0, 1.0 / 2.0, 1.0 / 2.0, 1.0 / 2.0}, // {1, 1, 1, 1, 1} / 2
+        {1.0 / 3.0, 1.0 / 3.0, 1.0 / 3.0, 1.0 / 3.0, 1.0 / 3.0}, // {1, 1, 1, 1, 1} / 3
+        {3.0 / 4.0, 1.0 / 4.0, 1.0 / 4.0, 1.0 / 4.0, 1.0 / 4.0}, // {3, 1, 1, 1, 1} / 4
+        {3.0 / 5.0, 2.0 / 5.0, 2.0 / 5.0, 1.0 / 5.0, 1.0 / 5.0}, // {3, 2, 2, 1, 1} / 5
+        {2.0 / 4.0, 2.0 / 4.0, 1.0 / 4.0, 1.0 / 4.0, 1.0 / 4.0}, // {2, 2, 1, 1, 1} / 4
+        {3.0 / 4.0, 3.0 / 4.0, 2.0 / 4.0, 2.0 / 4.0, 1.0 / 4.0}, // {3, 3, 2, 2, 1} / 4
+        {2.0 / 3.0, 2.0 / 3.0, 2.0 / 3.0, 1.0 / 3.0, 1.0 / 3.0}  // {2, 2, 2, 1, 1} / 3
+    };
+    */
 
     // random get 10 p_num vectors, and create 10 SRCPermutation vectors with shufle p_num[i] and the same p_dem
     // Shuffle indices to randomly access p_num and p_dem
-    int              permutation_count = p_num.size();
-    std::vector<int> indices(permutation_count);
-    std::iota(indices.begin(), indices.end(), 0); // Fill indices with 0, 1, 2, ..., permutation_count-1
-                                                  //
-    Xoroshiro128Plus rng;                         // Seed it (you can change the seed)
-
-    // Shuffle the indices to access random p_num and p_dem vectors
-    std::shuffle(indices.begin(), indices.end(), rng);
+    int              permutation_count = 10;
+    Xoroshiro128Plus rng; // Seed it (you can change the seed)
 
     for (int i = 0; i < permutation_count; ++i) { // Get 10 random p_num vectors
         SRCPermutation perm;
 
+        // generate random number from 0 to p_frac.size()
+        auto random_index = rng() % p_num.size();
+
         // Use shuffled index to randomly select p_num and p_dem vectors
-        int random_index = indices[i];
-        perm.num         = p_num[random_index];
-        perm.den         = p_dem[random_index];
+        // int random_index = indices[i];
+        perm.num = p_num[random_index];
+        perm.den = p_dem[random_index];
 
         // Optionally shuffle perm.num again if you want to shuffle within the vector
         std::shuffle(perm.num.begin(), perm.num.end(), rng);
@@ -214,18 +233,20 @@ inline std::vector<SRCPermutation> getPermutationsForSize5() {
  *
  */
 inline std::vector<SRCPermutation> getPermutationsForSize4() {
-    std::vector<SRCPermutation> permutations;
-    std::vector<int>            p_num = {2, 1, 1, 1};
-    int                         p_den = 3;
+    std::vector<SRCPermutation>   permutations;
+    std::vector<std::vector<int>> p_num = {{2, 1, 1, 1}, {1, 2, 1, 1}, {1, 1, 2, 1}, {1, 1, 1, 2}};
+    int                           p_den = 3;
+    // std::vector<double> p_frac = {2.0 / 3.0, 1.0 / 3.0, 1.0 / 3.0, 1.0 / 3.0};
 
     Xoroshiro128Plus rng; // Seed it (you can change the seed)
 
     // random permute p_num and create 4 SRCPermutation vectors
     for (int i = 0; i < 4; ++i) {
         SRCPermutation perm;
-        perm.num = p_num;
-        std::shuffle(perm.num.begin(), perm.num.end(), rng);
+        perm.num = p_num[i];
         perm.den = p_den;
+        // std::shuffle(perm.frac.begin(), perm.frac.end(), rng);
+        //  perm.den = p_den;
         permutations.push_back(perm);
     }
 
@@ -319,9 +340,9 @@ inline uint64_t hashVector(const std::vector<double> &vec) {
  */
 template <CutType T>
 void LimitedMemoryRank1Cuts::the45Heuristic(const SparseMatrix &A, const std::vector<double> &x) {
-    int    max_number_of_cuts  = 10; // Max number of cuts to generate
+    int    max_number_of_cuts  = 2; // Max number of cuts to generate
     double violation_threshold = 1e-3;
-    int    max_generated_cuts  = 15;
+    int    max_generated_cuts  = 30;
 
     auto &selectedNodes = the45selectedNodes;
     // Ensure selectedNodes is valid
@@ -337,9 +358,9 @@ void LimitedMemoryRank1Cuts::the45Heuristic(const SparseMatrix &A, const std::ve
     // int seed = std::chrono::system_clock::now().time_since_epoch().count(); // Use current time as a seed
 
     Xoroshiro128Plus rng; // Seed it (you can change the seed)
-    if (permutations.size() > 4) {
+    if (permutations.size() > 10) {
         // Use std::shuffle with the Xoroshiro128Plus generator
-        permutations.resize(4);
+        permutations.resize(10);
     }
 
     ankerl::unordered_dense::set<uint64_t> processedSetsCache;
@@ -379,11 +400,8 @@ void LimitedMemoryRank1Cuts::the45Heuristic(const SparseMatrix &A, const std::ve
 
         std::vector<std::vector<int>> setsOf45;
 
-        if constexpr (T == CutType::FourRow) {
-            combinations(consumer, 4, 10, setsOf45);
-        } else if constexpr (T == CutType::FiveRow) {
-            combinations(consumer, 5, 10, setsOf45);
-        }
+        constexpr int combination_size = (T == CutType::FourRow) ? 4 : 5;
+        combinations(consumer, combination_size, 20, setsOf45);
 
         for (auto set45 : setsOf45) {
             // Emplace the task id and its setsOf45 into the task_data vector
@@ -395,12 +413,11 @@ void LimitedMemoryRank1Cuts::the45Heuristic(const SparseMatrix &A, const std::ve
     auto bulk_sender = stdexec::bulk(
         stdexec::just(), (task_data.size() + chunk_size - 1) / chunk_size, // Calculate number of chunks
         [this, &permutations, &processedSetsCache, &processedPermutationsCache, &cuts_mutex, &x, &selectedNodes,
-         &cutQueue, &max_number_of_cuts, &max_generated_cuts, violation_threshold, &task_data,
-         &cuts_count](std::size_t chunk_idx) {
+         &cutQueue, &max_number_of_cuts, &max_generated_cuts, violation_threshold, &task_data, &cuts_count,
+         &rng](std::size_t chunk_idx) {
             // Calculate the start and end index for this chunk
-            size_t           start_idx = chunk_idx * chunk_size;
-            size_t           end_idx   = std::min(start_idx + chunk_size, task_data.size());
-            Xoroshiro128Plus rng; // Seed it (you can change the seed)
+            size_t start_idx = chunk_idx * chunk_size;
+            size_t end_idx   = std::min(start_idx + chunk_size, task_data.size());
 
             // Process each task in the chunk
             for (size_t idx = start_idx; idx < end_idx; ++idx) {
@@ -443,7 +460,8 @@ void LimitedMemoryRank1Cuts::the45Heuristic(const SparseMatrix &A, const std::ve
                     int ordering = 0;
                     for (auto node : set45) {
                         AM[node >> 6] |= (1ULL << (node & 63)); // Set the bit for node in AM
-                        order[node] = ordering++;
+                        order[node] = ordering;
+                        ordering++;
                     }
 
                     std::fill(coefficients_aux.begin(), coefficients_aux.end(), 0.0);
@@ -455,17 +473,28 @@ void LimitedMemoryRank1Cuts::the45Heuristic(const SparseMatrix &A, const std::ve
                         // if (selectedNodes[j] == selectedNodes[task_idx]) {}
                         auto &consumer_inner = allPaths[selectedNodes[j]].route;
 
-                        int max_limit = (T == CutType::FourRow) ? 3 : 4;
+                        int              max_limit   = (T == CutType::FourRow) ? 3 : 4;
+                        int              match_count = 0;
+                        std::vector<int> match_indices;
 
-                        int match_count = 0;
-                        for (auto &node : set45) {
-                            if (std::ranges::find(consumer_inner, node) != consumer_inner.end()) {
+                        for (int i = 0; i < consumer_inner.size(); ++i) {
+                            if (std::ranges::find(set45, consumer_inner[i]) != set45.end()) {
+                                match_indices.push_back(i);
                                 if (++match_count == max_limit) { break; }
                             }
                         }
 
-                        if (match_count < max_limit) continue;
-                        for (auto c : consumer_inner) { AM[c >> 6] |= (1ULL << (c & 63)); }
+                        if (match_count < max_limit) continue; // Skip if not enough matches
+
+                        // Extract elements between the first and last match indices
+                        int start_idx = match_indices.front();
+                        int end_idx   = match_indices.back();
+
+                        for (int i = start_idx; i <= end_idx; ++i) {
+                            AM[consumer_inner[i] >> 6] |= (1ULL << (consumer_inner[i] & 63));
+                        }
+                        for (auto c : set45) { AM[c >> 6] |= (1ULL << (c & 63)); }
+
                         double alpha_inner = computeLimitedMemoryCoefficient(baseSet, AM, p, consumer_inner, order);
                         alpha += alpha_inner;
 
@@ -474,128 +503,8 @@ void LimitedMemoryRank1Cuts::the45Heuristic(const SparseMatrix &A, const std::ve
                         if (alpha > rhs + violation_threshold) { violation_found = true; }
 
                         if (violation_found) {
-                            std::bitset<N_SIZE> minimal_bitset;
-
-                            // Function to check if removing a set of nodes still results in a violation
-                            auto is_violation = [&](const std::bitset<N_SIZE> &removal_set) -> bool {
-                                std::array<uint64_t, num_words> tempAM = AM; // Use direct initialization
-
-                                // Temporarily remove all nodes in removal_set from tempAM
-                                for (int i = 0; i < N_SIZE; ++i) {
-                                    if (removal_set[i]) {
-                                        tempAM[i >> 6] &= ~(1ULL << (i & 63)); // Use bit operations to unset nodes
-                                    }
-                                }
-
-                                // Recalculate alpha with the modified tempAM, introduce early exit
-                                double reduced_alpha = 0;
-                                for (const auto &selected_node : selectedNodes) {
-                                    const auto &consumer_inner = allPaths[selected_node].route;
-                                    reduced_alpha +=
-                                        computeLimitedMemoryCoefficient(baseSet, tempAM, p, consumer_inner, order);
-                                    if (reduced_alpha > rhs + violation_threshold) { // Early exit
-                                        return true;
-                                    }
-                                }
-
-                                return (reduced_alpha > rhs + violation_threshold);
-                            };
-
-                            // Function to find the minimal violating set using genetic algorithm
-                            auto find_minimal_violation_set =
-                                [&](std::bitset<N_SIZE> &current_bitset) -> std::bitset<N_SIZE> {
-                                std::bitset<N_SIZE> minimal_bitset = current_bitset;
-
-                                int    population_size = 10;  // Number of candidates in each generation
-                                int    max_generations = 5;   // Number of generations
-                                double mutation_rate   = 0.7; // Probability of mutating a bit
-                                std::vector<std::bitset<N_SIZE>> population;
-
-                                int mutationCandidate = N_SIZE / 10; // Number of mutations in each candidate
-                                // Initialize the population with random mutations of the current bitset
-                                for (int i = 0; i < population_size; ++i) {
-                                    std::bitset<N_SIZE> candidate = current_bitset;
-                                    for (int j = 0; j < mutationCandidate; ++j) {
-                                        auto bit = rng() % N_SIZE;
-                                        if ((rng() / double(RAND_MAX)) < mutation_rate) {
-                                            candidate.reset(bit); // Mutate: remove random nodes
-                                        }
-                                    }
-                                    population.push_back(candidate);
-                                }
-
-                                // Main loop for genetic algorithm generations
-                                for (int gen = 0; gen < max_generations; ++gen) {
-                                    // Evaluate the population and store fitness (whether it causes a violation)
-                                    std::vector<std::pair<std::bitset<N_SIZE>, bool>> evaluated_population;
-                                    for (auto &candidate : population) {
-                                        evaluated_population.push_back({candidate, is_violation(candidate)});
-                                    }
-
-                                    // Select the best candidate from the population (the one that still violates)
-                                    pdqsort(evaluated_population.begin(), evaluated_population.end(),
-                                            [](const auto &lhs, const auto &rhs) { return lhs.second < rhs.second; });
-                                    minimal_bitset = evaluated_population.front().first;
-
-                                    // Perform crossover (combine two parents) to generate new population
-                                    std::vector<std::bitset<N_SIZE>> new_population;
-                                    for (int i = 0; i < population_size / 2; ++i) {
-                                        std::bitset<N_SIZE> parent1 = evaluated_population[i].first;
-                                        std::bitset<N_SIZE> parent2 = evaluated_population[i + 1].first;
-                                        std::bitset<N_SIZE> child1, child2;
-
-                                        // Crossover: mix bits from two parents
-                                        for (int j = 0; j < N_SIZE; ++j) {
-                                            if (rng() % 2) {
-                                                child1[j] = parent1[j];
-                                                child2[j] = parent2[j];
-                                            } else {
-                                                child1[j] = parent2[j];
-                                                child2[j] = parent1[j];
-                                            }
-                                        }
-
-                                        // Mutate the children
-                                        for (int j = 0; j < N_SIZE; ++j) {
-                                            if ((rand() / double(RAND_MAX)) < mutation_rate) {
-                                                child1.reset(j); // Mutate: remove random nodes
-                                            }
-                                            if ((rand() / double(RAND_MAX)) < mutation_rate) {
-                                                child2.reset(j); // Mutate: remove random nodes
-                                            }
-                                        }
-
-                                        // Add children to the new population
-                                        new_population.push_back(child1);
-                                        new_population.push_back(child2);
-                                    }
-
-                                    // Replace the old population with the new one
-                                    population = new_population;
-                                }
-
-                                return minimal_bitset;
-                            };
-
-                            // Build the initial set of nodes not in baseSet but in AM
-                            std::bitset<N_SIZE> current_bitset;
-                            for (int i = 1; i < N_SIZE - 2; ++i) {
-                                if (!(baseSet[i >> 6] & (1ULL << (i & 63))) && (AM[i >> 6] & (1ULL << (i & 63)))) {
-                                    current_bitset.set(i);
-                                }
-                            }
-
-                            // Find the minimal violating set using simulated annealing
-                            std::bitset<N_SIZE> minimalSet = find_minimal_violation_set(current_bitset);
-
-                            // Apply the minimal set to adjust AM
-                            for (int i = 0; i < N_SIZE; ++i) {
-                                if (!minimalSet[i]) {
-                                    AM[i >> 6] &= ~(1ULL << (i & 63)); // Clear bit if i not in minimalSet
-                                } else {
-                                    AM[i >> 6] |= (1ULL << (i & 63)); // Set bit if i in minimalSet
-                                }
-                            }
+                            // set setOf45 to AM
+                            for (auto c : set45) { AM[c >> 6] |= (1ULL << (c & 63)); }
 
                             // Recalculate alpha after applying the minimal set of nodes
                             alpha = 0;
@@ -608,21 +517,6 @@ void LimitedMemoryRank1Cuts::the45Heuristic(const SparseMatrix &A, const std::ve
                             for (auto k = 0; k < allPaths.size(); k++) {
                                 if (k == selectedNodes[j]) continue;
                                 auto &consumer_inner = allPaths[k];
-
-                                int max_limit = 0;
-                                if constexpr (T == CutType::FourRow) {
-                                    max_limit = 3;
-                                } else if constexpr (T == CutType::FiveRow) {
-                                    max_limit = 4;
-                                }
-                                int match_count = 0;
-                                for (auto &node : set45) {
-                                    if (std::ranges::find(consumer_inner, node) != consumer_inner.end()) {
-                                        if (++match_count == max_limit) { break; }
-                                    }
-                                }
-
-                                if (match_count < max_limit) continue;
 
                                 std::vector<int> thePath(consumer_inner.begin(), consumer_inner.end());
 

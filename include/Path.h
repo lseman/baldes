@@ -30,8 +30,8 @@ struct Path {
     std::vector<int> route;
     double           cost;
     double           red_cost = std::numeric_limits<double>::max();
-
-    bool operator==(const Path &other) const { return route == other.route && cost == other.cost; }
+    double           frac_x   = 0.0;
+    bool             operator==(const Path &other) const { return route == other.route && cost == other.cost; }
 
     // default constructor
     Path() : route({}), cost(0.0) {}
@@ -44,6 +44,9 @@ struct Path {
     // define begin and end methods linking to route
     auto begin() { return route.begin(); }
     auto end() { return route.end(); }
+    // define begin and end const
+    auto begin() const { return route.begin(); }
+    auto end() const { return route.end(); }
     // define size
     auto size() { return route.size(); }
     // make the [] operator available

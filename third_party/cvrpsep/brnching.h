@@ -5,6 +5,8 @@
 #ifndef _H_BRNCHING
 #define _H_BRNCHING
 
+#include "cnstrmgr.h"
+
 void BRNCHING_GetCandidateSets(int NoOfCustomers,
                                int *Demand,
                                int CAP,

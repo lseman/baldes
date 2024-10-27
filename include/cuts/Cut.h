@@ -13,19 +13,21 @@
 #include "miphandler/Constraint.h"
 
 struct SRCPermutation {
-    std::vector<int> num;
-    int              den;
+    std::vector<int>    num;
+    std::vector<double> frac;
+    int                 den;
     // Default constructor
     SRCPermutation() = default;
 
     // Constructor with two vectors
     SRCPermutation(std::vector<int> num, int den) : num(num), den(den) {}
 
+    SRCPermutation(std::vector<double> frac) : frac(frac) {}
     // Function to compute RHS
     double getRHS() const {
         double rhs = 0;
         for (size_t i = 0; i < num.size(); ++i) { rhs += static_cast<double>(num[i]) / static_cast<double>(den); }
-        return rhs;
+        return std::floor(rhs);
     }
 
     // Begin and end (non-const to allow modification)
@@ -37,10 +39,9 @@ struct SRCPermutation {
     void swap(SRCPermutation &other) {
 
         // Swap each corresponding element in the num and den vectors
-        for (size_t i = 0; i < num.size(); ++i) {
-            std::swap(num[i], other.num[i]);
-        }
+        for (size_t i = 0; i < num.size(); ++i) { std::swap(num[i], other.num[i]); }
         std::swap(den, other.den);
+        // std::swap(frac, other.frac);
     }
 
     // Support next_permutation for the 'num' vector
@@ -61,8 +62,26 @@ struct Cut {
     std::array<uint64_t, num_words> neighbors;    // Bit-level neighbors
     std::vector<int>                baseSetOrder; // Order for baseSet
     std::vector<double>             coefficients; // Cut coefficients
-    SRCPermutation                  p = {{1, 1, 1, 1, 1}, 2};
+    SRCPermutation                  p = {{1, 1, 1, 1}, 2};
+    // SRCPermutation p = {{1.0 / 2.0, 1.0 / 2.0, 1.0 / 2.0}};
 
+    void printCut() {
+        fmt::print("BaseSet: ");
+        // print the bit position where the bit is set
+        for (int i = 0; i < N_SIZE; ++i) {
+            if (baseSet[i / 64] & (1ULL << (i % 64))) { fmt::print("{} ", i); }
+        }
+        fmt::print("\n");
+        fmt::print("Neighbors: ");
+        for (int i = 0; i < N_SIZE; ++i) {
+            if (neighbors[i / 64] & (1ULL << (i % 64))) { fmt::print("{} ", i); }
+        }
+        fmt::print("\n");
+        // print the p.num and p.den
+        fmt::print("Permutation: ");
+        for (auto &i : p.num) { fmt::print("{} ", i); }
+        fmt::print("| {}\n", p.den);
+    }
     double      rhs     = 1;
     int         id      = -1;
     bool        added   = false;
@@ -80,7 +99,9 @@ struct Cut {
 
     Cut(const std::array<uint64_t, num_words> baseSetInput, const std::array<uint64_t, num_words> &neighborsInput,
         const std::vector<double> &coefficients, const SRCPermutation &multipliers)
-        : baseSet(baseSetInput), neighbors(neighborsInput), coefficients(coefficients), p(multipliers) {}
+        : baseSet(baseSetInput), neighbors(neighborsInput), coefficients(coefficients), p(multipliers) {
+        rhs = p.getRHS();
+    }
 
     // Define size of the cut
     size_t size() const { return coefficients.size(); }
@@ -120,7 +141,7 @@ public:
         SRCDuals = {};
     }
 
-    Cut &getCut(int cutIndex) { return cuts[cutIndex]; }
+    Cut       &getCut(int cutIndex) { return cuts[cutIndex]; }
     const Cut &getCut(int cutIndex) const { return cuts[cutIndex]; }
 
     int getID(int cutIndex) { return cuts[cutIndex].id; }
@@ -225,6 +246,7 @@ public:
         for (auto c : cuts) {
             double alpha = 0.0;
             int    S     = 0;
+            auto   den   = c.p.den;
             auto   AM    = c.neighbors;
             auto   C     = c.baseSet;
             auto   p     = c.p;
@@ -236,13 +258,12 @@ public:
                 // Check if the node vj is in AM (bitwise check)
                 if (!(AM[vj / 64] & (1ULL << (vj % 64)))) {
                     S = 0; // Reset S if vj is not in AM
-                }
-                if (C[vj / 64] & (1ULL << (vj % 64))) {
+                } else if (C[vj / 64] & (1ULL << (vj % 64))) {
                     // Get the position of vj in C by counting the set bits up to vj
                     int pos = order[vj];
                     S += p.num[pos];
-                    if (S % p.den == 0) {
-                        // S -= 1;
+                    if (S >= den) {
+                        S -= den;
                         alpha += 1;
                     }
                 }

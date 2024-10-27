@@ -43,7 +43,6 @@ struct InstanceData {
     std::vector<int>                                    n_tw;
     std::vector<double>                                 service_time;
     std::vector<double>                                 demand_additional;
-    std::vector<std::vector<double>>                    distance_additional;
     int                                                 q          = 0;
     int                                                 nC         = 0;
     int                                                 nV         = 0;

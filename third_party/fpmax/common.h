@@ -32,6 +32,8 @@ THE POSSIBILITY OF SUCH DAMAGE.
 
 */
 
+#pragma once
+
 #include <time.h>
 #include "fpmax.h"
 

@@ -83,19 +83,14 @@ inline bool check_dominance_against_vector(const Label *new_label, const std::pm
 
                             for (size_t k = 0; k < SRCDuals.size(); ++k) {
                                 const auto &den         = cut_storage->getCut(k).p.den;
-                                const auto  labelMod    = labelSRCMap[k] % den;
-                                const auto  newLabelMod = newLabelSRCMap[k] % den;
+                                const auto  labelMod    = labelSRCMap[k];
+                                const auto  newLabelMod = newLabelSRCMap[k];
                                 if (labelMod > newLabelMod) { sumSRC += SRCDuals[k]; }
                             }
                         }
 
                         // SIMD cost comparison after adjusting for SRC Duals
                         if (labels[i + j]->cost - sumSRC > new_label->cost) {
-                            continue; // Label is not dominated, skip
-                        }
-                    } else {
-                        // Simple cost check
-                        if (labels[i + j]->cost > new_label->cost) {
                             continue; // Label is not dominated, skip
                         }
                     }
@@ -150,18 +145,14 @@ inline bool check_dominance_against_vector(const Label *new_label, const std::pm
                     const auto &newLabelSRCMap = new_label->SRCmap;
 
                     for (size_t k = 0; k < SRCDuals.size(); ++k) {
-                        const auto &den         = cut_storage->getCut(k).p.den;
-                        const auto  labelMod    = labelSRCMap[k] % den;
-                        const auto  newLabelMod = newLabelSRCMap[k] % den;
+                        //const auto &den         = cut_storage->getCut(k).p.frac;
+                        const auto  labelMod    = labelSRCMap[k];
+                        const auto  newLabelMod = newLabelSRCMap[k];
                         if (labelMod > newLabelMod) { sumSRC += SRCDuals[k]; }
                     }
                 }
 
                 if (labels[i]->cost - sumSRC > new_label->cost) {
-                    continue; // Label is not dominated, skip
-                }
-            } else {
-                if (labels[i]->cost > new_label->cost) {
                     continue; // Label is not dominated, skip
                 }
             }
