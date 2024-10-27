@@ -609,8 +609,8 @@ BucketGraph::Extend(const std::conditional_t<M == Mutability::Mut, Label *, cons
     size_t segment      = node_id >> 6; // Determine the segment in the bitmap
     size_t bit_position = node_id & 63; // Determine the bit position in the segment
     if constexpr (S != Stage::Enumerate) {
-        if ((neighborhoods_bitmap[initial_node_id][segment] & (1ULL << bit_position)) &&
-            is_node_visited(L_prime->visited_bitmap, node_id)) {
+        //if ((neighborhoods_bitmap[initial_node_id][segment] & (1ULL << bit_position)) &&
+            if (is_node_visited(L_prime->visited_bitmap, node_id)) {
             return std::vector<Label *>(); // Skip if the node is in the neighborhood and has been visited
         }
     }
@@ -729,9 +729,9 @@ BucketGraph::Extend(const std::conditional_t<M == Mutability::Mut, Label *, cons
     }
 
     // new_label->visited_bitmap = L_prime->visited_bitmap; // Copy visited bitmap from the original label
-    std::memcpy(new_label->visited_bitmap.data(), L_prime->visited_bitmap.data(),
-                new_label->visited_bitmap.size() * sizeof(uint64_t));
-    set_node_visited(new_label->visited_bitmap, node_id); // Mark the new node as visited
+    //std::memcpy(new_label->visited_bitmap.data(), L_prime->visited_bitmap.data(),
+    //            new_label->visited_bitmap.size() * sizeof(uint64_t));
+    //set_node_visited(new_label->visited_bitmap, node_id); // Mark the new node as visited
 
 #ifdef UNREACHABLE_DOMINANCE
     // Copy unreachable bitmap (if applicable)
@@ -753,20 +753,18 @@ BucketGraph::Extend(const std::conditional_t<M == Mutability::Mut, Label *, cons
     if constexpr (S != Stage::Enumerate) {
         size_t limit = new_label->visited_bitmap.size();
         for (size_t i = 0; i < limit; ++i) {
-            uint64_t current_visited = new_label->visited_bitmap[i];
+            uint64_t current_visited = L_prime->visited_bitmap[i];
 
             if (!current_visited) continue; // Skip if no nodes were visited in this segment
 
             uint64_t neighborhood_mask = neighborhoods_bitmap[node_id][i]; // Get neighborhood mask for the current node
-            uint64_t bits_to_clear     = current_visited & ~neighborhood_mask; // Determine which bits to clear
+            uint64_t bits_to_clear     = current_visited & neighborhood_mask; // Determine which bits to clear
 
-            if (i == node_id / 64) {
-                bits_to_clear &= ~(1ULL << (node_id & 63)); // Ensure current node remains visited
-            }
-
-            new_label->visited_bitmap[i] &= ~bits_to_clear; // Clear irrelevant visited nodes
+            new_label->visited_bitmap[i] = bits_to_clear; // Clear irrelevant visited nodes
         }
     }
+
+    set_node_visited(new_label->visited_bitmap, node_id); // Mark the new node as visited
 
 #if defined(SRC3) || defined(SRC)
     // Apply SRC (Subset Row Cuts) logic in Stages 3, 4, and Enumerate
@@ -804,9 +802,11 @@ BucketGraph::Extend(const std::conditional_t<M == Mutability::Mut, Label *, cons
             }
 
             if (bitIsSet2) {
+                auto &den = multipliers.den;
                 src_map_value += multipliers.num[baseSetorder[node_id]];
-                if (src_map_value % multipliers.den == 0) {
+                if (src_map_value >= den) {
                     new_label->cost -= SRCDuals[idx]; // Apply the SRC dual value if threshold is exceeded
+                    src_map_value -= den;             // Reset the SRC map value
                 }
             }
 #endif
@@ -832,28 +832,8 @@ inline bool BucketGraph::is_dominated(const Label *new_label, const Label *label
     const auto &new_resources   = new_label->resources;
     const auto &label_resources = label->resources;
 
-    double sumSRC = 0;
-
-#ifdef SRC
-    if constexpr (S == Stage::Four || S == Stage::Enumerate) {
-        const auto &SRCDuals = cut_storage->SRCDuals;
-        if (!SRCDuals.empty()) {
-            const auto &labelSRCMap    = label->SRCmap;
-            const auto &newLabelSRCMap = new_label->SRCmap;
-            for (size_t i = 0; i < SRCDuals.size(); ++i) {
-                const auto &den         = cut_storage->getCut(i).p.den;
-                const auto  labelMod    = labelSRCMap[i] % den;
-                const auto  newLabelMod = newLabelSRCMap[i] % den;
-                if (labelMod > newLabelMod) { sumSRC += SRCDuals[i]; }
-            }
-        }
-        if (label->cost - sumSRC > new_label->cost) { return false; }
-    } else
-#endif
-    {
-        // Simple cost check: if the comparison label has a higher cost, it is not dominated
-        if (label->cost > new_label->cost) { return false; }
-    }
+    // Simple cost check: if the comparison label has a higher cost, it is not dominated
+    if (label->cost > new_label->cost) { return false; }
 
     // Check resource conditions based on the direction (Forward or Backward)
     for (size_t i = 0; i < R_SIZE; ++i) {
@@ -874,7 +854,7 @@ inline bool BucketGraph::is_dominated(const Label *new_label, const Label *label
         // label visits
         for (size_t i = 0; i < label->visited_bitmap.size(); ++i) {
             // If the comparison label visits a node that the new label does not, it is not dominated
-            if ((label->visited_bitmap[i] & ~new_label->visited_bitmap[i]) != 0) { return false; }
+            if (((label->visited_bitmap[i] & new_label->visited_bitmap[i]) ^ label->visited_bitmap[i]) != 0) { return false; }
         }
     }
 #else
@@ -903,6 +883,25 @@ inline bool BucketGraph::is_dominated(const Label *new_label, const Label *label
             // If the adjusted cost of the comparison label is greater, it is not dominated
             if (label->cost + sumSRC > new_label->cost) { return false; }
         }
+    }
+#endif
+
+#ifdef SRC
+    if constexpr (S == Stage::Four || S == Stage::Enumerate) {
+        double sumSRC = 0;
+
+        const auto &SRCDuals = cut_storage->SRCDuals;
+        if (!SRCDuals.empty()) {
+            const auto &labelSRCMap    = label->SRCmap;
+            const auto &newLabelSRCMap = new_label->SRCmap;
+            for (size_t i = 0; i < SRCDuals.size(); ++i) {
+                const auto &den         = cut_storage->getCut(i).p.den;
+                const auto labelMod    = labelSRCMap[i];    // % den;
+                const auto newLabelMod = newLabelSRCMap[i]; // % den;
+                if (labelMod > newLabelMod) { sumSRC += SRCDuals[i]; }
+            }
+        }
+        if (label->cost - sumSRC > new_label->cost) { return false; }
     }
 #endif
 

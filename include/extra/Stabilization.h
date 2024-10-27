@@ -481,4 +481,8 @@ public:
         if (base_alpha == 0) { return true; }
         return false;
     }
+
+    void define_smooth_dual_sol(const DualSolution &nodeDuals) {
+        smooth_dual_sol.assign(nodeDuals.begin(), nodeDuals.begin() + sizeDual);
+    }
 };

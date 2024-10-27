@@ -31,10 +31,10 @@
 
 #include "Definitions.h"
 #include "HGS.h"
-#include "miphandler/MIPHandler.h"
 #include "Reader.h"
 #include "bnb/BNB.h"
 #include "bnb/Node.h"
+#include "miphandler/MIPHandler.h"
 
 #ifdef GUROBI
 #include "gurobi_c++.h"
@@ -228,12 +228,13 @@ int main(int argc, char *argv[]) {
     // print size of initialRoutesHGS
     initRMP(&mip, problem, initialRoutesHGS);
 #ifdef GUROBI
-    //auto gurobi_model = mip.toGurobiModel(GurobiEnvSingleton::getInstance());
+    // auto gurobi_model = mip.toGurobiModel(GurobiEnvSingleton::getInstance());
 #endif
-    BNBNode *node = new BNBNode(mip);
-    node->paths   = paths;
-    node->problem = problem;
-    node->mip     = mip;
+    BNBNode *node  = new BNBNode(mip);
+    node->paths    = paths;
+    node->problem  = problem;
+    node->mip      = mip;
+    node->instance = instance;
 
     BranchAndBound solver(std::move(problem), BNBNodeSelectionStrategy::DFS); // Choose
     solver.setRootNode(node);

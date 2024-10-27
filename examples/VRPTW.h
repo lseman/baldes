@@ -50,7 +50,7 @@
 
 #include "Hashes.h"
 
-#ifdef IPM
+#if defined(IPM) || defined(IPM_ACEL)
 #include "ipm/IPSolver.h"
 #endif
 
@@ -249,7 +249,7 @@ public:
             auto vec = cuts.computeLimitedMemoryCoefficients(label->nodes_covered);
             if (vec.size() > 0) {
                 for (int i = 0; i < vec.size(); i++) {
-                    if (abs(vec[i]) > 1e-2) { col.addTerm(SRCconstraints[i]->index(), vec[i]); }
+                    if (abs(vec[i]) > 1e-3) { col.addTerm(SRCconstraints[i]->index(), vec[i]); }
                 }
             }
 #endif
@@ -259,7 +259,7 @@ public:
             auto RCCconstraints = rccManager.getConstraints();
             if (RCCvec.size() > 0) {
                 for (int i = 0; i < RCCvec.size(); i++) {
-                    if (abs(RCCvec[i]) > 1e-2) {
+                    if (abs(RCCvec[i]) > 1e-3) {
                         col.addTerm(RCCconstraints[i]->index(), RCCvec[i]); // Add RCC terms to the Column
                     }
                 }
@@ -317,6 +317,7 @@ public:
                     std::string constraint_name = "cuts(z" + std::to_string(z) + ")";
                     // constraint_name << "cuts(z" << z << ")";
                     // auto ctr = ;
+                    // print cut.rhs
                     auto ctr = node->addConstr(lhs <= cut.rhs, constraint_name);
                     constraints.emplace_back(ctr);
                 }
@@ -325,6 +326,7 @@ public:
                 cut.updated = false;
             }
         }
+        // print constraints size
         return changed;
     }
 
@@ -547,6 +549,7 @@ public:
 
 #ifdef SRC
         r1c                      = LimitedMemoryRank1Cuts(nodes);
+        r1c.setDistanceMatrix(node->instance.getDistanceMatrix());
         CutStorage *cuts         = &r1c.cutStorage;
         bucket_graph.cut_storage = cuts;
 
@@ -557,9 +560,10 @@ public:
         bucket_graph.setDuals(nodeDuals);
         auto sizeDuals = nodeDuals.size();
 
-        double lp_obj_dual = 0.0;
-        double lp_obj      = node->getObjVal();
-        ;
+        double lp_obj_dual     = 0.0;
+        double lp_obj          = node->getObjVal();
+        double lp_obj_old      = lp_obj;
+        int    iter_non_improv = 0;
 
         bucket_graph.setup();
 
@@ -594,10 +598,12 @@ public:
         double v = 0;
 #endif
 
-#ifdef IPM
-        IPSolver solver;
+#ifdef IPM_ACEL
+        int      base_threshold     = 20;
+        int      adaptive_threshold = 20;
+        IPSolver ipm_solver;
+        bool     use_ipm_duals = false;
 #endif
-
         bool   rcc         = false;
         bool   reoptimized = false;
         double obj;
@@ -608,8 +614,12 @@ public:
 
 #if defined(RCC) || defined(EXACT_RCC)
             if (rcc) {
+                matrix = node->extractModelDataSparse();
+                // node->optimize();
+                // node->ipSolver->run_optimization(matrix, 1e-6);
                 node->optimize();
                 solution = node->extractSolution();
+                // solution = node->ipSolver->getPrimals();
 #ifdef RCC
                 rcc = RCCsep(node, solution);
 #endif
@@ -617,8 +627,9 @@ public:
                 rcc = exactRCCsep(node, solution);
 #endif
                 if (rcc) {
-                    // matrix = node->extractModelDataSparse();
+                    matrix = node->extractModelDataSparse();
                     node->optimize();
+                    // node->ipSolver->run_optimization(matrix, 1e-6);
                 }
                 reoptimized = true;
             }
@@ -626,8 +637,13 @@ public:
 
             if (ss && !rcc) {
 #if defined(RCC) || defined(EXACT_RCC)
-                if (!reoptimized) { node->optimize(); }
+                if (!reoptimized) { // node->optimize();
+                                    // matrix = node->extractModelDataSparse();
+                    node->optimize();
+                    // node->ipSolver->run_optimization(matrix, 1e-6);
+                }
                 solution = node->extractSolution();
+                // solution = node->ipSolver->getPrimals();
 #ifdef RCC
                 rcc = RCCsep(node, solution);
 #endif
@@ -702,7 +718,7 @@ public:
             // Enforce upper and lower bounds on gap
             if (std::isnan(gap) || std::signbit(gap)) { gap = 1e-1; }
             gap = std::clamp(gap, 1e-8, 1e-1); // Clamping gap to be between 1e-6 and 1e-2
-            solver.run_optimization(matrix, gap);
+            node->ipSolver->run_optimization(matrix, gap);
 
             // auto end_time_ipm = std::chrono::high_resolution_clock::now();
 
@@ -713,9 +729,9 @@ public:
             // Print the time in seconds with microsecond precision
             // fmt::print("IPM time: {:.6f} seconds\n", duration_microseconds / 1e6);
 
-            lp_obj           = solver.getObjective();
-            solution         = solver.getPrimals();
-            nodeDuals        = solver.getDuals();
+            lp_obj           = node->ipSolver->getObjective();
+            solution         = node->ipSolver->getPrimals();
+            nodeDuals        = node->ipSolver->getDuals();
             auto originDuals = nodeDuals;
             // print origin duals size
             for (auto &dual : nodeDuals) { dual = -dual; }
@@ -729,7 +745,7 @@ public:
 #endif
 #ifdef STAB
             stab.update_stabilization_after_master_optim(nodeDuals);
-            nodeDuals = stab.getStabDualSol(nodeDuals);
+            nodeDuals = stab.getStabDualSolAdvanced(nodeDuals);
 
             misprice = true;
             while (misprice) {
@@ -748,15 +764,56 @@ public:
                         }
                     }
                     if (integer) {
-                        if (lp_obj > integer_solution) {
+                        if (lp_obj < integer_solution) {
                             print_info("Updating integer solution to {}\n", lp_obj);
                             integer_solution = lp_obj;
                         }
                     }
                 }
 
+#ifdef IPM_ACEL
+                auto updateGapAndRunOptimization = [&](auto node, auto lp_obj, auto inner_obj, auto &ipm_solver,
+                                                       auto &iter_non_improv, auto &use_ipm_duals, auto &nodeDuals) {
+                    auto matrix = node->extractModelDataSparse();
+
+                    int    d               = 1;
+                    double obj_change      = std::abs(lp_obj - inner_obj);
+                    double adaptive_factor = std::min(1.0, std::max(1e-1, obj_change / std::abs(lp_obj + 1e-6)));
+
+                    // Compute gap based on current objective difference and adaptive factor
+                    double gap = std::abs(lp_obj - (lp_obj + std::min(0.0, inner_obj))) / std::abs(lp_obj + 1e-6);
+                    gap        = (gap / d) * adaptive_factor;
+
+                    // Enforce upper and lower bounds on gap
+                    if (std::isnan(gap) || std::signbit(gap)) { gap = 1e-1; }
+                    gap = std::clamp(gap, 1e-10, 1e-1);
+
+                    // Run optimization and adjust duals
+                    ipm_solver.run_optimization(matrix, gap);
+                    nodeDuals = ipm_solver.getDuals();
+                    for (auto &dual : nodeDuals) { dual = -dual; }
+                };
+
+                adaptive_threshold = std::max(20, base_threshold + iter / 100); // Adapt with total iterations
+
+                if (std::abs(lp_obj - lp_obj_old) < 1.0) {
+                    iter_non_improv += 1;
+                    if (iter_non_improv > adaptive_threshold) {
+                        print_info("No improvement in the last iterations, running IPM\n");
+                        updateGapAndRunOptimization(node, lp_obj, inner_obj, ipm_solver, iter_non_improv, use_ipm_duals,
+                                                    nodeDuals);
+                        stab.define_smooth_dual_sol(nodeDuals);
+                        iter_non_improv = 0;
+                        use_ipm_duals   = true;
+                    }
+                } else {
+                    iter_non_improv = 0;
+                }
+#endif
+                lp_obj_old = lp_obj;
+
                 bucket_graph.relaxation = lp_obj;
-                bucket_graph.augment_ng_memories(solution, allPaths, true, 5, 100, 16, N_SIZE);
+                bucket_graph.augment_ng_memories(solution, allPaths, true, 5, 110, 18, N_SIZE);
 #if defined(SRC3) || defined(SRC)
                 // SRC cuts
 
@@ -790,6 +847,7 @@ public:
                 // Branching duals
                 if (branchingDuals.size() > 0) { branchingDuals.computeDuals(node); }
                 bucket_graph.setDuals(nodeDuals);
+                r1c.setDuals(nodeDuals);
 
                 //////////////////////////////////////////////////////////////////////
                 // CALLING BALDES
@@ -868,6 +926,11 @@ public:
             auto   n_cuts     = 0;
             auto   n_rcc_cuts = 0;
             double tr_val     = 0;
+            int    athreshold = 0;
+
+#ifdef IPM_ACEL
+            athreshold = adaptive_threshold;
+#endif
 
 #ifdef STAB
             cur_alpha = stab.base_alpha;
@@ -887,8 +950,9 @@ public:
             if (iter % 50 == 0)
                 fmt::print("| It.: {:4} | Obj.: {:8.2f} | Price: {:9.2f} | SRC: {:3} | RCC: {:3} | Paths: {:3} | "
                            "Stage: {:1} | "
-                           "Lag.: {:10.4f} | α: {:4.2f} | tr: {:2.2f} | \n",
-                           iter, lp_obj, inner_obj, n_cuts, n_rcc_cuts, colAdded, stage, lag_gap, cur_alpha, tr_val);
+                           "Lag.: {:10.4f} | α: {:4.2f} | tr: {:2.2f} | threshold: {:3} |\n",
+                           iter, lp_obj, inner_obj, n_cuts, n_rcc_cuts, colAdded, stage, lag_gap, cur_alpha, tr_val,
+                           athreshold);
         }
         bucket_graph.print_statistics();
 

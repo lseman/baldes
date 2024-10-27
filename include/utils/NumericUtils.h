@@ -4,7 +4,7 @@
 #include <cstdlib>
 namespace numericutils {
     // Define the epsilon value for floating-point comparisons
-    constexpr double eps = 1e-6;
+    constexpr double eps = 1e-3;
 
     constexpr double half = 0.5;
 

@@ -87,8 +87,13 @@ private:
     SolverInterface *solver = nullptr;
 
 public:
-    Problem *problem;
-    int      numConstrs = 0;
+#ifdef IPM
+    IPSolver *ipSolver = nullptr;
+#endif
+    Problem     *problem;
+    InstanceData instance;
+
+    int numConstrs = 0;
 
     MIPProblem mip = MIPProblem("node", 0, 0);
 
@@ -116,6 +121,9 @@ public:
     std::vector<VRPCandidate *> raisedVRPChildren;
 
     explicit BNBNode(const MIPProblem &eModel) {
+#ifdef IPM
+        ipSolver = new IPSolver();
+#endif
         mip = eModel;
 
 #ifdef HIGHS

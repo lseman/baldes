@@ -19,18 +19,17 @@ else()
 endif()
 
 if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
-    string(REPLACE "-fconcepts-diagnostics-depth=10" "" CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
+  string(REPLACE "-fconcepts-diagnostics-depth=10" "" CMAKE_CXX_FLAGS
+                 "${CMAKE_CXX_FLAGS}")
 endif()
 
 # C++ standard
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
 
-# set cuda standard to 17
-set(CMAKE_CUDA_STANDARD 17)
-
 # Enable Interprocedural Optimization (Link Time Optimization)
 set(CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE ON)
+set(CMAKE_INTERPROCEDURAL_OPTIMIZATION TRUE)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 set(CMAKE_EXPERIMENTAL_CXX_MODULE_CMAKE_API_BOTH TRUE)
 
@@ -64,7 +63,6 @@ include_directories("${CMAKE_CURRENT_BINARY_DIR}")
 
 option(RIH "Enable RIH compilation option" OFF)
 option(RCC "Enable RCC compilation option" ON)
-option(SRC3 "Enable 3SRC compilation option" OFF)
 option(SRC "Enable SRC compilation option" ON)
 # option(GET_TBB "Enable TBB compilation option" OFF)
 option(UNREACHABLE_DOMINANCE "Enable Unreachable Dominance compilation option"
@@ -90,6 +88,7 @@ option(GUROBI "Enable GUROBI" OFF)
 option(HIGHS "Enable HIGHS" ON)
 option(NSYNC "Enable nsync" OFF)
 option(CHOLMOD "Enable cholmod" OFF)
+option(IPM_ACEL "Enable ipm acelleration" OFF)
 
 # Define the size of resources without using cache
 set(R_SIZE
@@ -120,16 +119,14 @@ set(HGS_TIME
     5
     CACHE STRING "HGS max running time")
 
-    # Get the latest Git commit hash
+# Get the latest Git commit hash
 execute_process(
   COMMAND git rev-parse --short HEAD
   OUTPUT_VARIABLE GIT_COMMIT_HASH
-  OUTPUT_STRIP_TRAILING_WHITESPACE
-)
+  OUTPUT_STRIP_TRAILING_WHITESPACE)
 
 # Pass the commit hash as a preprocessor definition
 add_definitions(-DGIT_COMMIT_HASH="${GIT_COMMIT_HASH}")
-
 
 add_definitions(-DN_SIZE=${N_SIZE})
 add_definitions(-DR_SIZE=${R_SIZE})
@@ -154,15 +151,14 @@ set(OR_RESOURCES
     "1"
     CACHE STRING "List of resources that are OR resources")
 
-    # if IPM is disabled, force STAB to be enabled
+# if IPM is disabled, force STAB to be enabled
 if(NOT IPM)
-message(STATUS "IPM is disabled, enabling STAB")
-set(STAB ON)
+  message(STATUS "IPM is disabled, enabling STAB")
+  set(STAB ON)
 else()
-message(STATUS "IPM is enabled, disabling STAB")
-set(STAB OFF)
+  message(STATUS "IPM is enabled, disabling STAB")
+  set(STAB OFF)
 endif()
-
 
 # Configure the config.h file
 configure_file(
@@ -170,13 +166,6 @@ configure_file(
   ${CMAKE_CURRENT_BINARY_DIR}/config.h # Output file (config.h)
 )
 
-# Ensure that both SRC3 and SRC are not selected at the same time
-if(SRC AND SRC3)
-  message(
-    FATAL_ERROR
-      "Both SRC and SRC3 cannot be enabled at the same time. Please choose only one."
-  )
-endif()
 
 if(STAB AND IPM)
   message(
@@ -203,7 +192,6 @@ if(NOT COMMAND CPMAddPackage)
   include(${cpm_SOURCE_DIR}/cmake/CPM.cmake)
 endif()
 
-
 cpmaddpackage(
   NAME
   stdexec
@@ -218,15 +206,19 @@ cpmaddpackage(
   "STDEXEC_BUILD_DOCS OFF"
   "BUILD_TESTING OFF")
 
-  
-cpmaddpackage(NAME xxhash GITHUB_REPOSITORY Cyan4973/xxHash
-              GIT_TAG origin/dev
-              SOURCE_SUBDIRECTORY cmake_unofficial  # Specify the folder with CMake configuration
-              )
+cpmaddpackage(
+  NAME
+  xxhash
+  GITHUB_REPOSITORY
+  Cyan4973/xxHash
+  GIT_TAG
+  origin/dev
+  SOURCE_SUBDIRECTORY
+  cmake_unofficial # Specify the folder with CMake configuration
+)
 include_directories(${xxhash_SOURCE_DIR})
 # After fetching via CPM, manually add the cmake_unofficial folder
 add_subdirectory(${xxhash_SOURCE_DIR}/cmake_unofficial)
-
 
 # add https://github.com/martinus/unordered_dense
 cpmaddpackage(
@@ -237,12 +229,15 @@ cpmaddpackage(
 # add https://github.com/google/nsync.git
 if(NSYNC)
   set(nsync_ADDED ON)
-cpmaddpackage(
-  NAME nsync GITHUB_REPOSITORY google/nsync
-  GIT_TAG origin/master # or a specific version/tag
-  OPTIONS
-  "NSYNC_ENABLE_TESTS OFF"
-)
+  cpmaddpackage(
+    NAME
+    nsync
+    GITHUB_REPOSITORY
+    google/nsync
+    GIT_TAG
+    origin/master # or a specific version/tag
+    OPTIONS
+    "NSYNC_ENABLE_TESTS OFF")
 endif()
 
 # include ankerl
@@ -254,10 +249,7 @@ if(NOT FMT_FOUND)
   cpmaddpackage(NAME fmt GITHUB_REPOSITORY fmtlib/fmt GIT_TAG 11.0.2)
 endif()
 
-
-
 if(IPM)
- 
 
 endif()
 
@@ -276,8 +268,7 @@ if(HIGHS)
     "BUILD_CSHARP_EXAMPLE OFF"
     "BUILD_TESTING OFF"
     "USE_DOTNET_STD_21 OFF")
-  include_directories(${Highs_SOURCE_DIR}/src
-                      ${Highs_INCLUDE_DIR})
+  include_directories(${Highs_SOURCE_DIR}/src ${Highs_INCLUDE_DIR})
 
   # Path to your patch file
   set(PATCH_FILE "${CMAKE_CURRENT_LIST_DIR}/highs.patch")
@@ -304,7 +295,6 @@ include_directories(${GUROBI_HOME}/include)
 set(SOURCES src/BucketGraph.cpp src/MIPHandler.cpp include/algebra/LDLT.cu)
 
 set(CVRPSEP_SOURCES
-    src/RCC.cpp
     third_party/cvrpsep/basegrph.cpp
     third_party/cvrpsep/capsep.cpp
     third_party/cvrpsep/cnstrmgr.cpp
@@ -337,7 +327,7 @@ set(FPSOURCE
     third_party/fpmax/fp_tree.cpp third_party/fpmax/fp_node.cpp)
 
 set(IPM_SOURCES src/IPSolver.cpp)
-set(SRC_SOURCES src/SRC.cpp)
+set(SRC_SOURCES src/SRC.cpp src/SRCHelper.cpp)
 
 # Define a list for the source files that will be included
 set(EXECUTABLE_SOURCES ${SOURCES} ${HGS_SOURCES} ${FPSOURCE})
@@ -346,9 +336,10 @@ set(EXECUTABLE_SOURCES ${SOURCES} ${HGS_SOURCES} ${FPSOURCE})
 if(RCC)
   message(STATUS "RCC is set, adding CVRPSEP_SOURCES.")
   list(APPEND EXECUTABLE_SOURCES ${CVRPSEP_SOURCES})
+  list(APPEND EXECUTABLE_SOURCES src/RCC.cpp)
 endif()
 
-if(IPM)
+if(IPM OR IPM_ACEL)
   message(STATUS "IPM is set, adding IPM_SOURCES.")
   list(APPEND EXECUTABLE_SOURCES ${IPM_SOURCES})
 endif()
@@ -372,7 +363,7 @@ else()
   target_link_libraries(vrptw PRIVATE fmt::fmt)
 endif()
 
-if(IPM)
+if(IPM OR IPM_ACEL)
   cpmaddpackage(
     NAME
     Eigen
@@ -421,17 +412,17 @@ endif()
 
 find_package(xxhash REQUIRED)
 
-
 if(WITH_PYTHON)
-  pybind11_add_module(baldes src/BucketBindings.cpp src/BucketGraph.cpp ${EXECUTABLE_SOURCES})
+  pybind11_add_module(baldes src/BucketBindings.cpp src/BucketGraph.cpp
+                      ${EXECUTABLE_SOURCES})
   target_link_libraries(baldes PRIVATE pybind11::module)
   target_link_libraries(baldes PRIVATE fmt::fmt)
   target_link_libraries(baldes PRIVATE STDEXEC::stdexec)
   target_link_libraries(baldes PRIVATE xxhash)
   target_link_libraries(baldes PRIVATE unordered_dense)
   if(NSYNC)
-  target_include_directories(baldes PRIVATE nsync)
-  include_directories(${nsync_SOURCE_DIR}/public)
+    target_include_directories(baldes PRIVATE nsync)
+    include_directories(${nsync_SOURCE_DIR}/public)
   endif()
   set_target_properties(baldes PROPERTIES POSITION_INDEPENDENT_CODE ON)
   target_compile_options(baldes PRIVATE -Wno-c++26-extensions
@@ -515,10 +506,8 @@ if(MTW)
   target_link_libraries(vrpmtw PRIVATE unordered_dense)
   target_link_libraries(vrpmtw PRIVATE STDEXEC::stdexec)
   target_link_libraries(vrpmtw PRIVATE fmt::fmt)
-  # link eigen
-  #target_include_directories(vrpmtw PRIVATE ${eigen_SOURCE_DIR})
+  # link eigen target_include_directories(vrpmtw PRIVATE ${eigen_SOURCE_DIR})
 endif()
-
 
 find_program(CCACHE_PROGRAM ccache)
 if(CCACHE_PROGRAM)
@@ -528,12 +517,12 @@ if(CCACHE_PROGRAM)
 endif()
 
 # link nsync
-if (nsync_ADDED)
+if(nsync_ADDED)
   target_link_libraries(vrptw PRIVATE nsync)
   include_directories(${nsync_SOURCE_DIR}/public)
 endif()
 
-if (CHOLMOD)
+if(CHOLMOD)
   message(STATUS "SuiteSparse is enabled, linking with cholmod")
   find_package(SuiteSparse)
   include_directories(${SuiteSparse_INCLUDE_DIRS})
@@ -543,3 +532,17 @@ endif()
 
 # include /opt/cuda/targets/x86_64-linux/include/cuda_runtime.h
 target_include_directories(vrptw PRIVATE /opt/cuda/targets/x86_64-linux/include)
+
+file(GLOB_RECURSE CVRPSEP_HEADERS "${CMAKE_SOURCE_DIR}/third_party/cvrpsep/*.h")
+file(GLOB_RECURSE FPMAX_HEADERS "${CMAKE_SOURCE_DIR}/third_party/fpmax/*.h")
+
+target_precompile_headers(
+  vrptw
+  PRIVATE
+  include/Common.h
+  ${CVRPSEP_HEADERS}
+  ${FPMAX_HEADERS}
+  include/Arc.h
+  include/Dual.h
+  include/VRPNode.h
+  third_party/pdqsort.h)

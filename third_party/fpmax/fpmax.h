@@ -1,3 +1,5 @@
+#pragma once
+
 #include "fp_tree.h"
 
 class FPmax
