@@ -53,7 +53,7 @@ set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "-O3 -g -march=native -flto")
 set(CMAKE_CXX_FLAGS_DEBUG "-Og -g -Wall -Wextra")
 
 if(APPLE)
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -stdlib=libc++")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -stdlib=libc++ -std=c++20")
 endif()
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
@@ -354,14 +354,7 @@ add_executable(vrptw examples/VRPTW.cpp ${EXECUTABLE_SOURCES})
 
 # Linking libraries
 target_link_libraries(vrptw PRIVATE STDEXEC::stdexec)
-
-find_package(FMT)
-if(NOT FMT_FOUND)
-  message(STATUS "FMT not found, using bundled version")
-  target_link_libraries(vrptw PRIVATE fmt::fmt)
-else()
-  target_link_libraries(vrptw PRIVATE fmt::fmt)
-endif()
+target_link_libraries(vrptw PRIVATE fmt::fmt)
 
 if(IPM OR IPM_ACEL)
   cpmaddpackage(
@@ -550,6 +543,6 @@ target_precompile_headers(
   third_party/pdqsort.h)
 
 if(IPM)
-find_package(Eigen3 3.3 REQUIRED NO_MODULE)
-target_link_libraries(vrptw PRIVATE Eigen3::Eigen)
+target_include_directories(vrptw PRIVATE ${Eigen_SOURCE_DIR})
+target_include_directories(vrptw PRIVATE ${Eigen_SOURCE_DIR}/unsupported)
 endif()
