@@ -531,7 +531,7 @@ public:
         auto &rccManager = node->rccManager;
 #endif
 
-        int bucket_interval       = 20;
+        int bucket_interval       = 25;
         int time_horizon          = instance.T_max;
         numConstrs                = node->getIntAttr("NumConstrs");
         node->numConstrs          = numConstrs;
@@ -1010,6 +1010,7 @@ public:
         fmt::print("| {:<14} | {}{:>16}.{:03}{} |\n", "CG Duration", blue, duration_seconds, duration_milliseconds,
                    reset);
         fmt::print("+---------------------------------------+\n");
+        
     }
 
     void branch(BNBNode *node) {

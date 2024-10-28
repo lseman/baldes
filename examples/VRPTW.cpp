@@ -158,6 +158,7 @@ void printDistanceMatrix(const std::vector<std::vector<double>> &distance) {
  * @return int Returns 0 on successful execution.
  */
 int main(int argc, char *argv[]) {
+    //py::scoped_interpreter guard{};
 
     printBaldes();
 

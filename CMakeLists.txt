@@ -116,7 +116,7 @@ set(N_ADD
     10
     CACHE STRING "Number of additional nodes")
 set(HGS_TIME
-    5
+    2
     CACHE STRING "HGS max running time")
 
 # Get the latest Git commit hash
@@ -415,10 +415,12 @@ find_package(xxhash REQUIRED)
 if(WITH_PYTHON)
   pybind11_add_module(baldes src/BucketBindings.cpp src/BucketGraph.cpp
                       ${EXECUTABLE_SOURCES})
+                      
   target_link_libraries(baldes PRIVATE pybind11::module)
   target_link_libraries(baldes PRIVATE fmt::fmt)
   target_link_libraries(baldes PRIVATE STDEXEC::stdexec)
   target_link_libraries(baldes PRIVATE xxhash)
+
   target_link_libraries(baldes PRIVATE unordered_dense)
   if(NSYNC)
     target_include_directories(baldes PRIVATE nsync)

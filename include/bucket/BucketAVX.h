@@ -83,8 +83,8 @@ inline bool check_dominance_against_vector(const Label *new_label, const std::pm
 
                             for (size_t k = 0; k < SRCDuals.size(); ++k) {
                                 const auto &den         = cut_storage->getCut(k).p.den;
-                                const auto  labelMod    = labelSRCMap[k];
-                                const auto  newLabelMod = newLabelSRCMap[k];
+                                const auto  labelMod    = labelSRCMap[k] % den;
+                                const auto  newLabelMod = newLabelSRCMap[k] % den;
                                 if (labelMod > newLabelMod) { sumSRC += SRCDuals[k]; }
                             }
                         }
@@ -146,8 +146,8 @@ inline bool check_dominance_against_vector(const Label *new_label, const std::pm
 
                     for (size_t k = 0; k < SRCDuals.size(); ++k) {
                         const auto &den         = cut_storage->getCut(k).p.den;
-                        const auto  labelMod    = labelSRCMap[k];
-                        const auto  newLabelMod = newLabelSRCMap[k];
+                        const auto  labelMod    = labelSRCMap[k] % den;
+                        const auto  newLabelMod = newLabelSRCMap[k] % den;
                         if (labelMod > newLabelMod) { sumSRC += SRCDuals[k]; }
                     }
                 }

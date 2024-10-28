@@ -9,21 +9,14 @@
 
 #pragma once
 
+#include "Common.h"
 #include "Path.h"
-#include "SparseMatrix.h"
-#include <bitset>
-#include <iostream>
-#include <tuple>
-#include <vector>
+#include "VRPNode.h"
 
-#include <algorithm>
-#include <bitset>
-#include <cstring>
-#include <iostream>
-#include <limits>
-#include <numeric>
-#include <tuple>
-
+/*
+#include <pybind11/embed.h>
+#include <pybind11/stl.h>
+*/
 #include <exec/static_thread_pool.hpp>
 #include <stdexec/execution.hpp>
 
@@ -38,13 +31,12 @@ constexpr int    max_row_rank1                                  = 5;
 constexpr int    max_heuristic_initial_seed_set_size_row_rank1c = 6;
 
 constexpr int    max_num_r1c_per_round = 10;
-constexpr double cut_vio_factor        = 0.08;
+constexpr double cut_vio_factor        = 0.1;
 
 #define INITIAL_IDX_R1C (-1)
 
 struct R1c {
     std::pair<std::vector<int>, int> info_r1c{}; // cut and plan
-    //int                              idx_r1c{INITIAL_IDX_R1C};
     int                              rhs{};
     std::vector<int>                 arc_mem{}; // Store only memory positions
 };
@@ -62,8 +54,44 @@ struct Rank1MultiLabel {
     Rank1MultiLabel() = default;
 };
 
+// namespace py = pybind11;
+
 class HighDimCutsGenerator {
 public:
+    /*
+        void sendToPython(const std::vector<R1c> &cuts, const std::vector<Path> &routes) {
+            try {
+                // Import the Python script (make sure cuts_callback.py is in the working directory)
+                py::module_ callback_module = py::module_::import("cuts_callback");
+
+                // Retrieve the callback function
+                py::object process_cuts = callback_module.attr("process_cuts");
+
+                // Convert C++ data to Python objects
+                std::vector<py::dict> py_cuts;
+                for (const auto &cut : cuts) {
+                    py::dict py_cut;
+                    py_cut["info_r1c"] = py::cast(cut.info_r1c); // Explicitly cast to Python list
+                    py_cut["rhs"]      = cut.rhs;
+                    py_cut["arc_mem"]  = py::cast(cut.arc_mem); // Explicitly cast to Python list
+                    py_cuts.push_back(py_cut);
+                }
+
+                std::vector<py::dict> py_routes;
+                for (const auto &route : routes) {
+                    py::dict py_route;
+                    py_route["route"]    = py::cast(route.route); // Convert route vector to Python list
+                    py_route["cost"]     = route.cost;
+                    py_route["red_cost"] = route.red_cost;
+                    py_route["frac_x"]   = route.frac_x;
+                    py_routes.push_back(py_route);
+                }
+
+                // Call the Python function with C++ data as arguments
+                process_cuts(py_cuts, py_routes);
+            } catch (const py::error_already_set &e) { std::cerr << "Python error: " << e.what() << std::endl; }
+        }
+    */
     double max_cut_mem_factor = 0.15;
 
     HighDimCutsGenerator(int dim, int maxRowRank, double tolerance)
@@ -102,19 +130,41 @@ public:
     double                                                     TOLERANCE;
     std::vector<ankerl::unordered_dense::map<int, int>>        v_r_map;
     std::vector<std::pair<std::vector<int>, std::vector<int>>> c_N_noC;
-    ankerl::unordered_dense::map<Bitset<N_SIZE>, std::vector<std::pair<std::vector<int>, double>>>
-                                 map_cut_plan_vio;
-    std::vector<Rank1MultiLabel> rank1_multi_label_pool;
-    ankerl::unordered_dense::map<int, std::vector<std::tuple<Bitset<N_SIZE>, int, double>>>
-                     generated_rank1_multi_pool;
-    std::vector<R1c> cuts;
-    std::vector<R1c> old_cuts;
+    ankerl::unordered_dense::map<Bitset<N_SIZE>, std::vector<std::pair<std::vector<int>, double>>> map_cut_plan_vio;
+    std::vector<Rank1MultiLabel>                                                            rank1_multi_label_pool;
+    ankerl::unordered_dense::map<int, std::vector<std::tuple<Bitset<N_SIZE>, int, double>>> generated_rank1_multi_pool;
+    std::vector<R1c>                                                                        cuts;
+    std::vector<R1c>                                                                        old_cuts;
 
     ankerl::unordered_dense::map<std::vector<int>, std::vector<std::vector<int>>, VectorHash> rank1_multi_mem_plan_map;
     ankerl::unordered_dense::map<std::vector<int>, ankerl::unordered_dense::set<int>, VectorHash> cut_record;
     std::vector<std::pair<int, double>>                                                           move_vio;
     std::vector<yzzLong> rank1_sep_heur_mem4_vertex;
 
+    void generateR1C1() {
+        std::vector<std::pair<double, R1c>> tmp_cuts;
+
+        std::unordered_map<int, int> vis_map;
+        for (const auto &r : sol) {
+            vis_map.clear();
+            for (const auto i : r.route) { ++vis_map[i]; }
+            for (auto &[v, times] : vis_map) {
+                if (times > 1) {
+                    tmp_cuts.emplace_back();
+                    tmp_cuts.back().first           = floor(times / 2. + tolerance) * r.frac_x;
+                    tmp_cuts.back().second.info_r1c = make_pair(std::vector{v}, 0);
+                }
+            }
+        }
+        if (tmp_cuts.empty()) return;
+
+        pdqsort(tmp_cuts.begin(), tmp_cuts.end(),
+                [](const std::pair<double, R1c> &a, const std::pair<double, R1c> &b) { return a.first > b.first; });
+        std::vector<R1c> pure_cuts(tmp_cuts.size());
+        transform(tmp_cuts.begin(), tmp_cuts.end(), pure_cuts.begin(),
+                  [](const std::pair<double, R1c> &a) { return a.second; });
+        chooseCuts(pure_cuts, cuts, max_num_r1c_per_round);
+    }
     void initialSupportvector() {
         cut_record.clear();
         v_r_map.clear();
@@ -134,9 +184,14 @@ public:
         startSeedCrazy();
         for (int i = 0; i < num_label;) { operationsCrazy(rank1_multi_label_pool[i], i); }
         constructCutsCrazy();
+
+        // send to python
+        // sendToPython(cuts, sol);
+        old_cuts = cuts;
     }
 
     void processSeedForPlan(int plan_idx, std::vector<Rank1MultiLabel> &local_pool) {
+        // Iterate through each plan and accumulate results in temp_elements
         for (auto &[c, wc] : c_N_noC) {
             double vio, best_vio;
             exactFindBestPermutationForOnePlan(c, plan_idx, vio);
@@ -168,6 +223,9 @@ public:
 
             cutLong          tmp;
             std::vector<int> new_c, new_w_no_c;
+            int              target_index = static_cast<int>(c.size());
+
+            auto &target_pool = generated_rank1_multi_pool[target_index];
 
             // Use optimized operations based on `best_oper`
             switch (best_oper) {
@@ -175,7 +233,12 @@ public:
                 if (c.size() < 2 || c.size() > max_row_rank1) break;
                 tmp = 0;
                 for (int i : c) tmp.set(i);
-                generated_rank1_multi_pool[static_cast<int>(c.size())].emplace_back(tmp, plan_idx, best_vio);
+                // Directly add to target_pool at the current target_index
+                {
+                    std::lock_guard<std::mutex> lock(pool_mutex);
+                    auto                       &target_pool = generated_rank1_multi_pool[target_index];
+                    target_pool.emplace_back(tmp, plan_idx, best_vio);
+                }
                 break;
 
             case 'a': // Add operation
@@ -205,10 +268,8 @@ public:
                 break;
             }
 
-            // Only add to local pool if an operation was performed
-            if (best_oper != 'o') {
-                local_pool.emplace_back(std::move(new_c), std::move(new_w_no_c), plan_idx, best_vio, best_oper);
-            }
+            // Only add to local_pool if an operation was performed
+            if (best_oper != 'o') { local_pool.emplace_back(new_c, new_w_no_c, plan_idx, best_vio, best_oper); }
         }
     }
 
@@ -232,7 +293,7 @@ public:
                 if (num_label >= rank1_multi_label_pool.size()) {
                     rank1_multi_label_pool.resize(rank1_multi_label_pool.size() * 1.5);
                 }
-                rank1_multi_label_pool[num_label++] = std::move(label);
+                rank1_multi_label_pool[num_label++] = (label);
             }
         });
 
@@ -362,13 +423,11 @@ public:
         // Update `map_cut_plan_vio` with new cut
         {
             std::lock_guard<std::mutex> lock(map_cut_plan_vio_mutex);
-            if (plan_idx < map_cut_plan_vio[tmp].size()) {
-                map_cut_plan_vio[tmp][plan_idx] = {std::move(new_cut), vio};
-            }
+            if (plan_idx < map_cut_plan_vio[tmp].size()) { map_cut_plan_vio[tmp][plan_idx] = {(new_cut), vio}; }
         }
     }
 
-    const int                        max_heuristic_sep_mem4_row_rank1 = 8;
+    const int                        max_heuristic_sep_mem4_row_rank1 = 5;
     std::vector<std::vector<double>> cost_mat4_vertex;
     void                             generateSepHeurMem4Vertex() {
         rank1_sep_heur_mem4_vertex.resize(dim);
@@ -376,7 +435,9 @@ public:
 
         for (int i = 0; i < dim; ++i) {
             cost[0] = {0, INFINITY};
-            for (int j = 1; j < dim - 1; ++j) { cost[j] = {j, cost_mat4_vertex[i][j]}; }
+            for (int j = 1; j < dim - 1; ++j) {
+                cost[j] = {j, cost_mat4_vertex[i][j] - (nodes[i].cost / 2 + nodes[j].cost / 2)};
+            }
 
             // Sort by cost
             pdqsort(cost.begin(), cost.end(), [](const auto &a, const auto &b) { return a.second < b.second; });
@@ -890,9 +951,9 @@ public:
         for (auto &c : cuts) {
             ankerl::unordered_dense::set<int> mem;
 
-            //if (c.idx_r1c != INITIAL_IDX_R1C) {
-            //    for (const auto &m : c.arc_mem) { mem.insert(m); }
-            //}
+            // if (c.idx_r1c != INITIAL_IDX_R1C) {
+            //     for (const auto &m : c.arc_mem) { mem.insert(m); }
+            // }
 
             bool  if_suc = false;
             auto &cut    = c.info_r1c;

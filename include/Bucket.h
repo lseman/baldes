@@ -13,7 +13,6 @@
 
 #include "Definitions.h"
 
-#include "Allocator.h"
 #include "Arc.h"
 #include "Common.h"
 #include "Label.h"
@@ -28,8 +27,9 @@
 struct Bucket {
     // std::vector<Label *> labels_vec;
     // std::vector<Label *, PoolAllocator<Label *>> labels_vec;
-    std::pmr::unsynchronized_pool_resource pool;
-    std::pmr::vector<Label *>              labels_vec; // Declare the vector here
+    // std::pmr::pool_options                 pool_opts;
+    // std::pmr::unsynchronized_pool_resource pool;
+    std::vector<Label *> labels_vec;
 
     int                    node_id = -1;
     std::vector<double>    lb;
@@ -164,9 +164,8 @@ struct Bucket {
     }
 
     Bucket(int node_id, std::vector<double> lb, std::vector<double> ub)
-        : node_id(node_id), lb(std::move(lb)), ub(std::move(ub)), labels_vec(&pool) {
-
-        labels_vec.reserve(250);
+        : node_id(node_id), lb(std::move(lb)), ub(std::move(ub)) {
+        labels_vec.reserve(256);
     }
 
     // create default constructor
@@ -208,7 +207,7 @@ struct Bucket {
      * has reached the limit, the function will replace the label with the highest cost
      * if the new label has a lower cost.
      *
-    */
+     */
     void add_label_lim(Label *label, size_t limit) noexcept {
         if (labels_vec.size() < limit) {
             labels_vec.push_back(label);
@@ -276,6 +275,7 @@ struct Bucket {
         */
         return filtered_view;
     }
+    
     void clear() { labels_vec.clear(); }
 
     /**
@@ -316,4 +316,9 @@ struct Bucket {
     }
 
     [[nodiscard]] bool empty() const { return labels_vec.empty(); }
+
+    ~Bucket() {
+        reset(); // Ensure all elements are cleared
+        // pool.release(); // Explicitly release the memory pool resources
+    }
 };

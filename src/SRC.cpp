@@ -492,15 +492,20 @@ std::pair<bool, bool> LimitedMemoryRank1Cuts::runSeparation(BNBNode *node, std::
         return cut_ctr;
     };
 
+    generator->setNodes(nodes);
+    generator->generateSepHeurMem4Vertex();
+    
     // Generator operations
     generator->initialize(allPaths);
+    generator->generateR1C1();
     generator->setMemFactor(0.15);
     generator->fillMemory();
     generator->getHighDimCuts();
     generator->constructMemoryVertexBased();
+
     auto cut_number = processCuts();
     if (cut_number == 0) {
-        for (double memFactor = 0.25; memFactor <= 0.35; memFactor += 0.10) {
+        for (double memFactor = 0.25; memFactor <= 0.45; memFactor += 0.10) {
             generator->setMemFactor(memFactor);
             generator->constructMemoryVertexBased();
             auto cut_number = processCuts();

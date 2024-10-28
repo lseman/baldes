@@ -218,20 +218,20 @@ std::vector<double> BucketGraph::labeling_algorithm() noexcept {
         do {
             all_ext = true; // Assume all labels have been extended at the start
             for (const auto bucket : sorted_sccs[scc_index]) {
-                auto &bucket_labels = buckets[bucket].get_labels(); // Get unextended labels from this bucket
-                if (bucket_labels.empty()) { continue; }            // Skip empty buckets
+                auto bucket_labels = buckets[bucket].get_unextended_labels(); // Get unextended labels from this bucket
+                //if (bucket_labels.empty()) { continue; }            // Skip empty buckets
                 for (Label *label : bucket_labels) {
-                    if (label->is_extended) { continue; } // Skip labels that have already been extended
+                    //if (label->is_extended) { continue; } // Skip labels that have already been extended
 
                     // NOTE: double check if this is the best way to handle this
                     if constexpr (F == Full::Partial) {
                         if constexpr (D == Direction::Forward) {
-                            if (label->resources[TIME_INDEX] > q_star[TIME_INDEX]) {
+                            if (label->resources[TIME_INDEX] > q_star[TIME_INDEX] + numericutils::eps) {
                                 label->set_extended(true);
                                 continue;
                             }
                         } else if constexpr (D == Direction::Backward) {
-                            if (label->resources[TIME_INDEX] <= q_star[TIME_INDEX]) {
+                            if (label->resources[TIME_INDEX] <= q_star[TIME_INDEX] - numericutils::eps) {
                                 label->set_extended(true);
                                 continue;
                             }

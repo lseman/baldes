@@ -87,7 +87,6 @@ public:
 
     void setDistanceMatrix(const std::vector<std::vector<double>> &distances) {
         generator->cost_mat4_vertex = distances;
-        generator->generateSepHeurMem4Vertex();
     }
     LimitedMemoryRank1Cuts(std::vector<VRPNode> &nodes);
 
@@ -110,11 +109,10 @@ public:
     void insertSet(VRPTW_SRC &cuts, int i, int j, int k, const std::vector<int> &buffer_int, int buffer_int_n,
                    double LHS_cut);
 
+    void insertSet(VRPTW_SRC &cuts, int i, const std::vector<int> &buffer_int, int buffer_int_n,
+                   double LHS_cut);
     void generateCutCoefficients(VRPTW_SRC &cuts, std::vector<std::vector<double>> &coefficients, int numNodes,
                                  const SparseMatrix &A, const std::vector<double> &x);
-
-    template <CutType T>
-    void the45Heuristic(const SparseMatrix &A, const std::vector<double> &x);
 
     /**
      * @brief Computes the limited memory coefficient based on the given parameters.
