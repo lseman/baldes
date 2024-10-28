@@ -548,3 +548,8 @@ target_precompile_headers(
   include/Dual.h
   include/VRPNode.h
   third_party/pdqsort.h)
+
+if(IPM)
+find_package(Eigen3 3.3 REQUIRED NO_MODULE)
+target_link_libraries(vrptw PRIVATE Eigen3::Eigen)
+endif()

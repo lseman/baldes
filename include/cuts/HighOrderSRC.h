@@ -791,7 +791,7 @@ public:
 
                 // Only proceed if the cut is unique in `cut_set` and `p_set`
                 if (!cut_set.contains(key) || !p_set.contains(plan_idx)) {
-                    const auto &cut_plan = map_cut_plan_vio.at(key).at(plan_idx);
+                    const auto &cut_plan = map_cut_plan_vio[key][plan_idx];
                     tmp_cuts.emplace_back(R1c{std::make_pair(cut_plan.first, plan_idx)});
 
                     cut_set.insert(key);
