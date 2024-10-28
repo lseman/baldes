@@ -319,7 +319,7 @@ std::vector<double> BucketGraph::labeling_algorithm() noexcept {
                                 n_labels++; // Increment the count of labels added
 
                                 // Add the new label to the bucket
-#ifdef SORTED_LABELS
+#ifndef SORTED_LABELS
                                 buckets[to_bucket].add_sorted_label(new_label);
 #elif LIMITED_BUCKETS
                                 buckets[to_bucket].sorted_label(new_label, BUCKET_CAPACITY);

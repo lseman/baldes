@@ -138,6 +138,11 @@ public:
     // Inequality operator
     bool operator!=(const Bitset &other) const { return !(*this == other); }
 
+    // define << operator
+    friend std::ostream &operator<<(std::ostream &os, const Bitset &bitset) {
+        for (size_t i = 0; i < N_BITS; ++i) { os << bitset[i]; }
+        return os;
+    }
     Bitset(const Bitset &)            = default;
     Bitset(Bitset &&)                 = default;
     Bitset &operator=(const Bitset &) = default;
@@ -157,9 +162,3 @@ struct hash<Bitset<N_BITS>> {
 };
 } // namespace std
 
-template <size_t N_BITS>
-struct BitsetHash {
-    size_t operator()(const Bitset<N_BITS>& bitset) const noexcept {
-        return XXH3_64bits(bitset.bits_.data(), bitset.bits_.size() * sizeof(uint64_t));
-    }
-};

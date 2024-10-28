@@ -275,7 +275,7 @@ struct Bucket {
         */
         return filtered_view;
     }
-    
+
     void clear() { labels_vec.clear(); }
 
     /**

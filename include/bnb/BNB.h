@@ -133,7 +133,9 @@ public:
 
     // Solve using multiple threads
     void solveParallel(size_t numThreads) {
-        std::vector<std::jthread> threads;
+        std::vector<std::thread> threads;
+        threads.reserve(numThreads); // Pre-allocate memory for efficiency
+
         for (size_t i = 0; i < numThreads; ++i) {
             threads.emplace_back([this]() {
                 while (!isSolutionFound()) {
@@ -145,6 +147,11 @@ public:
                     }
                 }
             });
+        }
+
+        // Join all threads before exiting to avoid leaving them detached
+        for (auto &thread : threads) {
+            if (thread.joinable()) { thread.join(); }
         }
     }
 

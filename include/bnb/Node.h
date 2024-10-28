@@ -27,6 +27,8 @@
 
 #include <optional>
 #include <variant>
+#include <mutex>
+#include <shared_mutex>
 
 // include unordered_dense_map
 #include "ankerl/unordered_dense.h"
