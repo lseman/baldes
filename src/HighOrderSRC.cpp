@@ -1,5 +1,7 @@
 
-#include "cuts/SRCHelper.h"
+#include "cuts/HighOrderSRC.h"
+
+#include "../third_party/small_vector.hpp"
 
 void HighDimCutsGenerator::generateOptimalMultiplier() {
     map_rank1_multiplier[max_heuristic_initial_seed_set_size_row_rank1c + 1].resize(10);
@@ -106,10 +108,9 @@ void HighDimCutsGenerator::printCuts() {
         fmt::print("Info_r1c: ");
         for (int i = 0; i < par.first.size(); ++i) { fmt::print("{} ", par.first[i]); }
         fmt::print("Plan: {}\n", par.second);
-        fmt::print("Idx_r1c: {}\n", cut.idx_r1c);
         fmt::print("RHS: {}\n", cut.rhs);
         fmt::print("Arc_mem: ");
-        for (auto &arc : cut.arc_mem) { fmt::print(" {}", arc.second); }
+        for (auto &arc : cut.arc_mem) { fmt::print(" {}", arc); }
         fmt::print("\n");
     }
 }

@@ -145,7 +145,7 @@ inline bool check_dominance_against_vector(const Label *new_label, const std::pm
                     const auto &newLabelSRCMap = new_label->SRCmap;
 
                     for (size_t k = 0; k < SRCDuals.size(); ++k) {
-                        //const auto &den         = cut_storage->getCut(k).p.frac;
+                        const auto &den         = cut_storage->getCut(k).p.den;
                         const auto  labelMod    = labelSRCMap[k];
                         const auto  newLabelMod = newLabelSRCMap[k];
                         if (labelMod > newLabelMod) { sumSRC += SRCDuals[k]; }

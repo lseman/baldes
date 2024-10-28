@@ -24,7 +24,6 @@
 
 #include "bnb/Node.h"
 
-#include "SRCHelper.h"
 #include "ipm/IPSolver.h"
 
 #ifdef HIGHS
@@ -410,12 +409,107 @@ void LimitedMemoryRank1Cuts::generateCutCoefficients(VRPTW_SRC &cuts, std::vecto
 }
 
 std::pair<bool, bool> LimitedMemoryRank1Cuts::runSeparation(BNBNode *node, std::vector<Constraint *> &SRCconstraints) {
+    auto                cuts = &cutStorage;
+    ModelData           matrix;
+    auto                cuts_before = cuts->size();
+    std::vector<double> solution;
+#ifdef IPM
+    matrix = node->extractModelDataSparse(); // Extract model data
+    node->ipSolver->run_optimization(matrix, 1e-6);
+    solution = node->ipSolver->getPrimals();
+#else
     node->optimize();
-    auto      solution = node->extractSolution();
-    auto      cuts     = &cutStorage;
-    ModelData matrix;
+    solution = node->extractSolution();
+#endif
+    separate(matrix.A_sparse, solution);
+    size_t i = 0;
+    std::for_each(allPaths.begin(), allPaths.end(), [&](auto &path) { path.frac_x = solution[i++]; });
 
-    auto cuts_before = cuts->size();
+    auto processCuts = [&]() {
+        // Initialize paths with solution values
+        auto multipliers = generator->map_rank1_multiplier;
+        auto cortes      = generator->getCuts();
+        auto cut_ctr     = 0;
+
+        // Process each cut
+        for (auto &cut : cortes) {
+            auto &cut_info = cut.info_r1c;
+
+            // Skip if arc_mem is empty
+            if (cut.arc_mem.empty()) { continue; }
+
+            // Pre-allocate cut_indices to avoid repeated resizing
+            std::vector<int> cut_indices;
+            cut_indices.reserve(cut_info.first.size());
+            for (auto &node : cut_info.first) { cut_indices.push_back(node); }
+
+            // Use std::array with pre-initialization for bit arrays
+            std::array<uint64_t, num_words> C  = {};
+            std::array<uint64_t, num_words> AM = {};
+
+            // Set bits in C and AM for cut_indices
+            for (auto &node : cut_indices) {
+                C[node / 64] |= (1ULL << (node % 64));
+                AM[node / 64] |= (1ULL << (node % 64));
+            }
+            // Set bits in AM for arcs in arc_mem
+            for (auto &arc : cut.arc_mem) { AM[arc / 64] |= (1ULL << (arc % 64)); }
+
+            // Retrieve multiplier information
+            auto          &mult = multipliers[cut_info.first.size()][cut_info.second];
+            SRCPermutation p;
+            p.num = std::get<0>(mult);
+            p.den = std::get<1>(mult);
+
+            // Initialize order without an extra resize, only if N_SIZE is constant
+            std::vector<int> order(N_SIZE, 0);
+            int              ordering = 0;
+            for (auto node : cut_indices) { order[node] = ordering++; }
+
+            // Pre-allocate coeffs to allPaths.size()
+            std::vector<double> coeffs(allPaths.size(), 0.0);
+            bool                has_coeff = false;
+
+            // Compute coefficients for each path
+            for (size_t i = 0; i < allPaths.size(); ++i) {
+                auto &clients = allPaths[i].route;
+                auto  coeff   = computeLimitedMemoryCoefficient(C, AM, p, clients, order);
+
+                // Check if coefficient is above threshold
+                if (coeff > 1e-3) { has_coeff = true; }
+                coeffs[i] = coeff;
+            }
+
+            // Skip adding cut if no coefficients met threshold
+            if (!has_coeff) { continue; }
+
+            // Create and add new cut
+            Cut corte(C, AM, coeffs, p);
+            corte.baseSetOrder = order;
+            cuts->addCut(corte);
+            cut_ctr++;
+        }
+        return cut_ctr;
+    };
+
+    // Generator operations
+    generator->initialize(allPaths);
+    generator->setMemFactor(0.15);
+    generator->fillMemory();
+    generator->getHighDimCuts();
+    generator->constructMemoryVertexBased();
+    auto cut_number = processCuts();
+    if (cut_number == 0) {
+        for (double memFactor = 0.25; memFactor <= 0.35; memFactor += 0.10) {
+            generator->setMemFactor(memFactor);
+            generator->constructMemoryVertexBased();
+            auto cut_number = processCuts();
+            if (cut_number != 0) {
+                break; // Exit the loop if cuts are successfully processed
+            }
+        }
+    }
+
     ////////////////////////////////////////////////////
     // Handle non-violated cuts in a single pass
     ////////////////////////////////////////////////////
@@ -423,83 +517,8 @@ std::pair<bool, bool> LimitedMemoryRank1Cuts::runSeparation(BNBNode *node, std::
     auto n_cuts_removed = 0;
     // Iterate over the constraints in reverse order to remove non-violated cuts
     // sort SRCconstraints by index
-    std::sort(SRCconstraints.begin(), SRCconstraints.end(),
-              [](const Constraint *a, const Constraint *b) { return a->index() < b->index(); });
-
-    // if (cleared) node->optimize();
-    matrix   = node->extractModelDataSparse(); // Extract model data    
-    node->ipSolver->run_optimization(matrix, 1e-6);
-    solution         = node->ipSolver->getPrimals();
-    separate(matrix.A_sparse, solution);
-
-    size_t i = 0;
-    std::for_each(allPaths.begin(), allPaths.end(), [&](auto &path) { path.frac_x = solution[i++]; });
-    generator->initialize(matrix.A_sparse, allPaths, solution);
-    //generator->setNodes(nodes);
-    generator->fillMemory();
-    //generator->generateR1C1();
-    generator->getHighDimCuts();
-    generator->constructMemoryVertexBased();
-    //generator.printCuts();
-    auto multipliers = generator->map_rank1_multiplier;
-    auto cortes      = generator->getCuts();
-
-    auto cut_ctr = 0;
-    for (auto &cut : cortes) {
-        auto &cut_info = cut.info_r1c;
-        // check if cut.arc_mem is empty, if so continue
-        if (cut.arc_mem.empty()) { continue; }
-        std::vector<int> cut_indices;
-        for (auto &node : cut_info.first) { cut_indices.push_back(node); }
-        std::array<uint64_t, num_words> C  = {};
-        std::array<uint64_t, num_words> AM = {};
-
-        for (auto &node : cut_indices) {
-            C[node / 64] |= (1ULL << (node % 64));
-            AM[node / 64] |= (1ULL << (node % 64));
-        }
-        for (auto &arc : cut.arc_mem) { AM[arc.second / 64] |= (1ULL << (arc.second % 64)); }
-
-        std::vector<double> cut_multipliers;
-
-        auto          &mult = multipliers[cut_info.first.size()][cut_info.second];
-        SRCPermutation p;
-        p.num = std::get<0>(mult);
-        p.den = std::get<1>(mult);
-        std::vector<int> order;
-        order.resize(N_SIZE, 0);
-        int ordering = 0;
-
-        for (auto node : cut_indices) {
-            order[node] = ordering;
-            ordering++;
-        }
-
-        std::vector<double> coeffs(allPaths.size(), 0.0);
-        // print allPaths.size()
-        // fmt::print("AllPaths size: {}\n", allPaths.size());
-        bool has_coeff = false;
-        for (int i = 0; i < allPaths.size(); ++i) {
-            auto &clients = allPaths[i].route; // Reference to the clients for in-place modification
-
-            auto coeff = computeLimitedMemoryCoefficient(C, AM, p, clients, order);
-            if (coeff > 1e-3) { has_coeff = true; }
-            coeffs[i] = coeff;
-        }
-        if (!has_coeff) { continue; }
-        Cut corte(C, AM, coeffs, p);
-        corte.baseSetOrder = order;
-
-        cuts->addCut(corte);
-        cut_ctr++;
-        //corte.printCut();
-    }
-    //fmt::print("Added {} cuts\n", cut_ctr);
-
-    // separate(matrix.A_sparse, solution);
-    // prepare45Heuristic(matrix.A_sparse, solution);
-    // the45Heuristic<CutType::FourRow>(matrix.A_sparse, solution);
-    // the45Heuristic<CutType::FiveRow>(matrix.A_sparse, solution);
+    pdqsort(SRCconstraints.begin(), SRCconstraints.end(),
+            [](const Constraint *a, const Constraint *b) { return a->index() < b->index(); });
 
     for (int i = SRCconstraints.size() - 1; i >= 0; --i) {
         auto constr = SRCconstraints[i];
@@ -531,12 +550,6 @@ std::pair<bool, bool> LimitedMemoryRank1Cuts::runSeparation(BNBNode *node, std::
  * @brief Computes the limited memory coefficient for a given set of nodes.
  *
  */
-
-inline void printSetBits(const std::array<uint64_t, num_words> &bitVector, const std::string &label) {
-    for (int i = 0; i < N_SIZE; ++i) {
-        if (bitVector[i / 64] & (1ULL << (i % 64))) { fmt::print("{}[{}] is set\n", label, i); }
-    }
-}
 double LimitedMemoryRank1Cuts::computeLimitedMemoryCoefficient(const std::array<uint64_t, num_words> &C,
                                                                const std::array<uint64_t, num_words> &AM,
                                                                const SRCPermutation &p, const std::vector<int> &P,
@@ -568,32 +581,4 @@ double LimitedMemoryRank1Cuts::computeLimitedMemoryCoefficient(const std::array<
     }
 
     return alpha;
-}
-std::vector<int> LimitedMemoryRank1Cuts::selectHighestCoefficients(const std::vector<double> &x, int maxNodes) {
-    // Min-heap to store the top maxNodes elements
-    std::priority_queue<std::pair<double, int>, std::vector<std::pair<double, int>>, std::greater<>> minHeap;
-
-    for (int i = 0; i < allPaths.size(); ++i) {
-        if (x[i] > 1e-2) {
-            if (minHeap.size() < maxNodes) {
-                minHeap.push({x[i], i});
-            } else if (x[i] > minHeap.top().first) {
-                minHeap.pop();
-                minHeap.push({x[i], i});
-            }
-        }
-    }
-
-    // Extract elements from the heap into the result vector
-    std::vector<int> selectedNodes;
-    selectedNodes.reserve(minHeap.size());
-    while (!minHeap.empty()) {
-        selectedNodes.push_back(minHeap.top().second);
-        minHeap.pop();
-    }
-
-    // Since it's a min-heap, you might want to reverse the order for descending coefficients
-    std::reverse(selectedNodes.begin(), selectedNodes.end());
-
-    return selectedNodes;
 }

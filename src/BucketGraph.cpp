@@ -859,9 +859,9 @@ void BucketGraph::print_statistics() {
     const char *reset     = "\033[0m";    // Reset color
 
     // Print table header with horizontal line and separators
-    fmt::print("\n+----------------------+-----------------+-----------------+\n");
+    fmt::print("\n+----------------------------------------------------------+\n");
     fmt::print("|{}{:<20}{}| {:<15} | {:<15} |\n", blue_bold, " Metric", reset, " Forward", " Backward");
-    fmt::print("+----------------------+-----------------+-----------------+\n");
+    fmt::print("+----------------------------------------------------------+\n");
 
     // Print labels for forward and backward with bold blue metric
     fmt::print("|{}{:<20}{}| {:<15} | {:<15} |\n", blue_bold, " Labels", reset, stat_n_labels_fw, stat_n_labels_bw);
@@ -870,7 +870,7 @@ void BucketGraph::print_statistics() {
     fmt::print("|{}{:<20}{}| {:<15} | {:<15} |\n", blue_bold, " Dominance Check", reset, stat_n_dom_fw, stat_n_dom_bw);
 
     // Print the final horizontal line
-    fmt::print("+----------------------+-----------------+-----------------+\n");
+    fmt::print("+----------------------------------------------------------+\n");
 
     fmt::print("\n");
 }

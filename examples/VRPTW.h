@@ -548,7 +548,7 @@ public:
         bucket_graph.incumbent = integer_solution;
 
 #ifdef SRC
-        r1c                      = LimitedMemoryRank1Cuts(nodes);
+        r1c = LimitedMemoryRank1Cuts(nodes);
         r1c.setDistanceMatrix(node->instance.getDistanceMatrix());
         CutStorage *cuts         = &r1c.cutStorage;
         bucket_graph.cut_storage = cuts;
@@ -615,10 +615,13 @@ public:
 #if defined(RCC) || defined(EXACT_RCC)
             if (rcc) {
                 matrix = node->extractModelDataSparse();
-                // node->optimize();
-                // node->ipSolver->run_optimization(matrix, 1e-6);
+#ifdef IPM
+                node->ipSolver->run_optimization(matrix, 1e-6);
+                solution = node->ipSolver->getPrimals();
+#else
                 node->optimize();
                 solution = node->extractSolution();
+#endif
                 // solution = node->ipSolver->getPrimals();
 #ifdef RCC
                 rcc = RCCsep(node, solution);
@@ -626,23 +629,21 @@ public:
 #ifdef EXACT_RCC
                 rcc = exactRCCsep(node, solution);
 #endif
-                if (rcc) {
-                    matrix = node->extractModelDataSparse();
-                    node->optimize();
-                    // node->ipSolver->run_optimization(matrix, 1e-6);
-                }
-                reoptimized = true;
             }
 #endif
 
             if (ss && !rcc) {
 #if defined(RCC) || defined(EXACT_RCC)
-                if (!reoptimized) { // node->optimize();
-                                    // matrix = node->extractModelDataSparse();
-                    node->optimize();
-                    // node->ipSolver->run_optimization(matrix, 1e-6);
-                }
+// if (!reoptimized) { // node->optimize();
+#ifdef IPM
+                matrix = node->extractModelDataSparse();
+                node->ipSolver->run_optimization(matrix, 1e-6);
+                solution = node->ipSolver->getPrimals();
+//}
+#else
+                node->optimize();
                 solution = node->extractSolution();
+#endif
                 // solution = node->ipSolver->getPrimals();
 #ifdef RCC
                 rcc = RCCsep(node, solution);
@@ -650,12 +651,6 @@ public:
 #ifdef EXACT_RCC
                 rcc = exactRCCsep(node, solution, cvrsep_ctrs);
 #endif
-
-                if (rcc) {
-                    // matrix = node->extractModelDataSparse();
-                    node->optimize();
-                    reoptimized = true;
-                }
 
 #endif
 
@@ -681,16 +676,16 @@ public:
 
                             // TODO: see why this is necessary here
                             // matrix = node->extractModelDataSparse();
-                            node->optimize();
-                            nodeDuals = node->getDuals();
+                            // node->optimize();
+                            // nodeDuals = node->getDuals();
                         }
 
                     } else {
                         changed = cutHandler(r1c, node, SRCconstraints);
                         if (changed) {
                             // matrix = node->extractModelDataSparse();
-                            node->optimize();
-                            nodeDuals = node->getDuals();
+                            // node->optimize();
+                            // nodeDuals = node->getDuals();
                         }
                     }
                 }
@@ -1009,12 +1004,12 @@ public:
         constexpr auto blue  = "\033[34m";
         constexpr auto reset = "\033[0m";
 
-        fmt::print("+----------------------+----------------+\n");
+        fmt::print("+---------------------------------------+\n");
         fmt::print("| {:<14} | {}{:>20}{} |\n", "Bound", blue, relaxed_result, reset);
         fmt::print("| {:<14} | {}{:>20}{} |\n", "Incumbent", blue, ip_result, reset);
         fmt::print("| {:<14} | {}{:>16}.{:03}{} |\n", "CG Duration", blue, duration_seconds, duration_milliseconds,
                    reset);
-        fmt::print("+----------------------+----------------+\n");
+        fmt::print("+---------------------------------------+\n");
     }
 
     void branch(BNBNode *node) {

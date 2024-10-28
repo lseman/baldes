@@ -59,3 +59,10 @@ struct hash<std::pair<int, int>> {
     }
 };
 } // namespace std
+
+struct VectorHash {
+    std::size_t operator()(const std::vector<int> &vec) const {
+        // Directly hash the data in the vector using xxh3
+        return XXH3_64bits(vec.data(), vec.size() * sizeof(int));
+    }
+};

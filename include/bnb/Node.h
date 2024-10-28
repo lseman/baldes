@@ -90,6 +90,7 @@ public:
 #ifdef IPM
     IPSolver *ipSolver = nullptr;
 #endif
+
     Problem     *problem;
     InstanceData instance;
 
@@ -105,7 +106,6 @@ public:
 
     ModelData         matrix;
     std::vector<Path> paths;
-    // ankerl::unordered_dense::set<Path, PathHash> pathSet;
     ankerl::unordered_dense::set<Path, PathHash> pathSet;
 
 #ifdef RCC
@@ -245,11 +245,11 @@ public:
     }
 
     double getSlack(int constraintIndex, const std::vector<double> &solution) {
-#if defined(GUROBI)
-        return solver->getSlack(constraintIndex);
-#else
-        return mip.getSlack(constraintIndex, solution);
 
+#if defined(IPM)
+    return mip.getSlack(constraintIndex, solution);
+#elif defined(GUROBI)
+        return solver->getSlack(constraintIndex);     
 #endif
     }
 
