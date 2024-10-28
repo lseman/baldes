@@ -324,6 +324,15 @@ public:
     exec::static_thread_pool            bi_pool  = exec::static_thread_pool(2);
     exec::static_thread_pool::scheduler bi_sched = bi_pool.get_scheduler();
 
+    ~BucketGraph() {
+        bi_pool.request_stop();
+        //delete cut_storage;
+        //delete branching_duals;
+        //delete ils;
+        //label_pool_fw.clear();
+        //label_pool_bw.clear();
+    }
+
     int fw_buckets_size = 0;
     int bw_buckets_size = 0;
 

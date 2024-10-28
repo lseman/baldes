@@ -135,65 +135,59 @@ public:
 class LabelPool {
 public:
     explicit LabelPool(size_t initial_pool_size, size_t max_pool_size = 5000000)
-        : pool_size(initial_pool_size), max_pool_size(max_pool_size),
-          pool(std::pmr::get_default_resource()) // Default memory resource
+        : pool_size(initial_pool_size), max_pool_size(max_pool_size)
     {
         allocate_labels(pool_size);
     }
 
-    Label *acquire() {
+    Label* acquire() {
         if (!available_labels.empty()) {
-            Label *new_label = available_labels.back();
+            Label* new_label = available_labels.back();
             available_labels.pop_back();
             in_use_labels.push_back(new_label);
             new_label->reset();
             return new_label;
         }
 
-        // Allocate label using the pool resource
-        auto *new_label = new (pool.allocate(sizeof(Label))) Label();
+        // Allocate a new label and add it to in_use_labels
+        auto* new_label = new Label();
         in_use_labels.push_back(new_label);
         return new_label;
-    }
-
-    Label **acquire_array(size_t count) {
-        // Allocate space for count + 1 elements (to allow for null-termination)
-        Label **label_array = static_cast<Label **>(pool.allocate(sizeof(Label *) * (count + 1)));
-        return label_array;
     }
 
     void reset() {
         available_labels.reserve(available_labels.size() + in_use_labels.size());
 
+        // Move in-use labels back to the available pool
         available_labels.insert(available_labels.end(), std::make_move_iterator(in_use_labels.begin()),
                                 std::make_move_iterator(in_use_labels.end()));
-
         in_use_labels.clear();
     }
-    std::pmr::unsynchronized_pool_resource pool; // Memory pool
+
+    ~LabelPool() { cleanup(); }
 
 private:
     void allocate_labels(size_t count) {
         available_labels.reserve(count);
-        for (size_t i = 0; i < count; ++i) { available_labels.push_back(new (pool.allocate(sizeof(Label))) Label()); }
+        for (size_t i = 0; i < count; ++i) {
+            available_labels.push_back(new Label());
+        }
     }
 
     void cleanup() {
-        for (auto &label : available_labels) {
-            label->~Label();
-            pool.deallocate(label, sizeof(Label));
+        // Properly delete each Label to free memory
+        for (auto& label : available_labels) {
+            delete label;
         }
         available_labels.clear();
 
-        for (auto &label : in_use_labels) {
-            label->~Label();
-            pool.deallocate(label, sizeof(Label));
+        for (auto& label : in_use_labels) {
+            delete label;
         }
         in_use_labels.clear();
 
-        for (auto &label : deleted_states) {
-            label->~Label();
-            pool.deallocate(label, sizeof(Label));
+        for (auto& label : deleted_states) {
+            delete label;
         }
         deleted_states.clear();
     }
@@ -201,9 +195,9 @@ private:
     size_t pool_size;
     size_t max_pool_size;
 
-    std::pmr::vector<Label *> available_labels{&pool}; // Labels ready to be acquired
-    std::pmr::vector<Label *> in_use_labels{&pool};    // Labels currently in use
-    std::vector<Label *>      deleted_states;          // Labels available for recycling
+    std::vector<Label*> available_labels; // Labels ready to be acquired
+    std::vector<Label*> in_use_labels;    // Labels currently in use
+    std::vector<Label*> deleted_states;   // Labels available for recycling
 };
 
 /**

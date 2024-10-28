@@ -104,17 +104,23 @@ template <Direction D>
 inline int BucketGraph::get_bucket_number(int node, std::vector<double> &resource_values_vec) noexcept {
 
     for (int r = 0; r < MAIN_RESOURCES; ++r) {
-        resource_values_vec[r] = roundToTwoDecimalPlaces(resource_values_vec[r]);
+        if constexpr (D == Direction::Forward) {
+            resource_values_vec[r] = (resource_values_vec[r]);// + numericutils::eps;
+        } else {
+            resource_values_vec[r] = (resource_values_vec[r]);// - numericutils::eps;
+        }
     }
+    auto val = -1;
     if constexpr (D == Direction::Forward) {
-        auto val = fw_node_interval_trees[node].query(resource_values_vec);
-        return val;
+        val = fw_node_interval_trees[node].query(resource_values_vec);
     } else if constexpr (D == Direction::Backward) {
-        auto val = bw_node_interval_trees[node].query(resource_values_vec);
-        return val;
+        val = bw_node_interval_trees[node].query(resource_values_vec);
     }
-    // std::throw_with_nested(std::runtime_error("BucketGraph::get_bucket_number: Invalid direction"));
-    return -100; // If no bucket is found
+    if (val < 0) {
+        std::cerr << "BucketGraph::get_bucket_number: Invalid bucket number: " << val << std::endl;
+    }
+    return val;
+
 }
 
 /**

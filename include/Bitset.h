@@ -43,32 +43,20 @@ public:
     };
 
     // Subscript operator for read/write access
-    BitReference operator[](size_t bit) {
-        return BitReference(bits_[wordIndex(bit)], 1ULL << bitOffset(bit));
-    }
+    BitReference operator[](size_t bit) { return BitReference(bits_[wordIndex(bit)], 1ULL << bitOffset(bit)); }
 
     // Const subscript operator for read-only access
-    bool operator[](size_t bit) const {
-        return (bits_[wordIndex(bit)] >> bitOffset(bit)) & 1ULL;
-    }
+    bool operator[](size_t bit) const { return (bits_[wordIndex(bit)] >> bitOffset(bit)) & 1ULL; }
 
     // Other member functions from before...
 
-    void set(size_t bit) {
-        bits_[wordIndex(bit)] |= (1ULL << bitOffset(bit));
-    }
+    void set(size_t bit) { bits_[wordIndex(bit)] |= (1ULL << bitOffset(bit)); }
 
-    void clear(size_t bit) {
-        bits_[wordIndex(bit)] &= ~(1ULL << bitOffset(bit));
-    }
+    void clear(size_t bit) { bits_[wordIndex(bit)] &= ~(1ULL << bitOffset(bit)); }
 
-    bool test(size_t bit) const {
-        return (bits_[wordIndex(bit)] >> bitOffset(bit)) & 1ULL;
-    }
+    bool test(size_t bit) const { return (bits_[wordIndex(bit)] >> bitOffset(bit)) & 1ULL; }
 
-    void toggle(size_t bit) {
-        bits_[wordIndex(bit)] ^= (1ULL << bitOffset(bit));
-    }
+    void toggle(size_t bit) { bits_[wordIndex(bit)] ^= (1ULL << bitOffset(bit)); }
 
     size_t count() const {
         return std::accumulate(bits_.begin(), bits_.end(), 0ULL,
@@ -149,6 +137,14 @@ public:
 
     // Inequality operator
     bool operator!=(const Bitset &other) const { return !(*this == other); }
+
+    Bitset(const Bitset &)            = default;
+    Bitset(Bitset &&)                 = default;
+    Bitset &operator=(const Bitset &) = default;
+    Bitset &operator=(Bitset &&)      = default;
+
+    // create delete method that clears the bitset
+    ~Bitset() { bits_.fill(0); }
 };
 
 namespace std {
@@ -160,3 +156,10 @@ struct hash<Bitset<N_BITS>> {
     }
 };
 } // namespace std
+
+template <size_t N_BITS>
+struct BitsetHash {
+    size_t operator()(const Bitset<N_BITS>& bitset) const noexcept {
+        return XXH3_64bits(bitset.bits_.data(), bitset.bits_.size() * sizeof(uint64_t));
+    }
+};

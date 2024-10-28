@@ -61,6 +61,10 @@ struct BucketArc {
         if (resource_increment != other.resource_increment) return resource_increment < other.resource_increment;
         return fixed < other.fixed;
     }
+
+    ~BucketArc() {
+        resource_increment.clear(); // Explicitly clear to release vector memory if pooled
+    }
 };
 
 /**
