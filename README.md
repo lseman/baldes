@@ -25,8 +25,7 @@
 </table>
 
 
-The algorithm is based on the approach presented in the paper:  
-**A Bucket Graph Based Labeling Algorithm for Vehicle Routing** by Sadykov et al.
+The algorithm is based on state-of-the-art RCESPP techniques, including interior point stabilization, limited memory subset row cuts and the so called bucket graph labelling.
 
 ## 📝 Overview
 
@@ -70,6 +69,16 @@ Some features are experimental and subject to ongoing improvements:
 - [SuiteSparse](https://github.com/DrTimothyAldenDavis/SuiteSparse) optional for using CHOLMOD as IPM solver instead of Eigen built-in solvers
 - [Gurobi](https://www.gurobi.com/) for using Gurobi as the MIP solver
 
+###  macOS
+
+For macOS, it is recommended to install latest llvm via homebrew.
+
+```bash
+brew install llvm
+export CC=/opt/homebrew/opt/llvm/bin/clang
+export CXX=/opt/homebrew/opt/llvm/bin/clang++
+export PATH=/opt/homebrew/opt/llvm/bin:$PATH
+```
 
 ### ⚙️ Compiling
 
@@ -91,14 +100,13 @@ Make sure the `GUROBI_HOME` environment variable is set.
 | ----------------------- | -------------------------------------- | ------- |
 | `RIH`                   | Enable improvement heuristics          | OFF     |
 | `RCC`$^2$               | Enable RCC cuts                        | OFF     |
-| `SRC3`$^2$              | Enable classical SRC cuts              | OFF     |
 | `SRC`                   | Enable limited memory SRC cuts         | ON      |
 | `UNREACHABLE_DOMINANCE` | Enable unreachable dominance           | OFF     |
 | `MCD`                   | Perform MCD on instance capacities     | OFF     |
 | `LIMITED_BUCKETS`       | Limit the capacity of the buckets      | OFF     |
 | `SORTED_LABELS`         | Sort labels on bucket insertion        | OFF     |
-| `STAB`$^3$              | Use dynamic-alpha smooth stabilization | ON      |
-| `IPM`$^3$               | Use interior point stabilization       | OFF     |
+| `STAB`$^3$              | Use dynamic-alpha smooth stabilization | OFF     |
+| `IPM`$^3$               | Use interior point stabilization       | ON      |
 | `TR`                    | Use trust region stabilization         | OFF     |
 | `WITH_PYTHON`           | Enable the python wrapper              | OFF     |
 | `SCHRODINGER`           | Enable schrodinger pool                | OFF     |

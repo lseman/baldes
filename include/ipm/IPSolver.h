@@ -1,7 +1,6 @@
 #pragma once
 
 #include "Definitions.h"
-#include "fmt/base.h"
 #include <Eigen/Dense>
 #include <Eigen/Sparse>
 #include <Eigen/SparseCholesky>
