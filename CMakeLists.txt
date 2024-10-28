@@ -327,7 +327,7 @@ set(FPSOURCE
     third_party/fpmax/fp_tree.cpp third_party/fpmax/fp_node.cpp)
 
 set(IPM_SOURCES src/IPSolver.cpp)
-set(SRC_SOURCES src/SRC.cpp src/SRCHelper.cpp)
+set(SRC_SOURCES src/SRC.cpp src/HighOrderSRC.cpp)
 
 # Define a list for the source files that will be included
 set(EXECUTABLE_SOURCES ${SOURCES} ${HGS_SOURCES} ${FPSOURCE})
