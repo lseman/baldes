@@ -100,22 +100,17 @@ public:
 
     MIPProblem mip = MIPProblem("node", 0, 0);
 
-// node specific
-#ifdef SRC
-    std::vector<Constraint *> SRCconstraints;
-    using LimitedMemoryRank1CutsPtr = std::shared_ptr<LimitedMemoryRank1Cuts>;
-    LimitedMemoryRank1CutsPtr r1c   = std::make_shared<LimitedMemoryRank1Cuts>();
-#endif
+    // node specific
+    SRC_MODE_BLOCK(std::vector<Constraint *> SRCconstraints;
+                   using LimitedMemoryRank1CutsPtr = std::shared_ptr<LimitedMemoryRank1Cuts>;
+                   LimitedMemoryRank1CutsPtr r1c   = std::make_shared<LimitedMemoryRank1Cuts>();)
 
     ModelData                                    matrix;
     std::vector<Path>                            paths;
     ankerl::unordered_dense::set<Path, PathHash> pathSet;
 
-#ifdef RCC
-    CnstrMgrPointer oldCutsCMP = nullptr;
-    using RCCManagerPtr        = std::shared_ptr<RCCManager>;
-    RCCManagerPtr rccManager   = std::make_shared<RCCManager>();
-#endif
+    RCC_MODE_BLOCK(CnstrMgrPointer oldCutsCMP = nullptr; using RCCManagerPtr = std::shared_ptr<RCCManager>;
+                   RCCManagerPtr   rccManager                                = std::make_shared<RCCManager>();)
 
     void addPath(Path path) { paths.emplace_back(path); }
 
@@ -140,9 +135,8 @@ public:
 #endif
         generateUUID();
         this->initialized = true;
-#ifdef RCC
-        CMGR_CreateCMgr(&oldCutsCMP, 100); // For old cuts, if needed
-#endif
+        RCC_MODE_BLOCK(CMGR_CreateCMgr(&oldCutsCMP, 100); // For old cuts, if needed
+        )
     };
 
     void setPaths(std::vector<Path> paths) { this->paths = paths; }
@@ -365,9 +359,9 @@ public:
 
     std::vector<BranchingQueueItem> historyCandidates;
 
-    Constraint *addBranchingConstraint(double rhs, const BranchingDirection &sense, const CandidateType &ctype,
-                                       std::optional<std::variant<int, std::pair<int, int>>> payload = std::nullopt) {
-
+    Constraint *addBranchingConstraint(
+        double rhs, const BranchingDirection &sense, const CandidateType &ctype,
+        std::optional<std::variant<int, std::pair<int, int>, std::vector<int>>> payload = std::nullopt) {
         // Get the decision variables from the MIP problem
         auto            &variables = mip.getVars(); // Assumes mip is a pointer to MIPProblem
         LinearExpression linExpr;                   // Initialize linear expression for MIP
@@ -403,6 +397,26 @@ public:
                                 paths[i].timesArc(arg.first, arg.second) ? 1.0 : 0.0); // Use pair payload
                         } else {
                             throw std::invalid_argument("Payload for Edge must be a std::pair<int, int>.");
+                        }
+                    },
+                    *payload);
+            }
+        } else if (ctype == CandidateType::Cluster) {
+            for (size_t i = 0; i < variables.size(); ++i) {
+                // Use the payload as std::vector<int> for Cluster
+                std::visit(
+                    [&](auto &&arg) {
+                        using T = std::decay_t<decltype(arg)>;
+                        if constexpr (std::is_same_v<T, std::vector<int>>) {
+                            for (int cluster_ele : arg) {
+                                // Assuming `contains` checks if the path contains `cluster_ele`
+                                if (paths[i].contains(cluster_ele)) {
+                                    linExpr.add_or_update_term(variables[i]->get_name(),
+                                                               1.0); // Add term with coefficient 1.0
+                                }
+                            }
+                        } else {
+                            throw std::invalid_argument("Payload for Cluster must be a std::vector<int>.");
                         }
                     },
                     *payload);

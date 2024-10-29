@@ -160,7 +160,7 @@ void printDistanceMatrix(const std::vector<std::vector<double>> &distance) {
 
 using HGSptr = std::shared_ptr<HGS>;
 int main(int argc, char *argv[]) {
-    //py::scoped_interpreter guard{};
+    // py::scoped_interpreter guard{};
 
     printBaldes();
 
@@ -176,8 +176,8 @@ int main(int argc, char *argv[]) {
         std::cerr << "Error reading instance\n";
     }
 
-    HGSptr hgs = std::make_shared<HGS>();
-    auto initialRoutesHGS = hgs->run(instance);
+    HGSptr hgs              = std::make_shared<HGS>();
+    auto   initialRoutesHGS = hgs->run(instance);
 
     std::vector<VRPNode> nodes;
     nodes.clear();

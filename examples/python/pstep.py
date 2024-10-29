@@ -4,10 +4,10 @@
 # %%
 import os
 import sys
-import numpy as np
-import random
+
 # Add the build directory to the Python path
 sys.path.append(os.path.abspath("../../build"))
+
 
 # %%
 
@@ -229,7 +229,7 @@ def solve_tsp(paths, nodes, path_costs, firsts, lasts, cost_matrix, first_time=F
             n, p1, p2, paths, path_costs, firsts, lasts, cost_matrix, num_paths
         )
 
-    #print(paths)
+    # print(paths)
     # Create an environment and model
     env = gp.Env(empty=True)
     env.setParam("LogFile", "tsp.log")

@@ -1,18 +1,18 @@
-#include "LDLTCuda.h"
 #include "Eigen/Core"
 #include "Eigen/Sparse"
+#include "LDLTCuda.h"
 #include "ipm/LDLTSimp.h"
 
 // Type definitions (adjust as needed)
 using CholMatrixType = Eigen::SparseMatrix<double>; // Example
-using Scalar = double;
-using StorageIndex = int;
+using Scalar         = double;
+using StorageIndex   = int;
 using DiagonalScalar = double;
-using RealScalar = double;
+using RealScalar     = double;
 
-using Index = int; // Adjust depending on your needs
-    Scalar                                            m_shiftScale  = Scalar(1);
-    Scalar                                            m_shiftOffset = Scalar(0);
+using Index          = int; // Adjust depending on your needs
+Scalar m_shiftScale  = Scalar(1);
+Scalar m_shiftOffset = Scalar(0);
 
 // Helper function to get symmetric values (replace this with the correct logic)
 __device__ __host__ inline Scalar getSymm(Scalar x) {
@@ -24,20 +24,20 @@ __device__ __host__ inline DiagonalScalar getDiag(Scalar x) {
     return x; // Modify this based on your actual requirement (e.g., conjugate for complex)
 }
 
-
 // CUDA kernel implementation
 template <bool DoLDLT, bool NonHermitian>
-__global__ void factorizeKernel(const StorageIndex *Lp, StorageIndex *Li, Scalar *Lx, DiagonalScalar *diag,
-                                Scalar *y, StorageIndex *pattern, StorageIndex *tags, StorageIndex *nonZerosPerCol,
-                                StorageIndex *parent, Scalar shiftScale, Scalar shiftOffset, StorageIndex size, bool *ok, const CholMatrixType ap) {
+__global__ void factorizeKernel(const StorageIndex *Lp, StorageIndex *Li, Scalar *Lx, DiagonalScalar *diag, Scalar *y,
+                                StorageIndex *pattern, StorageIndex *tags, StorageIndex *nonZerosPerCol,
+                                StorageIndex *parent, Scalar shiftScale, Scalar shiftOffset, StorageIndex size,
+                                bool *ok, const CholMatrixType ap) {
     int task_idx = blockIdx.x * blockDim.x + threadIdx.x;
 
     if (task_idx < size) {
         StorageIndex k = task_idx;
 
-        y[k] = Scalar(0);
-        StorageIndex top = size;
-        tags[k] = k;
+        y[k]              = Scalar(0);
+        StorageIndex top  = size;
+        tags[k]           = k;
         nonZerosPerCol[k] = 0;
 
         for (typename CholMatrixType::InnerIterator it(ap, k); it; ++it) {
@@ -48,7 +48,7 @@ __global__ void factorizeKernel(const StorageIndex *Lp, StorageIndex *Li, Scalar
                 Index len;
                 for (len = 0; tags[i] != k; i = parent[i]) {
                     pattern[len++] = i;
-                    tags[i] = k;
+                    tags[i]        = k;
                 }
 
                 while (len > 0) { pattern[--top] = pattern[--len]; }
@@ -56,20 +56,18 @@ __global__ void factorizeKernel(const StorageIndex *Lp, StorageIndex *Li, Scalar
         }
 
         DiagonalScalar d = getDiag(y[k]) * shiftScale + shiftOffset;
-        y[k] = Scalar(0);
+        y[k]             = Scalar(0);
 
         // Sparse reductions
         for (; top < size; ++top) {
-            Index i = pattern[top];
+            Index  i  = pattern[top];
             Scalar yi = y[i];
-            y[i] = Scalar(0);
+            y[i]      = Scalar(0);
 
             Scalar l_ki = yi / getDiag(diag[i]);
-            Index p2 = Lp[i] + nonZerosPerCol[i];
+            Index  p2   = Lp[i] + nonZerosPerCol[i];
 
-            for (Index p = Lp[i]; p < p2; ++p) {
-                y[Li[p]] -= getSymm(Lx[p]) * yi;
-            }
+            for (Index p = Lp[i]; p < p2; ++p) { y[Li[p]] -= getSymm(Lx[p]) * yi; }
 
             d -= getDiag(l_ki * getSymm(yi));
             Li[p2] = k;
@@ -78,26 +76,25 @@ __global__ void factorizeKernel(const StorageIndex *Lp, StorageIndex *Li, Scalar
         }
 
         diag[k] = d;
-        if (d == RealScalar(0)) {
-            *ok = false;
-        }
+        if (d == RealScalar(0)) { *ok = false; }
     }
 }
 
 // Function definition
-template <bool DoLDLT, bool NonHermitian, typename CholMatrixType, typename Scalar, typename StorageIndex, typename DiagonalScalar>
+template <bool DoLDLT, bool NonHermitian, typename CholMatrixType, typename Scalar, typename StorageIndex,
+          typename DiagonalScalar>
 void CustomSimplicialLDLT::factorize_preordered_cuda(const CholMatrixType &ap) {
-    const StorageIndex size = StorageIndex(ap.rows());
-    const StorageIndex *Lp  = m_matrix.outerIndexPtr();
-    StorageIndex *Li        = m_matrix.innerIndexPtr();
-    Scalar *Lx              = m_matrix.valuePtr();
+    const StorageIndex  size = StorageIndex(ap.rows());
+    const StorageIndex *Lp   = m_matrix.outerIndexPtr();
+    StorageIndex       *Li   = m_matrix.innerIndexPtr();
+    Scalar             *Lx   = m_matrix.valuePtr();
 
     // Allocate device memory
-    Scalar *d_y;
-    StorageIndex *d_pattern, *d_tags, *d_Lp, *d_Li, *d_nonZerosPerCol, *d_parent;
+    Scalar         *d_y;
+    StorageIndex   *d_pattern, *d_tags, *d_Lp, *d_Li, *d_nonZerosPerCol, *d_parent;
     DiagonalScalar *d_diag;
-    Scalar *d_Lx;
-    bool *d_ok;
+    Scalar         *d_Lx;
+    bool           *d_ok;
 
     CUDA_CHECK(cudaMalloc((void **)&d_y, sizeof(Scalar) * size));
     CUDA_CHECK(cudaMalloc((void **)&d_pattern, sizeof(StorageIndex) * size));
@@ -125,9 +122,9 @@ void CustomSimplicialLDLT::factorize_preordered_cuda(const CholMatrixType &ap) {
     int numBlocks = (size + blockSize - 1) / blockSize;
 
     // Launch the kernel
-    factorizeKernel<DoLDLT, NonHermitian><<<numBlocks, blockSize>>>(
-        d_Lp, d_Li, d_Lx, d_diag, d_y, d_pattern, d_tags, d_nonZerosPerCol, d_parent,
-        m_shiftScale, m_shiftOffset, size, d_ok, ap);
+    factorizeKernel<DoLDLT, NonHermitian><<<numBlocks, blockSize>>>(d_Lp, d_Li, d_Lx, d_diag, d_y, d_pattern, d_tags,
+                                                                    d_nonZerosPerCol, d_parent, m_shiftScale,
+                                                                    m_shiftOffset, size, d_ok, ap);
 
     // Synchronize and check for errors
     CUDA_CHECK(cudaDeviceSynchronize());

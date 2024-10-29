@@ -437,10 +437,10 @@ public:
     bool is_less_than(const std::vector<double> &point) const {
         for (size_t i = 0; i < low.size(); ++i) {
             if (high[i] < point[i]) {
-            //if (numericutils::less_than(high[i], point[i])) {
+                // if (numericutils::less_than(high[i], point[i])) {
                 return true;
             } else if (low[i] > point[i]) {
-            //} else if (numericutils::greater_than(low[i], point[i])) {
+                //} else if (numericutils::greater_than(low[i], point[i])) {
                 return false;
             }
         }

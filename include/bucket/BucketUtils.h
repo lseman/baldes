@@ -105,9 +105,9 @@ inline int BucketGraph::get_bucket_number(int node, std::vector<double> &resourc
 
     for (int r = 0; r < MAIN_RESOURCES; ++r) {
         if constexpr (D == Direction::Forward) {
-            resource_values_vec[r] = (resource_values_vec[r]);// + numericutils::eps;
+            resource_values_vec[r] = (resource_values_vec[r]); // + numericutils::eps;
         } else {
-            resource_values_vec[r] = (resource_values_vec[r]);// - numericutils::eps;
+            resource_values_vec[r] = (resource_values_vec[r]); // - numericutils::eps;
         }
     }
     auto val = -1;
@@ -116,11 +116,8 @@ inline int BucketGraph::get_bucket_number(int node, std::vector<double> &resourc
     } else if constexpr (D == Direction::Backward) {
         val = bw_node_interval_trees[node].query(resource_values_vec);
     }
-    if (val < 0) {
-        std::cerr << "BucketGraph::get_bucket_number: Invalid bucket number: " << val << std::endl;
-    }
+    if (val < 0) { std::cerr << "BucketGraph::get_bucket_number: Invalid bucket number: " << val << std::endl; }
     return val;
-
 }
 
 /**
@@ -472,15 +469,12 @@ void BucketGraph::ConcatenateLabel(const Label *L, int &b, Label *&pbest, std::v
         // Branching duals
         if (branching_duals->size() > 0) { cost -= branching_duals->getDual(L_node_id, bucketLprimenode); }
 
-#ifdef SRC
-        decltype(cut_storage)            cutter   = nullptr;
-        decltype(cut_storage->SRCDuals) *SRCDuals = nullptr;
+        SRC_MODE_BLOCK(decltype(cut_storage) cutter = nullptr; decltype(cut_storage->SRCDuals) *SRCDuals = nullptr;
 
-        if constexpr (S > Stage::Three) {
-            cutter   = cut_storage;       // Initialize cutter
-            SRCDuals = &cutter->SRCDuals; // Initialize SRCDuals
-        }
-#endif
+                       if constexpr (S > Stage::Three) {
+                           cutter   = cut_storage;       // Initialize cutter
+                           SRCDuals = &cutter->SRCDuals; // Initialize SRCDuals
+                       })
 
         double L_cost_plus_cost = L->cost + cost;
 
@@ -498,16 +492,14 @@ void BucketGraph::ConcatenateLabel(const Label *L, int &b, Label *&pbest, std::v
             if (L_bw->node_id == L_node_id || !check_feasibility(L, L_bw)) continue;
             double candidate_cost = L_cost_plus_cost + L_bw->cost;
 
-#ifdef SRC
-            if constexpr (S > Stage::Three) {
+            SRC_MODE_BLOCK(if constexpr (S > Stage::Three) {
                 for (auto it = cutter->begin(); it < cutter->end(); ++it) {
                     if ((*SRCDuals)[it->id] == 0) continue;
                     auto den = it->p.den;
                     auto sum = (L->SRCmap[it->id] + L_bw->SRCmap[it->id]);
                     if (sum >= den) { candidate_cost -= (*SRCDuals)[it->id]; }
                 }
-            }
-#endif
+            })
 
             // Check for visited overlap and skip if true
 

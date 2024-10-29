@@ -28,8 +28,8 @@
 
 #include <iostream>
 
-#include "miphandler/MIPHandler.h"
 #include "ankerl/unordered_dense.h"
+#include "miphandler/MIPHandler.h"
 
 // Define the RawArc struct
 struct RCCut {

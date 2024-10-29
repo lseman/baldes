@@ -41,9 +41,9 @@ inline void AMDord(Eigen::SparseMatrix<Scalar, Eigen::ColMajor, StorageIndex>   
     std::vector<StorageIndex> len(n + 1, 0), nv(n + 1, 1), next(n + 1, -1), head(n + 1, -1);
     std::vector<StorageIndex> elen(n + 1, 0), degree(n + 1, 0), w(n + 1, 1), hhead(n + 1, -1);
 
-    //StorageIndex *last = perm.indices().data(); /* use P as workspace for last */
+    // StorageIndex *last = perm.indices().data(); /* use P as workspace for last */
     std::vector<StorageIndex> last(n + 1, -1);
-    
+
     /* --- Initialize quotient graph ---------------------------------------- */
     StorageIndex *Cp = C.outerIndexPtr();
     StorageIndex *Ci = C.innerIndexPtr();
@@ -52,8 +52,8 @@ inline void AMDord(Eigen::SparseMatrix<Scalar, Eigen::ColMajor, StorageIndex>   
     nzmax  = t;
 
     for (i = 0; i <= n; i++) {
-        //head[i]   = -1; // degree list i is empty
-        last[i]   = -1;
+        // head[i]   = -1; // degree list i is empty
+        last[i] = -1;
 
         degree[i] = len[i]; // degree of node i
     }

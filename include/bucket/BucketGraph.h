@@ -341,13 +341,13 @@ public:
     CutStorage          *cut_storage = new CutStorage();
     static constexpr int max_buckets = 10000; // Define maximum number of buckets beforehand
 
-    std::vector<Bucket>           fw_buckets;
-    std::vector<Bucket>           bw_buckets;
+    std::vector<Bucket> fw_buckets;
+    std::vector<Bucket> bw_buckets;
 
     using LabelPoolPtr = std::shared_ptr<LabelPool>;
 
-    LabelPoolPtr                     label_pool_fw = std::make_shared<LabelPool>(100);
-    LabelPoolPtr                     label_pool_bw = std::make_shared<LabelPool>(100);
+    LabelPoolPtr                  label_pool_fw = std::make_shared<LabelPool>(100);
+    LabelPoolPtr                  label_pool_bw = std::make_shared<LabelPool>(100);
     std::vector<BucketArc>        fw_arcs;
     std::vector<BucketArc>        bw_arcs;
     std::vector<Label *>          merged_labels;

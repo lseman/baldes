@@ -17,11 +17,10 @@ template <typename T, typename Container>
 inline std::experimental::simd<T> load_simd(const Container &source, size_t start_index, size_t simd_size) {
     std::experimental::simd<T> result;
     for (size_t i = 0; i < simd_size; ++i) {
-        result[i] = source[start_index + i]->cost;  // Load the cost from each Label
+        result[i] = source[start_index + i]->cost; // Load the cost from each Label
     }
     return result;
 }
-
 
 /**
  * @brief Checks if a new label is dominated by any label in a given vector using SIMD operations.
@@ -74,27 +73,27 @@ inline bool check_dominance_against_vector(const Label *new_label, const std::ve
                         }
                     }
 
-                    // Additional check for Stage::Four and Stage::Enumerate
-                    double sumSRC = 0.0;
-                    if constexpr (S == Stage::Four || S == Stage::Enumerate) {
-                        const auto &SRCDuals = cut_storage->SRCDuals;
-                        if (!SRCDuals.empty()) {
-                            const auto &labelSRCMap    = labels[i + j]->SRCmap;
-                            const auto &newLabelSRCMap = new_label->SRCmap;
+                    SRC_MODE_BLOCK(
+                        // Additional check for Stage::Four and Stage::Enumerate
+                        double sumSRC = 0.0; if constexpr (S == Stage::Four || S == Stage::Enumerate) {
+                            const auto &SRCDuals = cut_storage->SRCDuals;
+                            if (!SRCDuals.empty()) {
+                                const auto &labelSRCMap    = labels[i + j]->SRCmap;
+                                const auto &newLabelSRCMap = new_label->SRCmap;
 
-                            for (size_t k = 0; k < SRCDuals.size(); ++k) {
-                                const auto &den         = cut_storage->getCut(k).p.den;
-                                const auto  labelMod    = labelSRCMap[k] % den;
-                                const auto  newLabelMod = newLabelSRCMap[k] % den;
-                                if (labelMod > newLabelMod) { sumSRC += SRCDuals[k]; }
+                                for (size_t k = 0; k < SRCDuals.size(); ++k) {
+                                    const auto &den         = cut_storage->getCut(k).p.den;
+                                    const auto  labelMod    = labelSRCMap[k] % den;
+                                    const auto  newLabelMod = newLabelSRCMap[k] % den;
+                                    if (labelMod > newLabelMod) { sumSRC += SRCDuals[k]; }
+                                }
                             }
-                        }
 
-                        // SIMD cost comparison after adjusting for SRC Duals
-                        if (labels[i + j]->cost - sumSRC > new_label->cost) {
-                            continue; // Label is not dominated, skip
-                        }
-                    }
+                            // SIMD cost comparison after adjusting for SRC Duals
+                            if (labels[i + j]->cost - sumSRC > new_label->cost) {
+                                continue; // Label is not dominated, skip
+                            }
+                        })
 
                     // Bitmap comparison for dominance
                     if constexpr (S == Stage::Three || S == Stage::Four || S == Stage::Enumerate) {
@@ -137,26 +136,26 @@ inline bool check_dominance_against_vector(const Label *new_label, const std::ve
                 }
             }
 
-            // Check for SRC Duals (if Stage Four or Enumerate)
-            double sumSRC = 0.0;
-            if constexpr (S == Stage::Four || S == Stage::Enumerate) {
-                const auto &SRCDuals = cut_storage->SRCDuals;
-                if (!SRCDuals.empty()) {
-                    const auto &labelSRCMap    = labels[i]->SRCmap;
-                    const auto &newLabelSRCMap = new_label->SRCmap;
+            SRC_MODE_BLOCK(
+                // Check for SRC Duals (if Stage Four or Enumerate)
+                double sumSRC = 0.0; if constexpr (S == Stage::Four || S == Stage::Enumerate) {
+                    const auto &SRCDuals = cut_storage->SRCDuals;
+                    if (!SRCDuals.empty()) {
+                        const auto &labelSRCMap    = labels[i]->SRCmap;
+                        const auto &newLabelSRCMap = new_label->SRCmap;
 
-                    for (size_t k = 0; k < SRCDuals.size(); ++k) {
-                        const auto &den         = cut_storage->getCut(k).p.den;
-                        const auto  labelMod    = labelSRCMap[k] % den;
-                        const auto  newLabelMod = newLabelSRCMap[k] % den;
-                        if (labelMod > newLabelMod) { sumSRC += SRCDuals[k]; }
+                        for (size_t k = 0; k < SRCDuals.size(); ++k) {
+                            const auto &den         = cut_storage->getCut(k).p.den;
+                            const auto  labelMod    = labelSRCMap[k] % den;
+                            const auto  newLabelMod = newLabelSRCMap[k] % den;
+                            if (labelMod > newLabelMod) { sumSRC += SRCDuals[k]; }
+                        }
                     }
-                }
 
-                if (labels[i]->cost - sumSRC > new_label->cost) {
-                    continue; // Label is not dominated, skip
-                }
-            }
+                    if (labels[i]->cost - sumSRC > new_label->cost) {
+                        continue; // Label is not dominated, skip
+                    }
+                })
 
             if constexpr (S == Stage::Three || S == Stage::Four || S == Stage::Enumerate) {
                 const size_t bitmap_size = new_label->visited_bitmap.size();

@@ -31,7 +31,7 @@ public:
     CandidateType      candidateType; // Type of the candidate (Vehicle, Node, or Edge)
 
     // Variant to hold different types of data based on candidate type
-    std::optional<std::variant<int, std::pair<int, int>>> payload = std::nullopt;
+    std::optional<std::variant<int, std::pair<int, int>, std::vector<int>>> payload = std::nullopt;
 
     // Disable copy constructor and copy assignment
     VRPCandidate(const VRPCandidate &)            = delete;

@@ -20,7 +20,6 @@ struct BucketOptions {
     int max_path_size = N_SIZE / 2;
 };
 
-
 enum class Direction { Forward, Backward };
 enum class Stage { One, Two, Three, Four, Enumerate, Fix };
 enum class ArcType { Node, Bucket, Jump };
@@ -29,7 +28,7 @@ enum class Full { Full, Partial, Reverse };
 enum class Status { Optimal, Separation, NotOptimal, Error, Rollback };
 enum class CutType { ThreeRow, FourRow, FiveRow };
 enum class BranchingDirection { Greater, Less, Equal };
-enum class CandidateType { Vehicle, Node, Edge };
+enum class CandidateType { Vehicle, Node, Edge, Cluster };
 
 using Payload = std::optional<std::variant<int, std::pair<int, int>>>; // Optional variant for payload data
                                                                        //
@@ -42,9 +41,11 @@ struct BranchingQueueItem {
     ankerl::unordered_dense::map<int, double>                 g_m;             // Vehicle type aggregation
     ankerl::unordered_dense::map<int, double>                 g_m_v;           // Customer-service aggregation
     ankerl::unordered_dense::map<std::pair<int, int>, double> g_v_vp;          // Edge usage aggregation
-    CandidateType         candidateType; // Type of the candidate (Vehicle, Node, or Edge)
-    std::pair<bool, bool> flags;         // Flags for additional information
-    double                score = 0.0;   // Pseudo-cost or score for the candidate
+    CandidateType                             candidateType; // Type of the candidate (Vehicle, Node, or Edge)
+    std::pair<bool, bool>                     flags;         // Flags for additional information
+    double                                    score = 0.0;   // Pseudo-cost or score for the candidate
+    ankerl::unordered_dense::map<int, double> g_c;           // Cluster aggregation
+    std::vector<int>                          clusters;      // Clusters for the candidate
 };
 
 // Comparator function for Stage enum
@@ -309,6 +310,53 @@ auto parallel_sections(Scheduler &scheduler, Tasks &&...tasks) {
         BW_ACTION;                                   \
     }
 
-inline double roundToTwoDecimalPlaces(double value) {
-    return std::round(value * 100.0) / 100.0;
-}
+inline double roundToTwoDecimalPlaces(double value) { return std::round(value * 100.0) / 100.0; }
+
+#ifdef IPM
+#define RUN_OPTIMIZATION(node, tol)                  \
+    matrix = (node)->extractModelDataSparse();       \
+    (node)->ipSolver->run_optimization(matrix, tol); \
+    solution = (node)->ipSolver->getPrimals();
+#else
+#define RUN_OPTIMIZATION(node, tol) \
+    (node)->optimize();             \
+    solution = (node)->extractSolution();
+#endif
+
+#ifdef SRC
+#define SRC_MODE_BLOCK(code_block) code_block
+#else
+#define SRC_MODE_BLOCK(code_block) // No operation if SRC is not defined
+#endif
+
+#ifdef RCC
+#define RCC_MODE_BLOCK(code_block) code_block
+#else
+#define RCC_MODE_BLOCK(code_block) // No operation if RCC is not defined
+#endif
+
+#define PARALLEL_EXECUTE(tasks, lambda_func, ...)                                               \
+    do {                                                                                        \
+        const int JOBS = std::thread::hardware_concurrency();                                   \
+        exec::static_thread_pool pool(JOBS);                                                    \
+        auto sched = pool.get_scheduler();                                                      \
+                                                                                                \
+        const int chunk_size = (tasks.size() + JOBS - 1) / JOBS;                                \
+        std::mutex tasks_mutex; /* Protect shared resources */                                  \
+                                                                                                \
+        auto bulk_sender = stdexec::bulk(                                                       \
+            stdexec::just(), (tasks.size() + chunk_size - 1) / chunk_size,                      \
+            [&](std::size_t chunk_idx) {                                                        \
+                size_t start_idx = chunk_idx * chunk_size;                                      \
+                size_t end_idx = std::min(start_idx + chunk_size, tasks.size());                \
+                                                                                                \
+                /* Process a chunk of tasks */                                                  \
+                for (size_t task_idx = start_idx; task_idx < end_idx; ++task_idx) {             \
+                    (lambda_func)(tasks[task_idx], tasks_mutex, __VA_ARGS__);                   \
+                }                                                                               \
+            });                                                                                 \
+                                                                                                \
+        /* Submit work to the thread pool and wait for completion */                            \
+        auto work = stdexec::starts_on(sched, bulk_sender);                                     \
+        stdexec::sync_wait(std::move(work));                                                    \
+    } while (0)
