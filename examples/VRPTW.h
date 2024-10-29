@@ -549,6 +549,7 @@ public:
         bucket_graph.incumbent = integer_solution;
 
 #ifdef SRC
+        auto distanceMatrix = node->instance.getDistanceMatrix();
         r1c->setDistanceMatrix(node->instance.getDistanceMatrix());
         r1c->setNodes(nodes);
         CutStorage *cuts         = &r1c->cutStorage;
@@ -811,8 +812,6 @@ public:
                 bucket_graph.augment_ng_memories(solution, allPaths, true, 5, 110, 18, N_SIZE);
 #if defined(SRC3) || defined(SRC)
                 // SRC cuts
-
-                // print SRCconstraints.size()
                 if (!SRCconstraints.empty()) {
                     // print SRCconstraints size
                     std::vector<double> cutDuals;

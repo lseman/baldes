@@ -99,7 +99,6 @@ void CutStorage::addCut(Cut &cut) {
     auto neighbors = cut.neighbors;
     auto p_num     = cut.p.num;
     auto p_dem     = cut.p.den;
-    // auto p_frac = cut.p.frac;
 
     // concatenate p_num and p_dem in a single vector
     auto p_cat = p_num;
@@ -413,6 +412,8 @@ std::pair<bool, bool> LimitedMemoryRank1Cuts::runSeparation(BNBNode *node, std::
     ModelData           matrix;
     auto                cuts_before = cuts->size();
     std::vector<double> solution;
+
+    // print size of SRCconstraints
 #ifdef IPM
     matrix = node->extractModelDataSparse(); // Extract model data
     node->ipSolver->run_optimization(matrix, 1e-8);
@@ -421,10 +422,12 @@ std::pair<bool, bool> LimitedMemoryRank1Cuts::runSeparation(BNBNode *node, std::
     node->optimize();
     solution = node->extractSolution();
 #endif
+    // print size of solution
     separate(matrix.A_sparse, solution);
     size_t i = 0;
     std::for_each(allPaths.begin(), allPaths.end(), [&](auto &path) { path.frac_x = solution[i++]; });
 
+    // print solution size and allPaths size
     auto processCuts = [&]() {
         // Initialize paths with solution values
         auto multipliers = generator->map_rank1_multiplier;
@@ -494,7 +497,6 @@ std::pair<bool, bool> LimitedMemoryRank1Cuts::runSeparation(BNBNode *node, std::
 
     generator->setNodes(nodes);
     generator->generateSepHeurMem4Vertex();
-    
     // Generator operations
     generator->initialize(allPaths);
     generator->generateR1C1();
@@ -514,7 +516,6 @@ std::pair<bool, bool> LimitedMemoryRank1Cuts::runSeparation(BNBNode *node, std::
             }
         }
     }
-
     ////////////////////////////////////////////////////
     // Handle non-violated cuts in a single pass
     ////////////////////////////////////////////////////
