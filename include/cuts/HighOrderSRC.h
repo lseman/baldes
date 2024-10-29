@@ -11,6 +11,7 @@
 
 #include "Common.h"
 #include "Path.h"
+#include "SparseMatrix.h"
 #include "VRPNode.h"
 
 /*
@@ -23,6 +24,8 @@
 #include "Bitset.h"
 #include "utils/Hashes.h"
 
+#include <experimental/simd>
+
 constexpr int INITIAL_RANK_1_MULTI_LABEL_POOL_SIZE              = 100;
 using yzzLong                                                   = Bitset<N_SIZE>;
 using cutLong                                                   = yzzLong;
@@ -32,8 +35,6 @@ constexpr int    max_heuristic_initial_seed_set_size_row_rank1c = 6;
 
 constexpr int    max_num_r1c_per_round = 10;
 constexpr double cut_vio_factor        = 0.1;
-
-#define INITIAL_IDX_R1C (-1)
 
 struct R1c {
     std::pair<std::vector<int>, int> info_r1c{}; // cut and plan
@@ -116,7 +117,8 @@ public:
     void generatePermutations(ankerl::unordered_dense::map<int, int> &count_map, std::vector<int> &result,
                               std::vector<std::vector<int>> &results, int remaining);
 
-    void initialize(const std::vector<Path> &routes) {
+    SparseMatrix matrix;
+    void         initialize(const std::vector<Path> &routes) {
         this->sol = routes;
         initialSupportvector();
         cacheValidRoutesAndMappings(); // Call new caching function
@@ -312,32 +314,31 @@ public:
         cached_map_old_new_routes.reserve(sol.size());
 
         for (int i = 0; i < sol.size(); ++i) {
-            if (sol[i].frac_x > 1e-9) { // Assuming a threshold to select valid routes
+            if (sol[i].frac_x > 1e-3) { // Assuming a threshold to select valid routes
                 cached_valid_routes.push_back(sol[i].frac_x);
                 cached_map_old_new_routes[i] = static_cast<int>(cached_valid_routes.size() - 1);
             }
         }
     }
 
-    // Assuming map_cut_plan_vio is declared as follows
-    std::mutex map_cut_plan_vio_mutex; // Mutex for protecting map_cut_plan_vio
-    void       exactFindBestPermutationForOnePlan(std::vector<int> &cut, const int plan_idx, double &vio) {
+    // declare map_cut_plan_vio_mutex
+    std::mutex map_cut_plan_vio_mutex;
+
+    void exactFindBestPermutationForOnePlan(std::vector<int> &cut, const int plan_idx, double &vio) {
         const int   cut_size = static_cast<int>(cut.size());
         const auto &plan     = map_rank1_multiplier[cut_size][plan_idx];
 
-        // Early exit if denominator is zero
         if (get<1>(plan) == 0) {
             vio = -std::numeric_limits<double>::max();
             return;
         }
 
-        // Generate a unique key for caching based on the cut
         cutLong tmp = 0;
         for (const auto &it : cut) {
             if (it >= 0 && it < v_r_map.size()) tmp.set(it);
         }
 
-        // Attempt to fetch from `map_cut_plan_vio`
+        // Attempt to fetch from map_cut_plan_vio
         {
             std::lock_guard<std::mutex> lock(map_cut_plan_vio_mutex);
             if (auto it = map_cut_plan_vio.find(tmp);
@@ -353,7 +354,6 @@ public:
         const double rhs         = get<2>(plan);
         const auto  &coeffs      = record_map_rank1_combinations[cut_size][plan_idx];
 
-        // Cache route visibility counts to avoid repeated access to `v_r_map`
         ankerl::unordered_dense::map<int, int> map_r_numbers;
         for (int idx : cut) {
             if (idx >= 0 && idx < v_r_map.size()) {
@@ -361,7 +361,6 @@ public:
             }
         }
 
-        // Cache `cut_num_times_vis_routes`
         static thread_local std::vector<std::vector<int>> cut_num_times_vis_routes;
         cut_num_times_vis_routes.clear();
         cut_num_times_vis_routes.resize(cut_size);
@@ -382,14 +381,12 @@ public:
         int                 best_idx = -1;
 
         for (size_t cnt = 0; cnt < coeffs.size(); ++cnt) {
-            // Reuse buffer
             std::fill(num_times_vis_routes.begin(), num_times_vis_routes.end(), 0.0);
 
             for (int i = 0; i < cut_size; ++i) {
                 for (int j : cut_num_times_vis_routes[i]) { num_times_vis_routes[j] += coeffs[cnt][i]; }
             }
 
-            // Calculate violation with parallelization if possible
             double vio_tmp = -rhs;
             for (size_t i = 0; i < num_times_vis_routes.size(); ++i) {
                 num_times_vis_routes[i] =
@@ -405,7 +402,6 @@ public:
 
         vio = best_vio;
 
-        // Prepare sorted cut coefficients
         std::vector<std::pair<int, int>> cut_coeff(cut_size);
         for (int i = 0; i < cut_size; ++i) {
             if (best_idx >= 0 && best_idx < coeffs.size() && i < coeffs[best_idx].size()) {
@@ -413,21 +409,20 @@ public:
             }
         }
 
-        // Sort cut coefficients in descending order of coefficient values
         pdqsort(cut_coeff.begin(), cut_coeff.end(), [](const auto &a, const auto &b) { return a.second > b.second; });
 
-        // Construct new cut
         std::vector<int> new_cut(cut_size);
         std::transform(cut_coeff.begin(), cut_coeff.end(), new_cut.begin(), [](const auto &a) { return a.first; });
 
-        // Update `map_cut_plan_vio` with new cut
         {
             std::lock_guard<std::mutex> lock(map_cut_plan_vio_mutex);
-            if (plan_idx < map_cut_plan_vio[tmp].size()) { map_cut_plan_vio[tmp][plan_idx] = {(new_cut), vio}; }
+            if (plan_idx < map_cut_plan_vio[tmp].size()) { map_cut_plan_vio[tmp][plan_idx] = {new_cut, vio}; }
         }
     }
+    
 
-    const int                        max_heuristic_sep_mem4_row_rank1 = 5;
+    static constexpr  int                        max_heuristic_sep_mem4_row_rank1 = 8;
+
     std::vector<std::vector<double>> cost_mat4_vertex;
     void                             generateSepHeurMem4Vertex() {
         rank1_sep_heur_mem4_vertex.resize(dim);

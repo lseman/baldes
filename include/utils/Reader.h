@@ -325,10 +325,6 @@ inline int VRPTW_read_instance(const std::string &file_name, InstanceData &insta
     // Example output to verify the data
     instance.nN = i + 2;
     instance.nC = i;
-
-    // print instance.nN
-    fmt::print("nN: {}\n", instance.nN);
-
     xcoord[instance.nN - 1]                = xcoord[0];
     ycoord[instance.nN - 1]                = ycoord[0];
     instance.demand[instance.nN - 1]       = instance.demand[0];
@@ -391,7 +387,6 @@ inline int VRPTW_read_instance(const std::string &file_name, InstanceData &insta
 
     if (mtw) { instance.T_max = instance.time_windows[0][0].second; }
 
-    std::cout << "T_max: " << instance.T_max << std::endl;
     instance.T_avg /= static_cast<double>(instance.nC);
 
 #ifdef MCD

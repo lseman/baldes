@@ -131,6 +131,8 @@ public:
         branch(currentBNBNode);
     }
 
+// check if macOS
+#ifdef __APPLE__
     // Solve using multiple threads
     void solveParallel(size_t numThreads) {
         std::vector<std::thread> threads;
@@ -154,6 +156,23 @@ public:
             if (thread.joinable()) { thread.join(); }
         }
     }
+#else
+    void solveParallel(size_t numThreads) {
+        std::vector<std::jthread> threads;
+        for (size_t i = 0; i < numThreads; ++i) {
+            threads.emplace_back([this]() {
+                while (!isSolutionFound()) {
+                    BNBNode *currentBNBNode = getNextBNBNode();
+                    if (currentBNBNode) {
+                        processBNBNode(currentBNBNode);
+                    } else {
+                        std::this_thread::yield(); // Avoid busy-waiting, yield the thread
+                    }
+                }
+            });
+        }
+    }
+#endif
 
     // Non-parallel version of solve
     void solve() {
@@ -169,7 +188,7 @@ public:
 
             problem->evaluate(currentBNBNode);
             double boundValue = problem->bound(currentBNBNode);
-            print_info("Bound value: {}\n", boundValue);
+            print_info("Bound value: {}\n", boundValue / 10);
 
             if (currentBNBNode->getPrune()) {
                 print_info("Pruned node: {}\n", currentBNBNode->getUUID());
@@ -179,11 +198,11 @@ public:
             if (boundValue < globalBestObjective.load()) continue;
 
             auto objectiveValue = problem->objective(currentBNBNode);
-            print_info("Objective value: {}\n", objectiveValue);
+            print_info("Objective value: {}\n", objectiveValue / 10);
 
             if (std::abs(boundValue - objectiveValue) < 1e-2) {
                 fmt::print("\n");
-                fmt::print("\033[34m_SOLUTION FOUND \033[0m: {}\n", objectiveValue);
+                fmt::print("\033[34m_SOLUTION FOUND \033[0m: {}\n", objectiveValue / 10);
 
                 globalBestObjective.store(objectiveValue, std::memory_order_release);
                 markSolutionFound();
@@ -208,4 +227,16 @@ public:
     }
 
     [[nodiscard]] auto getBestObjective() const { return globalBestObjective.load(std::memory_order_acquire); }
+
+    void cleanupNodes() {
+        while (!bestFirstBNBNodes.empty()) {
+            delete bestFirstBNBNodes.top();
+            bestFirstBNBNodes.pop();
+        }
+
+        BNBNode *node;
+        while (otherBNBNodes.try_dequeue(node)) { delete node; }
+    }
+
+    ~BranchAndBound() { cleanupNodes(); }
 };

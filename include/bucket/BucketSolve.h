@@ -424,7 +424,7 @@ std::vector<Label *> BucketGraph::bi_labeling_algorithm() {
     run_labeling_algorithms<S, Full::Partial>(forward_cbar, backward_cbar);
 
     // Acquire the best label from the forward label pool (will later combine with backward)
-    auto best_label = label_pool_fw.acquire();
+    auto best_label = label_pool_fw->acquire();
 
     // Check if the best forward and backward labels can be combined into a feasible solution
     if (check_feasibility(fw_best_label, bw_best_label)) {
@@ -712,7 +712,7 @@ BucketGraph::Extend(const std::conditional_t<M == Mutability::Mut, Label *, cons
 #endif
 
     // Acquire a new label from the pool and initialize it with the new state
-    auto new_label = label_pool.acquire();
+    auto new_label = label_pool->acquire();
     new_label->initialize(to_bucket, new_cost, new_resources, node_id);
 
     // Lambda to create a Label** array with null-termination using the label pool

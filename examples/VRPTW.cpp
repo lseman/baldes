@@ -157,6 +157,8 @@ void printDistanceMatrix(const std::vector<std::vector<double>> &distance) {
  * @param argv The array of command line arguments.
  * @return int Returns 0 on successful execution.
  */
+
+using HGSptr = std::shared_ptr<HGS>;
 int main(int argc, char *argv[]) {
     //py::scoped_interpreter guard{};
 
@@ -174,8 +176,8 @@ int main(int argc, char *argv[]) {
         std::cerr << "Error reading instance\n";
     }
 
-    HGS  hgs;
-    auto initialRoutesHGS = hgs.run(instance);
+    HGSptr hgs = std::make_shared<HGS>();
+    auto initialRoutesHGS = hgs->run(instance);
 
     std::vector<VRPNode> nodes;
     nodes.clear();

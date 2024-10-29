@@ -83,7 +83,7 @@ export PATH=/opt/homebrew/opt/llvm/bin:$PATH
 ### ⚙️ Compiling
 
 ```bash
-cmake -S . -B build -DR_SIZE=1 -DN_SIZE=102 -DSRC=ON -DHGS=5
+cmake -S . -B build -DR_SIZE=1 -DN_SIZE=102 -DSRC=ON -DHGS=3
 cd build
 make -j$nprocs
 ```

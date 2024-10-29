@@ -374,8 +374,8 @@ public:
         auto                     sched = pool.get_scheduler();
 
         // Define chunk size based on performance tuning (adjust as needed)
-        const int chunk_size   = 1;
-        auto      total_chunks = (phase1Candidates.size() + chunk_size - 1) / chunk_size;
+        const int chunk_size   = 10;
+        auto      total_chunks = phase1Candidates.size() / JOBS;
 
         // Parallel bulk execution
         auto bulk_sender = stdexec::bulk(
@@ -464,6 +464,7 @@ public:
         auto generatedCandidates = generateVRPCandidates(node, phase1Candidates);
         candidates.insert(candidates.end(), generatedCandidates.begin(), generatedCandidates.end());
 
+        // TODO: add cluster branching based on MST or other clustering methods
         return candidates;
     }
 };

@@ -6,6 +6,7 @@
  */
 #pragma once
 
+#include "Cut.h"
 #include "Definitions.h"
 
 #include "Pools.h"
@@ -30,7 +31,7 @@ inline std::experimental::simd<T> load_simd(const Container &source, size_t star
  *
  */
 template <Direction D, Stage S>
-inline bool check_dominance_against_vector(const Label *new_label, const std::pmr::vector<Label *> &labels,
+inline bool check_dominance_against_vector(const Label *new_label, const std::vector<Label *> &labels,
                                            const CutStorage *cut_storage) noexcept {
     using namespace std::experimental;
     size_t       size      = labels.size();

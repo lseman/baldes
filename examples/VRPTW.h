@@ -83,7 +83,7 @@ public:
     int addPath(BNBNode *node, const std::vector<Path> paths, bool enumerate = false) {
 #ifdef SRC
         auto &r1c  = node->r1c;
-        auto &cuts = r1c.cutStorage;
+        auto &cuts = r1c->cutStorage;
 #endif
 #ifdef RCC
         auto &rccManager = node->rccManager;
@@ -149,8 +149,8 @@ public:
 #endif
 
 #if defined(RCC) || defined(EXACT_RCC)
-            auto RCCvec         = rccManager.computeRCCCoefficients(label.route);
-            auto RCCconstraints = rccManager.getConstraints();
+            auto RCCvec         = rccManager->computeRCCCoefficients(label.route);
+            auto RCCconstraints = rccManager->getConstraints();
             if (RCCvec.size() > 0) {
                 for (int i = 0; i < RCCvec.size(); i++) {
                     if (abs(RCCvec[i]) > 1e-3) {
@@ -187,7 +187,7 @@ public:
     inline int addColumn(BNBNode *node, const auto &columns, bool enumerate = false) {
 #ifdef SRC
         auto &r1c  = node->r1c;
-        auto &cuts = r1c.cutStorage;
+        auto &cuts = r1c->cutStorage;
 #endif
 #ifdef RCC
         auto &rccManager = node->rccManager;
@@ -255,8 +255,8 @@ public:
 #endif
 
 #if defined(RCC) || defined(EXACT_RCC)
-            auto RCCvec         = rccManager.computeRCCCoefficients(label->nodes_covered);
-            auto RCCconstraints = rccManager.getConstraints();
+            auto RCCvec         = rccManager->computeRCCCoefficients(label->nodes_covered);
+            auto RCCconstraints = rccManager->getConstraints();
             if (RCCvec.size() > 0) {
                 for (int i = 0; i < RCCvec.size(); i++) {
                     if (abs(RCCvec[i]) > 1e-3) {
@@ -291,8 +291,9 @@ public:
      * Handles the cuts for the VRPTW problem.
      *
      */
-    bool cutHandler(LimitedMemoryRank1Cuts &r1c, BNBNode *node, std::vector<Constraint *> &constraints) {
-        auto &cuts    = r1c.cutStorage;
+    bool cutHandler(std::shared_ptr<LimitedMemoryRank1Cuts> &r1c, BNBNode *node,
+                    std::vector<Constraint *> &constraints) {
+        auto &cuts    = r1c->cutStorage;
         bool  changed = false;
 
         if (!cuts.empty()) {
@@ -387,7 +388,7 @@ public:
         // std::vector<Constraint> newConstraints(cutExpressions.size());
         for (size_t i = 0; i < cutExpressions.size(); ++i) {
             auto ctr = model->addConstr(cutExpressions[i] <= rhsValues[i]);
-            rccManager.addCut(arcGroups[i], rhsValues[i], ctr);
+            rccManager->addCut(arcGroups[i], rhsValues[i], ctr);
         }
 
         fmt::print("Added {} RCC cuts\n", cutExpressions.size());
@@ -453,10 +454,10 @@ public:
         CAPSEP_SeparateCapCuts(nVertices - 1, demands.data(), instance.q, edgex.size() - 1, edgex.data(), edgey.data(),
                                edgeval.data(), oldCutsCMP, 5, 1e-4, &intAndFeasible, &maxViolation, cutsCMP);
 
+        // print_cut("Found {} violated RCC cuts, max violation: {}\n", cutsCMP->Size, maxViolation);
+
         if (intAndFeasible) return false; /* Optimal solution found */
         if (cutsCMP->Size == 0) return false;
-
-        // print_cut("Found {} violated RCC cuts, max violation: {}\n", cutsCMP->Size, maxViolation);
 
         std::vector<int>                 rhsValues(cutsCMP->Size);
         std::vector<std::vector<RawArc>> arcGroups(cutsCMP->Size);
@@ -491,10 +492,10 @@ public:
             }
 
             // Add the constraint to the model
-            auto ctr_name = "RCC_cut_" + std::to_string(rccManager.cut_ctr);
+            auto ctr_name = "RCC_cut_" + std::to_string(rccManager->cut_ctr);
             auto ctr      = cutExpr <= rhsValues[i];
             ctr           = model->addConstr(ctr, ctr_name);
-            rccManager.addCut(arcGroups[i], rhsValues[i], ctr);
+            rccManager->addCut(arcGroups[i], rhsValues[i], ctr);
         }
 
         for (auto i = 0; i < cutsCMP->Size; i++) { CMGR_MoveCnstr(cutsCMP, oldCutsCMP, i, 0); }
@@ -548,11 +549,10 @@ public:
         bucket_graph.incumbent = integer_solution;
 
 #ifdef SRC
-        r1c = LimitedMemoryRank1Cuts(nodes);
-        r1c.setDistanceMatrix(node->instance.getDistanceMatrix());
-        CutStorage *cuts         = &r1c.cutStorage;
+        r1c->setDistanceMatrix(node->instance.getDistanceMatrix());
+        r1c->setNodes(nodes);
+        CutStorage *cuts         = &r1c->cutStorage;
         bucket_graph.cut_storage = cuts;
-
 #endif
 
         std::vector<double> cutDuals;
@@ -616,7 +616,7 @@ public:
             if (rcc) {
                 matrix = node->extractModelDataSparse();
 #ifdef IPM
-                node->ipSolver->run_optimization(matrix, 1e-6);
+                node->ipSolver->run_optimization(matrix, 1e-8);
                 solution = node->ipSolver->getPrimals();
 #else
                 node->optimize();
@@ -637,7 +637,7 @@ public:
 // if (!reoptimized) { // node->optimize();
 #ifdef IPM
                 matrix = node->extractModelDataSparse();
-                node->ipSolver->run_optimization(matrix, 1e-6);
+                node->ipSolver->run_optimization(matrix, 1e-8);
                 solution = node->ipSolver->getPrimals();
 //}
 #else
@@ -656,9 +656,9 @@ public:
 
 #if defined(SRC3) || defined(SRC)
                 if (!rcc) {
-                    r1c.allPaths = allPaths;
+                    r1c->allPaths = allPaths;
                     // auto start_time_ = std::chrono::high_resolution_clock::now();
-                    auto srcResult = r1c.runSeparation(node, SRCconstraints);
+                    auto srcResult = r1c->runSeparation(node, SRCconstraints);
                     // auto end_time_   = std::chrono::high_resolution_clock::now();
                     // auto duration_microseconds =
                     //     std::chrono::duration_cast<std::chrono::microseconds>(end_time_ - start_time_).count();
@@ -828,12 +828,13 @@ public:
 #endif
 
 #ifdef RCC
+
                 // RCC cuts
-                if (rccManager.size() > 0) {
+                if (rccManager->size() > 0) {
 #ifndef IPM
-                    auto arc_duals = rccManager.computeDuals(node);
+                    auto arc_duals = rccManager->computeDuals(node);
 #else
-                    auto arc_duals = rccManager.computeDuals(nodeDuals);
+                    auto arc_duals = rccManager->computeDuals(nodeDuals);
 #endif
                     bucket_graph.setArcDuals(arc_duals);
                 }
@@ -842,7 +843,8 @@ public:
                 // Branching duals
                 if (branchingDuals.size() > 0) { branchingDuals.computeDuals(node); }
                 bucket_graph.setDuals(nodeDuals);
-                r1c.setDuals(nodeDuals);
+
+                r1c->setDuals(nodeDuals);
 
                 //////////////////////////////////////////////////////////////////////
                 // CALLING BALDES
@@ -936,7 +938,7 @@ public:
 #endif
 
 #ifdef RCC
-            n_rcc_cuts = rccManager.size();
+            n_rcc_cuts = rccManager->size();
 #endif
 
 #ifdef TR
@@ -1005,12 +1007,11 @@ public:
         constexpr auto reset = "\033[0m";
 
         fmt::print("+---------------------------------------+\n");
-        fmt::print("| {:<14} | {}{:>20}{} |\n", "Bound", blue, relaxed_result, reset);
-        fmt::print("| {:<14} | {}{:>20}{} |\n", "Incumbent", blue, ip_result, reset);
+        fmt::print("| {:<14} | {}{:>20}{} |\n", "Bound", blue, relaxed_result / 10, reset);
+        fmt::print("| {:<14} | {}{:>20}{} |\n", "Incumbent", blue, ip_result / 10, reset);
         fmt::print("| {:<14} | {}{:>16}.{:03}{} |\n", "CG Duration", blue, duration_seconds, duration_milliseconds,
                    reset);
         fmt::print("+---------------------------------------+\n");
-        
     }
 
     void branch(BNBNode *node) {
@@ -1055,7 +1056,6 @@ public:
     bool heuristicCG(BNBNode *node, int max_iter = 2000) {
         node->relaxNode();
         node->optimize();
-
         relaxed_result = std::numeric_limits<double>::max();
 
         // check if feasible
@@ -1063,12 +1063,11 @@ public:
             node->setPrune(true);
             return false;
         }
-
         auto &matrix         = node->matrix;
         auto &allPaths       = node->paths;
         auto &branchingDuals = node->branchingDuals;
 
-        int bucket_interval = 100;
+        int bucket_interval = 20;
         int time_horizon    = instance.T_max;
 
         numConstrs                = node->getIntAttr("NumConstrs");
@@ -1081,6 +1080,7 @@ public:
         // print distance matrix size
         bucket_graph.set_distance_matrix(instance.getDistanceMatrix(), 8);
         bucket_graph.branching_duals = &branchingDuals;
+        bucket_graph.A_MAX           = N_SIZE;
 
         // node->optimize();
         matrix                 = node->extractModelDataSparse();
@@ -1111,8 +1111,8 @@ public:
 
         auto                 inner_obj = 0.0;
         std::vector<Label *> paths;
-        std::vector<double>  solution;
-        bool                 can_add = true;
+        std::vector<double>  solution = node->extractSolution();
+        bool                 can_add  = true;
 
 #ifdef STAB
         Stabilization stab(0.5, nodeDuals);
@@ -1126,14 +1126,14 @@ public:
         double obj;
         auto   colAdded = 0;
 
-        auto &r1c = node->r1c;
 #ifdef RCC
         auto &rccManager = node->rccManager;
+
 #endif
 
 #ifdef SRC
-        r1c              = LimitedMemoryRank1Cuts(allNodes);
-        CutStorage *cuts = &r1c.cutStorage;
+        auto &r1c  = node->r1c;
+        auto  cuts = &r1c->cutStorage;
 #endif
 
 #ifdef SRC
@@ -1141,14 +1141,15 @@ public:
 #endif
 
         for (int iter = 0; iter < max_iter; ++iter) {
-            reoptimized = false;
-
 #ifdef STAB
             stab.update_stabilization_after_master_optim(nodeDuals);
             misprice = true;
             while (misprice) {
                 nodeDuals = stab.getStabDualSol(nodeDuals);
                 solution  = node->extractSolution();
+#else
+            node->optimize();
+            solution = node->extractSolution();
 #endif
 
                 bool integer = true;

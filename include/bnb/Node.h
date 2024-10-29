@@ -25,10 +25,10 @@
 
 #include "VRPCandidate.h"
 
-#include <optional>
-#include <variant>
 #include <mutex>
+#include <optional>
 #include <shared_mutex>
+#include <variant>
 
 // include unordered_dense_map
 #include "ankerl/unordered_dense.h"
@@ -103,16 +103,18 @@ public:
 // node specific
 #ifdef SRC
     std::vector<Constraint *> SRCconstraints;
-    LimitedMemoryRank1Cuts    r1c;
+    using LimitedMemoryRank1CutsPtr = std::shared_ptr<LimitedMemoryRank1Cuts>;
+    LimitedMemoryRank1CutsPtr r1c   = std::make_shared<LimitedMemoryRank1Cuts>();
 #endif
 
-    ModelData         matrix;
-    std::vector<Path> paths;
+    ModelData                                    matrix;
+    std::vector<Path>                            paths;
     ankerl::unordered_dense::set<Path, PathHash> pathSet;
 
 #ifdef RCC
     CnstrMgrPointer oldCutsCMP = nullptr;
-    RCCManager      rccManager;
+    using RCCManagerPtr        = std::shared_ptr<RCCManager>;
+    RCCManagerPtr rccManager   = std::make_shared<RCCManager>();
 #endif
 
     void addPath(Path path) { paths.emplace_back(path); }
@@ -122,7 +124,7 @@ public:
     BNBNode                    *parent = nullptr;
     std::vector<VRPCandidate *> raisedVRPChildren;
 
-    explicit BNBNode(const MIPProblem &eModel) {
+    explicit BNBNode(const MIPProblem eModel) {
 #ifdef IPM
         ipSolver = new IPSolver();
 #endif
@@ -205,18 +207,18 @@ public:
     }
 
     BNBNode *newChild() {
+        // TODO: verify if this is the best approach
+        auto emipClone = mip.clone();
         // Create a new child node
-        auto child = new BNBNode(mip);
+        auto child = new BNBNode(*emipClone);
         // Set the parent of the child node to this node
         child->parent            = this;
         child->paths             = paths;
         child->historyCandidates = historyCandidates;
         child->candidates        = candidates;
         child->r1c               = r1c;
-        child->matrix            = matrix;
         child->rccManager        = rccManager;
-
-        // Add the child node to the list of children
+        child->matrix = matrix;
         children.push_back(child);
         // Return the new child node
         return child;
@@ -249,9 +251,9 @@ public:
     double getSlack(int constraintIndex, const std::vector<double> &solution) {
 
 #if defined(IPM)
-    return mip.getSlack(constraintIndex, solution);
+        return mip.getSlack(constraintIndex, solution);
 #elif defined(GUROBI)
-        return solver->getSlack(constraintIndex);     
+        return solver->getSlack(constraintIndex);
 #endif
     }
 
@@ -355,73 +357,72 @@ public:
 
     std::vector<BranchingQueueItem> historyCandidates;
 
-    Constraint addBranchingConstraint(double rhs, const BranchingDirection &sense, const CandidateType &ctype,
-                                      std::optional<std::variant<int, std::pair<int, int>>> payload = std::nullopt) {
-        /*
-                // Get the decision variables from the model
-                auto varsPtr = model->getVars(); // Assumes model is a pointer to GRBModel
-                // deference the pointer
-                auto vars = std::vector<GRBVar>(varsPtr, varsPtr + model->get(GRB_IntAttr_NumVars));
+    Constraint *addBranchingConstraint(double rhs, const BranchingDirection &sense, const CandidateType &ctype,
+                                       std::optional<std::variant<int, std::pair<int, int>>> payload = std::nullopt) {
 
-                GRBLinExpr linExpr; // Initialize linExpr
+        // Get the decision variables from the MIP problem
+        auto            &variables = mip.getVars(); // Assumes mip is a pointer to MIPProblem
+        LinearExpression linExpr;                   // Initialize linear expression for MIP
 
-                if (ctype == CandidateType::Vehicle) {
-                    for (auto i = 0; i < vars.size(); i++) { linExpr += vars[i]; }
-                } else if (ctype == CandidateType::Node) {
-                    for (auto i = 0; i < vars.size(); i++) {
-                        // Use the payload as int for Node
-                        std::visit(
-                            [&](auto &&arg) {
-                                using T = std::decay_t<decltype(arg)>;
-                                if constexpr (std::is_same_v<T, int>) {
-                                    linExpr += vars[i] * paths[i].contains(arg); // Use the int payload
-                                } else {
-                                    throw std::invalid_argument("Payload for Node must be an int.");
-                                }
-                            },
-                            *payload);
-                    }
-                } else if (ctype == CandidateType::Edge) {
-                    for (auto i = 0; i < vars.size(); i++) {
-                        // Use the payload as std::pair<int, int> for Edge
-                        std::visit(
-                            [&](auto &&arg) {
-                                using T = std::decay_t<decltype(arg)>;
-                                if constexpr (std::is_same_v<T, std::pair<int, int>>) {
-                                    linExpr += vars[i] * paths[i].timesArc(arg.first, arg.second); // Use the
-           std::pair payload } else { throw std::invalid_argument("Payload for Edge must be a std::pair<int,
-           int>.");
-                                }
-                            },
-                            *payload);
-                    }
-                }
+        if (ctype == CandidateType::Vehicle) {
+            for (auto *var : variables) {
+                linExpr.add_or_update_term(var->get_name(), 1.0); // Add each variable with coefficient 1.0
+            }
+        } else if (ctype == CandidateType::Node) {
+            for (size_t i = 0; i < variables.size(); ++i) {
+                // Use the payload as int for Node
+                std::visit(
+                    [&](auto &&arg) {
+                        using T = std::decay_t<decltype(arg)>;
+                        if constexpr (std::is_same_v<T, int>) {
+                            linExpr.add_or_update_term(variables[i]->get_name(),
+                                                       paths[i].contains(arg) ? 1.0 : 0.0); // Use int payload
+                        } else {
+                            throw std::invalid_argument("Payload for Node must be an int.");
+                        }
+                    },
+                    *payload);
+            }
+        } else if (ctype == CandidateType::Edge) {
+            for (size_t i = 0; i < variables.size(); ++i) {
+                // Use the payload as std::pair<int, int> for Edge
+                std::visit(
+                    [&](auto &&arg) {
+                        using T = std::decay_t<decltype(arg)>;
+                        if constexpr (std::is_same_v<T, std::pair<int, int>>) {
+                            linExpr.add_or_update_term(
+                                variables[i]->get_name(),
+                                paths[i].timesArc(arg.first, arg.second) ? 1.0 : 0.0); // Use pair payload
+                        } else {
+                            throw std::invalid_argument("Payload for Edge must be a std::pair<int, int>.");
+                        }
+                    },
+                    *payload);
+            }
+        }
 
-                // Add the constraint based on the sense
-                GRBConstr constraint;
-                if (sense == BranchingDirection::Greater) {
-                    constraint = model->addConstr(linExpr, GRB_GREATER_EQUAL, rhs);
-                } else if (sense == BranchingDirection::Less) {
-                    constraint = model->addConstr(linExpr, GRB_LESS_EQUAL, rhs);
-                } else {
-                    constraint = model->addConstr(linExpr, GRB_EQUAL, rhs);
-                }
+        // Add the constraint to MIP based on the branching direction
+        Constraint *constraint;
+        if (sense == BranchingDirection::Greater) {
+            constraint = mip.add_constraint(linExpr, rhs, '>');
+        } else if (sense == BranchingDirection::Less) {
+            constraint = mip.add_constraint(linExpr, rhs, '<');
+        } else {
+            constraint = mip.add_constraint(linExpr, rhs, '=');
+        }
 
-                // Update the model to reflect the changes
-                model->update();
+        // Update the MIP structure if necessary
+        // mip->update();
 
-                return constraint;
-                */
-        return Constraint();
+        return constraint;
     }
-
     BranchingDuals branchingDuals;
 
     void enforceBranching() {
         // Iterate over the candidates and enforce the branching constraints
         for (const auto &candidate : candidates) {
-            Constraint ctr = addBranchingConstraint(candidate->boundValue, candidate->boundType,
-                                                    candidate->candidateType, candidate->payload);
+            Constraint *ctr = addBranchingConstraint(candidate->boundValue, candidate->boundType,
+                                                     candidate->candidateType, candidate->payload);
             branchingDuals.addCandidate(candidate, ctr);
         }
     }

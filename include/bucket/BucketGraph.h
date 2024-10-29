@@ -326,11 +326,7 @@ public:
 
     ~BucketGraph() {
         bi_pool.request_stop();
-        //delete cut_storage;
-        //delete branching_duals;
-        //delete ils;
-        //label_pool_fw.clear();
-        //label_pool_bw.clear();
+        merged_labels.clear();
     }
 
     int fw_buckets_size = 0;
@@ -347,8 +343,11 @@ public:
 
     std::vector<Bucket>           fw_buckets;
     std::vector<Bucket>           bw_buckets;
-    LabelPool                     label_pool_fw = LabelPool(100);
-    LabelPool                     label_pool_bw = LabelPool(100);
+
+    using LabelPoolPtr = std::shared_ptr<LabelPool>;
+
+    LabelPoolPtr                     label_pool_fw = std::make_shared<LabelPool>(100);
+    LabelPoolPtr                     label_pool_bw = std::make_shared<LabelPool>(100);
     std::vector<BucketArc>        fw_arcs;
     std::vector<BucketArc>        bw_arcs;
     std::vector<Label *>          merged_labels;
@@ -796,8 +795,8 @@ public:
      * used to clear any existing labels and prepare the pools for reuse.
      */
     void reset_pool() {
-        label_pool_fw.reset();
-        label_pool_bw.reset();
+        label_pool_fw->reset();
+        label_pool_bw->reset();
     }
 
     /**

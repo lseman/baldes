@@ -415,7 +415,7 @@ std::pair<bool, bool> LimitedMemoryRank1Cuts::runSeparation(BNBNode *node, std::
     std::vector<double> solution;
 #ifdef IPM
     matrix = node->extractModelDataSparse(); // Extract model data
-    node->ipSolver->run_optimization(matrix, 1e-6);
+    node->ipSolver->run_optimization(matrix, 1e-8);
     solution = node->ipSolver->getPrimals();
 #else
     node->optimize();

@@ -45,6 +45,41 @@ class MIPProblem {
 public:
     MIPProblem(const std::string &name, int num_rows, int num_cols) : name(name), sparse_matrix(num_rows, num_cols) {}
 
+    MIPProblem *clone() const {
+        // Create a new MIPProblem instance with the same name and matrix dimensions
+        auto *clone = new MIPProblem(name, sparse_matrix.num_rows, sparse_matrix.num_cols);
+
+        // Clone variables
+        for (const auto *var : variables) {
+            Variable *newVar = new Variable(var->get_name(), var->get_type(), var->get_lb(), var->get_ub(),
+                                            var->get_objective_coefficient());
+            newVar->set_index(var->index());
+            clone->variables.push_back(newVar);
+            clone->var_name_to_index[var->get_name()] = newVar->index();
+        }
+
+        // Clone constraints
+        for (auto *constraint : constraints) {
+            LinearExpression clonedExpr;
+            for (auto &[var_name, coeff] : constraint->get_expression().get_terms()) {
+                clonedExpr.add_or_update_term(var_name, coeff);
+            }
+            Constraint *newConstraint = new Constraint(clonedExpr, constraint->get_rhs(), constraint->get_relation());
+            newConstraint->set_index(constraint->index());
+            clone->constraints.push_back(newConstraint);
+            clone->b_vec.push_back(newConstraint->get_rhs());
+        }
+
+        // Clone the objective
+        clone->objective      = objective;
+        clone->objective_type = objective_type;
+
+        // Deep copy the sparse matrix
+        clone->sparse_matrix = sparse_matrix;
+
+        return clone;
+    }
+
     // Add a variable to the problem
     Variable *add_variable(const std::string &var_name, VarType type, double lb = 0.0, double ub = 1.0,
                            double obj_coeff = 0.0) {
