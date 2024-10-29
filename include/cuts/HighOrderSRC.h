@@ -14,6 +14,8 @@
 #include "SparseMatrix.h"
 #include "VRPNode.h"
 
+#include <ranges>
+
 /*
 #include <pybind11/embed.h>
 #include <pybind11/stl.h>
@@ -33,7 +35,7 @@ constexpr double tolerance                                      = 1e-6;
 constexpr int    max_row_rank1                                  = 5;
 constexpr int    max_heuristic_initial_seed_set_size_row_rank1c = 6;
 
-constexpr int    max_num_r1c_per_round = 10;
+constexpr int    max_num_r1c_per_round = 20;
 constexpr double cut_vio_factor        = 0.1;
 
 struct R1c {
@@ -179,6 +181,7 @@ public:
         rank1_multi_mem_plan_map.clear();
         cuts.clear();
         rank1_multi_label_pool.resize(INITIAL_RANK_1_MULTI_LABEL_POOL_SIZE);
+        cut_cache.clear();
     }
 
     void getHighDimCuts() {
@@ -323,6 +326,9 @@ public:
 
     // declare map_cut_plan_vio_mutex
     std::mutex map_cut_plan_vio_mutex;
+    std::mutex cut_cache_mutex;
+
+    ankerl::unordered_dense::map<std::vector<int>, std::vector<std::vector<int>>, VectorIntHash> cut_cache;
 
     void exactFindBestPermutationForOnePlan(std::vector<int> &cut, const int plan_idx, double &vio) {
         const int   cut_size = static_cast<int>(cut.size());
@@ -335,20 +341,24 @@ public:
 
         cutLong tmp = 0;
         for (const auto &it : cut) {
-            if (it >= 0 && it < v_r_map.size()) tmp.set(it);
+            if (it >= 0 && it < v_r_map.size()) {
+                tmp.set(it); // Optimized bitset handling by reducing `v_r_map` size checks
+            }
         }
 
-        // Attempt to fetch from map_cut_plan_vio
+        // Cache and minimize mutex usage
+        bool found_in_cache = false;
         {
             std::lock_guard<std::mutex> lock(map_cut_plan_vio_mutex);
             if (auto it = map_cut_plan_vio.find(tmp);
                 it != map_cut_plan_vio.end() && plan_idx < it->second.size() && !it->second[plan_idx].first.empty()) {
-                vio = it->second[plan_idx].second;
-                return;
+                vio            = it->second[plan_idx].second;
+                found_in_cache = true;
             } else {
                 map_cut_plan_vio[tmp].resize(7);
             }
         }
+        if (found_in_cache) return;
 
         const int    denominator = get<1>(plan);
         const double rhs         = get<2>(plan);
@@ -362,17 +372,33 @@ public:
         }
 
         static thread_local std::vector<std::vector<int>> cut_num_times_vis_routes;
-        cut_num_times_vis_routes.clear();
-        cut_num_times_vis_routes.resize(cut_size);
 
-        for (int i = 0; i < cut_size; ++i) {
-            int c = cut[i];
-            if (c >= 0 && c < v_r_map.size()) {
-                for (const auto &pr : v_r_map[c]) {
-                    if (auto it = cached_map_old_new_routes.find(pr.first); it != cached_map_old_new_routes.end()) {
-                        cut_num_times_vis_routes[i].insert(cut_num_times_vis_routes[i].end(), pr.second, it->second);
+        // Check if `cut` is already in cache
+        {
+            std::lock_guard<std::mutex> lock(cut_cache_mutex);
+            if (auto cache_it = cut_cache.find(cut); cache_it != cut_cache.end()) {
+                // Retrieve cached value if it exists
+                cut_num_times_vis_routes = cache_it->second;
+            } else {
+                // Calculate and initialize `cut_num_times_vis_routes`
+                cut_num_times_vis_routes.clear();
+                cut_num_times_vis_routes.resize(cut_size);
+
+                for (int i = 0; i < cut_size; ++i) {
+                    int c = cut[i];
+                    if (c >= 0 && c < v_r_map.size()) {
+                        for (const auto &pr : v_r_map[c]) {
+                            if (auto it = cached_map_old_new_routes.find(pr.first);
+                                it != cached_map_old_new_routes.end()) {
+                                cut_num_times_vis_routes[i].insert(cut_num_times_vis_routes[i].end(), pr.second,
+                                                                   it->second);
+                            }
+                        }
                     }
                 }
+
+                // Now, safely insert the newly computed `cut_num_times_vis_routes` into the cache
+                cut_cache[cut] = cut_num_times_vis_routes;
             }
         }
 
@@ -380,6 +406,7 @@ public:
         double              best_vio = -std::numeric_limits<double>::max();
         int                 best_idx = -1;
 
+        // Loop through coeffs only once, using cumulative values for `num_times_vis_routes`
         for (size_t cnt = 0; cnt < coeffs.size(); ++cnt) {
             std::fill(num_times_vis_routes.begin(), num_times_vis_routes.end(), 0.0);
 
@@ -399,7 +426,6 @@ public:
                 best_idx = static_cast<int>(cnt);
             }
         }
-
         vio = best_vio;
 
         std::vector<std::pair<int, int>> cut_coeff(cut_size);
@@ -434,19 +460,24 @@ public:
     static constexpr int max_heuristic_sep_mem4_row_rank1 = 8;
 
     void generateSepHeurMem4Vertex() {
-        // print size of rank1_sep_heur_mem4_vertex
         rank1_sep_heur_mem4_vertex.resize(dim);
-        std::vector<std::pair<int, double>> cost(dim);
+
+        // Precompute half-costs for nodes to avoid repeated divisions
+        std::vector<double> half_cost(dim);
+        for (int i = 0; i < dim; ++i) { half_cost[i] = nodes[i].cost / 2; }
 
         for (int i = 0; i < dim; ++i) {
+            // Initialize and populate the `cost` vector directly for each `i`
+            std::vector<std::pair<int, double>> cost(dim);
             cost[0] = {0, INFINITY};
-            for (int j = 1; j < dim - 1; ++j) {
-                cost[j] = {j, cost_mat4_vertex[i][j] - (nodes[i].cost / 2 + nodes[j].cost / 2)};
-            }
 
-            // Sort by cost
-            pdqsort(cost.begin(), cost.end(), [](const auto &a, const auto &b) { return a.second < b.second; });
+            for (int j = 1; j < dim - 1; ++j) { cost[j] = {j, cost_mat4_vertex[i][j] - (half_cost[i] + half_cost[j])}; }
 
+            // Use partial sort to get only the top `max_heuristic_sep_mem4_row_rank1` elements
+            std::partial_sort(cost.begin(), cost.begin() + max_heuristic_sep_mem4_row_rank1, cost.end(),
+                              [](const auto &a, const auto &b) { return a.second < b.second; });
+
+            // Set bits in `vst2` for the smallest costs
             cutLong &vst2 = rank1_sep_heur_mem4_vertex[i];
             for (int k = 0; k < max_heuristic_sep_mem4_row_rank1; ++k) { vst2.set(cost[k].first); }
         }
@@ -819,18 +850,18 @@ public:
         int mod = sum % denominator;
 
         // Prepare key for rank1_multi_mem_plan_map
-        std::vector<int> key = vis;
+        std::vector<int> key;
+        key.reserve(vis.size() + 1); // Reserve size to avoid reallocations
+        key.insert(key.end(), vis.begin(), vis.end());
         key.push_back(mod);
 
         auto &other2 = rank1_multi_mem_plan_map[key];
         if (other2.empty()) {
-            // Initialize deque to hold temporary states directly
             std::deque<std::tuple<int, int, std::vector<int>, std::vector<int>>> states;
             states.emplace_back(0, mod, vis, std::vector<int>{});
 
-            // Expand deque to cover necessary permutations
             while (!states.empty()) {
-                auto [beg, tor, left_c, mem_c] = states.front();
+                auto [beg, tor, left_c, mem_c] = std::move(states.front());
                 states.pop_front();
 
                 int cnt = 0;
@@ -844,12 +875,10 @@ public:
                                                 std::vector<int>(left_c.begin() + j + 1, left_c.end()), mem_c);
                         }
                         int rem = beg + j;
-                        if (rem != static_cast<int>(vis.size()) - 1) {
-                            mem_c.push_back(rem); // Maintain sequence order
-                        }
+                        if (rem != static_cast<int>(vis.size()) - 1) { mem_c.push_back(rem); }
                     }
                 }
-                other2.push_back(mem_c); // Record result in other2
+                other2.push_back(std::move(mem_c));
             }
         }
 
@@ -860,7 +889,7 @@ public:
             }
         }
 
-        // Track which segments are visible in each sub-plan
+        // Track visibility across segments
         std::vector<ankerl::unordered_dense::set<int>> num_vis(dim);
         for (size_t i = 0; i < other2.size(); ++i) {
             for (int j : other2[i]) {
@@ -868,7 +897,7 @@ public:
             }
         }
 
-        // Update `mem` based on `num_vis` and clear matched segments
+        // Update `mem` and clear segments based on visibility
         for (int i = 1; i < dim; ++i) {
             if (num_vis[i].size() == other2.size()) {
                 mem.set(i);
@@ -876,7 +905,7 @@ public:
             }
         }
 
-        // Prepare `mem_other` to hold unique memory states for sub-plans
+        // Prepare unique memory states
         std::vector<std::pair<cutLong, std::vector<int>>> mem_other;
         for (const auto &i : other2) {
             cutLong p_mem;
@@ -892,13 +921,13 @@ public:
             bool found = false;
             for (auto &[existing_mem, mem_indices] : mem_other) {
                 if (((p_mem & existing_mem) ^ p_mem).none()) {
-                    existing_mem = p_mem;
+                    existing_mem = std::move(p_mem);
                     mem_indices  = i;
                     found        = true;
                     break;
                 }
             }
-            if (!found) { mem_other.emplace_back(p_mem, i); }
+            if (!found) { mem_other.emplace_back(std::move(p_mem), i); }
         }
 
         // Transform `mem_other` into the output plan
@@ -953,21 +982,21 @@ public:
         std::vector<int> tmp_fill(dim);
         std::iota(tmp_fill.begin(), tmp_fill.end(), 0);
 
-        for (auto &c : cuts) {
-            ankerl::unordered_dense::set<int> mem;
+        ankerl::unordered_dense::set<int> mem;
+        mem.reserve(dim); // Reserve based on expected size to reduce reallocations
 
-            // if (c.idx_r1c != INITIAL_IDX_R1C) {
-            //     for (const auto &m : c.arc_mem) { mem.insert(m); }
-            // }
+        for (auto &c : cuts) {
+            mem.clear(); // Clear `mem` at the start of each iteration to reuse it
 
             bool  if_suc = false;
             auto &cut    = c.info_r1c;
 
+            // Call `findMemoryForRank1Multi` only if `cut.second` is non-zero
             if (cut.second != 0) { findMemoryForRank1Multi(cut, mem, if_suc); }
 
+            // Only assign to `arc_mem` if `if_suc` is true
             if (if_suc) {
-                // Allocate memory positions for arc_mem
-                c.arc_mem.assign(mem.begin(), mem.end()); // Directly assign integers from `mem` to `arc_mem`
+                c.arc_mem.assign(mem.begin(), mem.end()); // Assign elements of `mem` to `arc_mem`
             }
         }
     }
@@ -1117,27 +1146,24 @@ public:
     void findMemAggressively(const std::vector<std::vector<std::vector<int>>>                  &array,
                              const std::vector<std::vector<ankerl::unordered_dense::set<int>>> &vec_segment,
                              ankerl::unordered_dense::set<int>                                 &mem) {
-        mem.reserve(array.size() * 10); // Estimate and reserve space to reduce reallocation
+        mem.reserve(array.size() * 10); // Adjust reserve size if more precise estimates are possible
 
         for (int i = 0; i < array.size(); ++i) {
             const auto &r        = array[i];
             const auto &segments = vec_segment[i];
 
-            int min_size = std::numeric_limits<int>::max();
-            int min_idx  = 0;
-
-            // Find the index with the minimum size in `r`
+            // Cache sizes to avoid recalculating in the inner loop
+            std::vector<int> segment_sizes(r.size());
             for (int j = 0; j < r.size(); ++j) {
-                int current_size = 0;
-                for (int k : r[j]) { current_size += static_cast<int>(segments[k].size()); }
-
-                if (current_size < min_size) {
-                    min_size = current_size;
-                    min_idx  = j;
-                }
+                segment_sizes[j] = std::accumulate(r[j].begin(), r[j].end(), 0, [&](int sum, int k) {
+                    return sum + static_cast<int>(segments[k].size());
+                });
             }
 
-            // Add elements from the minimum index segment to `mem`
+            // Find the index of the minimum size segment
+            int min_idx = std::distance(segment_sizes.begin(), std::ranges::min_element(segment_sizes));
+
+            // Manually insert elements from the minimum index segment into `mem`
             for (int k : r[min_idx]) { mem.insert(segments[k].begin(), segments[k].end()); }
         }
     }

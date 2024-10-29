@@ -11,6 +11,7 @@
 #pragma once
 
 #include "Definitions.h"
+#include "VRPNode.h"
 #include "bnb/Node.h"
 #include <memory>
 
@@ -56,6 +57,8 @@ public:
 
     // define clone method
     virtual std::unique_ptr<Problem> clone() const = 0;
+
+    virtual std::vector<VRPNode> getNodes() { return {}; }
 
     /**
      * @brief Virtual destructor for proper cleanup of derived classes.

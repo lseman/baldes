@@ -444,5 +444,4 @@ struct Supernode {
         saved = true;
     }
     // throw fatal error
-    
 };

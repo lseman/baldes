@@ -404,8 +404,8 @@ void IPSolver::run_optimization(ModelData &model, const double tol) {
 
         // Copy old values to new positions in x
         // As free variables and slack variables are added, the original variables move down
-        //int original_counter          = 0;
-        //x.head(nv_old - n_slacks_old) = x_old.head(nv_old - n_slacks_old);
+        // int original_counter          = 0;
+        // x.head(nv_old - n_slacks_old) = x_old.head(nv_old - n_slacks_old);
 
         lambda.head(N_SIZE - 1) = lambda_old.head(N_SIZE - 1);
     }
@@ -540,10 +540,10 @@ void IPSolver::run_optimization(ModelData &model, const double tol) {
         if (k % 5 == 0 || (k == max_iter - 1)) {
             // Save intermediate solution every 5 iterations or at the last iteration
             // Save only if the current solution is reasonably "central"
-            if (!saved_interior_solution_bool && (_d <= 1e-10 &&_g <= tol * 2)) {
+            if (!saved_interior_solution_bool && (_d <= 1e-10 && _g <= tol * 2)) {
                 save_interior_solution(x, lambda, w, s, v, tau, kappa);
                 saved_interior_solution_bool = true;
-                warm_start              = true;
+                warm_start                   = true;
             }
         }
 
@@ -572,7 +572,6 @@ void IPSolver::run_optimization(ModelData &model, const double tol) {
                 regG *= 100.0;
             }
         }
-
 
         // Solve the augmented system
         solve_augsys(delta_x, delta_y, delta_z, ls, theta_vw, ubi, b, c, ubv);

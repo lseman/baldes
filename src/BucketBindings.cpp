@@ -70,12 +70,8 @@ PYBIND11_MODULE(baldes, m) {
 #ifdef UNREACHABLE_DOMINANCE
         .def_readwrite("unreachable_bitmap", &Label::unreachable_bitmap)
 #endif
-#ifdef SRC3
-        .def_readwrite("SRCmap", &Label::SRCmap)
-#endif
-#ifdef SRC
-        .def_readwrite("SRCmap", &Label::SRCmap)
-#endif
+
+            SRC_MODE_BLOCK(.def_readwrite("SRCmap", &Label::SRCmap))
         .def("set_extended", &Label::set_extended)
         .def("visits", &Label::visits)
         .def("reset", &Label::reset)

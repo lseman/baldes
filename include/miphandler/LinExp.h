@@ -33,7 +33,7 @@ public:
 
     // Add a term to the expression
     LinearExpression &operator+=(const std::pair<Variable *, double> &term) {
-        if (term.second != 0.0) {                        // Skip zero coefficients
+        if (term.second != 0.0) {                         // Skip zero coefficients
             terms[term.first->get_name()] += term.second; // Accumulate coefficients for the same variable
         }
         return *this;
@@ -41,7 +41,7 @@ public:
 
     // Add a term to the expression
     LinearExpression &operator+=(const std::pair<Variable *, int> &term) {
-        if (term.second != 0.0) {                        // Skip zero coefficients
+        if (term.second != 0.0) {                         // Skip zero coefficients
             terms[term.first->get_name()] += term.second; // Accumulate coefficients for the same variable
         }
         return *this;

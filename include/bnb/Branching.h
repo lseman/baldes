@@ -13,10 +13,12 @@
 
 #include "Definitions.h"
 
+#include "MST.h"
 #include "Node.h"
 #include "Reader.h"
 #include "VRPCandidate.h"
 
+#include "VRPNode.h"
 #include "ankerl/unordered_dense.h"
 
 #include <optional>
@@ -49,13 +51,20 @@ public:
     // Helper function to check if a value is fractional
     inline static bool isFractional(double value) { return std::fabs(value - std::round(value)) > TOLERANCE_INTEGER; }
 
+    static auto calculateMSTClusters(const InstanceData *instance, std::vector<VRPNode> &nodes, double theta = 1.0) {
+        MST  mst_solver(nodes, [&](int from, int to) { return instance->getcij(from, to); });
+        auto clusters = mst_solver.cluster(theta);
+        return clusters;
+    }
+
     /**
      * Calculate aggregated variables for branching constraints
      * @param node: Current BNB node
      * @param instance: Instance data
      * @return List of branching candidates
      */
-    static std::vector<BranchingQueueItem> calculateAggregatedVariables(BNBNode *node, const InstanceData *instance) {
+    static std::vector<BranchingQueueItem> calculateAggregatedVariables(BNBNode *node, const InstanceData *instance,
+                                                                        std::vector<VRPNode> &nodes) {
         std::vector<BranchingQueueItem> queueItems;
         auto                            LPSolution = node->extractSolution();
         auto                            routes     = node->getPaths();
@@ -66,6 +75,9 @@ public:
             g_m_v; // Aggregated g_m_v (whether customer v is served by a vehicle of type m)
         ankerl::unordered_dense::map<std::pair<int, int>, double>
             g_v_vp; // Aggregated g_{v,v'} (whether edge (v, v') is used)
+
+        auto                clusters = calculateMSTClusters(instance, nodes, 1.0);
+        std::vector<double> clusterUsages(clusters.size(), 0.0); // Vector to store usage of each cluster
 
         // Iterate over all routes in the LPSolution
         for (int i = 0; i < LPSolution.size(); ++i) {
@@ -102,6 +114,16 @@ public:
                     g_m_v[customer] +=
                         LPSolution[i]; // Accumulate the value for this customer being served by vehicle type m
                 }
+
+                // Aggregate fractional values into clusters
+                for (size_t clusterIdx = 0; clusterIdx < clusters.size(); ++clusterIdx) {
+                    for (int nodeId : clusters[clusterIdx]) {
+                        if (std::find(routes[i].route.begin(), routes[i].route.end(), nodeId) !=
+                            routes[i].route.end()) {
+                            clusterUsages[clusterIdx] += LPSolution[i];
+                        }
+                    }
+                }
             }
         }
 
@@ -125,6 +147,17 @@ public:
                 BranchingQueueItem{edge.first, edge.second, value, 0.0, {}, {}, {{edge, value}}, CandidateType::Edge});
         }
 
+        // Add queue items for clusters with significant fractional usage
+        for (size_t clusterIdx = 0; clusterIdx < clusters.size(); ++clusterIdx) {
+            if (clusterUsages[clusterIdx] > TOLERANCE_ZERO) {
+                BranchingQueueItem item =
+                    BranchingQueueItem{0, 0, clusterUsages[clusterIdx], 0.0, {}, {}, {}, CandidateType::Cluster};
+                item.g_c[clusterIdx] = clusterUsages[clusterIdx];
+                item.clusters        = clusters[clusterIdx];
+                queueItems.push_back(item);
+            }
+        }
+
         return queueItems;
     }
     static void addConstraintForCandidate(BNBNode *childNode, const BranchingQueueItem &item, double bound,
@@ -136,6 +169,8 @@ public:
         } else if (item.candidateType == CandidateType::Edge) {
             std::pair<int, int> edge = {item.sourceNode, item.targetNode};
             childNode->addBranchingConstraint(bound, direction, CandidateType::Edge, edge);
+        } else if (item.candidateType == CandidateType::Cluster) {
+            childNode->addBranchingConstraint(bound, direction, CandidateType::Cluster, item.g_c.begin()->first);
         }
     }
 
@@ -230,19 +265,19 @@ public:
         std::vector<VRPCandidate *> candidates;
 
         // Lambda to generate candidates
-        auto generateCandidates = [&](CandidateType type, int sourceNode, int targetNode, double fractionalValue,
-                                      std::pair<bool, bool>                                 flags,
-                                      std::optional<std::variant<int, std::pair<int, int>>> payload = std::nullopt) {
-            // check if flag first is true
-            if (flags.first) {
-                candidates.emplace_back(new VRPCandidate(sourceNode, targetNode, BranchingDirection::Greater,
-                                                         std::floor(fractionalValue), type, payload));
-            }
-            if (flags.second) {
-                candidates.emplace_back(new VRPCandidate(sourceNode, targetNode, BranchingDirection::Less,
-                                                         std::ceil(fractionalValue), type, payload));
-            }
-        };
+        auto generateCandidates =
+            [&](CandidateType type, int sourceNode, int targetNode, double fractionalValue, std::pair<bool, bool> flags,
+                std::optional<std::variant<int, std::pair<int, int>, std::vector<int>>> payload = std::nullopt) {
+                // check if flag first is true
+                if (flags.first) {
+                    candidates.emplace_back(new VRPCandidate(sourceNode, targetNode, BranchingDirection::Greater,
+                                                             std::floor(fractionalValue), type, payload));
+                }
+                if (flags.second) {
+                    candidates.emplace_back(new VRPCandidate(sourceNode, targetNode, BranchingDirection::Less,
+                                                             std::ceil(fractionalValue), type, payload));
+                }
+            };
 
         for (const auto &item : phase1Candidates) {
             if (!item.g_m.empty()) {
@@ -260,6 +295,11 @@ public:
                 generateCandidates(CandidateType::Edge, item.sourceNode, item.targetNode, item.fractionalValue,
                                    item.flags,
                                    edge); // Edge as payload
+            }
+            if (!item.g_c.empty()) {
+                generateCandidates(CandidateType::Cluster, item.sourceNode, item.targetNode, item.fractionalValue,
+                                   item.flags,
+                                   item.clusters); // Clusters as payload
             }
         }
 
@@ -440,9 +480,10 @@ public:
     static std::vector<VRPCandidate *> VRPTWStandardBranching(BNBNode *node, InstanceData *instance, Problem *problem) {
         std::vector<VRPCandidate *> candidates;
 
+        auto nodes = problem->getNodes();
         node->optimize();
 
-        auto aggregatedCandidates = calculateAggregatedVariables(node, instance);
+        auto aggregatedCandidates = calculateAggregatedVariables(node, instance, nodes);
 
         // Select candidates based on the new Phase 0 logic
         print_info("Phase 0: selecting candidates for branching...\n");

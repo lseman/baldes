@@ -134,14 +134,13 @@ public:
 class LabelPool {
 public:
     explicit LabelPool(size_t initial_pool_size, size_t max_pool_size = 5000000)
-        : pool_size(initial_pool_size), max_pool_size(max_pool_size)
-    {
+        : pool_size(initial_pool_size), max_pool_size(max_pool_size) {
         allocate_labels(pool_size);
     }
 
-    Label* acquire() {
+    Label *acquire() {
         if (!available_labels.empty()) {
-            Label* new_label = available_labels.back();
+            Label *new_label = available_labels.back();
             available_labels.pop_back();
             in_use_labels.push_back(new_label);
             new_label->reset();
@@ -149,7 +148,7 @@ public:
         }
 
         // Allocate a new label and add it to in_use_labels
-        auto* new_label = new Label();
+        auto *new_label = new Label();
         in_use_labels.push_back(new_label);
         return new_label;
     }
@@ -167,39 +166,30 @@ public:
 
     void cleanup() {
         // Properly delete each Label to free memory in available and in-use pools
-        for (Label* label : available_labels) {
-            delete label;
-        }
+        for (Label *label : available_labels) { delete label; }
         available_labels.clear();
 
-        for (Label* label : in_use_labels) {
-            delete label;
-        }
+        for (Label *label : in_use_labels) { delete label; }
         in_use_labels.clear();
 
         // Delete any additional states if needed
-        for (Label* label : deleted_states) {
-            delete label;
-        }
+        for (Label *label : deleted_states) { delete label; }
         deleted_states.clear();
     }
 
 private:
     void allocate_labels(size_t count) {
         available_labels.reserve(count);
-        for (size_t i = 0; i < count; ++i) {
-            available_labels.push_back(new Label());
-        }
+        for (size_t i = 0; i < count; ++i) { available_labels.push_back(new Label()); }
     }
 
     size_t pool_size;
     size_t max_pool_size;
 
-    std::vector<Label*> available_labels; // Labels ready to be acquired
-    std::vector<Label*> in_use_labels;    // Labels currently in use
-    std::vector<Label*> deleted_states;   // Labels available for recycling
+    std::vector<Label *> available_labels; // Labels ready to be acquired
+    std::vector<Label *> in_use_labels;    // Labels currently in use
+    std::vector<Label *> deleted_states;   // Labels available for recycling
 };
-
 
 /**
  * @struct PSTEPDuals

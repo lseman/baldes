@@ -36,7 +36,7 @@ template <Direction D>
 void BucketGraph::UpdateBucketsSet(const double theta, const Label *label, ankerl::unordered_dense::set<int> &Bbidi,
                                    int &current_bucket, std::vector<uint64_t> &Bvisited) {
     // Precompute values and assign references for the direction-specific data
-    
+
     auto &Phi_opposite     = assign_buckets<D>(Phi_bw, Phi_fw);
     auto &buckets_opposite = assign_buckets<D>(bw_buckets, fw_buckets);
     auto &c_bar_opposite   = assign_buckets<D>(bw_c_bar, fw_c_bar);
@@ -64,10 +64,7 @@ void BucketGraph::UpdateBucketsSet(const double theta, const Label *label, anker
         const int bucketLprimenode = buckets_opposite[curr_bucket].node_id;
         double    cost             = getcij(bucketLnode, bucketLprimenode);
 
-#ifdef RCC
-        auto arc_dual = arc_duals.getDual(bucketLnode, bucketLprimenode);
-        cost -= arc_dual;
-#endif
+        RCC_MODE_BLOCK(auto arc_dual = arc_duals.getDual(bucketLnode, bucketLprimenode); cost -= arc_dual;)
         // Stop exploring if the cost exceeds the threshold
         if (label->cost + cost + c_bar_opposite[curr_bucket] >= theta) { continue; }
 
@@ -277,7 +274,7 @@ void BucketGraph::ObtainJumpBucketArcs() {
             const int from_node = orig_arc.from;
             const int to_node   = orig_arc.to;
             bool      have_path = false;
-            
+
             // Check if the path exists in the current bucket arcs
             for (const auto &gamma : arcs) {
                 if (fixed_buckets[gamma.from_bucket][gamma.to_bucket] == 1) { continue; }
@@ -321,7 +318,7 @@ void BucketGraph::ObtainJumpBucketArcs() {
                             // Wrap the resource increment in a vector
                             const std::vector<double> res  = gamma_prime.resource_increment;
                             const double              cost = gamma_prime.cost_increment;
-                            
+
                             buckets[b].add_jump_arc(b, b_prime, res, cost, true);
                             nodes[buckets[b].node_id].add_jump_arc(b, b_prime, res, cost, true, to_node);
                             ++arc_counter; // Increment the jump arc counter

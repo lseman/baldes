@@ -6,7 +6,7 @@
 #include <numeric>
 #include <vector>
 
-#if defined (IPM) || defined (IPM_ACEL)
+#if defined(IPM) || defined(IPM_ACEL)
 #include <Eigen/Sparse>
 #endif
 
@@ -329,7 +329,7 @@ struct SparseMatrix {
         // After compression, the matrix is now in an optimized state
     }
 
-#if defined (IPM) || defined (IPM_ACEL)
+#if defined(IPM) || defined(IPM_ACEL)
     // Modify convertToCRS to be const
     Eigen::SparseMatrix<double> toEigenSparseMatrix() const {
         Eigen::SparseMatrix<double>         eigenMatrix(num_rows, num_cols);

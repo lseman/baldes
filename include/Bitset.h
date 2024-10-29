@@ -161,4 +161,3 @@ struct hash<Bitset<N_BITS>> {
     }
 };
 } // namespace std
-

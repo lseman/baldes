@@ -21,6 +21,7 @@
 #include "Definitions.h"
 
 #include "RCC.h"
+#include "VRPNode.h"
 #include "miphandler/MIPHandler.h"
 
 // #include "TR.h"
@@ -81,13 +82,8 @@ public:
 #endif
 
     int addPath(BNBNode *node, const std::vector<Path> paths, bool enumerate = false) {
-#ifdef SRC
-        auto &r1c  = node->r1c;
-        auto &cuts = r1c->cutStorage;
-#endif
-#ifdef RCC
-        auto &rccManager = node->rccManager;
-#endif
+        SRC_MODE_BLOCK(auto &r1c = node->r1c; auto &cuts = r1c->cutStorage;)
+        RCC_MODE_BLOCK(auto &rccManager = node->rccManager;)
         int   numConstrsLocal = node->getIntAttr("NumConstrs");
         auto &constrs         = node->getConstrs();
 
@@ -137,16 +133,13 @@ public:
             col.addTerm(N_SIZE - 2, 1.0); // Add term for the vehicle constraint
 
             // Add terms for the limited memory rank 1 cuts
-#if defined(SRC3) || defined(SRC)
-            auto vec = cuts.computeLimitedMemoryCoefficients(label.route);
-            if (vec.size() > 0) {
+            SRC_MODE_BLOCK(auto vec = cuts.computeLimitedMemoryCoefficients(label.route); if (vec.size() > 0) {
                 for (int i = 0; i < vec.size(); i++) {
                     if (abs(vec[i]) > 1e-3) {
                         col.addTerm(SRCconstraints[i]->index(), vec[i]); // Add to the appropriate constraint in Column
                     }
                 }
-            }
-#endif
+            })
 
 #if defined(RCC) || defined(EXACT_RCC)
             auto RCCvec         = rccManager->computeRCCCoefficients(label.route);
@@ -185,14 +178,8 @@ public:
      *
      */
     inline int addColumn(BNBNode *node, const auto &columns, bool enumerate = false) {
-#ifdef SRC
-        auto &r1c  = node->r1c;
-        auto &cuts = r1c->cutStorage;
-#endif
-#ifdef RCC
-        auto &rccManager = node->rccManager;
-#endif
-
+        SRC_MODE_BLOCK(auto &r1c = node->r1c; auto &cuts = r1c->cutStorage;)
+        RCC_MODE_BLOCK(auto &rccManager = node->rccManager;)
         int                 numConstrsLocal = node->getIntAttr("NumConstrs");
         auto               &constrs         = node->getConstrs();
         std::vector<double> coluna(numConstrsLocal, 0.0); // Declare outside the loop
@@ -245,14 +232,11 @@ public:
             col.addTerm(N_SIZE - 2, 1.0); // Add term for the vehicle constraint
 
             // Add terms for the limited memory rank 1 cuts
-#if defined(SRC3) || defined(SRC)
-            auto vec = cuts.computeLimitedMemoryCoefficients(label->nodes_covered);
-            if (vec.size() > 0) {
+            SRC_MODE_BLOCK(auto vec = cuts.computeLimitedMemoryCoefficients(label->nodes_covered); if (vec.size() > 0) {
                 for (int i = 0; i < vec.size(); i++) {
                     if (abs(vec[i]) > 1e-3) { col.addTerm(SRCconstraints[i]->index(), vec[i]); }
                 }
-            }
-#endif
+            })
 
 #if defined(RCC) || defined(EXACT_RCC)
             auto RCCvec         = rccManager->computeRCCCoefficients(label->nodes_covered);
@@ -524,13 +508,10 @@ public:
         auto &matrix         = node->matrix;
         auto &SRCconstraints = node->SRCconstraints;
         auto &allPaths       = node->paths;
-#ifdef SRC
-        auto &r1c = node->r1c;
-#endif
+
+        SRC_MODE_BLOCK(auto &r1c = node->r1c;)
         auto &branchingDuals = node->branchingDuals;
-#ifdef RCC
-        auto &rccManager = node->rccManager;
-#endif
+        RCC_MODE_BLOCK(auto &rccManager = node->rccManager;)
 
         int bucket_interval       = 25;
         int time_horizon          = instance.T_max;
@@ -548,13 +529,8 @@ public:
         auto integer_solution  = node->getObjVal();
         bucket_graph.incumbent = integer_solution;
 
-#ifdef SRC
-        auto distanceMatrix = node->instance.getDistanceMatrix();
-        r1c->setDistanceMatrix(node->instance.getDistanceMatrix());
-        r1c->setNodes(nodes);
-        CutStorage *cuts         = &r1c->cutStorage;
-        bucket_graph.cut_storage = cuts;
-#endif
+        SRC_MODE_BLOCK(r1c->setDistanceMatrix(node->instance.getDistanceMatrix()); r1c->setNodes(nodes);
+                       CutStorage *cuts = &r1c->cutStorage; bucket_graph.cut_storage = cuts;)
 
         std::vector<double> cutDuals;
         std::vector<double> nodeDuals = node->getDuals();
@@ -615,18 +591,10 @@ public:
 
 #if defined(RCC) || defined(EXACT_RCC)
             if (rcc) {
-                matrix = node->extractModelDataSparse();
-#ifdef IPM
-                node->ipSolver->run_optimization(matrix, 1e-8);
-                solution = node->ipSolver->getPrimals();
-#else
-                node->optimize();
-                solution = node->extractSolution();
-#endif
-                // solution = node->ipSolver->getPrimals();
-#ifdef RCC
-                rcc = RCCsep(node, solution);
-#endif
+                RUN_OPTIMIZATION(node, 1e-8)
+
+                RCC_MODE_BLOCK(rcc = RCCsep(node, solution);)
+
 #ifdef EXACT_RCC
                 rcc = exactRCCsep(node, solution);
 #endif
@@ -635,28 +603,17 @@ public:
 
             if (ss && !rcc) {
 #if defined(RCC) || defined(EXACT_RCC)
-// if (!reoptimized) { // node->optimize();
-#ifdef IPM
-                matrix = node->extractModelDataSparse();
-                node->ipSolver->run_optimization(matrix, 1e-8);
-                solution = node->ipSolver->getPrimals();
-//}
-#else
-                node->optimize();
-                solution = node->extractSolution();
-#endif
-                // solution = node->ipSolver->getPrimals();
-#ifdef RCC
-                rcc = RCCsep(node, solution);
-#endif
+                RUN_OPTIMIZATION(node, 1e-8)
+
+                RCC_MODE_BLOCK(rcc = RCCsep(node, solution);)
+
 #ifdef EXACT_RCC
                 rcc = exactRCCsep(node, solution, cvrsep_ctrs);
 #endif
 
 #endif
 
-#if defined(SRC3) || defined(SRC)
-                if (!rcc) {
+                SRC_MODE_BLOCK(if (!rcc) {
                     r1c->allPaths = allPaths;
                     // auto start_time_ = std::chrono::high_resolution_clock::now();
                     auto srcResult = r1c->runSeparation(node, SRCconstraints);
@@ -689,8 +646,7 @@ public:
                             // nodeDuals = node->getDuals();
                         }
                     }
-                }
-#endif
+                })
                 bucket_graph.ss = false;
             }
 
@@ -715,15 +671,6 @@ public:
             if (std::isnan(gap) || std::signbit(gap)) { gap = 1e-1; }
             gap = std::clamp(gap, 1e-8, 1e-1); // Clamping gap to be between 1e-6 and 1e-2
             node->ipSolver->run_optimization(matrix, gap);
-
-            // auto end_time_ipm = std::chrono::high_resolution_clock::now();
-
-            // Calculate duration in microseconds
-            // auto duration_microseconds =
-            //    std::chrono::duration_cast<std::chrono::microseconds>(end_time_ipm - start_time_ipm).count();
-
-            // Print the time in seconds with microsecond precision
-            // fmt::print("IPM time: {:.6f} seconds\n", duration_microseconds / 1e6);
 
             lp_obj           = node->ipSolver->getObjective();
             solution         = node->ipSolver->getPrimals();
@@ -810,34 +757,30 @@ public:
 
                 bucket_graph.relaxation = lp_obj;
                 bucket_graph.augment_ng_memories(solution, allPaths, true, 5, 110, 18, N_SIZE);
-#if defined(SRC3) || defined(SRC)
-                // SRC cuts
-                if (!SRCconstraints.empty()) {
-                    // print SRCconstraints size
-                    std::vector<double> cutDuals;
+                SRC_MODE_BLOCK( // SRC cuts
+                    if (!SRCconstraints.empty()) {
+                        // print SRCconstraints size
+                        std::vector<double> cutDuals;
 
-                    for (int i = 0; i < SRCconstraints.size(); i++) {
-                        auto constr = SRCconstraints[i];
-                        auto index  = constr->index();
-                        cutDuals.push_back(originDuals[index]);
-                    }
+                        for (int i = 0; i < SRCconstraints.size(); i++) {
+                            auto constr = SRCconstraints[i];
+                            auto index  = constr->index();
+                            cutDuals.push_back(originDuals[index]);
+                        }
 
-                    cuts->setDuals(cutDuals);
-                }
-#endif
+                        cuts->setDuals(cutDuals);
+                    })
 
-#ifdef RCC
-
-                // RCC cuts
-                if (rccManager->size() > 0) {
+                RCC_MODE_BLOCK(
+                    // RCC cuts
+                    if (rccManager->size() > 0) {
 #ifndef IPM
-                    auto arc_duals = rccManager->computeDuals(node);
+                        auto arc_duals = rccManager->computeDuals(node);
 #else
                     auto arc_duals = rccManager->computeDuals(nodeDuals);
 #endif
-                    bucket_graph.setArcDuals(arc_duals);
-                }
-#endif
+                        bucket_graph.setArcDuals(arc_duals);
+                    })
 
                 // Branching duals
                 if (branchingDuals.size() > 0) { branchingDuals.computeDuals(node); }
@@ -848,28 +791,12 @@ public:
                 //////////////////////////////////////////////////////////////////////
                 // CALLING BALDES
                 //////////////////////////////////////////////////////////////////////
-                // if (bucket_graph.s4 && iter % 500 == 0) {
-                //     paths = bucket_graph.solve(true);
-                // } else {
-                // auto start_time_bucket = std::chrono::high_resolution_clock::now();
-                paths = bucket_graph.solve();
-                // auto end_time_bucket   = std::chrono::high_resolution_clock::now();
-
-                // Calculate duration in microseconds
-                // duration_microseconds =
-                //    std::chrono::duration_cast<std::chrono::microseconds>(end_time_bucket -
-                //    start_time_bucket).count();
-
-                // Print the time in seconds with microsecond precision
-                // fmt::print("Bucket time: {:.6f} seconds\n", duration_microseconds / 1e6);
-
-                //}
+                paths     = bucket_graph.solve();
                 inner_obj = bucket_graph.inner_obj;
                 stage     = bucket_graph.getStage();
                 ss        = bucket_graph.ss;
                 //////////////////////////////////////////////////////////////////////
 
-                // print paths.size
                 // Adding cols
                 colAdded = addColumn(node, paths, false);
 
@@ -932,13 +859,8 @@ public:
             cur_alpha = stab.base_alpha;
 #endif
 
-#ifdef SRC
-            n_cuts = cuts->size();
-#endif
-
-#ifdef RCC
-            n_rcc_cuts = rccManager->size();
-#endif
+            SRC_MODE_BLOCK(n_cuts = cuts->size();)
+            RCC_MODE_BLOCK(n_rcc_cuts = rccManager->size();)
 
 #ifdef TR
             tr_val = v;
@@ -957,6 +879,8 @@ public:
 
         return true;
     }
+
+    std::vector<VRPNode> getNodes() { return nodes; }
 
     double objective(BNBNode *node) { return ip_result; }
 
@@ -1125,19 +1049,11 @@ public:
         double obj;
         auto   colAdded = 0;
 
-#ifdef RCC
-        auto &rccManager = node->rccManager;
+        RCC_MODE_BLOCK(auto &rccManager = node->rccManager;)
 
-#endif
+        SRC_MODE_BLOCK(auto &r1c = node->r1c; auto cuts = &r1c->cutStorage;)
 
-#ifdef SRC
-        auto &r1c  = node->r1c;
-        auto  cuts = &r1c->cutStorage;
-#endif
-
-#ifdef SRC
-        bucket_graph.cut_storage = cuts;
-#endif
+        SRC_MODE_BLOCK(bucket_graph.cut_storage = cuts;)
 
         for (int iter = 0; iter < max_iter; ++iter) {
 #ifdef STAB

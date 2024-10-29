@@ -323,8 +323,8 @@ inline int VRPTW_read_instance(const std::string &file_name, InstanceData &insta
     }
 
     // Example output to verify the data
-    instance.nN = i + 2;
-    instance.nC = i;
+    instance.nN                            = i + 2;
+    instance.nC                            = i;
     xcoord[instance.nN - 1]                = xcoord[0];
     ycoord[instance.nN - 1]                = ycoord[0];
     instance.demand[instance.nN - 1]       = instance.demand[0];

@@ -156,24 +156,21 @@ Label *BucketGraph::compute_label(const Label *L, const Label *L_prime) {
     new_label->cost      = new_cost;
     new_label->real_cost = real_cost;
 
-#ifdef SRC
-    //  Check SRCDuals condition for specific stages
-    auto        sumSRC   = 0.0;
-    const auto &SRCDuals = cut_storage->SRCDuals;
-    if (!SRCDuals.empty()) {
-        size_t idx = 0;
-        auto   sumSRC =
-            std::transform_reduce(SRCDuals.begin(), SRCDuals.end(), 0.0, std::plus<>(), [&](const auto &dual) {
-                size_t curr_idx = idx++;
-                auto   den      = cut_storage->getCut(curr_idx).p.den;
-                auto   sum      = (L->SRCmap[curr_idx] + L_prime->SRCmap[curr_idx]);
-                return (sum >= den) ? dual : 0.0;
-            });
+    SRC_MODE_BLOCK(
+        //  Check SRCDuals condition for specific stages
+        auto sumSRC = 0.0; const auto &SRCDuals = cut_storage->SRCDuals; if (!SRCDuals.empty()) {
+            size_t idx = 0;
+            auto   sumSRC =
+                std::transform_reduce(SRCDuals.begin(), SRCDuals.end(), 0.0, std::plus<>(), [&](const auto &dual) {
+                    size_t curr_idx = idx++;
+                    auto   den      = cut_storage->getCut(curr_idx).p.den;
+                    auto   sum      = (L->SRCmap[curr_idx] + L_prime->SRCmap[curr_idx]);
+                    return (sum >= den) ? dual : 0.0;
+                });
 
-        new_label->cost -= sumSRC;
-    }
+            new_label->cost -= sumSRC;
+        })
 
-#endif
 #ifdef SRC3
     //  Check SRCDuals condition for specific stages
     auto        sumSRC   = 0.0;
@@ -678,9 +675,7 @@ void BucketGraph::common_initialization() {
             depot->initialize(calculated_index, 0.0, interval_starts, options.depot);
             depot->is_extended = false;
             set_node_visited(depot->visited_bitmap, options.depot);
-#ifdef SRC
-            depot->SRCmap.assign(cut_storage->SRCDuals.size(), 0);
-#endif
+            SRC_MODE_BLOCK(depot->SRCmap.assign(cut_storage->SRCDuals.size(), 0);)
             fw_buckets[calculated_index].add_label(depot);
             fw_buckets[calculated_index].node_id = options.depot;
             interval_starts[r] += roundToTwoDecimalPlaces(base_intervals[r]);
@@ -697,9 +692,7 @@ void BucketGraph::common_initialization() {
             end_depot->initialize(calculated_index, 0.0, interval_ends, options.end_depot);
             end_depot->is_extended = false;
             set_node_visited(end_depot->visited_bitmap, options.end_depot);
-#ifdef SRC
-            end_depot->SRCmap.assign(cut_storage->SRCDuals.size(), 0);
-#endif
+            SRC_MODE_BLOCK(end_depot->SRCmap.assign(cut_storage->SRCDuals.size(), 0);)
             bw_buckets[calculated_index].add_label(end_depot);
             bw_buckets[calculated_index].node_id = options.end_depot;
             interval_ends[r] -= roundToTwoDecimalPlaces(base_intervals[r]);
@@ -784,9 +777,7 @@ void BucketGraph::mono_initialization() {
         depot->initialize(calculated_index, 0.0, interval_starts, options.depot);
         depot->is_extended = false;
         set_node_visited(depot->visited_bitmap, options.depot);
-#ifdef SRC
-        depot->SRCmap.assign(cut_storage->SRCDuals.size(), 0);
-#endif
+        SRC_MODE_BLOCK(depot->SRCmap.assign(cut_storage->SRCDuals.size(), 0);)
         fw_buckets[calculated_index].add_label(depot);
         fw_buckets[calculated_index].node_id = options.depot;
 

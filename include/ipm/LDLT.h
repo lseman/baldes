@@ -655,11 +655,11 @@ public:
         // Scalar       regularizationFactor = Scalar(1e-10) * std::max(1.0, condNumber);
 
         // Residual-Based Regularization
-        Scalar       residualNorm         = (matrixL() * dest - b).norm();
-        //fmt::print("Residual Norm: {}\n", residualNorm);
+        Scalar residualNorm = (matrixL() * dest - b).norm();
+        // fmt::print("Residual Norm: {}\n", residualNorm);
         const Scalar regularizationFactor = std::min(Scalar(1e-10), residualNorm * Scalar(1e-12));
-        //fmt::print("Regularization Factor: {}\n", regularizationFactor);
-        
+        // fmt::print("Regularization Factor: {}\n", regularizationFactor);
+
         // Solve L * y = P * b using SparseSolveTriangular for lower triangular matrix
         solveTriangular<decltype(matrixL()), decltype(dest), Lower>(matrixL(), dest, regularizationFactor);
 
@@ -668,7 +668,6 @@ public:
         for (Index i = 0; i < dest.size(); ++i) { dest(i) /= m_diag(i); }
         // Solve U * x = z using SparseSolveTriangular for upper triangular matrix
         solveTriangular<decltype(matrixU()), decltype(dest), Upper>(matrixU(), dest, regularizationFactor);
-
 
         // Apply backward permutation (if needed)
         if (m_Pinv.size() > 0) { dest = m_Pinv * dest; }

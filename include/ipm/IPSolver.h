@@ -177,16 +177,15 @@ public:
     IPSolver() {}
     Eigen::SparseMatrix<double> convertToSparseDiagonal(const Eigen::VectorXd &vec);
 
-    
     void save_interior_solution(const Eigen::VectorXd &x, const Eigen::VectorXd &lambda, const Eigen::VectorXd &s,
                                 const Eigen::VectorXd &v, const Eigen::VectorXd &w, double tau, double kappa) {
-        x_old                   = x;
-        lambda_old              = lambda;
-        s_old                   = s;
-        v_old                   = v;
-        w_old                   = w;
-        tau_old                 = tau;
-        kappa_old               = kappa;
+        x_old      = x;
+        lambda_old = lambda;
+        s_old      = s;
+        v_old      = v;
+        w_old      = w;
+        tau_old    = tau;
+        kappa_old  = kappa;
     }
 
     // Method to convert the given linear programming problem to standard form

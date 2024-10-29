@@ -35,12 +35,7 @@ struct Label {
     std::vector<int>           nodes_covered = {}; // Add nodes_covered to Label
     int                        node_id       = -1; // Add node_id to Label
     Label                     *parent        = nullptr;
-#ifdef SRC3
-    std::array<std::uint16_t, MAX_SRC_CUTS> SRCmap = {};
-#endif
-#ifdef SRC
-    std::vector<int> SRCmap;
-#endif
+    SRC_MODE_BLOCK(std::vector<int> SRCmap;)
     // uint64_t             visited_bitmap; // Bitmap for visited nodes
     std::array<uint64_t, num_words> visited_bitmap = {0};
 #ifdef UNREACHABLE_DOMINANCE
@@ -100,12 +95,7 @@ struct Label {
 #ifdef UNREACHABLE_DOMINANCE
         std::memset(unreachable_bitmap.data(), 0, unreachable_bitmap.size() * sizeof(uint64_t));
 #endif
-#ifdef SRC3
-        std::memset(SRCmap.data(), 0, SRCmap.size() * sizeof(std::uint16_t));
-#endif
-#ifdef SRC
-        SRCmap.clear();
-#endif
+        SRC_MODE_BLOCK(SRCmap.clear();)
     }
 
     void addNode(int node) { nodes_covered.push_back(node); }

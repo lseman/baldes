@@ -381,14 +381,8 @@ void LimitedMemoryRank1Cuts::generateCutCoefficients(VRPTW_SRC &cuts, std::vecto
 
                 // Iterate over remaining nodes and calculate the coefficients_aux
                 for (auto node : remainingNodes) {
-#ifdef SRC3
-                    for (auto c : C_index) { coefficients_aux[node] += allPaths[node].countOccurrences(c) * 0.5; }
-                    coefficients_aux[node] = std::floor(coefficients_aux[node]);
-#endif
-#ifdef SRC
                     auto &clients          = allPaths[node].route; // Reference to the clients for in-place modification
                     coefficients_aux[node] = computeLimitedMemoryCoefficient(C, AM, p, clients, order);
-#endif
                 }
 
                 // Create and store the cut
@@ -414,14 +408,8 @@ std::pair<bool, bool> LimitedMemoryRank1Cuts::runSeparation(BNBNode *node, std::
     std::vector<double> solution;
 
     // print size of SRCconstraints
-#ifdef IPM
-    matrix = node->extractModelDataSparse(); // Extract model data
-    node->ipSolver->run_optimization(matrix, 1e-8);
-    solution = node->ipSolver->getPrimals();
-#else
-    node->optimize();
-    solution = node->extractSolution();
-#endif
+    RUN_OPTIMIZATION(node, 1e-8)
+
     // print size of solution
     separate(matrix.A_sparse, solution);
     size_t i = 0;
@@ -499,7 +487,7 @@ std::pair<bool, bool> LimitedMemoryRank1Cuts::runSeparation(BNBNode *node, std::
     generator->generateSepHeurMem4Vertex();
     // Generator operations
     generator->initialize(allPaths);
-    generator->generateR1C1();
+    //generator->generateR1C1();
     generator->setMemFactor(0.15);
     generator->fillMemory();
     generator->getHighDimCuts();

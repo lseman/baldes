@@ -166,7 +166,6 @@ configure_file(
   ${CMAKE_CURRENT_BINARY_DIR}/config.h # Output file (config.h)
 )
 
-
 if(STAB AND IPM)
   message(
     FATAL_ERROR
@@ -408,7 +407,7 @@ find_package(xxhash REQUIRED)
 if(WITH_PYTHON)
   pybind11_add_module(baldes src/BucketBindings.cpp src/BucketGraph.cpp
                       ${EXECUTABLE_SOURCES})
-                      
+
   target_link_libraries(baldes PRIVATE pybind11::module)
   target_link_libraries(baldes PRIVATE fmt::fmt)
   target_link_libraries(baldes PRIVATE STDEXEC::stdexec)
@@ -543,6 +542,6 @@ target_precompile_headers(
   third_party/pdqsort.h)
 
 if(IPM)
-target_include_directories(vrptw PRIVATE ${Eigen_SOURCE_DIR})
-target_include_directories(vrptw PRIVATE ${Eigen_SOURCE_DIR}/unsupported)
+  target_include_directories(vrptw PRIVATE ${Eigen_SOURCE_DIR})
+  target_include_directories(vrptw PRIVATE ${Eigen_SOURCE_DIR}/unsupported)
 endif()

@@ -25,7 +25,7 @@
 </table>
 
 
-The algorithm is based on state-of-the-art RCESPP techniques, including interior point stabilization, limited memory subset row cuts and the so called bucket graph labelling.
+The algorithm is based on state-of-the-art RCESPP techniques, including interior point stabilization, limited memory subset row cuts, clustering branching, and the so called bucket graph labelling.
 
 ## 📝 Overview
 
@@ -38,6 +38,7 @@ The Bucket Graph-based labeling algorithm organizes labels into **buckets** base
 - **Dominance Rules:** Efficient dominance checks using resource-based comparisons and integration of additional criteria from Limited-Memory Subset Row Cuts (SRCs) for enhanced speed.
 - **Multi-phase solving:** Out-of-the-box multi-phase solving that begins with heuristics and dynamically guides the algorithm towards an exact solution.
 - **Good initial solutions** Utilizes the state-of-the-art [HGS-VRPTW](https://github.com/ortec/euro-neurips-vrp-2022-quickstart) algorithm to generate high-quality initial bounds and routes, an extension of the [HGS-CVRP](https://github.com/vidalt/HGS-CVRP) method employed by the ORTEC team to win the VRPTW track at the DIMACS Implementation Challenge. We also enchanced the HGS-VRPTW with the concepts proposed in [MDM-HGS-CVRP](https://github.com/marcelorhmaia/MDM-HGS-CVRP/), resulting in what we call the **MDM-HGS-VRPTW**.
+- **Multi-stage branching**: Perform a multi-stage branching, including the recent cluster branching.
 - **Improvement Heuristics:** Optional fast improvement heuristics are applied at the end of each labeling phase to enhance label quality.
 
 ## ⚠️ Disclaimer
@@ -50,7 +51,7 @@ Some features are experimental and subject to ongoing improvements:
 ## 📋 TODO
 
 - [x] Consider branching constraints duals
-- [ ] Improve branching decisions
+- [x] Improve branching decisions
 
 ## 🛠️ Building
 
@@ -69,6 +70,16 @@ Some features are experimental and subject to ongoing improvements:
 - [SuiteSparse](https://github.com/DrTimothyAldenDavis/SuiteSparse) optional for using CHOLMOD as IPM solver instead of Eigen built-in solvers
 - [Gurobi](https://www.gurobi.com/) for using Gurobi as the MIP solver
 
+### ⚙️ Compiling
+
+```bash
+cmake -S . -B build
+cd build
+make -j$nprocs
+```
+
+Make sure the `GUROBI_HOME` environment variable is set.
+
 ###  macOS
 
 For macOS, it is recommended to install latest llvm via homebrew.
@@ -80,33 +91,25 @@ export CXX=/opt/homebrew/opt/llvm/bin/clang++
 export PATH=/opt/homebrew/opt/llvm/bin:$PATH
 ```
 
-### ⚙️ Compiling
-
-```bash
-cmake -S . -B build -DR_SIZE=1 -DN_SIZE=102 -DSRC=ON -DHGS=3
-cd build
-make -j$nprocs
-```
-
-Make sure the `GUROBI_HOME` environment variable is set.
 
 ### 🛠️ Compilation Options
 
 ---
+
 
 **Boolean Options**
 
 | Option                  | Description                            | Default |
 | ----------------------- | -------------------------------------- | ------- |
 | `RIH`                   | Enable improvement heuristics          | OFF     |
-| `RCC`$^2$               | Enable RCC cuts                        | OFF     |
+| `RCC`               | Enable RCC cuts                        | OFF     |
 | `SRC`                   | Enable limited memory SRC cuts         | ON      |
 | `UNREACHABLE_DOMINANCE` | Enable unreachable dominance           | OFF     |
 | `MCD`                   | Perform MCD on instance capacities     | OFF     |
 | `LIMITED_BUCKETS`       | Limit the capacity of the buckets      | OFF     |
 | `SORTED_LABELS`         | Sort labels on bucket insertion        | OFF     |
-| `STAB`$^3$              | Use dynamic-alpha smooth stabilization | OFF     |
-| `IPM`$^3$               | Use interior point stabilization       | ON      |
+| `STAB`$^2$              | Use dynamic-alpha smooth stabilization | OFF     |
+| `IPM`$^2$               | Use interior point stabilization       | ON      |
 | `TR`                    | Use trust region stabilization         | OFF     |
 | `WITH_PYTHON`           | Enable the python wrapper              | OFF     |
 | `SCHRODINGER`           | Enable schrodinger pool                | OFF     |
@@ -139,10 +142,8 @@ To control how each resource is treated (whether disposable, non-disposable, or 
 ```
 
 > **Note 1**: Including depot and depot copy (end node).
- 
-> **Note 2**: Both `SRC` and `SRC3` cannot be enabled simultaneously. Ensure only one is selected.
 
-> **Note 3**: Only one stabilization can be selected.
+> **Note 2**: Only one stabilization can be selected.
 
 **TUI**
 

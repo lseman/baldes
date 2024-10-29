@@ -66,3 +66,10 @@ struct VectorHash {
         return XXH3_64bits(vec.data(), vec.size() * sizeof(int));
     }
 };
+
+struct VectorIntHash {
+    size_t operator()(const std::vector<int>& vec) const {
+        // Use xxh3 for efficient hashing of the vector
+        return XXH3_64bits(vec.data(), vec.size() * sizeof(int));
+    }
+};
