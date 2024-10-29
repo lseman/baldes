@@ -52,6 +52,7 @@ Some features are experimental and subject to ongoing improvements:
 
 - [x] Consider branching constraints duals
 - [x] Improve branching decisions
+- [ ] Refactor high order SRC cuts
 
 ## 🛠️ Building
 
@@ -166,7 +167,7 @@ See examples in the `examples/` directory.
 To run Solomon instances in the `example` folder:
 
 ```bash
-./vrptw C203.txt
+./baldes vrptw ../examples/C203.txt
 ```
 
 ### 🐍 Python Wrapper

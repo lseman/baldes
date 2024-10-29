@@ -349,11 +349,11 @@ if(SRC)
 endif()
 
 # Add the executable with the combined sources
-add_executable(vrptw examples/VRPTW.cpp ${EXECUTABLE_SOURCES})
+add_executable(baldes examples/Baldes.cpp ${EXECUTABLE_SOURCES})
 
 # Linking libraries
-target_link_libraries(vrptw PRIVATE STDEXEC::stdexec)
-target_link_libraries(vrptw PRIVATE fmt::fmt)
+target_link_libraries(baldes PRIVATE STDEXEC::stdexec)
+target_link_libraries(baldes PRIVATE fmt::fmt)
 
 if(IPM OR IPM_ACEL)
   cpmaddpackage(
@@ -378,12 +378,12 @@ if(GUROBI)
   # Link Gurobi libraries
   if(APPLE)
     # macOS detected, use .dylib for linking
-    target_link_libraries(vrptw PRIVATE ${GUROBI_HOME}/lib/libgurobi_c++.a
+    target_link_libraries(baldes PRIVATE ${GUROBI_HOME}/lib/libgurobi_c++.a
                                         ${GUROBI_HOME}/lib/libgurobi100.dylib)
   else()
     # Non-macOS (Linux or other platforms), use .so and .a files
     target_link_libraries(
-      vrptw PRIVATE ${GUROBI_HOME}/lib/libgurobi_c++.a
+      baldes PRIVATE ${GUROBI_HOME}/lib/libgurobi_c++.a
                     ${GUROBI_HOME}/lib/libgurobi${GUROBI_VERSION_MAJOR}.so tbb)
   endif()
 endif()
@@ -392,46 +392,46 @@ if(JEMALLOC)
   find_library(JEMALLOC_LIBRARY jemalloc)
   if(JEMALLOC_LIBRARY)
     message(STATUS "jemalloc found: ${JEMALLOC_LIBRARY}")
-    target_link_libraries(vrptw PRIVATE ${JEMALLOC_LIBRARY})
+    target_link_libraries(baldes PRIVATE ${JEMALLOC_LIBRARY})
   else()
     message(STATUS "jemalloc not found")
   endif()
 endif()
 
 if(HIGHS)
-  target_link_libraries(vrptw PRIVATE highs::highs)
+  target_link_libraries(baldes PRIVATE highs::highs)
 endif()
 
 find_package(xxhash REQUIRED)
 
 if(WITH_PYTHON)
-  pybind11_add_module(baldes src/BucketBindings.cpp src/BucketGraph.cpp
+  pybind11_add_module(pybaldes src/BucketBindings.cpp src/BucketGraph.cpp
                       ${EXECUTABLE_SOURCES})
 
-  target_link_libraries(baldes PRIVATE pybind11::module)
-  target_link_libraries(baldes PRIVATE fmt::fmt)
-  target_link_libraries(baldes PRIVATE STDEXEC::stdexec)
-  target_link_libraries(baldes PRIVATE xxhash)
+  target_link_libraries(pybaldes PRIVATE pybind11::module)
+  target_link_libraries(pybaldes PRIVATE fmt::fmt)
+  target_link_libraries(pybaldes PRIVATE STDEXEC::stdexec)
+  target_link_libraries(pybaldes PRIVATE xxhash)
 
-  target_link_libraries(baldes PRIVATE unordered_dense)
+  target_link_libraries(pybaldes PRIVATE unordered_dense)
   if(NSYNC)
-    target_include_directories(baldes PRIVATE nsync)
+    target_include_directories(pybaldes PRIVATE nsync)
     include_directories(${nsync_SOURCE_DIR}/public)
   endif()
-  set_target_properties(baldes PROPERTIES POSITION_INDEPENDENT_CODE ON)
-  target_compile_options(baldes PRIVATE -Wno-c++26-extensions
+  set_target_properties(pybaldes PROPERTIES POSITION_INDEPENDENT_CODE ON)
+  target_compile_options(pybaldes PRIVATE -Wno-c++26-extensions
                                         -Wno-deprecated-declarations)
 
   if(HIGHS)
-    target_link_libraries(baldes PRIVATE highs::highs)
+    target_link_libraries(pybaldes PRIVATE highs::highs)
   endif()
 endif()
 
-target_compile_options(vrptw PRIVATE -Wno-c++26-extensions
+target_compile_options(baldes PRIVATE -Wno-c++26-extensions
                                      -Wno-deprecated-declarations)
 
-target_link_libraries(vrptw PRIVATE xxhash)
-target_link_libraries(vrptw PRIVATE unordered_dense)
+target_link_libraries(baldes PRIVATE xxhash)
+target_link_libraries(baldes PRIVATE unordered_dense)
 
 if(CLIQUER)
   add_executable(cliquer src/Original.cpp src/BucketGraph.cpp)
@@ -512,7 +512,7 @@ endif()
 
 # link nsync
 if(nsync_ADDED)
-  target_link_libraries(vrptw PRIVATE nsync)
+  target_link_libraries(baldes PRIVATE nsync)
   include_directories(${nsync_SOURCE_DIR}/public)
 endif()
 
@@ -521,17 +521,17 @@ if(CHOLMOD)
   find_package(SuiteSparse)
   include_directories(${SuiteSparse_INCLUDE_DIRS})
   include_directories(/usr/include/suitesparse/)
-  target_link_libraries(vrptw PRIVATE cholmod)
+  target_link_libraries(baldes PRIVATE cholmod)
 endif()
 
 # include /opt/cuda/targets/x86_64-linux/include/cuda_runtime.h
-target_include_directories(vrptw PRIVATE /opt/cuda/targets/x86_64-linux/include)
+target_include_directories(baldes PRIVATE /opt/cuda/targets/x86_64-linux/include)
 
 file(GLOB_RECURSE CVRPSEP_HEADERS "${CMAKE_SOURCE_DIR}/third_party/cvrpsep/*.h")
 file(GLOB_RECURSE FPMAX_HEADERS "${CMAKE_SOURCE_DIR}/third_party/fpmax/*.h")
 
 target_precompile_headers(
-  vrptw
+  baldes
   PRIVATE
   include/Common.h
   ${CVRPSEP_HEADERS}
@@ -542,6 +542,6 @@ target_precompile_headers(
   third_party/pdqsort.h)
 
 if(IPM)
-  target_include_directories(vrptw PRIVATE ${Eigen_SOURCE_DIR})
-  target_include_directories(vrptw PRIVATE ${Eigen_SOURCE_DIR}/unsupported)
+  target_include_directories(baldes PRIVATE ${Eigen_SOURCE_DIR})
+  target_include_directories(baldes PRIVATE ${Eigen_SOURCE_DIR}/unsupported)
 endif()
