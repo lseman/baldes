@@ -130,7 +130,6 @@ public:
  *
  */
 #include <deque>
-#include <memory_resource>
 
 class LabelPool {
 public:
@@ -166,30 +165,31 @@ public:
 
     ~LabelPool() { cleanup(); }
 
+    void cleanup() {
+        // Properly delete each Label to free memory in available and in-use pools
+        for (Label* label : available_labels) {
+            delete label;
+        }
+        available_labels.clear();
+
+        for (Label* label : in_use_labels) {
+            delete label;
+        }
+        in_use_labels.clear();
+
+        // Delete any additional states if needed
+        for (Label* label : deleted_states) {
+            delete label;
+        }
+        deleted_states.clear();
+    }
+
 private:
     void allocate_labels(size_t count) {
         available_labels.reserve(count);
         for (size_t i = 0; i < count; ++i) {
             available_labels.push_back(new Label());
         }
-    }
-
-    void cleanup() {
-        // Properly delete each Label to free memory
-        for (auto& label : available_labels) {
-            delete label;
-        }
-        available_labels.clear();
-
-        for (auto& label : in_use_labels) {
-            delete label;
-        }
-        in_use_labels.clear();
-
-        for (auto& label : deleted_states) {
-            delete label;
-        }
-        deleted_states.clear();
     }
 
     size_t pool_size;
@@ -199,6 +199,7 @@ private:
     std::vector<Label*> in_use_labels;    // Labels currently in use
     std::vector<Label*> deleted_states;   // Labels available for recycling
 };
+
 
 /**
  * @struct PSTEPDuals

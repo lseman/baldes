@@ -83,8 +83,9 @@ struct SparseMatrix;
 class LimitedMemoryRank1Cuts {
 public:
     Xoroshiro128Plus      rp; // Seed it (you can change the seed)
-    HighDimCutsGenerator *generator = new HighDimCutsGenerator(N_SIZE, 5, 1e-6);
-
+    using HighDimCutsGeneratorPtr = std::shared_ptr<HighDimCutsGenerator>;
+    HighDimCutsGeneratorPtr generator = std::make_shared<HighDimCutsGenerator>(N_SIZE, 5, 1e-6);
+    
     void setDistanceMatrix(const std::vector<std::vector<double>> &distances) {
         generator->cost_mat4_vertex = distances;
     }
@@ -97,6 +98,8 @@ public:
 
     // default constructor
     LimitedMemoryRank1Cuts() = default;
+
+    void setNodes(std::vector<VRPNode> &nodes) { this->nodes = nodes; }
 
     CutStorage cutStorage = CutStorage();
 

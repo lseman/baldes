@@ -152,7 +152,7 @@ Label *BucketGraph::compute_label(const Label *L, const Label *L_prime) {
     if (branching_duals->size() > 0) { new_cost -= branching_duals->getDual(L->node_id, L_prime->node_id); }
 
     // Directly acquire new_label and set the cost
-    auto new_label       = label_pool_fw.acquire();
+    auto new_label       = label_pool_fw->acquire();
     new_label->cost      = new_cost;
     new_label->real_cost = real_cost;
 
@@ -672,7 +672,7 @@ void BucketGraph::common_initialization() {
 
     for (int r = 0; r < num_intervals; ++r) {
         for (auto k = 0; k < intervals[r].interval; ++k) {
-            auto depot            = label_pool_fw.acquire();
+            auto depot            = label_pool_fw->acquire();
             auto calculated_index = r * MAIN_RESOURCES + k;
 
             depot->initialize(calculated_index, 0.0, interval_starts, options.depot);
@@ -691,7 +691,7 @@ void BucketGraph::common_initialization() {
 
     for (int r = 0; r < num_intervals; ++r) {
         for (auto k = 0; k < intervals[r].interval; ++k) {
-            auto end_depot        = label_pool_bw.acquire();
+            auto end_depot        = label_pool_bw->acquire();
             auto calculated_index = num_buckets_index_bw[N_SIZE - 1] + r * MAIN_RESOURCES + k;
             // print interval_ends size
             end_depot->initialize(calculated_index, 0.0, interval_ends, options.end_depot);
@@ -771,7 +771,7 @@ void BucketGraph::mono_initialization() {
 
     // Iterate over all intervals for the forward direction
     while (true) {
-        auto depot = label_pool_fw.acquire();
+        auto depot = label_pool_fw->acquire();
         // print num_intervals
         std::vector<double> interval_starts(num_intervals);
         for (int r = 0; r < num_intervals; ++r) {
@@ -1002,7 +1002,7 @@ void BucketGraph::initInfo() {
  */
 Label *BucketGraph::compute_mono_label(const Label *L) {
     // Directly acquire new_label and set the cost
-    auto new_label       = label_pool_fw.acquire();
+    auto new_label       = label_pool_fw->acquire();
     new_label->cost      = L->cost;      // Use the cost from L
     new_label->real_cost = L->real_cost; // Use the real cost from L
 

@@ -20,6 +20,7 @@ struct BucketOptions {
     int max_path_size = N_SIZE / 2;
 };
 
+
 enum class Direction { Forward, Backward };
 enum class Stage { One, Two, Three, Four, Enumerate, Fix };
 enum class ArcType { Node, Bucket, Jump };

@@ -45,7 +45,7 @@ include_directories(third_party/hgs_vrptw)
 # Build types and flags
 if(NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE
-      "Debug"
+      "RelWithDebInfo"
       CACHE STRING "Choose the type of build." FORCE)
 endif()
 set(CMAKE_CXX_FLAGS_RELEASE "-O3 -march=native -flto")
@@ -71,7 +71,7 @@ option(SORTED_LABELS "Enable Sorted Labels compilation option" OFF)
 option(MCD "Enable MCD compilation option" OFF)
 option(FIX_BUCKETS "Enable Fixed Buckets compilation option" ON)
 option(AVX "Enable AVX compilation option" OFF)
-option(IPM "Enable IPM compilation option" OFF)
+option(IPM "Enable IPM compilation option" ON)
 option(TR "Enable TR compilation option" OFF)
 option(AUGMENTED "Enable Augmented compilation option" ON)
 option(GET_SUITESPARSE "Enable SuiteSparse compilation option" OFF)
