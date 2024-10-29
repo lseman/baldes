@@ -419,12 +419,22 @@ public:
             if (plan_idx < map_cut_plan_vio[tmp].size()) { map_cut_plan_vio[tmp][plan_idx] = {new_cut, vio}; }
         }
     }
-    
-
-    static constexpr  int                        max_heuristic_sep_mem4_row_rank1 = 8;
-
     std::vector<std::vector<double>> cost_mat4_vertex;
-    void                             generateSepHeurMem4Vertex() {
+
+    std::shared_ptr<HighDimCutsGenerator> clone() const {
+        // Directly create a new instance without copying `pool_mutex`
+        auto new_gen = std::shared_ptr<HighDimCutsGenerator>(new HighDimCutsGenerator(N_SIZE, 5, 1e-6));
+        new_gen->setDistanceMatrix(cost_mat4_vertex);
+        new_gen->old_cuts = this->old_cuts;
+        return new_gen;
+    }
+
+    void setDistanceMatrix(const std::vector<std::vector<double>> distances) { cost_mat4_vertex = distances; }
+
+    static constexpr int max_heuristic_sep_mem4_row_rank1 = 8;
+
+    void generateSepHeurMem4Vertex() {
+        // print size of rank1_sep_heur_mem4_vertex
         rank1_sep_heur_mem4_vertex.resize(dim);
         std::vector<std::pair<int, double>> cost(dim);
 

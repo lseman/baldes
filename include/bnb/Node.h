@@ -60,7 +60,7 @@
 class Problem;
 /**
  * @class BNBNode
- * @brief Represents a node in a tree structure.
+ * @brief Represents a node in a tree structure./
  *
  * The Node class is used to represent a node in a tree structure. Each node can
  * have child nodes, and contains state information, objective value, bound
@@ -216,8 +216,16 @@ public:
         child->paths             = paths;
         child->historyCandidates = historyCandidates;
         child->candidates        = candidates;
-        child->r1c               = r1c;
-        child->rccManager        = rccManager;
+        child->r1c               = std::make_shared<LimitedMemoryRank1Cuts>(*r1c);
+        child->rccManager        = std::make_shared<RCCManager>(*rccManager);
+        child->instance          = instance;
+        child->SRCconstraints.clear();
+        child->SRCconstraints.reserve(SRCconstraints.size()); // Reserve space if size is known
+
+        for (Constraint *constraint : SRCconstraints) {
+            child->SRCconstraints.push_back(new Constraint(*constraint)); // Deep copy each `Constraint` object
+        }
+
         child->matrix = matrix;
         children.push_back(child);
         // Return the new child node

@@ -146,6 +146,9 @@ public:
 
     int getID(int cutIndex) { return cuts[cutIndex].id; }
 
+    void printCuts() {
+        for (auto &cut : cuts) { cut.printCut(); }
+    }
     void removeCut(int cutIndex) {
         // Ensure the cutIndex is within bounds
         if (cutIndex < 0 || cutIndex >= cuts.size()) {

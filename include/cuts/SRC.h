@@ -82,14 +82,21 @@ struct SparseMatrix;
  */
 class LimitedMemoryRank1Cuts {
 public:
-    Xoroshiro128Plus      rp; // Seed it (you can change the seed)
-    using HighDimCutsGeneratorPtr = std::shared_ptr<HighDimCutsGenerator>;
+    Xoroshiro128Plus rp; // Seed it (you can change the seed)
+    using HighDimCutsGeneratorPtr     = std::shared_ptr<HighDimCutsGenerator>;
     HighDimCutsGeneratorPtr generator = std::make_shared<HighDimCutsGenerator>(N_SIZE, 5, 1e-6);
-    
-    void setDistanceMatrix(const std::vector<std::vector<double>> &distances) {
-        generator->cost_mat4_vertex = distances;
+
+    void setDistanceMatrix(const std::vector<std::vector<double>> distances) {
+        generator->setDistanceMatrix(distances);
     }
     LimitedMemoryRank1Cuts(std::vector<VRPNode> &nodes);
+
+    LimitedMemoryRank1Cuts(const LimitedMemoryRank1Cuts &other)
+        : rp(other.rp), generator(other.generator ? other.generator->clone() : nullptr), // Clone generator if it exists
+          cutStorage(other.cutStorage), allPaths(other.allPaths), labels(other.labels),
+          labels_counter(other.labels_counter), nodes(other.nodes) {
+        other.generator->setDistanceMatrix(other.generator->cost_mat4_vertex);
+    }
 
     void setDuals(const std::vector<double> &duals) {
         // print nodes.size
@@ -112,8 +119,7 @@ public:
     void insertSet(VRPTW_SRC &cuts, int i, int j, int k, const std::vector<int> &buffer_int, int buffer_int_n,
                    double LHS_cut);
 
-    void insertSet(VRPTW_SRC &cuts, int i, const std::vector<int> &buffer_int, int buffer_int_n,
-                   double LHS_cut);
+    void insertSet(VRPTW_SRC &cuts, int i, const std::vector<int> &buffer_int, int buffer_int_n, double LHS_cut);
     void generateCutCoefficients(VRPTW_SRC &cuts, std::vector<std::vector<double>> &coefficients, int numNodes,
                                  const SparseMatrix &A, const std::vector<double> &x);
 
@@ -136,6 +142,6 @@ private:
 
     static ankerl::unordered_dense::map<int, std::pair<std::vector<int>, std::vector<int>>> column_cache;
 
-    std::vector<VRPNode>                                nodes;
-    CutType                                             cutType;
+    std::vector<VRPNode> nodes;
+    CutType              cutType;
 };
