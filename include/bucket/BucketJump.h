@@ -76,15 +76,33 @@ void BucketGraph::UpdateBucketsSet(const double theta, const Label *label, anker
                     continue; // Skip labels with the same node ID or conflicting bitmaps
                 }
 
-                const VRPNode &L_last_node     = (D == Direction::Forward) ? nodes[label->node_id] : nodes[L->node_id];
-                const double   time_constraint = (D == Direction::Forward)
-                                                     ? label->resources[TIME_INDEX] + cost + L_last_node.duration
-                                                     : L->resources[TIME_INDEX] + cost + L_last_node.duration;
+                const VRPNode &L_last_node = (D == Direction::Forward) ? nodes[label->node_id] : nodes[L->node_id];
 
-                if (time_constraint >
-                    ((D == Direction::Forward) ? L->resources[TIME_INDEX] : label->resources[TIME_INDEX])) {
-                    continue; // Skip if time constraint is violated
+                bool violated = false;
+                for (auto r = 0; r < options.resources.size(); ++r) {
+                    if (options.resources[r] == "time") {
+                        const double time_constraint = (D == Direction::Forward)
+                                                           ? label->resources[TIME_INDEX] + cost + L_last_node.duration
+                                                           : L->resources[TIME_INDEX] + cost + L_last_node.duration;
+
+                        if (time_constraint >
+                            ((D == Direction::Forward) ? L->resources[TIME_INDEX] : label->resources[TIME_INDEX])) {
+                            violated = true;
+                            break;
+                        }
+                    } else {
+                        const double resource_constraint = (D == Direction::Forward)
+                                                               ? label->resources[r] + L_last_node.consumption[r]
+                                                               : L->resources[r] + L_last_node.consumption[r];
+
+                        if (resource_constraint > ((D == Direction::Forward) ? L->resources[r] : label->resources[r])) {
+                            violated = true;
+                            break;
+                        }
+                    }
                 }
+
+                if (violated) { continue; }
 
                 // Insert the current bucket into Bbidi if the total cost is below theta
                 if (label->cost + cost + L->cost < theta) { Bbidi.emplace(curr_bucket); }
@@ -174,9 +192,9 @@ void BucketGraph::BucketArcElimination(double theta) {
                     increment[r] = buckets[b].ub[r] - a.resource_increment[r];
                 }
             }
-            auto arc_key    = create_arc_key(buckets[a.from_bucket].node_id, buckets[a.to_bucket].node_id, b);
-            int  b_opposite = get_opposite_bucket_number<D>(a.to_bucket, increment);
-            auto &Bidi_map = local_B_Ba_b[arc_key];
+            auto  arc_key    = create_arc_key(buckets[a.from_bucket].node_id, buckets[a.to_bucket].node_id, b);
+            int   b_opposite = get_opposite_bucket_number<D>(a.to_bucket, increment);
+            auto &Bidi_map   = local_B_Ba_b[arc_key];
 
             for (auto &L_item : labels) {
                 Bidi_map.insert(b);

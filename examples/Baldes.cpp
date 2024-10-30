@@ -204,15 +204,17 @@ int main(int argc, char *argv[]) {
         double cost       = 0; // Assuming cost can be derived or set as needed
         nodes.emplace_back(k, start_time, end_time, duration, cost, demand);
         nodes[k].set_location(instance.x_coord[k], instance.y_coord[k]);
-        nodes[k].lb.push_back(start_time);
-        nodes[k].ub.push_back(end_time);
+        if (instance.problem_type == ProblemType::vrptw) {
+            nodes[k].lb.push_back(start_time);
+            nodes[k].ub.push_back(end_time);
+            nodes[k].consumption.push_back(duration);
+        }
         // print start time and end time
         if (instance.problem_type == ProblemType::cvrp) {
             nodes[k].lb.push_back(0);
             nodes[k].ub.push_back(instance.q);
+            nodes[k].consumption.push_back(demand);
         }
-        nodes[k].consumption.push_back(duration);
-        nodes[k].consumption.push_back(demand);
     }
 
     MIPProblem mip = MIPProblem(problem_kind, 0, 0);

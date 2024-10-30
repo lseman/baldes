@@ -106,12 +106,7 @@ set(BUCKET_CAPACITY
 set(TIME_INDEX
     0
     CACHE STRING "Time index")
-set(DEMAND_INDEX
-    1
-    CACHE STRING "Demand index")
-set(MAIN_RESOURCES
-    1
-    CACHE STRING "Main resources")
+
 set(N_ADD
     10
     CACHE STRING "Number of additional nodes")
@@ -133,23 +128,7 @@ add_definitions(-DR_SIZE=${R_SIZE})
 add_definitions(-DMAX_SRC_CUTS=${MAX_SRC_CUTS})
 add_definitions(-DBUCKET_CAPACITY=${BUCKET_CAPACITY})
 add_definitions(-DTIME_INDEX=${TIME_INDEX})
-add_definitions(-DDEMAND_INDEX=${DEMAND_INDEX})
-add_definitions(-DMAIN_RESOURCES=${MAIN_RESOURCES})
 add_definitions(-DN_ADD=${N_ADD})
-
-# Define resources and whether they are disposable or not
-set(RESOURCES
-    "Time"
-    CACHE STRING "List of resources")
-set(RESOURCES_DISPOSABLE
-    "1"
-    CACHE
-      STRING
-      "List of flags indicating if each resource is disposable (1 for disposable, 0 for non-disposable)"
-)
-set(OR_RESOURCES
-    "1"
-    CACHE STRING "List of resources that are OR resources")
 
 # if IPM is disabled, force STAB to be enabled
 if(NOT IPM)

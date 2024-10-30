@@ -309,7 +309,11 @@ void HGSLocalSearch::run(Individual *indiv, double penaltyCapacityLS, double pen
     const bool        runLS_INT       = params->rng() % 100 < (unsigned int)params->config.intensificationProbabilityLS;
 
     this->penaltyCapacityLS = penaltyCapacityLS;
-    this->penaltyTimeWarpLS = penaltyTimeWarpLS;
+    if (params->problemType == ProblemType::vrptw) {
+        this->penaltyTimeWarpLS = penaltyTimeWarpLS;
+    } else {
+        this->penaltyTimeWarpLS = 0;
+    }
     loadIndividual(indiv);
 
     // Shuffling the order of the nodes explored by the LS to allow for more diversity in the search
@@ -1377,7 +1381,7 @@ CostSol HGSLocalSearch::getCostSol(bool usePenaltiesLS) {
         myCostSol.distance += myRoute->duration;
         myCostSol.capacityExcess += std::max(0, myRoute->load - params->vehicleCapacity);
         myCostSol.waitTime += 0; // TODO
-        myCostSol.timeWarp += myRoute->twData.timeWarp;
+        if (params->problemType == ProblemType::vrptw) { myCostSol.timeWarp += myRoute->twData.timeWarp; }
     }
 
     // Subtract service durations which are not part of distance

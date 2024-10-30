@@ -221,17 +221,15 @@ std::vector<double> BucketGraph::labeling_algorithm() noexcept {
                 auto bucket_labels = buckets[bucket].get_unextended_labels(); // Get unextended labels from this bucket
                 // if (bucket_labels.empty()) { continue; }            // Skip empty buckets
                 for (Label *label : bucket_labels) {
-                    // if (label->is_extended) { continue; } // Skip labels that have already been extended
-
                     // NOTE: double check if this is the best way to handle this
                     if constexpr (F == Full::Partial) {
                         if constexpr (D == Direction::Forward) {
-                            if (label->resources[TIME_INDEX] > q_star[TIME_INDEX] + numericutils::eps) {
+                            if (label->resources[options.main_resources[0]] > q_star[options.main_resources[0]] + numericutils::eps) {
                                 label->set_extended(true);
                                 continue;
                             }
                         } else if constexpr (D == Direction::Backward) {
-                            if (label->resources[TIME_INDEX] <= q_star[TIME_INDEX] - numericutils::eps) {
+                            if (label->resources[options.main_resources[0]] <= q_star[options.main_resources[0]] - numericutils::eps) {
                                 label->set_extended(true);
                                 continue;
                             }
@@ -436,7 +434,6 @@ std::vector<Label *> BucketGraph::bi_labeling_algorithm() {
         best_label->real_cost     = std::numeric_limits<double>::infinity();
         best_label->nodes_covered = {};
     }
-
     // Add the best label (combined forward/backward path) to the merged label list
     merged_labels.push_back(best_label);
 
@@ -485,7 +482,7 @@ std::vector<Label *> BucketGraph::bi_labeling_algorithm() {
                 // Iterate over the returned Label** array and add each valid label to the vector
                 for (auto L_prime : extended_labels) {
                     // auto L_prime = *label_ptr; // Get the current label from the array
-                    if (L_prime->resources[TIME_INDEX] <= q_star[TIME_INDEX]) {
+                    if (L_prime->resources[options.main_resources[0]] <= q_star[options.main_resources[0]]) {
                         continue; // Skip if the label exceeds q_star
                     }
 

@@ -486,7 +486,11 @@ Params::Params(const std::string &path_location) {
 
     // Initial parameter values of these two parameters are not argued
     penaltyWaitTime = 0.;
-    penaltyTimeWarp = config.initialTimeWarpPenalty;
+    if (problemType == ProblemType::vrptw) {
+        penaltyTimeWarp = config.initialTimeWarpPenalty;
+    } else {
+        penaltyTimeWarp = 0;
+    }
 
     // See Vidal 2012, HGS for VRPTW
     proximityWeightWaitTime = 0.2;
