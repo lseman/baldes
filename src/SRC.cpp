@@ -24,7 +24,9 @@
 
 #include "bnb/Node.h"
 
+#ifdef IPM
 #include "ipm/IPSolver.h"
+#endif
 
 #ifdef HIGHS
 #include <Highs.h>

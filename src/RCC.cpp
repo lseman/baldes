@@ -4,10 +4,10 @@
 
 ArcDuals RCCManager::computeDuals(BNBNode *model, double threshold) {
     ArcDuals arcDuals;
+    model->optimize();
     // First pass: Compute dual values and store them
     for (int i = 0; i < cuts_.size(); ++i) {
         const auto &cut = cuts_[i];
-
         // TODO: adjust to new stuff
         double dualValue = model->getDualVal(cut.ctr->index());
 

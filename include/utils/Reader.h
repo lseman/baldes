@@ -497,7 +497,7 @@ inline int CVRP_read_instance(const std::string &file_name, InstanceData &instan
         for (int j = 0; j < instance.nN; ++j) {
             int  dx                 = instance.x_coord[i] - instance.x_coord[j];
             int  dy                 = instance.y_coord[i] - instance.y_coord[j];
-            auto aux                = (int)(1 * std::sqrt(dx * dx + dy * dy));
+            auto aux                = (int)(10 * std::sqrt(dx * dx + dy * dy));
             instance.distance[i][j] = 1.0 * aux;
         }
     }
@@ -509,7 +509,7 @@ inline int CVRP_read_instance(const std::string &file_name, InstanceData &instan
     // define windows open and close of each as 0
     for (int i = 0; i < instance.nN; i++) {
         instance.window_open[i]  = 0;
-        instance.window_close[i] = 100000;
+        instance.window_close[i] = 5000;
     }
     // define n_tw as 0
     for (int i = 0; i < instance.nN; i++) { instance.n_tw[i] = 0; }
