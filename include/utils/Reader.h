@@ -493,13 +493,16 @@ inline int CVRP_read_instance(const std::string &file_name, InstanceData &instan
     }
 
     // Calculate Euclidean distances between nodes
-    for (int i = 1; i <= dimension; ++i) {
-        for (int j = i + 1; j <= dimension; ++j) {
-            double dx               = instance.x_coord[i] - instance.x_coord[j];
-            double dy               = instance.y_coord[i] - instance.y_coord[j];
-            instance.distance[i][j] = instance.distance[j][i] = std::sqrt(dx * dx + dy * dy);
+    for (int i = 0; i < instance.nN; ++i) {
+        for (int j = 0; j < instance.nN; ++j) {
+            int  dx                 = instance.x_coord[i] - instance.x_coord[j];
+            int  dy                 = instance.y_coord[i] - instance.y_coord[j];
+            auto aux                = (int)(1 * std::sqrt(dx * dx + dy * dy));
+            instance.distance[i][j] = 1.0 * aux;
         }
     }
+
+    instance.travel_cost = instance.distance;
 
     // define service_time of each as 0
     for (int i = 0; i < instance.nN; i++) { instance.service_time[i] = 0; }
@@ -519,8 +522,10 @@ inline int CVRP_read_instance(const std::string &file_name, InstanceData &instan
     instance.window_close[instance.nN - 1] = instance.window_close[0];
     instance.n_tw[instance.nN - 1]         = instance.n_tw[0];
 
-    instance.nV = 100;
+    instance.nV = 30;
 
+    for (int i = 1; i < instance.nN - 1; ++i) { instance.demand_sum += instance.demand[i]; }
+    instance.T_max        = instance.window_close[0];
     instance.problem_type = ProblemType::cvrp;
 
     return 1; // Success

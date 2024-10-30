@@ -201,10 +201,18 @@ private:
         return std::max(0., myLoad - params->vehicleCapacity) * penaltyCapacityLS;
     }
     inline double penaltyTimeWindows(const TimeWindowData &twData) {
-        return (twData.timeWarp + std::max(twData.latestReleaseTime - twData.latestArrival, 0)) * penaltyTimeWarpLS;
+        if (params->problemType == ProblemType::vrptw) {
+            return (twData.timeWarp + std::max(twData.latestReleaseTime - twData.latestArrival, 0)) * penaltyTimeWarpLS;
+        } else {
+            return 0;
+        }
     }
     inline double deltaPenaltyTimeWindows(const TimeWindowData &twDataAdd, const TimeWindowData &twDataSubtract) {
-        return penaltyTimeWindows(twDataAdd) - penaltyTimeWindows(twDataSubtract);
+        if (params->problemType == ProblemType::vrptw) {
+            return penaltyTimeWindows(twDataAdd) - penaltyTimeWindows(twDataSubtract);
+        } else {
+            return 0;
+        }
     }
 
     /* RELOCATE MOVES */

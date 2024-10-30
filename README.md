@@ -124,10 +124,8 @@ export PATH=/opt/homebrew/opt/llvm/bin:$PATH
 | ----------------- | ------------------------------------------------------- | ------- |
 | `R_SIZE`          | Number of resources                                     | 1       |
 | `N_SIZE`$^1$      | Number of customers                                     | 102     |
-| `MAX_SRC_CUTS`    | Number of allowed SRC cuts                              | 50      |
 | `BUCKET_CAPACITY` | Maximum bucket capacity if `LIMITED_BUCKETS` is enabled | 50      |
 | `N_ADD`           | Number of columns to be added for each pricing          | 10      |
-| `MAIN_RESOURCES`  | Define the number of main resources                     | 1       |
 | `HGS`             | Maximum HGS running time                                | 5       |
 
 > **Note 1**: Including depot and depot copy (end node).
@@ -151,7 +149,7 @@ struct BucketOptions {
     int max_path_size           = N_SIZE / 2;
     int main_resources          = 1;
     std::vector<std::string> resources = {"time", "capacity"};
-    std::vector<int> resource_disposability = {0, 1}; // 0=disposable, 1=non-disposable
+    std::vector<int> resource_disposability = {1, 1}; // 1=disposable, 0=non-disposable
     std::vector<int> or_resources = {1};
 };
 ```
@@ -178,11 +176,19 @@ See examples in the `examples/` directory.
 
 ### 🚀 Running the Example Algorithm
 
-To run Solomon instances in the `example` folder:
+To run Solomon-like instances:
 
 ```bash
 ./baldes vrptw ../examples/C203.txt
 ```
+
+To run CVRP-like instance like the 10k instance proposed by [Uchoa et al.](http://vrp.galgos.inf.puc-rio.br/media/com_vrp/instances/Vrp-Set-XML100.zip).
+
+
+```bash
+./baldes cvrp ../examples/XML100_1111_01.vrp
+```
+
 
 ### 🐍 Python Wrapper
 
@@ -192,7 +198,7 @@ We also provide a Python wrapper, which can be used to instantiate the bucket gr
 import random
 
 # Now you can import the BALDES module
-import baldes
+import pybaldes as baldes
 
 # Define nodes
 nodes = [baldes.VRPNode() for _ in range(102)]

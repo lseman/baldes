@@ -87,8 +87,8 @@ void Individual::evaluateCompleteCost() {
             myCostSol.waitTime += waitTime;
 
         } else {
-            myCostSol.timeWarp += 0;
-            myCostSol.waitTime += 0;
+            myCostSol.timeWarp = 0;
+            myCostSol.waitTime = 0;
         }
         myCostSol.nbRoutes++;
 

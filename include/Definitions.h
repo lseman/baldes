@@ -18,10 +18,11 @@ struct BucketOptions {
     int depot         = 0;
     int end_depot     = N_SIZE - 1;
     int max_path_size = N_SIZE / 2;
-    int main_resources = 1;
-    std::vector<std::string> resources = {"time"};
-    std::vector<int> resource_disposability = {1};
-    std::vector<int> or_resources = {1};
+
+    std::vector<int>         main_resources         = {0};
+    std::vector<std::string> resources              = {"time"};
+    std::vector<int>         resource_disposability = {1};
+    std::vector<int>         or_resources           = {1};
 };
 
 enum class Direction { Forward, Backward };
@@ -340,28 +341,27 @@ inline double roundToTwoDecimalPlaces(double value) { return std::round(value * 
 #define RCC_MODE_BLOCK(code_block) // No operation if RCC is not defined
 #endif
 
-#define PARALLEL_EXECUTE(tasks, lambda_func, ...)                                               \
-    do {                                                                                        \
-        const int JOBS = std::thread::hardware_concurrency();                                   \
-        exec::static_thread_pool pool(JOBS);                                                    \
-        auto sched = pool.get_scheduler();                                                      \
-                                                                                                \
-        const int chunk_size = (tasks.size() + JOBS - 1) / JOBS;                                \
-        std::mutex tasks_mutex; /* Protect shared resources */                                  \
-                                                                                                \
-        auto bulk_sender = stdexec::bulk(                                                       \
-            stdexec::just(), (tasks.size() + chunk_size - 1) / chunk_size,                      \
-            [&](std::size_t chunk_idx) {                                                        \
-                size_t start_idx = chunk_idx * chunk_size;                                      \
-                size_t end_idx = std::min(start_idx + chunk_size, tasks.size());                \
-                                                                                                \
-                /* Process a chunk of tasks */                                                  \
-                for (size_t task_idx = start_idx; task_idx < end_idx; ++task_idx) {             \
-                    (lambda_func)(tasks[task_idx], tasks_mutex, __VA_ARGS__);                   \
-                }                                                                               \
-            });                                                                                 \
-                                                                                                \
-        /* Submit work to the thread pool and wait for completion */                            \
-        auto work = stdexec::starts_on(sched, bulk_sender);                                     \
-        stdexec::sync_wait(std::move(work));                                                    \
+#define PARALLEL_EXECUTE(tasks, lambda_func, ...)                                                                     \
+    do {                                                                                                              \
+        const int                JOBS = std::thread::hardware_concurrency();                                          \
+        exec::static_thread_pool pool(JOBS);                                                                          \
+        auto                     sched = pool.get_scheduler();                                                        \
+                                                                                                                      \
+        const int  chunk_size = (tasks.size() + JOBS - 1) / JOBS;                                                     \
+        std::mutex tasks_mutex; /* Protect shared resources */                                                        \
+                                                                                                                      \
+        auto bulk_sender =                                                                                            \
+            stdexec::bulk(stdexec::just(), (tasks.size() + chunk_size - 1) / chunk_size, [&](std::size_t chunk_idx) { \
+                size_t start_idx = chunk_idx * chunk_size;                                                            \
+                size_t end_idx   = std::min(start_idx + chunk_size, tasks.size());                                    \
+                                                                                                                      \
+                /* Process a chunk of tasks */                                                                        \
+                for (size_t task_idx = start_idx; task_idx < end_idx; ++task_idx) {                                   \
+                    (lambda_func)(tasks[task_idx], tasks_mutex, __VA_ARGS__);                                         \
+                }                                                                                                     \
+            });                                                                                                       \
+                                                                                                                      \
+        /* Submit work to the thread pool and wait for completion */                                                  \
+        auto work = stdexec::starts_on(sched, bulk_sender);                                                           \
+        stdexec::sync_wait(std::move(work));                                                                          \
     } while (0)

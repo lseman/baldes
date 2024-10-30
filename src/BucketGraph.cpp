@@ -63,18 +63,18 @@ JumpArc::JumpArc(int base, int jump, const std::vector<double> &res_inc, double 
  * and defines the intervals and resource limits.
  *
  */
-BucketGraph::BucketGraph(const std::vector<VRPNode> &nodes, int time_horizon, int bucket_interval, int capacity,
+BucketGraph::BucketGraph(const std::vector<VRPNode> &nodes, int horizon, int bucket_interval, int capacity,
                          int capacity_interval)
-    : fw_buckets(), bw_buckets(), nodes(nodes), time_horizon(time_horizon), capacity(capacity),
+    : fw_buckets(), bw_buckets(), nodes(nodes), horizon(horizon), capacity(capacity),
       bucket_interval(bucket_interval), best_cost(std::numeric_limits<double>::infinity()), fw_best_label() {
 
     // initInfo();
-    Interval intervalTime(bucket_interval, time_horizon);
+    Interval intervalTime(bucket_interval, horizon);
     Interval intervalCap(capacity_interval, capacity);
 
     intervals = {intervalTime, intervalCap};
     R_min     = {0, 0};
-    R_max     = {static_cast<double>(time_horizon), static_cast<double>(capacity)};
+    R_max     = {static_cast<double>(horizon), static_cast<double>(capacity)};
 }
 
 /**
@@ -85,24 +85,24 @@ BucketGraph::BucketGraph(const std::vector<VRPNode> &nodes, int time_horizon, in
  * and defines the intervals and resource limits.
  *
  */
-BucketGraph::BucketGraph(const std::vector<VRPNode> &nodes, int time_horizon, int bucket_interval)
-    : fw_buckets(), bw_buckets(), nodes(nodes), time_horizon(time_horizon), bucket_interval(bucket_interval),
+BucketGraph::BucketGraph(const std::vector<VRPNode> &nodes, int horizon, int bucket_interval)
+    : fw_buckets(), bw_buckets(), nodes(nodes), horizon(horizon), bucket_interval(bucket_interval),
       best_cost(std::numeric_limits<double>::infinity()), fw_best_label() {
 
 #if defined(RCC) || defined(EXACT_RCC)
     // cvrsep_duals.assign(nodes.size() + 2, std::vector<double>(nodes.size() + 2, 0.0));
 #endif
     // initInfo();
-    Interval intervalTime(bucket_interval, time_horizon);
+    Interval interval(bucket_interval, horizon);
 
-    intervals = {intervalTime};
+    intervals = {interval};
     R_min     = {0};
-    R_max     = {static_cast<double>(time_horizon)};
+    R_max     = {static_cast<double>(horizon)};
 }
 
 BucketGraph::BucketGraph(const std::vector<VRPNode> &nodes, std::vector<int> &bounds,
                          std::vector<int> &bucket_intervals)
-    : fw_buckets(), bw_buckets(), nodes(nodes), time_horizon(bounds[0]), bucket_interval(bucket_intervals[0]),
+    : fw_buckets(), bw_buckets(), nodes(nodes), horizon(bounds[0]), bucket_interval(bucket_intervals[0]),
       best_cost(std::numeric_limits<double>::infinity()), fw_best_label() {
 
 #if defined(RCC) || defined(EXACT_RCC)
@@ -552,8 +552,14 @@ void BucketGraph::set_adjacency_list() {
             auto   travel_cost = getcij(node.id, next_node.id); // Calculate travel cost
             double cost_inc    = travel_cost - next_node.cost;  // Adjust cost increment by subtracting next node's cost
 
-            for (int r = 0; r < options.resources.size(); ++r) { res_inc[r] = node.consumption[r]; }
-            res_inc[TIME_INDEX] += travel_cost; // Add travel time to resource increment
+            for (int r = 0; r < options.resources.size(); ++r) {
+                if (options.resources[r] == "time") {
+                    res_inc[r] = travel_cost + node.duration; // Update resource increment based on node duration
+                } else {
+                    res_inc[r] = node.consumption[r];
+                }
+            }
+            // res_inc[TIME_INDEX] += travel_cost; // Add travel time to resource increment
 
             int to_bucket = next_node.id;
             if (from_bucket == to_bucket) continue; // Skip arcs that loop back to the same bucket
@@ -633,7 +639,7 @@ void BucketGraph::common_initialization() {
     auto &num_buckets      = assign_buckets<Direction::Forward>(num_buckets_fw, num_buckets_bw);
     auto &num_bucket_index = assign_buckets<Direction::Forward>(num_buckets_index_fw, num_buckets_index_bw);
 
-    int                 num_intervals = options.main_resources;
+    int                 num_intervals = options.main_resources.size();
     std::vector<double> total_ranges(num_intervals);
     std::vector<double> base_intervals(num_intervals);
 
@@ -689,6 +695,7 @@ void BucketGraph::common_initialization() {
                                    : interval_ends[r] - current_pos[r] * roundToTwoDecimalPlaces(base_intervals[r]);
                 }
 
+                // print interval
                 // Initialize depot with the current interval boundaries
                 depot->initialize(calculated_index, 0.0, interval_bounds, depot_id);
                 depot->is_extended = false;
@@ -948,7 +955,7 @@ void BucketGraph::setup() {
 #endif
 
     // Initialize the split
-    for (int i = 0; i < options.main_resources; ++i) { q_star.push_back((R_max[i] - R_min[i] + 1) / 2); }
+    for (int i = 0; i < options.main_resources.size(); ++i) { q_star.push_back((R_max[i] - R_min[i] + 1) / 2); }
 }
 
 /**

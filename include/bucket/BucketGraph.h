@@ -480,9 +480,9 @@ public:
 
     // define default
     BucketGraph() = default;
-    BucketGraph(const std::vector<VRPNode> &nodes, int time_horizon, int bucket_interval, int capacity,
+    BucketGraph(const std::vector<VRPNode> &nodes, int horizon, int bucket_interval, int capacity,
                 int capacity_interval);
-    BucketGraph(const std::vector<VRPNode> &nodes, int time_horizon, int bucket_interval);
+    BucketGraph(const std::vector<VRPNode> &nodes, int horizon, int bucket_interval);
     BucketGraph(const std::vector<VRPNode> &nodes, std::vector<int> &bounds, std::vector<int> &bucket_intervals);
 
     // Common Tools
@@ -714,7 +714,7 @@ public:
         auto &num_buckets       = assign_buckets<D>(num_buckets_fw, num_buckets_bw);
         auto &num_buckets_index = assign_buckets<D>(num_buckets_index_fw, num_buckets_index_bw);
 
-        int                 num_intervals = options.main_resources;
+        int                 num_intervals = options.main_resources.size();
         std::vector<double> total_ranges(num_intervals);
         std::vector<double> base_intervals(num_intervals);
 
@@ -849,10 +849,13 @@ public:
         const struct VRPNode &VRPNode      = nodes[fw_label->node_id];
 
         // Time feasibility check
-        const auto time_fw     = fw_resources[TIME_INDEX];
-        const auto time_bw     = bw_resources[TIME_INDEX];
-        const auto travel_time = getcij(fw_label->node_id, bw_label->node_id);
-        if (time_fw + travel_time + VRPNode.duration > time_bw) { return false; }
+        for (auto r = 0; r < options.resources.size(); ++r) {
+            if (options.resources[r] != "time") { continue; }
+            const auto time_fw     = fw_resources[r];
+            const auto time_bw     = bw_resources[r];
+            const auto travel_time = getcij(fw_label->node_id, bw_label->node_id);
+            if (time_fw + travel_time + VRPNode.duration > time_bw) { return false; }
+        }
 
         // Resource feasibility check (if applicable)
         if (options.resources.size() > 1) {
@@ -879,12 +882,12 @@ public:
             // If there are more backward labels than forward labels, increase the terminal time slightly
             if (((static_cast<double>(n_bw_labels) - static_cast<double>(n_fw_labels)) /
                  static_cast<double>(n_fw_labels)) > 0.05) {
-                split += 0.05 * R_max[TIME_INDEX];
+                split += 0.05 * R_max[options.main_resources[0]];
             }
             // If there are more forward labels than backward labels, decrease the terminal time slightly
             else if (((static_cast<double>(n_fw_labels) - static_cast<double>(n_bw_labels)) /
                       static_cast<double>(n_bw_labels)) > 0.05) {
-                split -= 0.05 * R_max[TIME_INDEX];
+                split -= 0.05 * R_max[options.main_resources[0]];
             }
         }
     }
@@ -970,7 +973,7 @@ public:
 private:
     std::vector<Interval> intervals;
     std::vector<VRPNode>  nodes;
-    int                   time_horizon{};
+    int                   horizon{};
     int                   capacity{};
     int                   bucket_interval{};
 

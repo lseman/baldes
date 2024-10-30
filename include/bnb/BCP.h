@@ -508,9 +508,8 @@ public:
         RCC_MODE_BLOCK(auto &rccManager = node->rccManager;)
 
         int bucket_interval = 25;
-        if (problemType == ProblemType::cvrp) { bucket_interval = 5; }
         int time_horizon = instance.T_max;
-        if (problemType == ProblemType::cvrp) { time_horizon = 100000; }
+        //if (problemType == ProblemType::cvrp) { time_horizon = 50000; }
         numConstrs                = node->getIntAttr("NumConstrs");
         node->numConstrs          = numConstrs;
         std::vector<double> duals = std::vector<double>(numConstrs, 0.0);
@@ -521,14 +520,14 @@ public:
             bucket_graph = std::make_unique<BucketGraph>(nodes, time_horizon, bucket_interval);
         } else if (problemType == ProblemType::cvrp) {
             bucket_graph =
-                std::make_unique<BucketGraph>(nodes, time_horizon, bucket_interval, instance.q, bucket_interval);
+                std::make_unique<BucketGraph>(nodes, instance.q, bucket_interval);
         }
 
         if (problemType == ProblemType::cvrp) {
             BucketOptions options;
-            options.main_resources         = 2;
-            options.resources              = {"time", "capacity"};
-            options.resource_disposability = {1, 1};
+            options.main_resources         = {0};
+            options.resources              = {"capacity"};
+            options.resource_disposability = {1};
             bucket_graph->options           = options;
         }
 
