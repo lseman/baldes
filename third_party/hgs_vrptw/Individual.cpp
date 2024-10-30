@@ -5,6 +5,7 @@
 #include <sstream>
 #include <vector>
 
+#include "Definitions.h"
 #include "Individual.h"
 #include "Params.h"
 #include "fmt/core.h"
@@ -80,8 +81,15 @@ void Individual::evaluateCompleteCost() {
         }
 
         myCostSol.distance += distance;
-        myCostSol.waitTime += waitTime;
-        myCostSol.timeWarp += timeWarp;
+
+        if (params->problemType == ProblemType::vrptw) {
+            myCostSol.timeWarp += timeWarp;
+            myCostSol.waitTime += waitTime;
+
+        } else {
+            myCostSol.timeWarp += 0;
+            myCostSol.waitTime += 0;
+        }
         myCostSol.nbRoutes++;
 
         if (load > params->vehicleCapacity) { myCostSol.capacityExcess += load - params->vehicleCapacity; }
@@ -200,6 +208,7 @@ Individual::Individual(Params *params, bool rcws, std::vector<std::vector<int>> 
         unsigned             savingsCount               = 0;
         int                  nextEmptyRoute             = 0;
         int                  nbVehicles                 = params->nbVehicles;
+        auto                 problem_type               = params->problemType;
         // Initialize arrival_times for each vehicle
         std::vector<std::vector<double>> arrival_times(params->nbVehicles);
 
@@ -258,9 +267,18 @@ Individual::Individual(Params *params, bool rcws, std::vector<std::vector<int>> 
                                 load.push_back(0);
                             }
 
-                            // Add time window feasibility check before adding both customers
-                            if (is_time_window_feasible(tournamentSavings[i].c1, chromR[nextEmptyRoute], *params) &&
-                                is_time_window_feasible(tournamentSavings[i].c2, chromR[nextEmptyRoute], *params)) {
+                            if (problem_type == ProblemType::vrptw) {
+                                // Add time window feasibility check before adding both customers
+                                if (is_time_window_feasible(tournamentSavings[i].c1, chromR[nextEmptyRoute], *params) &&
+                                    is_time_window_feasible(tournamentSavings[i].c2, chromR[nextEmptyRoute], *params)) {
+                                    chromR[nextEmptyRoute].push_back(tournamentSavings[i].c1);
+                                    chromR[nextEmptyRoute].push_back(tournamentSavings[i].c2);
+                                    load[nextEmptyRoute] += params->cli[tournamentSavings[i].c1].demand +
+                                                            params->cli[tournamentSavings[i].c2].demand;
+                                    inRoute[tournamentSavings[i].c1] = true;
+                                    inRoute[tournamentSavings[i].c2] = true;
+                                }
+                            } else {
                                 chromR[nextEmptyRoute].push_back(tournamentSavings[i].c1);
                                 chromR[nextEmptyRoute].push_back(tournamentSavings[i].c2);
                                 load[nextEmptyRoute] += params->cli[tournamentSavings[i].c1].demand +
@@ -353,9 +371,93 @@ Individual::Individual(Params *params, bool rcws, std::vector<std::vector<int>> 
                                                 if (pos2 == 0) {
                                                     // Check time window feasibility before merging r2 into the front of
                                                     // r1
+                                                    if (problem_type == ProblemType::vrptw) {
+                                                        if (is_time_window_feasible(tournamentSavings[i].c1, chromR[r2],
+                                                                                    *params)) {
+                                                            chromR[r1].insert(chromR[r1].begin(), chromR[r2].rbegin(),
+                                                                              chromR[r2].rend());
+                                                            load[r1] += load[r2];
+                                                            chromR[r2].clear();
+                                                            load[r2] = 0;
+                                                            if (r2 < nextEmptyRoute) nextEmptyRoute = r2;
+
+                                                            // Update arrival times after merging
+                                                            update_arrival_times(chromR[r1], arrival_times[r1],
+                                                                                 *params);
+                                                        }
+                                                    } else {
+                                                        chromR[r1].insert(chromR[r1].begin(), chromR[r2].rbegin(),
+                                                                          chromR[r2].rend());
+                                                        load[r1] += load[r2];
+                                                        chromR[r2].clear();
+                                                        load[r2] = 0;
+                                                        if (r2 < nextEmptyRoute) nextEmptyRoute = r2;
+                                                    }
+                                                } else {
+                                                    // Check time window feasibility before merging r1 into the back of
+                                                    // r2
+                                                    if (problem_type == ProblemType::vrptw) {
+
+                                                        if (is_time_window_feasible(tournamentSavings[i].c2, chromR[r1],
+                                                                                    *params)) {
+                                                            chromR[r2].insert(chromR[r2].end(), chromR[r1].begin(),
+                                                                              chromR[r1].end());
+                                                            load[r2] += load[r1];
+                                                            chromR[r1].clear();
+                                                            load[r1] = 0;
+                                                            if (r1 < nextEmptyRoute) nextEmptyRoute = r1;
+
+                                                            // Update arrival times after merging
+                                                            update_arrival_times(chromR[r2], arrival_times[r2],
+                                                                                 *params);
+                                                        }
+                                                    } else {
+                                                        chromR[r2].insert(chromR[r2].end(), chromR[r1].begin(),
+                                                                          chromR[r1].end());
+                                                        load[r2] += load[r1];
+                                                        chromR[r1].clear();
+                                                        load[r1] = 0;
+                                                        if (r1 < nextEmptyRoute) nextEmptyRoute = r1;
+                                                    }
+                                                }
+
+                                                interior[tournamentSavings[i].c1] = true;
+                                                interior[tournamentSavings[i].c2] = true;
+                                            } else if (pos2 == 0) {
+                                                // Check time window feasibility before merging r2 into the back of r1
+
+                                                if (problem_type == ProblemType::vrptw) {
+
                                                     if (is_time_window_feasible(tournamentSavings[i].c1, chromR[r2],
                                                                                 *params)) {
-                                                        chromR[r1].insert(chromR[r1].begin(), chromR[r2].rbegin(),
+                                                        chromR[r1].insert(chromR[r1].end(), chromR[r2].begin(),
+                                                                          chromR[r2].end());
+                                                        load[r1] += load[r2];
+                                                        chromR[r2].clear();
+                                                        load[r2] = 0;
+                                                        if (r2 < nextEmptyRoute) nextEmptyRoute = r2;
+
+                                                        // Update arrival times after merging
+                                                        update_arrival_times(chromR[r1], arrival_times[r1], *params);
+                                                    }
+                                                } else {
+                                                    chromR[r1].insert(chromR[r1].end(), chromR[r2].begin(),
+                                                                      chromR[r2].end());
+                                                    load[r1] += load[r2];
+                                                    chromR[r2].clear();
+                                                    load[r2] = 0;
+                                                    if (r2 < nextEmptyRoute) nextEmptyRoute = r2;
+                                                }
+
+                                                interior[tournamentSavings[i].c1] = true;
+                                                interior[tournamentSavings[i].c2] = true;
+                                            } else {
+                                                // Check time window feasibility before merging r1 into the back of r2
+                                                if (problem_type == ProblemType::vrptw) {
+
+                                                    if (is_time_window_feasible(tournamentSavings[i].c2, chromR[r1],
+                                                                                *params)) {
+                                                        chromR[r1].insert(chromR[r1].end(), chromR[r2].rbegin(),
                                                                           chromR[r2].rend());
                                                         load[r1] += load[r2];
                                                         chromR[r2].clear();
@@ -366,54 +468,12 @@ Individual::Individual(Params *params, bool rcws, std::vector<std::vector<int>> 
                                                         update_arrival_times(chromR[r1], arrival_times[r1], *params);
                                                     }
                                                 } else {
-                                                    // Check time window feasibility before merging r1 into the back of
-                                                    // r2
-                                                    if (is_time_window_feasible(tournamentSavings[i].c2, chromR[r1],
-                                                                                *params)) {
-                                                        chromR[r2].insert(chromR[r2].end(), chromR[r1].begin(),
-                                                                          chromR[r1].end());
-                                                        load[r2] += load[r1];
-                                                        chromR[r1].clear();
-                                                        load[r1] = 0;
-                                                        if (r1 < nextEmptyRoute) nextEmptyRoute = r1;
-
-                                                        // Update arrival times after merging
-                                                        update_arrival_times(chromR[r2], arrival_times[r2], *params);
-                                                    }
-                                                }
-
-                                                interior[tournamentSavings[i].c1] = true;
-                                                interior[tournamentSavings[i].c2] = true;
-                                            } else if (pos2 == 0) {
-                                                // Check time window feasibility before merging r2 into the back of r1
-                                                if (is_time_window_feasible(tournamentSavings[i].c1, chromR[r2],
-                                                                            *params)) {
-                                                    chromR[r1].insert(chromR[r1].end(), chromR[r2].begin(),
-                                                                      chromR[r2].end());
-                                                    load[r1] += load[r2];
-                                                    chromR[r2].clear();
-                                                    load[r2] = 0;
-                                                    if (r2 < nextEmptyRoute) nextEmptyRoute = r2;
-
-                                                    // Update arrival times after merging
-                                                    update_arrival_times(chromR[r1], arrival_times[r1], *params);
-                                                }
-
-                                                interior[tournamentSavings[i].c1] = true;
-                                                interior[tournamentSavings[i].c2] = true;
-                                            } else {
-                                                // Check time window feasibility before merging r1 into the back of r2
-                                                if (is_time_window_feasible(tournamentSavings[i].c2, chromR[r1],
-                                                                            *params)) {
                                                     chromR[r1].insert(chromR[r1].end(), chromR[r2].rbegin(),
                                                                       chromR[r2].rend());
                                                     load[r1] += load[r2];
                                                     chromR[r2].clear();
                                                     load[r2] = 0;
                                                     if (r2 < nextEmptyRoute) nextEmptyRoute = r2;
-
-                                                    // Update arrival times after merging
-                                                    update_arrival_times(chromR[r1], arrival_times[r1], *params);
                                                 }
 
                                                 interior[tournamentSavings[i].c1] = true;

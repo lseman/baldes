@@ -11,7 +11,8 @@
 #include "Definitions.h"
 
 #include "bnb/Node.h"
-#include "bnb/Problem.h"
+
+#include "bnb/BCP.h"
 
 #include "../third_party/concurrentqueue.h"
 
@@ -35,9 +36,10 @@ struct BNBNodeCompare {
     }
 };
 
+
 class BranchAndBound {
 private:
-    Problem                                                               *problem;
+    VRProblem                                                               *problem;
     std::priority_queue<BNBNode *, std::vector<BNBNode *>, BNBNodeCompare> bestFirstBNBNodes;
     moodycamel::ConcurrentQueue<BNBNode *>                                 otherBNBNodes;
     BNBNode                                                               *rootBNBNode;
@@ -75,13 +77,13 @@ private:
     }
 
 public:
-    explicit BranchAndBound(Problem *problem, BNBNodeSelectionStrategy strategy = BNBNodeSelectionStrategy::BestFirst)
+    explicit BranchAndBound(VRProblem *problem, BNBNodeSelectionStrategy strategy = BNBNodeSelectionStrategy::BestFirst)
         : problem(problem), strategy(strategy) {}
 
     explicit BranchAndBound(BNBNodeSelectionStrategy strategy = BNBNodeSelectionStrategy::BestFirst)
         : strategy(strategy) {}
 
-    void setProblem(Problem *problem) { this->problem = problem; }
+    void setVRProblem(VRProblem *problem) { this->problem = problem; }
 
     void markSolutionFound() {
         solutionFound.store(true, std::memory_order_release); // Use atomic store

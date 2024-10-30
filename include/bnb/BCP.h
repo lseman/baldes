@@ -1,17 +1,12 @@
 /**
- * @file VRPTW.h
- * @brief Defines the Vehicle Routing Problem with Time Windows (VRPTW) class and its associated methods.
+ * @file BCP.h
+ * @brief Header file for the BCP class.
  *
- * This file contains the implementation of the `VRProblem` class, which solves the Vehicle Routing Problem with
- * Time Windows (VRPTW) using column generation and various optimization techniques. The VRPTW class handles:
- * - Column generation and constraint handling using the Gurobi optimizer.
- * - Addition and removal of variables and paths from the model.
- * - Handling of dual values and reduced costs for optimization.
- * - Stabilization mechanisms using Limited Memory Rank 1 Cuts and RCC separation.
- * - Integration with external algorithms such as bucket graphs and RCC managers for advanced routing optimization.
+ * This file contains the definition of the BCP class, which represents the Branch-Cut-and-Price (BCP) algorithm.
+ * The class provides methods to solve the Vehicle Routing Problem (VRP) using a column generation approach with
+ * stabilization and rank-1 cuts. The BCP algorithm iteratively solves the problem by generating columns, adding
+ * cuts, and branching on the resulting nodes.
  *
- * The VRPTW class uses Gurobi for solving linear programming relaxations and applies iterative methods to refine
- * the solution with constraints and separation cuts.
  */
 
 #pragma once
@@ -25,7 +20,6 @@
 #include "miphandler/MIPHandler.h"
 
 // #include "TR.h"
-#include "bnb/Branching.h"
 #include "bnb/Node.h"
 
 #include "bucket/BucketGraph.h"
@@ -63,14 +57,14 @@
 
 #include "RIH.h"
 
-class VRProblem : public Problem {
+class VRProblem {
 public:
-    InstanceData instance;
-
-    double ip_result      = std::numeric_limits<double>::max();
-    double relaxed_result = std::numeric_limits<double>::max();
-
+    InstanceData         instance;
     std::vector<VRPNode> nodes;
+    double               ip_result      = std::numeric_limits<double>::max();
+    double               relaxed_result = std::numeric_limits<double>::max();
+
+    ProblemType problemType = ProblemType::vrptw;
 
     std::vector<std::vector<int>> labels;
     int                           numConstrs = 0;
@@ -494,7 +488,7 @@ public:
     bool CG(BNBNode *node, int max_iter = 2000) {
         print_info("Column generation preparation...\n");
 
-        // node->relaxNode();
+        node->relaxNode();
         node->optimize();
         relaxed_result = std::numeric_limits<double>::max();
 
@@ -513,28 +507,45 @@ public:
         auto &branchingDuals = node->branchingDuals;
         RCC_MODE_BLOCK(auto &rccManager = node->rccManager;)
 
-        int bucket_interval       = 25;
-        int time_horizon          = instance.T_max;
+        int bucket_interval = 25;
+        if (problemType == ProblemType::cvrp) { bucket_interval = 5; }
+        int time_horizon = instance.T_max;
+        if (problemType == ProblemType::cvrp) { time_horizon = 100000; }
         numConstrs                = node->getIntAttr("NumConstrs");
         node->numConstrs          = numConstrs;
         std::vector<double> duals = std::vector<double>(numConstrs, 0.0);
 
-        // BucketGraph bucket_graph(nodes, time_horizon, bucket_interval, instance.q, bucket_interval);
-        BucketGraph bucket_graph(nodes, time_horizon, bucket_interval);
-        bucket_graph.set_distance_matrix(instance.getDistanceMatrix(), 8);
-        bucket_graph.branching_duals = &branchingDuals;
-        bucket_graph.A_MAX           = N_SIZE;
+        std::unique_ptr<BucketGraph> bucket_graph;
 
-        matrix                 = node->extractModelDataSparse();
-        auto integer_solution  = node->getObjVal();
-        bucket_graph.incumbent = integer_solution;
+        if (problemType == ProblemType::vrptw) {
+            bucket_graph = std::make_unique<BucketGraph>(nodes, time_horizon, bucket_interval);
+        } else if (problemType == ProblemType::cvrp) {
+            bucket_graph =
+                std::make_unique<BucketGraph>(nodes, time_horizon, bucket_interval, instance.q, bucket_interval);
+        }
+
+        if (problemType == ProblemType::cvrp) {
+            BucketOptions options;
+            options.main_resources         = 2;
+            options.resources              = {"time", "capacity"};
+            options.resource_disposability = {1, 1};
+            bucket_graph->options           = options;
+        }
+
+        bucket_graph->set_distance_matrix(instance.getDistanceMatrix(), 8);
+        bucket_graph->branching_duals = &branchingDuals;
+        bucket_graph->A_MAX           = N_SIZE;
+
+        matrix                  = node->extractModelDataSparse();
+        auto integer_solution   = node->getObjVal();
+        bucket_graph->incumbent = integer_solution;
 
         SRC_MODE_BLOCK(r1c->setDistanceMatrix(node->instance.getDistanceMatrix()); r1c->setNodes(nodes);
-                       CutStorage *cuts = &r1c->cutStorage; bucket_graph.cut_storage = cuts;)
+                       CutStorage *cuts = &r1c->cutStorage; bucket_graph->cut_storage = cuts;)
 
         std::vector<double> cutDuals;
         std::vector<double> nodeDuals = node->getDuals();
-        bucket_graph.setDuals(nodeDuals);
+        bucket_graph->setDuals(nodeDuals);
         auto sizeDuals = nodeDuals.size();
 
         double lp_obj_dual     = 0.0;
@@ -542,7 +553,7 @@ public:
         double lp_obj_old      = lp_obj;
         int    iter_non_improv = 0;
 
-        bucket_graph.setup();
+        bucket_graph->setup();
 
         double gap      = 1e-6;
         bool   ss       = false;
@@ -561,7 +572,7 @@ public:
 
 #ifdef RIH
         IteratedLocalSearch ils(instance);
-        bucket_graph.ils = &ils;
+        bucket_graph->ils = &ils;
 #endif
 
         bool changed = false;
@@ -624,13 +635,13 @@ public:
                     bool violated = srcResult.first;
                     bool cleared  = srcResult.second;
                     if (!violated) {
-                        if (bucket_graph.A_MAX == N_SIZE) {
+                        if (bucket_graph->A_MAX == N_SIZE) {
                             print_info("No violated cuts found, calling it a day\n");
                             break;
                         } else {
-                            auto new_relaxation = std::min(bucket_graph.A_MAX + 10, N_SIZE);
+                            auto new_relaxation = std::min(bucket_graph->A_MAX + 10, N_SIZE);
                             print_info("Increasing A_MAX to {}\n", new_relaxation);
-                            bucket_graph.A_MAX = new_relaxation;
+                            bucket_graph->A_MAX = new_relaxation;
 
                             // TODO: see why this is necessary here
                             // matrix = node->extractModelDataSparse();
@@ -647,12 +658,12 @@ public:
                         }
                     }
                 })
-                bucket_graph.ss = false;
+                bucket_graph->ss = false;
             }
 
 #ifdef TR
             if (!TRstop) {
-                v      = tr.iterate(node, nodeDuals, inner_obj, bucket_graph.getStage());
+                v      = tr.iterate(node, nodeDuals, inner_obj, bucket_graph->getStage());
                 TRstop = tr.stop();
             }
 #endif
@@ -679,8 +690,8 @@ public:
             // print origin duals size
             for (auto &dual : nodeDuals) { dual = -dual; }
 
-            lag_gap          = integer_solution - (lp_obj + std::min(0.0, inner_obj));
-            bucket_graph.gap = lag_gap;
+            lag_gap           = integer_solution - (lp_obj + std::min(0.0, inner_obj));
+            bucket_graph->gap = lag_gap;
 #endif
 #ifndef IPM
             nodeDuals        = node->getDuals();
@@ -755,8 +766,8 @@ public:
 #endif
                 lp_obj_old = lp_obj;
 
-                bucket_graph.relaxation = lp_obj;
-                bucket_graph.augment_ng_memories(solution, allPaths, true, 5, 110, 18, N_SIZE);
+                bucket_graph->relaxation = lp_obj;
+                bucket_graph->augment_ng_memories(solution, allPaths, true, 5, 110, 18, N_SIZE);
                 SRC_MODE_BLOCK( // SRC cuts
                     if (!SRCconstraints.empty()) {
                         // print SRCconstraints size
@@ -779,22 +790,22 @@ public:
 #else
                     auto arc_duals = rccManager->computeDuals(nodeDuals);
 #endif
-                        bucket_graph.setArcDuals(arc_duals);
+                        bucket_graph->setArcDuals(arc_duals);
                     })
 
                 // Branching duals
                 if (branchingDuals.size() > 0) { branchingDuals.computeDuals(node); }
-                bucket_graph.setDuals(nodeDuals);
+                bucket_graph->setDuals(nodeDuals);
 
                 r1c->setDuals(nodeDuals);
 
                 //////////////////////////////////////////////////////////////////////
                 // CALLING BALDES
                 //////////////////////////////////////////////////////////////////////
-                paths     = bucket_graph.solve();
-                inner_obj = bucket_graph.inner_obj;
-                stage     = bucket_graph.getStage();
-                ss        = bucket_graph.ss;
+                paths     = bucket_graph->solve();
+                inner_obj = bucket_graph->inner_obj;
+                stage     = bucket_graph->getStage();
+                ss        = bucket_graph->ss;
                 //////////////////////////////////////////////////////////////////////
 
                 // Adding cols
@@ -802,7 +813,7 @@ public:
 
 #ifdef SCHRODINGER
                 // Adding schrodinger paths
-                auto sch_paths = bucket_graph.getSchrodinger();
+                auto sch_paths = bucket_graph->getSchrodinger();
                 addPath(node, sch_paths, true);
 #endif
 
@@ -823,7 +834,7 @@ public:
                 lp_obj    = node->getObjVal();
                 nodeDuals = node->getDuals();
 
-                bucket_graph.gap = lag_gap;
+                bucket_graph->gap = lag_gap;
 
                 matrix = node->extractModelDataSparse();
 
@@ -837,7 +848,7 @@ public:
                 }
             }
 
-            if (bucket_graph.getStatus() == Status::Optimal && stab.shouldExit()) {
+            if (bucket_graph->getStatus() == Status::Optimal && stab.shouldExit()) {
                 print_info("Optimal solution found\n");
                 break;
             }
@@ -872,7 +883,7 @@ public:
                            iter, lp_obj, inner_obj, n_cuts, n_rcc_cuts, colAdded, stage, lag_gap, cur_alpha, tr_val,
                            athreshold);
         }
-        bucket_graph.print_statistics();
+        bucket_graph->print_statistics();
 
         node->optimize();
         relaxed_result = node->getObjVal();
@@ -937,41 +948,10 @@ public:
         fmt::print("+---------------------------------------+\n");
     }
 
-    void branch(BNBNode *node) {
-        fmt::print("\033[34m_STARTING BRANCH PROCEDURE \033[0m");
-        fmt::print("\n");
-
-        node->relaxNode();
-
-        auto candidates       = Branching::VRPTWStandardBranching(node, &instance, this);
-        auto candidateCounter = 0;
-
-        print_info("Candidates generated: {}\n", candidates.size());
-        for (auto &candidate : candidates) {
-
-            if (node->hasCandidate(candidate)) continue;
-            if (node->hasRaisedChild(candidate)) continue;
-
-            auto candidatosNode = node->getCandidatos();
-            auto childNode      = node->newChild();
-            childNode->addCandidate(candidate);
-            node->addRaisedChildren(candidate);
-
-            candidateCounter++;
-            if (candidateCounter >= NUMERO_CANDIDATOS) break;
-        }
-
-        fmt::print("\033[34m_FINISHED BRANCH PROCEDURE \033[0m");
-        fmt::print("\n");
-    }
+    void branch(BNBNode *node);
 
     // implement clone method for virtual std::unique_ptr<Problem> clone() const = 0;
-    std::unique_ptr<Problem> clone() const {
-        auto newProblem      = std::make_unique<VRProblem>();
-        newProblem->instance = instance;
-        newProblem->nodes    = nodes;
-        return newProblem;
-    }
+    std::unique_ptr<VRProblem> clone() const;
 
     /**
      * Column generation algorithm.
@@ -997,20 +977,26 @@ public:
         node->numConstrs          = numConstrs;
         std::vector<double> duals = std::vector<double>(numConstrs, 0.0);
 
-        // BucketGraph bucket_graph(nodes, time_horizon, bucket_interval, instance.q, bucket_interval);
-        BucketGraph bucket_graph(nodes, time_horizon, bucket_interval);
+        std::unique_ptr<BucketGraph> bucket_graph;
+
+        if (problemType == ProblemType::vrptw) {
+            bucket_graph = std::make_unique<BucketGraph>(nodes, time_horizon, bucket_interval);
+        } else if (problemType == ProblemType::cvrp) {
+            bucket_graph =
+                std::make_unique<BucketGraph>(nodes, time_horizon, bucket_interval, instance.q, bucket_interval);
+        }
 
         // print distance matrix size
-        bucket_graph.set_distance_matrix(instance.getDistanceMatrix(), 8);
-        bucket_graph.branching_duals = &branchingDuals;
-        bucket_graph.A_MAX           = N_SIZE;
+        bucket_graph->set_distance_matrix(instance.getDistanceMatrix(), 8);
+        bucket_graph->branching_duals = &branchingDuals;
+        bucket_graph->A_MAX           = N_SIZE;
 
         // node->optimize();
-        matrix                 = node->extractModelDataSparse();
-        auto integer_solution  = node->getObjVal();
-        bucket_graph.incumbent = integer_solution;
+        matrix                  = node->extractModelDataSparse();
+        auto integer_solution   = node->getObjVal();
+        bucket_graph->incumbent = integer_solution;
 
-        auto allNodes = bucket_graph.getNodes();
+        auto allNodes = bucket_graph->getNodes();
 
         std::vector<double> cutDuals;
         std::vector<double> nodeDuals = node->getDuals();
@@ -1019,7 +1005,7 @@ public:
         double lp_obj_dual = 0.0;
         double lp_obj      = node->getObjVal();
 
-        bucket_graph.setup();
+        bucket_graph->setup();
 
         double gap = 1e-6;
 
@@ -1053,7 +1039,7 @@ public:
 
         SRC_MODE_BLOCK(auto &r1c = node->r1c; auto cuts = &r1c->cutStorage;)
 
-        SRC_MODE_BLOCK(bucket_graph.cut_storage = cuts;)
+        SRC_MODE_BLOCK(bucket_graph->cut_storage = cuts;)
 
         for (int iter = 0; iter < max_iter; ++iter) {
 #ifdef STAB
@@ -1079,25 +1065,25 @@ public:
                 if (integer) {
                     if (lp_obj < integer_solution) {
                         print_info("Updating integer solution to {}\n", lp_obj);
-                        integer_solution       = lp_obj;
-                        bucket_graph.incumbent = integer_solution;
+                        integer_solution        = lp_obj;
+                        bucket_graph->incumbent = integer_solution;
                     }
                 }
 
-                bucket_graph.relaxation = lp_obj;
-                bucket_graph.augment_ng_memories(solution, allPaths, true, 5, 100, 16, N_SIZE);
+                bucket_graph->relaxation = lp_obj;
+                bucket_graph->augment_ng_memories(solution, allPaths, true, 5, 100, 16, N_SIZE);
 
                 // Branching duals
                 if (branchingDuals.size() > 0) { branchingDuals.computeDuals(node); }
-                bucket_graph.setDuals(nodeDuals);
+                bucket_graph->setDuals(nodeDuals);
 
                 //////////////////////////////////////////////////////////////////////
                 // CALLING BALDES
                 //////////////////////////////////////////////////////////////////////
-                paths     = bucket_graph.solveHeuristic();
+                paths     = bucket_graph->solveHeuristic();
                 inner_obj = paths[0]->cost;
-                stage     = bucket_graph.getStage();
-                ss        = bucket_graph.ss;
+                stage     = bucket_graph->getStage();
+                ss        = bucket_graph->ss;
                 //////////////////////////////////////////////////////////////////////
 
                 // Adding cols
@@ -1110,8 +1096,8 @@ public:
 
                 nodeDuals = node->getDuals();
 
-                lag_gap          = integer_solution - (lp_obj + std::min(0.0, inner_obj));
-                bucket_graph.gap = lag_gap;
+                lag_gap           = integer_solution - (lp_obj + std::min(0.0, inner_obj));
+                bucket_graph->gap = lag_gap;
 
                 matrix = node->extractModelDataSparse();
 
@@ -1125,7 +1111,7 @@ public:
                 }
             }
 
-            if (bucket_graph.getStatus() == Status::Optimal && stab.shouldExit()) {
+            if (bucket_graph->getStatus() == Status::Optimal && stab.shouldExit()) {
                 print_info("Optimal solution found\n");
                 break;
             }
@@ -1133,7 +1119,7 @@ public:
             stab.update_stabilization_after_iter(nodeDuals);
 #endif
         }
-        // bucket_graph.print_statistics();
+        // bucket_graph->print_statistics();
 
         node->optimize();
         relaxed_result = node->getObjVal();

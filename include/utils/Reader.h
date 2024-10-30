@@ -16,6 +16,7 @@
 
 #pragma once
 
+#include "Definitions.h"
 #include "config.h"
 #include <cmath>
 #include <cstring>
@@ -24,6 +25,7 @@
 #include <iostream>
 #include <sstream> // This is where std::istringstream is defined
 #include <vector>
+
 /**
  * @struct InstanceData
  * @brief A structure to hold various data related to an instance of a problem.
@@ -61,6 +63,7 @@ struct InstanceData {
 
     std::vector<double> x_coord;
     std::vector<double> y_coord;
+    ProblemType         problem_type;
 
     int getNbVertices() const { return nN - 1; }
 
@@ -399,5 +402,126 @@ inline int VRPTW_read_instance(const std::string &file_name, InstanceData &insta
     }
 #endif
 
+    instance.problem_type = ProblemType::vrptw;
     return 1;
+}
+
+inline int CVRP_read_instance(const std::string &file_name, InstanceData &instance) {
+    std::ifstream myfile(file_name);
+    if (!myfile.is_open()) {
+        std::cerr << "Failed to open file: " << file_name << std::endl;
+        return 0;
+    }
+
+    std::string line;
+    int         dimension          = 0;
+    bool        node_coord_section = false, demand_section = false, depot_section = false;
+
+    while (std::getline(myfile, line)) {
+        std::istringstream iss(line);
+        std::string        key;
+        iss >> key;
+
+        if (key == "NAME" || key == "COMMENT" || key == "TYPE" || key == "EDGE_WEIGHT_TYPE") {
+            // Ignore these fields
+            continue;
+        } else if (key == "DIMENSION") {
+            std::string colon;
+            iss >> colon >> dimension;
+            instance.nN = dimension + 1;
+            instance.x_coord.resize(instance.nN + 1); // 1-based indexing, so +1
+            instance.y_coord.resize(instance.nN + 1);
+            instance.demand.resize(instance.nN + 1);
+            instance.service_time.resize(instance.nN + 1);
+            instance.window_open.resize(instance.nN + 1);
+            instance.window_close.resize(instance.nN + 1);
+            instance.n_tw.resize(instance.nN + 1);
+            instance.distance.resize(instance.nN + 1, std::vector<double>(instance.nN + 1));
+        } else if (key == "CAPACITY") {
+            std::string colon;
+            iss >> colon >> instance.q; // Vehicle capacity
+        } else if (key == "NODE_COORD_SECTION") {
+            node_coord_section = true;
+            continue;
+        } else if (key == "DEMAND_SECTION") {
+            node_coord_section = false;
+            demand_section     = true;
+            continue;
+        } else if (key == "DEPOT_SECTION") {
+            demand_section = false;
+            depot_section  = true;
+            continue;
+        } else if (key == "EOF") {
+            break; // End of file
+        }
+
+        if (node_coord_section) {
+            int    node;
+            double x, y;
+            // get the node, x and y given the format 1    764  255
+            std::istringstream coord_line(line);   // Reinitialize stream for each line
+            if (!(coord_line >> node >> x >> y)) { // Attempt to parse node and coordinates
+                std::cerr << "Error reading NODE_COORD_SECTION at line: " << line << std::endl;
+                continue;
+            }
+            node -= 1; // Adjust to 0-based indexing
+            if (node >= 0 && node < dimension) {
+                instance.x_coord[node] = x;
+                instance.y_coord[node] = y;
+            } else {
+                std::cerr << "Node index out of range: " << node << std::endl;
+            }
+        } else if (demand_section) {
+            int                node, demand;
+            std::istringstream demand_line(line); // Reinitialize stream for each line
+            if (!(demand_line >> node >> demand)) {
+                std::cerr << "Error reading DEMAND_SECTION at line: " << line << std::endl;
+                continue;
+            }
+            node -= 1; // Adjust to 0-based indexing
+
+            if (node >= 0 && node < dimension) {
+                instance.demand[node] = demand;
+            } else {
+                std::cerr << "Node index out of range: " << node << std::endl;
+            }
+        } else if (depot_section) {
+            int depot;
+            iss >> depot;
+            if (depot == -1) break; // End of DEPOT_SECTION
+        }
+    }
+
+    // Calculate Euclidean distances between nodes
+    for (int i = 1; i <= dimension; ++i) {
+        for (int j = i + 1; j <= dimension; ++j) {
+            double dx               = instance.x_coord[i] - instance.x_coord[j];
+            double dy               = instance.y_coord[i] - instance.y_coord[j];
+            instance.distance[i][j] = instance.distance[j][i] = std::sqrt(dx * dx + dy * dy);
+        }
+    }
+
+    // define service_time of each as 0
+    for (int i = 0; i < instance.nN; i++) { instance.service_time[i] = 0; }
+    // define windows open and close of each as 0
+    for (int i = 0; i < instance.nN; i++) {
+        instance.window_open[i]  = 0;
+        instance.window_close[i] = 100000;
+    }
+    // define n_tw as 0
+    for (int i = 0; i < instance.nN; i++) { instance.n_tw[i] = 0; }
+
+    instance.x_coord[instance.nN - 1]      = instance.x_coord[0];
+    instance.y_coord[instance.nN - 1]      = instance.y_coord[0];
+    instance.demand[instance.nN - 1]       = instance.demand[0];
+    instance.service_time[instance.nN - 1] = instance.service_time[0];
+    instance.window_open[instance.nN - 1]  = instance.window_open[0];
+    instance.window_close[instance.nN - 1] = instance.window_close[0];
+    instance.n_tw[instance.nN - 1]         = instance.n_tw[0];
+
+    instance.nV = 100;
+
+    instance.problem_type = ProblemType::cvrp;
+
+    return 1; // Success
 }

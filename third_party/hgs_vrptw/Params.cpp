@@ -49,6 +49,7 @@ Params::Params(const InstanceData &instance) {
     cli       = std::vector<Client>(1001); // Assuming max of 1000 clients + depot
     nbClients = 0;
 
+    problemType = instance.problem_type;
     // Loop over all customer lines
     for (int i = 0; i < N_SIZE - 1; i++) {
         cli[nbClients].custNum = i;

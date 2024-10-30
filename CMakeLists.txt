@@ -291,7 +291,7 @@ set(GUROBI_HOME $ENV{GUROBI_HOME})
 include_directories(${GUROBI_HOME}/include)
 
 # Source files
-set(SOURCES src/BucketGraph.cpp src/MIPHandler.cpp include/algebra/LDLT.cu)
+set(SOURCES src/BCP.cpp src/BucketGraph.cpp src/MIPHandler.cpp include/algebra/LDLT.cu)
 
 set(CVRPSEP_SOURCES
     third_party/cvrpsep/basegrph.cpp

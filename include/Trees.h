@@ -635,6 +635,7 @@ public:
     SplayTree() : root(nullptr) {}
 
     TreeNode *find(const std::vector<double> &point) {
+
         TreeNode *curr = root;
 
         while (curr != nullptr) {

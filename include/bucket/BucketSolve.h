@@ -296,7 +296,7 @@ std::vector<double> BucketGraph::labeling_algorithm() noexcept {
                                 }
 
 #else
-                                if (check_dominance_against_vector<D, S>(new_label, to_bucket_labels, cut_storage)) {
+                                if (check_dominance_against_vector<D, S>(new_label, to_bucket_labels, cut_storage, options.resources.size())) {
                                     stat_n_dom++; // Increment dominated labels count
                                     dominated = true;
                                 }
@@ -577,7 +577,7 @@ BucketGraph::Extend(const std::conditional_t<M == Mutability::Mut, Label *, cons
     } else if constexpr (A == ArcType::Jump) {
         node_id = buckets[gamma.jump_bucket].node_id; // Use the node ID from the jump bucket
         // Update resources based on jump bucket bounds
-        for (size_t i = 0; i < initial_resources.size(); ++i) {
+        for (size_t i = 0; i < options.resources.size(); ++i) {
             if constexpr (D == Direction::Forward) {
                 initial_resources[i] =
                     std::max(initial_resources[i], static_cast<double>(buckets[gamma.jump_bucket].lb[i]));
@@ -619,11 +619,11 @@ BucketGraph::Extend(const std::conditional_t<M == Mutability::Mut, Label *, cons
     const VRPNode &VRPNode = nodes[node_id];
 
     // Initialize new resources based on the arc's resource increments and check feasibility
-    std::vector<double> new_resources(initial_resources.size());
+    std::vector<double> new_resources(options.resources.size());
 
     // Note: workaround
-    constexpr size_t N = R_SIZE;
-    if (!process_all_resources<D, 0, N>(new_resources, initial_resources, gamma, VRPNode)) {
+    size_t N = options.resources.size();
+    if (!process_all_resources<D>(new_resources, initial_resources, gamma, VRPNode, N)) {
         return std::vector<Label *>(); // Handle failure case (constraint violation)
     }
 
@@ -836,7 +836,7 @@ inline bool BucketGraph::is_dominated(const Label *new_label, const Label *label
     if (label->cost > new_label->cost) { return false; }
 
     // Check resource conditions based on the direction (Forward or Backward)
-    for (size_t i = 0; i < R_SIZE; ++i) {
+    for (size_t i = 0; i < options.resources.size(); ++i) {
         if constexpr (D == Direction::Forward) {
             // In Forward direction: the comparison label must not have more resources than the new label
             if (label_resources[i] > new_resources[i]) { return false; }
@@ -958,7 +958,7 @@ inline bool BucketGraph::DominatedInCompWiseSmallerBuckets(const Label *L, int b
                 }
             }
 #else
-            if (check_dominance_against_vector<D, S>(L, bucket_labels, cut_storage)) {
+            if (check_dominance_against_vector<D, S>(L, bucket_labels, cut_storage, options.resources.size())) {
                 return true; // If any label dominates L, return true
             }
 #endif

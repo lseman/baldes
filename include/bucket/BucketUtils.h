@@ -103,7 +103,7 @@ inline int BucketGraph::get_bucket_number(int node, std::vector<double> &resourc
 template <Direction D>
 inline int BucketGraph::get_bucket_number(int node, std::vector<double> &resource_values_vec) noexcept {
 
-    for (int r = 0; r < MAIN_RESOURCES; ++r) {
+    for (int r = 0; r < options.main_resources; ++r) {
         if constexpr (D == Direction::Forward) {
             resource_values_vec[r] = (resource_values_vec[r]); // + numericutils::eps;
         } else {
@@ -116,7 +116,18 @@ inline int BucketGraph::get_bucket_number(int node, std::vector<double> &resourc
     } else if constexpr (D == Direction::Backward) {
         val = bw_node_interval_trees[node].query(resource_values_vec);
     }
-    if (val < 0) { std::cerr << "BucketGraph::get_bucket_number: Invalid bucket number: " << val << std::endl; }
+    // print val
+    if constexpr (D == Direction::Forward) {
+        if (val < 0) {
+            std::cerr << "FW BucketGraph::get_bucket_number: Invalid bucket number: " << val << "for node: " << node
+                      << std::endl;
+        }
+    } else {
+        if (val < 0) {
+            std::cerr << "BW BucketGraph::get_bucket_number: Invalid bucket number: " << val << "for node: " << node
+                      << std::endl;
+        }
+    }
     return val;
 }
 
@@ -129,7 +140,7 @@ inline int BucketGraph::get_bucket_number(int node, std::vector<double> &resourc
  */
 template <Direction D>
 void BucketGraph::define_buckets() {
-    int                 num_intervals = MAIN_RESOURCES;
+    int                 num_intervals = options.main_resources;
     std::vector<double> total_ranges(num_intervals);
     std::vector<double> base_intervals(num_intervals);
 
@@ -179,53 +190,109 @@ void BucketGraph::define_buckets() {
         std::vector<double> interval_start(num_intervals), interval_end(num_intervals);
 
         // Calculate the start and end for each interval dimension
-        for (int r = 0; r < num_intervals; ++r) {
-            for (auto j = 0; j < intervals[r].interval; ++j) {
-
+        // Check if there is only one interval and proceed with the single interval logic
+        if (num_intervals == 1) {
+            for (auto j = 0; j < intervals[0].interval; ++j) {
+                // Perform the same interval logic for a single interval
                 if constexpr (D == Direction::Forward) {
-                    interval_start[r] = VRPNode.lb[r] + current_pos[r] * node_base_interval[r];
+                    interval_start[0] = VRPNode.lb[0] + current_pos[0] * node_base_interval[0];
 
-                    if (j == intervals[r].interval - 1) {
-                        interval_end[r] = VRPNode.ub[r];
+                    if (j == intervals[0].interval - 1) {
+                        interval_end[0] = VRPNode.ub[0];
                     } else {
-                        interval_end[r] = VRPNode.lb[r] + (current_pos[r] + 1) * node_base_interval[r];
+                        interval_end[0] = VRPNode.lb[0] + (current_pos[0] + 1) * node_base_interval[0];
                     }
                 } else {
-                    if (j == intervals[r].interval - 1) {
-                        interval_start[r] = VRPNode.lb[r];
+                    if (j == intervals[0].interval - 1) {
+                        interval_start[0] = VRPNode.lb[0];
                     } else {
-                        interval_start[r] = VRPNode.ub[r] - (current_pos[r] + 1) * node_base_interval[r];
+                        interval_start[0] = VRPNode.ub[0] - (current_pos[0] + 1) * node_base_interval[0];
                     }
-                    // interval_start[r] = VRPNode.ub[r] - (current_pos[r] + 1) * node_base_interval[r];
-                    interval_end[r] = VRPNode.ub[r] - current_pos[r] * node_base_interval[r];
+                    interval_end[0] = VRPNode.ub[0] - current_pos[0] * node_base_interval[0];
                 }
 
-                // Apply rounding to two decimal places before using values
-                interval_start[r] = roundToTwoDecimalPlaces(interval_start[r]);
-                interval_end[r]   = roundToTwoDecimalPlaces(interval_end[r]);
+                interval_start[0] = roundToTwoDecimalPlaces(interval_start[0]);
+                interval_end[0]   = roundToTwoDecimalPlaces(interval_end[0]);
 
                 if constexpr (D == Direction::Backward) {
-                    interval_start[r] = std::max(interval_start[r], R_min[r]);
+                    interval_start[0] = std::max(interval_start[0], R_min[0]);
                 } else {
-                    interval_end[r] = std::min(interval_end[r], R_max[r]);
+                    interval_end[0] = std::min(interval_end[0], R_max[0]);
                 }
 
+                // Print and store
+                fmt::print("Creating bucket with interval: [{}, {}]\n", interval_start[0], interval_end[0]);
                 buckets.push_back(Bucket(VRPNode.id, interval_start, interval_end));
+                node_tree.insert(interval_start, interval_end, bucket_index);
 
+                bucket_index++;
+                n_buckets++;
+                cum_sum++;
+                current_pos[0]++;
+            }
+        } else {
+            // Multiple intervals case, nested loop logic to generate all combinations
+            std::vector<int> pos(num_intervals, 0);
+
+            while (true) {
+                for (int r = 0; r < num_intervals; ++r) {
+                    if constexpr (D == Direction::Forward) {
+                        interval_start[r] = VRPNode.lb[r] + pos[r] * node_base_interval[r];
+
+                        if (pos[r] == intervals[r].interval - 1) {
+                            interval_end[r] = VRPNode.ub[r];
+                        } else {
+                            interval_end[r] = VRPNode.lb[r] + (pos[r] + 1) * node_base_interval[r];
+                        }
+                    } else {
+                        if (pos[r] == intervals[r].interval - 1) {
+                            interval_start[r] = VRPNode.lb[r];
+                        } else {
+                            interval_start[r] = VRPNode.ub[r] - (pos[r] + 1) * node_base_interval[r];
+                        }
+                        interval_end[r] = VRPNode.ub[r] - pos[r] * node_base_interval[r];
+                    }
+
+                    interval_start[r] = roundToTwoDecimalPlaces(interval_start[r]);
+                    interval_end[r]   = roundToTwoDecimalPlaces(interval_end[r]);
+
+                    if constexpr (D == Direction::Backward) {
+                        interval_start[r] = std::max(interval_start[r], R_min[r]);
+                    } else {
+                        interval_end[r] = std::min(interval_end[r], R_max[r]);
+                    }
+                }
+
+/*
+                // Print and store
+                fmt::print("Creating bucket with interval: [");
+                for (int i = 0; i < num_intervals; ++i) {
+                    fmt::print("({}, {})", interval_start[i], interval_end[i]);
+                    if (i < num_intervals - 1) fmt::print(", ");
+                }
+                fmt::print("]\n");
+*/
+
+                buckets.push_back(Bucket(VRPNode.id, interval_start, interval_end));
                 node_tree.insert(interval_start, interval_end, bucket_index);
 
                 bucket_index++;
                 n_buckets++;
                 cum_sum++;
 
-                current_pos[r]++;
+                // Increment the positions for combinations
+                int i = 0;
+                while (i < num_intervals && ++pos[i] >= intervals[i].interval) {
+                    pos[i] = 0;
+                    i++;
+                }
+                if (i == num_intervals) break; // All combinations generated
             }
         }
 
         // Update node-specific bucket data
-        num_buckets[VRPNode.id]       = n_buckets;
-        num_buckets_index[VRPNode.id] = cum_sum - n_buckets;
-
+        num_buckets[VRPNode.id]         = n_buckets;
+        num_buckets_index[VRPNode.id]   = cum_sum - n_buckets;
         node_interval_trees[VRPNode.id] = node_tree;
     }
 
@@ -725,8 +792,8 @@ int BucketGraph::get_opposite_bucket_number(int current_bucket_index, std::vecto
 
     // Find the opposite bucket using the appropriate direction
     int                 opposite_bucket_index = -1;
-    std::vector<double> reference_point(MAIN_RESOURCES);
-    for (int r = 0; r < MAIN_RESOURCES; ++r) {
+    std::vector<double> reference_point(options.main_resources);
+    for (int r = 0; r < options.main_resources; ++r) {
         if constexpr (D == Direction::Forward) {
             reference_point[r] = std::max(inc[r], theNode.lb[r]);
         } else {
