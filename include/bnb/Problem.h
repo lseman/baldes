@@ -15,6 +15,8 @@
 #include "bnb/Node.h"
 #include <memory>
 
+#include "Reader.h"
+
 class BNBNode;
 /**
  * @brief The Problem class represents an abstract base class for defining optimization problems.
@@ -26,6 +28,9 @@ class BNBNode;
 class Problem {
 public:
     Problem() = default;
+
+    InstanceData         instance;
+    std::vector<VRPNode> nodes;
 
     /**
      * @brief Branches the given node.

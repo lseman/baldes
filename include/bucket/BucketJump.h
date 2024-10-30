@@ -165,18 +165,16 @@ void BucketGraph::BucketArcElimination(double theta) {
         std::vector<uint64_t> Bvisited(n_segments, 0);
 
         for (const auto &a : bucket_arcs) {
-            std::vector<double> increment(MAIN_RESOURCES, 0);
-            for (int r = 0; r < MAIN_RESOURCES; ++r) {
+            std::vector<double> increment(options.main_resources, 0);
+            for (int r = 0; r < options.main_resources; ++r) {
                 if constexpr (D == Direction::Forward) {
                     increment[r] = buckets[b].lb[r] + a.resource_increment[r];
                 } else {
                     increment[r] = buckets[b].ub[r] - a.resource_increment[r];
                 }
             }
-            // print b
             auto arc_key    = create_arc_key(buckets[a.from_bucket].node_id, buckets[a.to_bucket].node_id, b);
             int  b_opposite = get_opposite_bucket_number<D>(a.to_bucket, increment);
-            // print b_opposite
             auto &Bidi_map = local_B_Ba_b[arc_key];
 
             for (auto &L_item : labels) {

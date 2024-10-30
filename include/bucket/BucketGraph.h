@@ -136,10 +136,6 @@ public:
         return (new_range.lower_bound >= fixed_range.lower_bound && new_range.upper_bound <= fixed_range.upper_bound);
     }
 
-    // Note: very tricky way to unroll the loop at compile time and check for disposability
-    static constexpr std::string_view resources[] = {RESOURCES}; // RESOURCES will expand to your string list
-    static constexpr int              resource_disposability[] = {RESOURCES_DISPOSABLE};
-
     /**
      * @brief Assigns the buckets based on the specified direction.
      *
@@ -166,17 +162,14 @@ public:
      * are processed successfully, the function returns true.
      *
      */
-    template <Direction D, size_t I, size_t N, typename Gamma, typename VRPNode>
-    inline constexpr bool process_all_resources(std::vector<double>              &new_resources,
-                                                const std::array<double, R_SIZE> &initial_resources, const Gamma &gamma,
-                                                const VRPNode &theNode) {
-        if constexpr (I < N) {
-            // Process the resource at index I
-            if (!process_resource<D, I, N>(new_resources[I], initial_resources, gamma, theNode)) {
+    template <Direction D, typename Gamma, typename VRPNode>
+    inline bool process_all_resources(std::vector<double>              &new_resources,
+                                      const std::array<double, R_SIZE> &initial_resources, const Gamma &gamma,
+                                      const VRPNode &theNode, size_t N) {
+        for (size_t I = 0; I < N; ++I) {
+            if (!process_resource<D>(new_resources[I], initial_resources, gamma, theNode, I)) {
                 return false; // Constraint violated, return false
             }
-            // Recur to process the next resource
-            return process_all_resources<D, I + 1, N>(new_resources, initial_resources, gamma, theNode);
         }
         return true; // All resources processed successfully
     }
@@ -190,10 +183,10 @@ public:
      * The behavior varies depending on the disposability type of the resource.
      *
      */
-    template <Direction D, size_t I, size_t N, typename Gamma, typename VRPNode>
+    template <Direction D, typename Gamma, typename VRPNode>
     inline constexpr bool process_resource(double &new_resource, const std::array<double, R_SIZE> &initial_resources,
-                                           const Gamma &gamma, const VRPNode &theNode) {
-        if constexpr (resource_disposability[I] == 1) { // Checked at compile-time
+                                           const Gamma &gamma, const VRPNode &theNode, size_t I) {
+        if (options.resource_disposability[I] == 1) { // Checked at compile-time
             if constexpr (D == Direction::Forward) {
                 new_resource =
                     std::max(initial_resources[I] + gamma.resource_increment[I], static_cast<double>(theNode.lb[I]));
@@ -207,7 +200,7 @@ public:
                     return false; // Below lower bound, return false to stop processing
                 }
             }
-        } else if constexpr (resource_disposability[I] == 0) {
+        } else if (options.resource_disposability[I] == 0) {
             // TODO: Non-disposable resource handling, check if it is right
             if constexpr (D == Direction::Forward) {
                 new_resource = initial_resources[I] + gamma.resource_increment[I];
@@ -224,7 +217,7 @@ public:
                     return false; // Below lower bound, return false to stop processing
                 }
             }
-        } else if constexpr (resource_disposability[I] == 2) {
+        } else if (options.resource_disposability[I] == 2) {
             // TODO:: Binary resource handling, check if logic is right
             if constexpr (D == Direction::Forward) {
                 // For binary resources, flip between 0 and 1 based on gamma.resource_increment[I]
@@ -241,7 +234,7 @@ public:
                     new_resource = 1.0; // Reverse logic: turn "on"
                 }
             }
-        } else if constexpr (resource_disposability[I] == 3) {
+        } else if (options.resource_disposability[I] == 3) {
             // TODO: handling multiple time windows case
             // "OR" resource case using mtw_lb and mtw_ub vectors for multiple time windows
             if constexpr (D == Direction::Forward) {
@@ -294,10 +287,10 @@ public:
     std::vector<Label *> merged_labels_rih;
     int                  A_MAX = N_SIZE;
 
-    std::pmr::unsynchronized_pool_resource label_pool_memory_resource;
-
+#ifdef RIH
     std::thread rih_thread;
-    std::mutex  mtx; // For thread-safe access to merged_labels_improved
+#endif
+    std::mutex mtx; // For thread-safe access to merged_labels_improved
     //
     int redefine_counter = 0;
 
@@ -667,7 +660,7 @@ public:
     void redefine(int bucketInterval) {
         this->bucket_interval = bucketInterval;
         intervals.clear();
-        for (int i = 0; i < R_SIZE; ++i) { intervals.push_back(Interval(bucketInterval, 0)); }
+        for (int i = 0; i < options.resources.size(); ++i) { intervals.push_back(Interval(bucketInterval, 0)); }
 
         // auto fw_save_rebuild = rebuild_buckets<Direction::Forward>();
         // auto bw_save_rebuild = rebuild_buckets<Direction::Backward>();
@@ -721,7 +714,7 @@ public:
         auto &num_buckets       = assign_buckets<D>(num_buckets_fw, num_buckets_bw);
         auto &num_buckets_index = assign_buckets<D>(num_buckets_index_fw, num_buckets_index_bw);
 
-        int                 num_intervals = MAIN_RESOURCES;
+        int                 num_intervals = options.main_resources;
         std::vector<double> total_ranges(num_intervals);
         std::vector<double> base_intervals(num_intervals);
 
@@ -862,8 +855,8 @@ public:
         if (time_fw + travel_time + VRPNode.duration > time_bw) { return false; }
 
         // Resource feasibility check (if applicable)
-        if constexpr (R_SIZE > 1) {
-            for (size_t i = 1; i < R_SIZE; ++i) {
+        if (options.resources.size() > 1) {
+            for (size_t i = 1; i < options.resources.size(); ++i) {
                 const auto resource_fw = fw_resources[i];
                 const auto resource_bw = bw_resources[i];
                 const auto demand      = VRPNode.demand;

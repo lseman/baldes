@@ -103,7 +103,7 @@ export PATH=/opt/homebrew/opt/llvm/bin:$PATH
 | Option                  | Description                            | Default |
 | ----------------------- | -------------------------------------- | ------- |
 | `RIH`                   | Enable improvement heuristics          | OFF     |
-| `RCC`               | Enable RCC cuts                        | OFF     |
+| `RCC`                   | Enable RCC cuts                        | OFF     |
 | `SRC`                   | Enable limited memory SRC cuts         | ON      |
 | `UNREACHABLE_DOMINANCE` | Enable unreachable dominance           | OFF     |
 | `MCD`                   | Perform MCD on instance capacities     | OFF     |
@@ -130,21 +130,35 @@ export PATH=/opt/homebrew/opt/llvm/bin:$PATH
 | `MAIN_RESOURCES`  | Define the number of main resources                     | 1       |
 | `HGS`             | Maximum HGS running time                                | 5       |
 
+> **Note 1**: Including depot and depot copy (end node).
+
+> **Note 2**: Only one stabilization can be selected.
+
 **Resource Disposability Definition**
 
-To control how each resource is treated (whether disposable, non-disposable, or binary), it is necessary to define a vector using the `#define RESOURCES_DISPOSABLE` directive. Each position in this vector corresponds to a specific resource and should be assigned a value of `0`, `1`, or `2` to indicate the disposability type:
+To control how each resource is treated (whether disposable, non-disposable, or binary), define the disposability type for each resource in the `BucketOptions` struct. Each position in the `resource_disposability` vector corresponds to a specific resource and should be assigned a value of `0`, `1`, or `2` to indicate the disposability type:
 
 - **0**: Disposable resource – the resource can be consumed or reset during the routing process.
 - **1**: Non-disposable resource – the resource is conserved and cannot be disposed of.
 - **2**: Binary resource – the resource toggles between two states (e.g., `0` for off and `1` for on).
 
+Example configuration:
+
 ```cpp
-#define RESOURCES_DISPOSABLE {0, 1, 2, 1}
+struct BucketOptions {
+    int depot                   = 0;
+    int end_depot               = N_SIZE - 1;
+    int max_path_size           = N_SIZE / 2;
+    int main_resources          = 1;
+    std::vector<std::string> resources = {"time", "capacity"};
+    std::vector<int> resource_disposability = {0, 1}; // 0=disposable, 1=non-disposable
+    std::vector<int> or_resources = {1};
+};
 ```
 
-> **Note 1**: Including depot and depot copy (end node).
-
-> **Note 2**: Only one stabilization can be selected.
+In this example:
+- **"time"** is treated as a disposable resource (`0`).
+- **"capacity"** is treated as a non-disposable resource (`1`).
 
 **TUI**
 

@@ -75,10 +75,6 @@ BucketGraph::BucketGraph(const std::vector<VRPNode> &nodes, int time_horizon, in
     intervals = {intervalTime, intervalCap};
     R_min     = {0, 0};
     R_max     = {static_cast<double>(time_horizon), static_cast<double>(capacity)};
-
-    PARALLEL_SECTIONS(
-        work, bi_sched, SECTION { define_buckets<Direction::Forward>(); },
-        SECTION { define_buckets<Direction::Backward>(); });
 }
 
 /**
@@ -102,10 +98,6 @@ BucketGraph::BucketGraph(const std::vector<VRPNode> &nodes, int time_horizon, in
     intervals = {intervalTime};
     R_min     = {0};
     R_max     = {static_cast<double>(time_horizon)};
-
-    PARALLEL_SECTIONS(
-        work, bi_sched, SECTION { define_buckets<Direction::Forward>(); },
-        SECTION { define_buckets<Direction::Backward>(); });
 }
 
 BucketGraph::BucketGraph(const std::vector<VRPNode> &nodes, std::vector<int> &bounds,
@@ -216,7 +208,7 @@ std::vector<int> BucketGraph::computePhi(int &bucket_id, bool fw) {
     auto &fixed_buckets       = fw ? fw_fixed_buckets : bw_fixed_buckets;
     auto &node_interval_trees = fw ? fw_node_interval_trees : bw_node_interval_trees;
 
-    if constexpr (R_SIZE > 1) {
+    if (options.resources.size() > 1) {
         if (bucket_id >= buckets.size() || bucket_id < 0) return phi;
 
         std::vector<double> total_ranges(intervals.size());
@@ -560,14 +552,14 @@ void BucketGraph::set_adjacency_list() {
             auto   travel_cost = getcij(node.id, next_node.id); // Calculate travel cost
             double cost_inc    = travel_cost - next_node.cost;  // Adjust cost increment by subtracting next node's cost
 
-            for (int r = 0; r < R_SIZE; ++r) { res_inc[r] = node.consumption[r]; }
+            for (int r = 0; r < options.resources.size(); ++r) { res_inc[r] = node.consumption[r]; }
             res_inc[TIME_INDEX] += travel_cost; // Add travel time to resource increment
 
             int to_bucket = next_node.id;
             if (from_bucket == to_bucket) continue; // Skip arcs that loop back to the same bucket
 
             bool feasible = true; // Check feasibility based on resource constraints
-            for (int r = 0; r < R_SIZE; ++r) {
+            for (int r = 0; r < options.resources.size(); ++r) {
                 if (node.lb[r] + res_inc[r] > next_node.ub[r]) {
                     feasible = false;
                     break;
@@ -641,7 +633,7 @@ void BucketGraph::common_initialization() {
     auto &num_buckets      = assign_buckets<Direction::Forward>(num_buckets_fw, num_buckets_bw);
     auto &num_bucket_index = assign_buckets<Direction::Forward>(num_buckets_index_fw, num_buckets_index_bw);
 
-    int                 num_intervals = intervals.size(); // Determine how many resources we have (number of intervals)
+    int                 num_intervals = options.main_resources;
     std::vector<double> total_ranges(num_intervals);
     std::vector<double> base_intervals(num_intervals);
 
@@ -664,40 +656,65 @@ void BucketGraph::common_initialization() {
     std::vector<double> interval_starts(num_intervals);
     std::vector<double> interval_ends(num_intervals);
 
-    for (int r = 0; r < num_intervals; ++r) { interval_starts[r] = VRPNode.lb[r]; }
-    // Iterate over all intervals for the forward direction
-
+    // Initialize interval_starts to lower bounds and interval_ends to upper bounds
     for (int r = 0; r < num_intervals; ++r) {
-        for (auto k = 0; k < intervals[r].interval; ++k) {
-            auto depot            = label_pool_fw->acquire();
-            auto calculated_index = r * MAIN_RESOURCES + k;
-
-            depot->initialize(calculated_index, 0.0, interval_starts, options.depot);
-            depot->is_extended = false;
-            set_node_visited(depot->visited_bitmap, options.depot);
-            SRC_MODE_BLOCK(depot->SRCmap.assign(cut_storage->SRCDuals.size(), 0);)
-            fw_buckets[calculated_index].add_label(depot);
-            fw_buckets[calculated_index].node_id = options.depot;
-            interval_starts[r] += roundToTwoDecimalPlaces(base_intervals[r]);
-        }
+        interval_starts[r] = VRPNode.lb[r];
+        interval_ends[r]   = VRPNode.ub[r];
     }
+    int offset_fw = 0;
+    int offset_bw = 0;
 
-    for (int r = 0; r < num_intervals; ++r) { interval_ends[r] = VRPNode.ub[r]; }
+    // Lambda to handle forward and backward direction initialization across combinations
+    auto initialize_intervals_combinations = [&](bool is_forward) {
+        int        &offset                = is_forward ? offset_fw : offset_bw;
+        auto       &label_pool            = is_forward ? label_pool_fw : label_pool_bw;
+        auto       &buckets               = is_forward ? fw_buckets : bw_buckets;
+        const auto &depot_id              = is_forward ? options.depot : options.end_depot;
+        int         calculated_index_base = is_forward ? 0 : num_buckets_index_bw[N_SIZE - 1];
 
-    for (int r = 0; r < num_intervals; ++r) {
-        for (auto k = 0; k < intervals[r].interval; ++k) {
-            auto end_depot        = label_pool_bw->acquire();
-            auto calculated_index = num_buckets_index_bw[N_SIZE - 1] + r * MAIN_RESOURCES + k;
-            // print interval_ends size
-            end_depot->initialize(calculated_index, 0.0, interval_ends, options.end_depot);
-            end_depot->is_extended = false;
-            set_node_visited(end_depot->visited_bitmap, options.end_depot);
-            SRC_MODE_BLOCK(end_depot->SRCmap.assign(cut_storage->SRCDuals.size(), 0);)
-            bw_buckets[calculated_index].add_label(end_depot);
-            bw_buckets[calculated_index].node_id = options.end_depot;
-            interval_ends[r] -= roundToTwoDecimalPlaces(base_intervals[r]);
-        }
-    }
+        std::vector<int>    current_pos(num_intervals, 0); // Tracks current position in each interval dimension
+        std::vector<double> interval_bounds(num_intervals);
+
+        // Recursive lambda to generate all combinations of intervals
+        std::function<void(int)> generate_combinations = [&](int depth) {
+            if (depth == num_intervals) {
+                // All dimensions processed, now initialize for the current combination
+                auto depot            = label_pool->acquire();
+                int  calculated_index = calculated_index_base + offset;
+
+                // Set interval_bounds to current combination of interval starts or ends
+                for (int r = 0; r < num_intervals; ++r) {
+                    interval_bounds[r] =
+                        is_forward ? interval_starts[r] + current_pos[r] * roundToTwoDecimalPlaces(base_intervals[r])
+                                   : interval_ends[r] - current_pos[r] * roundToTwoDecimalPlaces(base_intervals[r]);
+                }
+
+                // Initialize depot with the current interval boundaries
+                depot->initialize(calculated_index, 0.0, interval_bounds, depot_id);
+                depot->is_extended = false;
+                set_node_visited(depot->visited_bitmap, depot_id);
+                SRC_MODE_BLOCK(depot->SRCmap.assign(cut_storage->SRCDuals.size(), 0);)
+                buckets[calculated_index].add_label(depot);
+                buckets[calculated_index].node_id = depot_id;
+
+                offset++; // Increment offset for each combination
+                return;
+            }
+
+            // Loop through each interval in the current dimension
+            for (int k = 0; k < intervals[depth].interval; ++k) {
+                current_pos[depth] = k;
+                generate_combinations(depth + 1);
+            }
+        };
+
+        // Start generating combinations from depth 0
+        generate_combinations(0);
+    };
+
+    // Call the lambda for both forward and backward directions, ensuring all combinations are processed
+    initialize_intervals_combinations(true);  // Forward direction
+    initialize_intervals_combinations(false); // Backward direction
 }
 
 /**
@@ -907,6 +924,11 @@ void BucketGraph::generate_arcs() {
  *
  */
 void BucketGraph::setup() {
+
+    PARALLEL_SECTIONS(
+        work, bi_sched, SECTION { define_buckets<Direction::Forward>(); },
+        SECTION { define_buckets<Direction::Backward>(); });
+
     // Initialize the sizes
     fixed_arcs.resize(getNodes().size());
     for (int i = 0; i < getNodes().size(); ++i) { fixed_arcs[i].resize(getNodes().size()); }
@@ -926,7 +948,7 @@ void BucketGraph::setup() {
 #endif
 
     // Initialize the split
-    for (int i = 0; i < MAIN_RESOURCES; ++i) { q_star.push_back((R_max[i] - R_min[i] + 1) / 2); }
+    for (int i = 0; i < options.main_resources; ++i) { q_star.push_back((R_max[i] - R_min[i] + 1) / 2); }
 }
 
 /**

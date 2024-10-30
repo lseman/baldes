@@ -24,15 +24,15 @@
 
 // #include "../third_party/lkh/include/lkh_tsp.hpp"
 
-#include "VRPTW.h"
-
 #include <string>
 #include <vector>
+
+#include "bnb/BNB.h"
 
 #include "Definitions.h"
 #include "HGS.h"
 #include "Reader.h"
-#include "bnb/BNB.h"
+#include "bnb/BCP.h"
 #include "bnb/Node.h"
 #include "miphandler/MIPHandler.h"
 
@@ -177,7 +177,7 @@ int main(int argc, char *argv[]) {
         }
         print_info("VRPTW instance read successfully.\n");
     } else if (problem_kind == "cvrp") {
-        if (!VRPTW_read_instance(instance_name, instance)) {
+        if (!CVRP_read_instance(instance_name, instance)) {
             std::cerr << "Error reading CVRP instance\n";
             return 1;
         }
@@ -189,7 +189,6 @@ int main(int argc, char *argv[]) {
 
     printBaldes();
 
-
     print_heur("Initializing heuristic solver for initial solution\n");
 
     HGSptr hgs              = std::make_shared<HGS>();
@@ -198,8 +197,8 @@ int main(int argc, char *argv[]) {
     std::vector<VRPNode> nodes;
     nodes.clear();
     for (int k = 0; k < instance.nN; ++k) {
-        int    start_time = static_cast<int>(instance.window_open[k]);
-        int    end_time   = static_cast<int>(instance.window_close[k]);
+        int    start_time = instance.window_open[k];
+        int    end_time   = instance.window_close[k];
         double duration   = instance.service_time[k];
         double demand     = instance.demand[k];
         double cost       = 0; // Assuming cost can be derived or set as needed
@@ -207,17 +206,21 @@ int main(int argc, char *argv[]) {
         nodes[k].set_location(instance.x_coord[k], instance.y_coord[k]);
         nodes[k].lb.push_back(start_time);
         nodes[k].ub.push_back(end_time);
-        // nodes[k].lb.push_back(0);
-        // nodes[k].ub.push_back(instance.q);
+        // print start time and end time
+        if (instance.problem_type == ProblemType::cvrp) {
+            nodes[k].lb.push_back(0);
+            nodes[k].ub.push_back(instance.q);
+        }
         nodes[k].consumption.push_back(duration);
         nodes[k].consumption.push_back(demand);
     }
 
-    MIPProblem mip = MIPProblem("VRPTW", 0, 0);
+    MIPProblem mip = MIPProblem(problem_kind, 0, 0);
 
     VRProblem *problem = new VRProblem();
-    problem->instance  = instance;
-    problem->nodes     = nodes;
+
+    problem->instance = instance;
+    problem->nodes    = nodes;
 
     std::vector<Path>    paths;
     std::vector<Label *> labels;
@@ -249,6 +252,13 @@ int main(int argc, char *argv[]) {
 #ifdef GUROBI
     // auto gurobi_model = mip.toGurobiModel(GurobiEnvSingleton::getInstance());
 #endif
+
+    if (problem_kind == "vrptw") {
+        problem->problemType = ProblemType::vrptw;
+    } else if (problem_kind == "cvrp") {
+        problem->problemType = ProblemType::cvrp;
+    }
+
     BNBNode *node  = new BNBNode(mip);
     node->paths    = paths;
     node->problem  = problem;

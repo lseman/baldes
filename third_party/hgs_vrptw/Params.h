@@ -34,11 +34,12 @@ SOFTWARE.*/
 #include <string>
 #include <vector>
 
+#include "Definitions.h"
 #include "Matrix.h"
 // #include "xorshift128.h"
 
-#include "Reader.h"
 #include "CircleSector.h"
+#include "Reader.h"
 
 #include "../include/RNG.h"
 #include "config.h"
@@ -175,6 +176,8 @@ public:
 
     double proximityWeightWaitTime; // Weight for waiting time in defining the neighbourhood proximities
     double proximityWeightTimeWarp; // Weight for time warp in defining the neighbourhood proximities
+
+    ProblemType problemType = ProblemType::vrptw; // Type of the problem (VRPTW, CVRP, ...)
 
     // Data of the problem instance
     std::string         instanceName;

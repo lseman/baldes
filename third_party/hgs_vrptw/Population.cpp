@@ -43,7 +43,6 @@ void Population::doHGSLocalSearchAndAddIndividual(Individual *indiv) {
 }
 
 void Population::generatePopulation() {
-
     if (params->nbClients == 1) {
         // Quickly generate the one solution
         Individual randomIndiv(params, true, nextMDMPattern());
@@ -55,12 +54,9 @@ void Population::generatePopulation() {
     }
 
     if (params->config.initialSolution != "") {
-        fmt::print("Adding initial solution to population\n");
         Individual initialIndiv(params, params->config.initialSolution);
         addIndividual(&initialIndiv, true);
-        std::cout << "Added initial solution to population" << std::endl;
     }
-
     // ------- The below parameters are configurable through command line arguments ---------
     double fractionGeneratedNearest      = params->config.fractionGeneratedNearest;
     double fractionGeneratedFurthest     = params->config.fractionGeneratedFurthest;
@@ -80,7 +76,6 @@ void Population::generatePopulation() {
     // Note we actually set initial penalty in Params.cpp but by setting it here we also reset it when resetting the
     // population (probably not ideal but test before changing)
     params->penaltyTimeWarp = initialTimeWarpPenalty;
-
     // Too low fill percentage may cause that not all clients are planned
     minSweepFillPercentage               = std::max(minSweepFillPercentage, 30);
     int nofNearestIndividualsToGenerate  = round(fractionGeneratedNearest * nofIndividuals);

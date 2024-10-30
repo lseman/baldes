@@ -31,7 +31,7 @@ inline std::experimental::simd<T> load_simd(const Container &source, size_t star
  */
 template <Direction D, Stage S>
 inline bool check_dominance_against_vector(const Label *new_label, const std::vector<Label *> &labels,
-                                           const CutStorage *cut_storage) noexcept {
+                                           const CutStorage *cut_storage, int r_size) noexcept {
     using namespace std::experimental;
     size_t       size      = labels.size();
     const size_t simd_size = simd<double>::size(); // SIMD size based on hardware
@@ -58,14 +58,14 @@ inline bool check_dominance_against_vector(const Label *new_label, const std::ve
 
                     // Perform resource checks element-wise
                     if constexpr (D == Direction::Forward) {
-                        for (size_t k = 0; k < new_label->resources.size(); ++k) {
+                        for (size_t k = 0; k < r_size; ++k) {
                             if (label_resources[k] > new_label->resources[k]) {
                                 dominated = false;
                                 break;
                             }
                         }
                     } else if constexpr (D == Direction::Backward) {
-                        for (size_t k = 0; k < new_label->resources.size(); ++k) {
+                        for (size_t k = 0; k < r_size; ++k) {
                             if (label_resources[k] < new_label->resources[k]) {
                                 dominated = false;
                                 break;
@@ -121,14 +121,14 @@ inline bool check_dominance_against_vector(const Label *new_label, const std::ve
             bool        dominated       = true;
 
             if constexpr (D == Direction::Forward) {
-                for (size_t k = 0; k < new_label->resources.size(); ++k) {
+                for (size_t k = 0; k < r_size; ++k) {
                     if (label_resources[k] > new_label->resources[k]) {
                         dominated = false;
                         break;
                     }
                 }
             } else if constexpr (D == Direction::Backward) {
-                for (size_t k = 0; k < new_label->resources.size(); ++k) {
+                for (size_t k = 0; k < r_size; ++k) {
                     if (label_resources[k] < new_label->resources[k]) {
                         dominated = false;
                         break;

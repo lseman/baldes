@@ -196,7 +196,7 @@ public:
     }
 
     void processSeedForPlan(int plan_idx, std::vector<Rank1MultiLabel> &local_pool) {
-        // Iterate through each plan and accumulate results in temp_elements
+        // Iterate through each `c, wc` pair in `c_N_noC`
         for (auto &[c, wc] : c_N_noC) {
             double vio, best_vio;
             exactFindBestPermutationForOnePlan(c, plan_idx, vio);
@@ -207,74 +207,74 @@ public:
             int                 add_j = -1, remove_j = -1;
             std::pair<int, int> swap_i_j = {-1, -1};
 
-            // Perform the searches
+            // Perform add search and update best operation if necessary
             addSearchCrazy(plan_idx, c, wc, vio, add_j);
             if (vio > best_vio) {
                 best_vio  = vio;
                 best_oper = 'a';
             }
 
+            // Perform remove search and update best operation if necessary
             removeSearchCrazy(plan_idx, c, vio, remove_j);
             if (vio > best_vio) {
                 best_vio  = vio;
                 best_oper = 'r';
             }
 
+            // Perform swap search and update best operation if necessary
             swapSearchCrazy(plan_idx, c, wc, vio, swap_i_j);
             if (vio > best_vio) {
                 best_vio  = vio;
                 best_oper = 's';
             }
 
-            cutLong          tmp;
+            // Prepare `new_c` and `new_w_no_c` based on the best operation
             std::vector<int> new_c, new_w_no_c;
-            int              target_index = static_cast<int>(c.size());
+            applyBestOperation(best_oper, c, wc, add_j, remove_j, swap_i_j, new_c, new_w_no_c, plan_idx, best_vio);
 
-            auto &target_pool = generated_rank1_multi_pool[target_index];
+            // Only add to `local_pool` if an operation other than 'o' was performed
+            if (best_oper != 'o') { local_pool.emplace_back(new_c, new_w_no_c, plan_idx, best_vio, best_oper); }
+        }
+    }
 
-            // Use optimized operations based on `best_oper`
-            switch (best_oper) {
-            case 'o':
-                if (c.size() < 2 || c.size() > max_row_rank1) break;
-                tmp = 0;
+    void applyBestOperation(char best_oper, const std::vector<int> &c, const std::vector<int> &wc, int add_j,
+                            int remove_j, const std::pair<int, int> &swap_i_j, std::vector<int> &new_c,
+                            std::vector<int> &new_w_no_c, int plan_idx, double best_vio) {
+        switch (best_oper) {
+        case 'o': // No operation, directly add to target pool
+            if (c.size() >= 2 && c.size() <= max_row_rank1) {
+                cutLong tmp;
                 for (int i : c) tmp.set(i);
-                // Directly add to target_pool at the current target_index
                 {
                     std::lock_guard<std::mutex> lock(pool_mutex);
-                    auto                       &target_pool = generated_rank1_multi_pool[target_index];
-                    target_pool.emplace_back(tmp, plan_idx, best_vio);
+                    generated_rank1_multi_pool[static_cast<int>(c.size())].emplace_back(tmp, plan_idx, best_vio);
                 }
-                break;
-
-            case 'a': // Add operation
-                new_c = c;
-                new_c.push_back(add_j);
-                new_w_no_c.reserve(wc.size() - 1);
-                std::copy_if(wc.begin(), wc.end(), std::back_inserter(new_w_no_c),
-                             [add_j](int w) { return w != add_j; });
-                break;
-
-            case 'r': // Remove operation
-                new_c.reserve(c.size() - 1);
-                std::copy_if(c.begin(), c.end(), std::back_inserter(new_c),
-                             [remove_j](int i) { return i != remove_j; });
-                new_w_no_c = wc;
-                break;
-
-            case 's': // Swap operation
-                new_c      = c;
-                new_w_no_c = wc;
-                for (int &i : new_c) {
-                    if (i == swap_i_j.first) i = swap_i_j.second;
-                }
-                for (int &i : new_w_no_c) {
-                    if (i == swap_i_j.second) i = swap_i_j.first;
-                }
-                break;
             }
+            break;
 
-            // Only add to local_pool if an operation was performed
-            if (best_oper != 'o') { local_pool.emplace_back(new_c, new_w_no_c, plan_idx, best_vio, best_oper); }
+        case 'a': // Add operation
+            new_c = c;
+            new_c.push_back(add_j);
+            new_w_no_c.reserve(wc.size() - 1);
+            std::copy_if(wc.begin(), wc.end(), std::back_inserter(new_w_no_c), [add_j](int w) { return w != add_j; });
+            break;
+
+        case 'r': // Remove operation
+            new_c.reserve(c.size() - 1);
+            std::copy_if(c.begin(), c.end(), std::back_inserter(new_c), [remove_j](int i) { return i != remove_j; });
+            new_w_no_c = wc;
+            break;
+
+        case 's': // Swap operation
+            new_c      = c;
+            new_w_no_c = wc;
+            for (int &i : new_c) {
+                if (i == swap_i_j.first) i = swap_i_j.second;
+            }
+            for (int &i : new_w_no_c) {
+                if (i == swap_i_j.second) i = swap_i_j.first;
+            }
+            break;
         }
     }
 
@@ -484,58 +484,53 @@ public:
     }
 
     void constructVRMapAndSeedCrazy() {
-        // Initialize and reserve space for `rank1_sep_heur_mem4_vertex` and `v_r_map`
+        // Resize `rank1_sep_heur_mem4_vertex` and initialize `v_r_map`
         rank1_sep_heur_mem4_vertex.resize(dim);
         v_r_map.assign(dim, {});
         for (auto &map_entry : v_r_map) { map_entry.reserve(sol.size()); }
 
-        // Populate v_r_map based on `sol`
+        // Populate `v_r_map` with counts of route appearances for each vertex `i`
         for (int r = 0; r < sol.size(); ++r) {
-            for (const int i : sol[r].route) {
-                if (i > 0 && i < dim - 1) {
-                    auto &entry = v_r_map[i];
-                    if (entry.find(r) == entry.end())
-                        entry[r] = 1;
-                    else
-                        ++entry[r];
-                }
+            for (int i : sol[r].route) {
+                if (i > 0 && i < dim - 1) { ++v_r_map[i][r]; }
             }
         }
 
-        // Generate `seed_map` with reserve capacity
+        // Initialize `seed_map` for storing combinations
         ankerl::unordered_dense::map<cutLong, cutLong> seed_map;
         seed_map.reserve(4096);
 
+        // Create `wc` bitset based on neighboring vertices for each vertex `i`
         for (int i = 1; i < dim - 1; ++i) {
             if (v_r_map[i].empty()) continue;
 
             cutLong wc;
             for (const auto &[route_index, count] : v_r_map[i]) {
-                for (const int v : sol[route_index].route) {
+                for (int v : sol[route_index].route) {
                     if (v > 0 && v < dim - 1 && rank1_sep_heur_mem4_vertex[i].test(v)) { wc.set(v); }
                 }
             }
 
-            // Create seed map entries based on `wc`
+            // Iterate over routes that do not contain vertex `i` to create `tmp_c`
             for (int r = 0; r < sol.size(); ++r) {
-                if (v_r_map[i].find(r) != v_r_map[i].end()) continue;
+                if (v_r_map[i].contains(r)) continue;
 
                 cutLong tmp_c;
-                for (const int v : sol[r].route) {
+                for (int v : sol[r].route) {
                     if (v > 0 && v < dim - 1 && wc.test(v)) { tmp_c.set(v); }
                 }
-                tmp_c.set(i);
+                tmp_c.set(i); // Include `i` in the bitset
 
+                // Check the size of `tmp_c` and conditionally add it to `seed_map`
                 int c_size = static_cast<int>(tmp_c.count());
                 if (c_size >= 4 && c_size <= max_heuristic_initial_seed_set_size_row_rank1c) {
-                    if (auto [it, inserted] = seed_map.try_emplace(tmp_c, wc ^ tmp_c); !inserted) {
-                        it->second |= wc ^ tmp_c;
-                    }
+                    auto [it, inserted] = seed_map.try_emplace(tmp_c, wc ^ tmp_c);
+                    if (!inserted) { it->second |= wc ^ tmp_c; }
                 }
             }
         }
 
-        // Populate `c_N_noC` based on `seed_map`
+        // Populate `c_N_noC` using `seed_map`
         c_N_noC.resize(seed_map.size());
         int cnt = 0;
         for (const auto &[fst, snd] : seed_map) {
@@ -543,6 +538,7 @@ public:
             tmp_fst.reserve(fst.count());
             tmp_snd.reserve(snd.count());
 
+            // Assign vertices to `tmp_fst` or `tmp_snd` based on `fst` and `snd`
             for (int i = 1; i < dim - 1; ++i) {
                 if (fst.test(i)) {
                     tmp_fst.push_back(i);
@@ -553,6 +549,8 @@ public:
             ++cnt;
         }
     }
+
+
     ////////////////////////////////////////
     // Operators
     ////////////////////////////////////////

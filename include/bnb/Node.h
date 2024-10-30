@@ -11,7 +11,6 @@
 #pragma once
 
 #include "Definitions.h"
-#include "bnb/Problem.h"
 
 #include "miphandler/Constraint.h"
 
@@ -57,7 +56,8 @@
 #include "solvers/HighsSolver.h"
 #endif
 
-class Problem;
+class VRProblem;
+
 /**
  * @class BNBNode
  * @brief Represents a node in a tree structure./
@@ -93,7 +93,7 @@ public:
     IPSolver *ipSolver = nullptr;
 #endif
 
-    Problem     *problem;
+    VRProblem    *problem;
     InstanceData instance;
 
     int numConstrs = 0;
