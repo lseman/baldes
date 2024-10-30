@@ -165,8 +165,9 @@ void BucketGraph::BucketArcElimination(double theta) {
         std::vector<uint64_t> Bvisited(n_segments, 0);
 
         for (const auto &a : bucket_arcs) {
-            std::vector<double> increment(options.main_resources, 0);
-            for (int r = 0; r < options.main_resources; ++r) {
+            std::vector<double> increment(options.resources.size(), 0);
+            // print increment.size
+            for (int r = 0; r < options.resources.size(); ++r) {
                 if constexpr (D == Direction::Forward) {
                     increment[r] = buckets[b].lb[r] + a.resource_increment[r];
                 } else {

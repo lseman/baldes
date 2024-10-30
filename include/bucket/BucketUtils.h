@@ -220,8 +220,6 @@ void BucketGraph::define_buckets() {
                     interval_end[0] = std::min(interval_end[0], R_max[0]);
                 }
 
-                // Print and store
-                fmt::print("Creating bucket with interval: [{}, {}]\n", interval_start[0], interval_end[0]);
                 buckets.push_back(Bucket(VRPNode.id, interval_start, interval_end));
                 node_tree.insert(interval_start, interval_end, bucket_index);
 
@@ -335,8 +333,8 @@ void BucketGraph::generate_arcs() {
         // Retrieve the arcs for the node in the given direction (Forward/Backward)
         auto arcs = node.get_arcs<D>();
         // Compute base intervals for each resource dimension based on R_max and R_min
-        std::vector<double> node_intervals(intervals.size());
-        for (int r = 0; r < intervals.size(); ++r) {
+        std::vector<double> node_intervals(options.resources.size());
+        for (int r = 0; r < options.resources.size(); ++r) {
             node_intervals[r] = (node.ub[r] - node.lb[r]) / intervals[r].interval;
         }
 
@@ -344,8 +342,8 @@ void BucketGraph::generate_arcs() {
         for (const auto &arc : arcs) {
             const auto &next_node = nodes[arc.to]; // Get the destination node of the arc
 
-            std::vector<double> next_node_intervals(intervals.size());
-            for (int r = 0; r < intervals.size(); ++r) {
+            std::vector<double> next_node_intervals(options.resources.size());
+            for (int r = 0; r < options.resources.size(); ++r) {
                 next_node_intervals[r] = (next_node.ub[r] - next_node.lb[r]) / intervals[r].interval;
             }
             // Skip self-loops (no arc from a node to itself)
@@ -356,6 +354,9 @@ void BucketGraph::generate_arcs() {
             double     cost_inc    = travel_cost - next_node.cost;
             res_inc[0]             = travel_cost + node.duration; // Update resource increment based on node duration
             // Iterate over all possible destination buckets for the next node
+            for (auto z = 1; z < options.resources.size(); z++) {
+                res_inc[z] = node.consumption[z];
+            }
 
             for (int j = 0; j < num_buckets[next_node.id]; ++j) {
                 int to_bucket = j + num_buckets_index[next_node.id];
@@ -450,7 +451,7 @@ void BucketGraph::generate_arcs() {
                 int            node_id = tasks[task_idx]; // Get the node id
                 const VRPNode &VRPNode = nodes[node_id];
 
-                std::vector<double> res_inc = {static_cast<double>(VRPNode.duration)}; // Resource increment vector
+                std::vector<double> res_inc(options.resources.size()); // Resource increment vector
                 std::vector<std::pair<int, int>> local_arcs;                           // Local storage for arcs
 
                 // Generate arcs for all buckets associated with the current node
