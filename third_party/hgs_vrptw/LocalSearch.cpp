@@ -1238,6 +1238,7 @@ TimeWindowData HGSLocalSearch::MergeTWDataRecursive(const TimeWindowData &twData
     mergedTwData.earliestArrival   = std::max(twData2.earliestArrival - delta, twData1.earliestArrival) - deltaWaitTime;
     mergedTwData.latestArrival     = std::min(twData2.latestArrival - delta, twData1.latestArrival) + deltaTimeWarp;
     mergedTwData.latestReleaseTime = std::max(twData1.latestReleaseTime, twData2.latestReleaseTime);
+
     return mergedTwData;
 }
 
@@ -1327,10 +1328,14 @@ void HGSLocalSearch::updateRouteData(HGSRoute *myRoute) {
         firstIt = false;
     }
 
-    myRoute->duration         = mytime; // Driving duration + service duration, excluding waiting time / time warp
-    myRoute->load             = myload;
-    myRoute->twData           = mynode->prefixTwData;
-    myRoute->penalty          = penaltyExcessLoad(myload) + penaltyTimeWindows(myRoute->twData);
+    myRoute->duration = mytime; // Driving duration + service duration, excluding waiting time / time warp
+    myRoute->load     = myload;
+    myRoute->twData   = mynode->prefixTwData;
+    if (params->problemType == ProblemType::vrptw) {
+        myRoute->penalty = penaltyExcessLoad(myload) + penaltyTimeWindows(myRoute->twData);
+    } else if (params->problemType == ProblemType::cvrp) {
+        myRoute->penalty = penaltyExcessLoad(myload);
+    }
     myRoute->nbCustomers      = myplace - 1;
     myRoute->reversalDistance = myReversalDistance;
     // Remember "when" this route has been last modified (will be used to filter unnecessary move evaluations)
@@ -1381,19 +1386,28 @@ CostSol HGSLocalSearch::getCostSol(bool usePenaltiesLS) {
         myCostSol.distance += myRoute->duration;
         myCostSol.capacityExcess += std::max(0, myRoute->load - params->vehicleCapacity);
         myCostSol.waitTime += 0; // TODO
-        if (params->problemType == ProblemType::vrptw) { myCostSol.timeWarp += myRoute->twData.timeWarp; }
+        if (params->problemType == ProblemType::vrptw) {
+            myCostSol.timeWarp += myRoute->twData.timeWarp;
+        } else {
+            myCostSol.timeWarp = 0;
+        }
     }
 
     // Subtract service durations which are not part of distance
     for (int i = 1; i <= params->nbClients; i++) { myCostSol.distance -= params->cli[i].serviceDuration; }
 
     if (usePenaltiesLS) {
-        myCostSol.penalizedCost = myCostSol.distance + myCostSol.capacityExcess * penaltyCapacityLS +
-                                  myCostSol.timeWarp * penaltyTimeWarpLS + myCostSol.waitTime * params->penaltyWaitTime;
+        myCostSol.penalizedCost = myCostSol.distance + myCostSol.capacityExcess * penaltyCapacityLS;
+        if (params->problemType == ProblemType::vrptw) {
+            myCostSol.penalizedCost +=
+                myCostSol.timeWarp * penaltyTimeWarpLS + myCostSol.waitTime * params->penaltyWaitTime;
+        }
     } else {
-        myCostSol.penalizedCost = myCostSol.distance + myCostSol.capacityExcess * params->penaltyCapacity +
-                                  myCostSol.timeWarp * params->penaltyTimeWarp +
-                                  myCostSol.waitTime * params->penaltyWaitTime;
+        myCostSol.penalizedCost = myCostSol.distance + myCostSol.capacityExcess * params->penaltyCapacity;
+        if (params->problemType == ProblemType::vrptw) {
+            myCostSol.penalizedCost +=
+                myCostSol.timeWarp * params->penaltyTimeWarp + myCostSol.waitTime * params->penaltyWaitTime;
+        }
     }
     return myCostSol;
 }

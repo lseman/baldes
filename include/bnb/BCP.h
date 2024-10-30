@@ -429,8 +429,11 @@ public:
         // RCC Separation
         char   intAndFeasible;
         double maxViolation;
+        int    maxCuts = 5;
+        if (problemType == ProblemType::cvrp) { maxCuts = 20; }
+
         CAPSEP_SeparateCapCuts(nVertices - 1, demands.data(), instance.q, edgex.size() - 1, edgex.data(), edgey.data(),
-                               edgeval.data(), oldCutsCMP, 5, 1e-4, &intAndFeasible, &maxViolation, cutsCMP);
+                               edgeval.data(), oldCutsCMP, maxCuts, 1e-4, &intAndFeasible, &maxViolation, cutsCMP);
 
         // print_cut("Found {} violated RCC cuts, max violation: {}\n", cutsCMP->Size, maxViolation);
 
@@ -508,8 +511,8 @@ public:
         RCC_MODE_BLOCK(auto &rccManager = node->rccManager;)
 
         int bucket_interval = 25;
-        int time_horizon = instance.T_max;
-        //if (problemType == ProblemType::cvrp) { time_horizon = 50000; }
+        int time_horizon    = instance.T_max;
+        // if (problemType == ProblemType::cvrp) { time_horizon = 50000; }
         numConstrs                = node->getIntAttr("NumConstrs");
         node->numConstrs          = numConstrs;
         std::vector<double> duals = std::vector<double>(numConstrs, 0.0);
@@ -519,8 +522,7 @@ public:
         if (problemType == ProblemType::vrptw) {
             bucket_graph = std::make_unique<BucketGraph>(nodes, time_horizon, bucket_interval);
         } else if (problemType == ProblemType::cvrp) {
-            bucket_graph =
-                std::make_unique<BucketGraph>(nodes, instance.q, bucket_interval);
+            bucket_graph = std::make_unique<BucketGraph>(nodes, instance.q, bucket_interval);
         }
 
         if (problemType == ProblemType::cvrp) {
@@ -528,7 +530,7 @@ public:
             options.main_resources         = {0};
             options.resources              = {"capacity"};
             options.resource_disposability = {1};
-            bucket_graph->options           = options;
+            bucket_graph->options          = options;
         }
 
         bucket_graph->set_distance_matrix(instance.getDistanceMatrix(), 8);
@@ -651,9 +653,12 @@ public:
                     } else {
                         changed = cutHandler(r1c, node, SRCconstraints);
                         if (changed) {
-                            // matrix = node->extractModelDataSparse();
-                            // node->optimize();
-                            // nodeDuals = node->getDuals();
+// matrix = node->extractModelDataSparse();
+// node->optimize();
+// nodeDuals = node->getDuals();
+#ifndef IPM
+                            node->optimize();
+#endif
                         }
                     }
                 })
@@ -875,7 +880,7 @@ public:
 #ifdef TR
             tr_val = v;
 #endif
-            if (iter % 50 == 0)
+            if (iter % 10 == 0)
                 fmt::print("| It.: {:4} | Obj.: {:8.2f} | Price: {:9.2f} | SRC: {:3} | RCC: {:3} | Paths: {:3} | "
                            "Stage: {:1} | "
                            "Lag.: {:10.4f} | α: {:4.2f} | tr: {:2.2f} | threshold: {:3} |\n",

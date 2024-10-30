@@ -85,7 +85,6 @@ void Individual::evaluateCompleteCost() {
         if (params->problemType == ProblemType::vrptw) {
             myCostSol.timeWarp += timeWarp;
             myCostSol.waitTime += waitTime;
-
         } else {
             myCostSol.timeWarp = 0;
             myCostSol.waitTime = 0;
