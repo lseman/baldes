@@ -83,7 +83,6 @@ void Population::generatePopulation() {
     int nofSweepIndividualsToGenerate    = round(fractionGeneratedSweep * nofIndividuals);
     int nofRandomIndividualsToGenerate   = round(fractionGeneratedRandomly * nofIndividuals);
     int noOfMDMIndividualsToGenerate     = round(fractionGeneratedMDM * nofIndividuals);
-
     // Generate some individuals using the MDMPatterns
     for (int i = 0; i < noOfMDMIndividualsToGenerate; i++) {
         Individual indiv(params, true, nextMDMPattern());

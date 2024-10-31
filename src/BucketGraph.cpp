@@ -65,8 +65,8 @@ JumpArc::JumpArc(int base, int jump, const std::vector<double> &res_inc, double 
  */
 BucketGraph::BucketGraph(const std::vector<VRPNode> &nodes, int horizon, int bucket_interval, int capacity,
                          int capacity_interval)
-    : fw_buckets(), bw_buckets(), nodes(nodes), horizon(horizon), capacity(capacity),
-      bucket_interval(bucket_interval), best_cost(std::numeric_limits<double>::infinity()), fw_best_label() {
+    : fw_buckets(), bw_buckets(), nodes(nodes), horizon(horizon), capacity(capacity), bucket_interval(bucket_interval),
+      best_cost(std::numeric_limits<double>::infinity()), fw_best_label() {
 
     // initInfo();
     Interval intervalTime(bucket_interval, horizon);
@@ -518,6 +518,106 @@ void BucketGraph::set_adjacency_list() {
 }
 */
 
+
+void BucketGraph::set_adjacency_list_manual() {
+    // Clear existing arcs for each node
+    for (auto &node : nodes) {
+        node.clear_arcs(); // Remove any existing arcs associated with the node
+    }
+
+    // Step 1: Compute the clusters using MST-based clustering
+    MST    mst_solver(nodes, [&](int from, int to) { return this->getcij(from, to); });
+    double theta    = 1.0; // Experiment with different values of θ
+    auto   clusters = mst_solver.cluster(theta);
+
+    // Create a job-to-cluster mapping (cluster ID for each job/node)
+    std::vector<int> job_to_cluster(nodes.size(), -1); // Mapping from job (node) to cluster ID
+    for (int cluster_id = 0; cluster_id < clusters.size(); ++cluster_id) {
+        for (int job : clusters[cluster_id]) { job_to_cluster[job] = cluster_id; }
+    }
+
+    // Step 2: Modify add_arcs_for_node to give priority based on cluster membership
+    auto add_arcs_for_node = [&](const VRPNode &node, int from_bucket, std::vector<double> &res_inc) {
+        using Arc = std::tuple<double, int, std::vector<double>,
+                               double>; // Arc: priority, to_node, resource increments, cost increment
+
+        std::vector<Arc> best_arcs;
+        best_arcs.reserve(nodes.size()); // Reserve space for forward arcs
+
+        std::vector<Arc> best_arcs_rev;
+        best_arcs_rev.reserve(nodes.size()); // Reserve space for reverse arcs
+
+        for (const auto &next_node : nodes) {
+            if (!manual_arcs.has_arc(node.id, next_node.id)) continue; // Skip arcs not in the manual list
+
+            if (next_node.id == options.depot || node.id == next_node.id) continue; // Skip depot and same node
+
+            auto   travel_cost = getcij(node.id, next_node.id); // Calculate travel cost
+            double cost_inc    = travel_cost - next_node.cost;  // Adjust cost increment by subtracting next node's cost
+
+            for (int r = 0; r < options.resources.size(); ++r) {
+                if (options.resources[r] == "time") {
+                    res_inc[r] = travel_cost + node.duration; // Update resource increment based on node duration
+                } else {
+                    res_inc[r] = node.consumption[r];
+                }
+            }
+            // res_inc[TIME_INDEX] += travel_cost; // Add travel time to resource increment
+
+            int to_bucket = next_node.id;
+            if (from_bucket == to_bucket) continue; // Skip arcs that loop back to the same bucket
+
+            bool feasible = true; // Check feasibility based on resource constraints
+            for (int r = 0; r < options.resources.size(); ++r) {
+                if (node.lb[r] + res_inc[r] > next_node.ub[r]) {
+                    feasible = false;
+                    break;
+                }
+            }
+            if (!feasible) continue; // Skip infeasible arcs
+
+            // Step 3: Calculate priority based on cluster membership
+            double priority_value;
+            double reverse_priority_value;
+            if (job_to_cluster[node.id] == job_to_cluster[next_node.id]) {
+                // Higher priority if both nodes are in the same cluster
+                priority_value         = 5.0 + 1.E-5 * next_node.start_time; // Adjust weight for same-cluster priority
+                reverse_priority_value = 1.0 + 1.E-5 * node.start_time;      // Adjust weight for same-cluster priority
+            } else {
+                // Lower priority for cross-cluster arcs
+                priority_value         = 1.0 + 1.E-5 * next_node.start_time; // Higher base value for cross-cluster arcs
+                reverse_priority_value = 5.0 + 1.E-5 * node.start_time;      // Higher base value for cross-cluster arcs
+            }
+
+            best_arcs.emplace_back(priority_value, next_node.id, res_inc, cost_inc); // Store the forward arc
+            best_arcs_rev.emplace_back(reverse_priority_value, next_node.id, res_inc,
+                                       cost_inc); // Store the reverse arc
+        }
+
+        // Add forward arcs from the current node to its neighbors
+        for (const auto &arc : best_arcs) {
+            auto [priority_value, to_bucket, res_inc_local, cost_inc] = arc;
+            nodes[node.id].add_arc(node.id, to_bucket, res_inc_local, cost_inc, true,
+                                   priority_value); // Add forward arc
+        }
+
+        // Add reverse arcs from neighboring nodes to the current node
+        for (const auto &arc : best_arcs_rev) {
+            auto [priority_value, to_bucket, res_inc_local, cost_inc] = arc;
+            nodes[to_bucket].add_arc(to_bucket, node.id, res_inc_local, cost_inc, false,
+                                     priority_value); // Add reverse arc
+        }
+    };
+
+    // Step 4: Iterate over all nodes to set the adjacency list
+    for (const auto &VRPNode : nodes) {
+        if (VRPNode.id == options.end_depot) continue; // Skip the last node (depot)
+
+        std::vector<double> res_inc(intervals.size());   // Resource increment vector
+        add_arcs_for_node(VRPNode, VRPNode.id, res_inc); // Add arcs for the current node
+    }
+}
+
 void BucketGraph::set_adjacency_list() {
     // Clear existing arcs for each node
     for (auto &node : nodes) {
@@ -944,7 +1044,12 @@ void BucketGraph::setup() {
     fw_fixed_buckets.assign(fw_buckets.size(), std::vector<bool>(fw_buckets.size(), false));
     bw_fixed_buckets.assign(fw_buckets.size(), std::vector<bool>(fw_buckets.size(), false));
     // define initial relationships
-    set_adjacency_list();
+    nodes.resize(options.size);
+    if (!options.manual_arcs) {
+        set_adjacency_list();
+    } else {
+        set_adjacency_list_manual();
+    }
     generate_arcs();
     for (auto &VRPNode : nodes) { VRPNode.sort_arcs(); }
 

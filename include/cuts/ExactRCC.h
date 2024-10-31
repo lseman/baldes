@@ -20,6 +20,7 @@
 #pragma once
 
 #include "Definitions.h"
+#include "bnb/Node.h"
 #include "gurobi_c++.h"
 #include "gurobi_c.h"
 
@@ -43,8 +44,7 @@ using namespace std;
  * nodes corresponding to the solutions found.
  *
  */
-inline std::vector<set<int>> separate_Rounded_Capacity_cuts(GRBModel *gurobi_model, int Q,
-                                                            const std::vector<int>    &demand,
+inline std::vector<set<int>> separate_Rounded_Capacity_cuts(BNBNode *node, int Q, const std::vector<int> &demand,
                                                             const std::vector<Path>   &allPaths,
                                                             const std::vector<double> &sol) {
     double                     epsilon_1         = 0.5;
@@ -58,15 +58,17 @@ inline std::vector<set<int>> separate_Rounded_Capacity_cuts(GRBModel *gurobi_mod
     // int                 varNumber = gurobi_model->get(GRB_IntAttr_NumVars);
     // for (int i = 0; i < varNumber; i++) { sol.push_back(gurobi_model->getVar(i).get(GRB_DoubleAttr_X)); }
 
-    vector<double> x_values     = sol;
-    GRBModel       m_separation = GRBModel(gurobi_model->getEnv());
+    vector<double> x_values = sol;
+    GRBEnv        &env      = GurobiEnvSingleton::getInstance();
+
+    GRBModel m_separation = GRBModel(env);
     m_separation.set(GRB_IntParam_OutputFlag, 0);
 
     // Enable Gurobi to search for multiple solutions
     m_separation.set(GRB_IntParam_PoolSearchMode, 2);
 
     // Set the number of solutions to be found
-    m_separation.set(GRB_IntParam_PoolSolutions, 5);
+    m_separation.set(GRB_IntParam_PoolSolutions, 10);
 
     GRBVar alpha = m_separation.addVar(0, GRB_INFINITY, 0, GRB_INTEGER);
 

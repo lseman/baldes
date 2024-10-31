@@ -6,7 +6,7 @@ import sys
 sys.path.append(os.path.abspath('../../build'))
 
 # Now you can import the BALDES module
-import baldes
+import pybaldes as baldes
 
 # Define nodes
 nodes = [baldes.VRPNode() for _ in range(102)]
@@ -20,7 +20,7 @@ for node in nodes:
     node.duration = random.randint(1, 100)  # Set random integer duration
     node.cost = random.uniform(1.0, 100.0)  # Set random float cost
     node.start_time = random.randint(0, 10000)  # Set random integer start time
-    node.end_time = random.randint(node.start_time + 1, 10000)  # Ensure end_time > start_time (integer)
+    node.end_time = random.randint(int(node.start_time + 1), 10000)  # Ensure end_time > start_time (integer)
     node.demand = random.uniform(1.0, 100.0)  # Set random float demand
     node.consumption = [random.uniform(1.0, 100.0) for _ in range(num_intervals)]  # Set random float consumption
     node.set_location(random.uniform(0, 100), random.uniform(0, 100))  # Set random float location
@@ -55,3 +55,5 @@ print("Nodes and BucketGraph initialized successfully!")
 # Call the solve method
 labels = bg.solve()
 print(labels)
+for label in labels:
+    print(label.nodes_covered)
