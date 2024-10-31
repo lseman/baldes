@@ -132,6 +132,12 @@ inline void print_cut(fmt::format_string<Args...> format, Args &&...args) {
     fmt::print(format, std::forward<Args>(args)...);
 }
 
+template <typename... Args>
+inline void print_branching(fmt::format_string<Args...> format, Args &&...args) {
+    // Print "[", then yellow "info", then reset color and print "] "
+    fmt::print(fg(fmt::color::dark_cyan), "[branching] ");
+    fmt::print(format, std::forward<Args>(args)...);
+}
 /**
  * @brief Prints a formatted message with a blue "info" tag.
  *

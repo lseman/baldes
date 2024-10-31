@@ -43,6 +43,14 @@ public:
     // define get_name
     std::string get_name() const { return name; }
 
+    void print() const {
+        fmt::print("Constraint: ");
+        for (const auto &[var_name, coeff] : expression.get_terms()) {
+            fmt::print("{:.2f} * {} + ", coeff, var_name);
+        }
+        fmt::print(" {} {} {}\n", relation, rhs, name);
+    }
+
 private:
     LinearExpression expression; // The linear expression of the constraint
     double           rhs;        // The right-hand side of the constraint

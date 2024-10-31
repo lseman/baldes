@@ -77,7 +77,8 @@ public:
     void          mono_initialization();
     Label        *compute_mono_label(const Label *L);
 
-    BranchingDuals *branching_duals = new BranchingDuals();
+    using BranchingDualsPtr           = std::shared_ptr<BranchingDuals>;
+    BranchingDualsPtr branching_duals = std::make_shared<BranchingDuals>();
 
 #if defined(RCC) || defined(EXACT_RCC)
     ArcDuals arc_duals;

@@ -206,6 +206,8 @@ public:
                 fmt::print("\n");
                 fmt::print("\033[34m_SOLUTION FOUND \033[0m: {}\n", objectiveValue / 10);
 
+                problem->printSolution(currentBNBNode);
+
                 globalBestObjective.store(objectiveValue, std::memory_order_release);
                 markSolutionFound();
                 break;
