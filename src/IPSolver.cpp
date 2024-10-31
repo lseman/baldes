@@ -200,7 +200,6 @@ void IPSolver::update_residuals(Residuals &res, const Eigen::VectorXd &x, const 
  */
 void IPSolver::solve_augmented_system(Eigen::VectorXd &dx, Eigen::VectorXd &dy, SparseSolver &ls,
                                       const Eigen::VectorXd &xi_p, const Eigen::VectorXd &xi_d) {
-#ifdef AUGMENTED
     // Set-up right-hand side
     Eigen::VectorXd xi(xi_d.size() + xi_p.size());
     xi << xi_d, xi_p;
@@ -212,37 +211,6 @@ void IPSolver::solve_augmented_system(Eigen::VectorXd &dx, Eigen::VectorXd &dy, 
     dx = d.head(xi_d.size()); // Gets the first n elements
     dy = d.tail(xi_p.size()); // Gets the last m elements
     // Recover dx
-#else
-    Eigen::VectorXd d = 1.0 / (ls.theta.array() + ls.regP.array());
-    // Eigen::VectorXd xi_ = xi_p; // + ls.A * (d.asDiagonal() * xi_d);
-
-    // print ls.A size
-    Eigen::MatrixXd             dDense  = d.asDiagonal();
-    Eigen::SparseMatrix<double> dSparse = dDense.sparseView();
-    Eigen::SparseMatrix<double> AD(ls.A.rows(), dSparse.cols());
-    for (int k = 0; k < ls.A.outerSize(); ++k) {
-        for (Eigen::SparseMatrix<double>::InnerIterator it(ls.A, k); it; ++it) {
-            int row = it.row();
-            int col = it.col();
-            for (Eigen::SparseMatrix<double>::InnerIterator jt(dSparse, col); jt; ++jt) {
-                int target_col = jt.col();
-                AD.coeffRef(row, target_col) += it.value() * jt.value();
-            }
-        }
-    }
-
-    Eigen::VectorXd xi_ = xi_p + AD * xi_d;
-
-    // Solve augmented system
-    dy = ls.solve(xi_);
-
-    // Recover dx
-    dx = d.asDiagonal() * (ls.A.transpose() * dy - xi_d);
-    // Eigen::VectorXd ADy = ls.A.transpose() * dy; // AD will be of size A.cols() x 1
-    // Eigen::VectorXd ADxi_d = ADy - xi_d; // Assuming xi_d is already of size A.cols() x 1
-    // dx = d.asDiagonal() * ADxi_d; // dx will be of size A.cols() x 1
-
-#endif
 }
 
 void IPSolver::solve_augsys(Eigen::VectorXd &delta_x, Eigen::VectorXd &delta_y, Eigen::VectorXd &delta_z,
@@ -396,19 +364,19 @@ void IPSolver::run_optimization(ModelData &model, const double tol) {
     Eigen::VectorXd lambda = Eigen::VectorXd::Zero(m);
     Eigen::VectorXd s      = Eigen::VectorXd::Ones(n);
 
-    if (x_old.size() > 0 && warm_start) {
-        int nv_old = x_old.size(); // Original number of variables
-        int nv_new = x.size();     // New number of variables
-        int mv_old = lambda_old.size();
-        int mv_new = lambda.size();
+    // if (x_old.size() > 0 && warm_start) {
+    //     int nv_old = x_old.size(); // Original number of variables
+    //     int nv_new = x.size();     // New number of variables
+    //     int mv_old = lambda_old.size();
+    //     int mv_new = lambda.size();
 
-        // Copy old values to new positions in x
-        // As free variables and slack variables are added, the original variables move down
-        // int original_counter          = 0;
-        // x.head(nv_old - n_slacks_old) = x_old.head(nv_old - n_slacks_old);
+    //     // Copy old values to new positions in x
+    //     // As free variables and slack variables are added, the original variables move down
+    //     // int original_counter          = 0;
+    //     // x.head(nv_old - n_slacks_old) = x_old.head(nv_old - n_slacks_old);
 
-        lambda.head(N_SIZE - 1) = lambda_old.head(N_SIZE - 1);
-    }
+    //     lambda.head(N_SIZE - 1) = lambda_old.head(N_SIZE - 1);
+    // }
 
     warm_start   = false;
     n_slacks_old = n_slacks;
@@ -823,7 +791,6 @@ int IPSolver::update_linear_solver(SparseSolver &ls, const Eigen::VectorXd &thet
     ls.regP  = regP;
     ls.regD  = regD;
 
-#ifdef AUGMENTED
     // Update S. S is stored as upper-triangular and only its diagonal changes.
     Eigen::VectorXd combinedValues(ls.n + ls.m);
     combinedValues.head(ls.n) = -theta - regP;
@@ -837,24 +804,6 @@ int IPSolver::update_linear_solver(SparseSolver &ls, const Eigen::VectorXd &thet
 
     return ls.info();
 
-#else
-
-    // define lhs for normal equations
-    Eigen::SparseMatrix<double> lhs(ls.n + ls.m, ls.n + ls.m);
-    // define lhs as   A (\Theta^{-1} + R_{p})^{-1} A^{\top} + R_{d}
-    Eigen::VectorXd d = 1.0 / (ls.theta.array() + ls.regP.array());
-    // set rhs as \xi_{p} + A (Θ^{-1} + R_{p})^{-1} \xi_{d}
-    Eigen::MatrixXd             dDense  = d.asDiagonal();
-    Eigen::SparseMatrix<double> dSparse = dDense.sparseView();
-
-    Eigen::MatrixXd             regDDense  = regD.asDiagonal();
-    Eigen::SparseMatrix<double> regDSparse = regDDense.sparseView();
-    Eigen::SparseMatrix<double> AD         = ls.A * dSparse;
-    Eigen::SparseMatrix<double> ADA        = AD * ls.A.transpose();
-    lhs                                    = ADA + regDSparse;
-    ls.factorizeMatrix(lhs);
-
-#endif
 }
 
 /**
@@ -868,7 +817,6 @@ void IPSolver::start_linear_solver(SparseSolver &ls, const Eigen::SparseMatrix<d
     ls.n = A.cols();
     // print ls.A size
 
-#ifdef AUGMENTED
     ls.theta = Eigen::VectorXd::Ones(ls.n);
     ls.regP  = Eigen::VectorXd::Ones(ls.n);
     ls.regD  = Eigen::VectorXd::Ones(ls.m);
@@ -907,5 +855,4 @@ void IPSolver::start_linear_solver(SparseSolver &ls, const Eigen::SparseMatrix<d
     ls.S = S_;
     // Factorize
     ls.factorizeMatrix(ls.S);
-#endif
 }

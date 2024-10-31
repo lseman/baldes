@@ -29,8 +29,6 @@
 #include <exec/static_thread_pool.hpp>
 #include <stdexec/execution.hpp>
 
-
-
 constexpr double TOLERANCE_ZERO    = 1E-6;
 constexpr double TOLERANCE_INTEGER = 1E-2;
 constexpr double SCORE_INCREMENT   = 0.0001;
@@ -232,6 +230,7 @@ public:
                     double feasLB1, feasLB2;
                     std::tie(feasLB1, deltaLB1) = childNode1->solveRestrictedMasterLP();
                     std::tie(feasLB2, deltaLB2) = childNode2->solveRestrictedMasterLP();
+                    // print the deltaLB1 and deltaLB2
 
                     // Calculate product value for branching
                     double productValue = deltaLB1 * deltaLB2;
@@ -273,17 +272,25 @@ public:
             [&](CandidateType type, int sourceNode, int targetNode, double fractionalValue, std::pair<bool, bool> flags,
                 std::optional<std::variant<int, std::pair<int, int>, std::vector<int>>> payload = std::nullopt) {
                 // check if flag first is true
+                double lower_bound = std::floor(fractionalValue);
+                double upper_bound = std::ceil(fractionalValue);
+
+                if (type == CandidateType::Node) {
+                    lower_bound = 0;
+                    upper_bound = 1;
+                }
                 if (flags.first) {
-                    candidates.emplace_back(new VRPCandidate(sourceNode, targetNode, BranchingDirection::Greater,
-                                                             std::floor(fractionalValue), type, payload));
+                    candidates.emplace_back(
+                        new VRPCandidate(sourceNode, targetNode, BranchingDirection::Less, lower_bound, type, payload));
                 }
                 if (flags.second) {
-                    candidates.emplace_back(new VRPCandidate(sourceNode, targetNode, BranchingDirection::Less,
-                                                             std::ceil(fractionalValue), type, payload));
+                    candidates.emplace_back(new VRPCandidate(sourceNode, targetNode, BranchingDirection::Greater,
+                                                             upper_bound, type, payload));
                 }
             };
 
         for (const auto &item : phase1Candidates) {
+            // print candidate product value
             if (!item.g_m.empty()) {
                 generateCandidates(CandidateType::Vehicle, item.sourceNode, item.targetNode, item.fractionalValue,
                                    item.flags,
@@ -321,10 +328,13 @@ public:
         // Helper to add branching constraint
         auto addConstraints = [&](double bound, BranchingDirection direction, BNBNode *child) {
             if (candidate.candidateType == CandidateType::Vehicle) {
+                fmt::print("Adding constraint for Vehicle\n");
                 child->addBranchingConstraint(bound, direction, candidate.candidateType);
             } else if (candidate.candidateType == CandidateType::Node) {
+                fmt::print("Adding constraint for Node\n");
                 child->addBranchingConstraint(bound, direction, candidate.candidateType, candidate.targetNode);
             } else { // CandidateType::Edge
+                fmt::print("Adding constraint for Edge\n");
                 std::pair<int, int> edge = {candidate.sourceNode, candidate.targetNode};
                 child->addBranchingConstraint(bound, direction, candidate.candidateType, edge);
             }
@@ -332,6 +342,11 @@ public:
 
         double lowerBound = std::floor(candidate.fractionalValue);
         double upperBound = std::ceil(candidate.fractionalValue);
+
+        if (candidate.candidateType == CandidateType::Node) {
+            lowerBound = 0;
+            upperBound = 1;
+        }
 
         // Add constraints to both child nodes
         addConstraints(lowerBound, BranchingDirection::Less, childNode1);
@@ -408,7 +423,8 @@ public:
         return selectedCandidates;
     }
 
-   static std::vector<BranchingQueueItem> evaluateWithCG(BNBNode *node, const std::vector<BranchingQueueItem> &phase1Candidates, VRProblem *problem);
+    static std::vector<BranchingQueueItem>
+    evaluateWithCG(BNBNode *node, const std::vector<BranchingQueueItem> &phase1Candidates, VRProblem *problem);
 
     /**
      * VRPTW Standard Branching Strategy
@@ -443,6 +459,7 @@ public:
         auto generatedCandidates = generateVRPCandidates(node, phase1Candidates);
         candidates.insert(candidates.end(), generatedCandidates.begin(), generatedCandidates.end());
 
+        //for (auto &c : candidates) { c->print(); }
         // TODO: add cluster branching based on MST or other clustering methods
         return candidates;
     }

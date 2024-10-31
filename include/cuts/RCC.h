@@ -93,6 +93,13 @@ public:
     // Compute the dual values for each arc by summing the duals of cuts passing through the arc
     ArcDuals computeDuals(BNBNode *model, double threshold = 1e-3);
 
+    // define remove cut method
+    void removeCut(RCCut &cut) {
+        // std::lock_guard<std::mutex> lock(mutex_);
+        cuts_.erase(std::remove_if(cuts_.begin(), cuts_.end(),
+                                   [&](const RCCut &c) { return c.ctr == cut.ctr; }),
+                    cuts_.end());
+    }
     ArcDuals computeDuals(std::vector<double> dualValues, double threshold = 1e-3) {
         ArcDuals arcDuals;
         // First pass: Compute dual values and store them

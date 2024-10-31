@@ -242,8 +242,8 @@ std::vector<double> BucketGraph::labeling_algorithm() noexcept {
                     std::memset(Bvisited.data(), 0, Bvisited.size() * sizeof(uint64_t));
 
                     // Check if the label is dominated by any labels in smaller buckets
-                    domin_smaller =
-                        DominatedInCompWiseSmallerBuckets<D, S>(label, bucket, c_bar, Bvisited, ordered_sccs);
+                    // domin_smaller =
+                        // DominatedInCompWiseSmallerBuckets<D, S>(label, bucket, c_bar, Bvisited, ordered_sccs);
 
                     if (!domin_smaller) {
                         // Lambda function to process new labels after extension
@@ -698,15 +698,21 @@ BucketGraph::Extend(const std::conditional_t<M == Mutability::Mut, Label *, cons
     }
 #endif
 
-#ifdef KP_BOUND
+//#ifdef KP_BOUND
     // Apply knapsack bound check in the forward direction (if applicable)
-    if constexpr (D == Direction::Forward) {
-        auto kpBound = knapsackBound(L_prime);
-        if (kpBound > 0.0) {
-            return nullptr; // Skip if knapsack bound is exceeded
-        }
-    }
-#endif
+    // if constexpr (D == Direction::Forward) {
+    //     auto kpBound = knapsackBound(L_prime);
+    //     if (kpBound > 0.0) {
+    //         return std::vector<Label *>(); // Skip if the knapsack bound is violated
+    //     }
+    // }
+    // else {
+    //     auto kpBound = knapsackBound(L_prime);
+    //     if (kpBound > 0.0) {
+    //         return std::vector<Label *>(); // Skip if the knapsack bound is violated
+    //     }
+    // }
+// #endif
 
     // Acquire a new label from the pool and initialize it with the new state
     auto new_label = label_pool->acquire();

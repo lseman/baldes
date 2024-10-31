@@ -420,32 +420,40 @@ void HGSLocalSearch::run(Individual *indiv, double penaltyCapacityLS, double pen
 }
 
 void HGSLocalSearch::setLocalVariablesRouteU() {
-    routeU            = nodeU->route;
-    nodeX             = nodeU->next;
-    nodeXNextIndex    = nodeX->next->cour;
-    nodeUIndex        = nodeU->cour;
-    nodeUPrevIndex    = nodeU->prev->cour;
-    nodeXIndex        = nodeX->cour;
-    loadU             = params->cli[nodeUIndex].demand;
-    serviceU          = params->cli[nodeUIndex].serviceDuration;
-    loadX             = params->cli[nodeXIndex].demand;
-    serviceX          = params->cli[nodeXIndex].serviceDuration;
-    routeUTimeWarp    = routeU->twData.timeWarp > 0;
+    routeU         = nodeU->route;
+    nodeX          = nodeU->next;
+    nodeXNextIndex = nodeX->next->cour;
+    nodeUIndex     = nodeU->cour;
+    nodeUPrevIndex = nodeU->prev->cour;
+    nodeXIndex     = nodeX->cour;
+    loadU          = params->cli[nodeUIndex].demand;
+    serviceU       = params->cli[nodeUIndex].serviceDuration;
+    loadX          = params->cli[nodeXIndex].demand;
+    serviceX       = params->cli[nodeXIndex].serviceDuration;
+    if (params->problemType == ProblemType::vrptw) {
+        routeUTimeWarp = routeU->twData.timeWarp > 0;
+    } else {
+        routeUTimeWarp = false;
+    }
     routeULoadPenalty = routeU->load > params->vehicleCapacity;
 }
 
 void HGSLocalSearch::setLocalVariablesRouteV() {
-    routeV            = nodeV->route;
-    nodeY             = nodeV->next;
-    nodeYNextIndex    = nodeY->next->cour;
-    nodeVIndex        = nodeV->cour;
-    nodeVPrevIndex    = nodeV->prev->cour;
-    nodeYIndex        = nodeY->cour;
-    loadV             = params->cli[nodeVIndex].demand;
-    serviceV          = params->cli[nodeVIndex].serviceDuration;
-    loadY             = params->cli[nodeYIndex].demand;
-    serviceY          = params->cli[nodeYIndex].serviceDuration;
-    routeVTimeWarp    = routeV->twData.timeWarp > 0;
+    routeV         = nodeV->route;
+    nodeY          = nodeV->next;
+    nodeYNextIndex = nodeY->next->cour;
+    nodeVIndex     = nodeV->cour;
+    nodeVPrevIndex = nodeV->prev->cour;
+    nodeYIndex     = nodeY->cour;
+    loadV          = params->cli[nodeVIndex].demand;
+    serviceV       = params->cli[nodeVIndex].serviceDuration;
+    loadY          = params->cli[nodeYIndex].demand;
+    serviceY       = params->cli[nodeYIndex].serviceDuration;
+    if (params->problemType == ProblemType::vrptw) {
+        routeVTimeWarp = routeV->twData.timeWarp > 0;
+    } else {
+        routeVTimeWarp = false;
+    }
     routeVLoadPenalty = routeV->load > params->vehicleCapacity;
 }
 

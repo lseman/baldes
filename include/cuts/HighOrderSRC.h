@@ -457,32 +457,84 @@ public:
 
     void setDistanceMatrix(const std::vector<std::vector<double>> distances) { cost_mat4_vertex = distances; }
 
-    static constexpr int max_heuristic_sep_mem4_row_rank1 = 8;
+    static constexpr int max_heuristic_sep_mem4_row_rank1 = 12;
 
+/*
     void generateSepHeurMem4Vertex() {
+        rank1_sep_heur_mem4_vertex.clear();
         rank1_sep_heur_mem4_vertex.resize(dim);
+
+        // Check dimensions to avoid out-of-bounds access
+        if (nodes.size() < dim || cost_mat4_vertex.size() < dim) return;
 
         // Precompute half-costs for nodes to avoid repeated divisions
         std::vector<double> half_cost(dim);
         for (int i = 0; i < dim; ++i) { half_cost[i] = nodes[i].cost / 2; }
 
+        // Map to store occurrences of each node in routes
+        std::vector<std::unordered_map<int, int>> v_r_map(dim);
+
+        // Step 1: Populate v_r_map for fractional candidates based on `sol`
+        for (int r = 0; r < sol.size(); ++r) {
+            if (sol[r].frac_x > 1e-2) {
+                for (int i : sol[r].route) {
+                    if (i > 0 && i < dim - 1) { ++v_r_map[i][r]; }
+                }
+            }
+        }
+
+        // Step 2: Generate heuristic memory for each vertex
         for (int i = 0; i < dim; ++i) {
-            // Initialize and populate the `cost` vector directly for each `i`
-            std::vector<std::pair<int, double>> cost(dim);
-            cost[0] = {0, INFINITY};
+            if (cost_mat4_vertex[i].size() < dim) continue; // Skip if cost_mat4_vertex[i] is out of bounds
 
-            for (int j = 1; j < dim - 1; ++j) { cost[j] = {j, cost_mat4_vertex[i][j] - (half_cost[i] + half_cost[j])}; }
+            std::vector<std::pair<int, double>> cost;
 
-            // Use partial sort to get only the top `max_heuristic_sep_mem4_row_rank1` elements
-            std::partial_sort(cost.begin(), cost.begin() + max_heuristic_sep_mem4_row_rank1, cost.end(),
-                              [](const auto &a, const auto &b) { return a.second < b.second; });
+            // Populate `cost` vector based on fractional route distances
+            for (const auto &[route_index, count] : v_r_map[i]) {
+                if (route_index >= dim) continue; // Ensure route_index is within bounds
+                double adjusted_cost = cost_mat4_vertex[i][route_index] - (half_cost[i] + half_cost[route_index]);
+                cost.emplace_back(route_index, adjusted_cost);
+            }
 
-            // Set bits in `vst2` for the smallest costs
+            // Only sort if there are enough elements
+            int sort_size = std::min(static_cast<int>(cost.size()), max_heuristic_sep_mem4_row_rank1);
+            if (sort_size > 0) {
+                std::partial_sort(cost.begin(), cost.begin() + sort_size, cost.end(),
+                                  [](const auto &a, const auto &b) { return a.second < b.second; });
+            }
+
+            // Update vst2 based on sorted cost
             cutLong &vst2 = rank1_sep_heur_mem4_vertex[i];
-            for (int k = 0; k < max_heuristic_sep_mem4_row_rank1; ++k) { vst2.set(cost[k].first); }
+            for (int k = 0; k < sort_size; ++k) { vst2.set(cost[k].first); }
         }
     }
+*/
+    
+        void generateSepHeurMem4Vertex() {
+            rank1_sep_heur_mem4_vertex.resize(dim);
 
+            // Precompute half-costs for nodes to avoid repeated divisions
+            std::vector<double> half_cost(dim);
+            for (int i = 0; i < dim; ++i) { half_cost[i] = nodes[i].cost / 2; }
+
+            for (int i = 0; i < dim; ++i) {
+                // Initialize and populate the `cost` vector directly for each `i`
+                std::vector<std::pair<int, double>> cost(dim);
+                cost[0] = {0, INFINITY};
+
+                for (int j = 1; j < dim - 1; ++j) { cost[j] = {j, cost_mat4_vertex[i][j] - (half_cost[i] +
+       half_cost[j])}; }
+
+                // Use partial sort to get only the top `max_heuristic_sep_mem4_row_rank1` elements
+                std::partial_sort(cost.begin(), cost.begin() + max_heuristic_sep_mem4_row_rank1, cost.end(),
+                                  [](const auto &a, const auto &b) { return a.second < b.second; });
+
+                // Set bits in `vst2` for the smallest costs
+                cutLong &vst2 = rank1_sep_heur_mem4_vertex[i];
+                for (int k = 0; k < max_heuristic_sep_mem4_row_rank1; ++k) { vst2.set(cost[k].first); }
+            }
+        }
+    
     void constructVRMapAndSeedCrazy() {
         // Resize `rank1_sep_heur_mem4_vertex` and initialize `v_r_map`
         rank1_sep_heur_mem4_vertex.resize(dim);

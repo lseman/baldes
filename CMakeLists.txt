@@ -73,7 +73,6 @@ option(FIX_BUCKETS "Enable Fixed Buckets compilation option" ON)
 option(AVX "Enable AVX compilation option" OFF)
 option(IPM "Enable IPM compilation option" ON)
 option(TR "Enable TR compilation option" OFF)
-option(AUGMENTED "Enable Augmented compilation option" ON)
 option(GET_SUITESPARSE "Enable SuiteSparse compilation option" OFF)
 option(EXACT_RCC "Enable Exact RCC compilation option" OFF)
 option(EVRP "Enable EVRPTW compilation option" OFF)
@@ -89,7 +88,8 @@ option(HIGHS "Enable HIGHS" ON)
 option(NSYNC "Enable nsync" OFF)
 option(CHOLMOD "Enable cholmod" OFF)
 option(IPM_ACEL "Enable ipm acelleration" OFF)
-
+option(BALDES "Enable baldes compilation" ON)
+option(HGS "Enable HGS" OFF)
 # Define the size of resources without using cache
 set(R_SIZE
     1
@@ -328,13 +328,6 @@ if(SRC)
   list(APPEND EXECUTABLE_SOURCES ${SRC_SOURCES})
 endif()
 
-# Add the executable with the combined sources
-add_executable(baldes examples/Baldes.cpp ${EXECUTABLE_SOURCES})
-
-# Linking libraries
-target_link_libraries(baldes PRIVATE STDEXEC::stdexec)
-target_link_libraries(baldes PRIVATE fmt::fmt)
-
 if(IPM OR IPM_ACEL)
   cpmaddpackage(
     NAME
@@ -350,6 +343,14 @@ if(IPM OR IPM_ACEL)
   include_directories(${Eigen_SOURCE_DIR}/unsupported)
 
 endif()
+
+if(BALDES)
+# Add the executable with the combined sources
+add_executable(baldes examples/Baldes.cpp ${EXECUTABLE_SOURCES})
+
+# Linking libraries
+target_link_libraries(baldes PRIVATE STDEXEC::stdexec)
+target_link_libraries(baldes PRIVATE fmt::fmt)
 
 set(GUROBI_VERSION_MAJOR 110) # Adjust based on Gurobi version
 message(STATUS "Gurobi version: ${GUROBI_VERSION_MAJOR}")
@@ -383,35 +384,29 @@ if(HIGHS)
 endif()
 
 find_package(xxhash REQUIRED)
-
-if(WITH_PYTHON)
-  pybind11_add_module(pybaldes src/BucketBindings.cpp src/BucketGraph.cpp
-                      ${EXECUTABLE_SOURCES})
-
-  target_link_libraries(pybaldes PRIVATE pybind11::module)
-  target_link_libraries(pybaldes PRIVATE fmt::fmt)
-  target_link_libraries(pybaldes PRIVATE STDEXEC::stdexec)
-  target_link_libraries(pybaldes PRIVATE xxhash)
-
-  target_link_libraries(pybaldes PRIVATE unordered_dense)
-  if(NSYNC)
-    target_include_directories(pybaldes PRIVATE nsync)
-    include_directories(${nsync_SOURCE_DIR}/public)
-  endif()
-  set_target_properties(pybaldes PROPERTIES POSITION_INDEPENDENT_CODE ON)
-  target_compile_options(pybaldes PRIVATE -Wno-c++26-extensions
-                                          -Wno-deprecated-declarations)
-
-  if(HIGHS)
-    target_link_libraries(pybaldes PRIVATE highs::highs)
-  endif()
-endif()
-
 target_compile_options(baldes PRIVATE -Wno-c++26-extensions
                                       -Wno-deprecated-declarations)
 
 target_link_libraries(baldes PRIVATE xxhash)
 target_link_libraries(baldes PRIVATE unordered_dense)
+
+target_precompile_headers(
+  baldes
+  PRIVATE
+  include/Common.h
+  ${CVRPSEP_HEADERS}
+  ${FPMAX_HEADERS}
+  include/Arc.h
+  include/Dual.h
+  include/VRPNode.h
+  third_party/pdqsort.h)
+
+if(IPM)
+  target_include_directories(baldes PRIVATE ${Eigen_SOURCE_DIR})
+  target_include_directories(baldes PRIVATE ${Eigen_SOURCE_DIR}/unsupported)
+endif()
+
+endif()
 
 if(CLIQUER)
   add_executable(cliquer src/Original.cpp src/BucketGraph.cpp)
@@ -446,7 +441,6 @@ if(CLIQUER)
 endif()
 
 if(MTW)
-
   add_executable(vrpmtw mtw/VRPMTW.cpp ${EXECUTABLE_SOURCES} ${HGS_SOURCES}
                         ${FPSOURCE})
   # Link Gurobi libraries
@@ -490,6 +484,31 @@ if(CCACHE_PROGRAM)
   set_property(GLOBAL PROPERTY RULE_LAUNCH_LINK "${CCACHE_PROGRAM}")
 endif()
 
+
+if(WITH_PYTHON)
+  pybind11_add_module(pybaldes src/BucketBindings.cpp src/BucketGraph.cpp
+                      ${EXECUTABLE_SOURCES})
+
+  target_link_libraries(pybaldes PRIVATE pybind11::module)
+  target_link_libraries(pybaldes PRIVATE fmt::fmt)
+  target_link_libraries(pybaldes PRIVATE STDEXEC::stdexec)
+  target_link_libraries(pybaldes PRIVATE xxhash)
+
+  target_link_libraries(pybaldes PRIVATE unordered_dense)
+  if(NSYNC)
+    target_include_directories(pybaldes PRIVATE nsync)
+    include_directories(${nsync_SOURCE_DIR}/public)
+  endif()
+  set_target_properties(pybaldes PROPERTIES POSITION_INDEPENDENT_CODE ON)
+  target_compile_options(pybaldes PRIVATE -Wno-c++26-extensions
+                                          -Wno-deprecated-declarations)
+
+  if(HIGHS)
+    target_link_libraries(pybaldes PRIVATE highs::highs)
+  endif()
+endif()
+
+
 # link nsync
 if(nsync_ADDED)
   target_link_libraries(baldes PRIVATE nsync)
@@ -504,25 +523,16 @@ if(CHOLMOD)
   target_link_libraries(baldes PRIVATE cholmod)
 endif()
 
-# include /opt/cuda/targets/x86_64-linux/include/cuda_runtime.h
-target_include_directories(baldes
-                           PRIVATE /opt/cuda/targets/x86_64-linux/include)
-
 file(GLOB_RECURSE CVRPSEP_HEADERS "${CMAKE_SOURCE_DIR}/third_party/cvrpsep/*.h")
 file(GLOB_RECURSE FPMAX_HEADERS "${CMAKE_SOURCE_DIR}/third_party/fpmax/*.h")
 
-target_precompile_headers(
-  baldes
-  PRIVATE
-  include/Common.h
-  ${CVRPSEP_HEADERS}
-  ${FPMAX_HEADERS}
-  include/Arc.h
-  include/Dual.h
-  include/VRPNode.h
-  third_party/pdqsort.h)
-
-if(IPM)
-  target_include_directories(baldes PRIVATE ${Eigen_SOURCE_DIR})
-  target_include_directories(baldes PRIVATE ${Eigen_SOURCE_DIR}/unsupported)
-endif()
+if(HGS)
+  add_executable(hgs src/HGS.cpp ${HGS_SOURCES} ${FPSOURCE})
+  target_link_libraries(hgs PRIVATE STDEXEC::stdexec)
+  target_link_libraries(hgs PRIVATE fmt::fmt)
+  target_link_libraries(hgs PRIVATE xxhash)
+  target_link_libraries(hgs PRIVATE unordered_dense)
+  target_link_libraries(hgs PRIVATE xxhash)
+  target_compile_options(hgs PRIVATE -Wno-c++26-extensions
+                                     -Wno-deprecated-declarations)
+                                     endif()

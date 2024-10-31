@@ -518,7 +518,6 @@ void BucketGraph::set_adjacency_list() {
 }
 */
 
-
 void BucketGraph::set_adjacency_list_manual() {
     // Clear existing arcs for each node
     for (auto &node : nodes) {
@@ -923,16 +922,17 @@ void BucketGraph::mono_initialization() {
  * @return The computed knapsack bound as a double.
  */
 double BucketGraph::knapsackBound(const Label *l) {
+    // Initialize Knapsack instance and set capacity based on remaining load
     Knapsack kp;
-    int      rload = R_max[DEMAND_INDEX] - l->resources[DEMAND_INDEX];
+    int      rload = R_max[0] - l->resources[0];
     kp.setCapacity(rload);
 
+    // Add eligible items based on node conditions
     for (int i = 1; i < nodes.size(); ++i) {
-        if (!l->visits(i) && nodes[i].consumption[DEMAND_INDEX] <= rload) {
-            kp.addItem(nodes[i].cost, nodes[i].consumption[DEMAND_INDEX]);
-        }
+        if (!l->visits(i) && nodes[i].consumption[0] <= rload) { kp.addItem(nodes[i].cost, nodes[i].consumption[0]); }
     }
 
+    // Solve the knapsack problem and compute the bound
     return l->cost - kp.solve();
 }
 
