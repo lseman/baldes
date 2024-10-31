@@ -17,18 +17,17 @@ void VRProblem::branch(BNBNode *node) {
     auto candidates       = Branching::VRPStandardBranching(node, &instance, this);
     auto candidateCounter = 0;
 
-    print_info("Candidates generated: {}\n", candidates.size());
     for (auto candidate : candidates) {
-
-        candidate->print();
 
         if (node->hasCandidate(candidate)) continue;
         if (node->hasRaisedChild(candidate)) continue;
 
         auto candidatosNode = node->getCandidatos();
-        auto childNode      = node->newChild();
+        // print len candidatosNode
+        auto childNode = node->newChild();
         childNode->addCandidate(candidate);
         node->addRaisedChildren(candidate);
+        node->addChildren(childNode);
 
         candidateCounter++;
         if (candidateCounter >= NUMERO_CANDIDATOS) break;

@@ -7,11 +7,18 @@ ArcDuals RCCManager::computeDuals(BNBNode *model, double threshold) {
     model->optimize();
     // First pass: Compute dual values and store them
     for (int i = 0; i < cuts_.size(); ++i) {
-        const auto &cut = cuts_[i];
+        auto &cut = cuts_[i];
         // TODO: adjust to new stuff
         double dualValue = model->getDualVal(cut.ctr->index());
 
-        if (std::abs(dualValue) < 1e-3) { continue; }
+        if (std::abs(dualValue) < 1e-3) { 
+            fmt::print("Cut {} has dual value near zero: {}\n", i, dualValue);
+            // remove cut
+            model->remove(cut.ctr);
+            removeCut(cut);
+            dualValue = 0;
+        }
+
 
         // Sum the dual values for all arcs in this cut
         for (const auto &arc : cut.arcs) {

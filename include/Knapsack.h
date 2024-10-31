@@ -74,7 +74,7 @@ public:
         std::vector<double> dp(capacity + 1, 0.0);
 
         // For large capacity problems, use parallelization
-        const int numThreads = std::thread::hardware_concurrency();
+        const int numThreads = 1;
         if (numThreads > 1) {
             // Parallelizing the DP update loop
             std::vector<std::thread> threads;

@@ -197,8 +197,10 @@ public:
 
             Path path(label->nodes_covered, label->real_cost);
 
+            // check if path is already in pathSet
+            //if (pathSet.find(path) != pathSet.end()) continue;
             // Insert the path into the set to avoid duplicates
-            pathSet.insert(path);
+            //pathSet.insert(path);
 
             counter += 1;
             if (counter > 9) break;
@@ -392,6 +394,7 @@ public:
      */
     bool RCCsep(BNBNode *model, const std::vector<double> &solution) {
         auto &rccManager = model->rccManager;
+        //if (rccManager->cut_ctr >= 50) return false;
         // Constraint manager to store cuts
         CnstrMgrPointer cutsCMP = nullptr;
         CMGR_CreateCMgr(&cutsCMP, 100);
@@ -436,7 +439,7 @@ public:
         char   intAndFeasible;
         double maxViolation;
         int    maxCuts = 5;
-        if (problemType == ProblemType::cvrp) { maxCuts = 50; }
+        if (problemType == ProblemType::cvrp) { maxCuts = 10; }
 
         CAPSEP_SeparateCapCuts(nVertices - 1, demands.data(), instance.q, edgex.size() - 1, edgex.data(), edgey.data(),
                                edgeval.data(), oldCutsCMP, maxCuts, 1e-4, &intAndFeasible, &maxViolation, cutsCMP);
@@ -496,7 +499,6 @@ public:
      */
     bool CG(BNBNode *node, int max_iter = 2000) {
 
-        node->mip.printBranchingConstraint();
         print_info("Column generation preparation...\n");
 
         node->relaxNode();
@@ -645,10 +647,10 @@ public:
                     bool cleared  = srcResult.second;
                     if (!violated) {
                         if (bucket_graph->A_MAX == N_SIZE) {
-                            if (std::abs(inner_obj) < 1e-6) {
+                            // if (std::abs(inner_obj) < 1e-6) {
                                 print_info("No violated cuts found, calling it a day\n");
                                 break;
-                            }
+                            // }
                         } else {
                             auto new_relaxation = std::min(bucket_graph->A_MAX + 10, N_SIZE);
                             print_info("Increasing A_MAX to {}\n", new_relaxation);
@@ -683,7 +685,7 @@ public:
 #endif
 
 #ifdef IPM
-            auto d                 = 0.1;
+            auto d                 = 1;
             matrix                 = node->extractModelDataSparse();
             double obj_change      = std::abs(lp_obj - inner_obj);
             double adaptive_factor = std::min(1.0, std::max(1e-1, obj_change / std::abs(lp_obj + 1e-6)));
@@ -764,7 +766,7 @@ public:
 
                 adaptive_threshold = std::max(20, base_threshold + iter / 100); // Adapt with total iterations
 
-                if (std::abs(lp_obj - lp_obj_old) < 1.0) {
+                if (std::abs(lp_obj - lp_obj_old) < 0.1) {
                     iter_non_improv += 1;
                     if (iter_non_improv > adaptive_threshold) {
                         print_info("No improvement in the last iterations, running IPM\n");
@@ -918,6 +920,18 @@ public:
             relaxed_result = std::numeric_limits<double>::max();
             return;
         }
+
+        node->binarizeNode();
+        node->optimize();
+
+        // check if optimal
+        if (node->getStatus() != 2) {
+            ip_result = std::numeric_limits<double>::max();
+            // node->setPrune(true);
+            print_info("No optimal solution found.\n");
+        } else {
+            ip_result = node->getObjVal();
+        }
         // auto end_timer        = std::chrono::high_resolution_clock::now();
         // auto duration_ms      = std::chrono::duration_cast<std::chrono::milliseconds>(end_timer -
         // start_timer).count(); auto duration_seconds = duration_ms / 1000;
@@ -941,18 +955,6 @@ public:
         }
         fmt::print("\n");
 
-        node->binarizeNode();
-        node->optimize();
-
-        // check if optimal
-        if (node->getStatus() != 2) {
-            ip_result = std::numeric_limits<double>::max();
-            // node->setPrune(true);
-            print_info("No optimal solution found.\n");
-        } else {
-            ip_result = node->getObjVal();
-        }
-
         // ANSI escape code for blue text
         constexpr auto blue  = "\033[34m";
         constexpr auto reset = "\033[0m";
@@ -961,7 +963,7 @@ public:
         fmt::print("| {:<14} | {}{:>20}{} |\n", "Bound", blue, relaxed_result / 10, reset);
         fmt::print("| {:<14} | {}{:>20}{} |\n", "Incumbent", blue, ip_result / 10, reset);
         // fmt::print("| {:<14} | {}{:>16}.{:03}{} |\n", "CG Duration", blue, duration_seconds, duration_milliseconds,
-                //    reset);
+        //    reset);
         fmt::print("+---------------------------------------+\n");
     }
 

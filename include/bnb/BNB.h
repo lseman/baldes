@@ -36,10 +36,9 @@ struct BNBNodeCompare {
     }
 };
 
-
 class BranchAndBound {
 private:
-    VRProblem                                                               *problem;
+    VRProblem                                                             *problem;
     std::priority_queue<BNBNode *, std::vector<BNBNode *>, BNBNodeCompare> bestFirstBNBNodes;
     moodycamel::ConcurrentQueue<BNBNode *>                                 otherBNBNodes;
     BNBNode                                                               *rootBNBNode;
@@ -205,6 +204,7 @@ public:
             if (std::abs(boundValue - objectiveValue) < 1e-2) {
                 fmt::print("\n");
                 fmt::print("\033[34m_SOLUTION FOUND \033[0m: {}\n", objectiveValue / 10);
+                fmt::print("\n");
 
                 problem->printSolution(currentBNBNode);
 
@@ -224,9 +224,11 @@ public:
         print_info("Elapsed time: {:.2f}\n", elapsed.count());
     }
 
-    void branch(BNBNode *&node) {
+    void branch(BNBNode *node) {
         problem->branch(node);
         auto children = node->getChildren();
+        // print children.size
+        fmt::print("Children size: {}\n", children.size());
         for (auto &child : children) { addBNBNode(child); }
     }
 

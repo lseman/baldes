@@ -501,7 +501,7 @@ inline int CVRP_read_instance(const std::string &file_name, InstanceData &instan
             int dx                  = instance.x_coord[i] - instance.x_coord[j];
             int dy                  = instance.y_coord[i] - instance.y_coord[j];
             int aux                 = static_cast<int>(10 * std::sqrt(dx * dx + dy * dy));
-            instance.distance[i][j] = 1.0 * aux;
+            instance.distance[i][j] = aux / 10.0;
 
             if (aux > max_travel_time) { max_travel_time = aux; }
         }
@@ -514,7 +514,7 @@ inline int CVRP_read_instance(const std::string &file_name, InstanceData &instan
     for (int i = 0; i < instance.nN; ++i) {
         instance.service_time[i] = 0;
         instance.window_open[i]  = 0;
-        instance.window_close[i] = max_travel_time + 1000; // Set a buffer to cover all routes
+        instance.window_close[i] = max_travel_time + max_travel_time/2.0;
     }
 
     // define n_tw as 0

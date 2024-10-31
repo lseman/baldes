@@ -215,7 +215,7 @@ public:
     inline double norm(const std::vector<double> &vector_1, const std::vector<double> &vector_2) {
         double res = 0.0;
         for (auto i = 0; i < vector_1.size(); ++i) { res += (vector_2[i] - vector_1[i]) * (vector_2[i] - vector_1[i]); }
-        return std::sqrt(res + 1e-12);
+        return std::sqrt(res + 1e-8);
     }
 
     inline std::vector<double> mult(const std::vector<double> &v, const std::vector<double> &w) {
@@ -239,12 +239,13 @@ public:
      * of steps to compute intermediate values such as `duals_tilde`, `duals_g`, and `rho`, and uses these
      * to update the `duals_sep` and `smooth_dual_sol`.
      *
-     * @param nodeDuals The input dual solution to be stabilized.
-     * @return The stabilized dual solution.
      */
+
+    std::vector<double> duals_tilde;
+
     // TODO: we need to check the implementation of this method
     DualSolution getStabDualSolAdvanced(const DualSolution &input_duals) {
-        std::vector<double> nodeDuals;
+        DualSolution nodeDuals;
         nodeDuals.assign(input_duals.begin(), input_duals.begin() + sizeDual);
         // If there's no stabilization center, return the input duals
         if (cur_stab_center.empty()) { return nodeDuals; }
@@ -265,10 +266,11 @@ public:
         const auto &duals_in  = cur_stab_center;
         const auto &duals_out = nodeDuals;
 
-        const size_t        n = nodeDuals.size();
-        std::vector<double> duals_tilde(n, 0.0);
-        std::vector<double> duals_g(n, 0.0);
-        std::vector<double> rho(n, 0.0);
+        const size_t n = nodeDuals.size();
+
+        duals_tilde.assign(n, 0.0);
+        duals_g.assign(n, 0.0);
+        rho.assign(n, 0.0);
 
         // Precompute norms that are used multiple times
         double norm_in_out      = norm(duals_in, duals_out); // Norm of (duals_out - duals_in)

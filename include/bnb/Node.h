@@ -221,9 +221,13 @@ public:
         }
 
         child->matrix = matrix;
-        children.push_back(child);
         // Return the new child node
         return child;
+    }
+
+    void addChildren(BNBNode *child) {
+        // std::lock_guard<std::mutex> lock(mtx);
+        children.push_back(child);
     }
 
     bool hasRaisedChild(VRPCandidate *strongCandidate) {
@@ -349,7 +353,7 @@ public:
             feasible = true;
             return std::make_pair(feasible, getObjVal());
         } else {
-            return std::make_pair(feasible, 0.0);
+            return std::make_pair(feasible, std::numeric_limits<double>::max());
         }
     }
 
@@ -362,6 +366,7 @@ public:
     Constraint *addBranchingConstraint(
         double rhs, const BranchingDirection &sense, const CandidateType &ctype,
         std::optional<std::variant<int, std::pair<int, int>, std::vector<int>>> payload = std::nullopt) {
+
         // Get the decision variables from the MIP problem
         auto            &variables = mip.getVars(); // Assumes mip is a pointer to MIPProblem
         LinearExpression linExpr;                   // Initialize linear expression for MIP
@@ -370,7 +375,7 @@ public:
         if (ctype == CandidateType::Vehicle) {
             for (auto *var : variables) {
                 linExpr.add_or_update_term(var->get_name(), 1.0); // Add each variable with coefficient 1.0
-                name = "branching_vehicle";
+                name = "branching_vehicle_" + std::to_string(rhs);
             }
         } else if (ctype == CandidateType::Node) {
             for (size_t i = 0; i < variables.size(); ++i) {
@@ -381,7 +386,7 @@ public:
                         if constexpr (std::is_same_v<T, int>) {
                             linExpr.add_or_update_term(variables[i]->get_name(),
                                                        paths[i].contains(arg) ? 1.0 : 0.0); // Use int payload
-                            name = "branching_node_" + std::to_string(arg);
+                            name = "branching_node_" + std::to_string(arg) + "_" + std::to_string(rhs);
                         } else {
                             throw std::invalid_argument("Payload for Node must be an int.");
                         }
@@ -398,7 +403,8 @@ public:
                             linExpr.add_or_update_term(
                                 variables[i]->get_name(),
                                 paths[i].timesArc(arg.first, arg.second) ? 1.0 : 0.0); // Use pair payload
-                            name = "branching_edge_" + std::to_string(arg.first) + "_" + std::to_string(arg.second);
+                            name = "branching_edge_" + std::to_string(arg.first) + "_" + std::to_string(arg.second) + "_" +
+                                   std::to_string(rhs);
                         } else {
                             throw std::invalid_argument("Payload for Edge must be a std::pair<int, int>.");
                         }
@@ -406,7 +412,6 @@ public:
                     *payload);
             }
         } else if (ctype == CandidateType::Cluster) {
-            fmt::print("Adding constraint for Cluster\n");
             for (size_t i = 0; i < variables.size(); ++i) {
                 // Use the payload as std::vector<int> for Cluster
                 std::visit(
@@ -419,7 +424,7 @@ public:
                                     linExpr.add_or_update_term(variables[i]->get_name(),
                                                                1.0); // Add term with coefficient 1.0
                                 }
-                                name = "branching_cluster_" + std::to_string(cluster_ele);
+                                name = "branching_cluster_" + std::to_string(cluster_ele) + "_" + std::to_string(rhs);
                             }
                         } else {
                             throw std::invalid_argument("Payload for Cluster must be a std::vector<int>.");
@@ -444,7 +449,6 @@ public:
 
         // Update the MIP structure if necessary
         // mip->update();
-
         return constraint;
     }
     using BranchingDualsPtr = std::shared_ptr<BranchingDuals>;
@@ -453,9 +457,10 @@ public:
     void enforceBranching() {
         // Iterate over the candidates and enforce the branching constraints
         for (const auto &candidate : candidates) {
-            Constraint *ctr = addBranchingConstraint(candidate->boundValue, candidate->boundType,
+            auto ctr = addBranchingConstraint(candidate->boundValue, candidate->boundType,
                                                      candidate->candidateType, candidate->payload);
             branchingDuals->addCandidate(candidate, ctr);
         }
+        mip.printBranchingConstraint();
     }
 };
