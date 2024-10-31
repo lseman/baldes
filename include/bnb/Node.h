@@ -93,7 +93,7 @@ public:
     IPSolver *ipSolver = nullptr;
 #endif
 
-    VRProblem    *problem;
+    VRProblem   *problem;
     InstanceData instance;
 
     int numConstrs = 0;
@@ -365,10 +365,12 @@ public:
         // Get the decision variables from the MIP problem
         auto            &variables = mip.getVars(); // Assumes mip is a pointer to MIPProblem
         LinearExpression linExpr;                   // Initialize linear expression for MIP
+        std::string      name;
 
         if (ctype == CandidateType::Vehicle) {
             for (auto *var : variables) {
                 linExpr.add_or_update_term(var->get_name(), 1.0); // Add each variable with coefficient 1.0
+                name = "branching_vehicle";
             }
         } else if (ctype == CandidateType::Node) {
             for (size_t i = 0; i < variables.size(); ++i) {
@@ -379,6 +381,7 @@ public:
                         if constexpr (std::is_same_v<T, int>) {
                             linExpr.add_or_update_term(variables[i]->get_name(),
                                                        paths[i].contains(arg) ? 1.0 : 0.0); // Use int payload
+                            name = "branching_node_" + std::to_string(arg);
                         } else {
                             throw std::invalid_argument("Payload for Node must be an int.");
                         }
@@ -395,6 +398,7 @@ public:
                             linExpr.add_or_update_term(
                                 variables[i]->get_name(),
                                 paths[i].timesArc(arg.first, arg.second) ? 1.0 : 0.0); // Use pair payload
+                            name = "branching_edge_" + std::to_string(arg.first) + "_" + std::to_string(arg.second);
                         } else {
                             throw std::invalid_argument("Payload for Edge must be a std::pair<int, int>.");
                         }
@@ -402,6 +406,7 @@ public:
                     *payload);
             }
         } else if (ctype == CandidateType::Cluster) {
+            fmt::print("Adding constraint for Cluster\n");
             for (size_t i = 0; i < variables.size(); ++i) {
                 // Use the payload as std::vector<int> for Cluster
                 std::visit(
@@ -414,6 +419,7 @@ public:
                                     linExpr.add_or_update_term(variables[i]->get_name(),
                                                                1.0); // Add term with coefficient 1.0
                                 }
+                                name = "branching_cluster_" + std::to_string(cluster_ele);
                             }
                         } else {
                             throw std::invalid_argument("Payload for Cluster must be a std::vector<int>.");
@@ -427,10 +433,13 @@ public:
         Constraint *constraint;
         if (sense == BranchingDirection::Greater) {
             constraint = mip.add_constraint(linExpr, rhs, '>');
+            constraint->set_name(name);
         } else if (sense == BranchingDirection::Less) {
             constraint = mip.add_constraint(linExpr, rhs, '<');
+            constraint->set_name(name);
         } else {
             constraint = mip.add_constraint(linExpr, rhs, '=');
+            constraint->set_name(name);
         }
 
         // Update the MIP structure if necessary
@@ -438,14 +447,15 @@ public:
 
         return constraint;
     }
-    BranchingDuals branchingDuals;
+    using BranchingDualsPtr = std::shared_ptr<BranchingDuals>;
+    BranchingDualsPtr branchingDuals = std::make_shared<BranchingDuals>();
 
     void enforceBranching() {
         // Iterate over the candidates and enforce the branching constraints
         for (const auto &candidate : candidates) {
             Constraint *ctr = addBranchingConstraint(candidate->boundValue, candidate->boundType,
                                                      candidate->candidateType, candidate->payload);
-            branchingDuals.addCandidate(candidate, ctr);
+            branchingDuals->addCandidate(candidate, ctr);
         }
     }
 };

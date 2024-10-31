@@ -180,6 +180,15 @@ public:
         return constraints.back();
     }
 
+    void printBranchingConstraint() {
+        // Iterate over constraints and print the name if it contains "branching"
+        for (const auto &constraint : constraints) {
+            if (constraint->get_name().find("branching") != std::string::npos) {
+                print_branching("Constraint '{}' is part of the branching set.\n", constraint->get_name());
+            }
+        }
+    }
+
     // Delete a constraint (row) from the problem
     void delete_constraint(int constraint_index) {
         // Delete the row from the sparse matrix (assumed efficient row deletion)

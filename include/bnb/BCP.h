@@ -436,7 +436,7 @@ public:
         char   intAndFeasible;
         double maxViolation;
         int    maxCuts = 5;
-        if (problemType == ProblemType::cvrp) { maxCuts = 20; }
+        if (problemType == ProblemType::cvrp) { maxCuts = 50; }
 
         CAPSEP_SeparateCapCuts(nVertices - 1, demands.data(), instance.q, edgex.size() - 1, edgex.data(), edgey.data(),
                                edgeval.data(), oldCutsCMP, maxCuts, 1e-4, &intAndFeasible, &maxViolation, cutsCMP);
@@ -495,6 +495,8 @@ public:
      * Column generation algorithm.
      */
     bool CG(BNBNode *node, int max_iter = 2000) {
+
+        node->mip.printBranchingConstraint();
         print_info("Column generation preparation...\n");
 
         node->relaxNode();
@@ -540,7 +542,7 @@ public:
         }
 
         bucket_graph->set_distance_matrix(instance.getDistanceMatrix(), 8);
-        bucket_graph->branching_duals = &branchingDuals;
+        bucket_graph->branching_duals = branchingDuals;
         bucket_graph->A_MAX           = N_SIZE;
 
         matrix                  = node->extractModelDataSparse();
@@ -643,8 +645,10 @@ public:
                     bool cleared  = srcResult.second;
                     if (!violated) {
                         if (bucket_graph->A_MAX == N_SIZE) {
-                            print_info("No violated cuts found, calling it a day\n");
-                            break;
+                            if (std::abs(inner_obj) < 1e-6) {
+                                print_info("No violated cuts found, calling it a day\n");
+                                break;
+                            }
                         } else {
                             auto new_relaxation = std::min(bucket_graph->A_MAX + 10, N_SIZE);
                             print_info("Increasing A_MAX to {}\n", new_relaxation);
@@ -709,7 +713,7 @@ public:
 #endif
 #ifdef STAB
             stab.update_stabilization_after_master_optim(nodeDuals);
-            nodeDuals = stab.getStabDualSolAdvanced(nodeDuals);
+            nodeDuals = stab.getStabDualSol(nodeDuals);
 
             misprice = true;
             while (misprice) {
@@ -740,7 +744,7 @@ public:
                                                        auto &iter_non_improv, auto &use_ipm_duals, auto &nodeDuals) {
                     auto matrix = node->extractModelDataSparse();
 
-                    int    d               = 1;
+                    auto   d               = 0.1;
                     double obj_change      = std::abs(lp_obj - inner_obj);
                     double adaptive_factor = std::min(1.0, std::max(1e-1, obj_change / std::abs(lp_obj + 1e-6)));
 
@@ -804,7 +808,7 @@ public:
                     })
 
                 // Branching duals
-                if (branchingDuals.size() > 0) { branchingDuals.computeDuals(node); }
+                if (branchingDuals->size() > 0) { branchingDuals->computeDuals(node); }
                 bucket_graph->setDuals(nodeDuals);
 
                 r1c->setDuals(nodeDuals);
@@ -908,17 +912,20 @@ public:
     double bound(BNBNode *node) { return relaxed_result; }
 
     void evaluate(BNBNode *node) {
-        auto start_timer = std::chrono::high_resolution_clock::now();
-        auto cg          = CG(node);
+        // auto start_timer = std::chrono::high_resolution_clock::now();
+        auto cg = CG(node);
         if (!cg) {
             relaxed_result = std::numeric_limits<double>::max();
             return;
         }
-        auto end_timer        = std::chrono::high_resolution_clock::now();
-        auto duration_ms      = std::chrono::duration_cast<std::chrono::milliseconds>(end_timer - start_timer).count();
-        auto duration_seconds = duration_ms / 1000;
-        auto duration_milliseconds = duration_ms % 1000;
+        // auto end_timer        = std::chrono::high_resolution_clock::now();
+        // auto duration_ms      = std::chrono::duration_cast<std::chrono::milliseconds>(end_timer -
+        // start_timer).count(); auto duration_seconds = duration_ms / 1000;
 
+        // auto duration_milliseconds = duration_ms % 1000;
+    }
+
+    void printSolution(BNBNode *node) {
         auto &allPaths = node->paths;
 
         // get solution in which x > 0.5 and print the corresponding allPaths
@@ -953,8 +960,8 @@ public:
         fmt::print("+---------------------------------------+\n");
         fmt::print("| {:<14} | {}{:>20}{} |\n", "Bound", blue, relaxed_result / 10, reset);
         fmt::print("| {:<14} | {}{:>20}{} |\n", "Incumbent", blue, ip_result / 10, reset);
-        fmt::print("| {:<14} | {}{:>16}.{:03}{} |\n", "CG Duration", blue, duration_seconds, duration_milliseconds,
-                   reset);
+        // fmt::print("| {:<14} | {}{:>16}.{:03}{} |\n", "CG Duration", blue, duration_seconds, duration_milliseconds,
+                //    reset);
         fmt::print("+---------------------------------------+\n");
     }
 
@@ -998,7 +1005,7 @@ public:
 
         // print distance matrix size
         bucket_graph->set_distance_matrix(instance.getDistanceMatrix(), 8);
-        bucket_graph->branching_duals = &branchingDuals;
+        bucket_graph->branching_duals = branchingDuals;
         bucket_graph->A_MAX           = N_SIZE;
 
         // node->optimize();
@@ -1084,7 +1091,7 @@ public:
                 bucket_graph->augment_ng_memories(solution, allPaths, true, 5, 100, 16, N_SIZE);
 
                 // Branching duals
-                if (branchingDuals.size() > 0) { branchingDuals.computeDuals(node); }
+                if (branchingDuals->size() > 0) { branchingDuals->computeDuals(node); }
                 bucket_graph->setDuals(nodeDuals);
 
                 //////////////////////////////////////////////////////////////////////

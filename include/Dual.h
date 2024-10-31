@@ -111,25 +111,7 @@ public:
 
     double getDual(int node) const { return nodeDuals_.getDual(node); }
 
-    void computeDuals(BNBNode *model, double threshold = 1e-3) {
-        arcDuals_  = ArcDuals();
-        nodeDuals_ = NodeDuals();
-
-        // First pass: Compute dual values and store them
-        for (int i = 0; i < branchingCandidates_.size(); ++i) {
-            const auto &candidate = branchingCandidates_[i];
-            // TODO: Check if the constraint is violated
-            double dualValue = 0; // branchingConstraints_[i].get(GRB_DoubleAttr_Pi);
-            if (std::abs(dualValue) < threshold) { continue; }
-
-            if (candidate->getCandidateType() == CandidateType::Edge) {
-                RawArc arc(candidate->sourceNode, candidate->targetNode);
-                arcDuals_.setOrIncrementDual(arc, dualValue);
-            } else if (candidate->getCandidateType() == CandidateType::Node) {
-                nodeDuals_.setOrIncrementDual(candidate->targetNode, dualValue);
-            }
-        }
-    }
+    void computeDuals(BNBNode *model, double threshold = 1e-3);
 
     // define size as size of branchingCandidates_
     int size() { return branchingCandidates_.size(); }

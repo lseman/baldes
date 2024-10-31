@@ -96,7 +96,7 @@ public:
         case CandidateType::Edge: std::cout << "EdgeCandidate, "; break;
         case CandidateType::Cluster: std::cout << "ClusterCandidate, "; break;
         }
-        std::cout << "Source node: " << sourceNode << ", Bound value: " << boundValue << ", Payload: ";
+        std::cout << "Bound value: " << boundValue << ", Payload: ";
         if (payload) {
             std::visit(
                 [](auto &&arg) {

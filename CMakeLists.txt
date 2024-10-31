@@ -270,7 +270,8 @@ set(GUROBI_HOME $ENV{GUROBI_HOME})
 include_directories(${GUROBI_HOME}/include)
 
 # Source files
-set(SOURCES src/BCP.cpp src/BucketGraph.cpp src/MIPHandler.cpp include/algebra/LDLT.cu)
+set(SOURCES src/BCP.cpp src/BucketGraph.cpp src/MIPHandler.cpp
+            src/Branching.cpp)
 
 set(CVRPSEP_SOURCES
     third_party/cvrpsep/basegrph.cpp
@@ -358,12 +359,12 @@ if(GUROBI)
   if(APPLE)
     # macOS detected, use .dylib for linking
     target_link_libraries(baldes PRIVATE ${GUROBI_HOME}/lib/libgurobi_c++.a
-                                        ${GUROBI_HOME}/lib/libgurobi100.dylib)
+                                         ${GUROBI_HOME}/lib/libgurobi100.dylib)
   else()
     # Non-macOS (Linux or other platforms), use .so and .a files
     target_link_libraries(
       baldes PRIVATE ${GUROBI_HOME}/lib/libgurobi_c++.a
-                    ${GUROBI_HOME}/lib/libgurobi${GUROBI_VERSION_MAJOR}.so tbb)
+                     ${GUROBI_HOME}/lib/libgurobi${GUROBI_VERSION_MAJOR}.so tbb)
   endif()
 endif()
 
@@ -399,7 +400,7 @@ if(WITH_PYTHON)
   endif()
   set_target_properties(pybaldes PROPERTIES POSITION_INDEPENDENT_CODE ON)
   target_compile_options(pybaldes PRIVATE -Wno-c++26-extensions
-                                        -Wno-deprecated-declarations)
+                                          -Wno-deprecated-declarations)
 
   if(HIGHS)
     target_link_libraries(pybaldes PRIVATE highs::highs)
@@ -407,7 +408,7 @@ if(WITH_PYTHON)
 endif()
 
 target_compile_options(baldes PRIVATE -Wno-c++26-extensions
-                                     -Wno-deprecated-declarations)
+                                      -Wno-deprecated-declarations)
 
 target_link_libraries(baldes PRIVATE xxhash)
 target_link_libraries(baldes PRIVATE unordered_dense)
@@ -504,7 +505,8 @@ if(CHOLMOD)
 endif()
 
 # include /opt/cuda/targets/x86_64-linux/include/cuda_runtime.h
-target_include_directories(baldes PRIVATE /opt/cuda/targets/x86_64-linux/include)
+target_include_directories(baldes
+                           PRIVATE /opt/cuda/targets/x86_64-linux/include)
 
 file(GLOB_RECURSE CVRPSEP_HEADERS "${CMAKE_SOURCE_DIR}/third_party/cvrpsep/*.h")
 file(GLOB_RECURSE FPMAX_HEADERS "${CMAKE_SOURCE_DIR}/third_party/fpmax/*.h")

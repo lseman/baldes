@@ -74,7 +74,7 @@ inline std::vector<Label *> BucketGraph::solve(bool trigger) {
         // inner_obj = paths[0]->cost;
 
         // Transition from Stage 2 to Stage 3 if the objective improves or after 800 iterations
-        if (inner_obj >= -100 || iter > 800) {
+        if (inner_obj >= -100 || iter > 500) {
             s2 = false;
             s3 = true; // Move to Stage 3
         }

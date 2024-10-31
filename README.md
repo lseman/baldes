@@ -53,6 +53,7 @@ Some features are experimental and subject to ongoing improvements:
 - [x] Consider branching constraints duals
 - [x] Improve branching decisions
 - [ ] Refactor high order SRC cuts
+- [ ] Change pybind to nanobind
 
 ## 🛠️ Building
 
@@ -68,7 +69,6 @@ Some features are experimental and subject to ongoing improvements:
 
 *Optional*
 - [pybind11](https://github.com/pybind/pybind11) for optional python wrapper
-- [SuiteSparse](https://github.com/DrTimothyAldenDavis/SuiteSparse) optional for using CHOLMOD as IPM solver instead of Eigen built-in solvers
 - [Gurobi](https://www.gurobi.com/) for using Gurobi as the MIP solver
 
 ### ⚙️ Compiling

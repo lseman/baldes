@@ -18,7 +18,9 @@ void VRProblem::branch(BNBNode *node) {
     auto candidateCounter = 0;
 
     print_info("Candidates generated: {}\n", candidates.size());
-    for (auto &candidate : candidates) {
+    for (auto candidate : candidates) {
+
+        candidate->print();
 
         if (node->hasCandidate(candidate)) continue;
         if (node->hasRaisedChild(candidate)) continue;
