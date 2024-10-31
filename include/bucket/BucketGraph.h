@@ -131,6 +131,9 @@ public:
     // ankerl::unordered_dense::map<int, BucketIntervalTree> fw_interval_trees;
     // ankerl::unordered_dense::map<int, BucketIntervalTree> bw_interval_trees;
 
+    ArcList manual_arcs;
+    void    setManualArcs(const ArcList &manual_arcs) { this->manual_arcs = manual_arcs; }
+
     template <Direction D>
     inline bool is_within_bounds(const BucketRange<D> &new_range, const BucketRange<D> &fixed_range) {
         return (new_range.lower_bound >= fixed_range.lower_bound && new_range.upper_bound <= fixed_range.upper_bound);
@@ -494,12 +497,14 @@ public:
     void                 print_statistics();
     void                 generate_arcs();
     void                 set_adjacency_list();
-    double               knapsackBound(const Label *l);
-    Label               *compute_label(const Label *L, const Label *L_prime);
-    bool                 BucketSetContains(const std::set<int> &bucket_set, const int &bucket);
-    void                 setSplit(const std::vector<double> q_star) { this->q_star = q_star; }
-    int                  getStage() const { return stage; }
-    Status               getStatus() const { return status; }
+    void                 set_adjacency_list_manual();
+
+    double knapsackBound(const Label *l);
+    Label *compute_label(const Label *L, const Label *L_prime);
+    bool   BucketSetContains(const std::set<int> &bucket_set, const int &bucket);
+    void   setSplit(const std::vector<double> q_star) { this->q_star = q_star; }
+    int    getStage() const { return stage; }
+    Status getStatus() const { return status; }
 
     void forbidCycle(const std::vector<int> &cycle, bool aggressive);
     void augment_ng_memories(std::vector<double> &solution, std::vector<Path> &paths, bool aggressive, int eta1,

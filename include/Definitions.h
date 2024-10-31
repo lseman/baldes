@@ -15,9 +15,11 @@
 #include "ankerl/unordered_dense.h"
 
 struct BucketOptions {
-    int depot         = 0;
-    int end_depot     = N_SIZE - 1;
-    int max_path_size = N_SIZE / 2;
+    int  depot         = 0;
+    int  end_depot     = N_SIZE - 1;
+    int  max_path_size = N_SIZE / 2;
+    bool manual_arcs   = false;
+    int size = 102;
 
     std::vector<int>         main_resources         = {0};
     std::vector<std::string> resources              = {"time"};

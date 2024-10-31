@@ -12,7 +12,6 @@
 
 void Individual::evaluateCompleteCost() {
     myCostSol = CostSol();
-
     for (int r = 0; r < params->nbVehicles; ++r) {
         if (chromR[r].empty()) continue;
 

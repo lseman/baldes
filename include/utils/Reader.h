@@ -493,24 +493,30 @@ inline int CVRP_read_instance(const std::string &file_name, InstanceData &instan
     }
 
     // Calculate Euclidean distances between nodes
+    int max_travel_time = 0;
+
+    // Calculate maximum travel time for setting window close time
     for (int i = 0; i < instance.nN; ++i) {
         for (int j = 0; j < instance.nN; ++j) {
-            int  dx                 = instance.x_coord[i] - instance.x_coord[j];
-            int  dy                 = instance.y_coord[i] - instance.y_coord[j];
-            auto aux                = (int)(10 * std::sqrt(dx * dx + dy * dy));
+            int dx                  = instance.x_coord[i] - instance.x_coord[j];
+            int dy                  = instance.y_coord[i] - instance.y_coord[j];
+            int aux                 = static_cast<int>(10 * std::sqrt(dx * dx + dy * dy));
             instance.distance[i][j] = 1.0 * aux;
+
+            if (aux > max_travel_time) { max_travel_time = aux; }
         }
     }
 
+    // Assign the travel cost
     instance.travel_cost = instance.distance;
 
-    // define service_time of each as 0
-    for (int i = 0; i < instance.nN; i++) { instance.service_time[i] = 0; }
-    // define windows open and close of each as 0
-    for (int i = 0; i < instance.nN; i++) {
+    // Set service time and window times
+    for (int i = 0; i < instance.nN; ++i) {
+        instance.service_time[i] = 0;
         instance.window_open[i]  = 0;
-        instance.window_close[i] = 5000;
+        instance.window_close[i] = max_travel_time + 1000; // Set a buffer to cover all routes
     }
+
     // define n_tw as 0
     for (int i = 0; i < instance.nN; i++) { instance.n_tw[i] = 0; }
 

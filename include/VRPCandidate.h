@@ -94,6 +94,7 @@ public:
         case CandidateType::Vehicle: std::cout << "VehicleCandidate, "; break;
         case CandidateType::Node: std::cout << "NodeCandidate, "; break;
         case CandidateType::Edge: std::cout << "EdgeCandidate, "; break;
+        case CandidateType::Cluster: std::cout << "ClusterCandidate, "; break;
         }
         std::cout << "Source node: " << sourceNode << ", Bound value: " << boundValue << ", Payload: ";
         if (payload) {

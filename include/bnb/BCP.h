@@ -17,6 +17,7 @@
 
 #include "RCC.h"
 #include "VRPNode.h"
+#include "miphandler/LinExp.h"
 #include "miphandler/MIPHandler.h"
 
 // #include "TR.h"
@@ -322,10 +323,11 @@ public:
      * @param constraints 3D vector of Gurobi constraints.
      * @return True if any RCCs were added, false otherwise.
      */
-    bool exactRCCsep(GRBModel *model, const std::vector<double> &solution,
-                     std::vector<std::vector<std::vector<Constraint>>> &constraints) {
+    bool RCCsep(BNBNode *node, const std::vector<double> &solution) {
+        auto &allPaths   = node->paths;
+        auto &rccManager = node->rccManager;
 
-        auto Ss = separate_Rounded_Capacity_cuts(model, instance.q, instance.demand, allPaths, solution);
+        auto Ss = separate_Rounded_Capacity_cuts(node, instance.q, instance.demand, allPaths, solution);
 
         if (Ss.size() == 0) return false;
 
@@ -337,20 +339,13 @@ public:
         for (size_t c = 0; c < Ss.size(); ++c) {
             auto S = Ss[c];
 
-            GRBLinExpr          cutExpr = 0.0;
+            LinearExpression    cutExpr;
             std::vector<RawArc> arcs;
 
             // Generate all possible arc pairs from nodes in S
             for (int i : S) {
                 for (int j : S) {
-                    if (i != j) {
-
-                        GRBLinExpr contributionSum = 0.0;
-                        for (size_t ctr = 0; ctr < allPaths.size(); ++ctr) {
-                            contributionSum += allPaths[ctr].timesArc(i, j) * model->getVar(ctr);
-                        }
-                        cutExpr += contributionSum;
-                    }
+                    if (i != j) { arcs.emplace_back(i, j); }
                 }
             }
 
@@ -358,19 +353,30 @@ public:
                 ceil(std::accumulate(S.begin(), S.end(), 0, [&](int sum, int i) { return sum + instance.demand[i]; }) /
                      instance.q);
 
-            cutExpressions[c] = cutExpr;
-            rhsValues[c]      = S.size() - target_no_vehicles;
-            arcGroups[c]      = std::move(arcs);
+            rhsValues[c] = S.size() - target_no_vehicles;
+            arcGroups[c] = std::move(arcs);
         }
 
         // std::vector<Constraint> newConstraints(cutExpressions.size());
-        for (size_t i = 0; i < cutExpressions.size(); ++i) {
-            auto ctr = model->addConstr(cutExpressions[i] <= rhsValues[i]);
+        for (std::size_t i = 0; i < rhsValues.size(); ++i) {
+            LinearExpression cutExpr;
+
+            // For each arc in arcGroups[i], compute the cut expression
+            for (const auto &arc : arcGroups[i]) {
+                for (size_t ctr = 0; ctr < allPaths.size(); ++ctr) {
+                    cutExpr.addTerm(node->getVar(ctr), allPaths[ctr].timesArc(arc.from, arc.to));
+                }
+            }
+
+            // Add the constraint to the model
+            auto ctr_name = "RCC_cut_" + std::to_string(rccManager->cut_ctr);
+            auto ctr      = cutExpr <= rhsValues[i];
+            ctr           = node->addConstr(ctr, ctr_name);
             rccManager->addCut(arcGroups[i], rhsValues[i], ctr);
         }
 
         fmt::print("Added {} RCC cuts\n", cutExpressions.size());
-        model->optimize();
+        node->optimize();
 
         return true;
     }

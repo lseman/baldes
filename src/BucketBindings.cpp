@@ -31,7 +31,7 @@
 namespace py = pybind11;
 using namespace pybind11::literals; // Enables _a suffix for named arguments
 
-PYBIND11_MODULE(baldes, m) {
+PYBIND11_MODULE(pybaldes, m) {
     py::class_<VRPNode>(m, "VRPNode")
         .def(py::init<>())                                   // Default constructor
         .def(py::init<int, int, int, int, double>())         // Constructor with multiple arguments
@@ -104,6 +104,7 @@ PYBIND11_MODULE(baldes, m) {
         .def("solvePSTEP", &BucketGraph::solvePSTEP, py::return_value_policy::reference)
 #endif
         .def("setOptions", &BucketGraph::setOptions, "options"_a)
+        .def("setArcs", &BucketGraph::setManualArcs, "arcs"_a)
         .def("phaseFour", &BucketGraph::run_labeling_algorithms<Stage::Four, Full::Partial>);
 
     // Expose PSTEPDuals class
@@ -120,6 +121,10 @@ PYBIND11_MODULE(baldes, m) {
         .def_readwrite("depot", &BucketOptions::depot)                 // Expose depot field
         .def_readwrite("end_depot", &BucketOptions::end_depot)         // Expose end_depot field
         .def_readwrite("max_path_size", &BucketOptions::max_path_size) // Expose max_path_size field
+        .def_readwrite("main_resources", &BucketOptions::main_resources) // Expose main_resources field
+        .def_readwrite("resources", &BucketOptions::resources)         // Expose resources field
+        .def_readwrite("size", &BucketOptions::size)                   // Expose size field
+        .def_readwrite("resource_disposability", &BucketOptions::resource_disposability) // Expose resource_disposability field
         .def("__repr__", [](const BucketOptions &options) {
             return "<BucketOptions depot=" + std::to_string(options.depot) +
                    " end_depot=" + std::to_string(options.end_depot) +
