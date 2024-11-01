@@ -36,7 +36,7 @@ The algorithm is based on state-of-the-art RCESPP techniques, including interior
 - [🛠️ Building](#️-building)
   - [📋 Prerequisites](#-prerequisites)
   - [⚙️ Compiling](#️-compiling)
-  - [ macOS](#-macos)
+    - [ macOS users](#-macos-users)
   - [🛠️ Compilation Options](#️-compilation-options)
 - [📂 Input File Format](#-input-file-format)
   - [🚀 Running the Example Algorithm](#-running-the-example-algorithm)
@@ -78,13 +78,17 @@ The Bucket Graph-based labeling algorithm organizes labels into **buckets** base
   
   Out-of-the-box multi-phase solving that begins with heuristics and dynamically guides the algorithm towards an exact solution.
 
+- **Limited-Memory Subset Row Cuts**
+
+  Performs the separation of the SRCs in paralell, even for high order cuts.
+
 - **High-quality initial solutions**
   
-  Utilizes the state-of-the-art [HGS-VRPTW](https://github.com/ortec/euro-neurips-vrp-2022-quickstart) algorithm to generate high-quality initial bounds and routes, an extension of the [HGS-CVRP](https://github.com/vidalt/HGS-CVRP) method employed by the ORTEC team to win the VRPTW track at the DIMACS Implementation Challenge. We also enchanced the HGS-VRPTW with the concepts proposed in [MDM-HGS-CVRP](https://github.com/marcelorhmaia/MDM-HGS-CVRP/), resulting in what we call the **MDM-HGS-VRPTW**.
+  Employs the state-of-the-art [HGS-VRPTW](https://github.com/ortec/euro-neurips-vrp-2022-quickstart) algorithm to generate high-quality initial bounds and routes, an extension of the [HGS-CVRP](https://github.com/vidalt/HGS-CVRP) method employed by the ORTEC team to win the VRPTW track at the DIMACS Implementation Challenge. We also enchanced the HGS-VRPTW with the concepts proposed in [MDM-HGS-CVRP](https://github.com/marcelorhmaia/MDM-HGS-CVRP/), resulting in what we call the **MDM-HGS-VRPTW**.
 
 - **Multi-stage branching**
   
-  Perform a multi-stage branching, including the recent cluster branching.
+  Performs a multi-stage branching, including the recent cluster branching. In each node, **branching variables** are selected through a hierarchical evaluation. The evaluation involves three phases: in **Phase 0**, candidates are chosen based on pseudo-cost history, fractional proximity to integers, and, for edges, distance to the depot. **Phase 1** evaluates these by solving a restricted master LP for each child node without new columns, using the Product Rule to select candidates maximizing lower bound increases. In **Phase 2**, the best candidates undergo further relaxation with heuristic column generation, again selected by the Product Rule. This structured approach adapts to tree depth, prioritizing impactful selections early on.
 
 - **Improvement Heuristics:** Optional fast improvement heuristics are applied at the end of each labeling phase to enhance label quality.
 
@@ -101,22 +105,18 @@ Some features are experimental and subject to ongoing improvements:
 - [x] Improve branching decisions
 - [ ] Refactor high order SRC cuts
 - [ ] Change pybind to nanobind
+- [ ] Enchance the improvement heuristics.
 
 ## 🛠️ Building
 
 ### 📋 Prerequisites
 
-- C++23 compliant compiler (tested with GCC 14.* and Clang 19.*)
-- [NVIDIA/stdexec](https://github.com/NVIDIA/stdexec) for parallel tasks
-- [fmt](https://github.com/fmtlib/fmt) for console output formatting
-- [jemalloc](https://jemalloc.net/) for better memory allocation (can be disabled, but it is highly recommended)
-- [xxHash](https://github.com/Cyan4973/xxHash) for improved hash calculations
-- [ankerl::unordered_dense](https://github.com/martinus/unordered_dense) for improved hash map and set
-- [HiGHS](https://github.com/ERGO-Code/HiGHS/tree/master) for the MIP solver
-
-*Optional*
-- [pybind11](https://github.com/pybind/pybind11) for optional python wrapper
-- [Gurobi](https://www.gurobi.com/) for using Gurobi as the MIP solver
+- **C++23 compliant compiler** (tested with GCC 14.* and Clang 19.*)
+- **Parallel Tasks:** [NVIDIA/stdexec](https://github.com/NVIDIA/stdexec)
+- **Console Output:** [fmt](https://github.com/fmtlib/fmt)
+- **Memory Allocation:** [jemalloc](https://jemalloc.net/) (recommended)
+- **Hashing and Storage:** [xxHash](https://github.com/Cyan4973/xxHash) and [ankerl::unordered_dense](https://github.com/martinus/unordered_dense)
+- **Optional**: [pybind11](https://github.com/pybind/pybind11) for Python wrapper, [Gurobi](https://www.gurobi.com/) for MIP solver
 
 ### ⚙️ Compiling
 
@@ -126,9 +126,9 @@ cd build
 make -j$nprocs
 ```
 
-Make sure the `GUROBI_HOME` environment variable is set.
+Make sure the `GUROBI_HOME` environment variable is set if Gurobi is to be used.
 
-###  macOS
+####  macOS users
 
 For macOS, it is recommended to install latest llvm via homebrew.
 
