@@ -27,18 +27,65 @@
 
 The algorithm is based on state-of-the-art RCESPP techniques, including interior point stabilization, limited memory subset row cuts, clustering branching, and the so called bucket graph labelling.
 
+## 📋 Table of Contents
+- [📋 Table of Contents](#-table-of-contents)
+- [📝 Overview](#-overview)
+  - [🚀 Key Features](#-key-features)
+- [⚠️ Disclaimer](#️-disclaimer)
+- [📋 TODO](#-todo)
+- [🛠️ Building](#️-building)
+  - [📋 Prerequisites](#-prerequisites)
+  - [⚙️ Compiling](#️-compiling)
+  - [ macOS](#-macos)
+  - [🛠️ Compilation Options](#️-compilation-options)
+- [📂 Input File Format](#-input-file-format)
+  - [🚀 Running the Example Algorithm](#-running-the-example-algorithm)
+  - [🐍 Python Wrapper](#-python-wrapper)
+- [📖 Documentation](#-documentation)
+- [📜 License](#-license)
+- [🖊️ Cite](#️-cite)
+- [🙏 Acknowledgements](#-acknowledgements)
+- [📚 References](#-references)
+
+---
+
 ## 📝 Overview
 
 The Bucket Graph-based labeling algorithm organizes labels into **buckets** based on vertex and resource consumption intervals. This structure reduces the number of dominance checks, making the algorithm highly efficient, particularly in large VRP instances with extensive resource constraints.
 
+**Efficient resource-constrained routing:** Scales well for large VRP instances with complex constraints.
+
+**State-of-the-art heuristic integration:** Uses top-performing heuristics from HGS-VRPTW for initial solutions.
+
+**Flexible, customizable configuration:** Optimized for various constraints and resource types.
+
+---
 ### 🚀 Key Features
 
-- **Bucket Graph Organization:** Grouping labels by vertex and resource consumption to minimize dominance checks, using n-dimensional Splay Trees to keep the most acessed buckets easier to reach.
-- **Parallel Bi-Directional Labeling:** Supports paralell forward and backward search strategies.
-- **Dominance Rules:** Efficient dominance checks using resource-based comparisons and integration of additional criteria from Limited-Memory Subset Row Cuts (SRCs) for enhanced speed.
-- **Multi-phase solving:** Out-of-the-box multi-phase solving that begins with heuristics and dynamically guides the algorithm towards an exact solution.
-- **Good initial solutions** Utilizes the state-of-the-art [HGS-VRPTW](https://github.com/ortec/euro-neurips-vrp-2022-quickstart) algorithm to generate high-quality initial bounds and routes, an extension of the [HGS-CVRP](https://github.com/vidalt/HGS-CVRP) method employed by the ORTEC team to win the VRPTW track at the DIMACS Implementation Challenge. We also enchanced the HGS-VRPTW with the concepts proposed in [MDM-HGS-CVRP](https://github.com/marcelorhmaia/MDM-HGS-CVRP/), resulting in what we call the **MDM-HGS-VRPTW**.
-- **Multi-stage branching**: Perform a multi-stage branching, including the recent cluster branching.
+- **Bucket Graph Organization**
+  
+  Grouping labels by vertex and resource consumption to minimize dominance checks, using n-dimensional Splay Trees to keep the most acessed buckets easier to reach.
+  
+- **Parallel Bi-Directional Labeling**
+  
+  Supports paralell forward and backward search strategies.
+
+- **Dominance Rules:**
+  
+  Efficient dominance checks using resource-based comparisons and integration of additional criteria from Limited-Memory Subset Row Cuts (SRCs) for enhanced speed. AVX can be enabled for faster dominance check.
+
+- **Multi-phase solving:**
+  
+  Out-of-the-box multi-phase solving that begins with heuristics and dynamically guides the algorithm towards an exact solution.
+
+- **High-quality initial solutions**
+  
+  Utilizes the state-of-the-art [HGS-VRPTW](https://github.com/ortec/euro-neurips-vrp-2022-quickstart) algorithm to generate high-quality initial bounds and routes, an extension of the [HGS-CVRP](https://github.com/vidalt/HGS-CVRP) method employed by the ORTEC team to win the VRPTW track at the DIMACS Implementation Challenge. We also enchanced the HGS-VRPTW with the concepts proposed in [MDM-HGS-CVRP](https://github.com/marcelorhmaia/MDM-HGS-CVRP/), resulting in what we call the **MDM-HGS-VRPTW**.
+
+- **Multi-stage branching**
+  
+  Perform a multi-stage branching, including the recent cluster branching.
+
 - **Improvement Heuristics:** Optional fast improvement heuristics are applied at the end of each labeling phase to enhance label quality.
 
 ## ⚠️ Disclaimer
