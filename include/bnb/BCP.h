@@ -647,10 +647,10 @@ public:
                     bool cleared  = srcResult.second;
                     if (!violated) {
                         if (bucket_graph->A_MAX == N_SIZE) {
-                            // if (std::abs(inner_obj) < 1e-6) {
+                            if (std::abs(inner_obj) < 1e-3) {
                                 print_info("No violated cuts found, calling it a day\n");
                                 break;
-                            // }
+                            }
                         } else {
                             auto new_relaxation = std::min(bucket_graph->A_MAX + 10, N_SIZE);
                             print_info("Increasing A_MAX to {}\n", new_relaxation);

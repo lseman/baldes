@@ -12,7 +12,7 @@ ArcDuals RCCManager::computeDuals(BNBNode *model, double threshold) {
         double dualValue = model->getDualVal(cut.ctr->index());
 
         if (std::abs(dualValue) < 1e-3) { 
-            fmt::print("Cut {} has dual value near zero: {}\n", i, dualValue);
+            // fmt::print("Cut {} has dual value near zero: {}\n", i, dualValue);
             // remove cut
             model->remove(cut.ctr);
             removeCut(cut);
