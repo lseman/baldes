@@ -28,14 +28,14 @@
 
 #include <experimental/simd>
 
-constexpr int INITIAL_RANK_1_MULTI_LABEL_POOL_SIZE              = 100;
+constexpr int INITIAL_RANK_1_MULTI_LABEL_POOL_SIZE              = 50;
 using yzzLong                                                   = Bitset<N_SIZE>;
 using cutLong                                                   = yzzLong;
 constexpr double tolerance                                      = 1e-6;
 constexpr int    max_row_rank1                                  = 5;
 constexpr int    max_heuristic_initial_seed_set_size_row_rank1c = 6;
 
-constexpr int    max_num_r1c_per_round = 20;
+constexpr int    max_num_r1c_per_round = 10;
 constexpr double cut_vio_factor        = 0.1;
 
 struct R1c {
@@ -457,7 +457,7 @@ public:
 
     void setDistanceMatrix(const std::vector<std::vector<double>> distances) { cost_mat4_vertex = distances; }
 
-    static constexpr int max_heuristic_sep_mem4_row_rank1 = 12;
+    static constexpr int max_heuristic_sep_mem4_row_rank1 = 8;
 
 /*
     void generateSepHeurMem4Vertex() {
