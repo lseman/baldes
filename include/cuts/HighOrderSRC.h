@@ -35,7 +35,7 @@ constexpr double tolerance                                      = 1e-6;
 constexpr int    max_row_rank1                                  = 5;
 constexpr int    max_heuristic_initial_seed_set_size_row_rank1c = 6;
 
-constexpr int    max_num_r1c_per_round = 10;
+constexpr int    max_num_r1c_per_round = 20;
 constexpr double cut_vio_factor        = 0.1;
 
 struct R1c {
@@ -435,56 +435,55 @@ public:
 
     static constexpr int max_heuristic_sep_mem4_row_rank1 = 16;
 
-    
-        void generateSepHeurMem4Vertex() {
-            rank1_sep_heur_mem4_vertex.clear();
-            rank1_sep_heur_mem4_vertex.resize(dim);
+    void generateSepHeurMem4Vertex() {
+        rank1_sep_heur_mem4_vertex.clear();
+        rank1_sep_heur_mem4_vertex.resize(dim);
 
-            // Check dimensions to avoid out-of-bounds access
-            if (nodes.size() < dim || cost_mat4_vertex.size() < dim) return;
+        // Check dimensions to avoid out-of-bounds access
+        if (nodes.size() < dim || cost_mat4_vertex.size() < dim) return;
 
-            // Precompute half-costs for nodes to avoid repeated divisions
-            std::vector<double> half_cost(dim);
-            for (int i = 0; i < dim; ++i) { half_cost[i] = nodes[i].cost / 2; }
+        // Precompute half-costs for nodes to avoid repeated divisions
+        std::vector<double> half_cost(dim);
+        for (int i = 0; i < dim; ++i) { half_cost[i] = nodes[i].cost / 2; }
 
-            // Step 1: Populate v_r_map to track nodes appearing in fractional solutions
-            std::vector<bool> is_fractional(dim, false);
-            for (int r = 0; r < sol.size(); ++r) {
-                if (sol[r].frac_x > 1e-2 && sol[r].frac_x < 0.98) {
-                    for (int i : sol[r].route) {
-                        if (i > 0 && i < dim - 1) {
-                            is_fractional[i] = true; // Mark node `i` as appearing in a fractional route
-                        }
+        // Step 1: Populate v_r_map to track nodes appearing in fractional solutions
+        std::vector<bool> is_fractional(dim, false);
+        for (int r = 0; r < sol.size(); ++r) {
+            if (sol[r].frac_x > 1e-2 && sol[r].frac_x < 0.98) {
+                for (int i : sol[r].route) {
+                    if (i > 0 && i < dim - 1) {
+                        is_fractional[i] = true; // Mark node `i` as appearing in a fractional route
                     }
                 }
             }
-
-            // Step 2: Generate heuristic memory for each vertex `i`
-            for (int i = 0; i < dim; ++i) {
-                if (cost_mat4_vertex[i].size() < dim) continue; // Skip if out of bounds
-
-                std::vector<std::pair<int, double>> cost(dim);
-                cost[0] = {0, INFINITY};
-
-                for (int j = 1; j < dim - 1; ++j) {
-                    // Apply higher weight if either `i` or `j` appears in a fractional solution
-                    double weight        = (is_fractional[i] || is_fractional[j]) ? 0.75 : 1.0;
-                    double adjusted_cost = (cost_mat4_vertex[i][j] - (half_cost[i] + half_cost[j])) * weight;
-                    cost[j]              = {j, adjusted_cost};
-                }
-
-                // Use partial sort to get only the top `max_heuristic_sep_mem4_row_rank1` elements
-                int sort_size = std::min(static_cast<int>(cost.size()), max_heuristic_sep_mem4_row_rank1);
-                if (sort_size > 0) {
-                    std::partial_sort(cost.begin(), cost.begin() + sort_size, cost.end(),
-                                      [](const auto &a, const auto &b) { return a.second < b.second; });
-                }
-
-                // Set bits in `vst2` for the smallest costs
-                cutLong &vst2 = rank1_sep_heur_mem4_vertex[i];
-                for (int k = 0; k < sort_size; ++k) { vst2.set(cost[k].first); }
-            }
         }
+
+        // Step 2: Generate heuristic memory for each vertex `i`
+        for (int i = 0; i < dim; ++i) {
+            if (cost_mat4_vertex[i].size() < dim) continue; // Skip if out of bounds
+
+            std::vector<std::pair<int, double>> cost(dim);
+            cost[0] = {0, INFINITY};
+
+            for (int j = 1; j < dim - 1; ++j) {
+                // Apply higher weight if either `i` or `j` appears in a fractional solution
+                double weight        = (is_fractional[i] || is_fractional[j]) ? 0.75 : 1.0;
+                double adjusted_cost = (cost_mat4_vertex[i][j] - (half_cost[i] + half_cost[j])) * weight;
+                cost[j]              = {j, adjusted_cost};
+            }
+
+            // Use partial sort to get only the top `max_heuristic_sep_mem4_row_rank1` elements
+            int sort_size = std::min(static_cast<int>(cost.size()), max_heuristic_sep_mem4_row_rank1);
+            if (sort_size > 0) {
+                std::partial_sort(cost.begin(), cost.begin() + sort_size, cost.end(),
+                                  [](const auto &a, const auto &b) { return a.second < b.second; });
+            }
+
+            // Set bits in `vst2` for the smallest costs
+            cutLong &vst2 = rank1_sep_heur_mem4_vertex[i];
+            for (int k = 0; k < sort_size; ++k) { vst2.set(cost[k].first); }
+        }
+    }
     /*
 
     void generateSepHeurMem4Vertex() {
@@ -709,29 +708,32 @@ public:
         auto &plan_idx = label.plan_idx;
         auto  dir      = label.search_dir;
 
-        int                                   add_j = -1, remove_j = -1;
-        std::pair<int, int>                   swap_i_j;
         std::array<std::pair<int, double>, 4> move_vio = {{{0, vio},
                                                            {1, -std::numeric_limits<double>::max()},
                                                            {2, -std::numeric_limits<double>::max()},
                                                            {3, -std::numeric_limits<double>::max()}}};
 
-        double new_vio;
-        bool   add_checked = false, remove_checked = false, swap_checked = false;
+        bool                               add_checked = false, remove_checked = false, swap_checked = false;
+        std::optional<int>                 add_j, remove_j;
+        std::optional<std::pair<int, int>> swap_i_j;
+        double                             new_vio = -std::numeric_limits<double>::max();
 
         // Determine which moves to evaluate based on `dir`
         if (dir == 'a' || dir == 's') {
-            addSearchCrazy(plan_idx, new_cij, w_no_cij, new_vio, add_j);
+            add_j.emplace(); // Emplace a default int for add_j
+            addSearchCrazy(plan_idx, new_cij, w_no_cij, new_vio, *add_j);
             move_vio[1].second = new_vio;
             add_checked        = true;
         }
         if (dir == 'r' || dir == 's') {
-            removeSearchCrazy(plan_idx, new_cij, new_vio, remove_j);
+            remove_j.emplace(); // Emplace a default int for remove_j
+            removeSearchCrazy(plan_idx, new_cij, new_vio, *remove_j);
             move_vio[2].second = new_vio;
             remove_checked     = true;
         }
         if (dir == 'a' || dir == 'r') {
-            swapSearchCrazy(plan_idx, new_cij, w_no_cij, new_vio, swap_i_j);
+            swap_i_j.emplace(); // Emplace a default pair<int, int> for swap_i_j
+            swapSearchCrazy(plan_idx, new_cij, w_no_cij, new_vio, *swap_i_j);
             move_vio[3].second = new_vio;
             swap_checked       = true;
         }
@@ -742,41 +744,40 @@ public:
         int    best_move     = best_move_it->first;
         double best_move_vio = best_move_it->second;
 
-        cutLong tmp;
-        switch (best_move) {
-        case 0: { // No operation (default best move)
-            tmp = 0;
-            for (int j : new_cij) { tmp.set(j); }
+        // Handle no operation (early exit)
+        if (best_move == 0) {
+            cutLong tmp;
+            for (int j : new_cij) tmp.set(j);
             generated_rank1_multi_pool[static_cast<int>(new_cij.size())].emplace_back(tmp, plan_idx, best_move_vio);
             ++i;
-            break;
+            return;
         }
-        case 1: { // Add operation
-            if (add_checked) {
-                auto pos = std::remove(w_no_cij.begin(), w_no_cij.end(), add_j);
-                w_no_cij.erase(pos, w_no_cij.end()); // Remove add_j from w_no_cij
-                new_cij.push_back(add_j);            // Add add_j to new_cij
+
+        // Execute the chosen operation
+        switch (best_move) {
+        case 1: // Add operation
+            if (add_checked && add_j.has_value()) {
+                w_no_cij.erase(std::remove(w_no_cij.begin(), w_no_cij.end(), *add_j), w_no_cij.end());
+                new_cij.push_back(*add_j);
             }
             break;
-        }
-        case 2: { // Remove operation
-            if (remove_checked) {
-                auto pos = std::remove(new_cij.begin(), new_cij.end(), remove_j);
-                new_cij.erase(pos, new_cij.end()); // Remove remove_j from new_cij
+
+        case 2: // Remove operation
+            if (remove_checked && remove_j.has_value()) {
+                new_cij.erase(std::remove(new_cij.begin(), new_cij.end(), *remove_j), new_cij.end());
             }
             break;
-        }
-        case 3: { // Swap operation
-            if (swap_checked) {
-                auto pos = std::find(new_cij.begin(), new_cij.end(), swap_i_j.first);
+
+        case 3: // Swap operation
+            if (swap_checked && swap_i_j.has_value()) {
+                auto pos = std::find(new_cij.begin(), new_cij.end(), swap_i_j->first);
                 if (pos != new_cij.end()) {
-                    *pos       = swap_i_j.second;
-                    auto w_pos = std::remove(w_no_cij.begin(), w_no_cij.end(), swap_i_j.second);
-                    w_no_cij.erase(w_pos, w_no_cij.end()); // Remove swapped value from w_no_cij
+                    *pos = swap_i_j->second;
+                    w_no_cij.erase(std::remove(w_no_cij.begin(), w_no_cij.end(), swap_i_j->second), w_no_cij.end());
                 }
             }
             break;
-        }
+
         default: throw std::runtime_error("Invalid best move");
         }
 
@@ -874,11 +875,8 @@ public:
         int sum = std::accumulate(vis.begin(), vis.end(), 0);
         int mod = sum % denominator;
 
-        // Prepare key for rank1_multi_mem_plan_map
-        std::vector<int> key;
-        key.reserve(vis.size() + 1); // Reserve size to avoid reallocations
-        key.insert(key.end(), vis.begin(), vis.end());
-        key.push_back(mod);
+        std::vector<int> key(vis);
+        key.push_back(mod); // Add mod as the last element
 
         auto &other2 = rank1_multi_mem_plan_map[key];
         if (other2.empty()) {
@@ -895,34 +893,31 @@ public:
                     cnt %= denominator;
 
                     if (cnt > 0) {
-                        if (cnt <= tor && (left_c.begin() + j + 1) < left_c.end()) {
+                        if (cnt <= tor && j + 1 < left_c.size()) {
                             states.emplace_back(beg + j + 1, tor - cnt,
                                                 std::vector<int>(left_c.begin() + j + 1, left_c.end()), mem_c);
                         }
                         int rem = beg + j;
-                        if (rem != static_cast<int>(vis.size()) - 1) { mem_c.push_back(rem); }
+                        if (rem != vis.size() - 1) { mem_c.push_back(rem); }
                     }
                 }
                 other2.push_back(std::move(mem_c));
             }
         }
 
-        // Filter elements in `segment` based on `mem`
         for (int i = 1; i < dim; ++i) {
             if (mem[i]) {
                 for (auto &seg : segment) { seg.erase(i); }
             }
         }
 
-        // Track visibility across segments
         std::vector<ankerl::unordered_dense::set<int>> num_vis(dim);
         for (size_t i = 0; i < other2.size(); ++i) {
             for (int j : other2[i]) {
-                for (int k : segment[j]) { num_vis[k].insert(static_cast<int>(i)); }
+                for (int k : segment[j]) { num_vis[k].insert(i); }
             }
         }
 
-        // Update `mem` and clear segments based on visibility
         for (int i = 1; i < dim; ++i) {
             if (num_vis[i].size() == other2.size()) {
                 mem.set(i);
@@ -930,7 +925,6 @@ public:
             }
         }
 
-        // Prepare unique memory states
         std::vector<std::pair<cutLong, std::vector<int>>> mem_other;
         for (const auto &i : other2) {
             cutLong p_mem;
@@ -955,7 +949,6 @@ public:
             if (!found) { mem_other.emplace_back(std::move(p_mem), i); }
         }
 
-        // Transform `mem_other` into the output plan
         plan.resize(mem_other.size());
         std::transform(mem_other.begin(), mem_other.end(), plan.begin(),
                        [](const auto &entry) { return entry.second; });

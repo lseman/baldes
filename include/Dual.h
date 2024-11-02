@@ -1,8 +1,10 @@
 #pragma once
 
+#include "Common.h"
+
 #include "Arc.h"
 #include "Hashes.h"
-#include "ankerl/unordered_dense.h"
+
 #include "miphandler/Constraint.h"
 #include "miphandler/MIPHandler.h"
 
@@ -11,15 +13,7 @@
 #include "gurobi_c.h"
 #endif
 
-#include <cmath>
-#include <iostream>
-#include <numeric>
-#include <set>
-#include <vector>
-
 #include "VRPCandidate.h"
-
-#include "TupleSeparator.h"
 
 // Forward declare NodeDuals class
 class NodeDuals;

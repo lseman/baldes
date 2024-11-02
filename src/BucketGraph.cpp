@@ -26,8 +26,9 @@
  * return values.
  */
 
-#include "bucket/BucketGraph.h"
 #include "Definitions.h"
+
+#include "bucket/BucketGraph.h"
 #include "bucket/BucketUtils.h"
 
 #include "../third_party/pdqsort.h"

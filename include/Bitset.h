@@ -148,6 +148,8 @@ public:
     Bitset &operator=(const Bitset &) = default;
     Bitset &operator=(Bitset &&)      = default;
 
+    void reset() { bits_.fill(0); }
+
     // create delete method that clears the bitset
     ~Bitset() { bits_.fill(0); }
 };

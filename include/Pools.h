@@ -11,15 +11,10 @@
 
 #pragma once
 
-#include "Definitions.h"
+#include "Common.h"
 #include "Label.h"
 #include "Path.h"
 #include "VRPNode.h"
-
-#include <deque>
-#include <tuple>
-#include <utility>
-#include <vector>
 
 #include "ankerl/unordered_dense.h"
 

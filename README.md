@@ -37,6 +37,7 @@ The algorithm is based on state-of-the-art RCESPP techniques, including interior
   - [📋 Prerequisites](#-prerequisites)
   - [⚙️ Compiling](#️-compiling)
     - [ macOS users](#-macos-users)
+    - [MDM-HGS-VRPTW](#mdm-hgs-vrptw)
   - [🛠️ Compilation Options](#️-compilation-options)
 - [📂 Input File Format](#-input-file-format)
   - [🚀 Running the Example Algorithm](#-running-the-example-algorithm)
@@ -143,6 +144,16 @@ brew install llvm
 export CC=/opt/homebrew/opt/llvm/bin/clang
 export CXX=/opt/homebrew/opt/llvm/bin/clang++
 export PATH=/opt/homebrew/opt/llvm/bin:$PATH
+```
+
+#### MDM-HGS-VRPTW
+
+To compile only MDM-HGS-VRPTW:
+
+```bash
+cmake -S . -B build
+cd build
+make -j$nprocs -DHGS=ON -DBALDES=OFF
 ```
 
 ### 🛠️ Compilation Options

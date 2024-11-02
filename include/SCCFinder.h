@@ -14,12 +14,7 @@
 
 #pragma once
 
-#include <algorithm>
-#include <fstream>
-#include <iostream>
-#include <stack>
-#include <vector>
-
+#include "Common.h"
 /**
  * @class SCC
  * @brief A class to find Strongly Connected Components (SCCs) in a directed graph using Tarjan's algorithm.

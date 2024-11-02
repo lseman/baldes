@@ -520,7 +520,7 @@ public:
         auto &branchingDuals = node->branchingDuals;
         RCC_MODE_BLOCK(auto &rccManager = node->rccManager;)
 
-        int bucket_interval = 25;
+        int bucket_interval = 20;
         int time_horizon    = instance.T_max;
         // if (problemType == ProblemType::cvrp) { time_horizon = 50000; }
         numConstrs                = node->getIntAttr("NumConstrs");
@@ -897,9 +897,9 @@ public:
             if (iter % 10 == 0)
                 fmt::print("| It.: {:4} | Obj.: {:8.2f} | Price: {:9.2f} | SRC: {:3} | RCC: {:3} | Paths: {:3} | "
                            "Stage: {:1} | "
-                           "Lag.: {:10.4f} | α: {:4.2f} | tr: {:2.2f} | threshold: {:3} |\n",
+                           "Lag.: {:10.4f} | α: {:4.2f} | tr: {:2.2f} | gap: {:2.4f} |\n",
                            iter, lp_obj, inner_obj, n_cuts, n_rcc_cuts, colAdded, stage, lag_gap, cur_alpha, tr_val,
-                           athreshold);
+                           gap);
         }
         bucket_graph->print_statistics();
 
