@@ -64,6 +64,8 @@ public:
 
     double getObjVal() const override { return model->get(GRB_DoubleAttr_ObjVal); }
 
+    double getDualObjVal() const override { return model->get(GRB_DoubleAttr_ObjBound); }
+    
     double getVarValue(int i) const override { return model->getVar(i).get(GRB_DoubleAttr_X); }
 
     double getDualVal(int i) const override { return model->getConstr(i).get(GRB_DoubleAttr_Pi); }

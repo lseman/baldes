@@ -12,12 +12,16 @@
 #include "Label.h"
 #include "RNG.h"
 
+#include "Cut.h"
+
 #include <exec/task.hpp>
 #include <queue>
 class IteratedLocalSearch {
 public:
     InstanceData         instance;
     std::vector<VRPNode> nodes;
+    CutStorage          *cut_storage = new CutStorage();
+
     // default default initialization passing InstanceData &instance
     IteratedLocalSearch(const InstanceData &instance) : instance(instance) {}
 
@@ -367,34 +371,38 @@ public:
                     Path new_path_i = Path{new_route_i, cost_i.first};
                     Path new_path_j = Path{new_route_j, cost_j.first};
 
-                    if (is_feasible(new_path_i) && is_feasible(new_path_j)) {
-                        double new_cost     = cost_i.second + cost_j.second;
-                        double current_cost = label_i->cost + label_j->cost;
+                    // Lambda function to add an improved label to best_new
+                    auto add_improved_label = [&](const auto &path, const auto &cost, const Label *label, int op_idx) {
+                        double new_cost     = cost.second;
+                        double current_cost = label->cost;
 
-                        if (new_cost < current_cost) {
-                            // Lock to update operator performance and best_new
+                        // Check if the new cost is better
+                        if (new_cost < current_cost - 1e-3) {
+                            // fmt::print("Improvement: {} -> {}\n", current_cost, new_cost);
+
+                            // Lock to update operator performance
                             {
                                 std::lock_guard<std::mutex> lock(operator_mutex);
                                 operator_improvements[op_idx] += current_cost - new_cost;
                             }
 
-                            auto best_new_i_label           = new Label();
-                            best_new_i_label->nodes_covered = new_path_i.route;
-                            best_new_i_label->real_cost     = cost_i.first;
-                            best_new_i_label->cost          = cost_i.second;
+                            auto best_new_label           = new Label();
+                            best_new_label->nodes_covered = path.route;
+                            best_new_label->real_cost     = cost.first;
+                            best_new_label->cost          = new_cost;
 
-                            auto best_new_j_label           = new Label();
-                            best_new_j_label->nodes_covered = new_path_j.route;
-                            best_new_j_label->real_cost     = cost_j.first;
-                            best_new_j_label->cost          = cost_j.second;
-
+                            // Lock to update best_new
                             {
                                 std::lock_guard<std::mutex> lock(best_new_mutex);
-                                best_new.push_back(best_new_i_label);
-                                best_new.push_back(best_new_j_label);
+                                best_new.push_back(best_new_label);
                             }
                         }
-                    }
+                    };
+
+                    // Outside the lambda: check feasibility and improvements separately
+                    if (is_feasible(new_path_i)) { add_improved_label(new_path_i, cost_i, label_i, op_idx); }
+
+                    if (is_feasible(new_path_j)) { add_improved_label(new_path_j, cost_j, label_j, op_idx); }
                 }
             });
 
@@ -476,13 +484,50 @@ private:
         double cost     = 0;
         double red_cost = 0;
 
+        auto &cutter   = cut_storage;      // Access the cut storage manager
+        auto &SRCDuals = cutter->SRCDuals; // Access the dual values for the SRC cuts
+        SRC_MODE_BLOCK(std::vector<int> SRCmap; SRCmap.resize(cutter->size(), 0.0);)
+
         for (size_t i = 0; i < route.size() - 1; ++i) {
             auto travel_cost = instance.getcij(route[i], route[i + 1]);
+            auto node        = route[i];
             cost += travel_cost;
             // If the reduced cost should be based on travel cost minus node-specific costs, we subtract that here
             red_cost += travel_cost - nodes[route[i]].cost;
-        }
 
+            SRC_MODE_BLOCK(size_t segment      = node >> 6; // Determine the segment in the bitmap
+                           size_t bit_position = node & 63; // Determine the bit position in the segment
+
+                           const uint64_t bit_mask = 1ULL
+                                                     << bit_position; // Precompute bit shift for the node's position
+                           for (std::size_t idx = 0; idx < cutter->size(); ++idx) {
+                               auto it = cutter->begin();
+                               std::advance(it, idx);
+                               const auto &cut          = *it;
+                               const auto &baseSet      = cut.baseSet;
+                               const auto &baseSetorder = cut.baseSetOrder;
+                               const auto &neighbors    = cut.neighbors;
+                               const auto &multipliers  = cut.p;
+
+                               // Apply SRC logic: Update the SRC map based on neighbors and base set
+                               bool bitIsSet  = neighbors[segment] & bit_mask;
+                               bool bitIsSet2 = baseSet[segment] & bit_mask;
+
+                               auto &src_map_value = SRCmap[idx]; // Use reference to avoid multiple accesses
+                               if (!bitIsSet) {
+                                   src_map_value = 0.0; // Reset the SRC map value
+                               }
+
+                               if (bitIsSet2) {
+                                   auto &den = multipliers.den;
+                                   src_map_value += multipliers.num[baseSetorder[node]];
+                                   if (src_map_value >= den) {
+                                       red_cost -= SRCDuals[idx]; // Apply the SRC dual value if threshold is exceeded
+                                       src_map_value -= den;      // Reset the SRC map value
+                                   }
+                               }
+                           })
+        }
         return {cost, red_cost};
     }
     // Task queue and synchronization primitives

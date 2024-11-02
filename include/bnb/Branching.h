@@ -177,16 +177,21 @@ public:
     }
 
     // Apply branching constraints based on the fractional value of the candidate
-    static std::pair<BNBNode *, BNBNode *>
-    applyBranchingConstraints(BNBNode *parentNode, const BranchingQueueItem &item, double fractionalValue) {
+    static std::pair<BNBNode *, BNBNode *> applyBranchingConstraints(BNBNode                  *parentNode,
+                                                                     const BranchingQueueItem &item,
+                                                                     double fractionalValue, CandidateType type) {
         BNBNode *childNode1 = parentNode->newChild();
         BNBNode *childNode2 = parentNode->newChild();
 
         double lowerBound = std::floor(fractionalValue);
         double upperBound = std::ceil(fractionalValue);
+        if (type == CandidateType::Node) {
+            lowerBound = 0;
+            upperBound = 1;
+        }
 
-        addConstraintForCandidate(childNode1, item, upperBound, BranchingDirection::Greater);
-        addConstraintForCandidate(childNode2, item, lowerBound, BranchingDirection::Less);
+        addConstraintForCandidate(childNode1, item, lowerBound, BranchingDirection::Less);
+        addConstraintForCandidate(childNode2, item, upperBound, BranchingDirection::Greater);
 
         return {childNode1, childNode2};
     }
@@ -223,7 +228,7 @@ public:
 
                     // Add branching constraints and create two child nodes
                     auto [childNode1, childNode2] =
-                        applyBranchingConstraints(node, candidate, candidate.fractionalValue);
+                        applyBranchingConstraints(node, candidate, candidate.fractionalValue, candidate.candidateType);
 
                     // Solve the Restricted Master LP for each child node
                     double deltaLB1, deltaLB2;
@@ -459,8 +464,7 @@ public:
         auto generatedCandidates = generateVRPCandidates(node, phase1Candidates);
         candidates.insert(candidates.end(), generatedCandidates.begin(), generatedCandidates.end());
 
-        //for (auto &c : candidates) { c->print(); }
-        // TODO: add cluster branching based on MST or other clustering methods
+        // for (auto &c : candidates) { c->print(); }
         return candidates;
     }
 };

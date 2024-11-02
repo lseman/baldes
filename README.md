@@ -70,13 +70,20 @@ The Bucket Graph-based labeling algorithm organizes labels into **buckets** base
   
   Supports paralell forward and backward search strategies.
 
-- **Dominance Rules:**
+- **Dominance Rules**
   
   Efficient dominance checks using resource-based comparisons and integration of additional criteria from Limited-Memory Subset Row Cuts (SRCs) for enhanced speed. AVX can be enabled for faster dominance check.
 
-- **Multi-phase solving:**
+- **Multi-phase solving**
   
   Out-of-the-box multi-phase solving that begins with heuristics and dynamically guides the algorithm towards an exact solution.
+
+
+  - Stage 1: Retain min cost per bucket, filter search space.
+  - Stage 2: Relax dominance, expand label retention.
+  - Stage 3: Estimate bounds, discard suboptimal paths.
+  - Stage 4: Apply exact dominance for optimal path.
+
 
 - **Limited-Memory Subset Row Cuts**
 
@@ -101,8 +108,7 @@ Some features are experimental and subject to ongoing improvements:
 
 ## 📋 TODO
 
-- [x] Consider branching constraints duals
-- [x] Improve branching decisions
+- [ ] Fix branching duals
 - [ ] Refactor high order SRC cuts
 - [ ] Change pybind to nanobind
 - [ ] Enchance the improvement heuristics.
@@ -138,7 +144,6 @@ export CC=/opt/homebrew/opt/llvm/bin/clang
 export CXX=/opt/homebrew/opt/llvm/bin/clang++
 export PATH=/opt/homebrew/opt/llvm/bin:$PATH
 ```
-
 
 ### 🛠️ Compilation Options
 

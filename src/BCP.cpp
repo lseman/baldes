@@ -67,7 +67,7 @@ Branching::evaluateWithCG(BNBNode *node, const std::vector<BranchingQueueItem> &
                 const auto &candidate = phase1Candidates[idx];
 
                 // Add branching constraints and create two child nodes
-                auto [childNode1, childNode2] = applyBranchingConstraints(node, candidate, candidate.fractionalValue);
+                auto [childNode1, childNode2] = applyBranchingConstraints(node, candidate, candidate.fractionalValue, candidate.candidateType);
 
                 // Solve CG and bound for each child node using the cloned problem
                 double deltaLB1, deltaLB2;

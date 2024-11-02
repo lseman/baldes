@@ -198,9 +198,9 @@ public:
             Path path(label->nodes_covered, label->real_cost);
 
             // check if path is already in pathSet
-            //if (pathSet.find(path) != pathSet.end()) continue;
+            // if (pathSet.find(path) != pathSet.end()) continue;
             // Insert the path into the set to avoid duplicates
-            //pathSet.insert(path);
+            // pathSet.insert(path);
 
             counter += 1;
             if (counter > 9) break;
@@ -394,8 +394,8 @@ public:
      */
     bool RCCsep(BNBNode *model, const std::vector<double> &solution) {
         auto &rccManager = model->rccManager;
-        //if (rccManager->cut_ctr >= 50) return false;
-        // Constraint manager to store cuts
+        // if (rccManager->cut_ctr >= 50) return false;
+        //  Constraint manager to store cuts
         CnstrMgrPointer cutsCMP = nullptr;
         CMGR_CreateCMgr(&cutsCMP, 100);
 
@@ -584,6 +584,8 @@ public:
 #ifdef RIH
         IteratedLocalSearch ils(instance);
         bucket_graph->ils = &ils;
+        SRC_MODE_BLOCK(ils.cut_storage = cuts;)
+
 #endif
 
         bool changed = false;
@@ -715,7 +717,7 @@ public:
 #endif
 #ifdef STAB
             stab.update_stabilization_after_master_optim(nodeDuals);
-            nodeDuals = stab.getStabDualSol(nodeDuals);
+            nodeDuals = stab.getStabDualSolAdvanced(nodeDuals);
 
             misprice = true;
             while (misprice) {
@@ -975,7 +977,7 @@ public:
     /**
      * Column generation algorithm.
      */
-    bool heuristicCG(BNBNode *node, int max_iter = 2000) {
+    bool heuristicCG(BNBNode *node, int max_iter = 100) {
         node->relaxNode();
         node->optimize();
         relaxed_result = std::numeric_limits<double>::max();

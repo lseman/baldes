@@ -284,15 +284,15 @@ set(CVRPSEP_SOURCES
     third_party/cvrpsep/cutbase.cpp
     third_party/cvrpsep/fcapfix.cpp
     third_party/cvrpsep/mxf.cpp
-    third_party/cvrpsep/twomatch.cpp
-    third_party/cvrpsep/glmsep.cpp
-    third_party/cvrpsep/binpack.cpp
+    #third_party/cvrpsep/twomatch.cpp
+    #third_party/cvrpsep/glmsep.cpp
+    #third_party/cvrpsep/binpack.cpp
     third_party/cvrpsep/combsep.cpp
     third_party/cvrpsep/fcits.cpp
     third_party/cvrpsep/grsearch.cpp
-    third_party/cvrpsep/hpmstar.cpp
-    third_party/cvrpsep/strcomb.cpp
-    third_party/cvrpsep/blocks.cpp
+    #third_party/cvrpsep/hpmstar.cpp
+    #third_party/cvrpsep/strcomb.cpp
+    #third_party/cvrpsep/blocks.cpp
     third_party/cvrpsep/sort.cpp)
 
 set(HGS_SOURCES
@@ -306,7 +306,7 @@ set(FPSOURCE
     third_party/fpmax/fp_tree.cpp third_party/fpmax/fp_node.cpp)
 
 set(IPM_SOURCES src/IPSolver.cpp)
-set(SRC_SOURCES src/SRC.cpp src/HighOrderSRC.cpp)
+set(SRC_SOURCES src/SRC.cpp src/HighOrderSRC.cpp src/TupleSeparator.cpp)
 
 # Define a list for the source files that will be included
 set(EXECUTABLE_SOURCES ${SOURCES} ${HGS_SOURCES} ${FPSOURCE})
@@ -523,8 +523,8 @@ if(CHOLMOD)
   target_link_libraries(baldes PRIVATE cholmod)
 endif()
 
-file(GLOB_RECURSE CVRPSEP_HEADERS "${CMAKE_SOURCE_DIR}/third_party/cvrpsep/*.h")
-file(GLOB_RECURSE FPMAX_HEADERS "${CMAKE_SOURCE_DIR}/third_party/fpmax/*.h")
+#file(GLOB_RECURSE CVRPSEP_HEADERS "${CMAKE_SOURCE_DIR}/third_party/cvrpsep/*.h")
+#file(GLOB_RECURSE FPMAX_HEADERS "${CMAKE_SOURCE_DIR}/third_party/fpmax/*.h")
 
 if(HGS)
   add_executable(hgs src/HGS.cpp ${HGS_SOURCES} ${FPSOURCE})

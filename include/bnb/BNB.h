@@ -42,6 +42,7 @@ private:
     std::priority_queue<BNBNode *, std::vector<BNBNode *>, BNBNodeCompare> bestFirstBNBNodes;
     moodycamel::ConcurrentQueue<BNBNode *>                                 otherBNBNodes;
     BNBNode                                                               *rootBNBNode;
+    std::deque<BNBNode *>                                                  dfsBNBNodes;
 
     BNBNodeSelectionStrategy strategy;
     std::mutex               bestFirstMutex; // Mutex for bestFirstBNBNodes
@@ -53,6 +54,9 @@ private:
         if (strategy == BNBNodeSelectionStrategy::BestFirst) {
             std::lock_guard<std::mutex> lock(bestFirstMutex); // Protect bestFirst queue
             bestFirstBNBNodes.push(node);
+        } else if (strategy == BNBNodeSelectionStrategy::DFS) {
+            std::lock_guard<std::mutex> lock(bestFirstMutex);
+            dfsBNBNodes.push_front(node); // Push to front for LIFO order
         } else {
             otherBNBNodes.enqueue(node);
         }
@@ -68,9 +72,16 @@ private:
                 bestFirstBNBNodes.pop();
                 return node;
             }
+        } else if (strategy == BNBNodeSelectionStrategy::DFS) {
+            std::lock_guard<std::mutex> lock(bestFirstMutex);
+            if (!dfsBNBNodes.empty()) {
+                node = dfsBNBNodes.front(); // Pop from the front
+                dfsBNBNodes.pop_front();
+                return node;
+            }
+        } else {
+            otherBNBNodes.try_dequeue(node);
         }
-
-        if (otherBNBNodes.try_dequeue(node)) { return node; }
 
         return nullptr; // No node available
     }
@@ -185,7 +196,7 @@ public:
         while (BNBNode *currentBNBNode = getNextBNBNode()) {
             currentBNBNode->start();
             currentBNBNode->enforceBranching();
-            print_info("Current node id: {}\n", currentBNBNode->getUUID());
+            print_info("Current node depth: {}\n", currentBNBNode->getDepth());
 
             problem->evaluate(currentBNBNode);
             double boundValue = problem->bound(currentBNBNode);
@@ -196,7 +207,10 @@ public:
                 continue;
             }
 
-            if (boundValue < globalBestObjective.load()) continue;
+            if (boundValue < globalBestObjective.load()) {
+                print_branching("Pruned node: {}\n", currentBNBNode->getUUID());
+                continue;
+            }
 
             auto objectiveValue = problem->objective(currentBNBNode);
             print_info("Objective value: {}\n", objectiveValue / 10);
@@ -218,6 +232,7 @@ public:
             }
 
             branch(currentBNBNode);
+            // print currentBNBNode->getDepth
         }
         auto                          end     = std::chrono::high_resolution_clock::now();
         std::chrono::duration<double> elapsed = end - start;
@@ -228,8 +243,9 @@ public:
         problem->branch(node);
         auto children = node->getChildren();
         // print children.size
-        fmt::print("Children size: {}\n", children.size());
-        for (auto &child : children) { addBNBNode(child); }
+        for (auto &child : children) {
+            addBNBNode(child);
+        }
     }
 
     [[nodiscard]] auto getBestObjective() const { return globalBestObjective.load(std::memory_order_acquire); }

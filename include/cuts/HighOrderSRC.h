@@ -145,30 +145,6 @@ public:
     std::vector<std::pair<int, double>>                                                           move_vio;
     std::vector<yzzLong> rank1_sep_heur_mem4_vertex;
 
-    void generateR1C1() {
-        std::vector<std::pair<double, R1c>> tmp_cuts;
-
-        std::unordered_map<int, int> vis_map;
-        for (const auto &r : sol) {
-            vis_map.clear();
-            for (const auto i : r.route) { ++vis_map[i]; }
-            for (auto &[v, times] : vis_map) {
-                if (times > 1) {
-                    tmp_cuts.emplace_back();
-                    tmp_cuts.back().first           = floor(times / 2. + tolerance) * r.frac_x;
-                    tmp_cuts.back().second.info_r1c = make_pair(std::vector{v}, 0);
-                }
-            }
-        }
-        if (tmp_cuts.empty()) return;
-
-        pdqsort(tmp_cuts.begin(), tmp_cuts.end(),
-                [](const std::pair<double, R1c> &a, const std::pair<double, R1c> &b) { return a.first > b.first; });
-        std::vector<R1c> pure_cuts(tmp_cuts.size());
-        transform(tmp_cuts.begin(), tmp_cuts.end(), pure_cuts.begin(),
-                  [](const std::pair<double, R1c> &a) { return a.second; });
-        chooseCuts(pure_cuts, cuts, max_num_r1c_per_round);
-    }
     void initialSupportvector() {
         cut_record.clear();
         v_r_map.clear();
@@ -457,84 +433,84 @@ public:
 
     void setDistanceMatrix(const std::vector<std::vector<double>> distances) { cost_mat4_vertex = distances; }
 
-    static constexpr int max_heuristic_sep_mem4_row_rank1 = 8;
+    static constexpr int max_heuristic_sep_mem4_row_rank1 = 16;
 
-/*
-    void generateSepHeurMem4Vertex() {
-        rank1_sep_heur_mem4_vertex.clear();
-        rank1_sep_heur_mem4_vertex.resize(dim);
-
-        // Check dimensions to avoid out-of-bounds access
-        if (nodes.size() < dim || cost_mat4_vertex.size() < dim) return;
-
-        // Precompute half-costs for nodes to avoid repeated divisions
-        std::vector<double> half_cost(dim);
-        for (int i = 0; i < dim; ++i) { half_cost[i] = nodes[i].cost / 2; }
-
-        // Map to store occurrences of each node in routes
-        std::vector<std::unordered_map<int, int>> v_r_map(dim);
-
-        // Step 1: Populate v_r_map for fractional candidates based on `sol`
-        for (int r = 0; r < sol.size(); ++r) {
-            if (sol[r].frac_x > 1e-2) {
-                for (int i : sol[r].route) {
-                    if (i > 0 && i < dim - 1) { ++v_r_map[i][r]; }
-                }
-            }
-        }
-
-        // Step 2: Generate heuristic memory for each vertex
-        for (int i = 0; i < dim; ++i) {
-            if (cost_mat4_vertex[i].size() < dim) continue; // Skip if cost_mat4_vertex[i] is out of bounds
-
-            std::vector<std::pair<int, double>> cost;
-
-            // Populate `cost` vector based on fractional route distances
-            for (const auto &[route_index, count] : v_r_map[i]) {
-                if (route_index >= dim) continue; // Ensure route_index is within bounds
-                double adjusted_cost = cost_mat4_vertex[i][route_index] - (half_cost[i] + half_cost[route_index]);
-                cost.emplace_back(route_index, adjusted_cost);
-            }
-
-            // Only sort if there are enough elements
-            int sort_size = std::min(static_cast<int>(cost.size()), max_heuristic_sep_mem4_row_rank1);
-            if (sort_size > 0) {
-                std::partial_sort(cost.begin(), cost.begin() + sort_size, cost.end(),
-                                  [](const auto &a, const auto &b) { return a.second < b.second; });
-            }
-
-            // Update vst2 based on sorted cost
-            cutLong &vst2 = rank1_sep_heur_mem4_vertex[i];
-            for (int k = 0; k < sort_size; ++k) { vst2.set(cost[k].first); }
-        }
-    }
-*/
     
         void generateSepHeurMem4Vertex() {
+            rank1_sep_heur_mem4_vertex.clear();
             rank1_sep_heur_mem4_vertex.resize(dim);
+
+            // Check dimensions to avoid out-of-bounds access
+            if (nodes.size() < dim || cost_mat4_vertex.size() < dim) return;
 
             // Precompute half-costs for nodes to avoid repeated divisions
             std::vector<double> half_cost(dim);
             for (int i = 0; i < dim; ++i) { half_cost[i] = nodes[i].cost / 2; }
 
+            // Step 1: Populate v_r_map to track nodes appearing in fractional solutions
+            std::vector<bool> is_fractional(dim, false);
+            for (int r = 0; r < sol.size(); ++r) {
+                if (sol[r].frac_x > 1e-2 && sol[r].frac_x < 0.98) {
+                    for (int i : sol[r].route) {
+                        if (i > 0 && i < dim - 1) {
+                            is_fractional[i] = true; // Mark node `i` as appearing in a fractional route
+                        }
+                    }
+                }
+            }
+
+            // Step 2: Generate heuristic memory for each vertex `i`
             for (int i = 0; i < dim; ++i) {
-                // Initialize and populate the `cost` vector directly for each `i`
+                if (cost_mat4_vertex[i].size() < dim) continue; // Skip if out of bounds
+
                 std::vector<std::pair<int, double>> cost(dim);
                 cost[0] = {0, INFINITY};
 
-                for (int j = 1; j < dim - 1; ++j) { cost[j] = {j, cost_mat4_vertex[i][j] - (half_cost[i] +
-       half_cost[j])}; }
+                for (int j = 1; j < dim - 1; ++j) {
+                    // Apply higher weight if either `i` or `j` appears in a fractional solution
+                    double weight        = (is_fractional[i] || is_fractional[j]) ? 0.75 : 1.0;
+                    double adjusted_cost = (cost_mat4_vertex[i][j] - (half_cost[i] + half_cost[j])) * weight;
+                    cost[j]              = {j, adjusted_cost};
+                }
 
                 // Use partial sort to get only the top `max_heuristic_sep_mem4_row_rank1` elements
-                std::partial_sort(cost.begin(), cost.begin() + max_heuristic_sep_mem4_row_rank1, cost.end(),
-                                  [](const auto &a, const auto &b) { return a.second < b.second; });
+                int sort_size = std::min(static_cast<int>(cost.size()), max_heuristic_sep_mem4_row_rank1);
+                if (sort_size > 0) {
+                    std::partial_sort(cost.begin(), cost.begin() + sort_size, cost.end(),
+                                      [](const auto &a, const auto &b) { return a.second < b.second; });
+                }
 
                 // Set bits in `vst2` for the smallest costs
                 cutLong &vst2 = rank1_sep_heur_mem4_vertex[i];
-                for (int k = 0; k < max_heuristic_sep_mem4_row_rank1; ++k) { vst2.set(cost[k].first); }
+                for (int k = 0; k < sort_size; ++k) { vst2.set(cost[k].first); }
             }
         }
-    
+    /*
+
+    void generateSepHeurMem4Vertex() {
+        rank1_sep_heur_mem4_vertex.resize(dim);
+
+        // Precompute half-costs for nodes to avoid repeated divisions
+        std::vector<double> half_cost(dim);
+        for (int i = 0; i < dim; ++i) { half_cost[i] = nodes[i].cost / 2; }
+
+        for (int i = 0; i < dim; ++i) {
+            // Initialize and populate the `cost` vector directly for each `i`
+            std::vector<std::pair<int, double>> cost(dim);
+            cost[0] = {0, INFINITY};
+
+            for (int j = 1; j < dim - 1; ++j) { cost[j] = {j, cost_mat4_vertex[i][j] - (half_cost[i] + half_cost[j])}; }
+
+            // Use partial sort to get only the top `max_heuristic_sep_mem4_row_rank1` elements
+            std::partial_sort(cost.begin(), cost.begin() + max_heuristic_sep_mem4_row_rank1, cost.end(),
+                              [](const auto &a, const auto &b) { return a.second < b.second; });
+
+            // Set bits in `vst2` for the smallest costs
+            cutLong &vst2 = rank1_sep_heur_mem4_vertex[i];
+            for (int k = 0; k < max_heuristic_sep_mem4_row_rank1; ++k) { vst2.set(cost[k].first); }
+        }
+    }
+*/
     void constructVRMapAndSeedCrazy() {
         // Resize `rank1_sep_heur_mem4_vertex` and initialize `v_r_map`
         rank1_sep_heur_mem4_vertex.resize(dim);
