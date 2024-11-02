@@ -13,8 +13,6 @@
 #include "Arc.h"
 #include "Common.h"
 
-#include "xxhash.h" // Include the header file for xxhash
-
 #include "RNG.h"
 
 /**

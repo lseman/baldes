@@ -31,10 +31,6 @@
 #include "RCC.h"
 #include "Trees.h"
 
-#include <queue>
-#include <set>
-#include <string_view>
-
 #include "Bucket.h"
 #include "VRPNode.h"
 
@@ -43,8 +39,6 @@
 #include "Dual.h"
 
 #include "RIH.h"
-
-#include "../third_party/small_vector.hpp"
 
 #define RCESPP_TOL_ZERO 1.E-6
 
@@ -907,7 +901,7 @@ public:
             mean_dominance_checks += dominance_checks_per_bucket[i];
         }
         auto step_calc = mean_dominance_checks / non_dominated_labels_per_bucket;
-        if (step_calc > 1000) {
+        if (step_calc > 1250) {
 
             // redefine_counter = 0;
             print_info("Increasing bucket interval to {}\n", bucket_interval * 2);

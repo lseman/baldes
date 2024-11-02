@@ -11,14 +11,7 @@
 
 #pragma once
 
-#include <algorithm>
-#include <cmath>
-#include <functional>
-#include <limits>
-#include <numeric>
-#include <queue>
-#include <tuple>
-#include <vector>
+#include "Common.h"
 
 class MST {
 public:

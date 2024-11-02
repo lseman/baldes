@@ -1,10 +1,6 @@
 #pragma once
 
-#include <algorithm>
-#include <cassert>
-#include <iostream>
-#include <numeric>
-#include <vector>
+#include "Common.h"
 
 #if defined(IPM) || defined(IPM_ACEL)
 #include <Eigen/Sparse>

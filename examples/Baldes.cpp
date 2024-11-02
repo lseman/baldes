@@ -165,6 +165,12 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
+    printBaldes();
+
+    fmt::print("\n");
+    fmt::print("\033[34m_PREPARING THE ROOM \033[0m");
+    fmt::print("\n");
+
     std::string problem_kind  = argv[1];
     std::string instance_name = argv[2];
 
@@ -186,8 +192,6 @@ int main(int argc, char *argv[]) {
         std::cerr << "Unsupported problem kind: " << problem_kind << "\n";
         return 1;
     } // py::scoped_interpreter guard{};
-
-    printBaldes();
 
     print_heur("Initializing heuristic solver for initial solution\n");
 

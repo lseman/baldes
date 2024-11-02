@@ -15,14 +15,7 @@
 
 #include "Cut.h"
 #include "Definitions.h"
-#include <stdexec/execution.hpp>
 
-#include <cstddef>
-#include <functional>
-#include <mutex>
-#include <vector>
-
-#include "TupleSeparator.h"
 #include "bnb/Node.h"
 
 #ifdef IPM
@@ -283,7 +276,7 @@ void LimitedMemoryRank1Cuts::separate(const SparseMatrix &A, const std::vector<d
 
     pdqsort(tmp_cuts.begin(), tmp_cuts.end(), [](const auto &a, const auto &b) { return a.first > b.first; });
 
-    auto max_cuts = 10;
+    auto max_cuts = 2;
     for (int i = 0; i < std::min(max_cuts, static_cast<int>(tmp_cuts.size())); ++i) {
         auto &cut = tmp_cuts[i].second;
         cutStorage.addCut(cut);
@@ -304,7 +297,7 @@ std::pair<bool, bool> LimitedMemoryRank1Cuts::runSeparation(BNBNode *node, std::
     size_t i = 0;
     std::for_each(allPaths.begin(), allPaths.end(), [&](auto &path) { path.frac_x = solution[i++]; });
 
-    separateR1C1(matrix.A_sparse, solution);
+    //separateR1C1(matrix.A_sparse, solution);
     separate(matrix.A_sparse, solution);
 
     // TupleBasedSeparator r1c4(allPaths);

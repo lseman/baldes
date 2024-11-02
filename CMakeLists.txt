@@ -33,6 +33,13 @@ set(CMAKE_INTERPROCEDURAL_OPTIMIZATION TRUE)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 set(CMAKE_EXPERIMENTAL_CXX_MODULE_CMAKE_API_BOTH TRUE)
 
+find_program(CCACHE_PROGRAM ccache)
+if(CCACHE_PROGRAM)
+  message(STATUS "ccache found: using ccache for compilation")
+  set_property(GLOBAL PROPERTY RULE_LAUNCH_COMPILE "${CCACHE_PROGRAM}")
+  set_property(GLOBAL PROPERTY RULE_LAUNCH_LINK "${CCACHE_PROGRAM}")
+endif()
+
 # Include directories
 include_directories(include)
 include_directories(include/bucket)
@@ -90,7 +97,8 @@ option(CHOLMOD "Enable cholmod" OFF)
 option(IPM_ACEL "Enable ipm acelleration" OFF)
 option(BALDES "Enable baldes compilation" ON)
 option(HGS "Enable HGS" OFF)
-# Define the size of resources without using cache
+
+# Resource Definitions
 set(R_SIZE
     1
     CACHE STRING "Number of resources")
@@ -106,7 +114,6 @@ set(BUCKET_CAPACITY
 set(TIME_INDEX
     0
     CACHE STRING "Time index")
-
 set(N_ADD
     10
     CACHE STRING "Number of additional nodes")
@@ -114,13 +121,11 @@ set(HGS_TIME
     2
     CACHE STRING "HGS max running time")
 
-# Get the latest Git commit hash
+# Git Commit Hash
 execute_process(
   COMMAND git rev-parse --short HEAD
   OUTPUT_VARIABLE GIT_COMMIT_HASH
   OUTPUT_STRIP_TRAILING_WHITESPACE)
-
-# Pass the commit hash as a preprocessor definition
 add_definitions(-DGIT_COMMIT_HASH="${GIT_COMMIT_HASH}")
 
 add_definitions(-DN_SIZE=${N_SIZE})
@@ -184,27 +189,26 @@ cpmaddpackage(
   "STDEXEC_BUILD_DOCS OFF"
   "BUILD_TESTING OFF")
 
-cpmaddpackage(
-  NAME
-  xxhash
-  GITHUB_REPOSITORY
-  Cyan4973/xxHash
-  GIT_TAG
-  origin/dev
-  SOURCE_SUBDIRECTORY
-  cmake_unofficial # Specify the folder with CMake configuration
-)
-include_directories(${xxhash_SOURCE_DIR})
-# After fetching via CPM, manually add the cmake_unofficial folder
-add_subdirectory(${xxhash_SOURCE_DIR}/cmake_unofficial)
+find_package(xxhash)
+if(NOT xxhash_FOUND)
+  cpmaddpackage(
+    NAME
+    xxhash
+    GITHUB_REPOSITORY
+    Cyan4973/xxHash
+    GIT_TAG
+    origin/dev
+    SOURCE_SUBDIRECTORY
+    cmake_unofficial # Specify the folder with CMake configuration
+  )
+  include_directories(${xxhash_SOURCE_DIR})
+  add_subdirectory(${xxhash_SOURCE_DIR}/cmake_unofficial)
+endif()
 
-# add https://github.com/martinus/unordered_dense
-cpmaddpackage(
-  NAME ankerl_unordered_dense GITHUB_REPOSITORY martinus/unordered_dense
-  GIT_TAG origin/main # or a specific version/tag
-)
+cpmaddpackage(NAME ankerl_unordered_dense GITHUB_REPOSITORY
+              martinus/unordered_dense GIT_TAG origin/main)
+include_directories(${ankerl_unordered_dense_SOURCE_DIR}/include)
 
-# add https://github.com/google/nsync.git
 if(NSYNC)
   set(nsync_ADDED ON)
   cpmaddpackage(
@@ -213,13 +217,10 @@ if(NSYNC)
     GITHUB_REPOSITORY
     google/nsync
     GIT_TAG
-    origin/master # or a specific version/tag
+    origin/master
     OPTIONS
     "NSYNC_ENABLE_TESTS OFF")
 endif()
-
-# include ankerl
-include_directories(${ankerl_unordered_dense_SOURCE_DIR}/include)
 
 find_package(FMT)
 if(NOT FMT_FOUND)
@@ -284,15 +285,13 @@ set(CVRPSEP_SOURCES
     third_party/cvrpsep/cutbase.cpp
     third_party/cvrpsep/fcapfix.cpp
     third_party/cvrpsep/mxf.cpp
-    #third_party/cvrpsep/twomatch.cpp
-    #third_party/cvrpsep/glmsep.cpp
-    #third_party/cvrpsep/binpack.cpp
+    # third_party/cvrpsep/twomatch.cpp third_party/cvrpsep/glmsep.cpp
+    # third_party/cvrpsep/binpack.cpp
     third_party/cvrpsep/combsep.cpp
     third_party/cvrpsep/fcits.cpp
     third_party/cvrpsep/grsearch.cpp
-    #third_party/cvrpsep/hpmstar.cpp
-    #third_party/cvrpsep/strcomb.cpp
-    #third_party/cvrpsep/blocks.cpp
+    # third_party/cvrpsep/hpmstar.cpp third_party/cvrpsep/strcomb.cpp
+    # third_party/cvrpsep/blocks.cpp
     third_party/cvrpsep/sort.cpp)
 
 set(HGS_SOURCES
@@ -306,7 +305,7 @@ set(FPSOURCE
     third_party/fpmax/fp_tree.cpp third_party/fpmax/fp_node.cpp)
 
 set(IPM_SOURCES src/IPSolver.cpp)
-set(SRC_SOURCES src/SRC.cpp src/HighOrderSRC.cpp src/TupleSeparator.cpp)
+set(SRC_SOURCES src/SRC.cpp src/HighOrderSRC.cpp)
 
 # Define a list for the source files that will be included
 set(EXECUTABLE_SOURCES ${SOURCES} ${HGS_SOURCES} ${FPSOURCE})
@@ -339,200 +338,95 @@ if(IPM OR IPM_ACEL)
     DOWNLOAD_ONLY
     YES # Only download Eigen, don't configure or build it
   )
-  include_directories(${Eigen_SOURCE_DIR})
-  include_directories(${Eigen_SOURCE_DIR}/unsupported)
-
 endif()
 
-if(BALDES)
-# Add the executable with the combined sources
-add_executable(baldes examples/Baldes.cpp ${EXECUTABLE_SOURCES})
+# Common Libraries List
+set(COMMON_LIBRARIES STDEXEC::stdexec fmt::fmt xxhash)
 
-# Linking libraries
-target_link_libraries(baldes PRIVATE STDEXEC::stdexec)
-target_link_libraries(baldes PRIVATE fmt::fmt)
-
-set(GUROBI_VERSION_MAJOR 110) # Adjust based on Gurobi version
-message(STATUS "Gurobi version: ${GUROBI_VERSION_MAJOR}")
-
-if(GUROBI)
-  # Link Gurobi libraries
-  if(APPLE)
-    # macOS detected, use .dylib for linking
-    target_link_libraries(baldes PRIVATE ${GUROBI_HOME}/lib/libgurobi_c++.a
-                                         ${GUROBI_HOME}/lib/libgurobi100.dylib)
-  else()
-    # Non-macOS (Linux or other platforms), use .so and .a files
-    target_link_libraries(
-      baldes PRIVATE ${GUROBI_HOME}/lib/libgurobi_c++.a
-                     ${GUROBI_HOME}/lib/libgurobi${GUROBI_VERSION_MAJOR}.so tbb)
-  endif()
+if(HIGHS)
+  list(APPEND COMMON_LIBRARIES highs::highs)
 endif()
 
 if(JEMALLOC)
   find_library(JEMALLOC_LIBRARY jemalloc)
   if(JEMALLOC_LIBRARY)
     message(STATUS "jemalloc found: ${JEMALLOC_LIBRARY}")
-    target_link_libraries(baldes PRIVATE ${JEMALLOC_LIBRARY})
+    list(APPEND COMMON_LIBRARIES ${JEMALLOC_LIBRARY})
   else()
     message(STATUS "jemalloc not found")
   endif()
 endif()
 
-if(HIGHS)
-  target_link_libraries(baldes PRIVATE highs::highs)
+if(NSYNC)
+  list(APPEND COMMON_LIBRARIES nsync)
+  include_directories(${nsync_SOURCE_DIR}/public)
 endif()
 
-find_package(xxhash REQUIRED)
-target_compile_options(baldes PRIVATE -Wno-c++26-extensions
-                                      -Wno-deprecated-declarations)
+set(GUROBI_VERSION_MAJOR 110) # Adjust based on Gurobi version
 
-target_link_libraries(baldes PRIVATE xxhash)
-target_link_libraries(baldes PRIVATE unordered_dense)
+if(APPLE)
+  # macOS detected, use .dylib for linking
+  list(APPEND COMMON_LIBRARIES ${GUROBI_HOME}/lib/libgurobi_c++.a
+       ${GUROBI_HOME}/lib/libgurobi100.dylib)
+else()
+  # Non-macOS (Linux or other platforms), use .so and .a files
 
-target_precompile_headers(
-  baldes
-  PRIVATE
-  include/Common.h
-  ${CVRPSEP_HEADERS}
-  ${FPMAX_HEADERS}
-  include/Arc.h
-  include/Dual.h
-  include/VRPNode.h
-  third_party/pdqsort.h)
-
-if(IPM)
-  target_include_directories(baldes PRIVATE ${Eigen_SOURCE_DIR})
-  target_include_directories(baldes PRIVATE ${Eigen_SOURCE_DIR}/unsupported)
+  list(APPEND COMMON_LIBRARIES ${GUROBI_HOME}/lib/libgurobi_c++.a
+       ${GUROBI_HOME}/lib/libgurobi${GUROBI_VERSION_MAJOR}.so)
 endif()
+
+if(BALDES)
+  # Add the executable with the combined sources
+  add_executable(baldes examples/Baldes.cpp ${EXECUTABLE_SOURCES})
+
+  message(STATUS "Gurobi version: ${GUROBI_VERSION_MAJOR}")
+  target_compile_options(baldes PRIVATE -Wno-c++26-extensions
+                                        -Wno-deprecated-declarations)
+
+  target_precompile_headers(
+    baldes
+    PRIVATE
+    include/Common.h
+    ${CVRPSEP_HEADERS}
+    ${FPMAX_HEADERS}
+    include/Arc.h
+    include/Dual.h
+    include/VRPNode.h
+    third_party/pdqsort.h)
+
+  if(IPM)
+    target_include_directories(baldes PRIVATE ${Eigen_SOURCE_DIR})
+    target_include_directories(baldes PRIVATE ${Eigen_SOURCE_DIR}/unsupported)
+  endif()
+
+  target_link_libraries(baldes PRIVATE ${COMMON_LIBRARIES})
 
 endif()
 
 if(CLIQUER)
   add_executable(cliquer src/Original.cpp src/BucketGraph.cpp)
-  target_link_libraries(cliquer PRIVATE STDEXEC::stdexec)
-  target_link_libraries(cliquer PRIVATE fmt::fmt)
-
-  if(GUROBI)
-    if(APPLE)
-      # macOS detected, use .dylib for linking
-      target_link_libraries(
-        cliquer PRIVATE ${GUROBI_HOME}/lib/libgurobi_c++.a
-                        ${GUROBI_HOME}/lib/libgurobi100.dylib)
-    else()
-      # Non-macOS (Linux or other platforms), use .so and .a files
-      target_link_libraries(
-        cliquer PRIVATE ${GUROBI_HOME}/lib/libgurobi_c++.a
-                        ${GUROBI_HOME}/lib/libgurobi${GUROBI_VERSION_MAJOR}.so)
-    endif()
-  endif()
-
-  if(JEMALLOC)
-    find_library(JEMALLOC_LIBRARY jemalloc)
-    if(JEMALLOC_LIBRARY)
-      target_link_libraries(cliquer PRIVATE ${JEMALLOC_LIBRARY})
-    else()
-      message(STATUS "jemalloc not found")
-    endif()
-  endif()
-
-  target_compile_options(cliquer PRIVATE -Wno-c++26-extensions
-                                         -Wno-deprecated-declarations)
 endif()
 
 if(MTW)
   add_executable(vrpmtw mtw/VRPMTW.cpp ${EXECUTABLE_SOURCES} ${HGS_SOURCES}
                         ${FPSOURCE})
-  # Link Gurobi libraries
-  if(APPLE)
-    # macOS detected, use .dylib for linking
-    target_link_libraries(vrpmtw PRIVATE ${GUROBI_HOME}/lib/libgurobi_c++.a
-                                         ${GUROBI_HOME}/lib/libgurobi100.dylib)
-  else()
-    # Non-macOS (Linux or other platforms), use .so and .a files
-    target_link_libraries(
-      vrpmtw PRIVATE ${GUROBI_HOME}/lib/libgurobi_c++.a
-                     ${GUROBI_HOME}/lib/libgurobi${GUROBI_VERSION_MAJOR}.so tbb)
-  endif()
-
-  if(JEMALLOC)
-    find_library(JEMALLOC_LIBRARY jemalloc)
-    if(JEMALLOC_LIBRARY)
-      message(STATUS "jemalloc found: ${JEMALLOC_LIBRARY}")
-      target_link_libraries(vrpmtw PRIVATE ${JEMALLOC_LIBRARY})
-    else()
-      message(STATUS "jemalloc not found")
-    endif()
-  endif()
-
   target_compile_options(vrpmtw PRIVATE -Wno-c++26-extensions
                                         -Wno-deprecated-declarations)
-
-  # link with xxhash
-  target_link_libraries(vrpmtw PRIVATE xxhash)
-  # link with unordered_dense
-  target_link_libraries(vrpmtw PRIVATE unordered_dense)
-  target_link_libraries(vrpmtw PRIVATE STDEXEC::stdexec)
-  target_link_libraries(vrpmtw PRIVATE fmt::fmt)
-  # link eigen target_include_directories(vrpmtw PRIVATE ${eigen_SOURCE_DIR})
+  target_link_libraries(vrpmtw PRIVATE ${COMMON_LIBRARIES})
 endif()
-
-find_program(CCACHE_PROGRAM ccache)
-if(CCACHE_PROGRAM)
-  message(STATUS "ccache found: using ccache for compilation")
-  set_property(GLOBAL PROPERTY RULE_LAUNCH_COMPILE "${CCACHE_PROGRAM}")
-  set_property(GLOBAL PROPERTY RULE_LAUNCH_LINK "${CCACHE_PROGRAM}")
-endif()
-
 
 if(WITH_PYTHON)
   pybind11_add_module(pybaldes src/BucketBindings.cpp src/BucketGraph.cpp
                       ${EXECUTABLE_SOURCES})
-
-  target_link_libraries(pybaldes PRIVATE pybind11::module)
-  target_link_libraries(pybaldes PRIVATE fmt::fmt)
-  target_link_libraries(pybaldes PRIVATE STDEXEC::stdexec)
-  target_link_libraries(pybaldes PRIVATE xxhash)
-
-  target_link_libraries(pybaldes PRIVATE unordered_dense)
-  if(NSYNC)
-    target_include_directories(pybaldes PRIVATE nsync)
-    include_directories(${nsync_SOURCE_DIR}/public)
-  endif()
+  target_link_libraries(pybaldes PRIVATE ${COMMON_LIBRARIES})
   set_target_properties(pybaldes PROPERTIES POSITION_INDEPENDENT_CODE ON)
   target_compile_options(pybaldes PRIVATE -Wno-c++26-extensions
                                           -Wno-deprecated-declarations)
-
-  if(HIGHS)
-    target_link_libraries(pybaldes PRIVATE highs::highs)
-  endif()
 endif()
-
-
-# link nsync
-if(nsync_ADDED)
-  target_link_libraries(baldes PRIVATE nsync)
-  include_directories(${nsync_SOURCE_DIR}/public)
-endif()
-
-if(CHOLMOD)
-  message(STATUS "SuiteSparse is enabled, linking with cholmod")
-  find_package(SuiteSparse)
-  include_directories(${SuiteSparse_INCLUDE_DIRS})
-  include_directories(/usr/include/suitesparse/)
-  target_link_libraries(baldes PRIVATE cholmod)
-endif()
-
-#file(GLOB_RECURSE CVRPSEP_HEADERS "${CMAKE_SOURCE_DIR}/third_party/cvrpsep/*.h")
-#file(GLOB_RECURSE FPMAX_HEADERS "${CMAKE_SOURCE_DIR}/third_party/fpmax/*.h")
 
 if(HGS)
   add_executable(hgs src/HGS.cpp ${HGS_SOURCES} ${FPSOURCE})
-  target_link_libraries(hgs PRIVATE STDEXEC::stdexec)
-  target_link_libraries(hgs PRIVATE fmt::fmt)
-  target_link_libraries(hgs PRIVATE xxhash)
-  target_link_libraries(hgs PRIVATE unordered_dense)
-  target_link_libraries(hgs PRIVATE xxhash)
+  target_link_libraries(hgs PRIVATE ${COMMON_LIBRARIES})
   target_compile_options(hgs PRIVATE -Wno-c++26-extensions
                                      -Wno-deprecated-declarations)
-                                     endif()
+endif()

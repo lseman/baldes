@@ -21,9 +21,7 @@
 #include <stdexec/execution.hpp>
 
 #include <execution>
-#ifdef AVX
-#include <immintrin.h>
-#endif
+
 
 #include <algorithm>
 #include <array>
@@ -36,10 +34,15 @@
 #include <mutex>
 #include <ranges>
 #include <vector>
+#include <queue>
+#include <string_view>
 
 #include "ankerl/unordered_dense.h"
 
-#include <unordered_set>
+#include "../third_party/small_vector.hpp"
 
 #include <fmt/color.h>
 #include <fmt/core.h>
+
+#include "xxhash.h" // Include the header file for xxhash
+#include <stack>
