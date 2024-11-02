@@ -16,6 +16,7 @@ public:
     virtual double              getVarValue(int i) const    = 0;
     virtual double              getDualVal(int i) const     = 0;
     virtual double              getSlack(int i) const       = 0;
+    virtual double              getDualObjVal() const       = 0;
     // virtual void                update()                = 0;
 
     // Virtual method for setting a model, without a concrete type in the base class

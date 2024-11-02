@@ -14,8 +14,8 @@ ArcDuals RCCManager::computeDuals(BNBNode *model, double threshold) {
         if (std::abs(dualValue) < 1e-3) { 
             // fmt::print("Cut {} has dual value near zero: {}\n", i, dualValue);
             // remove cut
-            model->remove(cut.ctr);
-            removeCut(cut);
+            //model->remove(cut.ctr);
+            //removeCut(cut);
             dualValue = 0;
         }
 

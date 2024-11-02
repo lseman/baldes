@@ -224,12 +224,14 @@ std::vector<double> BucketGraph::labeling_algorithm() noexcept {
                     // NOTE: double check if this is the best way to handle this
                     if constexpr (F == Full::Partial) {
                         if constexpr (D == Direction::Forward) {
-                            if (label->resources[options.main_resources[0]] > q_star[options.main_resources[0]] + numericutils::eps) {
+                            if (label->resources[options.main_resources[0]] >
+                                q_star[options.main_resources[0]] + numericutils::eps) {
                                 label->set_extended(true);
                                 continue;
                             }
                         } else if constexpr (D == Direction::Backward) {
-                            if (label->resources[options.main_resources[0]] <= q_star[options.main_resources[0]] - numericutils::eps) {
+                            if (label->resources[options.main_resources[0]] <=
+                                q_star[options.main_resources[0]] - numericutils::eps) {
                                 label->set_extended(true);
                                 continue;
                             }
@@ -294,7 +296,8 @@ std::vector<double> BucketGraph::labeling_algorithm() noexcept {
                                 }
 
 #else
-                                if (check_dominance_against_vector<D, S>(new_label, to_bucket_labels, cut_storage, options.resources.size())) {
+                                if (check_dominance_against_vector<D, S>(new_label, to_bucket_labels, cut_storage,
+                                                                         options.resources.size())) {
                                     stat_n_dom++; // Increment dominated labels count
                                     dominated = true;
                                 }
@@ -317,7 +320,7 @@ std::vector<double> BucketGraph::labeling_algorithm() noexcept {
                                 n_labels++; // Increment the count of labels added
 
                                 // Add the new label to the bucket
-#ifndef SORTED_LABELS
+#ifdef SORTED_LABELS
                                 buckets[to_bucket].add_sorted_label(new_label);
 #elif LIMITED_BUCKETS
                                 buckets[to_bucket].sorted_label(new_label, BUCKET_CAPACITY);
@@ -503,8 +506,6 @@ std::vector<Label *> BucketGraph::bi_labeling_algorithm() {
     pdqsort(merged_labels.begin(), merged_labels.end(),
             [](const Label *a, const Label *b) { return a->cost < b->cost; });
 
-    inner_obj = merged_labels[0]->cost;
-
 #ifdef SCHRODINGER
     // if merged_labels is bigger than 10, create Path related to the remaining ones
     // and add them to a std::vector<Path>
@@ -542,6 +543,8 @@ std::vector<Label *> BucketGraph::bi_labeling_algorithm() {
                        [](const Label *a, const Label *b) { return a->cost < b->cost; });
 
 #endif
+    inner_obj = merged_labels[0]->cost;
+
     return merged_labels;
 }
 
@@ -698,21 +701,21 @@ BucketGraph::Extend(const std::conditional_t<M == Mutability::Mut, Label *, cons
     }
 #endif
 
-//#ifdef KP_BOUND
-    // Apply knapsack bound check in the forward direction (if applicable)
-    // if constexpr (D == Direction::Forward) {
-    //     auto kpBound = knapsackBound(L_prime);
-    //     if (kpBound > 0.0) {
-    //         return std::vector<Label *>(); // Skip if the knapsack bound is violated
-    //     }
-    // }
-    // else {
-    //     auto kpBound = knapsackBound(L_prime);
-    //     if (kpBound > 0.0) {
-    //         return std::vector<Label *>(); // Skip if the knapsack bound is violated
-    //     }
-    // }
-// #endif
+    // #ifdef KP_BOUND
+    //  Apply knapsack bound check in the forward direction (if applicable)
+    //  if constexpr (D == Direction::Forward) {
+    //      auto kpBound = knapsackBound(L_prime);
+    //      if (kpBound > 0.0) {
+    //          return std::vector<Label *>(); // Skip if the knapsack bound is violated
+    //      }
+    //  }
+    //  else {
+    //      auto kpBound = knapsackBound(L_prime);
+    //      if (kpBound > 0.0) {
+    //          return std::vector<Label *>(); // Skip if the knapsack bound is violated
+    //      }
+    //  }
+    // #endif
 
     // Acquire a new label from the pool and initialize it with the new state
     auto new_label = label_pool->acquire();
@@ -784,15 +787,6 @@ BucketGraph::Extend(const std::conditional_t<M == Mutability::Mut, Label *, cons
             const auto &baseSetorder = cut.baseSetOrder;
             const auto &neighbors    = cut.neighbors;
             const auto &multipliers  = cut.p;
-
-#if defined(SRC3)
-            // Apply SRC3 logic: if the node is in the base set, increment the SRC map
-            bool bitIsSet3 = baseSet[segment] & bit_mask;
-            if (bitIsSet3) {
-                new_label->SRCmap[idx]++;
-                if (new_label->SRCmap[idx] % 2 == 0) { new_label->cost -= SRCDuals[idx]; }
-            }
-#endif
 
 #if defined(SRC)
             // Apply SRC logic: Update the SRC map based on neighbors and base set

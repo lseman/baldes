@@ -19,6 +19,8 @@
 
 #include "VRPCandidate.h"
 
+#include "TupleSeparator.h"
+
 // Forward declare NodeDuals class
 class NodeDuals;
 

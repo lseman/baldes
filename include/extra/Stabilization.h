@@ -409,8 +409,9 @@ public:
         subgradient.assign(number_of_rows, 0.0);
 
         for (size_t row_id = 0; row_id < number_of_rows; ++row_id) {
-            // subgradient[row_id] = std::min(0.0, new_row_upper_bounds[row_id] - new_rows[row_id]) +
-            //                       std::max(0.0, new_row_lower_bounds[row_id] - new_rows[row_id]);
+            subgradient[row_id] = std::min(0.0, new_row_upper_bounds[row_id] - new_rows[row_id]) +
+                                   std::max(0.0, new_row_lower_bounds[row_id] - new_rows[row_id]);
+            /*
             if (dados.sense[row_id] == '<') {
                 subgradient[row_id] = new_rows[row_id] - new_row_upper_bounds[row_id];
             } else if (dados.sense[row_id] == '>') {
@@ -418,6 +419,7 @@ public:
             } else if (dados.sense[row_id] == '=') {
                 subgradient[row_id] = new_row_upper_bounds[row_id] - new_rows[row_id];
             }
+            */
         }
         subgradient_norm = norm(subgradient);
     }

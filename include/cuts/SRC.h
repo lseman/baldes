@@ -32,6 +32,7 @@
 // #include "xxhash.h"
 
 #include "RNG.h"
+#include <cstdint>
 // include nsync
 #ifdef NSYNC
 extern "C" {
@@ -47,21 +48,6 @@ struct CachedCut {
 };
 
 class BNBNode;
-
-/**
- * @struct VRPTW_SRC
- * @brief A structure to represent the Vehicle Routing Problem with Time Windows (VRPTW) source data.
- *
- * This structure holds various vectors and integers that are used in the context of solving the VRPTW.
- */
-struct VRPTW_SRC {
-    std::vector<int>                    S;
-    std::vector<int>                    S_C_P;
-    int                                 S_C_P_max;
-    int                                 S_n;
-    std::vector<std::pair<double, int>> best_sets;
-    int                                 S_n_max = 10000;
-};
 
 struct VectorStringHash;
 struct UnorderedSetStringHash;
@@ -115,13 +101,7 @@ public:
 
     std::vector<std::vector<int>>    labels;
     int                              labels_counter = 0;
-    std::vector<std::vector<double>> separate(const SparseMatrix &A, const std::vector<double> &x);
-    void insertSet(VRPTW_SRC &cuts, int i, int j, int k, const std::vector<int> &buffer_int, int buffer_int_n,
-                   double LHS_cut);
-
-    void insertSet(VRPTW_SRC &cuts, int i, const std::vector<int> &buffer_int, int buffer_int_n, double LHS_cut);
-    void generateCutCoefficients(VRPTW_SRC &cuts, std::vector<std::vector<double>> &coefficients, int numNodes,
-                                 const SparseMatrix &A, const std::vector<double> &x);
+    void separate(const SparseMatrix &A, const std::vector<double> &x);
 
     /**
      * @brief Computes the limited memory coefficient based on the given parameters.
@@ -136,6 +116,60 @@ public:
                                            const std::vector<int> &P, std::vector<int> &order);
 
     std::pair<bool, bool> runSeparation(BNBNode *node, std::vector<Constraint *> &SRCconstraints);
+
+    void separateR1C1(const SparseMatrix &A, const std::vector<double> &x) {
+        std::vector<std::pair<double, int>> tmp_cuts;
+        tmp_cuts.reserve(allPaths.size()); // Conservative reservation based on sol size
+
+        ankerl::unordered_dense::map<int, int> vis_map;
+        for (const auto &r : allPaths) {
+            vis_map.clear();
+            for (const auto i : r.route) { ++vis_map[i]; }
+            for (const auto &[v, times] : vis_map) {
+                if (times > 1) {
+                    // Calculate fractional cut value with integer division instead of `floor`
+                    double cut_value = std::floor(times / 2.) * r.frac_x;
+                    if (cut_value > 1e-3) { // Apply tolerance check
+                        tmp_cuts.emplace_back(cut_value, v);
+                    }
+                }
+            }
+        }
+        // print tmp_cuts.size()
+        if (tmp_cuts.empty()) return;
+        pdqsort(tmp_cuts.begin(), tmp_cuts.end(),
+                [](const std::pair<double, int> &a, const std::pair<double, int> &b) { return a.first > b.first; });
+
+        std::vector<double> coefficients_aux(allPaths.size(), 0.0);
+
+        auto cuts_to_apply = std::min(static_cast<int>(tmp_cuts.size()), 10);
+        for (int i = 0; i < cuts_to_apply; ++i) {
+            auto cut_value = tmp_cuts[i].first;
+            auto v         = tmp_cuts[i].second;
+            // Create a new cut
+            std::array<uint64_t, num_words> C  = {}; // Reset C for each cut
+            std::array<uint64_t, num_words> AM = {};
+            std::vector<int>                order(N_SIZE, 0);
+            // define C
+            C[v / 64] |= (1ULL << (v % 64));
+            // define AM
+            for (int node = 0; node < N_SIZE; ++node) { AM[node / 64] |= (1ULL << (node % 64)); }
+            SRCPermutation p;
+            p.num    = {1};
+            p.den    = 2;
+            //auto rhs = 0;
+
+            coefficients_aux.assign(allPaths.size(), 0.0);
+
+            for (size_t j = 0; j < allPaths.size(); ++j) {
+                auto &clients = allPaths[j].route;
+                coefficients_aux[j] = computeLimitedMemoryCoefficient(C, AM, p, clients, order);
+            }
+            Cut cut(C, AM, coefficients_aux, p);
+            cut.baseSetOrder = order;
+            cutStorage.addCut(cut);
+        }
+    }
 
 private:
     static std::mutex cache_mutex;

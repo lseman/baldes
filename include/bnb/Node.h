@@ -96,6 +96,7 @@ public:
     VRProblem   *problem;
     InstanceData instance;
 
+    int depth = 0;
     int numConstrs = 0;
 
     MIPProblem mip = MIPProblem("node", 0, 0);
@@ -133,7 +134,7 @@ public:
         auto gurobi_model = mip.toGurobiModel(GurobiEnvSingleton::getInstance());
         solver            = new GurobiSolver(&gurobi_model);
 #endif
-        generateUUID();
+        uuid = generateUUID();
         this->initialized = true;
         RCC_MODE_BLOCK(CMGR_CreateCMgr(&oldCutsCMP, 100); // For old cuts, if needed
         )
@@ -200,6 +201,8 @@ public:
         candidates.push_back(candidate);
     }
 
+    int getDepth() { return depth; }
+
     BNBNode *newChild() {
         // TODO: verify if this is the best approach
         auto emipClone = mip.clone();
@@ -215,6 +218,7 @@ public:
         child->instance          = instance;
         child->SRCconstraints.clear();
         child->SRCconstraints.reserve(SRCconstraints.size()); // Reserve space if size is known
+        child->depth = depth + 1;
 
         for (Constraint *constraint : SRCconstraints) {
             child->SRCconstraints.push_back(new Constraint(*constraint)); // Deep copy each `Constraint` object
@@ -345,15 +349,17 @@ public:
     // Update
     void update() { mip.update(); }
 
+    double getDualObjVal() { return solver->getDualObjVal(); }
+
     std::pair<bool, double> solveRestrictedMasterLP() {
         bool feasible = false;
         relaxNode();
         optimize();
         if (getStatus() == 2) {
             feasible = true;
-            return std::make_pair(feasible, getObjVal());
+            return std::make_pair(feasible, getDualObjVal());
         } else {
-            return std::make_pair(feasible, std::numeric_limits<double>::max());
+            return std::make_pair(feasible, -std::numeric_limits<double>::max());
         }
     }
 
@@ -375,7 +381,7 @@ public:
         if (ctype == CandidateType::Vehicle) {
             for (auto *var : variables) {
                 linExpr.add_or_update_term(var->get_name(), 1.0); // Add each variable with coefficient 1.0
-                name = "branching_vehicle_" + std::to_string(rhs);
+                name = "branching_vehicle_" + std::to_string(int(rhs));
             }
         } else if (ctype == CandidateType::Node) {
             for (size_t i = 0; i < variables.size(); ++i) {
@@ -386,7 +392,7 @@ public:
                         if constexpr (std::is_same_v<T, int>) {
                             linExpr.add_or_update_term(variables[i]->get_name(),
                                                        paths[i].contains(arg) ? 1.0 : 0.0); // Use int payload
-                            name = "branching_node_" + std::to_string(arg) + "_" + std::to_string(rhs);
+                            name = "branching_node_" + std::to_string(arg) + "_" + std::to_string(int(rhs));
                         } else {
                             throw std::invalid_argument("Payload for Node must be an int.");
                         }
@@ -404,7 +410,7 @@ public:
                                 variables[i]->get_name(),
                                 paths[i].timesArc(arg.first, arg.second) ? 1.0 : 0.0); // Use pair payload
                             name = "branching_edge_" + std::to_string(arg.first) + "_" + std::to_string(arg.second) + "_" +
-                                   std::to_string(rhs);
+                                   std::to_string(int(rhs));
                         } else {
                             throw std::invalid_argument("Payload for Edge must be a std::pair<int, int>.");
                         }
@@ -424,7 +430,7 @@ public:
                                     linExpr.add_or_update_term(variables[i]->get_name(),
                                                                1.0); // Add term with coefficient 1.0
                                 }
-                                name = "branching_cluster_" + std::to_string(cluster_ele) + "_" + std::to_string(rhs);
+                                name = "branching_cluster_" + std::to_string(cluster_ele) + "_" + std::to_string(int(rhs));
                             }
                         } else {
                             throw std::invalid_argument("Payload for Cluster must be a std::vector<int>.");
