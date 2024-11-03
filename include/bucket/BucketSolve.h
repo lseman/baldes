@@ -682,15 +682,14 @@ BucketGraph::Extend(const std::conditional_t<M == Mutability::Mut, Label *, cons
     // Compute branching duals
     if (branching_duals->size() > 0) {
         if constexpr (D == Direction::Forward) {
-            new_cost -= branching_duals->getDual(initial_node_id, node_id);
+            new_cost += branching_duals->getDual(initial_node_id, node_id);
         } else {
-            new_cost -= branching_duals->getDual(node_id, initial_node_id);
+            new_cost += branching_duals->getDual(node_id, initial_node_id);
         }
-        new_cost -= branching_duals->getDual(node_id);
+        new_cost += branching_duals->getDual(node_id);
     }
 
-#if defined(RCC) || defined(EXACT_RCC)
-    if constexpr (S == Stage::Four) {
+    RCC_MODE_BLOCK(if constexpr (S == Stage::Four) {
         if constexpr (D == Direction::Forward) {
             auto arc_dual = arc_duals.getDual(initial_node_id, node_id);
             new_cost -= arc_dual;
@@ -698,20 +697,21 @@ BucketGraph::Extend(const std::conditional_t<M == Mutability::Mut, Label *, cons
             auto arc_dual = arc_duals.getDual(node_id, initial_node_id);
             new_cost -= arc_dual;
         }
-    }
-#endif
+    })
 
     // #ifdef KP_BOUND
     //  Apply knapsack bound check in the forward direction (if applicable)
     //  if constexpr (D == Direction::Forward) {
     //      auto kpBound = knapsackBound(L_prime);
-    //      if (kpBound > 0.0) {
+    //      //fmt::print("kpBound: {}\n", kpBound);
+    //      if (kpBound < 0.0) {
     //          return std::vector<Label *>(); // Skip if the knapsack bound is violated
     //      }
     //  }
     //  else {
     //      auto kpBound = knapsackBound(L_prime);
-    //      if (kpBound > 0.0) {
+    //      //fmt::print("kpBound: {}\n", kpBound);
+    //      if (kpBound < 0.0) {
     //          return std::vector<Label *>(); // Skip if the knapsack bound is violated
     //      }
     //  }

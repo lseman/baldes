@@ -94,6 +94,59 @@ public:
         if (type == CandidateType::Edge) { arcDuals_.setDual(arc, dualValue); }
     }
 
+    std::vector<double> computeCoefficients(const std::vector<int> route) {
+        std::vector<double> coefficients;
+        for (auto candidate : branchingCandidates_) {
+            if (candidate->getCandidateType() == CandidateType::Node) {
+                bool has_node = false;
+                for (auto node : route) {
+                    if (candidate->targetNode == node) {
+                        has_node = true;
+                        break;
+                    }
+                }
+                if (has_node) {
+                    coefficients.push_back(1.0);
+                } else {
+                    coefficients.push_back(0.0);
+                }
+            } else if (candidate->getCandidateType() == CandidateType::Edge) {
+                bool has_edge = false;
+                for (size_t i = 1; i < route.size(); ++i) {
+                    if (candidate->sourceNode == route[i - 1] && candidate->targetNode == route[i]) {
+                        has_edge = true;
+                        break;
+                    }
+                }
+                if (has_edge) {
+                    coefficients.push_back(1.0);
+                } else {
+                    coefficients.push_back(0.0);
+                }
+            } else if (candidate->getCandidateType() == CandidateType::Vehicle) {
+                coefficients.push_back(1.0);
+            } else if (candidate->getCandidateType() == CandidateType::Cluster) {
+                bool has_cluster = false;
+                for (auto node : route) {
+                    for (auto cluster_node : candidate->cluster) {
+                        if (node == cluster_node) {
+                            has_cluster = true;
+                            break;
+                        }
+                    }
+                }
+                if (has_cluster) {
+                    coefficients.push_back(1.0);
+                } else {
+                    coefficients.push_back(0.0);
+                }
+            } else {
+                coefficients.push_back(0.0);
+            }
+        }
+        return coefficients;
+    }
+
     void setDual(CandidateType type, int node, double dualValue) {
         if (type == CandidateType::Node) { nodeDuals_.setDual(node, dualValue); }
     }
@@ -108,6 +161,8 @@ public:
     double getDual(int node) const { return nodeDuals_.getDual(node); }
 
     void computeDuals(BNBNode *model, double threshold = 1e-3);
+
+    auto getBranchingConstraints() { return branchingConstraints_; }
 
     // define size as size of branchingCandidates_
     int size() { return branchingCandidates_.size(); }

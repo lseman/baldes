@@ -29,6 +29,7 @@ public:
     double             boundValue;    // Bound value for the candidate
     BranchingDirection boundType;     // Upper or lower bound type
     CandidateType      candidateType; // Type of the candidate (Vehicle, Node, or Edge)
+    std::vector<int>   cluster;
 
     // Variant to hold different types of data based on candidate type
     std::optional<std::variant<int, std::pair<int, int>, std::vector<int>>> payload = std::nullopt;

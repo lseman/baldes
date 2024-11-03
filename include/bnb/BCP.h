@@ -235,17 +235,25 @@ public:
                 }
             })
 
-#if defined(RCC) || defined(EXACT_RCC)
-            auto RCCvec         = rccManager->computeRCCCoefficients(label->nodes_covered);
-            auto RCCconstraints = rccManager->getConstraints();
-            if (RCCvec.size() > 0) {
-                for (int i = 0; i < RCCvec.size(); i++) {
-                    if (abs(RCCvec[i]) > 1e-3) {
-                        col.addTerm(RCCconstraints[i]->index(), RCCvec[i]); // Add RCC terms to the Column
+            RCC_MODE_BLOCK(
+                auto RCCvec = rccManager->computeRCCCoefficients(label->nodes_covered); if (RCCvec.size() > 0) {
+                    auto RCCconstraints = rccManager->getConstraints();
+
+                    for (int i = 0; i < RCCvec.size(); i++) {
+                        if (abs(RCCvec[i]) > 1e-3) {
+                            col.addTerm(RCCconstraints[i]->index(), RCCvec[i]); // Add RCC terms to the Column
+                        }
                     }
+                })
+
+            auto &branching    = node->branchingDuals;
+            auto  branchingVec = branching->computeCoefficients(label->nodes_covered);
+            if (branchingVec.size() > 0) {
+                auto branchingConstraints = branching->getBranchingConstraints();
+                for (int i = 0; i < branchingVec.size(); i++) {
+                    if (abs(branchingVec[i]) > 1e-3) { col.addTerm(branchingConstraints[i]->index(), branchingVec[i]); }
                 }
             }
-#endif
 
             // Collect bounds, costs, columns, and names
             lb.push_back(0.0);
@@ -311,78 +319,6 @@ public:
         // print constraints size
         return changed;
     }
-
-#ifdef EXACT_RCC
-    /**
-     * @brief Separates Rounded Capacity Cuts (RCC) for the given model and solution.
-     *
-     * This function identifies and separates RCCs for the provided model and solution.
-     * It uses parallel execution to handle multiple tasks concurrently, generating
-     * cut expressions and right-hand side values for each identified cut.
-     *
-     * @param model Pointer to the Gurobi model.
-     * @param solution Vector of doubles representing the solution.
-     * @param constraints 3D vector of Gurobi constraints.
-     * @return True if any RCCs were added, false otherwise.
-     */
-    bool RCCsep(BNBNode *node, const std::vector<double> &solution) {
-        auto &allPaths   = node->paths;
-        auto &rccManager = node->rccManager;
-
-        auto Ss = separate_Rounded_Capacity_cuts(node, instance.q, instance.demand, allPaths, solution);
-
-        if (Ss.size() == 0) return false;
-
-        // Define the tasks to be executed sequentially
-        std::vector<GRBLinExpr>          cutExpressions(Ss.size());
-        std::vector<int>                 rhsValues(Ss.size());
-        std::vector<std::vector<RawArc>> arcGroups(Ss.size());
-
-        for (size_t c = 0; c < Ss.size(); ++c) {
-            auto S = Ss[c];
-
-            LinearExpression    cutExpr;
-            std::vector<RawArc> arcs;
-
-            // Generate all possible arc pairs from nodes in S
-            for (int i : S) {
-                for (int j : S) {
-                    if (i != j) { arcs.emplace_back(i, j); }
-                }
-            }
-
-            auto target_no_vehicles =
-                ceil(std::accumulate(S.begin(), S.end(), 0, [&](int sum, int i) { return sum + instance.demand[i]; }) /
-                     instance.q);
-
-            rhsValues[c] = S.size() - target_no_vehicles;
-            arcGroups[c] = std::move(arcs);
-        }
-
-        // std::vector<Constraint> newConstraints(cutExpressions.size());
-        for (std::size_t i = 0; i < rhsValues.size(); ++i) {
-            LinearExpression cutExpr;
-
-            // For each arc in arcGroups[i], compute the cut expression
-            for (const auto &arc : arcGroups[i]) {
-                for (size_t ctr = 0; ctr < allPaths.size(); ++ctr) {
-                    cutExpr.addTerm(node->getVar(ctr), allPaths[ctr].timesArc(arc.from, arc.to));
-                }
-            }
-
-            // Add the constraint to the model
-            auto ctr_name = "RCC_cut_" + std::to_string(rccManager->cut_ctr);
-            auto ctr      = cutExpr <= rhsValues[i];
-            ctr           = node->addConstr(ctr, ctr_name);
-            rccManager->addCut(arcGroups[i], rhsValues[i], ctr);
-        }
-
-        fmt::print("Added {} RCC cuts\n", cutExpressions.size());
-        node->optimize();
-
-        return true;
-    }
-#endif
 
 #ifdef RCC
     /**
@@ -497,7 +433,7 @@ public:
     /**
      * Column generation algorithm.
      */
-    bool CG(BNBNode *node, int max_iter = 2000) {
+    bool CG(BNBNode *node, int max_iter = 1000) {
 
         print_info("Column generation preparation...\n");
 
@@ -657,11 +593,6 @@ public:
                             auto new_relaxation = std::min(bucket_graph->A_MAX + 10, N_SIZE);
                             print_info("Increasing A_MAX to {}\n", new_relaxation);
                             bucket_graph->A_MAX = new_relaxation;
-
-                            // TODO: see why this is necessary here
-                            // matrix = node->extractModelDataSparse();
-                            // node->optimize();
-                            // nodeDuals = node->getDuals();
                         }
 
                     } else {
@@ -748,7 +679,7 @@ public:
                                                        auto &iter_non_improv, auto &use_ipm_duals, auto &nodeDuals) {
                     auto matrix = node->extractModelDataSparse();
 
-                    auto   d               = 0.1;
+                    auto   d               = 1;
                     double obj_change      = std::abs(lp_obj - inner_obj);
                     double adaptive_factor = std::min(1.0, std::max(1e-1, obj_change / std::abs(lp_obj + 1e-6)));
 
