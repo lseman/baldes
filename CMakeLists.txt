@@ -394,7 +394,7 @@ if(BALDES)
     include/VRPNode.h
     third_party/pdqsort.h)
 
-  if(IPM)
+  if(IPM OR IPM_ACEL)
     target_include_directories(baldes PRIVATE ${Eigen_SOURCE_DIR})
     target_include_directories(baldes PRIVATE ${Eigen_SOURCE_DIR}/unsupported)
   endif()

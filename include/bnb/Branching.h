@@ -285,12 +285,20 @@ public:
                     upper_bound = 1;
                 }
                 if (flags.first) {
-                    candidates.emplace_back(
-                        new VRPCandidate(sourceNode, targetNode, BranchingDirection::Less, lower_bound, type, payload));
+                    auto candidate =
+                        new VRPCandidate(sourceNode, targetNode, BranchingDirection::Less, lower_bound, type, payload);
+                    if (type == CandidateType::Cluster) {
+                        candidate->cluster = std::get<std::vector<int>>(payload.value());
+                    }
+                    candidates.push_back(candidate);
                 }
                 if (flags.second) {
-                    candidates.emplace_back(new VRPCandidate(sourceNode, targetNode, BranchingDirection::Greater,
-                                                             upper_bound, type, payload));
+                    auto candidate = new VRPCandidate(sourceNode, targetNode, BranchingDirection::Greater, upper_bound,
+                                                      type, payload);
+                    if (type == CandidateType::Cluster) {
+                        candidate->cluster = std::get<std::vector<int>>(payload.value());
+                    }
+                    candidates.push_back(candidate);
                 }
             };
 

@@ -34,6 +34,7 @@ using cutLong                                                   = yzzLong;
 constexpr double tolerance                                      = 1e-6;
 constexpr int    max_row_rank1                                  = 5;
 constexpr int    max_heuristic_initial_seed_set_size_row_rank1c = 6;
+constexpr int    max_heuristic_sep_mem4_row_rank1               = 8;
 
 constexpr int    max_num_r1c_per_round = 20;
 constexpr double cut_vio_factor        = 0.1;
@@ -61,40 +62,6 @@ struct Rank1MultiLabel {
 
 class HighDimCutsGenerator {
 public:
-    /*
-        void sendToPython(const std::vector<R1c> &cuts, const std::vector<Path> &routes) {
-            try {
-                // Import the Python script (make sure cuts_callback.py is in the working directory)
-                py::module_ callback_module = py::module_::import("cuts_callback");
-
-                // Retrieve the callback function
-                py::object process_cuts = callback_module.attr("process_cuts");
-
-                // Convert C++ data to Python objects
-                std::vector<py::dict> py_cuts;
-                for (const auto &cut : cuts) {
-                    py::dict py_cut;
-                    py_cut["info_r1c"] = py::cast(cut.info_r1c); // Explicitly cast to Python list
-                    py_cut["rhs"]      = cut.rhs;
-                    py_cut["arc_mem"]  = py::cast(cut.arc_mem); // Explicitly cast to Python list
-                    py_cuts.push_back(py_cut);
-                }
-
-                std::vector<py::dict> py_routes;
-                for (const auto &route : routes) {
-                    py::dict py_route;
-                    py_route["route"]    = py::cast(route.route); // Convert route vector to Python list
-                    py_route["cost"]     = route.cost;
-                    py_route["red_cost"] = route.red_cost;
-                    py_route["frac_x"]   = route.frac_x;
-                    py_routes.push_back(py_route);
-                }
-
-                // Call the Python function with C++ data as arguments
-                process_cuts(py_cuts, py_routes);
-            } catch (const py::error_already_set &e) { std::cerr << "Python error: " << e.what() << std::endl; }
-        }
-    */
     double max_cut_mem_factor = 0.15;
 
     HighDimCutsGenerator(int dim, int maxRowRank, double tolerance)
@@ -129,11 +96,12 @@ public:
     std::vector<VRPNode> nodes;
     void                 setNodes(std::vector<VRPNode> &nodes) { this->nodes = nodes; }
 
-    std::vector<Path>                                          sol;
-    int                                                        dim, max_row_rank1, num_label;
-    double                                                     TOLERANCE;
-    std::vector<ankerl::unordered_dense::map<int, int>>        v_r_map;
-    std::vector<std::pair<std::vector<int>, std::vector<int>>> c_N_noC;
+    std::vector<Path> sol;
+    int               dim, max_row_rank1, num_label;
+    double            TOLERANCE;
+    // std::vector<ankerl::unordered_dense::map<int, int>>        v_r_map;
+    gch::small_vector<std::vector<int>>                                                            v_r_map;
+    gch::small_vector<std::pair<std::vector<int>, std::vector<int>>>                               c_N_noC;
     ankerl::unordered_dense::map<Bitset<N_SIZE>, std::vector<std::pair<std::vector<int>, double>>> map_cut_plan_vio;
     std::vector<Rank1MultiLabel>                                                            rank1_multi_label_pool;
     ankerl::unordered_dense::map<int, std::vector<std::tuple<Bitset<N_SIZE>, int, double>>> generated_rank1_multi_pool;
@@ -158,6 +126,7 @@ public:
         cuts.clear();
         rank1_multi_label_pool.resize(INITIAL_RANK_1_MULTI_LABEL_POOL_SIZE);
         cut_cache.clear();
+        num_valid_routes = 0;
     }
 
     void getHighDimCuts() {
@@ -282,21 +251,25 @@ public:
         stdexec::sync_wait(std::move(work));
     }
 
-    std::vector<double>                    cached_valid_routes;
-    ankerl::unordered_dense::map<int, int> cached_map_old_new_routes;
-    void                                   cacheValidRoutesAndMappings() {
+    gch::small_vector<double> cached_valid_routes;
+    gch::small_vector<int>    cached_map_old_new_routes;
+    int                       num_valid_routes;
+
+    void cacheValidRoutesAndMappings() {
         cached_valid_routes.clear();
         cached_map_old_new_routes.clear();
 
-        // Cache valid routes and map_old_new_routes
+        // Reserve space for the expected number of valid routes
         cached_valid_routes.reserve(sol.size());
-        cached_map_old_new_routes.reserve(sol.size());
+        cached_map_old_new_routes.resize(sol.size(), -1); // Initialize all elements to -1
 
         for (int i = 0; i < sol.size(); ++i) {
-            if (sol[i].frac_x > 1e-3) { // Assuming a threshold to select valid routes
+            if (sol[i].frac_x > 1e-3) { // Only consider routes with frac_x > threshold
                 cached_valid_routes.push_back(sol[i].frac_x);
                 cached_map_old_new_routes[i] = static_cast<int>(cached_valid_routes.size() - 1);
+                num_valid_routes++;
             }
+            // No need for else clause as -1 already indicates invalid entries
         }
     }
 
@@ -340,10 +313,25 @@ public:
         const double rhs         = get<2>(plan);
         const auto  &coeffs      = record_map_rank1_combinations[cut_size][plan_idx];
 
-        ankerl::unordered_dense::map<int, int> map_r_numbers;
+        std::vector<int> map_r_numbers(sol.size(), 0); // Pre-allocate vector for route frequencies
         for (int idx : cut) {
             if (idx >= 0 && idx < v_r_map.size()) {
-                for (const auto &[fst, snd] : v_r_map[idx]) { map_r_numbers[fst] += snd; }
+                for (int route_idx = 0; route_idx < v_r_map[idx].size(); ++route_idx) {
+                    int frequency = v_r_map[idx][route_idx];
+                    if (frequency > 0) {
+                        map_r_numbers[route_idx] += frequency; // Direct indexing is faster than map access
+                    }
+                }
+            }
+        }
+        for (int idx : cut) {
+            if (idx >= 0 && idx < v_r_map.size()) {
+                for (int route_idx = 0; route_idx < v_r_map[idx].size(); ++route_idx) {
+                    int frequency = v_r_map[idx][route_idx];
+                    if (frequency > 0) { // Only consider routes where the vertex has a frequency > 0
+                        map_r_numbers[route_idx] += frequency;
+                    }
+                }
             }
         }
 
@@ -363,11 +351,15 @@ public:
                 for (int i = 0; i < cut_size; ++i) {
                     int c = cut[i];
                     if (c >= 0 && c < v_r_map.size()) {
-                        for (const auto &pr : v_r_map[c]) {
-                            if (auto it = cached_map_old_new_routes.find(pr.first);
-                                it != cached_map_old_new_routes.end()) {
-                                cut_num_times_vis_routes[i].insert(cut_num_times_vis_routes[i].end(), pr.second,
-                                                                   it->second);
+                        for (int route_idx = 0; route_idx < v_r_map[c].size(); ++route_idx) {
+                            int frequency = v_r_map[c][route_idx];
+                            if (frequency > 0) { // Only consider routes where the vertex has a frequency > 0
+                                // print route_idx and cached_map_old_new_routes.size()
+                                if (cached_map_old_new_routes[route_idx] != -1) {
+                                    auto val = cached_map_old_new_routes[route_idx];
+                                    cut_num_times_vis_routes[i].insert(cut_num_times_vis_routes[i].end(), frequency,
+                                                                       val);
+                                }
                             }
                         }
                     }
@@ -378,7 +370,7 @@ public:
             }
         }
 
-        std::vector<double> num_times_vis_routes(cached_map_old_new_routes.size());
+        std::vector<double> num_times_vis_routes(num_valid_routes, 0.0);
         double              best_vio = -std::numeric_limits<double>::max();
         int                 best_idx = -1;
 
@@ -387,7 +379,11 @@ public:
             std::fill(num_times_vis_routes.begin(), num_times_vis_routes.end(), 0.0);
 
             for (int i = 0; i < cut_size; ++i) {
-                for (int j : cut_num_times_vis_routes[i]) { num_times_vis_routes[j] += coeffs[cnt][i]; }
+                // print cut_num_times_vis_routes size
+                for (int j : cut_num_times_vis_routes[i]) {
+                    // print j
+                    num_times_vis_routes[j] += coeffs[cnt][i];
+                }
             }
 
             double vio_tmp = -rhs;
@@ -433,59 +429,6 @@ public:
 
     void setDistanceMatrix(const std::vector<std::vector<double>> distances) { cost_mat4_vertex = distances; }
 
-    static constexpr int max_heuristic_sep_mem4_row_rank1 = 16;
-
-    void generateSepHeurMem4Vertex() {
-        rank1_sep_heur_mem4_vertex.clear();
-        rank1_sep_heur_mem4_vertex.resize(dim);
-
-        // Check dimensions to avoid out-of-bounds access
-        if (nodes.size() < dim || cost_mat4_vertex.size() < dim) return;
-
-        // Precompute half-costs for nodes to avoid repeated divisions
-        std::vector<double> half_cost(dim);
-        for (int i = 0; i < dim; ++i) { half_cost[i] = nodes[i].cost / 2; }
-
-        // Step 1: Populate v_r_map to track nodes appearing in fractional solutions
-        std::vector<bool> is_fractional(dim, false);
-        for (int r = 0; r < sol.size(); ++r) {
-            if (sol[r].frac_x > 1e-2 && sol[r].frac_x < 0.98) {
-                for (int i : sol[r].route) {
-                    if (i > 0 && i < dim - 1) {
-                        is_fractional[i] = true; // Mark node `i` as appearing in a fractional route
-                    }
-                }
-            }
-        }
-
-        // Step 2: Generate heuristic memory for each vertex `i`
-        for (int i = 0; i < dim; ++i) {
-            if (cost_mat4_vertex[i].size() < dim) continue; // Skip if out of bounds
-
-            std::vector<std::pair<int, double>> cost(dim);
-            cost[0] = {0, INFINITY};
-
-            for (int j = 1; j < dim - 1; ++j) {
-                // Apply higher weight if either `i` or `j` appears in a fractional solution
-                double weight        = (is_fractional[i] || is_fractional[j]) ? 0.75 : 1.0;
-                double adjusted_cost = (cost_mat4_vertex[i][j] - (half_cost[i] + half_cost[j])) * weight;
-                cost[j]              = {j, adjusted_cost};
-            }
-
-            // Use partial sort to get only the top `max_heuristic_sep_mem4_row_rank1` elements
-            int sort_size = std::min(static_cast<int>(cost.size()), max_heuristic_sep_mem4_row_rank1);
-            if (sort_size > 0) {
-                std::partial_sort(cost.begin(), cost.begin() + sort_size, cost.end(),
-                                  [](const auto &a, const auto &b) { return a.second < b.second; });
-            }
-
-            // Set bits in `vst2` for the smallest costs
-            cutLong &vst2 = rank1_sep_heur_mem4_vertex[i];
-            for (int k = 0; k < sort_size; ++k) { vst2.set(cost[k].first); }
-        }
-    }
-    /*
-
     void generateSepHeurMem4Vertex() {
         rank1_sep_heur_mem4_vertex.resize(dim);
 
@@ -509,46 +452,53 @@ public:
             for (int k = 0; k < max_heuristic_sep_mem4_row_rank1; ++k) { vst2.set(cost[k].first); }
         }
     }
-*/
+
     void constructVRMapAndSeedCrazy() {
         // Resize `rank1_sep_heur_mem4_vertex` and initialize `v_r_map`
         rank1_sep_heur_mem4_vertex.resize(dim);
-        v_r_map.assign(dim, {});
-        for (auto &map_entry : v_r_map) { map_entry.reserve(sol.size()); }
+        v_r_map.assign(dim, std::vector<int>(sol.size(), 0));
 
-        // Populate `v_r_map` with counts of route appearances for each vertex `i`
+        // Populate `v_r_map` with route appearances for each vertex `i`
         for (int r = 0; r < sol.size(); ++r) {
             for (int i : sol[r].route) {
                 if (i > 0 && i < dim - 1) { ++v_r_map[i][r]; }
             }
         }
 
-        // Initialize `seed_map` for storing combinations
+        // Initialize `seed_map` with reserved space
         ankerl::unordered_dense::map<cutLong, cutLong> seed_map;
         seed_map.reserve(4096);
 
-        // Create `wc` bitset based on neighboring vertices for each vertex `i`
-        for (int i = 1; i < dim - 1; ++i) {
+        // Cache dimensions for efficiency
+        const int max_dim_minus_1 = dim - 1;
+
+        // Iterate through vertices to build `seed_map`
+        for (int i = 1; i < max_dim_minus_1; ++i) {
             if (v_r_map[i].empty()) continue;
 
-            cutLong wc;
-            for (const auto &[route_index, count] : v_r_map[i]) {
-                for (int v : sol[route_index].route) {
-                    if (v > 0 && v < dim - 1 && rank1_sep_heur_mem4_vertex[i].test(v)) { wc.set(v); }
+            cutLong     wc;
+            const auto &heur_mem = rank1_sep_heur_mem4_vertex[i];
+
+            // Create bitset `wc` based on neighbors in routes containing vertex `i`
+            for (int route_index = 0; route_index < v_r_map[i].size(); ++route_index) {
+                if (v_r_map[i][route_index] > 0) {
+                    for (int v : sol[route_index].route) {
+                        if (v > 0 && v < max_dim_minus_1 && heur_mem.test(v)) { wc.set(v); }
+                    }
                 }
             }
 
-            // Iterate over routes that do not contain vertex `i` to create `tmp_c`
+            // Construct `tmp_c` for routes excluding vertex `i`
             for (int r = 0; r < sol.size(); ++r) {
-                if (v_r_map[i].contains(r)) continue;
+                if (v_r_map[i][r] > 0) continue;
 
                 cutLong tmp_c;
                 for (int v : sol[r].route) {
-                    if (v > 0 && v < dim - 1 && wc.test(v)) { tmp_c.set(v); }
+                    if (v > 0 && v < max_dim_minus_1 && wc.test(v)) { tmp_c.set(v); }
                 }
-                tmp_c.set(i); // Include `i` in the bitset
+                tmp_c.set(i);
 
-                // Check the size of `tmp_c` and conditionally add it to `seed_map`
+                // Add to `seed_map` if within size limits
                 int c_size = static_cast<int>(tmp_c.count());
                 if (c_size >= 4 && c_size <= max_heuristic_initial_seed_set_size_row_rank1c) {
                     auto [it, inserted] = seed_map.try_emplace(tmp_c, wc ^ tmp_c);
@@ -557,7 +507,7 @@ public:
             }
         }
 
-        // Populate `c_N_noC` using `seed_map`
+        // Prepare `c_N_noC` by transforming `seed_map` entries
         c_N_noC.resize(seed_map.size());
         int cnt = 0;
         for (const auto &[fst, snd] : seed_map) {
@@ -565,8 +515,7 @@ public:
             tmp_fst.reserve(fst.count());
             tmp_snd.reserve(snd.count());
 
-            // Assign vertices to `tmp_fst` or `tmp_snd` based on `fst` and `snd`
-            for (int i = 1; i < dim - 1; ++i) {
+            for (int i = 1; i < max_dim_minus_1; ++i) {
                 if (fst.test(i)) {
                     tmp_fst.push_back(i);
                 } else if (snd.test(i)) {
@@ -795,7 +744,7 @@ public:
             const auto &snd = cut.info_r1c.second;
 
             // Attempt to insert in cut_record and skip if already exists
-            if (!cut_record[fst].emplace(snd).second) continue;
+            // if (!cut_record[fst].emplace(snd).second) continue;
 
             int         size  = static_cast<int>(fst.size());
             const auto &coeff = get<0>(map_rank1_multiplier[size][snd]);
@@ -954,47 +903,50 @@ public:
                        [](const auto &entry) { return entry.second; });
     }
 
-    void fillMemory() {
-        // Build v_r_map to count route occurrences for each vertex
-        std::vector<ankerl::unordered_dense::map<int, int>> v_r_map(dim);
-        for (int r_idx = 0; const auto &route : sol) {
-            for (int j : route.route) { ++v_r_map[j][r_idx]; }
-            ++r_idx;
-        }
+    /*
+        void fillMemory() {
+            // Build v_r_map to count route occurrences for each vertex
+            std::vector<ankerl::unordered_dense::map<int, int>> v_r_map(dim);
+            for (int r_idx = 0; const auto &route : sol) {
+                for (int j : route.route) { ++v_r_map[j][r_idx]; }
+                ++r_idx;
+            }
 
-        int                 num_add_mem = 0;
-        std::vector<double> vis_times(sol.size());
+            int                 num_add_mem = 0;
+            std::vector<double> vis_times(sol.size());
 
-        for (const auto &r1c : old_cuts) {
-            std::fill(vis_times.begin(), vis_times.end(), 0.0); // Reset vis_times for this cut
+            for (const auto &r1c : old_cuts) {
+                std::fill(vis_times.begin(), vis_times.end(), 0.0); // Reset vis_times for this cut
 
-            // Fetch the rank-1 multiplier plan components
-            const auto &[coeff, deno, rhs] = map_rank1_multiplier.at(r1c.info_r1c.first.size()).at(r1c.info_r1c.second);
+                // Fetch the rank-1 multiplier plan components
+                const auto &[coeff, deno, rhs] =
+       map_rank1_multiplier.at(r1c.info_r1c.first.size()).at(r1c.info_r1c.second);
 
-            // Accumulate visibility times for each route
-            int cnt = 0;
-            for (int v : r1c.info_r1c.first) {
-                const auto &vertex_routes = v_r_map[v];
-                double      coeff_value   = coeff[cnt++];
-                for (const auto &[route_idx, frequency] : vertex_routes) {
-                    vis_times[route_idx] += frequency * coeff_value;
+                // Accumulate visibility times for each route
+                int cnt = 0;
+                for (int v : r1c.info_r1c.first) {
+                    const auto &vertex_routes = v_r_map[v];
+                    double      coeff_value   = coeff[cnt++];
+                    for (const auto &[route_idx, frequency] : vertex_routes) {
+                        vis_times[route_idx] += frequency * coeff_value;
+                    }
+                }
+
+                // Transform vis_times based on denominator and tolerance
+                std::transform(
+                    vis_times.begin(), vis_times.end(), sol.begin(), vis_times.begin(),
+                    [deno](double a, const auto &s) { return static_cast<int>(a / deno + tolerance) * s.frac_x; });
+
+                // Calculate violation
+                double vio = std::accumulate(vis_times.begin(), vis_times.end(), -rhs);
+                if (vio > tolerance) {
+                    cuts.push_back(r1c);
+                    cut_record[r1c.info_r1c.first].insert(r1c.info_r1c.second);
+                    ++num_add_mem;
                 }
             }
-
-            // Transform vis_times based on denominator and tolerance
-            std::transform(
-                vis_times.begin(), vis_times.end(), sol.begin(), vis_times.begin(),
-                [deno](double a, const auto &s) { return static_cast<int>(a / deno + tolerance) * s.frac_x; });
-
-            // Calculate violation
-            double vio = std::accumulate(vis_times.begin(), vis_times.end(), -rhs);
-            if (vio > tolerance) {
-                cuts.push_back(r1c);
-                cut_record[r1c.info_r1c.first].insert(r1c.info_r1c.second);
-                ++num_add_mem;
-            }
         }
-    }
+    */
 
     void constructMemoryVertexBased() {
         std::vector<int> tmp_fill(dim);
@@ -1070,12 +1022,18 @@ public:
         std::vector<int>                       num_vis_times(sol.size(), 0);
         ankerl::unordered_dense::map<int, int> map_cut_mul;
         for (int i = 0; i < cut.size(); ++i) {
+            int vertex          = cut[i];
             int multiplier      = multi[i];
-            map_cut_mul[cut[i]] = multiplier;
-            for (const auto &[route_idx, frequency] : v_r_map[cut[i]]) {
-                num_vis_times[route_idx] += multiplier * frequency;
+            map_cut_mul[vertex] = multiplier;
+
+            for (int route_idx = 0; route_idx < v_r_map[vertex].size(); ++route_idx) {
+                int frequency = v_r_map[vertex][route_idx];
+                if (frequency > 0) { // Only proceed if the vertex appears in this route
+                    num_vis_times[route_idx] += multiplier * frequency;
+                }
             }
         }
+
         std::transform(num_vis_times.begin(), num_vis_times.end(), num_vis_times.begin(),
                        [denominator](int x) { return x / denominator; });
 

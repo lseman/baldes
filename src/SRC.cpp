@@ -376,7 +376,7 @@ std::pair<bool, bool> LimitedMemoryRank1Cuts::runSeparation(BNBNode *node, std::
     generator->setNodes(nodes);
     generator->generateSepHeurMem4Vertex();
     generator->initialize(allPaths);
-    generator->fillMemory();
+    //generator->fillMemory();
     generator->getHighDimCuts();
     // generator->setMemFactor(0.15);
     // generator->constructMemoryVertexBased();
