@@ -24,6 +24,8 @@
 #include <thread>
 #include <vector>
 
+#include "Logger.h"
+
 enum class BNBNodeSelectionStrategy {
     DFS,      // Depth-First Search
     BFS,      // Breadth-First Search
@@ -237,6 +239,7 @@ public:
         auto                          end     = std::chrono::high_resolution_clock::now();
         std::chrono::duration<double> elapsed = end - start;
         print_info("Elapsed time: {:.2f}\n", elapsed.count());
+        Logger::log("Elapsed time: {:.2f}\n", elapsed.count());
     }
 
     void branch(BNBNode *node) {
