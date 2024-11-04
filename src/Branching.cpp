@@ -17,7 +17,7 @@ void BranchingDuals::computeDuals(BNBNode *model, double threshold) {
             double dualValue = model->getDualVal(ctr->index());
 
             // TODO: check sign direction
-            if (candidate->boundType == BranchingDirection::Greater) { dualValue = -dualValue; }
+            if (candidate->boundType == BranchingDirection::Less) { dualValue = -dualValue; }
 
             if (std::abs(dualValue) < threshold) { continue; }
 

@@ -33,6 +33,7 @@ The algorithm is based on state-of-the-art RCESPP techniques, including interior
   - [🚀 Key Features](#-key-features)
 - [⚠️ Disclaimer](#️-disclaimer)
 - [📋 TODO](#-todo)
+- [Known Issues](#known-issues)
 - [🛠️ Building](#️-building)
   - [📋 Prerequisites](#-prerequisites)
   - [⚙️ Compiling](#️-compiling)
@@ -104,8 +105,7 @@ The Bucket Graph-based labeling algorithm organizes labels into **buckets** base
 
 Some features are experimental and subject to ongoing improvements:
 
-- **[experimental]** Knapsack Completion Bounds for Capacity Constraints
-- **[experimental]** Branching (Branch-Cut-and-Price) for the VRPTW
+- **[experimental]** Branching (Branch-Cut-and-Price) for the CVRP/VRPTW
 
 ## 📋 TODO
 
@@ -113,6 +113,10 @@ Some features are experimental and subject to ongoing improvements:
 - [ ] Refactor high order SRC cuts
 - [ ] Change pybind to nanobind
 - [x] Enchance the improvement heuristics.
+
+## Known Issues
+
+- Branching duals are not behaving as expected
 
 ## 🛠️ Building
 

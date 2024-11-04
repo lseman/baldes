@@ -422,103 +422,6 @@ void BucketGraph::forbidCycle(const std::vector<int> &cycle, bool aggressive) {
     }
 }
 
-/**
- * @brief Sets the adjacency list for the BucketGraph.
- *
- * This function initializes the adjacency list for each node in the graph by clearing existing arcs
- * and then adding new arcs based on the travel cost and resource consumption between nodes.
- *
- */
-/*
-void BucketGraph::set_adjacency_list() {
-   // Clear existing arcs for each node
-   for (auto &node : nodes) {
-       node.clear_arcs(); // Remove any existing arcs associated with the node
-   }
-
-   // Lambda function to add arcs for a specific node and bucket
-   auto add_arcs_for_node = [&](const VRPNode &node, int from_bucket, std::vector<double> &res_inc) {
-       using Arc =
-           std::tuple<double, int, std::vector<double>, double>; // Define an Arc as a tuple with priority value,
-                                                                 // node id, resource increments, and cost increment
-
-       // Containers to store the best arcs for forward and reverse directions
-       std::vector<Arc> best_arcs;
-       best_arcs.reserve(nodes.size()); // Reserve space for best arcs to avoid frequent memory reallocations
-
-       std::vector<Arc> best_arcs_rev;
-       best_arcs_rev.reserve(nodes.size()); // Reserve space for reverse arcs
-
-       // Iterate over all nodes to determine potential arcs
-       for (const auto &next_node : nodes) {
-           if (next_node.id == options.depot) continue; // Skip the depot
-           if (node.id == next_node.id) continue;       // Skip arcs to the same node
-
-           // Calculate the travel cost between the current node and the next node
-           auto   travel_cost = getcij(node.id, next_node.id);
-           double cost_inc =
-               travel_cost - next_node.cost; // Adjust the cost increment by subtracting the next node's cost
-
-           // Initialize the resource increments based on the current node's consumption
-           for (int r = 0; r < R_SIZE; ++r) { res_inc[r] = node.consumption[r]; }
-           res_inc[TIME_INDEX] += travel_cost; // Add travel time to the resource increment
-
-           int to_bucket = next_node.id;
-           if (from_bucket == to_bucket) continue; // Skip arcs that loop back to the same bucket
-
-           // Check feasibility of the arc based on resource constraints
-           bool feasible = true;
-           for (int r = 0; r < R_SIZE; ++r) {
-               if (node.lb[r] + res_inc[r] >
-                   next_node.ub[r]) { // If resource exceeds the upper bound of the next node, the arc is infeasible
-                   feasible = false;
-                   break;
-               }
-           }
-           if (!feasible) continue; // Skip if the arc is not feasible
-
-           // Calculate priority values for forward and reverse arcs
-           double aux_double = 1.E-5 * next_node.start_time; // Small weight for start time
-           best_arcs.emplace_back(aux_double, next_node.id, res_inc,
-                                  cost_inc); // Store the arc for forward direction
-
-           double aux_double_rev = 1.E-5 * node.start_time; // Small weight for end time
-           best_arcs_rev.emplace_back(aux_double_rev, next_node.id, res_inc,
-                                      cost_inc); // Store the arc for reverse direction
-       }
-
-       // Add forward arcs from the current node to its neighbors
-       for (const auto &arc : best_arcs) {
-           auto [priority_value, to_bucket, res_inc_local, cost_inc] = arc;
-
-           auto next_node = to_bucket;
-           nodes[node.id].add_arc(node.id, next_node, res_inc_local, cost_inc, true,
-                                  priority_value); // Add forward arc to the adjacency list
-       }
-
-       // Add reverse arcs from neighboring nodes to the current node
-       for (const auto &arc : best_arcs_rev) {
-           auto [priority_value, to_bucket, res_inc_local, cost_inc] = arc;
-           auto next_node                                            = to_bucket;
-
-           nodes[next_node].add_arc(next_node, node.id, res_inc_local, cost_inc, false,
-                                    priority_value); // Add reverse arc to the adjacency list
-       }
-   };
-
-   // Iterate over all nodes to set the adjacency list
-   for (const auto &VRPNode : nodes) {
-       if (VRPNode.id == options.end_depot) continue; // Skip the last node (depot)
-
-       // Initialize the resource increment vector based on the number of intervals
-       std::vector<double> res_inc(intervals.size());
-
-       // Add arcs for the current node
-       add_arcs_for_node(VRPNode, VRPNode.id, res_inc);
-   }
-}
-*/
-
 void BucketGraph::set_adjacency_list_manual() {
     // Clear existing arcs for each node
     for (auto &node : nodes) {
@@ -624,6 +527,16 @@ void BucketGraph::set_adjacency_list() {
         node.clear_arcs(); // Remove any existing arcs associated with the node
     }
 
+    RawArcList heur_arcs;
+    for (const auto &path : topHeurRoutes) {
+        for (size_t i = 0; i < path.size() - 1; ++i) {
+            int    from = path[i];
+            int    to   = path[i + 1];
+            RawArc arc(from, to);
+            heur_arcs.add_arc(arc);
+        }
+    }
+
     // Step 1: Compute the clusters using MST-based clustering
     MST    mst_solver(nodes, [&](int from, int to) { return this->getcij(from, to); });
     double theta    = 1.0; // Experiment with different values of θ
@@ -676,6 +589,9 @@ void BucketGraph::set_adjacency_list() {
             // Step 3: Calculate priority based on cluster membership
             double priority_value;
             double reverse_priority_value;
+
+            bool is_heuristic_arc = heur_arcs.has_arc(node.id, next_node.id);
+
             if (job_to_cluster[node.id] == job_to_cluster[next_node.id]) {
                 // Higher priority if both nodes are in the same cluster
                 priority_value         = 5.0 + 1.E-5 * next_node.start_time; // Adjust weight for same-cluster priority

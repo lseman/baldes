@@ -325,7 +325,7 @@ std::vector<double> BucketGraph::labeling_algorithm() noexcept {
 #elif LIMITED_BUCKETS
                                 buckets[to_bucket].sorted_label(new_label, BUCKET_CAPACITY);
 #else
-                                buckets[to_bucket].add_label(new_label);
+                                buckets[to_bucket].add_sorted_with_limit(new_label, 35);
 #endif
                                 all_ext = false; // Not all labels have been extended, continue processing
                             }
@@ -673,12 +673,14 @@ BucketGraph::Extend(const std::conditional_t<M == Mutability::Mut, Label *, cons
 
     // Compute branching duals
     if (branching_duals->size() > 0) {
+        
         if constexpr (D == Direction::Forward) {
             new_cost += branching_duals->getDual(initial_node_id, node_id);
         } else {
             new_cost += branching_duals->getDual(node_id, initial_node_id);
         }
-        new_cost += branching_duals->getDual(node_id);
+        auto b_duals = branching_duals->getDual(node_id);
+        new_cost += b_duals;
     }
 
     RCC_MODE_BLOCK(if constexpr (S == Stage::Four) {

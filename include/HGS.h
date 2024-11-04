@@ -34,6 +34,8 @@ public:
     // default constructor
     HGS() = default;
 
+    std::vector<std::vector<int>> bestRoutes;
+
     std::vector<std::vector<int>> run(const InstanceData &instance) {
 
         // InstanceData instance;
@@ -57,9 +59,11 @@ public:
         // std::cout << "----- GENETIC ALGORITHM FINISHED, TIME SPENT: " << params.getTimeElapsedSeconds() << std::endl;
         print_heur("Genetic algorithm finished in {:.2f} seconds\n", params.getTimeElapsedSeconds());
 
-        auto sol = population.extractTopBestFeasibleRoutes(25);
-
+        auto sol   = population.extractTopBestFeasibleRoutes(25);
+        bestRoutes = population.extractBestFeasibleRoutes();
         // Return 0 if the program execution was successfull
         return sol;
     }
+
+    std::vector<std::vector<int>> getBestRoutes() { return bestRoutes; }
 };

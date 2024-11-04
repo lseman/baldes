@@ -205,6 +205,8 @@ int main(int argc, char *argv[]) {
     HGSptr hgs              = std::make_shared<HGS>();
     auto   initialRoutesHGS = hgs->run(instance);
 
+    auto topRoutes = hgs->getBestRoutes();
+
     std::vector<VRPNode> nodes;
     nodes.clear();
     for (int k = 0; k < instance.nN; ++k) {
@@ -277,6 +279,7 @@ int main(int argc, char *argv[]) {
     node->problem  = problem;
     node->mip      = mip;
     node->instance = instance;
+    node->bestRoutes = topRoutes;
 
     BranchAndBound solver(std::move(problem), BNBNodeSelectionStrategy::DFS); // Choose
     solver.setRootNode(node);
