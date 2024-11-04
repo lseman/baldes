@@ -181,10 +181,33 @@ public:
     }
 
     void printBranchingConstraint() {
-        // Iterate over constraints and print the name if it contains "branching"
         for (const auto &constraint : constraints) {
-            if (constraint->get_name().find("branching") != std::string::npos) {
-                print_branching("Constraint '{}' is part of the branching set.\n", constraint->get_name());
+            std::string name = constraint->get_name();
+            if (name.find("branching") != std::string::npos) {
+                std::stringstream        ss(name);
+                std::string              segment;
+                std::vector<std::string> parts;
+
+                // Split by underscore
+                while (std::getline(ss, segment, '_')) { parts.push_back(segment); }
+
+                if (parts.size() >= 4 && parts[1] == "node") {
+                    int node  = std::stoi(parts[2]);
+                    int bound = std::stoi(parts[3]);
+
+                    print_branching("Branching on node {} is '{}=' bound {}\n", node, constraint->get_relation(), bound);
+                }
+                if (parts.size() >= 4 && parts[1] == "edge") {
+                    int source = std::stoi(parts[2]);
+                    int target = std::stoi(parts[3]);
+                    int bound  = std::stoi(parts[4]);
+
+                    print_branching("Branching on edge ({},{}) with bound {}\n", source, target, bound);
+                }
+                if (parts.size() >= 3 && parts[1] == "vehicle") {
+                    int bound = std::stoi(parts[2]);
+                    print_branching("Branching on vehicle with bound {}\n", bound);
+                }
             }
         }
     }

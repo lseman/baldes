@@ -892,6 +892,8 @@ public:
         }
     }
 
+    std::vector<std::vector<int>> topHeurRoutes;
+
     bool updateStepSize() {
         bool updated = false;
         if (bucket_interval > 100) { return false; }

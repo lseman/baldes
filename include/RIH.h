@@ -446,6 +446,10 @@ public:
         std::lock_guard<std::mutex> lock(labels_mutex);
         std::vector<Label *>        labels = std::move(processed_labels); // Transfer ownership
         processed_labels.clear();                                         // Clear the processed_labels vector
+
+        pdqsort(labels.begin(), labels.end(),
+                [](const Label *a, const Label *b) { return a->cost < b->cost; });
+
         return labels;
     }
 

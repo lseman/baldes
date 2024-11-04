@@ -151,3 +151,23 @@ public:
 private:
     std::vector<Arc> predefined_arcs; // List of predefined arcs
 };
+
+class RawArcList {
+public:
+    // Add a predefined arc to the list
+    void add_arc(const RawArc &arc) { predefined_arcs.emplace_back(arc); }
+
+    // Check if an arc exists between two nodes
+    bool has_arc(int from, int to) const {
+        for (const auto &arc : predefined_arcs) {
+            if (arc.from == from && arc.to == to) { return true; }
+        }
+        return false;
+    }
+
+    // define get_arcs
+    const std::vector<RawArc> &get_arcs() const { return predefined_arcs; }
+
+private:
+    std::vector<RawArc> predefined_arcs; // List of predefined arcs
+};

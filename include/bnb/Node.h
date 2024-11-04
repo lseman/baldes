@@ -96,6 +96,8 @@ public:
     VRProblem   *problem;
     InstanceData instance;
 
+    std::vector<std::vector<int>> bestRoutes;
+
     int depth = 0;
     int numConstrs = 0;
 

@@ -443,7 +443,7 @@ public:
         node->optimize();
         relaxed_result = std::numeric_limits<double>::max();
 
-        // check if feasible
+    // check if feasible
         if (node->getStatus() != 2) {
             print_info("Model is infeasible, pruning node.\n");
             node->setPrune(true);
@@ -484,6 +484,8 @@ public:
         bucket_graph->set_distance_matrix(instance.getDistanceMatrix(), 8);
         bucket_graph->branching_duals = branchingDuals;
         bucket_graph->A_MAX           = N_SIZE;
+
+        bucket_graph->topHeurRoutes = node->bestRoutes;
 
         matrix                  = node->extractModelDataSparse();
         auto integer_solution   = node->getObjVal();
