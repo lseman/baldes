@@ -16,17 +16,11 @@
 
 #include <ranges>
 
-/*
-#include <pybind11/embed.h>
-#include <pybind11/stl.h>
-*/
 #include <exec/static_thread_pool.hpp>
 #include <stdexec/execution.hpp>
 
 #include "Bitset.h"
 #include "utils/Hashes.h"
-
-#include <experimental/simd>
 
 constexpr int INITIAL_RANK_1_MULTI_LABEL_POOL_SIZE              = 50;
 using yzzLong                                                   = Bitset<N_SIZE>;

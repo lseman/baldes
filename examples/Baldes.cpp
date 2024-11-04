@@ -36,6 +36,8 @@
 #include "bnb/Node.h"
 #include "miphandler/MIPHandler.h"
 
+#include "Logger.h"
+
 #ifdef GUROBI
 #include "gurobi_c++.h"
 #include "solvers/Gurobi.h"
@@ -174,6 +176,8 @@ int main(int argc, char *argv[]) {
     std::string problem_kind  = argv[1];
     std::string instance_name = argv[2];
 
+
+
     // Initialize the instance data and print the problem kind
     InstanceData instance;
     if (problem_kind == "vrptw") {
@@ -192,6 +196,9 @@ int main(int argc, char *argv[]) {
         std::cerr << "Unsupported problem kind: " << problem_kind << "\n";
         return 1;
     } // py::scoped_interpreter guard{};
+
+    Logger::init("logfile.txt");
+    Logger::log("Starting the BCP algorithm for the {} problem \n", instance_name);
 
     print_heur("Initializing heuristic solver for initial solution\n");
 

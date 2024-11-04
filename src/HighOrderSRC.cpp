@@ -1,11 +1,13 @@
 
 #include "cuts/HighOrderSRC.h"
 
+#include "Bitset.h"
+
 #include "../third_party/small_vector.hpp"
 
 void HighDimCutsGenerator::generateOptimalMultiplier() {
     map_rank1_multiplier[max_heuristic_initial_seed_set_size_row_rank1c + 1].resize(10);
-    ankerl::unordered_dense::map<int, std::bitset<8>> support;
+    ankerl::unordered_dense::map<int, Bitset<8>> support;
 
     for (int i = 1; i <= max_heuristic_initial_seed_set_size_row_rank1c; ++i) {
         auto &it  = map_rank1_multiplier[i];
