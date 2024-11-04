@@ -553,13 +553,13 @@ void BucketGraph::ConcatenateLabel(const Label *L, int &b, Label *&pbest, std::v
 
         // Get the labels for the current bucket
         auto       &bucket = bw_buckets[current_bucket];
-        const auto &labels = bucket.get_labels();
+        const auto labels = bucket.get_labels();
 
         for (const auto &L_bw : labels) {
             if (L_bw->node_id == L_node_id || !check_feasibility(L, L_bw)) continue;
             double candidate_cost = L_cost_plus_cost + L_bw->cost;
 
-            SRC_MODE_BLOCK(if constexpr (S > Stage::Three) {
+            SRC_MODE_BLOCK(if constexpr (S == Stage::Four) {
                 for (auto it = cutter->begin(); it < cutter->end(); ++it) {
                     if ((*SRCDuals)[it->id] == 0) continue;
                     auto den = it->p.den;
@@ -588,7 +588,7 @@ void BucketGraph::ConcatenateLabel(const Label *L, int &b, Label *&pbest, std::v
             }
 
             // Compute and store the new label
-            pbest = compute_label(L, L_bw);
+            pbest = compute_label<S>(L, L_bw);
             merged_labels.push_back(pbest);
         }
 
@@ -890,7 +890,7 @@ void BucketGraph::heuristic_fixing() {
 
     auto group_labels = [&](auto &buckets, auto &labels_map) {
         for (auto &bucket : buckets) {
-            for (auto &label : bucket.get_labels()) {
+            for (auto label : bucket.get_labels()) {
                 labels_map[label->node_id].push_back(label); // Directly index using node_id
             }
         }

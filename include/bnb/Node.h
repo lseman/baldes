@@ -98,7 +98,7 @@ public:
 
     std::vector<std::vector<int>> bestRoutes;
 
-    int depth = 0;
+    int depth      = 0;
     int numConstrs = 0;
 
     MIPProblem mip = MIPProblem("node", 0, 0);
@@ -136,7 +136,7 @@ public:
         auto gurobi_model = mip.toGurobiModel(GurobiEnvSingleton::getInstance());
         solver            = new GurobiSolver(&gurobi_model);
 #endif
-        uuid = generateUUID();
+        uuid              = generateUUID();
         this->initialized = true;
         RCC_MODE_BLOCK(CMGR_CreateCMgr(&oldCutsCMP, 100); // For old cuts, if needed
         )
@@ -226,9 +226,14 @@ public:
             child->SRCconstraints.push_back(new Constraint(*constraint)); // Deep copy each `Constraint` object
         }
 
+        //child->clearSRC();
         child->matrix = matrix;
         // Return the new child node
         return child;
+    }
+
+    void clearSRC() {
+        for (auto *c : SRCconstraints) { mip.delete_constraint(c); }
     }
 
     void addChildren(BNBNode *child) {
@@ -411,8 +416,8 @@ public:
                             linExpr.add_or_update_term(
                                 variables[i]->get_name(),
                                 paths[i].timesArc(arg.first, arg.second) ? 1.0 : 0.0); // Use pair payload
-                            name = "branching_edge_" + std::to_string(arg.first) + "_" + std::to_string(arg.second) + "_" +
-                                   std::to_string(int(rhs));
+                            name = "branching_edge_" + std::to_string(arg.first) + "_" + std::to_string(arg.second) +
+                                   "_" + std::to_string(int(rhs));
                         } else {
                             throw std::invalid_argument("Payload for Edge must be a std::pair<int, int>.");
                         }
@@ -432,7 +437,8 @@ public:
                                     linExpr.add_or_update_term(variables[i]->get_name(),
                                                                1.0); // Add term with coefficient 1.0
                                 }
-                                name = "branching_cluster_" + std::to_string(cluster_ele) + "_" + std::to_string(int(rhs));
+                                name =
+                                    "branching_cluster_" + std::to_string(cluster_ele) + "_" + std::to_string(int(rhs));
                             }
                         } else {
                             throw std::invalid_argument("Payload for Cluster must be a std::vector<int>.");
@@ -459,14 +465,14 @@ public:
         // mip->update();
         return constraint;
     }
-    using BranchingDualsPtr = std::shared_ptr<BranchingDuals>;
+    using BranchingDualsPtr          = std::shared_ptr<BranchingDuals>;
     BranchingDualsPtr branchingDuals = std::make_shared<BranchingDuals>();
 
     void enforceBranching() {
         // Iterate over the candidates and enforce the branching constraints
         for (const auto &candidate : candidates) {
-            auto ctr = addBranchingConstraint(candidate->boundValue, candidate->boundType,
-                                                     candidate->candidateType, candidate->payload);
+            auto ctr = addBranchingConstraint(candidate->boundValue, candidate->boundType, candidate->candidateType,
+                                              candidate->payload);
             branchingDuals->addCandidate(candidate, ctr);
         }
         mip.printBranchingConstraint();

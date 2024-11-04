@@ -484,6 +484,7 @@ public:
         bucket_graph->set_distance_matrix(instance.getDistanceMatrix(), 8);
         bucket_graph->branching_duals = branchingDuals;
         bucket_graph->A_MAX           = N_SIZE;
+        bucket_graph->depth = node->depth;
 
         bucket_graph->topHeurRoutes = node->bestRoutes;
 

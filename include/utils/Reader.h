@@ -229,7 +229,6 @@ inline int VRPTW_read_instance(const std::string &file_name, InstanceData &insta
     std::vector<double> xcoord(instance.nN);
     std::vector<double> ycoord(instance.nN);
     instance.demand.resize(instance.nN);
-    instance.demand_additional.resize(instance.nN);
     instance.window_open.resize(instance.nN);
     instance.window_close.resize(instance.nN);
     instance.service_time.resize(instance.nN);

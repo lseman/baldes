@@ -38,6 +38,8 @@
 
 #include "Logger.h"
 
+#include "POPMUSIC.h"
+
 #ifdef GUROBI
 #include "gurobi_c++.h"
 #include "solvers/Gurobi.h"
@@ -176,8 +178,6 @@ int main(int argc, char *argv[]) {
     std::string problem_kind  = argv[1];
     std::string instance_name = argv[2];
 
-
-
     // Initialize the instance data and print the problem kind
     InstanceData instance;
     if (problem_kind == "vrptw") {
@@ -202,8 +202,18 @@ int main(int argc, char *argv[]) {
 
     print_heur("Initializing heuristic solver for initial solution\n");
 
-    HGSptr hgs              = std::make_shared<HGS>();
-    auto   initialRoutesHGS = hgs->run(instance);
+    HGSptr hgs = std::make_shared<HGS>();
+
+    /*
+        HGS myhgs;
+        int alpha = 50, delta = 40, timeLimit = 3600;  // Example parameters
+        fmt::print("Running POPMUSIC algorithm\n");
+        POPMUSIC popmusic(instance, myhgs, alpha, delta, timeLimit);
+        Solution optimizedSolution = popmusic.run();
+        fmt::print("Optimized solution cost: {}\n", optimizedSolution.totalCost);
+        */
+
+    auto initialRoutesHGS = hgs->run(instance);
 
     auto topRoutes = hgs->getBestRoutes();
 
@@ -274,11 +284,11 @@ int main(int argc, char *argv[]) {
         problem->problemType = ProblemType::cvrp;
     }
 
-    BNBNode *node  = new BNBNode(mip);
-    node->paths    = paths;
-    node->problem  = problem;
-    node->mip      = mip;
-    node->instance = instance;
+    BNBNode *node    = new BNBNode(mip);
+    node->paths      = paths;
+    node->problem    = problem;
+    node->mip        = mip;
+    node->instance   = instance;
     node->bestRoutes = topRoutes;
 
     BranchAndBound solver(std::move(problem), BNBNodeSelectionStrategy::DFS); // Choose
