@@ -35,7 +35,6 @@ Params::Params(const InstanceData &instance) {
     int         serviceTimeData = 0;
     int         node;
     bool        hasServiceTimeSection = false;
-    // nbClients                         = N_SIZE - 1;
     totalDemand     = 0;
     maxDemand       = 0;
     nbVehicles      = instance.nV;
@@ -51,7 +50,7 @@ Params::Params(const InstanceData &instance) {
 
     problemType = instance.problem_type;
     // Loop over all customer lines
-    for (int i = 0; i < N_SIZE - 1; i++) {
+    for (int i = 0; i < instance.nN - 1; i++) {
         cli[nbClients].custNum = i;
 
         cli[nbClients].coordX          = instance.x_coord[i];

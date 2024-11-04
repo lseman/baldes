@@ -15,6 +15,7 @@
 
 #include "Arc.h"
 #include "Label.h"
+#include "config.h"
 /**
  * @struct Bucket
  * @brief Represents a bucket.
@@ -30,6 +31,8 @@ struct Bucket {
     // std::pmr::unsynchronized_pool_resource pool;
     std::vector<Label *> labels_vec;
 
+    int depth = 0;
+
     int                    node_id = -1;
     std::vector<double>    lb;
     std::vector<double>    ub;
@@ -39,6 +42,7 @@ struct Bucket {
     std::vector<BucketArc> bw_bucket_arcs;
     std::vector<JumpArc>   fw_jump_arcs;
     std::vector<JumpArc>   bw_jump_arcs;
+    std::vector<Bucket>    sub_buckets; // Holds sub-buckets within the "mother bucket"
 
     Bucket(const Bucket &other) : labels_vec(other.labels_vec) {
         // Deep copy or other operations, if needed
@@ -94,6 +98,52 @@ struct Bucket {
                                                     return arc.from_bucket == from_bucket && arc.to_bucket == to_bucket;
                                                 }),
                                  bw_bucket_arcs.end());
+        }
+    }
+
+    bool             is_split        = false;
+    static constexpr double min_split_range = 2.0; // Define a threshold for minimum range to split
+
+    void split_into_sub_buckets(size_t num_sub_buckets) {
+        double total_range = ub[0] - lb[0]; // Assuming 1D bounds here
+
+        // Check if the range is too small to justify splitting
+        if (total_range < min_split_range) {
+            // Skip splitting and retain labels in the mother bucket
+            print_info("Skipping split due to small range. lb: {}, ub: {}, range: {}\n", lb[0], ub[0], total_range);
+            return;
+        }
+
+        is_split = true;
+        sub_buckets.clear();
+        sub_buckets.reserve(num_sub_buckets);
+
+        // Calculate new bounds for each sub-bucket
+        double range_per_bucket = total_range / num_sub_buckets; // Example for 1D case
+        // print_info("Splitting bucket into {} sub-buckets with range per bucket: {}\n", num_sub_buckets,
+                //    range_per_bucket);
+
+        for (size_t i = 0; i < num_sub_buckets; ++i) {
+            Bucket sub_bucket;
+            sub_bucket.node_id = node_id;
+            sub_bucket.lb      = {lb[0] + i * range_per_bucket};
+            sub_bucket.ub      = {lb[0] + (i + 1) * range_per_bucket};
+            sub_bucket.depth   = depth + 1;
+            sub_buckets.push_back(std::move(sub_bucket));
+        }
+
+        // Distribute existing labels into sub-buckets based on their cost
+        for (auto label : labels_vec) { assign_label_to_sub_bucket(label); }
+        labels_vec.clear(); // Clear mother bucket's labels after distribution
+    }
+
+    void assign_label_to_sub_bucket(Label *label) {
+        double cost = label->cost;
+        for (auto &sub_bucket : sub_buckets) {
+            if (cost >= sub_bucket.lb[0] && cost < sub_bucket.ub[0]) {
+                sub_bucket.labels_vec.push_back(label);
+                return;
+            }
         }
     }
 
@@ -176,7 +226,18 @@ struct Bucket {
      * This function adds a label to the labels vector. The label is currently added to the end of the vector.
      *
      */
-    void add_label(Label *label) noexcept { labels_vec.push_back(label); }
+    // void add_label(Label *label) noexcept { labels_vec.push_back(label); }
+    void add_label(Label *label) {
+        if (!is_split) {
+            labels_vec.push_back(label);
+            if (labels_vec.size() >= BUCKET_CAPACITY) {
+                // print_info("Bucket capacity reached\n");
+                split_into_sub_buckets(2); // Example: Split into 4 sub-buckets
+            }
+        } else {
+            assign_label_to_sub_bucket(label); // Directly add to the correct sub-bucket
+        }
+    }
 
     /**
      * @brief Adds a label to the labels_vec in sorted order based on the cost.
@@ -186,15 +247,58 @@ struct Bucket {
      * using binary search to find the appropriate position, ensuring efficient insertion.
      *
      */
+    /*
+   void add_sorted_label(Label *label) noexcept {
+       if (labels_vec.empty() || label->cost >= labels_vec.back()->cost) {
+           labels_vec.push_back(label); // Direct insertion at the end
+       } else if (label->cost <= labels_vec.front()->cost) {
+           labels_vec.insert(labels_vec.begin(), label); // Direct insertion at the beginning
+       } else {
+           auto it = std::lower_bound(labels_vec.begin(), labels_vec.end(), label,
+                                      [](const Label *a, const Label *b) { return a->cost < b->cost; });
+           labels_vec.insert(it, label); // Insertion in the middle
+       }
+   }
+   */
+
     void add_sorted_label(Label *label) noexcept {
-        if (labels_vec.empty() || label->cost >= labels_vec.back()->cost) {
-            labels_vec.push_back(label); // Direct insertion at the end
-        } else if (label->cost <= labels_vec.front()->cost) {
-            labels_vec.insert(labels_vec.begin(), label); // Direct insertion at the beginning
+        // Lambda to add label in sorted order within a vector of labels
+        auto add_sorted_to_vector = [&](std::vector<Label *> &labels) {
+            if (labels.empty() || label->cost >= labels.back()->cost) {
+                labels.push_back(label); // Direct insertion at the end
+            } else if (label->cost <= labels.front()->cost) {
+                labels.insert(labels.begin(), label); // Direct insertion at the beginning
+            } else {
+                auto it = std::lower_bound(labels.begin(), labels.end(), label,
+                                           [](const Label *a, const Label *b) { return a->cost < b->cost; });
+                labels.insert(it, label); // Insertion in the middle
+            }
+        };
+
+        // Check if the mother bucket is already split into sub-buckets
+        if (!is_split) {
+            // Add label to the mother bucket's labels in sorted order
+            add_sorted_to_vector(labels_vec);
+
+            // Check if splitting is needed
+            if (labels_vec.size() > BUCKET_CAPACITY) {
+                // Trigger splitting process (e.g., into 4 sub-buckets)
+                split_into_sub_buckets(2);
+
+                // Re-assign the newly added label into the correct sub-bucket
+                assign_label_to_sub_bucket(label);
+
+                // Clear mother bucket's labels as they have been redistributed
+                labels_vec.clear();
+            }
         } else {
-            auto it = std::lower_bound(labels_vec.begin(), labels_vec.end(), label,
-                                       [](const Label *a, const Label *b) { return a->cost < b->cost; });
-            labels_vec.insert(it, label); // Insertion in the middle
+            // If already split, find the correct sub-bucket and add label there
+            for (auto &sub_bucket : sub_buckets) {
+                if (label->cost >= sub_bucket.lb[0] && label->cost < sub_bucket.ub[0]) {
+                    add_sorted_to_vector(sub_bucket.labels_vec);
+                    return;
+                }
+            }
         }
     }
 
@@ -219,16 +323,20 @@ struct Bucket {
 
     void add_sorted_with_limit(Label *label, size_t limit) noexcept {
         if (labels_vec.empty() || label->cost >= labels_vec.back()->cost) {
-            labels_vec.push_back(label); // Direct insertion at the end
+            labels_vec.push_back(label);
         } else if (label->cost <= labels_vec.front()->cost) {
-            labels_vec.insert(labels_vec.begin(), label); // Direct insertion at the beginning
+            labels_vec.insert(labels_vec.begin(), label);
         } else {
             auto it = std::lower_bound(labels_vec.begin(), labels_vec.end(), label,
                                        [](const Label *a, const Label *b) { return a->cost < b->cost; });
-            labels_vec.insert(it, label); // Insertion
-            // Check if the vector has reached the limit
-            // If so, remove the last element
-            if (labels_vec.size() > limit) { labels_vec.pop_back(); }
+
+            // Insert only if within limit or smaller than current max element
+            if (labels_vec.size() < limit || label->cost < labels_vec.back()->cost) {
+                labels_vec.insert(it, label);
+
+                // Remove last if we exceed the limit
+                if (labels_vec.size() > limit) { labels_vec.pop_back(); }
+            }
         }
     }
 
@@ -250,7 +358,19 @@ struct Bucket {
     }
 
     // std::vector<Label *> &get_labels() { return labels_vec; }
-    inline auto &get_labels() { return labels_vec; }
+    // inline auto &get_labels() { return labels_vec; }
+
+    inline std::vector<Label *> get_labels() const {
+        if (is_split) {
+            std::vector<Label *> all_labels;
+            for (const auto &sub_bucket : sub_buckets) {
+                all_labels.insert(all_labels.end(), sub_bucket.labels_vec.begin(), sub_bucket.labels_vec.end());
+            }
+            return all_labels;
+        } else {
+            return labels_vec;
+        }
+    }
 
     inline auto &get_sorted_labels() {
         pdqsort(labels_vec.begin(), labels_vec.end(), [](const Label *a, const Label *b) { return a->cost < b->cost; });

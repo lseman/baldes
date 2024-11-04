@@ -291,6 +291,7 @@ public:
     std::mutex mtx; // For thread-safe access to merged_labels_improved
     //
     int redefine_counter = 0;
+    int depth            = 0;
 
     IteratedLocalSearch *ils = nullptr;
 
@@ -495,7 +496,10 @@ public:
     void                 set_adjacency_list_manual();
 
     double knapsackBound(const Label *l);
+
+    template <Stage S>
     Label *compute_label(const Label *L, const Label *L_prime);
+
     bool   BucketSetContains(const std::set<int> &bucket_set, const int &bucket);
     void   setSplit(const std::vector<double> q_star) { this->q_star = q_star; }
     int    getStage() const { return stage; }

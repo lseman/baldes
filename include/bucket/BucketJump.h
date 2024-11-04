@@ -70,7 +70,7 @@ void BucketGraph::UpdateBucketsSet(const double theta, const Label *label, anker
 
         // Only process if bucket is not already in Bbidi
         if (Bbidi.insert(curr_bucket).second) {
-            const auto &opposite_labels = buckets_opposite[curr_bucket].get_labels();
+            const auto opposite_labels = buckets_opposite[curr_bucket].get_labels();
             for (const auto &L : opposite_labels) {
                 if (label->node_id == L->node_id || bitmaps_conflict(label, L)) {
                     continue; // Skip labels with the same node ID or conflicting bitmaps
@@ -155,7 +155,7 @@ void BucketGraph::BucketArcElimination(double theta) {
         if (!jump_arcs.empty()) {
             const size_t          n_segments = buckets_size / 64 + 1;
             std::vector<uint64_t> Bvisited(n_segments, 0);
-            auto                 &labels = buckets[b].get_labels();
+            auto                 labels = buckets[b].get_labels();
             for (const auto &a : jump_arcs) {
                 auto increment = a.resource_increment;
 
@@ -177,7 +177,7 @@ void BucketGraph::BucketArcElimination(double theta) {
     // Function to process bucket arcs
     auto process_bucket_arcs = [&](int b) {
         const auto &bucket_arcs = buckets[b].template get_bucket_arcs<D>();
-        auto       &labels      = buckets[b].get_labels();
+        auto       labels      = buckets[b].get_labels();
 
         const size_t          n_segments = buckets_size / 64 + 1;
         std::vector<uint64_t> Bvisited(n_segments, 0);

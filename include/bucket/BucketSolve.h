@@ -55,7 +55,7 @@ inline std::vector<Label *> BucketGraph::solve(bool trigger) {
     // ADAPTIVE STAGE HANDLING
     //////////////////////////////////////////////////////////////////////
     // Stage 1: Apply a light heuristic (Stage::One)
-    if (s1) {
+    if (s1 && depth == 0) {
         stage = 1;
         paths = bi_labeling_algorithm<Stage::One>(); // Solve the problem with Stage 1 heuristic
         // inner_obj = paths[0]->cost;
@@ -67,7 +67,7 @@ inline std::vector<Label *> BucketGraph::solve(bool trigger) {
         }
     }
     // Stage 2: Apply a more expensive pricing heuristic (Stage::Two)
-    else if (s2) {
+    else if (s2 && depth == 0) {
         s2    = true;
         stage = 2;
         paths = bi_labeling_algorithm<Stage::Two>(); // Solve the problem with Stage 2 heuristic
@@ -80,7 +80,7 @@ inline std::vector<Label *> BucketGraph::solve(bool trigger) {
         }
     }
     // Stage 3: Apply a heuristic fixing approach (Stage::Three)
-    else if (s3) {
+    else if (s3 && depth == 0) {
         stage = 3;
         paths = bi_labeling_algorithm<Stage::Three>(); // Solve the problem with Stage 3 heuristic
         // inner_obj = paths[0]->cost;
@@ -93,7 +93,7 @@ inline std::vector<Label *> BucketGraph::solve(bool trigger) {
         }
     }
     // Stage 4: Exact labeling algorithm with fixing enabled (Stage::Four)
-    else if (s4) {
+    else {
         stage = 4;
 
 #ifdef FIX_BUCKETS
@@ -218,9 +218,10 @@ std::vector<double> BucketGraph::labeling_algorithm() noexcept {
         do {
             all_ext = true; // Assume all labels have been extended at the start
             for (const auto bucket : sorted_sccs[scc_index]) {
-                auto bucket_labels = buckets[bucket].get_unextended_labels(); // Get unextended labels from this bucket
+                auto bucket_labels = buckets[bucket].get_labels(); // Get unextended labels from this bucket
                 // if (bucket_labels.empty()) { continue; }            // Skip empty buckets
                 for (Label *label : bucket_labels) {
+                    if (label->is_extended) { continue; } // Skip already extended labels
                     // NOTE: double check if this is the best way to handle this
                     if constexpr (F == Full::Partial) {
                         if constexpr (D == Direction::Forward) {
@@ -277,31 +278,69 @@ std::vector<double> BucketGraph::labeling_algorithm() noexcept {
                                     }
                                 }
                             } else {
+
+                                /*
+                                                                if (check_dominance_against_vector<D, S>(new_label,
+                                   to_bucket_labels, cut_storage, options.resources.size())) { stat_n_dom++; //
+                                   Increment dominated labels count dominated = true;
+                                                                }
+                                                                */
+                                // Lambda to check dominance in a specified bucket
+
+                                auto &mother_bucket             = buckets[to_bucket];
+                                auto  check_dominance_in_bucket = [&](const std::vector<Label *> &labels) {
 #ifndef AVX
+                                    for (auto *existing_label : labels) {
+                                        if (is_dominated<D, S>(new_label, existing_label)) {
+                                            stat_n_dom++; // Increment dominated labels count
+                                            dominated = true;
+                                            break;
+                                        }
+                                    }
+#else
+                                    return check_dominance_against_vector<D, S>(new_label, labels, cut_storage,
+                                                                                options.resources.size());
+#endif
+                                };
 
-                                // General dominance check
-                                for (size_t j = 0; j < to_bucket_labels.size(); ++j) {
-                                    Label *existing_label = to_bucket_labels[j];
-
-                                    // Prefetch the next label for comparison
-                                    // if (j + 1 < to_bucket_labels.size()) {
-                                    //    __builtin_prefetch(to_bucket_labels[j + 1]);
-                                    //}
-
-                                    if (is_dominated<D, S>(new_label, existing_label)) {
+                                // Check if the mother bucket is split into sub-buckets
+                                if (!mother_bucket.is_split) {
+                                    // Perform dominance check directly on the mother bucket's labels
+                                    if (check_dominance_in_bucket(mother_bucket.labels_vec)) {
                                         stat_n_dom++; // Increment dominated labels count
                                         dominated = true;
-                                        break;
+                                    }
+                                } else {
+                                    // Proceed with sub-bucket dominance checks if the bucket is split
+                                    auto &sub_buckets = mother_bucket.sub_buckets;
+
+                                    // Identify the current sub-bucket based on `new_label` cost or other criteria
+                                    Bucket *current_sub_bucket = nullptr;
+                                    for (auto &sub_bucket : sub_buckets) {
+                                        if (new_label->cost >= sub_bucket.lb[0] && new_label->cost < sub_bucket.ub[0]) {
+                                            current_sub_bucket = &sub_bucket;
+                                            break;
+                                        }
+                                    }
+
+                                    // Check dominance in the current sub-bucket
+                                    if (current_sub_bucket &&
+                                        check_dominance_in_bucket(current_sub_bucket->get_labels())) {
+                                        stat_n_dom++; // Increment dominated labels count
+                                        dominated = true;
+                                    } else {
+                                        // If not dominated, check other sub-buckets
+                                        for (auto &sub_bucket : sub_buckets) {
+                                            if (&sub_bucket == current_sub_bucket)
+                                                continue; // Skip the current sub-bucket
+                                            if (check_dominance_in_bucket(sub_bucket.get_labels())) {
+                                                stat_n_dom++; // Increment dominated labels count
+                                                dominated = true;
+                                                break;
+                                            }
+                                        }
                                     }
                                 }
-
-#else
-                                if (check_dominance_against_vector<D, S>(new_label, to_bucket_labels, cut_storage,
-                                                                         options.resources.size())) {
-                                    stat_n_dom++; // Increment dominated labels count
-                                    dominated = true;
-                                }
-#endif
                             }
 
                             if (!dominated) {
@@ -325,7 +364,7 @@ std::vector<double> BucketGraph::labeling_algorithm() noexcept {
 #elif LIMITED_BUCKETS
                                 buckets[to_bucket].sorted_label(new_label, BUCKET_CAPACITY);
 #else
-                                buckets[to_bucket].add_sorted_with_limit(new_label, 35);
+                                buckets[to_bucket].add_sorted_label(new_label);
 #endif
                                 all_ext = false; // Not all labels have been extended, continue processing
                             }
@@ -360,7 +399,7 @@ std::vector<double> BucketGraph::labeling_algorithm() noexcept {
 
         // Update the cost bounds (c_bar) for the current SCC's buckets
         for (const int bucket : sorted_sccs[scc_index]) {
-            const auto &labels = buckets[bucket].get_labels();
+            const auto labels = buckets[bucket].get_labels();
 
             // Find the label with the minimum cost in the bucket
             if (!labels.empty()) {
@@ -430,7 +469,7 @@ std::vector<Label *> BucketGraph::bi_labeling_algorithm() {
     // Check if the best forward and backward labels can be combined into a feasible solution
     if (check_feasibility(fw_best_label, bw_best_label)) {
         // If feasible, compute and combine the best forward and backward labels into one
-        best_label = compute_label(fw_best_label, bw_best_label);
+        best_label = compute_label<S>(fw_best_label, bw_best_label);
     } else {
         // If not feasible, set the best label to have infinite cost (not usable)
         best_label->cost          = 0.0;
@@ -449,8 +488,8 @@ std::vector<Label *> BucketGraph::bi_labeling_algorithm() {
 
     // Iterate over all forward buckets
     for (auto bucket = 0; bucket < fw_buckets_size; ++bucket) {
-        auto       &current_bucket = fw_buckets[bucket];          // Get the current bucket
-        const auto &labels         = current_bucket.get_labels(); // Get labels in the current bucket
+        auto      &current_bucket = fw_buckets[bucket];          // Get the current bucket
+        const auto labels         = current_bucket.get_labels(); // Get labels in the current bucket
         //
         if constexpr (S == Stage::Four) {
             non_dominated_labels_per_bucket += labels.size(); // Track non-dominated labels
@@ -673,7 +712,7 @@ BucketGraph::Extend(const std::conditional_t<M == Mutability::Mut, Label *, cons
 
     // Compute branching duals
     if (branching_duals->size() > 0) {
-        
+
         if constexpr (D == Direction::Forward) {
             new_cost += branching_duals->getDual(initial_node_id, node_id);
         } else {
@@ -938,7 +977,7 @@ inline bool BucketGraph::DominatedInCompWiseSmallerBuckets(const Label *L, int b
 
         // If the current bucket is different from the label's bucket, compare the labels in this bucket
         if (b_L != currentBucket) {
-            const auto &bucket_labels = buckets[currentBucket].get_labels(); // Get the labels in the current bucket
+            const auto bucket_labels = buckets[currentBucket].get_labels(); // Get the labels in the current bucket
             // Iterate over each label in the current bucket and check if it dominates L
 
 #ifndef AVX
@@ -995,4 +1034,67 @@ void BucketGraph::run_labeling_algorithms(std::vector<double> &forward_cbar, std
                 });
 
     stdexec::sync_wait(std::move(work));
+}
+
+/**
+ * Computes a new label based on the given labels L and L_prime.
+ *
+ */
+template <Stage S>
+Label *BucketGraph::compute_label(const Label *L, const Label *L_prime) {
+    double cij_cost = getcij(L->node_id, L_prime->node_id);
+    double new_cost = L->cost + L_prime->cost + cij_cost;
+
+    double real_cost = L->real_cost + L_prime->real_cost + cij_cost;
+
+    if constexpr (S == Stage::Four) {
+#if defined(RCC) || defined(EXACT_RCC)
+        auto arc_dual = arc_duals.getDual(L->node_id, L_prime->node_id);
+        new_cost -= arc_dual;
+#endif
+    }
+
+    // Branching duals
+    if (branching_duals->size() > 0) { new_cost -= branching_duals->getDual(L->node_id, L_prime->node_id); }
+
+    // Directly acquire new_label and set the cost
+    auto new_label       = label_pool_fw->acquire();
+    new_label->cost      = new_cost;
+    new_label->real_cost = real_cost;
+
+    if constexpr (S == Stage::Four) {
+        SRC_MODE_BLOCK(
+            //  Check SRCDuals condition for specific stages
+            auto sumSRC = 0.0; const auto &SRCDuals = cut_storage->SRCDuals; if (!SRCDuals.empty()) {
+                size_t idx = 0;
+                auto   sumSRC =
+                    std::transform_reduce(SRCDuals.begin(), SRCDuals.end(), 0.0, std::plus<>(), [&](const auto &dual) {
+                        size_t curr_idx = idx++;
+                        auto   den      = cut_storage->getCut(curr_idx).p.den;
+                        auto   sum      = (L->SRCmap[curr_idx] + L_prime->SRCmap[curr_idx]);
+                        return (sum >= den) ? dual : 0.0;
+                    });
+
+                new_label->cost -= sumSRC;
+            })
+    }
+
+    new_label->nodes_covered.clear();
+
+    // Start by inserting backward list elements
+    size_t forward_size = 0;
+    auto   L_bw         = L_prime;
+    for (; L_bw != nullptr; L_bw = L_bw->parent) {
+        new_label->nodes_covered.push_back(L_bw->node_id); // Insert backward elements directly
+    }
+
+    // Now insert forward list elements in reverse order without using std::reverse
+    auto L_fw = L;
+    for (; L_fw != nullptr; L_fw = L_fw->parent) {
+        new_label->nodes_covered.insert(new_label->nodes_covered.begin(),
+                                        L_fw->node_id); // Insert forward elements at the front
+        forward_size++;
+    }
+
+    return new_label;
 }
