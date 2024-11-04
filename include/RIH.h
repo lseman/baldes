@@ -23,8 +23,17 @@ public:
     CutStorage          *cut_storage = new CutStorage();
 
     // default default initialization passing InstanceData &instance
-    IteratedLocalSearch(const InstanceData &instance) : instance(instance) {}
+    IteratedLocalSearch(const InstanceData &instance) : instance(instance), pool(5), sched(pool.get_scheduler()) {
+        // Start the worker coroutine when the instance is created
+        worker_thread = std::thread([this] { run_worker(); });
+    }
 
+    std::thread worker_thread; // Background thread to run the worker coroutine
+
+    ~IteratedLocalSearch() {
+        stop_worker();
+        if (worker_thread.joinable()) { worker_thread.join(); }
+    }
     /**
      * @brief Performs the 2-opt optimization on a given route.
      *
@@ -318,6 +327,7 @@ public:
     exec::static_thread_pool::scheduler sched = pool.get_scheduler();
 
     std::vector<Label *> perturbation(const std::vector<Label *> &paths, const std::vector<VRPNode> &nodes) {
+
         this->nodes               = nodes;
         std::vector<Label *> best = paths;
         std::vector<Label *> best_new;
@@ -418,6 +428,25 @@ public:
         if (best_new.size() > 5) { best_new.erase(best_new.begin() + 5, best_new.end()); }
 
         return best_new;
+    }
+
+    // Function to submit new tasks to the queue
+    void submit_task(const std::vector<Label *> &paths, const std::vector<VRPNode> &nodes) {
+        {
+            std::lock_guard<std::mutex> lock(queue_mutex);
+            task_queue.emplace(paths, nodes); // Add new task to the queue
+        }
+        queue_condition.notify_one(); // Notify the worker that a new task is available
+    }
+
+    std::mutex labels_mutex; // Mutex to protect access to processed labels
+
+    // Function to retrieve processed labels
+    std::vector<Label *> get_labels() {
+        std::lock_guard<std::mutex> lock(labels_mutex);
+        std::vector<Label *>        labels = std::move(processed_labels); // Transfer ownership
+        processed_labels.clear();                                         // Clear the processed_labels vector
+        return labels;
     }
 
 private:
@@ -545,6 +574,9 @@ private:
     }
 
     // Process a batch of 5 tasks
+
+    std::vector<Label *> processed_labels; // Store results from perturbation
+
     exec::task<void> process_tasks(IteratedLocalSearch &ils) {
         std::vector<std::pair<std::vector<Label *>, std::vector<VRPNode>>> tasks_to_process;
         {
@@ -555,10 +587,17 @@ private:
             }
         }
 
-        // Process the batch of tasks
+        // Process the batch of tasks and store results
+        std::vector<Label *> result_labels;
         for (const auto &task : tasks_to_process) {
-            ils.perturbation(task.first, task.second);
-            std::cout << "Processed a task!" << std::endl;
+            auto new_labels = ils.perturbation(task.first, task.second);
+            result_labels.insert(result_labels.end(), new_labels.begin(), new_labels.end());
+        }
+
+        // Store the results in processed_labels
+        {
+            std::lock_guard<std::mutex> lock(labels_mutex);
+            processed_labels = std::move(result_labels);
         }
 
         co_return;
@@ -573,13 +612,13 @@ private:
         co_return;
     }
 
-    // Function to submit new tasks to the queue
-    void submit_task(const std::vector<Label *> &paths, const std::vector<VRPNode> &nodes) {
-        {
-            std::lock_guard<std::mutex> lock(queue_mutex);
-            task_queue.emplace(paths, nodes); // Add new task to the queue
+    // Worker coroutine to process tasks
+    void run_worker() {
+        while (!shutdown) {
+            // Wait for tasks and process them using coroutines
+            auto work = task_worker(*this);
+            stdexec::sync_wait(std::move(work)); // Wait until the coroutine completes
         }
-        queue_condition.notify_one(); // Notify the worker that a new task is available
     }
 
     // Function to gracefully shut down the worker

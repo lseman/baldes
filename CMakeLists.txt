@@ -422,6 +422,11 @@ if(WITH_PYTHON)
   set_target_properties(pybaldes PROPERTIES POSITION_INDEPENDENT_CODE ON)
   target_compile_options(pybaldes PRIVATE -Wno-c++26-extensions
                                           -Wno-deprecated-declarations)
+
+  if(IPM OR IPM_ACEL)
+    target_include_directories(pybaldes PRIVATE ${Eigen_SOURCE_DIR})
+    target_include_directories(pybaldes PRIVATE ${Eigen_SOURCE_DIR}/unsupported)
+  endif()
 endif()
 
 if(HGS)
