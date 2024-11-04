@@ -762,6 +762,12 @@ public:
                 // Adding cols
                 colAdded = addColumn(node, paths, false);
 
+#ifdef RIH
+                // Adding RIH paths
+                auto rih_paths = ils.get_labels();
+                if (rih_paths.size() > 0) { colAdded += addColumn(node, rih_paths, false); }
+#endif
+
 #ifdef SCHRODINGER
                 // Adding schrodinger paths
                 auto sch_paths = bucket_graph->getSchrodinger();
@@ -834,10 +840,10 @@ public:
                            iter, lp_obj, inner_obj, n_cuts, n_rcc_cuts, colAdded, stage, lag_gap, cur_alpha, tr_val,
                            gap);
                 Logger::log("| It.: {:4} | Obj.: {:8.2f} | Price: {:9.2f} | SRC: {:3} | RCC: {:3} | Paths: {:3} | "
-                           "Stage: {:1} | "
-                           "Lag.: {:10.4f} | α: {:4.2f} | tr: {:2.2f} | gap: {:2.4f} |\n",
-                           iter, lp_obj, inner_obj, n_cuts, n_rcc_cuts, colAdded, stage, lag_gap, cur_alpha, tr_val,
-                           gap);
+                            "Stage: {:1} | "
+                            "Lag.: {:10.4f} | α: {:4.2f} | tr: {:2.2f} | gap: {:2.4f} |\n",
+                            iter, lp_obj, inner_obj, n_cuts, n_rcc_cuts, colAdded, stage, lag_gap, cur_alpha, tr_val,
+                            gap);
             }
         }
         bucket_graph->print_statistics();
@@ -887,9 +893,10 @@ public:
         for (auto s : sol) {
             fmt::print("Path: ");
             Logger::log("Path: ");
-            for (auto j : allPaths[s].route) { 
+            for (auto j : allPaths[s].route) {
                 Logger::log("{} ", j);
-                fmt::print("{} ", j); }
+                fmt::print("{} ", j);
+            }
             fmt::print("\n");
             Logger::log("\n");
         }
@@ -906,12 +913,12 @@ public:
         //    reset);
         fmt::print("+---------------------------------------+\n");
 
-        //Logger::log("+---------------------------------------+\n");
+        // Logger::log("+---------------------------------------+\n");
         Logger::log("Bound: {} \n", relaxed_result / 10);
         Logger::log("Incumbent: {} \n", ip_result / 10);
         // Logger::log("| {:<14} | {}{:>16}.{:03}{} |\n", "CG Duration", blue, duration_seconds, duration_milliseconds,
         //    reset);
-        //Logger::log("+---------------------------------------+\n");
+        // Logger::log("+---------------------------------------+\n");
     }
 
     void branch(BNBNode *node);

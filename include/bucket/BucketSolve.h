@@ -531,16 +531,8 @@ std::vector<Label *> BucketGraph::bi_labeling_algorithm() {
         top_labels.push_back(merged_labels[i]);
     }
 
-    auto new_labels = ils->perturbation(top_labels, nodes);
-
-    // Use move semantics to avoid unnecessary copying of new_labels
-    merged_labels.insert(merged_labels.end(), std::make_move_iterator(new_labels.begin()),
-                         std::make_move_iterator(new_labels.end()));
-
-    // Sort with inplace_merge to minimize sorting overhead
-    auto mid = merged_labels.end() - new_labels.size();
-    std::inplace_merge(merged_labels.begin(), mid, merged_labels.end(),
-                       [](const Label *a, const Label *b) { return a->cost < b->cost; });
+    // auto new_labels = ils->perturbation(top_labels, nodes);
+    ils->submit_task(top_labels, nodes);
 
 #endif
     inner_obj = merged_labels[0]->cost;
