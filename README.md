@@ -98,7 +98,7 @@ The Bucket Graph-based labeling algorithm organizes labels into **buckets** base
   
   Performs a multi-stage branching, including the recent cluster branching. In each node, **branching variables** are selected through a hierarchical evaluation. The evaluation involves three phases: in **Phase 0**, candidates are chosen based on pseudo-cost history, fractional proximity to integers, and, for edges, distance to the depot. **Phase 1** evaluates these by solving a restricted master LP for each child node without new columns, using the Product Rule to select candidates maximizing lower bound increases. In **Phase 2**, the best candidates undergo further relaxation with heuristic column generation, again selected by the Product Rule. This structured approach adapts to tree depth, prioritizing impactful selections early on.
 
-- **Improvement Heuristics:** Optional fast improvement heuristics are applied at the end of each labeling phase to enhance label quality.
+- **Improvement Heuristics:** Optional fast improvement heuristics are applied at the end of each labeling phase to enhance label quality. The improvement heuristics are based on an iterated local search with adaptive operators weight in a ANLS-like heuristic.
 
 ## ⚠️ Disclaimer
 
@@ -112,7 +112,7 @@ Some features are experimental and subject to ongoing improvements:
 - [ ] Fix branching duals
 - [ ] Refactor high order SRC cuts
 - [ ] Change pybind to nanobind
-- [ ] Enchance the improvement heuristics.
+- [x] Enchance the improvement heuristics.
 
 ## 🛠️ Building
 
@@ -165,21 +165,28 @@ make -j$nprocs -DHGS=ON -DBALDES=OFF
 
 | Option                  | Description                            | Default |
 | ----------------------- | -------------------------------------- | ------- |
-| `RIH`                   | Enable improvement heuristics          | OFF     |
-| `RCC`                   | Enable RCC cuts                        | OFF     |
-| `SRC`                   | Enable limited memory SRC cuts         | ON      |
-| `UNREACHABLE_DOMINANCE` | Enable unreachable dominance           | OFF     |
-| `MCD`                   | Perform MCD on instance capacities     | OFF     |
-| `LIMITED_BUCKETS`       | Limit the capacity of the buckets      | OFF     |
-| `SORTED_LABELS`         | Sort labels on bucket insertion        | OFF     |
-| `STAB`$^2$              | Use dynamic-alpha smooth stabilization | OFF     |
-| `IPM`$^2$               | Use interior point stabilization       | ON      |
-| `TR`                    | Use trust region stabilization         | OFF     |
-| `WITH_PYTHON`           | Enable the python wrapper              | OFF     |
-| `SCHRODINGER`           | Enable schrodinger pool                | OFF     |
-| `PSTEP`                 | Enable PStep compilation               | OFF     |
 | `FIXED_BUCKETS`         | Enable bucket arc fixing               | ON      |
 | `JEMALLOC`              | Enable jemalloc                        | ON      |
+| `SRC`                   | Enable limited memory SRC cuts         | ON      |
+| `LIMITED_BUCKETS`       | Limit the capacity of the buckets      | OFF     |
+| `MCD`                   | Perform MCD on instance capacities     | OFF     |
+| `PSTEP`                 | Enable PStep compilation               | OFF     |
+| `RCC`                   | Enable RCC cuts                        | OFF     |
+| `RIH`                   | Enable improvement heuristics          | OFF     |
+| `SCHRODINGER`           | Enable schrodinger pool                | OFF     |
+| `SORTED_LABELS`         | Sort labels on bucket insertion        | OFF     |
+| `STAB`$^2$              | Use dynamic-alpha smooth stabilization | OFF     |
+| `TR`                    | Use trust region stabilization         | OFF     |
+| `WITH_PYTHON`           | Enable the python wrapper              | OFF     |
+
+
+**Solvers**
+
+| Option                  | Description                            | Default |
+| ----------------------- | -------------------------------------- | ------- |
+| `IPM`$^2$               | Use interior point stabilization with the in-house solver       | ON      |
+| `HIGHS`             | Enable HiGHS as the IP Solver          | ON      |
+| `GUROBI`            | Enable GUROBI as the IP Solver         | OFF      |
 
 **Numerical and Other Definitions**
 
@@ -258,6 +265,7 @@ To run CVRP-like instance like the 10k instance proposed by [Uchoa et al.](http:
 We also provide a Python wrapper, which can be used to instantiate the bucket graph labeling:
 
 ```python
+# Import external libraries
 import random
 
 # Now you can import the BALDES module
@@ -270,15 +278,24 @@ num_intervals = 1
 # Set random bounds for each node
 id = 0
 for node in nodes:
-    node.lb = [random.randint(0, 9000) for _ in range(num_intervals)]  # Set random lower bounds
-    node.ub = [random.randint(lb + 1, 10000) for lb in node.lb]  # Set random upper bounds greater than lb
-    node.duration = random.randint(1, 100)  # Set random duration
-    node.cost = random.randint(1, 100)  # Set random cost
-    node.start_time = random.randint(0, 10000)  # Set random start time
-    node.end_time = random.randint(node.start_time, 10000)  # Set random end time greater than start time
-    node.demand = random.randint(1, 100)  # Set random demand
-    node.consumption = [random.randint(1, 100) for _ in range(num_intervals)]  # Set random consumption
-    node.set_location(random.randint(0, 100), random.randint(0, 100))  # Set random location
+    # Set random lower bounds
+    node.lb = [random.randint(0, 9000) for _ in range(num_intervals)]  
+    # Set random upper bounds greater than lb
+    node.ub = [random.randint(lb + 1, 10000) for lb in node.lb]
+    # Set random duration
+    node.duration = random.randint(1, 100)
+    # Set random cost
+    node.cost = random.randint(1, 100)
+    # Set random start time
+    node.start_time = random.randint(0, 10000)
+    # Set random end time greater than start time
+    node.end_time = random.randint(node.start_time, 10000)
+    # Set random demand
+    node.demand = random.randint(1, 100)
+    # Set random consumption
+    node.consumption = [random.randint(1, 100) for _ in range(num_intervals)]
+    # Set random location
+    node.set_location(random.randint(0, 100), random.randint(0, 100))
     node.id = id
     id += 1
 
