@@ -136,9 +136,9 @@ public:
     Label *acquire() {
         if (!available_labels.empty()) {
             Label *new_label = available_labels.back();
+            new_label->reset();
             available_labels.pop_back();
             in_use_labels.push_back(new_label);
-            new_label->reset();
             return new_label;
         }
 

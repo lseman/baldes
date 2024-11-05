@@ -85,7 +85,7 @@ struct Label {
         this->vertex    = -1;
         this->cost      = 0.0;
         this->resources = {};
-        // this->node_id      = -1;
+        this->node_id      = -1;
         this->real_cost   = 0.0;
         this->parent      = nullptr;
         this->is_extended = false;
