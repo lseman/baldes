@@ -214,10 +214,11 @@ void BucketGraph::define_buckets() {
                 interval_start[0] = roundToTwoDecimalPlaces(interval_start[0]);
                 interval_end[0]   = roundToTwoDecimalPlaces(interval_end[0]);
 
+                
                 if constexpr (D == Direction::Backward) {
-                    interval_start[0] = std::max(interval_start[0], R_min[0]);
+                    interval_start[0] = std::max(interval_start[0], VRPNode.lb[0]);
                 } else {
-                    interval_end[0] = std::min(interval_end[0], R_max[0]);
+                    interval_end[0] = std::min(interval_end[0], VRPNode.ub[0]);
                 }
 
                 buckets.push_back(Bucket(VRPNode.id, interval_start, interval_end));

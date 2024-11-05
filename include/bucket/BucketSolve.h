@@ -279,24 +279,20 @@ std::vector<double> BucketGraph::labeling_algorithm() noexcept {
                                 }
                             } else {
 
-                                /*
-                                                                if (check_dominance_against_vector<D, S>(new_label,
-                                   to_bucket_labels, cut_storage, options.resources.size())) { stat_n_dom++; //
-                                   Increment dominated labels count dominated = true;
-                                                                }
-                                                                */
-                                // Lambda to check dominance in a specified bucket
-
                                 auto &mother_bucket             = buckets[to_bucket];
-                                auto  check_dominance_in_bucket = [&](const std::vector<Label *> &labels) {
+                                auto  check_dominance_in_bucket = [&](const std::vector<Label *> labels) {
+                                    if (labels.size() == 0) { return false; } // Skip empty buckets
+                                    // print labels.size
+
 #ifndef AVX
                                     for (auto *existing_label : labels) {
                                         if (is_dominated<D, S>(new_label, existing_label)) {
                                             stat_n_dom++; // Increment dominated labels count
-                                            dominated = true;
-                                            break;
+                                            return true;
+                                            // break;
                                         }
                                     }
+                                    return false;
 #else
                                     return check_dominance_against_vector<D, S>(new_label, labels, cut_storage,
                                                                                 options.resources.size());
@@ -306,7 +302,7 @@ std::vector<double> BucketGraph::labeling_algorithm() noexcept {
                                 // Check if the mother bucket is split into sub-buckets
                                 if (!mother_bucket.is_split) {
                                     // Perform dominance check directly on the mother bucket's labels
-                                    if (check_dominance_in_bucket(mother_bucket.labels_vec)) {
+                                    if (check_dominance_in_bucket(mother_bucket.get_labels())) {
                                         stat_n_dom++; // Increment dominated labels count
                                         dominated = true;
                                     }
@@ -317,14 +313,15 @@ std::vector<double> BucketGraph::labeling_algorithm() noexcept {
                                     // Identify the current sub-bucket based on `new_label` cost or other criteria
                                     Bucket *current_sub_bucket = nullptr;
                                     for (auto &sub_bucket : sub_buckets) {
-                                        if (new_label->cost >= sub_bucket.lb[0] && new_label->cost < sub_bucket.ub[0]) {
+                                        if (sub_bucket.is_contained(new_label)) {
                                             current_sub_bucket = &sub_bucket;
                                             break;
                                         }
                                     }
 
                                     // Check dominance in the current sub-bucket
-                                    if (current_sub_bucket &&
+                                    
+                                    if (current_sub_bucket != nullptr &&
                                         check_dominance_in_bucket(current_sub_bucket->get_labels())) {
                                         stat_n_dom++; // Increment dominated labels count
                                         dominated = true;
@@ -333,7 +330,8 @@ std::vector<double> BucketGraph::labeling_algorithm() noexcept {
                                         for (auto &sub_bucket : sub_buckets) {
                                             if (&sub_bucket == current_sub_bucket)
                                                 continue; // Skip the current sub-bucket
-                                            if (check_dominance_in_bucket(sub_bucket.get_labels())) {
+                                            auto sub_labels = sub_bucket.get_labels();
+                                            if (check_dominance_in_bucket(sub_labels)) {
                                                 stat_n_dom++; // Increment dominated labels count
                                                 dominated = true;
                                                 break;
@@ -364,7 +362,7 @@ std::vector<double> BucketGraph::labeling_algorithm() noexcept {
 #elif LIMITED_BUCKETS
                                 buckets[to_bucket].sorted_label(new_label, BUCKET_CAPACITY);
 #else
-                                buckets[to_bucket].add_sorted_label(new_label);
+                                buckets[to_bucket].add_label(new_label);
 #endif
                                 all_ext = false; // Not all labels have been extended, continue processing
                             }
