@@ -11,6 +11,7 @@
 #pragma once
 #include "Definitions.h"
 #include "SparseMatrix.h" // Include your SparseMatrix class
+#include <memory>
 
 #ifdef GUROBI
 #include "gurobi_c++.h"
@@ -34,7 +35,14 @@
 #include "Highs.h"
 #endif
 
-std::pair<Variable, double> operator*(int coeff, Variable &var);
+// Free function operator* to handle baldesVarPtr and a coefficient
+inline std::pair<baldesVar::baldesVarPtr, double> operator*(const baldesVar::baldesVarPtr& var, double coeff) {
+    return {var, coeff};
+}
+
+inline std::pair<baldesVar::baldesVarPtr, double> operator*(const baldesVar::baldesVarPtr& var, int coeff) {
+    return {var, static_cast<double>(coeff)};
+}
 
 enum class ObjectiveType { Minimize, Maximize };
 
@@ -50,24 +58,25 @@ public:
         auto *clone = new MIPProblem(name, sparse_matrix.num_rows, sparse_matrix.num_cols);
 
         // Clone variables
-        for (const auto *var : variables) {
-            Variable *newVar = new Variable(var->get_name(), var->get_type(), var->get_lb(), var->get_ub(),
-                                            var->get_objective_coefficient());
+        for (const auto var : variables) {
+            baldesVarPtr newVar = std::make_shared<baldesVar>(var->get_name(), var->get_type(), var->get_lb(), var->get_ub(),
+                                              var->get_objective_coefficient());
             newVar->set_index(var->index());
             clone->variables.push_back(newVar);
             clone->var_name_to_index[var->get_name()] = newVar->index();
         }
 
         // Clone constraints
-        for (auto *constraint : constraints) {
+        for (auto constraint : constraints) {
             LinearExpression clonedExpr;
             for (auto &[var_name, coeff] : constraint->get_expression().get_terms()) {
                 clonedExpr.add_or_update_term(var_name, coeff);
             }
-            Constraint *newConstraint = new Constraint(clonedExpr, constraint->get_rhs(), constraint->get_relation());
-            newConstraint->set_index(constraint->index());
-            clone->constraints.push_back(newConstraint);
-            clone->b_vec.push_back(newConstraint->get_rhs());
+            baldesCtrPtr newbaldesCtr =
+                std::make_shared<baldesCtr>(clonedExpr, constraint->get_rhs(), constraint->get_relation());
+            newbaldesCtr->set_index(constraint->index());
+            clone->constraints.push_back(newbaldesCtr);
+            clone->b_vec.push_back(newbaldesCtr->get_rhs());
         }
 
         // Clone the objective
@@ -81,10 +90,10 @@ public:
     }
 
     // Add a variable to the problem
-    Variable *add_variable(const std::string &var_name, VarType type, double lb = 0.0, double ub = 1.0,
-                           double obj_coeff = 0.0) {
+    baldesVarPtr add_variable(const std::string &var_name, VarType type, double lb = 0.0, double ub = 1.0,
+                             double obj_coeff = 0.0) {
         auto  index  = variables.size();
-        auto *newVar = new Variable(var_name, type, lb, ub, obj_coeff);
+        auto newVar = std::make_shared<baldesVar>(var_name, type, lb, ub, obj_coeff);
         newVar->set_index(index);
         variables.emplace_back(newVar);
         var_name_to_index[var_name] = variables.size() - 1;
@@ -127,10 +136,10 @@ public:
         }
     }
 
-    Constraint *add_constraint(const LinearExpression &expression, double rhs, char relation) {
+    baldesCtrPtr add_constraint(const LinearExpression &expression, double rhs, char relation) {
         int constraint_index = constraints.size(); // Get the current index
         // Add the constraint to the list of constraints and set its index
-        auto new_constraint = new Constraint(expression, rhs, relation);
+        auto new_constraint = std::make_shared<baldesCtr>(expression, rhs, relation);
         b_vec.push_back(rhs);
         new_constraint->set_index(constraint_index); // Set the constraint's index
 
@@ -147,7 +156,7 @@ public:
                 int col_index = it->second;
                 sparse_matrix.insert(row_index, col_index, coeff);
             } else {
-                fmt::print("Variable {} not found in the problem's variables list!\n", var_name);
+                fmt::print("baldesVar {} not found in the problem's variables list!\n", var_name);
             }
         }
 
@@ -156,7 +165,7 @@ public:
         return new_constraint;
     }
 
-    Constraint *add_constraint(Constraint *constraint, const std::string &name) {
+    baldesCtrPtr add_constraint(baldesCtrPtr constraint, const std::string &name) {
         int constraint_index = constraints.size(); // Get the current index
         constraint->set_index(constraint_index);
         constraint->set_name(name);
@@ -180,7 +189,7 @@ public:
         return constraints.back();
     }
 
-    void printBranchingConstraint() {
+    void printBranchingbaldesCtr() {
         for (const auto &constraint : constraints) {
             std::string name = constraint->get_name();
             if (name.find("branching") != std::string::npos) {
@@ -195,7 +204,8 @@ public:
                     int node  = std::stoi(parts[2]);
                     int bound = std::stoi(parts[3]);
 
-                    print_branching("Branching on node {} is '{}=' bound {}\n", node, constraint->get_relation(), bound);
+                    print_branching("Branching on node {} is '{}=' bound {}\n", node, constraint->get_relation(),
+                                    bound);
                 }
                 if (parts.size() >= 4 && parts[1] == "edge") {
                     int source = std::stoi(parts[2]);
@@ -225,9 +235,9 @@ public:
         for (int i = constraint_index; i < constraints.size(); ++i) { constraints[i]->set_index(i); }
     }
 
-    void delete_constraint(Constraint *constraint) { delete_constraint(constraint->index()); }
+    void delete_constraint(baldesCtrPtr constraint) { delete_constraint(constraint->index()); }
 
-    void delete_variable(const Variable *variable) {
+    void delete_variable(const baldesVarPtr variable) {
         // Find the index of the given variable in the variables vector
         auto var_index = variable->index();
         // Delete the column from the sparse matrix
@@ -256,18 +266,19 @@ public:
     }
 
     // Get a variable by index
-    Variable *getVar(size_t index) {
-        if (index >= variables.size()) { throw std::out_of_range("Variable index out of range"); }
+    baldesVarPtr getVar(size_t index) {
+        if (index >= variables.size()) { throw std::out_of_range("baldesVar index out of range"); }
         return variables[index];
     }
 
     void chgCoeff(int constraintIndex, const std::vector<double> &values) {
         if (constraintIndex < 0 || constraintIndex >= constraints.size()) {
+            fmt::print("Invalid constraint index: {}\n", constraintIndex);
             throw std::out_of_range("Invalid constraint index");
         }
 
         // Get the constraint that is being modified
-        Constraint       *constraint = constraints[constraintIndex];
+        baldesCtrPtr     constraint = constraints[constraintIndex];
         LinearExpression &expression = constraint->get_expression();
 
         // Iterate over the values and only update changed entries
@@ -300,8 +311,8 @@ public:
         // Update the sparse matrix only if the value has changed
         sparse_matrix.modify_or_delete(constraintIndex, variableIndex, value);
 
-        // Update the LinearExpression in the corresponding Constraint
-        Constraint       *constraint = constraints[constraintIndex];
+        // Update the LinearExpression in the corresponding baldesCtr
+        baldesCtrPtr     constraint = constraints[constraintIndex];
         LinearExpression &expression = constraint->get_expression();
 
         const std::string &var_name = variables[variableIndex]->get_name();
@@ -320,9 +331,9 @@ public:
     void addVars(const double *lb, const double *ub, const double *obj, const VarType *vtypes, const std::string *names,
                  size_t count);
     // Get all variables
-    std::vector<Variable *> &getVars() { return variables; }
+    std::vector<baldesVarPtr> &getVars() { return variables; }
     // Get all constraints
-    std::vector<Constraint *> &getConstraints() { return constraints; }
+    std::vector<baldesCtrPtr> &getbaldesCtrs() { return constraints; }
 
     // Method to get the b vector (RHS values of all constraints)
     std::vector<double> get_b_vector() const {
@@ -331,7 +342,7 @@ public:
         return b;
     }
 
-    void chgCoeff(Constraint *constraint, const std::vector<double> &new_coeffs) {
+    void chgCoeff(baldesCtrPtr constraint, const std::vector<double> &new_coeffs) {
         auto constraintIndex = constraint->index();
         // Change the coefficients for the constraint
         chgCoeff(constraintIndex, new_coeffs);
@@ -389,7 +400,7 @@ public:
     }
 
     // Helper function to convert MIP constraints into a Gurobi linear expression
-    GRBLinExpr convertToGurobiExpr(const Constraint                                        *constraint,
+    GRBLinExpr convertToGurobiExpr(const baldesCtrPtr                                      constraint,
                                    const ankerl::unordered_dense::map<std::string, GRBVar> &gurobiVars) {
         GRBLinExpr expr;
         for (const auto &term : constraint->get_terms()) {
@@ -505,7 +516,7 @@ public:
         std::vector<double> c;
         c.reserve(variables.size()); // Reserve space upfront
         std::transform(variables.begin(), variables.end(), std::back_inserter(c),
-                       [](const Variable *var) { return var->get_objective_coefficient(); });
+                       [](const baldesVarPtr var) { return var->get_objective_coefficient(); });
         return c;
     }
 
@@ -536,7 +547,7 @@ public:
         std::vector<double> lb;
         lb.reserve(variables.size()); // Reserve space upfront
         std::transform(variables.begin(), variables.end(), std::back_inserter(lb),
-                       [](const Variable *var) { return var->get_lb(); });
+                       [](const baldesVarPtr var) { return var->get_lb(); });
         return lb;
     }
 
@@ -544,7 +555,7 @@ public:
         std::vector<double> ub;
         ub.reserve(variables.size()); // Reserve space upfront
         std::transform(variables.begin(), variables.end(), std::back_inserter(ub),
-                       [](const Variable *var) { return var->get_ub(); });
+                       [](const baldesVarPtr var) { return var->get_ub(); });
         return ub;
     }
 
@@ -567,8 +578,8 @@ public:
 
 private:
     std::string                                    name;
-    std::vector<Variable *>                        variables;
-    std::vector<Constraint *>                      constraints;    // Store the constraints
+    std::vector<baldesVarPtr>                       variables;
+    std::vector<baldesCtrPtr>                     constraints;    // Store the constraints
     LinearExpression                               objective;      // Store the objective function
     ObjectiveType                                  objective_type; // Minimize or Maximize
     SparseMatrix                                   sparse_matrix;  // Use SparseMatrix for coefficient storage

@@ -252,7 +252,7 @@ public:
             }
 
             if (lhs_values[i] > alphaMax || alphaMin > rhs_values[i]) {
-                std::cout << "Constraint " << i << " is infeasible.\n";
+                std::cout << "baldesCtr " << i << " is infeasible.\n";
             }
         });
     }

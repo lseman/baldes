@@ -166,7 +166,7 @@ public:
                                       const VRPNode &theNode, size_t N) {
         for (size_t I = 0; I < N; ++I) {
             if (!process_resource<D>(new_resources[I], initial_resources, gamma, theNode, I)) {
-                return false; // Constraint violated, return false
+                return false; // baldesCtr violated, return false
             }
         }
         return true; // All resources processed successfully

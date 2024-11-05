@@ -284,7 +284,7 @@ void LimitedMemoryRank1Cuts::separate(const SparseMatrix &A, const std::vector<d
     return;
 }
 
-std::pair<bool, bool> LimitedMemoryRank1Cuts::runSeparation(BNBNode *node, std::vector<Constraint *> &SRCconstraints) {
+std::pair<bool, bool> LimitedMemoryRank1Cuts::runSeparation(BNBNode *node, std::vector<baldesCtrPtr > &SRCconstraints) {
     auto                cuts = &cutStorage;
     ModelData           matrix;
     auto                cuts_before = cuts->size();
@@ -400,7 +400,7 @@ std::pair<bool, bool> LimitedMemoryRank1Cuts::runSeparation(BNBNode *node, std::
     // Iterate over the constraints in reverse order to remove non-violated cuts
     // sort SRCconstraints by index
     pdqsort(SRCconstraints.begin(), SRCconstraints.end(),
-            [](const Constraint *a, const Constraint *b) { return a->index() < b->index(); });
+            [](const baldesCtrPtr a, const baldesCtrPtr b) { return a->index() < b->index(); });
 
     for (int i = SRCconstraints.size() - 1; i >= 0; --i) {
         auto constr = SRCconstraints[i];

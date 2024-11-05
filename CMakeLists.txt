@@ -74,7 +74,7 @@ option(SRC "Enable SRC compilation option" ON)
 # option(GET_TBB "Enable TBB compilation option" OFF)
 option(UNREACHABLE_DOMINANCE "Enable Unreachable Dominance compilation option"
        OFF)
-option(SORTED_LABELS "Enable Sorted Labels compilation option" OFF)
+option(SORTED_LABELS "Enable Sorted Labels compilation option" ON)
 option(MCD "Enable MCD compilation option" OFF)
 option(FIX_BUCKETS "Enable Fixed Buckets compilation option" ON)
 option(AVX "Enable AVX compilation option" OFF)
@@ -109,7 +109,7 @@ set(MAX_SRC_CUTS
     50
     CACHE STRING "Maximum number of SRC cuts")
 set(BUCKET_CAPACITY
-    50
+    100
     CACHE STRING "Bucket capacity")
 set(TIME_INDEX
     0
@@ -377,7 +377,7 @@ endif()
 
 if(BALDES)
   # Add the executable with the combined sources
-  add_executable(baldes examples/Baldes.cpp ${EXECUTABLE_SOURCES})
+  add_executable(baldes src/Baldes.cpp ${EXECUTABLE_SOURCES})
 
   message(STATUS "Gurobi version: ${GUROBI_VERSION_MAJOR}")
   target_compile_options(baldes PRIVATE -Wno-c++26-extensions

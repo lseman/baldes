@@ -268,7 +268,7 @@ public:
     // Function to print the conflict graph
     void printCg() {
         for (size_t i = 0; i < conflictGraph.size(); ++i) {
-            fmt::print("Variable {} conflicts with: ", i);
+            fmt::print("baldesVar {} conflicts with: ", i);
             for (size_t j = 0; j < conflictGraph[i].size(); ++j) {
                 if (conflictGraph[i][j]) { fmt::print("{} ", j); }
             }
@@ -278,7 +278,7 @@ public:
 
     void printCg(std::map<int, std::string> varIndex2Name) {
         for (size_t i = 0; i < conflictGraph.size(); ++i) {
-            fmt::print("Variable {} conflicts with: ", varIndex2Name[i]);
+            fmt::print("baldesVar {} conflicts with: ", varIndex2Name[i]);
             for (size_t j = 0; j < conflictGraph[i].size(); ++j) {
                 if (conflictGraph[i][j]) { fmt::print("{} ", varIndex2Name[j]); }
             }

@@ -190,7 +190,7 @@ void CMGR_AddExplicitCnstr(CnstrMgrPointer CMP,
 void CMGR_AddGomoryCnstr(CnstrMgrPointer CMP,
                          int CType, int Key,
                          int ListSize,
-                         int *IntList, /* Variable numbers */
+                         int *IntList, /* baldesVar numbers */
                          double *CoeffList,
                          double RHS) /* >= RHS */
 {

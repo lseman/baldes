@@ -1,5 +1,6 @@
 #include "../include/miphandler/MIPHandler.h"
 #include <iostream>
+#include <memory>
 
 void MIPProblem::addVars(const double *lb, const double *ub, const double *obj, const VarType *vtypes,
                          const std::string *names, const MIPColumn *cols, size_t count) {
@@ -52,17 +53,4 @@ void MIPProblem::addVars(const double *lb, const double *ub, const double *obj, 
         // Add each variable with its bounds, objective, and type
         add_variable(names[i], vtypes[i], lb[i], ub[i], obj[i]);
     }
-}
-
-Constraint *LinearExpression::operator>=(double rhs) const {
-    auto ctr = new Constraint(*this, rhs, '>'); // '>' represents '>='
-    return ctr;
-}
-Constraint *LinearExpression::operator<=(double rhs) const {
-    auto ctr = new Constraint(*this, rhs, '<'); // '<' represents '<='
-    return ctr;
-}
-Constraint *LinearExpression::operator==(double rhs) const {
-    auto ctr = new Constraint(*this, rhs, '='); // '=' represents '=='
-    return ctr;
 }

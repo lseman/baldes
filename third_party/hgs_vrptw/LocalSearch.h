@@ -191,9 +191,9 @@ private:
     bool      routeUTimeWarp, routeULoadPenalty, routeVTimeWarp, routeVLoadPenalty;
     double    penaltyCapacityLS, penaltyTimeWarpLS;
 
-    void setLocalVariablesRouteU(); // Initializes some local variables and distances associated to routeU to avoid
+    void setLocalbaldesVarsRouteU(); // Initializes some local variables and distances associated to routeU to avoid
                                     // always querying the same values in the distance matrix
-    void setLocalVariablesRouteV(); // Initializes some local variables and distances associated to routeV to avoid
+    void setLocalbaldesVarsRouteV(); // Initializes some local variables and distances associated to routeV to avoid
                                     // always querying the same values in the distance matrix
 
     // Functions in charge of excess load penalty calculations

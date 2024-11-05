@@ -60,7 +60,7 @@ int Split::splitSimple(Individual *indiv) {
     // MAIN SIMPLE SPLIT ALGORITHM -- Simple Split using Bellman's algorithm in topological order
     // This code has been maintained as it is very simple and can be easily adapted to a variety of constraints,
     // whereas the O(n) Split has a more restricted application scope
-    if (params->isDurationConstraint) {
+    if (params->isDurationbaldesCtr) {
         // Loop over all clients (excluding the depot). This runs in O(nB).
         for (int i = 0; i < params->nbClients; i++) {
             int    load            = 0;
@@ -154,7 +154,7 @@ int Split::splitLF(Individual *indiv) {
     // MAIN ALGORITHM -- Simple Split using Bellman's algorithm in topological order
     // This code has been maintained as it is very simple and can be easily adapted to a variety of constraints, whereas
     // the O(n) Split has a more restricted application scope
-    if (params->isDurationConstraint) {
+    if (params->isDurationbaldesCtr) {
         double maxLoad = 1.5 * params->vehicleCapacity; // Precompute to avoid repeated calculations
 
         for (int k = 0; k < maxVehicles; k++) {

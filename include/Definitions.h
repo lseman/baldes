@@ -14,6 +14,10 @@
 
 #include "ankerl/unordered_dense.h"
 
+using baldesCtrPtr = std::shared_ptr<baldesCtr>;
+using baldesVarPtr   = std::shared_ptr<baldesVar>;
+using LinearExpPtr  = std::shared_ptr<LinearExpression>;
+
 struct BucketOptions {
     int  depot         = 0;
     int  end_depot     = N_SIZE - 1;
@@ -40,7 +44,7 @@ enum class ProblemType { vrptw, cvrp };
 
 using Payload = std::optional<std::variant<int, std::pair<int, int>>>; // Optional variant for payload data
                                                                        //
-// Step 1: Implement Aggregated Variables for Branching Constraints
+// Step 1: Implement Aggregated baldesVars for Branching baldesCtrs
 struct BranchingQueueItem {
     int                                                       sourceNode;      // route index (or source node for edges)
     int                                                       targetNode;      // source node or customer for edges
@@ -168,7 +172,7 @@ struct ModelData {
     std::vector<double>      c;     // Coefficients for the objective function
     std::vector<double>      lb;    // Lower bounds for variables
     std::vector<double>      ub;    // Upper bounds for variables
-    std::vector<char>        vtype; // Variable types ('C', 'I', 'B')
+    std::vector<char>        vtype; // baldesVar types ('C', 'I', 'B')
     std::vector<std::string> name;
     std::vector<std::string> cname;
 };
@@ -218,7 +222,7 @@ inline void printBaldes() {
 inline ModelData extractModelDataSparse(GRBModel *model) {
     ModelData data;
     try {
-        // Variables
+        // baldesVars
         int     numVars = model->get(GRB_IntAttr_NumVars);
         GRBVar *vars    = model->getVars();
 
@@ -243,7 +247,7 @@ inline ModelData extractModelDataSparse(GRBModel *model) {
         data.c.assign(objs, objs + numVars);
         data.vtype.assign(vtypes, vtypes + numVars);
 
-        // Constraints
+        // baldesCtrs
         int          numConstrs = model->get(GRB_IntAttr_NumConstrs);
         SparseMatrix A_sparse;
 
@@ -272,7 +276,7 @@ inline ModelData extractModelDataSparse(GRBModel *model) {
                 A_sparse.insert(i, varIndex, coeff);
             }
 
-            // Batch fetch Constraint Name, RHS, and Sense (improve by reducing single fetches)
+            // Batch fetch baldesCtr Name, RHS, and Sense (improve by reducing single fetches)
             data.cname.push_back(constr.get(GRB_StringAttr_ConstrName)); // Fetch constraint names
             data.b.push_back(constr.get(GRB_DoubleAttr_RHS));            // Fetch RHS values
             data.sense.push_back(constr.get(GRB_CharAttr_Sense));        // Fetch sense values

@@ -8,11 +8,11 @@ void BranchingDuals::computeDuals(BNBNode *model, double threshold) {
 
     // First pass: Compute dual values and store them
     for (int i = 0; i < branchingCandidates_.size(); ++i) {
-        size_t size = std::min(branchingCandidates_.size(), branchingConstraints_.size());
+        size_t size = std::min(branchingCandidates_.size(), branchingbaldesCtrs_.size());
 
         for (size_t i = 0; i < size; ++i) {
             auto candidate = branchingCandidates_[i];
-            auto ctr       = branchingConstraints_[i];
+            auto ctr       = branchingbaldesCtrs_[i];
 
             double dualValue = model->getDualVal(ctr->index());
 
@@ -62,7 +62,7 @@ Branching::evaluateWithCG(BNBNode *node, const std::vector<BranchingQueueItem> &
 
                 // Add branching constraints and create two child nodes
                 auto [childNode1, childNode2] =
-                    applyBranchingConstraints(node, candidate, candidate.fractionalValue, candidate.candidateType);
+                    applyBranchingbaldesCtrs(node, candidate, candidate.fractionalValue, candidate.candidateType);
 
                 // Solve CG and bound for each child node using the cloned problem
                 double deltaLB1, deltaLB2;

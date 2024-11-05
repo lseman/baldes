@@ -85,9 +85,9 @@ class BranchingDuals {
 public:
     std::vector<VRPCandidate *> getBranchingCandidates() { return branchingCandidates_; }
 
-    void addCandidate(VRPCandidate *candidate, Constraint *constraint) {
+    void addCandidate(VRPCandidate *candidate, baldesCtrPtr constraint) {
         branchingCandidates_.push_back(candidate);
-        branchingConstraints_.push_back(constraint);
+        branchingbaldesCtrs_.push_back(constraint);
     }
 
     void setDual(CandidateType type, const RawArc &arc, double dualValue) {
@@ -162,14 +162,14 @@ public:
 
     void computeDuals(BNBNode *model, double threshold = 1e-3);
 
-    auto getBranchingConstraints() { return branchingConstraints_; }
+    auto getBranchingbaldesCtrs() { return branchingbaldesCtrs_; }
 
     // define size as size of branchingCandidates_
     int size() { return branchingCandidates_.size(); }
 
 private:
     std::vector<VRPCandidate *> branchingCandidates_;
-    std::vector<Constraint *>   branchingConstraints_;
+    std::vector<baldesCtrPtr>  branchingbaldesCtrs_;
     ArcDuals                    arcDuals_;
     NodeDuals                   nodeDuals_;
 };

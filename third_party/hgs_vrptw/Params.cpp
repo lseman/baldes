@@ -41,7 +41,7 @@ Params::Params(const InstanceData &instance) {
     vehicleCapacity = instance.q;
     durationLimit   = INT_MAX;
     // vehicleCapacity          = INT_MAX;
-    isDurationConstraint     = false;
+    isDurationbaldesCtr     = false;
     isExplicitDistanceMatrix = false;
 
     // Read INPUT dataset from the new format
@@ -84,6 +84,8 @@ Params::Params(const InstanceData &instance) {
     // Reduce the size of the vector of clients
     cli.resize(nbClients);
     nbClients--; // Don't count the depot as a client
+
+    fmt::print("Number of clients: {}\n", nbClients);
 
     // Check depot constraints
     if (cli[0].earliestArrival != 0) { throw std::string("Time window for depot should start at 0"); }
@@ -274,7 +276,7 @@ Params::Params(const std::string &path_location) {
     maxDemand                         = 0;
     durationLimit                     = INT_MAX;
     vehicleCapacity                   = INT_MAX;
-    isDurationConstraint              = false;
+    isDurationbaldesCtr              = false;
     isExplicitDistanceMatrix          = false;
 
     // Read INPUT dataset from the new format

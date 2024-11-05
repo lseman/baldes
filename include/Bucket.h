@@ -101,21 +101,48 @@ struct Bucket {
         }
     }
 
+    // Dominance check method for Bucket
+    bool check_dominance(const Label *new_label, std::function<bool(const std::vector<Label *> &)> dominance_func,
+                         int &stat_n_dom) {
+        if (!is_split) {
+            // Directly check dominance in the mother bucket
+            if (dominance_func(get_labels())) {
+                stat_n_dom++; // Increment dominated labels count
+                return true;
+            }
+        } else {
+            // Find the current sub-bucket containing the new_label
+            Bucket *current_sub_bucket       = nullptr;
+            size_t  current_sub_bucket_index = sub_buckets.size(); // Invalid index if not found
+
+            for (size_t i = 0; i < sub_buckets.size(); ++i) {
+                if (sub_buckets[i].is_contained(new_label)) {
+                    current_sub_bucket       = &sub_buckets[i];
+                    current_sub_bucket_index = i;
+                    break;
+                }
+            }
+
+            // Check dominance recursively in the current sub-bucket
+            if (current_sub_bucket && current_sub_bucket->check_dominance(new_label, dominance_func, stat_n_dom)) {
+                return true;
+            }
+
+            // Check only the sub-buckets that come before the current sub-bucket
+            for (size_t i = 0; i < current_sub_bucket_index; ++i) {
+                if (sub_buckets[i].check_dominance(new_label, dominance_func, stat_n_dom)) { return true; }
+            }
+        }
+        return false;
+    }
+
     bool                    is_split        = false;
-    static constexpr double min_split_range = 1.0; // Define a threshold for minimum range to split
+    static constexpr double min_split_range = 0.5; // Define a threshold for minimum range to split
     void                    split_into_sub_buckets(size_t num_sub_buckets) {
         double total_range = ub[0] - lb[0]; // Assuming 1D bounds here
-        if (total_range < min_split_range) {
-            // fmt::print("Skipping split due to small range. lb: {}, ub: {}, range: {}\n", lb[0], ub[0], total_range);
-            return;
-        }
+        if (total_range < min_split_range) { return; }
 
-        if (depth > 0) {
-            // fmt::print("Skipping split due to depth. lb: {}, ub: {}, range: {}\n", lb[0], ub[0], total_range);
-            return;
-        }
-
-        // fmt::print("Splitting bucket with node ID: {}\n", node_id);
+        // if (depth > 0) { return; } // Do not split beyond a certain depth
 
         is_split = true;
         sub_buckets.clear();
@@ -138,12 +165,15 @@ struct Bucket {
         }
 
         // Distribute existing labels into sub-buckets based on their resources
-        for (auto label : labels_vec) {
-            // if (label->node_id != node_id) { print_info("Warning: Label node ID mismatch\n"); }
-            // fmt::print("Label value: {} and node_id: {}\n", label->resources[0], label->node_id);
-            assign_label_to_sub_bucket(label);
-        }
+        for (auto label : labels_vec) { assign_label_to_sub_bucket(label); }
+
+        // iterate over subbuckets and sort labels
+        for (auto &sub_bucket : sub_buckets) { sub_bucket.sort(); }
         labels_vec.clear();
+    }
+
+    void sort() {
+        pdqsort(labels_vec.begin(), labels_vec.end(), [](const Label *a, const Label *b) { return a->cost < b->cost; });
     }
 
     void assign_label_to_sub_bucket(Label *label) {
@@ -245,7 +275,7 @@ struct Bucket {
 
         if (!is_split) {
             labels_vec.push_back(label);
-            if (labels_vec.size() >= 100) {
+            if (labels_vec.size() >= BUCKET_CAPACITY) {
                 // print_info("Bucket capacity reached\n");
                 split_into_sub_buckets(2); // Example: Split into 4 sub-buckets
             }
@@ -291,34 +321,15 @@ struct Bucket {
             }
         };
 
-        // Check if the mother bucket is already split into sub-buckets
         if (!is_split) {
             // Add label to the mother bucket's labels in sorted order
             add_sorted_to_vector(labels_vec);
 
             // Check if splitting is needed
-            if (labels_vec.size() > BUCKET_CAPACITY) {
-                // Trigger splitting process (e.g., into 4 sub-buckets)
-                split_into_sub_buckets(2);
-
-                if (is_split) {
-                    // Re-distribute all labels, including the new label, into sub-buckets
-                    for (auto *existing_label : labels_vec) { assign_label_to_sub_bucket(existing_label); }
-
-                    // Clear mother bucket's labels as they have been redistributed
-                    labels_vec.clear();
-                } else {
-                    fmt::print("Warning: Splitting failed\n");
-                    add_sorted_to_vector(labels_vec); // Add the new label to the correct sub-bucket
-                }
-            }
+            if (labels_vec.size() >= BUCKET_CAPACITY) { split_into_sub_buckets(2); }
         } else {
-            // If already split, find the correct sub-bucket and add label there
-            for (size_t i = 0; i < sub_buckets.size(); ++i) {
-                auto &sub_bucket = sub_buckets[i];
-
-                // Check if the label falls within the current sub-bucket range based on resources[0]
-                bool is_last_bucket = (i == sub_buckets.size() - 1);
+            // If already split, find the correct sub-bucket and add the label there
+            for (auto &sub_bucket : sub_buckets) {
                 if (sub_bucket.is_contained(label)) {
                     add_sorted_to_vector(sub_bucket.labels_vec);
                     return;
@@ -385,18 +396,8 @@ struct Bucket {
      */
     void remove_label(Label *label) noexcept {
         if (is_split) {
-            // Iterate through sub-buckets to find and remove the label
-            for (auto &sub_bucket : sub_buckets) {
-                auto it = std::find(sub_bucket.labels_vec.begin(), sub_bucket.labels_vec.end(), label);
-                if (it != sub_bucket.labels_vec.end()) {
-                    // Only move last element if there are multiple elements
-                    if (sub_bucket.labels_vec.size() > 1) {
-                        *it = sub_bucket.labels_vec.back(); // Move last element to the found position
-                    }
-                    sub_bucket.labels_vec.pop_back(); // Remove the last element
-                    return;                           // Label found and removed, exit function
-                }
-            }
+            // Recursively call remove_label on each sub-bucket
+            for (auto &sub_bucket : sub_buckets) { sub_bucket.remove_label(label); }
         } else {
             // If not split, remove the label from the main labels_vec
             auto it = std::find(labels_vec.begin(), labels_vec.end(), label);
@@ -410,22 +411,23 @@ struct Bucket {
         }
     }
 
-    // std::vector<Label *> &get_labels() { return labels_vec; }
-    // inline auto &get_labels() { return labels_vec; }
-
     mutable std::vector<Label *> all_labels; // Mutable to allow modification in const function
 
     inline const std::vector<Label *> &get_labels() const {
         if (is_split) {
-            all_labels.clear(); // Clear any previous contents
+            // Reserve space only once, based on the size of all sub-buckets
+            all_labels.clear();
+            size_t total_size = 0;
+            for (const auto &sub_bucket : sub_buckets) { total_size += sub_bucket.get_labels().size(); }
+            all_labels.reserve(total_size);
+
+            // Insert labels from each sub-bucket
             for (const auto &sub_bucket : sub_buckets) {
-                const auto &sub_labels =
-                    sub_bucket.get_labels(); // Ensure get_labels() in sub-bucket returns a const reference
+                const auto &sub_labels = sub_bucket.get_labels();
                 all_labels.insert(all_labels.end(), sub_labels.begin(), sub_labels.end());
             }
             return all_labels;
         } else {
-            all_labels.clear(); // Clear any stale data to prevent unintended persistence
             return labels_vec;
         }
     }
@@ -435,22 +437,15 @@ struct Bucket {
         return labels_vec;
     }
 
-    inline auto get_unextended_labels() {
-        // Define the lambda once to ensure consistency between both branches
-        auto filtered_view = labels_vec | std::ranges::views::filter([](Label *label) { return !label->is_extended; });
-        /*
-        auto filter_lambda = [](Label *label) { return !label->is_extended; };
+    constexpr static const auto is_unextended = [](Label *label) { return !label->is_extended; };
 
-        if (!labels_vec.empty()) {
-            return labels_vec | std::views::filter(filter_lambda);
-        } else {
-            //fmt::print("Empty vector\n");
-            // Use a static empty vector with the same pool resource
-            static std::pmr::vector<Label *> empty_vec{&pool};    // Use the same pool
-            return empty_vec | std::views::filter(filter_lambda); // Same lambda applied to the empty case
-        }
-        */
-        return filtered_view;
+    inline auto get_unextended_labels() const {
+        // Directly use get_labels() to retrieve the appropriate vector, whether split or not
+        const auto &all_labels_ref = get_labels();
+
+        // Return a filtered view of the retrieved labels
+        return std::ranges::filter_view{
+            std::ranges::views::all(static_cast<const std::vector<Label *> &>(all_labels_ref)), is_unextended};
     }
 
     void clear() {

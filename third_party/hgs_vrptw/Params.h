@@ -181,8 +181,8 @@ public:
 
     // Data of the problem instance
     std::string         instanceName;
-    bool                isDurationConstraint;     // Indicates if the problem includes duration constraints
-    bool                isTimeWindowConstraint;   // Indicates if the problem includes time window constraints
+    bool                isDurationbaldesCtr;     // Indicates if the problem includes duration constraints
+    bool                isTimeWindowbaldesCtr;   // Indicates if the problem includes time window constraints
     bool                isExplicitDistanceMatrix; // Indicates if the problem is with explicit distances (non-euclidean)
     int                 nbClients;                // Number of clients (excluding the depot)
     int                 nbVehicles;               // Number of vehicles

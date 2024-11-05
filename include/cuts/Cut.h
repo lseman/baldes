@@ -87,7 +87,7 @@ struct Cut {
     bool        added   = false;
     bool        updated = false;
     CutType     type    = CutType::ThreeRow;
-    Constraint *grbConstr;
+    baldesCtrPtr grbConstr;
     size_t      key;
     // Default constructor
     Cut() = default;

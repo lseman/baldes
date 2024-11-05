@@ -115,7 +115,7 @@ public:
                                            const std::array<uint64_t, num_words> &AM, const SRCPermutation &p,
                                            const std::vector<int> &P, std::vector<int> &order);
 
-    std::pair<bool, bool> runSeparation(BNBNode *node, std::vector<Constraint *> &SRCconstraints);
+    std::pair<bool, bool> runSeparation(BNBNode *node, std::vector<baldesCtrPtr > &SRCconstraints);
 
     void separateR1C1(const SparseMatrix &A, const std::vector<double> &x) {
         std::vector<std::pair<double, int>> tmp_cuts;

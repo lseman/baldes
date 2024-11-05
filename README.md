@@ -33,7 +33,6 @@ The algorithm is based on state-of-the-art RCESPP techniques, including interior
   - [🚀 Key Features](#-key-features)
 - [⚠️ Disclaimer](#️-disclaimer)
 - [📋 TODO](#-todo)
-- [Known Issues](#known-issues)
 - [🛠️ Building](#️-building)
   - [📋 Prerequisites](#-prerequisites)
   - [⚙️ Compiling](#️-compiling)
@@ -86,7 +85,6 @@ The Bucket Graph-based labeling algorithm organizes labels into **buckets** base
   - Stage 3: Estimate bounds, discard suboptimal paths.
   - Stage 4: Apply exact dominance for optimal path.
 
-
 - **Limited-Memory Subset Row Cuts**
 
   Performs the separation of the SRCs in paralell, even for high order cuts.
@@ -99,6 +97,10 @@ The Bucket Graph-based labeling algorithm organizes labels into **buckets** base
   
   Performs a multi-stage branching, including the recent cluster branching. In each node, **branching variables** are selected through a hierarchical evaluation. The evaluation involves three phases: in **Phase 0**, candidates are chosen based on pseudo-cost history, fractional proximity to integers, and, for edges, distance to the depot. **Phase 1** evaluates these by solving a restricted master LP for each child node without new columns, using the Product Rule to select candidates maximizing lower bound increases. In **Phase 2**, the best candidates undergo further relaxation with heuristic column generation, again selected by the Product Rule. This structured approach adapts to tree depth, prioritizing impactful selections early on.
 
+- **Adaptive Bucket-Size**
+
+  In addition to automatically increasing the bucket step size when the number of dominance checks reach a certain level, we also introduce the concept of "sub-buckets". Sub-buckets are created when the number of labels in a bucket gets to "BUCKET_CAPACITY", and their dominance-order is automatically handled.
+
 - **Improvement Heuristics:** Optional fast improvement heuristics are applied at the end of each labeling phase to enhance label quality. The improvement heuristics are based on an iterated local search with adaptive operators weight in a ANLS-like heuristic.
 
 ## ⚠️ Disclaimer
@@ -109,14 +111,10 @@ Some features are experimental and subject to ongoing improvements:
 
 ## 📋 TODO
 
-- [ ] Fix branching duals
+- [x] Fix branching duals
 - [ ] Refactor high order SRC cuts
 - [ ] Change pybind to nanobind
 - [x] Enchance the improvement heuristics.
-
-## Known Issues
-
-- Branching duals are not behaving as expected
 
 ## 🛠️ Building
 
@@ -167,30 +165,30 @@ make -j$nprocs -DHGS=ON -DBALDES=OFF
 
 **Boolean Options**
 
-| Option                  | Description                            | Default |
-| ----------------------- | -------------------------------------- | ------- |
-| `FIXED_BUCKETS`         | Enable bucket arc fixing               | ON      |
-| `JEMALLOC`              | Enable jemalloc                        | ON      |
-| `SRC`                   | Enable limited memory SRC cuts         | ON      |
-| `LIMITED_BUCKETS`       | Limit the capacity of the buckets      | OFF     |
-| `MCD`                   | Perform MCD on instance capacities     | OFF     |
-| `PSTEP`                 | Enable PStep compilation               | OFF     |
-| `RCC`                   | Enable RCC cuts                        | OFF     |
-| `RIH`                   | Enable improvement heuristics          | OFF     |
-| `SCHRODINGER`           | Enable schrodinger pool                | OFF     |
-| `SORTED_LABELS`         | Sort labels on bucket insertion        | OFF     |
-| `STAB`$^2$              | Use dynamic-alpha smooth stabilization | OFF     |
-| `TR`                    | Use trust region stabilization         | OFF     |
-| `WITH_PYTHON`           | Enable the python wrapper              | OFF     |
+| Option            | Description                            | Default |
+| ----------------- | -------------------------------------- | ------- |
+| `FIXED_BUCKETS`   | Enable bucket arc fixing               | ON      |
+| `JEMALLOC`        | Enable jemalloc                        | ON      |
+| `SORTED_LABELS`   | Sort labels on bucket insertion        | ON      |
+| `SRC`             | Enable limited memory SRC cuts         | ON      |
+| `LIMITED_BUCKETS` | Limit the capacity of the buckets      | OFF     |
+| `MCD`             | Perform MCD on instance capacities     | OFF     |
+| `PSTEP`           | Enable PStep compilation               | OFF     |
+| `RCC`             | Enable RCC cuts                        | OFF     |
+| `RIH`             | Enable improvement heuristics          | OFF     |
+| `SCHRODINGER`     | Enable schrodinger pool                | OFF     |
+| `STAB`$^2$        | Use dynamic-alpha smooth stabilization | OFF     |
+| `TR`              | Use trust region stabilization         | OFF     |
+| `WITH_PYTHON`     | Enable the python wrapper              | OFF     |
 
 
 **Solvers**
 
-| Option                  | Description                            | Default |
-| ----------------------- | -------------------------------------- | ------- |
-| `IPM`$^2$               | Use interior point stabilization with the in-house solver       | ON      |
-| `HIGHS`             | Enable HiGHS as the IP Solver          | ON      |
-| `GUROBI`            | Enable GUROBI as the IP Solver         | OFF      |
+| Option    | Description                                               | Default |
+| --------- | --------------------------------------------------------- | ------- |
+| `IPM`$^2$ | Use interior point stabilization with the in-house solver | ON      |
+| `HIGHS`   | Enable HiGHS as the IP Solver                             | ON      |
+| `GUROBI`  | Enable GUROBI as the IP Solver                            | OFF     |
 
 **Numerical and Other Definitions**
 

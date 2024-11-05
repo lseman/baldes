@@ -116,9 +116,13 @@ private:
     }
 
     // Generate a new sub-instance for a given subproblem Vsp
-    InstanceData createSubInstance(const std::vector<int> &Vsp) const {
+    InstanceData createSubInstance(std::vector<int> &Vsp) const {
         InstanceData subInstance;
         // Include depot as the first node in subInstance
+        // remove duplicated members in Vsp
+        std::sort(Vsp.begin(), Vsp.end());  // Sort the vector
+        Vsp.erase(std::unique(Vsp.begin(), Vsp.end()), Vsp.end());
+        // print Vsp.size
         subInstance.nN = Vsp.size() + 1; // +1 for depot
         subInstance.nV = 1;
         subInstance.q  = instance.q;
