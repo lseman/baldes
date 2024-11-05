@@ -65,7 +65,7 @@ public:
      * @param instance: Instance data
      * @return List of branching candidates
      */
-    static std::vector<BranchingQueueItem> calculateAggregatedVariables(BNBNode *node, const InstanceData *instance,
+    static std::vector<BranchingQueueItem> calculateAggregatedbaldesVars(BNBNode *node, const InstanceData *instance,
                                                                         std::vector<VRPNode> &nodes) {
         std::vector<BranchingQueueItem> queueItems;
         auto                            LPSolution = node->extractSolution();
@@ -162,22 +162,22 @@ public:
 
         return queueItems;
     }
-    static void addConstraintForCandidate(BNBNode *childNode, const BranchingQueueItem &item, double bound,
+    static void addbaldesCtrForCandidate(BNBNode *childNode, const BranchingQueueItem &item, double bound,
                                           BranchingDirection direction) {
         if (item.candidateType == CandidateType::Vehicle) {
-            childNode->addBranchingConstraint(bound, direction, CandidateType::Vehicle);
+            childNode->addBranchingbaldesCtr(bound, direction, CandidateType::Vehicle);
         } else if (item.candidateType == CandidateType::Node) {
-            childNode->addBranchingConstraint(bound, direction, CandidateType::Node, item.targetNode);
+            childNode->addBranchingbaldesCtr(bound, direction, CandidateType::Node, item.targetNode);
         } else if (item.candidateType == CandidateType::Edge) {
             std::pair<int, int> edge = {item.sourceNode, item.targetNode};
-            childNode->addBranchingConstraint(bound, direction, CandidateType::Edge, edge);
+            childNode->addBranchingbaldesCtr(bound, direction, CandidateType::Edge, edge);
         } else if (item.candidateType == CandidateType::Cluster) {
-            childNode->addBranchingConstraint(bound, direction, CandidateType::Cluster, item.g_c.begin()->first);
+            childNode->addBranchingbaldesCtr(bound, direction, CandidateType::Cluster, item.g_c.begin()->first);
         }
     }
 
     // Apply branching constraints based on the fractional value of the candidate
-    static std::pair<BNBNode *, BNBNode *> applyBranchingConstraints(BNBNode                  *parentNode,
+    static std::pair<BNBNode *, BNBNode *> applyBranchingbaldesCtrs(BNBNode                  *parentNode,
                                                                      const BranchingQueueItem &item,
                                                                      double fractionalValue, CandidateType type) {
         BNBNode *childNode1 = parentNode->newChild();
@@ -190,8 +190,8 @@ public:
             upperBound = 1;
         }
 
-        addConstraintForCandidate(childNode1, item, lowerBound, BranchingDirection::Less);
-        addConstraintForCandidate(childNode2, item, upperBound, BranchingDirection::Greater);
+        addbaldesCtrForCandidate(childNode1, item, lowerBound, BranchingDirection::Less);
+        addbaldesCtrForCandidate(childNode2, item, upperBound, BranchingDirection::Greater);
 
         return {childNode1, childNode2};
     }
@@ -228,7 +228,7 @@ public:
 
                     // Add branching constraints and create two child nodes
                     auto [childNode1, childNode2] =
-                        applyBranchingConstraints(node, candidate, candidate.fractionalValue, candidate.candidateType);
+                        applyBranchingbaldesCtrs(node, candidate, candidate.fractionalValue, candidate.candidateType);
 
                     // Solve the Restricted Master LP for each child node
                     double deltaLB1, deltaLB2;
@@ -339,17 +339,17 @@ public:
         BNBNode *childNode2 = parentNode->newChild();
 
         // Helper to add branching constraint
-        auto addConstraints = [&](double bound, BranchingDirection direction, BNBNode *child) {
+        auto addbaldesCtrs = [&](double bound, BranchingDirection direction, BNBNode *child) {
             if (candidate.candidateType == CandidateType::Vehicle) {
                 fmt::print("Adding constraint for Vehicle\n");
-                child->addBranchingConstraint(bound, direction, candidate.candidateType);
+                child->addBranchingbaldesCtr(bound, direction, candidate.candidateType);
             } else if (candidate.candidateType == CandidateType::Node) {
                 fmt::print("Adding constraint for Node\n");
-                child->addBranchingConstraint(bound, direction, candidate.candidateType, candidate.targetNode);
+                child->addBranchingbaldesCtr(bound, direction, candidate.candidateType, candidate.targetNode);
             } else { // CandidateType::Edge
                 fmt::print("Adding constraint for Edge\n");
                 std::pair<int, int> edge = {candidate.sourceNode, candidate.targetNode};
-                child->addBranchingConstraint(bound, direction, candidate.candidateType, edge);
+                child->addBranchingbaldesCtr(bound, direction, candidate.candidateType, edge);
             }
         };
 
@@ -362,8 +362,8 @@ public:
         }
 
         // Add constraints to both child nodes
-        addConstraints(lowerBound, BranchingDirection::Less, childNode1);
-        addConstraints(upperBound, BranchingDirection::Greater, childNode2);
+        addbaldesCtrs(lowerBound, BranchingDirection::Less, childNode1);
+        addbaldesCtrs(upperBound, BranchingDirection::Greater, childNode2);
 
         return {childNode1, childNode2};
     }
@@ -450,10 +450,10 @@ public:
         auto nodes = problem->getNodes();
         node->optimize();
 
-        auto aggregatedCandidates = calculateAggregatedVariables(node, instance, nodes);
+        auto aggregatedCandidates = calculateAggregatedbaldesVars(node, instance, nodes);
 
         // Select candidates based on the new Phase 0 logic
-        print_info("Phase 0: selecting candidates for branching...\n");
+        print_branching("Phase 0: selecting candidates for branching...\n");
         auto phase0Candidates =
             selectCandidatesPhase0(aggregatedCandidates, node->historyCandidates, maxCandidatesPhase0, instance);
 
@@ -461,14 +461,14 @@ public:
         node->historyCandidates = phase0Candidates;
 
         // Evaluate candidates and apply branching constraints
-        print_info("Phase 1: evaluating candidates for branching...\n");
+        print_branching("Phase 1: evaluating candidates by RMP relaxation...\n");
         auto phase1Candidates = evaluateWithBranching(node, phase0Candidates);
 
         // TODO: add logic to select the best candidates from phase1Candidates
-        print_info("Phase 2: selecting best candidates from Phase 1...\n");
+        print_branching("Phase 2: evaluating candidates with heuristic CG...\n");
         auto phase2Candidates = evaluateWithCG(node, phase1Candidates, problem);
 
-        print_info("Phase 3: generating VRP candidates...\n");
+        print_branching("Generating VRP candidates...\n");
         auto generatedCandidates = generateVRPCandidates(node, phase1Candidates);
         candidates.insert(candidates.end(), generatedCandidates.begin(), generatedCandidates.end());
 

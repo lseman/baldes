@@ -9,8 +9,8 @@ class TrustRegion {
 public:
     bool                    isInsideTrustRegion;
     int                     numConstrs;
-    std::vector<Variable *> w;
-    std::vector<Variable *> zeta;
+    std::vector<baldesVarPtr > w;
+    std::vector<baldesVarPtr > zeta;
     std::vector<double>     delta1;
     std::vector<double>     delta2;
     int                     epsilon1 = 10;

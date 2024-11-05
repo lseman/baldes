@@ -33,7 +33,7 @@
 
 typedef struct
 {
-  int CType; /* Constraint Type. */
+  int CType; /* baldesCtr Type. */
   int Key;
   int IntListSize;
   int *IntList;
@@ -83,7 +83,7 @@ void CMGR_AddExplicitCnstr(CnstrMgrPointer CMP,
 void CMGR_AddGomoryCnstr(CnstrMgrPointer CMP,
                          int CType, int Key,
                          int ListSize,
-                         int *IntList, /* Variable numbers */
+                         int *IntList, /* baldesVar numbers */
                          double *CoeffList,
                          double RHS); /* >= RHS */
 void CMGR_AppendCMP(CnstrMgrPointer Sink,

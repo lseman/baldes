@@ -14,6 +14,7 @@
 
 #include "miphandler/Constraint.h"
 
+#include <memory>
 #include <sstream>
 
 #include "Hashes.h"
@@ -104,7 +105,7 @@ public:
     MIPProblem mip = MIPProblem("node", 0, 0);
 
     // node specific
-    SRC_MODE_BLOCK(std::vector<Constraint *> SRCconstraints;
+    SRC_MODE_BLOCK(std::vector<baldesCtrPtr> SRCconstraints;
                    using LimitedMemoryRank1CutsPtr = std::shared_ptr<LimitedMemoryRank1Cuts>;
                    LimitedMemoryRank1CutsPtr r1c   = std::make_shared<LimitedMemoryRank1Cuts>();)
 
@@ -222,18 +223,19 @@ public:
         child->SRCconstraints.reserve(SRCconstraints.size()); // Reserve space if size is known
         child->depth = depth + 1;
 
-        for (Constraint *constraint : SRCconstraints) {
-            child->SRCconstraints.push_back(new Constraint(*constraint)); // Deep copy each `Constraint` object
+        for (baldesCtrPtr constraint : SRCconstraints) {
+            child->SRCconstraints.push_back(
+                std::make_shared<baldesCtr>(*constraint)); // Deep copy each `baldesCtr` object
         }
 
-        //child->clearSRC();
+        // child->clearSRC();
         child->matrix = matrix;
         // Return the new child node
         return child;
     }
 
     void clearSRC() {
-        for (auto *c : SRCconstraints) { mip.delete_constraint(c); }
+        for (auto c : SRCconstraints) { mip.delete_constraint(c); }
     }
 
     void addChildren(BNBNode *child) {
@@ -258,7 +260,7 @@ public:
 
     // Change multiple coefficients for a specific constraint
     void chgCoeff(int constraintIndex, const std::vector<double> &values) { mip.chgCoeff(constraintIndex, values); }
-    void chgCoeff(Constraint *ctr, const std::vector<double> &values) { mip.chgCoeff(ctr, values); }
+    void chgCoeff(baldesCtrPtr ctr, const std::vector<double> &values) { mip.chgCoeff(ctr, values); }
 
     // Change a single coefficient for a specific constraint and variable
     void chgCoeff(int constraintIndex, int variableIndex, double value) {
@@ -277,19 +279,19 @@ public:
     // Binarize all variables (set to binary type)
     void binarizeNode() {
         auto &vars = mip.getVars();
-        for (auto *var : vars) { var->set_type(VarType::Binary); }
+        for (auto var : vars) { var->set_type(VarType::Binary); }
     }
 
     // Relax all variables (set to continuous type)
     void relaxNode() {
         auto &vars = mip.getVars();
-        for (auto *var : vars) { var->set_type(VarType::Continuous); }
+        for (auto var : vars) { var->set_type(VarType::Continuous); }
     }
 
-    void remove(Constraint *ctr) { mip.delete_constraint(ctr); }
-    void remove(Variable *var) { mip.delete_variable(var); }
+    void remove(baldesCtrPtr ctr) { mip.delete_constraint(ctr); }
+    void remove(baldesVarPtr var) { mip.delete_variable(var); }
 
-    Variable *addVar(const std::string &name, VarType type, double lb, double ub, double obj) {
+    baldesVarPtr addVar(const std::string &name, VarType type, double lb, double ub, double obj) {
         return mip.add_variable(name, type, lb, ub, obj);
     }
 
@@ -306,7 +308,7 @@ public:
         if (attr == "NumVars") {
             return mip.getVars().size();
         } else if (attr == "NumConstrs") {
-            return mip.getConstraints().size();
+            return mip.getbaldesCtrs().size();
         }
         throw std::invalid_argument("Unknown attribute");
     }
@@ -314,7 +316,7 @@ public:
     void setIntAttr(const std::string &attr, int value) { throw std::invalid_argument("Unknown attribute"); }
     void setDoubleAttr(const std::string &attr, double value) { throw std::invalid_argument("Unknown attribute"); }
 
-    Constraint *addConstr(Constraint *ctr, const std::string &name) {
+    baldesCtrPtr addConstr(baldesCtrPtr ctr, const std::string &name) {
         ctr = mip.add_constraint(ctr, name);
         return ctr;
     }
@@ -323,10 +325,10 @@ public:
     void removeConstr(int constraintIndex) { mip.delete_constraint(constraintIndex); }
 
     // Get a variable by index
-    Variable *getVar(int i) { return mip.getVar(i); }
+    baldesVarPtr getVar(int i) { return mip.getVar(i); }
 
     // Get all constraints
-    std::vector<Constraint *> &getConstrs() { return mip.getConstraints(); }
+    std::vector<baldesCtrPtr> &getConstrs() { return mip.getbaldesCtrs(); }
 
     ModelData extractModelDataSparse() { return mip.extractModelDataSparse(); }
 
@@ -376,7 +378,7 @@ public:
 
     std::vector<BranchingQueueItem> historyCandidates;
 
-    Constraint *addBranchingConstraint(
+    baldesCtrPtr addBranchingbaldesCtr(
         double rhs, const BranchingDirection &sense, const CandidateType &ctype,
         std::optional<std::variant<int, std::pair<int, int>, std::vector<int>>> payload = std::nullopt) {
 
@@ -386,7 +388,7 @@ public:
         std::string      name;
 
         if (ctype == CandidateType::Vehicle) {
-            for (auto *var : variables) {
+            for (auto var : variables) {
                 linExpr.add_or_update_term(var->get_name(), 1.0); // Add each variable with coefficient 1.0
                 name = "branching_vehicle_" + std::to_string(int(rhs));
             }
@@ -449,7 +451,7 @@ public:
         }
 
         // Add the constraint to MIP based on the branching direction
-        Constraint *constraint;
+        baldesCtrPtr constraint;
         if (sense == BranchingDirection::Greater) {
             constraint = mip.add_constraint(linExpr, rhs, '>');
             constraint->set_name(name);
@@ -471,10 +473,10 @@ public:
     void enforceBranching() {
         // Iterate over the candidates and enforce the branching constraints
         for (const auto &candidate : candidates) {
-            auto ctr = addBranchingConstraint(candidate->boundValue, candidate->boundType, candidate->candidateType,
+            auto ctr = addBranchingbaldesCtr(candidate->boundValue, candidate->boundType, candidate->candidateType,
                                               candidate->payload);
             branchingDuals->addCandidate(candidate, ctr);
         }
-        mip.printBranchingConstraint();
+        mip.printBranchingbaldesCtr();
     }
 };

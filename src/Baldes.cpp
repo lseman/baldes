@@ -114,13 +114,13 @@ void initRMP(MIPProblem *model, VRProblem *problem, std::vector<std::vector<int>
                 lhs.addTerm(model->getVar(j), 1.0);
             }
         }
-        model->add_constraint(lhs, 1.0, '>'); // Constraint: lhs >= 1 (visit the node)
+        model->add_constraint(lhs, 1.0, '>'); // baldesCtr: lhs >= 1 (visit the node)
     }
 
     // Second part: Ensure the number of vehicles does not exceed the maximum
     LinearExpression vehicle_constraint_lhs;
     for (size_t j = 0; j < heuristicRoutes.size(); ++j) { vehicle_constraint_lhs.addTerm(model->getVar(j), 1.0); }
-    model->add_constraint(vehicle_constraint_lhs, static_cast<double>(Um), '<'); // Constraint: sum(lambda) <= Um
+    model->add_constraint(vehicle_constraint_lhs, static_cast<double>(Um), '<'); // baldesCtr: sum(lambda) <= Um
 
     // Set the objective to minimize
     model->setObjectiveSense(ObjectiveType::Minimize);
@@ -205,13 +205,13 @@ int main(int argc, char *argv[]) {
     HGSptr hgs = std::make_shared<HGS>();
 
     /*
-        HGS myhgs;
-        int alpha = 50, delta = 40, timeLimit = 3600;  // Example parameters
-        fmt::print("Running POPMUSIC algorithm\n");
-        POPMUSIC popmusic(instance, myhgs, alpha, delta, timeLimit);
-        Solution optimizedSolution = popmusic.run();
-        fmt::print("Optimized solution cost: {}\n", optimizedSolution.totalCost);
-        */
+    HGS myhgs;
+    int alpha = 50, delta = 40, timeLimit = 3600;  // Example parameters
+    fmt::print("Running POPMUSIC algorithm\n");
+    POPMUSIC popmusic(instance, myhgs, alpha, delta, timeLimit);
+    Solution optimizedSolution = popmusic.run();
+    fmt::print("Optimized solution cost: {}\n", optimizedSolution.totalCost);
+    */
 
     auto initialRoutesHGS = hgs->run(instance);
 

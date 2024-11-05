@@ -348,8 +348,8 @@ void HGSLocalSearch::run(Individual *indiv, double penaltyCapacityLS, double pen
                     // Randomizing the order of the neighborhoods within this loop does not matter much as we are
                     // already randomizing the order of the node pairs (and it's not very common to find improving
                     // moves of different types for the same node pair)
-                    setLocalVariablesRouteU();
-                    setLocalVariablesRouteV();
+                    setLocalbaldesVarsRouteU();
+                    setLocalbaldesVarsRouteV();
                     if (MoveSingleClient()) continue;                                  // RELOCATE
                     if (MoveTwoClients()) continue;                                    // RELOCATE
                     if (MoveTwoClientsReversed()) continue;                            // RELOCATE
@@ -362,7 +362,7 @@ void HGSLocalSearch::run(Individual *indiv, double penaltyCapacityLS, double pen
                     // Trying moves that insert nodeU directly after the depot
                     if (nodeV->prev->isDepot) {
                         nodeV = nodeV->prev;
-                        setLocalVariablesRouteV();
+                        setLocalbaldesVarsRouteV();
                         if (MoveSingleClient()) continue;                                  // RELOCATE
                         if (MoveTwoClients()) continue;                                    // RELOCATE
                         if (MoveTwoClientsReversed()) continue;                            // RELOCATE
@@ -375,8 +375,8 @@ void HGSLocalSearch::run(Individual *indiv, double penaltyCapacityLS, double pen
              * SIZE */
             if (loopID > 0 && !emptyRoutes.empty()) {
                 nodeV = routes[*emptyRoutes.begin()].depot;
-                setLocalVariablesRouteU();
-                setLocalVariablesRouteV();
+                setLocalbaldesVarsRouteU();
+                setLocalbaldesVarsRouteV();
                 if (MoveSingleClient()) continue;       // RELOCATE
                 if (MoveTwoClients()) continue;         // RELOCATE
                 if (MoveTwoClientsReversed()) continue; // RELOCATE
@@ -419,7 +419,7 @@ void HGSLocalSearch::run(Individual *indiv, double penaltyCapacityLS, double pen
     exportIndividual(indiv);
 }
 
-void HGSLocalSearch::setLocalVariablesRouteU() {
+void HGSLocalSearch::setLocalbaldesVarsRouteU() {
     routeU         = nodeU->route;
     nodeX          = nodeU->next;
     nodeXNextIndex = nodeX->next->cour;
@@ -438,7 +438,7 @@ void HGSLocalSearch::setLocalVariablesRouteU() {
     routeULoadPenalty = routeU->load > params->vehicleCapacity;
 }
 
-void HGSLocalSearch::setLocalVariablesRouteV() {
+void HGSLocalSearch::setLocalbaldesVarsRouteV() {
     routeV         = nodeV->route;
     nodeY          = nodeV->next;
     nodeYNextIndex = nodeY->next->cour;
@@ -1037,7 +1037,7 @@ bool HGSLocalSearch::RelocateStar() {
     Node  *insertionPoint = nullptr;
     Node  *nodeToInsert   = nullptr;
     for (nodeU = routeU->depot->next; !nodeU->isDepot; nodeU = nodeU->next) {
-        setLocalVariablesRouteU();
+        setLocalbaldesVarsRouteU();
 
         // Precompute nodeU related values that don't change within inner loop
         const TimeWindowData routeUTwData = MergeTWDataRecursive(nodeU->prev->prefixTwData, nodeX->postfixTwData);

@@ -35,7 +35,7 @@
 struct RCCut {
     std::vector<RawArc> arcs; // Stores the arcs involved in the cut
     int                 rhs;  // Right-hand side value of the constraint
-    Constraint         *ctr;  // Gurobi constraint object
+    baldesCtrPtr       ctr;  // Gurobi constraint object
 };
 
 class BNBNode;
@@ -48,8 +48,8 @@ public:
     // define size as the size of the cuts vector
     int size() { return cuts_.size(); }
 
-    std::vector<Constraint *> getConstraints() {
-        std::vector<Constraint *> constraints;
+    std::vector<baldesCtrPtr> getbaldesCtrs() {
+        std::vector<baldesCtrPtr> constraints;
         for (const auto &cut : cuts_) { constraints.push_back(cut.ctr); }
         return constraints;
     }
@@ -75,7 +75,7 @@ public:
     }
 
     // Method to add a new cut
-    void addCut(const std::vector<RawArc> &arcs, int rhs, Constraint *ctr) {
+    void addCut(const std::vector<RawArc> &arcs, int rhs, baldesCtrPtr ctr) {
         // std::lock_guard<std::mutex> lock(mutex_);
         cuts_.emplace_back(RCCut{arcs, rhs, ctr});
         cut_ctr++;
@@ -96,8 +96,7 @@ public:
     // define remove cut method
     void removeCut(RCCut &cut) {
         // std::lock_guard<std::mutex> lock(mutex_);
-        cuts_.erase(std::remove_if(cuts_.begin(), cuts_.end(),
-                                   [&](const RCCut &c) { return c.ctr == cut.ctr; }),
+        cuts_.erase(std::remove_if(cuts_.begin(), cuts_.end(), [&](const RCCut &c) { return c.ctr == cut.ctr; }),
                     cuts_.end());
     }
     ArcDuals computeDuals(std::vector<double> dualValues, double threshold = 1e-3) {

@@ -1,9 +1,9 @@
 /*
  * @file Constraint.h
- * @brief Constraint class implementation
+ * @brief baldesCtr class implementation
  *
- * This file contains the implementation of the Constraint class.
- * The Constraint class represents a linear constraint in a mathematical optimization problem.
+ * This file contains the implementation of the baldesCtr class.
+ * The baldesCtr class represents a linear constraint in a mathematical optimization problem.
  * It encapsulates a linear expression, a right-hand side value, and a relational operator to define a constraint.
  *
  */
@@ -12,19 +12,19 @@
 #include "ankerl/unordered_dense.h"
 
 /**
- * @class Constraint
+ * @class baldesCtr
  * @brief Represents a linear constraint in a mathematical optimization problem.
  *
- * The Constraint class encapsulates a linear expression, a right-hand side value,
+ * The baldesCtr class encapsulates a linear expression, a right-hand side value,
  * and a relational operator to define a constraint in a mathematical optimization problem.
  */
-class Constraint {
+class baldesCtr {
 public:
-    Constraint(const LinearExpression &expr, double rhs, char relation)
+    baldesCtr(const LinearExpression &expr, double rhs, char relation)
         : expression(expr), rhs(rhs), relation(relation) {}
 
     // default constructor
-    Constraint() : expression(), rhs(0.0), relation('=') {}
+    baldesCtr() : expression(), rhs(0.0), relation('=') {}
 
     LinearExpression &get_expression() { return expression; }
     double            get_rhs() const { return rhs; }
@@ -38,13 +38,13 @@ public:
 
     const ankerl::unordered_dense::map<std::string, double> &get_terms() const { return expression.get_terms(); }
 
-    void addTerm(const Variable *var, double coeff) { expression.addTerm(var, coeff); }
+    void addTerm(const baldesVarPtr var, double coeff) { expression.addTerm(var, coeff); }
 
     // define get_name
     std::string get_name() const { return name; }
 
     void print() const {
-        fmt::print("Constraint: ");
+        fmt::print("baldesCtr: ");
         for (const auto &[var_name, coeff] : expression.get_terms()) {
             fmt::print("{:.2f} * {} + ", coeff, var_name);
         }

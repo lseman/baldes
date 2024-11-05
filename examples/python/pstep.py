@@ -256,7 +256,7 @@ def solve_tsp(paths, nodes, path_costs, firsts, lasts, cost_matrix, first_time=F
         gp.quicksum(path_costs[i] * x[i] for i in range(R)), GRB.MINIMIZE
     )
 
-    # Constraints (3.3) and (3.4)
+    # baldesCtrs (3.3) and (3.4)
     three_two = {}
     three_three = {}
     for i in range(1, n):
@@ -274,7 +274,7 @@ def solve_tsp(paths, nodes, path_costs, firsts, lasts, cost_matrix, first_time=F
         three_two[i] = model.addConstr(in_constraint == 0, name=f"33_{i}")
         three_three[i] = model.addConstr(out_constraint == 1, name=f"34_{i}")
 
-    # Constraints (3.5): Avoid sub-tours using MTZ constraints
+    # baldesCtrs (3.5): Avoid sub-tours using MTZ constraints
     three_five_constraints_matrix = {}
     for i in range(n):
         for j in range(n):

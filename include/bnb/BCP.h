@@ -140,7 +140,7 @@ public:
 
 #if defined(RCC) || defined(EXACT_RCC)
             auto RCCvec         = rccManager->computeRCCCoefficients(label.route);
-            auto RCCconstraints = rccManager->getConstraints();
+            auto RCCconstraints = rccManager->getbaldesCtrs();
             if (RCCvec.size() > 0) {
                 for (int i = 0; i < RCCvec.size(); i++) {
                     if (abs(RCCvec[i]) > 1e-3) {
@@ -239,7 +239,7 @@ public:
 
             RCC_MODE_BLOCK(
                 auto RCCvec = rccManager->computeRCCCoefficients(label->nodes_covered); if (RCCvec.size() > 0) {
-                    auto RCCconstraints = rccManager->getConstraints();
+                    auto RCCconstraints = rccManager->getbaldesCtrs();
 
                     for (int i = 0; i < RCCvec.size(); i++) {
                         if (abs(RCCvec[i]) > 1e-3) {
@@ -251,9 +251,9 @@ public:
             auto &branching    = node->branchingDuals;
             auto  branchingVec = branching->computeCoefficients(label->nodes_covered);
             if (branchingVec.size() > 0) {
-                auto branchingConstraints = branching->getBranchingConstraints();
+                auto branchingbaldesCtrs = branching->getBranchingbaldesCtrs();
                 for (int i = 0; i < branchingVec.size(); i++) {
-                    if (abs(branchingVec[i]) > 1e-3) { col.addTerm(branchingConstraints[i]->index(), branchingVec[i]); }
+                    if (abs(branchingVec[i]) > 1e-3) { col.addTerm(branchingbaldesCtrs[i]->index(), branchingVec[i]); }
                 }
             }
 
@@ -283,7 +283,7 @@ public:
      *
      */
     bool cutHandler(std::shared_ptr<LimitedMemoryRank1Cuts> &r1c, BNBNode *node,
-                    std::vector<Constraint *> &constraints) {
+                    std::vector<baldesCtrPtr > &constraints) {
         auto &cuts    = r1c->cutStorage;
         bool  changed = false;
 
@@ -303,7 +303,7 @@ public:
                     LinearExpression lhs;
                     for (size_t i = 0; i < coeffs.size(); ++i) {
                         if (coeffs[i] == 0) { continue; }
-                        lhs.addTerm(node->getVar(i), coeffs[i]);
+                        lhs += node->getVar(i) * coeffs[i];
                     }
 
                     std::string constraint_name = "cuts(z" + std::to_string(z) + ")";
@@ -333,7 +333,7 @@ public:
     bool RCCsep(BNBNode *model, const std::vector<double> &solution) {
         auto &rccManager = model->rccManager;
         // if (rccManager->cut_ctr >= 50) return false;
-        //  Constraint manager to store cuts
+        //  baldesCtr manager to store cuts
         CnstrMgrPointer cutsCMP = nullptr;
         CMGR_CreateCMgr(&cutsCMP, 100);
 
@@ -415,7 +415,7 @@ public:
             // For each arc in arcGroups[i], compute the cut expression
             for (const auto &arc : arcGroups[i]) {
                 for (size_t ctr = 0; ctr < allPaths.size(); ++ctr) {
-                    cutExpr.addTerm(model->getVar(ctr), allPaths[ctr].timesArc(arc.from, arc.to));
+                    cutExpr += model->getVar(ctr) * allPaths[ctr].timesArc(arc.from, arc.to);
                 }
             }
 

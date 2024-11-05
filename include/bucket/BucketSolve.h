@@ -218,21 +218,21 @@ std::vector<double> BucketGraph::labeling_algorithm() noexcept {
         do {
             all_ext = true; // Assume all labels have been extended at the start
             for (const auto bucket : sorted_sccs[scc_index]) {
-                auto bucket_labels = buckets[bucket].get_labels(); // Get unextended labels from this bucket
+                auto bucket_labels = buckets[bucket].get_unextended_labels(); // Get unextended labels from this bucket
                 // if (bucket_labels.empty()) { continue; }            // Skip empty buckets
                 for (Label *label : bucket_labels) {
-                    if (label->is_extended) { continue; } // Skip already extended labels
-                    // NOTE: double check if this is the best way to handle this
+                    // if (label->is_extended) { continue; } // Skip already extended labels
+                    //  NOTE: double check if this is the best way to handle this
                     if constexpr (F == Full::Partial) {
                         if constexpr (D == Direction::Forward) {
                             if (label->resources[options.main_resources[0]] >
-                                q_star[options.main_resources[0]] + numericutils::eps) {
+                                q_star[options.main_resources[0]]) { // + numericutils::eps) {
                                 label->set_extended(true);
                                 continue;
                             }
                         } else if constexpr (D == Direction::Backward) {
                             if (label->resources[options.main_resources[0]] <=
-                                q_star[options.main_resources[0]] - numericutils::eps) {
+                                q_star[options.main_resources[0]]) { // - numericutils::eps) {
                                 label->set_extended(true);
                                 continue;
                             }
@@ -280,16 +280,12 @@ std::vector<double> BucketGraph::labeling_algorithm() noexcept {
                             } else {
 
                                 auto &mother_bucket             = buckets[to_bucket];
-                                auto  check_dominance_in_bucket = [&](const std::vector<Label *> labels) {
-                                    if (labels.size() == 0) { return false; } // Skip empty buckets
-                                    // print labels.size
-
+                                auto  check_dominance_in_bucket = [&](const std::vector<Label *> &labels) {
 #ifndef AVX
                                     for (auto *existing_label : labels) {
                                         if (is_dominated<D, S>(new_label, existing_label)) {
                                             stat_n_dom++; // Increment dominated labels count
                                             return true;
-                                            // break;
                                         }
                                     }
                                     return false;
@@ -299,46 +295,9 @@ std::vector<double> BucketGraph::labeling_algorithm() noexcept {
 #endif
                                 };
 
-                                // Check if the mother bucket is split into sub-buckets
-                                if (!mother_bucket.is_split) {
-                                    // Perform dominance check directly on the mother bucket's labels
-                                    if (check_dominance_in_bucket(mother_bucket.get_labels())) {
-                                        stat_n_dom++; // Increment dominated labels count
-                                        dominated = true;
-                                    }
-                                } else {
-                                    // Proceed with sub-bucket dominance checks if the bucket is split
-                                    auto &sub_buckets = mother_bucket.sub_buckets;
-
-                                    // Identify the current sub-bucket based on `new_label` cost or other criteria
-                                    Bucket *current_sub_bucket = nullptr;
-                                    for (auto &sub_bucket : sub_buckets) {
-                                        if (sub_bucket.is_contained(new_label)) {
-                                            current_sub_bucket = &sub_bucket;
-                                            break;
-                                        }
-                                    }
-
-                                    // Check dominance in the current sub-bucket
-                                    
-                                    if (current_sub_bucket != nullptr &&
-                                        check_dominance_in_bucket(current_sub_bucket->get_labels())) {
-                                        stat_n_dom++; // Increment dominated labels count
-                                        dominated = true;
-                                    } else {
-                                        // If not dominated, check other sub-buckets
-                                        for (auto &sub_bucket : sub_buckets) {
-                                            if (&sub_bucket == current_sub_bucket)
-                                                continue; // Skip the current sub-bucket
-                                            auto sub_labels = sub_bucket.get_labels();
-                                            if (check_dominance_in_bucket(sub_labels)) {
-                                                stat_n_dom++; // Increment dominated labels count
-                                                dominated = true;
-                                                break;
-                                            }
-                                        }
-                                    }
-                                }
+                                // Call check_dominance on the mother bucket
+                                dominated =
+                                    mother_bucket.check_dominance(new_label, check_dominance_in_bucket, stat_n_dom);
                             }
 
                             if (!dominated) {
@@ -976,20 +935,25 @@ inline bool BucketGraph::DominatedInCompWiseSmallerBuckets(const Label *L, int b
         // If the current bucket is different from the label's bucket, compare the labels in this bucket
         if (b_L != currentBucket) {
             const auto bucket_labels = buckets[currentBucket].get_labels(); // Get the labels in the current bucket
-            // Iterate over each label in the current bucket and check if it dominates L
-
+            auto      &mother_bucket = buckets[currentBucket];              // Get the mother bucket for the label
+            auto       check_dominance_in_bucket = [&](const std::vector<Label *> &labels) {
 #ifndef AVX
-
-            for (auto *label : bucket_labels) {
-                if (is_dominated<D, S>(L, label)) {
-                    return true; // If any label dominates L, return true
+                for (auto *existing_label : labels) {
+                    if (is_dominated<D, S>(L, existing_label)) {
+                        stat_n_dom++; // Increment dominated labels count
+                        return true;
+                    }
                 }
-            }
+                return false;
 #else
-            if (check_dominance_against_vector<D, S>(L, bucket_labels, cut_storage, options.resources.size())) {
-                return true; // If any label dominates L, return true
-            }
+                return check_dominance_against_vector<D, S>(L, labels, cut_storage, options.resources.size());
 #endif
+            };
+
+            int stat_n_dom = 0; // Initialize the count of dominated labels
+            // Call check_dominance on the mother bucket
+            bool dominated = mother_bucket.check_dominance(L, check_dominance_in_bucket, stat_n_dom);
+            if (dominated) { return true; }
         }
 
         // Add the neighboring buckets (from Phi) to the stack if they haven't been visited yet

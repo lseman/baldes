@@ -51,7 +51,7 @@ GRBModel solve_vrp(const InstanceData &instance) {
     }
     model.setObjective(obj, GRB_MINIMIZE);
 
-    // Constraint 1: Flow conservation at each customer
+    // baldesCtr 1: Flow conservation at each customer
     for (int i = 1; i <= num_customers; ++i) {
         GRBLinExpr flow_in  = 0;
         GRBLinExpr flow_out = 0;
@@ -67,7 +67,7 @@ GRBModel solve_vrp(const InstanceData &instance) {
         model.addConstr(flow_out == 1, "flow_out_" + std::to_string(i)); // Exactly one vehicle leaves each customer
     }
 
-    // Constraint 2: Each vehicle leaves and returns to the depot
+    // baldesCtr 2: Each vehicle leaves and returns to the depot
     for (int v = 0; v < num_vehicles; ++v) {
         GRBLinExpr vehicle_start = 0;
         GRBLinExpr vehicle_end   = 0;
@@ -79,7 +79,7 @@ GRBModel solve_vrp(const InstanceData &instance) {
         model.addConstr(vehicle_end == 1, "vehicle_end_" + std::to_string(v));     // Each vehicle returns to depot once
     }
 
-    // Constraint 3: Time window constraints
+    // baldesCtr 3: Time window constraints
     for (int i = 1; i <= num_customers; ++i) {
         for (int j = 1; j <= num_customers; ++j) {
             if (i != j) {
@@ -92,7 +92,7 @@ GRBModel solve_vrp(const InstanceData &instance) {
         }
     }
 
-    // Constraint 4: Vehicle capacity constraint
+    // baldesCtr 4: Vehicle capacity constraint
     for (int v = 0; v < num_vehicles; ++v) {
         GRBLinExpr load = 0;
         for (int i = 1; i <= num_customers; ++i) {
@@ -144,7 +144,7 @@ int main(int argc, char *argv[]) {
     print_info("Converting to knapsack\n");
     // iterate over the number of rows
     for (size_t i = 0; i < modelData.A.size(); ++i) {
-        print_info("Constraint: {}\n", i);
+        print_info("baldesCtr: {}\n", i);
         preprocessor.convert2Knapsack(i);
     }
 
