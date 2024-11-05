@@ -774,7 +774,7 @@ public:
 #ifdef SCHRODINGER
                 // Adding schrodinger paths
                 auto sch_paths = bucket_graph->getSchrodinger();
-                addPath(node, sch_paths, true);
+                colAdded += addPath(node, sch_paths, true);
 #endif
 
 #ifdef STAB

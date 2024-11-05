@@ -30,6 +30,8 @@
 #include "Variable.h"
 
 #include <fmt/core.h>
+#include <sstream>
+
 
 #ifdef HIGHS
 #include "Highs.h"
