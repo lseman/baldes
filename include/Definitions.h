@@ -14,16 +14,12 @@
 
 #include "ankerl/unordered_dense.h"
 
-using baldesCtrPtr = std::shared_ptr<baldesCtr>;
-using baldesVarPtr   = std::shared_ptr<baldesVar>;
-using LinearExpPtr  = std::shared_ptr<LinearExpression>;
-
 struct BucketOptions {
     int  depot         = 0;
     int  end_depot     = N_SIZE - 1;
     int  max_path_size = N_SIZE / 2;
     bool manual_arcs   = false;
-    int size = 102;
+    int size = N_SIZE;
 
     std::vector<int>         main_resources         = {0};
     std::vector<std::string> resources              = {"time"};

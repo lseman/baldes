@@ -129,7 +129,8 @@ struct Bucket {
             }
 
             // Check only the sub-buckets that come before the current sub-bucket
-            for (size_t i = 0; i < current_sub_bucket_index; ++i) {
+            for (size_t i = 0; i < sub_buckets.size(); ++i) {
+                if (i == current_sub_bucket_index) { continue; }
                 if (sub_buckets[i].check_dominance(new_label, dominance_func, stat_n_dom)) { return true; }
             }
         }

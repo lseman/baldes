@@ -33,6 +33,10 @@
 #include <sstream>
 
 
+using baldesCtrPtr = std::shared_ptr<baldesCtr>;
+using baldesVarPtr   = std::shared_ptr<baldesVar>;
+using LinearExpPtr  = std::shared_ptr<LinearExpression>;
+
 #ifdef HIGHS
 #include "Highs.h"
 #endif

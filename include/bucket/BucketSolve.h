@@ -621,7 +621,7 @@ BucketGraph::Extend(const std::conditional_t<M == Mutability::Mut, Label *, cons
     for (size_t i = 0; i < L_prime->visited_bitmap.size(); ++i) {
         n_visited += __builtin_popcountll(L_prime->visited_bitmap[i]);
     }
-    if (n_visited >= options.max_path_size) { return nullptr; }
+    if (n_visited >= options.max_path_size) { return std::vector<Label *>(); }
 #endif
 
     // Get the bucket number for the new node and resource state
@@ -665,6 +665,21 @@ BucketGraph::Extend(const std::conditional_t<M == Mutability::Mut, Label *, cons
     double new_cost = initial_cost + travel_cost - VRPNode.cost;
 #else
     double new_cost = initial_cost + travel_cost;
+    // consider pstep duals
+    auto arc_dual         = pstep_duals.getArcDualValue(initial_node_id, node_id); // eq (3.5)
+    auto three_two_dual   = pstep_duals.getThreeTwoDualValue(node_id);             // eq (3.2)
+    auto three_three_dual = pstep_duals.getThreeThreeDualValue(node_id);           // eq (3.3)
+
+    auto old_three_two_dual = pstep_duals.getThreeTwoDualValue(initial_node_id);
+
+    // If there were other vertices rather than the first one visited previously to this current node,
+    // we give back the dual as a final node and add the dual corresponding to the visit
+    if (n_visited > 1 && initial_node_id > 0) { new_cost += old_three_two_dual + three_three_dual; }
+    // We assume the current vertex is the last in the route, thus we add the dual corresponding to the second set of
+    // constraints
+    new_cost += -three_two_dual;
+    // Add the arc dual
+    new_cost += arc_dual;
 #endif
 
     // Compute branching duals

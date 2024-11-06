@@ -63,6 +63,9 @@ if(APPLE)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -stdlib=libc++ -std=c++20")
 endif()
 
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-error=unknown-argument")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-error=unused-command-line-argument")
+
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 # Include the generated config.h file
@@ -89,7 +92,7 @@ option(PSTEP "Enable PSTEP compilation option" OFF)
 option(SCHRODINGER "Enable Schrodinger compilation option" OFF)
 option(CLIQUER "Enable Cliquer compilation option" OFF)
 option(VERBOSE "Enable verbose output" OFF)
-option(JEMALLOC "Enable jemalloc" ON)
+option(JEMALLOC "Enable jemalloc" OFF)
 option(GUROBI "Enable GUROBI" OFF)
 option(HIGHS "Enable HIGHS" ON)
 option(NSYNC "Enable nsync" OFF)
@@ -188,6 +191,7 @@ cpmaddpackage(
   "STDEXEC_BUILD_BENCHMARKS OFF"
   "STDEXEC_BUILD_DOCS OFF"
   "BUILD_TESTING OFF")
+  string(REPLACE "-fconcepts-diagnostics-depth=10" "" CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
 
 find_package(xxhash)
 if(NOT xxhash_FOUND)
@@ -347,16 +351,6 @@ if(HIGHS)
   list(APPEND COMMON_LIBRARIES highs::highs)
 endif()
 
-if(JEMALLOC)
-  find_library(JEMALLOC_LIBRARY jemalloc)
-  if(JEMALLOC_LIBRARY)
-    message(STATUS "jemalloc found: ${JEMALLOC_LIBRARY}")
-    list(APPEND COMMON_LIBRARIES ${JEMALLOC_LIBRARY})
-  else()
-    message(STATUS "jemalloc not found")
-  endif()
-endif()
-
 if(NSYNC)
   list(APPEND COMMON_LIBRARIES nsync)
   include_directories(${nsync_SOURCE_DIR}/public)
@@ -379,20 +373,30 @@ if(BALDES)
   # Add the executable with the combined sources
   add_executable(baldes src/Baldes.cpp ${EXECUTABLE_SOURCES})
 
+  if(JEMALLOC)
+  find_library(JEMALLOC_LIBRARY jemalloc)
+  if(JEMALLOC_LIBRARY)
+    message(STATUS "jemalloc found: ${JEMALLOC_LIBRARY}")
+    target_link_libraries(baldes PRIVATE ${JEMALLOC_LIBRARY})
+  else()
+    message(STATUS "jemalloc not found")
+  endif()
+endif()
+
   message(STATUS "Gurobi version: ${GUROBI_VERSION_MAJOR}")
   target_compile_options(baldes PRIVATE -Wno-c++26-extensions
                                         -Wno-deprecated-declarations)
 
-  target_precompile_headers(
-    baldes
-    PRIVATE
-    include/Common.h
-    ${CVRPSEP_HEADERS}
-    ${FPMAX_HEADERS}
-    include/Arc.h
-    include/Dual.h
-    include/VRPNode.h
-    third_party/pdqsort.h)
+  # target_precompile_headers(
+  #   baldes
+  #   PRIVATE
+  #   include/Common.h
+  #   ${CVRPSEP_HEADERS}
+  #   ${FPMAX_HEADERS}
+  #   include/Arc.h
+  #   include/Dual.h
+  #   include/VRPNode.h
+  #   third_party/pdqsort.h)
 
   if(IPM OR IPM_ACEL)
     target_include_directories(baldes PRIVATE ${Eigen_SOURCE_DIR})
@@ -416,12 +420,17 @@ if(MTW)
 endif()
 
 if(WITH_PYTHON)
-  pybind11_add_module(pybaldes src/BucketBindings.cpp src/BucketGraph.cpp
+  pybind11_add_module(pybaldes src/BucketBindings.cpp src/BCP.cpp src/BucketGraph.cpp src/MIPHandler.cpp
+  src/Branching.cpp
                       ${EXECUTABLE_SOURCES})
   target_link_libraries(pybaldes PRIVATE ${COMMON_LIBRARIES})
   set_target_properties(pybaldes PROPERTIES POSITION_INDEPENDENT_CODE ON)
   target_compile_options(pybaldes PRIVATE -Wno-c++26-extensions
                                           -Wno-deprecated-declarations)
+
+  # link pybind
+  target_link_libraries(pybaldes PRIVATE pybind11::module)
+  set_target_properties(pybaldes PROPERTIES PREFIX "")
 
   if(IPM OR IPM_ACEL)
     target_include_directories(pybaldes PRIVATE ${Eigen_SOURCE_DIR})
@@ -435,3 +444,5 @@ if(HGS)
   target_compile_options(hgs PRIVATE -Wno-c++26-extensions
                                      -Wno-deprecated-declarations)
 endif()
+
+string(REPLACE "-fconcepts-diagnostics-depth=10" "" CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")

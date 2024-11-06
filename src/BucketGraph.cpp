@@ -456,16 +456,17 @@ void BucketGraph::set_adjacency_list() {
         node.clear_arcs(); // Remove any existing arcs associated with the node
     }
 
-    RawArcList heur_arcs;
-    for (const auto &path : topHeurRoutes) {
-        for (size_t i = 0; i < path.size() - 1; ++i) {
-            int    from = path[i];
-            int    to   = path[i + 1];
-            RawArc arc(from, to);
-            heur_arcs.add_arc(arc);
+    /*
+        RawArcList heur_arcs;
+        for (const auto &path : topHeurRoutes) {
+            for (size_t i = 0; i < path.size() - 1; ++i) {
+                int    from = path[i];
+                int    to   = path[i + 1];
+                RawArc arc(from, to);
+                heur_arcs.add_arc(arc);
+            }
         }
-    }
-
+    */
     // Step 1: Compute the clusters using MST-based clustering
     MST    mst_solver(nodes, [&](int from, int to) { return this->getcij(from, to); });
     double theta    = 1.0; // Experiment with different values of θ
@@ -519,7 +520,7 @@ void BucketGraph::set_adjacency_list() {
             double priority_value;
             double reverse_priority_value;
 
-            bool is_heuristic_arc = heur_arcs.has_arc(node.id, next_node.id);
+            // bool is_heuristic_arc = heur_arcs.has_arc(node.id, next_node.id);
 
             if (job_to_cluster[node.id] == job_to_cluster[next_node.id]) {
                 // Higher priority if both nodes are in the same cluster
@@ -541,6 +542,7 @@ void BucketGraph::set_adjacency_list() {
             auto [priority_value, to_bucket, res_inc_local, cost_inc] = arc;
             nodes[node.id].add_arc(node.id, to_bucket, res_inc_local, cost_inc, true,
                                    priority_value); // Add forward arc
+            // fmt::print("Node ID: {}, To Bucket: {}, Cost Inc: {}\n", node.id, to_bucket, cost_inc);
         }
 
         // Add reverse arcs from neighboring nodes to the current node
@@ -553,7 +555,11 @@ void BucketGraph::set_adjacency_list() {
 
     // Step 4: Iterate over all nodes to set the adjacency list
     for (const auto &VRPNode : nodes) {
-        if (VRPNode.id == options.end_depot) continue; // Skip the last node (depot)
+        // fmt::print("Node ID: {}\n", VRPNode.id);
+
+        if (VRPNode.id == options.end_depot) {
+            continue; // Skip the last node (depot)
+        }
 
         std::vector<double> res_inc(intervals.size());   // Resource increment vector
         add_arcs_for_node(VRPNode, VRPNode.id, res_inc); // Add arcs for the current node
@@ -991,6 +997,29 @@ Label *BucketGraph::compute_mono_label(const Label *L) {
     }
 
     std::reverse(new_label->nodes_covered.begin(), new_label->nodes_covered.end());
+
+    // check if last node is the end depot
+    if (new_label->nodes_covered.back() != options.end_depot) {
+        new_label->nodes_covered.push_back(options.end_depot);
+        new_label->cost += getcij(new_label->nodes_covered[new_label->nodes_covered.size() - 2], options.end_depot);
+        new_label->real_cost +=
+            getcij(new_label->nodes_covered[new_label->nodes_covered.size() - 2], options.end_depot);
+
+        auto arc_dual = pstep_duals.getArcDualValue(new_label->nodes_covered.size() - 2, options.end_depot); // eq (3.5)
+        auto three_two_dual   = pstep_duals.getThreeTwoDualValue(options.end_depot);                         // eq (3.2)
+        auto three_three_dual = pstep_duals.getThreeThreeDualValue(options.end_depot);                       // eq (3.3)
+
+        auto old_three_two_dual = pstep_duals.getThreeTwoDualValue(new_label->nodes_covered.size() - 2);
+
+        // If there were other vertices rather than the first one visited previously to this current node,
+        // we give back the dual as a final node and add the dual corresponding to the visit
+        new_label->cost += old_three_two_dual + three_three_dual;
+        // We assume the current vertex is the last in the route, thus we add the dual corresponding to the second set
+        // of constraints
+        new_label->cost += -three_two_dual;
+        // Add the arc dual
+        new_label->cost += arc_dual;
+    }
 
     return new_label;
 }
