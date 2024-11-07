@@ -116,6 +116,14 @@ inline int BucketGraph::get_bucket_number(int node, std::vector<double> &resourc
     } else if constexpr (D == Direction::Backward) {
         val = bw_node_interval_trees[node].query(resource_values_vec);
     }
+
+    auto &buckets = assign_buckets<D>(fw_buckets, bw_buckets);
+    auto &to_bucket = buckets[val];
+    // check is resources_values_vec[0] is within the bounds of the bucket
+    if (resource_values_vec[0] < to_bucket.lb[0] || resource_values_vec[0] > to_bucket.ub[0]) {
+        std::cerr << "BucketGraph::get_bucket_number: Invalid bucket number: " << val << "for node: " << node
+                  << std::endl;
+    }
     // print val
     if constexpr (D == Direction::Forward) {
         if (val < 0) {

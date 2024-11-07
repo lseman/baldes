@@ -81,7 +81,7 @@ public:
 
 #ifdef PSTEP
     PSTEPDuals pstep_duals;
-    void       setArcDuals(const PSTEPDuals &arc_duals) { this->pstep_duals = arc_duals; }
+    void       setPSTEPduals(const PSTEPDuals &arc_duals) { this->pstep_duals = arc_duals; }
     /**
      * @brief Solves the PSTEP problem and returns a vector of labels representing paths.
      *
@@ -103,14 +103,23 @@ public:
 
         std::vector<double> forward_cbar(fw_buckets.size());
 
-        forward_cbar = labeling_algorithm<Direction::Forward, Stage::Four, Full::Full>();
+        forward_cbar = labeling_algorithm<Direction::Forward, Stage::Enumerate, Full::Full>();
 
         for (auto bucket : std::ranges::iota_view(0, fw_buckets_size)) {
             auto bucket_labels = fw_buckets[bucket].get_labels();
             for (auto label : bucket_labels) {
                 auto new_label = compute_mono_label(label);
-                if (new_label->nodes_covered.size() < options.max_path_size) { continue; }
-                paths.push_back(new_label);
+                // print new_label->nodes_covered
+
+                if ((new_label->nodes_covered.size() == options.max_path_size && new_label->nodes_covered.back() == options.end_depot) ||
+                    (new_label->nodes_covered.size() == options.max_path_size - 1 && new_label->nodes_covered.back() != options.end_depot)) {
+                    paths.push_back(new_label);
+                }
+                //paths.push_back(new_label);
+                // for (auto node : new_label->nodes_covered) {
+                //     fmt::print("{} ", node);
+                // }
+                // fmt::print("\n");
             }
         }
 
