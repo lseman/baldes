@@ -1,4 +1,5 @@
 #include "Definitions.h"
+#include "PDHG.h"
 
 #define EIGEN_INITIALIZE_MATRICES_BY_ZERO
 

@@ -55,9 +55,9 @@ if(NOT CMAKE_BUILD_TYPE)
       "RelWithDebInfo"
       CACHE STRING "Choose the type of build." FORCE)
 endif()
-set(CMAKE_CXX_FLAGS_RELEASE "-O3 -march=native -flto")
-set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "-O3 -g -march=native -flto")
-set(CMAKE_CXX_FLAGS_DEBUG "-Og -g -Wall -Wextra")
+set(CMAKE_CXX_FLAGS_RELEASE "-O3 -march=native -flto -Xclang -Wno-unknown-warning-option")
+set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "-O3 -g -march=native -flto -Xclang -Wno-unknown-warning-option")
+set(CMAKE_CXX_FLAGS_DEBUG "-Og -g -Wall -Wextra -Xclang -Wno-unknown-warning-option")
 
 if(APPLE)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -stdlib=libc++ -std=c++20")
@@ -446,3 +446,7 @@ if(HGS)
 endif()
 
 string(REPLACE "-fconcepts-diagnostics-depth=10" "" CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
+
+add_executable(pdhg src/PDHG.cpp)
+# link eigen
+target_include_directories(pdhg PRIVATE ${Eigen_SOURCE_DIR})

@@ -492,6 +492,10 @@ void BucketGraph::set_adjacency_list() {
         for (const auto &next_node : nodes) {
             if (next_node.id == options.depot || node.id == next_node.id) continue; // Skip depot and same node
 
+#ifdef PSTEP
+            if (next_node.id == 0 || next_node.id == N_SIZE - 1) continue; // Skip depot and end depot
+#endif
+
             auto   travel_cost = getcij(node.id, next_node.id); // Calculate travel cost
             double cost_inc    = travel_cost - next_node.cost;  // Adjust cost increment by subtracting next node's cost
 
@@ -1005,6 +1009,7 @@ Label *BucketGraph::compute_mono_label(const Label *L) {
         new_label->real_cost +=
             getcij(new_label->nodes_covered[new_label->nodes_covered.size() - 2], options.end_depot);
 
+#ifdef PSTEP
         auto arc_dual = pstep_duals.getArcDualValue(new_label->nodes_covered.size() - 2, options.end_depot); // eq (3.5)
         auto three_two_dual   = pstep_duals.getThreeTwoDualValue(options.end_depot);                         // eq (3.2)
         auto three_three_dual = pstep_duals.getThreeThreeDualValue(options.end_depot);                       // eq (3.3)
@@ -1019,6 +1024,7 @@ Label *BucketGraph::compute_mono_label(const Label *L) {
         new_label->cost += -three_two_dual;
         // Add the arc dual
         new_label->cost += arc_dual;
+#endif
     }
 
     return new_label;

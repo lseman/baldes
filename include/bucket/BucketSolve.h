@@ -218,11 +218,12 @@ std::vector<double> BucketGraph::labeling_algorithm() noexcept {
         do {
             all_ext = true; // Assume all labels have been extended at the start
             for (const auto bucket : sorted_sccs[scc_index]) {
-                auto bucket_labels = buckets[bucket].get_unextended_labels(); // Get unextended labels from this bucket
-                // if (bucket_labels.empty()) { continue; }            // Skip empty buckets
+                auto bucket_labels = buckets[bucket].get_labels(); // Get unextended labels from this bucket
+                if (bucket_labels.empty()) { continue; }           // Skip empty buckets
                 for (Label *label : bucket_labels) {
-                    // if (label->is_extended) { continue; } // Skip already extended labels
-                    //  NOTE: double check if this is the best way to handle this
+                    if (label->is_extended) { continue; } // Skip already extended labels
+//  NOTE: double check if this is the best way to handle this
+#ifndef PSTEP
                     if constexpr (F == Full::Partial) {
                         if constexpr (D == Direction::Forward) {
                             if (label->resources[options.main_resources[0]] >
@@ -238,6 +239,7 @@ std::vector<double> BucketGraph::labeling_algorithm() noexcept {
                             }
                         }
                     }
+#endif
 
                     domin_smaller = false;
 
@@ -609,11 +611,13 @@ BucketGraph::Extend(const std::conditional_t<M == Mutability::Mut, Label *, cons
     // Initialize new resources based on the arc's resource increments and check feasibility
     std::vector<double> new_resources(options.resources.size());
 
+#ifndef PSTEP
     // Note: workaround
     size_t N = options.resources.size();
     if (!process_all_resources<D>(new_resources, initial_resources, gamma, VRPNode, N)) {
         return std::vector<Label *>(); // Handle failure case (constraint violation)
     }
+#endif
 
 #ifdef PSTEP
     // counter the number of bits set in L_prime->visited_bitmap
@@ -621,7 +625,7 @@ BucketGraph::Extend(const std::conditional_t<M == Mutability::Mut, Label *, cons
     for (size_t i = 0; i < L_prime->visited_bitmap.size(); ++i) {
         n_visited += __builtin_popcountll(L_prime->visited_bitmap[i]);
     }
-    if (n_visited >= options.max_path_size) { return std::vector<Label *>(); }
+    if (n_visited > options.max_path_size) { return std::vector<Label *>(); }
 #endif
 
     // Get the bucket number for the new node and resource state
@@ -670,16 +674,19 @@ BucketGraph::Extend(const std::conditional_t<M == Mutability::Mut, Label *, cons
     auto three_two_dual   = pstep_duals.getThreeTwoDualValue(node_id);             // eq (3.2)
     auto three_three_dual = pstep_duals.getThreeThreeDualValue(node_id);           // eq (3.3)
 
-    auto old_three_two_dual = pstep_duals.getThreeTwoDualValue(initial_node_id);
+    auto old_dual_two = pstep_duals.getThreeTwoDualValue(initial_node_id);
+    auto old_dual_three = pstep_duals.getThreeThreeDualValue(initial_node_id);
 
     // If there were other vertices rather than the first one visited previously to this current node,
     // we give back the dual as a final node and add the dual corresponding to the visit
-    if (n_visited > 1 && initial_node_id > 0) { new_cost += old_three_two_dual + three_three_dual; }
+    new_cost += old_dual_three + old_dual_two;
     // We assume the current vertex is the last in the route, thus we add the dual corresponding to the second set of
     // constraints
-    new_cost += -three_two_dual;
+    new_cost -= three_two_dual;
     // Add the arc dual
     new_cost += arc_dual;
+    // print the duals
+
 #endif
 
     // Compute branching duals
@@ -725,8 +732,8 @@ BucketGraph::Extend(const std::conditional_t<M == Mutability::Mut, Label *, cons
     // Acquire a new label from the pool and initialize it with the new state
     auto new_label = label_pool->acquire();
     new_label->initialize(to_bucket, new_cost, new_resources, node_id);
+    new_label->vertex = to_bucket;
 
-    // Lambda to create a Label** array with null-termination using the label pool
     // Lambda to create a Label** array with null-termination using the label pool
     // Function returning a single Label* in a vector (which can act like a Label**)
     auto create_label_array = [](Label *label) -> std::vector<Label *> {
@@ -738,11 +745,6 @@ BucketGraph::Extend(const std::conditional_t<M == Mutability::Mut, Label *, cons
     if constexpr (F == Full::Reverse) {
         return create_label_array(new_label); // Return the array (as Label**)
     }
-
-    // new_label->visited_bitmap = L_prime->visited_bitmap; // Copy visited bitmap from the original label
-    // std::memcpy(new_label->visited_bitmap.data(), L_prime->visited_bitmap.data(),
-    //            new_label->visited_bitmap.size() * sizeof(uint64_t));
-    // set_node_visited(new_label->visited_bitmap, node_id); // Mark the new node as visited
 
 #ifdef UNREACHABLE_DOMINANCE
     // Copy unreachable bitmap (if applicable)
@@ -955,7 +957,7 @@ inline bool BucketGraph::DominatedInCompWiseSmallerBuckets(const Label *L, int b
 #ifndef AVX
                 for (auto *existing_label : labels) {
                     if (is_dominated<D, S>(L, existing_label)) {
-                        stat_n_dom++; // Increment dominated labels count
+                        //stat_n_dom++; // Increment dominated labels count
                         return true;
                     }
                 }

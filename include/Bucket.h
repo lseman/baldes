@@ -105,35 +105,48 @@ struct Bucket {
     bool check_dominance(const Label *new_label, std::function<bool(const std::vector<Label *> &)> dominance_func,
                          int &stat_n_dom) {
         if (!is_split) {
+
+            // check if label->resources is within bounds
+            // if (!is_contained(new_label)) { fmt::print("Warning: Label not contained in bucket\n"); }
             // Directly check dominance in the mother bucket
             if (dominance_func(get_labels())) {
                 stat_n_dom++; // Increment dominated labels count
                 return true;
             }
+
         } else {
-            // Find the current sub-bucket containing the new_label
-            Bucket *current_sub_bucket       = nullptr;
-            size_t  current_sub_bucket_index = sub_buckets.size(); // Invalid index if not found
+            // // Find the current sub-bucket containing the new_label
+            // Bucket *current_sub_bucket       = nullptr;
+            // size_t  current_sub_bucket_index = sub_buckets.size(); // Invalid index if not found
 
+            // for (size_t i = 0; i < sub_buckets.size(); ++i) {
+            //     // print subbucket lb and ub
+            //     if (sub_buckets[i].is_contained(new_label)) {
+            //         current_sub_bucket       = &sub_buckets[i];
+            //         current_sub_bucket_index = i;
+            //         break;
+            //     }
+            // }
+
+            // if (!current_sub_bucket) {
+            //  check in all sub-buckets
             for (size_t i = 0; i < sub_buckets.size(); ++i) {
-                if (sub_buckets[i].is_contained(new_label)) {
-                    current_sub_bucket       = &sub_buckets[i];
-                    current_sub_bucket_index = i;
-                    break;
-                }
-            }
-
-            // Check dominance recursively in the current sub-bucket
-            if (current_sub_bucket && current_sub_bucket->check_dominance(new_label, dominance_func, stat_n_dom)) {
-                return true;
-            }
-
-            // Check only the sub-buckets that come before the current sub-bucket
-            for (size_t i = 0; i < sub_buckets.size(); ++i) {
-                if (i == current_sub_bucket_index) { continue; }
                 if (sub_buckets[i].check_dominance(new_label, dominance_func, stat_n_dom)) { return true; }
             }
+            return false;
+
+            // // Check dominance recursively in the current sub-bucket
+            // if (current_sub_bucket && current_sub_bucket->check_dominance(new_label, dominance_func, stat_n_dom)) {
+            //     return true;
+            // }
+
+            // // Check only the sub-buckets that come before the current sub-bucket
+            // for (size_t i = 0; i < sub_buckets.size(); ++i) {
+            //     if (i == current_sub_bucket_index) { continue; }
+            //     if (sub_buckets[i].check_dominance(new_label, dominance_func, stat_n_dom)) { return true; }
+            // }
         }
+
         return false;
     }
 
@@ -141,6 +154,8 @@ struct Bucket {
     static constexpr double min_split_range = 0.5; // Define a threshold for minimum range to split
     void                    split_into_sub_buckets(size_t num_sub_buckets) {
         double total_range = ub[0] - lb[0]; // Assuming 1D bounds here
+        // print bounds original
+        // fmt::print("Mother bucket: lb: {}, ub: {}\n", lb[0], ub[0]);
         if (total_range < min_split_range) { return; }
 
         // if (depth > 0) { return; } // Do not split beyond a certain depth
@@ -149,27 +164,33 @@ struct Bucket {
         sub_buckets.clear();
         sub_buckets.reserve(num_sub_buckets);
 
-        // Calculate the range for each sub-bucket
-        double range_per_bucket = total_range / num_sub_buckets;
+        sub_buckets.clear();
+        sub_buckets.reserve(2); // Reserve space for two sub-buckets
 
-        for (size_t i = 0; i < num_sub_buckets; ++i) {
-            Bucket sub_bucket;
-            sub_bucket.node_id = node_id;
-            sub_bucket.lb      = {lb[0] + i * range_per_bucket};
-            sub_bucket.ub      = {lb[0] + (i + 1) * range_per_bucket};
+        // Calculate the midpoint
+        double midpoint = lb[0] + total_range / 2.0;
 
-            // For the last sub-bucket, set ub to the mother's ub[0] to ensure full range coverage
-            if (i == num_sub_buckets - 1) { sub_bucket.ub[0] = ub[0]; }
+        // Create the first sub-bucket from lb[0] to midpoint
+        Bucket first_sub_bucket;
+        first_sub_bucket.node_id = node_id;
+        first_sub_bucket.lb      = {roundToTwoDecimalPlaces(lb[0])};
+        first_sub_bucket.ub      = {roundToTwoDecimalPlaces(midpoint)};
+        first_sub_bucket.depth   = depth + 1;
+        sub_buckets.push_back(first_sub_bucket);
 
-            sub_bucket.depth = depth + 1;
-            sub_buckets.push_back(std::move(sub_bucket));
-        }
+        // Create the second sub-bucket from midpoint to ub[0]
+        Bucket second_sub_bucket;
+        second_sub_bucket.node_id = node_id;
+        second_sub_bucket.lb      = {roundToTwoDecimalPlaces(midpoint)};
+        second_sub_bucket.ub      = {roundToTwoDecimalPlaces(ub[0])};
+        second_sub_bucket.depth   = depth + 1;
+        sub_buckets.push_back(second_sub_bucket);
 
         // Distribute existing labels into sub-buckets based on their resources
         for (auto label : labels_vec) { assign_label_to_sub_bucket(label); }
 
         // iterate over subbuckets and sort labels
-        for (auto &sub_bucket : sub_buckets) { sub_bucket.sort(); }
+        // for (auto &sub_bucket : sub_buckets) { sub_bucket.sort(); }
         labels_vec.clear();
     }
 
@@ -276,6 +297,8 @@ struct Bucket {
 
         if (!is_split) {
             labels_vec.push_back(label);
+            // check if label is contained
+            if (!is_contained(label)) { fmt::print("Warning: label not contained in bucket\n"); }
             if (labels_vec.size() >= BUCKET_CAPACITY) {
                 // print_info("Bucket capacity reached\n");
                 split_into_sub_buckets(2); // Example: Split into 4 sub-buckets
@@ -450,9 +473,9 @@ struct Bucket {
     }
 
     void clear() {
-        labels_vec.clear();
         for (auto &sub_bucket : sub_buckets) { sub_bucket.clear(); }
         sub_buckets.clear();
+        labels_vec.clear();
         is_split = false;
     }
 
@@ -479,9 +502,10 @@ struct Bucket {
         bw_bucket_arcs.clear();
         fw_jump_arcs.clear();
         bw_jump_arcs.clear();
-        labels_vec.clear();
         for (auto &sub_bucket : sub_buckets) { sub_bucket.reset(); }
         sub_buckets.clear();
+        labels_vec.clear();
+
         is_split = false;
     }
     /**

@@ -100,7 +100,7 @@ PYBIND11_MODULE(pybaldes, m) {
         .def("phaseTwo", &BucketGraph::run_labeling_algorithms<Stage::Two, Full::Partial>)
         .def("phaseThree", &BucketGraph::run_labeling_algorithms<Stage::Three, Full::Partial>)
 #ifdef PSTEP
-        //.def("setArcDuals", &BucketGraph::setArcDuals, "duals"_a)
+        .def("setPSTEPDuals", &BucketGraph::setPSTEPduals, "duals"_a)
         .def("solvePSTEP", &BucketGraph::solvePSTEP, py::return_value_policy::reference)
 #endif
         .def("setOptions", &BucketGraph::setOptions, "options"_a)
