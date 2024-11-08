@@ -15,6 +15,7 @@ third_party/lkh/
 vrpsolve/
 testing/
 mtw/
+evrp/
 
 cmake/
 CPM_modules/
