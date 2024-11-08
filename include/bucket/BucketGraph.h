@@ -34,6 +34,8 @@
 #include "Bucket.h"
 #include "VRPNode.h"
 
+#include "PSTEP.h"
+
 #include "SCCFinder.h"
 
 #include "Dual.h"
@@ -107,13 +109,20 @@ public:
 
         for (auto bucket : std::ranges::iota_view(0, fw_buckets_size)) {
             auto bucket_labels = fw_buckets[bucket].get_labels();
+            // print bucket_labels size
+            // fmt::print("bucket_labels size: {}\n", bucket_labels.size());
             for (auto label : bucket_labels) {
                 auto new_label = compute_mono_label(label);
                 // print new_label->nodes_covered
-
-                if ((new_label->nodes_covered.size() == options.max_path_size && new_label->nodes_covered.back() == options.end_depot) ||
-                    (new_label->nodes_covered.size() == options.max_path_size - 1 && new_label->nodes_covered.back() != options.end_depot)) {
+                // for (auto node : new_label->nodes_covered) {
+                //     fmt::print("{} ", node);
+                // }
+                // fmt::print("\n");
+                if ((new_label->nodes_covered.size() == options.max_path_size)) {
                     paths.push_back(new_label);
+                    // // print new_label->cost
+                    // fmt::print("cost: {}\n", new_label->cost);
+
                 }
                 //paths.push_back(new_label);
                 // for (auto node : new_label->nodes_covered) {
