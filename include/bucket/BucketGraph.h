@@ -113,22 +113,9 @@ public:
             // fmt::print("bucket_labels size: {}\n", bucket_labels.size());
             for (auto label : bucket_labels) {
                 auto new_label = compute_mono_label(label);
-                // print new_label->nodes_covered
-                // for (auto node : new_label->nodes_covered) {
-                //     fmt::print("{} ", node);
-                // }
-                // fmt::print("\n");
                 if ((new_label->nodes_covered.size() == options.max_path_size)) {
                     paths.push_back(new_label);
-                    // // print new_label->cost
-                    // fmt::print("cost: {}\n", new_label->cost);
-
                 }
-                //paths.push_back(new_label);
-                // for (auto node : new_label->nodes_covered) {
-                //     fmt::print("{} ", node);
-                // }
-                // fmt::print("\n");
             }
         }
 
