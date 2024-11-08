@@ -687,81 +687,104 @@ void BucketGraph::mono_initialization() {
     merged_labels.clear();
     merged_labels.reserve(100);
     fw_c_bar.clear();
+    bw_c_bar.clear();
+
+    // print fw_buckets size
+    // fmt::print("fw_buckets size: {}\n", fw_buckets.size());
+    // fmt::print("fw_buckets size: {}\n", bw_buckets_size);
+    dominance_checks_per_bucket.assign(fw_buckets_size + 1, 0);
+    non_dominated_labels_per_bucket = 0;
 
     // Resize cost vectors to match the number of buckets
-    fw_c_bar.resize(fw_buckets.size(), std::numeric_limits<double>::infinity());
+    fw_c_bar.resize(fw_buckets_size, std::numeric_limits<double>::infinity());
+    bw_c_bar.resize(bw_buckets_size, std::numeric_limits<double>::infinity());
 
     auto &num_buckets      = assign_buckets<Direction::Forward>(num_buckets_fw, num_buckets_bw);
     auto &num_bucket_index = assign_buckets<Direction::Forward>(num_buckets_index_fw, num_buckets_index_bw);
 
-    int                 num_intervals = intervals.size(); // Determine how many resources we have (number of intervals)
+    int                 num_intervals = options.main_resources.size();
     std::vector<double> total_ranges(num_intervals);
     std::vector<double> base_intervals(num_intervals);
 
+    auto &VRPNode = nodes[0]; // Example for the first node
+
     // Calculate base intervals and total ranges for each resource dimension
     for (int r = 0; r < intervals.size(); ++r) {
-        total_ranges[r]   = R_max[r] - R_min[r];
-        base_intervals[r] = total_ranges[r] / intervals[r].interval;
+        base_intervals[r] = (VRPNode.ub[r] - VRPNode.lb[r]) / intervals[r].interval;
     }
 
     // Clear forward and backward buckets
-    for (auto b = 0; b < fw_buckets_size; b++) { fw_buckets[b].clear(); }
-
-    auto &VRPNode = nodes[0]; // Example for the first node
-
-    std::vector<int> node_total_ranges(num_intervals);
-    for (int r = 0; r < num_intervals; ++r) { node_total_ranges[r] = VRPNode.ub[r] - VRPNode.lb[r]; }
-
-    // Helper lambda to update current position of the intervals
-    auto update_position = [&](std::vector<int> &current_pos) -> bool {
-        bool done = true;
-        for (int r = num_intervals - 1; r >= 0; --r) {
-            current_pos[r]++;
-            if (current_pos[r] * base_intervals[r] < node_total_ranges[r]) {
-                done = false;
-                break;
-            } else {
-                current_pos[r] = 0;
-            }
-        }
-        return done;
-    };
-
-    auto calculate_index = [&](const std::vector<int> &current_pos, int &total_buckets) -> int {
-        int index = 0;
-
-        // Loop through each interval (dimension) and compute the index
-        for (int r = 0; r < current_pos.size(); ++r) {
-            index += current_pos[r]; // Accumulate the positional index across intervals
-        }
-
-        return index;
-    };
+    for (auto b = 0; b < fw_buckets.size(); b++) {
+        fw_buckets[b].clear();
+        bw_buckets[b].clear();
+    }
 
     // Initialize forward buckets (generic for multiple dimensions)
     std::vector<int> current_pos(num_intervals, 0);
 
-    // Iterate over all intervals for the forward direction
-    while (true) {
-        auto depot = label_pool_fw->acquire();
-        // print num_intervals
-        std::vector<double> interval_starts(num_intervals);
-        for (int r = 0; r < num_intervals; ++r) {
-            interval_starts[r] = std::min(R_max[r], VRPNode.lb[r] + current_pos[r] * base_intervals[r]);
-        }
+    std::vector<double> interval_starts(num_intervals);
+    std::vector<double> interval_ends(num_intervals);
 
-        // Adjust to calculate index using `num_buckets[0]`, which is likely multi-dimensional for the depot
-        int calculated_index = calculate_index(current_pos, num_buckets[options.depot]) +
-                               num_bucket_index[options.depot]; // Calculate index once
-        depot->initialize(calculated_index, 0.0, interval_starts, options.depot);
-        depot->is_extended = false;
-        set_node_visited(depot->visited_bitmap, options.depot);
-        SRC_MODE_BLOCK(depot->SRCmap.assign(cut_storage->SRCDuals.size(), 0);)
-        fw_buckets[calculated_index].add_label(depot);
-        fw_buckets[calculated_index].node_id = options.depot;
-
-        if (update_position(current_pos)) break; // Update position and break if done
+    // Initialize interval_starts to lower bounds and interval_ends to upper bounds
+    for (int r = 0; r < num_intervals; ++r) {
+        interval_starts[r] = VRPNode.lb[r];
+        interval_ends[r]   = VRPNode.ub[r];
     }
+    int offset_fw = 0;
+    int offset_bw = 0;
+
+    // Lambda to handle forward and backward direction initialization across combinations
+    auto initialize_intervals_combinations = [&](bool is_forward) {
+        int        &offset                = is_forward ? offset_fw : offset_bw;
+        auto       &label_pool            = is_forward ? label_pool_fw : label_pool_bw;
+        auto       &buckets               = is_forward ? fw_buckets : bw_buckets;
+        const auto &depot_id              = is_forward ? options.depot : options.end_depot;
+        int         calculated_index_base = is_forward ? 0 : num_buckets_index_bw[N_SIZE - 1];
+
+        std::vector<int>    current_pos(num_intervals, 0); // Tracks current position in each interval dimension
+        std::vector<double> interval_bounds(num_intervals);
+
+        // Recursive lambda to generate all combinations of intervals
+        std::function<void(int)> generate_combinations = [&](int depth) {
+            if (depth == num_intervals) {
+                // All dimensions processed, now initialize for the current combination
+                auto depot            = label_pool->acquire();
+                int  calculated_index = calculated_index_base + offset;
+
+                // Set interval_bounds to current combination of interval starts or ends
+                for (int r = 0; r < num_intervals; ++r) {
+                    interval_bounds[r] =
+                        is_forward ? interval_starts[r] + current_pos[r] * roundToTwoDecimalPlaces(base_intervals[r])
+                                   : interval_ends[r] - current_pos[r] * roundToTwoDecimalPlaces(base_intervals[r]);
+                }
+
+                // print interval
+                // Initialize depot with the current interval boundaries
+                depot->initialize(calculated_index, 0.0, interval_bounds, depot_id);
+                depot->is_extended = false;
+                depot->cost += pstep_duals.getThreeTwoDualValue(depot_id);
+                set_node_visited(depot->visited_bitmap, depot_id);
+                SRC_MODE_BLOCK(depot->SRCmap.assign(cut_storage->SRCDuals.size(), 0);)
+                buckets[calculated_index].add_label(depot);
+                buckets[calculated_index].node_id = depot_id;
+
+                offset++; // Increment offset for each combination
+                return;
+            }
+
+            // Loop through each interval in the current dimension
+            for (int k = 0; k < intervals[depth].interval; ++k) {
+                current_pos[depth] = k;
+                generate_combinations(depth + 1);
+            }
+        };
+
+        // Start generating combinations from depth 0
+        generate_combinations(0);
+    };
+
+    // Call the lambda for both forward and backward directions, ensuring all combinations are processed
+    initialize_intervals_combinations(true);  // Forward direction
 }
 
 #include "Knapsack.h"
@@ -1002,30 +1025,30 @@ Label *BucketGraph::compute_mono_label(const Label *L) {
 
     std::reverse(new_label->nodes_covered.begin(), new_label->nodes_covered.end());
 
-    // check if last node is the end depot
-    if (new_label->nodes_covered.back() != options.end_depot) {
-        new_label->nodes_covered.push_back(options.end_depot);
-        new_label->cost += getcij(new_label->nodes_covered[new_label->nodes_covered.size() - 2], options.end_depot);
-        new_label->real_cost +=
-            getcij(new_label->nodes_covered[new_label->nodes_covered.size() - 2], options.end_depot);
+//     // check if last node is the end depot
+//     if (new_label->nodes_covered.back() != options.end_depot) {
+//         new_label->nodes_covered.push_back(options.end_depot);
+//         new_label->cost += getcij(new_label->nodes_covered[new_label->nodes_covered.size() - 2], options.end_depot);
+//         new_label->real_cost +=
+//             getcij(new_label->nodes_covered[new_label->nodes_covered.size() - 2], options.end_depot);
 
-#ifdef PSTEP
-        auto arc_dual = pstep_duals.getArcDualValue(new_label->nodes_covered.size() - 2, options.end_depot); // eq (3.5)
-        auto three_two_dual   = pstep_duals.getThreeTwoDualValue(options.end_depot);                         // eq (3.2)
-        auto three_three_dual = pstep_duals.getThreeThreeDualValue(options.end_depot);                       // eq (3.3)
+// #ifdef PSTEP
+//         auto arc_dual = pstep_duals.getArcDualValue(new_label->nodes_covered.size() - 2, options.end_depot); // eq (3.5)
+//         auto three_two_dual   = pstep_duals.getThreeTwoDualValue(options.end_depot);                         // eq (3.2)
+//         auto three_three_dual = pstep_duals.getThreeThreeDualValue(options.end_depot);                       // eq (3.3)
 
-        auto old_three_two_dual = pstep_duals.getThreeTwoDualValue(new_label->nodes_covered.size() - 2);
+//         auto old_three_two_dual = pstep_duals.getThreeTwoDualValue(new_label->nodes_covered.size() - 2);
 
-        // If there were other vertices rather than the first one visited previously to this current node,
-        // we give back the dual as a final node and add the dual corresponding to the visit
-        new_label->cost += old_three_two_dual + three_three_dual;
-        // We assume the current vertex is the last in the route, thus we add the dual corresponding to the second set
-        // of constraints
-        new_label->cost += -three_two_dual;
-        // Add the arc dual
-        new_label->cost += arc_dual;
-#endif
-    }
+//         // If there were other vertices rather than the first one visited previously to this current node,
+//         // we give back the dual as a final node and add the dual corresponding to the visit
+//         new_label->cost += old_three_two_dual + three_three_dual;
+//         // We assume the current vertex is the last in the route, thus we add the dual corresponding to the second set
+//         // of constraints
+//         new_label->cost += -three_two_dual;
+//         // Add the arc dual
+//         new_label->cost += arc_dual;
+// #endif
+    // }
 
     return new_label;
 }

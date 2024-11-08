@@ -247,9 +247,10 @@ std::vector<double> BucketGraph::labeling_algorithm() noexcept {
                     std::memset(Bvisited.data(), 0, Bvisited.size() * sizeof(uint64_t));
 
                     // Check if the label is dominated by any labels in smaller buckets
+#ifndef PSTEP
                     domin_smaller =
                         DominatedInCompWiseSmallerBuckets<D, S>(label, bucket, c_bar, Bvisited, ordered_sccs);
-
+#endif
                     if (!domin_smaller) {
                         // Lambda function to process new labels after extension
                         auto process_new_label = [&](Label *new_label) {
@@ -318,7 +319,7 @@ std::vector<double> BucketGraph::labeling_algorithm() noexcept {
                                 n_labels++; // Increment the count of labels added
 
                                 // Add the new label to the bucket
-#ifdef SORTED_LABELS
+#ifndef SORTED_LABELS
                                 buckets[to_bucket].add_sorted_label(new_label);
 #elif LIMITED_BUCKETS
                                 buckets[to_bucket].sorted_label(new_label, BUCKET_CAPACITY);
@@ -588,9 +589,7 @@ BucketGraph::Extend(const std::conditional_t<M == Mutability::Mut, Label *, cons
     }
 
     // Check if the node has already been visited for enumeration (Stage Enumerate)
-    if constexpr (S == Stage::Enumerate) {
-        if (is_node_visited(L_prime->visited_bitmap, node_id)) { return std::vector<Label *>(); }
-    }
+    if (is_node_visited(L_prime->visited_bitmap, node_id)) { return std::vector<Label *>(); }
 
     // Perform 2-cycle elimination: if the node ID is the same as the current label's node, skip
     if (node_id == L_prime->node_id) { return std::vector<Label *>(); }
@@ -598,12 +597,6 @@ BucketGraph::Extend(const std::conditional_t<M == Mutability::Mut, Label *, cons
     // Check if node_id is in the neighborhood of initial_node_id and has already been visited
     size_t segment      = node_id >> 6; // Determine the segment in the bitmap
     size_t bit_position = node_id & 63; // Determine the bit position in the segment
-    if constexpr (S != Stage::Enumerate) {
-        // if ((neighborhoods_bitmap[initial_node_id][segment] & (1ULL << bit_position)) &&
-        if (is_node_visited(L_prime->visited_bitmap, node_id)) {
-            return std::vector<Label *>(); // Skip if the node is in the neighborhood and has been visited
-        }
-    }
 
     // Get the VRP node corresponding to node_id
     const VRPNode &VRPNode = nodes[node_id];
@@ -621,11 +614,17 @@ BucketGraph::Extend(const std::conditional_t<M == Mutability::Mut, Label *, cons
 
 #ifdef PSTEP
     // counter the number of bits set in L_prime->visited_bitmap
-    size_t n_visited = 0;
+    int n_visited = 0;
     for (size_t i = 0; i < L_prime->visited_bitmap.size(); ++i) {
         n_visited += __builtin_popcountll(L_prime->visited_bitmap[i]);
     }
-    if (n_visited > options.max_path_size) { return std::vector<Label *>(); }
+
+    if (n_visited > options.max_path_size) { 
+        return std::vector<Label *>(); }
+
+    if (n_visited == options.max_path_size) {
+        if (node_id != options.end_depot) { return std::vector<Label *>(); }
+    }
 #endif
 
     // Get the bucket number for the new node and resource state
@@ -670,21 +669,22 @@ BucketGraph::Extend(const std::conditional_t<M == Mutability::Mut, Label *, cons
 #else
     double new_cost = initial_cost + travel_cost;
     // consider pstep duals
-    auto arc_dual         = pstep_duals.getArcDualValue(initial_node_id, node_id); // eq (3.5)
-    auto three_two_dual   = pstep_duals.getThreeTwoDualValue(node_id);             // eq (3.2)
-    auto three_three_dual = pstep_duals.getThreeThreeDualValue(node_id);           // eq (3.3)
+    auto arc_dual      = pstep_duals.getArcDualValue(initial_node_id, node_id); // eq (3.5)
+    auto last_dual     = pstep_duals.getThreeTwoDualValue(node_id);             // eq (3.2)
+    auto not_last_dual = pstep_duals.getThreeThreeDualValue(node_id);           // eq (3.3)
 
-    auto old_dual_two = pstep_duals.getThreeTwoDualValue(initial_node_id);
-    auto old_dual_three = pstep_duals.getThreeThreeDualValue(initial_node_id);
+    auto old_last_dual     = pstep_duals.getThreeTwoDualValue(initial_node_id);
+    auto old_not_last_dual = pstep_duals.getThreeThreeDualValue(initial_node_id);
 
     // If there were other vertices rather than the first one visited previously to this current node,
     // we give back the dual as a final node and add the dual corresponding to the visit
-    new_cost += old_dual_three + old_dual_two;
-    // We assume the current vertex is the last in the route, thus we add the dual corresponding to the second set of
-    // constraints
-    new_cost -= three_two_dual;
+    if (node_id != options.end_depot) {
+        new_cost += not_last_dual;
+    } else if (node_id == options.end_depot) {
+        new_cost += -last_dual;
+    }
     // Add the arc dual
-    new_cost += arc_dual;
+    new_cost += -arc_dual;
     // print the duals
 
 #endif
@@ -757,11 +757,7 @@ BucketGraph::Extend(const std::conditional_t<M == Mutability::Mut, Label *, cons
     // Set the parent label, depending on mutability
     if constexpr (M == Mutability::Mut) { new_label->parent = L_prime; }
 
-#if defined(SRC3) || defined(SRC)
-    // Copy the SRC map from the original label (for SRC cuts)
-    new_label->SRCmap = L_prime->SRCmap;
-#endif
-
+#ifndef PSTEP
     // If not in enumeration stage, update visited bitmap to avoid redundant labels
     if constexpr (S != Stage::Enumerate) {
         size_t limit = new_label->visited_bitmap.size();
@@ -776,10 +772,13 @@ BucketGraph::Extend(const std::conditional_t<M == Mutability::Mut, Label *, cons
             new_label->visited_bitmap[i] = bits_to_clear; // Clear irrelevant visited nodes
         }
     }
-
+#else
+    new_label->visited_bitmap = L_prime->visited_bitmap;
+#endif
     set_node_visited(new_label->visited_bitmap, node_id); // Mark the new node as visited
 
-#if defined(SRC3) || defined(SRC)
+#if defined(SRC)
+    new_label->SRCmap = L_prime->SRCmap;
     // Apply SRC (Subset Row Cuts) logic in Stages 3, 4, and Enumerate
     if constexpr (S == Stage::Four || S == Stage::Enumerate) {
         auto          &cutter   = cut_storage;          // Access the cut storage manager
@@ -957,7 +956,7 @@ inline bool BucketGraph::DominatedInCompWiseSmallerBuckets(const Label *L, int b
 #ifndef AVX
                 for (auto *existing_label : labels) {
                     if (is_dominated<D, S>(L, existing_label)) {
-                        //stat_n_dom++; // Increment dominated labels count
+                        // stat_n_dom++; // Increment dominated labels count
                         return true;
                     }
                 }

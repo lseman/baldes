@@ -306,13 +306,13 @@ def solve_tsp(paths, nodes, path_costs, firsts, lasts, cost_matrix, first_time=F
 
         # Get dual variables for the constraints
         for i in range(1, n):
-            three_two_duals[i] = three_two[i].Pi
-            three_three_duals[i] = three_three[i].Pi
+            three_two_duals[i] = -three_two[i].Pi
+            three_three_duals[i] = -three_three[i].Pi
 
         for i in range(n):
             for j in range(n):
                 if i != j:
-                    three_five_duals[i][j] = three_five_constraints_matrix[(i, j)].Pi
+                    three_five_duals[i][j] = -three_five_constraints_matrix[(i, j)].Pi
     else:
         print("No optimal solution found.")
 

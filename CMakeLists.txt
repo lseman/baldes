@@ -446,7 +446,3 @@ if(HGS)
 endif()
 
 string(REPLACE "-fconcepts-diagnostics-depth=10" "" CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
-
-add_executable(pdhg src/PDHG.cpp)
-# link eigen
-target_include_directories(pdhg PRIVATE ${Eigen_SOURCE_DIR})
