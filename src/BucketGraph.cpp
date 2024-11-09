@@ -1035,32 +1035,5 @@ Label *BucketGraph::compute_mono_label(const Label *L) {
 
     std::reverse(new_label->nodes_covered.begin(), new_label->nodes_covered.end());
 
-    //     // check if last node is the end depot
-    //     if (new_label->nodes_covered.back() != options.end_depot) {
-    //         new_label->nodes_covered.push_back(options.end_depot);
-    //         new_label->cost += getcij(new_label->nodes_covered[new_label->nodes_covered.size() - 2],
-    //         options.end_depot); new_label->real_cost +=
-    //             getcij(new_label->nodes_covered[new_label->nodes_covered.size() - 2], options.end_depot);
-
-    // #ifdef PSTEP
-    //         auto arc_dual = pstep_duals.getArcDualValue(new_label->nodes_covered.size() - 2, options.end_depot); //
-    //         eq (3.5) auto three_two_dual   = pstep_duals.getThreeTwoDualValue(options.end_depot); // eq (3.2) auto
-    //         three_three_dual = pstep_duals.getThreeThreeDualValue(options.end_depot);                       // eq
-    //         (3.3)
-
-    //         auto old_three_two_dual = pstep_duals.getThreeTwoDualValue(new_label->nodes_covered.size() - 2);
-
-    //         // If there were other vertices rather than the first one visited previously to this current node,
-    //         // we give back the dual as a final node and add the dual corresponding to the visit
-    //         new_label->cost += old_three_two_dual + three_three_dual;
-    //         // We assume the current vertex is the last in the route, thus we add the dual corresponding to the
-    //         second set
-    //         // of constraints
-    //         new_label->cost += -three_two_dual;
-    //         // Add the arc dual
-    //         new_label->cost += arc_dual;
-    // #endif
-    // }
-
     return new_label;
 }

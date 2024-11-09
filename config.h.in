@@ -24,7 +24,6 @@
 #cmakedefine WITH_PYTHON
 #cmakedefine EVRP
 #cmakedefine MTW
-#cmakedefine PSTEP
 #cmakedefine SCHRODINGER
 #cmakedefine JEMALLOC
 #cmakedefine GUROBI

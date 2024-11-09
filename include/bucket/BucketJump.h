@@ -155,7 +155,7 @@ void BucketGraph::BucketArcElimination(double theta) {
         if (!jump_arcs.empty()) {
             const size_t          n_segments = buckets_size / 64 + 1;
             std::vector<uint64_t> Bvisited(n_segments, 0);
-            auto                 labels = buckets[b].get_labels();
+            auto                  labels = buckets[b].get_labels();
             for (const auto &a : jump_arcs) {
                 auto increment = a.resource_increment;
 
@@ -167,7 +167,7 @@ void BucketGraph::BucketArcElimination(double theta) {
 
                 for (auto &L_item : labels) {
                     Bidi_map.insert(b);
-                    std::memset(Bvisited.data(), 0, Bvisited.size() * sizeof(uint64_t));
+                    if (!Bvisited.empty()) { std::memset(Bvisited.data(), 0, Bvisited.size() * sizeof(uint64_t)); }
                     UpdateBucketsSet<D>(theta, L_item, Bidi_map, b_opposite, Bvisited);
                 }
             }
@@ -177,7 +177,7 @@ void BucketGraph::BucketArcElimination(double theta) {
     // Function to process bucket arcs
     auto process_bucket_arcs = [&](int b) {
         const auto &bucket_arcs = buckets[b].template get_bucket_arcs<D>();
-        auto       labels      = buckets[b].get_labels();
+        auto        labels      = buckets[b].get_labels();
 
         const size_t          n_segments = buckets_size / 64 + 1;
         std::vector<uint64_t> Bvisited(n_segments, 0);
