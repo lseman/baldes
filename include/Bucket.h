@@ -43,6 +43,7 @@ struct Bucket {
     std::vector<JumpArc>   fw_jump_arcs;
     std::vector<JumpArc>   bw_jump_arcs;
     std::vector<Bucket>    sub_buckets; // Holds sub-buckets within the "mother bucket"
+    double                 cb = std::numeric_limits<double>::max();
 
     Bucket(const Bucket &other) : labels_vec(other.labels_vec) {
         // Deep copy or other operations, if needed
@@ -109,6 +110,8 @@ struct Bucket {
             // check if label->resources is within bounds
             // if (!is_contained(new_label)) { fmt::print("Warning: Label not contained in bucket\n"); }
             // Directly check dominance in the mother bucket
+
+            if (cb > new_label->cost) { return false; }
             if (dominance_func(get_labels())) {
                 stat_n_dom++; // Increment dominated labels count
                 return true;
@@ -131,6 +134,7 @@ struct Bucket {
             // if (!current_sub_bucket) {
             //  check in all sub-buckets
             for (size_t i = 0; i < sub_buckets.size(); ++i) {
+                // check if new_label is bigger than cb
                 if (sub_buckets[i].check_dominance(new_label, dominance_func, stat_n_dom)) { return true; }
             }
             return false;
@@ -298,7 +302,6 @@ struct Bucket {
         if (!is_split) {
             labels_vec.push_back(label);
             // check if label is contained
-            if (!is_contained(label)) { fmt::print("Warning: label not contained in bucket\n"); }
             if (labels_vec.size() >= BUCKET_CAPACITY) {
                 // print_info("Bucket capacity reached\n");
                 split_into_sub_buckets(2); // Example: Split into 4 sub-buckets
@@ -343,6 +346,7 @@ struct Bucket {
                                            [](const Label *a, const Label *b) { return a->cost < b->cost; });
                 labels.insert(it, label); // Insertion in the middle
             }
+            cb = labels.front()->cost;
         };
 
         if (!is_split) {
@@ -352,13 +356,18 @@ struct Bucket {
             // Check if splitting is needed
             if (labels_vec.size() >= BUCKET_CAPACITY) { split_into_sub_buckets(2); }
         } else {
-            // If already split, find the correct sub-bucket and add the label there
+            // Recursively find the correct sub-bucket to insert the label
             for (auto &sub_bucket : sub_buckets) {
                 if (sub_bucket.is_contained(label)) {
-                    add_sorted_to_vector(sub_bucket.labels_vec);
+                    // Recursively add the label to the sub-bucket
+                    sub_bucket.add_sorted_label(label);
                     return;
                 }
             }
+
+            // If no sub-bucket contains the label, insert it into the current level
+            // This handles the case where the label might fall outside the range of all sub-buckets
+            add_sorted_to_vector(labels_vec);
         }
     }
 

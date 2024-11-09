@@ -38,7 +38,6 @@
 
 #include "Logger.h"
 
-#include "POPMUSIC.h"
 
 #ifdef GUROBI
 #include "gurobi_c++.h"
