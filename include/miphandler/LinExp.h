@@ -20,7 +20,7 @@
 
 class baldesCtr;
 using baldesCtrPtr = std::shared_ptr<baldesCtr>;
-using baldesVarPtr   = std::shared_ptr<baldesVar>;
+using baldesVarPtr = std::shared_ptr<baldesVar>;
 
 /**
  * @class LinearExpression
@@ -33,36 +33,53 @@ class LinearExpression {
 public:
     LinearExpression() = default;
 
-    // Add a term to the expression
-    LinearExpression &operator+=(const std::pair<baldesVarPtr, double> &term) {
-        if (term.second != 0.0) {                         // Skip zero coefficients
-            terms[term.first->get_name()] += term.second; // Accumulate coefficients for the same variable
+        // Add a single variable with an implicit coefficient of 1.0
+    LinearExpression& operator+=(const baldesVarPtr& var) {
+        addTerm(var, 1.0);
+        return *this;
+    }
+
+    // Subtract a single variable with an implicit coefficient of -1.0
+    LinearExpression& operator-=(const baldesVarPtr& var) {
+        addTerm(var, -1.0);
+        return *this;
+    }
+
+    // Add a term with a double coefficient
+    LinearExpression& operator+=(const std::pair<baldesVarPtr, double>& term) {
+        addTerm(term.first, term.second);
+        return *this;
+    }
+
+    // Subtract a term with a double coefficient
+    LinearExpression& operator-=(const std::pair<baldesVarPtr, double>& term) {
+        addTerm(term.first, -term.second);
+        return *this;
+    }
+
+    // Template to handle numeric types (int, double, etc.)
+    template <typename T, typename = std::enable_if_t<std::is_arithmetic<T>::value>>
+    LinearExpression& operator+=(const std::pair<baldesVarPtr, T>& term) {
+        addTerm(term.first, static_cast<double>(term.second));
+        return *this;
+    }
+
+    // Add multiple terms to the expression (vector of pairs)
+    LinearExpression& operator+=(const std::vector<std::pair<baldesVarPtr, double>>& termsVec) {
+        for (const auto& term : termsVec) {
+            addTerm(term.first, term.second);
         }
         return *this;
     }
 
-    // Add a term to the expression
-    LinearExpression &operator+=(const std::pair<baldesVarPtr, int> &term) {
-        if (term.second != 0.0) {                         // Skip zero coefficients
-            terms[term.first->get_name()] += term.second; // Accumulate coefficients for the same variable
+    // Subtract multiple terms from the expression (vector of pairs)
+    LinearExpression& operator-=(const std::vector<std::pair<baldesVarPtr, double>>& termsVec) {
+        for (const auto& term : termsVec) {
+            addTerm(term.first, -term.second);
         }
         return *this;
     }
-
-    // Add a baldesVar with an implicit coefficient of 1.0
-    LinearExpression &operator+=(const baldesVarPtr var) {
-        terms[var->get_name()] += 1.0; // Add the variable with coefficient 1.0
-        return *this;
-    }
-
-    template <typename T>
-    LinearExpression &operator+=(const std::pair<baldesVarPtr, T> &term) {
-        if (term.second != 0.0) { // Skip zero coefficients
-            terms[term.first->get_name()] += static_cast<double>(term.second);
-        }
-        return *this;
-    }
-
+    
     const ankerl::unordered_dense::map<std::string, double> &get_terms() const { return terms; }
 
     void addTerm(const baldesVarPtr var, double coeff) {
@@ -87,19 +104,20 @@ public:
         std::cout << std::endl;
     }
 
+    void multiply_by_constant(double constant) {
+        for (auto &[var_name, coeff] : terms) { coeff *= constant; }
+    }
+    void multiply_by_constant(int constant) {
+        for (auto &[var_name, coeff] : terms) { coeff *= constant; }
+    }
+
     void add_or_update_term(const std::string &var_name, double coeff) { terms[var_name] = coeff; }
 
-   baldesCtrPtr operator>=(double rhs) const {
-        return std::make_shared<baldesCtr>(*this, rhs, '>');
-    }
+    baldesCtrPtr operator>=(double rhs) const { return std::make_shared<baldesCtr>(*this, rhs, '>'); }
 
-    baldesCtrPtr operator<=(double rhs) const {
-        return std::make_shared<baldesCtr>(*this, rhs, '<');
-    }
+    baldesCtrPtr operator<=(double rhs) const { return std::make_shared<baldesCtr>(*this, rhs, '<'); }
 
-    baldesCtrPtr operator==(double rhs) const {
-        return std::make_shared<baldesCtr>(*this, rhs, '=');
-    }
+    baldesCtrPtr operator==(double rhs) const { return std::make_shared<baldesCtr>(*this, rhs, '='); }
 
 private:
     ankerl::unordered_dense::map<std::string, double> terms; // Map of variable name to coefficient

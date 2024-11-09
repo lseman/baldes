@@ -26,14 +26,23 @@
  * return values.
  */
 
+#include "Common.h"
 #include "Definitions.h"
 
 #include "bucket/BucketGraph.h"
+#include "bucket/BucketSolve.h"
 #include "bucket/BucketUtils.h"
 
 #include "../third_party/pdqsort.h"
 
 #include "MST.h"
+#include <omp.h>
+
+#ifdef GUROBI
+#include "gurobi_c++.h"
+#include "gurobi_c.h"
+#include "solvers/Gurobi.h"
+#endif
 
 // Implementation of Arc constructors
 Arc::Arc(int from, int to, const std::vector<double> &res_inc, double cost_inc)
@@ -492,9 +501,9 @@ void BucketGraph::set_adjacency_list() {
         for (const auto &next_node : nodes) {
             if (next_node.id == options.depot || node.id == next_node.id) continue; // Skip depot and same node
 
-#ifdef PSTEP
-            if (next_node.id == 0 || next_node.id == N_SIZE - 1) continue; // Skip depot and end depot
-#endif
+            if (options.pstep == true) {
+                if (next_node.id == options.pstep_depot || next_node.id == options.pstep_end_depot) continue; // Skip depot and end depot
+            }
 
             auto   travel_cost = getcij(node.id, next_node.id); // Calculate travel cost
             double cost_inc    = travel_cost - next_node.cost;  // Adjust cost increment by subtracting next node's cost
@@ -506,7 +515,6 @@ void BucketGraph::set_adjacency_list() {
                     res_inc[r] = node.consumption[r];
                 }
             }
-            // res_inc[TIME_INDEX] += travel_cost; // Add travel time to resource increment
 
             int to_bucket = next_node.id;
             if (from_bucket == to_bucket) continue; // Skip arcs that loop back to the same bucket
@@ -535,7 +543,6 @@ void BucketGraph::set_adjacency_list() {
                 priority_value         = 1.0 + 1.E-5 * next_node.start_time; // Higher base value for cross-cluster arcs
                 reverse_priority_value = 5.0 + 1.E-5 * node.start_time;      // Higher base value for cross-cluster arcs
             }
-
             best_arcs.emplace_back(priority_value, next_node.id, res_inc, cost_inc); // Store the forward arc
             best_arcs_rev.emplace_back(reverse_priority_value, next_node.id, res_inc,
                                        cost_inc); // Store the reverse arc
@@ -558,6 +565,7 @@ void BucketGraph::set_adjacency_list() {
     };
 
     // Step 4: Iterate over all nodes to set the adjacency list
+    // print depot and end depot
     for (const auto &VRPNode : nodes) {
         // fmt::print("Node ID: {}\n", VRPNode.id);
 
@@ -735,11 +743,13 @@ void BucketGraph::mono_initialization() {
 
     // Lambda to handle forward and backward direction initialization across combinations
     auto initialize_intervals_combinations = [&](bool is_forward) {
-        int        &offset                = is_forward ? offset_fw : offset_bw;
-        auto       &label_pool            = is_forward ? label_pool_fw : label_pool_bw;
-        auto       &buckets               = is_forward ? fw_buckets : bw_buckets;
-        const auto &depot_id              = is_forward ? options.depot : options.end_depot;
-        int         calculated_index_base = is_forward ? 0 : num_buckets_index_bw[N_SIZE - 1];
+        int        &offset     = is_forward ? offset_fw : offset_bw;
+        auto       &label_pool = is_forward ? label_pool_fw : label_pool_bw;
+        auto       &buckets    = is_forward ? fw_buckets : bw_buckets;
+        const auto &depot_id   = is_forward ? options.depot : options.end_depot;
+        // print depot_id
+        int calculated_index_base =
+            is_forward ? num_buckets_index_fw[options.depot] : num_buckets_index_bw[options.end_depot];
 
         std::vector<int>    current_pos(num_intervals, 0); // Tracks current position in each interval dimension
         std::vector<double> interval_bounds(num_intervals);
@@ -762,8 +772,8 @@ void BucketGraph::mono_initialization() {
                 // Initialize depot with the current interval boundaries
                 depot->initialize(calculated_index, 0.0, interval_bounds, depot_id);
                 depot->is_extended = false;
-                depot->cost += pstep_duals.getThreeTwoDualValue(depot_id);
-                depot->cost += pstep_duals.getThreeThreeDualValue(depot_id);
+                // depot->cost += pstep_duals.getThreeTwoDualValue(depot_id);
+                // depot->cost += pstep_duals.getThreeThreeDualValue(depot_id);
                 set_node_visited(depot->visited_bitmap, depot_id);
                 SRC_MODE_BLOCK(depot->SRCmap.assign(cut_storage->SRCDuals.size(), 0);)
                 buckets[calculated_index].add_label(depot);
@@ -785,7 +795,7 @@ void BucketGraph::mono_initialization() {
     };
 
     // Call the lambda for both forward and backward directions, ensuring all combinations are processed
-    initialize_intervals_combinations(true);  // Forward direction
+    initialize_intervals_combinations(true); // Forward direction
 }
 
 #include "Knapsack.h"
@@ -915,7 +925,6 @@ void BucketGraph::setup() {
     PARALLEL_SECTIONS(
         work, bi_sched, SECTION { define_buckets<Direction::Forward>(); },
         SECTION { define_buckets<Direction::Backward>(); });
-
     // Initialize the sizes
     fixed_arcs.resize(getNodes().size());
     for (int i = 0; i < getNodes().size(); ++i) { fixed_arcs[i].resize(getNodes().size()); }
@@ -1026,29 +1035,31 @@ Label *BucketGraph::compute_mono_label(const Label *L) {
 
     std::reverse(new_label->nodes_covered.begin(), new_label->nodes_covered.end());
 
-//     // check if last node is the end depot
-//     if (new_label->nodes_covered.back() != options.end_depot) {
-//         new_label->nodes_covered.push_back(options.end_depot);
-//         new_label->cost += getcij(new_label->nodes_covered[new_label->nodes_covered.size() - 2], options.end_depot);
-//         new_label->real_cost +=
-//             getcij(new_label->nodes_covered[new_label->nodes_covered.size() - 2], options.end_depot);
+    //     // check if last node is the end depot
+    //     if (new_label->nodes_covered.back() != options.end_depot) {
+    //         new_label->nodes_covered.push_back(options.end_depot);
+    //         new_label->cost += getcij(new_label->nodes_covered[new_label->nodes_covered.size() - 2],
+    //         options.end_depot); new_label->real_cost +=
+    //             getcij(new_label->nodes_covered[new_label->nodes_covered.size() - 2], options.end_depot);
 
-// #ifdef PSTEP
-//         auto arc_dual = pstep_duals.getArcDualValue(new_label->nodes_covered.size() - 2, options.end_depot); // eq (3.5)
-//         auto three_two_dual   = pstep_duals.getThreeTwoDualValue(options.end_depot);                         // eq (3.2)
-//         auto three_three_dual = pstep_duals.getThreeThreeDualValue(options.end_depot);                       // eq (3.3)
+    // #ifdef PSTEP
+    //         auto arc_dual = pstep_duals.getArcDualValue(new_label->nodes_covered.size() - 2, options.end_depot); //
+    //         eq (3.5) auto three_two_dual   = pstep_duals.getThreeTwoDualValue(options.end_depot); // eq (3.2) auto
+    //         three_three_dual = pstep_duals.getThreeThreeDualValue(options.end_depot);                       // eq
+    //         (3.3)
 
-//         auto old_three_two_dual = pstep_duals.getThreeTwoDualValue(new_label->nodes_covered.size() - 2);
+    //         auto old_three_two_dual = pstep_duals.getThreeTwoDualValue(new_label->nodes_covered.size() - 2);
 
-//         // If there were other vertices rather than the first one visited previously to this current node,
-//         // we give back the dual as a final node and add the dual corresponding to the visit
-//         new_label->cost += old_three_two_dual + three_three_dual;
-//         // We assume the current vertex is the last in the route, thus we add the dual corresponding to the second set
-//         // of constraints
-//         new_label->cost += -three_two_dual;
-//         // Add the arc dual
-//         new_label->cost += arc_dual;
-// #endif
+    //         // If there were other vertices rather than the first one visited previously to this current node,
+    //         // we give back the dual as a final node and add the dual corresponding to the visit
+    //         new_label->cost += old_three_two_dual + three_three_dual;
+    //         // We assume the current vertex is the last in the route, thus we add the dual corresponding to the
+    //         second set
+    //         // of constraints
+    //         new_label->cost += -three_two_dual;
+    //         // Add the arc dual
+    //         new_label->cost += arc_dual;
+    // #endif
     // }
 
     return new_label;

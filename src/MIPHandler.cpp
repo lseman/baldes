@@ -54,3 +54,41 @@ void MIPProblem::addVars(const double *lb, const double *ub, const double *obj, 
         add_variable(names[i], vtypes[i], lb[i], ub[i], obj[i]);
     }
 }
+
+// Addition of two variables with an implicit coefficient of 1.0
+std::vector<std::pair<baldesVarPtr, double>> operator+(const baldesVarPtr &var1, const baldesVarPtr &var2) {
+    return {{var1, 1.0}, {var2, 1.0}};
+}
+
+// Subtraction of two variables with coefficients 1.0 and -1.0
+std::vector<std::pair<baldesVarPtr, double>> operator-(const baldesVarPtr &var1, const baldesVarPtr &var2) {
+    return {{var1, 1.0}, {var2, -1.0}};
+}
+
+// Addition of a baldesVarPtr with a LinearExpression
+LinearExpression operator+(const baldesVarPtr &var, const LinearExpression &expr) {
+    LinearExpression result = expr;
+    result += var;
+    return result;
+}
+
+// Subtraction of a baldesVarPtr with a LinearExpression
+LinearExpression operator-(const baldesVarPtr &var, const LinearExpression &expr) {
+    LinearExpression result = expr;
+    result -= var;
+    return result;
+}
+
+// Addition of a LinearExpression with a baldesVarPtr
+LinearExpression operator+(const LinearExpression &expr, const baldesVarPtr &var) {
+    LinearExpression result = expr;
+    result += var;
+    return result;
+}
+
+// Subtraction of a LinearExpression with a baldesVarPtr
+LinearExpression operator-(const LinearExpression &expr, const baldesVarPtr &var) {
+    LinearExpression result = expr;
+    result -= var;
+    return result;
+}

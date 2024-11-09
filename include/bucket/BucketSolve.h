@@ -185,7 +185,7 @@ inline std::vector<Label *> BucketGraph::solveHeuristic() {
  *
  */
 template <Direction D, Stage S, Full F>
-std::vector<double> BucketGraph::labeling_algorithm() noexcept {
+std::vector<double> BucketGraph::labeling_algorithm() {
 
     // Assign the correct direction buckets, ordered SCCs, and other related structures depending on the direction D
     auto &buckets           = assign_buckets<D>(fw_buckets, bw_buckets);
@@ -221,25 +221,28 @@ std::vector<double> BucketGraph::labeling_algorithm() noexcept {
                 auto bucket_labels = buckets[bucket].get_labels(); // Get unextended labels from this bucket
                 if (bucket_labels.empty()) { continue; }           // Skip empty buckets
                 for (Label *label : bucket_labels) {
-                    if (label->is_extended) { continue; } // Skip already extended labels
-//  NOTE: double check if this is the best way to handle this
-#ifndef PSTEP
-                    if constexpr (F == Full::Partial) {
-                        if constexpr (D == Direction::Forward) {
-                            if (label->resources[options.main_resources[0]] >
-                                q_star[options.main_resources[0]]) { // + numericutils::eps) {
-                                label->set_extended(true);
-                                continue;
-                            }
-                        } else if constexpr (D == Direction::Backward) {
-                            if (label->resources[options.main_resources[0]] <=
-                                q_star[options.main_resources[0]]) { // - numericutils::eps) {
-                                label->set_extended(true);
-                                continue;
+                    if (label->is_extended) {
+                        continue;
+                    } // Skip already extended labels
+                      //  NOTE: double check if this is the best way to handle this
+                    if constexpr (F != Full::PSTEP) {
+
+                        if constexpr (F == Full::Partial) {
+                            if constexpr (D == Direction::Forward) {
+                                if (label->resources[options.main_resources[0]] >
+                                    q_star[options.main_resources[0]]) { // + numericutils::eps) {
+                                    label->set_extended(true);
+                                    continue;
+                                }
+                            } else if constexpr (D == Direction::Backward) {
+                                if (label->resources[options.main_resources[0]] <=
+                                    q_star[options.main_resources[0]]) { // - numericutils::eps) {
+                                    label->set_extended(true);
+                                    continue;
+                                }
                             }
                         }
                     }
-#endif
 
                     domin_smaller = false;
 
@@ -247,10 +250,11 @@ std::vector<double> BucketGraph::labeling_algorithm() noexcept {
                     std::memset(Bvisited.data(), 0, Bvisited.size() * sizeof(uint64_t));
 
                     // Check if the label is dominated by any labels in smaller buckets
-#ifndef PSTEP
-                    domin_smaller =
-                        DominatedInCompWiseSmallerBuckets<D, S>(label, bucket, c_bar, Bvisited, ordered_sccs);
-#endif
+                    if constexpr (F != Full::PSTEP) {
+                        domin_smaller =
+                            DominatedInCompWiseSmallerBuckets<D, S>(label, bucket, c_bar, Bvisited, ordered_sccs);
+                    }
+
                     if (!domin_smaller) {
                         // Lambda function to process new labels after extension
                         auto process_new_label = [&](Label *new_label) {
@@ -261,14 +265,14 @@ std::vector<double> BucketGraph::labeling_algorithm() noexcept {
                             const auto &to_bucket_labels =
                                 buckets[to_bucket].get_labels(); // Get existing labels in the destination bucket
 
-#ifndef PSTEP
-                            if constexpr (S == Stage::Four) {
-                                // Track dominance checks for this bucket
-                                if constexpr (D == Direction::Forward) {
-                                    dominance_checks_per_bucket[to_bucket] += to_bucket_labels.size();
+                            if constexpr (F != Full::PSTEP) {
+                                if constexpr (S == Stage::Four) {
+                                    // Track dominance checks for this bucket
+                                    if constexpr (D == Direction::Forward) {
+                                        dominance_checks_per_bucket[to_bucket] += to_bucket_labels.size();
+                                    }
                                 }
                             }
-#endif
                             // Stage-specific dominance check
                             if constexpr (S == Stage::One) {
                                 // If the new label has lower cost, remove dominated labels
@@ -604,28 +608,25 @@ BucketGraph::Extend(const std::conditional_t<M == Mutability::Mut, Label *, cons
     // Initialize new resources based on the arc's resource increments and check feasibility
     std::vector<double> new_resources(options.resources.size());
 
-#ifndef PSTEP
-    // Note: workaround
-    size_t N = options.resources.size();
-    if (!process_all_resources<D>(new_resources, initial_resources, gamma, VRPNode, N)) {
-        return std::vector<Label *>(); // Handle failure case (constraint violation)
-    }
-#endif
-
-#ifdef PSTEP
-    // counter the number of bits set in L_prime->visited_bitmap
     int n_visited = 0;
-    for (size_t i = 0; i < L_prime->visited_bitmap.size(); ++i) {
-        n_visited += __builtin_popcountll(L_prime->visited_bitmap[i]);
-    }
+    if constexpr (F != Full::PSTEP) {
+        // Note: workaround
+        size_t N = options.resources.size();
+        if (!process_all_resources<D>(new_resources, initial_resources, gamma, VRPNode, N)) {
+            return std::vector<Label *>(); // Handle failure case (constraint violation)
+        }
+    } else if constexpr (F == Full::PSTEP) {
+        // counter the number of bits set in L_prime->visited_bitmap
+        for (size_t i = 0; i < L_prime->visited_bitmap.size(); ++i) {
+            n_visited += __builtin_popcountll(L_prime->visited_bitmap[i]);
+        }
 
-    if (n_visited > options.max_path_size) { 
-        return std::vector<Label *>(); }
+        if (n_visited > options.max_path_size) { return std::vector<Label *>(); }
 
-    if (n_visited == options.max_path_size) {
-        if (node_id != options.end_depot) { return std::vector<Label *>(); }
+        if (n_visited == options.max_path_size) {
+            if (node_id != options.end_depot) { return std::vector<Label *>(); }
+        }
     }
-#endif
 
     // Get the bucket number for the new node and resource state
     int to_bucket = get_bucket_number<D>(node_id, new_resources);
@@ -664,30 +665,30 @@ BucketGraph::Extend(const std::conditional_t<M == Mutability::Mut, Label *, cons
 
     // Compute travel cost between the initial and current nodes
     const double travel_cost = getcij(initial_node_id, node_id);
-#ifndef PSTEP
-    double new_cost = initial_cost + travel_cost - VRPNode.cost;
-#else
-    double new_cost = initial_cost + travel_cost;
-    // consider pstep duals
-    auto arc_dual      = pstep_duals.getArcDualValue(initial_node_id, node_id); // eq (3.5)
-    auto last_dual     = pstep_duals.getThreeTwoDualValue(node_id);             // eq (3.2)
-    auto not_last_dual = pstep_duals.getThreeThreeDualValue(node_id);           // eq (3.3)
+    double       new_cost    = 0.0;
+    if constexpr (F != Full::PSTEP) {
+        new_cost = initial_cost + travel_cost - VRPNode.cost;
+    } else {
+        new_cost = initial_cost + travel_cost;
+        // consider pstep duals
+        auto arc_dual      = pstep_duals.getArcDualValue(initial_node_id, node_id); // eq (3.5)
+        auto last_dual     = pstep_duals.getThreeTwoDualValue(node_id);             // eq (3.2)
+        auto not_last_dual = pstep_duals.getThreeThreeDualValue(node_id);           // eq (3.3)
 
-    auto old_last_dual     = pstep_duals.getThreeTwoDualValue(initial_node_id);
-    auto old_not_last_dual = pstep_duals.getThreeThreeDualValue(initial_node_id);
+        auto old_last_dual     = pstep_duals.getThreeTwoDualValue(initial_node_id);
+        auto old_not_last_dual = pstep_duals.getThreeThreeDualValue(initial_node_id);
 
-    // If there were other vertices rather than the first one visited previously to this current node,
-    // we give back the dual as a final node and add the dual corresponding to the visit
-    if (node_id != options.end_depot) {
-        new_cost += not_last_dual;
-    } else if (node_id == options.end_depot) {
-        new_cost += -last_dual;
+        // If there were other vertices rather than the first one visited previously to this current node,
+        // we give back the dual as a final node and add the dual corresponding to the visit
+        if (node_id != options.end_depot) {
+            new_cost += not_last_dual;
+        } else if (node_id == options.end_depot) {
+            new_cost -= last_dual;
+        }
+        // Add the arc dual
+        new_cost += arc_dual;
+        // print the duals
     }
-    // Add the arc dual
-    new_cost += -arc_dual;
-    // print the duals
-
-#endif
 
     // Compute branching duals
     if (branching_duals->size() > 0) {
@@ -757,7 +758,7 @@ BucketGraph::Extend(const std::conditional_t<M == Mutability::Mut, Label *, cons
     // Set the parent label, depending on mutability
     if constexpr (M == Mutability::Mut) { new_label->parent = L_prime; }
 
-#ifndef PSTEP
+if constexpr (F != Full::PSTEP) {
     // If not in enumeration stage, update visited bitmap to avoid redundant labels
     if constexpr (S != Stage::Enumerate) {
         size_t limit = new_label->visited_bitmap.size();
@@ -772,9 +773,10 @@ BucketGraph::Extend(const std::conditional_t<M == Mutability::Mut, Label *, cons
             new_label->visited_bitmap[i] = bits_to_clear; // Clear irrelevant visited nodes
         }
     }
-#else
+}
+else {
     new_label->visited_bitmap = L_prime->visited_bitmap;
-#endif
+}
     set_node_visited(new_label->visited_bitmap, node_id); // Mark the new node as visited
 
 #if defined(SRC)
