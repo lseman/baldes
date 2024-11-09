@@ -81,7 +81,6 @@ public:
     void     setArcDuals(const ArcDuals &arc_duals) { this->arc_duals = arc_duals; }
 #endif
 
-#ifdef PSTEP
     PSTEPDuals pstep_duals;
     void       setPSTEPduals(const PSTEPDuals &arc_duals) { this->pstep_duals = arc_duals; }
     /**
@@ -96,32 +95,10 @@ public:
      *
      * @return std::vector<Label*> A vector of pointers to Label objects representing the paths.
      */
-    std::vector<Label *> solvePSTEP() {
-        std::vector<Label *> paths;
-        double               inner_obj;
+    std::vector<Label *> solvePSTEP(PSTEPDuals &inner_pstep_duals);
 
-        reset_pool();
-        mono_initialization();
+    std::vector<Label*> solvePSTEP_by_MTZ();
 
-        std::vector<double> forward_cbar(fw_buckets.size());
-
-        forward_cbar = labeling_algorithm<Direction::Forward, Stage::Enumerate, Full::Full>();
-
-        for (auto bucket : std::ranges::iota_view(0, fw_buckets_size)) {
-            auto bucket_labels = fw_buckets[bucket].get_labels();
-            // print bucket_labels size
-            // fmt::print("bucket_labels size: {}\n", bucket_labels.size());
-            for (auto label : bucket_labels) {
-                auto new_label = compute_mono_label(label);
-                if ((new_label->nodes_covered.size() == options.max_path_size)) {
-                    paths.push_back(new_label);
-                }
-            }
-        }
-
-        return paths;
-    }
-#endif
     void setOptions(const BucketOptions &options) { this->options = options; }
 
 #ifdef SCHRODINGER
@@ -933,7 +910,7 @@ public:
     void SCC_handler();
 
     template <Direction D, Stage S, Full F>
-    std::vector<double> labeling_algorithm() noexcept;
+    std::vector<double> labeling_algorithm();
 
     UnionFind fw_union_find;
     UnionFind bw_union_find;

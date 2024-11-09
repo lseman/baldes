@@ -17,9 +17,15 @@
 struct BucketOptions {
     int  depot         = 0;
     int  end_depot     = N_SIZE - 1;
+    int  pstep         = false;
     int  max_path_size = N_SIZE / 2;
+    int  min_path_size = 3;
+
+    int pstep_depot = 0;
+    int pstep_end_depot = N_SIZE - 1;
+
     bool manual_arcs   = false;
-    int size = N_SIZE;
+    int  size          = N_SIZE;
 
     std::vector<int>         main_resources         = {0};
     std::vector<std::string> resources              = {"time"};
@@ -31,7 +37,7 @@ enum class Direction { Forward, Backward };
 enum class Stage { One, Two, Three, Four, Enumerate, Fix };
 enum class ArcType { Node, Bucket, Jump };
 enum class Mutability { Const, Mut };
-enum class Full { Full, Partial, Reverse };
+enum class Full { Full, Partial, Reverse, PSTEP };
 enum class Status { Optimal, Separation, NotOptimal, Error, Rollback };
 enum class CutType { ThreeRow, FourRow, FiveRow };
 enum class BranchingDirection { Greater, Less, Equal };

@@ -173,7 +173,6 @@ make -j$nprocs -DHGS=ON -DBALDES=OFF
 | `SRC`             | Enable limited memory SRC cuts         | ON      |
 | `LIMITED_BUCKETS` | Limit the capacity of the buckets      | OFF     |
 | `MCD`             | Perform MCD on instance capacities     | OFF     |
-| `PSTEP`           | Enable PStep compilation               | OFF     |
 | `RCC`             | Enable RCC cuts                        | OFF     |
 | `RIH`             | Enable improvement heuristics          | OFF     |
 | `SCHRODINGER`     | Enable schrodinger pool                | OFF     |

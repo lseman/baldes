@@ -55,16 +55,20 @@ if(NOT CMAKE_BUILD_TYPE)
       "RelWithDebInfo"
       CACHE STRING "Choose the type of build." FORCE)
 endif()
-set(CMAKE_CXX_FLAGS_RELEASE "-O3 -march=native -flto -Xclang -Wno-unknown-warning-option")
-set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "-O3 -g -march=native -flto -Xclang -Wno-unknown-warning-option")
-set(CMAKE_CXX_FLAGS_DEBUG "-Og -g -Wall -Wextra -Xclang -Wno-unknown-warning-option")
+set(CMAKE_CXX_FLAGS_RELEASE
+    "-O3 -march=native -flto -Xclang -Wno-unknown-warning-option")
+set(CMAKE_CXX_FLAGS_RELWITHDEBINFO
+    "-O3 -g -march=native -flto -Xclang -Wno-unknown-warning-option")
+set(CMAKE_CXX_FLAGS_DEBUG
+    "-Og -g -Wall -Wextra -Xclang -Wno-unknown-warning-option")
 
 if(APPLE)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -stdlib=libc++ -std=c++20")
 endif()
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-error=unknown-argument")
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-error=unused-command-line-argument")
+set(CMAKE_CXX_FLAGS
+    "${CMAKE_CXX_FLAGS} -Wno-error=unused-command-line-argument")
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
@@ -88,7 +92,6 @@ option(EXACT_RCC "Enable Exact RCC compilation option" OFF)
 option(EVRP "Enable EVRPTW compilation option" OFF)
 option(WITH_PYTHON "Enable Python bindings" OFF)
 option(MTW "Enable MTW compilation option" OFF)
-option(PSTEP "Enable PSTEP compilation option" OFF)
 option(SCHRODINGER "Enable Schrodinger compilation option" OFF)
 option(CLIQUER "Enable Cliquer compilation option" OFF)
 option(VERBOSE "Enable verbose output" OFF)
@@ -191,7 +194,8 @@ cpmaddpackage(
   "STDEXEC_BUILD_BENCHMARKS OFF"
   "STDEXEC_BUILD_DOCS OFF"
   "BUILD_TESTING OFF")
-  string(REPLACE "-fconcepts-diagnostics-depth=10" "" CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
+string(REPLACE "-fconcepts-diagnostics-depth=10" "" CMAKE_CXX_FLAGS
+               "${CMAKE_CXX_FLAGS}")
 
 find_package(xxhash)
 if(NOT xxhash_FOUND)
@@ -276,7 +280,7 @@ include_directories(${GUROBI_HOME}/include)
 
 # Source files
 set(SOURCES src/BCP.cpp src/BucketGraph.cpp src/MIPHandler.cpp
-            src/Branching.cpp)
+            src/Branching.cpp src/BucketPSTEP.cpp)
 
 set(CVRPSEP_SOURCES
     third_party/cvrpsep/basegrph.cpp
@@ -374,29 +378,22 @@ if(BALDES)
   add_executable(baldes src/Baldes.cpp ${EXECUTABLE_SOURCES})
 
   if(JEMALLOC)
-  find_library(JEMALLOC_LIBRARY jemalloc)
-  if(JEMALLOC_LIBRARY)
-    message(STATUS "jemalloc found: ${JEMALLOC_LIBRARY}")
-    target_link_libraries(baldes PRIVATE ${JEMALLOC_LIBRARY})
-  else()
-    message(STATUS "jemalloc not found")
+    find_library(JEMALLOC_LIBRARY jemalloc)
+    if(JEMALLOC_LIBRARY)
+      message(STATUS "jemalloc found: ${JEMALLOC_LIBRARY}")
+      target_link_libraries(baldes PRIVATE ${JEMALLOC_LIBRARY})
+    else()
+      message(STATUS "jemalloc not found")
+    endif()
   endif()
-endif()
 
   message(STATUS "Gurobi version: ${GUROBI_VERSION_MAJOR}")
   target_compile_options(baldes PRIVATE -Wno-c++26-extensions
                                         -Wno-deprecated-declarations)
 
-  # target_precompile_headers(
-  #   baldes
-  #   PRIVATE
-  #   include/Common.h
-  #   ${CVRPSEP_HEADERS}
-  #   ${FPMAX_HEADERS}
-  #   include/Arc.h
-  #   include/Dual.h
-  #   include/VRPNode.h
-  #   third_party/pdqsort.h)
+  # target_precompile_headers( baldes PRIVATE include/Common.h
+  # ${CVRPSEP_HEADERS} ${FPMAX_HEADERS} include/Arc.h include/Dual.h
+  # include/VRPNode.h third_party/pdqsort.h)
 
   if(IPM OR IPM_ACEL)
     target_include_directories(baldes PRIVATE ${Eigen_SOURCE_DIR})
@@ -420,9 +417,14 @@ if(MTW)
 endif()
 
 if(WITH_PYTHON)
-  pybind11_add_module(pybaldes src/BucketBindings.cpp src/BCP.cpp src/BucketGraph.cpp src/MIPHandler.cpp
-  src/Branching.cpp
-                      ${EXECUTABLE_SOURCES})
+  pybind11_add_module(
+    pybaldes
+    src/BucketBindings.cpp
+    src/BCP.cpp
+    src/BucketGraph.cpp
+    src/MIPHandler.cpp
+    src/Branching.cpp
+    ${EXECUTABLE_SOURCES})
   target_link_libraries(pybaldes PRIVATE ${COMMON_LIBRARIES})
   set_target_properties(pybaldes PROPERTIES POSITION_INDEPENDENT_CODE ON)
   target_compile_options(pybaldes PRIVATE -Wno-c++26-extensions
@@ -445,4 +447,5 @@ if(HGS)
                                      -Wno-deprecated-declarations)
 endif()
 
-string(REPLACE "-fconcepts-diagnostics-depth=10" "" CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
+string(REPLACE "-fconcepts-diagnostics-depth=10" "" CMAKE_CXX_FLAGS
+               "${CMAKE_CXX_FLAGS}")

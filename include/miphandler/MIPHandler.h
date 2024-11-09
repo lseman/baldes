@@ -32,22 +32,105 @@
 #include <fmt/core.h>
 #include <sstream>
 
-
 using baldesCtrPtr = std::shared_ptr<baldesCtr>;
-using baldesVarPtr   = std::shared_ptr<baldesVar>;
-using LinearExpPtr  = std::shared_ptr<LinearExpression>;
+using baldesVarPtr = std::shared_ptr<baldesVar>;
+using LinearExpPtr = std::shared_ptr<LinearExpression>;
 
 #ifdef HIGHS
 #include "Highs.h"
 #endif
 
-// Free function operator* to handle baldesVarPtr and a coefficient
-inline std::pair<baldesVar::baldesVarPtr, double> operator*(const baldesVar::baldesVarPtr& var, double coeff) {
-    return {var, coeff};
+// Multiplication of a variable by a coefficient (int or double)
+template <typename T, typename = std::enable_if_t<std::is_arithmetic<T>::value>>
+std::pair<baldesVarPtr, double> operator*(const baldesVarPtr &var, T coeff) {
+    return {var, static_cast<double>(coeff)};
 }
 
-inline std::pair<baldesVar::baldesVarPtr, double> operator*(const baldesVar::baldesVarPtr& var, int coeff) {
+template <typename T, typename = std::enable_if_t<std::is_arithmetic<T>::value>>
+std::pair<baldesVarPtr, double> operator*(T coeff, const baldesVarPtr &var) {
     return {var, static_cast<double>(coeff)};
+}
+
+// Addition of a vector of terms with a single term
+template <typename T, typename = std::enable_if_t<std::is_arithmetic<T>::value>>
+std::vector<std::pair<baldesVarPtr, double>> operator+(const std::vector<std::pair<baldesVarPtr, double>> &terms,
+                                                       const std::pair<baldesVarPtr, T>                   &term) {
+    auto result = terms;
+    if (term.second != 0.0) { result.push_back({term.first, static_cast<double>(term.second)}); }
+    return result;
+}
+
+// Subtraction of a vector of terms with a single term
+template <typename T, typename = std::enable_if_t<std::is_arithmetic<T>::value>>
+std::vector<std::pair<baldesVarPtr, double>> operator-(const std::vector<std::pair<baldesVarPtr, double>> &terms,
+                                                       const std::pair<baldesVarPtr, T>                   &term) {
+    auto result = terms;
+    if (term.second != 0.0) { result.push_back({term.first, -static_cast<double>(term.second)}); }
+    return result;
+}
+
+// Addition of a single term with a vector of terms
+template <typename T, typename = std::enable_if_t<std::is_arithmetic<T>::value>>
+inline std::vector<std::pair<baldesVarPtr, double>>
+operator+(const std::pair<baldesVarPtr, T> &term, const std::vector<std::pair<baldesVarPtr, double>> &terms) {
+    auto result = terms;
+    if (term.second != 0.0) { result.insert(result.begin(), {term.first, static_cast<double>(term.second)}); }
+    return result;
+}
+
+// Subtraction of a single term with a vector of terms
+template <typename T, typename = std::enable_if_t<std::is_arithmetic<T>::value>>
+inline std::vector<std::pair<baldesVarPtr, double>>
+operator-(const std::pair<baldesVarPtr, T> &term, const std::vector<std::pair<baldesVarPtr, double>> &terms) {
+    auto result = terms;
+    if (term.second != 0.0) { result.insert(result.begin(), {term.first, -static_cast<double>(term.second)}); }
+    return result;
+}
+
+std::vector<std::pair<baldesVarPtr, double>> operator+(const baldesVarPtr &var1, const baldesVarPtr &var2);
+std::vector<std::pair<baldesVarPtr, double>> operator-(const baldesVarPtr &var1, const baldesVarPtr &var2);
+LinearExpression                             operator+(const baldesVarPtr &var, const LinearExpression &expr);
+LinearExpression                             operator-(const baldesVarPtr &var, const LinearExpression &expr);
+LinearExpression                             operator+(const LinearExpression &expr, const baldesVarPtr &var);
+LinearExpression                             operator-(const LinearExpression &expr, const baldesVarPtr &var);
+
+inline baldesCtrPtr operator<=(const baldesVarPtr &var, double rhs) {
+    LinearExpression expr;
+    expr.add_term(var->get_name(), 1.0);
+    return std::make_shared<baldesCtr>(expr, rhs, '<');
+}
+inline baldesCtrPtr operator>=(const baldesVarPtr &var, double rhs) {
+    LinearExpression expr;
+    expr.add_term(var->get_name(), 1.0);
+    return std::make_shared<baldesCtr>(expr, rhs, '>');
+}
+
+inline baldesCtrPtr operator==(const baldesVarPtr &var, double rhs) {
+    LinearExpression expr;
+    expr.add_term(var->get_name(), 1.0);
+    return std::make_shared<baldesCtr>(expr, rhs, '=');
+}
+
+// operator for std::pair<baldesVarPtr, double> and LinearExpression
+inline LinearExpression operator+(const std::pair<baldesVarPtr, double> &term, const LinearExpression &expr) {
+    LinearExpression result = expr;
+    result.add_term(term.first->get_name(), term.second);
+    return result;
+}
+
+// operator std::vector<std::pair<baldesVarPtr, double>> and LinearExpression
+inline LinearExpression operator+(const std::vector<std::pair<baldesVarPtr, double>> &terms,
+                                  const LinearExpression &expr) {
+    LinearExpression result = expr;
+    for (const auto &term : terms) { result.add_term(term.first->get_name(), term.second); }
+    return result;
+}
+
+// int times LinearExpression
+inline LinearExpression operator*(int coeff, const LinearExpression &expr) {
+    LinearExpression result = expr;
+    result.multiply_by_constant(coeff);
+    return result;
 }
 
 enum class ObjectiveType { Minimize, Maximize };
@@ -65,8 +148,8 @@ public:
 
         // Clone variables
         for (const auto var : variables) {
-            baldesVarPtr newVar = std::make_shared<baldesVar>(var->get_name(), var->get_type(), var->get_lb(), var->get_ub(),
-                                              var->get_objective_coefficient());
+            baldesVarPtr newVar = std::make_shared<baldesVar>(var->get_name(), var->get_type(), var->get_lb(),
+                                                              var->get_ub(), var->get_objective_coefficient());
             newVar->set_index(var->index());
             clone->variables.push_back(newVar);
             clone->var_name_to_index[var->get_name()] = newVar->index();
@@ -97,8 +180,8 @@ public:
 
     // Add a variable to the problem
     baldesVarPtr add_variable(const std::string &var_name, VarType type, double lb = 0.0, double ub = 1.0,
-                             double obj_coeff = 0.0) {
-        auto  index  = variables.size();
+                              double obj_coeff = 0.0) {
+        auto index  = variables.size();
         auto newVar = std::make_shared<baldesVar>(var_name, type, lb, ub, obj_coeff);
         newVar->set_index(index);
         variables.emplace_back(newVar);
@@ -284,7 +367,7 @@ public:
         }
 
         // Get the constraint that is being modified
-        baldesCtrPtr     constraint = constraints[constraintIndex];
+        baldesCtrPtr      constraint = constraints[constraintIndex];
         LinearExpression &expression = constraint->get_expression();
 
         // Iterate over the values and only update changed entries
@@ -318,7 +401,7 @@ public:
         sparse_matrix.modify_or_delete(constraintIndex, variableIndex, value);
 
         // Update the LinearExpression in the corresponding baldesCtr
-        baldesCtrPtr     constraint = constraints[constraintIndex];
+        baldesCtrPtr      constraint = constraints[constraintIndex];
         LinearExpression &expression = constraint->get_expression();
 
         const std::string &var_name = variables[variableIndex]->get_name();
@@ -406,7 +489,7 @@ public:
     }
 
     // Helper function to convert MIP constraints into a Gurobi linear expression
-    GRBLinExpr convertToGurobiExpr(const baldesCtrPtr                                      constraint,
+    GRBLinExpr convertToGurobiExpr(const baldesCtrPtr                                       constraint,
                                    const ankerl::unordered_dense::map<std::string, GRBVar> &gurobiVars) {
         GRBLinExpr expr;
         for (const auto &term : constraint->get_terms()) {
@@ -584,8 +667,8 @@ public:
 
 private:
     std::string                                    name;
-    std::vector<baldesVarPtr>                       variables;
-    std::vector<baldesCtrPtr>                     constraints;    // Store the constraints
+    std::vector<baldesVarPtr>                      variables;
+    std::vector<baldesCtrPtr>                      constraints;    // Store the constraints
     LinearExpression                               objective;      // Store the objective function
     ObjectiveType                                  objective_type; // Minimize or Maximize
     SparseMatrix                                   sparse_matrix;  // Use SparseMatrix for coefficient storage

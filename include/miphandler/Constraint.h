@@ -45,9 +45,7 @@ public:
 
     void print() const {
         fmt::print("baldesCtr: ");
-        for (const auto &[var_name, coeff] : expression.get_terms()) {
-            fmt::print("{:.2f} * {} + ", coeff, var_name);
-        }
+        for (const auto &[var_name, coeff] : expression.get_terms()) { fmt::print("{:.2f} * {} + ", coeff, var_name); }
         fmt::print(" {} {} {}\n", relation, rhs, name);
     }
 

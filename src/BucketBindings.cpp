@@ -99,10 +99,9 @@ PYBIND11_MODULE(pybaldes, m) {
         .def("phaseOne", &BucketGraph::run_labeling_algorithms<Stage::One, Full::Partial>)
         .def("phaseTwo", &BucketGraph::run_labeling_algorithms<Stage::Two, Full::Partial>)
         .def("phaseThree", &BucketGraph::run_labeling_algorithms<Stage::Three, Full::Partial>)
-#ifdef PSTEP
-        .def("setPSTEPDuals", &BucketGraph::setPSTEPduals, "duals"_a)
-        .def("solvePSTEP", &BucketGraph::solvePSTEP, py::return_value_policy::reference)
-#endif
+        // .def("setPSTEPDuals", &BucketGraph::setPSTEPduals, "duals"_a)
+        .def("solvePSTEP_by_MTZ", &BucketGraph::solvePSTEP_by_MTZ)
+        // .def("solvePSTEP", &BucketGraph::solvePSTEP, py::return_value_policy::reference)
         .def("setOptions", &BucketGraph::setOptions, "options"_a)
         .def("setArcs", &BucketGraph::setManualArcs, "arcs"_a)
         .def("phaseFour", &BucketGraph::run_labeling_algorithms<Stage::Four, Full::Partial>);
@@ -121,6 +120,7 @@ PYBIND11_MODULE(pybaldes, m) {
         .def_readwrite("depot", &BucketOptions::depot)                 // Expose depot field
         .def_readwrite("end_depot", &BucketOptions::end_depot)         // Expose end_depot field
         .def_readwrite("max_path_size", &BucketOptions::max_path_size) // Expose max_path_size field
+        .def_readwrite("min_path_size", &BucketOptions::min_path_size) // Expose min_path_size field
         .def_readwrite("main_resources", &BucketOptions::main_resources) // Expose main_resources field
         .def_readwrite("resources", &BucketOptions::resources)         // Expose resources field
         .def_readwrite("size", &BucketOptions::size)                   // Expose size field
