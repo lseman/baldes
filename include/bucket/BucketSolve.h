@@ -219,14 +219,11 @@ std::vector<double> BucketGraph::labeling_algorithm() {
             all_ext = true; // Assume all labels have been extended at the start
             for (const auto bucket : sorted_sccs[scc_index]) {
                 auto bucket_labels = buckets[bucket].get_labels(); // Get unextended labels from this bucket
-                if (bucket_labels.empty()) { continue; }           // Skip empty buckets
+                // if (bucket_labels.empty()) { continue; }           // Skip empty buckets
                 for (Label *label : bucket_labels) {
-                    if (label->is_extended) {
-                        continue;
-                    } // Skip already extended labels
-                      //  NOTE: double check if this is the best way to handle this
+                    if (label->is_extended) { continue; }
+                    //  NOTE: double check if this is the best way to handle this
                     if constexpr (F != Full::PSTEP) {
-
                         if constexpr (F == Full::Partial) {
                             if constexpr (D == Direction::Forward) {
                                 if (label->resources[options.main_resources[0]] >
@@ -334,14 +331,9 @@ std::vector<double> BucketGraph::labeling_algorithm() {
                             }
                         };
 
-                        a_ctr = 0;
                         // Process regular arcs for label extension
                         const auto &arcs = nodes[label->node_id].get_arcs<D>(scc_index);
                         for (const auto &arc : arcs) {
-                            if constexpr (S == Stage::Four && F == Full::Partial) {
-                                a_ctr++;
-                                if (a_ctr > A_MAX) { break; }
-                            }
                             auto new_labels = Extend<D, S, ArcType::Node, Mutability::Mut, F>(label, arc);
                             if (new_labels.empty()) {
 #ifdef UNREACHABLE_DOMINANCE
@@ -349,7 +341,6 @@ std::vector<double> BucketGraph::labeling_algorithm() {
 #endif
                             } else {
                                 for (auto label_ptr : new_labels) {
-
                                     process_new_label(label_ptr); // Process the new label
                                 }
                             }
@@ -363,18 +354,19 @@ std::vector<double> BucketGraph::labeling_algorithm() {
 
         // Update the cost bounds (c_bar) for the current SCC's buckets
         for (const int bucket : sorted_sccs[scc_index]) {
-            const auto labels = buckets[bucket].get_labels();
+            // parallelize this
 
-            // Find the label with the minimum cost in the bucket
-            if (!labels.empty()) {
-                auto   min_label = std::min_element(labels.begin(), labels.end(),
-                                                    [](const Label *a, const Label *b) { return a->cost < b->cost; });
-                double min_cost  = (*min_label)->cost;
-                c_bar[bucket]    = std::min(c_bar[bucket], min_cost); // Update the lower bound for the bucket
+            // std::for_each(std::execution::par_unseq, sorted_sccs[scc_index].begin(), sorted_sccs[scc_index].end(),
+            //   [&](int bucket) {
+            // Update c_bar[bucket] with the minimum cost found in the bucket
+            double current_cb = buckets[bucket].get_cb();
+            c_bar[bucket]     = std::min(c_bar[bucket], current_cb);
+
+            // Update the cost bound for dependencies in Phi[bucket]
+            for (auto phi_bucket : Phi[bucket]) {
+                int min_value = std::min(c_bar[bucket], c_bar[phi_bucket]);
+                c_bar[bucket] = min_value;
             }
-
-            // Update the cost bound for the bucket's dependencies (Phi buckets)
-            for (auto phi_bucket : Phi[bucket]) { c_bar[bucket] = std::min(c_bar[bucket], c_bar[phi_bucket]); }
         }
     }
 
@@ -758,25 +750,25 @@ BucketGraph::Extend(const std::conditional_t<M == Mutability::Mut, Label *, cons
     // Set the parent label, depending on mutability
     if constexpr (M == Mutability::Mut) { new_label->parent = L_prime; }
 
-if constexpr (F != Full::PSTEP) {
-    // If not in enumeration stage, update visited bitmap to avoid redundant labels
-    if constexpr (S != Stage::Enumerate) {
-        size_t limit = new_label->visited_bitmap.size();
-        for (size_t i = 0; i < limit; ++i) {
-            uint64_t current_visited = L_prime->visited_bitmap[i];
+    if constexpr (F != Full::PSTEP) {
+        // If not in enumeration stage, update visited bitmap to avoid redundant labels
+        if constexpr (S != Stage::Enumerate) {
+            size_t limit = new_label->visited_bitmap.size();
+            for (size_t i = 0; i < limit; ++i) {
+                uint64_t current_visited = L_prime->visited_bitmap[i];
 
-            if (!current_visited) continue; // Skip if no nodes were visited in this segment
+                if (!current_visited) continue; // Skip if no nodes were visited in this segment
 
-            uint64_t neighborhood_mask = neighborhoods_bitmap[node_id][i]; // Get neighborhood mask for the current node
-            uint64_t bits_to_clear     = current_visited & neighborhood_mask; // Determine which bits to clear
+                uint64_t neighborhood_mask =
+                    neighborhoods_bitmap[node_id][i]; // Get neighborhood mask for the current node
+                uint64_t bits_to_clear = current_visited & neighborhood_mask; // Determine which bits to clear
 
-            new_label->visited_bitmap[i] = bits_to_clear; // Clear irrelevant visited nodes
+                new_label->visited_bitmap[i] = bits_to_clear; // Clear irrelevant visited nodes
+            }
         }
+    } else {
+        new_label->visited_bitmap = L_prime->visited_bitmap;
     }
-}
-else {
-    new_label->visited_bitmap = L_prime->visited_bitmap;
-}
     set_node_visited(new_label->visited_bitmap, node_id); // Mark the new node as visited
 
 #if defined(SRC)

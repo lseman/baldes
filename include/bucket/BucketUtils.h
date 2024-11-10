@@ -856,18 +856,18 @@ void BucketGraph::bucket_fixing() {
 
         print_info("performing bucket arc elimination with theta = {}\n", gap);
 
-        PARALLEL_SECTIONS(
-            work, bi_sched,
-            SECTION {
+        // PARALLEL_SECTIONS(
+            // work, bi_sched,
+            // SECTION {
                 // Section 1: Forward direction
                 BucketArcElimination<Direction::Forward>(gap);
                 ObtainJumpBucketArcs<Direction::Forward>();
-            },
-            SECTION {
+            // },
+            // SECTION {
                 // Section 2: Backward direction
                 BucketArcElimination<Direction::Backward>(gap);
                 ObtainJumpBucketArcs<Direction::Backward>();
-            });
+            // });
 
         generate_arcs();
         fmt::print("\033[34m_BUCKET FIXING PROCEDURE FINISHED\033[0m");

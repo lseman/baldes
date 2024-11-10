@@ -623,7 +623,7 @@ public:
 #endif
 
 #ifdef IPM
-            double d                 = 1;
+            double d                 = 10;
             matrix                 = node->extractModelDataSparse();
             double obj_change      = std::abs(lp_obj - inner_obj);
             double adaptive_factor = std::min(1.0, std::max(1e-1, obj_change / std::abs(lp_obj + 1e-6)));
