@@ -43,7 +43,24 @@ struct Bucket {
     std::vector<JumpArc>   fw_jump_arcs;
     std::vector<JumpArc>   bw_jump_arcs;
     std::vector<Bucket>    sub_buckets; // Holds sub-buckets within the "mother bucket"
-    double                 cb = std::numeric_limits<double>::max();
+    bool                   is_split = false;
+
+    double get_cb() const {
+        if (is_split) {
+            double min_cb = std::numeric_limits<double>::max();
+            for (const auto &sub_bucket : sub_buckets) { min_cb = std::min(min_cb, sub_bucket.get_cb()); }
+            return min_cb;
+        } else {
+#ifdef SORTED_LABELS
+            if (labels_vec.empty()) { return std::numeric_limits<double>::max(); }
+            return labels_vec[0]->cost;
+#else
+            auto min_cost = std::min_element(labels_vec.begin(), labels_vec.end(),
+                                             [](const Label *a, const Label *b) { return a->cost < b->cost; });
+            return (*min_cost)->cost;
+#endif
+        }
+    }
 
     Bucket(const Bucket &other) : labels_vec(other.labels_vec) {
         // Deep copy or other operations, if needed
@@ -106,55 +123,35 @@ struct Bucket {
     bool check_dominance(const Label *new_label, std::function<bool(const std::vector<Label *> &)> dominance_func,
                          int &stat_n_dom) {
         if (!is_split) {
-
-            // check if label->resources is within bounds
-            // if (!is_contained(new_label)) { fmt::print("Warning: Label not contained in bucket\n"); }
-            // Directly check dominance in the mother bucket
-
-            if (cb > new_label->cost) { return false; }
+            if (get_cb() > new_label->cost) { return false; }
             if (dominance_func(get_labels())) {
                 stat_n_dom++; // Increment dominated labels count
                 return true;
             }
 
         } else {
-            // // Find the current sub-bucket containing the new_label
-            // Bucket *current_sub_bucket       = nullptr;
-            // size_t  current_sub_bucket_index = sub_buckets.size(); // Invalid index if not found
 
-            // for (size_t i = 0; i < sub_buckets.size(); ++i) {
-            //     // print subbucket lb and ub
-            //     if (sub_buckets[i].is_contained(new_label)) {
-            //         current_sub_bucket       = &sub_buckets[i];
-            //         current_sub_bucket_index = i;
-            //         break;
-            //     }
-            // }
-
-            // if (!current_sub_bucket) {
             //  check in all sub-buckets
-            for (size_t i = 0; i < sub_buckets.size(); ++i) {
-                // check if new_label is bigger than cb
-                if (sub_buckets[i].check_dominance(new_label, dominance_func, stat_n_dom)) { return true; }
-            }
-            return false;
-
-            // // Check dominance recursively in the current sub-bucket
-            // if (current_sub_bucket && current_sub_bucket->check_dominance(new_label, dominance_func, stat_n_dom)) {
-            //     return true;
-            // }
-
-            // // Check only the sub-buckets that come before the current sub-bucket
             // for (size_t i = 0; i < sub_buckets.size(); ++i) {
-            //     if (i == current_sub_bucket_index) { continue; }
-            //     if (sub_buckets[i].check_dominance(new_label, dominance_func, stat_n_dom)) { return true; }
-            // }
+            bool dominance_found = false;
+            std::for_each(std::execution::par_unseq, sub_buckets.begin(), sub_buckets.end(), [&](Bucket &sub_bucket) {
+                // Check if new_label is bigger than cb
+                if (sub_bucket.get_cb() > new_label->cost) {
+                    return; // Skip this sub-bucket if condition is not met
+                }
+
+                // Check dominance
+                if (sub_bucket.check_dominance(new_label, dominance_func, stat_n_dom)) {
+                    dominance_found = true;
+                    return;
+                }
+            });
+            return dominance_found;
         }
 
         return false;
     }
 
-    bool                    is_split        = false;
     static constexpr double min_split_range = 0.5; // Define a threshold for minimum range to split
     void                    split_into_sub_buckets(size_t num_sub_buckets) {
         double total_range = ub[0] - lb[0]; // Assuming 1D bounds here
@@ -321,7 +318,7 @@ struct Bucket {
      *
      */
     /*
-   void add_sorted_label(Label *label) noexcept {
+    void add_sorted_label(Label *label) noexcept {
        if (labels_vec.empty() || label->cost >= labels_vec.back()->cost) {
            labels_vec.push_back(label); // Direct insertion at the end
        } else if (label->cost <= labels_vec.front()->cost) {
@@ -331,8 +328,8 @@ struct Bucket {
                                       [](const Label *a, const Label *b) { return a->cost < b->cost; });
            labels_vec.insert(it, label); // Insertion in the middle
        }
-   }
-   */
+    }
+    */
 
     void add_sorted_label(Label *label) noexcept {
         // Lambda to add label in sorted order within a vector of labels
@@ -346,7 +343,6 @@ struct Bucket {
                                            [](const Label *a, const Label *b) { return a->cost < b->cost; });
                 labels.insert(it, label); // Insertion in the middle
             }
-            cb = labels.front()->cost;
         };
 
         if (!is_split) {

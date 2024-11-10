@@ -370,7 +370,7 @@ else()
   # Non-macOS (Linux or other platforms), use .so and .a files
 
   list(APPEND COMMON_LIBRARIES ${GUROBI_HOME}/lib/libgurobi_c++.a
-       ${GUROBI_HOME}/lib/libgurobi${GUROBI_VERSION_MAJOR}.so)
+       ${GUROBI_HOME}/lib/libgurobi${GUROBI_VERSION_MAJOR}.so tbb)
 endif()
 
 if(BALDES)

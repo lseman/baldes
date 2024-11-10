@@ -365,19 +365,19 @@ void IPSolver::run_optimization(ModelData &model, const double tol) {
     Eigen::VectorXd lambda = Eigen::VectorXd::Zero(m);
     Eigen::VectorXd s      = Eigen::VectorXd::Ones(n);
 
-    // if (x_old.size() > 0 && warm_start) {
-    //     int nv_old = x_old.size(); // Original number of variables
-    //     int nv_new = x.size();     // New number of variables
-    //     int mv_old = lambda_old.size();
-    //     int mv_new = lambda.size();
+    if (x_old.size() > 0 && warm_start) {
+        int nv_old = x_old.size(); // Original number of variables
+        int nv_new = x.size();     // New number of variables
+        int mv_old = lambda_old.size();
+        int mv_new = lambda.size();
 
-    //     // Copy old values to new positions in x
-    //     // As free variables and slack variables are added, the original variables move down
-    //     // int original_counter          = 0;
-    //     // x.head(nv_old - n_slacks_old) = x_old.head(nv_old - n_slacks_old);
+        // Copy old values to new positions in x
+        // As free variables and slack variables are added, the original variables move down
+        // int original_counter          = 0;
+        // x.head(nv_old - n_slacks_old) = x_old.head(nv_old - n_slacks_old);
 
-    //     lambda.head(N_SIZE - 1) = lambda_old.head(N_SIZE - 1);
-    // }
+        lambda.head(N_SIZE - 1) = lambda_old.head(N_SIZE - 1);
+    }
 
     warm_start   = false;
     n_slacks_old = n_slacks;
@@ -506,7 +506,7 @@ void IPSolver::run_optimization(ModelData &model, const double tol) {
         double bl_dot_lambda = b.dot(lambda) - ubv.dot(w);
         _g                   = std::abs(c.dot(x) - bl_dot_lambda) / (tau + std::abs(bl_dot_lambda));
 
-        if (k % 5 == 0 || (k == max_iter - 1)) {
+        // if (k % 5 == 0 || (k == max_iter - 1)) {
             // Save intermediate solution every 5 iterations or at the last iteration
             // Save only if the current solution is reasonably "central"
             if (!saved_interior_solution_bool && (_d <= 1e-10 && _g <= tol * 2)) {
@@ -514,7 +514,7 @@ void IPSolver::run_optimization(ModelData &model, const double tol) {
                 saved_interior_solution_bool = true;
                 warm_start                   = true;
             }
-        }
+        // }
 
         // Check for optimality and infeasibility
         if (_d <= 1e-10 && _g <= tol) { break; }
