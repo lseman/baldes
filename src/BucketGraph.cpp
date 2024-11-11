@@ -772,8 +772,8 @@ void BucketGraph::mono_initialization() {
                 // Initialize depot with the current interval boundaries
                 depot->initialize(calculated_index, 0.0, interval_bounds, depot_id);
                 depot->is_extended = false;
-                // depot->cost += pstep_duals.getThreeTwoDualValue(depot_id);
-                // depot->cost += pstep_duals.getThreeThreeDualValue(depot_id);
+                depot->cost += pstep_duals.getThreeTwoDualValue(depot_id);
+                depot->cost += pstep_duals.getThreeThreeDualValue(depot_id);
                 set_node_visited(depot->visited_bitmap, depot_id);
                 SRC_MODE_BLOCK(depot->SRCmap.assign(cut_storage->SRCDuals.size(), 0);)
                 buckets[calculated_index].add_label(depot);
@@ -1016,7 +1016,7 @@ void BucketGraph::initInfo() {
  */
 Label *BucketGraph::compute_mono_label(const Label *L) {
     // Directly acquire new_label and set the cost
-    auto new_label       = label_pool_fw->acquire();
+    auto new_label       = new Label();
     new_label->cost      = L->cost;      // Use the cost from L
     new_label->real_cost = L->real_cost; // Use the real cost from L
 

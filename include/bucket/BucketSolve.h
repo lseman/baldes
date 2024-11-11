@@ -306,7 +306,7 @@ std::vector<double> BucketGraph::labeling_algorithm() {
 
                             if (!dominated) {
                                 // Remove dominated labels from the bucket
-                                if constexpr (S != Stage::Enumerate) {
+                                if constexpr (S != Stage::Enumerate || F == Full::PSTEP) {
                                     std::vector<Label *> labels_to_remove;
                                     for (auto *existing_label : to_bucket_labels) {
                                         if (is_dominated<D, S>(existing_label, new_label)) {
@@ -404,7 +404,9 @@ std::vector<Label *> BucketGraph::bi_labeling_algorithm() {
 
 #ifdef FIX_BUCKETS
     // If in Stage 4, apply bucket fixing based on q_star
-    if constexpr (S == Stage::Four) { bucket_fixing<S>(); }
+    if constexpr (S == Stage::Four) {
+        if (options.bucket_fixing) { bucket_fixing<S>(); }
+    }
 #endif
 
     // Reset the label pool to ensure no leftover labels from previous runs
@@ -670,13 +672,11 @@ BucketGraph::Extend(const std::conditional_t<M == Mutability::Mut, Label *, cons
         auto old_last_dual     = pstep_duals.getThreeTwoDualValue(initial_node_id);
         auto old_not_last_dual = pstep_duals.getThreeThreeDualValue(initial_node_id);
 
-        // If there were other vertices rather than the first one visited previously to this current node,
-        // we give back the dual as a final node and add the dual corresponding to the visit
-        if (node_id != options.end_depot) {
-            new_cost += not_last_dual;
-        } else if (node_id == options.end_depot) {
-            new_cost -= last_dual;
-        }
+        // since there was a new node visited, we give back the dual as a final node and add the dual corresponding to
+        // the visit
+        if (n_visited > 1 && initial_node_id != options.depot) { new_cost += old_last_dual + old_not_last_dual; }
+        // suppose this is the last
+        new_cost += -1.0 * last_dual;
         // Add the arc dual
         new_cost += arc_dual;
         // print the duals

@@ -220,7 +220,7 @@ struct BucketOptions {
     int max_path_size           = N_SIZE / 2;
     int main_resources          = 1;
     std::vector<std::string> resources = {"time", "capacity"};
-    std::vector<int> resource_disposability = {1, 1}; // 1=disposable, 0=non-disposable
+    std::vector<int> resource_type = {1, 1}; // 1=disposable, 0=non-disposable
     std::vector<int> or_resources = {1};
 };
 ```

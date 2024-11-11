@@ -15,22 +15,27 @@
 #include "ankerl/unordered_dense.h"
 
 struct BucketOptions {
-    int  depot         = 0;
-    int  end_depot     = N_SIZE - 1;
-    int  pstep         = false;
-    int  max_path_size = N_SIZE / 2;
-    int  min_path_size = 3;
+    int depot         = 0;
+    int end_depot     = N_SIZE - 1;
+    int pstep         = false;
+    int max_path_size = N_SIZE / 2;
+    int min_path_size = 3;
 
-    int pstep_depot = 0;
+    int pstep_depot     = 0;
     int pstep_end_depot = N_SIZE - 1;
 
-    bool manual_arcs   = false;
-    int  size          = N_SIZE;
+    bool manual_arcs = false;
+    bool bucket_fixing = true;
+    int  size        = N_SIZE;
 
-    std::vector<int>         main_resources         = {0};
-    std::vector<std::string> resources              = {"time"};
-    std::vector<int>         resource_disposability = {1};
-    std::vector<int>         or_resources           = {1};
+    int three_two_sign   = 1;
+    int three_three_sign = 1;
+    int three_five_sign  = 1;
+
+    std::vector<int>         main_resources = {0};
+    std::vector<std::string> resources      = {"time"};
+    std::vector<int>         resource_type  = {1};
+    std::vector<int>         or_resources   = {1};
 };
 
 enum class Direction { Forward, Backward };
@@ -42,7 +47,7 @@ enum class Status { Optimal, Separation, NotOptimal, Error, Rollback };
 enum class CutType { ThreeRow, FourRow, FiveRow };
 enum class BranchingDirection { Greater, Less, Equal };
 enum class CandidateType { Vehicle, Node, Edge, Cluster };
-enum class ProblemType { vrptw, cvrp };
+enum class ProblemType { vrptw, cvrp, evrp };
 
 using Payload = std::optional<std::variant<int, std::pair<int, int>>>; // Optional variant for payload data
                                                                        //

@@ -309,7 +309,7 @@ void HGSLocalSearch::run(Individual *indiv, double penaltyCapacityLS, double pen
     const bool        runLS_INT       = params->rng() % 100 < (unsigned int)params->config.intensificationProbabilityLS;
 
     this->penaltyCapacityLS = penaltyCapacityLS;
-    if (params->problemType == ProblemType::vrptw) {
+    if (params->problemType == ProblemType::vrptw || params->problemType == ProblemType::evrp) {
         this->penaltyTimeWarpLS = penaltyTimeWarpLS;
     } else {
         this->penaltyTimeWarpLS = 0;
@@ -430,7 +430,7 @@ void HGSLocalSearch::setLocalbaldesVarsRouteU() {
     serviceU       = params->cli[nodeUIndex].serviceDuration;
     loadX          = params->cli[nodeXIndex].demand;
     serviceX       = params->cli[nodeXIndex].serviceDuration;
-    if (params->problemType == ProblemType::vrptw) {
+    if (params->problemType == ProblemType::vrptw || params->problemType == ProblemType::evrp) {
         routeUTimeWarp = routeU->twData.timeWarp > 0;
     } else {
         routeUTimeWarp = false;
@@ -449,7 +449,7 @@ void HGSLocalSearch::setLocalbaldesVarsRouteV() {
     serviceV       = params->cli[nodeVIndex].serviceDuration;
     loadY          = params->cli[nodeYIndex].demand;
     serviceY       = params->cli[nodeYIndex].serviceDuration;
-    if (params->problemType == ProblemType::vrptw) {
+    if (params->problemType == ProblemType::vrptw || params->problemType == ProblemType::evrp) {
         routeVTimeWarp = routeV->twData.timeWarp > 0;
     } else {
         routeVTimeWarp = false;
@@ -1339,7 +1339,7 @@ void HGSLocalSearch::updateRouteData(HGSRoute *myRoute) {
     myRoute->duration = mytime; // Driving duration + service duration, excluding waiting time / time warp
     myRoute->load     = myload;
     myRoute->twData   = mynode->prefixTwData;
-    if (params->problemType == ProblemType::vrptw) {
+    if (params->problemType == ProblemType::vrptw || params->problemType == ProblemType::evrp) {
         myRoute->penalty = penaltyExcessLoad(myload) + penaltyTimeWindows(myRoute->twData);
     } else if (params->problemType == ProblemType::cvrp) {
         myRoute->penalty = penaltyExcessLoad(myload);
@@ -1394,7 +1394,7 @@ CostSol HGSLocalSearch::getCostSol(bool usePenaltiesLS) {
         myCostSol.distance += myRoute->duration;
         myCostSol.capacityExcess += std::max(0, myRoute->load - params->vehicleCapacity);
         myCostSol.waitTime += 0; // TODO
-        if (params->problemType == ProblemType::vrptw) {
+        if (params->problemType == ProblemType::vrptw || params->problemType == ProblemType::evrp) {
             myCostSol.timeWarp += myRoute->twData.timeWarp;
         } else {
             myCostSol.timeWarp = 0;
@@ -1406,13 +1406,13 @@ CostSol HGSLocalSearch::getCostSol(bool usePenaltiesLS) {
 
     if (usePenaltiesLS) {
         myCostSol.penalizedCost = myCostSol.distance + myCostSol.capacityExcess * penaltyCapacityLS;
-        if (params->problemType == ProblemType::vrptw) {
+        if (params->problemType == ProblemType::vrptw || params->problemType == ProblemType::evrp) {
             myCostSol.penalizedCost +=
                 myCostSol.timeWarp * penaltyTimeWarpLS + myCostSol.waitTime * params->penaltyWaitTime;
         }
     } else {
         myCostSol.penalizedCost = myCostSol.distance + myCostSol.capacityExcess * params->penaltyCapacity;
-        if (params->problemType == ProblemType::vrptw) {
+        if (params->problemType == ProblemType::vrptw || params->problemType == ProblemType::evrp) {
             myCostSol.penalizedCost +=
                 myCostSol.timeWarp * params->penaltyTimeWarp + myCostSol.waitTime * params->penaltyWaitTime;
         }

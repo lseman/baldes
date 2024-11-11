@@ -39,6 +39,7 @@ struct VRPNode {
     std::vector<std::vector<Arc>> bw_arcs_scc;
     std::vector<JumpArc>          fw_jump_arcs;
     std::vector<JumpArc>          bw_jump_arcs;
+    std::string                   identifier;
 
     std::string track_id;
     int         subject;

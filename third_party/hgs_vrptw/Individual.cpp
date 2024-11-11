@@ -81,7 +81,7 @@ void Individual::evaluateCompleteCost() {
 
         myCostSol.distance += distance;
 
-        if (params->problemType == ProblemType::vrptw) {
+        if (params->problemType == ProblemType::vrptw || params->problemType == ProblemType::evrp) {
             myCostSol.timeWarp += timeWarp;
             myCostSol.waitTime += waitTime;
         } else {
@@ -265,7 +265,7 @@ Individual::Individual(Params *params, bool rcws, std::vector<std::vector<int>> 
                                 load.push_back(0);
                             }
 
-                            if (problem_type == ProblemType::vrptw) {
+                            if (problem_type == ProblemType::vrptw || params->problemType == ProblemType::evrp) {
                                 // Add time window feasibility check before adding both customers
                                 if (is_time_window_feasible(tournamentSavings[i].c1, chromR[nextEmptyRoute], *params) &&
                                     is_time_window_feasible(tournamentSavings[i].c2, chromR[nextEmptyRoute], *params)) {
@@ -369,7 +369,7 @@ Individual::Individual(Params *params, bool rcws, std::vector<std::vector<int>> 
                                                 if (pos2 == 0) {
                                                     // Check time window feasibility before merging r2 into the front of
                                                     // r1
-                                                    if (problem_type == ProblemType::vrptw) {
+                                                    if (problem_type == ProblemType::vrptw || params->problemType == ProblemType::evrp) {
                                                         if (is_time_window_feasible(tournamentSavings[i].c1, chromR[r2],
                                                                                     *params)) {
                                                             chromR[r1].insert(chromR[r1].begin(), chromR[r2].rbegin(),
@@ -394,7 +394,7 @@ Individual::Individual(Params *params, bool rcws, std::vector<std::vector<int>> 
                                                 } else {
                                                     // Check time window feasibility before merging r1 into the back of
                                                     // r2
-                                                    if (problem_type == ProblemType::vrptw) {
+                                                    if (problem_type == ProblemType::vrptw || params->problemType == ProblemType::evrp) {
 
                                                         if (is_time_window_feasible(tournamentSavings[i].c2, chromR[r1],
                                                                                     *params)) {
@@ -424,7 +424,7 @@ Individual::Individual(Params *params, bool rcws, std::vector<std::vector<int>> 
                                             } else if (pos2 == 0) {
                                                 // Check time window feasibility before merging r2 into the back of r1
 
-                                                if (problem_type == ProblemType::vrptw) {
+                                                if (problem_type == ProblemType::vrptw || params->problemType == ProblemType::evrp) {
 
                                                     if (is_time_window_feasible(tournamentSavings[i].c1, chromR[r2],
                                                                                 *params)) {
@@ -451,7 +451,7 @@ Individual::Individual(Params *params, bool rcws, std::vector<std::vector<int>> 
                                                 interior[tournamentSavings[i].c2] = true;
                                             } else {
                                                 // Check time window feasibility before merging r1 into the back of r2
-                                                if (problem_type == ProblemType::vrptw) {
+                                                if (problem_type == ProblemType::vrptw || params->problemType == ProblemType::evrp) {
 
                                                     if (is_time_window_feasible(tournamentSavings[i].c2, chromR[r1],
                                                                                 *params)) {

@@ -83,6 +83,8 @@ public:
 
     PSTEPDuals pstep_duals;
     void       setPSTEPduals(const PSTEPDuals &arc_duals) { this->pstep_duals = arc_duals; }
+    auto       solveTSP(std::vector<std::vector<int>> &paths, std::vector<double> &path_costs, std::vector<int> &firsts,
+                        std::vector<int> &lasts, std::vector<std::vector<double>> &cost_matrix, bool first_time = false);
     /**
      * @brief Solves the PSTEP problem and returns a vector of labels representing paths.
      *
@@ -97,7 +99,7 @@ public:
      */
     std::vector<Label *> solvePSTEP(PSTEPDuals &inner_pstep_duals);
 
-    std::vector<Label*> solvePSTEP_by_MTZ();
+    std::vector<Label *> solvePSTEP_by_MTZ();
 
     void setOptions(const BucketOptions &options) { this->options = options; }
 
@@ -166,7 +168,7 @@ public:
     template <Direction D, typename Gamma, typename VRPNode>
     inline constexpr bool process_resource(double &new_resource, const std::array<double, R_SIZE> &initial_resources,
                                            const Gamma &gamma, const VRPNode &theNode, size_t I) {
-        if (options.resource_disposability[I] == 1) { // Checked at compile-time
+        if (options.resource_type[I] == 1) { // Checked at compile-time
             if constexpr (D == Direction::Forward) {
                 new_resource =
                     std::max(initial_resources[I] + gamma.resource_increment[I], static_cast<double>(theNode.lb[I]));
@@ -180,7 +182,7 @@ public:
                     return false; // Below lower bound, return false to stop processing
                 }
             }
-        } else if (options.resource_disposability[I] == 0) {
+        } else if (options.resource_type[I] == 0) {
             // TODO: Non-disposable resource handling, check if it is right
             if constexpr (D == Direction::Forward) {
                 new_resource = initial_resources[I] + gamma.resource_increment[I];
@@ -197,7 +199,7 @@ public:
                     return false; // Below lower bound, return false to stop processing
                 }
             }
-        } else if (options.resource_disposability[I] == 2) {
+        } else if (options.resource_type[I] == 2) {
             // TODO:: Binary resource handling, check if logic is right
             if constexpr (D == Direction::Forward) {
                 // For binary resources, flip between 0 and 1 based on gamma.resource_increment[I]
@@ -214,7 +216,7 @@ public:
                     new_resource = 1.0; // Reverse logic: turn "on"
                 }
             }
-        } else if (options.resource_disposability[I] == 3) {
+        } else if (options.resource_type[I] == 3) {
             // TODO: handling multiple time windows case
             // "OR" resource case using mtw_lb and mtw_ub vectors for multiple time windows
             if constexpr (D == Direction::Forward) {

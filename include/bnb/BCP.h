@@ -477,7 +477,7 @@ public:
             BucketOptions options;
             options.main_resources         = {0};
             options.resources              = {"capacity"};
-            options.resource_disposability = {1};
+            options.resource_type = {1};
             bucket_graph->options          = options;
         }
 

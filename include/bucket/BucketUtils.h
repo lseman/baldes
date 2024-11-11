@@ -228,7 +228,6 @@ void BucketGraph::define_buckets() {
                 } else {
                     interval_end[0] = std::min(interval_end[0], VRPNode.ub[0]);
                 }
-
                 buckets.push_back(Bucket(VRPNode.id, interval_start, interval_end));
                 node_tree.insert(interval_start, interval_end, bucket_index);
 
