@@ -487,7 +487,7 @@ Params::Params(const std::string &path_location) {
 
     // Initial parameter values of these two parameters are not argued
     penaltyWaitTime = 0.;
-    if (problemType == ProblemType::vrptw) {
+    if (problemType == ProblemType::vrptw || problemType == ProblemType::evrp) {
         penaltyTimeWarp = config.initialTimeWarpPenalty;
     } else {
         penaltyTimeWarp = 0;

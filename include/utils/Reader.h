@@ -35,6 +35,15 @@
  * for solving a problem instance.
  *
  */
+
+struct CS {
+    double x_coord;
+    double y_coord;
+
+    // create constructor
+    CS(double x, double y) : x_coord(x), y_coord(y) {}
+};
+
 struct InstanceData {
     std::vector<std::vector<double>>                    distance;
     std::vector<std::vector<double>>                    travel_cost;
@@ -53,17 +62,20 @@ struct InstanceData {
     double                                              T_max      = 0.0;
     double                                              T_avg      = 0.0;
     double                                              demand_sum = 0.0;
-    int                                                 nV_min     = 0;
-    int                                                 nV_max     = 0;
-    int                                                 nD_min     = 0;
-    int                                                 nD_max     = 0;
-    std::vector<int>                                    deleted_arcs;
-    int                                                 deleted_arcs_n     = 0;
-    int                                                 deleted_arcs_n_max = 0;
+    std::vector<char>                                   type;
+
+    // EVRP-specific fields
+    double fuel_tank_capacity = 0.0;
+    double vehicle_capacity   = 0.0;
+    double fuel_consumption   = 0.0;
+    double refueling_rate     = 0.0;
+    double velocity           = 0.0;
 
     std::vector<double> x_coord;
     std::vector<double> y_coord;
     ProblemType         problem_type;
+
+    std::vector<CS> charging_stations;
 
     int getNbVertices() const { return nN - 1; }
 
@@ -494,6 +506,24 @@ inline int CVRP_read_instance(const std::string &file_name, InstanceData &instan
     // Calculate Euclidean distances between nodes
     int max_travel_time = 0;
 
+    // Set service time and window times
+    for (int i = 0; i < instance.nN; ++i) {
+        instance.service_time[i] = 0;
+        instance.window_open[i]  = 0;
+        instance.window_close[i] = max_travel_time + max_travel_time / 2.0;
+    }
+
+    // define n_tw as 0
+    for (int i = 0; i < instance.nN; i++) { instance.n_tw[i] = 0; }
+
+    instance.x_coord[instance.nN - 1]      = instance.x_coord[0];
+    instance.y_coord[instance.nN - 1]      = instance.y_coord[0];
+    instance.demand[instance.nN - 1]       = instance.demand[0];
+    instance.service_time[instance.nN - 1] = instance.service_time[0];
+    instance.window_open[instance.nN - 1]  = instance.window_open[0];
+    instance.window_close[instance.nN - 1] = instance.window_close[0];
+    instance.n_tw[instance.nN - 1]         = instance.n_tw[0];
+
     // Calculate maximum travel time for setting window close time
     for (int i = 0; i < instance.nN; ++i) {
         for (int j = 0; j < instance.nN; ++j) {
@@ -509,24 +539,6 @@ inline int CVRP_read_instance(const std::string &file_name, InstanceData &instan
     // Assign the travel cost
     instance.travel_cost = instance.distance;
 
-    // Set service time and window times
-    for (int i = 0; i < instance.nN; ++i) {
-        instance.service_time[i] = 0;
-        instance.window_open[i]  = 0;
-        instance.window_close[i] = max_travel_time + max_travel_time/2.0;
-    }
-
-    // define n_tw as 0
-    for (int i = 0; i < instance.nN; i++) { instance.n_tw[i] = 0; }
-
-    instance.x_coord[instance.nN - 1]      = instance.x_coord[0];
-    instance.y_coord[instance.nN - 1]      = instance.y_coord[0];
-    instance.demand[instance.nN - 1]       = instance.demand[0];
-    instance.service_time[instance.nN - 1] = instance.service_time[0];
-    instance.window_open[instance.nN - 1]  = instance.window_open[0];
-    instance.window_close[instance.nN - 1] = instance.window_close[0];
-    instance.n_tw[instance.nN - 1]         = instance.n_tw[0];
-
     instance.nV = 30;
 
     for (int i = 1; i < instance.nN - 1; ++i) { instance.demand_sum += instance.demand[i]; }
@@ -534,4 +546,125 @@ inline int CVRP_read_instance(const std::string &file_name, InstanceData &instan
     instance.problem_type = ProblemType::cvrp;
 
     return 1; // Success
+}
+
+inline double extract_value_between_slashes(std::istringstream &iss) {
+    std::string token;
+    char        delimiter;
+
+    // Read until the first slash
+    while (iss >> delimiter && delimiter != '/') {}
+
+    // Read the value between slashes
+    std::getline(iss, token, '/');
+    return std::stod(token);
+}
+
+inline int EVRP_read_instance(const std::string &file_name, InstanceData &instance) {
+    std::ifstream myfile(file_name);
+    if (!myfile.is_open()) {
+        std::cerr << "Failed to open file: " << file_name << std::endl;
+        return 0;
+    }
+
+    std::string line;
+    // Read each line and parse relevant information
+    while (std::getline(myfile, line)) {
+        std::istringstream iss(line);
+        std::string        key;
+        iss >> key;
+        if (line.empty()) { continue; }
+        if (key == "Q") {
+            char temp;
+            instance.fuel_tank_capacity = extract_value_between_slashes(iss);
+        } else if (key == "C") {
+            char temp;
+            instance.vehicle_capacity = extract_value_between_slashes(iss);
+        } else if (key == "r") {
+            char temp;
+            instance.fuel_consumption = extract_value_between_slashes(iss);
+        } else if (key == "g") {
+            char temp;
+            instance.refueling_rate = extract_value_between_slashes(iss);
+        } else if (key == "v") {
+            char temp;
+            instance.velocity = extract_value_between_slashes(iss);
+        } else if (key == "StringID") {
+            // Skip the header line
+            continue;
+        } else {
+            // Reading node data
+            char   type;
+            double x, y, demand, ready_time, due_date, service_time;
+            iss >> type >> x >> y >> demand >> ready_time >> due_date >> service_time;
+            if (type == 'f') {
+                instance.charging_stations.push_back({x, y});
+            } else if (type == 'd' || type == 'c') {
+                instance.nN++;
+                instance.x_coord.push_back(x);
+                instance.y_coord.push_back(y);
+                instance.demand.push_back(static_cast<int>(demand));
+                instance.window_open.push_back(ready_time);
+                instance.window_close.push_back(due_date);
+                instance.service_time.push_back(service_time);
+                instance.type.push_back(type);
+            }
+        }
+    }
+
+    instance.problem_type = ProblemType::evrp;
+
+    instance.x_coord.push_back(instance.x_coord[0]);
+    instance.y_coord.push_back(instance.y_coord[0]);
+    instance.demand.push_back(instance.demand[0]);
+    instance.window_open.push_back(instance.window_open[0]);
+    instance.window_close.push_back(instance.window_close[0]);
+    instance.service_time.push_back(instance.service_time[0]);
+    instance.type.push_back(instance.type[0]);
+    instance.nN++;
+
+    fmt::print("instance.nN: {}\n", instance.nN);
+    // define n_tw as 0
+    instance.n_tw.resize(instance.nN);
+    for (int i = 0; i < instance.nN; i++) { instance.n_tw[i] = 0; }
+
+    // Initialize distance matrix
+    instance.distance.resize(instance.nN, std::vector<double>(instance.nN));
+    for (int i = 0; i < instance.nN; ++i) {
+        for (int j = 0; j < instance.nN; ++j) {
+            double dx               = instance.x_coord[i] - instance.x_coord[j];
+            double dy               = instance.y_coord[i] - instance.y_coord[j];
+            auto   aux              = (int)(10 * sqrt(dx * dx + dy * dy));
+            instance.distance[i][j] = 1.0 * aux;
+        }
+        instance.window_open[i] *= 10;
+        instance.window_close[i] *= 10;
+        instance.service_time[i] *= 10;
+    }
+
+    VRPTW_reduce_time_windows(instance);
+
+    instance.travel_cost = instance.distance;
+
+    for (int i = 1; i < instance.nN - 1; ++i) { instance.demand_sum += instance.demand[i]; }
+    for (int i = 1; i < instance.nN - 1; ++i) {
+        instance.demand_sum += instance.demand[i];
+        instance.T_avg += instance.window_close[i] - instance.window_open[i];
+        if (instance.T_max <
+            instance.window_close[i] + instance.service_time[i] + instance.distance[i][instance.nN - 1]) {
+            instance.T_max =
+                instance.window_close[i] + instance.service_time[i] + instance.distance[i][instance.nN - 1];
+        }
+    }
+    instance.T_max = instance.window_close[0];
+
+    instance.nC = instance.nN - 2;
+
+    // define nV
+    instance.nV = 50;
+    instance.q  = 100;
+
+    instance.T_avg /= static_cast<double>(instance.nC);
+
+    return 1;
 }

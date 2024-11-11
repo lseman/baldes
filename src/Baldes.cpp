@@ -38,7 +38,6 @@
 
 #include "Logger.h"
 
-
 #ifdef GUROBI
 #include "gurobi_c++.h"
 #include "solvers/Gurobi.h"
@@ -191,6 +190,17 @@ int main(int argc, char *argv[]) {
             return 1;
         }
         print_info("CVRP instance read successfully.\n");
+    } else if (problem_kind == "evrp") {
+        if (!EVRP_read_instance(instance_name, instance)) {
+            std::cerr << "Error reading TSP instance\n";
+            return 1;
+        }
+        print_info("EVRP instance read successfully.\n");
+        fmt::print("Fuel tank capacity: {}\n", instance.fuel_tank_capacity);
+        fmt::print("Vehicle capacity: {}\n", instance.vehicle_capacity);
+        fmt::print("Fuel consumption rate: {}\n", instance.fuel_consumption);
+        fmt::print("Refueling rate: {}\n", instance.refueling_rate);
+        fmt::print("Velocity: {}\n", instance.velocity);
     } else {
         std::cerr << "Unsupported problem kind: " << problem_kind << "\n";
         return 1;

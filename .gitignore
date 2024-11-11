@@ -16,6 +16,7 @@ vrpsolve/
 testing/
 mtw/
 evrp/
+__pycache__/
 
 cmake/
 CPM_modules/

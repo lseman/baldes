@@ -46,6 +46,9 @@ PYBIND11_MODULE(pybaldes, m) {
         .def_readwrite("consumption", &VRPNode::consumption) // Expose consumption (vector of double)
         .def_readwrite("lb", &VRPNode::lb)                   // Expose lb (vector of int)
         .def_readwrite("ub", &VRPNode::ub)                   // Expose ub (vector of int)
+        .def_readwrite("mtw_lb", &VRPNode::mtw_lb)           // Expose mtw_lb (vector of int)
+        .def_readwrite("mtw_ub", &VRPNode::mtw_ub)           // Expose mtw_ub (vector of int)
+        .def_readwrite("identifier", &VRPNode::identifier)   // Expose identifier
         .def("set_location", &VRPNode::set_location)         // Expose set_location function
         .def("add_arc", py::overload_cast<int, int, std::vector<double>, double, bool>(
                             &VRPNode::add_arc))  // Expose add_arc with one version
@@ -124,7 +127,12 @@ PYBIND11_MODULE(pybaldes, m) {
         .def_readwrite("main_resources", &BucketOptions::main_resources) // Expose main_resources field
         .def_readwrite("resources", &BucketOptions::resources)         // Expose resources field
         .def_readwrite("size", &BucketOptions::size)                   // Expose size field
-        .def_readwrite("resource_disposability", &BucketOptions::resource_disposability) // Expose resource_disposability field
+        .def_readwrite("three_two_sign", &BucketOptions::three_two_sign) // Expose three_two_sign field
+        .def_readwrite("three_three_sign", &BucketOptions::three_three_sign) // Expose three_three_sign field
+        .def_readwrite("three_five_sign", &BucketOptions::three_five_sign) // Expose three_five_sign field
+        .def_readwrite("pstep", &BucketOptions::pstep)                   // Expose pstep field
+        .def_readwrite("resource_type", &BucketOptions::resource_type) // Expose resource_type field
+        .def_readwrite("bucket_fixing", &BucketOptions::bucket_fixing) // Expose bucket_fixing field
         .def("__repr__", [](const BucketOptions &options) {
             return "<BucketOptions depot=" + std::to_string(options.depot) +
                    " end_depot=" + std::to_string(options.end_depot) +
