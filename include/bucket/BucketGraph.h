@@ -790,7 +790,7 @@ public:
      */
     void setDuals(const std::vector<double> &duals) {
         // print nodes.size
-        for (size_t i = 1; i < N_SIZE - 1; ++i) { nodes[i].setDuals(duals[i - 1]); }
+        for (size_t i = 1; i < options.size - 1; ++i) { nodes[i].setDuals(duals[i - 1]); }
     }
 
     /**

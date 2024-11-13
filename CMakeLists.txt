@@ -360,7 +360,7 @@ if(NSYNC)
   include_directories(${nsync_SOURCE_DIR}/public)
 endif()
 
-set(GUROBI_VERSION_MAJOR 110) # Adjust based on Gurobi version
+set(GUROBI_VERSION_MAJOR 120) # Adjust based on Gurobi version
 
 if(APPLE)
   # macOS detected, use .dylib for linking
