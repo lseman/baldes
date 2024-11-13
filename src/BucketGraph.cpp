@@ -639,7 +639,7 @@ void BucketGraph::common_initialization() {
         auto       &label_pool            = is_forward ? label_pool_fw : label_pool_bw;
         auto       &buckets               = is_forward ? fw_buckets : bw_buckets;
         const auto &depot_id              = is_forward ? options.depot : options.end_depot;
-        int         calculated_index_base = is_forward ? options.depot : num_buckets_index_bw[options.end_depot - 1];
+        int         calculated_index_base = is_forward ? options.depot : num_buckets_index_bw[options.end_depot];
 
         std::vector<int>    current_pos(num_intervals, 0); // Tracks current position in each interval dimension
         std::vector<double> interval_bounds(num_intervals);
