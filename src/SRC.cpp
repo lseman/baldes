@@ -284,7 +284,7 @@ void LimitedMemoryRank1Cuts::separate(const SparseMatrix &A, const std::vector<d
     return;
 }
 
-std::pair<bool, bool> LimitedMemoryRank1Cuts::runSeparation(BNBNode *node, std::vector<baldesCtrPtr > &SRCconstraints) {
+std::pair<bool, bool> LimitedMemoryRank1Cuts::runSeparation(BNBNode *node, std::vector<baldesCtrPtr> &SRCconstraints) {
     auto                cuts = &cutStorage;
     ModelData           matrix;
     auto                cuts_before = cuts->size();
@@ -297,7 +297,7 @@ std::pair<bool, bool> LimitedMemoryRank1Cuts::runSeparation(BNBNode *node, std::
     size_t i = 0;
     std::for_each(allPaths.begin(), allPaths.end(), [&](auto &path) { path.frac_x = solution[i++]; });
 
-    //separateR1C1(matrix.A_sparse, solution);
+    // separateR1C1(matrix.A_sparse, solution);
     separate(matrix.A_sparse, solution);
 
     // TupleBasedSeparator r1c4(allPaths);
@@ -376,7 +376,7 @@ std::pair<bool, bool> LimitedMemoryRank1Cuts::runSeparation(BNBNode *node, std::
     generator->setNodes(nodes);
     generator->generateSepHeurMem4Vertex();
     generator->initialize(allPaths);
-    //generator->fillMemory();
+    // generator->fillMemory();
     generator->getHighDimCuts();
     // generator->setMemFactor(0.15);
     // generator->constructMemoryVertexBased();
@@ -402,24 +402,25 @@ std::pair<bool, bool> LimitedMemoryRank1Cuts::runSeparation(BNBNode *node, std::
     pdqsort(SRCconstraints.begin(), SRCconstraints.end(),
             [](const baldesCtrPtr a, const baldesCtrPtr b) { return a->index() < b->index(); });
 
-    for (int i = SRCconstraints.size() - 1; i >= 0; --i) {
-        auto constr = SRCconstraints[i];
+    // print SRCconstraints.size()
+    auto it = SRCconstraints.end();
+    while (it != SRCconstraints.begin()) {
+        --it;
+        auto constr        = *it;
+        int  current_index = node->get_current_index(constr->get_unique_id());
 
         // Get the slack value of the constraint
-        double slack = node->getSlack(constr->index(), solution);
-        // double slack = slacks[constr->index()];
+        double slack = node->getSlack(current_index, solution);
 
         // If the slack is positive, it means the constraint is not violated
         if (slack > 1e-3) {
             cleared = true;
-
-            // Remove the constraint from the model and cut storage
             node->remove(constr);
-            cuts->removeCut(cuts->getID(i));
+            cuts->removeCut(cuts->getID(std::distance(SRCconstraints.begin(), it)));
             n_cuts_removed++;
 
-            // Remove from SRCconstraints
-            SRCconstraints.erase(SRCconstraints.begin() + i);
+            // Remove from SRCconstraints using iterator
+            it = SRCconstraints.erase(it);
         }
     }
 

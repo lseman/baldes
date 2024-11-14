@@ -217,15 +217,14 @@ public:
         child->historyCandidates = historyCandidates;
         child->candidates        = candidates;
         child->r1c               = std::make_shared<LimitedMemoryRank1Cuts>(*r1c);
-        child->rccManager        = std::make_shared<RCCManager>(*rccManager);
+        child->rccManager        = rccManager->clone();
         child->instance          = instance;
         child->SRCconstraints.clear();
         child->SRCconstraints.reserve(SRCconstraints.size()); // Reserve space if size is known
         child->depth = depth + 1;
 
         for (baldesCtrPtr constraint : SRCconstraints) {
-            child->SRCconstraints.push_back(
-                std::make_shared<baldesCtr>(*constraint)); // Deep copy each `baldesCtr` object
+            child->SRCconstraints.push_back(constraint->clone()); // Clone the constraint and add to the child node
         }
 
         // child->clearSRC();
@@ -290,6 +289,7 @@ public:
 
     void remove(baldesCtrPtr ctr) { mip.delete_constraint(ctr); }
     void remove(baldesVarPtr var) { mip.delete_variable(var); }
+    int  get_current_index(int unique_id) { return mip.get_current_index(unique_id); }
 
     baldesVarPtr addVar(const std::string &name, VarType type, double lb, double ub, double obj) {
         return mip.add_variable(name, type, lb, ub, obj);
@@ -474,7 +474,7 @@ public:
         // Iterate over the candidates and enforce the branching constraints
         for (const auto &candidate : candidates) {
             auto ctr = addBranchingbaldesCtr(candidate->boundValue, candidate->boundType, candidate->candidateType,
-                                              candidate->payload);
+                                             candidate->payload);
             branchingDuals->addCandidate(candidate, ctr);
         }
         mip.printBranchingbaldesCtr();

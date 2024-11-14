@@ -435,7 +435,7 @@ public:
     /**
      * Column generation algorithm.
      */
-    bool CG(BNBNode *node, int max_iter = 1000) {
+    bool CG(BNBNode *node, int max_iter = 140) {
 
         print_info("Column generation preparation...\n");
 
@@ -678,7 +678,6 @@ public:
                         }
                     }
                 }
-
 #ifdef IPM_ACEL
                 auto updateGapAndRunOptimization = [&](auto node, auto lp_obj, auto inner_obj, auto &ipm_solver,
                                                        auto &iter_non_improv, auto &use_ipm_duals, auto &nodeDuals) {
@@ -719,23 +718,23 @@ public:
                 }
 #endif
                 lp_obj_old = lp_obj;
-
                 bucket_graph->relaxation = lp_obj;
                 bucket_graph->augment_ng_memories(solution, allPaths, true, 5, 110, 18, N_SIZE);
                 SRC_MODE_BLOCK( // SRC cuts
                     if (!SRCconstraints.empty()) {
                         // print SRCconstraints size
                         std::vector<double> cutDuals;
+                        cutDuals.reserve(SRCconstraints.size());
 
                         for (int i = 0; i < SRCconstraints.size(); i++) {
                             auto constr = SRCconstraints[i];
                             auto index  = constr->index();
+                            // print size of originDuals
                             cutDuals.push_back(originDuals[index]);
                         }
 
                         cuts->setDuals(cutDuals);
                     })
-
                 RCC_MODE_BLOCK(
                     // RCC cuts
                     if (rccManager->size() > 0) {

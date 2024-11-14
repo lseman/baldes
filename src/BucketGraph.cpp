@@ -683,7 +683,9 @@ void BucketGraph::common_initialization() {
     };
 
     // Call the lambda for both forward and backward directions, ensuring all combinations are processed
+    // fmt::print("Forward Initialization\n");
     initialize_intervals_combinations(true);  // Forward direction
+    // fmt::print("Backward Initialization\n");
     initialize_intervals_combinations(false); // Backward direction
 }
 

@@ -120,7 +120,7 @@ inline LinearExpression operator+(const std::pair<baldesVarPtr, double> &term, c
 
 // operator std::vector<std::pair<baldesVarPtr, double>> and LinearExpression
 inline LinearExpression operator+(const std::vector<std::pair<baldesVarPtr, double>> &terms,
-                                  const LinearExpression &expr) {
+                                  const LinearExpression                             &expr) {
     LinearExpression result = expr;
     for (const auto &term : terms) { result.add_term(term.first->get_name(), term.second); }
     return result;
@@ -155,17 +155,22 @@ public:
             clone->var_name_to_index[var->get_name()] = newVar->index();
         }
 
-        // Clone constraints
-        for (auto constraint : constraints) {
-            LinearExpression clonedExpr;
-            for (auto &[var_name, coeff] : constraint->get_expression().get_terms()) {
-                clonedExpr.add_or_update_term(var_name, coeff);
-            }
-            baldesCtrPtr newbaldesCtr =
-                std::make_shared<baldesCtr>(clonedExpr, constraint->get_rhs(), constraint->get_relation());
-            newbaldesCtr->set_index(constraint->index());
-            clone->constraints.push_back(newbaldesCtr);
-            clone->b_vec.push_back(newbaldesCtr->get_rhs());
+        // // Clone constraints
+        // for (auto constraint : constraints) {
+        //     LinearExpression clonedExpr;
+        //     for (auto &[var_name, coeff] : constraint->get_expression().get_terms()) {
+        //         clonedExpr.add_or_update_term(var_name, coeff);
+        //     }
+        //     baldesCtrPtr newbaldesCtr =
+        //         std::make_shared<baldesCtr>(clonedExpr, constraint->get_rhs(), constraint->get_relation());
+        //     newbaldesCtr->set_index(constraint->index());
+        //     clone->constraints.push_back(newbaldesCtr);
+        //     clone->b_vec.push_back(newbaldesCtr->get_rhs());
+        // }
+        for (const auto &constraint : constraints) {
+            auto clonedCtr = constraint->clone();
+            clone->constraints.push_back(clonedCtr);
+            clone->b_vec.push_back(clonedCtr->get_rhs());
         }
 
         // Clone the objective
@@ -311,20 +316,47 @@ public:
         }
     }
 
-    // Delete a constraint (row) from the problem
-    void delete_constraint(int constraint_index) {
-        // Delete the row from the sparse matrix (assumed efficient row deletion)
+    int get_current_index(int unique_id) {
+        // print the unique_id
+        for (int i = 0; i < constraints.size(); i++) {
+            if (constraints[i]->get_unique_id() == unique_id) { return i; }
+        }
+        return -1;
+    }
+
+    // Main implementation that does the actual deletion work
+    void delete_constraint(int constraint_unique_id) {
+
+
+        // find the constraint in which the unique_id matches the given constraint_index
+        auto it = std::find_if(constraints.begin(), constraints.end(),
+                               [constraint_unique_id](const baldesCtrPtr &constraint) {
+                                   return constraint->get_unique_id() == constraint_unique_id;
+                               });
+        const int constraint_index = std::distance(constraints.begin(), it);
+        
+        // Delete the row from the sparse matrix
         sparse_matrix.delete_row(constraint_index);
 
-        // Erase the constraint from the list
+        // Erase the constraint from the constraints vector and b_vec atomically
         constraints.erase(constraints.begin() + constraint_index);
         b_vec.erase(b_vec.begin() + constraint_index);
 
-        // Update the indices of the remaining constraints (this step can be costly if many constraints exist)
-        for (int i = constraint_index; i < constraints.size(); ++i) { constraints[i]->set_index(i); }
+        // Update the indices of the remaining constraints
+        // Consider using parallel processing if constraints.size() is very large
+        for (int i = constraint_index; i < static_cast<int>(constraints.size()); ++i) {
+            auto &constraint = constraints[i];
+            if (constraint) { // null check
+                int old_index = constraint->index();
+                constraint->set_index(i);
+
+            } else {
+                std::cerr << "Null constraint found at position " << i << std::endl;
+            }
+        }
     }
 
-    void delete_constraint(baldesCtrPtr constraint) { delete_constraint(constraint->index()); }
+    void delete_constraint(baldesCtrPtr constraint) { delete_constraint(constraint->get_unique_id()); }
 
     void delete_variable(const baldesVarPtr variable) {
         // Find the index of the given variable in the variables vector
