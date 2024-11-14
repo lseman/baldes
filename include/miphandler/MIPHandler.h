@@ -325,16 +325,15 @@ public:
     }
 
     // Main implementation that does the actual deletion work
-    void delete_constraint(int constraint_unique_id) {
-
-
+    void delete_constraint(int constraint_index) {
+        /*
         // find the constraint in which the unique_id matches the given constraint_index
-        auto it = std::find_if(constraints.begin(), constraints.end(),
-                               [constraint_unique_id](const baldesCtrPtr &constraint) {
+        auto      it               = std::find_if(constraints.begin(), constraints.end(),
+                                                  [constraint_unique_id](const baldesCtrPtr &constraint) {
                                    return constraint->get_unique_id() == constraint_unique_id;
                                });
         const int constraint_index = std::distance(constraints.begin(), it);
-        
+        */
         // Delete the row from the sparse matrix
         sparse_matrix.delete_row(constraint_index);
 
@@ -356,7 +355,7 @@ public:
         }
     }
 
-    void delete_constraint(baldesCtrPtr constraint) { delete_constraint(constraint->get_unique_id()); }
+    void delete_constraint(baldesCtrPtr constraint) { delete_constraint(constraint->index()); }
 
     void delete_variable(const baldesVarPtr variable) {
         // Find the index of the given variable in the variables vector
@@ -390,6 +389,22 @@ public:
     baldesVarPtr getVar(size_t index) {
         if (index >= variables.size()) { throw std::out_of_range("baldesVar index out of range"); }
         return variables[index];
+    }
+
+    std::vector<baldesCtrPtr> getSRCconstraints() {
+        std::vector<baldesCtrPtr> SRCconstraints;
+        for (const auto &constraint : constraints) {
+            if (constraint->get_name().find("SRC") != std::string::npos) { SRCconstraints.push_back(constraint); }
+        }
+        return SRCconstraints;
+    }
+
+    std::vector<baldesCtrPtr> getRCCconstraints() {
+        std::vector<baldesCtrPtr> RCCconstraints;
+        for (const auto &constraint : constraints) {
+            if (constraint->get_name().find("RCC") != std::string::npos) { RCCconstraints.push_back(constraint); }
+        }
+        return RCCconstraints;
     }
 
     void chgCoeff(int constraintIndex, const std::vector<double> &values) {
@@ -464,9 +479,10 @@ public:
     }
 
     void chgCoeff(baldesCtrPtr constraint, const std::vector<double> &new_coeffs) {
-        auto constraintIndex = constraint->index();
+        int current_index = get_current_index(constraint->get_unique_id());
+
         // Change the coefficients for the constraint
-        chgCoeff(constraintIndex, new_coeffs);
+        chgCoeff(current_index, new_coeffs);
     }
 
 #ifdef GUROBI

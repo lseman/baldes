@@ -306,7 +306,7 @@ public:
                         lhs += node->getVar(i) * coeffs[i];
                     }
 
-                    std::string constraint_name = "cuts(z" + std::to_string(z) + ")";
+                    std::string constraint_name = "SRC(z" + std::to_string(z) + ")";
                     // constraint_name << "cuts(z" << z << ")";
                     // auto ctr = ;
                     // print cut.rhs
@@ -435,7 +435,7 @@ public:
     /**
      * Column generation algorithm.
      */
-    bool CG(BNBNode *node, int max_iter = 140) {
+    bool CG(BNBNode *node, int max_iter = 1000) {
 
         print_info("Column generation preparation...\n");
 
@@ -728,7 +728,7 @@ public:
 
                         for (int i = 0; i < SRCconstraints.size(); i++) {
                             auto constr = SRCconstraints[i];
-                            auto index  = constr->index();
+                            auto index  =  constr->index(); //node->get_current_index(constr->get_unique_id());
                             // print size of originDuals
                             cutDuals.push_back(originDuals[index]);
                         }
@@ -740,8 +740,8 @@ public:
                     if (rccManager->size() > 0) {
 #ifndef IPM
                         auto arc_duals = rccManager->computeDuals(node);
-#else
-                    auto arc_duals = rccManager->computeDuals(nodeDuals);
+#else  
+                    auto arc_duals = rccManager->computeDuals(nodeDuals, node);
 #endif
                         bucket_graph->setArcDuals(arc_duals);
                     })
