@@ -35,7 +35,7 @@
 struct RCCut {
     std::vector<RawArc> arcs; // Stores the arcs involved in the cut
     int                 rhs;  // Right-hand side value of the constraint
-    baldesCtrPtr       ctr;  // Gurobi constraint object
+    baldesCtrPtr        ctr;  // Gurobi constraint object
 };
 
 class BNBNode;
@@ -52,6 +52,18 @@ public:
         std::vector<baldesCtrPtr> constraints;
         for (const auto &cut : cuts_) { constraints.push_back(cut.ctr); }
         return constraints;
+    }
+
+    std::shared_ptr<RCCManager> clone() {
+        auto clone   = std::make_shared<RCCManager>();
+        clone->cuts_ = cuts_; // First copy the vector structure
+
+        // Clone each cut's constraint using the baldesCtr clone method
+        for (auto &cut : clone->cuts_) {
+            // Use the constraint's clone method instead of creating new one
+            cut.ctr = cut.ctr->clone(); // This preserves unique_id
+        }
+        return clone;
     }
 
     std::vector<double> computeRCCCoefficients(const std::vector<int> &label) {

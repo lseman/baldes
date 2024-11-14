@@ -107,7 +107,31 @@ PYBIND11_MODULE(pybaldes, m) {
         // .def("solvePSTEP", &BucketGraph::solvePSTEP, py::return_value_policy::reference)
         .def("setOptions", &BucketGraph::setOptions, "options"_a)
         .def("setArcs", &BucketGraph::setManualArcs, "arcs"_a)
-        .def("phaseFour", &BucketGraph::run_labeling_algorithms<Stage::Four, Full::Partial>);
+        .def("phaseFour", &BucketGraph::run_labeling_algorithms<Stage::Four, Full::Partial>)
+        .def(
+            "update_ng_neighbors",
+            [](BucketGraph &self, const std::vector<std::tuple<int, int>> &conflicts) {
+                // Convert Python tuples to C++ pairs
+                std::vector<std::pair<size_t, size_t>> cpp_conflicts;
+                cpp_conflicts.reserve(conflicts.size());
+                for (const auto &conflict : conflicts) {
+                    cpp_conflicts.emplace_back(std::get<0>(conflict), std::get<1>(conflict));
+                }
+                self.update_neighborhoods(cpp_conflicts);
+            },
+            "Update NG neighborhoods based on conflicts")
+        .def("get_neighborhood_size", &BucketGraph::get_neighborhood_size, "Get size of neighborhood for given node")
+        .def("get_neighbors", &BucketGraph::get_neighbors, "Get list of neighbors for given node")
+        .def("is_in_neighborhood", &BucketGraph::is_in_neighborhood, "Check if node j is in node i's neighborhood")
+        .def(
+            "set_deleted_arcs",
+            [](BucketGraph &self, const std::vector<std::tuple<int, int>> &arcs) {
+                // Convert Python tuples to ArcList entries to mark as deleted
+                std::vector<std::pair<int, int>> deleted_arcs;
+                for (const auto &arc : arcs) { deleted_arcs.emplace_back(std::get<0>(arc), std::get<1>(arc)); }
+                self.set_deleted_arcs(deleted_arcs);
+            },
+            "Set arcs that should be forbidden/deleted from the graph");
 
     // Expose PSTEPDuals class
     py::class_<PSTEPDuals>(m, "PSTEPDuals")
@@ -119,20 +143,20 @@ PYBIND11_MODULE(pybaldes, m) {
         .def("__repr__", [](const PSTEPDuals &pstepDuals) { return "<PSTEPDuals with arc and node dual values>"; });
 
     py::class_<BucketOptions>(m, "BucketOptions")
-        .def(py::init<>())                                             // Default constructor
-        .def_readwrite("depot", &BucketOptions::depot)                 // Expose depot field
-        .def_readwrite("end_depot", &BucketOptions::end_depot)         // Expose end_depot field
-        .def_readwrite("max_path_size", &BucketOptions::max_path_size) // Expose max_path_size field
-        .def_readwrite("min_path_size", &BucketOptions::min_path_size) // Expose min_path_size field
-        .def_readwrite("main_resources", &BucketOptions::main_resources) // Expose main_resources field
-        .def_readwrite("resources", &BucketOptions::resources)         // Expose resources field
-        .def_readwrite("size", &BucketOptions::size)                   // Expose size field
-        .def_readwrite("three_two_sign", &BucketOptions::three_two_sign) // Expose three_two_sign field
+        .def(py::init<>())                                                   // Default constructor
+        .def_readwrite("depot", &BucketOptions::depot)                       // Expose depot field
+        .def_readwrite("end_depot", &BucketOptions::end_depot)               // Expose end_depot field
+        .def_readwrite("max_path_size", &BucketOptions::max_path_size)       // Expose max_path_size field
+        .def_readwrite("min_path_size", &BucketOptions::min_path_size)       // Expose min_path_size field
+        .def_readwrite("main_resources", &BucketOptions::main_resources)     // Expose main_resources field
+        .def_readwrite("resources", &BucketOptions::resources)               // Expose resources field
+        .def_readwrite("size", &BucketOptions::size)                         // Expose size field
+        .def_readwrite("three_two_sign", &BucketOptions::three_two_sign)     // Expose three_two_sign field
         .def_readwrite("three_three_sign", &BucketOptions::three_three_sign) // Expose three_three_sign field
-        .def_readwrite("three_five_sign", &BucketOptions::three_five_sign) // Expose three_five_sign field
-        .def_readwrite("pstep", &BucketOptions::pstep)                   // Expose pstep field
-        .def_readwrite("resource_type", &BucketOptions::resource_type) // Expose resource_type field
-        .def_readwrite("bucket_fixing", &BucketOptions::bucket_fixing) // Expose bucket_fixing field
+        .def_readwrite("three_five_sign", &BucketOptions::three_five_sign)   // Expose three_five_sign field
+        .def_readwrite("pstep", &BucketOptions::pstep)                       // Expose pstep field
+        .def_readwrite("resource_type", &BucketOptions::resource_type)       // Expose resource_type field
+        .def_readwrite("bucket_fixing", &BucketOptions::bucket_fixing)       // Expose bucket_fixing field
         .def("__repr__", [](const BucketOptions &options) {
             return "<BucketOptions depot=" + std::to_string(options.depot) +
                    " end_depot=" + std::to_string(options.end_depot) +

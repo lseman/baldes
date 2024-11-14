@@ -493,7 +493,10 @@ public:
     void augment_ng_memories(std::vector<double> &solution, std::vector<Path> &paths, bool aggressive, int eta1,
                              int eta2, int eta_max, int nC);
 
-    inline double        getcij(int i, int j) const { return distance_matrix[i][j]; }
+    inline double        getcij(int i, int j) const { 
+        if (i == options.end_depot) {  i = options.depot; }
+        if (j == options.end_depot) {  j = options.depot; }
+        return distance_matrix[i][j]; }
     void                 calculate_neighborhoods(size_t num_closest);
     std::vector<VRPNode> getNodes() const { return nodes; }
     std::vector<int>     computePhi(int &bucket, bool fw);
@@ -959,6 +962,81 @@ public:
 
     template <Direction D>
     int get_opposite_bucket_number(int current_bucket_index, std::vector<double> &inc);
+
+    void update_neighborhoods(const std::vector<std::pair<size_t, size_t>> &conflicts) {
+        size_t num_nodes = nodes.size();
+
+        // For each conflict (u,v), add u to v's neighborhood and vice versa
+        for (const auto &conflict : conflicts) {
+            size_t u = conflict.first;
+            size_t v = conflict.second;
+
+            if (u >= num_nodes || v >= num_nodes) continue; // Skip invalid nodes
+
+            // Add v to u's neighborhood
+            size_t segment_v      = v >> 6;
+            size_t bit_position_v = v & 63;
+            if (segment_v < neighborhoods_bitmap[u].size()) {
+                neighborhoods_bitmap[u][segment_v] |= (1ULL << bit_position_v);
+            }
+
+            // Add u to v's neighborhood
+            size_t segment_u      = u >> 6;
+            size_t bit_position_u = u & 63;
+            if (segment_u < neighborhoods_bitmap[v].size()) {
+                neighborhoods_bitmap[v][segment_u] |= (1ULL << bit_position_u);
+            }
+        }
+    }
+    // Helper method to check if node j is in node i's neighborhood
+    bool is_in_neighborhood(size_t i, size_t j) const {
+        if (i >= neighborhoods_bitmap.size()) return false;
+
+        size_t segment      = j >> 6;
+        size_t bit_position = j & 63;
+
+        if (segment >= neighborhoods_bitmap[i].size()) return false;
+
+        return (neighborhoods_bitmap[i][segment] & (1ULL << bit_position)) != 0;
+    }
+
+    // Method to get current neighborhood size for node i
+    size_t get_neighborhood_size(size_t i) const {
+        if (i >= neighborhoods_bitmap.size()) return 0;
+
+        size_t count = 0;
+        for (const auto &segment : neighborhoods_bitmap[i]) {
+            count += __builtin_popcountll(segment); // Count set bits
+        }
+        return count;
+    }
+
+    // Method to get all neighbors of node i
+    std::vector<size_t> get_neighbors(size_t i) const {
+        std::vector<size_t> neighbors;
+        if (i >= neighborhoods_bitmap.size()) return neighbors;
+
+        size_t num_nodes = nodes.size();
+        for (size_t j = 0; j < num_nodes; ++j) {
+            if (is_in_neighborhood(i, j)) { neighbors.push_back(j); }
+        }
+        return neighbors;
+    }
+
+    void set_deleted_arcs(const std::vector<std::pair<int, int>> &arcs) {
+        size_t num_nodes = nodes.size();
+
+        // Initialize or reset fixed_arcs matrix
+        fixed_arcs.resize(num_nodes);
+        for (auto &row : fixed_arcs) {
+            row.assign(num_nodes, false); // Initialize all arcs as not fixed
+        }
+
+        // Mark each arc in the input list as fixed/deleted
+        for (const auto &[from, to] : arcs) {
+            if (from < num_nodes && to < num_nodes) { fixed_arcs[from][to] = true; }
+        }
+    }
 
 private:
     std::vector<Interval> intervals;
