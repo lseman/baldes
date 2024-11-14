@@ -30,6 +30,9 @@
 #include "Bucket.h"
 #include "utils/NumericUtils.h"
 
+#include "MST.h"
+
+
 /**
  * @brief Represents a bucket in the Bucket Graph.
  * Adds an arc to the bucket graph.
@@ -117,7 +120,7 @@ inline int BucketGraph::get_bucket_number(int node, std::vector<double> &resourc
         val = bw_node_interval_trees[node].query(resource_values_vec);
     }
 
-    auto &buckets = assign_buckets<D>(fw_buckets, bw_buckets);
+    auto &buckets   = assign_buckets<D>(fw_buckets, bw_buckets);
     auto &to_bucket = buckets[val];
     // check is resources_values_vec[0] is within the bounds of the bucket
     if (resource_values_vec[0] < to_bucket.lb[0] || resource_values_vec[0] > to_bucket.ub[0]) {
@@ -222,7 +225,6 @@ void BucketGraph::define_buckets() {
                 interval_start[0] = roundToTwoDecimalPlaces(interval_start[0]);
                 interval_end[0]   = roundToTwoDecimalPlaces(interval_end[0]);
 
-                
                 if constexpr (D == Direction::Backward) {
                     interval_start[0] = std::max(interval_start[0], VRPNode.lb[0]);
                 } else {
@@ -512,12 +514,15 @@ Label *BucketGraph::get_best_label(const std::vector<int> &topological_order, co
  * Concatenates the label L with the bucket b and updates the best label pbest.
  *
  */
-template <Stage S>
+template <Stage S, Symmetry SYM>
 void BucketGraph::ConcatenateLabel(const Label *L, int &b, Label *&pbest, std::vector<uint64_t> &Bvisited) {
     // Use a vector for iterative processing as a stack
     std::vector<int> bucket_stack;
     bucket_stack.reserve(50);
     bucket_stack.push_back(b);
+
+    auto &other_buckets = assign_symmetry<SYM>(fw_buckets, bw_buckets);
+    auto &other_c_bar   = assign_symmetry<SYM>(fw_c_bar, bw_c_bar);
 
     const auto &L_node_id   = L->node_id;
     const auto &L_resources = L->resources;
@@ -534,7 +539,7 @@ void BucketGraph::ConcatenateLabel(const Label *L, int &b, Label *&pbest, std::v
 
         Bvisited[segment] |= (1ULL << bit_position);
 
-        const auto &bucketLprimenode = bw_buckets[current_bucket].node_id;
+        const auto &bucketLprimenode = other_buckets[current_bucket].node_id;
         double      cost             = getcij(L_node_id, bucketLprimenode);
 
 #if defined(RCC) || defined(EXACT_RCC)
@@ -554,13 +559,13 @@ void BucketGraph::ConcatenateLabel(const Label *L, int &b, Label *&pbest, std::v
         double L_cost_plus_cost = L->cost + cost;
 
         // Early exit based on cost comparison
-        if ((S != Stage::Enumerate && L_cost_plus_cost + bw_c_bar[current_bucket] >= pbest->cost) ||
-            (S == Stage::Enumerate && L_cost_plus_cost + bw_c_bar[current_bucket] >= gap)) {
+        if ((S != Stage::Enumerate && L_cost_plus_cost + other_c_bar[current_bucket] >= pbest->cost) ||
+            (S == Stage::Enumerate && L_cost_plus_cost + other_c_bar[current_bucket] >= gap)) {
             continue;
         }
 
         // Get the labels for the current bucket
-        auto       &bucket = bw_buckets[current_bucket];
+        auto      &bucket = other_buckets[current_bucket];
         const auto labels = bucket.get_labels();
 
         for (const auto &L_bw : labels) {
@@ -856,17 +861,17 @@ void BucketGraph::bucket_fixing() {
         print_info("performing bucket arc elimination with theta = {}\n", gap);
 
         // PARALLEL_SECTIONS(
-            // work, bi_sched,
-            // SECTION {
-                // Section 1: Forward direction
-                BucketArcElimination<Direction::Forward>(gap);
-                ObtainJumpBucketArcs<Direction::Forward>();
-            // },
-            // SECTION {
-                // Section 2: Backward direction
-                BucketArcElimination<Direction::Backward>(gap);
-                ObtainJumpBucketArcs<Direction::Backward>();
-            // });
+        // work, bi_sched,
+        // SECTION {
+        // Section 1: Forward direction
+        BucketArcElimination<Direction::Forward>(gap);
+        ObtainJumpBucketArcs<Direction::Forward>();
+        // },
+        // SECTION {
+        // Section 2: Backward direction
+        BucketArcElimination<Direction::Backward>(gap);
+        ObtainJumpBucketArcs<Direction::Backward>();
+        // });
 
         generate_arcs();
         fmt::print("\033[34m_BUCKET FIXING PROCEDURE FINISHED\033[0m");
@@ -960,5 +965,135 @@ void BucketGraph::heuristic_fixing() {
                 num_fixes++;
             }
         }
+    }
+}
+
+template <Symmetry SYM>
+void BucketGraph::set_adjacency_list() {
+    // Clear existing arcs for each node
+    for (auto &node : nodes) {
+        node.clear_arcs(); // Remove any existing arcs associated with the node
+    }
+
+    /*
+        RawArcList heur_arcs;
+        for (const auto &path : topHeurRoutes) {
+            for (size_t i = 0; i < path.size() - 1; ++i) {
+                int    from = path[i];
+                int    to   = path[i + 1];
+                RawArc arc(from, to);
+                heur_arcs.add_arc(arc);
+            }
+        }
+    */
+    // Step 1: Compute the clusters using MST-based clustering
+    MST    mst_solver(nodes, [&](int from, int to) { return this->getcij(from, to); });
+    double theta    = 1.0; // Experiment with different values of θ
+    auto   clusters = mst_solver.cluster(theta);
+
+    // Create a job-to-cluster mapping (cluster ID for each job/node)
+    std::vector<int> job_to_cluster(nodes.size(), -1); // Mapping from job (node) to cluster ID
+    for (int cluster_id = 0; cluster_id < clusters.size(); ++cluster_id) {
+        for (int job : clusters[cluster_id]) { job_to_cluster[job] = cluster_id; }
+    }
+
+    // Step 2: Modify add_arcs_for_node to give priority based on cluster membership
+    auto add_arcs_for_node = [&](const VRPNode &node, int from_bucket, std::vector<double> &res_inc) {
+        using Arc = std::tuple<double, int, std::vector<double>,
+                               double>; // Arc: priority, to_node, resource increments, cost increment
+
+        std::vector<Arc> best_arcs;
+        best_arcs.reserve(nodes.size()); // Reserve space for forward arcs
+
+        std::vector<Arc> best_arcs_rev;
+        best_arcs_rev.reserve(nodes.size()); // Reserve space for reverse arcs
+
+        for (const auto &next_node : nodes) {
+            if (next_node.id == options.depot || node.id == next_node.id) continue; // Skip depot and same node
+
+            if (options.pstep == true) {
+                if (next_node.id == options.pstep_depot || next_node.id == options.pstep_end_depot)
+                    continue; // Skip depot and end depot
+            }
+
+            auto   travel_cost = getcij(node.id, next_node.id); // Calculate travel cost
+            double cost_inc    = travel_cost - next_node.cost;  // Adjust cost increment by subtracting next node's cost
+
+            for (int r = 0; r < options.resources.size(); ++r) {
+                if (options.resources[r] == "time") {
+                    if constexpr (SYM == Symmetry::Asymmetric) {
+                        res_inc[r] = travel_cost + node.duration; // Update resource increment based on node duration
+                    } else {
+                        res_inc[r] = node.duration / 2 + travel_cost +
+                                     next_node.duration / 2; // Update resource increment based on node duration
+                    }
+                } else {
+                    if constexpr (SYM == Symmetry::Asymmetric) {
+                        res_inc[r] = node.consumption[r];
+                    } else {
+                        res_inc[r] = node.consumption[r] / 2 + next_node.consumption[r] / 2;
+                    }
+                }
+            }
+
+            int to_bucket = next_node.id;
+            if (from_bucket == to_bucket) continue; // Skip arcs that loop back to the same bucket
+
+            bool feasible = true; // Check feasibility based on resource constraints
+            for (int r = 0; r < options.resources.size(); ++r) {
+                if (node.lb[r] + res_inc[r] > next_node.ub[r]) {
+                    feasible = false;
+                    break;
+                }
+            }
+            if (!feasible) continue; // Skip infeasible arcs
+
+            // Step 3: Calculate priority based on cluster membership
+            double priority_value;
+            double reverse_priority_value;
+
+            // bool is_heuristic_arc = heur_arcs.has_arc(node.id, next_node.id);
+
+            if (job_to_cluster[node.id] == job_to_cluster[next_node.id]) {
+                // Higher priority if both nodes are in the same cluster
+                priority_value         = 5.0 + 1.E-5 * next_node.start_time; // Adjust weight for same-cluster priority
+                reverse_priority_value = 1.0 + 1.E-5 * node.start_time;      // Adjust weight for same-cluster priority
+            } else {
+                // Lower priority for cross-cluster arcs
+                priority_value         = 1.0 + 1.E-5 * next_node.start_time; // Higher base value for cross-cluster arcs
+                reverse_priority_value = 5.0 + 1.E-5 * node.start_time;      // Higher base value for cross-cluster arcs
+            }
+            best_arcs.emplace_back(priority_value, next_node.id, res_inc, cost_inc); // Store the forward arc
+            best_arcs_rev.emplace_back(reverse_priority_value, next_node.id, res_inc,
+                                       cost_inc); // Store the reverse arc
+        }
+
+        // Add forward arcs from the current node to its neighbors
+        for (const auto &arc : best_arcs) {
+            auto [priority_value, to_bucket, res_inc_local, cost_inc] = arc;
+            nodes[node.id].add_arc(node.id, to_bucket, res_inc_local, cost_inc, true,
+                                   priority_value); // Add forward arc
+            // fmt::print("Node ID: {}, To Bucket: {}, Cost Inc: {}\n", node.id, to_bucket, cost_inc);
+        }
+
+        // Add reverse arcs from neighboring nodes to the current node
+        for (const auto &arc : best_arcs_rev) {
+            auto [priority_value, to_bucket, res_inc_local, cost_inc] = arc;
+            nodes[to_bucket].add_arc(to_bucket, node.id, res_inc_local, cost_inc, false,
+                                     priority_value); // Add reverse arc
+        }
+    };
+
+    // Step 4: Iterate over all nodes to set the adjacency list
+    // print depot and end depot
+    for (const auto &VRPNode : nodes) {
+        // fmt::print("Node ID: {}\n", VRPNode.id);
+
+        if (VRPNode.id == options.end_depot) {
+            continue; // Skip the last node (depot)
+        }
+
+        std::vector<double> res_inc(intervals.size());   // Resource increment vector
+        add_arcs_for_node(VRPNode, VRPNode.id, res_inc); // Add arcs for the current node
     }
 }

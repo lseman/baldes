@@ -479,8 +479,8 @@ public:
     }
 
     void chgCoeff(baldesCtrPtr constraint, const std::vector<double> &new_coeffs) {
-        int current_index = get_current_index(constraint->get_unique_id());
-
+        //int current_index = get_current_index(constraint->get_unique_id());
+        int current_index = constraint->index();
         // Change the coefficients for the constraint
         chgCoeff(current_index, new_coeffs);
     }

@@ -135,6 +135,11 @@ public:
         return (D == Direction::Forward) ? FW : BW;
     }
 
+    template <Symmetry SYM>
+    constexpr auto &assign_symmetry(auto &FW, auto &BW) noexcept {
+        return (SYM == Symmetry::Symmetric) ? FW : BW;
+    }
+
     /**
      * @brief Processes all resources by iterating through them and applying constraints.
      *
@@ -470,12 +475,17 @@ public:
 
     // Common Tools
     static void          initInfo();
+
+    template<Symmetry SYM = Symmetry::Asymmetric>
     std::vector<Label *> solve(bool trigger = false);
+    
     std::vector<Label *> solveHeuristic();
     void                 common_initialization();
     void                 setup();
     void                 print_statistics();
     void                 generate_arcs();
+
+    template <Symmetry SYM = Symmetry::Asymmetric>
     void                 set_adjacency_list();
     void                 set_adjacency_list_manual();
 
@@ -944,10 +954,10 @@ public:
     template <Direction D, Stage S>
     bool is_dominated(const Label *new_label, const Label *labels) noexcept;
 
-    template <Stage S>
+    template <Stage S, Symmetry SYM = Symmetry::Asymmetric>
     std::vector<Label *> bi_labeling_algorithm();
 
-    template <Stage S>
+    template <Stage S, Symmetry SYM = Symmetry::Asymmetric>
     void ConcatenateLabel(const Label *L, int &b, Label *&pbest, std::vector<uint64_t> &Bvisited);
 
     template <Direction D>

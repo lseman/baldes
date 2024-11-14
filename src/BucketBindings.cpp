@@ -90,9 +90,9 @@ PYBIND11_MODULE(pybaldes, m) {
         .def(py::init<const std::vector<VRPNode> &, int, int>(), "nodes"_a, "time_horizon"_a, "bucket_interval"_a)
         .def("setup", &BucketGraph::setup)                            // Bind the setup method
         .def("redefine", &BucketGraph::redefine, "bucket_interval"_a) // Bind redefine method
-        .def("solve", &BucketGraph::solve, py::arg("arg0") = false, py::return_value_policy::reference)
+        .def("solve", &BucketGraph::solve<Symmetry::Asymmetric>, py::arg("arg0") = false, py::return_value_policy::reference)
 
-        .def("set_adjacency_list", &BucketGraph::set_adjacency_list) // Bind adjacency list setup
+        .def("set_adjacency_list", &BucketGraph::set_adjacency_list<Symmetry::Asymmetric>) // Bind adjacency list setup
         .def("get_nodes", &BucketGraph::getNodes)                    // Get the nodes in the graph
         .def("print_statistics", &BucketGraph::print_statistics)     // Print stats
         .def("set_duals", &BucketGraph::setDuals, "duals"_a)         // Set dual values
