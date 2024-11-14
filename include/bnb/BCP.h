@@ -306,7 +306,7 @@ public:
                         lhs += node->getVar(i) * coeffs[i];
                     }
 
-                    std::string constraint_name = "SRC(z" + std::to_string(z) + ")";
+                    std::string constraint_name = "SRC_" + std::to_string(z);
                     // constraint_name << "cuts(z" << z << ")";
                     // auto ctr = ;
                     // print cut.rhs
@@ -420,7 +420,7 @@ public:
             }
 
             // Add the constraint to the model
-            auto ctr_name = "RCC_cut_" + std::to_string(rccManager->cut_ctr);
+            auto ctr_name = "RCC_" + std::to_string(rccManager->cut_ctr);
             auto ctr      = cutExpr <= rhsValues[i];
             ctr           = model->addConstr(ctr, ctr_name);
             rccManager->addCut(arcGroups[i], rhsValues[i], ctr);

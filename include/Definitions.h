@@ -32,6 +32,8 @@ struct BucketOptions {
     int three_three_sign = 1;
     int three_five_sign  = 1;
 
+    bool symmetric = false;
+
     std::vector<int>         main_resources = {0};
     std::vector<std::string> resources      = {"time"};
     std::vector<int>         resource_type  = {1};
@@ -48,6 +50,7 @@ enum class CutType { ThreeRow, FourRow, FiveRow };
 enum class BranchingDirection { Greater, Less, Equal };
 enum class CandidateType { Vehicle, Node, Edge, Cluster };
 enum class ProblemType { vrptw, cvrp, evrp };
+enum class Symmetry { Asymmetric, Symmetric };
 
 using Payload = std::optional<std::variant<int, std::pair<int, int>>>; // Optional variant for payload data
                                                                        //

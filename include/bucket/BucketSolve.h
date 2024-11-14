@@ -38,6 +38,7 @@
  * based on the inner objective values and iteration counts.
  *
  */
+template <Symmetry SYM>
 inline std::vector<Label *> BucketGraph::solve(bool trigger) {
     // Initialize the status as not optimal at the start
     status = Status::NotOptimal;
@@ -387,7 +388,7 @@ std::vector<double> BucketGraph::labeling_algorithm() {
  * Performs the bi-labeling algorithm on the BucketGraph.
  *
  */
-template <Stage S>
+template <Stage S, Symmetry SYM>
 std::vector<Label *> BucketGraph::bi_labeling_algorithm() {
 
     // If in Stage 3, apply heuristic fixing based on q_star
@@ -419,21 +420,32 @@ std::vector<Label *> BucketGraph::bi_labeling_algorithm() {
     std::vector<double> backward_cbar(bw_buckets.size());
 
     // Run the labeling algorithm in both directions, but only partially (Full::Partial)
-    run_labeling_algorithms<S, Full::Partial>(forward_cbar, backward_cbar);
+    if constexpr (SYM == Symmetry::Asymmetric) {
+        run_labeling_algorithms<S, Full::Partial>(forward_cbar, backward_cbar);
+    } else {
+        forward_cbar = labeling_algorithm<Direction::Forward, S, Full::Partial>();
+    }
 
     // Acquire the best label from the forward label pool (will later combine with backward)
     auto best_label = label_pool_fw->acquire();
 
-    // Check if the best forward and backward labels can be combined into a feasible solution
-    if (check_feasibility(fw_best_label, bw_best_label)) {
-        // If feasible, compute and combine the best forward and backward labels into one
-        best_label = compute_label<S>(fw_best_label, bw_best_label);
+    if constexpr (SYM == Symmetry::Asymmetric) {
+        // Check if the best forward and backward labels can be combined into a feasible solution
+        if (check_feasibility(fw_best_label, bw_best_label)) {
+            // If feasible, compute and combine the best forward and backward labels into one
+            best_label = compute_label<S>(fw_best_label, bw_best_label);
+        } else {
+            // If not feasible, set the best label to have infinite cost (not usable)
+            best_label->cost          = 0.0;
+            best_label->real_cost     = std::numeric_limits<double>::infinity();
+            best_label->nodes_covered = {};
+        }
     } else {
-        // If not feasible, set the best label to have infinite cost (not usable)
-        best_label->cost          = 0.0;
+        best_label->cost          = best_label->real_cost;
         best_label->real_cost     = std::numeric_limits<double>::infinity();
         best_label->nodes_covered = {};
     }
+
     // Add the best label (combined forward/backward path) to the merged label list
     merged_labels.push_back(best_label);
 
@@ -493,7 +505,7 @@ std::vector<Label *> BucketGraph::bi_labeling_algorithm() {
                     std::memset(Bvisited.data(), 0, Bvisited.size() * sizeof(uint64_t));
 
                     // Concatenate this new label with the best label found so far
-                    ConcatenateLabel<S>(L, b_prime, best_label, Bvisited);
+                    ConcatenateLabel<S,SYM>(L, b_prime, best_label, Bvisited);
                 }
             }
         }
