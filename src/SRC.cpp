@@ -407,8 +407,8 @@ std::pair<bool, bool> LimitedMemoryRank1Cuts::runSeparation(BNBNode *node, std::
     while (it != SRCconstraints.begin()) {
         --it;
         auto constr        = *it;
-        int  current_index = node->get_current_index(constr->get_unique_id());
-
+        //int  current_index = node->get_current_index(constr->get_unique_id());
+        int current_index = constr->index();
         // Get the slack value of the constraint
         double slack = node->getSlack(current_index, solution);
 

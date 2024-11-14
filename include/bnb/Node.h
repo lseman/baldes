@@ -223,9 +223,10 @@ public:
         child->SRCconstraints.reserve(SRCconstraints.size()); // Reserve space if size is known
         child->depth = depth + 1;
 
-        for (baldesCtrPtr constraint : SRCconstraints) {
-            child->SRCconstraints.push_back(constraint->clone()); // Clone the constraint and add to the child node
-        }
+        child->SRCconstraints = child->mip.getSRCconstraints();
+        auto RCCconstraints = child->mip.getRCCconstraints();
+
+        child->rccManager->setCutCtrs(RCCconstraints);
 
         // child->clearSRC();
         child->matrix = matrix;
