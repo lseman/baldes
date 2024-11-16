@@ -224,7 +224,7 @@ std::vector<double> BucketGraph::labeling_algorithm() {
                 for (Label *label : bucket_labels) {
                     if (label->is_extended) { continue; }
                     //  NOTE: double check if this is the best way to handle this
-                    if constexpr (F != Full::PSTEP) {
+                    if constexpr (F != Full::PSTEP && F != Full::TSP) {
                         if constexpr (F == Full::Partial) {
                             if constexpr (D == Direction::Forward) {
                                 if (label->resources[options.main_resources[0]] >
@@ -248,7 +248,7 @@ std::vector<double> BucketGraph::labeling_algorithm() {
                     std::memset(Bvisited.data(), 0, Bvisited.size() * sizeof(uint64_t));
 
                     // Check if the label is dominated by any labels in smaller buckets
-                    if constexpr (F != Full::PSTEP) {
+                    if constexpr (F != Full::TSP) {
                         domin_smaller =
                             DominatedInCompWiseSmallerBuckets<D, S>(label, bucket, c_bar, Bvisited, ordered_sccs);
                     }
@@ -263,7 +263,7 @@ std::vector<double> BucketGraph::labeling_algorithm() {
                             const auto &to_bucket_labels =
                                 buckets[to_bucket].get_labels(); // Get existing labels in the destination bucket
 
-                            if constexpr (F != Full::PSTEP) {
+                            if constexpr (F != Full::PSTEP && F != Full::TSP) {
                                 if constexpr (S == Stage::Four) {
                                     // Track dominance checks for this bucket
                                     if constexpr (D == Direction::Forward) {
@@ -307,7 +307,7 @@ std::vector<double> BucketGraph::labeling_algorithm() {
 
                             if (!dominated) {
                                 // Remove dominated labels from the bucket
-                                if constexpr (S != Stage::Enumerate || F == Full::PSTEP) {
+                                if constexpr (S != Stage::Enumerate) {
                                     std::vector<Label *> labels_to_remove;
                                     for (auto *existing_label : to_bucket_labels) {
                                         if (is_dominated<D, S>(existing_label, new_label)) {
@@ -475,7 +475,7 @@ std::vector<Label *> BucketGraph::bi_labeling_algorithm() {
                 const auto &to_node = arc.to;
 
                 // Skip fixed arcs in Stage 3 if necessary
-                if constexpr (S == Stage::Three) {
+                if constexpr (S == Stage::Three || S == Stage::Eliminate) {
                     if (fixed_arcs[L->node_id][to_node] == 1) {
                         continue; // Skip if the arc is fixed
                     }
@@ -505,7 +505,7 @@ std::vector<Label *> BucketGraph::bi_labeling_algorithm() {
                     std::memset(Bvisited.data(), 0, Bvisited.size() * sizeof(uint64_t));
 
                     // Concatenate this new label with the best label found so far
-                    ConcatenateLabel<S,SYM>(L, b_prime, best_label, Bvisited);
+                    ConcatenateLabel<S, SYM>(L, b_prime, best_label, Bvisited);
                 }
             }
         }
@@ -590,7 +590,7 @@ BucketGraph::Extend(const std::conditional_t<M == Mutability::Mut, Label *, cons
     }
 
     // Check if the arc between initial_node_id and node_id is fixed, and skip if so (in Stage 3)
-    if constexpr (S == Stage::Three) {
+    if constexpr (S == Stage::Three || S == Stage::Eliminate) {
         if constexpr (D == Direction::Forward) {
             if (fixed_arcs[initial_node_id][node_id] == 1) { return std::vector<Label *>(); }
         } else {
@@ -615,13 +615,14 @@ BucketGraph::Extend(const std::conditional_t<M == Mutability::Mut, Label *, cons
     std::vector<double> new_resources(options.resources.size());
 
     int n_visited = 0;
-    if constexpr (F != Full::PSTEP) {
-        // Note: workaround
+    if constexpr (F != Full::TSP) {
+        //  Note: workaround
         size_t N = options.resources.size();
         if (!process_all_resources<D>(new_resources, initial_resources, gamma, VRPNode, N)) {
             return std::vector<Label *>(); // Handle failure case (constraint violation)
         }
-    } else if constexpr (F == Full::PSTEP) {
+    }
+    if constexpr (F == Full::PSTEP || F == Full::TSP) {
         // counter the number of bits set in L_prime->visited_bitmap
         for (size_t i = 0; i < L_prime->visited_bitmap.size(); ++i) {
             n_visited += __builtin_popcountll(L_prime->visited_bitmap[i]);
@@ -715,24 +716,6 @@ BucketGraph::Extend(const std::conditional_t<M == Mutability::Mut, Label *, cons
             new_cost -= arc_dual;
         }
     })
-
-    // #ifdef KP_BOUND
-    //  Apply knapsack bound check in the forward direction (if applicable)
-    //  if constexpr (D == Direction::Forward) {
-    //      auto kpBound = knapsackBound(L_prime);
-    //      //fmt::print("kpBound: {}\n", kpBound);
-    //      if (kpBound < 0.0) {
-    //          return std::vector<Label *>(); // Skip if the knapsack bound is violated
-    //      }
-    //  }
-    //  else {
-    //      auto kpBound = knapsackBound(L_prime);
-    //      //fmt::print("kpBound: {}\n", kpBound);
-    //      if (kpBound < 0.0) {
-    //          return std::vector<Label *>(); // Skip if the knapsack bound is violated
-    //      }
-    //  }
-    // #endif
 
     // Acquire a new label from the pool and initialize it with the new state
     auto new_label = label_pool->acquire();

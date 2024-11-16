@@ -32,7 +32,6 @@
 
 #include "MST.h"
 
-
 /**
  * @brief Represents a bucket in the Bucket Graph.
  * Adds an arc to the bucket graph.
@@ -52,57 +51,6 @@ void BucketGraph::add_arc(int from_bucket, int to_bucket, const std::vector<doub
     }
 }
 
-/**
- * @brief Get the bucket number for a given node and value.
- *
- * This function returns the bucket number for a given node and value in the bucket graph.
- * The bucket graph is represented by the `buckets` vector, which contains intervals of buckets.
- * The direction of the bucket graph is specified by the template parameter `D`.
- */
-/*
-template <Direction D>
-inline int BucketGraph::get_bucket_number(int node, std::vector<double> &resource_values_vec) noexcept {
-    const int num_intervals = MAIN_RESOURCES; // Number of resources
-    auto     &theNode       = nodes[node];    // Get the node
-
-    auto &base_intervals    = assign_buckets<D>(fw_base_intervals, bw_base_intervals);
-    auto &num_buckets_index = assign_buckets<D>(num_buckets_index_fw, num_buckets_index_bw);
-    auto &num_buckets       = assign_buckets<D>(num_buckets_fw, num_buckets_bw);
-
-    int bucket_offset = num_buckets_index[node];
-    int cumulative_base = 1;
-
-    // Precompute base intervals only once
-    std::array<double, MAIN_RESOURCES> node_base_interval;
-    for (int r = 0; r < num_intervals; ++r) {
-        node_base_interval[r] = (theNode.ub[r] - theNode.lb[r]) / intervals[r].interval;
-    }
-
-    for (int r = 0; r < num_intervals; ++r) {
-        double value = roundToTwoDecimalPlaces(resource_values_vec[r]);
-        int i = 0;
-
-        if constexpr (D == Direction::Forward) {
-            // Forward: map value to bucket based on lb
-            i = static_cast<int>((value - theNode.lb[r]) / node_base_interval[r]);
-        } else if constexpr (D == Direction::Backward) {
-            // Backward: map value to bucket based on ub
-            i = static_cast<int>((theNode.ub[r] - value) / node_base_interval[r]);
-        }
-
-        // Bound the index to valid intervals
-        i = std::clamp(i, 0, intervals[r].interval - 1);
-
-        // Update bucket offset and cumulative base
-        bucket_offset += cumulative_base * i;
-        cumulative_base *= intervals[r].interval; // Update base for the next dimension
-    }
-
-    return bucket_offset;
-}
-
-*/
-
 template <Direction D>
 inline int BucketGraph::get_bucket_number(int node, std::vector<double> &resource_values_vec) noexcept {
 
@@ -120,25 +68,6 @@ inline int BucketGraph::get_bucket_number(int node, std::vector<double> &resourc
         val = bw_node_interval_trees[node].query(resource_values_vec);
     }
 
-    auto &buckets   = assign_buckets<D>(fw_buckets, bw_buckets);
-    auto &to_bucket = buckets[val];
-    // check is resources_values_vec[0] is within the bounds of the bucket
-    if (resource_values_vec[0] < to_bucket.lb[0] || resource_values_vec[0] > to_bucket.ub[0]) {
-        std::cerr << "BucketGraph::get_bucket_number: Invalid bucket number: " << val << "for node: " << node
-                  << std::endl;
-    }
-    // print val
-    if constexpr (D == Direction::Forward) {
-        if (val < 0) {
-            std::cerr << "FW BucketGraph::get_bucket_number: Invalid bucket number: " << val << "for node: " << node
-                      << std::endl;
-        }
-    } else {
-        if (val < 0) {
-            std::cerr << "BW BucketGraph::get_bucket_number: Invalid bucket number: " << val << "for node: " << node
-                      << std::endl;
-        }
-    }
     return val;
 }
 
@@ -499,7 +428,7 @@ Label *BucketGraph::get_best_label(const std::vector<int> &topological_order, co
         for (const int bucket : component_buckets) {
             const auto &label = buckets[bucket].get_best_label();
             if (!label) continue;
-
+            // print label->cost
             if (label->cost < best_cost) {
                 best_cost  = label->cost;
                 best_label = label;

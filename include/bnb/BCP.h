@@ -283,7 +283,7 @@ public:
      *
      */
     bool cutHandler(std::shared_ptr<LimitedMemoryRank1Cuts> &r1c, BNBNode *node,
-                    std::vector<baldesCtrPtr > &constraints) {
+                    std::vector<baldesCtrPtr> &constraints) {
         auto &cuts    = r1c->cutStorage;
         bool  changed = false;
 
@@ -443,7 +443,7 @@ public:
         node->optimize();
         relaxed_result = std::numeric_limits<double>::max();
 
-    // check if feasible
+        // check if feasible
         if (node->getStatus() != 2) {
             print_info("Model is infeasible, pruning node.\n");
             node->setPrune(true);
@@ -475,16 +475,16 @@ public:
 
         if (problemType == ProblemType::cvrp) {
             BucketOptions options;
-            options.main_resources         = {0};
-            options.resources              = {"capacity"};
-            options.resource_type = {1};
-            bucket_graph->options          = options;
+            options.main_resources = {0};
+            options.resources      = {"capacity"};
+            options.resource_type  = {1};
+            bucket_graph->options  = options;
         }
 
         bucket_graph->set_distance_matrix(instance.getDistanceMatrix(), 8);
         bucket_graph->branching_duals = branchingDuals;
         bucket_graph->A_MAX           = N_SIZE;
-        bucket_graph->depth = node->depth;
+        bucket_graph->depth           = node->depth;
 
         bucket_graph->topHeurRoutes = node->bestRoutes;
 
@@ -623,7 +623,7 @@ public:
 #endif
 
 #ifdef IPM
-            double d                 = 10;
+            double d               = 10;
             matrix                 = node->extractModelDataSparse();
             double obj_change      = std::abs(lp_obj - inner_obj);
             double adaptive_factor = std::min(1.0, std::max(1e-1, obj_change / std::abs(lp_obj + 1e-6)));
@@ -717,7 +717,7 @@ public:
                     iter_non_improv = 0;
                 }
 #endif
-                lp_obj_old = lp_obj;
+                lp_obj_old               = lp_obj;
                 bucket_graph->relaxation = lp_obj;
                 bucket_graph->augment_ng_memories(solution, allPaths, true, 5, 110, 18, N_SIZE);
                 SRC_MODE_BLOCK( // SRC cuts
@@ -728,7 +728,7 @@ public:
 
                         for (int i = 0; i < SRCconstraints.size(); i++) {
                             auto constr = SRCconstraints[i];
-                            auto index  =  constr->index(); //node->get_current_index(constr->get_unique_id());
+                            auto index  = constr->index(); // node->get_current_index(constr->get_unique_id());
                             // print size of originDuals
                             cutDuals.push_back(originDuals[index]);
                         }
@@ -740,7 +740,7 @@ public:
                     if (rccManager->size() > 0) {
 #ifndef IPM
                         auto arc_duals = rccManager->computeDuals(node);
-#else  
+#else
                     auto arc_duals = rccManager->computeDuals(nodeDuals, node);
 #endif
                         bucket_graph->setArcDuals(arc_duals);

@@ -85,6 +85,10 @@ public:
     void       setPSTEPduals(const PSTEPDuals &arc_duals) { this->pstep_duals = arc_duals; }
     auto       solveTSP(std::vector<std::vector<int>> &paths, std::vector<double> &path_costs, std::vector<int> &firsts,
                         std::vector<int> &lasts, std::vector<std::vector<double>> &cost_matrix, bool first_time = false);
+    auto solveTSPTW(std::vector<std::vector<int>> &paths, std::vector<double> &path_costs, std::vector<int> &firsts,
+                    std::vector<int> &lasts, std::vector<std::vector<double>> &cost_matrix,
+                    std::vector<double> &service_times, std::vector<double> &time_windows_start,
+                    std::vector<double> &time_windows_end, bool first_time = false);
     /**
      * @brief Solves the PSTEP problem and returns a vector of labels representing paths.
      *
@@ -100,6 +104,7 @@ public:
     std::vector<Label *> solvePSTEP(PSTEPDuals &inner_pstep_duals);
 
     std::vector<Label *> solvePSTEP_by_MTZ();
+    std::vector<Label *> solveTSPTW_by_MTZ();
 
     void setOptions(const BucketOptions &options) { this->options = options; }
 
@@ -474,11 +479,11 @@ public:
     BucketGraph(const std::vector<VRPNode> &nodes, std::vector<int> &bounds, std::vector<int> &bucket_intervals);
 
     // Common Tools
-    static void          initInfo();
+    static void initInfo();
 
-    template<Symmetry SYM = Symmetry::Asymmetric>
+    template <Symmetry SYM = Symmetry::Asymmetric>
     std::vector<Label *> solve(bool trigger = false);
-    
+
     std::vector<Label *> solveHeuristic();
     void                 common_initialization();
     void                 setup();
@@ -486,8 +491,8 @@ public:
     void                 generate_arcs();
 
     template <Symmetry SYM = Symmetry::Asymmetric>
-    void                 set_adjacency_list();
-    void                 set_adjacency_list_manual();
+    void set_adjacency_list();
+    void set_adjacency_list_manual();
 
     double knapsackBound(const Label *l);
 
@@ -503,10 +508,11 @@ public:
     void augment_ng_memories(std::vector<double> &solution, std::vector<Path> &paths, bool aggressive, int eta1,
                              int eta2, int eta_max, int nC);
 
-    inline double        getcij(int i, int j) const { 
-        if (i == options.end_depot) {  i = options.depot; }
-        if (j == options.end_depot) {  j = options.depot; }
-        return distance_matrix[i][j]; }
+    inline double getcij(int i, int j) const {
+        // if (i == options.end_depot) { i = options.depot; }
+        // if (j == options.end_depot) { j = options.depot; }
+        return distance_matrix[i][j];
+    }
     void                 calculate_neighborhoods(size_t num_closest);
     std::vector<VRPNode> getNodes() const { return nodes; }
     std::vector<int>     computePhi(int &bucket, bool fw);
@@ -1036,11 +1042,11 @@ public:
     void set_deleted_arcs(const std::vector<std::pair<int, int>> &arcs) {
         size_t num_nodes = nodes.size();
 
-        // Initialize or reset fixed_arcs matrix
-        fixed_arcs.resize(num_nodes);
-        for (auto &row : fixed_arcs) {
-            row.assign(num_nodes, false); // Initialize all arcs as not fixed
-        }
+        // // Initialize or reset fixed_arcs matrix
+        // fixed_arcs.resize(num_nodes);
+        // for (auto &row : fixed_arcs) {
+        //     row.assign(num_nodes, false); // Initialize all arcs as not fixed
+        // }
 
         // Mark each arc in the input list as fixed/deleted
         for (const auto &[from, to] : arcs) {

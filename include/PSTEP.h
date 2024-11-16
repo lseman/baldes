@@ -20,6 +20,7 @@ struct PSTEPDuals {
     ankerl::unordered_dense::map<Arc, double> arcDuals;          // Stores dual values for arcs
     ankerl::unordered_dense::map<int, double> three_two_Duals;   // Stores dual values for nodes
     ankerl::unordered_dense::map<int, double> three_three_Duals; // Stores dual values for nodes
+    ankerl::unordered_dense::map<int, double> time_Duals;        // Stores dual values for nodes
 
     // Set dual values for arcs
     void setArcDualValues(const std::vector<std::pair<Arc, double>> &values) {
@@ -63,6 +64,7 @@ struct PSTEPDuals {
         if (it != three_three_Duals.end()) { return it->second; }
         return 0.0; // Default value if node is not found
     }
+    
 
     void printDuals() {
         fmt::print("Arc duals:\n");

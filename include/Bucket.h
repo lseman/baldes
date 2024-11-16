@@ -521,8 +521,28 @@ struct Bucket {
      *
      */
     Label *get_best_label() {
-        if (labels_vec.empty()) return nullptr;
-        return labels_vec.front();
+        if (is_split) {
+            // Recursively find the best label in each sub-bucket
+            std::vector<Label *> best_labels;
+            for (auto &sub_bucket : sub_buckets) {
+                auto best_label = sub_bucket.get_best_label();
+                if (best_label) { best_labels.push_back(best_label); }
+            }
+
+            // Return the best label from all sub-buckets
+            if (best_labels.empty()) { return nullptr; }
+            return *std::min_element(best_labels.begin(), best_labels.end(),
+                                     [](const Label *a, const Label *b) { return a->cost < b->cost; });
+        } else {
+#ifdef SORTED_LABELS
+            if (labels_vec.empty()) { return nullptr; }
+            return labels_vec[0];
+#else
+            auto min_cost = std::min_element(labels_vec.begin(), labels_vec.end(),
+                                             [](const Label *a, const Label *b) { return a->cost < b->cost; });
+            return min_cost;
+#endif
+        }
     }
 
     [[nodiscard]] bool empty() const { return labels_vec.empty(); }

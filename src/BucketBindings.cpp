@@ -12,6 +12,7 @@
  * Each class is exposed with its constructors, member variables, and member functions.
  * Conditional compilation is used to expose additional fields and methods based on defined macros.
  */
+#include "Definitions.h"
 #include "bucket/BucketGraph.h"
 #include "bucket/BucketSolve.h"
 #include "bucket/BucketUtils.h"
@@ -90,12 +91,13 @@ PYBIND11_MODULE(pybaldes, m) {
         .def(py::init<const std::vector<VRPNode> &, int, int>(), "nodes"_a, "time_horizon"_a, "bucket_interval"_a)
         .def("setup", &BucketGraph::setup)                            // Bind the setup method
         .def("redefine", &BucketGraph::redefine, "bucket_interval"_a) // Bind redefine method
-        .def("solve", &BucketGraph::solve<Symmetry::Asymmetric>, py::arg("arg0") = false, py::return_value_policy::reference)
+        .def("solve", &BucketGraph::solve<Symmetry::Asymmetric>, py::arg("arg0") = false,
+             py::return_value_policy::reference)
 
         .def("set_adjacency_list", &BucketGraph::set_adjacency_list<Symmetry::Asymmetric>) // Bind adjacency list setup
-        .def("get_nodes", &BucketGraph::getNodes)                    // Get the nodes in the graph
-        .def("print_statistics", &BucketGraph::print_statistics)     // Print stats
-        .def("set_duals", &BucketGraph::setDuals, "duals"_a)         // Set dual values
+        .def("get_nodes", &BucketGraph::getNodes)                                          // Get the nodes in the graph
+        .def("print_statistics", &BucketGraph::print_statistics)                           // Print stats
+        .def("set_duals", &BucketGraph::setDuals, "duals"_a)                               // Set dual values
         .def("set_distance_matrix", &BucketGraph::set_distance_matrix, "distance_matrix"_a,
              "n_ng"_a = 8)                           // Set distance matrix
         .def("reset_pool", &BucketGraph::reset_pool) // Reset the label pools
@@ -104,10 +106,12 @@ PYBIND11_MODULE(pybaldes, m) {
         .def("phaseThree", &BucketGraph::run_labeling_algorithms<Stage::Three, Full::Partial>)
         // .def("setPSTEPDuals", &BucketGraph::setPSTEPduals, "duals"_a)
         .def("solvePSTEP_by_MTZ", &BucketGraph::solvePSTEP_by_MTZ)
+        .def("solveTSPTW_by_MTZ", &BucketGraph::solveTSPTW_by_MTZ)
         // .def("solvePSTEP", &BucketGraph::solvePSTEP, py::return_value_policy::reference)
         .def("setOptions", &BucketGraph::setOptions, "options"_a)
         .def("setArcs", &BucketGraph::setManualArcs, "arcs"_a)
-        .def("phaseFour", &BucketGraph::run_labeling_algorithms<Stage::Four, Full::Partial>)
+        .def("phaseFour", &BucketGraph::bi_labeling_algorithm<Stage::Eliminate, Symmetry::Asymmetric>,
+             py::return_value_policy::reference)
         .def(
             "update_ng_neighbors",
             [](BucketGraph &self, const std::vector<std::tuple<int, int>> &conflicts) {

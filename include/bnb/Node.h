@@ -222,6 +222,7 @@ public:
         child->SRCconstraints.clear();
         child->SRCconstraints.reserve(SRCconstraints.size()); // Reserve space if size is known
         child->depth = depth + 1;
+        child->prune = false;
 
         child->SRCconstraints = child->mip.getSRCconstraints();
         auto RCCconstraints = child->mip.getRCCconstraints();
@@ -453,6 +454,10 @@ public:
 
         // Add the constraint to MIP based on the branching direction
         baldesCtrPtr constraint;
+        if (mip.constraint_exists(name)) {
+            constraint = mip.get_constraint(name);
+            return constraint;
+        }
         if (sense == BranchingDirection::Greater) {
             constraint = mip.add_constraint(linExpr, rhs, '>');
             constraint->set_name(name);

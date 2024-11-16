@@ -23,7 +23,7 @@
 
 std::vector<Label *> BucketGraph::solvePSTEP(PSTEPDuals &inner_pstep_duals) {
 
-    const int CHUNK_SIZE = 1;
+    const int CHUNK_SIZE = 10;
 
     std::vector<Label *> all_paths;
     std::vector<double>  all_costs;
@@ -52,8 +52,7 @@ std::vector<Label *> BucketGraph::solvePSTEP(PSTEPDuals &inner_pstep_duals) {
                           for (size_t task_idx = start_idx; task_idx < end_idx; ++task_idx) {
                               auto [i, j] = tasks[task_idx];
                               BucketOptions sub_options;
-
-                              auto sub_bg = BucketGraph(nodes, 10000, 1);
+                              auto sub_bg = BucketGraph(nodes, R_max[0], 20);
                               sub_bg.set_distance_matrix(distance_matrix);
                               sub_options.depot     = i;
                               sub_options.end_depot = j;
@@ -61,17 +60,14 @@ std::vector<Label *> BucketGraph::solvePSTEP(PSTEPDuals &inner_pstep_duals) {
                               sub_options.pstep         = true; // print depot and end_depot
                               sub_options.max_path_size = options.max_path_size;
                               sub_options.min_path_size = options.min_path_size;
-
                               sub_bg.setOptions(sub_options);
                               sub_bg.setPSTEPduals(inner_pstep_duals);
                               sub_bg.setup();
                               sub_bg.reset_pool();
                               sub_bg.mono_initialization();
-
                               // Solve and get the paths
                               std::vector<double> forward_cbar(sub_bg.fw_buckets.size());
-                              forward_cbar =
-                                  sub_bg.labeling_algorithm<Direction::Forward, Stage::Enumerate, Full::PSTEP>();
+                              forward_cbar = sub_bg.labeling_algorithm<Direction::Forward, Stage::Four, Full::PSTEP>();
                               std::vector<Label *> paths;
                               // print paths.size
                               for (auto bucket : std::ranges::iota_view(0, sub_bg.fw_buckets_size)) {
@@ -108,7 +104,86 @@ std::vector<Label *> BucketGraph::solvePSTEP(PSTEPDuals &inner_pstep_duals) {
 
     return all_paths;
 }
+void generateInitialPathsTSPTW(int n, std::vector<std::vector<int>> &paths, std::vector<double> &path_costs,
+                               std::vector<int> &firsts, std::vector<int> &lasts,
+                               const std::vector<std::vector<double>> &cost_matrix,
+                               const std::vector<double> &start_times, const std::vector<double> &end_times,
+                               const std::vector<double> &service_times) {
+    std::vector<bool> visited(n + 1, false); // Increased size to include node 101
+    std::vector<int>  initial_path;
+    int               current_node = 0;
+    double            current_time = 0.0;
+    double            cost         = 0.0;
 
+    // Debug prints
+    fmt::print("Start times[0]: {}, End times[0]: {}\n", start_times[0], end_times[0]);
+    fmt::print("Start times[101]: {}, End times[101]: {}\n", start_times[101], end_times[101]);
+
+    visited[current_node] = true;
+    initial_path.push_back(current_node);
+
+    for (int step = 1; step < n; ++step) {
+        int    nearest_node = -1;
+        double min_cost     = std::numeric_limits<double>::max();
+
+        for (int j = 1; j < n; ++j) {
+            if (!visited[j]) {
+                double travel_cost  = cost_matrix[current_node][j];
+                double arrival_time = current_time + travel_cost;
+
+                fmt::print("Considering node {}: arrival={}, window=[{},{}]\n", j, arrival_time, start_times[j],
+                           end_times[j]);
+
+                if (arrival_time <= end_times[j]) {
+                    double wait_time      = std::max(0.0, start_times[j] - arrival_time);
+                    double total_cost     = travel_cost + wait_time;
+                    double departure_time = std::max(arrival_time, start_times[j]) + service_times[j];
+
+                    if (total_cost < min_cost && departure_time <= end_times[j]) {
+                        nearest_node = j;
+                        min_cost     = total_cost;
+                    }
+                }
+            }
+        }
+
+        if (nearest_node != -1) {
+            fmt::print("Selected node {}\n", nearest_node);
+            visited[nearest_node] = true;
+            current_node          = nearest_node;
+            initial_path.push_back(current_node);
+
+            double travel_cost = cost_matrix[initial_path[step - 1]][current_node];
+            current_time += travel_cost;
+            current_time = std::max(current_time, start_times[current_node]);
+            current_time += service_times[current_node];
+            cost += travel_cost;
+
+            fmt::print("Current time after service: {}\n", current_time);
+        }
+    }
+
+    double return_cost   = cost_matrix[current_node][101];
+    double final_arrival = current_time + return_cost;
+    fmt::print("Final arrival at 101: {}, Window: [{},{}]\n", final_arrival, start_times[101], end_times[101]);
+
+    if (final_arrival <= end_times[101]) {
+        cost += return_cost;
+        initial_path.push_back(101);
+        paths.push_back(initial_path);
+        firsts.push_back(initial_path.front());
+        lasts.push_back(initial_path.back());
+        path_costs.push_back(cost);
+    } else {
+        fmt::print("Path not feasible - violates end time at node 101\n");
+    }
+
+    for (int i = 0; i < paths.size(); ++i) {
+        fmt::print("Path {}: ", i);
+        for (auto node : paths[i]) { fmt::print("{} ", node); }
+        fmt::print("\n");
+    }
+}
 inline void generateInitialPaths(int n, std::vector<std::vector<int>> &paths, std::vector<double> &path_costs,
                                  std::vector<int> &firsts, std::vector<int> &lasts,
                                  const std::vector<std::vector<double>> &cost_matrix) {
@@ -254,6 +329,7 @@ auto BucketGraph::solveTSP(std::vector<std::vector<int>> &paths, std::vector<dou
     }
     modelGRB->update();
     modelGRB->optimize();
+
     if (modelGRB->get(GRB_IntAttr_Status) == GRB_OPTIMAL) {
         fmt::print("Integer solution found with value: {}\n", modelGRB->get(GRB_DoubleAttr_ObjVal));
         for (int i = 0; i < R; ++i) {
@@ -267,109 +343,6 @@ auto BucketGraph::solveTSP(std::vector<std::vector<int>> &paths, std::vector<dou
     }
 
     return std::make_tuple(three_two_duals, three_three_duals, three_five_duals);
-}
-
-inline auto solveTSP2(std::vector<std::vector<int>> &paths, std::vector<double> &path_costs, std::vector<int> &firsts,
-                      std::vector<int> &lasts, std::vector<std::vector<double>> &cost_matrix, bool first_time = false) {
-
-    auto       n     = 10; // Number of nodes
-    MIPProblem model = MIPProblem("tsp", 0, 0);
-    int        p1 = 4, p2 = 4, num_paths = 100;
-    // if (first_time) { generateInitialPaths(n, p1, p2, paths, path_costs, firsts, lasts, cost_matrix, num_paths); }
-
-    // Define variables
-    int                                    R = paths.size(); // Number of p-steps
-    std::vector<baldesVarPtr>              x(R);             // Continuous variables for each p-step
-    std::vector<std::vector<baldesVarPtr>> theta(n, std::vector<baldesVarPtr>(n)); // Binary variables for arcs
-
-    // Create continuous variables x_r for each p-step r
-    for (int r = 0; r < R; ++r) {
-        std::string varname = "x_" + std::to_string(r);
-        x[r]                = model.add_variable(varname, VarType::Continuous, 0.0, 1.0, path_costs[r]);
-    }
-
-    // Create binary variables theta_ij for each arc (i, j)
-    for (int i = 0; i < n; ++i) {
-        for (int j = 0; j < n; ++j) {
-            if (i != j) {
-                std::string varname = "theta_" + std::to_string(i) + "_" + std::to_string(j);
-                theta[i][j]         = model.add_variable(varname, VarType::Binary, 0.0, 1.0, 0.0);
-            }
-        }
-    }
-
-    // Set the objective function: Minimize sum of path costs
-    model.setObjectiveSense(ObjectiveType::Minimize);
-
-    // Constraints (3.14): Ensuring correct entry and exit from nodes
-    for (int i = 1; i < n - 1; ++i) {
-        LinearExpression in_constraint, out_constraint;
-        for (int r = 0; r < R; ++r) {
-            if (firsts[r] == i) in_constraint += x[r];
-            if (lasts[r] == i) out_constraint += x[r];
-        }
-        model.add_constraint(in_constraint == 0, "concat_" + std::to_string(i));
-        model.add_constraint(out_constraint == 2, "visit_once_" + std::to_string(i));
-    }
-
-    // Constraints (3.16): Sub-tour elimination using visit counts
-    for (int i = 1; i < n - 1; ++i) {
-        LinearExpression visit_sum;
-        for (int r = 0; r < R; ++r) { visit_sum += x[r] * (firsts[r] == i ? 1 : lasts[r] == i ? -1 : 0); }
-        model.add_constraint(visit_sum >= 0, "subtour_" + std::to_string(i));
-    }
-
-    // Constraints (3.23): Linking x_r with theta_ij
-    for (int i = 0; i < n; ++i) {
-        for (int j = 0; j < n; ++j) {
-            if (i != j) {
-                LinearExpression arc_sum;
-                for (int r = 0; r < R; ++r) {
-                    // Check if the arc (i, j) belongs to path r
-                    for (int k = 0; k < paths[r].size() - 1; ++k) {
-                        if (paths[r][k] == i && paths[r][k + 1] == j) {
-                            arc_sum += x[r];
-                            break;
-                        }
-                    }
-                }
-                model.add_constraint(arc_sum - theta[i][j] == 0,
-                                     "arc_link_" + std::to_string(i) + "_" + std::to_string(j));
-            }
-        }
-    }
-
-    // Solve the linear relaxation first
-    GRBEnv &env      = GurobiEnvSingleton::getInstance();
-    auto    modelGRB = new GRBModel(model.toGurobiModel(env));
-    modelGRB->set(GRB_IntParam_OutputFlag, 0);
-    modelGRB->optimize();
-
-    if (modelGRB->get(GRB_IntAttr_Status) == GRB_OPTIMAL) {
-        fmt::print("Linear relaxation solved with value: {}\n", modelGRB->get(GRB_DoubleAttr_ObjVal));
-    } else {
-        fmt::print("Linear relaxation not optimal\n");
-    }
-
-    // Convert theta variables to binary and re-solve
-    for (int i = 0; i < n; ++i) {
-        for (int j = 0; j < n; ++j) {
-            if (i != j) {
-                modelGRB->getVarByName("theta_" + std::to_string(i) + "_" + std::to_string(j))
-                    .set(GRB_CharAttr_VType, GRB_BINARY);
-            }
-        }
-    }
-    modelGRB->update();
-    modelGRB->optimize();
-
-    if (modelGRB->get(GRB_IntAttr_Status) == GRB_OPTIMAL) {
-        fmt::print("Integer solution found with value: {}\n", modelGRB->get(GRB_DoubleAttr_ObjVal));
-    } else {
-        fmt::print("Integer solution not optimal\n");
-    }
-
-    return modelGRB->get(GRB_DoubleAttr_ObjVal);
 }
 
 std::vector<Label *> BucketGraph::solvePSTEP_by_MTZ() {
@@ -434,5 +407,232 @@ std::vector<Label *> BucketGraph::solvePSTEP_by_MTZ() {
 
         duals = solveTSP(all_paths, all_costs, all_firsts, all_lasts, distance_matrix);
     }
+    return {};
+}
+
+auto BucketGraph::solveTSPTW(std::vector<std::vector<int>> &paths, std::vector<double> &path_costs,
+                             std::vector<int> &firsts, std::vector<int> &lasts,
+                             std::vector<std::vector<double>> &cost_matrix, std::vector<double> &service_times,
+                             std::vector<double> &time_windows_start, std::vector<double> &time_windows_end,
+                             bool first_time) {
+    auto       n     = cost_matrix.size();
+    MIPProblem model = MIPProblem("tsptw", 0, 0);
+
+    if (first_time) {
+        generateInitialPathsTSPTW(n - 1, paths, path_costs, firsts, lasts, cost_matrix, time_windows_start,
+                                  time_windows_end, service_times);
+    }
+
+    // Variables
+    int                       R = paths.size();
+    std::vector<baldesVarPtr> x(R);     // Binary variables for p-steps
+    std::vector<baldesVarPtr> omega(n); // Continuous variables for accumulated time
+
+    // Create binary variables x_r for each p-step r
+    for (int i = 0; i < R; ++i) {
+        x[i] = model.add_variable("x_" + std::to_string(i), VarType::Binary, 0.0, 1.0, path_costs[i]);
+    }
+
+    // Create continuous variables ω_i for time accumulation
+    for (int i = 0; i < n; ++i) {
+        omega[i] = model.add_variable("omega_" + std::to_string(i), VarType::Continuous, 0.0, 1e8, 0.0);
+    }
+    model.setObjectiveSense(ObjectiveType::Minimize);
+
+    std::vector<baldesCtrPtr> three_two(n);
+    std::vector<baldesCtrPtr> three_three(n);
+    // Constraints (4.11): Flow balance for p-steps
+    for (int i = 1; i < n - 1; ++i) {
+        LinearExpression flow_balance;
+        for (int r = 0; r < R; ++r) {
+            if (firsts[r] == i) flow_balance += x[r];
+            if (lasts[r] == i) flow_balance -= x[r];
+        }
+        three_two[i] = model.add_constraint(flow_balance == 0, "flow_" + std::to_string(i));
+    }
+
+    // Constraints (4.12): Visit each node at most once
+    for (int i = 1; i < n - 1; ++i) {
+        LinearExpression visit_once;
+        for (int r = 0; r < R; ++r) {
+            if (std::find(paths[r].begin(), paths[r].end(), i) != paths[r].end()) { visit_once += x[r]; }
+        }
+        three_three[i] = model.add_constraint(visit_once <= 1, "visit_" + std::to_string(i));
+    }
+
+    // Constraint (4.13): Visit source exactly once
+    LinearExpression source_visit;
+    for (int r = 0; r < R; ++r) {
+        if (firsts[r] == 0) { source_visit += x[r]; }
+    }
+    model.add_constraint(source_visit == 1, "source");
+
+    // Constraints (4.14): Time accumulation with big-M
+    std::vector<baldesCtrPtr>              three_five_constraints;
+    std::vector<std::vector<baldesCtrPtr>> three_five_constraints_matrix(n, std::vector<baldesCtrPtr>(n));
+    for (int i = 0; i < n - 1; ++i) {
+        for (int j = 1; j < n; ++j) {
+            if (i != j) {
+                double           M_ij = 1e8;
+                LinearExpression time_acc;
+                for (int r = 0; r < R; ++r) {
+                    for (size_t k = 0; k < paths[r].size() - 1; ++k) {
+                        if (paths[r][k] == i && paths[r][k + 1] == j) { time_acc += x[r]; }
+                    }
+                }
+                three_five_constraints_matrix[i][j] = model.add_constraint(
+                    omega[j] - omega[i] - (cost_matrix[i][j] + service_times[i]) * time_acc - M_ij * time_acc >= -M_ij,
+                    "time_" + std::to_string(i) + "_" + std::to_string(j));
+            }
+        }
+    }
+
+    // define omega[0] = 0
+
+    // Constraints (4.15): Time window constraints
+    for (int i = 1; i < n - 1; ++i) {
+        LinearExpression node_used;
+        for (int r = 0; r < R; ++r) {
+            if (std::find(paths[r].begin(), paths[r].end(), i) != paths[r].end()) { node_used += x[r]; }
+        }
+        model.add_constraint(omega[i] - time_windows_start[i] * node_used >= 0, "tw_lb_" + std::to_string(i));
+        model.add_constraint(omega[i] - time_windows_end[i] * node_used <= 0, "tw_ub_" + std::to_string(i));
+    }
+
+    // Solve the model
+    IPSolver *ipSolver = new IPSolver();
+    auto      matrix   = model.extractModelDataSparse();
+    ipSolver->run_optimization(matrix, 1e-2);
+
+    // Extract solution and duals
+    auto                             duals = ipSolver->getDuals();
+    std::vector<double>              three_two_duals(n, 0.0);
+    std::vector<double>              three_three_duals(n, 0.0);
+    std::vector<std::vector<double>> three_five_duals(n, std::vector<double>(n + 1, 0.0));
+    for (int i = 1; i < n - 1; ++i) {
+        three_two_duals[i]   = options.three_two_sign * duals[three_two[i]->index()];
+        three_three_duals[i] = options.three_three_sign * duals[three_three[i]->index()];
+        fmt::print("Duals for node {}: 3.2 = {}, 3.3 = {}\n", i, three_two_duals[i], three_three_duals[i]);
+    }
+
+    // Extract duals for three_five constraints
+    for (int i = 0; i < n - 1; ++i) {
+        for (int j = 1; j < n; ++j) {
+            if (i != j) {
+                three_five_duals[i][j] =
+                    options.three_five_sign * (n - 1) * duals[three_five_constraints_matrix[i][j]->index()];
+            }
+        }
+    }
+
+    // Solution output and return
+    fmt::print("LP Objective: {}\n", ipSolver->getObjective());
+
+    GRBEnv &env = GurobiEnvSingleton::getInstance();
+
+    auto modelGRB = new GRBModel(model.toGurobiModel(env));
+    // set model verbose
+    modelGRB->set(GRB_IntParam_OutputFlag, 1);
+    // set model type as 2
+    modelGRB->set(GRB_IntParam_Method, 0);
+
+    modelGRB->update();
+    modelGRB->optimize();
+
+    return std::make_tuple(three_two_duals, three_three_duals, three_five_duals);
+}
+
+std::vector<Label *> BucketGraph::solveTSPTW_by_MTZ() {
+    int JOBS = nodes.size();
+
+    // Initialize containers for storing paths, costs, firsts, and lasts
+    std::vector<std::vector<int>> all_paths;
+    std::vector<double>           all_costs;
+    std::vector<int>              all_firsts;
+    std::vector<int>              all_lasts;
+
+    // extract service time from nodes
+    std::vector<double> service_times;
+    std::vector<double> time_windows_start(JOBS, 0.0);
+    std::vector<double> time_windows_end(JOBS, 10000.0);
+    for (int i = 0; i < JOBS; ++i) {
+        time_windows_start[i] = nodes[i].lb[0];
+        time_windows_end[i]   = nodes[i].ub[0];
+        service_times.push_back(nodes[i].duration);
+    }
+    // Step 1: Solve the initial TSPTW using the previously defined method
+    auto duals = solveTSPTW(all_paths, all_costs, all_firsts, all_lasts, distance_matrix, service_times,
+                            time_windows_start, time_windows_end, true);
+
+    // Step 2: Set up iteration for generating new paths using dual values
+    int max_pstep_iterations = 10;
+    for (int z = 0; z < max_pstep_iterations; ++z) {
+        fmt::print("--------------------------------------\n");
+        fmt::print("Iteration {}\n", z);
+
+        // Extract dual values for constraints
+        auto three_two_duals   = std::get<0>(duals);
+        auto three_three_duals = std::get<1>(duals);
+        auto three_five_duals  = std::get<2>(duals);
+        // auto arrival_time_duals = std::get<3>(duals);
+
+        PSTEPDuals inner_pstep_duals;
+
+        // Convert dual values for constraint (3.32)
+        std::vector<std::pair<int, double>> three_two_tuples;
+        three_two_tuples.reserve(three_two_duals.size());
+        std::transform(three_two_duals.begin(), three_two_duals.end(), std::back_inserter(three_two_tuples),
+                       [index = 0](double value) mutable { return std::make_pair(index++, value); });
+        inner_pstep_duals.setThreeTwoDualValues(std::move(three_two_tuples));
+
+        // Convert dual values for constraint (3.33)
+        std::vector<std::pair<int, double>> three_three_tuples;
+        three_three_tuples.reserve(three_three_duals.size());
+        std::transform(three_three_duals.begin(), three_three_duals.end(), std::back_inserter(three_three_tuples),
+                       [index = 0](double value) mutable { return std::make_pair(index++, value); });
+        inner_pstep_duals.setThreeThreeDualValues(std::move(three_three_tuples));
+
+        // Convert dual values for MTZ constraints (3.34) and time windows (3.35)
+        std::vector<std::pair<std::pair<int, int>, double>> arc_duals_tuples;
+        for (size_t i = 0; i < three_five_duals.size(); ++i) {
+            for (size_t j = 0; j < three_five_duals[i].size(); ++j) {
+                if (i != j) { arc_duals_tuples.emplace_back(std::pair{i, j}, three_five_duals[i][j]); }
+            }
+        }
+        inner_pstep_duals.setArcDualValues(std::move(arc_duals_tuples));
+
+        for (size_t i = 0; i < three_five_duals.size(); ++i) {
+            for (size_t j = 0; j < three_five_duals[i].size(); ++j) {
+                if (i != j) { // Skip diagonal or add specific condition if needed
+                    arc_duals_tuples.emplace_back(std::pair{i, j}, three_five_duals[i][j]);
+                }
+            }
+        }
+        inner_pstep_duals.setArcDualValues(std::move(arc_duals_tuples));
+
+        // Step 3: Solve the subproblem to generate new p-steps
+        fmt::print("Solving PSTEP subproblem\n");
+        auto sub_paths = solvePSTEP(inner_pstep_duals);
+        fmt::print("Subproblem solved\n");
+
+        // Add the new paths to the existing list if valid
+        int paths_added = 0;
+        for (auto path : sub_paths) {
+            if (path->cost >= 0) { continue; }
+            paths_added++;
+            all_paths.push_back(path->nodes_covered);
+            all_costs.push_back(path->real_cost);
+            all_firsts.push_back(path->nodes_covered.front());
+            all_lasts.push_back(path->nodes_covered.back());
+        }
+
+        // If no new paths were added, stop the iteration
+        if (paths_added == 0) { break; }
+
+        // Step 4: Re-solve the TSPTW with the updated set of p-steps
+        duals = solveTSPTW(all_paths, all_costs, all_firsts, all_lasts, distance_matrix, service_times,
+                           time_windows_start, time_windows_end);
+    }
+
     return {};
 }
