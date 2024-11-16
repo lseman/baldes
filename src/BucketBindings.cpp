@@ -135,7 +135,8 @@ PYBIND11_MODULE(pybaldes, m) {
                 for (const auto &arc : arcs) { deleted_arcs.emplace_back(std::get<0>(arc), std::get<1>(arc)); }
                 self.set_deleted_arcs(deleted_arcs);
             },
-            "Set arcs that should be forbidden/deleted from the graph");
+            "Set arcs that should be forbidden/deleted from the graph")
+        .def("reset_fixed_arcs", &BucketGraph::reset_fixed, "Reset all fixed arcs in the graph");
 
     // Expose PSTEPDuals class
     py::class_<PSTEPDuals>(m, "PSTEPDuals")

@@ -69,10 +69,7 @@ public:
 
     ProblemType problemType = ProblemType::vrptw;
 
-    std::vector<std::vector<int>> labels;
-    int                           numConstrs = 0;
-
-    std::vector<Path> toMerge;
+    int numConstrs = 0;
 
 #ifdef EXACT_RCC
     RCCManager rccManager;
@@ -767,7 +764,10 @@ public:
 #ifdef RIH
                 // Adding RIH paths
                 auto rih_paths = ils.get_labels();
-                if (rih_paths.size() > 0) { colAdded += addColumn(node, rih_paths, false); }
+                if (rih_paths.size() > 0) {
+                    auto rih_added = addColumn(node, rih_paths, false);
+                    colAdded += rih_added;
+                }
 #endif
 
 #ifdef SCHRODINGER

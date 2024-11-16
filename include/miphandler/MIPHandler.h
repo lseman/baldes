@@ -18,11 +18,8 @@
 #endif
 
 #include <iostream>
-#include <optional>
-#include <ranges>
 #include <string>
 #include <unordered_map>
-#include <variant>
 #include <vector>
 
 #include "Constraint.h"
@@ -192,20 +189,20 @@ public:
         return clone;
     }
 
-    void reduceByRC(MIPProblem *problem, const std::vector<double> &dual_solution, double keep_percentage = 0.7) {
+    std::vector<int> reduceByRC(const std::vector<double> &dual_solution, double keep_percentage = 0.7) {
         if (keep_percentage <= 0.0 || keep_percentage > 1.0) {
             throw std::invalid_argument("keep_percentage must be between 0 and 1");
         }
 
         // Get all RCs and their corresponding variable indices
         std::vector<std::pair<double, int>> rc_pairs;
-        for (int i = 0; i < problem->getVars().size(); i++) {
-            double rc = std::abs(problem->getRC(i, dual_solution));
+        for (int i = 0; i < getVars().size(); i++) {
+            double rc = getRC(i, dual_solution);
             rc_pairs.push_back({rc, i});
         }
 
         // Sort by absolute RC value in descending order
-        std::sort(rc_pairs.begin(), rc_pairs.end(), [](const auto &a, const auto &b) { return a.first > b.first; });
+        std::sort(rc_pairs.begin(), rc_pairs.end(), [](const auto &a, const auto &b) { return a.first < b.first; });
 
         // Calculate how many variables to keep
         size_t keep_count = static_cast<size_t>(std::ceil(rc_pairs.size() * keep_percentage));
@@ -219,7 +216,12 @@ public:
         std::sort(sorted_indices.begin(), sorted_indices.end(), std::greater<int>());
 
         // Delete variables
-        for (int idx : sorted_indices) { problem->delete_variable(idx); }
+        for (int idx : sorted_indices) { delete_variable(idx); }
+
+        // redo var_name_to_index
+        for (int i = 0; i < variables.size(); ++i) { var_name_to_index[variables[i]->get_name()] = i; }
+
+        return sorted_indices;
     }
 
     // Add a variable to the problem
@@ -365,6 +367,11 @@ public:
                     int bound = std::stoi(parts[2]);
                     print_branching("Branching on vehicle with bound {}\n", bound);
                 }
+                if (parts.size() >= 4 && parts[1] == "cluster") {
+                    int cluster = std::stoi(parts[2]);
+                    int bound   = std::stoi(parts[3]);
+                    print_branching("Branching on cluster {} with bound {}\n", cluster, bound);
+                }
             }
         }
     }
@@ -379,14 +386,6 @@ public:
 
     // Main implementation that does the actual deletion work
     void delete_constraint(int constraint_index) {
-        /*
-        // find the constraint in which the unique_id matches the given constraint_index
-        auto      it               = std::find_if(constraints.begin(), constraints.end(),
-                                                  [constraint_unique_id](const baldesCtrPtr &constraint) {
-                                   return constraint->get_unique_id() == constraint_unique_id;
-                               });
-        const int constraint_index = std::distance(constraints.begin(), it);
-        */
         // Delete the row from the sparse matrix
         sparse_matrix.delete_row(constraint_index);
 
