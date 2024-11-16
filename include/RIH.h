@@ -3,7 +3,6 @@
 #pragma once
 #include "Path.h"
 #include <algorithm>
-#include <functional>
 
 #include "Reader.h"
 
@@ -17,11 +16,8 @@
 #include <exec/task.hpp>
 #include <queue>
 
-#pragma once
 #include <condition_variable>
-#include <exec/task.hpp>
 #include <mutex>
-#include <queue>
 #include <thread>
 #include <vector>
 
@@ -467,11 +463,13 @@ public:
     // Adaptive operator selection
     using OperatorFunc = std::pair<std::vector<int>, std::vector<int>> (IteratedLocalSearch::*)(
         const std::vector<int> &, const std::vector<int> &, int, int);
-    std::vector<OperatorFunc> operators = {
-        &IteratedLocalSearch::cross,         &IteratedLocalSearch::insertion,
-        &IteratedLocalSearch::swap,          &IteratedLocalSearch::relocate_star,
-        &IteratedLocalSearch::enhanced_swap, &IteratedLocalSearch::move_two_clients_reversed,
-        &IteratedLocalSearch::nm_exchange};
+    std::vector<OperatorFunc> operators = {&IteratedLocalSearch::cross,
+                                           &IteratedLocalSearch::insertion,
+                                           &IteratedLocalSearch::swap,
+                                           &IteratedLocalSearch::relocate_star,
+                                           &IteratedLocalSearch::enhanced_swap,
+                                           &IteratedLocalSearch::move_two_clients_reversed,
+                                           &::IteratedLocalSearch::extended_swap_star};
 
     std::vector<double> operator_weights       = {1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0};
     std::vector<double> operator_improvements  = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};

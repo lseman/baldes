@@ -719,6 +719,9 @@ class ColumnElimination:
             # print(f"Fixed arcs: {fixed_arcs}")
             self.graph.set_deleted_arcs(list(fixed_arcs))
 
+            if iteration > 700:
+                form = self.formulate_and_solve_gurobi(fixed_arcs)
+                break
             # Early stopping condition
             if (
                 alpha < 0.01
@@ -729,12 +732,140 @@ class ColumnElimination:
 
         return best_lb, path_sequences
 
+    def formulate_and_solve_gurobi(self, fixed_arcs: List[Tuple[int, int]]):
+        """
+        Formulate and solve the VRPTW problem using Gurobi, excluding fixed arcs (i.e., setting them to 0).
+        """
+        # Initialize the Gurobi model
+        model = Model("VRPTW_Gurobi")
+
+        # Extract necessary problem data
+        distances = self.instance.distances
+        node_demands = [node.demand for node in self.nodes]
+        time_windows = [(node.lb[0], node.ub[0]) for node in self.nodes]
+        vehicle_capacity = self.vehicle_capacity
+        n_nodes = self.n_nodes
+        time_horizon = self.time_horizon
+
+        # Step 1: Define decision variables
+        x = model.addVars(n_nodes, n_nodes, vtype=GRB.BINARY, name="x")
+        arrival_time = model.addVars(
+            n_nodes, vtype=GRB.CONTINUOUS, lb=0, ub=time_horizon, name="arrival_time"
+        )
+        load = model.addVars(
+            n_nodes, vtype=GRB.CONTINUOUS, lb=0, ub=vehicle_capacity, name="load"
+        )
+
+        # Step 2: Set the objective function (minimize total travel distance)
+        model.setObjective(
+            quicksum(
+                distances[i][j] * x[i, j]
+                for i in range(n_nodes)
+                for j in range(n_nodes)
+                if i != j
+            ),
+            GRB.MINIMIZE,
+        )
+
+        # Step 3: Add flow conservation constraints
+        for node in range(1, n_nodes - 1):
+            model.addConstr(
+                quicksum(x[i, node] for i in range(n_nodes) if i != node) == 1,
+                name=f"visit_{node}",
+            )
+            model.addConstr(
+                quicksum(x[node, j] for j in range(n_nodes) if j != node) == 1,
+                name=f"leave_{node}",
+            )
+
+        # Step 4: Add depot flow constraints
+        model.addConstr(
+            quicksum(x[0, j] for j in range(1, n_nodes)) <= self.n_vehicles,
+            name="vehicles_depart",
+        )
+        model.addConstr(
+            quicksum(x[i, 101] for i in range(n_nodes - 1)) == self.n_vehicles,
+            name="vehicles_return",
+        )
+
+        # Step 5: Add capacity constraints
+        for i in range(n_nodes):
+            for j in range(n_nodes):
+                if i != j:
+                    model.addConstr(
+                        load[j]
+                        >= load[i]
+                        + node_demands[j] * x[i, j]
+                        - vehicle_capacity * (1 - x[i, j]),
+                        name=f"load_{i}_{j}",
+                    )
+
+        for node in range(1, n_nodes):
+            model.addConstr(load[node] <= vehicle_capacity, name=f"capacity_{node}")
+
+        # Step 6: Add time window constraints
+        M = time_horizon
+        for i in range(n_nodes):
+            for j in range(n_nodes):
+                if i != j:
+                    travel_time = distances[i][j]
+                    service_time = self.nodes[i].duration
+                    model.addConstr(
+                        arrival_time[j]
+                        >= arrival_time[i]
+                        + service_time
+                        + travel_time
+                        - M * (1 - x[i, j]),
+                        name=f"time_{i}_{j}",
+                    )
+
+        for node in range(1, n_nodes):
+            model.addConstr(
+                arrival_time[node] >= time_windows[node][0], name=f"early_{node}"
+            )
+            model.addConstr(
+                arrival_time[node] <= time_windows[node][1], name=f"late_{node}"
+            )
+
+        # Step 7: Exclude fixed arcs by setting them to 0
+        for i, j in fixed_arcs:
+            if (i, j) in x:
+                model.addConstr(x[i, j] == 0, name=f"fixed_arc_{i}_{j}")
+
+        # Step 8: Set Gurobi parameters
+        model.Params.TimeLimit = 300  # 5-minute time limit
+        model.Params.MIPGap = 0.01  # 1% optimality gap
+        model.Params.Threads = 4  # Use 4 threads for parallel processing
+
+        # Step 9: Optimize the model
+        model.optimize()
+
+        # Step 10: Check for infeasibility and diagnostics
+        if model.status == GRB.INFEASIBLE:
+            print("Model is infeasible. Running diagnostics...")
+            model.computeIIS()
+            model.write("infeasible_model.ilp")
+            return float("inf"), []
+
+        # Step 11: Extract the solution if feasible
+        if model.status == GRB.OPTIMAL or model.status == GRB.TIME_LIMIT:
+            solution_arcs = [
+                (i, j)
+                for i in range(n_nodes)
+                for j in range(n_nodes)
+                if i != j and x[i, j].x > 0.5
+            ]
+            obj_val = model.objVal if model.status == GRB.OPTIMAL else float("inf")
+            return obj_val, solution_arcs
+
+        return float("inf"), []
+
 
 # %%
 # Create instance data
 solomon_instance = InstanceData()
 solomon_instance.read_instance(
-    "../build/instances/C203.txt"
+    "../build/instances/C202.txt"
 )  # Set mtw=True if using multiple time windows
 instance = convert_instance_data(solomon_instance)
 
