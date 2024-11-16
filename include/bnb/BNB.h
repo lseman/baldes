@@ -49,7 +49,7 @@ private:
     BNBNodeSelectionStrategy strategy;
     std::mutex               bestFirstMutex; // Mutex for bestFirstBNBNodes
 
-    std::atomic<double> globalBestObjective{std::numeric_limits<double>::lowest()};
+    std::atomic<double> globalBestObjective{std::numeric_limits<double>::max()};
     std::atomic<bool>   solutionFound{false};
 
     void addBNBNode(BNBNode *&node) {
@@ -117,6 +117,7 @@ public:
                !globalBestObjective.compare_exchange_weak(prevGlobalBest, objectiveValue, std::memory_order_release)) {
             // Repeat until update is successful
         }
+        print_info("Global best: {}\n", globalBestObjective.load(std::memory_order_acquire) / 10);
 
         if ((std::floor(boundValue) == globalBestObjective.load(std::memory_order_acquire)) && boundValue > 0) {
             markSolutionFound(); // If bound equals the best objective, mark solution found
@@ -198,19 +199,21 @@ public:
         while (BNBNode *currentBNBNode = getNextBNBNode()) {
             currentBNBNode->start();
             currentBNBNode->enforceBranching();
-            print_info("Current node depth: {}\n", currentBNBNode->getDepth());
+            print_info("Solving for node {} with depth: {}\n", currentBNBNode->getUUID(), currentBNBNode->getDepth());
 
             problem->evaluate(currentBNBNode);
             double boundValue = problem->bound(currentBNBNode);
             print_info("Bound value: {}\n", boundValue / 10);
 
             if (currentBNBNode->getPrune()) {
-                print_info("Pruned node: {}\n", currentBNBNode->getUUID());
+                print_info("Pruned node (feasibility): {}\n", currentBNBNode->getUUID());
                 continue;
             }
 
-            if (boundValue < globalBestObjective.load()) {
-                print_branching("Pruned node: {}\n", currentBNBNode->getUUID());
+            if (boundValue > globalBestObjective.load()) {
+                print_branching("Pruned node (bound): {}\n", currentBNBNode->getUUID());
+                // print globalBestObjective.load
+                print_branching("Global best: {}\n", globalBestObjective.load() / 10);
                 continue;
             }
 

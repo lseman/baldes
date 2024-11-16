@@ -11,7 +11,7 @@
 </div>
 <br>
 
-**BALDES**: A Bucket Graph Labeling Algorithm for Vehicle Routing
+**BALDES**: A Branch-Cut-and-Price Bucket Graph Labeling Algorithm for Vehicle Routing
 
 <table>
   <tr>
@@ -19,7 +19,7 @@
       <img src="docs/logo.png" alt="BALDES" width="300"/>
     </td>
     <td>
-      BALDES (pronounced /'baw-dɨs/) is a C++ implementation of a Bucket Graph-based labeling algorithm designed to solve the Resource-Constrained Shortest Path Problem (RCSPP), commonly used as a subproblem in state-of-the-art Branch-Cut-and-Price algorithms for various Vehicle Routing Problems (VRPs).
+      BALDES (pronounced /'baw-dɨs/) is a high-performance C++ implementation of a Branch-Cut-and-Price algorithm. It features a custom version of the Bucket Graph-based labeling algorithm tailored to efficiently solve the Resource-Constrained Shortest Path Problem (RCSPP). Currently, BALDES is optimized for tackling two key problem classes: (i) Capacitated Veichle Routing Problem (CVRP) and (ii) Vehicle Routing Problems with Time-Windows (VRPTW).
     </td>
   </tr>
 </table>

@@ -65,7 +65,7 @@ template <typename T, typename = std::enable_if_t<std::is_arithmetic<T>::value>>
 std::vector<std::pair<baldesVarPtr, double>> operator-(const std::vector<std::pair<baldesVarPtr, double>> &terms,
                                                        const std::pair<baldesVarPtr, T>                   &term) {
     auto result = terms;
-    if (term.second != 0.0) { result.push_back({term.first, -static_cast<double>(term.second)}); }
+    if (term.second != 0.0) { result.push_back({term.first, static_cast<double>(-term.second)}); }
     return result;
 }
 
@@ -83,7 +83,7 @@ template <typename T, typename = std::enable_if_t<std::is_arithmetic<T>::value>>
 inline std::vector<std::pair<baldesVarPtr, double>>
 operator-(const std::pair<baldesVarPtr, T> &term, const std::vector<std::pair<baldesVarPtr, double>> &terms) {
     auto result = terms;
-    if (term.second != 0.0) { result.insert(result.begin(), {term.first, -static_cast<double>(term.second)}); }
+    if (term.second != 0.0) { result.insert(result.begin(), {term.first, static_cast<double>(-term.second)}); }
     return result;
 }
 
@@ -93,6 +93,8 @@ LinearExpression                             operator+(const baldesVarPtr &var, 
 LinearExpression                             operator-(const baldesVarPtr &var, const LinearExpression &expr);
 LinearExpression                             operator+(const LinearExpression &expr, const baldesVarPtr &var);
 LinearExpression                             operator-(const LinearExpression &expr, const baldesVarPtr &var);
+LinearExpression                             operator+(const LinearExpression &expr1, const LinearExpression &expr2);
+LinearExpression                             operator-(const LinearExpression &expr1, const LinearExpression &expr2);
 
 inline baldesCtrPtr operator<=(const baldesVarPtr &var, double rhs) {
     LinearExpression expr;
@@ -126,6 +128,25 @@ inline LinearExpression operator+(const std::vector<std::pair<baldesVarPtr, doub
     return result;
 }
 
+// - operator for std::pair<baldesVarPtr, double> and LinearExpression
+inline LinearExpression operator-(const std::pair<baldesVarPtr, double> &term, const LinearExpression &expr) {
+    LinearExpression result = expr;
+    // Add the term with a positive coefficient
+    for (const auto &[var, coeff] : expr.get_terms()) { result.add_term(var, -coeff); }
+    return result;
+}
+
+// - operator for std::vector<std::pair<baldesVarPtr, double>> and LinearExpression
+inline LinearExpression operator-(const std::vector<std::pair<baldesVarPtr, double>> &terms,
+                                  const LinearExpression                             &expr) {
+    LinearExpression result;
+    // Add terms with positive coefficients
+    for (const auto &term : terms) { result.add_term(term.first->get_name(), term.second); }
+    // Subtract the expression
+    for (const auto &[var, coeff] : expr.get_terms()) { result.add_term(var, -coeff); }
+    return result;
+}
+
 // int times LinearExpression
 inline LinearExpression operator*(int coeff, const LinearExpression &expr) {
     LinearExpression result = expr;
@@ -155,18 +176,6 @@ public:
             clone->var_name_to_index[var->get_name()] = newVar->index();
         }
 
-        // // Clone constraints
-        // for (auto constraint : constraints) {
-        //     LinearExpression clonedExpr;
-        //     for (auto &[var_name, coeff] : constraint->get_expression().get_terms()) {
-        //         clonedExpr.add_or_update_term(var_name, coeff);
-        //     }
-        //     baldesCtrPtr newbaldesCtr =
-        //         std::make_shared<baldesCtr>(clonedExpr, constraint->get_rhs(), constraint->get_relation());
-        //     newbaldesCtr->set_index(constraint->index());
-        //     clone->constraints.push_back(newbaldesCtr);
-        //     clone->b_vec.push_back(newbaldesCtr->get_rhs());
-        // }
         for (const auto &constraint : constraints) {
             auto clonedCtr = constraint->clone();
             clone->constraints.push_back(clonedCtr);
@@ -181,6 +190,36 @@ public:
         clone->sparse_matrix = sparse_matrix;
 
         return clone;
+    }
+
+    void reduceByRC(MIPProblem *problem, const std::vector<double> &dual_solution, double keep_percentage = 0.7) {
+        if (keep_percentage <= 0.0 || keep_percentage > 1.0) {
+            throw std::invalid_argument("keep_percentage must be between 0 and 1");
+        }
+
+        // Get all RCs and their corresponding variable indices
+        std::vector<std::pair<double, int>> rc_pairs;
+        for (int i = 0; i < problem->getVars().size(); i++) {
+            double rc = std::abs(problem->getRC(i, dual_solution));
+            rc_pairs.push_back({rc, i});
+        }
+
+        // Sort by absolute RC value in descending order
+        std::sort(rc_pairs.begin(), rc_pairs.end(), [](const auto &a, const auto &b) { return a.first > b.first; });
+
+        // Calculate how many variables to keep
+        size_t keep_count = static_cast<size_t>(std::ceil(rc_pairs.size() * keep_percentage));
+
+        // Create a set of indices to remove (the bottom 30%)
+        ankerl::unordered_dense::set<int> indices_to_remove;
+        for (size_t i = keep_count; i < rc_pairs.size(); i++) { indices_to_remove.insert(rc_pairs[i].second); }
+
+        // Remove variables from highest index to lowest to maintain validity of remaining indices
+        std::vector<int> sorted_indices(indices_to_remove.begin(), indices_to_remove.end());
+        std::sort(sorted_indices.begin(), sorted_indices.end(), std::greater<int>());
+
+        // Delete variables
+        for (int idx : sorted_indices) { problem->delete_variable(idx); }
     }
 
     // Add a variable to the problem
@@ -228,6 +267,20 @@ public:
         } else {
             throw std::out_of_range("Invalid variable index");
         }
+    }
+
+    bool constraint_exists(const std::string &name) {
+        for (const auto &constraint : constraints) {
+            if (constraint->get_name() == name) { return true; }
+        }
+        return false;
+    }
+
+    baldesCtrPtr get_constraint(const std::string &name) {
+        for (const auto &constraint : constraints) {
+            if (constraint->get_name() == name) { return constraint; }
+        }
+        return nullptr;
     }
 
     baldesCtrPtr add_constraint(const LinearExpression &expression, double rhs, char relation) {
@@ -479,7 +532,7 @@ public:
     }
 
     void chgCoeff(baldesCtrPtr constraint, const std::vector<double> &new_coeffs) {
-        //int current_index = get_current_index(constraint->get_unique_id());
+        // int current_index = get_current_index(constraint->get_unique_id());
         int current_index = constraint->index();
         // Change the coefficients for the constraint
         chgCoeff(current_index, new_coeffs);
@@ -647,6 +700,29 @@ public:
 
         // Return the slack: rhs - (dot product of the row and solution)
         return rhs - row_value;
+    }
+
+    double getRC(int col, const std::vector<double> &dual_solution) {
+        // Get the objective coefficient for this variable
+        double obj_coeff = variables[col]->get_objective_coefficient();
+
+        // Calculate the sum of (dual_value * coefficient) for all constraints
+        double dual_sum = 0.0;
+
+        // Iterate through the non-zero elements in COO format
+        for (size_t i = 0; i < sparse_matrix.rows.size(); ++i) {
+            if (sparse_matrix.cols[i] == col) {
+                int    row_index = sparse_matrix.rows[i];   // Get the row index
+                double value     = sparse_matrix.values[i]; // Get the matrix coefficient
+
+                // Multiply the dual variable value by the coefficient and add to sum
+                dual_sum += dual_solution[row_index] * value;
+            }
+        }
+
+        // For minimization problems:
+        // Reduced Cost = objective_coefficient - sum(dual_values * coefficients)
+        return obj_coeff - dual_sum;
     }
 
     std::vector<double> get_c() const {

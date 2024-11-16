@@ -33,53 +33,50 @@ class LinearExpression {
 public:
     LinearExpression() = default;
 
-        // Add a single variable with an implicit coefficient of 1.0
-    LinearExpression& operator+=(const baldesVarPtr& var) {
+    // Add a single variable with an implicit coefficient of 1.0
+    LinearExpression &operator+=(const baldesVarPtr &var) {
         addTerm(var, 1.0);
         return *this;
     }
 
     // Subtract a single variable with an implicit coefficient of -1.0
-    LinearExpression& operator-=(const baldesVarPtr& var) {
+    LinearExpression &operator-=(const baldesVarPtr &var) {
         addTerm(var, -1.0);
         return *this;
     }
 
     // Add a term with a double coefficient
-    LinearExpression& operator+=(const std::pair<baldesVarPtr, double>& term) {
+    LinearExpression &operator+=(const std::pair<baldesVarPtr, double> &term) {
         addTerm(term.first, term.second);
         return *this;
     }
 
     // Subtract a term with a double coefficient
-    LinearExpression& operator-=(const std::pair<baldesVarPtr, double>& term) {
+    LinearExpression &operator-=(const std::pair<baldesVarPtr, double> &term) {
         addTerm(term.first, -term.second);
         return *this;
     }
 
     // Template to handle numeric types (int, double, etc.)
     template <typename T, typename = std::enable_if_t<std::is_arithmetic<T>::value>>
-    LinearExpression& operator+=(const std::pair<baldesVarPtr, T>& term) {
+    LinearExpression &operator+=(const std::pair<baldesVarPtr, T> &term) {
         addTerm(term.first, static_cast<double>(term.second));
         return *this;
     }
 
     // Add multiple terms to the expression (vector of pairs)
-    LinearExpression& operator+=(const std::vector<std::pair<baldesVarPtr, double>>& termsVec) {
-        for (const auto& term : termsVec) {
-            addTerm(term.first, term.second);
-        }
+    LinearExpression &operator+=(const std::vector<std::pair<baldesVarPtr, double>> &termsVec) {
+        for (const auto &term : termsVec) { addTerm(term.first, term.second); }
         return *this;
     }
 
     // Subtract multiple terms from the expression (vector of pairs)
-    LinearExpression& operator-=(const std::vector<std::pair<baldesVarPtr, double>>& termsVec) {
-        for (const auto& term : termsVec) {
-            addTerm(term.first, -term.second);
-        }
+    LinearExpression &operator-=(const std::vector<std::pair<baldesVarPtr, double>> &termsVec) {
+        for (const auto &term : termsVec) { addTerm(term.first, -term.second); }
         return *this;
     }
-    
+
+    ankerl::unordered_dense::map<std::string, double>       &get_terms() { return terms; }
     const ankerl::unordered_dense::map<std::string, double> &get_terms() const { return terms; }
 
     void addTerm(const baldesVarPtr var, double coeff) {
@@ -89,6 +86,20 @@ public:
         if (existing_coeff == 0.0) {
             terms.erase(var->get_name()); // Remove terms that become zero
         }
+    }
+
+    void addTerm(std::string var_name, double coeff) {
+        if (coeff == 0.0) return; // Skip zero coefficients
+        auto &existing_coeff = terms[var_name];
+        existing_coeff += coeff;
+        if (existing_coeff == 0.0) {
+            terms.erase(var_name); // Remove terms that become zero
+        }
+    }
+
+    void change_term(const std::string &var_name, double new_coeff) {
+        terms[var_name] = new_coeff;
+        if (terms[var_name] == 0.0) { terms.erase(var_name); }
     }
 
     void clear_terms() { terms.clear(); }

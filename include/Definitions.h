@@ -19,14 +19,14 @@ struct BucketOptions {
     int end_depot     = N_SIZE - 1;
     int pstep         = false;
     int max_path_size = N_SIZE / 2;
-    int min_path_size = 3;
+    int min_path_size = N_SIZE / 2;
 
     int pstep_depot     = 0;
     int pstep_end_depot = N_SIZE - 1;
 
-    bool manual_arcs = false;
+    bool manual_arcs   = false;
     bool bucket_fixing = true;
-    int  size        = N_SIZE;
+    int  size          = N_SIZE;
 
     int three_two_sign   = 1;
     int three_three_sign = 1;
@@ -41,10 +41,10 @@ struct BucketOptions {
 };
 
 enum class Direction { Forward, Backward };
-enum class Stage { One, Two, Three, Four, Enumerate, Fix };
+enum class Stage { One, Two, Three, Four, Enumerate, Fix, Eliminate };
 enum class ArcType { Node, Bucket, Jump };
 enum class Mutability { Const, Mut };
-enum class Full { Full, Partial, Reverse, PSTEP };
+enum class Full { Full, Partial, Reverse, PSTEP, TSP };
 enum class Status { Optimal, Separation, NotOptimal, Error, Rollback };
 enum class CutType { ThreeRow, FourRow, FiveRow };
 enum class BranchingDirection { Greater, Less, Equal };

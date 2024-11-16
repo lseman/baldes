@@ -55,40 +55,67 @@ void MIPProblem::addVars(const double *lb, const double *ub, const double *obj, 
     }
 }
 
-// Addition of two variables with an implicit coefficient of 1.0
+// Variable-Variable operators - these are correct
 std::vector<std::pair<baldesVarPtr, double>> operator+(const baldesVarPtr &var1, const baldesVarPtr &var2) {
     return {{var1, 1.0}, {var2, 1.0}};
 }
 
-// Subtraction of two variables with coefficients 1.0 and -1.0
 std::vector<std::pair<baldesVarPtr, double>> operator-(const baldesVarPtr &var1, const baldesVarPtr &var2) {
     return {{var1, 1.0}, {var2, -1.0}};
 }
 
-// Addition of a baldesVarPtr with a LinearExpression
+// Variable-Expression operators
 LinearExpression operator+(const baldesVarPtr &var, const LinearExpression &expr) {
     LinearExpression result = expr;
-    result += var;
+    result.addTerm(var, 1.0);
     return result;
 }
 
-// Subtraction of a baldesVarPtr with a LinearExpression
 LinearExpression operator-(const baldesVarPtr &var, const LinearExpression &expr) {
-    LinearExpression result = expr;
-    result -= var;
+    LinearExpression result;
+    result.addTerm(var, 1.0);
+    for (auto &[v, coeff] : expr.get_terms()) {
+        result.addTerm(v, -coeff);
+    }
     return result;
 }
 
-// Addition of a LinearExpression with a baldesVarPtr
+// Expression-Variable operators
 LinearExpression operator+(const LinearExpression &expr, const baldesVarPtr &var) {
     LinearExpression result = expr;
-    result += var;
+    result.addTerm(var, 1.0);
     return result;
 }
 
-// Subtraction of a LinearExpression with a baldesVarPtr
 LinearExpression operator-(const LinearExpression &expr, const baldesVarPtr &var) {
     LinearExpression result = expr;
-    result -= var;
+    result.addTerm(var, -1.0);
     return result;
 }
+
+// Expression-Expression operators
+LinearExpression operator+(const LinearExpression &expr1, const LinearExpression &expr2) {
+    LinearExpression result = expr1;
+    for (auto &[var, coeff] : expr2.get_terms()) {
+        if (result.get_terms().find(var) != result.get_terms().end()) {
+            result.get_terms()[var] += coeff;
+        } else {
+            result.get_terms()[var] = coeff;
+        }
+    }
+    return result;
+}
+
+LinearExpression operator-(const LinearExpression &expr1, const LinearExpression &expr2) {
+    LinearExpression result = expr1;
+    for (auto &[var, coeff] : expr2.get_terms()) {
+        if (result.get_terms().find(var) != result.get_terms().end()) {
+            result.get_terms()[var] -= coeff;
+        } else {
+            result.get_terms()[var] = -coeff;
+        }
+    }
+    return result;
+}
+
+//
