@@ -39,7 +39,9 @@ struct BucketOptions {
     std::vector<int>         resource_type  = {1};
     std::vector<int>         or_resources   = {1};
 
-    bool warm_start = false;
+    int n_warm_start = 10;
+
+    bool warm_start = true;
 
     // Singleton pattern: Get the single instance of BucketOptions
     static BucketOptions &getInstance() {
