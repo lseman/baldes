@@ -93,6 +93,8 @@ PYBIND11_MODULE(pybaldes, m) {
         .def("redefine", &BucketGraph::redefine, "bucket_interval"_a) // Bind redefine method
         .def("solve", &BucketGraph::solve<Symmetry::Asymmetric>, py::arg("arg0") = false,
              py::return_value_policy::reference)
+        .def("extend_path", &BucketGraph::extend_path, "path"_a, "resources"_a,
+             py::return_value_policy::reference) // Bind extend_path method
 
         .def("set_adjacency_list", &BucketGraph::set_adjacency_list<Symmetry::Asymmetric>) // Bind adjacency list setup
         .def("get_nodes", &BucketGraph::getNodes)                                          // Get the nodes in the graph

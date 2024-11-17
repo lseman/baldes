@@ -1,20 +1,10 @@
 # %%
-from collections import defaultdict
 from typing import Any, Dict, Set, Tuple, List, Optional
 from dataclasses import dataclass
-import heapq
-import gurobipy as gp
-from gurobipy import GRB
 import math
-from copy import deepcopy
-from gurobipy import Model, GRB, quicksum
 
-
-import math
-from typing import List
 
 class InstanceData:
-
     def __init__(self):
         self.distance: List[List[float]] = []
         self.travel_cost: List[List[float]] = []
@@ -44,15 +34,15 @@ class InstanceData:
         self.problem_type = "vrptw"
 
     def read_instance(self, file_name: str):
-        with open(file_name, 'r') as file:
+        with open(file_name, "r") as file:
             # Skip the initial 4 lines
             for _ in range(7):
                 next(file)
 
             # Read nV and q values
             line = file.readline().strip()
-            
-            #self.nV, self.q = map(int, line.split())
+
+            # self.nV, self.q = map(int, line.split())
             self.nN = 102  # Assuming N_SIZE = 25
 
             # Initialize arrays based on nN
@@ -68,7 +58,7 @@ class InstanceData:
             i = 0
             for line in file:
                 values = line.split()
-                
+
                 if len(values) < 7:
                     continue  # Skip any incomplete lines
                 self.x_coord[i] = float(values[1])
@@ -89,7 +79,6 @@ class InstanceData:
             self.service_time[self.nN - 1] = self.service_time[0]
             self.n_tw[self.nN - 1] = self.n_tw[0]
 
-
             # Populate distance and travel_cost matrices
             self.distance = [[0.0] * self.nN for _ in range(self.nN)]
             for i in range(self.nN):
@@ -104,40 +93,44 @@ class InstanceData:
             self.travel_cost = self.distance
 
             self.q = 700
-            
+
             # Calculate T_max, T_avg, and demand_sum
             self.T_max = max(self.window_close) if self.window_close else 0.0
-            self.T_avg = sum(self.window_close[i] - self.window_open[i] for i in range(1, self.nN - 1)) / (self.nN - 2)
-            self.demand_sum = sum(self.demand[1:self.nN - 1])
-
-            
+            self.T_avg = sum(
+                self.window_close[i] - self.window_open[i]
+                for i in range(1, self.nN - 1)
+            ) / (self.nN - 2)
+            self.demand_sum = sum(self.demand[1 : self.nN - 1])
 
 
 @dataclass(frozen=True, order=True)
 class State:
     """Represents a state in the dynamic program"""
+
     no_good: frozenset
     weight: int
     location: int
     time: float  # Added time attribute to handle time windows
-    
+
     def __hash__(self):
         return hash((self.no_good, self.weight, self.location, self.time))
 
 
-
 # %%
 import numpy as np
-@dataclass 
+
+
+@dataclass
 class VRPTWInstance:
     """VRPTW problem instance data"""
+
     num_nodes: int
-    demands: np.ndarray  
+    demands: np.ndarray
     time_windows: np.ndarray
     distances: np.ndarray
     capacities: float
     service_times: np.ndarray
-    
+
     def get_time_horizon(self) -> float:
         return np.max(self.time_windows[:, 1])
 
@@ -147,13 +140,10 @@ def convert_instance_data(instance_data: InstanceData) -> VRPTWInstance:
     return VRPTWInstance(
         num_nodes=instance_data.nN,
         demands=np.array(instance_data.demand),
-        time_windows=np.column_stack([
-            instance_data.window_open,
-            instance_data.window_close
-        ]),
+        time_windows=np.column_stack(
+            [instance_data.window_open, instance_data.window_close]
+        ),
         distances=np.array(instance_data.distance),
         capacities=instance_data.q,
-        service_times=np.array(instance_data.service_time)
+        service_times=np.array(instance_data.service_time),
     )
-
-

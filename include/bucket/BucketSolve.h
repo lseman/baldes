@@ -670,6 +670,7 @@ BucketGraph::Extend(const std::conditional_t<M == Mutability::Mut, Label *, cons
     }
 #endif
 
+    // print initial_node_id and node_id
     // Compute travel cost between the initial and current nodes
     const double travel_cost = getcij(initial_node_id, node_id);
     double       new_cost    = 0.0;

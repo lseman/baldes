@@ -35,6 +35,7 @@ struct Label {
     std::vector<int>           nodes_covered = {}; // Add nodes_covered to Label
     int                        node_id       = -1; // Add node_id to Label
     Label                     *parent        = nullptr;
+    bool                       fresh         = true;
     SRC_MODE_BLOCK(std::vector<int> SRCmap;)
     // uint64_t             visited_bitmap; // Bitmap for visited nodes
     std::array<uint64_t, num_words> visited_bitmap = {0};
@@ -69,10 +70,10 @@ struct Label {
      *
      */
     inline void reset() {
-        this->vertex    = -1;
-        this->cost      = 0.0;
-        this->resources = {};
-        this->node_id      = -1;
+        this->vertex      = -1;
+        this->cost        = 0.0;
+        this->resources   = {};
+        this->node_id     = -1;
         this->real_cost   = 0.0;
         this->parent      = nullptr;
         this->is_extended = false;

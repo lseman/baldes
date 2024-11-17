@@ -2,24 +2,18 @@
 from collections import defaultdict
 from typing import Any, Dict, Set, Tuple, List, Optional
 from dataclasses import dataclass
-import heapq
 import gurobipy as gp
 from gurobipy import GRB
-import math
-from copy import deepcopy
 from gurobipy import Model, GRB, quicksum
 
-
-import math
-from typing import List
 
 from reader import *
 from auxiliar import *
 
 import numpy as np
-from typing import List, Tuple, Dict, Set
 
 import sys
+import random
 
 sys.path.append("../build")
 import pybaldes as baldes
@@ -42,6 +36,7 @@ class ColumnElimination:
         self.vehicle_capacity = vehicle_capacity
         self.n_vehicles = n_vehicles
         self.instance = instance
+        self.column_pool = ColumnPool()
 
         # Initialize baldes components
         self.vrp_nodes = nodes
@@ -63,26 +58,81 @@ class ColumnElimination:
         self.current_lb = float("-inf")
 
     def detect_conflict_patterns(self, conflict_path: List[int]):
-        """Enhanced conflict pattern detection with more sophisticated patterns"""
-        # Check for simple cycles first
-        cycle = self._detect_cycle(conflict_path)
-        if cycle:
-            return {"type": "cycle", "nodes": cycle}
+        """
+        Enhanced conflict pattern detection that identifies root causes and minimal subsequences.
+        """
+        conflict_info = {
+            "type": None,
+            "subsequence": None,
+            "root_cause": None,
+            "resources": None,
+        }
 
-        # Check for capacity violations with subsequence identification
-        capacity_violation = self._detect_capacity_violation(conflict_path)
-        if capacity_violation:
-            return {"type": "capacity", "nodes": capacity_violation}
+        # 1. Check for minimal capacity violations
+        current_load = 0
+        for i, node in enumerate(conflict_path):
+            current_load += self.nodes[node].demand
+            if current_load > self.vehicle_capacity:
+                # Find minimal subsequence causing violation
+                min_seq_start = i
+                min_load = self.nodes[node].demand
+                while (
+                    min_seq_start > 0
+                    and current_load - min_load > self.vehicle_capacity
+                ):
+                    min_seq_start -= 1
+                    min_load += self.nodes[conflict_path[min_seq_start]].demand
 
-        # Check time window violations with slack analysis
-        time_violation = self._detect_time_window_violation(conflict_path)
-        if time_violation:
-            return {"type": "time_window", "nodes": time_violation}
+                conflict_info.update(
+                    {
+                        "type": "capacity",
+                        "subsequence": conflict_path[min_seq_start : i + 1],
+                        "root_cause": f"Capacity exceeded: {current_load} > {self.vehicle_capacity}",
+                        "resources": {"load": current_load},
+                    }
+                )
+                return conflict_info
 
-        # Check for resource synchronization violations
-        sync_violation = self._detect_sync_violation(conflict_path)
-        if sync_violation:
-            return {"type": "synchronization", "nodes": sync_violation}
+        # 2. Check for minimal time window violations
+        current_time = 0
+        min_slack = float("inf")
+        critical_node = None
+
+        for i in range(len(conflict_path) - 1):
+            current_node = conflict_path[i]
+            next_node = conflict_path[i + 1]
+
+            if i > 0:
+                current_time += self.nodes[current_node].duration
+
+            travel_time = self.calculate_travel_time(current_node, next_node)
+            arrival_time = current_time + travel_time
+
+            # Track minimum slack
+            slack = self.nodes[next_node].ub[0] - arrival_time
+            if slack < min_slack:
+                min_slack = slack
+                critical_node = next_node
+
+            if arrival_time > self.nodes[next_node].ub[0]:
+                conflict_info.update(
+                    {
+                        "type": "time_window",
+                        "subsequence": [current_node, next_node],
+                        "root_cause": (
+                            f"Time window violation at node {next_node}: "
+                            f"Arrival {arrival_time} > Latest {self.nodes[next_node].ub[0]}"
+                        ),
+                        "resources": {
+                            "arrival_time": arrival_time,
+                            "latest_time": self.nodes[next_node].ub[0],
+                            "slack": min_slack,
+                        },
+                    }
+                )
+                return conflict_info
+
+            current_time = max(arrival_time, self.nodes[next_node].lb[0])
 
         return None
 
@@ -148,12 +198,6 @@ class ColumnElimination:
 
         return None
 
-    def _detect_sync_violation(self, path: List[int]) -> Optional[List[int]]:
-        """Detect violations of resource synchronization constraints"""
-        # This would be specific to problems with synchronization requirements
-        # For basic VRPTW we return None
-        return None
-
     def refine_conflict_by_pattern(self, conflict: Dict):
         """Enhanced conflict refinement based on violation patterns"""
         if conflict["type"] == "cycle":
@@ -193,50 +237,138 @@ class ColumnElimination:
                         if self._would_cause_similar_violation(n1, n2, arrival_time):
                             self.graph.set_deleted_arcs([(n1, n2)])
 
-        elif conflict["type"] == "synchronization":
-            # Handle synchronization-specific refinements
-            pass
+    def is_path_feasible(self, path: List[int]) -> bool:
+        """Check if a path is feasible in the original problem"""
+        current_load = 0
+        for i, node_id in enumerate(path):
+            current_load += self.nodes[node_id].demand
+            if current_load > self.vehicle_capacity:
+                return False
 
-    def _calculate_arrival_time(self, sequence: List[int]) -> float:
-        """Calculate arrival time at last node in sequence"""
         current_time = 0
-        for i in range(len(sequence) - 1):
-            if i > 0:
-                current_time += self.nodes[sequence[i]].duration
-            current_time += self.calculate_travel_time(sequence[i], sequence[i + 1])
-            current_time = max(current_time, self.nodes[sequence[i + 1]].lb[0])
-        return current_time
+        for i in range(len(path) - 1):
+            current_node = path[i]
+            next_node = path[i + 1]
 
-    def _would_cause_similar_violation(
-        self, node1: int, node2: int, critical_time: float
-    ) -> bool:
-        """Check if arc would cause similar timing violation"""
-        travel_time = self.calculate_travel_time(node1, node2)
-        earliest_arrival = (
-            self.nodes[node1].lb[0] + self.nodes[node1].duration + travel_time
-        )
-        return earliest_arrival > self.nodes[node2].ub[0]
+            if i > 0:
+                current_time += self.nodes[current_node].duration
+
+            travel_time = self.calculate_travel_time(current_node, next_node)
+            current_time += travel_time
+
+            if current_time > self.nodes[next_node].ub[0]:
+                return False
+
+            current_time = max(current_time, self.nodes[next_node].lb[0])
+
+        if path[-1] != 0:
+            final_travel = self.calculate_travel_time(path[-1], 0)
+            final_time = current_time + self.nodes[path[-1]].duration + final_travel
+            if final_time > self.nodes[0].ub[0]:
+                return False
+
+        return True
 
     def refine_conflict(self, conflict_path: List[int]):
-        """Enhanced conflict refinement with pattern detection"""
-        conflict = self.detect_conflict_patterns(conflict_path)
-        if conflict:
-            self.refine_conflict_by_pattern(conflict)
-        else:
-            # Fallback to original refinement for other cases
-            s_curr = 0
-            for j in range(1, len(conflict_path)):
-                next_node = conflict_path[j]
-                valid_transitions = self.find_valid_transitions_to_state(
-                    conflict_path[:j]
-                )
-                if not any(
-                    self.is_subsequence_feasible(trans + [next_node], next_node)
-                    for trans in valid_transitions
-                ):
-                    self.graph.set_deleted_arcs([(conflict_path[j - 1], next_node)])
-                    return
-                s_curr = next_node
+        """
+        Enhanced conflict refinement that better handles different types of conflicts
+        and their root causes.
+        """
+        # First try to detect specific conflict patterns
+        conflict_info = self.detect_conflict_patterns(conflict_path)
+        if conflict_info:
+            print(f"Detected conflict: {conflict_info}")
+            self.refine_by_conflict_type(conflict_info)
+            return
+
+        # Fallback to general refinement algorithm
+        for j in range(1, len(conflict_path)):
+            prefix = conflict_path[:j]
+            next_node = conflict_path[j]
+
+            print(f"Analyzing prefix {prefix} → {next_node}")
+
+            # Find all valid transitions to current state
+            valid_transitions = self.find_valid_transitions_to_state(prefix)
+
+            if not valid_transitions:
+                print(f"No valid transitions found for prefix {prefix}")
+                self.graph.set_deleted_arcs([(prefix[-1], next_node)])
+                return
+
+            # Check if any valid transition can be feasibly extended
+            is_extension_feasible = False
+            for trans in valid_transitions:
+                extended = trans + [next_node]
+                if self.is_subsequence_feasible(extended, next_node):
+                    is_extension_feasible = True
+                    break
+
+            if not is_extension_feasible:
+                print(f"No feasible extension found from {prefix[-1]} to {next_node}")
+                print(f"Valid transitions were: {valid_transitions}")
+                self.graph.set_deleted_arcs([(prefix[-1], next_node)])
+                return
+
+    def refine_by_conflict_type(self, conflict_info: dict):
+        """
+        Apply specific refinement strategies based on the type of conflict.
+        """
+        if conflict_info["type"] == "capacity":
+            self._refine_capacity_conflict(conflict_info)
+        elif conflict_info["type"] == "time_window":
+            self._refine_time_window_conflict(conflict_info)
+        # Add other conflict types as needed
+
+    def _refine_capacity_conflict(self, conflict_info: dict):
+        """
+        Refined strategy for capacity conflicts - remove arcs that would
+        lead to similar violations.
+        """
+        seq = conflict_info["subsequence"]
+        total_load = sum(self.nodes[node].demand for node in seq)
+
+        # Remove arcs that would lead to similar overloads
+        arcs_to_remove = []
+        for i in range(len(seq) - 1):
+            accumulated_load = sum(self.nodes[node].demand for node in seq[i:])
+            if accumulated_load > self.vehicle_capacity:
+                arcs_to_remove.append((seq[i], seq[i + 1]))
+
+        if arcs_to_remove:
+            print(
+                f"Removing arcs that would cause capacity violations: {arcs_to_remove}"
+            )
+            self.graph.set_deleted_arcs(arcs_to_remove)
+
+    def _refine_time_window_conflict(self, conflict_info: dict):
+        """
+        Refined strategy for time window conflicts - remove arcs that would
+        lead to similar timing violations.
+        """
+        seq = conflict_info["subsequence"]
+        arrival_time = conflict_info["resources"]["arrival_time"]
+        latest_time = conflict_info["resources"]["latest_time"]
+
+        # Remove similar problematic arcs
+        arcs_to_remove = []
+        for i in range(len(seq) - 1):
+            current_node, next_node = seq[i], seq[i + 1]
+            travel_time = self.calculate_travel_time(current_node, next_node)
+            service_time = self.nodes[current_node].duration
+
+            # If minimal time to reach next node exceeds its time window
+            if (
+                self.nodes[current_node].lb[0] + service_time + travel_time
+                > self.nodes[next_node].ub[0]
+            ):
+                arcs_to_remove.append((current_node, next_node))
+
+        if arcs_to_remove:
+            print(
+                f"Removing arcs that would cause time window violations: {arcs_to_remove}"
+            )
+            self.graph.set_deleted_arcs(arcs_to_remove)
 
     def is_subsequence_feasible(self, path: List[int], next_node: int) -> bool:
         """
@@ -281,41 +413,104 @@ class ColumnElimination:
 
     def find_valid_transitions_to_state(self, prefix: List[int]) -> List[List[int]]:
         """
-        Find all valid transitions from root to the current state that could be
-        part of a feasible solution. This implements the S^- set from Algorithm 1.
+        Enhanced implementation of S^- set from Algorithm 1. This method finds all valid
+        transitions that could lead to the current state, considering problem constraints.
         """
         valid_transitions = []
 
-        def is_valid_transition(trans):
-            # Check capacity
-            current_load = 0
-            current_time = 0
+        def explore_transitions(current_path, current_load, current_time):
+            """
+            Recursively explore valid transitions using the bucket graph.
+            """
+            print(f"Exploring transitions from path: {current_path}")
 
-            for i in range(len(trans) - 1):
-                node = trans[i]
-                next_node = trans[i + 1]
+            # Package current state information
+            resources = [current_time]  # Current implementation uses time as resource
 
-                current_load += self.nodes[node].demand
-                if current_load > self.vehicle_capacity:
-                    return False
+            # Get extensions from bucket graph
+            new_paths = self.graph.extend_path(current_path, resources)
+            if not new_paths:
+                print(f"No extensions found from {current_path}")
+                return
 
-                travel_time = self.calculate_travel_time(node, next_node)
-                service_time = self.nodes[node].duration
-                current_time = max(
-                    current_time + travel_time + service_time,
-                    self.nodes[next_node].lb[0],
-                )
+            # Process and validate each extension
+            for path in new_paths:
+                path_nodes = path.nodes_covered
+                # print(f"Validating potential path: {path_nodes}")
 
-                if current_time > self.nodes[next_node].ub[0]:
-                    return False
+                # Validate complete path
+                valid, diagnostics = self.validate_path_with_diagnostics(path_nodes)
 
-            return True
+                if valid:
+                    # print(f"Found valid transition: {path_nodes}")
+                    valid_transitions.append(path_nodes)
+                    # Note: recursive exploration handled by bucket graph
+                else:
+                    print(f"Invalid path: {path_nodes}, Reason: {diagnostics}")
 
-        # Start with the prefix and try to find other valid paths
-        if is_valid_transition(prefix):
-            valid_transitions.append(prefix)
+        # Initialize from prefix if provided
+        if prefix:
+            initial_state = self.calculate_initial_state(prefix)
+            print(
+                f"Starting exploration from prefix {prefix} with state {initial_state}"
+            )
+
+            # Add prefix itself if valid
+            if self.is_path_feasible(prefix):
+                valid_transitions.append(prefix)
+
+            # Explore further transitions
+            explore_transitions(prefix, initial_state["load"], initial_state["time"])
 
         return valid_transitions
+
+    def calculate_initial_state(self, path: List[int]) -> dict:
+        """Calculate initial state values for a given path."""
+        initial_load = sum(self.nodes[node].demand for node in path)
+        initial_time = 0
+
+        # Calculate cumulative time including travel and service
+        for i in range(len(path) - 1):
+            current_node = path[i]
+            next_node = path[i + 1]
+            if i > 0:
+                initial_time += self.nodes[current_node].duration
+            travel_time = self.calculate_travel_time(current_node, next_node)
+            initial_time += travel_time
+            initial_time = max(initial_time, self.nodes[next_node].lb[0])
+
+        return {"load": initial_load, "time": initial_time}
+
+    def validate_path_with_diagnostics(self, path: List[int]) -> Tuple[bool, str]:
+        """
+        Validate a path and return detailed diagnostics about any violations.
+        """
+        # Check load constraints
+        current_load = sum(self.nodes[node].demand for node in path)
+        if current_load > self.vehicle_capacity:
+            return False, f"Capacity exceeded: {current_load} > {self.vehicle_capacity}"
+
+        # Check time windows
+        current_time = 0
+        for i in range(len(path) - 1):
+            current_node = path[i]
+            next_node = path[i + 1]
+
+            if i > 0:
+                current_time += self.nodes[current_node].duration
+
+            travel_time = self.calculate_travel_time(current_node, next_node)
+            arrival_time = current_time + travel_time
+
+            if arrival_time > self.nodes[next_node].ub[0]:
+                return False, (
+                    f"Time window violated at node {next_node}: "
+                    f"Arrival {arrival_time} > Latest {self.nodes[next_node].ub[0]}"
+                )
+
+            current_time = max(arrival_time, self.nodes[next_node].lb[0])
+
+        return True, "Path is valid"
 
     def calculate_travel_time(self, node1: int, node2: int) -> float:
         if node1 == 101:
@@ -465,7 +660,7 @@ class ColumnElimination:
 
     def fix_arcs(
         self,
-        best_ub: float,
+        upper_bound: float,
         duals: List[float],
         node_demands: List[float],
         time_windows: List[Tuple[float, float]],
@@ -473,138 +668,123 @@ class ColumnElimination:
         current_paths: List[List[int]],
     ) -> Set[Tuple[int, int]]:
         """
-        Conservative arc fixing for VRPTW using stability checks, critical arc detection,
-        and path-based analysis to avoid fixing essential arcs.
+        Arc fixing based on the paper's approach using:
+        - Shortest path calculations with reduced costs
+        - Dual values for computing reduced costs
+        - Upper and lower bounds for fixing criterion
         """
         fixed_arcs = set()
 
-        # Calculate path-based statistics and node potentials
-        path_stats = {
-            "avg_cost": 0,
-            "avg_load": 0,
-            "avg_service_time": 0,
-            "min_service_time": float("inf"),
-            "avg_slack": 0,
-        }
-        total_paths = len(current_paths)
-        node_potentials = [0.0] * self.n_nodes
+        # For each arc (v1, v2), calculate:
+        # sp↓v1 + rc(v1,v2) + sp↑v2
+        # where sp↓v1 is shortest path from root to v1
+        # and sp↑v2 is shortest path from v2 to terminal
 
-        if total_paths > 0:
-            # Calculate path statistics and node potentials
-            for path in current_paths:
-                for i in range(len(path) - 1):
-                    node1, node2 = path[i], path[i + 1]
-                    path_stats["avg_cost"] += distances[node1][node2]
-                    path_stats["avg_load"] += self.nodes[node1].demand
-                    service_time = self.nodes[node1].duration
-                    path_stats["avg_service_time"] += service_time
-                    path_stats["min_service_time"] = min(
-                        path_stats["min_service_time"], service_time
-                    )
+        # Calculate shortest paths from root to all nodes using reduced costs
+        sp_down = self.calculate_shortest_paths_from_root(duals, distances)
 
-                    # Calculate node potentials based on path position
-                    position_weight = 1.0 - (abs(i - len(path) / 2) / (len(path) / 2))
-                    node_potentials[node1] += distances[node1][node2] * position_weight
+        # Calculate shortest paths from all nodes to terminal using reduced costs
+        sp_up = self.calculate_shortest_paths_to_terminal(duals, distances)
 
-            path_stats["avg_cost"] /= total_paths
-            path_stats["avg_load"] /= total_paths
-            path_stats["avg_service_time"] /= total_paths
-
-        # Initialize historical reduced costs if not already present
-        if not hasattr(self, "arc_reduced_costs"):
-            self.arc_reduced_costs = defaultdict(list)
-
-        # Parameters for arc fixing
-        arc_fix_threshold = 0.9
-        min_fix_iterations = 5
-        max_arcs_to_fix = max(1, int(0.05 * len(distances) * len(distances[0])))
-
-        arc_candidates = []
+        # Get current lower bound from dual solution
+        v_lambda = sum(duals[i - 1] for i in range(1, self.n_nodes - 1))
 
         for i in range(1, self.n_nodes - 1):
             for j in range(1, self.n_nodes - 1):
                 if i != j:
-                    # Step 1: Calculate basic reduced cost
-                    reduced_cost = distances[i][j] - duals[i - 1] - duals[j - 1]
+                    # Calculate reduced cost for arc (i,j)
+                    rc = distances[i][j] - duals[i - 1] - duals[j - 1]
 
-                    # Enhanced reduced cost calculation
-                    early_i, late_i = time_windows[i]
-                    early_j, late_j = time_windows[j]
-                    travel_time = distances[i][j]
-                    service_time = self.nodes[i].duration
+                    # Calculate complete path cost through this arc
+                    path_cost = v_lambda + sp_down[i] + rc + sp_up[j]
 
-                    # Add capacity-based penalty
-                    remaining_capacity = (
-                        self.vehicle_capacity - node_demands[i] - node_demands[j]
-                    )
-                    if remaining_capacity < 0:
-                        reduced_cost += float("inf")
-                    else:
-                        reduced_cost += (
-                            max(
-                                0,
-                                (node_demands[i] + node_demands[j]) / remaining_capacity
-                                - 1,
-                            )
-                            * path_stats["avg_load"]
-                        )
-
-                    # Add time window compatibility penalty
-                    if early_i + service_time + travel_time > late_j:
-                        reduced_cost += float("inf")
-                    else:
-                        time_window_slack = late_j - (
-                            early_i + service_time + travel_time
-                        )
-                        if time_window_slack < 0:
-                            reduced_cost += float("inf")
-                        else:
-                            reduced_cost += (
-                                max(
-                                    0,
-                                    path_stats["avg_slack"] / (time_window_slack + 1e-6)
-                                    - 1,
-                                )
-                                * path_stats["avg_cost"]
-                            )
-
-                    # Add node potential penalty
-                    reduced_cost += (
-                        abs(node_potentials[i] - node_potentials[j])
-                        * path_stats["avg_cost"]
-                    )
-
-                    # Track historical reduced costs
-                    self.arc_reduced_costs[(i, j)].append(reduced_cost)
-
-                    # Use moving average of reduced costs over recent iterations
-                    if len(self.arc_reduced_costs[(i, j)]) > min_fix_iterations:
-                        avg_rc = (
-                            sum(self.arc_reduced_costs[(i, j)][-min_fix_iterations:])
-                            / min_fix_iterations
-                        )
-                    else:
-                        avg_rc = reduced_cost
-
-                    # Check if the arc is critical based on paths and time windows
-                    is_critical_arc = False
-                    for path in current_paths:
-                        if (i, j) in zip(path, path[1:]):
-                            is_critical_arc = True
-                            break
-                    if early_i + service_time > late_i or travel_time > late_j:
-                        is_critical_arc = True
-
-                    # Add to candidates if it's not critical and has a high average reduced cost
-                    if not is_critical_arc and avg_rc >= best_ub * arc_fix_threshold:
-                        arc_candidates.append((i, j, avg_rc))
-
-        # Sort arcs by reduced cost in descending order and fix a limited number
-        arc_candidates.sort(key=lambda x: x[2], reverse=True)
-        for arc in arc_candidates[:max_arcs_to_fix]:
-            fixed_arcs.add((arc[0], arc[1]))
+                    # If path cost exceeds upper bound, we can fix this arc to zero
+                    if path_cost > upper_bound:
+                        fixed_arcs.add((i, j))
 
         return fixed_arcs
+
+    def calculate_shortest_paths_from_root(
+        self, duals: List[float], distances: List[List[float]]
+    ) -> List[float]:
+        """
+        Calculate shortest paths from root to all nodes using reduced costs
+        """
+        n = self.n_nodes
+        dist = [float("inf")] * n
+        dist[0] = 0  # root
+
+        # Use Dijkstra's algorithm with reduced costs
+        visited = [False] * n
+        while True:
+            # Find unvisited node with minimum distance
+            u = -1
+            min_dist = float("inf")
+            for i in range(n):
+                if not visited[i] and dist[i] < min_dist:
+                    min_dist = dist[i]
+                    u = i
+
+            if u == -1:
+                break
+
+            visited[u] = True
+
+            # Update distances through u
+            for v in range(1, n - 1):
+                if u != v:
+                    # Calculate reduced cost
+                    rc = distances[u][v]
+                    if u != 0:  # Not from root
+                        rc -= duals[u - 1]
+                    if v != n - 1:  # Not to terminal
+                        rc -= duals[v - 1]
+
+                    if dist[u] + rc < dist[v]:
+                        dist[v] = dist[u] + rc
+
+        return dist
+
+    def calculate_shortest_paths_to_terminal(
+        self, duals: List[float], distances: List[List[float]]
+    ) -> List[float]:
+        """
+        Calculate shortest paths from all nodes to terminal using reduced costs
+        """
+        n = self.n_nodes
+        dist = [float("inf")] * n
+        dist[n - 1] = 0  # terminal
+
+        # Use Dijkstra's algorithm with reduced costs
+        visited = [False] * n
+        while True:
+            # Find unvisited node with minimum distance
+            u = -1
+            min_dist = float("inf")
+            for i in range(n):
+                if not visited[i] and dist[i] < min_dist:
+                    min_dist = dist[i]
+                    u = i
+
+            if u == -1:
+                break
+
+            visited[u] = True
+
+            # Update distances through u
+            for v in range(1, n - 1):
+                if u != v:
+                    # Calculate reduced cost
+                    rc = distances[v][u]
+                    if v != 0:  # Not from root
+                        rc -= duals[v - 1]
+                    if u != n - 1:  # Not to terminal
+                        rc -= duals[u - 1]
+
+                    if dist[u] + rc < dist[v]:
+                        dist[v] = dist[u] + rc
+
+        return dist
 
     def calculate_solution_cost(self, paths: List[List[int]]) -> float:
         cost = 0.0
@@ -614,52 +794,52 @@ class ColumnElimination:
         return cost
 
     def solve_with_subgradient(self, max_iterations: int = 1000):
-        """Enhanced subgradient method with adaptive parameters and stabilization"""
+        """Modified solve method with column pool"""
         duals = [0.0] * self.n_nodes
         best_lb = float("-inf")
         best_ub = float("inf")
-        alpha = 2.0  # Initial step size multiplier
-        step_reduction = 0.95  # Step size reduction factor
+        alpha = 2.0
+        step_reduction = 0.95
         non_improving_count = 0
-        stabilization_center = duals.copy()
-        stability_weight = 1.0
 
-        # Initialize duals using a better heuristic
+        # Initialize duals as before
         for i in range(1, self.n_nodes - 1):
-            duals[i - 1] = (
-                2 * self.calculate_travel_time(0, i) * (self.nodes[i].demand / 100)
-            )
+            duals[i - 1] = 50.0
 
         for iteration in range(max_iterations):
-            # Add proximal term to objective for stabilization
-
             self.graph.set_duals(duals)
 
-            # Solve subproblem using minimum update SSP
+            # Generate new columns and add to pool
             paths = self.graph.phaseFour()
             path_sequences = [
                 p.nodes_covered for p in paths if len(p.nodes_covered) > 2
             ]
-            print(f"Paths found: {path_sequences}")
+            for path in paths:
+                if len(path.nodes_covered) > 2:
+                    cost = self.calculate_solution_cost([path.nodes_covered])
+                    self.column_pool.add_column(path.nodes_covered, cost)
 
-            if not path_sequences:
-                break
+            # Get columns for current iteration
+            current_columns = self.column_pool.get_columns_for_rmp()
+            # if not current_columns:
+            #    break
 
-                # Check for conflicts and refine if necessary
+            # Check conflicts using columns from pool
             conflict_found = False
-            for path in path_sequences:
+            for path in current_columns:
                 conflict = self.find_conflict(path)
                 if conflict:
                     print(f"Found conflict in path: {path}")
+                    print(f"Conflict details: {conflict}")
                     self.refine_conflict(conflict)
+                    # Verify the conflict was actually eliminated
+                    if self.find_conflict(path):
+                        print("WARNING: Conflict still exists after refinement!")
+                    self.column_pool.remove_column(path)
                     conflict_found = True
                     break
 
-            # if conflict_found:
-            #    print("Conflict found. Refining and continuing.")
-            #    continue
-
-            # Calculate current value and subgradient
+            # Solve RMP using subgradient
             current_value, visits = self.calculate_lagrangian(paths, duals)
             subgradient = [1 - visits[j] for j in range(1, self.n_nodes - 1)]
             print(
@@ -669,204 +849,66 @@ class ColumnElimination:
             # Update bounds
             best_lb = max(best_lb, current_value)
 
-            # Estimate psi* with dynamic adjustment
+            # Update step size
             if best_ub < float("inf"):
-                psi_star = best_lb * (1 + max(0.5, 5 / (100 + iteration)))
+                # psi_star = best_lb * (1 + max(0.5, 5 / (100 + iteration)))
+                psi_star = best_lb * (1 + 5 / (100 + iteration))
+
             else:
                 psi_star = current_value * 1.1
 
-            # Calculate step size with normalization
             subgradient_norm = sum(g * g for g in subgradient)
             if subgradient_norm > 0:
                 step_size = alpha * (psi_star - current_value) / subgradient_norm
             else:
                 step_size = 0
 
-            # Update duals with projection
+            # Update duals
             new_duals = []
             for j in range(1, self.n_nodes - 1):
                 new_val = max(0, duals[j - 1] - step_size * subgradient[j - 1])
                 new_duals.append(new_val)
 
-            # Update stabilization center if improving
+            # Handle convergence
             if current_value > best_lb - 0.01 * abs(best_lb):
-                stabilization_center = new_duals.copy()
                 non_improving_count = 0
             else:
                 non_improving_count += 1
 
-            # Adaptive parameter updates
             if non_improving_count > 20:
                 alpha *= step_reduction
-                stability_weight *= 1.1
                 non_improving_count = 0
 
             duals = new_duals
 
-            # calculate path cost
+            # Calculate path cost
             path_cost = self.calculate_solution_cost(path_sequences)
             print(f"Path cost: {path_cost}")
 
-            # Perform arc fixing using the current duals
-            fixed_arcs = self.fix_arcs(
-                best_ub,
-                duals,
-                [node.demand for node in self.nodes],
-                [(node.lb[0], node.ub[0]) for node in self.nodes],
-                self.instance.distances,
-                path_sequences,
-            )
-            # print(f"Fixed arcs: {fixed_arcs}")
-            self.graph.set_deleted_arcs(list(fixed_arcs))
+            # Periodic arc fixing when we have good bounds
+            if iteration > 0 and iteration % 10 == 0:
+                fixed_arcs = self.fix_arcs(
+                    best_ub,
+                    duals,
+                    [node.demand for node in self.nodes],
+                    [(node.lb[0], node.ub[0]) for node in self.nodes],
+                    self.instance.distances,
+                    path_sequences,
+                )
+                self.graph.set_deleted_arcs(list(fixed_arcs))
 
-            if iteration > 700:
-                form = self.formulate_and_solve_gurobi(fixed_arcs)
-                break
-            # Early stopping condition
-            if (
-                alpha < 0.01
-                or iteration > 50
-                and abs(best_ub - best_lb) < 0.001 * abs(best_lb)
+            # Termination criteria
+            if alpha < 0.01 or (
+                iteration > 50 and abs(best_ub - best_lb) < 0.001 * abs(best_lb)
             ):
                 break
 
         return best_lb, path_sequences
 
-    def formulate_and_solve_gurobi(self, fixed_arcs: List[Tuple[int, int]]):
-        """
-        Formulate and solve the VRPTW problem using Gurobi, excluding fixed arcs (i.e., setting them to 0).
-        """
-        # Initialize the Gurobi model
-        model = Model("VRPTW_Gurobi")
 
-        # Extract necessary problem data
-        distances = self.instance.distances
-        node_demands = [node.demand for node in self.nodes]
-        time_windows = [(node.lb[0], node.ub[0]) for node in self.nodes]
-        vehicle_capacity = self.vehicle_capacity
-        n_nodes = self.n_nodes
-        time_horizon = self.time_horizon
-
-        # Step 1: Define decision variables
-        x = model.addVars(n_nodes, n_nodes, vtype=GRB.BINARY, name="x")
-        arrival_time = model.addVars(
-            n_nodes, vtype=GRB.CONTINUOUS, lb=0, ub=time_horizon, name="arrival_time"
-        )
-        load = model.addVars(
-            n_nodes, vtype=GRB.CONTINUOUS, lb=0, ub=vehicle_capacity, name="load"
-        )
-
-        # Step 2: Set the objective function (minimize total travel distance)
-        model.setObjective(
-            quicksum(
-                distances[i][j] * x[i, j]
-                for i in range(n_nodes)
-                for j in range(n_nodes)
-                if i != j
-            ),
-            GRB.MINIMIZE,
-        )
-
-        # Step 3: Add flow conservation constraints
-        for node in range(1, n_nodes - 1):
-            model.addConstr(
-                quicksum(x[i, node] for i in range(n_nodes) if i != node) == 1,
-                name=f"visit_{node}",
-            )
-            model.addConstr(
-                quicksum(x[node, j] for j in range(n_nodes) if j != node) == 1,
-                name=f"leave_{node}",
-            )
-
-        # Step 4: Add depot flow constraints
-        model.addConstr(
-            quicksum(x[0, j] for j in range(1, n_nodes)) <= self.n_vehicles,
-            name="vehicles_depart",
-        )
-        model.addConstr(
-            quicksum(x[i, 101] for i in range(n_nodes - 1)) == self.n_vehicles,
-            name="vehicles_return",
-        )
-
-        # Step 5: Add capacity constraints
-        for i in range(n_nodes):
-            for j in range(n_nodes):
-                if i != j:
-                    model.addConstr(
-                        load[j]
-                        >= load[i]
-                        + node_demands[j] * x[i, j]
-                        - vehicle_capacity * (1 - x[i, j]),
-                        name=f"load_{i}_{j}",
-                    )
-
-        for node in range(1, n_nodes):
-            model.addConstr(load[node] <= vehicle_capacity, name=f"capacity_{node}")
-
-        # Step 6: Add time window constraints
-        M = time_horizon
-        for i in range(n_nodes):
-            for j in range(n_nodes):
-                if i != j:
-                    travel_time = distances[i][j]
-                    service_time = self.nodes[i].duration
-                    model.addConstr(
-                        arrival_time[j]
-                        >= arrival_time[i]
-                        + service_time
-                        + travel_time
-                        - M * (1 - x[i, j]),
-                        name=f"time_{i}_{j}",
-                    )
-
-        for node in range(1, n_nodes):
-            model.addConstr(
-                arrival_time[node] >= time_windows[node][0], name=f"early_{node}"
-            )
-            model.addConstr(
-                arrival_time[node] <= time_windows[node][1], name=f"late_{node}"
-            )
-
-        # Step 7: Exclude fixed arcs by setting them to 0
-        for i, j in fixed_arcs:
-            if (i, j) in x:
-                model.addConstr(x[i, j] == 0, name=f"fixed_arc_{i}_{j}")
-
-        # Step 8: Set Gurobi parameters
-        model.Params.TimeLimit = 300  # 5-minute time limit
-        model.Params.MIPGap = 0.01  # 1% optimality gap
-        model.Params.Threads = 4  # Use 4 threads for parallel processing
-
-        # Step 9: Optimize the model
-        model.optimize()
-
-        # Step 10: Check for infeasibility and diagnostics
-        if model.status == GRB.INFEASIBLE:
-            print("Model is infeasible. Running diagnostics...")
-            model.computeIIS()
-            model.write("infeasible_model.ilp")
-            return float("inf"), []
-
-        # Step 11: Extract the solution if feasible
-        if model.status == GRB.OPTIMAL or model.status == GRB.TIME_LIMIT:
-            solution_arcs = [
-                (i, j)
-                for i in range(n_nodes)
-                for j in range(n_nodes)
-                if i != j and x[i, j].x > 0.5
-            ]
-            obj_val = model.objVal if model.status == GRB.OPTIMAL else float("inf")
-            return obj_val, solution_arcs
-
-        return float("inf"), []
-
-
-# %%
 # Create instance data
 solomon_instance = InstanceData()
-solomon_instance.read_instance(
-    "../build/instances/C202.txt"
-)  # Set mtw=True if using multiple time windows
+solomon_instance.read_instance("../build/instances/R201.txt")
 instance = convert_instance_data(solomon_instance)
 
 nodes = []
@@ -886,7 +928,7 @@ for i in range(instance.num_nodes):
 solver = ColumnElimination(
     nodes=nodes,
     time_horizon=int(instance.get_time_horizon()),
-    bucket_interval=10,
+    bucket_interval=20,
     vehicle_capacity=700,
     n_vehicles=3,
     instance=instance,
@@ -894,3 +936,4 @@ solver = ColumnElimination(
 
 # Solve
 best_cost, best_routes = solver.solve_with_subgradient()
+# best_cost, best_routes = solver.solve_with_column_elimination()

@@ -10,6 +10,7 @@ rapids-cmake
 *.pdf
 *.pkl
 *.json
+*.ilp
 savings.py
 third_party/lkh/
 vrpsolve/
