@@ -1060,28 +1060,26 @@ public:
         // Initialize an empty SRCmap for the current label
         std::vector<int> updated_SRCmap(cut_storage->size(), 0.0);
 
-        const Label     *current   = L;
-        const Label     *last_node = nullptr;
-        std::vector<int> nodes_covered;
+        int last_node = -1;
+        if (L->nodes_covered.size() <= 3) { return nullptr; }
 
         // Traverse through the label nodes from current to root
-        while (current != nullptr) {
-            nodes_covered.push_back(current->node_id);
+        for (auto node_id : L->nodes_covered) {
             // If there is a previous node, compute the edge cost
-            if (last_node) {
-                double cij_cost = getcij(last_node->node_id, current->node_id);
+            if (last_node != -1) {
+                double cij_cost = getcij(last_node, node_id);
                 real_cost += cij_cost;
                 red_cost += cij_cost;
             }
 
-            red_cost -= nodes[current->node_id].cost;
+            red_cost -= nodes[node_id].cost;
 
             // Add the current node's real cost and cost
             // real_cost += current->real_cost;
             // red_cost += current->cost;
 
-            size_t segment      = current->node_id >> 6; // Determine the segment in the bitmap
-            size_t bit_position = current->node_id & 63; // Determine the bit position in the segment
+            size_t segment      = node_id >> 6; // Determine the segment in the bitmap
+            size_t bit_position = node_id & 63; // Determine the bit position in the segment
 
             // Update the SRCmap for each cut
             auto          &cutter   = cut_storage;
@@ -1109,7 +1107,7 @@ public:
 
                 if (bitIsSet2) {
                     auto &den = multipliers.den;
-                    src_map_value += multipliers.num[baseSetorder[current->node_id]];
+                    src_map_value += multipliers.num[baseSetorder[node_id]];
                     if (src_map_value >= den) {
                         red_cost -= SRCDuals[idx]; // Apply the SRC dual value if threshold is exceeded
                         src_map_value -= den;      // Reset the SRC map value
@@ -1121,19 +1119,16 @@ public:
             // Adjust for arc duals if in Stage::Four
 #if defined(RCC) || defined(EXACT_RCC)
             if (last_node) {
-                auto arc_dual = arc_duals.getDual(last_node->node_id, current->node_id);
+                auto arc_dual = arc_duals.getDual(last_node, node_id);
                 red_cost -= arc_dual;
             }
 #endif
 
             // Adjust for branching duals if they exist
-            if (branching_duals->size() > 0 && last_node) {
-                red_cost -= branching_duals->getDual(last_node->node_id, current->node_id);
-            }
+            if (branching_duals->size() > 0 && last_node) { red_cost -= branching_duals->getDual(last_node, node_id); }
 
             // Move to the parent node and update last_node
-            last_node = current;
-            current   = current->parent;
+            last_node = node_id;
         }
 
         auto new_label            = label_pool_fw->acquire();
@@ -1142,10 +1137,10 @@ public:
         new_label->parent         = nullptr;
         new_label->node_id        = L->node_id;
         new_label->visited_bitmap = L->visited_bitmap;
-        new_label->nodes_covered  = nodes_covered;
-        if (nodes_covered.size() <= 3) { return nullptr; }
-        new_label->is_extended = false;
-        new_label->resources   = L->resources;
+        new_label->nodes_covered  = L->nodes_covered;
+        new_label->is_extended    = false;
+        new_label->resources      = L->resources;
+        new_label->SRCmap         = updated_SRCmap;
 
         // Bucket number for the new label
         std::vector<double> new_resources(options.resources.size());

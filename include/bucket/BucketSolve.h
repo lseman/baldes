@@ -766,7 +766,8 @@ BucketGraph::Extend(const std::conditional_t<M == Mutability::Mut, Label *, cons
         new_label->visited_bitmap = L_prime->visited_bitmap;
     }
     set_node_visited(new_label->visited_bitmap, node_id); // Mark the new node as visited
-
+    new_label->nodes_covered = L_prime->nodes_covered;    // Copy the list of covered nodes
+    new_label->nodes_covered.push_back(node_id);          // Add the new node to the list of covered nodes
 #if defined(SRC)
     new_label->SRCmap = L_prime->SRCmap;
     // Apply SRC (Subset Row Cuts) logic in Stages 3, 4, and Enumerate
@@ -1049,11 +1050,17 @@ Label *BucketGraph::compute_label(const Label *L, const Label *L_prime) {
 
     new_label->nodes_covered.clear();
 
+    /*
     // Start by inserting backward list elements
     size_t forward_size = 0;
     auto   L_bw         = L_prime;
     for (; L_bw != nullptr; L_bw = L_bw->parent) {
         new_label->nodes_covered.push_back(L_bw->node_id); // Insert backward elements directly
+        if (L_bw->parent == nullptr && L_bw->fresh == false) {
+            for (size_t i = 0; i < L_bw->nodes_covered.size(); ++i) {
+                new_label->nodes_covered.push_back(L_bw->nodes_covered[i]);
+            }
+        }
     }
 
     // Now insert forward list elements in reverse order without using std::reverse
@@ -1061,8 +1068,17 @@ Label *BucketGraph::compute_label(const Label *L, const Label *L_prime) {
     for (; L_fw != nullptr; L_fw = L_fw->parent) {
         new_label->nodes_covered.insert(new_label->nodes_covered.begin(),
                                         L_fw->node_id); // Insert forward elements at the front
-        forward_size++;
+        if (L_fw->parent == nullptr && L_fw->fresh == false) {
+            for (size_t i = 0; i < L_fw->nodes_covered.size(); ++i) {
+                new_label->nodes_covered.insert(new_label->nodes_covered.begin(), L_fw->nodes_covered[i]);
+            }
+        }
     }
+    */
+    new_label->nodes_covered = L_prime->nodes_covered;
+    // reverse the nodes_covered
+    std::reverse(new_label->nodes_covered.begin(), new_label->nodes_covered.end());
+    new_label->nodes_covered.insert(new_label->nodes_covered.begin(), L->nodes_covered.begin(), L->nodes_covered.end());
 
     return new_label;
 }

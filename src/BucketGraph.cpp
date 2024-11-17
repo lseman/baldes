@@ -527,8 +527,8 @@ void BucketGraph::common_initialization() {
         pdqsort(bw_warm_labels.begin(), bw_warm_labels.end(),
                 [](const Label *a, const Label *b) { return a->cost < b->cost; });
         // keep only top 100
-        if (fw_warm_labels.size() > 10) { fw_warm_labels.resize(10); }
-        if (bw_warm_labels.size() > 10) { bw_warm_labels.resize(10); }
+        if (fw_warm_labels.size() > options.n_warm_start) { fw_warm_labels.resize(options.n_warm_start); }
+        if (bw_warm_labels.size() > options.n_warm_start) { bw_warm_labels.resize(options.n_warm_start); }
         for (auto label : fw_warm_labels) {
             if (!label->fresh) { continue; }
             label = compute_red_cost(label, true);
@@ -596,6 +596,7 @@ void BucketGraph::common_initialization() {
                 // Initialize depot with the current interval boundaries
                 depot->initialize(calculated_index, 0.0, interval_bounds, depot_id);
                 depot->is_extended = false;
+                depot->nodes_covered.push_back(depot_id);
                 set_node_visited(depot->visited_bitmap, depot_id);
                 SRC_MODE_BLOCK(depot->SRCmap.assign(cut_storage->SRCDuals.size(), 0);)
                 buckets[calculated_index].add_label(depot);

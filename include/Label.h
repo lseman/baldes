@@ -77,7 +77,8 @@ struct Label {
         this->real_cost   = 0.0;
         this->parent      = nullptr;
         this->is_extended = false;
-        // this->nodes_covered.clear();
+        this->nodes_covered.clear();
+        this->nodes_covered.reserve(N_SIZE / 2);
 
         std::memset(visited_bitmap.data(), 0, visited_bitmap.size() * sizeof(uint64_t));
 #ifdef UNREACHABLE_DOMINANCE
