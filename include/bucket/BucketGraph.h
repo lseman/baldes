@@ -42,6 +42,8 @@
 
 #include "RIH.h"
 
+#include <condition_variable>
+
 #define RCESPP_TOL_ZERO 1.E-6
 
 /**
@@ -465,7 +467,7 @@ public:
      *
      */
     std::vector<Path> getSchrodinger() {
-        std::vector<Path> negative_cost_paths = sPool.get_paths_with_negative_red_cost();
+        std::vector<Path> negative_cost_paths = sPool.get_paths();
         if (negative_cost_paths.size() > N_ADD) { negative_cost_paths.resize(N_ADD); }
         return negative_cost_paths;
     }
@@ -1053,6 +1055,118 @@ public:
             if (from < num_nodes && to < num_nodes) { fixed_arcs[from][to] = true; }
         }
     }
+
+    std::vector<Label *> extend_path(const std::vector<int> &path, std::vector<double> &resources);
+
+    Label *compute_red_cost(Label *L, bool fw) {
+        double real_cost = 0.0;
+        double red_cost  = 0.0;
+
+        // Initialize an empty SRCmap for the current label
+        std::vector<int> updated_SRCmap(cut_storage->size(), 0.0);
+
+        const Label     *current   = L;
+        const Label     *last_node = nullptr;
+        std::vector<int> nodes_covered;
+
+        // Traverse through the label nodes from current to root
+        while (current != nullptr) {
+            nodes_covered.push_back(current->node_id);
+            // If there is a previous node, compute the edge cost
+            if (last_node) {
+                double cij_cost = getcij(last_node->node_id, current->node_id);
+                real_cost += cij_cost;
+                red_cost += cij_cost;
+            }
+
+            red_cost -= nodes[current->node_id].cost;
+
+            // Add the current node's real cost and cost
+            // real_cost += current->real_cost;
+            // red_cost += current->cost;
+
+            size_t segment      = current->node_id >> 6; // Determine the segment in the bitmap
+            size_t bit_position = current->node_id & 63; // Determine the bit position in the segment
+
+            // Update the SRCmap for each cut
+            auto          &cutter   = cut_storage;
+            auto          &SRCDuals = cutter->SRCDuals;
+            const uint64_t bit_mask = 1ULL << bit_position;
+
+            for (std::size_t idx = 0; idx < cutter->size(); ++idx) {
+                auto it = cutter->begin();
+                std::advance(it, idx);
+                const auto &cut          = *it;
+                const auto &baseSet      = cut.baseSet;
+                const auto &baseSetorder = cut.baseSetOrder;
+                const auto &neighbors    = cut.neighbors;
+                const auto &multipliers  = cut.p;
+
+#if defined(SRC)
+                // Apply SRC logic to update the SRCmap
+                bool bitIsSet  = neighbors[segment] & bit_mask;
+                bool bitIsSet2 = baseSet[segment] & bit_mask;
+
+                auto &src_map_value = updated_SRCmap[idx];
+                if (!bitIsSet) {
+                    src_map_value = 0.0; // Reset if bit is not set in neighbors
+                }
+
+                if (bitIsSet2) {
+                    auto &den = multipliers.den;
+                    src_map_value += multipliers.num[baseSetorder[current->node_id]];
+                    if (src_map_value >= den) {
+                        red_cost -= SRCDuals[idx]; // Apply the SRC dual value if threshold is exceeded
+                        src_map_value -= den;      // Reset the SRC map value
+                    }
+                }
+#endif
+            }
+
+            // Adjust for arc duals if in Stage::Four
+#if defined(RCC) || defined(EXACT_RCC)
+            if (last_node) {
+                auto arc_dual = arc_duals.getDual(last_node->node_id, current->node_id);
+                red_cost -= arc_dual;
+            }
+#endif
+
+            // Adjust for branching duals if they exist
+            if (branching_duals->size() > 0 && last_node) {
+                red_cost -= branching_duals->getDual(last_node->node_id, current->node_id);
+            }
+
+            // Move to the parent node and update last_node
+            last_node = current;
+            current   = current->parent;
+        }
+
+        auto new_label            = label_pool_fw->acquire();
+        new_label->cost           = red_cost;
+        new_label->real_cost      = real_cost;
+        new_label->parent         = nullptr;
+        new_label->node_id        = L->node_id;
+        new_label->visited_bitmap = L->visited_bitmap;
+        new_label->nodes_covered  = nodes_covered;
+        if (nodes_covered.size() <= 3) { return nullptr; }
+        new_label->is_extended = false;
+
+        // Bucket number for the new label
+        std::vector<double> new_resources(options.resources.size());
+        for (size_t i = 0; i < options.resources.size(); ++i) { new_resources[i] = L->resources[i]; }
+        if (fw) {
+            int bucket        = get_bucket_number<Direction::Forward>(new_label->node_id, new_resources);
+            new_label->vertex = bucket;
+        } else {
+            int bucket        = get_bucket_number<Direction::Backward>(new_label->node_id, new_resources);
+            new_label->vertex = bucket;
+        }
+        for (size_t i = 0; i < options.resources.size(); ++i) { new_label->resources[i] = new_resources[i]; }
+
+        new_label->fresh = false;
+
+        return L;
+    };
 
 private:
     std::vector<Interval> intervals;

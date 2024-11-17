@@ -464,6 +464,33 @@ void BucketGraph::set_adjacency_list_manual() {
  */
 void BucketGraph::common_initialization() {
     // Clear previous data
+
+    std::vector<Label *> fw_warm_labels;
+    std::vector<Label *> bw_warm_labels;
+    std::vector<Label *> fw_warmed_labels;
+    std::vector<Label *> bw_warmed_labels;
+    if (merged_labels.size() > 0 && options.warm_start) {
+
+        for (auto bucket = 0; bucket < fw_buckets_size; ++bucket) {
+            auto      &current_bucket = fw_buckets[bucket];          // Get the current bucket
+            const auto labels         = current_bucket.get_labels(); // Get labels in the current bucket
+            // get the first label of each bucket
+            if (labels.size() > 0) {
+                if (!labels[0]->fresh) { continue; }
+                fw_warm_labels.push_back(labels[0]);
+            }
+        }
+        for (auto bucket = 0; bucket < bw_buckets_size; ++bucket) {
+            auto      &current_bucket = bw_buckets[bucket];          // Get the current bucket
+            const auto labels         = current_bucket.get_labels(); // Get labels in the current bucket
+            // get the first label of each bucket
+            if (labels.size() > 0) {
+                if (!labels[0]->fresh) { continue; }
+                bw_warm_labels.push_back(labels[0]);
+            }
+        }
+    }
+
     merged_labels.clear();
     merged_labels.reserve(100);
     fw_c_bar.clear();
@@ -493,12 +520,39 @@ void BucketGraph::common_initialization() {
         base_intervals[r] = (VRPNode.ub[r] - VRPNode.lb[r]) / intervals[r].interval;
     }
 
+    if (options.warm_start) {
+        // sort the warm labels for the ones with the smallest cost
+        pdqsort(fw_warm_labels.begin(), fw_warm_labels.end(),
+                [](const Label *a, const Label *b) { return a->cost < b->cost; });
+        pdqsort(bw_warm_labels.begin(), bw_warm_labels.end(),
+                [](const Label *a, const Label *b) { return a->cost < b->cost; });
+        // keep only top 100
+        if (fw_warm_labels.size() > 10) { fw_warm_labels.resize(10); }
+        if (bw_warm_labels.size() > 10) { bw_warm_labels.resize(10); }
+        for (auto label : fw_warm_labels) {
+            if (!label->fresh) { continue; }
+            label = compute_red_cost(label, true);
+            if (label == nullptr) { continue; }
+            fw_warmed_labels.push_back(label);
+        }
+        for (auto label : bw_warm_labels) {
+            if (!label->fresh) { continue; }
+            label = compute_red_cost(label, false);
+            if (label == nullptr) { continue; }
+            bw_warmed_labels.push_back(label);
+        }
+    }
+
     // Clear forward and backward buckets
     for (auto b = 0; b < fw_buckets.size(); b++) {
         fw_buckets[b].clear();
         bw_buckets[b].clear();
     }
 
+    if (options.warm_start) {
+        for (auto label : fw_warmed_labels) { fw_buckets[label->vertex].add_label(label); }
+        for (auto label : bw_warmed_labels) { bw_buckets[label->vertex].add_label(label); }
+    }
     // Initialize forward buckets (generic for multiple dimensions)
     std::vector<int> current_pos(num_intervals, 0);
 
@@ -922,4 +976,36 @@ Label *BucketGraph::compute_mono_label(const Label *L) {
     std::reverse(new_label->nodes_covered.begin(), new_label->nodes_covered.end());
 
     return new_label;
+}
+
+std::vector<Label *> BucketGraph::extend_path(const std::vector<int> &path, std::vector<double> &resources) {
+
+    // Add the new nodes to the path
+    auto label     = label_pool_fw->acquire();
+    label->node_id = path.back();
+    label->cost    = 0.0;
+    for (size_t i = 0; i < resources.size(); ++i) { label->resources[i] = resources[i]; }
+    label->nodes_covered = path;
+    for (auto node : path) { set_node_visited(label->visited_bitmap, node); }
+
+    label->cost = 0.0;
+    std::vector<Label *> new_labels;
+    const auto          &arcs = nodes[label->node_id].get_arcs<Direction::Forward>();
+    for (const auto &arc : arcs) {
+        auto labels =
+            Extend<Direction::Forward, Stage::Extend, ArcType::Node, Mutability::Mut, Full::Partial>(label, arc);
+        for (auto new_label : labels) { new_labels.push_back(new_label); }
+    }
+
+    std::vector<Label *> new_labels_to_return;
+
+    for (auto new_label : new_labels) {
+        new_label = compute_mono_label(new_label);
+        // add label->nodes_covered to the front of new_labels->nodes_covered
+        new_label->nodes_covered.insert(new_label->nodes_covered.begin(), label->nodes_covered.begin(),
+                                        label->nodes_covered.end() - 1);
+        // print new_labels->nodes_covered
+        new_labels_to_return.push_back(new_label);
+    }
+    return new_labels_to_return;
 }

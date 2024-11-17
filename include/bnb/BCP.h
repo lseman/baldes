@@ -95,6 +95,7 @@ public:
 
         auto counter = 0;
         for (auto &label : paths) {
+            if (label.route.empty()) continue;
             counter += 1;
             if (counter > 10) break;
             // Insert the path into the set to avoid duplicates

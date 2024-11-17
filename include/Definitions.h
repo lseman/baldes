@@ -38,10 +38,21 @@ struct BucketOptions {
     std::vector<std::string> resources      = {"time"};
     std::vector<int>         resource_type  = {1};
     std::vector<int>         or_resources   = {1};
+
+    bool warm_start = false;
+
+    // Singleton pattern: Get the single instance of BucketOptions
+    static BucketOptions &getInstance() {
+        static BucketOptions instance;
+        return instance;
+    }
+
+private:
+    // Private constructor to prevent instantiation
 };
 
 enum class Direction { Forward, Backward };
-enum class Stage { One, Two, Three, Four, Enumerate, Fix, Eliminate };
+enum class Stage { One, Two, Three, Four, Enumerate, Fix, Eliminate, Extend };
 enum class ArcType { Node, Bucket, Jump };
 enum class Mutability { Const, Mut };
 enum class Full { Full, Partial, Reverse, PSTEP, TSP };

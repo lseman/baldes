@@ -16,8 +16,13 @@
 #include "Path.h"
 #include "VRPNode.h"
 
-#include "ankerl/unordered_dense.h"
+#include <exec/static_thread_pool.hpp>
+#include <exec/task.hpp>
+#include <stdexec/execution.hpp>
 
+#include <deque>
+
+#include "TaskQueue.h"
 /**
  * @class SchrodingerPool
  * @brief Manages a pool of paths with a limited lifespan, computes reduced costs, and filters paths based on their
@@ -40,7 +45,15 @@ private:
 public:
     std::vector<std::vector<double>> distance_matrix; // Distance matrix for the graph
 
-    SchrodingerPool(int live_time) : max_live_time(live_time) {}
+    exec::static_thread_pool            pool  = exec::static_thread_pool(5);
+    exec::static_thread_pool::scheduler sched = pool.get_scheduler();
+
+    // SchrodingerPool(int live_time) : max_live_time(live_time) {}
+    SchrodingerPool(int live_time) : max_live_time(live_time), pool(5), task_queue(5, pool.get_scheduler(), *this) {}
+
+    ~SchrodingerPool() {}
+
+    TaskQueue<Path, SchrodingerPool> task_queue;
 
     void setNodes(std::vector<VRPNode> *nodes) { this->nodes = nodes; }
 
@@ -58,10 +71,9 @@ public:
         paths.push_back({current_iteration, path});
     }
 
+    // Submit a task to add new paths
     void add_paths(const std::vector<Path> &new_paths) {
-        remove_old_paths();
-        for (const Path &path : new_paths) { add_path(path); }
-        computeRC();
+        for (const Path &path : new_paths) { task_queue.submit_task(path); }
     }
 
     void computeRC() {
@@ -83,7 +95,15 @@ public:
         }
     }
 
-    std::vector<Path> get_paths_with_negative_red_cost() {
+    std::vector<Path> perturbation(const std::vector<Path> &paths_to_process) {
+        remove_old_paths();
+        for (const Path &path : paths_to_process) { add_path(path); }
+        computeRC();
+        auto result = _get_paths_with_negative_red_cost();
+        return result;
+    }
+
+    std::vector<Path> _get_paths_with_negative_red_cost() {
         std::vector<Path> result;
 
         // Remove the paths that are older than current_iteration + max_life or have a negative red_cost
@@ -104,8 +124,15 @@ public:
         }
 
         // Sort the result based on red_cost
-        std::sort(result.begin(), result.end(), [](const Path &a, const Path &b) { return a.red_cost < b.red_cost; });
+        pdqsort(result.begin(), result.end(), [](const Path &a, const Path &b) { return a.red_cost < b.red_cost; });
 
+        return result;
+    }
+
+    std::vector<Path> get_paths() {
+        auto              tasks = task_queue.get_processed_tasks();
+        std::vector<Path> result;
+        result.insert(result.end(), tasks.begin(), tasks.end());
         return result;
     }
 
@@ -124,7 +151,6 @@ public:
  * method. If the pool is full, a new label will be allocated.
  *
  */
-#include <deque>
 
 class LabelPool {
 public:
