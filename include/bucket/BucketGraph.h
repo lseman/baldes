@@ -989,21 +989,16 @@ public:
             size_t u = conflict.first;
             size_t v = conflict.second;
 
-            if (u >= num_nodes || v >= num_nodes) continue; // Skip invalid nodes
-
+            print_info("Adding conflict between {} and {}\n", u, v);
             // Add v to u's neighborhood
             size_t segment_v      = v >> 6;
             size_t bit_position_v = v & 63;
-            if (segment_v < neighborhoods_bitmap[u].size()) {
-                neighborhoods_bitmap[u][segment_v] |= (1ULL << bit_position_v);
-            }
+            neighborhoods_bitmap[u][segment_v] |= (1ULL << bit_position_v);
 
             // Add u to v's neighborhood
             size_t segment_u      = u >> 6;
             size_t bit_position_u = u & 63;
-            if (segment_u < neighborhoods_bitmap[v].size()) {
-                neighborhoods_bitmap[v][segment_u] |= (1ULL << bit_position_u);
-            }
+            neighborhoods_bitmap[v][segment_u] |= (1ULL << bit_position_u);
         }
     }
     // Helper method to check if node j is in node i's neighborhood
@@ -1150,10 +1145,11 @@ public:
         new_label->nodes_covered  = nodes_covered;
         if (nodes_covered.size() <= 3) { return nullptr; }
         new_label->is_extended = false;
+        new_label->resources   = L->resources;
 
         // Bucket number for the new label
         std::vector<double> new_resources(options.resources.size());
-        for (size_t i = 0; i < options.resources.size(); ++i) { new_resources[i] = L->resources[i]; }
+        for (size_t i = 0; i < options.resources.size(); ++i) { new_resources[i] = new_label->resources[i]; }
         if (fw) {
             int bucket        = get_bucket_number<Direction::Forward>(new_label->node_id, new_resources);
             new_label->vertex = bucket;
@@ -1161,11 +1157,10 @@ public:
             int bucket        = get_bucket_number<Direction::Backward>(new_label->node_id, new_resources);
             new_label->vertex = bucket;
         }
-        for (size_t i = 0; i < options.resources.size(); ++i) { new_label->resources[i] = new_resources[i]; }
 
         new_label->fresh = false;
 
-        return L;
+        return new_label;
     };
 
 private:

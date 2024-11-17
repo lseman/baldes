@@ -57,185 +57,126 @@ class ColumnElimination:
         self.conflicts: Set[Tuple[int, int]] = set()
         self.current_lb = float("-inf")
 
-    def detect_conflict_patterns(self, conflict_path: List[int]):
+    def find_conflict(self, path: List[int]) -> Optional[Tuple[str, List[int], Dict]]:
         """
-        Enhanced conflict pattern detection that identifies root causes and minimal subsequences.
+        Enhanced conflict detection that returns type of conflict and relevant state
+        Returns: (conflict_type, conflict_sequence, state_at_conflict)
         """
-        conflict_info = {
-            "type": None,
-            "subsequence": None,
-            "root_cause": None,
-            "resources": None,
-        }
-
-        # 1. Check for minimal capacity violations
-        current_load = 0
-        for i, node in enumerate(conflict_path):
-            current_load += self.nodes[node].demand
-            if current_load > self.vehicle_capacity:
-                # Find minimal subsequence causing violation
-                min_seq_start = i
-                min_load = self.nodes[node].demand
-                while (
-                    min_seq_start > 0
-                    and current_load - min_load > self.vehicle_capacity
-                ):
-                    min_seq_start -= 1
-                    min_load += self.nodes[conflict_path[min_seq_start]].demand
-
-                conflict_info.update(
-                    {
-                        "type": "capacity",
-                        "subsequence": conflict_path[min_seq_start : i + 1],
-                        "root_cause": f"Capacity exceeded: {current_load} > {self.vehicle_capacity}",
-                        "resources": {"load": current_load},
-                    }
-                )
-                return conflict_info
-
-        # 2. Check for minimal time window violations
-        current_time = 0
-        min_slack = float("inf")
-        critical_node = None
-
-        for i in range(len(conflict_path) - 1):
-            current_node = conflict_path[i]
-            next_node = conflict_path[i + 1]
-
-            if i > 0:
-                current_time += self.nodes[current_node].duration
-
-            travel_time = self.calculate_travel_time(current_node, next_node)
-            arrival_time = current_time + travel_time
-
-            # Track minimum slack
-            slack = self.nodes[next_node].ub[0] - arrival_time
-            if slack < min_slack:
-                min_slack = slack
-                critical_node = next_node
-
-            if arrival_time > self.nodes[next_node].ub[0]:
-                conflict_info.update(
-                    {
-                        "type": "time_window",
-                        "subsequence": [current_node, next_node],
-                        "root_cause": (
-                            f"Time window violation at node {next_node}: "
-                            f"Arrival {arrival_time} > Latest {self.nodes[next_node].ub[0]}"
-                        ),
-                        "resources": {
-                            "arrival_time": arrival_time,
-                            "latest_time": self.nodes[next_node].ub[0],
-                            "slack": min_slack,
-                        },
-                    }
-                )
-                return conflict_info
-
-            current_time = max(arrival_time, self.nodes[next_node].lb[0])
-
-        return None
-
-    def _detect_cycle(self, path: List[int]) -> Optional[List[int]]:
-        """Detect minimal cycles in the path"""
-        node_positions = {}
+        # Check for cycles first
+        visited = set()
         for i, node in enumerate(path):
-            if node in node_positions and node != 0:  # Allow depot repeats
-                return path[node_positions[node] : i + 1]
-            node_positions[node] = i
-        return None
+            if node != 0 and node in visited:  # Allow depot visits
+                cycle_start = path.index(node)
+                return ("cycle", path[: i + 1], {"cycle_node": node})
+            visited.add(node)
 
-    def _detect_capacity_violation(self, path: List[int]) -> Optional[List[int]]:
-        """Find minimal subsequence causing capacity violation"""
-        load = 0
-        start_idx = 0
+        # Track state
+        current_state = {"load": 0.0, "time": 0}
 
-        for i, node in enumerate(path):
-            load += self.nodes[node].demand
-
-            # Try to minimize the violating sequence by removing nodes from start
-            while (
-                start_idx < i
-                and load - self.nodes[path[start_idx]].demand > self.vehicle_capacity
-            ):
-                load -= self.nodes[path[start_idx]].demand
-                start_idx += 1
-
-            if load > self.vehicle_capacity:
-                return path[start_idx : i + 1]
-
-        return None
-
-    def _detect_time_window_violation(self, path: List[int]) -> Optional[List[int]]:
-        """Find minimal subsequence causing time window violation with slack analysis"""
-        current_time = 0
-        critical_sequence = []
-        min_slack = float("inf")
-        violation_start = 0
-
+        # Check capacity and time window constraints
         for i in range(len(path) - 1):
-            current_node = path[i]
-            next_node = path[i + 1]
+            prev_node = path[i]
+            curr_node = path[i + 1]
 
+            # Update load
+            new_load = current_state["load"] + self.nodes[curr_node].demand
+            if new_load > self.vehicle_capacity:
+                # Find minimal subsequence causing violation
+                violation_seq = self._find_minimal_capacity_violation(path[: i + 2])
+                print(f"Capacity violation at {violation_seq}")
+                return ("capacity", violation_seq, {"load": new_load})
+
+            # Update time
             if i > 0:
-                current_time += self.nodes[current_node].duration
+                current_state["time"] += self.nodes[prev_node].duration
+            travel_time = self.calculate_travel_time(prev_node, curr_node)
+            arrival_time = current_state["time"] + travel_time
 
-            travel_time = self.calculate_travel_time(current_node, next_node)
-            arrival_time = current_time + travel_time
+            if arrival_time > self.nodes[curr_node].ub[0]:
+                print(f"Time window violation at {prev_node}->{curr_node}")
+                return (
+                    "time_window",
+                    [prev_node, curr_node],
+                    {"time": arrival_time, "latest": self.nodes[curr_node].ub[0]},
+                )
 
-            # Calculate slack
-            slack = self.nodes[next_node].ub[0] - arrival_time
-            if slack < min_slack:
-                min_slack = slack
-                if slack < 0:
-                    violation_start = i
-
-            current_time = max(arrival_time, self.nodes[next_node].lb[0])
-
-        if min_slack < 0:
-            # Return minimal subsequence that leads to violation
-            return path[violation_start : violation_start + 2]
+            current_state["time"] = max(arrival_time, self.nodes[curr_node].lb[0])
+            current_state["load"] = new_load
 
         return None
 
-    def refine_conflict_by_pattern(self, conflict: Dict):
-        """Enhanced conflict refinement based on violation patterns"""
-        if conflict["type"] == "cycle":
-            cycle_nodes = conflict["nodes"]
-            # Remove all arcs that could recreate this cycle pattern
-            for i in range(len(cycle_nodes)):
-                for j in range(i + 1, len(cycle_nodes)):
-                    self.graph.set_deleted_arcs([(cycle_nodes[i], cycle_nodes[j])])
+    def refine_conflict(
+        self, conflict: Tuple[str, List[int], Dict], conflict_path: List[int]
+    ):
+        """
+        Enhanced conflict refinement that properly handles cycles and updates NG relaxation
+        """
+        conflict_type, sequence, state = conflict
+        print(f"Refining {conflict_type} conflict in sequence: {sequence}")
 
-        elif conflict["type"] == "capacity":
-            violating_nodes = conflict["nodes"]
-            total_load = sum(self.nodes[n].demand for n in violating_nodes)
+        if conflict_type == "cycle":
+            # 1. Update NG neighborhoods for cycle
+            cycle_node = state["cycle_node"]
+            conflicts = []
 
-            # Remove arcs that would create similar load patterns
-            for i in range(len(violating_nodes)):
-                accumulated_load = sum(
-                    self.nodes[n].demand for n in violating_nodes[i:]
-                )
-                if accumulated_load > self.vehicle_capacity:
-                    # Remove arcs that would lead to similar accumulation
-                    for j in range(i + 1, len(violating_nodes)):
-                        self.graph.set_deleted_arcs(
-                            [(violating_nodes[i], violating_nodes[j])]
-                        )
+            # Find cycle positions
+            first_pos = sequence.index(cycle_node)
+            second_pos = sequence.index(cycle_node, first_pos + 1)
+            cycle = sequence[first_pos : second_pos + 1]
 
-        elif conflict["type"] == "time_window":
-            violating_sequence = conflict["nodes"]
-            # Remove arcs that would create similar timing patterns
-            arrival_time = self._calculate_arrival_time(violating_sequence)
+            print(f"Found cycle: {cycle}")
 
-            # Remove arcs with similar timing characteristics
-            for i in range(len(violating_sequence) - 1):
-                node1, node2 = violating_sequence[i], violating_sequence[i + 1]
-                # Find similar node pairs that would cause violations
-                for n1 in range(self.n_nodes):
-                    for n2 in range(self.n_nodes):
-                        if self._would_cause_similar_violation(n1, n2, arrival_time):
-                            self.graph.set_deleted_arcs([(n1, n2)])
+            # Add all pairs in cycle to conflicts
+            for i in range(len(cycle)):
+                for j in range(i + 1, len(cycle)):
+                    if cycle[i] != 0 and cycle[j] != 0:  # Skip depot
+                        conflicts.append((cycle[i], cycle[j]))
+                        conflicts.append((cycle[j], cycle[i]))  # Both directions
+
+            print(f"Updating NG neighborhoods with conflicts: {conflicts}")
+            self.graph.update_ng_neighbors(conflicts)
+
+            # Print updated neighborhoods for debugging
+            for node in cycle:
+                if node != 0:
+                    size = self.graph.get_neighborhood_size(node)
+                    neighbors = self.graph.get_neighbors(node)
+                    print(f"Node {node} now has neighborhood size {size}: {neighbors}")
+
+            # 2. Also proceed with standard refinement
+            print("Proceeding with standard refinement after updating NG neighborhoods")
+
+        # Standard refinement process
+        for j in range(1, len(sequence)):
+            prefix = sequence[:j]
+            next_node = sequence[j]
+
+            print(f"Analyzing prefix {prefix} → {next_node}")
+            initial_state = self.calculate_initial_state(prefix)
+            print(
+                f"Starting exploration from prefix {prefix} with state {initial_state}"
+            )
+
+            # Find valid transitions to current state
+            valid_transitions = self.find_valid_transitions_to_state(prefix)
+
+            if not valid_transitions:
+                print(f"No valid transitions found for prefix {prefix}")
+                self.graph.set_deleted_arcs([(prefix[-1], next_node)])
+                return
+
+            # Check if any valid transition can be feasibly extended
+            is_extension_feasible = False
+            for trans in valid_transitions:
+                extended = trans + [next_node]
+                if self.is_subsequence_feasible(extended, next_node):
+                    is_extension_feasible = True
+                    break
+
+            if not is_extension_feasible:
+                print(f"No feasible extension found from {prefix[-1]} to {next_node}")
+                self.graph.set_deleted_arcs([(prefix[-1], next_node)])
+                return
 
     def is_path_feasible(self, path: List[int]) -> bool:
         """Check if a path is feasible in the original problem"""
@@ -268,107 +209,6 @@ class ColumnElimination:
                 return False
 
         return True
-
-    def refine_conflict(self, conflict_path: List[int]):
-        """
-        Enhanced conflict refinement that better handles different types of conflicts
-        and their root causes.
-        """
-        # First try to detect specific conflict patterns
-        conflict_info = self.detect_conflict_patterns(conflict_path)
-        if conflict_info:
-            print(f"Detected conflict: {conflict_info}")
-            self.refine_by_conflict_type(conflict_info)
-            return
-
-        # Fallback to general refinement algorithm
-        for j in range(1, len(conflict_path)):
-            prefix = conflict_path[:j]
-            next_node = conflict_path[j]
-
-            print(f"Analyzing prefix {prefix} → {next_node}")
-
-            # Find all valid transitions to current state
-            valid_transitions = self.find_valid_transitions_to_state(prefix)
-
-            if not valid_transitions:
-                print(f"No valid transitions found for prefix {prefix}")
-                self.graph.set_deleted_arcs([(prefix[-1], next_node)])
-                return
-
-            # Check if any valid transition can be feasibly extended
-            is_extension_feasible = False
-            for trans in valid_transitions:
-                extended = trans + [next_node]
-                if self.is_subsequence_feasible(extended, next_node):
-                    is_extension_feasible = True
-                    break
-
-            if not is_extension_feasible:
-                print(f"No feasible extension found from {prefix[-1]} to {next_node}")
-                print(f"Valid transitions were: {valid_transitions}")
-                self.graph.set_deleted_arcs([(prefix[-1], next_node)])
-                return
-
-    def refine_by_conflict_type(self, conflict_info: dict):
-        """
-        Apply specific refinement strategies based on the type of conflict.
-        """
-        if conflict_info["type"] == "capacity":
-            self._refine_capacity_conflict(conflict_info)
-        elif conflict_info["type"] == "time_window":
-            self._refine_time_window_conflict(conflict_info)
-        # Add other conflict types as needed
-
-    def _refine_capacity_conflict(self, conflict_info: dict):
-        """
-        Refined strategy for capacity conflicts - remove arcs that would
-        lead to similar violations.
-        """
-        seq = conflict_info["subsequence"]
-        total_load = sum(self.nodes[node].demand for node in seq)
-
-        # Remove arcs that would lead to similar overloads
-        arcs_to_remove = []
-        for i in range(len(seq) - 1):
-            accumulated_load = sum(self.nodes[node].demand for node in seq[i:])
-            if accumulated_load > self.vehicle_capacity:
-                arcs_to_remove.append((seq[i], seq[i + 1]))
-
-        if arcs_to_remove:
-            print(
-                f"Removing arcs that would cause capacity violations: {arcs_to_remove}"
-            )
-            self.graph.set_deleted_arcs(arcs_to_remove)
-
-    def _refine_time_window_conflict(self, conflict_info: dict):
-        """
-        Refined strategy for time window conflicts - remove arcs that would
-        lead to similar timing violations.
-        """
-        seq = conflict_info["subsequence"]
-        arrival_time = conflict_info["resources"]["arrival_time"]
-        latest_time = conflict_info["resources"]["latest_time"]
-
-        # Remove similar problematic arcs
-        arcs_to_remove = []
-        for i in range(len(seq) - 1):
-            current_node, next_node = seq[i], seq[i + 1]
-            travel_time = self.calculate_travel_time(current_node, next_node)
-            service_time = self.nodes[current_node].duration
-
-            # If minimal time to reach next node exceeds its time window
-            if (
-                self.nodes[current_node].lb[0] + service_time + travel_time
-                > self.nodes[next_node].ub[0]
-            ):
-                arcs_to_remove.append((current_node, next_node))
-
-        if arcs_to_remove:
-            print(
-                f"Removing arcs that would cause time window violations: {arcs_to_remove}"
-            )
-            self.graph.set_deleted_arcs(arcs_to_remove)
 
     def is_subsequence_feasible(self, path: List[int], next_node: int) -> bool:
         """
@@ -413,54 +253,29 @@ class ColumnElimination:
 
     def find_valid_transitions_to_state(self, prefix: List[int]) -> List[List[int]]:
         """
-        Enhanced implementation of S^- set from Algorithm 1. This method finds all valid
-        transitions that could lead to the current state, considering problem constraints.
+        Find all valid transitions that could lead to the current state,
+        following Algorithm 1 from the paper (S^- set)
         """
+        if not prefix:
+            return []
+
         valid_transitions = []
+        current_state = self.calculate_initial_state(prefix)
+        print(f"Starting exploration from prefix {prefix} with state {current_state}")
 
-        def explore_transitions(current_path, current_load, current_time):
-            """
-            Recursively explore valid transitions using the bucket graph.
-            """
-            print(f"Exploring transitions from path: {current_path}")
+        # Package current state information for bucket graph
+        resources = [current_state["time"]]
 
-            # Package current state information
-            resources = [current_time]  # Current implementation uses time as resource
+        # Get extensions from bucket graph
+        extensions = self.graph.extend_path(prefix, resources)
+        if not extensions:
+            return []
 
-            # Get extensions from bucket graph
-            new_paths = self.graph.extend_path(current_path, resources)
-            if not new_paths:
-                print(f"No extensions found from {current_path}")
-                return
-
-            # Process and validate each extension
-            for path in new_paths:
-                path_nodes = path.nodes_covered
-                # print(f"Validating potential path: {path_nodes}")
-
-                # Validate complete path
-                valid, diagnostics = self.validate_path_with_diagnostics(path_nodes)
-
-                if valid:
-                    # print(f"Found valid transition: {path_nodes}")
-                    valid_transitions.append(path_nodes)
-                    # Note: recursive exploration handled by bucket graph
-                else:
-                    print(f"Invalid path: {path_nodes}, Reason: {diagnostics}")
-
-        # Initialize from prefix if provided
-        if prefix:
-            initial_state = self.calculate_initial_state(prefix)
-            print(
-                f"Starting exploration from prefix {prefix} with state {initial_state}"
-            )
-
-            # Add prefix itself if valid
-            if self.is_path_feasible(prefix):
-                valid_transitions.append(prefix)
-
-            # Explore further transitions
-            explore_transitions(prefix, initial_state["load"], initial_state["time"])
+        # Validate extensions
+        for path in extensions:
+            path_nodes = path.nodes_covered
+            if self.is_path_feasible(path_nodes):
+                valid_transitions.append(path_nodes)
 
         return valid_transitions
 
@@ -481,37 +296,6 @@ class ColumnElimination:
 
         return {"load": initial_load, "time": initial_time}
 
-    def validate_path_with_diagnostics(self, path: List[int]) -> Tuple[bool, str]:
-        """
-        Validate a path and return detailed diagnostics about any violations.
-        """
-        # Check load constraints
-        current_load = sum(self.nodes[node].demand for node in path)
-        if current_load > self.vehicle_capacity:
-            return False, f"Capacity exceeded: {current_load} > {self.vehicle_capacity}"
-
-        # Check time windows
-        current_time = 0
-        for i in range(len(path) - 1):
-            current_node = path[i]
-            next_node = path[i + 1]
-
-            if i > 0:
-                current_time += self.nodes[current_node].duration
-
-            travel_time = self.calculate_travel_time(current_node, next_node)
-            arrival_time = current_time + travel_time
-
-            if arrival_time > self.nodes[next_node].ub[0]:
-                return False, (
-                    f"Time window violated at node {next_node}: "
-                    f"Arrival {arrival_time} > Latest {self.nodes[next_node].ub[0]}"
-                )
-
-            current_time = max(arrival_time, self.nodes[next_node].lb[0])
-
-        return True, "Path is valid"
-
     def calculate_travel_time(self, node1: int, node2: int) -> float:
         if node1 == 101:
             node1 = 0
@@ -519,65 +303,28 @@ class ColumnElimination:
             node2 = 0
         return self.instance.distances[node1][node2]
 
-    def find_conflict(self, path: List[int]) -> Optional[List[int]]:
-        """
-        Check if path is feasible in the original problem.
-        If not, return the infeasible subsequence.
-        Returns None if path is feasible.
-        """
+    def _find_minimal_capacity_violation(self, path: List[int]) -> List[int]:
+        """Find minimal subsequence causing capacity violation"""
+        total_load = 0
+        min_seq = []
 
-        # Check multiple visits
-        visits = defaultdict(int)
+        # Forward pass - find violation
         for node in path:
-            visits[node] += 1
-            if visits[node] > 1:
-                return path[: path.index(node) + 1]
+            total_load += self.nodes[node].demand
+            min_seq.append(node)
+            if total_load > self.vehicle_capacity:
+                break
 
-        # Check capacity constraints
-        current_load = 0
-        for i, node_id in enumerate(path):
-            current_load += self.nodes[node_id].demand
-            if current_load > self.vehicle_capacity:
-                print(
-                    f"Capacity violation at node {node_id}: {current_load} > {self.vehicle_capacity}"
-                )
-                return path[: i + 1]  # Return subsequence up to violation
+        # Backward pass - minimize sequence
+        while len(min_seq) > 2:  # Keep at least two nodes
+            first_node = min_seq[0]
+            if total_load - self.nodes[first_node].demand > self.vehicle_capacity:
+                total_load -= self.nodes[first_node].demand
+                min_seq.pop(0)
+            else:
+                break
 
-        # Check time window constraints
-        current_time = 0
-        for i in range(len(path) - 1):
-            current_node = path[i]
-            next_node = path[i + 1]
-
-            # Add service time at current node
-            if i > 0:  # Skip service time for depot at start
-                current_time += self.nodes[current_node].duration
-
-            # Add travel time to next node
-            travel_time = self.calculate_travel_time(current_node, next_node)
-            current_time += travel_time
-
-            # Check if we arrive before the end of time window
-            if current_time > self.nodes[next_node].ub[0]:
-                print(f"Time window violation at node {next_node}")
-                print(
-                    f"Arrival time: {current_time}, Latest allowed: {self.nodes[next_node].ub[0]}"
-                )
-                return path[: i + 2]  # Return subsequence including violating node
-
-            # Update current_time to start of service at next node
-            current_time = max(current_time, self.nodes[next_node].lb[0])
-
-        # Check if we can return to depot within its time window
-        if path[-1] != 0:  # If we're not already at depot
-            final_travel = self.calculate_travel_time(path[-1], 0)
-            final_time = current_time + self.nodes[path[-1]].duration + final_travel
-            if final_time > self.nodes[0].ub[0]:
-                print(f"Cannot return to depot within time window")
-                print(f"Return time: {final_time}, Depot closes: {self.nodes[0].ub[0]}")
-                return path  # The whole path is infeasible
-
-        return None
+        return min_seq
 
     def _is_feasible_solution(self, paths: List[List[int]]) -> bool:
         """
@@ -607,27 +354,6 @@ class ColumnElimination:
 
         return True
 
-    def extract_solution(self, x, arc_set):
-        """
-        Extracts the arcs used in the solution from the Gurobi model.
-        """
-        selected_arcs = []
-        for arc in arc_set:
-            if x[arc].x > 0.5:  # Check if the arc is used in the solution
-                selected_arcs.append(arc)
-        return selected_arcs
-
-    def decompose_paths(self, path_sequences):
-        """
-        Extract arcs from the given path sequences for the Gurobi model.
-        """
-        arcs_to_include = set()
-        for path in path_sequences:
-            for i in range(len(path) - 1):
-                arc = (path[i], path[i + 1])
-                arcs_to_include.add(arc)
-        return arcs_to_include
-
     def calculate_lagrangian(self, paths, duals):
         """
         Calculate the objective value of the Lagrangian relaxation.
@@ -648,15 +374,6 @@ class ColumnElimination:
             current_value += path_cost
 
         return current_value, visits
-
-    def repair_duals_greedy(self, duals):
-        """
-        Repair infeasible dual values using a greedy method.
-        """
-        for j in range(1, len(duals) - 1):
-            # If dual value is negative or violates a constraint, adjust it greedily
-            if duals[j] < 0:
-                duals[j] = 0
 
     def fix_arcs(
         self,
@@ -804,16 +521,18 @@ class ColumnElimination:
 
         # Initialize duals as before
         for i in range(1, self.n_nodes - 1):
-            duals[i - 1] = 50.0
+            duals[i - 1] = 100.0
 
         for iteration in range(max_iterations):
             self.graph.set_duals(duals)
 
             # Generate new columns and add to pool
             paths = self.graph.phaseFour()
+            print(len(paths))
             path_sequences = [
                 p.nodes_covered for p in paths if len(p.nodes_covered) > 2
             ]
+            print(f"Iteration {iteration}: Found {path_sequences}")
             for path in paths:
                 if len(path.nodes_covered) > 2:
                     cost = self.calculate_solution_cost([path.nodes_covered])
@@ -821,6 +540,7 @@ class ColumnElimination:
 
             # Get columns for current iteration
             current_columns = self.column_pool.get_columns_for_rmp()
+
             # if not current_columns:
             #    break
 
@@ -831,7 +551,7 @@ class ColumnElimination:
                 if conflict:
                     print(f"Found conflict in path: {path}")
                     print(f"Conflict details: {conflict}")
-                    self.refine_conflict(conflict)
+                    self.refine_conflict(conflict, path)
                     # Verify the conflict was actually eliminated
                     if self.find_conflict(path):
                         print("WARNING: Conflict still exists after refinement!")
@@ -908,7 +628,7 @@ class ColumnElimination:
 
 # Create instance data
 solomon_instance = InstanceData()
-solomon_instance.read_instance("../build/instances/R201.txt")
+solomon_instance.read_instance("../build/instances/C201.txt")
 instance = convert_instance_data(solomon_instance)
 
 nodes = []
@@ -928,7 +648,7 @@ for i in range(instance.num_nodes):
 solver = ColumnElimination(
     nodes=nodes,
     time_horizon=int(instance.get_time_horizon()),
-    bucket_interval=20,
+    bucket_interval=10,
     vehicle_capacity=700,
     n_vehicles=3,
     instance=instance,
