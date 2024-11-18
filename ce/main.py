@@ -38,9 +38,10 @@ class ColumnElimination:
         self.instance = instance
         self.column_pool = ColumnPool()
         self.conflict_manager = ConflictManager(self)
-
+        self.path_decomposer = PathDecomposition(self)
         # Initialize baldes components
         self.vrp_nodes = nodes
+        self.path_selector = PathSelector(self)
 
         self.graph = baldes.BucketGraph(self.vrp_nodes, time_horizon, bucket_interval)
 
@@ -67,22 +68,37 @@ class ColumnElimination:
 
     def calculate_lagrangian(self, paths, duals):
         """
-        Calculate the objective value of the Lagrangian relaxation.
+        Calculate the objective value of the Lagrangian relaxation according to the paper.
+
+        L(λ) = min Σ(c_a - Σ g_j(a)λ_j)y_a + Σ λ_j b_j
+
+        Where:
+        - c_a is the travel time cost
+        - g_j(a) indicates if node j is in arc a
+        - λ_j are the dual variables
+        - b_j = 1 (each node must be visited exactly once)
         """
         current_value = 0
         visits = defaultdict(int)
 
+        # First term: path costs with dual adjustments
         for path in paths:
             path = path.nodes_covered
+            # Calculate original path cost
             path_cost = sum(
                 self.calculate_travel_time(path[i], path[i + 1])
                 for i in range(len(path) - 1)
             )
-            for node in path[1:-1]:
+
+            # Track visits and adjust cost by duals
+            for node in path[1:-1]:  # Skip depots
                 visits[node] += 1
                 path_cost -= duals[node - 1]
 
             current_value += path_cost
+
+        # Second term: sum of duals (since b_j = 1 for all j)
+        current_value -= sum(duals)
 
         return current_value, visits
 
@@ -221,7 +237,17 @@ class ColumnElimination:
                 cost += self.calculate_travel_time(path[i], path[i + 1])
         return cost
 
-    def solve_with_subgradient(self, max_iterations: int = 1000):
+    def _is_feasible_solution(self, solution: List[List[int]]) -> bool:
+        """Check if a solution is feasible"""
+        covered_nodes = set()
+        for path in solution:
+            path_nodes = set(path) - {0, self.n_nodes - 1}
+            if path_nodes & covered_nodes:
+                return False
+            covered_nodes.update(path_nodes)
+        return True
+
+    def solve_with_subgradient(self, max_iterations: int = 10000):
         """Modified solve method with path selection optimization"""
         duals = [0.0] * self.n_nodes
         best_lb = float("-inf")
@@ -238,8 +264,13 @@ class ColumnElimination:
         # Keep track of best feasible paths found
         feasible_paths = set()
         node_coverage = defaultdict(int)
+        smoothing_factor = 0.7  # For exponential smoothing
+        prev_duals = duals.copy()
+        max_dual = 500.0  # Maximum allowed dual value
+        min_dual = 0.0  # Minimum allowed dual value
 
         for iteration in range(max_iterations):
+            print(duals)
             self.graph.set_duals(duals)
 
             # Generate new columns and add to pool
@@ -247,25 +278,43 @@ class ColumnElimination:
             path_sequences = [
                 p.nodes_covered for p in paths if len(p.nodes_covered) > 2
             ]
+            # print(path_sequences)
+            decomposed_paths = self.path_decomposer.decompose_solution(path_sequences)
 
+            path_sequences = [p for p in decomposed_paths if len(p) > 2]
             # Check feasibility of new paths and add to pool
             for path in paths:
-                if len(path.nodes_covered) > 2:
-                    conflict = self.conflict_manager.find_conflict(path.nodes_covered)
-                    if not conflict:  # Path is feasible
-                        cost = self.calculate_solution_cost([path.nodes_covered])
-                        self.column_pool.add_column(path.nodes_covered, cost)
-                        feasible_paths.add(tuple(path.nodes_covered))
+                conflict = self.conflict_manager.find_conflict(path.nodes_covered)
+                if conflict.type == "empty":
+                    cost = self.calculate_solution_cost([path.nodes_covered])
+                    self.column_pool.add_column(path.nodes_covered, cost)
+                    feasible_paths.add(tuple(path.nodes_covered))
 
-            # Try to construct a complete solution from feasible paths
             if feasible_paths:
-                solution = self._select_best_paths(feasible_paths)
-                if solution:
-                    solution_cost = self.calculate_solution_cost(solution)
-                    if solution_cost < best_ub:
-                        best_ub = solution_cost
-                        best_solution = solution
-                        print(f"New best solution found with cost {best_ub}")
+                # Try all selection strategies
+                for strategy_name in ["greedy"]:
+                    if strategy_name == "greedy":
+                        solution = self.path_selector._greedy_selection(feasible_paths)
+                    elif strategy_name == "regret":
+                        solution = self.path_selector._regret_based_selection(
+                            feasible_paths
+                        )
+                    else:
+                        solution = self.path_selector._load_balanced_selection(
+                            feasible_paths
+                        )
+
+                    if solution:
+                        solution_cost = self.calculate_solution_cost(solution)
+
+                        # Check if solution is feasible
+                        if self._is_feasible_solution(solution):
+                            if solution_cost < best_ub:
+                                best_ub = solution_cost
+                                best_solution = solution
+                                print(f"New best solution found with cost {best_ub}")
+                                print(f"Using strategy: {strategy_name}")
+                                print(f"Solution: {solution}")
 
             # Get columns for current iteration
             current_columns = self.column_pool.get_columns_for_rmp()
@@ -274,7 +323,9 @@ class ColumnElimination:
             conflict_found = False
             for path in current_columns:
                 conflict = self.conflict_manager.find_conflict(path)
-                if conflict:
+                # print(f"Checking conflict for path {path}: {conflict}")
+                if conflict.type != "empty":
+                    print(f"Conflict found: {conflict}")
                     if self.conflict_manager.refine_conflict(conflict):
                         self.column_pool.remove_column(path)
                         if tuple(path) in feasible_paths:
@@ -284,6 +335,7 @@ class ColumnElimination:
 
             # Solve RMP using subgradient
             current_value, visits = self.calculate_lagrangian(paths, duals)
+
             subgradient = [1 - visits[j] for j in range(1, self.n_nodes - 1)]
 
             # Update bounds
@@ -293,30 +345,64 @@ class ColumnElimination:
             if best_ub < float("inf"):
                 psi_star = best_lb * (1 + 5 / (100 + iteration))
             else:
+                # psi_star = current_value * 1.1
                 psi_star = current_value * 1.1
 
             subgradient_norm = sum(g * g for g in subgradient)
             if subgradient_norm > 0:
-                step_size = alpha * (psi_star - current_value) / subgradient_norm
+                step_size = min(
+                    10.0,  # Maximum step size
+                    alpha * (psi_star - current_value) / subgradient_norm,
+                )
+            # step_size = alpha * (psi_star - current_value) / subgradient_norm
             else:
                 step_size = 0
 
             # Update duals
+            # Update duals with smoothing and bounds
             new_duals = []
             for j in range(1, self.n_nodes - 1):
-                new_val = max(0, duals[j - 1] - step_size * subgradient[j - 1])
-                new_duals.append(new_val)
+                # Calculate raw update
+                raw_update = duals[j - 1] - step_size * subgradient[j - 1]
+
+                # Apply smoothing with previous values
+                smoothed_value = (
+                    smoothing_factor * prev_duals[j - 1]
+                    + (1 - smoothing_factor) * raw_update
+                )
+
+                # Enforce bounds
+                bounded_value = max(min_dual, min(max_dual, smoothed_value))
+
+                # Gradual change limit (prevent sudden jumps)
+                max_change = max(10.0, abs(prev_duals[j - 1]) * 0.2)  # 20% or 10 units
+                final_value = max(
+                    prev_duals[j - 1] - max_change,
+                    min(prev_duals[j - 1] + max_change, bounded_value),
+                )
+
+                new_duals.append(final_value)
 
             # Handle convergence
-            if current_value > best_lb - 0.01 * abs(best_lb):
-                non_improving_count = 0
-            else:
+            gap = abs(best_ub - best_lb) / (abs(best_lb) + 1e-10)
+            if gap < 0.01:  # 1% gap
+                print(f"Converged with gap {gap*100:.2f}%")
+                break
+
+            if abs(current_value - best_lb) < 0.01 * abs(best_lb):
                 non_improving_count += 1
+            else:
+                non_improving_count = 0
 
             if non_improving_count > 20:
                 alpha *= step_reduction
+                smoothing_factor = min(
+                    0.95, smoothing_factor + 0.01
+                )  # Increase smoothing
                 non_improving_count = 0
 
+            # Store previous duals and update current ones
+            prev_duals = duals.copy()
             duals = new_duals
 
             # Periodic arc fixing when we have good bounds
@@ -344,91 +430,6 @@ class ColumnElimination:
 
         return best_lb, best_solution
 
-    def _select_best_paths(
-        self, feasible_paths: Set[Tuple[int]]
-    ) -> Optional[List[List[int]]]:
-        """
-        Select best combination of feasible paths to cover all nodes
-        Uses a greedy selection strategy with path scoring
-        """
-        required_nodes = set(range(1, self.n_nodes - 1))  # All nodes except depot
-        selected_paths = []
-        remaining_nodes = required_nodes.copy()
-
-        # Convert paths to list and sort by score
-        paths_list = list(feasible_paths)
-        path_scores = [
-            (path, self._score_path(path, remaining_nodes)) for path in paths_list
-        ]
-
-        while remaining_nodes and path_scores:
-            # Sort paths by score (higher is better)
-            path_scores.sort(key=lambda x: x[1], reverse=True)
-
-            # Select best path
-            best_path, _ = path_scores[0]
-            selected_paths.append(list(best_path))
-
-            # Update remaining nodes
-            path_nodes = set(best_path) - {0, self.n_nodes - 1}  # Exclude depot
-            remaining_nodes -= path_nodes
-
-            # Recalculate scores for remaining paths
-            path_scores = [
-                (p, self._score_path(p, remaining_nodes))
-                for p, _ in path_scores[1:]
-                if self._is_path_compatible(p, selected_paths)
-            ]
-
-        if not remaining_nodes:
-            return selected_paths
-        return None
-
-    def _score_path(self, path: Tuple[int], remaining_nodes: Set[int]) -> float:
-        """
-        Score a path based on various criteria:
-        - Coverage of remaining nodes
-        - Path cost
-        - Load utilization
-        - Time window efficiency
-        """
-        path_nodes = set(path) - {0, self.n_nodes - 1}
-        coverage = len(path_nodes & remaining_nodes)
-        cost = self.calculate_solution_cost([list(path)])
-
-        # Calculate load utilization
-        total_load = sum(self.nodes[i].demand for i in path_nodes)
-        load_ratio = total_load / self.vehicle_capacity
-
-        # Time window efficiency (smaller is better)
-        time_span = 0
-        current_time = 0
-        for i in range(len(path) - 1):
-            if i > 0:
-                current_time += self.nodes[path[i]].duration
-            travel = self.calculate_travel_time(path[i], path[i + 1])
-            current_time += travel
-            time_span = max(time_span, current_time)
-
-        # Combine factors into final score
-        # Higher coverage and load utilization are better
-        # Lower cost and time span are better
-        score = (
-            (coverage * 1000) + (load_ratio * 100) - (cost * 0.1) - (time_span * 0.01)
-        )
-        return score
-
-    def _is_path_compatible(
-        self, path: Tuple[int], selected_paths: List[List[int]]
-    ) -> bool:
-        """Check if a path is compatible with already selected paths"""
-        path_nodes = set(path) - {0, self.n_nodes - 1}
-        for selected in selected_paths:
-            selected_nodes = set(selected) - {0, self.n_nodes - 1}
-            if path_nodes & selected_nodes:  # If there's any overlap
-                return False
-        return True
-
 
 # Create instance data
 solomon_instance = InstanceData()
@@ -452,7 +453,7 @@ for i in range(instance.num_nodes):
 solver = ColumnElimination(
     nodes=nodes,
     time_horizon=int(instance.get_time_horizon()),
-    bucket_interval=10,
+    bucket_interval=20,
     vehicle_capacity=700,
     n_vehicles=3,
     instance=instance,

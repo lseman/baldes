@@ -467,32 +467,30 @@ void BucketGraph::common_initialization() {
 
     std::vector<Label *> fw_warm_labels;
     std::vector<Label *> bw_warm_labels;
-    std::vector<Label *> fw_warmed_labels;
-    std::vector<Label *> bw_warmed_labels;
     if (merged_labels.size() > 0 && options.warm_start) {
 
-        for (auto bucket = 0; bucket < fw_buckets_size; ++bucket) {
-            auto      &current_bucket = fw_buckets[bucket];          // Get the current bucket
-            const auto labels         = current_bucket.get_labels(); // Get labels in the current bucket
-            // get the first label of each bucket
-            if (labels.size() > 0) {
-                if (!labels[0]->fresh) { continue; }
-                fw_warm_labels.push_back(labels[0]);
-            }
-        }
-        for (auto bucket = 0; bucket < bw_buckets_size; ++bucket) {
-            auto      &current_bucket = bw_buckets[bucket];          // Get the current bucket
-            const auto labels         = current_bucket.get_labels(); // Get labels in the current bucket
-            // get the first label of each bucket
-            if (labels.size() > 0) {
-                if (!labels[0]->fresh) { continue; }
-                bw_warm_labels.push_back(labels[0]);
-            }
-        }
+        PARALLEL_SECTIONS(
+            work, bi_sched,
+            SECTION_CUSTOM(this, &fw_warm_labels) {
+                for (auto bucket = 0; bucket < fw_buckets_size; ++bucket) {
+                    auto      &current_bucket = fw_buckets[bucket];          // Get the current bucket
+                    const auto labels         = current_bucket.get_labels(); // Get labels in the current bucket
+                    // get the first label of each bucket
+                    auto label = current_bucket.get_best_label();
+                    if (label != nullptr) { fw_warm_labels.push_back(label); }
+                }
+            },
+            SECTION_CUSTOM(this, &bw_warm_labels) {
+                for (auto bucket = 0; bucket < bw_buckets_size; ++bucket) {
+                    auto &current_bucket = bw_buckets[bucket];              // Get the current bucket
+                    auto  label          = current_bucket.get_best_label(); // get the first label of each bucket
+                    if (label != nullptr) { bw_warm_labels.push_back(label); }
+                }
+            });
     }
 
     merged_labels.clear();
-    merged_labels.reserve(100);
+    merged_labels.reserve(50);
     fw_c_bar.clear();
     bw_c_bar.clear();
 
@@ -520,29 +518,6 @@ void BucketGraph::common_initialization() {
         base_intervals[r] = (VRPNode.ub[r] - VRPNode.lb[r]) / intervals[r].interval;
     }
 
-    if (options.warm_start) {
-        // sort the warm labels for the ones with the smallest cost
-        pdqsort(fw_warm_labels.begin(), fw_warm_labels.end(),
-                [](const Label *a, const Label *b) { return a->cost < b->cost; });
-        pdqsort(bw_warm_labels.begin(), bw_warm_labels.end(),
-                [](const Label *a, const Label *b) { return a->cost < b->cost; });
-        // keep only top 100
-        if (fw_warm_labels.size() > options.n_warm_start) { fw_warm_labels.resize(options.n_warm_start); }
-        if (bw_warm_labels.size() > options.n_warm_start) { bw_warm_labels.resize(options.n_warm_start); }
-        for (auto label : fw_warm_labels) {
-            if (!label->fresh) { continue; }
-            label = compute_red_cost(label, true);
-            if (label == nullptr) { continue; }
-            fw_warmed_labels.push_back(label);
-        }
-        for (auto label : bw_warm_labels) {
-            if (!label->fresh) { continue; }
-            label = compute_red_cost(label, false);
-            if (label == nullptr) { continue; }
-            bw_warmed_labels.push_back(label);
-        }
-    }
-
     // Clear forward and backward buckets
     for (auto b = 0; b < fw_buckets.size(); b++) {
         fw_buckets[b].clear();
@@ -550,9 +525,72 @@ void BucketGraph::common_initialization() {
     }
 
     if (options.warm_start) {
-        for (auto label : fw_warmed_labels) { fw_buckets[label->vertex].add_label(label); }
-        for (auto label : bw_warmed_labels) { bw_buckets[label->vertex].add_label(label); }
+        // sort the warm labels for the ones with the smallest cost
+        PARALLEL_SECTIONS(
+            work, bi_sched,
+            SECTION_CUSTOM(this, &fw_warm_labels) {
+                // Sort forward labels
+                pdqsort(fw_warm_labels.begin(), fw_warm_labels.end(),
+                        [](const Label *a, const Label *b) { return a->cost < b->cost; });
+
+                // Create a new vector for processed labels
+                std::vector<Label *> processed_labels;
+                const size_t         process_size =
+                    fw_warm_labels.size() > options.n_warm_start ? options.n_warm_start : fw_warm_labels.size();
+                processed_labels.reserve(process_size);
+
+                // Process labels
+                for (size_t i = 0; i < process_size; ++i) {
+                    auto label = fw_warm_labels[i];
+                    if (!label->fresh) { continue; }
+
+                    // compute_red_cost returns a new label from the pool
+                    auto new_label = compute_red_cost(label, true);
+                    if (new_label != nullptr) {
+                        // Add to bucket first since we have a valid label
+                        fw_buckets[new_label->vertex].add_label(new_label);
+                        processed_labels.push_back(new_label);
+                    }
+                }
+
+                // Replace original vector contents
+                fw_warm_labels.clear(); // Clear without deleting original labels
+                fw_warm_labels = std::move(processed_labels);
+            },
+            SECTION_CUSTOM(this, &bw_warm_labels) {
+                // Sort backward labels
+                pdqsort(bw_warm_labels.begin(), bw_warm_labels.end(),
+                        [](const Label *a, const Label *b) { return a->cost < b->cost; });
+
+                // Create a new vector for processed labels
+                std::vector<Label *> processed_labels;
+                const size_t         process_size =
+                    bw_warm_labels.size() > options.n_warm_start ? options.n_warm_start : bw_warm_labels.size();
+                processed_labels.reserve(process_size);
+
+                // Process labels
+                for (size_t i = 0; i < process_size; ++i) {
+                    auto label = bw_warm_labels[i];
+                    if (!label->fresh) { continue; }
+
+                    // compute_red_cost returns a new label from the pool
+                    auto new_label = compute_red_cost(label, false);
+                    if (new_label != nullptr) {
+                        // Add to bucket first since we have a valid label
+                        bw_buckets[new_label->vertex].add_label(new_label);
+                        processed_labels.push_back(new_label);
+                    }
+                }
+
+                // Replace original vector contents
+                bw_warm_labels.clear(); // Clear without deleting original labels
+                bw_warm_labels = std::move(processed_labels);
+            });
     }
+    // if (options.warm_start) {
+    // for (auto label : fw_warmed_labels) { fw_buckets[label->vertex].add_label(label); }
+    // for (auto label : bw_warmed_labels) { bw_buckets[label->vertex].add_label(label); }
+    // }
     // Initialize forward buckets (generic for multiple dimensions)
     std::vector<int> current_pos(num_intervals, 0);
 
@@ -986,7 +1024,7 @@ std::vector<Label *> BucketGraph::extend_path(const std::vector<int> &path, std:
     label->node_id = path.back();
     label->cost    = 0.0;
     for (size_t i = 0; i < resources.size(); ++i) { label->resources[i] = resources[i]; }
-    label->nodes_covered = path;
+    label->addRoute(path);
     for (auto node : path) { set_node_visited(label->visited_bitmap, node); }
 
     label->cost = 0.0;

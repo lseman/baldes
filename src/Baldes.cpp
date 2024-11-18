@@ -263,8 +263,8 @@ int main(int argc, char *argv[]) {
     int  labelID        = 0;
     int  labels_counter = 0;
     auto process_route  = [&](const std::vector<int> &route) {
-        auto label           = new Label();
-        label->nodes_covered = route;
+        auto label = new Label();
+        label->addRoute(route);
         // calculate total distance
         for (int i = 0; i < route.size() - 1; i++) { label->cost += instance.getcij(route[i], route[i + 1]); }
         // label->cost         = route.total_distance();

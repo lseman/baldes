@@ -276,7 +276,7 @@ void LimitedMemoryRank1Cuts::separate(const SparseMatrix &A, const std::vector<d
 
     pdqsort(tmp_cuts.begin(), tmp_cuts.end(), [](const auto &a, const auto &b) { return a.first > b.first; });
 
-    auto max_cuts = 2;
+    auto max_cuts = 3;
     for (int i = 0; i < std::min(max_cuts, static_cast<int>(tmp_cuts.size())); ++i) {
         auto &cut = tmp_cuts[i].second;
         cutStorage.addCut(cut);
@@ -297,7 +297,7 @@ std::pair<bool, bool> LimitedMemoryRank1Cuts::runSeparation(BNBNode *node, std::
     size_t i = 0;
     std::for_each(allPaths.begin(), allPaths.end(), [&](auto &path) { path.frac_x = solution[i++]; });
 
-    // separateR1C1(matrix.A_sparse, solution);
+    separateR1C1(matrix.A_sparse, solution);
     separate(matrix.A_sparse, solution);
 
     // TupleBasedSeparator r1c4(allPaths);
@@ -382,7 +382,7 @@ std::pair<bool, bool> LimitedMemoryRank1Cuts::runSeparation(BNBNode *node, std::
     // generator->constructMemoryVertexBased();
 
     // auto cut_number = processCuts();
-    for (double memFactor = 0.15; memFactor <= 0.55; memFactor += 0.20) {
+    for (double memFactor = 0.15; memFactor <= 0.65; memFactor += 0.05) {
         generator->setMemFactor(memFactor);
         generator->constructMemoryVertexBased();
         auto cut_number = processCuts();
@@ -406,8 +406,8 @@ std::pair<bool, bool> LimitedMemoryRank1Cuts::runSeparation(BNBNode *node, std::
     auto it = SRCconstraints.end();
     while (it != SRCconstraints.begin()) {
         --it;
-        auto constr        = *it;
-        //int  current_index = node->get_current_index(constr->get_unique_id());
+        auto constr = *it;
+        // int  current_index = node->get_current_index(constr->get_unique_id());
         int current_index = constr->index();
         // Get the slack value of the constraint
         double slack = node->getSlack(current_index, solution);

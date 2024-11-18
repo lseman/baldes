@@ -32,7 +32,7 @@ struct Label {
     double                     cost          = 0.0;
     double                     real_cost     = 0.0;
     std::array<double, R_SIZE> resources     = {};
-    std::vector<int>           nodes_covered = {}; // Add nodes_covered to Label
+    gch::small_vector<int>     nodes_covered = {}; // Add nodes_covered to Label
     int                        node_id       = -1; // Add node_id to Label
     Label                     *parent        = nullptr;
     bool                       fresh         = true;
@@ -56,6 +56,15 @@ struct Label {
 
     void set_extended(bool extended) { is_extended = extended; }
 
+    auto getRoute() const {
+        std::vector<int> nodes;
+        for (auto node : nodes_covered) { nodes.push_back(node); }
+        return nodes;
+    }
+
+    void addRoute(const std::vector<int> &route) {
+        for (auto node : route) { nodes_covered.push_back(node); }
+    }
     /**
      * @brief Checks if a node has been visited.
      *

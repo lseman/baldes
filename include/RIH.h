@@ -461,8 +461,8 @@ public:
 
                 for (size_t task_idx = start_idx; task_idx < end_idx; ++task_idx) {
                     const auto &[label_i, label_j, k, l] = tasks[task_idx];
-                    const auto &route_i                  = label_i->nodes_covered;
-                    const auto &route_j                  = label_j->nodes_covered;
+                    const auto &route_i                  = label_i->getRoute();
+                    const auto &route_j                  = label_j->getRoute();
 
                     // Select operator based on weights
                     int op_idx = select_operator(rng);
@@ -493,10 +493,10 @@ public:
                                 operator_success_count[op_idx] += 1; // Increment success count
                             }
 
-                            auto best_new_label           = new Label();
-                            best_new_label->nodes_covered = path.route;
-                            best_new_label->real_cost     = cost.first;
-                            best_new_label->cost          = new_cost;
+                            auto best_new_label = new Label();
+                            best_new_label->addRoute(path.route);
+                            best_new_label->real_cost = cost.first;
+                            best_new_label->cost      = new_cost;
 
                             // Lock to update best_new
                             {

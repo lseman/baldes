@@ -80,15 +80,13 @@ class ColumnPool:
 class Conflict:
     """Class representing a conflict in a path"""
 
-    def __init__(self, conflict_type: str, sequence: List[int], state: Dict):
-        self.type = conflict_type
+    def __init__(self, type: str, sequence: List[int], details: Dict):
+        self.type = type
         self.sequence = sequence
-        self.state = state
+        self.details = details  # Changed from state to details to match usage
 
     def __str__(self):
-        return (
-            f"Conflict(type={self.type}, sequence={self.sequence}, state={self.state})"
-        )
+        return f"Conflict(type={self.type}, sequence={self.sequence}, details={self.details})"
 
 
 from typing import List, Dict, Optional, Set
@@ -99,18 +97,12 @@ from collections import defaultdict
 from dataclasses import dataclass
 
 
-@dataclass
-class Conflict:
-    """Data class to represent conflicts"""
-
-    type: str
-    sequence: List[int]
-    details: Dict
-
-
 from typing import List, Dict, Optional, Set, Tuple
 from collections import defaultdict
 from copy import deepcopy
+
+# import Union from typing
+from typing import Union
 
 
 class ConflictManager:
@@ -208,87 +200,107 @@ class ConflictManager:
             time = max(time, self._node_time_windows[path[i]][0])
         return time
 
-    def find_conflict(self, path: List[int]) -> Optional[Dict]:
-        """Enhanced conflict detection with state preservation"""
-        # Save current state
-        self._current_state = {
-            "path": path[:],
-            "visited": set(),
-            "current_load": 0,
-            "current_time": 0,
-        }
-
-        # Check for cycles using set for O(1) lookup
+    def find_conflict(self, path: List[int]) -> Conflict:
+        """Enhanced conflict detection returning Conflict objects"""
+        # Check for cycles
+        visited = set()
         for i, node in enumerate(path):
-            if node != 0 and node in self._current_state["visited"]:
+            if node != 0 and node in visited:
                 cycle_start = path.index(node)
                 cycle_sequence = path[cycle_start : i + 1]
                 self.refinement_stats["cycle_conflicts"] += 1
-                return {
-                    "type": "cycle",
-                    "sequence": cycle_sequence,
-                    "details": {"cycle_node": node},
-                }
-            self._current_state["visited"].add(node)
+                # print(pato)
+                novo_conflito = Conflict(
+                    type="cycle", sequence=cycle_sequence, details={"cycle_node": node}
+                )
+                # print(novo_conflito)
+                return novo_conflito
+            visited.add(node)
 
-        # Progressive resource checking with early exits
-        current_load = 0
+        # Track cumulative load and time
         time = 0
+        load = 0
         violation_start = 0
 
+        # Check each node in sequence
         for i, node in enumerate(path):
             # Update load
-            current_load += self._node_demands[node]
+            load += self._node_demands[node]
 
-            # Quick capacity check
-            if current_load > self.solver.vehicle_capacity:
-                subsequence = path[violation_start : i + 1]
-                self.refinement_stats["capacity_conflicts"] += 1
-                return {
-                    "type": "capacity",
-                    "sequence": subsequence,
-                    "details": {"load": current_load},
-                }
+            # Capacity check
+            if load > self.solver.vehicle_capacity:
+                # Find minimal subsequence causing violation
+                for start in range(violation_start, i + 1):
+                    subload = sum(
+                        self._node_demands[path[j]] for j in range(start, i + 1)
+                    )
+                    if subload > self.solver.vehicle_capacity:
+                        subsequence = path[start : i + 1]
+                        self.refinement_stats["capacity_conflicts"] += 1
+                        return Conflict(
+                            type="capacity",
+                            sequence=subsequence,
+                            details={"load": subload},
+                        )
 
-            # Update time
+            # Time window check
             if i > 0:
+                # Add service time at previous location
                 time += self._node_durations[path[i - 1]]
-                time += self._get_travel_time(path[i - 1], node)
+
+                # Add travel time to current location
+                travel = self._get_travel_time(path[i - 1], node)
+                time += travel
+
+                # Cannot arrive before earliest time
                 time = max(time, self._node_time_windows[node][0])
 
-                # Time window check
+                # Check if we've violated the latest arrival time
                 if time > self._node_time_windows[node][1]:
-                    subsequence = path[violation_start : i + 1]
-                    self.refinement_stats["time_window_conflicts"] += 1
-                    return {
-                        "type": "time_window",
-                        "sequence": subsequence,
-                        "details": {
-                            "time": time,
-                            "latest": self._node_time_windows[node][1],
-                        },
-                    }
+                    # Find minimal subsequence causing violation
+                    for start in range(violation_start, i):
+                        subtime = self._node_time_windows[path[start]][
+                            0
+                        ]  # Start at earliest time
+                        for j in range(start, i + 1):
+                            if j > start:
+                                subtime += self._node_durations[path[j - 1]]
+                                subtime += self._get_travel_time(path[j - 1], path[j])
+                                subtime = max(
+                                    subtime, self._node_time_windows[path[j]][0]
+                                )
 
-            # Reset violation tracking if still feasible
+                            if subtime > self._node_time_windows[path[j]][1]:
+                                subsequence = path[start : j + 1]
+                                self.refinement_stats["time_window_conflicts"] += 1
+                                return Conflict(
+                                    type="time_window",
+                                    sequence=subsequence,
+                                    details={
+                                        "time": subtime,
+                                        "latest": self._node_time_windows[path[j]][1],
+                                    },
+                                )
+
+            # Only update violation_start if we're still feasible
             if i > 0 and time <= self._node_time_windows[node][1]:
                 violation_start = i
-                current_load = self._node_demands[node]
-                time = max(
-                    self._node_time_windows[node][0], self._get_travel_time(0, node)
-                )
 
-        return None
+        # No conflicts found
+        new_empty_conflict = Conflict(type="empty", sequence=[], details={})
+        return new_empty_conflict
 
-    def refine_conflict(self, conflict: Dict) -> bool:
+    def refine_conflict(self, conflict: Conflict) -> bool:
         """Refine conflict with state preservation"""
         try:
-            sequence = conflict["sequence"]
+            print("Refining conflict")
+            sequence = conflict.sequence
 
             # Save state before refinement
             self._state_history.append(deepcopy(self._current_state))
 
             # Fast path for cycle conflicts
-            if conflict["type"] == "cycle":
+            if conflict.type == "cycle":
                 return self._refine_cycle(conflict)
 
             # Process sequence positions
@@ -336,9 +348,9 @@ class ConflictManager:
             print(f"Error during conflict refinement: {e}")
             return False
 
-    def _refine_cycle(self, conflict: Dict) -> bool:
+    def _refine_cycle(self, conflict: Conflict) -> bool:
         """Optimized cycle refinement"""
-        sequence = conflict["sequence"]
+        sequence = conflict.sequence
         conflicts = set()  # Use set for faster lookups
 
         # Add all pairs in cycle to conflicts
@@ -362,3 +374,438 @@ class ConflictManager:
     def get_stats(self) -> Dict:
         """Get complete statistics"""
         return dict(self.refinement_stats)
+
+
+class PathDecomposition:
+    """Class to handle path decomposition of network flow solutions"""
+
+    def __init__(self, solver):
+        self.solver = solver
+
+    def decompose_solution(self, paths) -> List[List[int]]:
+        """
+        Decompose network flow solution into paths following flow decomposition theorem
+        Args:
+            paths: Solution from phaseFour() containing flow values
+        Returns:
+            List of paths representing flow decomposition
+        """
+        decomposed_paths = []
+
+        # Convert to flow representation if needed
+        flow_graph = self._build_flow_graph(paths)
+
+        # While there is remaining flow
+        while self._has_remaining_flow(flow_graph):
+            # Find a path from source to sink with positive flow
+            path = self._find_positive_flow_path(flow_graph)
+            if not path:
+                break
+
+            # Find minimum flow along path
+            min_flow = self._get_min_flow(flow_graph, path)
+
+            # Subtract flow along path
+            self._subtract_flow(flow_graph, path, min_flow)
+
+            # Add path to decomposition
+            decomposed_paths.append(path)
+
+        return decomposed_paths
+
+    def _build_flow_graph(self, paths):
+        """Convert paths to residual flow graph"""
+        flow_graph = defaultdict(lambda: defaultdict(float))
+
+        for path in paths:
+            sequence = path
+            for i in range(len(sequence) - 1):
+                u, v = sequence[i], sequence[i + 1]
+                flow_graph[u][v] += 1  # Assuming unit flow per path
+
+        return flow_graph
+
+    def _has_remaining_flow(self, flow_graph):
+        """Check if graph has any remaining positive flow"""
+        return any(
+            any(f > 0.001 for f in flows.values()) for flows in flow_graph.values()
+        )
+
+    def _find_positive_flow_path(self, flow_graph):
+        """Find a path from source (0) to sink (101) with positive flow"""
+
+        def dfs(node, path, visited):
+            # Found valid path when we reach end depot (101) and have visited customers
+            if node == 101 and len(path) > 2:
+                # Verify it starts from depot 0
+                if path[0] == 0:
+                    return path
+                return None
+
+            # Don't add depots to visited set
+            if node not in {0, 101}:
+                if node in visited:
+                    return None
+                visited.add(node)
+
+            # Try all possible next nodes with positive flow
+            for next_node, flow in flow_graph[node].items():
+                if flow > 0.001:
+                    # Allow visiting end depot (101) anytime
+                    if next_node == 101 or next_node not in visited:
+                        new_path = path + [next_node]
+                        result = dfs(next_node, new_path, visited.copy())
+                        if result:
+                            return result
+
+            return None
+
+        # Start DFS from start depot (0)
+        initial_path = [0]
+        return dfs(0, initial_path, set())
+
+    def _get_min_flow(self, flow_graph, path):
+        """Get minimum flow value along path"""
+        min_flow = float("inf")
+        for i in range(len(path) - 1):
+            u, v = path[i], path[i + 1]
+            min_flow = min(min_flow, flow_graph[u][v])
+        return min_flow
+
+    def _subtract_flow(self, flow_graph, path, flow_value):
+        """Subtract flow value along path"""
+        for i in range(len(path) - 1):
+            u, v = path[i], path[i + 1]
+            flow_graph[u][v] -= flow_value
+
+
+class PathScore:
+    """Class to represent and compare path scores"""
+
+    def __init__(self, path: List[int], score_components: Dict[str, float]):
+        self.path = path
+        self.components = score_components
+        self.total_score = self._calculate_total_score()
+
+    def _calculate_total_score(self) -> float:
+        # Weights for different components
+        weights = {
+            "coverage_ratio": 1000,
+            "load_efficiency": 200,
+            "time_efficiency": 300,
+            "cost_efficiency": 500,
+            "route_balance": 150,
+        }
+        return sum(weights[k] * v for k, v in self.components.items())
+
+    def __lt__(self, other):
+        return self.total_score < other.total_score
+
+
+class PathSelector:
+    """Enhanced path selection with multiple strategies"""
+
+    def __init__(self, solver):
+        self.solver = solver
+        self.best_solution = None
+        self.best_cost = float("inf")
+
+    def select_best_paths(
+        self, feasible_paths: Set[Tuple[int]]
+    ) -> Optional[List[List[int]]]:
+        """Select best combination of paths using multiple strategies"""
+        if not feasible_paths:
+            return None
+
+        solutions = []
+
+        # Try different selection strategies
+        strategies = [
+            self._greedy_selection,
+            self._regret_based_selection,
+            self._load_balanced_selection,
+        ]
+
+        for strategy in strategies:
+            solution = strategy(feasible_paths)
+            if solution:
+                solutions.append(solution)
+
+        # Return best solution found
+        if not solutions:
+            return None
+
+        return min(solutions, key=lambda s: self.solver.calculate_solution_cost(s))
+
+    def _greedy_selection(
+        self, feasible_paths: Set[Tuple[int]]
+    ) -> Optional[List[List[int]]]:
+        """Greedy selection based on comprehensive path scoring"""
+        required_nodes = set(range(1, self.solver.n_nodes - 1))
+        selected_paths = []
+        remaining_nodes = required_nodes.copy()
+
+        while remaining_nodes:
+            # Score all compatible paths
+            scored_paths = []
+            for path in feasible_paths:
+                if self._is_compatible(path, selected_paths):
+                    score = self._score_path(path, remaining_nodes, selected_paths)
+                    scored_paths.append((path, score))
+
+            if not scored_paths:
+                return None
+
+            # Select best path
+            best_path = max(scored_paths, key=lambda x: x[1].total_score)[0]
+            selected_paths.append(list(best_path))
+
+            # Update remaining nodes
+            path_nodes = set(best_path) - {0, 101}
+            remaining_nodes -= path_nodes
+
+            # Early termination if we exceed vehicle limit
+            if len(selected_paths) > self.solver.n_vehicles:
+                return None
+
+        return selected_paths
+
+    def _regret_based_selection(
+        self, feasible_paths: Set[Tuple[int]]
+    ) -> Optional[List[List[int]]]:
+        """Selection based on regret value - considering cost of not choosing a path"""
+        required_nodes = set(range(1, self.solver.n_nodes - 1))
+        selected_paths = []
+        remaining_nodes = required_nodes.copy()
+
+        while remaining_nodes:
+            # Calculate regret values
+            regrets = []
+            for path in feasible_paths:
+                if not self._is_compatible(path, selected_paths):
+                    continue
+
+                # Calculate cost with and without this path
+                base_score = self._score_path(path, remaining_nodes, selected_paths)
+                alternative_scores = []
+
+                for alt_path in feasible_paths:
+                    if alt_path != path and self._is_compatible(
+                        alt_path, selected_paths
+                    ):
+                        alt_score = self._score_path(
+                            alt_path, remaining_nodes, selected_paths
+                        )
+                        alternative_scores.append(alt_score)
+
+                if alternative_scores:
+                    best_alternative = max(
+                        alternative_scores, key=lambda x: x.total_score
+                    )
+                    regret = base_score.total_score - best_alternative.total_score
+                    regrets.append((path, regret))
+
+            if not regrets:
+                return None
+
+            # Select path with highest regret
+            selected_path = max(regrets, key=lambda x: x[1])[0]
+            selected_paths.append(list(selected_path))
+
+            # Update remaining nodes
+            path_nodes = set(selected_path) - {0, 101}
+            remaining_nodes -= path_nodes
+
+            if len(selected_paths) > self.solver.n_vehicles:
+                return None
+
+        return selected_paths
+
+    def _score_path(
+        self,
+        path: Tuple[int],
+        remaining_nodes: Set[int],
+        selected_paths: List[List[int]],
+    ) -> PathScore:
+        """Enhanced path scoring with multiple criteria"""
+        path_nodes = set(path) - {0, 101}
+
+        # Coverage efficiency
+        coverage_ratio = (
+            len(path_nodes & remaining_nodes) / len(remaining_nodes)
+            if remaining_nodes
+            else 0
+        )
+
+        # Load efficiency
+        total_load = sum(self.solver.nodes[i].demand for i in path_nodes)
+        load_efficiency = total_load / self.solver.vehicle_capacity
+
+        # Time window efficiency
+        earliest_possible = (
+            min(self.solver.nodes[i].lb[0] for i in path_nodes) if path_nodes else 0
+        )
+        latest_required = (
+            max(self.solver.nodes[i].ub[0] for i in path_nodes) if path_nodes else 0
+        )
+        time_span = latest_required - earliest_possible
+        max_span = self.solver.time_horizon
+        time_efficiency = 1 - (time_span / max_span) if max_span > 0 else 0
+
+        # Cost efficiency
+        path_cost = self.solver.calculate_solution_cost([list(path)])
+        avg_cost_per_node = path_cost / len(path_nodes) if path_nodes else float("inf")
+        cost_efficiency = 1 / (1 + avg_cost_per_node)
+
+        # Route balance with existing routes
+        if selected_paths:
+            avg_route_length = sum(len(p) for p in selected_paths) / len(selected_paths)
+            length_diff = abs(len(path) - avg_route_length)
+            route_balance = 1 / (1 + length_diff)
+        else:
+            route_balance = 1.0
+
+        return PathScore(
+            list(path),
+            {
+                "coverage_ratio": coverage_ratio,
+                "load_efficiency": load_efficiency,
+                "time_efficiency": time_efficiency,
+                "cost_efficiency": cost_efficiency,
+                "route_balance": route_balance,
+            },
+        )
+
+    def _is_compatible(
+        self, new_path: Tuple[int], selected_paths: List[List[int]]
+    ) -> bool:
+        """Check if new path is compatible with selected paths"""
+        new_nodes = set(new_path) - {0, 101}
+
+        # Check for node overlap
+        for path in selected_paths:
+            path_nodes = set(path) - {0, 101}
+            if new_nodes & path_nodes:
+                return False
+
+        # Check vehicle capacity
+        if len(selected_paths) + 1 > self.solver.n_vehicles:
+            return False
+
+        return True
+
+    def _load_balanced_selection(
+        self, feasible_paths: Set[Tuple[int]]
+    ) -> Optional[List[List[int]]]:
+        """Selection strategy focusing on balanced load distribution"""
+        required_nodes = set(range(1, self.solver.n_nodes - 1))
+        selected_paths = []
+        remaining_nodes = required_nodes.copy()
+
+        # Calculate total demand to aim for balance
+        total_demand = sum(self.solver.nodes[i].demand for i in required_nodes)
+        target_load_per_vehicle = (
+            total_demand / self.solver.n_vehicles
+            if self.solver.n_vehicles > 0
+            else total_demand
+        )
+
+        while remaining_nodes:
+            # Score paths based on load balancing criteria
+            scored_paths = []
+            current_loads = [
+                sum(self.solver.nodes[n].demand for n in path[1:-1])
+                for path in selected_paths
+            ]
+            avg_current_load = (
+                sum(current_loads) / len(current_loads) if current_loads else 0
+            )
+
+            for path in feasible_paths:
+                if not self._is_compatible(path, selected_paths):
+                    continue
+
+                path_load = sum(
+                    self.solver.nodes[i].demand for i in path if i not in {0, 101}
+                )
+
+                # Calculate how well this path balances the solution
+                if selected_paths:
+                    load_deviation = abs(path_load - avg_current_load)
+                    target_deviation = abs(path_load - target_load_per_vehicle)
+                else:
+                    load_deviation = abs(path_load - target_load_per_vehicle)
+                    target_deviation = load_deviation
+
+                # Create comprehensive score
+                score_components = {
+                    "load_balance": 1.0 / (1.0 + load_deviation),
+                    "target_balance": 1.0 / (1.0 + target_deviation),
+                    "coverage_ratio": len(set(path) & remaining_nodes)
+                    / len(remaining_nodes),
+                    "capacity_usage": path_load / self.solver.vehicle_capacity,
+                    "time_efficiency": self._calculate_time_efficiency(path),
+                }
+
+                scored_paths.append((path, PathScore(list(path), score_components)))
+
+            if not scored_paths:
+                return None
+
+            # Select best balanced path
+            best_path = max(scored_paths, key=lambda x: x[1].total_score)[0]
+            selected_paths.append(list(best_path))
+
+            # Update remaining nodes
+            path_nodes = set(best_path) - {0, 101}
+            remaining_nodes -= path_nodes
+
+            # Check vehicle limit
+            if len(selected_paths) > self.solver.n_vehicles:
+                return None
+
+        return selected_paths
+
+    def _calculate_time_efficiency(self, path: Tuple[int]) -> float:
+        """Calculate time window efficiency for a path"""
+        if len(path) <= 2:  # Only depots
+            return 0.0
+
+        current_time = 0
+        total_waiting = 0
+        max_time = 0
+
+        for i in range(len(path) - 1):
+            if i > 0:
+                current_time += self.solver.nodes[path[i]].duration
+
+            travel = self.solver.calculate_travel_time(path[i], path[i + 1])
+            current_time += travel
+
+            if i < len(path) - 1:  # Not for end depot
+                earliest = self.solver.nodes[path[i + 1]].lb[0]
+                if current_time < earliest:
+                    total_waiting += earliest - current_time
+                    current_time = earliest
+
+                latest = self.solver.nodes[path[i + 1]].ub[0]
+                if current_time > latest:
+                    return 0.0  # Infeasible path
+
+            max_time = max(max_time, current_time)
+
+        # Return normalized efficiency score
+        time_span = max_time - self.solver.nodes[path[0]].lb[0]
+        total_service_time = sum(self.solver.nodes[i].duration for i in path[1:-1])
+        total_travel_time = sum(
+            self.solver.calculate_travel_time(path[i], path[i + 1])
+            for i in range(len(path) - 1)
+        )
+
+        if time_span <= 0:
+            return 1.0
+
+        efficiency = (total_service_time + total_travel_time) / (
+            time_span + total_waiting
+        )
+        return min(1.0, efficiency)

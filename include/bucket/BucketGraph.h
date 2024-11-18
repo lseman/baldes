@@ -1131,7 +1131,7 @@ public:
             last_node = node_id;
         }
 
-        auto new_label            = label_pool_fw->acquire();
+        auto new_label            = fw ? label_pool_fw->acquire() : label_pool_bw->acquire();
         new_label->cost           = red_cost;
         new_label->real_cost      = real_cost;
         new_label->parent         = nullptr;
