@@ -335,7 +335,7 @@ using DualSolution = std::vector<double>;
 #define SECTION [this]() -> void
 
 // #define SECTION_CUSTOM(capture_list) [capture_list]() -> void
-#define SECTION_CUSTOM(capture_list) [capture_list]() -> void
+#define SECTION_CUSTOM(capture_list...) [capture_list]() -> void
 
 // Template for scheduling parallel sections
 template <typename Scheduler, typename... Tasks>

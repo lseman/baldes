@@ -195,7 +195,7 @@ public:
             if (label->nodes_covered.empty()) continue;
             if (!enumerate && label->cost > 0) continue;
 
-            Path path(label->nodes_covered, label->real_cost);
+            Path path(label->getRoute(), label->real_cost);
 
             // check if path is already in pathSet
             // if (pathSet.find(path) != pathSet.end()) continue;
@@ -229,25 +229,24 @@ public:
             col.addTerm(N_SIZE - 2, 1.0); // Add term for the vehicle constraint
 
             // Add terms for the limited memory rank 1 cuts
-            SRC_MODE_BLOCK(auto vec = cuts.computeLimitedMemoryCoefficients(label->nodes_covered); if (vec.size() > 0) {
+            SRC_MODE_BLOCK(auto vec = cuts.computeLimitedMemoryCoefficients(path.route); if (vec.size() > 0) {
                 for (int i = 0; i < vec.size(); i++) {
                     if (abs(vec[i]) > 1e-3) { col.addTerm(SRCconstraints[i]->index(), vec[i]); }
                 }
             })
 
-            RCC_MODE_BLOCK(
-                auto RCCvec = rccManager->computeRCCCoefficients(label->nodes_covered); if (RCCvec.size() > 0) {
-                    auto RCCconstraints = rccManager->getbaldesCtrs();
+            RCC_MODE_BLOCK(auto RCCvec = rccManager->computeRCCCoefficients(path.route); if (RCCvec.size() > 0) {
+                auto RCCconstraints = rccManager->getbaldesCtrs();
 
-                    for (int i = 0; i < RCCvec.size(); i++) {
-                        if (abs(RCCvec[i]) > 1e-3) {
-                            col.addTerm(RCCconstraints[i]->index(), RCCvec[i]); // Add RCC terms to the Column
-                        }
+                for (int i = 0; i < RCCvec.size(); i++) {
+                    if (abs(RCCvec[i]) > 1e-3) {
+                        col.addTerm(RCCconstraints[i]->index(), RCCvec[i]); // Add RCC terms to the Column
                     }
-                })
+                }
+            })
 
             auto &branching    = node->branchingDuals;
-            auto  branchingVec = branching->computeCoefficients(label->nodes_covered);
+            auto  branchingVec = branching->computeCoefficients(path.route);
             if (branchingVec.size() > 0) {
                 auto branchingbaldesCtrs = branching->getBranchingbaldesCtrs();
                 for (int i = 0; i < branchingVec.size(); i++) {
@@ -456,7 +455,7 @@ public:
         auto &branchingDuals = node->branchingDuals;
         RCC_MODE_BLOCK(auto &rccManager = node->rccManager;)
 
-        int bucket_interval = 20;
+        int bucket_interval = 30;
         int time_horizon    = instance.T_max;
         // if (problemType == ProblemType::cvrp) { time_horizon = 50000; }
         numConstrs                = node->getIntAttr("NumConstrs");

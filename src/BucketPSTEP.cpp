@@ -52,7 +52,7 @@ std::vector<Label *> BucketGraph::solvePSTEP(PSTEPDuals &inner_pstep_duals) {
                           for (size_t task_idx = start_idx; task_idx < end_idx; ++task_idx) {
                               auto [i, j] = tasks[task_idx];
                               BucketOptions sub_options;
-                              auto sub_bg = BucketGraph(nodes, R_max[0], 20);
+                              auto          sub_bg = BucketGraph(nodes, R_max[0], 20);
                               sub_bg.set_distance_matrix(distance_matrix);
                               sub_options.depot     = i;
                               sub_options.end_depot = j;
@@ -398,7 +398,7 @@ std::vector<Label *> BucketGraph::solvePSTEP_by_MTZ() {
         for (auto path : sub_paths) {
             if (path->cost >= 0) { continue; }
             paths_added++;
-            all_paths.push_back(path->nodes_covered);
+            all_paths.push_back(path->getRoute());
             all_costs.push_back(path->real_cost);
             all_firsts.push_back(path->nodes_covered.front());
             all_lasts.push_back(path->nodes_covered.back());
@@ -620,7 +620,7 @@ std::vector<Label *> BucketGraph::solveTSPTW_by_MTZ() {
         for (auto path : sub_paths) {
             if (path->cost >= 0) { continue; }
             paths_added++;
-            all_paths.push_back(path->nodes_covered);
+            all_paths.push_back(path->getRoute());
             all_costs.push_back(path->real_cost);
             all_firsts.push_back(path->nodes_covered.front());
             all_lasts.push_back(path->nodes_covered.back());
