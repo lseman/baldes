@@ -312,11 +312,12 @@ set(FPSOURCE
     third_party/fpmax/data.cpp third_party/fpmax/fsout.cpp
     third_party/fpmax/fp_tree.cpp third_party/fpmax/fp_node.cpp)
 
+set(MUSSPSOURCE third_party/muSSP/Graph.cpp third_party/muSSP/Sink.cpp)
 set(IPM_SOURCES src/IPSolver.cpp)
 set(SRC_SOURCES src/SRC.cpp src/HighOrderSRC.cpp)
 
 # Define a list for the source files that will be included
-set(EXECUTABLE_SOURCES ${SOURCES} ${HGS_SOURCES} ${FPSOURCE})
+set(EXECUTABLE_SOURCES ${SOURCES} ${HGS_SOURCES} ${FPSOURCE} ${MUSSPSOURCE})
 
 # Append sources based on the flags
 if(RCC)

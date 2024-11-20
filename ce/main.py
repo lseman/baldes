@@ -83,7 +83,8 @@ class ColumnElimination:
 
         # First term: path costs with dual adjustments
         for path in paths:
-            path = path.nodes_covered
+            path = path[0]
+            # path = path.nodes_covered()
             # Calculate original path cost
             path_cost = sum(
                 self.calculate_travel_time(path[i], path[i + 1])
@@ -247,6 +248,41 @@ class ColumnElimination:
             covered_nodes.update(path_nodes)
         return True
 
+    def get_reduced_costs(self, arc_data: Dict[int, List[Tuple[int, float, int]]], 
+                        dual_vars: np.ndarray) -> Dict[int, List[Tuple[int, float, int]]]:
+        """
+        Compute reduced costs for arcs using current dual values.
+        rc(a) = ca - ∑ gj(a)λj
+        Where:
+        - ca is the original arc cost
+        - gj(a) = 1 if arc a visits node j, 0 otherwise
+        - λj is the dual variable for node j
+        
+        Args:
+            arc_data: Dictionary mapping from_node to list of (to_node, cost, capacity) tuples
+            dual_vars: Array of dual variables for each node
+            
+        Returns:
+            Dictionary with same structure as arc_data but with reduced costs
+        """
+        reduced_costs = {}
+        
+        for from_node, edges in arc_data.items():
+            reduced_costs[from_node] = []
+            
+            for to_node, original_cost, capacity in edges:
+                # Start with original cost
+                reduced_cost = original_cost
+                
+                # Subtract dual contribution for the destination node
+                # Note: We only subtract for actual nodes (not source/sink)
+                if 1 <= to_node <= len(dual_vars):  # Adjust if nodes start at 1
+                    reduced_cost -= dual_vars[to_node - 1]
+                    
+                reduced_costs[from_node].append((to_node, reduced_cost, capacity))
+                
+        return reduced_costs
+
     def solve_with_subgradient(self, max_iterations: int = 10000):
         """Modified solve method with path selection optimization"""
         duals = [0.0] * self.n_nodes
@@ -259,40 +295,96 @@ class ColumnElimination:
 
         # Initialize duals
         for i in range(1, self.n_nodes - 1):
-            duals[i - 1] = 100.0
+            duals[i - 1] = (
+                100 #2 * self.instance.distances[0][i] * self.instance.demands[i] / 700
+            )
 
         # Keep track of best feasible paths found
         feasible_paths = set()
         node_coverage = defaultdict(int)
+        new_duals = duals.copy()
         smoothing_factor = 0.7  # For exponential smoothing
         prev_duals = duals.copy()
         max_dual = 500.0  # Maximum allowed dual value
         min_dual = 0.0  # Minimum allowed dual value
+        best_lower_bound = float("-inf")
 
-        for iteration in range(max_iterations):
-            print(duals)
-            self.graph.set_duals(duals)
+        for iteration in range(500):
+            # print(duals)
 
-            # Generate new columns and add to pool
-            paths = self.graph.phaseFour()
-            path_sequences = [
-                p.nodes_covered for p in paths if len(p.nodes_covered) > 2
-            ]
-            # print(path_sequences)
-            decomposed_paths = self.path_decomposer.decompose_solution(path_sequences)
 
-            path_sequences = [p for p in decomposed_paths if len(p) > 2]
-            # Check feasibility of new paths and add to pool
+            # print(arc_data)
+            source = 0  # Replace with your actual source node
+            sink = 101  # Replace with your actual sink node
+    
+            # Initial solver with original costs
+            for z in range(500):
+                self.graph.set_duals(new_duals)
+                arc_data = self.graph.get_adjacency_list()
+                solver = muSSP(Graph.from_arc_dict(arc_data, source, sink))
+                #for z in range(4):
+                paths = solver.find_all_shortest_paths()
+                current_value, visits = self.calculate_lagrangian(paths, new_duals)
+                print("Value", current_value, visits)
+                
+                # compute subgradient based on visited
+                subgradient = [1 - visits[j] for j in range(1, self.n_nodes - 1)]
+                print(subgradient)
+                # Update bounds
+                best_lb = max(best_lb, current_value)
+
+                # Update step size
+                if best_ub < float("inf"):
+                    psi_star = best_lb * (1 + 5 / (100 + iteration))
+                else:
+                    # psi_star = current_value * 1.1
+                    psi_star = current_value * 1.1
+
+                subgradient_norm = sum(g * g for g in subgradient)
+                if subgradient_norm > 0:
+                    step_size = alpha * (psi_star - current_value) / subgradient_norm
+                # step_size = alpha * (psi_star - current_value) / subgradient_norm
+                else:
+                    step_size = 0
+
+                # Update duals
+                # Update duals with smoothing and bounds
+                new_duals = []
+                for j in range(1, self.n_nodes - 1):
+                    # Calculate raw update
+                    raw_update = duals[j - 1] - step_size * subgradient[j - 1]
+                    new_duals.append(raw_update)
+
+                print(new_duals)
+            print(pato)
+
+
+            self.graph.set_duals(new_duals)
+
+            print(new_duals)
+
+            labels = self.graph.phaseFour()
+            paths = [label.nodes_covered() for label in labels]
+
             for path in paths:
-                conflict = self.conflict_manager.find_conflict(path.nodes_covered)
-                if conflict.type == "empty":
-                    cost = self.calculate_solution_cost([path.nodes_covered])
-                    self.column_pool.add_column(path.nodes_covered, cost)
-                    feasible_paths.add(tuple(path.nodes_covered))
+                conflict = self.conflict_manager.find_conflict(path)
+                # print(f"Checking conflict for path {path}: {conflict}")
+                if conflict.type != "empty":
+                    print(f"Conflict found: {conflict}")
+                    if self.conflict_manager.refine_conflict(conflict):
+                        self.column_pool.remove_column(path)
+                        if tuple(path) in feasible_paths:
+                            feasible_paths.remove(tuple(path))
+                        conflict_found = True
+                        break
+                else:
+                    feasible_paths.add(tuple(path))
+                    cost = self.calculate_solution_cost([path])
+                    self.column_pool.add_column(path, cost)
 
             if feasible_paths:
                 # Try all selection strategies
-                for strategy_name in ["greedy"]:
+                for strategy_name in ["greedy", "regret"]:
                     if strategy_name == "greedy":
                         solution = self.path_selector._greedy_selection(feasible_paths)
                     elif strategy_name == "regret":
@@ -315,95 +407,21 @@ class ColumnElimination:
                                 print(f"New best solution found with cost {best_ub}")
                                 print(f"Using strategy: {strategy_name}")
                                 print(f"Solution: {solution}")
+                                # print(pato)
 
-            # Get columns for current iteration
-            current_columns = self.column_pool.get_columns_for_rmp()
+            # print(pato)
+
+            # Get reduced costs for next iteration
+            #reduced_costs = sd.get_reduced_costs()
 
             # Check conflicts using columns from pool
             conflict_found = False
-            for path in current_columns:
-                conflict = self.conflict_manager.find_conflict(path)
-                # print(f"Checking conflict for path {path}: {conflict}")
-                if conflict.type != "empty":
-                    print(f"Conflict found: {conflict}")
-                    if self.conflict_manager.refine_conflict(conflict):
-                        self.column_pool.remove_column(path)
-                        if tuple(path) in feasible_paths:
-                            feasible_paths.remove(tuple(path))
-                        conflict_found = True
-                        break
-
-            # Solve RMP using subgradient
-            current_value, visits = self.calculate_lagrangian(paths, duals)
-
-            subgradient = [1 - visits[j] for j in range(1, self.n_nodes - 1)]
-
-            # Update bounds
-            best_lb = max(best_lb, current_value)
-
-            # Update step size
-            if best_ub < float("inf"):
-                psi_star = best_lb * (1 + 5 / (100 + iteration))
-            else:
-                # psi_star = current_value * 1.1
-                psi_star = current_value * 1.1
-
-            subgradient_norm = sum(g * g for g in subgradient)
-            if subgradient_norm > 0:
-                step_size = min(
-                    10.0,  # Maximum step size
-                    alpha * (psi_star - current_value) / subgradient_norm,
-                )
-            # step_size = alpha * (psi_star - current_value) / subgradient_norm
-            else:
-                step_size = 0
-
-            # Update duals
-            # Update duals with smoothing and bounds
-            new_duals = []
-            for j in range(1, self.n_nodes - 1):
-                # Calculate raw update
-                raw_update = duals[j - 1] - step_size * subgradient[j - 1]
-
-                # Apply smoothing with previous values
-                smoothed_value = (
-                    smoothing_factor * prev_duals[j - 1]
-                    + (1 - smoothing_factor) * raw_update
-                )
-
-                # Enforce bounds
-                bounded_value = max(min_dual, min(max_dual, smoothed_value))
-
-                # Gradual change limit (prevent sudden jumps)
-                max_change = max(10.0, abs(prev_duals[j - 1]) * 0.2)  # 20% or 10 units
-                final_value = max(
-                    prev_duals[j - 1] - max_change,
-                    min(prev_duals[j - 1] + max_change, bounded_value),
-                )
-
-                new_duals.append(final_value)
 
             # Handle convergence
             gap = abs(best_ub - best_lb) / (abs(best_lb) + 1e-10)
             if gap < 0.01:  # 1% gap
                 print(f"Converged with gap {gap*100:.2f}%")
                 break
-
-            if abs(current_value - best_lb) < 0.01 * abs(best_lb):
-                non_improving_count += 1
-            else:
-                non_improving_count = 0
-
-            if non_improving_count > 20:
-                alpha *= step_reduction
-                smoothing_factor = min(
-                    0.95, smoothing_factor + 0.01
-                )  # Increase smoothing
-                non_improving_count = 0
-
-            # Store previous duals and update current ones
-            prev_duals = duals.copy()
-            duals = new_duals
 
             # Periodic arc fixing when we have good bounds
             if iteration > 0 and iteration % 10 == 0:
@@ -413,7 +431,7 @@ class ColumnElimination:
                     [node.demand for node in self.nodes],
                     [(node.lb[0], node.ub[0]) for node in self.nodes],
                     self.instance.distances,
-                    path_sequences,
+                    paths,
                 )
                 self.graph.set_deleted_arcs(list(fixed_arcs))
 
@@ -433,7 +451,7 @@ class ColumnElimination:
 
 # Create instance data
 solomon_instance = InstanceData()
-solomon_instance.read_instance("../build/instances/C203.txt")
+solomon_instance.read_instance("../build/instances/C201.txt")
 instance = convert_instance_data(solomon_instance)
 
 nodes = []
@@ -453,7 +471,7 @@ for i in range(instance.num_nodes):
 solver = ColumnElimination(
     nodes=nodes,
     time_horizon=int(instance.get_time_horizon()),
-    bucket_interval=20,
+    bucket_interval=40,
     vehicle_capacity=700,
     n_vehicles=3,
     instance=instance,

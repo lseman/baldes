@@ -43,6 +43,11 @@ struct BucketOptions {
 
     bool warm_start = true;
 
+    // EVRP options
+    int battery_capacity  = 100;
+    int max_recharges     = 3;
+    int max_recharge_time = 30;
+
     // Singleton pattern: Get the single instance of BucketOptions
     static BucketOptions &getInstance() {
         static BucketOptions instance;

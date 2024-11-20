@@ -42,6 +42,8 @@
 
 #include "RIH.h"
 
+#include "muSPP.h"
+
 #include <condition_variable>
 
 #define RCESPP_TOL_ZERO 1.E-6
@@ -157,16 +159,8 @@ public:
      *
      */
     template <Direction D, typename Gamma, typename VRPNode>
-    inline bool process_all_resources(std::vector<double>              &new_resources,
-                                      const std::array<double, R_SIZE> &initial_resources, const Gamma &gamma,
-                                      const VRPNode &theNode, size_t N) {
-        for (size_t I = 0; I < N; ++I) {
-            if (!process_resource<D>(new_resources[I], initial_resources, gamma, theNode, I)) {
-                return false; // baldesCtr violated, return false
-            }
-        }
-        return true; // All resources processed successfully
-    }
+    bool process_all_resources(std::vector<double> &new_resources, const std::array<double, R_SIZE> &initial_resources,
+                               const Gamma &gamma, const VRPNode &theNode, size_t N);
 
     // Template recursion for compile-time unrolling
     /**
@@ -178,95 +172,8 @@ public:
      *
      */
     template <Direction D, typename Gamma, typename VRPNode>
-    inline constexpr bool process_resource(double &new_resource, const std::array<double, R_SIZE> &initial_resources,
-                                           const Gamma &gamma, const VRPNode &theNode, size_t I) {
-        if (options.resource_type[I] == 1) { // Checked at compile-time
-            if constexpr (D == Direction::Forward) {
-                new_resource =
-                    std::max(initial_resources[I] + gamma.resource_increment[I], static_cast<double>(theNode.lb[I]));
-                if (new_resource > theNode.ub[I]) {
-                    return false; // Exceeds upper bound, return false to stop processing
-                }
-            } else {
-                new_resource =
-                    std::min(initial_resources[I] - gamma.resource_increment[I], static_cast<double>(theNode.ub[I]));
-                if (new_resource < theNode.lb[I]) {
-                    return false; // Below lower bound, return false to stop processing
-                }
-            }
-        } else if (options.resource_type[I] == 0) {
-            // TODO: Non-disposable resource handling, check if it is right
-            if constexpr (D == Direction::Forward) {
-                new_resource = initial_resources[I] + gamma.resource_increment[I];
-                if (new_resource > theNode.ub[I]) {
-                    return false; // Exceeds upper bound, return false to stop processing
-                } else if (new_resource < theNode.lb[I]) {
-                    return false; // Below lower bound, return false to stop processing
-                }
-            } else {
-                new_resource = initial_resources[I] - gamma.resource_increment[I];
-                if (new_resource > theNode.ub[I]) {
-                    return false; // Exceeds upper bound, return false to stop processing
-                } else if (new_resource < theNode.lb[I]) {
-                    return false; // Below lower bound, return false to stop processing
-                }
-            }
-        } else if (options.resource_type[I] == 2) {
-            // TODO:: Binary resource handling, check if logic is right
-            if constexpr (D == Direction::Forward) {
-                // For binary resources, flip between 0 and 1 based on gamma.resource_increment[I]
-                if (gamma.resource_increment[I] > 0) {
-                    new_resource = 1.0; // Switch "on"
-                } else {
-                    new_resource = 0.0; // Switch "off"
-                }
-            } else {
-                // In reverse, toggle as well
-                if (gamma.resource_increment[I] > 0) {
-                    new_resource = 0.0; // Reverse logic: turn "off"
-                } else {
-                    new_resource = 1.0; // Reverse logic: turn "on"
-                }
-            }
-        } else if (options.resource_type[I] == 3) {
-            // TODO: handling multiple time windows case
-            // "OR" resource case using mtw_lb and mtw_ub vectors for multiple time windows
-            if constexpr (D == Direction::Forward) {
-                bool is_feasible = false;
-                for (size_t i = 0; i < theNode.mtw_lb.size(); ++i) {
-                    new_resource = std::max(initial_resources[I] + gamma.resource_increment[I], theNode.mtw_lb[i]);
-                    if (new_resource > theNode.ub[I]) {
-                        continue; // Exceeds upper bound, try next time window
-                    } else {
-                        is_feasible = true; // Feasible in this time window
-                        break;
-                    }
-                }
-
-                if (!is_feasible) {
-                    return false; // Not feasible in any of the ranges
-                }
-
-                return true; // Successfully processed all resources
-            } else {
-                bool is_feasible = false;
-                for (size_t i = 0; i < theNode.mtw_ub.size(); ++i) {
-                    new_resource = std::min(initial_resources[I] - gamma.resource_increment[I], theNode.mtw_ub[i]);
-                    if (new_resource < theNode.lb[I]) {
-                        continue; // Below lower bound, try next time window }
-                    } else {
-                        is_feasible = true; // Feasible in this time window break;
-                    }
-                }
-
-                if (!is_feasible) {
-                    return false; // Not feasible in any of the ranges
-                }
-            }
-        }
-        return true; // Successfully processed all resources
-    }
-
+    constexpr bool       process_resource(double &new_resource, const std::array<double, R_SIZE> &initial_resources,
+                                          const Gamma &gamma, const VRPNode &theNode, size_t I);
     bool                 s1    = true;
     bool                 s2    = false;
     bool                 s3    = false;
@@ -1047,7 +954,7 @@ public:
 
         // Mark each arc in the input list as fixed/deleted
         for (const auto &[from, to] : arcs) {
-            if (from < num_nodes && to < num_nodes) { fixed_arcs[from][to] = true; }
+            if (from < num_nodes && to < num_nodes) { fixed_arcs[from][to] = 1; }
         }
     }
 
@@ -1062,10 +969,31 @@ public:
 
         int last_node = -1;
         if (L->nodes_covered.size() <= 3) { return nullptr; }
+        auto new_label = new Label();
 
         // Traverse through the label nodes from current to root
         for (auto node_id : L->nodes_covered) {
-            // If there is a previous node, compute the edge cost
+
+            /////////////////////////////////////////////
+            // NG-route feasibility check
+            /////////////////////////////////////////////
+            ///
+            if (is_node_visited(new_label->visited_bitmap, node_id)) { return nullptr; }
+
+            size_t limit = new_label->visited_bitmap.size();
+            for (size_t i = 0; i < limit; ++i) {
+                uint64_t current_visited = new_label->visited_bitmap[i]; // Get visited nodes in the current segment
+
+                if (!current_visited) continue; // Skip if no nodes were visited in this segment
+
+                uint64_t neighborhood_mask =
+                    neighborhoods_bitmap[node_id][i]; // Get neighborhood mask for the current node
+                uint64_t bits_to_clear = current_visited & neighborhood_mask; // Determine which bits to clear
+
+                new_label->visited_bitmap[i] = bits_to_clear; // Clear irrelevant visited nodes
+            }
+            set_node_visited(new_label->visited_bitmap, node_id); // Mark the new node as visited
+
             if (last_node != -1) {
                 double cij_cost = getcij(last_node, node_id);
                 real_cost += cij_cost;
@@ -1074,10 +1002,10 @@ public:
 
             red_cost -= nodes[node_id].cost;
 
-            // Add the current node's real cost and cost
-            // real_cost += current->real_cost;
-            // red_cost += current->cost;
-
+            /////////////////////////////////////////////
+            // SRC logic
+            /////////////////////////////////////////////
+            ///
             size_t segment      = node_id >> 6; // Determine the segment in the bitmap
             size_t bit_position = node_id & 63; // Determine the bit position in the segment
 
@@ -1131,32 +1059,90 @@ public:
             last_node = node_id;
         }
 
-        auto new_label            = fw ? label_pool_fw->acquire() : label_pool_bw->acquire();
-        new_label->cost           = red_cost;
-        new_label->real_cost      = real_cost;
-        new_label->parent         = nullptr;
-        new_label->node_id        = L->node_id;
-        new_label->visited_bitmap = L->visited_bitmap;
-        new_label->nodes_covered  = L->nodes_covered;
-        new_label->is_extended    = false;
-        new_label->resources      = L->resources;
-        new_label->SRCmap         = updated_SRCmap;
+        new_label->cost          = red_cost;
+        new_label->real_cost     = real_cost;
+        new_label->parent        = nullptr;
+        new_label->node_id       = L->node_id;
+        new_label->nodes_covered = L->nodes_covered;
+        new_label->is_extended   = false;
+        new_label->resources     = L->resources;
+        new_label->SRCmap        = updated_SRCmap;
 
         // Bucket number for the new label
         std::vector<double> new_resources(options.resources.size());
         for (size_t i = 0; i < options.resources.size(); ++i) { new_resources[i] = new_label->resources[i]; }
-        if (fw) {
-            int bucket        = get_bucket_number<Direction::Forward>(new_label->node_id, new_resources);
-            new_label->vertex = bucket;
-        } else {
-            int bucket        = get_bucket_number<Direction::Backward>(new_label->node_id, new_resources);
-            new_label->vertex = bucket;
-        }
+        int bucket        = fw ? get_bucket_number<Direction::Forward>(new_label->node_id, new_resources)
+                               : get_bucket_number<Direction::Backward>(new_label->node_id, new_resources);
+        new_label->vertex = bucket;
 
         new_label->fresh = false;
 
         return new_label;
     };
+
+    // Define types for better readability
+    using AdjList = std::unordered_map<int, std::vector<std::tuple<int, double, int>>>;
+
+    template <Symmetry SYM>
+    AdjList get_adjacency_list() {
+        AdjList adjacency_list;
+
+        // Iterate through all nodes in the graph
+        for (const auto &node : nodes) {
+            std::vector<std::tuple<int, double, int>> arcs;
+
+            // Retrieve all arcs associated with the current node
+            for (const auto &arc : node.get_arcs<Direction::Forward>()) {
+                int    to_node  = arc.to;
+                double cost     = getcij(node.id, to_node) - nodes[to_node].cost;
+                int    capacity = 1;
+
+                // Only add arcs with non-zero capacity
+                if (capacity > 0) { arcs.emplace_back(to_node, cost, capacity); }
+            }
+
+            // Add the node's arcs to the adjacency list if it has any outgoing edges
+            if (!arcs.empty()) { adjacency_list[node.id] = arcs; }
+        }
+
+        return adjacency_list;
+    }
+    template <Symmetry SYM>
+    std::vector<std::vector<int>> solve_min_cost_flow(int source, int sink) {
+        fmt::print("Generating adjacency list...\n");
+        auto adj_list = get_adjacency_list<SYM>();
+
+        auto  labels       = bi_labeling_algorithm<Stage::Eliminate, Symmetry::Asymmetric>();
+        auto  initial_path = labels[0]->getRoute();
+        MUSSP solver;
+
+        // addNode for each node
+        std::vector<MUSSP::Node *> SPPnodes = {};
+        fmt::print("Adding nodes...\n");
+        for (auto i = 0; i < nodes.size(); ++i) { SPPnodes.push_back(solver.addNode()); }
+        fmt::print("Added {} nodes\n", SPPnodes.size());
+
+        solver.setSource(SPPnodes[source]);
+        solver.setSink(SPPnodes[sink]);
+
+        // addEdge
+        for (const auto &[from_node, arcs] : adj_list) {
+            for (const auto &[to_node, cost, capacity] : arcs) {
+                // fmt::print("Adding edge from {} to {} with cost {} and capacity {}\n", from_node, to_node, cost,
+                // capacity);
+                solver.addEdge(SPPnodes[from_node], SPPnodes[to_node], cost, capacity);
+            }
+        }
+
+        fmt::print("Solving minimum cost flow...\n");
+        solver.solve();
+        // auto path_set = solver.getPaths();
+
+        // for (auto label : labels) { path_set.push_back(label->getRoute()); }
+        //  path_set.push_back(initial_path);
+        std::vector<std::vector<int>> path_set;
+        return path_set; // Return all computed paths
+    }
 
 private:
     std::vector<Interval> intervals;

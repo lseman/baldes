@@ -23,12 +23,13 @@
 #include "utils/Hashes.h"
 
 constexpr int INITIAL_RANK_1_MULTI_LABEL_POOL_SIZE              = 50;
+constexpr int INITIAL_POOL_SIZE                                 = 100;
 using yzzLong                                                   = Bitset<N_SIZE>;
 using cutLong                                                   = yzzLong;
 constexpr double tolerance                                      = 1e-6;
-constexpr int    max_row_rank1                                  = 5;
-constexpr int    max_heuristic_initial_seed_set_size_row_rank1c = 5;
-constexpr int    max_heuristic_sep_mem4_row_rank1               = 9;
+constexpr int    max_row_rank1                                  = 6;
+constexpr int    max_heuristic_initial_seed_set_size_row_rank1c = 6;
+constexpr int    max_heuristic_sep_mem4_row_rank1               = 20;
 
 constexpr int    max_num_r1c_per_round = 20;
 constexpr double cut_vio_factor        = 0.1;
@@ -60,6 +61,11 @@ public:
 
     HighDimCutsGenerator(int dim, int maxRowRank, double tolerance)
         : dim(dim), max_row_rank1(maxRowRank), TOLERANCE(tolerance), num_label(0) {
+        cuts.reserve(INITIAL_POOL_SIZE);
+        rank1_multi_label_pool.reserve(INITIAL_POOL_SIZE);
+        generated_rank1_multi_pool.reserve(INITIAL_POOL_SIZE);
+        map_cut_plan_vio.reserve(INITIAL_POOL_SIZE);
+
         generateOptimalMultiplier();
         // printMultiplierMap();
     }
@@ -282,109 +288,118 @@ public:
             return;
         }
 
-        cutLong tmp = 0;
-        for (const auto &it : cut) {
-            if (it >= 0 && it < v_r_map.size()) {
-                tmp.set(it); // Optimized bitset handling by reducing `v_r_map` size checks
-            }
+        // Use thread_local for frequently reused vectors to avoid allocations
+        static thread_local cutLong tmp;
+        tmp.reset();
+
+        // SIMD-friendly loop with no branching for setting bits
+        for (int i = 0; i < cut_size; ++i) {
+            const int it = cut[i];
+            tmp.set(it * (it >= 0 && it < v_r_map.size())); // Branchless using multiplication
         }
 
-        // Cache and minimize mutex usage
-        bool found_in_cache = false;
+        // Quick cache lookup
         {
             std::lock_guard<std::mutex> lock(map_cut_plan_vio_mutex);
             if (auto it = map_cut_plan_vio.find(tmp);
                 it != map_cut_plan_vio.end() && plan_idx < it->second.size() && !it->second[plan_idx].first.empty()) {
-                vio            = it->second[plan_idx].second;
-                found_in_cache = true;
-            } else {
-                map_cut_plan_vio[tmp].resize(7);
+                vio = it->second[plan_idx].second;
+                return;
             }
+            map_cut_plan_vio[tmp].resize(7);
         }
-        if (found_in_cache) return;
 
         const int    denominator = get<1>(plan);
         const double rhs         = get<2>(plan);
         const auto  &coeffs      = record_map_rank1_combinations[cut_size][plan_idx];
 
-        std::vector<int> map_r_numbers(sol.size(), 0); // Pre-allocate vector for route frequencies
+        // Use thread_local vectors to avoid allocations
+        static thread_local std::vector<int> map_r_numbers;
+        map_r_numbers.resize(sol.size());
+        std::fill(map_r_numbers.begin(), map_r_numbers.end(), 0);
+
+        // Pre-compute route frequencies in a single pass
         for (int idx : cut) {
             if (idx >= 0 && idx < v_r_map.size()) {
-                for (int route_idx = 0; route_idx < v_r_map[idx].size(); ++route_idx) {
-                    int frequency = v_r_map[idx][route_idx];
-                    if (frequency > 0) {
-                        map_r_numbers[route_idx] += frequency; // Direct indexing is faster than map access
-                    }
-                }
-            }
-        }
-        for (int idx : cut) {
-            if (idx >= 0 && idx < v_r_map.size()) {
-                for (int route_idx = 0; route_idx < v_r_map[idx].size(); ++route_idx) {
-                    int frequency = v_r_map[idx][route_idx];
-                    if (frequency > 0) { // Only consider routes where the vertex has a frequency > 0
-                        map_r_numbers[route_idx] += frequency;
-                    }
+                const auto &route_freqs = v_r_map[idx];
+                const int   route_size  = static_cast<int>(route_freqs.size());
+
+                // SIMD-friendly loop for frequency accumulation
+                for (int route_idx = 0; route_idx < route_size; ++route_idx) {
+                    const int frequency = route_freqs[route_idx];
+                    map_r_numbers[route_idx] += frequency * (frequency > 0); // Branchless using multiplication
                 }
             }
         }
 
         static thread_local std::vector<std::vector<int>> cut_num_times_vis_routes;
 
-        // Check if `cut` is already in cache
+        // Cache lookup with minimized critical section
+        bool cache_hit = false;
         {
             std::lock_guard<std::mutex> lock(cut_cache_mutex);
             if (auto cache_it = cut_cache.find(cut); cache_it != cut_cache.end()) {
-                // Retrieve cached value if it exists
                 cut_num_times_vis_routes = cache_it->second;
-            } else {
-                // Calculate and initialize `cut_num_times_vis_routes`
-                cut_num_times_vis_routes.clear();
-                cut_num_times_vis_routes.resize(cut_size);
-
-                for (int i = 0; i < cut_size; ++i) {
-                    int c = cut[i];
-                    if (c >= 0 && c < v_r_map.size()) {
-                        for (int route_idx = 0; route_idx < v_r_map[c].size(); ++route_idx) {
-                            int frequency = v_r_map[c][route_idx];
-                            if (frequency > 0) { // Only consider routes where the vertex has a frequency > 0
-                                // print route_idx and cached_map_old_new_routes.size()
-                                if (cached_map_old_new_routes[route_idx] != -1) {
-                                    auto val = cached_map_old_new_routes[route_idx];
-                                    cut_num_times_vis_routes[i].insert(cut_num_times_vis_routes[i].end(), frequency,
-                                                                       val);
-                                }
-                            }
-                        }
-                    }
-                }
-
-                // Now, safely insert the newly computed `cut_num_times_vis_routes` into the cache
-                cut_cache[cut] = cut_num_times_vis_routes;
+                cache_hit                = true;
             }
         }
 
-        std::vector<double> num_times_vis_routes(num_valid_routes, 0.0);
-        double              best_vio = -std::numeric_limits<double>::max();
-        int                 best_idx = -1;
+        if (!cache_hit) {
+            cut_num_times_vis_routes.clear();
+            cut_num_times_vis_routes.resize(cut_size);
 
-        // Loop through coeffs only once, using cumulative values for `num_times_vis_routes`
-        for (size_t cnt = 0; cnt < coeffs.size(); ++cnt) {
-            std::fill(num_times_vis_routes.begin(), num_times_vis_routes.end(), 0.0);
+            // Pre-reserve space to avoid reallocations
+            for (auto &route_vec : cut_num_times_vis_routes) {
+                route_vec.reserve(num_valid_routes * 2); // Estimate capacity
+            }
 
             for (int i = 0; i < cut_size; ++i) {
-                // print cut_num_times_vis_routes size
-                for (int j : cut_num_times_vis_routes[i]) {
-                    // print j
-                    num_times_vis_routes[j] += coeffs[cnt][i];
+                const int c = cut[i];
+                if (c >= 0 && c < v_r_map.size()) {
+                    auto       &current_route = cut_num_times_vis_routes[i];
+                    const auto &route_freqs   = v_r_map[c];
+
+                    // Vectorizable loop for route processing
+                    for (int route_idx = 0; route_idx < route_freqs.size(); ++route_idx) {
+                        const int frequency = route_freqs[route_idx];
+                        if (frequency > 0 && cached_map_old_new_routes[route_idx] != -1) {
+                            const int val = cached_map_old_new_routes[route_idx];
+                            current_route.insert(current_route.end(), frequency, val);
+                        }
+                    }
                 }
             }
 
+            // Update cache
+            std::lock_guard<std::mutex> lock(cut_cache_mutex);
+            cut_cache[cut] = cut_num_times_vis_routes;
+        }
+
+        // Use thread_local vector for accumulation
+        static thread_local std::vector<double> num_times_vis_routes;
+        num_times_vis_routes.resize(num_valid_routes);
+
+        double best_vio = -std::numeric_limits<double>::max();
+        int    best_idx = -1;
+
+        // SIMD-friendly loop for coefficient processing
+        for (size_t cnt = 0; cnt < coeffs.size(); ++cnt) {
+            std::fill(num_times_vis_routes.begin(), num_times_vis_routes.end(), 0.0);
+
+            // Vectorizable nested loops
+            for (int i = 0; i < cut_size; ++i) {
+                const auto  &routes = cut_num_times_vis_routes[i];
+                const double coeff  = coeffs[cnt][i];
+
+                for (const int j : routes) { num_times_vis_routes[j] += coeff; }
+            }
+
+            // Compute violation score with SIMD-friendly loop
             double vio_tmp = -rhs;
             for (size_t i = 0; i < num_times_vis_routes.size(); ++i) {
-                num_times_vis_routes[i] =
+                const double scaled_value =
                     static_cast<int>(num_times_vis_routes[i] / denominator + tolerance) * cached_valid_routes[i];
-                vio_tmp += num_times_vis_routes[i];
+                vio_tmp += scaled_value;
             }
 
             if (vio_tmp > best_vio) {
@@ -394,7 +409,10 @@ public:
         }
         vio = best_vio;
 
-        std::vector<std::pair<int, int>> cut_coeff(cut_size);
+        // Final result preparation with thread_local storage
+        static thread_local std::vector<std::pair<int, int>> cut_coeff;
+        cut_coeff.resize(cut_size);
+
         for (int i = 0; i < cut_size; ++i) {
             if (best_idx >= 0 && best_idx < coeffs.size() && i < coeffs[best_idx].size()) {
                 cut_coeff[i] = {cut[i], coeffs[best_idx][i]};
@@ -403,13 +421,13 @@ public:
 
         pdqsort(cut_coeff.begin(), cut_coeff.end(), [](const auto &a, const auto &b) { return a.second > b.second; });
 
-        std::vector<int> new_cut(cut_size);
+        static thread_local std::vector<int> new_cut;
+        new_cut.resize(cut_size);
         std::transform(cut_coeff.begin(), cut_coeff.end(), new_cut.begin(), [](const auto &a) { return a.first; });
 
-        {
-            std::lock_guard<std::mutex> lock(map_cut_plan_vio_mutex);
-            if (plan_idx < map_cut_plan_vio[tmp].size()) { map_cut_plan_vio[tmp][plan_idx] = {new_cut, vio}; }
-        }
+        // Update final results
+        std::lock_guard<std::mutex> lock(map_cut_plan_vio_mutex);
+        if (plan_idx < map_cut_plan_vio[tmp].size()) { map_cut_plan_vio[tmp][plan_idx] = {new_cut, vio}; }
     }
     std::vector<std::vector<double>> cost_mat4_vertex;
 

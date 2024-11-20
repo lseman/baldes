@@ -352,9 +352,8 @@ void BucketGraph::generate_arcs() {
                 {
                     std::lock_guard<std::mutex> lock(buckets_mutex); // Lock the mutex to ensure thread safety
                     add_arc<D>(from_bucket, to_bucket, local_res_inc, local_cost_inc); // Add the arc globally
-                    buckets[from_bucket].add_bucket_arc(from_bucket, to_bucket, local_res_inc, local_cost_inc,
-                                                        D == Direction::Forward,
-                                                        false); // Add the arc to the bucket
+                    buckets[from_bucket].template add_bucket_arc<D>(from_bucket, to_bucket, local_res_inc,
+                                                                    local_cost_inc, false); // Add the arc to the bucket
                 }
             }
         }
@@ -1000,16 +999,16 @@ void BucketGraph::set_adjacency_list() {
         // Add forward arcs from the current node to its neighbors
         for (const auto &arc : best_arcs) {
             auto [priority_value, to_bucket, res_inc_local, cost_inc] = arc;
-            nodes[node.id].add_arc(node.id, to_bucket, res_inc_local, cost_inc, true,
-                                   priority_value); // Add forward arc
+            nodes[node.id].template add_arc<Direction::Forward>(node.id, to_bucket, res_inc_local, cost_inc,
+                                                                priority_value); // Add forward arc
             // fmt::print("Node ID: {}, To Bucket: {}, Cost Inc: {}\n", node.id, to_bucket, cost_inc);
         }
 
         // Add reverse arcs from neighboring nodes to the current node
         for (const auto &arc : best_arcs_rev) {
             auto [priority_value, to_bucket, res_inc_local, cost_inc] = arc;
-            nodes[to_bucket].add_arc(to_bucket, node.id, res_inc_local, cost_inc, false,
-                                     priority_value); // Add reverse arc
+            nodes[to_bucket].template add_arc<Direction::Backward>(to_bucket, node.id, res_inc_local, cost_inc,
+                                                                   priority_value); // Add reverse arc
         }
     };
 
