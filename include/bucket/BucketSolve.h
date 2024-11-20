@@ -20,6 +20,8 @@
 #include "BucketJump.h"
 #include "Definitions.h"
 
+#include "BucketRes.h"
+
 #include "Trees.h"
 #include "cuts/SRC.h"
 #include <cstring>

@@ -23,11 +23,14 @@
 #include "VRPNode.h"
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
+#include <pybind11/stl_bind.h>
 
 #ifdef GUROBI
 #include "gurobi_c++.h"
 #include "gurobi_c.h"
 #endif
+
+#include "../third_party/small_vector.hpp"
 
 namespace py = pybind11;
 using namespace pybind11::literals; // Enables _a suffix for named arguments
@@ -67,7 +70,7 @@ PYBIND11_MODULE(pybaldes, m) {
         .def_readwrite("cost", &Label::cost)
         .def_readwrite("real_cost", &Label::real_cost)
         .def_readwrite("resources", &Label::resources)
-        .def_readwrite("nodes_covered", &Label::nodes_covered)
+        .def("nodes_covered", &Label::getRoute, "Get the nodes covered")
         .def_readwrite("node_id", &Label::node_id)
         .def_readwrite("parent", &Label::parent)
         .def_readwrite("visited_bitmap", &Label::visited_bitmap)
@@ -138,8 +141,28 @@ PYBIND11_MODULE(pybaldes, m) {
                 self.set_deleted_arcs(deleted_arcs);
             },
             "Set arcs that should be forbidden/deleted from the graph")
-        .def("reset_fixed_arcs", &BucketGraph::reset_fixed, "Reset all fixed arcs in the graph");
+        .def(
+            "get_adjacency_list",
+            [](BucketGraph &self) {
+                // Convert the C++ adjacency list to a Python dictionary
+                auto     adj_list = self.get_adjacency_list<Symmetry::Asymmetric>();
+                py::dict py_adj_list;
 
+                for (const auto &[node, arcs] : adj_list) {
+                    py::list py_arcs;
+                    for (const auto &[to_node, cost, capacity] : arcs) {
+                        py_arcs.append(py::make_tuple(to_node, cost, capacity));
+                    }
+                    // Use the Python attribute method to set dictionary items
+                    py_adj_list.attr("__setitem__")(py::cast(node), py_arcs);
+                }
+
+                return py_adj_list;
+            },
+            "Get the adjacency list as a dictionary")
+        .def("reset_fixed_arcs", &BucketGraph::reset_fixed, "Reset all fixed arcs in the graph")
+        .def("solve_min_cost_flow", &BucketGraph::solve_min_cost_flow<Symmetry::Symmetric>, py::arg("source"),
+             py::arg("sink"));
     // Expose PSTEPDuals class
     py::class_<PSTEPDuals>(m, "PSTEPDuals")
         .def(py::init<>())                                                                   // Default constructor

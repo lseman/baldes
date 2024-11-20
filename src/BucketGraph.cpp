@@ -437,15 +437,15 @@ void BucketGraph::set_adjacency_list_manual() {
         // Add forward arcs from the current node to its neighbors
         for (const auto &arc : best_arcs) {
             auto [priority_value, to_bucket, res_inc_local, cost_inc] = arc;
-            nodes[node.id].add_arc(node.id, to_bucket, res_inc_local, cost_inc, true,
-                                   priority_value); // Add forward arc
+            nodes[node.id].template add_arc<Direction::Forward>(node.id, to_bucket, res_inc_local, cost_inc,
+                                                                priority_value); // Add forward arc
         }
 
         // Add reverse arcs from neighboring nodes to the current node
         for (const auto &arc : best_arcs_rev) {
             auto [priority_value, to_bucket, res_inc_local, cost_inc] = arc;
-            nodes[to_bucket].add_arc(to_bucket, node.id, res_inc_local, cost_inc, false,
-                                     priority_value); // Add reverse arc
+            nodes[to_bucket].template add_arc<Direction::Backward>(to_bucket, node.id, res_inc_local, cost_inc,
+                                                                   priority_value); // Add reverse arc
         }
     };
 
@@ -467,24 +467,24 @@ void BucketGraph::common_initialization() {
 
     std::vector<Label *> fw_warm_labels;
     std::vector<Label *> bw_warm_labels;
-    if (merged_labels.size() > 0 && options.warm_start) {
 
+    if (merged_labels.size() > 0 && options.warm_start) {
         PARALLEL_SECTIONS(
             work, bi_sched,
             SECTION_CUSTOM(this, &fw_warm_labels) {
+                fw_warm_labels.clear();
+                fw_warm_labels.reserve(fw_buckets_size);
                 for (auto bucket = 0; bucket < fw_buckets_size; ++bucket) {
-                    auto      &current_bucket = fw_buckets[bucket];          // Get the current bucket
-                    const auto labels         = current_bucket.get_labels(); // Get labels in the current bucket
-                    // get the first label of each bucket
-                    auto label = current_bucket.get_best_label();
-                    if (label != nullptr) { fw_warm_labels.push_back(label); }
+                    auto &current_bucket = fw_buckets[bucket];
+                    if (auto *label = current_bucket.get_best_label()) { fw_warm_labels.push_back(std::move(label)); }
                 }
             },
             SECTION_CUSTOM(this, &bw_warm_labels) {
+                bw_warm_labels.clear();
+                bw_warm_labels.reserve(bw_buckets_size);
                 for (auto bucket = 0; bucket < bw_buckets_size; ++bucket) {
-                    auto &current_bucket = bw_buckets[bucket];              // Get the current bucket
-                    auto  label          = current_bucket.get_best_label(); // get the first label of each bucket
-                    if (label != nullptr) { bw_warm_labels.push_back(label); }
+                    auto &current_bucket = bw_buckets[bucket];
+                    if (auto *label = current_bucket.get_best_label()) { bw_warm_labels.push_back(std::move(label)); }
                 }
             });
     }
@@ -494,9 +494,6 @@ void BucketGraph::common_initialization() {
     fw_c_bar.clear();
     bw_c_bar.clear();
 
-    // print fw_buckets size
-    // fmt::print("fw_buckets size: {}\n", fw_buckets.size());
-    // fmt::print("fw_buckets size: {}\n", bw_buckets_size);
     dominance_checks_per_bucket.assign(fw_buckets_size + 1, 0);
     non_dominated_labels_per_bucket = 0;
 
@@ -587,10 +584,6 @@ void BucketGraph::common_initialization() {
                 bw_warm_labels = std::move(processed_labels);
             });
     }
-    // if (options.warm_start) {
-    // for (auto label : fw_warmed_labels) { fw_buckets[label->vertex].add_label(label); }
-    // for (auto label : bw_warmed_labels) { bw_buckets[label->vertex].add_label(label); }
-    // }
     // Initialize forward buckets (generic for multiple dimensions)
     std::vector<int> current_pos(num_intervals, 0);
 
@@ -655,10 +648,7 @@ void BucketGraph::common_initialization() {
         generate_combinations(0);
     };
 
-    // Call the lambda for both forward and backward directions, ensuring all combinations are processed
-    // fmt::print("Forward Initialization\n");
-    initialize_intervals_combinations(true); // Forward direction
-    // fmt::print("Backward Initialization\n");
+    initialize_intervals_combinations(true);  // Forward direction
     initialize_intervals_combinations(false); // Backward direction
 }
 
@@ -672,9 +662,6 @@ void BucketGraph::mono_initialization() {
     fw_c_bar.clear();
     bw_c_bar.clear();
 
-    // print fw_buckets size
-    // fmt::print("fw_buckets size: {}\n", fw_buckets.size());
-    // fmt::print("fw_buckets size: {}\n", bw_buckets_size);
     dominance_checks_per_bucket.assign(fw_buckets_size + 1, 0);
     non_dominated_labels_per_bucket = 0;
 
@@ -771,34 +758,6 @@ void BucketGraph::mono_initialization() {
 
     // Call the lambda for both forward and backward directions, ensuring all combinations are processed
     initialize_intervals_combinations(true); // Forward direction
-}
-
-#include "Knapsack.h"
-
-/**
- * Computes the knapsack bound for a given label.
- *
- * This function calculates the upper bound of the knapsack problem for a given label `l`.
- * It initializes a knapsack with the remaining capacity and iterates through the nodes to add
- * items that have not been visited and fit within the remaining capacity.
- * The function returns the difference between the label's cost and the solution to the knapsack problem.
- *
- * @param l A pointer to the Label object for which the knapsack bound is being calculated.
- * @return The computed knapsack bound as a double.
- */
-double BucketGraph::knapsackBound(const Label *l) {
-    // Initialize Knapsack instance and set capacity based on remaining load
-    Knapsack kp;
-    int      rload = R_max[0] - l->resources[0];
-    kp.setCapacity(rload);
-
-    // Add eligible items based on node conditions
-    for (int i = 1; i < nodes.size(); ++i) {
-        if (!l->visits(i) && nodes[i].consumption[0] <= rload) { kp.addItem(nodes[i].cost, nodes[i].consumption[0]); }
-    }
-
-    // Solve the knapsack problem and compute the bound
-    return l->cost - kp.solve();
 }
 
 /**
@@ -995,24 +954,24 @@ void BucketGraph::initInfo() {
  */
 Label *BucketGraph::compute_mono_label(const Label *L) {
     // Directly acquire new_label and set the cost
-    auto new_label       = new Label();
-    new_label->cost      = L->cost;      // Use the cost from L
-    new_label->real_cost = L->real_cost; // Use the real cost from L
+    auto new_label           = new Label();
+    new_label->cost          = L->cost;      // Use the cost from L
+    new_label->real_cost     = L->real_cost; // Use the real cost from L
+    new_label->nodes_covered = L->nodes_covered;
 
     // Calculate the number of nodes covered by the label (its ancestors)
-    size_t label_size = 0;
-    for (auto current_label = L; current_label != nullptr; current_label = current_label->parent) { label_size++; }
+    // size_t label_size = 0;
+    // for (auto current_label = L; current_label != nullptr; current_label = current_label->parent) { label_size++; }
 
     // Reserve space in one go
-    new_label->nodes_covered.clear();
-    new_label->nodes_covered.reserve(label_size);
+    // new_label->nodes_covered.reserve(label_size);
 
     // Insert the nodes from the label and its ancestors
-    for (auto current_label = L; current_label != nullptr; current_label = current_label->parent) {
-        new_label->nodes_covered.push_back(current_label->node_id);
-    }
+    // for (auto current_label = L; current_label != nullptr; current_label = current_label->parent) {
+    // new_label->nodes_covered.push_back(current_label->node_id);
+    // }
 
-    std::reverse(new_label->nodes_covered.begin(), new_label->nodes_covered.end());
+    // std::reverse(new_label->nodes_covered.begin(), new_label->nodes_covered.end());
 
     return new_label;
 }
@@ -1036,15 +995,15 @@ std::vector<Label *> BucketGraph::extend_path(const std::vector<int> &path, std:
         for (auto new_label : labels) { new_labels.push_back(new_label); }
     }
 
-    std::vector<Label *> new_labels_to_return;
+    // std::vector<Label *> new_labels_to_return;
 
-    for (auto new_label : new_labels) {
-        new_label = compute_mono_label(new_label);
-        // add label->nodes_covered to the front of new_labels->nodes_covered
-        new_label->nodes_covered.insert(new_label->nodes_covered.begin(), label->nodes_covered.begin(),
-                                        label->nodes_covered.end() - 1);
-        // print new_labels->nodes_covered
-        new_labels_to_return.push_back(new_label);
-    }
-    return new_labels_to_return;
+    // for (auto new_label : new_labels) {
+    //     //new_label = compute_mono_label(new_label);
+    //     // add label->nodes_covered to the front of new_labels->nodes_covered
+    //     //new_label->nodes_covered.insert(new_label->nodes_covered.begin(), label->nodes_covered.begin(),
+    //                                     // label->nodes_covered.end() - 1);
+    //     // print new_labels->nodes_covered
+    //     new_labels_to_return.push_back(new_label);
+    // }
+    return new_labels;
 }

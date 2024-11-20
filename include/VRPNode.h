@@ -41,6 +41,8 @@ struct VRPNode {
     std::vector<JumpArc>          bw_jump_arcs;
     std::string                   identifier;
 
+    bool is_station = false;
+
     std::string track_id;
     int         subject;
     int         week;
@@ -83,26 +85,29 @@ struct VRPNode {
      * or the backward arc list, based on the direction specified by the `fw` parameter.
      *
      */
-    void add_arc(int from_bucket, int to_bucket, std::vector<double> res_inc, double cost_inc, bool fw, bool fixed) {
-        if (fw) {
+    template <Direction D>
+
+    void add_arc(int from_bucket, int to_bucket, std::vector<double> res_inc, double cost_inc, bool fixed) {
+        if constexpr (D == Direction::Forward) {
             fw_arcs.push_back({from_bucket, to_bucket, std::move(res_inc), cost_inc, fixed});
         } else {
             bw_arcs.push_back({from_bucket, to_bucket, std::move(res_inc), cost_inc, fixed});
         }
     }
 
-    void add_arc(int from_bucket, int to_bucket, std::vector<double> res_inc, double cost_inc, bool fw,
-                 double priority) {
-        if (fw) {
+    template <Direction D>
+    void add_arc(int from_bucket, int to_bucket, std::vector<double> res_inc, double cost_inc, double priority) {
+        if constexpr (D == Direction::Forward) {
             fw_arcs.push_back({from_bucket, to_bucket, std::move(res_inc), cost_inc, priority});
         } else {
             bw_arcs.push_back({from_bucket, to_bucket, std::move(res_inc), cost_inc, priority});
         }
     }
 
-    void add_jump_arc(int from_bucket, int to_bucket, const std::vector<double> &res_inc, double cost_inc, bool fw,
+    template <Direction D>
+    void add_jump_arc(int from_bucket, int to_bucket, const std::vector<double> &res_inc, double cost_inc,
                       int to_job = -1) {
-        if (fw) {
+        if constexpr (D == Direction::Forward) {
             fw_jump_arcs.emplace_back(from_bucket, to_bucket, res_inc, cost_inc, to_job);
         } else {
             bw_jump_arcs.emplace_back(from_bucket, to_bucket, res_inc, cost_inc, to_job);

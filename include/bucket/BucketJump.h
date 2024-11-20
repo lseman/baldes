@@ -336,8 +336,8 @@ void BucketGraph::ObtainJumpBucketArcs() {
                             const std::vector<double> res  = gamma_prime.resource_increment;
                             const double              cost = gamma_prime.cost_increment;
 
-                            buckets[b].add_jump_arc(b, b_prime, res, cost, true);
-                            nodes[buckets[b].node_id].add_jump_arc(b, b_prime, res, cost, true, to_node);
+                            buckets[b].template add_jump_arc<D>(b, b_prime, res, cost);
+                            nodes[buckets[b].node_id].template add_jump_arc<D>(b, b_prime, res, cost, to_node);
                             ++arc_counter; // Increment the jump arc counter
                         }
                     }

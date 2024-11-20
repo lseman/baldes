@@ -292,11 +292,15 @@ auto BucketGraph::solveTSP(std::vector<std::vector<int>> &paths, std::vector<dou
         model.add_constraint(u[i] <= n - 1, "u_ub_" + std::to_string(i));
     }
 
+#ifdef IPM
     IPSolver *ipSolver = new IPSolver();
     auto      matrix   = model.extractModelDataSparse();
     ipSolver->run_optimization(matrix, 1e-2);
 
-    auto                             duals = ipSolver->getDuals();
+    auto duals = ipSolver->getDuals();
+#else
+    auto duals = std::vector<double>(N_SIZE, 0.0);
+#endif
     std::vector<double>              three_two_duals(n, 0.0);
     std::vector<double>              three_three_duals(n, 0.0);
     std::vector<std::vector<double>> three_five_duals(n, std::vector<double>(n + 1, 0.0));
@@ -314,7 +318,11 @@ auto BucketGraph::solveTSP(std::vector<std::vector<int>> &paths, std::vector<dou
             }
         }
     }
+#ifdef IPM
     auto lp_obj = ipSolver->getObjective();
+#else
+    auto lp_obj = 0.0;
+#endif
     fmt::print("LP Objective: {}\n", lp_obj);
     GRBEnv &env      = GurobiEnvSingleton::getInstance();
     auto    modelGRB = new GRBModel(model.toGurobiModel(env));
@@ -499,13 +507,17 @@ auto BucketGraph::solveTSPTW(std::vector<std::vector<int>> &paths, std::vector<d
         model.add_constraint(omega[i] - time_windows_end[i] * node_used <= 0, "tw_ub_" + std::to_string(i));
     }
 
-    // Solve the model
+// Solve the model
+#ifdef IPM
     IPSolver *ipSolver = new IPSolver();
     auto      matrix   = model.extractModelDataSparse();
     ipSolver->run_optimization(matrix, 1e-2);
 
     // Extract solution and duals
-    auto                             duals = ipSolver->getDuals();
+    auto duals = ipSolver->getDuals();
+#else
+    auto duals = std::vector<double>(N_SIZE, 0.0);
+#endif
     std::vector<double>              three_two_duals(n, 0.0);
     std::vector<double>              three_three_duals(n, 0.0);
     std::vector<std::vector<double>> three_five_duals(n, std::vector<double>(n + 1, 0.0));
@@ -526,7 +538,7 @@ auto BucketGraph::solveTSPTW(std::vector<std::vector<int>> &paths, std::vector<d
     }
 
     // Solution output and return
-    fmt::print("LP Objective: {}\n", ipSolver->getObjective());
+    //fmt::print("LP Objective: {}\n", ipSolver->getObjective());
 
     GRBEnv &env = GurobiEnvSingleton::getInstance();
 

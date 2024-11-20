@@ -276,7 +276,7 @@ void LimitedMemoryRank1Cuts::separate(const SparseMatrix &A, const std::vector<d
 
     pdqsort(tmp_cuts.begin(), tmp_cuts.end(), [](const auto &a, const auto &b) { return a.first > b.first; });
 
-    auto max_cuts = 3;
+    auto max_cuts = 2;
     for (int i = 0; i < std::min(max_cuts, static_cast<int>(tmp_cuts.size())); ++i) {
         auto &cut = tmp_cuts[i].second;
         cutStorage.addCut(cut);
@@ -297,7 +297,7 @@ std::pair<bool, bool> LimitedMemoryRank1Cuts::runSeparation(BNBNode *node, std::
     size_t i = 0;
     std::for_each(allPaths.begin(), allPaths.end(), [&](auto &path) { path.frac_x = solution[i++]; });
 
-    separateR1C1(matrix.A_sparse, solution);
+    // separateR1C1(matrix.A_sparse, solution);
     separate(matrix.A_sparse, solution);
 
     // TupleBasedSeparator r1c4(allPaths);
@@ -372,26 +372,25 @@ std::pair<bool, bool> LimitedMemoryRank1Cuts::runSeparation(BNBNode *node, std::
         return cut_ctr;
     };
 
-    // if (cuts_before == cuts_after_separation) {
-    generator->setNodes(nodes);
-    generator->generateSepHeurMem4Vertex();
-    generator->initialize(allPaths);
-    // generator->fillMemory();
-    generator->getHighDimCuts();
-    // generator->setMemFactor(0.15);
-    // generator->constructMemoryVertexBased();
+    if (cuts_before == cuts_after_separation) {
+        generator->setNodes(nodes);
+        generator->generateSepHeurMem4Vertex();
+        generator->initialize(allPaths);
+        // generator->fillMemory();
+        generator->getHighDimCuts();
+        // generator->setMemFactor(0.15);
+        // generator->constructMemoryVertexBased();
 
-    // auto cut_number = processCuts();
-    for (double memFactor = 0.15; memFactor <= 0.65; memFactor += 0.05) {
-        generator->setMemFactor(memFactor);
-        generator->constructMemoryVertexBased();
-        auto cut_number = processCuts();
-        if (cut_number != 0) {
-            break; // Exit the loop if cuts are successfully processed
+        // auto cut_number = processCuts();
+        for (double memFactor = 0.15; memFactor <= 0.65; memFactor += 0.10) {
+            generator->setMemFactor(memFactor);
+            generator->constructMemoryVertexBased();
+            auto cut_number = processCuts();
+            if (cut_number != 0) {
+                break; // Exit the loop if cuts are successfully processed
+            }
         }
     }
-
-    // }
     ////////////////////////////////////////////////////
     // Handle non-violated cuts in a single pass
     ////////////////////////////////////////////////////
