@@ -76,7 +76,7 @@ public:
     BucketOptions options;
     void          mono_initialization();
     Label        *compute_mono_label(const Label *L);
-
+    bool just_fixed = false;
     using BranchingDualsPtr           = std::shared_ptr<BranchingDuals>;
     BranchingDualsPtr branching_duals = std::make_shared<BranchingDuals>();
 

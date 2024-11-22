@@ -804,7 +804,10 @@ void BucketGraph::bucket_fixing() {
         generate_arcs();
         fmt::print("\033[34m_BUCKET FIXING PROCEDURE FINISHED\033[0m");
         fmt::print("\n");
+        just_fixed = true;
+        return;
     }
+    just_fixed = false;
 }
 
 /**

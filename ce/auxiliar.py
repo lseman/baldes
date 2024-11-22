@@ -126,11 +126,15 @@ class ConflictManager:
         self._current_state = None
         self._state_history = []
 
+    def calculate_travel_time(self, from_node: int, to_node: int) -> float:
+        """Calculate travel time between two nodes"""
+        return self.solver.distances[from_node][to_node]
+    
     def _get_travel_time(self, from_node: int, to_node: int) -> float:
         """Cached travel time calculation"""
         key = (from_node, to_node)
         if key not in self._travel_times:
-            self._travel_times[key] = self.solver.calculate_travel_time(
+            self._travel_times[key] = self.calculate_travel_time(
                 from_node, to_node
             )
         return self._travel_times[key]

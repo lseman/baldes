@@ -468,7 +468,7 @@ void BucketGraph::common_initialization() {
     std::vector<Label *> fw_warm_labels;
     std::vector<Label *> bw_warm_labels;
 
-    if (merged_labels.size() > 0 && options.warm_start) {
+    if (merged_labels.size() > 0 && options.warm_start && !just_fixed) {
         PARALLEL_SECTIONS(
             work, bi_sched,
             SECTION_CUSTOM(this, &fw_warm_labels) {
@@ -521,7 +521,7 @@ void BucketGraph::common_initialization() {
         bw_buckets[b].clear();
     }
 
-    if (options.warm_start) {
+    if (options.warm_start && !just_fixed) {
         // sort the warm labels for the ones with the smallest cost
         PARALLEL_SECTIONS(
             work, bi_sched,
