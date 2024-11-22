@@ -25,10 +25,6 @@
  * get jump arcs, add labels, remove labels, get labels, clear labels, reset labels, and clear arcs.
  */
 struct Bucket {
-    // std::vector<Label *> labels_vec;
-    // std::vector<Label *, PoolAllocator<Label *>> labels_vec;
-    // std::pmr::pool_options                 pool_opts;
-    // std::pmr::unsynchronized_pool_resource pool;
     std::vector<Label *> labels_vec;
 
     int depth = 0;

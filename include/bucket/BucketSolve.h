@@ -26,7 +26,7 @@
 #include "cuts/SRC.h"
 #include <cstring>
 
-#ifdef AVX
+#ifdef __AVX2__
 #include "BucketAVX.h"
 #endif
 
@@ -288,7 +288,7 @@ std::vector<double> BucketGraph::labeling_algorithm() {
 
                                 auto &mother_bucket             = buckets[to_bucket];
                                 auto  check_dominance_in_bucket = [&](const std::vector<Label *> &labels) {
-#ifndef AVX
+#ifndef __AVX2__
                                     for (auto *existing_label : labels) {
                                         if (is_dominated<D, S>(new_label, existing_label)) {
                                             stat_n_dom++; // Increment dominated labels count
@@ -946,7 +946,7 @@ inline bool BucketGraph::DominatedInCompWiseSmallerBuckets(const Label *L, int b
             const auto bucket_labels = buckets[currentBucket].get_labels(); // Get the labels in the current bucket
             auto      &mother_bucket = buckets[currentBucket];              // Get the mother bucket for the label
             auto       check_dominance_in_bucket = [&](const std::vector<Label *> &labels) {
-#ifndef AVX
+#ifndef __AVX2__
                 for (auto *existing_label : labels) {
                     if (is_dominated<D, S>(L, existing_label)) {
                         // stat_n_dom++; // Increment dominated labels count

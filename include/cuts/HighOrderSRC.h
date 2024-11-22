@@ -273,11 +273,11 @@ public:
         }
     }
 
-    // declare map_cut_plan_vio_mutex
-    std::mutex map_cut_plan_vio_mutex;
-    std::mutex cut_cache_mutex;
-
     ankerl::unordered_dense::map<std::vector<int>, std::vector<std::vector<int>>, VectorIntHash> cut_cache;
+
+    // declare map_cut_plan_vio_mutex
+    std::shared_mutex map_cut_plan_vio_mutex;
+    std::shared_mutex cut_cache_mutex;
 
     void exactFindBestPermutationForOnePlan(std::vector<int> &cut, const int plan_idx, double &vio) {
         const int   cut_size = static_cast<int>(cut.size());
@@ -298,14 +298,19 @@ public:
             tmp.set(it * (it >= 0 && it < v_r_map.size())); // Branchless using multiplication
         }
 
-        // Quick cache lookup
+        // Quick cache lookup with shared lock
         {
-            std::lock_guard<std::mutex> lock(map_cut_plan_vio_mutex);
+            std::shared_lock<std::shared_mutex> lock(map_cut_plan_vio_mutex);
             if (auto it = map_cut_plan_vio.find(tmp);
                 it != map_cut_plan_vio.end() && plan_idx < it->second.size() && !it->second[plan_idx].first.empty()) {
                 vio = it->second[plan_idx].second;
                 return;
             }
+        }
+
+        // Upgrade to exclusive lock to modify
+        {
+            std::unique_lock<std::shared_mutex> lock(map_cut_plan_vio_mutex);
             map_cut_plan_vio[tmp].resize(7);
         }
 
@@ -337,7 +342,7 @@ public:
         // Cache lookup with minimized critical section
         bool cache_hit = false;
         {
-            std::lock_guard<std::mutex> lock(cut_cache_mutex);
+            std::shared_lock<std::shared_mutex> lock(cut_cache_mutex);
             if (auto cache_it = cut_cache.find(cut); cache_it != cut_cache.end()) {
                 cut_num_times_vis_routes = cache_it->second;
                 cache_hit                = true;
@@ -371,7 +376,7 @@ public:
             }
 
             // Update cache
-            std::lock_guard<std::mutex> lock(cut_cache_mutex);
+            std::unique_lock<std::shared_mutex> lock(cut_cache_mutex);
             cut_cache[cut] = cut_num_times_vis_routes;
         }
 
@@ -426,7 +431,7 @@ public:
         std::transform(cut_coeff.begin(), cut_coeff.end(), new_cut.begin(), [](const auto &a) { return a.first; });
 
         // Update final results
-        std::lock_guard<std::mutex> lock(map_cut_plan_vio_mutex);
+        std::unique_lock<std::shared_mutex> lock(map_cut_plan_vio_mutex);
         if (plan_idx < map_cut_plan_vio[tmp].size()) { map_cut_plan_vio[tmp][plan_idx] = {new_cut, vio}; }
     }
     std::vector<std::vector<double>> cost_mat4_vertex;
@@ -469,281 +474,319 @@ public:
         // Resize `rank1_sep_heur_mem4_vertex` and initialize `v_r_map`
         rank1_sep_heur_mem4_vertex.resize(dim);
         v_r_map.assign(dim, std::vector<int>(sol.size(), 0));
+        const int  max_dim_minus_1 = dim - 1;
+        const auto sol_size        = sol.size();
 
         // Populate `v_r_map` with route appearances for each vertex `i`
-        for (int r = 0; r < sol.size(); ++r) {
-            for (int i : sol[r].route) {
-                if (i > 0 && i < dim - 1) { ++v_r_map[i][r]; }
+#ifdef __cpp_lib_parallel_algorithm
+        std::for_each(std::execution::par_unseq, sol.begin(), sol.end(), [&](const auto &route_data) {
+            const auto r = &route_data - &sol[0]; // Get index without separate counter
+            for (const int i : route_data.route) {
+                if (i > 0 && i < max_dim_minus_1) { ++v_r_map[i][r]; }
+            }
+        });
+#else
+        for (size_t r = 0; r < sol_size; ++r) {
+            for (const int i : sol[r].route) {
+                if (i > 0 && i < max_dim_minus_1) { ++v_r_map[i][r]; }
             }
         }
+#endif
 
         // Initialize `seed_map` with reserved space
         ankerl::unordered_dense::map<cutLong, cutLong> seed_map;
         seed_map.reserve(4096);
 
         // Cache dimensions for efficiency
-        const int max_dim_minus_1 = dim - 1;
 
-        // Iterate through vertices to build `seed_map`
-        for (int i = 1; i < max_dim_minus_1; ++i) {
+        // Process vertices and build seed map
+        for (size_t i = 1; i < max_dim_minus_1; ++i) {
             if (v_r_map[i].empty()) continue;
 
-            cutLong     wc;
+            // Create working set for current vertex
+            cutLong     working_set;
             const auto &heur_mem = rank1_sep_heur_mem4_vertex[i];
 
-            // Create bitset `wc` based on neighbors in routes containing vertex `i`
-            for (int route_index = 0; route_index < v_r_map[i].size(); ++route_index) {
-                if (v_r_map[i][route_index] > 0) {
-                    for (int v : sol[route_index].route) {
-                        if (v > 0 && v < max_dim_minus_1 && heur_mem.test(v)) { wc.set(v); }
-                    }
+            // Build working set from routes containing vertex i
+            for (size_t route_idx = 0; route_idx < v_r_map[i].size(); ++route_idx) {
+                if (v_r_map[i][route_idx] <= 0) continue;
+
+                for (const int v : sol[route_idx].route) {
+                    if (v > 0 && v < max_dim_minus_1 && heur_mem.test(v)) { working_set.set(v); }
                 }
             }
 
-            // Construct `tmp_c` for routes excluding vertex `i`
-            for (int r = 0; r < sol.size(); ++r) {
+            // Process routes not containing vertex i
+            for (size_t r = 0; r < sol_size; ++r) {
                 if (v_r_map[i][r] > 0) continue;
 
-                cutLong tmp_c;
-                for (int v : sol[r].route) {
-                    if (v > 0 && v < max_dim_minus_1 && wc.test(v)) { tmp_c.set(v); }
+                cutLong candidate_set;
+                for (const int v : sol[r].route) {
+                    if (v > 0 && v < max_dim_minus_1 && working_set.test(v)) { candidate_set.set(v); }
                 }
-                tmp_c.set(i);
+                candidate_set.set(i);
 
-                // Add to `seed_map` if within size limits
-                int c_size = static_cast<int>(tmp_c.count());
+                const auto c_size = candidate_set.count();
                 if (c_size >= 4 && c_size <= max_heuristic_initial_seed_set_size_row_rank1c) {
-                    auto [it, inserted] = seed_map.try_emplace(tmp_c, wc ^ tmp_c);
-                    if (!inserted) { it->second |= wc ^ tmp_c; }
+                    const auto complement = working_set ^ candidate_set;
+                    auto [it, inserted]   = seed_map.try_emplace(candidate_set, complement);
+                    if (!inserted) { it->second |= complement; }
                 }
             }
         }
 
         // Prepare `c_N_noC` by transforming `seed_map` entries
         c_N_noC.resize(seed_map.size());
-        int cnt = 0;
-        for (const auto &[fst, snd] : seed_map) {
-            auto &[tmp_fst, tmp_snd] = c_N_noC[cnt];
-            tmp_fst.reserve(fst.count());
-            tmp_snd.reserve(snd.count());
+        std::transform(seed_map.begin(), seed_map.end(), c_N_noC.begin(), [max_dim_minus_1](const auto &seed_pair) {
+            const auto &[fst, snd] = seed_pair;
+            std::pair<std::vector<int>, std::vector<int>> result;
 
-            for (int i = 1; i < max_dim_minus_1; ++i) {
+            result.first.reserve(fst.count());
+            result.second.reserve(snd.count());
+
+            for (size_t i = 1; i < max_dim_minus_1; ++i) {
                 if (fst.test(i)) {
-                    tmp_fst.push_back(i);
+                    result.first.push_back(static_cast<int>(i));
                 } else if (snd.test(i)) {
-                    tmp_snd.push_back(i);
+                    result.second.push_back(static_cast<int>(i));
                 }
             }
-            ++cnt;
-        }
+
+            return result;
+        });
     }
 
     ////////////////////////////////////////
     // Operators
     ////////////////////////////////////////
+    // Common validation helper
+    struct PlanValidationResult {
+        bool                                          is_valid;
+        const std::tuple<std::vector<int>, int, int> *plan;
+
+        static PlanValidationResult
+        validate(int plan_idx, int size,
+                 const ankerl::unordered_dense::map<int, std::vector<std::tuple<std::vector<int>, int, int>>> &map) {
+            auto size_it = map.find(size);
+            if (size < 3 || size_it == map.end() || plan_idx >= size_it->second.size()) { return {false, nullptr}; }
+            return {true, &size_it->second[plan_idx]};
+        }
+    };
+
+    // Helper for finding best violation
+    template <typename F>
+    auto findBestViolation(F &&calculate_violation, const std::vector<int> &candidates,
+                           double initial_vio = -std::numeric_limits<double>::max()) {
+        double best_vio       = initial_vio;
+        int    best_candidate = -1;
+
+        for (const int candidate : candidates) {
+            if (double vio = calculate_violation(candidate); vio > best_vio) {
+                best_vio       = vio;
+                best_candidate = candidate;
+            }
+        }
+
+        return std::make_pair(best_vio, best_candidate);
+    }
+
     inline void addSearchCrazy(int plan_idx, const std::vector<int> &c, const std::vector<int> &w_no_c, double &new_vio,
                                int &add_j) {
-        const int new_c_size = static_cast<int>(c.size()) + 1;
+        const int new_size = c.size() + 1;
 
-        // Validate and precompute the plan reference
-        if (new_c_size > max_row_rank1 || new_c_size >= map_rank1_multiplier.size() ||
-            plan_idx >= map_rank1_multiplier[new_c_size].size() ||
-            !get<1>(map_rank1_multiplier[new_c_size][plan_idx])) {
+        // Validate size and plan
+        if (new_size > max_row_rank1) {
             new_vio = -std::numeric_limits<double>::max();
             return;
         }
-        const auto &plan = map_rank1_multiplier[new_c_size][plan_idx];
 
-        std::vector<int> tmp_c = c; // Start with `c` and add one element
-        tmp_c.push_back(0);         // Reserve last spot for the candidate in `w_no_c`
-
-        double best_vio       = -std::numeric_limits<double>::max();
-        int    best_candidate = -1;
-
-        // Lambda for violation calculation
-        auto calculateViolation = [&](int candidate) {
-            tmp_c.back() = candidate;
-            double vio;
-            exactFindBestPermutationForOnePlan(tmp_c, plan_idx, vio);
-            return vio;
-        };
-
-        // Loop through w_no_c to find the best candidate
-        for (const int cplus : w_no_c) {
-            double vio = calculateViolation(cplus);
-            if (vio > best_vio) {
-                best_vio       = vio;
-                best_candidate = cplus;
-            }
+        auto validation = PlanValidationResult::validate(plan_idx, new_size, map_rank1_multiplier);
+        if (!validation.is_valid) {
+            new_vio = -std::numeric_limits<double>::max();
+            return;
         }
+
+        // Prepare temporary vector once
+        std::vector<int> tmp_c = c;
+        tmp_c.push_back(0);
+
+        // Find best candidate
+        auto [best_vio, best_candidate] = findBestViolation(
+            [&](int candidate) {
+                tmp_c.back() = candidate;
+                double vio;
+                exactFindBestPermutationForOnePlan(tmp_c, plan_idx, vio);
+                return vio;
+            },
+            w_no_c);
 
         new_vio = best_vio - tolerance;
         add_j   = best_candidate;
     }
 
     inline void removeSearchCrazy(int plan_idx, const std::vector<int> &c, double &new_vio, int &remove_j) {
-        const int new_c_size = static_cast<int>(c.size()) - 1;
+        const int new_size = c.size() - 1;
 
-        // Validate and precompute the plan reference
-        if (new_c_size < 3 || new_c_size >= map_rank1_multiplier.size() ||
-            plan_idx >= map_rank1_multiplier[new_c_size].size() ||
-            !get<1>(map_rank1_multiplier[new_c_size][plan_idx])) {
+        // Validate size and plan
+        auto validation = PlanValidationResult::validate(plan_idx, new_size, map_rank1_multiplier);
+        if (!validation.is_valid) {
             new_vio = -std::numeric_limits<double>::max();
             return;
         }
-        const auto &plan = map_rank1_multiplier[new_c_size][plan_idx];
 
-        std::vector<int> tmp_c(new_c_size); // Pre-resize tmp_c for removal operations
-        double           best_vio       = -std::numeric_limits<double>::max();
-        int              best_candidate = -1;
+        // Prepare temporary vector once
+        std::vector<int> tmp_c(new_size);
+        std::vector<int> indices(c.size());
+        std::iota(indices.begin(), indices.end(), 0);
 
-        // Lambda for violation calculation
-        auto calculateViolation = [&](int remove_index) {
-            std::copy(c.begin(), c.begin() + remove_index, tmp_c.begin());
-            std::copy(c.begin() + remove_index + 1, c.end(), tmp_c.begin() + remove_index);
-            double vio;
-            exactFindBestPermutationForOnePlan(tmp_c, plan_idx, vio);
-            return vio;
-        };
+        // Find best removal
+        auto [best_vio, best_idx] = findBestViolation(
+            [&](int idx) {
+                std::copy(c.begin(), c.begin() + idx, tmp_c.begin());
+                std::copy(c.begin() + idx + 1, c.end(), tmp_c.begin() + idx);
+                double vio;
+                exactFindBestPermutationForOnePlan(tmp_c, plan_idx, vio);
+                return vio;
+            },
+            indices);
 
-        // Loop through indices in `c` to find the best candidate for removal
-        for (int i = 0; i < c.size(); ++i) {
-            double vio = calculateViolation(i);
-            if (vio > best_vio) {
-                best_vio       = vio;
-                best_candidate = c[i];
-            }
-        }
-
-        new_vio  = best_vio + tolerance; // Apply penalty
-        remove_j = best_candidate;
+        new_vio  = best_vio + tolerance;
+        remove_j = best_idx >= 0 ? c[best_idx] : -1;
     }
 
     inline void swapSearchCrazy(int plan_idx, const std::vector<int> &c, const std::vector<int> &w_no_c,
                                 double &new_vio, std::pair<int, int> &swap_i_j) {
-        const int c_size = static_cast<int>(c.size());
-
-        // Validate and precompute the plan reference
-        if (c_size < 3 || c_size > max_row_rank1 || c_size >= map_rank1_multiplier.size() ||
-            plan_idx >= map_rank1_multiplier[c_size].size() || !get<1>(map_rank1_multiplier[c_size][plan_idx])) {
+        // Validate size and plan
+        auto validation = PlanValidationResult::validate(plan_idx, c.size(), map_rank1_multiplier);
+        if (!validation.is_valid) {
             new_vio = -std::numeric_limits<double>::max();
             return;
         }
-        const auto &plan = map_rank1_multiplier[c_size][plan_idx];
 
-        std::vector<int>    tmp_c     = c; // Start with a copy of `c` to swap elements
-        double              best_vio  = -std::numeric_limits<double>::max();
-        std::pair<int, int> best_swap = {-1, -1};
+        std::vector<int>    tmp_c    = c;
+        double              best_vio = -std::numeric_limits<double>::max();
+        std::pair<int, int> best_swap{-1, -1};
 
-        // Lambda for violation calculation
-        auto calculateViolation = [&](int index, int candidate) {
-            tmp_c[index] = candidate;
-            double vio;
-            exactFindBestPermutationForOnePlan(tmp_c, plan_idx, vio);
-            return vio;
-        };
-
-        // Loop through each element in `c` and each candidate in `w_no_c`
+        // Optimize loop structure to reduce vector modifications
         for (int i = 0; i < c.size(); ++i) {
-            int original = tmp_c[i];
-            for (int swap_candidate : w_no_c) {
-                if (swap_candidate == original) continue;
+            const int original = c[i];
 
-                double vio = calculateViolation(i, swap_candidate);
-                if (vio > best_vio) {
-                    best_vio  = vio;
-                    best_swap = {original, swap_candidate};
-                }
+            // Find best swap for current position
+            auto [pos_best_vio, best_candidate] = findBestViolation(
+                [&](int candidate) {
+                    if (candidate == original) return -std::numeric_limits<double>::max();
+                    tmp_c[i] = candidate;
+                    double vio;
+                    exactFindBestPermutationForOnePlan(tmp_c, plan_idx, vio);
+                    tmp_c[i] = original; // Restore immediately
+                    return vio;
+                },
+                w_no_c);
+
+            if (pos_best_vio > best_vio) {
+                best_vio  = pos_best_vio;
+                best_swap = {original, best_candidate};
             }
-            tmp_c[i] = original; // Restore original element
         }
 
         new_vio  = best_vio;
         swap_i_j = best_swap;
     }
 
+    ////////////////////////////////////////
+
+    struct MoveResult {
+        double                                                 violation_score;
+        std::variant<std::monostate, int, std::pair<int, int>> operation_data;
+
+        MoveResult(double score = -std::numeric_limits<double>::max()) : violation_score(score) {}
+    };
+
     void operationsCrazy(Rank1MultiLabel &label, int &i) {
-        auto &vio      = label.vio;
-        auto &new_cij  = label.c;
-        auto &w_no_cij = label.w_no_c;
-        auto &plan_idx = label.plan_idx;
-        auto  dir      = label.search_dir;
+        constexpr double          MIN_SCORE = -std::numeric_limits<double>::max();
+        std::array<MoveResult, 4> moves{
+            MoveResult{label.vio}, // No operation
+            MoveResult{},          // Add
+            MoveResult{},          // Remove
+            MoveResult{}           // Swap
+        };
 
-        std::array<std::pair<int, double>, 4> move_vio = {{{0, vio},
-                                                           {1, -std::numeric_limits<double>::max()},
-                                                           {2, -std::numeric_limits<double>::max()},
-                                                           {3, -std::numeric_limits<double>::max()}}};
+        // Determine which operations to perform based on search direction
+        const bool can_add    = label.search_dir == 'a' || label.search_dir == 's';
+        const bool can_remove = label.search_dir == 'r' || label.search_dir == 's';
+        const bool can_swap   = label.search_dir == 'a' || label.search_dir == 'r';
 
-        bool                               add_checked = false, remove_checked = false, swap_checked = false;
-        std::optional<int>                 add_j, remove_j;
-        std::optional<std::pair<int, int>> swap_i_j;
-        double                             new_vio = -std::numeric_limits<double>::max();
+        double new_vio = MIN_SCORE;
 
-        // Determine which moves to evaluate based on `dir`
-        if (dir == 'a' || dir == 's') {
-            add_j.emplace(); // Emplace a default int for add_j
-            addSearchCrazy(plan_idx, new_cij, w_no_cij, new_vio, *add_j);
-            move_vio[1].second = new_vio;
-            add_checked        = true;
-        }
-        if (dir == 'r' || dir == 's') {
-            remove_j.emplace(); // Emplace a default int for remove_j
-            removeSearchCrazy(plan_idx, new_cij, new_vio, *remove_j);
-            move_vio[2].second = new_vio;
-            remove_checked     = true;
-        }
-        if (dir == 'a' || dir == 'r') {
-            swap_i_j.emplace(); // Emplace a default pair<int, int> for swap_i_j
-            swapSearchCrazy(plan_idx, new_cij, w_no_cij, new_vio, *swap_i_j);
-            move_vio[3].second = new_vio;
-            swap_checked       = true;
+        // Perform valid operations
+        if (can_add) {
+            int add_j;
+            addSearchCrazy(label.plan_idx, label.c, label.w_no_c, new_vio, add_j);
+            moves[1]                = MoveResult{new_vio};
+            moves[1].operation_data = add_j;
         }
 
-        // Find the best move by maximizing violation score
-        auto   best_move_it  = std::max_element(move_vio.begin(), move_vio.end(),
-                                                [](const auto &a, const auto &b) { return a.second < b.second; });
-        int    best_move     = best_move_it->first;
-        double best_move_vio = best_move_it->second;
+        if (can_remove) {
+            int remove_j;
+            removeSearchCrazy(label.plan_idx, label.c, new_vio, remove_j);
+            moves[2]                = MoveResult{new_vio};
+            moves[2].operation_data = remove_j;
+        }
 
-        // Handle no operation (early exit)
-        if (best_move == 0) {
+        if (can_swap) {
+            std::pair<int, int> swap_pair;
+            swapSearchCrazy(label.plan_idx, label.c, label.w_no_c, new_vio, swap_pair);
+            moves[3]                = MoveResult{new_vio};
+            moves[3].operation_data = swap_pair;
+        }
+
+        // Find best move
+        const auto   best_move_it = std::max_element(moves.begin(), moves.end(), [](const auto &a, const auto &b) {
+            return a.violation_score < b.violation_score;
+        });
+        const size_t best_idx     = std::distance(moves.begin(), best_move_it);
+        const auto  &best_move    = *best_move_it;
+
+        // Handle no operation case
+        if (best_idx == 0) {
             cutLong tmp;
-            for (int j : new_cij) tmp.set(j);
-            generated_rank1_multi_pool[static_cast<int>(new_cij.size())].emplace_back(tmp, plan_idx, best_move_vio);
+            for (const int j : label.c) { tmp.set(j); }
+            generated_rank1_multi_pool[label.c.size()].emplace_back(tmp, label.plan_idx, best_move.violation_score);
             ++i;
             return;
         }
 
-        // Execute the chosen operation
-        switch (best_move) {
-        case 1: // Add operation
-            if (add_checked && add_j.has_value()) {
-                w_no_cij.erase(std::remove(w_no_cij.begin(), w_no_cij.end(), *add_j), w_no_cij.end());
-                new_cij.push_back(*add_j);
-            }
-            break;
+        // Execute the chosen operation using std::visit
+        std::visit(overloaded{[](const std::monostate &) { /* No operation */ },
+                              [&](const int j) {
+                                  if (best_idx == 1) { // Add
+                                      label.w_no_c.erase(std::remove(label.w_no_c.begin(), label.w_no_c.end(), j),
+                                                         label.w_no_c.end());
+                                      label.c.push_back(j);
+                                  } else { // Remove
+                                      label.c.erase(std::remove(label.c.begin(), label.c.end(), j), label.c.end());
+                                  }
+                              },
+                              [&](const std::pair<int, int> &swap_pair) {
+                                  const auto [from, to] = swap_pair;
+                                  if (auto it = std::find(label.c.begin(), label.c.end(), from); it != label.c.end()) {
+                                      *it = to;
+                                      label.w_no_c.erase(std::remove(label.w_no_c.begin(), label.w_no_c.end(), to),
+                                                         label.w_no_c.end());
+                                  }
+                              }},
+                   best_move.operation_data);
 
-        case 2: // Remove operation
-            if (remove_checked && remove_j.has_value()) {
-                new_cij.erase(std::remove(new_cij.begin(), new_cij.end(), *remove_j), new_cij.end());
-            }
-            break;
-
-        case 3: // Swap operation
-            if (swap_checked && swap_i_j.has_value()) {
-                auto pos = std::find(new_cij.begin(), new_cij.end(), swap_i_j->first);
-                if (pos != new_cij.end()) {
-                    *pos = swap_i_j->second;
-                    w_no_cij.erase(std::remove(w_no_cij.begin(), w_no_cij.end(), swap_i_j->second), w_no_cij.end());
-                }
-            }
-            break;
-
-        default: throw std::runtime_error("Invalid best move");
-        }
-
-        vio = best_move_vio;
+        label.vio = best_move.violation_score;
     }
+
+    // Helper struct for std::visit
+    template <class... Ts>
+    struct overloaded : Ts... {
+        using Ts::operator()...;
+    };
+    template <class... Ts>
+    overloaded(Ts...) -> overloaded<Ts...>;
 
     void chooseCuts(const std::vector<R1c> &tmp_cuts, std::vector<R1c> &chosen_cuts, int numCuts) {
         numCuts = std::min(numCuts, static_cast<int>(tmp_cuts.size()));
@@ -754,9 +797,6 @@ public:
         for (const auto &cut : tmp_cuts) {
             const auto &fst = cut.info_r1c.first;
             const auto &snd = cut.info_r1c.second;
-
-            // Attempt to insert in cut_record and skip if already exists
-            // if (!cut_record[fst].emplace(snd).second) continue;
 
             int         size  = static_cast<int>(fst.size());
             const auto &coeff = get<0>(map_rank1_multiplier[size][snd]);
@@ -830,135 +870,119 @@ public:
         }
     }
 
+    struct State {
+        int              begin;
+        int              target_remainder;
+        std::vector<int> remaining_counts;
+        std::vector<int> memory_indices;
+
+        State(int b, int t, std::vector<int> rc, std::vector<int> mi)
+            : begin(b), target_remainder(t), remaining_counts(std::move(rc)), memory_indices(std::move(mi)) {}
+    };
+
     void findPlanForRank1Multi(const std::vector<int> &vis, const int denominator, cutLong &mem,
                                std::vector<ankerl::unordered_dense::set<int>> &segment,
                                std::vector<std::vector<int>>                  &plan) {
-        int sum = std::accumulate(vis.begin(), vis.end(), 0);
-        int mod = sum % denominator;
+        // Calculate initial sum and remainder
+        const int sum         = std::accumulate(vis.begin(), vis.end(), 0);
+        const int initial_mod = sum % denominator;
 
-        std::vector<int> key(vis);
-        key.push_back(mod); // Add mod as the last element
+        // Create key for memoization
+        auto key = vis;
+        key.push_back(initial_mod);
 
-        auto &other2 = rank1_multi_mem_plan_map[key];
-        if (other2.empty()) {
-            std::deque<std::tuple<int, int, std::vector<int>, std::vector<int>>> states;
-            states.emplace_back(0, mod, vis, std::vector<int>{});
+        auto &cached_result = rank1_multi_mem_plan_map[key];
+
+        // Generate solutions if not cached
+        if (cached_result.empty()) {
+            std::deque<State> states;
+            states.emplace_back(0, initial_mod, vis, std::vector<int>{});
 
             while (!states.empty()) {
-                auto [beg, tor, left_c, mem_c] = std::move(states.front());
+                auto [begin, target_rem, remaining, memory] = std::move(states.front());
                 states.pop_front();
 
-                int cnt = 0;
-                for (size_t j = 0; j < left_c.size(); ++j) {
-                    cnt += left_c[j];
-                    cnt %= denominator;
+                int running_sum = 0;
+                for (size_t j = 0; j < remaining.size(); ++j) {
+                    running_sum = (running_sum + remaining[j]) % denominator;
 
-                    if (cnt > 0) {
-                        if (cnt <= tor && j + 1 < left_c.size()) {
-                            states.emplace_back(beg + j + 1, tor - cnt,
-                                                std::vector<int>(left_c.begin() + j + 1, left_c.end()), mem_c);
+                    if (running_sum > 0) {
+                        const size_t current_pos = begin + j;
+
+                        // Try branching if possible
+                        if (running_sum <= target_rem && j + 1 < remaining.size()) {
+                            std::vector<int> new_remaining(remaining.begin() + j + 1, remaining.end());
+                            states.emplace_back(current_pos + 1, target_rem - running_sum, std::move(new_remaining),
+                                                memory);
                         }
-                        int rem = beg + j;
-                        if (rem != vis.size() - 1) { mem_c.push_back(rem); }
+
+                        // Add to memory if not last element
+                        if (current_pos != vis.size() - 1) { memory.push_back(current_pos); }
                     }
                 }
-                other2.push_back(std::move(mem_c));
+                cached_result.push_back(std::move(memory));
             }
         }
 
+        // Process memory constraints
         for (int i = 1; i < dim; ++i) {
             if (mem[i]) {
                 for (auto &seg : segment) { seg.erase(i); }
             }
         }
 
-        std::vector<ankerl::unordered_dense::set<int>> num_vis(dim);
-        for (size_t i = 0; i < other2.size(); ++i) {
-            for (int j : other2[i]) {
-                for (int k : segment[j]) { num_vis[k].insert(i); }
+        // Build visibility map
+        std::vector<ankerl::unordered_dense::set<int>> vertex_visibility(dim);
+        for (size_t plan_idx = 0; plan_idx < cached_result.size(); ++plan_idx) {
+            for (int j : cached_result[plan_idx]) {
+                for (int k : segment[j]) { vertex_visibility[k].insert(plan_idx); }
             }
         }
 
+        // Update memory based on visibility
         for (int i = 1; i < dim; ++i) {
-            if (num_vis[i].size() == other2.size()) {
+            if (vertex_visibility[i].size() == cached_result.size()) {
                 mem.set(i);
                 for (auto &seg : segment) { seg.erase(i); }
             }
         }
 
-        std::vector<std::pair<cutLong, std::vector<int>>> mem_other;
-        for (const auto &i : other2) {
-            cutLong p_mem;
-            for (int j : i) {
-                for (int k : segment[j]) { p_mem.set(k); }
+        // Process memory patterns
+        std::vector<std::pair<cutLong, std::vector<int>>> memory_patterns;
+        memory_patterns.reserve(cached_result.size());
+
+        for (const auto &memory_indices : cached_result) {
+            cutLong pattern_mem;
+
+            // Build memory pattern
+            for (int j : memory_indices) {
+                for (int k : segment[j]) { pattern_mem.set(k); }
             }
 
-            if (p_mem.none()) {
+            // Check for empty pattern
+            if (pattern_mem.none()) {
                 plan.clear();
                 return;
             }
 
-            bool found = false;
-            for (auto &[existing_mem, mem_indices] : mem_other) {
-                if (((p_mem & existing_mem) ^ p_mem).none()) {
-                    existing_mem = std::move(p_mem);
-                    mem_indices  = i;
-                    found        = true;
-                    break;
-                }
+            // Find or add pattern
+            auto it = std::find_if(memory_patterns.begin(), memory_patterns.end(), [&pattern_mem](const auto &entry) {
+                return ((pattern_mem & entry.first) ^ pattern_mem).none();
+            });
+
+            if (it != memory_patterns.end()) {
+                it->first  = std::move(pattern_mem);
+                it->second = memory_indices;
+            } else {
+                memory_patterns.emplace_back(std::move(pattern_mem), memory_indices);
             }
-            if (!found) { mem_other.emplace_back(std::move(p_mem), i); }
         }
 
-        plan.resize(mem_other.size());
-        std::transform(mem_other.begin(), mem_other.end(), plan.begin(),
+        // Build final plan
+        plan.resize(memory_patterns.size());
+        std::transform(memory_patterns.begin(), memory_patterns.end(), plan.begin(),
                        [](const auto &entry) { return entry.second; });
     }
-
-    /*
-        void fillMemory() {
-            // Build v_r_map to count route occurrences for each vertex
-            std::vector<ankerl::unordered_dense::map<int, int>> v_r_map(dim);
-            for (int r_idx = 0; const auto &route : sol) {
-                for (int j : route.route) { ++v_r_map[j][r_idx]; }
-                ++r_idx;
-            }
-
-            int                 num_add_mem = 0;
-            std::vector<double> vis_times(sol.size());
-
-            for (const auto &r1c : old_cuts) {
-                std::fill(vis_times.begin(), vis_times.end(), 0.0); // Reset vis_times for this cut
-
-                // Fetch the rank-1 multiplier plan components
-                const auto &[coeff, deno, rhs] =
-       map_rank1_multiplier.at(r1c.info_r1c.first.size()).at(r1c.info_r1c.second);
-
-                // Accumulate visibility times for each route
-                int cnt = 0;
-                for (int v : r1c.info_r1c.first) {
-                    const auto &vertex_routes = v_r_map[v];
-                    double      coeff_value   = coeff[cnt++];
-                    for (const auto &[route_idx, frequency] : vertex_routes) {
-                        vis_times[route_idx] += frequency * coeff_value;
-                    }
-                }
-
-                // Transform vis_times based on denominator and tolerance
-                std::transform(
-                    vis_times.begin(), vis_times.end(), sol.begin(), vis_times.begin(),
-                    [deno](double a, const auto &s) { return static_cast<int>(a / deno + tolerance) * s.frac_x; });
-
-                // Calculate violation
-                double vio = std::accumulate(vis_times.begin(), vis_times.end(), -rhs);
-                if (vio > tolerance) {
-                    cuts.push_back(r1c);
-                    cut_record[r1c.info_r1c.first].insert(r1c.info_r1c.second);
-                    ++num_add_mem;
-                }
-            }
-        }
-    */
 
     void constructMemoryVertexBased() {
         std::vector<int> tmp_fill(dim);
