@@ -82,13 +82,13 @@ struct Cut {
         for (auto &i : p.num) { fmt::print("{} ", i); }
         fmt::print("| {}\n", p.den);
     }
-    double      rhs     = 1;
-    int         id      = -1;
-    bool        added   = false;
-    bool        updated = false;
-    CutType     type    = CutType::ThreeRow;
+    double       rhs     = 1;
+    int          id      = -1;
+    bool         added   = false;
+    bool         updated = false;
+    CutType      type    = CutType::ThreeRow;
     baldesCtrPtr grbConstr;
-    size_t      key;
+    size_t       key;
     // Default constructor
     Cut() = default;
 
@@ -145,6 +145,8 @@ public:
     const Cut &getCut(int cutIndex) const { return cuts[cutIndex]; }
 
     int getID(int cutIndex) { return cuts[cutIndex].id; }
+
+    Cut &get_cut(int cutIndex) { return cuts[cutIndex]; }
 
     void printCuts() {
         for (auto &cut : cuts) { cut.printCut(); }

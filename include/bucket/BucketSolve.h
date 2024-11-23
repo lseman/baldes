@@ -225,7 +225,7 @@ std::vector<double> BucketGraph::labeling_algorithm() {
                 // if (bucket_labels.empty()) { continue; }           // Skip empty buckets
                 for (Label *label : bucket_labels) {
                     if (label->is_extended) { continue; }
-                    //  NOTE: double check if this is the best way to handle this
+
                     if constexpr (F != Full::PSTEP && F != Full::TSP) {
                         if constexpr (F == Full::Partial) {
                             if constexpr (D == Direction::Forward) {
@@ -246,8 +246,12 @@ std::vector<double> BucketGraph::labeling_algorithm() {
 
                     domin_smaller = false;
 
-                    //  Clear the visited buckets vector for the current label
-                    std::memset(Bvisited.data(), 0, Bvisited.size() * sizeof(uint64_t));
+                    // Clear visited buckets efficiently
+                    if (n_segments <= 8) {
+                        for (size_t i = 0; i < n_segments; ++i) { Bvisited[i] = 0; }
+                    } else {
+                        std::memset(Bvisited.data(), 0, n_segments * sizeof(uint64_t));
+                    }
 
                     // Check if the label is dominated by any labels in smaller buckets
                     if constexpr (F != Full::TSP) {
@@ -278,7 +282,26 @@ std::vector<double> BucketGraph::labeling_algorithm() {
                                 // If the new label has lower cost, remove dominated labels
                                 for (auto *existing_label : to_bucket_labels) {
                                     if (label->cost < existing_label->cost) {
-                                        buckets[to_bucket].remove_label(existing_label);
+
+                                        // TODO: check if removing children is a good idea
+                                        // Use a stack to track labels whose children need to be removed
+                                        std::stack<Label *> stack;
+                                        stack.push(existing_label);
+
+                                        // Process all children recursively using the stack
+                                        while (!stack.empty()) {
+                                            Label *current_label = stack.top();
+                                            stack.pop();
+
+                                            // Remove all children of the current label
+                                            for (auto *child : current_label->children) {
+                                                buckets[child->vertex].remove_label(child);
+                                                stack.push(child); // Add child's children to the stack
+                                            }
+
+                                            // Remove the current label itself
+                                            buckets[current_label->vertex].remove_label(current_label);
+                                        }
                                     } else {
                                         dominated = true;
                                         break;
@@ -746,7 +769,10 @@ BucketGraph::Extend(const std::conditional_t<M == Mutability::Mut, Label *, cons
     new_label->real_cost = L_prime->real_cost + travel_cost;
 
     // Set the parent label, depending on mutability
-    if constexpr (M == Mutability::Mut) { new_label->parent = L_prime; }
+    if constexpr (M == Mutability::Mut) {
+        new_label->parent = L_prime;
+        L_prime->children.push_back(new_label);
+    }
 
     if constexpr (F != Full::PSTEP) {
         // If not in enumeration stage, update visited bitmap to avoid redundant labels
@@ -770,43 +796,65 @@ BucketGraph::Extend(const std::conditional_t<M == Mutability::Mut, Label *, cons
     set_node_visited(new_label->visited_bitmap, node_id); // Mark the new node as visited
     new_label->nodes_covered = L_prime->nodes_covered;    // Copy the list of covered nodes
     new_label->nodes_covered.push_back(node_id);          // Add the new node to the list of covered nodes
+
 #if defined(SRC)
     new_label->SRCmap = L_prime->SRCmap;
     // Apply SRC (Subset Row Cuts) logic in Stages 3, 4, and Enumerate
     if constexpr (S == Stage::Four || S == Stage::Enumerate) {
-        auto          &cutter   = cut_storage;          // Access the cut storage manager
-        auto          &SRCDuals = cutter->SRCDuals;     // Access the dual values for the SRC cuts
-        const uint64_t bit_mask = 1ULL << bit_position; // Precompute bit shift for the node's position
-
-        for (std::size_t idx = 0; idx < cutter->size(); ++idx) {
-            auto it = cutter->begin();
-            std::advance(it, idx);
-            const auto &cut          = *it;
-            const auto &baseSet      = cut.baseSet;
-            const auto &baseSetorder = cut.baseSetOrder;
-            const auto &neighbors    = cut.neighbors;
-            const auto &multipliers  = cut.p;
+        auto          &cutter   = cut_storage;
+        auto          &SRCDuals = cutter->SRCDuals;
+        const uint64_t bit_mask = 1ULL << bit_position;
 
 #if defined(SRC)
-            // Apply SRC logic: Update the SRC map based on neighbors and base set
-            bool bitIsSet  = neighbors[segment] & bit_mask;
-            bool bitIsSet2 = baseSet[segment] & bit_mask;
+        // Generate indices for parallel processing
+#if defined(__cpp_lib_ranges)
+        auto indices = std::views::iota(size_t{0}, cutter->size());
+#else
+        std::vector<size_t> indices(cutter->size());
+        std::iota(indices.begin(), indices.end(), 0);
+#endif
 
-            auto &src_map_value = new_label->SRCmap[idx]; // Use reference to avoid multiple accesses
+        // Lambda to process each cut and return cost update
+        auto process_cut = [&](size_t idx) -> double {
+            if (SRCDuals[idx] > -1e-3) { return 0.0; }
+
+            const auto &cut           = cutter->getCut(idx);
+            const bool  bitIsSet      = cut.neighbors[segment] & bit_mask;
+            auto       &src_map_value = new_label->SRCmap[idx];
+
             if (!bitIsSet) {
-                src_map_value = 0.0; // Reset the SRC map value
+                src_map_value = 0.0;
+                return 0.0;
             }
+
+            const bool bitIsSet2 = cut.baseSet[segment] & bit_mask;
 
             if (bitIsSet2) {
-                auto &den = multipliers.den;
-                src_map_value += multipliers.num[baseSetorder[node_id]];
+                const auto &multipliers = cut.p;
+                const auto &den         = multipliers.den;
+                src_map_value += multipliers.num[cut.baseSetOrder[node_id]];
+
                 if (src_map_value >= den) {
-                    new_label->cost -= SRCDuals[idx]; // Apply the SRC dual value if threshold is exceeded
-                    src_map_value -= den;             // Reset the SRC map value
+                    src_map_value -= den;
+                    return -SRCDuals[idx];
                 }
             }
+
+            return 0.0;
+        };
+
+#if defined(__cpp_lib_parallel_algorithm)
+        // Parallel process all cuts and accumulate cost updates
+        const double total_cost_update = std::transform_reduce(std::execution::par_unseq, indices.begin(),
+                                                               indices.end(), 0.0, std::plus<>(), process_cut);
+#else
+        const double total_cost_update =
+            std::transform_reduce(indices.begin(), indices.end(), 0.0, std::plus<>(), process_cut);
 #endif
-        }
+
+        // Apply the total cost update
+        new_label->cost += total_cost_update;
+#endif
     }
 #endif
 

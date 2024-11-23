@@ -22,6 +22,15 @@ inline std::experimental::simd<T> load_simd(const Container &source, size_t star
     return result;
 }
 
+template <typename T, typename Container>
+inline std::experimental::simd<T> load_simd_generic(const Container &source, size_t start_index, size_t simd_size) {
+    std::experimental::simd<T> result;
+    for (size_t i = 0; i < simd_size; ++i) {
+        result[i] = source[start_index + i]; // Load the cost from each Label
+    }
+    return result;
+}
+
 /**
  * @brief Checks if a new label is dominated by any label in a given vector using SIMD operations.
  *
@@ -40,6 +49,7 @@ inline bool check_dominance_against_vector(const Label *new_label, const std::ve
 
     // Load the current label's cost into a SIMD register (for all lanes)
     simd<double> current_cost(new_label->cost);
+    const double new_label_cost = new_label->cost;
 
     // Process the labels in SIMD batches
     for (; i + simd_size <= size; i += simd_size) {
@@ -72,6 +82,7 @@ inline bool check_dominance_against_vector(const Label *new_label, const std::ve
                             }
                         }
                     }
+                    alignas(32) std::array<double, simd_size> resources_buffer;
 
                     SRC_MODE_BLOCK(
                         // Additional check for Stage::Four and Stage::Enumerate
@@ -81,11 +92,26 @@ inline bool check_dominance_against_vector(const Label *new_label, const std::ve
                                 const auto &labelSRCMap    = labels[i + j]->SRCmap;
                                 const auto &newLabelSRCMap = new_label->SRCmap;
 
-                                for (size_t k = 0; k < SRCDuals.size(); ++k) {
-                                    const auto &den         = cut_storage->getCut(k).p.den;
-                                    const auto  labelMod    = labelSRCMap[k];
-                                    const auto  newLabelMod = newLabelSRCMap[k];
-                                    if (labelMod > newLabelMod) { sumSRC += SRCDuals[k]; }
+                                // Use SIMD for transform_reduce when possible
+                                const size_t src_size = SRCDuals.size();
+                                size_t       k        = 0;
+
+                                // Process in SIMD chunks
+                                for (; k + simd_size <= src_size; k += simd_size) {
+                                    for (size_t m = 0; m < simd_size; ++m) {
+                                        const double dual = SRCDuals[k + m];
+                                        resources_buffer[m] =
+                                            (dual <= -1e-3 && labelSRCMap[k + m] > newLabelSRCMap[k + m]) ? dual : 0.0;
+                                    }
+                                    simd<double> src_vec =
+                                        load_simd_generic<double>(resources_buffer.data(), 0, simd_size);
+                                    sumSRC = std::experimental::reduce(src_vec);
+                                }
+
+                                // Handle remaining elements
+                                for (; k < src_size; ++k) {
+                                    const double dual = SRCDuals[k];
+                                    if (dual <= -1e-3 && labelSRCMap[k] > newLabelSRCMap[k]) { sumSRC += dual; }
                                 }
                             }
 
@@ -94,7 +120,6 @@ inline bool check_dominance_against_vector(const Label *new_label, const std::ve
                                 continue; // Label is not dominated, skip
                             }
                         })
-
                     // Bitmap comparison for dominance
                     if constexpr (S == Stage::Three || S == Stage::Four || S == Stage::Enumerate) {
                         const size_t bitmap_size = new_label->visited_bitmap.size();
@@ -143,13 +168,12 @@ inline bool check_dominance_against_vector(const Label *new_label, const std::ve
                     if (!SRCDuals.empty()) {
                         const auto &labelSRCMap    = labels[i]->SRCmap;
                         const auto &newLabelSRCMap = new_label->SRCmap;
-
-                        for (size_t k = 0; k < SRCDuals.size(); ++k) {
-                            const auto &den         = cut_storage->getCut(k).p.den;
-                            const auto  labelMod    = labelSRCMap[k];
-                            const auto  newLabelMod = newLabelSRCMap[k];
-                            if (labelMod > newLabelMod) { sumSRC += SRCDuals[k]; }
-                        }
+                        sumSRC                     = std::transform_reduce(
+                            SRCDuals.begin(), SRCDuals.end(), 0.0, std::plus<>(), [&](const auto &dual) {
+                                size_t k = &dual - &SRCDuals[0];  // Get the index from the iterator
+                                if (dual > -1e-3) { return 0.0; } // Skip non-SRC cuts
+                                return (labelSRCMap[k] > newLabelSRCMap[k]) ? dual : 0.0;
+                            });
                     }
 
                     if (labels[i]->cost - sumSRC > new_label->cost) {

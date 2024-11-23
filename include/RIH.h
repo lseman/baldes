@@ -34,6 +34,63 @@ public:
         : instance(instance), pool(5), sched(pool.get_scheduler()), task_queue(5, sched, *this) {}
 
     ~IteratedLocalSearch() {}
+
+    static std::vector<int> order_crossover(const std::vector<int> &parent1, const std::vector<int> &parent2, int i,
+                                            int j) {
+        int n = parent1.size();
+        if (i < 0 || j >= n || i >= j) { throw std::invalid_argument("Invalid crossover points."); }
+
+        // Initialize offspring with placeholders (-1 indicates empty)
+        std::vector<int> offspring(n, -1);
+
+        // Copy segment from parent1
+        std::copy(parent1.begin() + i, parent1.begin() + j + 1, offspring.begin() + i);
+
+        // Fill remaining positions with elements from parent2
+        auto it = parent2.begin();
+        for (int k = 0; k < n; ++k) {
+            if (offspring[k] == -1) { // Empty slot in offspring
+                // Skip elements already present in the offspring
+                while (std::find(offspring.begin(), offspring.end(), *it) != offspring.end()) { ++it; }
+                offspring[k] = *it;
+                ++it;
+            }
+        }
+
+        return offspring;
+    }
+
+    std::pair<std::vector<int>, std::vector<int>> srex_crossover(const std::vector<int> &parent1,
+                                                                 const std::vector<int> &parent2, int i, int j) {
+        int n = parent1.size();
+        if (i < 0 || j >= n || i >= j) { return {parent1, parent2}; }
+
+        // Copy subroutes
+        std::vector<int> segment1(parent1.begin() + i, parent1.begin() + j + 1);
+        std::vector<int> segment2(parent2.begin() + i, parent2.begin() + j + 1);
+
+        // Create offspring by swapping the segments
+        std::vector<int> offspring1, offspring2;
+
+        // Insert segment2 into parent1 and reconstruct
+        for (int node : parent1) {
+            if (std::find(segment2.begin(), segment2.end(), node) == segment2.end()) {
+                offspring1.push_back(node); // Add nodes not in the swapped segment
+            }
+        }
+        offspring1.insert(offspring1.begin() + i, segment2.begin(), segment2.end());
+
+        // Insert segment1 into parent2 and reconstruct
+        for (int node : parent2) {
+            if (std::find(segment1.begin(), segment1.end(), node) == segment1.end()) {
+                offspring2.push_back(node); // Add nodes not in the swapped segment
+            }
+        }
+        offspring2.insert(offspring2.begin() + i, segment1.begin(), segment1.end());
+
+        return {std::move(offspring1), std::move(offspring2)};
+    }
+
     /**
      * @brief Performs the 2-opt optimization on a given route.
      *
@@ -44,10 +101,10 @@ public:
      *
      */
     static std::vector<int> two_opt(const std::vector<int> &route, int i, int j) {
-        // Ensure indices are within bounds and do not include depots
-        if (i >= j || i <= 0 || j >= static_cast<int>(route.size()) - 1) { return route; }
+        // Validate indices and ensure they do not include depots
+        if (i <= 0 || j >= static_cast<int>(route.size()) - 1 || i >= j) { return route; }
 
-        // Reverse the segment between i and j directly on a copied vector
+        // Perform the 2-opt operation by reversing the segment between i and j
         std::vector<int> new_route(route);
         std::reverse(new_route.begin() + i, new_route.begin() + j + 1);
         return new_route;
@@ -64,15 +121,16 @@ public:
     std::pair<std::vector<int>, std::vector<int>> relocate_star(const std::vector<int> &route1,
                                                                 const std::vector<int> &route2, int i, int j) {
         // Check if indices are valid and do not involve depots
-        if (i <= 0 || i >= static_cast<int>(route1.size()) - 1 || j <= 0 || j >= static_cast<int>(route2.size())) {
+        if (i <= 0 || i >= static_cast<int>(route1.size()) - 1 || j < 0 || j > static_cast<int>(route2.size())) {
             return {route1, route2};
         }
 
-        // Move customer from route1 to route2
-        std::vector<int> new_route1(route1);
-        std::vector<int> new_route2(route2);
+        // Perform relocation
+        std::vector<int> new_route1(route1.begin(), route1.end());
+        std::vector<int> new_route2(route2.begin(), route2.end());
 
-        int customer = new_route1[i];
+        // Extract and move customer
+        int customer = std::move(new_route1[i]);
         new_route1.erase(new_route1.begin() + i);            // Remove customer from route1
         new_route2.insert(new_route2.begin() + j, customer); // Insert into route2
 
@@ -124,14 +182,10 @@ public:
         }
 
         // Create new routes by swapping tails
-        std::vector<int> new_route1;
-        new_route1.reserve(k + (route2.size() - l));
-        new_route1.insert(new_route1.end(), route1.begin(), route1.begin() + k);
+        std::vector<int> new_route1(route1.begin(), route1.begin() + k);
         new_route1.insert(new_route1.end(), route2.begin() + l, route2.end());
 
-        std::vector<int> new_route2;
-        new_route2.reserve(l + (route1.size() - k));
-        new_route2.insert(new_route2.end(), route2.begin(), route2.begin() + l);
+        std::vector<int> new_route2(route2.begin(), route2.begin() + l);
         new_route2.insert(new_route2.end(), route1.begin() + k, route1.end());
 
         return {std::move(new_route1), std::move(new_route2)};
@@ -148,17 +202,20 @@ public:
     std::pair<std::vector<int>, std::vector<int>> insertion(const std::vector<int> &route1,
                                                             const std::vector<int> &route2, int k, int l) {
         // Ensure valid positions that do not involve depots
-        if (k <= 0 || k >= static_cast<int>(route1.size()) - 1 || l <= 0 || l > static_cast<int>(route2.size())) {
+        if (k <= 0 || k >= static_cast<int>(route1.size()) - 1 || l < 0 || l > static_cast<int>(route2.size())) {
             return {route1, route2};
         }
 
-        // Insert customer from route1 into route2
+        // Copy routes and perform insertion
         std::vector<int> new_route1(route1);
         std::vector<int> new_route2(route2);
 
-        int customer = new_route1[k];
+        // Extract the customer from route1
+        int customer = std::move(new_route1[k]); // Move to avoid unnecessary copying
         new_route1.erase(new_route1.begin() + k);
-        new_route2.insert(new_route2.begin() + l, customer);
+
+        // Insert the customer into route2
+        new_route2.insert(new_route2.begin() + l, std::move(customer));
 
         return {std::move(new_route1), std::move(new_route2)};
     }
@@ -249,26 +306,28 @@ public:
     std::pair<std::vector<int>, std::vector<int>> extended_swap_star_fun(const std::vector<int> &route1,
                                                                          const std::vector<int> &route2, int i, int j,
                                                                          int chain_length = 2) {
-
         // Ensure indices are within bounds and do not involve depot nodes
-        if (i <= 0 || i + chain_length > static_cast<int>(route1.size()) - 1 || j <= 0 ||
-            j + chain_length > static_cast<int>(route2.size()) - 1) {
+        if (i <= 0 || i + chain_length >= static_cast<int>(route1.size()) || j <= 0 ||
+            j + chain_length >= static_cast<int>(route2.size())) {
             return {route1, route2};
         }
 
-        // Swap a chain of customers between route1 and route2
-        std::vector<int> new_route1 = route1;
-        std::vector<int> new_route2 = route2;
+        // Create mutable copies of the routes
+        std::vector<int> new_route1(route1.begin(), route1.end());
+        std::vector<int> new_route2(route2.begin(), route2.end());
 
-        // Extract chains of customers
-        std::vector<int> chain1(new_route1.begin() + i, new_route1.begin() + i + chain_length);
-        std::vector<int> chain2(new_route2.begin() + j, new_route2.begin() + j + chain_length);
+        // Extract and erase chains in-place
+        auto             chain1_start = new_route1.begin() + i;
+        auto             chain1_end   = chain1_start + chain_length;
+        std::vector<int> chain1(std::make_move_iterator(chain1_start), std::make_move_iterator(chain1_end));
+        new_route1.erase(chain1_start, chain1_end);
 
-        // Remove the chains from their respective routes
-        new_route1.erase(new_route1.begin() + i, new_route1.begin() + i + chain_length);
-        new_route2.erase(new_route2.begin() + j, new_route2.begin() + j + chain_length);
+        auto             chain2_start = new_route2.begin() + j;
+        auto             chain2_end   = chain2_start + chain_length;
+        std::vector<int> chain2(std::make_move_iterator(chain2_start), std::make_move_iterator(chain2_end));
+        new_route2.erase(chain2_start, chain2_end);
 
-        // Find the best positions for inserting the chains
+        // Find the best insertion positions
         int best_pos_route1 = find_best_insertion_position(new_route1, chain2);
         int best_pos_route2 = find_best_insertion_position(new_route2, chain1);
 
@@ -291,16 +350,17 @@ public:
         int    best_pos  = 1;
         double best_cost = std::numeric_limits<double>::max();
 
-        // Precompute the original cost of the route once
-        double original_cost = this->compute_cost(route).second;
+        // Precompute the cost of the original route
+        const double original_cost = this->compute_cost(route).second;
 
-        // Try inserting the chain at every valid position
+        // Iterate over valid insertion positions
         for (int pos = 1; pos < static_cast<int>(route.size()); ++pos) {
-            // Calculate the cost incrementally without creating a new vector
-            double new_cost = compute_insertion_cost(route, chain, pos, original_cost);
+            // Incrementally compute the new cost for inserting the chain at position `pos`
+            const double incremental_cost = compute_insertion_cost(route, chain, pos, original_cost);
 
-            if (new_cost < best_cost) {
-                best_cost = new_cost;
+            // Track the best position based on the cost
+            if (incremental_cost < best_cost) {
+                best_cost = incremental_cost;
                 best_pos  = pos;
             }
         }
@@ -360,7 +420,7 @@ public:
                                            &IteratedLocalSearch::relocate_star,
                                            &IteratedLocalSearch::enhanced_swap,
                                            &IteratedLocalSearch::move_two_clients_reversed,
-                                           &::IteratedLocalSearch::extended_swap_star};
+                                           &IteratedLocalSearch::extended_swap_star};
 
     std::vector<double> operator_weights       = {1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0};
     std::vector<double> operator_improvements  = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
@@ -380,33 +440,27 @@ public:
 
     void update_operator_weights(double decay_factor = 0.9, double reward_factor = 0.1, double min_weight = 0.01) {
         // Calculate total improvement and success count for normalization
-        double total_improvement = 0.0;
-        int    total_successes   = 0;
-
-        for (size_t i = 0; i < operator_improvements.size(); ++i) {
-            total_improvement += operator_improvements[i];
-            total_successes += operator_success_count[i];
-        }
+        const double total_improvement =
+            std::accumulate(operator_improvements.begin(), operator_improvements.end(), 0.0);
+        const int total_successes = std::accumulate(operator_success_count.begin(), operator_success_count.end(), 0);
 
         if (total_improvement > 0 || total_successes > 0) {
+            const double inv_total_improvement = (total_improvement > 0) ? 1.0 / total_improvement : 0.0;
+            const double inv_total_successes   = (total_successes > 0) ? 1.0 / total_successes : 0.0;
+
             for (size_t i = 0; i < operator_weights.size(); ++i) {
                 // Calculate normalized improvement and success rate
-                double normalized_improvement =
-                    (total_improvement > 0) ? (operator_improvements[i] / total_improvement) : 0.0;
-                double success_rate =
-                    (total_successes > 0) ? (static_cast<double>(operator_success_count[i]) / total_successes) : 0.0;
+                const double normalized_improvement = operator_improvements[i] * inv_total_improvement;
+                const double success_rate           = operator_success_count[i] * inv_total_successes;
 
-                // Update weight using a combination of improvement and success rate
-                operator_weights[i] =
-                    decay_factor * operator_weights[i] + reward_factor * (normalized_improvement + success_rate);
-
-                // Ensure weights do not drop below a minimum threshold
-                if (operator_weights[i] < min_weight) { operator_weights[i] = min_weight; }
+                // Update weight with decay and reward
+                operator_weights[i] = std::max(min_weight, decay_factor * operator_weights[i] +
+                                                               reward_factor * (normalized_improvement + success_rate));
             }
         }
 
         // Normalize weights to sum to 1
-        double total_weight = std::accumulate(operator_weights.begin(), operator_weights.end(), 0.0);
+        const double total_weight = std::accumulate(operator_weights.begin(), operator_weights.end(), 0.0);
         if (total_weight > 0) {
             for (auto &weight : operator_weights) { weight /= total_weight; }
         }
@@ -615,28 +669,29 @@ private:
             // If the reduced cost should be based on travel cost minus node-specific costs, we subtract that here
             red_cost += travel_cost - nodes[route[i]].cost;
 
-            SRC_MODE_BLOCK(size_t segment      = node >> 6; // Determine the segment in the bitmap
-                           size_t bit_position = node & 63; // Determine the bit position in the segment
+            SRC_MODE_BLOCK(const size_t segment      = node >> 6; // Determine the segment in the bitmap
+                           const size_t bit_position = node & 63; // Determine the bit position in the segment
 
                            const uint64_t bit_mask = 1ULL
                                                      << bit_position; // Precompute bit shift for the node's position
-                           for (std::size_t idx = 0; idx < cutter->size(); ++idx) {
-                               auto it = cutter->begin();
-                               std::advance(it, idx);
-                               const auto &cut          = *it;
-                               const auto &baseSet      = cut.baseSet;
+                           for (size_t idx = 0; idx < cutter->size(); ++idx) {
+                               if (SRCDuals[idx] > -1e-3) { continue; } // Skip non-SRC cuts
+
+                               const auto &cut     = cutter->get_cut(idx); // Use indexed access instead of iterator
+                               const auto &baseSet = cut.baseSet;
                                const auto &baseSetorder = cut.baseSetOrder;
                                const auto &neighbors    = cut.neighbors;
                                const auto &multipliers  = cut.p;
 
                                // Apply SRC logic: Update the SRC map based on neighbors and base set
-                               bool bitIsSet  = neighbors[segment] & bit_mask;
-                               bool bitIsSet2 = baseSet[segment] & bit_mask;
-
-                               auto &src_map_value = SRCmap[idx]; // Use reference to avoid multiple accesses
+                               const bool bitIsSet      = neighbors[segment] & bit_mask;
+                               auto      &src_map_value = SRCmap[idx]; // Use reference to avoid multiple accesses
                                if (!bitIsSet) {
                                    src_map_value = 0.0; // Reset the SRC map value
+                                   continue;
                                }
+
+                               const bool bitIsSet2 = baseSet[segment] & bit_mask;
 
                                if (bitIsSet2) {
                                    auto &den = multipliers.den;
