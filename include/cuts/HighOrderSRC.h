@@ -27,11 +27,11 @@ constexpr int INITIAL_POOL_SIZE                                 = 100;
 using yzzLong                                                   = Bitset<N_SIZE>;
 using cutLong                                                   = yzzLong;
 constexpr double tolerance                                      = 1e-6;
-constexpr int    max_row_rank1                                  = 6;
+constexpr int    max_row_rank1                                  = 5;
 constexpr int    max_heuristic_initial_seed_set_size_row_rank1c = 6;
-constexpr int    max_heuristic_sep_mem4_row_rank1               = 20;
+constexpr int    max_heuristic_sep_mem4_row_rank1               = 8;
 
-constexpr int    max_num_r1c_per_round = 20;
+constexpr int    max_num_r1c_per_round = 15;
 constexpr double cut_vio_factor        = 0.1;
 
 struct R1c {

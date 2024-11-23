@@ -76,7 +76,7 @@ public:
     BucketOptions options;
     void          mono_initialization();
     Label        *compute_mono_label(const Label *L);
-    bool just_fixed = false;
+    bool          just_fixed          = false;
     using BranchingDualsPtr           = std::shared_ptr<BranchingDuals>;
     BranchingDualsPtr branching_duals = std::make_shared<BranchingDuals>();
 
@@ -912,8 +912,8 @@ public:
     bool is_in_neighborhood(size_t i, size_t j) const {
         if (i >= neighborhoods_bitmap.size()) return false;
 
-        size_t segment      = j >> 6;
-        size_t bit_position = j & 63;
+        const size_t segment      = j >> 6;
+        const size_t bit_position = j & 63;
 
         if (segment >= neighborhoods_bitmap[i].size()) return false;
 
@@ -945,12 +945,6 @@ public:
 
     void set_deleted_arcs(const std::vector<std::pair<int, int>> &arcs) {
         size_t num_nodes = nodes.size();
-
-        // // Initialize or reset fixed_arcs matrix
-        // fixed_arcs.resize(num_nodes);
-        // for (auto &row : fixed_arcs) {
-        //     row.assign(num_nodes, false); // Initialize all arcs as not fixed
-        // }
 
         // Mark each arc in the input list as fixed/deleted
         for (const auto &[from, to] : arcs) {
