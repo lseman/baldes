@@ -41,7 +41,7 @@ struct BucketOptions {
 
     int n_warm_start = 5;
 
-    bool warm_start = true;
+    bool warm_start = false;
 
     // EVRP options
     int battery_capacity  = 100;

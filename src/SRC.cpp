@@ -299,6 +299,10 @@ std::pair<bool, bool> LimitedMemoryRank1Cuts::runSeparation(BNBNode *node, std::
 
     // separateR1C1(matrix.A_sparse, solution);
     separate(matrix.A_sparse, solution);
+    //prepare45Heuristic(matrix.A_sparse, solution);
+    //setDistanceMatrix(node->getDistanceMatrix());
+    //the45Heuristic<CutType::FourRow>(matrix.A_sparse, solution);
+    //the45Heuristic<CutType::FiveRow>(matrix.A_sparse, solution);
 
     // TupleBasedSeparator r1c4(allPaths);
     // r1c4.separate4R1Cs();
@@ -372,6 +376,7 @@ std::pair<bool, bool> LimitedMemoryRank1Cuts::runSeparation(BNBNode *node, std::
         return cut_ctr;
     };
 
+
     if (cuts_before == cuts_after_separation) {
         generator->setNodes(nodes);
         generator->generateSepHeurMem4Vertex();
@@ -391,6 +396,7 @@ std::pair<bool, bool> LimitedMemoryRank1Cuts::runSeparation(BNBNode *node, std::
             }
         }
     }
+
     ////////////////////////////////////////////////////
     // Handle non-violated cuts in a single pass
     ////////////////////////////////////////////////////

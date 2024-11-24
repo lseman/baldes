@@ -84,7 +84,7 @@ class ColumnElimination:
 
         # First term: path costs with dual adjustments
         for path in paths:
-            #ath = path.nodes_covered
+            # ath = path.nodes_covered
             # Calculate original path cost
             path_cost = sum(
                 self.calculate_travel_time(path[i], path[i + 1])
@@ -275,14 +275,13 @@ class ColumnElimination:
             self.graph.set_duals(duals)
 
             # Generate new columns and add to pool
-            paths = self.graph.phaseFour()
-            paths = [
-                p.nodes_covered() for p in paths if len(p.nodes_covered()) > 2
-            ]
+            paths = self.graph.solve_min_cost_flow(0, 101)
+            print(paths)
+            paths = [p.nodes_covered() for p in paths if len(p.nodes_covered()) > 2]
             # print(path_sequences)
             decomposed_paths = self.path_decomposer.decompose_solution(paths)
 
-            #path_sequences = [p for p in decomposed_paths if len(p) > 2]
+            # path_sequences = [p for p in decomposed_paths if len(p) > 2]
             # Check feasibility of new paths and add to pool
             for path in paths:
                 conflict = self.conflict_manager.find_conflict(path)
@@ -335,8 +334,9 @@ class ColumnElimination:
                         break
 
             # Solve RMP using subgradient
-            #lag_paths = [paths[0]] * 3
-            paths = paths[0:3]
+            # lag_paths = [paths[0]] * 3
+            # paths = paths[0:3]
+            # paths = [paths[0]] * 3
             current_value, visits = self.calculate_lagrangian(paths, duals)
 
             subgradient = [1 - visits[j] for j in range(1, self.n_nodes - 1)]
@@ -353,10 +353,7 @@ class ColumnElimination:
 
             subgradient_norm = sum(g * g for g in subgradient)
             if subgradient_norm > 0:
-                step_size = min(
-                    10.0,  # Maximum step size
-                    alpha * (psi_star - current_value) / subgradient_norm,
-                )
+                step_size = alpha * (psi_star - current_value) / subgradient_norm
             # step_size = alpha * (psi_star - current_value) / subgradient_norm
             else:
                 step_size = 0
@@ -368,23 +365,7 @@ class ColumnElimination:
                 # Calculate raw update
                 raw_update = duals[j - 1] - step_size * subgradient[j - 1]
 
-                # Apply smoothing with previous values
-                smoothed_value = (
-                    smoothing_factor * prev_duals[j - 1]
-                    + (1 - smoothing_factor) * raw_update
-                )
-
-                # Enforce bounds
-                bounded_value = max(min_dual, min(max_dual, smoothed_value))
-
-                # Gradual change limit (prevent sudden jumps)
-                max_change = max(10.0, abs(prev_duals[j - 1]) * 0.2)  # 20% or 10 units
-                final_value = max(
-                    prev_duals[j - 1] - max_change,
-                    min(prev_duals[j - 1] + max_change, bounded_value),
-                )
-
-                new_duals.append(final_value)
+                new_duals.append(raw_update)
 
             # Handle convergence
             gap = abs(best_ub - best_lb) / (abs(best_lb) + 1e-10)
@@ -436,7 +417,7 @@ class ColumnElimination:
 
 # Create instance data
 solomon_instance = InstanceData()
-solomon_instance.read_instance("../build/instances/C203.txt")
+solomon_instance.read_instance("../build/instances/C202.txt")
 instance = convert_instance_data(solomon_instance)
 
 nodes = []

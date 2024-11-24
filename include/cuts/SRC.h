@@ -26,6 +26,7 @@
 
 #include "../third_party/concurrentqueue.h"
 
+#include "miphandler/LinExp.h"
 #include "miphandler/MIPHandler.h"
 
 #include "HighOrderSRC.h"
@@ -69,8 +70,8 @@ struct SparseMatrix;
 class LimitedMemoryRank1Cuts {
 public:
     Xoroshiro128Plus rp; // Seed it (you can change the seed)
-    using HighDimCutsGeneratorPtr     = std::shared_ptr<HighDimCutsGenerator>;
-    HighDimCutsGeneratorPtr generator = std::make_shared<HighDimCutsGenerator>(N_SIZE, 5, 1e-6);
+    using HighDimCutsGeneratorPtr              = std::shared_ptr<HighDimCutsGenerator>;
+    HighDimCutsGeneratorPtr          generator = std::make_shared<HighDimCutsGenerator>(N_SIZE, 5, 1e-6);
 
     void setDistanceMatrix(const std::vector<std::vector<double>> distances) {
         generator->setDistanceMatrix(distances);
@@ -99,9 +100,9 @@ public:
     void              printBaseSets();
     std::vector<Path> allPaths;
 
-    std::vector<std::vector<int>>    labels;
-    int                              labels_counter = 0;
-    void separate(const SparseMatrix &A, const std::vector<double> &x);
+    std::vector<std::vector<int>> labels;
+    int                           labels_counter = 0;
+    void                          separate(const SparseMatrix &A, const std::vector<double> &x);
 
     /**
      * @brief Computes the limited memory coefficient based on the given parameters.
@@ -115,7 +116,7 @@ public:
                                            const std::array<uint64_t, num_words> &AM, const SRCPermutation &p,
                                            const std::vector<int> &P, std::vector<int> &order);
 
-    std::pair<bool, bool> runSeparation(BNBNode *node, std::vector<baldesCtrPtr > &SRCconstraints);
+    std::pair<bool, bool> runSeparation(BNBNode *node, std::vector<baldesCtrPtr> &SRCconstraints);
 
     void separateR1C1(const SparseMatrix &A, const std::vector<double> &x) {
         std::vector<std::pair<double, int>> tmp_cuts;
@@ -155,14 +156,14 @@ public:
             // define AM
             for (int node = 0; node < N_SIZE; ++node) { AM[node / 64] |= (1ULL << (node % 64)); }
             SRCPermutation p;
-            p.num    = {1};
-            p.den    = 2;
-            //auto rhs = 0;
+            p.num = {1};
+            p.den = 2;
+            // auto rhs = 0;
 
             coefficients_aux.assign(allPaths.size(), 0.0);
 
             for (size_t j = 0; j < allPaths.size(); ++j) {
-                auto &clients = allPaths[j].route;
+                auto &clients       = allPaths[j].route;
                 coefficients_aux[j] = computeLimitedMemoryCoefficient(C, AM, p, clients, order);
             }
             Cut cut(C, AM, coefficients_aux, p);
@@ -170,6 +171,7 @@ public:
             cutStorage.addCut(cut);
         }
     }
+
 
 private:
     static std::mutex cache_mutex;

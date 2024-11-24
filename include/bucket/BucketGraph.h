@@ -959,7 +959,7 @@ public:
         double red_cost  = 0.0;
 
         // Initialize an empty SRCmap for the current label
-        std::vector<int> updated_SRCmap(cut_storage->size(), 0.0);
+        std::vector<double> updated_SRCmap(cut_storage->size(), 0.0);
 
         int last_node = -1;
         if (L->nodes_covered.size() <= 3) { return nullptr; }
@@ -1009,9 +1009,7 @@ public:
             const uint64_t bit_mask = 1ULL << bit_position;
 
             for (std::size_t idx = 0; idx < cutter->size(); ++idx) {
-                auto it = cutter->begin();
-                std::advance(it, idx);
-                const auto &cut          = *it;
+                const auto &cut          = cutter->getCut(idx);
                 const auto &baseSet      = cut.baseSet;
                 const auto &baseSetorder = cut.baseSetOrder;
                 const auto &neighbors    = cut.neighbors;
@@ -1019,13 +1017,14 @@ public:
 
 #if defined(SRC)
                 // Apply SRC logic to update the SRCmap
-                bool bitIsSet  = neighbors[segment] & bit_mask;
-                bool bitIsSet2 = baseSet[segment] & bit_mask;
+                const bool bitIsSet = neighbors[segment] & bit_mask;
 
                 auto &src_map_value = updated_SRCmap[idx];
                 if (!bitIsSet) {
                     src_map_value = 0.0; // Reset if bit is not set in neighbors
+                    continue;
                 }
+                const bool bitIsSet2 = baseSet[segment] & bit_mask;
 
                 if (bitIsSet2) {
                     auto &den = multipliers.den;

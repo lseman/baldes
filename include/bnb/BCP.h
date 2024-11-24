@@ -294,7 +294,7 @@ public:
 
                 if (cut.added && cut.updated) {
                     cut.updated = false;
-                    if (z >= constraints.size()) { continue; }
+                    // if (z >= constraints.size()) { continue; }
                     node->chgCoeff(constraints[z], coeffs);
                 } else {
                     LinearExpression lhs;
@@ -620,18 +620,18 @@ public:
 #endif
 
 #ifdef IPM
-            double d               = 10;
-            matrix                 = node->extractModelDataSparse();
-            double obj_change      = std::abs(lp_obj - inner_obj);
-            double adaptive_factor = std::min(1.0, std::max(1e-1, obj_change / std::abs(lp_obj + 1e-6)));
+            double d          = 10;
+            matrix            = node->extractModelDataSparse();
+            double obj_change = std::abs(lp_obj - inner_obj);
+            // double adaptive_factor = std::min(1.0, std::max(1e-1, obj_change / std::abs(lp_obj + 1e-6)));
 
             // Compute gap based on current objective difference and adaptive factor
             gap = std::abs(lp_obj - (lp_obj + std::min(0.0, inner_obj))) / std::abs(lp_obj + 1e-6);
-            gap = (gap / d) * adaptive_factor;
+            gap = (gap / d);
 
             // Enforce upper and lower bounds on gap
             if (std::isnan(gap) || std::signbit(gap)) { gap = 1e-1; }
-            gap = std::clamp(gap, 1e-8, 1e-1); // Clamping gap to be between 1e-6 and 1e-2
+            gap = std::clamp(gap, 1e-10, 1e-1); // Clamping gap to be between 1e-6 and 1e-2
             node->ipSolver->run_optimization(matrix, gap);
 
             lp_obj           = node->ipSolver->getObjective();

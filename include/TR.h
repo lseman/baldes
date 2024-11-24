@@ -107,7 +107,7 @@ public:
             delta1[i] = nodeDuals[i] - v / 2;
             delta2[i] = nodeDuals[i] + v / 2;
         }
-        if (v <= 5) {
+        if (v <= 20) {
             v = 0;
             for (int i = 0; i < w.size(); i++) {
                 node->remove(w[i]);

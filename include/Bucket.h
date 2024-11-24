@@ -49,9 +49,11 @@ struct Bucket {
         } else {
 #ifdef SORTED_LABELS
             return labels_vec.empty() ? std::numeric_limits<double>::max() : labels_vec.front()->cost;
-#else
-            return std::min_element(labels_vec.begin(), labels_vec.end(),
-                                    [](const Label *a, const Label *b) { return a->cost < b->cost; })
+#else  
+            if (labels_vec.empty()) return std::numeric_limits<double>::max();
+
+            return (*std::min_element(labels_vec.begin(), labels_vec.end(),
+                                      [](const Label *a, const Label *b) { return a->cost < b->cost; }))
                 ->cost;
 #endif
         }
@@ -145,6 +147,11 @@ struct Bucket {
 
         sub_buckets.clear();
         sub_buckets.reserve(2);
+
+        if (depth >= 4) {
+            // print_info("Warning: Bucket split depth reached maximum limit\n");
+            return;
+        }
 
         Bucket first_sub_bucket;
         first_sub_bucket.node_id = node_id;
