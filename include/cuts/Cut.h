@@ -95,7 +95,9 @@ struct Cut {
     // constructor to receive array
     Cut(const std::array<uint64_t, num_words> baseSetInput, const std::array<uint64_t, num_words> &neighborsInput,
         const std::vector<double> &coefficients)
-        : baseSet(baseSetInput), neighbors(neighborsInput), coefficients(coefficients) {}
+        : baseSet(baseSetInput), neighbors(neighborsInput), coefficients(coefficients) {
+        rhs = p.getRHS();
+    }
 
     Cut(const std::array<uint64_t, num_words> baseSetInput, const std::array<uint64_t, num_words> &neighborsInput,
         const std::vector<double> &coefficients, const SRCPermutation &multipliers)

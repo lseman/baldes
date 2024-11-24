@@ -127,7 +127,7 @@ inline std::vector<Label *> BucketGraph::solve(bool trigger) {
             return paths;              // Return the paths after rollback
         }
         // If the objective improves sufficiently, set the status to separation or optimal
-        if (inner_obj >= -1e-1) {
+        if (inner_obj >= -1e-6) {
             ss = true; // Enter separation mode (for SRC handling)
 #if !defined(SRC) && !defined(SRC3)
             status = Status::Optimal; // If SRC is not defined, set status to optimal
@@ -282,26 +282,8 @@ std::vector<double> BucketGraph::labeling_algorithm() {
                                 // If the new label has lower cost, remove dominated labels
                                 for (auto *existing_label : to_bucket_labels) {
                                     if (label->cost < existing_label->cost) {
-
-                                        // TODO: check if removing children is a good idea
-                                        // Use a stack to track labels whose children need to be removed
-                                        std::stack<Label *> stack;
-                                        stack.push(existing_label);
-
-                                        // Process all children recursively using the stack
-                                        while (!stack.empty()) {
-                                            Label *current_label = stack.top();
-                                            stack.pop();
-
-                                            // Remove all children of the current label
-                                            for (auto *child : current_label->children) {
-                                                buckets[child->vertex].remove_label(child);
-                                                stack.push(child); // Add child's children to the stack
-                                            }
-
-                                            // Remove the current label itself
-                                            buckets[current_label->vertex].remove_label(current_label);
-                                        }
+                                        // Remove children of the dominated label
+                                        buckets[to_bucket].remove_label(existing_label);
                                     } else {
                                         dominated = true;
                                         break;
@@ -333,6 +315,7 @@ std::vector<double> BucketGraph::labeling_algorithm() {
                             if (!dominated) {
                                 // Remove dominated labels from the bucket
                                 if constexpr (S != Stage::Enumerate) {
+                                    /*
                                     std::vector<Label *> labels_to_remove;
                                     for (auto *existing_label : to_bucket_labels) {
                                         if (is_dominated<D, S>(existing_label, new_label)) {
@@ -341,6 +324,41 @@ std::vector<double> BucketGraph::labeling_algorithm() {
                                     }
                                     // Now remove all marked labels in one pass
                                     for (auto *label : labels_to_remove) { buckets[to_bucket].remove_label(label); }
+                                    */
+                                    for (auto *existing_label : to_bucket_labels) {
+                                        if (is_dominated<D, S>(existing_label, new_label)) {
+
+                                            // TODO: check if removing
+                                            // children is necessary
+                                            //  Use a stack to track labels
+                                            //  whose children need to be
+                                            // removed
+                                            std::stack<Label *> stack;
+                                            stack.push(existing_label);
+
+                                            // Process all children
+                                            // recursively using the stack
+                                            while (!stack.empty()) {
+                                                Label *current_label = stack.top();
+                                                stack.pop();
+
+                                                // Remove all children of
+                                                // the current label
+                                                for (auto *child : current_label->children) {
+                                                    buckets[child->vertex].remove_label(child);
+                                                    stack.push(child); //
+                                                    // Add child's children
+                                                    // to the stack
+                                                }
+
+                                                // Remove the current label
+                                                // itself
+                                                buckets[current_label->vertex].remove_label(current_label);
+                                            }
+
+                                            //buckets[to_bucket].remove_label(existing_label);
+                                        }
+                                    }
                                 }
 
                                 n_labels++; // Increment the count of labels added
@@ -380,11 +398,7 @@ std::vector<double> BucketGraph::labeling_algorithm() {
 
         // Update the cost bounds (c_bar) for the current SCC's buckets
         for (const int bucket : sorted_sccs[scc_index]) {
-            // parallelize this
 
-            // std::for_each(std::execution::par_unseq, sorted_sccs[scc_index].begin(), sorted_sccs[scc_index].end(),
-            //   [&](int bucket) {
-            // Update c_bar[bucket] with the minimum cost found in the bucket
             double current_cb = buckets[bucket].get_cb();
             c_bar[bucket]     = std::min(c_bar[bucket], current_cb);
 
@@ -519,9 +533,9 @@ std::vector<Label *> BucketGraph::bi_labeling_algorithm() {
                 // Iterate over the returned Label** array and add each valid label to the vector
                 for (auto L_prime : extended_labels) {
                     // auto L_prime = *label_ptr; // Get the current label from the array
-                    if (L_prime->resources[options.main_resources[0]] <= q_star[options.main_resources[0]]) {
-                        continue; // Skip if the label exceeds q_star
-                    }
+                    // if (L_prime->resources[options.main_resources[0]] <= q_star[options.main_resources[0]]) {
+                    // continue; // Skip if the label exceeds q_star
+                    // }
 
                     // Get the bucket for the extended label
                     auto b_prime = L_prime->vertex;
@@ -711,8 +725,8 @@ BucketGraph::Extend(const std::conditional_t<M == Mutability::Mut, Label *, cons
         auto old_last_dual     = pstep_duals.getThreeTwoDualValue(initial_node_id);
         auto old_not_last_dual = pstep_duals.getThreeThreeDualValue(initial_node_id);
 
-        // since there was a new node visited, we give back the dual as a final node and add the dual corresponding to
-        // the visit
+        // since there was a new node visited, we give back the dual as a final node and add the dual corresponding
+        // to the visit
         if (n_visited > 1 && initial_node_id != options.depot) { new_cost += old_last_dual + old_not_last_dual; }
         // suppose this is the last
         new_cost += -1.0 * last_dual;
@@ -876,8 +890,10 @@ inline bool BucketGraph::is_dominated(const Label *new_label, const Label *label
     const auto &new_resources   = new_label->resources;
     const auto &label_resources = label->resources;
 
-    // Simple cost check: if the comparison label has a higher cost, it is not dominated
-    if (label->cost > new_label->cost) { return false; }
+    {
+        // Simple cost check: if the comparison label has a higher cost, it is not dominated
+        if (label->cost > new_label->cost) { return false; }
+    }
 
     // Check resource conditions based on the direction (Forward or Backward)
     for (size_t i = 0; i < options.resources.size(); ++i) {
@@ -915,7 +931,8 @@ inline bool BucketGraph::is_dominated(const Label *new_label, const Label *label
     }
 #endif
 
-    SRC_MODE_BLOCK(if constexpr (S == Stage::Four || S == Stage::Enumerate) {
+#ifdef SRC
+    if constexpr (S == Stage::Four || S == Stage::Enumerate) {
         double sumSRC = 0;
 
         const auto &SRCDuals = cut_storage->SRCDuals;
@@ -930,7 +947,8 @@ inline bool BucketGraph::is_dominated(const Label *new_label, const Label *label
             }
         }
         if (label->cost - sumSRC > new_label->cost) { return false; }
-    })
+    }
+#endif
 
     // If all conditions are met, return true, indicating that the new label is dominated by the comparison label
     return true;
@@ -1061,9 +1079,8 @@ void BucketGraph::run_labeling_algorithms(std::vector<double> &forward_cbar, std
  */
 template <Stage S>
 Label *BucketGraph::compute_label(const Label *L, const Label *L_prime) {
-    double cij_cost = getcij(L->node_id, L_prime->node_id);
-    double new_cost = L->cost + L_prime->cost + cij_cost;
-
+    double cij_cost  = getcij(L->node_id, L_prime->node_id);
+    double new_cost  = L->cost + L_prime->cost + cij_cost;
     double real_cost = L->real_cost + L_prime->real_cost + cij_cost;
 
     if constexpr (S == Stage::Four) {

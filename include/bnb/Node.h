@@ -161,6 +161,10 @@ public:
 
     std::vector<BNBNode *> getChildren() { return children; }
 
+    std::vector<std::vector<double>> getDistanceMatrix() {
+        return instance.getDistanceMatrix();
+    }
+
     /**
      * Generates a Universally Unique Identifier (UUID) as a string.
      *

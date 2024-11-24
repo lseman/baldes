@@ -102,23 +102,7 @@ class InstanceData:
             ) / (self.nN - 2)
             self.demand_sum = sum(self.demand[1 : self.nN - 1])
 
-
-@dataclass(frozen=True, order=True)
-class State:
-    """Represents a state in the dynamic program"""
-
-    no_good: frozenset
-    weight: int
-    location: int
-    time: float  # Added time attribute to handle time windows
-
-    def __hash__(self):
-        return hash((self.no_good, self.weight, self.location, self.time))
-
-
-# %%
 import numpy as np
-
 
 @dataclass
 class VRPTWInstance:

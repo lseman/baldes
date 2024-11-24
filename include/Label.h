@@ -36,7 +36,7 @@ struct Label {
     int                        node_id       = -1; // Add node_id to Label
     Label                     *parent        = nullptr;
     bool                       fresh         = true;
-    SRC_MODE_BLOCK(std::vector<int> SRCmap;)
+    SRC_MODE_BLOCK(std::vector<double> SRCmap;)
     // uint64_t             visited_bitmap; // Bitmap for visited nodes
     std::array<uint64_t, num_words> visited_bitmap = {0};
 #ifdef UNREACHABLE_DOMINANCE
