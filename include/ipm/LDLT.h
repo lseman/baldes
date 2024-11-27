@@ -152,94 +152,81 @@ public:
         StorageIndex       *Li   = m_matrix.innerIndexPtr();
         Scalar             *Lx   = m_matrix.valuePtr();
 
-        // Use aligned arrays for SIMD optimization
-        std::vector<Scalar, Eigen::aligned_allocator<Scalar>>             y(size, Scalar(0));
-        std::vector<StorageIndex, Eigen::aligned_allocator<StorageIndex>> pattern(size, 0);
-        std::vector<StorageIndex, Eigen::aligned_allocator<StorageIndex>> tags(size, 0);
+        alignas(64) std::vector<Scalar>       y(size, Scalar(0));
+        alignas(64) std::vector<StorageIndex> pattern(size, 0);
+        alignas(64) std::vector<StorageIndex> tags(size, 0);
 
-        bool ok = true;
         m_diag.resize(size);
+        std::atomic<bool> ok{true};
 
-        std::mutex                            diag_mutex;
-        std::vector<std::tuple<StorageIndex>> tasks(size); // Task vector for each k value
+        const int hardware_threads     = std::thread::hardware_concurrency();
+        const int min_tasks_per_thread = 32;
+        const int chunk_size           = std::max(size / (hardware_threads * min_tasks_per_thread), StorageIndex(1));
 
-        // Create tasks for each k
-        for (StorageIndex k = 0; k < size; ++k) { tasks.emplace_back(k); }
+        auto bulk_sender =
+            stdexec::bulk(stdexec::just(), (size + chunk_size - 1) / chunk_size,
+                          [this, &y, &pattern, &tags, Lp, Li, Lx, size, &ap, &ok, chunk_size](std::size_t chunk_idx) {
+                              const size_t start_k = chunk_idx * chunk_size;
+                              const size_t end_k   = std::min(start_k + chunk_size, size_t(size));
 
-        // Define chunk size to reduce parallelization overhead
-        const int chunk_size = static_cast<int>(size / std::thread::hardware_concurrency());
+                              std::vector<Scalar> y_local(size, Scalar(0));
 
-        // Parallel execution in chunks
-        auto bulk_sender = stdexec::bulk(stdexec::just(), (tasks.size() + chunk_size - 1) / chunk_size,
-                                         [this, &y, &pattern, &tags, &Lp, &Li, &Lx, size, &ap, &diag_mutex, &tasks, &ok,
-                                          chunk_size](std::size_t chunk_idx) {
-                                             size_t start_idx = chunk_idx * chunk_size;
-                                             size_t end_idx   = std::min(start_idx + chunk_size, tasks.size());
+                              for (size_t k = start_k; k < end_k && ok; ++k) {
+                                  StorageIndex top    = size;
+                                  tags[k]             = k;
+                                  m_nonZerosPerCol[k] = 0;
 
-                                             // Process a chunk of tasks
-                                             for (size_t task_idx = start_idx; task_idx < end_idx; ++task_idx) {
-                                                 const auto &[k] = tasks[task_idx];
+                                  // Process column k using local buffer
+                                  for (typename CholMatrixType::InnerIterator it(ap, k); it; ++it) {
+                                      StorageIndex i = it.index();
+                                      if (i <= k) {
+                                          y_local[i] += getSymm(it.value());
 
-                                                 y[k]                = Scalar(0);
-                                                 StorageIndex top    = size;
-                                                 tags[k]             = k;
-                                                 m_nonZerosPerCol[k] = 0;
+                                          StorageIndex len = 0;
+                                          for (; tags[i] != k; i = m_parent[i]) {
+                                              pattern[len++] = i;
+                                              tags[i]        = k;
+                                          }
+                                          while (len > 0) pattern[--top] = pattern[--len];
+                                      }
+                                  }
 
-                                                 // Iterate over non-zero elements in column k
-                                                 for (typename CholMatrixType::InnerIterator it(ap, k); it; ++it) {
-                                                     StorageIndex i = it.index();
-                                                     if (i <= k) {
-                                                         y[i] += getSymm(it.value());
+                                  DiagonalScalar d = getDiag(y_local[k]) * m_shiftScale + m_shiftOffset;
+                                  y_local[k]       = Scalar(0);
 
-                                                         Index len;
-                                                         for (len = 0; tags[i] != k; i = m_parent[i]) {
-                                                             pattern[len++] = i;
-                                                             tags[i]        = k;
-                                                         }
+                                  for (; top < size; ++top) {
+                                      const StorageIndex i  = pattern[top];
+                                      const Scalar       yi = y_local[i];
+                                      y_local[i]            = Scalar(0);
 
-                                                         while (len > 0) { pattern[--top] = pattern[--len]; }
-                                                     }
-                                                 }
+                                      const Scalar       l_ki = yi / getDiag(m_diag[i]);
+                                      const StorageIndex p2   = Lp[i] + m_nonZerosPerCol[i];
 
-                                                 DiagonalScalar d = getDiag(y[k]) * m_shiftScale + m_shiftOffset;
-                                                 y[k]             = Scalar(0); // Reset y[k]
+// Vectorized sparse update
+#pragma omp simd
+                                      for (StorageIndex p = Lp[i]; p < p2; ++p) {
+                                          y_local[Li[p]] -= getSymm(Lx[p]) * yi;
+                                      }
 
-                                                 // SIMD on dense vector y, but avoid SIMD for sparse indices in Li
-                                                 for (; top < size; ++top) {
-                                                     Index  i  = pattern[top];
-                                                     Scalar yi = y[i];
-                                                     y[i]      = Scalar(0);
+                                      d -= getDiag(l_ki * getSymm(yi));
+                                      Li[p2] = k;
+                                      Lx[p2] = l_ki;
+                                      ++m_nonZerosPerCol[i];
+                                  }
 
-                                                     Scalar l_ki = yi / getDiag(m_diag[i]);
+                                  // Atomic write to diagonal
+                                  m_diag[k] = d;
+                                  if (d == RealScalar(0)) {
+                                      ok.store(false, std::memory_order_relaxed);
+                                      break;
+                                  }
+                              }
+                          });
 
-                                                     Index p2 = Lp[i] + m_nonZerosPerCol[i];
-
-                                                     // Sparse reductions
-                                                     for (Index p = Lp[i]; p < p2; ++p) {
-                                                         y[Li[p]] -= getSymm(Lx[p]) * yi;
-                                                     }
-
-                                                     d -= getDiag(l_ki * getSymm(yi));
-                                                     Li[p2] = k;
-                                                     Lx[p2] = l_ki;
-                                                     ++m_nonZerosPerCol[i];
-                                                 }
-
-                                                 std::lock_guard<std::mutex> lock(diag_mutex);
-                                                 m_diag[k] = d;
-                                                 if (d == RealScalar(0)) {
-                                                     ok = false;
-                                                     break;
-                                                 }
-                                             }
-                                         });
-
-        // Synchronize execution
         stdexec::sync_wait(stdexec::when_all(bulk_sender));
         m_info              = ok ? Success : NumericalIssue;
         m_factorizationIsOk = true;
     }
-
     /*
         template <typename Lhs, typename Rhs, int Mode, bool IsLower, bool IsRowMajor>
         struct SparseSolveTriangular {

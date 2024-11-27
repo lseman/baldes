@@ -298,7 +298,7 @@ int main(int argc, char *argv[]) {
     node->problem    = problem;
     node->mip        = mip;
     node->instance   = instance;
-    node->bestRoutes = topRoutes;
+    //node->bestRoutes = topRoutes;
 
     BranchAndBound solver(std::move(problem), BNBNodeSelectionStrategy::DFS); // Choose
     solver.setRootNode(node);

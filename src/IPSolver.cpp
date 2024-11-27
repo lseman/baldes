@@ -164,23 +164,13 @@ void IPSolver::update_residuals(Residuals &res, const Eigen::VectorXd &x, const 
     res.rp.noalias() = tau * b - A * x;
     res.rpn          = res.rp.norm(); // Primal residual norm
 
-    // Calculate ru (upper bound residual) with fewer iterations by combining operations
-    res.ru = -v; // Directly assign -v to res.ru
-
     // Update res.ru more efficiently using Eigen's indexed operations
-    for (int i = 0; i < ubi.size(); ++i) {
-        int idx = ubi(i); // Cache index access
-        res.ru(idx) += tau * ubv(i) - x(idx);
-    }
+    res.ru = -v;
+    for (int i = 0; i < ubi.size(); ++i) { res.ru(ubi[i]) += tau * ubv[i] - x[ubi[i]]; }
 
     // Efficiently calculate rd (dual residual) using noalias to avoid temporary allocations
     res.rd.noalias() = tau * c - A.transpose() * lambda - s;
-
-    // Update res.rd similarly to ru, using Eigen's indexed access
-    for (int i = 0; i < ubi.size(); ++i) {
-        int idx = ubi(i); // Cache index access
-        res.rd(idx) += w(i);
-    }
+    res.rd(ubi) += w;
 
     // Efficiently calculate rg (gap residual) by combining dot products
     res.rg  = kappa + c.dot(x) - b.dot(lambda) + ubv.dot(w);
@@ -364,21 +354,21 @@ void IPSolver::run_optimization(ModelData &model, const double tol) {
     Eigen::VectorXd x      = Eigen::VectorXd::Ones(n);
     Eigen::VectorXd lambda = Eigen::VectorXd::Zero(m);
     Eigen::VectorXd s      = Eigen::VectorXd::Ones(n);
-    /*
-        if (x_old.size() > 0 && warm_start) {
-            int nv_old = x_old.size(); // Original number of variables
-            int nv_new = x.size();     // New number of variables
-            int mv_old = lambda_old.size();
-            int mv_new = lambda.size();
 
-            // Copy old values to new positions in x
-            // As free variables and slack variables are added, the original variables move down
-            // int original_counter          = 0;
-            // x.head(nv_old - n_slacks_old) = x_old.head(nv_old - n_slacks_old);
+    if (x_old.size() > 0 && warm_start) {
+        int nv_old = x_old.size(); // Original number of variables
+        int nv_new = x.size();     // New number of variables
+        int mv_old = lambda_old.size();
+        int mv_new = lambda.size();
 
-            lambda.head(N_SIZE - 1) = lambda_old.head(N_SIZE - 1);
-        }
-    */
+        // Copy old values to new positions in x
+        // As free variables and slack variables are added, the original variables move down
+        // int original_counter          = 0;
+        x.head(nv_old - n_slacks_old) = x_old.head(nv_old - n_slacks_old);
+
+        lambda.head(N_SIZE - 1) = lambda_old.head(N_SIZE - 1);
+    }
+
     warm_start   = false;
     n_slacks_old = n_slacks;
     // initialize ubi and ubv as empty vectors
@@ -487,7 +477,7 @@ void IPSolver::run_optimization(ModelData &model, const double tol) {
 
         // Update residuals
         update_residuals(res, x, lambda, s, v, w, A, b, c, ubv, ubi, vbv, vbi, tau, kappa);
-        mu = (tau * kappa + x.dot(s) + v.dot(w)) / (n + ubi.size() + 1.0);
+        const double mu = (tau * kappa + x.array() * s.array()).sum() / (n + nu + 1.0);
 
         // Calculate _p, _d, and _g in parallel
         // Calculate primal and dual residual norms using Infinity norm
@@ -514,10 +504,9 @@ void IPSolver::run_optimization(ModelData &model, const double tol) {
             saved_interior_solution_bool = true;
             warm_start                   = true;
         }
-        // }
 
         // Check for optimality and infeasibility
-        if (_p <= 1e-6 && _d <= 1e-6 && _g <= tol) { break; }
+        if (_p <= 1e-9 && _d <= 1e-9 && _g <= tol) { break; }
         // Scaling factors
         theta_vw = w.cwiseQuotient(v);
         theta_xs = s.cwiseQuotient(x);

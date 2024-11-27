@@ -17,7 +17,6 @@
 #cmakedefine SORTED_LABELS
 #cmakedefine MCD
 #cmakedefine FIX_BUCKETS
-#cmakedefine AVX
 #cmakedefine IPM
 #cmakedefine TR
 #cmakedefine STAB
