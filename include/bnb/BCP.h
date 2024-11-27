@@ -101,9 +101,6 @@ public:
             // Insert the path into the set to avoid duplicates
             // pathSet.insert(path);
 
-            counter += 1;
-            if (counter >= 10) break;
-
             std::fill(coluna.begin(), coluna.end(), 0.0); // Reset the coefficients
 
             double      travel_cost = label.cost;
@@ -432,7 +429,7 @@ public:
     /**
      * Column generation algorithm.
      */
-    bool CG(BNBNode *node, int max_iter = 1000) {
+    bool CG(BNBNode *node, int max_iter = 2000) {
 
         print_info("Column generation preparation...\n");
 
@@ -543,11 +540,11 @@ public:
         IPSolver ipm_solver;
         bool     use_ipm_duals = false;
 #endif
-        bool   rcc         = false;
-        bool   reoptimized = false;
-        double obj;
-        auto   colAdded = 0;
-
+        bool                rcc         = false;
+        bool                reoptimized = false;
+        double              obj;
+        auto                colAdded = 0;
+        std::vector<double> originDuals;
         for (int iter = 0; iter < max_iter; ++iter) {
             reoptimized = false;
 
@@ -620,27 +617,49 @@ public:
 #endif
 
 #ifdef IPM
-            double d          = 10;
+            double d          = 1;
             matrix            = node->extractModelDataSparse();
-            double obj_change = std::abs(lp_obj - inner_obj);
-            // double adaptive_factor = std::min(1.0, std::max(1e-1, obj_change / std::abs(lp_obj + 1e-6)));
+            double obj_change = std::abs(lp_obj - lp_obj_old);
+            // fmt::print("Objective change: {}\n", obj_change);
+            // double adaptive_factor = std::min(1.0, std::max(1e-4, obj_change / std::abs(lp_obj + 1e-6)));
+            // fmt::print("Adaptive factor: {}\n", adaptive_factor);
 
             // Compute gap based on current objective difference and adaptive factor
             gap = std::abs(lp_obj - (lp_obj + std::min(0.0, inner_obj))) / std::abs(lp_obj + 1e-6);
             gap = (gap / d);
+            // fmt::print("Gap: {}\n", gap);
 
             // Enforce upper and lower bounds on gap
             if (std::isnan(gap) || std::signbit(gap)) { gap = 1e-1; }
-            gap = std::clamp(gap, 1e-10, 1e-1); // Clamping gap to be between 1e-6 and 1e-2
+            gap = std::clamp(gap, 1e-8, 1e-1); // Clamping gap to be between 1e-6 and 1e-2
             node->ipSolver->run_optimization(matrix, gap);
 
-            lp_obj           = node->ipSolver->getObjective();
-            solution         = node->ipSolver->getPrimals();
-            nodeDuals        = node->ipSolver->getDuals();
-            auto originDuals = nodeDuals;
+            lp_obj_old  = lp_obj;
+            lp_obj      = node->ipSolver->getObjective();
+            solution    = node->ipSolver->getPrimals();
+            nodeDuals   = node->ipSolver->getDuals();
+            originDuals = nodeDuals;
             // print origin duals size
             for (auto &dual : nodeDuals) { dual = -dual; }
 
+/*
+            if (iter > 1 && iter % 50 == 0 && stage != 4) {
+                auto toRemoveIndices = node->mip.reduceByRC(nodeDuals, 0.95);
+                matrix               = node->extractModelDataSparse();
+
+                for (auto &index : toRemoveIndices) {
+                    // remove index from allPaths
+                    allPaths.erase(allPaths.begin() + index);
+                }
+                node->ipSolver->run_optimization(matrix, gap);
+                //lp_obj_old  = lp_obj;
+                //lp_obj      = node->ipSolver->getObjective();
+                solution    = node->ipSolver->getPrimals();
+                //nodeDuals   = node->ipSolver->getDuals();
+                //originDuals = nodeDuals;
+                //for (auto &dual : nodeDuals) { dual = -dual; }
+            }
+*/
             lag_gap           = integer_solution - (lp_obj + std::min(0.0, inner_obj));
             bucket_graph->gap = lag_gap;
 #endif
@@ -714,7 +733,6 @@ public:
                     iter_non_improv = 0;
                 }
 #endif
-                lp_obj_old               = lp_obj;
                 bucket_graph->relaxation = lp_obj;
                 bucket_graph->augment_ng_memories(solution, allPaths, true, 5, 110, 18, N_SIZE);
                 SRC_MODE_BLOCK( // SRC cuts

@@ -84,7 +84,6 @@ option(UNREACHABLE_DOMINANCE "Enable Unreachable Dominance compilation option"
 option(SORTED_LABELS "Enable Sorted Labels compilation option" ON)
 option(MCD "Enable MCD compilation option" OFF)
 option(FIX_BUCKETS "Enable Fixed Buckets compilation option" ON)
-option(AVX "Enable AVX compilation option" OFF)
 option(IPM "Enable IPM compilation option" ON)
 option(TR "Enable TR compilation option" OFF)
 option(GET_SUITESPARSE "Enable SuiteSparse compilation option" OFF)

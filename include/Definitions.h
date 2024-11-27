@@ -369,6 +369,14 @@ inline double roundToTwoDecimalPlaces(double value) { return std::round(value * 
     solution = (node)->extractSolution();
 #endif
 
+#ifdef IPM
+#define GET_SOL(node)                  \
+    solution = (node)->ipSolver->getPrimals();
+#else
+#define GET_SOL(node) \
+    solution = (node)->extractSolution();
+#endif
+
 #ifdef SRC
 #define SRC_MODE_BLOCK(code_block) code_block
 #else

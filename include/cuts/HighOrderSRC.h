@@ -29,7 +29,7 @@ using cutLong                                                   = yzzLong;
 constexpr double tolerance                                      = 1e-6;
 constexpr int    max_row_rank1                                  = 5;
 constexpr int    max_heuristic_initial_seed_set_size_row_rank1c = 6;
-constexpr int    max_heuristic_sep_mem4_row_rank1               = 16;
+constexpr int    max_heuristic_sep_mem4_row_rank1               = 10;
 
 constexpr int    max_num_r1c_per_round = 20;
 constexpr double cut_vio_factor        = 0.1;
@@ -53,11 +53,62 @@ struct Rank1MultiLabel {
     Rank1MultiLabel() = default;
 };
 
-// namespace py = pybind11;
+// Replace the current cache with a lock-free version
+struct alignas(64) CacheEntry { // Align to cache line
+    std::atomic<uint64_t>         version{0};
+    std::vector<std::vector<int>> data;
+};
+
+class LockFreeCache {
+    static constexpr size_t            CACHE_SIZE = 4096; // Must be power of 2
+    std::array<CacheEntry, CACHE_SIZE> entries;
+    std::hash<cutLong>                 hasher;
+
+public:
+    bool try_get(const cutLong &key, std::vector<std::vector<int>> &result) {
+        size_t   idx     = hasher(key) & (CACHE_SIZE - 1);
+        uint64_t version = entries[idx].version.load(std::memory_order_acquire);
+        if (version == 0) return false;
+
+        result = entries[idx].data; // Copy while data is consistent
+        return entries[idx].version.load(std::memory_order_acquire) == version;
+    }
+
+    void update(const cutLong &key, const std::vector<std::vector<int>> &value) {
+        size_t   idx      = hasher(key) & (CACHE_SIZE - 1);
+        uint64_t version  = entries[idx].version.load(std::memory_order_relaxed) + 1;
+        entries[idx].data = value;
+        entries[idx].version.store(version, std::memory_order_release);
+    }
+};
 
 class HighDimCutsGenerator {
 public:
     double max_cut_mem_factor = 0.15;
+
+    template <typename T, std::size_t Alignment = 32>
+    struct aligned_allocator {
+        typedef T value_type;
+
+        aligned_allocator() noexcept {}
+
+        template <class U>
+        aligned_allocator(const aligned_allocator<U, Alignment> &) noexcept {}
+
+        template <typename U>
+        struct rebind {
+            typedef aligned_allocator<U, Alignment> other;
+        };
+
+        T *allocate(std::size_t n) {
+            if (n == 0) return nullptr;
+            void *ptr = std::aligned_alloc(Alignment, n * sizeof(T));
+            if (!ptr) throw std::bad_alloc();
+            return static_cast<T *>(ptr);
+        }
+
+        void deallocate(T *p, std::size_t) noexcept { std::free(p); }
+    };
 
     HighDimCutsGenerator(int dim, int maxRowRank, double tolerance)
         : dim(dim), max_row_rank1(maxRowRank), TOLERANCE(tolerance), num_label(0) {
@@ -279,6 +330,28 @@ public:
     std::shared_mutex map_cut_plan_vio_mutex;
     std::shared_mutex cut_cache_mutex;
 
+    // For the frequency accumulation loop:
+    void accumulate_frequencies_simd(int *map_r_numbers, const auto &route_freqs, int route_size) {
+        const int simd_size = 8; // AVX2 processes 8 integers at once
+        int       i         = 0;
+
+        // Process 8 elements at a time using AVX2
+        for (; i + simd_size <= route_size; i += simd_size) {
+            __m256i freq = _mm256_loadu_si256((__m256i *)&route_freqs[i]);
+            __m256i curr = _mm256_loadu_si256((__m256i *)&map_r_numbers[i]);
+            __m256i mask = _mm256_cmpgt_epi32(freq, _mm256_setzero_si256());
+            freq         = _mm256_and_si256(freq, mask);
+            curr         = _mm256_add_epi32(curr, freq);
+            _mm256_storeu_si256((__m256i *)&map_r_numbers[i], curr);
+        }
+
+        // Handle remaining elements
+        for (; i < route_size; i++) {
+            const int frequency = route_freqs[i];
+            map_r_numbers[i] += frequency * (frequency > 0);
+        }
+    }
+
     void exactFindBestPermutationForOnePlan(std::vector<int> &cut, const int plan_idx, double &vio) {
         const int   cut_size = static_cast<int>(cut.size());
         const auto &plan     = map_rank1_multiplier[cut_size][plan_idx];
@@ -319,10 +392,13 @@ public:
         const auto  &coeffs      = record_map_rank1_combinations[cut_size][plan_idx];
 
         // Use thread_local vectors to avoid allocations
-        static thread_local std::vector<int> map_r_numbers;
+        // static thread_local std::vector<int> map_r_numbers;
+        alignas(32) static thread_local std::vector<int, aligned_allocator<int>> map_r_numbers;
+
         map_r_numbers.resize(sol.size());
         std::fill(map_r_numbers.begin(), map_r_numbers.end(), 0);
 
+#ifndef __AVX2__
         // Pre-compute route frequencies in a single pass
         for (int idx : cut) {
             if (idx >= 0 && idx < v_r_map.size()) {
@@ -336,6 +412,15 @@ public:
                 }
             }
         }
+#else
+        for (int idx : cut) {
+            if (idx >= 0 && idx < v_r_map.size()) {
+                const auto &route_freqs = v_r_map[idx];
+                const int   route_size  = static_cast<int>(route_freqs.size());
+                accumulate_frequencies_simd(map_r_numbers.data(), route_freqs, route_size);
+            }
+        }
+#endif
 
         static thread_local std::vector<std::vector<int>> cut_num_times_vis_routes;
 
@@ -1179,6 +1264,16 @@ public:
             for (int k : r[min_idx]) { mem.insert(segments[k].begin(), segments[k].end()); }
         }
     }
+
+    // New members for R1C separation
+    struct R1CMemory {
+        std::vector<int> C;          // Customer subset
+        int              p_idx;      // Index of optimal vector p
+        yzzLong          arc_memory; // Arc memory as bitset
+        double           violation;  // Cut violation
+
+        R1CMemory(std::vector<int> c, int p, double v) : C(std::move(c)), p_idx(p), violation(v) {}
+    };
 
 private:
 };

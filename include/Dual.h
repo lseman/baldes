@@ -85,6 +85,8 @@ class BranchingDuals {
 public:
     std::vector<VRPCandidate *> getBranchingCandidates() { return branchingCandidates_; }
 
+    bool empty() { return branchingCandidates_.empty(); }
+    
     void addCandidate(VRPCandidate *candidate, baldesCtrPtr constraint) {
         branchingCandidates_.push_back(candidate);
         branchingbaldesCtrs_.push_back(constraint);

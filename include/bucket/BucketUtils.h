@@ -444,28 +444,39 @@ Label *BucketGraph::get_best_label(const std::vector<int> &topological_order, co
  */
 template <Stage S, Symmetry SYM>
 void BucketGraph::ConcatenateLabel(const Label *L, int &b, Label *&pbest, std::vector<uint64_t> &Bvisited) {
-    // Use a vector for iterative processing as a stack
-    std::vector<int> bucket_stack;
+    static thread_local std::vector<int> bucket_stack;
+    bucket_stack.clear();
     bucket_stack.reserve(50);
     bucket_stack.push_back(b);
 
     auto &other_buckets = assign_symmetry<SYM>(fw_buckets, bw_buckets);
     auto &other_c_bar   = assign_symmetry<SYM>(fw_c_bar, bw_c_bar);
 
-    const auto &L_node_id   = L->node_id;
-    const auto &L_resources = L->resources;
-    const auto &L_last_node = nodes[L_node_id];
+    // Cache frequently accessed values
+    const auto  &L_node_id   = L->node_id;
+    const auto  &L_resources = L->resources;
+    const auto  &L_last_node = nodes[L_node_id];
+    const double L_cost      = L->cost;
+    const size_t bitmap_size = L->visited_bitmap.size();
+
+    // Pre-compute constants
+    constexpr uint64_t one           = 1ULL;
+    const bool         has_branching = branching_duals->size() > 0;
+
+    SRC_MODE_BLOCK(decltype(cut_storage) cutter = nullptr; decltype(cut_storage->SRCDuals) *SRCDuals = nullptr;
+                   if constexpr (S > Stage::Three) {
+                       cutter   = cut_storage;
+                       SRCDuals = &cutter->SRCDuals;
+                   })
 
     while (!bucket_stack.empty()) {
-        // Pop the next bucket from the stack (vector back)
-        int current_bucket = bucket_stack.back();
+        const int current_bucket = bucket_stack.back();
         bucket_stack.pop_back();
 
-        // Mark the bucket as visited
-        const size_t segment      = current_bucket >> 6; // Equivalent to current_bucket / 64
-        const size_t bit_position = current_bucket & 63; // Equivalent to current_bucket % 64
-
-        Bvisited[segment] |= (1ULL << bit_position);
+        // Optimize bit operations
+        const size_t   segment  = current_bucket >> 6;
+        const uint64_t bit_mask = one << (current_bucket & 63);
+        Bvisited[segment] |= bit_mask;
 
         const auto &bucketLprimenode = other_buckets[current_bucket].node_id;
         double      cost             = getcij(L_node_id, bucketLprimenode);
@@ -474,46 +485,28 @@ void BucketGraph::ConcatenateLabel(const Label *L, int &b, Label *&pbest, std::v
         if constexpr (S == Stage::Four) { cost -= arc_duals.getDual(L_node_id, bucketLprimenode); }
 #endif
 
-        // Branching duals
-        if (branching_duals->size() > 0) { cost -= branching_duals->getDual(L_node_id, bucketLprimenode); }
+        if (has_branching) { cost -= branching_duals->getDual(L_node_id, bucketLprimenode); }
 
-        SRC_MODE_BLOCK(decltype(cut_storage) cutter = nullptr; decltype(cut_storage->SRCDuals) *SRCDuals = nullptr;
+        const double L_cost_plus_cost = L_cost + cost;
+        const double current_bound    = other_c_bar[current_bucket];
 
-                       if constexpr (S > Stage::Three) {
-                           cutter   = cut_storage;       // Initialize cutter
-                           SRCDuals = &cutter->SRCDuals; // Initialize SRCDuals
-                       })
+        // Early exit check
+        const bool should_continue = (S != Stage::Enumerate && L_cost_plus_cost + current_bound >= pbest->cost) ||
+                                     (S == Stage::Enumerate && L_cost_plus_cost + current_bound >= gap);
 
-        double L_cost_plus_cost = L->cost + cost;
+        if (should_continue) continue;
 
-        // Early exit based on cost comparison
-        if ((S != Stage::Enumerate && L_cost_plus_cost + other_c_bar[current_bucket] >= pbest->cost) ||
-            (S == Stage::Enumerate && L_cost_plus_cost + other_c_bar[current_bucket] >= gap)) {
-            continue;
-        }
-
-        // Get the labels for the current bucket
+        // Process labels in current bucket
         auto      &bucket = other_buckets[current_bucket];
         const auto labels = bucket.get_labels();
 
         for (const auto &L_bw : labels) {
             if (L_bw->node_id == L_node_id || !check_feasibility(L, L_bw)) continue;
-            double candidate_cost = L_cost_plus_cost + L_bw->cost;
 
-            SRC_MODE_BLOCK(if constexpr (S == Stage::Four) {
-                for (auto it = cutter->begin(); it < cutter->end(); ++it) {
-                    if ((*SRCDuals)[it->id] == 0) continue;
-                    auto den = it->p.den;
-                    auto sum = (L->SRCmap[it->id] + L_bw->SRCmap[it->id]);
-                    if (sum >= den) { candidate_cost -= (*SRCDuals)[it->id]; }
-                }
-            })
-
-            // Check for visited overlap and skip if true
-
+            // Check visited overlap early if needed
             if constexpr (S >= Stage::Three) {
                 bool visited_overlap = false;
-                for (size_t i = 0; i < L->visited_bitmap.size(); ++i) {
+                for (size_t i = 0; i < bitmap_size; ++i) {
                     if (L->visited_bitmap[i] & L_bw->visited_bitmap[i]) {
                         visited_overlap = true;
                         break;
@@ -522,24 +515,31 @@ void BucketGraph::ConcatenateLabel(const Label *L, int &b, Label *&pbest, std::v
                 if (visited_overlap) continue;
             }
 
+            double candidate_cost = L_cost_plus_cost + L_bw->cost;
+
+            SRC_MODE_BLOCK(if constexpr (S == Stage::Four) {
+                for (auto it = cutter->begin(); it < cutter->end(); ++it) {
+                    if ((*SRCDuals)[it->id] == 0) continue;
+                    auto den = it->p.den;
+                    if (L->SRCmap[it->id] + L_bw->SRCmap[it->id] >= den) { candidate_cost -= (*SRCDuals)[it->id]; }
+                }
+            })
+
             // Early exit based on candidate cost
             if ((S != Stage::Enumerate && candidate_cost >= pbest->cost) ||
                 (S == Stage::Enumerate && candidate_cost >= gap)) {
                 continue;
             }
 
-            // Compute and store the new label
+            // Compute and store new label
             pbest = compute_label<S>(L, L_bw);
             merged_labels.push_back(pbest);
         }
 
-        // Add unvisited neighboring buckets to the stack (vector back)
+        // Process neighbors with optimized bit operations
         for (int b_prime : Phi_bw[current_bucket]) {
-            const size_t segment_prime      = b_prime >> 6;
-            const size_t bit_position_prime = b_prime & 63;
-            if (!(Bvisited[segment_prime] & (1ULL << bit_position_prime))) {
-                bucket_stack.push_back(b_prime); // Add to the vector stack
-            }
+            const size_t seg_prime = b_prime >> 6;
+            if (!(Bvisited[seg_prime] & (one << (b_prime & 63)))) { bucket_stack.push_back(b_prime); }
         }
     }
 }

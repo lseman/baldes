@@ -292,28 +292,24 @@ std::pair<bool, bool> LimitedMemoryRank1Cuts::runSeparation(BNBNode *node, std::
 
     // print size of SRCconstraints
     // RUN_OPTIMIZATION(node, 1e-8)
-    (node)->optimize();
-    solution = (node)->extractSolution();
+    GET_SOL(node);
+    //(node)->optimize();
+    // solution = (node)->extractSolution();
+    // solution = (node)->ipSolver->getPrimals();
+
     size_t i = 0;
     std::for_each(allPaths.begin(), allPaths.end(), [&](auto &path) { path.frac_x = solution[i++]; });
 
-    // separateR1C1(matrix.A_sparse, solution);
+    separateR1C1(matrix.A_sparse, solution);
     separate(matrix.A_sparse, solution);
-    //prepare45Heuristic(matrix.A_sparse, solution);
-    //setDistanceMatrix(node->getDistanceMatrix());
-    //the45Heuristic<CutType::FourRow>(matrix.A_sparse, solution);
-    //the45Heuristic<CutType::FiveRow>(matrix.A_sparse, solution);
-
-    // TupleBasedSeparator r1c4(allPaths);
-    // r1c4.separate4R1Cs();
     auto cuts_after_separation = cuts->size();
+    auto multipliers           = generator->map_rank1_multiplier;
 
     // print solution size and allPaths size
     auto processCuts = [&]() {
         // Initialize paths with solution values
-        auto multipliers = generator->map_rank1_multiplier;
-        auto cortes      = generator->getCuts();
-        auto cut_ctr     = 0;
+        auto cortes  = generator->getCuts();
+        auto cut_ctr = 0;
 
         // Process each cut
         for (auto &cut : cortes) {
@@ -352,18 +348,23 @@ std::pair<bool, bool> LimitedMemoryRank1Cuts::runSeparation(BNBNode *node, std::
 
             // Pre-allocate coeffs to allPaths.size()
             std::vector<double> coeffs(allPaths.size(), 0.0);
-            bool                has_coeff = false;
 
-            // Compute coefficients for each path
-            for (size_t i = 0; i < allPaths.size(); ++i) {
-                auto &clients = allPaths[i].route;
-                auto  coeff   = computeLimitedMemoryCoefficient(C, AM, p, clients, order);
-
-                // Check if coefficient is above threshold
-                if (coeff > 1e-3) { has_coeff = true; }
-                coeffs[i] = coeff;
-            }
-
+#if defined(__cpp_lib_parallel_algorithm)
+            std::atomic<bool> has_coeff{false};
+            std::transform(std::execution::par_unseq, allPaths.begin(), allPaths.end(), coeffs.begin(),
+                           [&](const auto &path) {
+                               auto coeff = computeLimitedMemoryCoefficient(C, AM, p, path.route, order);
+                               if (coeff > 1e-3) has_coeff.store(true, std::memory_order_relaxed);
+                               return coeff;
+                           });
+#else
+            bool has_coeff = false;
+            std::transform(allPaths.begin(), allPaths.end(), coeffs.begin(), [&](const auto &path) {
+                auto coeff = computeLimitedMemoryCoefficient(C, AM, p, path.route, order);
+                if (coeff > 1e-3) has_coeff = true;
+                return coeff;
+            });
+#endif
             // Skip adding cut if no coefficients met threshold
             if (!has_coeff) { continue; }
 
@@ -375,7 +376,6 @@ std::pair<bool, bool> LimitedMemoryRank1Cuts::runSeparation(BNBNode *node, std::
         }
         return cut_ctr;
     };
-
 
     if (cuts_before == cuts_after_separation) {
         generator->setNodes(nodes);

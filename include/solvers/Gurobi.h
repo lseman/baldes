@@ -10,7 +10,7 @@ private:
         try {
             env.set(GRB_IntParam_OutputFlag, 0); // Set default parameters, if needed
             // set method
-            //env.set(GRB_IntParam_Method, 2);
+            // env.set(GRB_IntParam_Method, 2);
             // set gurobi multicore
             env.set(GRB_IntParam_Threads, std::thread::hardware_concurrency());
 
@@ -65,7 +65,7 @@ public:
     double getObjVal() const override { return model->get(GRB_DoubleAttr_ObjVal); }
 
     double getDualObjVal() const override { return model->get(GRB_DoubleAttr_ObjBound); }
-    
+
     double getVarValue(int i) const override { return model->getVar(i).get(GRB_DoubleAttr_X); }
 
     double getDualVal(int i) const override { return model->getConstr(i).get(GRB_DoubleAttr_Pi); }
