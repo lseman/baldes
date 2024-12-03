@@ -12,11 +12,11 @@ private:
             // set method
             // env.set(GRB_IntParam_Method, 2);
             // set gurobi multicore
-            env.set(GRB_IntParam_Threads, std::thread::hardware_concurrency());
+            //env.set(GRB_IntParam_Threads, std::thread::hardware_concurrency());
 
             // reduce gurobi tolerance to 1e-4
             // set ConcurrentMethod
-            // env.set(GRB_IntParam_ConcurrentMIP, 3);
+            //env.set(GRB_IntParam_ConcurrentMIP, 3);
         } catch (GRBException &e) {
             std::cerr << "Error code = " << e.getErrorCode() << std::endl;
             std::cerr << e.getMessage() << std::endl;
@@ -93,4 +93,30 @@ public:
         sol.assign(vals, vals + varNumber);
         return sol;
     }
+
+    std::vector<int> getBasicVariableIndices() override {
+        std::vector<int> basicVariableIndices;
+        try {
+            // Get variables and numVars
+            GRBVar *vars    = model->getVars();
+            int     numVars = model->get(GRB_IntAttr_NumVars);
+
+            // Create vector to store basis status for each variable
+            for (int i = 0; i < numVars; i++) {
+                int basisStatus = vars[i].get(GRB_IntAttr_VBasis);
+                // Check if the variable is basic (status == 0)
+                if (basisStatus == 0) {
+                    basicVariableIndices.push_back(i);
+                }
+            }
+
+            delete[] vars; // Clean up allocated memory
+        } catch (GRBException &e) {
+            std::cout << "Error code = " << e.getErrorCode() << std::endl;
+            std::cout << e.getMessage() << std::endl;
+        }
+
+        return basicVariableIndices;
+    }
+
 };

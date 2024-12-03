@@ -14,6 +14,12 @@
 
 #include "ankerl/unordered_dense.h"
 
+struct ReducedCostResult {
+    double           value;
+    int              column_index;
+    std::vector<int> col;
+};
+
 struct BucketOptions {
     int depot         = 0;
     int end_depot     = N_SIZE - 1;
@@ -370,11 +376,9 @@ inline double roundToTwoDecimalPlaces(double value) { return std::round(value * 
 #endif
 
 #ifdef IPM
-#define GET_SOL(node)                  \
-    solution = (node)->ipSolver->getPrimals();
+#define GET_SOL(node) solution = (node)->ipSolver->getPrimals();
 #else
-#define GET_SOL(node) \
-    solution = (node)->extractSolution();
+#define GET_SOL(node) solution = (node)->extractSolution();
 #endif
 
 #ifdef SRC

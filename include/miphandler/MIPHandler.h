@@ -189,7 +189,8 @@ public:
         return clone;
     }
 
-    std::vector<int> reduceByRC(const std::vector<double> &dual_solution, double keep_percentage = 0.7) {
+    std::vector<int> reduceByRC(const std::vector<double> &dual_solution, const std::vector<int> &basic,
+                                double keep_percentage = 0.7) {
         if (keep_percentage <= 0.0 || keep_percentage > 1.0) {
             throw std::invalid_argument("keep_percentage must be between 0 and 1");
         }
@@ -209,7 +210,12 @@ public:
 
         // Create a set of indices to remove (the bottom 30%)
         ankerl::unordered_dense::set<int> indices_to_remove;
-        for (size_t i = keep_count; i < rc_pairs.size(); i++) { indices_to_remove.insert(rc_pairs[i].second); }
+        for (size_t i = keep_count; i < rc_pairs.size(); i++) {
+            int var_index = rc_pairs[i].second;
+            // Skip variables that are in the basic set
+            if (std::find(basic.begin(), basic.end(), var_index) != basic.end()) { continue; }
+            indices_to_remove.insert(var_index);
+        }
 
         // Remove variables from highest index to lowest to maintain validity of remaining indices
         std::vector<int> sorted_indices(indices_to_remove.begin(), indices_to_remove.end());
@@ -218,7 +224,7 @@ public:
         // Delete variables
         for (int idx : sorted_indices) { delete_variable(idx); }
 
-        // redo var_name_to_index
+        // Rebuild var_name_to_index
         for (int i = 0; i < variables.size(); ++i) { var_name_to_index[variables[i]->get_name()] = i; }
 
         return sorted_indices;
@@ -722,6 +728,64 @@ public:
         // For minimization problems:
         // Reduced Cost = objective_coefficient - sum(dual_values * coefficients)
         return obj_coeff - dual_sum;
+    }
+
+    std::vector<double> getAllReducedCosts(const std::vector<double> &dual_solution) {
+        // Initialize reduced costs with objective coefficients
+        std::vector<double> reduced_costs(variables.size());
+        for (size_t i = 0; i < variables.size(); ++i) { reduced_costs[i] = variables[i]->get_objective_coefficient(); }
+
+        // Subtract the dual contributions in one pass through the sparse matrix
+        for (size_t i = 0; i < sparse_matrix.rows.size(); ++i) {
+            int    col   = sparse_matrix.cols[i];
+            int    row   = sparse_matrix.rows[i];
+            double value = sparse_matrix.values[i];
+
+            // Subtract dual_value * coefficient from the corresponding reduced cost
+            reduced_costs[col] -= dual_solution[row] * value;
+        }
+
+        return reduced_costs;
+    }
+
+    ReducedCostResult getMostViolatingReducedCost(const std::vector<double> &dual_solution,
+                                                  bool                       is_minimization = true) {
+        std::vector<double> reduced_costs = getAllReducedCosts(dual_solution);
+
+        ReducedCostResult result{0.0, -1};
+
+        // For initialization
+        if (!reduced_costs.empty()) {
+            result.value        = reduced_costs[0];
+            result.column_index = 0;
+        }
+
+        // Find the most violating reduced cost based on optimization direction
+        for (size_t i = 1; i < reduced_costs.size(); ++i) {
+            if (is_minimization) {
+                // For minimization, we want the most negative reduced cost
+                if (reduced_costs[i] < result.value) {
+                    result.value        = reduced_costs[i];
+                    result.column_index = i;
+                }
+            } else {
+                // For maximization, we want the most positive reduced cost
+                if (reduced_costs[i] > result.value) {
+                    result.value        = reduced_costs[i];
+                    result.column_index = i;
+                }
+            }
+        }
+
+        std::vector<int> col;
+        col.assign(b_vec.size(), 0);
+        // iterate over sparse matrix at column_index col and populate the col vector
+        for (size_t i = 0; i < sparse_matrix.rows.size(); ++i) {
+            if (sparse_matrix.cols[i] == result.column_index) { col[sparse_matrix.rows[i]] = sparse_matrix.values[i]; }
+        }
+        result.col = col;
+
+        return result;
     }
 
     std::vector<double> get_c() const {

@@ -163,248 +163,86 @@ public:
         const int min_tasks_per_thread = 32;
         const int chunk_size           = std::max(size / (hardware_threads * min_tasks_per_thread), StorageIndex(1));
 
-        auto bulk_sender =
-            stdexec::bulk(stdexec::just(), (size + chunk_size - 1) / chunk_size,
-                          [this, &y, &pattern, &tags, Lp, Li, Lx, size, &ap, &ok, chunk_size](std::size_t chunk_idx) {
-                              const size_t start_k = chunk_idx * chunk_size;
-                              const size_t end_k   = std::min(start_k + chunk_size, size_t(size));
+        using simd_vec           = std::experimental::native_simd<double>; // adjust type as needed
+        constexpr int simd_width = simd_vec::size();
 
-                              std::vector<Scalar> y_local(size, Scalar(0));
+        auto bulk_sender = stdexec::bulk(
+            stdexec::just(), (size + chunk_size - 1) / chunk_size,
+            [this, &y, &pattern, &tags, Lp, Li, Lx, size, &ap, &ok, chunk_size, simd_width](std::size_t chunk_idx) {
+                const size_t start_k = chunk_idx * chunk_size;
+                const size_t end_k   = std::min(start_k + chunk_size, size_t(size));
 
-                              for (size_t k = start_k; k < end_k && ok; ++k) {
-                                  StorageIndex top    = size;
-                                  tags[k]             = k;
-                                  m_nonZerosPerCol[k] = 0;
+                std::vector<Scalar> y_local(size, Scalar(0));
 
-                                  // Process column k using local buffer
-                                  for (typename CholMatrixType::InnerIterator it(ap, k); it; ++it) {
-                                      StorageIndex i = it.index();
-                                      if (i <= k) {
-                                          y_local[i] += getSymm(it.value());
+                for (size_t k = start_k; k < end_k && ok; ++k) {
+                    StorageIndex top    = size;
+                    tags[k]             = k;
+                    m_nonZerosPerCol[k] = 0;
 
-                                          StorageIndex len = 0;
-                                          for (; tags[i] != k; i = m_parent[i]) {
-                                              pattern[len++] = i;
-                                              tags[i]        = k;
-                                          }
-                                          while (len > 0) pattern[--top] = pattern[--len];
-                                      }
-                                  }
+                    // Process column k using local buffer
+                    for (typename CholMatrixType::InnerIterator it(ap, k); it; ++it) {
+                        StorageIndex i = it.index();
+                        if (i <= k) {
+                            y_local[i] += getSymm(it.value());
 
-                                  DiagonalScalar d = getDiag(y_local[k]) * m_shiftScale + m_shiftOffset;
-                                  y_local[k]       = Scalar(0);
+                            StorageIndex len = 0;
+                            for (; tags[i] != k; i = m_parent[i]) {
+                                pattern[len++] = i;
+                                tags[i]        = k;
+                            }
+                            while (len > 0) pattern[--top] = pattern[--len];
+                        }
+                    }
 
-                                  for (; top < size; ++top) {
-                                      const StorageIndex i  = pattern[top];
-                                      const Scalar       yi = y_local[i];
-                                      y_local[i]            = Scalar(0);
+                    DiagonalScalar d = getDiag(y_local[k]) * m_shiftScale + m_shiftOffset;
+                    y_local[k]       = Scalar(0);
 
-                                      const Scalar       l_ki = yi / getDiag(m_diag[i]);
-                                      const StorageIndex p2   = Lp[i] + m_nonZerosPerCol[i];
+                    for (; top < size; ++top) {
+                        const StorageIndex i  = pattern[top];
+                        const Scalar       yi = y_local[i];
+                        y_local[i]            = Scalar(0);
 
-// Vectorized sparse update
-#pragma omp simd
-                                      for (StorageIndex p = Lp[i]; p < p2; ++p) {
-                                          y_local[Li[p]] -= getSymm(Lx[p]) * yi;
-                                      }
+                        const Scalar       l_ki = yi / getDiag(m_diag[i]);
+                        const StorageIndex p2   = Lp[i] + m_nonZerosPerCol[i];
 
-                                      d -= getDiag(l_ki * getSymm(yi));
-                                      Li[p2] = k;
-                                      Lx[p2] = l_ki;
-                                      ++m_nonZerosPerCol[i];
-                                  }
+                        // Vectorized sparse update
+                        for (StorageIndex p = Lp[i]; p < p2; p += simd_width) {
+                            const int remaining = std::min(simd_width, static_cast<int>(p2 - p));
+                            if (remaining < simd_width) {
+                                // Handle remaining elements sequentially
+                                for (int k = 0; k < remaining; ++k) { y_local[Li[p + k]] -= getSymm(Lx[p + k]) * yi; }
+                            } else {
+                                // SIMD processing
+                                simd_vec lx_vec, indices_vec;
+                                for (int k = 0; k < simd_width; ++k) {
+                                    lx_vec[k]      = getSymm(Lx[p + k]);
+                                    indices_vec[k] = Li[p + k];
+                                }
+                                auto result = lx_vec * simd_vec(yi);
+                                for (int k = 0; k < simd_width; ++k) { y_local[indices_vec[k]] -= result[k]; }
+                            }
+                        }
 
-                                  // Atomic write to diagonal
-                                  m_diag[k] = d;
-                                  if (d == RealScalar(0)) {
-                                      ok.store(false, std::memory_order_relaxed);
-                                      break;
-                                  }
-                              }
-                          });
+                        d -= getDiag(l_ki * getSymm(yi));
+                        Li[p2] = k;
+                        Lx[p2] = l_ki;
+                        ++m_nonZerosPerCol[i];
+                    }
+
+                    // Atomic write to diagonal
+                    m_diag[k] = d;
+                    if (d == RealScalar(0)) {
+                        ok.store(false, std::memory_order_relaxed);
+                        break;
+                    }
+                }
+            });
 
         stdexec::sync_wait(stdexec::when_all(bulk_sender));
         m_info              = ok ? Success : NumericalIssue;
         m_factorizationIsOk = true;
     }
-    /*
-        template <typename Lhs, typename Rhs, int Mode, bool IsLower, bool IsRowMajor>
-        struct SparseSolveTriangular {
-            typedef typename Rhs::Scalar                                    Scalar;
-            typedef Eigen::internal::evaluator<Lhs>                         LhsEval;
-            typedef typename Eigen::internal::evaluator<Lhs>::InnerIterator LhsIterator;
-            typedef typename Lhs::Index                                     Index;
 
-            template <typename Scalar>
-            static typename std::enable_if<std::is_floating_point<Scalar>::value, bool>::type
-            is_exactly_zero(Scalar value) {
-                return std::abs(value) < std::numeric_limits<Scalar>::epsilon();
-            }
-
-            template <typename Scalar>
-            static typename std::enable_if<std::is_integral<Scalar>::value, bool>::type is_exactly_zero(Scalar value) {
-                return value == Scalar(0);
-            }
-
-            // Adding parallelism using stdexec for task execution
-            static void run(const Lhs &lhs, Rhs &other, Scalar regularizationFactor) {
-                LhsEval lhsEval(lhs);
-
-                std::mutex other_mutex;
-
-                // Iterate over columns sequentially (because of dependencies)
-                for (Index col = 0; col < other.cols(); ++col) {
-                    if constexpr (IsRowMajor) {
-                        if constexpr (IsLower) {
-                            for (Index i = 0; i < lhs.rows(); ++i) {
-                                Scalar tmp       = other.coeff(i, col);
-                                Scalar lastVal   = 0;
-                                Index  lastIndex = 0;
-
-                                // Sequentially process LHS values up to the diagonal
-                                for (LhsIterator it(lhsEval, i); it; ++it) {
-                                    lastVal   = it.value();
-                                    lastIndex = it.index();
-                                    if (lastIndex == i) break; // Stop at the diagonal
-                                    tmp -= lastVal * other.coeff(lastIndex, col);
-                                }
-
-                                // Create a list of tasks for the remaining operations (after the diagonal)
-                                std::vector<LhsIterator> inner_tasks;
-                                for (LhsIterator it(lhsEval, i); it; ++it) {
-                                    inner_tasks.push_back(it); // Push remaining tasks after diagonal
-                                }
-
-                                // Execute the remaining operations in parallel using stdexec
-                                auto bulk_sender = stdexec::bulk(
-                                    stdexec::just(), inner_tasks.size(),
-                                    [&inner_tasks, &tmp, &other, &lastVal, &lastIndex, &col](std::size_t idx) {
-                                        LhsIterator it = inner_tasks[idx];
-                                        lastVal        = it.value();
-                                        lastIndex      = it.index();
-                                        if (lastIndex != i) { tmp -= lastVal * other.coeff(lastIndex, col); }
-                                    });
-
-                                stdexec::sync_wait(bulk_sender); // Ensure parallel tasks complete
-
-                                // Apply regularization and update result
-                                std::lock_guard<std::mutex> lock(other_mutex);
-                                if (Mode & Eigen::UnitDiag) {
-                                    other.coeffRef(i, col) = tmp;
-                                } else {
-                                    if (std::abs(lastVal) < regularizationFactor) {
-                                        lastVal = (lastVal >= 0 ? regularizationFactor : -regularizationFactor);
-                                    }
-                                    other.coeffRef(i, col) = tmp / lastVal;
-                                }
-                            }
-                        } else { // Upper triangular, row-major case
-                            for (Index i = lhs.rows() - 1; i >= 0; --i) {
-                                Scalar tmp  = other.coeff(i, col);
-                                Scalar l_ii = 0;
-
-                                LhsIterator it(lhsEval, i);
-
-                                // Process the diagonal element sequentially
-                                while (it && it.index() < i) ++it;
-                                if (!(Mode & Eigen::UnitDiag)) {
-                                    eigen_assert(it && it.index() == i);
-                                    l_ii = it.value(); // Update l_ii
-                                    ++it;
-                                } else if (it && it.index() == i) {
-                                    ++it;
-                                }
-
-                                // Parallelize the remaining operations
-                                std::vector<LhsIterator> inner_tasks;
-                                for (; it; ++it) { inner_tasks.push_back(it); }
-
-                                auto bulk_sender = stdexec::bulk(stdexec::just(), inner_tasks.size(),
-                                                                 [&inner_tasks, &tmp, &other, &col](std::size_t idx) {
-                                                                     LhsIterator it = inner_tasks[idx];
-                                                                     tmp -= it.value() * other.coeff(it.index(), col);
-                                                                 });
-
-                                stdexec::sync_wait(bulk_sender); // Ensure parallel tasks complete
-
-                                // Lock the mutex before updating shared memory (i.e., the other matrix)
-                                std::lock_guard<std::mutex> lock(other_mutex);
-                                if (Mode & Eigen::UnitDiag) {
-                                    other.coeffRef(i, col) = tmp;
-                                } else {
-                                    if (std::abs(l_ii) < regularizationFactor) {
-                                        l_ii = (l_ii >= 0 ? regularizationFactor : -regularizationFactor);
-                                    }
-                                    other.coeffRef(i, col) = tmp / l_ii;
-                                }
-                            }
-                        }
-                    } else { // Column-major case
-                        if constexpr (IsLower) {
-                            for (Index i = 0; i < lhs.cols(); ++i) {
-                                Scalar &tmp = other.coeffRef(i, col);
-                                if (!is_exactly_zero(tmp)) {
-                                    LhsIterator it(lhsEval, i);
-                                    // Sequentially process LHS values up to the diagonal
-                                    while (it && it.index() < i) ++it;
-
-                                    if (!(Mode & Eigen::UnitDiag)) {
-                                        constexpr Scalar epsilon = Scalar(1e-12); // Regularization threshold
-                                        tmp /= (std::abs(it.value()) < epsilon) ? it.value() + epsilon : it.value();
-                                    }
-                                    if (it && it.index() == i) ++it;
-
-                                    // Parallelize the remaining operations
-                                    std::vector<LhsIterator> inner_tasks;
-                                    for (; it; ++it) { inner_tasks.push_back(it); }
-
-                                    auto bulk_sender = stdexec::bulk(stdexec::just(), inner_tasks.size(),
-                                                                     [&inner_tasks, &tmp, &other, &col](std::size_t idx)
-       { LhsIterator it = inner_tasks[idx]; other.coeffRef(it.index(), col) -= tmp * it.value();
-                                                                     });
-
-                                    stdexec::sync_wait(bulk_sender); // Ensure parallel tasks complete
-                                }
-                            }
-                        } else { // Upper triangular, column-major case
-                            for (Index i = lhs.cols() - 1; i >= 0; --i) {
-                                Scalar &tmp = other.coeffRef(i, col);
-                                if (!is_exactly_zero(tmp)) {
-                                    LhsIterator it(lhsEval, i);
-                                    // Sequentially process LHS values up to the diagonal
-                                    if (!(Mode & Eigen::UnitDiag)) {
-                                        constexpr Scalar epsilon = Scalar(1e-12); // Regularization threshold
-                                        while (it && it.index() != i) ++it;
-                                        tmp /= (std::abs(it.value()) < epsilon) ? it.value() + epsilon : it.value();
-                                    }
-
-                                    // Parallelize the remaining operations
-                                    std::vector<LhsIterator> inner_tasks;
-                                    for (; it && it.index() < i; ++it) { inner_tasks.push_back(it); }
-
-                                    auto bulk_sender = stdexec::bulk(stdexec::just(), inner_tasks.size(),
-                                                                     [&inner_tasks, &tmp, &other, &col](std::size_t idx)
-       { LhsIterator it = inner_tasks[idx]; other.coeffRef(it.index(), col) -= tmp * it.value();
-                                                                     });
-
-                                    stdexec::sync_wait(bulk_sender); // Ensure parallel tasks complete
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        };
-
-        // Dispatch to the correct specialization
-        template <typename Lhs, typename Rhs, int Mode>
-        void solveTriangular(const Lhs &lhs, Rhs &other, typename Lhs::Scalar regularizationFactor) const {
-            constexpr bool isLower    = (Mode & Eigen::Lower) != 0;
-            constexpr bool isRowMajor = (int(Lhs::Flags) & Eigen::RowMajorBit) != 0;
-
-            SparseSolveTriangular<Lhs, Rhs, Mode, isLower, isRowMajor>::run(lhs, other, regularizationFactor);
-        }
-    */
     template <int SrcMode_, int DstMode_, bool NonHermitian, typename MatrixType, int DstOrder>
     void
     permute_symm_to_symm(const MatrixType                                                                       &mat,
@@ -592,6 +430,7 @@ public:
         // Ordering_ ordering;
         CholMatrixType symm;
         internal::ordering_helper_at_plus_a(C, symm);
+        //(symm, m_Pinv);
         internal::minimum_degree_ordering(symm, m_Pinv);
 
         // if (m_Pinv.size() > 0)

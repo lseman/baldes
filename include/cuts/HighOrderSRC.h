@@ -29,7 +29,6 @@ using cutLong                                                   = yzzLong;
 constexpr double tolerance                                      = 1e-6;
 constexpr int    max_row_rank1                                  = 5;
 constexpr int    max_heuristic_initial_seed_set_size_row_rank1c = 6;
-constexpr int    max_heuristic_sep_mem4_row_rank1               = 10;
 
 constexpr int    max_num_r1c_per_round = 20;
 constexpr double cut_vio_factor        = 0.1;
@@ -53,37 +52,10 @@ struct Rank1MultiLabel {
     Rank1MultiLabel() = default;
 };
 
-// Replace the current cache with a lock-free version
-struct alignas(64) CacheEntry { // Align to cache line
-    std::atomic<uint64_t>         version{0};
-    std::vector<std::vector<int>> data;
-};
-
-class LockFreeCache {
-    static constexpr size_t            CACHE_SIZE = 4096; // Must be power of 2
-    std::array<CacheEntry, CACHE_SIZE> entries;
-    std::hash<cutLong>                 hasher;
-
-public:
-    bool try_get(const cutLong &key, std::vector<std::vector<int>> &result) {
-        size_t   idx     = hasher(key) & (CACHE_SIZE - 1);
-        uint64_t version = entries[idx].version.load(std::memory_order_acquire);
-        if (version == 0) return false;
-
-        result = entries[idx].data; // Copy while data is consistent
-        return entries[idx].version.load(std::memory_order_acquire) == version;
-    }
-
-    void update(const cutLong &key, const std::vector<std::vector<int>> &value) {
-        size_t   idx      = hasher(key) & (CACHE_SIZE - 1);
-        uint64_t version  = entries[idx].version.load(std::memory_order_relaxed) + 1;
-        entries[idx].data = value;
-        entries[idx].version.store(version, std::memory_order_release);
-    }
-};
-
 class HighDimCutsGenerator {
 public:
+    int max_heuristic_sep_mem4_row_rank1 = 8;
+
     double max_cut_mem_factor = 0.15;
 
     template <typename T, std::size_t Alignment = 32>
