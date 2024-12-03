@@ -575,6 +575,9 @@ public:
     }
 
     void updateNumK(int numK) { this->numK = numK; }
+
+    // Multi-point stab
+    
     // Main hybrid stabilization method combining directional and multi-point
     DualSolution getHybridStabDualSol(const DualSolution &input_duals) {
         try {
