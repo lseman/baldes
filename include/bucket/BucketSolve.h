@@ -117,8 +117,8 @@ inline std::vector<Label *> BucketGraph::solve(bool trigger) {
         paths = bi_labeling_algorithm<Stage::Four>();
         // inner_obj = paths[0]->cost;
 
-        auto rollback = updateStepSize(); // Update the step size for the bucket graph
-        // auto rollback = false;
+        // auto rollback = updateStepSize(); // Update the step size for the bucket graph
+        auto rollback = false;
         //  auto rollback = false;
         if (rollback) {
             //    s4     = false; // Rollback to Stage 3 if necessary
@@ -534,9 +534,9 @@ std::vector<Label *> BucketGraph::bi_labeling_algorithm() {
                 // Iterate over the returned Label** array and add each valid label to the vector
                 for (auto L_prime : extended_labels) {
                     // auto L_prime = *label_ptr; // Get the current label from the array
-                    if (L_prime->resources[options.main_resources[0]] <= q_star[options.main_resources[0]]) {
-                        continue; // Skip if the label exceeds q_star
-                    }
+                    // if (L_prime->resources[options.main_resources[0]] <= q_star[options.main_resources[0]]) {
+                    //    continue; // Skip if the label exceeds q_star
+                    //}
 
                     // Get the bucket for the extended label
                     auto b_prime = L_prime->vertex;
@@ -833,8 +833,8 @@ BucketGraph::Extend(const std::conditional_t<M == Mutability::Mut, Label *, cons
             for (size_t i = 0; i < cut_size; ++i) { total_cost_update += process_cut(i); }
         } else {
 #if defined(__cpp_lib_parallel_algorithm)
-            total_cost_update = std::transform_reduce(std::execution::par_unseq,std::begin(indices), std::end(indices), 0.0,
-                                                      std::plus<>(), process_cut);
+            total_cost_update = std::transform_reduce(std::execution::par_unseq, std::begin(indices), std::end(indices),
+                                                      0.0, std::plus<>(), process_cut);
 #else
             total_cost_update =
                 std::transform_reduce(std::begin(indices), std::end(indices), 0.0, std::plus<>(), process_cut);

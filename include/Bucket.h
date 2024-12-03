@@ -137,22 +137,45 @@ struct Bucket {
         return dominance_found;
     }
 
-    static constexpr double min_split_range = 0.5; // Define a threshold for minimum range to split
-    void                    split_into_sub_buckets(size_t /*num_sub_buckets*/) noexcept {
+    double min_split_range = 0.5;
+    void   split_into_sub_buckets() noexcept {
+        if (labels_vec.empty()) return;
+
+        // If range is too small, don't split
         double total_range = ub[0] - lb[0];
         if (total_range < min_split_range) return;
 
-        is_split        = true;
-        double midpoint = roundToTwoDecimalPlaces(lb[0] + total_range / 2.0);
+        if (is_split) return;
+        
+
+        // Sort labels by their values
+        std::vector<double> label_values;
+        label_values.reserve(labels_vec.size());
+        if (label_values.empty()) { return; }
+
+        is_split = true;
+        for (const auto *label : labels_vec) { label_values.push_back(label->resources[0]); }
+        std::sort(label_values.begin(), label_values.end());
+
+        // Find median value
+        size_t mid_idx = label_values.size() / 2;
+        double midpoint;
+        if (label_values.size() % 2 == 0) {
+            // If even number of labels, take average of middle two
+            midpoint = roundToTwoDecimalPlaces((label_values[mid_idx - 1] + label_values[mid_idx]) / 2.0);
+        } else {
+            // If odd number of labels, take middle value
+            midpoint = roundToTwoDecimalPlaces(label_values[mid_idx]);
+        }
+
+        // Ensure midpoint is within bucket bounds
+        midpoint = std::max(midpoint, lb[0]);
+        midpoint = std::min(midpoint, ub[0]);
 
         sub_buckets.clear();
         sub_buckets.reserve(2);
 
-        // if (depth >= 4) {
-        // print_info("Warning: Bucket split depth reached maximum limit\n");
-        // return;
-        // }
-
+        // Create first sub-bucket
         Bucket first_sub_bucket;
         first_sub_bucket.node_id = node_id;
         first_sub_bucket.lb      = {roundToTwoDecimalPlaces(lb[0])};
@@ -160,6 +183,7 @@ struct Bucket {
         first_sub_bucket.depth   = depth + 1;
         sub_buckets.push_back(first_sub_bucket);
 
+        // Create second sub-bucket
         Bucket second_sub_bucket;
         second_sub_bucket.node_id = node_id;
         second_sub_bucket.lb      = {midpoint};
@@ -167,11 +191,10 @@ struct Bucket {
         second_sub_bucket.depth   = depth + 1;
         sub_buckets.push_back(second_sub_bucket);
 
+        // Assign labels to sub-buckets
         for (auto *label : labels_vec) { assign_label_to_sub_bucket(label); }
-
         labels_vec.clear();
     }
-
     void sort() {
         pdqsort(labels_vec.begin(), labels_vec.end(), [](const Label *a, const Label *b) { return a->cost < b->cost; });
     }
@@ -276,7 +299,7 @@ struct Bucket {
         }
 
         labels_vec.push_back(label);
-        if (labels_vec.size() >= BUCKET_CAPACITY) { split_into_sub_buckets(2); }
+        if (labels_vec.size() >= BUCKET_CAPACITY) { split_into_sub_buckets(); }
     }
 
     void add_sorted_label(Label *label) noexcept {
@@ -300,7 +323,7 @@ struct Bucket {
             labels_vec.insert(it, label);
         }
 
-        if (!is_split && labels_vec.size() >= BUCKET_CAPACITY) { split_into_sub_buckets(2); }
+        if (!is_split && labels_vec.size() >= BUCKET_CAPACITY) { split_into_sub_buckets(); }
     }
 
     bool is_contained(const Label *label) {

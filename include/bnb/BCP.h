@@ -200,7 +200,7 @@ public:
             // pathSet.insert(path);
 
             counter += 1;
-            if (counter > 9) break;
+            if (counter > N_ADD - 1) break;
 
             std::fill(coluna.begin(), coluna.end(), 0.0); // Reset the coefficients
 
@@ -452,7 +452,7 @@ public:
         auto &branchingDuals = node->branchingDuals;
         RCC_MODE_BLOCK(auto &rccManager = node->rccManager;)
 
-        int bucket_interval = 30;
+        int bucket_interval = 25;
         int time_horizon    = instance.T_max;
         // if (problemType == ProblemType::cvrp) { time_horizon = 50000; }
         numConstrs                = node->getIntAttr("NumConstrs");
@@ -509,11 +509,11 @@ public:
 
         auto                 inner_obj = 0.0;
         std::vector<Label *> paths;
-        std::vector<double>  solution;
-        bool                 can_add = true;
+        std::vector<double>  solution = node->extractSolution();
+        bool                 can_add  = true;
 
 #ifdef STAB
-        Stabilization stab(0.9, nodeDuals);
+        Stabilization stab(0.5, nodeDuals);
 #endif
 
 #ifdef RIH
@@ -531,6 +531,7 @@ public:
         bool        TRstop = false;
         TrustRegion tr(numConstrs);
         tr.setup(node, nodeDuals);
+        solution = node->extractSolution();
         double v = 0;
 #endif
 
@@ -617,15 +618,16 @@ public:
 #endif
 
 #ifdef IPM
-            double d          = 1;
+            double d          = 10;
             matrix            = node->extractModelDataSparse();
             double obj_change = std::abs(lp_obj - lp_obj_old);
             // fmt::print("Objective change: {}\n", obj_change);
             // double adaptive_factor = std::min(1.0, std::max(1e-4, obj_change / std::abs(lp_obj + 1e-6)));
             // fmt::print("Adaptive factor: {}\n", adaptive_factor);
+            int numK = std::ceil(std::accumulate(solution.begin(), solution.end(), 0.0));
 
             // Compute gap based on current objective difference and adaptive factor
-            gap = std::abs(lp_obj - (lp_obj + std::min(0.0, inner_obj))) / std::abs(lp_obj + 1e-6);
+            gap = std::abs(lp_obj - (lp_obj + numK * inner_obj)) / std::abs(lp_obj + 1e-6);
             gap = (gap / d);
             // fmt::print("Gap: {}\n", gap);
 
@@ -642,34 +644,58 @@ public:
             // print origin duals size
             for (auto &dual : nodeDuals) { dual = -dual; }
 
+            /*
+                        if (iter > 1 && iter % 50 == 0 && stage != 4) {
+                            auto toRemoveIndices = node->mip.reduceByRC(nodeDuals, 0.95);
+                            matrix               = node->extractModelDataSparse();
+
+                            for (auto &index : toRemoveIndices) {
+                                // remove index from allPaths
+                                allPaths.erase(allPaths.begin() + index);
+                            }
+                            node->ipSolver->run_optimization(matrix, gap);
+                            //lp_obj_old  = lp_obj;
+                            //lp_obj      = node->ipSolver->getObjective();
+                            solution    = node->ipSolver->getPrimals();
+                            //nodeDuals   = node->ipSolver->getDuals();
+                            //originDuals = nodeDuals;
+                            //for (auto &dual : nodeDuals) { dual = -dual; }
+                        }
+            */
+            // lag_gap           = integer_solution - (lp_obj + std::min(0.0, inner_obj));
+#endif
+#ifndef IPM
+            nodeDuals        = node->getDuals();
+            auto originDuals = nodeDuals;
+#endif
+
 /*
-            if (iter > 1 && iter % 50 == 0 && stage != 4) {
-                auto toRemoveIndices = node->mip.reduceByRC(nodeDuals, 0.95);
+#ifdef GUROBI
+            if (iter > 1 && iter % 50 == 0) {
+                auto basic = node->getBasicVariableIndices();
+                auto toRemoveIndices = node->mip.reduceByRC(nodeDuals, basic, 0.9);
                 matrix               = node->extractModelDataSparse();
 
                 for (auto &index : toRemoveIndices) {
                     // remove index from allPaths
                     allPaths.erase(allPaths.begin() + index);
                 }
-                node->ipSolver->run_optimization(matrix, gap);
-                //lp_obj_old  = lp_obj;
-                //lp_obj      = node->ipSolver->getObjective();
-                solution    = node->ipSolver->getPrimals();
-                //nodeDuals   = node->ipSolver->getDuals();
-                //originDuals = nodeDuals;
-                //for (auto &dual : nodeDuals) { dual = -dual; }
+                node->optimize();
+                solution = node->extractSolution();
+                nodeDuals = node->getDuals();
             }
+#endif
 */
-            lag_gap           = integer_solution - (lp_obj + std::min(0.0, inner_obj));
-            bucket_graph->gap = lag_gap;
-#endif
-#ifndef IPM
-            nodeDuals        = node->getDuals();
-            auto originDuals = nodeDuals;
-#endif
 #ifdef STAB
+            // define numK as the number of non-zero vars in solution
+            int    numK       = std::ceil(std::accumulate(solution.begin(), solution.end(), 0.0));
+            double newBound   = lp_obj + numK * inner_obj;
+            lag_gap           = integer_solution - newBound;
+            bucket_graph->gap = lag_gap;
+            stab.set_pseudo_dual_bound(newBound);
+            stab.updateNumK(numK);
             stab.update_stabilization_after_master_optim(nodeDuals);
-            nodeDuals = stab.getStabDualSolAdvanced(nodeDuals);
+            nodeDuals = stab.getHybridStabDualSol(nodeDuals);
 
             misprice = true;
             while (misprice) {
@@ -709,7 +735,7 @@ public:
 
                     // Enforce upper and lower bounds on gap
                     if (std::isnan(gap) || std::signbit(gap)) { gap = 1e-1; }
-                    gap = std::clamp(gap, 1e-10, 1e-1);
+                    gap = std::clamp(gap, 1e-8, 1e-1);
 
                     // Run optimization and adjust duals
                     ipm_solver.run_optimization(matrix, gap);
@@ -718,8 +744,7 @@ public:
                 };
 
                 adaptive_threshold = std::max(20, base_threshold + iter / 100); // Adapt with total iterations
-
-                if (std::abs(lp_obj - lp_obj_old) < 0.1) {
+                if (std::abs(lp_obj - lp_obj_old) < 1) {
                     iter_non_improv += 1;
                     if (iter_non_improv > adaptive_threshold) {
                         print_info("No improvement in the last iterations, running IPM\n");
@@ -797,7 +822,7 @@ public:
 #ifdef STAB
 
                 // auto pseudo_bound = stab.compute_pseudo_dual_bound(matrix, nodeDuals, paths);
-                lag_gap = integer_solution - (lp_obj + std::min(0.0, inner_obj));
+                lag_gap = integer_solution - (lp_obj + numK * inner_obj);
                 auto d  = 50;
 #ifdef HIGHS
                 gap = std::abs(lp_obj - (lp_obj + std::min(0.0, inner_obj))) / std::abs(lp_obj);
@@ -808,18 +833,23 @@ public:
 #endif
                 // fmt::print("Gap: {}\n", gap);
                 node->optimize(gap);
-                lp_obj    = node->getObjVal();
-                nodeDuals = node->getDuals();
+                lp_obj_old = lp_obj;
+                lp_obj     = node->getObjVal();
+                nodeDuals  = node->getDuals();
 
-                bucket_graph->gap = lag_gap;
+                // auto RC = node->mip.getMostViolatingReducedCost(nodeDuals);
 
-                matrix = node->extractModelDataSparse();
+                bucket_graph->gap = lp_obj + numK * inner_obj;
+
+                matrix      = node->extractModelDataSparse();
+                stab.lp_obj = lp_obj;
+                // stab.rc     = RC;
 
                 stab.update_stabilization_after_pricing_optim(matrix, nodeDuals, lag_gap, paths);
                 if (stab.shouldExit()) { misprice = false; }
                 if (colAdded == 0) {
                     stab.update_stabilization_after_misprice();
-                    nodeDuals = stab.getStabDualSol(nodeDuals);
+                    nodeDuals = stab.getStabDualSolAdvanced(nodeDuals);
                 } else {
                     misprice = false;
                 }

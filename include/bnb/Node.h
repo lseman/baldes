@@ -161,9 +161,7 @@ public:
 
     std::vector<BNBNode *> getChildren() { return children; }
 
-    std::vector<std::vector<double>> getDistanceMatrix() {
-        return instance.getDistanceMatrix();
-    }
+    std::vector<std::vector<double>> getDistanceMatrix() { return instance.getDistanceMatrix(); }
 
     /**
      * Generates a Universally Unique Identifier (UUID) as a string.
@@ -229,7 +227,7 @@ public:
         child->prune = false;
 
         child->SRCconstraints = child->mip.getSRCconstraints();
-        auto RCCconstraints = child->mip.getRCCconstraints();
+        auto RCCconstraints   = child->mip.getRCCconstraints();
 
         child->rccManager->setCutCtrs(RCCconstraints);
 
@@ -489,4 +487,11 @@ public:
         }
         mip.printBranchingbaldesCtr();
     }
+
+#ifdef GUROBI
+    // Assuming model is your GRBModel and obj is your objective sense
+    std::vector<int> getBasicVariableIndices() {
+        return solver->getBasicVariableIndices();
+    }
+#endif
 };

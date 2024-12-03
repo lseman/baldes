@@ -355,6 +355,7 @@ void IPSolver::run_optimization(ModelData &model, const double tol) {
     Eigen::VectorXd lambda = Eigen::VectorXd::Zero(m);
     Eigen::VectorXd s      = Eigen::VectorXd::Ones(n);
 
+/*
     if (x_old.size() > 0 && warm_start) {
         int nv_old = x_old.size(); // Original number of variables
         int nv_new = x.size();     // New number of variables
@@ -364,11 +365,11 @@ void IPSolver::run_optimization(ModelData &model, const double tol) {
         // Copy old values to new positions in x
         // As free variables and slack variables are added, the original variables move down
         // int original_counter          = 0;
-        x.head(nv_old - n_slacks_old) = x_old.head(nv_old - n_slacks_old);
+//        x.head(nv_old - n_slacks_old) = x_old.head(nv_old - n_slacks_old);
 
         lambda.head(N_SIZE - 1) = lambda_old.head(N_SIZE - 1);
     }
-
+*/
     warm_start   = false;
     n_slacks_old = n_slacks;
     // initialize ubi and ubv as empty vectors

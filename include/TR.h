@@ -7,18 +7,19 @@
 
 class TrustRegion {
 public:
-    bool                    isInsideTrustRegion;
-    int                     numConstrs;
-    std::vector<baldesVarPtr > w;
-    std::vector<baldesVarPtr > zeta;
-    std::vector<double>     delta1;
-    std::vector<double>     delta2;
-    int                     epsilon1 = 10;
-    int                     epsilon2 = 10;
-    double                  v        = 100;
-    bool                    TRstop   = false;
-    std::vector<double>     prevDuals;
-    double                  c = 0;
+    bool                      isInsideTrustRegion;
+    int                       numConstrs;
+    std::vector<baldesVarPtr> w;
+    std::vector<baldesVarPtr> zeta;
+    std::vector<double>       delta1;
+    std::vector<double>       delta2;
+    int                       epsilon1 = 10;
+    int                       epsilon2 = 10;
+    double                    v        = 100;
+    bool                      TRstop   = false;
+    std::vector<double>       prevDuals;
+    double                    c     = 0;
+    double                    kappa = 0.9;
 
     TrustRegion(int numConstrs) : numConstrs(numConstrs) {}
 
@@ -29,7 +30,7 @@ public:
         w.resize(numConstrs);
         zeta.resize(numConstrs);
         v = std::accumulate(nodeDuals.begin(), nodeDuals.end(), 0.0) / numConstrs;
-        c = v / 100;
+        c = v / kappa;
         std::vector<int> tr_vars_idx;
         // Create w_i and zeta_i variables for each constraint
         for (int i = 0; i < numConstrs; i++) {
@@ -97,17 +98,17 @@ public:
             }
             for (int i = 0; i < numConstrs; i++) {
                 // Update coefficients for w[i] and zeta[i] in the objective function
-                w[i]->setOBJ(nodeDuals[i]);        // Set w[i]'s coefficient to -delta1
-                zeta[i]->setOBJ(nodeDuals[i] + v); // Set zeta[i]'s coefficient to delta2
-                w[i]->setUB(epsilon1);
-                zeta[i]->setUB(epsilon2);
+                w[i]->setOBJ(std::max(0.0, nodeDuals[i] - v)); // Set w[i]'s coefficient to -delta1
+                zeta[i]->setOBJ(nodeDuals[i] + v);             // Set zeta[i]'s coefficient to delta2
+                w[i]->setUB(new_eps);
+                zeta[i]->setUB(new_eps);
             }
         }
         for (int i = 0; i < numConstrs; i++) {
             delta1[i] = nodeDuals[i] - v / 2;
             delta2[i] = nodeDuals[i] + v / 2;
         }
-        if (v <= 20) {
+        if (v <= 10 || stage == 4) {
             v = 0;
             for (int i = 0; i < w.size(); i++) {
                 node->remove(w[i]);
