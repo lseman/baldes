@@ -1,0 +1,18 @@
+<map id="VRProblem::addPath" name="VRProblem::addPath">
+<area shape="rect" id="Node000001" title=" " alt="" coords="5,104,147,130"/>
+<area shape="rect" id="Node000002" href="$classMIPColumn.html#ade479a0c70a0f077ebdac6c2b5677283" title=" " alt="" coords="246,5,392,31"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="92,101,136,70,194,40,230,28,231,33,196,45,139,75,95,106"/>
+<area shape="rect" id="Node000003" href="$classRCCManager.html#ab8747b8050b74ee4daa2cec75e8a6ab3" title=" " alt="" coords="195,55,443,80"/>
+<area shape="poly" id="edge2_Node000001_Node000003" title=" " alt="" coords="138,101,194,89,232,81,233,86,195,94,139,106"/>
+<area shape="rect" id="Node000004" href="$classRCCManager.html#a28d315c74656a4bfea52a8591b44c26f" title=" " alt="" coords="227,104,411,130"/>
+<area shape="poly" id="edge3_Node000001_Node000004" title=" " alt="" coords="147,114,211,114,211,120,147,120"/>
+<area shape="rect" id="Node000005" href="$classBNBNode.html#a8e9719a49d2b149441b61ee4aa790fa2" title=" " alt="" coords="244,153,394,179"/>
+<area shape="poly" id="edge4_Node000001_Node000005" title=" " alt="" coords="139,128,195,140,233,147,232,152,194,145,138,133"/>
+<area shape="rect" id="Node000007" href="$classBNBNode.html#a04a0757f406626dd8880a5b83b084bed" title=" " alt="" coords="249,203,389,228"/>
+<area shape="poly" id="edge6_Node000001_Node000007" title=" " alt="" coords="95,128,139,159,196,189,234,201,233,206,194,194,136,164,92,132"/>
+<area shape="rect" id="Node000006" href="$classMIPProblem.html#af3061cfe5612892a459913ae8bcaca81" title=" " alt="" coords="491,153,670,179"/>
+<area shape="poly" id="edge5_Node000005_Node000006" title=" " alt="" coords="394,164,475,164,475,169,394,169"/>
+<area shape="poly" id="edge7_Node000007_Node000006" title=" " alt="" coords="389,200,494,180,495,185,390,205"/>
+<area shape="rect" id="Node000008" href="$classMIPProblem.html#a15cf712c50d97736774b35f6ec269db3" title=" " alt="" coords="508,203,653,228"/>
+<area shape="poly" id="edge8_Node000007_Node000008" title=" " alt="" coords="390,213,493,213,493,218,390,218"/>
+</map>

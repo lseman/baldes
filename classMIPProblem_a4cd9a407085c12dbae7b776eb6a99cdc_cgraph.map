@@ -1,0 +1,7 @@
+<map id="MIPProblem::delete_variable" name="MIPProblem::delete_variable">
+<area shape="rect" id="Node000001" title=" " alt="" coords="5,5,140,46"/>
+<area shape="rect" id="Node000002" href="$structSparseMatrix.html#a0258596fb5ba12281547a708a7212126" title=" " alt="" coords="188,5,326,46"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="140,23,172,23,172,28,140,28"/>
+<area shape="rect" id="Node000003" href="$structSparseMatrix.html#ad1a2ceb5c4b1170f4ba4219200066004" title=" " alt="" coords="374,13,559,38"/>
+<area shape="poly" id="edge2_Node000002_Node000003" title=" " alt="" coords="327,23,358,23,358,28,327,28"/>
+</map>

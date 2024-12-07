@@ -1,0 +1,19 @@
+<map id="BNBNode::addBranchingbaldesCtr" name="BNBNode::addBranchingbaldesCtr">
+<area shape="rect" id="Node000001" title=" " alt="" coords="5,164,226,189"/>
+<area shape="rect" id="Node000002" href="$classMIPProblem.html#a38c9f38202c52c5aad1e0a65ac494b7c" title=" " alt="" coords="274,41,458,66"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="133,161,193,120,273,77,292,69,294,74,275,81,196,124,136,165"/>
+<area shape="rect" id="Node000006" href="$classLinearExpression.html#a931036cafcd17fe3553ffd79468da49e" title=" " alt="" coords="292,91,440,131"/>
+<area shape="poly" id="edge5_Node000001_Node000006" title=" " alt="" coords="167,160,276,132,278,137,168,166"/>
+<area shape="rect" id="Node000007" href="$classMIPProblem.html#ae21d64436d178848ddbbbe44f2a3a803" title=" " alt="" coords="288,156,444,197"/>
+<area shape="poly" id="edge6_Node000001_Node000007" title=" " alt="" coords="226,174,272,174,272,179,226,179"/>
+<area shape="rect" id="Node000008" href="$classMIPProblem.html#a855300f7fb9c27b0f2b672707a830347" title=" " alt="" coords="275,221,456,246"/>
+<area shape="poly" id="edge7_Node000001_Node000008" title=" " alt="" coords="176,187,292,214,291,219,174,192"/>
+<area shape="rect" id="Node000009" href="$classMIPProblem.html#a15cf712c50d97736774b35f6ec269db3" title=" " alt="" coords="294,270,438,296"/>
+<area shape="poly" id="edge8_Node000001_Node000009" title=" " alt="" coords="140,187,199,221,275,257,292,263,291,268,273,261,197,226,137,192"/>
+<area shape="rect" id="Node000003" href="$classLinearExpression.html#a941cd736bd9e19240abed98b3a000c44" title=" " alt="" coords="506,5,650,46"/>
+<area shape="poly" id="edge2_Node000002_Node000003" title=" " alt="" coords="458,39,491,34,491,40,459,44"/>
+<area shape="rect" id="Node000004" href="$structSparseMatrix.html#ab07cd94bee1d7f2387e8abe437478cdf" title=" " alt="" coords="510,70,646,96"/>
+<area shape="poly" id="edge3_Node000002_Node000004" title=" " alt="" coords="459,64,496,69,495,74,458,69"/>
+<area shape="rect" id="Node000005" href="$structSparseMatrix.html#ad1a2ceb5c4b1170f4ba4219200066004" title=" " alt="" coords="698,70,884,96"/>
+<area shape="poly" id="edge4_Node000004_Node000005" title=" " alt="" coords="646,80,683,80,683,86,646,86"/>
+</map>

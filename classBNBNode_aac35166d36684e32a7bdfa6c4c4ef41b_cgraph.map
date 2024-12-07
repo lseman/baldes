@@ -1,0 +1,23 @@
+<map id="BNBNode::enforceBranching" name="BNBNode::enforceBranching">
+<area shape="rect" id="Node000001" title=" " alt="" coords="5,242,193,268"/>
+<area shape="rect" id="Node000002" href="$classBNBNode.html#a88d143f3bb4f20f932a519fa2d685e97" title=" " alt="" coords="249,193,470,218"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="170,239,272,219,273,225,171,244"/>
+<area shape="rect" id="Node000011" href="$classMIPProblem.html#ab4b0d5ba095d20b6e18e8f57a7b3e9f7" title=" " alt="" coords="241,266,478,292"/>
+<area shape="poly" id="edge9_Node000001_Node000011" title=" " alt="" coords="193,261,225,264,225,269,193,266"/>
+<area shape="rect" id="Node000003" href="$classMIPProblem.html#a38c9f38202c52c5aad1e0a65ac494b7c" title=" " alt="" coords="526,41,710,66"/>
+<area shape="poly" id="edge2_Node000002_Node000003" title=" " alt="" coords="372,190,435,136,478,104,525,77,541,70,543,75,527,81,481,109,438,140,376,194"/>
+<area shape="rect" id="Node000007" href="$classLinearExpression.html#a931036cafcd17fe3553ffd79468da49e" title=" " alt="" coords="544,91,692,131"/>
+<area shape="poly" id="edge5_Node000002_Node000007" title=" " alt="" coords="396,190,525,142,544,135,546,140,527,147,398,195"/>
+<area shape="rect" id="Node000008" href="$classMIPProblem.html#ae21d64436d178848ddbbbe44f2a3a803" title=" " alt="" coords="540,156,696,197"/>
+<area shape="poly" id="edge6_Node000002_Node000008" title=" " alt="" coords="470,190,524,184,525,190,470,196"/>
+<area shape="rect" id="Node000009" href="$classMIPProblem.html#a855300f7fb9c27b0f2b672707a830347" title=" " alt="" coords="528,221,709,246"/>
+<area shape="poly" id="edge7_Node000002_Node000009" title=" " alt="" coords="470,215,513,220,512,225,470,220"/>
+<area shape="rect" id="Node000010" href="$classMIPProblem.html#a15cf712c50d97736774b35f6ec269db3" title=" " alt="" coords="546,270,690,296"/>
+<area shape="poly" id="edge8_Node000002_Node000010" title=" " alt="" coords="401,217,527,256,550,263,549,268,525,262,399,222"/>
+<area shape="rect" id="Node000004" href="$classLinearExpression.html#a941cd736bd9e19240abed98b3a000c44" title=" " alt="" coords="758,5,903,46"/>
+<area shape="poly" id="edge3_Node000003_Node000004" title=" " alt="" coords="710,39,743,34,744,40,711,44"/>
+<area shape="rect" id="Node000005" href="$structSparseMatrix.html#ab07cd94bee1d7f2387e8abe437478cdf" title=" " alt="" coords="763,70,898,96"/>
+<area shape="poly" id="edge4_Node000003_Node000005" title=" " alt="" coords="711,64,748,69,747,74,710,69"/>
+<area shape="rect" id="Node000012" href="$Definitions_8h.html#af576d1ee32f587dbbccb77e46e4ce2bb" title=" " alt="" coords="564,320,673,345"/>
+<area shape="poly" id="edge10_Node000011_Node000012" title=" " alt="" coords="426,290,549,315,548,321,425,295"/>
+</map>

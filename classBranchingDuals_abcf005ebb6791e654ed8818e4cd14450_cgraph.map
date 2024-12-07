@@ -1,0 +1,13 @@
+<map id="BranchingDuals::computeDuals" name="BranchingDuals::computeDuals">
+<area shape="rect" id="Node000001" title=" " alt="" coords="5,80,207,106"/>
+<area shape="rect" id="Node000002" href="$classBNBNode.html#a7c216d32f620367175809ffa6c56fb97" title=" " alt="" coords="284,5,433,31"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="142,77,254,40,280,33,281,38,255,45,144,82"/>
+<area shape="rect" id="Node000004" href="$classArcDuals.html#a24a3f7097597ac4d6b76b361a23f5c0c" title=" " alt="" coords="260,55,456,80"/>
+<area shape="poly" id="edge3_Node000001_Node000004" title=" " alt="" coords="207,80,244,76,245,82,207,85"/>
+<area shape="rect" id="Node000005" href="$classNodeDuals.html#aedd1a3e4c6a78e6f4e318287afc43df7" title=" " alt="" coords="255,104,462,130"/>
+<area shape="poly" id="edge4_Node000001_Node000005" title=" " alt="" coords="207,100,239,103,239,108,207,105"/>
+<area shape="rect" id="Node000006" href="$classBranchingDuals.html#a8cfa95af83dab193f7dfd2ffee2b841a" title=" " alt="" coords="288,153,429,179"/>
+<area shape="poly" id="edge5_Node000001_Node000006" title=" " alt="" coords="145,104,255,140,282,147,280,152,254,145,143,109"/>
+<area shape="rect" id="Node000003" href="$classSolverInterface.html#ab79d88959a058367c1c1fe8e8990c471" title=" " alt="" coords="510,5,688,31"/>
+<area shape="poly" id="edge2_Node000002_Node000003" title=" " alt="" coords="433,16,495,16,495,21,433,21"/>
+</map>

@@ -1,0 +1,5 @@
+<map id="BucketGraph::get_opposite_bucket_number" name="BucketGraph::get_opposite_bucket_number">
+<area shape="rect" id="Node000001" title="Get the opposite bucket number for a given bucket index." alt="" coords="5,5,183,46"/>
+<area shape="rect" id="Node000002" href="$classBucketGraph.html#abb791c45d27a9425607480e3101f7d28" title=" " alt="" coords="231,5,398,46"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="183,23,215,23,215,28,183,28"/>
+</map>

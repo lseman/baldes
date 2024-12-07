@@ -1,0 +1,18 @@
+<map id="Stabilization::update_stabilization_after_pricing_optim" name="Stabilization::update_stabilization_after_pricing_optim">
+<area shape="rect" id="Node000001" title="Updates the stabilization parameters after the pricing optimization step." alt="" coords="5,120,142,176"/>
+<area shape="rect" id="Node000002" href="$classStabilization.html#ac2f24133b3ae9bb48b0d72b7fb0fb996" title=" " alt="" coords="191,13,334,38"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="101,118,140,82,188,49,200,43,203,47,191,53,144,87,104,122"/>
+<area shape="rect" id="Node000004" href="$classStabilization.html#ae9092a933972d2d35d8196975e66e555" title="Computes the dynamic alpha schedule for stabilization." alt="" coords="190,63,335,103"/>
+<area shape="poly" id="edge3_Node000001_Node000004" title=" " alt="" coords="141,122,186,106,188,111,143,127"/>
+<area shape="rect" id="Node000006" href="$classMultiPointManager.html#a797b2cc4ba1de55bd37bcca84e7bec70" title=" " alt="" coords="192,128,332,169"/>
+<area shape="poly" id="edge5_Node000001_Node000006" title=" " alt="" coords="142,146,177,146,177,151,142,151"/>
+<area shape="rect" id="Node000007" href="$classStabilization.html#a79c5b5f1f4dbd1511c28f8b6a64ef0d1" title=" " alt="" coords="194,193,330,234"/>
+<area shape="poly" id="edge6_Node000001_Node000007" title=" " alt="" coords="143,169,188,185,186,190,141,174"/>
+<area shape="rect" id="Node000008" href="$classMultiPointManager.html#a4f20b67c8b4472346543775d2f01af97" title=" " alt="" coords="195,259,330,299"/>
+<area shape="poly" id="edge8_Node000001_Node000008" title=" " alt="" coords="106,175,145,209,191,243,200,249,197,253,188,248,142,213,102,179"/>
+<area shape="rect" id="Node000003" href="$classMultiPointManager.html#a0416f3776356e2441ab68878655f4a16" title=" " alt="" coords="383,5,518,46"/>
+<area shape="poly" id="edge2_Node000002_Node000003" title=" " alt="" coords="334,23,368,23,368,28,334,28"/>
+<area shape="rect" id="Node000005" href="$classStabilization.html#a4f4e3b43fbae641f421179c3519a7ff7" title="Computes the Euclidean norm (L2 norm) of a given vector." alt="" coords="388,136,514,161"/>
+<area shape="poly" id="edge4_Node000004_Node000005" title=" " alt="" coords="324,101,398,127,396,132,322,106"/>
+<area shape="poly" id="edge7_Node000007_Node000005" title=" " alt="" coords="322,190,396,164,398,169,324,195"/>
+</map>

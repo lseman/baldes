@@ -1,0 +1,30 @@
+<map id="Branching::applyBranchingbaldesCtrs" name="Branching::applyBranchingbaldesCtrs">
+<area shape="rect" id="Node000001" title=" " alt="" coords="5,267,241,292"/>
+<area shape="rect" id="Node000002" href="$classBranching.html#a7bb85af41f936756314e80d72e79aa72" title=" " alt="" coords="289,210,469,250"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="193,263,273,248,274,253,194,269"/>
+<area shape="rect" id="Node000012" href="$classBNBNode.html#a836f57043aee50b30ca1bb91e15a31f6" title=" " alt="" coords="309,295,448,320"/>
+<area shape="poly" id="edge8_Node000001_Node000012" title=" " alt="" coords="242,290,294,296,293,301,241,295"/>
+<area shape="rect" id="Node000003" href="$classBNBNode.html#a88d143f3bb4f20f932a519fa2d685e97" title=" " alt="" coords="517,157,737,183"/>
+<area shape="poly" id="edge2_Node000002_Node000003" title=" " alt="" coords="465,207,555,185,557,190,467,212"/>
+<area shape="rect" id="Node000004" href="$classMIPProblem.html#a38c9f38202c52c5aad1e0a65ac494b7c" title=" " alt="" coords="785,5,970,31"/>
+<area shape="poly" id="edge3_Node000003_Node000004" title=" " alt="" coords="639,155,698,100,739,69,784,41,800,34,802,39,787,46,742,73,702,104,643,159"/>
+<area shape="rect" id="Node000008" href="$classLinearExpression.html#a931036cafcd17fe3553ffd79468da49e" title=" " alt="" coords="804,55,951,96"/>
+<area shape="poly" id="edge4_Node000003_Node000008" title=" " alt="" coords="661,154,784,106,803,99,805,104,786,111,663,159"/>
+<area shape="rect" id="Node000009" href="$classMIPProblem.html#ae21d64436d178848ddbbbe44f2a3a803" title=" " alt="" coords="799,120,956,161"/>
+<area shape="poly" id="edge5_Node000003_Node000009" title=" " alt="" coords="738,155,784,149,784,154,738,160"/>
+<area shape="rect" id="Node000010" href="$classMIPProblem.html#a855300f7fb9c27b0f2b672707a830347" title=" " alt="" coords="787,185,968,211"/>
+<area shape="poly" id="edge6_Node000003_Node000010" title=" " alt="" coords="738,180,772,184,771,189,738,185"/>
+<area shape="rect" id="Node000011" href="$classMIPProblem.html#a15cf712c50d97736774b35f6ec269db3" title=" " alt="" coords="805,235,950,260"/>
+<area shape="poly" id="edge7_Node000003_Node000011" title=" " alt="" coords="666,181,786,221,809,227,807,233,785,226,665,186"/>
+<area shape="rect" id="Node000013" href="$classBNBNode.html#a332aaaf5da60dea0917b5c29cc6d51e7" title=" " alt="" coords="554,295,700,320"/>
+<area shape="poly" id="edge9_Node000012_Node000013" title=" " alt="" coords="449,305,539,305,539,310,449,310"/>
+<area shape="rect" id="Node000016" href="$classMIPProblem.html#ad084e76d838ff4c283b52e9b395558fe" title=" " alt="" coords="562,388,692,414"/>
+<area shape="poly" id="edge12_Node000012_Node000016" title=" " alt="" coords="416,318,577,380,575,385,414,323"/>
+<area shape="rect" id="Node000014" href="$classBNBNode.html#a17edf3264d46bd38e762a445c9500bee" title=" " alt="" coords="793,284,962,310"/>
+<area shape="poly" id="edge10_Node000013_Node000014" title=" " alt="" coords="700,302,777,298,778,304,700,307"/>
+<area shape="rect" id="Node000015" href="$classGurobiEnvSingleton.html#a49c3ce63088629c2246dec252a73df16" title=" " alt="" coords="810,334,945,374"/>
+<area shape="poly" id="edge11_Node000013_Node000015" title=" " alt="" coords="701,318,795,336,794,341,700,324"/>
+<area shape="poly" id="edge13_Node000016_Node000016" title=" " alt="" coords="586,389,578,379,583,369,600,363,627,361,658,364,673,371,671,376,657,369,627,367,601,369,586,374,583,379,590,386"/>
+<area shape="rect" id="Node000017" href="$classMIPProblem.html#adaf09269c578d30ea17724fed7535bb0" title=" " alt="" coords="792,399,963,424"/>
+<area shape="poly" id="edge14_Node000016_Node000017" title=" " alt="" coords="693,401,777,405,776,410,693,406"/>
+</map>

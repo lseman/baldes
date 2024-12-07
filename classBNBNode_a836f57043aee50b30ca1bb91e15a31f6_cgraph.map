@@ -1,0 +1,14 @@
+<map id="BNBNode::newChild" name="BNBNode::newChild">
+<area shape="rect" id="Node000001" title=" " alt="" coords="5,92,145,118"/>
+<area shape="rect" id="Node000002" href="$classBNBNode.html#a332aaaf5da60dea0917b5c29cc6d51e7" title=" " alt="" coords="193,55,338,80"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="144,89,181,81,182,87,145,94"/>
+<area shape="rect" id="Node000005" href="$classMIPProblem.html#ad084e76d838ff4c283b52e9b395558fe" title=" " alt="" coords="200,128,330,154"/>
+<area shape="poly" id="edge4_Node000001_Node000005" title=" " alt="" coords="146,115,185,123,184,128,145,121"/>
+<area shape="rect" id="Node000003" href="$classBNBNode.html#a17edf3264d46bd38e762a445c9500bee" title=" " alt="" coords="387,5,556,31"/>
+<area shape="poly" id="edge2_Node000002_Node000003" title=" " alt="" coords="322,51,400,33,401,38,323,57"/>
+<area shape="rect" id="Node000004" href="$classGurobiEnvSingleton.html#a49c3ce63088629c2246dec252a73df16" title=" " alt="" coords="404,55,539,96"/>
+<area shape="poly" id="edge3_Node000002_Node000004" title=" " alt="" coords="339,68,389,70,389,75,338,73"/>
+<area shape="poly" id="edge5_Node000005_Node000005" title=" " alt="" coords="233,129,227,119,231,110,244,104,265,101,288,104,300,110,298,115,287,109,265,107,245,109,235,113,232,119,238,126"/>
+<area shape="rect" id="Node000006" href="$classMIPProblem.html#adaf09269c578d30ea17724fed7535bb0" title=" " alt="" coords="386,128,557,154"/>
+<area shape="poly" id="edge6_Node000005_Node000006" title=" " alt="" coords="331,138,370,138,370,144,331,144"/>
+</map>

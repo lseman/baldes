@@ -1,0 +1,18 @@
+<map id="Branching::evaluateWithCG" name="Branching::evaluateWithCG">
+<area shape="rect" id="Node000001" title=" " alt="" coords="5,66,185,92"/>
+<area shape="rect" id="Node000002" href="$classBranching.html#ab40fc6214a355c79db1efb6e81d3f9be" title=" " alt="" coords="233,41,468,66"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="185,67,217,64,217,70,185,73"/>
+<area shape="rect" id="Node000019" href="$classVRProblem.html#af3e79a1674c161c90da908d282c0a15a" title=" " alt="" coords="288,90,412,116"/>
+<area shape="poly" id="edge8_Node000001_Node000019" title=" " alt="" coords="185,85,273,93,273,98,185,90"/>
+<area shape="rect" id="Node000003" href="$classBranching.html#a7bb85af41f936756314e80d72e79aa72" title=" " alt="" coords="516,5,696,46"/>
+<area shape="poly" id="edge2_Node000002_Node000003" title=" " alt="" coords="468,38,500,35,501,40,469,43"/>
+<area shape="rect" id="Node000013" href="$classBNBNode.html#a836f57043aee50b30ca1bb91e15a31f6" title=" " alt="" coords="536,70,676,96"/>
+<area shape="poly" id="edge4_Node000002_Node000013" title=" " alt="" coords="468,64,521,71,520,76,468,70"/>
+<area shape="rect" id="Node000004" href="$classBNBNode.html#a88d143f3bb4f20f932a519fa2d685e97" title=" " alt="" coords="744,13,965,38"/>
+<area shape="poly" id="edge3_Node000003_Node000004" title=" " alt="" coords="697,23,729,23,729,28,697,28"/>
+<area shape="rect" id="Node000014" href="$classBNBNode.html#a332aaaf5da60dea0917b5c29cc6d51e7" title=" " alt="" coords="782,66,927,92"/>
+<area shape="poly" id="edge5_Node000013_Node000014" title=" " alt="" coords="676,79,766,78,766,83,676,85"/>
+<area shape="rect" id="Node000017" href="$classMIPProblem.html#ad084e76d838ff4c283b52e9b395558fe" title=" " alt="" coords="789,140,920,165"/>
+<area shape="poly" id="edge6_Node000013_Node000017" title=" " alt="" coords="656,94,792,132,790,137,654,99"/>
+<area shape="poly" id="edge7_Node000017_Node000017" title=" " alt="" coords="814,141,805,131,810,121,827,115,855,113,885,116,901,123,898,128,884,121,854,118,828,120,814,125,811,130,818,137"/>
+</map>

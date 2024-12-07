@@ -1,0 +1,5 @@
+<map id="Stabilization::shouldExit" name="Stabilization::shouldExit">
+<area shape="rect" id="Node000001" title="Determines whether the process should exit based on the current alpha value." alt="" coords="5,13,162,38"/>
+<area shape="rect" id="Node000002" href="$classMultiPointManager.html#a653a6986f6815c1abfeacfc0afa4ec19" title=" " alt="" coords="210,5,345,46"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="162,23,195,23,195,28,162,28"/>
+</map>
