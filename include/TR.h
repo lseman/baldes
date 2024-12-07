@@ -1,3 +1,12 @@
+/**
+ * @file TR.h
+ * @brief Defines the TrustRegion class for trust region management in optimization problems.
+ *
+ * This file implements the TrustRegion class, which is responsible for handling the trust region
+ * management during optimization in large-scale optimization problems, such as vehicle routing
+ * and resource-constrained shortest path problems (RCSPP).
+ *
+ **/
 #pragma once
 
 #include "bnb/Node.h"

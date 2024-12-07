@@ -398,7 +398,7 @@ std::pair<bool, bool> LimitedMemoryRank1Cuts::runSeparation(BNBNode *node, std::
     }
 
     if (cuts_before == cuts_after_separation) {
-        generator->max_heuristic_sep_mem4_row_rank1 = 16;
+        generator->max_heuristic_sep_mem4_row_rank1 = 12;
         generator->generateSepHeurMem4Vertex();
         generator->initialize(allPaths);
         // generator->fillMemory();
