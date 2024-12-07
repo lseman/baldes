@@ -21,6 +21,8 @@
 #include "gurobi_c.h"
 #endif
 
+#include "MultiPointMgr.h"
+
 #include <algorithm> // For std::transform
 #include <cmath>
 #include <iostream>
@@ -80,22 +82,7 @@ public:
 
     ReducedCostResult rc;
 
-    // Structure for stability points
-    struct StabilityPoint {
-        DualSolution duals;
-        double       objective_value;
-        int          age;
-        StabilityPoint() : objective_value(0.0), age(0) {}
-
-        StabilityPoint(const DualSolution &d, double obj) : duals(d), objective_value(obj), age(0) {}
-    };
-
-    std::vector<StabilityPoint> stability_points;
-    static constexpr size_t     MAX_POINTS      = 5;
-    static constexpr size_t     MAX_AGE         = 5;
-    static constexpr double     MIN_IMPROVEMENT = 1e-6;
-
-    // Track stabilization constraints
+    MultiPointManager   mp_manager;
     std::vector<double> stab_constraint_values;
 
     /**
@@ -185,13 +172,12 @@ public:
      */
     Stabilization(double base_alpha, DualSolution &mast_dual_sol)
         : alpha(base_alpha), t(0), base_alpha(base_alpha), cur_alpha(base_alpha), nb_misprices(0),
-          cur_stab_center(mast_dual_sol) {
+          cur_stab_center(mast_dual_sol), mp_manager(mast_dual_sol.size()) {
         pseudo_dual_bound = std::numeric_limits<double>::infinity();
         valid_dual_bound  = std::numeric_limits<double>::infinity();
         beta              = 0.0;
         sizeDual          = mast_dual_sol.size();
     }
-
     /**
      * @brief Computes the stabilized dual solution.
      *
@@ -270,16 +256,11 @@ public:
 
     std::vector<double> duals_tilde;
 
-    // TODO: we need to check the implementation of this method
     DualSolution getStabDualSolAdvanced(const DualSolution &input_duals) {
-        // Constants and initialization
         constexpr double EPSILON = 1e-12;
         DualSolution     nodeDuals(input_duals.begin(), input_duals.begin() + sizeDual);
 
-        // Base cases
-        if (cur_stab_center.empty() || subgradient.empty() || duals_sep.empty()) {
-            return getStabDualSol(input_duals); // Fall back to basic smoothing
-        }
+        if (cur_stab_center.empty() || subgradient.empty() || duals_sep.empty()) { return getStabDualSol(input_duals); }
 
         const size_t        n = nodeDuals.size();
         std::vector<double> direction(n);
@@ -300,15 +281,12 @@ public:
         double cos_angle = safeDiv(dot_product, safeMult(norm_in_out, subgradient_norm));
 
         // 3. Update beta based on angle
-        if (nb_misprices > 0) {
-            beta = 0.0; // No directional component during mispricing
-        } else {
-            beta = std::max(0.0, cos_angle); // Only use positive correlation
-        }
+        double beta = (nb_misprices > 0) ? 0.0 : std::max(0.0, cos_angle);
 
-        // 4. Combine directions (in original space, not normalized)
+        // 4. Combine directions with proper normalization
         for (size_t i = 0; i < n; ++i) {
-            direction[i] = safeMult(beta, subgradient[i]) + safeMult(1.0 - beta, direction[i]);
+            direction[i] =
+                safeMult(beta / subgradient_norm, subgradient[i]) + safeMult((1.0 - beta) / norm_in_out, direction[i]);
         }
 
         // 5. Normalize combined direction
@@ -316,15 +294,13 @@ public:
         for (size_t i = 0; i < n; ++i) { norm_direction += direction[i] * direction[i]; }
         norm_direction = std::sqrt(norm_direction + EPSILON);
 
-        // 6. Compute Wentges step and apply combined direction
-        double wentges_step = norm_in_out * cur_alpha;
+        // 6. Compute adaptive step size
+        double wentges_step = std::min(norm_in_out, subgradient_norm) * cur_alpha;
 
         // 7. Update separation point
         DualSolution new_duals(n);
         for (size_t i = 0; i < n; ++i) {
-            // Take step from stability center
             new_duals[i] = safeAdd(cur_stab_center[i], safeMult(wentges_step / norm_direction, direction[i]));
-            // Ensure dual feasibility
             new_duals[i] = std::max(0.0, new_duals[i]);
         }
 
@@ -375,10 +351,6 @@ public:
      * and best pricing columns. It adjusts the current alpha value based on the angle between the
      * separation direction and the subgradient.
      *
-     * @param dados The model data containing problem-specific information.
-     * @param nodeDuals The dual solution vector.
-     * @param best_pricing_cols A vector of pointers to the best pricing columns.
-     * @return The updated alpha value based on the dynamic schedule.
      */
     bool dynamic_alpha_schedule(const ModelData &dados) {
         const size_t n = cur_stab_center.size();
@@ -480,21 +452,18 @@ public:
      * there have been no misprices. Additionally, it updates the stabilization center
      * for the next iteration if the current lagrangian gap is smaller than the previous one.
      *
-     * @param dados The model data containing relevant information for the optimization.
-     * @param nodeDuals The dual solution obtained from the pricing optimization.
-     * @param lag_gap The current lagrangian gap.
-     * @param best_pricing_cols A vector of pointers to the best pricing columns.
      */
     void update_stabilization_after_pricing_optim(const ModelData &dados, const DualSolution &input_duals,
                                                   const double &lag_gap, std::vector<Label *> best_pricing_cols) {
-        // Detect cycling - if we've made no progress for too long
+        // Early exit checks and cycling detection
         static int    no_progress_count = 0;
         static double last_gap          = lag_gap;
 
         if (std::abs(lag_gap - last_gap) < EPSILON) {
             no_progress_count++;
-            if (no_progress_count > 10) { // Adjust threshold as needed
+            if (no_progress_count > 4) {
                 stabilization_active = false;
+                cleanup();
                 return;
             }
         } else {
@@ -502,55 +471,118 @@ public:
             last_gap          = lag_gap;
         }
 
-        // Only proceed with stabilization if it's still active
-        if (!stabilization_active) { return; }
+        if (!stabilization_active) return;
 
-        // Rest of the existing update logic...
         std::vector<double> nodeDuals(input_duals.begin(), input_duals.begin() + sizeDual);
 
+        // Update stabilization parameters if no misprices
         if (nb_misprices == 0) {
             update_subgradient(dados, nodeDuals, best_pricing_cols);
             bool should_increase = dynamic_alpha_schedule(dados);
 
-            constexpr double ALPHA_FACTOR = 0.1;
-            constexpr double MAX_ALPHA    = 0.99;
-            constexpr double MIN_ALPHA    = 0.0;
-
+            constexpr double ALPHA_FACTOR = 0.15;
             if (should_increase) {
-                alpha = std::min(MAX_ALPHA, base_alpha + (1.0 - base_alpha) * ALPHA_FACTOR);
+                alpha = std::min(0.99, alpha + (1.0 - alpha) * ALPHA_FACTOR);
             } else {
-                alpha = std::max(MIN_ALPHA, base_alpha - ALPHA_FACTOR);
+                alpha = std::max(0.1, alpha * (1.0 - ALPHA_FACTOR));
             }
 
             if (!std::isnan(alpha) && !std::isinf(alpha)) { base_alpha = alpha; }
         }
 
-        // For now, let's disable multi-point and use only directional
+        // Get current stabilized solution
         DualSolution stab_sol = smooth_dual_sol;
 
-        // Update based on gap
-        double gap_diff = lag_gap - lag_gap_prev;
-        if (gap_diff < -EPSILON) {
-            // Improvement
+        // Update multi-point manager
+        mp_manager.updatePool(stab_sol, -lag_gap); // Negative because we're maximizing
+
+        // Calculate relative improvement for stability center update
+        double relative_improvement    = std::abs(lag_gap - lag_gap_prev) / (std::abs(lag_gap_prev) + EPSILON);
+        bool   significant_improvement = relative_improvement > mp_manager.MIN_IMPROVEMENT;
+
+        if (significant_improvement) {
             stab_center_for_next_iteration = stab_sol;
         } else {
-            // No improvement - conservative update
-            double weight = 0.3;
+            // Conservative update using weighted average with multi-point prediction
+            double conservative_weight = 0.2;
             stab_center_for_next_iteration.resize(sizeDual);
+
+            DualSolution mp_sol = mp_manager.getWeightedSolution();
+
             for (size_t i = 0; i < sizeDual; i++) {
-                stab_center_for_next_iteration[i] = weight * stab_sol[i] + (1.0 - weight) * cur_stab_center[i];
+                stab_center_for_next_iteration[i] = 0.5 * cur_stab_center[i] + conservative_weight * stab_sol[i] +
+                                                    (0.5 - conservative_weight) * mp_sol[i];
             }
         }
 
-        smooth_dual_sol = stab_sol;
-        lag_gap_prev    = lag_gap;
+        // Update metrics
+        lag_gap_prev = lag_gap;
 
-        // Safety check
+        // Safety checks
         if (std::isnan(alpha) || std::isinf(alpha)) {
             stabilization_active = false;
-            alpha                = 0.0;
-            base_alpha           = 0.0;
+            cleanup();
         }
+    }
+
+    DualSolution getStabDualSolAdvanceHybrid(const DualSolution &input_duals) {
+        // Constants and initialization
+        constexpr double EPSILON = 1e-12;
+        DualSolution     nodeDuals(input_duals.begin(), input_duals.begin() + sizeDual);
+
+        // Base cases
+        if (cur_stab_center.empty() || subgradient.empty()) { return getStabDualSol(input_duals); }
+
+        const size_t n = nodeDuals.size();
+
+        // Get multi-point prediction
+        DualSolution mp_sol = mp_manager.getWeightedSolution();
+
+        // Calculate directional solution
+        std::vector<double> direction(n);
+        double              norm_in_out = 0.0;
+
+        // Use multi-point solution to adjust direction
+        double dir_weight = mp_manager.computeAdaptiveWeight(nodeDuals, mp_sol, subgradient, subgradient_norm);
+
+        for (size_t i = 0; i < n; ++i) {
+            direction[i] = (1.0 - dir_weight) * (nodeDuals[i] - cur_stab_center[i]) +
+                           dir_weight * (mp_sol[i] - cur_stab_center[i]);
+            norm_in_out += direction[i] * direction[i];
+        }
+        norm_in_out = std::sqrt(norm_in_out + EPSILON);
+
+        if (norm_in_out < EPSILON || subgradient_norm < EPSILON) { return getStabDualSol(input_duals); }
+
+        // Compute angle with subgradient
+        double dot_product = 0.0;
+        for (size_t i = 0; i < n; ++i) { dot_product += subgradient[i] * direction[i]; }
+        double cos_angle = safeDiv(dot_product, safeMult(norm_in_out, subgradient_norm));
+
+        // Update beta based on angle
+        beta = nb_misprices > 0 ? 0.0 : std::max(0.0, cos_angle);
+
+        // Combine directions
+        double norm_direction = 0.0;
+        for (size_t i = 0; i < n; ++i) {
+            direction[i] = safeMult(beta, subgradient[i]) + safeMult(1.0 - beta, direction[i]);
+            norm_direction += direction[i] * direction[i];
+        }
+        norm_direction = std::sqrt(norm_direction + EPSILON);
+
+        // Compute Wentges step
+        double wentges_step = norm_in_out * cur_alpha;
+
+        // Compute new duals
+        DualSolution new_duals(n);
+        for (size_t i = 0; i < n; ++i) {
+            new_duals[i] = safeAdd(cur_stab_center[i], safeMult(wentges_step / norm_direction, direction[i]));
+            new_duals[i] = std::max(0.0, new_duals[i]);
+        }
+
+        smooth_dual_sol = new_duals;
+        duals_sep       = new_duals;
+        return new_duals;
     }
 
     /**
@@ -562,153 +594,13 @@ public:
      * @return true if `cur_alpha` is zero, otherwise false.
      */
     bool shouldExit() {
-        // Exit if:
-        // 1. Alpha is effectively zero
-        // 2. No progress is being made (cycling detection)
-        // 3. Stabilization is explicitly deactivated
-        if (base_alpha < EPSILON || !stabilization_active) { return true; }
-        return false;
-    }
-
-    void define_smooth_dual_sol(const DualSolution &nodeDuals) {
-        smooth_dual_sol.assign(nodeDuals.begin(), nodeDuals.begin() + sizeDual);
-    }
-
-    void updateNumK(int numK) { this->numK = numK; }
-
-    // Multi-point stab
-    
-    // Main hybrid stabilization method combining directional and multi-point
-    DualSolution getHybridStabDualSol(const DualSolution &input_duals) {
-        try {
-            const size_t n = sizeDual;
-            if (n == 0 || input_duals.size() < n) { return input_duals; }
-
-            // Get directional solution
-            DualSolution dir_sol = getStabDualSolAdvanced(input_duals);
-
-            // Use only directional if not enough stability points
-            if (stability_points.size() < 2) {
-                smooth_dual_sol = dir_sol;
-                return dir_sol;
-            }
-
-            // Get multi-point solution
-            DualSolution mp_sol = getMultiPointSol(n);
-
-            // Ensure feasibility of multi-point solution
-            for (double &val : mp_sol) { val = std::max(0.0, val); }
-
-            // Calculate weight with bounds checking
-            double mp_weight = calculateMultiPointWeight(dir_sol, mp_sol);
-            mp_weight        = std::max(0.0, std::min(1.0, mp_weight));
-
-            // Combine solutions
-            DualSolution result(n);
-            for (size_t i = 0; i < n; i++) {
-                result[i] = std::max(0.0, mp_weight * mp_sol[i] + (1.0 - mp_weight) * dir_sol[i]);
-            }
-
-            smooth_dual_sol = result;
-            return result;
-        } catch (const std::exception &e) {
-            // Fallback to directional on any error
-            return getStabDualSolAdvanced(input_duals);
-        }
-    }
-    // Update stability points with new solution
-    void updateStabilityPoints(const DualSolution &new_point, double obj_value) {
-        // Check if point provides meaningful improvement
-        bool should_add = true;
-        for (const auto &point : stability_points) {
-            if (norm(point.duals, new_point) < EPSILON ||
-                std::abs(point.objective_value - obj_value) < MIN_IMPROVEMENT) {
-                should_add = false;
-                break;
-            }
-        }
-
-        if (should_add) {
-            // Add new point
-            stability_points.emplace_back(new_point, obj_value);
-
-            // Age existing points
-            for (auto &point : stability_points) { point.age++; }
-
-            // Remove old points
-            stability_points.erase(std::remove_if(stability_points.begin(), stability_points.end(),
-                                                  [this](const auto &p) { return p.age >= MAX_AGE; }),
-                                   stability_points.end());
-
-            // Keep only best points if we exceed maximum
-            if (stability_points.size() > MAX_POINTS) {
-                // Sort by objective value (descending)
-                std::sort(stability_points.begin(), stability_points.end(),
-                          [](const auto &a, const auto &b) { return a.objective_value > b.objective_value; });
-                stability_points.resize(MAX_POINTS);
-            }
-        }
-    }
-
-private:
-    // Helper method to compute multi-point solution
-    DualSolution getMultiPointSol(size_t n) const {
-        DualSolution result(n, 0.0);
-        double       total_weight = 0.0;
-
-        // Compute age-based weights
-        for (const auto &point : stability_points) {
-            double weight = std::max(0.0, 1.0 - static_cast<double>(point.age) / MAX_AGE);
-            total_weight += weight;
-
-            for (size_t i = 0; i < n; i++) { result[i] += weight * point.duals[i]; }
-        }
-
-        // Normalize
-        if (total_weight > EPSILON) {
-            for (double &val : result) { val /= total_weight; }
-        }
-
-        return result;
-    }
-
-    // Helper method to compute weight between multi-point and directional solutions
-    double calculateMultiPointWeight(const DualSolution &dir_sol, const DualSolution &mp_sol) const {
-        if (subgradient.empty() || subgradient_norm < EPSILON) {
-            return 0.5; // Default to equal weight if no subgradient info
-        }
-
-        // Compute direction between solutions
-        std::vector<double> diff_dir(dir_sol.size());
-        double              diff_norm = 0.0;
-
-        for (size_t i = 0; i < dir_sol.size(); i++) {
-            diff_dir[i] = mp_sol[i] - dir_sol[i];
-            diff_norm += diff_dir[i] * diff_dir[i];
-        }
-        diff_norm = std::sqrt(diff_norm + EPSILON);
-
-        if (diff_norm < EPSILON) {
-            return 0.5; // Solutions are very close
-        }
-
-        // Compute angle with subgradient
-        double dot_product = 0.0;
-        for (size_t i = 0; i < dir_sol.size(); i++) {
-            dot_product += (diff_dir[i] / diff_norm) * (subgradient[i] / subgradient_norm);
-        }
-
-        // Adjust weight based on angle
-        if (dot_product < -0.5) {
-            return 0.7; // Multi-point solution appears better
-        } else if (dot_product > 0.5) {
-            return 0.3; // Directional solution appears better
-        }
-        return 0.5; // No strong preference
+        return !stabilization_active ||
+               (mp_manager.getMetrics().last_improvement < mp_manager.FAST_CONV_THRESHOLD &&
+                mp_manager.getMetrics().stagnant_iterations >= MultiPointManager::Metrics::MAX_STAGNANT);
     }
 
     void cleanup() {
-        stability_points.clear();
+        mp_manager.clear();
         stab_constraint_values.clear();
         smooth_dual_sol.clear();
         subgradient.clear();
@@ -716,4 +608,10 @@ private:
         beta  = 0.0;
         alpha = base_alpha;
     }
+
+    void define_smooth_dual_sol(const DualSolution &nodeDuals) {
+        smooth_dual_sol.assign(nodeDuals.begin(), nodeDuals.begin() + sizeDual);
+    }
+
+    void updateNumK(int numK) { this->numK = numK; }
 };

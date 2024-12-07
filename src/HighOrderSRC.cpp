@@ -5,6 +5,8 @@
 
 #include "../third_party/small_vector.hpp"
 
+
+
 void HighDimCutsGenerator::generateOptimalMultiplier() {
     map_rank1_multiplier[max_heuristic_initial_seed_set_size_row_rank1c + 1].resize(10);
     ankerl::unordered_dense::map<int, Bitset<8>> support;

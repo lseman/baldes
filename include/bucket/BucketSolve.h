@@ -534,9 +534,9 @@ std::vector<Label *> BucketGraph::bi_labeling_algorithm() {
                 // Iterate over the returned Label** array and add each valid label to the vector
                 for (auto L_prime : extended_labels) {
                     // auto L_prime = *label_ptr; // Get the current label from the array
-                    // if (L_prime->resources[options.main_resources[0]] <= q_star[options.main_resources[0]]) {
-                    //    continue; // Skip if the label exceeds q_star
-                    //}
+                    if (L_prime->resources[options.main_resources[0]] <= q_star[options.main_resources[0]]) {
+                        continue; // Skip if the label exceeds q_star
+                    }
 
                     // Get the bucket for the extended label
                     auto b_prime = L_prime->vertex;
@@ -577,6 +577,7 @@ std::vector<Label *> BucketGraph::bi_labeling_algorithm() {
     std::vector<Label *> top_labels;
     top_labels.reserve(5); // Reserve memory for 5 elements
     for (size_t i = 0; i < std::min(5, static_cast<int>(merged_labels.size())); ++i) {
+        if (merged_labels[i]->nodes_covered.size() <= 3) { continue; }
         top_labels.push_back(merged_labels[i]);
     }
 

@@ -695,7 +695,7 @@ public:
             stab.set_pseudo_dual_bound(newBound);
             stab.updateNumK(numK);
             stab.update_stabilization_after_master_optim(nodeDuals);
-            nodeDuals = stab.getHybridStabDualSol(nodeDuals);
+            nodeDuals = stab.getStabDualSol(nodeDuals);
 
             misprice = true;
             while (misprice) {
@@ -849,7 +849,7 @@ public:
                 if (stab.shouldExit()) { misprice = false; }
                 if (colAdded == 0) {
                     stab.update_stabilization_after_misprice();
-                    nodeDuals = stab.getStabDualSolAdvanced(nodeDuals);
+                    nodeDuals = stab.getStabDualSol(nodeDuals);
                 } else {
                     misprice = false;
                 }
