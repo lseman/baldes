@@ -258,50 +258,57 @@ public:
 
     DualSolution getStabDualSolAdvanced(const DualSolution &input_duals) {
         constexpr double EPSILON = 1e-12;
-        DualSolution     nodeDuals(input_duals.begin(), input_duals.begin() + sizeDual);
+
+        DualSolution nodeDuals(input_duals.begin(), input_duals.begin() + sizeDual);
 
         if (cur_stab_center.empty() || subgradient.empty()) { return getStabDualSol(input_duals); }
 
-        const size_t        n = nodeDuals.size();
-        std::vector<double> direction(n);
+        const size_t n = nodeDuals.size();
 
-        // 1. Calculate in-out direction and its norm
+        // Step 1: π˜ = πin + (1−α)(πout − πin)
+        DualSolution pi_tilde(n);
+        for (size_t i = 0; i < n; ++i) {
+            pi_tilde[i] = cur_stab_center[i] + (1.0 - cur_alpha) * (nodeDuals[i] - cur_stab_center[i]);
+        }
+
+        // Step 2: πg = πin + (gin/||gin||) * ||πout − πin||
         double norm_in_out = 0.0;
         for (size_t i = 0; i < n; ++i) {
-            direction[i] = nodeDuals[i] - cur_stab_center[i];
-            norm_in_out += direction[i] * direction[i];
+            double diff = nodeDuals[i] - cur_stab_center[i];
+            norm_in_out += diff * diff;
         }
         norm_in_out = std::sqrt(norm_in_out + EPSILON);
 
-        if (norm_in_out < EPSILON || subgradient_norm < EPSILON) { return getStabDualSol(input_duals); }
-
-        // 2. Compute angle between subgradient and in-out direction
-        double dot_product = 0.0;
-        for (size_t i = 0; i < n; ++i) { dot_product += subgradient[i] * direction[i]; }
-        double cos_angle = safeDiv(dot_product, safeMult(norm_in_out, subgradient_norm));
-
-        // 3. Update beta based on angle
-        double beta = (nb_misprices > 0) ? 0.0 : std::max(0.0, cos_angle);
-
-        // 4. Combine directions with proper normalization
+        DualSolution pi_g(n);
         for (size_t i = 0; i < n; ++i) {
-            direction[i] =
-                safeMult(beta / subgradient_norm, subgradient[i]) + safeMult((1.0 - beta) / norm_in_out, direction[i]);
+            pi_g[i] = cur_stab_center[i] + (subgradient[i] / subgradient_norm) * norm_in_out;
         }
 
-        // 5. Normalize combined direction
-        double norm_direction = 0.0;
-        for (size_t i = 0; i < n; ++i) { norm_direction += direction[i] * direction[i]; }
-        norm_direction = std::sqrt(norm_direction + EPSILON);
+        // Step 3: ρ = βπg + (1−β)πout
+        DualSolution rho(n);
+        for (size_t i = 0; i < n; ++i) { rho[i] = beta * pi_g[i] + (1.0 - beta) * nodeDuals[i]; }
 
-        // 6. Compute adaptive step size
-        double wentges_step = std::min(norm_in_out, subgradient_norm) * cur_alpha;
+        // Calculate ||π˜ − πin||
+        double norm_tilde_in = 0.0;
+        for (size_t i = 0; i < n; ++i) {
+            double diff = pi_tilde[i] - cur_stab_center[i];
+            norm_tilde_in += diff * diff;
+        }
+        norm_tilde_in = std::sqrt(norm_tilde_in + EPSILON);
 
-        // 7. Update separation point
+        // Calculate ||ρ − πin||
+        double norm_rho_in = 0.0;
+        for (size_t i = 0; i < n; ++i) {
+            double diff = rho[i] - cur_stab_center[i];
+            norm_rho_in += diff * diff;
+        }
+        norm_rho_in = std::sqrt(norm_rho_in + EPSILON);
+
+        // Step 4: πsep = πin + (||π˜ − πin||/||ρ − πin||)(ρ − πin)
         DualSolution new_duals(n);
         for (size_t i = 0; i < n; ++i) {
-            new_duals[i] = safeAdd(cur_stab_center[i], safeMult(wentges_step / norm_direction, direction[i]));
-            new_duals[i] = std::max(0.0, new_duals[i]);
+            new_duals[i] = cur_stab_center[i] + (norm_tilde_in / norm_rho_in) * (rho[i] - cur_stab_center[i]);
+            new_duals[i] = std::max(0.0, new_duals[i]); // Project onto positive orthant
         }
 
         smooth_dual_sol = new_duals;
@@ -459,19 +466,7 @@ public:
         static int    no_progress_count = 0;
         static double last_gap          = lag_gap;
 
-        if (std::abs(lag_gap - last_gap) < EPSILON) {
-            no_progress_count++;
-            if (no_progress_count > 4) {
-                stabilization_active = false;
-                cleanup();
-                return;
-            }
-        } else {
-            no_progress_count = 0;
-            last_gap          = lag_gap;
-        }
-
-        if (!stabilization_active) return;
+        // if (!stabilization_active) return;
 
         std::vector<double> nodeDuals(input_duals.begin(), input_duals.begin() + sizeDual);
 
@@ -500,34 +495,10 @@ public:
         double relative_improvement    = std::abs(lag_gap - lag_gap_prev) / (std::abs(lag_gap_prev) + EPSILON);
         bool   significant_improvement = relative_improvement > mp_manager.MIN_IMPROVEMENT;
 
-        if (significant_improvement) {
-            stab_center_for_next_iteration = stab_sol;
+        if (lag_gap < lag_gap_prev) {
+            stab_center_for_next_iteration = smooth_dual_sol;
         } else {
-            // Adaptive weights based on convergence metrics from mp_manager
-            const auto &metrics = mp_manager.getMetrics();
-
-            // Increase conservative weight when:
-            // - More stagnant iterations (less trust in new solutions)
-            // - Higher variance in improvements (more unstable behavior)
-            double stagnation_factor = std::min(0.3, 0.1 * metrics.stagnant_iterations);
-            double variance_factor   = std::min(0.2, metrics.variance_improvement);
-
-            // Base conservative weight adjusted by convergence behavior
-            double conservative_weight = 0.2 + stagnation_factor + variance_factor;
-
-            // MP solution influence decreases with stagnation and variance
-            double mp_weight = 0.5 * std::exp(-metrics.stagnant_iterations) * std::exp(-metrics.variance_improvement);
-
-            stab_center_for_next_iteration.resize(sizeDual);
-            DualSolution mp_sol = mp_manager.getWeightedSolution();
-
-            for (size_t i = 0; i < sizeDual; i++) {
-                double stability_weight = 1.0 - (conservative_weight + mp_weight);
-                stab_center_for_next_iteration[i] =
-                    stability_weight * cur_stab_center[i] + conservative_weight * stab_sol[i] + mp_weight * mp_sol[i];
-            }
-            
-            //stab_center_for_next_iteration = cur_stab_center;
+            stab_center_for_next_iteration = cur_stab_center;
         }
 
         // Update metrics
@@ -608,11 +579,7 @@ public:
      *
      * @return true if `cur_alpha` is zero, otherwise false.
      */
-    bool shouldExit() {
-        return !stabilization_active ||
-               (mp_manager.getMetrics().last_improvement < mp_manager.FAST_CONV_THRESHOLD &&
-                mp_manager.getMetrics().stagnant_iterations >= MultiPointManager::Metrics::MAX_STAGNANT);
-    }
+    bool shouldExit() { return cur_alpha < 1e-3; }
 
     void cleanup() {
         mp_manager.clear();

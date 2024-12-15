@@ -13,10 +13,18 @@ struct SparseMatrix {
     std::vector<double> values; // Non-zero values of the matrix elements
 
     // CRS format (constructed on-demand)
-    mutable std::vector<int>    crs_row_start;
-    mutable std::vector<int>    crs_cols;
-    mutable std::vector<double> crs_values;
-    mutable bool                coo_mode = true; // Always starts in COO mode
+    struct CRSData {
+        std::vector<int>    row_start;
+        std::vector<int>    cols;
+        std::vector<double> values;
+
+        // Add copy constructor for CRSData
+        CRSData() = default;
+        CRSData(const CRSData &other) : row_start(other.row_start), cols(other.cols), values(other.values) {}
+    };
+
+    mutable bool                     coo_mode = true; // Always starts in COO mode
+    mutable std::shared_ptr<CRSData> crs_data;
 
     int num_rows = 0;
     int num_cols = 0;
@@ -24,16 +32,46 @@ struct SparseMatrix {
     SparseMatrix() = default;
     SparseMatrix(int num_rows, int num_cols) : num_rows(num_rows), num_cols(num_cols) {}
 
+    // Copy constructor
+    SparseMatrix(const SparseMatrix &other)
+        : rows(other.rows), cols(other.cols), values(other.values),
+          crs_data(other.crs_data) // shared_ptr handles copying
+          ,
+          coo_mode(other.coo_mode), num_rows(other.num_rows), num_cols(other.num_cols) {}
+
+    // Copy assignment operator
+    SparseMatrix &operator=(const SparseMatrix &other) {
+        if (this != &other) {
+            rows     = other.rows;
+            cols     = other.cols;
+            values   = other.values;
+            crs_data = other.crs_data; // shared_ptr handles copying
+            coo_mode = other.coo_mode;
+            num_rows = other.num_rows;
+            num_cols = other.num_cols;
+        }
+        return *this;
+    }
+
+    // Move constructor
+    SparseMatrix(SparseMatrix &&) noexcept = default;
+
+    // Move assignment
+    SparseMatrix &operator=(SparseMatrix &&) noexcept = default;
+
     // Insert a non-zero element into the sparse matrix (COO mode)
     void insert(int row, int col, double value) {
-        if (!coo_mode) switchToCOO(); // Ensure we're in COO mode
+        if (!coo_mode) switchToCOO();
 
-        // Dynamically resize rows and columns if the element is out of bounds
-        if (row >= num_rows) {
-            num_rows = row + 1; // Expand the number of rows
-        }
-        if (col >= num_cols) {
-            num_cols = col + 1; // Expand the number of columns
+        num_rows = std::max(num_rows, row + 1);
+        num_cols = std::max(num_cols, col + 1);
+
+        // Try to combine with existing element
+        for (size_t i = 0; i < rows.size(); ++i) {
+            if (rows[i] == row && cols[i] == col) {
+                values[i] += value;
+                return;
+            }
         }
 
         rows.push_back(row);
@@ -41,73 +79,215 @@ struct SparseMatrix {
         values.push_back(value);
     }
 
+    // Optimized batch insertion with sorting and deduplication
     void insert_batch(const std::vector<int> &batch_rows, const std::vector<int> &batch_cols,
                       const std::vector<double> &batch_values) {
-        if (!coo_mode) switchToCOO(); // Ensure we're in COO mode
+        if (!coo_mode) switchToCOO();
 
-        for (size_t i = 0; i < batch_values.size(); ++i) { insert(batch_rows[i], batch_cols[i], batch_values[i]); }
+        const size_t batch_size = batch_values.size();
+        if (batch_size == 0) return;
+
+        // Update matrix dimensions
+        num_rows = std::max(num_rows, *std::max_element(batch_rows.begin(), batch_rows.end()) + 1);
+        num_cols = std::max(num_cols, *std::max_element(batch_cols.begin(), batch_cols.end()) + 1);
+
+        // Create a map for combining duplicates
+        std::unordered_map<uint64_t, double> element_map;
+        element_map.reserve(rows.size() + batch_size);
+
+        // Helper function to create key from row and column
+        auto make_key = [](int row, int col) -> uint64_t {
+            return (static_cast<uint64_t>(row) << 32) | static_cast<uint64_t>(col);
+        };
+
+        // Add existing elements to map
+        for (size_t i = 0; i < rows.size(); ++i) { element_map[make_key(rows[i], cols[i])] = values[i]; }
+
+        // Add batch elements to map, combining duplicates
+        for (size_t i = 0; i < batch_size; ++i) {
+            uint64_t key = make_key(batch_rows[i], batch_cols[i]);
+            element_map[key] += batch_values[i];
+        }
+
+        // Rebuild vectors from map
+        rows.clear();
+        cols.clear();
+        values.clear();
+        rows.reserve(element_map.size());
+        cols.reserve(element_map.size());
+        values.reserve(element_map.size());
+
+        for (const auto &[key, value] : element_map) {
+            rows.push_back(static_cast<int>(key >> 32));
+            cols.push_back(static_cast<int>(key & 0xFFFFFFFF));
+            values.push_back(value);
+        }
     }
 
     // Convert to CRS format (only if in COO mode)
     void convertToCRS() const {
         if (!coo_mode) return;
 
-        crs_row_start.assign(num_rows + 1, 0); // CRS row starts initialized
-        crs_cols.resize(values.size());
-        crs_values.resize(values.size());
+        if (!crs_data) { crs_data = std::make_shared<CRSData>(); }
+        auto &crs = *crs_data;
 
-        // Count non-zero elements per row
-        for (int row : rows) ++crs_row_start[row + 1];
+        // Initialize row starts
+        crs.row_start.assign(num_rows + 1, 0);
 
-        // Compute row start indices using cumulative sum
-        std::partial_sum(crs_row_start.begin(), crs_row_start.end(), crs_row_start.begin());
+        // Count elements per row
+        for (int row : rows) { ++crs.row_start[row + 1]; }
 
-        // Temporary row position tracker
-        std::vector<int> row_position = crs_row_start;
+        // Compute prefix sum for row starts
+        std::partial_sum(crs.row_start.begin(), crs.row_start.end(), crs.row_start.begin());
 
-        // Fill CRS data
-        for (size_t i = 0; i < values.size(); ++i) {
-            int row          = rows[i];
-            int dest         = row_position[row]++;
-            crs_cols[dest]   = cols[i];
-            crs_values[dest] = values[i];
+        // Allocate CRS arrays
+        const size_t nnz = values.size();
+        crs.cols.resize(nnz);
+        crs.values.resize(nnz);
+
+        // Fill CRS arrays
+        std::vector<int> row_position = crs.row_start;
+        for (size_t i = 0; i < nnz; ++i) {
+            const int pos   = row_position[rows[i]]++;
+            crs.cols[pos]   = cols[i];
+            crs.values[pos] = values[i];
         }
 
-        coo_mode = false; // Conversion complete
+        coo_mode = false;
     }
 
-    // Switch to COO mode
     void switchToCOO() {
         if (coo_mode) return;
+
+        // Only create new vectors if we're the only one using this CRS data
+        if (crs_data.use_count() == 1) {
+            const auto &crs = *crs_data;
+            rows.clear();
+            cols.clear();
+            values.clear();
+
+            const size_t nnz = crs.values.size();
+            rows.reserve(nnz);
+            cols.reserve(nnz);
+            values.reserve(nnz);
+
+            for (int row = 0; row < num_rows; ++row) {
+                const int row_start = crs.row_start[row];
+                const int row_end   = (row + 1 < num_rows) ? crs.row_start[row + 1] : crs.values.size();
+
+                for (int i = row_start; i < row_end; ++i) {
+                    rows.push_back(row);
+                    cols.push_back(crs.cols[i]);
+                    values.push_back(crs.values[i]);
+                }
+            }
+
+            crs_data.reset();
+        } else {
+            // If others are using the CRS data, we need to make a copy
+            const auto &crs = *crs_data;
+            rows.clear();
+            cols.clear();
+            values.clear();
+
+            const size_t nnz = crs.values.size();
+            rows.reserve(nnz);
+            cols.reserve(nnz);
+            values.reserve(nnz);
+
+            for (int row = 0; row < num_rows; ++row) {
+                const int row_start = crs.row_start[row];
+                const int row_end   = (row + 1 < num_rows) ? crs.row_start[row + 1] : crs.values.size();
+
+                for (int i = row_start; i < row_end; ++i) {
+                    rows.push_back(row);
+                    cols.push_back(crs.cols[i]);
+                    values.push_back(crs.values[i]);
+                }
+            }
+        }
+
         coo_mode = true;
-        crs_row_start.clear();
-        crs_cols.clear();
-        crs_values.clear();
     }
 
     // RowIterator for CRS mode
-    struct RowIterator {
+    class RowIterator {
+    private:
         const SparseMatrix &matrix;
-        size_t              index;
-        size_t              end;
+        size_t              current_index;
+        size_t              row_end;
 
-        RowIterator(const SparseMatrix &matrix, int row)
-            : matrix(matrix), index(matrix.crs_row_start[row]),
-              end((row + 1 < matrix.num_rows) ? matrix.crs_row_start[row + 1] : matrix.crs_values.size()) {}
+    public:
+        // STL iterator traits
+        using iterator_category = std::forward_iterator_tag;
+        using value_type        = std::pair<int, double>;
+        using difference_type   = std::ptrdiff_t;
+        using pointer           = const value_type *;
+        using reference         = const value_type &;
 
-        bool valid() const { return index < end; }
+        RowIterator(const SparseMatrix &matrix_, int row) : matrix(matrix_) {
+            if (matrix.coo_mode) { matrix.convertToCRS(); }
 
-        void next() { ++index; }
+            if (!matrix.crs_data) { throw std::runtime_error("CRS data not initialized"); }
 
-        double value() const { return matrix.crs_values[index]; }
+            const auto &crs = *matrix.crs_data;
 
-        int col() const { return matrix.crs_cols[index]; }
+            if (row < 0 || row >= matrix.num_rows) { throw std::out_of_range("Row index out of bounds"); }
+
+            current_index = crs.row_start[row];
+            row_end       = (row + 1 < matrix.num_rows) ? crs.row_start[row + 1] : crs.values.size();
+        }
+
+        // STL-compatible iterator operations
+        bool operator==(const RowIterator &other) const { return current_index == other.current_index; }
+
+        bool operator!=(const RowIterator &other) const { return !(*this == other); }
+
+        RowIterator &operator++() {
+            if (current_index < row_end) { ++current_index; }
+            return *this;
+        }
+
+        RowIterator operator++(int) {
+            RowIterator tmp = *this;
+            ++(*this);
+            return tmp;
+        }
+
+        value_type operator*() const {
+            if (current_index >= row_end) { throw std::out_of_range("Iterator out of range"); }
+            const auto &crs = *matrix.crs_data;
+            return {crs.cols[current_index], crs.values[current_index]};
+        }
+
+        // Additional helper methods
+        bool valid() const { return current_index < row_end; }
+
+        int col() const {
+            if (!valid()) { throw std::out_of_range("Invalid iterator access"); }
+            return matrix.crs_data->cols[current_index];
+        }
+
+        double value() const {
+            if (!valid()) { throw std::out_of_range("Invalid iterator access"); }
+            return matrix.crs_data->values[current_index];
+        }
     };
 
-    // Get a RowIterator for a specific row (convert to CRS if needed)
-    RowIterator rowIterator(int row) const {
-        if (coo_mode) const_cast<SparseMatrix *>(this)->convertToCRS(); // Convert to CRS if in COO mode
-        return RowIterator(*this, row);
+    // Iterator factory methods
+    RowIterator row_begin(int row) const { return RowIterator(*this, row); }
+
+    RowIterator row_end(int row) const {
+        auto it = RowIterator(*this, row);
+        while (it.valid()) { ++it; }
+        return it;
+    }
+
+    // Example usage of the iterator in a method
+    std::vector<double> get_row_values(int row) const {
+        std::vector<double> result;
+        for (auto it = row_begin(row); it.valid(); ++it) { result.push_back(it.value()); }
+        return result;
     }
 
     // Delete a column in COO mode
@@ -159,18 +339,21 @@ struct SparseMatrix {
     }
 
     // Matrix-vector multiplication in CRS mode
-    std::vector<double> multiply(const std::vector<double> &x) {
-        if (coo_mode) convertToCRS(); // Convert to CRS before multiplication
+    std::vector<double> multiply(const std::vector<double> &x) const {
+        if (coo_mode) convertToCRS();
 
         std::vector<double> result(num_rows, 0.0);
+        const auto         &crs = *crs_data;
+
         for (int row = 0; row < num_rows; ++row) {
+            const int row_start = crs.row_start[row];
+            const int row_end   = (row + 1 < num_rows) ? crs.row_start[row + 1] : crs.values.size();
+
             double sum = 0.0;
-            for (int i = crs_row_start[row]; i < (row + 1 < num_rows) ? crs_row_start[row + 1] : crs_values.size();
-                 ++i) {
-                sum += crs_values[i] * x[crs_cols[i]];
-            }
+            for (int i = row_start; i < row_end; ++i) { sum += crs.values[i] * x[crs.cols[i]]; }
             result[row] = sum;
         }
+
         return result;
     }
 
@@ -237,23 +420,23 @@ struct SparseMatrix {
     // Inline accessors for row_start (const version)
     const std::vector<int> &getRowStart() const {
         if (coo_mode) { throw std::runtime_error("row_start is only available in CRS mode."); }
-        return crs_row_start;
+        return crs_data->row_start;
     }
 
     // Inline accessors for row_start (non-const version)
     std::vector<int> &getRowStart() {
         if (coo_mode) { throw std::runtime_error("row_start is only available in CRS mode."); }
-        return crs_row_start;
+        return crs_data->row_start;
     }
 
     std::vector<int> &getIndices() {
         if (coo_mode) { throw std::runtime_error("indices are only available in CRS mode."); }
-        return crs_cols;
+        return crs_data->cols;
     }
 
     std::vector<double> &getValues() {
         if (coo_mode) { throw std::runtime_error("values are only available in CRS mode."); }
-        return crs_values;
+        return crs_data->values;
     }
 
     // Build the row start indices for CRS mode
