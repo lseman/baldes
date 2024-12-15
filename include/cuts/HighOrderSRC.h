@@ -152,6 +152,19 @@ public:
         num_valid_routes = 0;
     }
 
+    void clearMemory() {
+        cut_record.clear();
+        v_r_map.clear();
+        c_N_noC.clear();
+        map_cut_plan_vio.clear();
+        generated_rank1_multi_pool.clear();
+        rank1_multi_label_pool.clear();
+        rank1_multi_mem_plan_map.clear();
+        cuts.clear();
+        cut_cache.clear();
+        num_valid_routes = 0;
+    }
+
     void getHighDimCuts() {
         constructVRMapAndSeedCrazy();
         startSeedCrazy();

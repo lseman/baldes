@@ -104,16 +104,16 @@ std::vector<Label *> BucketGraph::solvePSTEP(PSTEPDuals &inner_pstep_duals) {
 
     return all_paths;
 }
-void generateInitialPathsTSPTW(int n, std::vector<std::vector<int>> &paths, std::vector<double> &path_costs,
+void generateInitialPathsTSPTW(int n, std::vector<std::vector<uint16_t>> &paths, std::vector<double> &path_costs,
                                std::vector<int> &firsts, std::vector<int> &lasts,
                                const std::vector<std::vector<double>> &cost_matrix,
                                const std::vector<double> &start_times, const std::vector<double> &end_times,
                                const std::vector<double> &service_times) {
-    std::vector<bool> visited(n + 1, false); // Increased size to include node 101
-    std::vector<int>  initial_path;
-    int               current_node = 0;
-    double            current_time = 0.0;
-    double            cost         = 0.0;
+    std::vector<bool>     visited(n + 1, false); // Increased size to include node 101
+    std::vector<uint16_t> initial_path;
+    int                   current_node = 0;
+    double                current_time = 0.0;
+    double                cost         = 0.0;
 
     // Debug prints
     fmt::print("Start times[0]: {}, End times[0]: {}\n", start_times[0], end_times[0]);
@@ -184,13 +184,13 @@ void generateInitialPathsTSPTW(int n, std::vector<std::vector<int>> &paths, std:
         fmt::print("\n");
     }
 }
-inline void generateInitialPaths(int n, std::vector<std::vector<int>> &paths, std::vector<double> &path_costs,
+inline void generateInitialPaths(int n, std::vector<std::vector<uint16_t>> &paths, std::vector<double> &path_costs,
                                  std::vector<int> &firsts, std::vector<int> &lasts,
                                  const std::vector<std::vector<double>> &cost_matrix) {
-    std::vector<bool> visited(n, false);
-    std::vector<int>  initial_path;
-    int               current_node = 0;
-    visited[current_node]          = true;
+    std::vector<bool>     visited(n, false);
+    std::vector<uint16_t> initial_path;
+    int                   current_node = 0;
+    visited[current_node]              = true;
     initial_path.push_back(current_node);
 
     auto cost = 0.0;
@@ -225,7 +225,7 @@ inline void generateInitialPaths(int n, std::vector<std::vector<int>> &paths, st
     fmt::print("Initial heuristic cost = {}\n", cost);
 }
 
-auto BucketGraph::solveTSP(std::vector<std::vector<int>> &paths, std::vector<double> &path_costs,
+auto BucketGraph::solveTSP(std::vector<std::vector<uint16_t>> &paths, std::vector<double> &path_costs,
                            std::vector<int> &firsts, std::vector<int> &lasts,
                            std::vector<std::vector<double>> &cost_matrix, bool first_time) {
     auto       n     = cost_matrix.size();
@@ -324,8 +324,8 @@ auto BucketGraph::solveTSP(std::vector<std::vector<int>> &paths, std::vector<dou
     auto lp_obj = 0.0;
 #endif
     fmt::print("LP Objective: {}\n", lp_obj);
-    GRBEnv &env      = GurobiEnvSingleton::getInstance();
-    auto    modelGRB = new GRBModel(model.toGurobiModel(env));
+    GRBEnv   &env      = GurobiEnvSingleton::getInstance();
+    GRBModel *modelGRB = model.toGurobiModel(env).release(); // Release ownership from unique_ptr
     // set model verbose
     modelGRB->set(GRB_IntParam_OutputFlag, 0);
     // set model type as 2
@@ -356,10 +356,10 @@ auto BucketGraph::solveTSP(std::vector<std::vector<int>> &paths, std::vector<dou
 std::vector<Label *> BucketGraph::solvePSTEP_by_MTZ() {
     int JOBS = nodes.size();
 
-    std::vector<std::vector<int>> all_paths;
-    std::vector<double>           all_costs;
-    std::vector<int>              all_firsts;
-    std::vector<int>              all_lasts;
+    std::vector<std::vector<uint16_t>> all_paths;
+    std::vector<double>                all_costs;
+    std::vector<int>                   all_firsts;
+    std::vector<int>                   all_lasts;
 
     auto duals                = solveTSP(all_paths, all_costs, all_firsts, all_lasts, distance_matrix, true);
     auto max_pstep_iterations = 10;
@@ -418,7 +418,7 @@ std::vector<Label *> BucketGraph::solvePSTEP_by_MTZ() {
     return {};
 }
 
-auto BucketGraph::solveTSPTW(std::vector<std::vector<int>> &paths, std::vector<double> &path_costs,
+auto BucketGraph::solveTSPTW(std::vector<std::vector<uint16_t>> &paths, std::vector<double> &path_costs,
                              std::vector<int> &firsts, std::vector<int> &lasts,
                              std::vector<std::vector<double>> &cost_matrix, std::vector<double> &service_times,
                              std::vector<double> &time_windows_start, std::vector<double> &time_windows_end,
@@ -538,11 +538,11 @@ auto BucketGraph::solveTSPTW(std::vector<std::vector<int>> &paths, std::vector<d
     }
 
     // Solution output and return
-    //fmt::print("LP Objective: {}\n", ipSolver->getObjective());
+    // fmt::print("LP Objective: {}\n", ipSolver->getObjective());
 
     GRBEnv &env = GurobiEnvSingleton::getInstance();
 
-    auto modelGRB = new GRBModel(model.toGurobiModel(env));
+    GRBModel *modelGRB = model.toGurobiModel(env).release();
     // set model verbose
     modelGRB->set(GRB_IntParam_OutputFlag, 1);
     // set model type as 2
@@ -558,10 +558,10 @@ std::vector<Label *> BucketGraph::solveTSPTW_by_MTZ() {
     int JOBS = nodes.size();
 
     // Initialize containers for storing paths, costs, firsts, and lasts
-    std::vector<std::vector<int>> all_paths;
-    std::vector<double>           all_costs;
-    std::vector<int>              all_firsts;
-    std::vector<int>              all_lasts;
+    std::vector<std::vector<uint16_t>> all_paths;
+    std::vector<double>                all_costs;
+    std::vector<int>                   all_firsts;
+    std::vector<int>                   all_lasts;
 
     // extract service time from nodes
     std::vector<double> service_times;

@@ -151,7 +151,6 @@ public:
  * method. If the pool is full, a new label will be allocated.
  *
  */
-
 class LabelPool {
 public:
     explicit LabelPool(size_t initial_pool_size, size_t max_pool_size = 5000000)

@@ -135,7 +135,7 @@ public:
 #endif
 #ifdef GUROBI
         auto gurobi_model = mip.toGurobiModel(GurobiEnvSingleton::getInstance());
-        solver            = new GurobiSolver(&gurobi_model);
+        solver            = new GurobiSolver(gurobi_model);
 #endif
         uuid              = generateUUID();
         this->initialized = true;
@@ -344,14 +344,18 @@ public:
     double              getObjVal() { return solver->getObjVal(); }
     std::vector<double> getDuals() { return solver->getDuals(); }
     std::vector<double> extractSolution() { return solver->extractSolution(); }
-    void                optimize(double tol = 1e-6) {
+
+    void optimize(double tol = 1e-6) {
 #ifdef HIGHS
         solver->setModel(mip.toHighsModel());
 #endif
 #ifdef GUROBI
-        GRBEnv &env   = GurobiEnvSingleton::getInstance();
-        auto    model = new GRBModel(mip.toGurobiModel(env)); // Pass the retrieved or new environment
-        solver->setModel(model);
+        GRBEnv &env = GurobiEnvSingleton::getInstance();
+        // auto    model = new GRBModel(mip.toGurobiModel(env)); // Pass the retrieved or new environment
+        // solver->setModel(mip.toGurobiModel(env));
+        auto model = mip.toGurobiModel(env); // Returns unique_ptr<GRBModel>
+        solver->setModel(std::any(GRBModelWrapper(std::move(model))));
+
 #endif
         solver->optimize(tol);
     }
@@ -490,8 +494,6 @@ public:
 
 #ifdef GUROBI
     // Assuming model is your GRBModel and obj is your objective sense
-    std::vector<int> getBasicVariableIndices() {
-        return solver->getBasicVariableIndices();
-    }
+    std::vector<int> getBasicVariableIndices() { return solver->getBasicVariableIndices(); }
 #endif
 };

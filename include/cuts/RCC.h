@@ -67,12 +67,10 @@ public:
     }
 
     void setCutCtrs(std::vector<baldesCtrPtr> ctrs) {
-        for (int i = 0; i < ctrs.size(); i++) {
-            cuts_[i].ctr = ctrs[i];
-        }
+        for (int i = 0; i < ctrs.size(); i++) { cuts_[i].ctr = ctrs[i]; }
     }
 
-    std::vector<double> computeRCCCoefficients(const std::vector<int> &label) {
+    std::vector<double> computeRCCCoefficients(const std::vector<uint16_t> &label) {
         std::vector<double> coeffs(cuts_.size(), 0);
 
         // Precompute the pairs of consecutive nodes in the label

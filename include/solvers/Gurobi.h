@@ -3,6 +3,28 @@
 #include <gurobi_c++.h>
 #include <iostream>
 
+struct GRBModelWrapper {
+    std::unique_ptr<GRBModel> model;
+
+    // Move constructor
+    GRBModelWrapper(std::unique_ptr<GRBModel> m) : model(std::move(m)) {}
+
+    // Copy constructor
+    GRBModelWrapper(const GRBModelWrapper &other) : model(other.model ? new GRBModel(*other.model) : nullptr) {}
+
+    // Move assignment
+    GRBModelWrapper &operator=(GRBModelWrapper &&other) noexcept {
+        model = std::move(other.model);
+        return *this;
+    }
+
+    // Copy assignment
+    GRBModelWrapper &operator=(const GRBModelWrapper &other) {
+        if (this != &other) { model.reset(other.model ? new GRBModel(*other.model) : nullptr); }
+        return *this;
+    }
+};
+
 class GurobiEnvSingleton {
 private:
     // Private constructor to prevent direct instantiation
@@ -12,11 +34,11 @@ private:
             // set method
             // env.set(GRB_IntParam_Method, 2);
             // set gurobi multicore
-            //env.set(GRB_IntParam_Threads, std::thread::hardware_concurrency());
+            // env.set(GRB_IntParam_Threads, std::thread::hardware_concurrency());
 
             // reduce gurobi tolerance to 1e-4
             // set ConcurrentMethod
-            //env.set(GRB_IntParam_ConcurrentMIP, 3);
+            // env.set(GRB_IntParam_ConcurrentMIP, 3);
         } catch (GRBException &e) {
             std::cerr << "Error code = " << e.getErrorCode() << std::endl;
             std::cerr << e.getMessage() << std::endl;
@@ -38,7 +60,8 @@ public:
 };
 
 class GurobiSolver : public SolverInterface {
-    GRBModel *model = nullptr;
+    GRBModel *model      = nullptr;
+    bool      owns_model = false; // Add this flag
     int       numConstrs;
 
 public:
@@ -46,17 +69,46 @@ public:
     GurobiSolver(GRBModel *model) : model(model) { numConstrs = model->get(GRB_IntAttr_NumConstrs); }
     GurobiSolver(GRBModel &model) : model(&model) { numConstrs = model.get(GRB_IntAttr_NumConstrs); }
 
+    // Constructor for unique_ptr
+    GurobiSolver(std::unique_ptr<GRBModel> &model) : model(model.get()) {
+        numConstrs = model->get(GRB_IntAttr_NumConstrs);
+    }
+
     GurobiSolver(GRBModel *model, bool mute) : model(model) {}
 
-    void setModel(const std::any &modelData) override { // Type check and assign
-        // print the type of modelData
-        // fmt::print("ModelData type: {}\n", modelData.type().name());
-        if (modelData.type() == typeid(GRBModel *)) {
-            // print modelData.type().name();
-            auto grbmodel = std::any_cast<GRBModel *>(modelData);
-            model         = grbmodel;
-        } else {
-            throw std::invalid_argument("Invalid model type for Gurobi");
+    void setModel(const std::any &modelData) override {
+        GRBModel *oldModel = model;
+        bool      old_owns = owns_model;
+        model              = nullptr;
+        owns_model         = false;
+
+        try {
+            if (modelData.type() == typeid(GRBModelWrapper)) {
+                const auto &wrapper = std::any_cast<const GRBModelWrapper &>(modelData);
+                if (!wrapper.model) { throw std::runtime_error("Null model in wrapper"); }
+                model      = new GRBModel(*wrapper.model);
+                owns_model = true; // We own this model
+            } else if (modelData.type() == typeid(GRBModel *)) {
+                auto grbmodel = std::any_cast<GRBModel *>(modelData);
+                if (!grbmodel) { throw std::runtime_error("Null model pointer"); }
+                model      = grbmodel;
+                owns_model = false; // We don't own this model
+            } else {
+                model      = oldModel;
+                owns_model = old_owns;
+                throw std::invalid_argument("Invalid model type for Gurobi");
+            }
+
+            if (oldModel != nullptr && oldModel != model && old_owns) { delete oldModel; }
+
+            if (model) { numConstrs = model->get(GRB_IntAttr_NumConstrs); }
+
+        } catch (const std::exception &e) {
+            if (model == nullptr) {
+                model      = oldModel;
+                owns_model = old_owns;
+            }
+            throw;
         }
     }
 
@@ -105,9 +157,7 @@ public:
             for (int i = 0; i < numVars; i++) {
                 int basisStatus = vars[i].get(GRB_IntAttr_VBasis);
                 // Check if the variable is basic (status == 0)
-                if (basisStatus == 0) {
-                    basicVariableIndices.push_back(i);
-                }
+                if (basisStatus == 0) { basicVariableIndices.push_back(i); }
             }
 
             delete[] vars; // Clean up allocated memory
@@ -119,4 +169,7 @@ public:
         return basicVariableIndices;
     }
 
+    ~GurobiSolver() {
+        if (model != nullptr && owns_model) { delete model; }
+    }
 };

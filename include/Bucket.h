@@ -42,21 +42,21 @@ struct Bucket {
     bool                   is_split = false;
 
     double get_cb() const {
+        if (labels_vec.empty() && !is_split) { return std::numeric_limits<double>::max(); }
+
         if (is_split) {
             double min_cb = std::numeric_limits<double>::max();
             for (const auto &sub_bucket : sub_buckets) { min_cb = std::min(min_cb, sub_bucket.get_cb()); }
             return min_cb;
-        } else {
-#ifdef SORTED_LABELS
-            return labels_vec.empty() ? std::numeric_limits<double>::max() : labels_vec.front()->cost;
-#else
-            if (labels_vec.empty()) return std::numeric_limits<double>::max();
-
-            return (*std::min_element(labels_vec.begin(), labels_vec.end(),
-                                      [](const Label *a, const Label *b) { return a->cost < b->cost; }))
-                ->cost;
-#endif
         }
+
+#ifdef SORTED_LABELS
+        return labels_vec.front()->cost;
+#else
+        return (*std::min_element(labels_vec.begin(), labels_vec.end(),
+                                  [](const Label *a, const Label *b) { return a->cost < b->cost; }))
+            ->cost;
+#endif
     }
 
     Bucket(const Bucket &other) : labels_vec(other.labels_vec) {
@@ -116,11 +116,17 @@ struct Bucket {
         }
     }
 
+    double               min_split_range  = 0.5;
+    static constexpr int MAX_BUCKET_DEPTH = 4;
+
     // Dominance check method for Bucket
     bool check_dominance(const Label                                             *new_label,
                          const std::function<bool(const std::vector<Label *> &)> &dominance_func, int &stat_n_dom) {
+        // Early return if cost bound exceeds new label's cost
+        if (get_cb() > new_label->cost) { return false; }
+
+        // Handle non-split case directly
         if (!is_split) {
-            if (get_cb() > new_label->cost) return false;
             if (dominance_func(get_labels())) {
                 ++stat_n_dom;
                 return true;
@@ -128,73 +134,186 @@ struct Bucket {
             return false;
         }
 
-        std::atomic<bool> dominance_found{false};
-        std::for_each(std::execution::par_unseq, sub_buckets.begin(), sub_buckets.end(), [&](Bucket &bucket) {
-            if (dominance_found || bucket.get_cb() > new_label->cost) return;
-            if (bucket.check_dominance(new_label, dominance_func, stat_n_dom)) { dominance_found = true; }
-        });
-
-        return dominance_found;
-    }
-
-    double min_split_range = 0.5;
-    void   split_into_sub_buckets() noexcept {
-        if (labels_vec.empty()) return;
-
-        // If range is too small, don't split
-        double total_range = ub[0] - lb[0];
-        if (total_range < min_split_range) return;
-
-        if (is_split) return;
-        
-
-        // Sort labels by their values
-        std::vector<double> label_values;
-        label_values.reserve(labels_vec.size());
-        if (label_values.empty()) { return; }
-
-        is_split = true;
-        for (const auto *label : labels_vec) { label_values.push_back(label->resources[0]); }
-        std::sort(label_values.begin(), label_values.end());
-
-        // Find median value
-        size_t mid_idx = label_values.size() / 2;
-        double midpoint;
-        if (label_values.size() % 2 == 0) {
-            // If even number of labels, take average of middle two
-            midpoint = roundToTwoDecimalPlaces((label_values[mid_idx - 1] + label_values[mid_idx]) / 2.0);
-        } else {
-            // If odd number of labels, take middle value
-            midpoint = roundToTwoDecimalPlaces(label_values[mid_idx]);
+        // For small number of sub-buckets, use sequential processing
+        constexpr size_t PARALLEL_THRESHOLD = 4;
+        if (sub_buckets.size() <= PARALLEL_THRESHOLD) {
+            for (auto &bucket : sub_buckets) {
+                if (bucket.get_cb() <= new_label->cost &&
+                    bucket.check_dominance(new_label, dominance_func, stat_n_dom)) {
+                    return true;
+                }
+            }
+            return false;
         }
 
-        // Ensure midpoint is within bucket bounds
-        midpoint = std::max(midpoint, lb[0]);
-        midpoint = std::min(midpoint, ub[0]);
+        // For larger sets, use parallel processing with optimizations
+        std::atomic<bool> dominance_found{false};
+        std::atomic<int>  local_stat_n_dom{0};
 
+        // Pre-filter buckets that could potentially dominate
+        std::vector<Bucket *> candidate_buckets;
+        candidate_buckets.reserve(sub_buckets.size());
+
+        for (auto &bucket : sub_buckets) {
+            if (bucket.get_cb() <= new_label->cost) { candidate_buckets.push_back(&bucket); }
+        }
+
+        // If no candidates, return early
+        if (candidate_buckets.empty()) { return false; }
+
+        // Process candidates in parallel
+        std::for_each(std::execution::par_unseq, candidate_buckets.begin(), candidate_buckets.end(),
+                      [&](Bucket *bucket) {
+                          // Skip if dominance already found
+                          if (dominance_found.load(std::memory_order_relaxed)) { return; }
+
+                          int local_dom = 0;
+                          if (bucket->check_dominance(new_label, dominance_func, local_dom)) {
+                              dominance_found.store(true, std::memory_order_release);
+                              local_stat_n_dom.fetch_add(local_dom, std::memory_order_relaxed);
+                          }
+                      });
+
+        // Update stats counter
+        stat_n_dom += local_stat_n_dom.load(std::memory_order_relaxed);
+
+        return dominance_found.load(std::memory_order_acquire);
+    }
+
+    void split_into_sub_buckets() noexcept {
+        // Early returns for invalid states
+        if (labels_vec.empty() || is_split || depth >= MAX_BUCKET_DEPTH) { return; }
+
+        constexpr size_t RESOURCE_INDEX = 0;
+        const double     total_range    = ub[RESOURCE_INDEX] - lb[RESOURCE_INDEX];
+
+        if (total_range < min_split_range) { return; }
+
+        // Pre-allocate vectors with exact sizes needed
+        size_t              label_count = labels_vec.size();
+        std::vector<double> label_values;
+        label_values.reserve(label_count);
+
+        // Extract resource values
+        std::transform(labels_vec.begin(), labels_vec.end(), std::back_inserter(label_values),
+                       [](const Label *label) { return label->resources[RESOURCE_INDEX]; });
+
+        // Find median using nth_element
+        const size_t mid_idx = label_count / 2;
+        std::nth_element(label_values.begin(), label_values.begin() + mid_idx, label_values.end());
+
+        const double midpoint         = roundToTwoDecimalPlaces(label_values[mid_idx]);
+        const double clamped_midpoint = std::clamp(midpoint, lb[RESOURCE_INDEX], ub[RESOURCE_INDEX]);
+
+        // Pre-allocate sub-buckets
         sub_buckets.clear();
         sub_buckets.reserve(2);
 
-        // Create first sub-bucket
-        Bucket first_sub_bucket;
-        first_sub_bucket.node_id = node_id;
-        first_sub_bucket.lb      = {roundToTwoDecimalPlaces(lb[0])};
-        first_sub_bucket.ub      = {midpoint};
-        first_sub_bucket.depth   = depth + 1;
-        sub_buckets.push_back(first_sub_bucket);
+        // Initialize both sub-buckets at once
+        for (int i = 0; i < 2; ++i) {
+            sub_buckets.emplace_back();
+            auto &bucket           = sub_buckets.back();
+            bucket.node_id         = node_id;
+            bucket.depth           = depth + 1;
+            bucket.min_split_range = min_split_range;
 
-        // Create second sub-bucket
-        Bucket second_sub_bucket;
-        second_sub_bucket.node_id = node_id;
-        second_sub_bucket.lb      = {midpoint};
-        second_sub_bucket.ub      = {roundToTwoDecimalPlaces(ub[0])};
-        second_sub_bucket.depth   = depth + 1;
-        sub_buckets.push_back(second_sub_bucket);
+            if (i == 0) {
+                bucket.lb = {roundToTwoDecimalPlaces(lb[RESOURCE_INDEX])};
+                bucket.ub = {clamped_midpoint};
+            } else {
+                bucket.lb = {clamped_midpoint};
+                bucket.ub = {roundToTwoDecimalPlaces(ub[RESOURCE_INDEX])};
+            }
+        }
 
-        // Assign labels to sub-buckets
-        for (auto *label : labels_vec) { assign_label_to_sub_bucket(label); }
+        // Partition labels more efficiently
+        auto &first  = sub_buckets[0];
+        auto &second = sub_buckets[1];
+
+        // Reserve approximate space based on median
+        first.labels_vec.reserve(label_count / 2 + label_count / 10); // Add 10% buffer
+        second.labels_vec.reserve(label_count / 2 + label_count / 10);
+
+        // Use stable_partition for better cache utilization
+        auto partition_point = std::stable_partition(labels_vec.begin(), labels_vec.end(),
+                                                     [RESOURCE_INDEX, clamped_midpoint](const Label *label) {
+                                                         return label->resources[RESOURCE_INDEX] <= clamped_midpoint;
+                                                     });
+
+        // Move labels to sub-buckets
+        first.labels_vec.assign(std::make_move_iterator(labels_vec.begin()), std::make_move_iterator(partition_point));
+        second.labels_vec.assign(std::make_move_iterator(partition_point), std::make_move_iterator(labels_vec.end()));
+
+        // Clear parent bucket's labels
         labels_vec.clear();
+        labels_vec.shrink_to_fit();
+        is_split = true;
+
+#ifdef SORTED_LABELS
+        // Maintain sorting in sub-buckets if needed
+        // first.sort();
+        // second.sort();
+        pdqsort(first.labels_vec.begin(), first.labels_vec.end(),
+                [](const Label *a, const Label *b) { return a->cost < b->cost; });
+        pdqsort(second.labels_vec.begin(), second.labels_vec.end(),
+                [](const Label *a, const Label *b) { return a->cost < b->cost; });
+#endif
     }
+
+    void add_label(Label *label) noexcept {
+        // Early return for null label
+        if (!label) { return; }
+
+        if (is_split) {
+            // There should always be exactly 2 sub-buckets when split
+            assert(sub_buckets.size() == 2);
+
+            // Direct index access is faster than iteration for 2 buckets
+            if (sub_buckets[0].is_contained(label)) {
+                if (sub_buckets[0].depth >= MAX_BUCKET_DEPTH) {
+                    sub_buckets[0].labels_vec.push_back(label);
+                } else {
+                    sub_buckets[0].add_label(label);
+                }
+                return;
+            }
+
+            if (sub_buckets[1].is_contained(label)) {
+                if (sub_buckets[1].depth >= MAX_BUCKET_DEPTH) {
+                    sub_buckets[1].labels_vec.push_back(label);
+                } else {
+                    sub_buckets[1].add_label(label);
+                }
+                return;
+            }
+
+// Handle out-of-bounds case
+#ifdef DEBUG
+            print_info("Warning: Label {:.2f} outside bucket range [{:.2f}, {:.2f}]\n", label->resources[0], lb[0],
+                       ub[0]);
+#endif
+
+            // Add to the closest sub-bucket instead of parent
+            const double mid_point = (sub_buckets[0].ub[0] + sub_buckets[1].lb[0]) / 2.0;
+            if (label->resources[0] <= mid_point) {
+                sub_buckets[0].labels_vec.push_back(label);
+            } else {
+                sub_buckets[1].labels_vec.push_back(label);
+            }
+            return;
+        }
+
+        // Pre-reserve space if needed
+        if (labels_vec.size() == labels_vec.capacity()) {
+            labels_vec.reserve(std::max(size_t(64), labels_vec.capacity() * 2));
+        }
+
+        labels_vec.push_back(label);
+
+        // Check for split condition
+        if (depth < MAX_BUCKET_DEPTH && labels_vec.size() >= BUCKET_CAPACITY) { split_into_sub_buckets(); }
+    }
+
     void sort() {
         pdqsort(labels_vec.begin(), labels_vec.end(), [](const Label *a, const Label *b) { return a->cost < b->cost; });
     }
@@ -285,55 +404,72 @@ struct Bucket {
     // create default constructor
     Bucket() {}
 
-    /**
-     * @brief Adds a label to the labels vector.
-     *
-     * This function adds a label to the labels vector. The label is currently added to the end of the vector.
-     *
-     */
-    // void add_label(Label *label) noexcept { labels_vec.push_back(label); }
-    void add_label(Label *label) noexcept {
-        if (is_split) {
-            assign_label_to_sub_bucket(label);
-            return;
-        }
-
-        labels_vec.push_back(label);
-        if (labels_vec.size() >= BUCKET_CAPACITY) { split_into_sub_buckets(); }
-    }
-
     void add_sorted_label(Label *label) noexcept {
+        // Check for invalid label
+        if (!label) return;
+
         if (is_split) {
+            // Find appropriate sub-bucket
             for (auto &bucket : sub_buckets) {
                 if (bucket.is_contained(label)) {
-                    bucket.add_sorted_label(label);
+                    // Only recurse if we haven't hit maximum depth
+                    if (bucket.depth >= MAX_BUCKET_DEPTH) {
+                        // Find insertion point even at max depth
+                        auto insert_pos =
+                            std::lower_bound(bucket.labels_vec.begin(), bucket.labels_vec.end(), label,
+                                             [](const Label *a, const Label *b) { return a->cost < b->cost; });
+                        bucket.labels_vec.insert(insert_pos, label);
+                    } else {
+                        bucket.add_sorted_label(label);
+                    }
                     return;
                 }
             }
+            // Fallback: add to parent if label doesn't fit in any sub-bucket
+            auto insert_pos = std::lower_bound(labels_vec.begin(), labels_vec.end(), label,
+                                               [](const Label *a, const Label *b) { return a->cost < b->cost; });
+            labels_vec.insert(insert_pos, label);
+            return;
         }
 
-        // Insert into current level's labels_vec
-        if (labels_vec.empty() || label->cost >= labels_vec.back()->cost) {
+        // Pre-reserve space if needed
+        if (labels_vec.size() == labels_vec.capacity()) {
+            labels_vec.reserve(std::max(size_t(64), labels_vec.capacity() * 2));
+        }
+
+        // Handle empty vector case
+        if (labels_vec.empty()) {
             labels_vec.push_back(label);
-        } else if (label->cost <= labels_vec.front()->cost) {
-            labels_vec.insert(labels_vec.begin(), label);
-        } else {
-            auto it = std::lower_bound(labels_vec.begin(), labels_vec.end(), label,
-                                       [](const Label *a, const Label *b) { return a->cost < b->cost; });
-            labels_vec.insert(it, label);
+            return;
         }
 
-        if (!is_split && labels_vec.size() >= BUCKET_CAPACITY) { split_into_sub_buckets(); }
+        // Fast path for common cases
+        if (label->cost >= labels_vec.back()->cost) {
+            labels_vec.push_back(label);
+            return;
+        }
+
+        if (label->cost <= labels_vec.front()->cost) {
+            labels_vec.insert(labels_vec.begin(), label);
+            return;
+        }
+
+        // Binary search for insertion point
+        auto insert_pos = std::lower_bound(labels_vec.begin(), labels_vec.end(), label,
+                                           [](const Label *a, const Label *b) { return a->cost < b->cost; });
+        labels_vec.insert(insert_pos, label);
+
+        // Only split if we're not at max depth and have enough labels
+        if (depth < MAX_BUCKET_DEPTH && labels_vec.size() >= BUCKET_CAPACITY) { split_into_sub_buckets(); }
     }
 
-    bool is_contained(const Label *label) {
-        // Check if each resource in label is within the bounds of sub_bucket
-        for (size_t i = 0; i < 1; ++i) {
-            if (label->resources[i] < lb[i] || label->resources[i] > ub[i]) {
-                return false; // Resource is out of bounds
-            }
-        }
-        return true; // All resources are within bounds
+    bool is_contained(const Label *label) const noexcept {
+        if (!label) { return false; }
+
+        constexpr size_t RESOURCE_INDEX = 0;
+        const double     resource_value = label->resources[RESOURCE_INDEX];
+
+        return resource_value >= lb[RESOURCE_INDEX] && resource_value <= ub[RESOURCE_INDEX];
     }
 
     /**
@@ -383,31 +519,80 @@ struct Bucket {
      *
      */
     void remove_label(Label *label) noexcept {
+        if (!label) { return; }
+
         if (!is_split) {
+            // For small vectors, linear search is faster than binary search
+            if (labels_vec.size() <= 16) {
+                auto it = std::find(labels_vec.begin(), labels_vec.end(), label);
+                if (it != labels_vec.end()) {
+                    *it = std::move(labels_vec.back());
+                    labels_vec.pop_back();
+                }
+                return;
+            }
+
+#ifdef SORTED_LABELS
+            // Use binary search for larger sorted vectors
+            auto it = std::lower_bound(labels_vec.begin(), labels_vec.end(), label,
+                                       [](const Label *a, const Label *b) { return a->cost < b->cost; });
+
+            if (it != labels_vec.end() && *it == label) { labels_vec.erase(it); }
+#else
+            // Use standard find for unsorted
             auto it = std::find(labels_vec.begin(), labels_vec.end(), label);
             if (it != labels_vec.end()) {
                 *it = std::move(labels_vec.back());
                 labels_vec.pop_back();
             }
+#endif
+            return;
+        }
+
+        // When split, check only the bucket that could contain the label
+        constexpr size_t RESOURCE_INDEX = 0;
+        const double     resource_value = label->resources[RESOURCE_INDEX];
+
+        // Direct index access is faster than iteration for 2 buckets
+        assert(sub_buckets.size() == 2);
+
+        if (resource_value <= sub_buckets[0].ub[RESOURCE_INDEX]) {
+            sub_buckets[0].remove_label(label);
         } else {
-            for (auto &bucket : sub_buckets) { bucket.remove_label(label); }
+            sub_buckets[1].remove_label(label);
         }
     }
 
     mutable std::vector<Label *> all_labels; // Mutable to allow modification in const function
 
     inline const std::vector<Label *> &get_labels() const {
-        if (!is_split) return labels_vec;
+        if (!is_split) { return labels_vec; }
+
+        // Pre-calculate total size to avoid multiple allocations
+        assert(sub_buckets.size() == 2); // We always split into exactly 2 buckets
+        const size_t total_size = sub_buckets[0].labels_vec.size() + sub_buckets[1].labels_vec.size();
 
         all_labels.clear();
-        all_labels.reserve(
-            std::accumulate(sub_buckets.begin(), sub_buckets.end(), size_t{0},
-                            [](size_t sum, const auto &bucket) { return sum + bucket.get_labels().size(); }));
+        if (all_labels.capacity() < total_size) { all_labels.reserve(total_size); }
 
+        // Direct insertion for each sub-bucket
+        // Using sub_bucket.labels_vec directly instead of get_labels() to avoid recursion
         for (const auto &bucket : sub_buckets) {
-            const auto &sub_labels = bucket.get_labels();
-            all_labels.insert(all_labels.end(), sub_labels.begin(), sub_labels.end());
+            if (!bucket.is_split) {
+                all_labels.insert(all_labels.end(), bucket.labels_vec.begin(), bucket.labels_vec.end());
+            } else {
+                // Recursive case - but should be rare due to MAX_BUCKET_DEPTH
+                const auto &sub_labels = bucket.get_labels();
+                all_labels.insert(all_labels.end(), sub_labels.begin(), sub_labels.end());
+            }
         }
+
+#ifdef SORTED_LABELS
+        // If labels need to be sorted, sort the combined result
+        // std::sort(all_labels.begin(), all_labels.end(),
+        // [](const Label *a, const Label *b) { return a->cost < b->cost; });
+#endif
+
         return all_labels;
     }
 
@@ -470,9 +655,10 @@ struct Bucket {
      * If the vector is empty, it returns a nullptr.
      *
      */
-    Label *get_best_label() {
+    Label *get_best_label() noexcept {
         if (!is_split) {
-            if (labels_vec.empty()) return nullptr;
+            if (labels_vec.empty()) { return nullptr; }
+
 #ifdef SORTED_LABELS
             return labels_vec[0];
 #else
@@ -481,18 +667,19 @@ struct Bucket {
 #endif
         }
 
-        Label *best     = nullptr;
-        float  min_cost = std::numeric_limits<float>::max();
+        // We always split into exactly 2 buckets
+        assert(sub_buckets.size() == 2);
 
-        for (auto &bucket : sub_buckets) {
-            if (Label *label = bucket.get_best_label()) {
-                if (label->cost < min_cost) {
-                    min_cost = label->cost;
-                    best     = label;
-                }
-            }
-        }
-        return best;
+        // Get best labels from both buckets
+        Label *first_best  = sub_buckets[0].get_best_label();
+        Label *second_best = sub_buckets[1].get_best_label();
+
+        // Handle cases where one or both buckets might be empty
+        if (!first_best) { return second_best; }
+        if (!second_best) { return first_best; }
+
+        // Return the label with lower cost
+        return (first_best->cost <= second_best->cost) ? first_best : second_best;
     }
 
     [[nodiscard]] bool empty() const { return labels_vec.empty(); }
