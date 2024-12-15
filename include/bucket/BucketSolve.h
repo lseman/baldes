@@ -127,7 +127,7 @@ inline std::vector<Label *> BucketGraph::solve(bool trigger) {
             return paths;              // Return the paths after rollback
         }
         // If the objective improves sufficiently, set the status to separation or optimal
-        if (inner_obj >= -1e-1) {
+        if (inner_obj >= -1.0) {
             ss = true; // Enter separation mode (for SRC handling)
 #if !defined(SRC) && !defined(SRC3)
             status = Status::Optimal; // If SRC is not defined, set status to optimal
@@ -793,7 +793,7 @@ BucketGraph::Extend(const std::conditional_t<M == Mutability::Mut, Label *, cons
         const uint64_t          bit_mask = 1ULL << bit_position;
         const size_t            cut_size = cutter->size();
 
-        static constexpr size_t SMALL_SIZE = 64;
+        static constexpr size_t SMALL_SIZE = 256;
 
 #if defined(__cpp_lib_ranges)
         auto indices = std::views::iota(size_t{0}, cut_size);
