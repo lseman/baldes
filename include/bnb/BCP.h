@@ -429,7 +429,7 @@ public:
     /**
      * Column generation algorithm.
      */
-    bool CG(BNBNode *node, int max_iter = 2000) {
+    bool CG(BNBNode *node, int max_iter = 5000) {
 
         print_info("Column generation preparation...\n");
 
@@ -846,6 +846,7 @@ public:
                 // stab.rc     = RC;
 
                 stab.update_stabilization_after_pricing_optim(matrix, nodeDuals, lag_gap, paths);
+                paths.clear();
                 if (stab.shouldExit()) { misprice = false; }
                 if (colAdded == 0) {
                     stab.update_stabilization_after_misprice();

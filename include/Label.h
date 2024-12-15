@@ -32,11 +32,11 @@ struct Label {
     double                     cost          = 0.0;
     double                     real_cost     = 0.0;
     std::array<double, R_SIZE> resources     = {};
-    gch::small_vector<int>     nodes_covered = {}; // Add nodes_covered to Label
+    std::vector<uint16_t>      nodes_covered = {}; // Add nodes_covered to Label
     int                        node_id       = -1; // Add node_id to Label
     Label                     *parent        = nullptr;
     bool                       fresh         = true;
-    SRC_MODE_BLOCK(std::vector<double> SRCmap;)
+    SRC_MODE_BLOCK(std::vector<uint16_t> SRCmap;)
     // uint64_t             visited_bitmap; // Bitmap for visited nodes
     std::array<uint64_t, num_words> visited_bitmap = {0};
 #ifdef UNREACHABLE_DOMINANCE
@@ -57,14 +57,14 @@ struct Label {
 
     void set_extended(bool extended) { is_extended = extended; }
 
-    auto getRoute() const {
-        std::vector<int> nodes;
-        for (auto node : nodes_covered) { nodes.push_back(node); }
-        return nodes;
-    }
+    auto &getRoute() const { return nodes_covered; }
 
     void addRoute(const std::vector<int> &route) {
-        for (auto node : route) { nodes_covered.push_back(node); }
+        nodes_covered.insert(nodes_covered.end(), route.begin(), route.end());
+    }
+
+    void addRoute(const std::vector<uint16_t> &route) {
+        nodes_covered.insert(nodes_covered.end(), route.begin(), route.end());
     }
     /**
      * @brief Checks if a node has been visited.
@@ -87,8 +87,8 @@ struct Label {
         this->real_cost   = 0.0;
         this->parent      = nullptr;
         this->is_extended = false;
-        this->nodes_covered.clear();
-        this->nodes_covered.reserve(N_SIZE / 2);
+        // this->nodes_covered.clear();
+        // this->nodes_covered.reserve(N_SIZE / 3);
         this->children.clear();
 
         std::memset(visited_bitmap.data(), 0, visited_bitmap.size() * sizeof(uint64_t));

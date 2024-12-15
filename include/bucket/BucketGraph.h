@@ -87,9 +87,9 @@ public:
 
     PSTEPDuals pstep_duals;
     void       setPSTEPduals(const PSTEPDuals &arc_duals) { this->pstep_duals = arc_duals; }
-    auto       solveTSP(std::vector<std::vector<int>> &paths, std::vector<double> &path_costs, std::vector<int> &firsts,
+    auto       solveTSP(std::vector<std::vector<uint16_t>> &paths, std::vector<double> &path_costs, std::vector<int> &firsts,
                         std::vector<int> &lasts, std::vector<std::vector<double>> &cost_matrix, bool first_time = false);
-    auto solveTSPTW(std::vector<std::vector<int>> &paths, std::vector<double> &path_costs, std::vector<int> &firsts,
+    auto solveTSPTW(std::vector<std::vector<uint16_t>> &paths, std::vector<double> &path_costs, std::vector<int> &firsts,
                     std::vector<int> &lasts, std::vector<std::vector<double>> &cost_matrix,
                     std::vector<double> &service_times, std::vector<double> &time_windows_start,
                     std::vector<double> &time_windows_end, bool first_time = false);
@@ -959,7 +959,7 @@ public:
         double red_cost  = 0.0;
 
         // Initialize an empty SRCmap for the current label
-        std::vector<double> updated_SRCmap(cut_storage->size(), 0.0);
+        std::vector<uint16_t> updated_SRCmap(cut_storage->size(), 0.0);
 
         int last_node = -1;
         if (L->nodes_covered.size() <= 3) { return nullptr; }

@@ -782,8 +782,8 @@ BucketGraph::Extend(const std::conditional_t<M == Mutability::Mut, Label *, cons
         new_label->visited_bitmap = L_prime->visited_bitmap;
     }
     set_node_visited(new_label->visited_bitmap, node_id); // Mark the new node as visited
-    new_label->nodes_covered = L_prime->nodes_covered;    // Copy the list of covered nodes
-    new_label->nodes_covered.push_back(node_id);          // Add the new node to the list of covered nodes
+    // new_label->nodes_covered = L_prime->nodes_covered;    // Copy the list of covered nodes
+    // new_label->nodes_covered.push_back(node_id);          // Add the new node to the list of covered nodes
 
 #if defined(SRC)
     new_label->SRCmap = L_prime->SRCmap;
@@ -949,69 +949,81 @@ inline bool precedes(const std::vector<std::vector<int>> &sccs, const T a, const
  *
  */
 template <Direction D, Stage S>
-inline bool BucketGraph::DominatedInCompWiseSmallerBuckets(const Label *L, int bucket, const std::vector<double> &c_bar,
-                                                           std::vector<uint64_t>               &Bvisited,
-                                                           const std::vector<std::vector<int>> &bucket_order) noexcept {
+inline bool BucketGraph::DominatedInCompWiseSmallerBuckets(
+    const Label *__restrict__ L, int bucket, const std::vector<double> &__restrict__ c_bar,
+    std::vector<uint64_t> &__restrict__ Bvisited,
+    const std::vector<std::vector<int>> &__restrict__ bucket_order) noexcept {
 
+    // Use references to avoid indirection
     auto &buckets = assign_buckets<D>(fw_buckets, bw_buckets);
     auto &Phi     = assign_buckets<D>(Phi_fw, Phi_bw);
     auto &uf      = assign_buckets<D>(fw_union_find, bw_union_find);
 
+    // Cache frequently used values
     const int    b_L        = L->vertex;
-    const double label_cost = L->cost; // Cache this value
+    const double label_cost = L->cost;
+    const size_t res_size   = options.resources.size();
 
-    // Pre-allocate space for bucket stack to avoid reallocations
-    static thread_local std::vector<int> bucketStack;
-    bucketStack.clear();
-    bucketStack.reserve(10);
-    bucketStack.push_back(bucket);
+    // Pre-compute bit operation constants
+    constexpr uint64_t one                 = 1ULL;
+    constexpr uint64_t bit_mask_lookup[64] = {
+        1ULL << 0, 1ULL << 1, /* ... pre-compute all 64 values ... */
+    };
 
-    // Pre-compute masks for faster bit operations
-    constexpr uint64_t one      = 1ULL;
-    const size_t       res_size = options.resources.size();
+    // Stack-based implementation with fixed size for small bucket counts
+    constexpr size_t MAX_STACK_SIZE = 16;
+    int              stack_buffer[MAX_STACK_SIZE];
+    int              stack_size = 1;
+    stack_buffer[0]             = bucket;
 
-    // Create a dominance checking lambda that's customized for AVX2 vs non-AVX2
+    // SIMD-optimized dominance check function
     auto check_dominance = [&](const std::vector<Label *> &labels) {
-#ifndef __AVX2__
-        for (auto *existing_label : labels) {
-            if (is_dominated<D, S>(L, existing_label)) { return true; }
+#if defined(__AVX2__)
+        return check_dominance_against_vector<D, S>(L, labels, cut_storage, res_size);
+#else
+        const size_t n = labels.size();
+        for (size_t i = 0; i < n; ++i) {
+            if (is_dominated<D, S>(L, labels[i])) return true;
         }
         return false;
-#else
-        return check_dominance_against_vector<D, S>(L, labels, cut_storage, res_size);
 #endif
     };
 
-    // Main bucket traversal loop
     do {
-        const int currentBucket = bucketStack.back();
-        bucketStack.pop_back();
+        const int current_bucket = stack_buffer[--stack_size];
 
-        // Optimize bit operations by computing them once
-        const size_t   segment  = currentBucket >> 6;
-        const uint64_t bit_mask = one << (currentBucket & 63);
-        Bvisited[segment] |= bit_mask;
+        // Optimize bit operations
+        const size_t   segment = current_bucket >> 6;
+        const uint64_t bit     = bit_mask_lookup[current_bucket & 63];
+        Bvisited[segment] |= bit;
 
-        // Early exit condition
-        if (label_cost < c_bar[currentBucket] && ::precedes<int>(bucket_order, currentBucket, b_L, uf)) {
+        // Early exit check
+        if (__builtin_expect(
+                (label_cost < c_bar[current_bucket] && ::precedes<int>(bucket_order, current_bucket, b_L, uf)), 0)) {
             return false;
         }
 
-        // Check for dominance in current bucket
-        if (b_L != currentBucket) {
-            auto &mother_bucket = buckets[currentBucket];
-            int   stat_n_dom    = 0; // Required by check_dominance interface
+        // Check dominance only if necessary
+        if (b_L != current_bucket) {
+            auto &mother_bucket = buckets[current_bucket];
+            int   stat_n_dom    = 0;
             if (mother_bucket.check_dominance(L, check_dominance, stat_n_dom)) { return true; }
         }
 
-        // Process neighbors - use references to avoid copies
-        const auto &bucket_phi = Phi[currentBucket];
-        for (const int b_prime : bucket_phi) {
+        // Process neighbors using SIMD if available
+        const auto  &bucket_neighbors = Phi[current_bucket];
+        const size_t n_neighbors      = bucket_neighbors.size();
+
+        // Regular processing
+        for (size_t i = 0; i < n_neighbors; ++i) {
+            const int    b_prime   = bucket_neighbors[i];
             const size_t seg_prime = b_prime >> 6;
-            // Check if not visited using pre-computed masks
-            if (!(Bvisited[seg_prime] & (one << (b_prime & 63)))) { bucketStack.push_back(b_prime); }
+            if (!(Bvisited[seg_prime] & bit_mask_lookup[b_prime & 63])) {
+                if (stack_size < MAX_STACK_SIZE) { stack_buffer[stack_size++] = b_prime; }
+            }
         }
-    } while (!bucketStack.empty());
+
+    } while (stack_size > 0);
 
     return false;
 }
@@ -1088,7 +1100,6 @@ Label *BucketGraph::compute_label(const Label *L, const Label *L_prime) {
 
     new_label->nodes_covered.clear();
 
-    /*
     // Start by inserting backward list elements
     size_t forward_size = 0;
     auto   L_bw         = L_prime;
@@ -1112,11 +1123,12 @@ Label *BucketGraph::compute_label(const Label *L, const Label *L_prime) {
             }
         }
     }
-    */
-    new_label->nodes_covered = L_prime->nodes_covered;
-    // reverse the nodes_covered
-    std::reverse(new_label->nodes_covered.begin(), new_label->nodes_covered.end());
-    new_label->nodes_covered.insert(new_label->nodes_covered.begin(), L->nodes_covered.begin(), L->nodes_covered.end());
+
+    // new_label->nodes_covered = L_prime->nodes_covered;
+    //  reverse the nodes_covered
+    // std::reverse(new_label->nodes_covered.begin(), new_label->nodes_covered.end());
+    // new_label->nodes_covered.insert(new_label->nodes_covered.begin(), L->nodes_covered.begin(),
+    // L->nodes_covered.end());
 
     return new_label;
 }

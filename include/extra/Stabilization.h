@@ -260,7 +260,7 @@ public:
         constexpr double EPSILON = 1e-12;
         DualSolution     nodeDuals(input_duals.begin(), input_duals.begin() + sizeDual);
 
-        if (cur_stab_center.empty() || subgradient.empty() || duals_sep.empty()) { return getStabDualSol(input_duals); }
+        if (cur_stab_center.empty() || subgradient.empty()) { return getStabDualSol(input_duals); }
 
         const size_t        n = nodeDuals.size();
         std::vector<double> direction(n);
@@ -494,7 +494,7 @@ public:
         DualSolution stab_sol = smooth_dual_sol;
 
         // Update multi-point manager
-        mp_manager.updatePool(stab_sol, -lag_gap); // Negative because we're maximizing
+        mp_manager.updatePool(stab_sol, lag_gap); // Negative because we're maximizing
 
         // Calculate relative improvement for stability center update
         double relative_improvement    = std::abs(lag_gap - lag_gap_prev) / (std::abs(lag_gap_prev) + EPSILON);
@@ -503,16 +503,31 @@ public:
         if (significant_improvement) {
             stab_center_for_next_iteration = stab_sol;
         } else {
-            // Conservative update using weighted average with multi-point prediction
-            double conservative_weight = 0.2;
-            stab_center_for_next_iteration.resize(sizeDual);
+            // Adaptive weights based on convergence metrics from mp_manager
+            const auto &metrics = mp_manager.getMetrics();
 
+            // Increase conservative weight when:
+            // - More stagnant iterations (less trust in new solutions)
+            // - Higher variance in improvements (more unstable behavior)
+            double stagnation_factor = std::min(0.3, 0.1 * metrics.stagnant_iterations);
+            double variance_factor   = std::min(0.2, metrics.variance_improvement);
+
+            // Base conservative weight adjusted by convergence behavior
+            double conservative_weight = 0.2 + stagnation_factor + variance_factor;
+
+            // MP solution influence decreases with stagnation and variance
+            double mp_weight = 0.5 * std::exp(-metrics.stagnant_iterations) * std::exp(-metrics.variance_improvement);
+
+            stab_center_for_next_iteration.resize(sizeDual);
             DualSolution mp_sol = mp_manager.getWeightedSolution();
 
             for (size_t i = 0; i < sizeDual; i++) {
-                stab_center_for_next_iteration[i] = 0.5 * cur_stab_center[i] + conservative_weight * stab_sol[i] +
-                                                    (0.5 - conservative_weight) * mp_sol[i];
+                double stability_weight = 1.0 - (conservative_weight + mp_weight);
+                stab_center_for_next_iteration[i] =
+                    stability_weight * cur_stab_center[i] + conservative_weight * stab_sol[i] + mp_weight * mp_sol[i];
             }
+            
+            //stab_center_for_next_iteration = cur_stab_center;
         }
 
         // Update metrics

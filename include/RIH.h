@@ -60,17 +60,17 @@ public:
         return offspring;
     }
 
-    std::pair<std::vector<int>, std::vector<int>> srex_crossover(const std::vector<int> &parent1,
-                                                                 const std::vector<int> &parent2, int i, int j) {
+    std::pair<std::vector<uint16_t>, std::vector<uint16_t>> srex_crossover(const std::vector<uint16_t> &parent1,
+                                                                 const std::vector<uint16_t> &parent2, int i, int j) {
         int n = parent1.size();
         if (i < 0 || j >= n || i >= j) { return {parent1, parent2}; }
 
         // Copy subroutes
-        std::vector<int> segment1(parent1.begin() + i, parent1.begin() + j + 1);
-        std::vector<int> segment2(parent2.begin() + i, parent2.begin() + j + 1);
+        std::vector<uint16_t> segment1(parent1.begin() + i, parent1.begin() + j + 1);
+        std::vector<uint16_t> segment2(parent2.begin() + i, parent2.begin() + j + 1);
 
         // Create offspring by swapping the segments
-        std::vector<int> offspring1, offspring2;
+        std::vector<uint16_t> offspring1, offspring2;
 
         // Insert segment2 into parent1 and reconstruct
         for (int node : parent1) {
@@ -100,12 +100,12 @@ public:
      * not involved in the reversal.
      *
      */
-    static std::vector<int> two_opt(const std::vector<int> &route, int i, int j) {
+    static std::vector<uint16_t> two_opt(const std::vector<uint16_t> &route, int i, int j) {
         // Validate indices and ensure they do not include depots
         if (i <= 0 || j >= static_cast<int>(route.size()) - 1 || i >= j) { return route; }
 
         // Perform the 2-opt operation by reversing the segment between i and j
-        std::vector<int> new_route(route);
+        std::vector<uint16_t> new_route(route);
         std::reverse(new_route.begin() + i, new_route.begin() + j + 1);
         return new_route;
     }
@@ -118,16 +118,16 @@ public:
      * no changes are made and the original routes are returned.
      *
      */
-    std::pair<std::vector<int>, std::vector<int>> relocate_star(const std::vector<int> &route1,
-                                                                const std::vector<int> &route2, int i, int j) {
+    std::pair<std::vector<uint16_t>, std::vector<uint16_t>> relocate_star(const std::vector<uint16_t> &route1,
+                                                                const std::vector<uint16_t> &route2, int i, int j) {
         // Check if indices are valid and do not involve depots
         if (i <= 0 || i >= static_cast<int>(route1.size()) - 1 || j < 0 || j > static_cast<int>(route2.size())) {
             return {route1, route2};
         }
 
         // Perform relocation
-        std::vector<int> new_route1(route1.begin(), route1.end());
-        std::vector<int> new_route2(route2.begin(), route2.end());
+        std::vector<uint16_t> new_route1(route1.begin(), route1.end());
+        std::vector<uint16_t> new_route2(route2.begin(), route2.end());
 
         // Extract and move customer
         int customer = std::move(new_route1[i]);
@@ -145,8 +145,8 @@ public:
      * no changes are made to avoid swapping depot nodes.
      *
      */
-    std::pair<std::vector<int>, std::vector<int>> enhanced_swap(const std::vector<int> &route1,
-                                                                const std::vector<int> &route2, int i, int j) {
+    std::pair<std::vector<uint16_t>, std::vector<uint16_t>> enhanced_swap(const std::vector<uint16_t> &route1,
+                                                                const std::vector<uint16_t> &route2, int i, int j) {
         // Check if indices are valid and do not involve depots
         if (i <= 0 || i >= static_cast<int>(route1.size()) - 1 || j <= 0 || j >= static_cast<int>(route2.size()) - 1) {
             return {route1, route2};
@@ -157,8 +157,8 @@ public:
         int segment_length =
             std::min({max_segment_length, static_cast<int>(route1.size() - i), static_cast<int>(route2.size() - j)});
 
-        std::vector<int> new_route1(route1);
-        std::vector<int> new_route2(route2);
+        std::vector<uint16_t> new_route1(route1);
+        std::vector<uint16_t> new_route2(route2);
 
         // Swap the segments between the two routes
         std::swap_ranges(new_route1.begin() + i, new_route1.begin() + i + segment_length, new_route2.begin() + j);
@@ -174,7 +174,7 @@ public:
      * crossover points.
      *
      */
-    std::pair<std::vector<int>, std::vector<int>> cross(const std::vector<int> &route1, const std::vector<int> &route2,
+    std::pair<std::vector<uint16_t>, std::vector<uint16_t>> cross(const std::vector<uint16_t> &route1, const std::vector<uint16_t> &route2,
                                                         int k, int l) {
         // Ensure valid crossover points that do not involve depots
         if (k <= 0 || k >= static_cast<int>(route1.size()) - 1 || l <= 0 || l >= static_cast<int>(route2.size()) - 1) {
@@ -182,10 +182,10 @@ public:
         }
 
         // Create new routes by swapping tails
-        std::vector<int> new_route1(route1.begin(), route1.begin() + k);
+        std::vector<uint16_t> new_route1(route1.begin(), route1.begin() + k);
         new_route1.insert(new_route1.end(), route2.begin() + l, route2.end());
 
-        std::vector<int> new_route2(route2.begin(), route2.begin() + l);
+        std::vector<uint16_t> new_route2(route2.begin(), route2.begin() + l);
         new_route2.insert(new_route2.end(), route1.begin() + k, route1.end());
 
         return {std::move(new_route1), std::move(new_route2)};
@@ -199,16 +199,16 @@ public:
      * depots (first and last positions) are not involved in the insertion process.
      *
      */
-    std::pair<std::vector<int>, std::vector<int>> insertion(const std::vector<int> &route1,
-                                                            const std::vector<int> &route2, int k, int l) {
+    std::pair<std::vector<uint16_t>, std::vector<uint16_t>> insertion(const std::vector<uint16_t> &route1,
+                                                            const std::vector<uint16_t> &route2, int k, int l) {
         // Ensure valid positions that do not involve depots
         if (k <= 0 || k >= static_cast<int>(route1.size()) - 1 || l < 0 || l > static_cast<int>(route2.size())) {
             return {route1, route2};
         }
 
         // Copy routes and perform insertion
-        std::vector<int> new_route1(route1);
-        std::vector<int> new_route2(route2);
+        std::vector<uint16_t> new_route1(route1);
+        std::vector<uint16_t> new_route2(route2);
 
         // Extract the customer from route1
         int customer = std::move(new_route1[k]); // Move to avoid unnecessary copying
@@ -228,7 +228,7 @@ public:
      * are not swapped.
      *
      */
-    std::pair<std::vector<int>, std::vector<int>> swap(const std::vector<int> &route1, const std::vector<int> &route2,
+    std::pair<std::vector<uint16_t>, std::vector<uint16_t>> swap(const std::vector<uint16_t> &route1, const std::vector<uint16_t> &route2,
                                                        int k, int l) {
         // Ensure valid swap positions that do not involve depots
         if (k <= 0 || k >= static_cast<int>(route1.size()) - 1 || l <= 0 || l >= static_cast<int>(route2.size()) - 1) {
@@ -236,31 +236,31 @@ public:
         }
 
         // Swap customers between route1 and route2
-        std::vector<int> new_route1(route1);
-        std::vector<int> new_route2(route2);
+        std::vector<uint16_t> new_route1(route1);
+        std::vector<uint16_t> new_route2(route2);
 
         std::swap(new_route1[k], new_route2[l]);
 
         return {std::move(new_route1), std::move(new_route2)};
     }
 
-    std::pair<std::vector<int>, std::vector<int>> nm_exchange(const std::vector<int> &route1,
-                                                              const std::vector<int> &route2, int i, int j) {
+    std::pair<std::vector<uint16_t>, std::vector<uint16_t>> nm_exchange(const std::vector<uint16_t> &route1,
+                                                              const std::vector<uint16_t> &route2, int i, int j) {
         return nm_exchange_fun(route1, route2, i, j, 2, 1);
     }
 
     // (N, M)-Exchange Operator
-    std::pair<std::vector<int>, std::vector<int>> nm_exchange_fun(const std::vector<int> &route1,
-                                                                  const std::vector<int> &route2, int i, int j,
+    std::pair<std::vector<uint16_t>, std::vector<uint16_t>> nm_exchange_fun(const std::vector<uint16_t> &route1,
+                                                                  const std::vector<uint16_t> &route2, int i, int j,
                                                                   int n = 2, int m = 1) {
         if (i == 0 || j == 0 || i + n > route1.size() || j + m > route2.size()) { return {route1, route2}; }
 
-        std::vector<int> new_route1 = route1;
-        std::vector<int> new_route2 = route2;
+        std::vector<uint16_t> new_route1 = route1;
+        std::vector<uint16_t> new_route2 = route2;
 
         // Extract chains
-        std::vector<int> chain1(new_route1.begin() + i, new_route1.begin() + i + n);
-        std::vector<int> chain2(new_route2.begin() + j, new_route2.begin() + j + m);
+        std::vector<uint16_t> chain1(new_route1.begin() + i, new_route1.begin() + i + n);
+        std::vector<uint16_t> chain2(new_route2.begin() + j, new_route2.begin() + j + m);
 
         // Swap the chains
         new_route1.erase(new_route1.begin() + i, new_route1.begin() + i + n);
@@ -273,15 +273,15 @@ public:
     }
 
     // MoveTwoClientsReversed Operator
-    std::pair<std::vector<int>, std::vector<int>>
-    move_two_clients_reversed(const std::vector<int> &route1, const std::vector<int> &route2, int i, int j) {
+    std::pair<std::vector<uint16_t>, std::vector<uint16_t>>
+    move_two_clients_reversed(const std::vector<uint16_t> &route1, const std::vector<uint16_t> &route2, int i, int j) {
         if (i == 0 || i + 1 >= route1.size() || j == 0 || j >= route2.size()) { return {route1, route2}; }
 
-        std::vector<int> new_route1 = route1;
-        std::vector<int> new_route2 = route2;
+        std::vector<uint16_t> new_route1 = route1;
+        std::vector<uint16_t> new_route2 = route2;
 
         // Extract the chain and reverse it
-        std::vector<int> chain = {new_route1[i], new_route1[i + 1]};
+        std::vector<uint16_t> chain = {new_route1[i], new_route1[i + 1]};
         std::reverse(chain.begin(), chain.end());
 
         new_route1.erase(new_route1.begin() + i, new_route1.begin() + i + 2);
@@ -297,14 +297,14 @@ public:
      * each chain into the best possible position in the opposite route, ensuring depots are not involved.
      */
 
-    std::pair<std::vector<int>, std::vector<int>> extended_swap_star(const std::vector<int> &route1,
-                                                                     const std::vector<int> &route2, int i, int j) {
+    std::pair<std::vector<uint16_t>, std::vector<uint16_t>> extended_swap_star(const std::vector<uint16_t> &route1,
+                                                                     const std::vector<uint16_t> &route2, int i, int j) {
         // Call the actual extended_swap_star with a default chain length of 2
         return extended_swap_star_fun(route1, route2, i, j, 2);
     }
 
-    std::pair<std::vector<int>, std::vector<int>> extended_swap_star_fun(const std::vector<int> &route1,
-                                                                         const std::vector<int> &route2, int i, int j,
+    std::pair<std::vector<uint16_t>, std::vector<uint16_t>> extended_swap_star_fun(const std::vector<uint16_t> &route1,
+                                                                         const std::vector<uint16_t> &route2, int i, int j,
                                                                          int chain_length = 2) {
         // Ensure indices are within bounds and do not involve depot nodes
         if (i <= 0 || i + chain_length >= static_cast<int>(route1.size()) || j <= 0 ||
@@ -313,18 +313,18 @@ public:
         }
 
         // Create mutable copies of the routes
-        std::vector<int> new_route1(route1.begin(), route1.end());
-        std::vector<int> new_route2(route2.begin(), route2.end());
+        std::vector<uint16_t> new_route1(route1.begin(), route1.end());
+        std::vector<uint16_t> new_route2(route2.begin(), route2.end());
 
         // Extract and erase chains in-place
         auto             chain1_start = new_route1.begin() + i;
         auto             chain1_end   = chain1_start + chain_length;
-        std::vector<int> chain1(std::make_move_iterator(chain1_start), std::make_move_iterator(chain1_end));
+        std::vector<uint16_t> chain1(std::make_move_iterator(chain1_start), std::make_move_iterator(chain1_end));
         new_route1.erase(chain1_start, chain1_end);
 
         auto             chain2_start = new_route2.begin() + j;
         auto             chain2_end   = chain2_start + chain_length;
-        std::vector<int> chain2(std::make_move_iterator(chain2_start), std::make_move_iterator(chain2_end));
+        std::vector<uint16_t> chain2(std::make_move_iterator(chain2_start), std::make_move_iterator(chain2_end));
         new_route2.erase(chain2_start, chain2_end);
 
         // Find the best insertion positions
@@ -346,7 +346,7 @@ public:
      * This helper function evaluates the cost of inserting a chain into each possible position
      * in the route and returns the index of the best insertion point.
      */
-    int find_best_insertion_position(const std::vector<int> &route, const std::vector<int> &chain) {
+    int find_best_insertion_position(const std::vector<uint16_t> &route, const std::vector<uint16_t> &chain) {
         int    best_pos  = 1;
         double best_cost = std::numeric_limits<double>::max();
 
@@ -367,10 +367,10 @@ public:
         return best_pos;
     }
 
-    double compute_insertion_cost(const std::vector<int> &route, const std::vector<int> &chain, int pos,
+    double compute_insertion_cost(const std::vector<uint16_t> &route, const std::vector<uint16_t> &chain, int pos,
                                   double original_cost) {
         // Simulate the insertion and calculate the cost incrementally
-        std::vector<int> new_route(route.size() + chain.size());
+        std::vector<uint16_t> new_route(route.size() + chain.size());
         std::copy(route.begin(), route.begin() + pos, new_route.begin());
         std::copy(chain.begin(), chain.end(), new_route.begin() + pos);
         std::copy(route.begin() + pos, route.end(), new_route.begin() + pos + chain.size());
@@ -384,8 +384,8 @@ public:
      * This operator moves a chain of 2 or 3 consecutive customers from one route
      * to another. The depots (first and last elements) are not involved.
      */
-    std::pair<std::vector<int>, std::vector<int>> extended_relocate_star(const std::vector<int> &route1,
-                                                                         const std::vector<int> &route2, int i, int j,
+    std::pair<std::vector<uint16_t>, std::vector<uint16_t>> extended_relocate_star(const std::vector<uint16_t> &route1,
+                                                                         const std::vector<uint16_t> &route2, int i, int j,
                                                                          int chain_length = 2) {
         // Ensure we are not relocating depot nodes or exceeding bounds
         if (i == 0 || i + chain_length > route1.size() - 1 || j == 0 || j == route2.size() - 1) {
@@ -393,11 +393,11 @@ public:
         }
 
         // Relocate a chain of customers from route1 to route2
-        std::vector<int> new_route1 = route1;
-        std::vector<int> new_route2 = route2;
+        std::vector<uint16_t> new_route1 = route1;
+        std::vector<uint16_t> new_route2 = route2;
 
         // Extract the chain of customers to relocate
-        std::vector<int> chain(new_route1.begin() + i, new_route1.begin() + i + chain_length);
+        std::vector<uint16_t> chain(new_route1.begin() + i, new_route1.begin() + i + chain_length);
 
         // Remove the chain from route1
         new_route1.erase(new_route1.begin() + i, new_route1.begin() + i + chain_length);
@@ -412,8 +412,8 @@ public:
     // End operators
     ///////////////////////////////////////
     // Adaptive operator selection
-    using OperatorFunc = std::pair<std::vector<int>, std::vector<int>> (IteratedLocalSearch::*)(
-        const std::vector<int> &, const std::vector<int> &, int, int);
+    using OperatorFunc = std::pair<std::vector<uint16_t>, std::vector<uint16_t>> (IteratedLocalSearch::*)(
+        const std::vector<uint16_t> &, const std::vector<uint16_t> &, int, int);
     std::vector<OperatorFunc> operators = {&IteratedLocalSearch::cross,
                                            &IteratedLocalSearch::insertion,
                                            &IteratedLocalSearch::swap,
@@ -433,8 +433,8 @@ public:
     }
 
     // Apply the selected operator
-    std::pair<std::vector<int>, std::vector<int>> apply_operator(int op_index, const std::vector<int> &route1,
-                                                                 const std::vector<int> &route2, int k, int l) {
+    std::pair<std::vector<uint16_t>, std::vector<uint16_t>> apply_operator(int op_index, const std::vector<uint16_t> &route1,
+                                                                 const std::vector<uint16_t> &route2, int k, int l) {
         return (this->*operators[op_index])(route1, route2, k, l);
     }
 
@@ -654,7 +654,7 @@ private:
         return true;
     }
 
-    std::pair<double, double> compute_cost(const std::vector<int> &route) {
+    std::pair<double, double> compute_cost(const std::vector<uint16_t> &route) {
         double cost     = 0;
         double red_cost = 0;
 

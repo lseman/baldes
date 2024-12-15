@@ -70,8 +70,8 @@ struct SparseMatrix;
 class LimitedMemoryRank1Cuts {
 public:
     Xoroshiro128Plus rp; // Seed it (you can change the seed)
-    using HighDimCutsGeneratorPtr              = std::shared_ptr<HighDimCutsGenerator>;
-    HighDimCutsGeneratorPtr          generator = std::make_shared<HighDimCutsGenerator>(N_SIZE, 5, 1e-6);
+    using HighDimCutsGeneratorPtr     = std::shared_ptr<HighDimCutsGenerator>;
+    HighDimCutsGeneratorPtr generator = std::make_shared<HighDimCutsGenerator>(N_SIZE, 5, 1e-6);
 
     void setDistanceMatrix(const std::vector<std::vector<double>> distances) {
         generator->setDistanceMatrix(distances);
@@ -114,7 +114,7 @@ public:
      */
     double computeLimitedMemoryCoefficient(const std::array<uint64_t, num_words> &C,
                                            const std::array<uint64_t, num_words> &AM, const SRCPermutation &p,
-                                           const std::vector<int> &P, std::vector<int> &order);
+                                           const std::vector<uint16_t> &P, std::vector<int> &order);
 
     std::pair<bool, bool> runSeparation(BNBNode *node, std::vector<baldesCtrPtr> &SRCconstraints);
 
@@ -171,7 +171,6 @@ public:
             cutStorage.addCut(cut);
         }
     }
-
 
 private:
     static std::mutex cache_mutex;

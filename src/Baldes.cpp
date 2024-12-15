@@ -273,7 +273,7 @@ int main(int argc, char *argv[]) {
         labels_counter++;
 
         Path path;
-        path.route = route;
+        path.route.assign(route.begin(), route.end());
         // change last element of the route
         path.route[path.route.size() - 1] = N_SIZE - 1;
         path.cost                         = label->cost;
@@ -293,12 +293,12 @@ int main(int argc, char *argv[]) {
         problem->problemType = ProblemType::cvrp;
     }
 
-    BNBNode *node    = new BNBNode(mip);
-    node->paths      = paths;
-    node->problem    = problem;
-    node->mip        = mip;
-    node->instance   = instance;
-    //node->bestRoutes = topRoutes;
+    BNBNode *node  = new BNBNode(mip);
+    node->paths    = paths;
+    node->problem  = problem;
+    node->mip      = mip;
+    node->instance = instance;
+    // node->bestRoutes = topRoutes;
 
     BranchAndBound solver(std::move(problem), BNBNodeSelectionStrategy::DFS); // Choose
     solver.setRootNode(node);

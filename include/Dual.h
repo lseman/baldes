@@ -86,7 +86,7 @@ public:
     std::vector<VRPCandidate *> getBranchingCandidates() { return branchingCandidates_; }
 
     bool empty() { return branchingCandidates_.empty(); }
-    
+
     void addCandidate(VRPCandidate *candidate, baldesCtrPtr constraint) {
         branchingCandidates_.push_back(candidate);
         branchingbaldesCtrs_.push_back(constraint);
@@ -96,7 +96,7 @@ public:
         if (type == CandidateType::Edge) { arcDuals_.setDual(arc, dualValue); }
     }
 
-    std::vector<double> computeCoefficients(const std::vector<int> route) {
+    std::vector<double> computeCoefficients(const std::vector<uint16_t> route) {
         std::vector<double> coefficients;
         for (auto candidate : branchingCandidates_) {
             if (candidate->getCandidateType() == CandidateType::Node) {
@@ -171,7 +171,7 @@ public:
 
 private:
     std::vector<VRPCandidate *> branchingCandidates_;
-    std::vector<baldesCtrPtr>  branchingbaldesCtrs_;
+    std::vector<baldesCtrPtr>   branchingbaldesCtrs_;
     ArcDuals                    arcDuals_;
     NodeDuals                   nodeDuals_;
 };

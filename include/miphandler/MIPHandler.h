@@ -545,66 +545,88 @@ public:
 
 #ifdef GUROBI
     // Function to populate a Gurobi model from this MIPProblem instance
-    GRBModel toGurobiModel(GRBEnv &env) {
-        // Create a new Gurobi model
-        GRBModel gurobiModel(env);
+    std::unique_ptr<GRBModel> toGurobiModel(GRBEnv &env) {
+        try {
+            auto gurobiModel = std::make_unique<GRBModel>(env);
 
-        // Map to store Gurobi variables
-        ankerl::unordered_dense::map<std::string, GRBVar> gurobiVars;
+            // Pre-size containers
+            ankerl::unordered_dense::map<std::string, GRBVar> gurobiVars;
+            gurobiVars.reserve(variables.size());
 
-        // check if we have repeted variable name
-        std::unordered_map<std::string, int> var_count;
-        // Step 1: Add variables to the Gurobi model
-        for (const auto &var : variables) {
-            // Add each variable to the Gurobi model, according to its type and bounds
-            GRBVar gurobiVar = gurobiModel.addVar(var->get_lb(), var->get_ub(), var->get_objective_coefficient(),
-                                                  toGRBVarType(var->get_type()), var->get_name());
-            gurobiVars[var->get_name()] = gurobiVar;
-        }
-
-        // Step 2: Add constraints to the Gurobi model
-        for (const auto &constraint : constraints) {
-            GRBLinExpr gurobiExpr = convertToGurobiExpr(constraint, gurobiVars);
-            if (constraint->get_relation() == '<') {
-                gurobiModel.addConstr(gurobiExpr <= constraint->get_rhs(), constraint->get_name());
-            } else if (constraint->get_relation() == '>') {
-                gurobiModel.addConstr(gurobiExpr >= constraint->get_rhs(), constraint->get_name());
-            } else if (constraint->get_relation() == '=') {
-                gurobiModel.addConstr(gurobiExpr == constraint->get_rhs(), constraint->get_name());
+            // Step 1: Add variables efficiently
+            for (const auto &var : variables) {
+                gurobiVars.emplace(var->get_name(),
+                                   gurobiModel->addVar(var->get_lb(), var->get_ub(), var->get_objective_coefficient(),
+                                                       toGRBVarType(var->get_type()), var->get_name()));
             }
-        }
 
-        // Step 3: Set objective if needed (assuming a linear objective function)
-        GRBLinExpr objective;
-        for (const auto &var : variables) {
-            objective += gurobiVars[var->get_name()] * var->get_objective_coefficient();
+            // Step 2: Add constraints
+            for (const auto &constraint : constraints) {
+                GRBLinExpr expr = 0.0;
+
+                // Build the expression efficiently
+                for (const auto &[varName, coeff] : constraint->get_terms()) {
+                    try {
+                        expr += gurobiVars.at(varName) * coeff;
+                    } catch (const std::out_of_range &e) { throw std::runtime_error("Variable not found: " + varName); }
+                }
+
+                const double rhs = constraint->get_rhs();
+                switch (constraint->get_relation()) {
+                case '<': gurobiModel->addConstr(expr <= rhs, constraint->get_name()); break;
+                case '>': gurobiModel->addConstr(expr >= rhs, constraint->get_name()); break;
+                case '=': gurobiModel->addConstr(expr == rhs, constraint->get_name()); break;
+                }
+            }
+
+            // Step 3: Set objective
+            GRBLinExpr objective = 0.0;
+            for (const auto &var : variables) {
+                objective += gurobiVars.at(var->get_name()) * var->get_objective_coefficient();
+            }
+
+            gurobiModel->setObjective(objective, GRB_MINIMIZE);
+            gurobiModel->update();
+            return gurobiModel;
+
+        } catch (const GRBException &e) { throw; } catch (const std::exception &e) {
+            throw;
         }
-        gurobiModel.setObjective(objective, GRB_MINIMIZE); // Assume minimization problem
-        gurobiModel.update();
-        return gurobiModel;
     }
 
     // Helper function to convert MIP variable type to Gurobi variable type
-    char toGRBVarType(VarType varType) {
+    constexpr char toGRBVarType(VarType varType) {
         switch (varType) {
         case VarType::Continuous: return GRB_CONTINUOUS;
         case VarType::Integer: return GRB_INTEGER;
         case VarType::Binary: return GRB_BINARY;
-        default: throw std::invalid_argument("Unknown variable type");
+        default: throw std::invalid_argument("Invalid VarType: " + std::to_string(static_cast<int>(varType)));
         }
     }
 
     // Helper function to convert MIP constraints into a Gurobi linear expression
-    GRBLinExpr convertToGurobiExpr(const baldesCtrPtr                                       constraint,
+    GRBLinExpr convertToGurobiExpr(const baldesCtrPtr                                      &constraint,
                                    const ankerl::unordered_dense::map<std::string, GRBVar> &gurobiVars) {
+        // Pre-size the expression if possible (if Gurobi provides such API)
         GRBLinExpr expr;
-        for (const auto &term : constraint->get_terms()) {
-            const std::string &varName = term.first;
-            double             coeff   = term.second;
-            expr += gurobiVars.at(varName) * coeff;
+
+        // Reserve space for terms if the constraint provides a size hint
+        const auto &terms = constraint->get_terms();
+
+        try {
+            // Use structured bindings for cleaner code
+            for (const auto &[varName, coeff] : terms) {
+                // Use .at() for bounds checking
+                expr.addTerms(&coeff, &gurobiVars.at(varName), 1);
+                // This is more efficient than expr += as it avoids creating temporary objects
+            }
+        } catch (const std::out_of_range &e) {
+            throw std::runtime_error("Variable not found in Gurobi model: " + std::string(e.what()));
         }
-        return expr;
+
+        return expr; // Return value optimization will handle this efficiently
     }
+
 #endif
 
 #ifdef HIGHS

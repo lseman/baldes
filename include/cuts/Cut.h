@@ -246,7 +246,7 @@ public:
      * in specific sets and updating coefficients accordingly.
      *
      */
-    auto computeLimitedMemoryCoefficients(const std::vector<int> &P) {
+    auto computeLimitedMemoryCoefficients(const std::vector<uint16_t> &P) {
         // iterate over cuts
         std::vector<double> alphas;
         alphas.reserve(cuts.size());

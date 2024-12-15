@@ -627,7 +627,7 @@ void BucketGraph::common_initialization() {
                 // Initialize depot with the current interval boundaries
                 depot->initialize(calculated_index, 0.0, interval_bounds, depot_id);
                 depot->is_extended = false;
-                depot->nodes_covered.push_back(depot_id);
+                //depot->nodes_covered.push_back(depot_id);
                 set_node_visited(depot->visited_bitmap, depot_id);
                 SRC_MODE_BLOCK(depot->SRCmap.assign(cut_storage->SRCDuals.size(), 0);)
                 buckets[calculated_index].add_label(depot);
