@@ -1,0 +1,8 @@
+<map id="HighDimCutsGenerator::HighDimCutsGenerator" name="HighDimCutsGenerator::HighDimCutsGenerator">
+<area shape="rect" id="Node000001" title=" " alt="" coords="5,29,167,70"/>
+<area shape="rect" id="Node000002" href="$classHighDimCutsGenerator.html#a1f94c71a106196a0b633d1c8b2a1e91a" title=" " alt="" coords="215,29,389,70"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="167,47,199,47,199,52,167,52"/>
+<area shape="rect" id="Node000003" href="$classHighDimCutsGenerator.html#a49e2f8f87888ed3c9e2e892a18c61b7f" title=" " alt="" coords="437,29,592,70"/>
+<area shape="poly" id="edge2_Node000002_Node000003" title=" " alt="" coords="389,47,421,47,421,52,389,52"/>
+<area shape="poly" id="edge3_Node000003_Node000003" title=" " alt="" coords="474,29,472,19,479,10,493,5,515,3,538,5,551,11,549,16,536,10,515,8,494,10,482,15,478,20,480,28"/>
+</map>

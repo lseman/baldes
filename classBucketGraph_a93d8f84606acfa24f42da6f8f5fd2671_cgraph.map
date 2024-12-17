@@ -1,0 +1,55 @@
+<map id="BucketGraph::solveHeuristic" name="BucketGraph::solveHeuristic">
+<area shape="rect" id="Node000001" title=" " alt="" coords="5,496,192,522"/>
+<area shape="rect" id="Node000002" href="$classBucketGraph.html#a8153a13e14a6233434a3f7ef3230f8b8" title=" " alt="" coords="242,459,406,500"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="192,494,226,490,227,495,193,499"/>
+<area shape="rect" id="Node000041" href="$classBucketGraph.html#a4af3d0a5cb4eefd400b213d93e86fe82" title=" " alt="" coords="240,524,408,550"/>
+<area shape="poly" id="edge33_Node000001_Node000041" title=" " alt="" coords="193,518,225,522,224,527,192,523"/>
+<area shape="rect" id="Node000003" href="$classBucketGraph.html#adea4cf77fe1775dac8bb3aa80b4c0dd4" title="Fixes the bucket arcs for the specified stage." alt="" coords="473,172,615,213"/>
+<area shape="poly" id="edge2_Node000002_Node000003" title=" " alt="" coords="329,458,345,412,371,353,407,289,429,259,454,232,471,219,474,224,458,236,433,263,411,292,375,355,350,414,334,460"/>
+<area shape="rect" id="Node000011" href="$classBucketGraph.html#ae66be852d4827d04e368e208b63f9240" title="Initializes the BucketGraph by clearing previous data and setting up forward and backward buckets." alt="" coords="724,230,878,270"/>
+<area shape="poly" id="edge14_Node000002_Node000011" title=" " alt="" coords="330,458,347,420,373,372,409,325,430,304,455,287,485,271,517,259,583,244,649,238,709,238,709,243,649,243,584,249,518,264,487,276,457,291,434,308,413,329,377,375,351,422,335,460"/>
+<area shape="rect" id="Node000025" href="$classBucketGraph.html#a66484f0fb3c999584f77880b3dd54f7c" title="Runs forward and backward labeling algorithms in parallel and synchronizes the results." alt="" coords="715,344,887,385"/>
+<area shape="poly" id="edge31_Node000002_Node000025" title=" " alt="" coords="346,456,394,420,423,402,455,388,517,371,580,361,643,357,699,356,699,361,643,362,581,366,518,376,457,393,426,406,397,424,349,461"/>
+<area shape="rect" id="Node000026" href="$classBucketGraph.html#aa05e883574a58a277e1dbf8cfcdcde11" title=" " alt="" coords="970,316,1117,357"/>
+<area shape="poly" id="edge28_Node000002_Node000026" title=" " alt="" coords="338,457,386,404,418,376,455,354,519,330,585,314,654,305,722,300,849,304,955,317,954,322,849,310,722,306,654,310,586,319,520,336,457,359,421,381,389,408,342,460"/>
+<area shape="rect" id="Node000033" href="$classBucketGraph.html#a858b68317a9a0a60723698509d78d575" title="Checks the feasibility of a given forward and backward label." alt="" coords="732,754,870,794"/>
+<area shape="poly" id="edge13_Node000002_Node000033" title=" " alt="" coords="397,498,410,510,425,532,433,554,434,597,435,639,442,659,458,679,551,706,718,750,716,755,550,711,454,683,438,661,430,640,428,597,427,555,421,534,406,513,393,502"/>
+<area shape="rect" id="Node000034" href="$classBucketGraph.html#a58212b002ceaa4e24b5290c8059a6e1c" title=" " alt="" coords="724,574,878,614"/>
+<area shape="poly" id="edge15_Node000002_Node000034" title=" " alt="" coords="388,498,457,518,589,550,709,575,708,580,588,555,455,523,387,503"/>
+<area shape="rect" id="Node000035" href="$classBucketGraph.html#a866bef4d7f6ebeb91111e735ef06a195" title=" " alt="" coords="456,628,632,669"/>
+<area shape="poly" id="edge17_Node000002_Node000035" title=" " alt="" coords="394,498,410,510,428,533,435,556,442,579,458,602,479,618,476,622,454,605,437,581,430,558,423,535,406,513,391,503"/>
+<area shape="rect" id="Node000037" href="$classBucketGraph.html#a06036b30388d0f91c677340bff2c6b6a" title="Applies heuristic fixing to the current solution." alt="" coords="468,402,620,442"/>
+<area shape="poly" id="edge22_Node000002_Node000037" title=" " alt="" coords="404,456,452,443,454,448,405,461"/>
+<area shape="rect" id="Node000038" href="$classBucketGraph.html#a2379392ccc37be9a4a27800b116465d2" title="Resets all fixed arcs in the graph." alt="" coords="735,459,867,500"/>
+<area shape="poly" id="edge29_Node000002_Node000038" title=" " alt="" coords="406,477,719,477,719,482,406,482"/>
+<area shape="rect" id="Node000039" href="$classBucketGraph.html#a3e1492bb1589d5edb06e80a753d000dd" title="Resets the forward and backward label pools." alt="" coords="719,524,883,550"/>
+<area shape="poly" id="edge30_Node000002_Node000039" title=" " alt="" coords="407,487,705,523,704,528,406,492"/>
+<area shape="rect" id="Node000040" href="$classIteratedLocalSearch.html#abfd474564c90d5889134a07e55ec8517" title=" " alt="" coords="475,743,613,784"/>
+<area shape="poly" id="edge32_Node000002_Node000040" title=" " alt="" coords="397,498,410,510,428,538,436,565,438,592,435,618,433,644,434,670,441,696,458,723,467,732,463,736,454,726,436,698,429,671,428,644,430,617,432,591,431,566,423,540,406,513,394,502"/>
+<area shape="rect" id="Node000004" href="$classBucketGraph.html#a395e609a3dcdb495e2a43da1742af7bd" title="Eliminates bucket arcs based on a given threshold." alt="" coords="687,180,915,206"/>
+<area shape="poly" id="edge3_Node000003_Node000004" title=" " alt="" coords="616,190,672,190,672,196,616,196"/>
+<area shape="rect" id="Node000008" href="$Definitions_8h.html#a086546d06aa565cdd48f436973ebc496" title="Prints an informational message with a specific format." alt="" coords="1006,129,1080,155"/>
+<area shape="poly" id="edge10_Node000003_Node000008" title=" " alt="" coords="616,175,680,165,850,149,990,141,991,147,851,154,681,170,616,181"/>
+<area shape="poly" id="edge5_Node000003_Node000011" title=" " alt="" coords="617,206,710,227,708,232,615,211"/>
+<area shape="rect" id="Node000017" href="$classBucketGraph.html#a78afa4d3e7c6078f874480c68f43caff" title="Generates arcs in both forward and backward directions in parallel." alt="" coords="708,79,894,104"/>
+<area shape="poly" id="edge6_Node000003_Node000017" title=" " alt="" coords="580,169,626,145,679,121,724,106,726,111,681,126,629,149,582,174"/>
+<area shape="rect" id="Node000024" href="$classBucketGraph.html#a84a8345b541e0e44e44e6215a9cdc779" title="Obtains jump bucket arcs for the BucketGraph." alt="" coords="680,5,922,31"/>
+<area shape="poly" id="edge8_Node000003_Node000024" title=" " alt="" coords="556,170,604,105,639,69,679,40,689,35,691,40,682,44,642,73,608,108,560,174"/>
+<area shape="poly" id="edge11_Node000003_Node000025" title=" " alt="" coords="578,211,758,334,755,338,575,216"/>
+<area shape="poly" id="edge4_Node000004_Node000008" title=" " alt="" coords="865,177,990,150,991,156,866,182"/>
+<area shape="poly" id="edge7_Node000017_Node000017" title=" " alt="" coords="761,80,753,70,758,60,774,54,801,52,831,55,846,62,844,67,830,60,801,57,775,59,761,64,758,69,765,77"/>
+<area shape="poly" id="edge9_Node000024_Node000008" title=" " alt="" coords="895,29,923,40,952,56,979,76,1022,116,1018,120,975,80,949,61,921,45,893,34"/>
+<area shape="poly" id="edge12_Node000025_Node000026" title=" " alt="" coords="887,352,954,344,955,350,888,358"/>
+<area shape="rect" id="Node000010" href="$classBucketGraph.html#ad15267e0cffaa8dc5222028409c9e082" title=" " alt="" coords="976,581,1110,607"/>
+<area shape="poly" id="edge16_Node000034_Node000010" title=" " alt="" coords="878,592,960,592,960,597,878,597"/>
+<area shape="poly" id="edge19_Node000035_Node000033" title=" " alt="" coords="603,667,634,685,649,700,658,713,667,726,682,739,718,755,716,760,679,743,663,730,654,716,645,703,631,690,600,672"/>
+<area shape="poly" id="edge20_Node000035_Node000034" title=" " alt="" coords="632,627,709,611,710,616,634,633"/>
+<area shape="poly" id="edge21_Node000035_Node000010" title=" " alt="" coords="633,646,769,640,921,624,985,609,986,614,922,629,769,645,633,651"/>
+<area shape="rect" id="Node000036" href="$classBucketGraph.html#a2a66984a5d0225286c0598b884772f8c" title=" " alt="" coords="730,688,872,729"/>
+<area shape="poly" id="edge18_Node000035_Node000036" title=" " alt="" coords="634,667,716,686,714,691,632,672"/>
+<area shape="poly" id="edge23_Node000037_Node000011" title=" " alt="" coords="575,399,755,277,758,281,578,404"/>
+<area shape="poly" id="edge27_Node000037_Node000025" title=" " alt="" coords="620,403,699,385,700,390,621,408"/>
+<area shape="poly" id="edge24_Node000037_Node000010" title=" " alt="" coords="621,408,688,403,766,405,846,417,886,429,923,445,959,470,990,503,1014,536,1031,566,1027,569,1009,539,986,506,956,475,920,450,884,434,845,422,765,410,688,408,621,413"/>
+<area shape="poly" id="edge25_Node000037_Node000038" title=" " alt="" coords="621,437,720,459,719,464,620,442"/>
+<area shape="poly" id="edge26_Node000037_Node000039" title=" " alt="" coords="572,441,621,476,681,509,705,517,703,522,679,514,618,481,569,445"/>
+</map>

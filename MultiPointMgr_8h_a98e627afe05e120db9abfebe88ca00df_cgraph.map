@@ -1,0 +1,5 @@
+<map id="createStabilityManager" name="createStabilityManager">
+<area shape="rect" id="Node000001" title="Create stability manager with initial point." alt="" coords="5,13,159,38"/>
+<area shape="rect" id="Node000002" href="$classMultiPointManager.html#a4f20b67c8b4472346543775d2f01af97" title="Updates the stability point pool with a new solution." alt="" coords="207,5,342,46"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="159,23,191,23,191,28,159,28"/>
+</map>

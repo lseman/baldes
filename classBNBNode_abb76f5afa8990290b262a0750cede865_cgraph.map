@@ -1,0 +1,9 @@
+<map id="BNBNode::optimize" name="BNBNode::optimize">
+<area shape="rect" id="Node000001" title=" " alt="" coords="5,70,140,96"/>
+<area shape="rect" id="Node000002" href="$classGurobiEnvSingleton.html#a49c3ce63088629c2246dec252a73df16" title=" " alt="" coords="204,5,340,46"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="119,67,189,47,190,52,121,72"/>
+<area shape="rect" id="Node000003" href="$classSolverInterface.html#aeaac9dd85da0f259e9804a9970a7f54f" title=" " alt="" coords="190,70,354,96"/>
+<area shape="poly" id="edge2_Node000001_Node000003" title=" " alt="" coords="140,80,174,80,174,86,140,86"/>
+<area shape="rect" id="Node000004" href="$classSolverInterface.html#afc4cb03aa6a487dd87a2a2d3090a5577" title=" " alt="" coords="188,120,356,145"/>
+<area shape="poly" id="edge3_Node000001_Node000004" title=" " alt="" coords="128,94,203,113,201,118,127,99"/>
+</map>

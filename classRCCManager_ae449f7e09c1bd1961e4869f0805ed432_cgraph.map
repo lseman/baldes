@@ -1,0 +1,9 @@
+<map id="RCCManager::computeDuals" name="RCCManager::computeDuals">
+<area shape="rect" id="Node000001" title=" " alt="" coords="5,42,193,68"/>
+<area shape="rect" id="Node000002" href="$classBNBNode.html#af2ca916e1267bff2383c4103f7f88a76" title=" " alt="" coords="263,5,414,46"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="193,41,248,34,248,39,193,46"/>
+<area shape="rect" id="Node000004" href="$classArcDuals.html#a24a3f7097597ac4d6b76b361a23f5c0c" title=" " alt="" coords="241,70,437,96"/>
+<area shape="poly" id="edge3_Node000001_Node000004" title=" " alt="" coords="193,63,225,67,225,72,193,69"/>
+<area shape="rect" id="Node000003" href="$classMIPProblem.html#ad17128caed049bbe90eb55696860b453" title=" " alt="" coords="485,5,649,46"/>
+<area shape="poly" id="edge2_Node000002_Node000003" title=" " alt="" coords="415,23,469,23,469,28,415,28"/>
+</map>

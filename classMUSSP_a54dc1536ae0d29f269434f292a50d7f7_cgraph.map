@@ -1,0 +1,7 @@
+<map id="MUSSP::solve" name="MUSSP::solve">
+<area shape="rect" id="Node000001" title=" " alt="" coords="5,5,112,31"/>
+<area shape="rect" id="Node000002" href="$classMUSSP.html#a30b04507e4fe7daec72c77f5addeed92" title=" " alt="" coords="160,5,334,31"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="112,16,144,16,144,21,112,21"/>
+<area shape="rect" id="Node000003" href="$classMUSSP.html#a3b0e37f3121ff06e493cdc3c2214e36a" title=" " alt="" coords="382,5,580,31"/>
+<area shape="poly" id="edge2_Node000002_Node000003" title=" " alt="" coords="334,16,366,16,366,21,334,21"/>
+</map>

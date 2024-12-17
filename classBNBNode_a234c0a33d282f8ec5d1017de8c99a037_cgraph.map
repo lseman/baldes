@@ -1,0 +1,15 @@
+<map id="BNBNode::extractModelDataSparse" name="BNBNode::extractModelDataSparse">
+<area shape="rect" id="Node000001" title=" " alt="" coords="5,96,193,137"/>
+<area shape="rect" id="Node000002" href="$classMIPProblem.html#ae1444b927d088a4f9d35dfe604aeb7d9" title=" " alt="" coords="241,96,414,137"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="193,114,225,114,225,120,193,120"/>
+<area shape="rect" id="Node000003" href="$classMIPProblem.html#ab90d73fab03bc3983fe3b263c447eb9b" title=" " alt="" coords="480,5,611,31"/>
+<area shape="poly" id="edge2_Node000002_Node000003" title=" " alt="" coords="360,94,407,66,461,40,477,34,479,39,463,45,409,71,362,98"/>
+<area shape="rect" id="Node000004" href="$classMIPProblem.html#a5f3fa530fb8a6061e1d294a1857dd250" title=" " alt="" coords="478,55,612,80"/>
+<area shape="poly" id="edge3_Node000002_Node000004" title=" " alt="" coords="414,95,470,82,471,87,415,100"/>
+<area shape="rect" id="Node000005" href="$classMIPProblem.html#a00841d8835fad12f1b35e83d7b5cf9a5" title=" " alt="" coords="462,104,628,130"/>
+<area shape="poly" id="edge4_Node000002_Node000005" title=" " alt="" coords="414,114,447,114,447,120,414,120"/>
+<area shape="rect" id="Node000006" href="$classMIPProblem.html#a94d7739fb700ed6194d73ddea3a870e8" title=" " alt="" coords="476,153,614,179"/>
+<area shape="poly" id="edge5_Node000002_Node000006" title=" " alt="" coords="415,134,471,147,470,152,414,139"/>
+<area shape="rect" id="Node000007" href="$classMIPProblem.html#a29674f674d7f14b118a031cdf734611e" title=" " alt="" coords="464,203,626,228"/>
+<area shape="poly" id="edge6_Node000002_Node000007" title=" " alt="" coords="362,135,409,163,463,189,479,195,477,200,461,194,407,167,360,140"/>
+</map>

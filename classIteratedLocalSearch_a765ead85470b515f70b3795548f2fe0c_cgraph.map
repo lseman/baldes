@@ -1,0 +1,9 @@
+<map id="IteratedLocalSearch::extended_swap_star" name="IteratedLocalSearch::extended_swap_star">
+<area shape="rect" id="Node000001" title="Swaps sequences of customers between two routes and inserts them at optimal positions." alt="" coords="5,13,152,54"/>
+<area shape="rect" id="Node000002" href="$classIteratedLocalSearch.html#a54c19f98bcafced3fb5c662687878d96" title=" " alt="" coords="200,13,371,54"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="152,30,184,30,184,36,152,36"/>
+<area shape="rect" id="Node000003" href="$classIteratedLocalSearch.html#a6c668d676ee2fc23b820b54088412925" title="Finds the best position to insert a chain of customers into a route." alt="" coords="419,5,557,61"/>
+<area shape="poly" id="edge2_Node000002_Node000003" title=" " alt="" coords="372,30,404,30,404,36,372,36"/>
+<area shape="rect" id="Node000004" href="$classIteratedLocalSearch.html#a3a385fcceeeac471cab42d124f7f4dae" title=" " alt="" coords="605,13,771,54"/>
+<area shape="poly" id="edge3_Node000003_Node000004" title=" " alt="" coords="558,30,590,30,590,36,558,36"/>
+</map>

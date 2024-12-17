@@ -1,0 +1,25 @@
+<map id="RCCManager::computeDuals" name="RCCManager::computeDuals">
+<area shape="rect" id="Node000001" title=" " alt="" coords="5,169,193,195"/>
+<area shape="rect" id="Node000002" href="$classBNBNode.html#a7c216d32f620367175809ffa6c56fb97" title=" " alt="" coords="264,39,414,64"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="124,166,298,70,301,75,126,171"/>
+<area shape="rect" id="Node000004" href="$classBNBNode.html#abb76f5afa8990290b262a0750cede865" title=" " alt="" coords="272,120,406,146"/>
+<area shape="poly" id="edge3_Node000001_Node000004" title=" " alt="" coords="165,166,257,147,258,152,166,171"/>
+<area shape="rect" id="Node000008" href="$classBNBNode.html#a1cc8d061978cecc41e360cb505517267" title=" " alt="" coords="274,169,404,195"/>
+<area shape="poly" id="edge7_Node000001_Node000008" title=" " alt="" coords="193,180,259,180,259,185,193,185"/>
+<area shape="rect" id="Node000013" href="$classRCCManager.html#a9a69651f248e4fe422fd110547e8379a" title=" " alt="" coords="255,219,422,244"/>
+<area shape="poly" id="edge10_Node000001_Node000013" title=" " alt="" coords="166,193,258,212,257,218,165,198"/>
+<area shape="rect" id="Node000014" href="$classArcDuals.html#a24a3f7097597ac4d6b76b361a23f5c0c" title=" " alt="" coords="241,268,437,294"/>
+<area shape="poly" id="edge11_Node000001_Node000014" title=" " alt="" coords="123,193,176,224,242,254,260,261,258,266,240,259,173,228,120,198"/>
+<area shape="rect" id="Node000003" href="$classSolverInterface.html#ab79d88959a058367c1c1fe8e8990c471" title=" " alt="" coords="485,5,663,31"/>
+<area shape="poly" id="edge2_Node000002_Node000003" title=" " alt="" coords="413,38,469,30,470,36,414,44"/>
+<area shape="rect" id="Node000005" href="$classGurobiEnvSingleton.html#a49c3ce63088629c2246dec252a73df16" title=" " alt="" coords="506,55,642,96"/>
+<area shape="poly" id="edge4_Node000004_Node000005" title=" " alt="" coords="394,117,491,93,492,98,395,122"/>
+<area shape="rect" id="Node000006" href="$classSolverInterface.html#aeaac9dd85da0f259e9804a9970a7f54f" title=" " alt="" coords="492,120,656,146"/>
+<area shape="poly" id="edge5_Node000004_Node000006" title=" " alt="" coords="406,130,477,130,477,136,406,136"/>
+<area shape="rect" id="Node000007" href="$classSolverInterface.html#afc4cb03aa6a487dd87a2a2d3090a5577" title=" " alt="" coords="490,169,658,195"/>
+<area shape="poly" id="edge6_Node000004_Node000007" title=" " alt="" coords="404,144,495,163,494,168,403,149"/>
+<area shape="rect" id="Node000009" href="$classMIPProblem.html#a4e55c60ce1b0dfd21733f9fbbc157891" title=" " alt="" coords="507,219,641,260"/>
+<area shape="poly" id="edge8_Node000008_Node000009" title=" " alt="" coords="395,193,492,217,491,222,394,198"/>
+<area shape="rect" id="Node000010" href="$structSparseMatrix.html#ac25e8f241cd1de61244dcff74c474799" title=" " alt="" coords="711,227,878,252"/>
+<area shape="poly" id="edge9_Node000009_Node000010" title=" " alt="" coords="642,237,696,237,696,242,642,242"/>
+</map>

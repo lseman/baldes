@@ -1,0 +1,11 @@
+<map id="Preprocessor::convert2Knapsack" name="Preprocessor::convert2Knapsack">
+<area shape="rect" id="Node000001" title=" " alt="" coords="5,56,218,82"/>
+<area shape="rect" id="Node000002" href="$classSparseMatrix_1_1RowIterator.html#a738ba7db10d2730bc58cfe4196defe48" title=" " alt="" coords="266,5,459,31"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="178,53,280,32,281,37,179,58"/>
+<area shape="rect" id="Node000003" href="$classSparseMatrix_1_1RowIterator.html#a9bcb08fd6bd3d20ca050dba4c96c0435" title=" " alt="" coords="507,48,677,89"/>
+<area shape="poly" id="edge3_Node000001_Node000003" title=" " alt="" coords="218,66,492,66,492,72,218,72"/>
+<area shape="rect" id="Node000004" href="$classSparseMatrix_1_1RowIterator.html#ab217d7cab2877a7b2c436c2d00df950c" title=" " alt="" coords="277,106,448,146"/>
+<area shape="poly" id="edge4_Node000001_Node000004" title=" " alt="" coords="172,80,263,101,261,106,170,85"/>
+<area shape="poly" id="edge2_Node000002_Node000003" title=" " alt="" coords="425,29,493,44,492,49,423,34"/>
+<area shape="poly" id="edge5_Node000004_Node000003" title=" " alt="" coords="446,103,492,91,494,96,447,108"/>
+</map>
