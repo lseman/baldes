@@ -552,7 +552,6 @@ public:
 #if defined(RCC) || defined(EXACT_RCC)
             if (rcc) {
                 RUN_OPTIMIZATION(node, 1e-8)
-
                 RCC_MODE_BLOCK(rcc = RCCsep(node, solution);)
 
 #ifdef EXACT_RCC
@@ -564,7 +563,6 @@ public:
             if (ss && !rcc) {
 #if defined(RCC) || defined(EXACT_RCC)
                 RUN_OPTIMIZATION(node, 1e-8)
-
                 RCC_MODE_BLOCK(rcc = RCCsep(node, solution);)
 
 #ifdef EXACT_RCC

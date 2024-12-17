@@ -136,7 +136,6 @@ private:
     SolverBase *solver;
 };
 
-
 /**
  * @class IPSolver
  * @brief A class for solving linear programming problems using an interior point method.
@@ -251,6 +250,5 @@ public:
 
     // Method to start the linear solver by initializing necessary data structures and performing factorization
     void start_linear_solver(SparseSolver &ls, const Eigen::SparseMatrix<double> A);
+
 };
-
-

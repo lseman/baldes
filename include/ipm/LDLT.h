@@ -84,45 +84,64 @@ public:
 
     void analyzePattern_preordered(const CholMatrixType &ap, bool doLDLT) {
         const StorageIndex size = StorageIndex(ap.rows());
+
+        // Pre-allocate all vectors at once with appropriate sizes
         m_matrix.resize(size, size);
         m_parent.resize(size);
         m_nonZerosPerCol.resize(size);
+        std::vector<StorageIndex> tags(size);
 
-        // Using std::vector instead of VLAs for dynamic memory allocation
-        std::vector<StorageIndex> tags(size, 0); // dynamically sized array for tags
+        // Initialize arrays - use memset for better performance on POD types
+        std::memset(m_parent.data(), -1, size * sizeof(StorageIndex));
+        std::memset(m_nonZerosPerCol.data(), 0, size * sizeof(StorageIndex));
 
+        // Compute elimination tree and count nonzeros per column
         for (StorageIndex k = 0; k < size; ++k) {
-            m_parent[k]         = -1; // Parent of k is not yet known
-            tags[k]             = k;  // Mark node k as visited
-            m_nonZerosPerCol[k] = 0;  // Count of nonzeros in column k of L
+            tags[k] = k; // Mark node k as visited
 
+            // Traverse column k using iterator
             for (typename CholMatrixType::InnerIterator it(ap, k); it; ++it) {
                 StorageIndex i = it.index();
                 if (i < k) {
-                    // Follow path from i to root of the etree, stop at flagged node
-                    for (; tags[i] != k; i = m_parent[i]) {
-                        if (m_parent[i] == -1) m_parent[i] = k; // Set parent of i
-                        m_nonZerosPerCol[i]++;                  // L(k,i) is nonzero
-                        tags[i] = k;                            // Mark i as visited
+                    // Use local variables to reduce memory access
+                    StorageIndex current = i;
+                    StorageIndex parent;
+
+                    // Follow path from i to root of etree
+                    while (tags[current] != k) {
+                        parent = m_parent[current];
+                        if (parent == -1) {
+                            m_parent[current] = k;
+                            parent            = k;
+                        }
+                        m_nonZerosPerCol[current]++;
+                        tags[current] = k;
+                        current       = parent;
                     }
                 }
             }
         }
 
-        // Construct Lp index array from m_nonZerosPerCol column counts
-        StorageIndex *Lp = m_matrix.outerIndexPtr();
-        Lp[0]            = 0;
-        for (StorageIndex k = 0; k < size; ++k) { Lp[k + 1] = Lp[k] + m_nonZerosPerCol[k]; }
+        // Build column pointers array
+        StorageIndex *Lp            = m_matrix.outerIndexPtr();
+        StorageIndex  running_total = 0;
 
-        // Resize non-zeros for the matrix
-        m_matrix.resizeNonZeros(Lp[size]);
+        // Use prefix sum for better cache utilization
+        Lp[0] = 0;
+        for (StorageIndex k = 0; k < size; ++k) {
+            running_total += m_nonZerosPerCol[k];
+            Lp[k + 1] = running_total;
+        }
 
+        // Allocate space for non-zeros
+        m_matrix.resizeNonZeros(running_total);
+
+        // Set status flags
         m_isInitialized     = true;
         m_info              = Success;
         m_analysisIsOk      = true;
         m_factorizationIsOk = false;
     }
-
     typedef typename MatrixType::RealScalar DiagonalScalar;
     static inline DiagonalScalar            getDiag(Scalar x) { return numext::real(x); }
     static inline Scalar                    getSymm(Scalar x) { return numext::conj(x); }
@@ -159,11 +178,12 @@ public:
         m_diag.resize(size);
         std::atomic<bool> ok{true};
 
+        // Optimize thread count and chunk size
         const int hardware_threads     = std::thread::hardware_concurrency();
         const int min_tasks_per_thread = 32;
         const int chunk_size           = std::max(size / (hardware_threads * min_tasks_per_thread), StorageIndex(1));
 
-        using simd_vec           = std::experimental::native_simd<double>; // adjust type as needed
+        using simd_vec           = std::experimental::native_simd<double>;
         constexpr int simd_width = simd_vec::size();
 
         auto bulk_sender = stdexec::bulk(
@@ -205,21 +225,26 @@ public:
                         const Scalar       l_ki = yi / getDiag(m_diag[i]);
                         const StorageIndex p2   = Lp[i] + m_nonZerosPerCol[i];
 
-                        // Vectorized sparse update
+                        // Vectorized sparse update with improved cache efficiency
                         for (StorageIndex p = Lp[i]; p < p2; p += simd_width) {
                             const int remaining = std::min(simd_width, static_cast<int>(p2 - p));
                             if (remaining < simd_width) {
                                 // Handle remaining elements sequentially
                                 for (int k = 0; k < remaining; ++k) { y_local[Li[p + k]] -= getSymm(Lx[p + k]) * yi; }
                             } else {
-                                // SIMD processing
-                                simd_vec lx_vec, indices_vec;
+                                // Full SIMD processing
+                                simd_vec     lx_vec;
+                                StorageIndex vec_indices[simd_width];
+
+                                // Load data
                                 for (int k = 0; k < simd_width; ++k) {
                                     lx_vec[k]      = getSymm(Lx[p + k]);
-                                    indices_vec[k] = Li[p + k];
+                                    vec_indices[k] = Li[p + k];
                                 }
+
+                                // Compute and store
                                 auto result = lx_vec * simd_vec(yi);
-                                for (int k = 0; k < simd_width; ++k) { y_local[indices_vec[k]] -= result[k]; }
+                                for (int k = 0; k < simd_width; ++k) { y_local[vec_indices[k]] -= result[k]; }
                             }
                         }
 
@@ -229,7 +254,6 @@ public:
                         ++m_nonZerosPerCol[i];
                     }
 
-                    // Atomic write to diagonal
                     m_diag[k] = d;
                     if (d == RealScalar(0)) {
                         ok.store(false, std::memory_order_relaxed);
@@ -463,7 +487,7 @@ public:
 
     template <typename Rhs>
     Eigen::VectorXd solve(const MatrixBase<Rhs> &b) const {
-        eigen_assert(m_isInitialized && "Decomposition not initialized");
+        eigen_assert(m_isInitialized && "Decomposition not initialized.");
 
         Eigen::VectorXd dest;
 
@@ -474,25 +498,17 @@ public:
             dest = b;
         }
 
-        // const Scalar regularizationFactor = Scalar(1e-10); // Small regularization term
-
-        // Matrix Condition Number-Based Regularization
-        // const Scalar condNumber           = matrixL().norm() * matrixL().inverse().norm();
-        // Scalar       regularizationFactor = Scalar(1e-10) * std::max(1.0, condNumber);
-
         // Residual-Based Regularization
-        Scalar residualNorm = (matrixL() * dest - b).norm();
-        // fmt::print("Residual Norm: {}\n", residualNorm);
+        const Scalar residualNorm         = (matrixL() * dest - b).norm();
         const Scalar regularizationFactor = std::min(Scalar(1e-10), residualNorm * Scalar(1e-12));
-        // fmt::print("Regularization Factor: {}\n", regularizationFactor);
 
-        // Solve L * y = P * b using SparseSolveTriangular for lower triangular matrix
+        // Solve L * y = P * b
         solveTriangular<decltype(matrixL()), decltype(dest), Lower>(matrixL(), dest, regularizationFactor);
 
-        // Solve D * z = y (element-wise division)
-        // Use Eigen's array-based division for vectorized operations
-        for (Index i = 0; i < dest.size(); ++i) { dest(i) /= m_diag(i); }
-        // Solve U * x = z using SparseSolveTriangular for upper triangular matrix
+        // Solve D * z = y using Eigen's coefficient-wise operations
+        dest.array() /= m_diag.array();
+
+        // Solve U * x = z
         solveTriangular<decltype(matrixU()), decltype(dest), Upper>(matrixU(), dest, regularizationFactor);
 
         // Apply backward permutation (if needed)

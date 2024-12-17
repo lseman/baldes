@@ -225,10 +225,13 @@ private:
 
     void cleanup(BNBNode *node) {
         v = 0;
+        int counter = 0;
         for (size_t i = 0; i < w.size(); i++) {
             node->remove(w[i]);
             node->remove(zeta[i]);
+            counter++;
         }
+        fmt::print("HERE: Removed {} variables\n", counter);
         TRstop = true;
         node->update();
         node->optimize();
