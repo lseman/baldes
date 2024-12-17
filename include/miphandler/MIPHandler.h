@@ -270,7 +270,10 @@ public:
             variables.erase(variables.begin() + var_index);
 
             // reduce index of variables after the deleted variable
-            for (int i = var_index; i < variables.size(); ++i) { variables[i]->set_index(i); }
+            for (int i = var_index; i < variables.size(); ++i) {
+                variables[i]->set_index(i);
+                var_name_to_index[variables[i]->get_name()] = i;
+            }
 
         } else {
             throw std::out_of_range("Invalid variable index");
@@ -427,7 +430,10 @@ public:
 
         variables.erase(variables.begin() + var_index);
 
-        for (int i = var_index; i < variables.size(); ++i) { variables[i]->set_index(i); }
+        for (int i = var_index; i < variables.size(); ++i) {
+            variables[i]->set_index(i);
+            var_name_to_index[variables[i]->get_name()] = i;
+        }
     }
 
     // Print sparse matrix as dense (for debugging)
@@ -870,7 +876,6 @@ public:
 
         // print sparse matrix sparsity
         // fmt::print("Sparsity of the sparse matrix: {:.2f}%\n", sparse_matrix.sparsity() * 100);
-
         return data;
     }
 

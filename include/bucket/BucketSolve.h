@@ -162,7 +162,7 @@ inline std::vector<Label *> BucketGraph::solveHeuristic() {
         inner_obj = paths[0]->cost;
 
         // Transition from Stage 1 to Stage 2 if the objective improves or after 10 iterations
-        if (inner_obj >= -1 || iter >= 10) {
+        if (inner_obj >= -5 || iter >= 10) {
             s1 = false;
             s2 = true; // Move to Stage 2
         }
@@ -345,12 +345,11 @@ std::vector<double> BucketGraph::labeling_algorithm() {
 
                                                 // Remove all children of
                                                 // the current label
-                                                for (auto *child : current_label->children) {
-                                                    buckets[child->vertex].remove_label(child);
-                                                    stack.push(child); //
-                                                    // Add child's children
-                                                    // to the stack
-                                                }
+                                                // for (auto *child : current_label->children) {
+                                                //     buckets[child->vertex].remove_label(child);
+                                                //     stack.push(child); //
+                                                //      Add child's children to the stack
+                                                // }
 
                                                 // Remove the current label
                                                 // itself
@@ -971,14 +970,14 @@ inline bool BucketGraph::DominatedInCompWiseSmallerBuckets(
     };
 
     // Stack-based implementation with fixed size for small bucket counts
-    constexpr size_t MAX_STACK_SIZE = 16;
+    constexpr size_t MAX_STACK_SIZE = 128;
     int              stack_buffer[MAX_STACK_SIZE];
     int              stack_size = 1;
     stack_buffer[0]             = bucket;
 
     // SIMD-optimized dominance check function
     auto check_dominance = [&](const std::vector<Label *> &labels) {
-#if defined(__AVX2__)
+#ifdef __AVX2__
         return check_dominance_against_vector<D, S>(L, labels, cut_storage, res_size);
 #else
         const size_t n = labels.size();
@@ -1019,7 +1018,12 @@ inline bool BucketGraph::DominatedInCompWiseSmallerBuckets(
             const int    b_prime   = bucket_neighbors[i];
             const size_t seg_prime = b_prime >> 6;
             if (!(Bvisited[seg_prime] & bit_mask_lookup[b_prime & 63])) {
-                if (stack_size < MAX_STACK_SIZE) { stack_buffer[stack_size++] = b_prime; }
+                if (stack_size < MAX_STACK_SIZE) {
+                    stack_buffer[stack_size++] = b_prime;
+                } else {
+                    fmt::print("Stack overflow in DominatedInCompWiseSmallerBuckets\n");
+                    return false;
+                }
             }
         }
 
