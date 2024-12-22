@@ -232,12 +232,12 @@ public:
 
     // Add a variable to the problem
     baldesVarPtr add_variable(const std::string &var_name, VarType type, double lb = 0.0, double ub = 1.0,
-                              double obj_coeff = 0.0) {
-        auto index  = variables.size();
-        auto newVar = std::make_shared<baldesVar>(var_name, type, lb, ub, obj_coeff);
+                                          double obj_coeff = 0.0) {
+        size_t index  = variables.size();
+        auto   newVar = std::make_shared<baldesVar>(var_name, type, lb, ub, obj_coeff);
         newVar->set_index(index);
         variables.emplace_back(newVar);
-        var_name_to_index[var_name] = variables.size() - 1;
+        var_name_to_index.emplace(var_name, index); // Using emplace instead of [] operator
         return newVar;
     }
 
@@ -308,15 +308,30 @@ public:
         // sparse_matrix.num_rows++;
 
         // Assuming you have many variables, use a more efficient lookup like a map
+        // Original individual insertions
+        std::vector<int>    batch_rows;
+        std::vector<int>    batch_cols;
+        std::vector<double> batch_values;
+
+        // Pre-allocate vectors with expected size
+        batch_rows.reserve(expression.get_terms().size());
+        batch_cols.reserve(expression.get_terms().size());
+        batch_values.reserve(expression.get_terms().size());
+
+        // Collect all terms for batch insertion
         for (const auto &[var_name, coeff] : expression.get_terms()) {
             auto it = var_name_to_index.find(var_name);
             if (it != var_name_to_index.end()) {
-                int col_index = it->second;
-                sparse_matrix.insert(row_index, col_index, coeff);
+                batch_rows.push_back(row_index);
+                batch_cols.push_back(it->second);
+                batch_values.push_back(coeff);
             } else {
                 fmt::print("baldesVar {} not found in the problem's variables list!\n", var_name);
             }
         }
+
+        // Perform batch insertion
+        sparse_matrix.insert_batch(batch_rows, batch_cols, batch_values);
 
         // Update row start for CRS
         // sparse_matrix.buildRowStart();
@@ -337,11 +352,26 @@ public:
         // Add terms of the expression into the sparse matrix
         int row_index = constraint_index;
 
-        for (const auto &[var_name, coeff] : expression.get_terms()) {
+        // Prepare batch vectors
+        std::vector<int>    batch_rows;
+        std::vector<int>    batch_cols;
+        std::vector<double> batch_values;
 
+        // Pre-allocate space
+        batch_rows.reserve(expression.get_terms().size());
+        batch_cols.reserve(expression.get_terms().size());
+        batch_values.reserve(expression.get_terms().size());
+
+        // Collect terms for batch insertion
+        for (const auto &[var_name, coeff] : expression.get_terms()) {
             int col_index = var_name_to_index[var_name];
-            sparse_matrix.insert(row_index, col_index, coeff);
+            batch_rows.push_back(row_index);
+            batch_cols.push_back(col_index);
+            batch_values.push_back(coeff);
         }
+
+        // Perform batch insertion
+        sparse_matrix.insert_batch(batch_rows, batch_cols, batch_values);
 
         // Return reference to the added constraint
         return constraints.back();

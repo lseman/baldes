@@ -575,7 +575,7 @@ public:
 
         // Sort and limit to top solutions
         pdqsort(best_new.begin(), best_new.end(), [](const Label *a, const Label *b) { return a->cost < b->cost; });
-        if (best_new.size() > 5) { best_new.erase(best_new.begin() + 5, best_new.end()); }
+        if (best_new.size() > N_ADD) { best_new.erase(best_new.begin() + N_ADD, best_new.end()); }
 
         return best_new;
     }
@@ -710,7 +710,7 @@ private:
     std::mutex                              queue_mutex;
     std::condition_variable                 queue_condition;
     bool                                    shutdown       = false;
-    const int                               task_threshold = 5; // The threshold for processing tasks
+    const int                               task_threshold = N_ADD; // The threshold for processing tasks
 
     std::vector<Label *> processed_labels; // Store results from perturbation
 

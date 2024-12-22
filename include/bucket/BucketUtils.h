@@ -453,93 +453,103 @@ void BucketGraph::ConcatenateLabel(const Label *L, int &b, Label *&pbest, std::v
     auto &other_c_bar   = assign_symmetry<SYM>(fw_c_bar, bw_c_bar);
 
     // Cache frequently accessed values
-    const auto  &L_node_id   = L->node_id;
+    const int    L_node_id   = L->node_id;
     const auto  &L_resources = L->resources;
     const auto  &L_last_node = nodes[L_node_id];
     const double L_cost      = L->cost;
     const size_t bitmap_size = L->visited_bitmap.size();
 
-    // Pre-compute constants
+    // Pre-compute constants for bit operations
     constexpr uint64_t one           = 1ULL;
-    const bool         has_branching = branching_duals->size() > 0;
+    const bool         has_branching = !branching_duals->empty();
 
-    SRC_MODE_BLOCK(decltype(cut_storage) cutter = nullptr; decltype(cut_storage->SRCDuals) *SRCDuals = nullptr;
-                   if constexpr (S > Stage::Three) {
-                       cutter   = cut_storage;
-                       SRCDuals = &cutter->SRCDuals;
-                   })
+    // SRC mode setup
+#if defined(SRC)
+    decltype(cut_storage)            cutter   = nullptr;
+    decltype(cut_storage->SRCDuals) *SRCDuals = nullptr;
+    if constexpr (S > Stage::Three) {
+        cutter   = cut_storage;
+        SRCDuals = &cutter->SRCDuals;
+    }
+#endif
 
     while (!bucket_stack.empty()) {
         const int current_bucket = bucket_stack.back();
         bucket_stack.pop_back();
 
-        // Optimize bit operations
+        // Optimize bit operations for visited tracking
         const size_t   segment  = current_bucket >> 6;
         const uint64_t bit_mask = one << (current_bucket & 63);
         Bvisited[segment] |= bit_mask;
 
-        const auto &bucketLprimenode = other_buckets[current_bucket].node_id;
-        double      cost             = getcij(L_node_id, bucketLprimenode);
+        const int bucketLprimenode = other_buckets[current_bucket].node_id;
+        double    travel_cost      = getcij(L_node_id, bucketLprimenode);
 
+        // Apply arc duals if needed
 #if defined(RCC) || defined(EXACT_RCC)
-        if constexpr (S == Stage::Four) { cost -= arc_duals.getDual(L_node_id, bucketLprimenode); }
+        if constexpr (S == Stage::Four) { travel_cost -= arc_duals.getDual(L_node_id, bucketLprimenode); }
 #endif
 
-        if (has_branching) { cost -= branching_duals->getDual(L_node_id, bucketLprimenode); }
+        if (has_branching) { travel_cost -= branching_duals->getDual(L_node_id, bucketLprimenode); }
 
-        const double L_cost_plus_cost = L_cost + cost;
-        const double current_bound    = other_c_bar[current_bucket];
+        const double path_cost = L_cost + travel_cost;
+        const double bound     = other_c_bar[current_bucket];
 
-        // Early exit check
-        const bool should_continue = (S != Stage::Enumerate && L_cost_plus_cost + current_bound >= pbest->cost) ||
-                                     (S == Stage::Enumerate && L_cost_plus_cost + current_bound >= gap);
-
-        if (should_continue) continue;
+        // Early bound check
+        if ((S != Stage::Enumerate && path_cost + bound >= pbest->cost) ||
+            (S == Stage::Enumerate && path_cost + bound >= gap)) {
+            continue;
+        }
 
         // Process labels in current bucket
-        auto      &bucket = other_buckets[current_bucket];
-        const auto labels = bucket.get_labels();
+        const auto &bucket = other_buckets[current_bucket];
+        const auto &labels = bucket.get_labels();
 
-        for (const auto &L_bw : labels) {
-            if (L_bw->node_id == L_node_id || !check_feasibility(L, L_bw)) continue;
+        for (const Label *L_bw : labels) {
+            // Early rejection tests
+            if (L_bw->node_id == L_node_id || !check_feasibility(L, L_bw)) { continue; }
 
-            // Check visited overlap early if needed
+            // Visited nodes overlap check
             if constexpr (S >= Stage::Three) {
-                bool visited_overlap = false;
+                bool has_overlap = false;
                 for (size_t i = 0; i < bitmap_size; ++i) {
                     if (L->visited_bitmap[i] & L_bw->visited_bitmap[i]) {
-                        visited_overlap = true;
+                        has_overlap = true;
                         break;
                     }
                 }
-                if (visited_overlap) continue;
+                if (has_overlap) continue;
             }
 
-            double candidate_cost = L_cost_plus_cost + L_bw->cost;
+            double total_cost = path_cost + L_bw->cost;
 
-            SRC_MODE_BLOCK(if constexpr (S == Stage::Four) {
+            // SRC cost adjustments
+#if defined(SRC)
+            if constexpr (S == Stage::Four) {
                 for (auto it = cutter->begin(); it < cutter->end(); ++it) {
-                    if ((*SRCDuals)[it->id] == 0) continue;
-                    auto den = it->p.den;
-                    if (L->SRCmap[it->id] + L_bw->SRCmap[it->id] >= den) { candidate_cost -= (*SRCDuals)[it->id]; }
-                }
-            })
+                    const auto &dual = (*SRCDuals)[it->id];
+                    if (dual == 0) continue;
 
-            // Early exit based on candidate cost
-            if ((S != Stage::Enumerate && candidate_cost >= pbest->cost) ||
-                (S == Stage::Enumerate && candidate_cost >= gap)) {
+                    if (L->SRCmap[it->id] + L_bw->SRCmap[it->id] >= it->p.den) { total_cost -= dual; }
+                }
+            }
+#endif
+
+            // Cost-based filtering
+            if ((S != Stage::Enumerate && total_cost >= pbest->cost) || (S == Stage::Enumerate && total_cost >= gap)) {
                 continue;
             }
 
-            // Compute and store new label
+            // Create new merged label
             pbest = compute_label<S>(L, L_bw);
             merged_labels.push_back(pbest);
         }
 
-        // Process neighbors with optimized bit operations
+        // Process neighbor buckets
         for (int b_prime : Phi_bw[current_bucket]) {
-            const size_t seg_prime = b_prime >> 6;
-            if (!(Bvisited[seg_prime] & (one << (b_prime & 63)))) { bucket_stack.push_back(b_prime); }
+            const size_t   seg_prime  = b_prime >> 6;
+            const uint64_t mask_prime = one << (b_prime & 63);
+            if (!(Bvisited[seg_prime] & mask_prime)) { bucket_stack.push_back(b_prime); }
         }
     }
 }

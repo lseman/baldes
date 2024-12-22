@@ -22,6 +22,11 @@
 #include "Bitset.h"
 #include "utils/Hashes.h"
 
+#include "Stealing.h"
+
+// include intel concurrent hashmap
+#include <tbb/concurrent_hash_map.h>
+
 constexpr int INITIAL_RANK_1_MULTI_LABEL_POOL_SIZE              = 50;
 constexpr int INITIAL_POOL_SIZE                                 = 100;
 using yzzLong                                                   = Bitset<N_SIZE>;
@@ -30,7 +35,7 @@ constexpr double tolerance                                      = 1e-6;
 constexpr int    max_row_rank1                                  = 5;
 constexpr int    max_heuristic_initial_seed_set_size_row_rank1c = 6;
 
-constexpr int    max_num_r1c_per_round = 20;
+constexpr int    max_num_r1c_per_round = 3;
 constexpr double cut_vio_factor        = 0.1;
 
 struct R1c {
@@ -54,6 +59,8 @@ struct Rank1MultiLabel {
 
 class HighDimCutsGenerator {
 public:
+    WorkStealingPool thread_pool;
+
     int max_heuristic_sep_mem4_row_rank1 = 8;
 
     double max_cut_mem_factor = 0.15;
@@ -87,7 +94,7 @@ public:
         cuts.reserve(INITIAL_POOL_SIZE);
         rank1_multi_label_pool.reserve(INITIAL_POOL_SIZE);
         generated_rank1_multi_pool.reserve(INITIAL_POOL_SIZE);
-        map_cut_plan_vio.reserve(INITIAL_POOL_SIZE);
+        // map_cut_plan_vio.reserve(INITIAL_POOL_SIZE);
 
         generateOptimalMultiplier();
         // printMultiplierMap();
@@ -123,9 +130,8 @@ public:
     int               dim, max_row_rank1, num_label;
     double            TOLERANCE;
     // std::vector<ankerl::unordered_dense::map<int, int>>        v_r_map;
-    gch::small_vector<std::vector<int>>                                                            v_r_map;
-    gch::small_vector<std::pair<std::vector<int>, std::vector<int>>>                               c_N_noC;
-    ankerl::unordered_dense::map<Bitset<N_SIZE>, std::vector<std::pair<std::vector<int>, double>>> map_cut_plan_vio;
+    gch::small_vector<std::vector<int>>                                                     v_r_map;
+    gch::small_vector<std::pair<std::vector<int>, std::vector<int>>>                        c_N_noC;
     std::vector<Rank1MultiLabel>                                                            rank1_multi_label_pool;
     ankerl::unordered_dense::map<int, std::vector<std::tuple<Bitset<N_SIZE>, int, double>>> generated_rank1_multi_pool;
     std::vector<R1c>                                                                        cuts;
@@ -141,7 +147,7 @@ public:
         v_r_map.clear();
         c_N_noC.clear();
         map_cut_plan_vio.clear();
-        map_cut_plan_vio.reserve(4096);
+        // map_cut_plan_vio.reserve(4096);
         generated_rank1_multi_pool.clear();
         rank1_multi_label_pool.clear();
         num_label = 0;
@@ -167,6 +173,7 @@ public:
 
     void getHighDimCuts() {
         constructVRMapAndSeedCrazy();
+        // runing startSeedCrazy
         startSeedCrazy();
         for (int i = 0; i < num_label;) { operationsCrazy(rank1_multi_label_pool[i], i); }
         constructCutsCrazy();
@@ -176,46 +183,85 @@ public:
         old_cuts = cuts;
     }
 
-    void processSeedForPlan(int plan_idx, std::vector<Rank1MultiLabel> &local_pool) {
-        // Iterate through each `c, wc` pair in `c_N_noC`
-        for (auto &[c, wc] : c_N_noC) {
-            double vio, best_vio;
-            exactFindBestPermutationForOnePlan(c, plan_idx, vio);
-            if (vio < TOLERANCE) continue;
+    void startSeedCrazy() {
+        num_label                    = 0;
+        const size_t     max_threads = std::thread::hardware_concurrency();
+        WorkStealingPool pool(max_threads); // Use a thread pool for parallel processing
+        std::mutex       rank1_mutex;       // Protect shared pool access
 
-            best_vio                      = vio;
-            char                best_oper = 'o';
-            int                 add_j = -1, remove_j = -1;
-            std::pair<int, int> swap_i_j = {-1, -1};
+        // Submit tasks for each plan and corresponding c_N_noC
+        for (int plan_idx : {0, 1, 2, 3, 4, 5, 6}) {
+            for (const auto &pair : c_N_noC) {
+                pool.submit([this, plan_idx, pair, &rank1_mutex]() mutable {
+                    try {
+                        // std::cout << "Task submitted for plan_idx " << plan_idx << "\n";
 
-            // Perform add search and update best operation if necessary
-            addSearchCrazy(plan_idx, c, wc, vio, add_j);
-            if (vio > best_vio) {
-                best_vio  = vio;
-                best_oper = 'a';
+                        const auto &[c, wc] = pair;
+                        if (c.empty() || wc.empty()) {
+                            // std::cout << "Task skipped for plan_idx " << plan_idx << " due to empty c or wc.\n";
+                            return;
+                        }
+
+                        std::vector<int> c_mutable   = c;
+                        double           initial_vio = 0.0;
+
+                        exactFindBestPermutationForOnePlan(c_mutable, plan_idx, initial_vio);
+
+                        if (initial_vio < TOLERANCE) {
+                            // std::cout << "Task completed for plan_idx " << plan_idx << " with no updates.\n";
+                            return;
+                        }
+
+                        // Additional operations: add, remove, swap
+                        int                 add_j, remove_j;
+                        double              add_vio = initial_vio, remove_vio = initial_vio;
+                        std::pair<int, int> swap_i_j;
+                        double              swap_vio = initial_vio;
+
+                        addSearchCrazy(plan_idx, c_mutable, wc, add_vio, add_j);
+                        removeSearchCrazy(plan_idx, c_mutable, remove_vio, remove_j);
+                        swapSearchCrazy(plan_idx, c_mutable, wc, swap_vio, swap_i_j);
+
+                        double best_vio = std::max({add_vio, remove_vio, swap_vio});
+                        if (best_vio > initial_vio) {
+                            std::vector<int> new_c, new_w_no_c;
+                            char             best_op = 'n';
+
+                            if (best_vio == add_vio) {
+                                best_op = 'a';
+                                applyBestOperation('a', c_mutable, wc, add_j, -1, std::make_pair(-1, -1), new_c,
+                                                   new_w_no_c, plan_idx, best_vio);
+                            } else if (best_vio == remove_vio) {
+                                best_op = 'r';
+                                applyBestOperation('r', c_mutable, wc, -1, remove_j, std::make_pair(-1, -1), new_c,
+                                                   new_w_no_c, plan_idx, best_vio);
+                            } else {
+                                best_op = 's';
+                                applyBestOperation('s', c_mutable, wc, -1, -1, swap_i_j, new_c, new_w_no_c, plan_idx,
+                                                   best_vio);
+                            }
+
+                            {
+                                std::lock_guard<std::mutex> lock(rank1_mutex);
+                                if (num_label + 1 > rank1_multi_label_pool.size()) {
+                                    rank1_multi_label_pool.resize(
+                                        std::max<std::size_t>(rank1_multi_label_pool.size() * 2, num_label + 1));
+                                }
+                                rank1_multi_label_pool[num_label++] = Rank1MultiLabel(
+                                    std::move(new_c), std::move(new_w_no_c), plan_idx, best_vio, best_op);
+                            }
+                        }
+
+                        // std::cout << "Task completed for plan_idx " << plan_idx << "\n";
+                    } catch (const std::exception &e) {
+                        std::cerr << "Exception in task for plan_idx " << plan_idx << ": " << e.what() << "\n";
+                    } catch (...) { std::cerr << "Unknown exception in task for plan_idx " << plan_idx << "\n"; }
+                });
             }
-
-            // Perform remove search and update best operation if necessary
-            removeSearchCrazy(plan_idx, c, vio, remove_j);
-            if (vio > best_vio) {
-                best_vio  = vio;
-                best_oper = 'r';
-            }
-
-            // Perform swap search and update best operation if necessary
-            swapSearchCrazy(plan_idx, c, wc, vio, swap_i_j);
-            if (vio > best_vio) {
-                best_vio  = vio;
-                best_oper = 's';
-            }
-
-            // Prepare `new_c` and `new_w_no_c` based on the best operation
-            std::vector<int> new_c, new_w_no_c;
-            applyBestOperation(best_oper, c, wc, add_j, remove_j, swap_i_j, new_c, new_w_no_c, plan_idx, best_vio);
-
-            // Only add to `local_pool` if an operation other than 'o' was performed
-            if (best_oper != 'o') { local_pool.emplace_back(new_c, new_w_no_c, plan_idx, best_vio, best_oper); }
         }
+
+        // Wait for all tasks to complete
+        pool.wait_idle();
     }
 
     void applyBestOperation(char best_oper, const std::vector<int> &c, const std::vector<int> &wc, int add_j,
@@ -256,36 +302,22 @@ public:
                 if (i == swap_i_j.second) i = swap_i_j.first;
             }
             break;
+
+            // case 'h': // Shift operation
+            //     new_c      = c;
+            //     new_w_no_c = wc;
+            //     if (swap_i_j.first < swap_i_j.second) {
+            //         std::rotate(new_c.begin() + swap_i_j.first, new_c.begin() + swap_i_j.first + 1,
+            //                     new_c.begin() + swap_i_j.second + 1);
+            //     } else {
+            //         std::rotate(new_c.begin() + swap_i_j.second, new_c.begin() + swap_i_j.first,
+            //                     new_c.begin() + swap_i_j.first + 1);
+            //     }
+            //     break;
         }
     }
 
     std::mutex pool_mutex; // Mutex to protect shared pool access
-
-    void startSeedCrazy() {
-        num_label                     = 0;
-        std::vector<int> plan_indices = {0, 1, 2, 3, 4, 5, 6};
-
-        const int                JOBS = plan_indices.size();
-        exec::static_thread_pool pool(JOBS);
-        auto                     sched = pool.get_scheduler();
-
-        auto bulk_sender = stdexec::bulk(stdexec::just(), JOBS, [&](std::size_t plan_idx) {
-            std::vector<Rank1MultiLabel> local_pool; // Local pool to collect results per thread
-            processSeedForPlan(plan_idx, local_pool);
-
-            // Lock and transfer data from local pool to shared pool
-            std::lock_guard<std::mutex> lock(pool_mutex);
-            for (auto &label : local_pool) {
-                if (num_label >= rank1_multi_label_pool.size()) {
-                    rank1_multi_label_pool.resize(rank1_multi_label_pool.size() * 1.5);
-                }
-                rank1_multi_label_pool[num_label++] = (label);
-            }
-        });
-
-        auto work = stdexec::starts_on(sched, bulk_sender);
-        stdexec::sync_wait(std::move(work));
-    }
 
     gch::small_vector<double> cached_valid_routes;
     gch::small_vector<int>    cached_map_old_new_routes;
@@ -309,33 +341,67 @@ public:
         }
     }
 
-    ankerl::unordered_dense::map<std::vector<int>, std::vector<std::vector<int>>, VectorIntHash> cut_cache;
+    // ankerl::unordered_dense::map<std::vector<int>, std::vector<std::vector<int>>, VectorIntHash> cut_cache;
+
+    tbb::concurrent_hash_map<std::vector<int>, std::vector<std::vector<int>>, VectorIntHashCompare> cut_cache;
+
+    using KeyType   = Bitset<N_SIZE>;
+    using ValueType = std::vector<std::pair<std::vector<int>, double>>;
+    // ankerl::unordered_dense::map<Bitset<N_SIZE>, std::vector<std::pair<std::vector<int>, double>>> map_cut_plan_vio;
+    tbb::concurrent_hash_map<cutLong, std::vector<std::pair<std::vector<int>, double>>> map_cut_plan_vio;
 
     // declare map_cut_plan_vio_mutex
     std::shared_mutex map_cut_plan_vio_mutex;
     std::shared_mutex cut_cache_mutex;
 
     // For the frequency accumulation loop:
-    void accumulate_frequencies_simd(int *map_r_numbers, const auto &route_freqs, int route_size) {
-        const int simd_size = 8; // AVX2 processes 8 integers at once
-        int       i         = 0;
+    void accumulate_frequencies_simd(int *__restrict map_r_numbers, const auto &__restrict route_freqs,
+                                     const int route_size) noexcept {
+        static constexpr int SIMD_SIZE         = 8;  // AVX2 processes 8 integers at once
+        static constexpr int PREFETCH_DISTANCE = 64; // Common cache line size
+
+        // Ensure proper alignment for best performance
+        alignas(32) const int *freq_ptr = route_freqs.data();
+        alignas(32) int       *map_ptr  = map_r_numbers;
+
+        int i = 0;
+
+        // Prefetch next cache lines
+        _mm_prefetch(reinterpret_cast<const char *>(freq_ptr + PREFETCH_DISTANCE), _MM_HINT_T0);
+        _mm_prefetch(reinterpret_cast<const char *>(map_ptr + PREFETCH_DISTANCE), _MM_HINT_T0);
 
         // Process 8 elements at a time using AVX2
-        for (; i + simd_size <= route_size; i += simd_size) {
-            __m256i freq = _mm256_loadu_si256((__m256i *)&route_freqs[i]);
-            __m256i curr = _mm256_loadu_si256((__m256i *)&map_r_numbers[i]);
-            __m256i mask = _mm256_cmpgt_epi32(freq, _mm256_setzero_si256());
+        for (; i + SIMD_SIZE <= route_size; i += SIMD_SIZE) {
+            // Prefetch next iteration
+            _mm_prefetch(reinterpret_cast<const char *>(freq_ptr + i + PREFETCH_DISTANCE), _MM_HINT_T0);
+            _mm_prefetch(reinterpret_cast<const char *>(map_ptr + i + PREFETCH_DISTANCE), _MM_HINT_T0);
+
+            __m256i freq = _mm256_loadu_si256(reinterpret_cast<const __m256i *>(&freq_ptr[i]));
+            __m256i curr = _mm256_loadu_si256(reinterpret_cast<const __m256i *>(&map_ptr[i]));
+
+            // Optimize comparison and masking
+            __m256i zero = _mm256_setzero_si256();
+            __m256i mask = _mm256_cmpgt_epi32(freq, zero);
             freq         = _mm256_and_si256(freq, mask);
-            curr         = _mm256_add_epi32(curr, freq);
-            _mm256_storeu_si256((__m256i *)&map_r_numbers[i], curr);
+
+            // Accumulate
+            curr = _mm256_add_epi32(curr, freq);
+            _mm256_storeu_si256(reinterpret_cast<__m256i *>(&map_ptr[i]), curr);
         }
 
-        // Handle remaining elements
+// Handle remaining elements with auto-vectorization hint
+#pragma omp simd
         for (; i < route_size; i++) {
-            const int frequency = route_freqs[i];
-            map_r_numbers[i] += frequency * (frequency > 0);
+            const int frequency = freq_ptr[i];
+            map_ptr[i] += frequency * (frequency > 0);
         }
     }
+
+    struct ViolationResult {
+        double violation;
+        int    index;
+        bool   operator<(const ViolationResult &other) const { return violation < other.violation; }
+    };
 
     void exactFindBestPermutationForOnePlan(std::vector<int> &cut, const int plan_idx, double &vio) {
         const int   cut_size = static_cast<int>(cut.size());
@@ -346,75 +412,66 @@ public:
             return;
         }
 
-        // Use thread_local for frequently reused vectors to avoid allocations
-        static thread_local cutLong tmp;
+        // Thread-local storage with aligned vectors for SIMD
+        alignas(64) static thread_local cutLong                                  tmp;
+        alignas(64) static thread_local std::vector<int, aligned_allocator<int>> map_r_numbers;
+        alignas(64) static thread_local std::vector<double>                      num_times_vis_routes;
+        alignas(64) static thread_local std::vector<std::vector<int>>            cut_num_times_vis_routes;
+        alignas(64) static thread_local std::vector<std::pair<int, int>>         cut_coeff;
+        alignas(64) static thread_local std::vector<int>                         new_cut;
+
         tmp.reset();
 
-        // SIMD-friendly loop with no branching for setting bits
+        // Branchless bit setting
         for (int i = 0; i < cut_size; ++i) {
             const int it = cut[i];
-            tmp.set(it * (it >= 0 && it < v_r_map.size())); // Branchless using multiplication
+            tmp.set(it * (it >= 0 && it < v_r_map.size()));
         }
 
-        // Quick cache lookup with shared lock
+        // Quick cache lookup
         {
-            std::shared_lock<std::shared_mutex> lock(map_cut_plan_vio_mutex);
-            if (auto it = map_cut_plan_vio.find(tmp);
-                it != map_cut_plan_vio.end() && plan_idx < it->second.size() && !it->second[plan_idx].first.empty()) {
-                vio = it->second[plan_idx].second;
-                return;
+            tbb::concurrent_hash_map<KeyType, ValueType>::const_accessor accessor;
+            if (map_cut_plan_vio.find(accessor, tmp)) {
+                const auto &value = accessor->second;
+                if (plan_idx < value.size() && !value[plan_idx].first.empty()) {
+                    vio = value[plan_idx].second;
+                    return;
+                }
             }
         }
 
-        // Upgrade to exclusive lock to modify
+        // Initialize map entry
         {
-            std::unique_lock<std::shared_mutex> lock(map_cut_plan_vio_mutex);
-            map_cut_plan_vio[tmp].resize(7);
+            tbb::concurrent_hash_map<KeyType, ValueType>::accessor accessor;
+            if (map_cut_plan_vio.insert(accessor, tmp)) { accessor->second.resize(7); }
         }
 
         const int    denominator = get<1>(plan);
         const double rhs         = get<2>(plan);
         const auto  &coeffs      = record_map_rank1_combinations[cut_size][plan_idx];
 
-        // Use thread_local vectors to avoid allocations
-        // static thread_local std::vector<int> map_r_numbers;
-        alignas(32) static thread_local std::vector<int, aligned_allocator<int>> map_r_numbers;
-
+        // Pre-size vectors to avoid reallocations
         map_r_numbers.resize(sol.size());
         std::fill(map_r_numbers.begin(), map_r_numbers.end(), 0);
 
-#ifndef __AVX2__
-        // Pre-compute route frequencies in a single pass
-        for (int idx : cut) {
+        // Frequency accumulation
+        for (int i = 0; i < cut_size; ++i) {
+            const int idx = cut[i];
             if (idx >= 0 && idx < v_r_map.size()) {
                 const auto &route_freqs = v_r_map[idx];
-                const int   route_size  = static_cast<int>(route_freqs.size());
-
-                // SIMD-friendly loop for frequency accumulation
-                for (int route_idx = 0; route_idx < route_size; ++route_idx) {
-                    const int frequency = route_freqs[route_idx];
-                    map_r_numbers[route_idx] += frequency * (frequency > 0); // Branchless using multiplication
+                for (size_t j = 0; j < route_freqs.size(); ++j) {
+                    map_r_numbers[j] += route_freqs[j] * (route_freqs[j] > 0);
                 }
             }
         }
-#else
-        for (int idx : cut) {
-            if (idx >= 0 && idx < v_r_map.size()) {
-                const auto &route_freqs = v_r_map[idx];
-                const int   route_size  = static_cast<int>(route_freqs.size());
-                accumulate_frequencies_simd(map_r_numbers.data(), route_freqs, route_size);
-            }
-        }
-#endif
 
-        static thread_local std::vector<std::vector<int>> cut_num_times_vis_routes;
-
-        // Cache lookup with minimized critical section
+        // Cache lookup with two-phase locking
         bool cache_hit = false;
         {
-            std::shared_lock<std::shared_mutex> lock(cut_cache_mutex);
-            if (auto cache_it = cut_cache.find(cut); cache_it != cut_cache.end()) {
-                cut_num_times_vis_routes = cache_it->second;
+            tbb::concurrent_hash_map<std::vector<int>, std::vector<std::vector<int>>,
+                                     VectorIntHashCompare>::const_accessor accessor;
+            if (cut_cache.find(accessor, cut)) {
+                cut_num_times_vis_routes = accessor->second;
                 cache_hit                = true;
             }
         }
@@ -423,87 +480,80 @@ public:
             cut_num_times_vis_routes.clear();
             cut_num_times_vis_routes.resize(cut_size);
 
-            // Pre-reserve space to avoid reallocations
-            for (auto &route_vec : cut_num_times_vis_routes) {
-                route_vec.reserve(num_valid_routes * 2); // Estimate capacity
-            }
+            // Pre-reserve space for route vectors
+            for (auto &route_vec : cut_num_times_vis_routes) { route_vec.reserve(num_valid_routes * 2); }
 
+            // Route processing
             for (int i = 0; i < cut_size; ++i) {
                 const int c = cut[i];
                 if (c >= 0 && c < v_r_map.size()) {
                     auto       &current_route = cut_num_times_vis_routes[i];
                     const auto &route_freqs   = v_r_map[c];
 
-                    // Vectorizable loop for route processing
-                    for (int route_idx = 0; route_idx < route_freqs.size(); ++route_idx) {
-                        const int frequency = route_freqs[route_idx];
+                    for (size_t route_idx = 0; route_idx < route_freqs.size(); ++route_idx) {
+                        const auto frequency = route_freqs[route_idx];
                         if (frequency > 0 && cached_map_old_new_routes[route_idx] != -1) {
-                            const int val = cached_map_old_new_routes[route_idx];
-                            current_route.insert(current_route.end(), frequency, val);
+                            current_route.insert(current_route.end(), frequency, cached_map_old_new_routes[route_idx]);
                         }
                     }
                 }
             }
 
             // Update cache
-            std::unique_lock<std::shared_mutex> lock(cut_cache_mutex);
-            cut_cache[cut] = cut_num_times_vis_routes;
+            tbb::concurrent_hash_map<std::vector<int>, std::vector<std::vector<int>>, VectorIntHashCompare>::accessor
+                accessor;
+            cut_cache.insert(accessor, cut);
+            accessor->second = cut_num_times_vis_routes;
         }
 
-        // Use thread_local vector for accumulation
-        static thread_local std::vector<double> num_times_vis_routes;
         num_times_vis_routes.resize(num_valid_routes);
+        std::vector<ViolationResult> violations(coeffs.size());
 
-        double best_vio = -std::numeric_limits<double>::max();
-        int    best_idx = -1;
+        for (size_t coeff_idx = 0; coeff_idx < coeffs.size(); ++coeff_idx) {
+            const auto         &coeff_row = coeffs[coeff_idx];
+            std::vector<double> local_num_times_vis_routes(num_valid_routes, 0.0);
 
-        // SIMD-friendly loop for coefficient processing
-        for (size_t cnt = 0; cnt < coeffs.size(); ++cnt) {
-            std::fill(num_times_vis_routes.begin(), num_times_vis_routes.end(), 0.0);
-
-            // Vectorizable nested loops
             for (int i = 0; i < cut_size; ++i) {
-                const auto  &routes = cut_num_times_vis_routes[i];
-                const double coeff  = coeffs[cnt][i];
-
-                for (const int j : routes) { num_times_vis_routes[j] += coeff; }
+                const double coeff = coeff_row[i];
+                for (const int route : cut_num_times_vis_routes[i]) { local_num_times_vis_routes[route] += coeff; }
             }
 
-            // Compute violation score with SIMD-friendly loop
             double vio_tmp = -rhs;
-            for (size_t i = 0; i < num_times_vis_routes.size(); ++i) {
-                const double scaled_value =
-                    static_cast<int>(num_times_vis_routes[i] / denominator + tolerance) * cached_valid_routes[i];
-                vio_tmp += scaled_value;
+            for (size_t i = 0; i < num_valid_routes; ++i) {
+                vio_tmp +=
+                    static_cast<int>(local_num_times_vis_routes[i] / denominator + TOLERANCE) * cached_valid_routes[i];
             }
 
-            if (vio_tmp > best_vio) {
-                best_vio = vio_tmp;
-                best_idx = static_cast<int>(cnt);
-            }
+            { violations[coeff_idx] = {vio_tmp, static_cast<int>(coeff_idx)}; }
         }
-        vio = best_vio;
 
-        // Final result preparation with thread_local storage
-        static thread_local std::vector<std::pair<int, int>> cut_coeff;
+        // Find best violation
+        const auto best_result = *std::max_element(violations.begin(), violations.end());
+        vio                    = best_result.violation;
+
+        // Prepare final result
         cut_coeff.resize(cut_size);
+        if (best_result.index >= 0 && best_result.index < coeffs.size()) {
+            const auto &best_coeffs = coeffs[best_result.index];
 
-        for (int i = 0; i < cut_size; ++i) {
-            if (best_idx >= 0 && best_idx < coeffs.size() && i < coeffs[best_idx].size()) {
-                cut_coeff[i] = {cut[i], coeffs[best_idx][i]};
+            for (int i = 0; i < cut_size; ++i) {
+                cut_coeff[i] = {cut[i], i < best_coeffs.size() ? static_cast<int>(best_coeffs[i]) : 0};
             }
         }
 
+        // Sort and prepare new cut
         pdqsort(cut_coeff.begin(), cut_coeff.end(), [](const auto &a, const auto &b) { return a.second > b.second; });
 
-        static thread_local std::vector<int> new_cut;
         new_cut.resize(cut_size);
         std::transform(cut_coeff.begin(), cut_coeff.end(), new_cut.begin(), [](const auto &a) { return a.first; });
 
         // Update final results
-        std::unique_lock<std::shared_mutex> lock(map_cut_plan_vio_mutex);
-        if (plan_idx < map_cut_plan_vio[tmp].size()) { map_cut_plan_vio[tmp][plan_idx] = {new_cut, vio}; }
+        tbb::concurrent_hash_map<KeyType, ValueType>::accessor accessor;
+        if (map_cut_plan_vio.find(accessor, tmp)) {
+            if (plan_idx < accessor->second.size()) { accessor->second[plan_idx] = {new_cut, vio}; }
+        }
     }
+
     std::vector<std::vector<double>> cost_mat4_vertex;
 
     std::shared_ptr<HighDimCutsGenerator> clone() const {
@@ -660,6 +710,57 @@ public:
         return std::make_pair(best_vio, best_candidate);
     }
 
+    inline void shiftSearchCrazy(int plan_idx, const std::vector<int> &c, double &new_vio,
+                                 std::pair<int, int> &shift_positions) {
+        // Validate size and plan
+        auto validation = PlanValidationResult::validate(plan_idx, c.size(), map_rank1_multiplier);
+        if (!validation.is_valid) {
+            new_vio = -std::numeric_limits<double>::max();
+            return;
+        }
+
+        std::vector<int>    tmp_c    = c;
+        double              best_vio = -std::numeric_limits<double>::max();
+        std::pair<int, int> best_shift{-1, -1};
+
+        // Try shifting elements to different positions
+        for (int from = 0; from < c.size(); ++from) {
+            const int element = c[from];
+
+            // Find best position to shift this element to
+            auto [pos_best_vio, to_pos] = findBestViolation(
+                [&](int to) {
+                    if (to == from) return -std::numeric_limits<double>::max();
+
+                    // Perform the shift
+                    if (to < from) {
+                        // Shift up - move element earlier in sequence
+                        std::rotate(tmp_c.begin() + to, tmp_c.begin() + from, tmp_c.begin() + from + 1);
+                    } else {
+                        // Shift down - move element later in sequence
+                        std::rotate(tmp_c.begin() + from, tmp_c.begin() + from + 1, tmp_c.begin() + to + 1);
+                    }
+
+                    double vio;
+                    // fmt::print("Calling in shiftSearchCrazy\n");
+                    exactFindBestPermutationForOnePlan(tmp_c, plan_idx, vio);
+
+                    // Restore original order
+                    tmp_c = c;
+                    return vio;
+                },
+                std::vector<int>(c.size())); // Try all possible positions
+
+            if (pos_best_vio > best_vio) {
+                best_vio   = pos_best_vio;
+                best_shift = {from, to_pos};
+            }
+        }
+
+        new_vio         = best_vio;
+        shift_positions = best_shift;
+    }
+
     inline void addSearchCrazy(int plan_idx, const std::vector<int> &c, const std::vector<int> &w_no_c, double &new_vio,
                                int &add_j) {
         const int new_size = c.size() + 1;
@@ -676,19 +777,27 @@ public:
             return;
         }
 
-        // Prepare temporary vector once
+        // Prepare temporary vector with space for the new candidate
         std::vector<int> tmp_c = c;
-        tmp_c.push_back(0);
+        tmp_c.push_back(0); // Placeholder for the candidate
 
-        // Find best candidate
-        auto [best_vio, best_candidate] = findBestViolation(
-            [&](int candidate) {
-                tmp_c.back() = candidate;
-                double vio;
-                exactFindBestPermutationForOnePlan(tmp_c, plan_idx, vio);
-                return vio;
-            },
-            w_no_c);
+        double best_vio       = -std::numeric_limits<double>::max();
+        int    best_candidate = -1;
+
+        // Find the best candidate
+        for (const int candidate : w_no_c) {
+            tmp_c.back() = candidate;
+
+            // Compute violation
+            double vio;
+            // fmt::print("Calling in addSearchCrazy\n");
+            exactFindBestPermutationForOnePlan(tmp_c, plan_idx, vio);
+
+            if (vio > best_vio) {
+                best_vio       = vio;
+                best_candidate = candidate;
+            }
+        }
 
         new_vio = best_vio - tolerance;
         add_j   = best_candidate;
@@ -704,21 +813,28 @@ public:
             return;
         }
 
-        // Prepare temporary vector once
+        // Prepare temporary vector for reduced size
         std::vector<int> tmp_c(new_size);
-        std::vector<int> indices(c.size());
-        std::iota(indices.begin(), indices.end(), 0);
 
-        // Find best removal
-        auto [best_vio, best_idx] = findBestViolation(
-            [&](int idx) {
-                std::copy(c.begin(), c.begin() + idx, tmp_c.begin());
-                std::copy(c.begin() + idx + 1, c.end(), tmp_c.begin() + idx);
-                double vio;
-                exactFindBestPermutationForOnePlan(tmp_c, plan_idx, vio);
-                return vio;
-            },
-            indices);
+        double best_vio = -std::numeric_limits<double>::max();
+        int    best_idx = -1;
+
+        // Iterate over all indices to find the best removal
+        for (int idx = 0; idx < static_cast<int>(c.size()); ++idx) {
+            // Create the reduced vector by skipping the current index
+            std::copy(c.begin(), c.begin() + idx, tmp_c.begin());
+            std::copy(c.begin() + idx + 1, c.end(), tmp_c.begin() + idx);
+
+            // Compute violation
+            double vio;
+            // fmt::print("Calling in removeSearchCrazy\n");
+            exactFindBestPermutationForOnePlan(tmp_c, plan_idx, vio);
+
+            if (vio > best_vio) {
+                best_vio = vio;
+                best_idx = idx;
+            }
+        }
 
         new_vio  = best_vio + tolerance;
         remove_j = best_idx >= 0 ? c[best_idx] : -1;
@@ -733,26 +849,38 @@ public:
             return;
         }
 
+        // Temporary working vector and tracking variables
         std::vector<int>    tmp_c    = c;
         double              best_vio = -std::numeric_limits<double>::max();
         std::pair<int, int> best_swap{-1, -1};
 
-        // Optimize loop structure to reduce vector modifications
-        for (int i = 0; i < c.size(); ++i) {
-            const int original = c[i];
+        for (int i = 0; i < static_cast<int>(c.size()); ++i) {
+            const int original       = c[i];
+            int       best_candidate = -1;
+            double    pos_best_vio   = -std::numeric_limits<double>::max();
 
-            // Find best swap for current position
-            auto [pos_best_vio, best_candidate] = findBestViolation(
-                [&](int candidate) {
-                    if (candidate == original) return -std::numeric_limits<double>::max();
-                    tmp_c[i] = candidate;
-                    double vio;
-                    exactFindBestPermutationForOnePlan(tmp_c, plan_idx, vio);
-                    tmp_c[i] = original; // Restore immediately
-                    return vio;
-                },
-                w_no_c);
+            // Iterate through candidates directly, avoiding lambda overhead
+            for (const int candidate : w_no_c) {
+                if (candidate == original) continue;
 
+                // Modify in place
+                tmp_c[i] = candidate;
+
+                // Compute violation
+                double vio;
+                // fmt::print("Calling in swapSearchCrazy\n");
+                exactFindBestPermutationForOnePlan(tmp_c, plan_idx, vio);
+
+                if (vio > pos_best_vio) {
+                    pos_best_vio   = vio;
+                    best_candidate = candidate;
+                }
+            }
+
+            // Restore original value
+            tmp_c[i] = original;
+
+            // Update global best swap if better violation is found
             if (pos_best_vio > best_vio) {
                 best_vio  = pos_best_vio;
                 best_swap = {original, best_candidate};
@@ -785,6 +913,7 @@ public:
         const bool can_add    = label.search_dir == 'a' || label.search_dir == 's';
         const bool can_remove = label.search_dir == 'r' || label.search_dir == 's';
         const bool can_swap   = label.search_dir == 'a' || label.search_dir == 'r';
+        // const bool can_shift  = label.search_dir == 'h';
 
         double new_vio = MIN_SCORE;
 
@@ -809,6 +938,13 @@ public:
             moves[3]                = MoveResult{new_vio};
             moves[3].operation_data = swap_pair;
         }
+
+        // if (can_shift) {
+        //     std::pair<int, int> shift_pos;
+        //     shiftSearchCrazy(label.plan_idx, label.c, new_vio, shift_pos);
+        //     moves[4]                = MoveResult{new_vio};
+        //     moves[4].operation_data = shift_pos;
+        // }
 
         // Find best move
         const auto   best_move_it = std::max_element(moves.begin(), moves.end(), [](const auto &a, const auto &b) {
@@ -917,22 +1053,37 @@ public:
 
             int num_cuts = 0;
             for (const auto &cut : pool.second) {
-                if (std::get<2>(cut) < vio_threshold) break; // Stop if violation score falls below threshold
+                if (std::get<2>(cut) < vio_threshold) break;
 
                 const auto &key      = std::get<0>(cut);
                 int         plan_idx = std::get<1>(cut);
 
-                // Only proceed if the cut is unique in `cut_set` and `p_set`
-                if (!cut_set.contains(key) || !p_set.contains(plan_idx)) {
-                    const auto &cut_plan = map_cut_plan_vio[key][plan_idx];
+                // // Check if key exists in the map
+                // if (map_cut_plan_vio.find(key) == map_cut_plan_vio.end()) {
+                //     std::cerr << "Key not found: " << key << std::endl;
+                //     continue;
+                // }
+
+                tbb::concurrent_hash_map<KeyType, ValueType>::const_accessor accessor;
+                if (map_cut_plan_vio.find(accessor, key)) {
+                    const auto &cut_plans = accessor->second; // Read-only access
+
+                    // Check if plan_idx is valid
+                    if (plan_idx < 0 || plan_idx >= cut_plans.size()) {
+                        std::cerr << "Invalid plan_idx: " << plan_idx << " for key: " << key
+                                  << " with size: " << cut_plans.size() << std::endl;
+                        continue;
+                    }
+
+                    const auto &cut_plan = cut_plans[plan_idx];
                     tmp_cuts.emplace_back(R1c{std::make_pair(cut_plan.first, plan_idx)});
 
                     cut_set.insert(key);
                     p_set.insert(plan_idx);
                     ++num_cuts;
-
-                    if (num_cuts >= max_num_r1c_per_round) break; // Stop if the limit is reached
                 }
+
+                if (num_cuts >= max_num_r1c_per_round) break;
             }
 
             // Move the selected cuts to the main cuts vector in a single operation

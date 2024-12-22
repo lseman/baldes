@@ -48,10 +48,19 @@ void MIPProblem::addVars(const double *lb, const double *ub, const double *obj, 
 }
 
 void MIPProblem::addVars(const double *lb, const double *ub, const double *obj, const VarType *vtypes,
-                         const std::string *names, size_t count) {
+                        const std::string *names, size_t count) {
+    // Pre-allocate space in containers
+    variables.reserve(variables.size() + count);
+    var_name_to_index.reserve(var_name_to_index.size() + count);
+    
+    size_t start_index = variables.size();
+    
+    // Batch create all variables
     for (size_t i = 0; i < count; ++i) {
-        // Add each variable with its bounds, objective, and type
-        add_variable(names[i], vtypes[i], lb[i], ub[i], obj[i]);
+        auto newVar = std::make_shared<baldesVar>(names[i], vtypes[i], lb[i], ub[i], obj[i]);
+        newVar->set_index(start_index + i);
+        variables.emplace_back(newVar);
+        var_name_to_index.emplace(names[i], start_index + i);
     }
 }
 

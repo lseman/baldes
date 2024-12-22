@@ -5,7 +5,15 @@
 
 #include "../third_party/small_vector.hpp"
 
+// #include "RouteCache.h"
 
+// RouteCache HighDimCutsGenerator::route_cache;
+
+// thread_local std::pair<std::vector<int>, RouteCache::Entry *> RouteCache::local_cache = {{}, nullptr};
+
+#include "Stealing.h"
+
+thread_local size_t WorkStealingPool::thread_id = std::numeric_limits<size_t>::max();
 
 void HighDimCutsGenerator::generateOptimalMultiplier() {
     map_rank1_multiplier[max_heuristic_initial_seed_set_size_row_rank1c + 1].resize(10);
