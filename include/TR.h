@@ -231,7 +231,7 @@ private:
             node->remove(zeta[i]);
             counter++;
         }
-        fmt::print("HERE: Removed {} variables\n", counter);
+        // fmt::print("HERE: Removed {} variables\n", counter);
         TRstop = true;
         node->update();
         node->optimize();

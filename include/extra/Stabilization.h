@@ -488,14 +488,10 @@ public:
         // Get current stabilized solution
         DualSolution stab_sol = smooth_dual_sol;
 
-        // Update multi-point manager
-        mp_manager.updatePool(stab_sol, lag_gap); // Negative because we're maximizing
-
-        // Calculate relative improvement for stability center update
-        double relative_improvement    = std::abs(lag_gap - lag_gap_prev) / (std::abs(lag_gap_prev) + EPSILON);
-        bool   significant_improvement = relative_improvement > mp_manager.MIN_IMPROVEMENT;
-
         if (lag_gap < lag_gap_prev) {
+            // Update multi-point manager
+            mp_manager.updatePool(stab_sol, lag_gap); // Negative because we're maximizing
+            
             stab_center_for_next_iteration = smooth_dual_sol;
         } else {
             stab_center_for_next_iteration = cur_stab_center;
@@ -509,66 +505,6 @@ public:
             stabilization_active = false;
             cleanup();
         }
-    }
-
-    DualSolution getStabDualSolAdvanceHybrid(const DualSolution &input_duals) {
-        // Constants and initialization
-        constexpr double EPSILON = 1e-12;
-        DualSolution     nodeDuals(input_duals.begin(), input_duals.begin() + sizeDual);
-
-        // Base cases
-        if (cur_stab_center.empty() || subgradient.empty()) { return getStabDualSol(input_duals); }
-
-        const size_t n = nodeDuals.size();
-
-        // Get multi-point prediction
-        DualSolution mp_sol = mp_manager.getWeightedSolution();
-
-        // Calculate directional solution
-        std::vector<double> direction(n);
-        double              norm_in_out = 0.0;
-
-        // Use multi-point solution to adjust direction
-        double dir_weight = mp_manager.computeAdaptiveWeight(nodeDuals, mp_sol, subgradient, subgradient_norm);
-
-        for (size_t i = 0; i < n; ++i) {
-            direction[i] = (1.0 - dir_weight) * (nodeDuals[i] - cur_stab_center[i]) +
-                           dir_weight * (mp_sol[i] - cur_stab_center[i]);
-            norm_in_out += direction[i] * direction[i];
-        }
-        norm_in_out = std::sqrt(norm_in_out + EPSILON);
-
-        if (norm_in_out < EPSILON || subgradient_norm < EPSILON) { return getStabDualSol(input_duals); }
-
-        // Compute angle with subgradient
-        double dot_product = 0.0;
-        for (size_t i = 0; i < n; ++i) { dot_product += subgradient[i] * direction[i]; }
-        double cos_angle = safeDiv(dot_product, safeMult(norm_in_out, subgradient_norm));
-
-        // Update beta based on angle
-        beta = nb_misprices > 0 ? 0.0 : std::max(0.0, cos_angle);
-
-        // Combine directions
-        double norm_direction = 0.0;
-        for (size_t i = 0; i < n; ++i) {
-            direction[i] = safeMult(beta, subgradient[i]) + safeMult(1.0 - beta, direction[i]);
-            norm_direction += direction[i] * direction[i];
-        }
-        norm_direction = std::sqrt(norm_direction + EPSILON);
-
-        // Compute Wentges step
-        double wentges_step = norm_in_out * cur_alpha;
-
-        // Compute new duals
-        DualSolution new_duals(n);
-        for (size_t i = 0; i < n; ++i) {
-            new_duals[i] = safeAdd(cur_stab_center[i], safeMult(wentges_step / norm_direction, direction[i]));
-            new_duals[i] = std::max(0.0, new_duals[i]);
-        }
-
-        smooth_dual_sol = new_duals;
-        duals_sep       = new_duals;
-        return new_duals;
     }
 
     /**

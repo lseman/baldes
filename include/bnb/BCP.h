@@ -711,12 +711,17 @@ public:
                             break;
                         }
                     }
+                    // check if the lp_obj itself is within tolerance
+                    if (std::abs(std::round(lp_obj) - lp_obj) > 1e-2) { integer = false; }
+
                     if (integer) {
                         if (lp_obj < integer_solution) {
                             print_info("Updating integer solution to {}\n", lp_obj);
-                            integer_solution = lp_obj;
+                            integer_solution        = lp_obj;
+                            bucket_graph->incumbent = integer_solution;
                         }
                     }
+
                 }
 #ifdef IPM_ACEL
                 auto updateGapAndRunOptimization = [&](auto node, auto lp_obj, auto inner_obj, auto &ipm_solver,
@@ -848,7 +853,7 @@ public:
                 if (stab.shouldExit()) { misprice = false; }
                 if (colAdded == 0) {
                     stab.update_stabilization_after_misprice();
-                    nodeDuals = stab.getStabDualSolAdvanced(nodeDuals);
+                    nodeDuals = stab.getStabDualSol(nodeDuals);
                 } else {
                     misprice = false;
                 }
@@ -1084,12 +1089,20 @@ public:
                         break;
                     }
                 }
+                // check if the lp_obj itself is within tolerance
+                if (std::abs(std::round(lp_obj) - lp_obj) > 1e-2) { integer = false; }
+
                 if (integer) {
                     if (lp_obj < integer_solution) {
                         print_info("Updating integer solution to {}\n", lp_obj);
                         integer_solution        = lp_obj;
                         bucket_graph->incumbent = integer_solution;
                     }
+                }
+
+                if (!TRstop) {
+                    // we do not use integer inside trust region
+                    integer = false;
                 }
 
                 bucket_graph->relaxation = lp_obj;

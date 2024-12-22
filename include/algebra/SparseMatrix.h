@@ -6,6 +6,9 @@
 #include <Eigen/Sparse>
 #endif
 
+// include for cerr
+#include <iostream>
+
 struct SparseMatrix {
     // COO format (always the default)
     std::vector<int>    rows;   // Row indices of the matrix elements

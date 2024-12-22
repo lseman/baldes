@@ -68,8 +68,20 @@ struct VectorHash {
 };
 
 struct VectorIntHash {
-    size_t operator()(const std::vector<int>& vec) const {
-        // Use xxh3 for efficient hashing of the vector
-        return XXH3_64bits(vec.data(), vec.size() * sizeof(int));
+    std::size_t operator()(const std::vector<int> &vec) const {
+        return XXH64(vec.data(), vec.size() * sizeof(int), 0); // Seed = 0
+    }
+};
+
+// Hash and comparison class for tbb::concurrent_hash_map
+struct VectorIntHashCompare {
+    using KeyType = std::vector<int>;
+
+    std::size_t hash(const KeyType& key) const {
+        return XXH64(key.data(), key.size() * sizeof(int), 0); // Seed = 0
+    }
+
+    bool equal(const KeyType& lhs, const KeyType& rhs) const {
+        return lhs == rhs;
     }
 };

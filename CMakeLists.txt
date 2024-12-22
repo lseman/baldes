@@ -27,6 +27,10 @@ endif()
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
 
+# set cc and cxx path
+set(CMAKE_C_COMPILER /home/seman/toolchain18/llvm/stage2-prof-use-lto/install/bin/clang)
+set(CMAKE_CXX_COMPILER /home/seman/toolchain18/llvm/stage2-prof-use-lto/install/bin/clang++)
+
 # Enable Interprocedural Optimization (Link Time Optimization)
 set(CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE ON)
 set(CMAKE_INTERPROCEDURAL_OPTIMIZATION TRUE)
@@ -52,7 +56,7 @@ include_directories(third_party/hgs_vrptw)
 # Build types and flags
 if(NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE
-      "RelWithDebInfo"
+      "Debug"
       CACHE STRING "Choose the type of build." FORCE)
 endif()
 set(CMAKE_CXX_FLAGS_RELEASE
@@ -195,6 +199,21 @@ cpmaddpackage(
 string(REPLACE "-fconcepts-diagnostics-depth=10" "" CMAKE_CXX_FLAGS
                "${CMAKE_CXX_FLAGS}")
 
+# add mdspan
+cpmaddpackage(
+  NAME
+  mdspan
+  GITHUB_REPOSITORY
+  kokkos/mdspan
+  GIT_TAG
+  stable
+  OPTIONS
+  "MDSPAN_BUILD_TESTS OFF"
+  "MDSPAN_BUILD_EXAMPLES OFF"
+  "MDSPAN_BUILD_BENCHMARKS OFF"
+  "MDSPAN_BUILD_DOCS OFF"
+  "BUILD_TESTING OFF")
+
 find_package(xxhash)
 if(NOT xxhash_FOUND)
   cpmaddpackage(
@@ -228,11 +247,11 @@ if(NSYNC)
     "NSYNC_ENABLE_TESTS OFF")
 endif()
 
-find_package(FMT)
-if(NOT FMT_FOUND)
-  message(STATUS "FMT not found, using bundled version")
+#find_package(FMT)
+#if(NOT FMT_FOUND)
+#  message(STATUS "FMT not found, using bundled version")
   cpmaddpackage(NAME fmt GITHUB_REPOSITORY fmtlib/fmt GIT_TAG 11.0.2)
-endif()
+#endif()
 
 if(IPM)
 
@@ -348,7 +367,7 @@ if(IPM OR IPM_ACEL)
 endif()
 
 # Common Libraries List
-set(COMMON_LIBRARIES STDEXEC::stdexec fmt::fmt xxhash)
+set(COMMON_LIBRARIES STDEXEC::stdexec fmt xxhash mdspan)
 
 if(HIGHS)
   list(APPEND COMMON_LIBRARIES highs::highs)
@@ -385,6 +404,17 @@ if(BALDES)
       message(STATUS "jemalloc not found")
     endif()
   endif()
+
+  if(TCMALLOC)
+  # find tcmalloc
+  find_library(TCMALLOC_LIBRARY tcmalloc)
+  if(TCMALLOC_LIBRARY)
+    message(STATUS "tcmalloc found: ${TCMALLOC_LIBRARY}")
+    target_link_libraries(baldes PRIVATE ${TCMALLOC_LIBRARY})
+  else()
+    message(STATUS "tcmalloc not found")
+  endif()
+endif()
 
   message(STATUS "Gurobi version: ${GUROBI_VERSION_MAJOR}")
   target_compile_options(baldes PRIVATE -Wno-c++26-extensions
