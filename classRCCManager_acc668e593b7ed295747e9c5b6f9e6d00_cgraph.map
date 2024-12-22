@@ -1,0 +1,17 @@
+<map id="RCCManager::computeDuals" name="RCCManager::computeDuals">
+<area shape="rect" id="Node000001" title=" " alt="" coords="5,104,193,130"/>
+<area shape="rect" id="Node000002" href="$classBNBNode.html#a7c216d32f620367175809ffa6c56fb97" title=" " alt="" coords="264,23,414,48"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="139,101,283,51,285,56,140,106"/>
+<area shape="rect" id="Node000004" href="$classBNBNode.html#abb76f5afa8990290b262a0750cede865" title=" " alt="" coords="272,104,406,130"/>
+<area shape="poly" id="edge3_Node000001_Node000004" title=" " alt="" coords="193,114,256,114,256,120,193,120"/>
+<area shape="rect" id="Node000008" href="$classArcDuals.html#a24a3f7097597ac4d6b76b361a23f5c0c" title=" " alt="" coords="241,153,437,179"/>
+<area shape="poly" id="edge7_Node000001_Node000008" title=" " alt="" coords="166,128,258,147,257,152,165,133"/>
+<area shape="rect" id="Node000003" href="$classSolverInterface.html#ab79d88959a058367c1c1fe8e8990c471" title=" " alt="" coords="485,5,663,31"/>
+<area shape="poly" id="edge2_Node000002_Node000003" title=" " alt="" coords="414,27,469,23,470,29,414,33"/>
+<area shape="rect" id="Node000005" href="$classGurobiEnvSingleton.html#a49c3ce63088629c2246dec252a73df16" title=" " alt="" coords="506,55,642,96"/>
+<area shape="poly" id="edge4_Node000004_Node000005" title=" " alt="" coords="406,102,491,87,492,93,407,108"/>
+<area shape="rect" id="Node000006" href="$classSolverInterface.html#aeaac9dd85da0f259e9804a9970a7f54f" title=" " alt="" coords="492,120,656,146"/>
+<area shape="poly" id="edge5_Node000004_Node000006" title=" " alt="" coords="406,119,477,124,477,129,406,124"/>
+<area shape="rect" id="Node000007" href="$classSolverInterface.html#afc4cb03aa6a487dd87a2a2d3090a5577" title=" " alt="" coords="490,169,658,195"/>
+<area shape="poly" id="edge6_Node000004_Node000007" title=" " alt="" coords="400,128,438,138,486,156,507,162,506,167,484,161,436,143,398,133"/>
+</map>

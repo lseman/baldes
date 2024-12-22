@@ -1,0 +1,33 @@
+<map id="TrustRegion::setup" name="TrustRegion::setup">
+<area shape="rect" id="Node000001" title=" " alt="" coords="5,161,135,186"/>
+<area shape="rect" id="Node000002" href="$classBNBNode.html#a58adcc5f912a44be604d0e11063d7926" title=" " alt="" coords="221,30,348,56"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="79,159,120,113,149,88,181,66,205,56,207,61,184,71,153,92,124,117,83,162"/>
+<area shape="rect" id="Node000004" href="$classBNBNode.html#a1bed7031f27bac7f4a80424438c5d5f6" title=" " alt="" coords="216,81,353,106"/>
+<area shape="poly" id="edge3_Node000001_Node000004" title=" " alt="" coords="94,158,134,137,182,117,206,109,208,114,184,121,137,142,96,163"/>
+<area shape="rect" id="Node000012" href="$classBNBNode.html#a8e9719a49d2b149441b61ee4aa790fa2" title=" " alt="" coords="210,132,359,157"/>
+<area shape="poly" id="edge8_Node000001_Node000012" title=" " alt="" coords="134,162,194,154,194,159,135,168"/>
+<area shape="rect" id="Node000014" href="$classBNBNode.html#abb76f5afa8990290b262a0750cede865" title=" " alt="" coords="217,185,352,210"/>
+<area shape="poly" id="edge10_Node000001_Node000014" title=" " alt="" coords="135,178,202,186,201,191,135,184"/>
+<area shape="rect" id="Node000018" href="$classTrustRegion.html#ac3eda2d301f297e8fde56f1a687eb51d" title=" " alt="" coords="194,234,374,260"/>
+<area shape="poly" id="edge14_Node000001_Node000018" title=" " alt="" coords="99,185,184,220,206,227,204,232,182,226,97,189"/>
+<area shape="rect" id="Node000019" href="$classTrustRegion.html#af950367106933c2f9b74145a9829982f" title=" " alt="" coords="183,284,386,309"/>
+<area shape="poly" id="edge15_Node000001_Node000019" title=" " alt="" coords="84,185,125,228,153,251,184,270,196,275,193,280,181,275,150,255,122,231,81,189"/>
+<area shape="rect" id="Node000003" href="$classMIPProblem.html#a7d7c950859d42587ebd021023edde212" title=" " alt="" coords="438,29,610,54"/>
+<area shape="poly" id="edge2_Node000002_Node000003" title=" " alt="" coords="348,40,422,40,422,45,348,45"/>
+<area shape="rect" id="Node000005" href="$classMIPProblem.html#af77d84a36fde97467ad7069ea2a230f8" title=" " alt="" coords="448,78,599,104"/>
+<area shape="poly" id="edge4_Node000004_Node000005" title=" " alt="" coords="353,90,433,89,433,95,354,96"/>
+<area shape="rect" id="Node000006" href="$classLinearExpression.html#a931036cafcd17fe3553ffd79468da49e" title=" " alt="" coords="689,5,836,46"/>
+<area shape="poly" id="edge5_Node000005_Node000006" title=" " alt="" coords="574,75,613,64,673,48,675,53,614,70,575,80"/>
+<area shape="rect" id="Node000007" href="$structSparseMatrix.html#adc8a18b61890921ed7f6321ff48a791d" title=" " alt="" coords="692,71,833,111"/>
+<area shape="poly" id="edge6_Node000005_Node000007" title=" " alt="" coords="599,88,676,88,676,94,599,94"/>
+<area shape="rect" id="Node000011" href="$classLinearExpression.html#a055d01a2c6ce59aad0e6ec6595159ed8" title=" " alt="" coords="661,136,864,161"/>
+<area shape="poly" id="edge7_Node000005_Node000011" title=" " alt="" coords="581,102,692,129,690,134,580,107"/>
+<area shape="rect" id="Node000013" href="$classMIPProblem.html#af3061cfe5612892a459913ae8bcaca81" title=" " alt="" coords="434,128,613,153"/>
+<area shape="poly" id="edge9_Node000012_Node000013" title=" " alt="" coords="359,140,418,139,418,145,359,146"/>
+<area shape="rect" id="Node000015" href="$classGurobiEnvSingleton.html#a49c3ce63088629c2246dec252a73df16" title=" " alt="" coords="456,177,591,218"/>
+<area shape="poly" id="edge11_Node000014_Node000015" title=" " alt="" coords="352,195,440,195,440,200,352,200"/>
+<area shape="rect" id="Node000016" href="$classSolverInterface.html#aeaac9dd85da0f259e9804a9970a7f54f" title=" " alt="" coords="442,242,605,268"/>
+<area shape="poly" id="edge12_Node000014_Node000016" title=" " alt="" coords="343,208,387,219,454,235,453,241,385,224,341,214"/>
+<area shape="rect" id="Node000017" href="$classSolverInterface.html#afc4cb03aa6a487dd87a2a2d3090a5577" title=" " alt="" coords="440,292,608,317"/>
+<area shape="poly" id="edge13_Node000014_Node000017" title=" " alt="" coords="353,205,387,219,404,234,412,250,421,264,436,278,443,282,440,287,432,282,416,268,408,252,399,237,385,224,351,209"/>
+</map>

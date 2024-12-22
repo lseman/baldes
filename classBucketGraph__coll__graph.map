@@ -1,0 +1,18 @@
+<map id="BucketGraph" name="BucketGraph">
+<area shape="rect" id="Node000001" title="Represents a graph structure used for bucket&#45;based optimization in a solver." alt="" coords="300,198,397,223"/>
+<area shape="rect" id="Node000002" href="$structBucketOptions.html" title=" " alt="" coords="5,94,113,120"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="83,128,111,151,144,171,184,185,225,195,300,205,299,210,224,200,182,190,142,176,108,156,79,132"/>
+<area shape="rect" id="Node000003" href="$structPSTEPDuals.html" title="A structure to manage dual values for arcs and nodes in a network." alt="" coords="137,94,234,120"/>
+<area shape="poly" id="edge2_Node000001_Node000003" title=" " alt="" coords="193,134,201,154,215,172,234,185,255,194,300,204,299,210,254,199,231,189,211,176,197,157,188,136"/>
+<area shape="rect" id="Node000004" href="$classArcList.html" title=" " alt="" coords="258,94,321,120"/>
+<area shape="poly" id="edge3_Node000001_Node000004" title=" " alt="" coords="292,135,296,154,303,172,314,185,327,195,324,199,310,189,298,175,290,156,287,136"/>
+<area shape="rect" id="Node000005" href="$classIteratedLocalSearch.html" title=" " alt="" coords="346,94,484,120"/>
+<area shape="poly" id="edge4_Node000001_Node000005" title=" " alt="" coords="404,135,380,175,361,199,357,195,375,172,400,132"/>
+<area shape="rect" id="Node000006" href="$structInstanceData.html" title="A structure to hold various data related to an instance of a problem." alt="" coords="310,5,408,31"/>
+<area shape="poly" id="edge5_Node000005_Node000006" title=" " alt="" coords="358,46,363,69,373,81,387,91,384,96,370,85,358,71,352,47"/>
+<area shape="rect" id="Node000007" href="$classCutStorage.html" title="Manages the storage and operations related to cuts in a solver." alt="" coords="460,5,546,31"/>
+<area shape="poly" id="edge7_Node000001_Node000007" title=" " alt="" coords="514,45,516,55,516,90,498,121,473,148,442,170,383,200,381,195,440,165,469,144,494,118,511,89,511,55,509,46"/>
+<area shape="poly" id="edge6_Node000005_Node000007" title=" " alt="" coords="464,41,445,57,431,76,422,95,417,92,426,73,441,53,461,37"/>
+<area shape="rect" id="Node000008" href="$classUnionFind.html" title=" " alt="" coords="627,94,707,120"/>
+<area shape="poly" id="edge8_Node000001_Node000008" title=" " alt="" coords="639,131,599,155,552,176,471,197,398,208,397,203,470,192,550,171,596,150,636,126"/>
+</map>

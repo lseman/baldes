@@ -1,0 +1,5 @@
+<map id="IPSolver::max_alpha" name="IPSolver::max_alpha">
+<area shape="rect" id="Node000001" title="Computes the maximum step size (alpha) that can be taken along the direction of the search vectors." alt="" coords="5,13,145,38"/>
+<area shape="rect" id="Node000002" href="$classIPSolver.html#add3037642e4e2090f62e90d9df5eee9f" title="Computes the maximum step size (alpha) for a single direction vector." alt="" coords="193,5,332,46"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="145,23,177,23,177,28,145,28"/>
+</map>

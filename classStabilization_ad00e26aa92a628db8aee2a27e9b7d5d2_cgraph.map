@@ -1,0 +1,16 @@
+<map id="Stabilization::update_stabilization_after_pricing_optim" name="Stabilization::update_stabilization_after_pricing_optim">
+<area shape="rect" id="Node000001" title="Updates the stabilization parameters after the pricing optimization step." alt="" coords="5,88,142,144"/>
+<area shape="rect" id="Node000002" href="$classStabilization.html#ac2f24133b3ae9bb48b0d72b7fb0fb996" title=" " alt="" coords="191,13,334,38"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="119,86,189,49,204,42,206,47,191,53,121,90"/>
+<area shape="rect" id="Node000004" href="$classStabilization.html#ae9092a933972d2d35d8196975e66e555" title="Computes the dynamic alpha schedule for stabilization." alt="" coords="190,63,335,103"/>
+<area shape="poly" id="edge3_Node000001_Node000004" title=" " alt="" coords="142,102,174,96,175,101,143,107"/>
+<area shape="rect" id="Node000006" href="$classStabilization.html#a79c5b5f1f4dbd1511c28f8b6a64ef0d1" title=" " alt="" coords="194,128,330,169"/>
+<area shape="poly" id="edge5_Node000001_Node000006" title=" " alt="" coords="142,125,179,132,179,137,142,131"/>
+<area shape="rect" id="Node000007" href="$classMultiPointManager.html#a4f20b67c8b4472346543775d2f01af97" title="Updates the stability point pool with a new solution." alt="" coords="195,193,330,234"/>
+<area shape="poly" id="edge7_Node000001_Node000007" title=" " alt="" coords="125,142,191,178,203,184,200,189,188,183,122,147"/>
+<area shape="rect" id="Node000003" href="$classMultiPointManager.html#a0416f3776356e2441ab68878655f4a16" title="Reset manager state." alt="" coords="383,5,518,46"/>
+<area shape="poly" id="edge2_Node000002_Node000003" title=" " alt="" coords="334,23,368,23,368,28,334,28"/>
+<area shape="rect" id="Node000005" href="$classStabilization.html#a4f4e3b43fbae641f421179c3519a7ff7" title="Computes the Euclidean norm (L2 norm) of a given vector." alt="" coords="388,102,514,128"/>
+<area shape="poly" id="edge4_Node000004_Node000005" title=" " alt="" coords="336,93,373,99,372,104,335,98"/>
+<area shape="poly" id="edge6_Node000006_Node000005" title=" " alt="" coords="330,134,372,126,373,131,331,139"/>
+</map>

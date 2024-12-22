@@ -1,0 +1,48 @@
+<map id="BranchAndBound::branch" name="BranchAndBound::branch">
+<area shape="rect" id="Node000001" title=" " alt="" coords="5,228,173,254"/>
+<area shape="rect" id="Node000002" href="$classVRProblem.html#a3cfef8034f9be7d8a23de61cbbecae97" title=" " alt="" coords="230,203,362,228"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="173,228,214,223,215,228,173,233"/>
+<area shape="rect" id="Node000048" href="$classBNBNode.html#af5035c88619967009f8a770fb8e18c57" title=" " alt="" coords="221,252,372,278"/>
+<area shape="poly" id="edge23_Node000001_Node000048" title=" " alt="" coords="173,248,206,252,205,257,173,253"/>
+<area shape="rect" id="Node000003" href="$classBNBNode.html#a5f6e9a8d3933c84c6a08f0404a20a040" title=" " alt="" coords="448,5,614,31"/>
+<area shape="poly" id="edge2_Node000002_Node000003" title=" " alt="" coords="301,201,316,168,341,124,375,78,418,40,433,32,435,37,422,44,379,82,345,127,321,170,305,203"/>
+<area shape="rect" id="Node000004" href="$classBNBNode.html#a5fe96f9b26428400192229a7afd1e5a1" title=" " alt="" coords="454,55,608,80"/>
+<area shape="poly" id="edge3_Node000002_Node000004" title=" " alt="" coords="305,201,349,146,381,115,419,89,439,80,441,85,421,94,385,119,353,150,309,204"/>
+<area shape="rect" id="Node000005" href="$classBNBNode.html#a8e883c5bacc552f43710ebf93e579efc" title=" " alt="" coords="434,104,628,130"/>
+<area shape="poly" id="edge4_Node000002_Node000005" title=" " alt="" coords="314,200,360,169,419,138,437,132,439,137,421,143,363,173,317,204"/>
+<area shape="rect" id="Node000006" href="$classBNBNode.html#a9f73f54c85aede03b5e67e83ed05091a" title=" " alt="" coords="446,153,616,179"/>
+<area shape="poly" id="edge5_Node000002_Node000006" title=" " alt="" coords="361,199,451,180,452,185,362,205"/>
+<area shape="rect" id="Node000007" href="$classBNBNode.html#a5c85ee916cbc385efa09b5719fd69063" title=" " alt="" coords="448,203,614,228"/>
+<area shape="poly" id="edge6_Node000002_Node000007" title=" " alt="" coords="363,213,433,213,433,218,363,218"/>
+<area shape="rect" id="Node000008" href="$classBNBNode.html#a7003d79e1532175a72f06e0d91a08de6" title=" " alt="" coords="443,252,619,278"/>
+<area shape="poly" id="edge7_Node000002_Node000008" title=" " alt="" coords="362,226,452,246,451,251,361,232"/>
+<area shape="rect" id="Node000009" href="$classBNBNode.html#a836f57043aee50b30ca1bb91e15a31f6" title=" " alt="" coords="462,301,601,327"/>
+<area shape="poly" id="edge8_Node000002_Node000009" title=" " alt="" coords="352,227,373,237,389,250,398,264,407,276,421,288,448,299,446,304,419,292,403,280,394,267,385,254,371,242,350,231"/>
+<area shape="rect" id="Node000015" href="$classBNBNode.html#a93bf363e7ba8aa5c7dd4ee56a81189b3" title=" " alt="" coords="459,351,603,376"/>
+<area shape="poly" id="edge12_Node000002_Node000015" title=" " alt="" coords="357,227,374,237,385,250,392,264,398,290,404,315,410,326,422,337,446,351,443,356,418,342,406,329,399,317,393,291,387,265,381,253,370,242,354,231"/>
+<area shape="rect" id="Node000017" href="$classBranching.html#a4d81de879aa3ef2b06a45b2b20d55efe" title="This function implements the standard branching strategy for the VRPTW problem." alt="" coords="420,548,642,574"/>
+<area shape="poly" id="edge14_Node000002_Node000017" title=" " alt="" coords="359,227,374,238,389,256,399,274,406,309,410,345,422,388,468,469,513,534,508,537,464,472,418,390,404,346,401,309,394,276,385,259,370,241,356,231"/>
+<area shape="rect" id="Node000010" href="$classBNBNode.html#a332aaaf5da60dea0917b5c29cc6d51e7" title=" " alt="" coords="752,228,897,254"/>
+<area shape="poly" id="edge9_Node000009_Node000010" title=" " alt="" coords="601,300,641,288,665,275,689,262,736,250,737,255,691,267,668,280,643,293,602,305"/>
+<area shape="rect" id="Node000013" href="$classMIPProblem.html#ad084e76d838ff4c283b52e9b395558fe" title=" " alt="" coords="759,301,890,327"/>
+<area shape="poly" id="edge10_Node000009_Node000013" title=" " alt="" coords="601,312,743,312,743,317,601,317"/>
+<area shape="poly" id="edge11_Node000013_Node000013" title=" " alt="" coords="776,303,767,293,773,283,792,277,825,275,861,278,879,285,877,290,860,283,824,280,793,282,776,287,772,292,780,299"/>
+<area shape="rect" id="Node000016" href="$classMIPProblem.html#a15cf712c50d97736774b35f6ec269db3" title=" " alt="" coords="752,351,897,376"/>
+<area shape="poly" id="edge13_Node000015_Node000016" title=" " alt="" coords="604,361,737,361,737,366,604,366"/>
+<area shape="rect" id="Node000018" href="$classBranching.html#a5c7e267b99596b0194eb57091365fff6" title=" " alt="" coords="690,400,959,426"/>
+<area shape="poly" id="edge15_Node000017_Node000018" title=" " alt="" coords="543,545,602,491,644,460,689,434,705,428,707,433,691,439,647,464,606,495,547,549"/>
+<area shape="rect" id="Node000027" href="$classBranching.html#a2432915701eeaaef5fee8889ec791382" title="This function evaluates the candidates with branching and returns the results." alt="" coords="715,449,934,475"/>
+<area shape="poly" id="edge16_Node000017_Node000027" title=" " alt="" coords="555,545,614,514,689,484,715,476,717,482,691,489,617,519,557,550"/>
+<area shape="rect" id="Node000039" href="$classBranching.html#a31b8e665bc049748d39842b7e0839579" title=" " alt="" coords="735,499,914,524"/>
+<area shape="poly" id="edge17_Node000017_Node000039" title=" " alt="" coords="611,545,729,525,730,530,612,550"/>
+<area shape="rect" id="Node000041" href="$classBranching.html#ac8c08c019d744e601a7e1d0428cdd91f" title="This function generates VRP candidates based on the selected branching candidates." alt="" coords="711,548,938,574"/>
+<area shape="poly" id="edge18_Node000017_Node000041" title=" " alt="" coords="643,558,695,558,695,564,643,564"/>
+<area shape="rect" id="Node000042" href="$classVRProblem.html#a9412127820418558ad6a795e0d713cb5" title=" " alt="" coords="750,597,899,623"/>
+<area shape="poly" id="edge19_Node000017_Node000042" title=" " alt="" coords="612,572,735,593,734,598,611,577"/>
+<area shape="rect" id="Node000043" href="$classBNBNode.html#abb76f5afa8990290b262a0750cede865" title=" " alt="" coords="757,647,892,672"/>
+<area shape="poly" id="edge20_Node000017_Node000043" title=" " alt="" coords="557,572,617,603,691,633,743,646,741,651,690,638,614,608,555,577"/>
+<area shape="rect" id="Node000046" href="$Definitions_8h.html#af576d1ee32f587dbbccb77e46e4ce2bb" title=" " alt="" coords="770,696,879,722"/>
+<area shape="poly" id="edge21_Node000017_Node000046" title=" " alt="" coords="547,572,606,627,647,657,691,682,723,693,755,700,754,706,721,698,689,687,644,662,602,631,543,576"/>
+<area shape="rect" id="Node000047" href="$classBranching.html#a2e021a056f31e0c4336ac8b347e3fa96" title="This function implements the new branching logic for selecting candidates in Phase 0." alt="" coords="732,746,917,786"/>
+<area shape="poly" id="edge22_Node000017_Node000047" title=" " alt="" coords="543,573,565,605,598,649,641,694,692,732,719,745,716,749,689,736,638,698,594,652,560,609,538,576"/>
+</map>

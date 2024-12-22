@@ -1,0 +1,7 @@
+<map id="BucketGraph::compute_red_cost" name="BucketGraph::compute_red_cost">
+<area shape="rect" id="Node000001" title=" " alt="" coords="5,23,159,64"/>
+<area shape="rect" id="Node000002" href="$classArcDuals.html#ac75e53f0c4f24e6aca539c544e9f8109" title=" " alt="" coords="207,5,331,31"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="159,30,191,26,192,31,160,36"/>
+<area shape="rect" id="Node000003" href="$classCutStorage.html#add951e84b2eed093740382498e91bb9a" title=" " alt="" coords="211,55,326,80"/>
+<area shape="poly" id="edge2_Node000001_Node000003" title=" " alt="" coords="160,51,196,56,196,61,159,56"/>
+</map>

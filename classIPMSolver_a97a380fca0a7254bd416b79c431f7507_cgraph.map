@@ -1,0 +1,37 @@
+<map id="IPMSolver::optimize" name="IPMSolver::optimize">
+<area shape="rect" id="Node000001" title=" " alt="" coords="5,256,142,281"/>
+<area shape="rect" id="Node000002" href="$classIPSolver.html#acc02635739446925971f247ee90227ad" title="Runs the optimization process on the given model data." alt="" coords="190,256,361,281"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="142,266,174,266,174,271,142,271"/>
+<area shape="rect" id="Node000003" href="$classIPSolver.html#a2651221065511beedd53613296aaddcb" title="Converts the given linear programming problem to its standard form." alt="" coords="457,5,595,46"/>
+<area shape="poly" id="edge2_Node000002_Node000003" title=" " alt="" coords="279,254,294,215,320,161,358,104,381,78,407,55,441,38,443,43,411,60,385,82,362,108,325,164,299,217,284,256"/>
+<area shape="rect" id="Node000004" href="$classIPSolver.html#a2f6983d42c0a0af7344a9c7f9b79cdfe" title=" " alt="" coords="409,70,643,96"/>
+<area shape="poly" id="edge3_Node000002_Node000004" title=" " alt="" coords="281,254,299,222,327,182,363,140,408,105,416,100,419,105,410,109,367,144,331,185,304,225,286,256"/>
+<area shape="rect" id="Node000005" href="$classIPSolver.html#a16c38201e3fc179e9265a82e67510679" title="Computes the maximum step size (alpha) that can be taken along the direction of the search vectors." alt="" coords="456,120,596,145"/>
+<area shape="poly" id="edge4_Node000002_Node000005" title=" " alt="" coords="286,253,335,204,370,177,408,154,441,142,442,147,410,159,373,181,339,208,290,257"/>
+<area shape="rect" id="Node000007" href="$classSparseSolver.html#a20ba8516f7109e55228bdcf545037304" title=" " alt="" coords="459,169,593,194"/>
+<area shape="poly" id="edge6_Node000002_Node000007" title=" " alt="" coords="300,252,349,228,408,204,443,194,445,200,410,210,351,233,303,257"/>
+<area shape="rect" id="Node000008" href="$classIPSolver.html#a0ecea75d40171352fa5298be01d3d007" title=" " alt="" coords="450,219,602,259"/>
+<area shape="poly" id="edge7_Node000002_Node000008" title=" " alt="" coords="361,256,435,247,435,252,362,261"/>
+<area shape="rect" id="Node000009" href="$classIPSolver.html#a10d79c906c9f170d975b9404e793a14e" title=" " alt="" coords="708,313,864,338"/>
+<area shape="poly" id="edge8_Node000002_Node000009" title=" " alt="" coords="361,275,693,313,693,318,361,281"/>
+<area shape="rect" id="Node000012" href="$classIPSolver.html#ac225cc4dcfe81ae25d3d59bdcb0b029f" title="Solves the Newton system for the interior point method." alt="" coords="448,333,605,374"/>
+<area shape="poly" id="edge10_Node000002_Node000012" title=" " alt="" coords="315,279,410,312,448,325,447,331,408,318,313,284"/>
+<area shape="rect" id="Node000013" href="$classIPSolver.html#aac549fa9ef9fd8c98dc9262550a81f4d" title=" " alt="" coords="456,399,597,439"/>
+<area shape="poly" id="edge12_Node000002_Node000013" title=" " alt="" coords="290,280,339,330,373,359,410,383,442,397,439,402,408,388,370,363,335,334,286,284"/>
+<area shape="rect" id="Node000016" href="$classIPSolver.html#a22f7028c11d89b7986357f004f269924" title=" " alt="" coords="449,464,603,505"/>
+<area shape="poly" id="edge15_Node000002_Node000016" title=" " alt="" coords="285,281,302,315,329,360,366,408,411,449,436,462,433,467,407,453,362,412,325,363,297,317,280,283"/>
+<area shape="rect" id="Node000018" href="$classIPSolver.html#a2dcb29f3a4d1b424e4daa6921ba2b8e1" title="Updates the residuals for the interior point method solver." alt="" coords="438,529,614,554"/>
+<area shape="poly" id="edge18_Node000002_Node000018" title=" " alt="" coords="282,281,295,326,319,390,357,458,382,488,411,514,426,523,423,528,407,518,378,492,353,461,315,392,290,328,277,282"/>
+<area shape="rect" id="Node000006" href="$classIPSolver.html#add3037642e4e2090f62e90d9df5eee9f" title="Computes the maximum step size (alpha) for a single direction vector." alt="" coords="716,112,856,153"/>
+<area shape="poly" id="edge5_Node000005_Node000006" title=" " alt="" coords="596,130,701,130,701,135,596,135"/>
+<area shape="rect" id="Node000010" href="$classIPSolver.html#a55c0e0acdfb28b73b2387a610bf8fbd6" title="Solves the augmented system for the given right&#45;hand side vectors." alt="" coords="929,305,1108,346"/>
+<area shape="poly" id="edge9_Node000009_Node000010" title=" " alt="" coords="864,323,913,323,913,328,864,328"/>
+<area shape="poly" id="edge11_Node000012_Node000009" title=" " alt="" coords="605,343,692,333,693,338,606,348"/>
+<area shape="rect" id="Node000014" href="$classIPSolver.html#ad6ab576c321bd6a0506d9c5bf8362f1a" title="Converts a dense vector to a sparse diagonal matrix." alt="" coords="698,395,874,435"/>
+<area shape="poly" id="edge13_Node000013_Node000014" title=" " alt="" coords="597,415,682,414,682,419,597,421"/>
+<area shape="rect" id="Node000015" href="$classSparseSolver.html#aaeeba47cb827fd930578cd6d71a35272" title=" " alt="" coords="691,460,881,485"/>
+<area shape="poly" id="edge14_Node000013_Node000015" title=" " alt="" coords="598,431,705,453,704,458,597,436"/>
+<area shape="poly" id="edge16_Node000016_Node000015" title=" " alt="" coords="604,478,675,475,676,480,604,483"/>
+<area shape="rect" id="Node000017" href="$classSparseSolver.html#a74ae5c7933c370fa1460a8e6600b7346" title=" " alt="" coords="723,509,849,534"/>
+<area shape="poly" id="edge17_Node000016_Node000017" title=" " alt="" coords="604,493,708,508,707,513,604,498"/>
+</map>

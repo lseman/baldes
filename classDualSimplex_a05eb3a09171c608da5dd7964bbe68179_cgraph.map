@@ -1,0 +1,11 @@
+<map id="DualSimplex::DualSimplex" name="DualSimplex::DualSimplex">
+<area shape="rect" id="Node000001" title=" " alt="" coords="5,31,177,56"/>
+<area shape="rect" id="Node000002" href="$classDualSimplex.html#adf5ab4b0bc75be786a282ffcb5991fcd" title=" " alt="" coords="225,31,370,56"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="177,41,209,41,209,46,177,46"/>
+<area shape="rect" id="Node000003" href="$classDualSimplex.html#a91719b317440fd66f4172a74160d0af0" title=" " alt="" coords="422,5,601,31"/>
+<area shape="poly" id="edge2_Node000002_Node000003" title=" " alt="" coords="370,32,407,28,407,33,371,38"/>
+<area shape="rect" id="Node000004" href="$classDualSimplex.html#aafa9f3e548bec568d58b7e2fa3dd6092" title=" " alt="" coords="418,55,605,80"/>
+<area shape="poly" id="edge3_Node000002_Node000004" title=" " alt="" coords="371,49,402,53,402,58,370,54"/>
+<area shape="rect" id="Node000005" href="$classDualSimplex.html#af2e76ef74793aa84f0b46c8274a21a18" title=" " alt="" coords="653,55,784,80"/>
+<area shape="poly" id="edge4_Node000004_Node000005" title=" " alt="" coords="606,65,638,65,638,70,606,70"/>
+</map>
