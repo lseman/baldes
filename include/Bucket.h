@@ -24,23 +24,26 @@
  * arcs, forward jump arcs, and backward jump arcs. It provides methods to add arcs, add jump arcs, get arcs,
  * get jump arcs, add labels, remove labels, get labels, clear labels, reset labels, and clear arcs.
  */
-struct Bucket {
-    std::vector<Label *> labels_vec;
+struct alignas(64) Bucket {
+    // Hot data - frequently accessed (kept in first cache line)
+    std::vector<Label*> labels_vec;   // Most accessed member
+    int depth{0};
+    int node_id{-1};
+    bool is_split{false};
+    double min_cost{std::numeric_limits<double>::max()};
+    char padding[32];  // Ensure alignment
 
-    int depth = 0;
-
-    int                    node_id = -1;
-    std::vector<double>    lb;
-    std::vector<double>    ub;
-    std::vector<Arc>       fw_arcs;
-    std::vector<Arc>       bw_arcs;
+    // Cold data - less frequently accessed
+    std::vector<double> lb;
+    std::vector<double> ub;
+    std::vector<Arc> fw_arcs;
+    std::vector<Arc> bw_arcs;
     std::vector<BucketArc> fw_bucket_arcs;
     std::vector<BucketArc> bw_bucket_arcs;
-    std::vector<JumpArc>   fw_jump_arcs;
-    std::vector<JumpArc>   bw_jump_arcs;
-    std::vector<Bucket>    sub_buckets; // Holds sub-buckets within the "mother bucket"
-    bool                   is_split = false;
-
+    std::vector<JumpArc> fw_jump_arcs;
+    std::vector<JumpArc> bw_jump_arcs;
+    std::vector<Bucket> sub_buckets;
+    
     double get_cb() const {
         if (labels_vec.empty() && !is_split) { return std::numeric_limits<double>::max(); }
 

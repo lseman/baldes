@@ -452,7 +452,7 @@ public:
         auto &branchingDuals = node->branchingDuals;
         RCC_MODE_BLOCK(auto &rccManager = node->rccManager;)
 
-        int bucket_interval = 25;
+        int bucket_interval = 100;
         int time_horizon    = instance.T_max;
         // if (problemType == ProblemType::cvrp) { time_horizon = 50000; }
         numConstrs                = node->getIntAttr("NumConstrs");
@@ -693,7 +693,7 @@ public:
             stab.set_pseudo_dual_bound(newBound);
             stab.updateNumK(numK);
             stab.update_stabilization_after_master_optim(nodeDuals);
-            nodeDuals = stab.getStabDualSolAdvanced(nodeDuals);
+            nodeDuals = stab.getStabDualSol(nodeDuals);
 
             misprice = true;
             while (misprice) {

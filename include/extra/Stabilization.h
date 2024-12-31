@@ -490,7 +490,7 @@ public:
 
         if (lag_gap < lag_gap_prev) {
             // Update multi-point manager
-            mp_manager.updatePool(stab_sol, lag_gap); // Negative because we're maximizing
+            // mp_manager.updatePool(stab_sol, lag_gap); // Negative because we're maximizing
             
             stab_center_for_next_iteration = smooth_dual_sol;
         } else {

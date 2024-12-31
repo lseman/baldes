@@ -24,37 +24,27 @@ class BNBNode;
 class ArcDuals {
 public:
     // Add or update the dual value for an arc
-    void setDual(const RawArc &arc, double dualValue) { arcDuals_[arc] = dualValue; }
+    void setDual(const RawArc& arc, double dualValue) {
+        arcDuals_[arc] = dualValue;
+    }
 
-    // Retrieve the dual value for an arc; returns 0 if the arc does not have a dual
+    // Retrieve the dual value for an arc
     double getDual(int i, int j) const {
-        RawArc arc(i, j);
-        auto   it = arcDuals_.find(arc);
-        if (it != arcDuals_.end()) {
-            return it->second; // Return the dual if found
-        }
-        return 0.0; // Default to 0 if not found
+        return getDual(RawArc(i, j));
     }
 
-    double getDual(RawArc arc) const {
+    double getDual(const RawArc& arc) const {
         auto it = arcDuals_.find(arc);
-        if (it != arcDuals_.end()) {
-            return it->second; // Return the dual if found
-        }
-        return 0.0; // Default to 0 if not found
+        return (it != arcDuals_.end()) ? it->second : 0.0;
     }
 
-    void setOrIncrementDual(const RawArc &arc, double dualValue) {
-        auto it = arcDuals_.find(arc);
-        if (it != arcDuals_.end()) {
-            it->second += dualValue; // Increment the dual if the arc already has a dual
-        } else {
-            arcDuals_[arc] = dualValue; // Set the dual if the arc does not have a dual
-        }
+    // Set or increment dual value in one operation
+    void setOrIncrementDual(const RawArc& arc, double dualValue) {
+        arcDuals_[arc] += dualValue; // Will create with 0 + dualValue if not exists
     }
 
 private:
-    ankerl::unordered_dense::map<RawArc, double, RawArcHash> arcDuals_; // Map for storing arc duals
+    ankerl::unordered_dense::map<RawArc, double, RawArcHash> arcDuals_;
 };
 
 // Structure to store and manage dual values for nodes

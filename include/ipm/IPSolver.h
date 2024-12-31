@@ -137,6 +137,19 @@ private:
 };
 
 /**
+ * @brief Performs Ruiz scaling on the optimization problem data.
+ * 
+ * This function implements the Ruiz equilibration algorithm to improve the numerical
+ * conditioning of the optimization problem. It iteratively scales the rows and columns
+ * of the constraint matrix A and adjusts the corresponding vectors accordingly.
+ */
+struct ScalingFactors {
+    Eigen::VectorXd row_scaling;    // Diagonal elements of row scaling matrix
+    Eigen::VectorXd col_scaling;    // Diagonal elements of column scaling matrix
+};
+
+
+/**
  * @class IPSolver
  * @brief A class for solving linear programming problems using an interior point method.
  *
@@ -198,8 +211,7 @@ public:
     void update_residuals(Residuals &res, const Eigen::VectorXd &x, const Eigen::VectorXd &lambda,
                           const Eigen::VectorXd &s, const Eigen::VectorXd &v, const Eigen::VectorXd &w,
                           const Eigen::SparseMatrix<double> &A, const Eigen::VectorXd &b, const Eigen::VectorXd &c,
-                          const Eigen::VectorXd &ubv, const Eigen::VectorXi &ubi, const Eigen::VectorXd &vbv,
-                          const Eigen::VectorXi &vbi, double tau, double kappa);
+                          const Eigen::VectorXd &ubv, const Eigen::VectorXi &ubi, double tau, double kappa);
 
     // Method to solve the augmented system of equations to obtain the solution vectors dx and dy
     void solve_augmented_system(Eigen::VectorXd &dx, Eigen::VectorXd &dy, SparseSolver &ls, const Eigen::VectorXd &xi_p,
@@ -250,5 +262,16 @@ public:
 
     // Method to start the linear solver by initializing necessary data structures and performing factorization
     void start_linear_solver(SparseSolver &ls, const Eigen::SparseMatrix<double> A);
+
+    ScalingFactors ruiz_scaling(Eigen::SparseMatrix<double>& A, 
+                                    Eigen::VectorXd& b,
+                                    Eigen::VectorXd& c,
+                                    Eigen::VectorXd& lo,
+                                    Eigen::VectorXd& hi);
+
+    void unscale_solution(Eigen::VectorXd& x,
+                               Eigen::VectorXd& lambda,
+                               const ScalingFactors& factors);
+                    
 
 };
