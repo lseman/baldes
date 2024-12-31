@@ -443,7 +443,7 @@ Label *BucketGraph::get_best_label(const std::vector<int> &topological_order, co
  *
  */
 template <Stage S, Symmetry SYM>
-void BucketGraph::ConcatenateLabel(const Label *L, int &b, Label *&pbest, std::vector<uint64_t> &Bvisited) {
+void BucketGraph::ConcatenateLabel(const Label *L, int &b, double &best_cost, std::vector<uint64_t> &Bvisited) {
     static thread_local std::vector<int> bucket_stack;
     bucket_stack.clear();
     bucket_stack.reserve(50);
@@ -496,7 +496,7 @@ void BucketGraph::ConcatenateLabel(const Label *L, int &b, Label *&pbest, std::v
         const double bound     = other_c_bar[current_bucket];
 
         // Early bound check
-        if ((S != Stage::Enumerate && path_cost + bound >= pbest->cost) ||
+        if ((S != Stage::Enumerate && path_cost + bound >= best_cost) ||
             (S == Stage::Enumerate && path_cost + bound >= gap)) {
             continue;
         }
@@ -536,12 +536,14 @@ void BucketGraph::ConcatenateLabel(const Label *L, int &b, Label *&pbest, std::v
 #endif
 
             // Cost-based filtering
-            if ((S != Stage::Enumerate && total_cost >= pbest->cost) || (S == Stage::Enumerate && total_cost >= gap)) {
+            if ((S != Stage::Enumerate && total_cost >= best_cost) || (S == Stage::Enumerate && total_cost >= gap)) {
                 continue;
             }
 
             // Create new merged label
-            pbest = compute_label<S>(L, L_bw);
+            auto pbest = compute_label<S>(L, L_bw);
+            best_cost = pbest->cost;
+            // fmt::print("Best cost: {}\n", best_cost);
             merged_labels.push_back(pbest);
         }
 

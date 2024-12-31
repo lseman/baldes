@@ -28,8 +28,8 @@ set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
 
 # set cc and cxx path
-set(CMAKE_C_COMPILER /home/seman/toolchain18/llvm/stage2-prof-use-lto/install/bin/clang)
-set(CMAKE_CXX_COMPILER /home/seman/toolchain18/llvm/stage2-prof-use-lto/install/bin/clang++)
+#set(CMAKE_C_COMPILER /home/seman/toolchain18/llvm/stage2-prof-use-lto/install/bin/clang)
+#set(CMAKE_CXX_COMPILER /home/seman/toolchain18/llvm/stage2-prof-use-lto/install/bin/clang++)
 
 # Enable Interprocedural Optimization (Link Time Optimization)
 set(CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE ON)
@@ -62,7 +62,8 @@ endif()
 set(CMAKE_CXX_FLAGS_RELEASE
     "-O3 -march=native -flto -Xclang -Wno-unknown-warning-option")
 set(CMAKE_CXX_FLAGS_RELWITHDEBINFO
-    "-O3 -g -march=native -flto -Xclang -Wno-unknown-warning-option")
+"-O3 -g -march=native -flto -funroll-loops -ftree-vectorize -fomit-frame-pointer -ffunction-sections -fdata-sections -fno-signed-zeros -fno-trapping-math -mtune=native -fvectorize -Xclang -Wno-unknown-warning-option"
+)
 set(CMAKE_CXX_FLAGS_DEBUG
     "-Og -g -Wall -Wextra -Xclang -Wno-unknown-warning-option")
 
@@ -97,7 +98,7 @@ option(MTW "Enable MTW compilation option" OFF)
 option(SCHRODINGER "Enable Schrodinger compilation option" OFF)
 option(CLIQUER "Enable Cliquer compilation option" OFF)
 option(VERBOSE "Enable verbose output" OFF)
-option(JEMALLOC "Enable jemalloc" OFF)
+option(JEMALLOC "Enable jemalloc" ON)
 option(GUROBI "Enable GUROBI" OFF)
 option(HIGHS "Enable HIGHS" ON)
 option(NSYNC "Enable nsync" OFF)
@@ -196,8 +197,6 @@ cpmaddpackage(
   "STDEXEC_BUILD_BENCHMARKS OFF"
   "STDEXEC_BUILD_DOCS OFF"
   "BUILD_TESTING OFF")
-string(REPLACE "-fconcepts-diagnostics-depth=10" "" CMAKE_CXX_FLAGS
-               "${CMAKE_CXX_FLAGS}")
 
 # add mdspan
 cpmaddpackage(
@@ -212,7 +211,8 @@ cpmaddpackage(
   "MDSPAN_BUILD_EXAMPLES OFF"
   "MDSPAN_BUILD_BENCHMARKS OFF"
   "MDSPAN_BUILD_DOCS OFF"
-  "BUILD_TESTING OFF")
+  "BUILD_TESTING OFF"
+  "CMAKE_INSTALL_PREFIX ${CMAKE_BINARY_DIR}/_deps/stdexec-install")
 
 find_package(xxhash)
 if(NOT xxhash_FOUND)
@@ -250,7 +250,7 @@ endif()
 #find_package(FMT)
 #if(NOT FMT_FOUND)
 #  message(STATUS "FMT not found, using bundled version")
-  cpmaddpackage(NAME fmt GITHUB_REPOSITORY fmtlib/fmt GIT_TAG 11.0.2)
+  cpmaddpackage(NAME fmt GITHUB_REPOSITORY fmtlib/fmt GIT_TAG 11.1.1)
 #endif()
 
 if(IPM)
@@ -367,7 +367,7 @@ if(IPM OR IPM_ACEL)
 endif()
 
 # Common Libraries List
-set(COMMON_LIBRARIES STDEXEC::stdexec fmt xxhash mdspan)
+set(COMMON_LIBRARIES stdexec fmt xxhash mdspan)
 
 if(HIGHS)
   list(APPEND COMMON_LIBRARIES highs::highs)
@@ -475,6 +475,3 @@ if(HGS)
   target_compile_options(hgs PRIVATE -Wno-c++26-extensions
                                      -Wno-deprecated-declarations)
 endif()
-
-string(REPLACE "-fconcepts-diagnostics-depth=10" "" CMAKE_CXX_FLAGS
-               "${CMAKE_CXX_FLAGS}")

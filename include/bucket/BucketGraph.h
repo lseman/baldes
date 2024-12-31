@@ -797,12 +797,12 @@ public:
             // print n_fw_labels and n_bw_labels
             // If there are more backward labels than forward labels, increase the terminal time slightly
             if (((static_cast<double>(n_bw_labels) - static_cast<double>(n_fw_labels)) /
-                 static_cast<double>(n_fw_labels)) > 0.05) {
+                 static_cast<double>(n_fw_labels)) > 0.2) {
                 split += 0.05 * R_max[options.main_resources[0]];
             }
             // If there are more forward labels than backward labels, decrease the terminal time slightly
             else if (((static_cast<double>(n_fw_labels) - static_cast<double>(n_bw_labels)) /
-                      static_cast<double>(n_bw_labels)) > 0.05) {
+                      static_cast<double>(n_bw_labels)) > 0.2) {
                 split -= 0.05 * R_max[options.main_resources[0]];
             }
         }
@@ -812,18 +812,18 @@ public:
 
     bool updateStepSize() {
         bool updated = false;
-        if (bucket_interval > 100) { return false; }
+        if (bucket_interval >= 100) { return false; }
         // compute the mean of dominance_checks_per_bucket
         double mean_dominance_checks = 0.0;
         for (size_t i = 0; i < dominance_checks_per_bucket.size(); ++i) {
             mean_dominance_checks += dominance_checks_per_bucket[i];
         }
         auto step_calc = mean_dominance_checks / non_dominated_labels_per_bucket;
-        if (step_calc > 1250) {
+        if (step_calc > 100) {
 
             // redefine_counter = 0;
-            print_info("Increasing bucket interval to {}\n", bucket_interval * 2);
-            bucket_interval = bucket_interval * 2;
+            print_info("Increasing bucket interval to {}\n", bucket_interval + 25);
+            bucket_interval = bucket_interval + 25;
             redefine(bucket_interval);
             updated = true;
             fixed   = false;
@@ -873,7 +873,7 @@ public:
     std::vector<Label *> bi_labeling_algorithm();
 
     template <Stage S, Symmetry SYM = Symmetry::Asymmetric>
-    void ConcatenateLabel(const Label *L, int &b, Label *&pbest, std::vector<uint64_t> &Bvisited);
+    void ConcatenateLabel(const Label *L, int &b, double &best_cost, std::vector<uint64_t> &Bvisited);
 
     template <Direction D>
     void UpdateBucketsSet(double theta, const Label *label, ankerl::unordered_dense::set<int> &Bbidi,

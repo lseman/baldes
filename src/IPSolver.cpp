@@ -3,15 +3,164 @@
 
 #define EIGEN_INITIALIZE_MATRICES_BY_ZERO
 
+#include <omp.h>
+
 #include <Eigen/Dense>
 #include <Eigen/Sparse>
 #include <algorithm>
 #include <limits>
-#include <omp.h>
 #include <stdexcept>
 #include <vector>
 
 #include "ipm/IPSolver.h"
+/**
+ * @brief Performs gradient-based equilibration scaling.
+ * This scaling method considers both the objective and constraints
+ * to produce better-balanced optimality conditions.
+ */
+ScalingFactors IPSolver::ruiz_scaling(Eigen::SparseMatrix<double> &A,
+                                      Eigen::VectorXd &b, Eigen::VectorXd &c,
+                                      Eigen::VectorXd &lo,
+                                      Eigen::VectorXd &hi) {
+    const int m = A.rows();
+    const int n = A.cols();
+    const int n_bounds = lo.size();
+
+    ScalingFactors factors;
+    factors.row_scaling = Eigen::VectorXd::Ones(m);
+    factors.col_scaling = Eigen::VectorXd::Ones(n);
+
+    // Parameters
+    const int max_iter = 10;
+    const double thresh = 1e-3;  // Convergence threshold
+    const double alpha = 0.1;    // Step size for updates
+
+    // Store initial norms for reference
+    double init_objective_norm = c.norm();
+    double init_constraint_norm = b.norm();
+
+    // Compute column norms for A and objective scaling
+    Eigen::VectorXd col_norms = Eigen::VectorXd::Zero(n);
+    Eigen::VectorXd row_norms = Eigen::VectorXd::Zero(m);
+
+    // Initial norms computation
+    for (int k = 0; k < A.outerSize(); ++k) {
+        for (Eigen::SparseMatrix<double>::InnerIterator it(A, k); it; ++it) {
+            double val = std::abs(it.value());
+            col_norms(it.col()) += val;
+            row_norms(it.row()) += val;
+        }
+    }
+
+    // Initial scaling to roughly same magnitude
+    double mean_norm =
+        (col_norms.sum() / (n * m) + std::abs(c.mean()) + std::abs(b.mean())) /
+        3.0;
+    if (mean_norm > 0) {
+        double log_scale = -std::log10(mean_norm);
+        double scale = std::pow(10.0, std::round(log_scale));
+
+        // Apply initial scaling
+        if (scale != 1.0 && scale > 1e-4 && scale < 1e4) {
+            A *= scale;
+            b *= scale;
+            c *= scale;
+
+            factors.row_scaling *= std::sqrt(scale);
+            factors.col_scaling *= std::sqrt(scale);
+        }
+    }
+
+    // Iterative equilibration
+    for (int iter = 0; iter < max_iter; iter++) {
+        // Compute gradient of the scaled problem
+        Eigen::VectorXd grad_scaling = Eigen::VectorXd::Zero(n);
+
+        // Consider objective contribution
+        grad_scaling = c.cwiseAbs();
+
+        // Add constraint contributions
+        for (int k = 0; k < A.outerSize(); ++k) {
+            for (Eigen::SparseMatrix<double>::InnerIterator it(A, k); it;
+                 ++it) {
+                grad_scaling(it.col()) += std::abs(it.value());
+            }
+        }
+
+        // Compute scaling updates
+        double max_update = 0.0;
+        for (int j = 0; j < n; j++) {
+            if (grad_scaling(j) > 0) {
+                double target = 1.0;
+                double current = grad_scaling(j);
+                double log_ratio = std::log(target / current);
+
+                // Limit the update
+                double update =
+                    std::min(std::max(log_ratio * alpha, -0.1), 0.1);
+                double scale = std::exp(update);
+
+                // Apply column scaling
+                if (scale != 1.0) {
+                    for (Eigen::SparseMatrix<double>::InnerIterator it(A, j);
+                         it; ++it) {
+                        A.coeffRef(it.row(), j) *= scale;
+                    }
+                    c(j) *= scale;
+                    factors.col_scaling(j) *= scale;
+
+                    max_update = std::max(max_update, std::abs(update));
+                }
+            }
+        }
+
+        // Check convergence
+        if (max_update < thresh) break;
+    }
+
+    // Scale bounds
+    for (int j = 0; j < n_bounds && j < n; ++j) {
+        if (std::isfinite(lo(j))) {
+            lo(j) *= factors.col_scaling(j);
+        }
+        if (std::isfinite(hi(j))) {
+            hi(j) *= factors.col_scaling(j);
+        }
+    }
+
+    // Compute and print statistics
+    double scaled_objective_norm = c.norm();
+    double scaled_constraint_norm = b.norm();
+
+    std::cout << "\nGradient-based scaling statistics:\n";
+    std::cout << "Objective norm - Before: " << init_objective_norm
+              << ", After: " << scaled_objective_norm << "\n";
+    std::cout << "Constraint norm - Before: " << init_constraint_norm
+              << ", After: " << scaled_constraint_norm << "\n";
+    std::cout << "Column scaling range: [" << factors.col_scaling.minCoeff()
+              << ", " << factors.col_scaling.maxCoeff() << "]\n\n";
+
+    return factors;
+}
+
+/**
+ * @brief Unscales the optimization solution using the scaling factors.
+ *
+ * This function reverses the scaling applied by ruiz_scaling to recover
+ * the solution in the original problem space.
+ *
+ * @param x Primal solution vector to be unscaled
+ * @param lambda Dual solution vector to be unscaled
+ * @param factors The scaling factors used in the scaling phase
+ */
+void IPSolver::unscale_solution(Eigen::VectorXd &x, Eigen::VectorXd &lambda,
+                                const ScalingFactors &factors) {
+    // Unscale primal solution
+    x = x.cwiseQuotient(factors.col_scaling);
+
+    // Unscale dual solution
+    lambda = lambda.cwiseQuotient(factors.row_scaling);
+}
 
 /**
  * @brief Converts a dense vector to a sparse diagonal matrix.
@@ -20,7 +169,8 @@
  * matrix. The resulting sparse matrix has non-zero values only on its diagonal,
  * where the values are taken from the input vector.
  */
-Eigen::SparseMatrix<double> IPSolver::convertToSparseDiagonal(const Eigen::VectorXd &vec) {
+Eigen::SparseMatrix<double> IPSolver::convertToSparseDiagonal(
+    const Eigen::VectorXd &vec) {
     Eigen::SparseMatrix<double> mat(vec.size(), vec.size());
     mat = vec.asDiagonal();
     return mat;
@@ -35,17 +185,20 @@ Eigen::SparseMatrix<double> IPSolver::convertToSparseDiagonal(const Eigen::Vecto
  * constraints as equalities.
  *
  */
-void IPSolver::convert_to_standard_form(const Eigen::SparseMatrix<double> &A, const Eigen::VectorXd &b,
-                                        const Eigen::VectorXd &c, const Eigen::VectorXd &lb, const Eigen::VectorXd &ub,
-                                        const Eigen::VectorXd &sense, Eigen::SparseMatrix<double> &As,
-                                        Eigen::VectorXd &bs, Eigen::VectorXd &cs) {
+void IPSolver::convert_to_standard_form(
+    const Eigen::SparseMatrix<double> &A, const Eigen::VectorXd &b,
+    const Eigen::VectorXd &c, const Eigen::VectorXd &lb,
+    const Eigen::VectorXd &ub, const Eigen::VectorXd &sense,
+    Eigen::SparseMatrix<double> &As, Eigen::VectorXd &bs, Eigen::VectorXd &cs) {
     constexpr double infty = std::numeric_limits<double>::infinity();
-    const int        n     = A.rows();
-    const int        m     = A.cols();
+    const int n = A.rows();
+    const int m = A.cols();
 
     if (b.size() != n || c.size() != m) {
-        fmt::print("b.size(): {}, n: {}, c.size(): {}, m: {}\n", b.size(), n, c.size(), m);
-        throw std::invalid_argument("Size of b or c does not match the matrix A dimensions.");
+        fmt::print("b.size(): {}, n: {}, c.size(): {}, m: {}\n", b.size(), n,
+                   c.size(), m);
+        throw std::invalid_argument(
+            "Size of b or c does not match the matrix A dimensions.");
     }
 
     Eigen::VectorXd lo = lb;
@@ -54,7 +207,8 @@ void IPSolver::convert_to_standard_form(const Eigen::SparseMatrix<double> &A, co
     int n_free = 0, n_ubounds = 0, nv = A.cols();
 
     // Precompute bound categories
-    std::vector<bool> is_free(lo.size()), is_bounded(lo.size()), is_upper(lo.size()), is_lower(lo.size());
+    std::vector<bool> is_free(lo.size()), is_bounded(lo.size()),
+        is_upper(lo.size()), is_lower(lo.size());
     for (int i = 0; i < lo.size(); ++i) {
         if (lo[i] == -infty && hi[i] == infty) {
             is_free[i] = true;
@@ -77,12 +231,13 @@ void IPSolver::convert_to_standard_form(const Eigen::SparseMatrix<double> &A, co
     cs.setZero();
     cs.head(m) = c;
 
-    bs = b; // Direct assignment
+    bs = b;  // Direct assignment
 
     std::vector<Eigen::Triplet<double>> triplets;
-    triplets.reserve(A.nonZeros() + num_slacks); // Reserve space to avoid reallocations
+    triplets.reserve(A.nonZeros() +
+                     num_slacks);  // Reserve space to avoid reallocations
 
-    std::vector<int>    ind_ub;
+    std::vector<int> ind_ub;
     std::vector<double> val_ub;
 
     auto lb_extended = lb;
@@ -98,11 +253,11 @@ void IPSolver::convert_to_standard_form(const Eigen::SparseMatrix<double> &A, co
         double h = hi[j];
 
         for (Eigen::SparseMatrix<double>::InnerIterator it(A, j); it; ++it) {
-            int    i = it.row();
+            int i = it.row();
             double v = it.value();
 
             if (is_free[j]) {
-                cs[j]         = c[j];
+                cs[j] = c[j];
                 cs[nv + free] = -c[j];
                 triplets.emplace_back(i, j, v);
                 triplets.emplace_back(i, nv + free, -v);
@@ -151,57 +306,61 @@ void IPSolver::convert_to_standard_form(const Eigen::SparseMatrix<double> &A, co
 /**
  * @brief Updates the residuals for the interior point method solver.
  *
- * This function calculates and updates the primal residual (rp), upper bound residual (ru),
- * dual residual (rd), and gap residual (rg) along with their norms.
+ * This function calculates and updates the primal residual (rp), upper bound
+ * residual (ru), dual residual (rd), and gap residual (rg) along with their
+ * norms.
  *
  */
-void IPSolver::update_residuals(Residuals &res, const Eigen::VectorXd &x, const Eigen::VectorXd &lambda,
-                                const Eigen::VectorXd &s, const Eigen::VectorXd &v, const Eigen::VectorXd &w,
-                                const Eigen::SparseMatrix<double> &A, const Eigen::VectorXd &b,
-                                const Eigen::VectorXd &c, const Eigen::VectorXd &ubv, const Eigen::VectorXi &ubi,
-                                const Eigen::VectorXd &vbv, const Eigen::VectorXi &vbi, double tau, double kappa) {
+void IPSolver::update_residuals(
+    Residuals &res, const Eigen::VectorXd &x, const Eigen::VectorXd &lambda,
+    const Eigen::VectorXd &s, const Eigen::VectorXd &v,
+    const Eigen::VectorXd &w, const Eigen::SparseMatrix<double> &A,
+    const Eigen::VectorXd &b, const Eigen::VectorXd &c,
+    const Eigen::VectorXd &ubv, const Eigen::VectorXi &ubi, double tau,
+    double kappa) {
     // Pre-compute tau-scaled vectors to avoid repeated multiplications
     const Eigen::VectorXd tau_b = tau * b;
     const Eigen::VectorXd tau_c = tau * c;
 
     // Calculate primal residual (rp)
-    if (res.rp.size() != b.size()) { res.rp.resize(b.size()); }
     res.rp.noalias() = tau_b - A * x;
-    res.rpn          = res.rp.norm();
+    res.rpn = res.rp.norm();
 
     // Update residual for upper bounds (ru)
-    if (res.ru.size() != v.size()) { res.ru.resize(v.size()); }
-    res.ru = -v; // Direct assignment for better performance
+    res.ru = -v;  // Direct assignment for better performance
 
     // Use raw pointers for faster access in the loop
-    double       *ru_data  = res.ru.data();
+    double *ru_data = res.ru.data();
     const double *ubv_data = ubv.data();
-    const double *x_data   = x.data();
-    const int    *ubi_data = ubi.data();
-    const int     ubi_size = ubi.size();
+    const double *x_data = x.data();
+    const int *ubi_data = ubi.data();
+    const int ubi_size = ubi.size();
 
-    // Update ru using direct memory access
+    // Parallelize the loop for updating ru
     for (int i = 0; i < ubi_size; ++i) {
         const int idx = ubi_data[i];
         ru_data[idx] += tau * ubv_data[i] - x_data[idx];
     }
 
     // Calculate dual residual (rd)
-    if (res.rd.size() != c.size()) { res.rd.resize(c.size()); }
     res.rd.noalias() = tau_c - A.transpose() * lambda - s;
 
     // Update rd with w values
-    double       *rd_data = res.rd.data();
-    const double *w_data  = w.data();
-    for (int i = 0; i < ubi_size; ++i) { rd_data[ubi_data[i]] += w_data[i]; }
+    double *rd_data = res.rd.data();
+    const double *w_data = w.data();
+
+    // Parallelize the loop for updating rd
+    for (int i = 0; i < ubi_size; ++i) {
+        const int idx = ubi_data[i];
+        rd_data[idx] += w_data[i];
+    }
 
     // Calculate gap residual (rg) using dot products
-    // Pre-compute dot products to avoid temporaries
-    const double cx      = c.dot(x);
+    const double cx = c.dot(x);
     const double blambda = b.dot(lambda);
-    const double wubv    = ubv.dot(w);
+    const double wubv = ubv.dot(w);
 
-    res.rg  = kappa + cx - blambda + wubv;
+    res.rg = kappa + cx - blambda + wubv;
     res.rgn = std::abs(res.rg);
 }
 
@@ -212,8 +371,10 @@ void IPSolver::update_residuals(Residuals &res, const Eigen::VectorXd &x, const 
  * or the regularized approach based on the preprocessor directive `AUGMENTED`.
  *
  */
-void IPSolver::solve_augmented_system(Eigen::VectorXd &dx, Eigen::VectorXd &dy, SparseSolver &ls,
-                                      const Eigen::VectorXd &xi_p, const Eigen::VectorXd &xi_d) {
+void IPSolver::solve_augmented_system(Eigen::VectorXd &dx, Eigen::VectorXd &dy,
+                                      SparseSolver &ls,
+                                      const Eigen::VectorXd &xi_p,
+                                      const Eigen::VectorXd &xi_d) {
     // Set-up right-hand side with preserved order
     Eigen::VectorXd xi(xi_d.size() + xi_p.size());
     xi << xi_d, xi_p;
@@ -222,85 +383,142 @@ void IPSolver::solve_augmented_system(Eigen::VectorXd &dx, Eigen::VectorXd &dy, 
     Eigen::VectorXd d = ls.solve(xi);
 
     // Recover dx, dy in original order
-    dx = d.head(xi_d.size()); // Gets the first n elements
-    dy = d.tail(xi_p.size()); // Gets the last m elements
+    dx = d.head(xi_d.size());  // Gets the first n elements
+    dy = d.tail(xi_p.size());  // Gets the last m elements
 }
 
-void IPSolver::solve_augsys(Eigen::VectorXd &delta_x, Eigen::VectorXd &delta_y, Eigen::VectorXd &delta_z,
-                            SparseSolver &ls, const Eigen::VectorXd &theta_vw, const Eigen::VectorXi &ubi,
-                            const Eigen::VectorXd &xi_p, const Eigen::VectorXd &xi_d, const Eigen::VectorXd &xi_u) {
-    // Static allocation to avoid repeated memory allocation
+void IPSolver::solve_augsys(Eigen::VectorXd &delta_x, Eigen::VectorXd &delta_y,
+                            Eigen::VectorXd &delta_z, SparseSolver &ls,
+                            const Eigen::VectorXd &theta_vw,
+                            const Eigen::VectorXi &ubi,
+                            const Eigen::VectorXd &xi_p,
+                            const Eigen::VectorXd &xi_d,
+                            const Eigen::VectorXd &xi_u) {
+    // Static allocation for frequently used vectors
     static Eigen::VectorXd xi_d_mod;
+    if (xi_d_mod.size() != xi_d.size()) {
+        xi_d_mod.resize(xi_d.size());
+    }
 
-    // Resize only if necessary
-    if (xi_d_mod.size() != xi_d.size()) { xi_d_mod.resize(xi_d.size()); }
-
-    // Direct copy instead of assignment operator
+    // Use direct memory copy instead of assignment
     std::memcpy(xi_d_mod.data(), xi_d.data(), xi_d.size() * sizeof(double));
 
     // Get raw pointers for faster access
-    double       *xi_d_data     = xi_d_mod.data();
+    double *xi_d_data = xi_d_mod.data();
     const double *theta_vw_data = theta_vw.data();
-    const double *xi_u_data     = xi_u.data();
-    const int    *ubi_data      = ubi.data();
-    const int     ubi_size      = ubi.size();
+    const double *xi_u_data = xi_u.data();
+    const int *ubi_data = ubi.data();
+    const int ubi_size = ubi.size();
 
-    // Update xi_d_mod efficiently
+// Use SIMD vectorization for the update loop
+#pragma omp simd
     for (int i = 0; i < ubi_size; ++i) {
         const int idx = ubi_data[i];
-        xi_d_data[idx] -= xi_u_data[idx] * theta_vw_data[i];
+        xi_d_data[idx] -= xi_u_data[i] * theta_vw_data[i];
     }
 
-    // Solve augmented system
+    // Solve augmented system with optimized xi_d_mod
     solve_augmented_system(delta_x, delta_y, ls, xi_p, xi_d_mod);
 
-    // Update delta_z efficiently using raw pointers
-    double       *delta_z_data = delta_z.data();
+    // Update delta_z efficiently
+    delta_z.resize(ubi_size);
+    double *delta_z_data = delta_z.data();
     const double *delta_x_data = delta_x.data();
 
+// Use SIMD vectorization for final update
+#pragma omp simd
     for (int i = 0; i < ubi_size; ++i) {
-        const int idx   = ubi_data[i];
+        const int idx = ubi_data[i];
         delta_z_data[i] = (delta_x_data[idx] - xi_u_data[i]) * theta_vw_data[i];
     }
 }
-
 /**
  * @brief Solves the Newton system for the interior point method.
  *
- * This function updates the provided solution vectors (Delta_x, Delta_lambda, Delta_w, Delta_s, Delta_v)
- * and scalars (Delta_tau, Delta_kappa) by solving the augmented system using the provided sparse solver.
+ * This function updates the provided solution vectors (Delta_x, Delta_lambda,
+ * Delta_w, Delta_s, Delta_v) and scalars (Delta_tau, Delta_kappa) by solving
+ * the augmented system using the provided sparse solver.
  *
  */
 void IPSolver::solve_newton_system(
-    Eigen::VectorXd &Delta_x, Eigen::VectorXd &Delta_lambda, Eigen::VectorXd &Delta_w, Eigen::VectorXd &Delta_s,
-    Eigen::VectorXd &Delta_v, double &Delta_tau, double &Delta_kappa, SparseSolver &ls, const Eigen::VectorXd &theta_vw,
-    const Eigen::VectorXd &b, const Eigen::VectorXd &c, const Eigen::VectorXi &ubi, const Eigen::VectorXd &ubv,
-    const Eigen::VectorXd &delta_x, const Eigen::VectorXd &delta_y, const Eigen::VectorXd &delta_w, double delta_0,
-    const Eigen::VectorXd &iter_x, const Eigen::VectorXd &iter_lambda, const Eigen::VectorXd &iter_w,
-    const Eigen::VectorXd &iter_s, const Eigen::VectorXd &iter_v, double iter_tau, double iter_kappa,
-    const Eigen::VectorXd &xi_p, const Eigen::VectorXd &xi_u, const Eigen::VectorXd &xi_d, double xi_g,
-    const Eigen::VectorXd &xi_xs, const Eigen::VectorXd &xi_vw, double xi_tau_kappa) {
-    Eigen::VectorXd xi_d_copy = xi_d - (xi_xs.array() / iter_x.array()).matrix();
-    Eigen::VectorXd xi_u_copy = xi_u - (xi_vw.array() / iter_w.array()).matrix();
+    Eigen::VectorXd &Delta_x, Eigen::VectorXd &Delta_lambda,
+    Eigen::VectorXd &Delta_w, Eigen::VectorXd &Delta_s,
+    Eigen::VectorXd &Delta_v, double &Delta_tau, double &Delta_kappa,
+    SparseSolver &ls, const Eigen::VectorXd &theta_vw, const Eigen::VectorXd &b,
+    const Eigen::VectorXd &c, const Eigen::VectorXi &ubi,
+    const Eigen::VectorXd &ubv, const Eigen::VectorXd &delta_x,
+    const Eigen::VectorXd &delta_y, const Eigen::VectorXd &delta_w,
+    double delta_0, const Eigen::VectorXd &iter_x,
+    const Eigen::VectorXd &iter_lambda, const Eigen::VectorXd &iter_w,
+    const Eigen::VectorXd &iter_s, const Eigen::VectorXd &iter_v,
+    double iter_tau, double iter_kappa, const Eigen::VectorXd &xi_p,
+    const Eigen::VectorXd &xi_u, const Eigen::VectorXd &xi_d, double xi_g,
+    const Eigen::VectorXd &xi_xs, const Eigen::VectorXd &xi_vw,
+    double xi_tau_kappa) {
+    Eigen::VectorXd xi_d_copy =
+        xi_d - (xi_xs.array() / iter_x.array()).matrix();
+    Eigen::VectorXd xi_u_copy =
+        xi_u - (xi_vw.array() / iter_w.array()).matrix();
 
-    // Call solve_augsys function here to update Delta_x, Delta_lambda, and
-    // Delta_w
-    solve_augsys(Delta_x, Delta_lambda, Delta_w, ls, theta_vw, ubi, xi_p, xi_d_copy, xi_u_copy);
+    // Pre-compute frequently used values
+    const double inv_tau = 1.0 / iter_tau;
+    const double inv_kappa = 1.0 / iter_kappa;
 
-    // Avoid redundant calculations and simplify expressions where possible
-    Delta_tau = (xi_g + (xi_tau_kappa / iter_tau) + c.dot(Delta_x) - b.dot(Delta_lambda) + ubv.dot(Delta_w)) / delta_0;
-    Delta_kappa = (xi_tau_kappa - iter_kappa * Delta_tau) / iter_tau;
+    // Pre-allocate vectors to avoid reallocations
+    static Eigen::VectorXd xi_d_mod;
+    if (xi_d_mod.size() != xi_d.size()) {
+        xi_d_mod.resize(xi_d.size());
+    }
 
-    // Use in-place operations to update Delta_x, Delta_lambda, and Delta_w
-    Delta_x.array() += Delta_tau * delta_x.array();
-    Delta_lambda.array() += Delta_tau * delta_y.array();
-    Delta_w.array() += Delta_tau * delta_w.array();
+// Use vectorized operations for division
+#pragma omp parallel sections
+    {
+#pragma omp section
+        {
+            // Compute xi_d_mod = xi_d - xi_xs./iter_x efficiently
+            xi_d_mod = xi_d.array() - (xi_xs.array() / iter_x.array());
+        }
+#pragma omp section
+        {
+            // Pre-compute xi_u_copy = xi_u - xi_vw./iter_w
+            Eigen::VectorXd xi_u_copy =
+                xi_u - (xi_vw.array() / iter_w.array()).matrix();
 
-    // Simplify the Delta_s and Delta_v calculations
-    Delta_s = (xi_xs.array() - iter_s.array() * Delta_x.array()).cwiseQuotient(iter_x.array());
-    Delta_v = (xi_vw.array() - iter_v.array() * Delta_w.array()).cwiseQuotient(iter_w.array());
+            // Call solve_augsys with pre-computed values
+            solve_augsys(Delta_x, Delta_lambda, Delta_w, ls, theta_vw, ubi,
+                         xi_p, xi_d_mod, xi_u_copy);
+        }
+    }
+
+    // Compute Delta_tau using efficient dot products
+    const double c_dot_Delta_x = c.dot(Delta_x);
+    const double b_dot_Delta_lambda = b.dot(Delta_lambda);
+    const double ubv_dot_Delta_w = ubv.dot(Delta_w);
+
+    Delta_tau = (xi_g + xi_tau_kappa * inv_tau + c_dot_Delta_x -
+                 b_dot_Delta_lambda + ubv_dot_Delta_w) /
+                delta_0;
+    Delta_kappa = (xi_tau_kappa - iter_kappa * Delta_tau) * inv_tau;
+
+// Update vectors using vectorized operations
+#pragma omp parallel sections
+    {
+#pragma omp section
+        {
+            Delta_x.array() += Delta_tau * delta_x.array();
+            Delta_lambda.array() += Delta_tau * delta_y.array();
+            Delta_w.array() += Delta_tau * delta_w.array();
+        }
+#pragma omp section
+        {
+            // Compute Delta_s and Delta_v using vectorized operations
+            Delta_s = (xi_xs.array() - iter_s.array() * Delta_x.array()) /
+                      iter_x.array();
+            Delta_v = (xi_vw.array() - iter_v.array() * Delta_w.array()) /
+                      iter_w.array();
+        }
+    }
 }
-
 /**
  * @brief Computes the maximum step size (alpha) for a single direction vector.
  *
@@ -311,45 +529,55 @@ void IPSolver::solve_newton_system(
  * alpha values is returned as the result.
  *
  */
-double IPSolver::max_alpha_single(const Eigen::VectorXd &v, const Eigen::VectorXd &dv) {
+double IPSolver::max_alpha_single(const Eigen::VectorXd &v,
+                                  const Eigen::VectorXd &dv) {
     double alpha = std::numeric_limits<double>::infinity();
 
     // Get direct access to data
-    const double      *v_data  = v.data();
-    const double      *dv_data = dv.data();
-    const Eigen::Index size    = v.size();
+    const double *v_data = v.data();
+    const double *dv_data = dv.data();
+    const Eigen::Index size = v.size();
 
     // Process in chunks for better cache utilization
     constexpr Eigen::Index CHUNK_SIZE = 4;
-    Eigen::Index           i          = 0;
+    Eigen::Index i = 0;
 
     // Process main chunks
     for (; i + CHUNK_SIZE <= size; i += CHUNK_SIZE) {
         if (dv_data[i] < 0) alpha = std::min(alpha, -v_data[i] / dv_data[i]);
-        if (dv_data[i + 1] < 0) alpha = std::min(alpha, -v_data[i + 1] / dv_data[i + 1]);
-        if (dv_data[i + 2] < 0) alpha = std::min(alpha, -v_data[i + 2] / dv_data[i + 2]);
-        if (dv_data[i + 3] < 0) alpha = std::min(alpha, -v_data[i + 3] / dv_data[i + 3]);
+        if (dv_data[i + 1] < 0)
+            alpha = std::min(alpha, -v_data[i + 1] / dv_data[i + 1]);
+        if (dv_data[i + 2] < 0)
+            alpha = std::min(alpha, -v_data[i + 2] / dv_data[i + 2]);
+        if (dv_data[i + 3] < 0)
+            alpha = std::min(alpha, -v_data[i + 3] / dv_data[i + 3]);
     }
 
     // Handle remaining elements
     for (; i < size; ++i) {
-        if (dv_data[i] < 0) { alpha = std::min(alpha, -v_data[i] / dv_data[i]); }
+        if (dv_data[i] < 0) {
+            alpha = std::min(alpha, -v_data[i] / dv_data[i]);
+        }
     }
 
     return alpha;
 }
 /**
- * @brief Computes the maximum step size (alpha) that can be taken along the direction of the search vectors.
+ * @brief Computes the maximum step size (alpha) that can be taken along the
+ * direction of the search vectors.
  *
- * This function calculates the maximum allowable step size (alpha) that can be taken along the direction
- * of the search vectors (dx, dv, ds, dw) without violating certain constraints. It considers the current
- * values of the variables (x, v, s, w) and their respective search directions. Additionally, it takes into
- * account the step sizes for tau and kappa.
+ * This function calculates the maximum allowable step size (alpha) that can be
+ * taken along the direction of the search vectors (dx, dv, ds, dw) without
+ * violating certain constraints. It considers the current values of the
+ * variables (x, v, s, w) and their respective search directions. Additionally,
+ * it takes into account the step sizes for tau and kappa.
  *
  */
-double IPSolver::max_alpha(const Eigen::VectorXd &x, const Eigen::VectorXd &dx, const Eigen::VectorXd &v,
-                           const Eigen::VectorXd &dv, const Eigen::VectorXd &s, const Eigen::VectorXd &ds,
-                           const Eigen::VectorXd &w, const Eigen::VectorXd &dw, double tau, double dtau, double kappa,
+double IPSolver::max_alpha(const Eigen::VectorXd &x, const Eigen::VectorXd &dx,
+                           const Eigen::VectorXd &v, const Eigen::VectorXd &dv,
+                           const Eigen::VectorXd &s, const Eigen::VectorXd &ds,
+                           const Eigen::VectorXd &w, const Eigen::VectorXd &dw,
+                           double tau, double dtau, double kappa,
                            double dkappa) {
     // Initialize alpha with first scalar check
     double alpha = (dtau < 0) ? (-tau / dtau) : 1.0;
@@ -357,7 +585,9 @@ double IPSolver::max_alpha(const Eigen::VectorXd &x, const Eigen::VectorXd &dx, 
     // Check kappa condition and update alpha if needed
     if (dkappa < 0) {
         double alpha_kappa = -kappa / dkappa;
-        if (alpha_kappa < alpha) { alpha = alpha_kappa; }
+        if (alpha_kappa < alpha) {
+            alpha = alpha_kappa;
+        }
     }
 
     // Efficiently compute and update minimum alpha for each vector pair
@@ -379,80 +609,59 @@ double IPSolver::max_alpha(const Eigen::VectorXd &x, const Eigen::VectorXd &dx, 
 /**
  * @brief Runs the optimization process on the given model data.
  *
- * This function performs an optimization using an interior point method (IPM) on the provided model data.
- * It converts the model data to a standard form, initializes necessary variables, and iteratively solves
- * the optimization problem until convergence or the maximum number of iterations is reached.
+ * This function performs an optimization using an interior point method (IPM)
+ * on the provided model data. It converts the model data to a standard form,
+ * initializes necessary variables, and iteratively solves the optimization
+ * problem until convergence or the maximum number of iterations is reached.
  *
  */
 void IPSolver::run_optimization(ModelData &model, const double tol) {
-
-    // auto componentes = extractOptimizationComponents(model);
-
     auto componentes = convertToOptimizationData(model);
 
-    Eigen::SparseMatrix<double> As    = componentes.As;
-    Eigen::VectorXd             bs    = componentes.bs;
-    Eigen::VectorXd             cs    = componentes.cs;
-    Eigen::VectorXd             lo    = componentes.lo;
-    Eigen::VectorXd             hi    = componentes.hi;
-    Eigen::VectorXd             sense = componentes.sense;
-
-    auto n_vars_origin = As.cols();
-
-    //  Convert to standard form;
-    Eigen::SparseMatrix<double> A;
-    Eigen::VectorXd             b;
-    Eigen::VectorXd             c;
+    Eigen::SparseMatrix<double> As = componentes.As;
+    Eigen::VectorXd bs = componentes.bs;
+    Eigen::VectorXd cs = componentes.cs;
+    Eigen::VectorXd lo = componentes.lo;
+    Eigen::VectorXd hi = componentes.hi;
+    Eigen::VectorXd sense = componentes.sense;
 
     int nv_orig = cs.size();
 
+    // Convert to standard form
+    Eigen::SparseMatrix<double> A;
+    Eigen::VectorXd b;
+    Eigen::VectorXd c;
     convert_to_standard_form(As, bs, cs, lo, hi, sense, A, b, c);
-
-    // preconditioner(A, b, c, lo, hi, sense);
 
     int n = A.cols();
     int m = A.rows();
 
-    // Output the initial results
     // Tolerance and maximum iterations
-    int max_iter = 100;
+    int max_iter = 50;
 
     // Initialize vectors and scalars
-    Eigen::VectorXd x      = Eigen::VectorXd::Ones(n);
+    Eigen::VectorXd x = Eigen::VectorXd::Ones(n);
     Eigen::VectorXd lambda = Eigen::VectorXd::Zero(m);
-    Eigen::VectorXd s      = Eigen::VectorXd::Ones(n);
+    Eigen::VectorXd s = Eigen::VectorXd::Ones(n);
 
-    /*
-        if (x_old.size() > 0 && warm_start) {
-            int nv_old = x_old.size(); // Original number of variables
-            int nv_new = x.size();     // New number of variables
-            int mv_old = lambda_old.size();
-            int mv_new = lambda.size();
-
-            // Copy old values to new positions in x
-            // As free variables and slack variables are added, the original variables move down
-            // int original_counter          = 0;
-    //        x.head(nv_old - n_slacks_old) = x_old.head(nv_old - n_slacks_old);
-
-            lambda.head(N_SIZE - 1) = lambda_old.head(N_SIZE - 1);
-        }
-    */
-    warm_start   = false;
+    warm_start = false;
     n_slacks_old = n_slacks;
-    // initialize ubi and ubv as empty vectors
+
+    // Initialize ubi and ubv
     Eigen::VectorXi ubi;
     Eigen::VectorXd ubv;
-
-    int count = 0; // Count of non-zero entries
+    int count = 0;
     for (int i = 0; i < hi.size(); i++) {
-        if (hi[i] != std::numeric_limits<double>::infinity()) { count++; }
+        if (hi[i] != std::numeric_limits<double>::infinity()) {
+            count++;
+        }
     }
 
     Eigen::VectorXi tempUbi(count);
     Eigen::VectorXd tempUbv(count);
 
     double infty = std::numeric_limits<double>::infinity();
-    count        = 0;
+    count = 0;
     for (int i = 0; i < hi.size(); i++) {
         if (hi[i] != infty) {
             tempUbi[count] = i;
@@ -466,64 +675,46 @@ void IPSolver::run_optimization(ModelData &model, const double tol) {
     Eigen::VectorXd v = Eigen::VectorXd::Ones(ubv.size());
     Eigen::VectorXd w = Eigen::VectorXd::Ones(ubv.size());
 
-    // initialize vbi and vbv as empty vectors
-    Eigen::VectorXi vbi;
-    Eigen::VectorXd vbv;
-
-    double tau   = 1.0;
+    double tau = 1.0;
     double kappa = 1.0;
 
-    // Assuming lp.nv and lp.nc are the dimensions you need
     Eigen::VectorXd regP = Eigen::VectorXd::Ones(n);
     Eigen::VectorXd regD = Eigen::VectorXd::Ones(m);
-    double          regG = 1.0;
+    double regG = 1.0;
 
     ls.reset();
     start_linear_solver(ls, A);
 
-    int nc = A.rows(); // Assuming ls is the sparse matrix
+    int nc = A.rows();
     int nv = A.cols();
     int nu = ubi.size();
 
     Eigen::VectorXd delta_x(nv), delta_y(nc), delta_z(nu);
-    // Residuals
     Residuals res;
 
-    // Dimensions and constants
-    double r_min   = std::sqrt(std::numeric_limits<double>::epsilon()); // approx 1e-8
-    int    attempt = 0, ncor = 0;
-    // Residual related variables
+    double r_min = std::sqrt(std::numeric_limits<double>::epsilon());
+    int attempt = 0, ncor = 0;
     double _p, _d, _g, mu;
-    // Step length and corrections
     double alpha, alpha_c, alpha_;
-    // Damping factors
     double beta, gamma, damping, oneMinusAlpha;
-    // Cross products and thresholds
     double mu_l, mu_u, taukappa, t0;
-    // Theta values
     Eigen::VectorXd theta_vw, theta_xs;
-    // Xi values
     Eigen::VectorXd xi_p, xi_d, xi_u, xi_xs, xi_vw;
-    // Delta values
-    Eigen::VectorXd Delta_x(x.size()), Delta_lambda(lambda.size()), Delta_w(w.size()), Delta_s(s.size()),
-        Delta_v(v.size());
+    Eigen::VectorXd Delta_x(x.size()), Delta_lambda(lambda.size()),
+        Delta_w(w.size()), Delta_s(s.size()), Delta_v(v.size());
     double Delta_tau, Delta_kappa;
-    // Corrected Delta values
-    Eigen::VectorXd Delta_x_c(x.size()), Delta_lambda_c(lambda.size()), Delta_w_c(w.size()), Delta_s_c(s.size()),
-        Delta_v_c(v.size());
+    Eigen::VectorXd Delta_x_c(x.size()), Delta_lambda_c(lambda.size()),
+        Delta_w_c(w.size()), Delta_s_c(s.size()), Delta_v_c(v.size());
     double Delta_tau_c, Delta_kappa_c;
-    // Temporary values for corrections
     Eigen::VectorXd xs, vw, t_xs, t_vw;
-    Eigen::ArrayXd  t_xs_lower, t_xs_upper, t_vw_lower, t_vw_upper;
-    // Delta calculations
+    Eigen::ArrayXd t_xs_lower, t_xs_upper, t_vw_lower, t_vw_upper;
     double delta_0, bl_dot_lambda, correction;
-    bool   saved_interior_solution_bool = false;
+    bool saved_interior_solution_bool = false;
 
-    // Initialize the ADMM variables
-    Eigen::VectorXd z           = Eigen::VectorXd::Zero(n); // Auxiliary variable for ADMM
-    Eigen::VectorXd lambda_admm = Eigen::VectorXd::Zero(n); // Dual variable for ADMM
-
-    double rho = 1.0; // Penalty parameter for ADMM
+    // Adaptive tolerance parameters
+    const double initial_tol = 1e-6;  // Initial tolerance
+    const double min_tol = 1e-10;     // Minimum tolerance
+    const double scale_factor = 0.1;  // Scaling factor for adaptive tolerance
 
     for (int k = 0; k < max_iter; ++k) {
         ncor = 0;
@@ -540,78 +731,109 @@ void IPSolver::run_optimization(ModelData &model, const double tol) {
         Delta_v.setZero();
         Delta_tau = Delta_kappa = 0.0;
 
-        update_residuals(res, x, lambda, s, v, w, A, b, c, ubv, ubi, vbv, vbi, tau, kappa);
-        const double mu = (tau * kappa + x.dot(s)) / (n + nu + 1.0);
+        // Update residuals without vbv and vbi
+        update_residuals(res, x, lambda, s, v, w, A, b, c, ubv, ubi, tau,
+                         kappa);
+        mu = (tau * kappa + x.dot(s)) / (n + nu + 1.0);
 
         // Efficient residual calculations
-        const double rp_norm  = res.rp.lpNorm<Eigen::Infinity>();
-        const double ru_norm  = res.ru.lpNorm<Eigen::Infinity>();
-        const double rd_norm  = res.rd.lpNorm<Eigen::Infinity>();
-        const double b_norm   = b.lpNorm<Eigen::Infinity>();
-        const double ubv_norm = ubv.lpNorm<Eigen::Infinity>();
-        const double c_norm   = c.lpNorm<Eigen::Infinity>();
+        double rp_norm = res.rp.lpNorm<Eigen::Infinity>();
+        double ru_norm = res.ru.lpNorm<Eigen::Infinity>();
+        double rd_norm = res.rd.lpNorm<Eigen::Infinity>();
+        double b_norm = b.lpNorm<Eigen::Infinity>();
+        double ubv_norm = ubv.lpNorm<Eigen::Infinity>();
+        double c_norm = c.lpNorm<Eigen::Infinity>();
+
+        // Adaptive tolerance computation
+        double adaptive_tol = std::max(min_tol, initial_tol * scale_factor);
 
         // Combined residual computations
-        const double bl_dot_lambda = b.dot(lambda) - ubv.dot(w);
-        _p                         = std::fmax(rp_norm / (tau * (1.0 + b_norm)), ru_norm / (tau * (1.0 + ubv_norm)));
-        _d                         = rd_norm / (tau * (1.0 + c_norm));
-        _g                         = std::abs(c.dot(x) - bl_dot_lambda) / (tau + std::abs(bl_dot_lambda));
+        bl_dot_lambda = b.dot(lambda) - ubv.dot(w);
+        _p = std::fmax(rp_norm / (tau * (1.0 + b_norm)),
+                       ru_norm / (tau * (1.0 + ubv_norm)));
+        _d = rd_norm / (tau * (1.0 + c_norm));
+        _g = std::abs(c.dot(x) - bl_dot_lambda) /
+             (tau + std::abs(bl_dot_lambda));
 
-        if (!saved_interior_solution_bool && (_d <= 1e-10 && _g <= tol * 2)) {
+        // Save interior solution if residuals are small
+        if (!saved_interior_solution_bool &&
+            (_d <= adaptive_tol && _g <= adaptive_tol * 2)) {
             save_interior_solution(x, lambda, w, s, v, tau, kappa);
             saved_interior_solution_bool = true;
-            warm_start                   = true;
+            warm_start = true;
         }
 
-        if (_p <= 1e-9 && _d <= 1e-9 && _g <= tol) break;
+        // Check convergence with adaptive tolerance
+        if (_p <= adaptive_tol && _d <= adaptive_tol && _g <= tol) break;
+
+        // Update adaptive tolerance for the next iteration
+        adaptive_tol = std::max(min_tol, adaptive_tol * scale_factor);
 
         // Efficient scaling computations
         theta_vw = w.cwiseQuotient(v);
         theta_xs = s.cwiseQuotient(x);
-        for (int i = 0; i < ubi.size(); ++i) { theta_xs[ubi[i]] += theta_vw[i]; }
+        for (int i = 0; i < ubi.size(); ++i) {
+            theta_xs[ubi[i]] += theta_vw[i];
+        }
 
-        // Update regularizations
-        regP = (regP / 10.0).cwiseMax(r_min);
-        regD = (regD / 10.0).cwiseMax(r_min);
-        regG = std::max(r_min, regG / 10.0);
-
+        // Update regularizations dynamically
         for (int attempt = 0; attempt < 3; ++attempt) {
+            // Adjust regularization based on solver performance
+            regP = (regP / 10.0).cwiseMax(r_min);
+            regD = (regD / 10.0).cwiseMax(r_min);
+            regG = std::max(r_min, regG / 10.0);
+
+            // Update linear solver with new regularization
             if (update_linear_solver(ls, theta_xs, regP, regD) == 0) break;
+
+            // Increase regularization if solver fails
             regP *= 100.0;
             regD *= 100.0;
             regG *= 100.0;
         }
 
         solve_augsys(delta_x, delta_y, delta_z, ls, theta_vw, ubi, b, c, ubv);
-        delta_0 = regG + kappa / tau - delta_x.dot(c) + delta_y.dot(b) - delta_z.dot(ubv);
+        delta_0 = regG + kappa / tau - delta_x.dot(c) + delta_y.dot(b) -
+                  delta_z.dot(ubv);
 
         // First Newton solve
-        solve_newton_system(Delta_x, Delta_lambda, Delta_w, Delta_s, Delta_v, Delta_tau, Delta_kappa, ls, theta_vw, b,
-                            c, ubi, ubv, delta_x, delta_y, delta_z, delta_0, x, lambda, w, s, v, tau, kappa, res.rp,
-                            res.ru, res.rd, res.rg, -x.cwiseProduct(s), -v.cwiseProduct(w), -tau * kappa);
+        solve_newton_system(Delta_x, Delta_lambda, Delta_w, Delta_s, Delta_v,
+                            Delta_tau, Delta_kappa, ls, theta_vw, b, c, ubi,
+                            ubv, delta_x, delta_y, delta_z, delta_0, x, lambda,
+                            w, s, v, tau, kappa, res.rp, res.ru, res.rd, res.rg,
+                            -x.cwiseProduct(s), -v.cwiseProduct(w),
+                            -tau * kappa);
 
-        alpha = max_alpha(x, Delta_x, v, Delta_v, s, Delta_s, w, Delta_w, tau, Delta_tau, kappa, Delta_kappa);
+        alpha = max_alpha(x, Delta_x, v, Delta_v, s, Delta_s, w, Delta_w, tau,
+                          Delta_tau, kappa, Delta_kappa);
 
         oneMinusAlpha = 1.0 - alpha;
-        gamma         = std::fmax(oneMinusAlpha * oneMinusAlpha * std::fmin(beta, oneMinusAlpha), 0.1);
-        damping       = 1.0 - gamma;
+        gamma = std::fmax(
+            oneMinusAlpha * oneMinusAlpha * std::fmin(beta, oneMinusAlpha),
+            0.1);
+        damping = 1.0 - gamma;
 
         // Second Newton solve with damping
-        solve_newton_system(Delta_x, Delta_lambda, Delta_w, Delta_s, Delta_v, Delta_tau, Delta_kappa, ls, theta_vw, b,
-                            c, ubi, ubv, delta_x, delta_y, delta_z, delta_0, x, lambda, w, s, v, tau, kappa,
-                            damping * res.rp, damping * res.ru, damping * res.rd, damping * res.rg,
-                            (-x.cwiseProduct(s)).array() + (gamma * mu) - Delta_x.cwiseProduct(Delta_s).array(),
-                            (-v.cwiseProduct(w)).array() + (gamma * mu) - Delta_v.cwiseProduct(Delta_w).array(),
-                            (-tau * kappa) + (gamma * mu) - Delta_tau * Delta_kappa);
+        solve_newton_system(
+            Delta_x, Delta_lambda, Delta_w, Delta_s, Delta_v, Delta_tau,
+            Delta_kappa, ls, theta_vw, b, c, ubi, ubv, delta_x, delta_y,
+            delta_z, delta_0, x, lambda, w, s, v, tau, kappa, damping * res.rp,
+            damping * res.ru, damping * res.rd, damping * res.rg,
+            (-x.cwiseProduct(s)).array() + (gamma * mu) -
+                Delta_x.cwiseProduct(Delta_s).array(),
+            (-v.cwiseProduct(w)).array() + (gamma * mu) -
+                Delta_v.cwiseProduct(Delta_w).array(),
+            (-tau * kappa) + (gamma * mu) - Delta_tau * Delta_kappa);
 
-        alpha = max_alpha(x, Delta_x, v, Delta_v, s, Delta_s, w, Delta_w, tau, Delta_tau, kappa, Delta_kappa);
+        alpha = max_alpha(x, Delta_x, v, Delta_v, s, Delta_s, w, Delta_w, tau,
+                          Delta_tau, kappa, Delta_kappa);
 
         // High order corrections
         while (ncor <= 2 && alpha < 0.9995) {
             ncor++;
             alpha_ = std::min(1.0, 2.0 * alpha);
-            mu_l   = beta * mu * gamma;
-            mu_u   = gamma * mu / beta;
+            mu_l = beta * mu * gamma;
+            mu_u = gamma * mu / beta;
 
             // Compute products and corrections
             xs = x + alpha_ * Delta_x;
@@ -619,44 +841,56 @@ void IPSolver::run_optimization(ModelData &model, const double tol) {
             vw = v + alpha_ * Delta_v;
             vw.array() *= (w + alpha_ * Delta_w).array();
 
-            t_xs = (xs.array() < mu_l).select(mu_l - xs.array(), (xs.array() > mu_u).select(mu_u - xs.array(), 0.0));
-            t_vw = (vw.array() < mu_l).select(mu_l - vw.array(), (vw.array() > mu_u).select(mu_u - vw.array(), 0.0));
+            t_xs =
+                (xs.array() < mu_l)
+                    .select(mu_l - xs.array(),
+                            (xs.array() > mu_u).select(mu_u - xs.array(), 0.0));
+            t_vw =
+                (vw.array() < mu_l)
+                    .select(mu_l - vw.array(),
+                            (vw.array() > mu_u).select(mu_u - vw.array(), 0.0));
 
-            taukappa = (tau + alpha_ * Delta_tau) * (kappa + alpha_ * Delta_kappa);
-            t0       = std::clamp(taukappa, mu_l, mu_u) - taukappa;
+            taukappa =
+                (tau + alpha_ * Delta_tau) * (kappa + alpha_ * Delta_kappa);
+            t0 = std::clamp(taukappa, mu_l, mu_u) - taukappa;
 
-            const double sum_correction = (t_xs.sum() + t_vw.sum() + t0) / (nv + nu + 1);
+            const double sum_correction =
+                (t_xs.sum() + t_vw.sum() + t0) / (nv + nu + 1);
             t_xs.array() -= sum_correction;
             t_vw.array() -= sum_correction;
             t0 -= sum_correction;
 
             // Save current directions
-            Delta_x_c      = Delta_x;
+            Delta_x_c = Delta_x;
             Delta_lambda_c = Delta_lambda;
-            Delta_w_c      = Delta_w;
-            Delta_s_c      = Delta_s;
-            Delta_v_c      = Delta_v;
-            Delta_tau_c    = Delta_tau;
-            Delta_kappa_c  = Delta_kappa;
+            Delta_w_c = Delta_w;
+            Delta_s_c = Delta_s;
+            Delta_v_c = Delta_v;
+            Delta_tau_c = Delta_tau;
+            Delta_kappa_c = Delta_kappa;
 
             // Solve correction system
-            solve_newton_system(Delta_x_c, Delta_lambda_c, Delta_w_c, Delta_s_c, Delta_v_c, Delta_tau_c, Delta_kappa_c,
-                                ls, theta_vw, b, c, ubi, ubv, delta_x, delta_y, delta_z, delta_0, x, lambda, w, s, v,
-                                tau, kappa, Eigen::VectorXd::Zero(res.rp.size()), Eigen::VectorXd::Zero(res.ru.size()),
-                                Eigen::VectorXd::Zero(res.rd.size()), 0, -t_xs, -t_vw, -t0);
+            solve_newton_system(
+                Delta_x_c, Delta_lambda_c, Delta_w_c, Delta_s_c, Delta_v_c,
+                Delta_tau_c, Delta_kappa_c, ls, theta_vw, b, c, ubi, ubv,
+                delta_x, delta_y, delta_z, delta_0, x, lambda, w, s, v, tau,
+                kappa, Eigen::VectorXd::Zero(res.rp.size()),
+                Eigen::VectorXd::Zero(res.ru.size()),
+                Eigen::VectorXd::Zero(res.rd.size()), 0, -t_xs, -t_vw, -t0);
 
-            alpha_c = max_alpha(x, Delta_x_c, v, Delta_v_c, s, Delta_s_c, w, Delta_w_c, tau, Delta_tau_c, kappa,
-                                Delta_kappa_c);
+            alpha_c =
+                max_alpha(x, Delta_x_c, v, Delta_v_c, s, Delta_s_c, w,
+                          Delta_w_c, tau, Delta_tau_c, kappa, Delta_kappa_c);
 
             if (alpha_c > alpha_) {
-                Delta_x      = Delta_x_c;
+                Delta_x = Delta_x_c;
                 Delta_lambda = Delta_lambda_c;
-                Delta_w      = Delta_w_c;
-                Delta_s      = Delta_s_c;
-                Delta_v      = Delta_v_c;
-                Delta_tau    = Delta_tau_c;
-                Delta_kappa  = Delta_kappa_c;
-                alpha        = alpha_c;
+                Delta_w = Delta_w_c;
+                Delta_s = Delta_s_c;
+                Delta_v = Delta_v_c;
+                Delta_tau = Delta_tau_c;
+                Delta_kappa = Delta_kappa_c;
+                alpha = alpha_c;
             }
 
             if (alpha_c < 1.1 * alpha_) break;
@@ -674,9 +908,9 @@ void IPSolver::run_optimization(ModelData &model, const double tol) {
     }
 
     // Final solution recovery
-    const double    inv_tau = 1.0 / tau;
+    const double inv_tau = 1.0 / tau;
     Eigen::VectorXd original_x(As.cols());
-    int             free_var = 0;
+    int free_var = 0;
 
     for (int j = 0; j < lo.size(); ++j) {
         const double l = lo[j];
@@ -698,14 +932,15 @@ void IPSolver::run_optimization(ModelData &model, const double tol) {
     objVal = cs.dot(original_x);
     lambda *= inv_tau;
     dual_vals.assign(lambda.data(), lambda.data() + lambda.size());
-    primal_vals.assign(original_x.data(), original_x.data() + original_x.size());
+    primal_vals.assign(original_x.data(),
+                       original_x.data() + original_x.size());
 }
 
 #ifdef GUROBI
 OptimizationData IPSolver::extractOptimizationComponents(GRBModel &model) {
     OptimizationData data;
-    int              numConstrs = model.get(GRB_IntAttr_NumConstrs);
-    int              numVars    = model.get(GRB_IntAttr_NumVars);
+    int numConstrs = model.get(GRB_IntAttr_NumConstrs);
+    int numVars = model.get(GRB_IntAttr_NumVars);
 
     std::vector<Eigen::Triplet<double>> triplets;
     data.bs.resize(numConstrs);
@@ -729,9 +964,9 @@ OptimizationData IPSolver::extractOptimizationComponents(GRBModel &model) {
 
     // Extract constraint coefficients and senses
     for (int i = 0; i < numConstrs; ++i) {
-        GRBConstr  constr = model.getConstr(i);
-        GRBLinExpr expr   = model.getRow(constr);
-        data.bs(i)        = constr.get(GRB_DoubleAttr_RHS);
+        GRBConstr constr = model.getConstr(i);
+        GRBLinExpr expr = model.getRow(constr);
+        data.bs(i) = constr.get(GRB_DoubleAttr_RHS);
 
         //
         data.sense(i) = (constr.get(GRB_CharAttr_Sense) == '=') ? 1 : 0;
@@ -739,13 +974,16 @@ OptimizationData IPSolver::extractOptimizationComponents(GRBModel &model) {
             // if constr.get(GRB_CharAttr_Sense) > flip the sign
             double coef;
             if (constr.get(GRB_CharAttr_Sense) == '>') {
-                coef       = -expr.getCoeff(j);
+                coef = -expr.getCoeff(j);
                 data.bs(i) = -data.bs(i);
             } else {
                 coef = expr.getCoeff(j);
             }
             GRBVar var = expr.getVar(j);
-            if (coef != 0.0) { triplets.push_back(Eigen::Triplet<double>(i, var.index(), coef)); }
+            if (coef != 0.0) {
+                triplets.push_back(
+                    Eigen::Triplet<double>(i, var.index(), coef));
+            }
         }
     }
 
@@ -760,19 +998,22 @@ OptimizationData IPSolver::extractOptimizationComponents(GRBModel &model) {
 }
 #endif
 
-OptimizationData IPSolver::convertToOptimizationData(const ModelData &modelData) {
+OptimizationData IPSolver::convertToOptimizationData(
+    const ModelData &modelData) {
     OptimizationData optData;
 
     // Convert SparseMatrix to Eigen::SparseMatrix using Eigen::Triplet
     std::vector<Eigen::Triplet<double>> triplets;
-    auto                                sparseMatrix = modelData.A_sparse;
+    auto sparseMatrix = modelData.A_sparse;
 
     optData.As = modelData.A_sparse.toEigenSparseMatrix();
 
     // Iterate over the CRS format of SparseMatrix to build triplets
     // for (int i = 0; i < sparseMatrix.outerSize(); ++i) {
-    //    for (Eigen::SparseMatrix<double>::InnerIterator it(sparseMatrix, i); it; ++it) {
-    //        triplets.push_back(Eigen::Triplet<double>(it.row(), it.col(), it.value()));
+    //    for (Eigen::SparseMatrix<double>::InnerIterator it(sparseMatrix, i);
+    //    it; ++it) {
+    //        triplets.push_back(Eigen::Triplet<double>(it.row(), it.col(),
+    //        it.value()));
     //    }
     //}
     // Resize the Eigen sparse matrix
@@ -796,7 +1037,8 @@ OptimizationData IPSolver::convertToOptimizationData(const ModelData &modelData)
     // Convert ub to Eigen::VectorXd
     optData.hi = Eigen::VectorXd::Map(modelData.ub.data(), modelData.ub.size());
 
-    // Convert sense to Eigen::VectorXd (mapping '<' to 0, '=' to 1, '>' to 0 and flipping the corresponding row)
+    // Convert sense to Eigen::VectorXd (mapping '<' to 0, '=' to 1, '>' to 0
+    // and flipping the corresponding row)
     optData.sense.resize(modelData.sense.size());
     for (size_t i = 0; i < modelData.sense.size(); ++i) {
         if (modelData.sense[i] == '<') {
@@ -805,20 +1047,22 @@ OptimizationData IPSolver::convertToOptimizationData(const ModelData &modelData)
             optData.sense[i] = 1.0;
         } else if (modelData.sense[i] == '>') {
             optData.sense[i] = 0.0;
-            optData.bs[i]    = -optData.bs[i];
-            optData.As.row(i) *= -1; // Flip the row for '>'
+            optData.bs[i] = -optData.bs[i];
+            optData.As.row(i) *= -1;  // Flip the row for '>'
         }
     }
 
     return optData;
 }
 
-int IPSolver::update_linear_solver(SparseSolver &ls, const Eigen::VectorXd &theta, const Eigen::VectorXd &regP,
+int IPSolver::update_linear_solver(SparseSolver &ls,
+                                   const Eigen::VectorXd &theta,
+                                   const Eigen::VectorXd &regP,
                                    const Eigen::VectorXd &regD) {
     // Update internal data
     ls.theta = theta;
-    ls.regP  = regP;
-    ls.regD  = regD;
+    ls.regP = regP;
+    ls.regD = regD;
 
     // Update S. S is stored as upper-triangular and only its diagonal changes.
     Eigen::VectorXd combinedValues(ls.n + ls.m);
@@ -826,7 +1070,9 @@ int IPSolver::update_linear_solver(SparseSolver &ls, const Eigen::VectorXd &thet
     combinedValues.tail(ls.m) = regD;
 
     // Efficiently update diagonal elements
-    for (int i = 0; i < combinedValues.size(); i++) { ls.S.coeffRef(i, i) = combinedValues[i]; }
+    for (int i = 0; i < combinedValues.size(); i++) {
+        ls.S.coeffRef(i, i) = combinedValues[i];
+    }
 
     // Refactorize
     ls.factorizeMatrix(ls.S);
@@ -839,34 +1085,40 @@ int IPSolver::update_linear_solver(SparseSolver &ls, const Eigen::VectorXd &thet
  * performing factorization.
  *
  */
-void IPSolver::start_linear_solver(SparseSolver &ls, const Eigen::SparseMatrix<double> A) {
+void IPSolver::start_linear_solver(SparseSolver &ls,
+                                   const Eigen::SparseMatrix<double> A) {
     ls.A = A;
     ls.m = A.rows();
     ls.n = A.cols();
     // print ls.A size
 
     ls.theta = Eigen::VectorXd::Ones(ls.n);
-    ls.regP  = Eigen::VectorXd::Ones(ls.n);
-    ls.regD  = Eigen::VectorXd::Ones(ls.m);
+    ls.regP = Eigen::VectorXd::Ones(ls.n);
+    ls.regD = Eigen::VectorXd::Ones(ls.m);
 
-    Eigen::SparseMatrix<double> topRight    = ls.A.transpose();
-    Eigen::SparseMatrix<double> bottomLeft  = ls.A;
-    Eigen::SparseMatrix<double> topLeft     = convertToSparseDiagonal(-ls.theta - ls.regP);
+    Eigen::SparseMatrix<double> topRight = ls.A.transpose();
+    Eigen::SparseMatrix<double> bottomLeft = ls.A;
+    Eigen::SparseMatrix<double> topLeft =
+        convertToSparseDiagonal(-ls.theta - ls.regP);
     Eigen::SparseMatrix<double> bottomRight = convertToSparseDiagonal(ls.regD);
 
     // S_ is known, reserve space for it
     Eigen::SparseMatrix<double> S_(ls.n + ls.m, ls.n + ls.m);
 
     // Reserving space for tripletList
-    int estimated_nonzeros = topLeft.nonZeros() + 2 * topRight.nonZeros() + bottomRight.nonZeros();
+    int estimated_nonzeros =
+        topLeft.nonZeros() + 2 * topRight.nonZeros() + bottomRight.nonZeros();
     std::vector<Eigen::Triplet<double>> tripletList;
     tripletList.reserve(estimated_nonzeros);
 
     // Insert topLeft, topRight, bottomLeft, bottomRight matrices
-    auto insertBlock = [&](const Eigen::SparseMatrix<double> &block, int startRow, int startCol) {
+    auto insertBlock = [&](const Eigen::SparseMatrix<double> &block,
+                           int startRow, int startCol) {
         for (int k = 0; k < block.outerSize(); ++k) {
-            for (Eigen::SparseMatrix<double>::InnerIterator it(block, k); it; ++it) {
-                tripletList.emplace_back(it.row() + startRow, it.col() + startCol, it.value());
+            for (Eigen::SparseMatrix<double>::InnerIterator it(block, k); it;
+                 ++it) {
+                tripletList.emplace_back(it.row() + startRow,
+                                         it.col() + startCol, it.value());
             }
         }
     };
