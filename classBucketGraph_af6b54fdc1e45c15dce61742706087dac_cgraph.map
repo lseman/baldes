@@ -1,0 +1,11 @@
+<map id="BucketGraph::set_adjacency_list" name="BucketGraph::set_adjacency_list">
+<area shape="rect" id="Node000001" title=" " alt="" coords="5,55,216,80"/>
+<area shape="rect" id="Node000002" href="$classBucketGraph.html#a42e016ec947d0a75ffa73ceab03207d7" title="Represents a bucket in the Bucket Graph. Adds an arc to the bucket graph." alt="" coords="264,5,413,31"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="173,51,260,32,261,38,174,57"/>
+<area shape="rect" id="Node000003" href="$classMST.html#aab20166a0b84167db616699bcaf02360" title=" " alt="" coords="291,55,386,80"/>
+<area shape="poly" id="edge2_Node000001_Node000003" title=" " alt="" coords="216,65,276,65,276,70,216,70"/>
+<area shape="rect" id="Node000005" href="$classBucketGraph.html#ad15267e0cffaa8dc5222028409c9e082" title=" " alt="" coords="271,104,406,130"/>
+<area shape="poly" id="edge4_Node000001_Node000005" title=" " alt="" coords="174,78,261,97,260,103,173,84"/>
+<area shape="rect" id="Node000004" href="$classMST.html#ae8f38e66bc8580c27c85f2455a6a4d2d" title=" " alt="" coords="461,55,595,80"/>
+<area shape="poly" id="edge3_Node000003_Node000004" title=" " alt="" coords="386,65,445,65,445,70,386,70"/>
+</map>

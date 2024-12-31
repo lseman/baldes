@@ -1,0 +1,9 @@
+<map id="BNBNode::clearSRC" name="BNBNode::clearSRC">
+<area shape="rect" id="Node000001" title=" " alt="" coords="5,13,147,38"/>
+<area shape="rect" id="Node000002" href="$classMIPProblem.html#a4e55c60ce1b0dfd21733f9fbbc157891" title=" " alt="" coords="195,5,329,46"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="147,23,179,23,179,28,147,28"/>
+<area shape="rect" id="Node000003" href="$structSparseMatrix.html#ac25e8f241cd1de61244dcff74c474799" title=" " alt="" coords="377,13,543,38"/>
+<area shape="poly" id="edge2_Node000002_Node000003" title=" " alt="" coords="329,23,361,23,361,28,329,28"/>
+<area shape="rect" id="Node000004" href="$structSparseMatrix.html#ad1a2ceb5c4b1170f4ba4219200066004" title=" " alt="" coords="591,13,777,38"/>
+<area shape="poly" id="edge3_Node000003_Node000004" title=" " alt="" coords="544,23,576,23,576,28,544,28"/>
+</map>

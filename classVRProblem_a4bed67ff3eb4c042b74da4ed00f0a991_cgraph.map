@@ -1,0 +1,25 @@
+<map id="VRProblem::evaluate" name="VRProblem::evaluate">
+<area shape="rect" id="Node000001" title=" " alt="" coords="5,104,148,130"/>
+<area shape="rect" id="Node000002" href="$classBNBNode.html#a9b28b1d87eebcfb6c13c1bf28aaa511f" title=" " alt="" coords="196,5,357,31"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="94,101,138,71,195,40,208,34,210,39,197,45,141,76,97,106"/>
+<area shape="rect" id="Node000004" href="$classBNBNode.html#a5ab2003e9b82939f868fe7ddc0cac3ef" title=" " alt="" coords="205,55,348,80"/>
+<area shape="poly" id="edge3_Node000001_Node000004" title=" " alt="" coords="131,101,206,82,207,87,132,106"/>
+<area shape="rect" id="Node000006" href="$classBNBNode.html#a6581837245535f5aa0986dcc0ae4fb07" title=" " alt="" coords="205,104,348,130"/>
+<area shape="poly" id="edge5_Node000001_Node000006" title=" " alt="" coords="148,114,190,114,190,120,148,120"/>
+<area shape="rect" id="Node000008" href="$classBNBNode.html#abb76f5afa8990290b262a0750cede865" title=" " alt="" coords="209,161,344,187"/>
+<area shape="poly" id="edge7_Node000001_Node000008" title=" " alt="" coords="125,128,215,154,213,159,123,133"/>
+<area shape="rect" id="Node000012" href="$Definitions_8h.html#a086546d06aa565cdd48f436973ebc496" title="Prints an informational message with a specific format." alt="" coords="239,211,314,236"/>
+<area shape="poly" id="edge11_Node000001_Node000012" title=" " alt="" coords="95,128,139,162,197,197,225,208,223,213,194,202,136,166,92,132"/>
+<area shape="rect" id="Node000003" href="$classMIPProblem.html#a15cf712c50d97736774b35f6ec269db3" title=" " alt="" coords="419,5,563,31"/>
+<area shape="poly" id="edge2_Node000002_Node000003" title=" " alt="" coords="357,16,403,16,403,21,357,21"/>
+<area shape="rect" id="Node000005" href="$classSolverInterface.html#a4151c0d91b5740e43001530529c96c09" title=" " alt="" coords="405,55,577,80"/>
+<area shape="poly" id="edge4_Node000004_Node000005" title=" " alt="" coords="348,65,389,65,389,70,348,70"/>
+<area shape="rect" id="Node000007" href="$classSolverInterface.html#a3d15e89c7d8c69802e77d29eebd8e2c6" title=" " alt="" coords="406,104,577,130"/>
+<area shape="poly" id="edge6_Node000006_Node000007" title=" " alt="" coords="348,114,390,114,390,120,348,120"/>
+<area shape="rect" id="Node000009" href="$classGurobiEnvSingleton.html#a49c3ce63088629c2246dec252a73df16" title=" " alt="" coords="424,154,559,194"/>
+<area shape="poly" id="edge8_Node000008_Node000009" title=" " alt="" coords="344,172,408,172,408,177,344,177"/>
+<area shape="rect" id="Node000010" href="$classSolverInterface.html#aeaac9dd85da0f259e9804a9970a7f54f" title=" " alt="" coords="410,219,573,244"/>
+<area shape="poly" id="edge9_Node000008_Node000010" title=" " alt="" coords="328,185,426,212,425,217,327,190"/>
+<area shape="rect" id="Node000011" href="$classSolverInterface.html#afc4cb03aa6a487dd87a2a2d3090a5577" title=" " alt="" coords="407,268,575,294"/>
+<area shape="poly" id="edge10_Node000008_Node000011" title=" " alt="" coords="337,185,359,196,374,211,383,226,392,241,407,255,414,259,411,264,403,259,387,244,379,229,370,214,355,200,335,190"/>
+</map>

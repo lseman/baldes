@@ -1,0 +1,21 @@
+<map id="Stealing.h" name="Stealing.h">
+<area shape="rect" id="Node000001" title=" " alt="" coords="407,5,485,31"/>
+<area shape="rect" id="Node000002" title=" " alt="" coords="5,79,66,105"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="407,27,267,47,82,81,81,76,266,42,406,22"/>
+<area shape="rect" id="Node000003" title=" " alt="" coords="90,79,154,105"/>
+<area shape="poly" id="edge2_Node000001_Node000003" title=" " alt="" coords="407,30,170,81,169,76,406,25"/>
+<area shape="rect" id="Node000004" title=" " alt="" coords="178,79,304,105"/>
+<area shape="poly" id="edge3_Node000001_Node000004" title=" " alt="" coords="412,34,291,76,289,71,410,29"/>
+<area shape="rect" id="Node000005" title=" " alt="" coords="327,79,384,105"/>
+<area shape="poly" id="edge4_Node000001_Node000005" title=" " alt="" coords="432,34,384,72,381,67,429,29"/>
+<area shape="rect" id="Node000006" title=" " alt="" coords="408,79,485,105"/>
+<area shape="poly" id="edge5_Node000001_Node000006" title=" " alt="" coords="449,31,449,63,444,63,444,31"/>
+<area shape="rect" id="Node000007" title=" " alt="" coords="509,79,565,105"/>
+<area shape="poly" id="edge6_Node000001_Node000007" title=" " alt="" coords="463,29,512,67,508,72,460,34"/>
+<area shape="rect" id="Node000008" title=" " alt="" coords="589,79,653,105"/>
+<area shape="poly" id="edge7_Node000001_Node000008" title=" " alt="" coords="477,29,578,70,576,75,475,34"/>
+<area shape="rect" id="Node000009" title=" " alt="" coords="678,79,735,105"/>
+<area shape="poly" id="edge8_Node000001_Node000009" title=" " alt="" coords="486,28,663,76,662,81,485,33"/>
+<area shape="rect" id="Node000010" title=" " alt="" coords="759,79,816,105"/>
+<area shape="poly" id="edge9_Node000001_Node000010" title=" " alt="" coords="486,24,599,44,744,76,743,81,598,50,485,29"/>
+</map>

@@ -1,0 +1,12 @@
+<map id="BucketGraph::ConcatenateLabel" name="BucketGraph::ConcatenateLabel">
+<area shape="rect" id="Node000001" title=" " alt="" coords="5,104,182,145"/>
+<area shape="rect" id="Node000002" href="$classBucketGraph.html#a2a66984a5d0225286c0598b884772f8c" title=" " alt="" coords="236,5,377,46"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="136,101,229,57,242,50,244,55,231,61,138,106"/>
+<area shape="rect" id="Node000003" href="$classBucketGraph.html#a858b68317a9a0a60723698509d78d575" title="Checks the feasibility of a given forward and backward label." alt="" coords="237,71,376,111"/>
+<area shape="poly" id="edge2_Node000001_Node000003" title=" " alt="" coords="182,108,221,102,222,107,183,113"/>
+<area shape="rect" id="Node000004" href="$classBucketGraph.html#a58212b002ceaa4e24b5290c8059a6e1c" title=" " alt="" coords="230,136,383,177"/>
+<area shape="poly" id="edge3_Node000001_Node000004" title=" " alt="" coords="183,135,215,140,214,145,182,140"/>
+<area shape="rect" id="Node000005" href="$classBucketGraph.html#ad15267e0cffaa8dc5222028409c9e082" title=" " alt="" coords="431,173,565,198"/>
+<area shape="poly" id="edge5_Node000001_Node000005" title=" " alt="" coords="129,143,176,167,230,186,277,193,326,196,416,193,416,199,326,202,277,199,229,191,174,172,126,147"/>
+<area shape="poly" id="edge4_Node000004_Node000005" title=" " alt="" coords="384,165,416,170,415,176,383,171"/>
+</map>

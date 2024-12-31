@@ -1,0 +1,5 @@
+<map id="CutStorage::addCut" name="CutStorage::addCut">
+<area shape="rect" id="Node000001" title="Adds a cut to the current collection of cuts." alt="" coords="5,5,139,31"/>
+<area shape="rect" id="Node000002" href="$SRC_8cpp.html#a221ddfa4aa7f40ac52f772b73a3b50ce" title="Computes a unique cut key based on the provided base set and multipliers." alt="" coords="187,5,310,31"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="139,16,171,16,171,21,139,21"/>
+</map>

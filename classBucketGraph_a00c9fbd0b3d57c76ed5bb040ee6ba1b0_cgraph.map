@@ -1,0 +1,17 @@
+<map id="BucketGraph::solve_min_cost_flow" name="BucketGraph::solve_min_cost_flow">
+<area shape="rect" id="Node000001" title=" " alt="" coords="5,96,140,137"/>
+<area shape="rect" id="Node000002" href="$classMUSSP.html#a1ca0af45ce20ab78a87132582295fa70" title=" " alt="" coords="192,5,318,31"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="100,94,140,67,186,40,197,35,199,40,189,45,143,71,103,98"/>
+<area shape="rect" id="Node000003" href="$classMUSSP.html#a98ced5407d01677ff28c4ebcf9f330ae" title=" " alt="" coords="191,55,318,80"/>
+<area shape="poly" id="edge2_Node000001_Node000003" title=" " alt="" coords="140,96,190,82,191,87,141,101"/>
+<area shape="rect" id="Node000004" href="$classMUSSP.html#a0f0426743c9851ee4fedb6f922453c72" title=" " alt="" coords="195,104,314,130"/>
+<area shape="poly" id="edge3_Node000001_Node000004" title=" " alt="" coords="140,114,180,114,180,120,140,120"/>
+<area shape="rect" id="Node000005" href="$classMUSSP.html#a6e6b14176a54aa4954049de1d45bd6a2" title=" " alt="" coords="188,153,322,179"/>
+<area shape="poly" id="edge4_Node000001_Node000005" title=" " alt="" coords="141,132,191,146,190,151,140,138"/>
+<area shape="rect" id="Node000006" href="$classMUSSP.html#a54dc1536ae0d29f269434f292a50d7f7" title=" " alt="" coords="202,203,308,228"/>
+<area shape="poly" id="edge5_Node000001_Node000006" title=" " alt="" coords="103,136,143,163,189,189,199,194,197,199,186,194,140,167,100,140"/>
+<area shape="rect" id="Node000007" href="$classMUSSP.html#a30b04507e4fe7daec72c77f5addeed92" title=" " alt="" coords="370,203,544,228"/>
+<area shape="poly" id="edge6_Node000006_Node000007" title=" " alt="" coords="309,213,354,213,354,218,309,218"/>
+<area shape="rect" id="Node000008" href="$classMUSSP.html#a3b0e37f3121ff06e493cdc3c2214e36a" title=" " alt="" coords="592,203,791,228"/>
+<area shape="poly" id="edge7_Node000007_Node000008" title=" " alt="" coords="545,213,577,213,577,218,545,218"/>
+</map>

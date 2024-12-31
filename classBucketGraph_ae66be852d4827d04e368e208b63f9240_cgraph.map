@@ -1,0 +1,16 @@
+<map id="BucketGraph::common_initialization" name="BucketGraph::common_initialization">
+<area shape="rect" id="Node000001" title="Initializes the BucketGraph by clearing previous data and setting up forward and backward buckets." alt="" coords="5,100,159,141"/>
+<area shape="rect" id="Node000002" href="$classBucketGraph.html#af129eff306551dc7cc7fe00b919bbbd0" title="Assigns the buckets based on the specified direction." alt="" coords="226,5,368,46"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="122,97,206,57,222,50,224,55,208,61,124,102"/>
+<area shape="rect" id="Node000003" href="$classBucketGraph.html#a820c42b7e4fbfb599cdde7550ba3a12e" title=" " alt="" coords="220,71,374,111"/>
+<area shape="poly" id="edge2_Node000001_Node000003" title=" " alt="" coords="159,107,204,101,205,106,160,112"/>
+<area shape="rect" id="Node000006" href="$Definitions_8h.html#a59e29a115ea52c2f99d3ff52f83cb3cf" title=" " alt="" coords="207,136,387,161"/>
+<area shape="poly" id="edge6_Node000001_Node000006" title=" " alt="" coords="160,128,192,132,191,137,159,133"/>
+<area shape="rect" id="Node000007" href="$classBucketGraph.html#ad36a543a58c7d3cd4ded313dd5069f03" title="Marks a node as visited in the bitmap." alt="" coords="219,185,375,226"/>
+<area shape="poly" id="edge7_Node000001_Node000007" title=" " alt="" coords="131,139,208,171,223,177,221,182,206,176,129,144"/>
+<area shape="rect" id="Node000004" href="$classArcDuals.html#ac75e53f0c4f24e6aca539c544e9f8109" title=" " alt="" coords="435,54,559,80"/>
+<area shape="poly" id="edge3_Node000003_Node000004" title=" " alt="" coords="374,79,419,74,420,79,374,84"/>
+<area shape="rect" id="Node000005" href="$classCutStorage.html#add951e84b2eed093740382498e91bb9a" title=" " alt="" coords="440,104,555,129"/>
+<area shape="poly" id="edge5_Node000003_Node000005" title=" " alt="" coords="374,98,424,104,423,110,374,103"/>
+<area shape="poly" id="edge4_Node000004_Node000004" title=" " alt="" coords="464,55,457,46,461,36,475,30,497,28,522,30,534,37,532,42,520,35,497,33,476,35,465,40,462,45,468,52"/>
+</map>

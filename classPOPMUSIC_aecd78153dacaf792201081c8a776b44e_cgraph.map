@@ -1,0 +1,9 @@
+<map id="POPMUSIC::run" name="POPMUSIC::run">
+<area shape="rect" id="Node000001" title=" " alt="" coords="5,31,122,56"/>
+<area shape="rect" id="Node000002" href="$classHGS.html#a14c2fae27dddcd033da5060c5dabe089" title=" " alt="" coords="170,5,312,31"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="122,33,154,28,155,33,122,38"/>
+<area shape="rect" id="Node000003" href="$classHGS.html#a771e549efb4a549a45e2733a7cdbc214" title=" " alt="" coords="204,55,278,80"/>
+<area shape="poly" id="edge2_Node000001_Node000003" title=" " alt="" coords="122,49,188,58,188,63,122,54"/>
+<area shape="rect" id="Node000004" href="$Definitions_8h.html#a064e59f67e1c74ad38938bd6bd7a9210" title="Prints a formatted heuristic message with a specific color scheme." alt="" coords="360,55,438,80"/>
+<area shape="poly" id="edge3_Node000003_Node000004" title=" " alt="" coords="279,65,344,65,344,70,279,70"/>
+</map>

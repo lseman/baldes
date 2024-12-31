@@ -1,0 +1,9 @@
+<map id="Branching::calculateMSTClusters" name="Branching::calculateMSTClusters">
+<area shape="rect" id="Node000001" title=" " alt="" coords="5,31,219,56"/>
+<area shape="rect" id="Node000002" href="$classMST.html#aab20166a0b84167db616699bcaf02360" title=" " alt="" coords="287,5,382,31"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="219,29,271,23,272,28,220,34"/>
+<area shape="rect" id="Node000004" href="$structInstanceData.html#a8c2987f0a1fcc42b1981f7599ee944d7" title="Retrieves the distance value between two points." alt="" coords="267,55,402,80"/>
+<area shape="poly" id="edge3_Node000001_Node000004" title=" " alt="" coords="220,52,252,56,251,61,219,58"/>
+<area shape="rect" id="Node000003" href="$classMST.html#ae8f38e66bc8580c27c85f2455a6a4d2d" title=" " alt="" coords="450,5,584,31"/>
+<area shape="poly" id="edge2_Node000002_Node000003" title=" " alt="" coords="382,16,435,16,435,21,382,21"/>
+</map>

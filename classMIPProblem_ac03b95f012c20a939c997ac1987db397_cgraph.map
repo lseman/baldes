@@ -1,0 +1,16 @@
+<map id="MIPProblem::chgCoeff" name="MIPProblem::chgCoeff">
+<area shape="rect" id="Node000001" title=" " alt="" coords="5,78,156,104"/>
+<area shape="rect" id="Node000002" href="$classMIPProblem.html#af77d84a36fde97467ad7069ea2a230f8" title=" " alt="" coords="204,78,354,104"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="156,88,188,88,188,94,156,94"/>
+<area shape="rect" id="Node000003" href="$classLinearExpression.html#a931036cafcd17fe3553ffd79468da49e" title=" " alt="" coords="430,5,577,46"/>
+<area shape="poly" id="edge2_Node000002_Node000003" title=" " alt="" coords="325,75,416,48,417,53,326,80"/>
+<area shape="rect" id="Node000004" href="$structSparseMatrix.html#adc8a18b61890921ed7f6321ff48a791d" title=" " alt="" coords="432,71,574,111"/>
+<area shape="poly" id="edge3_Node000002_Node000004" title=" " alt="" coords="355,88,417,88,417,94,355,94"/>
+<area shape="rect" id="Node000008" href="$classLinearExpression.html#a055d01a2c6ce59aad0e6ec6595159ed8" title=" " alt="" coords="402,136,604,161"/>
+<area shape="poly" id="edge7_Node000002_Node000008" title=" " alt="" coords="332,102,403,120,434,129,433,134,401,126,330,107"/>
+<area shape="rect" id="Node000005" href="$structSparseMatrix.html#ab07cd94bee1d7f2387e8abe437478cdf" title=" " alt="" coords="652,53,788,78"/>
+<area shape="poly" id="edge4_Node000004_Node000005" title=" " alt="" coords="574,80,637,73,637,78,574,85"/>
+<area shape="rect" id="Node000006" href="$structSparseMatrix.html#ad1a2ceb5c4b1170f4ba4219200066004" title=" " alt="" coords="836,78,1021,104"/>
+<area shape="poly" id="edge6_Node000004_Node000006" title=" " alt="" coords="574,88,820,88,820,94,574,94"/>
+<area shape="poly" id="edge5_Node000005_Node000006" title=" " alt="" coords="788,71,821,75,820,80,788,77"/>
+</map>

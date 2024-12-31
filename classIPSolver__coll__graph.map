@@ -1,0 +1,7 @@
+<map id="IPSolver" name="IPSolver">
+<area shape="rect" id="Node000001" title="A class for solving linear programming problems using an interior point method." alt="" coords="65,94,136,120"/>
+<area shape="rect" id="Node000002" href="$structResiduals.html" title="A structure to hold various residual vectors and their norms." alt="" coords="5,5,84,31"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="63,43,95,92,91,95,58,46"/>
+<area shape="rect" id="Node000003" href="$classSparseSolver.html" title="A class for solving sparse linear systems using various solver types." alt="" coords="108,5,208,31"/>
+<area shape="poly" id="edge2_Node000001_Node000003" title=" " alt="" coords="144,45,111,95,106,92,139,42"/>
+</map>

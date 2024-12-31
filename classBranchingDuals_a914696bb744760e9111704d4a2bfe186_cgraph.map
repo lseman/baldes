@@ -1,0 +1,6 @@
+<map id="BranchingDuals::getDual" name="BranchingDuals::getDual">
+<area shape="rect" id="Node000001" title=" " alt="" coords="5,29,168,55"/>
+<area shape="rect" id="Node000002" href="$classArcDuals.html#ac75e53f0c4f24e6aca539c544e9f8109" title=" " alt="" coords="216,29,340,55"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="168,40,200,40,200,45,168,45"/>
+<area shape="poly" id="edge2_Node000002_Node000002" title=" " alt="" coords="246,30,239,21,243,11,256,5,278,3,301,5,313,12,311,16,299,10,278,8,258,10,247,15,245,20,250,27"/>
+</map>

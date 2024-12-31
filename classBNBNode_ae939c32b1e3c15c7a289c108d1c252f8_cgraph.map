@@ -1,0 +1,13 @@
+<map id="BNBNode::addVars" name="BNBNode::addVars">
+<area shape="rect" id="Node000001" title=" " alt="" coords="5,55,140,80"/>
+<area shape="rect" id="Node000002" href="$classMIPProblem.html#a97dbd36a79a4301e2a6905451f743c2e" title=" " alt="" coords="188,55,335,80"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="140,65,172,65,172,70,140,70"/>
+<area shape="rect" id="Node000003" href="$classMIPProblem.html#a7d7c950859d42587ebd021023edde212" title=" " alt="" coords="383,5,555,31"/>
+<area shape="poly" id="edge2_Node000002_Node000003" title=" " alt="" coords="318,51,397,33,398,38,319,57"/>
+<area shape="rect" id="Node000004" href="$classMIPColumn.html#a6cdb097e73df4f28024436d31cf15171" title=" " alt="" coords="394,55,544,80"/>
+<area shape="poly" id="edge3_Node000002_Node000004" title=" " alt="" coords="336,65,378,65,378,70,336,70"/>
+<area shape="rect" id="Node000005" href="$structSparseMatrix.html#a91d925348a3a7d26839cbf7de084f498" title=" " alt="" coords="402,104,537,145"/>
+<area shape="poly" id="edge4_Node000002_Node000005" title=" " alt="" coords="311,78,387,100,386,105,310,84"/>
+<area shape="rect" id="Node000006" href="$structSparseMatrix.html#ad1a2ceb5c4b1170f4ba4219200066004" title=" " alt="" coords="603,112,789,138"/>
+<area shape="poly" id="edge5_Node000005_Node000006" title=" " alt="" coords="537,122,588,122,588,128,537,128"/>
+</map>
