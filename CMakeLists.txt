@@ -197,6 +197,8 @@ cpmaddpackage(
   "STDEXEC_BUILD_BENCHMARKS OFF"
   "STDEXEC_BUILD_DOCS OFF"
   "BUILD_TESTING OFF")
+string(REPLACE "-fconcepts-diagnostics-depth=10" "" CMAKE_CXX_FLAGS
+               "${CMAKE_CXX_FLAGS}")
 
 # add mdspan
 cpmaddpackage(
