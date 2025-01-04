@@ -195,9 +195,9 @@ public:
             Path path(label->getRoute(), label->real_cost);
 
             // check if path is already in pathSet
-            // if (pathSet.find(path) != pathSet.end()) continue;
+            if (pathSet.find(path) != pathSet.end()) continue;
             // Insert the path into the set to avoid duplicates
-            // pathSet.insert(path);
+            pathSet.insert(path);
 
             counter += 1;
             if (counter > N_ADD - 1) break;
@@ -546,6 +546,7 @@ public:
         double              obj;
         auto                colAdded = 0;
         std::vector<double> originDuals;
+        bool force_cuts = false;
         for (int iter = 0; iter < max_iter; ++iter) {
             reoptimized = false;
 
@@ -560,7 +561,8 @@ public:
             }
 #endif
 
-            if (ss && !rcc) {
+            if ((ss && !rcc) || force_cuts) {
+                force_cuts = false;
 #if defined(RCC) || defined(EXACT_RCC)
                 RUN_OPTIMIZATION(node, 1e-8)
                 RCC_MODE_BLOCK(rcc = RCCsep(node, solution);)
@@ -693,7 +695,7 @@ public:
             stab.set_pseudo_dual_bound(newBound);
             stab.updateNumK(numK);
             stab.update_stabilization_after_master_optim(nodeDuals);
-            nodeDuals = stab.getStabDualSol(nodeDuals);
+            nodeDuals = stab.getStabDualSolAdvanced(nodeDuals);
 
             misprice = true;
             while (misprice) {
@@ -853,7 +855,7 @@ public:
                 if (stab.shouldExit()) { misprice = false; }
                 if (colAdded == 0) {
                     stab.update_stabilization_after_misprice();
-                    nodeDuals = stab.getStabDualSol(nodeDuals);
+                    nodeDuals = stab.getStabDualSolAdvanced(nodeDuals);
                 } else {
                     misprice = false;
                 }
@@ -862,6 +864,10 @@ public:
             if (bucket_graph->getStatus() == Status::Optimal && stab.shouldExit()) {
                 print_info("Optimal solution found\n");
                 break;
+            }
+
+            if (colAdded == 0) {
+                force_cuts = true;
             }
 
             stab.update_stabilization_after_iter(nodeDuals);
