@@ -32,7 +32,7 @@ constexpr double tolerance                                      = 1e-6;
 constexpr int    max_row_rank1                                  = 5;
 constexpr int    max_heuristic_initial_seed_set_size_row_rank1c = 6;
 
-constexpr int    max_num_r1c_per_round = 3;
+constexpr int    max_num_r1c_per_round = 2;
 constexpr double cut_vio_factor        = 0.1;
 
 struct R1c {
@@ -91,7 +91,7 @@ public:
         cuts.reserve(INITIAL_POOL_SIZE);
         rank1_multi_label_pool.reserve(INITIAL_POOL_SIZE);
         generated_rank1_multi_pool.reserve(INITIAL_POOL_SIZE);
-        // map_cut_plan_vio.reserve(INITIAL_POOL_SIZE);
+        //map_cut_plan_vio.reserve(INITIAL_POOL_SIZE);
 
         generateOptimalMultiplier();
         // printMultiplierMap();
@@ -610,7 +610,7 @@ public:
 
         // Populate `v_r_map` with route appearances for each vertex `i`
 #ifdef __cpp_lib_parallel_algorithm
-        std::for_each(std::execution::par_unseq, sol.begin(), sol.end(), [&](const auto &route_data) {
+        std::for_each(sol.begin(), sol.end(), [&](const auto &route_data) {
             const auto r = &route_data - &sol[0]; // Get index without separate counter
             for (const int i : route_data.route) {
                 if (i > 0 && i < max_dim_minus_1) { ++v_r_map[i][r]; }
