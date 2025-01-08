@@ -87,10 +87,10 @@ public:
 
     PSTEPDuals pstep_duals;
     void       setPSTEPduals(const PSTEPDuals &arc_duals) { this->pstep_duals = arc_duals; }
-    auto       solveTSP(std::vector<std::vector<uint16_t>> &paths, std::vector<double> &path_costs, std::vector<int> &firsts,
-                        std::vector<int> &lasts, std::vector<std::vector<double>> &cost_matrix, bool first_time = false);
-    auto solveTSPTW(std::vector<std::vector<uint16_t>> &paths, std::vector<double> &path_costs, std::vector<int> &firsts,
-                    std::vector<int> &lasts, std::vector<std::vector<double>> &cost_matrix,
+    auto solveTSP(std::vector<std::vector<uint16_t>> &paths, std::vector<double> &path_costs, std::vector<int> &firsts,
+                  std::vector<int> &lasts, std::vector<std::vector<double>> &cost_matrix, bool first_time = false);
+    auto solveTSPTW(std::vector<std::vector<uint16_t>> &paths, std::vector<double> &path_costs,
+                    std::vector<int> &firsts, std::vector<int> &lasts, std::vector<std::vector<double>> &cost_matrix,
                     std::vector<double> &service_times, std::vector<double> &time_windows_start,
                     std::vector<double> &time_windows_end, bool first_time = false);
     /**
@@ -788,22 +788,36 @@ public:
     }
 
     void updateSplit() {
-        //////////////////////////////////////////////////////////////////////
-        // ADAPTIVE TERMINAL TIME
-        //////////////////////////////////////////////////////////////////////
-        // Adjust the terminal time dynamically based on the difference between the number of forward and
-        // backward labels
+        constexpr double IMBALANCE_THRESHOLD = 0.2;  // Threshold for label imbalance
+        constexpr double ADJUSTMENT_FACTOR   = 0.05; // Base adjustment factor
+        constexpr double MIN_ADJUSTMENT      = 0.01; // Minimum adjustment to avoid tiny changes
+        constexpr double MAX_ADJUSTMENT      = 0.15; // Maximum adjustment to prevent overshooting
+
+        const double fw_labels = static_cast<double>(n_fw_labels);
+        const double bw_labels = static_cast<double>(n_bw_labels);
+
+        // Skip if we don't have enough labels for meaningful adjustment
+        if (fw_labels < 10 || bw_labels < 10) { return; }
+
+        const double resource_max = R_max[options.main_resources[0]];
+
+        // Calculate normalized imbalance ratio
+        // Positive means more backward labels, negative means more forward labels
+        const double imbalance = (bw_labels - fw_labels) / std::min(fw_labels, bw_labels);
+
         for (auto &split : q_star) {
-            // print n_fw_labels and n_bw_labels
-            // If there are more backward labels than forward labels, increase the terminal time slightly
-            if (((static_cast<double>(n_bw_labels) - static_cast<double>(n_fw_labels)) /
-                 static_cast<double>(n_fw_labels)) > 0.2) {
-                split += 0.05 * R_max[options.main_resources[0]];
-            }
-            // If there are more forward labels than backward labels, decrease the terminal time slightly
-            else if (((static_cast<double>(n_fw_labels) - static_cast<double>(n_bw_labels)) /
-                      static_cast<double>(n_bw_labels)) > 0.2) {
-                split -= 0.05 * R_max[options.main_resources[0]];
+            if (std::abs(imbalance) > IMBALANCE_THRESHOLD) {
+                // Calculate adaptive adjustment based on imbalance magnitude
+                double adjustment = ADJUSTMENT_FACTOR * std::tanh(std::abs(imbalance));
+
+                // Clamp adjustment to reasonable bounds
+                adjustment = std::clamp(adjustment, MIN_ADJUSTMENT, MAX_ADJUSTMENT);
+
+                // Apply adjustment in the appropriate direction
+                split += (imbalance > 0 ? adjustment : -adjustment) * resource_max;
+
+                // Ensure split stays within valid bounds
+                split = std::clamp(split, 0.0, resource_max);
             }
         }
     }

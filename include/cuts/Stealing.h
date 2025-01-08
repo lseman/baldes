@@ -1,70 +1,102 @@
 #pragma once
+#include <algorithm>
 #include <atomic>
 #include <cassert>
 #include <condition_variable>
 #include <deque>
+#include <format>   // For std::format
 #include <functional>
+#include <generator> // For std::generator (C++23)
 #include <mutex>
+#include <numeric>
 #include <random>
+#include <sched.h> // For thread affinity
+#include <span>    // For std::span
 #include <thread>
 #include <vector>
 
 class WorkStealingPool {
 private:
     struct WorkQueue {
-        std::deque<std::function<void()>> tasks;
-        std::mutex                        mutex;
-        std::condition_variable           cv;
+        std::deque<std::move_only_function<void()>> tasks; // Move-only tasks
+        std::mutex                                  mutex;
+        std::condition_variable                     cv;
     };
 
     std::vector<std::unique_ptr<WorkQueue>> queues;
-    std::vector<std::thread>                threads;
+    std::vector<std::jthread>               threads; // Automatically joins on destruction
     std::atomic<bool>                       running{true};
     std::atomic<size_t>                     active_tasks{0};
     static thread_local size_t              thread_id;
-    std::condition_variable                 idle_cv;
-    std::mutex                              idle_mutex;
-    std::mutex                              resize_mutex;
 
 public:
     explicit WorkStealingPool(size_t num_threads = std::thread::hardware_concurrency()) { init_threads(num_threads); }
 
     ~WorkStealingPool() { shutdown(); }
 
+    // Submit a single task
     template <typename F>
     void submit(F &&f) {
         size_t queue_idx = thread_id < queues.size() ? thread_id : std::random_device{}() % queues.size();
-
-        auto &queue = *queues[queue_idx];
+        auto  &queue     = *queues[queue_idx];
         {
             std::lock_guard<std::mutex> lock(queue.mutex);
             queue.tasks.emplace_back([f = std::forward<F>(f), this]() mutable {
                 try {
                     std::invoke(f);
+                } catch (const std::exception &e) {
+                    std::cerr << std::format("Task failed: {}\n", e.what());
                 } catch (...) {
-                    // Log or handle exception
+                    std::cerr << "Task failed with unknown exception\n";
                 }
                 active_tasks.fetch_sub(1, std::memory_order_release);
-                idle_cv.notify_one();
             });
         }
         active_tasks.fetch_add(1, std::memory_order_acquire);
         queue.cv.notify_one();
     }
 
-    void wait_idle() {
-        std::unique_lock<std::mutex> lock(idle_mutex);
-        idle_cv.wait(lock, [this] { return active_tasks.load(std::memory_order_acquire) == 0; });
+    // Submit a batch of tasks
+    template <typename F>
+    void submit_batch(std::span<F> tasks) {
+        size_t queue_idx = thread_id < queues.size() ? thread_id : std::random_device{}() % queues.size();
+        auto  &queue     = *queues[queue_idx];
+        {
+            std::lock_guard<std::mutex> lock(queue.mutex);
+            for (const auto &f : tasks) {
+                queue.tasks.emplace_back([f, this]() mutable {
+                    try {
+                        std::invoke(f);
+                    } catch (const std::exception &e) {
+                        std::cerr << std::format("Task failed: {}\n", e.what());
+                    } catch (...) {
+                        std::cerr << "Task failed with unknown exception\n";
+                    }
+                    active_tasks.fetch_sub(1, std::memory_order_release);
+                });
+            }
+        }
+        active_tasks.fetch_add(tasks.size(), std::memory_order_acquire);
+        queue.cv.notify_all();
     }
 
+    // Wait until all tasks are completed
+    void wait_idle() {
+        while (active_tasks.load(std::memory_order_acquire) > 0) {
+            std::this_thread::yield();
+        }
+    }
+
+    // Resize the thread pool
     void resize(size_t new_size) {
-        std::lock_guard<std::mutex> lock(resize_mutex);
         shutdown();
         init_threads(new_size);
     }
 
+    // Get the number of threads in the pool
     size_t size() const noexcept { return queues.size(); }
 
+    // Get the number of tasks in a specific queue
     size_t queue_size(size_t queue_idx) const {
         if (queue_idx >= queues.size()) return 0;
         std::lock_guard<std::mutex> lock(queues[queue_idx]->mutex);
@@ -72,6 +104,7 @@ public:
     }
 
 private:
+    // Initialize threads and queues
     void init_threads(size_t num_threads) {
         queues.resize(num_threads);
         for (size_t i = 0; i < num_threads; ++i) {
@@ -83,44 +116,55 @@ private:
         for (size_t i = 0; i < num_threads; ++i) {
             threads.emplace_back([this, i] {
                 thread_id = i;
+                pin_thread_to_core(i); // Pin thread to core for better performance
                 run();
             });
         }
     }
 
+    // Shutdown the thread pool
     void shutdown() {
-        wait_idle();
         running.store(false, std::memory_order_release);
 
+        // Notify all queues to wake up threads
         for (auto &queue : queues) {
-            if (queue) queue->cv.notify_all();
+            if (queue) {
+                std::lock_guard<std::mutex> lock(queue->mutex);
+                queue->cv.notify_all();
+            }
         }
 
+        // Wait for all threads to finish
         for (auto &thread : threads) {
-            if (thread.joinable()) { thread.join(); }
+            if (thread.joinable()) {
+                thread.join();
+            }
         }
 
         threads.clear();
         queues.clear();
     }
 
+    // Main worker thread loop
     void run() {
         std::mt19937 rng(std::random_device{}());
 
         while (running.load(std::memory_order_acquire)) {
-            std::function<void()> task;
+            std::move_only_function<void()> task;
             if (try_pop_task_from_local_queue(task) || try_steal_task(task, rng)) {
                 task();
             } else {
-                std::unique_lock<std::mutex> lock(queues[thread_id]->mutex);
-                queues[thread_id]->cv.wait_for(lock, std::chrono::milliseconds(1), [this] {
-                    return !queues[thread_id]->tasks.empty() || !running.load(std::memory_order_acquire);
+                auto &queue = *queues[thread_id];
+                std::unique_lock<std::mutex> lock(queue.mutex);
+                queue.cv.wait_for(lock, std::chrono::milliseconds(1), [this, &queue] {
+                    return !queue.tasks.empty() || !running.load(std::memory_order_acquire);
                 });
             }
         }
     }
 
-    bool try_pop_task_from_local_queue(std::function<void()> &task) {
+    // Try to pop a task from the local queue
+    bool try_pop_task_from_local_queue(std::move_only_function<void()> &task) {
         auto                       &queue = *queues[thread_id];
         std::lock_guard<std::mutex> lock(queue.mutex);
         if (!queue.tasks.empty()) {
@@ -131,12 +175,13 @@ private:
         return false;
     }
 
-    bool try_steal_task(std::function<void()> &task, std::mt19937 &rng) {
-        std::uniform_int_distribution<size_t> dist(0, queues.size() - 1);
-        size_t                                start_idx = dist(rng);
+    // Try to steal a task from another queue
+    bool try_steal_task(std::move_only_function<void()> &task, std::mt19937 &rng) {
+        std::vector<size_t> indices(queues.size());
+        std::iota(indices.begin(), indices.end(), 0);
+        std::shuffle(indices.begin(), indices.end(), rng);
 
-        for (size_t i = 0; i < queues.size(); ++i) {
-            size_t idx = (start_idx + i) % queues.size();
+        for (size_t idx : indices) {
             if (idx == thread_id) continue;
 
             auto                       &queue = *queues[idx];
@@ -148,5 +193,13 @@ private:
             }
         }
         return false;
+    }
+
+    // Pin thread to a specific CPU core
+    void pin_thread_to_core(size_t core_id) {
+        cpu_set_t cpuset;
+        CPU_ZERO(&cpuset);
+        CPU_SET(core_id, &cpuset);
+        pthread_setaffinity_np(pthread_self(), sizeof(cpu_set_t), &cpuset);
     }
 };

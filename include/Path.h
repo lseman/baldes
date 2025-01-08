@@ -81,15 +81,49 @@ struct Path {
     }
 };
 
-// Simplified hash function that doesn't allocate memory
 struct PathHash {
-    std::size_t operator()(const Path &p) const {
-        size_t hash = 0;
-        for (const auto &node : p.route) { hash = hash * 31 + node; }
-        // Combine with cost using XOR and bit rotation
-        uint32_t cost_bits;
-        memcpy(&cost_bits, &p.cost, sizeof(cost_bits));
-        hash ^= ((size_t)cost_bits << 32) | ((size_t)cost_bits >> 32);
+    static constexpr uint64_t PRIME64_1 = 11400714785074694791ULL;
+    static constexpr uint64_t PRIME64_2 = 14029467366897019727ULL;
+    static constexpr uint64_t PRIME64_3 = 1609587929392839161ULL;
+    
+    inline uint64_t rotl(uint64_t x, int r) const {
+        return (x << r) | (x >> (64 - r));
+    }
+    
+    std::size_t operator()(const Path& p) const {
+        uint64_t hash = PRIME64_1;
+        
+        // Process route nodes in blocks of 4 for better vectorization
+        const auto* data = p.route.data();
+        const size_t size = p.route.size();
+        const size_t blocks = size / 4;
+        
+        // Process 4 nodes at a time
+        for (size_t i = 0; i < blocks * 4; i += 4) {
+            hash = rotl(hash + 
+                       data[i] * PRIME64_2 + 
+                       data[i + 1] * PRIME64_3 + 
+                       data[i + 2] * PRIME64_2 + 
+                       data[i + 3] * PRIME64_3, 31);
+        }
+        
+        // Handle remaining nodes
+        for (size_t i = blocks * 4; i < size; ++i) {
+            hash = rotl(hash + data[i] * PRIME64_2, 11);
+        }
+        
+        // Mix in the cost
+        uint64_t cost_bits;
+        memcpy(&cost_bits, &p.cost, sizeof(p.cost));
+        hash ^= rotl(cost_bits * PRIME64_2, 17);
+        
+        // Final mix
+        hash ^= hash >> 33;
+        hash *= PRIME64_2;
+        hash ^= hash >> 29;
+        hash *= PRIME64_3;
+        hash ^= hash >> 32;
+        
         return hash;
     }
 };

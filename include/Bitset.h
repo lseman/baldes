@@ -39,6 +39,9 @@ class Bitset {
         }
     }
 
+    // create size method to answer .size
+    static constexpr size_t size() { return N_BITS; }
+
     constexpr void set(size_t bit) noexcept {
         bits_[wordIndex(bit)] |= (1ULL << bitOffset(bit));
     }

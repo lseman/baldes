@@ -45,19 +45,21 @@ struct Label {
 
     std::vector<Label *> children;
     // Constructor with node_id
-    Label(int v, double c, const std::vector<double> &res, int pred, int node_id)
-        : vertex(v), cost(c), resources({res[0]}), node_id(node_id) {}
+    Label(int v, double c, const std::vector<double>& res, int pred, int node_id)
+        : vertex(v), cost(c), node_id(node_id) {
+        std::copy(res.begin(), res.end(), resources.begin());
+    }
 
     // Constructor without node_id
-    Label(int v, double c, const std::vector<double> &res, int pred)
-        : vertex(v), cost(c), resources({res[0]}), node_id(-1) {}
+    Label(int v, double c, const std::vector<double>& res, int pred)
+        : Label(v, c, res, pred, -1) {}
 
     // Default constructor
     Label() : vertex(-1), cost(0), resources({0.0}), node_id(-1) {}
 
     void set_extended(bool extended) { is_extended = extended; }
 
-    auto &getRoute() const { return nodes_covered; }
+    const auto &getRoute() const { return nodes_covered; }
 
     void addRoute(const std::vector<int> &route) {
         nodes_covered.insert(nodes_covered.end(), route.begin(), route.end());
