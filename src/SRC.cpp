@@ -133,63 +133,73 @@ LimitedMemoryRank1Cuts::LimitedMemoryRank1Cuts(std::vector<VRPNode> &nodes) : no
  * that exceed the specified threshold.
  *
  */
-void LimitedMemoryRank1Cuts::separate(const SparseMatrix &A, const std::vector<double> &x) {
-    // Create a map for non-zero entries by rows
+void LimitedMemoryRank1Cuts::separate(const SparseMatrix& A, const std::vector<double>& x) {
+    // Create a map for non-zero entries by rows with pre-allocation
     std::vector<std::vector<int>> row_indices_map(N_SIZE);
-    // print num_rows
-    // fmt::print("Num rows: {}\n", A.num_rows);
+    for (auto& row : row_indices_map) {
+        row.reserve(A.num_cols / N_SIZE); // Estimate average row size
+    }
+    
+    // Populate row indices map
     for (int idx = 0; idx < A.values.size(); ++idx) {
         int row = A.rows[idx];
-        // fmt::print("Row: {}\n", row);
         if (row > N_SIZE - 2) { continue; }
         row_indices_map[row + 1].push_back(idx);
     }
+
+    // Pre-allocate vector for storing cuts
     std::vector<std::pair<double, Cut>> tmp_cuts;
-
-    const int                JOBS = std::thread::hardware_concurrency();
+    tmp_cuts.reserve(N_SIZE * 2); // Reserve space for estimated number of cuts
+    
+    const int JOBS = std::thread::hardware_concurrency();
     exec::static_thread_pool pool(JOBS);
-    auto                     sched = pool.get_scheduler();
+    auto sched = pool.get_scheduler();
 
-    auto                                   nC = N_SIZE;
+    // Pre-calculate tasks with reserve
     std::vector<std::tuple<int, int, int>> tasks;
-    tasks.reserve((nC * (nC - 1) * (nC - 2)) / 6); // Preallocate task space to avoid reallocations
-
-    // Create tasks for each combination of (i, j, k)
+    tasks.reserve((N_SIZE * (N_SIZE - 1) * (N_SIZE - 2)) / 6);
+    
+    // Generate tasks efficiently
     for (int i = 1; i < N_SIZE - 1; ++i) {
         for (int j = i + 1; j < N_SIZE - 1; ++j) {
-            for (int k = j + 1; k < N_SIZE - 1; ++k) { tasks.emplace_back(i, j, k); }
+            for (int k = j + 1; k < N_SIZE - 1; ++k) {
+                tasks.emplace_back(i, j, k);
+            }
         }
     }
 
-    // Define chunk size to reduce parallelization overhead
-    const int chunk_size = (N_SIZE - 1) / JOBS;
-#ifdef NSYNC
-    nsync::nsync_mu cuts_mutex = NSYNC_MU_INIT;
-#else
-    std::mutex cuts_mutex; // Protect access to shared resources
-#endif
+    const int chunk_size = std::max(1, static_cast<int>((tasks.size() + JOBS - 1) / JOBS));
+    std::mutex cuts_mutex;
 
-    // Parallel execution in chunks
     auto bulk_sender = stdexec::bulk(
-        stdexec::just(), (tasks.size() + chunk_size - 1) / chunk_size,
-        [this, &row_indices_map, &A, &x, nC, &cuts_mutex, &tasks, chunk_size, &tmp_cuts](std::size_t chunk_idx) {
-            size_t start_idx = chunk_idx * chunk_size;
-            size_t end_idx   = std::min(start_idx + chunk_size, tasks.size());
-
-            // Process a chunk of tasks
+        stdexec::just(), 
+        (tasks.size() + chunk_size - 1) / chunk_size,
+        [this, &row_indices_map, &A, &x, &cuts_mutex, &tasks, chunk_size, &tmp_cuts]
+        (std::size_t chunk_idx) {
+            const size_t start_idx = chunk_idx * chunk_size;
+            const size_t end_idx = std::min(start_idx + chunk_size, tasks.size());
+            
+            // Reuse vectors to avoid repeated allocations
+            std::vector<int> expanded(A.num_cols, 0);
+            std::vector<int> buffer_int(A.num_cols);
+            std::vector<int> order(N_SIZE);
+            
+            // Local storage for cuts to reduce mutex contention
+            std::vector<std::pair<double, Cut>> local_cuts;
+            local_cuts.reserve(chunk_size / 10); // Estimate number of violations
+            
             for (size_t task_idx = start_idx; task_idx < end_idx; ++task_idx) {
-                const auto &[i, j, k] = tasks[task_idx];
-                std::vector<int> expanded(A.num_cols, 0);
-                std::vector<int> buffer_int(A.num_cols);
-                int              buffer_int_n = 0;
-                double           lhs          = 0.0;
+                const auto& [i, j, k] = tasks[task_idx];
+                std::fill(expanded.begin(), expanded.end(), 0);
+                int buffer_int_n = 0;
+                double lhs = 0.0;
 
-                // Combine the three updates into one loop for efficiency
-                for (int idx : row_indices_map[i]) expanded[A.cols[idx]] += 1;
-                for (int idx : row_indices_map[j]) expanded[A.cols[idx]] += 1;
-                for (int idx : row_indices_map[k]) expanded[A.cols[idx]] += 1;
+                // Combine updates for better cache utilization
+                for (int idx : row_indices_map[i]) expanded[A.cols[idx]]++;
+                for (int idx : row_indices_map[j]) expanded[A.cols[idx]]++;
+                for (int idx : row_indices_map[k]) expanded[A.cols[idx]]++;
 
-                // Accumulate LHS cut values
+                // Calculate LHS efficiently
                 for (int idx = 0; idx < A.num_cols; ++idx) {
                     if (expanded[idx] >= 2) {
                         lhs += std::floor(expanded[idx] * 0.5) * x[idx];
@@ -197,105 +207,102 @@ void LimitedMemoryRank1Cuts::separate(const SparseMatrix &A, const std::vector<d
                     }
                 }
 
-                // If lhs violation found, insert the cut
                 if (lhs > 1.0 + 1e-3) {
-                    std::array<uint64_t, num_words> C  = {};
-                    std::array<uint64_t, num_words> AM = {};
-                    std::vector<int>                order(N_SIZE, 0);
-                    int                             ordering = 0;
-
-                    std::vector<int> C_index = {i, j, k};
-                    for (auto node : C_index) {
+                    std::array<uint64_t, num_words> C{};
+                    std::array<uint64_t, num_words> AM{};
+                    std::fill(order.begin(), order.end(), 0);
+                    
+                    const std::array<int, 3> C_index{i, j, k};
+                    int ordering = 0;
+                    
+                    for (const auto node : C_index) {
                         C[node / 64] |= (1ULL << (node % 64));
                         AM[node / 64] |= (1ULL << (node % 64));
                         order[node] = ordering++;
                     }
-                    std::vector<int> remainingNodes;
-                    remainingNodes.assign(buffer_int.begin(), buffer_int.begin() + buffer_int_n);
+
+                    std::vector<int> remainingNodes(buffer_int.begin(), 
+                                                  buffer_int.begin() + buffer_int_n);
+                    
                     SRCPermutation p;
                     p.num = {1, 1, 1};
                     p.den = 2;
+                    
                     std::vector<double> cut_coefficients(allPaths.size(), 0.0);
-
+                    
+                    // Use unordered_set for faster lookups
                     ankerl::unordered_dense::set<int> C_set(C_index.begin(), C_index.end());
-                    for (auto node : remainingNodes) {
-                        auto &consumers = allPaths[node]; // Reference to the consumers for in-place modification
 
+                    for (const auto node : remainingNodes) {
+                        const auto& consumers = allPaths[node];
                         int first = -1, second = -1;
 
-                        // Find the first and second appearances of any element in C_set within consumers
+                        // Find first two occurrences efficiently
                         for (size_t i = 1; i < consumers.size() - 1; ++i) {
-                            if (C_set.find(consumers[i]) != C_set.end()) {
+                            if (C_set.contains(consumers[i])) {
                                 if (first == -1) {
                                     first = i;
                                 } else {
                                     second = i;
-                                    break; // We found both first and second, so we can exit the loop
+                                    break;
                                 }
                             }
                         }
 
-                        // If we found both the first and second indices, mark nodes in AM
                         if (first != -1 && second != -1) {
                             for (int i = first + 1; i < second; ++i) {
-                                AM[consumers[i] / 64] |= (1ULL << (consumers[i] % 64)); // Set the bit for the consumer
+                                AM[consumers[i] / 64] |= (1ULL << (consumers[i] % 64));
                             }
                             break;
                         }
                     }
-                    auto z = 0;
-                    for (auto path : allPaths) {
-                        auto &clients         = path.route; // Reference to clients for in-place modification
-                        cut_coefficients[z++] = computeLimitedMemoryCoefficient(C, AM, p, clients, order);
+
+                    size_t z = 0;
+                    for (const auto& path : allPaths) {
+                        cut_coefficients[z++] = computeLimitedMemoryCoefficient(
+                            C, AM, p, path.route, order);
                     }
 
                     Cut cut(C, AM, cut_coefficients, p);
                     cut.baseSetOrder = order;
-
-// print lhs
-#ifdef NSYNC
-                    nsync::nsync_mu_lock(&cuts_mutex);
-#else
-                    std::lock_guard<std::mutex> lock(cuts_mutex);
-#endif
-                    tmp_cuts.emplace_back(lhs, cut);
-#ifdef NSYNC
-                    nsync::nsync_mu_unlock(&cuts_mutex);
-#endif
+                    local_cuts.emplace_back(lhs, std::move(cut));
                 }
+            }
+            
+            // Batch update shared cuts to reduce lock contention
+            if (!local_cuts.empty()) {
+                std::lock_guard<std::mutex> lock(cuts_mutex);
+                tmp_cuts.insert(
+                    tmp_cuts.end(),
+                    std::make_move_iterator(local_cuts.begin()),
+                    std::make_move_iterator(local_cuts.end())
+                );
             }
         });
 
-    // Submit work to the thread pool
+    // Submit work to thread pool
     auto work = stdexec::starts_on(sched, bulk_sender);
     stdexec::sync_wait(std::move(work));
 
-    // Generate cut coefficients
-    // get the top 3 cuts
-    // auto cuts    = VRPTW_SRC();
+    // Sort cuts by violation
+    pdqsort(tmp_cuts.begin(), tmp_cuts.end(), 
+            [](const auto& a, const auto& b) { return a.first > b.first; });
 
-    pdqsort(tmp_cuts.begin(), tmp_cuts.end(), [](const auto &a, const auto &b) { return a.first > b.first; });
-
-    auto max_cuts = 2;
-    for (int i = 0; i < std::min(max_cuts, static_cast<int>(tmp_cuts.size())); ++i) {
-        auto &cut = tmp_cuts[i].second;
+    // Add top cuts to storage
+    const int max_cuts = std::min(2, static_cast<int>(tmp_cuts.size()));
+    for (int i = 0; i < max_cuts; ++i) {
+        Cut& cut = tmp_cuts[i].second;
         cutStorage.addCut(cut);
     }
-    return;
 }
 
 std::pair<bool, bool> LimitedMemoryRank1Cuts::runSeparation(BNBNode *node, std::vector<baldesCtrPtr> &SRCconstraints) {
-    auto                cuts = &cutStorage;
-    ModelData           matrix;
-    auto                cuts_before = cuts->size();
+    auto cuts = &cutStorage;
+    ModelData matrix;
+    auto cuts_before = cuts->size();
     std::vector<double> solution;
 
-    // print size of SRCconstraints
-    // RUN_OPTIMIZATION(node, 1e-8)
     GET_SOL(node);
-    //(node)->optimize();
-    // solution = (node)->extractSolution();
-    // solution = (node)->ipSolver->getPrimals();
 
     size_t i = 0;
     std::for_each(allPaths.begin(), allPaths.end(), [&](auto &path) { path.frac_x = solution[i++]; });
@@ -303,50 +310,45 @@ std::pair<bool, bool> LimitedMemoryRank1Cuts::runSeparation(BNBNode *node, std::
     separateR1C1(matrix.A_sparse, solution);
     separate(matrix.A_sparse, solution);
     auto cuts_after_separation = cuts->size();
-    auto multipliers           = generator->map_rank1_multiplier;
+    auto multipliers = generator->map_rank1_multiplier;
 
-    // print solution size and allPaths size
     auto processCuts = [&]() {
-        // Initialize paths with solution values
-        auto cortes  = generator->getCuts();
+        auto cortes = generator->getCuts();
         auto cut_ctr = 0;
 
-        // Process each cut
         for (auto &cut : cortes) {
             auto &cut_info = cut.info_r1c;
 
-            // Skip if arc_mem is empty
             if (cut.arc_mem.empty()) { continue; }
 
-            // Pre-allocate cut_indices to avoid repeated resizing
             std::vector<int> cut_indices;
             cut_indices.reserve(cut_info.first.size());
             for (auto &node : cut_info.first) { cut_indices.push_back(node); }
 
-            // Use std::array with pre-initialization for bit arrays
-            std::array<uint64_t, num_words> C  = {};
+            std::array<uint64_t, num_words> C = {};
             std::array<uint64_t, num_words> AM = {};
 
-            // Set bits in C and AM for cut_indices
+            // Optimize bit operations
             for (auto &node : cut_indices) {
-                C[node / 64] |= (1ULL << (node % 64));
-                AM[node / 64] |= (1ULL << (node % 64));
+                const uint32_t word_idx = node >> 6;  // Divide by 64
+                const uint64_t bit_mask = 1ULL << (node & 63);  // Modulo 64
+                C[word_idx] |= bit_mask;
+                AM[word_idx] |= bit_mask;
             }
-            // Set bits in AM for arcs in arc_mem
-            for (auto &arc : cut.arc_mem) { AM[arc / 64] |= (1ULL << (arc % 64)); }
 
-            // Retrieve multiplier information
-            auto          &mult = multipliers[cut_info.first.size()][cut_info.second];
+            for (auto &arc : cut.arc_mem) {
+                AM[arc >> 6] |= (1ULL << (arc & 63));
+            }
+
+            auto &mult = multipliers[cut_info.first.size()][cut_info.second];
             SRCPermutation p;
             p.num = std::get<0>(mult);
             p.den = std::get<1>(mult);
 
-            // Initialize order without an extra resize, only if N_SIZE is constant
             std::vector<int> order(N_SIZE, 0);
-            int              ordering = 0;
+            int ordering = 0;
             for (auto node : cut_indices) { order[node] = ordering++; }
 
-            // Pre-allocate coeffs to allPaths.size()
             std::vector<double> coeffs(allPaths.size(), 0.0);
 
 #if defined(__cpp_lib_parallel_algorithm)
@@ -357,6 +359,7 @@ std::pair<bool, bool> LimitedMemoryRank1Cuts::runSeparation(BNBNode *node, std::
                                if (coeff > 1e-3) has_coeff.store(true, std::memory_order_relaxed);
                                return coeff;
                            });
+            if (!has_coeff.load(std::memory_order_relaxed)) { continue; }
 #else
             bool has_coeff = false;
             std::transform(allPaths.begin(), allPaths.end(), coeffs.begin(), [&](const auto &path) {
@@ -364,11 +367,9 @@ std::pair<bool, bool> LimitedMemoryRank1Cuts::runSeparation(BNBNode *node, std::
                 if (coeff > 1e-3) has_coeff = true;
                 return coeff;
             });
-#endif
-            // Skip adding cut if no coefficients met threshold
             if (!has_coeff) { continue; }
+#endif
 
-            // Create and add new cut
             Cut corte(C, AM, coeffs, p);
             corte.baseSetOrder = order;
             cuts->addCut(corte);
@@ -381,18 +382,14 @@ std::pair<bool, bool> LimitedMemoryRank1Cuts::runSeparation(BNBNode *node, std::
         generator->setNodes(nodes);
         generator->generateSepHeurMem4Vertex();
         generator->initialize(allPaths);
-        // generator->fillMemory();
         generator->getHighDimCuts();
-        // generator->setMemFactor(0.15);
-        // generator->constructMemoryVertexBased();
 
-        // auto cut_number = processCuts();
         for (double memFactor = 0.15; memFactor <= 0.65; memFactor += 0.10) {
             generator->setMemFactor(memFactor);
             generator->constructMemoryVertexBased();
             auto cut_number = processCuts();
             if (cut_number != 0) {
-                break; // Exit the loop if cuts are successfully processed
+                break;
             }
         }
     }
@@ -401,7 +398,6 @@ std::pair<bool, bool> LimitedMemoryRank1Cuts::runSeparation(BNBNode *node, std::
         generator->max_heuristic_sep_mem4_row_rank1 = 12;
         generator->generateSepHeurMem4Vertex();
         generator->initialize(allPaths);
-        // generator->fillMemory();
         generator->getHighDimCuts();
         generator->constructMemoryVertexBased();
         auto cut_number = processCuts();
@@ -409,40 +405,29 @@ std::pair<bool, bool> LimitedMemoryRank1Cuts::runSeparation(BNBNode *node, std::
 
     generator->clearMemory();
 
-    ////////////////////////////////////////////////////
-    // Handle non-violated cuts in a single pass
-    ////////////////////////////////////////////////////
-    bool cleared        = false;
+    bool cleared = false;
     auto n_cuts_removed = 0;
-    // Iterate over the constraints in reverse order to remove non-violated cuts
-    // sort SRCconstraints by index
+
     pdqsort(SRCconstraints.begin(), SRCconstraints.end(),
             [](const baldesCtrPtr a, const baldesCtrPtr b) { return a->index() < b->index(); });
 
-    // print SRCconstraints.size()
     auto it = SRCconstraints.end();
     while (it != SRCconstraints.begin()) {
         --it;
         auto constr = *it;
-        // int  current_index = node->get_current_index(constr->get_unique_id());
         int current_index = constr->index();
-        // Get the slack value of the constraint
         double slack = node->getSlack(current_index, solution);
 
-        // If the slack is positive, it means the constraint is not violated
         if (slack > 1e-3) {
             cleared = true;
             node->remove(constr);
             cuts->removeCut(cuts->getID(std::distance(SRCconstraints.begin(), it)));
             n_cuts_removed++;
-
-            // Remove from SRCconstraints using iterator
             it = SRCconstraints.erase(it);
         }
     }
 
     if (cuts_before == cuts->size() + n_cuts_removed) { return std::make_pair(false, cleared); }
-
     return std::make_pair(true, cleared);
 }
 
@@ -450,35 +435,35 @@ std::pair<bool, bool> LimitedMemoryRank1Cuts::runSeparation(BNBNode *node, std::
  * @brief Computes the limited memory coefficient for a given set of nodes.
  *
  */
-double LimitedMemoryRank1Cuts::computeLimitedMemoryCoefficient(const std::array<uint64_t, num_words> &C,
-                                                               const std::array<uint64_t, num_words> &AM,
-                                                               const SRCPermutation &p, const std::vector<uint16_t> &P,
-                                                               std::vector<int> &order) {
+double LimitedMemoryRank1Cuts::computeLimitedMemoryCoefficient(
+    const std::array<uint64_t, num_words>& C,
+    const std::array<uint64_t, num_words>& AM,
+    const SRCPermutation& p,
+    const std::vector<uint16_t>& P,
+    std::vector<int>& order) {
+    
     double alpha = 0.0;
-    int    S     = 0;
-    auto   den   = p.den;
-
+    int S = 0;
+    const int den = p.den;  // Cache denominator
+    const auto& num = p.num;  // Cache numerator reference
+    
+    // Main loop with minimal bounds checking
     for (size_t j = 1; j < P.size() - 1; ++j) {
-        int vj = P[j];
-
-        // Precompute bitshift values for reuse
-        uint64_t am_mask  = (1ULL << (vj & 63));
-        uint64_t am_index = vj >> 6;
-
-        // Check if vj is in AM using precomputed values
-        if (!(AM[am_index] & am_mask)) {
-            S = 0; // Reset S if vj is not in AM
-        } else if (C[am_index] & am_mask) {
-            // Get the position of vj in C by counting the set bits up to vj
-            int pos = order[vj];
-
-            S += p.num[pos];
+        const uint16_t vj = P[j];
+        const uint32_t word_idx = vj >> 6;      // Divide by 64
+        const uint64_t bit_mask = 1ULL << (vj & 63);  // Modulo 64
+        
+        // Check if vj is in AM using cached values
+        if (!(AM[word_idx] & bit_mask)) {
+            S = 0;  // Reset S if vj is not in AM
+        } else if (C[word_idx] & bit_mask) {
+            S += num[order[vj]];
             if (S >= den) {
                 S -= den;
                 alpha += 1;
             }
         }
     }
-
+    
     return alpha;
 }

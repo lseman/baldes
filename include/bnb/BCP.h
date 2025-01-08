@@ -425,7 +425,7 @@ public:
     }
 
 #endif
-
+ 
     /**
      * Column generation algorithm.
      */
@@ -546,13 +546,20 @@ public:
         double              obj;
         auto                colAdded = 0;
         std::vector<double> originDuals;
-        bool force_cuts = false;
+        bool                force_cuts = false;
+
+        // Initial parameters
+        int  eta1       = 5;   // Maximum cycle size to forbid
+        int  eta2       = 100; // Maximum number of cycles to forbid
+        int  eta_max    = 18;  // Maximum neighborhood size
+        bool aggressive = true;
+
         for (int iter = 0; iter < max_iter; ++iter) {
             reoptimized = false;
 
 #if defined(RCC) || defined(EXACT_RCC)
             if (rcc) {
-                RUN_OPTIMIZATION(node, 1e-8)
+                RUN_OPTIMIZATION(node, 1e-4)
                 RCC_MODE_BLOCK(rcc = RCCsep(node, solution);)
 
 #ifdef EXACT_RCC
@@ -564,7 +571,7 @@ public:
             if ((ss && !rcc) || force_cuts) {
                 force_cuts = false;
 #if defined(RCC) || defined(EXACT_RCC)
-                RUN_OPTIMIZATION(node, 1e-8)
+                RUN_OPTIMIZATION(node, 1e-4)
                 RCC_MODE_BLOCK(rcc = RCCsep(node, solution);)
 
 #ifdef EXACT_RCC
@@ -723,7 +730,6 @@ public:
                             bucket_graph->incumbent = integer_solution;
                         }
                     }
-
                 }
 #ifdef IPM_ACEL
                 auto updateGapAndRunOptimization = [&](auto node, auto lp_obj, auto inner_obj, auto &ipm_solver,
@@ -764,7 +770,7 @@ public:
                 }
 #endif
                 bucket_graph->relaxation = lp_obj;
-                bucket_graph->augment_ng_memories(solution, allPaths, true, 5, 110, 18, N_SIZE);
+                bucket_graph->augment_ng_memories(solution, allPaths, true, eta1, eta2, eta_max, N_SIZE);
                 SRC_MODE_BLOCK( // SRC cuts
                     if (!SRCconstraints.empty()) {
                         // print SRCconstraints size
@@ -842,6 +848,23 @@ public:
                 lp_obj     = node->getObjVal();
                 nodeDuals  = node->getDuals();
 
+                // Adjust parameters based on solution quality
+                if (lp_obj >= lp_obj_old) {
+                    // Solution quality stagnated or degraded
+                    if (aggressive) {
+                        aggressive = false; // Switch to less aggressive forbidding
+                    } else {
+                        eta1 += 1;    // Allow larger cycles
+                        eta2 += 10;   // Forbid more cycles
+                        eta_max += 2; // Increase neighborhood size
+                    }
+                } else {
+                    // Solution improved
+                    eta1    = std::max(5, eta1 - 1);     // Tighten cycle size limit
+                    eta2    = std::max(110, eta2 - 10);  // Reduce number of cycles to forbid
+                    eta_max = std::max(18, eta_max - 1); // Tighten neighborhood size
+                }
+
                 // auto RC = node->mip.getMostViolatingReducedCost(nodeDuals);
 
                 bucket_graph->gap = lp_obj + numK * inner_obj;
@@ -866,9 +889,7 @@ public:
                 break;
             }
 
-            if (colAdded == 0) {
-                force_cuts = true;
-            }
+            if (colAdded == 0) { force_cuts = true; }
 
             stab.update_stabilization_after_iter(nodeDuals);
 #endif

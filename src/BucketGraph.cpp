@@ -273,86 +273,84 @@ void BucketGraph::calculate_neighborhoods(size_t num_closest) {
  */
 void BucketGraph::augment_ng_memories(std::vector<double> &solution, std::vector<Path> &paths, bool aggressive,
                                       int eta1, int eta2, int eta_max, int nC) {
-    std::set<std::pair<int, int>> forbidden_augmentations;
     std::vector<std::vector<int>> cycles;
 
+    // Detect cycles in paths
     for (int col = 0; col < paths.size(); ++col) {
-
         if (solution[col] > 1e-2 && solution[col] < 1 - 1e-2) {
             ankerl::unordered_dense::map<int, int> visited_clients;
-            std::vector<int>                       cycle;
-            bool                                   has_cycle = false;
+            std::vector<int> cycle;
+            bool has_cycle = false;
 
             for (int i = 0; i < paths[col].size(); ++i) {
                 int client = paths[col][i];
                 if (client == 0 || client == N_SIZE - 1) {
-                    continue; // Ignore 0 in cycle detection
+                    continue; // Ignore depot in cycle detection
                 }
                 if (visited_clients.find(client) != visited_clients.end()) {
                     has_cycle = true;
-                    // Start from the first occurrence of the repeated client to form the cycle
-                    for (int j = visited_clients[client]; j <= i; ++j) { cycle.push_back(paths[col][j]); }
-                    break; // Stop once the cycle is stored
+                    // Extract the cycle
+                    for (int j = visited_clients[client]; j <= i; ++j) {
+                        cycle.push_back(paths[col][j]);
+                    }
+                    break; // Stop after detecting the first cycle in this path
                 }
                 visited_clients[client] = i;
             }
 
-            if (has_cycle) { cycles.push_back(cycle); }
+            if (has_cycle) {
+                cycles.push_back(cycle);
+            }
         }
     }
 
-    // Sort cycles by size to prioritize smaller cycles
+    // Sort cycles by size (smallest first)
     pdqsort(cycles.begin(), cycles.end(),
             [](const std::vector<int> &a, const std::vector<int> &b) { return a.size() < b.size(); });
+
     int forbidden_count = 0;
 
+    // Forbid cycles based on conditions
     for (const auto &cycle : cycles) {
-        // Check the current sizes of neighborhoods involved in the cycle
+        if (forbidden_count >= eta2) {
+            break; // Stop after forbidding enough cycles
+        }
+
+        // Check if the cycle can be forbidden
         bool can_forbid = true;
         for (const auto &node : cycle) {
-            // Count the number of 1s in neighborhoods_bitmap[node]
             int count = 0;
-            // print size of neighborhoods_bitmap
             for (const auto &segment : neighborhoods_bitmap[node]) {
-                count += __builtin_popcountll(segment); // Counts the number of set bits (1s)
+                count += __builtin_popcountll(segment);
                 if (count >= eta_max) {
                     can_forbid = false;
                     break;
                 }
             }
-            if (!can_forbid) { break; }
+            if (!can_forbid) {
+                break;
+            }
         }
 
-        if (can_forbid && (cycle.size() <= eta1 || (forbidden_count < eta2 && !cycle.empty()))) {
-            // Forbid the cycle
+        if (can_forbid && (cycle.size() <= eta1 || forbidden_count < eta2)) {
             forbidCycle(cycle, aggressive);
             forbidden_count++;
         }
-
-        if (forbidden_count >= eta2) { break; }
     }
 }
 
-/**
- * Forbids a cycle in the bucket graph.
- *
- * This function takes a vector representing a cycle in the graph and forbids the edges
- * corresponding to the cycle. If the 'aggressive' flag is set to true, it also forbids
- * additional edges between the vertices of the cycle.
- *
- */
 void BucketGraph::forbidCycle(const std::vector<int> &cycle, bool aggressive) {
     for (size_t i = 0; i < cycle.size() - 1; ++i) {
         int v1 = cycle[i];
         int v2 = cycle[i + 1];
 
         // Update the bitmap to forbid v2 in the neighborhood of v1
-        size_t segment      = v2 >> 6;
+        size_t segment = v2 >> 6;
         size_t bit_position = v2 & 63;
         neighborhoods_bitmap[v1][segment] |= (1ULL << bit_position);
 
         if (aggressive) {
-            segment      = v1 >> 6;
+            segment = v1 >> 6;
             bit_position = v1 & 63;
             neighborhoods_bitmap[v2][segment] |= (1ULL << bit_position);
         }

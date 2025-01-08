@@ -64,6 +64,7 @@ private:
     // Private constructor to prevent instantiation
 };
 
+
 enum class Direction { Forward, Backward };
 enum class Stage { One, Two, Three, Four, Enumerate, Fix, Eliminate, Extend };
 enum class ArcType { Node, Bucket, Jump };

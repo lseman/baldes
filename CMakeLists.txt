@@ -201,20 +201,20 @@ string(REPLACE "-fconcepts-diagnostics-depth=10" "" CMAKE_CXX_FLAGS
                "${CMAKE_CXX_FLAGS}")
 
 # add mdspan
-cpmaddpackage(
-  NAME
-  mdspan
-  GITHUB_REPOSITORY
-  kokkos/mdspan
-  GIT_TAG
-  stable
-  OPTIONS
-  "MDSPAN_BUILD_TESTS OFF"
-  "MDSPAN_BUILD_EXAMPLES OFF"
-  "MDSPAN_BUILD_BENCHMARKS OFF"
-  "MDSPAN_BUILD_DOCS OFF"
-  "BUILD_TESTING OFF"
-  "CMAKE_INSTALL_PREFIX ${CMAKE_BINARY_DIR}/_deps/stdexec-install")
+#cpmaddpackage(
+#  NAME
+#  mdspan
+#  GITHUB_REPOSITORY
+#  kokkos/mdspan
+#  GIT_TAG
+#  stable
+#  OPTIONS
+#  "MDSPAN_BUILD_TESTS OFF"
+#  "MDSPAN_BUILD_EXAMPLES OFF"
+#  "MDSPAN_BUILD_BENCHMARKS OFF"
+#  "MDSPAN_BUILD_DOCS OFF"
+#  "BUILD_TESTING OFF"
+#  "CMAKE_INSTALL_PREFIX ${CMAKE_BINARY_DIR}/_deps/stdexec-install")
 
 find_package(xxhash)
 if(NOT xxhash_FOUND)
@@ -231,6 +231,13 @@ if(NOT xxhash_FOUND)
   include_directories(${xxhash_SOURCE_DIR})
   add_subdirectory(${xxhash_SOURCE_DIR}/cmake_unofficial)
 endif()
+
+
+#cpmaddpackage(
+#    NAME libcuckoo
+#    GITHUB_REPOSITORY efficient/libcuckoo
+#    GIT_TAG        origin/master
+#)
 
 cpmaddpackage(NAME ankerl_unordered_dense GITHUB_REPOSITORY
               martinus/unordered_dense GIT_TAG origin/main)
@@ -369,7 +376,7 @@ if(IPM OR IPM_ACEL)
 endif()
 
 # Common Libraries List
-set(COMMON_LIBRARIES stdexec fmt xxhash mdspan)
+set(COMMON_LIBRARIES stdexec fmt xxhash)
 
 if(HIGHS)
   list(APPEND COMMON_LIBRARIES highs::highs)
