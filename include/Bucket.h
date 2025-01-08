@@ -26,24 +26,24 @@
  */
 struct alignas(64) Bucket {
     // Hot data - frequently accessed (kept in first cache line)
-    std::vector<Label*> labels_vec;   // Most accessed member
-    int depth{0};
-    int node_id{-1};
-    bool is_split{false};
-    double min_cost{std::numeric_limits<double>::max()};
-    char padding[32];  // Ensure alignment
+    std::vector<Label *> labels_vec; // Most accessed member
+    int                  depth{0};
+    int                  node_id{-1};
+    bool                 is_split{false};
+    double               min_cost{std::numeric_limits<double>::max()};
+    char                 padding[32]; // Ensure alignment
 
     // Cold data - less frequently accessed
-    std::vector<double> lb;
-    std::vector<double> ub;
-    std::vector<Arc> fw_arcs;
-    std::vector<Arc> bw_arcs;
+    std::vector<double>    lb;
+    std::vector<double>    ub;
+    std::vector<Arc>       fw_arcs;
+    std::vector<Arc>       bw_arcs;
     std::vector<BucketArc> fw_bucket_arcs;
     std::vector<BucketArc> bw_bucket_arcs;
-    std::vector<JumpArc> fw_jump_arcs;
-    std::vector<JumpArc> bw_jump_arcs;
-    std::vector<Bucket> sub_buckets;
-    
+    std::vector<JumpArc>   fw_jump_arcs;
+    std::vector<JumpArc>   bw_jump_arcs;
+    std::vector<Bucket>    sub_buckets;
+
     double get_cb() const {
         if (labels_vec.empty() && !is_split) { return std::numeric_limits<double>::max(); }
 
@@ -104,25 +104,17 @@ struct alignas(64) Bucket {
      *
      */
     void delete_bucket_arc(int from_bucket, int to_bucket, bool fw) {
-        if (fw) {
-            fw_bucket_arcs.erase(std::remove_if(fw_bucket_arcs.begin(), fw_bucket_arcs.end(),
-                                                [from_bucket, to_bucket](const BucketArc &arc) {
-                                                    return arc.from_bucket == from_bucket && arc.to_bucket == to_bucket;
-                                                }),
-                                 fw_bucket_arcs.end());
-        } else {
-            bw_bucket_arcs.erase(std::remove_if(bw_bucket_arcs.begin(), bw_bucket_arcs.end(),
-                                                [from_bucket, to_bucket](const BucketArc &arc) {
-                                                    return arc.from_bucket == from_bucket && arc.to_bucket == to_bucket;
-                                                }),
-                                 bw_bucket_arcs.end());
-        }
+        auto &arcs = fw ? fw_bucket_arcs : bw_bucket_arcs; // Use a reference to avoid code duplication
+
+        // Use std::erase_if (C++20) for cleaner and more efficient removal
+        std::erase_if(arcs, [from_bucket, to_bucket](const BucketArc &arc) {
+            return arc.from_bucket == from_bucket && arc.to_bucket == to_bucket;
+        });
     }
 
     double               min_split_range  = 0.5;
     static constexpr int MAX_BUCKET_DEPTH = 4;
 
-    // Dominance check method for Bucket
     bool check_dominance(const Label                                             *new_label,
                          const std::function<bool(const std::vector<Label *> &)> &dominance_func, int &stat_n_dom) {
         // Early return if cost bound exceeds new label's cost
@@ -193,7 +185,7 @@ struct alignas(64) Bucket {
         if (total_range < min_split_range) { return; }
 
         // Pre-allocate vectors with exact sizes needed
-        size_t              label_count = labels_vec.size();
+        const size_t        label_count = labels_vec.size();
         std::vector<double> label_values;
         label_values.reserve(label_count);
 
@@ -254,8 +246,6 @@ struct alignas(64) Bucket {
 
 #ifdef SORTED_LABELS
         // Maintain sorting in sub-buckets if needed
-        // first.sort();
-        // second.sort();
         pdqsort(first.labels_vec.begin(), first.labels_vec.end(),
                 [](const Label *a, const Label *b) { return a->cost < b->cost; });
         pdqsort(second.labels_vec.begin(), second.labels_vec.end(),
@@ -272,36 +262,39 @@ struct alignas(64) Bucket {
             assert(sub_buckets.size() == 2);
 
             // Direct index access is faster than iteration for 2 buckets
-            if (sub_buckets[0].is_contained(label)) {
-                if (sub_buckets[0].depth >= MAX_BUCKET_DEPTH) {
-                    sub_buckets[0].labels_vec.push_back(label);
+            auto &first_bucket  = sub_buckets[0];
+            auto &second_bucket = sub_buckets[1];
+
+            if (first_bucket.is_contained(label)) {
+                if (first_bucket.depth >= MAX_BUCKET_DEPTH) {
+                    first_bucket.labels_vec.push_back(label);
                 } else {
-                    sub_buckets[0].add_label(label);
+                    first_bucket.add_label(label);
                 }
                 return;
             }
 
-            if (sub_buckets[1].is_contained(label)) {
-                if (sub_buckets[1].depth >= MAX_BUCKET_DEPTH) {
-                    sub_buckets[1].labels_vec.push_back(label);
+            if (second_bucket.is_contained(label)) {
+                if (second_bucket.depth >= MAX_BUCKET_DEPTH) {
+                    second_bucket.labels_vec.push_back(label);
                 } else {
-                    sub_buckets[1].add_label(label);
+                    second_bucket.add_label(label);
                 }
                 return;
             }
 
-// Handle out-of-bounds case
+            // Handle out-of-bounds case
 #ifdef DEBUG
             print_info("Warning: Label {:.2f} outside bucket range [{:.2f}, {:.2f}]\n", label->resources[0], lb[0],
                        ub[0]);
 #endif
 
             // Add to the closest sub-bucket instead of parent
-            const double mid_point = (sub_buckets[0].ub[0] + sub_buckets[1].lb[0]) / 2.0;
+            const double mid_point = (first_bucket.ub[0] + second_bucket.lb[0]) / 2.0;
             if (label->resources[0] <= mid_point) {
-                sub_buckets[0].labels_vec.push_back(label);
+                first_bucket.labels_vec.push_back(label);
             } else {
-                sub_buckets[1].labels_vec.push_back(label);
+                second_bucket.labels_vec.push_back(label);
             }
             return;
         }
@@ -322,6 +315,10 @@ struct alignas(64) Bucket {
     }
 
     void assign_label_to_sub_bucket(Label *label) noexcept {
+        // Early return for null label
+        if (!label) { return; }
+
+        // Use a range-based for loop for clarity
         for (auto &bucket : sub_buckets) {
             if (bucket.is_contained(label)) {
                 bucket.add_label(label);
@@ -329,8 +326,12 @@ struct alignas(64) Bucket {
             }
         }
 
+        // Handle out-of-bounds case
+#ifdef DEBUG
         print_info("Warning: Label {:.2f} outside bucket range [{:.2f}, {:.2f}]\n", label->resources[0], lb[0], ub[0]);
+#endif
     }
+
     /**
      * @brief Adds an arc between two buckets.
      *
@@ -472,9 +473,9 @@ struct alignas(64) Bucket {
         constexpr size_t RESOURCE_INDEX = 0;
         const double     resource_value = label->resources[RESOURCE_INDEX];
 
+        // Directly check if the resource value is within the bounds
         return resource_value >= lb[RESOURCE_INDEX] && resource_value <= ub[RESOURCE_INDEX];
     }
-
     /**
      * @brief Adds a label to the labels vector with a limit on the number of labels.
      *

@@ -131,15 +131,16 @@ void BucketGraph::UpdateBucketsSet(const double theta, const Label *label, anker
  */
 template <Direction D>
 void BucketGraph::BucketArcElimination(double theta) {
+    // fmt::print("Eliminating arcs in the {} direction\n", (D == Direction::Forward) ? "Forward" : "Backward");
     // Assign forward or backward buckets, adjacency lists, and fixed buckets based on direction
     auto &buckets       = assign_buckets<D>(fw_buckets, bw_buckets);
     auto &Phi           = assign_buckets<D>(Phi_fw, Phi_bw);
     auto &Phi_opposite  = assign_buckets<D>(Phi_bw, Phi_fw);
-    auto &fixed_buckets = assign_buckets<D>(fw_fixed_buckets, bw_fixed_buckets);
     auto &buckets_size  = assign_buckets<D>(fw_buckets_size, bw_buckets_size);
+    auto &fixed_buckets_bitmap = assign_buckets<D>(fw_fixed_buckets_bitmap, bw_fixed_buckets_bitmap);
 
-    // Reset fixed_buckets
-    for (auto &fb : fixed_buckets) { std::fill(fb.begin(), fb.end(), 0); }
+    // Initialize fixed_buckets_bitmap if not already initialized
+    const size_t n = buckets_size;
 
     using ArcMap = ankerl::unordered_dense::map<std::pair<std::pair<int, int>, int>, ankerl::unordered_dense::set<int>,
                                                 arc_map_hash>;
@@ -159,7 +160,6 @@ void BucketGraph::BucketArcElimination(double theta) {
             for (const auto &a : jump_arcs) {
                 auto increment = a.resource_increment;
 
-                // auto arc_key    = std::make_pair(std::make_pair(a.base_bucket, a.jump_bucket), b);
                 auto arc_key    = create_arc_key(a.base_bucket, a.jump_bucket, b);
                 int  b_opposite = get_opposite_bucket_number<D>(a.jump_bucket, increment);
 
@@ -184,7 +184,6 @@ void BucketGraph::BucketArcElimination(double theta) {
 
         for (const auto &a : bucket_arcs) {
             std::vector<double> increment(options.resources.size(), 0);
-            // print increment.size
             for (int r = 0; r < options.resources.size(); ++r) {
                 if constexpr (D == Direction::Forward) {
                     increment[r] = buckets[b].lb[r] + a.resource_increment[r];
@@ -211,7 +210,11 @@ void BucketGraph::BucketArcElimination(double theta) {
                     });
 
                 if (!contains && Bidi_map_opposite.find(b_opposite) == Bidi_map_opposite.end()) {
-                    fixed_buckets[a.from_bucket][a.to_bucket] = 1;
+                    // Set the bit in fixed_buckets_bitmap for the arc (a.from_bucket, a.to_bucket)
+                    const size_t pos = a.from_bucket * n + a.to_bucket;
+                    const size_t idx = pos >> 6;
+                    const uint64_t bit = 1ULL << (pos & 63);
+                    fixed_buckets_bitmap[idx] |= bit;
                     ++removed_arcs;
                 }
             }
@@ -263,14 +266,15 @@ void BucketGraph::BucketArcElimination(double theta) {
  */
 template <Direction D>
 void BucketGraph::ObtainJumpBucketArcs() {
-    // Assign forward or backward buckets, fixed buckets, bucket indices, and Phi (adjacency list) based on
-    // direction
+    // Assign forward or backward buckets, bucket indices, and Phi (adjacency list) based on direction
     auto &buckets           = assign_buckets<D>(fw_buckets, bw_buckets);
-    auto &fixed_buckets     = assign_buckets<D>(fw_fixed_buckets, bw_fixed_buckets);
     auto &num_buckets_index = assign_buckets<D>(num_buckets_index_fw, num_buckets_index_bw);
     auto &num_buckets       = assign_buckets<D>(num_buckets_fw, num_buckets_bw);
     auto &Phi               = assign_buckets<D>(Phi_fw, Phi_bw);
     auto &buckets_size      = assign_buckets<D>(fw_buckets_size, bw_buckets_size);
+
+    // Use fixed_buckets_bitmap instead of fixed_buckets
+    const auto &fixed_buckets_bitmap = assign_buckets<D>(fw_fixed_buckets_bitmap, bw_fixed_buckets_bitmap);
 
     int arc_counter     = 0; // Counter for jump arcs added
     int missing_counter = 0; // Counter for missing paths
@@ -294,7 +298,13 @@ void BucketGraph::ObtainJumpBucketArcs() {
 
             // Check if the path exists in the current bucket arcs
             for (const auto &gamma : arcs) {
-                if (fixed_buckets[gamma.from_bucket][gamma.to_bucket] == 1) { continue; }
+                // Check if the arc is fixed using fixed_buckets_bitmap
+                const size_t pos = gamma.from_bucket * buckets_size + gamma.to_bucket;
+                const size_t idx = pos >> 6;
+                const uint64_t bit = 1ULL << (pos & 63);
+                bool is_fixed = (fixed_buckets_bitmap[idx] & bit) != 0;
+
+                if (is_fixed) { continue; } // Skip fixed arcs
 
                 const int from_node_b = buckets[gamma.from_bucket].node_id;
                 const int to_node_b   = buckets[gamma.to_bucket].node_id;
@@ -323,7 +333,13 @@ void BucketGraph::ObtainJumpBucketArcs() {
                     // Check arcs in the adjacent bucket b_prime
                     const auto &arcs_prime = buckets[b_prime].template get_bucket_arcs<D>();
                     for (const auto &gamma_prime : arcs_prime) {
-                        if (fixed_buckets[gamma_prime.from_bucket][gamma_prime.to_bucket] == 1) { continue; }
+                        // Check if the arc is fixed using fixed_buckets_bitmap
+                        const size_t pos_prime = gamma_prime.from_bucket * buckets_size + gamma_prime.to_bucket;
+                        const size_t idx_prime = pos_prime >> 6;
+                        const uint64_t bit_prime = 1ULL << (pos_prime & 63);
+                        bool is_fixed_prime = (fixed_buckets_bitmap[idx_prime] & bit_prime) != 0;
+
+                        if (is_fixed_prime) { continue; } // Skip fixed arcs
 
                         const int from_node_prime = buckets[gamma_prime.from_bucket].node_id;
                         const int to_node_prime   = buckets[gamma_prime.to_bucket].node_id;
@@ -350,7 +366,6 @@ void BucketGraph::ObtainJumpBucketArcs() {
                     }
                 } else {
                     // Backward direction: decrementing buckets
-                    // for (int b_prime = b - 1; b_prime >= start_bucket; --b_prime) { process_bucket(b, b_prime); }
                     for (int b_prime = b + 1; b_prime < start_bucket + node_buckets; ++b_prime) {
                         process_bucket(b, b_prime);
                     }

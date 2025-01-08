@@ -256,10 +256,11 @@ void BucketGraph::generate_arcs() {
     }
 
     // Assign the forward or backward fixed buckets and other bucket-related structures
-    auto &fixed_buckets     = assign_buckets<D>(fw_fixed_buckets, bw_fixed_buckets);
-    auto &buckets           = assign_buckets<D>(fw_buckets, bw_buckets);
-    auto &num_buckets       = assign_buckets<D>(num_buckets_fw, num_buckets_bw);
-    auto &num_buckets_index = assign_buckets<D>(num_buckets_index_fw, num_buckets_index_bw);
+    auto &fixed_buckets_bitmap = assign_buckets<D>(fw_fixed_buckets_bitmap, bw_fixed_buckets_bitmap);
+    auto &buckets_size         = assign_buckets<D>(fw_buckets_size, bw_buckets_size);
+    auto &buckets              = assign_buckets<D>(fw_buckets, bw_buckets);
+    auto &num_buckets          = assign_buckets<D>(num_buckets_fw, num_buckets_bw);
+    auto &num_buckets_index    = assign_buckets<D>(num_buckets_index_fw, num_buckets_index_bw);
 
     // Clear all buckets in parallel, removing any existing arcs
     std::for_each(buckets.begin(), buckets.end(), [&](auto &bucket) {
@@ -300,8 +301,9 @@ void BucketGraph::generate_arcs() {
                 int to_bucket = j + num_buckets_index[next_node.id];
                 if (from_bucket == to_bucket) continue; // Skip arcs that loop back to the same bucket
 
-                if (fixed_buckets[from_bucket][to_bucket] == 1) continue; // Skip fixed arcs
-
+                // Calculate the position of the bit in fixed_buckets_bitmap
+                if (is_arc_fixed<D>(from_bucket, to_bucket)) continue; // Skip fixed arcs
+                
                 bool valid_arc = true;
                 for (int r = 0; r < res_inc.size(); ++r) {
                     // Forward direction: Check that resource increment doesn't exceed upper bounds
@@ -542,7 +544,7 @@ void BucketGraph::ConcatenateLabel(const Label *L, int &b, double &best_cost, st
 
             // Create new merged label
             auto pbest = compute_label<S>(L, L_bw);
-            best_cost = pbest->cost;
+            best_cost  = pbest->cost;
             // fmt::print("Best cost: {}\n", best_cost);
             merged_labels.push_back(pbest);
         }

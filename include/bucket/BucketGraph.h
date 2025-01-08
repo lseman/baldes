@@ -228,8 +228,10 @@ public:
     int bw_buckets_size = 0;
 
     std::vector<std::vector<bool>> fixed_arcs;
-    std::vector<std::vector<bool>> fw_fixed_buckets;
-    std::vector<std::vector<bool>> bw_fixed_buckets;
+    // std::vector<std::vector<bool>> fw_fixed_buckets;
+    // std::vector<std::vector<bool>> bw_fixed_buckets;
+    std::vector<uint64_t> fw_fixed_buckets_bitmap; // Bitmap for fixed bucket arcs
+    std::vector<uint64_t> bw_fixed_buckets_bitmap; // Bitmap for fixed bucket arcs
 
     double gap = std::numeric_limits<double>::infinity();
 
@@ -327,8 +329,10 @@ public:
     template <Direction D>
     ankerl::unordered_dense::map<int, BucketIntervalTree<D>> rebuild_buckets() {
         // References to the forward or backward fixed buckets and ranges
-        auto &fixed_buckets = assign_buckets<D>(fw_fixed_buckets, bw_fixed_buckets);
-        auto &buckets       = assign_buckets<D>(fw_buckets, bw_buckets);
+        // auto &fixed_buckets = assign_buckets<D>(fw_fixed_buckets, bw_fixed_buckets);
+        auto &buckets              = assign_buckets<D>(fw_buckets, bw_buckets);
+        auto &buckets_size         = assign_buckets<D>(fw_buckets_size, bw_buckets_size);
+        auto &fixed_buckets_bitmap = assign_buckets<D>(fw_fixed_buckets_bitmap, bw_fixed_buckets_bitmap);
         // auto &interval_tree = assign_buckets<D>(fw_interval_trees, bw_interval_trees);
         ankerl::unordered_dense::map<int, BucketIntervalTree<D>> interval_tree;
         // interval_tree.clear();
@@ -339,7 +343,14 @@ public:
             for (int to_bucket = 0; to_bucket < fw_buckets_size; ++to_bucket) {
                 auto to_node = buckets[to_bucket].node_id;
                 // Check if there is a fixed arc between from_bucket and to_bucket
-                if (fixed_buckets[from_bucket][to_bucket] == 0) { continue; }
+
+                // Calculate the position of the bit in fixed_buckets_bitmap
+                const size_t   pos = from_bucket * buckets_size + to_bucket;
+                const size_t   idx = pos >> 6;           // Index in the bitmap vector
+                const uint64_t bit = 1ULL << (pos & 63); // Bit position within the uint64_t
+
+                // Check if the bit is set (i.e., the arc is fixed)
+                if ((fixed_buckets_bitmap[idx] & bit) != 0) continue; // Skip fixed arcs
 
                 // Get the range for from_bucket
                 BucketRange<D> from_range = {buckets[from_bucket].lb, buckets[from_bucket].ub};
@@ -593,9 +604,9 @@ public:
                 // Section 1: Forward direction
                 define_buckets<Direction::Forward>();
                 // split_buckets<Direction::Forward>();
-                fw_fixed_buckets.clear();
-                fw_fixed_buckets.resize(fw_buckets_size);
-                for (auto &fb : fw_fixed_buckets) { fb.assign(fw_buckets_size, 0); }
+                fw_fixed_buckets_bitmap.clear();
+                const size_t n = fw_buckets_size;
+                fw_fixed_buckets_bitmap.resize((n * n + 63) >> 6, 0); // Ensure fixed_buckets_bitmap is the correct size
             },
             SECTION {
                 // Section 2: Backward direction
@@ -603,9 +614,9 @@ public:
                 bw_buckets.clear();
                 define_buckets<Direction::Backward>();
                 // split_buckets<Direction::Backward>();
-                bw_fixed_buckets.clear();
-                bw_fixed_buckets.resize(bw_buckets_size);
-                for (auto &bb : bw_fixed_buckets) { bb.assign(bw_buckets_size, 0); }
+                bw_fixed_buckets_bitmap.clear();
+                const size_t n = bw_buckets_size;
+                bw_fixed_buckets_bitmap.resize((n * n + 63) >> 6, 0); // Ensure fixed_buckets_bitmap is the correct size
             });
 
         generate_arcs();
@@ -745,9 +756,38 @@ public:
     }
 
     void reset_fixed_buckets() {
-        for (auto &fb : fw_fixed_buckets) { std::fill(fb.begin(), fb.end(), 0); }
-        for (auto &bb : bw_fixed_buckets) { std::fill(bb.begin(), bb.end(), 0); }
+        std::fill(fw_fixed_buckets_bitmap.begin(), fw_fixed_buckets_bitmap.end(), 0);
+        std::fill(bw_fixed_buckets_bitmap.begin(), bw_fixed_buckets_bitmap.end(), 0);
     }
+
+
+    template <Direction D>
+    bool if_arc_not_fixed_fun(int from, int to) {
+        auto &fixed_buckets_bitmap = assign_buckets<D>(fw_fixed_buckets_bitmap, bw_fixed_buckets_bitmap);
+        auto &buckets_size         = assign_buckets<D>(fw_buckets_size, bw_buckets_size);
+        // Calculate the position of the bit in fixed_buckets_bitmap
+        const size_t   pos = from * buckets_size + to;
+        const size_t   idx = pos >> 6;           // Index in the bitmap vector
+        const uint64_t bit = 1ULL << (pos & 63); // Bit position within the uint64_t
+
+        // Check if the bit is not set (i.e., the arc is not fixed)
+        return (fixed_buckets_bitmap[idx] & bit) == 0;
+    }
+
+    template <Direction D>
+    bool is_arc_fixed(int from, int to) {
+        auto &fixed_buckets_bitmap = assign_buckets<D>(fw_fixed_buckets_bitmap, bw_fixed_buckets_bitmap);
+        auto &buckets_size         = assign_buckets<D>(fw_buckets_size, bw_buckets_size);
+        // Calculate the position of the bit in fixed_buckets_bitmap
+        const size_t   pos = from * buckets_size + to;
+        const size_t   idx = pos >> 6;           // Index in the bitmap vector
+        const uint64_t bit = 1ULL << (pos & 63); // Bit position within the uint64_t
+
+        // Check if the bit is not set (i.e., the arc is not fixed)
+        return (fixed_buckets_bitmap[idx] & bit) == 1;
+    }
+
+
 
     /**
      * @brief Checks the feasibility of a given forward and backward label.
