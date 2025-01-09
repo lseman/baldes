@@ -48,115 +48,118 @@
  * counts.
  *
  */
-enum class SolverStage { One = 1, Two = 2, Three = 3, Four = 4 };
-
 template <Symmetry SYM>
 inline std::vector<Label *> BucketGraph::solve(bool trigger) {
+    // Initialize the status as not optimal at the start
     status = Status::NotOptimal;
-
     if (trigger) {
         transition = true;
         fixed = false;
     }
 
-    updateSplit();
+    updateSplit();  // Update the split values for the bucket graph
 
+    // Placeholder for the final paths (labels) and inner objective value
     std::vector<Label *> paths;
 
-    // Only process stages if at root level
-    if (depth != 0) {
+    //////////////////////////////////////////////////////////////////////
+    // ADAPTIVE STAGE HANDLING
+    //////////////////////////////////////////////////////////////////////
+    // Stage 1: Apply a light heuristic (Stage::One)
+    if (s1 && depth == 0) {
+        stage = 1;
+        paths = bi_labeling_algorithm<Stage::One>();  // Solve the problem with
+                                                      // Stage 1 heuristic
+        // inner_obj = paths[0]->cost;
+
+        // Transition from Stage 1 to Stage 2 if the objective improves or after
+        // 10 iterations
+        if (inner_obj >= -1 || iter >= 10) {
+            s1 = false;
+            s2 = true;  // Move to Stage 2
+        }
+    }
+    // Stage 2: Apply a more expensive pricing heuristic (Stage::Two)
+    else if (s2 && depth == 0) {
+        s2 = true;
+        stage = 2;
+        paths = bi_labeling_algorithm<Stage::Two>();  // Solve the problem with
+                                                      // Stage 2 heuristic
+        // inner_obj = paths[0]->cost;
+
+        // Transition from Stage 2 to Stage 3 if the objective improves or after
+        // 800 iterations
+        if (inner_obj >= -100 || iter > 500) {
+            s2 = false;
+            s3 = true;  // Move to Stage 3
+        }
+    }
+    // Stage 3: Apply a heuristic fixing approach (Stage::Three)
+    else if (s3 && depth == 0) {
+        stage = 3;
+        paths =
+            bi_labeling_algorithm<Stage::Three>();  // Solve the problem with
+                                                    // Stage 3 heuristic
+        // inner_obj = paths[0]->cost;
+
+        // Transition from Stage 3 to Stage 4 if the objective improves
+        // significantly
+        if (inner_obj >= -0.5) {
+            s4 = true;
+            s3 = false;
+            transition = true;  // Prepare for transition to Stage 4
+        }
+    }
+    // Stage 4: Exact labeling algorithm with fixing enabled (Stage::Four)
+    else {
         stage = 4;
-        return bi_labeling_algorithm<Stage::Four>();
-    }
 
-    // Stage handling logic
-    auto processStage =
-        [&](SolverStage current_stage) -> std::optional<std::vector<Label *>> {
-        stage = static_cast<int>(current_stage);
-
-        switch (current_stage) {
-            case SolverStage::One: {
-                if (!s1) return std::nullopt;
-                paths = bi_labeling_algorithm<Stage::One>();
-                if (inner_obj >= -1 || iter >= 10) {
-                    s1 = false;
-                    s2 = true;
-                }
-                return paths;
-            }
-
-            case SolverStage::Two: {
-                if (!s2) return std::nullopt;
-                paths = bi_labeling_algorithm<Stage::Two>();
-                if (inner_obj >= -100 || iter > 500) {
-                    s2 = false;
-                    s3 = true;
-                }
-                return paths;
-            }
-
-            case SolverStage::Three: {
-                if (!s3) return std::nullopt;
-                paths = bi_labeling_algorithm<Stage::Three>();
-                if (inner_obj >= -0.5) {
-                    s3 = false;
-                    s4 = true;
-                    transition = true;
-                }
-                return paths;
-            }
-
-            case SolverStage::Four: {
 #ifdef FIX_BUCKETS
-                if (transition) {
-                    const bool original_fixed = fixed;
-                    fixed = true;
-                    paths = bi_labeling_algorithm<Stage::Four>();
-                    transition = false;
-                    fixed = original_fixed;
-                    min_red_cost = paths[0]->cost;
-                    iter++;
-                    return paths;
-                }
-#endif
-
-                paths = bi_labeling_algorithm<Stage::Four>();
-                // const bool rollback = updateStepSize();
-                bool rollback = false;
-
-                if (rollback) {
-                    status = Status::Rollback;
-                    return paths;
-                }
-
-                if (inner_obj >= -1.0) {
-                    ss = true;
-#if !defined(SRC) && !defined(SRC3)
-                    status = Status::Optimal;
-                    return paths;
-#endif
-                    status = Status::Separation;
-                }
-                return paths;
-            }
-        }
-        return std::nullopt;
-    };
-
-    // Process stages in sequence until we get a valid result
-    for (const auto current_stage : {SolverStage::One, SolverStage::Two,
-                                     SolverStage::Three, SolverStage::Four}) {
-        if (auto result = processStage(current_stage)) {
+        // If transitioning to Stage 4, print a message and apply fixing
+        if (transition) {
+            // print_cut("Transitioning to stage 4\n");
+            bool original_fixed = fixed;  // Store the original fixed status
+            fixed = true;                 // Enable fixing of buckets in Stage 4
+            paths = bi_labeling_algorithm<Stage::Four>();  // Solve the problem
+                                                           // with Stage 4
+            transition = false;             // End the transition period
+            fixed = original_fixed;         // Restore the original fixed status
+            min_red_cost = paths[0]->cost;  // Update the minimum reduced cost
             iter++;
-            return *result;
+            return paths;  // Return the final paths
+        }
+#endif
+        // If not transitioning, continue with Stage 4 algorithm
+        paths = bi_labeling_algorithm<Stage::Four>();
+        // inner_obj = paths[0]->cost;
+
+        auto rollback =
+            false;
+        // auto rollback = false;
+        //   auto rollback = false;
+        if (rollback) {
+            //    s4     = false; // Rollback to Stage 3 if necessary
+            //    s3     = true;
+            status = Status::Rollback;  // Set status to rollback
+            return paths;               // Return the paths after rollback
+        }
+        // If the objective improves sufficiently, set the status to separation
+        // or optimal
+        if (inner_obj >= -1.0) {
+            ss = true;  // Enter separation mode (for SRC handling)
+#if !defined(SRC) && !defined(SRC3)
+            status = Status::Optimal;  // If SRC is not defined, set status to
+                                       // optimal
+            return paths;              // Return the optimal paths
+#endif
+            status = Status::Separation;  // If SRC is defined, set status to
+                                          // separation
         }
     }
 
-    // Fallback to stage 4 if no other stage produced a result
-    stage = 4;
-    paths = bi_labeling_algorithm<Stage::Four>();
-    iter++;
-    return paths;
+    iter++;  // Increment the iteration counter
+
+    return paths;  // Return the final paths after processing
 }
 
 inline std::vector<Label *> BucketGraph::solveHeuristic() {
@@ -233,8 +236,8 @@ std::vector<double> BucketGraph::labeling_algorithm() {
     std::vector<uint64_t> Bvisited(n_segments);
 
     // Preallocate vector for new labels to avoid repeated allocations
-    std::vector<Label *> new_labels;  // Use raw pointers
-    new_labels.reserve(4);            // Adjust size based on typical usage
+    std::vector<Label *> new_labels;
+    new_labels.reserve(16);  // Adjust size based on typical usage
 
     // Process SCCs in topological order
     for (const auto &scc_index : topological_order) {
@@ -250,7 +253,7 @@ std::vector<double> BucketGraph::labeling_algorithm() {
 
                 for (size_t label_idx = 0; label_idx < n_bucket_labels;
                      ++label_idx) {
-                    auto &label = bucket_labels[label_idx];
+                    Label *label = bucket_labels[label_idx];
                     if (label->is_extended) continue;
 
                     // Early resource check for partial solutions
@@ -277,7 +280,9 @@ std::vector<double> BucketGraph::labeling_algorithm() {
 
                     // Efficient visited bucket clearing
                     if (n_segments <= 8) {
-                        std::ranges::fill(Bvisited, 0);
+                        for (size_t i = 0; i < n_segments; ++i) {
+                            Bvisited[i] = 0;
+                        }
                     } else {
                         std::memset(Bvisited.data(), 0,
                                     n_segments * sizeof(uint64_t));
@@ -293,16 +298,15 @@ std::vector<double> BucketGraph::labeling_algorithm() {
                     if (!domin_smaller) {
                         // Process arcs for current label
                         const auto &node_arcs =
-                            nodes[label->node_id].template get_arcs<D>(
-                                scc_index);
+                            nodes[label->node_id].get_arcs<D>(scc_index);
 
                         for (const auto &arc : node_arcs) {
                             new_labels.clear();  // Reuse vector
-                            new_labels =
+                            auto extended_labels =
                                 Extend<D, S, ArcType::Node, Mutability::Mut, F>(
                                     label, arc);
 
-                            if (new_labels.empty()) {
+                            if (extended_labels.empty()) {
 #ifdef UNREACHABLE_DOMINANCE
                                 set_node_unreachable(label->unreachable_bitmap,
                                                      arc.to);
@@ -311,7 +315,7 @@ std::vector<double> BucketGraph::labeling_algorithm() {
                             }
 
                             // Process each new label
-                            for (Label *new_label : new_labels) {
+                            for (Label *new_label : extended_labels) {
                                 stat_n_labels++;
 
                                 const int to_bucket = new_label->vertex;
@@ -345,8 +349,8 @@ std::vector<double> BucketGraph::labeling_algorithm() {
                                         }
                                     }
                                 } else {
-                                    // Use existing dominance check
-                                    // implementation
+                                    // Use existing SIMD implementation for
+                                    // other stages
                                     auto check_dominance_in_bucket =
                                         [&](const std::vector<Label *>
                                                 &labels) {
@@ -427,12 +431,14 @@ std::vector<double> BucketGraph::labeling_algorithm() {
 
     return c_bar;
 }
+
 /**
  * Performs the bi-labeling algorithm on the BucketGraph.
  *
  */
 template <Stage S, Symmetry SYM>
 std::vector<Label *> BucketGraph::bi_labeling_algorithm() {
+    // Stage-specific initializations
     if constexpr (S == Stage::Three) {
         heuristic_fixing<S>();
     } else if constexpr (S == Stage::Four) {
@@ -449,8 +455,6 @@ std::vector<Label *> BucketGraph::bi_labeling_algorithm() {
 
     reset_pool();
     common_initialization();
-    merged_labels.clear();
-    merged_labels.reserve(500);
 
     std::vector<double> forward_cbar(fw_buckets.size());
     std::vector<double> backward_cbar(bw_buckets.size());
@@ -482,35 +486,10 @@ std::vector<Label *> BucketGraph::bi_labeling_algorithm() {
         fmt::print("Labels generated, concatenating...\n");
     }
 
-    const size_t n_segments = (fw_buckets_size + 63) >> 6;
-    alignas(64) std::vector<uint64_t> Bvisited(n_segments);
-
-    // Pre-compute fixed arcs bitmap if needed
-    alignas(64) std::vector<uint64_t> fixed_bitmap;
-    if constexpr (S == Stage::Three || S == Stage::Eliminate) {
-        const size_t n = nodes.size();
-        fixed_bitmap.resize((n * n + 63) >> 6, 0);
-        for (size_t i = 0; i < n; ++i) {
-            for (size_t j = 0; j < n; ++j) {
-                if (fixed_arcs[i][j] == 1) {
-                    const size_t idx = (i * n + j) >> 6;
-                    fixed_bitmap[idx] |= 1ULL << ((i * n + j) & 63);
-                }
-            }
-        }
-    }
-
-    auto check_fixed = [&](int from, int to) {
-        if constexpr (S == Stage::Three || S == Stage::Eliminate) {
-            const size_t pos = from * nodes.size() + to;
-            return (fixed_bitmap[pos >> 6] & (1ULL << (pos & 63))) != 0;
-        }
-        return false;
-    };
+    const size_t n_segments = (fw_buckets_size + 63) / 64;
+    std::vector<uint64_t> Bvisited(n_segments);
 
     double best_cost = std::numeric_limits<double>::infinity();
-
-    // #pragma GCC ivdep
     for (int bucket = 0; bucket < fw_buckets_size; ++bucket) {
         const auto &bucket_labels = fw_buckets[bucket].get_labels();
 
@@ -521,20 +500,22 @@ std::vector<Label *> BucketGraph::bi_labeling_algorithm() {
         for (const Label *L : bucket_labels) {
             const auto &to_arcs =
                 nodes[L->node_id].get_arcs<Direction::Forward>();
-            const int current_node = L->node_id;
 
-            // #pragma GCC ivdep
             for (const auto &arc : to_arcs) {
                 const int to_node = arc.to;
 
-                // if (check_fixed(current_node, to_node)) continue;
+                if constexpr (S == Stage::Three || S == Stage::Eliminate) {
+                    if (fixed_arcs[L->node_id][to_node] == 1) {
+                        continue;
+                    }
+                }
 
                 auto extended_labels =
                     Extend<Direction::Forward, S, ArcType::Node,
                            Mutability::Const, Full::Reverse>(L, arc);
-
                 for (Label *L_prime : extended_labels) {
-                    int bucket_to_process = L_prime->vertex;
+                    int bucket_to_process =
+                        L_prime->vertex;  // Create mutable copy
                     std::memset(Bvisited.data(), 0,
                                 n_segments * sizeof(uint64_t));
                     ConcatenateLabel<S, SYM>(L, bucket_to_process, best_cost,
@@ -552,13 +533,16 @@ std::vector<Label *> BucketGraph::bi_labeling_algorithm() {
         std::vector<Path> paths;
         const int labels_size = merged_labels.size();
         const int end_idx = std::min(N_ADD + N_ADD, labels_size);
-        paths.reserve(end_idx - N_ADD);
 
+        paths.reserve(end_idx - N_ADD);
         for (int i = N_ADD; i < end_idx; ++i) {
-            if (merged_labels[i]->nodes_covered.size() <= 3) continue;
+            if (merged_labels[i]->nodes_covered.size() <= 3) {
+                continue;
+            }
             paths.emplace_back(merged_labels[i]->nodes_covered,
                                merged_labels[i]->real_cost);
         }
+
         sPool.add_paths(paths);
         sPool.iterate();
     }
@@ -567,11 +551,13 @@ std::vector<Label *> BucketGraph::bi_labeling_algorithm() {
 #ifdef RIH
     std::vector<Label *> top_labels;
     top_labels.reserve(N_ADD);
+
     const int n_candidates =
         std::min(N_ADD, static_cast<int>(merged_labels.size()));
-
     for (int i = 0; i < n_candidates; ++i) {
-        if (merged_labels[i]->nodes_covered.size() <= 3) continue;
+        if (merged_labels[i]->nodes_covered.size() <= 3) {
+            continue;
+        }
         top_labels.push_back(merged_labels[i]);
     }
     ils->submit_task(top_labels, nodes);
@@ -597,40 +583,28 @@ inline std::vector<Label *> BucketGraph::Extend(
     new_resources.resize(options.resources.size());
 
     const int initial_node_id = L_prime->node_id;
-    auto initial_resources = L_prime->resources;  // Copy resources
+    auto initial_resources = L_prime->resources;  // Make a copy as in original
     const double initial_cost = L_prime->cost;
 
-    // Determine the target node ID based on the arc type
     int node_id;
     if constexpr (A == ArcType::Bucket) {
         node_id =
             assign_buckets<D>(fw_buckets, bw_buckets)[gamma.to_bucket].node_id;
     } else if constexpr (A == ArcType::Node) {
         node_id = gamma.to;
-    } else if constexpr (A == ArcType::Jump) {
-        const auto &buckets = assign_buckets<D>(fw_buckets, bw_buckets);
+    } else {
+        auto &buckets = assign_buckets<D>(fw_buckets, bw_buckets);
         node_id = buckets[gamma.jump_bucket].node_id;
 
-        // Update resources for jump arcs
+        // Update copy of resources for jump arcs
+        const auto &bucket = buckets[gamma.jump_bucket];
         for (size_t i = 0; i < options.resources.size(); ++i) {
             if constexpr (D == Direction::Forward) {
                 initial_resources[i] = std::max(
-                    initial_resources[i],
-                    static_cast<double>(buckets[gamma.jump_bucket].lb[i]));
-                // std::transform(initial_resources.begin(),
-                // initial_resources.end(),
-                // buckets[gamma.jump_bucket].lb.begin(),
-                //              new_resources.begin(), [](double a, double b) {
-                //              return std::max(a, b); });
+                    initial_resources[i], static_cast<double>(bucket.lb[i]));
             } else {
                 initial_resources[i] = std::min(
-                    initial_resources[i],
-                    static_cast<double>(buckets[gamma.jump_bucket].ub[i]));
-                // std::transform(initial_resources.begin(),
-                // initial_resources.end(),
-                // buckets[gamma.jump_bucket].ub.begin(),
-                //                new_resources.begin(), [](double a, double b)
-                //                { return std::min(a, b); });
+                    initial_resources[i], static_cast<double>(bucket.ub[i]));
             }
         }
     }
@@ -675,19 +649,18 @@ inline std::vector<Label *> BucketGraph::Extend(
 
     const int to_bucket = get_bucket_number<D>(node_id, new_resources);
 
+    // Handle fixed buckets
 #ifdef FIX_BUCKETS
     if constexpr (S == Stage::Four && A != ArcType::Jump) {
-        // Calculate the position of the bit in fixed_buckets_bitmap
-        bool is_fixed = is_arc_fixed<D>(initial_node_id, node_id);
-
-        if (is_fixed) {
-            if (depth > 1) return {};  // Return an empty vector
+        auto &fixed_buckets =
+            assign_buckets<D>(fw_fixed_buckets, bw_fixed_buckets);
+        if (fixed_buckets[L_prime->vertex][to_bucket] == 1) {
+            if (depth > 1) return {};
 
             static thread_local std::vector<Label *>
                 label_vector;  // Reuse vector
             label_vector.clear();
 
-            // Process jump arcs if the bucket arc is fixed
             for (const auto &jump_arc :
                  nodes[L_prime->node_id].template get_jump_arcs<D>(node_id)) {
                 auto extended_labels =
@@ -778,6 +751,10 @@ inline std::vector<Label *> BucketGraph::Extend(
     }
     set_node_visited(new_label->visited_bitmap, node_id);
 
+    // new_label->nodes_covered = L_prime->nodes_covered;    // Copy the list of
+    // covered nodes new_label->nodes_covered.push_back(node_id);          //
+    // Add the new node to the list of covered nodes
+
 #if defined(SRC)
     new_label->SRCmap = L_prime->SRCmap;
     if constexpr (S == Stage::Four || S == Stage::Enumerate) {
@@ -788,10 +765,8 @@ inline std::vector<Label *> BucketGraph::Extend(
         const uint64_t bit_mask = 1ULL << bit_position;
         const size_t cut_size = cutter->size();
 
-        static constexpr size_t SMALL_SIZE = 128;
+        static constexpr size_t SMALL_SIZE = 256;
 
-        // Use std::views::iota if available, otherwise fall back to a
-        // thread-local vector
 #if defined(__cpp_lib_ranges)
         auto indices = std::views::iota(size_t{0}, cut_size);
 #else
@@ -800,17 +775,14 @@ inline std::vector<Label *> BucketGraph::Extend(
         std::iota(indices.begin(), indices.end(), 0);
 #endif
 
-        // Lambda to process a single cut
         auto process_cut = [&](size_t idx) -> double {
             if (SRCDuals[idx] > -1e-3) {
-                return 0.0;  // Skip if the dual value is non-negative
+                return 0.0;
             }
 
             const auto &cut = cutter->getCut(idx);
             if (!(cut.neighbors[segment] & bit_mask)) {
-                new_label->SRCmap[idx] =
-                    0.0;  // Reset SRCmap value if the node is not in the cut's
-                          // neighborhood
+                new_label->SRCmap[idx] = 0.0;
                 return 0.0;
             }
 
@@ -821,14 +793,12 @@ inline std::vector<Label *> BucketGraph::Extend(
                 src_map_value += multipliers.num[cut.baseSetOrder[node_id]];
                 if (src_map_value >= den) {
                     src_map_value -= den;
-                    return -SRCDuals[idx];  // Return the dual value if the
-                                            // condition is met
+                    return -SRCDuals[idx];
                 }
             }
             return 0.0;
         };
 
-        // Compute the total cost update
         double total_cost_update;
         if (cut_size <= SMALL_SIZE) {
             total_cost_update = 0.0;
@@ -847,7 +817,6 @@ inline std::vector<Label *> BucketGraph::Extend(
 #endif
         }
 
-        // Update the label's cost
         new_label->cost += total_cost_update;
     }
 #endif
@@ -985,76 +954,102 @@ inline bool precedes(const std::vector<std::vector<int>> &sccs, const T a,
  */
 template <Direction D, Stage S>
 inline bool BucketGraph::DominatedInCompWiseSmallerBuckets(
-    const Label *L, int bucket, const std::vector<double> &c_bar,
-    std::vector<uint64_t> &Bvisited,
-    const std::vector<std::vector<int>> &bucket_order) noexcept {
+    const Label *__restrict__ L, int bucket,
+    const std::vector<double> &__restrict__ c_bar,
+    std::vector<uint64_t> &__restrict__ Bvisited,
+    const std::vector<std::vector<int>> &__restrict__ bucket_order) noexcept {
+    // Use references to avoid indirection
     auto &buckets = assign_buckets<D>(fw_buckets, bw_buckets);
     auto &Phi = assign_buckets<D>(Phi_fw, Phi_bw);
     auto &uf = assign_buckets<D>(fw_union_find, bw_union_find);
 
-    // Cache frequently accessed values
+    // Cache frequently used values
     const int b_L = L->vertex;
     const double label_cost = L->cost;
+    const size_t res_size = options.resources.size();
 
-    // Pre-allocate space for bucket stack to avoid reallocations
-    static thread_local std::vector<int> bucketStack;
-    bucketStack.resize(0);  // Retains capacity
-    bucketStack.reserve(10);
-    bucketStack.push_back(bucket);
-
-    // Pre-compute masks for faster bit operations
+    // Pre-compute bit operation constants
     constexpr uint64_t one = 1ULL;
+    constexpr uint64_t bit_mask_lookup[64] = {
+        1ULL << 0, 1ULL << 1, 1ULL << 2, 1ULL << 3, 1ULL << 4, 1ULL << 5,
+        1ULL << 6, 1ULL << 7, 1ULL << 8, 1ULL << 9, 1ULL << 10, 1ULL << 11,
+        1ULL << 12, 1ULL << 13, 1ULL << 14, 1ULL << 15, 1ULL << 16, 1ULL << 17,
+        1ULL << 18, 1ULL << 19, 1ULL << 20, 1ULL << 21, 1ULL << 22, 1ULL << 23,
+        1ULL << 24, 1ULL << 25, 1ULL << 26, 1ULL << 27, 1ULL << 28, 1ULL << 29,
+        1ULL << 30, 1ULL << 31, 1ULL << 32, 1ULL << 33, 1ULL << 34, 1ULL << 35,
+        1ULL << 36, 1ULL << 37, 1ULL << 38, 1ULL << 39, 1ULL << 40, 1ULL << 41,
+        1ULL << 42, 1ULL << 43, 1ULL << 44, 1ULL << 45, 1ULL << 46, 1ULL << 47,
+        1ULL << 48, 1ULL << 49, 1ULL << 50, 1ULL << 51, 1ULL << 52, 1ULL << 53,
+        1ULL << 54, 1ULL << 55, 1ULL << 56, 1ULL << 57, 1ULL << 58, 1ULL << 59,
+        1ULL << 60, 1ULL << 61, 1ULL << 62, 1ULL << 63
+    };
 
-    // Create a dominance checking lambda that's customized for AVX2 vs non-AVX2
+    // Stack-based implementation with fixed size for small bucket counts
+    constexpr size_t MAX_STACK_SIZE = 128;
+    int stack_buffer[MAX_STACK_SIZE];
+    int stack_size = 1;
+    stack_buffer[0] = bucket;
+
+    // SIMD-optimized dominance check function
     auto check_dominance = [&](const std::vector<Label *> &labels) {
-#ifndef __AVX2__
-        for (auto *existing_label : labels) {
-            if (is_dominated<D, S>(L, existing_label)) {
-                return true;
-            }
+#ifdef __AVX2__
+        return check_dominance_against_vector<D, S>(L, labels, cut_storage,
+                                                    res_size);
+#else
+        const size_t n = labels.size();
+        for (size_t i = 0; i < n; ++i) {
+            if (is_dominated<D, S>(L, labels[i])) return true;
         }
         return false;
-#else
-        return check_dominance_against_vector<D, S>(L, labels, cut_storage,
-                                                    options.resources.size());
 #endif
     };
 
-    // Main bucket traversal loop
-    while (!bucketStack.empty()) {
-        const int currentBucket = bucketStack.back();
-        bucketStack.pop_back();
+    do {
+        const int current_bucket = stack_buffer[--stack_size];
 
-        // Optimize bit operations by computing them once
-        const size_t segment = currentBucket >> 6;
-        const uint64_t bit_mask = one << (currentBucket & 63);
-        Bvisited[segment] |= bit_mask;
+        // Optimize bit operations
+        const size_t segment = current_bucket >> 6;
+        const uint64_t bit = bit_mask_lookup[current_bucket & 63];
+        Bvisited[segment] |= bit;
 
-        // Early exit condition
-        if (label_cost < c_bar[currentBucket] &&
-            ::precedes<int>(bucket_order, currentBucket, b_L, uf)) {
+        // Early exit check
+        if (__builtin_expect(
+                (label_cost < c_bar[current_bucket] &&
+                 ::precedes<int>(bucket_order, current_bucket, b_L, uf)),
+                0)) {
             return false;
         }
 
-        // Check for dominance in current bucket
-        if (b_L != currentBucket) {
-            auto &mother_bucket = buckets[currentBucket];
-            int stat_n_dom = 0;  // Required by check_dominance interface
+        // Check dominance only if necessary
+        if (b_L != current_bucket) {
+            auto &mother_bucket = buckets[current_bucket];
+            int stat_n_dom = 0;
             if (mother_bucket.check_dominance(L, check_dominance, stat_n_dom)) {
                 return true;
             }
         }
 
-        // Process neighbors - use references to avoid copies
-        const auto &bucket_phi = Phi[currentBucket];
-        for (const int b_prime : bucket_phi) {
+        // Process neighbors using SIMD if available
+        const auto &bucket_neighbors = Phi[current_bucket];
+        const size_t n_neighbors = bucket_neighbors.size();
+
+        // Regular processing
+        for (size_t i = 0; i < n_neighbors; ++i) {
+            const int b_prime = bucket_neighbors[i];
             const size_t seg_prime = b_prime >> 6;
-            const uint64_t mask_prime = one << (b_prime & 63);
-            if (!(Bvisited[seg_prime] & mask_prime)) {
-                bucketStack.push_back(b_prime);
+            if (!(Bvisited[seg_prime] & bit_mask_lookup[b_prime & 63])) {
+                if (stack_size < MAX_STACK_SIZE) {
+                    stack_buffer[stack_size++] = b_prime;
+                } else {
+                    fmt::print(
+                        "Stack overflow in "
+                        "DominatedInCompWiseSmallerBuckets\n");
+                    return false;
+                }
             }
         }
-    }
+
+    } while (stack_size > 0);
 
     return false;
 }
@@ -1071,44 +1066,39 @@ inline bool BucketGraph::DominatedInCompWiseSmallerBuckets(
 template <Stage state, Full fullness>
 void BucketGraph::run_labeling_algorithms(std::vector<double> &forward_cbar,
                                           std::vector<double> &backward_cbar) {
-    // Pre-allocate vectors to avoid reallocations during parallel execution
-    forward_cbar.reserve(10000);
-    backward_cbar.reserve(10000);
+    // Create tasks for forward and backward labeling algorithms
 
-    // Run both algorithms in parallel with minimal overhead
     auto forward_task =
-        stdexec::schedule(bi_sched) | stdexec::then([&]() noexcept {
+        stdexec::schedule(bi_sched) | stdexec::then([&]() {
             return labeling_algorithm<Direction::Forward, state, fullness>();
         });
 
     auto backward_task =
-        stdexec::schedule(bi_sched) | stdexec::then([&]() noexcept {
+        stdexec::schedule(bi_sched) | stdexec::then([&]() {
             return labeling_algorithm<Direction::Backward, state, fullness>();
         });
 
-    // Use when_all without unnecessary moves/copies
-    stdexec::sync_wait(
+    // Execute the tasks in parallel and synchronize
+    auto work =
         stdexec::when_all(std::move(forward_task), std::move(backward_task)) |
-        stdexec::then(
-            [&](auto &&forward_result, auto &&backward_result) noexcept {
-                forward_cbar =
-                    std::forward<decltype(forward_result)>(forward_result);
-                backward_cbar =
-                    std::forward<decltype(backward_result)>(backward_result);
-            }));
+        stdexec::then([&](auto forward_result, auto backward_result) {
+            forward_cbar = std::move(forward_result);
+            backward_cbar = std::move(backward_result);
+        });
+
+    stdexec::sync_wait(std::move(work));
 }
+
 /**
  * Computes a new label based on the given labels L and L_prime.
  *
  */
 template <Stage S>
 Label *BucketGraph::compute_label(const Label *L, const Label *L_prime) {
-    // Calculate the new cost and real cost
     double cij_cost = getcij(L->node_id, L_prime->node_id);
     double new_cost = L->cost + L_prime->cost + cij_cost;
     double real_cost = L->real_cost + L_prime->real_cost + cij_cost;
 
-    // Adjust cost based on dual values (if applicable)
     if constexpr (S == Stage::Four) {
 #if defined(RCC) || defined(EXACT_RCC)
         auto arc_dual = arc_duals.getDual(L->node_id, L_prime->node_id);
@@ -1116,68 +1106,72 @@ Label *BucketGraph::compute_label(const Label *L, const Label *L_prime) {
 #endif
     }
 
-    // Adjust cost based on branching duals
+    // Branching duals
     if (branching_duals->size() > 0) {
         new_cost -= branching_duals->getDual(L->node_id, L_prime->node_id);
     }
 
-    // Acquire a new label from the pool
+    // Directly acquire new_label and set the cost
     auto new_label = label_pool_fw->acquire();
     new_label->cost = new_cost;
     new_label->real_cost = real_cost;
 
-    // Handle SRCDuals (if applicable)
     if constexpr (S == Stage::Four) {
         SRC_MODE_BLOCK(
-
-            const auto &SRCDuals = cut_storage->SRCDuals;
+            //  Check SRCDuals condition for specific stages
+            auto sumSRC = 0.0; const auto &SRCDuals = cut_storage->SRCDuals;
             if (!SRCDuals.empty()) {
-                double sumSRC = 0.0;
-                for (size_t idx = 0; idx < SRCDuals.size(); ++idx) {
-                    const auto &dual = SRCDuals[idx];
-                    const auto &cut = cut_storage->getCut(idx);
-                    auto den = cut.p.den;
-                    auto sum = L->SRCmap[idx] + L_prime->SRCmap[idx];
-                    if (sum >= den) {
-                        sumSRC += dual;
-                    }
-                }
+                size_t idx = 0;
+                auto sumSRC = std::transform_reduce(
+                    SRCDuals.begin(), SRCDuals.end(), 0.0, std::plus<>(),
+                    [&](const auto &dual) {
+                        size_t curr_idx = idx++;
+                        auto den = cut_storage->getCut(curr_idx).p.den;
+                        auto sum =
+                            (L->SRCmap[curr_idx] + L_prime->SRCmap[curr_idx]);
+                        return (sum >= den) ? dual : 0.0;
+                    });
+
                 new_label->cost -= sumSRC;
             })
     }
 
-    // Clear the nodes_covered list
     new_label->nodes_covered.clear();
 
-    // Helper function to insert nodes from a label's parent chain
-    auto insert_nodes = [&](const Label *label, bool insert_at_front) {
-        for (; label != nullptr; label = label->parent) {
-            if (insert_at_front) {
-                new_label->nodes_covered.insert(
-                    new_label->nodes_covered.begin(), label->node_id);
-            } else {
-                new_label->nodes_covered.push_back(label->node_id);
-            }
-            if (label->parent == nullptr && !label->fresh) {
-                const auto &covered = label->nodes_covered;
-                if (insert_at_front) {
-                    new_label->nodes_covered.insert(
-                        new_label->nodes_covered.begin(), covered.begin(),
-                        covered.end());
-                } else {
-                    new_label->nodes_covered.insert(
-                        new_label->nodes_covered.end(), covered.begin(),
-                        covered.end());
-                }
+    // Start by inserting backward list elements
+    size_t forward_size = 0;
+    auto L_bw = L_prime;
+    for (; L_bw != nullptr; L_bw = L_bw->parent) {
+        new_label->nodes_covered.push_back(
+            L_bw->node_id);  // Insert backward elements directly
+        if (L_bw->parent == nullptr && L_bw->fresh == false) {
+            for (size_t i = 0; i < L_bw->nodes_covered.size(); ++i) {
+                new_label->nodes_covered.push_back(L_bw->nodes_covered[i]);
             }
         }
-    };
+    }
 
-    // Insert nodes from L_prime (backward)
-    insert_nodes(L_prime, false);
+    // Now insert forward list elements in reverse order without using
+    // std::reverse
+    auto L_fw = L;
+    for (; L_fw != nullptr; L_fw = L_fw->parent) {
+        new_label->nodes_covered.insert(
+            new_label->nodes_covered.begin(),
+            L_fw->node_id);  // Insert forward elements at the front
+        if (L_fw->parent == nullptr && L_fw->fresh == false) {
+            for (size_t i = 0; i < L_fw->nodes_covered.size(); ++i) {
+                new_label->nodes_covered.insert(
+                    new_label->nodes_covered.begin(), L_fw->nodes_covered[i]);
+            }
+        }
+    }
 
-    // Insert nodes from L (forward)
-    insert_nodes(L, true);
+    // new_label->nodes_covered = L_prime->nodes_covered;
+    //  reverse the nodes_covered
+    // std::reverse(new_label->nodes_covered.begin(),
+    // new_label->nodes_covered.end());
+    // new_label->nodes_covered.insert(new_label->nodes_covered.begin(),
+    // L->nodes_covered.begin(), L->nodes_covered.end());
 
     return new_label;
 }

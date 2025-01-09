@@ -142,10 +142,9 @@ std::vector<int> BucketGraph::computePhi(int &bucket_id, bool fw) {
     std::vector<int> phi;
 
     // Ensure bucket_id is within valid bounds
-    auto &buckets              = fw ? fw_buckets : bw_buckets;
-    auto &node_interval_trees  = fw ? fw_node_interval_trees : bw_node_interval_trees;
-    auto &buckets_size         = fw ? fw_buckets_size : bw_buckets_size;
-    auto &fixed_buckets_bitmap = fw ? fw_fixed_buckets_bitmap : bw_fixed_buckets_bitmap;
+    auto &buckets             = fw ? fw_buckets : bw_buckets;
+    auto &fixed_buckets       = fw ? fw_fixed_buckets : bw_fixed_buckets;
+    auto &node_interval_trees = fw ? fw_node_interval_trees : bw_node_interval_trees;
 
     if (options.resources.size() > 1) {
         if (bucket_id >= buckets.size() || bucket_id < 0) return phi;
@@ -177,10 +176,7 @@ std::vector<int> BucketGraph::computePhi(int &bucket_id, bool fw) {
             if (found_node != nullptr && buckets[found_node->bucket_index].node_id == node_id) {
                 // Check if the found bucket is fixed
 #ifdef FIX_BUCKETS
-                const size_t   pos = found_node->bucket_index * buckets_size + bucket_id;
-                const size_t   idx = pos >> 6;
-                const uint64_t bit = 1ULL << (pos & 63);
-                if ((fixed_buckets_bitmap[idx] & bit) == 0)
+                if (fixed_buckets[found_node->bucket_index][bucket_id] == 0)
 #endif
                 {
                     phi.push_back(found_node->bucket_index);
@@ -197,10 +193,7 @@ std::vector<int> BucketGraph::computePhi(int &bucket_id, bool fw) {
             if (found_node != nullptr && buckets[found_node->bucket_index].node_id == node_id) {
                 // Check if the found bucket is fixed
 #ifdef FIX_BUCKETS
-                const size_t   pos = found_node->bucket_index * buckets_size + bucket_id;
-                const size_t   idx = pos >> 6;
-                const uint64_t bit = 1ULL << (pos & 63);
-                if ((fixed_buckets_bitmap[idx] & bit) == 0)
+                if (fixed_buckets[found_node->bucket_index][bucket_id] == 0)
 #endif
                 {
                     phi.push_back(found_node->bucket_index);
@@ -214,10 +207,7 @@ std::vector<int> BucketGraph::computePhi(int &bucket_id, bool fw) {
 
         if (smaller >= 0 && buckets[smaller].node_id == buckets[bucket_id].node_id) {
 #ifdef FIX_BUCKETS
-            const size_t   pos = smaller * buckets_size + bucket_id;
-            const size_t   idx = pos >> 6;
-            const uint64_t bit = 1ULL << (pos & 63);
-            if ((fixed_buckets_bitmap[idx] & bit) == 0)
+            if (fixed_buckets[smaller][bucket_id] == 0)
 #endif
             {
                 phi.push_back(smaller);
@@ -283,10 +273,11 @@ void BucketGraph::calculate_neighborhoods(size_t num_closest) {
  */
 void BucketGraph::augment_ng_memories(std::vector<double> &solution, std::vector<Path> &paths, bool aggressive,
                                       int eta1, int eta2, int eta_max, int nC) {
+    std::set<std::pair<int, int>> forbidden_augmentations;
     std::vector<std::vector<int>> cycles;
 
-    // Detect cycles in paths
     for (int col = 0; col < paths.size(); ++col) {
+
         if (solution[col] > 1e-2 && solution[col] < 1 - 1e-2) {
             ankerl::unordered_dense::map<int, int> visited_clients;
             std::vector<int>                       cycle;
@@ -295,13 +286,13 @@ void BucketGraph::augment_ng_memories(std::vector<double> &solution, std::vector
             for (int i = 0; i < paths[col].size(); ++i) {
                 int client = paths[col][i];
                 if (client == 0 || client == N_SIZE - 1) {
-                    continue; // Ignore depot in cycle detection
+                    continue; // Ignore 0 in cycle detection
                 }
                 if (visited_clients.find(client) != visited_clients.end()) {
                     has_cycle = true;
-                    // Extract the cycle
+                    // Start from the first occurrence of the repeated client to form the cycle
                     for (int j = visited_clients[client]; j <= i; ++j) { cycle.push_back(paths[col][j]); }
-                    break; // Stop after detecting the first cycle in this path
+                    break; // Stop once the cycle is stored
                 }
                 visited_clients[client] = i;
             }
@@ -310,24 +301,20 @@ void BucketGraph::augment_ng_memories(std::vector<double> &solution, std::vector
         }
     }
 
-    // Sort cycles by size (smallest first)
+    // Sort cycles by size to prioritize smaller cycles
     pdqsort(cycles.begin(), cycles.end(),
             [](const std::vector<int> &a, const std::vector<int> &b) { return a.size() < b.size(); });
-
     int forbidden_count = 0;
 
-    // Forbid cycles based on conditions
     for (const auto &cycle : cycles) {
-        if (forbidden_count >= eta2) {
-            break; // Stop after forbidding enough cycles
-        }
-
-        // Check if the cycle can be forbidden
+        // Check the current sizes of neighborhoods involved in the cycle
         bool can_forbid = true;
         for (const auto &node : cycle) {
+            // Count the number of 1s in neighborhoods_bitmap[node]
             int count = 0;
+            // print size of neighborhoods_bitmap
             for (const auto &segment : neighborhoods_bitmap[node]) {
-                count += __builtin_popcountll(segment);
+                count += __builtin_popcountll(segment); // Counts the number of set bits (1s)
                 if (count >= eta_max) {
                     can_forbid = false;
                     break;
@@ -336,13 +323,24 @@ void BucketGraph::augment_ng_memories(std::vector<double> &solution, std::vector
             if (!can_forbid) { break; }
         }
 
-        if (can_forbid && (cycle.size() <= eta1 || forbidden_count < eta2)) {
+        if (can_forbid && (cycle.size() <= eta1 || (forbidden_count < eta2 && !cycle.empty()))) {
+            // Forbid the cycle
             forbidCycle(cycle, aggressive);
             forbidden_count++;
         }
+
+        if (forbidden_count >= eta2) { break; }
     }
 }
 
+/**
+ * Forbids a cycle in the bucket graph.
+ *
+ * This function takes a vector representing a cycle in the graph and forbids the edges
+ * corresponding to the cycle. If the 'aggressive' flag is set to true, it also forbids
+ * additional edges between the vertices of the cycle.
+ *
+ */
 void BucketGraph::forbidCycle(const std::vector<int> &cycle, bool aggressive) {
     for (size_t i = 0; i < cycle.size() - 1; ++i) {
         int v1 = cycle[i];
@@ -629,7 +627,7 @@ void BucketGraph::common_initialization() {
                 // Initialize depot with the current interval boundaries
                 depot->initialize(calculated_index, 0.0, interval_bounds, depot_id);
                 depot->is_extended = false;
-                // depot->nodes_covered.push_back(depot_id);
+                //depot->nodes_covered.push_back(depot_id);
                 set_node_visited(depot->visited_bitmap, depot_id);
                 SRC_MODE_BLOCK(depot->SRCmap.assign(cut_storage->SRCDuals.size(), 0);)
                 buckets[calculated_index].add_label(depot);
@@ -866,10 +864,8 @@ void BucketGraph::setup() {
     for (int i = 0; i < getNodes().size(); ++i) { fixed_arcs[i].resize(getNodes().size()); }
 
     // Resize and initialize fw_fixed_buckets and bw_fixed_buckets for std::vector<bool>
-    // fw_fixed_buckets.assign(fw_buckets.size(), std::vector<bool>(fw_buckets.size(), false));
-    // bw_fixed_buckets.assign(fw_buckets.size(), std::vector<bool>(fw_buckets.size(), false));
-    fw_fixed_buckets_bitmap.assign(fw_buckets.size() * fw_buckets.size(), 0);
-    bw_fixed_buckets_bitmap.assign(bw_buckets.size() * bw_buckets.size(), 0);
+    fw_fixed_buckets.assign(fw_buckets.size(), std::vector<bool>(fw_buckets.size(), false));
+    bw_fixed_buckets.assign(fw_buckets.size(), std::vector<bool>(fw_buckets.size(), false));
     // define initial relationships
     nodes.resize(options.size);
     if (!options.manual_arcs) {
@@ -965,8 +961,7 @@ Label *BucketGraph::compute_mono_label(const Label *L) {
 
     // Calculate the number of nodes covered by the label (its ancestors)
     // size_t label_size = 0;
-    // for (auto current_label = L; current_label != nullptr; current_label = current_label->parent) { label_size++;
-    // }
+    // for (auto current_label = L; current_label != nullptr; current_label = current_label->parent) { label_size++; }
 
     // Reserve space in one go
     // new_label->nodes_covered.reserve(label_size);
