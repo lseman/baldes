@@ -60,9 +60,9 @@ if(NOT CMAKE_BUILD_TYPE)
       CACHE STRING "Choose the type of build." FORCE)
 endif()
 set(CMAKE_CXX_FLAGS_RELEASE
-    "-O3 -march=native -flto -Xclang -Wno-unknown-warning-option -Qunused-arguments ")
+    "-O3 -march=native -flto -Xclang -Wno-unknown-warning-option")
 set(CMAKE_CXX_FLAGS_RELWITHDEBINFO
-"-O3 -g -march=native -flto -funroll-loops -ftree-vectorize -fomit-frame-pointer -ffunction-sections -fdata-sections -fno-signed-zeros -fno-trapping-math -mtune=native -fvectorize -Xclang -Wno-unknown-warning-option -Qunused-arguments "
+"-O3 -g -march=native -flto -funroll-loops -ftree-vectorize -fomit-frame-pointer -ffunction-sections -fdata-sections -fno-signed-zeros -fno-trapping-math -mtune=native -fvectorize -Xclang -Wno-unknown-warning-option"
 )
 set(CMAKE_CXX_FLAGS_DEBUG
     "-Og -g -Wall -Wextra -Xclang -Wno-unknown-warning-option")
@@ -201,20 +201,20 @@ string(REPLACE "-fconcepts-diagnostics-depth=10" "" CMAKE_CXX_FLAGS
                "${CMAKE_CXX_FLAGS}")
 
 # add mdspan
-#cpmaddpackage(
-#  NAME
-#  mdspan
-#  GITHUB_REPOSITORY
-#  kokkos/mdspan
-#  GIT_TAG
-#  stable
-#  OPTIONS
-#  "MDSPAN_BUILD_TESTS OFF"
-#  "MDSPAN_BUILD_EXAMPLES OFF"
-#  "MDSPAN_BUILD_BENCHMARKS OFF"
-#  "MDSPAN_BUILD_DOCS OFF"
-#  "BUILD_TESTING OFF"
-#  "CMAKE_INSTALL_PREFIX ${CMAKE_BINARY_DIR}/_deps/stdexec-install")
+cpmaddpackage(
+  NAME
+  mdspan
+  GITHUB_REPOSITORY
+  kokkos/mdspan
+  GIT_TAG
+  stable
+  OPTIONS
+  "MDSPAN_BUILD_TESTS OFF"
+  "MDSPAN_BUILD_EXAMPLES OFF"
+  "MDSPAN_BUILD_BENCHMARKS OFF"
+  "MDSPAN_BUILD_DOCS OFF"
+  "BUILD_TESTING OFF"
+  "CMAKE_INSTALL_PREFIX ${CMAKE_BINARY_DIR}/_deps/stdexec-install")
 
 find_package(xxhash)
 if(NOT xxhash_FOUND)
@@ -227,19 +227,10 @@ if(NOT xxhash_FOUND)
     origin/dev
     SOURCE_SUBDIRECTORY
     cmake_unofficial # Specify the folder with CMake configuration
-    DOWNLOAD_ONLY
-    YES # Only download Eigen, don't configure or build it
   )
   include_directories(${xxhash_SOURCE_DIR})
   add_subdirectory(${xxhash_SOURCE_DIR}/cmake_unofficial)
 endif()
-
-
-#cpmaddpackage(
-#    NAME libcuckoo
-#    GITHUB_REPOSITORY efficient/libcuckoo
-#    GIT_TAG        origin/master
-#)
 
 cpmaddpackage(NAME ankerl_unordered_dense GITHUB_REPOSITORY
               martinus/unordered_dense GIT_TAG origin/main)
@@ -378,7 +369,7 @@ if(IPM OR IPM_ACEL)
 endif()
 
 # Common Libraries List
-set(COMMON_LIBRARIES stdexec fmt xxhash)
+set(COMMON_LIBRARIES stdexec fmt xxhash mdspan)
 
 if(HIGHS)
   list(APPEND COMMON_LIBRARIES highs::highs)
@@ -485,9 +476,4 @@ if(HGS)
   target_link_libraries(hgs PRIVATE ${COMMON_LIBRARIES})
   target_compile_options(hgs PRIVATE -Wno-c++26-extensions
                                      -Wno-deprecated-declarations)
-endif()
-
-if (NOT CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-    # Remove GCC-specific flags for non-GCC compilers
-    string(REGEX REPLACE "-fconcepts-diagnostics-depth=[0-9]+" "" CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
 endif()
