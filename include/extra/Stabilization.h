@@ -48,13 +48,16 @@ class Stabilization {
 
     double base_alpha;  // "global" alpha parameter
     double cur_alpha;   // alpha parameter during the current misprice sequence
-    int nb_misprices = 0;  // number of misprices during the current misprice sequence
+    int nb_misprices =
+        0;  // number of misprices during the current misprice sequence
     double pseudo_dual_bound;      // pseudo dual bound, may be non-valid
     double valid_dual_bound;       // valid dual bound
     DualSolution cur_stab_center;  // current stability center
-    DualSolution stab_center_for_next_iteration;  // stability center for the next iteration
+    DualSolution stab_center_for_next_iteration;  // stability center for the
+                                                  // next iteration
 
     bool stabilization_active = true;
+    bool cut_added = false;
 
     DualSolution phi_in;
     DualSolution phi_out;
@@ -88,6 +91,12 @@ class Stabilization {
     MultiPointManager mp_manager;
     std::vector<double> stab_constraint_values;
 
+    /**
+     * @brief Increments the misprice counter if the alpha value is positive.
+     *
+     * This function checks if the alpha value is greater than zero. If it is,
+     * the function increments the misprice counter (nb_misprices).
+     */
     void update_stabilization_after_misprice() {
         nb_misprices++;
         alpha = _misprice_schedule(nb_misprices, base_alpha);
@@ -95,6 +104,16 @@ class Stabilization {
         beta = 0.0;
     }
 
+    /**
+     * @brief Updates the stabilization center after an iteration.
+     *
+     * This function updates the current stabilization center with the new
+     * center if the `stab_center_for_next_iteration` is not empty. After
+     * updating, it clears the `stab_center_for_next_iteration`.
+     *
+     * @param new_center The new dual solution center to be considered for
+     * stabilization.
+     */
     void update_stabilization_after_iter(const DualSolution &new_center) {
         if (!stab_center_for_next_iteration.empty()) {
             cur_stab_center = stab_center_for_next_iteration;
@@ -102,7 +121,22 @@ class Stabilization {
         }
     }
 
-    bool update_stabilization_after_master_optim(const DualSolution &new_center) {
+    /**
+     * @brief Updates the stabilization parameters after the master
+     * optimization.
+     *
+     * This function updates the stabilization parameters based on the new
+     * center provided by the master optimization. It resets the mispricing
+     * counter and the current alpha value. If the current stabilization center
+     * is empty, it sets it to the new center and returns false. Otherwise, it
+     * updates the current alpha to the base alpha and returns whether the
+     * current alpha is greater than zero.
+     *
+     * @param new_center The new center provided by the master optimization.
+     * @return true if the current alpha is greater than zero, false otherwise.
+     */
+    bool update_stabilization_after_master_optim(
+        const DualSolution &new_center) {
         nb_misprices = 0;
         cur_alpha = 0;
 
@@ -114,8 +148,23 @@ class Stabilization {
         return cur_alpha > 0;
     }
 
+    /**
+     * @brief Resets the mispricing counter to zero.
+     *
+     * This function sets the number of misprices (`nb_misprices`) to zero,
+     * effectively resetting any previously recorded mispricing events.
+     */
     void reset_misprices() { nb_misprices = 0; }
 
+    /**
+     * Calculates the stabilization factor based on the number of misprices.
+     *
+     * @param nb_misprices The number of misprices encountered.
+     * @param base_alpha The base alpha value used for calculation.
+     * @return The calculated alpha value. If the number of misprices is greater
+     * than 10 or the calculated alpha is less than or equal to 0.001,
+     * stabilization is deactivated and alpha is set to 0.0.
+     */
     double _misprice_schedule(int nb_misprices, double base_alpha) {
         double alpha = 1.0 - (nb_misprices + 1) * (1 - base_alpha);
         if (nb_misprices > 10 || alpha <= 1e-3) {
@@ -125,6 +174,13 @@ class Stabilization {
         return alpha;
     }
 
+    /**
+     * @brief Constructs a Stabilization object with the given base alpha value
+     * and master dual solution.
+     *
+     * @param base_alpha The base alpha value used for stabilization.
+     * @param mast_dual_sol A reference to the master dual solution.
+     */
     Stabilization(double base_alpha, DualSolution &mast_dual_sol)
         : alpha(base_alpha),
           t(0),
@@ -138,7 +194,15 @@ class Stabilization {
         beta = 0.0;
         sizeDual = mast_dual_sol.size();
     }
-
+    /**
+     * @brief Computes the stabilized dual solution.
+     *
+     * This function calculates a stabilized dual solution by combining the
+     * input and output dual values using a weighted average. The weights are
+     * determined by the current alpha value (`cur_alpha`).
+     *
+     * @return DualSolution The stabilized dual solution.
+     */
     DualSolution getStabDualSol(const DualSolution &input_duals) {
         std::vector<double> master_dual;
         master_dual.assign(input_duals.begin(), input_duals.begin() + sizeDual);
@@ -155,6 +219,17 @@ class Stabilization {
         return stab_dual_sol;
     }
 
+    /**
+     * @brief Computes the Euclidean norm (L2 norm) of a given vector.
+     *
+     * This function calculates the square root of the sum of the squares of the
+     * elements in the input vector, with a small epsilon added to avoid
+     * division by zero.
+     *
+     * @param vector A constant reference to a std::vector<double> containing
+     * the elements.
+     * @return The Euclidean norm of the vector.
+     */
     inline double norm(const std::vector<double> &vector) {
         double res = 0;
         for (int i = 0; i < vector.size(); ++i) {
@@ -163,6 +238,18 @@ class Stabilization {
         return std::sqrt(res + 1e-6);
     }
 
+    /**
+     * @brief Computes the Euclidean norm (distance) between two vectors.
+     *
+     * This function calculates the Euclidean distance between two vectors by
+     * summing the squared differences of their corresponding elements and then
+     * taking the square root of the result, with a small epsilon added to avoid
+     * division by zero.
+     *
+     * @param vector_1 The first vector.
+     * @param vector_2 The second vector.
+     * @return The Euclidean norm (distance) between vector_1 and vector_2.
+     */
     inline double norm(const std::vector<double> &vector_1,
                        const std::vector<double> &vector_2) {
         double res = 0.0;
@@ -189,6 +276,21 @@ class Stabilization {
         }
         return res;
     }
+
+    /**
+     * @brief Computes an advanced stabilized dual solution.
+     *
+     * This function computes a stabilized dual solution based on the provided
+     * dual solution (`nodeDuals`). It uses various internal states and
+     * parameters to compute the stabilized solution, including
+     * `cur_stab_center`, `smooth_dual_sol`, `subgradient`, and `duals_sep`. The
+     * function follows a series of steps to compute intermediate values such as
+     * `duals_tilde`, `duals_g`, and `rho`, and uses these to update the
+     * `duals_sep` and `smooth_dual_sol`.
+     *
+     */
+
+    std::vector<double> duals_tilde;
 
     DualSolution getStabDualSolAdvanced(const DualSolution &input_duals) {
         constexpr double EPSILON = 1e-12;
@@ -262,6 +364,7 @@ class Stabilization {
     }
 
     static constexpr double LARGE_NUMBER = 1e+6;
+    // Safe numerical operations
     inline double safeAdd(double a, double b) {
         if (std::abs(a) > LARGE_NUMBER || std::abs(b) > LARGE_NUMBER) {
             return std::copysign(LARGE_NUMBER, a + b);
@@ -307,9 +410,19 @@ class Stabilization {
 
     static constexpr double EPSILON = 1e-12;
 
+    /**
+     * @brief Computes the dynamic alpha schedule for stabilization.
+     *
+     * This function calculates the dynamic alpha schedule based on the provided
+     * model data, dual solution, and best pricing columns. It adjusts the
+     * current alpha value based on the angle between the separation direction
+     * and the subgradient.
+     *
+     */
     bool dynamic_alpha_schedule(const ModelData &dados) {
         const size_t n = cur_stab_center.size();
 
+        // 1. Check if stabilization is needed at all
         double relative_distance = norm(smooth_dual_sol, cur_stab_center) /
                                    (std::abs(lp_obj) + EPSILON);
         if (relative_distance < NORM_TOLERANCE) {
@@ -317,6 +430,7 @@ class Stabilization {
             return false;
         }
 
+        // 2. Calculate and normalize the in-out direction
         std::vector<double> direction(n);
         double direction_norm = 0.0;
 
@@ -330,6 +444,7 @@ class Stabilization {
             return false;
         }
 
+        // 3. Normalize both vectors
         std::vector<double> normalized_direction(n);
         std::vector<double> normalized_subgradient(n);
 
@@ -338,11 +453,16 @@ class Stabilization {
             normalized_subgradient[i] = subgradient[i] / subgradient_norm;
         }
 
+        // 4. Calculate cosine of angle between normalized vectors
         double cos_angle = 0.0;
         for (size_t i = 0; i < n; i++) {
             cos_angle += normalized_direction[i] * normalized_subgradient[i];
         }
 
+        // 5. Logic for alpha adjustment
+        // If cos_angle < 0: vectors point in opposite directions -> increase
+        // alpha If cos_angle > 0: vectors point in similar directions ->
+        // decrease alpha
         return cos_angle < 0;
     }
 
@@ -351,49 +471,93 @@ class Stabilization {
                             const std::vector<Label *> &best_pricing_cols) {
         size_t number_of_rows = nodeDuals.size();
 
+        // Initialize new_rows to track column contributions
         new_rows.assign(number_of_rows, 0.0);
 
+        // Step 1: Calculate new_rows from columns brought by pricing
         auto best_pricing_col = best_pricing_cols[0];
 
+        // Update rows based on column contributions
         for (const auto &node : best_pricing_col->nodes_covered) {
+            // Skip artificial nodes (0 and last node)
             if (node > 0 && node != N_SIZE - 1) {
                 new_rows[node - 1] += 1.0;
             }
         }
 
+        // Step 2: Calculate the subgradient based on constraint types
         subgradient.assign(number_of_rows, 0.0);
 
+        /*
+                for (size_t row_id = 0; row_id < number_of_rows; ++row_id) {
+                    // For each constraint type, calculate appropriate component
+           as per paper:
+                    // g = min(0, b - ax) for ≤ constraints
+                    // g = max(0, b - ax) for ≥ constraints
+                    // g = (b - ax) for = constraints
+                    if (dados.sense[row_id] == '<') {
+                        // ax ≤ b  =>  b - ax ≥ 0
+                        subgradient[row_id] = std::min(0.0, dados.b[row_id] -
+           numK * new_rows[row_id]); } else if (dados.sense[row_id] == '>') {
+                        // ax ≥ b  =>  b - ax ≤ 0
+                        subgradient[row_id] = std::max(0.0, dados.b[row_id] -
+           numK * new_rows[row_id]); } else { // dados.sense[row_id] == '='
+                        // ax = b
+                        subgradient[row_id] = dados.b[row_id] - numK *
+           new_rows[row_id];
+                    }
+                }
+        */
+        // get column of the most reduced cost
         std::vector<double> most_reduced_cost_column = new_rows;
 
+        // Update subgradient with most reduced cost column
+        // std::vector<double> subgradient(pi_out.size());
         std::transform(dados.b.begin(), dados.b.end(),
                        most_reduced_cost_column.begin(), subgradient.begin(),
                        [this](double a, double b) {
                            return a - numK * b;
-                       });
+                       });  // num_vehicle
 
+        // Update subgradient norm
         subgradient_norm = norm(subgradient);
     }
 
     void set_pseudo_dual_bound(double bound) { pseudo_dual_bound = bound; }
 
+    /**
+     * @brief Updates the stabilization parameters after the pricing
+     * optimization step.
+     *
+     * This function adjusts the stabilization parameters based on the results
+     * of the pricing optimization. It updates the alpha value using a dynamic
+     * schedule if there have been no misprices. Additionally, it updates the
+     * stabilization center for the next iteration if the current lagrangian gap
+     * is smaller than the previous one.
+     *
+     */
     void update_stabilization_after_pricing_optim(
         const ModelData &dados, const DualSolution &input_duals,
         const double &lag_gap, std::vector<Label *> best_pricing_cols) {
+        // Early exit checks and cycling detection
         static int no_progress_count = 0;
         static double last_gap = lag_gap;
+
+        // if (!stabilization_active) return;
 
         std::vector<double> nodeDuals(input_duals.begin(),
                                       input_duals.begin() + sizeDual);
 
+        // Update stabilization parameters if no misprices
         if (nb_misprices == 0) {
             update_subgradient(dados, nodeDuals, best_pricing_cols);
             bool should_increase = dynamic_alpha_schedule(dados);
 
-            constexpr double ALPHA_FACTOR = 0.1;
+            constexpr double ALPHA_FACTOR = 0.15;
             if (should_increase) {
                 alpha = std::min(0.99, alpha + (1.0 - alpha) * ALPHA_FACTOR);
             } else {
-                alpha = std::max(0.0, alpha / 1.1);
+                alpha = std::max(0.1, alpha * (1.0 - ALPHA_FACTOR));
             }
 
             if (!std::isnan(alpha) && !std::isinf(alpha)) {
@@ -401,22 +565,40 @@ class Stabilization {
             }
         }
 
+        // Get current stabilized solution
         DualSolution stab_sol = smooth_dual_sol;
 
-        if (lag_gap < lag_gap_prev) {
+        if (lag_gap < lag_gap_prev || cut_added) {
+            // Update multi-point manager
+            // mp_manager.updatePool(stab_sol, lag_gap);  // Negative because
+            // we're maximizing
+
             stab_center_for_next_iteration = smooth_dual_sol;
+            cut_added = false;
         } else {
             stab_center_for_next_iteration = cur_stab_center;
         }
 
+        // Update metrics
         lag_gap_prev = lag_gap;
 
+        // Safety checks
         if (std::isnan(alpha) || std::isinf(alpha)) {
             stabilization_active = false;
             cleanup();
         }
     }
 
+    /**
+     * @brief Determines whether the process should exit based on the current
+     * alpha value.
+     *
+     * This function checks the value of `cur_alpha`. If `cur_alpha` is zero, it
+     * returns true, indicating that the process should exit. Otherwise, it
+     * returns false.
+     *
+     * @return true if `cur_alpha` is zero, otherwise false.
+     */
     bool shouldExit() { return cur_alpha < 1e-3; }
 
     void cleanup() {
@@ -433,6 +615,5 @@ class Stabilization {
         smooth_dual_sol.assign(nodeDuals.begin(), nodeDuals.begin() + sizeDual);
     }
 
-        void updateNumK(int numK) { this->numK = numK; }
-
+    void updateNumK(int numK) { this->numK = numK; }
 };
