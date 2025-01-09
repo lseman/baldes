@@ -13,53 +13,62 @@
  */
 #pragma once
 
-#include <immintrin.h>  // For SIMD intrinsics
-#include <xxhash.h>     // For fast hashing
+#include <immintrin.h> // For SIMD intrinsics
+#include <xxhash.h>    // For fast hashing
 
 #include <array>
 #include <cstdint>
-#include <execution>  // For parallel algorithms
+#include <execution> // For parallel algorithms
 #include <numeric>
 
 template <size_t N_BITS>
 class Bitset {
-   private:
-    static constexpr size_t NUM_WORDS = (N_BITS + 63) / 64;
+private:
+    static constexpr size_t NUM_WORDS        = (N_BITS + 63) / 64;
+    static constexpr size_t SIMD_WIDTH       = 256; // AVX2 width in bits
+    static constexpr size_t WORDS_PER_SIMD   = SIMD_WIDTH / 64;
+    static constexpr size_t NUM_SIMD_WORDS   = NUM_WORDS / WORDS_PER_SIMD;
+    static constexpr size_t NUM_SCALAR_WORDS = NUM_WORDS % WORDS_PER_SIMD;
 
     static constexpr size_t wordIndex(size_t bit) { return bit / 64; }
     static constexpr size_t bitOffset(size_t bit) { return bit % 64; }
 
-   public:
+public:
     alignas(32) std::array<uint64_t, NUM_WORDS> bits_{};
 
     constexpr Bitset(uint64_t value = 0) {
         bits_.fill(0);
-        if (value != 0) {
-            bits_[0] = value;
-        }
+        if (value != 0) { bits_[0] = value; }
     }
 
     // create size method to answer .size
     static constexpr size_t size() { return N_BITS; }
 
-    constexpr void set(size_t bit) noexcept {
-        bits_[wordIndex(bit)] |= (1ULL << bitOffset(bit));
+    constexpr void set(size_t bit) noexcept { bits_[wordIndex(bit)] |= (1ULL << bitOffset(bit)); }
+    constexpr void clear(size_t bit) noexcept { bits_[wordIndex(bit)] &= ~(1ULL << bitOffset(bit)); }
+    constexpr bool test(size_t bit) const noexcept { return (bits_[wordIndex(bit)] >> bitOffset(bit)) & 1ULL; }
+    constexpr void toggle(size_t bit) noexcept { bits_[wordIndex(bit)] ^= (1ULL << bitOffset(bit)); }
+
+    void reset() noexcept {
+        if constexpr (NUM_WORDS >= 4) {
+// Use AVX2 for larger bitsets
+#ifdef __AVX2__
+            __m256i zero = _mm256_setzero_si256();
+            for (size_t i = 0; i < NUM_SIMD_WORDS; i++) {
+                _mm256_store_si256((__m256i *)&bits_[i * WORDS_PER_SIMD], zero);
+            }
+            // Handle remaining words
+            for (size_t i = NUM_SIMD_WORDS * WORDS_PER_SIMD; i < NUM_WORDS; i++) { bits_[i] = 0; }
+#else
+            bits_.fill(0);
+#endif
+        } else {
+            bits_.fill(0);
+        }
     }
-    constexpr void clear(size_t bit) noexcept {
-        bits_[wordIndex(bit)] &= ~(1ULL << bitOffset(bit));
-    }
-    constexpr bool test(size_t bit) const noexcept {
-        return (bits_[wordIndex(bit)] >> bitOffset(bit)) & 1ULL;
-    }
-    constexpr void toggle(size_t bit) noexcept {
-        bits_[wordIndex(bit)] ^= (1ULL << bitOffset(bit));
-    }
-    constexpr void reset() noexcept { bits_.fill(0); }
 
     // Const subscript operator for read-only access
-    constexpr bool operator[](size_t bit) const noexcept {
-        return (bits_[wordIndex(bit)] >> bitOffset(bit)) & 1ULL;
-    }
+    constexpr bool operator[](size_t bit) const noexcept { return (bits_[wordIndex(bit)] >> bitOffset(bit)) & 1ULL; }
 
     constexpr bool none() const noexcept {
         for (const auto &word : bits_) {
@@ -78,82 +87,58 @@ class Bitset {
     size_t count() const noexcept {
 #ifdef __AVX2__
         size_t total = 0;
-        for (const auto &word : bits_) {
-            total += __builtin_popcountll(word);
-        }
+        for (const auto &word : bits_) { total += __builtin_popcountll(word); }
         return total;
 #else
         return std::accumulate(bits_.begin(), bits_.end(), 0ULL,
-                               [](size_t total, uint64_t word) {
-                                   return total + __builtin_popcountll(word);
-                               });
+                               [](size_t total, uint64_t word) { return total + __builtin_popcountll(word); });
 #endif
     }
 
     Bitset operator&(const Bitset &other) const noexcept {
         Bitset result;
-        for (size_t i = 0; i < NUM_WORDS; ++i) {
-            result.bits_[i] = bits_[i] & other.bits_[i];
-        }
+        for (size_t i = 0; i < NUM_WORDS; ++i) { result.bits_[i] = bits_[i] & other.bits_[i]; }
         return result;
     }
 
     Bitset operator|(const Bitset &other) const noexcept {
         Bitset result;
-        for (size_t i = 0; i < NUM_WORDS; ++i) {
-            result.bits_[i] = bits_[i] | other.bits_[i];
-        }
+        for (size_t i = 0; i < NUM_WORDS; ++i) { result.bits_[i] = bits_[i] | other.bits_[i]; }
         return result;
     }
 
     Bitset operator^(const Bitset &other) const noexcept {
         Bitset result;
-        for (size_t i = 0; i < NUM_WORDS; ++i) {
-            result.bits_[i] = bits_[i] ^ other.bits_[i];
-        }
+        for (size_t i = 0; i < NUM_WORDS; ++i) { result.bits_[i] = bits_[i] ^ other.bits_[i]; }
         return result;
     }
 
     Bitset operator~() const noexcept {
         Bitset result;
-        for (size_t i = 0; i < NUM_WORDS; ++i) {
-            result.bits_[i] = ~bits_[i];
-        }
+        for (size_t i = 0; i < NUM_WORDS; ++i) { result.bits_[i] = ~bits_[i]; }
         return result;
     }
 
     Bitset &operator&=(const Bitset &other) noexcept {
-        for (size_t i = 0; i < NUM_WORDS; ++i) {
-            bits_[i] &= other.bits_[i];
-        }
+        for (size_t i = 0; i < NUM_WORDS; ++i) { bits_[i] &= other.bits_[i]; }
         return *this;
     }
 
     Bitset &operator|=(const Bitset &other) noexcept {
-        for (size_t i = 0; i < NUM_WORDS; ++i) {
-            bits_[i] |= other.bits_[i];
-        }
+        for (size_t i = 0; i < NUM_WORDS; ++i) { bits_[i] |= other.bits_[i]; }
         return *this;
     }
 
     Bitset &operator^=(const Bitset &other) noexcept {
-        for (size_t i = 0; i < NUM_WORDS; ++i) {
-            bits_[i] ^= other.bits_[i];
-        }
+        for (size_t i = 0; i < NUM_WORDS; ++i) { bits_[i] ^= other.bits_[i]; }
         return *this;
     }
 
-    bool operator==(const Bitset &other) const noexcept {
-        return bits_ == other.bits_;
-    }
-    bool operator!=(const Bitset &other) const noexcept {
-        return !(*this == other);
-    }
+    bool operator==(const Bitset &other) const noexcept { return bits_ == other.bits_; }
+    bool operator!=(const Bitset &other) const noexcept { return !(*this == other); }
 
     friend std::ostream &operator<<(std::ostream &os, const Bitset &bitset) {
-        for (size_t i = 0; i < N_BITS; ++i) {
-            os << bitset.test(i);
-        }
+        for (size_t i = 0; i < N_BITS; ++i) { os << bitset.test(i); }
         return os;
     }
 
@@ -164,8 +149,8 @@ namespace std {
 template <size_t N_BITS>
 struct hash<Bitset<N_BITS>> {
     size_t operator()(const Bitset<N_BITS> &bitset) const noexcept {
-        return XXH3_64bits(bitset.bits_.data(),
-                           bitset.bits_.size() * sizeof(uint64_t));
+        // Use XXH3 with SIMD acceleration
+        return XXH3_64bits(bitset.bits_.data(), bitset.bits_.size() * sizeof(uint64_t));
     }
 };
-}  // namespace std
+} // namespace std

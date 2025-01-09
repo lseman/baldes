@@ -161,7 +161,7 @@ class LabelPool {
 private:
     // Memory block for contiguous allocation
     struct MemoryBlock {
-        static constexpr size_t BLOCK_SIZE = 256; // See if this can be optimized
+        static constexpr size_t BLOCK_SIZE = 512; // See if this can be optimized
         std::unique_ptr<Label[]> data;
         size_t used = 0;
         

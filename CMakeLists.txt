@@ -60,9 +60,9 @@ if(NOT CMAKE_BUILD_TYPE)
       CACHE STRING "Choose the type of build." FORCE)
 endif()
 set(CMAKE_CXX_FLAGS_RELEASE
-    "-O3 -march=native -flto -Xclang -Wno-unknown-warning-option")
+    "-O3 -march=native -flto -Xclang -Wno-unknown-warning-option -Qunused-arguments ")
 set(CMAKE_CXX_FLAGS_RELWITHDEBINFO
-"-O3 -g -march=native -flto -funroll-loops -ftree-vectorize -fomit-frame-pointer -ffunction-sections -fdata-sections -fno-signed-zeros -fno-trapping-math -mtune=native -fvectorize -Xclang -Wno-unknown-warning-option"
+"-O3 -g -march=native -flto -funroll-loops -ftree-vectorize -fomit-frame-pointer -ffunction-sections -fdata-sections -fno-signed-zeros -fno-trapping-math -mtune=native -fvectorize -Xclang -Wno-unknown-warning-option -Qunused-arguments "
 )
 set(CMAKE_CXX_FLAGS_DEBUG
     "-Og -g -Wall -Wextra -Xclang -Wno-unknown-warning-option")
@@ -227,6 +227,8 @@ if(NOT xxhash_FOUND)
     origin/dev
     SOURCE_SUBDIRECTORY
     cmake_unofficial # Specify the folder with CMake configuration
+    DOWNLOAD_ONLY
+    YES # Only download Eigen, don't configure or build it
   )
   include_directories(${xxhash_SOURCE_DIR})
   add_subdirectory(${xxhash_SOURCE_DIR}/cmake_unofficial)
@@ -483,4 +485,9 @@ if(HGS)
   target_link_libraries(hgs PRIVATE ${COMMON_LIBRARIES})
   target_compile_options(hgs PRIVATE -Wno-c++26-extensions
                                      -Wno-deprecated-declarations)
+endif()
+
+if (NOT CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+    # Remove GCC-specific flags for non-GCC compilers
+    string(REGEX REPLACE "-fconcepts-diagnostics-depth=[0-9]+" "" CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
 endif()

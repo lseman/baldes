@@ -1,116 +1,96 @@
+/**
+ * @file UnionFind.h
+ * @brief This file contains the definition of the UnionFind class.
+ *
+ * This file contains the definition of the UnionFind class, which implements the Union-Find data structure
+ * for finding connected components in a graph. The class provides methods for finding the root of a set,
+ * uniting two sets, and getting the subset index of an element.
+ *
+ */
 #pragma once
-#include <vector>
-#include <cstdint>
+
+#include "Common.h"
 
 class UnionFind {
 public:
+    // default constructor
     UnionFind() = default;
-
-    UnionFind(const std::vector<std::vector<int>>& sccs) {
-        // Pre-calculate size needed
+    // Constructor initializes based on the elements in the SCCs
+    UnionFind(const std::vector<std::vector<int>> &sccs) {
+        // Find the maximum element in SCCs to size the parent, rank, and subsetIndex vectors
         int max_elem = 0;
-        size_t total_elements = 0;
-        for (const auto& scc : sccs) {
-            total_elements += scc.size();
-            for (int elem : scc) {
-                max_elem = (elem > max_elem) ? elem : max_elem;
-            }
+        for (const auto &scc : sccs) {
+            for (int elem : scc) { max_elem = std::max(max_elem, elem); }
         }
 
-        // Pre-allocate all vectors at once
-        const size_t size = max_elem + 1;
-        parent.resize(size);
-        rank.resize(size);
-        subsetIndex.resize(size, -1);
-
-        // Initialize in batches for better cache usage
+        // Initialize parent, rank, and subsetIndex vectors based on the max element
+        parent.resize(max_elem + 1);
+        rank.resize(max_elem + 1, 0);
+        subsetIndex.resize(max_elem + 1, -1); // Initialize with -1 (not assigned yet)
         int subset_counter = 0;
-        for (const auto& scc : sccs) {
-            if (!scc.empty()) {
-                const int first_elem = scc[0];
-                const int current_subset = subset_counter++;
-                
-                // Initialize first element
-                parent[first_elem] = first_elem;
-                subsetIndex[first_elem] = current_subset;
 
-                // Batch process remaining elements
-                const size_t scc_size = scc.size();
-                #pragma GCC ivdep
-                for (size_t i = 1; i < scc_size; ++i) {
-                    const int elem = scc[i];
-                    parent[elem] = first_elem;  // Point directly to root
-                    subsetIndex[elem] = current_subset;
+        for (const auto &scc : sccs) {
+            if (!scc.empty()) {
+                // Assign subset number to all elements in the current SCC
+                for (size_t i = 0; i < scc.size(); ++i) {
+                    int elem          = scc[i];
+                    parent[elem]      = elem;           // Initially, each element is its own parent
+                    subsetIndex[elem] = subset_counter; // Assign subset number
                 }
+                // Unite all elements within this SCC
+                for (size_t i = 1; i < scc.size(); ++i) {
+                    unite(scc[0], scc[i]); // Unite the first element with others
+                }
+                subset_counter++; // Move to the next subset
             }
         }
     }
 
-    // Fast path for root finding
-    __attribute__((always_inline)) 
-    inline int find(int x) const noexcept {
+    // Find the root of the set containing x with path compression
+    inline int find(int x) {
         int root = x;
-        
-        // Quick check if already root
-        if (__builtin_expect(parent[x] == x, 1)) {
-            return x;
+        // Find the root
+        while (root != parent[root]) { root = parent[root]; }
+        // Path compression
+        while (x != root) {
+            int next  = parent[x];
+            parent[x] = root;
+            x         = next;
         }
-
-        // Find root (without path halving since const)
-        while (root != parent[root]) {
-            root = parent[root];
-        }
-        
         return root;
     }
 
-    // Non-const version for path compression
-    __attribute__((always_inline)) 
-    inline int find_and_compress(int x) noexcept {
-        int root = x;
-        
-        // Quick check if already root
-        if (__builtin_expect(parent[x] == x, 1)) {
-            return x;
-        }
-
-        // Find root with path halving
-        while (root != parent[root]) {
-            root = parent[root] = parent[parent[root]];  // Path halving
-        }
-        
-        return root;
-    }
-
-    // Optimized union operation
-    __attribute__((always_inline))
-    inline void unite(int x, int y) noexcept {
-        int rootX = find_and_compress(x);
-        int rootY = find_and_compress(y);
-
+    // Union two sets by rank, and update the subset index
+    void unite(int x, int y) {
+        int rootX = find(x);
+        int rootY = find(y);
         if (rootX != rootY) {
-            // Union by rank with direct subset update
-            if (rank[rootX] < rank[rootY]) {
+            // Union by rank
+            if (rank[rootX] > rank[rootY]) {
+                parent[rootY] = rootX;
+                // Update subsetIndex for all elements in the rootY tree
+                subsetIndex[rootY] = subsetIndex[rootX];
+            } else if (rank[rootX] < rank[rootY]) {
                 parent[rootX] = rootY;
+                // Update subsetIndex for all elements in the rootX tree
                 subsetIndex[rootX] = subsetIndex[rootY];
             } else {
                 parent[rootY] = rootX;
+                ++rank[rootX];
+                // Update subsetIndex for rootY
                 subsetIndex[rootY] = subsetIndex[rootX];
-                if (rank[rootX] == rank[rootY]) {
-                    ++rank[rootX];
-                }
             }
         }
     }
 
-    // Fast subset lookup
-    __attribute__((always_inline))
-    inline int getSubset(int x) const noexcept {
-        return subsetIndex[find(x)];
+    // Function to get the subset index of an element
+    int getSubset(int x) {
+        int root = find(x);       // Find the root of the set
+        return subsetIndex[root]; // Return the subset index
     }
 
 private:
-    alignas(64) std::vector<int> parent;     // Aligned for cache line
-    alignas(64) std::vector<int> rank;       // Aligned for cache line
-    alignas(64) std::vector<int> subsetIndex;// Aligned for cache line
+    std::vector<int> parent;
+    std::vector<int> rank;
+    std::vector<int> subsetIndex; // Store the subset number of each element
 };

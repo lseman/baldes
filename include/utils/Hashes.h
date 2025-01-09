@@ -84,7 +84,7 @@ struct VectorIntHashCompare {
     
     // Keep the original hash method if needed elsewhere
     std::size_t hash(const KeyType& key) const {
-        return operator()(key);
+        return XXH64(key.data(), key.size() * sizeof(int), 0); // Seed = 0
     }
     
     // Equal function remains the same
