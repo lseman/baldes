@@ -73,15 +73,16 @@ struct VectorIntHash {
     }
 };
 
-// Hash and comparison class for tbb::concurrent_hash_map
 struct VectorIntHashCompare {
     using KeyType = std::vector<int>;
-
-    std::size_t hash(const KeyType& key) const {
+    
+    // Hash operator for std::unordered_map
+    std::size_t operator()(const KeyType& key) const {
         return XXH64(key.data(), key.size() * sizeof(int), 0); // Seed = 0
     }
-
-    bool equal(const KeyType& lhs, const KeyType& rhs) const {
+    
+    // Equality operator for std::unordered_map
+    bool operator()(const KeyType& lhs, const KeyType& rhs) const {
         return lhs == rhs;
     }
 };

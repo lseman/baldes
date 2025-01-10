@@ -48,11 +48,13 @@ class Stabilization {
 
     double base_alpha;  // "global" alpha parameter
     double cur_alpha;   // alpha parameter during the current misprice sequence
-    int nb_misprices = 0;  // number of misprices during the current misprice sequence
+    int nb_misprices =
+        0;  // number of misprices during the current misprice sequence
     double pseudo_dual_bound;      // pseudo dual bound, may be non-valid
     double valid_dual_bound;       // valid dual bound
     DualSolution cur_stab_center;  // current stability center
-    DualSolution stab_center_for_next_iteration;  // stability center for the next iteration
+    DualSolution stab_center_for_next_iteration;  // stability center for the
+                                                  // next iteration
 
     bool stabilization_active = true;
 
@@ -88,6 +90,8 @@ class Stabilization {
     MultiPointManager mp_manager;
     std::vector<double> stab_constraint_values;
 
+    bool cut_added = false;
+
     void update_stabilization_after_misprice() {
         nb_misprices++;
         alpha = _misprice_schedule(nb_misprices, base_alpha);
@@ -102,7 +106,8 @@ class Stabilization {
         }
     }
 
-    bool update_stabilization_after_master_optim(const DualSolution &new_center) {
+    bool update_stabilization_after_master_optim(
+        const DualSolution &new_center) {
         nb_misprices = 0;
         cur_alpha = 0;
 
@@ -367,44 +372,67 @@ class Stabilization {
 
         std::transform(dados.b.begin(), dados.b.end(),
                        most_reduced_cost_column.begin(), subgradient.begin(),
-                       [this](double a, double b) {
-                           return a - numK * b;
-                       });
+                       [this](double a, double b) { return a - numK * b; });
 
         subgradient_norm = norm(subgradient);
     }
 
     void set_pseudo_dual_bound(double bound) { pseudo_dual_bound = bound; }
 
+    int no_progress_count = 0;
+
+    void setObj(double obj) { lp_obj = obj; }
+
+    double lp_obj_prev = 0.0;
+    const int NO_PROGRESS_THRESHOLD = 5;
+
     void update_stabilization_after_pricing_optim(
         const ModelData &dados, const DualSolution &input_duals,
         const double &lag_gap, std::vector<Label *> best_pricing_cols) {
-        static int no_progress_count = 0;
-        static double last_gap = lag_gap;
-
         std::vector<double> nodeDuals(input_duals.begin(),
                                       input_duals.begin() + sizeDual);
 
-        if (nb_misprices == 0) {
+        double lp_obj_rounded = std::round(lp_obj);
+        // Check if lag_gap has changed
+        if (lp_obj_rounded == lp_obj_prev) {
+            no_progress_count++;
+        } else {
+            no_progress_count = 0;  // Reset the counter if lag_gap changes
+        }
+        lp_obj_prev = lp_obj_rounded;
+
+        // If lag_gap remains constant for 3 iterations, set alpha to zero
+        if (no_progress_count >= NO_PROGRESS_THRESHOLD) {
+            alpha = 0.0;
+            base_alpha = 0.0;
+            no_progress_count =
+                0;  // Reset the counter after setting alpha to zero
             update_subgradient(dados, nodeDuals, best_pricing_cols);
-            bool should_increase = dynamic_alpha_schedule(dados);
 
-            constexpr double ALPHA_FACTOR = 0.1;
-            if (should_increase) {
-                alpha = std::min(0.99, alpha + (1.0 - alpha) * ALPHA_FACTOR);
-            } else {
-                alpha = std::max(0.0, alpha / 1.1);
-            }
+        } else {
+            if (nb_misprices == 0) {
+                update_subgradient(dados, nodeDuals, best_pricing_cols);
+                bool should_increase = dynamic_alpha_schedule(dados);
 
-            if (!std::isnan(alpha) && !std::isinf(alpha)) {
-                base_alpha = alpha;
+                constexpr double ALPHA_FACTOR = 0.1;
+                if (should_increase) {
+                    alpha =
+                        std::min(0.99, alpha + (1.0 - alpha) * ALPHA_FACTOR);
+                } else {
+                    alpha = std::max(0.0, alpha / 1.1);
+                }
+
+                if (!std::isnan(alpha) && !std::isinf(alpha)) {
+                    base_alpha = alpha;
+                }
             }
         }
 
         DualSolution stab_sol = smooth_dual_sol;
 
-        if (lag_gap < lag_gap_prev) {
+        if (lag_gap < lag_gap_prev || cut_added) {
             stab_center_for_next_iteration = smooth_dual_sol;
+            cut_added = false;
         } else {
             stab_center_for_next_iteration = cur_stab_center;
         }
@@ -433,6 +461,7 @@ class Stabilization {
         smooth_dual_sol.assign(nodeDuals.begin(), nodeDuals.begin() + sizeDual);
     }
 
-        void updateNumK(int numK) { this->numK = numK; }
+    void updateNumK(int numK) { this->numK = numK; }
 
+    void clearAlpha() { alpha = 0.0; }
 };

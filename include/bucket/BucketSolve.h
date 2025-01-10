@@ -133,8 +133,7 @@ inline std::vector<Label *> BucketGraph::solve(bool trigger) {
         paths = bi_labeling_algorithm<Stage::Four>();
         // inner_obj = paths[0]->cost;
 
-        auto rollback =
-            false;
+        auto rollback = false;
         // auto rollback = false;
         //   auto rollback = false;
         if (rollback) {
@@ -145,7 +144,7 @@ inline std::vector<Label *> BucketGraph::solve(bool trigger) {
         }
         // If the objective improves sufficiently, set the status to separation
         // or optimal
-        if (inner_obj >= -1.0) {
+        if (inner_obj > -1.0) {
             ss = true;  // Enter separation mode (for SRC handling)
 #if !defined(SRC) && !defined(SRC3)
             status = Status::Optimal;  // If SRC is not defined, set status to
@@ -652,9 +651,7 @@ inline std::vector<Label *> BucketGraph::Extend(
     // Handle fixed buckets
 #ifdef FIX_BUCKETS
     if constexpr (S == Stage::Four && A != ArcType::Jump) {
-        auto &fixed_buckets =
-            assign_buckets<D>(fw_fixed_buckets, bw_fixed_buckets);
-        if (fixed_buckets[L_prime->vertex][to_bucket] == 1) {
+        if (is_bucket_fixed<D>(L_prime->vertex, to_bucket)) {
             if (depth > 1) return {};
 
             static thread_local std::vector<Label *>
@@ -971,8 +968,8 @@ inline bool BucketGraph::DominatedInCompWiseSmallerBuckets(
     // Pre-compute bit operation constants
     constexpr uint64_t one = 1ULL;
     constexpr uint64_t bit_mask_lookup[64] = {
-        1ULL << 0, 1ULL << 1, 1ULL << 2, 1ULL << 3, 1ULL << 4, 1ULL << 5,
-        1ULL << 6, 1ULL << 7, 1ULL << 8, 1ULL << 9, 1ULL << 10, 1ULL << 11,
+        1ULL << 0,  1ULL << 1,  1ULL << 2,  1ULL << 3,  1ULL << 4,  1ULL << 5,
+        1ULL << 6,  1ULL << 7,  1ULL << 8,  1ULL << 9,  1ULL << 10, 1ULL << 11,
         1ULL << 12, 1ULL << 13, 1ULL << 14, 1ULL << 15, 1ULL << 16, 1ULL << 17,
         1ULL << 18, 1ULL << 19, 1ULL << 20, 1ULL << 21, 1ULL << 22, 1ULL << 23,
         1ULL << 24, 1ULL << 25, 1ULL << 26, 1ULL << 27, 1ULL << 28, 1ULL << 29,
@@ -981,8 +978,7 @@ inline bool BucketGraph::DominatedInCompWiseSmallerBuckets(
         1ULL << 42, 1ULL << 43, 1ULL << 44, 1ULL << 45, 1ULL << 46, 1ULL << 47,
         1ULL << 48, 1ULL << 49, 1ULL << 50, 1ULL << 51, 1ULL << 52, 1ULL << 53,
         1ULL << 54, 1ULL << 55, 1ULL << 56, 1ULL << 57, 1ULL << 58, 1ULL << 59,
-        1ULL << 60, 1ULL << 61, 1ULL << 62, 1ULL << 63
-    };
+        1ULL << 60, 1ULL << 61, 1ULL << 62, 1ULL << 63};
 
     // Stack-based implementation with fixed size for small bucket counts
     constexpr size_t MAX_STACK_SIZE = 128;

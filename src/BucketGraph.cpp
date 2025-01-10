@@ -176,7 +176,7 @@ std::vector<int> BucketGraph::computePhi(int &bucket_id, bool fw) {
             if (found_node != nullptr && buckets[found_node->bucket_index].node_id == node_id) {
                 // Check if the found bucket is fixed
 #ifdef FIX_BUCKETS
-                if (fixed_buckets[found_node->bucket_index][bucket_id] == 0)
+                if (is_bucket_not_fixed<Direction::Forward>(found_node->bucket_index, bucket_id))
 #endif
                 {
                     phi.push_back(found_node->bucket_index);
@@ -193,7 +193,7 @@ std::vector<int> BucketGraph::computePhi(int &bucket_id, bool fw) {
             if (found_node != nullptr && buckets[found_node->bucket_index].node_id == node_id) {
                 // Check if the found bucket is fixed
 #ifdef FIX_BUCKETS
-                if (fixed_buckets[found_node->bucket_index][bucket_id] == 0)
+                if (is_bucket_not_fixed<Direction::Forward>(found_node->bucket_index, bucket_id))
 #endif
                 {
                     phi.push_back(found_node->bucket_index);
@@ -207,7 +207,7 @@ std::vector<int> BucketGraph::computePhi(int &bucket_id, bool fw) {
 
         if (smaller >= 0 && buckets[smaller].node_id == buckets[bucket_id].node_id) {
 #ifdef FIX_BUCKETS
-            if (fixed_buckets[smaller][bucket_id] == 0)
+            if (fw ? is_bucket_not_fixed_forward(smaller, bucket_id) : is_bucket_not_fixed_backward(smaller, bucket_id))
 #endif
             {
                 phi.push_back(smaller);
@@ -627,7 +627,7 @@ void BucketGraph::common_initialization() {
                 // Initialize depot with the current interval boundaries
                 depot->initialize(calculated_index, 0.0, interval_bounds, depot_id);
                 depot->is_extended = false;
-                //depot->nodes_covered.push_back(depot_id);
+                // depot->nodes_covered.push_back(depot_id);
                 set_node_visited(depot->visited_bitmap, depot_id);
                 SRC_MODE_BLOCK(depot->SRCmap.assign(cut_storage->SRCDuals.size(), 0);)
                 buckets[calculated_index].add_label(depot);
@@ -798,9 +798,9 @@ void BucketGraph::print_statistics() {
     const char *reset     = "\033[0m";    // Reset color
 
     // Print table header with horizontal line and separators
-    fmt::print("\n+----------------------------------------------------------+\n");
+    fmt::print("\n+--------------------------------------------------------+\n");
     fmt::print("|{}{:<20}{}| {:<15} | {:<15} |\n", blue_bold, " Metric", reset, " Forward", " Backward");
-    fmt::print("+----------------------------------------------------------+\n");
+    fmt::print("+--------------------------------------------------------+\n");
 
     // Print labels for forward and backward with bold blue metric
     fmt::print("|{}{:<20}{}| {:<15} | {:<15} |\n", blue_bold, " Labels", reset, stat_n_labels_fw, stat_n_labels_bw);
@@ -809,7 +809,7 @@ void BucketGraph::print_statistics() {
     fmt::print("|{}{:<20}{}| {:<15} | {:<15} |\n", blue_bold, " Dominance Check", reset, stat_n_dom_fw, stat_n_dom_bw);
 
     // Print the final horizontal line
-    fmt::print("+----------------------------------------------------------+\n");
+    fmt::print("+--------------------------------------------------------+\n");
 
     fmt::print("\n");
 }
@@ -864,8 +864,14 @@ void BucketGraph::setup() {
     for (int i = 0; i < getNodes().size(); ++i) { fixed_arcs[i].resize(getNodes().size()); }
 
     // Resize and initialize fw_fixed_buckets and bw_fixed_buckets for std::vector<bool>
-    fw_fixed_buckets.assign(fw_buckets.size(), std::vector<bool>(fw_buckets.size(), false));
-    bw_fixed_buckets.assign(fw_buckets.size(), std::vector<bool>(fw_buckets.size(), false));
+    // fw_fixed_buckets.assign(fw_buckets.size(), std::vector<bool>(fw_buckets.size(), false));
+    // bw_fixed_buckets.assign(fw_buckets.size(), std::vector<bool>(fw_buckets.size(), false));
+
+    size_t fw_bitmap_size = (fw_buckets.size() * fw_buckets.size() + 63) / 64; // Round up division by 64
+    size_t bw_bitmap_size = (bw_buckets.size() * bw_buckets.size() + 63) / 64; // Round up division by 64
+    fw_fixed_buckets_bitmap.assign(fw_bitmap_size, 0);
+    bw_fixed_buckets_bitmap.assign(bw_bitmap_size, 0);
+
     // define initial relationships
     nodes.resize(options.size);
     if (!options.manual_arcs) {
