@@ -1,4 +1,5 @@
 #pragma once
+#include "RNG.h"
 #include <atomic>
 #include <cassert>
 #include <condition_variable>
@@ -105,7 +106,7 @@ private:
     }
 
     void run() {
-        std::mt19937 rng(std::random_device{}());
+        Xoroshiro128Plus rng; // You can use any seed you prefer
 
         while (running.load(std::memory_order_acquire)) {
             std::function<void()> task;
@@ -131,7 +132,7 @@ private:
         return false;
     }
 
-    bool try_steal_task(std::function<void()> &task, std::mt19937 &rng) {
+    bool try_steal_task(std::function<void()> &task, Xoroshiro128Plus &rng) {
         std::uniform_int_distribution<size_t> dist(0, queues.size() - 1);
         size_t                                start_idx = dist(rng);
 

@@ -22,7 +22,7 @@
 #include "utils/Hashes.h"
 
 // include intel concurrent hashmap
-#include <tbb/concurrent_hash_map.h>
+#include "ConcurrentMap.h"
 
 constexpr int INITIAL_RANK_1_MULTI_LABEL_POOL_SIZE = 50;
 constexpr int INITIAL_POOL_SIZE = 100;
@@ -32,7 +32,7 @@ constexpr double tolerance = 1e-6;
 constexpr int max_row_rank1 = 5;
 constexpr int max_heuristic_initial_seed_set_size_row_rank1c = 6;
 
-constexpr int max_num_r1c_per_round = 3;
+constexpr int max_num_r1c_per_round = 2;
 constexpr double cut_vio_factor = 0.1;
 
 struct R1c {
@@ -191,10 +191,13 @@ class HighDimCutsGenerator {
     void getHighDimCuts() {
         constructVRMapAndSeedCrazy();
         // runing startSeedCrazy
+        // fmt::print("startSeedCrazy crazy\n");
         startSeedCrazy();
+        // fmt::print("operationsCrazy crazy\n");
         for (int i = 0; i < num_label;) {
             operationsCrazy(rank1_multi_label_pool[i], i);
         }
+        // fmt::print("Construct cut crazy\n");
         constructCutsCrazy();
 
         // send to python
@@ -378,37 +381,40 @@ class HighDimCutsGenerator {
         cached_valid_routes.clear();
         cached_map_old_new_routes.clear();
 
-        // Reserve space for the expected number of valid routes
         cached_valid_routes.reserve(sol.size());
-        cached_map_old_new_routes.resize(sol.size(),
-                                         -1);  // Initialize all elements to -1
+        cached_map_old_new_routes.resize(sol.size(), -1);
 
-        for (int i = 0; i < sol.size(); ++i) {
-            if (sol[i].frac_x >
-                1e-3) {  // Only consider routes with frac_x > threshold
-                cached_valid_routes.push_back(sol[i].frac_x);
-                cached_map_old_new_routes[i] =
-                    static_cast<int>(cached_valid_routes.size() - 1);
-                num_valid_routes++;
-            }
-            // No need for else clause as -1 already indicates invalid entries
-        }
+        num_valid_routes = 0;
+
+        std::for_each(sol.begin(), sol.end(),
+                      [this, current = 0](const auto &route) mutable {
+                          if (route.frac_x > 1e-3) {
+                              cached_valid_routes.push_back(route.frac_x);
+                              cached_map_old_new_routes[current] =
+                                  num_valid_routes++;
+                          }
+                          ++current;
+                      });
     }
 
     // ankerl::unordered_dense::map<std::vector<int>,
     // std::vector<std::vector<int>>, VectorIntHash> cut_cache;
 
-    tbb::concurrent_hash_map<std::vector<int>, std::vector<std::vector<int>>,
-                             VectorIntHashCompare>
+    // Then declare the map types
+    // Now the correct map declarations - note that map_cut_plan_vio uses
+    // cutLong as key
+    ConcurrentHashMap<cutLong, std::vector<std::pair<std::vector<int>, double>>>
+        map_cut_plan_vio;
+
+    // cut_cache uses vector<int> as key
+    ConcurrentHashMap<std::vector<int>, std::vector<std::vector<int>>,
+                      VectorIntHashCompare>
         cut_cache;
 
     using KeyType = Bitset<N_SIZE>;
     using ValueType = std::vector<std::pair<std::vector<int>, double>>;
     // ankerl::unordered_dense::map<Bitset<N_SIZE>,
     // std::vector<std::pair<std::vector<int>, double>>> map_cut_plan_vio;
-    tbb::concurrent_hash_map<cutLong,
-                             std::vector<std::pair<std::vector<int>, double>>>
-        map_cut_plan_vio;
 
     // declare map_cut_plan_vio_mutex
     std::shared_mutex map_cut_plan_vio_mutex;
@@ -475,6 +481,11 @@ class HighDimCutsGenerator {
         bool operator<(const ViolationResult &other) const {
             return violation < other.violation;
         }
+        bool operator>(const ViolationResult &other) const {
+            return violation > other.violation;
+        }
+        // operator for max element
+        bool operator<(const double &other) const { return violation < other; }
     };
 
     void exactFindBestPermutationForOnePlan(std::vector<int> &cut,
@@ -487,7 +498,7 @@ class HighDimCutsGenerator {
             return;
         }
 
-        // Thread-local storage with aligned vectors for SIMD
+        // Thread-local storage with aligned vectors
         alignas(64) static thread_local cutLong tmp;
         alignas(64) static thread_local std::vector<int, aligned_allocator<int>>
             map_r_numbers;
@@ -501,167 +512,155 @@ class HighDimCutsGenerator {
 
         tmp.reset();
 
-        // Branchless bit setting
-        for (int i = 0; i < cut_size; ++i) {
-            const int it = cut[i];
-            tmp.set(it * (it >= 0 && it < v_r_map.size()));
+        // Filter valid indices
+        auto valid_range =
+            cut | std::views::filter([size = v_r_map.size()](int x) {
+                return x >= 0 && static_cast<size_t>(x) < size;
+            });
+
+        for (const int it : valid_range) {
+            tmp.set(it);
         }
 
-        // Quick cache lookup
-        {
-            tbb::concurrent_hash_map<KeyType, ValueType>::const_accessor
-                accessor;
-            if (map_cut_plan_vio.find(accessor, tmp)) {
-                const auto &value = accessor->second;
-                if (plan_idx < value.size() && !value[plan_idx].first.empty()) {
-                    vio = value[plan_idx].second;
-                    return;
-                }
-            }
+        if (auto cached = map_cut_plan_vio.find(tmp);
+            cached && plan_idx < cached->size() &&
+            !(*cached)[plan_idx].first.empty()) {
+            vio = (*cached)[plan_idx].second;
+            return;
         }
 
-        // Initialize map entry
-        {
-            tbb::concurrent_hash_map<KeyType, ValueType>::accessor accessor;
-            if (map_cut_plan_vio.insert(accessor, tmp)) {
-                accessor->second.resize(7);
-            }
-        }
+        map_cut_plan_vio.insert(
+            tmp, std::vector<std::pair<std::vector<int>, double>>(7));
 
         const int denominator = get<1>(plan);
         const double rhs = get<2>(plan);
         const auto &coeffs = record_map_rank1_combinations[cut_size][plan_idx];
 
-        // Pre-size vectors to avoid reallocations
-        map_r_numbers.resize(sol.size());
-        std::fill(map_r_numbers.begin(), map_r_numbers.end(), 0);
+        map_r_numbers.assign(sol.size(), 0);
 
-        // Frequency accumulation
-        for (int i = 0; i < cut_size; ++i) {
+        // Process frequencies
+        auto indices = std::views::iota(0, cut_size);
+        for (int i : indices) {
             const int idx = cut[i];
-            if (idx >= 0 && idx < v_r_map.size()) {
-                const auto &route_freqs = v_r_map[idx];
-                for (size_t j = 0; j < route_freqs.size(); ++j) {
-                    map_r_numbers[j] += route_freqs[j] * (route_freqs[j] > 0);
+            if (idx >= 0 && static_cast<size_t>(idx) < v_r_map.size()) {
+                const auto &freqs = v_r_map[idx];
+                for (size_t j = 0; j < freqs.size(); ++j) {
+                    const int freq = freqs[j];
+                    map_r_numbers[j] += freq * (freq > 0);
                 }
             }
         }
 
-        // Cache lookup with two-phase locking
-        bool cache_hit = false;
-        {
-            tbb::concurrent_hash_map<
-                std::vector<int>, std::vector<std::vector<int>>,
-                VectorIntHashCompare>::const_accessor accessor;
-            if (cut_cache.find(accessor, cut)) {
-                cut_num_times_vis_routes = accessor->second;
-                cache_hit = true;
-            }
-        }
-
-        if (!cache_hit) {
+        // Handle cache
+        if (auto cached = cut_cache.find(cut)) {
+            cut_num_times_vis_routes = *cached;
+        } else {
             cut_num_times_vis_routes.clear();
             cut_num_times_vis_routes.resize(cut_size);
 
-            // Pre-reserve space for route vectors
-            for (auto &route_vec : cut_num_times_vis_routes) {
-                route_vec.reserve(num_valid_routes * 2);
+            // Reserve space
+            for (auto &vec : cut_num_times_vis_routes) {
+                vec.reserve(num_valid_routes * 2);
             }
 
-            // Route processing
-            for (int i = 0; i < cut_size; ++i) {
+            for (int i : indices) {
                 const int c = cut[i];
-                if (c >= 0 && c < v_r_map.size()) {
+                if (c >= 0 && static_cast<size_t>(c) < v_r_map.size()) {
                     auto &current_route = cut_num_times_vis_routes[i];
                     const auto &route_freqs = v_r_map[c];
 
-                    for (size_t route_idx = 0; route_idx < route_freqs.size();
-                         ++route_idx) {
-                        const auto frequency = route_freqs[route_idx];
+                    auto route_indices =
+                        std::views::iota(size_t{0}, route_freqs.size());
+                    for (size_t route_idx : route_indices) {
+                        const int frequency = route_freqs[route_idx];
                         const int cached_route =
-                            cached_map_old_new_routes[route_idx];  // Cache
-                                                                   // this
-                                                                   // value
+                            cached_map_old_new_routes[route_idx];
                         if (frequency > 0 && cached_route != -1) {
-                            current_route.insert(current_route.end(), frequency,
+                            current_route.insert(current_route.end(),
+                                                 static_cast<size_t>(frequency),
                                                  cached_route);
                         }
                     }
                 }
             }
 
-            tbb::concurrent_hash_map<std::vector<int>,
-                                     std::vector<std::vector<int>>,
-                                     VectorIntHashCompare>::accessor accessor;
-            cut_cache.insert(accessor, cut);
-            accessor->second = cut_num_times_vis_routes;
+            cut_cache.insert(cut, cut_num_times_vis_routes);
         }
 
-        // Pre-size num_times_vis_routes
+        // Process violations
         num_times_vis_routes.resize(num_valid_routes);
+        std::vector<ViolationResult> violations;
+        violations.reserve(coeffs.size());
 
-        std::vector<ViolationResult> violations(coeffs.size());
-
-        for (size_t coeff_idx = 0; coeff_idx < coeffs.size(); ++coeff_idx) {
+        auto coeff_indices = std::views::iota(size_t{0}, coeffs.size());
+        for (size_t coeff_idx : coeff_indices) {
             const auto &coeff_row = coeffs[coeff_idx];
-            std::vector<double> local_num_times_vis_routes(num_valid_routes,
-                                                           0.0);
 
-            for (int i = 0; i < cut_size; ++i) {
+            constexpr size_t STACK_SIZE = 1024;
+            std::array<double, STACK_SIZE> local_times{};
+            std::unique_ptr<double[]> heap_times;
+            std::span<double> times_span;
+
+            if (num_valid_routes <= STACK_SIZE) {
+                times_span = std::span{local_times}.first(num_valid_routes);
+            } else {
+                heap_times = std::make_unique<double[]>(num_valid_routes);
+                times_span = std::span{heap_times.get(),
+                                       static_cast<size_t>(num_valid_routes)};
+            }
+            std::ranges::fill(times_span, 0.0);
+
+            auto route_indices =
+                std::views::iota(size_t{0}, cut_num_times_vis_routes.size());
+            for (size_t i : route_indices) {
                 const double coeff = coeff_row[i];
-                const auto &routes =
-                    cut_num_times_vis_routes[i];  // Cache this reference
+                const auto &routes = cut_num_times_vis_routes[i];
                 for (const int route : routes) {
-                    local_num_times_vis_routes[route] += coeff;
+                    times_span[route] += coeff;
                 }
             }
 
             double vio_tmp = -rhs;
             for (size_t i = 0; i < num_valid_routes; ++i) {
-                vio_tmp += static_cast<int>(local_num_times_vis_routes[i] /
-                                                denominator +
-                                            TOLERANCE) *
-                           cached_valid_routes[i];
+                vio_tmp +=
+                    static_cast<int>(times_span[i] / denominator + TOLERANCE) *
+                    cached_valid_routes[i];
             }
 
-            violations[coeff_idx] = {vio_tmp, static_cast<int>(coeff_idx)};
+            violations.emplace_back(vio_tmp, static_cast<int>(coeff_idx));
         }
 
-        // Find best violation
-        const auto best_result =
-            *std::max_element(violations.begin(), violations.end());
+        const auto best_result = *std::ranges::max_element(
+            violations, [](const ViolationResult &a, const ViolationResult &b) {
+                return a.violation < b.violation;
+            });
         vio = best_result.violation;
 
-        // Prepare final result
         cut_coeff.resize(cut_size);
-        if (best_result.index >= 0 && best_result.index < coeffs.size()) {
+        if (static_cast<size_t>(best_result.index) < coeffs.size()) {
             const auto &best_coeffs = coeffs[best_result.index];
 
             for (int i = 0; i < cut_size; ++i) {
-                cut_coeff[i] = {cut[i], i < best_coeffs.size()
+                cut_coeff[i] = {cut[i], i < static_cast<int>(best_coeffs.size())
                                             ? static_cast<int>(best_coeffs[i])
                                             : 0};
             }
         }
 
-        // Sort and prepare new cut
-        pdqsort(
-            cut_coeff.begin(), cut_coeff.end(),
-            [](const auto &a, const auto &b) { return a.second > b.second; });
+        std::ranges::sort(cut_coeff, std::greater{},
+                          &std::pair<int, int>::second);
 
         new_cut.resize(cut_size);
-        std::transform(cut_coeff.begin(), cut_coeff.end(), new_cut.begin(),
-                       [](const auto &a) { return a.first; });
+        std::ranges::transform(cut_coeff, new_cut.begin(),
+                               &std::pair<int, int>::first);
 
-        // Update final results
-        tbb::concurrent_hash_map<KeyType, ValueType>::accessor accessor;
-        if (map_cut_plan_vio.find(accessor, tmp)) {
-            if (plan_idx < accessor->second.size()) {
-                accessor->second[plan_idx] = {new_cut, vio};
-            }
-        }
+        map_cut_plan_vio.update(tmp, [&](auto &value) {
+            value.resize(
+                std::max(value.size(), static_cast<size_t>(plan_idx + 1)));
+            value[plan_idx] = {new_cut, vio};
+            return true;
+        });
     }
-
     std::vector<std::vector<double>> cost_mat4_vertex;
 
     std::shared_ptr<HighDimCutsGenerator> clone() const {
@@ -722,17 +721,15 @@ class HighDimCutsGenerator {
 
         // Populate `v_r_map` with route appearances for each vertex `i`
 #ifdef __cpp_lib_parallel_algorithm
-        std::for_each(std::execution::par_unseq, sol.begin(), sol.end(),
-                      [&](const auto &route_data) {
-                          const auto r =
-                              &route_data -
-                              &sol[0];  // Get index without separate counter
-                          for (const int i : route_data.route) {
-                              if (i > 0 && i < max_dim_minus_1) {
-                                  ++v_r_map[i][r];
-                              }
-                          }
-                      });
+        std::for_each(sol.begin(), sol.end(), [&](const auto &route_data) {
+            const auto r =
+                &route_data - &sol[0];  // Get index without separate counter
+            for (const int i : route_data.route) {
+                if (i > 0 && i < max_dim_minus_1) {
+                    ++v_r_map[i][r];
+                }
+            }
+        });
 #else
         for (size_t r = 0; r < sol_size; ++r) {
             for (const int i : sol[r].route) {
@@ -1223,6 +1220,9 @@ class HighDimCutsGenerator {
             cut_set;  // Reuse across pools if keys/plans are shared
         ankerl::unordered_dense::set<int> p_set;
 
+        // Reserve initial capacity for the hash table
+        // map_cut_plan_vio.reserve(1000000); // Adjust based on expected size
+
         for (auto &pool : generated_rank1_multi_pool) {
             if (pool.second.empty()) continue;  // Skip empty pools
 
@@ -1242,41 +1242,52 @@ class HighDimCutsGenerator {
                          static_cast<size_t>(max_num_r1c_per_round)));
 
             int num_cuts = 0;
+            int insertion_count = 0;
             for (const auto &cut : pool.second) {
                 if (std::get<2>(cut) < vio_threshold) break;
 
                 const auto &key = std::get<0>(cut);
                 int plan_idx = std::get<1>(cut);
 
-                // // Check if key exists in the map
-                // if (map_cut_plan_vio.find(key) == map_cut_plan_vio.end())
-                // {
-                //     std::cerr << "Key not found: " << key << std::endl;
-                //     continue;
-                // }
+                // Check if key exists in the map - using std::optional return
+                if (auto opt_cut_plans = map_cut_plan_vio.find(key)) {
+                    const auto &cut_plans = *opt_cut_plans;
 
-                tbb::concurrent_hash_map<KeyType, ValueType>::const_accessor
-                    accessor;
-                if (map_cut_plan_vio.find(accessor, key)) {
-                    const auto &cut_plans =
-                        accessor->second;  // Read-only access
+                    if (plan_idx >= 0 &&
+                        static_cast<size_t>(plan_idx) < cut_plans.size()) {
+                        const auto &cut_plan = cut_plans[plan_idx];
 
-                    // Check if plan_idx is valid
-                    if (plan_idx < 0 || plan_idx >= cut_plans.size()) {
+                        // Add validation for empty vector
+                        if (cut_plan.first.empty()) {
+                            // std::cerr << "Warning: Empty cut vector for
+                            // plan_idx: " << plan_idx << std::endl;
+                            continue;
+                        }
+
+                        try {
+                            tmp_cuts.emplace_back(
+                                R1c{std::make_pair(cut_plan.first, plan_idx)});
+                            // std::cerr << "Successfully created R1c" <<
+                            // std::endl;
+
+                            cut_set.insert(key);
+                            p_set.insert(plan_idx);
+                            ++num_cuts;
+                        } catch (const std::exception &e) {
+                            // std::cerr << "Exception creating R1c: " <<
+                            // e.what() << std::endl;
+                        }
+                    } else {
                         std::cerr << "Invalid plan_idx: " << plan_idx
-                                  << " for key: " << key
-                                  << " with size: " << cut_plans.size()
                                   << std::endl;
-                        continue;
                     }
-
-                    const auto &cut_plan = cut_plans[plan_idx];
-                    tmp_cuts.emplace_back(
-                        R1c{std::make_pair(cut_plan.first, plan_idx)});
-
-                    cut_set.insert(key);
-                    p_set.insert(plan_idx);
-                    ++num_cuts;
+                }
+                ++insertion_count;
+                if (insertion_count % 1000 == 0) {
+                    std::cout << "Insertions: " << insertion_count
+                              << ", Size: " << map_cut_plan_vio.size()
+                              << ", Capacity: " << map_cut_plan_vio.capacity()
+                              << std::endl;
                 }
 
                 if (num_cuts >= max_num_r1c_per_round) break;

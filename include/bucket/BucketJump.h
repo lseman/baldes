@@ -132,14 +132,18 @@ void BucketGraph::UpdateBucketsSet(const double theta, const Label *label, anker
 template <Direction D>
 void BucketGraph::BucketArcElimination(double theta) {
     // Assign forward or backward buckets, adjacency lists, and fixed buckets based on direction
-    auto &buckets       = assign_buckets<D>(fw_buckets, bw_buckets);
-    auto &Phi           = assign_buckets<D>(Phi_fw, Phi_bw);
-    auto &Phi_opposite  = assign_buckets<D>(Phi_bw, Phi_fw);
-    auto &fixed_buckets = assign_buckets<D>(fw_fixed_buckets, bw_fixed_buckets);
-    auto &buckets_size  = assign_buckets<D>(fw_buckets_size, bw_buckets_size);
-
+    auto &buckets              = assign_buckets<D>(fw_buckets, bw_buckets);
+    auto &Phi                  = assign_buckets<D>(Phi_fw, Phi_bw);
+    auto &Phi_opposite         = assign_buckets<D>(Phi_bw, Phi_fw);
+    auto &fixed_buckets        = assign_buckets<D>(fw_fixed_buckets, bw_fixed_buckets);
+    auto &buckets_size         = assign_buckets<D>(fw_buckets_size, bw_buckets_size);
+    auto &fixed_buckets_bitmap = assign_buckets<D>(fw_fixed_buckets_bitmap, bw_fixed_buckets_bitmap);
     // Reset fixed_buckets
-    for (auto &fb : fixed_buckets) { std::fill(fb.begin(), fb.end(), 0); }
+    auto n_buckets = buckets_size;
+
+    // for (auto &fb : fixed_buckets) { std::fill(fb.begin(), fb.end(), 0); }
+    //  set fixed_buckets_bitmap all to 0
+    fixed_buckets_bitmap.assign(fixed_buckets_bitmap.size(), 0);
 
     using ArcMap = ankerl::unordered_dense::map<std::pair<std::pair<int, int>, int>, ankerl::unordered_dense::set<int>,
                                                 arc_map_hash>;
@@ -211,7 +215,9 @@ void BucketGraph::BucketArcElimination(double theta) {
                     });
 
                 if (!contains && Bidi_map_opposite.find(b_opposite) == Bidi_map_opposite.end()) {
-                    fixed_buckets[a.from_bucket][a.to_bucket] = 1;
+                    size_t bit_pos = a.from_bucket * n_buckets + a.to_bucket;
+                    fixed_buckets_bitmap[bit_pos / 64] |= (1ULL << (bit_pos % 64));
+
                     ++removed_arcs;
                 }
             }
@@ -294,7 +300,7 @@ void BucketGraph::ObtainJumpBucketArcs() {
 
             // Check if the path exists in the current bucket arcs
             for (const auto &gamma : arcs) {
-                if (fixed_buckets[gamma.from_bucket][gamma.to_bucket] == 1) { continue; }
+                if (is_bucket_fixed<D>(gamma.from_bucket, gamma.to_bucket)) { continue; }
 
                 const int from_node_b = buckets[gamma.from_bucket].node_id;
                 const int to_node_b   = buckets[gamma.to_bucket].node_id;
@@ -323,7 +329,7 @@ void BucketGraph::ObtainJumpBucketArcs() {
                     // Check arcs in the adjacent bucket b_prime
                     const auto &arcs_prime = buckets[b_prime].template get_bucket_arcs<D>();
                     for (const auto &gamma_prime : arcs_prime) {
-                        if (fixed_buckets[gamma_prime.from_bucket][gamma_prime.to_bucket] == 1) { continue; }
+                        if (is_bucket_fixed<D>(gamma_prime.from_bucket, gamma_prime.to_bucket)) { continue; }
 
                         const int from_node_prime = buckets[gamma_prime.from_bucket].node_id;
                         const int to_node_prime   = buckets[gamma_prime.to_bucket].node_id;
