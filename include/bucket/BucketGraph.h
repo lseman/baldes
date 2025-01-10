@@ -230,6 +230,43 @@ public:
     std::vector<std::vector<bool>> fixed_arcs;
     std::vector<std::vector<bool>> fw_fixed_buckets;
     std::vector<std::vector<bool>> bw_fixed_buckets;
+    std::vector<uint64_t>
+        fw_fixed_buckets_bitmap;  // Bitmap for fixed bucket arcs
+    std::vector<uint64_t>
+        bw_fixed_buckets_bitmap;  // Bitmap for fixed bucket arcs
+
+    template <Direction D>
+    bool is_arc_not_fixed(int from, int to) {
+        auto &fixed_buckets_bitmap =
+            assign_buckets<D>(fw_fixed_buckets_bitmap, bw_fixed_buckets_bitmap);
+        auto &buckets_size =
+            assign_buckets<D>(fw_buckets_size, bw_buckets_size);
+        // Calculate the position of the bit in fixed_buckets_bitmap
+        const size_t pos = from * buckets_size + to;
+        const size_t idx = pos >> 6;  // Index in the bitmap vector
+        const uint64_t bit = 1ULL
+                             << (pos & 63);  // Bit position within the uint64_t
+
+        // Check if the bit is not set (i.e., the arc is not fixed)
+        return (fixed_buckets_bitmap[idx] & bit) == 0;
+    }
+
+    template <Direction D>
+    bool is_arc_fixed(int from, int to) {
+        auto &fixed_buckets_bitmap =
+            assign_buckets<D>(fw_fixed_buckets_bitmap, bw_fixed_buckets_bitmap);
+        auto &buckets_size =
+            assign_buckets<D>(fw_buckets_size, bw_buckets_size);
+        // Calculate the position of the bit in fixed_buckets_bitmap
+        const size_t pos = from * buckets_size + to;
+        const size_t idx = pos >> 6;  // Index in the bitmap vector
+        const uint64_t bit = 1ULL
+                             << (pos & 63);  // Bit position within the uint64_t
+
+        // Check if the bit is not set (i.e., the arc is not fixed)
+        return (fixed_buckets_bitmap[idx] & bit) == 1;
+    }
+
 
     double gap = std::numeric_limits<double>::infinity();
 
