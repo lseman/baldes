@@ -315,12 +315,12 @@ class Stabilization {
     bool dynamic_alpha_schedule(const ModelData &dados) {
         const size_t n = cur_stab_center.size();
 
-        double relative_distance = norm(smooth_dual_sol, cur_stab_center) /
-                                   (std::abs(lp_obj) + EPSILON);
-        if (relative_distance < NORM_TOLERANCE) {
-            alpha = 0.0;
-            return false;
-        }
+        // double relative_distance = norm(smooth_dual_sol, cur_stab_center) /
+        //                            (std::abs(lp_obj) + EPSILON);
+        // if (relative_distance < NORM_TOLERANCE) {
+        //     alpha = 0.0;
+        //     return false;
+        // }
 
         std::vector<double> direction(n);
         double direction_norm = 0.0;
@@ -402,14 +402,14 @@ class Stabilization {
         lp_obj_prev = lp_obj_rounded;
 
         // If lag_gap remains constant for 3 iterations, set alpha to zero
-        if (no_progress_count >= NO_PROGRESS_THRESHOLD) {
-            alpha = 0.0;
-            base_alpha = 0.0;
-            no_progress_count =
-                0;  // Reset the counter after setting alpha to zero
-            update_subgradient(dados, nodeDuals, best_pricing_cols);
+        // if (no_progress_count >= NO_PROGRESS_THRESHOLD) {
+        //     alpha = 0.0;
+        //     base_alpha = 0.0;
+        //     no_progress_count =
+        //         0;  // Reset the counter after setting alpha to zero
+        //     update_subgradient(dados, nodeDuals, best_pricing_cols);
 
-        } else {
+        // } else {
             if (nb_misprices == 0) {
                 update_subgradient(dados, nodeDuals, best_pricing_cols);
                 bool should_increase = dynamic_alpha_schedule(dados);
@@ -426,7 +426,7 @@ class Stabilization {
                     base_alpha = alpha;
                 }
             }
-        }
+        // }
 
         DualSolution stab_sol = smooth_dual_sol;
 

@@ -1034,14 +1034,14 @@ inline bool BucketGraph::DominatedInCompWiseSmallerBuckets(
             const int b_prime = bucket_neighbors[i];
             const size_t seg_prime = b_prime >> 6;
             if (!(Bvisited[seg_prime] & bit_mask_lookup[b_prime & 63])) {
-                if (stack_size < MAX_STACK_SIZE) {
-                    stack_buffer[stack_size++] = b_prime;
-                } else {
-                    fmt::print(
-                        "Stack overflow in "
-                        "DominatedInCompWiseSmallerBuckets\n");
-                    return false;
-                }
+                // if (stack_size < MAX_STACK_SIZE) {
+                stack_buffer[stack_size++] = b_prime;
+                // } else {
+                // fmt::print(
+                // "Stack overflow in "
+                // "DominatedInCompWiseSmallerBuckets\n");
+                // return false;
+                // }
             }
         }
 

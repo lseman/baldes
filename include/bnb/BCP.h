@@ -183,7 +183,7 @@ class VRProblem {
      * Adds a column to the GRBModel.
      *
      */
-    inline int addColumn(BNBNode *node, const auto &columns,
+    inline int addColumn(BNBNode *node, const auto &columns, double &inner_obj,
                          bool enumerate = false) {
         SRC_MODE_BLOCK(auto &r1c = node->r1c; auto &cuts = r1c->cutStorage;)
         RCC_MODE_BLOCK(auto &rccManager = node->rccManager;)
@@ -202,6 +202,7 @@ class VRProblem {
         std::vector<VarType> vtypes;
 
         auto &pathSet = node->pathSet;
+        inner_obj = 0.0;
 
         auto counter = 0;
         for (auto &label : columns) {
@@ -214,6 +215,10 @@ class VRProblem {
             if (pathSet.find(path) != pathSet.end()) continue;
             // Insert the path into the set to avoid duplicates
             pathSet.insert(path);
+
+            if (label->cost < inner_obj) {
+                inner_obj = label->cost;
+            }
 
             counter += 1;
             if (counter > N_ADD - 1) break;
@@ -646,7 +651,7 @@ class VRProblem {
                     bool cleared = srcResult.second;
                     if (!violated) {
                         if (bucket_graph->A_MAX == N_SIZE) {
-                            if (std::abs(inner_obj) < 1e-3) {
+                            if (std::abs(inner_obj) < 1.0) {
                                 print_info(
                                     "No violated cuts found, calling it a "
                                     "day\n");
@@ -799,10 +804,10 @@ class VRProblem {
                     }
 
                     if (integer) {
-                        if (lp_obj < integer_solution) {
-                            print_info("Updating integer solution to {}\n",
-                                       lp_obj);
-                            integer_solution = lp_obj;
+                        if (std::round(lp_obj) < integer_solution) {
+                            // print_info("Updating integer solution to {}\n",
+                            // std::round(lp_obj));
+                            integer_solution = std::round(lp_obj);
                             bucket_graph->incumbent = integer_solution;
                             stab.clearAlpha();
                         }
@@ -866,7 +871,7 @@ class VRProblem {
 #endif
                 bucket_graph->relaxation = lp_obj;
                 bucket_graph->augment_ng_memories(solution, allPaths, true, 5,
-                                                  110, 18, N_SIZE);
+                                                  100, 20, N_SIZE);
                 SRC_MODE_BLOCK(  // SRC cuts
                     if (!SRCconstraints.empty()) {
                         // print SRCconstraints size
@@ -907,13 +912,13 @@ class VRProblem {
                 // CALLING BALDES
                 //////////////////////////////////////////////////////////////////////
                 paths = bucket_graph->solve();
-                inner_obj = bucket_graph->inner_obj;
+                // inner_obj = bucket_graph->inner_obj;
                 stage = bucket_graph->getStage();
                 ss = bucket_graph->ss;
                 //////////////////////////////////////////////////////////////////////
 
                 // Adding cols
-                colAdded = addColumn(node, paths, false);
+                colAdded = addColumn(node, paths, inner_obj, false);
 
 #ifdef RIH
                 // Adding RIH paths
@@ -1017,9 +1022,10 @@ class VRProblem {
                     "| RCC: {:3} | Paths: {:3} | "
                     "Stage: {:1} | "
                     "Lag.: {:10.4f} | α: {:4.2f} | tr: {:2.2f} | gap: {:2.4f} "
+                    "| Int.: {:4} "
                     "|\n",
                     iter, lp_obj, inner_obj, n_cuts, n_rcc_cuts, colAdded,
-                    stage, lag_gap, cur_alpha, tr_val, gap);
+                    stage, lag_gap, cur_alpha, tr_val, gap, integer_solution);
                 Logger::log(
                     "| It.: {:4} | Obj.: {:8.2f} | Price: {:9.2f} | SRC: {:3} "
                     "| RCC: {:3} | Paths: {:3} | "
@@ -1260,13 +1266,13 @@ class VRProblem {
                 // CALLING BALDES
                 //////////////////////////////////////////////////////////////////////
                 paths = bucket_graph->solveHeuristic();
-                inner_obj = paths[0]->cost;
+                // inner_obj = paths[0]->cost;
                 stage = bucket_graph->getStage();
                 ss = bucket_graph->ss;
                 //////////////////////////////////////////////////////////////////////
 
                 // Adding cols
-                colAdded = addColumn(node, paths, false);
+                colAdded = addColumn(node, paths, inner_obj, false);
 
 #ifdef STAB
                 // TODO: check if we should update this before running the stab
