@@ -63,7 +63,7 @@ class HighDimCutsGenerator {
    public:
     WorkStealingPool thread_pool;
 
-    int max_heuristic_sep_mem4_row_rank1 = 8;
+    int max_heuristic_sep_mem4_row_rank1 = 10;
 
     double max_cut_mem_factor = 0.15;
 
@@ -244,12 +244,16 @@ class HighDimCutsGenerator {
                         double add_vio = initial_vio, remove_vio = initial_vio;
                         std::pair<int, int> swap_i_j;
                         double swap_vio = initial_vio;
+                        double shift_vio = initial_vio;
+                        std::pair<int, int> shift_i_j;
 
                         addSearchCrazy(plan_idx, c_mutable, wc, add_vio, add_j);
                         removeSearchCrazy(plan_idx, c_mutable, remove_vio,
                                           remove_j);
                         swapSearchCrazy(plan_idx, c_mutable, wc, swap_vio,
                                         swap_i_j);
+                        shiftSearchCrazy(plan_idx, c_mutable, shift_vio,
+                                         shift_i_j);
 
                         double best_vio =
                             std::max({add_vio, remove_vio, swap_vio});
@@ -355,19 +359,19 @@ class HighDimCutsGenerator {
                 }
                 break;
 
-                // case 'h': // Shift operation
-                //     new_c      = c;
-                //     new_w_no_c = wc;
-                //     if (swap_i_j.first < swap_i_j.second) {
-                //         std::rotate(new_c.begin() + swap_i_j.first,
-                //         new_c.begin() + swap_i_j.first + 1,
-                //                     new_c.begin() + swap_i_j.second + 1);
-                //     } else {
-                //         std::rotate(new_c.begin() + swap_i_j.second,
-                //         new_c.begin() + swap_i_j.first,
-                //                     new_c.begin() + swap_i_j.first + 1);
-                //     }
-                //     break;
+            case 'h':  // Shift operation
+                new_c = c;
+                new_w_no_c = wc;
+                if (swap_i_j.first < swap_i_j.second) {
+                    std::rotate(new_c.begin() + swap_i_j.first,
+                                new_c.begin() + swap_i_j.first + 1,
+                                new_c.begin() + swap_i_j.second + 1);
+                } else {
+                    std::rotate(new_c.begin() + swap_i_j.second,
+                                new_c.begin() + swap_i_j.first,
+                                new_c.begin() + swap_i_j.first + 1);
+                }
+                break;
         }
     }
 
@@ -421,30 +425,22 @@ class HighDimCutsGenerator {
     std::shared_mutex cut_cache_mutex;
 
     // For the frequency accumulation loop:
-    void accumulate_frequencies_simd(int *__restrict map_r_numbers,
-                                     const auto &__restrict route_freqs,
+    void accumulate_frequencies_simd(int *__restrict__ map_r_numbers,
+                                     const int *__restrict__ route_freqs,
                                      const int route_size) noexcept {
         static constexpr int SIMD_SIZE =
             8;  // AVX2 processes 8 integers at once
         static constexpr int PREFETCH_DISTANCE = 64;  // Common cache line size
 
         // Ensure proper alignment for best performance
-        alignas(32) const int *freq_ptr = route_freqs.data();
+        alignas(32) const int *freq_ptr = route_freqs;  // No .data() needed
         alignas(32) int *map_ptr = map_r_numbers;
 
         int i = 0;
 
-        // Prefetch next cache lines
-        _mm_prefetch(
-            reinterpret_cast<const char *>(freq_ptr + PREFETCH_DISTANCE),
-            _MM_HINT_T0);
-        _mm_prefetch(
-            reinterpret_cast<const char *>(map_ptr + PREFETCH_DISTANCE),
-            _MM_HINT_T0);
-
         // Process 8 elements at a time using AVX2
         for (; i + SIMD_SIZE <= route_size; i += SIMD_SIZE) {
-            // Prefetch next iteration
+            // Prefetch next cache lines
             _mm_prefetch(reinterpret_cast<const char *>(freq_ptr + i +
                                                         PREFETCH_DISTANCE),
                          _MM_HINT_T0);
@@ -452,12 +448,13 @@ class HighDimCutsGenerator {
                 reinterpret_cast<const char *>(map_ptr + i + PREFETCH_DISTANCE),
                 _MM_HINT_T0);
 
+            // Load frequencies and current values
             __m256i freq = _mm256_loadu_si256(
                 reinterpret_cast<const __m256i *>(&freq_ptr[i]));
             __m256i curr = _mm256_loadu_si256(
                 reinterpret_cast<const __m256i *>(&map_ptr[i]));
 
-            // Optimize comparison and masking
+            // Mask frequencies greater than 0
             __m256i zero = _mm256_setzero_si256();
             __m256i mask = _mm256_cmpgt_epi32(freq, zero);
             freq = _mm256_and_si256(freq, mask);
@@ -467,7 +464,7 @@ class HighDimCutsGenerator {
             _mm256_storeu_si256(reinterpret_cast<__m256i *>(&map_ptr[i]), curr);
         }
 
-// Handle remaining elements with auto-vectorization hint
+        // Handle remaining elements with auto-vectorization hint
 #pragma omp simd
         for (; i < route_size; i++) {
             const int frequency = freq_ptr[i];
@@ -513,15 +510,11 @@ class HighDimCutsGenerator {
         tmp.reset();
 
         // Filter valid indices
-        auto valid_range =
-            cut | std::views::filter([size = v_r_map.size()](int x) {
-                return x >= 0 && static_cast<size_t>(x) < size;
-            });
-
-        for (const int it : valid_range) {
-            tmp.set(it);
+        for (int it : cut) {
+            if (it >= 0 && static_cast<size_t>(it) < v_r_map.size()) {
+                tmp.set(it);
+            }
         }
-
         if (auto cached = map_cut_plan_vio.find(tmp);
             cached && plan_idx < cached->size() &&
             !(*cached)[plan_idx].first.empty()) {
@@ -537,9 +530,20 @@ class HighDimCutsGenerator {
         const auto &coeffs = record_map_rank1_combinations[cut_size][plan_idx];
 
         map_r_numbers.assign(sol.size(), 0);
-
-        // Process frequencies
         auto indices = std::views::iota(0, cut_size);
+
+#ifdef __AVX2__
+        // Process frequencies using SIMD
+        for (int i = 0; i < cut_size; ++i) {
+            const int idx = cut[i];
+            if (idx >= 0 && static_cast<size_t>(idx) < v_r_map.size()) {
+                const auto &freqs = v_r_map[idx];
+                accumulate_frequencies_simd(map_r_numbers.data(), freqs.data(),
+                                            static_cast<int>(freqs.size()));
+            }
+        }
+#else
+        // Process frequencies
         for (int i : indices) {
             const int idx = cut[i];
             if (idx >= 0 && static_cast<size_t>(idx) < v_r_map.size()) {
@@ -550,6 +554,7 @@ class HighDimCutsGenerator {
                 }
             }
         }
+#endif
 
         // Handle cache
         if (auto cached = cut_cache.find(cut)) {
@@ -647,8 +652,10 @@ class HighDimCutsGenerator {
             }
         }
 
-        std::ranges::sort(cut_coeff, std::greater{},
-                          &std::pair<int, int>::second);
+        pdqsort(cut_coeff.begin(), cut_coeff.end(),
+                [](const std::pair<int, int> &a, const std::pair<int, int> &b) {
+                    return a.second > b.second;  // Sort in descending order
+                });
 
         new_cut.resize(cut_size);
         std::ranges::transform(cut_coeff, new_cut.begin(),
@@ -1057,11 +1064,12 @@ class HighDimCutsGenerator {
 
     void operationsCrazy(Rank1MultiLabel &label, int &i) {
         constexpr double MIN_SCORE = -std::numeric_limits<double>::max();
-        std::array<MoveResult, 4> moves{
+        std::array<MoveResult, 5> moves{
             MoveResult{label.vio},  // No operation
             MoveResult{},           // Add
             MoveResult{},           // Remove
-            MoveResult{}            // Swap
+            MoveResult{},           // Swap
+            MoveResult{}            // Shift
         };
 
         // Determine which operations to perform based on search direction
@@ -1070,7 +1078,7 @@ class HighDimCutsGenerator {
             label.search_dir == 'r' || label.search_dir == 's';
         const bool can_swap =
             label.search_dir == 'a' || label.search_dir == 'r';
-        // const bool can_shift  = label.search_dir == 'h';
+        const bool can_shift = label.search_dir == 'h';
 
         double new_vio = MIN_SCORE;
 
@@ -1098,12 +1106,12 @@ class HighDimCutsGenerator {
             moves[3].operation_data = swap_pair;
         }
 
-        // if (can_shift) {
-        //     std::pair<int, int> shift_pos;
-        //     shiftSearchCrazy(label.plan_idx, label.c, new_vio,
-        //     shift_pos); moves[4]                = MoveResult{new_vio};
-        //     moves[4].operation_data = shift_pos;
-        // }
+        if (can_shift) {
+            std::pair<int, int> shift_pos;
+            shiftSearchCrazy(label.plan_idx, label.c, new_vio, shift_pos);
+            moves[4] = MoveResult{new_vio};
+            moves[4].operation_data = shift_pos;
+        }
 
         // Find best move
         const auto best_move_it = std::max_element(
@@ -1282,13 +1290,14 @@ class HighDimCutsGenerator {
                                   << std::endl;
                     }
                 }
-                ++insertion_count;
-                if (insertion_count % 1000 == 0) {
-                    std::cout << "Insertions: " << insertion_count
-                              << ", Size: " << map_cut_plan_vio.size()
-                              << ", Capacity: " << map_cut_plan_vio.capacity()
-                              << std::endl;
-                }
+                // ++insertion_count;
+                // if (insertion_count % 1000 == 0) {
+                //     std::cout << "Insertions: " << insertion_count
+                //               << ", Size: " << map_cut_plan_vio.size()
+                //               << ", Capacity: " <<
+                //               map_cut_plan_vio.capacity()
+                //               << std::endl;
+                // }
 
                 if (num_cuts >= max_num_r1c_per_round) break;
             }

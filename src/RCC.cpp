@@ -1,4 +1,5 @@
 #include "RCC.h"
+
 #include "Cut.h"
 #include "bnb/Node.h"
 
@@ -12,16 +13,14 @@ ArcDuals RCCManager::computeDuals(BNBNode *model, double threshold) {
         double dualValue = model->getDualVal(cut.ctr->index());
 
         if (std::abs(dualValue) < 1e-3) {
-            // fmt::print("Cut {} has dual value near zero: {}\n", i, dualValue);
-            // remove cut
-            // model->remove(cut.ctr);
-            // removeCut(cut);
+            // fmt::print("Cut {} has dual value near zero: {}\n", i,
+            // dualValue); remove cut model->remove(cut.ctr); removeCut(cut);
             dualValue = 0;
         }
 
         // Sum the dual values for all arcs in this cut
         for (const auto &arc : cut.arcs) {
-            arcDuals.setOrIncrementDual(arc, dualValue); // Update arc duals
+            arcDuals.setOrIncrementDual(arc, dualValue);  // Update arc duals
         }
     }
 
@@ -30,8 +29,9 @@ ArcDuals RCCManager::computeDuals(BNBNode *model, double threshold) {
     cuts_.erase(std::remove_if(cuts_.begin(), cuts_.end(),
                                [&](const RCCut &cut, size_t i = 0) mutable {
                                    if (std::abs(dualValues[i]) < threshold) {
-                                       model->remove(cut.ctr); // Remove the constraint from the model
-                                       return true;            // Mark this cut for removal
+                                       model->remove(cut.ctr); // Remove the
+    constraint from the model return true;            // Mark this cut for
+    removal
                                    }
                                    ++i;
                                    return false; // Keep this cut
@@ -41,34 +41,38 @@ ArcDuals RCCManager::computeDuals(BNBNode *model, double threshold) {
     return arcDuals;
 }
 
-ArcDuals RCCManager::computeDuals(std::vector<double> dualValues, BNBNode *node, double threshold) {
+ArcDuals RCCManager::computeDuals(std::vector<double> dualValues, BNBNode *node,
+                                  double threshold) {
     ArcDuals arcDuals;
     // First pass: Compute dual values and store them
     for (int i = 0; i < cuts_.size(); ++i) {
-        const auto &cut       = cuts_[i];
-        double      index     = node->get_current_index(cut.ctr->get_unique_id());
-        auto        dualValue = -dualValues[index];
+        const auto &cut = cuts_[i];
+        double index = node->get_current_index(cut.ctr->get_unique_id());
+        auto dualValue = -dualValues[index];
 
-        if (std::abs(dualValue) < 1e-3) { continue; }
+        if (std::abs(dualValue) < 1e-3) {
+            continue;
+        }
 
         // Sum the dual values for all arcs in this cut
         for (const auto &arc : cut.arcs) {
-            arcDuals.setOrIncrementDual(arc, dualValue); // Update arc duals
+            arcDuals.setOrIncrementDual(arc, dualValue);  // Update arc duals
         }
     }
 
     // Second pass: Remove cuts with dual values near zero
-    /*
-    cuts_.erase(std::remove_if(cuts_.begin(), cuts_.end(),
-                               [&](const RCCut &cut, size_t i = 0) mutable {
-                                   if (std::abs(dualValues[i]) < threshold) {
-                                       model->remove(cut.ctr); // Remove the constraint from the model
-                                       return true;            // Mark this cut for removal
-                                   }
-                                   ++i;
-                                   return false; // Keep this cut
-                               }),
-                cuts_.end());
-*/
+    cuts_.erase(
+        std::remove_if(
+            cuts_.begin(), cuts_.end(),
+            [&](const RCCut &cut, size_t i = 0) mutable {
+                if (std::abs(dualValues[i]) < threshold) {
+                    node->remove(
+                        cut.ctr);  // Remove the constraint from the model
+                    return true;   // Mark this cut for removal
+                }
+                ++i;
+                return false;  // Keep this cut
+            }),
+        cuts_.end());
     return arcDuals;
 }
