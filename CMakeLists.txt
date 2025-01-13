@@ -252,7 +252,7 @@ endif()
 #find_package(FMT)
 #if(NOT FMT_FOUND)
 #  message(STATUS "FMT not found, using bundled version")
-  cpmaddpackage(NAME fmt GITHUB_REPOSITORY fmtlib/fmt GIT_TAG 11.1.1)
+  cpmaddpackage(NAME fmt GITHUB_REPOSITORY fmtlib/fmt GIT_TAG 11.1.2)
 #endif()
 
 if(IPM)

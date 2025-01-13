@@ -31,6 +31,7 @@
 #include <condition_variable>
 
 #include "Bucket.h"
+#include "CostFunction.h"
 #include "Cut.h"
 #include "Definitions.h"
 #include "Dual.h"
@@ -42,7 +43,6 @@
 #include "Trees.h"
 #include "UnionFind.h"
 #include "VRPNode.h"
-#include "muSPP.h"
 
 #define RCESPP_TOL_ZERO 1.E-6
 
@@ -73,6 +73,8 @@ class BucketGraph {
     using NGRouteBitmap = uint64_t;
 
    public:
+    CostFunction cost_calculator;
+
     BucketOptions options;
     void mono_initialization();
     Label *compute_mono_label(const Label *L);
@@ -1311,46 +1313,6 @@ class BucketGraph {
         }
 
         return adjacency_list;
-    }
-    template <Symmetry SYM>
-    std::vector<std::vector<int>> solve_min_cost_flow(int source, int sink) {
-        fmt::print("Generating adjacency list...\n");
-        auto adj_list = get_adjacency_list<SYM>();
-
-        auto labels =
-            bi_labeling_algorithm<Stage::Eliminate, Symmetry::Asymmetric>();
-        auto initial_path = labels[0]->getRoute();
-        MUSSP solver;
-
-        // addNode for each node
-        std::vector<MUSSP::Node *> SPPnodes = {};
-        fmt::print("Adding nodes...\n");
-        for (auto i = 0; i < nodes.size(); ++i) {
-            SPPnodes.push_back(solver.addNode());
-        }
-        fmt::print("Added {} nodes\n", SPPnodes.size());
-
-        solver.setSource(SPPnodes[source]);
-        solver.setSink(SPPnodes[sink]);
-
-        // addEdge
-        for (const auto &[from_node, arcs] : adj_list) {
-            for (const auto &[to_node, cost, capacity] : arcs) {
-                // fmt::print("Adding edge from {} to {} with cost {} and
-                // capacity {}\n", from_node, to_node, cost, capacity);
-                solver.addEdge(SPPnodes[from_node], SPPnodes[to_node], cost,
-                               capacity);
-            }
-        }
-
-        fmt::print("Solving minimum cost flow...\n");
-        solver.solve();
-        // auto path_set = solver.getPaths();
-
-        // for (auto label : labels) { path_set.push_back(label->getRoute()); }
-        //  path_set.push_back(initial_path);
-        std::vector<std::vector<int>> path_set;
-        return path_set;  // Return all computed paths
     }
 
    private:
