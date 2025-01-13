@@ -26,6 +26,7 @@
 #include "bucket/BucketGraph.h"
 #include "bucket/BucketSolve.h"
 #include "bucket/BucketUtils.h"
+#include "solvers/Gurobi.h"
 
 #ifdef STAB
 #include "extra/Stabilization.h"
@@ -543,7 +544,7 @@ class VRProblem {
         bucket_graph->topHeurRoutes = node->bestRoutes;
 
         matrix = node->extractModelDataSparse();
-        auto integer_solution = node->getObjVal();
+        auto integer_solution = node->integer_sol;
         bucket_graph->incumbent = integer_solution;
 
         SRC_MODE_BLOCK(
@@ -793,7 +794,7 @@ class VRProblem {
 #endif
                 {
                     for (auto sol : solution) {
-                        if (sol > 1e-2 && sol < 1 - 1e-2) {
+                        if (sol > 1e-1 && sol < 1 - 1e-1) {
                             integer = false;
                             break;
                         }
@@ -1013,6 +1014,15 @@ class VRProblem {
             SRC_MODE_BLOCK(n_cuts = cuts->size();)
             RCC_MODE_BLOCK(n_rcc_cuts = rccManager->size();)
 
+#ifdef GUROBI
+            if (iter % 250 == 0 && stage == 4) {
+                auto toRemoveIndices = node->mip.reduceNonBasicVariables(0.8);
+                for (auto &index : toRemoveIndices) {
+                    allPaths.erase(allPaths.begin() + index);
+                }
+            }
+#endif
+
 #ifdef TR
             tr_val = v;
 #endif
@@ -1165,7 +1175,8 @@ class VRProblem {
 
         // node->optimize();
         matrix = node->extractModelDataSparse();
-        auto integer_solution = node->getObjVal();
+        // auto integer_solution = node->getObjVal();
+        auto integer_solution = node->integer_sol;
         bucket_graph->incumbent = integer_solution;
 
         auto allNodes = bucket_graph->getNodes();
