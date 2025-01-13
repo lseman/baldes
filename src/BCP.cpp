@@ -1,10 +1,11 @@
 #include "bnb/BCP.h"
+
 #include "bnb/Branching.h"
 
 std::unique_ptr<VRProblem> VRProblem::clone() const {
-    auto newProblem      = std::make_unique<VRProblem>();
+    auto newProblem = std::make_unique<VRProblem>();
     newProblem->instance = instance;
-    newProblem->nodes    = nodes;
+    newProblem->nodes = nodes;
     return newProblem;
 }
 
@@ -14,11 +15,10 @@ void VRProblem::branch(BNBNode *node) {
 
     node->relaxNode();
 
-    auto candidates       = Branching::VRPStandardBranching(node, &instance, this);
+    auto candidates = Branching::VRPStandardBranching(node, &instance, this);
     auto candidateCounter = 0;
 
     for (auto candidate : candidates) {
-
         if (node->hasCandidate(candidate)) continue;
         if (node->hasRaisedChild(candidate)) continue;
 
@@ -36,4 +36,3 @@ void VRProblem::branch(BNBNode *node) {
     fmt::print("\033[34m_FINISHED BRANCH PROCEDURE \033[0m");
     fmt::print("\n");
 }
-

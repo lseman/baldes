@@ -1,3 +1,5 @@
+#include "Individual.h"
+
 #include <algorithm>
 #include <cfloat>
 #include <fstream>
@@ -6,31 +8,47 @@
 #include <vector>
 
 #include "Definitions.h"
-#include "Individual.h"
 #include "Params.h"
 #include "fmt/core.h"
 
 void Individual::evaluateCompleteCost() {
     myCostSol = CostSol();
+
+    // Precompute timeCost.get results for all customer pairs in each route
+    std::vector<std::vector<int>> timeCostCache(params->nbVehicles);
+    for (int r = 0; r < params->nbVehicles; ++r) {
+        if (chromR[r].empty()) continue;
+        timeCostCache[r].resize(chromR[r].size());
+        timeCostCache[r][0] = params->timeCost.get(0, chromR[r][0]);
+        for (int i = 1; i < static_cast<int>(chromR[r].size()); ++i) {
+            timeCostCache[r][i] =
+                params->timeCost.get(chromR[r][i - 1], chromR[r][i]);
+        }
+    }
+
+    // Evaluate each route
     for (int r = 0; r < params->nbVehicles; ++r) {
         if (chromR[r].empty()) continue;
 
+        // Find the latest release time in the route
         int latestReleaseTime = params->cli[chromR[r][0]].releaseTime;
         for (int i = 1; i < static_cast<int>(chromR[r].size()); ++i) {
-            latestReleaseTime = std::max(latestReleaseTime, params->cli[chromR[r][i]].releaseTime);
+            latestReleaseTime = std::max(latestReleaseTime,
+                                         params->cli[chromR[r][i]].releaseTime);
         }
 
-        int distance = params->timeCost.get(0, chromR[r][0]);
-        int load     = params->cli[chromR[r][0]].demand;
-        int service  = params->cli[chromR[r][0]].serviceDuration;
-        int time     = latestReleaseTime + distance;
+        // Initialize route metrics
+        int distance = timeCostCache[r][0];
+        int load = params->cli[chromR[r][0]].demand;
+        int service = params->cli[chromR[r][0]].serviceDuration;
+        int time = latestReleaseTime + distance;
         int waitTime = 0, timeWarp = 0;
 
-        // Handle time windows if n_tw > 0
+        // Handle time windows for the first customer
         if (params->cli[chromR[r][0]].n_tw > 0) {
-            // Use multiple time windows
             auto &firstTimeWindows = params->cli[chromR[r][0]].timeWindows;
-            time                   = adjustToTimeWindow(time, firstTimeWindows, waitTime, timeWarp);
+            time =
+                adjustToTimeWindow(time, firstTimeWindows, waitTime, timeWarp);
         } else {
             // Single time window logic
             if (time < params->cli[chromR[r][0]].earliestArrival) {
@@ -43,17 +61,19 @@ void Individual::evaluateCompleteCost() {
 
         predecessors[chromR[r][0]] = 0;
 
+        // Evaluate the rest of the route
         for (int i = 1; i < static_cast<int>(chromR[r].size()); ++i) {
             int prev = chromR[r][i - 1], curr = chromR[r][i];
-            distance += params->timeCost.get(prev, curr);
+            distance += timeCostCache[r][i];
             load += params->cli[curr].demand;
             service += params->cli[curr].serviceDuration;
-            time += params->cli[prev].serviceDuration + params->timeCost.get(prev, curr);
+            time += params->cli[prev].serviceDuration + timeCostCache[r][i];
 
-            // Handle time windows if n_tw > 0
+            // Handle time windows for the current customer
             if (params->cli[curr].n_tw > 0) {
                 auto &currTimeWindows = params->cli[curr].timeWindows;
-                time                  = adjustToTimeWindow(time, currTimeWindows, waitTime, timeWarp);
+                time = adjustToTimeWindow(time, currTimeWindows, waitTime,
+                                          timeWarp);
             } else {
                 // Single time window logic
                 if (time < params->cli[curr].earliestArrival) {
@@ -66,22 +86,25 @@ void Individual::evaluateCompleteCost() {
             }
 
             predecessors[curr] = prev;
-            successors[prev]   = curr;
+            successors[prev] = curr;
         }
 
+        // Finalize the route
         successors[chromR[r].back()] = 0;
         distance += params->timeCost.get(chromR[r].back(), 0);
-        time += params->cli[chromR[r].back()].serviceDuration + params->timeCost.get(chromR[r].back(), 0);
+        time += params->cli[chromR[r].back()].serviceDuration +
+                params->timeCost.get(chromR[r].back(), 0);
 
-        // Final depot logic (assuming depot time window)
+        // Handle depot time window
         if (time > params->cli[0].latestArrival) {
             timeWarp += time - params->cli[0].latestArrival;
             time = params->cli[0].latestArrival;
         }
 
+        // Update solution metrics
         myCostSol.distance += distance;
-
-        if (params->problemType == ProblemType::vrptw || params->problemType == ProblemType::evrp) {
+        if (params->problemType == ProblemType::vrptw ||
+            params->problemType == ProblemType::evrp) {
             myCostSol.timeWarp += timeWarp;
             myCostSol.waitTime += waitTime;
         } else {
@@ -90,17 +113,27 @@ void Individual::evaluateCompleteCost() {
         }
         myCostSol.nbRoutes++;
 
-        if (load > params->vehicleCapacity) { myCostSol.capacityExcess += load - params->vehicleCapacity; }
+        if (load > params->vehicleCapacity) {
+            myCostSol.capacityExcess += load - params->vehicleCapacity;
+        }
     }
 
-    myCostSol.penalizedCost = myCostSol.distance + myCostSol.capacityExcess * params->penaltyCapacity +
-                              myCostSol.timeWarp * params->penaltyTimeWarp +
-                              myCostSol.waitTime * params->penaltyWaitTime;
-    isFeasible = (myCostSol.capacityExcess < MY_EPSILON && myCostSol.timeWarp < MY_EPSILON);
+    // Calculate penalized cost
+    myCostSol.penalizedCost =
+        myCostSol.distance +
+        myCostSol.capacityExcess * params->penaltyCapacity +
+        myCostSol.timeWarp * params->penaltyTimeWarp +
+        myCostSol.waitTime * params->penaltyWaitTime;
+
+    // Check feasibility
+    isFeasible = (myCostSol.capacityExcess < MY_EPSILON &&
+                  myCostSol.timeWarp < MY_EPSILON);
 }
 
 // Helper function to adjust time based on multiple time windows
-int Individual::adjustToTimeWindow(int time, const std::vector<TimeWindow> &timeWindows, int &waitTime, int &timeWarp) {
+int Individual::adjustToTimeWindow(int time,
+                                   const std::vector<TimeWindow> &timeWindows,
+                                   int &waitTime, int &timeWarp) {
     for (const auto &window : timeWindows) {
         if (time < window.earliestArrival) {
             waitTime += window.earliestArrival - time;
@@ -116,36 +149,51 @@ int Individual::adjustToTimeWindow(int time, const std::vector<TimeWindow> &time
 
 void Individual::shuffleChromT() {
     // Initialize the chromT with values from 1 to nbClients
-    for (int i = 0; i < params->nbClients; i++) { chromT[i] = i + 1; }
+    for (int i = 0; i < params->nbClients; i++) {
+        chromT[i] = i + 1;
+    }
     // Do a random shuffle chromT from begin to end
     std::shuffle(chromT.begin(), chromT.end(), params->rng);
 }
 
 void Individual::removeProximity(Individual *indiv) {
     // Find indiv in indivsPerProximity
-    auto it = std::find_if(indivsPerProximity.begin(), indivsPerProximity.end(),
-                           [indiv](const auto &pair) { return pair.second == indiv; });
+    auto it = std::find_if(
+        indivsPerProximity.begin(), indivsPerProximity.end(),
+        [indiv](const auto &pair) { return pair.second == indiv; });
     // Remove if found
-    if (it != indivsPerProximity.end()) { indivsPerProximity.erase(it); }
+    if (it != indivsPerProximity.end()) {
+        indivsPerProximity.erase(it);
+    }
 }
 
 double Individual::brokenPairsDistance(Individual *indiv2) {
-    // Initialize the difference to zero. Then loop over all clients of this individual
+    // Initialize the difference to zero. Then loop over all clients of this
+    // individual
     int differences = 0;
     for (int j = 1; j <= params->nbClients; j++) {
-        // Increase the difference if the successor of j in this individual is not directly linked to j in indiv2
-        if (successors[j] != indiv2->successors[j] && successors[j] != indiv2->predecessors[j]) { differences++; }
-        // Last loop covers all but the first arc. Increase the difference if the predecessor of j in this individual is
+        // Increase the difference if the successor of j in this individual is
         // not directly linked to j in indiv2
-        if (predecessors[j] == 0 && indiv2->predecessors[j] != 0 && indiv2->successors[j] != 0) { differences++; }
+        if (successors[j] != indiv2->successors[j] &&
+            successors[j] != indiv2->predecessors[j]) {
+            differences++;
+        }
+        // Last loop covers all but the first arc. Increase the difference if
+        // the predecessor of j in this individual is not directly linked to j
+        // in indiv2
+        if (predecessors[j] == 0 && indiv2->predecessors[j] != 0 &&
+            indiv2->successors[j] != 0) {
+            differences++;
+        }
     }
     return static_cast<double>(differences) / params->nbClients;
 }
 
 double Individual::averageBrokenPairsDistanceClosest(int nbClosest) {
-    double result  = 0;
-    int    maxSize = std::min(nbClosest, static_cast<int>(indivsPerProximity.size()));
-    auto   it      = indivsPerProximity.begin();
+    double result = 0;
+    int maxSize =
+        std::min(nbClosest, static_cast<int>(indivsPerProximity.size()));
+    auto it = indivsPerProximity.begin();
     for (int i = 0; i < maxSize; i++) {
         result += it->first;
         ++it;
@@ -155,29 +203,31 @@ double Individual::averageBrokenPairsDistanceClosest(int nbClosest) {
 
 Individual::Individual(Params *params, bool initializeChromTAndShuffle)
     : params(params), isFeasible(false), biasedFitness(0) {
-    successors   = std::vector<int>(params->nbClients + 1);
+    successors = std::vector<int>(params->nbClients + 1);
     predecessors = std::vector<int>(params->nbClients + 1);
-    chromR       = std::vector<std::vector<int>>(params->nbVehicles);
-    chromT       = std::vector<int>(params->nbClients);
-    if (initializeChromTAndShuffle) { shuffleChromT(); }
+    chromR = std::vector<std::vector<int>>(params->nbVehicles);
+    chromT = std::vector<int>(params->nbClients);
+    if (initializeChromTAndShuffle) {
+        shuffleChromT();
+    }
 }
 
-Individual::Individual(Params *params, std::string solutionStr) : params(params), isFeasible(false), biasedFitness(0) {
-    successors   = std::vector<int>(params->nbClients + 1);
+Individual::Individual(Params *params, std::string solutionStr)
+    : params(params), isFeasible(false), biasedFitness(0) {
+    successors = std::vector<int>(params->nbClients + 1);
     predecessors = std::vector<int>(params->nbClients + 1);
-    chromR       = std::vector<std::vector<int>>(params->nbVehicles);
-    chromT       = std::vector<int>(params->nbClients);
+    chromR = std::vector<std::vector<int>>(params->nbVehicles);
+    chromT = std::vector<int>(params->nbClients);
 
     std::stringstream ss(solutionStr);
-    int               inputCustomer;
+    int inputCustomer;
     // Loops as long as there is an integer to read
-    int pos   = 0;
+    int pos = 0;
     int route = 0;
     while (ss >> inputCustomer) {
         if (inputCustomer == 0) {
             // Depot
             route++;
-            assert(route < params->nbVehicles);
         } else {
             chromR[route].push_back(inputCustomer);
             chromT[pos] = inputCustomer;
@@ -188,371 +238,209 @@ Individual::Individual(Params *params, std::string solutionStr) : params(params)
     evaluateCompleteCost();
 }
 
-Individual::Individual(Params *params, bool rcws, std::vector<std::vector<int>> *pattern) {
-    successors   = std::vector<int>(params->nbClients + 1);
+Individual::Individual(Params *params, bool rcws,
+                       std::vector<std::vector<int>> *pattern) {
+    successors = std::vector<int>(params->nbClients + 1);
     predecessors = std::vector<int>(params->nbClients + 1);
-    chromR       = std::vector<std::vector<int>>(params->nbVehicles);
-    chromT       = std::vector<int>(params->nbClients);
+    chromR = std::vector<std::vector<int>>(params->nbVehicles);
+    chromT = std::vector<int>(params->nbClients);
     this->params = params;
 
-    if (rcws) // initialize the individual with a randomized version of the Clarke & Wright savings heuristic
-    {
-        std::vector<bool>    inRoute                    = std::vector<bool>(params->nbClients + 1, false);
-        std::vector<bool>    interior                   = std::vector<bool>(params->nbClients + 1, false);
-        std::vector<double>  load                       = std::vector<double>(params->nbVehicles, 0);
-        std::vector<Savings> tournamentSavings          = std::vector<Savings>(6);
-        std::vector<double>  selectionProbabilities     = std::vector<double>(6);
-        int                  tournamentSavingsOccupancy = 0;
-        unsigned             savingsCount               = 0;
-        int                  nextEmptyRoute             = 0;
-        int                  nbVehicles                 = params->nbVehicles;
-        auto                 problem_type               = params->problemType;
-        // Initialize arrival_times for each vehicle
-        std::vector<std::vector<double>> arrival_times(params->nbVehicles);
+    if (rcws) {
+        // Initialize helper vectors
+        std::vector<bool> inRoute(params->nbClients + 1, false);
+        std::vector<bool> interior(params->nbClients + 1, false);
+        std::vector<double> load(params->nbVehicles, 0);
+        int nextEmptyRoute = 0;
 
-        for (int r = 0; r < params->nbVehicles; ++r) {
-            arrival_times[r].resize(chromR[r].size()); // Resize based on the number of customers in the route
-        }
-
-        if (pattern) // insert pattern
+        // Insert pattern if provided
+        if (pattern) {
             for (unsigned r = 0; r < pattern->size(); r++) {
-                if (nextEmptyRoute == nbVehicles) {
-                    nbVehicles++;
+                if (nextEmptyRoute == params->nbVehicles) {
                     chromR.push_back(std::vector<int>());
                     load.push_back(0);
+                    params->nbVehicles++;
                 }
                 for (unsigned c = 0; c < (*pattern)[r].size(); c++) {
                     chromR[nextEmptyRoute].push_back((*pattern)[r][c]);
-                    load[nextEmptyRoute] += params->cli[(*pattern)[r][c]].demand;
+                    load[nextEmptyRoute] +=
+                        params->cli[(*pattern)[r][c]].demand;
                     inRoute[(*pattern)[r][c]] = true;
-                    if (c && c != (*pattern)[r].size() - 1) interior[(*pattern)[r][c]] = true;
+                    if (c && c != (*pattern)[r].size() - 1)
+                        interior[(*pattern)[r][c]] = true;
                 }
-                while (nextEmptyRoute < nbVehicles && !chromR[nextEmptyRoute].empty()) nextEmptyRoute++;
-            }
-
-        while (savingsCount < params->savingsList.size() || tournamentSavingsOccupancy > 0) {
-            int tournamentSize = std::min(2 + std::rand() % 5, (int)params->savingsList.size() - (int)savingsCount +
-                                                                   tournamentSavingsOccupancy);
-
-            while (tournamentSavingsOccupancy < tournamentSize) {
-                Savings s = params->savingsList[savingsCount++];
-                if (s.value > 0)
-                    tournamentSavings[tournamentSavingsOccupancy++] = s;
-                else {
-                    tournamentSize = tournamentSavingsOccupancy;
-                    savingsCount   = params->savingsList.size();
-                }
-            }
-
-            double tournamentSavingsSum = 0;
-            for (int i = 0; i < tournamentSize; i++) tournamentSavingsSum += tournamentSavings[i].value;
-
-            for (int i = 0; i < tournamentSize; i++)
-                selectionProbabilities[i] = tournamentSavings[i].value / tournamentSavingsSum;
-
-            double cumulativeProbability = 0;
-            double rand                  = (double)std::rand() / RAND_MAX;
-
-            for (int i = 0; i < tournamentSize; i++) {
-                if (rand <= selectionProbabilities[i] + cumulativeProbability) {
-                    // Process tournamentSavings[i]
-                    if (params->cli[tournamentSavings[i].c1].demand + params->cli[tournamentSavings[i].c2].demand <=
-                        params->vehicleCapacity) {
-                        if (!inRoute[tournamentSavings[i].c1] && !inRoute[tournamentSavings[i].c2]) {
-                            if (nextEmptyRoute == nbVehicles) {
-                                nbVehicles++;
-                                chromR.push_back(std::vector<int>());
-                                load.push_back(0);
-                            }
-
-                            if (problem_type == ProblemType::vrptw || params->problemType == ProblemType::evrp) {
-                                // Add time window feasibility check before adding both customers
-                                if (is_time_window_feasible(tournamentSavings[i].c1, chromR[nextEmptyRoute], *params) &&
-                                    is_time_window_feasible(tournamentSavings[i].c2, chromR[nextEmptyRoute], *params)) {
-                                    chromR[nextEmptyRoute].push_back(tournamentSavings[i].c1);
-                                    chromR[nextEmptyRoute].push_back(tournamentSavings[i].c2);
-                                    load[nextEmptyRoute] += params->cli[tournamentSavings[i].c1].demand +
-                                                            params->cli[tournamentSavings[i].c2].demand;
-                                    inRoute[tournamentSavings[i].c1] = true;
-                                    inRoute[tournamentSavings[i].c2] = true;
-                                }
-                            } else {
-                                chromR[nextEmptyRoute].push_back(tournamentSavings[i].c1);
-                                chromR[nextEmptyRoute].push_back(tournamentSavings[i].c2);
-                                load[nextEmptyRoute] += params->cli[tournamentSavings[i].c1].demand +
-                                                        params->cli[tournamentSavings[i].c2].demand;
-                                inRoute[tournamentSavings[i].c1] = true;
-                                inRoute[tournamentSavings[i].c2] = true;
-                            }
-
-                            while (nextEmptyRoute < nbVehicles && !chromR[nextEmptyRoute].empty()) nextEmptyRoute++;
-                        } else if (inRoute[tournamentSavings[i].c1] && !interior[tournamentSavings[i].c1] &&
-                                   !inRoute[tournamentSavings[i].c2]) {
-                            for (int r = 0; r < nbVehicles; r++)
-                                if (!chromR[r].empty()) {
-                                    if (chromR[r].front() == tournamentSavings[i].c1) {
-                                        if (load[r] + params->cli[tournamentSavings[i].c2].demand <=
-                                            params->vehicleCapacity) {
-                                            chromR[r].insert(chromR[r].begin(), tournamentSavings[i].c2);
-                                            load[r] += params->cli[tournamentSavings[i].c2].demand;
-                                            inRoute[tournamentSavings[i].c2] = true;
-                                            if (chromR[r].size() > 2) interior[tournamentSavings[i].c1] = true;
-                                        }
-                                        break;
-                                    } else if (chromR[r].back() == tournamentSavings[i].c1) {
-                                        if (load[r] + params->cli[tournamentSavings[i].c2].demand <=
-                                            params->vehicleCapacity) {
-                                            chromR[r].push_back(tournamentSavings[i].c2);
-                                            load[r] += params->cli[tournamentSavings[i].c2].demand;
-                                            inRoute[tournamentSavings[i].c2] = true;
-                                            if (chromR[r].size() > 2) interior[tournamentSavings[i].c1] = true;
-                                        }
-                                        break;
-                                    }
-                                }
-                        } else if (inRoute[tournamentSavings[i].c2] && !interior[tournamentSavings[i].c2] &&
-                                   !inRoute[tournamentSavings[i].c1]) {
-                            for (int r = 0; r < nbVehicles; r++)
-                                if (!chromR[r].empty()) {
-                                    if (chromR[r].front() == tournamentSavings[i].c2) {
-                                        if (load[r] + params->cli[tournamentSavings[i].c1].demand <=
-                                            params->vehicleCapacity) {
-                                            chromR[r].insert(chromR[r].begin(), tournamentSavings[i].c1);
-                                            load[r] += params->cli[tournamentSavings[i].c1].demand;
-                                            inRoute[tournamentSavings[i].c1] = true;
-                                            if (chromR[r].size() > 2) interior[tournamentSavings[i].c2] = true;
-                                        }
-                                        break;
-                                    } else if (chromR[r].back() == tournamentSavings[i].c2) {
-                                        if (load[r] + params->cli[tournamentSavings[i].c1].demand <=
-                                            params->vehicleCapacity) {
-                                            chromR[r].push_back(tournamentSavings[i].c1);
-                                            load[r] += params->cli[tournamentSavings[i].c1].demand;
-                                            inRoute[tournamentSavings[i].c1] = true;
-                                            if (chromR[r].size() > 2) interior[tournamentSavings[i].c2] = true;
-                                        }
-                                        break;
-                                    }
-                                }
-                        } else if (inRoute[tournamentSavings[i].c1] && !interior[tournamentSavings[i].c1] &&
-                                   inRoute[tournamentSavings[i].c2] && !interior[tournamentSavings[i].c2]) {
-                            int r1   = -1;
-                            int r2   = -1;
-                            int pos1 = 0;
-                            int pos2 = 0;
-
-                            for (int r = 0; r < nbVehicles; r++) {
-                                if (!chromR[r].empty()) {
-                                    if (chromR[r].front() == tournamentSavings[i].c1) {
-                                        r1   = r;
-                                        pos1 = 0;
-                                    } else if (chromR[r].back() == tournamentSavings[i].c1) {
-                                        r1   = r;
-                                        pos1 = chromR[r].size() - 1;
-                                    }
-
-                                    if (chromR[r].front() == tournamentSavings[i].c2) {
-                                        r2   = r;
-                                        pos2 = 0;
-                                    } else if (chromR[r].back() == tournamentSavings[i].c2) {
-                                        r2   = r;
-                                        pos2 = chromR[r].size() - 1;
-                                    }
-
-                                    if (r1 > -1 && r2 > -1) {
-                                        // Ensure routes r1 and r2 are not the same, and the total load doesn't exceed
-                                        // vehicle capacity
-                                        if (r1 != r2 && load[r1] + load[r2] <= params->vehicleCapacity) {
-
-                                            // Merge at pos1 == 0 (front of r1), or at pos1 == end
-                                            if (pos1 == 0) {
-                                                if (pos2 == 0) {
-                                                    // Check time window feasibility before merging r2 into the front of
-                                                    // r1
-                                                    if (problem_type == ProblemType::vrptw || params->problemType == ProblemType::evrp) {
-                                                        if (is_time_window_feasible(tournamentSavings[i].c1, chromR[r2],
-                                                                                    *params)) {
-                                                            chromR[r1].insert(chromR[r1].begin(), chromR[r2].rbegin(),
-                                                                              chromR[r2].rend());
-                                                            load[r1] += load[r2];
-                                                            chromR[r2].clear();
-                                                            load[r2] = 0;
-                                                            if (r2 < nextEmptyRoute) nextEmptyRoute = r2;
-
-                                                            // Update arrival times after merging
-                                                            update_arrival_times(chromR[r1], arrival_times[r1],
-                                                                                 *params);
-                                                        }
-                                                    } else {
-                                                        chromR[r1].insert(chromR[r1].begin(), chromR[r2].rbegin(),
-                                                                          chromR[r2].rend());
-                                                        load[r1] += load[r2];
-                                                        chromR[r2].clear();
-                                                        load[r2] = 0;
-                                                        if (r2 < nextEmptyRoute) nextEmptyRoute = r2;
-                                                    }
-                                                } else {
-                                                    // Check time window feasibility before merging r1 into the back of
-                                                    // r2
-                                                    if (problem_type == ProblemType::vrptw || params->problemType == ProblemType::evrp) {
-
-                                                        if (is_time_window_feasible(tournamentSavings[i].c2, chromR[r1],
-                                                                                    *params)) {
-                                                            chromR[r2].insert(chromR[r2].end(), chromR[r1].begin(),
-                                                                              chromR[r1].end());
-                                                            load[r2] += load[r1];
-                                                            chromR[r1].clear();
-                                                            load[r1] = 0;
-                                                            if (r1 < nextEmptyRoute) nextEmptyRoute = r1;
-
-                                                            // Update arrival times after merging
-                                                            update_arrival_times(chromR[r2], arrival_times[r2],
-                                                                                 *params);
-                                                        }
-                                                    } else {
-                                                        chromR[r2].insert(chromR[r2].end(), chromR[r1].begin(),
-                                                                          chromR[r1].end());
-                                                        load[r2] += load[r1];
-                                                        chromR[r1].clear();
-                                                        load[r1] = 0;
-                                                        if (r1 < nextEmptyRoute) nextEmptyRoute = r1;
-                                                    }
-                                                }
-
-                                                interior[tournamentSavings[i].c1] = true;
-                                                interior[tournamentSavings[i].c2] = true;
-                                            } else if (pos2 == 0) {
-                                                // Check time window feasibility before merging r2 into the back of r1
-
-                                                if (problem_type == ProblemType::vrptw || params->problemType == ProblemType::evrp) {
-
-                                                    if (is_time_window_feasible(tournamentSavings[i].c1, chromR[r2],
-                                                                                *params)) {
-                                                        chromR[r1].insert(chromR[r1].end(), chromR[r2].begin(),
-                                                                          chromR[r2].end());
-                                                        load[r1] += load[r2];
-                                                        chromR[r2].clear();
-                                                        load[r2] = 0;
-                                                        if (r2 < nextEmptyRoute) nextEmptyRoute = r2;
-
-                                                        // Update arrival times after merging
-                                                        update_arrival_times(chromR[r1], arrival_times[r1], *params);
-                                                    }
-                                                } else {
-                                                    chromR[r1].insert(chromR[r1].end(), chromR[r2].begin(),
-                                                                      chromR[r2].end());
-                                                    load[r1] += load[r2];
-                                                    chromR[r2].clear();
-                                                    load[r2] = 0;
-                                                    if (r2 < nextEmptyRoute) nextEmptyRoute = r2;
-                                                }
-
-                                                interior[tournamentSavings[i].c1] = true;
-                                                interior[tournamentSavings[i].c2] = true;
-                                            } else {
-                                                // Check time window feasibility before merging r1 into the back of r2
-                                                if (problem_type == ProblemType::vrptw || params->problemType == ProblemType::evrp) {
-
-                                                    if (is_time_window_feasible(tournamentSavings[i].c2, chromR[r1],
-                                                                                *params)) {
-                                                        chromR[r1].insert(chromR[r1].end(), chromR[r2].rbegin(),
-                                                                          chromR[r2].rend());
-                                                        load[r1] += load[r2];
-                                                        chromR[r2].clear();
-                                                        load[r2] = 0;
-                                                        if (r2 < nextEmptyRoute) nextEmptyRoute = r2;
-
-                                                        // Update arrival times after merging
-                                                        update_arrival_times(chromR[r1], arrival_times[r1], *params);
-                                                    }
-                                                } else {
-                                                    chromR[r1].insert(chromR[r1].end(), chromR[r2].rbegin(),
-                                                                      chromR[r2].rend());
-                                                    load[r1] += load[r2];
-                                                    chromR[r2].clear();
-                                                    load[r2] = 0;
-                                                    if (r2 < nextEmptyRoute) nextEmptyRoute = r2;
-                                                }
-
-                                                interior[tournamentSavings[i].c1] = true;
-                                                interior[tournamentSavings[i].c2] = true;
-                                            }
-                                        }
-
-                                        break;
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                    // Update tournament structures
-                    for (int j = i; j < tournamentSavingsOccupancy - 1; j++)
-                        tournamentSavings[j] = tournamentSavings[j + 1];
-
-                    tournamentSavingsOccupancy--;
-                    break;
-                }
-                cumulativeProbability += selectionProbabilities[i];
+                while (nextEmptyRoute < params->nbVehicles &&
+                       !chromR[nextEmptyRoute].empty())
+                    nextEmptyRoute++;
             }
         }
 
-        int i = nextEmptyRoute + 1;
-        while (nextEmptyRoute < nbVehicles && i < nbVehicles) {
-            if (!chromR[i].empty()) {
-                std::vector<int> temp  = chromR[nextEmptyRoute];
-                chromR[nextEmptyRoute] = chromR[i];
-                chromR[i]              = temp;
-                while (nextEmptyRoute < nbVehicles && !chromR[nextEmptyRoute].empty()) nextEmptyRoute++;
-                i = nextEmptyRoute;
-            }
-            i++;
-        }
+        // Process savings list
+        unsigned savingsCount = 0;
+        while (savingsCount < params->savingsList.size()) {
+            Savings s = params->savingsList[savingsCount++];
+            if (s.value <= 0) continue;  // Skip invalid savings
 
-        for (int i = 0; i < nbVehicles - params->nbVehicles; i++) chromR.pop_back();
-
-        for (int i = 1; i <= params->nbClients; i++)
-            if (!inRoute[i]) {
-                int    bestRoute         = -1;
-                double bestInsertionCost = DBL_MAX;
-                for (int r = 0; r < params->nbVehicles; r++)
-                    if (load[r] + params->cli[i].demand <= params->vehicleCapacity) {
-                        int c = 0;
-                        if (!chromR[r].empty()) c = chromR[r].back();
-
-                        if (params->timeCost[c][i] < bestInsertionCost) {
-                            bestRoute         = r;
-                            bestInsertionCost = params->timeCost[c][i];
-                        }
+            // Check feasibility and merge routes
+            if (params->cli[s.c1].demand + params->cli[s.c2].demand <=
+                params->vehicleCapacity) {
+                if (!inRoute[s.c1] && !inRoute[s.c2]) {
+                    // Create a new route
+                    if (nextEmptyRoute == params->nbVehicles) {
+                        chromR.push_back(std::vector<int>());
+                        load.push_back(0);
+                        params->nbVehicles++;
                     }
-
-                if (bestRoute < 0)
+                    chromR[nextEmptyRoute].push_back(s.c1);
+                    chromR[nextEmptyRoute].push_back(s.c2);
+                    load[nextEmptyRoute] +=
+                        params->cli[s.c1].demand + params->cli[s.c2].demand;
+                    inRoute[s.c1] = inRoute[s.c2] = true;
+                    while (nextEmptyRoute < params->nbVehicles &&
+                           !chromR[nextEmptyRoute].empty())
+                        nextEmptyRoute++;
+                } else if (inRoute[s.c1] && !interior[s.c1] && !inRoute[s.c2]) {
+                    // Merge s.c2 into the route containing s.c1
                     for (int r = 0; r < params->nbVehicles; r++) {
-                        int    c = chromR[r].back();
-                        double penalizedCost =
-                            params->timeCost[c][i] +
-                            (load[r] + params->cli[i].demand - params->vehicleCapacity) * params->penaltyCapacity;
-                        if (penalizedCost < bestInsertionCost) {
-                            bestRoute         = r;
-                            bestInsertionCost = penalizedCost;
+                        if (!chromR[r].empty()) {
+                            if (chromR[r].front() == s.c1) {
+                                if (load[r] + params->cli[s.c2].demand <=
+                                    params->vehicleCapacity) {
+                                    chromR[r].insert(chromR[r].begin(), s.c2);
+                                    load[r] += params->cli[s.c2].demand;
+                                    inRoute[s.c2] = true;
+                                    if (chromR[r].size() > 2)
+                                        interior[s.c1] = true;
+                                }
+                                break;
+                            } else if (chromR[r].back() == s.c1) {
+                                if (load[r] + params->cli[s.c2].demand <=
+                                    params->vehicleCapacity) {
+                                    chromR[r].push_back(s.c2);
+                                    load[r] += params->cli[s.c2].demand;
+                                    inRoute[s.c2] = true;
+                                    if (chromR[r].size() > 2)
+                                        interior[s.c1] = true;
+                                }
+                                break;
+                            }
                         }
                     }
-
-                chromR[bestRoute].push_back(i);
-                load[bestRoute] += params->cli[i].demand;
+                } else if (inRoute[s.c2] && !interior[s.c2] && !inRoute[s.c1]) {
+                    // Merge s.c1 into the route containing s.c2
+                    for (int r = 0; r < params->nbVehicles; r++) {
+                        if (!chromR[r].empty()) {
+                            if (chromR[r].front() == s.c2) {
+                                if (load[r] + params->cli[s.c1].demand <=
+                                    params->vehicleCapacity) {
+                                    chromR[r].insert(chromR[r].begin(), s.c1);
+                                    load[r] += params->cli[s.c1].demand;
+                                    inRoute[s.c1] = true;
+                                    if (chromR[r].size() > 2)
+                                        interior[s.c2] = true;
+                                }
+                                break;
+                            } else if (chromR[r].back() == s.c2) {
+                                if (load[r] + params->cli[s.c1].demand <=
+                                    params->vehicleCapacity) {
+                                    chromR[r].push_back(s.c1);
+                                    load[r] += params->cli[s.c1].demand;
+                                    inRoute[s.c1] = true;
+                                    if (chromR[r].size() > 2)
+                                        interior[s.c2] = true;
+                                }
+                                break;
+                            }
+                        }
+                    }
+                } else if (inRoute[s.c1] && !interior[s.c1] && inRoute[s.c2] &&
+                           !interior[s.c2]) {
+                    // Merge two routes
+                    int r1 = -1, r2 = -1;
+                    for (int r = 0; r < params->nbVehicles; r++) {
+                        if (!chromR[r].empty()) {
+                            if (chromR[r].front() == s.c1 ||
+                                chromR[r].back() == s.c1)
+                                r1 = r;
+                            if (chromR[r].front() == s.c2 ||
+                                chromR[r].back() == s.c2)
+                                r2 = r;
+                            if (r1 != -1 && r2 != -1) break;
+                        }
+                    }
+                    if (r1 != r2 &&
+                        load[r1] + load[r2] <= params->vehicleCapacity) {
+                        if (chromR[r1].front() == s.c1 &&
+                            chromR[r2].front() == s.c2) {
+                            chromR[r1].insert(chromR[r1].begin(),
+                                              chromR[r2].rbegin(),
+                                              chromR[r2].rend());
+                        } else if (chromR[r1].back() == s.c1 &&
+                                   chromR[r2].front() == s.c2) {
+                            chromR[r1].insert(chromR[r1].end(),
+                                              chromR[r2].begin(),
+                                              chromR[r2].end());
+                        } else if (chromR[r1].front() == s.c1 &&
+                                   chromR[r2].back() == s.c2) {
+                            chromR[r1].insert(chromR[r1].begin(),
+                                              chromR[r2].begin(),
+                                              chromR[r2].end());
+                        } else if (chromR[r1].back() == s.c1 &&
+                                   chromR[r2].back() == s.c2) {
+                            chromR[r1].insert(chromR[r1].end(),
+                                              chromR[r2].rbegin(),
+                                              chromR[r2].rend());
+                        }
+                        load[r1] += load[r2];
+                        chromR[r2].clear();
+                        load[r2] = 0;
+                        interior[s.c1] = interior[s.c2] = true;
+                    }
+                }
             }
+        }
 
+        // Assign unassigned customers to routes
+        for (int i = 1; i <= params->nbClients; i++) {
+            if (!inRoute[i]) {
+                int bestRoute = -1;
+                double bestCost = DBL_MAX;
+                for (int r = 0; r < params->nbVehicles; r++) {
+                    if (load[r] + params->cli[i].demand <=
+                        params->vehicleCapacity) {
+                        double cost = params->timeCost[chromR[r].back()][i];
+                        if (cost < bestCost) {
+                            bestRoute = r;
+                            bestCost = cost;
+                        }
+                    }
+                }
+                if (bestRoute != -1) {
+                    chromR[bestRoute].push_back(i);
+                    load[bestRoute] += params->cli[i].demand;
+                    inRoute[i] = true;
+                }
+            }
+        }
+
+        // Flatten chromR into chromT
         int c = 0;
-        for (unsigned i = 0; i < chromR.size(); i++)
-            for (unsigned j = 0; j < chromR[i].size(); j++) chromT[c++] = chromR[i][j];
+        for (const auto &route : chromR) {
+            for (int customer : route) {
+                chromT[c++] = customer;
+            }
+        }
 
         evaluateCompleteCost();
-    } else // initialize the individual with a random permutation
-    {
+    } else {
+        // Initialize with a random permutation
         for (int i = 0; i < params->nbClients; i++) chromT[i] = i + 1;
         std::shuffle(chromT.begin(), chromT.end(), params->ran);
         myCostSol.penalizedCost = 1.e30;
     }
 }
 
-Individual::Individual() : params(nullptr), isFeasible(false), biasedFitness(0) { myCostSol.penalizedCost = 1.e30; }
+Individual::Individual()
+    : params(nullptr), isFeasible(false), biasedFitness(0) {
+    myCostSol.penalizedCost = 1.e30;
+}
