@@ -675,7 +675,8 @@ inline std::vector<Label *> BucketGraph::Extend(
 #endif
 
     // Cost computation
-    double new_cost = initial_cost + getcij(initial_node_id, node_id);
+    auto distance = getcij(initial_node_id, node_id);
+    double new_cost = cost_calculator.calculate_cost(initial_cost, distance);
     const auto &VRPNode = nodes[node_id];
 
     if constexpr (F != Full::PSTEP) {

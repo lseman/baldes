@@ -12,6 +12,7 @@ rapids-cmake
 *.json
 *.ilp
 savings.py
+ambulance/
 third_party/lkh/
 vrpsolve/
 testing/
