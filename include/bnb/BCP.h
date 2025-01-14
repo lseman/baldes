@@ -925,8 +925,10 @@ class VRProblem {
                 // Adding RIH paths
                 auto rih_paths = ils.get_labels();
                 if (rih_paths.size() > 0) {
-                    auto rih_added = addColumn(node, rih_paths, false);
-                    colAdded += rih_added;
+                    double inner_obj_rih = 0.0;
+                    auto rih_added =
+                        addColumn(node, rih_paths, inner_obj_rih, true);
+                    // colAdded += rih_added;
                 }
 #endif
 
@@ -1026,16 +1028,20 @@ class VRProblem {
 #ifdef TR
             tr_val = v;
 #endif
+            const int threshold = 1000000;
             if (iter % 10 == 0) {
                 fmt::print(
                     "| It.: {:4} | Obj.: {:8.2f} | Price: {:9.2f} | SRC: {:3} "
                     "| RCC: {:3} | Paths: {:3} | "
                     "Stage: {:1} | "
                     "Lag.: {:10.4f} | α: {:4.2f} | tr: {:2.2f} | gap: {:2.4f} "
-                    "| Int.: {:4} "
+                    "| Int.: {:>4} "
                     "|\n",
                     iter, lp_obj, inner_obj, n_cuts, n_rcc_cuts, colAdded,
-                    stage, lag_gap, cur_alpha, tr_val, gap, integer_solution);
+                    stage, lag_gap, cur_alpha, tr_val, gap,
+                    (integer_solution > threshold)
+                        ? "∞"
+                        : fmt::format("{:4}", integer_solution));
                 Logger::log(
                     "| It.: {:4} | Obj.: {:8.2f} | Price: {:9.2f} | SRC: {:3} "
                     "| RCC: {:3} | Paths: {:3} | "

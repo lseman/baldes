@@ -25,11 +25,11 @@
 #include <iostream>
 #include <sstream>
 #include <string>
-#include <unordered_map>
 #include <vector>
 
 #include "Constraint.h"
 #include "LinExp.h"
+#include "MIPHelper.h"
 #include "Variable.h"
 
 using baldesCtrPtr = std::shared_ptr<baldesCtr>;
@@ -191,12 +191,80 @@ inline LinearExpression operator*(int coeff, const LinearExpression &expr) {
 
 enum class ObjectiveType { Minimize, Maximize };
 
-class MIPColumn;
 // Class representing the MIP Problem
 class MIPProblem {
+#ifdef GUROBI
+    std::unique_ptr<GurobiModelCache> gurobiCache;
+#endif
    public:
     MIPProblem(const std::string &name, int num_rows, int num_cols)
-        : name(name), sparse_matrix(num_rows, num_cols) {}
+        : name(name), sparse_matrix(num_rows, num_cols) {
+#ifdef GUROBI
+        gurobiCache = std::make_unique<GurobiModelCache>(
+            GurobiEnvSingleton::getInstance());
+#endif
+    }
+
+    // Copy constructor
+    MIPProblem(const MIPProblem &other)
+        : name(other.name),
+          variables(other.variables),
+          constraints(other.constraints),
+          objective(other.objective),
+          objective_type(other.objective_type),
+          sparse_matrix(other.sparse_matrix),
+          var_name_to_index(other.var_name_to_index),
+          b_vec(other.b_vec) {
+#ifdef GUROBI
+        if (other.gurobiCache) {
+            // create empty GurboiModelCache
+            gurobiCache = std::make_unique<GurobiModelCache>(
+                GurobiEnvSingleton::getInstance());
+            gurobi_initialized = false;
+        }
+#endif
+    }
+
+    // Move constructor
+    MIPProblem(MIPProblem &&other) noexcept
+        : name(std::move(other.name)),
+          variables(std::move(other.variables)),
+          constraints(std::move(other.constraints)),
+          objective(std::move(other.objective)),
+          objective_type(other.objective_type),
+          sparse_matrix(std::move(other.sparse_matrix)),
+          var_name_to_index(std::move(other.var_name_to_index)),
+          b_vec(std::move(other.b_vec))
+#ifdef GUROBI
+          ,
+          gurobiCache(std::move(other.gurobiCache))
+#endif
+    {
+    }
+
+    // Copy assignment operator
+    MIPProblem &operator=(const MIPProblem &other) {
+        if (this != &other) {
+            name = other.name;
+            variables = other.variables;
+            constraints = other.constraints;
+            objective = other.objective;
+            objective_type = other.objective_type;
+            sparse_matrix = other.sparse_matrix;
+            var_name_to_index = other.var_name_to_index;
+            b_vec = other.b_vec;
+#ifdef GUROBI
+            if (other.gurobiCache) {
+                gurobiCache = std::make_unique<GurobiModelCache>(
+                    GurobiEnvSingleton::getInstance());
+                gurobi_initialized = false;
+            } else {
+                gurobiCache.reset();
+            }
+#endif
+        }
+        return *this;
+    }
 
     MIPProblem *clone() const {
         // Create a new MIPProblem instance with the same name and matrix
@@ -266,8 +334,8 @@ class MIPProblem {
             indices_to_remove.insert(var_index);
         }
 
-        // Remove variables from highest index to lowest to maintain validity of
-        // remaining indices
+        // Remove variables from highest index to lowest to maintain
+        // validity of remaining indices
         std::vector<int> sorted_indices(indices_to_remove.begin(),
                                         indices_to_remove.end());
         std::sort(sorted_indices.begin(), sorted_indices.end(),
@@ -297,6 +365,9 @@ class MIPProblem {
         variables.emplace_back(newVar);
         var_name_to_index.emplace(
             var_name, index);  // Using emplace instead of [] operator
+#ifdef GUROBI
+        gurobiCache->addVariable(newVar);
+#endif
         return newVar;
     }
 
@@ -319,6 +390,10 @@ class MIPProblem {
     // Delete a variable (column) from the problem
     void delete_variable(int var_index) {
         if (var_index >= 0 && var_index < variables.size()) {
+#ifdef GUROBI
+            gurobiCache->deleteVariable(var_index);
+#endif
+
             // Delete the column from the sparse matrix
             sparse_matrix.delete_column(var_index);
 
@@ -366,6 +441,11 @@ class MIPProblem {
         // Add the constraint to the list of constraints and set its index
         auto new_constraint =
             std::make_shared<baldesCtr>(expression, rhs, relation);
+
+#ifdef GUROBI
+        gurobiCache->addConstraint(new_constraint);
+#endif
+
         b_vec.push_back(rhs);
         new_constraint->set_index(
             constraint_index);  // Set the constraint's index
@@ -377,8 +457,8 @@ class MIPProblem {
         int row_index = constraint_index;
         // sparse_matrix.num_rows++;
 
-        // Assuming you have many variables, use a more efficient lookup like a
-        // map Original individual insertions
+        // Assuming you have many variables, use a more efficient lookup
+        // like a map Original individual insertions
         std::vector<int> batch_rows;
         std::vector<int> batch_cols;
         std::vector<double> batch_values;
@@ -397,7 +477,8 @@ class MIPProblem {
                 batch_values.push_back(coeff);
             } else {
                 fmt::print(
-                    "baldesVar {} not found in the problem's variables list!\n",
+                    "baldesVar {} not found in the problem's variables "
+                    "list!\n",
                     var_name);
             }
         }
@@ -416,10 +497,15 @@ class MIPProblem {
         constraint->set_index(constraint_index);
         constraint->set_name(name);
 
+#ifdef GUROBI
+        gurobiCache->addConstraint(constraint);
+#endif
+
         // Add the constraint to the list
         constraints.push_back(constraint);
         b_vec.push_back(constraint->get_rhs());
-        // Get the expression and relation (assuming it needs to be used later)
+        // Get the expression and relation (assuming it needs to be used
+        // later)
         const LinearExpression &expression = constraint->get_expression();
 
         // Add terms of the expression into the sparse matrix
@@ -508,7 +594,12 @@ class MIPProblem {
         // Delete the row from the sparse matrix
         sparse_matrix.delete_row(constraint_index);
 
-        // Erase the constraint from the constraints vector and b_vec atomically
+#ifdef GUROBI
+        gurobiCache->deleteConstraint(constraint_index);
+#endif
+
+        // Erase the constraint from the constraints vector and b_vec
+        // atomically
         constraints.erase(constraints.begin() + constraint_index);
         b_vec.erase(b_vec.begin() + constraint_index);
 
@@ -601,6 +692,10 @@ class MIPProblem {
             throw std::out_of_range("Invalid constraint index");
         }
 
+#ifdef GUROBI
+        gurobiCache->modifyConstraint(constraintIndex, values);
+#endif
+
         // Get the constraint that is being modified
         baldesCtrPtr constraint = constraints[constraintIndex];
         LinearExpression &expression = constraint->get_expression();
@@ -617,7 +712,8 @@ class MIPProblem {
             // Update or remove terms in the LinearExpression
             if (new_value != 0.0) {
                 expression.add_or_update_term(
-                    var_name, new_value);  // Optimized to add/update the term
+                    var_name,
+                    new_value);  // Optimized to add/update the term
             } else {
                 expression.remove_term(
                     var_name);  // Remove the term if the value is 0
@@ -633,6 +729,10 @@ class MIPProblem {
             variableIndex < 0 || variableIndex >= variables.size()) {
             throw std::out_of_range("Invalid constraint or variable index");
         }
+
+#ifdef GUROBI
+        gurobiCache->modifyCoefficient(constraintIndex, variableIndex, value);
+#endif
 
         // Update the sparse matrix only if the value has changed
         sparse_matrix.modify_or_delete(constraintIndex, variableIndex, value);
@@ -676,7 +776,8 @@ class MIPProblem {
 
     void chgCoeff(baldesCtrPtr constraint,
                   const std::vector<double> &new_coeffs) {
-        // int current_index = get_current_index(constraint->get_unique_id());
+        // int current_index =
+        // get_current_index(constraint->get_unique_id());
         int current_index = constraint->index();
         // Change the coefficients for the constraint
         chgCoeff(current_index, new_coeffs);
@@ -684,7 +785,7 @@ class MIPProblem {
 
 #ifdef GUROBI
     // Function to populate a Gurobi model from this MIPProblem instance
-    std::unique_ptr<GRBModel> toGurobiModel(GRBEnv &env) {
+    std::unique_ptr<GRBModel> initialize_from_MIP(GRBEnv &env) {
         try {
             auto gurobiModel = std::make_unique<GRBModel>(env);
 
@@ -751,6 +852,25 @@ class MIPProblem {
         }
     }
 
+    bool gurobi_initialized = false;
+    std::unique_ptr<GRBModel> toGurobiModel(GRBEnv &env) {
+        try {
+            if (!gurobi_initialized) {
+                // First time initialization
+                gurobiCache = std::make_unique<GurobiModelCache>(env);
+                gurobiCache->initialize(
+                    variables, constraints,
+                    objective_type == ObjectiveType::Minimize);
+                gurobi_initialized = true;
+            }
+            // Get the model, which will apply any pending changes
+            return std::make_unique<GRBModel>(*gurobiCache->getModel());
+        } catch (const GRBException &e) {
+            throw;
+        } catch (const std::exception &e) {
+            throw;
+        }
+    }
     // Helper function to convert MIP variable type to Gurobi variable type
     constexpr char toGRBVarType(VarType varType) {
         switch (varType) {
@@ -791,7 +911,8 @@ class MIPProblem {
                                      std::string(e.what()));
         }
 
-        return expr;  // Return value optimization will handle this efficiently
+        return expr;  // Return value optimization will handle this
+                      // efficiently
     }
 
 #endif
@@ -840,7 +961,8 @@ class MIPProblem {
             char relation = constraint->get_relation();
             double rhs = constraint->get_rhs();
 
-            // Set lower and upper bounds for each constraint based on its type
+            // Set lower and upper bounds for each constraint based on its
+            // type
             if (relation == '<') {
                 lower_bound = -kHighsInf;
                 upper_bound = rhs;
@@ -876,12 +998,14 @@ class MIPProblem {
     void update() { sparse_matrix.buildRowStart(); }
 
     double getSlack(int row, const std::vector<double> &solution) {
-        // Ensure the sparse matrix row structure is built (we stay in COO mode)
+        // Ensure the sparse matrix row structure is built (we stay in COO
+        // mode)
         auto rhs =
             constraints[row]
                 ->get_rhs();  // Get the right-hand side value for this row
 
-        // Compute the dot product of the solution vector and the specified row
+        // Compute the dot product of the solution vector and the specified
+        // row
         double row_value = 0.0;
 
         // Iterate through the non-zero elements in COO format
@@ -894,8 +1018,8 @@ class MIPProblem {
                     sparse_matrix
                         .values[i];  // Get the value of the current element
 
-                // Perform the dot product with the corresponding element in the
-                // solution vector
+                // Perform the dot product with the corresponding element in
+                // the solution vector
                 row_value += value * solution[col_index];
             }
         }
@@ -908,7 +1032,8 @@ class MIPProblem {
         // Get the objective coefficient for this variable
         double obj_coeff = variables[col]->get_objective_coefficient();
 
-        // Calculate the sum of (dual_value * coefficient) for all constraints
+        // Calculate the sum of (dual_value * coefficient) for all
+        // constraints
         double dual_sum = 0.0;
 
         // Iterate through the non-zero elements in COO format
@@ -918,8 +1043,8 @@ class MIPProblem {
                 double value =
                     sparse_matrix.values[i];  // Get the matrix coefficient
 
-                // Multiply the dual variable value by the coefficient and add
-                // to sum
+                // Multiply the dual variable value by the coefficient and
+                // add to sum
                 dual_sum += dual_solution[row_index] * value;
             }
         }
@@ -938,14 +1063,15 @@ class MIPProblem {
             reduced_costs[i] = variables[i]->get_objective_coefficient();
         }
 
-        // Subtract the dual contributions in one pass through the sparse matrix
+        // Subtract the dual contributions in one pass through the sparse
+        // matrix
         for (size_t i = 0; i < sparse_matrix.rows.size(); ++i) {
             int col = sparse_matrix.cols[i];
             int row = sparse_matrix.rows[i];
             double value = sparse_matrix.values[i];
 
-            // Subtract dual_value * coefficient from the corresponding reduced
-            // cost
+            // Subtract dual_value * coefficient from the corresponding
+            // reduced cost
             reduced_costs[col] -= dual_solution[row] * value;
         }
 
@@ -964,7 +1090,8 @@ class MIPProblem {
             result.column_index = 0;
         }
 
-        // Find the most violating reduced cost based on optimization direction
+        // Find the most violating reduced cost based on optimization
+        // direction
         for (size_t i = 1; i < reduced_costs.size(); ++i) {
             if (is_minimization) {
                 // For minimization, we want the most negative reduced cost
@@ -983,8 +1110,8 @@ class MIPProblem {
 
         std::vector<int> col;
         col.assign(b_vec.size(), 0);
-        // iterate over sparse matrix at column_index col and populate the col
-        // vector
+        // iterate over sparse matrix at column_index col and populate the
+        // col vector
         for (size_t i = 0; i < sparse_matrix.rows.size(); ++i) {
             if (sparse_matrix.cols[i] == result.column_index) {
                 col[sparse_matrix.rows[i]] = sparse_matrix.values[i];
@@ -1048,8 +1175,8 @@ class MIPProblem {
     }
 
     ModelData extractModelDataSparse() {
-        // sparse_matrix.buildRowStart(); // Build the row start structure for
-        // CRS format
+        // sparse_matrix.buildRowStart(); // Build the row start structure
+        // for CRS format
         ModelData data;
         data.A_sparse = sparse_matrix;
         data.b = b_vec;
@@ -1126,7 +1253,8 @@ class MIPProblem {
                 }
             }
 
-            // Sort by reduced cost value in descending order (higher RC first)
+            // Sort by reduced cost value in descending order (higher RC
+            // first)
             std::sort(
                 rc_pairs.begin(), rc_pairs.end(),
                 [](const auto &a, const auto &b) { return a.first < b.first; });
@@ -1180,21 +1308,4 @@ class MIPProblem {
     SparseMatrix sparse_matrix;  // Use SparseMatrix for coefficient storage
     ankerl::unordered_dense::map<std::string, int> var_name_to_index;
     std::vector<double> b_vec;
-};
-
-class MIPColumn {
-   public:
-    // Add a term to the column (row index and coefficient)
-    void addTerm(int row_index, double value) {
-        if (value != 0.0) {
-            terms.push_back({row_index, value});
-        }
-    }
-
-    // Clear the column for reuse
-    void clear() { terms.clear(); }
-    std::vector<std::pair<int, double>> getTerms() const { return terms; }
-
-   private:
-    std::vector<std::pair<int, double>> terms;  // Pairs of row index and value
 };

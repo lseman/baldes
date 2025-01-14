@@ -106,6 +106,7 @@ option(CHOLMOD "Enable cholmod" OFF)
 option(IPM_ACEL "Enable ipm acelleration" OFF)
 option(BALDES "Enable baldes compilation" ON)
 option(HGS "Enable HGS" OFF)
+option(CUSTOM_COST "Enable custom cost" OFF)
 
 # Resource Definitions
 set(R_SIZE
