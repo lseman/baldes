@@ -2,10 +2,12 @@
  * @file VRPNode.h
  * @brief This file contains the definition of the VRPNode struct.
  *
- * This file contains the definition of the VRPNode struct, which represents a node in a Vehicle Routing Problem.
- * The struct contains information about a node, such as its ID, start time, end time, duration, cost, demand,
- * and capacity constraints. It provides constructors to initialize the node with different sets of parameters.
- * The `setDuals` method allows updating the cost of the node.
+ * This file contains the definition of the VRPNode struct, which represents a
+ * node in a Vehicle Routing Problem. The struct contains information about a
+ * node, such as its ID, start time, end time, duration, cost, demand, and
+ * capacity constraints. It provides constructors to initialize the node with
+ * different sets of parameters. The `setDuals` method allows updating the cost
+ * of the node.
  *
  */
 #pragma once
@@ -16,101 +18,123 @@
  * @struct VRPNode
  * @brief Represents a node in a Vehicle Routing Problem.
  *
- * This struct contains information about a node, such as its ID, start time, end time, duration, cost, demand,
- * and capacity constraints. It provides constructors to initialize the node with different sets of parameters.
- * The `setDuals` method allows updating the cost of the node.
+ * This struct contains information about a node, such as its ID, start time,
+ * end time, duration, cost, demand, and capacity constraints. It provides
+ * constructors to initialize the node with different sets of parameters. The
+ * `setDuals` method allows updating the cost of the node.
  */
 struct VRPNode {
-    double                        x;
-    double                        y;
-    int                           id;
-    double                        start_time;
-    double                        end_time;
-    double                        duration;
-    double                        cost = 0.0;
-    double                        demand;
-    std::vector<double>           lb;
-    std::vector<double>           ub;
-    std::vector<double>           mtw_lb;
-    std::vector<double>           mtw_ub;
-    std::vector<Arc>              fw_arcs;
-    std::vector<Arc>              bw_arcs;
+    double x;
+    double y;
+    int id;
+    double start_time;
+    double end_time;
+    double duration;
+    double cost = 0.0;
+    double demand;
+    std::vector<double> lb;
+    std::vector<double> ub;
+    std::vector<double> mtw_lb;
+    std::vector<double> mtw_ub;
+    std::vector<Arc> fw_arcs;
+    std::vector<Arc> bw_arcs;
     std::vector<std::vector<Arc>> fw_arcs_scc;
     std::vector<std::vector<Arc>> bw_arcs_scc;
-    std::vector<JumpArc>          fw_jump_arcs;
-    std::vector<JumpArc>          bw_jump_arcs;
-    std::string                   identifier;
+    std::vector<JumpArc> fw_jump_arcs;
+    std::vector<JumpArc> bw_jump_arcs;
+    std::string identifier;
 
     bool is_station = false;
 
     std::string track_id;
-    int         subject;
-    int         week;
-    int         year;
-    double      duration_min;
-    int         setup_time;
-    int         teardown_time;
-    long long   time_window_start;
-    long long   time_window_end;
+    int subject;
+    int week;
+    int year;
+    double duration_min;
+    int setup_time;
+    int teardown_time;
+    long long time_window_start;
+    long long time_window_end;
 
     std::vector<double> consumption;
 
     // default constructor
     VRPNode() = default;
 
-    VRPNode(int i, int st, int et, int dur, double c) : id(i), start_time(st), end_time(et), duration(dur), cost(c) {}
+    VRPNode(int i, int st, int et, int dur, double c)
+        : id(i), start_time(st), end_time(et), duration(dur), cost(c) {}
 
     VRPNode(int i, int st, int et, int dur, double c, double d)
-        : id(i), start_time(st), end_time(et), duration(dur), cost(c), demand(d) {}
+        : id(i),
+          start_time(st),
+          end_time(et),
+          duration(dur),
+          cost(c),
+          demand(d) {}
 
     /**
-     * @brief Adds an arc between two buckets with specified resource increments and cost.
+     * @brief Adds an arc between two buckets with specified resource increments
+     * and cost.
      *
-     * This function adds a forward or backward arc between the specified buckets.
-     * The arc is characterized by resource increments and a cost increment.
+     * This function adds a forward or backward arc between the specified
+     * buckets. The arc is characterized by resource increments and a cost
+     * increment.
      *
      */
-    void add_arc(int from_bucket, int to_bucket, std::vector<double> res_inc, double cost_inc, bool fw) {
+    void add_arc(int from_bucket, int to_bucket, std::vector<double> res_inc,
+                 double cost_inc, bool fw) {
         if (fw) {
-            fw_arcs.push_back({from_bucket, to_bucket, std::move(res_inc), cost_inc});
+            fw_arcs.push_back(
+                {from_bucket, to_bucket, std::move(res_inc), cost_inc});
         } else {
-            bw_arcs.push_back({from_bucket, to_bucket, std::move(res_inc), cost_inc});
+            bw_arcs.push_back(
+                {from_bucket, to_bucket, std::move(res_inc), cost_inc});
         }
     }
 
     /**
      * @brief Adds an arc to the forward or backward arc list.
      *
-     * This function adds an arc between two buckets, either to the forward arc list
-     * or the backward arc list, based on the direction specified by the `fw` parameter.
+     * This function adds an arc between two buckets, either to the forward arc
+     * list or the backward arc list, based on the direction specified by the
+     * `fw` parameter.
      *
      */
     template <Direction D>
 
-    void add_arc(int from_bucket, int to_bucket, std::vector<double> res_inc, double cost_inc, bool fixed) {
+    void add_arc(int from_bucket, int to_bucket, std::vector<double> res_inc,
+                 double cost_inc, bool fixed) {
         if constexpr (D == Direction::Forward) {
-            fw_arcs.push_back({from_bucket, to_bucket, std::move(res_inc), cost_inc, fixed});
+            fw_arcs.push_back(
+                {from_bucket, to_bucket, std::move(res_inc), cost_inc, fixed});
         } else {
-            bw_arcs.push_back({from_bucket, to_bucket, std::move(res_inc), cost_inc, fixed});
+            bw_arcs.push_back(
+                {from_bucket, to_bucket, std::move(res_inc), cost_inc, fixed});
         }
     }
 
     template <Direction D>
-    void add_arc(int from_bucket, int to_bucket, std::vector<double> res_inc, double cost_inc, double priority) {
+    void add_arc(int from_bucket, int to_bucket, std::vector<double> res_inc,
+                 double cost_inc, double priority) {
         if constexpr (D == Direction::Forward) {
-            fw_arcs.push_back({from_bucket, to_bucket, std::move(res_inc), cost_inc, priority});
+            fw_arcs.push_back({from_bucket, to_bucket, std::move(res_inc),
+                               cost_inc, priority});
         } else {
-            bw_arcs.push_back({from_bucket, to_bucket, std::move(res_inc), cost_inc, priority});
+            bw_arcs.push_back({from_bucket, to_bucket, std::move(res_inc),
+                               cost_inc, priority});
         }
     }
 
     template <Direction D>
-    void add_jump_arc(int from_bucket, int to_bucket, const std::vector<double> &res_inc, double cost_inc,
+    void add_jump_arc(int from_bucket, int to_bucket,
+                      const std::vector<double> &res_inc, double cost_inc,
                       int to_job = -1) {
         if constexpr (D == Direction::Forward) {
-            fw_jump_arcs.emplace_back(from_bucket, to_bucket, res_inc, cost_inc, to_job);
+            fw_jump_arcs.emplace_back(from_bucket, to_bucket, res_inc, cost_inc,
+                                      to_job);
         } else {
-            bw_jump_arcs.emplace_back(from_bucket, to_bucket, res_inc, cost_inc, to_job);
+            bw_jump_arcs.emplace_back(from_bucket, to_bucket, res_inc, cost_inc,
+                                      to_job);
         }
     }
 
@@ -121,9 +145,13 @@ struct VRPNode {
      * the `bw_arcs` in ascending order of priority.
      */
     void sort_arcs() {
-        std::sort(fw_arcs.begin(), fw_arcs.end(), [](const Arc &a, const Arc &b) { return a.priority > b.priority; });
+        std::sort(
+            fw_arcs.begin(), fw_arcs.end(),
+            [](const Arc &a, const Arc &b) { return a.priority > b.priority; });
 
-        std::sort(bw_arcs.begin(), bw_arcs.end(), [](const Arc &a, const Arc &b) { return a.priority < b.priority; });
+        std::sort(
+            bw_arcs.begin(), bw_arcs.end(),
+            [](const Arc &a, const Arc &b) { return a.priority < b.priority; });
     }
 
     /**
@@ -137,44 +165,39 @@ struct VRPNode {
     }
 
     /**
-     * @brief Retrieves a constant reference to the vector of arcs based on the specified direction.
+     * @brief Retrieves a constant reference to the vector of arcs based on the
+     * specified direction.
      *
-     * This function template returns a constant reference to either the forward arcs or backward arcs
-     * vector, depending on the direction specified by the template parameter.
+     * This function template returns a constant reference to either the forward
+     * arcs or backward arcs vector, depending on the direction specified by the
+     * template parameter.
      *
      */
     template <Direction dir>
-    inline const std::vector<Arc> &get_arcs() const {
-        if constexpr (dir == Direction::Forward) {
-            return fw_arcs;
-        } else {
-            return bw_arcs;
-        }
+    inline std::span<const Arc> get_arcs() const {
+        return (dir == Direction::Forward) ? fw_arcs : bw_arcs;
     }
 
     template <Direction dir>
     inline auto get_jump_arcs(int to_job) const {
-        const auto &jump_arcs = (dir == Direction::Forward) ? fw_jump_arcs : bw_jump_arcs;
-
-        // Create a filter view for arcs where arc.to_job == to_job
-        auto filtered_view =
-            jump_arcs | std::ranges::views::filter([to_job](const JumpArc &arc) { return arc.to_job == to_job; });
-
-        return filtered_view; // Returns a view, no need for copies
+        const auto &jump_arcs =
+            (dir == Direction::Forward) ? fw_jump_arcs : bw_jump_arcs;
+        // Directly construct the filter view
+        return std::ranges::views::filter(
+            jump_arcs,
+            [to_job](const JumpArc &arc) { return arc.to_job == to_job; });
     }
 
     /**
-     * @brief Retrieves the arcs associated with a given strongly connected component (SCC) in the specified
-     * direction.
+     * @brief Retrieves the arcs associated with a given strongly connected
+     * component (SCC) in the specified direction.
      *
      */
     template <Direction dir>
-    inline const std::vector<Arc> &get_arcs(int scc) const {
-        if constexpr (dir == Direction::Forward) {
-            return fw_arcs_scc[scc];
-        } else {
-            return bw_arcs_scc[scc];
-        }
+    inline std::span<const Arc> get_arcs(int scc) const {
+        const auto &arcs =
+            (dir == Direction::Forward) ? fw_arcs_scc[scc] : bw_arcs_scc[scc];
+        return std::span<const Arc>(arcs);
     }
 
     /**

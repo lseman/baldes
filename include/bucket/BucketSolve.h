@@ -548,18 +548,21 @@ std::vector<Label *> BucketGraph::bi_labeling_algorithm() {
 #endif
 
 #ifdef RIH
-    std::vector<Label *> top_labels;
-    top_labels.reserve(N_ADD);
 
-    const int n_candidates =
-        std::min(N_ADD, static_cast<int>(merged_labels.size()));
-    for (int i = 0; i < n_candidates; ++i) {
-        if (merged_labels[i]->nodes_covered.size() <= 3) {
-            continue;
+    if constexpr (S == Stage::Four) {
+        std::vector<Label *> top_labels;
+        top_labels.reserve(N_ADD);
+
+        const int n_candidates =
+            std::min(N_ADD, static_cast<int>(merged_labels.size()));
+        for (int i = 0; i < n_candidates; ++i) {
+            if (merged_labels[i]->nodes_covered.size() <= 3) {
+                continue;
+            }
+            top_labels.push_back(merged_labels[i]);
         }
-        top_labels.push_back(merged_labels[i]);
+        ils->submit_task(top_labels, nodes);
     }
-    ils->submit_task(top_labels, nodes);
 #endif
 
     inner_obj = merged_labels[0]->cost;
@@ -654,12 +657,13 @@ inline std::vector<Label *> BucketGraph::Extend(
         if (is_bucket_fixed<D>(L_prime->vertex, to_bucket)) {
             if (depth > 1) return {};
 
-            static thread_local std::vector<Label *>
-                label_vector;  // Reuse vector
+            static thread_local std::vector<Label *> label_vector;
             label_vector.clear();
 
-            for (const auto &jump_arc :
-                 nodes[L_prime->node_id].template get_jump_arcs<D>(node_id)) {
+            auto jump_arcs =
+                nodes[L_prime->node_id].template get_jump_arcs<D>(node_id);
+
+            for (const auto &jump_arc : jump_arcs) {
                 auto extended_labels =
                     Extend<D, S, ArcType::Jump, Mutability::Const, F>(
                         L_prime, jump_arc, depth + 1);
@@ -674,9 +678,13 @@ inline std::vector<Label *> BucketGraph::Extend(
     }
 #endif
 
-    // Cost computation
+#ifdef CUSTOM_COST
     auto distance = getcij(initial_node_id, node_id);
     double new_cost = cost_calculator.calculate_cost(initial_cost, distance);
+#else
+    double new_cost = initial_cost + getcij(initial_node_id, node_id);
+#endif
+
     const auto &VRPNode = nodes[node_id];
 
     if constexpr (F != Full::PSTEP) {

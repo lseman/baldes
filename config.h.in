@@ -29,6 +29,7 @@
 #cmakedefine HIGHS
 #cmakedefine NSYNC
 #cmakedefine IPM_ACEL
+#cmakedefine CUSTOM_COST
 
 // Define constants for resource sizes
 #define R_SIZE @R_SIZE@
@@ -39,4 +40,4 @@
 #define N_ADD @N_ADD@
 #define HGS_TIME @HGS_TIME@
 
-#endif // CONFIG_H
+#endif  // CONFIG_H

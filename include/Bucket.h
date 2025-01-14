@@ -471,41 +471,32 @@ struct alignas(64) Bucket {
     Bucket() {}
 
     void add_sorted_label(Label *label) noexcept {
-        // Check for invalid label
         if (!label) return;
 
+        // Split bucket case
         if (is_split) {
-            // Find appropriate sub-bucket
+            // Try to add to appropriate sub-bucket
             for (auto &bucket : sub_buckets) {
                 if (bucket.is_contained(label)) {
-                    // Only recurse if we haven't hit maximum depth
                     if (bucket.depth >= MAX_BUCKET_DEPTH) {
-                        // Find insertion point even at max depth
-                        auto insert_pos = std::lower_bound(
-                            bucket.labels_vec.begin(), bucket.labels_vec.end(),
-                            label, [](const Label *a, const Label *b) {
-                                return a->cost < b->cost;
-                            });
-                        bucket.labels_vec.insert(insert_pos, label);
+                        // At max depth, insert directly into bucket's vector
+                        insert_sorted_label(bucket.labels_vec, label);
                     } else {
                         bucket.add_sorted_label(label);
                     }
                     return;
                 }
             }
-            // Fallback: add to parent if label doesn't fit in any sub-bucket
-            auto insert_pos =
-                std::lower_bound(labels_vec.begin(), labels_vec.end(), label,
-                                 [](const Label *a, const Label *b) {
-                                     return a->cost < b->cost;
-                                 });
-            labels_vec.insert(insert_pos, label);
+            // Fallback: add to parent bucket if label doesn't fit in
+            // sub-buckets
+            insert_sorted_label(labels_vec, label);
             return;
         }
 
+        // Non-split bucket case
         // Pre-reserve space if needed
         if (labels_vec.size() == labels_vec.capacity()) {
-            labels_vec.reserve(std::max(size_t(64), labels_vec.capacity() * 2));
+            labels_vec.reserve(std::max<size_t>(64, labels_vec.capacity() * 2));
         }
 
         // Handle empty vector case
@@ -514,27 +505,32 @@ struct alignas(64) Bucket {
             return;
         }
 
-        // Fast path for common cases
+        // Fast path checks
         if (label->cost >= labels_vec.back()->cost) {
             labels_vec.push_back(label);
             return;
         }
-
         if (label->cost <= labels_vec.front()->cost) {
             labels_vec.insert(labels_vec.begin(), label);
             return;
         }
 
-        // Binary search for insertion point
-        auto insert_pos = std::lower_bound(
-            labels_vec.begin(), labels_vec.end(), label,
-            [](const Label *a, const Label *b) { return a->cost < b->cost; });
-        labels_vec.insert(insert_pos, label);
+        // Standard case: binary search and insert
+        insert_sorted_label(labels_vec, label);
 
-        // Only split if we're not at max depth and have enough labels
+        // Check if we need to split
         if (depth < MAX_BUCKET_DEPTH && labels_vec.size() >= BUCKET_CAPACITY) {
             split_into_sub_buckets();
         }
+    }
+
+    // Helper function to avoid code duplication
+    static void insert_sorted_label(std::vector<Label *> &vec,
+                                    Label *label) noexcept {
+        auto insert_pos = std::lower_bound(
+            vec.begin(), vec.end(), label,
+            [](const Label *a, const Label *b) { return a->cost < b->cost; });
+        vec.insert(insert_pos, label);
     }
 
     bool is_contained(const Label *label) const noexcept {
@@ -664,41 +660,32 @@ struct alignas(64) Bucket {
         all_labels;  // Mutable to allow modification in const function
 
     inline const std::vector<Label *> &get_labels() const {
+        // Fast path - return direct vector if not split
         if (!is_split) {
             return labels_vec;
         }
 
-        // Pre-calculate total size to avoid multiple allocations
-        assert(sub_buckets.size() ==
-               2);  // We always split into exactly 2 buckets
+        // We're split - need to combine sub-buckets
+        assert(sub_buckets.size() == 2);  // Always split into 2 buckets
+
+        // Calculate total size once
         const size_t total_size =
-            sub_buckets[0].labels_vec.size() + sub_buckets[1].labels_vec.size();
+            std::accumulate(sub_buckets.begin(), sub_buckets.end(), size_t{0},
+                            [](size_t sum, const auto &bucket) {
+                                return sum + bucket.labels_vec.size();
+                            });
 
+        // Prepare all_labels vector
         all_labels.clear();
-        if (all_labels.capacity() < total_size) {
-            all_labels.reserve(total_size);
-        }
+        all_labels.reserve(total_size);
 
-        // Direct insertion for each sub-bucket
-        // Using sub_bucket.labels_vec directly instead of get_labels() to avoid
-        // recursion
+        // Insert all labels from sub-buckets
         for (const auto &bucket : sub_buckets) {
-            if (!bucket.is_split) {
-                all_labels.insert(all_labels.end(), bucket.labels_vec.begin(),
-                                  bucket.labels_vec.end());
-            } else {
-                // Recursive case - but should be rare due to MAX_BUCKET_DEPTH
-                const auto &sub_labels = bucket.get_labels();
-                all_labels.insert(all_labels.end(), sub_labels.begin(),
-                                  sub_labels.end());
-            }
+            const auto &source_labels =
+                bucket.is_split ? bucket.get_labels() : bucket.labels_vec;
+            all_labels.insert(all_labels.end(), source_labels.begin(),
+                              source_labels.end());
         }
-
-#ifdef SORTED_LABELS
-        // If labels need to be sorted, sort the combined result
-        // std::sort(all_labels.begin(), all_labels.end(),
-        // [](const Label *a, const Label *b) { return a->cost < b->cost; });
-#endif
 
         return all_labels;
     }
