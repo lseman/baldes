@@ -314,6 +314,8 @@ class GurobiModelCache {
         return model.get();
     }
 
+    GRBModel *getUnmodifiedModel() { return model.get(); }
+
    private:
     void applyChanges() {
         try {

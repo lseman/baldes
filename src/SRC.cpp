@@ -313,9 +313,8 @@ std::pair<bool, bool> LimitedMemoryRank1Cuts::runSeparation(
     std::for_each(allPaths.begin(), allPaths.end(),
                   [&](auto &path) { path.frac_x = solution[i++]; });
 
-    // separateR1C1(matrix.A_sparse, solution);
-    // separate(matrix.A_sparse, solution);
-    separateCombined(matrix.A_sparse, solution);
+    separateR1C1(matrix.A_sparse, solution);
+    separate(matrix.A_sparse, solution);
     auto cuts_after_separation = cuts->size();
     auto multipliers = generator->map_rank1_multiplier;
 
@@ -374,15 +373,15 @@ std::pair<bool, bool> LimitedMemoryRank1Cuts::runSeparation(
 
 #if defined(__cpp_lib_parallel_algorithm)
             std::atomic<bool> has_coeff{false};
-            std::transform(
-                std::execution::par_unseq, allPaths.begin(), allPaths.end(),
-                coeffs.begin(), [&](const auto &path) {
-                    auto coeff = computeLimitedMemoryCoefficient(
-                        C, AM, p, path.route, order);
-                    if (coeff > 1e-3)
-                        has_coeff.store(true, std::memory_order_relaxed);
-                    return coeff;
-                });
+            std::transform(allPaths.begin(), allPaths.end(), coeffs.begin(),
+                           [&](const auto &path) {
+                               auto coeff = computeLimitedMemoryCoefficient(
+                                   C, AM, p, path.route, order);
+                               if (coeff > 1e-3)
+                                   has_coeff.store(true,
+                                                   std::memory_order_relaxed);
+                               return coeff;
+                           });
 #else
             bool has_coeff = false;
             std::transform(allPaths.begin(), allPaths.end(), coeffs.begin(),
@@ -407,24 +406,25 @@ std::pair<bool, bool> LimitedMemoryRank1Cuts::runSeparation(
         return cut_ctr;
     };
 
-    if (cuts_before == cuts_after_separation) {
-        generator->setNodes(nodes);
-        generator->generateSepHeurMem4Vertex();
-        generator->initialize(allPaths);
-        // generator->fillMemory();
-        generator->getHighDimCuts();
-        // generator->setMemFactor(0.15);
-        // generator->constructMemoryVertexBased();
+    // if (cuts_before == cuts_after_separation) {
+    generator->setArcDuals(arc_duals);
+    generator->setNodes(nodes);
+    generator->generateSepHeurMem4Vertex();
+    generator->initialize(allPaths);
+    // generator->fillMemory();
+    generator->getHighDimCuts();
+    // generator->setMemFactor(0.15);
+    // generator->constructMemoryVertexBased();
 
-        // auto cut_number = processCuts();
-        for (double memFactor = 0.15; memFactor <= 0.65; memFactor += 0.10) {
-            generator->setMemFactor(memFactor);
-            generator->constructMemoryVertexBased();
-            auto cut_number = processCuts();
-            if (cut_number != 0) {
-                break;  // Exit the loop if cuts are successfully processed
-            }
+    // auto cut_number = processCuts();
+    for (double memFactor = 0.15; memFactor <= 0.75; memFactor += 0.15) {
+        generator->setMemFactor(memFactor);
+        generator->constructMemoryVertexBased();
+        auto cut_number = processCuts();
+        if (cut_number != 0) {
+            break;  // Exit the loop if cuts are successfully processed
         }
+        // }
     }
 
     // if (cuts_before == cuts_after_separation) {

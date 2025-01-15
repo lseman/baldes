@@ -69,8 +69,15 @@ struct SparseMatrix;
  * sets, and performing heuristics.
  *
  */
+using RCCManagerPtr = std::shared_ptr<RCCManager>;
+
 class LimitedMemoryRank1Cuts {
    public:
+#if defined(RCC) || defined(EXACT_RCC)
+    ArcDuals arc_duals;
+    void setArcDuals(const ArcDuals &arc_duals) { this->arc_duals = arc_duals; }
+#endif
+
     Xoroshiro128Plus rp;  // Seed it (you can change the seed)
     using HighDimCutsGeneratorPtr = std::shared_ptr<HighDimCutsGenerator>;
     HighDimCutsGeneratorPtr generator =
@@ -131,191 +138,6 @@ class LimitedMemoryRank1Cuts {
 
     std::pair<bool, bool> runSeparation(
         BNBNode *node, std::vector<baldesCtrPtr> &SRCconstraints);
-
-    void separateCombined(const SparseMatrix &A, const std::vector<double> &x) {
-        std::vector<std::pair<double, Cut>> tmp_normal_cuts;
-        std::vector<std::pair<double, int>> tmp_r1c_cuts;
-
-        const int JOBS = std::thread::hardware_concurrency();
-        exec::static_thread_pool pool(JOBS);
-        auto sched = pool.get_scheduler();
-
-        // Define chunk size to reduce parallelization overhead
-        const int chunk_size = (allPaths.size() + JOBS - 1) / JOBS;
-
-        // Mutex to protect access to shared resources
-        std::mutex cuts_mutex;
-
-        // Create a map for non-zero entries by rows (for normal cuts)
-        std::vector<std::vector<int>> row_indices_map(N_SIZE);
-        for (int idx = 0; idx < A.values.size(); ++idx) {
-            int row = A.rows[idx];
-            if (row > N_SIZE - 2) {
-                continue;
-            }
-            row_indices_map[row + 1].push_back(idx);
-        }
-
-        // Parallel execution in chunks
-        auto bulk_sender = stdexec::bulk(
-            stdexec::just(), (allPaths.size() + chunk_size - 1) / chunk_size,
-            [&](std::size_t chunk_idx) {
-                size_t start_idx = chunk_idx * chunk_size;
-                size_t end_idx =
-                    std::min(start_idx + chunk_size, allPaths.size());
-
-                // Local storage for cuts in this chunk
-                std::vector<std::pair<double, Cut>> local_normal_cuts;
-                std::vector<std::pair<double, int>> local_r1c_cuts;
-
-                ankerl::unordered_dense::map<int, int> vis_map;
-                for (size_t i = start_idx; i < end_idx; ++i) {
-                    const auto &r = allPaths[i];
-
-                    // Compute R1C cuts
-                    vis_map.clear();
-                    for (const auto node : r.route) {
-                        ++vis_map[node];
-                    }
-                    for (const auto &[v, times] : vis_map) {
-                        if (times > 1) {
-                            double cut_value =
-                                std::floor(times / 2.) * r.frac_x;
-                            if (cut_value > 1e-3) {
-                                local_r1c_cuts.emplace_back(cut_value, v);
-                            }
-                        }
-                    }
-
-                    // Compute normal cuts
-                    for (int i = 1; i < N_SIZE - 1; ++i) {
-                        for (int j = i + 1; j < N_SIZE - 1; ++j) {
-                            for (int k = j + 1; k < N_SIZE - 1; ++k) {
-                                std::vector<int> expanded(A.num_cols, 0);
-                                double lhs = 0.0;
-
-                                // Combine the three updates into one loop for
-                                // efficiency
-                                for (int idx : row_indices_map[i])
-                                    expanded[A.cols[idx]] += 1;
-                                for (int idx : row_indices_map[j])
-                                    expanded[A.cols[idx]] += 1;
-                                for (int idx : row_indices_map[k])
-                                    expanded[A.cols[idx]] += 1;
-
-                                // Accumulate LHS cut values
-                                for (int idx = 0; idx < A.num_cols; ++idx) {
-                                    if (expanded[idx] >= 2) {
-                                        lhs += std::floor(expanded[idx] * 0.5) *
-                                               x[idx];
-                                    }
-                                }
-
-                                // If lhs violation found, insert the cut
-                                if (lhs > 1.0 + 1e-3) {
-                                    std::array<uint64_t, num_words> C = {};
-                                    std::array<uint64_t, num_words> AM = {};
-                                    std::vector<int> order(N_SIZE, 0);
-
-                                    std::vector<int> C_index = {i, j, k};
-                                    for (auto node : C_index) {
-                                        C[node / 64] |= (1ULL << (node % 64));
-                                        AM[node / 64] |= (1ULL << (node % 64));
-                                        order[node] = 1;  // Simplified ordering
-                                    }
-
-                                    SRCPermutation p;
-                                    p.num = {1, 1, 1};
-                                    p.den = 2;
-
-                                    std::vector<double> cut_coefficients(
-                                        allPaths.size(), 0.0);
-                                    for (size_t j = 0; j < allPaths.size();
-                                         ++j) {
-                                        auto &clients = allPaths[j].route;
-                                        cut_coefficients[j] =
-                                            computeLimitedMemoryCoefficient(
-                                                C, AM, p, clients, order);
-                                    }
-
-                                    Cut cut(C, AM, cut_coefficients, p);
-                                    cut.baseSetOrder = order;
-                                    local_normal_cuts.emplace_back(lhs, cut);
-                                }
-                            }
-                        }
-                    }
-                }
-
-                // Merge local cuts into global cuts
-                std::lock_guard<std::mutex> lock(cuts_mutex);
-                tmp_normal_cuts.insert(tmp_normal_cuts.end(),
-                                       local_normal_cuts.begin(),
-                                       local_normal_cuts.end());
-                tmp_r1c_cuts.insert(tmp_r1c_cuts.end(), local_r1c_cuts.begin(),
-                                    local_r1c_cuts.end());
-            });
-
-        // Submit work to the thread pool
-        auto work = stdexec::starts_on(sched, bulk_sender);
-        stdexec::sync_wait(std::move(work));
-
-        // Process R1C cuts
-        if (!tmp_r1c_cuts.empty()) {
-            pdqsort(
-                tmp_r1c_cuts.begin(), tmp_r1c_cuts.end(),
-                [](const auto &a, const auto &b) { return a.first > b.first; });
-
-            std::vector<double> coefficients_aux(allPaths.size(), 0.0);
-            auto cuts_to_apply =
-                std::min(static_cast<int>(tmp_r1c_cuts.size()), 2);
-
-            for (int i = 0; i < cuts_to_apply; ++i) {
-                auto cut_value = tmp_r1c_cuts[i].first;
-                auto v = tmp_r1c_cuts[i].second;
-
-                std::array<uint64_t, num_words> C = {};
-                std::array<uint64_t, num_words> AM = {};
-                std::vector<int> order(N_SIZE, 0);
-
-                C[v / 64] |= (1ULL << (v % 64));
-                for (int node = 0; node < N_SIZE; ++node) {
-                    AM[node / 64] |= (1ULL << (node % 64));
-                }
-
-                SRCPermutation p;
-                p.num = {1};
-                p.den = 2;
-
-                coefficients_aux.assign(allPaths.size(), 0.0);
-                for (size_t j = 0; j < allPaths.size(); ++j) {
-                    auto &clients = allPaths[j].route;
-                    coefficients_aux[j] = computeLimitedMemoryCoefficient(
-                        C, AM, p, clients, order);
-                }
-
-                Cut cut(C, AM, coefficients_aux, p);
-                cut.baseSetOrder = order;
-                cutStorage.addCut(cut);
-            }
-        }
-
-        // Process normal cuts
-        if (!tmp_normal_cuts.empty()) {
-            pdqsort(
-                tmp_normal_cuts.begin(), tmp_normal_cuts.end(),
-                [](const auto &a, const auto &b) { return a.first > b.first; });
-
-            auto max_cuts = 2;
-            for (int i = 0;
-                 i <
-                 std::min(max_cuts, static_cast<int>(tmp_normal_cuts.size()));
-                 ++i) {
-                auto &cut = tmp_normal_cuts[i].second;
-                cutStorage.addCut(cut);
-            }
-        }
-    }
 
     void separateR1C1(const SparseMatrix &A, const std::vector<double> &x) {
         std::vector<std::pair<double, int>> tmp_cuts;
