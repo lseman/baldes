@@ -315,12 +315,12 @@ class Stabilization {
     bool dynamic_alpha_schedule(const ModelData &dados) {
         const size_t n = cur_stab_center.size();
 
-        // double relative_distance = norm(smooth_dual_sol, cur_stab_center) /
-        //                            (std::abs(lp_obj) + EPSILON);
-        // if (relative_distance < NORM_TOLERANCE) {
-        //     alpha = 0.0;
-        //     return false;
-        // }
+        double relative_distance = norm(smooth_dual_sol, cur_stab_center) /
+                                   (std::abs(lp_obj) + EPSILON);
+        if (relative_distance < NORM_TOLERANCE) {
+            alpha = 0.0;
+            return false;
+        }
 
         std::vector<double> direction(n);
         double direction_norm = 0.0;
@@ -410,22 +410,21 @@ class Stabilization {
         //     update_subgradient(dados, nodeDuals, best_pricing_cols);
 
         // } else {
-            if (nb_misprices == 0) {
-                update_subgradient(dados, nodeDuals, best_pricing_cols);
-                bool should_increase = dynamic_alpha_schedule(dados);
+        if (nb_misprices == 0) {
+            update_subgradient(dados, nodeDuals, best_pricing_cols);
+            bool should_increase = dynamic_alpha_schedule(dados);
 
-                constexpr double ALPHA_FACTOR = 0.1;
-                if (should_increase) {
-                    alpha =
-                        std::min(0.99, alpha + (1.0 - alpha) * ALPHA_FACTOR);
-                } else {
-                    alpha = std::max(0.0, alpha / 1.1);
-                }
-
-                if (!std::isnan(alpha) && !std::isinf(alpha)) {
-                    base_alpha = alpha;
-                }
+            constexpr double ALPHA_FACTOR = 0.1;
+            if (should_increase) {
+                alpha = std::min(0.99, alpha + (1.0 - alpha) * ALPHA_FACTOR);
+            } else {
+                alpha = std::max(0.0, alpha / 1.1);
             }
+
+            if (!std::isnan(alpha) && !std::isinf(alpha)) {
+                base_alpha = alpha;
+            }
+        }
         // }
 
         DualSolution stab_sol = smooth_dual_sol;

@@ -236,7 +236,7 @@ std::vector<double> BucketGraph::labeling_algorithm() {
 
     // Preallocate vector for new labels to avoid repeated allocations
     std::vector<Label *> new_labels;
-    new_labels.reserve(16);  // Adjust size based on typical usage
+    new_labels.reserve(4);  // Adjust size based on typical usage
 
     // Process SCCs in topological order
     for (const auto &scc_index : topological_order) {
@@ -408,16 +408,16 @@ std::vector<double> BucketGraph::labeling_algorithm() {
                     label->set_extended(true);
                 }
             }
-
-            // Update c_bar values efficiently
-            for (const int bucket : sorted_sccs[scc_index]) {
-                double min_c_bar = buckets[bucket].get_cb();
-                for (const auto phi_bucket : Phi[bucket]) {
-                    min_c_bar = std::min(min_c_bar, c_bar[phi_bucket]);
-                }
-                c_bar[bucket] = min_c_bar;
-            }
         } while (!all_ext);
+
+        // Update c_bar values efficiently
+        for (const int bucket : sorted_sccs[scc_index]) {
+            double min_c_bar = buckets[bucket].get_cb();
+            for (const auto phi_bucket : Phi[bucket]) {
+                min_c_bar = std::min(min_c_bar, c_bar[phi_bucket]);
+            }
+            c_bar[bucket] = min_c_bar;
+        }
     }
 
     // Store best label
@@ -757,10 +757,6 @@ inline std::vector<Label *> BucketGraph::Extend(
     }
     set_node_visited(new_label->visited_bitmap, node_id);
 
-    // new_label->nodes_covered = L_prime->nodes_covered;    // Copy the list of
-    // covered nodes new_label->nodes_covered.push_back(node_id);          //
-    // Add the new node to the list of covered nodes
-
 #if defined(SRC)
     new_label->SRCmap = L_prime->SRCmap;
     if constexpr (S == Stage::Four || S == Stage::Enumerate) {
@@ -974,29 +970,39 @@ inline bool BucketGraph::DominatedInCompWiseSmallerBuckets(
     const double label_cost = L->cost;
     const size_t res_size = options.resources.size();
 
-    // Pre-compute bit operation constants
-    constexpr uint64_t one = 1ULL;
-    constexpr uint64_t bit_mask_lookup[64] = {
-        1ULL << 0,  1ULL << 1,  1ULL << 2,  1ULL << 3,  1ULL << 4,  1ULL << 5,
-        1ULL << 6,  1ULL << 7,  1ULL << 8,  1ULL << 9,  1ULL << 10, 1ULL << 11,
-        1ULL << 12, 1ULL << 13, 1ULL << 14, 1ULL << 15, 1ULL << 16, 1ULL << 17,
-        1ULL << 18, 1ULL << 19, 1ULL << 20, 1ULL << 21, 1ULL << 22, 1ULL << 23,
-        1ULL << 24, 1ULL << 25, 1ULL << 26, 1ULL << 27, 1ULL << 28, 1ULL << 29,
-        1ULL << 30, 1ULL << 31, 1ULL << 32, 1ULL << 33, 1ULL << 34, 1ULL << 35,
-        1ULL << 36, 1ULL << 37, 1ULL << 38, 1ULL << 39, 1ULL << 40, 1ULL << 41,
-        1ULL << 42, 1ULL << 43, 1ULL << 44, 1ULL << 45, 1ULL << 46, 1ULL << 47,
-        1ULL << 48, 1ULL << 49, 1ULL << 50, 1ULL << 51, 1ULL << 52, 1ULL << 53,
-        1ULL << 54, 1ULL << 55, 1ULL << 56, 1ULL << 57, 1ULL << 58, 1ULL << 59,
-        1ULL << 60, 1ULL << 61, 1ULL << 62, 1ULL << 63};
+    // Pre-compute bitmask lookup - now using constexpr array
+    static constexpr uint64_t bit_mask_lookup[64] = {
+        UINT64_C(1) << 0,  UINT64_C(1) << 1,  UINT64_C(1) << 2,
+        UINT64_C(1) << 3,  UINT64_C(1) << 4,  UINT64_C(1) << 5,
+        UINT64_C(1) << 6,  UINT64_C(1) << 7,  UINT64_C(1) << 8,
+        UINT64_C(1) << 9,  UINT64_C(1) << 10, UINT64_C(1) << 11,
+        UINT64_C(1) << 12, UINT64_C(1) << 13, UINT64_C(1) << 14,
+        UINT64_C(1) << 15, UINT64_C(1) << 16, UINT64_C(1) << 17,
+        UINT64_C(1) << 18, UINT64_C(1) << 19, UINT64_C(1) << 20,
+        UINT64_C(1) << 21, UINT64_C(1) << 22, UINT64_C(1) << 23,
+        UINT64_C(1) << 24, UINT64_C(1) << 25, UINT64_C(1) << 26,
+        UINT64_C(1) << 27, UINT64_C(1) << 28, UINT64_C(1) << 29,
+        UINT64_C(1) << 30, UINT64_C(1) << 31, UINT64_C(1) << 32,
+        UINT64_C(1) << 33, UINT64_C(1) << 34, UINT64_C(1) << 35,
+        UINT64_C(1) << 36, UINT64_C(1) << 37, UINT64_C(1) << 38,
+        UINT64_C(1) << 39, UINT64_C(1) << 40, UINT64_C(1) << 41,
+        UINT64_C(1) << 42, UINT64_C(1) << 43, UINT64_C(1) << 44,
+        UINT64_C(1) << 45, UINT64_C(1) << 46, UINT64_C(1) << 47,
+        UINT64_C(1) << 48, UINT64_C(1) << 49, UINT64_C(1) << 50,
+        UINT64_C(1) << 51, UINT64_C(1) << 52, UINT64_C(1) << 53,
+        UINT64_C(1) << 54, UINT64_C(1) << 55, UINT64_C(1) << 56,
+        UINT64_C(1) << 57, UINT64_C(1) << 58, UINT64_C(1) << 59,
+        UINT64_C(1) << 60, UINT64_C(1) << 61, UINT64_C(1) << 62,
+        UINT64_C(1) << 63};
 
-    // Stack-based implementation with fixed size for small bucket counts
-    constexpr size_t MAX_STACK_SIZE = 128;
-    int stack_buffer[MAX_STACK_SIZE];
+    // Stack-based implementation with fixed size
+    alignas(64) int stack_buffer[128];  // Aligned for better cache performance
     int stack_size = 1;
     stack_buffer[0] = bucket;
 
-    // SIMD-optimized dominance check function
-    auto check_dominance = [&](const std::vector<Label *> &labels) {
+    // SIMD-optimized dominance check using lambda to avoid function call
+    // overhead
+    const auto check_dominance = [&](const std::vector<Label *> &labels) {
 #ifdef __AVX2__
         return check_dominance_against_vector<D, S>(L, labels, cut_storage,
                                                     res_size);
@@ -1009,19 +1015,18 @@ inline bool BucketGraph::DominatedInCompWiseSmallerBuckets(
 #endif
     };
 
+    // Main processing loop with optimizations
     do {
         const int current_bucket = stack_buffer[--stack_size];
 
-        // Optimize bit operations
-        const size_t segment = current_bucket >> 6;
+        // Optimize bit operations using pre-computed masks
+        const size_t segment = static_cast<size_t>(current_bucket) >> 6;
         const uint64_t bit = bit_mask_lookup[current_bucket & 63];
         Bvisited[segment] |= bit;
 
-        // Early exit check
-        if (__builtin_expect(
-                (label_cost < c_bar[current_bucket] &&
-                 ::precedes<int>(bucket_order, current_bucket, b_L, uf)),
-                0)) {
+        // Early exit check with likely hint for better branch prediction
+        if (likely(label_cost < c_bar[current_bucket] &&
+                   ::precedes<int>(bucket_order, current_bucket, b_L, uf))) {
             return false;
         }
 
@@ -1034,26 +1039,20 @@ inline bool BucketGraph::DominatedInCompWiseSmallerBuckets(
             }
         }
 
-        // Process neighbors using SIMD if available
+        // Process neighbors with vectorization hints
         const auto &bucket_neighbors = Phi[current_bucket];
         const size_t n_neighbors = bucket_neighbors.size();
 
-        // Regular processing
+#pragma GCC ivdep
         for (size_t i = 0; i < n_neighbors; ++i) {
             const int b_prime = bucket_neighbors[i];
-            const size_t seg_prime = b_prime >> 6;
-            if (!(Bvisited[seg_prime] & bit_mask_lookup[b_prime & 63])) {
-                // if (stack_size < MAX_STACK_SIZE) {
+            const size_t seg_prime = static_cast<size_t>(b_prime) >> 6;
+            const uint64_t mask = bit_mask_lookup[b_prime & 63];
+
+            if (!(Bvisited[seg_prime] & mask)) {
                 stack_buffer[stack_size++] = b_prime;
-                // } else {
-                // fmt::print(
-                // "Stack overflow in "
-                // "DominatedInCompWiseSmallerBuckets\n");
-                // return false;
-                // }
             }
         }
-
     } while (stack_size > 0);
 
     return false;

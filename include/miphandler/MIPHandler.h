@@ -785,7 +785,7 @@ class MIPProblem {
 
 #ifdef GUROBI
     // Function to populate a Gurobi model from this MIPProblem instance
-    std::unique_ptr<GRBModel> initialize_from_MIP(GRBEnv &env) {
+    std::unique_ptr<GRBModel> toGurobiModel(GRBEnv &env) {
         try {
             auto gurobiModel = std::make_unique<GRBModel>(env);
 
@@ -853,7 +853,7 @@ class MIPProblem {
     }
 
     bool gurobi_initialized = false;
-    std::unique_ptr<GRBModel> toGurobiModel(GRBEnv &env) {
+    std::unique_ptr<GRBModel> toCachedGurobiModel(GRBEnv &env) {
         try {
             if (!gurobi_initialized) {
                 // First time initialization

@@ -16,6 +16,7 @@
 #include "Bitset.h"
 #include "Common.h"
 #include "Path.h"
+#include "RCC.h"
 #include "SparseMatrix.h"
 #include "Stealing.h"
 #include "VRPNode.h"
@@ -85,11 +86,11 @@ constexpr int INITIAL_RANK_1_MULTI_LABEL_POOL_SIZE = 50;
 constexpr int INITIAL_POOL_SIZE = 100;
 using yzzLong = Bitset<N_SIZE>;
 using cutLong = yzzLong;
-constexpr double tolerance = 1e-6;
+constexpr double tolerance = 1e-3;
 constexpr int max_row_rank1 = 5;
 constexpr int max_heuristic_initial_seed_set_size_row_rank1c = 6;
 
-constexpr int max_num_r1c_per_round = 2;
+constexpr int max_num_r1c_per_round = 3;
 constexpr double cut_vio_factor = 0.1;
 
 struct R1c {
@@ -276,13 +277,8 @@ class HighDimCutsGenerator {
             for (const auto &pair : c_N_noC) {
                 pool.submit([this, plan_idx, pair, &rank1_mutex]() mutable {
                     try {
-                        // std::cout << "Task submitted for plan_idx " <<
-                        // plan_idx << "\n";
-
                         const auto &[c, wc] = pair;
                         if (c.empty() || wc.empty()) {
-                            // std::cout << "Task skipped for plan_idx " <<
-                            // plan_idx << " due to empty c or wc.\n";
                             return;
                         }
 
@@ -293,8 +289,6 @@ class HighDimCutsGenerator {
                                                            initial_vio);
 
                         if (initial_vio < TOLERANCE) {
-                            // std::cout << "Task completed for plan_idx " <<
-                            // plan_idx << " with no updates.\n";
                             return;
                         }
 
@@ -304,15 +298,15 @@ class HighDimCutsGenerator {
                         std::pair<int, int> swap_i_j;
                         double swap_vio = initial_vio;
                         double shift_vio = initial_vio;
-                        std::pair<int, int> shift_i_j;
+                        // std::pair<int, int> shift_i_j;
 
                         addSearchCrazy(plan_idx, c_mutable, wc, add_vio, add_j);
                         removeSearchCrazy(plan_idx, c_mutable, remove_vio,
                                           remove_j);
                         swapSearchCrazy(plan_idx, c_mutable, wc, swap_vio,
                                         swap_i_j);
-                        shiftSearchCrazy(plan_idx, c_mutable, shift_vio,
-                                         shift_i_j);
+                        // shiftSearchCrazy(plan_idx, c_mutable, shift_vio,
+                        // shift_i_j);
 
                         double best_vio =
                             std::max({add_vio, remove_vio, swap_vio});
@@ -355,8 +349,8 @@ class HighDimCutsGenerator {
                             }
                         }
 
-                        // std::cout << "Task completed for plan_idx " <<
-                        // plan_idx << "\n";
+                        // std::cout << "Task completed for
+                        // plan_idx " << plan_idx << "\n";
                     } catch (const std::exception &e) {
                         std::cerr << "Exception in task for plan_idx "
                                   << plan_idx << ": " << e.what() << "\n";
@@ -418,19 +412,19 @@ class HighDimCutsGenerator {
                 }
                 break;
 
-            case 'h':  // Shift operation
-                new_c = c;
-                new_w_no_c = wc;
-                if (swap_i_j.first < swap_i_j.second) {
-                    std::rotate(new_c.begin() + swap_i_j.first,
-                                new_c.begin() + swap_i_j.first + 1,
-                                new_c.begin() + swap_i_j.second + 1);
-                } else {
-                    std::rotate(new_c.begin() + swap_i_j.second,
-                                new_c.begin() + swap_i_j.first,
-                                new_c.begin() + swap_i_j.first + 1);
-                }
-                break;
+                // case 'h':  // Shift operation
+                //     new_c = c;
+                //     new_w_no_c = wc;
+                //     if (swap_i_j.first < swap_i_j.second) {
+                //         std::rotate(new_c.begin() + swap_i_j.first,
+                //                     new_c.begin() + swap_i_j.first + 1,
+                //                     new_c.begin() + swap_i_j.second + 1);
+                //     } else {
+                //         std::rotate(new_c.begin() + swap_i_j.second,
+                //                     new_c.begin() + swap_i_j.first,
+                //                     new_c.begin() + swap_i_j.first + 1);
+                //     }
+                //     break;
         }
     }
 
@@ -459,9 +453,6 @@ class HighDimCutsGenerator {
                           ++current;
                       });
     }
-
-    // ankerl::unordered_dense::map<std::vector<int>,
-    // std::vector<std::vector<int>>, VectorIntHash> cut_cache;
 
     // cutLong as key
     ConcurrentHashMap<cutLong, std::vector<std::pair<std::vector<int>, double>>>
@@ -740,6 +731,11 @@ class HighDimCutsGenerator {
         cost_mat4_vertex = distances;
     }
 
+#if defined(RCC) || defined(EXACT_RCC)
+    ArcDuals arc_duals;
+    void setArcDuals(const ArcDuals &arc_duals) { this->arc_duals = arc_duals; }
+#endif
+
     void generateSepHeurMem4Vertex() {
         rank1_sep_heur_mem4_vertex.resize(dim);
 
@@ -760,8 +756,9 @@ class HighDimCutsGenerator {
 
             // Compute costs for j = 1 to dim - 1
             for (int j = 1; j < dim; ++j) {
-                cost.emplace_back(
-                    j, cost_mat4_vertex[i][j] - (half_cost[i] + half_cost[j]));
+                cost.emplace_back(j, cost_mat4_vertex[i][j] -
+                                         (half_cost[i] + half_cost[j]) -
+                                         arc_duals.getDual(i, j));
             }
 
             // Use nth_element to get the top `max_heuristic_sep_mem4_row_rank1`
@@ -1136,7 +1133,7 @@ class HighDimCutsGenerator {
             MoveResult{},           // Add
             MoveResult{},           // Remove
             MoveResult{},           // Swap
-            MoveResult{}            // Shift
+            // MoveResult{}            // Shift
         };
 
         double new_vio = MIN_SCORE;
@@ -1186,13 +1183,13 @@ class HighDimCutsGenerator {
                 moves[2].operation_data = remove_j;
             } break;
 
-            case 'h':  // Shift only
-            {
-                std::pair<int, int> shift_pos;
-                shiftSearchCrazy(label.plan_idx, label.c, new_vio, shift_pos);
-                moves[4] = MoveResult{new_vio};
-                moves[4].operation_data = shift_pos;
-            } break;
+                // case 'h':  // Shift only
+                // {
+                //     std::pair<int, int> shift_pos;
+                //     shiftSearchCrazy(label.plan_idx, label.c, new_vio,
+                //     shift_pos); moves[4] = MoveResult{new_vio};
+                //     moves[4].operation_data = shift_pos;
+                // } break;
 
             default:
                 // Invalid search direction - keep no operation as best move

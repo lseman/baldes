@@ -177,7 +177,7 @@ struct alignas(64) Bucket {
         }
 
         // Process candidates in parallel
-        std::for_each(std::execution::par_unseq, candidate_buckets.begin(),
+        std::for_each(candidate_buckets.begin(),
                       candidate_buckets.end(), [&](Bucket *bucket) {
                           // Skip if dominance already found
                           if (dominance_found.load(std::memory_order_relaxed)) {

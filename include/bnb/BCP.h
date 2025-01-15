@@ -600,7 +600,7 @@ class VRProblem {
 
 #ifdef IPM_ACEL
         int base_threshold = 20;
-        int adaptive_threshold = 20;
+        int adaptive_threshold;
         IPSolver ipm_solver;
         bool use_ipm_duals = false;
 #endif
@@ -638,6 +638,17 @@ class VRProblem {
 
                 SRC_MODE_BLOCK(if (!rcc) {
                     r1c->allPaths = allPaths;
+                    RCC_MODE_BLOCK(
+                        // RCC cuts
+                        if (rccManager->size() > 0) {
+#ifndef IPM
+                            auto arc_duals = rccManager->computeDuals(node);
+#else
+                    auto arc_duals = rccManager->computeDuals(nodeDuals, node);
+#endif
+                            r1c->setArcDuals(arc_duals);
+                        })
+
                     // auto start_time_ =
                     // std::chrono::high_resolution_clock::now();
                     auto srcResult = r1c->runSeparation(node, SRCconstraints);
@@ -815,56 +826,54 @@ class VRProblem {
                     }
                 }
 #ifdef IPM_ACEL
-                auto updateGapAndRunOptimization = [&](auto node, auto lp_obj,
-                                                       auto inner_obj,
-                                                       auto &ipm_solver,
-                                                       auto &iter_non_improv,
-                                                       auto &use_ipm_duals,
-                                                       auto &nodeDuals) {
-                    auto matrix = node->extractModelDataSparse();
+                auto updateGapAndRunOptimization =
+                    [&](auto node, auto lp_obj, auto inner_obj,
+                        auto &ipm_solver, auto &iter_non_improv,
+                        auto &use_ipm_duals, auto &nodeDuals) {
+                        auto matrix = node->extractModelDataSparse();
 
-                    auto d = 1;
-                    double obj_change = std::abs(lp_obj - inner_obj);
-                    double adaptive_factor = std::min(
-                        1.0,
-                        std::max(1e-1, obj_change / std::abs(lp_obj + 1e-6)));
+                        auto d = 10;
+                        // Compute gap based on current objective difference and
+                        // adaptive factor
 
-                    // Compute gap based on current objective difference and
-                    // adaptive factor
-                    double gap =
-                        std::abs(lp_obj - (lp_obj + std::min(0.0, inner_obj))) /
-                        std::abs(lp_obj + 1e-6);
-                    gap = (gap / d) * adaptive_factor;
+                        double gap =
+                            std::abs(lp_obj - (lp_obj + numK * inner_obj)) /
+                            std::abs(lp_obj + 1e-6);
+                        gap = (gap / d);
 
-                    // Enforce upper and lower bounds on gap
-                    if (std::isnan(gap) || std::signbit(gap)) {
-                        gap = 1e-1;
-                    }
-                    gap = std::clamp(gap, 1e-8, 1e-1);
+                        // Enforce upper and lower bounds on gap
+                        if (std::isnan(gap) || std::signbit(gap)) {
+                            gap = 1e-1;
+                        }
+                        gap = std::clamp(gap, 1e-8, 1e-1);
 
-                    // Run optimization and adjust duals
-                    ipm_solver.run_optimization(matrix, gap);
-                    nodeDuals = ipm_solver.getDuals();
-                    for (auto &dual : nodeDuals) {
-                        dual = -dual;
-                    }
-                };
+                        // Run optimization and adjust duals
+                        ipm_solver.run_optimization(matrix, gap);
+                        nodeDuals = ipm_solver.getDuals();
+                        for (auto &dual : nodeDuals) {
+                            dual = -dual;
+                        }
+                    };
 
-                adaptive_threshold = std::max(
-                    20, base_threshold +
-                            iter / 100);  // Adapt with total iterations
+                adaptive_threshold =
+                    std::max(base_threshold,
+                             base_threshold +
+                                 iter / 100);  // Adapt with total iterations
                 if (std::abs(lp_obj - lp_obj_old) < 1) {
                     iter_non_improv += 1;
                     if (iter_non_improv > adaptive_threshold) {
-                        print_info(
-                            "No improvement in the last iterations, running "
-                            "IPM\n");
-                        updateGapAndRunOptimization(node, lp_obj, inner_obj,
-                                                    ipm_solver, iter_non_improv,
-                                                    use_ipm_duals, nodeDuals);
-                        stab.define_smooth_dual_sol(nodeDuals);
-                        iter_non_improv = 0;
-                        use_ipm_duals = true;
+                        if (stab.alpha > 0) {
+                            print_info(
+                                "No improvement in the last iterations, "
+                                "running "
+                                "IPM\n");
+                            updateGapAndRunOptimization(
+                                node, lp_obj, inner_obj, ipm_solver,
+                                iter_non_improv, use_ipm_duals, nodeDuals);
+                            stab.define_smooth_dual_sol(nodeDuals);
+                            iter_non_improv = 0;
+                            use_ipm_duals = true;
+                        }
                     }
                 } else {
                     iter_non_improv = 0;
