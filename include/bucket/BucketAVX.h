@@ -4,38 +4,59 @@
  */
 #pragma once
 
+#include <experimental/simd>
+
 #include "Cut.h"
 #include "Definitions.h"
 #include "Pools.h"
-#include <experimental/simd>
 
 namespace {
-    constexpr double EPSILON = -1e-3;
-    constexpr size_t UNROLL_SIZE = 4;
-}
+constexpr double EPSILON = -1e-3;
+constexpr size_t UNROLL_SIZE = 4;
+}  // namespace
 
 // Optimized SIMD loading
 template <typename T, typename Container>
-inline std::experimental::simd<T> load_simd(const Container &source, size_t start_index, size_t simd_size) {
+inline std::experimental::simd<T> load_simd(const Container &source,
+                                            size_t start_index,
+                                            size_t simd_size) {
     std::experimental::simd<T> result;
+    alignas(64) std::array<T, std::experimental::simd<T>::size()> buffer;
+
+    // Load data into a buffer for better cache locality
     for (size_t i = 0; i < simd_size; ++i) {
-        result[i] = source[start_index + i]->cost;
+        buffer[i] = source[start_index + i]->cost;
     }
+
+    // Load the buffer into the SIMD register
+    result.copy_from(buffer.data(), std::experimental::vector_aligned);
+
     return result;
 }
 
 template <typename T, typename Container>
-inline std::experimental::simd<T> load_simd_generic(const Container &source, size_t start_index, size_t simd_size) {
+inline std::experimental::simd<T> load_simd_generic(const Container &source,
+                                                    size_t start_index,
+                                                    size_t simd_size) {
     std::experimental::simd<T> result;
+    alignas(64) std::array<T, std::experimental::simd<T>::size()> buffer;
+
+    // Load data into a buffer for better cache locality
     for (size_t i = 0; i < simd_size; ++i) {
-        result[i] = source[start_index + i];
+        buffer[i] = source[start_index + i];
     }
+
+    // Load the buffer into the SIMD register
+    result.copy_from(buffer.data(), std::experimental::vector_aligned);
+
     return result;
 }
 
 template <Direction D, Stage S>
-inline bool check_dominance_against_vector(const Label *new_label, const std::vector<Label *> &labels,
-                                         const CutStorage *cut_storage, int r_size) noexcept {
+inline bool check_dominance_against_vector(const Label *new_label,
+                                           const std::vector<Label *> &labels,
+                                           const CutStorage *cut_storage,
+                                           int r_size) noexcept {
     using namespace std::experimental;
     const size_t size = labels.size();
     const size_t simd_size = simd<double>::size();
@@ -43,10 +64,10 @@ inline bool check_dominance_against_vector(const Label *new_label, const std::ve
     // Cache frequently accessed data
     const double new_label_cost = new_label->cost;
     simd<double> current_cost(new_label_cost);
-    
+
     // Pre-allocated SIMD buffers
-    alignas(32) std::array<double, simd<double>::size()> resources_buffer;
-    alignas(32) std::array<double, simd<double>::size()> new_resources_buffer;
+    alignas(64) std::array<double, simd<double>::size()> resources_buffer;
+    alignas(64) std::array<double, simd<double>::size()> new_resources_buffer;
 
     // Process labels in SIMD-width chunks
     size_t i = 0;
@@ -54,7 +75,7 @@ inline bool check_dominance_against_vector(const Label *new_label, const std::ve
         // Load and compare costs
         simd<double> label_costs = load_simd<double>(labels, i, simd_size);
         auto cost_mask = (label_costs <= current_cost);
-        
+
         if (!any_of(cost_mask)) continue;
 
         // Check each label in the SIMD chunk that passed the cost check
@@ -82,9 +103,11 @@ inline bool check_dominance_against_vector(const Label *new_label, const std::ve
             if (!dominated) continue;
 
             // Visited nodes check for appropriate stages
-            if constexpr (S == Stage::Three || S == Stage::Four || S == Stage::Enumerate) {
+            if constexpr (S == Stage::Three || S == Stage::Four ||
+                          S == Stage::Enumerate) {
                 for (size_t k = 0; k < label->visited_bitmap.size(); ++k) {
-                    if (((label->visited_bitmap[k] & new_label->visited_bitmap[k]) ^ 
+                    if (((label->visited_bitmap[k] &
+                          new_label->visited_bitmap[k]) ^
                          label->visited_bitmap[k]) != 0) {
                         dominated = false;
                         break;
@@ -94,15 +117,15 @@ inline bool check_dominance_against_vector(const Label *new_label, const std::ve
 
             if (!dominated) continue;
 
-            // SRC check for Stage Four and Enumerate
-            #ifdef SRC
+// SRC check for Stage Four and Enumerate
+#ifdef SRC
             if constexpr (S == Stage::Four || S == Stage::Enumerate) {
                 if (cut_storage && !cut_storage->SRCDuals.empty()) {
                     double sumSRC = 0;
                     const auto &SRCDuals = cut_storage->SRCDuals;
                     const auto &labelSRCMap = label->SRCmap;
                     const auto &newLabelSRCMap = new_label->SRCmap;
-                    
+
                     for (size_t k = 0; k < SRCDuals.size(); ++k) {
                         const auto &den = cut_storage->getCut(k).p.den;
                         const auto labelMod = labelSRCMap[k];
@@ -111,11 +134,11 @@ inline bool check_dominance_against_vector(const Label *new_label, const std::ve
                             sumSRC += SRCDuals[k];
                         }
                     }
-                    
+
                     if (label->cost - sumSRC > new_label->cost) continue;
                 }
             }
-            #endif
+#endif
 
             if (dominated) return true;
         }
@@ -124,7 +147,7 @@ inline bool check_dominance_against_vector(const Label *new_label, const std::ve
     // Handle remaining labels
     for (; i < size; ++i) {
         const Label *label = labels[i];
-        
+
         if (label->cost > new_label->cost) continue;
 
         // Resource check
@@ -146,9 +169,10 @@ inline bool check_dominance_against_vector(const Label *new_label, const std::ve
         if (!dominated) continue;
 
         // Visited nodes check
-        if constexpr (S == Stage::Three || S == Stage::Four || S == Stage::Enumerate) {
+        if constexpr (S == Stage::Three || S == Stage::Four ||
+                      S == Stage::Enumerate) {
             for (size_t k = 0; k < label->visited_bitmap.size(); ++k) {
-                if (((label->visited_bitmap[k] & new_label->visited_bitmap[k]) ^ 
+                if (((label->visited_bitmap[k] & new_label->visited_bitmap[k]) ^
                      label->visited_bitmap[k]) != 0) {
                     dominated = false;
                     break;
@@ -158,15 +182,15 @@ inline bool check_dominance_against_vector(const Label *new_label, const std::ve
 
         if (!dominated) continue;
 
-        // SRC check
-        #ifdef SRC
+// SRC check
+#ifdef SRC
         if constexpr (S == Stage::Four || S == Stage::Enumerate) {
             if (cut_storage && !cut_storage->SRCDuals.empty()) {
                 double sumSRC = 0;
                 const auto &SRCDuals = cut_storage->SRCDuals;
                 const auto &labelSRCMap = label->SRCmap;
                 const auto &newLabelSRCMap = new_label->SRCmap;
-                
+
                 for (size_t k = 0; k < SRCDuals.size(); ++k) {
                     const auto &den = cut_storage->getCut(k).p.den;
                     const auto labelMod = labelSRCMap[k];
@@ -175,11 +199,11 @@ inline bool check_dominance_against_vector(const Label *new_label, const std::ve
                         sumSRC += SRCDuals[k];
                     }
                 }
-                
+
                 if (label->cost - sumSRC > new_label->cost) continue;
             }
         }
-        #endif
+#endif
 
         if (dominated) return true;
     }

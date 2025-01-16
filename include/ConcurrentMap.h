@@ -1,24 +1,24 @@
 #pragma once
+#include <immintrin.h>
+
 #include <array>
 #include <atomic>
+#include <bit>
 #include <functional>
-#include <immintrin.h>
 #include <memory>
 #include <mutex>
 #include <optional>
 #include <shared_mutex>
+#include <span>
 #include <unordered_map>
 #include <vector>
-#include <span>
-#include <bit>
 
 template <typename K, typename V, typename Hash = std::hash<K>>
 class ConcurrentHashMap {
-public:
+   public:
     static constexpr size_t NUM_SHARDS = 128;
-    
-    explicit ConcurrentHashMap(size_t bucket_count = 128) 
-        : total_size_(0) {
+
+    explicit ConcurrentHashMap(size_t bucket_count = 128) : total_size_(0) {
         size_t per_shard = std::max(size_t(128), bucket_count / NUM_SHARDS);
         per_shard = std::bit_ceil(per_shard);
         for (auto& shard : shards_) {
@@ -34,7 +34,7 @@ public:
         return insert_impl(std::move(key), std::move(value));
     }
 
-    template<typename... Args>
+    template <typename... Args>
     bool emplace(const K& key, Args&&... args) {
         return insert_impl(key, V(std::forward<Args>(args)...));
     }
@@ -72,7 +72,7 @@ public:
         total_size_.store(0, std::memory_order_relaxed);
     }
 
-    template<typename F>
+    template <typename F>
     bool update(const K& key, F&& updater) {
         const size_t hashval = calculateHash(key);
         auto& shard = shards_[getShardIndex(hashval)];
@@ -87,9 +87,7 @@ public:
         return false;
     }
 
-    size_t size() const {
-        return total_size_.load(std::memory_order_relaxed);
-    }
+    size_t size() const { return total_size_.load(std::memory_order_relaxed); }
 
     size_t capacity() const {
         size_t total = 0;
@@ -99,14 +97,14 @@ public:
         return total;
     }
 
-private:
+   private:
     static constexpr size_t SHARD_MASK = NUM_SHARDS - 1;
     static constexpr size_t BUCKET_RESIZE_THRESHOLD = 32;
 
     struct alignas(64) Bucket {
         std::unordered_map<K, V, Hash> items;
         mutable std::shared_mutex mutex;
-        
+
         static constexpr size_t POOL_SIZE = 16;
         struct {
             alignas(K) std::byte key_storage[sizeof(K)];
@@ -116,27 +114,30 @@ private:
         std::atomic<size_t> pool_size{0};
 
         Bucket() = default;
-        
-        Bucket(Bucket&& other) noexcept 
-            : items(std::move(other.items))
-            , pool_size(other.pool_size.load(std::memory_order_relaxed)) {
+
+        Bucket(Bucket&& other) noexcept
+            : items(std::move(other.items)),
+              pool_size(other.pool_size.load(std::memory_order_relaxed)) {
             memcpy(pool, other.pool, sizeof(pool));
         }
-        
+
         Bucket& operator=(Bucket&& other) noexcept {
             if (this != &other) {
                 items = std::move(other.items);
-                pool_size.store(other.pool_size.load(std::memory_order_relaxed));
+                pool_size.store(
+                    other.pool_size.load(std::memory_order_relaxed));
                 memcpy(pool, other.pool, sizeof(pool));
             }
             return *this;
         }
 
         ~Bucket() {
-            for (size_t i = 0; i < pool_size.load(std::memory_order_relaxed); ++i) {
+            for (size_t i = 0; i < pool_size.load(std::memory_order_relaxed);
+                 ++i) {
                 if (pool[i].occupied) {
                     std::destroy_at(reinterpret_cast<K*>(&pool[i].key_storage));
-                    std::destroy_at(reinterpret_cast<V*>(&pool[i].value_storage));
+                    std::destroy_at(
+                        reinterpret_cast<V*>(&pool[i].value_storage));
                 }
             }
         }
@@ -149,9 +150,9 @@ private:
         std::vector<Bucket> buckets;
         Hash hasher;
         std::atomic<bool> is_resizing{false};
-        
+
         explicit Shard(size_t n) : buckets(n) {}
-        
+
         size_t getBucketIndex(size_t hashval) const {
             return hashval & (buckets.size() - 1);
         }
@@ -169,10 +170,10 @@ private:
         return hashval & SHARD_MASK;
     }
 
-    template<typename T = K>
+    template <typename T = K>
     [[nodiscard]] inline size_t calculateHash(const T& key) const {
-        if constexpr (sizeof(T) == 16 && std::is_trivially_copyable_v<T> && 
-                     std::is_standard_layout_v<T>) {
+        if constexpr (sizeof(T) == 16 && std::is_trivially_copyable_v<T> &&
+                      std::is_standard_layout_v<T>) {
             return calculateHashSIMD(key);
         } else {
             return shards_[0]->hasher(key);
@@ -186,7 +187,7 @@ private:
         return _mm_extract_epi64(hash, 0) ^ _mm_extract_epi64(hash, 1);
     }
 
-    template<typename KeyArg>
+    template <typename KeyArg>
     bool insert_impl(KeyArg&& key, V value) {
         const size_t hashval = calculateHash(key);
         auto& shard = shards_[getShardIndex(hashval)];
@@ -205,7 +206,7 @@ private:
         std::unique_lock lock(bucket.mutex);
         auto [it, inserted] = bucket.items.try_emplace(
             std::forward<KeyArg>(key), std::move(value));
-        
+
         if (inserted) {
             total_size_.fetch_add(1, std::memory_order_relaxed);
             if (bucket.items.size() > BUCKET_RESIZE_THRESHOLD) {
@@ -217,18 +218,18 @@ private:
 
     void triggerResize(Shard* shard, size_t bucket_idx) {
         bool expected = false;
-        if (shard->is_resizing.compare_exchange_strong(expected, true, 
-                                                     std::memory_order_acquire,
-                                                     std::memory_order_relaxed)) {
+        if (shard->is_resizing.compare_exchange_strong(
+                expected, true, std::memory_order_acquire,
+                std::memory_order_relaxed)) {
             try {
                 auto& source_bucket = shard->buckets[bucket_idx];
-                
+
                 Bucket new_bucket1;
                 Bucket new_bucket2;
-                
+
                 {
                     std::unique_lock lock(source_bucket.mutex);
-                    
+
                     for (const auto& [key, value] : source_bucket.items) {
                         size_t item_hash = calculateHash(key);
                         if (item_hash & (shard->buckets.size())) {
@@ -237,26 +238,26 @@ private:
                             new_bucket1.items.emplace(key, value);
                         }
                     }
-                    
+
                     source_bucket.pool_size.store(0, std::memory_order_relaxed);
                 }
-                
+
                 size_t old_size = shard->buckets.size();
                 shard->buckets.resize(old_size * 2);
-                
+
                 size_t new_bucket_idx = bucket_idx + old_size;
-                
+
                 {
                     std::unique_lock lock(source_bucket.mutex);
                     source_bucket.items = std::move(new_bucket1.items);
-                    shard->buckets[new_bucket_idx].items = std::move(new_bucket2.items);
+                    shard->buckets[new_bucket_idx].items =
+                        std::move(new_bucket2.items);
                 }
-            }
-            catch (...) {
+            } catch (...) {
                 shard->is_resizing.store(false, std::memory_order_release);
                 throw;
             }
-            
+
             shard->is_resizing.store(false, std::memory_order_release);
         }
     }

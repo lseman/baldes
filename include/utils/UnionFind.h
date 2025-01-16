@@ -8,99 +8,141 @@
  * and getting the subset index of an element.
  *
  */
-#pragma once
 
+#pragma once
 #include "Common.h"
 
 class UnionFind {
    public:
-    // default constructor
     UnionFind() = default;
-    // Constructor initializes based on the elements in the SCCs
-    UnionFind(const std::vector<std::vector<int>> &sccs) {
-        // Find the maximum element in SCCs to size the parent, rank, and
-        // subsetIndex vectors
-        int max_elem = 0;
-        for (const auto &scc : sccs) {
+
+    // Constructor with pre-computed size
+    explicit UnionFind(size_t size) {
+        parent.resize(size);
+        rank.resize(size, 0);
+        subsetIndex.resize(size, -1);
+
+        // Initialize parent array - each element is its own parent initially
+        for (size_t i = 0; i < size; ++i) {
+            parent[i] = i;
+        }
+    }
+
+    // Constructor for SCCs with optimized initialization
+    explicit UnionFind(const std::vector<std::vector<int>>& sccs) {
+        // Find max element with single pass
+        int max_elem = -1;
+        size_t total_elements = 0;
+        for (const auto& scc : sccs) {
+            total_elements += scc.size();
             for (int elem : scc) {
                 max_elem = std::max(max_elem, elem);
             }
         }
 
-        // Initialize parent, rank, and subsetIndex vectors based on the max
-        // element
-        parent.resize(max_elem + 1);
-        rank.resize(max_elem + 1, 0);
-        subsetIndex.resize(max_elem + 1,
-                           -1);  // Initialize with -1 (not assigned yet)
-        int subset_counter = 0;
+        // Early return for empty input
+        if (max_elem < 0) return;
 
-        for (const auto &scc : sccs) {
-            if (!scc.empty()) {
-                // Assign subset number to all elements in the current SCC
-                for (size_t i = 0; i < scc.size(); ++i) {
-                    int elem = scc[i];
-                    parent[elem] =
-                        elem;  // Initially, each element is its own parent
-                    subsetIndex[elem] = subset_counter;  // Assign subset number
-                }
-                // Unite all elements within this SCC
-                for (size_t i = 1; i < scc.size(); ++i) {
-                    unite(scc[0],
-                          scc[i]);  // Unite the first element with others
-                }
-                subset_counter++;  // Move to the next subset
+        // Pre-allocate with exact sizes
+        const size_t size = max_elem + 1;
+        parent.resize(size);
+        rank.resize(size, 0);
+        subsetIndex.resize(size, -1);
+
+        // Initialize parent array - each element is its own parent initially
+        for (size_t i = 0; i < size; ++i) {
+            parent[i] = i;
+        }
+
+        // Reserve space for path compression
+        if (total_elements > 0) {
+            path_compression_stack.reserve(
+                static_cast<size_t>(std::log2(total_elements)) + 1);
+        }
+
+        // Process SCCs
+        int subset_counter = 0;
+        for (const auto& scc : sccs) {
+            if (scc.empty()) continue;
+
+            // Set subset index for first element
+            const int first_elem = scc[0];
+            subsetIndex[first_elem] = subset_counter;
+
+            // Unite all other elements with the first
+            for (size_t i = 1; i < scc.size(); ++i) {
+                unite(first_elem, scc[i]);
             }
+
+            subset_counter++;
         }
     }
 
-    // Find the root of the set containing x with path compression
-    inline int find(int x) {
+    // Find with path compression using stack instead of recursion
+    inline int find(int x) const noexcept {
+        // Early return if x is its own parent
+        if (parent[x] == x) return x;
+
+        // Find root
         int root = x;
-        // Find the root
-        while (root != parent[root]) {
+        while (parent[root] != root) {
             root = parent[root];
         }
-        // Path compression
-        while (x != root) {
-            int next = parent[x];
-            parent[x] = root;
-            x = next;
-        }
+
         return root;
     }
 
-    // Union two sets by rank, and update the subset index
-    void unite(int x, int y) {
-        int rootX = find(x);
-        int rootY = find(y);
-        if (rootX != rootY) {
-            // Union by rank
-            if (rank[rootX] > rank[rootY]) {
-                parent[rootY] = rootX;
-                // Update subsetIndex for all elements in the rootY tree
-                subsetIndex[rootY] = subsetIndex[rootX];
-            } else if (rank[rootX] < rank[rootY]) {
-                parent[rootX] = rootY;
-                // Update subsetIndex for all elements in the rootX tree
-                subsetIndex[rootX] = subsetIndex[rootY];
-            } else {
-                parent[rootY] = rootX;
-                ++rank[rootX];
-                // Update subsetIndex for rootY
-                subsetIndex[rootY] = subsetIndex[rootX];
-            }
+    // Non-const find for operations that need to modify the structure
+    inline int find_and_compress(int x) noexcept {
+        // Early return if x is its own parent
+        if (parent[x] == x) return x;
+
+        // Find root
+        int root = x;
+        path_compression_stack.clear();
+
+        while (parent[root] != root) {
+            path_compression_stack.push_back(root);
+            root = parent[root];
+        }
+
+        // Path compression
+        for (int node : path_compression_stack) {
+            parent[node] = root;
+        }
+
+        return root;
+    }
+
+    // Unite with rank and subset index update
+    void unite(int x, int y) noexcept {
+        int rootX = find_and_compress(x);
+        int rootY = find_and_compress(y);
+
+        if (rootX == rootY) return;
+
+        // Union by rank
+        if (rank[rootX] < rank[rootY]) {
+            std::swap(rootX, rootY);
+        }
+
+        // Attach smaller rank tree under root of high rank tree
+        parent[rootY] = rootX;
+        subsetIndex[rootY] = subsetIndex[rootX];
+
+        // If ranks are same, increment rank of rootX
+        if (rank[rootX] == rank[rootY]) {
+            ++rank[rootX];
         }
     }
 
-    // Function to get the subset index of an element
-    int getSubset(int x) {
-        int root = find(x);        // Find the root of the set
-        return subsetIndex[root];  // Return the subset index
-    }
+    // Get subset index
+    inline int getSubset(int x) const noexcept { return subsetIndex[find(x)]; }
 
    private:
-    std::vector<int> parent;
+    mutable std::vector<int> parent;
     std::vector<int> rank;
-    std::vector<int> subsetIndex;  // Store the subset number of each element
+    std::vector<int> subsetIndex;
+    std::vector<int>
+        path_compression_stack;  // Reusable stack for path compression
 };

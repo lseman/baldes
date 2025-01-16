@@ -45,6 +45,7 @@ struct alignas(64) Bucket {
     std::vector<JumpArc> fw_jump_arcs;
     std::vector<JumpArc> bw_jump_arcs;
     std::vector<Bucket> sub_buckets;
+    std::vector<Label *> labels_flush;
 
     double get_cb() const {
         if (labels_vec.empty() && !is_split) {
@@ -123,6 +124,20 @@ struct alignas(64) Bucket {
         });
     }
 
+    void lazy_flush(Label *new_label) { labels_flush.push_back(new_label); }
+
+    void flush() {
+        // remove from labels_vec all labels in labels_flush
+        labels_vec.erase(
+            std::remove_if(labels_vec.begin(), labels_vec.end(),
+                           [this](Label *label) {
+                               return std::find(labels_flush.begin(),
+                                                labels_flush.end(),
+                                                label) != labels_flush.end();
+                           }),
+            labels_vec.end());
+    }
+
     double min_split_range = 0.5;
     static constexpr int MAX_BUCKET_DEPTH = 4;
 
@@ -177,8 +192,8 @@ struct alignas(64) Bucket {
         }
 
         // Process candidates in parallel
-        std::for_each(candidate_buckets.begin(),
-                      candidate_buckets.end(), [&](Bucket *bucket) {
+        std::for_each(candidate_buckets.begin(), candidate_buckets.end(),
+                      [&](Bucket *bucket) {
                           // Skip if dominance already found
                           if (dominance_found.load(std::memory_order_relaxed)) {
                               return;

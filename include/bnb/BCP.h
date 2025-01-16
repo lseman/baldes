@@ -881,7 +881,7 @@ class VRProblem {
 #endif
                 bucket_graph->relaxation = lp_obj;
                 bucket_graph->augment_ng_memories(solution, allPaths, true, 5,
-                                                  100, 20, N_SIZE);
+                                                  100, 30, N_SIZE);
                 SRC_MODE_BLOCK(  // SRC cuts
                     if (!SRCconstraints.empty()) {
                         // print SRCconstraints size
@@ -1096,6 +1096,14 @@ class VRProblem {
         }
     }
 
+    static constexpr auto blue = "\033[34m";
+    static constexpr auto reset = "\033[0m";
+
+    template <typename T>
+    auto blue_text(const T &value) {
+        return fmt::format("{}{}{}", blue, value, reset);
+    }
+
     void printSolution(BNBNode *node) {
         auto &allPaths = node->paths;
 
@@ -1108,8 +1116,9 @@ class VRProblem {
         }
 
         for (auto s : sol) {
-            fmt::print("Path: ");
-            Logger::log("Path: ");
+            fmt::print("{}", blue_text("_PATH: "));
+
+            Logger::log("PATH: ");
             for (auto j : allPaths[s].route) {
                 Logger::log("{} ", j);
                 fmt::print("{} ", j);
@@ -1118,10 +1127,6 @@ class VRProblem {
             Logger::log("\n");
         }
         fmt::print("\n");
-
-        // ANSI escape code for blue text
-        constexpr auto blue = "\033[34m";
-        constexpr auto reset = "\033[0m";
 
         fmt::print("+---------------------------------------+\n");
         fmt::print("| {:<14} | {}{:>20}{} |\n", "Bound", blue,
