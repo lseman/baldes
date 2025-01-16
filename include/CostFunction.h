@@ -65,7 +65,9 @@ class ParametersBuilder {
     GenericParameters params;
 
    public:
-    ParametersBuilder(ParamType<double> initial_cost, ParamType<int> distance) {
+    ParametersBuilder(ParamType<double> initial_cost, ParamType<int> distance,
+                      ParamType<double> node_id = param(0.0),
+                      ParamType<double> resources = param(0.0)) {
         params.set(initial_cost);
         params.set(distance);
     }
@@ -107,7 +109,9 @@ class CostFunction {
         return cost_func(params);
     }
 
-    double calculate_cost(double initial_cost, int distance) const {
+    double calculate_cost(double initial_cost, int distance,
+                          double node_id = 0.0,
+                          std::vector<double> resources = {}) {
         auto params =
             ParametersBuilder(param<double>(initial_cost), param<int>(distance))
                 .build();

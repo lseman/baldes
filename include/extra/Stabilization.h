@@ -456,8 +456,10 @@ class Stabilization {
         alpha = base_alpha;
     }
 
+    bool ipm_active = false;
     void define_smooth_dual_sol(const DualSolution &nodeDuals) {
         smooth_dual_sol.assign(nodeDuals.begin(), nodeDuals.begin() + sizeDual);
+        ipm_active = true;
     }
 
     void updateNumK(int numK) { this->numK = numK; }

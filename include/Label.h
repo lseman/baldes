@@ -1,9 +1,11 @@
 /**
  * @file Label.h
- * @brief This file contains the definition of the Label struct and LabelComparator class.
+ * @brief This file contains the definition of the Label struct and
+ * LabelComparator class.
  *
- * The Label struct represents a label used in a solver, containing various properties and methods related to the label.
- * The LabelComparator class provides a comparator for comparing two Label objects based on their cost.
+ * The Label struct represents a label used in a solver, containing various
+ * properties and methods related to the label. The LabelComparator class
+ * provides a comparator for comparing two Label objects based on their cost.
  *
  */
 
@@ -14,28 +16,30 @@
  * @struct Label
  * @brief Represents a label used in a solver.
  *
- * This struct contains various properties and methods related to a label used in a solver.
- * It stores information such as the set of Fj, id, is_extended flag, vertex, cost, real_cost, SRC_cost,
- * resources, predecessor, is_dominated flag, nodes_covered, nodes_ordered, node_id, cut_storage,
- * parent, children, status, visited, and SRCmap.
+ * This struct contains various properties and methods related to a label used
+ * in a solver. It stores information such as the set of Fj, id, is_extended
+ * flag, vertex, cost, real_cost, SRC_cost, resources, predecessor, is_dominated
+ * flag, nodes_covered, nodes_ordered, node_id, cut_storage, parent, children,
+ * status, visited, and SRCmap.
  *
- * The struct provides constructors to initialize the label with or without a node_id.
- * It also provides methods to set the covered nodes, add a node to the covered nodes, check if a node is
- * already covered, and initialize the label with new values.
+ * The struct provides constructors to initialize the label with or without a
+ * node_id. It also provides methods to set the covered nodes, add a node to the
+ * covered nodes, check if a node is already covered, and initialize the label
+ * with new values.
  *
  * The struct overloads the equality and greater than operators for comparison.
  */
 struct Label {
     // int                   id;
-    bool                       is_extended = false;
-    int                        vertex;
-    double                     cost          = 0.0;
-    double                     real_cost     = 0.0;
-    std::array<double, R_SIZE> resources     = {};
-    std::vector<uint16_t>      nodes_covered = {}; // Add nodes_covered to Label
-    int                        node_id       = -1; // Add node_id to Label
-    Label                     *parent        = nullptr;
-    bool                       fresh         = true;
+    bool is_extended = false;
+    int vertex;
+    double cost = 0.0;
+    double real_cost = 0.0;
+    std::array<double, R_SIZE> resources = {};
+    std::vector<uint16_t> nodes_covered = {};  // Add nodes_covered to Label
+    int node_id = -1;                          // Add node_id to Label
+    Label *parent = nullptr;
+    bool fresh = true;
     SRC_MODE_BLOCK(std::vector<uint16_t> SRCmap;)
     // uint64_t             visited_bitmap; // Bitmap for visited nodes
     std::array<uint64_t, num_words> visited_bitmap = {0};
@@ -45,7 +49,8 @@ struct Label {
 
     std::vector<Label *> children;
     // Constructor with node_id
-    Label(int v, double c, const std::vector<double> &res, int pred, int node_id)
+    Label(int v, double c, const std::vector<double> &res, int pred,
+          int node_id)
         : vertex(v), cost(c), resources({res[0]}), node_id(node_id) {}
 
     // Constructor without node_id
@@ -69,31 +74,36 @@ struct Label {
     /**
      * @brief Checks if a node has been visited.
      *
-     * This function determines whether a node, identified by its node_id, has been visited.
-     * It uses a bitmask (visited_bitmap) where each bit represents the visit status of a node.
+     * This function determines whether a node, identified by its node_id, has
+     * been visited. It uses a bitmask (visited_bitmap) where each bit
+     * represents the visit status of a node.
      *
      */
-    bool visits(int node_id) const { return visited_bitmap[node_id / 64] & (1ULL << (node_id % 64)); }
+    bool visits(int node_id) const {
+        return visited_bitmap[node_id / 64] & (1ULL << (node_id % 64));
+    }
 
     /**
      * @brief Resets the state of the object to its initial values.
      *
      */
     inline void reset() {
-        this->vertex      = -1;
-        this->cost        = 0.0;
-        this->resources   = {};
-        this->node_id     = -1;
-        this->real_cost   = 0.0;
-        this->parent      = nullptr;
+        this->vertex = -1;
+        this->cost = 0.0;
+        this->resources = {};
+        this->node_id = -1;
+        this->real_cost = 0.0;
+        this->parent = nullptr;
         this->is_extended = false;
-        // this->nodes_covered.clear();
-        // this->nodes_covered.reserve(N_SIZE / 3);
+        this->nodes_covered.clear();
+        this->nodes_covered.reserve(N_SIZE / 3);
         this->children.clear();
 
-        std::memset(visited_bitmap.data(), 0, visited_bitmap.size() * sizeof(uint64_t));
+        std::memset(visited_bitmap.data(), 0,
+                    visited_bitmap.size() * sizeof(uint64_t));
 #ifdef UNREACHABLE_DOMINANCE
-        std::memset(unreachable_bitmap.data(), 0, unreachable_bitmap.size() * sizeof(uint64_t));
+        std::memset(unreachable_bitmap.data(), 0,
+                    unreachable_bitmap.size() * sizeof(uint64_t));
 #endif
         SRC_MODE_BLOCK(SRCmap.clear();)
     }
@@ -104,11 +114,13 @@ struct Label {
      * @brief Initializes the object with the given parameters.
      *
      */
-    inline void initialize(int vertex, double cost, const std::vector<double> &resources, int node_id) {
+    inline void initialize(int vertex, double cost,
+                           const std::vector<double> &resources, int node_id) {
         this->vertex = vertex;
-        this->cost   = cost;
+        this->cost = cost;
 
-        // Assuming `resources` is a vector or array-like structure with the same size as the input
+        // Assuming `resources` is a vector or array-like structure with the
+        // same size as the input
         std::copy(resources.begin(), resources.end(), this->resources.begin());
 
         this->node_id = node_id;
@@ -128,6 +140,6 @@ struct Label {
  * of the Label objects, with the comparison being in descending order.
  */
 class LabelComparator {
-public:
+   public:
     bool operator()(Label *a, Label *b) { return a->cost > b->cost; }
 };

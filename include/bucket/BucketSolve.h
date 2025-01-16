@@ -250,6 +250,8 @@ std::vector<double> BucketGraph::labeling_algorithm() {
                 const auto &bucket_labels = buckets[bucket].get_labels();
                 const size_t n_bucket_labels = bucket_labels.size();
 
+                std::vector<Label *> labels_to_flsuh;
+
                 for (size_t label_idx = 0; label_idx < n_bucket_labels;
                      ++label_idx) {
                     Label *label = bucket_labels[label_idx];
@@ -384,8 +386,55 @@ std::vector<double> BucketGraph::labeling_algorithm() {
                                             if (is_dominated<D, S>(
                                                     existing_label,
                                                     new_label)) {
-                                                mother_bucket.remove_label(
+                                                // Stack-based iterative removal
+                                                // to avoid recursion
+                                                std::vector<Label *>
+                                                    labels_to_remove;
+                                                labels_to_remove.reserve(
+                                                    32);  // Reserve space for
+                                                          // typical tree depth
+
+                                                // Helper lambda to add a label
+                                                // and all its children to
+                                                // removal list
+                                                auto add_label_and_children =
+                                                    [&labels_to_remove](
+                                                        Label *label) {
+                                                        std::vector<Label *>
+                                                            stack{label};
+                                                        while (!stack.empty()) {
+                                                            Label *current =
+                                                                stack.back();
+                                                            stack.pop_back();
+
+                                                            labels_to_remove
+                                                                .push_back(
+                                                                    current);
+
+                                                            // Add all children
+                                                            // to stack
+                                                            stack.insert(
+                                                                stack.end(),
+                                                                current
+                                                                    ->children
+                                                                    .begin(),
+                                                                current
+                                                                    ->children
+                                                                    .end());
+                                                        }
+                                                    };
+
+                                                // Process the dominated label
+                                                // and all its descendants
+                                                add_label_and_children(
                                                     existing_label);
+
+                                                // Remove all collected labels
+                                                for (Label *label :
+                                                     labels_to_remove) {
+                                                    buckets[label->vertex]
+                                                        .remove_label(label);
+                                                }
                                             }
                                         }
                                     }
@@ -403,10 +452,48 @@ std::vector<double> BucketGraph::labeling_algorithm() {
                                 }
                             }
                         }
-                    }
 
+                    } else {
+                        if (label != nullptr) {
+                            // Stack-based iterative removal to avoid recursion
+                            std::vector<Label *> labels_to_remove;
+                            labels_to_remove.reserve(
+                                32);  // Reserve space for typical tree depth
+
+                            // Helper lambda to add only children (not the label
+                            // itself)
+                            auto add_children =
+                                [&labels_to_remove](Label *label) {
+                                    // Start with all children
+                                    std::vector<Label *> stack(
+                                        label->children.begin(),
+                                        label->children.end());
+
+                                    while (!stack.empty()) {
+                                        Label *current = stack.back();
+                                        stack.pop_back();
+                                        labels_to_remove.push_back(current);
+                                        // Add all children to stack
+                                        stack.insert(stack.end(),
+                                                     current->children.begin(),
+                                                     current->children.end());
+                                    }
+                                };
+
+                            // Process only the children of the dominated label
+                            add_children(label);
+                            buckets[label->vertex].lazy_flush(label);
+
+                            // Remove all collected labels (children only)
+                            for (Label *label_to_remove : labels_to_remove) {
+                                buckets[label_to_remove->vertex].remove_label(
+                                    label_to_remove);
+                            }
+                        }
+                    }
                     label->set_extended(true);
                 }
+                buckets[bucket].flush();
             }
         } while (!all_ext);
 
@@ -680,7 +767,12 @@ inline std::vector<Label *> BucketGraph::Extend(
 
 #ifdef CUSTOM_COST
     auto distance = getcij(initial_node_id, node_id);
-    double new_cost = cost_calculator.calculate_cost(initial_cost, distance);
+    double new_cost =
+        cost_calculator.calculate_cost(initial_cost,  // InitialCost
+                                       distance,      // Distance
+                                       node_id,       // NodeId
+                                       new_resources  // Resources
+        );
 #else
     double new_cost = initial_cost + getcij(initial_node_id, node_id);
 #endif
@@ -756,6 +848,8 @@ inline std::vector<Label *> BucketGraph::Extend(
         new_label->visited_bitmap = L_prime->visited_bitmap;
     }
     set_node_visited(new_label->visited_bitmap, node_id);
+    new_label->nodes_covered = L_prime->nodes_covered;
+    new_label->nodes_covered.push_back(node_id);
 
 #if defined(SRC)
     new_label->SRCmap = L_prime->SRCmap;
@@ -996,7 +1090,7 @@ inline bool BucketGraph::DominatedInCompWiseSmallerBuckets(
         UINT64_C(1) << 63};
 
     // Stack-based implementation with fixed size
-    alignas(64) int stack_buffer[128];  // Aligned for better cache performance
+    alignas(64) int stack_buffer[32];  // Aligned for better cache performance
     int stack_size = 1;
     stack_buffer[0] = bucket;
 
@@ -1142,40 +1236,42 @@ Label *BucketGraph::compute_label(const Label *L, const Label *L_prime) {
 
     new_label->nodes_covered.clear();
 
-    // Start by inserting backward list elements
-    size_t forward_size = 0;
-    auto L_bw = L_prime;
-    for (; L_bw != nullptr; L_bw = L_bw->parent) {
-        new_label->nodes_covered.push_back(
-            L_bw->node_id);  // Insert backward elements directly
-        if (L_bw->parent == nullptr && L_bw->fresh == false) {
-            for (size_t i = 0; i < L_bw->nodes_covered.size(); ++i) {
-                new_label->nodes_covered.push_back(L_bw->nodes_covered[i]);
-            }
-        }
-    }
+    // // Start by inserting backward list elements
+    // size_t forward_size = 0;
+    // auto L_bw = L_prime;
+    // for (; L_bw != nullptr; L_bw = L_bw->parent) {
+    //     new_label->nodes_covered.push_back(
+    //         L_bw->node_id);  // Insert backward elements directly
+    //     if (L_bw->parent == nullptr && L_bw->fresh == false) {
+    //         for (size_t i = 0; i < L_bw->nodes_covered.size(); ++i) {
+    //             new_label->nodes_covered.push_back(L_bw->nodes_covered[i]);
+    //         }
+    //     }
+    // }
 
-    // Now insert forward list elements in reverse order without using
-    // std::reverse
-    auto L_fw = L;
-    for (; L_fw != nullptr; L_fw = L_fw->parent) {
-        new_label->nodes_covered.insert(
-            new_label->nodes_covered.begin(),
-            L_fw->node_id);  // Insert forward elements at the front
-        if (L_fw->parent == nullptr && L_fw->fresh == false) {
-            for (size_t i = 0; i < L_fw->nodes_covered.size(); ++i) {
-                new_label->nodes_covered.insert(
-                    new_label->nodes_covered.begin(), L_fw->nodes_covered[i]);
-            }
-        }
-    }
+    // // Now insert forward list elements in reverse order without using
+    // // std::reverse
+    // auto L_fw = L;
+    // for (; L_fw != nullptr; L_fw = L_fw->parent) {
+    //     new_label->nodes_covered.insert(
+    //         new_label->nodes_covered.begin(),
+    //         L_fw->node_id);  // Insert forward elements at the front
+    //     if (L_fw->parent == nullptr && L_fw->fresh == false) {
+    //         for (size_t i = 0; i < L_fw->nodes_covered.size(); ++i) {
+    //             new_label->nodes_covered.insert(
+    //                 new_label->nodes_covered.begin(),
+    //                 L_fw->nodes_covered[i]);
+    //         }
+    //     }
+    // }
 
-    // new_label->nodes_covered = L_prime->nodes_covered;
-    //  reverse the nodes_covered
-    // std::reverse(new_label->nodes_covered.begin(),
-    // new_label->nodes_covered.end());
-    // new_label->nodes_covered.insert(new_label->nodes_covered.begin(),
-    // L->nodes_covered.begin(), L->nodes_covered.end());
+    new_label->nodes_covered = L_prime->nodes_covered;
+    //     reverse the nodes_covered
+    std::reverse(new_label->nodes_covered.begin(),
+                 new_label->nodes_covered.end());
+    new_label->nodes_covered.insert(new_label->nodes_covered.begin(),
+                                    L->nodes_covered.begin(),
+                                    L->nodes_covered.end());
 
     return new_label;
 }
