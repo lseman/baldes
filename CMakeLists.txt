@@ -149,9 +149,6 @@ add_definitions(-DN_ADD=${N_ADD})
 if(NOT IPM)
   message(STATUS "IPM is disabled, enabling STAB")
   set(STAB ON)
-else()
-  message(STATUS "IPM is enabled, disabling STAB")
-  set(STAB OFF)
 endif()
 
 # Configure the config.h file
@@ -159,13 +156,6 @@ configure_file(
   ${CMAKE_CURRENT_SOURCE_DIR}/config.h.in # Input file (config.h.in)
   ${CMAKE_CURRENT_BINARY_DIR}/config.h # Output file (config.h)
 )
-
-if(STAB AND IPM)
-  message(
-    FATAL_ERROR
-      "Both STAB and IPM cannot be enabled at the same time. Please choose only one."
-  )
-endif()
 
 # Attempt to include CPM.cmake from provided path
 include(cmake/CPM.cmake OPTIONAL)
@@ -236,6 +226,11 @@ endif()
 cpmaddpackage(NAME ankerl_unordered_dense GITHUB_REPOSITORY
               martinus/unordered_dense GIT_TAG origin/main)
 include_directories(${ankerl_unordered_dense_SOURCE_DIR}/include)
+
+cpmaddpackage(
+  NAME libcuckoo
+  GITHUB_REPOSITORY efficient/libcuckoo
+  GIT_TAG origin/master)
 
 if(NSYNC)
   set(nsync_ADDED ON)
@@ -370,7 +365,7 @@ if(IPM OR IPM_ACEL)
 endif()
 
 # Common Libraries List
-set(COMMON_LIBRARIES stdexec fmt xxhash mdspan)
+set(COMMON_LIBRARIES stdexec fmt xxhash mdspan libcuckoo)
 
 if(HIGHS)
   list(APPEND COMMON_LIBRARIES highs::highs)
