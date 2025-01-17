@@ -43,7 +43,7 @@ warn() {
 get_cache_value() {
     local param_name=$1
     local default_value=$2
-    
+
     if [ -f "$CACHE_FILE" ]; then
         local value
         value=$(grep -E "^$param_name:" "$CACHE_FILE" | cut -d "=" -f 2) || true
@@ -62,11 +62,11 @@ validate_numeric() {
     local value=$1
     local param_name=$2
     local min_value=${3:-0}
-    
+
     if ! [[ "$value" =~ ^[0-9]+$ ]]; then
         error "$param_name must be a positive integer"
     fi
-    
+
     if [ "$value" -lt "$min_value" ]; then
         error "$param_name must be greater than or equal to $min_value"
     fi
@@ -137,7 +137,7 @@ configure_build_type() {
         "RelWithDebInfo" "Release with debug info" \
         "MinSizeRel" "Minimum size release" \
         3>&1 1>&2 2>&3) || return 1
-    
+
     mkdir -p build
     echo "CMAKE_BUILD_TYPE=$build_type" > build/BuildType.txt
     info "Build type set to: $build_type"
@@ -157,7 +157,7 @@ while true; do
         warn "Configuration cancelled. Exiting without running CMake."
         exit 0
     }
-    
+
     case $SELECTION in
         "BUILD_TYPE")
             configure_build_type
@@ -175,14 +175,14 @@ while true; do
                     "HGS_TIME" "Set HGS_TIME (Current: ${config_params[HGS_TIME]})" \
                     "Back" "Return to main menu" \
                     3>&1 1>&2 2>&3) || break
-                
+
                 [ "$PARAM_SELECTION" = "Back" ] && break
-                
+
                 new_value=$(whiptail --inputbox "Enter value for $PARAM_SELECTION" \
                     8 78 "${config_params[$PARAM_SELECTION]}" \
                     --title "$PARAM_SELECTION" \
                     3>&1 1>&2 2>&3) || continue
-                
+
                 validate_numeric "$new_value" "$PARAM_SELECTION" 1
                 config_params[$PARAM_SELECTION]=$new_value
             done
@@ -211,16 +211,16 @@ while true; do
                     "BALDES" "BALDES [${options[BALDES]}]" \
                     "Back" "Return to main menu" \
                     3>&1 1>&2 2>&3) || break
-                
+
                 [ "$OPT_SELECTION" = "Back" ] && break
-                
+
                 # Toggle the selected option
                 if [ "${options[$OPT_SELECTION]}" = "ON" ]; then
                     options[$OPT_SELECTION]="OFF"
                 else
                     options[$OPT_SELECTION]="ON"
                 fi
-                
+
                 # Handle special cases
                 if [ "$OPT_SELECTION" = "IPM" ]; then
                     if [ "${options[IPM]}" = "OFF" ]; then

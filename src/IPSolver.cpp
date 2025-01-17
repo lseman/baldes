@@ -13,154 +13,6 @@
 #include <vector>
 
 #include "ipm/IPSolver.h"
-/**
- * @brief Performs gradient-based equilibration scaling.
- * This scaling method considers both the objective and constraints
- * to produce better-balanced optimality conditions.
- */
-ScalingFactors IPSolver::ruiz_scaling(Eigen::SparseMatrix<double> &A,
-                                      Eigen::VectorXd &b, Eigen::VectorXd &c,
-                                      Eigen::VectorXd &lo,
-                                      Eigen::VectorXd &hi) {
-    const int m = A.rows();
-    const int n = A.cols();
-    const int n_bounds = lo.size();
-
-    ScalingFactors factors;
-    factors.row_scaling = Eigen::VectorXd::Ones(m);
-    factors.col_scaling = Eigen::VectorXd::Ones(n);
-
-    // Parameters
-    const int max_iter = 10;
-    const double thresh = 1e-3;  // Convergence threshold
-    const double alpha = 0.1;    // Step size for updates
-
-    // Store initial norms for reference
-    double init_objective_norm = c.norm();
-    double init_constraint_norm = b.norm();
-
-    // Compute column norms for A and objective scaling
-    Eigen::VectorXd col_norms = Eigen::VectorXd::Zero(n);
-    Eigen::VectorXd row_norms = Eigen::VectorXd::Zero(m);
-
-    // Initial norms computation
-    for (int k = 0; k < A.outerSize(); ++k) {
-        for (Eigen::SparseMatrix<double>::InnerIterator it(A, k); it; ++it) {
-            double val = std::abs(it.value());
-            col_norms(it.col()) += val;
-            row_norms(it.row()) += val;
-        }
-    }
-
-    // Initial scaling to roughly same magnitude
-    double mean_norm =
-        (col_norms.sum() / (n * m) + std::abs(c.mean()) + std::abs(b.mean())) /
-        3.0;
-    if (mean_norm > 0) {
-        double log_scale = -std::log10(mean_norm);
-        double scale = std::pow(10.0, std::round(log_scale));
-
-        // Apply initial scaling
-        if (scale != 1.0 && scale > 1e-4 && scale < 1e4) {
-            A *= scale;
-            b *= scale;
-            c *= scale;
-
-            factors.row_scaling *= std::sqrt(scale);
-            factors.col_scaling *= std::sqrt(scale);
-        }
-    }
-
-    // Iterative equilibration
-    for (int iter = 0; iter < max_iter; iter++) {
-        // Compute gradient of the scaled problem
-        Eigen::VectorXd grad_scaling = Eigen::VectorXd::Zero(n);
-
-        // Consider objective contribution
-        grad_scaling = c.cwiseAbs();
-
-        // Add constraint contributions
-        for (int k = 0; k < A.outerSize(); ++k) {
-            for (Eigen::SparseMatrix<double>::InnerIterator it(A, k); it;
-                 ++it) {
-                grad_scaling(it.col()) += std::abs(it.value());
-            }
-        }
-
-        // Compute scaling updates
-        double max_update = 0.0;
-        for (int j = 0; j < n; j++) {
-            if (grad_scaling(j) > 0) {
-                double target = 1.0;
-                double current = grad_scaling(j);
-                double log_ratio = std::log(target / current);
-
-                // Limit the update
-                double update =
-                    std::min(std::max(log_ratio * alpha, -0.1), 0.1);
-                double scale = std::exp(update);
-
-                // Apply column scaling
-                if (scale != 1.0) {
-                    for (Eigen::SparseMatrix<double>::InnerIterator it(A, j);
-                         it; ++it) {
-                        A.coeffRef(it.row(), j) *= scale;
-                    }
-                    c(j) *= scale;
-                    factors.col_scaling(j) *= scale;
-
-                    max_update = std::max(max_update, std::abs(update));
-                }
-            }
-        }
-
-        // Check convergence
-        if (max_update < thresh) break;
-    }
-
-    // Scale bounds
-    for (int j = 0; j < n_bounds && j < n; ++j) {
-        if (std::isfinite(lo(j))) {
-            lo(j) *= factors.col_scaling(j);
-        }
-        if (std::isfinite(hi(j))) {
-            hi(j) *= factors.col_scaling(j);
-        }
-    }
-
-    // Compute and print statistics
-    double scaled_objective_norm = c.norm();
-    double scaled_constraint_norm = b.norm();
-
-    std::cout << "\nGradient-based scaling statistics:\n";
-    std::cout << "Objective norm - Before: " << init_objective_norm
-              << ", After: " << scaled_objective_norm << "\n";
-    std::cout << "Constraint norm - Before: " << init_constraint_norm
-              << ", After: " << scaled_constraint_norm << "\n";
-    std::cout << "Column scaling range: [" << factors.col_scaling.minCoeff()
-              << ", " << factors.col_scaling.maxCoeff() << "]\n\n";
-
-    return factors;
-}
-
-/**
- * @brief Unscales the optimization solution using the scaling factors.
- *
- * This function reverses the scaling applied by ruiz_scaling to recover
- * the solution in the original problem space.
- *
- * @param x Primal solution vector to be unscaled
- * @param lambda Dual solution vector to be unscaled
- * @param factors The scaling factors used in the scaling phase
- */
-void IPSolver::unscale_solution(Eigen::VectorXd &x, Eigen::VectorXd &lambda,
-                                const ScalingFactors &factors) {
-    // Unscale primal solution
-    x = x.cwiseQuotient(factors.col_scaling);
-
-    // Unscale dual solution
-    lambda = lambda.cwiseQuotient(factors.row_scaling);
-}
 
 /**
  * @brief Converts a dense vector to a sparse diagonal matrix.
@@ -194,113 +46,98 @@ void IPSolver::convert_to_standard_form(
     const int n = A.rows();
     const int m = A.cols();
 
+    // Fast input validation
     if (b.size() != n || c.size() != m) {
-        fmt::print("b.size(): {}, n: {}, c.size(): {}, m: {}\n", b.size(), n,
-                   c.size(), m);
-        throw std::invalid_argument(
-            "Size of b or c does not match the matrix A dimensions.");
+        throw std::invalid_argument("Size mismatch in inputs");
     }
 
-    Eigen::VectorXd lo = lb;
-    Eigen::VectorXd hi = ub;
-
-    int n_free = 0, n_ubounds = 0, nv = A.cols();
-
-    // Precompute bound categories
-    std::vector<bool> is_free(lo.size()), is_bounded(lo.size()),
-        is_upper(lo.size()), is_lower(lo.size());
-    for (int i = 0; i < lo.size(); ++i) {
-        if (lo[i] == -infty && hi[i] == infty) {
-            is_free[i] = true;
+    // Pre-calculate sizes in one pass
+    const int num_slacks = n - sense.sum();
+    int n_free = 0;
+    
+    // Use char instead of bool for better performance
+    std::vector<char> is_free(m);
+    
+    // First pass: just count free variables and mark free vars
+    // This is faster than categorizing everything up front
+    for (int i = 0; i < m; ++i) {
+        if (lb[i] == -infty && ub[i] == infty) {
+            is_free[i] = 1;
             ++n_free;
-        } else if (std::isfinite(lo[i]) && std::isfinite(hi[i])) {
-            is_bounded[i] = true;
-            ++n_ubounds;
-        } else if (lo[i] == -infty && std::isfinite(hi[i])) {
-            is_upper[i] = true;
-        } else if (std::isfinite(lo[i]) && hi[i] == infty) {
-            is_lower[i] = true;
-        } else {
-            throw std::runtime_error("unexpected bounds");
         }
     }
 
-    // Precompute slack variables and reserve memory
-    int num_slacks = n - sense.sum();
-    cs.resize(c.size() + n_free + num_slacks);
-    cs.setZero();
-    cs.head(m) = c;
+    // Preallocate output vectors
+    const int total_vars = m + n_free + num_slacks;
+    cs.resize(total_vars);
+    cs.head(m) = c;  // Copy original costs
+    cs.tail(total_vars - m).setZero();  // Zero out the rest
+    
+    // Direct assignment is faster than copying
+    bs = b;
 
-    bs = b;  // Direct assignment
-
+    // Reserve exact space for triplets based on matrix structure
+    const int estimated_nnz = A.nonZeros() + n_free * (A.nonZeros()/m) + num_slacks;
     std::vector<Eigen::Triplet<double>> triplets;
-    triplets.reserve(A.nonZeros() +
-                     num_slacks);  // Reserve space to avoid reallocations
+    triplets.reserve(estimated_nnz);
 
-    std::vector<int> ind_ub;
-    std::vector<double> val_ub;
-
-    auto lb_extended = lb;
-    auto ub_extended = ub;
-    lb_extended.conservativeResize(nv + num_slacks + n_free);
-    ub_extended.conservativeResize(nv + num_slacks + n_free);
-    lb_extended.tail(num_slacks + n_free).setZero();
-    ub_extended.tail(num_slacks + n_free).setConstant(1.0);
-
-    int free = 0, ubi = 0;
-    for (int j = 0; j < lo.size(); ++j) {
-        double l = lo[j];
-        double h = hi[j];
-
+    // Process variables and construct matrix in a single pass
+    int free_counter = 0;
+    for (int j = 0; j < m; ++j) {
+        const double lj = lb[j];
+        const double uj = ub[j];
+        
+        // Process column j of the sparse matrix
         for (Eigen::SparseMatrix<double>::InnerIterator it(A, j); it; ++it) {
-            int i = it.row();
-            double v = it.value();
+            const int row = it.row();
+            const double val = it.value();
 
             if (is_free[j]) {
-                cs[j] = c[j];
-                cs[nv + free] = -c[j];
-                triplets.emplace_back(i, j, v);
-                triplets.emplace_back(i, nv + free, -v);
-                lb_extended[nv + free] = lb[j];
-                ub_extended[nv + free] = ub[j];
-                ++free;
-            } else if (is_bounded[j]) {
-                cs[j] = c[j];
-                bs[i] -= v * l;
-                triplets.emplace_back(i, j, v);
-                ind_ub.push_back(j);
-                val_ub.push_back(h - l);
-                ++ubi;
-            } else if (is_upper[j]) {
+                // Free variable: split into positive and negative parts
+                triplets.emplace_back(row, j, val);
+                triplets.emplace_back(row, m + free_counter, -val);
+                cs[m + free_counter] = -c[j];
+            }
+            else if (lj == -infty && uj == infty) {
+                // Already handled above
+                continue;
+            }
+            else if (std::isfinite(lj) && std::isfinite(uj)) {
+                // Bounded variable
+                triplets.emplace_back(row, j, val);
+                bs[row] -= val * lj;
+            }
+            else if (lj == -infty && std::isfinite(uj)) {
+                // Upper bounded
+                triplets.emplace_back(row, j, -val);
+                bs[row] += val * uj;
                 cs[j] = -c[j];
-                bs[i] -= (-v * h);
-                triplets.emplace_back(i, j, -v);
-            } else if (is_lower[j]) {
-                cs[j] = c[j];
-                bs[i] -= v * l;
-                triplets.emplace_back(i, j, v);
+            }
+            else if (std::isfinite(lj) && uj == infty) {
+                // Lower bounded
+                triplets.emplace_back(row, j, val);
+                bs[row] -= val * lj;
+            }
+            else {
+                throw std::runtime_error("unexpected bounds");
             }
         }
+        if (is_free[j]) ++free_counter;
     }
 
-    // Add slack variables
+    // Add slack variables efficiently
     int slack_counter = 0;
-    for (int i = 0; i < sense.size(); ++i) {
+    for (int i = 0; i < n; ++i) {
         if (sense(i) == 0) {
-            // print nv + n_free + slack_counter
-            triplets.emplace_back(i, nv + n_free + slack_counter, 1.0);
-            lb_extended[nv + n_free + slack_counter] = 0.0;
-            ub_extended[nv + n_free + slack_counter] = infty;
-            ++slack_counter;
+            triplets.emplace_back(i, m + n_free + slack_counter++, 1.0);
         }
     }
 
-    // Construct sparse matrix As
-    As.resize(bs.size(), cs.size());
+    // Construct final sparse matrix efficiently
+    As.resize(n, total_vars);
+    As.reserve(estimated_nnz);  // Reserve space before setting triplets
     As.setFromTriplets(triplets.begin(), triplets.end());
     As.makeCompressed();
-
-    n_slacks = num_slacks;
 }
 
 /**
@@ -410,8 +247,6 @@ void IPSolver::solve_augsys(Eigen::VectorXd &delta_x, Eigen::VectorXd &delta_y,
     const int *ubi_data = ubi.data();
     const int ubi_size = ubi.size();
 
-// Use SIMD vectorization for the update loop
-#pragma omp simd
     for (int i = 0; i < ubi_size; ++i) {
         const int idx = ubi_data[i];
         xi_d_data[idx] -= xi_u_data[i] * theta_vw_data[i];
@@ -425,8 +260,6 @@ void IPSolver::solve_augsys(Eigen::VectorXd &delta_x, Eigen::VectorXd &delta_y,
     double *delta_z_data = delta_z.data();
     const double *delta_x_data = delta_x.data();
 
-// Use SIMD vectorization for final update
-#pragma omp simd
     for (int i = 0; i < ubi_size; ++i) {
         const int idx = ubi_data[i];
         delta_z_data[i] = (delta_x_data[idx] - xi_u_data[i]) * theta_vw_data[i];
@@ -501,15 +334,12 @@ void IPSolver::solve_newton_system(
     Delta_kappa = (xi_tau_kappa - iter_kappa * Delta_tau) * inv_tau;
 
 // Update vectors using vectorized operations
-#pragma omp parallel sections
     {
-#pragma omp section
         {
             Delta_x.array() += Delta_tau * delta_x.array();
             Delta_lambda.array() += Delta_tau * delta_y.array();
             Delta_w.array() += Delta_tau * delta_w.array();
         }
-#pragma omp section
         {
             // Compute Delta_s and Delta_v using vectorized operations
             Delta_s = (xi_xs.array() - iter_s.array() * Delta_x.array()) /

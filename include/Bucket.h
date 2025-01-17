@@ -128,14 +128,9 @@ struct alignas(64) Bucket {
 
     void flush() {
         // remove from labels_vec all labels in labels_flush
-        labels_vec.erase(
-            std::remove_if(labels_vec.begin(), labels_vec.end(),
-                           [this](Label *label) {
-                               return std::find(labels_flush.begin(),
-                                                labels_flush.end(),
-                                                label) != labels_flush.end();
-                           }),
-            labels_vec.end());
+        for (auto label : labels_flush) {
+            remove_label(label);
+        }
     }
 
     double min_split_range = 0.5;
@@ -343,7 +338,8 @@ struct alignas(64) Bucket {
             // Handle out-of-bounds case
 #ifdef DEBUG
             print_info(
-                "Warning: Label {:.2f} outside bucket range [{:.2f}, {:.2f}]\n",
+                "Warning: Label {:.2f} outside bucket range [{:.2f}, "
+                "{:.2f}]\n",
                 label->resources[0], lb[0], ub[0]);
 #endif
 
@@ -442,8 +438,8 @@ struct alignas(64) Bucket {
     }
 
     /**
-     * @brief Retrieves a reference to the vector of arcs based on the specified
-     * direction.
+     * @brief Retrieves a reference to the vector of arcs based on the
+     * specified direction.
      *
      * This function template returns a reference to either the forward arcs
      * (fw_arcs) or the backward arcs (bw_arcs) depending on the template
@@ -494,7 +490,8 @@ struct alignas(64) Bucket {
             for (auto &bucket : sub_buckets) {
                 if (bucket.is_contained(label)) {
                     if (bucket.depth >= MAX_BUCKET_DEPTH) {
-                        // At max depth, insert directly into bucket's vector
+                        // At max depth, insert directly into bucket's
+                        // vector
                         insert_sorted_label(bucket.labels_vec, label);
                     } else {
                         bucket.add_sorted_label(label);
@@ -561,13 +558,14 @@ struct alignas(64) Bucket {
                resource_value <= ub[RESOURCE_INDEX];
     }
     /**
-     * @brief Adds a label to the labels vector with a limit on the number of
-     * labels.
+     * @brief Adds a label to the labels vector with a limit on the number
+     * of labels.
      *
-     * This function attempts to add a given label to the labels vector. If the
-     * vector has not yet reached the specified limit, the label is simply
-     * added. If the vector has reached the limit, the function will replace the
-     * label with the highest cost if the new label has a lower cost.
+     * This function attempts to add a given label to the labels vector. If
+     * the vector has not yet reached the specified limit, the label is
+     * simply added. If the vector has reached the limit, the function will
+     * replace the label with the highest cost if the new label has a lower
+     * cost.
      *
      */
     void add_label_lim(Label *label, size_t limit) noexcept {
@@ -596,7 +594,8 @@ struct alignas(64) Bucket {
                                      return a->cost < b->cost;
                                  });
 
-            // Insert only if within limit or smaller than current max element
+            // Insert only if within limit or smaller than current max
+            // element
             if (labels_vec.size() < limit ||
                 label->cost < labels_vec.back()->cost) {
                 labels_vec.insert(it, label);
@@ -619,55 +618,40 @@ struct alignas(64) Bucket {
      *
      */
     void remove_label(Label *label) noexcept {
-        if (!label) {
+        if (!label) return;
+
+        if (is_split) {
+            // When split, directly access appropriate bucket based on resource
+            // value
+            constexpr size_t RESOURCE_INDEX = 0;
+            sub_buckets[label->resources[RESOURCE_INDEX] >
+                        sub_buckets[0].ub[RESOURCE_INDEX]]
+                .remove_label(label);
             return;
         }
 
-        if (!is_split) {
-            // For small vectors, linear search is faster than binary search
-            if (labels_vec.size() <= 16) {
-                auto it =
-                    std::find(labels_vec.begin(), labels_vec.end(), label);
-                if (it != labels_vec.end()) {
-                    *it = std::move(labels_vec.back());
-                    labels_vec.pop_back();
-                }
-                return;
-            }
-
+        // For unsplit case, use a single optimized removal approach
+        auto &vec = labels_vec;
+        auto it = vec.size() <= 16
+                      ? std::find(vec.begin(), vec.end(), label)
+                      :
 #ifdef SORTED_LABELS
-            // Use binary search for larger sorted vectors
-            auto it =
-                std::lower_bound(labels_vec.begin(), labels_vec.end(), label,
-                                 [](const Label *a, const Label *b) {
-                                     return a->cost < b->cost;
-                                 });
-
-            if (it != labels_vec.end() && *it == label) {
-                labels_vec.erase(it);
-            }
+                      std::lower_bound(vec.begin(), vec.end(), label,
+                                       [](const Label *a, const Label *b) {
+                                           return a->cost < b->cost;
+                                       });
 #else
-            // Use standard find for unsorted
-            auto it = std::find(labels_vec.begin(), labels_vec.end(), label);
-            if (it != labels_vec.end()) {
-                *it = std::move(labels_vec.back());
-                labels_vec.pop_back();
-            }
+                      std::find(vec.begin(), vec.end(), label);
 #endif
-            return;
-        }
 
-        // When split, check only the bucket that could contain the label
-        constexpr size_t RESOURCE_INDEX = 0;
-        const double resource_value = label->resources[RESOURCE_INDEX];
-
-        // Direct index access is faster than iteration for 2 buckets
-        assert(sub_buckets.size() == 2);
-
-        if (resource_value <= sub_buckets[0].ub[RESOURCE_INDEX]) {
-            sub_buckets[0].remove_label(label);
-        } else {
-            sub_buckets[1].remove_label(label);
+        if (it != vec.end() &&
+            (!std::is_sorted(vec.begin(), vec.end()) || *it == label)) {
+#ifdef SORTED_LABELS
+            vec.erase(it);
+#else
+            *it = std::move(vec.back());
+            vec.pop_back();
+#endif
         }
     }
 
@@ -717,8 +701,8 @@ struct alignas(64) Bucket {
     };
 
     inline auto get_unextended_labels() const {
-        // Directly use get_labels() to retrieve the appropriate vector, whether
-        // split or not
+        // Directly use get_labels() to retrieve the appropriate vector,
+        // whether split or not
         const auto &all_labels_ref = get_labels();
 
         // Return a filtered view of the retrieved labels
@@ -740,8 +724,8 @@ struct alignas(64) Bucket {
     /**
      * @brief Clears the arcs in the specified direction.
      *
-     * This function clears the arcs in either the forward or backward direction
-     * based on the input parameter.
+     * This function clears the arcs in either the forward or backward
+     * direction based on the input parameter.
      *
      */
     void clear_arcs(bool fw) {
@@ -771,8 +755,8 @@ struct alignas(64) Bucket {
     /**
      * @brief Retrieves the best label from the labels vector.
      *
-     * This function returns the first label in the labels vector if it is not
-     * empty. If the vector is empty, it returns a nullptr.
+     * This function returns the first label in the labels vector if it is
+     * not empty. If the vector is empty, it returns a nullptr.
      *
      */
     Label *get_best_label() noexcept {

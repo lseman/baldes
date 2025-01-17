@@ -41,8 +41,6 @@ extern "C" {
 }
 #endif
 
-#define VRPTW_SRC_max_S_n 10000
-
 struct CachedCut {
     Cut cut;
     double violation;

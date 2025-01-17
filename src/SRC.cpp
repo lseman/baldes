@@ -406,37 +406,40 @@ std::pair<bool, bool> LimitedMemoryRank1Cuts::runSeparation(
         return cut_ctr;
     };
 
-    // if (cuts_before == cuts_after_separation) {
-    generator->setArcDuals(arc_duals);
-    generator->setNodes(nodes);
-    generator->generateSepHeurMem4Vertex();
-    generator->initialize(allPaths);
-    // generator->fillMemory();
-    generator->getHighDimCuts();
-    // generator->setMemFactor(0.15);
-    // generator->constructMemoryVertexBased();
+    if (cuts_before == cuts_after_separation) {
+        // Lambda for attempting cut generation with different memory factors
+        auto tryMemFactors = [&](const HighDimCutsGeneratorPtr &gen) -> bool {
+            for (double memFactor = 0.15; memFactor <= 0.75;
+                 memFactor += 0.15) {
+                gen->setMemFactor(memFactor);
+                gen->constructMemoryVertexBased();
+                if (auto cut_number = processCuts(); cut_number != 0) {
+                    return true;  // Exit if cuts were successfully processed
+                }
+            }
+            return false;
+        };
 
-    // auto cut_number = processCuts();
-    for (double memFactor = 0.15; memFactor <= 0.75; memFactor += 0.15) {
-        generator->setMemFactor(memFactor);
-        generator->constructMemoryVertexBased();
-        auto cut_number = processCuts();
-        if (cut_number != 0) {
-            break;  // Exit the loop if cuts are successfully processed
+        // Lambda for initializing generator and getting cuts
+        auto initAndGetCuts = [&](const HighDimCutsGeneratorPtr &gen,
+                                  int rank) {
+            gen->max_heuristic_sep_mem4_row_rank1 = rank;
+            gen->generateSepHeurMem4Vertex();
+            gen->initialize(allPaths);
+            gen->getHighDimCuts();
+        };
+
+        // Try with rank 8 first
+        generator->setArcDuals(arc_duals);
+        generator->setNodes(nodes);
+        initAndGetCuts(generator, 10);
+
+        if (!tryMemFactors(generator)) {
+            // If no cuts found, try again with rank 12
+            initAndGetCuts(generator, 12);
+            tryMemFactors(generator);
         }
-        // }
     }
-
-    // if (cuts_before == cuts_after_separation) {
-    // generator->max_heuristic_sep_mem4_row_rank1 = 12;
-    // generator->generateSepHeurMem4Vertex();
-    // generator->initialize(allPaths);
-    // generator->fillMemory();
-    // generator->getHighDimCuts();
-    // generator->constructMemoryVertexBased();
-    // auto cut_number = processCuts();
-    // }
-
     generator->clearMemory();
 
     ////////////////////////////////////////////////////
