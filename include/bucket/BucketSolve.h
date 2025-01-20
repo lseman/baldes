@@ -36,6 +36,8 @@
 #include "BucketAVX.h"
 #endif
 
+#include <execution>
+
 #include "../third_party/small_vector.hpp"
 
 /**
@@ -134,6 +136,9 @@ inline std::vector<Label *> BucketGraph::solve(bool trigger) {
         // inner_obj = paths[0]->cost;
 
         auto rollback = false;
+        if (status != Status::Rollback) {
+            rollback = shallUpdateStep();
+        }
         // auto rollback = false;
         //   auto rollback = false;
         if (rollback) {
@@ -250,8 +255,6 @@ std::vector<double> BucketGraph::labeling_algorithm() {
                 const auto &bucket_labels = buckets[bucket].get_labels();
                 const size_t n_bucket_labels = bucket_labels.size();
 
-                std::vector<Label *> labels_to_flsuh;
-
                 for (size_t label_idx = 0; label_idx < n_bucket_labels;
                      ++label_idx) {
                     Label *label = bucket_labels[label_idx];
@@ -329,9 +332,9 @@ std::vector<double> BucketGraph::labeling_algorithm() {
                                               F != Full::TSP) {
                                     if constexpr (S == Stage::Four &&
                                                   D == Direction::Forward) {
-                                        dominance_checks_per_bucket
-                                            [to_bucket] +=
-                                            to_bucket_labels.size();
+                                        // dominance_checks_per_bucket
+                                        //     [to_bucket] +=
+                                        //     to_bucket_labels.size();
                                     }
                                 }
 
@@ -386,55 +389,8 @@ std::vector<double> BucketGraph::labeling_algorithm() {
                                             if (is_dominated<D, S>(
                                                     existing_label,
                                                     new_label)) {
-                                                // Stack-based iterative removal
-                                                // to avoid recursion
-                                                std::vector<Label *>
-                                                    labels_to_remove;
-                                                labels_to_remove.reserve(
-                                                    32);  // Reserve space for
-                                                          // typical tree depth
-
-                                                // Helper lambda to add a label
-                                                // and all its children to
-                                                // removal list
-                                                auto add_label_and_children =
-                                                    [&labels_to_remove](
-                                                        Label *label) {
-                                                        std::vector<Label *>
-                                                            stack{label};
-                                                        while (!stack.empty()) {
-                                                            Label *current =
-                                                                stack.back();
-                                                            stack.pop_back();
-
-                                                            labels_to_remove
-                                                                .push_back(
-                                                                    current);
-
-                                                            // Add all children
-                                                            // to stack
-                                                            stack.insert(
-                                                                stack.end(),
-                                                                current
-                                                                    ->children
-                                                                    .begin(),
-                                                                current
-                                                                    ->children
-                                                                    .end());
-                                                        }
-                                                    };
-
-                                                // Process the dominated label
-                                                // and all its descendants
-                                                add_label_and_children(
+                                                buckets[to_bucket].remove_label(
                                                     existing_label);
-
-                                                // Remove all collected labels
-                                                for (Label *label :
-                                                     labels_to_remove) {
-                                                    buckets[label->vertex]
-                                                        .remove_label(label);
-                                                }
                                             }
                                         }
                                     }
@@ -454,42 +410,7 @@ std::vector<double> BucketGraph::labeling_algorithm() {
                         }
 
                     } else {
-                        if (label != nullptr) {
-                            // Stack-based iterative removal to avoid recursion
-                            std::vector<Label *> labels_to_remove;
-                            labels_to_remove.reserve(
-                                32);  // Reserve space for typical tree depth
-
-                            // Helper lambda to add only children (not the label
-                            // itself)
-                            auto add_children =
-                                [&labels_to_remove](Label *label) {
-                                    // Start with all children
-                                    std::vector<Label *> stack(
-                                        label->children.begin(),
-                                        label->children.end());
-
-                                    while (!stack.empty()) {
-                                        Label *current = stack.back();
-                                        stack.pop_back();
-                                        labels_to_remove.push_back(current);
-                                        // Add all children to stack
-                                        stack.insert(stack.end(),
-                                                     current->children.begin(),
-                                                     current->children.end());
-                                    }
-                                };
-
-                            // Process only the children of the dominated label
-                            add_children(label);
-                            buckets[label->vertex].lazy_flush(label);
-
-                            // Remove all collected labels (children only)
-                            for (Label *label_to_remove : labels_to_remove) {
-                                buckets[label_to_remove->vertex].remove_label(
-                                    label_to_remove);
-                            }
-                        }
+                        buckets[label->vertex].lazy_flush(label);
                     }
                     label->set_extended(true);
                 }
@@ -506,7 +427,6 @@ std::vector<double> BucketGraph::labeling_algorithm() {
             c_bar[bucket] = min_c_bar;
         }
     }
-
     // Store best label
     Label *best_label = get_best_label<D>(topological_order, c_bar, sccs);
     if constexpr (D == Direction::Forward) {
@@ -514,7 +434,6 @@ std::vector<double> BucketGraph::labeling_algorithm() {
     } else {
         bw_best_label = best_label;
     }
-
     return c_bar;
 }
 
@@ -831,6 +750,7 @@ inline std::vector<Label *> BucketGraph::Extend(
 
     if constexpr (M == Mutability::Mut) {
         new_label->parent = L_prime;
+        // L_prime->children.push_back(new_label);
     }
 
     // Handle visited bitmap
@@ -850,6 +770,8 @@ inline std::vector<Label *> BucketGraph::Extend(
     set_node_visited(new_label->visited_bitmap, node_id);
     new_label->nodes_covered = L_prime->nodes_covered;
     new_label->nodes_covered.push_back(node_id);
+    // Define the SIMD type for doubles
+    using simd_double = std::experimental::native_simd<double>;
 
 #if defined(SRC)
     new_label->SRCmap = L_prime->SRCmap;
@@ -860,8 +782,7 @@ inline std::vector<Label *> BucketGraph::Extend(
         const size_t bit_position = node_id & 63;
         const uint64_t bit_mask = 1ULL << bit_position;
         const size_t cut_size = cutter->size();
-
-        static constexpr size_t SMALL_SIZE = 256;
+        static constexpr size_t SMALL_SIZE = 128;
 
 #if defined(__cpp_lib_ranges)
         auto indices = std::views::iota(size_t{0}, cut_size);
@@ -871,17 +792,16 @@ inline std::vector<Label *> BucketGraph::Extend(
         std::iota(indices.begin(), indices.end(), 0);
 #endif
 
+        // Lambda for processing a single cut
         auto process_cut = [&](size_t idx) -> double {
             if (SRCDuals[idx] > -1e-3) {
                 return 0.0;
             }
-
             const auto &cut = cutter->getCut(idx);
             if (!(cut.neighbors[segment] & bit_mask)) {
                 new_label->SRCmap[idx] = 0.0;
                 return 0.0;
             }
-
             if (cut.baseSet[segment] & bit_mask) {
                 const auto &multipliers = cut.p;
                 const auto &den = multipliers.den;
@@ -895,12 +815,12 @@ inline std::vector<Label *> BucketGraph::Extend(
             return 0.0;
         };
 
-        double total_cost_update;
+        double total_cost_update = 0.0;
         if (cut_size <= SMALL_SIZE) {
-            total_cost_update = 0.0;
-            for (size_t i = 0; i < cut_size; ++i) {
-                total_cost_update += process_cut(i);
-            }
+            total_cost_update =
+                std::transform_reduce(std::begin(indices), std::end(indices),
+                                      0.0, std::plus<>(), process_cut);
+
         } else {
 #if defined(__cpp_lib_parallel_algorithm)
             total_cost_update = std::transform_reduce(
@@ -934,14 +854,15 @@ inline bool BucketGraph::is_dominated(const Label *new_label,
     const auto &label_resources = label->resources;
 
     {
-        // Simple cost check: if the comparison label has a higher cost, it is
-        // not dominated
+        // Simple cost check: if the comparison label has a higher cost, it
+        // is not dominated
         if (label->cost > new_label->cost) {
             return false;
         }
     }
 
-    // Check resource conditions based on the direction (Forward or Backward)
+    // Check resource conditions based on the direction (Forward or
+    // Backward)
     for (size_t i = 0; i < options.resources.size(); ++i) {
         if constexpr (D == Direction::Forward) {
             // In Forward direction: the comparison label must not have more
@@ -950,8 +871,8 @@ inline bool BucketGraph::is_dominated(const Label *new_label,
                 return false;
             }
         } else if constexpr (D == Direction::Backward) {
-            // In Backward direction: the comparison label must not have fewer
-            // resources than the new label
+            // In Backward direction: the comparison label must not have
+            // fewer resources than the new label
             if (label_resources[i] < new_resources[i]) {
                 return false;
             }
@@ -960,7 +881,8 @@ inline bool BucketGraph::is_dominated(const Label *new_label,
 
     // TODO:: check again this unreachable dominance
 #ifndef UNREACHABLE_DOMINANCE
-    // Check visited nodes (bitmap comparison) for Stages 3, 4, and Enumerate
+    // Check visited nodes (bitmap comparison) for Stages 3, 4, and
+    // Enumerate
     if constexpr (S == Stage::Three || S == Stage::Four ||
                   S == Stage::Enumerate) {
         // Iterate through the visited bitmap and ensure that the new label
@@ -1016,8 +938,8 @@ inline bool BucketGraph::is_dominated(const Label *new_label,
     }
 #endif
 
-    // If all conditions are met, return true, indicating that the new label is
-    // dominated by the comparison label
+    // If all conditions are met, return true, indicating that the new label
+    // is dominated by the comparison label
     return true;
 }
 
@@ -1025,9 +947,9 @@ inline bool BucketGraph::is_dominated(const Label *new_label,
  * @brief Checks if element 'a' precedes element 'b' in the given strongly
  * connected components (SCCs).
  *
- * This function takes a vector of SCCs and two elements 'a' and 'b' as input.
- * It searches for 'a' and 'b' in the SCCs and determines if 'a' precedes 'b' in
- * the SCC list.
+ * This function takes a vector of SCCs and two elements 'a' and 'b' as
+ * input. It searches for 'a' and 'b' in the SCCs and determines if 'a'
+ * precedes 'b' in the SCC list.
  *
  */
 template <typename T>
@@ -1037,15 +959,17 @@ inline bool precedes(const std::vector<std::vector<int>> &sccs, const T a,
     size_t rootA = uf.getSubset(a);
     size_t rootB = uf.getSubset(b);
 
-    // You can define precedence based on the comparison of the root components
+    // You can define precedence based on the comparison of the root
+    // components
     return rootA < rootB;
 }
 /**
- * @brief Determines if a label is dominated in component-wise smaller buckets.
+ * @brief Determines if a label is dominated in component-wise smaller
+ * buckets.
  *
  * This function checks if a given label is dominated by any other label in
- * component-wise smaller buckets. The dominance is determined based on the cost
- * and order of the buckets.
+ * component-wise smaller buckets. The dominance is determined based on the
+ * cost and order of the buckets.
  *
  */
 template <Direction D, Stage S>
@@ -1156,9 +1080,10 @@ inline bool BucketGraph::DominatedInCompWiseSmallerBuckets(
  * @brief Runs forward and backward labeling algorithms in parallel and
  * synchronizes the results.
  *
- * This function creates tasks for forward and backward labeling algorithms
- * using the provided scheduling mechanism. The tasks are executed in parallel,
- * and the results are synchronized and stored in the provided vectors.
+ * T#his function creates tasks for forward and backward labeling algorithms
+ * using the provided scheduling mechanism. The tasks are executed in
+ * parallel, and the results are synchronized and stored in the provided
+ * vectors.
  *
  */
 template <Stage state, Full fullness>
@@ -1185,6 +1110,25 @@ void BucketGraph::run_labeling_algorithms(std::vector<double> &forward_cbar,
         });
 
     stdexec::sync_wait(std::move(work));
+    // forward_cbar = labeling_algorithm<Direction::Forward, state, fullness>();
+    // backward_cbar = labeling_algorithm<Direction::Backward, state,
+    // fullness>();
+    //
+    // #pragma omp parallel sections
+    //     {
+    // #pragma omp section
+    //         {
+    //             forward_cbar =
+    //                 labeling_algorithm<Direction::Forward, state,
+    //                 fullness>();
+    //         }
+    // #pragma omp section
+    //         {
+    //             backward_cbar =
+    //                 labeling_algorithm<Direction::Backward, state,
+    //                 fullness>();
+    //         }
+    //     }
 }
 
 /**

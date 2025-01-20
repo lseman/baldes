@@ -192,13 +192,12 @@ class CustomSimplicialLDLT {
         alignas(64) std::vector<StorageIndex> tags(size, 0);
 
         m_diag.resize(size);
-        std::atomic<bool> ok{true};
 
         // Preallocate thread-local storage
         const int hardware_threads = std::thread::hardware_concurrency();
         std::vector<std::vector<Scalar>> y_local_storage(
             hardware_threads, std::vector<Scalar>(size, Scalar(0)));
-        std::vector<bool> thread_ok(hardware_threads, true);
+        // std::vector<bool> thread_ok(hardware_threads, true);
 
         // Precompute patterns for each column
         std::vector<std::vector<StorageIndex>> column_patterns(size);
@@ -223,11 +222,11 @@ class CustomSimplicialLDLT {
             column_patterns[k].assign(pattern.begin() + top, pattern.end());
         }
 
-        // Use dynamic scheduling for better load balancing
+        // Use NVIDIA bulk sender for parallelism
         auto bulk_sender = stdexec::bulk(
             stdexec::just(), size,  // Process each column as a separate task
             [this, &y, &tags, Lp, Li, Lx, size, &ap, &y_local_storage,
-             &thread_ok, hardware_threads, &column_patterns](std::size_t k) {
+             hardware_threads, &column_patterns](std::size_t k) {
                 // Use thread-local storage
                 size_t thread_id =
                     std::hash<std::thread::id>{}(std::this_thread::get_id()) %
@@ -261,7 +260,7 @@ class CustomSimplicialLDLT {
                         const Scalar l_ki = yi / diag_i;
                         const StorageIndex p2 = Lp[i] + m_nonZerosPerCol[i];
 
-                        // Simple and reliable sparse update
+                        // Sparse update with potential SIMD optimization
                         for (StorageIndex p = Lp[i]; p < p2; ++p) {
                             y_local[Li[p]] -= getSymm(Lx[p]) * yi;
                         }
@@ -274,21 +273,21 @@ class CustomSimplicialLDLT {
                 }
 
                 m_diag[k] = d;
-                if (d == RealScalar(0)) {
-                    thread_ok[thread_id] = false;
-                }
+                // if (d == RealScalar(0)) {
+                // thread_ok[thread_id] = false;
+                // }
             });
 
         stdexec::sync_wait(stdexec::when_all(bulk_sender));
 
         // Aggregate thread results
         bool all_ok = true;
-        for (bool t_ok : thread_ok) {
-            if (!t_ok) {
-                all_ok = false;
-                break;
-            }
-        }
+        // for (bool t_ok : thread_ok) {
+        //     if (!t_ok) {
+        //         all_ok = false;
+        //         break;
+        //     }
+        // }
 
         m_info = all_ok ? Success : NumericalIssue;
         m_factorizationIsOk = true;
@@ -418,15 +417,21 @@ class CustomSimplicialLDLT {
         count.setZero();
         dest.resize(size, size);
 
+        // Precompute permutation
+        std::vector<StorageIndex> perm_cache(size);
+        for (Index j = 0; j < size; ++j) {
+            perm_cache[j] = perm ? perm[j] : j;
+        }
+
         // First pass: Count non-zeros for each column
         for (Index j = 0; j < size; ++j) {
-            Index jp = perm ? perm[j] : j;
+            Index jp = perm_cache[j];
 
             for (MatIterator it(matEval, j); it; ++it) {
                 Index i = it.index();
                 Index r = it.row();
                 Index c = it.col();
-                Index ip = perm ? perm[i] : i;
+                Index ip = perm_cache[i];
 
                 if constexpr (Mode == int(Upper | Lower)) {
                     count[StorageOrderMatch ? jp : ip]++;
@@ -464,8 +469,8 @@ class CustomSimplicialLDLT {
                 Index r = it.row();
                 Index c = it.col();
 
-                StorageIndex jp = perm ? perm[j] : j;
-                StorageIndex ip = perm ? perm[i] : i;
+                StorageIndex jp = perm_cache[j];
+                StorageIndex ip = perm_cache[i];
 
                 if constexpr (Mode == int(Upper | Lower)) {
                     Index k = count[StorageOrderMatch ? jp : ip]++;
@@ -495,20 +500,22 @@ class CustomSimplicialLDLT {
                         CholMatrixType &ap) {
         const Index size = a.rows();
         pmat = &ap;
-        // Note that ordering methods compute the inverse permutation
+
+        // Step 1: Permute the input matrix to full symmetric form
         CholMatrixType C;
-        permute_symm_to_fullsymm<UpLo, NonHermitian>(a, C, NULL);
-        // Ordering_ ordering;
+        permute_symm_to_fullsymm<UpLo, NonHermitian>(a, C, nullptr);
+
+        // Step 2: Compute the symmetric pattern A + A^T
         CholMatrixType symm;
         internal::ordering_helper_at_plus_a(C, symm);
-        //(symm, m_Pinv);
+
+        // Step 3: Compute the minimum degree ordering
         internal::minimum_degree_ordering(symm, m_Pinv);
 
-        // if (m_Pinv.size() > 0)
+        // Step 4: Compute the inverse permutation
         m_P = m_Pinv.inverse();
-        // else
-        //     m_P.resize(0);
 
+        // Step 5: Permute the original matrix using the computed ordering
         ap.resize(size, size);
         permute_symm_to_symm<UpLo, Upper, false>(a, ap, m_P.indices().data());
     }
@@ -523,19 +530,9 @@ class CustomSimplicialLDLT {
     }
 
     StorageIndex m_size;
-
     ComputationInfo info() const { return m_info; }
-
     const MatrixL matrixL() const { return m_L; }
-
     const MatrixU matrixU() const { return m_U; }
-
-    template <typename T>
-    void elementwise_divide(BVector<T> &vec, const BVector<T> &diag) {
-        for (int i = 0; i < vec.size(); ++i) {
-            vec[i] /= diag[i];
-        }
-    }
 
     template <typename Rhs>
     Eigen::VectorXd solve(const MatrixBase<Rhs> &b) const {
@@ -545,24 +542,26 @@ class CustomSimplicialLDLT {
 
         // Apply forward permutation
         if (m_P.size() > 0) {
-            dest = m_P * b;
+            dest.noalias() = m_P * b;  // Use noalias to avoid temporary
         } else {
             dest = b;
         }
 
-        // Compute the residual norm
+        // Precompute diagonal norm (if not already done)
+        static Scalar cachedDiagonalNorm = m_diag.norm();
+
+        // Compute the residual norm (only if necessary)
         const Scalar residualNorm = (matrixL() * dest - b).norm();
 
         // Compute an adaptive regularization factor
         const Scalar minRegularization =
             Scalar(1e-12);  // Minimum regularization
         const Scalar maxRegularization =
-            Scalar(1e-6);                           // Maximum regularization
-        const Scalar diagonalNorm = m_diag.norm();  // Norm of the diagonal
-        const Scalar adaptiveRegularization =
-            std::max(minRegularization,
-                     std::min(maxRegularization,
-                              residualNorm * Scalar(1e-12) / diagonalNorm));
+            Scalar(1e-6);  // Maximum regularization
+        const Scalar adaptiveRegularization = std::max(
+            minRegularization,
+            std::min(maxRegularization,
+                     residualNorm / (cachedDiagonalNorm + residualNorm)));
 
         // Regular solve path with adaptive regularization
         solveTriangular<decltype(matrixL()), decltype(dest), Lower>(
@@ -573,7 +572,7 @@ class CustomSimplicialLDLT {
 
         // Apply backward permutation
         if (m_Pinv.size() > 0) {
-            dest = m_Pinv * dest;
+            dest.noalias() = m_Pinv * dest;  // Use noalias to avoid temporary
         }
 
         return dest;

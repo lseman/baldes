@@ -18,18 +18,20 @@ else()
   message(STATUS "Clang not found: using default compiler")
 endif()
 
-if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
-  string(REPLACE "-fconcepts-diagnostics-depth=10" "" CMAKE_CXX_FLAGS
-                 "${CMAKE_CXX_FLAGS}")
-endif()
+# set cc and cxx path
+
 
 # C++ standard
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
 
-# set cc and cxx path
-#set(CMAKE_C_COMPILER /home/seman/toolchain18/llvm/stage2-prof-use-lto/install/bin/clang)
-#set(CMAKE_CXX_COMPILER /home/seman/toolchain18/llvm/stage2-prof-use-lto/install/bin/clang++)
+# set(CMAKE_C_COMPILER /home/seman/toolchain18/llvm/stage2-prof-use-lto/install/bin/clang)
+# set(CMAKE_CXX_COMPILER /home/seman/toolchain18/llvm/stage2-prof-use-lto/install/bin/clang++)
+
+if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+  string(REPLACE "-fconcepts-diagnostics-depth=10" "" CMAKE_CXX_FLAGS
+                 "${CMAKE_CXX_FLAGS}")
+endif()
 
 # Enable Interprocedural Optimization (Link Time Optimization)
 set(CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE ON)
@@ -131,6 +133,10 @@ set(HGS_TIME
     2
     CACHE STRING "HGS max running time")
 
+set(VERBOSE_LEVEL
+    0
+    CACHE STRING "Verbose level")
+
 # Git Commit Hash
 execute_process(
   COMMAND git rev-parse --short HEAD
@@ -144,6 +150,8 @@ add_definitions(-DMAX_SRC_CUTS=${MAX_SRC_CUTS})
 add_definitions(-DBUCKET_CAPACITY=${BUCKET_CAPACITY})
 add_definitions(-DTIME_INDEX=${TIME_INDEX})
 add_definitions(-DN_ADD=${N_ADD})
+add_definitions(-DHGS_TIME=${HGS_TIME})
+add_definitions(-DVERBOSE_LEVEL=${VERBOSE_LEVEL})
 
 # if IPM is disabled, force STAB to be enabled
 if(NOT IPM)

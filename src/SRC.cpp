@@ -279,10 +279,6 @@ void LimitedMemoryRank1Cuts::separate(const SparseMatrix &A,
     auto work = stdexec::starts_on(sched, bulk_sender);
     stdexec::sync_wait(std::move(work));
 
-    // Generate cut coefficients
-    // get the top 3 cuts
-    // auto cuts    = VRPTW_SRC();
-
     pdqsort(tmp_cuts.begin(), tmp_cuts.end(),
             [](const auto &a, const auto &b) { return a.first > b.first; });
 
@@ -432,13 +428,14 @@ std::pair<bool, bool> LimitedMemoryRank1Cuts::runSeparation(
         // Try with rank 8 first
         generator->setArcDuals(arc_duals);
         generator->setNodes(nodes);
-        initAndGetCuts(generator, 10);
+        initAndGetCuts(generator, 16);
+        tryMemFactors(generator);
 
-        if (!tryMemFactors(generator)) {
-            // If no cuts found, try again with rank 12
-            initAndGetCuts(generator, 12);
-            tryMemFactors(generator);
-        }
+        // if (!tryMemFactors(generator)) {
+        //     // If no cuts found, try again with rank 12
+        //     initAndGetCuts(generator, 14);
+        //     tryMemFactors(generator);
+        // }
     }
     generator->clearMemory();
 
@@ -447,42 +444,37 @@ std::pair<bool, bool> LimitedMemoryRank1Cuts::runSeparation(
     ////////////////////////////////////////////////////
     bool cleared = false;
     auto n_cuts_removed = 0;
-    // Iterate over the constraints in reverse order to remove non-violated cuts
-    // sort SRCconstraints by index
+
+    // Sort SRCconstraints by index (if sorting is necessary)
     pdqsort(SRCconstraints.begin(), SRCconstraints.end(),
-            [](const baldesCtrPtr a, const baldesCtrPtr b) {
+            [](const baldesCtrPtr &a, const baldesCtrPtr &b) {
                 return a->index() < b->index();
             });
 
-    // print SRCconstraints.size()
-    auto it = SRCconstraints.end();
-    while (it != SRCconstraints.begin()) {
-        --it;
+    // Use reverse iterators to traverse the container in reverse order
+    for (auto it = SRCconstraints.rbegin(); it != SRCconstraints.rend();) {
         auto constr = *it;
-        // int  current_index =
-        // node->get_current_index(constr->get_unique_id());
         int current_index = constr->index();
-        // Get the slack value of the constraint
         double slack = node->getSlack(current_index, solution);
 
         // If the slack is positive, it means the constraint is not violated
-        if (slack > 1e-3) {
+        if (slack > 0) {
             cleared = true;
             node->remove(constr);
-            cuts->removeCut(
-                cuts->getID(std::distance(SRCconstraints.begin(), it)));
+            cuts->removeCut(cuts->getID(
+                std::distance(SRCconstraints.begin(), it.base()) - 1));
             n_cuts_removed++;
 
-            // Remove from SRCconstraints using iterator
-            it = SRCconstraints.erase(it);
+            // Remove from SRCconstraints using reverse iterator
+            it = decltype(it){SRCconstraints.erase(std::next(it).base())};
+        } else {
+            ++it;
         }
     }
 
-    if (cuts_before == cuts->size() + n_cuts_removed) {
-        return std::make_pair(false, cleared);
-    }
-
-    return std::make_pair(true, cleared);
+    // Simplify the final check
+    bool cuts_changed = (cuts_before != cuts->size() + n_cuts_removed);
+    return std::make_pair(cuts_changed, cleared);
 }
 
 /*

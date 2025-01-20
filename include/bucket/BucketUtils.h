@@ -90,41 +90,112 @@ inline int BucketGraph::get_bucket_number(
  */
 template <Direction D>
 void BucketGraph::define_buckets() {
+    std::vector<Bucket> old_buckets;
+    std::vector<bool> was_fixed;
+    auto &buckets = assign_buckets<D>(fw_buckets, bw_buckets);
+    auto old_size = buckets.size();
+
+    // Store the range of fixed buckets for each node pair
+    std::unordered_map<
+        int, std::unordered_map<
+                 int, std::pair<std::vector<double>, std::vector<double>>>>
+        node_pair_fixed_ranges;
+
+    if (old_size > 0) {
+        old_buckets = buckets;
+        was_fixed.resize(old_size * old_size, false);
+        auto &old_bitmap =
+            assign_buckets<D>(fw_fixed_buckets_bitmap, bw_fixed_buckets_bitmap);
+
+        // First pass: mark which bucket pairs were fixed
+        for (size_t i = 0; i < old_size; ++i) {
+            for (size_t j = 0; j < old_size; ++j) {
+                size_t old_bit_pos = i * old_size + j;
+                if (old_bit_pos / 64 < old_bitmap.size()) {
+                    was_fixed[old_bit_pos] =
+                        (old_bitmap[old_bit_pos / 64] &
+                         (1ULL << (old_bit_pos % 64))) != 0;
+                }
+            }
+        }
+
+        const int num_intervals = options.main_resources.size();
+        // For each fixed bucket pair, track the range by node pair
+        for (size_t i = 0; i < old_size; ++i) {
+            for (size_t j = 0; j < old_size; ++j) {
+                if (!was_fixed[i * old_size + j]) continue;
+
+                const auto &bucket_from = old_buckets[i];
+                const auto &bucket_to = old_buckets[j];
+
+                int from_node = bucket_from.node_id;
+                int to_node = bucket_to.node_id;
+
+                // Initialize ranges for this node pair if not already done
+                if (node_pair_fixed_ranges[from_node].find(to_node) ==
+                    node_pair_fixed_ranges[from_node].end()) {
+                    node_pair_fixed_ranges[from_node][to_node] = {
+                        std::vector<double>(num_intervals,
+                                            std::numeric_limits<double>::max()),
+                        std::vector<double>(
+                            num_intervals,
+                            std::numeric_limits<double>::lowest())};
+                }
+
+                // Update the ranges for this node pair
+                auto &[min_lbs, max_ubs] =
+                    node_pair_fixed_ranges[from_node][to_node];
+                for (int r = 0; r < num_intervals; ++r) {
+                    min_lbs[r] = std::min(min_lbs[r], bucket_from.lb[r]);
+                    max_ubs[r] = std::max(max_ubs[r], bucket_from.ub[r]);
+                }
+            }
+        }
+
+        // Debug output
+        // for (const auto &[from_node, to_nodes] : node_pair_fixed_ranges) {
+        //     for (const auto &[to_node, range] : to_nodes) {
+        //         fmt::print("Arc ({}, {}) has fixed range: ", from_node,
+        //                    to_node);
+        //         for (int r = 0; r < num_intervals; ++r) {
+        //             fmt::print("({}, {}), ", range.first[r],
+        //             range.second[r]);
+        //         }
+        //         fmt::print("\n");
+        //     }
+        // }
+    }
+
+    // Clear existing buckets and bitmap
+    buckets.clear();
+    auto &fixed_buckets_bitmap =
+        assign_buckets<D>(fw_fixed_buckets_bitmap, bw_fixed_buckets_bitmap);
+    fixed_buckets_bitmap.clear();
+
     const int num_intervals = options.main_resources.size();
     std::vector<double> total_ranges(num_intervals);
     std::vector<double> base_intervals(num_intervals);
-
-    // Pre-allocate base intervals
-    if constexpr (D == Direction::Forward) {
-        fw_base_intervals.resize(num_intervals);
-    } else {
-        bw_base_intervals.resize(num_intervals);
-    }
-
-    // Calculate base intervals once
-    for (int r = 0; r < num_intervals; ++r) {
-        total_ranges[r] = R_max[r] - R_min[r];
-        base_intervals[r] = total_ranges[r] / intervals[r].interval;
-    }
-
-    // Assign base intervals
-    if constexpr (D == Direction::Forward) {
-        fw_base_intervals = base_intervals;
-    } else {
-        bw_base_intervals = base_intervals;
-    }
+    const double min_bucket_size = 0.1;  // Define at the start
 
     // Get references to direction-specific containers
-    auto &buckets = assign_buckets<D>(fw_buckets, bw_buckets);
     auto &num_buckets = assign_buckets<D>(num_buckets_fw, num_buckets_bw);
     auto &num_buckets_index =
         assign_buckets<D>(num_buckets_index_fw, num_buckets_index_bw);
     auto &node_interval_trees =
         assign_buckets<D>(fw_node_interval_trees, bw_node_interval_trees);
     auto &buckets_size = assign_buckets<D>(fw_buckets_size, bw_buckets_size);
+    auto &bucket_splits = assign_buckets<D>(fw_bucket_splits, bw_bucket_splits);
+
+    // Calculate total resource ranges for better bucket sizing
+    for (int r = 0; r < num_intervals; ++r) {
+        total_ranges[r] = R_max[r] - R_min[r];
+        base_intervals[r] = total_ranges[r] / intervals[r].interval;
+    }
 
     // Pre-allocate containers
     const size_t num_nodes = nodes.size();
+    const size_t estimated_buckets_per_node = intervals[0].interval;
+    buckets.reserve(num_nodes * estimated_buckets_per_node);
     num_buckets.resize(num_nodes);
     num_buckets_index.resize(num_nodes);
     node_interval_trees.assign(num_nodes, SplayTree());
@@ -150,16 +221,54 @@ void BucketGraph::define_buckets() {
     int bucket_index = 0;
 
     // Temporary vectors for interval calculations
-    std::vector<double> interval_start(num_intervals);
-    std::vector<double> interval_end(num_intervals);
+    std::vector<double> interval_lb(num_intervals);
+    std::vector<double> interval_ub(num_intervals);
     std::vector<int> pos(num_intervals, 0);
 
     // Process each node
     for (const auto &VRPNode : nodes) {
         std::vector<double> node_base_interval(num_intervals);
+
+        // Improved bucket split calculation
+        if (bucket_splits.find(VRPNode.id) == bucket_splits.end()) {
+            double max_range_ratio = 0.0;
+            for (int r = 0; r < num_intervals; ++r) {
+                double node_range = VRPNode.ub[r] - VRPNode.lb[r];
+                double range_ratio = node_range / total_ranges[r];
+                max_range_ratio = std::max(max_range_ratio, range_ratio);
+            }
+
+            // Adjust splits based on node's resource usage and constraints
+            int base_splits = intervals[0].interval;
+            double utilization_factor = 1.0;
+
+            // Consider time window and resource constraints
+            for (int r = 0; r < num_intervals; ++r) {
+                double resource_tightness =
+                    (VRPNode.ub[r] - VRPNode.lb[r]) / total_ranges[r];
+                utilization_factor *= (1.0 + (1.0 - resource_tightness));
+            }
+
+            int adjusted_splits =
+                std::max(2,  // minimum 2 buckets
+                         static_cast<int>(base_splits * max_range_ratio *
+                                          utilization_factor));
+
+            bucket_splits[VRPNode.id] = adjusted_splits;
+        }
+
+        // Calculate base intervals
         for (int r = 0; r < num_intervals; ++r) {
             node_base_interval[r] =
-                (VRPNode.ub[r] - VRPNode.lb[r]) / intervals[r].interval;
+                (VRPNode.ub[r] - VRPNode.lb[r]) / bucket_splits[VRPNode.id];
+
+            // Ensure minimum bucket size
+            if (node_base_interval[r] < min_bucket_size) {
+                node_base_interval[r] = min_bucket_size;
+                bucket_splits[VRPNode.id] = std::max(
+                    2, static_cast<int>((VRPNode.ub[r] - VRPNode.lb[r]) /
+                                        min_bucket_size));
+            }
         }
 
         SplayTree node_tree;
@@ -167,56 +276,68 @@ void BucketGraph::define_buckets() {
 
         if (num_intervals == 1) {
             // Single interval case
-            for (int j = 0; j < intervals[0].interval; ++j) {
+            for (int j = 0; j < bucket_splits[VRPNode.id]; ++j) {
                 auto [start, end] = calculate_interval(
                     VRPNode.lb[0], VRPNode.ub[0], node_base_interval[0], j,
-                    intervals[0].interval, D == Direction::Forward);
+                    bucket_splits[VRPNode.id], D == Direction::Forward);
 
-                interval_start[0] = start;
-                interval_end[0] = end;
+                interval_lb[0] = start;
+                interval_ub[0] = end;
 
                 if constexpr (D == Direction::Backward) {
-                    interval_start[0] =
-                        std::max(interval_start[0], VRPNode.lb[0]);
+                    interval_lb[0] = std::max(interval_lb[0], VRPNode.lb[0]);
                 } else {
-                    interval_end[0] = std::min(interval_end[0], VRPNode.ub[0]);
+                    interval_ub[0] = std::min(interval_ub[0], VRPNode.ub[0]);
                 }
 
-                buckets.push_back(
-                    Bucket(VRPNode.id, interval_start, interval_end));
-                node_tree.insert(interval_start, interval_end, bucket_index++);
-                n_buckets++;
-                cum_sum++;
+                // Only create bucket if it has meaningful width
+                if (end - start >= min_bucket_size) {
+                    buckets.push_back(
+                        Bucket(VRPNode.id, interval_lb, interval_ub));
+                    node_tree.insert(interval_lb, interval_ub, bucket_index++);
+                    n_buckets++;
+                    cum_sum++;
+                }
             }
         } else {
             // Multiple intervals case
             std::fill(pos.begin(), pos.end(), 0);
             do {
+                bool valid_bucket = true;
                 for (int r = 0; r < num_intervals; ++r) {
                     auto [start, end] = calculate_interval(
                         VRPNode.lb[r], VRPNode.ub[r], node_base_interval[r],
-                        pos[r], intervals[r].interval, D == Direction::Forward);
+                        pos[r], bucket_splits[VRPNode.id],
+                        D == Direction::Forward);
 
-                    interval_start[r] = start;
-                    interval_end[r] = end;
+                    interval_lb[r] = start;
+                    interval_ub[r] = end;
 
                     if constexpr (D == Direction::Backward) {
-                        interval_start[r] =
-                            std::max(interval_start[r], R_min[r]);
+                        interval_lb[r] = std::max(interval_lb[r], R_min[r]);
                     } else {
-                        interval_end[r] = std::min(interval_end[r], R_max[r]);
+                        interval_ub[r] = std::min(interval_ub[r], R_max[r]);
+                    }
+
+                    // Check if this dimension has a valid bucket size
+                    if (end - start < min_bucket_size) {
+                        valid_bucket = false;
+                        break;
                     }
                 }
 
-                buckets.push_back(
-                    Bucket(VRPNode.id, interval_start, interval_end));
-                node_tree.insert(interval_start, interval_end, bucket_index++);
-                n_buckets++;
-                cum_sum++;
+                if (valid_bucket) {
+                    buckets.push_back(
+                        Bucket(VRPNode.id, interval_lb, interval_ub));
+                    node_tree.insert(interval_lb, interval_ub, bucket_index++);
+                    n_buckets++;
+                    cum_sum++;
+                }
 
                 // Generate next combination
                 int i = 0;
-                while (i < num_intervals && ++pos[i] >= intervals[i].interval) {
+                while (i < num_intervals &&
+                       ++pos[i] >= bucket_splits[VRPNode.id]) {
                     pos[i] = 0;
                     i++;
                 }
@@ -230,9 +351,58 @@ void BucketGraph::define_buckets() {
         node_interval_trees[VRPNode.id] = node_tree;
     }
 
-    buckets_size = cum_sum;
-}
+    if (!node_pair_fixed_ranges.empty()) {
+        size_t new_size = buckets.size();
+        size_t required_bitmap_words =
+            std::max(size_t(1), ((new_size * new_size) + 63) / 64);
 
+        fixed_buckets_bitmap.clear();
+        fixed_buckets_bitmap.resize(required_bitmap_words, 0);
+
+        for (size_t from = 0; from < new_size; ++from) {
+            const auto &bucket_from = buckets[from];
+            int from_node = bucket_from.node_id;
+
+            // Skip if no outgoing fixed arcs from this node
+            if (node_pair_fixed_ranges.find(from_node) ==
+                node_pair_fixed_ranges.end())
+                continue;
+
+            for (size_t to = 0; to < new_size; ++to) {
+                const auto &bucket_to = buckets[to];
+                int to_node = bucket_to.node_id;
+
+                // Skip if this arc wasn't fixed before
+                if (node_pair_fixed_ranges[from_node].find(to_node) ==
+                    node_pair_fixed_ranges[from_node].end())
+                    continue;
+
+                const auto &range = node_pair_fixed_ranges[from_node][to_node];
+
+                // Check if both buckets are within their fixed ranges
+                bool is_in_range = true;
+                for (int r = 0; r < options.main_resources.size(); ++r) {
+                    if (bucket_from.lb[r] < range.first[r] ||
+                        bucket_from.ub[r] > range.second[r]) {
+                        is_in_range = false;
+                        break;
+                    }
+                }
+
+                if (is_in_range) {
+                    size_t bit_pos = from * new_size + to;
+                    size_t word_idx = bit_pos / 64;
+                    if (word_idx < fixed_buckets_bitmap.size()) {
+                        fixed_buckets_bitmap[word_idx] |=
+                            (1ULL << (bit_pos % 64));
+                    }
+                }
+            }
+        }
+    }
+
+    buckets_size = buckets.size();
+}
 /**
  * @brief Generates arcs in the bucket graph based on the specified direction.
  *
@@ -253,7 +423,7 @@ void BucketGraph::generate_arcs() {
     auto &num_buckets = assign_buckets<D>(num_buckets_fw, num_buckets_bw);
     auto &num_buckets_index =
         assign_buckets<D>(num_buckets_index_fw, num_buckets_index_bw);
-
+    auto &bucket_splits = assign_buckets<D>(fw_bucket_splits, bw_bucket_splits);
     // Pre-compute intervals for all nodes
     std::vector<std::vector<double>> node_intervals(nodes.size());
     for (size_t node_id = 0; node_id < nodes.size(); ++node_id) {
@@ -261,7 +431,7 @@ void BucketGraph::generate_arcs() {
         node_intervals[node_id].resize(options.resources.size());
         for (int r = 0; r < options.resources.size(); ++r) {
             node_intervals[node_id][r] =
-                (node.ub[r] - node.lb[r]) / intervals[r].interval;
+                (node.ub[r] - node.lb[r]) / bucket_splits[node_id];
         }
     }
 
@@ -278,6 +448,7 @@ void BucketGraph::generate_arcs() {
         const auto &node_interval = node_intervals[node.id];
 
         for (const auto &arc : arcs) {
+            // print node_id
             const auto &next_node = nodes[arc.to];
             if (node.id == next_node.id) continue;
 
@@ -1091,5 +1262,145 @@ void BucketGraph::set_adjacency_list() {
         if (node.id != options.end_depot) {
             add_arcs_for_node(node, node.id, res_inc);
         }
+    }
+}
+
+/**
+ * @brief Initializes the BucketGraph by clearing previous data and setting up
+ * forward and backward buckets.
+ *
+ */
+template <Direction D>
+void BucketGraph::common_initialization() {
+    // Pre-allocate vectors with exact sizes
+    merged_labels.clear();
+    merged_labels.reserve(50);
+
+    const size_t num_intervals = options.main_resources.size();
+    std::vector<double> base_intervals(num_intervals);
+    std::vector<double> interval_starts(num_intervals);
+    std::vector<double> interval_ends(num_intervals);
+
+    auto &warm_labels = assign_buckets<D>(fw_warm_labels, bw_warm_labels);
+    auto &buckets_size = assign_buckets<D>(fw_buckets_size, bw_buckets_size);
+    auto &buckets = assign_buckets<D>(fw_buckets, bw_buckets);
+    auto &c_bar = assign_buckets<D>(fw_c_bar, bw_c_bar);
+    auto &bucket_splits = assign_buckets<D>(fw_bucket_splits, bw_bucket_splits);
+
+    if (merged_labels.size() > 0 && options.warm_start && !just_fixed) {
+        warm_labels.reserve(buckets_size);
+        warm_labels.clear();
+        warm_labels.reserve(buckets_size);
+        for (auto bucket = 0; bucket < buckets_size; ++bucket) {
+            if (auto *label = buckets[bucket].get_best_label()) {
+                warm_labels.push_back(label);
+            }
+        }
+    }
+
+    // Initialize vectors with exact sizes once
+    c_bar.resize(buckets_size, std::numeric_limits<double>::infinity());
+    // print size of c_bar
+
+    if constexpr (Direction::Forward == D) {
+        dominance_checks_per_bucket.assign(buckets_size + 1, 0);
+        non_dominated_labels_per_bucket = 0;
+    }
+
+    const auto &VRPNode = nodes[0];
+
+    for (size_t b = 0; b < buckets_size; b++) {
+        buckets[b].clear();
+    }
+
+    // Calculate intervals once
+    for (size_t r = 0; r < intervals.size(); ++r) {
+        base_intervals[r] =
+            (VRPNode.ub[r] - VRPNode.lb[r]) / bucket_splits[VRPNode.id];
+        interval_starts[r] = VRPNode.lb[r];
+        interval_ends[r] = VRPNode.ub[r];
+    }
+
+    if (options.warm_start && !just_fixed) {
+        pdqsort(
+            warm_labels.begin(), warm_labels.end(),
+            [](const Label *a, const Label *b) { return a->cost < b->cost; });
+
+        std::vector<Label *> processed_labels;
+        const size_t process_size = std::min(
+            warm_labels.size(), static_cast<size_t>(options.n_warm_start));
+        processed_labels.reserve(process_size);
+
+        for (size_t i = 0; i < process_size; ++i) {
+            auto label = warm_labels[i];
+            if (!label->fresh) continue;
+
+            auto new_label = compute_red_cost(label, true);
+            if (new_label != nullptr) {
+                fw_buckets[new_label->vertex].add_label(new_label);
+                processed_labels.push_back(new_label);
+            }
+        }
+        warm_labels = std::move(processed_labels);
+    }
+
+    // Initialize intervals
+    std::vector<int> current_pos(num_intervals, 0);
+    int offset = 0;
+
+    // Lambda for interval combination generation
+    auto generate_combinations = [&](bool is_forward, int &offset) {
+        auto &label_pool = is_forward ? label_pool_fw : label_pool_bw;
+        auto &buckets = is_forward ? fw_buckets : bw_buckets;
+        const auto depot_id = is_forward ? options.depot : options.end_depot;
+        const int calculated_index_base =
+            is_forward ? num_buckets_index_fw[options.depot]
+                       : num_buckets_index_bw[options.end_depot];
+
+        std::vector<double> interval_bounds(num_intervals);
+        std::function<void(int)> process_intervals = [&](int depth) {
+            if (depth == num_intervals) {
+                auto depot = label_pool->acquire();
+                int calculated_index = calculated_index_base + offset;
+
+                for (int r = 0; r < num_intervals; ++r) {
+                    interval_bounds[r] =
+                        is_forward
+                            ? interval_starts[r] +
+                                  current_pos[r] *
+                                      roundToTwoDecimalPlaces(base_intervals[r])
+                            : interval_ends[r] -
+                                  current_pos[r] * roundToTwoDecimalPlaces(
+                                                       base_intervals[r]);
+                }
+
+                depot->initialize(calculated_index, 0.0, interval_bounds,
+                                  depot_id);
+                depot->is_extended = false;
+                depot->nodes_covered.push_back(depot_id);
+                set_node_visited(depot->visited_bitmap, depot_id);
+                SRC_MODE_BLOCK(
+                    depot->SRCmap.assign(cut_storage->SRCDuals.size(), 0);)
+                buckets[calculated_index].add_label(depot);
+                buckets[calculated_index].node_id = depot_id;
+
+                offset++;
+                return;
+            }
+
+            for (int k = 0; k < bucket_splits[depot_id]; ++k) {
+                current_pos[depth] = k;
+                process_intervals(depth + 1);
+            }
+        };
+
+        process_intervals(0);
+    };
+
+    // Process forward and backward directions
+    if constexpr (Direction::Forward == D) {
+        generate_combinations(true, offset);
+    } else {
+        generate_combinations(false, offset);
     }
 }

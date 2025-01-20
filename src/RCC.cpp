@@ -6,11 +6,13 @@
 ArcDuals RCCManager::computeDuals(BNBNode *model, double threshold) {
     ArcDuals arcDuals;
     model->optimize();
+    std::vector<double> dualValues(cuts_.size());
     // First pass: Compute dual values and store them
     for (int i = 0; i < cuts_.size(); ++i) {
         auto &cut = cuts_[i];
         // TODO: adjust to new stuff
         double dualValue = model->getDualVal(cut.ctr->index());
+        dualValues[i] = dualValue;
 
         if (std::abs(dualValue) < 1e-3) {
             // fmt::print("Cut {} has dual value near zero: {}\n", i,
@@ -22,22 +24,25 @@ ArcDuals RCCManager::computeDuals(BNBNode *model, double threshold) {
         for (const auto &arc : cut.arcs) {
             arcDuals.setOrIncrementDual(arc, dualValue);  // Update arc duals
         }
+
+        if (std::abs(dualValue) < threshold) {
+            // fmt::print("Cut {} has dual value: {}\n", i, dualValue);
+        }
     }
 
     // Second pass: Remove cuts with dual values near zero
-    /*
-    cuts_.erase(std::remove_if(cuts_.begin(), cuts_.end(),
-                               [&](const RCCut &cut, size_t i = 0) mutable {
-                                   if (std::abs(dualValues[i]) < threshold) {
-                                       model->remove(cut.ctr); // Remove the
-    constraint from the model return true;            // Mark this cut for
-    removal
-                                   }
-                                   ++i;
-                                   return false; // Keep this cut
-                               }),
-                cuts_.end());
-*/
+    cuts_.erase(
+        std::remove_if(
+            cuts_.begin(), cuts_.end(),
+            [&](const RCCut &cut, size_t i = 0) mutable {
+                if (std::abs(dualValues[i]) < threshold) {
+                    model->remove(cut.ctr);
+                    return true;
+                }
+                ++i;
+                return false;  // Keep this cut
+            }),
+        cuts_.end());
     return arcDuals;
 }
 
