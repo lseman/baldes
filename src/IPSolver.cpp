@@ -54,10 +54,10 @@ void IPSolver::convert_to_standard_form(
     // Pre-calculate sizes in one pass
     const int num_slacks = n - sense.sum();
     int n_free = 0;
-    
+
     // Use char instead of bool for better performance
     std::vector<char> is_free(m);
-    
+
     // First pass: just count free variables and mark free vars
     // This is faster than categorizing everything up front
     for (int i = 0; i < m; ++i) {
@@ -70,14 +70,15 @@ void IPSolver::convert_to_standard_form(
     // Preallocate output vectors
     const int total_vars = m + n_free + num_slacks;
     cs.resize(total_vars);
-    cs.head(m) = c;  // Copy original costs
+    cs.head(m) = c;                     // Copy original costs
     cs.tail(total_vars - m).setZero();  // Zero out the rest
-    
+
     // Direct assignment is faster than copying
     bs = b;
 
     // Reserve exact space for triplets based on matrix structure
-    const int estimated_nnz = A.nonZeros() + n_free * (A.nonZeros()/m) + num_slacks;
+    const int estimated_nnz =
+        A.nonZeros() + n_free * (A.nonZeros() / m) + num_slacks;
     std::vector<Eigen::Triplet<double>> triplets;
     triplets.reserve(estimated_nnz);
 
@@ -86,7 +87,7 @@ void IPSolver::convert_to_standard_form(
     for (int j = 0; j < m; ++j) {
         const double lj = lb[j];
         const double uj = ub[j];
-        
+
         // Process column j of the sparse matrix
         for (Eigen::SparseMatrix<double>::InnerIterator it(A, j); it; ++it) {
             const int row = it.row();
@@ -97,28 +98,23 @@ void IPSolver::convert_to_standard_form(
                 triplets.emplace_back(row, j, val);
                 triplets.emplace_back(row, m + free_counter, -val);
                 cs[m + free_counter] = -c[j];
-            }
-            else if (lj == -infty && uj == infty) {
+            } else if (lj == -infty && uj == infty) {
                 // Already handled above
                 continue;
-            }
-            else if (std::isfinite(lj) && std::isfinite(uj)) {
+            } else if (std::isfinite(lj) && std::isfinite(uj)) {
                 // Bounded variable
                 triplets.emplace_back(row, j, val);
                 bs[row] -= val * lj;
-            }
-            else if (lj == -infty && std::isfinite(uj)) {
+            } else if (lj == -infty && std::isfinite(uj)) {
                 // Upper bounded
                 triplets.emplace_back(row, j, -val);
                 bs[row] += val * uj;
                 cs[j] = -c[j];
-            }
-            else if (std::isfinite(lj) && uj == infty) {
+            } else if (std::isfinite(lj) && uj == infty) {
                 // Lower bounded
                 triplets.emplace_back(row, j, val);
                 bs[row] -= val * lj;
-            }
-            else {
+            } else {
                 throw std::runtime_error("unexpected bounds");
             }
         }
@@ -333,7 +329,7 @@ void IPSolver::solve_newton_system(
                 delta_0;
     Delta_kappa = (xi_tau_kappa - iter_kappa * Delta_tau) * inv_tau;
 
-// Update vectors using vectorized operations
+    // Update vectors using vectorized operations
     {
         {
             Delta_x.array() += Delta_tau * delta_x.array();
@@ -467,7 +463,7 @@ void IPSolver::run_optimization(ModelData &model, const double tol) {
     int m = A.rows();
 
     // Tolerance and maximum iterations
-    int max_iter = 50;
+    int max_iter = 100;
 
     // Initialize vectors and scalars
     Eigen::VectorXd x = Eigen::VectorXd::Ones(n);

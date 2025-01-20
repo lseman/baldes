@@ -85,7 +85,7 @@ Params::Params(const InstanceData &instance) {
     cli.resize(nbClients);
     nbClients--; // Don't count the depot as a client
 
-    fmt::print("Number of clients: {}\n", nbClients);
+    // fmt::print("Number of clients: {}\n", nbClients);
 
     // Check depot constraints
     if (cli[0].earliestArrival != 0) { throw std::string("Time window for depot should start at 0"); }

@@ -201,7 +201,7 @@ std::vector<int> BucketGraph::computePhi(int &bucket_id, bool fw) {
     auto &fixed_buckets = fw ? fw_fixed_buckets : bw_fixed_buckets;
     auto &node_interval_trees =
         fw ? fw_node_interval_trees : bw_node_interval_trees;
-
+    auto &bucket_splits = fw ? fw_bucket_splits : bw_bucket_splits;
     if (options.resources.size() > 1) {
         if (bucket_id >= buckets.size() || bucket_id < 0) return phi;
 
@@ -211,7 +211,7 @@ std::vector<int> BucketGraph::computePhi(int &bucket_id, bool fw) {
         for (int r = 0; r < intervals.size(); ++r) {
             total_ranges[r] =
                 R_max[r] - R_min[r];  // Ensure integer type for total range
-            base_intervals[r] = total_ranges[r] / intervals[r].interval;
+            base_intervals[r] = total_ranges[r] / bucket_splits[bucket_id];
         }
 
         // Get the node ID and current bucket
@@ -581,184 +581,6 @@ void BucketGraph::set_adjacency_list_manual() {
         add_arcs_for_node(VRPNode, VRPNode.id,
                           res_inc);  // Add arcs for the current node
     }
-}
-
-/**
- * @brief Initializes the BucketGraph by clearing previous data and setting up
- * forward and backward buckets.
- *
- */
-void BucketGraph::common_initialization() {
-    // Pre-allocate vectors with exact sizes
-    merged_labels.clear();
-    merged_labels.reserve(50);
-
-    const size_t num_intervals = options.main_resources.size();
-    std::vector<double> base_intervals(num_intervals);
-    std::vector<double> interval_starts(num_intervals);
-    std::vector<double> interval_ends(num_intervals);
-
-    std::vector<Label *> fw_warm_labels;
-    std::vector<Label *> bw_warm_labels;
-
-    if (merged_labels.size() > 0 && options.warm_start && !just_fixed) {
-        fw_warm_labels.reserve(fw_buckets_size);
-        bw_warm_labels.reserve(bw_buckets_size);
-
-        PARALLEL_SECTIONS(
-            work, bi_sched,
-            SECTION_CUSTOM(this, &fw_warm_labels) {
-                fw_warm_labels.clear();
-                fw_warm_labels.reserve(fw_buckets_size);
-                for (auto bucket = 0; bucket < fw_buckets_size; ++bucket) {
-                    if (auto *label = fw_buckets[bucket].get_best_label()) {
-                        fw_warm_labels.push_back(label);
-                    }
-                }
-            },
-            SECTION_CUSTOM(this, &bw_warm_labels) {
-                bw_warm_labels.clear();
-                bw_warm_labels.reserve(bw_buckets_size);
-                for (auto bucket = 0; bucket < bw_buckets_size; ++bucket) {
-                    if (auto *label = bw_buckets[bucket].get_best_label()) {
-                        bw_warm_labels.push_back(label);
-                    }
-                }
-            });
-    }
-
-    // Initialize vectors with exact sizes once
-    fw_c_bar.assign(fw_buckets_size, std::numeric_limits<double>::infinity());
-    bw_c_bar.assign(bw_buckets_size, std::numeric_limits<double>::infinity());
-    dominance_checks_per_bucket.assign(fw_buckets_size + 1, 0);
-    non_dominated_labels_per_bucket = 0;
-
-    const auto &VRPNode = nodes[0];
-
-    // Calculate intervals once
-    for (size_t r = 0; r < intervals.size(); ++r) {
-        base_intervals[r] =
-            (VRPNode.ub[r] - VRPNode.lb[r]) / intervals[r].interval;
-        interval_starts[r] = VRPNode.lb[r];
-        interval_ends[r] = VRPNode.ub[r];
-    }
-
-    // Clear buckets
-    for (size_t b = 0; b < fw_buckets.size(); b++) {
-        fw_buckets[b].clear();
-        bw_buckets[b].clear();
-    }
-
-    if (options.warm_start && !just_fixed) {
-        PARALLEL_SECTIONS(
-            work, bi_sched,
-            SECTION_CUSTOM(this, &fw_warm_labels) {
-                pdqsort(fw_warm_labels.begin(), fw_warm_labels.end(),
-                        [](const Label *a, const Label *b) {
-                            return a->cost < b->cost;
-                        });
-
-                std::vector<Label *> processed_labels;
-                const size_t process_size =
-                    std::min(fw_warm_labels.size(),
-                             static_cast<size_t>(options.n_warm_start));
-                processed_labels.reserve(process_size);
-
-                for (size_t i = 0; i < process_size; ++i) {
-                    auto label = fw_warm_labels[i];
-                    if (!label->fresh) continue;
-
-                    auto new_label = compute_red_cost(label, true);
-                    if (new_label != nullptr) {
-                        fw_buckets[new_label->vertex].add_label(new_label);
-                        processed_labels.push_back(new_label);
-                    }
-                }
-                fw_warm_labels = std::move(processed_labels);
-            },
-            SECTION_CUSTOM(this, &bw_warm_labels) {
-                pdqsort(bw_warm_labels.begin(), bw_warm_labels.end(),
-                        [](const Label *a, const Label *b) {
-                            return a->cost < b->cost;
-                        });
-
-                std::vector<Label *> processed_labels;
-                const size_t process_size =
-                    std::min(bw_warm_labels.size(),
-                             static_cast<size_t>(options.n_warm_start));
-                processed_labels.reserve(process_size);
-
-                for (size_t i = 0; i < process_size; ++i) {
-                    auto label = bw_warm_labels[i];
-                    if (!label->fresh) continue;
-
-                    auto new_label = compute_red_cost(label, false);
-                    if (new_label != nullptr) {
-                        bw_buckets[new_label->vertex].add_label(new_label);
-                        processed_labels.push_back(new_label);
-                    }
-                }
-                bw_warm_labels = std::move(processed_labels);
-            });
-    }
-
-    // Initialize intervals
-    std::vector<int> current_pos(num_intervals, 0);
-    int offset_fw = 0;
-    int offset_bw = 0;
-
-    // Lambda for interval combination generation
-    auto generate_combinations = [&](bool is_forward, int &offset) {
-        auto &label_pool = is_forward ? label_pool_fw : label_pool_bw;
-        auto &buckets = is_forward ? fw_buckets : bw_buckets;
-        const auto depot_id = is_forward ? options.depot : options.end_depot;
-        const int calculated_index_base =
-            is_forward ? options.depot
-                       : num_buckets_index_bw[options.end_depot];
-
-        std::vector<double> interval_bounds(num_intervals);
-        std::function<void(int)> process_intervals = [&](int depth) {
-            if (depth == num_intervals) {
-                auto depot = label_pool->acquire();
-                int calculated_index = calculated_index_base + offset;
-
-                for (int r = 0; r < num_intervals; ++r) {
-                    interval_bounds[r] =
-                        is_forward
-                            ? interval_starts[r] +
-                                  current_pos[r] *
-                                      roundToTwoDecimalPlaces(base_intervals[r])
-                            : interval_ends[r] -
-                                  current_pos[r] * roundToTwoDecimalPlaces(
-                                                       base_intervals[r]);
-                }
-
-                depot->initialize(calculated_index, 0.0, interval_bounds,
-                                  depot_id);
-                depot->is_extended = false;
-                depot->nodes_covered.push_back(depot_id);
-                set_node_visited(depot->visited_bitmap, depot_id);
-                SRC_MODE_BLOCK(
-                    depot->SRCmap.assign(cut_storage->SRCDuals.size(), 0);)
-                buckets[calculated_index].add_label(depot);
-                buckets[calculated_index].node_id = depot_id;
-
-                offset++;
-                return;
-            }
-
-            for (int k = 0; k < intervals[depth].interval; ++k) {
-                current_pos[depth] = k;
-                process_intervals(depth + 1);
-            }
-        };
-
-        process_intervals(0);
-    };
-
-    // Process forward and backward directions
-    generate_combinations(true, offset_fw);
-    generate_combinations(false, offset_bw);
 }
 
 /**

@@ -1244,20 +1244,22 @@ class MIPProblem {
                 double rc = vars[i].get(GRB_DoubleAttr_RC);
                 int basis_status = vars[i].get(GRB_IntAttr_VBasis);
                 // Only consider variables with positive reduced costs
-                if (rc == 0) {
-                    rc_pairs.push_back({rc, i});
-                }
+                rc_pairs.push_back({rc, i});
 
                 if (basis_status == GRB_BASIC) {
                     basic_vars.push_back(i);
                 }
             }
 
-            // Sort by reduced cost value in descending order (higher RC
-            // first)
-            std::sort(
+            pdqsort(
                 rc_pairs.begin(), rc_pairs.end(),
-                [](const auto &a, const auto &b) { return a.first < b.first; });
+                [](const auto &a, const auto &b) { return a.first > b.first; });
+
+            // print the first 10 rc_pairs
+            for (int i = 0; i < 10 && i < rc_pairs.size(); i++) {
+                fmt::print("RC: {}, Var: {}\n", rc_pairs[i].first,
+                           rc_pairs[i].second);
+            }
 
             // Calculate how many variables to remove
             size_t remove_count = static_cast<size_t>(

@@ -211,6 +211,15 @@ struct VRPNode {
         bw_arcs.clear();
     }
 
+    template <Direction dir>
+    void clear_jump_arcs() {
+        if constexpr (dir == Direction::Forward) {
+            fw_jump_arcs.clear();
+        } else {
+            bw_jump_arcs.clear();
+        }
+    }
+
     // define setDuals method
     void setDuals(double d) { cost = d; }
 };

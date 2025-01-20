@@ -62,11 +62,11 @@
 #include "RIH.h"
 
 class VRProblem {
-public:
-    InstanceData         instance;
+   public:
+    InstanceData instance;
     std::vector<VRPNode> nodes;
-    double               ip_result      = std::numeric_limits<double>::max();
-    double               relaxed_result = std::numeric_limits<double>::max();
+    double ip_result = std::numeric_limits<double>::max();
+    double relaxed_result = std::numeric_limits<double>::max();
 
     ProblemType problemType = ProblemType::vrptw;
 
@@ -76,24 +76,25 @@ public:
     RCCManager rccManager;
 #endif
 
-    int addPath(BNBNode *node, const std::vector<Path> paths, bool enumerate = false) {
+    int addPath(BNBNode *node, const std::vector<Path> paths,
+                bool enumerate = false) {
         SRC_MODE_BLOCK(auto &r1c = node->r1c; auto &cuts = r1c->cutStorage;)
         RCC_MODE_BLOCK(auto &rccManager = node->rccManager;)
-        int   numConstrsLocal = node->getIntAttr("NumConstrs");
-        auto &constrs         = node->getConstrs();
+        int numConstrsLocal = node->getIntAttr("NumConstrs");
+        auto &constrs = node->getConstrs();
 
-        auto &matrix         = node->matrix;
-        auto &allPaths       = node->paths;
+        auto &matrix = node->matrix;
+        auto &allPaths = node->paths;
         auto &SRCconstraints = node->SRCconstraints;
 
         std::vector<double> coluna(numConstrsLocal,
-                                   0.0); // Declare outside the loop
+                                   0.0);  // Declare outside the loop
 
         // Collect the bounds, costs, names, and columns
-        std::vector<double>      lb, ub, obj;
-        std::vector<MIPColumn>   cols;
+        std::vector<double> lb, ub, obj;
+        std::vector<MIPColumn> cols;
         std::vector<std::string> names;
-        std::vector<VarType>     vtypes;
+        std::vector<VarType> vtypes;
 
         auto counter = 0;
         for (auto &label : paths) {
@@ -104,50 +105,53 @@ public:
             // pathSet.insert(path);
 
             std::fill(coluna.begin(), coluna.end(),
-                      0.0); // Reset the coefficients
+                      0.0);  // Reset the coefficients
 
-            double      travel_cost = label.cost;
-            std::string name        = "x[" + std::to_string(allPaths.size()) + "]";
+            double travel_cost = label.cost;
+            std::string name = "x[" + std::to_string(allPaths.size()) + "]";
 
-            MIPColumn col; // Use Column instead of GRBColumn
+            MIPColumn col;  // Use Column instead of GRBColumn
 
             // Step 1: Accumulate the coefficients for each node
             for (const auto &node : label.route) {
-                if (likely(node > 0 && node != N_SIZE - 1)) { // Use likely() if applicable
-                    coluna[node - 1]++;                       // Simplified increment operation
+                if (likely(node > 0 &&
+                           node != N_SIZE - 1)) {  // Use likely() if applicable
+                    coluna[node - 1]++;  // Simplified increment operation
                 }
             }
 
             // Add terms to the Column
             for (int i = 0; i < N_SIZE - 2; i++) {
                 if (coluna[i] == 0.0) continue;
-                col.addTerm(i, coluna[i]); // Add term to the Column (row index
-                                           // and coefficient)
+                col.addTerm(i, coluna[i]);  // Add term to the Column (row index
+                                            // and coefficient)
             }
 
             // Add the term for total vehicles constraint
             col.addTerm(N_SIZE - 2,
-                        1.0); // Add term for the vehicle constraint
+                        1.0);  // Add term for the vehicle constraint
 
             // Add terms for the limited memory rank 1 cuts
-            SRC_MODE_BLOCK(auto vec = cuts.computeLimitedMemoryCoefficients(label.route); if (vec.size() > 0) {
-                for (int i = 0; i < vec.size(); i++) {
-                    if (abs(vec[i]) > 1e-3) {
-                        col.addTerm(SRCconstraints[i]->index(),
-                                    vec[i]); // Add to the appropriate
-                                             // constraint in Column
+            SRC_MODE_BLOCK(
+                auto vec = cuts.computeLimitedMemoryCoefficients(label.route);
+                if (vec.size() > 0) {
+                    for (int i = 0; i < vec.size(); i++) {
+                        if (abs(vec[i]) > 1e-3) {
+                            col.addTerm(SRCconstraints[i]->index(),
+                                        vec[i]);  // Add to the appropriate
+                                                  // constraint in Column
+                        }
                     }
-                }
-            })
+                })
 
-#if defined(RCC) || defined(EXACT_RCC)
-            auto RCCvec         = rccManager->computeRCCCoefficients(label.route);
+#if defined(RCC)
+            auto RCCvec = rccManager->computeRCCCoefficients(label.route);
             auto RCCconstraints = rccManager->getbaldesCtrs();
             if (RCCvec.size() > 0) {
                 for (int i = 0; i < RCCvec.size(); i++) {
                     if (abs(RCCvec[i]) > 1e-3) {
                         col.addTerm(RCCconstraints[i]->index(),
-                                    RCCvec[i]); // Add RCC terms to the Column
+                                    RCCvec[i]);  // Add RCC terms to the Column
                     }
                 }
             }
@@ -157,18 +161,20 @@ public:
             lb.push_back(0.0);
             ub.push_back(1.0);
             obj.push_back(travel_cost);
-            cols.push_back(col); // Add the populated Column
+            cols.push_back(col);  // Add the populated Column
             names.push_back(name);
-            vtypes.push_back(VarType::Continuous); // Assuming VarType::Continuous is the
-                                                   // equivalent of GRB_CONTINUOUS
+            vtypes.push_back(
+                VarType::Continuous);  // Assuming VarType::Continuous is the
+                                       // equivalent of GRB_CONTINUOUS
 
-            node->addPath(label); // Store the path
+            node->addPath(label);  // Store the path
         }
 
         // Add variables with bounds, objectives, and columns
         if (!lb.empty()) {
             // Pass the data to the MIP problem
-            node->addVars(lb.data(), ub.data(), obj.data(), vtypes.data(), names.data(), cols.data(), lb.size());
+            node->addVars(lb.data(), ub.data(), obj.data(), vtypes.data(),
+                          names.data(), cols.data(), lb.size());
         }
 
         return counter;
@@ -178,25 +184,26 @@ public:
      * Adds a column to the GRBModel.
      *
      */
-    inline int addColumn(BNBNode *node, const auto &columns, double &inner_obj, bool enumerate = false) {
+    inline int addColumn(BNBNode *node, const auto &columns, double &inner_obj,
+                         bool enumerate = false) {
         SRC_MODE_BLOCK(auto &r1c = node->r1c; auto &cuts = r1c->cutStorage;)
         RCC_MODE_BLOCK(auto &rccManager = node->rccManager;)
-        int                 numConstrsLocal = node->getIntAttr("NumConstrs");
-        auto               &constrs         = node->getConstrs();
+        int numConstrsLocal = node->getIntAttr("NumConstrs");
+        auto &constrs = node->getConstrs();
         std::vector<double> coluna(numConstrsLocal,
-                                   0.0); // Declare outside the loop
+                                   0.0);  // Declare outside the loop
 
-        auto &allPaths       = node->paths;
+        auto &allPaths = node->paths;
         auto &SRCconstraints = node->SRCconstraints;
 
         // Collect the bounds, costs, names, and columns
-        std::vector<double>      lb, ub, obj;
-        std::vector<MIPColumn>   cols;
+        std::vector<double> lb, ub, obj;
+        std::vector<MIPColumn> cols;
         std::vector<std::string> names;
-        std::vector<VarType>     vtypes;
+        std::vector<VarType> vtypes;
 
         auto &pathSet = node->pathSet;
-        inner_obj     = 0.0;
+        inner_obj = 0.0;
 
         auto counter = 0;
         for (auto &label : columns) {
@@ -210,61 +217,74 @@ public:
             // Insert the path into the set to avoid duplicates
             pathSet.insert(path);
 
-            if (label->cost < inner_obj) { inner_obj = label->cost; }
+            if (label->cost < inner_obj) {
+                inner_obj = label->cost;
+            }
 
             counter += 1;
             if (counter > N_ADD - 1) break;
 
             std::fill(coluna.begin(), coluna.end(),
-                      0.0); // Reset the coefficients
+                      0.0);  // Reset the coefficients
 
-            double      travel_cost = label->real_cost;
-            std::string name        = "x[" + std::to_string(allPaths.size()) + "]";
+            double travel_cost = label->real_cost;
+            std::string name = "x[" + std::to_string(allPaths.size()) + "]";
 
-            MIPColumn col; // Use Column instead of GRBColumn
+            MIPColumn col;  // Use Column instead of GRBColumn
 
             // Step 1: Accumulate the coefficients for each node
             for (const auto &node : label->nodes_covered) {
-                if (likely(node > 0 && node != N_SIZE - 1)) { // Use likely() if applicable
-                    coluna[node - 1]++;                       // Simplified increment operation
+                if (likely(node > 0 &&
+                           node != N_SIZE - 1)) {  // Use likely() if applicable
+                    coluna[node - 1]++;  // Simplified increment operation
                 }
             }
 
             // Add terms to the Column
             for (int i = 0; i < N_SIZE - 2; i++) {
                 if (coluna[i] == 0.0) continue;
-                col.addTerm(i, coluna[i]); // Add term to the Column (row index
-                                           // and coefficient)
+                col.addTerm(i, coluna[i]);  // Add term to the Column (row index
+                                            // and coefficient)
             }
 
             // Add the term for total vehicles constraint
             col.addTerm(N_SIZE - 2,
-                        1.0); // Add term for the vehicle constraint
+                        1.0);  // Add term for the vehicle constraint
 
             // Add terms for the limited memory rank 1 cuts
-            SRC_MODE_BLOCK(auto vec = cuts.computeLimitedMemoryCoefficients(path.route); if (vec.size() > 0) {
-                for (int i = 0; i < vec.size(); i++) {
-                    if (abs(vec[i]) > 1e-3) { col.addTerm(SRCconstraints[i]->index(), vec[i]); }
-                }
-            })
-
-            RCC_MODE_BLOCK(auto RCCvec = rccManager->computeRCCCoefficients(path.route); if (RCCvec.size() > 0) {
-                auto RCCconstraints = rccManager->getbaldesCtrs();
-
-                for (int i = 0; i < RCCvec.size(); i++) {
-                    if (abs(RCCvec[i]) > 1e-3) {
-                        col.addTerm(RCCconstraints[i]->index(),
-                                    RCCvec[i]); // Add RCC terms to the Column
+            SRC_MODE_BLOCK(
+                auto vec = cuts.computeLimitedMemoryCoefficients(path.route);
+                if (vec.size() > 0) {
+                    for (int i = 0; i < vec.size(); i++) {
+                        if (abs(vec[i]) > 1e-3) {
+                            col.addTerm(SRCconstraints[i]->index(), vec[i]);
+                        }
                     }
-                }
-            })
+                })
 
-            auto &branching    = node->branchingDuals;
-            auto  branchingVec = branching->computeCoefficients(path.route);
+            RCC_MODE_BLOCK(
+                auto RCCvec = rccManager->computeRCCCoefficients(path.route);
+                if (RCCvec.size() > 0) {
+                    auto RCCconstraints = rccManager->getbaldesCtrs();
+
+                    for (int i = 0; i < RCCvec.size(); i++) {
+                        if (abs(RCCvec[i]) > 1e-3) {
+                            col.addTerm(
+                                RCCconstraints[i]->index(),
+                                RCCvec[i]);  // Add RCC terms to the Column
+                        }
+                    }
+                })
+
+            auto &branching = node->branchingDuals;
+            auto branchingVec = branching->computeCoefficients(path.route);
             if (branchingVec.size() > 0) {
                 auto branchingbaldesCtrs = branching->getBranchingbaldesCtrs();
                 for (int i = 0; i < branchingVec.size(); i++) {
-                    if (abs(branchingVec[i]) > 1e-3) { col.addTerm(branchingbaldesCtrs[i]->index(), branchingVec[i]); }
+                    if (abs(branchingVec[i]) > 1e-3) {
+                        col.addTerm(branchingbaldesCtrs[i]->index(),
+                                    branchingVec[i]);
+                    }
                 }
             }
 
@@ -272,18 +292,20 @@ public:
             lb.push_back(0.0);
             ub.push_back(1.0);
             obj.push_back(travel_cost);
-            cols.push_back(col); // Add the populated Column
+            cols.push_back(col);  // Add the populated Column
             names.push_back(name);
-            vtypes.push_back(VarType::Continuous); // Assuming VarType::Continuous is the
-                                                   // equivalent of GRB_CONTINUOUS
+            vtypes.push_back(
+                VarType::Continuous);  // Assuming VarType::Continuous is the
+                                       // equivalent of GRB_CONTINUOUS
 
-            node->addPath(path); // Store the path
+            node->addPath(path);  // Store the path
         }
 
         // Add variables with bounds, objectives, and columns
         if (!lb.empty()) {
             // Pass the data to the MIP problem
-            node->addVars(lb.data(), ub.data(), obj.data(), vtypes.data(), names.data(), cols.data(), lb.size());
+            node->addVars(lb.data(), ub.data(), obj.data(), vtypes.data(),
+                          names.data(), cols.data(), lb.size());
             node->update();
         }
 
@@ -296,15 +318,17 @@ public:
      */
     bool cutHandler(std::shared_ptr<LimitedMemoryRank1Cuts> &r1c, BNBNode *node,
                     std::vector<baldesCtrPtr> &constraints) {
-        auto &cuts    = r1c->cutStorage;
-        bool  changed = false;
+        auto &cuts = r1c->cutStorage;
+        bool changed = false;
 
         if (!cuts.empty()) {
             for (auto &cut : cuts) {
-                if (cut.added && !cut.updated) { continue; }
+                if (cut.added && !cut.updated) {
+                    continue;
+                }
 
-                changed            = true;
-                const int   z      = cut.id;
+                changed = true;
+                const int z = cut.id;
                 const auto &coeffs = cut.coefficients;
 
                 if (cut.added && cut.updated) {
@@ -314,7 +338,9 @@ public:
                 } else {
                     LinearExpression lhs;
                     for (size_t i = 0; i < coeffs.size(); ++i) {
-                        if (coeffs[i] == 0) { continue; }
+                        if (coeffs[i] == 0) {
+                            continue;
+                        }
                         lhs += node->getVar(i) * coeffs[i];
                     }
 
@@ -326,7 +352,7 @@ public:
                     constraints.emplace_back(ctr);
                 }
 
-                cut.added   = true;
+                cut.added = true;
                 cut.updated = false;
             }
         }
@@ -351,13 +377,14 @@ public:
         CnstrMgrPointer cutsCMP = nullptr;
         CMGR_CreateCMgr(&cutsCMP, 100);
 
-        auto             nVertices = N_SIZE - 1;
-        std::vector<int> demands   = instance.demand;
+        auto nVertices = N_SIZE - 1;
+        std::vector<int> demands = instance.demand;
 
         // Precompute edge values from LP solution
-        std::vector<std::vector<double>> aijs(N_SIZE + 1, std::vector<double>(N_SIZE + 1, 0.0));
+        std::vector<std::vector<double>> aijs(
+            N_SIZE + 1, std::vector<double>(N_SIZE + 1, 0.0));
 
-        auto &allPaths   = model->paths;
+        auto &allPaths = model->paths;
         auto &oldCutsCMP = model->oldCutsCMP;
 
         for (int counter = 0; counter < allPaths.size(); ++counter) {
@@ -369,7 +396,7 @@ public:
             }
         }
 
-        std::vector<int>    edgex, edgey;
+        std::vector<int> edgex, edgey;
         std::vector<double> edgeval;
 
         edgex.push_back(0);
@@ -388,13 +415,17 @@ public:
         }
 
         // RCC Separation
-        char   intAndFeasible;
+        char intAndFeasible;
         double maxViolation;
-        int    maxCuts = 5;
-        if (problemType == ProblemType::cvrp) { maxCuts = 10; }
+        int maxCuts = 5;
+        if (problemType == ProblemType::cvrp) {
+            maxCuts = 10;
+        }
 
-        CAPSEP_SeparateCapCuts(nVertices - 1, demands.data(), instance.q, edgex.size() - 1, edgex.data(), edgey.data(),
-                               edgeval.data(), oldCutsCMP, maxCuts, 1e-4, &intAndFeasible, &maxViolation, cutsCMP);
+        CAPSEP_SeparateCapCuts(nVertices - 1, demands.data(), instance.q,
+                               edgex.size() - 1, edgex.data(), edgey.data(),
+                               edgeval.data(), oldCutsCMP, maxCuts, 1e-4,
+                               &intAndFeasible, &maxViolation, cutsCMP);
 
         // print_cut("Found {} violated RCC cuts, max violation: {}\n",
         // cutsCMP->Size, maxViolation);
@@ -402,21 +433,24 @@ public:
         if (intAndFeasible) return false; /* Optimal solution found */
         if (cutsCMP->Size == 0) return false;
 
-        std::vector<int>                 rhsValues(cutsCMP->Size);
+        std::vector<int> rhsValues(cutsCMP->Size);
         std::vector<std::vector<RawArc>> arcGroups(cutsCMP->Size);
 
         // Instead of parallel execution, use a simple for-loop to process each
         // cut
         for (int cutIdx = 0; cutIdx < cutsCMP->Size; ++cutIdx) {
             std::vector<int> S(cutsCMP->CPL[cutIdx]->IntList + 1,
-                               cutsCMP->CPL[cutIdx]->IntList + cutsCMP->CPL[cutIdx]->IntListSize + 1);
+                               cutsCMP->CPL[cutIdx]->IntList +
+                                   cutsCMP->CPL[cutIdx]->IntListSize + 1);
 
             std::vector<RawArc> arcs;
 
             // Generate all possible arc pairs from nodes in S
             for (int i : S) {
                 for (int j : S) {
-                    if (i != j) { arcs.emplace_back(i, j); }
+                    if (i != j) {
+                        arcs.emplace_back(i, j);
+                    }
                 }
             }
 
@@ -432,18 +466,21 @@ public:
             // For each arc in arcGroups[i], compute the cut expression
             for (const auto &arc : arcGroups[i]) {
                 for (size_t ctr = 0; ctr < allPaths.size(); ++ctr) {
-                    cutExpr += model->getVar(ctr) * allPaths[ctr].timesArc(arc.from, arc.to);
+                    cutExpr += model->getVar(ctr) *
+                               allPaths[ctr].timesArc(arc.from, arc.to);
                 }
             }
 
             // Add the constraint to the model
             auto ctr_name = "RCC_" + std::to_string(rccManager->cut_ctr);
-            auto ctr      = cutExpr <= rhsValues[i];
-            ctr           = model->addConstr(ctr, ctr_name);
+            auto ctr = cutExpr <= rhsValues[i];
+            ctr = model->addConstr(ctr, ctr_name);
             rccManager->addCut(arcGroups[i], rhsValues[i], ctr);
         }
 
-        for (auto i = 0; i < cutsCMP->Size; i++) { CMGR_MoveCnstr(cutsCMP, oldCutsCMP, i, 0); }
+        for (auto i = 0; i < cutsCMP->Size; i++) {
+            CMGR_MoveCnstr(cutsCMP, oldCutsCMP, i, 0);
+        }
         return true;
     }
 
@@ -466,73 +503,77 @@ public:
             return false;
         }
 
-        auto &matrix         = node->matrix;
+        auto &matrix = node->matrix;
         auto &SRCconstraints = node->SRCconstraints;
-        auto &allPaths       = node->paths;
+        auto &allPaths = node->paths;
 
         SRC_MODE_BLOCK(auto &r1c = node->r1c;)
         auto &branchingDuals = node->branchingDuals;
         RCC_MODE_BLOCK(auto &rccManager = node->rccManager;)
 
-        int bucket_interval = 25;
-        int time_horizon    = instance.T_max;
+        int bucket_interval = 20;
+        int time_horizon = instance.T_max;
         // if (problemType == ProblemType::cvrp) { time_horizon = 50000; }
-        numConstrs                = node->getIntAttr("NumConstrs");
-        node->numConstrs          = numConstrs;
+        numConstrs = node->getIntAttr("NumConstrs");
+        node->numConstrs = numConstrs;
         std::vector<double> duals = std::vector<double>(numConstrs, 0.0);
 
         std::unique_ptr<BucketGraph> bucket_graph;
 
         if (problemType == ProblemType::vrptw) {
-            bucket_graph = std::make_unique<BucketGraph>(nodes, time_horizon, bucket_interval);
+            bucket_graph = std::make_unique<BucketGraph>(nodes, time_horizon,
+                                                         bucket_interval);
         } else if (problemType == ProblemType::cvrp) {
-            bucket_graph = std::make_unique<BucketGraph>(nodes, instance.q, bucket_interval);
+            bucket_graph = std::make_unique<BucketGraph>(nodes, instance.q,
+                                                         bucket_interval);
         }
 
         if (problemType == ProblemType::cvrp) {
             BucketOptions options;
             options.main_resources = {0};
-            options.resources      = {"capacity"};
-            options.resource_type  = {1};
-            bucket_graph->options  = options;
+            options.resources = {"capacity"};
+            options.resource_type = {1};
+            bucket_graph->options = options;
         }
 
         bucket_graph->set_distance_matrix(instance.getDistanceMatrix(), 8);
         bucket_graph->branching_duals = branchingDuals;
-        bucket_graph->A_MAX           = N_SIZE;
-        bucket_graph->depth           = node->depth;
+        bucket_graph->A_MAX = N_SIZE;
+        bucket_graph->depth = node->depth;
 
         bucket_graph->topHeurRoutes = node->bestRoutes;
 
-        matrix                  = node->extractModelDataSparse();
-        auto integer_solution   = node->integer_sol;
+        matrix = node->extractModelDataSparse();
+        auto integer_solution = node->integer_sol;
         bucket_graph->incumbent = integer_solution;
 
-        SRC_MODE_BLOCK(r1c->setDistanceMatrix(node->instance.getDistanceMatrix()); r1c->setNodes(nodes);
-                       CutStorage *cuts = &r1c->cutStorage; bucket_graph->cut_storage = cuts;)
+        SRC_MODE_BLOCK(
+            r1c->setDistanceMatrix(node->instance.getDistanceMatrix());
+            r1c->setNodes(nodes); CutStorage *cuts = &r1c->cutStorage;
+            bucket_graph->cut_storage = cuts;)
 
         std::vector<double> cutDuals;
         std::vector<double> nodeDuals = node->getDuals();
         bucket_graph->setDuals(nodeDuals);
         auto sizeDuals = nodeDuals.size();
 
-        double lp_obj_dual     = 0.0;
-        double lp_obj          = node->getObjVal();
-        double lp_obj_old      = lp_obj;
-        int    iter_non_improv = 0;
+        double lp_obj_dual = 0.0;
+        double lp_obj = node->getObjVal();
+        double lp_obj_old = lp_obj;
+        int iter_non_improv = 0;
 
         bucket_graph->setup();
 
-        double gap      = 1e-6;
-        bool   ss       = false;
-        int    stage    = 1;
-        bool   misprice = true;
-        double lag_gap  = 0.0;
+        double gap = 1e-6;
+        bool ss = false;
+        int stage = 1;
+        bool misprice = true;
+        double lag_gap = 0.0;
 
-        auto                 inner_obj = 0.0;
+        auto inner_obj = 0.0;
         std::vector<Label *> paths;
-        std::vector<double>  solution = node->extractSolution();
-        bool                 can_add  = true;
+        std::vector<double> solution = node->extractSolution();
+        bool can_add = true;
 
 #ifdef STAB
         Stabilization stab(0.5, nodeDuals);
@@ -550,7 +591,7 @@ public:
         bool transition = false;
 
 #ifdef TR
-        bool        TRstop = false;
+        bool TRstop = false;
         TrustRegion tr(numConstrs);
         tr.setup(node, nodeDuals);
         solution = node->extractSolution();
@@ -558,24 +599,24 @@ public:
 #endif
 
 #ifdef IPM_ACEL
-        int      base_threshold = 20;
-        int      adaptive_threshold;
+        int base_threshold = 20;
+        int adaptive_threshold;
         IPSolver ipm_solver;
-        bool     use_ipm_duals = false;
+        bool use_ipm_duals = false;
 #endif
-        bool                rcc         = false;
-        bool                reoptimized = false;
-        double              obj;
-        auto                colAdded = 0;
+        bool rcc = false;
+        bool reoptimized = false;
+        double obj;
+        auto colAdded = 0;
         std::vector<double> originDuals;
-        bool                force_cuts = false;
-        int                 numK;
+        bool force_cuts = false;
+        int numK;
         for (int iter = 0; iter < max_iter; ++iter) {
             reoptimized = false;
 
-#if defined(RCC) || defined(EXACT_RCC)
+#if defined(RCC)
             if (rcc) {
-                RUN_OPTIMIZATION(node, 1e-8)
+                RUN_OPTIMIZATION(node, 1e-6)
                 RCC_MODE_BLOCK(rcc = RCCsep(node, solution);)
 
 #ifdef EXACT_RCC
@@ -586,14 +627,9 @@ public:
 
             if ((ss && !rcc) || force_cuts) {
                 force_cuts = false;
-#if defined(RCC) || defined(EXACT_RCC)
+#if defined(RCC)
                 RUN_OPTIMIZATION(node, 1e-8)
                 RCC_MODE_BLOCK(rcc = RCCsep(node, solution);)
-
-#ifdef EXACT_RCC
-                rcc = exactRCCsep(node, solution, cvrsep_ctrs);
-#endif
-
 #endif
 
                 SRC_MODE_BLOCK(if (!rcc) {
@@ -608,29 +644,22 @@ public:
 #endif
                             r1c->setArcDuals(arc_duals);
                         })
-
-                    // auto start_time_ =
-                    // std::chrono::high_resolution_clock::now();
                     auto srcResult = r1c->runSeparation(node, SRCconstraints);
-                    // auto end_time_   =
-                    // std::chrono::high_resolution_clock::now(); auto
-                    // duration_microseconds =
-                    //     std::chrono::duration_cast<std::chrono::microseconds>(end_time_
-                    //     - start_time_).count();
-                    // fmt::print("SRC time: {:.6f} seconds\n",
-                    // duration_microseconds / 1e6);
                     bool violated = srcResult.first;
-                    bool cleared  = srcResult.second;
+                    bool cleared = srcResult.second;
                     if (!violated) {
                         if (bucket_graph->A_MAX == N_SIZE) {
                             if (std::abs(inner_obj) < 1.0) {
-                                print_info("No violated cuts found, calling it a "
-                                           "day\n");
+                                print_info(
+                                    "No violated cuts found, calling it a "
+                                    "day\n");
                                 break;
                             }
                         } else {
-                            auto new_relaxation = std::min(bucket_graph->A_MAX + 10, N_SIZE);
-                            print_info("Increasing A_MAX to {}\n", new_relaxation);
+                            auto new_relaxation =
+                                std::min(bucket_graph->A_MAX + 10, N_SIZE);
+                            print_info("Increasing A_MAX to {}\n",
+                                       new_relaxation);
                             bucket_graph->A_MAX = new_relaxation;
                         }
 
@@ -639,11 +668,6 @@ public:
                         if (changed) {
 #ifndef IPM
                             stab.cut_added = true;
-#endif
-// matrix = node->extractModelDataSparse();
-// node->optimize();
-// nodeDuals = node->getDuals();
-#ifndef IPM
                             node->optimize();
 #endif
                         }
@@ -654,173 +678,67 @@ public:
 
 #ifdef TR
             if (!TRstop) {
-                v      = tr.iterate(node, nodeDuals, inner_obj, bucket_graph->getStage());
+                v = tr.iterate(node, nodeDuals, inner_obj,
+                               bucket_graph->getStage());
                 TRstop = tr.stop();
             }
 #endif
 
 #ifdef IPM
-            double d          = 10;
-            matrix            = node->extractModelDataSparse();
-            double obj_change = std::abs(lp_obj - lp_obj_old);
-            // fmt::print("Objective change: {}\n", obj_change);
-            // double adaptive_factor = std::min(1.0, std::max(1e-4, obj_change
-            // / std::abs(lp_obj + 1e-6))); fmt::print("Adaptive factor: {}\n",
-            // adaptive_factor);
-            numK = std::ceil(std::accumulate(solution.begin(), solution.end(), 0.0));
-
-            // Compute gap based on current objective difference and adaptive
-            // factor
-            gap = std::abs(lp_obj - (lp_obj + numK * inner_obj)) / std::abs(lp_obj + 1e-6);
-            gap = (gap / d);
-            // fmt::print("Gap: {}\n", gap);
-
-            // Enforce upper and lower bounds on gap
-            if (std::isnan(gap) || std::signbit(gap)) { gap = 1e-1; }
-            gap = std::clamp(gap, 1e-8,
-                             1e-1); // Clamping gap to be between 1e-6 and 1e-2
-            node->ipSolver->run_optimization(matrix, gap);
-
-            lp_obj_old  = lp_obj;
-            lp_obj      = node->ipSolver->getObjective();
-            solution    = node->ipSolver->getPrimals();
-            nodeDuals   = node->ipSolver->getDuals();
-            originDuals = nodeDuals;
-            // print origin duals size
-            for (auto &dual : nodeDuals) { dual = -dual; }
-
-            /*
-                        if (iter > 1 && iter % 50 == 0 && stage != 4) {
-                            auto toRemoveIndices =
-               node->mip.reduceByRC(nodeDuals, 0.95); matrix               =
-               node->extractModelDataSparse();
-
-                            for (auto &index : toRemoveIndices) {
-                                // remove index from allPaths
-                                allPaths.erase(allPaths.begin() + index);
-                            }
-                            node->ipSolver->run_optimization(matrix, gap);
-                            //lp_obj_old  = lp_obj;
-                            //lp_obj      = node->ipSolver->getObjective();
-                            solution    = node->ipSolver->getPrimals();
-                            //nodeDuals   = node->ipSolver->getDuals();
-                            //originDuals = nodeDuals;
-                            //for (auto &dual : nodeDuals) { dual = -dual; }
-                        }
-            */
-            // lag_gap           = integer_solution - (lp_obj + std::min(0.0,
-            // inner_obj));
+#if defined(STAB) && defined(IPM)
+            if (stage >= 4) {
 #endif
-#ifndef IPM
-            nodeDuals        = node->getDuals();
-            auto originDuals = nodeDuals;
-#endif
+                double d = 1;
+                matrix = node->extractModelDataSparse();
+                double obj_change = std::abs(lp_obj - lp_obj_old);
+                // fmt::print("Objective change: {}\n", obj_change);
+                // double adaptive_factor = std::min(1.0, std::max(1e-4,
+                // obj_change / std::abs(lp_obj + 1e-6))); fmt::print("Adaptive
+                // factor: {}\n", adaptive_factor);
+                numK = std::ceil(
+                    std::accumulate(solution.begin(), solution.end(), 0.0));
 
-/*
-#ifdef GUROBI
-            if (iter > 1 && iter % 50 == 0) {
-                auto basic = node->getBasicVariableIndices();
-                auto toRemoveIndices = node->mip.reduceByRC(nodeDuals, basic,
-0.9); matrix               = node->extractModelDataSparse();
+                // Compute gap based on current objective difference and
+                // adaptive factor
+                gap = std::abs(lp_obj - (lp_obj + numK * inner_obj)) /
+                      std::abs(lp_obj + 1e-6);
+                gap = (gap / d);
+                // fmt::print("Gap: {}\n", gap);
 
-                for (auto &index : toRemoveIndices) {
-                    // remove index from allPaths
-                    allPaths.erase(allPaths.begin() + index);
+                // Enforce upper and lower bounds on gap
+                if (std::isnan(gap) || std::signbit(gap)) {
+                    gap = 1e-1;
                 }
-                node->optimize();
-                solution = node->extractSolution();
+                gap = std::clamp(
+                    gap, 1e-8,
+                    1e-1);  // Clamping gap to be between 1e-6 and 1e-2
+                node->ipSolver->run_optimization(matrix, gap);
+
+                lp_obj_old = lp_obj;
+                lp_obj = node->ipSolver->getObjective();
+                solution = node->ipSolver->getPrimals();
+                nodeDuals = node->ipSolver->getDuals();
+                originDuals = nodeDuals;
+                // print origin duals size
+                for (auto &dual : nodeDuals) {
+                    dual = -dual;
+                }
+#endif
+#if defined(STAB) && !defined(IPM)
                 nodeDuals = node->getDuals();
+                auto originDuals = nodeDuals;
+#endif
+
+#if defined(STAB) && defined(IPM)
             }
 #endif
-*/
-#ifdef STAB
-            // define numK as the number of non-zero vars in solution
-            numK              = std::ceil(std::accumulate(solution.begin(), solution.end(), 0.0));
-            double newBound   = lp_obj + numK * inner_obj;
-            lag_gap           = integer_solution - newBound;
-            bucket_graph->gap = lag_gap;
-            stab.set_pseudo_dual_bound(newBound);
-            stab.updateNumK(numK);
-            stab.update_stabilization_after_master_optim(nodeDuals);
-            stab.setObj(lp_obj);
-            nodeDuals = stab.getStabDualSolAdvanced(nodeDuals);
 
-            misprice = true;
-            while (misprice) {
-                solution = node->extractSolution();
-#endif
-
-                bool integer = true;
-#ifdef TR
-                if (TRstop)
-#endif
-                {
-                    for (auto sol : solution) {
-                        if (sol > 1e-1 && sol < 1 - 1e-1) {
-                            integer = false;
-                            break;
-                        }
-                    }
-                    // check if the lp_obj itself is within tolerance
-                    if (std::abs(std::round(lp_obj) - lp_obj) > 1e-2) { integer = false; }
-
-                    if (integer) {
-                        if (std::round(lp_obj) < integer_solution) {
-                            // print_info("Updating integer solution to {}\n",
-                            // std::round(lp_obj));
-                            integer_solution        = std::round(lp_obj);
-                            bucket_graph->incumbent = integer_solution;
-#ifdef STAB
-                            stab.clearAlpha();
-#endif
-                        }
-                    }
-                }
-#ifdef IPM_ACEL
-                auto updateGapAndRunOptimization = [&](auto node, auto lp_obj, auto inner_obj, auto &ipm_solver,
-                                                       auto &iter_non_improv, auto &use_ipm_duals, auto &nodeDuals) {
-                    auto matrix = node->extractModelDataSparse();
-
-                    auto d = 10;
-                    // Compute gap based on current objective difference and
-                    // adaptive factor
-
-                    double gap = std::abs(lp_obj - (lp_obj + numK * inner_obj)) / std::abs(lp_obj + 1e-6);
-                    gap        = (gap / d);
-
-                    // Enforce upper and lower bounds on gap
-                    if (std::isnan(gap) || std::signbit(gap)) { gap = 1e-1; }
-                    gap = std::clamp(gap, 1e-8, 1e-1);
-
-                    // Run optimization and adjust duals
-                    ipm_solver.run_optimization(matrix, gap);
-                    nodeDuals = ipm_solver.getDuals();
-                    for (auto &dual : nodeDuals) { dual = -dual; }
-                };
-
-                adaptive_threshold = std::max(base_threshold,
-                                              base_threshold + iter / 100); // Adapt with total iterations
-                if (std::abs(lp_obj - lp_obj_old) < 1) {
-                    iter_non_improv += 1;
-                    if (iter_non_improv > adaptive_threshold) {
-                        if (stab.alpha > 0) {
-                            print_info("No improvement in the last iterations, "
-                                       "running "
-                                       "IPM\n");
-                            updateGapAndRunOptimization(node, lp_obj, inner_obj, ipm_solver, iter_non_improv,
-                                                        use_ipm_duals, nodeDuals);
-                            stab.define_smooth_dual_sol(nodeDuals);
-                            iter_non_improv = 0;
-                            use_ipm_duals   = true;
-                        }
-                    }
-                } else {
-                    iter_non_improv = 0;
-                }
-#endif
+            auto updateGraphAndSolve = [&](auto &nodeDuals) {
                 bucket_graph->relaxation = lp_obj;
-                bucket_graph->augment_ng_memories(solution, allPaths, true, 5, 100, 30, N_SIZE);
-                SRC_MODE_BLOCK( // SRC cuts
+                bucket_graph->augment_ng_memories(solution, allPaths, true, 5,
+                                                  100, 30, N_SIZE);
+
+                SRC_MODE_BLOCK(  // SRC cuts
                     if (!SRCconstraints.empty()) {
                         // print SRCconstraints size
                         std::vector<double> cutDuals;
@@ -828,26 +746,32 @@ public:
 
                         for (int i = 0; i < SRCconstraints.size(); i++) {
                             auto constr = SRCconstraints[i];
-                            auto index  = constr->index(); // node->get_current_index(constr->get_unique_id());
+                            auto index =
+                                constr
+                                    ->index();  // node->get_current_index(constr->get_unique_id());
                             // print size of originDuals
                             cutDuals.push_back(originDuals[index]);
                         }
 
                         cuts->setDuals(cutDuals);
                     })
+
                 RCC_MODE_BLOCK(
                     // RCC cuts
                     if (rccManager->size() > 0) {
 #ifndef IPM
                         auto arc_duals = rccManager->computeDuals(node);
 #else
-                    auto arc_duals = rccManager->computeDuals(nodeDuals, node);
+                        auto arc_duals =
+                            rccManager->computeDuals(nodeDuals, node);
 #endif
                         bucket_graph->setArcDuals(arc_duals);
                     })
 
                 // Branching duals
-                if (branchingDuals->size() > 0) { branchingDuals->computeDuals(node); }
+                if (branchingDuals->size() > 0) {
+                    branchingDuals->computeDuals(node);
+                }
                 bucket_graph->setDuals(nodeDuals);
 
                 r1c->setDuals(nodeDuals);
@@ -858,7 +782,7 @@ public:
                 paths = bucket_graph->solve();
                 // inner_obj = bucket_graph->inner_obj;
                 stage = bucket_graph->getStage();
-                ss    = bucket_graph->ss;
+                ss = bucket_graph->ss;
                 //////////////////////////////////////////////////////////////////////
 
                 // Adding cols
@@ -869,7 +793,8 @@ public:
                 auto rih_paths = ils.get_labels();
                 if (rih_paths.size() > 0) {
                     double inner_obj_rih = 0.0;
-                    auto   rih_added     = addColumn(node, rih_paths, inner_obj_rih, true);
+                    auto rih_added =
+                        addColumn(node, rih_paths, inner_obj_rih, true);
                     // colAdded += rih_added;
                 }
 #endif
@@ -879,59 +804,192 @@ public:
                 auto sch_paths = bucket_graph->getSchrodinger();
                 colAdded += addPath(node, sch_paths, true);
 #endif
+            };
+
+            /////////////////////////////////////////////////////////
+            // Solve with Stabilization
+            /////////////////////////////////////////////////////////
+
+#if defined(STAB) && defined(IPM)
+            if (stage >= 4) {
+                updateGraphAndSolve();
+            }
+#endif
 
 #ifdef STAB
+#if defined(STAB) && defined(IPM)
+            if (stage <= 3) {
+#endif
 
-                lag_gap = integer_solution - (lp_obj + numK * inner_obj);
-                auto d  = 50;
+                // define numK as the number of non-zero vars in solution
+                numK = std::ceil(
+                    std::accumulate(solution.begin(), solution.end(), 0.0));
+                double newBound = lp_obj + numK * inner_obj;
+                lag_gap = integer_solution - newBound;
+                bucket_graph->gap = lag_gap;
+                stab.set_pseudo_dual_bound(newBound);
+                stab.updateNumK(numK);
+                stab.update_stabilization_after_master_optim(nodeDuals);
+                stab.setObj(lp_obj);
+                nodeDuals = stab.getStabDualSolAdvanced(nodeDuals);
+
+                misprice = true;
+                while (misprice) {
+                    solution = node->extractSolution();
+#endif
+
+                    bool integer = true;
+#ifdef TR
+                    if (TRstop)
+#endif
+                    {
+                        for (auto sol : solution) {
+                            if (sol > 1e-1 && sol < 1 - 1e-1) {
+                                integer = false;
+                                break;
+                            }
+                        }
+                        // check if the lp_obj itself is within tolerance
+                        if (std::abs(std::round(lp_obj) - lp_obj) > 1e-2) {
+                            integer = false;
+                        }
+
+                        if (integer) {
+                            if (std::round(lp_obj) < integer_solution) {
+                                // print_info("Updating integer solution to
+                                // {}\n", std::round(lp_obj));
+                                integer_solution = std::round(lp_obj);
+                                bucket_graph->incumbent = integer_solution;
+#ifdef STAB
+                                stab.clearAlpha();
+#endif
+                            }
+                        }
+                    }
+#ifdef IPM_ACEL
+                    auto updateGapAndRunOptimization =
+                        [&](auto node, auto lp_obj, auto inner_obj,
+                            auto &ipm_solver, auto &iter_non_improv,
+                            auto &use_ipm_duals, auto &nodeDuals) {
+                            auto matrix = node->extractModelDataSparse();
+
+                            auto d = 10;
+                            // Compute gap based on current objective difference
+                            // and adaptive factor
+
+                            double gap =
+                                std::abs(lp_obj - (lp_obj + numK * inner_obj)) /
+                                std::abs(lp_obj + 1e-6);
+                            gap = (gap / d);
+
+                            // Enforce upper and lower bounds on gap
+                            if (std::isnan(gap) || std::signbit(gap)) {
+                                gap = 1e-1;
+                            }
+                            gap = std::clamp(gap, 1e-8, 1e-1);
+
+                            // Run optimization and adjust duals
+                            ipm_solver.run_optimization(matrix, gap);
+                            nodeDuals = ipm_solver.getDuals();
+                            for (auto &dual : nodeDuals) {
+                                dual = -dual;
+                            }
+                        };
+
+                    adaptive_threshold = std::max(
+                        base_threshold,
+                        base_threshold +
+                            iter / 100);  // Adapt with total iterations
+                    if (std::abs(lp_obj - lp_obj_old) < 1) {
+                        iter_non_improv += 1;
+                        if (iter_non_improv > adaptive_threshold) {
+                            if (stab.alpha > 0) {
+                                print_info(
+                                    "No improvement in the last iterations, "
+                                    "running "
+                                    "IPM\n");
+                                updateGapAndRunOptimization(
+                                    node, lp_obj, inner_obj, ipm_solver,
+                                    iter_non_improv, use_ipm_duals, nodeDuals);
+                                stab.define_smooth_dual_sol(nodeDuals);
+                                iter_non_improv = 0;
+                                use_ipm_duals = true;
+                            }
+                        }
+                    } else {
+                        iter_non_improv = 0;
+                    }
+#endif
+
+                    updateGraphAndSolve(nodeDuals);
+#ifdef STAB
+
+                    lag_gap = integer_solution - (lp_obj + numK * inner_obj);
+                    auto d = 50;
 #ifdef HIGHS
-                gap = std::abs(lp_obj - (lp_obj + std::min(0.0, inner_obj))) / std::abs(lp_obj);
-                gap = gap / d;
-                if (std::isnan(gap)) { gap = 1e-2; }
-                if (std::signbit(gap)) { gap = 1e-2; }
-                if (gap > 1e-4) { gap = 1e-4; }
+                    gap =
+                        std::abs(lp_obj - (lp_obj + std::min(0.0, inner_obj))) /
+                        std::abs(lp_obj);
+                    gap = gap / d;
+                    if (std::isnan(gap)) {
+                        gap = 1e-2;
+                    }
+                    if (std::signbit(gap)) {
+                        gap = 1e-2;
+                    }
+                    if (gap > 1e-4) {
+                        gap = 1e-4;
+                    }
 #endif
-                // fmt::print("Gap: {}\n", gap);
-                node->optimize(gap);
-                lp_obj_old = lp_obj;
-                lp_obj     = node->getObjVal();
-                nodeDuals  = node->getDuals();
+                    // fmt::print("Gap: {}\n", gap);
+                    node->optimize(gap);
+                    lp_obj_old = lp_obj;
+                    lp_obj = node->getObjVal();
+                    nodeDuals = node->getDuals();
 
-                // auto RC = node->mip.getMostViolatingReducedCost(nodeDuals);
+                    // auto RC =
+                    // node->mip.getMostViolatingReducedCost(nodeDuals);
 
-                bucket_graph->gap = lp_obj + numK * inner_obj;
+                    bucket_graph->gap = lp_obj + numK * inner_obj;
 
-                matrix      = node->extractModelDataSparse();
-                stab.lp_obj = lp_obj;
-                // stab.rc     = RC;
+                    matrix = node->extractModelDataSparse();
+                    stab.lp_obj = lp_obj;
+                    // stab.rc     = RC;
 
-                stab.update_stabilization_after_pricing_optim(matrix, nodeDuals, lag_gap, paths);
-                paths.clear();
-                if (stab.shouldExit()) { misprice = false; }
-                if (colAdded == 0) {
-                    stab.update_stabilization_after_misprice();
-                    nodeDuals = stab.getStabDualSolAdvanced(nodeDuals);
-                } else {
-                    misprice = false;
+                    stab.update_stabilization_after_pricing_optim(
+                        matrix, nodeDuals, lag_gap, paths);
+                    paths.clear();
+                    if (stab.shouldExit()) {
+                        misprice = false;
+                    }
+                    if (colAdded == 0) {
+                        stab.update_stabilization_after_misprice();
+                        nodeDuals = stab.getStabDualSolAdvanced(nodeDuals);
+                    } else {
+                        misprice = false;
+                    }
                 }
+
+                if (bucket_graph->getStatus() == Status::Optimal &&
+                    stab.shouldExit()) {
+                    print_info("Optimal solution found\n");
+                    break;
+                }
+
+                if ((colAdded == 0 || inner_obj > -1.0) && stage == 4) {
+                    force_cuts = true;
+                }
+
+                stab.update_stabilization_after_iter(nodeDuals);
+#if defined(STAB) && defined(IPM)
             }
-
-            if (bucket_graph->getStatus() == Status::Optimal && stab.shouldExit()) {
-                print_info("Optimal solution found\n");
-                break;
-            }
-
-            if ((colAdded == 0 || inner_obj > -1.0) && stage == 4) { force_cuts = true; }
-
-            stab.update_stabilization_after_iter(nodeDuals);
-
 #endif
-
-            auto   cur_alpha  = 0.0;
-            auto   n_cuts     = 0;
-            auto   n_rcc_cuts = 0;
-            double tr_val     = 0;
-            int    athreshold = 0;
+#endif
+            auto cur_alpha = 0.0;
+            auto n_cuts = 0;
+            auto n_rcc_cuts = 0;
+            double tr_val = 0;
+            int athreshold = 0;
 
 #ifdef IPM_ACEL
             athreshold = adaptive_threshold;
@@ -945,9 +1003,11 @@ public:
             RCC_MODE_BLOCK(n_rcc_cuts = rccManager->size();)
 
 #ifdef GUROBI
-            if (iter % 250 == 0 && stage == 4) {
-                auto toRemoveIndices = node->mip.reduceNonBasicVariables(0.8);
-                for (auto &index : toRemoveIndices) { allPaths.erase(allPaths.begin() + index); }
+            if (allPaths.size() > 5000) {
+                auto toRemoveIndices = node->mip.reduceNonBasicVariables(0.66);
+                for (auto &index : toRemoveIndices) {
+                    allPaths.erase(allPaths.begin() + index);
+                }
             }
 #endif
 
@@ -956,21 +1016,29 @@ public:
 #endif
             const int threshold = 1000000;
             if (iter % 10 == 0) {
-                fmt::print("| It.: {:4} | Obj.: {:8.2f} | Price: {:9.2f} | SRC: {:3} "
-                           "| RCC: {:3} | Paths: {:3} | "
-                           "Stage: {:1} | "
-                           "Lag.: {:10.4f} | α: {:4.2f} | tr: {:2.2f} | gap: {:2.4f} "
-                           "| Int.: {:>4} "
-                           "|\n",
-                           iter, lp_obj, inner_obj, n_cuts, n_rcc_cuts, colAdded, stage, lag_gap, cur_alpha, tr_val,
-                           gap, (integer_solution > threshold) ? "∞" : fmt::format("{:4}", integer_solution));
-                Logger::log("| It.: {:4} | Obj.: {:8.2f} | Price: {:9.2f} | SRC: {:3} "
-                            "| RCC: {:3} | Paths: {:3} | "
-                            "Stage: {:1} | "
-                            "Lag.: {:10.4f} | α: {:4.2f} | tr: {:2.2f} | gap: {:2.4f} "
-                            "|\n",
-                            iter, lp_obj, inner_obj, n_cuts, n_rcc_cuts, colAdded, stage, lag_gap, cur_alpha, tr_val,
-                            gap);
+                fmt::print(
+                    "| It.: {:4} | Obj.: {:8.2f} | Price: {:9.2f} | SRC: {:3} "
+                    "| RCC: {:3} | Paths: {:3} | "
+                    "Stage: {:1} | "
+                    "Lag.: {:>10} | α: {:4.2f} | tr: {:2.2f} | gap: {:2.4f} "
+                    "| Int.: {:>4} "
+                    "|\n",
+                    iter, lp_obj, inner_obj, n_cuts, n_rcc_cuts, colAdded,
+                    stage,
+                    (std::isinf(lag_gap)) ? "∞"
+                                          : fmt::format("{:10.4f}", lag_gap),
+                    cur_alpha, tr_val, gap,
+                    (integer_solution > threshold)
+                        ? "∞"
+                        : fmt::format("{:4}", integer_solution));
+                Logger::log(
+                    "| It.: {:4} | Obj.: {:8.2f} | Price: {:9.2f} | SRC: {:3} "
+                    "| RCC: {:3} | Paths: {:3} | "
+                    "Stage: {:1} | "
+                    "Lag.: {:10.4f} | α: {:4.2f} | tr: {:2.2f} | gap: {:2.4f} "
+                    "|\n",
+                    iter, lp_obj, inner_obj, n_cuts, n_rcc_cuts, colAdded,
+                    stage, lag_gap, cur_alpha, tr_val, gap);
             }
         }
         bucket_graph->print_statistics();
@@ -1008,7 +1076,7 @@ public:
         }
     }
 
-    static constexpr auto blue  = "\033[34m";
+    static constexpr auto blue = "\033[34m";
     static constexpr auto reset = "\033[0m";
 
     template <typename T>
@@ -1022,7 +1090,9 @@ public:
         // get solution in which x > 0.5 and print the corresponding allPaths
         std::vector<int> sol;
         for (int i = 0; i < allPaths.size(); i++) {
-            if (node->getVarValue(i) > 0.5) { sol.push_back(i); }
+            if (node->getVarValue(i) > 0.5) {
+                sol.push_back(i);
+            }
         }
 
         for (auto s : sol) {
@@ -1039,8 +1109,10 @@ public:
         fmt::print("\n");
 
         fmt::print("+---------------------------------------+\n");
-        fmt::print("| {:<14} | {}{:>20}{} |\n", "Bound", blue, relaxed_result / 10, reset);
-        fmt::print("| {:<14} | {}{:>20}{} |\n", "Incumbent", blue, ip_result / 10, reset);
+        fmt::print("| {:<14} | {}{:>20}{} |\n", "Bound", blue,
+                   relaxed_result / 10, reset);
+        fmt::print("| {:<14} | {}{:>20}{} |\n", "Incumbent", blue,
+                   ip_result / 10, reset);
         // fmt::print("| {:<14} | {}{:>16}.{:03}{} |\n", "CG Duration", blue,
         // duration_seconds, duration_milliseconds,
         //    reset);
@@ -1074,52 +1146,54 @@ public:
             node->setPrune(true);
             return false;
         }
-        auto &matrix         = node->matrix;
-        auto &allPaths       = node->paths;
+        auto &matrix = node->matrix;
+        auto &allPaths = node->paths;
         auto &branchingDuals = node->branchingDuals;
 
         int bucket_interval = 20;
-        int time_horizon    = instance.T_max;
+        int time_horizon = instance.T_max;
 
-        numConstrs                = node->getIntAttr("NumConstrs");
-        node->numConstrs          = numConstrs;
+        numConstrs = node->getIntAttr("NumConstrs");
+        node->numConstrs = numConstrs;
         std::vector<double> duals = std::vector<double>(numConstrs, 0.0);
 
         std::unique_ptr<BucketGraph> bucket_graph;
 
         if (problemType == ProblemType::vrptw) {
-            bucket_graph = std::make_unique<BucketGraph>(nodes, time_horizon, bucket_interval);
+            bucket_graph = std::make_unique<BucketGraph>(nodes, time_horizon,
+                                                         bucket_interval);
         } else if (problemType == ProblemType::cvrp) {
-            bucket_graph =
-                std::make_unique<BucketGraph>(nodes, time_horizon, bucket_interval, instance.q, bucket_interval);
+            bucket_graph = std::make_unique<BucketGraph>(
+                nodes, time_horizon, bucket_interval, instance.q,
+                bucket_interval);
         }
 
         // print distance matrix size
         bucket_graph->set_distance_matrix(instance.getDistanceMatrix(), 8);
         bucket_graph->branching_duals = branchingDuals;
-        bucket_graph->A_MAX           = N_SIZE;
+        bucket_graph->A_MAX = N_SIZE;
 
         // node->optimize();
         matrix = node->extractModelDataSparse();
         // auto integer_solution = node->getObjVal();
-        auto integer_solution   = node->integer_sol;
+        auto integer_solution = node->integer_sol;
         bucket_graph->incumbent = integer_solution;
 
         auto allNodes = bucket_graph->getNodes();
 
         std::vector<double> cutDuals;
         std::vector<double> nodeDuals = node->getDuals();
-        auto                sizeDuals = nodeDuals.size();
+        auto sizeDuals = nodeDuals.size();
 
         double lp_obj_dual = 0.0;
-        double lp_obj      = node->getObjVal();
+        double lp_obj = node->getObjVal();
 
         bucket_graph->setup();
 
         double gap = 1e-6;
 
-        bool ss    = false;
-        int  stage = 1;
+        bool ss = false;
+        int stage = 1;
 
         bool TRstop = false;
 
@@ -1127,10 +1201,10 @@ public:
 
         double lag_gap = 0.0;
 
-        auto                 inner_obj = 0.0;
+        auto inner_obj = 0.0;
         std::vector<Label *> paths;
-        std::vector<double>  solution = node->extractSolution();
-        bool                 can_add  = true;
+        std::vector<double> solution = node->extractSolution();
+        bool can_add = true;
 
 #ifdef STAB
         Stabilization stab(0.5, nodeDuals);
@@ -1139,10 +1213,10 @@ public:
 
         bool transition = false;
 
-        bool   rcc         = false;
-        bool   reoptimized = false;
+        bool rcc = false;
+        bool reoptimized = false;
         double obj;
-        auto   colAdded = 0;
+        auto colAdded = 0;
 
         RCC_MODE_BLOCK(auto &rccManager = node->rccManager;)
 
@@ -1156,7 +1230,7 @@ public:
             misprice = true;
             while (misprice) {
                 nodeDuals = stab.getStabDualSol(nodeDuals);
-                solution  = node->extractSolution();
+                solution = node->extractSolution();
 #else
             node->optimize();
             solution = node->extractSolution();
@@ -1172,12 +1246,14 @@ public:
                     }
                 }
                 // check if the lp_obj itself is within tolerance
-                if (std::abs(std::round(lp_obj) - lp_obj) > 1e-2) { integer = false; }
+                if (std::abs(std::round(lp_obj) - lp_obj) > 1e-2) {
+                    integer = false;
+                }
 
                 if (integer) {
                     if (lp_obj < integer_solution) {
                         print_info("Updating integer solution to {}\n", lp_obj);
-                        integer_solution        = lp_obj;
+                        integer_solution = lp_obj;
                         bucket_graph->incumbent = integer_solution;
                     }
                 }
@@ -1188,10 +1264,13 @@ public:
                 }
 
                 bucket_graph->relaxation = lp_obj;
-                bucket_graph->augment_ng_memories(solution, allPaths, true, 5, 100, 16, N_SIZE);
+                bucket_graph->augment_ng_memories(solution, allPaths, true, 5,
+                                                  100, 16, N_SIZE);
 
                 // Branching duals
-                if (branchingDuals->size() > 0) { branchingDuals->computeDuals(node); }
+                if (branchingDuals->size() > 0) {
+                    branchingDuals->computeDuals(node);
+                }
                 bucket_graph->setDuals(nodeDuals);
 
                 //////////////////////////////////////////////////////////////////////
@@ -1200,7 +1279,7 @@ public:
                 paths = bucket_graph->solveHeuristic();
                 // inner_obj = paths[0]->cost;
                 stage = bucket_graph->getStage();
-                ss    = bucket_graph->ss;
+                ss = bucket_graph->ss;
                 //////////////////////////////////////////////////////////////////////
 
                 // Adding cols
@@ -1214,22 +1293,27 @@ public:
 
                 nodeDuals = node->getDuals();
 
-                lag_gap           = integer_solution - (lp_obj + std::min(0.0, inner_obj));
+                lag_gap =
+                    integer_solution - (lp_obj + std::min(0.0, inner_obj));
                 bucket_graph->gap = lag_gap;
 
                 matrix = node->extractModelDataSparse();
 
-                stab.update_stabilization_after_pricing_optim(matrix, nodeDuals, lag_gap, paths);
+                stab.update_stabilization_after_pricing_optim(matrix, nodeDuals,
+                                                              lag_gap, paths);
 
                 if (colAdded == 0) {
                     stab.update_stabilization_after_misprice();
-                    if (stab.shouldExit()) { misprice = false; }
+                    if (stab.shouldExit()) {
+                        misprice = false;
+                    }
                 } else {
                     misprice = false;
                 }
             }
 
-            if (bucket_graph->getStatus() == Status::Optimal && stab.shouldExit()) {
+            if (bucket_graph->getStatus() == Status::Optimal &&
+                stab.shouldExit()) {
                 print_info("Optimal solution found\n");
                 break;
             }
