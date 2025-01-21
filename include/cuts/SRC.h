@@ -132,7 +132,7 @@ class LimitedMemoryRank1Cuts {
     double computeLimitedMemoryCoefficient(
         const std::array<uint64_t, num_words> &C,
         const std::array<uint64_t, num_words> &AM, const SRCPermutation &p,
-        const std::vector<uint16_t> &P, std::vector<int> &order);
+        const std::vector<uint16_t> &P, std::vector<int> &order) noexcept;
 
     std::pair<bool, bool> runSeparation(
         BNBNode *node, std::vector<baldesCtrPtr> &SRCconstraints);

@@ -175,7 +175,6 @@ void BucketGraph::define_buckets() {
     const int num_intervals = options.main_resources.size();
     std::vector<double> total_ranges(num_intervals);
     std::vector<double> base_intervals(num_intervals);
-    const double min_bucket_size = 0.1;  // Define at the start
 
     // Get references to direction-specific containers
     auto &num_buckets = assign_buckets<D>(num_buckets_fw, num_buckets_bw);
@@ -186,16 +185,8 @@ void BucketGraph::define_buckets() {
     auto &buckets_size = assign_buckets<D>(fw_buckets_size, bw_buckets_size);
     auto &bucket_splits = assign_buckets<D>(fw_bucket_splits, bw_bucket_splits);
 
-    // Calculate total resource ranges for better bucket sizing
-    for (int r = 0; r < num_intervals; ++r) {
-        total_ranges[r] = R_max[r] - R_min[r];
-        base_intervals[r] = total_ranges[r] / intervals[r].interval;
-    }
-
     // Pre-allocate containers
     const size_t num_nodes = nodes.size();
-    const size_t estimated_buckets_per_node = intervals[0].interval;
-    buckets.reserve(num_nodes * estimated_buckets_per_node);
     num_buckets.resize(num_nodes);
     num_buckets_index.resize(num_nodes);
     node_interval_trees.assign(num_nodes, SplayTree());
@@ -221,53 +212,25 @@ void BucketGraph::define_buckets() {
     int bucket_index = 0;
 
     // Temporary vectors for interval calculations
-    std::vector<double> interval_lb(num_intervals);
-    std::vector<double> interval_ub(num_intervals);
+    std::vector<double> interval_start(num_intervals);
+    std::vector<double> interval_end(num_intervals);
     std::vector<int> pos(num_intervals, 0);
 
     // Process each node
     for (const auto &VRPNode : nodes) {
         std::vector<double> node_base_interval(num_intervals);
 
-        // Improved bucket split calculation
+        // check if fw_bucket_splits with node_id exists
         if (bucket_splits.find(VRPNode.id) == bucket_splits.end()) {
-            double max_range_ratio = 0.0;
             for (int r = 0; r < num_intervals; ++r) {
-                double node_range = VRPNode.ub[r] - VRPNode.lb[r];
-                double range_ratio = node_range / total_ranges[r];
-                max_range_ratio = std::max(max_range_ratio, range_ratio);
+                node_base_interval[r] =
+                    (VRPNode.ub[r] - VRPNode.lb[r]) / intervals[r].interval;
             }
-
-            // Adjust splits based on node's resource usage and constraints
-            int base_splits = intervals[0].interval;
-            double utilization_factor = 1.0;
-
-            // Consider time window and resource constraints
+            bucket_splits[VRPNode.id] = intervals[0].interval;
+        } else {
             for (int r = 0; r < num_intervals; ++r) {
-                double resource_tightness =
-                    (VRPNode.ub[r] - VRPNode.lb[r]) / total_ranges[r];
-                utilization_factor *= (1.0 + (1.0 - resource_tightness));
-            }
-
-            int adjusted_splits =
-                std::max(2,  // minimum 2 buckets
-                         static_cast<int>(base_splits * max_range_ratio *
-                                          utilization_factor));
-
-            bucket_splits[VRPNode.id] = adjusted_splits;
-        }
-
-        // Calculate base intervals
-        for (int r = 0; r < num_intervals; ++r) {
-            node_base_interval[r] =
-                (VRPNode.ub[r] - VRPNode.lb[r]) / bucket_splits[VRPNode.id];
-
-            // Ensure minimum bucket size
-            if (node_base_interval[r] < min_bucket_size) {
-                node_base_interval[r] = min_bucket_size;
-                bucket_splits[VRPNode.id] = std::max(
-                    2, static_cast<int>((VRPNode.ub[r] - VRPNode.lb[r]) /
-                                        min_bucket_size));
+                node_base_interval[r] =
+                    (VRPNode.ub[r] - VRPNode.lb[r]) / bucket_splits[VRPNode.id];
             }
         }
 
@@ -281,63 +244,52 @@ void BucketGraph::define_buckets() {
                     VRPNode.lb[0], VRPNode.ub[0], node_base_interval[0], j,
                     bucket_splits[VRPNode.id], D == Direction::Forward);
 
-                interval_lb[0] = start;
-                interval_ub[0] = end;
+                interval_start[0] = start;
+                interval_end[0] = end;
 
                 if constexpr (D == Direction::Backward) {
-                    interval_lb[0] = std::max(interval_lb[0], VRPNode.lb[0]);
+                    interval_start[0] =
+                        std::max(interval_start[0], VRPNode.lb[0]);
                 } else {
-                    interval_ub[0] = std::min(interval_ub[0], VRPNode.ub[0]);
+                    interval_end[0] = std::min(interval_end[0], VRPNode.ub[0]);
                 }
 
-                // Only create bucket if it has meaningful width
-                if (end - start >= min_bucket_size) {
-                    buckets.push_back(
-                        Bucket(VRPNode.id, interval_lb, interval_ub));
-                    node_tree.insert(interval_lb, interval_ub, bucket_index++);
-                    n_buckets++;
-                    cum_sum++;
-                }
+                buckets.push_back(
+                    Bucket(VRPNode.id, interval_start, interval_end));
+                node_tree.insert(interval_start, interval_end, bucket_index++);
+                n_buckets++;
+                cum_sum++;
             }
         } else {
+            fmt::print("Multiple intervals\n");
             // Multiple intervals case
             std::fill(pos.begin(), pos.end(), 0);
             do {
-                bool valid_bucket = true;
                 for (int r = 0; r < num_intervals; ++r) {
                     auto [start, end] = calculate_interval(
                         VRPNode.lb[r], VRPNode.ub[r], node_base_interval[r],
-                        pos[r], bucket_splits[VRPNode.id],
-                        D == Direction::Forward);
+                        pos[r], intervals[r].interval, D == Direction::Forward);
 
-                    interval_lb[r] = start;
-                    interval_ub[r] = end;
+                    interval_start[r] = start;
+                    interval_end[r] = end;
 
                     if constexpr (D == Direction::Backward) {
-                        interval_lb[r] = std::max(interval_lb[r], R_min[r]);
+                        interval_start[r] =
+                            std::max(interval_start[r], R_min[r]);
                     } else {
-                        interval_ub[r] = std::min(interval_ub[r], R_max[r]);
-                    }
-
-                    // Check if this dimension has a valid bucket size
-                    if (end - start < min_bucket_size) {
-                        valid_bucket = false;
-                        break;
+                        interval_end[r] = std::min(interval_end[r], R_max[r]);
                     }
                 }
 
-                if (valid_bucket) {
-                    buckets.push_back(
-                        Bucket(VRPNode.id, interval_lb, interval_ub));
-                    node_tree.insert(interval_lb, interval_ub, bucket_index++);
-                    n_buckets++;
-                    cum_sum++;
-                }
+                buckets.push_back(
+                    Bucket(VRPNode.id, interval_start, interval_end));
+                node_tree.insert(interval_start, interval_end, bucket_index++);
+                n_buckets++;
+                cum_sum++;
 
                 // Generate next combination
                 int i = 0;
-                while (i < num_intervals &&
-                       ++pos[i] >= bucket_splits[VRPNode.id]) {
+                while (i < num_intervals && ++pos[i] >= intervals[i].interval) {
                     pos[i] = 0;
                     i++;
                 }
@@ -403,6 +355,7 @@ void BucketGraph::define_buckets() {
 
     buckets_size = buckets.size();
 }
+
 /**
  * @brief Generates arcs in the bucket graph based on the specified direction.
  *

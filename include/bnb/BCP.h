@@ -511,7 +511,7 @@ class VRProblem {
         auto &branchingDuals = node->branchingDuals;
         RCC_MODE_BLOCK(auto &rccManager = node->rccManager;)
 
-        int bucket_interval = 20;
+        int bucket_interval = 100;
         int time_horizon = instance.T_max;
         // if (problemType == ProblemType::cvrp) { time_horizon = 50000; }
         numConstrs = node->getIntAttr("NumConstrs");
@@ -1025,7 +1025,7 @@ class VRProblem {
                     "|\n",
                     iter, lp_obj, inner_obj, n_cuts, n_rcc_cuts, colAdded,
                     stage,
-                    (std::isinf(lag_gap)) ? "∞"
+                    (lag_gap > threshold) ? "∞"
                                           : fmt::format("{:10.4f}", lag_gap),
                     cur_alpha, tr_val, gap,
                     (integer_solution > threshold)
@@ -1229,7 +1229,7 @@ class VRProblem {
             stab.update_stabilization_after_master_optim(nodeDuals);
             misprice = true;
             while (misprice) {
-                nodeDuals = stab.getStabDualSol(nodeDuals);
+                nodeDuals = stab.getStabDualSolAdvanced(nodeDuals);
                 solution = node->extractSolution();
 #else
             node->optimize();

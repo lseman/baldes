@@ -18,8 +18,8 @@
 
 #include "Cut.h"
 #include "Definitions.h"
+#include "HeuristicHighOrder.h"
 #include "bnb/Node.h"
-
 #ifdef IPM
 #include "ipm/IPSolver.h"
 #endif
@@ -484,7 +484,7 @@ std::pair<bool, bool> LimitedMemoryRank1Cuts::runSeparation(
 double LimitedMemoryRank1Cuts::computeLimitedMemoryCoefficient(
     const std::array<uint64_t, num_words> &C,
     const std::array<uint64_t, num_words> &AM, const SRCPermutation &p,
-    const std::vector<uint16_t> &P, std::vector<int> &order) {
+    const std::vector<uint16_t> &P, std::vector<int> &order) noexcept {
     double alpha = 0.0;
     int S = 0;
     auto den = p.den;
