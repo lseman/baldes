@@ -11,8 +11,12 @@
  **/
 #pragma once
 
+#include <algorithm>
 #include <iostream>
+#include <limits>
 #include <numeric>
+#include <string>
+#include <vector>
 
 #include "bnb/Node.h"
 #include "config.h"
@@ -24,8 +28,11 @@ class TrustRegion {
     static constexpr double MIN_V = 10.0;
     static constexpr double CURVATURE_RATE =
         0.1;  // Similar to StabilFuncCurvatureAdvanceRate
+    static constexpr double MAX_V = 1000.0;
+    static constexpr double MAX_DUAL_CHANGE = 1000.0;
+    static constexpr double MAX_EPSILON = 1000.0;
+    static constexpr int HISTORY_SIZE = 5;
 
-   public:
     bool isInsideTrustRegion;
     int numConstrs;
     std::vector<baldesVarPtr> w;     // Inner piece variables (w_i)
@@ -33,6 +40,8 @@ class TrustRegion {
     std::vector<double> delta1;      // Lower bounds
     std::vector<double> delta2;      // Upper bounds
     std::vector<double> prevDuals;   // Previous dual values
+    std::vector<double>
+        diffHistory;  // History of differences for adaptive adjustments
 
     double v;      // Trust region size
     double c;      // Scaling factor
@@ -48,6 +57,7 @@ class TrustRegion {
     double prev_inner_obj;
     double inner_obj;  // Current inner objective value
 
+   public:
     TrustRegion(int numConstrs)
         : numConstrs(numConstrs),
           v(INIT_V),
@@ -129,10 +139,10 @@ class TrustRegion {
         print_info("Starting trust region with v = {}\n", v);
     }
 
-    double calculateAverageDifference(const std::vector<double>& nodeDuals) {
+    double calculateAverageDifference(const std::vector<double> &nodeDuals) {
         double differenceSum = 0.0;
         int numStabConstraints = 0;
-        
+
         for (size_t i = 0; i < numConstrs; i++) {
             if (!prevDuals.empty()) {  // Check if we have previous duals
                 double value = std::abs(nodeDuals[i] - prevDuals[i]);
@@ -140,20 +150,25 @@ class TrustRegion {
                 numStabConstraints++;
             }
         }
-        
-        return numStabConstraints > 0 ? differenceSum / numStabConstraints : 0.0;
+
+        return numStabConstraints > 0 ? differenceSum / numStabConstraints
+                                      : 0.0;
     }
 
-        double calculateTRScaling() {
+    double calculateTRScaling() {
         // Base scaling of 1.0
         double scaling = 1.0;
-        
+
         // Adjust based on history stability
         if (diffHistory.size() >= 2) {
-            double recentVariation = std::abs(diffHistory.back() - diffHistory[diffHistory.size() - 2]);
-            double historyAvg = std::accumulate(diffHistory.begin(), diffHistory.end(), 0.0) / diffHistory.size();
-            
-            // If recent variation is high, increase scaling to be more conservative
+            double recentVariation = std::abs(
+                diffHistory.back() - diffHistory[diffHistory.size() - 2]);
+            double historyAvg =
+                std::accumulate(diffHistory.begin(), diffHistory.end(), 0.0) /
+                diffHistory.size();
+
+            // If recent variation is high, increase scaling to be more
+            // conservative
             if (recentVariation > historyAvg * 1.5) {
                 scaling *= 1.2;
             }
@@ -162,40 +177,39 @@ class TrustRegion {
                 scaling *= 0.9;
             }
         }
-        
+
         // Ensure scaling stays in reasonable range
         return std::max(0.5, std::min(scaling, 2.0));
     }
 
-
-    // Add new members for history tracking
-    static constexpr int HISTORY_SIZE = 5;
-    std::vector<double> diffHistory;
-
-    void updatePenaltyFunction(const std::vector<double>& nodeDuals) {
+    void updatePenaltyFunction(const std::vector<double> &nodeDuals) {
         // Calculate current difference and update history
         double currentDiff = calculateAverageDifference(nodeDuals);
         diffHistory.push_back(currentDiff);
         if (diffHistory.size() > HISTORY_SIZE) {
             diffHistory.erase(diffHistory.begin());
         }
-        
+
         // Calculate moving average for more stable updates
-        double avgDiff = std::accumulate(diffHistory.begin(), diffHistory.end(), 0.0) / diffHistory.size();
-        
+        double avgDiff =
+            std::accumulate(diffHistory.begin(), diffHistory.end(), 0.0) /
+            diffHistory.size();
+
         // Smoother transition in penalty updates
         if (savedInnerInterval == 0.0) {
             savedInnerInterval = avgDiff;
         } else {
             double alpha = calculateAdaptiveRate();
-            savedInnerInterval = savedInnerInterval + (avgDiff - savedInnerInterval) * alpha;
+            savedInnerInterval =
+                savedInnerInterval + (avgDiff - savedInnerInterval) * alpha;
         }
-        
+
         // More robust interval calculations
         if (savedInnerInterval < std::numeric_limits<double>::infinity()) {
-            innerHalfInterval = savedInnerInterval * calculateAdaptiveHalfInterval();
+            innerHalfInterval =
+                savedInnerInterval * calculateAdaptiveHalfInterval();
             v = savedInnerInterval / (c * calculateTRScaling());
-            
+
             // Add safeguards for v
             v = std::max(MIN_V, std::min(v, MAX_V));
         } else {
@@ -206,23 +220,28 @@ class TrustRegion {
 
     double calculateAdaptiveRate() {
         if (std::abs(prev_inner_obj) < EPSILON) {
-            return CURVATURE_RATE;  // Default rate if prev_inner_obj is close to zero
+            return CURVATURE_RATE;  // Default rate if prev_inner_obj is close
+                                    // to zero
         }
-        
+
         // Adjust rate based on optimization progress
-        return std::min(CURVATURE_RATE * (1.0 + std::abs(prev_inner_obj - inner_obj) / 
-               std::max(std::abs(prev_inner_obj), 1.0)), 0.5);
+        return std::min(CURVATURE_RATE *
+                            (1.0 + std::abs(prev_inner_obj - inner_obj) /
+                                       std::max(std::abs(prev_inner_obj), 1.0)),
+                        0.5);
     }
-    
+
     double calculateAdaptiveHalfInterval() {
         // Start with base factor of 0.5
         double factor = 0.5;
-        
+
         // Adjust based on history if available
         if (!diffHistory.empty()) {
-            double avgDiff = std::accumulate(diffHistory.begin(), diffHistory.end(), 0.0) / diffHistory.size();
+            double avgDiff =
+                std::accumulate(diffHistory.begin(), diffHistory.end(), 0.0) /
+                diffHistory.size();
             double latestDiff = diffHistory.back();
-            
+
             // If recent changes are smaller than average, reduce interval
             if (latestDiff < avgDiff * 0.8) {
                 factor *= 0.9;
@@ -232,7 +251,7 @@ class TrustRegion {
                 factor *= 1.1;
             }
         }
-        
+
         // Ensure factor stays in reasonable range
         return std::max(0.3, std::min(factor, 0.7));
     }
@@ -331,10 +350,6 @@ class TrustRegion {
     bool stop() { return TRstop; }
 
    private:
-    static constexpr double MAX_V = 1000.0;
-    static constexpr double MAX_DUAL_CHANGE = 1000.0;
-    static constexpr double MAX_EPSILON = 1000.0;
-
     void cleanup(BNBNode *node) {
         v = 0;
         int counter = 0;

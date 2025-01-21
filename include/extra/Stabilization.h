@@ -144,21 +144,21 @@ class Stabilization {
         sizeDual = mast_dual_sol.size();
     }
 
-    DualSolution getStabDualSol(const DualSolution &input_duals) {
-        std::vector<double> master_dual;
-        master_dual.assign(input_duals.begin(), input_duals.begin() + sizeDual);
-        if (cur_stab_center.empty()) {
-            return master_dual;
-        }
-        DualSolution stab_dual_sol(master_dual.size());
-        for (size_t i = 0; i < master_dual.size(); ++i) {
-            stab_dual_sol[i] =
-                std::max(0.0, cur_alpha * cur_stab_center[i] +
-                                  (1 - cur_alpha) * master_dual[i]);
-        }
-        smooth_dual_sol = stab_dual_sol;
-        return stab_dual_sol;
-    }
+    // DualSolution getStabDualSol(const DualSolution &input_duals) {
+    //     std::vector<double> master_dual;
+    //     master_dual.assign(input_duals.begin(), input_duals.begin() +
+    //     sizeDual); if (cur_stab_center.empty()) {
+    //         return master_dual;
+    //     }
+    //     DualSolution stab_dual_sol(master_dual.size());
+    //     for (size_t i = 0; i < master_dual.size(); ++i) {
+    //         stab_dual_sol[i] =
+    //             std::max(0.0, cur_alpha * cur_stab_center[i] +
+    //                               (1 - cur_alpha) * master_dual[i]);
+    //     }
+    //     smooth_dual_sol = stab_dual_sol;
+    //     return stab_dual_sol;
+    // }
 
     inline double norm(const std::vector<double> &vector) {
         double res = 0;
@@ -177,24 +177,6 @@ class Stabilization {
         return std::sqrt(res + 1e-8);
     }
 
-    inline std::vector<double> mult(const std::vector<double> &v,
-                                    const std::vector<double> &w) {
-        std::vector<double> res(v.size(), 0.0);
-        for (size_t i = 0; i < v.size(); ++i) {
-            res[i] = v[i] * w[i];
-        }
-        return res;
-    }
-
-    inline std::vector<double> sub(const std::vector<double> &v,
-                                   const std::vector<double> &w) {
-        std::vector<double> res(v.size(), 0.0);
-        for (size_t i = 0; i < v.size(); ++i) {
-            res[i] = v[i] - w[i];
-        }
-        return res;
-    }
-
     DualSolution getStabDualSolAdvanced(const DualSolution &input_duals) {
         constexpr double EPSILON = 1e-12;
 
@@ -202,7 +184,7 @@ class Stabilization {
                                input_duals.begin() + sizeDual);
 
         if (cur_stab_center.empty() || subgradient.empty()) {
-            return getStabDualSol(input_duals);
+            return input_duals;
         }
 
         const size_t n = nodeDuals.size();
@@ -266,50 +248,6 @@ class Stabilization {
         return new_duals;
     }
 
-    static constexpr double LARGE_NUMBER = 1e+6;
-    inline double safeAdd(double a, double b) {
-        if (std::abs(a) > LARGE_NUMBER || std::abs(b) > LARGE_NUMBER) {
-            return std::copysign(LARGE_NUMBER, a + b);
-        }
-        return a + b;
-    }
-
-    inline double safeMult(double a, double b) {
-        if (std::abs(a) < EPSILON || std::abs(b) < EPSILON) {
-            return 0.0;
-        }
-        if (std::abs(a) > LARGE_NUMBER || std::abs(b) > LARGE_NUMBER) {
-            return std::copysign(LARGE_NUMBER, a * b);
-        }
-        return a * b;
-    }
-
-    inline double safeDiv(double a, double b) {
-        if (std::abs(b) < EPSILON) {
-            return (std::abs(a) < EPSILON) ? 0.0
-                                           : std::copysign(LARGE_NUMBER, a);
-        }
-        return a / b;
-    }
-
-    inline double safeNorm(const std::vector<double> &v1,
-                           const std::vector<double> &v2) {
-        double sum = 0.0;
-        for (size_t i = 0; i < v1.size(); ++i) {
-            double diff = v2[i] - v1[i];
-            sum = safeAdd(sum, safeMult(diff, diff));
-        }
-        return std::sqrt(sum + EPSILON);
-    }
-
-    inline double safeNorm(const std::vector<double> &v) {
-        double sum = 0.0;
-        for (size_t i = 0; i < v.size(); ++i) {
-            sum = safeAdd(sum, safeMult(v[i], v[i]));
-        }
-        return std::sqrt(sum + EPSILON);
-    }
-
     static constexpr double EPSILON = 1e-12;
 
     bool dynamic_alpha_schedule(const ModelData &dados) {
@@ -348,31 +286,27 @@ class Stabilization {
             cos_angle += normalized_direction[i] * normalized_subgradient[i];
         }
 
-        return cos_angle < 0;
+        return cos_angle < 1e-3;
     }
 
     void update_subgradient(const ModelData &dados,
                             const DualSolution &nodeDuals,
                             const std::vector<Label *> &best_pricing_cols) {
         size_t number_of_rows = nodeDuals.size();
-
         new_rows.assign(number_of_rows, 0.0);
 
-        auto best_pricing_col = best_pricing_cols[0];
-
-        for (const auto &node : best_pricing_col->nodes_covered) {
-            if (node > 0 && node != N_SIZE - 1) {
-                new_rows[node - 1] += 1.0;
+        for (const auto &col : best_pricing_cols) {
+            for (const auto &node : col->nodes_covered) {
+                if (node > 0 && node != N_SIZE - 1) {
+                    new_rows[node - 1] += 1.0;
+                }
             }
         }
 
         subgradient.assign(number_of_rows, 0.0);
-
-        std::vector<double> most_reduced_cost_column = new_rows;
-
-        std::transform(dados.b.begin(), dados.b.end(),
-                       most_reduced_cost_column.begin(), subgradient.begin(),
-                       [this](double a, double b) { return a - numK * b; });
+        for (size_t i = 0; i < number_of_rows; ++i) {
+            subgradient[i] = dados.b[i] - numK * new_rows[i];
+        }
 
         subgradient_norm = norm(subgradient);
     }
@@ -392,24 +326,26 @@ class Stabilization {
         std::vector<double> nodeDuals(input_duals.begin(),
                                       input_duals.begin() + sizeDual);
 
-        double lp_obj_rounded = std::round(lp_obj);
-        // Check if lag_gap has changed
-        if (lp_obj_rounded == lp_obj_prev) {
-            no_progress_count++;
-        } else {
-            no_progress_count = 0;  // Reset the counter if lag_gap changes
+        // Add the current dual solution to the MultiPointManager
+        mp_manager.updatePool(nodeDuals, lp_obj);
+
+        // Use historical dual solutions to compute a weighted average
+        DualSolution historical_avg = mp_manager.getWeightedSolution();
+        if (!historical_avg.empty()) {
+            // Blend the current dual solution with the historical average
+            for (size_t i = 0; i < nodeDuals.size(); ++i) {
+                nodeDuals[i] = 0.7 * nodeDuals[i] + 0.3 * historical_avg[i];
+            }
         }
-        lp_obj_prev = lp_obj_rounded;
 
-        // If lag_gap remains constant for 3 iterations, set alpha to zero
-        // if (no_progress_count >= NO_PROGRESS_THRESHOLD) {
-        //     alpha = 0.0;
-        //     base_alpha = 0.0;
-        //     no_progress_count =
-        //         0;  // Reset the counter after setting alpha to zero
-        //     update_subgradient(dados, nodeDuals, best_pricing_cols);
-
+        // double lp_obj_rounded = std::round(lp_obj);
+        // if (lp_obj_rounded == lp_obj_prev) {
+        //     no_progress_count++;
         // } else {
+        //     no_progress_count = 0;
+        // }
+        // lp_obj_prev = lp_obj_rounded;
+
         if (nb_misprices == 0) {
             update_subgradient(dados, nodeDuals, best_pricing_cols);
             bool should_increase = dynamic_alpha_schedule(dados);
@@ -425,7 +361,6 @@ class Stabilization {
                 base_alpha = alpha;
             }
         }
-        // }
 
         DualSolution stab_sol = smooth_dual_sol;
 

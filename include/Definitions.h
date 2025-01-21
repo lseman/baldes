@@ -44,7 +44,7 @@ struct BucketOptions {
     std::vector<int> resource_type = {1};
     std::vector<int> or_resources = {1};
 
-    int n_warm_start = 20;
+    int n_warm_start = 25;
 
     bool warm_start = true;
 

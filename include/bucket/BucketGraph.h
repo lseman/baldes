@@ -822,6 +822,14 @@ class BucketGraph {
             0.15;  // Slightly lower base threshold
         const double MIN_ADJUSTMENT_FACTOR = 0.02;
         const double MAX_ADJUSTMENT_FACTOR = 0.10;
+        const double LEARNING_RATE_DECAY =
+            0.99;                      // Decay factor for learning rate
+        const double EMA_ALPHA = 0.1;  // Smoothing factor for EMA
+
+        static double learning_rate =
+            MAX_ADJUSTMENT_FACTOR;  // Initialize learning rate
+        static double ema_imbalance_ratio =
+            0.0;  // Initialize EMA of imbalance ratio
 
         // Calculate label counts and ratios
         double fw_labels = static_cast<double>(n_fw_labels);
@@ -836,26 +844,32 @@ class BucketGraph {
         double bw_ratio = bw_labels / total_labels;
         double imbalance_ratio = std::abs(fw_ratio - bw_ratio);
 
+        // Update EMA of imbalance ratio
+        ema_imbalance_ratio =
+            EMA_ALPHA * imbalance_ratio + (1 - EMA_ALPHA) * ema_imbalance_ratio;
+
         // Dynamic threshold based on total number of labels
         // As we get more labels, we can be more sensitive to imbalance
         double dynamic_threshold =
-            BASE_IMBALANCE_THRESHOLD *
-            std::exp(-total_labels /
-                     1000.0);  // Decrease threshold as labels increase
+            BASE_IMBALANCE_THRESHOLD * std::exp(-total_labels / 1000.0);
 
-        if (imbalance_ratio > dynamic_threshold) {
+        if (ema_imbalance_ratio > dynamic_threshold) {
             // Calculate adaptive adjustment factor
             // More severe imbalance = larger adjustment
-            double severity = (imbalance_ratio - dynamic_threshold) /
+            double severity = (ema_imbalance_ratio - dynamic_threshold) /
                               (1.0 - dynamic_threshold);
             double adjustment_factor =
                 MIN_ADJUSTMENT_FACTOR +
                 (MAX_ADJUSTMENT_FACTOR - MIN_ADJUSTMENT_FACTOR) * severity;
 
+            // Adjust learning rate based on the severity of imbalance
+            learning_rate *= LEARNING_RATE_DECAY;
+
             // Adjust based on resource range
             double resource_range = R_max[options.main_resources[0]] -
                                     R_min[options.main_resources[0]];
-            double base_adjustment = adjustment_factor * resource_range;
+            double base_adjustment =
+                adjustment_factor * resource_range * learning_rate;
 
             // Scale adjustment based on current split position
             for (size_t i = 0; i < q_star.size(); ++i) {
@@ -883,8 +897,9 @@ class BucketGraph {
 
             if (std::abs(base_adjustment) > resource_range * 0.05) {
                 print_info(
-                    "Split adjustment: imbalance={:.3f}, adjustment={:.3f}\n",
-                    imbalance_ratio, base_adjustment);
+                    "Split adjustment: imbalance={:.3f}, adjustment={:.3f}, "
+                    "learning_rate={:.3f}\n",
+                    ema_imbalance_ratio, base_adjustment, learning_rate);
             }
         }
     }
