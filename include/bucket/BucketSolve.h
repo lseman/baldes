@@ -39,6 +39,7 @@
 #include <execution>
 
 #include "../third_party/small_vector.hpp"
+#include "BucketUtils.h"
 
 /**
  * Solves the bucket graph optimization problem using a multi-stage bi-labeling
@@ -219,7 +220,7 @@ inline std::vector<Label *> BucketGraph::solveHeuristic() {
  */
 template <Direction D, Stage S, Full F>
 std::vector<double> BucketGraph::labeling_algorithm() {
-    // Use references to avoid repeated lookups
+    // Get references to avoid repeated lookups
     auto &buckets = assign_buckets<D>(fw_buckets, bw_buckets);
     auto &ordered_sccs = assign_buckets<D>(fw_ordered_sccs, bw_ordered_sccs);
     auto &topological_order =
@@ -235,13 +236,12 @@ std::vector<double> BucketGraph::labeling_algorithm() {
 
     n_labels = 0;
 
-    // Pre-calculate segment info
-    const size_t n_segments = (n_buckets + 63) / 64;
+    // Pre-calculate segment info using bit shift for better performance
+    const size_t n_segments = (n_buckets + 63) >> 6;
     std::vector<uint64_t> Bvisited(n_segments);
 
-    // Preallocate vector for new labels to avoid repeated allocations
+    // Use small vector optimization for new labels
     std::vector<Label *> new_labels;
-    new_labels.reserve(4);  // Adjust size based on typical usage
 
     // Process SCCs in topological order
     for (const auto &scc_index : topological_order) {
@@ -253,164 +253,137 @@ std::vector<double> BucketGraph::labeling_algorithm() {
             for (const auto bucket : sorted_sccs[scc_index]) {
                 // Cache bucket labels reference
                 const auto &bucket_labels = buckets[bucket].get_labels();
-                const size_t n_bucket_labels = bucket_labels.size();
+                std::span<Label *const> labels_span{bucket_labels};
 
-                for (size_t label_idx = 0; label_idx < n_bucket_labels;
-                     ++label_idx) {
-                    Label *label = bucket_labels[label_idx];
+                for (Label *label : labels_span) {
                     if (label->is_extended) continue;
 
                     // Early resource check for partial solutions
                     if constexpr (F != Full::PSTEP && F != Full::TSP) {
                         if constexpr (F == Full::Partial) {
-                            const double main_resource =
+                            const auto main_resource =
                                 label->resources[options.main_resources[0]];
-                            const double q_star_value =
+                            const auto q_star_value =
                                 q_star[options.main_resources[0]];
 
-                            if constexpr (D == Direction::Forward) {
-                                if (main_resource > q_star_value) {
-                                    label->set_extended(true);
-                                    continue;
-                                }
-                            } else if constexpr (D == Direction::Backward) {
-                                if (main_resource <= q_star_value) {
-                                    label->set_extended(true);
-                                    continue;
-                                }
+                            if (((D == Direction::Forward) &&
+                                 (main_resource > q_star_value)) ||
+                                ((D == Direction::Backward) &&
+                                 (main_resource <= q_star_value))) {
+                                label->set_extended(true);
+                                continue;
                             }
                         }
                     }
 
                     // Efficient visited bucket clearing
                     if (n_segments <= 8) {
-                        for (size_t i = 0; i < n_segments; ++i) {
-                            Bvisited[i] = 0;
-                        }
+                        std::fill_n(Bvisited.begin(), n_segments, 0);
                     } else {
                         std::memset(Bvisited.data(), 0,
                                     n_segments * sizeof(uint64_t));
                     }
 
                     // Check dominance in smaller buckets
-                    bool domin_smaller = false;
                     if constexpr (F != Full::TSP) {
-                        domin_smaller = DominatedInCompWiseSmallerBuckets<D, S>(
-                            label, bucket, c_bar, Bvisited, ordered_sccs);
+                        if (DominatedInCompWiseSmallerBuckets<D, S>(
+                                label, bucket, c_bar, Bvisited, ordered_sccs)) {
+                            buckets[label->vertex].lazy_flush(label);
+                            label->set_extended(true);
+                            continue;
+                        }
                     }
 
-                    if (!domin_smaller) {
-                        // Process arcs for current label
-                        const auto &node_arcs =
-                            nodes[label->node_id].get_arcs<D>(scc_index);
+                    // Process arcs for current label
+                    const auto &node_arcs =
+                        nodes[label->node_id].template get_arcs<D>(scc_index);
 
-                        for (const auto &arc : node_arcs) {
-                            new_labels.clear();  // Reuse vector
-                            auto extended_labels =
-                                Extend<D, S, ArcType::Node, Mutability::Mut, F>(
-                                    label, arc);
+                    for (const auto &arc : node_arcs) {
+                        new_labels.clear();
 
-                            if (extended_labels.empty()) {
+                        auto extended_labels =
+                            Extend<D, S, ArcType::Node, Mutability::Mut, F>(
+                                label, arc);
+                        if (extended_labels.empty()) {
 #ifdef UNREACHABLE_DOMINANCE
-                                set_node_unreachable(label->unreachable_bitmap,
-                                                     arc.to);
+                            set_node_unreachable(label->unreachable_bitmap,
+                                                 arc.to);
 #endif
-                                continue;
-                            }
-
-                            // Process each new label
-                            for (Label *new_label : extended_labels) {
-                                stat_n_labels++;
-
-                                const int to_bucket = new_label->vertex;
-                                auto &mother_bucket = buckets[to_bucket];
-                                const auto &to_bucket_labels =
-                                    mother_bucket.get_labels();
-
-                                // Stage-specific dominance checking
-                                if constexpr (F != Full::PSTEP &&
-                                              F != Full::TSP) {
-                                    if constexpr (S == Stage::Four &&
-                                                  D == Direction::Forward) {
-                                        // dominance_checks_per_bucket
-                                        //     [to_bucket] +=
-                                        //     to_bucket_labels.size();
-                                    }
-                                }
-
-                                bool dominated = false;
-                                if constexpr (S == Stage::One) {
-                                    // Optimized Stage One processing
-                                    for (auto *existing_label :
-                                         to_bucket_labels) {
-                                        if (label->cost <
-                                            existing_label->cost) {
-                                            mother_bucket.remove_label(
-                                                existing_label);
-                                        } else {
-                                            dominated = true;
-                                            break;
-                                        }
-                                    }
-                                } else {
-                                    // Use existing SIMD implementation for
-                                    // other stages
-                                    auto check_dominance_in_bucket =
-                                        [&](const std::vector<Label *>
-                                                &labels) {
-#ifndef __AVX2__
-                                            for (auto *existing_label :
-                                                 labels) {
-                                                if (is_dominated<D, S>(
-                                                        new_label,
-                                                        existing_label)) {
-                                                    stat_n_dom++;
-                                                    return true;
-                                                }
-                                            }
-                                            return false;
-#else
-                                            return check_dominance_against_vector<
-                                                D, S>(new_label, labels,
-                                                      cut_storage,
-                                                      options.resources.size());
-#endif
-                                        };
-
-                                    dominated = mother_bucket.check_dominance(
-                                        new_label, check_dominance_in_bucket,
-                                        stat_n_dom);
-                                }
-
-                                if (!dominated) {
-                                    if constexpr (S != Stage::Enumerate) {
-                                        for (auto *existing_label :
-                                             to_bucket_labels) {
-                                            if (is_dominated<D, S>(
-                                                    existing_label,
-                                                    new_label)) {
-                                                buckets[to_bucket].remove_label(
-                                                    existing_label);
-                                            }
-                                        }
-                                    }
-
-                                    n_labels++;
-#ifdef SORTED_LABELS
-                                    mother_bucket.add_sorted_label(new_label);
-#elif LIMITED_BUCKETS
-                                    mother_bucket.sorted_label(new_label,
-                                                               BUCKET_CAPACITY);
-#else
-                                    mother_bucket.add_label(new_label);
-#endif
-                                    all_ext = false;
-                                }
-                            }
+                            continue;
                         }
 
-                    } else {
-                        buckets[label->vertex].lazy_flush(label);
+                        // Process each new label
+                        for (Label *new_label : extended_labels) {
+                            ++stat_n_labels;
+
+                            const int to_bucket = new_label->vertex;
+                            auto &mother_bucket = buckets[to_bucket];
+                            const auto &to_bucket_labels =
+                                mother_bucket.get_labels();
+
+                            bool dominated = false;
+                            if constexpr (S == Stage::One) {
+                                // Stage One processing with early exits
+                                for (auto *existing_label : to_bucket_labels) {
+                                    if (label->cost < existing_label->cost) {
+                                        mother_bucket.remove_label(
+                                            existing_label);
+                                    } else {
+                                        dominated = true;
+                                        break;
+                                    }
+                                }
+                            } else {
+                                // SIMD dominance check
+                                auto check_dominance_in_bucket =
+                                    [&](const std::vector<Label *> &labels) {
+#ifdef __AVX2__
+                                        return check_dominance_against_vector<
+                                            D, S>(new_label, labels,
+                                                  cut_storage,
+                                                  options.resources.size());
+#else
+                                        for (auto *existing_label : labels) {
+                                            if (is_dominated<D, S>(
+                                                    new_label,
+                                                    existing_label)) {
+                                                ++stat_n_dom;
+                                                return true;
+                                            }
+                                        }
+                                        return false;
+#endif
+                                    };
+
+                                dominated = mother_bucket.check_dominance(
+                                    new_label, check_dominance_in_bucket,
+                                    stat_n_dom);
+                            }
+
+                            if (!dominated) {
+                                if constexpr (S != Stage::Enumerate) {
+                                    for (auto *existing_label :
+                                         to_bucket_labels) {
+                                        if (is_dominated<D, S>(existing_label,
+                                                               new_label)) {
+                                            buckets[to_bucket].remove_label(
+                                                existing_label);
+                                        }
+                                    }
+                                }
+
+                                ++n_labels;
+#ifdef SORTED_LABELS
+                                mother_bucket.add_sorted_label(new_label);
+#elif LIMITED_BUCKETS
+                                mother_bucket.sorted_label(new_label,
+                                                           BUCKET_CAPACITY);
+#else
+                                mother_bucket.add_label(new_label);
+#endif
+                                all_ext = false;
+                            }
+                        }
                     }
                     label->set_extended(true);
                 }
@@ -427,16 +400,18 @@ std::vector<double> BucketGraph::labeling_algorithm() {
             c_bar[bucket] = min_c_bar;
         }
     }
+
     // Store best label
-    Label *best_label = get_best_label<D>(topological_order, c_bar, sccs);
-    if constexpr (D == Direction::Forward) {
-        fw_best_label = best_label;
-    } else {
-        bw_best_label = best_label;
+    if (Label *best_label = get_best_label<D>(topological_order, c_bar, sccs)) {
+        if constexpr (D == Direction::Forward) {
+            fw_best_label = best_label;
+        } else {
+            bw_best_label = best_label;
+        }
     }
+
     return c_bar;
 }
-
 /**
  * Performs the bi-labeling algorithm on the BucketGraph.
  *
@@ -770,68 +745,120 @@ inline std::vector<Label *> BucketGraph::Extend(
     set_node_visited(new_label->visited_bitmap, node_id);
     new_label->nodes_covered = L_prime->nodes_covered;
     new_label->nodes_covered.push_back(node_id);
-    // Define the SIMD type for doubles
-    using simd_double = std::experimental::native_simd<double>;
 
 #if defined(SRC)
+    using simd_double = std::experimental::native_simd<double>;
+    using simd_abi = std::experimental::simd_abi::native<double>;
+    static constexpr size_t SIMD_WIDTH = simd_double::size();
+    static constexpr size_t SMALL_SIZE = 16;
+
     new_label->SRCmap = L_prime->SRCmap;
+
     if constexpr (S == Stage::Four || S == Stage::Enumerate) {
         auto &cutter = cut_storage;
-        std::span<const double> SRCDuals{cutter->SRCDuals};
         const size_t segment = node_id >> 6;
         const size_t bit_position = node_id & 63;
         const uint64_t bit_mask = 1ULL << bit_position;
-        const size_t cut_size = cutter->size();
-        static constexpr size_t SMALL_SIZE = 128;
 
-#if defined(__cpp_lib_ranges)
-        auto indices = std::views::iota(size_t{0}, cut_size);
-#else
-        static thread_local std::vector<size_t> indices;
-        indices.resize(cut_size);
-        std::iota(indices.begin(), indices.end(), 0);
-#endif
-
-        // Lambda for processing a single cut
-        auto process_cut = [&](size_t idx) -> double {
-            if (SRCDuals[idx] > -1e-3) {
-                return 0.0;
-            }
-            const auto &cut = cutter->getCut(idx);
-            if (!(cut.neighbors[segment] & bit_mask)) {
-                new_label->SRCmap[idx] = 0.0;
-                return 0.0;
-            }
-            if (cut.baseSet[segment] & bit_mask) {
-                const auto &multipliers = cut.p;
-                const auto &den = multipliers.den;
-                auto &src_map_value = new_label->SRCmap[idx];
-                src_map_value += multipliers.num[cut.baseSetOrder[node_id]];
-                if (src_map_value >= den) {
-                    src_map_value -= den;
-                    return -SRCDuals[idx];
-                }
-            }
-            return 0.0;
-        };
+        // Get active cuts once
+        const auto active_cuts = cutter->getActiveCuts();
+        const auto cut_size = cutter->activeSize();
+        const size_t simd_cut_size = cut_size - (cut_size % SIMD_WIDTH);
 
         double total_cost_update = 0.0;
-        if (cut_size <= SMALL_SIZE) {
-            total_cost_update =
-                std::transform_reduce(std::begin(indices), std::end(indices),
-                                      0.0, std::plus<>(), process_cut);
 
-        } else {
-#if defined(__cpp_lib_parallel_algorithm)
-            total_cost_update = std::transform_reduce(
-                std::execution::par_unseq, std::begin(indices),
-                std::end(indices), 0.0, std::plus<>(), process_cut);
-#else
-            total_cost_update =
-                std::transform_reduce(std::begin(indices), std::end(indices),
-                                      0.0, std::plus<>(), process_cut);
+#ifdef __AVX2__
+        if (cut_size <= SMALL_SIZE) {
 #endif
+
+            // Small size: direct processing of active cuts
+            for (const auto &active_cut : active_cuts) {
+                const auto &cut = *active_cut.cut_ptr;
+                const size_t idx = active_cut.index;
+                const double dual_value = active_cut.dual_value;
+
+                if (cut.neighbors[segment] & bit_mask) {
+                    if (cut.baseSet[segment] & bit_mask) {
+                        const auto &multipliers = cut.p;
+                        auto &src_map_value = new_label->SRCmap[idx];
+                        src_map_value +=
+                            multipliers.num[cut.baseSetOrder[node_id]];
+                        if (src_map_value >= multipliers.den) {
+                            src_map_value -= multipliers.den;
+                            total_cost_update -= dual_value;
+                        }
+                    }
+                } else {
+                    new_label->SRCmap[idx] = 0.0;
+                }
+            }
+
+#ifdef __AVX2__
+        } else {
+            // SIMD processing for larger sizes
+            alignas(64) std::array<double, SIMD_WIDTH> dual_values;
+            alignas(64) std::array<size_t, SIMD_WIDTH> indices;
+            alignas(64) std::array<const Cut *, SIMD_WIDTH> cut_ptrs;
+
+            for (size_t base_idx = 0; base_idx < simd_cut_size;
+                 base_idx += SIMD_WIDTH) {
+                // Prepare SIMD batch
+                for (size_t j = 0; j < SIMD_WIDTH; ++j) {
+                    const auto &active_cut = active_cuts[base_idx + j];
+                    dual_values[j] = active_cut.dual_value;
+                    indices[j] = active_cut.index;
+                    cut_ptrs[j] = active_cut.cut_ptr;
+                }
+
+                simd_double duals_vec = load_simd_values(
+                    std::span<const double>(dual_values.data(), SIMD_WIDTH), 0);
+
+                // Process SIMD batch
+                for (size_t j = 0; j < SIMD_WIDTH; ++j) {
+                    const auto &cut = *cut_ptrs[j];
+                    const size_t idx = indices[j];
+
+                    if (cut.neighbors[segment] & bit_mask) {
+                        if (cut.baseSet[segment] & bit_mask) {
+                            const auto &multipliers = cut.p;
+                            auto &src_map_value = new_label->SRCmap[idx];
+                            src_map_value +=
+                                multipliers.num[cut.baseSetOrder[node_id]];
+                            if (src_map_value >= multipliers.den) {
+                                src_map_value -= multipliers.den;
+                                total_cost_update -= dual_values[j];
+                            }
+                        }
+                    } else {
+                        new_label->SRCmap[idx] = 0.0;
+                    }
+                }
+            }
+
+            // Handle remaining active cuts
+            for (size_t i = simd_cut_size; i < cut_size; ++i) {
+                const auto &active_cut = active_cuts[i];
+                const auto &cut = *active_cut.cut_ptr;
+                const size_t idx = active_cut.index;
+                const double dual_value = active_cut.dual_value;
+
+                if (cut.neighbors[segment] & bit_mask) {
+                    if (cut.baseSet[segment] & bit_mask) {
+                        const auto &multipliers = cut.p;
+                        auto &src_map_value = new_label->SRCmap[idx];
+                        src_map_value +=
+                            multipliers.num[cut.baseSetOrder[node_id]];
+                        if (src_map_value >= multipliers.den) {
+                            src_map_value -= multipliers.den;
+                            total_cost_update -= dual_value;
+                        }
+                    }
+                } else {
+                    new_label->SRCmap[idx] = 0.0;
+                }
+            }
         }
+#endif
 
         new_label->cost += total_cost_update;
     }
@@ -902,12 +929,12 @@ inline bool BucketGraph::is_dominated(const Label *new_label,
     if constexpr (S == Stage::Three || S == Stage::Four ||
                   S == Stage::Enumerate) {
         for (size_t i = 0; i < label->visited_bitmap.size(); ++i) {
-            // Combine visited and unreachable nodes in the comparison label's
-            // bitmap
+            // Combine visited and unreachable nodes in the comparison
+            // label's bitmap
             auto combined_label_bitmap =
                 label->visited_bitmap[i] | label->unreachable_bitmap[i];
-            // Ensure the new label visits all nodes that the comparison label
-            // (or its unreachable nodes) visits
+            // Ensure the new label visits all nodes that the comparison
+            // label (or its unreachable nodes) visits
             if ((combined_label_bitmap & ~new_label->visited_bitmap[i]) != 0) {
                 return false;
             }

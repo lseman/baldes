@@ -1002,14 +1002,15 @@ class VRProblem {
             SRC_MODE_BLOCK(n_cuts = cuts->size();)
             RCC_MODE_BLOCK(n_rcc_cuts = rccManager->size();)
 
-#ifdef GUROBI
-            if (allPaths.size() > 5000) {
-                auto toRemoveIndices = node->mip.reduceNonBasicVariables(0.66);
-                for (auto &index : toRemoveIndices) {
-                    allPaths.erase(allPaths.begin() + index);
-                }
-            }
-#endif
+            // #ifdef GUROBI
+            //             if (allPaths.size() > 5000) {
+            //                 auto toRemoveIndices =
+            //                 node->mip.reduceNonBasicVariables(0.66); for
+            //                 (auto &index : toRemoveIndices) {
+            //                     allPaths.erase(allPaths.begin() + index);
+            //                 }
+            //             }
+            // #endif
 
 #ifdef TR
             tr_val = v;

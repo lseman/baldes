@@ -428,7 +428,7 @@ std::pair<bool, bool> LimitedMemoryRank1Cuts::runSeparation(
         // Try with rank 8 first
         generator->setArcDuals(arc_duals);
         generator->setNodes(nodes);
-        initAndGetCuts(generator, 16);
+        initAndGetCuts(generator, 18);
         tryMemFactors(generator);
 
         // if (!tryMemFactors(generator)) {

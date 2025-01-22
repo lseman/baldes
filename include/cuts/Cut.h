@@ -145,6 +145,14 @@ using Cuts = std::vector<Cut>;
 class CutStorage {
    public:
     int latest_column = 0;
+    struct ActiveCutInfo {
+        size_t index;        // Original index in cuts vector
+        const Cut *cut_ptr;  // Pointer to the cut
+        double dual_value;   // Cached dual value
+
+        ActiveCutInfo(size_t idx, const Cut *ptr, double dual)
+            : index(idx), cut_ptr(ptr), dual_value(dual) {}
+    };
 
     // Access a cut by index
     Cut &operator[](std::size_t index) {
@@ -167,6 +175,10 @@ class CutStorage {
     Cut &getCut(int cutIndex) { return cuts[cutIndex]; }
 
     Cut &get_cut(int cutIndex) { return cuts[cutIndex]; }
+
+    std::span<const ActiveCutInfo> getActiveCuts() const noexcept {
+        return std::span<const ActiveCutInfo>(active_cuts);
+    }
 
     const Cut &getCut(int cutIndex) const { return cuts[cutIndex]; }
 
@@ -220,10 +232,14 @@ class CutStorage {
     }
 
     // Set dual values for SRC
-    void setDuals(const std::vector<double> &duals) { SRCDuals = duals; }
+    void setDuals(const std::vector<double> &duals) {
+        SRCDuals = duals;
+        updateActiveCuts();
+    }
 
     // Get the number of cuts
     size_t size() const noexcept { return cuts.size(); }
+    size_t activeSize() const noexcept { return active_cuts.size(); }
 
     // Iterators
     auto begin() const noexcept { return cuts.begin(); }
@@ -308,4 +324,16 @@ class CutStorage {
         cutMaster_to_cut_map;  // Map from cut key to cut index
     ankerl::unordered_dense::map<std::size_t, std::vector<int>>
         indexCuts;  // Additional index for cuts (if needed)
+    std::vector<ActiveCutInfo> active_cuts;  // Cuts with positive duals
+
+    void updateActiveCuts() {
+        active_cuts.clear();
+        active_cuts.reserve(cuts.size());  // Pre-allocate for efficiency
+
+        for (size_t i = 0; i < cuts.size(); ++i) {
+            if (i < SRCDuals.size() && SRCDuals[i] <= -1e-3) {
+                active_cuts.emplace_back(i, &cuts[i], SRCDuals[i]);
+            }
+        }
+    }
 };
