@@ -28,7 +28,7 @@
  */
 struct alignas(64) Bucket {
     // Hot data - frequently accessed (kept in first cache line)
-    std::vector<Label *> labels_vec;  // Most accessed member
+    std::vector<Label *> labels_vec;
     int depth{0};
     int node_id{-1};
     bool is_split{false};
@@ -289,7 +289,7 @@ struct alignas(64) Bucket {
             std::clamp(midpoint, lb[RESOURCE_INDEX], ub[RESOURCE_INDEX]);
 
         // Initialize sub-buckets on the stack
-        std::array<Bucket*, 2> new_buckets;
+        std::array<Bucket *, 2> new_buckets;
         for (size_t i = 0; i < 2; ++i) {
             auto bucket = new Bucket();
             bucket->node_id = node_id;
@@ -312,7 +312,7 @@ struct alignas(64) Bucket {
         new_buckets[0]->labels_vec.reserve(
             mid_idx + label_count / 10);  // Add small buffer for uneven splits
         new_buckets[1]->labels_vec.reserve(label_count - mid_idx +
-                                          label_count / 10);
+                                           label_count / 10);
 
         // Single pass through sorted labels, distributing to appropriate
         // bucket

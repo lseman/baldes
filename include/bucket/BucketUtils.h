@@ -40,6 +40,30 @@
 #include "cuts/SRC.h"
 #include "utils/NumericUtils.h"
 
+template <typename T>
+class ThreadLocalPool {
+    static thread_local std::vector<std::vector<T>> pool;
+    static thread_local size_t current_index;
+
+   public:
+    std::vector<T> &acquire() {
+        if (current_index >= pool.size()) {
+            pool.emplace_back();
+        }
+        return pool[current_index++];
+    }
+    void reset() { current_index = 0; }
+};
+
+// Define static members
+template <typename T>
+thread_local std::vector<std::vector<T>> ThreadLocalPool<T>::pool;
+
+template <typename T>
+thread_local size_t ThreadLocalPool<T>::current_index = 0;
+
+// Explicit instantiation for the types we use
+template class ThreadLocalPool<double>;
 /**
  * @brief Represents a bucket in the Bucket Graph.
  * Adds an arc to the bucket graph.
@@ -575,11 +599,11 @@ void BucketGraph::ConcatenateLabel(const Label *L, int &b, double &best_cost,
     // SRC mode setup
 #if defined(SRC)
     decltype(cut_storage) cutter = nullptr;
-    decltype(cut_storage->SRCDuals) *SRCDuals = nullptr;
     if constexpr (S > Stage::Three) {
         cutter = cut_storage;
-        SRCDuals = &cutter->SRCDuals;
     }
+    const auto active_cuts = cutter->getActiveCuts();
+
 #endif
 
     while (!bucket_stack.empty()) {
@@ -642,11 +666,12 @@ void BucketGraph::ConcatenateLabel(const Label *L, int &b, double &best_cost,
             // SRC cost adjustments
 #if defined(SRC)
             if constexpr (S == Stage::Four) {
-                for (auto it = cutter->begin(); it < cutter->end(); ++it) {
-                    const auto &dual = (*SRCDuals)[it->id];
-                    if (dual == 0) continue;
+                for (const auto &active_cut : active_cuts) {
+                    const auto &cut = *active_cut.cut_ptr;
+                    const size_t idx = active_cut.index;
+                    const double dual = active_cut.dual_value;
 
-                    if (L->SRCmap[it->id] + L_bw->SRCmap[it->id] >= it->p.den) {
+                    if (L->SRCmap[idx] + L_bw->SRCmap[idx] >= cut.p.den) {
                         total_cost -= dual;
                     }
                 }

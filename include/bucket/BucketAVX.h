@@ -15,6 +15,22 @@ constexpr double EPSILON = -1e-3;
 constexpr size_t UNROLL_SIZE = 4;
 }  // namespace
 
+using simd_double = std::experimental::native_simd<double>;
+using simd_abi = std::experimental::simd_abi::native<double>;
+
+// Helper function for loading SIMD with correct type
+inline simd_double load_simd_values(const std::span<const double> &source,
+                                    size_t start_index) {
+    constexpr size_t simd_register_size = simd_double::size();
+    alignas(64) std::array<double, simd_register_size> buffer = {};
+
+    for (size_t i = 0; i < simd_register_size; ++i) {
+        buffer[i] = source[start_index + i];
+    }
+
+    return simd_double(buffer.data(), std::experimental::vector_aligned);
+}
+
 template <typename T, typename Container>
 inline std::experimental::simd<T> load_simd(const Container &source,
                                             size_t start_index,
@@ -169,22 +185,38 @@ inline bool check_dominance_against_vector(const Label *new_label,
                 if (cut_storage && !cut_storage->SRCDuals.empty()) {
                     using namespace std::experimental;
                     const size_t simd_size = simd<double>::size();
-                    const auto &SRCDuals = cut_storage->SRCDuals;
-                    const auto &labelSRCMap = label->SRCmap;
-                    const auto &newLabelSRCMap = new_label->SRCmap;
+
+                    const auto active_cuts = cut_storage->getActiveCuts();
+                    const auto cut_size = cut_storage->activeSize();
+                    const size_t simd_cut_size =
+                        cut_size - (cut_size % simd_size);
+
+                    // Prepare aligned buffers for SIMD processing
+                    alignas(64) std::array<double, simd_size> dual_buffer;
+                    alignas(64) std::array<double, simd_size> label_buffer;
+                    alignas(64) std::array<double, simd_size> new_label_buffer;
 
                     simd<double> sumSRC_simd = 0;  // SIMD accumulator
-                    size_t k = 0;
 
                     // Process in SIMD chunks
-                    for (; k + simd_size <= SRCDuals.size(); k += simd_size) {
+                    for (size_t base_idx = 0; base_idx < simd_cut_size;
+                         base_idx += simd_size) {
+                        // Fill buffers with active cut data
+                        for (size_t j = 0; j < simd_size; ++j) {
+                            const auto &active_cut = active_cuts[base_idx + j];
+                            const size_t idx = active_cut.index;
+                            dual_buffer[j] = active_cut.dual_value;
+                            label_buffer[j] = label->SRCmap[idx];
+                            new_label_buffer[j] = new_label->SRCmap[idx];
+                        }
+
                         // Load data into SIMD registers
                         simd<double> src_duals =
-                            simd<double>(&SRCDuals[k], vector_aligned);
+                            simd<double>(dual_buffer.data(), vector_aligned);
                         simd<double> label_mod =
-                            simd<double>(&labelSRCMap[k], vector_aligned);
-                        simd<double> new_label_mod =
-                            simd<double>(&newLabelSRCMap[k], vector_aligned);
+                            simd<double>(label_buffer.data(), vector_aligned);
+                        simd<double> new_label_mod = simd<double>(
+                            new_label_buffer.data(), vector_aligned);
 
                         // Perform comparison and create a mask
                         auto mask = label_mod > new_label_mod;
@@ -200,9 +232,11 @@ inline bool check_dominance_against_vector(const Label *new_label,
                     double sumSRC = reduce(sumSRC_simd);
 
                     // Process remaining elements (scalar fallback)
-                    for (; k < SRCDuals.size(); ++k) {
-                        if (labelSRCMap[k] > newLabelSRCMap[k]) {
-                            sumSRC += SRCDuals[k];
+                    for (size_t i = simd_cut_size; i < cut_size; ++i) {
+                        const auto &active_cut = active_cuts[i];
+                        const size_t idx = active_cut.index;
+                        if (label->SRCmap[idx] > new_label->SRCmap[idx]) {
+                            sumSRC += active_cut.dual_value;
                         }
                     }
 
@@ -259,16 +293,19 @@ inline bool check_dominance_against_vector(const Label *new_label,
         if constexpr (S == Stage::Four || S == Stage::Enumerate) {
             if (cut_storage && !cut_storage->SRCDuals.empty()) {
                 double sumSRC = 0;
-                const auto &SRCDuals = cut_storage->SRCDuals;
-                const auto &labelSRCMap = label->SRCmap;
-                const auto &newLabelSRCMap = new_label->SRCmap;
+                const auto active_cuts = cut_storage->getActiveCuts();
 
-                for (size_t k = 0; k < SRCDuals.size(); ++k) {
-                    const auto &den = cut_storage->getCut(k).p.den;
-                    const auto labelMod = labelSRCMap[k];
-                    const auto newLabelMod = newLabelSRCMap[k];
+                for (const auto &active_cut : active_cuts) {
+                    const size_t idx = active_cut.index;
+                    const double dual_value = active_cut.dual_value;
+                    const auto &cut = *active_cut.cut_ptr;
+
+                    // Access SRCmap values using the index from active cut
+                    const auto labelMod = label->SRCmap[idx];
+                    const auto newLabelMod = new_label->SRCmap[idx];
+
                     if (labelMod > newLabelMod) {
-                        sumSRC += SRCDuals[k];
+                        sumSRC += dual_value;
                     }
                 }
 
