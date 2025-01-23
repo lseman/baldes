@@ -511,7 +511,7 @@ class VRProblem {
         auto &branchingDuals = node->branchingDuals;
         RCC_MODE_BLOCK(auto &rccManager = node->rccManager;)
 
-        int bucket_interval = 100;
+        int bucket_interval = 20;
         int time_horizon = instance.T_max;
         // if (problemType == ProblemType::cvrp) { time_horizon = 50000; }
         numConstrs = node->getIntAttr("NumConstrs");
@@ -906,8 +906,7 @@ class VRProblem {
                             if (stab.alpha > 0) {
                                 print_info(
                                     "No improvement in the last iterations, "
-                                    "running "
-                                    "IPM\n");
+                                    "generating dual perturbation with IPM\n");
                                 updateGapAndRunOptimization(
                                     node, lp_obj, inner_obj, ipm_solver,
                                     iter_non_improv, use_ipm_duals, nodeDuals);

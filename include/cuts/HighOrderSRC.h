@@ -771,44 +771,67 @@ class HighDimCutsGenerator {
     void setArcDuals(const ArcDuals &arc_duals) { this->arc_duals = arc_duals; }
 #endif
 
+    struct Cluster {
+        std::vector<int> vertices;
+        double avg_cost;
+    };
+
     void generateSepHeurMem4Vertex() {
         rank1_sep_heur_mem4_vertex.resize(dim);
-
-        // Precompute half-costs for nodes to avoid repeated divisions
         std::vector<double> half_cost(dim);
         for (int i = 0; i < dim; ++i) {
             half_cost[i] = nodes[i].cost / 2;
         }
 
-        // Reusable vector for costs
-        std::vector<std::pair<int, double>> cost;
-        cost.reserve(dim);
+        // K-means clustering
+        const int k = std::min(5, dim / 2);  // Adjust cluster count
+        std::vector<Cluster> clusters(k);
+        std::vector<int> assignments(dim);
 
+        // Initial cluster assignment based on cost similarity
         for (int i = 0; i < dim; ++i) {
-            // Reset and populate the `cost` vector
-            cost.clear();
-            cost.emplace_back(0, INFINITY);  // First element is fixed
+            int cluster = i % k;
+            clusters[cluster].vertices.push_back(i);
+            assignments[i] = cluster;
+        }
 
-            // Compute costs for j = 1 to dim - 1
-            for (int j = 1; j < dim; ++j) {
-                cost.emplace_back(j, cost_mat4_vertex[i][j] -
-                                         (half_cost[i] + half_cost[j]) -
-                                         arc_duals.getDual(i, j));
+        // Iterate through vertices
+        for (int i = 0; i < dim; ++i) {
+            std::vector<std::pair<int, double>> candidates;
+            candidates.reserve(dim);
+
+            // Select from different clusters prioritizing cost
+            for (const auto &cluster : clusters) {
+                for (int j : cluster.vertices) {
+                    if (i != j) {
+                        double cost = cost_mat4_vertex[i][j] -
+                                      (half_cost[i] + half_cost[j]) -
+                                      arc_duals.getDual(i, j);
+                        candidates.emplace_back(j, cost);
+                    }
+                }
             }
 
-            // Use nth_element to get the top `max_heuristic_sep_mem4_row_rank1`
-            // elements
-            auto middle = cost.begin() + max_heuristic_sep_mem4_row_rank1;
-            std::nth_element(cost.begin(), middle, cost.end(),
-                             [](const auto &a, const auto &b) {
-                                 return a.second < b.second;
-                             });
+            // Select top vertices ensuring cluster diversity
+            pdqsort(candidates.begin(), candidates.end(),
+                    [](const auto &a, const auto &b) {
+                        return a.second < b.second;
+                    });
 
-            // Set bits in `vst2` for the smallest costs
             cutLong &vst2 = rank1_sep_heur_mem4_vertex[i];
-            vst2.reset();  // Clear previous bits
-            for (int k = 0; k < max_heuristic_sep_mem4_row_rank1; ++k) {
-                vst2.set(cost[k].first);
+            vst2.reset();
+
+            ankerl::unordered_dense::set<int> used_clusters;
+            // std::set<int> used_clusters;
+            int selected = 0;
+
+            for (const auto &candidate : candidates) {
+                int cluster = assignments[candidate.first];
+                if (used_clusters.insert(cluster).second ||
+                    used_clusters.size() == k) {
+                    vst2.set(candidate.first);
+                    if (++selected == max_heuristic_sep_mem4_row_rank1) break;
+                }
             }
         }
     }
