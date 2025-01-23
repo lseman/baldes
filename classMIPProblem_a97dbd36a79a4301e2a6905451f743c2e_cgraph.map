@@ -1,0 +1,7 @@
+<map id="MIPProblem::addVars" name="MIPProblem::addVars">
+<area shape="rect" id="Node000001" title=" " alt="" coords="5,31,153,56"/>
+<area shape="rect" id="Node000002" href="$classMIPProblem.html#a7d7c950859d42587ebd021023edde212" title=" " alt="" coords="201,5,373,31"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="153,32,185,28,185,33,154,37"/>
+<area shape="rect" id="Node000003" href="$classMIPColumn.html#a6cdb097e73df4f28024436d31cf15171" title=" " alt="" coords="212,55,362,80"/>
+<area shape="poly" id="edge2_Node000001_Node000003" title=" " alt="" coords="154,49,197,54,196,60,153,55"/>
+</map>

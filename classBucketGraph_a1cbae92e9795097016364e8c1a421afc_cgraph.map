@@ -1,0 +1,19 @@
+<map id="BucketGraph::DominatedInCompWiseSmallerBuckets" name="BucketGraph::DominatedInCompWiseSmallerBuckets">
+<area shape="rect" id="Node000001" title="Determines if a label is dominated in component&#45;wise smaller buckets." alt="" coords="5,100,182,141"/>
+<area shape="rect" id="Node000002" href="$classBucketGraph.html#af129eff306551dc7cc7fe00b919bbbd0" title="Assigns the buckets based on the specified direction." alt="" coords="249,5,390,46"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="138,97,229,57,246,50,248,55,231,61,140,102"/>
+<area shape="rect" id="Node000003" href="$BucketAVX_8h.html#a85dfd96e4157e132ed9a77e091964beb" title=" " alt="" coords="232,71,408,111"/>
+<area shape="poly" id="edge2_Node000001_Node000003" title=" " alt="" coords="182,106,216,102,217,107,182,112"/>
+<area shape="rect" id="Node000006" href="$classBucketGraph.html#a469baec04539f3c8ae984f5558fbfc25" title="Checks if a label is dominated by a new label based on cost and resource conditions." alt="" coords="230,136,410,161"/>
+<area shape="poly" id="edge5_Node000001_Node000006" title=" " alt="" coords="182,129,214,133,214,138,182,134"/>
+<area shape="rect" id="Node000007" href="$BucketSolve_8h.html#a6d1ee39d7f8cb4976dffcff3c41dc8e8" title="Checks if element &#39;a&#39; precedes element &#39;b&#39; in the given strongly connected components (SCCs)." alt="" coords="283,185,357,210"/>
+<area shape="poly" id="edge6_Node000001_Node000007" title=" " alt="" coords="145,139,231,171,268,182,267,188,229,176,143,144"/>
+<area shape="rect" id="Node000004" href="$BucketAVX_8h.html#a8c7a6a470d522e77dd5004c27eefcd1c" title=" " alt="" coords="490,54,571,80"/>
+<area shape="poly" id="edge3_Node000003_Node000004" title=" " alt="" coords="407,78,475,71,475,76,408,84"/>
+<area shape="rect" id="Node000005" href="$BucketAVX_8h.html#a5863d8936ce5089fb2122aa7e23a14b7" title=" " alt="" coords="466,104,595,129"/>
+<area shape="poly" id="edge4_Node000003_Node000005" title=" " alt="" coords="408,99,451,104,450,109,407,104"/>
+<area shape="rect" id="Node000008" href="$classUnionFind.html#aef4c07dd741d4fb4ab4715f6bca81b27" title=" " alt="" coords="458,185,603,210"/>
+<area shape="poly" id="edge7_Node000007_Node000008" title=" " alt="" coords="357,195,442,195,442,200,357,200"/>
+<area shape="rect" id="Node000009" href="$classUnionFind.html#a062823e09caac93290691c9ce81edfb3" title=" " alt="" coords="651,185,758,210"/>
+<area shape="poly" id="edge8_Node000008_Node000009" title=" " alt="" coords="604,195,636,195,636,200,604,200"/>
+</map>

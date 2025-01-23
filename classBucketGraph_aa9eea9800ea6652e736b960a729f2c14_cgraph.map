@@ -1,0 +1,13 @@
+<map id="BucketGraph::computePhi" name="BucketGraph::computePhi">
+<area shape="rect" id="Node000001" title=" " alt="" coords="5,31,178,57"/>
+<area shape="rect" id="Node000002" href="$classBucketGraph.html#a78be6c04ca36f1ad7b2e3a594898c335" title=" " alt="" coords="433,23,592,64"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="137,28,225,9,305,3,385,9,427,17,426,22,385,14,305,8,226,14,138,33"/>
+<area shape="rect" id="Node000004" href="$classBucketGraph.html#a90ce1e861b31ed9c05e36aa3f9ab6743" title=" " alt="" coords="226,23,385,64"/>
+<area shape="poly" id="edge3_Node000001_Node000004" title=" " alt="" coords="178,41,210,41,210,46,178,46"/>
+<area shape="rect" id="Node000005" href="$classBucketGraph.html#a491d87e43d4a6ec6ed9557be1769cd29" title=" " alt="" coords="226,89,385,129"/>
+<area shape="poly" id="edge5_Node000001_Node000005" title=" " alt="" coords="137,55,223,81,221,86,135,60"/>
+<area shape="rect" id="Node000003" href="$classBucketGraph.html#af129eff306551dc7cc7fe00b919bbbd0" title="Assigns the buckets based on the specified direction." alt="" coords="640,23,782,64"/>
+<area shape="poly" id="edge2_Node000002_Node000003" title=" " alt="" coords="592,41,625,41,625,46,592,46"/>
+<area shape="poly" id="edge4_Node000004_Node000002" title=" " alt="" coords="385,41,418,41,418,46,385,46"/>
+<area shape="poly" id="edge6_Node000005_Node000002" title=" " alt="" coords="371,86,431,67,432,72,373,91"/>
+</map>

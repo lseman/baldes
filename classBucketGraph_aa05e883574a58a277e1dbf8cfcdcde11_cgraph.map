@@ -1,0 +1,20 @@
+<map id="BucketGraph::labeling_algorithm" name="BucketGraph::labeling_algorithm">
+<area shape="rect" id="Node000001" title=" " alt="" coords="5,170,153,210"/>
+<area shape="rect" id="Node000002" href="$classBucketGraph.html#af129eff306551dc7cc7fe00b919bbbd0" title="Assigns the buckets based on the specified direction." alt="" coords="429,140,570,181"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="107,167,150,142,200,122,250,112,290,110,381,122,429,133,427,138,381,127,290,116,251,117,201,127,152,147,110,172"/>
+<area shape="rect" id="Node000003" href="$BucketAVX_8h.html#a85dfd96e4157e132ed9a77e091964beb" title=" " alt="" coords="203,22,378,62"/>
+<area shape="poly" id="edge2_Node000001_Node000003" title=" " alt="" coords="97,168,142,124,199,79,219,67,222,72,202,83,145,128,101,171"/>
+<area shape="rect" id="Node000006" href="$classBucketGraph.html#a281aecc3cd0ebf2089765105c1e430b3" title=" " alt="" coords="203,136,379,177"/>
+<area shape="poly" id="edge5_Node000001_Node000006" title=" " alt="" coords="152,176,187,171,188,176,153,181"/>
+<area shape="rect" id="Node000007" href="$classBucketGraph.html#abc324fb45e794482eb642adb8b0f664d" title="Retrieves the best label from the bucket graph based on the given topological order,..." alt="" coords="214,202,368,242"/>
+<area shape="poly" id="edge6_Node000001_Node000007" title=" " alt="" coords="153,199,199,206,198,211,152,204"/>
+<area shape="rect" id="Node000008" href="$classBucketGraph.html#a469baec04539f3c8ae984f5558fbfc25" title="Checks if a label is dominated by a new label based on cost and resource conditions." alt="" coords="201,267,381,292"/>
+<area shape="poly" id="edge8_Node000001_Node000008" title=" " alt="" coords="116,209,156,231,202,252,222,259,220,264,200,257,154,235,113,213"/>
+<area shape="rect" id="Node000009" href="$classBucketGraph.html#acb7b845b8a4d452a0ac15daad1df3927" title="Marks a node as unreachable in the given bitmap." alt="" coords="213,316,369,357"/>
+<area shape="poly" id="edge9_Node000001_Node000009" title=" " alt="" coords="99,209,143,256,172,281,202,303,210,307,207,312,199,307,168,285,140,260,95,213"/>
+<area shape="rect" id="Node000004" href="$BucketAVX_8h.html#a8c7a6a470d522e77dd5004c27eefcd1c" title=" " alt="" coords="460,55,540,80"/>
+<area shape="poly" id="edge3_Node000003_Node000004" title=" " alt="" coords="379,50,444,58,444,63,379,55"/>
+<area shape="rect" id="Node000005" href="$BucketAVX_8h.html#a5863d8936ce5089fb2122aa7e23a14b7" title=" " alt="" coords="435,5,564,31"/>
+<area shape="poly" id="edge4_Node000003_Node000005" title=" " alt="" coords="379,29,419,25,420,30,379,35"/>
+<area shape="poly" id="edge7_Node000007_Node000002" title=" " alt="" coords="362,199,414,183,415,188,363,204"/>
+</map>

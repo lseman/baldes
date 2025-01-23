@@ -1,0 +1,20 @@
+<map id="BucketGraph" name="BucketGraph">
+<area shape="rect" id="Node000001" title="Represents a graph structure used for bucket&#45;based optimization in a solver." alt="" coords="363,198,460,223"/>
+<area shape="rect" id="Node000002" href="$classCostFunction.html" title=" " alt="" coords="5,94,104,120"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="75,130,98,153,126,171,170,184,233,193,363,204,363,209,233,199,169,189,124,176,95,157,71,134"/>
+<area shape="rect" id="Node000003" href="$structBucketOptions.html" title=" " alt="" coords="128,94,235,120"/>
+<area shape="poly" id="edge2_Node000001_Node000003" title=" " alt="" coords="206,128,234,151,267,171,315,189,363,200,362,205,314,194,264,176,231,155,202,132"/>
+<area shape="rect" id="Node000004" href="$structPSTEPDuals.html" title="A structure to manage dual values for arcs and nodes in a network." alt="" coords="259,94,356,120"/>
+<area shape="poly" id="edge3_Node000001_Node000004" title=" " alt="" coords="316,134,323,154,335,172,352,185,371,195,369,199,349,189,332,175,319,157,311,136"/>
+<area shape="rect" id="Node000005" href="$classArcList.html" title=" " alt="" coords="380,94,444,120"/>
+<area shape="poly" id="edge4_Node000001_Node000005" title=" " alt="" coords="414,135,414,197,409,197,409,135"/>
+<area shape="rect" id="Node000006" href="$classIteratedLocalSearch.html" title=" " alt="" coords="468,94,606,120"/>
+<area shape="poly" id="edge5_Node000001_Node000006" title=" " alt="" coords="528,135,514,156,496,176,476,189,454,199,452,195,473,185,493,172,510,153,523,132"/>
+<area shape="rect" id="Node000007" href="$structInstanceData.html" title="A structure to hold various data related to an instance of a problem." alt="" coords="432,5,530,31"/>
+<area shape="poly" id="edge6_Node000006_Node000007" title=" " alt="" coords="480,46,485,69,495,81,509,91,506,96,492,85,480,71,475,47"/>
+<area shape="rect" id="Node000008" href="$classCutStorage.html" title="Manages the storage and operations related to cuts in a solver." alt="" coords="582,5,668,31"/>
+<area shape="poly" id="edge8_Node000001_Node000008" title=" " alt="" coords="637,45,638,55,638,90,621,121,586,154,545,178,501,194,461,204,460,199,500,189,542,173,583,150,616,118,633,89,633,55,631,46"/>
+<area shape="poly" id="edge7_Node000006_Node000008" title=" " alt="" coords="587,41,567,57,553,76,544,95,539,92,549,73,563,53,583,37"/>
+<area shape="rect" id="Node000009" href="$classUnionFind.html" title=" " alt="" coords="749,94,829,120"/>
+<area shape="poly" id="edge9_Node000001_Node000009" title=" " alt="" coords="762,131,721,155,674,176,618,191,561,202,461,211,461,205,560,196,617,186,672,171,719,150,759,126"/>
+</map>

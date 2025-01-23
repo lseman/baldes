@@ -1,0 +1,13 @@
+<map id="HighDimCutsGenerator::addSearchCrazy" name="HighDimCutsGenerator::addSearchCrazy">
+<area shape="rect" id="Node000001" title=" " alt="" coords="5,49,161,90"/>
+<area shape="rect" id="Node000002" href="$classHighDimCutsGenerator.html#a0ff82fbbced88f93f16bd5e64237645b" title=" " alt="" coords="209,5,408,61"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="161,54,193,49,194,54,161,59"/>
+<area shape="rect" id="Node000004" href="$structPlanValidationResult.html#abeb7ae4ab353d204a85b96ccb53c8440" title=" " alt="" coords="238,85,379,126"/>
+<area shape="poly" id="edge3_Node000001_Node000004" title=" " alt="" coords="161,79,223,89,222,94,161,84"/>
+<area shape="rect" id="Node000003" href="$classHighDimCutsGenerator.html#a68da01c5966e17f328e78e5dc7dde407" title=" " alt="" coords="456,13,659,54"/>
+<area shape="poly" id="edge2_Node000002_Node000003" title=" " alt="" coords="409,30,440,30,440,36,409,36"/>
+<area shape="rect" id="Node000005" href="$structPlanValidationResult.html#a0a4e3f65319741aa5731ca3bf2fae8b3" title=" " alt="" coords="487,81,628,122"/>
+<area shape="poly" id="edge4_Node000004_Node000005" title=" " alt="" coords="379,101,472,100,472,105,379,107"/>
+<area shape="rect" id="Node000006" href="$structPlanValidationResult.html#a991fb57795346b0f3c1dde8b3cb4657c" title=" " alt="" coords="484,146,631,187"/>
+<area shape="poly" id="edge5_Node000004_Node000006" title=" " alt="" coords="380,120,470,142,468,147,378,125"/>
+</map>

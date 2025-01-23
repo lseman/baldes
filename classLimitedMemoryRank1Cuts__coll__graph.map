@@ -1,0 +1,7 @@
+<map id="LimitedMemoryRank1Cuts" name="LimitedMemoryRank1Cuts">
+<area shape="rect" id="Node000001" title="A class for handling limited memory rank&#45;1 cuts in optimization problems." alt="" coords="44,94,218,120"/>
+<area shape="rect" id="Node000002" href="$classXoroshiro128Plus.html" title=" " alt="" coords="5,5,129,31"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="87,42,124,92,120,95,83,45"/>
+<area shape="rect" id="Node000003" href="$classCutStorage.html" title="Manages the storage and operations related to cuts in a solver." alt="" coords="153,5,240,31"/>
+<area shape="poly" id="edge2_Node000001_Node000003" title=" " alt="" coords="180,45,142,95,138,92,176,42"/>
+</map>

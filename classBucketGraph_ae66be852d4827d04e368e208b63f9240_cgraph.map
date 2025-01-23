@@ -1,0 +1,26 @@
+<map id="BucketGraph::common_initialization" name="BucketGraph::common_initialization">
+<area shape="rect" id="Node000001" title=" " alt="" coords="5,192,159,233"/>
+<area shape="rect" id="Node000002" href="$classBucketGraph.html#a8b934dd825af2c3536269ac190b398b3" title="Initializes the BucketGraph by clearing previous data and setting up forward and backward buckets." alt="" coords="207,192,360,233"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="159,210,191,210,191,215,159,215"/>
+<area shape="rect" id="Node000003" href="$classBucketGraph.html#af129eff306551dc7cc7fe00b919bbbd0" title="Assigns the buckets based on the specified direction." alt="" coords="649,5,791,46"/>
+<area shape="poly" id="edge2_Node000002_Node000003" title=" " alt="" coords="295,190,339,133,371,102,407,77,463,53,522,37,581,27,634,23,634,28,581,33,523,42,464,58,409,81,374,106,343,136,299,193"/>
+<area shape="rect" id="Node000004" href="$classBucketGraph.html#a820c42b7e4fbfb599cdde7550ba3a12e" title=" " alt="" coords="422,192,575,233"/>
+<area shape="poly" id="edge3_Node000002_Node000004" title=" " alt="" coords="361,210,406,210,406,215,361,215"/>
+<area shape="rect" id="Node000009" href="$classBucketGraph.html#ad36a543a58c7d3cd4ded313dd5069f03" title="Marks a node as visited in the bitmap." alt="" coords="642,324,798,365"/>
+<area shape="poly" id="edge13_Node000002_Node000009" title=" " alt="" coords="361,229,589,292,654,316,652,321,588,298,360,235"/>
+<area shape="rect" id="Node000010" href="$classBucketGraph.html#abc324fb45e794482eb642adb8b0f664d" title="Retrieves the best label from the bucket graph based on the given topological order,..." alt="" coords="422,91,575,131"/>
+<area shape="poly" id="edge10_Node000002_Node000010" title=" " alt="" coords="327,189,438,136,440,141,330,194"/>
+<area shape="rect" id="Node000011" href="$Definitions_8h.html#a59e29a115ea52c2f99d3ff52f83cb3cf" title=" " alt="" coords="408,308,588,333"/>
+<area shape="poly" id="edge12_Node000002_Node000011" title=" " alt="" coords="316,231,359,259,409,286,441,299,439,304,407,291,357,263,313,235"/>
+<area shape="rect" id="Node000005" href="$classBucketGraph.html#abb791c45d27a9425607480e3101f7d28" title=" " alt="" coords="636,71,804,111"/>
+<area shape="poly" id="edge4_Node000004_Node000005" title=" " alt="" coords="526,189,576,155,635,121,645,116,648,120,638,125,579,160,529,194"/>
+<area shape="rect" id="Node000006" href="$classBucketGraph.html#ad15267e0cffaa8dc5222028409c9e082" title=" " alt="" coords="653,136,787,161"/>
+<area shape="poly" id="edge5_Node000004_Node000006" title=" " alt="" coords="570,189,636,170,657,164,659,169,637,175,572,194"/>
+<area shape="rect" id="Node000007" href="$classArcDuals.html#ac75e53f0c4f24e6aca539c544e9f8109" title=" " alt="" coords="658,209,782,234"/>
+<area shape="poly" id="edge6_Node000004_Node000007" title=" " alt="" coords="575,213,643,216,642,221,575,218"/>
+<area shape="rect" id="Node000008" href="$classBucketGraph.html#aac3c165dfb9837288ad63ac34ad91041" title="Checks if a node has been visited based on a bitmap." alt="" coords="646,259,794,299"/>
+<area shape="poly" id="edge8_Node000004_Node000008" title=" " alt="" coords="569,231,636,251,635,256,567,236"/>
+<area shape="poly" id="edge9_Node000004_Node000009" title=" " alt="" coords="560,231,590,249,606,265,615,280,623,294,638,309,645,314,642,318,635,313,619,298,610,282,601,268,587,253,557,236"/>
+<area shape="poly" id="edge7_Node000007_Node000007" title=" " alt="" coords="683,210,676,200,680,190,695,184,720,182,747,185,761,192,759,196,746,190,720,187,697,190,684,194,681,200,687,207"/>
+<area shape="poly" id="edge11_Node000010_Node000003" title=" " alt="" coords="552,88,650,50,652,55,554,93"/>
+</map>

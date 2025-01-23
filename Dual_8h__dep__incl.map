@@ -1,0 +1,77 @@
+<map id="Dual.h" name="Dual.h">
+<area shape="rect" id="Node000001" title=" " alt="" coords="826,5,884,31"/>
+<area shape="rect" id="Node000002" href="$Branching_8cpp.html" title=" " alt="" coords="940,595,1044,620"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="899,20,971,30,1011,40,1050,54,1085,72,1115,96,1134,127,1141,164,1141,462,1138,486,1129,508,1115,529,1097,547,1058,576,1021,596,1019,592,1055,572,1094,543,1110,525,1124,506,1133,485,1136,461,1136,164,1129,129,1111,100,1083,77,1048,59,1009,45,970,35,899,25"/>
+<area shape="rect" id="Node000003" href="$BucketBindings_8cpp.html" title="Python bindings for the BucketGraph, VRPNode, Label, PSTEPDuals, and BucketOptions classes using pybi..." alt="" coords="5,447,142,473"/>
+<area shape="poly" id="edge2_Node000001_Node000003" title=" " alt="" coords="811,25,615,41,350,70,224,89,119,112,78,124,47,138,28,151,21,165,21,314,27,353,39,390,68,446,63,448,34,392,21,354,16,314,16,164,24,148,44,133,76,119,118,107,223,84,350,65,614,36,811,20"/>
+<area shape="rect" id="Node000004" href="$BucketGraph_8h.html" title="Defines the BucketGraph class and associated functionalities used in solving vehicle routing problems..." alt="" coords="410,153,518,178"/>
+<area shape="poly" id="edge3_Node000001_Node000004" title=" " alt="" coords="813,38,498,155,496,150,811,33"/>
+<area shape="rect" id="Node000019" href="$Node_8h.html" title="Node class implementation." alt="" coords="869,300,931,326"/>
+<area shape="poly" id="edge43_Node000001_Node000019" title=" " alt="" coords="881,40,924,88,945,118,960,152,968,179,972,203,969,226,960,253,942,281,919,302,916,298,938,278,955,251,964,225,966,203,963,181,955,154,940,121,920,91,877,43"/>
+<area shape="rect" id="Node000024" href="$RCC_8h.html" title="Definitions for generating and separating Rounded Capacity Cuts (RCC) in the context of vehicle routi..." alt="" coords="826,79,884,105"/>
+<area shape="poly" id="edge44_Node000001_Node000024" title=" " alt="" coords="858,46,858,79,852,79,852,46"/>
+<area shape="poly" id="edge12_Node000004_Node000003" title=" " alt="" coords="395,170,345,175,290,185,235,202,184,229,157,251,135,279,117,310,103,343,85,404,78,447,72,446,80,403,98,341,113,308,131,276,154,248,181,224,233,197,289,180,345,170,394,165"/>
+<area shape="rect" id="Node000005" href="$BCP_8h.html" title="Header file for the BCP class." alt="" coords="664,447,723,473"/>
+<area shape="poly" id="edge4_Node000004_Node000005" title=" " alt="" coords="480,191,535,286,575,343,619,397,649,424,677,445,674,449,645,428,616,401,571,346,531,289,475,193"/>
+<area shape="rect" id="Node000010" href="$BucketGraph_8cpp.html" title="Implementation of the BucketGraph class and related structures for solving vehicle routing problems (..." alt="" coords="169,447,290,473"/>
+<area shape="poly" id="edge13_Node000004_Node000010" title=" " alt="" coords="396,175,331,187,261,209,227,226,196,246,169,271,148,301,141,321,142,342,148,362,159,382,188,418,216,445,212,449,184,422,154,385,143,364,136,342,136,320,143,299,165,268,193,242,224,221,259,204,330,181,395,169"/>
+<area shape="rect" id="Node000011" href="$BucketJump_8h.html" title="Header file for the Bucket Graph&#39;s arc elimination and jump arc utilities in Vehicle Routing Problems..." alt="" coords="323,226,427,252"/>
+<area shape="poly" id="edge14_Node000004_Node000011" title=" " alt="" coords="439,190,391,228,388,224,436,186"/>
+<area shape="rect" id="Node000013" href="$BucketPSTEP_8cpp.html" title=" " alt="" coords="346,447,476,473"/>
+<area shape="poly" id="edge26_Node000004_Node000013" title=" " alt="" coords="463,194,441,326,416,447,411,446,436,325,458,194"/>
+<area shape="rect" id="Node000015" href="$BucketRes_8h.html" title=" " alt="" coords="158,300,253,326"/>
+<area shape="poly" id="edge27_Node000004_Node000015" title=" " alt="" coords="409,186,361,205,312,229,259,266,219,302,216,298,256,262,309,224,359,200,407,181"/>
+<area shape="rect" id="Node000016" href="$SRC_8h.html" title="Definitions for handling cuts and optimizations for the Vehicle Routing Problem with Time Windows (VR..." alt="" coords="552,226,611,252"/>
+<area shape="poly" id="edge29_Node000004_Node000016" title=" " alt="" coords="498,184,563,223,560,228,495,189"/>
+<area shape="rect" id="Node000006" href="$BCP_8cpp.html" title=" " alt="" coords="615,595,687,620"/>
+<area shape="poly" id="edge5_Node000005_Node000006" title=" " alt="" coords="688,489,677,522,657,595,652,593,672,520,683,487"/>
+<area shape="rect" id="Node000007" href="$BNB_8h.html" title=" " alt="" coords="730,521,790,547"/>
+<area shape="poly" id="edge6_Node000005_Node000007" title=" " alt="" coords="717,482,751,519,747,522,713,486"/>
+<area shape="rect" id="Node000008" href="$Baldes_8cpp.html" title=" " alt="" coords="718,595,803,620"/>
+<area shape="poly" id="edge8_Node000005_Node000008" title=" " alt="" coords="702,487,721,545,752,593,748,596,716,548,697,489"/>
+<area shape="rect" id="Node000009" href="$Branching_8h.html" title=" " alt="" coords="814,521,904,547"/>
+<area shape="poly" id="edge9_Node000005_Node000009" title=" " alt="" coords="736,477,832,518,830,523,734,482"/>
+<area shape="poly" id="edge7_Node000007_Node000008" title=" " alt="" coords="763,562,763,594,758,594,758,562"/>
+<area shape="poly" id="edge11_Node000009_Node000002" title=" " alt="" coords="896,552,971,592,968,596,894,557"/>
+<area shape="poly" id="edge10_Node000009_Node000006" title=" " alt="" coords="810,555,687,597,685,592,808,550"/>
+<area shape="rect" id="Node000012" href="$BucketSolve_8h.html" title="Defines the BucketGraph class and its solving methods for optimization problems." alt="" coords="268,374,373,399"/>
+<area shape="poly" id="edge15_Node000011_Node000012" title=" " alt="" coords="348,264,331,281,319,301,314,320,314,339,319,373,314,373,308,339,309,319,314,299,327,277,344,260"/>
+<area shape="rect" id="Node000014" href="$BucketUtils_8h.html" title="Header file for utilities related to the Bucket Graph in the Vehicle Routing Problem (VRP)." alt="" coords="328,300,427,326"/>
+<area shape="poly" id="edge20_Node000011_Node000014" title=" " alt="" coords="379,267,380,299,374,300,373,268"/>
+<area shape="poly" id="edge17_Node000012_Node000003" title=" " alt="" coords="264,407,116,449,115,444,263,402"/>
+<area shape="poly" id="edge16_Node000012_Node000005" title=" " alt="" coords="388,398,664,451,663,456,387,403"/>
+<area shape="poly" id="edge18_Node000012_Node000010" title=" " alt="" coords="295,411,246,449,243,445,291,407"/>
+<area shape="poly" id="edge19_Node000012_Node000013" title=" " alt="" coords="349,407,397,445,394,449,346,411"/>
+<area shape="poly" id="edge22_Node000014_Node000003" title=" " alt="" coords="334,334,236,376,96,449,93,445,234,371,332,329"/>
+<area shape="poly" id="edge21_Node000014_Node000005" title=" " alt="" coords="415,331,548,397,665,445,663,450,546,402,412,336"/>
+<area shape="poly" id="edge23_Node000014_Node000010" title=" " alt="" coords="319,334,286,351,257,375,246,393,239,412,233,447,227,447,234,411,241,390,253,372,283,346,317,329"/>
+<area shape="poly" id="edge25_Node000014_Node000012" title=" " alt="" coords="361,339,332,375,328,372,356,336"/>
+<area shape="poly" id="edge24_Node000014_Node000013" title=" " alt="" coords="386,340,411,446,405,447,381,341"/>
+<area shape="poly" id="edge28_Node000015_Node000012" title=" " alt="" coords="239,332,302,371,299,375,237,337"/>
+<area shape="poly" id="edge30_Node000016_Node000012" title=" " alt="" coords="551,263,440,328,347,376,344,371,438,323,548,258"/>
+<area shape="poly" id="edge31_Node000016_Node000014" title=" " alt="" coords="539,258,413,302,411,297,537,253"/>
+<area shape="rect" id="Node000017" href="$HeuristicHighOrder_8h.html" title=" " alt="" coords="653,300,795,326"/>
+<area shape="poly" id="edge32_Node000016_Node000017" title=" " alt="" coords="621,257,701,297,699,302,618,262"/>
+<area shape="rect" id="Node000018" href="$SRC_8cpp.html" title="Implementation of functions and classes for solving VRP problems using Limited Memory Rank&#45;1 Cuts." alt="" coords="629,374,702,399"/>
+<area shape="poly" id="edge42_Node000016_Node000018" title=" " alt="" coords="598,264,661,372,656,375,594,267"/>
+<area shape="poly" id="edge34_Node000016_Node000019" title=" " alt="" coords="626,250,869,303,868,308,625,255"/>
+<area shape="poly" id="edge33_Node000017_Node000018" title=" " alt="" coords="707,339,677,375,673,371,703,336"/>
+<area shape="poly" id="edge38_Node000019_Node000002" title=" " alt="" coords="931,334,948,351,963,372,975,403,984,435,995,499,997,556,996,594,990,594,992,556,989,500,979,436,970,405,958,375,944,355,927,338"/>
+<area shape="poly" id="edge35_Node000019_Node000005" title=" " alt="" coords="872,337,712,449,709,445,869,333"/>
+<area shape="poly" id="edge36_Node000019_Node000007" title=" " alt="" coords="887,340,770,522,765,519,882,337"/>
+<area shape="poly" id="edge37_Node000019_Node000008" title=" " alt="" coords="914,339,929,382,940,437,941,466,939,495,932,523,918,548,895,572,865,589,834,599,804,605,803,600,832,594,863,584,891,568,914,545,927,521,934,494,936,466,934,437,924,384,909,341"/>
+<area shape="poly" id="edge39_Node000019_Node000009" title=" " alt="" coords="898,341,864,521,858,520,893,340"/>
+<area shape="poly" id="edge41_Node000019_Node000018" title=" " alt="" coords="855,331,703,377,701,372,854,325"/>
+<area shape="rect" id="Node000022" href="$RCC_8cpp.html" title=" " alt="" coords="1029,374,1102,399"/>
+<area shape="poly" id="edge40_Node000019_Node000022" title=" " alt="" coords="943,330,1038,371,1036,376,941,335"/>
+<area shape="poly" id="edge46_Node000024_Node000004" title=" " alt="" coords="811,104,519,157,518,152,810,99"/>
+<area shape="poly" id="edge45_Node000024_Node000005" title=" " alt="" coords="877,115,897,143,914,178,923,215,922,235,916,253,904,271,891,281,859,302,781,376,707,449,703,445,777,372,856,298,888,277,900,267,911,251,916,234,917,216,909,180,892,146,873,118"/>
+<area shape="poly" id="edge51_Node000024_Node000022" title=" " alt="" coords="899,108,931,127,959,151,982,179,1002,210,1033,274,1054,332,1065,372,1060,374,1049,334,1028,276,997,213,978,182,956,155,928,131,897,113"/>
+<area shape="rect" id="Node000025" href="$HighOrderSRC_8h.html" title=" " alt="" coords="714,153,831,178"/>
+<area shape="poly" id="edge47_Node000024_Node000025" title=" " alt="" coords="831,117,788,154,784,150,827,113"/>
+<area shape="poly" id="edge50_Node000025_Node000016" title=" " alt="" coords="727,187,612,229,610,224,725,182"/>
+<area shape="rect" id="Node000026" href="$HighOrderSRC_8cpp.html" title=" " alt="" coords="634,226,766,252"/>
+<area shape="poly" id="edge48_Node000025_Node000026" title=" " alt="" coords="751,191,714,228,710,224,748,187"/>
+<area shape="rect" id="Node000027" href="$RLBindings_8cpp.html" title=" " alt="" coords="789,226,902,252"/>
+<area shape="poly" id="edge49_Node000025_Node000027" title=" " alt="" coords="797,187,835,224,831,228,793,191"/>
+</map>

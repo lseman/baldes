@@ -1,0 +1,19 @@
+<map id="TrustRegion::setup" name="TrustRegion::setup">
+<area shape="rect" id="Node000001" title=" " alt="" coords="5,153,135,179"/>
+<area shape="rect" id="Node000002" href="$classBNBNode.html#a58adcc5f912a44be604d0e11063d7926" title=" " alt="" coords="221,5,348,31"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="77,151,117,97,147,66,181,40,205,29,207,34,184,44,150,70,121,100,81,154"/>
+<area shape="rect" id="Node000003" href="$classBNBNode.html#a1bed7031f27bac7f4a80424438c5d5f6" title=" " alt="" coords="216,55,353,80"/>
+<area shape="poly" id="edge2_Node000001_Node000003" title=" " alt="" coords="86,151,127,120,182,89,200,82,202,87,184,94,130,124,89,155"/>
+<area shape="rect" id="Node000004" href="$classBNBNode.html#a8e9719a49d2b149441b61ee4aa790fa2" title=" " alt="" coords="210,104,359,130"/>
+<area shape="poly" id="edge3_Node000001_Node000004" title=" " alt="" coords="129,150,210,131,211,136,130,155"/>
+<area shape="rect" id="Node000005" href="$classBNBNode.html#abb76f5afa8990290b262a0750cede865" title=" " alt="" coords="217,153,352,179"/>
+<area shape="poly" id="edge4_Node000001_Node000005" title=" " alt="" coords="135,164,202,164,202,169,135,169"/>
+<area shape="rect" id="Node000007" href="$Definitions_8h.html#a086546d06aa565cdd48f436973ebc496" title="Prints an informational message with a specific format." alt="" coords="247,203,322,228"/>
+<area shape="poly" id="edge6_Node000001_Node000007" title=" " alt="" coords="130,177,232,201,231,206,129,182"/>
+<area shape="rect" id="Node000008" href="$classTrustRegion.html#ac3eda2d301f297e8fde56f1a687eb51d" title=" " alt="" coords="194,252,374,278"/>
+<area shape="poly" id="edge7_Node000001_Node000008" title=" " alt="" coords="89,177,130,208,184,238,199,244,197,249,182,243,127,213,86,182"/>
+<area shape="rect" id="Node000009" href="$classTrustRegion.html#af950367106933c2f9b74145a9829982f" title=" " alt="" coords="183,301,386,327"/>
+<area shape="poly" id="edge8_Node000001_Node000009" title=" " alt="" coords="81,178,121,232,150,262,184,288,193,293,190,297,181,292,147,266,117,235,77,181"/>
+<area shape="rect" id="Node000006" href="$classGurobiEnvSingleton.html#a49c3ce63088629c2246dec252a73df16" title=" " alt="" coords="434,146,569,186"/>
+<area shape="poly" id="edge5_Node000005_Node000006" title=" " alt="" coords="352,164,419,164,419,169,352,169"/>
+</map>

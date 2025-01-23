@@ -1,0 +1,5 @@
+<map id="IPSolver::solve_augsys" name="IPSolver::solve_augsys">
+<area shape="rect" id="Node000001" title=" " alt="" coords="5,13,162,38"/>
+<area shape="rect" id="Node000002" href="$classIPSolver.html#a55c0e0acdfb28b73b2387a610bf8fbd6" title="Solves the augmented system for the given right&#45;hand side vectors." alt="" coords="210,5,389,46"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="162,23,194,23,194,28,162,28"/>
+</map>
