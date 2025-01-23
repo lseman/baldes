@@ -1,11 +1,9 @@
-
 #pragma once
 #include "BucketGraph.h"
 #include "Common.h"
 #include "Definitions.h"
 
-// Resource type enumeration for better type safety and readability
-enum class ResourceType {
+enum ResourceType {
     Disposable = 1,
     NonDisposable = 0,
     Binary = 2,
@@ -15,154 +13,122 @@ enum class ResourceType {
     RechargeTime = 6
 };
 
-// Forward declare the BucketGraph class
-class BucketGraph;
+using ResourceProcessor = bool (*)(double&, double, double, const VRPNode&,
+                                   const BucketOptions&);
 
-// Declare all specialized processing functions first
 template <Direction D>
-inline bool process_disposable_resource(double& new_resource,
-                                        double initial_resource,
-                                        double increment, double lb,
-                                        double ub) {
-    if constexpr (D == Direction::Forward) {
-        new_resource = std::max(initial_resource + increment, lb);
-        return new_resource <= ub;
-    } else {
-        new_resource = std::min(initial_resource - increment, ub);
-        return new_resource >= lb;
-    }
+static constexpr bool check_bounds(double val, double lb, double ub) {
+    return D == Direction::Forward ? val <= ub : val >= lb;
 }
 
 template <Direction D>
-inline bool process_non_disposable_resource(double& new_resource,
-                                            double initial_resource,
-                                            double increment, double lb,
-                                            double ub) {
+static constexpr double get_binary_result(double increment) {
+    return (increment > 0) ? (D == Direction::Forward ? 1.0 : 0.0)
+                           : (D == Direction::Forward ? 0.0 : 1.0);
+}
+
+template <Direction D>
+static constexpr double adjust_resource(double initial, double increment) {
+    return initial + (D == Direction::Forward ? increment : -increment);
+}
+
+template <Direction D>
+static bool process_disposable(double& new_resource, double initial,
+                               double increment, const VRPNode& node,
+                               const BucketOptions& opts) {
+    constexpr auto dir = D == Direction::Forward;
     new_resource =
-        initial_resource + (D == Direction::Forward ? increment : -increment);
-    return new_resource >= lb && new_resource <= ub;
+        dir ? std::max(adjust_resource<D>(initial, increment), node.lb[0])
+            : std::min(adjust_resource<D>(initial, increment), node.ub[0]);
+    return check_bounds<D>(new_resource, node.lb[0], node.ub[0]);
 }
 
 template <Direction D>
-inline double process_binary_resource(double increment) {
-    const bool is_forward = D == Direction::Forward;
-    return (increment > 0) ? (is_forward ? 1.0 : 0.0)
-                           : (is_forward ? 0.0 : 1.0);
+static bool process_non_disposable(double& new_resource, double initial,
+                                   double increment, const VRPNode& node,
+                                   const BucketOptions& opts) {
+    new_resource = adjust_resource<D>(initial, increment);
+    return check_bounds<D>(new_resource, node.lb[0], node.ub[0]);
 }
 
 template <Direction D>
-inline bool process_battery_resource(double& new_resource,
-                                     double initial_resource, bool is_station,
-                                     double battery_capacity) {
-    if (is_station) {
-        new_resource = battery_capacity;
-        return true;
-    }
-    new_resource = initial_resource;
-    return D == Direction::Forward ? new_resource >= 0
-                                   : new_resource <= battery_capacity;
+static bool process_binary(double& new_resource, double initial,
+                           double increment, const VRPNode& node,
+                           const BucketOptions& opts) {
+    new_resource = get_binary_result<D>(increment);
+    return true;
 }
 
 template <Direction D>
-inline bool process_recharge_count(double& new_resource,
-                                   double initial_resource, bool is_station,
-                                   double max_recharges) {
-    if (!is_station) {
-        new_resource = initial_resource;
-        return true;
-    }
-    new_resource = initial_resource + 1;
-    return new_resource <= max_recharges;
-}
-
-template <Direction D>
-inline bool process_recharge_time(double& new_resource, double initial_resource,
-                                  bool is_station, double max_recharge_time) {
-    new_resource = is_station ? 0 : initial_resource;
-    return new_resource <= max_recharge_time;
-}
-
-template <Direction D>
-inline bool process_mtw_resource(double& new_resource, double initial_resource,
-                                 double increment, const VRPNode& theNode) {
+static bool process_mtw(double& new_resource, double initial, double increment,
+                        const VRPNode& node, const BucketOptions& opts) {
     if constexpr (D == Direction::Forward) {
-        for (size_t i = 0; i < theNode.mtw_lb.size(); ++i) {
-            new_resource =
-                std::max(initial_resource + increment, theNode.mtw_lb[i]);
-            if (new_resource <= theNode.ub[i]) return true;
+        const auto adjusted = adjust_resource<D>(initial, increment);
+        for (size_t i = 0; i < node.mtw_lb.size(); ++i) {
+            new_resource = std::max(adjusted, node.mtw_lb[i]);
+            if (check_bounds<D>(new_resource, node.lb[i], node.ub[i]))
+                return true;
         }
     } else {
-        for (size_t i = 0; i < theNode.mtw_ub.size(); ++i) {
-            new_resource =
-                std::min(initial_resource - increment, theNode.mtw_ub[i]);
-            if (new_resource >= theNode.lb[i]) return true;
+        const auto adjusted = adjust_resource<D>(initial, increment);
+        for (size_t i = 0; i < node.mtw_ub.size(); ++i) {
+            new_resource = std::min(adjusted, node.mtw_ub[i]);
+            if (check_bounds<D>(new_resource, node.lb[i], node.ub[i]))
+                return true;
         }
     }
     return false;
 }
 
-// Main processing function
+template <Direction D>
+static bool process_battery(double& new_resource, double initial,
+                            double increment, const VRPNode& node,
+                            const BucketOptions& opts) {
+    if (node.is_station) {
+        new_resource = opts.battery_capacity;
+        return true;
+    }
+    new_resource = initial;
+    return D == Direction::Forward ? new_resource >= 0
+                                   : new_resource <= opts.battery_capacity;
+}
+
+template <Direction D>
+static bool process_recharge_count(double& new_resource, double initial,
+                                   double increment, const VRPNode& node,
+                                   const BucketOptions& opts) {
+    if (!node.is_station) {
+        new_resource = initial;
+        return true;
+    }
+    new_resource = initial + 1;
+    return new_resource <= opts.max_recharges;
+}
+
+template <Direction D>
+static bool process_recharge_time(double& new_resource, double initial,
+                                  double increment, const VRPNode& node,
+                                  const BucketOptions& opts) {
+    new_resource = node.is_station ? 0 : initial;
+    return new_resource <= opts.max_recharge_time;
+}
+
 template <Direction D, typename Gamma, typename VRPNode>
 bool BucketGraph::process_all_resources(
     std::vector<double>& new_resources,
     const std::array<double, R_SIZE>& initial_resources, const Gamma& gamma,
     const VRPNode& theNode, size_t N) {
-    for (size_t I = 0; I < N; ++I) {
-        switch (static_cast<ResourceType>(options.resource_type[I])) {
-            [[likely]] case ResourceType::Disposable:
-                if (!process_disposable_resource<D>(
-                        new_resources[I], initial_resources[I],
-                        gamma.resource_increment[I], theNode.lb[I],
-                        theNode.ub[I])) {
-                    return false;
-                }
-                break;
+    static constexpr ResourceProcessor processors[] = {
+        &process_non_disposable<D>, &process_disposable<D>,
+        &process_binary<D>,         &process_mtw<D>,
+        &process_battery<D>,        &process_recharge_count<D>,
+        &process_recharge_time<D>};
 
-            case ResourceType::NonDisposable:
-                if (!process_non_disposable_resource<D>(
-                        new_resources[I], initial_resources[I],
-                        gamma.resource_increment[I], theNode.lb[I],
-                        theNode.ub[I])) {
-                    return false;
-                }
-                break;
-
-            case ResourceType::Binary:
-                new_resources[I] =
-                    process_binary_resource<D>(gamma.resource_increment[I]);
-                break;
-
-            case ResourceType::Battery:
-                if (!process_battery_resource<D>(
-                        new_resources[I], initial_resources[I],
-                        theNode.is_station, options.battery_capacity)) {
-                    return false;
-                }
-                break;
-
-            case ResourceType::RechargeCount:
-                if (!process_recharge_count<D>(
-                        new_resources[I], initial_resources[I],
-                        theNode.is_station, options.max_recharges)) {
-                    return false;
-                }
-                break;
-
-            case ResourceType::RechargeTime:
-                if (!process_recharge_time<D>(
-                        new_resources[I], initial_resources[I],
-                        theNode.is_station, options.max_recharge_time)) {
-                    return false;
-                }
-                break;
-
-            case ResourceType::MTW:
-                if (!process_mtw_resource<D>(
-                        new_resources[I], initial_resources[I],
-                        gamma.resource_increment[I], theNode)) {
-                    return false;
-                }
-                break;
+    for (size_t i = 0; i < N; ++i) {
+        if (!processors[options.resource_type[i]](
+                new_resources[i], initial_resources[i],
+                gamma.resource_increment[i], theNode, options)) {
+            return false;
         }
     }
     return true;

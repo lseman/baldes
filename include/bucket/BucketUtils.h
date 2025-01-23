@@ -577,9 +577,10 @@ Label *BucketGraph::get_best_label(const std::vector<int> &topological_order,
 template <Stage S, Symmetry SYM>
 void BucketGraph::ConcatenateLabel(const Label *L, int &b, double &best_cost,
                                    std::vector<uint64_t> &Bvisited) {
+    // Reuse thread-local bucket_stack to avoid repeated allocations
     static thread_local std::vector<int> bucket_stack;
     bucket_stack.clear();
-    bucket_stack.reserve(50);
+    bucket_stack.reserve(50);  // Adjust based on expected size
     bucket_stack.push_back(b);
 
     auto &other_buckets = assign_symmetry<SYM>(fw_buckets, bw_buckets);
@@ -603,7 +604,6 @@ void BucketGraph::ConcatenateLabel(const Label *L, int &b, double &best_cost,
         cutter = cut_storage;
     }
     const auto active_cuts = cutter->getActiveCuts();
-
 #endif
 
     while (!bucket_stack.empty()) {
@@ -643,7 +643,11 @@ void BucketGraph::ConcatenateLabel(const Label *L, int &b, double &best_cost,
         const auto &bucket = other_buckets[current_bucket];
         const auto &labels = bucket.get_labels();
 
-        for (const Label *L_bw : labels) {
+// Parallelize the inner loop if possible
+#pragma omp parallel for schedule(dynamic) reduction(min : best_cost)
+        for (size_t i = 0; i < labels.size(); ++i) {
+            const Label *L_bw = labels[i];
+
             // Early rejection tests
             if (L_bw->node_id == L_node_id || !check_feasibility(L, L_bw)) {
                 continue;
@@ -652,8 +656,8 @@ void BucketGraph::ConcatenateLabel(const Label *L, int &b, double &best_cost,
             // Visited nodes overlap check
             if constexpr (S >= Stage::Three) {
                 bool has_overlap = false;
-                for (size_t i = 0; i < bitmap_size; ++i) {
-                    if (L->visited_bitmap[i] & L_bw->visited_bitmap[i]) {
+                for (size_t j = 0; j < bitmap_size; ++j) {
+                    if (L->visited_bitmap[j] & L_bw->visited_bitmap[j]) {
                         has_overlap = true;
                         break;
                     }
@@ -686,9 +690,13 @@ void BucketGraph::ConcatenateLabel(const Label *L, int &b, double &best_cost,
 
             // Create new merged label
             auto pbest = compute_label<S>(L, L_bw);
-            best_cost = pbest->cost;
-            // fmt::print("Best cost: {}\n", best_cost);
-            merged_labels.push_back(pbest);
+#pragma omp critical
+            {
+                if (pbest->cost < best_cost) {
+                    best_cost = pbest->cost;
+                }
+                merged_labels.push_back(pbest);
+            }
         }
 
         // Process neighbor buckets
@@ -792,64 +800,44 @@ void BucketGraph::SCC_handler() {
     for (const auto &scc : sccs) {
         // Iterate over each bucket in the SCC
         for (int bucket : scc) {
-            int from_node_id =
-                buckets[bucket].node_id;  // Get the source node ID
-            VRPNode &node =
-                nodes[from_node_id];  // Access the corresponding node
-            //  Define filtered arcs depending on the direction
+            const int from_node_id =
+                buckets[bucket].node_id;          // Cache source node ID
+            VRPNode &node = nodes[from_node_id];  // Cache node reference
+
+            // Define filtered arcs depending on the direction
+            auto &filtered_arcs = (D == Direction::Forward)
+                                      ? node.fw_arcs_scc[scc_ctr]
+                                      : node.bw_arcs_scc[scc_ctr];
+
+            // Reserve space for filtered arcs to avoid reallocations
+            filtered_arcs.reserve(
+                buckets[bucket].template get_bucket_arcs<D>().size());
+
+            // Create a map for faster arc lookups
+            // std::unordered_map<int, Arc> arc_map;
+            ankerl::unordered_dense::map<int, Arc> arc_map;
             if constexpr (D == Direction::Forward) {
-                std::vector<Arc> &filtered_fw_arcs =
-                    nodes[from_node_id]
-                        .fw_arcs_scc[scc_ctr];  // For forward direction
-
-                // Iterate over the arcs from the current bucket
-                const auto &bucket_arcs =
-                    buckets[bucket].template get_bucket_arcs<D>();
-                for (const auto &arc : bucket_arcs) {
-                    int to_node_id =
-                        buckets[arc.to_bucket]
-                            .node_id;  // Get the destination node ID
-
-                    // Search for the arc from `from_node_id` to `to_node_id` in
-                    // the node's arcs
-                    auto it =
-                        std::find_if(node.fw_arcs.begin(), node.fw_arcs.end(),
-                                     [&to_node_id](const Arc &a) {
-                                         return a.to == to_node_id;
-                                     });
-
-                    // If both nodes are within the current SCC, retain the arc
-                    if (it != node.fw_arcs.end()) {
-                        // Add the arc to the filtered arcs
-                        filtered_fw_arcs.push_back(*it);  // Forward arcs
-                    }
+                for (const auto &arc : node.fw_arcs) {
+                    arc_map[arc.to] = arc;
                 }
             } else {
-                std::vector<Arc> &filtered_bw_arcs =
-                    nodes[from_node_id]
-                        .bw_arcs_scc[scc_ctr];  // For forward direction
+                for (const auto &arc : node.bw_arcs) {
+                    arc_map[arc.to] = arc;
+                }
+            }
 
-                // Iterate over the arcs from the current bucket
-                const auto &bucket_arcs =
-                    buckets[bucket].template get_bucket_arcs<D>();
-                for (const auto &arc : bucket_arcs) {
-                    int to_node_id =
-                        buckets[arc.to_bucket]
-                            .node_id;  // Get the destination node ID
+            // Iterate over the arcs from the current bucket
+            for (const auto &arc :
+                 buckets[bucket].template get_bucket_arcs<D>()) {
+                const int to_node_id =
+                    buckets[arc.to_bucket]
+                        .node_id;  // Cache destination node ID
 
-                    // Search for the arc from `from_node_id` to `to_node_id` in
-                    // the node's arcs
-                    auto it =
-                        std::find_if(node.bw_arcs.begin(), node.bw_arcs.end(),
-                                     [&to_node_id](const Arc &a) {
-                                         return a.to == to_node_id;
-                                     });
-
-                    // If both nodes are within the current SCC, retain the arc
-                    if (it != node.bw_arcs.end()) {
-                        // Add the arc to the filtered arcs
-                        filtered_bw_arcs.push_back(*it);  // Forward arcs
-                    }
+                // Check if the arc exists in the map
+                auto it = arc_map.find(to_node_id);
+                if (it != arc_map.end()) {
+                    // Add the arc to the filtered arcs
+                    filtered_arcs.push_back(it->second);
                 }
             }
         }
@@ -862,12 +850,15 @@ void BucketGraph::SCC_handler() {
         if constexpr (D == Direction::Forward) {
             // Iterate over all SCCs for each node
             for (auto &fw_arcs_scc : node.fw_arcs_scc) {
+                // Skip if the vector is empty
+                if (fw_arcs_scc.empty()) continue;
+
                 // Sort arcs by from_bucket and to_bucket
-                std::sort(fw_arcs_scc.begin(), fw_arcs_scc.end(),
-                          [](const Arc &a, const Arc &b) {
-                              return std::tie(a.from, a.to) <
-                                     std::tie(b.from, b.to);
-                          });
+                pdqsort(fw_arcs_scc.begin(), fw_arcs_scc.end(),
+                        [](const Arc &a, const Arc &b) {
+                            return std::tie(a.from, a.to) <
+                                   std::tie(b.from, b.to);
+                        });
 
                 // Remove consecutive duplicates
                 auto last =
@@ -882,12 +873,15 @@ void BucketGraph::SCC_handler() {
         } else {
             // Iterate over all SCCs for each node
             for (auto &bw_arcs_scc : node.bw_arcs_scc) {
+                // Skip if the vector is empty
+                if (bw_arcs_scc.empty()) continue;
+
                 // Sort arcs by from_bucket and to_bucket
-                std::sort(bw_arcs_scc.begin(), bw_arcs_scc.end(),
-                          [](const Arc &a, const Arc &b) {
-                              return std::tie(a.from, a.to) <
-                                     std::tie(b.from, b.to);
-                          });
+                pdqsort(bw_arcs_scc.begin(), bw_arcs_scc.end(),
+                        [](const Arc &a, const Arc &b) {
+                            return std::tie(a.from, a.to) <
+                                   std::tie(b.from, b.to);
+                        });
 
                 // Remove consecutive duplicates
                 auto last =
@@ -1138,8 +1132,26 @@ void BucketGraph::set_adjacency_list() {
     // Compute clusters using MST-based clustering
     MST mst_solver(nodes,
                    [this](int from, int to) { return this->getcij(from, to); });
-    const double theta = 1.0;
+
+    // Compute theta dynamically based on the 90th percentile of edge weights
+    auto mst = mst_solver.compute_mst();
+    std::vector<double> edge_weights;
+    edge_weights.reserve(mst.size());
+    for (const auto &[weight, from, to] : mst) {
+        edge_weights.push_back(weight);
+    }
+
+    // Sort edge weights to compute the 90th percentile
+    pdqsort(edge_weights.begin(), edge_weights.end());
+    double theta = edge_weights[static_cast<size_t>(
+        0.9 * edge_weights.size())];  // 75th percentile
+    theta = theta / 100;
+
+    print_info("Computed theta: {}\n", theta);
+
     auto clusters = mst_solver.cluster(theta);
+    // print number of clusters
+    print_info("Number of clusters: {}\n", clusters.size());
 
     // Create job-to-cluster mapping
     std::vector<int> job_to_cluster(nodes.size(), -1);
@@ -1208,16 +1220,31 @@ void BucketGraph::set_adjacency_list() {
             const bool same_cluster =
                 job_to_cluster[node.id] == job_to_cluster[next_node.id];
             const double base_priority = same_cluster ? 5.0 : 1.0;
+
+            // Incorporate dual values (if available)
+            double dual_value = -nodes[node.id].cost;
+
+            // Refine priority calculation
             const double priority =
-                base_priority + 1.E-5 * next_node.start_time;
-            const double rev_priority =
-                (same_cluster ? 1.0 : 5.0) + 1.E-5 * node.start_time;
+                base_priority + 1.E-5 * next_node.start_time + dual_value;
+            const double rev_priority = (same_cluster ? 1.0 : 5.0) +
+                                        1.E-5 * node.start_time + dual_value;
 
             forward_arcs.emplace_back(priority, next_node.id, res_inc,
                                       cost_inc);
             reverse_arcs.emplace_back(rev_priority, next_node.id, res_inc,
                                       cost_inc);
         }
+
+        // Sort arcs by priority (descending order) using pdqsort
+        pdqsort(forward_arcs.begin(), forward_arcs.end(),
+                [](const Arc &a, const Arc &b) {
+                    return std::get<0>(a) > std::get<0>(b);
+                });
+        pdqsort(reverse_arcs.begin(), reverse_arcs.end(),
+                [](const Arc &a, const Arc &b) {
+                    return std::get<0>(a) > std::get<0>(b);
+                });
 
         // Add forward arcs
         for (const auto &[priority, to_bucket, res_inc_local, cost_inc] :
@@ -1235,7 +1262,7 @@ void BucketGraph::set_adjacency_list() {
     };
 
     // Process all nodes
-    std::vector<double> res_inc(intervals.size());
+    std::vector<double> res_inc(options.resources.size());
     for (const auto &node : nodes) {
         if (node.id != options.end_depot) {
             add_arcs_for_node(node, node.id, res_inc);

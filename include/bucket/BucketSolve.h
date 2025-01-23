@@ -242,6 +242,7 @@ std::vector<double> BucketGraph::labeling_algorithm() {
 
     // Use small vector optimization for new labels
     std::vector<Label *> new_labels;
+    const auto q_star_value = q_star[options.main_resources[0]];
 
     // Process SCCs in topological order
     for (const auto &scc_index : topological_order) {
@@ -263,9 +264,6 @@ std::vector<double> BucketGraph::labeling_algorithm() {
                         if constexpr (F == Full::Partial) {
                             const auto main_resource =
                                 label->resources[options.main_resources[0]];
-                            const auto q_star_value =
-                                q_star[options.main_resources[0]];
-
                             if (((D == Direction::Forward) &&
                                  (main_resource > q_star_value)) ||
                                 ((D == Direction::Backward) &&
@@ -563,6 +561,9 @@ inline std::vector<Label *> BucketGraph::Extend(
         std::conditional_t<A == ArcType::Jump, JumpArc, Arc>> &gamma,
     int depth) noexcept {
     static thread_local std::vector<double> new_resources;
+    if (new_resources.capacity() < options.resources.size()) {
+        new_resources.reserve(options.resources.size());
+    }
     new_resources.resize(options.resources.size());
 
     const int initial_node_id = L_prime->node_id;
