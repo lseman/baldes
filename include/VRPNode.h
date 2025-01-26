@@ -58,6 +58,28 @@ struct VRPNode {
 
     std::vector<double> consumption;
 
+    template <Direction D>
+    void sort_arcs_by_scores(
+        const std::unordered_map<Arc, int, arc_hash> &arc_scores) {
+        auto get_score = [&arc_scores](const Arc &arc) {
+            auto it = arc_scores.find(arc);
+            auto scores = (it != arc_scores.end()) ? it->second : 0;
+            return scores;
+        };
+
+        if constexpr (D == Direction::Forward) {
+            pdqsort(fw_arcs.begin(), fw_arcs.end(),
+                    [&](const Arc &a, const Arc &b) {
+                        return get_score(a) > get_score(b);
+                    });
+        } else {
+            pdqsort(bw_arcs.begin(), bw_arcs.end(),
+                    [&](const Arc &a, const Arc &b) {
+                        return get_score(a) > get_score(b);
+                    });
+        }
+    }
+
     // default constructor
     VRPNode() = default;
 

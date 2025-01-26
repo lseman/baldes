@@ -21,8 +21,8 @@ struct Arc {
     int to;
     std::vector<double> resource_increment;
     double cost_increment;
-    bool fixed = false;
-    double priority = 0;
+    bool fixed;
+    double priority;
 
     Arc()
         : from(-1), to(-1), cost_increment(0.0), fixed(false), priority(0.0) {}
@@ -34,6 +34,35 @@ struct Arc {
 
     Arc(int from, int to, const std::vector<double> &res_inc, double cost_inc,
         double priority);
+
+    // Equality operator
+    bool operator==(const Arc &other) const {
+        return from == other.from && to == other.to &&
+               resource_increment == other.resource_increment &&
+               cost_increment == other.cost_increment && fixed == other.fixed &&
+               priority == other.priority;
+    }
+};
+
+// Custom hash function for Arc
+struct arc_hash {
+    std::size_t operator()(const Arc &arc) const {
+        // Combine hashes of the members
+        std::size_t h1 = std::hash<int>{}(arc.from);
+        std::size_t h2 = std::hash<int>{}(arc.to);
+        std::size_t h3 = std::hash<double>{}(arc.cost_increment);
+        std::size_t h4 = std::hash<bool>{}(arc.fixed);
+        std::size_t h5 = std::hash<double>{}(arc.priority);
+
+        // Hash the resource_increment vector
+        std::size_t h6 = 0;
+        for (const auto &res : arc.resource_increment) {
+            h6 ^= std::hash<double>{}(res) + 0x9e3779b9 + (h6 << 6) + (h6 >> 2);
+        }
+
+        // Combine all hashes
+        return h1 ^ (h2 << 1) ^ (h3 << 2) ^ (h4 << 3) ^ (h5 << 4) ^ (h6 << 5);
+    }
 };
 
 /**

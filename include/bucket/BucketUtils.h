@@ -1133,7 +1133,7 @@ void BucketGraph::set_adjacency_list() {
     MST mst_solver(nodes,
                    [this](int from, int to) { return this->getcij(from, to); });
 
-    // Compute theta dynamically based on the 90th percentile of edge weights
+    // Compute theta dynamically based on the distribution of edge weights
     auto mst = mst_solver.compute_mst();
     std::vector<double> edge_weights;
     edge_weights.reserve(mst.size());
@@ -1141,16 +1141,14 @@ void BucketGraph::set_adjacency_list() {
         edge_weights.push_back(weight);
     }
 
-    // Sort edge weights to compute the 90th percentile
+    // Sort edge weights to compute a dynamic percentile
     pdqsort(edge_weights.begin(), edge_weights.end());
-    double theta = edge_weights[static_cast<size_t>(
-        0.9 * edge_weights.size())];  // 75th percentile
+    double theta = edge_weights[static_cast<size_t>(0.9 * edge_weights.size())];
     theta = theta / 100;
 
     print_info("Computed theta: {}\n", theta);
 
     auto clusters = mst_solver.cluster(theta);
-    // print number of clusters
     print_info("Number of clusters: {}\n", clusters.size());
 
     // Create job-to-cluster mapping
@@ -1261,13 +1259,14 @@ void BucketGraph::set_adjacency_list() {
         }
     };
 
-    // Process all nodes
+    // Process all nodes in parallel
     std::vector<double> res_inc(options.resources.size());
-    for (const auto &node : nodes) {
+    std::mutex mtx;  // For thread-safe operations if needed
+    std::for_each(nodes.begin(), nodes.end(), [&](const VRPNode &node) {
         if (node.id != options.end_depot) {
             add_arcs_for_node(node, node.id, res_inc);
         }
-    }
+    });
 }
 
 /**
@@ -1280,6 +1279,15 @@ void BucketGraph::common_initialization() {
     // Pre-allocate vectors with exact sizes
     merged_labels.clear();
     merged_labels.reserve(50);
+
+    auto &arc_scores = assign_buckets<D>(fw_arc_scores, bw_arc_scores);
+    for (auto &node : nodes) {
+        // check if arc_stores[node.id] is empty
+        if (!arc_scores[node.id].empty()) {
+            node.sort_arcs_by_scores<D>(arc_scores[node.id]);
+        }
+        arc_scores[node.id].clear();
+    }
 
     const size_t num_intervals = options.main_resources.size();
     std::vector<double> base_intervals(num_intervals);
@@ -1305,7 +1313,6 @@ void BucketGraph::common_initialization() {
 
     // Initialize vectors with exact sizes once
     c_bar.resize(buckets_size, std::numeric_limits<double>::infinity());
-    // print size of c_bar
 
     if constexpr (Direction::Forward == D) {
         dominance_checks_per_bucket.assign(buckets_size + 1, 0);

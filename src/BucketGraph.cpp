@@ -836,6 +836,9 @@ void BucketGraph::setup() {
     fw_fixed_buckets_bitmap.assign(fw_bitmap_size, 0);
     bw_fixed_buckets_bitmap.assign(bw_bitmap_size, 0);
 
+    fw_arc_scores.resize(nodes.size());
+    bw_arc_scores.resize(nodes.size());
+
     // define initial relationships
     nodes.resize(options.size);
     if (!options.manual_arcs) {

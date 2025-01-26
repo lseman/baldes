@@ -20,7 +20,7 @@
 #include <cstdint>
 #include <execution>  // For parallel algorithms
 #include <numeric>
-
+//
 template <size_t N_BITS>
 class Bitset {
    private:
@@ -154,15 +154,24 @@ class Bitset {
         return os;
     }
 
+    // Zero-cost abstractions for bit manipulation
+    [[nodiscard]] constexpr auto data() const noexcept { return bits_.data(); }
+    [[nodiscard]] constexpr auto size() const noexcept { return N_BITS; }
+    [[nodiscard]] constexpr auto span() const noexcept {
+        return std::span(bits_);
+    }
+
     ~Bitset() noexcept { bits_.fill(0); }
 };
 
 namespace std {
 template <size_t N_BITS>
 struct hash<Bitset<N_BITS>> {
-    size_t operator()(const Bitset<N_BITS> &bitset) const noexcept {
-        return XXH3_64bits(bitset.bits_.data(),
-                           bitset.bits_.size() * sizeof(uint64_t));
+    [[nodiscard]] size_t operator()(
+        const Bitset<N_BITS> &bitset) const noexcept {
+        return XXH3_64bits_withSeed(
+            bitset.bits_.data(), bitset.bits_.size() * sizeof(uint64_t),
+            0x1234567890ABCDEF);  // Random seed for better distribution
     }
 };
 }  // namespace std
