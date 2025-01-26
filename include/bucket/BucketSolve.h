@@ -233,6 +233,7 @@ std::vector<double> BucketGraph::labeling_algorithm() {
     auto &n_buckets = assign_buckets<D>(fw_buckets_size, bw_buckets_size);
     auto &stat_n_labels = assign_buckets<D>(stat_n_labels_fw, stat_n_labels_bw);
     auto &stat_n_dom = assign_buckets<D>(stat_n_dom_fw, stat_n_dom_bw);
+    auto &arc_scores = assign_buckets<D>(fw_arc_scores, bw_arc_scores);
 
     n_labels = 0;
 
@@ -293,8 +294,9 @@ std::vector<double> BucketGraph::labeling_algorithm() {
                     }
 
                     // Process arcs for current label
+                    const int node_id = label->node_id;
                     const auto &node_arcs =
-                        nodes[label->node_id].template get_arcs<D>(scc_index);
+                        nodes[node_id].template get_arcs<D>(scc_index);
 
                     for (const auto &arc : node_arcs) {
                         new_labels.clear();
@@ -309,6 +311,7 @@ std::vector<double> BucketGraph::labeling_algorithm() {
 #endif
                             continue;
                         }
+                        arc_scores[node_id][arc] += extended_labels.size();
 
                         // Process each new label
                         for (Label *new_label : extended_labels) {

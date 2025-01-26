@@ -326,43 +326,42 @@ class Stabilization {
         std::vector<double> nodeDuals(input_duals.begin(),
                                       input_duals.begin() + sizeDual);
 
-        // Add the current dual solution to the MultiPointManager
         mp_manager.updatePool(nodeDuals, lp_obj);
-
-        // Use historical dual solutions to compute a weighted average
         DualSolution historical_avg = mp_manager.getWeightedSolution();
+
         if (!historical_avg.empty()) {
-            // Blend the current dual solution with the historical average
+            // Dynamic weighting based on optimization progress
+            double pw = std::min(
+                0.9, std::max(0.1, std::abs(lag_gap) /
+                                       (std::abs(lag_gap_prev) + 1e-10)));
+
+            // fmt::print("Progress weight: {}\n", pw);
+
+            // Scale historical weight based on
+            // pool quality
+            // double historical_weight = (1.0
+            // - progress_weight);
+
+            // Blend solutions with adaptive
+            // weights
             for (size_t i = 0; i < nodeDuals.size(); ++i) {
-                nodeDuals[i] = 0.7 * nodeDuals[i] + 0.3 * historical_avg[i];
+                nodeDuals[i] = pw * nodeDuals[i] + (1 - pw) * historical_avg[i];
             }
         }
-
-        // double lp_obj_rounded = std::round(lp_obj);
-        // if (lp_obj_rounded == lp_obj_prev) {
-        //     no_progress_count++;
-        // } else {
-        //     no_progress_count = 0;
-        // }
-        // lp_obj_prev = lp_obj_rounded;
 
         if (nb_misprices == 0) {
             update_subgradient(dados, nodeDuals, best_pricing_cols);
             bool should_increase = dynamic_alpha_schedule(dados);
-
             constexpr double ALPHA_FACTOR = 0.1;
-            if (should_increase) {
-                alpha = std::min(0.99, alpha + (1.0 - alpha) * ALPHA_FACTOR);
-            } else {
-                alpha = std::max(0.0, alpha / 1.1);
-            }
+
+            alpha = should_increase
+                        ? std::min(0.99, alpha + (1.0 - alpha) * ALPHA_FACTOR)
+                        : std::max(0.0, alpha / 1.1);
 
             if (!std::isnan(alpha) && !std::isinf(alpha)) {
                 base_alpha = alpha;
             }
         }
-
-        DualSolution stab_sol = smooth_dual_sol;
 
         if (lag_gap < lag_gap_prev || cut_added) {
             stab_center_for_next_iteration = smooth_dual_sol;

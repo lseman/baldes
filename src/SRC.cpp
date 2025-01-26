@@ -291,6 +291,46 @@ void LimitedMemoryRank1Cuts::separate(const SparseMatrix &A,
     return;
 }
 
+void LimitedMemoryRank1Cuts::separateBG(
+    BNBNode *node, std::vector<baldesCtrPtr> &SRCconstraints) {
+    // cutCleaner(node, SRCconstraints);
+
+    if (generator->checkBackgroundTask()) {
+        return;
+    }
+    auto cuts = &cutStorage;
+    std::vector<double> solution;
+    auto cuts_after_separation = cuts->size();
+    generator->setArcDuals(arc_duals);
+    generator->setNodes(nodes);
+    generator->initialize(allPaths);
+    generator->generateSepHeurMem4Vertex();
+    generator->generateCutsInBackground();
+}
+
+bool LimitedMemoryRank1Cuts::getCutsBG() {
+    if (!generator->readyGeneratedCuts()) {
+        return false;
+    }
+
+    auto cuts = &cutStorage;
+    auto cuts_before = cuts->size();
+
+    auto cutsBG = generator->returnBGcuts();
+    if (cutsBG.size() == 0) {
+        return false;
+    }
+    // print_info("Processing {} background cuts\n", cutsBG.size());
+    processCuts(cutsBG);
+
+    auto cuts_after_separation = cuts->size();
+    auto cuts_changed = cuts_after_separation - cuts_before;
+    if (cuts_changed > 0) {
+        return true;
+    }
+    return false;
+}
+
 std::pair<bool, bool> LimitedMemoryRank1Cuts::runSeparation(
     BNBNode *node, std::vector<baldesCtrPtr> &SRCconstraints) {
     auto cuts = &cutStorage;
@@ -298,12 +338,7 @@ std::pair<bool, bool> LimitedMemoryRank1Cuts::runSeparation(
     auto cuts_before = cuts->size();
     std::vector<double> solution;
 
-    // print size of SRCconstraints
-    // RUN_OPTIMIZATION(node, 1e-8)
     GET_SOL(node);
-    //(node)->optimize();
-    // solution = (node)->extractSolution();
-    // solution = (node)->ipSolver->getPrimals();
 
     size_t i = 0;
     std::for_each(allPaths.begin(), allPaths.end(),
@@ -312,144 +347,40 @@ std::pair<bool, bool> LimitedMemoryRank1Cuts::runSeparation(
     separateR1C1(matrix.A_sparse, solution);
     separate(matrix.A_sparse, solution);
     auto cuts_after_separation = cuts->size();
-    auto multipliers = generator->map_rank1_multiplier;
 
-    // print solution size and allPaths size
-    auto processCuts = [&]() {
-        // Initialize paths with solution values
-        auto cortes = generator->getCuts();
-        auto cut_ctr = 0;
-
-        // Process each cut
-        for (auto &cut : cortes) {
-            auto &cut_info = cut.info_r1c;
-
-            // Skip if arc_mem is empty
-            if (cut.arc_mem.empty()) {
-                continue;
-            }
-
-            // Pre-allocate cut_indices to avoid repeated resizing
-            std::vector<int> cut_indices;
-            cut_indices.reserve(cut_info.first.size());
-            for (auto &node : cut_info.first) {
-                cut_indices.push_back(node);
-            }
-
-            // Use std::array with pre-initialization for bit arrays
-            std::array<uint64_t, num_words> C = {};
-            std::array<uint64_t, num_words> AM = {};
-
-            // Set bits in C and AM for cut_indices
-            for (auto &node : cut_indices) {
-                C[node / 64] |= (1ULL << (node % 64));
-                AM[node / 64] |= (1ULL << (node % 64));
-            }
-            // Set bits in AM for arcs in arc_mem
-            for (auto &arc : cut.arc_mem) {
-                AM[arc / 64] |= (1ULL << (arc % 64));
-            }
-
-            // Retrieve multiplier information
-            auto &mult = multipliers[cut_info.first.size()][cut_info.second];
-            SRCPermutation p;
-            p.num = std::get<0>(mult);
-            p.den = std::get<1>(mult);
-
-            // Initialize order without an extra resize, only if N_SIZE is
-            // constant
-            std::vector<int> order(N_SIZE, 0);
-            int ordering = 0;
-            for (auto node : cut_indices) {
-                order[node] = ordering++;
-            }
-
-            // Pre-allocate coeffs to allPaths.size()
-            std::vector<double> coeffs(allPaths.size(), 0.0);
-
-#if defined(__cpp_lib_parallel_algorithm)
-            std::atomic<bool> has_coeff{false};
-            std::transform(allPaths.begin(), allPaths.end(), coeffs.begin(),
-                           [&](const auto &path) {
-                               auto coeff = computeLimitedMemoryCoefficient(
-                                   C, AM, p, path.route, order);
-                               if (coeff > 1e-3)
-                                   has_coeff.store(true,
-                                                   std::memory_order_relaxed);
-                               return coeff;
-                           });
-#else
-            bool has_coeff = false;
-            std::transform(allPaths.begin(), allPaths.end(), coeffs.begin(),
-                           [&](const auto &path) {
-                               auto coeff = computeLimitedMemoryCoefficient(
-                                   C, AM, p, path.route, order);
-                               if (coeff > 1e-3) has_coeff = true;
-                               return coeff;
-                           });
-#endif
-            // Skip adding cut if no coefficients met threshold
-            if (!has_coeff) {
-                continue;
-            }
-
-            // Create and add new cut
-            Cut corte(C, AM, coeffs, p);
-            corte.baseSetOrder = order;
-            cuts->addCut(corte);
-            cut_ctr++;
+    bool readGeneration = generator->readyGeneratedCuts();
+    if (readGeneration) {
+        auto cutsBG = generator->returnBGcuts();
+        // print_info("Processing {} background cuts\n", cutsBG.size());
+        if (cutsBG.size() > 0) {
+            processCuts(cutsBG);
         }
-        return cut_ctr;
-    };
-
-    if (cuts_before == cuts_after_separation) {
-        // Lambda for attempting cut generation with different memory factors
-        auto tryMemFactors = [&](const HighDimCutsGeneratorPtr &gen) -> bool {
-            for (double memFactor = 0.15; memFactor <= 0.75;
-                 memFactor += 0.15) {
-                gen->setMemFactor(memFactor);
-                gen->constructMemoryVertexBased();
-                if (auto cut_number = processCuts(); cut_number != 0) {
-                    return true;  // Exit if cuts were successfully processed
-                }
-            }
-            return false;
-        };
-
-        // Lambda for initializing generator and getting cuts
-        auto initAndGetCuts = [&](const HighDimCutsGeneratorPtr &gen,
-                                  int rank) {
-            gen->max_heuristic_sep_mem4_row_rank1 = rank;
-            gen->generateSepHeurMem4Vertex();
-            gen->initialize(allPaths);
-            gen->getHighDimCuts();
-        };
-
-        // Try with rank 8 first
-        generator->setArcDuals(arc_duals);
-        generator->setNodes(nodes);
-        initAndGetCuts(generator, 18);
-        tryMemFactors(generator);
-
-        // if (!tryMemFactors(generator)) {
-        //     // If no cuts found, try again with rank 12
-        //     initAndGetCuts(generator, 14);
-        //     tryMemFactors(generator);
-        // }
+    } else {
+        separateBG(node, SRCconstraints);
     }
-    generator->clearMemory();
 
     ////////////////////////////////////////////////////
     // Handle non-violated cuts in a single pass
     ////////////////////////////////////////////////////
-    bool cleared = false;
-    auto n_cuts_removed = 0;
+    int cuts_after = cuts->size();
+    bool cleared = cutCleaner(node, SRCconstraints);
+    int n_cuts_removed = cuts_after - cuts->size();
 
-    // Sort SRCconstraints by index (if sorting is necessary)
-    pdqsort(SRCconstraints.begin(), SRCconstraints.end(),
-            [](const baldesCtrPtr &a, const baldesCtrPtr &b) {
-                return a->index() < b->index();
-            });
+    // Simplify the final check
+    bool cuts_changed = (cuts_before != cuts->size() + n_cuts_removed);
+    if (!readGeneration) {
+        cuts_changed = true;
+    }
+    return std::make_pair(cuts_changed, cleared);
+}
+
+bool LimitedMemoryRank1Cuts::cutCleaner(
+    BNBNode *node, std::vector<baldesCtrPtr> &SRCconstraints) {
+    auto cuts = &cutStorage;
+    std::vector<double> solution;
+
+    bool cleaned = false;
+    GET_SOL(node);
 
     // Use reverse iterators to traverse the container in reverse order
     for (auto it = SRCconstraints.rbegin(); it != SRCconstraints.rend();) {
@@ -457,13 +388,13 @@ std::pair<bool, bool> LimitedMemoryRank1Cuts::runSeparation(
         int current_index = constr->index();
         double slack = node->getSlack(current_index, solution);
 
-        // If the slack is positive, it means the constraint is not violated
+        // If the slack is positive, it means the constraint is not
+        // violated
         if (slack > 0) {
-            cleared = true;
+            cleaned = true;
             node->remove(constr);
             cuts->removeCut(cuts->getID(
                 std::distance(SRCconstraints.begin(), it.base()) - 1));
-            n_cuts_removed++;
 
             // Remove from SRCconstraints using reverse iterator
             it = decltype(it){SRCconstraints.erase(std::next(it).base())};
@@ -471,14 +402,12 @@ std::pair<bool, bool> LimitedMemoryRank1Cuts::runSeparation(
             ++it;
         }
     }
-
-    // Simplify the final check
-    bool cuts_changed = (cuts_before != cuts->size() + n_cuts_removed);
-    return std::make_pair(cuts_changed, cleared);
+    return cleaned;
 }
 
 /*
- * @brief Computes the limited memory coefficient for a given set of nodes.
+ * @brief Computes the limited memory coefficient for a given set of
+ * nodes.
  *
  */
 double LimitedMemoryRank1Cuts::computeLimitedMemoryCoefficient(
@@ -500,7 +429,8 @@ double LimitedMemoryRank1Cuts::computeLimitedMemoryCoefficient(
         if (!(AM[am_index] & am_mask)) {
             S = 0;  // Reset S if vj is not in AM
         } else if (C[am_index] & am_mask) {
-            // Get the position of vj in C by counting the set bits up to vj
+            // Get the position of vj in C by counting the set bits up
+            // to vj
             int pos = order[vj];
 
             S += p.num[pos];

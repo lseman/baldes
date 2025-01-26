@@ -2,7 +2,8 @@
  * @file Hashes.h
  * @brief Hash functions for various data types and structures.
  *
- * This file contains hash functions for various data types and structures, including:
+ * This file contains hash functions for various data types and structures,
+ * including:
  * - Hash functions for vectors of integers and doubles.
  * - Hash functions for pairs and unordered sets.
  * - Specialized hash functions for specific data types.
@@ -11,17 +12,20 @@
 
 #pragma once
 
-#include <bit> // for std::bit_cast (C++20)
+#include <xxhash.h>  // Include XXHash header
+
+#include <bit>  // for std::bit_cast (C++20)
 #include <cstdint>
 #include <functional>
 #include <utility>  // for std::pair
-#include <xxhash.h> // Include XXHash header
 
 /**
- * @brief Combines hash values for multiple values using C++20, without recursion.
+ * @brief Combines hash values for multiple values using C++20, without
+ * recursion.
  */
 template <typename T, typename... Rest>
-constexpr void hash_combine(std::size_t &seed, const T &value, const Rest &...rest) noexcept {
+constexpr void hash_combine(std::size_t &seed, const T &value,
+                            const Rest &...rest) noexcept {
     // Use XXH3 for faster hashing
     seed ^= XXH3_64bits_withSeed(&value, sizeof(T), seed);
     (..., (seed ^= XXH3_64bits_withSeed(&rest, sizeof(Rest), seed)));
@@ -32,7 +36,8 @@ constexpr void hash_combine(std::size_t &seed, const T &value, const Rest &...re
  * @brief Optimized hash for std::pair<std::pair<int, int>, int>.
  */
 struct arc_map_hash {
-    constexpr std::size_t operator()(const std::pair<std::pair<int, int>, int> &p) const noexcept {
+    constexpr std::size_t operator()(
+        const std::pair<std::pair<int, int>, int> &p) const noexcept {
         std::size_t seed = 0;
         hash_combine(seed, p.first.first, p.first.second, p.second);
         return seed;
@@ -40,7 +45,8 @@ struct arc_map_hash {
 };
 
 /**
- * @brief Generates a hash value for a double using std::bit_cast for efficiency.
+ * @brief Generates a hash value for a double using std::bit_cast for
+ * efficiency.
  */
 constexpr std::size_t hash_double(double value, std::size_t seed) noexcept {
     // Convert double to uint64_t using bit_cast and hash it with XXH3
@@ -52,13 +58,14 @@ constexpr std::size_t hash_double(double value, std::size_t seed) noexcept {
 namespace std {
 template <>
 struct hash<std::pair<int, int>> {
-    constexpr std::size_t operator()(const std::pair<int, int> &pair) const noexcept {
+    constexpr std::size_t operator()(
+        const std::pair<int, int> &pair) const noexcept {
         std::size_t h1 = XXH3_64bits_withSeed(&pair.first, sizeof(int), 0);
         std::size_t h2 = XXH3_64bits_withSeed(&pair.second, sizeof(int), h1);
         return h1 ^ (h2 + 0x9e3779b9 + (h1 << 6) + (h1 >> 2));
     }
 };
-} // namespace std
+}  // namespace std
 
 struct VectorHash {
     std::size_t operator()(const std::vector<int> &vec) const {
@@ -69,20 +76,21 @@ struct VectorHash {
 
 struct VectorIntHash {
     std::size_t operator()(const std::vector<int> &vec) const {
-        return XXH64(vec.data(), vec.size() * sizeof(int), 0); // Seed = 0
+        return XXH64(vec.data(), vec.size() * sizeof(int), 0);  // Seed = 0
     }
 };
 
 struct VectorIntHashCompare {
     using KeyType = std::vector<int>;
-    
+
     // Hash operator for std::unordered_map
-    std::size_t operator()(const KeyType& key) const {
-        return XXH64(key.data(), key.size() * sizeof(int), 0); // Seed = 0
+    std::size_t operator()(const KeyType &key) const {
+        return XXH64(key.data(), key.size() * sizeof(int), 0);  // Seed = 0
     }
-    
+
     // Equality operator for std::unordered_map
-    bool operator()(const KeyType& lhs, const KeyType& rhs) const {
+    bool operator()(const KeyType &lhs, const KeyType &rhs) const {
         return lhs == rhs;
     }
 };
+

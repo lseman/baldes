@@ -1,93 +1,154 @@
 cmake_minimum_required(VERSION 3.16)
 project(BALDES LANGUAGES C CXX)
 
-# Check if Clang is available
+#-------------------------------------------------------------------------------
+# Compiler Settings
+#-------------------------------------------------------------------------------
+set(CMAKE_CXX_STANDARD 23)
+set(CMAKE_CXX_STANDARD_REQUIRED TRUE)
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
+# set(CMAKE_CUDA_STANDARD "")
+set(CMAKE_CUDA_STANDARD_REQUIRED OFF)
+set(CMAKE_CUDA_EXTENSIONS OFF)
+
+# Check for Clang
 find_program(CLANG_C_COMPILER clang)
 find_program(CLANG_CXX_COMPILER clang++)
 
 if(CLANG_C_COMPILER AND CLANG_CXX_COMPILER)
-  # Set Clang as the default compiler
-  set(CMAKE_C_COMPILER
-      "${CLANG_C_COMPILER}"
-      CACHE STRING "" FORCE)
-  set(CMAKE_CXX_COMPILER
-      "${CLANG_CXX_COMPILER}"
-      CACHE STRING "" FORCE)
+  set(CMAKE_C_COMPILER "${CLANG_C_COMPILER}" CACHE STRING "" FORCE)
+  set(CMAKE_CXX_COMPILER "${CLANG_CXX_COMPILER}" CACHE STRING "" FORCE)
   message(STATUS "Clang found: using Clang as the default compiler")
 else()
   message(STATUS "Clang not found: using default compiler")
 endif()
 
-# set cc and cxx path
-
-
-# C++ standard
-set(CMAKE_CXX_STANDARD 23)
-set(CMAKE_CXX_STANDARD_REQUIRED True)
-
-# set(CMAKE_C_COMPILER /home/seman/toolchain18/llvm/stage2-prof-use-lto/install/bin/clang)
-# set(CMAKE_CXX_COMPILER /home/seman/toolchain18/llvm/stage2-prof-use-lto/install/bin/clang++)
-
+# Compiler flags
 if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
-  string(REPLACE "-fconcepts-diagnostics-depth=10" "" CMAKE_CXX_FLAGS
-                 "${CMAKE_CXX_FLAGS}")
+  string(REPLACE "-fconcepts-diagnostics-depth=10" "" CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
 endif()
 
-# Enable Interprocedural Optimization (Link Time Optimization)
-set(CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE ON)
-set(CMAKE_INTERPROCEDURAL_OPTIMIZATION TRUE)
-set(CMAKE_POSITION_INDEPENDENT_CODE ON)
-set(CMAKE_EXPERIMENTAL_CXX_MODULE_CMAKE_API_BOTH TRUE)
-
-find_program(CCACHE_PROGRAM ccache)
-if(CCACHE_PROGRAM)
-  message(STATUS "ccache found: using ccache for compilation")
-  set_property(GLOBAL PROPERTY RULE_LAUNCH_COMPILE "${CCACHE_PROGRAM}")
-  set_property(GLOBAL PROPERTY RULE_LAUNCH_LINK "${CCACHE_PROGRAM}")
-endif()
-
-# Include directories
-include_directories(include)
-include_directories(include/bucket)
-include_directories(include/algebra)
-include_directories(include/cuts)
-include_directories(include/extra)
-include_directories(include/utils)
-include_directories(third_party/hgs_vrptw)
-
-# Build types and flags
-if(NOT CMAKE_BUILD_TYPE)
-  set(CMAKE_BUILD_TYPE
-      "Debug"
-      CACHE STRING "Choose the type of build." FORCE)
-endif()
-set(CMAKE_CXX_FLAGS_RELEASE
-    "-O3 -march=native -flto -Xclang -Wno-unknown-warning-option")
-set(CMAKE_CXX_FLAGS_RELWITHDEBINFO
-"-O3 -g -march=native -flto -funroll-loops -ftree-vectorize -fomit-frame-pointer -ffunction-sections -fdata-sections -fno-signed-zeros -fno-trapping-math -mtune=native -fvectorize -Xclang -Wno-unknown-warning-option"
-)
-set(CMAKE_CXX_FLAGS_DEBUG
-    "-Og -g -Wall -Wextra -Xclang -Wno-unknown-warning-option")
+set(CMAKE_CXX_FLAGS_RELEASE "-O3 -march=native -flto -Xclang -Wno-unknown-warning-option")
+set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "-O3 -g -march=native -flto -funroll-loops -ftree-vectorize -fomit-frame-pointer -ffunction-sections -fdata-sections -fno-signed-zeros -fno-trapping-math -mtune=native -fvectorize -Xclang -Wno-unknown-warning-option")
+set(CMAKE_CXX_FLAGS_DEBUG "-Og -g -Wall -Wextra -Xclang -Wno-unknown-warning-option")
 
 if(APPLE)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -stdlib=libc++ -std=c++20")
 endif()
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-error=unknown-argument")
-set(CMAKE_CXX_FLAGS
-    "${CMAKE_CXX_FLAGS} -Wno-error=unused-command-line-argument")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-error=unknown-argument -Wno-error=unused-command-line-argument")
 
-set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+#-------------------------------------------------------------------------------
+# Dependencies
+#-------------------------------------------------------------------------------
+include(FetchContent)
 
-# Include the generated config.h file
-include_directories("${CMAKE_CURRENT_BINARY_DIR}")
+# CPM.cmake
+if(NOT COMMAND CPMAddPackage)
+  FetchContent_Declare(
+    CPM
+    GIT_REPOSITORY https://github.com/cpm-cmake/CPM.cmake.git
+    GIT_TAG v0.40.5)
+  FetchContent_MakeAvailable(CPM)
+  include(${cpm_SOURCE_DIR}/cmake/CPM.cmake)
+endif()
 
+# stdexec
+cpmaddpackage(
+  NAME stdexec
+  GITHUB_REPOSITORY NVIDIA/stdexec
+  GIT_TAG main
+  OPTIONS "STDEXEC_BUILD_TESTS OFF" "STDEXEC_BUILD_EXAMPLES OFF" "STDEXEC_BUILD_BENCHMARKS OFF" "STDEXEC_BUILD_DOCS OFF" "BUILD_TESTING OFF"
+)
+
+# # mdspan
+# cpmaddpackage(
+#   NAME mdspan
+#   GITHUB_REPOSITORY kokkos/mdspan
+#   GIT_TAG stable
+#   OPTIONS "MDSPAN_BUILD_TESTS OFF" "MDSPAN_BUILD_EXAMPLES OFF" "MDSPAN_BUILD_BENCHMARKS OFF" "MDSPAN_BUILD_DOCS OFF" "BUILD_TESTING OFF"
+# )
+
+# xxhash
+find_package(xxhash QUIET)
+if(NOT xxhash_FOUND)
+  cpmaddpackage(
+    NAME xxhash
+    GITHUB_REPOSITORY Cyan4973/xxHash
+    GIT_TAG origin/dev
+    SOURCE_SUBDIRECTORY cmake_unofficial
+  )
+endif()
+
+# unordered_dense
+cpmaddpackage(
+  NAME ankerl_unordered_dense
+  GITHUB_REPOSITORY martinus/unordered_dense
+  GIT_TAG origin/main
+)
+
+# libcuckoo
+cpmaddpackage(
+  NAME libcuckoo
+  GITHUB_REPOSITORY efficient/libcuckoo
+  GIT_TAG origin/master
+)
+
+# Highs
+if(HIGHS)
+  cpmaddpackage(
+    NAME Highs
+    GITHUB_REPOSITORY ERGO-Code/HiGHS
+    GIT_TAG origin/master
+    OPTIONS "BUILD_SHARED_LIBS ON" "BUILD_EXAMPLES OFF" "BUILD_CXX_EXAMPLE OFF" "BUILD_CSHARP_EXAMPLE OFF" "BUILD_TESTING OFF" "USE_DOTNET_STD_21 OFF"
+  )
+endif()
+
+# pybind11
+if(WITH_PYTHON)
+  cpmaddpackage(
+    NAME pybind11
+    GITHUB_REPOSITORY pybind/pybind11
+    GIT_TAG v2.13.6
+  )
+endif()
+
+if(IPM OR IPM_ACEL)
+  cpmaddpackage(
+    NAME
+    Eigen
+    GIT_REPOSITORY
+    https://gitlab.com/libeigen/eigen.git
+    GIT_TAG
+    3.4.0
+    DOWNLOAD_ONLY
+    YES # Only download Eigen, don't configure or build it
+  )
+endif()
+
+if(NSYNC)
+  set(nsync_ADDED ON)
+  cpmaddpackage(
+    NAME
+    nsync
+    GITHUB_REPOSITORY
+    google/nsync
+    GIT_TAG
+    origin/master
+    OPTIONS
+    "NSYNC_ENABLE_TESTS OFF")
+endif()
+
+
+#-------------------------------------------------------------------------------
+# Project Configuration
+#-------------------------------------------------------------------------------
 option(RIH "Enable RIH compilation option" OFF)
 option(RCC "Enable RCC compilation option" ON)
 option(SRC "Enable SRC compilation option" ON)
-# option(GET_TBB "Enable TBB compilation option" OFF)
-option(UNREACHABLE_DOMINANCE "Enable Unreachable Dominance compilation option"
-       OFF)
+option(UNREACHABLE_DOMINANCE "Enable Unreachable Dominance compilation option" OFF)
 option(SORTED_LABELS "Enable Sorted Labels compilation option" ON)
 option(MCD "Enable MCD compilation option" OFF)
 option(FIX_BUCKETS "Enable Fixed Buckets compilation option" ON)
@@ -111,199 +172,36 @@ option(HGS "Enable HGS" OFF)
 option(CUSTOM_COST "Enable custom cost" OFF)
 
 # Resource Definitions
-set(R_SIZE
-    1
-    CACHE STRING "Number of resources")
-set(N_SIZE
-    102
-    CACHE STRING "Number of nodes")
-set(MAX_SRC_CUTS
-    50
-    CACHE STRING "Maximum number of SRC cuts")
-set(BUCKET_CAPACITY
-    100
-    CACHE STRING "Bucket capacity")
-set(TIME_INDEX
-    0
-    CACHE STRING "Time index")
-set(N_ADD
-    10
-    CACHE STRING "Number of additional nodes")
-set(HGS_TIME
-    2
-    CACHE STRING "HGS max running time")
-
-set(VERBOSE_LEVEL
-    0
-    CACHE STRING "Verbose level")
+set(R_SIZE 1 CACHE STRING "Number of resources")
+set(N_SIZE 102 CACHE STRING "Number of nodes")
+set(MAX_SRC_CUTS 50 CACHE STRING "Maximum number of SRC cuts")
+set(BUCKET_CAPACITY 100 CACHE STRING "Bucket capacity")
+set(TIME_INDEX 0 CACHE STRING "Time index")
+set(N_ADD 10 CACHE STRING "Number of additional nodes")
+set(HGS_TIME 2 CACHE STRING "HGS max running time")
+set(VERBOSE_LEVEL 0 CACHE STRING "Verbose level")
 
 # Git Commit Hash
 execute_process(
   COMMAND git rev-parse --short HEAD
   OUTPUT_VARIABLE GIT_COMMIT_HASH
-  OUTPUT_STRIP_TRAILING_WHITESPACE)
+  OUTPUT_STRIP_TRAILING_WHITESPACE
+)
 add_definitions(-DGIT_COMMIT_HASH="${GIT_COMMIT_HASH}")
 
-add_definitions(-DN_SIZE=${N_SIZE})
-add_definitions(-DR_SIZE=${R_SIZE})
-add_definitions(-DMAX_SRC_CUTS=${MAX_SRC_CUTS})
-add_definitions(-DBUCKET_CAPACITY=${BUCKET_CAPACITY})
-add_definitions(-DTIME_INDEX=${TIME_INDEX})
-add_definitions(-DN_ADD=${N_ADD})
-add_definitions(-DHGS_TIME=${HGS_TIME})
-add_definitions(-DVERBOSE_LEVEL=${VERBOSE_LEVEL})
-
-# if IPM is disabled, force STAB to be enabled
-if(NOT IPM)
-  message(STATUS "IPM is disabled, enabling STAB")
-  set(STAB ON)
-endif()
-
 # Configure the config.h file
-configure_file(
-  ${CMAKE_CURRENT_SOURCE_DIR}/config.h.in # Input file (config.h.in)
-  ${CMAKE_CURRENT_BINARY_DIR}/config.h # Output file (config.h)
+configure_file(${CMAKE_CURRENT_SOURCE_DIR}/config.h.in ${CMAKE_CURRENT_BINARY_DIR}/config.h)
+
+#-------------------------------------------------------------------------------
+# Source Files
+#-------------------------------------------------------------------------------
+set(SOURCES
+    src/BCP.cpp
+    src/BucketGraph.cpp
+    src/MIPHandler.cpp
+    src/Branching.cpp
+    src/BucketPSTEP.cpp
 )
-
-# Attempt to include CPM.cmake from provided path
-include(cmake/CPM.cmake OPTIONAL)
-
-# Check if CPM was included, if not, fetch and include CPM
-if(NOT COMMAND CPMAddPackage)
-  # Include FetchContent module
-  include(FetchContent)
-  # Declare CPM.cmake as a FetchContent
-  FetchContent_Declare(
-    CPM
-    GIT_REPOSITORY https://github.com/cpm-cmake/CPM.cmake.git
-    GIT_TAG v0.40.2)
-  # Fetch CPM
-  FetchContent_MakeAvailable(CPM)
-  # Include CPM.cmake after it has been fetched
-  include(${cpm_SOURCE_DIR}/cmake/CPM.cmake)
-endif()
-
-cpmaddpackage(
-  NAME
-  stdexec
-  GITHUB_REPOSITORY
-  NVIDIA/stdexec
-  GIT_TAG
-  main
-  OPTIONS
-  "STDEXEC_BUILD_TESTS OFF"
-  "STDEXEC_BUILD_EXAMPLES OFF"
-  "STDEXEC_BUILD_BENCHMARKS OFF"
-  "STDEXEC_BUILD_DOCS OFF"
-  "BUILD_TESTING OFF")
-string(REPLACE "-fconcepts-diagnostics-depth=10" "" CMAKE_CXX_FLAGS
-               "${CMAKE_CXX_FLAGS}")
-
-# add mdspan
-cpmaddpackage(
-  NAME
-  mdspan
-  GITHUB_REPOSITORY
-  kokkos/mdspan
-  GIT_TAG
-  stable
-  OPTIONS
-  "MDSPAN_BUILD_TESTS OFF"
-  "MDSPAN_BUILD_EXAMPLES OFF"
-  "MDSPAN_BUILD_BENCHMARKS OFF"
-  "MDSPAN_BUILD_DOCS OFF"
-  "BUILD_TESTING OFF"
-  "CMAKE_INSTALL_PREFIX ${CMAKE_BINARY_DIR}/_deps/stdexec-install")
-
-find_package(xxhash)
-if(NOT xxhash_FOUND)
-  cpmaddpackage(
-    NAME
-    xxhash
-    GITHUB_REPOSITORY
-    Cyan4973/xxHash
-    GIT_TAG
-    origin/dev
-    SOURCE_SUBDIRECTORY
-    cmake_unofficial # Specify the folder with CMake configuration
-  )
-  include_directories(${xxhash_SOURCE_DIR})
-  add_subdirectory(${xxhash_SOURCE_DIR}/cmake_unofficial)
-endif()
-
-cpmaddpackage(NAME ankerl_unordered_dense GITHUB_REPOSITORY
-              martinus/unordered_dense GIT_TAG origin/main)
-include_directories(${ankerl_unordered_dense_SOURCE_DIR}/include)
-
-cpmaddpackage(
-  NAME libcuckoo
-  GITHUB_REPOSITORY efficient/libcuckoo
-  GIT_TAG origin/master)
-
-if(NSYNC)
-  set(nsync_ADDED ON)
-  cpmaddpackage(
-    NAME
-    nsync
-    GITHUB_REPOSITORY
-    google/nsync
-    GIT_TAG
-    origin/master
-    OPTIONS
-    "NSYNC_ENABLE_TESTS OFF")
-endif()
-
-#find_package(FMT)
-#if(NOT FMT_FOUND)
-#  message(STATUS "FMT not found, using bundled version")
-  cpmaddpackage(NAME fmt GITHUB_REPOSITORY fmtlib/fmt GIT_TAG 11.1.2)
-#endif()
-
-if(IPM)
-
-endif()
-
-if(HIGHS)
-  cpmaddpackage(
-    NAME
-    Highs
-    GITHUB_REPOSITORY
-    ERGO-Code/HiGHS
-    GIT_TAG
-    origin/master
-    OPTIONS
-    "BUILD_SHARED_LIBS ON"
-    "BUILD_EXAMPLES OFF"
-    "BUILD_CXX_EXAMPLE OFF"
-    "BUILD_CSHARP_EXAMPLE OFF"
-    "BUILD_TESTING OFF"
-    "USE_DOTNET_STD_21 OFF")
-  include_directories(${Highs_SOURCE_DIR}/src ${Highs_INCLUDE_DIR})
-
-  # Path to your patch file
-  set(PATCH_FILE "${CMAKE_CURRENT_LIST_DIR}/highs.patch")
-  # echo the patch file
-  message(STATUS "Patch file: ${PATCH_FILE}")
-
-  # Apply the patch using execute_process
-  execute_process(
-    COMMAND patch -p1 -i ${PATCH_FILE}
-    WORKING_DIRECTORY ${Highs_SOURCE_DIR}
-    RESULT_VARIABLE PATCH_RESULT
-    ERROR_VARIABLE PATCH_ERROR)
-
-endif()
-
-if(WITH_PYTHON)
-  cpmaddpackage(NAME pybind11 GITHUB_REPOSITORY pybind/pybind11 GIT_TAG v2.13.6)
-endif()
-
-set(GUROBI_HOME $ENV{GUROBI_HOME})
-include_directories(${GUROBI_HOME}/include)
-
-# Source files
-set(SOURCES src/BCP.cpp src/BucketGraph.cpp src/MIPHandler.cpp
-            src/Branching.cpp src/BucketPSTEP.cpp)
 
 set(CVRPSEP_SOURCES
     third_party/cvrpsep/basegrph.cpp
@@ -316,76 +214,115 @@ set(CVRPSEP_SOURCES
     third_party/cvrpsep/cutbase.cpp
     third_party/cvrpsep/fcapfix.cpp
     third_party/cvrpsep/mxf.cpp
-    # third_party/cvrpsep/twomatch.cpp third_party/cvrpsep/glmsep.cpp
-    # third_party/cvrpsep/binpack.cpp
     third_party/cvrpsep/combsep.cpp
     third_party/cvrpsep/fcits.cpp
     third_party/cvrpsep/grsearch.cpp
-    # third_party/cvrpsep/hpmstar.cpp third_party/cvrpsep/strcomb.cpp
-    # third_party/cvrpsep/blocks.cpp
-    third_party/cvrpsep/sort.cpp)
+    third_party/cvrpsep/sort.cpp
+)
 
 set(HGS_SOURCES
-    third_party/hgs_vrptw/Genetic.cpp third_party/hgs_vrptw/Individual.cpp
-    third_party/hgs_vrptw/LocalSearch.cpp third_party/hgs_vrptw/Params.cpp
-    third_party/hgs_vrptw/Population.cpp third_party/hgs_vrptw/Split.cpp)
+    third_party/hgs_vrptw/Genetic.cpp
+    third_party/hgs_vrptw/Individual.cpp
+    third_party/hgs_vrptw/LocalSearch.cpp
+    third_party/hgs_vrptw/Params.cpp
+    third_party/hgs_vrptw/Population.cpp
+    third_party/hgs_vrptw/Split.cpp
+)
 
 set(FPSOURCE
-    third_party/fpmax/fpmax.cpp third_party/fpmax/buffer.cpp
-    third_party/fpmax/data.cpp third_party/fpmax/fsout.cpp
-    third_party/fpmax/fp_tree.cpp third_party/fpmax/fp_node.cpp)
+    third_party/fpmax/fpmax.cpp
+    third_party/fpmax/buffer.cpp
+    third_party/fpmax/data.cpp
+    third_party/fpmax/fsout.cpp
+    third_party/fpmax/fp_tree.cpp
+    third_party/fpmax/fp_node.cpp
+)
 
-set(MUSSPSOURCE third_party/muSSP/Graph.cpp third_party/muSSP/Sink.cpp)
+set(MUSSPSOURCE
+    third_party/muSSP/Graph.cpp
+    third_party/muSSP/Sink.cpp
+)
+
 set(IPM_SOURCES src/IPSolver.cpp)
 set(SRC_SOURCES src/SRC.cpp src/HighOrderSRC.cpp)
 
 # Define a list for the source files that will be included
 set(EXECUTABLE_SOURCES ${SOURCES} ${HGS_SOURCES} ${FPSOURCE} ${MUSSPSOURCE})
 
-# Append sources based on the flags
 if(RCC)
-  message(STATUS "RCC is set, adding CVRPSEP_SOURCES.")
-  list(APPEND EXECUTABLE_SOURCES ${CVRPSEP_SOURCES})
-  list(APPEND EXECUTABLE_SOURCES src/RCC.cpp)
+  list(APPEND EXECUTABLE_SOURCES ${CVRPSEP_SOURCES} src/RCC.cpp)
 endif()
 
 if(IPM OR IPM_ACEL)
-  message(STATUS "IPM is set, adding IPM_SOURCES.")
   list(APPEND EXECUTABLE_SOURCES ${IPM_SOURCES})
 endif()
 
 if(SRC)
-  message(STATUS "SRC is set, adding SRC_SOURCES.")
   list(APPEND EXECUTABLE_SOURCES ${SRC_SOURCES})
 endif()
 
-if(IPM OR IPM_ACEL)
-  cpmaddpackage(
-    NAME
-    Eigen
-    GIT_REPOSITORY
-    https://gitlab.com/libeigen/eigen.git
-    GIT_TAG
-    3.4.0
-    DOWNLOAD_ONLY
-    YES # Only download Eigen, don't configure or build it
-  )
-endif()
+#-------------------------------------------------------------------------------
+# Include Directories
+#-------------------------------------------------------------------------------
 
-# Common Libraries List
-set(COMMON_LIBRARIES stdexec fmt xxhash mdspan libcuckoo)
+# Include directories for third-party libraries
+include_directories(
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/bucket
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/algebra
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/cuts
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/extra
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/utils
+    ${CMAKE_CURRENT_SOURCE_DIR}/third_party/hgs_vrptw  # Add this line
+    ${CMAKE_CURRENT_SOURCE_DIR}/third_party/cvrpsep
+    ${CMAKE_CURRENT_SOURCE_DIR}/third_party/fpmax
+    ${CMAKE_CURRENT_SOURCE_DIR}/third_party/muSSP
+)
 
-if(HIGHS)
-  list(APPEND COMMON_LIBRARIES highs::highs)
-endif()
+configure_file(
+  ${CMAKE_CURRENT_SOURCE_DIR}/config.h.in  # Input template file
+  ${CMAKE_CURRENT_BINARY_DIR}/config.h     # Output file
+)
 
-if(NSYNC)
-  list(APPEND COMMON_LIBRARIES nsync)
-  include_directories(${nsync_SOURCE_DIR}/public)
-endif()
+# Include the generated config.h file
+include_directories("${CMAKE_CURRENT_BINARY_DIR}")
+
+include_directories(${ankerl_unordered_dense_SOURCE_DIR}/include)
+
+set(GUROBI_HOME $ENV{GUROBI_HOME})
+include_directories(${GUROBI_HOME}/include)
+
+# -----------------------------------------------------------------------------
+# CUDA
+# -----------------------------------------------------------------------------
+
+# # Find CUDA
+# # find_package(CUDA REQUIRED)
+# find_package(CUDAToolkit REQUIRED)
+
+# # Set CUDA compilation flags
+# set(CUDA_NVCC_FLAGS
+#     -O3
+#     -arch=sm_75  # Set the compute capability of your GPU
+#     --default-stream per-thread
+#     -Xcompiler -fPIC
+# )
+
+# # Add CUDA source files
+# set(CUDA_SOURCES
+#     include/algebra/EvaluatorGPU.cu
+# )
+
+# # Append CUDA sources to the list of executable sources
+# list(APPEND EXECUTABLE_SOURCES ${CUDA_SOURCES})
+
+
+#-------------------------------------------------------------------------------
+# Targets
+#-------------------------------------------------------------------------------
+set(COMMON_LIBRARIES stdexec fmt xxhash libcuckoo)
 
 set(GUROBI_VERSION_MAJOR 120) # Adjust based on Gurobi version
-
 if(APPLE)
   # macOS detected, use .dylib for linking
   list(APPEND COMMON_LIBRARIES ${GUROBI_HOME}/lib/libgurobi_c++.a
@@ -397,46 +334,43 @@ else()
        ${GUROBI_HOME}/lib/libgurobi${GUROBI_VERSION_MAJOR}.so tbb)
 endif()
 
+
+if(NSYNC)
+  list(APPEND COMMON_LIBRARIES nsync)
+  include_directories(${nsync_SOURCE_DIR}/public)
+endif()
+
+# -----------------------------------------------------------------------------
+# Executables
+# -----------------------------------------------------------------------------
+
 if(BALDES)
-  # Add the executable with the combined sources
   add_executable(baldes src/Baldes.cpp ${EXECUTABLE_SOURCES})
+  target_compile_options(baldes PRIVATE -Wno-c++26-extensions -Wno-deprecated-declarations)
+target_link_libraries(baldes PRIVATE ${COMMON_LIBRARIES})
+
+# target_link_libraries(baldes PRIVATE CUDA::cudart CUDA::cusparse)
 
   if(JEMALLOC)
     find_library(JEMALLOC_LIBRARY jemalloc)
     if(JEMALLOC_LIBRARY)
-      message(STATUS "jemalloc found: ${JEMALLOC_LIBRARY}")
       target_link_libraries(baldes PRIVATE ${JEMALLOC_LIBRARY})
-    else()
-      message(STATUS "jemalloc not found")
     endif()
   endif()
 
-  if(TCMALLOC)
-  # find tcmalloc
-  find_library(TCMALLOC_LIBRARY tcmalloc)
-  if(TCMALLOC_LIBRARY)
-    message(STATUS "tcmalloc found: ${TCMALLOC_LIBRARY}")
-    target_link_libraries(baldes PRIVATE ${TCMALLOC_LIBRARY})
-  else()
-    message(STATUS "tcmalloc not found")
+  if(IPM OR IPM_ACEL)
+    target_include_directories(baldes PRIVATE ${Eigen_SOURCE_DIR} ${Eigen_SOURCE_DIR}/unsupported)
   endif()
+
+if(GUROBI)
+target_link_libraries(baldes PRIVATE gurobi_c++)
 endif()
 
-  message(STATUS "Gurobi version: ${GUROBI_VERSION_MAJOR}")
-  target_compile_options(baldes PRIVATE -Wno-c++26-extensions
-                                        -Wno-deprecated-declarations)
-
-  # target_precompile_headers( baldes PRIVATE include/Common.h
-  # ${CVRPSEP_HEADERS} ${FPMAX_HEADERS} include/Arc.h include/Dual.h
-  # include/VRPNode.h third_party/pdqsort.h)
-
-  if(IPM OR IPM_ACEL)
-    target_include_directories(baldes PRIVATE ${Eigen_SOURCE_DIR})
-    target_include_directories(baldes PRIVATE ${Eigen_SOURCE_DIR}/unsupported)
-  endif()
-
-  target_link_libraries(baldes PRIVATE ${COMMON_LIBRARIES})
-
+      # Set CUDA-specific properties
+  set_target_properties(baldes PROPERTIES
+      CUDA_SEPARABLE_COMPILATION ON
+      CUDA_ARCHITECTURES 75  # Set the compute capability of your GPU
+  )
 endif()
 
 if(CLIQUER)
@@ -444,40 +378,24 @@ if(CLIQUER)
 endif()
 
 if(MTW)
-  add_executable(vrpmtw mtw/VRPMTW.cpp ${EXECUTABLE_SOURCES} ${HGS_SOURCES}
-                        ${FPSOURCE})
-  target_compile_options(vrpmtw PRIVATE -Wno-c++26-extensions
-                                        -Wno-deprecated-declarations)
-  target_link_libraries(vrpmtw PRIVATE ${COMMON_LIBRARIES})
+  add_executable(vrpmtw mtw/VRPMTW.cpp ${EXECUTABLE_SOURCES} ${HGS_SOURCES} ${FPSOURCE})
+  target_compile_options(vrpmtw PRIVATE -Wno-c++26-extensions -Wno-deprecated-declarations)
+  target_link_libraries(vrpmtw PRIVATE stdexec fmt xxhash mdspan libcuckoo)
 endif()
 
 if(WITH_PYTHON)
-  pybind11_add_module(
-    pybaldes
-    src/BucketBindings.cpp
-    src/BCP.cpp
-    src/BucketGraph.cpp
-    src/MIPHandler.cpp
-    src/Branching.cpp
-    ${EXECUTABLE_SOURCES})
-  target_link_libraries(pybaldes PRIVATE ${COMMON_LIBRARIES})
-  set_target_properties(pybaldes PROPERTIES POSITION_INDEPENDENT_CODE ON)
-  target_compile_options(pybaldes PRIVATE -Wno-c++26-extensions
-                                          -Wno-deprecated-declarations)
-
-  # link pybind
-  target_link_libraries(pybaldes PRIVATE pybind11::module)
-  set_target_properties(pybaldes PROPERTIES PREFIX "")
+  pybind11_add_module(pybaldes src/BucketBindings.cpp src/BCP.cpp src/BucketGraph.cpp src/MIPHandler.cpp src/Branching.cpp ${EXECUTABLE_SOURCES})
+  target_link_libraries(pybaldes PRIVATE stdexec fmt xxhash mdspan libcuckoo pybind11::module)
+  set_target_properties(pybaldes PROPERTIES POSITION_INDEPENDENT_CODE ON PREFIX "")
+  target_compile_options(pybaldes PRIVATE -Wno-c++26-extensions -Wno-deprecated-declarations)
 
   if(IPM OR IPM_ACEL)
-    target_include_directories(pybaldes PRIVATE ${Eigen_SOURCE_DIR})
-    target_include_directories(pybaldes PRIVATE ${Eigen_SOURCE_DIR}/unsupported)
+    target_include_directories(pybaldes PRIVATE ${Eigen_SOURCE_DIR} ${Eigen_SOURCE_DIR}/unsupported)
   endif()
 endif()
 
 if(HGS)
   add_executable(hgs src/HGS.cpp ${HGS_SOURCES} ${FPSOURCE})
-  target_link_libraries(hgs PRIVATE ${COMMON_LIBRARIES})
-  target_compile_options(hgs PRIVATE -Wno-c++26-extensions
-                                     -Wno-deprecated-declarations)
+  target_link_libraries(hgs PRIVATE stdexec fmt xxhash mdspan libcuckoo)
+  target_compile_options(hgs PRIVATE -Wno-c++26-extensions -Wno-deprecated-declarations)
 endif()

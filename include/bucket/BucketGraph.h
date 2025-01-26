@@ -35,6 +35,7 @@
 #include "Cut.h"
 #include "Definitions.h"
 #include "Dual.h"
+#include "Hashes.h"
 #include "PSTEP.h"
 #include "Pools.h"
 #include "RCC.h"
@@ -74,6 +75,10 @@ class BucketGraph {
 
    public:
     CostFunction cost_calculator;
+    std::vector<std::unordered_map<Arc, int, arc_hash>>
+        fw_arc_scores;  // Track arc performance
+    std::vector<std::unordered_map<Arc, int, arc_hash>>
+        bw_arc_scores;  // Track arc performance
 
     BucketOptions options;
     void mono_initialization();
@@ -213,7 +218,7 @@ class BucketGraph {
     int stage = 1;
     std::vector<double> q_star;
     int iter = 0;
-    bool transition = true;
+    bool transition = false;
     Status status = Status::NotOptimal;
     std::vector<Label *> merged_labels_rih;
     int A_MAX = N_SIZE;
@@ -817,89 +822,41 @@ class BucketGraph {
         return true;
     }
 
+    const double BASE_IMBALANCE_THRESHOLD =
+        0.15;  // Slightly lower base threshold
+    const double MIN_ADJUSTMENT_FACTOR = 0.02;
+    const double MAX_ADJUSTMENT_FACTOR = 0.10;
+    const double LEARNING_RATE_DECAY = 0.99;  // Decay factor for learning rate
+    const double EMA_ALPHA = 0.1;             // Smoothing factor for EMA
+
+    double learning_rate = MAX_ADJUSTMENT_FACTOR;  // Initialize learning rate
+    double ema_imbalance_ratio = 0.0;  // Initialize EMA of imbalance ratio
+
     void updateSplit() {
-        const double BASE_IMBALANCE_THRESHOLD =
-            0.15;  // Slightly lower base threshold
-        const double MIN_ADJUSTMENT_FACTOR = 0.02;
-        const double MAX_ADJUSTMENT_FACTOR = 0.10;
-        const double LEARNING_RATE_DECAY =
-            0.99;                      // Decay factor for learning rate
-        const double EMA_ALPHA = 0.1;  // Smoothing factor for EMA
+        const double IMBALANCE_THRESHOLD = 0.2;
+        const double ADJUSTMENT_FACTOR = 0.05;
 
-        static double learning_rate =
-            MAX_ADJUSTMENT_FACTOR;  // Initialize learning rate
-        static double ema_imbalance_ratio =
-            0.0;  // Initialize EMA of imbalance ratio
-
-        // Calculate label counts and ratios
+        // Calculate label imbalance ratio
         double fw_labels = static_cast<double>(n_fw_labels);
         double bw_labels = static_cast<double>(n_bw_labels);
-        double total_labels = fw_labels + bw_labels;
+        double imbalance_ratio;
 
-        // Skip if we don't have enough labels for meaningful adjustment
-        if (total_labels < 10) return;
+        // Use the larger value as denominator to avoid division by small
+        // numbers
+        if (fw_labels >= bw_labels) {
+            imbalance_ratio = (fw_labels - bw_labels) / fw_labels;
+        } else {
+            imbalance_ratio = (bw_labels - fw_labels) / bw_labels;
+        }
 
-        // Calculate imbalance ratio
-        double fw_ratio = fw_labels / total_labels;
-        double bw_ratio = bw_labels / total_labels;
-        double imbalance_ratio = std::abs(fw_ratio - bw_ratio);
+        // Only adjust if imbalance exceeds threshold
+        if (imbalance_ratio > IMBALANCE_THRESHOLD) {
+            double adjustment =
+                ADJUSTMENT_FACTOR * R_max[options.main_resources[0]];
 
-        // Update EMA of imbalance ratio
-        ema_imbalance_ratio =
-            EMA_ALPHA * imbalance_ratio + (1 - EMA_ALPHA) * ema_imbalance_ratio;
-
-        // Dynamic threshold based on total number of labels
-        // As we get more labels, we can be more sensitive to imbalance
-        double dynamic_threshold =
-            BASE_IMBALANCE_THRESHOLD * std::exp(-total_labels / 1000.0);
-
-        if (ema_imbalance_ratio > dynamic_threshold) {
-            // Calculate adaptive adjustment factor
-            // More severe imbalance = larger adjustment
-            double severity = (ema_imbalance_ratio - dynamic_threshold) /
-                              (1.0 - dynamic_threshold);
-            double adjustment_factor =
-                MIN_ADJUSTMENT_FACTOR +
-                (MAX_ADJUSTMENT_FACTOR - MIN_ADJUSTMENT_FACTOR) * severity;
-
-            // Adjust learning rate based on the severity of imbalance
-            learning_rate *= LEARNING_RATE_DECAY;
-
-            // Adjust based on resource range
-            double resource_range = R_max[options.main_resources[0]] -
-                                    R_min[options.main_resources[0]];
-            double base_adjustment =
-                adjustment_factor * resource_range * learning_rate;
-
-            // Scale adjustment based on current split position
-            for (size_t i = 0; i < q_star.size(); ++i) {
-                double relative_pos =
-                    (q_star[i] - R_min[options.main_resources[0]]) /
-                    resource_range;
-
-                // Smaller adjustments near boundaries
-                double position_factor =
-                    4.0 * relative_pos * (1.0 - relative_pos);
-
-                // Determine direction and apply adjustment
-                double direction = (bw_labels > fw_labels) ? 1.0 : -1.0;
-                double final_adjustment =
-                    base_adjustment * position_factor * direction;
-
-                // Apply adjustment with boundary protection
-                q_star[i] = std::clamp(q_star[i] + final_adjustment,
-                                       R_min[options.main_resources[0]] +
-                                           resource_range * 0.1,  // Lower bound
-                                       R_max[options.main_resources[0]] -
-                                           resource_range * 0.1  // Upper bound
-                );
-            }
-
-            if (std::abs(base_adjustment) > resource_range * 0.05) {
-                print_info(
-                    "Split adjustment: imbalance={:.3f}, adjustment={:.3f}, "
-                    "learning_rate={:.3f}\n",
-                    ema_imbalance_ratio, base_adjustment, learning_rate);
+            // Adjust split time based on which direction has more labels
+            for (auto &split : q_star) {
+                split += (bw_labels > fw_labels) ? adjustment : -adjustment;
             }
         }
     }
@@ -1265,11 +1222,12 @@ class BucketGraph {
                     if (updated_buckets.contains(inner_id)) {
                         continue;
                     }
-
-                    fw_bucket_splits[inner_id] =
-                        std::min(fw_bucket_splits[inner_id] + 10, 100);
-                    bw_bucket_splits[inner_id] =
-                        std::min(bw_bucket_splits[inner_id] + 10, 100);
+                    auto new_val = fw_bucket_splits[inner_id] + 10;
+                    if (new_val > 200) {
+                        continue;
+                    }
+                    bw_bucket_splits[inner_id] = new_val;
+                    fw_bucket_splits[inner_id] = new_val;
                     updated_buckets.insert(inner_id);
                     update_ctr++;
                 }
@@ -1283,10 +1241,12 @@ class BucketGraph {
                     if (updated_buckets.contains(inner_id)) {
                         continue;
                     }
-                    fw_bucket_splits[inner_id] =
-                        std::min(fw_bucket_splits[inner_id] + 10, 100);
-                    bw_bucket_splits[inner_id] =
-                        std::min(bw_bucket_splits[inner_id] + 10, 100);
+                    auto new_val = bw_bucket_splits[inner_id] + 10;
+                    if (new_val > 200) {
+                        continue;
+                    }
+                    bw_bucket_splits[inner_id] = new_val;
+                    fw_bucket_splits[inner_id] = new_val;
                     updated_buckets.insert(inner_id);
                     update_ctr++;
                 }

@@ -79,7 +79,7 @@ class LimitedMemoryRank1Cuts {
     Xoroshiro128Plus rp;  // Seed it (you can change the seed)
     using HighDimCutsGeneratorPtr = std::shared_ptr<HighDimCutsGenerator>;
     HighDimCutsGeneratorPtr generator =
-        std::make_shared<HighDimCutsGenerator>(N_SIZE, 5, 1e-6);
+        std::make_shared<HighDimCutsGenerator>(N_SIZE);
 
     void setDistanceMatrix(const std::vector<std::vector<double>> distances) {
         generator->setDistanceMatrix(distances);
@@ -241,6 +241,101 @@ class LimitedMemoryRank1Cuts {
             cutStorage.addCut(cut);
         }
     }
+
+    void separateBG(BNBNode *node, std::vector<baldesCtrPtr> &SRCconstraints);
+    bool getCutsBG();
+    bool cutCleaner(BNBNode *node, std::vector<baldesCtrPtr> &SRCconstraints);
+
+    std::function<int(std::vector<R1c> &)> processCuts =
+        [&](std::vector<R1c> &cortes) {
+            auto cuts = &cutStorage;
+            auto multipliers = generator->map_rank1_multiplier;
+
+            // Initialize paths with solution values
+            auto cut_ctr = 0;
+
+            // Process each cut
+            for (auto &cut : cortes) {
+                auto &cut_info = cut.info_r1c;
+
+                // Skip if arc_mem is empty
+                if (cut.arc_mem.empty()) {
+                    continue;
+                }
+
+                // Pre-allocate cut_indices to avoid repeated resizing
+                std::vector<int> cut_indices;
+                cut_indices.reserve(cut_info.first.size());
+                for (auto &node : cut_info.first) {
+                    cut_indices.push_back(node);
+                }
+
+                // Use std::array with pre-initialization for bit arrays
+                std::array<uint64_t, num_words> C = {};
+                std::array<uint64_t, num_words> AM = {};
+
+                // Set bits in C and AM for cut_indices
+                for (auto &node : cut_indices) {
+                    C[node / 64] |= (1ULL << (node % 64));
+                    AM[node / 64] |= (1ULL << (node % 64));
+                }
+                // Set bits in AM for arcs in arc_mem
+                for (auto &arc : cut.arc_mem) {
+                    AM[arc / 64] |= (1ULL << (arc % 64));
+                }
+
+                // Retrieve multiplier information
+                auto &mult =
+                    multipliers[cut_info.first.size()][cut_info.second];
+                SRCPermutation p;
+                p.num = std::get<0>(mult);
+                p.den = std::get<1>(mult);
+
+                // Initialize order without an extra resize, only if N_SIZE
+                // is constant
+                std::vector<int> order(N_SIZE, 0);
+                int ordering = 0;
+                for (auto node : cut_indices) {
+                    order[node] = ordering++;
+                }
+
+                // Pre-allocate coeffs to allPaths.size()
+                std::vector<double> coeffs(allPaths.size(), 0.0);
+
+#if defined(__cpp_lib_parallel_algorithm)
+                std::atomic<bool> has_coeff{false};
+                std::transform(allPaths.begin(), allPaths.end(), coeffs.begin(),
+                               [&](const auto &path) {
+                                   auto coeff = computeLimitedMemoryCoefficient(
+                                       C, AM, p, path.route, order);
+                                   if (coeff > 1e-3)
+                                       has_coeff.store(
+                                           true, std::memory_order_relaxed);
+                                   return coeff;
+                               });
+#else
+                bool has_coeff = false;
+                std::transform(allPaths.begin(), allPaths.end(), coeffs.begin(),
+                               [&](const auto &path) {
+                                   auto coeff = computeLimitedMemoryCoefficient(
+                                       C, AM, p, path.route, order);
+                                   if (coeff > 1e-3) has_coeff = true;
+                                   return coeff;
+                               });
+#endif
+                // Skip adding cut if no coefficients met threshold
+                if (!has_coeff) {
+                    continue;
+                }
+
+                // Create and add new cut
+                Cut corte(C, AM, coeffs, p);
+                corte.baseSetOrder = order;
+                cuts->addCut(corte);
+                cut_ctr++;
+            }
+            return cut_ctr;
+        };
 
    private:
     static std::mutex cache_mutex;

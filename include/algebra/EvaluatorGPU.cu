@@ -1,294 +1,157 @@
-// SparseSolveTriangularGPU.h
-
-#pragma once
-#include <Eigen/Sparse>
-#include <cmath>
+// EvaluatorGPU.cu
+#include "EvaluatorGPU.h"
 #include <cuda_runtime.h>
 
-// CUDA kernel for lower triangular solve (row-major)
-__global__ void sparseLowerTriangularSolveKernelRowMajor(const int *rowPtr, const int *colIdx, const double *values,
-                                                         double *other, int numRows, int numCols,
-                                                         double regularizationFactor) {
-    int row = blockIdx.x * blockDim.x + threadIdx.x; // Parallelize over rows
-    if (row >= numRows) return;                      // Out of bounds check
+template<typename T>
+__device__ bool is_exactly_zero(T value) {
+    return abs(value) < 1e-15;
+}
 
-    for (int col = 0; col < numCols; ++col) {
-        double tmp = other[row * numCols + col]; // Current RHS value
+class CustomMatIterator {
+public:
+    __device__ CustomMatIterator(const int* outerIndexPtr, const int* innerIndexPtr,
+                                const double* valuePtr, int col)
+        : outerIndexPtr_(outerIndexPtr),
+          innerIndexPtr_(innerIndexPtr),
+          valuePtr_(valuePtr),
+          col_(col) {
+        outerIndex_ = outerIndexPtr_[col];
+        end_ = outerIndexPtr_[col + 1];
+    }
 
-        int start = rowPtr[row];     // Row start in the compressed matrix
-        int end   = rowPtr[row + 1]; // Row end in the compressed matrix
+    __device__ bool isValid() const { return outerIndex_ < end_; }
+    __device__ void operator++() { ++outerIndex_; }
+    __device__ int row() const { return innerIndexPtr_[outerIndex_]; }
+    __device__ double value() const { return valuePtr_[outerIndex_]; }
+    __device__ int index() const { return innerIndexPtr_[outerIndex_]; }
 
-        double lastVal = 0;
-        for (int idx = start; idx < end; ++idx) {
-            int    currentCol = colIdx[idx]; // Get the column index
-            double val        = values[idx]; // Get the matrix value
+private:
+    const int* outerIndexPtr_;
+    const int* innerIndexPtr_;
+    const double* valuePtr_;
+    int col_;
+    int outerIndex_;
+    int end_;
+};
 
-            if (currentCol == row) {
-                lastVal = val; // Diagonal element
-                break;
+template<bool IsLower>
+__device__ void processRow(const int* outerIndexPtr, const int* innerIndexPtr,
+                          const double* valuePtr, double* other,
+                          int row, int col, int n, double regularizationFactor) {
+    double& tmp = other[row * n + col];
+    if (is_exactly_zero(tmp)) return;
+
+    CustomMatIterator it(outerIndexPtr, innerIndexPtr, valuePtr, row);
+
+    if constexpr (IsLower) {
+        while (it.isValid() && it.index() < row) {
+            tmp -= it.value() * other[it.index() * n + col];
+            ++it;
+        }
+
+        if (it.isValid() && it.index() == row) {
+            double diag_val = it.value();
+            if (abs(diag_val) < regularizationFactor) {
+                diag_val = (diag_val >= 0) ? regularizationFactor : -regularizationFactor;
             }
+            tmp /= diag_val;
+        }
+    } else {
+        double diag_val = 0;
+        bool found_diag = false;
 
-            // Subtract the contribution of already solved elements
-            tmp -= val * other[currentCol * numCols + col];
+        while (it.isValid()) {
+            const int idx = it.index();
+            const double val = it.value();
+
+            if (!found_diag) {
+                if (idx == row) {
+                    diag_val = val;
+                    found_diag = true;
+                }
+            } else if (idx > row) {
+                tmp -= val * other[idx * n + col];
+            }
+            ++it;
         }
 
-        // Diagonal processing
-        if (fabs(lastVal) < regularizationFactor) {
-            lastVal = (lastVal >= 0 ? regularizationFactor : -regularizationFactor);
+        if (found_diag) {
+            if (abs(diag_val) < regularizationFactor) {
+                diag_val = (diag_val >= 0) ? regularizationFactor : -regularizationFactor;
+            }
+            tmp /= diag_val;
         }
-        other[row * numCols + col] = tmp / lastVal;
     }
 }
 
-// CUDA kernel for upper triangular solve (row-major)
-__global__ void sparseUpperTriangularSolveKernelRowMajor(const int *rowPtr, const int *colIdx, const double *values,
-                                                         double *other, int numRows, int numCols,
-                                                         double regularizationFactor) {
-    int row = blockIdx.x * blockDim.x + threadIdx.x; // Parallelize over rows
-    if (row >= numRows) return;                      // Out of bounds check
+template<bool IsLower>
+__global__ void sparseSolveTriangularKernel(const int* outerIndexPtr,
+                                           const int* innerIndexPtr,
+                                           const double* valuePtr,
+                                           double* other, int n, int m,
+                                           double regularizationFactor) {
+    int col = blockIdx.x * blockDim.x + threadIdx.x;
+    if (col >= n) return;
 
-    for (int col = 0; col < numCols; ++col) {
-        double tmp = other[row * numCols + col]; // Current RHS value
-
-        int start = rowPtr[row];     // Row start in the compressed matrix
-        int end   = rowPtr[row + 1]; // Row end in the compressed matrix
-
-        double lastVal = 0;
-        for (int idx = end - 1; idx >= start; --idx) {
-            int    currentCol = colIdx[idx]; // Get the column index
-            double val        = values[idx]; // Get the matrix value
-
-            if (currentCol == row) {
-                lastVal = val; // Diagonal element
-                break;
-            }
-
-            // Subtract the contribution of already solved elements
-            tmp -= val * other[currentCol * numCols + col];
+    if constexpr (IsLower) {
+        for (int i = 0; i < m; ++i) {
+            __syncthreads();
+            processRow<true>(outerIndexPtr, innerIndexPtr, valuePtr,
+                           other, i, col, n, regularizationFactor);
         }
-
-        // Diagonal processing
-        if (fabs(lastVal) < regularizationFactor) {
-            lastVal = (lastVal >= 0 ? regularizationFactor : -regularizationFactor);
+    } else {
+        for (int i = m - 1; i >= 0; --i) {
+            __syncthreads();
+            processRow<false>(outerIndexPtr, innerIndexPtr, valuePtr,
+                            other, i, col, n, regularizationFactor);
         }
-        other[row * numCols + col] = tmp / lastVal;
     }
 }
 
-// CUDA kernel for lower triangular solve (column-major)
-__global__ void sparseLowerTriangularSolveKernelColMajor(const int *rowPtr, const int *colIdx, const double *values,
-                                                         double *other, int numRows, int numCols,
-                                                         double regularizationFactor) {
-    int col = blockIdx.x * blockDim.x + threadIdx.x; // Parallelize over columns
-    if (col >= numCols) return;                      // Out of bounds check
+void sparseTriangularSolveGPU(const Eigen::SparseMatrix<double>& mat,
+                             Eigen::Matrix<double, -1, 1>& other,
+                             bool isLower,
+                             double regularizationFactor) {
+    int m = mat.rows();
+    int n = other.cols();
 
-    for (int row = 0; row < numRows; ++row) {
-        double tmp = other[row * numCols + col]; // Current RHS value
+    int* d_outerIndexPtr;
+    int* d_innerIndexPtr;
+    double* d_valuePtr;
+    double* d_other;
 
-        int start = rowPtr[row];     // Row start in the compressed matrix
-        int end   = rowPtr[row + 1]; // Row end in the compressed matrix
+    cudaMalloc(&d_outerIndexPtr, (m + 1) * sizeof(int));
+    cudaMalloc(&d_innerIndexPtr, mat.nonZeros() * sizeof(int));
+    cudaMalloc(&d_valuePtr, mat.nonZeros() * sizeof(double));
+    cudaMalloc(&d_other, m * n * sizeof(double));
 
-        double lastVal = 0;
-        for (int idx = start; idx < end; ++idx) {
-            int    currentCol = colIdx[idx]; // Get the column index
-            double val        = values[idx]; // Get the matrix value
+    cudaMemcpy(d_outerIndexPtr, mat.outerIndexPtr(), (m + 1) * sizeof(int),
+               cudaMemcpyHostToDevice);
+    cudaMemcpy(d_innerIndexPtr, mat.innerIndexPtr(), mat.nonZeros() * sizeof(int),
+               cudaMemcpyHostToDevice);
+    cudaMemcpy(d_valuePtr, mat.valuePtr(), mat.nonZeros() * sizeof(double),
+               cudaMemcpyHostToDevice);
+    cudaMemcpy(d_other, other.data(), m * n * sizeof(double),
+               cudaMemcpyHostToDevice);
 
-            if (currentCol == row) {
-                lastVal = val; // Diagonal element
-                break;
-            }
+    int blockSize = 256;
+    int gridSize = (n + blockSize - 1) / blockSize;
 
-            // Subtract the contribution of already solved elements
-            tmp -= val * other[currentCol * numCols + col];
-        }
-
-        // Diagonal processing
-        if (fabs(lastVal) < regularizationFactor) {
-            lastVal = (lastVal >= 0 ? regularizationFactor : -regularizationFactor);
-        }
-        other[row * numCols + col] = tmp / lastVal;
+    if (isLower) {
+        sparseSolveTriangularKernel<true><<<gridSize, blockSize>>>(
+            d_outerIndexPtr, d_innerIndexPtr, d_valuePtr,
+            d_other, n, m, regularizationFactor);
+    } else {
+        sparseSolveTriangularKernel<false><<<gridSize, blockSize>>>(
+            d_outerIndexPtr, d_innerIndexPtr, d_valuePtr,
+            d_other, n, m, regularizationFactor);
     }
-}
 
-// CUDA kernel for upper triangular solve (column-major)
-__global__ void sparseUpperTriangularSolveKernelColMajor(const int *rowPtr, const int *colIdx, const double *values,
-                                                         double *other, int numRows, int numCols,
-                                                         double regularizationFactor) {
-    int col = blockIdx.x * blockDim.x + threadIdx.x; // Parallelize over columns
-    if (col >= numCols) return;                      // Out of bounds check
+    cudaMemcpy(other.data(), d_other, m * n * sizeof(double),
+               cudaMemcpyDeviceToHost);
 
-    for (int row = numRows - 1; row >= 0; --row) {
-        double tmp = other[row * numCols + col]; // Current RHS value
-
-        int start = rowPtr[row];     // Row start in the compressed matrix
-        int end   = rowPtr[row + 1]; // Row end in the compressed matrix
-
-        double lastVal = 0;
-        for (int idx = end - 1; idx >= start; --idx) {
-            int    currentCol = colIdx[idx]; // Get the column index
-            double val        = values[idx]; // Get the matrix value
-
-            if (currentCol == row) {
-                lastVal = val; // Diagonal element
-                break;
-            }
-
-            // Subtract the contribution of already solved elements
-            tmp -= val * other[currentCol * numCols + col];
-        }
-
-        // Diagonal processing
-        if (fabs(lastVal) < regularizationFactor) {
-            lastVal = (lastVal >= 0 ? regularizationFactor : -regularizationFactor);
-        }
-        other[row * numCols + col] = tmp / lastVal;
-    }
-}
-
-// Host function for row-major lower triangular solve
-void sparseLowerTriangularSolveGPU_RowMajor(const Eigen::SparseMatrix<double> &lhs, Eigen::MatrixXd &rhs,
-                                            double regularizationFactor) {
-    const int    *rowPtr  = lhs.outerIndexPtr();
-    const int    *colIdx  = lhs.innerIndexPtr();
-    const double *values  = lhs.valuePtr();
-    int           numRows = lhs.rows();
-    int           numCols = rhs.cols();
-
-    int    *d_rowPtr;
-    int    *d_colIdx;
-    double *d_values;
-    double *d_rhs;
-
-    cudaMalloc(&d_rowPtr, (numRows + 1) * sizeof(int));
-    cudaMalloc(&d_colIdx, lhs.nonZeros() * sizeof(int));
-    cudaMalloc(&d_values, lhs.nonZeros() * sizeof(double));
-    cudaMalloc(&d_rhs, numRows * numCols * sizeof(double));
-
-    cudaMemcpy(d_rowPtr, rowPtr, (numRows + 1) * sizeof(int), cudaMemcpyHostToDevice);
-    cudaMemcpy(d_colIdx, colIdx, lhs.nonZeros() * sizeof(int), cudaMemcpyHostToDevice);
-    cudaMemcpy(d_values, values, lhs.nonZeros() * sizeof(double), cudaMemcpyHostToDevice);
-    cudaMemcpy(d_rhs, rhs.data(), numRows * numCols * sizeof(double), cudaMemcpyHostToDevice);
-
-    int blockSize = 256;
-    int numBlocks = (numRows + blockSize - 1) / blockSize;
-    sparseLowerTriangularSolveKernelRowMajor<<<numBlocks, blockSize>>>(d_rowPtr, d_colIdx, d_values, d_rhs, numRows,
-                                                                       numCols, regularizationFactor);
-
-    cudaMemcpy(rhs.data(), d_rhs, numRows * numCols * sizeof(double), cudaMemcpyDeviceToHost);
-
-    cudaFree(d_rowPtr);
-    cudaFree(d_colIdx);
-    cudaFree(d_values);
-    cudaFree(d_rhs);
-}
-
-// Host function for row-major upper triangular solve
-void sparseUpperTriangularSolveGPU_RowMajor(const Eigen::SparseMatrix<double> &lhs, Eigen::MatrixXd &rhs,
-                                            double regularizationFactor) {
-    const int    *rowPtr  = lhs.outerIndexPtr();
-    const int    *colIdx  = lhs.innerIndexPtr();
-    const double *values  = lhs.valuePtr();
-    int           numRows = lhs.rows();
-    int           numCols = rhs.cols();
-
-    int    *d_rowPtr;
-    int    *d_colIdx;
-    double *d_values;
-    double *d_rhs;
-
-    cudaMalloc(&d_rowPtr, (numRows + 1) * sizeof(int));
-    cudaMalloc(&d_colIdx, lhs.nonZeros() * sizeof(int));
-    cudaMalloc(&d_values, lhs.nonZeros() * sizeof(double));
-    cudaMalloc(&d_rhs, numRows * numCols * sizeof(double));
-
-    cudaMemcpy(d_rowPtr, rowPtr, (numRows + 1) * sizeof(int), cudaMemcpyHostToDevice);
-    cudaMemcpy(d_colIdx, colIdx, lhs.nonZeros() * sizeof(int), cudaMemcpyHostToDevice);
-    cudaMemcpy(d_values, values, lhs.nonZeros() * sizeof(double), cudaMemcpyHostToDevice);
-    cudaMemcpy(d_rhs, rhs.data(), numRows * numCols * sizeof(double), cudaMemcpyHostToDevice);
-
-    int blockSize = 256;
-    int numBlocks = (numRows + blockSize - 1) / blockSize;
-    sparseUpperTriangularSolveKernelRowMajor<<<numBlocks, blockSize>>>(d_rowPtr, d_colIdx, d_values, d_rhs, numRows,
-                                                                       numCols, regularizationFactor);
-
-    cudaMemcpy(rhs.data(), d_rhs, numRows * numCols * sizeof(double), cudaMemcpyDeviceToHost);
-
-    cudaFree(d_rowPtr);
-    cudaFree(d_colIdx);
-    cudaFree(d_values);
-    cudaFree(d_rhs);
-}
-
-// Host function for column-major lower triangular solve
-void sparseLowerTriangularSolveGPU_ColMajor(const Eigen::SparseMatrix<double> &lhs, Eigen::MatrixXd &rhs,
-                                            double regularizationFactor) {
-    const int    *rowPtr  = lhs.outerIndexPtr();
-    const int    *colIdx  = lhs.innerIndexPtr();
-    const double *values  = lhs.valuePtr();
-    int           numRows = lhs.rows();
-    int           numCols = rhs.cols();
-
-    int    *d_rowPtr;
-    int    *d_colIdx;
-    double *d_values;
-    double *d_rhs;
-
-    cudaMalloc(&d_rowPtr, (numRows + 1) * sizeof(int));
-    cudaMalloc(&d_colIdx, lhs.nonZeros() * sizeof(int));
-    cudaMalloc(&d_values, lhs.nonZeros() * sizeof(double));
-    cudaMalloc(&d_rhs, numRows * numCols * sizeof(double));
-
-    cudaMemcpy(d_rowPtr, rowPtr, (numRows + 1) * sizeof(int), cudaMemcpyHostToDevice);
-    cudaMemcpy(d_colIdx, colIdx, lhs.nonZeros() * sizeof(int), cudaMemcpyHostToDevice);
-    cudaMemcpy(d_values, values, lhs.nonZeros() * sizeof(double), cudaMemcpyHostToDevice);
-    cudaMemcpy(d_rhs, rhs.data(), numRows * numCols * sizeof(double), cudaMemcpyHostToDevice);
-
-    int blockSize = 256;
-    int numBlocks = (numCols + blockSize - 1) / blockSize;
-    sparseLowerTriangularSolveKernelColMajor<<<numBlocks, blockSize>>>(d_rowPtr, d_colIdx, d_values, d_rhs, numRows,
-                                                                       numCols, regularizationFactor);
-
-    cudaMemcpy(rhs.data(), d_rhs, numRows * numCols * sizeof(double), cudaMemcpyDeviceToHost);
-
-    cudaFree(d_rowPtr);
-    cudaFree(d_colIdx);
-    cudaFree(d_values);
-    cudaFree(d_rhs);
-}
-
-// Host function for column-major upper triangular solve
-void sparseUpperTriangularSolveGPU_ColMajor(const Eigen::SparseMatrix<double> &lhs, Eigen::MatrixXd &rhs,
-                                            double regularizationFactor) {
-    const int    *rowPtr  = lhs.outerIndexPtr();
-    const int    *colIdx  = lhs.innerIndexPtr();
-    const double *values  = lhs.valuePtr();
-    int           numRows = lhs.rows();
-    int           numCols = rhs.cols();
-
-    int    *d_rowPtr;
-    int    *d_colIdx;
-    double *d_values;
-    double *d_rhs;
-
-    cudaMalloc(&d_rowPtr, (numRows + 1) * sizeof(int));
-    cudaMalloc(&d_colIdx, lhs.nonZeros() * sizeof(int));
-    cudaMalloc(&d_values, lhs.nonZeros() * sizeof(double));
-    cudaMalloc(&d_rhs, numRows * numCols * sizeof(double));
-
-    cudaMemcpy(d_rowPtr, rowPtr, (numRows + 1) * sizeof(int), cudaMemcpyHostToDevice);
-    cudaMemcpy(d_colIdx, colIdx, lhs.nonZeros() * sizeof(int), cudaMemcpyHostToDevice);
-    cudaMemcpy(d_values, values, lhs.nonZeros() * sizeof(double), cudaMemcpyHostToDevice);
-    cudaMemcpy(d_rhs, rhs.data(), numRows * numCols * sizeof(double), cudaMemcpyHostToDevice);
-
-    int blockSize = 256;
-    int numBlocks = (numCols + blockSize - 1) / blockSize;
-    sparseUpperTriangularSolveKernelColMajor<<<numBlocks, blockSize>>>(d_rowPtr, d_colIdx, d_values, d_rhs, numRows,
-                                                                       numCols, regularizationFactor);
-
-    cudaMemcpy(rhs.data(), d_rhs, numRows * numCols * sizeof(double), cudaMemcpyDeviceToHost);
-
-    cudaFree(d_rowPtr);
-    cudaFree(d_colIdx);
-    cudaFree(d_values);
-    cudaFree(d_rhs);
+    cudaFree(d_outerIndexPtr);
+    cudaFree(d_innerIndexPtr);
+    cudaFree(d_valuePtr);
+    cudaFree(d_other);
 }

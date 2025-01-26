@@ -511,7 +511,7 @@ class VRProblem {
         auto &branchingDuals = node->branchingDuals;
         RCC_MODE_BLOCK(auto &rccManager = node->rccManager;)
 
-        int bucket_interval = 20;
+        int bucket_interval = 25;
         int time_horizon = instance.T_max;
         // if (problemType == ProblemType::cvrp) { time_horizon = 50000; }
         numConstrs = node->getIntAttr("NumConstrs");
@@ -574,6 +574,7 @@ class VRProblem {
         std::vector<Label *> paths;
         std::vector<double> solution = node->extractSolution();
         bool can_add = true;
+        bool gen_bg_cuts = false;
 
 #ifdef STAB
         Stabilization stab(0.5, nodeDuals);
@@ -647,6 +648,7 @@ class VRProblem {
                     auto srcResult = r1c->runSeparation(node, SRCconstraints);
                     bool violated = srcResult.first;
                     bool cleared = srcResult.second;
+                    gen_bg_cuts = true;
                     if (!violated) {
                         if (bucket_graph->A_MAX == N_SIZE) {
                             if (std::abs(inner_obj) < 1.0) {
@@ -674,12 +676,29 @@ class VRProblem {
                     }
                 })
                 bucket_graph->ss = false;
+            } else if (gen_bg_cuts) {
+                // #ifdef IPM
+                // RUN_OPTIMIZATION(node, 1e-8)
+                // #endif
+                // r1c->separateBG(node, SRCconstraints);
+                r1c->cutCleaner(node, SRCconstraints);
+                bool generated = r1c->getCutsBG();
+                if (generated) {
+                    changed = cutHandler(r1c, node, SRCconstraints);
+                    if (changed) {
+#ifndef IPM
+                        // stab.cut_added = true;
+                        node->optimize();
+#endif
+                    }
+                }
             }
 
 #ifdef TR
             if (!TRstop) {
                 v = tr.iterate(node, nodeDuals, inner_obj,
-                               bucket_graph->getStage());
+                               bucket_graph->getStage(),
+                               bucket_graph->transition);
                 TRstop = tr.stop();
             }
 #endif
@@ -693,8 +712,8 @@ class VRProblem {
                 double obj_change = std::abs(lp_obj - lp_obj_old);
                 // fmt::print("Objective change: {}\n", obj_change);
                 // double adaptive_factor = std::min(1.0, std::max(1e-4,
-                // obj_change / std::abs(lp_obj + 1e-6))); fmt::print("Adaptive
-                // factor: {}\n", adaptive_factor);
+                // obj_change / std::abs(lp_obj + 1e-6)));
+                // fmt::print("Adaptive factor: {}\n", adaptive_factor);
                 numK = std::ceil(
                     std::accumulate(solution.begin(), solution.end(), 0.0));
 
@@ -796,6 +815,7 @@ class VRProblem {
                     auto rih_added =
                         addColumn(node, rih_paths, inner_obj_rih, true);
                     // colAdded += rih_added;
+                    fmt::print("RIH added: {}\n", rih_added);
                 }
 #endif
 
@@ -874,8 +894,8 @@ class VRProblem {
                             auto matrix = node->extractModelDataSparse();
 
                             auto d = 10;
-                            // Compute gap based on current objective difference
-                            // and adaptive factor
+                            // Compute gap based on current objective
+                            // difference and adaptive factor
 
                             double gap =
                                 std::abs(lp_obj - (lp_obj + numK * inner_obj)) /
@@ -905,8 +925,10 @@ class VRProblem {
                         if (iter_non_improv > adaptive_threshold) {
                             if (stab.alpha > 0) {
                                 print_info(
-                                    "No improvement in the last iterations, "
-                                    "generating dual perturbation with IPM\n");
+                                    "No improvement in the last "
+                                    "iterations, "
+                                    "generating dual perturbation with "
+                                    "IPM\n");
                                 updateGapAndRunOptimization(
                                     node, lp_obj, inner_obj, ipm_solver,
                                     iter_non_improv, use_ipm_duals, nodeDuals);
@@ -1017,10 +1039,12 @@ class VRProblem {
             const int threshold = 1000000;
             if (iter % 10 == 0) {
                 fmt::print(
-                    "| It.: {:4} | Obj.: {:8.2f} | Price: {:9.2f} | SRC: {:3} "
+                    "| It.: {:4} | Obj.: {:8.2f} | Price: {:9.2f} | SRC: "
+                    "{:3} "
                     "| RCC: {:3} | Paths: {:3} | "
                     "Stage: {:1} | "
-                    "Lag.: {:>10} | α: {:4.2f} | tr: {:2.2f} | gap: {:2.4f} "
+                    "Lag.: {:>10} | α: {:4.2f} | tr: {:2.2f} | gap: "
+                    "{:2.4f} "
                     "| Int.: {:>4} "
                     "|\n",
                     iter, lp_obj, inner_obj, n_cuts, n_rcc_cuts, colAdded,
@@ -1032,10 +1056,12 @@ class VRProblem {
                         ? "∞"
                         : fmt::format("{:4}", integer_solution));
                 Logger::log(
-                    "| It.: {:4} | Obj.: {:8.2f} | Price: {:9.2f} | SRC: {:3} "
+                    "| It.: {:4} | Obj.: {:8.2f} | Price: {:9.2f} | SRC: "
+                    "{:3} "
                     "| RCC: {:3} | Paths: {:3} | "
                     "Stage: {:1} | "
-                    "Lag.: {:10.4f} | α: {:4.2f} | tr: {:2.2f} | gap: {:2.4f} "
+                    "Lag.: {:10.4f} | α: {:4.2f} | tr: {:2.2f} | gap: "
+                    "{:2.4f} "
                     "|\n",
                     iter, lp_obj, inner_obj, n_cuts, n_rcc_cuts, colAdded,
                     stage, lag_gap, cur_alpha, tr_val, gap);
@@ -1087,7 +1113,8 @@ class VRProblem {
     void printSolution(BNBNode *node) {
         auto &allPaths = node->paths;
 
-        // get solution in which x > 0.5 and print the corresponding allPaths
+        // get solution in which x > 0.5 and print the corresponding
+        // allPaths
         std::vector<int> sol;
         for (int i = 0; i < allPaths.size(); i++) {
             if (node->getVarValue(i) > 0.5) {
@@ -1113,24 +1140,24 @@ class VRProblem {
                    relaxed_result / 10, reset);
         fmt::print("| {:<14} | {}{:>20}{} |\n", "Incumbent", blue,
                    ip_result / 10, reset);
-        // fmt::print("| {:<14} | {}{:>16}.{:03}{} |\n", "CG Duration", blue,
-        // duration_seconds, duration_milliseconds,
+        // fmt::print("| {:<14} | {}{:>16}.{:03}{} |\n", "CG Duration",
+        // blue, duration_seconds, duration_milliseconds,
         //    reset);
         fmt::print("+---------------------------------------+\n");
 
         // Logger::log("+---------------------------------------+\n");
         Logger::log("Bound: {} \n", relaxed_result / 10);
         Logger::log("Incumbent: {} \n", ip_result / 10);
-        // Logger::log("| {:<14} | {}{:>16}.{:03}{} |\n", "CG Duration", blue,
-        // duration_seconds, duration_milliseconds,
+        // Logger::log("| {:<14} | {}{:>16}.{:03}{} |\n", "CG Duration",
+        // blue, duration_seconds, duration_milliseconds,
         //    reset);
         // Logger::log("+---------------------------------------+\n");
     }
 
     void branch(BNBNode *node);
 
-    // implement clone method for virtual std::unique_ptr<Problem> clone() const
-    // = 0;
+    // implement clone method for virtual std::unique_ptr<Problem> clone()
+    // const = 0;
     std::unique_ptr<VRProblem> clone() const;
 
     /**
@@ -1286,8 +1313,8 @@ class VRProblem {
                 colAdded = addColumn(node, paths, inner_obj, false);
 
 #ifdef STAB
-                // TODO: check if we should update this before running the stab
-                // update
+                // TODO: check if we should update this before running the
+                // stab update
                 node->optimize();
                 lp_obj = node->getObjVal();
 

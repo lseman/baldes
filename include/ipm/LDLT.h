@@ -16,6 +16,7 @@
 #include <stdexec/execution.hpp>
 
 #include "AMD.h"
+#include "EvaluatorGPU.h"
 template <typename T>
 using BVector = std::vector<T>;
 
@@ -186,7 +187,7 @@ class CustomSimplicialLDLT {
         StorageIndex *Li = m_matrix.innerIndexPtr();
         Scalar *Lx = m_matrix.valuePtr();
 
-        // Keep original aligned vectors
+        // Aligned vectors for better cache performance
         alignas(64) std::vector<Scalar> y(size, Scalar(0));
         alignas(64) std::vector<StorageIndex> pattern(size, 0);
         alignas(64) std::vector<StorageIndex> tags(size, 0);
@@ -197,7 +198,6 @@ class CustomSimplicialLDLT {
         const int hardware_threads = std::thread::hardware_concurrency();
         std::vector<std::vector<Scalar>> y_local_storage(
             hardware_threads, std::vector<Scalar>(size, Scalar(0)));
-        // std::vector<bool> thread_ok(hardware_threads, true);
 
         // Precompute patterns for each column
         std::vector<std::vector<StorageIndex>> column_patterns(size);
@@ -221,13 +221,12 @@ class CustomSimplicialLDLT {
             }
             column_patterns[k].assign(pattern.begin() + top, pattern.end());
         }
-
-        // Use NVIDIA bulk sender for parallelism
+        std::vector<bool> thread_ok(hardware_threads, true);
+        // Use bulk sender for parallelism
         auto bulk_sender = stdexec::bulk(
-            stdexec::just(), size,  // Process each column as a separate task
+            stdexec::just(), size,
             [this, &y, &tags, Lp, Li, Lx, size, &ap, &y_local_storage,
-             hardware_threads, &column_patterns](std::size_t k) {
-                // Use thread-local storage
+             hardware_threads, &thread_ok, &column_patterns](std::size_t k) {
                 size_t thread_id =
                     std::hash<std::thread::id>{}(std::this_thread::get_id()) %
                     hardware_threads;
@@ -273,21 +272,20 @@ class CustomSimplicialLDLT {
                 }
 
                 m_diag[k] = d;
-                // if (d == RealScalar(0)) {
-                // thread_ok[thread_id] = false;
-                // }
+                if (d == RealScalar(0)) {
+                    thread_ok[thread_id] = false;
+                }
             });
 
         stdexec::sync_wait(stdexec::when_all(bulk_sender));
-
         // Aggregate thread results
         bool all_ok = true;
-        // for (bool t_ok : thread_ok) {
-        //     if (!t_ok) {
-        //         all_ok = false;
-        //         break;
-        //     }
-        // }
+        for (bool t_ok : thread_ok) {
+            if (!t_ok) {
+                all_ok = false;
+                break;
+            }
+        }
 
         m_info = all_ok ? Success : NumericalIssue;
         m_factorizationIsOk = true;
@@ -547,21 +545,7 @@ class CustomSimplicialLDLT {
             dest = b;
         }
 
-        // Precompute diagonal norm (if not already done)
-        static Scalar cachedDiagonalNorm = m_diag.norm();
-
-        // Compute the residual norm (only if necessary)
-        const Scalar residualNorm = (matrixL() * dest - b).norm();
-
-        // Compute an adaptive regularization factor
-        const Scalar minRegularization =
-            Scalar(1e-12);  // Minimum regularization
-        const Scalar maxRegularization =
-            Scalar(1e-6);  // Maximum regularization
-        const Scalar adaptiveRegularization = std::max(
-            minRegularization,
-            std::min(maxRegularization,
-                     residualNorm / (cachedDiagonalNorm + residualNorm)));
+        const Scalar adaptiveRegularization = 1e-8;
 
         // Regular solve path with adaptive regularization
         solveTriangular<decltype(matrixL()), decltype(dest), Lower>(
@@ -572,11 +556,45 @@ class CustomSimplicialLDLT {
 
         // Apply backward permutation
         if (m_Pinv.size() > 0) {
-            dest.noalias() = m_Pinv * dest;  // Use noalias to avoid temporary
+            dest.noalias() = m_Pinv * dest;  // Use noalias to avoid
+            // temporary
         }
 
         return dest;
     }
+
+    // Eigen::VectorXd solve(const MatrixBase<Rhs> &b) const {
+    //     eigen_assert(m_isInitialized && "Decomposition not initialized.");
+    //     Eigen::VectorXd dest;
+
+    //     if (m_P.size() > 0) {
+    //         dest.noalias() = m_P * b;
+    //     } else {
+    //         dest = b;
+    //     }
+
+    //     static Scalar cachedDiagonalNorm = m_diag.norm();
+    //     const Scalar residualNorm = (matrixL() * dest - b).norm();
+    //     const Scalar adaptiveRegularization = std::max(
+    //         Scalar(1e-12),
+    //         std::min(Scalar(1e-6),
+    //                  residualNorm / (cachedDiagonalNorm + residualNorm)));
+
+    //     // GPU triangular solves
+    //     SparseSolveTriangularGPU<decltype(matrixL()), decltype(dest), Lower>(
+    //         matrixL(), dest, adaptiveRegularization);
+
+    //     dest.array() /= m_diag.array();
+
+    //     SparseSolveTriangularGPU<decltype(matrixU()), decltype(dest), Upper>(
+    //         matrixU(), dest, adaptiveRegularization);
+
+    //     if (m_Pinv.size() > 0) {
+    //         dest.noalias() = m_Pinv * dest;
+    //     }
+
+    //     return dest;
+    // }
 
     void setRegularization(Scalar epsilon) { m_epsilon = epsilon; }
 

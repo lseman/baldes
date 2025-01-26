@@ -787,10 +787,13 @@ class IteratedLocalSearch {
         double red_cost = 0;
 
         auto &cutter = cut_storage;  // Access the cut storage manager
-        auto &SRCDuals =
-            cutter->SRCDuals;  // Access the dual values for the SRC cuts
-        auto theSize = SRCDuals.size();
-        SRC_MODE_BLOCK(std::vector<int> SRCmap; SRCmap.resize(theSize, 0.0);)
+        // auto cut_size = cutter->size();
+        // print theSize
+        const auto active_cuts = cutter->getActiveCuts();
+        // const auto activeSize = active_cuts.size();
+#ifdef SRC
+        ankerl::unordered_dense::map<size_t, double> SRCmap;
+#endif
 
         for (size_t i = 0; i < route.size() - 1; ++i) {
             auto travel_cost = instance.getcij(route[i], route[i + 1]);
@@ -800,51 +803,59 @@ class IteratedLocalSearch {
             // node-specific costs, we subtract that here
             red_cost += travel_cost - nodes[route[i]].cost;
 
-            SRC_MODE_BLOCK(
-                const size_t segment =
-                    node >> 6;  // Determine the segment in the bitmap
-                const size_t bit_position =
-                    node & 63;  // Determine the bit position in the segment
+#ifdef NOT_WORKING
+            const size_t segment =
+                node >> 6;  // Determine the segment in the bitmap
+            const size_t bit_position =
+                node & 63;  // Determine the bit position in the segment
 
-                const uint64_t bit_mask =
-                    1ULL << bit_position;  // Precompute bit shift for the
-                                           // node's position
-                for (size_t idx = 0; idx < theSize; ++idx) {
-                    if (SRCDuals[idx] > -1e-3) {
-                        continue;
-                    }  // Skip non-SRC cuts
+            const uint64_t bit_mask =
+                1ULL << bit_position;  // Precompute bit shift for the
+                                       // node's position
 
-                    const auto &cut = cutter->get_cut(
-                        idx);  // Use indexed access instead of iterator
-                    const auto &baseSet = cut.baseSet;
-                    const auto &baseSetorder = cut.baseSetOrder;
-                    const auto &neighbors = cut.neighbors;
-                    const auto &multipliers = cut.p;
+            for (const auto &active_cut : active_cuts) {
+                if (!active_cut.cut_ptr) {
+                    continue;
+                }
 
-                    // Apply SRC logic: Update the SRC map based on neighbors
-                    // and base set
-                    const bool bitIsSet = neighbors[segment] & bit_mask;
-                    auto &src_map_value =
-                        SRCmap[idx];  // Use reference to avoid multiple
-                                      // accesses
-                    if (!bitIsSet) {
-                        src_map_value = 0.0;  // Reset the SRC map value
-                        continue;
+                try {
+                    const Cut &cut = *active_cut.cut_ptr;
+                    const size_t idx = active_cut.index;
+                    const double dual_value = active_cut.dual_value;
+
+                    if (SRCmap.find(idx) == SRCmap.end()) {
+                        SRCmap[idx] = 0;
                     }
+                    auto &src_map_value = SRCmap[idx];
 
-                    const bool bitIsSet2 = baseSet[segment] & bit_mask;
-
-                    if (bitIsSet2) {
-                        auto &den = multipliers.den;
-                        src_map_value += multipliers.num[baseSetorder[node]];
-                        if (src_map_value >= den) {
-                            red_cost -=
-                                SRCDuals[idx];  // Apply the SRC dual value if
-                                                // threshold is exceeded
-                            src_map_value -= den;  // Reset the SRC map value
+                    if (cut.neighbors[segment] & bit_mask) {
+                        if (cut.baseSet[segment] & bit_mask) {
+                            const auto &multipliers = cut.p;
+                            // print size of cut.baseSetOrde
+                            if (cut.baseSetOrder.size() == 0) {
+                                continue;
+                            }
+                            try {
+                                src_map_value =
+                                    multipliers.num[cut.baseSetOrder[node]];
+                                if (src_map_value >= multipliers.den) {
+                                    try {
+                                        src_map_value -= multipliers.den;
+                                        cost -= dual_value;
+                                    } catch (...) {
+                                        continue;
+                                    }
+                                }
+                            } catch (...) {
+                                continue;
+                            }
                         }
                     }
-                })
+                } catch (...) {
+                    continue;
+                }
+            }
+#endif
         }
         return {cost, red_cost};
     }
