@@ -125,30 +125,36 @@ LimitedMemoryRank1Cuts::LimitedMemoryRank1Cuts(std::vector<VRPNode> &nodes)
  */
 void LimitedMemoryRank1Cuts::separate(const SparseMatrix &A,
                                       const std::vector<double> &x) {
-    // Create a map for non-zero entries by rows
+    // Pre-allocate row indices map with reserve
     std::vector<std::vector<int>> row_indices_map(N_SIZE);
-    // print num_rows
-    // fmt::print("Num rows: {}\n", A.num_rows);
-    for (int idx = 0; idx < A.values.size(); ++idx) {
-        int row = A.rows[idx];
-        // fmt::print("Row: {}\n", row);
-        if (row > N_SIZE - 2) {
-            continue;
-        }
-        row_indices_map[row + 1].push_back(idx);
+    for (auto &row : row_indices_map) {
+        row.reserve(32);  // Typical size, adjust based on your data
     }
-    std::vector<std::pair<double, Cut>> tmp_cuts;
 
+    // Build row indices map
+    for (int idx = 0; idx < A.values.size(); ++idx) {
+        const int row = A.rows[idx];
+        if (row <= N_SIZE - 2) {
+            row_indices_map[row + 1].push_back(idx);
+        }
+    }
+
+    // Pre-allocate thread-local storage to avoid allocations in parallel
+    // section
     const int JOBS = std::thread::hardware_concurrency();
+    std::vector<std::vector<std::pair<double, Cut>>> thread_local_cuts(JOBS);
+    for (auto &cuts : thread_local_cuts) {
+        cuts.reserve(20);  // Adjust based on expected number of cuts per thread
+    }
+
     exec::static_thread_pool pool(JOBS);
     auto sched = pool.get_scheduler();
 
-    auto nC = N_SIZE;
+    // Create tasks more efficiently
     std::vector<std::tuple<int, int, int>> tasks;
-    tasks.reserve((nC * (nC - 1) * (nC - 2)) /
-                  6);  // Preallocate task space to avoid reallocations
+    const int n = N_SIZE - 1;
+    tasks.reserve((n * (n - 1) * (n - 2)) / 6);
 
-    // Create tasks for each combination of (i, j, k)
     for (int i = 1; i < N_SIZE - 1; ++i) {
         for (int j = i + 1; j < N_SIZE - 1; ++j) {
             for (int k = j + 1; k < N_SIZE - 1; ++k) {
@@ -157,138 +163,193 @@ void LimitedMemoryRank1Cuts::separate(const SparseMatrix &A,
         }
     }
 
-    // Define chunk size to reduce parallelization overhead
-    const int chunk_size = (N_SIZE - 1) / JOBS;
-#ifdef NSYNC
-    nsync::nsync_mu cuts_mutex = NSYNC_MU_INIT;
-#else
-    std::mutex cuts_mutex;  // Protect access to shared resources
-#endif
+    // Thread-local buffers to avoid reallocations
+    struct ThreadLocalBuffers {
+        std::vector<int> expanded;
+        std::vector<int> buffer_int;
+        std::vector<int> remainingNodes;
+        std::vector<double> cut_coefficients;
+        std::vector<int> order;
+        ankerl::unordered_dense::set<int> C_set;
 
-    // Parallel execution in chunks
+        ThreadLocalBuffers(int num_cols)
+            : expanded(num_cols),
+              buffer_int(num_cols),
+              remainingNodes(num_cols),
+              cut_coefficients(),
+              order(N_SIZE),
+              C_set(3) {}  // Reserve space for C_set
+    };
+
+    const int chunk_size =
+        std::max(1000, static_cast<int>((tasks.size() + JOBS - 1) / JOBS));
+
     auto bulk_sender = stdexec::bulk(
         stdexec::just(), (tasks.size() + chunk_size - 1) / chunk_size,
-        [this, &row_indices_map, &A, &x, nC, &cuts_mutex, &tasks, chunk_size,
-         &tmp_cuts](std::size_t chunk_idx) {
+        [this, &row_indices_map, &A, &x, &thread_local_cuts, &tasks,
+         chunk_size](std::size_t chunk_idx) {
+            // Thread-local buffers
+            ThreadLocalBuffers buffers(A.num_cols);
+            buffers.cut_coefficients.resize(
+                this->allPaths.size());  // Resize here
+
+            auto &local_cuts =
+                thread_local_cuts[chunk_idx % thread_local_cuts.size()];
+
             size_t start_idx = chunk_idx * chunk_size;
             size_t end_idx = std::min(start_idx + chunk_size, tasks.size());
 
-            // Process a chunk of tasks
             for (size_t task_idx = start_idx; task_idx < end_idx; ++task_idx) {
                 const auto &[i, j, k] = tasks[task_idx];
-                std::vector<int> expanded(A.num_cols, 0);
-                std::vector<int> buffer_int(A.num_cols);
+
+                // Clear expanded array efficiently
+                if (buffers.expanded.size() > 0) {
+                    std::memset(buffers.expanded.data(), 0,
+                                buffers.expanded.size() * sizeof(int));
+                }
+
                 int buffer_int_n = 0;
                 double lhs = 0.0;
 
-                // Combine the three updates into one loop for efficiency
-                for (int idx : row_indices_map[i]) expanded[A.cols[idx]] += 1;
-                for (int idx : row_indices_map[j]) expanded[A.cols[idx]] += 1;
-                for (int idx : row_indices_map[k]) expanded[A.cols[idx]] += 1;
+                // Process rows more efficiently
+                for (int idx : row_indices_map[i])
+                    buffers.expanded[A.cols[idx]]++;
+                for (int idx : row_indices_map[j])
+                    buffers.expanded[A.cols[idx]]++;
+                for (int idx : row_indices_map[k])
+                    buffers.expanded[A.cols[idx]]++;
 
-                // Accumulate LHS cut values
+// Vectorization hint for modern compilers
+#pragma GCC ivdep
                 for (int idx = 0; idx < A.num_cols; ++idx) {
-                    if (expanded[idx] >= 2) {
-                        lhs += std::floor(expanded[idx] * 0.5) * x[idx];
-                        buffer_int[buffer_int_n++] = idx;
+                    if (buffers.expanded[idx] >= 2) {
+                        lhs += std::floor(buffers.expanded[idx] * 0.5) * x[idx];
+                        buffers.buffer_int[buffer_int_n++] = idx;
                     }
                 }
 
-                // If lhs violation found, insert the cut
                 if (lhs > 1.0 + 1e-3) {
                     std::array<uint64_t, num_words> C = {};
                     std::array<uint64_t, num_words> AM = {};
-                    std::vector<int> order(N_SIZE, 0);
-                    int ordering = 0;
+                    std::fill(buffers.order.begin(), buffers.order.end(), 0);
 
-                    std::vector<int> C_index = {i, j, k};
-                    for (auto node : C_index) {
-                        C[node / 64] |= (1ULL << (node % 64));
-                        AM[node / 64] |= (1ULL << (node % 64));
-                        order[node] = ordering++;
+                    // Set bits more efficiently
+                    const std::array<int, 3> C_index = {i, j, k};
+                    for (int idx = 0; idx < 3; ++idx) {
+                        const int node = C_index[idx];
+                        C[node >> 6] |= (1ULL << (node & 63));
+                        AM[node >> 6] |= (1ULL << (node & 63));
+                        buffers.order[node] = idx;
                     }
-                    std::vector<int> remainingNodes;
-                    remainingNodes.assign(buffer_int.begin(),
-                                          buffer_int.begin() + buffer_int_n);
+
+                    buffers.remainingNodes.assign(
+                        buffers.buffer_int.begin(),
+                        buffers.buffer_int.begin() + buffer_int_n);
+
                     SRCPermutation p;
                     p.num = {1, 1, 1};
                     p.den = 2;
-                    std::vector<double> cut_coefficients(allPaths.size(), 0.0);
 
-                    ankerl::unordered_dense::set<int> C_set(C_index.begin(),
-                                                            C_index.end());
-                    for (auto node : remainingNodes) {
-                        auto &consumers =
-                            allPaths[node];  // Reference to the consumers for
-                                             // in-place modification
+                    // Reuse C_set
+                    buffers.C_set.clear();
+                    buffers.C_set.insert(C_index.begin(), C_index.end());
 
-                        int first = -1, second = -1;
+                    // Process remaining nodes
+                    for (int node : buffers.remainingNodes) {
+                        const auto &consumers = allPaths[node];
+                        const size_t n = consumers.size();
 
-                        // Find the first and second appearances of any element
-                        // in C_set within consumers
-                        for (size_t i = 1; i < consumers.size() - 1; ++i) {
-                            if (C_set.find(consumers[i]) != C_set.end()) {
-                                if (first == -1) {
-                                    first = i;
-                                } else {
-                                    second = i;
-                                    break;  // We found both first and second,
-                                            // so we can exit the loop
-                                }
-                            }
+                        // Skip paths that are too short
+                        if (n < 3) continue;
+
+                        // Direct array access instead of hash lookups
+                        const int c1 = C_index[0], c2 = C_index[1],
+                                  c3 = C_index[2];
+
+                        size_t first = n, second = n;
+
+// Vectorization hint
+#pragma GCC ivdep
+                        for (size_t idx = 1; idx < n - 1; ++idx) {
+                            const int curr = consumers[idx];
+                            // Check against all three C_set elements at once
+                            const bool is_in_c =
+                                (curr == c1 || curr == c2 || curr == c3);
+
+                            // Branchless updates
+                            const bool update_first = is_in_c && (first == n);
+                            const bool update_second =
+                                is_in_c && (first != n) && (idx > first);
+
+                            first = update_first ? idx : first;
+                            second = update_second ? idx : second;
                         }
 
-                        // If we found both the first and second indices, mark
-                        // nodes in AM
-                        if (first != -1 && second != -1) {
-                            for (int i = first + 1; i < second; ++i) {
-                                AM[consumers[i] / 64] |=
-                                    (1ULL
-                                     << (consumers[i] %
-                                         64));  // Set the bit for the consumer
+                        // If we found two positions
+                        if (second != n) {
+// Process elements between first and second
+#pragma GCC ivdep
+                            for (size_t idx = first + 1; idx < second;
+                                 idx += 4) {
+                                // Process up to 4 elements at once
+                                const size_t remain = second - idx;
+                                if (remain >= 4) {
+                                    const uint16_t n1 = consumers[idx];
+                                    const uint16_t n2 = consumers[idx + 1];
+                                    const uint16_t n3 = consumers[idx + 2];
+                                    const uint16_t n4 = consumers[idx + 3];
+
+                                    AM[n1 >> 6] |= (1ULL << (n1 & 63));
+                                    AM[n2 >> 6] |= (1ULL << (n2 & 63));
+                                    AM[n3 >> 6] |= (1ULL << (n3 & 63));
+                                    AM[n4 >> 6] |= (1ULL << (n4 & 63));
+                                } else {
+                                    // Handle remaining elements
+                                    for (size_t j = 0; j < remain; ++j) {
+                                        const uint16_t n = consumers[idx + j];
+                                        AM[n >> 6] |= (1ULL << (n & 63));
+                                    }
+                                    break;
+                                }
                             }
                             break;
                         }
                     }
-                    auto z = 0;
-                    for (auto path : allPaths) {
-                        auto &clients = path.route;  // Reference to clients for
-                                                     // in-place modification
-                        cut_coefficients[z++] = computeLimitedMemoryCoefficient(
-                            C, AM, p, clients, order);
+
+                    // Compute coefficients
+                    size_t z = 0;
+                    for (const auto &path : allPaths) {
+                        buffers.cut_coefficients[z++] =
+                            computeLimitedMemoryCoefficient(
+                                C, AM, p, path.route, buffers.order);
                     }
 
-                    Cut cut(C, AM, cut_coefficients, p);
-                    cut.baseSetOrder = order;
-
-// print lhs
-#ifdef NSYNC
-                    nsync::nsync_mu_lock(&cuts_mutex);
-#else
-                    std::lock_guard<std::mutex> lock(cuts_mutex);
-#endif
-                    tmp_cuts.emplace_back(lhs, cut);
-#ifdef NSYNC
-                    nsync::nsync_mu_unlock(&cuts_mutex);
-#endif
+                    Cut cut(C, AM, buffers.cut_coefficients, p);
+                    cut.baseSetOrder = buffers.order;
+                    local_cuts.emplace_back(lhs, cut);
                 }
             }
         });
 
-    // Submit work to the thread pool
-    auto work = stdexec::starts_on(sched, bulk_sender);
-    stdexec::sync_wait(std::move(work));
+    // Execute work
+    stdexec::sync_wait(stdexec::on(sched, std::move(bulk_sender)));
 
-    pdqsort(tmp_cuts.begin(), tmp_cuts.end(),
+    // Merge and sort cuts from all threads
+    std::vector<std::pair<double, Cut>> final_cuts;
+    for (const auto &thread_cuts : thread_local_cuts) {
+        final_cuts.insert(final_cuts.end(), thread_cuts.begin(),
+                          thread_cuts.end());
+    }
+
+    pdqsort(final_cuts.begin(), final_cuts.end(),
             [](const auto &a, const auto &b) { return a.first > b.first; });
 
-    auto max_cuts = 2;
-    for (int i = 0; i < std::min(max_cuts, static_cast<int>(tmp_cuts.size()));
+    // Add top cuts
+    const int max_cuts = 2;
+    for (int i = 0; i < std::min(max_cuts, static_cast<int>(final_cuts.size()));
          ++i) {
-        auto &cut = tmp_cuts[i].second;
-        cutStorage.addCut(cut);
+        cutStorage.addCut(final_cuts[i].second);
     }
-    return;
 }
 
 void LimitedMemoryRank1Cuts::separateBG(
@@ -298,11 +359,19 @@ void LimitedMemoryRank1Cuts::separateBG(
     if (generator->checkBackgroundTask()) {
         return;
     }
-    auto cuts = &cutStorage;
+
     std::vector<double> solution;
+    GET_SOL(node);
+
+    size_t i = 0;
+    std::for_each(allPaths.begin(), allPaths.end(),
+                  [&](auto &path) { path.frac_x = solution[i++]; });
+
+    auto cuts = &cutStorage;
     auto cuts_after_separation = cuts->size();
     generator->setArcDuals(arc_duals);
     generator->setNodes(nodes);
+    generator->max_heuristic_sep_mem4_row_rank1 = 8;
     generator->initialize(allPaths);
     generator->generateSepHeurMem4Vertex();
     generator->generateCutsInBackground();
@@ -310,14 +379,21 @@ void LimitedMemoryRank1Cuts::separateBG(
 
 bool LimitedMemoryRank1Cuts::getCutsBG() {
     if (!generator->readyGeneratedCuts()) {
+        cuts_harvested = false;
         return false;
     }
+
+    std::vector<double> solution;
+
+    cuts_harvested = true;
 
     auto cuts = &cutStorage;
     auto cuts_before = cuts->size();
 
     auto cutsBG = generator->returnBGcuts();
-    if (cutsBG.size() == 0) {
+
+    n_high_order = cutsBG.size();
+    if (n_high_order == 0) {
         return false;
     }
     // print_info("Processing {} background cuts\n", cutsBG.size());
@@ -325,6 +401,8 @@ bool LimitedMemoryRank1Cuts::getCutsBG() {
 
     auto cuts_after_separation = cuts->size();
     auto cuts_changed = cuts_after_separation - cuts_before;
+
+    // cuts->updateActiveCuts();
     if (cuts_changed > 0) {
         return true;
     }
@@ -334,41 +412,50 @@ bool LimitedMemoryRank1Cuts::getCutsBG() {
 std::pair<bool, bool> LimitedMemoryRank1Cuts::runSeparation(
     BNBNode *node, std::vector<baldesCtrPtr> &SRCconstraints) {
     auto cuts = &cutStorage;
-    ModelData matrix;
+    ModelData matrix = node->extractModelDataSparse();
     auto cuts_before = cuts->size();
     std::vector<double> solution;
-
     GET_SOL(node);
-
-    size_t i = 0;
-    std::for_each(allPaths.begin(), allPaths.end(),
-                  [&](auto &path) { path.frac_x = solution[i++]; });
-
     separateR1C1(matrix.A_sparse, solution);
     separate(matrix.A_sparse, solution);
     auto cuts_after_separation = cuts->size();
 
-    bool readGeneration = generator->readyGeneratedCuts();
-    if (readGeneration) {
-        auto cutsBG = generator->returnBGcuts();
-        // print_info("Processing {} background cuts\n", cutsBG.size());
-        if (cutsBG.size() > 0) {
-            processCuts(cutsBG);
+    // if (cuts_after_separation != cuts_before) {
+    //     bool cleared = cutCleaner(node, SRCconstraints);
+    //     return std::make_pair(true, cleared);
+    // }
+
+    if (cuts_harvested) {
+        cuts_before -= n_high_order;
+        cuts_after_separation -= n_high_order;
+    }
+
+    if (!cuts_harvested) {
+        bool readGeneration = generator->readyGeneratedCuts();
+        if (readGeneration) {
+            auto cutsBG = generator->returnBGcuts();
+            // print_info("Processing {} background cuts\n", cutsBG.size());
+            cuts_harvested = true;
+            n_high_order = cutsBG.size();
+            if (n_high_order > 0) {
+                processCuts(cutsBG);
+            }
+        } else {
+            separateBG(node, SRCconstraints);
+            cuts_harvested = false;
         }
-    } else {
-        separateBG(node, SRCconstraints);
     }
 
     ////////////////////////////////////////////////////
     // Handle non-violated cuts in a single pass
     ////////////////////////////////////////////////////
-    int cuts_after = cuts->size();
+    int cuts_after = cuts_after_separation + n_high_order;
     bool cleared = cutCleaner(node, SRCconstraints);
     int n_cuts_removed = cuts_after - cuts->size();
 
     // Simplify the final check
     bool cuts_changed = (cuts_before != cuts->size() + n_cuts_removed);
-    if (!readGeneration) {
+    if (!cuts_harvested) {
         cuts_changed = true;
     }
     return std::make_pair(cuts_changed, cleared);
@@ -413,31 +500,33 @@ bool LimitedMemoryRank1Cuts::cutCleaner(
 double LimitedMemoryRank1Cuts::computeLimitedMemoryCoefficient(
     const std::array<uint64_t, num_words> &C,
     const std::array<uint64_t, num_words> &AM, const SRCPermutation &p,
-    const std::vector<uint16_t> &P, std::vector<int> &order) noexcept {
+    const std::vector<uint16_t> &P, const std::vector<int> &order) noexcept {
     double alpha = 0.0;
     int S = 0;
-    auto den = p.den;
+    const int den = p.den;
+    const size_t P_size = P.size();
 
-    for (size_t j = 1; j < P.size() - 1; ++j) {
-        int vj = P[j];
+// Vectorization hint
+#pragma GCC ivdep
+    for (size_t j = 1; j < P_size - 1; ++j) {
+        const int vj = P[j];
+        // Combine bit operations - shift once
+        const uint64_t word_idx = vj >> 6;
+        const uint64_t bit_mask = 1ULL << (vj & 63);
 
-        // Precompute bitshift values for reuse
-        uint64_t am_mask = (1ULL << (vj & 63));
-        uint64_t am_index = vj >> 6;
+        // Branchless updates using arithmetic
+        const bool in_am = (AM[word_idx] & bit_mask) != 0;
+        const bool in_c = (C[word_idx] & bit_mask) != 0;
 
-        // Check if vj is in AM using precomputed values
-        if (!(AM[am_index] & am_mask)) {
-            S = 0;  // Reset S if vj is not in AM
-        } else if (C[am_index] & am_mask) {
-            // Get the position of vj in C by counting the set bits up
-            // to vj
-            int pos = order[vj];
+        // Reset S if not in AM
+        S *= in_am;
 
-            S += p.num[pos];
-            if (S >= den) {
-                S -= den;
-                alpha += 1;
-            }
+        // Update S and alpha if in both AM and C
+        if (in_am && in_c) {
+            S += p.num[order[vj]];
+            // Branchless alpha update
+            alpha += S >= den;
+            S = S >= den ? S - den : S;
         }
     }
 

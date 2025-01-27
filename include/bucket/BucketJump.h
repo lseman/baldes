@@ -179,7 +179,6 @@ void BucketGraph::BucketArcElimination(double theta) {
     auto &buckets = assign_buckets<D>(fw_buckets, bw_buckets);
     auto &Phi = assign_buckets<D>(Phi_fw, Phi_bw);
     auto &Phi_opposite = assign_buckets<D>(Phi_bw, Phi_fw);
-    auto &fixed_buckets = assign_buckets<D>(fw_fixed_buckets, bw_fixed_buckets);
     auto &buckets_size = assign_buckets<D>(fw_buckets_size, bw_buckets_size);
     auto &fixed_buckets_bitmap =
         assign_buckets<D>(fw_fixed_buckets_bitmap, bw_fixed_buckets_bitmap);
@@ -341,7 +340,6 @@ void BucketGraph::ObtainJumpBucketArcs() {
     // Assign forward or backward buckets, fixed buckets, bucket indices, and
     // Phi (adjacency list) based on direction
     auto &buckets = assign_buckets<D>(fw_buckets, bw_buckets);
-    auto &fixed_buckets = assign_buckets<D>(fw_fixed_buckets, bw_fixed_buckets);
     auto &num_buckets_index =
         assign_buckets<D>(num_buckets_index_fw, num_buckets_index_bw);
     auto &num_buckets = assign_buckets<D>(num_buckets_fw, num_buckets_bw);

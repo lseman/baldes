@@ -583,7 +583,7 @@ class VRProblem {
 #ifdef RIH
         IteratedLocalSearch ils(instance);
         bucket_graph->ils = &ils;
-        SRC_MODE_BLOCK(ils.cut_storage = cuts;)
+        // SRC_MODE_BLOCK(ils.cut_storage = cuts;)
 
 #endif
 
@@ -595,7 +595,6 @@ class VRProblem {
         bool TRstop = false;
         TrustRegion tr(numConstrs);
         tr.setup(node, nodeDuals);
-        solution = node->extractSolution();
         double v = 0;
 #endif
 
@@ -617,7 +616,8 @@ class VRProblem {
 
 #if defined(RCC)
             if (rcc) {
-                RUN_OPTIMIZATION(node, 1e-6)
+                // RUN_OPTIMIZATION(node, 1e-6)
+                GET_SOL(node);
                 RCC_MODE_BLOCK(rcc = RCCsep(node, solution);)
 
 #ifdef EXACT_RCC
@@ -629,7 +629,8 @@ class VRProblem {
             if ((ss && !rcc) || force_cuts) {
                 force_cuts = false;
 #if defined(RCC)
-                RUN_OPTIMIZATION(node, 1e-8)
+                // RUN_OPTIMIZATION(node, 1e-8)
+                GET_SOL(node);
                 RCC_MODE_BLOCK(rcc = RCCsep(node, solution);)
 #endif
 
@@ -672,25 +673,28 @@ class VRProblem {
                             stab.cut_added = true;
                             node->optimize();
 #endif
+                        } else if (cleared) {
+                            node->optimize();
                         }
                     }
                 })
                 bucket_graph->ss = false;
             } else if (gen_bg_cuts) {
                 // #ifdef IPM
-                // RUN_OPTIMIZATION(node, 1e-8)
                 // #endif
                 // r1c->separateBG(node, SRCconstraints);
-                r1c->cutCleaner(node, SRCconstraints);
+                bool cleared = r1c->cutCleaner(node, SRCconstraints);
                 bool generated = r1c->getCutsBG();
                 if (generated) {
                     changed = cutHandler(r1c, node, SRCconstraints);
-                    if (changed) {
+                    if (changed || cleared) {
 #ifndef IPM
                         // stab.cut_added = true;
                         node->optimize();
 #endif
                     }
+                } else if (cleared) {
+                    node->optimize();
                 }
             }
 
@@ -700,6 +704,7 @@ class VRProblem {
                                bucket_graph->getStage(),
                                bucket_graph->transition);
                 TRstop = tr.stop();
+                node->optimize();
             }
 #endif
 
@@ -815,7 +820,7 @@ class VRProblem {
                     auto rih_added =
                         addColumn(node, rih_paths, inner_obj_rih, true);
                     // colAdded += rih_added;
-                    fmt::print("RIH added: {}\n", rih_added);
+                    // fmt::print("RIH added: {}\n", rih_added);
                 }
 #endif
 

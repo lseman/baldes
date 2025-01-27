@@ -351,7 +351,7 @@ class HighDimCutsGenerator {
                             applyBestOperation('r', c_mutable, wc, -1, remove_j,
                                                std::make_pair(-1, -1), new_c,
                                                new_w_no_c, plan_idx, best_vio);
-                        } else {
+                        } else if (best_vio == swap_vio) {
                             best_op = 's';
                             applyBestOperation('s', c_mutable, wc, -1, -1,
                                                swap_i_j, new_c, new_w_no_c,
@@ -434,20 +434,6 @@ class HighDimCutsGenerator {
                     if (i == swap_i_j.second) i = swap_i_j.first;
                 }
                 break;
-
-                // case 'h':  // Shift operation
-                //     new_c = c;
-                //     new_w_no_c = wc;
-                //     if (swap_i_j.first < swap_i_j.second) {
-                //         std::rotate(new_c.begin() + swap_i_j.first,
-                //                     new_c.begin() + swap_i_j.first + 1,
-                //                     new_c.begin() + swap_i_j.second + 1);
-                //     } else {
-                //         std::rotate(new_c.begin() + swap_i_j.second,
-                //                     new_c.begin() + swap_i_j.first,
-                //                     new_c.begin() + swap_i_j.first + 1);
-                //     }
-                //     break;
         }
     }
 
@@ -1178,7 +1164,6 @@ class HighDimCutsGenerator {
             MoveResult{},           // Add
             MoveResult{},           // Remove
             MoveResult{},           // Swap
-            MoveResult{}            // Shift
         };
 
         // Thread-local storage for temporary data
@@ -1187,28 +1172,38 @@ class HighDimCutsGenerator {
         thread_local std::vector<int> new_w_no_c;
 
         double new_vio = MIN_SCORE;
+        const bool can_add = label.search_dir == 'a' || label.search_dir == 's';
+        const bool can_remove =
+            label.search_dir == 'r' || label.search_dir == 's';
+        const bool can_swap =
+            label.search_dir == 'a' || label.search_dir == 'r';
 
         // Use mutex for operations that need to modify shared data
         {
             std::lock_guard<std::mutex> lock(pool_mutex);
             // Handle operations based on search direction
-            switch (label.search_dir) {
-                case 'a':  // Add and Swap
-                {
-                    int add_j;
-                    addSearchCrazy(label.plan_idx, label.c, label.w_no_c,
-                                   new_vio, add_j);
-                    moves[1] = MoveResult{new_vio};
-                    moves[1].operation_data = add_j;
+            // Perform valid operations
+            if (can_add) {
+                int add_j;
+                addSearchCrazy(label.plan_idx, label.c, label.w_no_c, new_vio,
+                               add_j);
+                moves[1] = MoveResult{new_vio};
+                moves[1].operation_data = add_j;
+            }
 
-                    std::pair<int, int> swap_pair;
-                    swapSearchCrazy(label.plan_idx, label.c, label.w_no_c,
-                                    new_vio, swap_pair);
-                    moves[3] = MoveResult{new_vio};
-                    moves[3].operation_data = swap_pair;
-                } break;
+            if (can_remove) {
+                int remove_j;
+                removeSearchCrazy(label.plan_idx, label.c, new_vio, remove_j);
+                moves[2] = MoveResult{new_vio};
+                moves[2].operation_data = remove_j;
+            }
 
-                    // ... rest of the switch cases ...
+            if (can_swap) {
+                std::pair<int, int> swap_pair;
+                swapSearchCrazy(label.plan_idx, label.c, label.w_no_c, new_vio,
+                                swap_pair);
+                moves[3] = MoveResult{new_vio};
+                moves[3].operation_data = swap_pair;
             }
         }
 

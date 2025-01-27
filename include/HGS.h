@@ -63,7 +63,7 @@ class HGS {
         print_heur("Genetic algorithm finished in {:.2f} seconds\n",
                    params.getTimeElapsedSeconds());
 
-        auto sol = population.extractTopBestFeasibleRoutes(25);
+        auto sol = population.extractFeasibleRoutes();
         // auto sol = population.extractBestFeasibleRoutes();
         bestRoutes = population.extractBestFeasibleRoutes();
         // Return 0 if the program execution was successfull

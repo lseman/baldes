@@ -71,6 +71,9 @@ using RCCManagerPtr = std::shared_ptr<RCCManager>;
 
 class LimitedMemoryRank1Cuts {
    public:
+    bool cuts_harvested = false;
+    int n_high_order = 0;
+
 #if defined(RCC) || defined(EXACT_RCC)
     ArcDuals arc_duals;
     void setArcDuals(const ArcDuals &arc_duals) { this->arc_duals = arc_duals; }
@@ -132,112 +135,128 @@ class LimitedMemoryRank1Cuts {
     double computeLimitedMemoryCoefficient(
         const std::array<uint64_t, num_words> &C,
         const std::array<uint64_t, num_words> &AM, const SRCPermutation &p,
-        const std::vector<uint16_t> &P, std::vector<int> &order) noexcept;
+        const std::vector<uint16_t> &P, const std::vector<int> &order) noexcept;
 
     std::pair<bool, bool> runSeparation(
         BNBNode *node, std::vector<baldesCtrPtr> &SRCconstraints);
 
     void separateR1C1(const SparseMatrix &A, const std::vector<double> &x) {
-        std::vector<std::pair<double, int>> tmp_cuts;
-        tmp_cuts.reserve(
-            allPaths.size());  // Conservative reservation based on sol size
-
         const int JOBS = std::thread::hardware_concurrency();
+        const size_t paths_size = allPaths.size();
+
+        // Pre-allocate thread-local storage
+        std::vector<std::vector<std::pair<double, int>>> thread_local_cuts(
+            JOBS);
+        for (auto &cuts : thread_local_cuts) {
+            cuts.reserve(paths_size / JOBS);  // Estimate per thread
+        }
+
         exec::static_thread_pool pool(JOBS);
         auto sched = pool.get_scheduler();
 
-        // Define chunk size to reduce parallelization overhead
-        const int chunk_size = (allPaths.size() + JOBS - 1) / JOBS;
+        const int chunk_size =
+            std::max(1000, static_cast<int>((paths_size + JOBS - 1) / JOBS));
 
-        // Mutex to protect access to tmp_cuts
-        std::mutex cuts_mutex;
+        // Thread-local buffers to avoid reallocations
+        struct ThreadLocalBuffers {
+            ankerl::unordered_dense::map<int, int> vis_map;
 
-        // Parallel execution in chunks
+            ThreadLocalBuffers() : vis_map(64) {}  // Pre-reserve typical size
+        };
+
         auto bulk_sender = stdexec::bulk(
-            stdexec::just(), (allPaths.size() + chunk_size - 1) / chunk_size,
-            [&](std::size_t chunk_idx) {
-                size_t start_idx = chunk_idx * chunk_size;
-                size_t end_idx =
-                    std::min(start_idx + chunk_size, allPaths.size());
+            stdexec::just(), (paths_size + chunk_size - 1) / chunk_size,
+            [this, &thread_local_cuts, paths_size,
+             chunk_size](std::size_t chunk_idx) {
+                ThreadLocalBuffers buffers;
+                auto &local_cuts =
+                    thread_local_cuts[chunk_idx % thread_local_cuts.size()];
 
-                // Local storage for cuts in this chunk
-                std::vector<std::pair<double, int>> local_cuts;
+                const size_t start_idx = chunk_idx * chunk_size;
+                const size_t end_idx =
+                    std::min(start_idx + chunk_size, paths_size);
 
-                ankerl::unordered_dense::map<int, int> vis_map;
                 for (size_t i = start_idx; i < end_idx; ++i) {
-                    const auto &r = allPaths[i];
-                    vis_map.clear();
-                    for (const auto i : r.route) {
-                        ++vis_map[i];
+                    const auto &route = allPaths[i].route;
+                    const double frac_x = allPaths[i].frac_x;
+
+                    buffers.vis_map.clear();
+
+                    // Count occurrences - manual loop for better performance
+                    const size_t route_size = route.size();
+                    for (size_t j = 0; j < route_size; ++j) {
+                        ++buffers.vis_map[route[j]];
                     }
-                    for (const auto &[v, times] : vis_map) {
+
+                    // Process repeating nodes
+                    for (const auto &[v, times] : buffers.vis_map) {
                         if (times > 1) {
-                            // Calculate fractional cut value with integer
-                            // division instead of `floor`
-                            double cut_value =
-                                std::floor(times / 2.) * r.frac_x;
-                            if (cut_value > 1e-3) {  // Apply tolerance check
+                            const double cut_value =
+                                (times >> 1) * frac_x;  // Integer division by 2
+                            if (cut_value > 1e-3) {
                                 local_cuts.emplace_back(cut_value, v);
                             }
                         }
                     }
                 }
-
-                // Merge local cuts into global tmp_cuts
-                std::lock_guard<std::mutex> lock(cuts_mutex);
-                tmp_cuts.insert(tmp_cuts.end(), local_cuts.begin(),
-                                local_cuts.end());
             });
 
-        // Submit work to the thread pool
-        auto work = stdexec::starts_on(sched, bulk_sender);
-        stdexec::sync_wait(std::move(work));
+        stdexec::sync_wait(stdexec::on(sched, std::move(bulk_sender)));
 
-        // Early return if no cuts were found
-        if (tmp_cuts.empty()) return;
+        // Merge cuts from all threads
+        std::vector<std::pair<double, int>> final_cuts;
+        size_t total_cuts = 0;
+        for (const auto &thread_cuts : thread_local_cuts) {
+            total_cuts += thread_cuts.size();
+        }
+        final_cuts.reserve(total_cuts);
 
-        // Sort cuts by value in descending order
-        pdqsort(
-            tmp_cuts.begin(), tmp_cuts.end(),
-            [](const std::pair<double, int> &a,
-               const std::pair<double, int> &b) { return a.first > b.first; });
+        for (const auto &thread_cuts : thread_local_cuts) {
+            final_cuts.insert(final_cuts.end(), thread_cuts.begin(),
+                              thread_cuts.end());
+        }
 
-        // Generate cut coefficients for the top cuts
-        std::vector<double> coefficients_aux(allPaths.size(), 0.0);
-        auto cuts_to_apply = std::min(static_cast<int>(tmp_cuts.size()), 2);
+        if (final_cuts.empty()) return;
+
+        // Sort cuts by value
+        pdqsort(final_cuts.begin(), final_cuts.end(),
+                [](const auto &a, const auto &b) { return a.first > b.first; });
+
+        // Pre-allocate reusable buffers for cut generation
+        std::vector<double> coefficients_aux(paths_size);
+        const int cuts_to_apply =
+            std::min(static_cast<int>(final_cuts.size()), 2);
 
         for (int i = 0; i < cuts_to_apply; ++i) {
-            auto cut_value = tmp_cuts[i].first;
-            auto v = tmp_cuts[i].second;
+            const int v = final_cuts[i].second;
 
-            // Create a new cut
-            std::array<uint64_t, num_words> C = {};  // Reset C for each cut
+            // Initialize C and AM more efficiently
+            std::array<uint64_t, num_words> C = {};
             std::array<uint64_t, num_words> AM = {};
-            std::vector<int> order(N_SIZE, 0);
 
-            // Define C
-            C[v / 64] |= (1ULL << (v % 64));
+            // Set bit in C
+            C[v >> 6] |= (1ULL << (v & 63));
 
-            // Define AM
-            for (int node = 0; node < N_SIZE; ++node) {
-                AM[node / 64] |= (1ULL << (node % 64));
-            }
+            // Fill AM using memset for better performance
+            std::memset(AM.data(), 0xFF, sizeof(AM));
+
+            // Initialize order vector
+            std::vector<int> order(N_SIZE);
+            std::iota(order.begin(), order.end(), 0);
 
             SRCPermutation p;
             p.num = {1};
             p.den = 2;
 
-            // Compute coefficients for all paths
-            coefficients_aux.assign(allPaths.size(), 0.0);
-            for (size_t j = 0; j < allPaths.size(); ++j) {
-                auto &clients = allPaths[j].route;
-                coefficients_aux[j] =
-                    computeLimitedMemoryCoefficient(C, AM, p, clients, order);
+// Compute coefficients
+#pragma GCC ivdep
+            for (size_t j = 0; j < paths_size; ++j) {
+                coefficients_aux[j] = computeLimitedMemoryCoefficient(
+                    C, AM, p, allPaths[j].route, order);
             }
 
-            // Create and store the cut
             Cut cut(C, AM, coefficients_aux, p);
-            cut.baseSetOrder = order;
+            cut.baseSetOrder = std::move(order);
             cutStorage.addCut(cut);
         }
     }

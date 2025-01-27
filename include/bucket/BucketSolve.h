@@ -286,7 +286,8 @@ std::vector<double> BucketGraph::labeling_algorithm() {
                     // Check dominance in smaller buckets
                     if constexpr (F != Full::TSP) {
                         if (DominatedInCompWiseSmallerBuckets<D, S>(
-                                label, bucket, c_bar, Bvisited, ordered_sccs)) {
+                                label, bucket, c_bar, Bvisited, ordered_sccs,
+                                stat_n_dom)) {
                             buckets[label->vertex].lazy_flush(label);
                             label->set_extended(true);
                             continue;
@@ -486,7 +487,7 @@ std::vector<Label *> BucketGraph::bi_labeling_algorithm() {
                 const int to_node = arc.to;
 
                 if constexpr (S == Stage::Three || S == Stage::Eliminate) {
-                    if (fixed_arcs[L->node_id][to_node] == 1) {
+                    if (is_arc_fixed(L->node_id, to_node) == 1) {
                         continue;
                     }
                 }
@@ -543,6 +544,7 @@ std::vector<Label *> BucketGraph::bi_labeling_algorithm() {
             }
             top_labels.push_back(merged_labels[i]);
         }
+        ils->cut_storage = cut_storage->cloneCuts();
         ils->submit_task(top_labels, nodes);
     }
 #endif
@@ -603,11 +605,14 @@ inline std::vector<Label *> BucketGraph::Extend(
     }
 
     if constexpr (S == Stage::Three || S == Stage::Eliminate) {
-        if ((D == Direction::Forward &&
-             fixed_arcs[initial_node_id][node_id] == 1) ||
-            (D == Direction::Backward &&
-             fixed_arcs[node_id][initial_node_id] == 1)) {
-            return {};
+        if constexpr (D == Direction::Forward) {
+            if (is_arc_fixed(initial_node_id, node_id)) {
+                return {};
+            }
+        } else {
+            if (is_arc_fixed(node_id, initial_node_id)) {
+                return {};
+            }
         }
     }
 
@@ -762,7 +767,7 @@ inline std::vector<Label *> BucketGraph::Extend(
         auto &cutter = cut_storage;
         const size_t segment = node_id >> 6;
         const size_t bit_position = node_id & 63;
-        const uint64_t bit_mask = 1ULL << bit_position;
+        const uint64_t bit_mask = bit_mask_lookup[bit_position];
 
         // Get active cuts once
         const auto active_cuts = cutter->getActiveCuts();
@@ -910,7 +915,6 @@ inline bool BucketGraph::is_dominated(const Label *new_label,
         }
     }
 
-    // TODO:: check again this unreachable dominance
 #ifndef UNREACHABLE_DOMINANCE
     // Check visited nodes (bitmap comparison) for Stages 3, 4, and
     // Enumerate
@@ -949,18 +953,21 @@ inline bool BucketGraph::is_dominated(const Label *new_label,
 #ifdef SRC
     if constexpr (S == Stage::Four || S == Stage::Enumerate) {
         double sumSRC = 0;
+        auto &cutter = cut_storage;
 
-        const auto &SRCDuals = cut_storage->SRCDuals;
-        if (!SRCDuals.empty()) {
+        const auto active_cuts = cutter->getActiveCuts();
+
+        for (const auto &active_cut : active_cuts) {
+            const auto &cut = *active_cut.cut_ptr;
+            const size_t idx = active_cut.index;
+            const double dual_value = active_cut.dual_value;
+
             const auto &labelSRCMap = label->SRCmap;
             const auto &newLabelSRCMap = new_label->SRCmap;
-            for (size_t i = 0; i < SRCDuals.size(); ++i) {
-                const auto &den = cut_storage->getCut(i).p.den;
-                const auto labelMod = labelSRCMap[i];        // % den;
-                const auto newLabelMod = newLabelSRCMap[i];  // % den;
-                if (labelMod > newLabelMod) {
-                    sumSRC += SRCDuals[i];
-                }
+            const auto labelMod = labelSRCMap[idx];        // % den;
+            const auto newLabelMod = newLabelSRCMap[idx];  // % den;
+            if (labelMod > newLabelMod) {
+                sumSRC += dual_value;
             }
         }
         if (label->cost - sumSRC > new_label->cost) {
@@ -985,14 +992,8 @@ inline bool BucketGraph::is_dominated(const Label *new_label,
  */
 template <typename T>
 inline bool precedes(const std::vector<std::vector<int>> &sccs, const T a,
-                     const T b, UnionFind &uf) {
-    // Step 2: Check if element `a`'s SCC precedes element `b`'s SCC
-    size_t rootA = uf.getSubset(a);
-    size_t rootB = uf.getSubset(b);
-
-    // You can define precedence based on the comparison of the root
-    // components
-    return rootA < rootB;
+                     const T b, const UnionFind &uf) noexcept {
+    return uf.compareSubsets(a, b);
 }
 /**
  * @brief Determines if a label is dominated in component-wise smaller
@@ -1008,7 +1009,8 @@ inline bool BucketGraph::DominatedInCompWiseSmallerBuckets(
     const Label *__restrict__ L, int bucket,
     const std::vector<double> &__restrict__ c_bar,
     std::vector<uint64_t> &__restrict__ Bvisited,
-    const std::vector<std::vector<int>> &__restrict__ bucket_order) noexcept {
+    const std::vector<std::vector<int>> &__restrict__ bucket_order,
+    int &stat_n_dom) noexcept {
     // Use references to avoid indirection
     auto &buckets = assign_buckets<D>(fw_buckets, bw_buckets);
     auto &Phi = assign_buckets<D>(Phi_fw, Phi_bw);
@@ -1018,31 +1020,6 @@ inline bool BucketGraph::DominatedInCompWiseSmallerBuckets(
     const int b_L = L->vertex;
     const double label_cost = L->cost;
     const size_t res_size = options.resources.size();
-
-    // Pre-compute bitmask lookup - now using constexpr array
-    static constexpr uint64_t bit_mask_lookup[64] = {
-        UINT64_C(1) << 0,  UINT64_C(1) << 1,  UINT64_C(1) << 2,
-        UINT64_C(1) << 3,  UINT64_C(1) << 4,  UINT64_C(1) << 5,
-        UINT64_C(1) << 6,  UINT64_C(1) << 7,  UINT64_C(1) << 8,
-        UINT64_C(1) << 9,  UINT64_C(1) << 10, UINT64_C(1) << 11,
-        UINT64_C(1) << 12, UINT64_C(1) << 13, UINT64_C(1) << 14,
-        UINT64_C(1) << 15, UINT64_C(1) << 16, UINT64_C(1) << 17,
-        UINT64_C(1) << 18, UINT64_C(1) << 19, UINT64_C(1) << 20,
-        UINT64_C(1) << 21, UINT64_C(1) << 22, UINT64_C(1) << 23,
-        UINT64_C(1) << 24, UINT64_C(1) << 25, UINT64_C(1) << 26,
-        UINT64_C(1) << 27, UINT64_C(1) << 28, UINT64_C(1) << 29,
-        UINT64_C(1) << 30, UINT64_C(1) << 31, UINT64_C(1) << 32,
-        UINT64_C(1) << 33, UINT64_C(1) << 34, UINT64_C(1) << 35,
-        UINT64_C(1) << 36, UINT64_C(1) << 37, UINT64_C(1) << 38,
-        UINT64_C(1) << 39, UINT64_C(1) << 40, UINT64_C(1) << 41,
-        UINT64_C(1) << 42, UINT64_C(1) << 43, UINT64_C(1) << 44,
-        UINT64_C(1) << 45, UINT64_C(1) << 46, UINT64_C(1) << 47,
-        UINT64_C(1) << 48, UINT64_C(1) << 49, UINT64_C(1) << 50,
-        UINT64_C(1) << 51, UINT64_C(1) << 52, UINT64_C(1) << 53,
-        UINT64_C(1) << 54, UINT64_C(1) << 55, UINT64_C(1) << 56,
-        UINT64_C(1) << 57, UINT64_C(1) << 58, UINT64_C(1) << 59,
-        UINT64_C(1) << 60, UINT64_C(1) << 61, UINT64_C(1) << 62,
-        UINT64_C(1) << 63};
 
     // Stack-based implementation with fixed size
     alignas(64) int stack_buffer[32];  // Aligned for better cache performance
@@ -1082,23 +1059,20 @@ inline bool BucketGraph::DominatedInCompWiseSmallerBuckets(
         // Check dominance only if necessary
         if (b_L != current_bucket) {
             auto &mother_bucket = buckets[current_bucket];
-            int stat_n_dom = 0;
             if (mother_bucket.check_dominance(L, check_dominance, stat_n_dom)) {
                 return true;
             }
         }
 
         // Process neighbors with vectorization hints
-        const auto &bucket_neighbors = Phi[current_bucket];
-        const size_t n_neighbors = bucket_neighbors.size();
+        const auto &neighbors = Phi[current_bucket];
 
 #pragma GCC ivdep
-        for (size_t i = 0; i < n_neighbors; ++i) {
-            const int b_prime = bucket_neighbors[i];
-            const size_t seg_prime = static_cast<size_t>(b_prime) >> 6;
+        for (const int b_prime : neighbors) {
+            const size_t word_idx_prime = static_cast<size_t>(b_prime) >> 6;
             const uint64_t mask = bit_mask_lookup[b_prime & 63];
 
-            if (!(Bvisited[seg_prime] & mask)) {
+            if (!(Bvisited[word_idx_prime] & mask)) {
                 stack_buffer[stack_size++] = b_prime;
             }
         }
@@ -1190,55 +1164,21 @@ Label *BucketGraph::compute_label(const Label *L, const Label *L_prime) {
     new_label->real_cost = real_cost;
 
     if constexpr (S == Stage::Four) {
-        SRC_MODE_BLOCK(
-            //  Check SRCDuals condition for specific stages
-            auto sumSRC = 0.0; const auto &SRCDuals = cut_storage->SRCDuals;
-            if (!SRCDuals.empty()) {
-                size_t idx = 0;
-                auto sumSRC = std::transform_reduce(
-                    SRCDuals.begin(), SRCDuals.end(), 0.0, std::plus<>(),
-                    [&](const auto &dual) {
-                        size_t curr_idx = idx++;
-                        auto den = cut_storage->getCut(curr_idx).p.den;
-                        auto sum =
-                            (L->SRCmap[curr_idx] + L_prime->SRCmap[curr_idx]);
-                        return (sum >= den) ? dual : 0.0;
-                    });
-
-                new_label->cost -= sumSRC;
-            })
+#if defined(SRC)
+        //  Check SRCDuals condition for specific stages
+        auto sumSRC = 0.0;
+        auto &cutter = cut_storage;
+        const auto active_cuts = cutter->getActiveCuts();
+        for (const auto &active_cut : active_cuts) {
+            const size_t idx = active_cut.index;
+            const auto &cut = *active_cut.cut_ptr;
+            auto den = cut.p.den;
+            if (L->SRCmap[idx] + L_prime->SRCmap[idx] >= den) {
+                new_label->cost -= active_cut.dual_value;
+            }
+        }
+#endif
     }
-
-    new_label->nodes_covered.clear();
-
-    // // Start by inserting backward list elements
-    // size_t forward_size = 0;
-    // auto L_bw = L_prime;
-    // for (; L_bw != nullptr; L_bw = L_bw->parent) {
-    //     new_label->nodes_covered.push_back(
-    //         L_bw->node_id);  // Insert backward elements directly
-    //     if (L_bw->parent == nullptr && L_bw->fresh == false) {
-    //         for (size_t i = 0; i < L_bw->nodes_covered.size(); ++i) {
-    //             new_label->nodes_covered.push_back(L_bw->nodes_covered[i]);
-    //         }
-    //     }
-    // }
-
-    // // Now insert forward list elements in reverse order without using
-    // // std::reverse
-    // auto L_fw = L;
-    // for (; L_fw != nullptr; L_fw = L_fw->parent) {
-    //     new_label->nodes_covered.insert(
-    //         new_label->nodes_covered.begin(),
-    //         L_fw->node_id);  // Insert forward elements at the front
-    //     if (L_fw->parent == nullptr && L_fw->fresh == false) {
-    //         for (size_t i = 0; i < L_fw->nodes_covered.size(); ++i) {
-    //             new_label->nodes_covered.insert(
-    //                 new_label->nodes_covered.begin(),
-    //                 L_fw->nodes_covered[i]);
-    //         }
-    //     }
-    // }
 
     new_label->nodes_covered = L_prime->nodes_covered;
     //     reverse the nodes_covered

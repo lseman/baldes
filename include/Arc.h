@@ -47,21 +47,25 @@ struct Arc {
 // Custom hash function for Arc
 struct arc_hash {
     std::size_t operator()(const Arc &arc) const {
-        // Combine hashes of the members
-        std::size_t h1 = std::hash<int>{}(arc.from);
-        std::size_t h2 = std::hash<int>{}(arc.to);
-        std::size_t h3 = std::hash<double>{}(arc.cost_increment);
-        std::size_t h4 = std::hash<bool>{}(arc.fixed);
-        std::size_t h5 = std::hash<double>{}(arc.priority);
+        XXH64_state_t *const state = XXH64_createState();
+        XXH64_reset(state, 0);  // Use 0 as seed, or choose another seed
 
-        // Hash the resource_increment vector
-        std::size_t h6 = 0;
-        for (const auto &res : arc.resource_increment) {
-            h6 ^= std::hash<double>{}(res) + 0x9e3779b9 + (h6 << 6) + (h6 >> 2);
+        // Add all members to the hash state
+        XXH64_update(state, &arc.from, sizeof(arc.from));
+        XXH64_update(state, &arc.to, sizeof(arc.to));
+        XXH64_update(state, &arc.cost_increment, sizeof(arc.cost_increment));
+        XXH64_update(state, &arc.fixed, sizeof(arc.fixed));
+        XXH64_update(state, &arc.priority, sizeof(arc.priority));
+
+        // Add the resource_increment vector
+        if (!arc.resource_increment.empty()) {
+            XXH64_update(state, arc.resource_increment.data(),
+                         arc.resource_increment.size() * sizeof(double));
         }
 
-        // Combine all hashes
-        return h1 ^ (h2 << 1) ^ (h3 << 2) ^ (h4 << 3) ^ (h5 << 4) ^ (h6 << 5);
+        const std::size_t hash = XXH64_digest(state);
+        XXH64_freeState(state);
+        return hash;
     }
 };
 
