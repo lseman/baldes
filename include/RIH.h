@@ -21,7 +21,7 @@ class IteratedLocalSearch {
    public:
     InstanceData instance;
     std::vector<VRPNode> nodes;
-    CutStorage *cut_storage = new CutStorage();
+    CutStorage cut_storage;
 
     // default default initialization passing InstanceData &instance
     IteratedLocalSearch(const InstanceData &instance)
@@ -789,7 +789,7 @@ class IteratedLocalSearch {
         auto &cutter = cut_storage;  // Access the cut storage manager
         // auto cut_size = cutter->size();
         // print theSize
-        const auto active_cuts = cutter->getActiveCuts();
+        const auto active_cuts = cutter.getActiveCuts();
         // const auto activeSize = active_cuts.size();
 #ifdef SRC
         ankerl::unordered_dense::map<size_t, double> SRCmap;
@@ -803,7 +803,6 @@ class IteratedLocalSearch {
             // node-specific costs, we subtract that here
             red_cost += travel_cost - nodes[route[i]].cost;
 
-#ifdef NOT_WORKING
             const size_t segment =
                 node >> 6;  // Determine the segment in the bitmap
             const size_t bit_position =
@@ -818,44 +817,27 @@ class IteratedLocalSearch {
                     continue;
                 }
 
-                try {
-                    const Cut &cut = *active_cut.cut_ptr;
-                    const size_t idx = active_cut.index;
-                    const double dual_value = active_cut.dual_value;
+                const Cut &cut = *active_cut.cut_ptr;
+                const size_t idx = active_cut.index;
+                const double dual_value = active_cut.dual_value;
 
-                    if (SRCmap.find(idx) == SRCmap.end()) {
-                        SRCmap[idx] = 0;
-                    }
-                    auto &src_map_value = SRCmap[idx];
+                if (SRCmap.find(idx) == SRCmap.end()) {
+                    SRCmap[idx] = 0;
+                }
+                auto &src_map_value = SRCmap[idx];
 
-                    if (cut.neighbors[segment] & bit_mask) {
-                        if (cut.baseSet[segment] & bit_mask) {
-                            const auto &multipliers = cut.p;
-                            // print size of cut.baseSetOrde
-                            if (cut.baseSetOrder.size() == 0) {
-                                continue;
-                            }
-                            try {
-                                src_map_value =
-                                    multipliers.num[cut.baseSetOrder[node]];
-                                if (src_map_value >= multipliers.den) {
-                                    try {
-                                        src_map_value -= multipliers.den;
-                                        cost -= dual_value;
-                                    } catch (...) {
-                                        continue;
-                                    }
-                                }
-                            } catch (...) {
-                                continue;
-                            }
+                if (cut.neighbors[segment] & bit_mask) {
+                    if (cut.baseSet[segment] & bit_mask) {
+                        const auto &multipliers = cut.p;
+                        // print size of cut.baseSetOrde
+                        src_map_value = multipliers.num[cut.baseSetOrder[node]];
+                        if (src_map_value >= multipliers.den) {
+                            src_map_value -= multipliers.den;
+                            cost -= dual_value;
                         }
                     }
-                } catch (...) {
-                    continue;
                 }
             }
-#endif
         }
         return {cost, red_cost};
     }

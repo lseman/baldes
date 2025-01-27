@@ -63,6 +63,14 @@ cpmaddpackage(
   OPTIONS "STDEXEC_BUILD_TESTS OFF" "STDEXEC_BUILD_EXAMPLES OFF" "STDEXEC_BUILD_BENCHMARKS OFF" "STDEXEC_BUILD_DOCS OFF" "BUILD_TESTING OFF"
 )
 
+# fmt
+cpmaddpackage(
+  NAME fmt
+  GITHUB_REPOSITORY fmtlib/fmt
+  GIT_TAG 11.1.3
+  OPTIONS "FMT_DOC OFF" "FMT_TEST OFF" "FMT_INSTALL OFF"
+)
+
 # # mdspan
 # cpmaddpackage(
 #   NAME mdspan
@@ -122,7 +130,7 @@ if(IPM OR IPM_ACEL)
     GIT_REPOSITORY
     https://gitlab.com/libeigen/eigen.git
     GIT_TAG
-    3.4.0
+    nightly
     DOWNLOAD_ONLY
     YES # Only download Eigen, don't configure or build it
   )

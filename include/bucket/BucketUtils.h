@@ -594,7 +594,6 @@ void BucketGraph::ConcatenateLabel(const Label *L, int &b, double &best_cost,
     const size_t bitmap_size = L->visited_bitmap.size();
 
     // Pre-compute constants for bit operations
-    constexpr uint64_t one = 1ULL;
     const bool has_branching = !branching_duals->empty();
 
     // SRC mode setup
@@ -612,7 +611,7 @@ void BucketGraph::ConcatenateLabel(const Label *L, int &b, double &best_cost,
 
         // Optimize bit operations for visited tracking
         const size_t segment = current_bucket >> 6;
-        const uint64_t bit_mask = one << (current_bucket & 63);
+        const uint64_t bit_mask = bit_mask_lookup[current_bucket & 63];
         Bvisited[segment] |= bit_mask;
 
         const int bucketLprimenode = other_buckets[current_bucket].node_id;
@@ -702,7 +701,7 @@ void BucketGraph::ConcatenateLabel(const Label *L, int &b, double &best_cost,
         // Process neighbor buckets
         for (int b_prime : Phi_bw[current_bucket]) {
             const size_t seg_prime = b_prime >> 6;
-            const uint64_t mask_prime = one << (b_prime & 63);
+            const uint64_t mask_prime = bit_mask_lookup[b_prime & 63];
             if (!(Bvisited[seg_prime] & mask_prime)) {
                 bucket_stack.push_back(b_prime);
             }
@@ -1115,7 +1114,16 @@ void BucketGraph::heuristic_fixing() {
             if (violated) continue;
 
             if (min_fw_label->cost + cost + min_bw_label->cost > gap) {
-                fixed_arcs[node_I.id][node_J.id] = 1;  // Index with node ids
+                const size_t n_buckets =
+                    fw_buckets_size;  // Assuming this is the number of
+                                      // nodes/buckets
+                const size_t bit_pos = node_I.id * n_buckets + node_J.id;
+                const size_t word_idx = bit_pos / 64;
+                const uint64_t bit_mask = 1ULL << (bit_pos % 64);
+
+                fw_fixed_buckets_bitmap[word_idx] |= bit_mask;  // Set the bit
+                // If you need bidirectional, also set the backward bitmap
+                bw_fixed_buckets_bitmap[word_idx] |= bit_mask;
                 num_fixes++;
             }
         }

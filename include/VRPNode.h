@@ -60,7 +60,7 @@ struct VRPNode {
 
     template <Direction D>
     void sort_arcs_by_scores(
-        const std::unordered_map<Arc, int, arc_hash> &arc_scores) {
+        const ankerl::unordered_dense::map<Arc, int, arc_hash> &arc_scores) {
         auto get_score = [&arc_scores](const Arc &arc) {
             auto it = arc_scores.find(arc);
             auto scores = (it != arc_scores.end()) ? it->second : 0;

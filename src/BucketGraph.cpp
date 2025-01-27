@@ -198,7 +198,6 @@ std::vector<int> BucketGraph::computePhi(int &bucket_id, bool fw) {
 
     // Ensure bucket_id is within valid bounds
     auto &buckets = fw ? fw_buckets : bw_buckets;
-    auto &fixed_buckets = fw ? fw_fixed_buckets : bw_fixed_buckets;
     auto &node_interval_trees =
         fw ? fw_node_interval_trees : bw_node_interval_trees;
     auto &bucket_splits = fw ? fw_bucket_splits : bw_bucket_splits;
@@ -817,11 +816,7 @@ void BucketGraph::setup() {
     PARALLEL_SECTIONS(
         work, bi_sched, SECTION { define_buckets<Direction::Forward>(); },
         SECTION { define_buckets<Direction::Backward>(); });
-    // Initialize the sizes
-    fixed_arcs.resize(getNodes().size());
-    for (int i = 0; i < getNodes().size(); ++i) {
-        fixed_arcs[i].resize(getNodes().size());
-    }
+
 
     // Resize and initialize fw_fixed_buckets and bw_fixed_buckets for
     // std::vector<bool> fw_fixed_buckets.assign(fw_buckets.size(),
@@ -835,6 +830,8 @@ void BucketGraph::setup() {
                             64;  // Round up division by 64
     fw_fixed_buckets_bitmap.assign(fw_bitmap_size, 0);
     bw_fixed_buckets_bitmap.assign(bw_bitmap_size, 0);
+
+    fixed_arcs_bitmap.assign(fw_bitmap_size, 0);
 
     fw_arc_scores.resize(nodes.size());
     bw_arc_scores.resize(nodes.size());

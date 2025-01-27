@@ -16,133 +16,131 @@ class UnionFind {
    public:
     UnionFind() = default;
 
-    // Constructor with pre-computed size
     explicit UnionFind(size_t size) {
         parent.resize(size);
+        subset_index.resize(size, -1);
         rank.resize(size, 0);
-        subsetIndex.resize(size, -1);
 
-        // Initialize parent array - each element is its own parent initially
-        for (size_t i = 0; i < size; ++i) {
-            parent[i] = i;
-        }
+        // Initialize arrays - use memset for better performance with large
+        // sizes
+        std::iota(parent.begin(), parent.end(), 0);
     }
 
-    // Constructor for SCCs with optimized initialization
     explicit UnionFind(const std::vector<std::vector<int>>& sccs) {
         // Find max element with single pass
         int max_elem = -1;
-        size_t total_elements = 0;
         for (const auto& scc : sccs) {
-            total_elements += scc.size();
             for (int elem : scc) {
                 max_elem = std::max(max_elem, elem);
             }
         }
 
-        // Early return for empty input
         if (max_elem < 0) return;
 
-        // Pre-allocate with exact sizes
         const size_t size = max_elem + 1;
         parent.resize(size);
+        subset_index.resize(size, -1);
         rank.resize(size, 0);
-        subsetIndex.resize(size, -1);
 
-        // Initialize parent array - each element is its own parent initially
-        for (size_t i = 0; i < size; ++i) {
-            parent[i] = i;
-        }
-
-        // Reserve space for path compression
-        if (total_elements > 0) {
-            path_compression_stack.reserve(
-                static_cast<size_t>(std::log2(total_elements)) + 1);
-        }
+        // Initialize parent array
+        std::iota(parent.begin(), parent.end(), 0);
 
         // Process SCCs
         int subset_counter = 0;
         for (const auto& scc : sccs) {
             if (scc.empty()) continue;
 
-            // Set subset index for first element
             const int first_elem = scc[0];
-            subsetIndex[first_elem] = subset_counter;
+            subset_index[first_elem] = subset_counter;
 
-            // Unite all other elements with the first
-            for (size_t i = 1; i < scc.size(); ++i) {
-                unite(first_elem, scc[i]);
+            // Unite remaining elements
+            const size_t scc_size = scc.size();
+            for (size_t i = 1; i < scc_size; ++i) {
+                unite_with_path_compression(first_elem, scc[i]);
             }
-
             subset_counter++;
         }
     }
 
-    // Find with path compression using stack instead of recursion
-    inline int find(int x) const noexcept {
-        // Early return if x is its own parent
-        if (parent[x] == x) return x;
-
-        // Find root
-        int root = x;
-        while (parent[root] != root) {
-            root = parent[root];
+    // Fast find without path compression for read-only operations
+    [[nodiscard]] inline int find(int x) const noexcept {
+        while (parent[x] != x) {
+            x = parent[x];
         }
-
-        return root;
+        return x;
     }
 
-    // Non-const find for operations that need to modify the structure
+    // Fast getSubset that combines find and subset lookup
+    [[nodiscard]] inline int getSubset(int x) const noexcept {
+        // Find root without path compression
+        while (parent[x] != x) {
+            x = parent[x];
+        }
+        return subset_index[x];
+    }
+
+    // Path compression version for unite operations
     inline int find_and_compress(int x) noexcept {
-        // Early return if x is its own parent
-        if (parent[x] == x) return x;
-
-        // Find root
         int root = x;
-        path_compression_stack.clear();
 
+        // First pass: find root
         while (parent[root] != root) {
-            path_compression_stack.push_back(root);
             root = parent[root];
         }
 
-        // Path compression
-        for (int node : path_compression_stack) {
-            parent[node] = root;
+        // Second pass: path compression
+        while (x != root) {
+            int next = parent[x];
+            parent[x] = root;
+            x = next;
         }
 
         return root;
     }
 
-    // Unite with rank and subset index update
-    void unite(int x, int y) noexcept {
-        int rootX = find_and_compress(x);
-        int rootY = find_and_compress(y);
+    // Optimized unite with immediate path compression
+    inline void unite_with_path_compression(int x, int y) noexcept {
+        int root_x = find_and_compress(x);
+        int root_y = find_and_compress(y);
 
-        if (rootX == rootY) return;
+        if (root_x == root_y) return;
 
         // Union by rank
-        if (rank[rootX] < rank[rootY]) {
-            std::swap(rootX, rootY);
+        if (rank[root_x] < rank[root_y]) {
+            std::swap(root_x, root_y);
         }
 
         // Attach smaller rank tree under root of high rank tree
-        parent[rootY] = rootX;
-        subsetIndex[rootY] = subsetIndex[rootX];
+        parent[root_y] = root_x;
+        subset_index[root_y] = subset_index[root_x];
 
-        // If ranks are same, increment rank of rootX
-        if (rank[rootX] == rank[rootY]) {
-            ++rank[rootX];
-        }
+        // If ranks are same, increment rank of root_x
+        rank[root_x] += (rank[root_x] == rank[root_y]);
     }
 
-    // Get subset index
-    inline int getSubset(int x) const noexcept { return subsetIndex[find(x)]; }
+    [[nodiscard]] inline bool compareSubsets(int x, int y) const noexcept {
+        // Find roots without path compression, combined in one loop
+        int root_x = x;
+        int root_y = y;
+
+        // Load both paths simultaneously for better cache usage
+        while (true) {
+            if (parent[root_x] != root_x) {
+                root_x = parent[root_x];
+            }
+            if (parent[root_y] != root_y) {
+                root_y = parent[root_y];
+            }
+            if (parent[root_x] == root_x && parent[root_y] == root_y) {
+                break;
+            }
+        }
+        return subset_index[root_x] < subset_index[root_y];
+    }
 
    private:
-    mutable std::vector<int> parent;
-    std::vector<int> rank;
-    std::vector<int> subsetIndex;
-    std::vector<int>
-        path_compression_stack;  // Reusable stack for path compression
+    // Aligned memory for better cache performance
+    alignas(64) std::vector<int> parent;
+    alignas(64) std::vector<int> subset_index;  // Renamed for clarity
+    alignas(64) std::vector<int> rank;
 };
