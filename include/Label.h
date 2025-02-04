@@ -40,6 +40,7 @@ struct Label {
     int node_id = -1;                          // Add node_id to Label
     Label *parent = nullptr;
     bool fresh = true;
+    bool is_dominated = false;
     SRC_MODE_BLOCK(std::vector<uint16_t> SRCmap;)
     // uint64_t             visited_bitmap; // Bitmap for visited nodes
     std::array<uint64_t, num_words> visited_bitmap = {0};
@@ -47,7 +48,7 @@ struct Label {
     std::array<uint64_t, num_words> unreachable_bitmap = {0};
 #endif
 
-    // std::vector<Label *> children;
+    std::vector<Label *> children;
     // Constructor with node_id
     Label(int v, double c, const std::vector<double> &res, int pred,
           int node_id)
@@ -61,7 +62,7 @@ struct Label {
     Label() : vertex(-1), cost(0), resources({0.0}), node_id(-1) {}
 
     void set_extended(bool extended) { is_extended = extended; }
-
+    void set_domination(bool dom) { is_dominated = dom; }
     auto &getRoute() const { return nodes_covered; }
 
     void addRoute(const std::vector<int> &route) {
@@ -95,9 +96,10 @@ struct Label {
         this->real_cost = 0.0;
         this->parent = nullptr;
         this->is_extended = false;
+        this->is_dominated = false;
         this->nodes_covered.clear();
         this->nodes_covered.reserve(N_SIZE / 3);
-        // this->children.clear();
+        this->children.clear();
 
         std::memset(visited_bitmap.data(), 0,
                     visited_bitmap.size() * sizeof(uint64_t));

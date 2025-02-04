@@ -74,6 +74,10 @@ class LimitedMemoryRank1Cuts {
     bool cuts_harvested = false;
     int n_high_order = 0;
 
+    exec::static_thread_pool src_pool =
+        exec::static_thread_pool(std::thread::hardware_concurrency());
+    exec::static_thread_pool::scheduler src_sched = src_pool.get_scheduler();
+
 #if defined(RCC) || defined(EXACT_RCC)
     ArcDuals arc_duals;
     void setArcDuals(const ArcDuals &arc_duals) { this->arc_duals = arc_duals; }
@@ -151,9 +155,6 @@ class LimitedMemoryRank1Cuts {
             cuts.reserve(paths_size / JOBS);  // Estimate per thread
         }
 
-        exec::static_thread_pool pool(JOBS);
-        auto sched = pool.get_scheduler();
-
         const int chunk_size =
             std::max(1000, static_cast<int>((paths_size + JOBS - 1) / JOBS));
 
@@ -164,6 +165,7 @@ class LimitedMemoryRank1Cuts {
             ThreadLocalBuffers() : vis_map(64) {}  // Pre-reserve typical size
         };
 
+        // Create a sender for parallel processing
         auto bulk_sender = stdexec::bulk(
             stdexec::just(), (paths_size + chunk_size - 1) / chunk_size,
             [this, &thread_local_cuts, paths_size,
@@ -201,7 +203,9 @@ class LimitedMemoryRank1Cuts {
                 }
             });
 
-        stdexec::sync_wait(stdexec::on(sched, std::move(bulk_sender)));
+        // Execute the parallel workload
+        stdexec::sync_wait(
+            stdexec::starts_on(src_sched, std::move(bulk_sender)));
 
         // Merge cuts from all threads
         std::vector<std::pair<double, int>> final_cuts;
@@ -225,7 +229,7 @@ class LimitedMemoryRank1Cuts {
         // Pre-allocate reusable buffers for cut generation
         std::vector<double> coefficients_aux(paths_size);
         const int cuts_to_apply =
-            std::min(static_cast<int>(final_cuts.size()), 2);
+            std::min(static_cast<int>(final_cuts.size()), 10);
 
         for (int i = 0; i < cuts_to_apply; ++i) {
             const int v = final_cuts[i].second;
@@ -248,21 +252,20 @@ class LimitedMemoryRank1Cuts {
             p.num = {1};
             p.den = 2;
 
-// Compute coefficients
-#pragma GCC ivdep
             for (size_t j = 0; j < paths_size; ++j) {
                 coefficients_aux[j] = computeLimitedMemoryCoefficient(
                     C, AM, p, allPaths[j].route, order);
-            }
+            };
 
             Cut cut(C, AM, coefficients_aux, p);
             cut.baseSetOrder = std::move(order);
+            cut.type = CutType::R1C1;
             cutStorage.addCut(cut);
         }
     }
 
     void separateBG(BNBNode *node, std::vector<baldesCtrPtr> &SRCconstraints);
-    bool getCutsBG();
+    bool getCutsBG(BNBNode *node, std::vector<baldesCtrPtr> &SRCconstraints);
     bool cutCleaner(BNBNode *node, std::vector<baldesCtrPtr> &SRCconstraints);
 
     std::function<int(std::vector<R1c> &)> processCuts =
@@ -273,6 +276,7 @@ class LimitedMemoryRank1Cuts {
             // Initialize paths with solution values
             auto cut_ctr = 0;
 
+            std::vector<Cut> cuts_to_add;
             // Process each cut
             for (auto &cut : cortes) {
                 auto &cut_info = cut.info_r1c;
@@ -350,7 +354,21 @@ class LimitedMemoryRank1Cuts {
                 // Create and add new cut
                 Cut corte(C, AM, coeffs, p);
                 corte.baseSetOrder = order;
-                cuts->addCut(corte);
+                // cuts->addCut(corte);
+                if (cut_indices.size() == 4) {
+                    corte.type = CutType::FourRow;
+                } else if (cut_indices.size() == 5) {
+                    corte.type = CutType::FiveRow;
+                }
+                cuts_to_add.push_back(corte);
+                // cut_ctr++;
+            }
+
+            // if (cuts_to_add.size() > 2) {
+            //     cuts_to_add.resize(2);
+            // }
+            for (auto &cut : cuts_to_add) {
+                cuts->addCut(cut);
                 cut_ctr++;
             }
             return cut_ctr;

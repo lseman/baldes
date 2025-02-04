@@ -121,7 +121,7 @@ void initRMP(MIPProblem *model, VRProblem *problem,
             }
         }
         model->add_constraint(lhs, 1.0,
-                              '>');  // baldesCtr: lhs >= 1 (visit the node)
+                              '=');  // baldesCtr: lhs >= 1 (visit the node)
     }
 
     // Second part: Ensure the number of vehicles does not exceed the maximum

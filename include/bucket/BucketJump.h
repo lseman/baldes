@@ -182,6 +182,8 @@ void BucketGraph::BucketArcElimination(double theta) {
     auto &buckets_size = assign_buckets<D>(fw_buckets_size, bw_buckets_size);
     auto &fixed_buckets_bitmap =
         assign_buckets<D>(fw_fixed_buckets_bitmap, bw_fixed_buckets_bitmap);
+    auto &removed_arcs = assign_buckets<D>(fw_removed_arcs, bw_removed_arcs);
+    removed_arcs = 0;
     // Reset fixed_buckets
     auto n_buckets = buckets_size;
 
@@ -195,7 +197,6 @@ void BucketGraph::BucketArcElimination(double theta) {
                                      arc_map_hash>;
 
     ArcMap local_B_Ba_b;
-    int removed_arcs = 0;
 
     auto create_arc_key = [](int from, int to, int b) {
         return std::make_pair(std::make_pair(from, to), b);
@@ -314,13 +315,6 @@ void BucketGraph::BucketArcElimination(double theta) {
         // Process jump and bucket arcs using separate functions
         process_jump_arcs(b);
         process_bucket_arcs(b);
-    }
-
-    // Print the number of arcs removed
-    if constexpr (D == Direction::Forward) {
-        print_info("[Fw] removed arcs: {}\n", removed_arcs);
-    } else {
-        print_info("[Bw] removed arcs: {}\n", removed_arcs);
     }
 }
 
@@ -458,6 +452,6 @@ void BucketGraph::ObtainJumpBucketArcs() {
             }
         }
     }
-    CONDITIONAL(D, print_info("[Fw] added {} jump arcs\n", arc_counter),
-                print_info("[Bw] added {} jump arcs\n", arc_counter));
+    // CONDITIONAL(D, print_info("[Fw] added {} jump arcs\n", arc_counter),
+    // print_info("[Bw] added {} jump arcs\n", arc_counter));
 }

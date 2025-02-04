@@ -128,26 +128,20 @@ struct Path {
 };
 
 struct PathHash {
-    std::size_t operator()(const Path &p) const {
-        // Initialize the XXH3 state
-        XXH3_state_t *state = XXH3_createState();
-        assert(state != nullptr);  // Ensure state creation succeeded
-        XXH3_64bits_reset(state);  // Reset the hashing state
+    [[nodiscard]] std::size_t operator()(const Path &p) const noexcept {
+        // Initialize hash value
+        std::size_t hash = 0;
 
-        // Hash the route (vector of nodes)
-        for (const auto &node : p.route) {
-            XXH3_64bits_update(state, &node, sizeof(node));
+        // Hash nodes using FNV-1a
+        for (const auto &node : p) {
+            hash ^= static_cast<size_t>(node);
+            hash *= 0x100000001b3;  // FNV prime
         }
 
-        // Hash the cost (double value)
-        double cost = p.cost;
-        XXH3_64bits_update(state, &cost, sizeof(cost));
-
-        // Finalize the hash
-        std::size_t hash = XXH3_64bits_digest(state);
-
-        // Free the state
-        XXH3_freeState(state);
+        // Combine with cost hash
+        const uint32_t cost_bits = std::bit_cast<uint32_t>(p.cost);
+        hash ^= cost_bits;
+        hash *= 0x100000001b3;
 
         return hash;
     }

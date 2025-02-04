@@ -1,4 +1,13 @@
 cmake_minimum_required(VERSION 3.16)
+find_program(CCACHE_PROGRAM ccache)
+if(CCACHE_PROGRAM)
+    set_property(GLOBAL PROPERTY RULE_LAUNCH_COMPILE "${CCACHE_PROGRAM}")
+    set_property(GLOBAL PROPERTY RULE_LAUNCH_LINK "${CCACHE_PROGRAM}")
+    message(STATUS "Using ccache for faster compilation: ${CCACHE_PROGRAM}")
+else()
+    message(WARNING "ccache not found, compilation will not be cached.")
+endif()
+
 project(BALDES LANGUAGES C CXX)
 
 #-------------------------------------------------------------------------------
@@ -357,12 +366,13 @@ if(BALDES)
   target_compile_options(baldes PRIVATE -Wno-c++26-extensions -Wno-deprecated-declarations)
 target_link_libraries(baldes PRIVATE ${COMMON_LIBRARIES})
 
+    target_precompile_headers(baldes PRIVATE include/Common.h)
 # target_link_libraries(baldes PRIVATE CUDA::cudart CUDA::cusparse)
 
   if(JEMALLOC)
-    find_library(JEMALLOC_LIBRARY jemalloc)
-    if(JEMALLOC_LIBRARY)
-      target_link_libraries(baldes PRIVATE ${JEMALLOC_LIBRARY})
+    find_library(MIMALLOC_LIBRARY MIMALLOC)
+    if(MIMALLOC_LIBRARY)
+      target_link_libraries(baldes PRIVATE ${MIMALLOC_LIBRARY})
     endif()
   endif()
 

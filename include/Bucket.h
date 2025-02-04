@@ -227,6 +227,18 @@ struct alignas(64) Bucket {
         labels_flush.clear();  // Clear after successful removal
     }
 
+    constexpr static const auto is_undominated =
+        [](const Label *label) {  // Made parameter const
+            return !label->is_dominated;
+        };
+
+    // Add a cache vector as a member to reuse memory
+    mutable std::vector<Label *> undom_cache_;
+
+    inline auto get_undominated_labels() const {
+        return std::views::all(labels_vec) | std::views::filter(is_undominated);
+    }
+
     double min_split_range = 0.5;
     static constexpr int MAX_BUCKET_DEPTH = 10;
 
@@ -235,34 +247,54 @@ struct alignas(64) Bucket {
         if (get_cb() > new_label->cost) {
             return false;
         }
-        if (!is_split) {
-            if (dominance_func(get_labels())) {
-                ++stat_n_dom;
-                return true;
-            }
-            return false;
+
+        // auto filtered = get_undominated_labels();
+
+        // // Reserve space in cache if needed
+        // size_t estimated_size = std::ranges::distance(filtered);
+        // if (undom_cache_.capacity() < estimated_size) {
+        //     undom_cache_.reserve(estimated_size);
+        // }
+
+        // // Clear without deallocating
+        // undom_cache_.clear();
+
+        // // Efficient copy into cache
+        // std::ranges::copy(filtered, std::back_inserter(undom_cache_));
+
+        // Check dominance using the cached vector
+        if (dominance_func(labels_vec)) {
+            stat_n_dom += 1;
+            return true;
         }
-        std::array<const Bucket *, 2> candidate_buckets;
-        size_t num_candidates = 0;
-        for (const auto &bucket : sub_buckets) {
-            if (bucket->get_cb() <= new_label->cost &&
-                num_candidates < candidate_buckets.size()) {
-                candidate_buckets[num_candidates++] = bucket;
-            }
-        }
-        std::ranges::sort(
-            std::ranges::subrange(candidate_buckets.begin(),
-                                  candidate_buckets.begin() + num_candidates),
-            [](const auto *a, const auto *b) noexcept {
-                return a->get_cb() < b->get_cb();
-            });
-        for (size_t i = 0; i < num_candidates; ++i) {
-            if (candidate_buckets[i]->check_dominance(new_label, dominance_func,
-                                                      stat_n_dom)) {
-                return true;
-            }
-        }
+
         return false;
+        // }
+        // std::array<const Bucket *, 2> candidate_buckets;
+        // size_t num_candidates = 0;
+        // for (const auto &bucket : sub_buckets) {
+        //     if (bucket->get_cb() <= new_label->cost &&
+        //         num_candidates < candidate_buckets.size()) {
+        //         candidate_buckets[num_candidates++] = bucket;
+        //     }
+        // }
+        // std::ranges::sort(
+        //     std::ranges::subrange(candidate_buckets.begin(),
+        //                           candidate_buckets.begin() +
+        //                           num_candidates),
+        //     [](const auto *a, const auto *b) noexcept {
+        //         return a->get_cb() < b->get_cb();
+        //     });
+        // for (size_t i = 0; i < num_candidates; ++i) {
+        //     if
+        //     (candidate_buckets[i]->check_dominance(new_label,
+        //     dominance_func,
+        //                                               stat_n_dom))
+        //                                               {
+        //         return true;
+        //     }
+        // }
+        // return false;
     }
 
     void split_into_sub_buckets() noexcept {
@@ -532,25 +564,25 @@ struct alignas(64) Bucket {
     void add_sorted_label(Label *label) noexcept {
         if (!label) return;
 
-        // Split bucket case
-        if (is_split) {
-            // Try to add to appropriate sub-bucket
-            for (auto &bucket : sub_buckets) {
-                if (bucket->is_contained(label)) {
-                    if (bucket->depth >= MAX_BUCKET_DEPTH) {
-                        // At max depth, insert directly into bucket's vector
-                        insert_sorted_label(bucket->labels_vec, label);
-                    } else {
-                        bucket->add_sorted_label(label);
-                    }
-                    return;
-                }
-            }
-            // Fallback: add to parent bucket if label doesn't fit in
-            // sub-buckets
-            insert_sorted_label(labels_vec, label);
-            return;
-        }
+        // // Split bucket case
+        // if (is_split) {
+        //     // Try to add to appropriate sub-bucket
+        //     for (auto &bucket : sub_buckets) {
+        //         if (bucket->is_contained(label)) {
+        //             if (bucket->depth >= MAX_BUCKET_DEPTH) {
+        //                 // At max depth, insert directly into bucket's vector
+        //                 insert_sorted_label(bucket->labels_vec, label);
+        //             } else {
+        //                 bucket->add_sorted_label(label);
+        //             }
+        //             return;
+        //         }
+        //     }
+        //     // Fallback: add to parent bucket if label doesn't fit in
+        //     // sub-buckets
+        //     insert_sorted_label(labels_vec, label);
+        //     return;
+        // }
 
         // Non-split bucket case
         // Pre-reserve space if needed
@@ -579,7 +611,8 @@ struct alignas(64) Bucket {
 
         // Check if we need to split
         if (depth < MAX_BUCKET_DEPTH && labels_vec.size() >= BUCKET_CAPACITY) {
-            split_into_sub_buckets();
+            // split_into_sub_buckets();
+            shall_split = true;
         }
     }
 
@@ -671,15 +704,16 @@ struct alignas(64) Bucket {
     void remove_label(Label *label) noexcept {
         if (!label) return;
 
-        if (is_split) {
-            // When split, directly access appropriate bucket based on resource
-            // value
-            constexpr size_t RESOURCE_INDEX = 0;
-            sub_buckets[label->resources[RESOURCE_INDEX] >
-                        sub_buckets[0]->ub[RESOURCE_INDEX]]
-                ->remove_label(label);
-            return;
-        }
+        // if (is_split) {
+        //     // When split, directly access appropriate bucket based on
+        //     resource
+        //     // value
+        //     constexpr size_t RESOURCE_INDEX = 0;
+        //     sub_buckets[label->resources[RESOURCE_INDEX] >
+        //                 sub_buckets[0]->ub[RESOURCE_INDEX]]
+        //         ->remove_label(label);
+        //     return;
+        // }
 
         // For unsplit case, use a single optimized removal approach
         auto &vec = labels_vec;
@@ -711,29 +745,29 @@ struct alignas(64) Bucket {
 
     inline const std::vector<Label *> &get_labels() const {
         // Fast path - return direct vector if not split
-        if (!is_split) {
-            return labels_vec;
-        }
+        // if (!is_split) {
+        return labels_vec;
+        // }
 
-        // Calculate total size once using std::ranges::fold_left (C++23)
-        const size_t total_size = std::ranges::fold_left(
-            sub_buckets, size_t{0}, [](size_t sum, const auto &bucket) {
-                return sum + bucket->labels_vec.size();
-            });
+        // // Calculate total size once using std::ranges::fold_left (C++23)
+        // const size_t total_size = std::ranges::fold_left(
+        //     sub_buckets, size_t{0}, [](size_t sum, const auto &bucket) {
+        //         return sum + bucket->labels_vec.size();
+        //     });
 
-        // Prepare all_labels vector
-        all_labels.clear();
-        all_labels.reserve(total_size);
+        // // Prepare all_labels vector
+        // all_labels.clear();
+        // all_labels.reserve(total_size);
 
-        // Insert all labels from sub-buckets
-        for (const auto &bucket : sub_buckets) {
-            const auto &source_labels =
-                bucket->is_split ? bucket->get_labels() : bucket->labels_vec;
-            all_labels.insert(all_labels.end(), source_labels.begin(),
-                              source_labels.end());
-        }
+        // // Insert all labels from sub-buckets
+        // for (const auto &bucket : sub_buckets) {
+        //     const auto &source_labels =
+        //         bucket->is_split ? bucket->get_labels() : bucket->labels_vec;
+        //     all_labels.insert(all_labels.end(), source_labels.begin(),
+        //                       source_labels.end());
+        // }
 
-        return all_labels;
+        // return all_labels;
     }
 
     inline auto &get_sorted_labels() {
@@ -758,7 +792,6 @@ struct alignas(64) Bucket {
                 static_cast<const std::vector<Label *> &>(all_labels_ref)),
             is_unextended};
     }
-
     void clear() {
         sub_buckets = {};
         labels_vec.clear();

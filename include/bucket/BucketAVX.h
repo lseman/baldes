@@ -185,7 +185,6 @@ inline bool check_dominance_against_vector(const Label *new_label,
                 if (cut_storage && !cut_storage->SRCDuals.empty()) {
                     using namespace std::experimental;
                     const size_t simd_size = simd<double>::size();
-
                     const auto active_cuts = cut_storage->getActiveCuts();
                     const auto cut_size = cut_storage->activeSize();
                     const size_t simd_cut_size =
@@ -196,10 +195,13 @@ inline bool check_dominance_against_vector(const Label *new_label,
                     alignas(64) std::array<double, simd_size> label_buffer;
                     alignas(64) std::array<double, simd_size> new_label_buffer;
 
+                    double partial_sumSRC = 0.0;   // Track partial sum
                     simd<double> sumSRC_simd = 0;  // SIMD accumulator
+                    bool should_terminate = false;
 
                     // Process in SIMD chunks
-                    for (size_t base_idx = 0; base_idx < simd_cut_size;
+                    for (size_t base_idx = 0;
+                         base_idx < simd_cut_size && !should_terminate;
                          base_idx += simd_size) {
                         // Fill buffers with active cut data
                         for (size_t j = 0; j < simd_size; ++j) {
@@ -226,26 +228,49 @@ inline bool check_dominance_against_vector(const Label *new_label,
                         where(mask, masked_values) =
                             src_duals;  // Apply mask to src_duals
                         sumSRC_simd += masked_values;
-                    }
 
-                    // Horizontal sum of SIMD accumulator
-                    double sumSRC = reduce(sumSRC_simd);
+                        // Check intermediary result every SIMD_CHECK_INTERVAL
+                        // chunks
+                        // Get current partial sum
+                        partial_sumSRC = reduce(sumSRC_simd);
 
-                    // Process remaining elements (scalar fallback)
-                    for (size_t i = simd_cut_size; i < cut_size; ++i) {
-                        const auto &active_cut = active_cuts[i];
-                        const size_t idx = active_cut.index;
-                        if (label->SRCmap[idx] > new_label->SRCmap[idx]) {
-                            sumSRC += active_cut.dual_value;
+                        // Early termination check
+                        if (label->cost - partial_sumSRC > new_label->cost) {
+                            should_terminate = true;
+                            break;
                         }
                     }
 
-                    // Final check
-                    if (label->cost - sumSRC > new_label->cost) continue;
+                    if (!should_terminate) {
+                        // Final SIMD sum
+                        partial_sumSRC = reduce(sumSRC_simd);
+
+                        // Process remaining elements (scalar fallback)
+                        for (size_t i = simd_cut_size;
+                             i < cut_size && !should_terminate; ++i) {
+                            const auto &active_cut = active_cuts[i];
+                            const size_t idx = active_cut.index;
+                            if (label->SRCmap[idx] > new_label->SRCmap[idx]) {
+                                partial_sumSRC += active_cut.dual_value;
+
+                                // Check after each scalar addition
+                                if (label->cost - partial_sumSRC >
+                                    new_label->cost) {
+                                    should_terminate = true;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+
+                    // Final check that will affect the outer scope
+                    if (should_terminate ||
+                        label->cost - partial_sumSRC > new_label->cost) {
+                        continue;
+                    }
                 }
             }
 #endif
-
             if (dominated) return true;
         }
     }
@@ -306,10 +331,11 @@ inline bool check_dominance_against_vector(const Label *new_label,
 
                     if (labelMod > newLabelMod) {
                         sumSRC += dual_value;
+                        if (label->cost - sumSRC > new_label->cost) {
+                            break;
+                        }
                     }
                 }
-
-                if (label->cost - sumSRC > new_label->cost) continue;
             }
         }
 #endif
