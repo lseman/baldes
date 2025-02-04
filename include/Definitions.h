@@ -44,9 +44,9 @@ struct BucketOptions {
     std::vector<int> resource_type = {1};
     std::vector<int> or_resources = {1};
 
-    int n_warm_start = 10;
+    int n_warm_start = 50;
 
-    bool warm_start = false;
+    bool warm_start = true;
 
     // EVRP options
     int battery_capacity = 100;
@@ -68,8 +68,15 @@ enum class Stage { One, Two, Three, Four, Enumerate, Fix, Eliminate, Extend };
 enum class ArcType { Node, Bucket, Jump };
 enum class Mutability { Const, Mut };
 enum class Full { Full, Partial, Reverse, PSTEP, TSP };
-enum class Status { Optimal, Separation, NotOptimal, Error, Rollback };
-enum class CutType { ThreeRow, FourRow, FiveRow };
+enum class Status {
+    Optimal,
+    Separation,
+    NotOptimal,
+    Error,
+    Rollback,
+    Enumerate
+};
+enum class CutType { R1C1, ThreeRow, FourRow, FiveRow };
 enum class BranchingDirection { Greater, Less, Equal };
 enum class CandidateType { Vehicle, Node, Edge, Cluster };
 enum class ProblemType { vrptw, cvrp, evrp };

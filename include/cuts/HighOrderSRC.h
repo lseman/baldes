@@ -15,12 +15,13 @@
 
 #include "Bitset.h"
 #include "Common.h"
+#include "Cut.h"
+#include "MST.h"
 #include "Path.h"
 #include "RCC.h"
 #include "SparseMatrix.h"
 #include "VRPNode.h"
 #include "utils/Hashes.h"
-
 // include intel concurrent hashmap
 // #include "ConcurrentMap.h"
 #include <libcuckoo/cuckoohash_map.hh>
@@ -33,7 +34,7 @@ constexpr double tolerance = 1e-3;
 constexpr int max_row_rank1 = 5;
 constexpr int max_heuristic_initial_seed_set_size_row_rank1c = 6;
 
-constexpr int max_num_r1c_per_round = 2;
+constexpr int max_num_r1c_per_round = 5;
 constexpr double cut_vio_factor = 0.1;
 
 class HighDimCutsGenerator {
@@ -49,49 +50,39 @@ class HighDimCutsGenerator {
         new_gen->cost_mat4_vertex = this->cost_mat4_vertex;
         new_gen->nodes = this->nodes;
         new_gen->arc_duals = this->arc_duals;
-        new_gen->max_heuristic_sep_mem4_row_rank1 = 16;
+        new_gen->max_heuristic_sep_mem4_row_rank1 = 8;
         new_gen->initialize(this->sol);
         new_gen->generateSepHeurMem4Vertex();
 
         return new_gen;
     }
 
-    void runTask() {
-        getHighDimCuts();
-        setMemFactor(0.75);
-        constructMemoryVertexBased();
-    }
+    std::jthread backgroundThread;
+
+    void runTask() { getHighDimCuts(); }
 
     // Start generating cuts in the background
     void generateCutsInBackground() {
-        if (backgroundTask.valid()) {
+        if (backgroundThread.joinable()) {
             return;
         }
-        // print_info("Generating cuts in the background\n");
-        // cloned = this->clone();
-        backgroundTask =
-            std::async(std::launch::async, [this]() { runTask(); });
+        backgroundThread = std::jthread([this]() { runTask(); });
     }
 
     std::vector<R1c> returnBGcuts() { return getCuts(); }
 
-    bool checkBackgroundTask() {
-        if (backgroundTask.valid()) {
-            return true;
-        }
-        return false;
-    }
+    bool checkBackgroundTask() { return backgroundThread.joinable(); }
 
     // Retrieve generated cuts
     bool readyGeneratedCuts() {
-        if (!backgroundTask.valid()) {
+        if (!backgroundThread.joinable()) {
             return false;
         }
 
         // Check if the background task has completed
-        if (backgroundTask.wait_for(std::chrono::seconds(0)) ==
-            std::future_status::ready) {
-            backgroundTask = std::future<void>();  // Reset the future
+        if (backgroundThread.joinable()) {
+            backgroundThread.join();            // Wait for the thread to finish
+            backgroundThread = std::jthread();  // Reset the jthread
             return true;
         } else {
             return false;
@@ -217,6 +208,9 @@ class HighDimCutsGenerator {
         cut_cache.clear();
         num_valid_routes = 0;
     }
+    const int JOBS = std::thread::hardware_concurrency() / 2;
+    exec::static_thread_pool src_pool = exec::static_thread_pool(JOBS);
+    exec::static_thread_pool::scheduler src_sched = src_pool.get_scheduler();
 
     void getHighDimCuts() {
         // Step 1: Initialize data structures and prepare for processing
@@ -226,11 +220,6 @@ class HighDimCutsGenerator {
         // Step 2: Set up parallel processing
         std::atomic<int> atomic_i{
             0};  // Atomic counter for thread-safe index tracking
-        const int JOBS =
-            std::thread::hardware_concurrency();  // Number of threads
-        exec::static_thread_pool pool(JOBS);      // Create a thread pool
-        auto sched =
-            pool.get_scheduler();  // Get the scheduler for the thread pool
 
         // Step 3: Define the parallel task
         auto bulk_sender = stdexec::bulk(
@@ -252,7 +241,7 @@ class HighDimCutsGenerator {
 
         // Step 4: Submit the parallel task to the thread pool and wait for
         // completion
-        auto work = stdexec::starts_on(sched, bulk_sender);
+        auto work = stdexec::starts_on(src_sched, bulk_sender);
         stdexec::sync_wait(std::move(work));
 
         // Step 5: Construct the final cuts and update the old cuts
@@ -265,11 +254,6 @@ class HighDimCutsGenerator {
 
     void startSeedCrazy() {
         num_label = 0;
-
-        // Create thread pool
-        const int JOBS = std::thread::hardware_concurrency();
-        exec::static_thread_pool pool(JOBS);
-        auto sched = pool.get_scheduler();
 
         // Preallocate work items
         std::vector<std::pair<int, std::reference_wrapper<const std::pair<
@@ -298,7 +282,7 @@ class HighDimCutsGenerator {
         // Parallel processing using bulk sender
         auto bulk_sender = stdexec::bulk(
             stdexec::just(), (work_items.size() + chunk_size - 1) / chunk_size,
-            [this, &work_items, chunk_size, JOBS,
+            [this, &work_items, chunk_size,
              &thread_local_results](std::size_t chunk_idx) {
                 size_t start_idx = chunk_idx * chunk_size;
                 size_t end_idx =
@@ -370,7 +354,7 @@ class HighDimCutsGenerator {
             });
 
         // Submit work to the thread pool and wait for completion
-        auto work = stdexec::starts_on(sched, bulk_sender);
+        auto work = stdexec::starts_on(src_sched, bulk_sender);
         stdexec::sync_wait(std::move(work));
 
         // Merge thread-local results into the global pool
@@ -442,26 +426,6 @@ class HighDimCutsGenerator {
     gch::small_vector<double> cached_valid_routes;
     gch::small_vector<int> cached_map_old_new_routes;
     int num_valid_routes;
-
-    void cacheValidRoutesAndMappings() {
-        cached_valid_routes.clear();
-        cached_map_old_new_routes.clear();
-
-        cached_valid_routes.reserve(sol.size());
-        cached_map_old_new_routes.resize(sol.size(), -1);
-
-        num_valid_routes = 0;
-
-        std::for_each(sol.begin(), sol.end(),
-                      [this, current = 0](const auto &route) mutable {
-                          if (route.frac_x > 1e-2) {
-                              cached_valid_routes.push_back(route.frac_x);
-                              cached_map_old_new_routes[current] =
-                                  num_valid_routes++;
-                          }
-                          ++current;
-                      });
-    }
 
     // cutLong as key
     libcuckoo::cuckoohash_map<cutLong,
@@ -599,7 +563,7 @@ class HighDimCutsGenerator {
 
         // Process frequencies using SIMD (if AVX2 is available) or scalar
         // operations
-#ifdef __AVX2__
+#ifndef __AVX2__
         for (int i = 0; i < cut_size; ++i) {
             const int idx = cut[i];
             if (idx >= 0 && static_cast<size_t>(idx) < v_r_map.size()) {
@@ -751,68 +715,179 @@ class HighDimCutsGenerator {
     void setArcDuals(const ArcDuals &arc_duals) { this->arc_duals = arc_duals; }
 #endif
 
-    void generateSepHeurMem4Vertex() {
-        // Early exit for invalid dimensions
-        if (dim <= 0) return;
+    // Original behavior preserved
+    void cacheValidRoutesAndMappings() {
+        cached_valid_routes.clear();
+        cached_map_old_new_routes.clear();
+        cached_valid_routes.reserve(sol.size());
+        cached_map_old_new_routes.resize(sol.size(), -1);
+        num_valid_routes = 0;
+        std::for_each(sol.begin(), sol.end(),
+                      [this, current = 0](const auto &route) mutable {
+                          if (route.frac_x > 1e-2) {
+                              cached_valid_routes.push_back(route.frac_x);
+                              cached_map_old_new_routes[current] =
+                                  num_valid_routes++;
+                          }
+                          ++current;
+                      });
+    }
+    struct Cluster {
+        std::vector<int> vertices;
+        double avg_cost;
+    };
 
-        // Resize and precompute half costs
+    CutStorage *cutter = nullptr;
+    // void generateSepHeurMem4Vertex() {
+    //     if (dim <= 0) return;
+    //     rank1_sep_heur_mem4_vertex.resize(dim);
+    //     std::vector<double> half_cost(dim);
+    //     for (int i = 0; i < dim; ++i) {
+    //         half_cost[i] = nodes[i].cost / 2;
+    //     }
+
+    //     const int k = std::min(5, dim / 2);
+    //     std::vector<Cluster> clusters(k);
+    //     std::vector<int> assignments(dim);
+
+    //     // Initialize k random centers
+    //     std::vector<int> centers;
+    //     centers.reserve(k);
+    //     centers.push_back(0);  // First center is 0
+    //     for (int i = 1; i < k; ++i) {
+    //         // Find the vertex that has maximum minimum distance to existing
+    //         // centers
+    //         double max_min_dist = -std::numeric_limits<double>::infinity();
+    //         int next_center = -1;
+    //         for (int j = 0; j < dim; ++j) {
+    //             if (std::find(centers.begin(), centers.end(), j) !=
+    //                 centers.end())
+    //                 continue;
+
+    //             // Find minimum distance to existing centers
+    //             double min_dist = std::numeric_limits<double>::infinity();
+    //             for (int center : centers) {
+    //                 double dist = cost_mat4_vertex[j][center];
+    //                 min_dist = std::min(min_dist, dist);
+    //             }
+
+    //             if (min_dist > max_min_dist) {
+    //                 max_min_dist = min_dist;
+    //                 next_center = j;
+    //             }
+    //         }
+    //         centers.push_back(next_center);
+    //     }
+
+    //     // Assign vertices to nearest center
+    //     for (int i = 0; i < dim; ++i) {
+    //         double min_dist = std::numeric_limits<double>::infinity();
+    //         int best_cluster = 0;
+    //         for (int c = 0; c < k; ++c) {
+    //             double dist = cost_mat4_vertex[i][centers[c]];
+    //             if (dist < min_dist) {
+    //                 min_dist = dist;
+    //                 best_cluster = c;
+    //             }
+    //         }
+    //         clusters[best_cluster].vertices.push_back(i);
+    //         assignments[i] = best_cluster;
+    //     }
+
+    //     struct Candidate {
+    //         int v1, v2;
+    //         double cost;
+    //         Candidate(int vertex1, int vertex2, double cost_val)
+    //             : v1(vertex1), v2(vertex2), cost(cost_val) {}
+    //     };
+
+    //     for (int i = 0; i < dim; ++i) {
+    //         std::vector<Candidate> candidates;
+    //         candidates.reserve(dim);
+    //         for (const auto &cluster : clusters) {
+    //             for (int j : cluster.vertices) {
+    //                 if (i != j) {
+    //                     double cost = cost_mat4_vertex[i][j] -
+    //                                   (half_cost[i] + half_cost[j]) -
+    //                                   arc_duals.getDual(i, j);
+    //                     candidates.emplace_back(i, j, cost);
+    //                 }
+    //             }
+    //         }
+
+    //         pdqsort(
+    //             candidates.begin(), candidates.end(),
+    //             [](const auto &a, const auto &b) { return a.cost < b.cost;
+    //             });
+
+    //         cutLong &vst2 = rank1_sep_heur_mem4_vertex[i];
+    //         vst2.reset();
+    //         ankerl::unordered_dense::set<int> used_clusters;
+    //         int selected = 0;
+    //         for (const auto &candidate : candidates) {
+    //             int cluster1 = assignments[candidate.v1];
+    //             int cluster2 = assignments[candidate.v2];
+    //             if (used_clusters.insert(cluster1).second ||
+    //                 used_clusters.insert(cluster2).second ||
+    //                 used_clusters.size() == k) {
+    //                 vst2.set(candidate.v1);
+    //                 vst2.set(candidate.v2);
+    //                 if (++selected == max_heuristic_sep_mem4_row_rank1)
+    //                 break;
+    //             }
+    //         }
+    //     }
+    // }
+
+    void generateSepHeurMem4Vertex() {
         rank1_sep_heur_mem4_vertex.resize(dim);
+        // Precompute half-costs for nodes to avoid repeated divisions
         std::vector<double> half_cost(dim);
         for (int i = 0; i < dim; ++i) {
             half_cost[i] = nodes[i].cost / 2;
         }
+        const auto active_cuts = cutter->getActiveCuts();
 
-        // Determine the number of clusters (k) for k-means
-        const int k = std::min(5, dim / 2);  // Ensure at least 1 cluster
+        // Define candidate structure to store both vertices
+        struct Candidate {
+            int v1, v2;
+            double cost;
+            Candidate(int vertex1, int vertex2, double cost_val)
+                : v1(vertex1), v2(vertex2), cost(cost_val) {}
+        };
 
-        // Initialize clusters and assignments
-        std::vector<Cluster> clusters(k);
-        std::vector<int> assignments(dim);
         for (int i = 0; i < dim; ++i) {
-            int cluster = i % k;  // Simple initial assignment (can be improved)
-            clusters[cluster].vertices.push_back(i);
-            assignments[i] = cluster;
-        }
+            // Initialize and populate the cost vector directly for each i
+            std::vector<Candidate> cost;
+            cost.reserve(dim);
+            cost.emplace_back(i, 0, INFINITY);  // Handle the j=0 case
 
-        // Iterate through each vertex to generate candidates
-        for (int i = 0; i < dim; ++i) {
-            std::vector<std::pair<int, double>> candidates;
-            candidates.reserve(dim);
-
-            // Generate candidates from all clusters
-            for (const auto &cluster : clusters) {
-                for (int j : cluster.vertices) {
-                    if (i != j) {
-                        // Compute the cost for the candidate
-                        double cost = cost_mat4_vertex[i][j] -
-                                      (half_cost[i] + half_cost[j]) -
-                                      arc_duals.getDual(i, j);
-                        candidates.emplace_back(j, cost);
+            for (int j = 1; j < dim - 1; ++j) {
+                double cost_val = cost_mat4_vertex[i][j] -
+                                  (half_cost[i] + half_cost[j]) -
+                                  arc_duals.getDual(i, j);
+                cost.emplace_back(i, j, cost_val);
+                // check if i and j are part of SRCset
+                for (const auto &active_cut : active_cuts) {
+                    if (active_cut.type == CutType::ThreeRow) {
+                        if (active_cut.isSRCset(i, j)) {
+                            cost.back().cost -= active_cut.dual_value;
+                        }
                     }
                 }
             }
+            // Use partial sort to get only the top
+            // max_heuristic_sep_mem4_row_rank1 elements
+            std::partial_sort(
+                cost.begin(), cost.begin() + max_heuristic_sep_mem4_row_rank1,
+                cost.end(),
+                [](const auto &a, const auto &b) { return a.cost < b.cost; });
 
-            // Sort candidates by cost in ascending order
-            pdqsort(candidates.begin(), candidates.end(),
-                    [](const auto &a, const auto &b) {
-                        return a.second < b.second;
-                    });
-
-            // Select top candidates ensuring cluster diversity
+            // Set bits in vst2 for both vertices of the smallest costs
             cutLong &vst2 = rank1_sep_heur_mem4_vertex[i];
-            vst2.reset();
-
-            ankerl::unordered_dense::set<int>
-                used_clusters;  // Tracks clusters already used
-            int selected = 0;
-
-            for (const auto &candidate : candidates) {
-                int cluster = assignments[candidate.first];
-                if (used_clusters.insert(cluster).second ||
-                    used_clusters.size() == k) {
-                    vst2.set(candidate.first);
-                    if (++selected == max_heuristic_sep_mem4_row_rank1) break;
-                }
+            for (int k = 0; k < max_heuristic_sep_mem4_row_rank1; ++k) {
+                vst2.set(cost[k].v1);
+                vst2.set(cost[k].v2);
             }
         }
     }
@@ -825,17 +900,6 @@ class HighDimCutsGenerator {
         const auto sol_size = sol.size();
 
         // Populate `v_r_map` with route appearances for each vertex `i`
-#ifdef __cpp_lib_parallel_algorithm
-        std::for_each(sol.begin(), sol.end(), [&](const auto &route_data) {
-            const auto r =
-                &route_data - &sol[0];  // Get index without separate counter
-            for (const int i : route_data.route) {
-                if (i > 0 && i < max_dim_minus_1) {
-                    ++v_r_map[i][r];
-                }
-            }
-        });
-#else
         for (size_t r = 0; r < sol_size; ++r) {
             for (const int i : sol[r].route) {
                 if (i > 0 && i < max_dim_minus_1) {
@@ -843,7 +907,6 @@ class HighDimCutsGenerator {
                 }
             }
         }
-#endif
 
         // Initialize `seed_map` with reserved space
         ankerl::unordered_dense::map<cutLong, cutLong> seed_map;
@@ -943,62 +1006,6 @@ class HighDimCutsGenerator {
         }
 
         return {best_vio, best_candidate};
-    }
-
-    inline void shiftSearchCrazy(int plan_idx, const std::vector<int> &c,
-                                 double &new_vio,
-                                 std::pair<int, int> &shift_positions) {
-        // Validate size and plan
-        auto validation = PlanValidationResult::validate(plan_idx, c.size(),
-                                                         map_rank1_multiplier);
-        if (!validation.is_valid) {
-            new_vio = -std::numeric_limits<double>::max();
-            return;
-        }
-
-        std::vector<int> tmp_c = c;
-        double best_vio = -std::numeric_limits<double>::max();
-        std::pair<int, int> best_shift{-1, -1};
-
-        // Try shifting elements to different positions
-        for (int from = 0; from < c.size(); ++from) {
-            const int element = c[from];
-
-            // Find best position to shift this element to
-            auto [pos_best_vio, to_pos] = findBestViolation(
-                [&](int to) {
-                    if (to == from) return -std::numeric_limits<double>::max();
-
-                    // Perform the shift
-                    if (to < from) {
-                        // Shift up - move element earlier in sequence
-                        std::rotate(tmp_c.begin() + to, tmp_c.begin() + from,
-                                    tmp_c.begin() + from + 1);
-                    } else {
-                        // Shift down - move element later in sequence
-                        std::rotate(tmp_c.begin() + from,
-                                    tmp_c.begin() + from + 1,
-                                    tmp_c.begin() + to + 1);
-                    }
-
-                    double vio;
-                    // fmt::print("Calling in shiftSearchCrazy\n");
-                    exactFindBestPermutationForOnePlan(tmp_c, plan_idx, vio);
-
-                    // Restore original order
-                    tmp_c = c;
-                    return vio;
-                },
-                std::vector<int>(c.size()));  // Try all possible positions
-
-            if (pos_best_vio > best_vio) {
-                best_vio = pos_best_vio;
-                best_shift = {from, to_pos};
-            }
-        }
-
-        new_vio = best_vio;
-        shift_positions = best_shift;
     }
 
     inline void addSearchCrazy(int plan_idx, const std::vector<int> &c,
@@ -1517,8 +1524,8 @@ class HighDimCutsGenerator {
                 return;
             }
 
-            // Find matching pattern using linear search since Bitset lacks <
-            // operator
+            // Find matching pattern using linear search since Bitset lacks
+            // < operator
             auto it = std::find_if(
                 memory_patterns.begin(), memory_patterns.end(),
                 [&pattern_mem](const auto &entry) {
@@ -1554,7 +1561,8 @@ class HighDimCutsGenerator {
             // Skip if cut.second is zero
             if (cut.second == 0) continue;
 
-            // Create a new set for each iteration to avoid clearing overhead
+            // Create a new set for each iteration to avoid clearing
+            // overhead
             ankerl::unordered_dense::set<int> local_mem;
             local_mem.reserve(dim);
 
@@ -1606,7 +1614,8 @@ class HighDimCutsGenerator {
                     std::move(tmp_mem);  // Use move semantics for efficiency
             }
         } else {
-            // Preallocate `accum` to avoid repeated `push_back` and `pop_back`
+            // Preallocate `accum` to avoid repeated `push_back` and
+            // `pop_back`
             if (accum.size() <= i) {
                 accum.resize(i + 1);
             }
@@ -1642,8 +1651,8 @@ class HighDimCutsGenerator {
             for (int route_idx = 0; route_idx < v_r_map[vertex].size();
                  ++route_idx) {
                 int frequency = v_r_map[vertex][route_idx];
-                if (frequency >
-                    0) {  // Only proceed if the vertex appears in this route
+                if (frequency > 0) {  // Only proceed if the vertex appears
+                                      // in this route
                     num_vis_times[route_idx] += multiplier * frequency;
                 }
             }

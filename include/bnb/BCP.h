@@ -56,6 +56,7 @@
 #endif
 
 #include "Logger.h"
+#include "RNG.h"
 
 #define NUMERO_CANDIDATOS 10
 
@@ -186,124 +187,147 @@ class VRProblem {
      */
     inline int addColumn(BNBNode *node, const auto &columns, double &inner_obj,
                          bool enumerate = false) {
+        // Get variables from macro blocks
         SRC_MODE_BLOCK(auto &r1c = node->r1c; auto &cuts = r1c->cutStorage;)
         RCC_MODE_BLOCK(auto &rccManager = node->rccManager;)
-        int numConstrsLocal = node->getIntAttr("NumConstrs");
-        auto &constrs = node->getConstrs();
-        std::vector<double> coluna(numConstrsLocal,
-                                   0.0);  // Declare outside the loop
-
-        auto &allPaths = node->paths;
         auto &SRCconstraints = node->SRCconstraints;
 
-        // Collect the bounds, costs, names, and columns
+        // Pre-allocate all vectors at the beginning with reserve()
         std::vector<double> lb, ub, obj;
         std::vector<MIPColumn> cols;
         std::vector<std::string> names;
         std::vector<VarType> vtypes;
 
+        // Reserve space based on N_ADD to prevent reallocations
+        const size_t estimated_size = std::min(columns.size(), size_t(N_ADD));
+        lb.reserve(estimated_size);
+        ub.reserve(estimated_size);
+        obj.reserve(estimated_size);
+        cols.reserve(estimated_size);
+        names.reserve(estimated_size);
+        vtypes.reserve(estimated_size);
+
+        // Get frequently accessed members once
         auto &pathSet = node->pathSet;
+        const int numConstrsLocal = node->getIntAttr("NumConstrs");
+
+        // Pre-allocate column vector and reuse it
+        std::vector<double> coluna(numConstrsLocal, 0.0);
+
+        // Initialize string buffer for path names
+        std::string name_buffer;
+        name_buffer.reserve(32);  // Reserve space for "x[" + number + "]"
+
         inner_obj = 0.0;
+        int counter = 0;
 
-        auto counter = 0;
-        for (auto &label : columns) {
-            if (label->nodes_covered.empty()) continue;
-            if (!enumerate && label->cost > 0) continue;
+        // Process columns
+        for (const auto &label : columns) {
+            // Early rejection criteria
+            if (label->nodes_covered.empty() ||
+                (!enumerate && label->cost > 0)) {
+                continue;
+            }
 
+            // Create path object once
             Path path(label->getRoute(), label->real_cost);
 
-            // check if path is already in pathSet
-            if (pathSet.find(path) != pathSet.end()) continue;
-            // Insert the path into the set to avoid duplicates
+            // Use find() with hint from previous insertion
+            if (pathSet.find(path) != pathSet.end()) {
+                continue;
+            }
+
             pathSet.insert(path);
 
-            if (label->cost < inner_obj) {
-                inner_obj = label->cost;
+            // Update inner objective if needed
+            inner_obj = std::min(inner_obj, label->cost);
+
+            if (++counter > N_ADD - 1) {
+                break;
             }
 
-            counter += 1;
-            if (counter > N_ADD - 1) break;
+            // Clear column vector efficiently
+            std::fill(coluna.begin(), coluna.end(), 0.0);
 
-            std::fill(coluna.begin(), coluna.end(),
-                      0.0);  // Reset the coefficients
-
-            double travel_cost = label->real_cost;
-            std::string name = "x[" + std::to_string(allPaths.size()) + "]";
-
-            MIPColumn col;  // Use Column instead of GRBColumn
-
-            // Step 1: Accumulate the coefficients for each node
-            for (const auto &node : label->nodes_covered) {
-                if (likely(node > 0 &&
-                           node != N_SIZE - 1)) {  // Use likely() if applicable
-                    coluna[node - 1]++;  // Simplified increment operation
+            // Process nodes coverage
+            for (const auto node_id : label->nodes_covered) {
+                if (node_id > 0 && node_id != N_SIZE - 1) {
+                    coluna[node_id - 1]++;
                 }
             }
 
-            // Add terms to the Column
+            // Create MIPColumn
+            MIPColumn col;
+
+            // Add non-zero terms only
             for (int i = 0; i < N_SIZE - 2; i++) {
-                if (coluna[i] == 0.0) continue;
-                col.addTerm(i, coluna[i]);  // Add term to the Column (row index
-                                            // and coefficient)
+                if (coluna[i] != 0.0) {
+                    col.addTerm(i, coluna[i]);
+                }
             }
 
-            // Add the term for total vehicles constraint
-            col.addTerm(N_SIZE - 2,
-                        1.0);  // Add term for the vehicle constraint
+            // Add vehicle constraint term
+            col.addTerm(N_SIZE - 2, 1.0);
 
-            // Add terms for the limited memory rank 1 cuts
+            // Process SRC cuts if enabled
             SRC_MODE_BLOCK(
-                auto vec = cuts.computeLimitedMemoryCoefficients(path.route);
-                if (vec.size() > 0) {
-                    for (int i = 0; i < vec.size(); i++) {
-                        if (abs(vec[i]) > 1e-3) {
-                            col.addTerm(SRCconstraints[i]->index(), vec[i]);
-                        }
+                const auto vec =
+                    cuts.computeLimitedMemoryCoefficients(path.route);
+                for (size_t i = 0; i < vec.size(); i++) {
+                    const double val = vec[i];
+                    if (std::abs(val) > 1e-3) {
+                        col.addTerm(SRCconstraints[i]->index(), val);
                     }
                 })
 
+            // Process RCC cuts if enabled
             RCC_MODE_BLOCK(
-                auto RCCvec = rccManager->computeRCCCoefficients(path.route);
-                if (RCCvec.size() > 0) {
-                    auto RCCconstraints = rccManager->getbaldesCtrs();
-
-                    for (int i = 0; i < RCCvec.size(); i++) {
-                        if (abs(RCCvec[i]) > 1e-3) {
-                            col.addTerm(
-                                RCCconstraints[i]->index(),
-                                RCCvec[i]);  // Add RCC terms to the Column
+                const auto RCCvec =
+                    rccManager->computeRCCCoefficients(path.route);
+                if (!RCCvec.empty()) {
+                    const auto &RCCconstraints = rccManager->getbaldesCtrs();
+                    for (size_t i = 0; i < RCCvec.size(); i++) {
+                        const double val = RCCvec[i];
+                        if (std::abs(val) > 1e-3) {
+                            col.addTerm(RCCconstraints[i]->index(), val);
                         }
                     }
                 })
 
+            // Process branching constraints
             auto &branching = node->branchingDuals;
-            auto branchingVec = branching->computeCoefficients(path.route);
-            if (branchingVec.size() > 0) {
-                auto branchingbaldesCtrs = branching->getBranchingbaldesCtrs();
-                for (int i = 0; i < branchingVec.size(); i++) {
-                    if (abs(branchingVec[i]) > 1e-3) {
-                        col.addTerm(branchingbaldesCtrs[i]->index(),
-                                    branchingVec[i]);
+            const auto branchingVec =
+                branching->computeCoefficients(path.route);
+            if (!branchingVec.empty()) {
+                const auto &branchingbaldesCtrs =
+                    branching->getBranchingbaldesCtrs();
+                for (size_t i = 0; i < branchingVec.size(); i++) {
+                    const double val = branchingVec[i];
+                    if (std::abs(val) > 1e-3) {
+                        col.addTerm(branchingbaldesCtrs[i]->index(), val);
                     }
                 }
             }
 
-            // Collect bounds, costs, columns, and names
+            // Build path name efficiently
+            name_buffer.clear();
+            name_buffer = "x[";
+            name_buffer += std::to_string(node->paths.size());
+            name_buffer += "]";
+
+            // Add all column data
             lb.push_back(0.0);
             ub.push_back(1.0);
-            obj.push_back(travel_cost);
-            cols.push_back(col);  // Add the populated Column
-            names.push_back(name);
-            vtypes.push_back(
-                VarType::Continuous);  // Assuming VarType::Continuous is the
-                                       // equivalent of GRB_CONTINUOUS
+            obj.push_back(label->real_cost);
+            cols.push_back(std::move(col));
+            names.push_back(name_buffer);
+            vtypes.push_back(VarType::Continuous);
 
-            node->addPath(path);  // Store the path
+            node->addPath(path);
         }
 
-        // Add variables with bounds, objectives, and columns
+        // Batch add variables if we have any
         if (!lb.empty()) {
-            // Pass the data to the MIP problem
             node->addVars(lb.data(), ub.data(), obj.data(), vtypes.data(),
                           names.data(), cols.data(), lb.size());
             node->update();
@@ -318,45 +342,44 @@ class VRProblem {
      */
     bool cutHandler(std::shared_ptr<LimitedMemoryRank1Cuts> &r1c, BNBNode *node,
                     std::vector<baldesCtrPtr> &constraints) {
-        auto &cuts = r1c->cutStorage;
-        bool changed = false;
-
-        if (!cuts.empty()) {
-            for (auto &cut : cuts) {
-                if (cut.added && !cut.updated) {
-                    continue;
-                }
-
-                changed = true;
-                const int z = cut.id;
-                const auto &coeffs = cut.coefficients;
-
-                if (cut.added && cut.updated) {
-                    cut.updated = false;
-                    // if (z >= constraints.size()) { continue; }
-                    node->chgCoeff(constraints[z], coeffs);
-                } else {
-                    LinearExpression lhs;
-                    for (size_t i = 0; i < coeffs.size(); ++i) {
-                        if (coeffs[i] == 0) {
-                            continue;
-                        }
-                        lhs += node->getVar(i) * coeffs[i];
-                    }
-
-                    std::string constraint_name = "SRC_" + std::to_string(z);
-                    // constraint_name << "cuts(z" << z << ")";
-                    // auto ctr = ;
-                    // print cut.rhs
-                    auto ctr = node->addConstr(lhs <= cut.rhs, constraint_name);
-                    constraints.emplace_back(ctr);
-                }
-
-                cut.added = true;
-                cut.updated = false;
-            }
+        if (r1c->cutStorage.empty()) {
+            return false;
         }
-        // print constraints size
+
+        bool changed = false;
+        auto &cuts = r1c->cutStorage;
+        cuts.changed = false;
+
+        for (auto &cut : cuts) {
+            // Skip if cut was added and not updated
+            if (cut.added && !cut.updated) {
+                continue;
+            }
+
+            const auto &coeffs = cut.coefficients;
+
+            if (cut.added) {  // Update existing constraint
+                node->chgCoeff(constraints[cut.id], coeffs);
+            } else {  // Add new constraint
+                LinearExpression lhs;
+                const size_t coeff_size = coeffs.size();
+
+                for (size_t i = 0; i < coeff_size; ++i) {
+                    const auto coeff = coeffs[i];
+                    if (coeff != 0) {
+                        lhs += node->getVar(i) * coeff;
+                    }
+                }
+
+                constraints.push_back(node->addConstr(
+                    lhs <= cut.rhs, "SRC_" + std::to_string(cut.id)));
+            }
+
+            cut.added = true;
+            cut.updated = false;
+            changed = true;
+        }
+
         return changed;
     }
 
@@ -492,6 +515,10 @@ class VRProblem {
     bool CG(BNBNode *node, int max_iter = 5000) {
         print_info("Column generation preparation...\n");
 
+        std::random_device rd;
+        Xoroshiro128Plus gen(rd());
+        std::uniform_real_distribution<> dis(-0.1, 0.1);
+
         node->relaxNode();
         node->optimize();
         relaxed_result = std::numeric_limits<double>::max();
@@ -616,20 +643,20 @@ class VRProblem {
 
 #if defined(RCC)
             if (rcc) {
-                // RUN_OPTIMIZATION(node, 1e-6)
+#ifdef IPM
+                RUN_OPTIMIZATION(node, 1e-6)
+#endif
                 GET_SOL(node);
                 RCC_MODE_BLOCK(rcc = RCCsep(node, solution);)
-
-#ifdef EXACT_RCC
-                rcc = exactRCCsep(node, solution);
-#endif
             }
 #endif
 
             if ((ss && !rcc) || force_cuts) {
                 force_cuts = false;
 #if defined(RCC)
-                // RUN_OPTIMIZATION(node, 1e-8)
+#ifdef IPM
+                RUN_OPTIMIZATION(node, 1e-8)
+#endif
                 GET_SOL(node);
                 RCC_MODE_BLOCK(rcc = RCCsep(node, solution);)
 #endif
@@ -652,7 +679,7 @@ class VRProblem {
                     gen_bg_cuts = true;
                     if (!violated) {
                         if (bucket_graph->A_MAX == N_SIZE) {
-                            if (std::abs(inner_obj) < 1.0) {
+                            if (std::abs(inner_obj) < 1.5) {
                                 print_info(
                                     "No violated cuts found, calling it a "
                                     "day\n");
@@ -683,8 +710,10 @@ class VRProblem {
                 // #ifdef IPM
                 // #endif
                 // r1c->separateBG(node, SRCconstraints);
-                bool cleared = r1c->cutCleaner(node, SRCconstraints);
-                bool generated = r1c->getCutsBG();
+                // bool cleared = r1c->cutCleaner(node, SRCconstraints);
+                bool cleared = false;
+                bool generated = r1c->getCutsBG(node, SRCconstraints);
+                // bool generated = false;
                 if (generated) {
                     changed = cutHandler(r1c, node, SRCconstraints);
                     if (changed || cleared) {
@@ -837,7 +866,7 @@ class VRProblem {
 
 #if defined(STAB) && defined(IPM)
             if (stage >= 4) {
-                updateGraphAndSolve();
+                updateGraphAndSolve(nodeDuals);
             }
 #endif
 
@@ -921,22 +950,36 @@ class VRProblem {
                             }
                         };
 
-                    adaptive_threshold = std::max(
-                        base_threshold,
-                        base_threshold +
-                            iter / 100);  // Adapt with total iterations
-                    if (std::abs(lp_obj - lp_obj_old) < 1) {
+                    adaptive_threshold =
+                        std::max(base_threshold,
+                                 base_threshold +
+                                     iter / 50);  // Adapt with total iterations
+                    if (std::abs(lp_obj - lp_obj_old) < 1 && stage >= 4) {
                         iter_non_improv += 1;
                         if (iter_non_improv > adaptive_threshold) {
                             if (stab.alpha > 0) {
+                                // print_info(
+                                // "No improvement in the last "
+                                // "iterations, "
+                                // "generating dual perturbation with "
+                                // "IPM\n");
+
                                 print_info(
                                     "No improvement in the last "
                                     "iterations, "
-                                    "generating dual perturbation with "
-                                    "IPM\n");
-                                updateGapAndRunOptimization(
-                                    node, lp_obj, inner_obj, ipm_solver,
-                                    iter_non_improv, use_ipm_duals, nodeDuals);
+                                    "generating dual perturbation\n");
+
+                                // create small perturbation random perturbation
+                                // on nodeDuals
+                                for (auto &dual : nodeDuals) {
+                                    if (std::abs(dual) > 1e-3) {
+                                        dual *= (1.0 + dis(gen));
+                                    }
+                                }
+                                // updateGapAndRunOptimization(
+                                //     node, lp_obj, inner_obj, ipm_solver,
+                                //     iter_non_improv, use_ipm_duals,
+                                //     nodeDuals);
                                 stab.define_smooth_dual_sol(nodeDuals);
                                 iter_non_improv = 0;
                                 use_ipm_duals = true;

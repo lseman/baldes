@@ -535,34 +535,53 @@ class CustomSimplicialLDLT {
     template <typename Rhs>
     Eigen::VectorXd solve(const MatrixBase<Rhs> &b) const {
         eigen_assert(m_isInitialized && "Decomposition not initialized.");
-
         Eigen::VectorXd dest;
 
         // Apply forward permutation
         if (m_P.size() > 0) {
-            dest.noalias() = m_P * b;  // Use noalias to avoid temporary
+            dest.noalias() = m_P * b;
         } else {
             dest = b;
         }
 
-        const Scalar adaptiveRegularization = 1e-8;
+        // Compute adaptive regularization based on matrix properties
+        const Scalar condition_estimate =
+            m_diag.maxCoeff() /
+            (m_diag.minCoeff() + std::numeric_limits<Scalar>::epsilon());
 
-        // Regular solve path with adaptive regularization
-        solveTriangular<decltype(matrixL()), decltype(dest), Lower>(
-            matrixL(), dest, adaptiveRegularization);
-        dest.array() /= m_diag.array();
-        solveTriangular<decltype(matrixU()), decltype(dest), Upper>(
-            matrixU(), dest, adaptiveRegularization);
+        // Base regularization scaled by condition number and problem size
+        const Scalar base_reg = std::numeric_limits<Scalar>::epsilon() *
+                                std::sqrt(static_cast<double>(b.size()));
+
+        // Adaptive regularization increases with condition number
+        Scalar adaptiveRegularization = base_reg;
+        if (condition_estimate > 1e6) {
+            adaptiveRegularization *= std::log10(condition_estimate);
+        }
+
+        // Create regularized diagonal
+        Eigen::VectorXd diagCopy = m_diag;
+        if (condition_estimate > 1e6) {
+            Scalar tikhonov_param =
+                base_reg * std::pow(condition_estimate, 0.1);
+            diagCopy.array() += tikhonov_param;
+        }
+
+        // Forward substitution with regularization
+        dest = (matrixL().template triangularView<Lower>()).solve(dest);
+        dest.array() *=
+            (Scalar(1.0) / (diagCopy.array() + adaptiveRegularization));
+
+        // Backward substitution with regularization
+        dest = (matrixU().template triangularView<Upper>()).solve(dest);
 
         // Apply backward permutation
         if (m_Pinv.size() > 0) {
-            dest.noalias() = m_Pinv * dest;  // Use noalias to avoid
-            // temporary
+            dest.noalias() = m_Pinv * dest;
         }
 
         return dest;
     }
-
     // Eigen::VectorXd solve(const MatrixBase<Rhs> &b) const {
     //     eigen_assert(m_isInitialized && "Decomposition not initialized.");
     //     Eigen::VectorXd dest;

@@ -1,10 +1,7 @@
 #pragma once
 
-#include "Common.h"
-
 #include "Arc.h"
-#include "Hashes.h"
-
+#include "Common.h"
 #include "miphandler/Constraint.h"
 #include "miphandler/MIPHandler.h"
 
@@ -22,34 +19,33 @@ class BNBNode;
 
 // Structure to store and manage dual values for arcs
 class ArcDuals {
-public:
+   public:
     // Add or update the dual value for an arc
-    void setDual(const RawArc& arc, double dualValue) {
+    void setDual(const RawArc &arc, double dualValue) {
         arcDuals_[arc] = dualValue;
     }
 
     // Retrieve the dual value for an arc
-    double getDual(int i, int j) const {
-        return getDual(RawArc(i, j));
-    }
+    double getDual(int i, int j) const { return getDual(RawArc(i, j)); }
 
-    double getDual(const RawArc& arc) const {
+    double getDual(const RawArc &arc) const {
         auto it = arcDuals_.find(arc);
         return (it != arcDuals_.end()) ? it->second : 0.0;
     }
 
     // Set or increment dual value in one operation
-    void setOrIncrementDual(const RawArc& arc, double dualValue) {
-        arcDuals_[arc] += dualValue; // Will create with 0 + dualValue if not exists
+    void setOrIncrementDual(const RawArc &arc, double dualValue) {
+        arcDuals_[arc] +=
+            dualValue;  // Will create with 0 + dualValue if not exists
     }
 
-private:
+   private:
     ankerl::unordered_dense::map<RawArc, double, RawArcHash> arcDuals_;
 };
 
 // Structure to store and manage dual values for nodes
 class NodeDuals {
-public:
+   public:
     void setDual(int node, double dualValue) { nodeDuals_[node] = dualValue; }
 
     double getDual(int node) const {
@@ -66,14 +62,16 @@ public:
         }
     }
 
-private:
+   private:
     ankerl::unordered_dense::map<int, double> nodeDuals_;
 };
 
 // Unified manager for branching duals
 class BranchingDuals {
-public:
-    std::vector<VRPCandidate *> getBranchingCandidates() { return branchingCandidates_; }
+   public:
+    std::vector<VRPCandidate *> getBranchingCandidates() {
+        return branchingCandidates_;
+    }
 
     bool empty() { return branchingCandidates_.empty(); }
 
@@ -83,7 +81,9 @@ public:
     }
 
     void setDual(CandidateType type, const RawArc &arc, double dualValue) {
-        if (type == CandidateType::Edge) { arcDuals_.setDual(arc, dualValue); }
+        if (type == CandidateType::Edge) {
+            arcDuals_.setDual(arc, dualValue);
+        }
     }
 
     std::vector<double> computeCoefficients(const std::vector<uint16_t> route) {
@@ -105,7 +105,8 @@ public:
             } else if (candidate->getCandidateType() == CandidateType::Edge) {
                 bool has_edge = false;
                 for (size_t i = 1; i < route.size(); ++i) {
-                    if (candidate->sourceNode == route[i - 1] && candidate->targetNode == route[i]) {
+                    if (candidate->sourceNode == route[i - 1] &&
+                        candidate->targetNode == route[i]) {
                         has_edge = true;
                         break;
                     }
@@ -115,9 +116,11 @@ public:
                 } else {
                     coefficients.push_back(0.0);
                 }
-            } else if (candidate->getCandidateType() == CandidateType::Vehicle) {
+            } else if (candidate->getCandidateType() ==
+                       CandidateType::Vehicle) {
                 coefficients.push_back(1.0);
-            } else if (candidate->getCandidateType() == CandidateType::Cluster) {
+            } else if (candidate->getCandidateType() ==
+                       CandidateType::Cluster) {
                 bool has_cluster = false;
                 for (auto node : route) {
                     for (auto cluster_node : candidate->cluster) {
@@ -140,7 +143,9 @@ public:
     }
 
     void setDual(CandidateType type, int node, double dualValue) {
-        if (type == CandidateType::Node) { nodeDuals_.setDual(node, dualValue); }
+        if (type == CandidateType::Node) {
+            nodeDuals_.setDual(node, dualValue);
+        }
     }
 
     double getDual(const RawArc &arc) const { return arcDuals_.getDual(arc); }
@@ -159,9 +164,9 @@ public:
     // define size as size of branchingCandidates_
     int size() { return branchingCandidates_.size(); }
 
-private:
+   private:
     std::vector<VRPCandidate *> branchingCandidates_;
-    std::vector<baldesCtrPtr>   branchingbaldesCtrs_;
-    ArcDuals                    arcDuals_;
-    NodeDuals                   nodeDuals_;
+    std::vector<baldesCtrPtr> branchingbaldesCtrs_;
+    ArcDuals arcDuals_;
+    NodeDuals nodeDuals_;
 };

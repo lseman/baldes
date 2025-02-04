@@ -18,7 +18,7 @@
 
 #include "Cut.h"
 #include "Definitions.h"
-#include "HeuristicHighOrder.h"
+// #include "HeuristicHighOrder.h"
 #include "bnb/Node.h"
 #ifdef IPM
 #include "ipm/IPSolver.h"
@@ -109,6 +109,7 @@ void CutStorage::addCut(Cut &cut) {
 
     // Update the indexCuts map
     indexCuts[cut_key].push_back(cuts.size() - 1);
+    changed = 1;
 }
 
 LimitedMemoryRank1Cuts::LimitedMemoryRank1Cuts(std::vector<VRPNode> &nodes)
@@ -123,6 +124,7 @@ LimitedMemoryRank1Cuts::LimitedMemoryRank1Cuts(std::vector<VRPNode> &nodes)
  * indices and identify violations that exceed the specified threshold.
  *
  */
+
 void LimitedMemoryRank1Cuts::separate(const SparseMatrix &A,
                                       const std::vector<double> &x) {
     // Pre-allocate row indices map with reserve
@@ -147,9 +149,6 @@ void LimitedMemoryRank1Cuts::separate(const SparseMatrix &A,
         cuts.reserve(20);  // Adjust based on expected number of cuts per thread
     }
 
-    exec::static_thread_pool pool(JOBS);
-    auto sched = pool.get_scheduler();
-
     // Create tasks more efficiently
     std::vector<std::tuple<int, int, int>> tasks;
     const int n = N_SIZE - 1;
@@ -173,7 +172,7 @@ void LimitedMemoryRank1Cuts::separate(const SparseMatrix &A,
         ankerl::unordered_dense::set<int> C_set;
 
         ThreadLocalBuffers(int num_cols)
-            : expanded(num_cols),
+            : expanded(num_cols, 0),  // Initialize with zeros
               buffer_int(num_cols),
               remainingNodes(num_cols),
               cut_coefficients(),
@@ -190,8 +189,7 @@ void LimitedMemoryRank1Cuts::separate(const SparseMatrix &A,
          chunk_size](std::size_t chunk_idx) {
             // Thread-local buffers
             ThreadLocalBuffers buffers(A.num_cols);
-            buffers.cut_coefficients.resize(
-                this->allPaths.size());  // Resize here
+            buffers.cut_coefficients.resize(this->allPaths.size());
 
             auto &local_cuts =
                 thread_local_cuts[chunk_idx % thread_local_cuts.size()];
@@ -203,27 +201,26 @@ void LimitedMemoryRank1Cuts::separate(const SparseMatrix &A,
                 const auto &[i, j, k] = tasks[task_idx];
 
                 // Clear expanded array efficiently
-                if (buffers.expanded.size() > 0) {
-                    std::memset(buffers.expanded.data(), 0,
-                                buffers.expanded.size() * sizeof(int));
-                }
+                std::memset(buffers.expanded.data(), 0,
+                            buffers.expanded.size() * sizeof(int));
 
                 int buffer_int_n = 0;
                 double lhs = 0.0;
 
                 // Process rows more efficiently
-                for (int idx : row_indices_map[i])
-                    buffers.expanded[A.cols[idx]]++;
-                for (int idx : row_indices_map[j])
-                    buffers.expanded[A.cols[idx]]++;
-                for (int idx : row_indices_map[k])
-                    buffers.expanded[A.cols[idx]]++;
+                auto process_row = [&](int row) {
+                    for (int idx : row_indices_map[row]) {
+                        buffers.expanded[A.cols[idx]]++;
+                    }
+                };
+                process_row(i);
+                process_row(j);
+                process_row(k);
 
-// Vectorization hint for modern compilers
-#pragma GCC ivdep
+                // Vectorized computation of lhs
                 for (int idx = 0; idx < A.num_cols; ++idx) {
                     if (buffers.expanded[idx] >= 2) {
-                        lhs += std::floor(buffers.expanded[idx] * 0.5) * x[idx];
+                        lhs += x[idx];
                         buffers.buffer_int[buffer_int_n++] = idx;
                     }
                 }
@@ -268,49 +265,25 @@ void LimitedMemoryRank1Cuts::separate(const SparseMatrix &A,
 
                         size_t first = n, second = n;
 
-// Vectorization hint
-#pragma GCC ivdep
+                        // Vectorized search for first and second positions
                         for (size_t idx = 1; idx < n - 1; ++idx) {
                             const int curr = consumers[idx];
-                            // Check against all three C_set elements at once
                             const bool is_in_c =
                                 (curr == c1 || curr == c2 || curr == c3);
 
                             // Branchless updates
-                            const bool update_first = is_in_c && (first == n);
-                            const bool update_second =
-                                is_in_c && (first != n) && (idx > first);
-
-                            first = update_first ? idx : first;
-                            second = update_second ? idx : second;
+                            first = (is_in_c && (first == n)) ? idx : first;
+                            second = (is_in_c && (first != n) && (idx > first))
+                                         ? idx
+                                         : second;
                         }
 
                         // If we found two positions
                         if (second != n) {
-// Process elements between first and second
-#pragma GCC ivdep
-                            for (size_t idx = first + 1; idx < second;
-                                 idx += 4) {
-                                // Process up to 4 elements at once
-                                const size_t remain = second - idx;
-                                if (remain >= 4) {
-                                    const uint16_t n1 = consumers[idx];
-                                    const uint16_t n2 = consumers[idx + 1];
-                                    const uint16_t n3 = consumers[idx + 2];
-                                    const uint16_t n4 = consumers[idx + 3];
-
-                                    AM[n1 >> 6] |= (1ULL << (n1 & 63));
-                                    AM[n2 >> 6] |= (1ULL << (n2 & 63));
-                                    AM[n3 >> 6] |= (1ULL << (n3 & 63));
-                                    AM[n4 >> 6] |= (1ULL << (n4 & 63));
-                                } else {
-                                    // Handle remaining elements
-                                    for (size_t j = 0; j < remain; ++j) {
-                                        const uint16_t n = consumers[idx + j];
-                                        AM[n >> 6] |= (1ULL << (n & 63));
-                                    }
-                                    break;
-                                }
+                            // Process elements between first and second
+                            for (size_t idx = first + 1; idx < second; ++idx) {
+                                const uint16_t n = consumers[idx];
+                                AM[n >> 6] |= (1ULL << (n & 63));
                             }
                             break;
                         }
@@ -332,7 +305,7 @@ void LimitedMemoryRank1Cuts::separate(const SparseMatrix &A,
         });
 
     // Execute work
-    stdexec::sync_wait(stdexec::on(sched, std::move(bulk_sender)));
+    stdexec::sync_wait(stdexec::starts_on(src_sched, std::move(bulk_sender)));
 
     // Merge and sort cuts from all threads
     std::vector<std::pair<double, Cut>> final_cuts;
@@ -345,7 +318,7 @@ void LimitedMemoryRank1Cuts::separate(const SparseMatrix &A,
             [](const auto &a, const auto &b) { return a.first > b.first; });
 
     // Add top cuts
-    const int max_cuts = 2;
+    const int max_cuts = 3;
     for (int i = 0; i < std::min(max_cuts, static_cast<int>(final_cuts.size()));
          ++i) {
         cutStorage.addCut(final_cuts[i].second);
@@ -369,41 +342,49 @@ void LimitedMemoryRank1Cuts::separateBG(
 
     auto cuts = &cutStorage;
     auto cuts_after_separation = cuts->size();
+    generator->cutter = &cutStorage;
     generator->setArcDuals(arc_duals);
     generator->setNodes(nodes);
-    generator->max_heuristic_sep_mem4_row_rank1 = 8;
+    generator->max_heuristic_sep_mem4_row_rank1 = 10;
     generator->initialize(allPaths);
     generator->generateSepHeurMem4Vertex();
     generator->generateCutsInBackground();
 }
 
-bool LimitedMemoryRank1Cuts::getCutsBG() {
+bool LimitedMemoryRank1Cuts::getCutsBG(
+    BNBNode *node, std::vector<baldesCtrPtr> &SRCconstraints) {
     if (!generator->readyGeneratedCuts()) {
         cuts_harvested = false;
         return false;
     }
 
-    std::vector<double> solution;
-
     cuts_harvested = true;
 
-    auto cuts = &cutStorage;
-    auto cuts_before = cuts->size();
+    auto cuts_before = cutStorage.size();
 
-    auto cutsBG = generator->returnBGcuts();
+    // auto cutsBG = generator->returnBGcuts();
 
-    n_high_order = cutsBG.size();
-    if (n_high_order == 0) {
-        return false;
+    // n_high_order = cutsBG.size();
+    // if (n_high_order == 0) {
+    //     return false;
+    // }
+
+    for (auto i = 0.6; i <= 0.90; i += 0.15) {
+        generator->setMemFactor(i);
+        generator->constructMemoryVertexBased();
+        auto cutsBG = generator->getCuts();
+        auto generated_cuts = processCuts(cutsBG);
+        if (generated_cuts > 0) {
+            break;
+        }
     }
-    // print_info("Processing {} background cuts\n", cutsBG.size());
-    processCuts(cutsBG);
 
-    auto cuts_after_separation = cuts->size();
-    auto cuts_changed = cuts_after_separation - cuts_before;
+    n_high_order = cutStorage.size() - cuts_before;
 
+    // Start generating cuts in the background again
+    // separateBG(node, SRCconstraints);
     // cuts->updateActiveCuts();
-    if (cuts_changed > 0) {
+    if (cutStorage.changed) {
         return true;
     }
     return false;
@@ -411,53 +392,82 @@ bool LimitedMemoryRank1Cuts::getCutsBG() {
 
 std::pair<bool, bool> LimitedMemoryRank1Cuts::runSeparation(
     BNBNode *node, std::vector<baldesCtrPtr> &SRCconstraints) {
-    auto cuts = &cutStorage;
+    auto &cuts = cutStorage;  // Use reference to avoid pointer syntax
     ModelData matrix = node->extractModelDataSparse();
-    auto cuts_before = cuts->size();
+    int initial_cut_count = cuts.size();
     std::vector<double> solution;
     GET_SOL(node);
-    separateR1C1(matrix.A_sparse, solution);
-    separate(matrix.A_sparse, solution);
-    auto cuts_after_separation = cuts->size();
 
-    // if (cuts_after_separation != cuts_before) {
-    //     bool cleared = cutCleaner(node, SRCconstraints);
-    //     return std::make_pair(true, cleared);
+    // Perform separation for rank-1 cuts
+    // separateR1C1(matrix.A_sparse, solution);
+    separate(matrix.A_sparse, solution);
+
+    int cuts_after_separation = cuts.size();
+
+    size_t i = 0;
+    std::for_each(allPaths.begin(), allPaths.end(),
+                  [&](auto &path) { path.frac_x = solution[i++]; });
+
+    // generator->cutter = &cutStorage;
+    // generator->setArcDuals(arc_duals);
+    // generator->setNodes(nodes);
+    // generator->max_heuristic_sep_mem4_row_rank1 = 12;
+    // generator->initialize(allPaths);
+    // generator->generateSepHeurMem4Vertex();
+    // // generator->generateCutsInBackground();
+    // generator->getHighDimCuts();
+
+    // for (auto i = 0.60; i <= 0.90; i += 0.15) {
+    //     generator->setMemFactor(i);
+    //     generator->constructMemoryVertexBased();
+    //     auto cutsBG = generator->getCuts();
+    //     auto generated_cuts = processCuts(cutsBG);
+    //     if (generated_cuts > 0) {
+    //         break;
+    //     }
     // }
 
-    if (cuts_harvested) {
-        cuts_before -= n_high_order;
-        cuts_after_separation -= n_high_order;
-    }
+    // n_high_order = cutStorage.size() - cuts_after_separation;
 
-    if (!cuts_harvested) {
+    // Adjust cut counts if high-order cuts were harvested
+    if (cuts_harvested) {
+        initial_cut_count -= n_high_order;
+        cuts_after_separation -= n_high_order;
+    } else {
         bool readGeneration = generator->readyGeneratedCuts();
         if (readGeneration) {
-            auto cutsBG = generator->returnBGcuts();
-            // print_info("Processing {} background cuts\n", cutsBG.size());
             cuts_harvested = true;
-            n_high_order = cutsBG.size();
-            if (n_high_order > 0) {
-                processCuts(cutsBG);
+            for (auto i = 0.70; i <= 0.90; i += 0.15) {
+                generator->setMemFactor(i);
+                generator->constructMemoryVertexBased();
+                auto cutsBG = generator->getCuts();
+                auto generated_cuts = processCuts(cutsBG);
+                if (generated_cuts > 0) {
+                    break;
+                }
             }
+            n_high_order = cutStorage.size() - cuts_after_separation;
+
         } else {
             separateBG(node, SRCconstraints);
             cuts_harvested = false;
         }
     }
 
-    ////////////////////////////////////////////////////
-    // Handle non-violated cuts in a single pass
-    ////////////////////////////////////////////////////
-    int cuts_after = cuts_after_separation + n_high_order;
-    bool cleared = cutCleaner(node, SRCconstraints);
-    int n_cuts_removed = cuts_after - cuts->size();
+    // Clean up non-violated cuts in a single pass
+    int total_cuts_after_separation = cuts_after_separation + n_high_order;
+    bool cleared = false;
+    int n_cuts_removed = 0;
 
-    // Simplify the final check
-    bool cuts_changed = (cuts_before != cuts->size() + n_cuts_removed);
-    if (!cuts_harvested) {
-        cuts_changed = true;
-    }
+    // Clean cuts if necessary
+    // if (cuts.size() > 100) {  // Replace 100 with a named constant
+    cleared = cutCleaner(node, SRCconstraints);
+    n_cuts_removed = total_cuts_after_separation - cuts.size();
+    // }
+
+    // Determine if cuts have changed
+    bool cuts_changed = cuts.changed;
+
     return std::make_pair(cuts_changed, cleared);
 }
 
@@ -477,7 +487,7 @@ bool LimitedMemoryRank1Cuts::cutCleaner(
 
         // If the slack is positive, it means the constraint is not
         // violated
-        if (slack > 0) {
+        if (slack > 1e-3) {
             cleaned = true;
             node->remove(constr);
             cuts->removeCut(cuts->getID(

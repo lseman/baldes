@@ -137,9 +137,14 @@ struct ActiveCutInfo {
     size_t index;        // Original index in cuts vector
     const Cut *cut_ptr;  // Pointer to the cut
     double dual_value;   // Cached dual value
+    CutType type;        // Type of the cut
+    ActiveCutInfo(size_t idx, const Cut *ptr, double dual, CutType type)
+        : index(idx), cut_ptr(ptr), dual_value(dual), type(type) {}
 
-    ActiveCutInfo(size_t idx, const Cut *ptr, double dual)
-        : index(idx), cut_ptr(ptr), dual_value(dual) {}
+    bool isSRCset(int i, int j) const {
+        return cut_ptr->baseSet[i / 64] & (1ULL << (i % 64)) &&
+               cut_ptr->baseSet[j / 64] & (1ULL << (j % 64));
+    }
 };
 
 /**
@@ -154,6 +159,7 @@ struct ActiveCutInfo {
 class CutStorage {
    public:
     int latest_column = 0;
+    bool changed = 0;
     CutStorage cloneCuts() const {
         CutStorage clonedStorage;
 
@@ -305,7 +311,8 @@ class CutStorage {
 
         for (size_t i = 0; i < cuts.size(); ++i) {
             if (i < SRCDuals.size() && SRCDuals[i] <= -1e-3) {
-                active_cuts.emplace_back(i, &cuts[i], SRCDuals[i]);
+                active_cuts.emplace_back(i, &cuts[i], SRCDuals[i],
+                                         cuts[i].type);
             }
         }
     }

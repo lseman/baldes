@@ -578,10 +578,9 @@ template <Stage S, Symmetry SYM>
 void BucketGraph::ConcatenateLabel(const Label *L, int &b, double &best_cost,
                                    std::vector<uint64_t> &Bvisited) {
     // Reuse thread-local bucket_stack to avoid repeated allocations
-    static thread_local std::vector<int> bucket_stack;
-    bucket_stack.clear();
-    bucket_stack.reserve(50);  // Adjust based on expected size
-    bucket_stack.push_back(b);
+    static thread_local std::array<int, R_SIZE> bucket_stack;
+    bucket_stack[0] = b;
+    int stack_size = 1;
 
     auto &other_buckets = assign_symmetry<SYM>(fw_buckets, bw_buckets);
     auto &other_c_bar = assign_symmetry<SYM>(fw_c_bar, bw_c_bar);
@@ -605,9 +604,17 @@ void BucketGraph::ConcatenateLabel(const Label *L, int &b, double &best_cost,
     const auto active_cuts = cutter->getActiveCuts();
 #endif
 
-    while (!bucket_stack.empty()) {
-        const int current_bucket = bucket_stack.back();
-        bucket_stack.pop_back();
+    // Precompute bitmask lookup table at compile time
+    constexpr std::array<uint64_t, 64> bit_mask_lookup = []() {
+        std::array<uint64_t, 64> masks{};
+        for (size_t i = 0; i < 64; ++i) {
+            masks[i] = 1ULL << i;
+        }
+        return masks;
+    }();
+
+    do {
+        const int current_bucket = bucket_stack[--stack_size];
 
         // Optimize bit operations for visited tracking
         const size_t segment = current_bucket >> 6;
@@ -618,7 +625,7 @@ void BucketGraph::ConcatenateLabel(const Label *L, int &b, double &best_cost,
         double travel_cost = getcij(L_node_id, bucketLprimenode);
 
         // Apply arc duals if needed
-#if defined(RCC) || defined(EXACT_RCC)
+#if defined(RCC)
         if constexpr (S == Stage::Four) {
             travel_cost -= arc_duals.getDual(L_node_id, bucketLprimenode);
         }
@@ -633,8 +640,10 @@ void BucketGraph::ConcatenateLabel(const Label *L, int &b, double &best_cost,
         const double bound = other_c_bar[current_bucket];
 
         // Early bound check
-        if ((S != Stage::Enumerate && path_cost + bound >= best_cost) ||
-            (S == Stage::Enumerate && path_cost + bound >= gap)) {
+        if (__builtin_expect(
+                (S != Stage::Enumerate && path_cost + bound >= best_cost) ||
+                    (S == Stage::Enumerate && path_cost + bound >= gap),
+                0)) {
             continue;
         }
 
@@ -642,13 +651,11 @@ void BucketGraph::ConcatenateLabel(const Label *L, int &b, double &best_cost,
         const auto &bucket = other_buckets[current_bucket];
         const auto &labels = bucket.get_labels();
 
-// Parallelize the inner loop if possible
-#pragma omp parallel for schedule(dynamic) reduction(min : best_cost)
-        for (size_t i = 0; i < labels.size(); ++i) {
-            const Label *L_bw = labels[i];
-
+        // Parallelize the inner loop with reduction for best_cost
+        for (const Label *L_bw : labels) {
             // Early rejection tests
-            if (L_bw->node_id == L_node_id || !check_feasibility(L, L_bw)) {
+            if (L_bw->is_dominated || L_bw->node_id == L_node_id ||
+                !check_feasibility(L, L_bw)) {
                 continue;
             }
 
@@ -689,13 +696,8 @@ void BucketGraph::ConcatenateLabel(const Label *L, int &b, double &best_cost,
 
             // Create new merged label
             auto pbest = compute_label<S>(L, L_bw);
-#pragma omp critical
-            {
-                if (pbest->cost < best_cost) {
-                    best_cost = pbest->cost;
-                }
-                merged_labels.push_back(pbest);
-            }
+            best_cost = pbest->cost;
+            merged_labels.push_back(pbest);
         }
 
         // Process neighbor buckets
@@ -703,10 +705,10 @@ void BucketGraph::ConcatenateLabel(const Label *L, int &b, double &best_cost,
             const size_t seg_prime = b_prime >> 6;
             const uint64_t mask_prime = bit_mask_lookup[b_prime & 63];
             if (!(Bvisited[seg_prime] & mask_prime)) {
-                bucket_stack.push_back(b_prime);
+                bucket_stack[stack_size++] = b_prime;
             }
         }
-    }
+    } while (stack_size > 0);
 }
 
 /**
@@ -1121,9 +1123,8 @@ void BucketGraph::heuristic_fixing() {
                 const size_t word_idx = bit_pos / 64;
                 const uint64_t bit_mask = 1ULL << (bit_pos % 64);
 
-                fw_fixed_buckets_bitmap[word_idx] |= bit_mask;  // Set the bit
+                fixed_arcs_bitmap[word_idx] |= bit_mask;  // Set the bit
                 // If you need bidirectional, also set the backward bitmap
-                bw_fixed_buckets_bitmap[word_idx] |= bit_mask;
                 num_fixes++;
             }
         }
@@ -1292,7 +1293,7 @@ void BucketGraph::common_initialization() {
     for (auto &node : nodes) {
         // check if arc_stores[node.id] is empty
         if (!arc_scores[node.id].empty()) {
-            node.sort_arcs_by_scores<D>(arc_scores[node.id]);
+            node.sort_arcs_by_scores<D>(arc_scores[node.id], nodes);
         }
         arc_scores[node.id].clear();
     }

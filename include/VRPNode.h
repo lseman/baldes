@@ -60,10 +60,12 @@ struct VRPNode {
 
     template <Direction D>
     void sort_arcs_by_scores(
-        const ankerl::unordered_dense::map<Arc, int, arc_hash> &arc_scores) {
-        auto get_score = [&arc_scores](const Arc &arc) {
+        const ankerl::unordered_dense::map<Arc, int, arc_hash> &arc_scores,
+        std::vector<VRPNode> &nodes) {
+        auto get_score = [&arc_scores, &nodes](const Arc &arc) {
             auto it = arc_scores.find(arc);
-            auto scores = (it != arc_scores.end()) ? it->second : 0;
+            auto scores = 0;  //-nodes[arc.to].cost / 100;
+            scores += (it != arc_scores.end()) ? it->second : 0;
             return scores;
         };
 

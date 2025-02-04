@@ -571,7 +571,7 @@ void IPSolver::run_optimization(ModelData &model, const double tol) {
         double c_norm = c.lpNorm<Eigen::Infinity>();
 
         // Adaptive tolerance computation
-        double adaptive_tol = std::max(min_tol, initial_tol * scale_factor);
+        double adaptive_tol = 1e-8;
 
         // Combined residual computations
         bl_dot_lambda = b.dot(lambda) - ubv.dot(w);

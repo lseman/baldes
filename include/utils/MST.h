@@ -21,6 +21,7 @@
 #include <vector>
 
 #include "Common.h"
+#include "VRPNode.h"
 
 class MST {
    public:

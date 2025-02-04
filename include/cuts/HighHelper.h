@@ -84,11 +84,6 @@ struct Rank1MultiLabel {
     Rank1MultiLabel() = default;
 };
 
-struct Cluster {
-    std::vector<int> vertices;
-    double avg_cost;
-};
-
 struct MoveResult {
     double violation_score;
     std::variant<std::monostate, int, std::pair<int, int>> operation_data;
