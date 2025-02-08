@@ -41,58 +41,6 @@
 #include "../third_party/small_vector.hpp"
 #include "BucketUtils.h"
 
-inline auto computeThreshold(int iteration, double inner_obj,
-                             const Stats &stats) {
-    // Constants for threshold computation
-    const double INITIAL_BASE = -5.0;
-    const double DECAY_RATE = 0.001;
-    const double MIN_THRESHOLD = -5.0;
-    const double MAX_THRESHOLD = -1.0;
-    const double STAGNATION_TARGET = -1.5;
-    const int STAGNATION_WINDOW =
-        10;  // Number of iterations to check for stagnation
-
-    // Base threshold with exponential decay
-    double base = INITIAL_BASE * std::exp(-DECAY_RATE * iteration);
-
-    // Adjust based on recent progress
-    double progress_factor = 1.0;
-    if (stats.hasHistory()) {
-        double avg_improvement = stats.getRecentImprovement(STAGNATION_WINDOW);
-        progress_factor = std::max(0.5, std::min(1.5, avg_improvement));
-    }
-
-    // Add dynamic component based on current inner_obj value
-    double dynamic_component = 0.01 * std::log(1 + std::abs(inner_obj));
-
-    // Combine components to compute the initial threshold
-    double threshold = base * progress_factor + dynamic_component;
-
-    // Check for stagnation in the objective value
-    static double prev_inner_obj = inner_obj;
-    static int stagnation_counter = 0;
-
-    if (std::abs(inner_obj - prev_inner_obj) < 1e-6) {
-        stagnation_counter++;
-    } else {
-        stagnation_counter = 0;  // Reset if there's improvement
-    }
-    prev_inner_obj = inner_obj;
-
-    // If stagnation is detected, gradually move the threshold toward -1.5
-    if (stagnation_counter >= STAGNATION_WINDOW) {
-        double stagnation_factor =
-            static_cast<double>(stagnation_counter - STAGNATION_WINDOW) /
-            STAGNATION_WINDOW;
-        threshold =
-            threshold + stagnation_factor * (STAGNATION_TARGET - threshold);
-    }
-
-    // Ensure the threshold stays within bounds
-    threshold = std::max(MIN_THRESHOLD, std::min(MAX_THRESHOLD, threshold));
-    print_info("Computed threshold: {}\n", threshold);
-    return threshold;
-}
 /**
  * Solves the bucket graph optimization problem using a multi-stage bi-labeling
  * algorithm.
@@ -105,21 +53,12 @@ inline auto computeThreshold(int iteration, double inner_obj,
  */
 template <Symmetry SYM>
 inline std::vector<Label *> BucketGraph::solve(bool trigger) {
-    iteration++;
     // Initialize the status as not optimal at the start
     status = Status::NotOptimal;
     if (trigger) {
         transition = true;
         fixed = false;
     }
-
-    // check for no_progress_counter on relaxation
-    if (std::abs(relaxation - old_relaxation) < 1e-3) {
-        no_progress_counter++;
-    } else {
-        no_progress_counter = 0;
-    }
-    old_relaxation = relaxation;
 
     updateSplit();  // Update the split values for the bucket graph
 
@@ -175,7 +114,7 @@ inline std::vector<Label *> BucketGraph::solve(bool trigger) {
         }
     }
     // Stage 4: Exact labeling algorithm with fixing enabled (Stage::Four)
-    else if (s4) {
+    else {
         stage = 4;
 
 #ifdef FIX_BUCKETS
@@ -211,22 +150,7 @@ inline std::vector<Label *> BucketGraph::solve(bool trigger) {
         }
         // If the objective improves sufficiently, set the status to separation
         // or optimal
-        //
-        stats.addIteration(inner_obj);
-
-        auto threshold = -1.0;  // computeThreshold(iteration, inner_obj,
-                                // stats);
-        // fmt::print("Threshold: {}\n", threshold);
-        // separation
-        // if (no_progress_counter > NO_PROGRESS_THRESHOLD) {
-        //     print_info("No progress counter exceeded\n");
-        //     ss = true;
-        //     status = Status::Separation;  // If no progress, set status to
-        //                                   // separation
-        //                                   // optimal
-        //     no_progress_counter = 0;
-        // } else
-        if (inner_obj > threshold) {
+        if (inner_obj > -5.0) {
             ss = true;  // Enter separation mode (for SRC handling)
 #if !defined(SRC) && !defined(SRC3)
             status = Status::Optimal;  // If SRC is not defined, set status to
@@ -234,11 +158,8 @@ inline std::vector<Label *> BucketGraph::solve(bool trigger) {
             return paths;              // Return the optimal paths
 #endif
             status = Status::Separation;  // If SRC is defined, set status to
+                                          // separation
         }
-    } else if (enumerate) {
-        stage = 5;
-        paths = bi_labeling_algorithm<Stage::Enumerate>();
-        status = Status::Optimal;
     }
 
     iter++;  // Increment the iteration counter
@@ -266,8 +187,8 @@ inline std::vector<Label *> BucketGraph::solveHeuristic() {
                                                       // Stage 1 heuristic
         inner_obj = paths[0]->cost;
 
-        // Transition from Stage 1 to Stage 2 if the objective improves or
-        // after 10 iterations
+        // Transition from Stage 1 to Stage 2 if the objective improves or after
+        // 10 iterations
         if (inner_obj >= -5 || iter >= 10) {
             s1 = false;
             s2 = true;  // Move to Stage 2
@@ -281,8 +202,8 @@ inline std::vector<Label *> BucketGraph::solveHeuristic() {
                                                       // Stage 2 heuristic
         inner_obj = paths[0]->cost;
 
-        // Transition from Stage 2 to Stage 3 if the objective improves or
-        // after 800 iterations
+        // Transition from Stage 2 to Stage 3 if the objective improves or after
+        // 800 iterations
         if (inner_obj >= -100 || iter > 800) {
             status = Status::Optimal;
         }
@@ -299,7 +220,7 @@ inline std::vector<Label *> BucketGraph::solveHeuristic() {
  */
 template <Direction D, Stage S, Full F>
 std::vector<double> BucketGraph::labeling_algorithm() {
-    // Cache references to avoid repeated lookups
+    // Get references to avoid repeated lookups
     auto &buckets = assign_buckets<D>(fw_buckets, bw_buckets);
     auto &ordered_sccs = assign_buckets<D>(fw_ordered_sccs, bw_ordered_sccs);
     auto &topological_order =
@@ -323,9 +244,7 @@ std::vector<double> BucketGraph::labeling_algorithm() {
 
     // Use small vector optimization for new labels
     std::vector<Label *> new_labels;
-    new_labels.reserve(16);  // Adjust capacity based on expected size
-
-    const auto q_star_value = q_star[options.main_resources[0]];
+    new_labels.reserve(8);
 
     // Process SCCs in topological order
     for (const auto &scc_index : topological_order) {
@@ -335,23 +254,24 @@ std::vector<double> BucketGraph::labeling_algorithm() {
 
             // Process buckets in sorted order within SCC
             for (const auto bucket : sorted_sccs[scc_index]) {
+                // Cache bucket labels reference
                 const auto &bucket_labels = buckets[bucket].get_labels();
-                const std::span<Label *const> labels_span{bucket_labels};
 
-                for (Label *label : labels_span) {
-                    if (label->is_extended || label->is_dominated) {
-                        continue;
-                    }
+                for (Label *label : bucket_labels) {
+                    if (label->is_extended || label->is_dominated) continue;
 
                     // Early resource check for partial solutions
                     if constexpr (F != Full::PSTEP && F != Full::TSP) {
                         if constexpr (F == Full::Partial) {
                             const auto main_resource =
                                 label->resources[options.main_resources[0]];
+                            const auto q_star_value =
+                                q_star[options.main_resources[0]];
+
                             if (((D == Direction::Forward) &&
                                  (main_resource > q_star_value)) ||
                                 ((D == Direction::Backward) &&
-                                 (main_resource < q_star_value))) {
+                                 (main_resource <= q_star_value))) {
                                 label->set_extended(true);
                                 continue;
                             }
@@ -369,16 +289,17 @@ std::vector<double> BucketGraph::labeling_algorithm() {
                     // Check dominance in smaller buckets
                     if constexpr (F != Full::TSP) {
                         if (DominatedInCompWiseSmallerBuckets<D, S>(
-                                label, bucket, c_bar, Bvisited, ordered_sccs,
-                                stat_n_dom)) {
-                            label->set_domination(true);
-                            label->set_extended(true);
+                                label, bucket, c_bar, Bvisited, stat_n_dom)) {
+                            // buckets[label->vertex].lazy_flush(label);
+                            // label->set_extended(true);
+                            label->set_dominated(true);
                             continue;
                         }
                     }
 
                     // Process arcs for current label
-                    const int node_id = label->node_id;
+                    auto node_id = label->node_id;
+
                     const auto &node_arcs =
                         nodes[node_id].template get_arcs<D>(scc_index);
 
@@ -428,27 +349,11 @@ std::vector<double> BucketGraph::labeling_algorithm() {
                                                   cut_storage,
                                                   options.resources.size());
 #else
-                                        for (size_t i = 0; i < labels.size();
-                                             ++i) {
-                                            // Prefetch 4-8 labels ahead for L1
-                                            // cache
-                                            if (i + 6 < labels.size()) {
-                                                // Prefetch the label data
-                                                // structure itself
-                                                __builtin_prefetch(
-                                                    labels[i + 6], 0,
-                                                    3);  // Read (0), High
-                                                         // locality (3)
-                                                // Prefetch the resources array
-                                                __builtin_prefetch(
-                                                    labels[i + 6]
-                                                        ->resources.data(),
-                                                    0, 3);
+                                        for (auto *existing_label : labels) {
+                                            if (existing_label->is_dominated) {
+                                                continue;
                                             }
-
-                                            auto *existing_label = labels[i];
-                                            if (!existing_label->is_dominated &&
-                                                is_dominated<D, S>(
+                                            if (is_dominated<D, S>(
                                                     new_label,
                                                     existing_label)) {
                                                 ++stat_n_dom;
@@ -464,16 +369,6 @@ std::vector<double> BucketGraph::labeling_algorithm() {
                                     stat_n_dom);
                             }
 
-                            // create lambda that receive label and set its
-                            // children to dominated, recursively
-                            auto set_domination_child =
-                                [&](Label *label, auto &self) -> void {
-                                label->set_domination(true);
-                                for (auto &child : label->children) {
-                                    self(child, self);
-                                }
-                            };
-
                             if (!dominated) {
                                 if constexpr (S != Stage::Enumerate) {
                                     for (auto *existing_label :
@@ -483,11 +378,9 @@ std::vector<double> BucketGraph::labeling_algorithm() {
                                         }
                                         if (is_dominated<D, S>(existing_label,
                                                                new_label)) {
-                                            existing_label->set_domination(
-                                                true);
-                                            // set_domination_child(
-                                            //     existing_label,
-                                            //     set_domination_child);
+                                            // buckets[to_bucket].remove_label(
+                                            //     existing_label);
+                                            existing_label->set_dominated(true);
                                         }
                                     }
                                 }
@@ -507,6 +400,7 @@ std::vector<double> BucketGraph::labeling_algorithm() {
                     }
                     label->set_extended(true);
                 }
+                // buckets[bucket].flush();
             }
         } while (!all_ext);
 
@@ -583,9 +477,9 @@ std::vector<Label *> BucketGraph::bi_labeling_algorithm() {
     }
 
     const size_t n_segments = (fw_buckets_size + 63) / 64;
-    std::vector<uint64_t> Bvisited(n_segments, 0);  // Initialize to 0
+    std::vector<uint64_t> Bvisited(n_segments);
 
-    double best_cost = 0;
+    double best_cost = std::numeric_limits<double>::infinity();
     for (int bucket = 0; bucket < fw_buckets_size; ++bucket) {
         const auto &bucket_labels = fw_buckets[bucket].get_labels();
 
@@ -597,14 +491,14 @@ std::vector<Label *> BucketGraph::bi_labeling_algorithm() {
             if (L->is_dominated) {
                 continue;
             }
-
             const auto &to_arcs =
                 nodes[L->node_id].get_arcs<Direction::Forward>();
+
             for (const auto &arc : to_arcs) {
                 const int to_node = arc.to;
 
                 if constexpr (S == Stage::Three || S == Stage::Eliminate) {
-                    if (is_arc_fixed(L->node_id, to_node) == 1) {
+                    if (fixed_arcs[L->node_id][to_node] == 1) {
                         continue;
                     }
                 }
@@ -615,8 +509,8 @@ std::vector<Label *> BucketGraph::bi_labeling_algorithm() {
                 for (Label *L_prime : extended_labels) {
                     int bucket_to_process =
                         L_prime->vertex;  // Create mutable copy
-                    std::fill(Bvisited.begin(), Bvisited.end(),
-                              0);  // Reset Bvisited efficiently
+                    std::memset(Bvisited.data(), 0,
+                                n_segments * sizeof(uint64_t));
                     ConcatenateLabel<S, SYM>(L, bucket_to_process, best_cost,
                                              Bvisited);
                 }
@@ -624,7 +518,6 @@ std::vector<Label *> BucketGraph::bi_labeling_algorithm() {
         }
     }
 
-    // Sort merged_labels by cost
     pdqsort(merged_labels.begin(), merged_labels.end(),
             [](const Label *a, const Label *b) { return a->cost < b->cost; });
 
@@ -649,6 +542,7 @@ std::vector<Label *> BucketGraph::bi_labeling_algorithm() {
 #endif
 
 #ifdef RIH
+
     if constexpr (S == Stage::Four) {
         std::vector<Label *> top_labels;
         top_labels.reserve(N_ADD);
@@ -661,7 +555,6 @@ std::vector<Label *> BucketGraph::bi_labeling_algorithm() {
             }
             top_labels.push_back(merged_labels[i]);
         }
-        ils->cut_storage = cut_storage->cloneCuts();
         ils->submit_task(top_labels, nodes);
     }
 #endif
@@ -683,9 +576,6 @@ inline std::vector<Label *> BucketGraph::Extend(
         std::conditional_t<A == ArcType::Jump, JumpArc, Arc>> &gamma,
     int depth) noexcept {
     static thread_local std::vector<double> new_resources;
-    if (new_resources.capacity() < options.resources.size()) {
-        new_resources.reserve(options.resources.size());
-    }
     new_resources.resize(options.resources.size());
 
     const int initial_node_id = L_prime->node_id;
@@ -722,14 +612,11 @@ inline std::vector<Label *> BucketGraph::Extend(
     }
 
     if constexpr (S == Stage::Three || S == Stage::Eliminate) {
-        if constexpr (D == Direction::Forward) {
-            if (is_arc_fixed(initial_node_id, node_id)) {
-                return {};
-            }
-        } else {
-            if (is_arc_fixed(node_id, initial_node_id)) {
-                return {};
-            }
+        if ((D == Direction::Forward &&
+             fixed_arcs[initial_node_id][node_id] == 1) ||
+            (D == Direction::Backward &&
+             fixed_arcs[node_id][initial_node_id] == 1)) {
+            return {};
         }
     }
 
@@ -831,12 +718,10 @@ inline std::vector<Label *> BucketGraph::Extend(
 
     // Handle Reverse case
     if constexpr (F == Full::Reverse) {
-        // if (S < Stage::Four) {
-        if (new_resources[options.main_resources[0]] <
+        if (new_resources[options.main_resources[0]] <=
             q_star[options.main_resources[0]]) {
             return {};
         }
-        // }
         auto &label_pool = assign_buckets<D>(label_pool_fw, label_pool_bw);
         auto new_label = label_pool->acquire();
         new_label->vertex = to_bucket;
@@ -853,7 +738,7 @@ inline std::vector<Label *> BucketGraph::Extend(
 
     if constexpr (M == Mutability::Mut) {
         new_label->parent = L_prime;
-        L_prime->children.push_back(new_label);
+        // L_prime->children.push_back(new_label);
     }
 
     // Handle visited bitmap
@@ -878,7 +763,7 @@ inline std::vector<Label *> BucketGraph::Extend(
     using simd_double = std::experimental::native_simd<double>;
     using simd_abi = std::experimental::simd_abi::native<double>;
     static constexpr size_t SIMD_WIDTH = simd_double::size();
-    static constexpr size_t SMALL_SIZE = 128;
+    static constexpr size_t SMALL_SIZE = 256;
 
     new_label->SRCmap = L_prime->SRCmap;
 
@@ -1002,118 +887,105 @@ inline std::vector<Label *> BucketGraph::Extend(
  *
  */
 template <Direction D, Stage S>
-inline bool BucketGraph::is_dominated(const Label *__restrict new_label,
-                                      const Label *__restrict label) noexcept {
-    // Early exit on cost check
-    const double cost_diff = label->cost - new_label->cost;
-    if (cost_diff > 0) {
-        return false;
+inline bool BucketGraph::is_dominated(const Label *new_label,
+                                      const Label *label) noexcept {
+    // Extract resources for the new label and the comparison label
+    const auto &new_resources = new_label->resources;
+    const auto &label_resources = label->resources;
+
+    {
+        // Simple cost check: if the comparison label has a higher cost, it
+        // is not dominated
+        if (label->cost > new_label->cost) {
+            return false;
+        }
     }
 
-    // Resource comparison using vectorization-friendly code
-    const auto *__restrict new_resources = new_label->resources.data();
-    const auto *__restrict label_resources = label->resources.data();
-    const size_t num_resources = options.resources.size();
-
-    // Process resources in chunks of 4 for vectorization
-    constexpr size_t vec_size = 4;
-    constexpr size_t num_vec_iterations = R_SIZE / vec_size;
-    size_t i = 0;
-
-    if constexpr (D == Direction::Forward) {
-        // Vector processing
-        for (; i < num_vec_iterations * vec_size; i += vec_size) {
-            bool any_greater = false;
-#pragma unroll
-            for (size_t j = 0; j < vec_size; ++j) {
-                any_greater |= (label_resources[i + j] > new_resources[i + j]);
-            }
-            if (any_greater) return false;
-        }
-        // Handle remaining elements
-        for (; i < num_resources; ++i) {
+    // Check resource conditions based on the direction (Forward or
+    // Backward)
+    for (size_t i = 0; i < options.resources.size(); ++i) {
+        if constexpr (D == Direction::Forward) {
+            // In Forward direction: the comparison label must not have more
+            // resources than the new label
             if (label_resources[i] > new_resources[i]) {
                 return false;
             }
-        }
-    } else {  // Direction::Backward
-        // Vector processing
-        for (; i < num_vec_iterations * vec_size; i += vec_size) {
-            bool any_less = false;
-#pragma unroll
-            for (size_t j = 0; j < vec_size; ++j) {
-                any_less |= (label_resources[i + j] < new_resources[i + j]);
-            }
-            if (any_less) return false;
-        }
-        // Handle remaining elements
-        for (; i < num_resources; ++i) {
+        } else if constexpr (D == Direction::Backward) {
+            // In Backward direction: the comparison label must not have
+            // fewer resources than the new label
             if (label_resources[i] < new_resources[i]) {
                 return false;
             }
         }
     }
 
+    // TODO:: check again this unreachable dominance
+#ifndef UNREACHABLE_DOMINANCE
+    // Check visited nodes (bitmap comparison) for Stages 3, 4, and
+    // Enumerate
     if constexpr (S == Stage::Three || S == Stage::Four ||
                   S == Stage::Enumerate) {
-        // Bitmap comparison using 64-bit operations
-        const auto *__restrict label_bits =
-            reinterpret_cast<const uint64_t *>(label->visited_bitmap.data());
-        const auto *__restrict new_label_bits =
-            reinterpret_cast<const uint64_t *>(
-                new_label->visited_bitmap.data());
-        const size_t size = (label->visited_bitmap.size() + 7) /
-                            8;  // Convert to uint64_t count
-
-        for (size_t i = 0; i < size; ++i) {
-            if ((label_bits[i] & ~new_label_bits[i]) != 0) {
+        // Iterate through the visited bitmap and ensure that the new label
+        // visits all nodes that the comparison label visits
+        for (size_t i = 0; i < label->visited_bitmap.size(); ++i) {
+            // If the comparison label visits a node that the new label does
+            // not, it is not dominated
+            if (((label->visited_bitmap[i] & new_label->visited_bitmap[i]) ^
+                 label->visited_bitmap[i]) != 0) {
                 return false;
             }
         }
     }
-
-#ifdef SRC
-    if constexpr (S == Stage::Four || S == Stage::Enumerate) {
-        const auto *__restrict label_srcs = label->SRCmap.data();
-        const auto *__restrict new_label_srcs = new_label->SRCmap.data();
-
-        // Process active cuts in batches for better cache utilization
-        double sum = 0.0;
-        const auto &active_cuts = cut_storage->getActiveCuts();
-        const size_t num_cuts = active_cuts.size();
-        const size_t batch_size = 4;
-        size_t i = 0;
-
-        // Process cuts in batches
-        for (; i + batch_size <= num_cuts; i += batch_size) {
-            double batch_sum = 0.0;
-#pragma unroll
-            for (size_t j = 0; j < batch_size; ++j) {
-                const auto &cut = active_cuts[i + j];
-                if (label_srcs[cut.index] > new_label_srcs[cut.index]) {
-                    batch_sum += cut.dual_value;
-                }
-            }
-            sum += batch_sum;
-            // Early exit if we can already determine non-dominance
-            if (label->cost - sum > new_label->cost) {
+#else
+    // Unreachable dominance logic: check visited and unreachable nodes in
+    // Stages 3, 4, and Enumerate
+    if constexpr (S == Stage::Three || S == Stage::Four ||
+                  S == Stage::Enumerate) {
+        for (size_t i = 0; i < label->visited_bitmap.size(); ++i) {
+            // Combine visited and unreachable nodes in the comparison
+            // label's bitmap
+            auto combined_label_bitmap =
+                label->visited_bitmap[i] | label->unreachable_bitmap[i];
+            // Ensure the new label visits all nodes that the comparison
+            // label (or its unreachable nodes) visits
+            if ((combined_label_bitmap & ~new_label->visited_bitmap[i]) != 0) {
                 return false;
-            }
-        }
-
-        // Handle remaining cuts
-        for (; i < num_cuts; ++i) {
-            const auto &cut = active_cuts[i];
-            if (label_srcs[cut.index] > new_label_srcs[cut.index]) {
-                sum += cut.dual_value;
-                if (label->cost - sum > new_label->cost) {
-                    return false;
-                }
             }
         }
     }
 #endif
 
+#ifdef SRC
+    if constexpr (S == Stage::Four || S == Stage::Enumerate) {
+        double sumSRC = 0;
+
+        const auto &SRCDuals = cut_storage->SRCDuals;
+        if (!SRCDuals.empty()) {
+            const auto &labelSRCMap = label->SRCmap;
+            const auto &newLabelSRCMap = new_label->SRCmap;
+            for (size_t i = 0; i < SRCDuals.size(); ++i) {
+                if (SRCDuals[i] == 0) {
+                    continue;
+                }
+                // const auto &den = cut_storage->getCut(i).p.den;
+                const auto labelMod = labelSRCMap[i];        // % den;
+                const auto newLabelMod = newLabelSRCMap[i];  // % den;
+                if (labelMod > newLabelMod) {
+                    sumSRC += SRCDuals[i];
+                    if (label->cost - sumSRC > new_label->cost) {
+                        return false;
+                    }
+                }
+            }
+        }
+        if (label->cost - sumSRC > new_label->cost) {
+            return false;
+        }
+    }
+#endif
+
+    // If all conditions are met, return true, indicating that the new label
+    // is dominated by the comparison label
     return true;
 }
 
@@ -1128,7 +1000,14 @@ inline bool BucketGraph::is_dominated(const Label *__restrict new_label,
  */
 template <typename T>
 inline bool precedes(const std::vector<std::vector<int>> &sccs, const T a,
-                     const T b, const UnionFind &uf) noexcept {
+                     const T b, const UnionFind &uf) {
+    // Step 2: Check if element `a`'s SCC precedes element `b`'s SCC
+    // size_t rootA = uf.getSubset(a);
+    // size_t rootB = uf.getSubset(b);
+
+    // You can define precedence based on the comparison of the root
+    // components
+    // return rootA < rootB;
     return uf.compareSubsets(a, b);
 }
 /**
@@ -1144,10 +1023,7 @@ template <Direction D, Stage S>
 inline bool BucketGraph::DominatedInCompWiseSmallerBuckets(
     const Label *__restrict__ L, int bucket,
     const std::vector<double> &__restrict__ c_bar,
-    std::vector<uint64_t> &__restrict__ Bvisited,
-    const std::vector<std::vector<int>> &__restrict__ bucket_order,
-    int &stat_n_dom) noexcept {
-    // Use references to avoid indirection
+    std::vector<uint64_t> &__restrict__ Bvisited, int &stat_n_dom) noexcept {
     const auto &buckets = assign_buckets<D>(fw_buckets, bw_buckets);
     const auto &Phi = assign_buckets<D>(Phi_fw, Phi_bw);
     const auto &uf = assign_buckets<D>(fw_union_find, bw_union_find);
@@ -1162,37 +1038,23 @@ inline bool BucketGraph::DominatedInCompWiseSmallerBuckets(
     int stack_size = 1;
     stack_buffer[0] = bucket;
 
-    // Precompute bitmask lookup table at compile time
-    constexpr std::array<uint64_t, 64> bit_mask_lookup = []() {
-        std::array<uint64_t, 64> masks{};
-        for (size_t i = 0; i < 64; ++i) {
-            masks[i] = 1ULL << i;
-        }
-        return masks;
-    }();
-
     const auto check_dominance = [&](const std::vector<Label *> &labels) {
 #ifndef __AVX2__
         return check_dominance_against_vector<D, S>(L, labels, cut_storage,
                                                     res_size);
-#else
-        for (size_t i = 0; i < labels.size(); ++i) {
-            // Prefetch 4-8 labels ahead for L1 cache
-            if (i + 6 < labels.size()) {
-                __builtin_prefetch(labels[i + 6], 0,
-                                   3);  // Read (0), High locality (3)
-                __builtin_prefetch(labels[i + 6]->resources.data(), 0, 3);
-            }
-
-            auto *existing_label = labels[i];
-            if (!existing_label->is_dominated &&
-                is_dominated<D, S>(L, existing_label)) {
-                ++stat_n_dom;
-                return true;
-            }
-        }
-        return false;
 #endif
+        {
+            for (size_t i = 0; i < labels.size(); ++i) {
+                // Prefetch 4-8 labels ahead for L1 cache
+                auto *existing_label = labels[i];
+                if (!existing_label->is_dominated &&
+                    is_dominated<D, S>(L, existing_label)) {
+                    ++stat_n_dom;
+                    return true;
+                }
+            }
+            return false;
+        }
     };
 
     // Main processing loop with optimizations
@@ -1204,11 +1066,10 @@ inline bool BucketGraph::DominatedInCompWiseSmallerBuckets(
         const uint64_t bit = bit_mask_lookup[current_bucket & 63];
         Bvisited[segment] |= bit;
 
-        // Early exit check with likely hint for better branch prediction
-        if (__builtin_expect(
-                (label_cost < c_bar[current_bucket] &&
-                 ::precedes<int>(bucket_order, current_bucket, b_L, uf)),
-                0)) {
+        // Early exit check with likely hint for better branch
+        // prediction
+        if (likely(label_cost < c_bar[current_bucket] &&
+                   uf.compareSubsets(b_L, current_bucket))) {
             return false;
         }
 
@@ -1224,7 +1085,6 @@ inline bool BucketGraph::DominatedInCompWiseSmallerBuckets(
         const auto &neighbors = Phi[current_bucket];
         const size_t n_neighbors = neighbors.size();
 
-#pragma GCC ivdep
         for (size_t i = 0; i < n_neighbors; ++i) {
             const int b_prime = neighbors[i];
             const size_t word_idx_prime = static_cast<size_t>(b_prime) >> 6;
@@ -1273,6 +1133,25 @@ void BucketGraph::run_labeling_algorithms(std::vector<double> &forward_cbar,
         });
 
     stdexec::sync_wait(std::move(work));
+    // forward_cbar = labeling_algorithm<Direction::Forward, state, fullness>();
+    // backward_cbar = labeling_algorithm<Direction::Backward, state,
+    // fullness>();
+    //
+    // #pragma omp parallel sections
+    //     {
+    // #pragma omp section
+    //         {
+    //             forward_cbar =
+    //                 labeling_algorithm<Direction::Forward, state,
+    //                 fullness>();
+    //         }
+    // #pragma omp section
+    //         {
+    //             backward_cbar =
+    //                 labeling_algorithm<Direction::Backward, state,
+    //                 fullness>();
+    //         }
+    //     }
 }
 
 /**
@@ -1280,51 +1159,53 @@ void BucketGraph::run_labeling_algorithms(std::vector<double> &forward_cbar,
  *
  */
 template <Stage S>
-Label *BucketGraph::compute_label(const Label *L, const Label *L_prime) {
-    // Precompute common values
-    const double cij_cost = getcij(L->node_id, L_prime->node_id);
-    double new_cost = L->cost + L_prime->cost + cij_cost;
-    const double real_cost = L->real_cost + L_prime->real_cost + cij_cost;
+Label *BucketGraph::compute_label(const Label *L, const Label *L_prime,
+                                  double red_cost) {
+    double cij_cost = getcij(L->node_id, L_prime->node_id);
+    double real_cost = L->real_cost + L_prime->real_cost + cij_cost;
 
-    // Apply arc duals if applicable
-    if constexpr (S == Stage::Four) {
-#if defined(RCC) || defined(EXACT_RCC)
-        new_cost -= arc_duals.getDual(L->node_id, L_prime->node_id);
-#endif
-    }
-
-    // Apply branching duals if available
-    if (!branching_duals->empty()) {
-        new_cost -= branching_duals->getDual(L->node_id, L_prime->node_id);
-    }
-
-    // Acquire a new label and set its cost
+    // Directly acquire new_label and set the cost
     auto new_label = label_pool_fw->acquire();
-    new_label->cost = new_cost;
+    new_label->cost = red_cost;
     new_label->real_cost = real_cost;
+    new_label->nodes_covered.clear();
 
-    // Apply SRCDuals if applicable
-    if constexpr (S == Stage::Four) {
-#if defined(SRC)
-        const auto &active_cuts = cut_storage->getActiveCuts();
-        for (const auto &active_cut : active_cuts) {
-            const size_t idx = active_cut.index;
-            const auto &cut = *active_cut.cut_ptr;
-            if (L->SRCmap[idx] + L_prime->SRCmap[idx] >= cut.p.den) {
-                new_label->cost -= active_cut.dual_value;
-            }
-        }
-#endif
-    }
+    // // Start by inserting backward list elements
+    // size_t forward_size = 0;
+    // auto L_bw = L_prime;
+    // for (; L_bw != nullptr; L_bw = L_bw->parent) {
+    //     new_label->nodes_covered.push_back(
+    //         L_bw->node_id);  // Insert backward elements directly
+    //     if (L_bw->parent == nullptr && L_bw->fresh == false) {
+    //         for (size_t i = 0; i < L_bw->nodes_covered.size(); ++i) {
+    //             new_label->nodes_covered.push_back(L_bw->nodes_covered[i]);
+    //         }
+    //     }
+    // }
 
-    // Combine and reverse nodes_covered
-    new_label->nodes_covered.reserve(L->nodes_covered.size() +
-                                     L_prime->nodes_covered.size());
-    new_label->nodes_covered.assign(L->nodes_covered.begin(),
+    // // Now insert forward list elements in reverse order without using
+    // // std::reverse
+    // auto L_fw = L;
+    // for (; L_fw != nullptr; L_fw = L_fw->parent) {
+    //     new_label->nodes_covered.insert(
+    //         new_label->nodes_covered.begin(),
+    //         L_fw->node_id);  // Insert forward elements at the front
+    //     if (L_fw->parent == nullptr && L_fw->fresh == false) {
+    //         for (size_t i = 0; i < L_fw->nodes_covered.size(); ++i) {
+    //             new_label->nodes_covered.insert(
+    //                 new_label->nodes_covered.begin(),
+    //                 L_fw->nodes_covered[i]);
+    //         }
+    //     }
+    // }
+
+    new_label->nodes_covered = L_prime->nodes_covered;
+    //     reverse the nodes_covered
+    std::reverse(new_label->nodes_covered.begin(),
+                 new_label->nodes_covered.end());
+    new_label->nodes_covered.insert(new_label->nodes_covered.begin(),
+                                    L->nodes_covered.begin(),
                                     L->nodes_covered.end());
-    new_label->nodes_covered.insert(new_label->nodes_covered.end(),
-                                    L_prime->nodes_covered.rbegin(),
-                                    L_prime->nodes_covered.rend());
 
     return new_label;
 }

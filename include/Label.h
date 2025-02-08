@@ -48,7 +48,7 @@ struct Label {
     std::array<uint64_t, num_words> unreachable_bitmap = {0};
 #endif
 
-    std::vector<Label *> children;
+    // std::vector<Label *> children;
     // Constructor with node_id
     Label(int v, double c, const std::vector<double> &res, int pred,
           int node_id)
@@ -62,7 +62,8 @@ struct Label {
     Label() : vertex(-1), cost(0), resources({0.0}), node_id(-1) {}
 
     void set_extended(bool extended) { is_extended = extended; }
-    void set_domination(bool dom) { is_dominated = dom; }
+    void set_dominated(bool dominated) { is_dominated = dominated; }
+
     auto &getRoute() const { return nodes_covered; }
 
     void addRoute(const std::vector<int> &route) {
@@ -99,7 +100,7 @@ struct Label {
         this->is_dominated = false;
         this->nodes_covered.clear();
         this->nodes_covered.reserve(N_SIZE / 3);
-        this->children.clear();
+        // this->children.clear();
 
         std::memset(visited_bitmap.data(), 0,
                     visited_bitmap.size() * sizeof(uint64_t));

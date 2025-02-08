@@ -10,8 +10,6 @@
  */
 
 #pragma once
-#include <numeric>  // for std::iota
-
 #include "Common.h"
 
 class UnionFind {
@@ -23,7 +21,7 @@ class UnionFind {
         subset_index.resize(size, -1);
         rank.resize(size, 0);
 
-        // Initialize arrays - use std::iota for better performance with large
+        // Initialize arrays - use memset for better performance with large
         // sizes
         std::iota(parent.begin(), parent.end(), 0);
     }

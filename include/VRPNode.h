@@ -58,30 +58,6 @@ struct VRPNode {
 
     std::vector<double> consumption;
 
-    template <Direction D>
-    void sort_arcs_by_scores(
-        const ankerl::unordered_dense::map<Arc, int, arc_hash> &arc_scores,
-        std::vector<VRPNode> &nodes) {
-        auto get_score = [&arc_scores, &nodes](const Arc &arc) {
-            auto it = arc_scores.find(arc);
-            auto scores = 0;  //-nodes[arc.to].cost / 100;
-            scores += (it != arc_scores.end()) ? it->second : 0;
-            return scores;
-        };
-
-        if constexpr (D == Direction::Forward) {
-            pdqsort(fw_arcs.begin(), fw_arcs.end(),
-                    [&](const Arc &a, const Arc &b) {
-                        return get_score(a) > get_score(b);
-                    });
-        } else {
-            pdqsort(bw_arcs.begin(), bw_arcs.end(),
-                    [&](const Arc &a, const Arc &b) {
-                        return get_score(a) > get_score(b);
-                    });
-        }
-    }
-
     // default constructor
     VRPNode() = default;
 
@@ -95,6 +71,34 @@ struct VRPNode {
           duration(dur),
           cost(c),
           demand(d) {}
+
+    template <Direction D>
+    void sort_arcs_by_scores(
+        const ankerl::unordered_dense::map<Arc, int, arc_hash> &arc_scores,
+        std::vector<VRPNode> &nodes) {
+        auto get_score = [&arc_scores, &nodes](const Arc &arc) {
+            auto it = arc_scores.find(arc);
+            auto scores = 0;  //-nodes[arc.to].cost / 100;
+            scores += (it != arc_scores.end()) ? it->second : 0;
+            return scores;
+        };
+
+        if constexpr (D == Direction::Forward) {
+            for (auto &arcs : fw_arcs_scc) {
+                pdqsort(arcs.begin(), arcs.end(),
+                        [&](const Arc &a, const Arc &b) {
+                            return get_score(a) > get_score(b);
+                        });
+            }
+        } else {
+            for (auto &arcs : bw_arcs_scc) {
+                pdqsort(arcs.begin(), arcs.end(),
+                        [&](const Arc &a, const Arc &b) {
+                            return get_score(a) > get_score(b);
+                        });
+            }
+        }
+    }
 
     /**
      * @brief Adds an arc between two buckets with specified resource increments

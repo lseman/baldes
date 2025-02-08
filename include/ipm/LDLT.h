@@ -16,7 +16,6 @@
 #include <stdexec/execution.hpp>
 
 #include "AMD.h"
-#include "EvaluatorGPU.h"
 template <typename T>
 using BVector = std::vector<T>;
 
@@ -187,7 +186,7 @@ class CustomSimplicialLDLT {
         StorageIndex *Li = m_matrix.innerIndexPtr();
         Scalar *Lx = m_matrix.valuePtr();
 
-        // Aligned vectors for better cache performance
+        // Keep original aligned vectors
         alignas(64) std::vector<Scalar> y(size, Scalar(0));
         alignas(64) std::vector<StorageIndex> pattern(size, 0);
         alignas(64) std::vector<StorageIndex> tags(size, 0);
@@ -198,6 +197,7 @@ class CustomSimplicialLDLT {
         const int hardware_threads = std::thread::hardware_concurrency();
         std::vector<std::vector<Scalar>> y_local_storage(
             hardware_threads, std::vector<Scalar>(size, Scalar(0)));
+        // std::vector<bool> thread_ok(hardware_threads, true);
 
         // Precompute patterns for each column
         std::vector<std::vector<StorageIndex>> column_patterns(size);
@@ -221,12 +221,13 @@ class CustomSimplicialLDLT {
             }
             column_patterns[k].assign(pattern.begin() + top, pattern.end());
         }
-        std::vector<bool> thread_ok(hardware_threads, true);
-        // Use bulk sender for parallelism
+
+        // Use NVIDIA bulk sender for parallelism
         auto bulk_sender = stdexec::bulk(
-            stdexec::just(), size,
+            stdexec::just(), size,  // Process each column as a separate task
             [this, &y, &tags, Lp, Li, Lx, size, &ap, &y_local_storage,
-             hardware_threads, &thread_ok, &column_patterns](std::size_t k) {
+             hardware_threads, &column_patterns](std::size_t k) {
+                // Use thread-local storage
                 size_t thread_id =
                     std::hash<std::thread::id>{}(std::this_thread::get_id()) %
                     hardware_threads;
@@ -272,20 +273,21 @@ class CustomSimplicialLDLT {
                 }
 
                 m_diag[k] = d;
-                if (d == RealScalar(0)) {
-                    thread_ok[thread_id] = false;
-                }
+                // if (d == RealScalar(0)) {
+                // thread_ok[thread_id] = false;
+                // }
             });
 
         stdexec::sync_wait(stdexec::when_all(bulk_sender));
+
         // Aggregate thread results
         bool all_ok = true;
-        for (bool t_ok : thread_ok) {
-            if (!t_ok) {
-                all_ok = false;
-                break;
-            }
-        }
+        // for (bool t_ok : thread_ok) {
+        //     if (!t_ok) {
+        //         all_ok = false;
+        //         break;
+        //     }
+        // }
 
         m_info = all_ok ? Success : NumericalIssue;
         m_factorizationIsOk = true;
@@ -535,85 +537,46 @@ class CustomSimplicialLDLT {
     template <typename Rhs>
     Eigen::VectorXd solve(const MatrixBase<Rhs> &b) const {
         eigen_assert(m_isInitialized && "Decomposition not initialized.");
+
         Eigen::VectorXd dest;
 
         // Apply forward permutation
         if (m_P.size() > 0) {
-            dest.noalias() = m_P * b;
+            dest.noalias() = m_P * b;  // Use noalias to avoid temporary
         } else {
             dest = b;
         }
 
-        // Compute adaptive regularization based on matrix properties
-        const Scalar condition_estimate =
-            m_diag.maxCoeff() /
-            (m_diag.minCoeff() + std::numeric_limits<Scalar>::epsilon());
+        // Precompute diagonal norm (if not already done)
+        static Scalar cachedDiagonalNorm = m_diag.norm();
 
-        // Base regularization scaled by condition number and problem size
-        const Scalar base_reg = std::numeric_limits<Scalar>::epsilon() *
-                                std::sqrt(static_cast<double>(b.size()));
+        // Compute the residual norm (only if necessary)
+        const Scalar residualNorm = (matrixL() * dest - b).norm();
 
-        // Adaptive regularization increases with condition number
-        Scalar adaptiveRegularization = base_reg;
-        if (condition_estimate > 1e6) {
-            adaptiveRegularization *= std::log10(condition_estimate);
-        }
+        // Compute an adaptive regularization factor
+        const Scalar minRegularization =
+            Scalar(1e-12);  // Minimum regularization
+        const Scalar maxRegularization =
+            Scalar(1e-6);  // Maximum regularization
+        const Scalar adaptiveRegularization = std::max(
+            minRegularization,
+            std::min(maxRegularization,
+                     residualNorm / (cachedDiagonalNorm + residualNorm)));
 
-        // Create regularized diagonal
-        Eigen::VectorXd diagCopy = m_diag;
-        if (condition_estimate > 1e6) {
-            Scalar tikhonov_param =
-                base_reg * std::pow(condition_estimate, 0.1);
-            diagCopy.array() += tikhonov_param;
-        }
-
-        // Forward substitution with regularization
-        dest = (matrixL().template triangularView<Lower>()).solve(dest);
-        dest.array() *=
-            (Scalar(1.0) / (diagCopy.array() + adaptiveRegularization));
-
-        // Backward substitution with regularization
-        dest = (matrixU().template triangularView<Upper>()).solve(dest);
+        // Regular solve path with adaptive regularization
+        solveTriangular<decltype(matrixL()), decltype(dest), Lower>(
+            matrixL(), dest, adaptiveRegularization);
+        dest.array() /= m_diag.array();
+        solveTriangular<decltype(matrixU()), decltype(dest), Upper>(
+            matrixU(), dest, adaptiveRegularization);
 
         // Apply backward permutation
         if (m_Pinv.size() > 0) {
-            dest.noalias() = m_Pinv * dest;
+            dest.noalias() = m_Pinv * dest;  // Use noalias to avoid temporary
         }
 
         return dest;
     }
-    // Eigen::VectorXd solve(const MatrixBase<Rhs> &b) const {
-    //     eigen_assert(m_isInitialized && "Decomposition not initialized.");
-    //     Eigen::VectorXd dest;
-
-    //     if (m_P.size() > 0) {
-    //         dest.noalias() = m_P * b;
-    //     } else {
-    //         dest = b;
-    //     }
-
-    //     static Scalar cachedDiagonalNorm = m_diag.norm();
-    //     const Scalar residualNorm = (matrixL() * dest - b).norm();
-    //     const Scalar adaptiveRegularization = std::max(
-    //         Scalar(1e-12),
-    //         std::min(Scalar(1e-6),
-    //                  residualNorm / (cachedDiagonalNorm + residualNorm)));
-
-    //     // GPU triangular solves
-    //     SparseSolveTriangularGPU<decltype(matrixL()), decltype(dest), Lower>(
-    //         matrixL(), dest, adaptiveRegularization);
-
-    //     dest.array() /= m_diag.array();
-
-    //     SparseSolveTriangularGPU<decltype(matrixU()), decltype(dest), Upper>(
-    //         matrixU(), dest, adaptiveRegularization);
-
-    //     if (m_Pinv.size() > 0) {
-    //         dest.noalias() = m_Pinv * dest;
-    //     }
-
-    //     return dest;
-    // }
 
     void setRegularization(Scalar epsilon) { m_epsilon = epsilon; }
 

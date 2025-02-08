@@ -133,20 +133,6 @@ struct Cut {
 
 using Cuts = std::vector<Cut>;
 
-struct ActiveCutInfo {
-    size_t index;        // Original index in cuts vector
-    const Cut *cut_ptr;  // Pointer to the cut
-    double dual_value;   // Cached dual value
-    CutType type;        // Type of the cut
-    ActiveCutInfo(size_t idx, const Cut *ptr, double dual, CutType type)
-        : index(idx), cut_ptr(ptr), dual_value(dual), type(type) {}
-
-    bool isSRCset(int i, int j) const {
-        return cut_ptr->baseSet[i / 64] & (1ULL << (i % 64)) &&
-               cut_ptr->baseSet[j / 64] & (1ULL << (j % 64));
-    }
-};
-
 /**
  * @class CutStorage
  * @brief Manages the storage and operations related to cuts in a solver.
@@ -159,31 +145,20 @@ struct ActiveCutInfo {
 class CutStorage {
    public:
     int latest_column = 0;
-    bool changed = 0;
-    CutStorage cloneCuts() const {
-        CutStorage clonedStorage;
+    struct ActiveCutInfo {
+        size_t index;        // Original index in cuts vector
+        const Cut *cut_ptr;  // Pointer to the cut
+        double dual_value;   // Cached dual value
+        CutType type;        // Type of the cut
 
-        // Deep copy the cuts vector
-        clonedStorage.cuts.reserve(cuts.size());
-        for (const auto &cut : cuts) {
-            clonedStorage.cuts.push_back(
-                cut);  // Assuming Cut has a copy constructor
+        ActiveCutInfo(size_t idx, const Cut *ptr, double dual, CutType type)
+            : index(idx), cut_ptr(ptr), dual_value(dual), type(type) {}
+
+        bool isSRCset(int i, int j) const {
+            return cut_ptr->baseSet[i / 64] & (1ULL << (i % 64)) &&
+                   cut_ptr->baseSet[j / 64] & (1ULL << (j % 64));
         }
-
-        // Copy the cutMaster_to_cut_map
-        clonedStorage.cutMaster_to_cut_map = cutMaster_to_cut_map;
-
-        // Copy the indexCuts map
-        clonedStorage.indexCuts = indexCuts;
-
-        // Copy the SRCDuals vector
-        clonedStorage.SRCDuals = SRCDuals;
-
-        // Rebuild the active_cuts vector
-        clonedStorage.updateActiveCuts();
-
-        return clonedStorage;
-    }
+    };
 
     // Access a cut by index
     Cut &operator[](std::size_t index) {
@@ -260,12 +235,6 @@ class CutStorage {
                 entry.second--;
             }
         }
-
-        // // remove SRCDuals value
-        // if (cutIndex < SRCDuals.size()) {
-        //     SRCDuals.erase(SRCDuals.begin() + cutIndex);
-        // }
-        // updateActiveCuts();
     }
 
     // Set dual values for SRC
@@ -303,18 +272,6 @@ class CutStorage {
     auto getCtr(int i) const {
         assert(i >= 0 && i < cuts.size());
         return cuts[i].grbConstr;
-    }
-
-    void updateActiveCuts() {
-        active_cuts.clear();
-        active_cuts.reserve(cuts.size());  // Pre-allocate for efficiency
-
-        for (size_t i = 0; i < cuts.size(); ++i) {
-            if (i < SRCDuals.size() && SRCDuals[i] <= -1e-3) {
-                active_cuts.emplace_back(i, &cuts[i], SRCDuals[i],
-                                         cuts[i].type);
-            }
-        }
     }
 
     // Compute limited memory coefficients for a given set of cuts
@@ -374,4 +331,16 @@ class CutStorage {
     ankerl::unordered_dense::map<std::size_t, std::vector<int>>
         indexCuts;  // Additional index for cuts (if needed)
     std::vector<ActiveCutInfo> active_cuts;  // Cuts with positive duals
+
+    void updateActiveCuts() {
+        active_cuts.clear();
+        active_cuts.reserve(cuts.size());  // Pre-allocate for efficiency
+
+        for (size_t i = 0; i < cuts.size(); ++i) {
+            if (i < SRCDuals.size() && std::abs(SRCDuals[i]) > 1e-3) {
+                active_cuts.emplace_back(i, &cuts[i], SRCDuals[i],
+                                         cuts[i].type);
+            }
+        }
+    }
 };

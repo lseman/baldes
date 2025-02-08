@@ -1,11 +1,9 @@
 /*
  * @file Common.h
- * @brief Header file containing common includes and definitions used across the
- * project.
+ * @brief Header file containing common includes and definitions used across the project.
  *
- * This file contains common includes and definitions used across the project,
- * such as standard library headers, definitions for constants, and utility
- * functions.
+ * This file contains common includes and definitions used across the project, such as standard library headers,
+ * definitions for constants, and utility functions.
  */
 #pragma once
 #include "config.h"
@@ -15,29 +13,36 @@
 #include "gurobi_c.h"
 #endif
 
-#include <fmt/color.h>
-#include <fmt/core.h>
+#include "../third_party/pdqsort.h"
+
+#include "Hashes.h"
+
+#include <exec/static_thread_pool.hpp>
+#include <stdexec/execution.hpp>
+
+#include <execution>
+
 
 #include <algorithm>
 #include <array>
 #include <cstring>
 #include <deque>
-#include <exec/static_thread_pool.hpp>
-#include <execution>
 #include <fstream>
 #include <future>
 #include <map>
 #include <memory>
 #include <mutex>
-#include <queue>
 #include <ranges>
-#include <stack>
-#include <stdexec/execution.hpp>
-#include <string_view>
 #include <vector>
+#include <queue>
+#include <string_view>
 
-#include "../third_party/pdqsort.h"
-#include "../third_party/small_vector.hpp"
-#include "Hashes.h"
 #include "ankerl/unordered_dense.h"
-#include "xxhash.h"  // Include the header file for xxhash
+
+#include "../third_party/small_vector.hpp"
+
+#include <fmt/color.h>
+#include <fmt/core.h>
+
+#include "xxhash.h" // Include the header file for xxhash
+#include <stack>

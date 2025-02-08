@@ -1,15 +1,30 @@
-// EvaluatorGPU.h
+// SparseSolveTriangularGPU.h
+
 #pragma once
 #include <Eigen/Sparse>
 
-void sparseTriangularSolveGPU(const Eigen::SparseMatrix<double>& lhs,
-                              Eigen::Matrix<double, -1, 1>& rhs, bool isLower,
-                              double regularizationFactor);
-
+using Scalar = double;
+// Template declaration for the solver
 template <typename Lhs, typename Rhs, int Mode>
-void SparseSolveTriangularGPU(const Lhs& lhs, Rhs& other,
-                              typename Lhs::Scalar regularizationFactor) {
-    constexpr bool isLower = (Mode & Eigen::Lower) != 0;
-    sparseTriangularSolveGPU(lhs.nestedExpression(), other, isLower,
-                             regularizationFactor);
+void SparseSolveTriangularGPU(const Lhs &lhs, Rhs &other, typename Lhs::Scalar regularizationFactor) {
+    constexpr bool isLower    = (Mode & Eigen::Lower) != 0;
+    constexpr bool isRowMajor = (int(Lhs::Flags) & Eigen::RowMajorBit) != 0;
+
+    if (isRowMajor) {
+        if (isLower) {
+            // Row-major, lower triangular solve
+            sparseLowerTriangularSolveGPU_RowMajor(lhs, other, regularizationFactor);
+        } else {
+            // Row-major, upper triangular solve
+            sparseUpperTriangularSolveGPU_RowMajor(lhs, other, regularizationFactor);
+        }
+    } else {
+        if (isLower) {
+            // Column-major, lower triangular solve
+            sparseLowerTriangularSolveGPU_ColMajor(lhs, other, regularizationFactor);
+        } else {
+            // Column-major, upper triangular solve
+            sparseUpperTriangularSolveGPU_ColMajor(lhs, other, regularizationFactor);
+        }
+    }
 }

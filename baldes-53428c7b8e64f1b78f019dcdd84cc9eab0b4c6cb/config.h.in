@@ -1,0 +1,43 @@
+#ifndef CONFIG_H
+#define CONFIG_H
+
+#if defined(__GNUC__) || defined(__clang__)
+#define likely(x) __builtin_expect(!!(x), 1)
+#define unlikely(x) __builtin_expect(!!(x), 0)
+#else
+#define likely(x) (x)
+#define unlikely(x) (x)
+#endif
+
+// Enable or disable specific features based on CMake options
+#cmakedefine RIH
+#cmakedefine RCC
+#cmakedefine SRC
+#cmakedefine UNREACHABLE_DOMINANCE
+#cmakedefine SORTED_LABELS
+#cmakedefine MCD
+#cmakedefine FIX_BUCKETS
+#cmakedefine IPM
+#cmakedefine TR
+#cmakedefine STAB
+#cmakedefine WITH_PYTHON
+#cmakedefine EVRP
+#cmakedefine MTW
+#cmakedefine SCHRODINGER
+#cmakedefine JEMALLOC
+#cmakedefine GUROBI
+#cmakedefine HIGHS
+#cmakedefine NSYNC
+#cmakedefine IPM_ACEL
+#cmakedefine CUSTOM_COST
+
+// Define constants for resource sizes
+#define R_SIZE @R_SIZE@
+#define N_SIZE @N_SIZE@
+#define BUCKET_CAPACITY @BUCKET_CAPACITY@
+#define TIME_INDEX @TIME_INDEX@
+#define DEMAND_INDEX @DEMAND_INDEX@
+#define N_ADD @N_ADD@
+#define HGS_TIME @HGS_TIME@
+#define VERBOSE_LEVEL @VERBOSE_LEVEL@
+#endif  // CONFIG_H

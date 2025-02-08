@@ -30,9 +30,10 @@
 #include "miphandler/LinExp.h"
 #include "miphandler/MIPHandler.h"
 // #include "xxhash.h"
-
+//
 #include <cstdint>
 
+#include "HeuristicHighOrder.h"
 #include "RNG.h"
 // include nsync
 #ifdef NSYNC
@@ -71,13 +72,7 @@ using RCCManagerPtr = std::shared_ptr<RCCManager>;
 
 class LimitedMemoryRank1Cuts {
    public:
-    bool cuts_harvested = false;
-    int n_high_order = 0;
-
-    exec::static_thread_pool src_pool =
-        exec::static_thread_pool(std::thread::hardware_concurrency());
-    exec::static_thread_pool::scheduler src_sched = src_pool.get_scheduler();
-
+    HighRankCuts high_rank_cuts;
 #if defined(RCC) || defined(EXACT_RCC)
     ArcDuals arc_duals;
     void setArcDuals(const ArcDuals &arc_duals) { this->arc_duals = arc_duals; }
@@ -86,7 +81,7 @@ class LimitedMemoryRank1Cuts {
     Xoroshiro128Plus rp;  // Seed it (you can change the seed)
     using HighDimCutsGeneratorPtr = std::shared_ptr<HighDimCutsGenerator>;
     HighDimCutsGeneratorPtr generator =
-        std::make_shared<HighDimCutsGenerator>(N_SIZE);
+        std::make_shared<HighDimCutsGenerator>(N_SIZE, 5, 1e-6);
 
     void setDistanceMatrix(const std::vector<std::vector<double>> distances) {
         generator->setDistanceMatrix(distances);
@@ -139,240 +134,120 @@ class LimitedMemoryRank1Cuts {
     double computeLimitedMemoryCoefficient(
         const std::array<uint64_t, num_words> &C,
         const std::array<uint64_t, num_words> &AM, const SRCPermutation &p,
-        const std::vector<uint16_t> &P, const std::vector<int> &order) noexcept;
+        const std::vector<uint16_t> &P, std::vector<int> &order) noexcept;
 
     std::pair<bool, bool> runSeparation(
         BNBNode *node, std::vector<baldesCtrPtr> &SRCconstraints);
 
+    exec::static_thread_pool pool =
+        exec::static_thread_pool(std::thread::hardware_concurrency());
+    exec::static_thread_pool::scheduler sched = pool.get_scheduler();
+
     void separateR1C1(const SparseMatrix &A, const std::vector<double> &x) {
+        std::vector<std::pair<double, int>> tmp_cuts;
+        tmp_cuts.reserve(
+            allPaths.size());  // Conservative reservation based on sol size
+
         const int JOBS = std::thread::hardware_concurrency();
-        const size_t paths_size = allPaths.size();
 
-        // Pre-allocate thread-local storage
-        std::vector<std::vector<std::pair<double, int>>> thread_local_cuts(
-            JOBS);
-        for (auto &cuts : thread_local_cuts) {
-            cuts.reserve(paths_size / JOBS);  // Estimate per thread
-        }
+        // Define chunk size to reduce parallelization overhead
+        const int chunk_size = (allPaths.size() + JOBS - 1) / JOBS;
 
-        const int chunk_size =
-            std::max(1000, static_cast<int>((paths_size + JOBS - 1) / JOBS));
+        // Mutex to protect access to tmp_cuts
+        std::mutex cuts_mutex;
 
-        // Thread-local buffers to avoid reallocations
-        struct ThreadLocalBuffers {
-            ankerl::unordered_dense::map<int, int> vis_map;
-
-            ThreadLocalBuffers() : vis_map(64) {}  // Pre-reserve typical size
-        };
-
-        // Create a sender for parallel processing
+        // Parallel execution in chunks
         auto bulk_sender = stdexec::bulk(
-            stdexec::just(), (paths_size + chunk_size - 1) / chunk_size,
-            [this, &thread_local_cuts, paths_size,
-             chunk_size](std::size_t chunk_idx) {
-                ThreadLocalBuffers buffers;
-                auto &local_cuts =
-                    thread_local_cuts[chunk_idx % thread_local_cuts.size()];
+            stdexec::just(), (allPaths.size() + chunk_size - 1) / chunk_size,
+            [&](std::size_t chunk_idx) {
+                size_t start_idx = chunk_idx * chunk_size;
+                size_t end_idx =
+                    std::min(start_idx + chunk_size, allPaths.size());
 
-                const size_t start_idx = chunk_idx * chunk_size;
-                const size_t end_idx =
-                    std::min(start_idx + chunk_size, paths_size);
+                // Local storage for cuts in this chunk
+                std::vector<std::pair<double, int>> local_cuts;
 
+                ankerl::unordered_dense::map<int, int> vis_map;
                 for (size_t i = start_idx; i < end_idx; ++i) {
-                    const auto &route = allPaths[i].route;
-                    const double frac_x = allPaths[i].frac_x;
-
-                    buffers.vis_map.clear();
-
-                    // Count occurrences - manual loop for better performance
-                    const size_t route_size = route.size();
-                    for (size_t j = 0; j < route_size; ++j) {
-                        ++buffers.vis_map[route[j]];
+                    const auto &r = allPaths[i];
+                    vis_map.clear();
+                    for (const auto i : r.route) {
+                        ++vis_map[i];
                     }
-
-                    // Process repeating nodes
-                    for (const auto &[v, times] : buffers.vis_map) {
+                    for (const auto &[v, times] : vis_map) {
                         if (times > 1) {
-                            const double cut_value =
-                                (times >> 1) * frac_x;  // Integer division by 2
-                            if (cut_value > 1e-3) {
+                            // Calculate fractional cut value with integer
+                            // division instead of `floor`
+                            double cut_value =
+                                std::floor(times / 2.) * r.frac_x;
+                            if (cut_value > 1e-3) {  // Apply tolerance check
                                 local_cuts.emplace_back(cut_value, v);
                             }
                         }
                     }
                 }
+
+                // Merge local cuts into global tmp_cuts
+                std::lock_guard<std::mutex> lock(cuts_mutex);
+                tmp_cuts.insert(tmp_cuts.end(), local_cuts.begin(),
+                                local_cuts.end());
             });
 
-        // Execute the parallel workload
-        stdexec::sync_wait(
-            stdexec::starts_on(src_sched, std::move(bulk_sender)));
+        // Submit work to the thread pool
+        auto work = stdexec::starts_on(sched, bulk_sender);
+        stdexec::sync_wait(std::move(work));
 
-        // Merge cuts from all threads
-        std::vector<std::pair<double, int>> final_cuts;
-        size_t total_cuts = 0;
-        for (const auto &thread_cuts : thread_local_cuts) {
-            total_cuts += thread_cuts.size();
-        }
-        final_cuts.reserve(total_cuts);
+        // Early return if no cuts were found
+        if (tmp_cuts.empty()) return;
 
-        for (const auto &thread_cuts : thread_local_cuts) {
-            final_cuts.insert(final_cuts.end(), thread_cuts.begin(),
-                              thread_cuts.end());
-        }
+        // Sort cuts by value in descending order
+        pdqsort(
+            tmp_cuts.begin(), tmp_cuts.end(),
+            [](const std::pair<double, int> &a,
+               const std::pair<double, int> &b) { return a.first > b.first; });
 
-        if (final_cuts.empty()) return;
-
-        // Sort cuts by value
-        pdqsort(final_cuts.begin(), final_cuts.end(),
-                [](const auto &a, const auto &b) { return a.first > b.first; });
-
-        // Pre-allocate reusable buffers for cut generation
-        std::vector<double> coefficients_aux(paths_size);
-        const int cuts_to_apply =
-            std::min(static_cast<int>(final_cuts.size()), 10);
+        // Generate cut coefficients for the top cuts
+        std::vector<double> coefficients_aux(allPaths.size(), 0.0);
+        auto cuts_to_apply = std::min(static_cast<int>(tmp_cuts.size()), 2);
 
         for (int i = 0; i < cuts_to_apply; ++i) {
-            const int v = final_cuts[i].second;
+            auto cut_value = tmp_cuts[i].first;
+            auto v = tmp_cuts[i].second;
 
-            // Initialize C and AM more efficiently
-            std::array<uint64_t, num_words> C = {};
+            // Create a new cut
+            std::array<uint64_t, num_words> C = {};  // Reset C for each cut
             std::array<uint64_t, num_words> AM = {};
+            std::vector<int> order(N_SIZE, 0);
 
-            // Set bit in C
-            C[v >> 6] |= (1ULL << (v & 63));
+            // Define C
+            C[v / 64] |= (1ULL << (v % 64));
 
-            // Fill AM using memset for better performance
-            std::memset(AM.data(), 0xFF, sizeof(AM));
-
-            // Initialize order vector
-            std::vector<int> order(N_SIZE);
-            std::iota(order.begin(), order.end(), 0);
+            // Define AM
+            for (int node = 0; node < N_SIZE; ++node) {
+                AM[node / 64] |= (1ULL << (node % 64));
+            }
 
             SRCPermutation p;
             p.num = {1};
             p.den = 2;
 
-            for (size_t j = 0; j < paths_size; ++j) {
-                coefficients_aux[j] = computeLimitedMemoryCoefficient(
-                    C, AM, p, allPaths[j].route, order);
-            };
+            // Compute coefficients for all paths
+            coefficients_aux.assign(allPaths.size(), 0.0);
+            for (size_t j = 0; j < allPaths.size(); ++j) {
+                auto &clients = allPaths[j].route;
+                coefficients_aux[j] =
+                    computeLimitedMemoryCoefficient(C, AM, p, clients, order);
+            }
 
+            // Create and store the cut
             Cut cut(C, AM, coefficients_aux, p);
-            cut.baseSetOrder = std::move(order);
-            cut.type = CutType::R1C1;
+            cut.baseSetOrder = order;
+            cut.type = CutType::OneRow;
             cutStorage.addCut(cut);
         }
     }
 
-    void separateBG(BNBNode *node, std::vector<baldesCtrPtr> &SRCconstraints);
-    bool getCutsBG(BNBNode *node, std::vector<baldesCtrPtr> &SRCconstraints);
     bool cutCleaner(BNBNode *node, std::vector<baldesCtrPtr> &SRCconstraints);
-
-    std::function<int(std::vector<R1c> &)> processCuts =
-        [&](std::vector<R1c> &cortes) {
-            auto cuts = &cutStorage;
-            auto multipliers = generator->map_rank1_multiplier;
-
-            // Initialize paths with solution values
-            auto cut_ctr = 0;
-
-            std::vector<Cut> cuts_to_add;
-            // Process each cut
-            for (auto &cut : cortes) {
-                auto &cut_info = cut.info_r1c;
-
-                // Skip if arc_mem is empty
-                if (cut.arc_mem.empty()) {
-                    continue;
-                }
-
-                // Pre-allocate cut_indices to avoid repeated resizing
-                std::vector<int> cut_indices;
-                cut_indices.reserve(cut_info.first.size());
-                for (auto &node : cut_info.first) {
-                    cut_indices.push_back(node);
-                }
-
-                // Use std::array with pre-initialization for bit arrays
-                std::array<uint64_t, num_words> C = {};
-                std::array<uint64_t, num_words> AM = {};
-
-                // Set bits in C and AM for cut_indices
-                for (auto &node : cut_indices) {
-                    C[node / 64] |= (1ULL << (node % 64));
-                    AM[node / 64] |= (1ULL << (node % 64));
-                }
-                // Set bits in AM for arcs in arc_mem
-                for (auto &arc : cut.arc_mem) {
-                    AM[arc / 64] |= (1ULL << (arc % 64));
-                }
-
-                // Retrieve multiplier information
-                auto &mult =
-                    multipliers[cut_info.first.size()][cut_info.second];
-                SRCPermutation p;
-                p.num = std::get<0>(mult);
-                p.den = std::get<1>(mult);
-
-                // Initialize order without an extra resize, only if N_SIZE
-                // is constant
-                std::vector<int> order(N_SIZE, 0);
-                int ordering = 0;
-                for (auto node : cut_indices) {
-                    order[node] = ordering++;
-                }
-
-                // Pre-allocate coeffs to allPaths.size()
-                std::vector<double> coeffs(allPaths.size(), 0.0);
-
-#if defined(__cpp_lib_parallel_algorithm)
-                std::atomic<bool> has_coeff{false};
-                std::transform(allPaths.begin(), allPaths.end(), coeffs.begin(),
-                               [&](const auto &path) {
-                                   auto coeff = computeLimitedMemoryCoefficient(
-                                       C, AM, p, path.route, order);
-                                   if (coeff > 1e-3)
-                                       has_coeff.store(
-                                           true, std::memory_order_relaxed);
-                                   return coeff;
-                               });
-#else
-                bool has_coeff = false;
-                std::transform(allPaths.begin(), allPaths.end(), coeffs.begin(),
-                               [&](const auto &path) {
-                                   auto coeff = computeLimitedMemoryCoefficient(
-                                       C, AM, p, path.route, order);
-                                   if (coeff > 1e-3) has_coeff = true;
-                                   return coeff;
-                               });
-#endif
-                // Skip adding cut if no coefficients met threshold
-                if (!has_coeff) {
-                    continue;
-                }
-
-                // Create and add new cut
-                Cut corte(C, AM, coeffs, p);
-                corte.baseSetOrder = order;
-                // cuts->addCut(corte);
-                if (cut_indices.size() == 4) {
-                    corte.type = CutType::FourRow;
-                } else if (cut_indices.size() == 5) {
-                    corte.type = CutType::FiveRow;
-                }
-                cuts_to_add.push_back(corte);
-                // cut_ctr++;
-            }
-
-            // if (cuts_to_add.size() > 2) {
-            //     cuts_to_add.resize(2);
-            // }
-            for (auto &cut : cuts_to_add) {
-                cuts->addCut(cut);
-                cut_ctr++;
-            }
-            return cut_ctr;
-        };
 
    private:
     static std::mutex cache_mutex;

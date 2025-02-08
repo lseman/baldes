@@ -236,3 +236,4 @@ class RawArcList {
    private:
     std::vector<RawArc> predefined_arcs;  // List of predefined arcs
 };
+

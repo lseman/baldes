@@ -561,6 +561,10 @@ struct alignas(64) Bucket {
     // create default constructor
     Bucket() {}
 
+    int get_non_dominated_count() const {
+        return std::ranges::count_if(labels_vec, is_undominated);
+    }
+
     void add_sorted_label(Label *label) noexcept {
         if (!label) return;
 

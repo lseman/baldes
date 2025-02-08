@@ -35,7 +35,6 @@
 #include "Cut.h"
 #include "Definitions.h"
 #include "Dual.h"
-#include "Hashes.h"
 #include "PSTEP.h"
 #include "Pools.h"
 #include "RCC.h"
@@ -70,69 +69,19 @@
  * @tparam ArcType The type of arc (Bucket or regular).
  * @tparam Mutability Indicates whether the label is mutable or immutable.
  */
-
-class Stats {
-    std::deque<double> obj_history;
-
-   public:
-    void addIteration(double obj_value) {
-        obj_history.push_back(obj_value);
-        if (obj_history.size() > 100) {  // Keep last 100 iterations
-            obj_history.pop_front();
-        }
-    }
-
-    bool hasHistory() const { return obj_history.size() >= 2; }
-
-    double getRecentImprovement(size_t window) const {
-        if (obj_history.size() < window) {
-            return 1.0;  // Default if not enough history
-        }
-        auto start = obj_history.end() - window;
-        auto end = obj_history.end();
-        double avg_change =
-            std::accumulate(start + 1, end, 0.0,
-                            [prev = *start](double sum, double curr) mutable {
-                                double change = (prev - curr) /
-                                                std::max(1e-10, std::abs(prev));
-                                prev = curr;
-                                return sum + change;
-                            }) /
-            (window - 1);
-        return avg_change;
-    }
-};
-
 class BucketGraph {
-    Stats stats;
     using NGRouteBitmap = uint64_t;
-    // Pre-compute bitmask lookup - now using constexpr array
-    static constexpr uint64_t bit_mask_lookup[64] = {
-        UINT64_C(1) << 0,  UINT64_C(1) << 1,  UINT64_C(1) << 2,
-        UINT64_C(1) << 3,  UINT64_C(1) << 4,  UINT64_C(1) << 5,
-        UINT64_C(1) << 6,  UINT64_C(1) << 7,  UINT64_C(1) << 8,
-        UINT64_C(1) << 9,  UINT64_C(1) << 10, UINT64_C(1) << 11,
-        UINT64_C(1) << 12, UINT64_C(1) << 13, UINT64_C(1) << 14,
-        UINT64_C(1) << 15, UINT64_C(1) << 16, UINT64_C(1) << 17,
-        UINT64_C(1) << 18, UINT64_C(1) << 19, UINT64_C(1) << 20,
-        UINT64_C(1) << 21, UINT64_C(1) << 22, UINT64_C(1) << 23,
-        UINT64_C(1) << 24, UINT64_C(1) << 25, UINT64_C(1) << 26,
-        UINT64_C(1) << 27, UINT64_C(1) << 28, UINT64_C(1) << 29,
-        UINT64_C(1) << 30, UINT64_C(1) << 31, UINT64_C(1) << 32,
-        UINT64_C(1) << 33, UINT64_C(1) << 34, UINT64_C(1) << 35,
-        UINT64_C(1) << 36, UINT64_C(1) << 37, UINT64_C(1) << 38,
-        UINT64_C(1) << 39, UINT64_C(1) << 40, UINT64_C(1) << 41,
-        UINT64_C(1) << 42, UINT64_C(1) << 43, UINT64_C(1) << 44,
-        UINT64_C(1) << 45, UINT64_C(1) << 46, UINT64_C(1) << 47,
-        UINT64_C(1) << 48, UINT64_C(1) << 49, UINT64_C(1) << 50,
-        UINT64_C(1) << 51, UINT64_C(1) << 52, UINT64_C(1) << 53,
-        UINT64_C(1) << 54, UINT64_C(1) << 55, UINT64_C(1) << 56,
-        UINT64_C(1) << 57, UINT64_C(1) << 58, UINT64_C(1) << 59,
-        UINT64_C(1) << 60, UINT64_C(1) << 61, UINT64_C(1) << 62,
-        UINT64_C(1) << 63};
 
    public:
-    int iteration = 0;
+    static  // Precompute bitmask lookup table at compile time
+        constexpr std::array<uint64_t, 64>
+            bit_mask_lookup = []() {
+                std::array<uint64_t, 64> masks{};
+                for (size_t i = 0; i < 64; ++i) {
+                    masks[i] = 1ULL << i;
+                }
+                return masks;
+            }();
 
     CostFunction cost_calculator;
     std::vector<ankerl::unordered_dense::map<Arc, int, arc_hash>>
@@ -275,7 +224,6 @@ class BucketGraph {
     bool s4 = false;
     bool s5 = false;
     bool ss = false;
-    bool enumerate = false;
     int stage = 1;
     std::vector<double> q_star;
     int iter = 0;
@@ -312,9 +260,6 @@ class BucketGraph {
 
     double incumbent = std::numeric_limits<double>::infinity();
     double relaxation = std::numeric_limits<double>::infinity();
-    double old_relaxation = std::numeric_limits<double>::infinity();
-    int NO_PROGRESS_THRESHOLD = 10;
-    int no_progress_counter = 0;
     bool fixed = false;
 
     exec::static_thread_pool bi_pool = exec::static_thread_pool(2);
@@ -328,31 +273,13 @@ class BucketGraph {
     int fw_buckets_size = 0;
     int bw_buckets_size = 0;
 
-    int fw_removed_arcs = 0;
-    int bw_removed_arcs = 0;
-
-    std::vector<uint64_t> fixed_arcs_bitmap;
+    std::vector<std::vector<bool>> fixed_arcs;
+    std::vector<std::vector<bool>> fw_fixed_buckets;
+    std::vector<std::vector<bool>> bw_fixed_buckets;
     std::vector<uint64_t>
         fw_fixed_buckets_bitmap;  // Bitmap for fixed bucket arcs
     std::vector<uint64_t>
         bw_fixed_buckets_bitmap;  // Bitmap for fixed bucket arcs
-
-    inline bool is_arc_fixed(int from, int to) const noexcept {
-        auto n_buckets = fw_buckets_size;
-        size_t bit_pos = from * n_buckets + to;
-        return (fixed_arcs_bitmap[bit_pos / 64] & (1ULL << (bit_pos % 64))) !=
-               0;
-    }
-
-    inline bool set_arc_fixed(int from, int to) noexcept {
-        size_t bit_pos = from * fw_buckets_size + to;
-        fixed_arcs_bitmap[bit_pos / 64] |= (1ULL << (bit_pos % 64));
-        return true;
-    }
-
-    inline bool is_arc_not_fixed(int from, int to) const noexcept {
-        return !is_arc_fixed(from, to);
-    }
 
     template <Direction D>
     inline bool is_bucket_not_fixed(int from, int to) const noexcept {
@@ -539,7 +466,8 @@ class BucketGraph {
     double knapsackBound(const Label *l);
 
     template <Stage S>
-    Label *compute_label(const Label *L, const Label *L_prime);
+    Label *compute_label(const Label *L, const Label *L_prime,
+                         double cost = 0.0);
 
     bool BucketSetContains(const std::set<int> &bucket_set, const int &bucket);
     void setSplit(const std::vector<double> q_star) { this->q_star = q_star; }
@@ -843,9 +771,9 @@ class BucketGraph {
      * may have been previously set.
      */
     void reset_fixed() {
-        size_t bitmap_size = (fw_buckets.size() * fw_buckets.size() + 63) /
-                             64;  // Round up division by 64
-        fixed_arcs_bitmap.assign(bitmap_size, 0);
+        for (auto &row : fixed_arcs) {
+            std::fill(row.begin(), row.end(), 0);
+        }
     }
 
     void reset_fixed_buckets() {
@@ -905,30 +833,88 @@ class BucketGraph {
     }
 
     void updateSplit() {
-        const double IMBALANCE_THRESHOLD = 0.2;
-        const double ADJUSTMENT_FACTOR = 0.05;
+        const double BASE_IMBALANCE_THRESHOLD =
+            0.15;  // Slightly lower base threshold
+        const double MIN_ADJUSTMENT_FACTOR = 0.02;
+        const double MAX_ADJUSTMENT_FACTOR = 0.10;
+        const double LEARNING_RATE_DECAY =
+            0.99;                      // Decay factor for learning rate
+        const double EMA_ALPHA = 0.1;  // Smoothing factor for EMA
 
-        // Calculate label imbalance ratio
+        static double learning_rate =
+            MAX_ADJUSTMENT_FACTOR;  // Initialize learning rate
+        static double ema_imbalance_ratio =
+            0.0;  // Initialize EMA of imbalance ratio
+
+        // Calculate label counts and ratios
         double fw_labels = static_cast<double>(n_fw_labels);
         double bw_labels = static_cast<double>(n_bw_labels);
-        double imbalance_ratio;
+        double total_labels = fw_labels + bw_labels;
 
-        // Use the larger value as denominator to avoid division by small
-        // numbers
-        if (fw_labels >= bw_labels) {
-            imbalance_ratio = (fw_labels - bw_labels) / fw_labels;
-        } else {
-            imbalance_ratio = (bw_labels - fw_labels) / bw_labels;
-        }
+        // Skip if we don't have enough labels for meaningful adjustment
+        if (total_labels < 10) return;
 
-        // Only adjust if imbalance exceeds threshold
-        if (imbalance_ratio > IMBALANCE_THRESHOLD) {
-            double adjustment =
-                ADJUSTMENT_FACTOR * R_max[options.main_resources[0]];
+        // Calculate imbalance ratio
+        double fw_ratio = fw_labels / total_labels;
+        double bw_ratio = bw_labels / total_labels;
+        double imbalance_ratio = std::abs(fw_ratio - bw_ratio);
 
-            // Adjust split time based on which direction has more labels
-            for (auto &split : q_star) {
-                split += (bw_labels > fw_labels) ? adjustment : -adjustment;
+        // Update EMA of imbalance ratio
+        ema_imbalance_ratio =
+            EMA_ALPHA * imbalance_ratio + (1 - EMA_ALPHA) * ema_imbalance_ratio;
+
+        // Dynamic threshold based on total number of labels
+        // As we get more labels, we can be more sensitive to imbalance
+        double dynamic_threshold =
+            BASE_IMBALANCE_THRESHOLD * std::exp(-total_labels / 1000.0);
+
+        if (ema_imbalance_ratio > dynamic_threshold) {
+            // Calculate adaptive adjustment factor
+            // More severe imbalance = larger adjustment
+            double severity = (ema_imbalance_ratio - dynamic_threshold) /
+                              (1.0 - dynamic_threshold);
+            double adjustment_factor =
+                MIN_ADJUSTMENT_FACTOR +
+                (MAX_ADJUSTMENT_FACTOR - MIN_ADJUSTMENT_FACTOR) * severity;
+
+            // Adjust learning rate based on the severity of imbalance
+            learning_rate *= LEARNING_RATE_DECAY;
+
+            // Adjust based on resource range
+            double resource_range = R_max[options.main_resources[0]] -
+                                    R_min[options.main_resources[0]];
+            double base_adjustment =
+                adjustment_factor * resource_range * learning_rate;
+
+            // Scale adjustment based on current split position
+            for (size_t i = 0; i < q_star.size(); ++i) {
+                double relative_pos =
+                    (q_star[i] - R_min[options.main_resources[0]]) /
+                    resource_range;
+
+                // Smaller adjustments near boundaries
+                double position_factor =
+                    4.0 * relative_pos * (1.0 - relative_pos);
+
+                // Determine direction and apply adjustment
+                double direction = (bw_labels > fw_labels) ? 1.0 : -1.0;
+                double final_adjustment =
+                    base_adjustment * position_factor * direction;
+
+                // Apply adjustment with boundary protection
+                q_star[i] = std::clamp(q_star[i] + final_adjustment,
+                                       R_min[options.main_resources[0]] +
+                                           resource_range * 0.1,  // Lower bound
+                                       R_max[options.main_resources[0]] -
+                                           resource_range * 0.1  // Upper bound
+                );
+            }
+
+            if (std::abs(base_adjustment) > resource_range * 0.05) {
+                print_info(
+                    "Split adjustment: imbalance={:.3f}, adjustment={:.3f}, "
+                    "learning_rate={:.3f}\n",
+                    ema_imbalance_ratio, base_adjustment, learning_rate);
             }
         }
     }
@@ -985,11 +971,10 @@ class BucketGraph {
     void define_buckets();
 
     template <Direction D, Stage S>
-    bool DominatedInCompWiseSmallerBuckets(
-        const Label *L, int bucket, const std::vector<double> &c_bar,
-        std::vector<uint64_t> &Bvisited,
-        const std::vector<std::vector<int>> &bucket_order,
-        int &stat_n_dom) noexcept;
+    bool DominatedInCompWiseSmallerBuckets(const Label *L, int bucket,
+                                           const std::vector<double> &c_bar,
+                                           std::vector<uint64_t> &Bvisited,
+                                           int &stat_n_dom) noexcept;
 
     template <Direction D, Stage S, ArcType A, Mutability M, Full F>
     inline std::vector<Label *> Extend(
@@ -1089,7 +1074,7 @@ class BucketGraph {
         // Mark each arc in the input list as fixed/deleted
         for (const auto &[from, to] : arcs) {
             if (from < num_nodes && to < num_nodes) {
-                set_arc_fixed(from, to);
+                fixed_arcs[from][to] = 1;
             }
         }
     }
@@ -1288,27 +1273,43 @@ class BucketGraph {
 
         ankerl::unordered_dense::set<int> updated_buckets;
         for (size_t b = 0; b < fw_buckets.size(); b++) {
-            if (fw_buckets[b].shall_split || bw_buckets[b].shall_split) {
+            if (fw_buckets[b].shall_split) {
                 auto inner_id = fw_buckets[b].node_id;
                 if (inner_id != options.depot &&
                     inner_id != options.end_depot) {
                     if (updated_buckets.contains(inner_id)) {
                         continue;
                     }
-                    auto new_val = fw_bucket_splits[inner_id] * 2;
-                    if (new_val > 200) {
-                        continue;
-                    }
-                    bw_bucket_splits[inner_id] = new_val;
-                    fw_bucket_splits[inner_id] = new_val;
+
+                    fw_bucket_splits[inner_id] =
+                        std::min(fw_bucket_splits[inner_id] + 10, 100);
+                    bw_bucket_splits[inner_id] =
+                        std::min(bw_bucket_splits[inner_id] + 10, 100);
                     updated_buckets.insert(inner_id);
                     update_ctr++;
                 }
             }
         }
-
-        const int CHANGE_THRESHOLD = 10;
-        if (update_ctr >= CHANGE_THRESHOLD) {
+        for (size_t b = 0; b < bw_buckets.size(); b++) {
+            if (bw_buckets[b].shall_split) {
+                auto inner_id = bw_buckets[b].node_id;
+                if (inner_id != options.depot &&
+                    inner_id != options.end_depot) {
+                    if (updated_buckets.contains(inner_id)) {
+                        continue;
+                    }
+                    fw_bucket_splits[inner_id] =
+                        std::min(fw_bucket_splits[inner_id] + 10, 100);
+                    bw_bucket_splits[inner_id] =
+                        std::min(bw_bucket_splits[inner_id] + 10, 100);
+                    updated_buckets.insert(inner_id);
+                    update_ctr++;
+                }
+            }
+        }
+        const int CHANGE_THRESHOLD = nodes.size() / 6;
+        if (update_ctr >= CHANGE_THRESHOLD && cut_storage->size() < 40) {
+            print_info("Updating bucket splits with {} changes\n", update_ctr);
             // reset_fixed();
             // reset_fixed_buckets();
 
@@ -1335,8 +1336,7 @@ class BucketGraph {
                     // Backward direction processing
                     ObtainJumpBucketArcs<Direction::Backward>();
                 });
-            // print_info("Updating bucket splits with {} changes\n",
-            // update_ctr); fmt::print("Generated arcs\n");
+            // fmt::print("Generated arcs\n");
 
             // fixed = false;
             return true;

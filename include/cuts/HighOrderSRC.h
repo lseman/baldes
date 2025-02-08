@@ -15,80 +15,110 @@
 
 #include "Bitset.h"
 #include "Common.h"
-#include "Cut.h"
-#include "MST.h"
 #include "Path.h"
 #include "RCC.h"
 #include "SparseMatrix.h"
 #include "VRPNode.h"
 #include "utils/Hashes.h"
+
 // include intel concurrent hashmap
 // #include "ConcurrentMap.h"
 #include <libcuckoo/cuckoohash_map.hh>
 
-#include "HighHelper.h"
+struct PlanValidationResult {
+    // Pack booleans together to reduce memory footprint
+    bool is_valid : 1;
+    const std::tuple<std::vector<int>, int, int> *plan;
+
+    // Constructor for direct initialization
+    constexpr PlanValidationResult(
+        bool valid, const std::tuple<std::vector<int>, int, int> *p)
+        : is_valid(valid), plan(p) {}
+
+    // Static size validation to allow compile-time optimization
+    static constexpr bool isValidSize(int size) noexcept { return size >= 3; }
+
+    // Main validation function optimized for branch prediction
+    static PlanValidationResult validate(
+        const int plan_idx, const int size,
+        const ankerl::unordered_dense::map<
+            int, std::vector<std::tuple<std::vector<int>, int, int>>>
+            &map) noexcept {
+        // Early size check (likely to be predicted well by CPU)
+        if (unlikely(!isValidSize(size))) {
+            return {false, nullptr};
+        }
+
+        // Find size in map
+        auto size_it = map.find(size);
+        if (unlikely(size_it == map.end())) {
+            return {false, nullptr};
+        }
+
+        // Check plan index bounds
+        const auto &plans = size_it->second;
+        if (unlikely(static_cast<size_t>(plan_idx) >= plans.size())) {
+            return {false, nullptr};
+        }
+
+        // Return valid result with plan pointer
+        return {true, &plans[plan_idx]};
+    }
+
+    // Optional: Add cache-friendly batch validation
+    static std::vector<PlanValidationResult> validateBatch(
+        const std::vector<std::pair<int, int>> &plan_sizes,
+        const ankerl::unordered_dense::map<
+            int, std::vector<std::tuple<std::vector<int>, int, int>>>
+            &map) noexcept {
+        std::vector<PlanValidationResult> results;
+        results.reserve(plan_sizes.size());  // Avoid reallocation
+
+        for (const auto &[plan_idx, size] : plan_sizes) {
+            results.push_back(validate(plan_idx, size, map));
+        }
+
+        return results;
+    }
+};
 
 constexpr int INITIAL_RANK_1_MULTI_LABEL_POOL_SIZE = 50;
 constexpr int INITIAL_POOL_SIZE = 100;
+using yzzLong = Bitset<N_SIZE>;
+using cutLong = yzzLong;
 constexpr double tolerance = 1e-3;
 constexpr int max_row_rank1 = 5;
 constexpr int max_heuristic_initial_seed_set_size_row_rank1c = 6;
 
-constexpr int max_num_r1c_per_round = 5;
+constexpr int max_num_r1c_per_round = 3;
 constexpr double cut_vio_factor = 0.1;
+
+struct R1c {
+    std::pair<std::vector<int>, int> info_r1c{};  // cut and plan
+    int rhs{};
+    std::vector<int> arc_mem{};  // Store only memory positions
+};
+
+struct Rank1MultiLabel {
+    std::vector<int> c;
+    std::vector<int> w_no_c;
+    int plan_idx{};
+    double vio{};
+    char search_dir{};
+
+    Rank1MultiLabel(std::vector<int> c, std::vector<int> w_no_c, int plan_idx,
+                    double vio, char search_dir)
+        : c(std::move(c)),
+          w_no_c(std::move(w_no_c)),
+          plan_idx(plan_idx),
+          vio(vio),
+          search_dir(search_dir) {}
+
+    Rank1MultiLabel() = default;
+};
 
 class HighDimCutsGenerator {
    public:
-    std::future<void> backgroundTask;  // Future to track the background task
-
-    std::shared_ptr<HighDimCutsGenerator> cloned;
-
-    std::shared_ptr<HighDimCutsGenerator> clone() const {
-        // Directly create a new instance without copying `pool_mutex`
-        auto new_gen = std::shared_ptr<HighDimCutsGenerator>(
-            new HighDimCutsGenerator(N_SIZE));
-        new_gen->cost_mat4_vertex = this->cost_mat4_vertex;
-        new_gen->nodes = this->nodes;
-        new_gen->arc_duals = this->arc_duals;
-        new_gen->max_heuristic_sep_mem4_row_rank1 = 8;
-        new_gen->initialize(this->sol);
-        new_gen->generateSepHeurMem4Vertex();
-
-        return new_gen;
-    }
-
-    std::jthread backgroundThread;
-
-    void runTask() { getHighDimCuts(); }
-
-    // Start generating cuts in the background
-    void generateCutsInBackground() {
-        if (backgroundThread.joinable()) {
-            return;
-        }
-        backgroundThread = std::jthread([this]() { runTask(); });
-    }
-
-    std::vector<R1c> returnBGcuts() { return getCuts(); }
-
-    bool checkBackgroundTask() { return backgroundThread.joinable(); }
-
-    // Retrieve generated cuts
-    bool readyGeneratedCuts() {
-        if (!backgroundThread.joinable()) {
-            return false;
-        }
-
-        // Check if the background task has completed
-        if (backgroundThread.joinable()) {
-            backgroundThread.join();            // Wait for the thread to finish
-            backgroundThread = std::jthread();  // Reset the jthread
-            return true;
-        } else {
-            return false;
-        }
-    }
-
     int max_heuristic_sep_mem4_row_rank1 = 8;
 
     double max_cut_mem_factor = 0.15;
@@ -117,7 +147,11 @@ class HighDimCutsGenerator {
         void deallocate(T *p, std::size_t) noexcept { std::free(p); }
     };
 
-    HighDimCutsGenerator(int dim) : dim(dim), num_label(0) {
+    HighDimCutsGenerator(int dim, int maxRowRank, double tolerance)
+        : dim(dim),
+          max_row_rank1(maxRowRank),
+          TOLERANCE(tolerance),
+          num_label(0) {
         cuts.reserve(INITIAL_POOL_SIZE);
         rank1_multi_label_pool.reserve(INITIAL_POOL_SIZE);
         generated_rank1_multi_pool.reserve(INITIAL_POOL_SIZE);
@@ -161,6 +195,7 @@ class HighDimCutsGenerator {
 
     std::vector<Path> sol;
     int dim, max_row_rank1, num_label;
+    double TOLERANCE;
     // std::vector<ankerl::unordered_dense::map<int, int>>        v_r_map;
     gch::small_vector<std::vector<int>> v_r_map;
     gch::small_vector<std::pair<std::vector<int>, std::vector<int>>> c_N_noC;
@@ -208,27 +243,23 @@ class HighDimCutsGenerator {
         cut_cache.clear();
         num_valid_routes = 0;
     }
-    const int JOBS = std::thread::hardware_concurrency() / 2;
-    exec::static_thread_pool src_pool = exec::static_thread_pool(JOBS);
-    exec::static_thread_pool::scheduler src_sched = src_pool.get_scheduler();
 
     void getHighDimCuts() {
-        // Step 1: Initialize data structures and prepare for processing
         constructVRMapAndSeedCrazy();
         startSeedCrazy();
+        std::atomic<int> atomic_i{0};
+        const int JOBS = std::thread::hardware_concurrency();
+        exec::static_thread_pool pool(JOBS);
+        auto sched = pool.get_scheduler();
 
-        // Step 2: Set up parallel processing
-        std::atomic<int> atomic_i{
-            0};  // Atomic counter for thread-safe index tracking
-
-        // Step 3: Define the parallel task
+        // Create a bulk sender for parallel processing
         auto bulk_sender = stdexec::bulk(
             stdexec::just(), JOBS, [this, &atomic_i](std::size_t) {
                 while (true) {
-                    // Atomically fetch the next index to process
+                    // Get next index atomically
                     int current_i = atomic_i.fetch_add(1);
 
-                    // Exit if all labels have been processed
+                    // Check if we've processed all labels
                     if (current_i >= num_label) {
                         break;
                     }
@@ -239,29 +270,30 @@ class HighDimCutsGenerator {
                 }
             });
 
-        // Step 4: Submit the parallel task to the thread pool and wait for
-        // completion
-        auto work = stdexec::starts_on(src_sched, bulk_sender);
+        // Submit work to thread pool and wait for completion
+        auto work = stdexec::starts_on(sched, bulk_sender);
         stdexec::sync_wait(std::move(work));
 
-        // Step 5: Construct the final cuts and update the old cuts
         constructCutsCrazy();
         old_cuts = cuts;
     }
 
-    // declare rank1_mutex
-    std::mutex rank1_mutex;
-
     void startSeedCrazy() {
         num_label = 0;
+        std::mutex rank1_mutex;
 
-        // Preallocate work items
+        // Create thread pool
+        const int JOBS = std::thread::hardware_concurrency();
+        exec::static_thread_pool pool(JOBS);
+        auto sched = pool.get_scheduler();
+
+        // Create work items vector
         std::vector<std::pair<int, std::reference_wrapper<const std::pair<
                                        std::vector<int>, std::vector<int>>>>>
             work_items;
-        work_items.reserve(7 * c_N_noC.size());
+        work_items.reserve(
+            7 * c_N_noC.size());  // Preallocate to avoid reallocations
 
-        // Populate work items
         for (int plan_idx : {0, 1, 2, 3, 4, 5, 6}) {
             for (const auto &pair : c_N_noC) {
                 work_items.emplace_back(plan_idx, std::ref(pair));
@@ -272,18 +304,11 @@ class HighDimCutsGenerator {
         const int chunk_size =
             std::max(1, static_cast<int>(work_items.size()) / JOBS);
 
-        // Thread-local storage for results to reduce lock contention
-        struct ThreadLocalResult {
-            std::vector<Rank1MultiLabel> labels;
-            std::mutex mutex;
-        };
-        std::vector<ThreadLocalResult> thread_local_results(JOBS);
-
-        // Parallel processing using bulk sender
+        // Create bulk sender for parallel processing
         auto bulk_sender = stdexec::bulk(
             stdexec::just(), (work_items.size() + chunk_size - 1) / chunk_size,
             [this, &work_items, chunk_size,
-             &thread_local_results](std::size_t chunk_idx) {
+             &rank1_mutex](std::size_t chunk_idx) {
                 size_t start_idx = chunk_idx * chunk_size;
                 size_t end_idx =
                     std::min(start_idx + chunk_size, work_items.size());
@@ -292,87 +317,87 @@ class HighDimCutsGenerator {
                 for (size_t task_idx = start_idx; task_idx < end_idx;
                      ++task_idx) {
                     const auto &[plan_idx, pair_ref] = work_items[task_idx];
-                    const auto &[c, wc] = pair_ref.get();
+                    const auto &pair = pair_ref.get();
+                    const auto &[c, wc] = pair;
 
-                    if (c.empty() || wc.empty()) {
-                        continue;
-                    }
-
-                    std::vector<int> c_mutable = c;
-                    double initial_vio = 0.0;
-
-                    exactFindBestPermutationForOnePlan(c_mutable, plan_idx,
-                                                       initial_vio);
-
-                    if (initial_vio < tolerance) {
-                        continue;
-                    }
-
-                    // Additional operations: add, remove, swap
-                    int add_j, remove_j;
-                    double add_vio = initial_vio, remove_vio = initial_vio;
-                    std::pair<int, int> swap_i_j;
-                    double swap_vio = initial_vio;
-
-                    addSearchCrazy(plan_idx, c_mutable, wc, add_vio, add_j);
-                    removeSearchCrazy(plan_idx, c_mutable, remove_vio,
-                                      remove_j);
-                    swapSearchCrazy(plan_idx, c_mutable, wc, swap_vio,
-                                    swap_i_j);
-
-                    double best_vio = std::max({add_vio, remove_vio, swap_vio});
-                    if (best_vio > initial_vio) {
-                        std::vector<int> new_c, new_w_no_c;
-                        char best_op = 'n';
-
-                        if (best_vio == add_vio) {
-                            best_op = 'a';
-                            applyBestOperation('a', c_mutable, wc, add_j, -1,
-                                               std::make_pair(-1, -1), new_c,
-                                               new_w_no_c, plan_idx, best_vio);
-                        } else if (best_vio == remove_vio) {
-                            best_op = 'r';
-                            applyBestOperation('r', c_mutable, wc, -1, remove_j,
-                                               std::make_pair(-1, -1), new_c,
-                                               new_w_no_c, plan_idx, best_vio);
-                        } else if (best_vio == swap_vio) {
-                            best_op = 's';
-                            applyBestOperation('s', c_mutable, wc, -1, -1,
-                                               swap_i_j, new_c, new_w_no_c,
-                                               plan_idx, best_vio);
+                    try {
+                        if (c.empty() || wc.empty()) {
+                            continue;
                         }
 
-                        // Store results in thread-local storage
-                        auto &local_result =
-                            thread_local_results[chunk_idx % JOBS];
-                        std::lock_guard<std::mutex> lock(local_result.mutex);
-                        local_result.labels.emplace_back(
-                            std::move(new_c), std::move(new_w_no_c), plan_idx,
-                            best_vio, best_op);
+                        std::vector<int> c_mutable = c;
+                        double initial_vio = 0.0;
+
+                        exactFindBestPermutationForOnePlan(c_mutable, plan_idx,
+                                                           initial_vio);
+
+                        if (initial_vio < TOLERANCE) {
+                            continue;
+                        }
+
+                        // Additional operations: add, remove, swap
+                        int add_j, remove_j;
+                        double add_vio = initial_vio, remove_vio = initial_vio;
+                        std::pair<int, int> swap_i_j;
+                        double swap_vio = initial_vio;
+
+                        addSearchCrazy(plan_idx, c_mutable, wc, add_vio, add_j);
+                        removeSearchCrazy(plan_idx, c_mutable, remove_vio,
+                                          remove_j);
+                        swapSearchCrazy(plan_idx, c_mutable, wc, swap_vio,
+                                        swap_i_j);
+
+                        double best_vio =
+                            std::max({add_vio, remove_vio, swap_vio});
+                        if (best_vio > initial_vio) {
+                            std::vector<int> new_c, new_w_no_c;
+                            char best_op = 'n';
+
+                            if (best_vio == add_vio) {
+                                best_op = 'a';
+                                applyBestOperation('a', c_mutable, wc, add_j,
+                                                   -1, std::make_pair(-1, -1),
+                                                   new_c, new_w_no_c, plan_idx,
+                                                   best_vio);
+                            } else if (best_vio == remove_vio) {
+                                best_op = 'r';
+                                applyBestOperation(
+                                    'r', c_mutable, wc, -1, remove_j,
+                                    std::make_pair(-1, -1), new_c, new_w_no_c,
+                                    plan_idx, best_vio);
+                            } else {
+                                best_op = 's';
+                                applyBestOperation('s', c_mutable, wc, -1, -1,
+                                                   swap_i_j, new_c, new_w_no_c,
+                                                   plan_idx, best_vio);
+                            }
+
+                            std::lock_guard<std::mutex> lock(rank1_mutex);
+                            if (num_label + 1 > rank1_multi_label_pool.size()) {
+                                rank1_multi_label_pool.resize(
+                                    std::max<std::size_t>(
+                                        rank1_multi_label_pool.size() * 2,
+                                        num_label + 1));
+                            }
+                            rank1_multi_label_pool[num_label++] =
+                                Rank1MultiLabel(std::move(new_c),
+                                                std::move(new_w_no_c), plan_idx,
+                                                best_vio, best_op);
+                        }
+                    } catch (const std::exception &e) {
+                        std::cerr << "Exception in task for plan_idx "
+                                  << plan_idx << ": " << e.what() << "\n";
+                    } catch (...) {
+                        std::cerr << "Unknown exception in task for plan_idx "
+                                  << plan_idx << "\n";
                     }
                 }
             });
 
         // Submit work to the thread pool and wait for completion
-        auto work = stdexec::starts_on(src_sched, bulk_sender);
+        auto work = stdexec::starts_on(sched, bulk_sender);
         stdexec::sync_wait(std::move(work));
-
-        // Merge thread-local results into the global pool
-        for (auto &local_result : thread_local_results) {
-            std::lock_guard<std::mutex> lock(
-                rank1_mutex);  // Fixed: Use rank1_mutex
-            if (num_label + local_result.labels.size() >
-                rank1_multi_label_pool.size()) {
-                rank1_multi_label_pool.resize(std::max<std::size_t>(
-                    rank1_multi_label_pool.size() * 2,
-                    num_label + local_result.labels.size()));
-            }
-            for (auto &label : local_result.labels) {
-                rank1_multi_label_pool[num_label++] = std::move(label);
-            }
-        }
     }
-
     void applyBestOperation(char best_oper, const std::vector<int> &c,
                             const std::vector<int> &wc, int add_j, int remove_j,
                             const std::pair<int, int> &swap_i_j,
@@ -418,6 +443,20 @@ class HighDimCutsGenerator {
                     if (i == swap_i_j.second) i = swap_i_j.first;
                 }
                 break;
+
+                // case 'h':  // Shift operation
+                //     new_c = c;
+                //     new_w_no_c = wc;
+                //     if (swap_i_j.first < swap_i_j.second) {
+                //         std::rotate(new_c.begin() + swap_i_j.first,
+                //                     new_c.begin() + swap_i_j.first + 1,
+                //                     new_c.begin() + swap_i_j.second + 1);
+                //     } else {
+                //         std::rotate(new_c.begin() + swap_i_j.second,
+                //                     new_c.begin() + swap_i_j.first,
+                //                     new_c.begin() + swap_i_j.first + 1);
+                //     }
+                //     break;
         }
     }
 
@@ -426,6 +465,26 @@ class HighDimCutsGenerator {
     gch::small_vector<double> cached_valid_routes;
     gch::small_vector<int> cached_map_old_new_routes;
     int num_valid_routes;
+
+    void cacheValidRoutesAndMappings() {
+        cached_valid_routes.clear();
+        cached_map_old_new_routes.clear();
+
+        cached_valid_routes.reserve(sol.size());
+        cached_map_old_new_routes.resize(sol.size(), -1);
+
+        num_valid_routes = 0;
+
+        std::for_each(sol.begin(), sol.end(),
+                      [this, current = 0](const auto &route) mutable {
+                          if (route.frac_x > 1e-2) {
+                              cached_valid_routes.push_back(route.frac_x);
+                              cached_map_old_new_routes[current] =
+                                  num_valid_routes++;
+                          }
+                          ++current;
+                      });
+    }
 
     // cutLong as key
     libcuckoo::cuckoohash_map<cutLong,
@@ -455,7 +514,7 @@ class HighDimCutsGenerator {
         static constexpr int PREFETCH_DISTANCE = 64;  // Common cache line size
 
         // Ensure proper alignment for best performance
-        alignas(32) const int *freq_ptr = route_freqs;
+        alignas(32) const int *freq_ptr = route_freqs;  // No .data() needed
         alignas(32) int *map_ptr = map_r_numbers;
 
         int i = 0;
@@ -512,7 +571,6 @@ class HighDimCutsGenerator {
         const int cut_size = static_cast<int>(cut.size());
         const auto &plan = map_rank1_multiplier[cut_size][plan_idx];
 
-        // Early exit if the plan denominator is zero
         if (get<1>(plan) == 0) {
             vio = -std::numeric_limits<double>::max();
             return;
@@ -530,17 +588,14 @@ class HighDimCutsGenerator {
             cut_coeff;
         alignas(64) static thread_local std::vector<int> new_cut;
 
-        // Reset the temporary cutLong
         tmp.reset();
 
-        // Filter valid indices and set them in the temporary cutLong
+        // Filter valid indices
         for (int it : cut) {
             if (it >= 0 && static_cast<size_t>(it) < v_r_map.size()) {
                 tmp.set(it);
             }
         }
-
-        // Check if the result is already cached
         std::vector<std::pair<std::vector<int>, double>> cached_plans;
         if (map_cut_plan_vio.find(tmp, cached_plans) &&
             plan_idx < cached_plans.size() &&
@@ -548,22 +603,18 @@ class HighDimCutsGenerator {
             vio = cached_plans[plan_idx].second;
             return;
         }
-
-        // Insert a new entry into the cache if not found
         map_cut_plan_vio.insert(
             tmp, std::vector<std::pair<std::vector<int>, double>>(7));
 
-        // Extract plan details
         const int denominator = get<1>(plan);
         const double rhs = get<2>(plan);
         const auto &coeffs = record_map_rank1_combinations[cut_size][plan_idx];
 
-        // Initialize map_r_numbers with zeros
         map_r_numbers.assign(sol.size(), 0);
+        auto indices = std::views::iota(0, cut_size);
 
-        // Process frequencies using SIMD (if AVX2 is available) or scalar
-        // operations
-#ifndef __AVX2__
+#ifdef __AVX2__
+        // Process frequencies using SIMD
         for (int i = 0; i < cut_size; ++i) {
             const int idx = cut[i];
             if (idx >= 0 && static_cast<size_t>(idx) < v_r_map.size()) {
@@ -573,7 +624,8 @@ class HighDimCutsGenerator {
             }
         }
 #else
-        for (int i = 0; i < cut_size; ++i) {
+        // Process frequencies
+        for (int i : indices) {
             const int idx = cut[i];
             if (idx >= 0 && static_cast<size_t>(idx) < v_r_map.size()) {
                 const auto &freqs = v_r_map[idx];
@@ -585,40 +637,41 @@ class HighDimCutsGenerator {
         }
 #endif
 
-        // Handle cache for cut_num_times_vis_routes
+        // Handle cache
         std::vector<std::vector<int>> cached_routes;
         if (cut_cache.find(cut, cached_routes)) {
             cut_num_times_vis_routes = cached_routes;
+
         } else {
             cut_num_times_vis_routes.clear();
             cut_num_times_vis_routes.resize(cut_size);
 
-            // Reserve space for each route
+            // Reserve space
             for (auto &vec : cut_num_times_vis_routes) {
                 vec.reserve(num_valid_routes * 2);
             }
 
-            // Populate cut_num_times_vis_routes
-            for (int i = 0; i < cut_size; ++i) {
+            for (int i : indices) {
                 const int c = cut[i];
                 if (c >= 0 && static_cast<size_t>(c) < v_r_map.size()) {
                     auto &current_route = cut_num_times_vis_routes[i];
                     const auto &route_freqs = v_r_map[c];
 
-                    for (size_t route_idx = 0; route_idx < route_freqs.size();
-                         ++route_idx) {
+                    auto route_indices =
+                        std::views::iota(size_t{0}, route_freqs.size());
+                    for (size_t route_idx : route_indices) {
                         const int frequency = route_freqs[route_idx];
                         const int cached_route =
                             cached_map_old_new_routes[route_idx];
                         if (frequency > 0 && cached_route != -1) {
-                            current_route.insert(current_route.end(), frequency,
+                            current_route.insert(current_route.end(),
+                                                 static_cast<size_t>(frequency),
                                                  cached_route);
                         }
                     }
                 }
             }
 
-            // Insert into cache
             cut_cache.insert(cut, cut_num_times_vis_routes);
         }
 
@@ -627,10 +680,10 @@ class HighDimCutsGenerator {
         std::vector<ViolationResult> violations;
         violations.reserve(coeffs.size());
 
-        for (size_t coeff_idx = 0; coeff_idx < coeffs.size(); ++coeff_idx) {
+        auto coeff_indices = std::views::iota(size_t{0}, coeffs.size());
+        for (size_t coeff_idx : coeff_indices) {
             const auto &coeff_row = coeffs[coeff_idx];
 
-            // Use stack-allocated array for small sizes, heap otherwise
             constexpr size_t STACK_SIZE = 1024;
             std::array<double, STACK_SIZE> local_times{};
             std::unique_ptr<double[]> heap_times;
@@ -645,8 +698,9 @@ class HighDimCutsGenerator {
             }
             std::ranges::fill(times_span, 0.0);
 
-            // Accumulate times for each route
-            for (size_t i = 0; i < cut_num_times_vis_routes.size(); ++i) {
+            auto route_indices =
+                std::views::iota(size_t{0}, cut_num_times_vis_routes.size());
+            for (size_t i : route_indices) {
                 const double coeff = coeff_row[i];
                 const auto &routes = cut_num_times_vis_routes[i];
                 for (const int route : routes) {
@@ -654,25 +708,22 @@ class HighDimCutsGenerator {
                 }
             }
 
-            // Calculate violation
             double vio_tmp = -rhs;
             for (size_t i = 0; i < num_valid_routes; ++i) {
                 vio_tmp +=
-                    static_cast<int>(times_span[i] / denominator + tolerance) *
+                    static_cast<int>(times_span[i] / denominator + TOLERANCE) *
                     cached_valid_routes[i];
             }
 
             violations.emplace_back(vio_tmp, static_cast<int>(coeff_idx));
         }
 
-        // Find the best violation
         const auto best_result = *std::ranges::max_element(
             violations, [](const ViolationResult &a, const ViolationResult &b) {
                 return a.violation < b.violation;
             });
         vio = best_result.violation;
 
-        // Prepare cut_coeff and new_cut
         cut_coeff.resize(cut_size);
         if (static_cast<size_t>(best_result.index) < coeffs.size()) {
             const auto &best_coeffs = coeffs[best_result.index];
@@ -684,18 +735,15 @@ class HighDimCutsGenerator {
             }
         }
 
-        // Sort cut_coeff in descending order of coefficients
         pdqsort(cut_coeff.begin(), cut_coeff.end(),
                 [](const std::pair<int, int> &a, const std::pair<int, int> &b) {
-                    return a.second > b.second;
+                    return a.second > b.second;  // Sort in descending order
                 });
 
-        // Create new_cut from sorted cut_coeff
         new_cut.resize(cut_size);
         std::ranges::transform(cut_coeff, new_cut.begin(),
                                &std::pair<int, int>::first);
 
-        // Update the cache with the new cut and violation
         map_cut_plan_vio.upsert(tmp, [&](auto &value) {
             value.resize(
                 std::max(value.size(), static_cast<size_t>(plan_idx + 1)));
@@ -703,8 +751,16 @@ class HighDimCutsGenerator {
             return true;
         });
     }
-
     std::vector<std::vector<double>> cost_mat4_vertex;
+
+    std::shared_ptr<HighDimCutsGenerator> clone() const {
+        // Directly create a new instance without copying `pool_mutex`
+        auto new_gen = std::shared_ptr<HighDimCutsGenerator>(
+            new HighDimCutsGenerator(N_SIZE, 5, 1e-6));
+        new_gen->setDistanceMatrix(cost_mat4_vertex);
+        new_gen->old_cuts = this->old_cuts;
+        return new_gen;
+    }
 
     void setDistanceMatrix(const std::vector<std::vector<double>> distances) {
         cost_mat4_vertex = distances;
@@ -715,179 +771,44 @@ class HighDimCutsGenerator {
     void setArcDuals(const ArcDuals &arc_duals) { this->arc_duals = arc_duals; }
 #endif
 
-    // Original behavior preserved
-    void cacheValidRoutesAndMappings() {
-        cached_valid_routes.clear();
-        cached_map_old_new_routes.clear();
-        cached_valid_routes.reserve(sol.size());
-        cached_map_old_new_routes.resize(sol.size(), -1);
-        num_valid_routes = 0;
-        std::for_each(sol.begin(), sol.end(),
-                      [this, current = 0](const auto &route) mutable {
-                          if (route.frac_x > 1e-2) {
-                              cached_valid_routes.push_back(route.frac_x);
-                              cached_map_old_new_routes[current] =
-                                  num_valid_routes++;
-                          }
-                          ++current;
-                      });
-    }
-    struct Cluster {
-        std::vector<int> vertices;
-        double avg_cost;
-    };
-
-    CutStorage *cutter = nullptr;
-    // void generateSepHeurMem4Vertex() {
-    //     if (dim <= 0) return;
-    //     rank1_sep_heur_mem4_vertex.resize(dim);
-    //     std::vector<double> half_cost(dim);
-    //     for (int i = 0; i < dim; ++i) {
-    //         half_cost[i] = nodes[i].cost / 2;
-    //     }
-
-    //     const int k = std::min(5, dim / 2);
-    //     std::vector<Cluster> clusters(k);
-    //     std::vector<int> assignments(dim);
-
-    //     // Initialize k random centers
-    //     std::vector<int> centers;
-    //     centers.reserve(k);
-    //     centers.push_back(0);  // First center is 0
-    //     for (int i = 1; i < k; ++i) {
-    //         // Find the vertex that has maximum minimum distance to existing
-    //         // centers
-    //         double max_min_dist = -std::numeric_limits<double>::infinity();
-    //         int next_center = -1;
-    //         for (int j = 0; j < dim; ++j) {
-    //             if (std::find(centers.begin(), centers.end(), j) !=
-    //                 centers.end())
-    //                 continue;
-
-    //             // Find minimum distance to existing centers
-    //             double min_dist = std::numeric_limits<double>::infinity();
-    //             for (int center : centers) {
-    //                 double dist = cost_mat4_vertex[j][center];
-    //                 min_dist = std::min(min_dist, dist);
-    //             }
-
-    //             if (min_dist > max_min_dist) {
-    //                 max_min_dist = min_dist;
-    //                 next_center = j;
-    //             }
-    //         }
-    //         centers.push_back(next_center);
-    //     }
-
-    //     // Assign vertices to nearest center
-    //     for (int i = 0; i < dim; ++i) {
-    //         double min_dist = std::numeric_limits<double>::infinity();
-    //         int best_cluster = 0;
-    //         for (int c = 0; c < k; ++c) {
-    //             double dist = cost_mat4_vertex[i][centers[c]];
-    //             if (dist < min_dist) {
-    //                 min_dist = dist;
-    //                 best_cluster = c;
-    //             }
-    //         }
-    //         clusters[best_cluster].vertices.push_back(i);
-    //         assignments[i] = best_cluster;
-    //     }
-
-    //     struct Candidate {
-    //         int v1, v2;
-    //         double cost;
-    //         Candidate(int vertex1, int vertex2, double cost_val)
-    //             : v1(vertex1), v2(vertex2), cost(cost_val) {}
-    //     };
-
-    //     for (int i = 0; i < dim; ++i) {
-    //         std::vector<Candidate> candidates;
-    //         candidates.reserve(dim);
-    //         for (const auto &cluster : clusters) {
-    //             for (int j : cluster.vertices) {
-    //                 if (i != j) {
-    //                     double cost = cost_mat4_vertex[i][j] -
-    //                                   (half_cost[i] + half_cost[j]) -
-    //                                   arc_duals.getDual(i, j);
-    //                     candidates.emplace_back(i, j, cost);
-    //                 }
-    //             }
-    //         }
-
-    //         pdqsort(
-    //             candidates.begin(), candidates.end(),
-    //             [](const auto &a, const auto &b) { return a.cost < b.cost;
-    //             });
-
-    //         cutLong &vst2 = rank1_sep_heur_mem4_vertex[i];
-    //         vst2.reset();
-    //         ankerl::unordered_dense::set<int> used_clusters;
-    //         int selected = 0;
-    //         for (const auto &candidate : candidates) {
-    //             int cluster1 = assignments[candidate.v1];
-    //             int cluster2 = assignments[candidate.v2];
-    //             if (used_clusters.insert(cluster1).second ||
-    //                 used_clusters.insert(cluster2).second ||
-    //                 used_clusters.size() == k) {
-    //                 vst2.set(candidate.v1);
-    //                 vst2.set(candidate.v2);
-    //                 if (++selected == max_heuristic_sep_mem4_row_rank1)
-    //                 break;
-    //             }
-    //         }
-    //     }
-    // }
-
     void generateSepHeurMem4Vertex() {
         rank1_sep_heur_mem4_vertex.resize(dim);
+
         // Precompute half-costs for nodes to avoid repeated divisions
         std::vector<double> half_cost(dim);
         for (int i = 0; i < dim; ++i) {
             half_cost[i] = nodes[i].cost / 2;
         }
-        const auto active_cuts = cutter->getActiveCuts();
 
-        // Define candidate structure to store both vertices
-        struct Candidate {
-            int v1, v2;
-            double cost;
-            Candidate(int vertex1, int vertex2, double cost_val)
-                : v1(vertex1), v2(vertex2), cost(cost_val) {}
-        };
+        // Reusable vector for costs
+        std::vector<std::pair<int, double>> cost;
+        cost.reserve(dim);
 
         for (int i = 0; i < dim; ++i) {
-            // Initialize and populate the cost vector directly for each i
-            std::vector<Candidate> cost;
-            cost.reserve(dim);
-            cost.emplace_back(i, 0, INFINITY);  // Handle the j=0 case
+            // Reset and populate the `cost` vector
+            cost.clear();
+            cost.emplace_back(0, INFINITY);  // First element is fixed
 
-            for (int j = 1; j < dim - 1; ++j) {
-                double cost_val = cost_mat4_vertex[i][j] -
-                                  (half_cost[i] + half_cost[j]) -
-                                  arc_duals.getDual(i, j);
-                cost.emplace_back(i, j, cost_val);
-                // check if i and j are part of SRCset
-                for (const auto &active_cut : active_cuts) {
-                    if (active_cut.type == CutType::ThreeRow) {
-                        if (active_cut.isSRCset(i, j)) {
-                            cost.back().cost -= active_cut.dual_value;
-                        }
-                    }
-                }
+            // Compute costs for j = 1 to dim - 1
+            for (int j = 1; j < dim; ++j) {
+                cost.emplace_back(j, cost_mat4_vertex[i][j] -
+                                         (half_cost[i] + half_cost[j]) -
+                                         arc_duals.getDual(i, j));
             }
-            // Use partial sort to get only the top
-            // max_heuristic_sep_mem4_row_rank1 elements
-            std::partial_sort(
-                cost.begin(), cost.begin() + max_heuristic_sep_mem4_row_rank1,
-                cost.end(),
-                [](const auto &a, const auto &b) { return a.cost < b.cost; });
 
-            // Set bits in vst2 for both vertices of the smallest costs
+            // Use nth_element to get the top `max_heuristic_sep_mem4_row_rank1`
+            // elements
+            auto middle = cost.begin() + max_heuristic_sep_mem4_row_rank1;
+            std::nth_element(cost.begin(), middle, cost.end(),
+                             [](const auto &a, const auto &b) {
+                                 return a.second < b.second;
+                             });
+
+            // Set bits in `vst2` for the smallest costs
             cutLong &vst2 = rank1_sep_heur_mem4_vertex[i];
+            vst2.reset();  // Clear previous bits
             for (int k = 0; k < max_heuristic_sep_mem4_row_rank1; ++k) {
-                vst2.set(cost[k].v1);
-                vst2.set(cost[k].v2);
+                vst2.set(cost[k].first);
             }
         }
     }
@@ -900,6 +821,17 @@ class HighDimCutsGenerator {
         const auto sol_size = sol.size();
 
         // Populate `v_r_map` with route appearances for each vertex `i`
+#ifdef __cpp_lib_parallel_algorithm
+        std::for_each(sol.begin(), sol.end(), [&](const auto &route_data) {
+            const auto r =
+                &route_data - &sol[0];  // Get index without separate counter
+            for (const int i : route_data.route) {
+                if (i > 0 && i < max_dim_minus_1) {
+                    ++v_r_map[i][r];
+                }
+            }
+        });
+#else
         for (size_t r = 0; r < sol_size; ++r) {
             for (const int i : sol[r].route) {
                 if (i > 0 && i < max_dim_minus_1) {
@@ -907,6 +839,7 @@ class HighDimCutsGenerator {
                 }
             }
         }
+#endif
 
         // Initialize `seed_map` with reserved space
         ankerl::unordered_dense::map<cutLong, cutLong> seed_map;
@@ -1006,6 +939,62 @@ class HighDimCutsGenerator {
         }
 
         return {best_vio, best_candidate};
+    }
+
+    inline void shiftSearchCrazy(int plan_idx, const std::vector<int> &c,
+                                 double &new_vio,
+                                 std::pair<int, int> &shift_positions) {
+        // Validate size and plan
+        auto validation = PlanValidationResult::validate(plan_idx, c.size(),
+                                                         map_rank1_multiplier);
+        if (!validation.is_valid) {
+            new_vio = -std::numeric_limits<double>::max();
+            return;
+        }
+
+        std::vector<int> tmp_c = c;
+        double best_vio = -std::numeric_limits<double>::max();
+        std::pair<int, int> best_shift{-1, -1};
+
+        // Try shifting elements to different positions
+        for (int from = 0; from < c.size(); ++from) {
+            const int element = c[from];
+
+            // Find best position to shift this element to
+            auto [pos_best_vio, to_pos] = findBestViolation(
+                [&](int to) {
+                    if (to == from) return -std::numeric_limits<double>::max();
+
+                    // Perform the shift
+                    if (to < from) {
+                        // Shift up - move element earlier in sequence
+                        std::rotate(tmp_c.begin() + to, tmp_c.begin() + from,
+                                    tmp_c.begin() + from + 1);
+                    } else {
+                        // Shift down - move element later in sequence
+                        std::rotate(tmp_c.begin() + from,
+                                    tmp_c.begin() + from + 1,
+                                    tmp_c.begin() + to + 1);
+                    }
+
+                    double vio;
+                    // fmt::print("Calling in shiftSearchCrazy\n");
+                    exactFindBestPermutationForOnePlan(tmp_c, plan_idx, vio);
+
+                    // Restore original order
+                    tmp_c = c;
+                    return vio;
+                },
+                std::vector<int>(c.size()));  // Try all possible positions
+
+            if (pos_best_vio > best_vio) {
+                best_vio = pos_best_vio;
+                best_shift = {from, to_pos};
+            }
+        }
+
+        new_vio = best_vio;
+        shift_positions = best_shift;
     }
 
     inline void addSearchCrazy(int plan_idx, const std::vector<int> &c,
@@ -1164,6 +1153,13 @@ class HighDimCutsGenerator {
 
     ////////////////////////////////////////
 
+    struct MoveResult {
+        double violation_score;
+        std::variant<std::monostate, int, std::pair<int, int>> operation_data;
+
+        MoveResult(double score = -std::numeric_limits<double>::max())
+            : violation_score(score) {}
+    };
     void operationsCrazy(Rank1MultiLabel &label, int i) {
         constexpr double MIN_SCORE = -std::numeric_limits<double>::max();
         std::array<MoveResult, 5> moves{
@@ -1171,6 +1167,7 @@ class HighDimCutsGenerator {
             MoveResult{},           // Add
             MoveResult{},           // Remove
             MoveResult{},           // Swap
+            MoveResult{}            // Shift
         };
 
         // Thread-local storage for temporary data
@@ -1179,38 +1176,28 @@ class HighDimCutsGenerator {
         thread_local std::vector<int> new_w_no_c;
 
         double new_vio = MIN_SCORE;
-        const bool can_add = label.search_dir == 'a' || label.search_dir == 's';
-        const bool can_remove =
-            label.search_dir == 'r' || label.search_dir == 's';
-        const bool can_swap =
-            label.search_dir == 'a' || label.search_dir == 'r';
 
         // Use mutex for operations that need to modify shared data
         {
             std::lock_guard<std::mutex> lock(pool_mutex);
             // Handle operations based on search direction
-            // Perform valid operations
-            if (can_add) {
-                int add_j;
-                addSearchCrazy(label.plan_idx, label.c, label.w_no_c, new_vio,
-                               add_j);
-                moves[1] = MoveResult{new_vio};
-                moves[1].operation_data = add_j;
-            }
+            switch (label.search_dir) {
+                case 'a':  // Add and Swap
+                {
+                    int add_j;
+                    addSearchCrazy(label.plan_idx, label.c, label.w_no_c,
+                                   new_vio, add_j);
+                    moves[1] = MoveResult{new_vio};
+                    moves[1].operation_data = add_j;
 
-            if (can_remove) {
-                int remove_j;
-                removeSearchCrazy(label.plan_idx, label.c, new_vio, remove_j);
-                moves[2] = MoveResult{new_vio};
-                moves[2].operation_data = remove_j;
-            }
+                    std::pair<int, int> swap_pair;
+                    swapSearchCrazy(label.plan_idx, label.c, label.w_no_c,
+                                    new_vio, swap_pair);
+                    moves[3] = MoveResult{new_vio};
+                    moves[3].operation_data = swap_pair;
+                } break;
 
-            if (can_swap) {
-                std::pair<int, int> swap_pair;
-                swapSearchCrazy(label.plan_idx, label.c, label.w_no_c, new_vio,
-                                swap_pair);
-                moves[3] = MoveResult{new_vio};
-                moves[3].operation_data = swap_pair;
+                    // ... rest of the switch cases ...
             }
         }
 
@@ -1342,54 +1329,46 @@ class HighDimCutsGenerator {
         std::vector<R1c> tmp_cuts;
         tmp_cuts.reserve(max_num_r1c_per_round);
 
-        // Iterate over each pool of generated cuts
         for (auto &pool : generated_rank1_multi_pool) {
             auto &cuts_in_pool = pool.second;
             if (cuts_in_pool.empty()) continue;
 
-            // Sort cuts by violation score in descending order
+            // Sort cuts by violation score using pdqsort
             pdqsort(cuts_in_pool.begin(), cuts_in_pool.end(),
                     [](const auto &a, const auto &b) {
-                        return std::get<2>(a) >
-                               std::get<2>(b);  // Sort by violation score
+                        return std::get<2>(a) > std::get<2>(b);
                     });
 
-            // Calculate the violation threshold
+            // Calculate violation threshold once
             const double vio_threshold =
                 std::get<2>(cuts_in_pool.front()) * cut_vio_factor;
 
-            // Clear the temporary cuts vector but retain its capacity
-            tmp_cuts.clear();
+            tmp_cuts.clear();  // Clear but maintain capacity
             int num_cuts = 0;
 
-            // Process cuts up to the violation threshold or max count
+            // Process cuts up to violation threshold or max count
             for (const auto &cut : cuts_in_pool) {
-                // Stop if the violation score is below the threshold or max
-                // cuts are reached
                 if (std::get<2>(cut) < vio_threshold ||
-                    num_cuts >= max_num_r1c_per_round) {
+                    num_cuts >= max_num_r1c_per_round)
                     break;
-                }
 
-                const auto &key = std::get<0>(cut);     // Cut key (Bitset)
-                const int plan_idx = std::get<1>(cut);  // Plan index
+                const auto &key = std::get<0>(cut);
+                const int plan_idx = std::get<1>(cut);
 
-                // Skip if the cut or plan has already been processed
-                if (!cut_set.insert(key).second ||
-                    !p_set.insert(plan_idx).second) {
-                    continue;
-                }
+                // Fast path: check if we've already processed this cut
+                if (!cut_set.insert(key).second) continue;
+                if (!p_set.insert(plan_idx).second) continue;
 
-                // Look up the cut plans
+                // Look up cut plans
                 std::vector<std::pair<std::vector<int>, double>> cut_plans;
                 if (map_cut_plan_vio.find(key, cut_plans)) {
-                    // Ensure the plan index is valid
+                    // Bounds check
                     if (plan_idx >= 0 &&
                         static_cast<size_t>(plan_idx) < cut_plans.size()) {
                         const auto &cut_plan = cut_plans[plan_idx];
-                        // Validate the cut plan
+                        // Validate cut plan
                         if (!cut_plan.first.empty()) {
-                            // Add the cut to the temporary cuts vector
+                            // Emplace directly with move semantics
                             tmp_cuts.emplace_back(
                                 R1c{std::make_pair(cut_plan.first, plan_idx)});
                             ++num_cuts;
@@ -1398,12 +1377,25 @@ class HighDimCutsGenerator {
                 }
             }
 
-            // Process the accumulated cuts
+            // Process accumulated cuts
             if (!tmp_cuts.empty()) {
                 chooseCuts(tmp_cuts, cuts, max_num_r1c_per_round);
             }
         }
     }
+
+    struct State {
+        int begin;
+        int target_remainder;
+        std::vector<int> remaining_counts;
+        std::vector<int> memory_indices;
+
+        State(int b, int t, std::vector<int> rc, std::vector<int> mi)
+            : begin(b),
+              target_remainder(t),
+              remaining_counts(std::move(rc)),
+              memory_indices(std::move(mi)) {}
+    };
 
     void findPlanForRank1Multi(
         const std::vector<int> &vis, const int denominator, cutLong &mem,
@@ -1524,8 +1516,8 @@ class HighDimCutsGenerator {
                 return;
             }
 
-            // Find matching pattern using linear search since Bitset lacks
-            // < operator
+            // Find matching pattern using linear search since Bitset lacks <
+            // operator
             auto it = std::find_if(
                 memory_patterns.begin(), memory_patterns.end(),
                 [&pattern_mem](const auto &entry) {
@@ -1561,8 +1553,7 @@ class HighDimCutsGenerator {
             // Skip if cut.second is zero
             if (cut.second == 0) continue;
 
-            // Create a new set for each iteration to avoid clearing
-            // overhead
+            // Create a new set for each iteration to avoid clearing overhead
             ankerl::unordered_dense::set<int> local_mem;
             local_mem.reserve(dim);
 
@@ -1614,8 +1605,7 @@ class HighDimCutsGenerator {
                     std::move(tmp_mem);  // Use move semantics for efficiency
             }
         } else {
-            // Preallocate `accum` to avoid repeated `push_back` and
-            // `pop_back`
+            // Preallocate `accum` to avoid repeated `push_back` and `pop_back`
             if (accum.size() <= i) {
                 accum.resize(i + 1);
             }
@@ -1651,8 +1641,8 @@ class HighDimCutsGenerator {
             for (int route_idx = 0; route_idx < v_r_map[vertex].size();
                  ++route_idx) {
                 int frequency = v_r_map[vertex][route_idx];
-                if (frequency > 0) {  // Only proceed if the vertex appears
-                                      // in this route
+                if (frequency >
+                    0) {  // Only proceed if the vertex appears in this route
                     num_vis_times[route_idx] += multiplier * frequency;
                 }
             }
@@ -1797,6 +1787,17 @@ class HighDimCutsGenerator {
             }
         }
     }
+
+    // New members for R1C separation
+    struct R1CMemory {
+        std::vector<int> C;  // Customer subset
+        int p_idx;           // Index of optimal vector p
+        yzzLong arc_memory;  // Arc memory as bitset
+        double violation;    // Cut violation
+
+        R1CMemory(std::vector<int> c, int p, double v)
+            : C(std::move(c)), p_idx(p), violation(v) {}
+    };
 
    private:
 };

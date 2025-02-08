@@ -336,26 +336,25 @@ class Stabilization {
             no_progress_count = 0;
         }
 
-        // if (!historical_avg.empty()) {
-        //     // Dynamic weighting based on optimization progress
-        //     double pw = std::min(
-        //         0.9, std::max(0.1, std::abs(lag_gap) /
-        //                                (std::abs(lag_gap_prev) + 1e-10)));
+        if (!historical_avg.empty()) {
+            // Dynamic weighting based on optimization progress
+            double pw = std::min(
+                0.9, std::max(0.1, std::abs(lag_gap) /
+                                       (std::abs(lag_gap_prev) + 1e-10)));
 
-        //     // fmt::print("Progress weight: {}\n", pw);
+            // fmt::print("Progress weight: {}\n", pw);
 
-        //     // Scale historical weight based on
-        //     // pool quality
-        //     // double historical_weight = (1.0
-        //     // - progress_weight);
+            // Scale historical weight based on
+            // pool quality
+            // double historical_weight = (1.0
+            // - progress_weight);
 
-        //     // Blend solutions with adaptive
-        //     // weights
-        //     for (size_t i = 0; i < nodeDuals.size(); ++i) {
-        //         nodeDuals[i] = pw * nodeDuals[i] + (1 - pw) *
-        //         historical_avg[i];
-        //     }
-        // }
+            // Blend solutions with adaptive
+            // weights
+            for (size_t i = 0; i < nodeDuals.size(); ++i) {
+                nodeDuals[i] = pw * nodeDuals[i] + (1 - pw) * historical_avg[i];
+            }
+        }
 
         if (nb_misprices == 0) {
             update_subgradient(dados, nodeDuals, best_pricing_cols);
