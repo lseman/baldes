@@ -144,21 +144,21 @@ class Stabilization {
         sizeDual = mast_dual_sol.size();
     }
 
-    // DualSolution getStabDualSol(const DualSolution &input_duals) {
-    //     std::vector<double> master_dual;
-    //     master_dual.assign(input_duals.begin(), input_duals.begin() +
-    //     sizeDual); if (cur_stab_center.empty()) {
-    //         return master_dual;
-    //     }
-    //     DualSolution stab_dual_sol(master_dual.size());
-    //     for (size_t i = 0; i < master_dual.size(); ++i) {
-    //         stab_dual_sol[i] =
-    //             std::max(0.0, cur_alpha * cur_stab_center[i] +
-    //                               (1 - cur_alpha) * master_dual[i]);
-    //     }
-    //     smooth_dual_sol = stab_dual_sol;
-    //     return stab_dual_sol;
-    // }
+    DualSolution getStabDualSol(const DualSolution &input_duals) {
+        std::vector<double> master_dual;
+        master_dual.assign(input_duals.begin(), input_duals.begin() + sizeDual);
+        if (cur_stab_center.empty()) {
+            return master_dual;
+        }
+        DualSolution stab_dual_sol(master_dual.size());
+        for (size_t i = 0; i < master_dual.size(); ++i) {
+            stab_dual_sol[i] =
+                std::max(0.0, cur_alpha * cur_stab_center[i] +
+                                  (1 - cur_alpha) * master_dual[i]);
+        }
+        smooth_dual_sol = stab_dual_sol;
+        return stab_dual_sol;
+    }
 
     inline double norm(const std::vector<double> &vector) {
         double res = 0;
@@ -326,7 +326,7 @@ class Stabilization {
         std::vector<double> nodeDuals(input_duals.begin(),
                                       input_duals.begin() + sizeDual);
 
-        mp_manager.updatePool(nodeDuals, -lp_obj);
+        mp_manager.updatePool(nodeDuals, lp_obj);
         DualSolution historical_avg = mp_manager.getWeightedSolution();
 
         // check for progress within a threshold

@@ -42,28 +42,24 @@ using Cuts = std::vector<Cut>;
 template <typename T>
 std::size_t compute_cut_key(const std::array<uint64_t, num_words> &baseSet,
                             const std::vector<T> &multipliers) {
-    XXH3_state_t *state = XXH3_createState();  // Initialize the XXH3 state
-    assert(state != nullptr);  // Ensure state creation succeeded
-    XXH3_64bits_reset(state);  // Reset the hashing state
+    // Initialize the XXH3 state once
+    XXH3_state_t *state = XXH3_createState();
+    assert(state != nullptr);
+    XXH3_64bits_reset(state);
 
-    // Hash the baseSet (uint64_t values) while preserving order
-    for (std::size_t i = 0; i < baseSet.size(); ++i) {
-        XXH3_64bits_update(state, &baseSet[i], sizeof(uint64_t));
-    }
+    // Hash baseSet as one contiguous block
+    XXH3_64bits_update(state, baseSet.data(),
+                       baseSet.size() * sizeof(uint64_t));
 
-    // Hash the multipliers (numeric values) while preserving order
-    for (std::size_t i = 0; i < multipliers.size(); ++i) {
-        XXH3_64bits_update(state, &multipliers[i], sizeof(T));
-    }
+    // Hash multipliers as one contiguous block
+    XXH3_64bits_update(state, multipliers.data(),
+                       multipliers.size() * sizeof(T));
 
-    // Finalize the hash
+    // Finalize and cleanup
     std::size_t cut_key = XXH3_64bits_digest(state);
-
-    XXH3_freeState(state);  // Free the state
-
+    XXH3_freeState(state);
     return cut_key;
 }
-
 /**
  * @brief Adds a cut to the CutStorage.
  *
@@ -126,7 +122,8 @@ LimitedMemoryRank1Cuts::LimitedMemoryRank1Cuts(std::vector<VRPNode> &nodes)
 void LimitedMemoryRank1Cuts::separate(const SparseMatrix &A,
                                       const std::vector<double> &x) {
     // Create a map for non-zero entries by rows
-    std::vector<std::vector<int>> row_indices_map(N_SIZE);
+    ankerl::unordered_dense::map<int, ankerl::unordered_dense::set<int>>
+        row_indices_map;
     // print num_rows
     // fmt::print("Num rows: {}\n", A.num_rows);
     for (int idx = 0; idx < A.values.size(); ++idx) {
@@ -135,38 +132,34 @@ void LimitedMemoryRank1Cuts::separate(const SparseMatrix &A,
         if (row > N_SIZE - 2) {
             continue;
         }
-        row_indices_map[row + 1].push_back(idx);
+        row_indices_map[row + 1].insert(idx);
     }
     std::vector<std::pair<double, Cut>> tmp_cuts;
 
     const int JOBS = std::thread::hardware_concurrency();
 
     auto nC = N_SIZE;
-    std::vector<std::tuple<int, int, int>> tasks;
-    tasks.reserve((nC * (nC - 1) * (nC - 2)) /
-                  6);  // Preallocate task space to avoid reallocations
-
-    // Create tasks for each combination of (i, j, k)
-    for (int i = 1; i < N_SIZE - 1; ++i) {
-        for (int j = i + 1; j < N_SIZE - 1; ++j) {
-            for (int k = j + 1; k < N_SIZE - 1; ++k) {
-                tasks.emplace_back(i, j, k);
-            }
-        }
-    }
 
     // Define chunk size to reduce parallelization overhead
-    const int chunk_size = (N_SIZE - 1) / JOBS;
+    const int chunk_size = tasks.size() / JOBS;
 #ifdef NSYNC
     nsync::nsync_mu cuts_mutex = NSYNC_MU_INIT;
 #else
     std::mutex cuts_mutex;  // Protect access to shared resources
 #endif
 
+    SRCPermutation p;
+    p.num = {1, 1, 1};
+    p.den = 2;
+    double rhs = 0.0;
+    for (size_t i = 0; i < 3; ++i) {
+        rhs += static_cast<double>(p.num[i]) / p.den;
+    }
+
     // Parallel execution in chunks
     auto bulk_sender = stdexec::bulk(
         stdexec::just(), (tasks.size() + chunk_size - 1) / chunk_size,
-        [this, &row_indices_map, &A, &x, nC, &cuts_mutex, &tasks, chunk_size,
+        [this, &row_indices_map, &A, &x, nC, &cuts_mutex, chunk_size, &p, &rhs,
          &tmp_cuts](std::size_t chunk_idx) {
             size_t start_idx = chunk_idx * chunk_size;
             size_t end_idx = std::min(start_idx + chunk_size, tasks.size());
@@ -208,13 +201,7 @@ void LimitedMemoryRank1Cuts::separate(const SparseMatrix &A,
                     std::vector<int> remainingNodes;
                     remainingNodes.assign(buffer_int.begin(),
                                           buffer_int.begin() + buffer_int_n);
-                    SRCPermutation p;
-                    p.num = {1, 1, 1};
-                    p.den = 2;
-                    double rhs = 0.0;
-                    for (size_t i = 0; i < 3; ++i) {
-                        rhs += static_cast<double>(p.num[i]) / p.den;
-                    }
+
                     rhs = std::floor(rhs);
 
                     std::vector<double> cut_coefficients(allPaths.size(), 0.0);
@@ -222,8 +209,8 @@ void LimitedMemoryRank1Cuts::separate(const SparseMatrix &A,
                     ankerl::unordered_dense::set<int> C_set(C_index.begin(),
                                                             C_index.end());
                     for (auto node : remainingNodes) {
-                        auto &consumers =
-                            allPaths[node];  // Reference to the consumers for
+                        auto &consumers = allPaths[node];  // Reference to the
+                                                           // consumers for
                         // in-place modification
 
                         int first = -1, second = -1;
@@ -236,22 +223,15 @@ void LimitedMemoryRank1Cuts::separate(const SparseMatrix &A,
                                     first = i;
                                 } else {
                                     second = i;
-                                    break;  // We found both first and second,
-                                    // so we can exit the loop
+                                    for (int i = first + 1; i < second; ++i) {
+                                        AM[consumers[i] / 64] |=
+                                            (1ULL
+                                             << (consumers[i] %
+                                                 64));  // Set the bit for the
+                                        // consumer
+                                    }
                                 }
                             }
-                        }
-
-                        // If we found both the first and second indices,
-                        // mark nodes in AM
-                        if (first != -1 && second != -1) {
-                            for (int i = first + 1; i < second; ++i) {
-                                AM[consumers[i] / 64] |=
-                                    (1ULL
-                                     << (consumers[i] %
-                                         64));  // Set the bit for the consumer
-                            }
-                            // break;
                         }
                     }
 
@@ -263,9 +243,10 @@ void LimitedMemoryRank1Cuts::separate(const SparseMatrix &A,
                     for (auto path : allPaths) {
                         auto &clients = path.route;  // Reference to clients for
                                                      // in-place modification
-                        cut_coefficients[z++] = computeLimitedMemoryCoefficient(
+                        cut_coefficients[z] = computeLimitedMemoryCoefficient(
                             C, AM, p, clients, order);
-                        lhs += cut_coefficients[z - 1] * x[z - 1];
+                        lhs += cut_coefficients[z] * x[z];
+                        z++;
                     }
                     auto violation = lhs - (rhs + 1e-3);
 
@@ -324,14 +305,14 @@ std::pair<bool, bool> LimitedMemoryRank1Cuts::runSeparation(
     //     z++;
     // }
 
-    // separateR1C1(matrix.A_sparse, solution);
+    separateR1C1(matrix.A_sparse, solution);
     // if (cuts_before != cuts->size()) {
     //     return {true, false};
     // }
     separate(matrix.A_sparse, solution);
-    if (cuts_before != cuts->size()) {
-        return {true, false};
-    }
+    // if (cuts_before != cuts->size()) {
+    //     return {true, false};
+    // }
     auto initial_cut_count = cuts->size();
     int rank3_cuts_size = cuts->size() - initial_cut_count;
     high_rank_cuts.cutStorage = &cutStorage;
@@ -371,7 +352,7 @@ bool LimitedMemoryRank1Cuts::cutCleaner(
 
         // If the slack is positive, it means the constraint is not
         // violated
-        if (std::abs(slack) > 1e-3) {
+        if (std::abs(slack) > 0) {
             cleaned = true;
             node->remove(constr);
             cuts->removeCut(cuts->getID(

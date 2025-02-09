@@ -577,9 +577,10 @@ Label *BucketGraph::get_best_label(const std::vector<int> &topological_order,
 template <Stage S, Symmetry SYM>
 void BucketGraph::ConcatenateLabel(const Label *L, int &b, double &best_cost,
                                    std::vector<uint64_t> &Bvisited) {
-    static thread_local std::array<int, R_SIZE> bucket_stack;
-    int stack_size = 1;
-    bucket_stack[0] = b;
+    static thread_local std::vector<int> bucket_stack;
+    bucket_stack.reserve(R_SIZE);  // Do this once at initialization
+    bucket_stack.clear();          // Clear for reuse
+    bucket_stack.push_back(b);
 
     auto &other_buckets = assign_symmetry<SYM>(fw_buckets, bw_buckets);
     auto &other_c_bar = assign_symmetry<SYM>(fw_c_bar, bw_c_bar);
@@ -604,8 +605,9 @@ void BucketGraph::ConcatenateLabel(const Label *L, int &b, double &best_cost,
 
 #endif
 
-    while (stack_size > 0) {
-        const int current_bucket = bucket_stack[--stack_size];
+    while (!bucket_stack.empty()) {
+        const int current_bucket = bucket_stack.back();
+        bucket_stack.pop_back();
 
         // Optimize bit operations for visited tracking
         const size_t segment = current_bucket >> 6;
@@ -647,16 +649,16 @@ void BucketGraph::ConcatenateLabel(const Label *L, int &b, double &best_cost,
             }
 
             // Visited nodes overlap check
-            if constexpr (S >= Stage::Three) {
-                bool has_overlap = false;
-                for (size_t i = 0; i < bitmap_size; ++i) {
-                    if (L->visited_bitmap[i] & L_bw->visited_bitmap[i]) {
-                        has_overlap = true;
-                        break;
-                    }
+            // if constexpr (S >= Stage::Three) {
+            bool has_overlap = false;
+            for (size_t i = 0; i < bitmap_size; ++i) {
+                if (L->visited_bitmap[i] & L_bw->visited_bitmap[i]) {
+                    has_overlap = true;
+                    break;
                 }
-                if (has_overlap) continue;
             }
+            if (has_overlap) continue;
+            // }
 
             double total_cost = path_cost + L_bw->cost;
 
@@ -693,7 +695,7 @@ void BucketGraph::ConcatenateLabel(const Label *L, int &b, double &best_cost,
             const size_t seg_prime = b_prime >> 6;
             const uint64_t mask_prime = bit_mask_lookup[b_prime & 63];
             if (!(Bvisited[seg_prime] & mask_prime)) {
-                bucket_stack[stack_size++] = b_prime;
+                bucket_stack.push_back(b_prime);
             }
         }
     }

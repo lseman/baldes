@@ -132,7 +132,7 @@ if(WITH_PYTHON)
   )
 endif()
 
-if(IPM OR IPM_ACEL)
+if(IPM)
   cpmaddpackage(
     NAME
     Eigen
@@ -270,7 +270,7 @@ if(RCC)
   list(APPEND EXECUTABLE_SOURCES ${CVRPSEP_SOURCES} src/RCC.cpp)
 endif()
 
-if(IPM OR IPM_ACEL)
+if(IPM)
   list(APPEND EXECUTABLE_SOURCES ${IPM_SOURCES})
 endif()
 

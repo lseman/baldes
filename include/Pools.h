@@ -179,124 +179,94 @@ class SchrodingerPool {
  */
 class LabelPool {
    private:
-    // Memory block for contiguous allocation
+    static constexpr size_t BLOCK_SIZE = 1024;  // Adjust based on profiling
+
     struct MemoryBlock {
-        static constexpr size_t BLOCK_SIZE =
-            1024;  // See if this can be optimized
         std::unique_ptr<Label[]> data;
         size_t used = 0;
 
         MemoryBlock() : data(std::make_unique<Label[]>(BLOCK_SIZE)) {}
-
-        Label *allocate() {
-            if (used >= BLOCK_SIZE) return nullptr;
-            return &data[used++];
-        }
     };
 
     size_t pool_size;
     size_t max_pool_size;
-    std::vector<std::unique_ptr<MemoryBlock>> memory_blocks;
+    std::vector<MemoryBlock> memory_blocks;
 
-    // Use indices instead of pointers for better cache locality
-    struct LabelRef {
-        size_t block_index;
-        size_t offset;
-    };
+    // Free list to manage available labels
+    std::vector<Label *> free_list;
 
-    std::vector<LabelRef> available_labels;
-    std::vector<LabelRef> in_use_labels;
+    // Contiguous storage for in-use labels
+    std::vector<Label *> in_use_labels;
 
     void allocate_labels(size_t count) {
-        size_t blocks_needed =
-            (count + MemoryBlock::BLOCK_SIZE - 1) / MemoryBlock::BLOCK_SIZE;
+        size_t blocks_needed = (count + BLOCK_SIZE - 1) / BLOCK_SIZE;
         size_t current_block = memory_blocks.size();
 
-        available_labels.reserve(available_labels.size() + count);
+        memory_blocks.reserve(memory_blocks.size() + blocks_needed);
+        free_list.reserve(free_list.size() + count);
 
         for (size_t b = 0; b < blocks_needed; ++b) {
-            auto block = std::make_unique<MemoryBlock>();
-            size_t block_alloc = std::min(count - b * MemoryBlock::BLOCK_SIZE,
-                                          MemoryBlock::BLOCK_SIZE);
+            memory_blocks.emplace_back();
+            auto &block = memory_blocks.back();
+            size_t block_alloc = std::min(count - b * BLOCK_SIZE, BLOCK_SIZE);
 
             for (size_t i = 0; i < block_alloc; ++i) {
-                available_labels.push_back({current_block, i});
+                free_list.push_back(&block.data[i]);
             }
 
-            block->used = block_alloc;
-            memory_blocks.push_back(std::move(block));
-            current_block++;
+            block.used = block_alloc;
         }
-    }
-
-    Label *get_label(const LabelRef &ref) {
-        assert(ref.block_index < memory_blocks.size());
-        assert(ref.offset < memory_blocks[ref.block_index]->used);
-        return &memory_blocks[ref.block_index]->data[ref.offset];
     }
 
    public:
     explicit LabelPool(size_t initial_pool_size, size_t max_pool_size = 5000000)
         : pool_size(initial_pool_size), max_pool_size(max_pool_size) {
-        memory_blocks.reserve(initial_pool_size / MemoryBlock::BLOCK_SIZE + 1);
-        available_labels.reserve(initial_pool_size);
+        memory_blocks.reserve(initial_pool_size / BLOCK_SIZE + 1);
+        free_list.reserve(initial_pool_size);
         in_use_labels.reserve(initial_pool_size);
         allocate_labels(pool_size);
     }
 
     Label *acquire() {
-        if (!available_labels.empty()) {
-            LabelRef ref = available_labels.back();
-            available_labels.pop_back();
-
-            Label *label = get_label(ref);
+        if (!free_list.empty()) {
+            Label *label = free_list.back();
+            free_list.pop_back();
             label->reset();
-
-            in_use_labels.push_back(ref);
+            in_use_labels.push_back(label);
             return label;
         }
 
-        // Need to allocate a new block
-        if (memory_blocks.empty() ||
-            memory_blocks.back()->used >= MemoryBlock::BLOCK_SIZE) {
-            size_t new_block_idx = memory_blocks.size();
-            auto block = std::make_unique<MemoryBlock>();
-            LabelRef ref = {new_block_idx, 0};
-            block->used = 1;
-
-            Label *label = block->data.get();
-            memory_blocks.push_back(std::move(block));
-            in_use_labels.push_back(ref);
+        // Allocate a new block if no labels are available
+        if (memory_blocks.empty() || memory_blocks.back().used >= BLOCK_SIZE) {
+            memory_blocks.emplace_back();
+            auto &block = memory_blocks.back();
+            Label *label = &block.data[0];
+            block.used = 1;
+            in_use_labels.push_back(label);
             return label;
         }
 
         // Use existing block
         auto &block = memory_blocks.back();
-        LabelRef ref = {memory_blocks.size() - 1, block->used};
-        block->used++;
-
-        Label *label = get_label(ref);
-        in_use_labels.push_back(ref);
+        Label *label = &block.data[block.used];
+        block.used++;
+        in_use_labels.push_back(label);
         return label;
     }
 
     void reset() {
-        // Reuse existing capacity
-        available_labels.reserve(available_labels.size() +
-                                 in_use_labels.size());
-
-        // Move all in-use labels back to available pool
-        available_labels.insert(available_labels.end(),
-                                std::make_move_iterator(in_use_labels.begin()),
-                                std::make_move_iterator(in_use_labels.end()));
-
+        // Move all in-use labels back to the free list
+        free_list.reserve(free_list.size() + in_use_labels.size());
+        for (auto label : in_use_labels) {
+            free_list.push_back(label);
+        }
         in_use_labels.clear();
     }
 
     void cleanup() {
-        available_labels.clear();
+        free_list.clear();
         in_use_labels.clear();
-        memory_blocks.clear();  // This will delete all Label objects
+        memory_blocks.clear();
     }
 
     ~LabelPool() { cleanup(); }

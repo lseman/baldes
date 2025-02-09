@@ -44,9 +44,9 @@ struct BucketOptions {
     std::vector<int> resource_type = {1};
     std::vector<int> or_resources = {1};
 
-    int n_warm_start = 25;
+    int n_warm_start = 50;
 
-    bool warm_start = false;
+    bool warm_start = true;
 
     // EVRP options
     int battery_capacity = 100;

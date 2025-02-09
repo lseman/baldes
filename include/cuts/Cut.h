@@ -337,7 +337,7 @@ class CutStorage {
         active_cuts.reserve(cuts.size());  // Pre-allocate for efficiency
 
         for (size_t i = 0; i < cuts.size(); ++i) {
-            if (i < SRCDuals.size() && std::abs(SRCDuals[i]) > 1e-3) {
+            if (i < SRCDuals.size() && std::abs(SRCDuals[i]) > 0) {
                 active_cuts.emplace_back(i, &cuts[i], SRCDuals[i],
                                          cuts[i].type);
             }

@@ -47,7 +47,7 @@
 
 #include "Hashes.h"
 
-#if defined(IPM) || defined(IPM_ACEL)
+#if defined(IPM)
 #include "ipm/IPSolver.h"
 #endif
 
@@ -492,6 +492,10 @@ class VRProblem {
     bool CG(BNBNode *node, int max_iter = 5000) {
         print_info("Column generation preparation...\n");
 
+        std::random_device rd;
+        Xoroshiro128Plus gen(rd());
+        std::uniform_real_distribution<> dis(-0.1, 0.1);
+
         node->relaxNode();
         node->optimize();
         relaxed_result = std::numeric_limits<double>::max();
@@ -603,7 +607,7 @@ class VRProblem {
 #ifdef IPM_ACEL
         int base_threshold = 20;
         int adaptive_threshold;
-        IPSolver ipm_solver;
+        // IPSolver ipm_solver;
         bool use_ipm_duals = false;
 #endif
         bool rcc = false;
@@ -840,10 +844,10 @@ class VRProblem {
                 stab.updateNumK(numK);
                 stab.update_stabilization_after_master_optim(nodeDuals);
                 stab.setObj(lp_obj);
-                nodeDuals = stab.getStabDualSolAdvanced(nodeDuals);
 
                 misprice = true;
                 while (misprice) {
+                    nodeDuals = stab.getStabDualSolAdvanced(nodeDuals);
                     solution = node->extractSolution();
 #endif
 
@@ -870,7 +874,7 @@ class VRProblem {
                                 integer_solution = std::round(lp_obj);
                                 bucket_graph->incumbent = integer_solution;
 #ifdef STAB
-                                stab.clearAlpha();
+                                // stab.clearAlpha();
 #endif
                             }
                         }
@@ -905,22 +909,37 @@ class VRProblem {
                             }
                         };
 
-                    adaptive_threshold = std::max(
-                        base_threshold,
-                        base_threshold +
-                            iter / 100);  // Adapt with total iterations
-                    if (std::abs(lp_obj - lp_obj_old) < 1) {
+                    adaptive_threshold =
+                        std::max(base_threshold,
+                                 base_threshold +
+                                     iter / 50);  // Adapt with total iterations
+                    if (std::abs(lp_obj - lp_obj_old) < 1 && stage >= 4) {
                         iter_non_improv += 1;
                         if (iter_non_improv > adaptive_threshold) {
                             if (stab.alpha > 0) {
+                                // print_info(
+                                // "No improvement in the last "
+                                // "iterations, "
+                                // "generating dual perturbation with "
+                                // "IPM\n");
+
                                 print_info(
                                     "No improvement in the last "
                                     "iterations, "
-                                    "running "
-                                    "IPM\n");
-                                updateGapAndRunOptimization(
-                                    node, lp_obj, inner_obj, ipm_solver,
-                                    iter_non_improv, use_ipm_duals, nodeDuals);
+                                    "generating dual perturbation\n");
+                                force_cuts = true;
+
+                                // create small perturbation random perturbation
+                                // on nodeDuals
+                                for (auto &dual : nodeDuals) {
+                                    if (std::abs(dual) > 1e-3) {
+                                        dual *= (1.0 + dis(gen));
+                                    }
+                                }
+                                // updateGapAndRunOptimization(
+                                //     node, lp_obj, inner_obj, ipm_solver,
+                                //     iter_non_improv, use_ipm_duals,
+                                //     nodeDuals);
                                 stab.define_smooth_dual_sol(nodeDuals);
                                 iter_non_improv = 0;
                                 use_ipm_duals = true;
@@ -974,7 +993,6 @@ class VRProblem {
                     }
                     if (colAdded == 0) {
                         stab.update_stabilization_after_misprice();
-                        nodeDuals = stab.getStabDualSolAdvanced(nodeDuals);
                     } else {
                         misprice = false;
                     }

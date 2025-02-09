@@ -51,6 +51,59 @@
  * counts.
  *
  */
+
+inline auto computeThreshold(int iteration, double inner_obj,
+                             const Stats &stats) {
+    // Constants for threshold computation
+    const double INITIAL_BASE = -15.0;
+    const double DECAY_RATE = 0.003;
+    const double MIN_THRESHOLD = -10.0;
+    const double MAX_THRESHOLD = -1.5;
+    const double STAGNATION_TARGET = -1.5;
+    const int STAGNATION_WINDOW =
+        10;  // Number of iterations to check for stagnation
+
+    // Base threshold with exponential decay
+    double base = INITIAL_BASE * std::exp(-DECAY_RATE * iteration);
+
+    // Adjust based on recent progress
+    double progress_factor = 1.0;
+    if (stats.hasHistory()) {
+        double avg_improvement = stats.getRecentImprovement(STAGNATION_WINDOW);
+        progress_factor = std::max(0.8, std::min(1.2, avg_improvement));
+    }
+
+    // Add dynamic component based on current inner_obj value
+    double dynamic_component = 0.01 * std::log(1 + std::abs(inner_obj));
+
+    // Combine components to compute the initial threshold
+    double threshold = base * progress_factor + dynamic_component;
+
+    // Check for stagnation in the objective value
+    static double prev_inner_obj = inner_obj;
+    static int stagnation_counter = 0;
+
+    if (std::abs(inner_obj - prev_inner_obj) < 1e-6) {
+        stagnation_counter++;
+    } else {
+        stagnation_counter = 0;  // Reset if there's improvement
+    }
+    prev_inner_obj = inner_obj;
+
+    // If stagnation is detected, gradually move the threshold toward -1.5
+    if (stagnation_counter >= STAGNATION_WINDOW) {
+        double stagnation_factor =
+            static_cast<double>(stagnation_counter - STAGNATION_WINDOW) /
+            STAGNATION_WINDOW;
+        threshold =
+            threshold + stagnation_factor * (STAGNATION_TARGET - threshold);
+    }
+
+    // Ensure the threshold stays within bounds
+    threshold = std::max(MIN_THRESHOLD, std::min(MAX_THRESHOLD, threshold));
+    // print_info("Computed threshold: {}\n", threshold);
+    return threshold;
+}
 template <Symmetry SYM>
 inline std::vector<Label *> BucketGraph::solve(bool trigger) {
     // Initialize the status as not optimal at the start
@@ -150,7 +203,8 @@ inline std::vector<Label *> BucketGraph::solve(bool trigger) {
         }
         // If the objective improves sufficiently, set the status to separation
         // or optimal
-        if (inner_obj > -5.0) {
+        auto threshold = -1.5;  // computeThreshold(iter, inner_obj, stats);
+        if (inner_obj > threshold) {
             ss = true;  // Enter separation mode (for SRC handling)
 #if !defined(SRC) && !defined(SRC3)
             status = Status::Optimal;  // If SRC is not defined, set status to
@@ -242,10 +296,6 @@ std::vector<double> BucketGraph::labeling_algorithm() {
     const size_t n_segments = (n_buckets + 63) >> 6;
     std::vector<uint64_t> Bvisited(n_segments);
 
-    // Use small vector optimization for new labels
-    std::vector<Label *> new_labels;
-    new_labels.reserve(8);
-
     // Process SCCs in topological order
     for (const auto &scc_index : topological_order) {
         bool all_ext;
@@ -288,12 +338,16 @@ std::vector<double> BucketGraph::labeling_algorithm() {
 
                     // Check dominance in smaller buckets
                     if constexpr (F != Full::TSP) {
+                        // random change of callong the function
+                        // auto change = rand() % 100;
+                        // if (change < 95) {
                         if (DominatedInCompWiseSmallerBuckets<D, S>(
                                 label, bucket, c_bar, Bvisited, stat_n_dom)) {
                             // buckets[label->vertex].lazy_flush(label);
                             // label->set_extended(true);
                             label->set_dominated(true);
                             continue;
+                            // }
                         }
                     }
 
@@ -301,11 +355,9 @@ std::vector<double> BucketGraph::labeling_algorithm() {
                     auto node_id = label->node_id;
 
                     const auto &node_arcs =
-                        nodes[node_id].template get_arcs<D>(scc_index);
+                        nodes[node_id].template get_arcs<D>();
 
                     for (const auto &arc : node_arcs) {
-                        new_labels.clear();
-
                         auto extended_labels =
                             Extend<D, S, ArcType::Node, Mutability::Mut, F>(
                                 label, arc);
@@ -483,14 +535,15 @@ std::vector<Label *> BucketGraph::bi_labeling_algorithm() {
     for (int bucket = 0; bucket < fw_buckets_size; ++bucket) {
         const auto &bucket_labels = fw_buckets[bucket].get_labels();
 
-        if constexpr (S == Stage::Four) {
-            non_dominated_labels_per_bucket += bucket_labels.size();
-        }
+        // if constexpr (S == Stage::Four) {
+        //     non_dominated_labels_per_bucket += bucket_labels.size();
+        // }
 
         for (const Label *L : bucket_labels) {
             if (L->is_dominated) {
                 continue;
             }
+            non_dominated_labels_per_bucket++;
             const auto &to_arcs =
                 nodes[L->node_id].get_arcs<Direction::Forward>();
 
@@ -887,22 +940,18 @@ inline std::vector<Label *> BucketGraph::Extend(
  *
  */
 template <Direction D, Stage S>
-inline bool BucketGraph::is_dominated(const Label *new_label,
-                                      const Label *label) noexcept {
-    // Extract resources for the new label and the comparison label
-    const auto &new_resources = new_label->resources;
-    const auto &label_resources = label->resources;
-
-    {
-        // Simple cost check: if the comparison label has a higher cost, it
-        // is not dominated
-        if (label->cost > new_label->cost) {
-            return false;
-        }
+inline bool BucketGraph::is_dominated(const Label *__restrict new_label,
+                                      const Label *__restrict label) noexcept {
+    // Early exit on cost check
+    const double cost_diff = label->cost - new_label->cost;
+    if (cost_diff > 0) {
+        return false;
     }
 
-    // Check resource conditions based on the direction (Forward or
-    // Backward)
+    // Resource comparison using vectorization-friendly code
+    const auto *__restrict new_resources = new_label->resources.data();
+    const auto *__restrict label_resources = label->resources.data();
+
     for (size_t i = 0; i < options.resources.size(); ++i) {
         if constexpr (D == Direction::Forward) {
             // In Forward direction: the comparison label must not have more
@@ -919,8 +968,6 @@ inline bool BucketGraph::is_dominated(const Label *new_label,
         }
     }
 
-    // TODO:: check again this unreachable dominance
-#ifndef UNREACHABLE_DOMINANCE
     // Check visited nodes (bitmap comparison) for Stages 3, 4, and
     // Enumerate
     if constexpr (S == Stage::Three || S == Stage::Four ||
@@ -936,59 +983,31 @@ inline bool BucketGraph::is_dominated(const Label *new_label,
             }
         }
     }
-#else
-    // Unreachable dominance logic: check visited and unreachable nodes in
-    // Stages 3, 4, and Enumerate
-    if constexpr (S == Stage::Three || S == Stage::Four ||
-                  S == Stage::Enumerate) {
-        for (size_t i = 0; i < label->visited_bitmap.size(); ++i) {
-            // Combine visited and unreachable nodes in the comparison
-            // label's bitmap
-            auto combined_label_bitmap =
-                label->visited_bitmap[i] | label->unreachable_bitmap[i];
-            // Ensure the new label visits all nodes that the comparison
-            // label (or its unreachable nodes) visits
-            if ((combined_label_bitmap & ~new_label->visited_bitmap[i]) != 0) {
-                return false;
-            }
-        }
-    }
-#endif
 
 #ifdef SRC
     if constexpr (S == Stage::Four || S == Stage::Enumerate) {
-        double sumSRC = 0;
+        const auto *__restrict label_srcs = label->SRCmap.data();
+        const auto *__restrict new_label_srcs = new_label->SRCmap.data();
 
-        const auto &SRCDuals = cut_storage->SRCDuals;
-        if (!SRCDuals.empty()) {
-            const auto &labelSRCMap = label->SRCmap;
-            const auto &newLabelSRCMap = new_label->SRCmap;
-            for (size_t i = 0; i < SRCDuals.size(); ++i) {
-                if (SRCDuals[i] == 0) {
-                    continue;
-                }
-                // const auto &den = cut_storage->getCut(i).p.den;
-                const auto labelMod = labelSRCMap[i];        // % den;
-                const auto newLabelMod = newLabelSRCMap[i];  // % den;
-                if (labelMod > newLabelMod) {
-                    sumSRC += SRCDuals[i];
-                    if (label->cost - sumSRC > new_label->cost) {
-                        return false;
-                    }
+        // Process active cuts in batches for better cache utilization
+        double sum = 0.0;
+        const auto &active_cuts = cut_storage->getActiveCuts();
+        const size_t num_cuts = active_cuts.size();
+
+        // Process cuts in batches
+        for (auto &cut : active_cuts) {
+            if (label_srcs[cut.index] > new_label_srcs[cut.index]) {
+                sum += cut.dual_value;
+                if (cost_diff - sum > 0) {
+                    return false;
                 }
             }
-        }
-        if (label->cost - sumSRC > new_label->cost) {
-            return false;
         }
     }
 #endif
 
-    // If all conditions are met, return true, indicating that the new label
-    // is dominated by the comparison label
     return true;
 }
-
 /**
  * @brief Checks if element 'a' precedes element 'b' in the given strongly
  * connected components (SCCs).
@@ -999,16 +1018,30 @@ inline bool BucketGraph::is_dominated(const Label *new_label,
  *
  */
 template <typename T>
-inline bool precedes(const std::vector<std::vector<int>> &sccs, const T a,
-                     const T b, const UnionFind &uf) {
-    // Step 2: Check if element `a`'s SCC precedes element `b`'s SCC
-    // size_t rootA = uf.getSubset(a);
-    // size_t rootB = uf.getSubset(b);
+inline bool precedes(
+    const std::vector<std::vector<int>> &sccs, const T a, const T b,
+    const UnionFind &uf,
+    ankerl::unordered_dense::map<std::pair<T, T>, bool> &cache) {
+    // Create a key for the cache
+    std::pair<T, T> key = std::make_pair(a, b);
 
-    // You can define precedence based on the comparison of the root
-    // components
-    // return rootA < rootB;
-    return uf.compareSubsets(a, b);
+    // Check if the result is already in the cache
+    auto it = cache.find(key);
+    if (it != cache.end()) {
+        return it->second;  // Return the cached result
+    }
+
+    // Step 2: Check if element `a`'s SCC precedes element `b`'s SCC
+    size_t rootA = uf.getSubset(a);
+    size_t rootB = uf.getSubset(b);
+
+    // Compute the result
+    bool result = rootA < rootB;
+
+    // Cache the result for future use
+    cache[key] = result;
+
+    return result;
 }
 /**
  * @brief Determines if a label is dominated in component-wise smaller
@@ -1027,6 +1060,8 @@ inline bool BucketGraph::DominatedInCompWiseSmallerBuckets(
     const auto &buckets = assign_buckets<D>(fw_buckets, bw_buckets);
     const auto &Phi = assign_buckets<D>(Phi_fw, Phi_bw);
     const auto &uf = assign_buckets<D>(fw_union_find, bw_union_find);
+    const auto &sccs = assign_buckets<D>(fw_ordered_sccs, bw_ordered_sccs);
+    auto &union_cache = assign_buckets<D>(fw_union_cache, bw_union_cache);
 
     // Cache frequently used values
     const int b_L = L->vertex;
@@ -1034,9 +1069,9 @@ inline bool BucketGraph::DominatedInCompWiseSmallerBuckets(
     const size_t res_size = options.resources.size();
 
     // Stack-based implementation with dynamic size
-    std::array<int, R_SIZE> stack_buffer;  // Larger fixed size
-    int stack_size = 1;
-    stack_buffer[0] = bucket;
+    static thread_local std::vector<int> stack_buffer;
+    stack_buffer.reserve(R_SIZE);
+    stack_buffer.push_back(bucket);
 
     const auto check_dominance = [&](const std::vector<Label *> &labels) {
 #ifndef __AVX2__
@@ -1044,9 +1079,7 @@ inline bool BucketGraph::DominatedInCompWiseSmallerBuckets(
                                                     res_size);
 #endif
         {
-            for (size_t i = 0; i < labels.size(); ++i) {
-                // Prefetch 4-8 labels ahead for L1 cache
-                auto *existing_label = labels[i];
+            for (auto &existing_label : labels) {
                 if (!existing_label->is_dominated &&
                     is_dominated<D, S>(L, existing_label)) {
                     ++stat_n_dom;
@@ -1058,8 +1091,9 @@ inline bool BucketGraph::DominatedInCompWiseSmallerBuckets(
     };
 
     // Main processing loop with optimizations
-    while (stack_size > 0) {
-        const int current_bucket = stack_buffer[--stack_size];
+    while (!stack_buffer.empty()) {
+        const int current_bucket = stack_buffer.back();
+        stack_buffer.pop_back();
 
         // Optimize bit operations using pre-computed masks
         const size_t segment = static_cast<size_t>(current_bucket) >> 6;
@@ -1068,8 +1102,8 @@ inline bool BucketGraph::DominatedInCompWiseSmallerBuckets(
 
         // Early exit check with likely hint for better branch
         // prediction
-        if (likely(label_cost < c_bar[current_bucket] &&
-                   uf.compareSubsets(b_L, current_bucket))) {
+        if (label_cost < c_bar[current_bucket] &&
+            ::precedes(sccs, current_bucket, b_L, uf, union_cache)) {
             return false;
         }
 
@@ -1083,15 +1117,13 @@ inline bool BucketGraph::DominatedInCompWiseSmallerBuckets(
 
         // Process neighbors with vectorization hints
         const auto &neighbors = Phi[current_bucket];
-        const size_t n_neighbors = neighbors.size();
 
-        for (size_t i = 0; i < n_neighbors; ++i) {
-            const int b_prime = neighbors[i];
+        for (auto b_prime : neighbors) {
             const size_t word_idx_prime = static_cast<size_t>(b_prime) >> 6;
             const uint64_t mask = bit_mask_lookup[b_prime & 63];
 
             if (!(Bvisited[word_idx_prime] & mask)) {
-                stack_buffer[stack_size++] = b_prime;
+                stack_buffer.push_back(b_prime);
             }
         }
     }
@@ -1133,9 +1165,9 @@ void BucketGraph::run_labeling_algorithms(std::vector<double> &forward_cbar,
         });
 
     stdexec::sync_wait(std::move(work));
-    // forward_cbar = labeling_algorithm<Direction::Forward, state, fullness>();
-    // backward_cbar = labeling_algorithm<Direction::Backward, state,
-    // fullness>();
+    // forward_cbar = labeling_algorithm<Direction::Forward, state,
+    // fullness>(); backward_cbar = labeling_algorithm<Direction::Backward,
+    // state, fullness>();
     //
     // #pragma omp parallel sections
     //     {
@@ -1169,35 +1201,6 @@ Label *BucketGraph::compute_label(const Label *L, const Label *L_prime,
     new_label->cost = red_cost;
     new_label->real_cost = real_cost;
     new_label->nodes_covered.clear();
-
-    // // Start by inserting backward list elements
-    // size_t forward_size = 0;
-    // auto L_bw = L_prime;
-    // for (; L_bw != nullptr; L_bw = L_bw->parent) {
-    //     new_label->nodes_covered.push_back(
-    //         L_bw->node_id);  // Insert backward elements directly
-    //     if (L_bw->parent == nullptr && L_bw->fresh == false) {
-    //         for (size_t i = 0; i < L_bw->nodes_covered.size(); ++i) {
-    //             new_label->nodes_covered.push_back(L_bw->nodes_covered[i]);
-    //         }
-    //     }
-    // }
-
-    // // Now insert forward list elements in reverse order without using
-    // // std::reverse
-    // auto L_fw = L;
-    // for (; L_fw != nullptr; L_fw = L_fw->parent) {
-    //     new_label->nodes_covered.insert(
-    //         new_label->nodes_covered.begin(),
-    //         L_fw->node_id);  // Insert forward elements at the front
-    //     if (L_fw->parent == nullptr && L_fw->fresh == false) {
-    //         for (size_t i = 0; i < L_fw->nodes_covered.size(); ++i) {
-    //             new_label->nodes_covered.insert(
-    //                 new_label->nodes_covered.begin(),
-    //                 L_fw->nodes_covered[i]);
-    //         }
-    //     }
-    // }
 
     new_label->nodes_covered = L_prime->nodes_covered;
     //     reverse the nodes_covered
