@@ -98,6 +98,18 @@ struct VRPNode {
                         });
             }
         }
+
+        if constexpr (D == Direction::Forward) {
+            pdqsort(fw_arcs.begin(), fw_arcs.end(),
+                    [&](const Arc &a, const Arc &b) {
+                        return get_score(a) > get_score(b);
+                    });
+        } else {
+            pdqsort(bw_arcs.begin(), bw_arcs.end(),
+                    [&](const Arc &a, const Arc &b) {
+                        return get_score(a) > get_score(b);
+                    });
+        }
     }
 
     /**

@@ -31,18 +31,16 @@ ArcDuals RCCManager::computeDuals(BNBNode *model, double threshold) {
     }
 
     // Second pass: Remove cuts with dual values near zero
-    // cuts_.erase(
-    //     std::remove_if(
-    //         cuts_.begin(), cuts_.end(),
-    //         [&](const RCCut &cut, size_t i = 0) mutable {
-    //             if (std::abs(dualValues[i]) < threshold) {
-    //                 model->remove(cut.ctr);
-    //                 return true;
-    //             }
-    //             ++i;
-    //             return false;  // Keep this cut
-    //         }),
-    //     cuts_.end());
+    cuts_.erase(std::remove_if(cuts_.begin(), cuts_.end(),
+                               [&](const RCCut &cut, size_t i = 0) mutable {
+                                   if (std::abs(dualValues[i]) < threshold) {
+                                       model->remove(cut.ctr);
+                                       return true;
+                                   }
+                                   ++i;
+                                   return false;  // Keep this cut
+                               }),
+                cuts_.end());
     return arcDuals;
 }
 
@@ -66,18 +64,18 @@ ArcDuals RCCManager::computeDuals(std::vector<double> dualValues, BNBNode *node,
     }
 
     // Second pass: Remove cuts with dual values near zero
-    // cuts_.erase(
-    //     std::remove_if(
-    //         cuts_.begin(), cuts_.end(),
-    //         [&](const RCCut &cut, size_t i = 0) mutable {
-    //             if (std::abs(dualValues[i]) < threshold) {
-    //                 node->remove(
-    //                     cut.ctr);  // Remove the constraint from the model
-    //                 return true;   // Mark this cut for removal
-    //             }
-    //             ++i;
-    //             return false;  // Keep this cut
-    //         }),
-    //     cuts_.end());
+    cuts_.erase(
+        std::remove_if(
+            cuts_.begin(), cuts_.end(),
+            [&](const RCCut &cut, size_t i = 0) mutable {
+                if (std::abs(dualValues[i]) < threshold) {
+                    node->remove(
+                        cut.ctr);  // Remove the constraint from the model
+                    return true;   // Mark this cut for removal
+                }
+                ++i;
+                return false;  // Keep this cut
+            }),
+        cuts_.end());
     return arcDuals;
 }

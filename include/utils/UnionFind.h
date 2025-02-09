@@ -1,62 +1,78 @@
-/**
- * @file UnionFind.h
- * @brief This file contains the definition of the UnionFind class.
- *
- * This file contains the definition of the UnionFind class, which implements
- * the Union-Find data structure for finding connected components in a graph.
- * The class provides methods for finding the root of a set, uniting two sets,
- * and getting the subset index of an element.
- *
- */
-
 #pragma once
 #include "Common.h"
 
 class UnionFind {
+   private:
+    // Pack data together for better cache locality
+    struct alignas(32) NodeData {
+        int parent;
+        int subset_index;
+        int16_t rank;  // Using int16_t since rank rarely grows large
+        int16_t pad;   // Maintain alignment
+    };
+
+    alignas(32) std::vector<NodeData> nodes;
+
+    // Optimization: Cache the last accessed root for repeated operations
+    mutable struct {
+        int element{-1};
+        int root{-1};
+    } cache;
+
    public:
     UnionFind() = default;
 
     explicit UnionFind(size_t size) {
-        parent.resize(size);
-        subset_index.resize(size, -1);
-        rank.resize(size, 0);
+        nodes.resize(size);
 
-        // Initialize arrays - use memset for better performance with large
-        // sizes
-        std::iota(parent.begin(), parent.end(), 0);
+        // Direct initialization for better performance
+        for (size_t i = 0; i < size; ++i) {
+            auto& node = nodes[i];
+            node.parent = i;
+            node.subset_index = -1;
+            node.rank = 0;
+        }
     }
 
     explicit UnionFind(const std::vector<std::vector<int>>& sccs) {
-        // Find max element with single pass
+        // Find max element with single pass over contiguous memory
         int max_elem = -1;
         for (const auto& scc : sccs) {
-            for (int elem : scc) {
-                max_elem = std::max(max_elem, elem);
+            if (!scc.empty()) {
+                const int* const data = scc.data();
+                const size_t size = scc.size();
+                for (size_t i = 0; i < size; ++i) {
+                    max_elem = std::max(max_elem, data[i]);
+                }
             }
         }
 
         if (max_elem < 0) return;
 
         const size_t size = max_elem + 1;
-        parent.resize(size);
-        subset_index.resize(size, -1);
-        rank.resize(size, 0);
+        nodes.resize(size);
 
-        // Initialize parent array
-        std::iota(parent.begin(), parent.end(), 0);
+        // Initialize with direct memory access
+        for (size_t i = 0; i < size; ++i) {
+            auto& node = nodes[i];
+            node.parent = i;
+            node.subset_index = -1;
+            node.rank = 0;
+        }
 
-        // Process SCCs
+        // Process SCCs with optimized memory access
         int subset_counter = 0;
         for (const auto& scc : sccs) {
             if (scc.empty()) continue;
 
             const int first_elem = scc[0];
-            subset_index[first_elem] = subset_counter;
+            nodes[first_elem].subset_index = subset_counter;
 
-            // Unite remaining elements
+            // Unite remaining elements with first_elem
+            const int* const data = scc.data();
             const size_t scc_size = scc.size();
             for (size_t i = 1; i < scc_size; ++i) {
-                unite_with_path_compression(first_elem, scc[i]);
+                unite_with_path_compression(first_elem, data[i]);
             }
             subset_counter++;
         }
@@ -64,19 +80,40 @@ class UnionFind {
 
     // Fast find without path compression for read-only operations
     [[nodiscard]] inline int find(int x) const noexcept {
-        while (parent[x] != x) {
-            x = parent[x];
+        // Check cache first
+        if (x == cache.element) {
+            return cache.root;
         }
-        return x;
+
+        int root = x;
+        while (nodes[root].parent != root) {
+            root = nodes[root].parent;
+        }
+
+        // Update cache
+        cache.element = x;
+        cache.root = root;
+
+        return root;
     }
 
     // Fast getSubset that combines find and subset lookup
     [[nodiscard]] inline int getSubset(int x) const noexcept {
-        // Find root without path compression
-        while (parent[x] != x) {
-            x = parent[x];
+        // Use the cached root if available
+        if (x == cache.element) {
+            return nodes[cache.root].subset_index;
         }
-        return subset_index[x];
+
+        int root = x;
+        while (nodes[root].parent != root) {
+            root = nodes[root].parent;
+        }
+
+        // Update cache
+        cache.element = x;
+        cache.root = root;
+
+        return nodes[root].subset_index;
     }
 
     // Path compression version for unite operations
@@ -84,16 +121,21 @@ class UnionFind {
         int root = x;
 
         // First pass: find root
-        while (parent[root] != root) {
-            root = parent[root];
+        while (nodes[root].parent != root) {
+            root = nodes[root].parent;
         }
 
-        // Second pass: path compression
+        // Second pass: path compression with direct memory access
         while (x != root) {
-            int next = parent[x];
-            parent[x] = root;
+            auto& node = nodes[x];
+            int next = node.parent;
+            node.parent = root;
             x = next;
         }
+
+        // Update cache
+        cache.element = x;
+        cache.root = root;
 
         return root;
     }
@@ -105,42 +147,32 @@ class UnionFind {
 
         if (root_x == root_y) return;
 
-        // Union by rank
-        if (rank[root_x] < rank[root_y]) {
+        auto& node_x = nodes[root_x];
+        auto& node_y = nodes[root_y];
+
+        // Union by rank with direct struct access
+        if (node_x.rank < node_y.rank) {
             std::swap(root_x, root_y);
+            std::swap(node_x, node_y);
         }
 
         // Attach smaller rank tree under root of high rank tree
-        parent[root_y] = root_x;
-        subset_index[root_y] = subset_index[root_x];
+        node_y.parent = root_x;
+        node_y.subset_index = node_x.subset_index;
 
         // If ranks are same, increment rank of root_x
-        rank[root_x] += (rank[root_x] == rank[root_y]);
+        if (node_x.rank == node_y.rank) {
+            node_x.rank++;
+        }
+
+        // Invalidate cache
+        cache.element = -1;
     }
 
     [[nodiscard]] inline bool compareSubsets(int x, int y) const noexcept {
-        // Find roots without path compression, combined in one loop
-        int root_x = x;
-        int root_y = y;
-
-        // Load both paths simultaneously for better cache usage
-        while (true) {
-            if (parent[root_x] != root_x) {
-                root_x = parent[root_x];
-            }
-            if (parent[root_y] != root_y) {
-                root_y = parent[root_y];
-            }
-            if (parent[root_x] == root_x && parent[root_y] == root_y) {
-                break;
-            }
-        }
-        return subset_index[root_x] < subset_index[root_y];
+        // Use cached values if possible
+        const int root_x = find(x);
+        const int root_y = find(y);
+        return nodes[root_x].subset_index < nodes[root_y].subset_index;
     }
-
-   private:
-    // Aligned memory for better cache performance
-    alignas(64) std::vector<int> parent;
-    alignas(64) std::vector<int> subset_index;  // Renamed for clarity
-    alignas(64) std::vector<int> rank;
 };

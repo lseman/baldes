@@ -156,6 +156,54 @@ struct CandidateSet {
     }
 };
 
+struct CandidateSetCompare {
+    bool operator()(const CandidateSet &a, const CandidateSet &b) const {
+        // First check if they represent the same set and permutation
+        bool same_candidate = (a.nodes == b.nodes && a.perm.den == b.perm.den &&
+                               a.perm.num == b.perm.num);
+
+        if (same_candidate) {
+            // If they're the same candidate, keep the one with higher violation
+            return a.violation > b.violation;
+        }
+
+        // If they're different candidates, treat them as different
+        // We need some consistent ordering for the set to work
+        if (a.nodes != b.nodes) return a.nodes > b.nodes;
+        if (a.perm.num != b.perm.num) return a.perm.num > b.perm.num;
+        return a.perm.den > b.perm.den;
+    }
+};
+
+struct CandidateSetHasher {
+    using is_transparent = void;
+
+    uint64_t operator()(const CandidateSet &cs) const {
+        XXH3_state_t *state = XXH3_createState();
+        assert(state != nullptr);
+        XXH3_64bits_reset(state);
+
+        // Hash nodes vector as one block since it's contiguous
+        XXH3_64bits_update(state, cs.nodes.data(),
+                           cs.nodes.size() * sizeof(int));
+
+        // Hash num vector as one block
+        XXH3_64bits_update(state, cs.perm.num.data(),
+                           cs.perm.num.size() * sizeof(int));
+
+        // Hash den and violation
+        XXH3_64bits_update(state, &cs.perm.den, sizeof(int));
+        XXH3_64bits_update(state, &cs.violation, sizeof(double));
+
+        uint64_t hash = XXH3_64bits_digest(state);
+        XXH3_freeState(state);
+        return hash;
+    }
+
+    // mixed_hash required by ankerl::unordered_dense
+    uint64_t mixed_hash(const CandidateSet &cs) const { return operator()(cs); }
+};
+
 class HighRankCuts {
    private:
     const int MIN_RANK = 4;
@@ -222,19 +270,23 @@ class HighRankCuts {
     }
 
     const int MAX_COMBINATIONS = 25;
-    const int MAX_WORKING_SET_SIZE = 20;
+    const int MAX_WORKING_SET_SIZE = 12;
 
     exec::static_thread_pool pool =
         exec::static_thread_pool(std::thread::hardware_concurrency());
     exec::static_thread_pool::scheduler sched = pool.get_scheduler();
 
-    std::set<CandidateSet> generateCandidates(
-        const std::vector<std::set<int>> &scores,
-        const std::vector<std::vector<int>> &row_indices_map,
-        const SparseMatrix &A, const std::vector<double> &x) {
+    ankerl::unordered_dense::set<CandidateSet, CandidateSetHasher,
+                                 CandidateSetCompare>
+    generateCandidates(const std::vector<std::set<int>> &scores,
+                       const std::vector<std::vector<int>> &row_indices_map,
+                       const SparseMatrix &A, const std::vector<double> &x) {
         // Thread-local data to avoid contention
         struct ThreadLocalData {
-            std::set<CandidateSet> candidates;
+            ankerl::unordered_dense::set<CandidateSet, CandidateSetHasher,
+                                         CandidateSetCompare>
+                candidates;
+
             ankerl::unordered_dense::map<std::vector<int>, double>
                 candidate_cache;
         };
@@ -245,8 +297,9 @@ class HighRankCuts {
 
         // Mutex for final merging
         std::mutex finalMergeMutex;
-        std::set<CandidateSet> finalCandidates;
-
+        ankerl::unordered_dense::set<CandidateSet, CandidateSetHasher,
+                                     CandidateSetCompare>
+            finalCandidates;
         const int JOBS = std::thread::hardware_concurrency();
 
         // Parallelize the outer loop over i
@@ -427,53 +480,82 @@ class HighRankCuts {
         const std::vector<int> &nodes, const std::set<int> &memory,
         const std::vector<std::vector<int>> &row_indices_map,
         const SparseMatrix &A, const std::vector<double> &x) {
-        const int RANK = nodes.size();
+        static constexpr double EPSILON = 1e-3;
+        const int RANK = static_cast<int>(nodes.size());
+
+        // Pre-allocate result variables
         double best_violation = 0.0;
-        Permutation *best_perm = nullptr;
-        auto permutations = getPermutations(RANK);
         double best_rhs = 0.0;
+        const Permutation *best_perm = nullptr;
 
-        std::array<uint64_t, num_words> C = {};
-        std::array<uint64_t, num_words> AM = {};
+        // Initialize bit arrays for efficient set operations
+        std::array<uint64_t, num_words> candidate_bits = {};
+        std::array<uint64_t, num_words> augmented_memory_bits = {};
 
-        std::vector<int> order(N_SIZE, 0);
-        auto ordering = 0;
-        for (auto node : nodes) {
-            C[node / 64] |= (1ULL << (node % 64));
-            AM[node / 64] |= (1ULL << (node % 64));
-            order[node] = ordering++;
+        // Create node ordering lookup
+        std::vector<int> node_order(N_SIZE,
+                                    -1);  // Initialize with invalid index
+
+        // Populate bit arrays and ordering
+        for (int i = 0; i < RANK; ++i) {
+            const int node = nodes[i];
+            const int word_idx = node / 64;
+            const uint64_t bit_mask = bit_mask_lookup[node % 64];
+
+            candidate_bits[word_idx] |= bit_mask;
+            augmented_memory_bits[word_idx] |= bit_mask;
+            node_order[node] = i;
         }
 
-        for (auto node : memory) {
-            AM[node / 64] |= (1ULL << (node % 64));
+        // Add memory nodes to augmented memory bits
+        for (const int node : memory) {
+            augmented_memory_bits[node / 64] |= (1ULL << (node % 64));
         }
 
-        for (auto &perm : permutations) {
-            double rhs = 0;
-            for (size_t i = 0; i < RANK; ++i) {
+        // Get permutations only once
+        const auto &permutations = getPermutations(RANK);
+
+        // Pre-allocate vectors for coefficient computation
+        std::vector<double> cut_coefficients;
+        cut_coefficients.reserve(allPaths.size());
+
+        // Process each permutation
+        for (const auto &perm : permutations) {
+            // Calculate RHS value
+            double rhs = 0.0;
+            for (int i = 0; i < RANK; ++i) {
                 rhs += static_cast<double>(perm.num[i]) / perm.den;
             }
             rhs = std::floor(rhs);
-            SRCPermutation p;
-            p.num = perm.num;
-            p.den = perm.den;
 
-            std::vector<double> cut_coefficients(allPaths.size());
-            auto z = 0;
-            auto lhs = 0.0;
-            for (auto &path : allPaths) {
-                if (x[z] == 0.0) {
-                    z++;
+            // Create SRC permutation
+            const SRCPermutation src_perm{perm.num, perm.den};
+
+            // Reset and compute cut coefficients
+            cut_coefficients.clear();
+            double lhs = 0.0;
+
+            // Process paths efficiently
+            for (size_t path_idx = 0; path_idx < allPaths.size(); ++path_idx) {
+                const double x_val = x[path_idx];
+
+                // Skip paths with zero coefficient
+                if (std::abs(x_val) < std::numeric_limits<double>::epsilon()) {
+                    cut_coefficients.push_back(0.0);
                     continue;
                 }
-                cut_coefficients[z] = computeLimitedMemoryCoefficient(
-                    C, AM, p, path.route, order);
-                lhs += cut_coefficients[z] * x[z];
-                z++;
+
+                // Compute coefficient
+                const double coeff = computeLimitedMemoryCoefficient(
+                    candidate_bits, augmented_memory_bits, src_perm,
+                    allPaths[path_idx].route, node_order);
+
+                cut_coefficients.push_back(coeff);
+                lhs += coeff * x_val;
             }
 
-            auto violation = lhs - (rhs + 1e-3);
-
+            // Check violation
+            const double violation = lhs - (rhs + EPSILON);
             if (violation > best_violation) {
                 best_violation = lhs;
                 best_perm = &perm;
@@ -481,6 +563,7 @@ class HighRankCuts {
             }
         }
 
+        // Return results, using default permutation if none found
         return {best_violation, best_perm ? *best_perm : Permutation({}, 0),
                 best_rhs};
     }
@@ -493,17 +576,35 @@ class HighRankCuts {
         const SparseMatrix &A, const std::vector<double> &x,
         const std::vector<std::set<int>> &node_scores,
         int max_iterations = 100) {
+        // Configuration constants
+        static constexpr struct Config {
+            const double MIN_WEIGHT = 0.01;
+            const int SEGMENT_SIZE = 20;
+            const int MAX_DIVERSE_SOLUTIONS = 5;
+            const double DIVERSITY_THRESHOLD = 0.3;
+            const double QUALITY_WEIGHT = 0.7;
+            const double DIVERSITY_WEIGHT = 0.3;
+            const double BASE_ACCEPTANCE_RATE = 0.3;
+            const double MIN_ACCEPTANCE_RATE = 0.1;
+            const double MAX_ACCEPTANCE_RATE = 0.5;
+            const int MAX_REMOVE_COUNT = 3;
+            const double IMPROVEMENT_BONUS = 1.5;
+            const double MAX_DETERIORATION = 0.1;
+            const double OPERATOR_LEARNING_RATE = 0.1;
+        } config;
+
+        // Solution tracking
         CandidateSet best = initial;
         CandidateSet current = initial;
+        std::vector<CandidateSet> diverse_solutions;
 
-        // Adaptive parameters
-        const double MIN_WEIGHT = 0.01;
-        const int SEGMENT_SIZE =
-            20;  // Number of iterations per segment for adaptation
-        double acceptance_threshold =
-            0.0;  // Dynamic threshold for accepting worse solutions
+        // ALNS operator management
+        enum OperatorType { SWAP_NODES, REMOVE_ADD_NODE, UPDATE_NEIGHBORS };
+        std::array<double, 3> operator_scores{1.0, 1.0, 1.0};
+        std::array<int, 3> operator_usage{0, 0, 0};
+        std::array<int, 3> operator_success{0, 0, 0};
 
-        // Track solution history for adaptation
+        // Adaptive parameters tracking
         struct SegmentStats {
             double avg_violation = 0.0;
             double best_violation = 0.0;
@@ -513,56 +614,41 @@ class HighRankCuts {
         std::deque<SegmentStats> history;
         SegmentStats current_segment;
 
-        // Track diverse solutions
-        std::vector<CandidateSet> diverse_solutions;
-        const int MAX_DIVERSE_SOLUTIONS = 5;
-        const double DIVERSITY_THRESHOLD = 0.3;
+        // RNG setup with better distribution
+        std::uniform_real_distribution<double> dist;
 
-        // ALNS operator scores and weights
-        enum OperatorType { SWAP_NODES, REMOVE_ADD_NODE, UPDATE_NEIGHBORS };
-        std::vector<double> operator_scores = {1.0, 1.0, 1.0};
-        std::vector<int> operator_usage = {0, 0, 0};
-        std::vector<int> operator_success = {0, 0, 0};
-
-        // Main optimization loop
+        // Optimization state
         int iterations_since_improvement = 0;
         int segment_iterations = 0;
 
+        // Main optimization loop
         for (int iter = 0; iter < max_iterations; ++iter) {
-            auto backup = current;
-            bool improved = false;
+            const auto backup = current;
 
-            // Select operator with normalized weights
-            std::vector<double> weights = operator_scores;
-            double total_weight = 0.0;
-            for (size_t i = 0; i < weights.size(); ++i) {
-                if (operator_usage[i] > 0) {
-                    weights[i] *= (static_cast<double>(operator_success[i]) /
-                                   operator_usage[i]);
+            // Select operator using roulette wheel selection
+            const auto total_weight = std::accumulate(
+                operator_scores.begin(), operator_scores.end(), 0.0);
+            const auto selected_op = [&]() {
+                const double r = dist(rng) * total_weight;
+                double cumsum = 0.0;
+                for (size_t i = 0; i < operator_scores.size(); ++i) {
+                    cumsum += operator_scores[i];
+                    if (r <= cumsum) return static_cast<int>(i);
                 }
-                weights[i] = std::max(weights[i], MIN_WEIGHT);
-                total_weight += weights[i];
-            }
-            for (auto &w : weights) w /= total_weight;
-
-            // Select operator using weights
-            double r = static_cast<double>(rng()) / rng.max();
-            int selected_op = 0;
-            double cumsum = weights[0];
-            while (selected_op < weights.size() - 1 && r > cumsum) {
-                selected_op++;
-                cumsum += weights[selected_op];
-            }
+                return static_cast<int>(operator_scores.size() - 1);
+            }();
             operator_usage[selected_op]++;
 
             // Apply selected operator
             switch (selected_op) {
                 case SWAP_NODES: {
                     if (current.nodes.size() >= 2) {
-                        int pos1 = rng() % current.nodes.size();
+                        std::uniform_int_distribution<> node_dist(
+                            0, current.nodes.size() - 1);
+                        const int pos1 = node_dist(rng);
                         int pos2;
                         do {
-                            pos2 = rng() % current.nodes.size();
+                            pos2 = node_dist(rng);
                         } while (pos2 == pos1);
                         std::swap(current.nodes[pos1], current.nodes[pos2]);
                     }
@@ -570,39 +656,41 @@ class HighRankCuts {
                 }
 
                 case REMOVE_ADD_NODE: {
-                    if (current.nodes.size() > MIN_RANK &&
-                        !current.neighbor.empty()) {
-                        // Remove random node
-                        int remove_pos = rng() % current.nodes.size();
-                        int removed_node = current.nodes[remove_pos];
+                    if (current.nodes.size() > 1 && !current.neighbor.empty()) {
+                        // Remove node
+                        std::uniform_int_distribution<> node_dist(
+                            0, current.nodes.size() - 1);
+                        const int remove_pos = node_dist(rng);
+                        const int removed_node = current.nodes[remove_pos];
                         current.nodes.erase(current.nodes.begin() + remove_pos);
                         current.neighbor.insert(removed_node);
 
-                        // Add promising neighbor based on scores
+                        // Score and select new node
                         std::vector<std::pair<int, double>> scored_neighbors;
-                        for (int n : current.neighbor) {
-                            double score = 0;
-                            for (int node : current.nodes) {
-                                if (node_scores[node].count(n)) score++;
-                            }
+                        scored_neighbors.reserve(current.neighbor.size());
+                        for (const int n : current.neighbor) {
+                            double score = std::count_if(
+                                current.nodes.begin(), current.nodes.end(),
+                                [&](int node) {
+                                    return node_scores[node].count(n);
+                                });
                             scored_neighbors.emplace_back(n, score);
                         }
 
                         if (!scored_neighbors.empty()) {
-                            pdqsort(scored_neighbors.begin(),
-                                    scored_neighbors.end(),
-                                    [](const auto &a, const auto &b) {
-                                        return a.second > b.second;
-                                    });
+                            std::sort(scored_neighbors.begin(),
+                                      scored_neighbors.end(),
+                                      [](const auto &a, const auto &b) {
+                                          return a.second > b.second;
+                                      });
 
-                            // Selection based on rank with some randomization
-                            int rank = std::min<int>(
-                                scored_neighbors.size() - 1,
-                                std::exponential_distribution<>(
-                                    1.0 /
-                                    (1.0 + iterations_since_improvement))(rng));
+                            std::exponential_distribution<> exp_dist(
+                                1.0 / (1.0 + iterations_since_improvement));
+                            const int rank =
+                                std::min<int>(scored_neighbors.size() - 1,
+                                              static_cast<int>(exp_dist(rng)));
 
-                            int new_node = scored_neighbors[rank].first;
+                            const int new_node = scored_neighbors[rank].first;
                             current.nodes.push_back(new_node);
                             current.neighbor.erase(new_node);
                         }
@@ -611,92 +699,98 @@ class HighRankCuts {
                 }
 
                 case UPDATE_NEIGHBORS: {
-                    int remove_count =
-                        1 + rng() % std::min(3, (int)current.neighbor.size());
+                    // Remove neighbors
+                    const int remove_count =
+                        std::min(config.MAX_REMOVE_COUNT,
+                                 static_cast<int>(current.neighbor.size()));
+
+                    std::vector<int> neighbor_vec(current.neighbor.begin(),
+                                                  current.neighbor.end());
+                    std::shuffle(neighbor_vec.begin(), neighbor_vec.end(), rng);
+
                     for (int i = 0; i < remove_count; ++i) {
-                        if (current.neighbor.empty()) break;
-                        auto it = current.neighbor.begin();
-                        std::advance(it, rng() % current.neighbor.size());
-                        current.neighbor.erase(it);
+                        current.neighbor.erase(neighbor_vec[i]);
                     }
 
+                    // Add new neighbors
                     std::set<int> potential_neighbors;
-                    for (int node : current.nodes) {
-                        for (int neighbor : node_scores[node]) {
-                            if (std::find(current.nodes.begin(),
-                                          current.nodes.end(),
-                                          neighbor) == current.nodes.end() &&
+                    for (const int node : current.nodes) {
+                        for (const int neighbor : node_scores[node]) {
+                            if (!std::binary_search(current.nodes.begin(),
+                                                    current.nodes.end(),
+                                                    neighbor) &&
                                 current.neighbor.count(neighbor) == 0) {
                                 potential_neighbors.insert(neighbor);
                             }
                         }
                     }
 
-                    int add_count = 1 + rng() % 3;
-                    while (add_count-- > 0 && !potential_neighbors.empty()) {
-                        auto it = potential_neighbors.begin();
-                        std::advance(it, rng() % potential_neighbors.size());
-                        current.neighbor.insert(*it);
-                        potential_neighbors.erase(it);
+                    std::vector<int> new_neighbors(potential_neighbors.begin(),
+                                                   potential_neighbors.end());
+                    std::shuffle(new_neighbors.begin(), new_neighbors.end(),
+                                 rng);
+
+                    const int add_count =
+                        std::min(config.MAX_REMOVE_COUNT,
+                                 static_cast<int>(new_neighbors.size()));
+
+                    for (int i = 0; i < add_count; ++i) {
+                        current.neighbor.insert(new_neighbors[i]);
                     }
                     break;
                 }
             }
 
-            // Evaluate new solution
-            auto [new_violation, new_perm, rhs] = computeViolationWithBestPerm(
-                current.nodes, current.neighbor, row_indices_map, A, x);
-
-            double delta = new_violation - backup.violation;
+            // Evaluate solution
+            const auto [new_violation, new_perm, rhs] =
+                computeViolationWithBestPerm(current.nodes, current.neighbor,
+                                             row_indices_map, A, x);
+            const double delta = new_violation - backup.violation;
 
             // Adaptive acceptance criteria
-            bool accept = false;
-            if (delta > 0) {
-                accept = true;  // Always accept improvements
-            } else if (history.size() >= 2) {
-                // Use historical performance to determine acceptance
-                double recent_improvement_rate =
-                    static_cast<double>(history.back().improvements) /
-                    SEGMENT_SIZE;
+            const bool accept = [&]() {
+                if (delta > 0) return true;
 
-                // Accept worse moves more often if we're not finding
-                // improvements
-                double acceptance_rate = std::min(
-                    0.5, std::max(0.1, 0.4 * (1.0 - recent_improvement_rate)));
+                if (history.size() >= 2) {
+                    const double recent_improvement_rate =
+                        static_cast<double>(history.back().improvements) /
+                        config.SEGMENT_SIZE;
+                    double acceptance_rate = std::min(
+                        config.MAX_ACCEPTANCE_RATE,
+                        std::max(config.MIN_ACCEPTANCE_RATE,
+                                 0.4 * (1.0 - recent_improvement_rate)));
 
-                // Scale threshold based on solution quality trend
-                double avg_recent_violation = 0.0;
-                for (const auto &seg : history) {
-                    avg_recent_violation += seg.avg_violation;
+                    const double avg_recent_violation =
+                        std::accumulate(history.begin(), history.end(), 0.0,
+                                        [](double sum, const auto &seg) {
+                                            return sum + seg.avg_violation;
+                                        }) /
+                        history.size();
+
+                    if (current.violation < avg_recent_violation) {
+                        acceptance_rate *= config.IMPROVEMENT_BONUS;
+                    }
+
+                    return (dist(rng) < acceptance_rate) &&
+                           (delta > -std::abs(current.violation *
+                                              config.MAX_DETERIORATION));
                 }
-                avg_recent_violation /= history.size();
 
-                // More lenient acceptance if we're below average quality
-                if (current.violation < avg_recent_violation) {
-                    acceptance_rate *= 1.5;
-                }
-
-                accept =
-                    (static_cast<double>(rng()) / rng.max() <
-                     acceptance_rate) &&
-                    (delta >
-                     -std::abs(current.violation *
-                               0.1));  // Don't accept very large deteriorations
-            } else {
-                // Early iterations - use more aggressive acceptance
-                accept = (static_cast<double>(rng()) / rng.max() < 0.3);
-            }
+                return dist(rng) < config.BASE_ACCEPTANCE_RATE;
+            }();
 
             if (accept) {
                 current.violation = new_violation;
                 current.perm = new_perm;
                 current.rhs = rhs;
 
-                // Update operator score and segment statistics
+                // Update operator scores and statistics
                 operator_success[selected_op]++;
-                operator_scores[selected_op] =
-                    std::max(MIN_WEIGHT, operator_scores[selected_op] * 0.9 +
-                                             0.1 * std::max(0.0, delta));
+                operator_scores[selected_op] = std::max(
+                    config.MIN_WEIGHT,
+                    operator_scores[selected_op] *
+                            (1 - config.OPERATOR_LEARNING_RATE) +
+                        config.OPERATOR_LEARNING_RATE * std::max(0.0, delta));
 
                 current_segment.accepted_moves++;
                 current_segment.avg_violation =
@@ -704,13 +798,10 @@ class HighRankCuts {
                      new_violation) /
                     (segment_iterations + 1);
 
-                // Update best solution if improved
                 if (new_violation > best.violation) {
                     best = current;
                     current_segment.improvements++;
                     iterations_since_improvement = 0;
-
-                    // Update best violation for segment
                     current_segment.best_violation =
                         std::max(current_segment.best_violation, new_violation);
                 } else {
@@ -718,18 +809,17 @@ class HighRankCuts {
                 }
 
                 // Maintain diverse solutions
-                bool is_diverse = true;
-                for (const auto &sol : diverse_solutions) {
-                    if (std::abs(sol.violation - new_violation) <
-                        DIVERSITY_THRESHOLD) {
-                        is_diverse = false;
-                        break;
-                    }
-                }
+                const bool is_diverse = std::none_of(
+                    diverse_solutions.begin(), diverse_solutions.end(),
+                    [&](const auto &sol) {
+                        return std::abs(sol.violation - new_violation) <
+                               config.DIVERSITY_THRESHOLD;
+                    });
 
                 if (is_diverse) {
                     diverse_solutions.push_back(current);
-                    if (diverse_solutions.size() > MAX_DIVERSE_SOLUTIONS) {
+                    if (diverse_solutions.size() >
+                        config.MAX_DIVERSE_SOLUTIONS) {
                         diverse_solutions.erase(std::min_element(
                             diverse_solutions.begin(), diverse_solutions.end(),
                             [](const auto &a, const auto &b) {
@@ -739,30 +829,33 @@ class HighRankCuts {
                 }
             } else {
                 current = backup;
-                operator_scores[selected_op] =
-                    std::max(MIN_WEIGHT, operator_scores[selected_op] * 0.9);
+                operator_scores[selected_op] = std::max(
+                    config.MIN_WEIGHT, operator_scores[selected_op] *
+                                           (1 - config.OPERATOR_LEARNING_RATE));
             }
 
             // Update segment statistics
             segment_iterations++;
-            if (segment_iterations == SEGMENT_SIZE) {
+            if (segment_iterations == config.SEGMENT_SIZE) {
                 history.push_back(current_segment);
-                if (history.size() > 3) {  // Keep last 3 segments
+                if (history.size() > 3) {
                     history.pop_front();
                 }
                 current_segment = SegmentStats();
                 segment_iterations = 0;
             }
 
-            // Adaptive restart strategy
-            if (iterations_since_improvement > SEGMENT_SIZE &&
+            // Strategic restart
+            if (iterations_since_improvement > config.SEGMENT_SIZE &&
                 !diverse_solutions.empty()) {
-                // Select restart solution based on both quality and diversity
                 std::vector<std::pair<double, int>> restart_candidates;
+                restart_candidates.reserve(diverse_solutions.size());
+
                 for (size_t i = 0; i < diverse_solutions.size(); ++i) {
-                    double quality_score =
+                    const double quality_score =
                         diverse_solutions[i].violation / best.violation;
                     double diversity_score = 0.0;
+
                     for (const auto &other : diverse_solutions) {
                         if (&other != &diverse_solutions[i]) {
                             diversity_score +=
@@ -770,22 +863,24 @@ class HighRankCuts {
                                          diverse_solutions[i].violation);
                         }
                     }
+
                     restart_candidates.emplace_back(
-                        quality_score * 0.7 + diversity_score * 0.3, i);
+                        quality_score * config.QUALITY_WEIGHT +
+                            diversity_score * config.DIVERSITY_WEIGHT,
+                        i);
                 }
 
-                pdqsort(restart_candidates.begin(), restart_candidates.end());
+                std::sort(restart_candidates.begin(), restart_candidates.end());
                 current = diverse_solutions[restart_candidates.back().second];
                 iterations_since_improvement = 0;
             }
         }
 
-        // Return best diverse solutions
         diverse_solutions.push_back(best);
-        pdqsort(diverse_solutions.begin(), diverse_solutions.end(),
-                [](const auto &a, const auto &b) {
-                    return a.violation > b.violation;
-                });
+        std::sort(diverse_solutions.begin(), diverse_solutions.end(),
+                  [](const auto &a, const auto &b) {
+                      return a.violation > b.violation;
+                  });
 
         return diverse_solutions;
     }
@@ -853,12 +948,14 @@ class HighRankCuts {
         auto candidates =
             generateCandidates(node_scores, row_indices_map, A, x);
 
-        print_cut("Generated {} candidates\n", candidates.size());
+        // print_cut("Generated {} candidates\n", candidates.size());
 
         const int JOBS = std::thread::hardware_concurrency();
 
         std::mutex candidates_mutex;
-        std::vector<CandidateSet> improved_candidates;
+        ankerl::unordered_dense::set<CandidateSet, CandidateSetHasher,
+                                     CandidateSetCompare>
+            improved_candidates;
 
         auto bulk_sender = stdexec::bulk(
             stdexec::just(), candidates.size(),
@@ -877,13 +974,13 @@ class HighRankCuts {
                     for (auto improved : improved_list) {
                         if (improved.violation > violation) {
                             std::lock_guard<std::mutex> lock(candidates_mutex);
-                            improved_candidates.push_back(improved);
+                            improved_candidates.insert(improved);
                             improved_found = true;
                         }
                     }
                     if (!improved_found) {
                         std::lock_guard<std::mutex> lock(candidates_mutex);
-                        improved_candidates.push_back(*it);
+                        improved_candidates.insert(*it);
                     }
                 }
             });
@@ -892,28 +989,41 @@ class HighRankCuts {
         stdexec::sync_wait(std::move(work));
 
         // print improved_candidates size
-        print_cut("Improved candidates: {}\n", improved_candidates.size());
+        // print_cut("Improved candidates: {}\n", improved_candidates.size());
 
-        pdqsort(improved_candidates.begin(), improved_candidates.end(),
-                [](const auto &a, const auto &b) {
+        auto cuts_called = 0;
+        auto initial_cut_size = cutStorage->size();
+        // Use the custom comparator in a set
+
+        // Add all candidates - the set will automatically keep the one with
+        // highest violation when duplicates are found
+        std::vector<CandidateSet> unique_candidates(improved_candidates.begin(),
+                                                    improved_candidates.end());
+        pdqsort(unique_candidates.begin(), unique_candidates.end(),
+                [](const CandidateSet &a, const CandidateSet &b) {
                     return a.violation > b.violation;
                 });
 
-        auto initial_cut_size = cutStorage->size();
+        // Now process the unique candidates (limited to max_cuts)
         const int max_cuts = 10;
-        for (int i = 0;
-             i <
-             std::min(max_cuts, static_cast<int>(improved_candidates.size()));
-             ++i) {
+        int cuts_added = 0;
+        for (const auto &candidate : unique_candidates) {
+            if (cuts_added >= max_cuts) break;
+
             std::vector<int> order(N_SIZE);
             int ordering = 0;
-            for (int node : improved_candidates[i].nodes) {
+            for (int node : candidate.nodes) {
                 order[node] = ordering++;
             }
-            addCutToCutStorage(improved_candidates[i], order);
+            addCutToCutStorage(candidate, order);
+            cuts_added++;
         }
         auto final_cut_size = cutStorage->size();
-        print_cut("Added {} SRC 4-5 cuts\n", final_cut_size - initial_cut_size);
+        print_cut(
+            "Candidates: {} | Improved Candidates: {} | Added {} SRC 4-5 "
+            "cuts\n",
+            candidates.size(), improved_candidates.size(),
+            final_cut_size - initial_cut_size);
     }
 
     static constexpr std::array<uint64_t, 64> bit_mask_lookup = []() {

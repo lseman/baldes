@@ -108,9 +108,22 @@ class LimitedMemoryRank1Cuts {
     }
 
     // default constructor
-    LimitedMemoryRank1Cuts() = default;
+    LimitedMemoryRank1Cuts() { setTasks(); }
 
     void setNodes(std::vector<VRPNode> &nodes) { this->nodes = nodes; }
+
+    std::vector<std::tuple<int, int, int>> tasks;
+
+    void setTasks() {
+        // Create tasks for each combination of (i, j, k)
+        for (int i = 1; i < N_SIZE - 1; ++i) {
+            for (int j = i + 1; j < N_SIZE - 1; ++j) {
+                for (int k = j + 1; k < N_SIZE - 1; ++k) {
+                    tasks.emplace_back(i, j, k);
+                }
+            }
+        }
+    }
 
     CutStorage cutStorage = CutStorage();
 
@@ -126,9 +139,9 @@ class LimitedMemoryRank1Cuts {
      * parameters.
      *
      * This function calculates the coefficient by iterating through the
-     * elements of the vector P, checking their presence in the bitwise arrays C
-     * and AM, and updating the coefficient based on the values in the vector p
-     * and the order vector.
+     * elements of the vector P, checking their presence in the bitwise
+     * arrays C and AM, and updating the coefficient based on the values in
+     * the vector p and the order vector.
      *
      */
     double computeLimitedMemoryCoefficient(
@@ -178,9 +191,9 @@ class LimitedMemoryRank1Cuts {
                         if (times > 1) {
                             // Calculate fractional cut value with integer
                             // division instead of `floor`
-                            double cut_value =
-                                std::floor(times / 2.) * r.frac_x;
-                            if (cut_value > 1e-3) {  // Apply tolerance check
+                            double cut_value = std::floor(times * 0.5) * x[i];
+                            if (cut_value >
+                                1.0 + 1e-3) {  // Apply tolerance check
                                 local_cuts.emplace_back(cut_value, v);
                             }
                         }
@@ -208,7 +221,7 @@ class LimitedMemoryRank1Cuts {
 
         // Generate cut coefficients for the top cuts
         std::vector<double> coefficients_aux(allPaths.size(), 0.0);
-        auto cuts_to_apply = std::min(static_cast<int>(tmp_cuts.size()), 2);
+        auto cuts_to_apply = std::min(static_cast<int>(tmp_cuts.size()), 3);
 
         for (int i = 0; i < cuts_to_apply; ++i) {
             auto cut_value = tmp_cuts[i].first;

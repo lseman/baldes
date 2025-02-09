@@ -128,21 +128,8 @@ struct Path {
 };
 
 struct PathHash {
-    [[nodiscard]] std::size_t operator()(const Path &p) const noexcept {
-        // Initialize hash value
-        std::size_t hash = 0;
-
-        // Hash nodes using FNV-1a
-        for (const auto &node : p) {
-            hash ^= static_cast<size_t>(node);
-            hash *= 0x100000001b3;  // FNV prime
-        }
-
-        // Combine with cost hash
-        const uint32_t cost_bits = std::bit_cast<uint32_t>(p.cost);
-        hash ^= cost_bits;
-        hash *= 0x100000001b3;
-
-        return hash;
+    std::size_t operator()(const Path &p) const {
+        // Use one-shot XXH3 function directly on the contiguous vector memory
+        return XXH3_64bits(p.route.data(), p.route.size() * sizeof(p.route[0]));
     }
 };

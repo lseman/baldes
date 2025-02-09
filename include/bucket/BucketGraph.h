@@ -46,6 +46,38 @@
 
 #define RCESPP_TOL_ZERO 1.E-6
 
+class Stats {
+    std::deque<double> obj_history;
+
+   public:
+    void addIteration(double obj_value) {
+        obj_history.push_back(obj_value);
+        if (obj_history.size() > 100) {  // Keep last 100 iterations
+            obj_history.pop_front();
+        }
+    }
+
+    bool hasHistory() const { return obj_history.size() >= 2; }
+
+    double getRecentImprovement(size_t window) const {
+        if (obj_history.size() < window) {
+            return 1.0;  // Default if not enough history
+        }
+        auto start = obj_history.end() - window;
+        auto end = obj_history.end();
+        double avg_change =
+            std::accumulate(start + 1, end, 0.0,
+                            [prev = *start](double sum, double curr) mutable {
+                                double change = (prev - curr) /
+                                                std::max(1e-10, std::abs(prev));
+                                prev = curr;
+                                return sum + change;
+                            }) /
+            (window - 1);
+        return avg_change;
+    }
+};
+
 /**
  * @class BucketGraph
  * @brief Represents a graph structure used for bucket-based optimization in a
@@ -71,6 +103,7 @@
  */
 class BucketGraph {
     using NGRouteBitmap = uint64_t;
+    Stats stats;
 
    public:
     static  // Precompute bitmask lookup table at compile time
@@ -82,6 +115,9 @@ class BucketGraph {
                 }
                 return masks;
             }();
+
+    ankerl::unordered_dense::map<std::pair<int, int>, bool> fw_union_cache;
+    ankerl::unordered_dense::map<std::pair<int, int>, bool> bw_union_cache;
 
     CostFunction cost_calculator;
     std::vector<ankerl::unordered_dense::map<Arc, int, arc_hash>>
@@ -1273,7 +1309,7 @@ class BucketGraph {
 
         ankerl::unordered_dense::set<int> updated_buckets;
         for (size_t b = 0; b < fw_buckets.size(); b++) {
-            if (fw_buckets[b].shall_split) {
+            if (fw_buckets[b].shall_split || bw_buckets[b].shall_split) {
                 auto inner_id = fw_buckets[b].node_id;
                 if (inner_id != options.depot &&
                     inner_id != options.end_depot) {
@@ -1281,34 +1317,23 @@ class BucketGraph {
                         continue;
                     }
 
-                    fw_bucket_splits[inner_id] =
-                        std::min(fw_bucket_splits[inner_id] + 10, 100);
-                    bw_bucket_splits[inner_id] =
-                        std::min(bw_bucket_splits[inner_id] + 10, 100);
-                    updated_buckets.insert(inner_id);
-                    update_ctr++;
-                }
-            }
-        }
-        for (size_t b = 0; b < bw_buckets.size(); b++) {
-            if (bw_buckets[b].shall_split) {
-                auto inner_id = bw_buckets[b].node_id;
-                if (inner_id != options.depot &&
-                    inner_id != options.end_depot) {
-                    if (updated_buckets.contains(inner_id)) {
+                    if (fw_bucket_splits[inner_id] == 100) {
                         continue;
                     }
-                    fw_bucket_splits[inner_id] =
-                        std::min(fw_bucket_splits[inner_id] + 10, 100);
-                    bw_bucket_splits[inner_id] =
-                        std::min(bw_bucket_splits[inner_id] + 10, 100);
+                    auto update_target =
+                        std::min(fw_bucket_splits[inner_id] * 2, 100);
+                    fw_bucket_splits[inner_id] = update_target;
+                    bw_bucket_splits[inner_id] = update_target;
                     updated_buckets.insert(inner_id);
                     update_ctr++;
                 }
             }
         }
+
         const int CHANGE_THRESHOLD = nodes.size() / 6;
         if (update_ctr >= CHANGE_THRESHOLD && cut_storage->size() < 40) {
+            fw_union_cache.clear();
+            bw_union_cache.clear();
             print_info("Updating bucket splits with {} changes\n", update_ctr);
             // reset_fixed();
             // reset_fixed_buckets();
