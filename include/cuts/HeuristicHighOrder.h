@@ -13,6 +13,27 @@
 #include "Arc.h"
 #include "Dual.h"
 
+// Move config outside as namespace constants
+namespace LocalSearchConfig {
+constexpr double MIN_WEIGHT = 0.01;
+constexpr int SEGMENT_SIZE = 20;
+constexpr int MAX_DIVERSE_SOLUTIONS = 5;
+constexpr double DIVERSITY_THRESHOLD = 0.3;
+constexpr double QUALITY_WEIGHT = 0.7;
+constexpr double DIVERSITY_WEIGHT = 0.3;
+constexpr double BASE_ACCEPTANCE_RATE = 0.3;
+constexpr double MIN_ACCEPTANCE_RATE = 0.1;
+constexpr double MAX_ACCEPTANCE_RATE = 0.5;
+constexpr int MAX_REMOVE_COUNT = 3;
+constexpr double IMPROVEMENT_BONUS = 1.5;
+constexpr double MAX_DETERIORATION = 0.1;
+constexpr double OPERATOR_LEARNING_RATE = 0.1;
+constexpr double INITIAL_TEMPERATURE = 100.0;
+constexpr double COOLING_RATE = 0.95;
+constexpr double REHEATING_FACTOR = 1.5;
+constexpr int REHEAT_INTERVAL = 50;
+}  // namespace LocalSearchConfig
+
 // Permutation structures and helper functions
 struct Permutation {
     std::vector<int> num;
@@ -87,11 +108,11 @@ struct CandidateSet {
     std::vector<int> nodes;
     double violation;
     Permutation perm;
-    std::set<int> neighbor;
+    std::vector<int> neighbor;
     double rhs = 0.0;
 
     CandidateSet(const std::vector<int> &n, double v, const Permutation &p,
-                 const std::set<int> &neigh, double r = 0.0)
+                 const std::vector<int> &neigh, double r = 0.0)
         : nodes(n), violation(v), perm(p), neighbor(neigh), rhs(r) {}
 
     // Equality operator for comparison
@@ -140,20 +161,6 @@ struct CandidateSet {
         }
         return result;
     }
-
-    // Method to check if a move is tabu
-    bool isTabu(int position, int node) const {
-        return std::find(tabu_moves.begin(), tabu_moves.end(),
-                         std::make_pair(position, node)) != tabu_moves.end();
-    }
-
-    // Method to add a move to tabu list
-    void addTabuMove(int position, int node, int tabu_tenure) {
-        tabu_moves.emplace_back(position, node);
-        if (tabu_moves.size() > tabu_tenure) {
-            tabu_moves.erase(tabu_moves.begin());
-        }
-    }
 };
 
 struct CandidateSetCompare {
@@ -193,7 +200,6 @@ struct CandidateSetHasher {
 
         // Hash den and violation
         XXH3_64bits_update(state, &cs.perm.den, sizeof(int));
-        XXH3_64bits_update(state, &cs.violation, sizeof(double));
 
         uint64_t hash = XXH3_64bits_digest(state);
         XXH3_freeState(state);
@@ -330,6 +336,8 @@ class HighRankCuts {
                         }
                     }
                 }
+                std::vector<int> heuristic_memory_vector(
+                    heuristic_memory.begin(), heuristic_memory.end());
 
                 // Remove duplicates and sort
                 pdqsort(working_set.begin(), working_set.end());
@@ -370,16 +378,16 @@ class HighRankCuts {
                             if (cache_it->second > 1e-3) {
                                 auto [violation, perm, rhs] =
                                     computeViolationWithBestPerm(
-                                        candidate_set, heuristic_memory,
+                                        candidate_set, heuristic_memory_vector,
                                         row_indices_map, A, x);
                                 localData.candidates.emplace(
                                     candidate_set, violation, perm,
-                                    heuristic_memory, rhs);
+                                    heuristic_memory_vector, rhs);
                             }
                         } else {
                             auto [violation, perm, rhs] =
                                 computeViolationWithBestPerm(
-                                    candidate_set, heuristic_memory,
+                                    candidate_set, heuristic_memory_vector,
                                     row_indices_map, A, x);
                             localData.candidate_cache[candidate_set] =
                                 violation;
@@ -387,7 +395,7 @@ class HighRankCuts {
                             if (violation > 1e-3) {
                                 localData.candidates.emplace(
                                     candidate_set, violation, perm,
-                                    heuristic_memory, rhs);
+                                    heuristic_memory_vector, rhs);
                             }
                         }
                     }
@@ -424,17 +432,19 @@ class HighRankCuts {
                                     if (cache_it->second > 1e-3) {
                                         auto [violation, perm, rhs] =
                                             computeViolationWithBestPerm(
-                                                candidate_set, heuristic_memory,
+                                                candidate_set,
+                                                heuristic_memory_vector,
                                                 row_indices_map, A, x);
                                         localData.candidates.emplace(
                                             candidate_set, violation, perm,
-                                            heuristic_memory, rhs);
+                                            heuristic_memory_vector, rhs);
                                         combination_count++;
                                     }
                                 } else {
                                     auto [violation, perm, rhs] =
                                         computeViolationWithBestPerm(
-                                            candidate_set, heuristic_memory,
+                                            candidate_set,
+                                            heuristic_memory_vector,
                                             row_indices_map, A, x);
                                     localData.candidate_cache[candidate_set] =
                                         violation;
@@ -442,7 +452,7 @@ class HighRankCuts {
                                     if (violation > 1e-3) {
                                         localData.candidates.emplace(
                                             candidate_set, violation, perm,
-                                            heuristic_memory, rhs);
+                                            heuristic_memory_vector, rhs);
                                         combination_count++;
                                     }
                                 }
@@ -477,7 +487,7 @@ class HighRankCuts {
     }
 
     std::tuple<double, Permutation, double> computeViolationWithBestPerm(
-        const std::vector<int> &nodes, const std::set<int> &memory,
+        const std::vector<int> &nodes, const std::vector<int> &memory,
         const std::vector<std::vector<int>> &row_indices_map,
         const SparseMatrix &A, const std::vector<double> &x) {
         static constexpr double EPSILON = 1e-3;
@@ -570,321 +580,6 @@ class HighRankCuts {
 
     Xoroshiro128Plus rng;
 
-    std::vector<CandidateSet> localSearch(
-        const CandidateSet &initial,
-        const std::vector<std::vector<int>> &row_indices_map,
-        const SparseMatrix &A, const std::vector<double> &x,
-        const std::vector<std::set<int>> &node_scores,
-        int max_iterations = 100) {
-        // Configuration constants
-        static constexpr struct Config {
-            const double MIN_WEIGHT = 0.01;
-            const int SEGMENT_SIZE = 20;
-            const int MAX_DIVERSE_SOLUTIONS = 5;
-            const double DIVERSITY_THRESHOLD = 0.3;
-            const double QUALITY_WEIGHT = 0.7;
-            const double DIVERSITY_WEIGHT = 0.3;
-            const double BASE_ACCEPTANCE_RATE = 0.3;
-            const double MIN_ACCEPTANCE_RATE = 0.1;
-            const double MAX_ACCEPTANCE_RATE = 0.5;
-            const int MAX_REMOVE_COUNT = 3;
-            const double IMPROVEMENT_BONUS = 1.5;
-            const double MAX_DETERIORATION = 0.1;
-            const double OPERATOR_LEARNING_RATE = 0.1;
-        } config;
-
-        // Solution tracking
-        CandidateSet best = initial;
-        CandidateSet current = initial;
-        std::vector<CandidateSet> diverse_solutions;
-
-        // ALNS operator management
-        enum OperatorType { SWAP_NODES, REMOVE_ADD_NODE, UPDATE_NEIGHBORS };
-        std::array<double, 3> operator_scores{1.0, 1.0, 1.0};
-        std::array<int, 3> operator_usage{0, 0, 0};
-        std::array<int, 3> operator_success{0, 0, 0};
-
-        // Adaptive parameters tracking
-        struct SegmentStats {
-            double avg_violation = 0.0;
-            double best_violation = 0.0;
-            int improvements = 0;
-            int accepted_moves = 0;
-        };
-        std::deque<SegmentStats> history;
-        SegmentStats current_segment;
-
-        // RNG setup with better distribution
-        std::uniform_real_distribution<double> dist;
-
-        // Optimization state
-        int iterations_since_improvement = 0;
-        int segment_iterations = 0;
-
-        // Main optimization loop
-        for (int iter = 0; iter < max_iterations; ++iter) {
-            const auto backup = current;
-
-            // Select operator using roulette wheel selection
-            const auto total_weight = std::accumulate(
-                operator_scores.begin(), operator_scores.end(), 0.0);
-            const auto selected_op = [&]() {
-                const double r = dist(rng) * total_weight;
-                double cumsum = 0.0;
-                for (size_t i = 0; i < operator_scores.size(); ++i) {
-                    cumsum += operator_scores[i];
-                    if (r <= cumsum) return static_cast<int>(i);
-                }
-                return static_cast<int>(operator_scores.size() - 1);
-            }();
-            operator_usage[selected_op]++;
-
-            // Apply selected operator
-            switch (selected_op) {
-                case SWAP_NODES: {
-                    if (current.nodes.size() >= 2) {
-                        std::uniform_int_distribution<> node_dist(
-                            0, current.nodes.size() - 1);
-                        const int pos1 = node_dist(rng);
-                        int pos2;
-                        do {
-                            pos2 = node_dist(rng);
-                        } while (pos2 == pos1);
-                        std::swap(current.nodes[pos1], current.nodes[pos2]);
-                    }
-                    break;
-                }
-
-                case REMOVE_ADD_NODE: {
-                    if (current.nodes.size() > 1 && !current.neighbor.empty()) {
-                        // Remove node
-                        std::uniform_int_distribution<> node_dist(
-                            0, current.nodes.size() - 1);
-                        const int remove_pos = node_dist(rng);
-                        const int removed_node = current.nodes[remove_pos];
-                        current.nodes.erase(current.nodes.begin() + remove_pos);
-                        current.neighbor.insert(removed_node);
-
-                        // Score and select new node
-                        std::vector<std::pair<int, double>> scored_neighbors;
-                        scored_neighbors.reserve(current.neighbor.size());
-                        for (const int n : current.neighbor) {
-                            double score = std::count_if(
-                                current.nodes.begin(), current.nodes.end(),
-                                [&](int node) {
-                                    return node_scores[node].count(n);
-                                });
-                            scored_neighbors.emplace_back(n, score);
-                        }
-
-                        if (!scored_neighbors.empty()) {
-                            std::sort(scored_neighbors.begin(),
-                                      scored_neighbors.end(),
-                                      [](const auto &a, const auto &b) {
-                                          return a.second > b.second;
-                                      });
-
-                            std::exponential_distribution<> exp_dist(
-                                1.0 / (1.0 + iterations_since_improvement));
-                            const int rank =
-                                std::min<int>(scored_neighbors.size() - 1,
-                                              static_cast<int>(exp_dist(rng)));
-
-                            const int new_node = scored_neighbors[rank].first;
-                            current.nodes.push_back(new_node);
-                            current.neighbor.erase(new_node);
-                        }
-                    }
-                    break;
-                }
-
-                case UPDATE_NEIGHBORS: {
-                    // Remove neighbors
-                    const int remove_count =
-                        std::min(config.MAX_REMOVE_COUNT,
-                                 static_cast<int>(current.neighbor.size()));
-
-                    std::vector<int> neighbor_vec(current.neighbor.begin(),
-                                                  current.neighbor.end());
-                    std::shuffle(neighbor_vec.begin(), neighbor_vec.end(), rng);
-
-                    for (int i = 0; i < remove_count; ++i) {
-                        current.neighbor.erase(neighbor_vec[i]);
-                    }
-
-                    // Add new neighbors
-                    std::set<int> potential_neighbors;
-                    for (const int node : current.nodes) {
-                        for (const int neighbor : node_scores[node]) {
-                            if (!std::binary_search(current.nodes.begin(),
-                                                    current.nodes.end(),
-                                                    neighbor) &&
-                                current.neighbor.count(neighbor) == 0) {
-                                potential_neighbors.insert(neighbor);
-                            }
-                        }
-                    }
-
-                    std::vector<int> new_neighbors(potential_neighbors.begin(),
-                                                   potential_neighbors.end());
-                    std::shuffle(new_neighbors.begin(), new_neighbors.end(),
-                                 rng);
-
-                    const int add_count =
-                        std::min(config.MAX_REMOVE_COUNT,
-                                 static_cast<int>(new_neighbors.size()));
-
-                    for (int i = 0; i < add_count; ++i) {
-                        current.neighbor.insert(new_neighbors[i]);
-                    }
-                    break;
-                }
-            }
-
-            // Evaluate solution
-            const auto [new_violation, new_perm, rhs] =
-                computeViolationWithBestPerm(current.nodes, current.neighbor,
-                                             row_indices_map, A, x);
-            const double delta = new_violation - backup.violation;
-
-            // Adaptive acceptance criteria
-            const bool accept = [&]() {
-                if (delta > 0) return true;
-
-                if (history.size() >= 2) {
-                    const double recent_improvement_rate =
-                        static_cast<double>(history.back().improvements) /
-                        config.SEGMENT_SIZE;
-                    double acceptance_rate = std::min(
-                        config.MAX_ACCEPTANCE_RATE,
-                        std::max(config.MIN_ACCEPTANCE_RATE,
-                                 0.4 * (1.0 - recent_improvement_rate)));
-
-                    const double avg_recent_violation =
-                        std::accumulate(history.begin(), history.end(), 0.0,
-                                        [](double sum, const auto &seg) {
-                                            return sum + seg.avg_violation;
-                                        }) /
-                        history.size();
-
-                    if (current.violation < avg_recent_violation) {
-                        acceptance_rate *= config.IMPROVEMENT_BONUS;
-                    }
-
-                    return (dist(rng) < acceptance_rate) &&
-                           (delta > -std::abs(current.violation *
-                                              config.MAX_DETERIORATION));
-                }
-
-                return dist(rng) < config.BASE_ACCEPTANCE_RATE;
-            }();
-
-            if (accept) {
-                current.violation = new_violation;
-                current.perm = new_perm;
-                current.rhs = rhs;
-
-                // Update operator scores and statistics
-                operator_success[selected_op]++;
-                operator_scores[selected_op] = std::max(
-                    config.MIN_WEIGHT,
-                    operator_scores[selected_op] *
-                            (1 - config.OPERATOR_LEARNING_RATE) +
-                        config.OPERATOR_LEARNING_RATE * std::max(0.0, delta));
-
-                current_segment.accepted_moves++;
-                current_segment.avg_violation =
-                    (current_segment.avg_violation * segment_iterations +
-                     new_violation) /
-                    (segment_iterations + 1);
-
-                if (new_violation > best.violation) {
-                    best = current;
-                    current_segment.improvements++;
-                    iterations_since_improvement = 0;
-                    current_segment.best_violation =
-                        std::max(current_segment.best_violation, new_violation);
-                } else {
-                    iterations_since_improvement++;
-                }
-
-                // Maintain diverse solutions
-                const bool is_diverse = std::none_of(
-                    diverse_solutions.begin(), diverse_solutions.end(),
-                    [&](const auto &sol) {
-                        return std::abs(sol.violation - new_violation) <
-                               config.DIVERSITY_THRESHOLD;
-                    });
-
-                if (is_diverse) {
-                    diverse_solutions.push_back(current);
-                    if (diverse_solutions.size() >
-                        config.MAX_DIVERSE_SOLUTIONS) {
-                        diverse_solutions.erase(std::min_element(
-                            diverse_solutions.begin(), diverse_solutions.end(),
-                            [](const auto &a, const auto &b) {
-                                return a.violation < b.violation;
-                            }));
-                    }
-                }
-            } else {
-                current = backup;
-                operator_scores[selected_op] = std::max(
-                    config.MIN_WEIGHT, operator_scores[selected_op] *
-                                           (1 - config.OPERATOR_LEARNING_RATE));
-            }
-
-            // Update segment statistics
-            segment_iterations++;
-            if (segment_iterations == config.SEGMENT_SIZE) {
-                history.push_back(current_segment);
-                if (history.size() > 3) {
-                    history.pop_front();
-                }
-                current_segment = SegmentStats();
-                segment_iterations = 0;
-            }
-
-            // Strategic restart
-            if (iterations_since_improvement > config.SEGMENT_SIZE &&
-                !diverse_solutions.empty()) {
-                std::vector<std::pair<double, int>> restart_candidates;
-                restart_candidates.reserve(diverse_solutions.size());
-
-                for (size_t i = 0; i < diverse_solutions.size(); ++i) {
-                    const double quality_score =
-                        diverse_solutions[i].violation / best.violation;
-                    double diversity_score = 0.0;
-
-                    for (const auto &other : diverse_solutions) {
-                        if (&other != &diverse_solutions[i]) {
-                            diversity_score +=
-                                std::abs(other.violation -
-                                         diverse_solutions[i].violation);
-                        }
-                    }
-
-                    restart_candidates.emplace_back(
-                        quality_score * config.QUALITY_WEIGHT +
-                            diversity_score * config.DIVERSITY_WEIGHT,
-                        i);
-                }
-
-                std::sort(restart_candidates.begin(), restart_candidates.end());
-                current = diverse_solutions[restart_candidates.back().second];
-                iterations_since_improvement = 0;
-            }
-        }
-
-        diverse_solutions.push_back(best);
-        std::sort(diverse_solutions.begin(), diverse_solutions.end(),
-                  [](const auto &a, const auto &b) {
-                      return a.violation > b.violation;
-                  });
-
-        return diverse_solutions;
-    }
-
     void addCutToCutStorage(const CandidateSet &candidate,
                             std::vector<int> &order) {
         std::array<uint64_t, num_words> C = {};
@@ -961,21 +656,23 @@ class HighRankCuts {
             stdexec::just(), candidates.size(),
             [this, &row_indices_map, &A, &x, &candidates_mutex, &node_scores,
              &improved_candidates, &candidates](std::size_t idx) {
+                LocalSearch local_search(this);
+
                 auto it = candidates.begin();
                 std::advance(it, idx);
                 auto rhs = it->rhs;
                 auto violation = it->violation;
+
                 auto improved_list =
-                    localSearch(*it, row_indices_map, A, x, node_scores);
-                // print improved.violation
-                //
+                    local_search.solve(*it, row_indices_map, A, x, node_scores);
+
                 {
                     bool improved_found = false;
-                    for (auto improved : improved_list) {
+                    for (const auto &improved : improved_list) {
                         if (improved.violation > violation) {
+                            improved_found = true;
                             std::lock_guard<std::mutex> lock(candidates_mutex);
                             improved_candidates.insert(improved);
-                            improved_found = true;
                         }
                     }
                     if (!improved_found) {
@@ -1063,4 +760,416 @@ class HighRankCuts {
 
         return alpha;
     }
+
+    ////////////////////////////////////////////////////////////////////////////
+    // Adaptive Large Neighborhood Search
+    ////////////////////////////////////////////////////////////////////////////
+    class LocalSearch {
+       private:
+        enum class OperatorType : uint8_t {
+            SWAP_NODES,
+            REMOVE_ADD_NODE,
+            UPDATE_NEIGHBORS
+        };
+
+        struct alignas(64) OperatorStats {
+            double score = 1.0;
+            int32_t usage = 0;
+            int32_t success = 0;
+            double avg_improvement = 0.0;
+        };
+
+        struct alignas(32) SegmentStats {
+            double avg_violation = 0.0;
+            double best_violation = 0.0;
+            int32_t improvements = 0;
+            int32_t accepted_moves = 0;
+        };
+
+        std::array<OperatorStats, 3> operators;
+        std::deque<SegmentStats> history;
+        SegmentStats current_segment{};
+        Xoroshiro128Plus rng;
+        int iterations_since_improvement = 0;
+        int segment_iterations = 0;
+        double temperature;
+        HighRankCuts *parent;
+
+        double computeSimilarity(const std::vector<int> &set1,
+                                 const std::vector<int> &set2) const {
+            std::vector<int> intersection;
+            intersection.reserve(std::min(set1.size(), set2.size()));
+
+            std::set_intersection(set1.begin(), set1.end(), set2.begin(),
+                                  set2.end(), std::back_inserter(intersection));
+
+            return 2.0 * intersection.size() / (set1.size() + set2.size());
+        }
+
+        OperatorType selectOperator() {
+            struct WeightedOperator {
+                double cumulative_weight;
+                OperatorType type;
+            };
+
+            std::array<WeightedOperator, 3> weighted_ops;
+            double cumsum = 0.0;
+
+            for (size_t i = 0; i < operators.size(); ++i) {
+                cumsum += operators[i].score;
+                weighted_ops[i] = {cumsum, static_cast<OperatorType>(i)};
+            }
+
+            std::uniform_real_distribution<double> dist(0.0, cumsum);
+            const double r = dist(rng);
+
+            return std::lower_bound(weighted_ops.begin(), weighted_ops.end(), r,
+                                    [](const auto &op, double val) {
+                                        return op.cumulative_weight < val;
+                                    })
+                ->type;
+        }
+
+        void applySwapNodes(CandidateSet &current) {
+            if (current.nodes.size() >= 2) {
+                std::uniform_int_distribution<> node_dist(
+                    0, current.nodes.size() - 1);
+                const int pos1 = node_dist(rng);
+                int pos2;
+                do {
+                    pos2 = node_dist(rng);
+                } while (pos2 == pos1);
+                std::swap(current.nodes[pos1], current.nodes[pos2]);
+            }
+        }
+
+        void applyRemoveAddNode(CandidateSet &current,
+                                const std::vector<std::set<int>> &node_scores) {
+            if (current.nodes.size() > 1 && !current.neighbor.empty()) {
+                std::uniform_int_distribution<> node_dist(
+                    0, current.nodes.size() - 1);
+                const int remove_pos = node_dist(rng);
+                const int removed_node = current.nodes[remove_pos];
+
+                current.nodes.erase(current.nodes.begin() + remove_pos);
+                // current.neighbor.insert(removed_node);
+
+                std::vector<std::pair<int, double>> scored_neighbors;
+                scored_neighbors.reserve(current.neighbor.size());
+
+                for (const auto &n : current.neighbor) {
+                    double score = std::count_if(
+                        current.nodes.begin(), current.nodes.end(),
+                        [&node_scores, n](int node) {
+                            return node_scores[node].count(n);
+                        });
+                    scored_neighbors.emplace_back(n, score);
+                }
+
+                if (!scored_neighbors.empty()) {
+                    pdqsort(scored_neighbors.begin(), scored_neighbors.end(),
+                            [](const auto &a, const auto &b) {
+                                return a.second > b.second;
+                            });
+
+                    double temp_factor = std::max(
+                        0.1,
+                        temperature / LocalSearchConfig::INITIAL_TEMPERATURE);
+                    std::exponential_distribution<> exp_dist(
+                        1.0 /
+                        (temp_factor * (1.0 + iterations_since_improvement)));
+
+                    const int rank =
+                        std::min<int>(scored_neighbors.size() - 1,
+                                      static_cast<int>(exp_dist(rng)));
+
+                    const int new_node = scored_neighbors[rank].first;
+                    current.nodes.push_back(new_node);
+                    if (std::find(current.neighbor.begin(),
+                                  current.neighbor.end(),
+                                  new_node) == current.neighbor.end()) {
+                        current.neighbor.push_back(new_node);
+                    }
+                }
+            }
+        }
+
+        void applyUpdateNeighbors(
+            CandidateSet &current,
+            const std::vector<std::set<int>> &node_scores) {
+            const int remove_count =
+                std::min(LocalSearchConfig::MAX_REMOVE_COUNT,
+                         static_cast<int>(current.neighbor.size()));
+
+            std::vector<int> neighbor_vec(current.neighbor.begin(),
+                                          current.neighbor.end());
+            std::shuffle(neighbor_vec.begin(), neighbor_vec.end(), rng);
+
+            for (int i = 0; i < remove_count; ++i) {
+                // current.neighbor.erase(neighbor_vec[i]);
+                current.neighbor.erase(std::find(current.neighbor.begin(),
+                                                 current.neighbor.end(),
+                                                 neighbor_vec[i]));
+            }
+
+            std::vector<int> potential_neighbors;
+            for (const int &node : current.nodes) {
+                for (const int &neighbor : node_scores[node]) {
+                    if (!std::binary_search(current.nodes.begin(),
+                                            current.nodes.end(), neighbor) &&
+                        // current.neighbor.count(neighbor) == 0) {
+                        std::find(current.neighbor.begin(),
+                                  current.neighbor.end(),
+                                  neighbor) == current.neighbor.end()) {
+                        // potential_neighbors.insert(neighbor);
+                        potential_neighbors.push_back(neighbor);
+                    }
+                }
+            }
+
+            std::vector<int> new_neighbors(potential_neighbors.begin(),
+                                           potential_neighbors.end());
+            std::shuffle(new_neighbors.begin(), new_neighbors.end(), rng);
+
+            const int add_count =
+                std::min(LocalSearchConfig::MAX_REMOVE_COUNT,
+                         static_cast<int>(new_neighbors.size()));
+
+            for (int i = 0; i < add_count; ++i) {
+                // current.neighbor.insert(new_neighbors[i]);
+                current.neighbor.push_back(new_neighbors[i]);
+            }
+        }
+
+        bool acceptMove(double delta, const CandidateSet &current) {
+            if (delta > 0) return true;
+
+            std::uniform_real_distribution<double> dist(0.0, 1.0);
+            const double acceptance_prob = std::exp(delta / temperature);
+
+            if (history.size() >= 2) {
+                const double recent_improvement_rate =
+                    static_cast<double>(history.back().improvements) /
+                    LocalSearchConfig::SEGMENT_SIZE;
+
+                const double acceptance_rate =
+                    std::clamp(0.4 * (1.0 - recent_improvement_rate),
+                               LocalSearchConfig::MIN_ACCEPTANCE_RATE,
+                               LocalSearchConfig::MAX_ACCEPTANCE_RATE);
+
+                const double avg_recent_violation =
+                    std::accumulate(history.begin(), history.end(), 0.0,
+                                    [](double sum, const auto &seg) {
+                                        return sum + seg.avg_violation;
+                                    }) /
+                    history.size();
+
+                if (current.violation < avg_recent_violation) {
+                    return (dist(rng) <
+                            acceptance_rate *
+                                LocalSearchConfig::IMPROVEMENT_BONUS) &&
+                           (delta >
+                            -std::abs(current.violation *
+                                      LocalSearchConfig::MAX_DETERIORATION));
+                }
+
+                return (dist(rng) < acceptance_rate) &&
+                       (delta >
+                        -std::abs(current.violation *
+                                  LocalSearchConfig::MAX_DETERIORATION));
+            }
+
+            return dist(rng) < acceptance_prob;
+        }
+
+        void updateStatistics(OperatorType op, double delta,
+                              CandidateSet &current, double new_violation) {
+            auto &op_stats = operators[static_cast<size_t>(op)];
+            op_stats.usage++;
+
+            if (delta > 0) {
+                op_stats.success++;
+                op_stats.avg_improvement =
+                    0.9 * op_stats.avg_improvement + 0.1 * delta;
+            }
+
+            op_stats.score = std::max(
+                LocalSearchConfig::MIN_WEIGHT,
+                op_stats.score *
+                        (1 - LocalSearchConfig::OPERATOR_LEARNING_RATE) +
+                    LocalSearchConfig::OPERATOR_LEARNING_RATE *
+                        (1.0 + std::max(0.0, delta)));
+
+            current_segment.accepted_moves++;
+            current_segment.avg_violation =
+                (current_segment.avg_violation * segment_iterations +
+                 new_violation) /
+                (segment_iterations + 1);
+        }
+
+        void updateTemperature() {
+            temperature *= LocalSearchConfig::COOLING_RATE;
+            if (iterations_since_improvement >=
+                LocalSearchConfig::REHEAT_INTERVAL) {
+                temperature *= LocalSearchConfig::REHEATING_FACTOR;
+                iterations_since_improvement = 0;
+            }
+        }
+
+        void strategicRestart(CandidateSet &current, const CandidateSet &best,
+                              std::vector<CandidateSet> &diverse_solutions) {
+            if (iterations_since_improvement >
+                    LocalSearchConfig::SEGMENT_SIZE &&
+                !diverse_solutions.empty()) {
+                std::vector<std::pair<double, size_t>> restart_candidates;
+                restart_candidates.reserve(diverse_solutions.size());
+
+                for (size_t i = 0; i < diverse_solutions.size(); ++i) {
+                    const auto &sol = diverse_solutions[i];
+                    const double quality_score = sol.violation / best.violation;
+                    double diversity_score = 0.0;
+
+                    for (const auto &other : diverse_solutions) {
+                        if (&other != &sol) {
+                            const double structural_div =
+                                1.0 - computeSimilarity(sol.nodes, other.nodes);
+                            const double violation_div =
+                                std::abs(other.violation - sol.violation);
+                            diversity_score +=
+                                0.5 * (structural_div + violation_div);
+                        }
+                    }
+
+                    restart_candidates.emplace_back(
+                        quality_score * LocalSearchConfig::QUALITY_WEIGHT +
+                            diversity_score *
+                                LocalSearchConfig::DIVERSITY_WEIGHT,
+                        i);
+                }
+
+                pdqsort(restart_candidates.begin(), restart_candidates.end());
+                current = diverse_solutions[restart_candidates.back().second];
+                iterations_since_improvement = 0;
+                temperature = LocalSearchConfig::INITIAL_TEMPERATURE;
+            }
+        }
+
+       public:
+        LocalSearch(HighRankCuts *p)
+            : rng(std::random_device{}()),
+              temperature(LocalSearchConfig::INITIAL_TEMPERATURE),
+              parent(p) {}
+
+        std::vector<CandidateSet> solve(
+            const CandidateSet &initial,
+            const std::vector<std::vector<int>> &row_indices_map,
+            const SparseMatrix &A, const std::vector<double> &x,
+            const std::vector<std::set<int>> &node_scores,
+            int max_iterations = 200) {
+            CandidateSet best = initial;
+            CandidateSet current = initial;
+            std::vector<CandidateSet> diverse_solutions;
+            diverse_solutions.reserve(LocalSearchConfig::MAX_DIVERSE_SOLUTIONS +
+                                      1);
+
+            for (int iter = 0; iter < max_iterations; ++iter) {
+                const auto backup = current;
+                const auto selected_op = selectOperator();
+
+                switch (selected_op) {
+                    case OperatorType::SWAP_NODES:
+                        applySwapNodes(current);
+                        break;
+                    case OperatorType::REMOVE_ADD_NODE:
+                        applyRemoveAddNode(current, node_scores);
+                        break;
+                    case OperatorType::UPDATE_NEIGHBORS:
+                        applyUpdateNeighbors(current, node_scores);
+                        break;
+                }
+
+                const auto [new_violation, new_perm, rhs] =
+                    parent->computeViolationWithBestPerm(
+                        current.nodes, current.neighbor, row_indices_map, A, x);
+
+                const double delta = new_violation - backup.violation;
+
+                if (acceptMove(delta, current)) {
+                    current.violation = new_violation;
+                    current.perm = std::move(new_perm);
+                    current.rhs = std::move(rhs);
+
+                    updateStatistics(selected_op, delta, current,
+                                     new_violation);
+
+                    if (new_violation > best.violation) {
+                        best = current;
+                        current_segment.improvements++;
+                        iterations_since_improvement = 0;
+                        current_segment.best_violation = std::max(
+                            current_segment.best_violation, new_violation);
+                    } else {
+                        iterations_since_improvement++;
+                    }
+
+                    bool is_diverse = true;
+                    for (const auto &sol : diverse_solutions) {
+                        const double similarity =
+                            computeSimilarity(current.nodes, sol.nodes);
+                        if (similarity > 0.7 ||
+                            std::abs(sol.violation - new_violation) <
+                                LocalSearchConfig::DIVERSITY_THRESHOLD) {
+                            is_diverse = false;
+                            break;
+                        }
+                    }
+
+                    if (is_diverse) {
+                        diverse_solutions.push_back(current);
+                        if (diverse_solutions.size() >
+                            LocalSearchConfig::MAX_DIVERSE_SOLUTIONS) {
+                            diverse_solutions.erase(std::min_element(
+                                diverse_solutions.begin(),
+                                diverse_solutions.end(),
+                                [](const auto &a, const auto &b) {
+                                    return a.violation < b.violation;
+                                }));
+                        }
+                    }
+                } else {
+                    current = backup;
+                    operators[static_cast<size_t>(selected_op)].score =
+                        std::max(
+                            LocalSearchConfig::MIN_WEIGHT,
+                            operators[static_cast<size_t>(selected_op)].score *
+                                (1 -
+                                 LocalSearchConfig::OPERATOR_LEARNING_RATE));
+                }
+
+                // Update segment statistics
+                segment_iterations++;
+                if (segment_iterations == LocalSearchConfig::SEGMENT_SIZE) {
+                    history.push_back(current_segment);
+                    if (history.size() > 3) {
+                        history.pop_front();
+                    }
+                    current_segment = SegmentStats{};
+                    segment_iterations = 0;
+                }
+
+                updateTemperature();
+                strategicRestart(current, best, diverse_solutions);
+            }
+
+            // Final solution processing
+            diverse_solutions.push_back(std::move(best));
+
+            pdqsort(diverse_solutions.begin(), diverse_solutions.end(),
+                    [](const auto &a, const auto &b) {
+                        return a.violation > b.violation;
+                    });
+
+            return diverse_solutions;
+        }
+    };
 };

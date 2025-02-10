@@ -34,20 +34,28 @@ inline simd_double load_simd_values(const std::span<const double> &source,
 template <typename T, typename Container>
 inline std::experimental::simd<T> load_simd(const Container &source,
                                             size_t start_index,
-                                            size_t simd_size) {
+                                            size_t simd_size) noexcept {
     constexpr size_t simd_register_size = std::experimental::simd<T>::size();
-
-    // Fallback: Load into a buffer and then into the SIMD register
     alignas(64) std::array<T, simd_register_size> buffer = {};
-    for (size_t i = 0; i < simd_size; ++i) {
-        buffer[i] =
-            source[start_index + i]->cost;  // Assumes source contains pointers
+
+    size_t valid_size = std::min(simd_size, source.size() - start_index);
+    size_t buffer_idx = 0;
+
+    // Only load non-dominated labels
+    for (size_t i = 0; i < valid_size && buffer_idx < simd_size; ++i) {
+        if (!source[start_index + i]->is_dominated) {
+            buffer[buffer_idx++] = source[start_index + i]->cost;
+        }
+    }
+
+    // Fill remaining slots with max value if needed
+    while (buffer_idx < simd_size) {
+        buffer[buffer_idx++] = std::numeric_limits<T>::max();
     }
 
     return std::experimental::simd<T>(buffer.data(),
                                       std::experimental::vector_aligned);
 }
-
 template <typename T, typename Container>
 inline std::experimental::simd<T> load_simd_generic(const Container &source,
                                                     size_t start_index,

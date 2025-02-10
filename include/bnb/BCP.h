@@ -616,6 +616,7 @@ class VRProblem {
         auto colAdded = 0;
         std::vector<double> originDuals;
         bool force_cuts = false;
+        bool non_violated_cuts = false;
         int numK;
         for (int iter = 0; iter < max_iter; ++iter) {
             reoptimized = false;
@@ -654,6 +655,7 @@ class VRProblem {
                     bool violated = srcResult.first;
                     bool cleared = srcResult.second;
                     if (!violated) {
+                        non_violated_cuts = true;
                         if (bucket_graph->A_MAX == N_SIZE) {
                             if (std::abs(inner_obj) < 1.0) {
                                 print_info(
@@ -670,6 +672,7 @@ class VRProblem {
                         }
 
                     } else {
+                        non_violated_cuts = false;
                         cuts_enabled = true;
                         changed = cutHandler(r1c, node, SRCconstraints);
                         if (changed) {
@@ -931,18 +934,18 @@ class VRProblem {
 
                                 // create small perturbation random perturbation
                                 // on nodeDuals
-                                for (auto &dual : nodeDuals) {
-                                    if (std::abs(dual) > 1e-3) {
-                                        dual *= (1.0 + dis(gen));
-                                    }
-                                }
+                                // for (auto &dual : nodeDuals) {
+                                //     if (std::abs(dual) > 1e-3) {
+                                //         dual *= (1.0 + dis(gen));
+                                //     }
+                                // }
                                 // updateGapAndRunOptimization(
                                 //     node, lp_obj, inner_obj, ipm_solver,
                                 //     iter_non_improv, use_ipm_duals,
                                 //     nodeDuals);
-                                stab.define_smooth_dual_sol(nodeDuals);
+                                // stab.define_smooth_dual_sol(nodeDuals);
                                 iter_non_improv = 0;
-                                use_ipm_duals = true;
+                                // use_ipm_duals = true;
                             }
                         }
                     } else {
@@ -1001,6 +1004,11 @@ class VRProblem {
                 if (bucket_graph->getStatus() == Status::Optimal &&
                     stab.shouldExit()) {
                     print_info("Optimal solution found\n");
+                    break;
+                }
+
+                if (colAdded == 0 && non_violated_cuts) {
+                    print_info("No violated cuts found, calling it a day\n");
                     break;
                 }
 

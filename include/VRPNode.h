@@ -78,7 +78,7 @@ struct VRPNode {
         std::vector<VRPNode> &nodes) {
         auto get_score = [&arc_scores, &nodes](const Arc &arc) {
             auto it = arc_scores.find(arc);
-            auto scores = 0;  //-nodes[arc.to].cost / 100;
+            auto scores = -nodes[arc.to].cost / 100;
             scores += (it != arc_scores.end()) ? it->second : 0;
             return scores;
         };

@@ -261,7 +261,7 @@ set(MUSSPSOURCE
 )
 
 set(IPM_SOURCES src/IPSolver.cpp)
-set(SRC_SOURCES src/SRC.cpp src/HighOrderSRC.cpp)
+set(SRC_SOURCES src/SRC.cpp)
 
 # Define a list for the source files that will be included
 set(EXECUTABLE_SOURCES ${SOURCES} ${HGS_SOURCES} ${FPSOURCE})

@@ -295,15 +295,6 @@ std::pair<bool, bool> LimitedMemoryRank1Cuts::runSeparation(
     // print size of SRCconstraints
     // RUN_OPTIMIZATION(node, 1e-8)
     GET_SOL(node);
-    //(node)->optimize();
-    // solution = (node)->extractSolution();
-    // solution = (node)->ipSolver->getPrimals();
-    //
-    // int z = 0;
-    // for (auto &path : allPaths) {
-    //     path.frac_x = solution[z];
-    //     z++;
-    // }
 
     separateR1C1(matrix.A_sparse, solution);
     // if (cuts_before != cuts->size()) {
@@ -315,9 +306,10 @@ std::pair<bool, bool> LimitedMemoryRank1Cuts::runSeparation(
     // }
     auto initial_cut_count = cuts->size();
     int rank3_cuts_size = cuts->size() - initial_cut_count;
+
+    ////////////////////////////////////////////////////
     high_rank_cuts.cutStorage = &cutStorage;
     high_rank_cuts.allPaths = allPaths;
-    high_rank_cuts.distances = generator->cost_mat4_vertex;
     high_rank_cuts.nodes = nodes;
     high_rank_cuts.arc_duals = arc_duals;
 
