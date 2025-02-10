@@ -123,7 +123,7 @@ class Stabilization {
 
     double _misprice_schedule(int nb_misprices, double base_alpha) {
         double alpha = 1.0 - (nb_misprices + 1) * (1 - base_alpha);
-        if (nb_misprices > 10 || alpha <= 1e-3) {
+        if (nb_misprices > 5 || alpha <= 1e-3) {
             alpha = 0.0;  // Deactivate stabilization
         }
         duals_in = duals_sep;
@@ -326,7 +326,7 @@ class Stabilization {
         std::vector<double> nodeDuals(input_duals.begin(),
                                       input_duals.begin() + sizeDual);
 
-        mp_manager.updatePool(nodeDuals, lp_obj);
+        mp_manager.updatePool(nodeDuals, -lp_obj);
         DualSolution historical_avg = mp_manager.getWeightedSolution();
 
         // check for progress within a threshold

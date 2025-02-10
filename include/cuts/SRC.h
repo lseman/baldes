@@ -22,7 +22,6 @@
 #include "../third_party/concurrentqueue.h"
 #include "Cut.h"
 #include "Definitions.h"
-#include "HighOrderSRC.h"
 #include "Pools.h"
 #include "SparseMatrix.h"
 #include "ankerl/unordered_dense.h"
@@ -79,26 +78,19 @@ class LimitedMemoryRank1Cuts {
 #endif
 
     Xoroshiro128Plus rp;  // Seed it (you can change the seed)
-    using HighDimCutsGeneratorPtr = std::shared_ptr<HighDimCutsGenerator>;
-    HighDimCutsGeneratorPtr generator =
-        std::make_shared<HighDimCutsGenerator>(N_SIZE, 5, 1e-6);
 
     void setDistanceMatrix(const std::vector<std::vector<double>> distances) {
-        generator->setDistanceMatrix(distances);
+        high_rank_cuts.distances = distances;
     }
     LimitedMemoryRank1Cuts(std::vector<VRPNode> &nodes);
 
     LimitedMemoryRank1Cuts(const LimitedMemoryRank1Cuts &other)
         : rp(other.rp),
-          generator(other.generator ? other.generator->clone()
-                                    : nullptr),  // Clone generator if it exists
           cutStorage(other.cutStorage),
           allPaths(other.allPaths),
           labels(other.labels),
           labels_counter(other.labels_counter),
-          nodes(other.nodes) {
-        other.generator->setDistanceMatrix(other.generator->cost_mat4_vertex);
-    }
+          nodes(other.nodes) {}
 
     void setDuals(const std::vector<double> &duals) {
         // print nodes.size

@@ -145,6 +145,7 @@ using Cuts = std::vector<Cut>;
 class CutStorage {
    public:
     int latest_column = 0;
+
     struct ActiveCutInfo {
         size_t index;        // Original index in cuts vector
         const Cut *cut_ptr;  // Pointer to the cut
@@ -159,6 +160,103 @@ class CutStorage {
                    cut_ptr->baseSet[j / 64] & (1ULL << (j % 64));
         }
     };
+
+    struct SegmentMasks {
+        constexpr static size_t n_segments = (N_SIZE + 63) / 64;
+        constexpr static size_t n_bit_positions = 64;
+        std::vector<std::vector<uint64_t>>
+            neighbor_masks;  // [segment][bit_position]
+        std::vector<std::vector<uint64_t>>
+            base_set_masks;       // [segment][bit_position]
+        size_t n_cuts;            // Keep track of number of cuts for safety
+        uint64_t cut_limit_mask;  // Mask to limit the number of cuts
+
+        std::vector<std::vector<uint64_t>>
+            valid_cut_masks;  // [segment][bit_position] - NEW!
+
+        SegmentMasks() : n_cuts(0) {
+            neighbor_masks.resize(n_segments);
+            base_set_masks.resize(n_segments);
+            valid_cut_masks.resize(n_segments);
+            for (size_t i = 0; i < n_segments; ++i) {
+                neighbor_masks[i].resize(n_bit_positions, 0);
+                base_set_masks[i].resize(n_bit_positions, 0);
+                valid_cut_masks[i].resize(n_bit_positions, 0);
+            }
+        }
+        void precompute(const std::vector<ActiveCutInfo> &active_cuts) {
+            n_cuts = active_cuts.size();
+            cut_limit_mask = (n_cuts >= 64) ? ~0ULL : ((1ULL << n_cuts) - 1);
+
+            // Precompute bit masks once
+            std::vector<uint64_t> cut_bit_masks(n_cuts);
+            for (size_t i = 0; i < n_cuts; ++i) {
+                cut_bit_masks[i] = 1ULL << i;
+            }
+
+            // Resize and zero-initialize
+            neighbor_masks.assign(n_segments,
+                                  std::vector<uint64_t>(n_bit_positions, 0));
+            base_set_masks.assign(n_segments,
+                                  std::vector<uint64_t>(n_bit_positions, 0));
+            valid_cut_masks.assign(n_segments,
+                                   std::vector<uint64_t>(n_bit_positions, 0));
+
+            // Iterate over segments and bit positions
+            for (size_t segment = 0; segment < n_segments; ++segment) {
+                size_t bit_limit =
+                    (segment == n_segments - 1) ? (N_SIZE % 64) : 64;
+
+                for (size_t bit_pos = 0; bit_pos < bit_limit; ++bit_pos) {
+                    const uint64_t bit_mask = 1ULL << bit_pos;
+                    uint64_t neighbor_bits = 0;
+                    uint64_t base_bits = 0;
+
+                    for (size_t cut_idx = 0; cut_idx < n_cuts; ++cut_idx) {
+                        const auto &cut = *active_cuts[cut_idx].cut_ptr;
+
+                        if (cut.neighbors[segment] & bit_mask) {
+                            neighbor_bits |= cut_bit_masks[cut_idx];
+                        }
+                        if (cut.baseSet[segment] & bit_mask) {
+                            base_bits |= cut_bit_masks[cut_idx];
+                        }
+                    }
+
+                    // Store with cut limit applied
+                    neighbor_masks[segment][bit_pos] =
+                        (neighbor_bits & cut_limit_mask);
+                    base_set_masks[segment][bit_pos] =
+                        (base_bits & cut_limit_mask);
+                    valid_cut_masks[segment][bit_pos] =
+                        (neighbor_bits & base_bits & cut_limit_mask) &
+                        cut_limit_mask;
+                }
+            }
+        }
+
+        // Safe accessors
+        uint64_t get_neighbor_mask(size_t segment, size_t bit_pos) const {
+            if (segment >= n_segments || bit_pos >= n_bit_positions) return 0;
+            return neighbor_masks[segment][bit_pos];
+        }
+
+        uint64_t get_base_mask(size_t segment, size_t bit_pos) const {
+            if (segment >= n_segments || bit_pos >= n_bit_positions) return 0;
+            return base_set_masks[segment][bit_pos];
+        }
+
+        uint64_t get_valid_cut_mask(size_t segment, size_t bit_pos) const {
+            if (segment >= n_segments || bit_pos >= n_bit_positions) return 0;
+            return valid_cut_masks[segment][bit_pos];
+        }
+
+        uint64_t get_cut_limit_mask() { return cut_limit_mask; }
+    };
+
+    SegmentMasks segment_masks;
+
+    auto &getSegmentMasks() { return segment_masks; }
 
     // Access a cut by index
     Cut &operator[](std::size_t index) {
@@ -296,8 +394,8 @@ class CutStorage {
                 if (!(AM[vj / 64] & (1ULL << (vj % 64)))) {
                     S = 0;  // Reset S if vj is not in AM
                 } else if (C[vj / 64] & (1ULL << (vj % 64))) {
-                    // Get the position of vj in C by counting the set bits up
-                    // to vj
+                    // Get the position of vj in C by counting the set
+                    // bits up to vj
                     int pos = order[vj];
                     S += p.num[pos];
                     if (S >= den) {
@@ -342,5 +440,8 @@ class CutStorage {
                                          cuts[i].type);
             }
         }
+
+        // Pre-compute bitmasks for all cuts in the all the segments
+        segment_masks.precompute(active_cuts);
     }
 };

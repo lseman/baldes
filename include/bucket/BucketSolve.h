@@ -203,7 +203,8 @@ inline std::vector<Label *> BucketGraph::solve(bool trigger) {
         }
         // If the objective improves sufficiently, set the status to separation
         // or optimal
-        auto threshold = -1.5;  // computeThreshold(iter, inner_obj, stats);
+        auto threshold = computeThreshold(iter, inner_obj, stats);
+        //
         if (inner_obj > threshold) {
             ss = true;  // Enter separation mode (for SRC handling)
 #if !defined(SRC) && !defined(SRC3)
@@ -384,8 +385,7 @@ std::vector<double> BucketGraph::labeling_algorithm() {
                                 // Stage One processing with early exits
                                 for (auto *existing_label : to_bucket_labels) {
                                     if (label->cost < existing_label->cost) {
-                                        mother_bucket.remove_label(
-                                            existing_label);
+                                        existing_label->set_dominated(true);
                                     } else {
                                         dominated = true;
                                         break;
@@ -790,7 +790,7 @@ inline std::vector<Label *> BucketGraph::Extend(
         L_prime->real_cost + getcij(initial_node_id, node_id);
 
     if constexpr (M == Mutability::Mut) {
-        new_label->parent = L_prime;
+        // new_label->parent = L_prime;
         // L_prime->children.push_back(new_label);
     }
 
@@ -813,118 +813,60 @@ inline std::vector<Label *> BucketGraph::Extend(
     new_label->nodes_covered.push_back(node_id);
 
 #if defined(SRC)
-    using simd_double = std::experimental::native_simd<double>;
-    using simd_abi = std::experimental::simd_abi::native<double>;
-    static constexpr size_t SIMD_WIDTH = simd_double::size();
-    static constexpr size_t SMALL_SIZE = 256;
-
-    new_label->SRCmap = L_prime->SRCmap;
 
     if constexpr (S == Stage::Four || S == Stage::Enumerate) {
+        new_label->SRCmap = L_prime->SRCmap;
+
         auto &cutter = cut_storage;
-        const size_t segment = node_id >> 6;
-        const size_t bit_position = node_id & 63;
-        const uint64_t bit_mask = bit_mask_lookup[bit_position];
-
-        // Get active cuts once
         const auto active_cuts = cutter->getActiveCuts();
-        const auto cut_size = cutter->activeSize();
-        const size_t simd_cut_size = cut_size - (cut_size % SIMD_WIDTH);
+        const auto n_cuts = cutter->activeSize();
 
+        if (n_cuts == 0) {
+            return {new_label};
+        }
         double total_cost_update = 0.0;
 
-#ifdef __AVX2__
-        if (cut_size <= SMALL_SIZE) {
-#endif
+        const size_t segment = node_id >> 6;
+        const size_t bit_position = node_id & 63;
 
-            // Small size: direct processing of active cuts
-            for (const auto &active_cut : active_cuts) {
-                const auto &cut = *active_cut.cut_ptr;
-                const size_t idx = active_cut.index;
-                const double dual_value = active_cut.dual_value;
+        // Get active cuts once
+        auto &masks = cutter->getSegmentMasks();
+        auto cut_limit_mask = masks.get_cut_limit_mask();
+        uint64_t valid_cuts = masks.get_valid_cut_mask(segment, bit_position);
 
-                if (cut.neighbors[segment] & bit_mask) {
-                    if (cut.baseSet[segment] & bit_mask) {
-                        const auto &multipliers = cut.p;
-                        auto &src_map_value = new_label->SRCmap[idx];
-                        src_map_value +=
-                            multipliers.num[cut.baseSetOrder[node_id]];
-                        if (src_map_value >= multipliers.den) {
-                            src_map_value -= multipliers.den;
-                            total_cost_update -= dual_value;
-                        }
-                    }
-                } else {
-                    new_label->SRCmap[idx] = 0.0;
-                }
+        valid_cuts &= cut_limit_mask;  // This is just a safeguard
+
+        while (valid_cuts) {
+            const int cut_idx = __builtin_ctzll(valid_cuts);
+
+            const auto &active_cut = active_cuts[cut_idx];
+            const auto &cut = *active_cut.cut_ptr;
+
+            auto &src_map_value = new_label->SRCmap[active_cut.index];
+            src_map_value += cut.p.num[cut.baseSetOrder[node_id]];
+
+            if (src_map_value >= cut.p.den) {
+                src_map_value -= cut.p.den;
+                total_cost_update -= active_cut.dual_value;
             }
 
-#ifdef __AVX2__
-        } else {
-            // SIMD processing for larger sizes
-            alignas(64) std::array<double, SIMD_WIDTH> dual_values;
-            alignas(64) std::array<size_t, SIMD_WIDTH> indices;
-            alignas(64) std::array<const Cut *, SIMD_WIDTH> cut_ptrs;
-
-            for (size_t base_idx = 0; base_idx < simd_cut_size;
-                 base_idx += SIMD_WIDTH) {
-                // Prepare SIMD batch
-                for (size_t j = 0; j < SIMD_WIDTH; ++j) {
-                    const auto &active_cut = active_cuts[base_idx + j];
-                    dual_values[j] = active_cut.dual_value;
-                    indices[j] = active_cut.index;
-                    cut_ptrs[j] = active_cut.cut_ptr;
-                }
-
-                simd_double duals_vec = load_simd_values(
-                    std::span<const double>(dual_values.data(), SIMD_WIDTH), 0);
-
-                // Process SIMD batch
-                for (size_t j = 0; j < SIMD_WIDTH; ++j) {
-                    const auto &cut = *cut_ptrs[j];
-                    const size_t idx = indices[j];
-
-                    if (cut.neighbors[segment] & bit_mask) {
-                        if (cut.baseSet[segment] & bit_mask) {
-                            const auto &multipliers = cut.p;
-                            auto &src_map_value = new_label->SRCmap[idx];
-                            src_map_value +=
-                                multipliers.num[cut.baseSetOrder[node_id]];
-                            if (src_map_value >= multipliers.den) {
-                                src_map_value -= multipliers.den;
-                                total_cost_update -= dual_values[j];
-                            }
-                        }
-                    } else {
-                        new_label->SRCmap[idx] = 0.0;
-                    }
-                }
-            }
-
-            // Handle remaining active cuts
-            for (size_t i = simd_cut_size; i < cut_size; ++i) {
-                const auto &active_cut = active_cuts[i];
-                const auto &cut = *active_cut.cut_ptr;
-                const size_t idx = active_cut.index;
-                const double dual_value = active_cut.dual_value;
-
-                if (cut.neighbors[segment] & bit_mask) {
-                    if (cut.baseSet[segment] & bit_mask) {
-                        const auto &multipliers = cut.p;
-                        auto &src_map_value = new_label->SRCmap[idx];
-                        src_map_value +=
-                            multipliers.num[cut.baseSetOrder[node_id]];
-                        if (src_map_value >= multipliers.den) {
-                            src_map_value -= multipliers.den;
-                            total_cost_update -= dual_value;
-                        }
-                    }
-                } else {
-                    new_label->SRCmap[idx] = 0.0;
-                }
-            }
+            valid_cuts &= (valid_cuts - 1);  // Clear current bit
         }
-#endif
+
+        // Handle cuts not in neighbors
+        uint64_t to_clear =
+            (~masks.get_neighbor_mask(segment, bit_position)) & cut_limit_mask;
+        while (to_clear) {
+            const int cut_idx = __builtin_ctzll(to_clear);
+            if (cut_idx >= n_cuts) {
+                fmt::print("Warning: Invalid clear_idx {} >= n_cuts {}\n",
+                           cut_idx, n_cuts);
+                break;
+            }
+
+            new_label->SRCmap[active_cuts[cut_idx].index] = 0.0;
+            to_clear &= (to_clear - 1);
+        }
 
         new_label->cost += total_cost_update;
     }

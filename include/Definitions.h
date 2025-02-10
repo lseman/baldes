@@ -44,7 +44,7 @@ struct BucketOptions {
     std::vector<int> resource_type = {1};
     std::vector<int> or_resources = {1};
 
-    int n_warm_start = 50;
+    int n_warm_start = 100;
 
     bool warm_start = true;
 
@@ -58,9 +58,6 @@ struct BucketOptions {
         static BucketOptions instance;
         return instance;
     }
-
-   private:
-    // Private constructor to prevent instantiation
 };
 
 enum class Direction { Forward, Backward };
@@ -175,7 +172,7 @@ inline void print_heur(fmt::format_string<Args...> format, Args &&...args) {
 template <typename... Args>
 inline void print_cut(fmt::format_string<Args...> format, Args &&...args) {
     // Print "[", then yellow "info", then reset color and print "] "
-    fmt::print(fg(fmt::color::green), "[cut] ");
+    fmt::print(fg(fmt::color::cyan), "[cut] ");
     fmt::print(format, std::forward<Args>(args)...);
 }
 
