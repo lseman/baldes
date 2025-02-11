@@ -76,30 +76,51 @@ class Stats {
             (window - 1);
         return avg_change;
     }
-};
 
+    double getRecentVariance(size_t window) const {
+        if (obj_history.size() < window) {
+            return 0.0;  // Default if not enough history
+        }
+        auto start = obj_history.end() - window;
+        auto end = obj_history.end();
+        double mean = std::accumulate(start, end, 0.0) / window;
+        double variance =
+            std::accumulate(start, end, 0.0,
+                            [mean](double sum, double curr) {
+                                return sum + std::pow(curr - mean, 2);
+                            }) /
+            window;
+        return variance;
+    }
+};
 /**
  * @class BucketGraph
- * @brief Represents a graph structure used for bucket-based optimization in a
- * solver.
+ * @brief Represents a graph structure used for bucket-based
+ * optimization in a solver.
  *
- * The BucketGraph class provides various functionalities for managing and
- * optimizing a graph structure using buckets. It includes methods for
- * initialization, configuration printing, node visitation checks, statistics
- * printing, bucket assignment, and more.
+ * The BucketGraph class provides various functionalities for
+ * managing and optimizing a graph structure using buckets. It
+ * includes methods for initialization, configuration printing, node
+ * visitation checks, statistics printing, bucket assignment, and
+ * more.
  *
- * The class also supports parallel arc generation, label management, and
- * feasibility checks. It is designed to work with different directions (Forward
- * and Backward) and stages of the optimization process.
+ * The class also supports parallel arc generation, label
+ * management, and feasibility checks. It is designed to work with
+ * different directions (Forward and Backward) and stages of the
+ * optimization process.
  *
- * @note This class relies on several preprocessor directives (e.g., RIH, RCC,
- * SRC) to conditionally enable or disable certain features.
+ * @note This class relies on several preprocessor directives (e.g.,
+ * RIH, RCC, SRC) to conditionally enable or disable certain
+ * features.
  *
- * @tparam Direction The direction of the graph (Forward or Backward).
+ * @tparam Direction The direction of the graph (Forward or
+ * Backward).
  * @tparam Stage The stage of the optimization process.
- * @tparam Full Indicates whether the full labeling algorithm should be used.
+ * @tparam Full Indicates whether the full labeling algorithm should
+ * be used.
  * @tparam ArcType The type of arc (Bucket or regular).
- * @tparam Mutability Indicates whether the label is mutable or immutable.
+ * @tparam Mutability Indicates whether the label is mutable or
+ * immutable.
  */
 class BucketGraph {
     using NGRouteBitmap = uint64_t;
@@ -131,7 +152,6 @@ class BucketGraph {
     bool just_fixed = false;
     using BranchingDualsPtr = std::shared_ptr<BranchingDuals>;
     BranchingDualsPtr branching_duals = std::make_shared<BranchingDuals>();
-
 #if defined(RCC) || defined(EXACT_RCC)
     ArcDuals arc_duals;
     void setArcDuals(const ArcDuals &arc_duals) { this->arc_duals = arc_duals; }
@@ -155,18 +175,19 @@ class BucketGraph {
                     std::vector<double> &time_windows_end,
                     bool first_time = false);
     /**
-     * @brief Solves the PSTEP problem and returns a vector of labels
-     * representing paths.
+     * @brief Solves the PSTEP problem and returns a vector of
+     * labels representing paths.
      *
      * This function performs the following steps:
      * 1. Resets the pool.
      * 2. Initializes the mono algorithm.
      * 3. Runs a labeling algorithm in the forward direction.
-     * 4. Iterates through the forward buckets and computes new labels.
+     * 4. Iterates through the forward buckets and computes new
+     * labels.
      * 5. Filters and collects labels that meet the criteria.
      *
-     * @return std::vector<Label*> A vector of pointers to Label objects
-     * representing the paths.
+     * @return std::vector<Label*> A vector of pointers to Label
+     * objects representing the paths.
      */
     std::vector<Label *> solvePSTEP(PSTEPDuals &inner_pstep_duals);
 
@@ -179,8 +200,9 @@ class BucketGraph {
     SchrodingerPool sPool = SchrodingerPool(200);
 #endif
 
-    // ankerl::unordered_dense::map<int, BucketIntervalTree> fw_interval_trees;
-    // ankerl::unordered_dense::map<int, BucketIntervalTree> bw_interval_trees;
+    // ankerl::unordered_dense::map<int, BucketIntervalTree>
+    // fw_interval_trees; ankerl::unordered_dense::map<int,
+    // BucketIntervalTree> bw_interval_trees;
 
     ArcList manual_arcs;
     void setManualArcs(const ArcList &manual_arcs) {
@@ -190,15 +212,16 @@ class BucketGraph {
     /**
      * @brief Assigns the buckets based on the specified direction.
      *
-     * This function returns a reference to the buckets based on the specified
-     * direction. If the direction is Forward, it returns a reference to the
-     * forward buckets. If the direction is Backward, it returns a reference to
-     * the backward buckets.
+     * This function returns a reference to the buckets based on the
+     * specified direction. If the direction is Forward, it returns
+     * a reference to the forward buckets. If the direction is
+     * Backward, it returns a reference to the backward buckets.
      *
      * @tparam D The direction (Forward or Backward).
      * @param FW The forward buckets.
      * @param BW The backward buckets.
-     * @return A reference to the buckets based on the specified direction.
+     * @return A reference to the buckets based on the specified
+     * direction.
      */
     template <Direction D>
     constexpr auto &assign_buckets(auto &FW, auto &BW) noexcept {
@@ -222,13 +245,14 @@ class BucketGraph {
         return (SYM == Symmetry::Symmetric) ? FW : BW;
     }
     /**
-     * @brief Processes all resources by iterating through them and applying
-     * constraints.
+     * @brief Processes all resources by iterating through them and
+     * applying constraints.
      *
-     * This function recursively processes each resource in the `new_resources`
-     * vector by calling `process_resource` for each index from `I` to `N-1`. If
-     * any resource processing fails (i.e., `process_resource` returns false),
-     * the function returns false immediately. If all resources are processed
+     * This function recursively processes each resource in the
+     * `new_resources` vector by calling `process_resource` for each
+     * index from `I` to `N-1`. If any resource processing fails
+     * (i.e., `process_resource` returns false), the function
+     * returns false immediately. If all resources are processed
      * successfully, the function returns true.
      *
      */
@@ -240,13 +264,13 @@ class BucketGraph {
 
     // Template recursion for compile-time unrolling
     /**
-     * @brief Processes a resource based on its disposability type and
-     * direction.
+     * @brief Processes a resource based on its disposability type
+     * and direction.
      *
-     * This function updates the `new_resource` value based on the initial
-     * resources, the increment provided by `gamma`, and the constraints defined
-     * by `theNode`. The behavior varies depending on the disposability type of
-     * the resource.
+     * This function updates the `new_resource` value based on the
+     * initial resources, the increment provided by `gamma`, and the
+     * constraints defined by `theNode`. The behavior varies
+     * depending on the disposability type of the resource.
      *
      */
     template <Direction D, typename Gamma, typename VRPNode>
@@ -389,7 +413,8 @@ class BucketGraph {
     std::vector<double> R_max;
     std::vector<double> R_min;
     std::vector<std::vector<uint64_t>>
-        neighborhoods_bitmap;  // Bitmap for neighborhoods of each node
+        neighborhoods_bitmap;  // Bitmap for neighborhoods of each
+                               // node
     std::vector<std::vector<uint64_t>>
         elementarity_bitmap;  // Bitmap for elementarity sets
     std::vector<std::vector<uint64_t>>
@@ -402,7 +427,8 @@ class BucketGraph {
         elementarity_bitmap.resize(num_nodes);  // Bitmap for elementarity sets
 
         for (size_t i = 0; i < num_nodes; ++i) {
-            // Each customer should appear in its own elementarity set
+            // Each customer should appear in its own elementarity
+            // set
             size_t num_segments = (num_nodes + 63) / 64;
             elementarity_bitmap[i].resize(num_segments, 0);
 
@@ -445,9 +471,10 @@ class BucketGraph {
     /**
      * @brief Retrieves a list of paths with negative reduced costs.
      *
-     * This function fetches paths from the sPool that have negative reduced
-     * costs. If the number of such paths exceeds a predefined limit (N_ADD),
-     * the list is truncated to contain only the first N_ADD paths.
+     * This function fetches paths from the sPool that have negative
+     * reduced costs. If the number of such paths exceeds a
+     * predefined limit (N_ADD), the list is truncated to contain
+     * only the first N_ADD paths.
      *
      */
     std::vector<Path> getSchrodinger() {
@@ -537,17 +564,17 @@ class BucketGraph {
     /**
      * @brief Checks if a node has been visited based on a bitmap.
      *
-     * This function determines if a specific node, identified by node_id, has
-     * been visited by checking the corresponding bit in a bitmap array. The
-     * bitmap is an array of 64-bit unsigned integers, where each bit represents
-     * the visited status of a node.
+     * This function determines if a specific node, identified by
+     * node_id, has been visited by checking the corresponding bit
+     * in a bitmap array. The bitmap is an array of 64-bit unsigned
+     * integers, where each bit represents the visited status of a
+     * node.
      *
      */
     static inline bool is_node_visited(
         const std::array<uint64_t, num_words> &bitmap, int node_id) {
-        int word_index =
-            node_id >>
-            6;  // Determine which 64-bit segment contains the node_id
+        int word_index = node_id >> 6;  // Determine which 64-bit segment
+                                        // contains the node_id
         int bit_position =
             node_id & 63;  // Determine the bit position within that segment
         return (bitmap[word_index] & (1ULL << bit_position)) != 0;
@@ -556,15 +583,15 @@ class BucketGraph {
     /**
      * @brief Marks a node as visited in the bitmap.
      *
-     * This function sets the bit corresponding to the given node_id in the
-     * provided bitmap, indicating that the node has been visited.
+     * This function sets the bit corresponding to the given node_id
+     * in the provided bitmap, indicating that the node has been
+     * visited.
      *
      */
     static inline void set_node_visited(std::array<uint64_t, num_words> &bitmap,
                                         int node_id) {
-        int word_index =
-            node_id >>
-            6;  // Determine which 64-bit segment contains the node_id
+        int word_index = node_id >> 6;  // Determine which 64-bit segment
+                                        // contains the node_id
         int bit_position =
             node_id & 63;  // Determine the bit position within that segment
         bitmap[word_index] |= (1ULL << bit_position);
@@ -573,16 +600,16 @@ class BucketGraph {
     /**
      * @brief Checks if a node is unreachable based on a bitmap.
      *
-     * This function determines if a node, identified by its node_id, is
-     * unreachable by checking a specific bit in a bitmap. The bitmap is
-     * represented as an array of 64-bit unsigned integers.
+     * This function determines if a node, identified by its
+     * node_id, is unreachable by checking a specific bit in a
+     * bitmap. The bitmap is represented as an array of 64-bit
+     * unsigned integers.
      *
      */
     static inline bool is_node_unreachable(
         const std::array<uint64_t, num_words> &bitmap, int node_id) {
-        int word_index =
-            node_id >>
-            6;  // Determine which 64-bit segment contains the node_id
+        int word_index = node_id >> 6;  // Determine which 64-bit segment
+                                        // contains the node_id
         int bit_position =
             node_id & 63;  // Determine the bit position within that segment
         return (bitmap[word_index] & (1ULL << bit_position)) != 0;
@@ -591,27 +618,27 @@ class BucketGraph {
     /**
      * @brief Marks a node as unreachable in the given bitmap.
      *
-     * This function sets the bit corresponding to the specified node_id in the
-     * bitmap, indicating that the node is unreachable.
+     * This function sets the bit corresponding to the specified
+     * node_id in the bitmap, indicating that the node is
+     * unreachable.
      *
      */
     static inline void set_node_unreachable(
         std::array<uint64_t, num_words> &bitmap, int node_id) {
-        int word_index =
-            node_id >>
-            6;  // Determine which 64-bit segment contains the node_id
+        int word_index = node_id >> 6;  // Determine which 64-bit segment
+                                        // contains the node_id
         int bit_position =
             node_id & 63;  // Determine the bit position within that segment
         bitmap[word_index] |= (1ULL << bit_position);
     }
 
     /**
-     * @brief Redefines the bucket intervals and reinitializes various data
-     * structures.
+     * @brief Redefines the bucket intervals and reinitializes
+     * various data structures.
      *
-     * This function updates the bucket interval and reinitializes the
-     * intervals, buckets, fixed arcs, and fixed buckets. It also generates arcs
-     * and sorts them for each node.
+     * This function updates the bucket interval and reinitializes
+     * the intervals, buckets, fixed arcs, and fixed buckets. It
+     * also generates arcs and sorts them for each node.
      *
      */
     void redefine(int bucketInterval) {
@@ -621,8 +648,9 @@ class BucketGraph {
             intervals.push_back(Interval(bucketInterval, 0));
         }
 
-        // auto fw_save_rebuild = rebuild_buckets<Direction::Forward>();
-        // auto bw_save_rebuild = rebuild_buckets<Direction::Backward>();
+        // auto fw_save_rebuild =
+        // rebuild_buckets<Direction::Forward>(); auto
+        // bw_save_rebuild = rebuild_buckets<Direction::Backward>();
 
         reset_fixed();
         reset_fixed_buckets();
@@ -659,8 +687,8 @@ class BucketGraph {
             workB, bi_sched,
             [&, this, fw_save_rebuild]() -> void {
                 // Forward direction processing
-                process_buckets<Direction::Forward>(fw_buckets_size, fw_buckets,
-        fw_save_rebuild, fw_fixed_buckets);
+                process_buckets<Direction::Forward>(fw_buckets_size,
+        fw_buckets, fw_save_rebuild, fw_fixed_buckets);
             },
             [&, this, bw_save_rebuild]() -> void {
                 // Backward direction processing
@@ -683,8 +711,8 @@ class BucketGraph {
         std::vector<double> total_ranges(num_intervals);
         std::vector<double> base_intervals(num_intervals);
 
-        // Determine the base interval and other relevant values for each
-        // resource
+        // Determine the base interval and other relevant values for
+        // each resource
         for (int r = 0; r < num_intervals; ++r) {
             total_ranges[r] = R_max[r] - R_min[r];
             base_intervals[r] = total_ranges[r] / intervals[r].interval;
@@ -695,7 +723,8 @@ class BucketGraph {
         // To track splits per node_id
         ankerl::unordered_dense::map<int, int> splits_per_node;
 
-        // Loop until the second-to-last bucket to avoid out-of-bounds access
+        // Loop until the second-to-last bucket to avoid
+        // out-of-bounds access
         for (int i = 0; i < original_num_buckets - 1; ++i) {
             const auto &bucket = buckets[i];
 
@@ -721,8 +750,8 @@ class BucketGraph {
                 bucket2 = Bucket(bucket.node_id, bucket.lb, mid_point);
             }
 
-            // Manually shift elements to the right to make space for the new
-            // bucket
+            // Manually shift elements to the right to make space
+            // for the new bucket
             for (int j = original_num_buckets; j > i + 1; --j) {
                 buckets[j] = buckets[j - 1];
             }
@@ -730,24 +759,25 @@ class BucketGraph {
             // Insert the new bucket at position i+1
             buckets[i + 1] = bucket2;
 
-            // Replace the current bucket with the first half (bucket1)
+            // Replace the current bucket with the first half
+            // (bucket1)
             buckets[i] = bucket1;
 
             // Track the number of splits for this node_id
             splits_per_node[bucket.node_id]++;
 
-            // Since we added a new bucket at i+1, increment i to skip over the
-            // new bucket
+            // Since we added a new bucket at i+1, increment i to
+            // skip over the new bucket
             ++i;
-            ++original_num_buckets;  // Adjust the count to account for the new
-                                     // bucket
+            ++original_num_buckets;  // Adjust the count to account
+                                     // for the new bucket
         }
 
         // Update the global bucket size
         buckets_size = original_num_buckets;
 
-        // Now update the num_buckets_index for each node_id based on the final
-        // positions
+        // Now update the num_buckets_index for each node_id based
+        // on the final positions
         int current_index = 0;
         for (int i = 0; i < original_num_buckets; ++i) {
             const auto &bucket = buckets[i];
@@ -761,9 +791,10 @@ class BucketGraph {
     /**
      * @brief Resets the forward and backward label pools.
      *
-     * This function resets both the forward (label_pool_fw) and backward
-     * (label_pool_bw) label pools to their initial states. It is typically
-     * used to clear any existing labels and prepare the pools for reuse.
+     * This function resets both the forward (label_pool_fw) and
+     * backward (label_pool_bw) label pools to their initial states.
+     * It is typically used to clear any existing labels and prepare
+     * the pools for reuse.
      */
     void reset_pool() {
         label_pool_fw->reset();
@@ -773,9 +804,9 @@ class BucketGraph {
     /**
      * @brief Sets the dual values for the nodes.
      *
-     * This function assigns the provided dual values to the nodes. It iterates
-     * through the given vector of duals and sets each node's dual value to the
-     * corresponding value from the vector.
+     * This function assigns the provided dual values to the nodes.
+     * It iterates through the given vector of duals and sets each
+     * node's dual value to the corresponding value from the vector.
      *
      */
     void setDuals(const std::vector<double> &duals) {
@@ -788,9 +819,9 @@ class BucketGraph {
     /**
      * @brief Sets the distance matrix and calculates neighborhoods.
      *
-     * This function assigns the provided distance matrix to the internal
-     * distance matrix of the class and then calculates the neighborhoods
-     * based on the given number of nearest neighbors.
+     * This function assigns the provided distance matrix to the
+     * internal distance matrix of the class and then calculates the
+     * neighborhoods based on the given number of nearest neighbors.
      *
      */
     void set_distance_matrix(
@@ -802,9 +833,9 @@ class BucketGraph {
     /**
      * @brief Resets all fixed arcs in the graph.
      *
-     * This function iterates over each row in the fixed_arcs matrix and sets
-     * all elements to 0. It effectively clears any fixed arc constraints that
-     * may have been previously set.
+     * This function iterates over each row in the fixed_arcs matrix
+     * and sets all elements to 0. It effectively clears any fixed
+     * arc constraints that may have been previously set.
      */
     void reset_fixed() {
         for (auto &row : fixed_arcs) {
@@ -822,11 +853,12 @@ class BucketGraph {
     }
 
     /**
-     * @brief Checks the feasibility of a given forward and backward label.
+     * @brief Checks the feasibility of a given forward and backward
+     * label.
      *
-     * This function determines if the transition from a forward label to a
-     * backward label is feasible based on resource constraints and node
-     * durations.
+     * This function determines if the transition from a forward
+     * label to a backward label is feasible based on resource
+     * constraints and node durations.
      *
      */
     inline bool check_feasibility(const Label *fw_label,
@@ -887,7 +919,8 @@ class BucketGraph {
         double bw_labels = static_cast<double>(n_bw_labels);
         double total_labels = fw_labels + bw_labels;
 
-        // Skip if we don't have enough labels for meaningful adjustment
+        // Skip if we don't have enough labels for meaningful
+        // adjustment
         if (total_labels < 10) return;
 
         // Calculate imbalance ratio
@@ -900,7 +933,8 @@ class BucketGraph {
             EMA_ALPHA * imbalance_ratio + (1 - EMA_ALPHA) * ema_imbalance_ratio;
 
         // Dynamic threshold based on total number of labels
-        // As we get more labels, we can be more sensitive to imbalance
+        // As we get more labels, we can be more sensitive to
+        // imbalance
         double dynamic_threshold =
             BASE_IMBALANCE_THRESHOLD * std::exp(-total_labels / 1000.0);
 
@@ -913,7 +947,8 @@ class BucketGraph {
                 MIN_ADJUSTMENT_FACTOR +
                 (MAX_ADJUSTMENT_FACTOR - MIN_ADJUSTMENT_FACTOR) * severity;
 
-            // Adjust learning rate based on the severity of imbalance
+            // Adjust learning rate based on the severity of
+            // imbalance
             learning_rate *= LEARNING_RATE_DECAY;
 
             // Adjust based on resource range
@@ -948,7 +983,8 @@ class BucketGraph {
 
             if (std::abs(base_adjustment) > resource_range * 0.05) {
                 print_info(
-                    "Split adjustment: imbalance={:.3f}, adjustment={:.3f}, "
+                    "Split adjustment: imbalance={:.3f}, "
+                    "adjustment={:.3f}, "
                     "learning_rate={:.3f}\n",
                     ema_imbalance_ratio, base_adjustment, learning_rate);
             }
@@ -1050,7 +1086,8 @@ class BucketGraph {
         const std::vector<std::pair<size_t, size_t>> &conflicts) {
         size_t num_nodes = nodes.size();
 
-        // For each conflict (u,v), add u to v's neighborhood and vice versa
+        // For each conflict (u,v), add u to v's neighborhood and
+        // vice versa
         for (const auto &conflict : conflicts) {
             size_t u = conflict.first;
             size_t v = conflict.second;
@@ -1157,21 +1194,24 @@ class BucketGraph {
             size_t limit = new_label->visited_bitmap.size();
             for (size_t i = 0; i < limit; ++i) {
                 uint64_t current_visited =
-                    new_label->visited_bitmap[i];  // Get visited nodes in the
-                                                   // current segment
+                    new_label->visited_bitmap[i];  // Get visited nodes
+                                                   // in the current
+                                                   // segment
 
                 if (!current_visited)
-                    continue;  // Skip if no nodes were visited in this segment
+                    continue;  // Skip if no nodes were visited in
+                               // this segment
 
                 uint64_t neighborhood_mask =
                     neighborhoods_bitmap[node_id][i];  // Get neighborhood mask
                                                        // for the current node
                 uint64_t bits_to_clear =
-                    current_visited &
-                    neighborhood_mask;  // Determine which bits to clear
+                    current_visited & neighborhood_mask;  // Determine which
+                                                          // bits to clear
 
                 new_label->visited_bitmap[i] =
-                    bits_to_clear;  // Clear irrelevant visited nodes
+                    bits_to_clear;  // Clear irrelevant visited
+                                    // nodes
             }
             set_node_visited(new_label->visited_bitmap,
                              node_id);  // Mark the new node as visited
@@ -1211,8 +1251,8 @@ class BucketGraph {
 
                 auto &src_map_value = updated_SRCmap[idx];
                 if (!bitIsSet) {
-                    src_map_value =
-                        0.0;  // Reset if bit is not set in neighbors
+                    src_map_value = 0.0;  // Reset if bit is not set
+                                          // in neighbors
                     continue;
                 }
                 const bool bitIsSet2 = baseSet[segment] & bit_mask;
@@ -1221,8 +1261,9 @@ class BucketGraph {
                     auto &den = multipliers.den;
                     src_map_value += multipliers.num[baseSetorder[node_id]];
                     if (src_map_value >= den) {
-                        red_cost -= SRCDuals[idx];  // Apply the SRC dual value
-                                                    // if threshold is exceeded
+                        red_cost -= SRCDuals[idx];  // Apply the SRC dual
+                                                    // value if threshold is
+                                                    // exceeded
                         src_map_value -= den;       // Reset the SRC map value
                     }
                 }
@@ -1294,8 +1335,8 @@ class BucketGraph {
                 }
             }
 
-            // Add the node's arcs to the adjacency list if it has any outgoing
-            // edges
+            // Add the node's arcs to the adjacency list if it has
+            // any outgoing edges
             if (!arcs.empty()) {
                 adjacency_list[node.id] = arcs;
             }

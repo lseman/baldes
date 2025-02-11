@@ -326,7 +326,7 @@ class Stabilization {
         std::vector<double> nodeDuals(input_duals.begin(),
                                       input_duals.begin() + sizeDual);
 
-        mp_manager.updatePool(nodeDuals, -lp_obj);
+        mp_manager.updatePool(nodeDuals, -lag_gap);
         DualSolution historical_avg = mp_manager.getWeightedSolution();
 
         // check for progress within a threshold

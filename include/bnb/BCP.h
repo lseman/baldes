@@ -222,7 +222,8 @@ class VRProblem {
             }
 
             counter += 1;
-            if (counter > N_ADD - 1) break;
+            if (!enumerate && counter > N_ADD - 1) break;
+            if (enumerate && counter > 1000) break;
 
             std::fill(coluna.begin(), coluna.end(),
                       0.0);  // Reset the coefficients
@@ -617,6 +618,8 @@ class VRProblem {
         std::vector<double> originDuals;
         bool force_cuts = false;
         bool non_violated_cuts = false;
+        int non_violated_ctr = 0;
+        bool enumerate = false;
         int numK;
         for (int iter = 0; iter < max_iter; ++iter) {
             reoptimized = false;
@@ -656,6 +659,7 @@ class VRProblem {
                     bool cleared = srcResult.second;
                     if (!violated) {
                         non_violated_cuts = true;
+                        non_violated_ctr++;
                         if (bucket_graph->A_MAX == N_SIZE) {
                             if (std::abs(inner_obj) < 1.0) {
                                 print_info(
@@ -673,6 +677,7 @@ class VRProblem {
 
                     } else {
                         non_violated_cuts = false;
+                        non_violated_ctr = 0;
                         cuts_enabled = true;
                         changed = cutHandler(r1c, node, SRCconstraints);
                         if (changed) {
@@ -802,7 +807,7 @@ class VRProblem {
                 //////////////////////////////////////////////////////////////////////
 
                 // Adding cols
-                colAdded = addColumn(node, paths, inner_obj, false);
+                colAdded = addColumn(node, paths, inner_obj, enumerate);
 
 #ifdef RIH
                 // Adding RIH paths
@@ -848,6 +853,14 @@ class VRProblem {
                 stab.update_stabilization_after_master_optim(nodeDuals);
                 stab.setObj(lp_obj);
 
+                if (non_violated_ctr >= 5) {
+                    print_info(
+                        "No violated cuts found, calling enumeration...\n");
+                    bucket_graph->s4 = false;
+                    bucket_graph->s5 = true;
+                    enumerate = true;
+                    // bucket_graph->gap = lp_obj + numK * inner_obj;
+                }
                 misprice = true;
                 while (misprice) {
                     nodeDuals = stab.getStabDualSolAdvanced(nodeDuals);
@@ -929,7 +942,7 @@ class VRProblem {
                                 print_info(
                                     "No improvement in the last "
                                     "iterations, "
-                                    "generating dual perturbation\n");
+                                    "forcing cuts\n");
                                 force_cuts = true;
 
                                 // create small perturbation random perturbation
@@ -1001,8 +1014,7 @@ class VRProblem {
                     }
                 }
 
-                if (bucket_graph->getStatus() == Status::Optimal &&
-                    stab.shouldExit()) {
+                if (bucket_graph->getStatus() == Status::Optimal) {
                     print_info("Optimal solution found\n");
                     break;
                 }
@@ -1012,9 +1024,9 @@ class VRProblem {
                     break;
                 }
 
-                if ((colAdded == 0 || inner_obj > -1.0) && stage == 4) {
-                    force_cuts = true;
-                }
+                // if ((colAdded == 0 || inner_obj > -1.0) && stage == 4) {
+                //     force_cuts = true;
+                // }
 
                 stab.update_stabilization_after_iter(nodeDuals);
 #if defined(STAB) && defined(IPM)
@@ -1257,6 +1269,8 @@ class VRProblem {
 
         bool rcc = false;
         bool reoptimized = false;
+
+        bool enumerate = false;
         double obj;
         auto colAdded = 0;
 
@@ -1325,7 +1339,7 @@ class VRProblem {
                 //////////////////////////////////////////////////////////////////////
 
                 // Adding cols
-                colAdded = addColumn(node, paths, inner_obj, false);
+                colAdded = addColumn(node, paths, inner_obj, enumerate);
 
 #ifdef STAB
                 // TODO: check if we should update this before running the
