@@ -159,6 +159,9 @@ class CutStorage {
             return cut_ptr->baseSet[i / 64] & (1ULL << (i % 64)) &&
                    cut_ptr->baseSet[j / 64] & (1ULL << (j % 64));
         }
+        bool isSRCset(int i) const {
+            return cut_ptr->baseSet[i / 64] & (1ULL << (i % 64));
+        }
     };
 
     struct SegmentMasks {
@@ -435,7 +438,7 @@ class CutStorage {
         active_cuts.reserve(cuts.size());  // Pre-allocate for efficiency
 
         for (size_t i = 0; i < cuts.size(); ++i) {
-            if (i < SRCDuals.size() && std::abs(SRCDuals[i]) > 0) {
+            if (i < SRCDuals.size() && std::abs(SRCDuals[i]) > 1e-2) {
                 active_cuts.emplace_back(i, &cuts[i], SRCDuals[i],
                                          cuts[i].type);
             }

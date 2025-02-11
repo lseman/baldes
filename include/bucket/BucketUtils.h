@@ -649,16 +649,16 @@ void BucketGraph::ConcatenateLabel(const Label *L, int &b, double &best_cost,
             }
 
             // Visited nodes overlap check
-            // if constexpr (S >= Stage::Three) {
-            bool has_overlap = false;
-            for (size_t i = 0; i < bitmap_size; ++i) {
-                if (L->visited_bitmap[i] & L_bw->visited_bitmap[i]) {
-                    has_overlap = true;
-                    break;
+            if constexpr (S >= Stage::Three) {
+                bool has_overlap = false;
+                for (size_t i = 0; i < bitmap_size; ++i) {
+                    if (L->visited_bitmap[i] & L_bw->visited_bitmap[i]) {
+                        has_overlap = true;
+                        break;
+                    }
                 }
+                if (has_overlap) continue;
             }
-            if (has_overlap) continue;
-            // }
 
             double total_cost = path_cost + L_bw->cost;
 

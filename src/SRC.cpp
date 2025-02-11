@@ -39,23 +39,21 @@ using Cuts = std::vector<Cut>;
  * both the base set and multipliers is preserved during hashing.
  *
  */
-template <typename T>
 std::size_t compute_cut_key(const std::array<uint64_t, num_words> &baseSet,
-                            const std::vector<T> &multipliers) {
-    // Initialize the XXH3 state once
+                            const std::vector<int> &perm_num,
+                            const int perm_den) {
     XXH3_state_t *state = XXH3_createState();
     assert(state != nullptr);
     XXH3_64bits_reset(state);
 
-    // Hash baseSet as one contiguous block
+    // Hash baseSet (array of uint64_t)
     XXH3_64bits_update(state, baseSet.data(),
                        baseSet.size() * sizeof(uint64_t));
+    // Hash perm_num
+    XXH3_64bits_update(state, perm_num.data(), perm_num.size() * sizeof(int));
+    // Hash perm_den
+    XXH3_64bits_update(state, &perm_den, sizeof(int));
 
-    // Hash multipliers as one contiguous block
-    XXH3_64bits_update(state, multipliers.data(),
-                       multipliers.size() * sizeof(T));
-
-    // Finalize and cleanup
     std::size_t cut_key = XXH3_64bits_digest(state);
     XXH3_freeState(state);
     return cut_key;
@@ -70,41 +68,29 @@ std::size_t compute_cut_key(const std::array<uint64_t, num_words> &baseSet,
  *
  */
 void CutStorage::addCut(Cut &cut) {
-    auto baseSet = cut.baseSet;
-    auto p_num = cut.p.num;
-    auto p_den = cut.p.den;
-
-    // Concatenate p_num and p_den into a single vector
-    std::vector<int> p_cat;
-    p_cat.reserve(p_num.size() + 1);  // Pre-allocate memory
-    p_cat.insert(p_cat.end(), p_num.begin(), p_num.end());
-    p_cat.push_back(p_den);
-
-    // Compute the unique cut key
-    std::size_t cut_key = compute_cut_key(baseSet, p_cat);
+    // Compute the unique cut key once
+    cut.key = compute_cut_key(cut.baseSet, cut.p.num, cut.p.den);
 
     // Check if the cut already exists
-    auto it = cutMaster_to_cut_map.find(cut_key);
-    if (it != cutMaster_to_cut_map.end()) {
+    if (auto it = cutMaster_to_cut_map.find(cut.key);
+        it != cutMaster_to_cut_map.end()) {
         // Update the existing cut
-        if (cuts[it->second].added) {
+        cut.id = it->second;
+        if (cuts[cut.id].added) {
             cut.added = true;
             cut.updated = true;
         }
-
-        cut.id = it->second;
-        cut.key = cut_key;
         cuts[cut.id] = cut;
     } else {
         // Add the new cut
         cut.id = cuts.size();
-        cut.key = cut_key;
         cuts.push_back(cut);
-        cutMaster_to_cut_map[cut_key] = cut.id;
+        cutMaster_to_cut_map[cut.key] = cut.id;
     }
 
-    // Update the indexCuts map
-    indexCuts[cut_key].push_back(cuts.size() - 1);
+    // Update the indexCuts map more safely
+    indexCuts[cut.key].push_back(
+        cut.id);  // Store id instead of cuts.size() - 1
 }
 
 LimitedMemoryRank1Cuts::LimitedMemoryRank1Cuts(std::vector<VRPNode> &nodes)
@@ -276,7 +262,7 @@ void LimitedMemoryRank1Cuts::separate(const SparseMatrix &A,
     pdqsort(tmp_cuts.begin(), tmp_cuts.end(),
             [](const auto &a, const auto &b) { return a.first > b.first; });
 
-    auto max_cuts = 3;
+    auto max_cuts = 2;
     for (int i = 0; i < std::min(max_cuts, static_cast<int>(tmp_cuts.size()));
          ++i) {
         auto &cut = tmp_cuts[i].second;

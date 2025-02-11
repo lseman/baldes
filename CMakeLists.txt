@@ -64,6 +64,30 @@ if(NOT COMMAND CPMAddPackage)
   include(${cpm_SOURCE_DIR}/cmake/CPM.cmake)
 endif()
 
+#xgboost
+CPMAddPackage(
+    NAME xgboost
+    GITHUB_REPOSITORY dmlc/xgboost
+    GIT_TAG v2.1.4
+    OPTIONS
+        "USE_CUDA OFF"
+        "BUILD_STATIC_LIB ON"
+        "BUILD_SHARED_LIB OFF"
+        "FORCE_SHARED_CXX_LIB OFF"
+        "XGBOOST_BUILD_TESTS OFF"
+        "XGBOOST_BUILD_EXAMPLES OFF"
+        "XGBOOST_BUILD_DOC OFF"
+        "XGBOOST_USE_CUDA OFF"
+        "XGBOOST_BUILTIN_PREFETCH_PRESENT OFF"
+        "XGBOOST_MM_PREFETCH_PRESENT OFF"
+        "XGBOOST_BUILD_OBJECTIVES reg_squarederror"  # Only include what you need
+        "XGBOOST_BUILD_METRICS rmse"                 # Only include what you need
+        "XGBOOST_JVM_BINDINGS OFF"
+        "XGBOOST_PYTHON_PACKAGE OFF"
+        "XGBOOST_R_PACKAGE OFF"
+        "USE_OPENMP ON"        # Keep this ON for parallel processing
+)
+
 # stdexec
 cpmaddpackage(
   NAME stdexec

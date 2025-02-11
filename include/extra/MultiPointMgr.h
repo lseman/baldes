@@ -5,6 +5,7 @@
 #include <cmath>
 #include <deque>
 #include <limits>
+#include <memory>
 #include <numeric>
 #include <stdexcept>
 #include <vector>
@@ -22,6 +23,8 @@ class MultiPointManager {
         static constexpr size_t HISTORY_SIZE = 10;
         static constexpr double AGE_DECAY_RATE = 0.5;
         static constexpr double QUALITY_OBJ_WEIGHT = 0.7;
+        static constexpr double LEARNING_RATE = 0.1;
+        static constexpr double CONVERGENCE_FACTOR = 0.9;
     };
 
     struct State {
@@ -127,7 +130,7 @@ class MultiPointManager {
     std::vector<StabilityPoint> stability_points;
     std::deque<double> improvement_history;
     Metrics metrics;
-    StabilityPoint* best_point;
+    std::shared_ptr<StabilityPoint> best_point;
 
     void updateObjectiveBounds(double obj_value) {
         state.best_objective = std::max(state.best_objective, obj_value);
@@ -349,11 +352,11 @@ class MultiPointManager {
             return;
         }
 
-        best_point =
-            &*std::max_element(stability_points.begin(), stability_points.end(),
-                               [](const auto& a, const auto& b) {
-                                   return a.objective_value < b.objective_value;
-                               });
+        best_point = std::make_shared<StabilityPoint>(
+            *std::max_element(stability_points.begin(), stability_points.end(),
+                              [](const auto& a, const auto& b) {
+                                  return a.objective_value < b.objective_value;
+                              }));
     }
 
     bool isNearingConvergence() const {

@@ -561,7 +561,7 @@ class IteratedLocalSearch {
                   0);
     }
 
-    exec::static_thread_pool pool = exec::static_thread_pool(5);
+    exec::static_thread_pool pool = exec::static_thread_pool(2);
     exec::static_thread_pool::scheduler sched = pool.get_scheduler();
 
     std::vector<Label *> perturbation(const std::vector<Label *> &paths) {
@@ -800,51 +800,57 @@ class IteratedLocalSearch {
             // node-specific costs, we subtract that here
             red_cost += travel_cost - nodes[route[i]].cost;
 
-            SRC_MODE_BLOCK(
-                const size_t segment =
-                    node >> 6;  // Determine the segment in the bitmap
-                const size_t bit_position =
-                    node & 63;  // Determine the bit position in the segment
+            //     SRC_MODE_BLOCK(
+            //         const size_t segment =
+            //             node >> 6;  // Determine the segment in the bitmap
+            //         const size_t bit_position =
+            //             node & 63;  // Determine the bit position in the
+            //             segment
 
-                const uint64_t bit_mask =
-                    1ULL << bit_position;  // Precompute bit shift for the
-                                           // node's position
-                for (size_t idx = 0; idx < theSize; ++idx) {
-                    if (SRCDuals[idx] > -1e-3) {
-                        continue;
-                    }  // Skip non-SRC cuts
+            //         const uint64_t bit_mask =
+            //             1ULL << bit_position;  // Precompute bit shift for
+            //             the
+            //                                    // node's position
+            //         for (size_t idx = 0; idx < theSize; ++idx) {
+            //             if (SRCDuals[idx] > -1e-3) {
+            //                 continue;
+            //             }  // Skip non-SRC cuts
 
-                    const auto &cut = cutter->get_cut(
-                        idx);  // Use indexed access instead of iterator
-                    const auto &baseSet = cut.baseSet;
-                    const auto &baseSetorder = cut.baseSetOrder;
-                    const auto &neighbors = cut.neighbors;
-                    const auto &multipliers = cut.p;
+            //             const auto &cut = cutter->get_cut(
+            //                 idx);  // Use indexed access instead of iterator
+            //             const auto &baseSet = cut.baseSet;
+            //             const auto &baseSetorder = cut.baseSetOrder;
+            //             const auto &neighbors = cut.neighbors;
+            //             const auto &multipliers = cut.p;
 
-                    // Apply SRC logic: Update the SRC map based on neighbors
-                    // and base set
-                    const bool bitIsSet = neighbors[segment] & bit_mask;
-                    auto &src_map_value =
-                        SRCmap[idx];  // Use reference to avoid multiple
-                                      // accesses
-                    if (!bitIsSet) {
-                        src_map_value = 0.0;  // Reset the SRC map value
-                        continue;
-                    }
+            //             // Apply SRC logic: Update the SRC map based on
+            //             neighbors
+            //             // and base set
+            //             const bool bitIsSet = neighbors[segment] & bit_mask;
+            //             auto &src_map_value =
+            //                 SRCmap[idx];  // Use reference to avoid multiple
+            //                               // accesses
+            //             if (!bitIsSet) {
+            //                 src_map_value = 0.0;  // Reset the SRC map value
+            //                 continue;
+            //             }
 
-                    const bool bitIsSet2 = baseSet[segment] & bit_mask;
+            //             const bool bitIsSet2 = baseSet[segment] & bit_mask;
 
-                    if (bitIsSet2) {
-                        auto &den = multipliers.den;
-                        src_map_value += multipliers.num[baseSetorder[node]];
-                        if (src_map_value >= den) {
-                            red_cost -=
-                                SRCDuals[idx];  // Apply the SRC dual value if
-                                                // threshold is exceeded
-                            src_map_value -= den;  // Reset the SRC map value
-                        }
-                    }
-                })
+            //             if (bitIsSet2) {
+            //                 auto &den = multipliers.den;
+            //                 src_map_value +=
+            //                 multipliers.num[baseSetorder[node]]; if
+            //                 (src_map_value >= den) {
+            //                     red_cost -=
+            //                         SRCDuals[idx];  // Apply the SRC dual
+            //                         value if
+            //                                         // threshold is exceeded
+            //                     src_map_value -= den;  // Reset the SRC map
+            //                     value
+            //                 }
+            //             }
+            //         })
         }
         return {cost, red_cost};
     }

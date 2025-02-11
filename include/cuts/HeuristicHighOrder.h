@@ -13,208 +13,33 @@
 #include "Arc.h"
 #include "Dual.h"
 
-// Move config outside as namespace constants
-namespace LocalSearchConfig {
-constexpr double MIN_WEIGHT = 0.01;
-constexpr int SEGMENT_SIZE = 20;
-constexpr int MAX_DIVERSE_SOLUTIONS = 5;
-constexpr double DIVERSITY_THRESHOLD = 0.3;
-constexpr double QUALITY_WEIGHT = 0.7;
-constexpr double DIVERSITY_WEIGHT = 0.3;
-constexpr double BASE_ACCEPTANCE_RATE = 0.3;
-constexpr double MIN_ACCEPTANCE_RATE = 0.1;
-constexpr double MAX_ACCEPTANCE_RATE = 0.5;
-constexpr int MAX_REMOVE_COUNT = 3;
-constexpr double IMPROVEMENT_BONUS = 1.5;
-constexpr double MAX_DETERIORATION = 0.1;
-constexpr double OPERATOR_LEARNING_RATE = 0.1;
-constexpr double INITIAL_TEMPERATURE = 100.0;
-constexpr double COOLING_RATE = 0.95;
-constexpr double REHEATING_FACTOR = 1.5;
-constexpr int REHEAT_INTERVAL = 50;
-}  // namespace LocalSearchConfig
+// include CutHelper
+#include "CutHelper.h"
+#include "CutIntelligence.h"
 
-// Permutation structures and helper functions
-struct Permutation {
-    std::vector<int> num;
-    int den;
-
-    Permutation(const std::vector<int> &n, int d) : num(n), den(d) {}
-};
-inline std::vector<Permutation> getPermutationsForSize5() {
-    static const std::vector<std::pair<std::vector<int>, int>> base_perms = {
-        {{2, 2, 1, 1, 1}, 4},
-        {{3, 1, 1, 1, 1}, 4},
-        {{3, 2, 2, 1, 1}, 5},
-        {{2, 2, 1, 1, 1}, 3},
-        {{3, 3, 2, 2, 1}, 4}};
-
-    // Pre-calculate total size needed (can be computed at compile-time)
-    constexpr size_t total_perms =
-        10 + 5 + 30 + 10 + 30;  // Based on unique permutations possible
-    std::vector<Permutation> all_perms;
-    all_perms.reserve(total_perms);
-
-    for (const auto &[nums, den] : base_perms) {
-        std::vector<int> p = nums;
-        do {
-            all_perms.emplace_back(p, den);
-        } while (std::next_permutation(p.begin(), p.end()));
-    }
-    return all_perms;
-}
-
-inline std::vector<Permutation> getPermutationsForSize4() {
-    static const std::vector<int> base = {2, 1, 1, 1};
-    std::vector<Permutation> perms;
-    perms.reserve(4);  // We know exactly how many permutations we'll get
-
-    std::vector<int> p = base;
-    do {
-        perms.emplace_back(p, 3);
-    } while (std::next_permutation(p.begin(), p.end()));
-    return perms;
-}
-
-// Custom hash function for vector<int>
-namespace std {
-template <>
-struct hash<vector<int>> {
-    size_t operator()(const vector<int> &v) const {
-        size_t seed = v.size();
-        for (const int &i : v) {
-            seed ^= hash<int>{}(i) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
-        }
-        return seed;
-    }
-};
-}  // namespace std
-
-struct NodeScore {
-    int node = 0;
-    int other_node = 0;
-    double cost_score = 0.0;
-
-    NodeScore() = default;
-
-    NodeScore(int i, int j, double c) : node(i), other_node(j), cost_score(c) {}
-
-    bool operator<(const NodeScore &other) const {
-        return cost_score > other.cost_score;
-    }
-};
-
-struct CandidateSet {
-    std::vector<int> nodes;
-    double violation;
-    Permutation perm;
-    std::vector<int> neighbor;
-    double rhs = 0.0;
-
-    CandidateSet(const std::vector<int> &n, double v, const Permutation &p,
-                 const std::vector<int> &neigh, double r = 0.0)
-        : nodes(n), violation(v), perm(p), neighbor(neigh), rhs(r) {}
-
-    // Equality operator for comparison
-    bool operator==(const CandidateSet &other) const {
-        return nodes == other.nodes && perm.den == other.perm.den &&
-               perm.num == other.perm.num;
-    }
-
-    // Less than operator for std::set
-    bool operator<(const CandidateSet &other) const {
-        return nodes < other.nodes;  // Compare only nodes for ordering
-    }
-
-    std::unordered_map<int, double>
-        neighbor_scores;  // Track scores for each neighbor
-    std::vector<std::pair<int, int>>
-        tabu_moves;  // Store (position, node) pairs
-
-    double best_violation_seen = 0.0;  // Track best violation for aspiration
-
-    // Method to update neighbor scores based on node_scores
-    void updateNeighborScores(const std::vector<std::set<int>> &node_scores) {
-        neighbor_scores.clear();
-        for (int node : nodes) {
-            for (int potential_neighbor : node_scores[node]) {
-                if (std::find(nodes.begin(), nodes.end(), potential_neighbor) ==
-                    nodes.end()) {
-                    neighbor_scores[potential_neighbor]++;
-                }
-            }
-        }
-    }
-
-    // Method to get promising neighbors sorted by score
-    std::vector<int> getPromisingNeighbors(int k = 10) const {
-        std::vector<std::pair<int, double>> scored_neighbors(
-            neighbor_scores.begin(), neighbor_scores.end());
-
-        pdqsort(
-            scored_neighbors.begin(), scored_neighbors.end(),
-            [](const auto &a, const auto &b) { return a.second > b.second; });
-
-        std::vector<int> result;
-        for (int i = 0; i < std::min(k, (int)scored_neighbors.size()); ++i) {
-            result.push_back(scored_neighbors[i].first);
-        }
-        return result;
-    }
-};
-
-struct CandidateSetCompare {
-    bool operator()(const CandidateSet &a, const CandidateSet &b) const {
-        // First check if they represent the same set and permutation
-        bool same_candidate = (a.nodes == b.nodes && a.perm.den == b.perm.den &&
-                               a.perm.num == b.perm.num);
-
-        if (same_candidate) {
-            // If they're the same candidate, keep the one with higher violation
-            return a.violation > b.violation;
-        }
-
-        // If they're different candidates, treat them as different
-        // We need some consistent ordering for the set to work
-        if (a.nodes != b.nodes) return a.nodes > b.nodes;
-        if (a.perm.num != b.perm.num) return a.perm.num > b.perm.num;
-        return a.perm.den > b.perm.den;
-    }
-};
-
-struct CandidateSetHasher {
-    using is_transparent = void;
-
-    uint64_t operator()(const CandidateSet &cs) const {
-        XXH3_state_t *state = XXH3_createState();
-        assert(state != nullptr);
-        XXH3_64bits_reset(state);
-
-        // Hash nodes vector as one block since it's contiguous
-        XXH3_64bits_update(state, cs.nodes.data(),
-                           cs.nodes.size() * sizeof(int));
-
-        // Hash num vector as one block
-        XXH3_64bits_update(state, cs.perm.num.data(),
-                           cs.perm.num.size() * sizeof(int));
-
-        // Hash den and violation
-        XXH3_64bits_update(state, &cs.perm.den, sizeof(int));
-
-        uint64_t hash = XXH3_64bits_digest(state);
-        XXH3_freeState(state);
-        return hash;
-    }
-
-    // mixed_hash required by ankerl::unordered_dense
-    uint64_t mixed_hash(const CandidateSet &cs) const { return operator()(cs); }
-};
+// namespace std {
+// template <>
+// struct hash<std::pair<int, int>> {
+//     size_t operator()(const std::pair<int, int> &p) const {
+//         // Combine the hash values of both integers
+//         size_t h1 = std::hash<int>{}(p.first);
+//         size_t h2 = std::hash<int>{}(p.second);
+//         return h1 ^ (h2 << 1);
+//     }
+// };
+// }  // namespace std
 
 class HighRankCuts {
    private:
-    const int MIN_RANK = 4;
-    const int MAX_RANK = 5;
+    static constexpr int MIN_RANK = 4;
+    static constexpr int MAX_RANK = 5;
     static constexpr int MAX_CANDIDATES_PER_NODE = 25;
+    static constexpr int MAX_COMBINATIONS = 25;
+    static constexpr int MAX_WORKING_SET_SIZE = 12;
+
+    exec::static_thread_pool pool =
+        exec::static_thread_pool(std::thread::hardware_concurrency());
+    exec::static_thread_pool::scheduler sched = pool.get_scheduler();
 
     // Add vertex-route mapping
     std::vector<std::vector<int>> vertex_route_map;
@@ -233,58 +58,175 @@ class HighRankCuts {
         }
     }
 
-    std::vector<std::set<int>> computeNodeScores(const SparseMatrix &A,
-                                                 const std::vector<double> &x) {
-        std::vector<std::set<int>> scores;
-        scores.resize(N_SIZE);
-        auto active_cuts = cutStorage->getActiveCuts();
+    ////////////////////////////////////////////////////////////////////////////
+    // Node scoring
+    ////////////////////////////////////////////////////////////////////////////
 
-        for (int i = 1; i < N_SIZE - 1; ++i) {
-            std::vector<NodeScore> node_scores;
-            node_scores.reserve(N_SIZE);
+    ankerl::unordered_dense::map<std::pair<int, int>, ScoreHistory>
+        score_history;
 
-            for (int j = 1; j < N_SIZE - 1; ++j) {
-                if (i != j) {
-                    auto cost_score = distances[i][j] -
-                                      (nodes[i].cost + nodes[j].cost) / 2 -
-                                      arc_duals.getDual(i, j);
-                    for (const auto &cut : active_cuts) {
-                        if (cut.type == CutType::ThreeRow &&
-                            cut.isSRCset(i, j)) {
-                            cost_score -= cut.dual_value;
+    double learning_rate = 0.1;  // Rate at which weights are adjusted
+
+    // Predict score based on historical data
+    double predictScore(int i, int j, double current_score) {
+        auto key = std::make_pair(i, j);
+        auto it = score_history.find(key);
+
+        if (it == score_history.end() || it->second.historical_scores.empty()) {
+            return current_score;  // No history available
+        }
+
+        // Calculate weighted average of historical scores
+        const auto &history = it->second.historical_scores;
+        double weight_sum = 0;
+        double weighted_score = 0;
+
+        for (size_t idx = 0; idx < history.size(); ++idx) {
+            // More recent scores get higher weights
+            double weight = std::exp(-0.5 * (history.size() - idx - 1));
+            weighted_score += history[idx] * weight;
+            weight_sum += weight;
+        }
+
+        double historical_prediction = weighted_score / weight_sum;
+
+        // Blend historical prediction with current score using adaptive weight
+        return it->second.prediction_weight * historical_prediction +
+               (1 - it->second.prediction_weight) * current_score;
+    }
+
+    // Update prediction weights based on accuracy
+    void updatePredictionWeight(int i, int j, double predicted, double actual) {
+        auto key = std::make_pair(i, j);
+        auto &history = score_history[key];
+
+        // Calculate prediction error
+        double error = std::abs(predicted - actual);
+        double max_error = std::abs(actual);  // Use actual value as scale
+        double accuracy = max_error > 0 ? 1.0 - (error / max_error) : 1.0;
+
+        // Update weight using exponential moving average
+        history.prediction_weight =
+            (1 - learning_rate) * history.prediction_weight +
+            learning_rate * accuracy;
+    }
+
+    std::vector<std::vector<int>> computeNodeScores(
+        const SparseMatrix &A, const std::vector<double> &x) {
+        std::vector<std::vector<int>> scores(N_SIZE);
+        const auto &active_cuts = cutStorage->getActiveCuts();
+
+        // Pre-calculate cut adjustments (same as original)
+        std::vector<std::vector<double>> cut_adjustments(
+            N_SIZE, std::vector<double>(N_SIZE, 0.0));
+        for (const auto &cut : active_cuts) {
+            if (cut.type == CutType::ThreeRow) {
+                for (int i = 1; i < N_SIZE - 1; ++i) {
+                    for (int j = i + 1; j < N_SIZE - 1; ++j) {
+                        if (cut.isSRCset(i, j)) {
+                            cut_adjustments[i][j] -= cut.dual_value;
+                            cut_adjustments[j][i] -= cut.dual_value;
                         }
                     }
-                    node_scores.emplace_back(i, j, cost_score);
+                }
+            } else if (cut.type == CutType::OneRow) {
+                for (int i = 1; i < N_SIZE - 1; ++i) {
+                    if (cut.isSRCset(i)) {
+                        cut_adjustments[i][0] -= cut.dual_value;
+                        cut_adjustments[0][i] -= cut.dual_value;
+                    }
+                }
+            }
+            // } else if (cut.type == CutType::FourRow) {
+            //     for (int i = 1; i < N_SIZE - 1; ++i) {
+            //         for (int j = i + 1; j < N_SIZE - 1; ++j) {
+            //             if (cut.isSRCset(i, j)) {
+            //                 cut_adjustments[i][j] -= cut.dual_value / 10;
+            //                 cut_adjustments[j][i] -= cut.dual_value / 10;
+            //             }
+            //         }
+            //     }
+            // } else if (cut.type == CutType::FiveRow) {
+            //     for (int i = 1; i < N_SIZE - 1; ++i) {
+            //         for (int j = i + 1; j < N_SIZE - 1; ++j) {
+            //             if (cut.isSRCset(i, j)) {
+            //                 cut_adjustments[i][j] -= cut.dual_value / 10;
+            //                 cut_adjustments[j][i] -= cut.dual_value / 10;
+            //             }
+            //         }
+            //     }
+            // }
+        }
+        std::vector<NodeScore> node_scores;
+        node_scores.reserve(N_SIZE - 2);
+
+        for (int i = 1; i < N_SIZE - 1; ++i) {
+            node_scores.clear();
+
+            // Calculate and predict scores for all j
+            for (int j = 1; j < N_SIZE - 1; ++j) {
+                if (i != j) {
+                    double base_score =
+                        distances[i][j] - (nodes[i].cost + nodes[j].cost) / 2 -
+                        arc_duals.getDual(i, j) + cut_adjustments[i][j];
+
+                    // Get predicted score using historical data
+                    // double predicted_score = predictScore(i, j, base_score);
+
+                    node_scores.emplace_back(i, j, base_score);
+
+                    // // Store current score in history
+                    // auto key = std::make_pair(i, j);
+                    // auto &history = score_history[key];
+                    // history.historical_scores.push_back(base_score);
+
+                    // // Maintain history size
+                    // if (history.historical_scores.size() >
+                    //     ScoreHistory::MAX_HISTORY) {
+                    //     history.historical_scores.pop_front();
+                    // }
+
+                    // // Update prediction weights
+                    // updatePredictionWeight(i, j, predicted_score,
+                    // base_score);
                 }
             }
 
-            std::partial_sort(node_scores.begin(),
-                              node_scores.begin() + MAX_CANDIDATES_PER_NODE,
-                              node_scores.end(),
-                              [](const auto &a, const auto &b) {
-                                  return a.cost_score < b.cost_score;
-                              });
+            // Sort and select top candidates (same as original)
+            if (node_scores.size() > MAX_CANDIDATES_PER_NODE) {
+                std::partial_sort(node_scores.begin(),
+                                  node_scores.begin() + MAX_CANDIDATES_PER_NODE,
+                                  node_scores.end(),
+                                  [](const auto &a, const auto &b) {
+                                      return a.cost_score < b.cost_score;
+                                  });
+            } else {
+                std::sort(node_scores.begin(), node_scores.end(),
+                          [](const auto &a, const auto &b) {
+                              return a.cost_score < b.cost_score;
+                          });
+            }
 
-            std::set<int> &i_scores = scores[i];
-            for (int j = 0; j < MAX_CANDIDATES_PER_NODE; ++j) {
-                // scores.insert(node_scores[j].node);
-                i_scores.insert(node_scores[j].other_node);
+            // Insert top candidates
+            auto &i_scores = scores[i];
+            for (int j = 0; j < std::min(MAX_CANDIDATES_PER_NODE,
+                                         static_cast<int>(node_scores.size()));
+                 ++j) {
+                i_scores.push_back(node_scores[j].other_node);
             }
         }
 
         return scores;
     }
-
-    const int MAX_COMBINATIONS = 25;
-    const int MAX_WORKING_SET_SIZE = 12;
-
-    exec::static_thread_pool pool =
-        exec::static_thread_pool(std::thread::hardware_concurrency());
-    exec::static_thread_pool::scheduler sched = pool.get_scheduler();
-
+    // std::vector<std::vector<int>> computeNodeScores(
+    //     const SparseMatrix &A, const std::vector<double> &x) {
+    //     return ml_scorer->computeNodeScores(A, x, distances, nodes,
+    //     arc_duals,
+    //                                         *cutStorage);
+    // }
     ankerl::unordered_dense::set<CandidateSet, CandidateSetHasher,
                                  CandidateSetCompare>
-    generateCandidates(const std::vector<std::set<int>> &scores,
+    generateCandidates(const std::vector<std::vector<int>> &scores,
                        const std::vector<std::vector<int>> &row_indices_map,
                        const SparseMatrix &A, const std::vector<double> &x) {
         // Thread-local data to avoid contention
@@ -345,21 +287,19 @@ class HighRankCuts {
                     std::unique(working_set.begin(), working_set.end()),
                     working_set.end());
 
-                // Limit the size of the working set based on a more intelligent
-                // heuristic
+                // Limit the size of the working set based on a more
+                // intelligent heuristic
                 if (working_set.size() > MAX_WORKING_SET_SIZE) {
                     std::nth_element(
                         working_set.begin(),
                         working_set.begin() + MAX_WORKING_SET_SIZE,
                         working_set.end(), [&](int a, int b) {
-                            return scores[i].count(a) >
-                                   scores[i].count(b);  // Prioritize vertices
-                                                        // with higher scores
+                            return scores[a] <
+                                   scores[b];  // Direct vector access
+                                               // instead of count()
                         });
                     working_set.resize(MAX_WORKING_SET_SIZE);
-                }
-
-                // Generate candidate sets
+                }  // Generate candidate sets
                 for (size_t r = 0; r < allPaths.size(); ++r) {
                     if (vertex_route_map[i][r] > 0) continue;
 
@@ -617,8 +557,12 @@ class HighRankCuts {
         cutStorage->addCut(cut);
     }
 
+    // std::unique_ptr<AdaptiveNodeScorer> ml_scorer;
+
    public:
-    HighRankCuts() {}
+    // HighRankCuts() { ml_scorer = std::make_unique<AdaptiveNodeScorer>();
+    // }
+    HighRankCuts() = default;
 
     CutStorage *cutStorage = nullptr;
 
@@ -642,6 +586,7 @@ class HighRankCuts {
 
         auto candidates =
             generateCandidates(node_scores, row_indices_map, A, x);
+        // provideFeedbackFromCandidates(candidates);
 
         // print_cut("Generated {} candidates\n", candidates.size());
 
@@ -684,9 +629,11 @@ class HighRankCuts {
 
         auto work = stdexec::starts_on(sched, bulk_sender);
         stdexec::sync_wait(std::move(work));
+        // provideFeedbackFromCandidates(improved_candidates);
 
         // print improved_candidates size
-        // print_cut("Improved candidates: {}\n", improved_candidates.size());
+        // print_cut("Improved candidates: {}\n",
+        // improved_candidates.size());
 
         auto cuts_called = 0;
         auto initial_cut_size = cutStorage->size();
@@ -722,6 +669,62 @@ class HighRankCuts {
             candidates.size(), improved_candidates.size(),
             final_cut_size - initial_cut_size);
     }
+
+    // void provideFeedbackFromCandidates(const auto &candidates) {
+    //     std::vector<std::pair<int, int>> node_pairs;
+    //     std::vector<std::vector<float>> features;
+
+    //     // Calculate max violation for normalization
+    //     double max_violation = 0.0;
+    //     for (const auto &candidate : candidates) {
+    //         max_violation = std::max(max_violation, candidate.violation);
+    //     }
+
+    //     if (max_violation <= 0.0) return;  // Skip if no good violations
+
+    //     for (const auto &candidate : candidates) {
+    //         float normalized_violation =
+    //             static_cast<float>(candidate.violation / max_violation);
+
+    //         // Extract all node pairs from the candidate
+    //         for (size_t i = 0; i < candidate.nodes.size(); ++i) {
+    //             for (size_t j = i + 1; j < candidate.nodes.size(); ++j) {
+    //                 int node1 = candidate.nodes[i];
+    //                 int node2 = candidate.nodes[j];
+
+    //                 // Get cut adjustment
+    //                 double cut_adjustment = 0.0;
+    //                 const auto &active_cuts =
+    //                 cutStorage->getActiveCuts(); for (const auto &cut :
+    //                 active_cuts) {
+    //                     if (cut.type == CutType::ThreeRow &&
+    //                         cut.isSRCset(node1, node2)) {
+    //                         cut_adjustment -= cut.dual_value;
+    //                     }
+    //                 }
+
+    //                 // Collect features for this pair
+    //                 std::vector<float> pair_features = {
+    //                     static_cast<float>(distances[node1][node2]),
+    //                     static_cast<float>(nodes[node1].cost),
+    //                     static_cast<float>(nodes[node2].cost),
+    //                     static_cast<float>(arc_duals.getDual(node1,
+    //                     node2)), static_cast<float>(cut_adjustment)};
+
+    //                 node_pairs.emplace_back(node1, node2);
+    //                 features.push_back(std::move(pair_features));
+    //             }
+    //         }
+
+    //         // Provide feedback in batches per candidate
+    //         if (!node_pairs.empty()) {
+    //             ml_scorer->provideFeedback(node_pairs, features,
+    //                                        normalized_violation);
+    //             node_pairs.clear();
+    //             features.clear();
+    //         }
+    //     }
+    // }
 
     static constexpr std::array<uint64_t, 64> bit_mask_lookup = []() {
         std::array<uint64_t, 64> masks{};
@@ -843,8 +846,9 @@ class HighRankCuts {
             }
         }
 
-        void applyRemoveAddNode(CandidateSet &current,
-                                const std::vector<std::set<int>> &node_scores) {
+        void applyRemoveAddNode(
+            CandidateSet &current,
+            const std::vector<std::vector<int>> &node_scores) {
             if (current.nodes.size() > 1 && !current.neighbor.empty()) {
                 std::uniform_int_distribution<> node_dist(
                     0, current.nodes.size() - 1);
@@ -858,11 +862,18 @@ class HighRankCuts {
                 scored_neighbors.reserve(current.neighbor.size());
 
                 for (const auto &n : current.neighbor) {
-                    double score = std::count_if(
-                        current.nodes.begin(), current.nodes.end(),
-                        [&node_scores, n](int node) {
-                            return node_scores[node].count(n);
-                        });
+                    // double score = std::count_if(
+                    //     current.nodes.begin(), current.nodes.end(),
+                    //     [&node_scores, n](int node) {
+                    //         return node_scores[node].count(n);
+                    //     });
+                    double score = 0.0;
+                    for (const auto &node : current.nodes) {
+                        if (std::binary_search(node_scores[node].begin(),
+                                               node_scores[node].end(), n)) {
+                            score += 1.0;
+                        }
+                    }
                     scored_neighbors.emplace_back(n, score);
                 }
 
@@ -896,7 +907,7 @@ class HighRankCuts {
 
         void applyUpdateNeighbors(
             CandidateSet &current,
-            const std::vector<std::set<int>> &node_scores) {
+            const std::vector<std::vector<int>> &node_scores) {
             const int remove_count =
                 std::min(LocalSearchConfig::MAX_REMOVE_COUNT,
                          static_cast<int>(current.neighbor.size()));
@@ -1064,7 +1075,7 @@ class HighRankCuts {
             const CandidateSet &initial,
             const std::vector<std::vector<int>> &row_indices_map,
             const SparseMatrix &A, const std::vector<double> &x,
-            const std::vector<std::set<int>> &node_scores,
+            const std::vector<std::vector<int>> &node_scores,
             int max_iterations = 200) {
             CandidateSet best = initial;
             CandidateSet current = initial;

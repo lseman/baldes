@@ -51,26 +51,35 @@
  * counts.
  *
  */
-
 inline auto computeThreshold(int iteration, double inner_obj,
                              const Stats &stats) {
     // Constants for threshold computation
     const double INITIAL_BASE = -15.0;
-    const double DECAY_RATE = 0.003;
     const double MIN_THRESHOLD = -10.0;
     const double MAX_THRESHOLD = -1.5;
     const double STAGNATION_TARGET = -1.5;
     const int STAGNATION_WINDOW =
         10;  // Number of iterations to check for stagnation
 
-    // Base threshold with exponential decay
-    double base = INITIAL_BASE * std::exp(-DECAY_RATE * iteration);
+    // Dynamic decay rate based on recent progress
+    double decay_rate = 0.003;
+    if (stats.hasHistory()) {
+        double recent_variance = stats.getRecentVariance(STAGNATION_WINDOW);
+        decay_rate *=
+            (1.0 +
+             recent_variance);  // Increase decay rate if progress is noisy
+    }
 
-    // Adjust based on recent progress
+    // Base threshold with exponential decay
+    double base = INITIAL_BASE * std::exp(-decay_rate * iteration);
+
+    // Adjust progress factor based on recent improvement and variance
     double progress_factor = 1.0;
     if (stats.hasHistory()) {
         double avg_improvement = stats.getRecentImprovement(STAGNATION_WINDOW);
-        progress_factor = std::max(0.8, std::min(1.2, avg_improvement));
+        double recent_variance = stats.getRecentVariance(STAGNATION_WINDOW);
+        progress_factor = std::max(
+            0.5, std::min(1.5, avg_improvement / (1.0 + recent_variance)));
     }
 
     // Add dynamic component based on current inner_obj value
@@ -90,7 +99,8 @@ inline auto computeThreshold(int iteration, double inner_obj,
     }
     prev_inner_obj = inner_obj;
 
-    // If stagnation is detected, gradually move the threshold toward -1.5
+    // If stagnation is detected, gradually move the threshold toward
+    // STAGNATION_TARGET
     if (stagnation_counter >= STAGNATION_WINDOW) {
         double stagnation_factor =
             static_cast<double>(stagnation_counter - STAGNATION_WINDOW) /
@@ -101,9 +111,13 @@ inline auto computeThreshold(int iteration, double inner_obj,
 
     // Ensure the threshold stays within bounds
     threshold = std::max(MIN_THRESHOLD, std::min(MAX_THRESHOLD, threshold));
-    // print_info("Computed threshold: {}\n", threshold);
+
+    // Debugging output (optional)
+    // std::cout << "Computed threshold: " << threshold << std::endl;
+
     return threshold;
 }
+
 template <Symmetry SYM>
 inline std::vector<Label *> BucketGraph::solve(bool trigger) {
     // Initialize the status as not optimal at the start
@@ -167,7 +181,7 @@ inline std::vector<Label *> BucketGraph::solve(bool trigger) {
         }
     }
     // Stage 4: Exact labeling algorithm with fixing enabled (Stage::Four)
-    else {
+    else if (s4 && depth == 0) {
         stage = 4;
 
 #ifdef FIX_BUCKETS
@@ -215,6 +229,15 @@ inline std::vector<Label *> BucketGraph::solve(bool trigger) {
             status = Status::Separation;  // If SRC is defined, set status to
                                           // separation
         }
+    } else if (s5 && depth == 0) {
+        gap = std::ceil(incumbent - (relaxation + std::min(0.0, min_red_cost)));
+
+        print_info("Starting enumeration with gap {}\n", gap);
+        stage = 5;
+        paths = bi_labeling_algorithm<Stage::Enumerate>();
+        print_info("Finished enumeration with {} paths\n", paths.size());
+        // inner_obj = paths[0]->cost;
+        status = Status::Optimal;
     }
 
     iter++;  // Increment the iteration counter
@@ -422,20 +445,19 @@ std::vector<double> BucketGraph::labeling_algorithm() {
                             }
 
                             if (!dominated) {
-                                if constexpr (S != Stage::Enumerate) {
-                                    for (auto *existing_label :
-                                         to_bucket_labels) {
-                                        if (existing_label->is_dominated) {
-                                            continue;
-                                        }
-                                        if (is_dominated<D, S>(existing_label,
-                                                               new_label)) {
-                                            // buckets[to_bucket].remove_label(
-                                            //     existing_label);
-                                            existing_label->set_dominated(true);
-                                        }
+                                // if constexpr (S != Stage::Enumerate) {
+                                for (auto *existing_label : to_bucket_labels) {
+                                    if (existing_label->is_dominated) {
+                                        continue;
+                                    }
+                                    if (is_dominated<D, S>(existing_label,
+                                                           new_label)) {
+                                        // buckets[to_bucket].remove_label(
+                                        //     existing_label);
+                                        existing_label->set_dominated(true);
                                     }
                                 }
+                                // }
 
                                 ++n_labels;
 #ifdef SORTED_LABELS
@@ -523,10 +545,6 @@ std::vector<Label *> BucketGraph::bi_labeling_algorithm() {
         best_label->nodes_covered.clear();
     }
     merged_labels.push_back(best_label);
-
-    if constexpr (S == Stage::Enumerate) {
-        fmt::print("Labels generated, concatenating...\n");
-    }
 
     const size_t n_segments = (fw_buckets_size + 63) / 64;
     std::vector<uint64_t> Bvisited(n_segments);
@@ -796,15 +814,15 @@ inline std::vector<Label *> BucketGraph::Extend(
 
     // Handle visited bitmap
     if constexpr (F != Full::PSTEP) {
-        if constexpr (S != Stage::Enumerate) {
-            for (size_t i = 0; i < new_label->visited_bitmap.size(); ++i) {
-                const uint64_t current_visited = L_prime->visited_bitmap[i];
-                if (current_visited) {
-                    new_label->visited_bitmap[i] =
-                        current_visited & neighborhoods_bitmap[node_id][i];
-                }
+        // if constexpr (S != Stage::Enumerate) {
+        for (size_t i = 0; i < new_label->visited_bitmap.size(); ++i) {
+            const uint64_t current_visited = L_prime->visited_bitmap[i];
+            if (current_visited) {
+                new_label->visited_bitmap[i] =
+                    current_visited & neighborhoods_bitmap[node_id][i];
             }
         }
+        // }
     } else {
         new_label->visited_bitmap = L_prime->visited_bitmap;
     }
