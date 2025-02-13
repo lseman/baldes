@@ -24,11 +24,11 @@ class TreeNode {
     std::vector<double> low;   // Lower bounds for each dimension
     std::vector<double> high;  // Upper bounds for each dimension
     int bucket_index;          // Bucket index for this node
-    TreeNode *left;
-    TreeNode *right;
-    TreeNode *parent;
+    TreeNode* left;
+    TreeNode* right;
+    TreeNode* parent;
 
-    TreeNode(const std::vector<double> &low, const std::vector<double> &high,
+    TreeNode(const std::vector<double>& low, const std::vector<double>& high,
              int bucket_index)
         : low(low),
           high(high),
@@ -37,7 +37,7 @@ class TreeNode {
           right(nullptr),
           parent(nullptr) {}
 
-    bool contains(const std::vector<double> &point) const {
+    bool contains(const std::vector<double>& point) const {
         for (size_t i = 0; i < low.size(); ++i) {
             if (point[i] < low[i] || point[i] > high[i]) {
                 return false;
@@ -46,7 +46,7 @@ class TreeNode {
         return true;
     }
 
-    bool is_less_than(const std::vector<double> &point) const {
+    bool is_less_than(const std::vector<double>& point) const {
         for (size_t i = 0; i < low.size(); ++i) {
             if (high[i] < point[i]) {
                 // if (numericutils::less_than(high[i], point[i])) {
@@ -75,130 +75,156 @@ class TreeNode {
  *
  */
 class SplayTree {
-    TreeNode *root;
+   private:
+    TreeNode* root;
 
-    void rotate(TreeNode *x) {
-        TreeNode *p = x->parent;
-        TreeNode *g = p->parent;
+    void rotate(TreeNode* x) {
+        TreeNode* p = x->parent;
+        TreeNode* g = p->parent;
+        bool is_left = (p->left == x);
 
-        if (p->left == x) {  // Left child
-            p->left = x->right;
-            if (x->right) x->right->parent = p;
+        // Update the parent's child pointer
+        TreeNode* child = is_left ? x->right : x->left;
+        if (is_left) {
+            p->left = child;
             x->right = p;
-        } else {  // Right child
-            p->right = x->left;
-            if (x->left) x->left->parent = p;
+        } else {
+            p->right = child;
             x->left = p;
         }
+        if (child) child->parent = p;
 
+        // Update parent pointers
         x->parent = g;
         p->parent = x;
 
+        // Update grandparent's child pointer
         if (g) {
-            if (g->left == p)
-                g->left = x;
-            else
-                g->right = x;
+            (g->left == p ? g->left : g->right) = x;
         }
     }
 
-    void splay(TreeNode *x) {
-        while (x->parent != nullptr) {
-            TreeNode *p = x->parent;
-            TreeNode *g = p->parent;
+    void splay(TreeNode* x) {
+        while (x->parent) {
+            TreeNode* p = x->parent;
+            TreeNode* g = p->parent;
 
-            if (g == nullptr) {
-                // Zig step (single rotation)
+            if (!g) {
+                rotate(x);  // Zig
+            } else if ((g->left == p) == (p->left == x)) {
+                rotate(p);  // Zig-zig
                 rotate(x);
-            } else if ((g->left == p && p->left == x) ||
-                       (g->right == p && p->right == x)) {
-                // Zig-zig step (double rotation)
-                rotate(p);  // First rotate parent
-                rotate(x);  // Then rotate x
             } else {
-                // Zig-zag step (rotating x twice in different directions)
-                rotate(x);  // Rotate x first
-                rotate(x);  // Then rotate x again
+                rotate(x);  // Zig-zag
+                rotate(x);
             }
         }
         root = x;
     }
 
+    void destroyTree(TreeNode* node) {
+        if (node) {
+            destroyTree(node->left);
+            destroyTree(node->right);
+            delete node;
+        }
+    }
+
+    TreeNode* copyTree(TreeNode* node, TreeNode* parent = nullptr) {
+        if (!node) return nullptr;
+
+        TreeNode* newNode =
+            new TreeNode(node->low, node->high, node->bucket_index);
+        newNode->parent = parent;
+        newNode->left = copyTree(node->left, newNode);
+        newNode->right = copyTree(node->right, newNode);
+        return newNode;
+    }
+
    public:
     SplayTree() : root(nullptr) {}
 
-    TreeNode *find(const std::vector<double> &point) {
-        TreeNode *curr = root;
+    // Copy constructor
+    SplayTree(const SplayTree& other) : root(nullptr) {
+        if (other.root) {
+            root = copyTree(other.root);
+        }
+    }
 
-        while (curr != nullptr) {
+    // Copy assignment
+    SplayTree& operator=(const SplayTree& other) {
+        if (this != &other) {
+            destroyTree(root);
+            root = other.root ? copyTree(other.root) : nullptr;
+        }
+        return *this;
+    }
+
+    // Destructor
+    ~SplayTree() { destroyTree(root); }
+
+    TreeNode* find(const std::vector<double>& point) {
+        TreeNode* curr = root;
+        TreeNode* last = nullptr;
+
+        while (curr) {
+            last = curr;
             if (curr->contains(point)) {
-                splay(curr);  // Splay only if we find the node
+                splay(curr);
                 return curr;
-            } else if (curr->is_less_than(point)) {
-                curr = curr->right;
-            } else {
-                curr = curr->left;
             }
+            curr = curr->is_less_than(point) ? curr->right : curr->left;
         }
 
-        // If not found, no splaying needed for the closest node
+        if (last) splay(last);
         return nullptr;
     }
 
-    int query(const std::vector<double> &point) {
-        TreeNode *node = find(point);
-        if (node != nullptr) return node->bucket_index;
-        return -1;
+    int query(const std::vector<double>& point) {
+        TreeNode* node = find(point);
+        return node ? node->bucket_index : -1;
     }
 
-    // Insert a new multidimensional interval
-    void insert(const std::vector<double> &low, const std::vector<double> &high,
+    void insert(const std::vector<double>& low, const std::vector<double>& high,
                 int bucket_index) {
-        if (root == nullptr) {
+        if (!root) {
             root = new TreeNode(low, high, bucket_index);
             return;
         }
 
-        TreeNode *curr = root;
-        while (curr != nullptr) {
+        TreeNode* curr = root;
+        while (true) {
             if (low < curr->low) {
-                if (curr->left == nullptr) {
-                    TreeNode *newNode = new TreeNode(low, high, bucket_index);
-                    curr->left = newNode;
-                    newNode->parent = curr;
-                    splay(newNode);
-                    return;
-                } else {
-                    curr = curr->left;
+                if (!curr->left) {
+                    curr->left = new TreeNode(low, high, bucket_index);
+                    curr->left->parent = curr;
+                    splay(curr->left);
+                    break;
                 }
+                curr = curr->left;
             } else if (low > curr->low) {
-                if (curr->right == nullptr) {
-                    TreeNode *newNode = new TreeNode(low, high, bucket_index);
-                    curr->right = newNode;
-                    newNode->parent = curr;
-                    splay(newNode);
-                    return;
-                } else {
-                    curr = curr->right;
+                if (!curr->right) {
+                    curr->right = new TreeNode(low, high, bucket_index);
+                    curr->right->parent = curr;
+                    splay(curr->right);
+                    break;
                 }
+                curr = curr->right;
             } else {
                 splay(curr);
-                return;  // Duplicate interval
+                break;  // Duplicate interval
             }
         }
     }
 
-    void inOrderPrint(TreeNode *node) {
-        if (node == nullptr) return;
-        inOrderPrint(node->left);
-        std::cout << "Bucket " << node->bucket_index << ": [";
-        for (size_t i = 0; i < node->low.size(); ++i) {
-            std::cout << "[" << node->low[i] << ", " << node->high[i] << "]";
-            if (i != node->low.size() - 1) std::cout << ", ";
-        }
-        std::cout << "]\n";
-        inOrderPrint(node->right);
-    }
+    void print() const { printTree(root, 0); }
 
-    void print() { inOrderPrint(root); }
+   private:
+    void printTree(const TreeNode* node, int depth) const {
+        if (!node) return;
+        printTree(node->right, depth + 1);
+        std::cout << std::string(depth * 2, ' ') << "Bucket "
+                  << node->bucket_index << '\n';
+        printTree(node->left, depth + 1);
+    }
 };

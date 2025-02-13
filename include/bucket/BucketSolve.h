@@ -51,73 +51,6 @@
  * counts.
  *
  */
-inline auto computeThreshold(int iteration, double inner_obj,
-                             const Stats &stats) {
-    // Constants for threshold computation
-    const double INITIAL_BASE = -15.0;
-    const double MIN_THRESHOLD = -10.0;
-    const double MAX_THRESHOLD = -1.5;
-    const double STAGNATION_TARGET = -1.5;
-    const int STAGNATION_WINDOW =
-        10;  // Number of iterations to check for stagnation
-
-    // Dynamic decay rate based on recent progress
-    double decay_rate = 0.003;
-    if (stats.hasHistory()) {
-        double recent_variance = stats.getRecentVariance(STAGNATION_WINDOW);
-        decay_rate *=
-            (1.0 +
-             recent_variance);  // Increase decay rate if progress is noisy
-    }
-
-    // Base threshold with exponential decay
-    double base = INITIAL_BASE * std::exp(-decay_rate * iteration);
-
-    // Adjust progress factor based on recent improvement and variance
-    double progress_factor = 1.0;
-    if (stats.hasHistory()) {
-        double avg_improvement = stats.getRecentImprovement(STAGNATION_WINDOW);
-        double recent_variance = stats.getRecentVariance(STAGNATION_WINDOW);
-        progress_factor = std::max(
-            0.5, std::min(1.5, avg_improvement / (1.0 + recent_variance)));
-    }
-
-    // Add dynamic component based on current inner_obj value
-    double dynamic_component = 0.01 * std::log(1 + std::abs(inner_obj));
-
-    // Combine components to compute the initial threshold
-    double threshold = base * progress_factor + dynamic_component;
-
-    // Check for stagnation in the objective value
-    static double prev_inner_obj = inner_obj;
-    static int stagnation_counter = 0;
-
-    if (std::abs(inner_obj - prev_inner_obj) < 1e-6) {
-        stagnation_counter++;
-    } else {
-        stagnation_counter = 0;  // Reset if there's improvement
-    }
-    prev_inner_obj = inner_obj;
-
-    // If stagnation is detected, gradually move the threshold toward
-    // STAGNATION_TARGET
-    if (stagnation_counter >= STAGNATION_WINDOW) {
-        double stagnation_factor =
-            static_cast<double>(stagnation_counter - STAGNATION_WINDOW) /
-            STAGNATION_WINDOW;
-        threshold =
-            threshold + stagnation_factor * (STAGNATION_TARGET - threshold);
-    }
-
-    // Ensure the threshold stays within bounds
-    threshold = std::max(MIN_THRESHOLD, std::min(MAX_THRESHOLD, threshold));
-
-    // Debugging output (optional)
-    // std::cout << "Computed threshold: " << threshold << std::endl;
-
-    return threshold;
-}
-
 template <Symmetry SYM>
 inline std::vector<Label *> BucketGraph::solve(bool trigger) {
     // Initialize the status as not optimal at the start
@@ -217,7 +150,9 @@ inline std::vector<Label *> BucketGraph::solve(bool trigger) {
         }
         // If the objective improves sufficiently, set the status to separation
         // or optimal
-        auto threshold = computeThreshold(iter, inner_obj, stats);
+        // fmt::print("Gap: {}\n", gap);
+        threshold = stats.computeThreshold(iter, inner_obj);
+        // fmt::print("Threshold: {}\n", threshold);
         //
         if (inner_obj > threshold) {
             ss = true;  // Enter separation mode (for SRC handling)
@@ -230,7 +165,8 @@ inline std::vector<Label *> BucketGraph::solve(bool trigger) {
                                           // separation
         }
     } else if (s5 && depth == 0) {
-        gap = std::ceil(incumbent - (relaxation + std::min(0.0, min_red_cost)));
+        // gap = std::ceil(incumbent - (relaxation + std::min(0.0,
+        // min_red_cost)));
 
         print_info("Starting enumeration with gap {}\n", gap);
         stage = 5;
@@ -417,26 +353,33 @@ std::vector<double> BucketGraph::labeling_algorithm() {
                             } else {
                                 // SIMD dominance check
                                 auto check_dominance_in_bucket =
-                                    [&](const std::vector<Label *> &labels) {
+                                    [&](const std::vector<Label *> &labels,
+                                        int &stat_n_dom) {
 #ifndef __AVX2__
-                                        return check_dominance_against_vector<
-                                            D, S>(new_label, labels,
-                                                  cut_storage,
-                                                  options.resources.size());
-#else
-                                        for (auto *existing_label : labels) {
-                                            if (existing_label->is_dominated) {
-                                                continue;
-                                            }
-                                            if (is_dominated<D, S>(
-                                                    new_label,
-                                                    existing_label)) {
-                                                ++stat_n_dom;
-                                                return true;
-                                            }
-                                        }
-                                        return false;
+                                        if (labels.size() >= 32) {
+                                            return check_dominance_against_vector<
+                                                D, S>(new_label, labels,
+                                                      cut_storage,
+                                                      options.resources.size(),
+                                                      stat_n_dom);
+                                        } else
 #endif
+                                        {
+                                            for (auto *existing_label :
+                                                 labels) {
+                                                if (existing_label
+                                                        ->is_dominated) {
+                                                    continue;
+                                                }
+                                                if (is_dominated<D, S>(
+                                                        new_label,
+                                                        existing_label)) {
+                                                    ++stat_n_dom;
+                                                    return true;
+                                                }
+                                            }
+                                            return false;
+                                        }
                                     };
 
                                 dominated = mother_bucket.check_dominance(
@@ -569,7 +512,8 @@ std::vector<Label *> BucketGraph::bi_labeling_algorithm() {
                 const int to_node = arc.to;
 
                 if constexpr (S == Stage::Three || S == Stage::Eliminate) {
-                    if (fixed_arcs[L->node_id][to_node] == 1) {
+                    // if (fixed_arcs[L->node_id][to_node] == 1) {
+                    if (is_arc_fixed(L->node_id, to_node)) {
                         continue;
                     }
                 }
@@ -684,9 +628,11 @@ inline std::vector<Label *> BucketGraph::Extend(
 
     if constexpr (S == Stage::Three || S == Stage::Eliminate) {
         if ((D == Direction::Forward &&
-             fixed_arcs[initial_node_id][node_id] == 1) ||
+             // fixed_arcs[initial_node_id][node_id] == 1) ||
+             is_arc_fixed(initial_node_id, node_id)) ||
             (D == Direction::Backward &&
-             fixed_arcs[node_id][initial_node_id] == 1)) {
+             // fixed_arcs[node_id][initial_node_id] == 1)) {
+             is_arc_fixed(node_id, initial_node_id))) {
             return {};
         }
     }
@@ -1033,10 +979,13 @@ inline bool BucketGraph::DominatedInCompWiseSmallerBuckets(
     stack_buffer.reserve(R_SIZE);
     stack_buffer.push_back(bucket);
 
-    const auto check_dominance = [&](const std::vector<Label *> &labels) {
+    const auto check_dominance = [&](const std::vector<Label *> &labels,
+                                     int &stat_n_dom) {
 #ifndef __AVX2__
-        return check_dominance_against_vector<D, S>(L, labels, cut_storage,
-                                                    res_size);
+        if (labels.size() >= 32) {
+            return check_dominance_against_vector<D, S>(L, labels, cut_storage,
+                                                        res_size, stat_n_dom);
+        } else
 #endif
         {
             for (auto &existing_label : labels) {

@@ -222,48 +222,26 @@ std::vector<int> BucketGraph::computePhi(int &bucket_id, bool fw) {
         auto &node_tree = node_interval_trees[node_id];
 
         // Search for matching intervals using the existing Splay Tree
-        if (fw) {
-            // Forward search: find the interval just below the current bucket
-            std::vector<double> target_low = current_bucket.lb;
-            for (int r = 0; r < intervals.size(); ++r) {
-                target_low[r] -=
-                    base_intervals[r];  // Adjust for the base intervals
-            }
-
-            TreeNode *found_node = node_tree.find(target_low);
-            if (found_node != nullptr &&
-                buckets[found_node->bucket_index].node_id == node_id) {
-                // Check if the found bucket is fixed
+        auto target = fw ? current_bucket.lb : current_bucket.ub;
+        std::vector<double> target_low = current_bucket.lb;
+        for (int r = 0; r < intervals.size(); ++r) {
+            target[r] -= base_intervals[r];  // Adjust for the base intervals
+        }
+        TreeNode *found_node = node_tree.find(target);
+        if (found_node != nullptr &&
+            buckets[found_node->bucket_index].node_id == node_id) {
+            // Check if the found bucket is fixed
 #ifdef FIX_BUCKETS
-                if (is_bucket_not_fixed<Direction::Forward>(
-                        found_node->bucket_index, bucket_id))
+            auto not_fixed = fw ? is_bucket_not_fixed_forward(
+                                      bucket_id, found_node->bucket_index)
+                                : is_bucket_not_fixed_backward(
+                                      bucket_id, found_node->bucket_index);
+            if (not_fixed)
 #endif
-                {
-                    phi.push_back(found_node->bucket_index);
-                }
-            }
-        } else {
-            // Backward search: find the interval just above the current bucket
-            std::vector<double> target_high = current_bucket.ub;
-            for (int r = 0; r < intervals.size(); ++r) {
-                target_high[r] +=
-                    base_intervals[r];  // Adjust for the base intervals
-            }
-
-            TreeNode *found_node = node_tree.find(target_high);
-            if (found_node != nullptr &&
-                buckets[found_node->bucket_index].node_id == node_id) {
-                // Check if the found bucket is fixed
-#ifdef FIX_BUCKETS
-                if (is_bucket_not_fixed<Direction::Forward>(
-                        found_node->bucket_index, bucket_id))
-#endif
-                {
-                    phi.push_back(found_node->bucket_index);
-                }
+            {
+                phi.push_back(found_node->bucket_index);
             }
         }
-
     } else {
         // Handle the case where R_SIZE == 1 with a simpler approach
         int smaller = bucket_id - 1;
@@ -289,8 +267,8 @@ std::vector<int> BucketGraph::computePhi(int &bucket_id, bool fw) {
 void BucketGraph::calculate_neighborhoods(size_t num_closest) {
     size_t num_nodes = nodes.size();
 
-    // Initialize the neighborhood bitmaps as vectors of uint64_t for forward
-    // and backward neighborhoods
+    // Initialize the neighborhood bitmaps as vectors of uint64_t for
+    // forward and backward neighborhoods
     neighborhoods_bitmap.resize(num_nodes);  // Forward neighborhood
 
     for (size_t i = 0; i < num_nodes; ++i) {
@@ -314,14 +292,15 @@ void BucketGraph::calculate_neighborhoods(size_t num_closest) {
         neighborhoods_bitmap[i].resize(num_segments,
                                        0);  // Resizing for forward bitmap
 
-        // Include the node itself in both forward and backward neighborhoods
+        // Include the node itself in both forward and backward
+        // neighborhoods
         size_t segment_self = i >> 6;
         size_t bit_position_self = i & 63;
         neighborhoods_bitmap[i][segment_self] |=
             (1ULL << bit_position_self);  // Forward
 
-        // Map the top 'num_closest' closest nodes for forward and set them in
-        // the backward neighborhoods
+        // Map the top 'num_closest' closest nodes for forward and set them
+        // in the backward neighborhoods
         for (size_t k = 0; k < num_closest && k < forward_distances.size();
              ++k) {
             size_t node_index = forward_distances[k].second;
@@ -339,11 +318,11 @@ void BucketGraph::calculate_neighborhoods(size_t num_closest) {
 /**
  * Augments the memories in the BucketGraph.
  *
- * This function takes a solution vector, a SparseModel, and several parameters
- * to augment the memories in the BucketGraph. It identifies cycles in the
- * SparseModel that meet certain conditions and forbids them in the BucketGraph.
- * The function prioritizes smaller cycles and limits the number of forbidden
- * cycles based on the given parameters.
+ * This function takes a solution vector, a SparseModel, and several
+ * parameters to augment the memories in the BucketGraph. It identifies
+ * cycles in the SparseModel that meet certain conditions and forbids them
+ * in the BucketGraph. The function prioritizes smaller cycles and limits
+ * the number of forbidden cycles based on the given parameters.
  *
  */
 void BucketGraph::augment_ng_memories(std::vector<double> &solution,
@@ -427,9 +406,10 @@ void BucketGraph::augment_ng_memories(std::vector<double> &solution,
 /**
  * Forbids a cycle in the bucket graph.
  *
- * This function takes a vector representing a cycle in the graph and forbids
- * the edges corresponding to the cycle. If the 'aggressive' flag is set to
- * true, it also forbids additional edges between the vertices of the cycle.
+ * This function takes a vector representing a cycle in the graph and
+ * forbids the edges corresponding to the cycle. If the 'aggressive' flag is
+ * set to true, it also forbids additional edges between the vertices of the
+ * cycle.
  *
  */
 void BucketGraph::forbidCycle(const std::vector<int> &cycle, bool aggressive) {
@@ -453,7 +433,8 @@ void BucketGraph::forbidCycle(const std::vector<int> &cycle, bool aggressive) {
 void BucketGraph::set_adjacency_list_manual() {
     // Clear existing arcs for each node
     for (auto &node : nodes) {
-        node.clear_arcs();  // Remove any existing arcs associated with the node
+        node.clear_arcs();  // Remove any existing arcs associated with the
+                            // node
     }
 
     // Step 1: Compute the clusters using MST-based clustering
@@ -663,8 +644,8 @@ void BucketGraph::mono_initialization() {
                 auto depot = label_pool->acquire();
                 int calculated_index = calculated_index_base + offset;
 
-                // Set interval_bounds to current combination of interval starts
-                // or ends
+                // Set interval_bounds to current combination of interval
+                // starts or ends
                 for (int r = 0; r < num_intervals; ++r) {
                     interval_bounds[r] =
                         is_forward
@@ -704,8 +685,8 @@ void BucketGraph::mono_initialization() {
         generate_combinations(0);
     };
 
-    // Call the lambda for both forward and backward directions, ensuring all
-    // combinations are processed
+    // Call the lambda for both forward and backward directions, ensuring
+    // all combinations are processed
     initialize_intervals_combinations(true);  // Forward direction
 }
 
@@ -724,10 +705,10 @@ bool BucketGraph::BucketSetContains(const std::set<int> &bucket_set,
 /**
  * @brief Prints the statistics of the bucket graph.
  *
- * This function outputs a formatted table displaying various metrics related to
- * the bucket graph. The table includes headers and values for forward and
- * backward labels, as well as dominance checks. The output is color-coded for
- * better readability:
+ * This function outputs a formatted table displaying various metrics
+ * related to the bucket graph. The table includes headers and values for
+ * forward and backward labels, as well as dominance checks. The output is
+ * color-coded for better readability:
  * - Bold blue for metric names
  * - Green for values (backward labels)
  * - Reset color to default after each line
@@ -771,18 +752,22 @@ void BucketGraph::print_statistics() {
 }
 
 /**
- * @brief Generates arcs in both forward and backward directions in parallel.
+ * @brief Generates arcs in both forward and backward directions in
+ * parallel.
  *
  * This function uses OpenMP to parallelize the generation of arcs in both
  * forward and backward directions. It performs the following steps for each
  * direction:
- * - Calls the generate_arcs function template with the appropriate direction.
+ * - Calls the generate_arcs function template with the appropriate
+ * direction.
  * - Clears and resizes the Phi vector for the respective direction.
- * - Computes the Phi values for each bucket and stores them in the Phi vector.
+ * - Computes the Phi values for each bucket and stores them in the Phi
+ * vector.
  * - Calls the SCC_handler function template with the appropriate direction.
  *
  * The forward direction operations are performed in one OpenMP section, and
- * the backward direction operations are performed in another OpenMP section.
+ * the backward direction operations are performed in another OpenMP
+ * section.
  */
 void BucketGraph::generate_arcs() {
     PARALLEL_SECTIONS(
@@ -818,10 +803,10 @@ void BucketGraph::setup() {
         work, bi_sched, SECTION { define_buckets<Direction::Forward>(); },
         SECTION { define_buckets<Direction::Backward>(); });
     // Initialize the sizes
-    fixed_arcs.resize(getNodes().size());
-    for (int i = 0; i < getNodes().size(); ++i) {
-        fixed_arcs[i].resize(getNodes().size());
-    }
+    // fixed_arcs.resize(getNodes().size());
+    auto arc_size = getNodes().size();
+    size_t arc_bitmap_size = (arc_size * arc_size + 63) / 64;
+    fixed_arcs_bitmap.assign(arc_bitmap_size, 0);
 
     // Resize and initialize fw_fixed_buckets and bw_fixed_buckets for
     // std::vector<bool> fw_fixed_buckets.assign(fw_buckets.size(),
@@ -872,8 +857,8 @@ void BucketGraph::setup() {
  *
  * This function outputs the configuration details including resource size,
  * number of clients, and maximum SRC cuts. It also conditionally prints
- * whether RIH, RCC, and SRC are enabled or disabled based on the preprocessor
- * directives.
+ * whether RIH, RCC, and SRC are enabled or disabled based on the
+ * preprocessor directives.
  *
  * The output format is as follows:
  *
@@ -923,11 +908,11 @@ void BucketGraph::initInfo() {
 /**
  * @brief Computes the mono label for the BucketGraph.
  *
- * This function computes the mono label for the BucketGraph by acquiring a new
- * label from the label pool and setting the cost and real cost values from the
- * given label `L`. It then calculates the number of nodes covered by the label
- * and its ancestors, reserves space for the nodes covered, and inserts the
- * nodes from the
+ * This function computes the mono label for the BucketGraph by acquiring a
+ * new label from the label pool and setting the cost and real cost values
+ * from the given label `L`. It then calculates the number of nodes covered
+ * by the label and its ancestors, reserves space for the nodes covered, and
+ * inserts the nodes from the
  *
  */
 Label *BucketGraph::compute_mono_label(const Label *L) {
@@ -939,15 +924,15 @@ Label *BucketGraph::compute_mono_label(const Label *L) {
 
     // Calculate the number of nodes covered by the label (its ancestors)
     // size_t label_size = 0;
-    // for (auto current_label = L; current_label != nullptr; current_label =
-    // current_label->parent) { label_size++; }
+    // for (auto current_label = L; current_label != nullptr; current_label
+    // = current_label->parent) { label_size++; }
 
     // Reserve space in one go
     // new_label->nodes_covered.reserve(label_size);
 
     // Insert the nodes from the label and its ancestors
-    // for (auto current_label = L; current_label != nullptr; current_label =
-    // current_label->parent) {
+    // for (auto current_label = L; current_label != nullptr; current_label
+    // = current_label->parent) {
     // new_label->nodes_covered.push_back(current_label->node_id);
     // }
 
@@ -986,10 +971,12 @@ std::vector<Label *> BucketGraph::extend_path(const std::vector<int> &path,
 
     // for (auto new_label : new_labels) {
     //     //new_label = compute_mono_label(new_label);
-    //     // add label->nodes_covered to the front of new_labels->nodes_covered
+    //     // add label->nodes_covered to the front of
+    //     new_labels->nodes_covered
     //     //new_label->nodes_covered.insert(new_label->nodes_covered.begin(),
     //     label->nodes_covered.begin(),
-    //                                     // label->nodes_covered.end() - 1);
+    //                                     // label->nodes_covered.end() -
+    //                                     1);
     //     // print new_labels->nodes_covered
     //     new_labels_to_return.push_back(new_label);
     // }

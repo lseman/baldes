@@ -213,7 +213,7 @@ class LimitedMemoryRank1Cuts {
 
         // Generate cut coefficients for the top cuts
         std::vector<double> coefficients_aux(allPaths.size(), 0.0);
-        auto cuts_to_apply = std::min(static_cast<int>(tmp_cuts.size()), 3);
+        auto cuts_to_apply = std::min(static_cast<int>(tmp_cuts.size()), 1);
 
         for (int i = 0; i < cuts_to_apply; ++i) {
             auto cut_value = tmp_cuts[i].first;

@@ -120,8 +120,7 @@ struct alignas(64) Bucket {
             return false;
         }
         if (!is_split) {
-            if (dominance_func(get_labels())) {
-                ++stat_n_dom;
+            if (dominance_func(get_labels(), stat_n_dom)) {
                 return true;
             }
             return false;

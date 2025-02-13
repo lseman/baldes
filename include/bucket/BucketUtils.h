@@ -1032,32 +1032,45 @@ void BucketGraph::bucket_fixing() {
  */
 template <Stage S>
 void BucketGraph::heuristic_fixing() {
-    // Stage 3 fixing heuristic
     reset_pool();
     reset_fixed();
     common_initialization();
 
+    // Pre-allocate vectors with reserve to avoid reallocations
     std::vector<double> forward_cbar(fw_buckets.size(),
                                      std::numeric_limits<double>::infinity());
     std::vector<double> backward_cbar(bw_buckets.size(),
                                       std::numeric_limits<double>::infinity());
 
-    run_labeling_algorithms<Stage::Two, Full::Partial>(forward_cbar,
+    run_labeling_algorithms<Stage::One, Full::Partial>(forward_cbar,
                                                        backward_cbar);
 
-    std::vector<std::vector<Label *>> fw_labels_map(nodes.size());
-    std::vector<std::vector<Label *>> bw_labels_map(nodes.size());
+    // Pre-allocate with exact sizes
+    const size_t num_nodes = nodes.size();
+    std::vector<std::vector<Label *>> fw_labels_map(num_nodes);
+    std::vector<std::vector<Label *>> bw_labels_map(num_nodes);
 
-    auto group_labels = [&](auto &buckets, auto &labels_map) {
-        for (auto &bucket : buckets) {
-            for (auto label : bucket.get_labels()) {
-                labels_map[label->node_id].push_back(
-                    label);  // Directly index using node_id
+    // Pre-reserve space based on average bucket size
+    size_t avg_bucket_size = 0;
+    for (const auto &bucket : fw_buckets) {
+        avg_bucket_size += bucket.get_labels().size();
+    }
+    avg_bucket_size /= fw_buckets.size();
+
+    for (auto &labels : fw_labels_map) labels.reserve(avg_bucket_size);
+    for (auto &labels : bw_labels_map) labels.reserve(avg_bucket_size);
+
+    // Optimized group_labels with direct indexing
+    auto group_labels = [](const auto &buckets, auto &labels_map) {
+        for (const auto &bucket : buckets) {
+            const auto &bucket_labels = bucket.get_labels();
+            for (auto *label : bucket_labels) {
+                labels_map[label->node_id].push_back(label);
             }
         }
     };
 
-    // Create tasks for forward and backward labels grouping
+    // Parallel execution of grouping
     auto forward_task = stdexec::schedule(bi_sched) | stdexec::then([&]() {
                             group_labels(fw_buckets, fw_labels_map);
                         });
@@ -1065,49 +1078,71 @@ void BucketGraph::heuristic_fixing() {
                              group_labels(bw_buckets, bw_labels_map);
                          });
 
-    // Execute the tasks in parallel
-    auto work =
-        stdexec::when_all(std::move(forward_task), std::move(backward_task));
+    stdexec::sync_wait(
+        stdexec::when_all(std::move(forward_task), std::move(backward_task)));
 
-    stdexec::sync_wait(std::move(work));
+    // Pre-compute minimum cost labels for each node
+    std::vector<const Label *> min_fw_labels(num_nodes, nullptr);
+    std::vector<const Label *> min_bw_labels(num_nodes, nullptr);
 
-    auto num_fixes = 0;
-    //  Function to find the minimum cost label in a vector of labels
-    auto find_min_cost_label =
-        [](const std::vector<Label *> &labels) -> const Label * {
-        return *std::min_element(
-            labels.begin(), labels.end(),
-            [](const Label *a, const Label *b) { return a->cost < b->cost; });
+    auto compute_min_labels = [](const auto &labels_map, auto &min_labels) {
+        for (size_t i = 0; i < labels_map.size(); ++i) {
+            const auto &labels = labels_map[i];
+            if (!labels.empty()) {
+                min_labels[i] =
+                    *std::min_element(labels.begin(), labels.end(),
+                                      [](const Label *a, const Label *b) {
+                                          return a->cost < b->cost;
+                                      });
+            }
+        }
     };
-    for (const auto &node_I : nodes) {
-        const auto &fw_labels = fw_labels_map[node_I.id];
-        if (fw_labels.empty()) continue;  // Skip if no labels for this node_id
 
-        for (const auto &node_J : nodes) {
-            if (node_I.id == node_J.id)
-                continue;  // Compare based on id (or other key field)
-            const auto &bw_labels = bw_labels_map[node_J.id];
-            if (bw_labels.empty())
-                continue;  // Skip if no labels for this node_id
+    // Parallel computation of minimum labels
+    auto min_fw_task = stdexec::schedule(bi_sched) | stdexec::then([&]() {
+                           compute_min_labels(fw_labels_map, min_fw_labels);
+                       });
+    auto min_bw_task = stdexec::schedule(bi_sched) | stdexec::then([&]() {
+                           compute_min_labels(bw_labels_map, min_bw_labels);
+                       });
 
-            const Label *min_fw_label = find_min_cost_label(fw_labels);
-            const Label *min_bw_label = find_min_cost_label(bw_labels);
+    stdexec::sync_wait(
+        stdexec::when_all(std::move(min_fw_task), std::move(min_bw_task)));
 
-            if (!min_fw_label || !min_bw_label) continue;
+    // Pre-compute resource indices
+    const size_t time_index = std::distance(
+        options.resources.begin(),
+        std::find(options.resources.begin(), options.resources.end(), "time"));
 
-            const VRPNode &L_last_node = nodes[min_fw_label->node_id];
-            auto cost = getcij(min_fw_label->node_id, min_bw_label->node_id);
+    size_t num_fixes = 0;
+    for (size_t i = 0; i < num_nodes; ++i) {
+        const auto *min_fw_label = min_fw_labels[i];
+        if (!min_fw_label) continue;
 
+        const VRPNode &L_last_node = nodes[min_fw_label->node_id];
+
+        for (size_t j = 0; j < num_nodes; ++j) {
+            if (i == j) continue;
+
+            const auto *min_bw_label = min_bw_labels[j];
+            if (!min_bw_label) continue;
+
+            const double cost =
+                getcij(min_fw_label->node_id, min_bw_label->node_id);
+
+            // Check time resource first as it's often the most restrictive
+            if (options.resources[time_index] == "time") {
+                if (min_fw_label->resources[time_index] + cost +
+                        L_last_node.duration >
+                    min_bw_label->resources[time_index]) {
+                    continue;
+                }
+            }
+
+            // Check other resources
             bool violated = false;
-            for (auto r = 0; r < options.resources.size(); ++r) {
-                if (options.resources[r] == "time") {
-                    if (min_fw_label->resources[TIME_INDEX] + cost +
-                            L_last_node.duration >
-                        min_bw_label->resources[TIME_INDEX]) {
-                        violated = true;
-                        break;
-                    }
-                } else {
+            for (size_t r = 0; r < options.resources.size(); ++r) {
+                if (r != time_index) {
                     if (min_fw_label->resources[r] +
                             L_last_node.consumption[r] >
                         min_bw_label->resources[r]) {
@@ -1117,11 +1152,11 @@ void BucketGraph::heuristic_fixing() {
                 }
             }
 
-            if (violated) continue;
-
-            if (min_fw_label->cost + cost + min_bw_label->cost > gap) {
-                fixed_arcs[node_I.id][node_J.id] = 1;  // Index with node ids
-                num_fixes++;
+            if (!violated &&
+                min_fw_label->cost + cost + min_bw_label->cost > gap) {
+                // fixed_arcs[i][j] = 1;
+                fix_arc(i, j);
+                ++num_fixes;
             }
         }
     }

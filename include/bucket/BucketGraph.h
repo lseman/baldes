@@ -40,59 +40,13 @@
 #include "RCC.h"
 #include "RIH.h"
 #include "SCCFinder.h"
+#include "Stats.h"
 #include "Trees.h"
 #include "UnionFind.h"
 #include "VRPNode.h"
 
 #define RCESPP_TOL_ZERO 1.E-6
 
-class Stats {
-    std::deque<double> obj_history;
-
-   public:
-    void addIteration(double obj_value) {
-        obj_history.push_back(obj_value);
-        if (obj_history.size() > 100) {  // Keep last 100 iterations
-            obj_history.pop_front();
-        }
-    }
-
-    bool hasHistory() const { return obj_history.size() >= 2; }
-
-    double getRecentImprovement(size_t window) const {
-        if (obj_history.size() < window) {
-            return 1.0;  // Default if not enough history
-        }
-        auto start = obj_history.end() - window;
-        auto end = obj_history.end();
-        double avg_change =
-            std::accumulate(start + 1, end, 0.0,
-                            [prev = *start](double sum, double curr) mutable {
-                                double change = (prev - curr) /
-                                                std::max(1e-10, std::abs(prev));
-                                prev = curr;
-                                return sum + change;
-                            }) /
-            (window - 1);
-        return avg_change;
-    }
-
-    double getRecentVariance(size_t window) const {
-        if (obj_history.size() < window) {
-            return 0.0;  // Default if not enough history
-        }
-        auto start = obj_history.end() - window;
-        auto end = obj_history.end();
-        double mean = std::accumulate(start, end, 0.0) / window;
-        double variance =
-            std::accumulate(start, end, 0.0,
-                            [mean](double sum, double curr) {
-                                return sum + std::pow(curr - mean, 2);
-                            }) /
-            window;
-        return variance;
-    }
-};
 /**
  * @class BucketGraph
  * @brief Represents a graph structure used for bucket-based
@@ -127,6 +81,8 @@ class BucketGraph {
     Stats stats;
 
    public:
+    double threshold = -1.5;
+
     static  // Precompute bitmask lookup table at compile time
         constexpr std::array<uint64_t, 64>
             bit_mask_lookup = []() {
@@ -333,13 +289,31 @@ class BucketGraph {
     int fw_buckets_size = 0;
     int bw_buckets_size = 0;
 
-    std::vector<std::vector<bool>> fixed_arcs;
+    std::vector<uint64_t> fixed_arcs_bitmap;
     std::vector<std::vector<bool>> fw_fixed_buckets;
     std::vector<std::vector<bool>> bw_fixed_buckets;
     std::vector<uint64_t>
         fw_fixed_buckets_bitmap;  // Bitmap for fixed bucket arcs
     std::vector<uint64_t>
         bw_fixed_buckets_bitmap;  // Bitmap for fixed bucket arcs
+
+    inline bool is_arc_fixed(int from, int to) const noexcept {
+        size_t bit_pos = from * nodes.size() + to;
+        return (fixed_arcs_bitmap[bit_pos / 64] & (1ULL << (bit_pos % 64))) !=
+               0;
+    }
+
+    inline bool is_arc_not_fixed(int from, int to) const noexcept {
+        size_t bit_pos = from * nodes.size() + to;
+        return (fixed_arcs_bitmap[bit_pos / 64] & (1ULL << (bit_pos % 64))) ==
+               0;
+    }
+
+    inline bool fix_arc(int from, int to) noexcept {
+        size_t bit_pos = from * nodes.size() + to;
+        fixed_arcs_bitmap[bit_pos / 64] |= (1ULL << (bit_pos % 64));
+        return true;
+    }
 
     template <Direction D>
     inline bool is_bucket_not_fixed(int from, int to) const noexcept {
@@ -838,9 +812,11 @@ class BucketGraph {
      * arc constraints that may have been previously set.
      */
     void reset_fixed() {
-        for (auto &row : fixed_arcs) {
-            std::fill(row.begin(), row.end(), 0);
-        }
+        // for (auto &row : fixed_arcs) {
+        // std::fill(row.begin(), row.end(), 0);
+        // }
+        size_t bitmap_size = (nodes.size() * nodes.size() + 63) / 64;
+        fixed_arcs_bitmap.assign(bitmap_size, 0);
     }
 
     void reset_fixed_buckets() {
@@ -1147,7 +1123,8 @@ class BucketGraph {
         // Mark each arc in the input list as fixed/deleted
         for (const auto &[from, to] : arcs) {
             if (from < num_nodes && to < num_nodes) {
-                fixed_arcs[from][to] = 1;
+                // fixed_arcs[from][to] = 1;
+                fix_arc(from, to);
             }
         }
     }
