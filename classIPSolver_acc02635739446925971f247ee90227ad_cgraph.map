@@ -1,0 +1,28 @@
+<map id="IPSolver::run_optimization" name="IPSolver::run_optimization">
+<area shape="rect" id="Node000001" title="Runs the optimization process on the given model data." alt="" coords="5,234,177,260"/>
+<area shape="rect" id="Node000002" href="$classIPSolver.html#a2651221065511beedd53613296aaddcb" title="Converts the given linear programming problem to its standard form." alt="" coords="273,5,411,46"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="95,232,112,197,139,149,176,99,199,76,223,55,257,39,259,43,226,60,202,79,181,102,144,152,117,199,100,235"/>
+<area shape="rect" id="Node000003" href="$classIPSolver.html#a2f6983d42c0a0af7344a9c7f9b79cdfe" title=" " alt="" coords="225,70,459,96"/>
+<area shape="poly" id="edge2_Node000001_Node000003" title=" " alt="" coords="99,232,146,170,182,134,223,105,233,100,236,104,226,109,185,138,150,174,103,235"/>
+<area shape="rect" id="Node000004" href="$classIPSolver.html#a16c38201e3fc179e9265a82e67510679" title="Computes the maximum step size (alpha) that can be taken along the direction of the search vectors." alt="" coords="272,120,412,145"/>
+<area shape="poly" id="edge3_Node000001_Node000004" title=" " alt="" coords="106,231,156,193,189,173,224,155,256,144,258,149,226,160,192,177,159,198,109,236"/>
+<area shape="rect" id="Node000006" href="$classIPSolver.html#a0ecea75d40171352fa5298be01d3d007" title=" " alt="" coords="266,169,418,210"/>
+<area shape="poly" id="edge5_Node000001_Node000006" title=" " alt="" coords="150,231,251,208,252,213,151,236"/>
+<area shape="rect" id="Node000007" href="$classIPSolver.html#a10d79c906c9f170d975b9404e793a14e" title=" " alt="" coords="517,264,673,289"/>
+<area shape="poly" id="edge6_Node000001_Node000007" title=" " alt="" coords="177,249,502,268,501,274,177,255"/>
+<area shape="rect" id="Node000009" href="$classIPSolver.html#ac225cc4dcfe81ae25d3d59bdcb0b029f" title="Solves the Newton system for the interior point method." alt="" coords="263,284,420,325"/>
+<area shape="poly" id="edge8_Node000001_Node000009" title=" " alt="" coords="151,258,249,280,248,286,150,263"/>
+<area shape="rect" id="Node000010" href="$classIPSolver.html#aac549fa9ef9fd8c98dc9262550a81f4d" title=" " alt="" coords="271,349,412,390"/>
+<area shape="poly" id="edge10_Node000001_Node000010" title=" " alt="" coords="110,258,160,295,226,334,257,346,255,351,223,339,157,300,107,263"/>
+<area shape="rect" id="Node000012" href="$classIPSolver.html#a22f7028c11d89b7986357f004f269924" title=" " alt="" coords="265,415,419,455"/>
+<area shape="poly" id="edge12_Node000001_Node000012" title=" " alt="" coords="102,259,149,326,184,366,226,399,251,412,249,417,223,404,181,370,145,330,98,262"/>
+<area shape="rect" id="Node000013" href="$classIPSolver.html#a1f22b1985e02e839ff3b2791a0389865" title="Updates the residuals for the interior point method solver." alt="" coords="254,480,430,505"/>
+<area shape="poly" id="edge13_Node000001_Node000013" title=" " alt="" coords="99,260,113,300,139,357,176,416,200,442,226,465,241,473,238,478,223,469,196,446,172,419,134,359,108,302,94,261"/>
+<area shape="rect" id="Node000005" href="$classIPSolver.html#add3037642e4e2090f62e90d9df5eee9f" title="Computes the maximum step size (alpha) for a single direction vector." alt="" coords="526,112,665,153"/>
+<area shape="poly" id="edge4_Node000004_Node000005" title=" " alt="" coords="412,130,510,130,510,135,412,135"/>
+<area shape="rect" id="Node000008" href="$classIPSolver.html#a55c0e0acdfb28b73b2387a610bf8fbd6" title="Solves the augmented system for the given right&#45;hand side vectors." alt="" coords="731,256,911,297"/>
+<area shape="poly" id="edge7_Node000007_Node000008" title=" " alt="" coords="674,274,716,274,716,279,674,279"/>
+<area shape="poly" id="edge9_Node000009_Node000007" title=" " alt="" coords="421,293,501,284,501,289,421,298"/>
+<area shape="rect" id="Node000011" href="$classIPSolver.html#ad6ab576c321bd6a0506d9c5bf8362f1a" title="Converts a dense vector to a sparse diagonal matrix." alt="" coords="507,349,683,390"/>
+<area shape="poly" id="edge11_Node000010_Node000011" title=" " alt="" coords="413,367,491,367,491,372,413,372"/>
+</map>

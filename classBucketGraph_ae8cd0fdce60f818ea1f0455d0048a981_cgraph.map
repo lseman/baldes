@@ -1,0 +1,27 @@
+<map id="BucketGraph::updateStepSize" name="BucketGraph::updateStepSize">
+<area shape="rect" id="Node000001" title=" " alt="" coords="5,134,200,160"/>
+<area shape="rect" id="Node000002" href="$Definitions_8h.html#a086546d06aa565cdd48f436973ebc496" title="Prints an informational message with a specific format." alt="" coords="285,109,359,135"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="200,133,269,125,269,131,200,139"/>
+<area shape="rect" id="Node000003" href="$classBucketGraph.html#a70676504af16413f5587e87c4f1f3427" title="Redefines the bucket intervals and reinitializes various data structures." alt="" coords="248,158,396,184"/>
+<area shape="poly" id="edge2_Node000001_Node000003" title=" " alt="" coords="200,155,232,159,232,164,200,161"/>
+<area shape="rect" id="Node000004" href="$classBucketGraph.html#a5d04c8a2da52796e87c1b443aa221a76" title="Defines the buckets for the BucketGraph." alt="" coords="468,31,605,72"/>
+<area shape="poly" id="edge3_Node000003_Node000004" title=" " alt="" coords="374,155,395,145,409,132,418,119,427,105,442,90,464,77,467,81,446,95,431,108,423,122,413,136,397,149,377,160"/>
+<area shape="rect" id="Node000008" href="$classBucketGraph.html#a78afa4d3e7c6078f874480c68f43caff" title="Generates arcs in both forward and backward directions in parallel." alt="" coords="444,129,629,155"/>
+<area shape="poly" id="edge7_Node000003_Node000008" title=" " alt="" coords="396,158,428,154,429,159,397,164"/>
+<area shape="rect" id="Node000018" href="$classBucketGraph.html#a2379392ccc37be9a4a27800b116465d2" title="Resets all fixed arcs in the graph." alt="" coords="470,179,603,220"/>
+<area shape="poly" id="edge12_Node000003_Node000018" title=" " alt="" coords="397,178,455,186,455,191,396,184"/>
+<area shape="rect" id="Node000019" href="$classBucketGraph.html#a2b278d6d639910a628446a2be038d41e" title=" " alt="" coords="470,244,603,285"/>
+<area shape="poly" id="edge13_Node000003_Node000019" title=" " alt="" coords="349,182,445,229,462,236,460,241,443,234,347,187"/>
+<area shape="rect" id="Node000005" href="$classBucketGraph.html#af129eff306551dc7cc7fe00b919bbbd0" title="Assigns the buckets based on the specified direction." alt="" coords="906,72,1047,113"/>
+<area shape="poly" id="edge4_Node000004_Node000005" title=" " alt="" coords="602,28,657,15,722,5,791,4,858,15,903,35,941,60,938,65,900,39,857,20,791,9,723,11,658,20,603,33"/>
+<area shape="rect" id="Node000006" href="$classSplayTree.html#a082bcce6c2734f2bbf7e967c32c8aa7f" title=" " alt="" coords="709,30,826,56"/>
+<area shape="poly" id="edge5_Node000004_Node000006" title=" " alt="" coords="606,46,693,43,693,48,606,52"/>
+<area shape="rect" id="Node000007" href="$Definitions_8h.html#a59e29a115ea52c2f99d3ff52f83cb3cf" title=" " alt="" coords="677,80,858,105"/>
+<area shape="poly" id="edge6_Node000004_Node000007" title=" " alt="" coords="606,61,677,74,676,79,605,66"/>
+<area shape="poly" id="edge9_Node000008_Node000008" title=" " alt="" coords="501,130,494,120,498,111,513,105,537,102,563,105,576,112,574,117,561,110,537,108,514,110,502,114,499,120,505,127"/>
+<area shape="rect" id="Node000009" href="$classBucketGraph.html#aa9eea9800ea6652e736b960a729f2c14" title=" " alt="" coords="681,129,854,155"/>
+<area shape="poly" id="edge8_Node000008_Node000009" title=" " alt="" coords="629,139,666,139,666,145,629,145"/>
+<area shape="rect" id="Node000013" href="$classBucketGraph.html#a2925857b35aa31c3c5af4a2795840b98" title="Handles the computation of Strongly Connected Components (SCCs) for the BucketGraph." alt="" coords="678,178,857,204"/>
+<area shape="poly" id="edge10_Node000008_Node000013" title=" " alt="" coords="601,153,690,172,689,177,600,158"/>
+<area shape="poly" id="edge11_Node000013_Node000005" title=" " alt="" coords="828,175,857,165,897,144,934,120,937,124,900,148,859,170,829,180"/>
+</map>

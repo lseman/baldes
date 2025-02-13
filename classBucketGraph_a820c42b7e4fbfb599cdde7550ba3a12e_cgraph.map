@@ -1,0 +1,14 @@
+<map id="BucketGraph::compute_red_cost" name="BucketGraph::compute_red_cost">
+<area shape="rect" id="Node000001" title=" " alt="" coords="5,136,159,177"/>
+<area shape="rect" id="Node000002" href="$classBucketGraph.html#abb791c45d27a9425607480e3101f7d28" title=" " alt="" coords="207,5,374,46"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="103,134,149,95,205,55,214,51,216,55,208,60,152,99,107,138"/>
+<area shape="rect" id="Node000003" href="$classBucketGraph.html#ad15267e0cffaa8dc5222028409c9e082" title=" " alt="" coords="223,70,358,96"/>
+<area shape="poly" id="edge2_Node000001_Node000003" title=" " alt="" coords="131,133,206,104,224,98,226,103,208,110,133,138"/>
+<area shape="rect" id="Node000004" href="$classArcDuals.html#ac75e53f0c4f24e6aca539c544e9f8109" title=" " alt="" coords="228,144,352,169"/>
+<area shape="poly" id="edge3_Node000001_Node000004" title=" " alt="" coords="159,154,213,154,213,159,159,159"/>
+<area shape="rect" id="Node000005" href="$classBucketGraph.html#aac3c165dfb9837288ad63ac34ad91041" title="Checks if a node has been visited based on a bitmap." alt="" coords="216,193,364,234"/>
+<area shape="poly" id="edge5_Node000001_Node000005" title=" " alt="" coords="159,175,202,187,200,192,157,180"/>
+<area shape="rect" id="Node000006" href="$classBucketGraph.html#ad36a543a58c7d3cd4ded313dd5069f03" title="Marks a node as visited in the bitmap." alt="" coords="212,259,368,299"/>
+<area shape="poly" id="edge6_Node000001_Node000006" title=" " alt="" coords="110,175,154,209,208,243,220,249,217,254,205,248,151,213,106,179"/>
+<area shape="poly" id="edge4_Node000004_Node000004" title=" " alt="" coords="256,145,249,135,253,125,267,119,290,117,316,120,329,126,326,131,314,125,290,122,268,124,257,129,254,134,260,142"/>
+</map>

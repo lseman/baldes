@@ -1,0 +1,9 @@
+<map id="IteratedLocalSearch" name="IteratedLocalSearch">
+<area shape="rect" id="Node000001" title=" " alt="" coords="35,183,173,208"/>
+<area shape="rect" id="Node000002" href="$structInstanceData.html" title="A structure to hold various data related to an instance of a problem." alt="" coords="5,94,104,120"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="64,133,74,157,93,180,89,184,70,160,59,135"/>
+<area shape="rect" id="Node000003" href="$classCutStorage.html" title="Manages the storage and operations related to cuts in a solver." alt="" coords="127,94,214,120"/>
+<area shape="poly" id="edge2_Node000001_Node000003" title=" " alt="" coords="154,134,115,184,111,181,150,130"/>
+<area shape="rect" id="Node000004" href="$structCutStorage_1_1SegmentMasks.html" title=" " alt="" coords="79,5,262,31"/>
+<area shape="poly" id="edge3_Node000003_Node000004" title=" " alt="" coords="173,47,173,94,168,94,168,47"/>
+</map>
