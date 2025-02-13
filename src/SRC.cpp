@@ -76,6 +76,11 @@ void CutStorage::addCut(Cut &cut) {
         it != cutMaster_to_cut_map.end()) {
         // Update the existing cut
         cut.id = it->second;
+        auto old_neighbors = cuts[cut.id].neighbors;
+        // merge the neighbors
+        for (size_t i = 0; i < num_words; ++i) {
+            cut.neighbors[i] |= old_neighbors[i];
+        }
         if (cuts[cut.id].added) {
             cut.added = true;
             cut.updated = true;
@@ -262,7 +267,7 @@ void LimitedMemoryRank1Cuts::separate(const SparseMatrix &A,
     pdqsort(tmp_cuts.begin(), tmp_cuts.end(),
             [](const auto &a, const auto &b) { return a.first > b.first; });
 
-    auto max_cuts = 2;
+    auto max_cuts = 1;
     for (int i = 0; i < std::min(max_cuts, static_cast<int>(tmp_cuts.size()));
          ++i) {
         auto &cut = tmp_cuts[i].second;

@@ -947,16 +947,16 @@ class VRProblem {
 
                                 // create small perturbation random perturbation
                                 // on nodeDuals
-                                // for (auto &dual : nodeDuals) {
-                                //     if (std::abs(dual) > 1e-3) {
-                                //         dual *= (1.0 + dis(gen));
-                                //     }
-                                // }
+                                for (auto &dual : nodeDuals) {
+                                    if (std::abs(dual) > 1e-3) {
+                                        dual *= (1.0 + dis(gen));
+                                    }
+                                }
                                 // updateGapAndRunOptimization(
                                 //     node, lp_obj, inner_obj, ipm_solver,
                                 //     iter_non_improv, use_ipm_duals,
                                 //     nodeDuals);
-                                // stab.define_smooth_dual_sol(nodeDuals);
+                                stab.define_smooth_dual_sol(nodeDuals);
                                 iter_non_improv = 0;
                                 // use_ipm_duals = true;
                             }
@@ -1064,24 +1064,27 @@ class VRProblem {
             tr_val = v;
 #endif
             const int threshold = 1000000;
+            auto bucketgraph_th = bucket_graph->threshold;
             if (iter % 10 == 0) {
-                fmt::print(
-                    "| It.: {:4} | Obj.: {:8.2f} | Price: {:9.2f} | SRC: "
-                    "{:3} "
-                    "| RCC: {:3} | Paths: {:3} | "
-                    "Stage: {:1} | "
-                    "Lag.: {:>10} | α: {:4.2f} | tr: {:2.2f} | gap: "
-                    "{:2.4f} "
-                    "| Int.: {:>4} "
-                    "|\n",
-                    iter, lp_obj, inner_obj, n_cuts, n_rcc_cuts, colAdded,
-                    stage,
+                std::string lag_gap_str =
                     (lag_gap > threshold) ? "∞"
-                                          : fmt::format("{:10.4f}", lag_gap),
-                    cur_alpha, tr_val, gap,
+                                          : fmt::format("{:10.4f}", lag_gap);
+
+                std::string int_sol_str =
                     (integer_solution > threshold)
                         ? "∞"
-                        : fmt::format("{:4}", integer_solution));
+                        : fmt::format("{:4}", integer_solution);
+
+                fmt::print(
+                    "| It.: {:4} | Obj.: {:8.2f} | Price: {:9.2f} | SRC: {:3} "
+                    "| RCC: {:3} | Paths: {:3} | "
+                    "Stage: {:1} | "
+                    "Lag.: {:>10} | α: {:4.2f} | tr: {:2.2f} | gap: {:2.4f} "
+                    "| Int.: {:>4} | Th: {:4.2f} |\n",
+                    iter, lp_obj, inner_obj, n_cuts, n_rcc_cuts, colAdded,
+                    stage, lag_gap_str, cur_alpha, tr_val, gap, int_sol_str,
+                    bucketgraph_th);
+
                 Logger::log(
                     "| It.: {:4} | Obj.: {:8.2f} | Price: {:9.2f} | SRC: "
                     "{:3} "

@@ -59,7 +59,7 @@ inline std::experimental::simd<T> load_simd(const Container &source,
 template <typename T, typename Container>
 inline std::experimental::simd<T> load_simd_generic(const Container &source,
                                                     size_t start_index,
-                                                    size_t simd_size) {
+                                                    size_t simd_size) noexcept {
     constexpr size_t simd_register_size = std::experimental::simd<T>::size();
 
     // Fallback: Load into a buffer and then into the SIMD register
@@ -76,7 +76,8 @@ template <Direction D, Stage S>
 inline bool check_dominance_against_vector(const Label *new_label,
                                            const std::vector<Label *> &labels,
                                            const CutStorage *cut_storage,
-                                           int r_size) noexcept {
+                                           int r_size,
+                                           int &stat_n_dom) noexcept {
     using namespace std::experimental;
     const size_t size = labels.size();
     const size_t simd_size = simd<double>::size();
@@ -100,6 +101,7 @@ inline bool check_dominance_against_vector(const Label *new_label,
 
         // Check each label in the SIMD chunk that passed the cost check
         for (size_t j = 0; j < simd_size; ++j) {
+            stat_n_dom += cost_mask[j] ? 1 : 0;
             if (!cost_mask[j]) continue;
 
             const Label *label = labels[i + j];

@@ -62,159 +62,11 @@ class HighRankCuts {
     // Node scoring
     ////////////////////////////////////////////////////////////////////////////
 
-    ankerl::unordered_dense::map<std::pair<int, int>, ScoreHistory>
-        score_history;
-
-    double learning_rate = 0.1;  // Rate at which weights are adjusted
-
-    // Predict score based on historical data
-    double predictScore(int i, int j, double current_score) {
-        auto key = std::make_pair(i, j);
-        auto it = score_history.find(key);
-
-        if (it == score_history.end() || it->second.historical_scores.empty()) {
-            return current_score;  // No history available
-        }
-
-        // Calculate weighted average of historical scores
-        const auto &history = it->second.historical_scores;
-        double weight_sum = 0;
-        double weighted_score = 0;
-
-        for (size_t idx = 0; idx < history.size(); ++idx) {
-            // More recent scores get higher weights
-            double weight = std::exp(-0.5 * (history.size() - idx - 1));
-            weighted_score += history[idx] * weight;
-            weight_sum += weight;
-        }
-
-        double historical_prediction = weighted_score / weight_sum;
-
-        // Blend historical prediction with current score using adaptive weight
-        return it->second.prediction_weight * historical_prediction +
-               (1 - it->second.prediction_weight) * current_score;
-    }
-
-    // Update prediction weights based on accuracy
-    void updatePredictionWeight(int i, int j, double predicted, double actual) {
-        auto key = std::make_pair(i, j);
-        auto &history = score_history[key];
-
-        // Calculate prediction error
-        double error = std::abs(predicted - actual);
-        double max_error = std::abs(actual);  // Use actual value as scale
-        double accuracy = max_error > 0 ? 1.0 - (error / max_error) : 1.0;
-
-        // Update weight using exponential moving average
-        history.prediction_weight =
-            (1 - learning_rate) * history.prediction_weight +
-            learning_rate * accuracy;
-    }
-
+    AdaptiveNodeScorer ml_scorer;
     std::vector<std::vector<int>> computeNodeScores(
         const SparseMatrix &A, const std::vector<double> &x) {
-        std::vector<std::vector<int>> scores(N_SIZE);
-        const auto &active_cuts = cutStorage->getActiveCuts();
-
-        // Pre-calculate cut adjustments (same as original)
-        std::vector<std::vector<double>> cut_adjustments(
-            N_SIZE, std::vector<double>(N_SIZE, 0.0));
-        for (const auto &cut : active_cuts) {
-            if (cut.type == CutType::ThreeRow) {
-                for (int i = 1; i < N_SIZE - 1; ++i) {
-                    for (int j = i + 1; j < N_SIZE - 1; ++j) {
-                        if (cut.isSRCset(i, j)) {
-                            cut_adjustments[i][j] -= cut.dual_value;
-                            cut_adjustments[j][i] -= cut.dual_value;
-                        }
-                    }
-                }
-            } else if (cut.type == CutType::OneRow) {
-                for (int i = 1; i < N_SIZE - 1; ++i) {
-                    if (cut.isSRCset(i)) {
-                        cut_adjustments[i][0] -= cut.dual_value;
-                        cut_adjustments[0][i] -= cut.dual_value;
-                    }
-                }
-            }
-            // } else if (cut.type == CutType::FourRow) {
-            //     for (int i = 1; i < N_SIZE - 1; ++i) {
-            //         for (int j = i + 1; j < N_SIZE - 1; ++j) {
-            //             if (cut.isSRCset(i, j)) {
-            //                 cut_adjustments[i][j] -= cut.dual_value / 10;
-            //                 cut_adjustments[j][i] -= cut.dual_value / 10;
-            //             }
-            //         }
-            //     }
-            // } else if (cut.type == CutType::FiveRow) {
-            //     for (int i = 1; i < N_SIZE - 1; ++i) {
-            //         for (int j = i + 1; j < N_SIZE - 1; ++j) {
-            //             if (cut.isSRCset(i, j)) {
-            //                 cut_adjustments[i][j] -= cut.dual_value / 10;
-            //                 cut_adjustments[j][i] -= cut.dual_value / 10;
-            //             }
-            //         }
-            //     }
-            // }
-        }
-        std::vector<NodeScore> node_scores;
-        node_scores.reserve(N_SIZE - 2);
-
-        for (int i = 1; i < N_SIZE - 1; ++i) {
-            node_scores.clear();
-
-            // Calculate and predict scores for all j
-            for (int j = 1; j < N_SIZE - 1; ++j) {
-                if (i != j) {
-                    double base_score =
-                        distances[i][j] - (nodes[i].cost + nodes[j].cost) / 2 -
-                        arc_duals.getDual(i, j) + cut_adjustments[i][j];
-
-                    // Get predicted score using historical data
-                    // double predicted_score = predictScore(i, j, base_score);
-
-                    node_scores.emplace_back(i, j, base_score);
-
-                    // // Store current score in history
-                    // auto key = std::make_pair(i, j);
-                    // auto &history = score_history[key];
-                    // history.historical_scores.push_back(base_score);
-
-                    // // Maintain history size
-                    // if (history.historical_scores.size() >
-                    //     ScoreHistory::MAX_HISTORY) {
-                    //     history.historical_scores.pop_front();
-                    // }
-
-                    // // Update prediction weights
-                    // updatePredictionWeight(i, j, predicted_score,
-                    // base_score);
-                }
-            }
-
-            // Sort and select top candidates (same as original)
-            if (node_scores.size() > MAX_CANDIDATES_PER_NODE) {
-                std::partial_sort(node_scores.begin(),
-                                  node_scores.begin() + MAX_CANDIDATES_PER_NODE,
-                                  node_scores.end(),
-                                  [](const auto &a, const auto &b) {
-                                      return a.cost_score < b.cost_score;
-                                  });
-            } else {
-                std::sort(node_scores.begin(), node_scores.end(),
-                          [](const auto &a, const auto &b) {
-                              return a.cost_score < b.cost_score;
-                          });
-            }
-
-            // Insert top candidates
-            auto &i_scores = scores[i];
-            for (int j = 0; j < std::min(MAX_CANDIDATES_PER_NODE,
-                                         static_cast<int>(node_scores.size()));
-                 ++j) {
-                i_scores.push_back(node_scores[j].other_node);
-            }
-        }
+        auto scores = ml_scorer.computeNodeScores(A, x, distances, nodes,
+                                                  arc_duals, *cutStorage);
 
         return scores;
     }
@@ -629,7 +481,7 @@ class HighRankCuts {
 
         auto work = stdexec::starts_on(sched, bulk_sender);
         stdexec::sync_wait(std::move(work));
-        // provideFeedbackFromCandidates(improved_candidates);
+        ml_scorer.provideFeedbackFromCandidates(improved_candidates);
 
         // print improved_candidates size
         // print_cut("Improved candidates: {}\n",
@@ -650,9 +502,12 @@ class HighRankCuts {
 
         // Now process the unique candidates (limited to max_cuts)
         const int max_cuts = 10;
+        int cuts_orig_size = cutStorage->size();
         int cuts_added = 0;
+        int max_trials = 50;
         for (const auto &candidate : unique_candidates) {
             if (cuts_added >= max_cuts) break;
+            if (max_trials <= 0) break;
 
             std::vector<int> order(N_SIZE);
             int ordering = 0;
@@ -660,7 +515,8 @@ class HighRankCuts {
                 order[node] = ordering++;
             }
             addCutToCutStorage(candidate, order);
-            cuts_added++;
+            cuts_added = cutStorage->size() - cuts_orig_size;
+            max_trials--;
         }
         auto final_cut_size = cutStorage->size();
         print_cut(
@@ -669,63 +525,6 @@ class HighRankCuts {
             candidates.size(), improved_candidates.size(),
             final_cut_size - initial_cut_size);
     }
-
-    // void provideFeedbackFromCandidates(const auto &candidates) {
-    //     std::vector<std::pair<int, int>> node_pairs;
-    //     std::vector<std::vector<float>> features;
-
-    //     // Calculate max violation for normalization
-    //     double max_violation = 0.0;
-    //     for (const auto &candidate : candidates) {
-    //         max_violation = std::max(max_violation, candidate.violation);
-    //     }
-
-    //     if (max_violation <= 0.0) return;  // Skip if no good violations
-
-    //     for (const auto &candidate : candidates) {
-    //         float normalized_violation =
-    //             static_cast<float>(candidate.violation / max_violation);
-
-    //         // Extract all node pairs from the candidate
-    //         for (size_t i = 0; i < candidate.nodes.size(); ++i) {
-    //             for (size_t j = i + 1; j < candidate.nodes.size(); ++j) {
-    //                 int node1 = candidate.nodes[i];
-    //                 int node2 = candidate.nodes[j];
-
-    //                 // Get cut adjustment
-    //                 double cut_adjustment = 0.0;
-    //                 const auto &active_cuts =
-    //                 cutStorage->getActiveCuts(); for (const auto &cut :
-    //                 active_cuts) {
-    //                     if (cut.type == CutType::ThreeRow &&
-    //                         cut.isSRCset(node1, node2)) {
-    //                         cut_adjustment -= cut.dual_value;
-    //                     }
-    //                 }
-
-    //                 // Collect features for this pair
-    //                 std::vector<float> pair_features = {
-    //                     static_cast<float>(distances[node1][node2]),
-    //                     static_cast<float>(nodes[node1].cost),
-    //                     static_cast<float>(nodes[node2].cost),
-    //                     static_cast<float>(arc_duals.getDual(node1,
-    //                     node2)), static_cast<float>(cut_adjustment)};
-
-    //                 node_pairs.emplace_back(node1, node2);
-    //                 features.push_back(std::move(pair_features));
-    //             }
-    //         }
-
-    //         // Provide feedback in batches per candidate
-    //         if (!node_pairs.empty()) {
-    //             ml_scorer->provideFeedback(node_pairs, features,
-    //                                        normalized_violation);
-    //             node_pairs.clear();
-    //             features.clear();
-    //         }
-    //     }
-    // }
-
     static constexpr std::array<uint64_t, 64> bit_mask_lookup = []() {
         std::array<uint64_t, 64> masks{};
         for (size_t i = 0; i < 64; ++i) {
