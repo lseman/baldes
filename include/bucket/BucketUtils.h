@@ -85,23 +85,69 @@ void BucketGraph::add_arc(int from_bucket, int to_bucket,
 template <Direction D>
 inline int BucketGraph::get_bucket_number(
     int node, std::vector<double> &resource_values_vec) noexcept {
-    for (int r = 0; r < options.main_resources.size(); ++r) {
+    const size_t num_resources = options.main_resources.size();
+
+    const auto &buckets = assign_buckets<D>(fw_buckets, bw_buckets);
+
+    // Optionally adjust resource values (uncomment if you need epsilon
+    // adjustments)
+    for (size_t r = 0; r < num_resources; ++r) {
         if constexpr (D == Direction::Forward) {
-            resource_values_vec[r] =
-                (resource_values_vec[r]);  // + numericutils::eps;
-        } else {
-            resource_values_vec[r] =
-                (resource_values_vec[r]);  // - numericutils::eps;
+            // resource_values_vec[r] += numericutils::eps;
+        } else {  // Direction::Backward
+            // resource_values_vec[r] -= numericutils::eps;
         }
     }
-    auto val = -1;
-    if constexpr (D == Direction::Forward) {
-        val = fw_node_interval_trees[node].query(resource_values_vec);
-    } else if constexpr (D == Direction::Backward) {
-        val = bw_node_interval_trees[node].query(resource_values_vec);
+    auto &num_buckets_index =
+        assign_buckets<D>(num_buckets_index_fw, num_buckets_index_bw);
+    // Start with the offset for this node’s buckets.
+    int bucket_number = num_buckets_index[node];
+    int multiplier = 1;
+
+    for (size_t r = 0; r < num_resources; ++r) {
+        // Node-specific resource bounds.
+        double node_lb = nodes[node].lb[r];
+        double node_ub = nodes[node].ub[r];
+
+        // Global bounds (if needed for computing splits).
+        double global_lb = R_min[r];
+        double global_ub = R_max[r];
+        double full_range = global_ub - global_lb;
+        double node_range = node_ub - node_lb;
+
+        // Determine the number of splits (i.e. intervals) for resource r.
+        int splits =
+            std::max(1, static_cast<int>(std::round((node_range / full_range) *
+                                                    intervals[r].interval)));
+        double interval_width = node_range / splits;
+
+        int pos = 0;
+        if constexpr (D == Direction::Forward) {
+            // Compute the bucket "digit" from the lower bound.
+            pos = std::min(
+                splits - 1,
+                static_cast<int>(std::floor((resource_values_vec[r] - node_lb) /
+                                            interval_width)));
+        } else {  // Direction::Backward
+            // For backward, we consider the distance from the upper bound.
+            pos = std::min(
+                splits - 1,
+                static_cast<int>(std::floor((node_ub - resource_values_vec[r]) /
+                                            interval_width)));
+        }
+
+        bucket_number += pos * multiplier;
+        multiplier *= splits;
     }
 
-    return val;
+    // check if buckets[bucket_number] contains the resource_vec
+    if (!buckets[bucket_number].contains(resource_values_vec)) {
+        std::throw_with_nested(
+            std::runtime_error("Resource values not contained in bucket"));
+        return -1;
+    }
+
+    return bucket_number;
 }
 
 /**
@@ -112,14 +158,19 @@ inline int BucketGraph::get_bucket_number(
  * and defines the bounds of each bucket.
  *
  */
+
 template <Direction D>
+// A constant representing the number of splits for a node that spans the full
+// range. For example, if a node covers the entire full range, it will get
+// FULL_RANGE_SPLITS buckets.
 void BucketGraph::define_buckets() {
+    // Save current buckets and fixed status.
     std::vector<Bucket> old_buckets;
     std::vector<bool> was_fixed;
     auto &buckets = assign_buckets<D>(fw_buckets, bw_buckets);
-    auto old_size = buckets.size();
+    size_t old_size = buckets.size();
 
-    // Store the range of fixed buckets for each node pair
+    // Map to store fixed range (min_lb and max_ub) for each node pair.
     std::unordered_map<
         int, std::unordered_map<
                  int, std::pair<std::vector<double>, std::vector<double>>>>
@@ -131,31 +182,29 @@ void BucketGraph::define_buckets() {
         auto &old_bitmap =
             assign_buckets<D>(fw_fixed_buckets_bitmap, bw_fixed_buckets_bitmap);
 
-        // First pass: mark which bucket pairs were fixed
+        // Mark which bucket pairs were fixed.
         for (size_t i = 0; i < old_size; ++i) {
             for (size_t j = 0; j < old_size; ++j) {
-                size_t old_bit_pos = i * old_size + j;
-                if (old_bit_pos / 64 < old_bitmap.size()) {
-                    was_fixed[old_bit_pos] =
-                        (old_bitmap[old_bit_pos / 64] &
-                         (1ULL << (old_bit_pos % 64))) != 0;
+                size_t pos = i * old_size + j;
+                if (pos / 64 < old_bitmap.size()) {
+                    was_fixed[pos] =
+                        ((old_bitmap[pos / 64] & (1ULL << (pos % 64))) != 0);
                 }
             }
         }
 
         const int num_intervals = options.main_resources.size();
-        // For each fixed bucket pair, track the range by node pair
+        // For each fixed bucket pair, update the range for the corresponding
+        // node pair.
         for (size_t i = 0; i < old_size; ++i) {
             for (size_t j = 0; j < old_size; ++j) {
                 if (!was_fixed[i * old_size + j]) continue;
-
                 const auto &bucket_from = old_buckets[i];
                 const auto &bucket_to = old_buckets[j];
-
                 int from_node = bucket_from.node_id;
                 int to_node = bucket_to.node_id;
 
-                // Initialize ranges for this node pair if not already done
+                // Initialize fixed range for this node pair if not already set.
                 if (node_pair_fixed_ranges[from_node].find(to_node) ==
                     node_pair_fixed_ranges[from_node].end()) {
                     node_pair_fixed_ranges[from_node][to_node] = {
@@ -165,8 +214,6 @@ void BucketGraph::define_buckets() {
                             num_intervals,
                             std::numeric_limits<double>::lowest())};
                 }
-
-                // Update the ranges for this node pair
                 auto &[min_lbs, max_ubs] =
                     node_pair_fixed_ranges[from_node][to_node];
                 for (int r = 0; r < num_intervals; ++r) {
@@ -175,22 +222,9 @@ void BucketGraph::define_buckets() {
                 }
             }
         }
+    }  // end if (old_size > 0)
 
-        // Debug output
-        // for (const auto &[from_node, to_nodes] : node_pair_fixed_ranges) {
-        //     for (const auto &[to_node, range] : to_nodes) {
-        //         fmt::print("Arc ({}, {}) has fixed range: ", from_node,
-        //                    to_node);
-        //         for (int r = 0; r < num_intervals; ++r) {
-        //             fmt::print("({}, {}), ", range.first[r],
-        //             range.second[r]);
-        //         }
-        //         fmt::print("\n");
-        //     }
-        // }
-    }
-
-    // Clear existing buckets and bitmap
+    // Clear existing buckets and the fixed bitmap.
     buckets.clear();
     auto &fixed_buckets_bitmap =
         assign_buckets<D>(fw_fixed_buckets_bitmap, bw_fixed_buckets_bitmap);
@@ -200,7 +234,7 @@ void BucketGraph::define_buckets() {
     std::vector<double> total_ranges(num_intervals);
     std::vector<double> base_intervals(num_intervals);
 
-    // Get references to direction-specific containers
+    // Get references to direction-specific containers.
     auto &num_buckets = assign_buckets<D>(num_buckets_fw, num_buckets_bw);
     auto &num_buckets_index =
         assign_buckets<D>(num_buckets_index_fw, num_buckets_index_bw);
@@ -209,94 +243,103 @@ void BucketGraph::define_buckets() {
     auto &buckets_size = assign_buckets<D>(fw_buckets_size, bw_buckets_size);
     auto &bucket_splits = assign_buckets<D>(fw_bucket_splits, bw_bucket_splits);
 
-    // Pre-allocate containers
+    // Pre-allocate node-specific containers.
     const size_t num_nodes = nodes.size();
     num_buckets.resize(num_nodes);
     num_buckets_index.resize(num_nodes);
     node_interval_trees.assign(num_nodes, SplayTree());
 
-    // Lambda for interval calculations
-    auto calculate_interval = [](double lb, double ub, double base_interval,
-                                 int pos, int max_interval,
-                                 bool is_forward) -> std::pair<double, double> {
+    // Lambda to calculate an interval for a given dimension.
+    // We compute raw boundaries then apply rounding only after ensuring
+    // that the first/last intervals use the original bounds.
+    auto calculate_interval =
+        [&](double lb, double ub, double base_interval, int pos,
+            int max_interval, bool is_forward) -> std::pair<double, double> {
         double start, end;
         if (is_forward) {
-            start = lb + pos * base_interval;
+            // For the first interval, start exactly at lb.
+            start = (pos == 0) ? lb : lb + pos * base_interval;
+            // For the last interval, end exactly at ub.
             end =
                 (pos == max_interval - 1) ? ub : lb + (pos + 1) * base_interval;
         } else {
+            // For Backward: first interval gets ub exactly, last gets lb
+            // exactly.
             start =
                 (pos == max_interval - 1) ? lb : ub - (pos + 1) * base_interval;
-            end = ub - pos * base_interval;
+            end = (pos == 0) ? ub : ub - pos * base_interval;
         }
-        return {roundToTwoDecimalPlaces(start), roundToTwoDecimalPlaces(end)};
+        return {start, end};
     };
 
     int cum_sum = 0;
     int bucket_index = 0;
-
-    // Temporary vectors for interval calculations
     std::vector<double> interval_start(num_intervals);
     std::vector<double> interval_end(num_intervals);
+    // "pos" will hold the current combination index for each dimension.
     std::vector<int> pos(num_intervals, 0);
 
-    // Process each node
+    // Process each node to define buckets.
     for (const auto &VRPNode : nodes) {
+        // For each resource, compute a node-specific split count.
+        std::vector<int> node_split_counts(num_intervals);
         std::vector<double> node_base_interval(num_intervals);
-
-        // check if fw_bucket_splits with node_id exists
-        if (bucket_splits.find(VRPNode.id) == bucket_splits.end()) {
-            for (int r = 0; r < num_intervals; ++r) {
-                node_base_interval[r] =
-                    (VRPNode.ub[r] - VRPNode.lb[r]) / intervals[r].interval;
+        for (int r = 0; r < num_intervals; ++r) {
+            double full_range = R_max[r] - R_min[r];
+            double node_range = VRPNode.ub[r] - VRPNode.lb[r];
+            int splits = 1;
+            // Guard against a near-zero full_range to avoid division issues.
+            if (std::fabs(full_range) >
+                std::numeric_limits<double>::epsilon()) {
+                // Multiply first for improved stability.
+                double splits_d =
+                    (node_range * intervals[r].interval) / full_range;
+                splits = std::max(1, static_cast<int>(std::round(splits_d)));
             }
-            bucket_splits[VRPNode.id] = intervals[0].interval;
-        } else {
-            for (int r = 0; r < num_intervals; ++r) {
-                node_base_interval[r] =
-                    (VRPNode.ub[r] - VRPNode.lb[r]) / bucket_splits[VRPNode.id];
-            }
+            node_split_counts[r] = splits;
+            // Compute the base interval (width) for this resource dimension.
+            node_base_interval[r] =
+                (VRPNode.ub[r] - VRPNode.lb[r]) / static_cast<double>(splits);
         }
+        // Optionally, store the per-resource splits for this node.
+        bucket_splits[VRPNode.id] =
+            node_split_counts[0];  // or store the full vector if needed
 
-        SplayTree node_tree;
+        // SplayTree node_tree;
         int n_buckets = 0;
 
         if (num_intervals == 1) {
-            // Single interval case
-            for (int j = 0; j < bucket_splits[VRPNode.id]; ++j) {
+            // Single dimension: iterate over the split count for resource 0.
+            for (int j = 0; j < node_split_counts[0]; ++j) {
                 auto [start, end] = calculate_interval(
                     VRPNode.lb[0], VRPNode.ub[0], node_base_interval[0], j,
-                    bucket_splits[VRPNode.id], D == Direction::Forward);
-
-                interval_start[0] = start;
-                interval_end[0] = end;
-
+                    node_split_counts[0], D == Direction::Forward);
+                // Ensure we do not exceed the actual resource range.
                 if constexpr (D == Direction::Backward) {
-                    interval_start[0] =
-                        std::max(interval_start[0], VRPNode.lb[0]);
+                    start = std::max(start, VRPNode.lb[0]);
                 } else {
-                    interval_end[0] = std::min(interval_end[0], VRPNode.ub[0]);
+                    end = std::min(end, VRPNode.ub[0]);
                 }
-
-                buckets.push_back(
-                    Bucket(VRPNode.id, interval_start, interval_end));
-                node_tree.insert(interval_start, interval_end, bucket_index++);
+                buckets.push_back(Bucket(VRPNode.id, std::vector<double>{start},
+                                         std::vector<double>{end}));
+                // node_tree.insert(std::vector<double>{start},
+                //                  std::vector<double>{end}, bucket_index++);
                 n_buckets++;
                 cum_sum++;
             }
         } else {
+            // Multi-dimensional: generate combinations over each resource.
             fmt::print("Multiple intervals\n");
-            // Multiple intervals case
+            // Reset the combination index vector.
             std::fill(pos.begin(), pos.end(), 0);
-            do {
+            while (true) {
                 for (int r = 0; r < num_intervals; ++r) {
                     auto [start, end] = calculate_interval(
                         VRPNode.lb[r], VRPNode.ub[r], node_base_interval[r],
-                        pos[r], intervals[r].interval, D == Direction::Forward);
-
+                        pos[r], node_split_counts[r], D == Direction::Forward);
                     interval_start[r] = start;
                     interval_end[r] = end;
-
+                    // Clamp to global resource bounds.
                     if constexpr (D == Direction::Backward) {
                         interval_start[r] =
                             std::max(interval_start[r], R_min[r]);
@@ -304,68 +347,64 @@ void BucketGraph::define_buckets() {
                         interval_end[r] = std::min(interval_end[r], R_max[r]);
                     }
                 }
-
                 buckets.push_back(
                     Bucket(VRPNode.id, interval_start, interval_end));
-                node_tree.insert(interval_start, interval_end, bucket_index++);
+                // node_tree.insert(interval_start, interval_end,
+                // bucket_index++);
                 n_buckets++;
                 cum_sum++;
 
-                // Generate next combination
+                // Generate next combination:
                 int i = 0;
-                while (i < num_intervals && ++pos[i] >= intervals[i].interval) {
-                    pos[i] = 0;
-                    i++;
+                while (i < num_intervals) {
+                    ++pos[i];
+                    if (pos[i] < node_split_counts[i]) {
+                        break;
+                    } else {
+                        pos[i] = 0;
+                        ++i;
+                    }
                 }
                 if (i == num_intervals) break;
-            } while (true);
+            }
         }
 
-        // Update node-specific data
+        // Update node-specific information.
         num_buckets[VRPNode.id] = n_buckets;
         num_buckets_index[VRPNode.id] = cum_sum - n_buckets;
-        node_interval_trees[VRPNode.id] = node_tree;
+        // node_interval_trees[VRPNode.id] = node_tree;
     }
 
+    // Process fixed bucket ranges, if available.
     if (!node_pair_fixed_ranges.empty()) {
         size_t new_size = buckets.size();
         size_t required_bitmap_words =
             std::max(size_t(1), ((new_size * new_size) + 63) / 64);
-
         fixed_buckets_bitmap.clear();
         fixed_buckets_bitmap.resize(required_bitmap_words, 0);
-
         for (size_t from = 0; from < new_size; ++from) {
             const auto &bucket_from = buckets[from];
             int from_node = bucket_from.node_id;
-
-            // Skip if no outgoing fixed arcs from this node
             if (node_pair_fixed_ranges.find(from_node) ==
                 node_pair_fixed_ranges.end())
                 continue;
-
             for (size_t to = 0; to < new_size; ++to) {
                 const auto &bucket_to = buckets[to];
                 int to_node = bucket_to.node_id;
-
-                // Skip if this arc wasn't fixed before
                 if (node_pair_fixed_ranges[from_node].find(to_node) ==
                     node_pair_fixed_ranges[from_node].end())
                     continue;
-
                 const auto &range = node_pair_fixed_ranges[from_node][to_node];
-
-                // Check if both buckets are within their fixed ranges
-                bool is_in_range = true;
+                bool in_range = true;
                 for (int r = 0; r < options.main_resources.size(); ++r) {
+                    // Using <= and >= to ensure we cover the full fixed range.
                     if (bucket_from.lb[r] < range.first[r] ||
                         bucket_from.ub[r] > range.second[r]) {
-                        is_in_range = false;
+                        in_range = false;
                         break;
                     }
                 }
-
-                if (is_in_range) {
+                if (in_range) {
                     size_t bit_pos = from * new_size + to;
                     size_t word_idx = bit_pos / 64;
                     if (word_idx < fixed_buckets_bitmap.size()) {
@@ -388,145 +427,186 @@ void BucketGraph::define_buckets() {
  */
 template <Direction D>
 void BucketGraph::generate_arcs() {
-    auto buckets_mutex = std::mutex();
+    // Mutex for protecting global bucket updates.
+    std::mutex buckets_mutex;
 
+    // Clear the appropriate graph.
     if constexpr (D == Direction::Forward) {
         fw_bucket_graph.clear();
     } else {
         bw_bucket_graph.clear();
     }
 
+    // Resolve references based on the direction.
     auto &buckets = assign_buckets<D>(fw_buckets, bw_buckets);
     auto &num_buckets = assign_buckets<D>(num_buckets_fw, num_buckets_bw);
-    auto &num_buckets_index =
+    auto &num_buckets_idx =
         assign_buckets<D>(num_buckets_index_fw, num_buckets_index_bw);
-    auto &bucket_splits = assign_buckets<D>(fw_bucket_splits, bw_bucket_splits);
-    // Pre-compute intervals for all nodes
-    std::vector<std::vector<double>> node_intervals(nodes.size());
+    // Note: we no longer rely solely on bucket_splits here.
+
+    // Pre-compute intervals (base widths) for each node and each resource,
+    // using the same logic as in define_buckets.
+    const int num_resources = options.resources.size();
+    std::vector<std::vector<double>> node_base_intervals(nodes.size());
+    // Also store the computed splits per resource for each node.
+    std::vector<std::vector<int>> node_split_counts(nodes.size());
+
     for (size_t node_id = 0; node_id < nodes.size(); ++node_id) {
         const auto &node = nodes[node_id];
-        node_intervals[node_id].resize(options.resources.size());
-        for (int r = 0; r < options.resources.size(); ++r) {
-            node_intervals[node_id][r] =
-                (node.ub[r] - node.lb[r]) / bucket_splits[node_id];
+        node_base_intervals[node_id].resize(num_resources);
+        node_split_counts[node_id].resize(num_resources);
+        for (int r = 0; r < num_resources; ++r) {
+            double full_range = R_max[r] - R_min[r];
+            double node_range = node.ub[r] - node.lb[r];
+            int splits = 1;
+            if (std::fabs(full_range) >
+                std::numeric_limits<double>::epsilon()) {
+                double splits_d =
+                    (node_range * intervals[r].interval) / full_range;
+                splits = std::max(1, static_cast<int>(std::round(splits_d)));
+            }
+            node_split_counts[node_id][r] = splits;
+            node_base_intervals[node_id][r] =
+                (node.ub[r] - node.lb[r]) / static_cast<double>(splits);
         }
     }
 
-    // Clear buckets
+    // Clear all buckets and their arcs.
     for (auto &bucket : buckets) {
         bucket.clear();
         bucket.clear_arcs(D == Direction::Forward);
     }
 
-    auto add_arcs_for_node = [&](const VRPNode &node, int from_bucket,
-                                 std::vector<double> &res_inc,
-                                 std::vector<std::pair<int, int>> &local_arcs) {
-        const auto arcs = node.get_arcs<D>();
-        const auto &node_interval = node_intervals[node.id];
-
-        for (const auto &arc : arcs) {
-            // print node_id
-            const auto &next_node = nodes[arc.to];
-            if (node.id == next_node.id) continue;
-
-            const auto &next_node_interval = node_intervals[arc.to];
-            const auto travel_cost = getcij(node.id, next_node.id);
-            const double cost_inc = travel_cost - next_node.cost;
-
-            // Pre-calculate resource increments
-            for (int r = 0; r < options.resources.size(); r++) {
-                res_inc[r] = node.consumption[r];
-                if (options.resources[r] == "time") {
-                    res_inc[r] += travel_cost;
+    // Helper lambda: validate an arc and, if valid, add it.
+    auto try_add_arc =
+        [&](const VRPNode &curr_node, int from_bucket, const VRPNode &next_node,
+            int to_bucket, const std::vector<double> &curr_node_base,
+            const std::vector<double> &next_node_base,
+            const std::vector<double> &res_inc, double cost_inc) -> bool {
+        bool valid = true;
+        if constexpr (D == Direction::Forward) {
+            for (int r = 0; r < res_inc.size() && valid; ++r) {
+                // For forward, check that adding the resource increment from
+                // the from-bucket does not push us past the next node's upper
+                // bound.
+                if (buckets[from_bucket].lb[r] + res_inc[r] > next_node.ub[r]) {
+                    valid = false;
+                } else {
+                    double max_calc =
+                        std::max(buckets[from_bucket].lb[r] + res_inc[r],
+                                 next_node.lb[r]);
+                    if (max_calc < buckets[to_bucket].lb[r] ||
+                        max_calc >=
+                            buckets[to_bucket].lb[r] + next_node_base[r]) {
+                        valid = false;
+                    }
                 }
             }
-
-            for (int j = 0; j < num_buckets[next_node.id]; ++j) {
-                const int to_bucket = j + num_buckets_index[next_node.id];
-                if (from_bucket == to_bucket ||
-                    is_bucket_fixed<D>(from_bucket, to_bucket)) {
-                    continue;
-                }
-
-                bool valid_arc = true;
-
-                // Resource bounds check
-                if constexpr (D == Direction::Forward) {
-                    for (int r = 0; r < res_inc.size() && valid_arc; ++r) {
-                        if (buckets[from_bucket].lb[r] + res_inc[r] >
-                            next_node.ub[r]) {
-                            valid_arc = false;
-                        } else {
-                            double max_calc = std::max(
-                                buckets[from_bucket].lb[r] + res_inc[r],
-                                next_node.lb[r]);
-                            if (max_calc < buckets[to_bucket].lb[r] ||
-                                max_calc >= buckets[to_bucket].lb[r] +
-                                                next_node_interval[r] +
-                                                numericutils::eps) {
-                                valid_arc = false;
-                            }
-                        }
-                    }
+        } else {
+            for (int r = 0; r < res_inc.size() && valid; ++r) {
+                // For backward, check that subtracting the resource increment
+                // does not drop below next node's lb.
+                if (buckets[from_bucket].ub[r] - res_inc[r] < next_node.lb[r]) {
+                    valid = false;
                 } else {
-                    for (int r = 0; r < res_inc.size() && valid_arc; ++r) {
-                        if (buckets[from_bucket].ub[r] - res_inc[r] <
-                            next_node.lb[r]) {
-                            valid_arc = false;
-                        } else {
-                            double min_calc = std::min(
-                                buckets[from_bucket].ub[r] - res_inc[r],
-                                next_node.ub[r]);
-                            if (min_calc > buckets[to_bucket].ub[r] ||
-                                min_calc <= buckets[to_bucket].ub[r] -
-                                                next_node_interval[r] -
-                                                numericutils::eps) {
-                                valid_arc = false;
-                            }
-                        }
+                    double min_calc =
+                        std::min(buckets[from_bucket].ub[r] - res_inc[r],
+                                 next_node.ub[r]);
+                    if (min_calc > buckets[to_bucket].ub[r] ||
+                        min_calc <=
+                            buckets[to_bucket].ub[r] - next_node_base[r]) {
+                        valid = false;
                     }
-                }
-
-                if (valid_arc) {
-                    local_arcs.emplace_back(from_bucket, to_bucket);
-                    std::lock_guard<std::mutex> lock(buckets_mutex);
-                    add_arc<D>(from_bucket, to_bucket, res_inc, cost_inc);
-                    buckets[from_bucket].template add_bucket_arc<D>(
-                        from_bucket, to_bucket, res_inc, cost_inc, false);
                 }
             }
         }
+        if (valid) {
+            // Add the arc to the global structure.
+            {
+                std::lock_guard<std::mutex> lock(buckets_mutex);
+                add_arc<D>(from_bucket, to_bucket, res_inc, cost_inc);
+                buckets[from_bucket].template add_bucket_arc<D>(
+                    from_bucket, to_bucket, res_inc, cost_inc, false);
+            }
+        }
+        return valid;
     };
 
-    const unsigned int thread_count = std::thread::hardware_concurrency() / 2;
-    exec::static_thread_pool pool(thread_count);
-    auto sched = pool.get_scheduler();
+    // Lambda to process a single node.
+    auto process_node = [&](int node_id) {
+        const auto &node = nodes[node_id];
+        std::vector<double> res_inc(num_resources);
+        // Local container for arcs (if further processing is needed).
+        std::vector<std::pair<int, int>> local_arcs;
+        local_arcs.reserve(100);  // heuristic reserve
 
+        const auto arcs = node.get_arcs<D>();
+        // Use the pre-computed base intervals for the current node.
+        const auto &curr_node_base = node_base_intervals[node.id];
+
+        // For every bucket in the current node.
+        for (int i = 0; i < num_buckets[node.id]; ++i) {
+            int from_bucket = i + num_buckets_idx[node.id];
+            // Process each outgoing arc.
+            for (const auto &arc : arcs) {
+                // Avoid self-loop.
+                if (node.id == nodes[arc.to].id) continue;
+
+                const auto &next_node = nodes[arc.to];
+                const auto &next_node_base = node_base_intervals[arc.to];
+                const double travel_cost = getcij(node.id, next_node.id);
+                const double cost_inc = travel_cost - next_node.cost;
+
+                // Pre-calculate resource increments.
+                for (int r = 0; r < num_resources; r++) {
+                    res_inc[r] = node.consumption[r];
+                    if (options.resources[r] == "time") {
+                        res_inc[r] += travel_cost;
+                    }
+                }
+
+                // Iterate over buckets in the next node.
+                for (int j = 0; j < num_buckets[next_node.id]; ++j) {
+                    int to_bucket = j + num_buckets_idx[next_node.id];
+                    if (from_bucket == to_bucket ||
+                        is_bucket_fixed<D>(from_bucket, to_bucket)) {
+                        continue;
+                    }
+                    // Validate and add arc if valid.
+                    if (try_add_arc(node, from_bucket, next_node, to_bucket,
+                                    curr_node_base, next_node_base, res_inc,
+                                    cost_inc)) {
+                        local_arcs.emplace_back(from_bucket, to_bucket);
+                    }
+                }
+            }
+        }
+        // If needed, local_arcs can be used for debugging or further
+        // processing.
+    };
+
+    // Create a list of tasks (each task is a node index).
     std::vector<int> tasks(nodes.size());
     std::iota(tasks.begin(), tasks.end(), 0);
 
-    const int chunk_size = 10;
+    // Choose a chunk size based on a heuristic.
+    constexpr int chunk_size = 10;
+
+    // Set up the thread pool.
+    const unsigned int thread_count =
+        std::max(1u, std::thread::hardware_concurrency() / 2);
+    exec::static_thread_pool pool(thread_count);
+    auto sched = pool.get_scheduler();
+
+    // Launch tasks in parallel over chunks.
     auto bulk_sender = stdexec::bulk(
         stdexec::just(), (tasks.size() + chunk_size - 1) / chunk_size,
-        [this, &tasks, &num_buckets, &num_buckets_index, &add_arcs_for_node,
-         chunk_size](std::size_t chunk_idx) {
+        [&, chunk_size](std::size_t chunk_idx) {
             const size_t start_idx = chunk_idx * chunk_size;
             const size_t end_idx =
                 std::min(start_idx + chunk_size, tasks.size());
-
-            std::vector<double> res_inc(options.resources.size());
-            std::vector<std::pair<int, int>> local_arcs;
-            local_arcs.reserve(chunk_size *
-                               100);  // Estimate average arcs per chunk
-
-            for (size_t task_idx = start_idx; task_idx < end_idx; ++task_idx) {
-                const int node_id = tasks[task_idx];
-                const auto &node = nodes[node_id];
-
-                for (int i = 0; i < num_buckets[node.id]; ++i) {
-                    const int from_bucket = i + num_buckets_index[node.id];
-                    add_arcs_for_node(node, from_bucket, res_inc, local_arcs);
-                }
+            for (size_t idx = start_idx; idx < end_idx; ++idx) {
+                process_node(tasks[idx]);
             }
         });
 
@@ -550,23 +630,18 @@ Label *BucketGraph::get_best_label(const std::vector<int> &topological_order,
                                    const std::vector<double> &c_bar,
                                    const std::vector<std::vector<int>> &sccs) {
     double best_cost = std::numeric_limits<double>::infinity();
-    Label *best_label = nullptr;  // Ensure this is initialized
+    Label *best_label = nullptr;
     auto &buckets = assign_buckets<D>(fw_buckets, bw_buckets);
 
-    for (const int component_index : topological_order) {
-        const auto &component_buckets = sccs[component_index];
-
-        for (const int bucket : component_buckets) {
-            const auto &label = buckets[bucket].get_best_label();
-            if (!label) continue;
-            // print label->cost
-            if (label->cost < best_cost) {
-                best_cost = label->cost;
-                best_label = label;
-            }
+    // Iterate over all buckets, and select the label with the lowest cost.
+    for (auto &bucket : buckets) {
+        Label *label = bucket.get_best_label();
+        if (!label) continue;
+        if (label->cost < best_cost) {
+            best_cost = label->cost;
+            best_label = label;
         }
     }
-
     return best_label;
 }
 
@@ -575,50 +650,86 @@ Label *BucketGraph::get_best_label(const std::vector<int> &topological_order,
  *
  */
 template <Stage S, Symmetry SYM>
-void BucketGraph::ConcatenateLabel(const Label *L, int &b, double &best_cost,
-                                   std::vector<uint64_t> &Bvisited) {
+void BucketGraph::ConcatenateLabel(const Label *L, int &b,
+                                   std::atomic<double> &best_cost) {
+    // Determine the number of segments needed for the bucket visited bitmap.
+    const size_t n_segments = (fw_buckets_size + 63) / 64;
+    std::vector<uint64_t> Bvisited(n_segments, 0);
+
+    // Use thread_local storage for the bucket stack to avoid reallocations.
     static thread_local std::vector<int> bucket_stack;
-    bucket_stack.reserve(R_SIZE);  // Do this once at initialization
+    bucket_stack.reserve(R_SIZE);  // Reserve once at initialization
     bucket_stack.clear();          // Clear for reuse
     bucket_stack.push_back(b);
 
+    // Choose symmetric buckets and cost-bar arrays based on symmetry.
     auto &other_buckets = assign_symmetry<SYM>(fw_buckets, bw_buckets);
     auto &other_c_bar = assign_symmetry<SYM>(fw_c_bar, bw_c_bar);
 
-    // Cache frequently accessed values
+    // Cache frequently accessed values.
     const int L_node_id = L->node_id;
     const auto &L_resources = L->resources;
     const auto &L_last_node = nodes[L_node_id];
     const double L_cost = L->cost;
     const size_t bitmap_size = L->visited_bitmap.size();
 
-    // Pre-compute constants for bit operations
+    // Pre-compute if branching is active.
     const bool has_branching = !branching_duals->empty();
 
-    // SRC mode setup
 #if defined(SRC)
+    // SRC mode setup: Only relevant in Stage::Four.
     decltype(cut_storage) cutter = nullptr;
     if constexpr (S > Stage::Three) {
         cutter = cut_storage;
     }
     const auto active_cuts = cutter->getActiveCuts();
-
 #endif
 
+    // Lambda to check if the visited bitmaps of L and L_bw overlap.
+    auto overlapsVisited = [bitmap_size](const Label *L,
+                                         const Label *L_bw) -> bool {
+        for (size_t i = 0; i < bitmap_size; ++i) {
+            if (L->visited_bitmap[i] & L_bw->visited_bitmap[i]) {
+                return true;
+            }
+        }
+        return false;
+    };
+
+    // Lambda to apply SRC adjustments to total_cost (only for Stage::Four).
+#if defined(SRC)
+    auto applySRCAdjustments = [&](double total_cost, const Label *L,
+                                   const Label *L_bw) -> double {
+        if constexpr (S == Stage::Four) {
+            for (const auto &active_cut : active_cuts) {
+                const auto &cut = *active_cut.cut_ptr;
+                const size_t idx = active_cut.index;
+                const double dual = active_cut.dual_value;
+                if (L->SRCmap[idx] + L_bw->SRCmap[idx] >= cut.p.den) {
+                    total_cost -= dual;
+                }
+            }
+        }
+        return total_cost;
+    };
+#endif
+
+    // Process buckets until the stack is empty.
     while (!bucket_stack.empty()) {
         const int current_bucket = bucket_stack.back();
         bucket_stack.pop_back();
 
-        // Optimize bit operations for visited tracking
+        // Mark current_bucket as visited in the bitmap.
         const size_t segment = current_bucket >> 6;
         const uint64_t bit_mask = bit_mask_lookup[current_bucket & 63];
         Bvisited[segment] |= bit_mask;
 
+        // Get the node id associated with this bucket.
         const int bucketLprimenode = other_buckets[current_bucket].node_id;
         double travel_cost = getcij(L_node_id, bucketLprimenode);
 
-        // Apply arc duals if needed
 #if defined(RCC) || defined(EXACT_RCC)
+        // Adjust travel cost with arc duals in Stage Four.
         if constexpr (S == Stage::Four) {
             travel_cost -= arc_duals.getDual(L_node_id, bucketLprimenode);
         }
@@ -632,65 +743,68 @@ void BucketGraph::ConcatenateLabel(const Label *L, int &b, double &best_cost,
         const double path_cost = L_cost + travel_cost;
         const double bound = other_c_bar[current_bucket];
 
-        // Early bound check
-        if ((S != Stage::Enumerate && path_cost + bound >= best_cost) ||
+        // Early bound check.
+        if ((S != Stage::Enumerate && path_cost + bound >= best_cost.load()) ||
             (S == Stage::Enumerate && path_cost + bound >= gap)) {
             continue;
         }
 
-        // Process labels in current bucket
+        // Retrieve labels in the current bucket.
         const auto &bucket = other_buckets[current_bucket];
-        const auto &labels = bucket.get_labels();
+        const auto labels = bucket.get_labels();
+        if (labels.empty()) continue;
 
+        // Process each label in the current bucket.
         for (const Label *L_bw : labels) {
-            if (L_bw->is_dominated || L_bw->node_id == L_node_id ||
-                !check_feasibility(L, L_bw)) {
+            // Skip null labels, dominated labels, same node, or infeasible
+            // merges.
+            if (L_bw == nullptr || L_bw->is_dominated ||
+                L_bw->node_id == L_node_id || !check_feasibility(L, L_bw)) {
                 continue;
             }
 
-            // Visited nodes overlap check
+            // If in Stage Three or later, check for visited node overlap.
             if constexpr (S >= Stage::Three) {
-                bool has_overlap = false;
-                for (size_t i = 0; i < bitmap_size; ++i) {
-                    if (L->visited_bitmap[i] & L_bw->visited_bitmap[i]) {
-                        has_overlap = true;
-                        break;
-                    }
-                }
-                if (has_overlap) continue;
+                if (overlapsVisited(L, L_bw)) continue;
             }
 
             double total_cost = path_cost + L_bw->cost;
 
-            // SRC cost adjustments
 #if defined(SRC)
-            if constexpr (S == Stage::Four) {
-                for (const auto &active_cut : active_cuts) {
-                    const auto &cut = *active_cut.cut_ptr;
-                    const size_t idx = active_cut.index;
-                    const double dual = active_cut.dual_value;
-
-                    if (L->SRCmap[idx] + L_bw->SRCmap[idx] >= cut.p.den) {
-                        total_cost -= dual;
-                    }
-                }
-            }
+            // Apply SRC adjustments if in Stage Four.
+            total_cost = applySRCAdjustments(total_cost, L, L_bw);
 #endif
+            double current_best = best_cost.load();
 
-            // Cost-based filtering
-            if ((S != Stage::Enumerate && total_cost >= best_cost) ||
+            // Filter based on total cost against best known cost or gap.
+            if ((S != Stage::Enumerate && total_cost >= current_best) ||
                 (S == Stage::Enumerate && total_cost >= gap)) {
                 continue;
             }
 
-            // Create new merged label
-            auto pbest = compute_label<S>(L, L_bw, total_cost);
-            best_cost = pbest->cost;
-            // fmt::print("Best cost: {}\n", best_cost);
-            merged_labels.push_back(pbest);
+            // Create and merge a new label. Protect the merge operation.
+            // Create and merge a new label. Protect the merge operation.
+            {
+                std::lock_guard<std::mutex> lock(merge_mutex);
+
+                // Update best_cost reliably using a compare_exchange loop.
+                double expected = best_cost.load();
+                while (total_cost < expected &&
+                       !best_cost.compare_exchange_weak(expected, total_cost)) {
+                    // 'expected' is updated with the current value of
+                    // best_cost.
+                }
+
+                // If our total_cost is still an improvement, then add the new
+                // label.
+                if (total_cost <= best_cost.load()) {
+                    auto pbest = compute_label<S>(L, L_bw, total_cost);
+                    merged_labels.push_back(pbest);
+                }
+            }
         }
 
-        // Process neighbor buckets
+        // Add neighbor buckets to the stack if they have not been visited.
         for (int b_prime : Phi_bw[current_bucket]) {
             const size_t seg_prime = b_prime >> 6;
             const uint64_t mask_prime = bit_mask_lookup[b_prime & 63];
@@ -702,82 +816,79 @@ void BucketGraph::ConcatenateLabel(const Label *L, int &b, double &best_cost,
 }
 
 /**
- * @brief Handles the computation of Strongly Connected Components (SCCs) for
- * the BucketGraph.
+ * @brief Handles the computation of Strongly Connected Components (SCCs)
+ * for the BucketGraph.
  *
  * This function processes the bucket graph to identify SCCs using Tarjan's
  * algorithm. It extends the bucket graph with arcs defined by the Phi sets,
- * computes the SCCs, and orders them topologically. It also sorts the buckets
- * within each SCC based on their lower or upper bounds, depending on the
- * direction. Finally, it splits the arcs for each SCC and removes duplicates.
+ * computes the SCCs, and orders them topologically. It also sorts the
+ * buckets within each SCC based on their lower or upper bounds, depending
+ * on the direction. Finally, it splits the arcs for each SCC and removes
+ * duplicates.
  *
  */
 template <Direction D>
 void BucketGraph::SCC_handler() {
+    // Get necessary references.
     auto &Phi = assign_buckets<D>(Phi_fw, Phi_bw);
     auto &buckets = assign_buckets<D>(fw_buckets, bw_buckets);
     auto &bucket_graph = assign_buckets<D>(fw_bucket_graph, bw_bucket_graph);
+
+    // Build an extended bucket graph from bucket_graph using Phi.
     ankerl::unordered_dense::map<int, std::vector<int>> extended_bucket_graph =
         bucket_graph;
-
-    // Extend the bucket graph with arcs defined by the Phi sets
-    for (auto i = 0; i < extended_bucket_graph.size(); ++i) {
-        auto phi_set = Phi[i];
+    for (size_t i = 0; i < extended_bucket_graph.size(); ++i) {
+        const auto &phi_set = Phi[i];
         if (phi_set.empty()) continue;
-        for (auto &phi_bucket : phi_set) {
+        for (auto phi_bucket : phi_set) {
             extended_bucket_graph[phi_bucket].push_back(i);
         }
     }
 
+    // Compute SCCs using Tarjan's algorithm.
     SCC scc_finder;
-    scc_finder.convertFromUnorderedMap(
-        extended_bucket_graph);  // print extended bucket graph
-
+    scc_finder.convertFromUnorderedMap(extended_bucket_graph);
     auto sccs = scc_finder.tarjanSCC();
     auto topological_order = scc_finder.topologicalOrderOfSCCs(sccs);
 
 #ifdef VERBOSE
-    // print SCCs and buckets in it
+    // Optional: Print SCCs.
     constexpr auto blue = "\033[34m";
     constexpr auto reset = "\033[0m";
-    if constexpr (D == Direction::Forward) {
-        fmt::print("FW SCCs: \n");
-    } else {
-        fmt::print("BW SCCs: \n");
-    }
+    fmt::print((D == Direction::Forward) ? "FW SCCs:\n" : "BW SCCs:\n");
     for (auto scc : topological_order) {
-        if constexpr (D == Direction::Forward) {
-            fmt::print("{}({}) -> {}", blue, scc, reset);
-        } else {
-            fmt::print("{}({}) -> {}", blue, scc, reset);
-        }
-        for (auto &bucket : sccs[scc]) {
+        fmt::print("{}({}) -> {}", blue, scc, reset);
+        for (auto bucket : sccs[scc]) {
             fmt::print("{} ", bucket);
         }
+        fmt::print("\n");
     }
     fmt::print("\n");
 #endif
 
+    // Order SCCs according to the topological order.
     std::vector<std::vector<int>> ordered_sccs;
-    ordered_sccs.reserve(sccs.size());  // Reserve space for all SCCs
-    for (int i : topological_order) {
-        ordered_sccs.push_back(sccs[i]);
+    ordered_sccs.reserve(sccs.size());
+    for (int scc : topological_order) {
+        ordered_sccs.push_back(sccs[scc]);
     }
 
-    auto sorted_sccs = sccs;
+    // Sort each SCC: For Forward, sort by bucket lower bound; for Backward,
+    // sort by bucket upper bound.
+    auto sorted_sccs = sccs;  // Make a copy
     for (auto &scc : sorted_sccs) {
         if constexpr (D == Direction::Forward) {
-            std::sort(scc.begin(), scc.end(), [&buckets](int a, int b) {
+            pdqsort(scc.begin(), scc.end(), [&buckets](int a, int b) {
                 return buckets[a].lb[0] < buckets[b].lb[0];
             });
         } else {
-            std::sort(scc.begin(), scc.end(), [&buckets](int a, int b) {
+            pdqsort(scc.begin(), scc.end(), [&buckets](int a, int b) {
                 return buckets[a].ub[0] > buckets[b].ub[0];
             });
         }
     }
 
-    // iterate over nodes
+    // Ensure each VRP node has the appropriate SCC arc container allocated.
     for (auto &node : nodes) {
         if constexpr (D == Direction::Forward) {
             node.fw_arcs_scc.resize(sccs.size());
@@ -786,121 +897,68 @@ void BucketGraph::SCC_handler() {
         }
     }
 
-    // Split arcs for each SCC
-    auto scc_ctr = 0;
-    for (const auto &scc : sccs) {
-        // Iterate over each bucket in the SCC
-        for (int bucket : scc) {
-            int from_node_id =
-                buckets[bucket].node_id;  // Get the source node ID
-            VRPNode &node =
-                nodes[from_node_id];  // Access the corresponding node
-            //  Define filtered arcs depending on the direction
-            if constexpr (D == Direction::Forward) {
-                std::vector<Arc> &filtered_fw_arcs =
-                    nodes[from_node_id]
-                        .fw_arcs_scc[scc_ctr];  // For forward direction
+    // Lambda: Filter and collect arcs for a given bucket, node, and
+    // direction.
+    auto process_bucket_arcs = [&](int bucket, int scc_index) {
+        int from_node_id = buckets[bucket].node_id;
+        VRPNode &node = nodes[from_node_id];
+        // Select the proper arc container and node arcs based on the
+        // direction.
+        const auto &node_arcs =
+            (D == Direction::Forward) ? node.fw_arcs : node.bw_arcs;
+        std::vector<Arc> &filtered_arcs = (D == Direction::Forward)
+                                              ? node.fw_arcs_scc[scc_index]
+                                              : node.bw_arcs_scc[scc_index];
 
-                // Iterate over the arcs from the current bucket
-                const auto &bucket_arcs =
-                    buckets[bucket].template get_bucket_arcs<D>();
-                for (const auto &arc : bucket_arcs) {
-                    int to_node_id =
-                        buckets[arc.to_bucket]
-                            .node_id;  // Get the destination node ID
-
-                    // Search for the arc from `from_node_id` to `to_node_id` in
-                    // the node's arcs
-                    auto it =
-                        std::find_if(node.fw_arcs.begin(), node.fw_arcs.end(),
-                                     [&to_node_id](const Arc &a) {
-                                         return a.to == to_node_id;
-                                     });
-
-                    // If both nodes are within the current SCC, retain the arc
-                    if (it != node.fw_arcs.end()) {
-                        // Add the arc to the filtered arcs
-                        filtered_fw_arcs.push_back(*it);  // Forward arcs
-                    }
-                }
-            } else {
-                std::vector<Arc> &filtered_bw_arcs =
-                    nodes[from_node_id]
-                        .bw_arcs_scc[scc_ctr];  // For forward direction
-
-                // Iterate over the arcs from the current bucket
-                const auto &bucket_arcs =
-                    buckets[bucket].template get_bucket_arcs<D>();
-                for (const auto &arc : bucket_arcs) {
-                    int to_node_id =
-                        buckets[arc.to_bucket]
-                            .node_id;  // Get the destination node ID
-
-                    // Search for the arc from `from_node_id` to `to_node_id` in
-                    // the node's arcs
-                    auto it =
-                        std::find_if(node.bw_arcs.begin(), node.bw_arcs.end(),
-                                     [&to_node_id](const Arc &a) {
-                                         return a.to == to_node_id;
-                                     });
-
-                    // If both nodes are within the current SCC, retain the arc
-                    if (it != node.bw_arcs.end()) {
-                        // Add the arc to the filtered arcs
-                        filtered_bw_arcs.push_back(*it);  // Forward arcs
-                    }
-                }
+        const auto &bucket_arcs = buckets[bucket].template get_bucket_arcs<D>();
+        for (const auto &arc : bucket_arcs) {
+            int to_node_id = buckets[arc.to_bucket].node_id;
+            // Look for an arc with destination equal to to_node_id.
+            auto it = std::find_if(
+                node_arcs.begin(), node_arcs.end(),
+                [&to_node_id](const Arc &a) { return a.to == to_node_id; });
+            if (it != node_arcs.end()) {
+                filtered_arcs.push_back(*it);
             }
         }
+    };
 
-        // Increment SCC counter
+    // For each SCC, process arcs for each bucket in the SCC.
+    int scc_ctr = 0;
+    for (const auto &scc : sccs) {
+        for (int bucket : scc) {
+            process_bucket_arcs(bucket, scc_ctr);
+        }
         ++scc_ctr;
     }
 
+    // Lambda: Sort and deduplicate arcs within each node's SCC arc
+    // container.
+    auto sortAndDedup = [](std::vector<Arc> &arcs) {
+        pdqsort(arcs.begin(), arcs.end(), [](const Arc &a, const Arc &b) {
+            return std::tie(a.from, a.to) < std::tie(b.from, b.to);
+        });
+        auto last = std::unique(arcs.begin(), arcs.end(),
+                                [](const Arc &a, const Arc &b) {
+                                    return a.from == b.from && a.to == b.to;
+                                });
+        arcs.erase(last, arcs.end());
+    };
+
+    // For each node, sort and deduplicate all arc lists.
     for (auto &node : nodes) {
         if constexpr (D == Direction::Forward) {
-            // Iterate over all SCCs for each node
-            for (auto &fw_arcs_scc : node.fw_arcs_scc) {
-                // Sort arcs by from_bucket and to_bucket
-                std::sort(fw_arcs_scc.begin(), fw_arcs_scc.end(),
-                          [](const Arc &a, const Arc &b) {
-                              return std::tie(a.from, a.to) <
-                                     std::tie(b.from, b.to);
-                          });
-
-                // Remove consecutive duplicates
-                auto last =
-                    std::unique(fw_arcs_scc.begin(), fw_arcs_scc.end(),
-                                [](const Arc &a, const Arc &b) {
-                                    return a.from == b.from && a.to == b.to;
-                                });
-
-                // Erase the duplicates from the vector
-                fw_arcs_scc.erase(last, fw_arcs_scc.end());
+            for (auto &arcs : node.fw_arcs_scc) {
+                sortAndDedup(arcs);
             }
         } else {
-            // Iterate over all SCCs for each node
-            for (auto &bw_arcs_scc : node.bw_arcs_scc) {
-                // Sort arcs by from_bucket and to_bucket
-                std::sort(bw_arcs_scc.begin(), bw_arcs_scc.end(),
-                          [](const Arc &a, const Arc &b) {
-                              return std::tie(a.from, a.to) <
-                                     std::tie(b.from, b.to);
-                          });
-
-                // Remove consecutive duplicates
-                auto last =
-                    std::unique(bw_arcs_scc.begin(), bw_arcs_scc.end(),
-                                [](const Arc &a, const Arc &b) {
-                                    return a.from == b.from && a.to == b.to;
-                                });
-
-                // Erase the duplicates from the vector
-                bw_arcs_scc.erase(last, bw_arcs_scc.end());
+            for (auto &arcs : node.bw_arcs_scc) {
+                sortAndDedup(arcs);
             }
         }
     }
 
+    // Build union-find structure for SCCs using the ordered SCCs.
     UnionFind uf(ordered_sccs);
     if constexpr (D == Direction::Forward) {
         fw_ordered_sccs = ordered_sccs;
@@ -921,40 +979,53 @@ void BucketGraph::SCC_handler() {
  * @brief Get the opposite bucket number for a given bucket index.
  *
  * This function retrieves the opposite bucket number based on the current
- * bucket index and the specified direction. It determines the node and bounds
- * of the current bucket, then calculates the opposite bucket index using the
- * appropriate direction.
+ * bucket index and the specified direction. It determines the node and
+ * bounds of the current bucket, then calculates the opposite bucket index
+ * using the appropriate direction.
  *
  */
 template <Direction D>
 int BucketGraph::get_opposite_bucket_number(int current_bucket_index,
                                             std::vector<double> &inc) {
-    // TODO: adjust to multi-resource case
-    auto &current_bucket = (D == Direction::Forward)
-                               ? fw_buckets[current_bucket_index]
-                               : bw_buckets[current_bucket_index];
-    int &node = current_bucket.node_id;
-    auto &theNode = nodes[node];
+    // Retrieve the current bucket based on the current direction.
+    const auto &current_bucket = (D == Direction::Forward)
+                                     ? fw_buckets[current_bucket_index]
+                                     : bw_buckets[current_bucket_index];
+    const int node = current_bucket.node_id;
+    const auto &theNode = nodes[node];
 
-    // Find the opposite bucket using the appropriate direction
-    int opposite_bucket_index = -1;
-    std::vector<double> reference_point(options.main_resources.size());
-    for (int r = 0; r < options.main_resources.size(); ++r) {
-        if constexpr (D == Direction::Forward) {
-            reference_point[r] = std::max(inc[r], theNode.lb[r]);
-        } else {
-            reference_point[r] = std::min(inc[r], theNode.ub[r]);
-        }
-    }
+    // Pre-compute the reference point for the given node using the main
+    // resources.
+    const size_t num_resources = options.main_resources.size();
+    // Optionally, add an assertion or check that inc has the expected size.
+    assert(inc.size() == num_resources && theNode.lb.size() == num_resources &&
+           theNode.ub.size() == num_resources);
+
+    std::vector<double> reference_point(num_resources);
+
     if constexpr (D == Direction::Forward) {
-        opposite_bucket_index =
-            get_bucket_number<Direction::Backward>(node, reference_point);
+        // For Forward direction:
+        // Use the maximum of inc and the node's lower bounds.
+        // This ensures we do not fall below the allowed lower bound.
+        for (size_t i = 0; i < num_resources; ++i) {
+            reference_point[i] = std::max(inc[i], theNode.lb[i]);
+            // Optionally, adjust with epsilon if needed:
+            // reference_point[i] += numericutils::eps;
+        }
+        // Get the opposite bucket using the Backward tree.
+        return get_bucket_number<Direction::Backward>(node, reference_point);
     } else {
-        opposite_bucket_index =
-            get_bucket_number<Direction::Forward>(node, reference_point);
+        // For Backward direction:
+        // Use the minimum of inc and the node's upper bounds.
+        // This ensures we do not exceed the allowed upper bound.
+        for (size_t i = 0; i < num_resources; ++i) {
+            reference_point[i] = std::min(inc[i], theNode.ub[i]);
+            // Optionally, adjust with epsilon if needed:
+            // reference_point[i] -= numericutils::eps;
+        }
+        // Get the opposite bucket using the Forward tree.
+        return get_bucket_number<Direction::Forward>(node, reference_point);
     }
-
-    return opposite_bucket_index;
 }
 
 /**
@@ -962,61 +1033,67 @@ int BucketGraph::get_opposite_bucket_number(int current_bucket_index,
  *
  * This function performs the bucket arc fixing for the given stage. It
  * initializes necessary variables and runs labeling algorithms to compute
- * forward and backward reduced costs. Based on the computed gap, it performs
- * arc elimination in both forward and backward directions and generates the
- * necessary arcs.
+ * forward and backward reduced costs. Based on the computed gap, it
+ * performs arc elimination in both forward and backward directions and
+ * generates the necessary arcs.
  *
  */
 template <Stage S>
 void BucketGraph::bucket_fixing() {
-    // Stage 4 bucket arc fixing
+    // Only execute if not already fixed.
     if (!fixed) {
-        fmt::print("\033[34m_STARTING BUCKET FIXING PROCEDURE \033[0m");
-        fmt::print("\n");
+        fmt::print("\033[34m_STARTING BUCKET FIXING PROCEDURE\033[0m\n");
         fixed = true;
+
+        // Initialize common structures, arc scores, warm labels, etc.
         common_initialization();
 
+        // Initialize forward and backward c_bar vectors.
         std::vector<double> forward_cbar(
             fw_buckets.size(), std::numeric_limits<double>::infinity());
         std::vector<double> backward_cbar(
             bw_buckets.size(), std::numeric_limits<double>::infinity());
 
+        // Run labeling algorithms for Stage Four with full mode.
         run_labeling_algorithms<Stage::Four, Full::Full>(forward_cbar,
                                                          backward_cbar);
 
+        // Compute gap and check feasibility (if gap is negative, exit
+        // early).
         gap = std::ceil(incumbent - (relaxation + std::min(0.0, min_red_cost)));
-
-        // check if gap is -inf and early exit, due to IPM
         if (gap < 0) {
             fmt::print(
                 "\033[34m_BUCKET FIXING PROCEDURE CAN'T BE EXECUTED DUE TO "
-                "GAP\033[0m");
-            fmt::print("\n");
-            // print the gap
+                "GAP\033[0m\n");
             fmt::print("gap: {}\n", gap);
             return;
         }
+
+        // Save computed c_bar values.
         fw_c_bar = forward_cbar;
         bw_c_bar = backward_cbar;
 
+        // Print info about bucket arc elimination.
         print_info("performing bucket arc elimination with theta = {}\n", gap);
 
+        // Run forward and backward sections in parallel.
         PARALLEL_SECTIONS(
             work, bi_sched,
             SECTION {
-                // Section 1: Forward direction
+                // Section 1: Process forward direction.
                 BucketArcElimination<Direction::Forward>(gap);
                 ObtainJumpBucketArcs<Direction::Forward>();
             },
             SECTION {
-                // Section 2: Backward direction
+                // Section 2: Process backward direction.
                 BucketArcElimination<Direction::Backward>(gap);
                 ObtainJumpBucketArcs<Direction::Backward>();
             });
 
+        // Generate arcs after elimination.
         generate_arcs();
-        fmt::print("\033[34m_BUCKET FIXING PROCEDURE FINISHED\033[0m");
-        fmt::print("\n");
+        fmt::print("\033[34m_BUCKET FIXING PROCEDURE FINISHED\033[0m\n");
+
         just_fixed = true;
         return;
     }
@@ -1032,89 +1109,86 @@ void BucketGraph::bucket_fixing() {
  */
 template <Stage S>
 void BucketGraph::heuristic_fixing() {
+    // Reset and initialize state.
     reset_pool();
     reset_fixed();
     common_initialization();
 
-    // Pre-allocate vectors with reserve to avoid reallocations
+    // Pre-allocate c-bar vectors with infinity.
     std::vector<double> forward_cbar(fw_buckets.size(),
                                      std::numeric_limits<double>::infinity());
     std::vector<double> backward_cbar(bw_buckets.size(),
                                       std::numeric_limits<double>::infinity());
 
+    // Run the labeling algorithms for Stage::One with Full::Partial mode.
     run_labeling_algorithms<Stage::One, Full::Partial>(forward_cbar,
                                                        backward_cbar);
 
-    // Pre-allocate with exact sizes
+    // Prepare containers for grouping labels by node.
     const size_t num_nodes = nodes.size();
     std::vector<std::vector<Label *>> fw_labels_map(num_nodes);
     std::vector<std::vector<Label *>> bw_labels_map(num_nodes);
 
-    // Pre-reserve space based on average bucket size
+    // Estimate average bucket size to pre-reserve capacity.
     size_t avg_bucket_size = 0;
     for (const auto &bucket : fw_buckets) {
         avg_bucket_size += bucket.get_labels().size();
     }
-    avg_bucket_size /= fw_buckets.size();
-
+    avg_bucket_size /= (fw_buckets.empty() ? 1 : fw_buckets.size());
     for (auto &labels : fw_labels_map) labels.reserve(avg_bucket_size);
     for (auto &labels : bw_labels_map) labels.reserve(avg_bucket_size);
 
-    // Optimized group_labels with direct indexing
+    // Helper lambda to group labels from buckets into a node-indexed map.
     auto group_labels = [](const auto &buckets, auto &labels_map) {
         for (const auto &bucket : buckets) {
-            const auto &bucket_labels = bucket.get_labels();
-            for (auto *label : bucket_labels) {
+            for (auto *label : bucket.get_labels()) {
                 labels_map[label->node_id].push_back(label);
             }
         }
     };
 
-    // Parallel execution of grouping
+    // Parallel grouping of forward and backward labels.
     auto forward_task = stdexec::schedule(bi_sched) | stdexec::then([&]() {
                             group_labels(fw_buckets, fw_labels_map);
                         });
     auto backward_task = stdexec::schedule(bi_sched) | stdexec::then([&]() {
                              group_labels(bw_buckets, bw_labels_map);
                          });
-
     stdexec::sync_wait(
         stdexec::when_all(std::move(forward_task), std::move(backward_task)));
 
-    // Pre-compute minimum cost labels for each node
+    // Pre-compute the minimum cost label for each node.
     std::vector<const Label *> min_fw_labels(num_nodes, nullptr);
     std::vector<const Label *> min_bw_labels(num_nodes, nullptr);
-
     auto compute_min_labels = [](const auto &labels_map, auto &min_labels) {
         for (size_t i = 0; i < labels_map.size(); ++i) {
-            const auto &labels = labels_map[i];
-            if (!labels.empty()) {
-                min_labels[i] =
-                    *std::min_element(labels.begin(), labels.end(),
-                                      [](const Label *a, const Label *b) {
-                                          return a->cost < b->cost;
-                                      });
+            if (!labels_map[i].empty()) {
+                min_labels[i] = *std::min_element(
+                    labels_map[i].begin(), labels_map[i].end(),
+                    [](const Label *a, const Label *b) {
+                        return a->cost < b->cost;
+                    });
             }
         }
     };
 
-    // Parallel computation of minimum labels
+    // Parallel computation of minimum labels.
     auto min_fw_task = stdexec::schedule(bi_sched) | stdexec::then([&]() {
                            compute_min_labels(fw_labels_map, min_fw_labels);
                        });
     auto min_bw_task = stdexec::schedule(bi_sched) | stdexec::then([&]() {
                            compute_min_labels(bw_labels_map, min_bw_labels);
                        });
-
     stdexec::sync_wait(
         stdexec::when_all(std::move(min_fw_task), std::move(min_bw_task)));
 
-    // Pre-compute resource indices
+    // Pre-compute the index of the "time" resource.
     const size_t time_index = std::distance(
         options.resources.begin(),
         std::find(options.resources.begin(), options.resources.end(), "time"));
 
     size_t num_fixes = 0;
+    // Iterate over all node pairs to check for fixable arcs.
     for (size_t i = 0; i < num_nodes; ++i) {
         const auto *min_fw_label = min_fw_labels[i];
         if (!min_fw_label) continue;
@@ -1123,14 +1197,13 @@ void BucketGraph::heuristic_fixing() {
 
         for (size_t j = 0; j < num_nodes; ++j) {
             if (i == j) continue;
-
             const auto *min_bw_label = min_bw_labels[j];
             if (!min_bw_label) continue;
 
             const double cost =
                 getcij(min_fw_label->node_id, min_bw_label->node_id);
 
-            // Check time resource first as it's often the most restrictive
+            // Check the "time" resource first (often the most restrictive).
             if (options.resources[time_index] == "time") {
                 if (min_fw_label->resources[time_index] + cost +
                         L_last_node.duration >
@@ -1139,7 +1212,7 @@ void BucketGraph::heuristic_fixing() {
                 }
             }
 
-            // Check other resources
+            // Check all other resources.
             bool violated = false;
             for (size_t r = 0; r < options.resources.size(); ++r) {
                 if (r != time_index) {
@@ -1152,9 +1225,10 @@ void BucketGraph::heuristic_fixing() {
                 }
             }
 
+            // If all resource constraints are satisfied and the cost exceeds
+            // the gap, fix the arc.
             if (!violated &&
-                min_fw_label->cost + cost + min_bw_label->cost > gap) {
-                // fixed_arcs[i][j] = 1;
+                (min_fw_label->cost + cost + min_bw_label->cost > gap)) {
                 fix_arc(i, j);
                 ++num_fixes;
             }
@@ -1164,34 +1238,32 @@ void BucketGraph::heuristic_fixing() {
 
 template <Symmetry SYM>
 void BucketGraph::set_adjacency_list() {
-    // Clear existing arcs
+    // === Step 1: Clear Existing Arcs from Each Node ===
     for (auto &node : nodes) {
         node.clear_arcs();
     }
 
-    // Compute clusters using MST-based clustering
+    // === Step 2: MST-Based Clustering ===
     MST mst_solver(nodes,
-                   [this](int from, int to) { return this->getcij(from, to); });
-
-    // Compute theta dynamically based on the distribution of edge weights
+                   [this](int from, int to) { return getcij(from, to); });
     auto mst = mst_solver.compute_mst();
+
+    // Collect and sort MST edge weights.
     std::vector<double> edge_weights;
     edge_weights.reserve(mst.size());
     for (const auto &[weight, from, to] : mst) {
         edge_weights.push_back(weight);
     }
-
-    // Sort edge weights to compute a dynamic percentile
     pdqsort(edge_weights.begin(), edge_weights.end());
-    double theta = edge_weights[static_cast<size_t>(0.9 * edge_weights.size())];
-    theta = theta / 100;
 
+    // Compute theta as the 90th percentile (scaled down by 100).
+    size_t p90_index = static_cast<size_t>(0.9 * edge_weights.size());
+    double theta = (edge_weights[p90_index]) / 100.0;
     print_info("Computed theta: {}\n", theta);
 
+    // Cluster nodes and build mapping: job_id -> cluster_id.
     auto clusters = mst_solver.cluster(theta);
     print_info("Number of clusters: {}\n", clusters.size());
-
-    // Create job-to-cluster mapping
     std::vector<int> job_to_cluster(nodes.size(), -1);
     for (int cluster_id = 0; cluster_id < clusters.size(); ++cluster_id) {
         for (int job : clusters[cluster_id]) {
@@ -1199,165 +1271,183 @@ void BucketGraph::set_adjacency_list() {
         }
     }
 
-    // Pre-calculate time resource index
+    // === Step 3: Precompute Resource Information ===
+    // Find the index for the "time" resource.
+    auto time_it =
+        std::find(options.resources.begin(), options.resources.end(), "time");
     const int time_resource_idx =
-        std::find(options.resources.begin(), options.resources.end(), "time") -
-        options.resources.begin();
+        (time_it != options.resources.end())
+            ? std::distance(options.resources.begin(), time_it)
+            : -1;
 
-    // Lambda for processing node arcs
-    auto add_arcs_for_node = [&](const VRPNode &node, int from_bucket,
-                                 std::vector<double> &res_inc) {
-        using Arc = std::tuple<double, int, std::vector<double>, double>;
-        std::vector<Arc> forward_arcs;
-        std::vector<Arc> reverse_arcs;
+    // === Step 4: Process Arcs for Each Node ===
+
+    // Helper lambda to compute resource increments.
+    // Depending on symmetry, consumption is either taken as-is or averaged.
+    auto compute_resource_increments = [&](const VRPNode &from_node,
+                                           const VRPNode &to_node,
+                                           double travel_cost,
+                                           std::vector<double> &inc) {
+        const int nres = options.resources.size();
+        if constexpr (SYM == Symmetry::Asymmetric) {
+            for (int r = 0; r < nres; ++r) {
+                inc[r] = (r == time_resource_idx)
+                             ? travel_cost + from_node.duration
+                             : from_node.consumption[r];
+            }
+        } else {
+            for (int r = 0; r < nres; ++r) {
+                inc[r] =
+                    (r == time_resource_idx)
+                        ? (from_node.duration / 2.0 + travel_cost +
+                           to_node.duration / 2.0)
+                        : ((from_node.consumption[r] + to_node.consumption[r]) /
+                           2.0);
+            }
+        }
+    };
+
+    // Lambda to add forward and reverse arcs from a given node.
+    auto add_arcs_for_node = [&](const VRPNode &curr_node) {
+        // Containers to accumulate arcs before insertion.
+        using ArcTuple = std::tuple<double, int, std::vector<double>, double>;
+        std::vector<ArcTuple> forward_arcs;
+        std::vector<ArcTuple> reverse_arcs;
         forward_arcs.reserve(nodes.size());
         reverse_arcs.reserve(nodes.size());
 
+        // Iterate over candidate next nodes.
         for (const auto &next_node : nodes) {
-            if (next_node.id == options.depot || node.id == next_node.id ||
+            // Skip if the candidate is a depot, the same node, or a pstep
+            // depot.
+            if (next_node.id == options.depot || curr_node.id == next_node.id ||
                 (options.pstep && (next_node.id == options.pstep_depot ||
                                    next_node.id == options.pstep_end_depot))) {
                 continue;
             }
 
-            const auto travel_cost = getcij(node.id, next_node.id);
-            const double cost_inc = travel_cost - next_node.cost;
-            const int to_bucket = next_node.id;
+            double travel_cost = getcij(curr_node.id, next_node.id);
+            double cost_inc = travel_cost - next_node.cost;
 
-            if (from_bucket == to_bucket) continue;
+            // Skip self-loops (or if bucket indexes match; here using node id
+            // as bucket id).
+            if (curr_node.id == next_node.id) continue;
 
-            // Calculate resource increments
-            if constexpr (SYM == Symmetry::Asymmetric) {
-                for (int r = 0; r < options.resources.size(); ++r) {
-                    res_inc[r] = r == time_resource_idx
-                                     ? travel_cost + node.duration
-                                     : node.consumption[r];
-                }
-            } else {
-                for (int r = 0; r < options.resources.size(); ++r) {
-                    res_inc[r] =
-                        r == time_resource_idx
-                            ? node.duration / 2 + travel_cost +
-                                  next_node.duration / 2
-                            : (node.consumption[r] + next_node.consumption[r]) /
-                                  2;
-                }
-            }
+            // Compute resource increments.
+            std::vector<double> res_inc(options.resources.size());
+            compute_resource_increments(curr_node, next_node, travel_cost,
+                                        res_inc);
 
-            // Check resource feasibility
+            // Check feasibility: ensure resource consumption does not exceed
+            // next node's upper bound.
             bool feasible = true;
             for (int r = 0; r < options.resources.size(); ++r) {
-                if (node.lb[r] + res_inc[r] > next_node.ub[r]) {
+                if (curr_node.lb[r] + res_inc[r] > next_node.ub[r]) {
                     feasible = false;
                     break;
                 }
             }
             if (!feasible) continue;
 
-            // Calculate priorities
-            const bool same_cluster =
-                job_to_cluster[node.id] == job_to_cluster[next_node.id];
-            const double base_priority = same_cluster ? 5.0 : 1.0;
-            const double priority =
-                base_priority + 1.E-5 * next_node.start_time;
-            const double rev_priority =
-                (same_cluster ? 1.0 : 5.0) + 1.E-5 * node.start_time;
+            // Compute priorities based on cluster membership.
+            bool same_cluster =
+                (job_to_cluster[curr_node.id] == job_to_cluster[next_node.id]);
+            double forward_priority =
+                (same_cluster ? 5.0 : 1.0) + 1.E-5 * next_node.start_time;
+            double reverse_priority =
+                (same_cluster ? 1.0 : 5.0) + 1.E-5 * curr_node.start_time;
 
-            forward_arcs.emplace_back(priority, next_node.id, res_inc,
+            // Collect arcs for forward and reverse directions.
+            forward_arcs.emplace_back(forward_priority, next_node.id, res_inc,
                                       cost_inc);
-            reverse_arcs.emplace_back(rev_priority, next_node.id, res_inc,
+            reverse_arcs.emplace_back(reverse_priority, next_node.id, res_inc,
                                       cost_inc);
         }
 
-        // Add forward arcs
-        for (const auto &[priority, to_bucket, res_inc_local, cost_inc] :
+        // Insert the arcs into the corresponding nodes.
+        for (const auto &[priority, to_node, res_inc, cost_inc] :
              forward_arcs) {
-            nodes[node.id].template add_arc<Direction::Forward>(
-                node.id, to_bucket, res_inc_local, cost_inc, priority);
+            nodes[curr_node.id].template add_arc<Direction::Forward>(
+                curr_node.id, to_node, res_inc, cost_inc, priority);
         }
-
-        // Add reverse arcs
-        for (const auto &[priority, to_bucket, res_inc_local, cost_inc] :
+        for (const auto &[priority, from_node, res_inc, cost_inc] :
              reverse_arcs) {
-            nodes[to_bucket].template add_arc<Direction::Backward>(
-                to_bucket, node.id, res_inc_local, cost_inc, priority);
+            nodes[from_node].template add_arc<Direction::Backward>(
+                from_node, curr_node.id, res_inc, cost_inc, priority);
         }
     };
 
-    // Process all nodes
-    std::vector<double> res_inc(intervals.size());
+    // Process each node, skipping the end depot.
     for (const auto &node : nodes) {
         if (node.id != options.end_depot) {
-            add_arcs_for_node(node, node.id, res_inc);
+            add_arcs_for_node(node);
         }
     }
 }
 
 /**
- * @brief Initializes the BucketGraph by clearing previous data and setting up
- * forward and backward buckets.
+ * @brief Initializes the BucketGraph by clearing previous data and setting
+ * up forward and backward buckets.
  *
  */
 template <Direction D>
 void BucketGraph::common_initialization() {
-    // Pre-allocate vectors with exact sizes
+    // --- Pre-allocate and clear temporary vectors ---
     merged_labels.clear();
     merged_labels.reserve(50);
 
+    // Retrieve active cuts and build a vector of ActiveCutInfo.
+    auto &cutter = cut_storage;
+    const auto active_cuts = cutter->getActiveCuts();
+    std::vector<ActiveCutInfo> active_cuts_info;
+    active_cuts_info.reserve(active_cuts.size());
+    for (const auto &cut : active_cuts) {
+        active_cuts_info.push_back(cut);
+    }
+
+    // --- Sort arcs by scores for each node ---
     auto &arc_scores = assign_buckets<D>(fw_arc_scores, bw_arc_scores);
     for (auto &node : nodes) {
-        // check if arc_stores[node.id] is empty
         if (!arc_scores[node.id].empty()) {
-            node.sort_arcs_by_scores<D>(arc_scores[node.id], nodes);
+            node.sort_arcs_by_scores<D>(arc_scores[node.id], nodes,
+                                        active_cuts_info);
         }
         arc_scores[node.id].clear();
     }
 
-    const size_t num_intervals = options.main_resources.size();
-    std::vector<double> base_intervals(num_intervals);
-    std::vector<double> interval_starts(num_intervals);
-    std::vector<double> interval_ends(num_intervals);
-
+    // --- Warm start: collect best labels from buckets ---
     auto &warm_labels = assign_buckets<D>(fw_warm_labels, bw_warm_labels);
     auto &buckets_size = assign_buckets<D>(fw_buckets_size, bw_buckets_size);
     auto &buckets = assign_buckets<D>(fw_buckets, bw_buckets);
     auto &c_bar = assign_buckets<D>(fw_c_bar, bw_c_bar);
     auto &bucket_splits = assign_buckets<D>(fw_bucket_splits, bw_bucket_splits);
 
-    if (merged_labels.size() > 0 && options.warm_start && !just_fixed) {
-        warm_labels.reserve(buckets_size);
+    if (!merged_labels.empty() && options.warm_start && !just_fixed) {
         warm_labels.clear();
         warm_labels.reserve(buckets_size);
-        for (auto bucket = 0; bucket < buckets_size; ++bucket) {
+        for (int bucket = 0; bucket < buckets_size; ++bucket) {
             if (auto *label = buckets[bucket].get_best_label()) {
                 warm_labels.push_back(label);
             }
         }
     }
 
-    // Initialize vectors with exact sizes once
+    // --- Initialize c_bar vector ---
     c_bar.resize(buckets_size, std::numeric_limits<double>::infinity());
-    // print size of c_bar
 
+    // --- Initialize dominance check counters for forward direction ---
     if constexpr (Direction::Forward == D) {
         dominance_checks_per_bucket.assign(buckets_size + 1, 0);
         non_dominated_labels_per_bucket = 0;
     }
 
-    const auto &VRPNode = nodes[0];
-
+    // --- Clear all buckets ---
     for (size_t b = 0; b < buckets_size; b++) {
         buckets[b].clear();
     }
 
-    // Calculate intervals once
-    for (size_t r = 0; r < intervals.size(); ++r) {
-        base_intervals[r] =
-            (VRPNode.ub[r] - VRPNode.lb[r]) / bucket_splits[VRPNode.id];
-        interval_starts[r] = VRPNode.lb[r];
-        interval_ends[r] = VRPNode.ub[r];
-    }
-
+    // --- Warm start processing: sort warm_labels and compute reduced costs
+    // ---
     if (options.warm_start && !just_fixed) {
         pdqsort(
             warm_labels.begin(), warm_labels.end(),
@@ -1365,27 +1455,50 @@ void BucketGraph::common_initialization() {
 
         std::vector<Label *> processed_labels;
         const size_t process_size = std::min(
-            warm_labels.size(), static_cast<size_t>(options.n_warm_start));
-        processed_labels.reserve(process_size);
-
+            warm_labels.size(),
+            static_cast<size_t>(options.n_warm_start * warm_labels.size()));
         for (size_t i = 0; i < process_size; ++i) {
             auto label = warm_labels[i];
+            // Uncomment if you want to skip non-fresh labels.
             if (!label->fresh) continue;
-
-            auto new_label = compute_red_cost(label, true);
+            auto new_label = compute_red_cost(label, D == Direction::Forward);
             if (new_label != nullptr) {
-                fw_buckets[new_label->vertex].add_label(new_label);
+                if constexpr (D == Direction::Forward) {
+                    fw_buckets[new_label->vertex].add_sorted_label(new_label);
+                } else {
+                    bw_buckets[new_label->vertex].add_sorted_label(new_label);
+                }
                 processed_labels.push_back(new_label);
             }
         }
         warm_labels = std::move(processed_labels);
     }
 
-    // Initialize intervals
+    // --- Prepare interval arrays and compute per-resource splits for depot ---
+    const size_t num_intervals = options.main_resources.size();
+    std::vector<double> base_intervals(num_intervals);
+    std::vector<double> interval_starts(num_intervals);
+    std::vector<double> interval_ends(num_intervals);
+    // Compute per-resource split counts for the depot
+    const auto &VRPNode = nodes[0];  // assuming node 0 is the depot
+    std::vector<int> depot_splits(num_intervals);
+    for (size_t r = 0; r < num_intervals; ++r) {
+        // Use the same ratio as earlier:
+        double full_range = R_max[r] - R_min[r];
+        double node_range = VRPNode.ub[r] - VRPNode.lb[r];
+        depot_splits[r] =
+            std::max(1, static_cast<int>(std::round((node_range / full_range) *
+                                                    intervals[r].interval)));
+        // Compute the base interval for resource r.
+        base_intervals[r] = (VRPNode.ub[r] - VRPNode.lb[r]) / depot_splits[r];
+        interval_starts[r] = VRPNode.lb[r];
+        interval_ends[r] = VRPNode.ub[r];
+    }
+
+    // --- Interval-based bucket generation ---
     std::vector<int> current_pos(num_intervals, 0);
     int offset = 0;
-
-    // Lambda for interval combination generation
+    // Lambda for generating interval combinations and creating depots.
     auto generate_combinations = [&](bool is_forward, int &offset) {
         auto &label_pool = is_forward ? label_pool_fw : label_pool_bw;
         auto &buckets = is_forward ? fw_buckets : bw_buckets;
@@ -1395,22 +1508,22 @@ void BucketGraph::common_initialization() {
                        : num_buckets_index_bw[options.end_depot];
 
         std::vector<double> interval_bounds(num_intervals);
+        // Recursive lambda to generate all interval combinations.
         std::function<void(int)> process_intervals = [&](int depth) {
             if (depth == num_intervals) {
+                // Acquire a new depot label.
                 auto depot = label_pool->acquire();
                 int calculated_index = calculated_index_base + offset;
-
-                for (int r = 0; r < num_intervals; ++r) {
+                for (int r = 0; r < static_cast<int>(num_intervals); ++r) {
+                    // For forward direction, start at the lower bound and add
+                    // multiples of the base interval; adjust similarly for
+                    // backward.
                     interval_bounds[r] =
-                        is_forward
-                            ? interval_starts[r] +
-                                  current_pos[r] *
-                                      roundToTwoDecimalPlaces(base_intervals[r])
-                            : interval_ends[r] -
-                                  current_pos[r] * roundToTwoDecimalPlaces(
-                                                       base_intervals[r]);
+                        is_forward ? interval_starts[r] +
+                                         current_pos[r] * base_intervals[r]
+                                   : interval_ends[r] -
+                                         current_pos[r] * base_intervals[r];
                 }
-
                 depot->initialize(calculated_index, 0.0, interval_bounds,
                                   depot_id);
                 depot->is_extended = false;
@@ -1425,19 +1538,16 @@ void BucketGraph::common_initialization() {
                 return;
             }
 
-            for (int k = 0; k < bucket_splits[depot_id]; ++k) {
+            // For the current resource dimension, loop using its specific split
+            // count.
+            for (int k = 0; k < depot_splits[depth]; ++k) {
                 current_pos[depth] = k;
                 process_intervals(depth + 1);
             }
         };
-
         process_intervals(0);
     };
 
-    // Process forward and backward directions
-    if constexpr (Direction::Forward == D) {
-        generate_combinations(true, offset);
-    } else {
-        generate_combinations(false, offset);
-    }
+    // Generate combinations for the current direction.
+    generate_combinations(D == Direction::Forward, offset);
 }

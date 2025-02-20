@@ -13,6 +13,7 @@
 #pragma once
 #include "Arc.h"
 #include "Common.h"
+#include "Cut.h"
 #include "Definitions.h"
 /**
  * @struct VRPNode
@@ -75,14 +76,31 @@ struct VRPNode {
     template <Direction D>
     void sort_arcs_by_scores(
         const ankerl::unordered_dense::map<Arc, int, arc_hash> &arc_scores,
-        std::vector<VRPNode> &nodes) {
-        auto get_score = [&arc_scores, &nodes](const Arc &arc) {
-            auto it = arc_scores.find(arc);
-            auto scores = -nodes[arc.to].cost / 100;
-            scores += (it != arc_scores.end()) ? it->second : 0;
-            return scores;
+        std::vector<VRPNode> &nodes, std::vector<ActiveCutInfo> &cuts) {
+        // Helper lambda to compute a score for a given arc.
+        // Note: 'cuts' is captured by reference to avoid copying.
+        auto get_score = [&arc_scores, &nodes,
+                          &cuts](const Arc &arc) -> double {
+            // Base score: cost of the destination node divided by 100.
+            double score = -nodes[arc.to].cost / 100.0;
+
+            // Add additional score if arc is present in arc_scores.
+            if (auto it = arc_scores.find(arc); it != arc_scores.end()) {
+                score += it->second;
+            }
+
+            // If any cut applies to this arc, override score with the cut's
+            // dual value.
+            for (const auto &cut : cuts) {
+                if (cut.isSRCset(arc.from, arc.to)) {
+                    score = -cut.dual_value / 100.0;
+                    break;
+                }
+            }
+            return score;
         };
 
+        // Sort arcs within strongly connected components.
         if constexpr (D == Direction::Forward) {
             for (auto &arcs : fw_arcs_scc) {
                 pdqsort(arcs.begin(), arcs.end(),
@@ -99,6 +117,7 @@ struct VRPNode {
             }
         }
 
+        // Sort the main list of arcs.
         if constexpr (D == Direction::Forward) {
             pdqsort(fw_arcs.begin(), fw_arcs.end(),
                     [&](const Arc &a, const Arc &b) {

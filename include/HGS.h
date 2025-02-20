@@ -64,7 +64,7 @@ class HGS {
                    params.getTimeElapsedSeconds());
 
         auto sol = population.extractFeasibleRoutes();
-        // auto sol = population.extractBestFeasibleRoutes();
+        // auto sol = population.extractTopBestFeasibleRoutes(50);
         bestRoutes = population.extractBestFeasibleRoutes();
         // Return 0 if the program execution was successfull
         //

@@ -1,10 +1,9 @@
-
 #pragma once
 #include "BucketGraph.h"
 #include "Common.h"
 #include "Definitions.h"
 
-// Resource type enumeration for better type safety and readability
+// Resource type enumeration for improved type safety and readability
 enum class ResourceType {
     Disposable = 1,
     NonDisposable = 0,
@@ -18,23 +17,26 @@ enum class ResourceType {
 // Forward declare the BucketGraph class
 class BucketGraph;
 
-// Declare all specialized processing functions first
+// Specialized processing functions for resources
+
 template <Direction D>
-inline bool process_disposable_resource(double& new_resource,
+inline bool process_disposable_resource(double &new_resource,
                                         double initial_resource,
                                         double increment, double lb,
                                         double ub) {
     if constexpr (D == Direction::Forward) {
         new_resource = std::max(initial_resource + increment, lb);
+        // new_resource = roundToTwoDecimalPlaces(new_resource);
         return new_resource <= ub;
     } else {
         new_resource = std::min(initial_resource - increment, ub);
+        // new_resource = roundToTwoDecimalPlaces(new_resource);
         return new_resource >= lb;
     }
 }
 
 template <Direction D>
-inline bool process_non_disposable_resource(double& new_resource,
+inline bool process_non_disposable_resource(double &new_resource,
                                             double initial_resource,
                                             double increment, double lb,
                                             double ub) {
@@ -45,13 +47,14 @@ inline bool process_non_disposable_resource(double& new_resource,
 
 template <Direction D>
 inline double process_binary_resource(double increment) {
-    const bool is_forward = D == Direction::Forward;
-    return (increment > 0) ? (is_forward ? 1.0 : 0.0)
-                           : (is_forward ? 0.0 : 1.0);
+    // For binary resource, return 1.0 if increment > 0 in forward direction,
+    // else 0.0, and vice versa in backward direction.
+    return (increment > 0) ? (D == Direction::Forward ? 1.0 : 0.0)
+                           : (D == Direction::Forward ? 0.0 : 1.0);
 }
 
 template <Direction D>
-inline bool process_battery_resource(double& new_resource,
+inline bool process_battery_resource(double &new_resource,
                                      double initial_resource, bool is_station,
                                      double battery_capacity) {
     if (is_station) {
@@ -64,7 +67,7 @@ inline bool process_battery_resource(double& new_resource,
 }
 
 template <Direction D>
-inline bool process_recharge_count(double& new_resource,
+inline bool process_recharge_count(double &new_resource,
                                    double initial_resource, bool is_station,
                                    double max_recharges) {
     if (!is_station) {
@@ -76,15 +79,15 @@ inline bool process_recharge_count(double& new_resource,
 }
 
 template <Direction D>
-inline bool process_recharge_time(double& new_resource, double initial_resource,
+inline bool process_recharge_time(double &new_resource, double initial_resource,
                                   bool is_station, double max_recharge_time) {
     new_resource = is_station ? 0 : initial_resource;
     return new_resource <= max_recharge_time;
 }
 
 template <Direction D>
-inline bool process_mtw_resource(double& new_resource, double initial_resource,
-                                 double increment, const VRPNode& theNode) {
+inline bool process_mtw_resource(double &new_resource, double initial_resource,
+                                 double increment, const VRPNode &theNode) {
     if constexpr (D == Direction::Forward) {
         for (size_t i = 0; i < theNode.mtw_lb.size(); ++i) {
             new_resource =
@@ -101,12 +104,17 @@ inline bool process_mtw_resource(double& new_resource, double initial_resource,
     return false;
 }
 
-// Main processing function
+// Main processing function for all resources.
+// new_resources: vector to be updated for the new resource levels.
+// initial_resources: initial values of the resources.
+// gamma: provides resource_increment among other things.
+// theNode: VRPNode with lower/upper bounds and other properties.
+// N: number of resources to process.
 template <Direction D, typename Gamma, typename VRPNode>
 bool BucketGraph::process_all_resources(
-    std::vector<double>& new_resources,
-    const std::array<double, R_SIZE>& initial_resources, const Gamma& gamma,
-    const VRPNode& theNode, size_t N) {
+    std::vector<double> &new_resources,
+    const std::array<double, R_SIZE> &initial_resources, const Gamma &gamma,
+    const VRPNode &theNode, size_t N) {
     for (size_t I = 0; I < N; ++I) {
         switch (static_cast<ResourceType>(options.resource_type[I])) {
             [[likely]] case ResourceType::Disposable:

@@ -42,11 +42,13 @@ struct Label {
     bool fresh = true;
     bool is_dominated = false;
     SRC_MODE_BLOCK(std::vector<uint16_t> SRCmap;)
+
     // uint64_t             visited_bitmap; // Bitmap for visited nodes
     std::array<uint64_t, num_words> visited_bitmap = {0};
 #ifdef UNREACHABLE_DOMINANCE
     std::array<uint64_t, num_words> unreachable_bitmap = {0};
 #endif
+    std::vector<Label *> children;
 
     // std::vector<Label *> children;
     // Constructor with node_id
@@ -90,24 +92,34 @@ struct Label {
      *
      */
     inline void reset() {
-        this->vertex = -1;
-        this->cost = 0.0;
-        this->resources = {};
-        this->node_id = -1;
-        this->real_cost = 0.0;
-        this->parent = nullptr;
-        this->is_extended = false;
-        this->is_dominated = false;
-        this->nodes_covered.clear();
-        this->nodes_covered.reserve(N_SIZE / 3);
-        // this->children.clear();
+        // Reset basic properties
+        vertex = -1;
+        cost = 0.0;
+        node_id = -1;
+        real_cost = 0.0;
+        parent = nullptr;
+        is_extended = false;
+        is_dominated = false;
+        fresh = true;
+        // Reset resources container (assuming operator= clears properly)
+        resources = {};
 
+        // Clear and preallocate nodes_covered to avoid reallocations later.
+        nodes_covered.clear();
+        nodes_covered.reserve(N_SIZE / 3);
+
+        // Clear children container.
+        children.clear();
+
+        // Zero out the bitmaps efficiently.
         std::memset(visited_bitmap.data(), 0,
                     visited_bitmap.size() * sizeof(uint64_t));
 #ifdef UNREACHABLE_DOMINANCE
         std::memset(unreachable_bitmap.data(), 0,
                     unreachable_bitmap.size() * sizeof(uint64_t));
 #endif
+
+        // If using source mode mapping, clear it.
         SRC_MODE_BLOCK(SRCmap.clear();)
     }
 

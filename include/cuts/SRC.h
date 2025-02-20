@@ -126,6 +126,8 @@ class LimitedMemoryRank1Cuts {
     int labels_counter = 0;
     void separate(const SparseMatrix &A, const std::vector<double> &x);
 
+    ankerl::unordered_dense::map<int, std::vector<int>> row_indices_map;
+    int last_path_idx = 0;
     /**
      * @brief Computes the limited memory coefficient based on the given
      * parameters.
@@ -149,19 +151,22 @@ class LimitedMemoryRank1Cuts {
     exec::static_thread_pool::scheduler sched = pool.get_scheduler();
 
     void separateR1C1(const SparseMatrix &A, const std::vector<double> &x) {
+        // === Step 1: Extract Potential Cuts from allPaths ===
         std::vector<std::pair<double, int>> tmp_cuts;
         tmp_cuts.reserve(
-            allPaths.size());  // Conservative reservation based on sol size
+            allPaths.size());  // Reserve conservatively based on solution size.
 
         const int JOBS = std::thread::hardware_concurrency();
-
-        // Define chunk size to reduce parallelization overhead
         const int chunk_size = (allPaths.size() + JOBS - 1) / JOBS;
 
-        // Mutex to protect access to tmp_cuts
+        // Mutex to protect access to tmp_cuts (using nsync if defined).
+#ifdef NSYNC
+        nsync::nsync_mu cuts_mutex = NSYNC_MU_INIT;
+#else
         std::mutex cuts_mutex;
+#endif
 
-        // Parallel execution in chunks
+        // Parallel execution in chunks over allPaths.
         auto bulk_sender = stdexec::bulk(
             stdexec::just(), (allPaths.size() + chunk_size - 1) / chunk_size,
             [&](std::size_t chunk_idx) {
@@ -169,74 +174,88 @@ class LimitedMemoryRank1Cuts {
                 size_t end_idx =
                     std::min(start_idx + chunk_size, allPaths.size());
 
-                // Local storage for cuts in this chunk
+                // Local vector for storing cuts computed in this chunk.
                 std::vector<std::pair<double, int>> local_cuts;
-
+                // Temporary map to count occurrences of nodes in a given path.
                 ankerl::unordered_dense::map<int, int> vis_map;
+
+                // Process each path in this chunk.
                 for (size_t i = start_idx; i < end_idx; ++i) {
-                    const auto &r = allPaths[i];
+                    const auto &path = allPaths[i];
                     vis_map.clear();
-                    for (const auto i : r.route) {
-                        ++vis_map[i];
+                    // Count occurrences of each node in the route.
+                    for (int node : path.route) {
+                        ++vis_map[node];
                     }
-                    for (const auto &[v, times] : vis_map) {
-                        if (times > 1) {
-                            // Calculate fractional cut value with integer
-                            // division instead of `floor`
-                            double cut_value = std::floor(times * 0.5) * x[i];
-                            if (cut_value >
-                                1.0 + 1e-3) {  // Apply tolerance check
-                                local_cuts.emplace_back(cut_value, v);
+                    // For nodes that appear more than once, compute a cut
+                    // value.
+                    for (const auto &[node, count] : vis_map) {
+                        if (count > 1) {
+                            // Calculate fractional cut value using floor
+                            // division.
+                            double cut_value = std::floor(count * 0.5) * x[i];
+                            if (cut_value > 1.0 + 1e-3) {  // Tolerance check.
+                                local_cuts.emplace_back(cut_value, node);
                             }
                         }
                     }
                 }
 
-                // Merge local cuts into global tmp_cuts
+            // Merge local cuts into the global temporary cuts vector.
+#ifdef NSYNC
+                nsync::nsync_mu_lock(&cuts_mutex);
+#else
                 std::lock_guard<std::mutex> lock(cuts_mutex);
+#endif
                 tmp_cuts.insert(tmp_cuts.end(), local_cuts.begin(),
                                 local_cuts.end());
+#ifdef NSYNC
+                nsync::nsync_mu_unlock(&cuts_mutex);
+#endif
             });
 
-        // Submit work to the thread pool
         auto work = stdexec::starts_on(sched, bulk_sender);
         stdexec::sync_wait(std::move(work));
 
-        // Early return if no cuts were found
+        // Early return if no cuts were found.
         if (tmp_cuts.empty()) return;
 
-        // Sort cuts by value in descending order
+        // === Step 2: Sort Extracted Cuts by Their Cut Value in Descending
+        // Order ===
         pdqsort(
             tmp_cuts.begin(), tmp_cuts.end(),
             [](const std::pair<double, int> &a,
                const std::pair<double, int> &b) { return a.first > b.first; });
 
-        // Generate cut coefficients for the top cuts
+        // === Step 3: Generate and Add the Best Cut ===
+        // We'll generate cut coefficients only for the top cut.
+        const int cuts_to_apply =
+            std::min(static_cast<int>(tmp_cuts.size()), 1);
         std::vector<double> coefficients_aux(allPaths.size(), 0.0);
-        auto cuts_to_apply = std::min(static_cast<int>(tmp_cuts.size()), 1);
+
+        // Setup a simple SRCPermutation for the cut.
+        SRCPermutation p;
+        p.num = {1};
+        p.den = 2;
 
         for (int i = 0; i < cuts_to_apply; ++i) {
-            auto cut_value = tmp_cuts[i].first;
-            auto v = tmp_cuts[i].second;
+            double cut_value = tmp_cuts[i].first;
+            int node = tmp_cuts[i].second;
 
-            // Create a new cut
-            std::array<uint64_t, num_words> C = {};  // Reset C for each cut
-            std::array<uint64_t, num_words> AM = {};
+            // Initialize bitmask arrays for representing the cut.
+            std::array<uint64_t, num_words> C = {};   // Base set bitmask.
+            std::array<uint64_t, num_words> AM = {};  // Augmented mask.
             std::vector<int> order(N_SIZE, 0);
 
-            // Define C
-            C[v / 64] |= (1ULL << (v % 64));
+            // Define C: mark only the selected node.
+            C[node / 64] |= (1ULL << (node % 64));
 
-            // Define AM
-            for (int node = 0; node < N_SIZE; ++node) {
-                AM[node / 64] |= (1ULL << (node % 64));
+            // Define AM: for this simple cut, mark all nodes.
+            for (int node_idx = 0; node_idx < N_SIZE; ++node_idx) {
+                AM[node_idx / 64] |= (1ULL << (node_idx % 64));
             }
 
-            SRCPermutation p;
-            p.num = {1};
-            p.den = 2;
-
-            // Compute coefficients for all paths
+            // Compute coefficients for each path based on the current cut.
             coefficients_aux.assign(allPaths.size(), 0.0);
             for (size_t j = 0; j < allPaths.size(); ++j) {
                 auto &clients = allPaths[j].route;
@@ -244,10 +263,11 @@ class LimitedMemoryRank1Cuts {
                     computeLimitedMemoryCoefficient(C, AM, p, clients, order);
             }
 
-            // Create and store the cut
+            // Create a new cut using the computed coefficients.
             Cut cut(C, AM, coefficients_aux, p);
             cut.baseSetOrder = order;
             cut.type = CutType::OneRow;
+            // Add the cut to the cut storage.
             cutStorage.addCut(cut);
         }
     }

@@ -83,6 +83,8 @@ class BucketGraph {
    public:
     double threshold = -1.5;
 
+    std::mutex merge_mutex;
+
     static  // Precompute bitmask lookup table at compile time
         constexpr std::array<uint64_t, 64>
             bit_mask_lookup = []() {
@@ -280,6 +282,11 @@ class BucketGraph {
 
     exec::static_thread_pool bi_pool = exec::static_thread_pool(2);
     exec::static_thread_pool::scheduler bi_sched = bi_pool.get_scheduler();
+
+    exec::static_thread_pool merge_pool =
+        exec::static_thread_pool(std::thread::hardware_concurrency());
+    exec::static_thread_pool::scheduler merge_sched =
+        merge_pool.get_scheduler();
 
     ~BucketGraph() {
         bi_pool.request_stop();
@@ -877,90 +884,95 @@ class BucketGraph {
     }
 
     void updateSplit() {
-        const double BASE_IMBALANCE_THRESHOLD =
-            0.15;  // Slightly lower base threshold
-        const double MIN_ADJUSTMENT_FACTOR = 0.02;
-        const double MAX_ADJUSTMENT_FACTOR = 0.10;
-        const double LEARNING_RATE_DECAY =
-            0.99;                      // Decay factor for learning rate
-        const double EMA_ALPHA = 0.1;  // Smoothing factor for EMA
+        // Base thresholds and parameters for adjustments.
+        constexpr double BASE_IMBALANCE_THRESHOLD =
+            0.15;  // Slightly lower base threshold.
+        constexpr double MIN_ADJUSTMENT_FACTOR = 0.02;
+        constexpr double MAX_ADJUSTMENT_FACTOR = 0.10;
+        constexpr double LEARNING_RATE_DECAY =
+            0.99;                          // Decay factor for learning rate.
+        constexpr double EMA_ALPHA = 0.1;  // Smoothing factor for EMA.
 
-        static double learning_rate =
-            MAX_ADJUSTMENT_FACTOR;  // Initialize learning rate
-        static double ema_imbalance_ratio =
-            0.0;  // Initialize EMA of imbalance ratio
+        // Static variables to persist state across calls.
+        static double learning_rate = MAX_ADJUSTMENT_FACTOR;
+        static double ema_imbalance_ratio = 0.0;
 
-        // Calculate label counts and ratios
-        double fw_labels = static_cast<double>(n_fw_labels);
-        double bw_labels = static_cast<double>(n_bw_labels);
-        double total_labels = fw_labels + bw_labels;
+        // Convert label counts to double for ratio computations.
+        const double fw_labels = static_cast<double>(n_fw_labels);
+        const double bw_labels = static_cast<double>(n_bw_labels);
+        const double total_labels = fw_labels + bw_labels;
 
-        // Skip if we don't have enough labels for meaningful
-        // adjustment
+        // Skip adjustment if too few labels exist.
         if (total_labels < 10) return;
 
-        // Calculate imbalance ratio
-        double fw_ratio = fw_labels / total_labels;
-        double bw_ratio = bw_labels / total_labels;
-        double imbalance_ratio = std::abs(fw_ratio - bw_ratio);
+        // Compute imbalance ratios for forward and backward labels.
+        const double fw_ratio = fw_labels / total_labels;
+        const double bw_ratio = bw_labels / total_labels;
+        const double imbalance_ratio = std::abs(fw_ratio - bw_ratio);
 
-        // Update EMA of imbalance ratio
-        ema_imbalance_ratio =
-            EMA_ALPHA * imbalance_ratio + (1 - EMA_ALPHA) * ema_imbalance_ratio;
+        // Update exponential moving average (EMA) of the imbalance ratio.
+        ema_imbalance_ratio = EMA_ALPHA * imbalance_ratio +
+                              (1.0 - EMA_ALPHA) * ema_imbalance_ratio;
 
-        // Dynamic threshold based on total number of labels
-        // As we get more labels, we can be more sensitive to
-        // imbalance
-        double dynamic_threshold =
+        // Dynamic threshold decreases as total_labels increase.
+        const double dynamic_threshold =
             BASE_IMBALANCE_THRESHOLD * std::exp(-total_labels / 1000.0);
 
+        // Only adjust split if the imbalance exceeds the dynamic threshold.
         if (ema_imbalance_ratio > dynamic_threshold) {
-            // Calculate adaptive adjustment factor
-            // More severe imbalance = larger adjustment
-            double severity = (ema_imbalance_ratio - dynamic_threshold) /
-                              (1.0 - dynamic_threshold);
-            double adjustment_factor =
+            // Severity scales between 0 and 1.
+            const double severity = (ema_imbalance_ratio - dynamic_threshold) /
+                                    (1.0 - dynamic_threshold);
+
+            // Adaptive adjustment factor increases with severity.
+            const double adjustment_factor =
                 MIN_ADJUSTMENT_FACTOR +
                 (MAX_ADJUSTMENT_FACTOR - MIN_ADJUSTMENT_FACTOR) * severity;
 
-            // Adjust learning rate based on the severity of
-            // imbalance
+            // Decay the learning rate.
             learning_rate *= LEARNING_RATE_DECAY;
 
-            // Adjust based on resource range
-            double resource_range = R_max[options.main_resources[0]] -
-                                    R_min[options.main_resources[0]];
-            double base_adjustment =
+            // Compute resource range based on the main resource.
+            const double resource_range = R_max[options.main_resources[0]] -
+                                          R_min[options.main_resources[0]];
+
+            // Base adjustment scales with the resource range and learning rate.
+            const double base_adjustment =
                 adjustment_factor * resource_range * learning_rate;
 
-            // Scale adjustment based on current split position
+            // Adjust each split position in q_star.
             for (size_t i = 0; i < q_star.size(); ++i) {
-                double relative_pos =
+                // Compute relative position (0: min, 1: max) within the
+                // resource range.
+                const double relative_pos =
                     (q_star[i] - R_min[options.main_resources[0]]) /
                     resource_range;
 
-                // Smaller adjustments near boundaries
-                double position_factor =
+                // Position factor gives smaller adjustments near boundaries.
+                const double position_factor =
                     4.0 * relative_pos * (1.0 - relative_pos);
 
-                // Determine direction and apply adjustment
-                double direction = (bw_labels > fw_labels) ? 1.0 : -1.0;
-                double final_adjustment =
+                // Determine direction: shift toward balancing label counts.
+                const double direction = (bw_labels > fw_labels) ? 1.0 : -1.0;
+
+                // Final adjustment for this split.
+                const double final_adjustment =
                     base_adjustment * position_factor * direction;
 
-                // Apply adjustment with boundary protection
-                q_star[i] = std::clamp(q_star[i] + final_adjustment,
-                                       R_min[options.main_resources[0]] +
-                                           resource_range * 0.1,  // Lower bound
-                                       R_max[options.main_resources[0]] -
-                                           resource_range * 0.1  // Upper bound
-                );
+                // Apply the adjustment with boundary protection.
+                q_star[i] =
+                    std::clamp(q_star[i] + final_adjustment,
+                               R_min[options.main_resources[0]] +
+                                   resource_range * 0.1,  // Lower bound.
+                               R_max[options.main_resources[0]] -
+                                   resource_range * 0.1  // Upper bound.
+                    );
             }
 
+            // Log adjustments if the base adjustment is significant.
             if (std::abs(base_adjustment) > resource_range * 0.05) {
                 print_info(
-                    "Split adjustment: imbalance={:.3f}, "
-                    "adjustment={:.3f}, "
+                    "Split adjustment: imbalance={:.3f}, adjustment={:.3f}, "
                     "learning_rate={:.3f}\n",
                     ema_imbalance_ratio, base_adjustment, learning_rate);
             }
@@ -1011,6 +1023,33 @@ class BucketGraph {
     int get_bucket_number(int node, std::vector<double> &values) noexcept;
 
     template <Direction D>
+    inline int get_static_bucket_number(
+        int node, std::vector<double> &resource_values_vec) noexcept {
+        const size_t num_resources = options.main_resources.size();
+
+        // Optionally adjust resource values (epsilon adjustments can be enabled
+        // here)
+        for (size_t r = 0; r < num_resources; ++r) {
+            if constexpr (D == Direction::Forward) {
+                // resource_values_vec[r] += numericutils::eps; // Uncomment if
+                // needed.
+            } else {
+                // resource_values_vec[r] -= numericutils::eps; // Uncomment if
+                // needed.
+            }
+        }
+
+        // Query the appropriate node interval tree based on direction.
+        if constexpr (D == Direction::Forward) {
+            return fw_node_interval_trees[node].queryStatic(
+                resource_values_vec);
+        } else {  // Direction::Backward
+            return bw_node_interval_trees[node].queryStatic(
+                resource_values_vec);
+        }
+    }
+
+    template <Direction D>
     Label *get_best_label(const std::vector<int> &topological_order,
                           const std::vector<double> &c_bar,
                           const std::vector<std::vector<int>> &sccs);
@@ -1040,8 +1079,8 @@ class BucketGraph {
     std::vector<Label *> bi_labeling_algorithm();
 
     template <Stage S, Symmetry SYM = Symmetry::Asymmetric>
-    void ConcatenateLabel(const Label *L, int &b, double &best_cost,
-                          std::vector<uint64_t> &Bvisited);
+    void ConcatenateLabel(const Label *L, int &b,
+                          std::atomic<double> &best_cost);
 
     template <Direction D>
     void UpdateBucketsSet(double theta, const Label *label,
@@ -1133,147 +1172,113 @@ class BucketGraph {
                                      std::vector<double> &resources);
 
     Label *compute_red_cost(Label *L, bool fw) {
+        // Calculate main and reduced costs.
         double real_cost = 0.0;
         double red_cost = 0.0;
 
+        // Check main resource feasibility.
         const double main_resource = L->resources[options.main_resources[0]];
         const double q_star_value = q_star[options.main_resources[0]];
-
         if (fw) {
-            if (main_resource > q_star_value) {
-                return nullptr;
-            }
+            if (main_resource > q_star_value) return nullptr;
         } else {
-            if (main_resource <= q_star_value) {
-                return nullptr;
-            }
+            if (main_resource <= q_star_value) return nullptr;
         }
 
-        // Initialize an empty SRCmap for the current label
-        std::vector<uint16_t> updated_SRCmap(cut_storage->size(), 0.0);
+        // Ensure sufficient nodes in the route.
+        if (L->nodes_covered.size() <= 3) return nullptr;
 
-        int last_node = -1;
-        if (L->nodes_covered.size() <= 3) {
-            return nullptr;
-        }
+        // Initialize an empty SRCmap vector with size equal to the current
+        // number of cuts.
+        std::vector<uint16_t> updated_SRCmap(cut_storage->size(), 0);
+
+        // Prepare new label.
         auto new_label = new Label();
+        new_label->nodes_covered.clear();
+        new_label->nodes_covered = L->nodes_covered;  // Copy the route
 
-        // Traverse through the label nodes from current to root
+        // Variables to keep track of costs.
+        int last_node = -1;
+
+        // Traverse the nodes in the route (from current label to root).
         for (auto node_id : L->nodes_covered) {
-            /////////////////////////////////////////////
-            // NG-route feasibility check
-            /////////////////////////////////////////////
-            ///
-            if (is_node_visited(new_label->visited_bitmap, node_id)) {
-                return nullptr;
+            // --- NG-route Feasibility Check ---
+            // Clear visited bitmap in the neighborhood of node_id.
+            for (size_t seg = 0, limit = new_label->visited_bitmap.size();
+                 seg < limit; ++seg) {
+                uint64_t current_visited = new_label->visited_bitmap[seg];
+                if (!current_visited) continue;
+                uint64_t neighborhood_mask = neighborhoods_bitmap[node_id][seg];
+                new_label->visited_bitmap[seg] =
+                    current_visited & neighborhood_mask;
             }
+            set_node_visited(new_label->visited_bitmap, node_id);
 
-            size_t limit = new_label->visited_bitmap.size();
-            for (size_t i = 0; i < limit; ++i) {
-                uint64_t current_visited =
-                    new_label->visited_bitmap[i];  // Get visited nodes
-                                                   // in the current
-                                                   // segment
-
-                if (!current_visited)
-                    continue;  // Skip if no nodes were visited in
-                               // this segment
-
-                uint64_t neighborhood_mask =
-                    neighborhoods_bitmap[node_id][i];  // Get neighborhood mask
-                                                       // for the current node
-                uint64_t bits_to_clear =
-                    current_visited & neighborhood_mask;  // Determine which
-                                                          // bits to clear
-
-                new_label->visited_bitmap[i] =
-                    bits_to_clear;  // Clear irrelevant visited
-                                    // nodes
-            }
-            set_node_visited(new_label->visited_bitmap,
-                             node_id);  // Mark the new node as visited
-
+            // --- Cost Accumulation ---
             if (last_node != -1) {
                 double cij_cost = getcij(last_node, node_id);
                 real_cost += cij_cost;
                 red_cost += cij_cost;
             }
-
             red_cost -= nodes[node_id].cost;
 
-            /////////////////////////////////////////////
-            // SRC logic
-            /////////////////////////////////////////////
-            ///
-            size_t segment =
-                node_id >> 6;  // Determine the segment in the bitmap
-            size_t bit_position =
-                node_id & 63;  // Determine the bit position in the segment
-
-            // Update the SRCmap for each cut
+            // --- SRC Logic ---
+            size_t segment = node_id >> 6;
+            const uint64_t bit_mask = bit_mask_lookup[node_id & 63];
             auto &cutter = cut_storage;
             auto &SRCDuals = cutter->SRCDuals;
-            const uint64_t bit_mask = 1ULL << bit_position;
 
+#if defined(SRC)
             for (std::size_t idx = 0; idx < cutter->size(); ++idx) {
                 const auto &cut = cutter->getCut(idx);
+                // Retrieve base set and order information.
                 const auto &baseSet = cut.baseSet;
-                const auto &baseSetorder = cut.baseSetOrder;
+                const auto &baseSetOrder = cut.baseSetOrder;
                 const auto &neighbors = cut.neighbors;
                 const auto &multipliers = cut.p;
 
-#if defined(SRC)
-                // Apply SRC logic to update the SRCmap
-                const bool bitIsSet = neighbors[segment] & bit_mask;
-
-                auto &src_map_value = updated_SRCmap[idx];
-                if (!bitIsSet) {
-                    src_map_value = 0.0;  // Reset if bit is not set
-                                          // in neighbors
+                // If the current node is not in the neighbor set, reset SRCmap
+                // value.
+                if (!(neighbors[segment] & bit_mask)) {
+                    updated_SRCmap[idx] = 0;
                     continue;
                 }
-                const bool bitIsSet2 = baseSet[segment] & bit_mask;
-
-                if (bitIsSet2) {
-                    auto &den = multipliers.den;
-                    src_map_value += multipliers.num[baseSetorder[node_id]];
-                    if (src_map_value >= den) {
-                        red_cost -= SRCDuals[idx];  // Apply the SRC dual
-                                                    // value if threshold is
-                                                    // exceeded
-                        src_map_value -= den;       // Reset the SRC map value
+                // If the current node is in the base set, update SRC value.
+                if (baseSet[segment] & bit_mask) {
+                    auto &src_val = updated_SRCmap[idx];
+                    src_val += multipliers.num[baseSetOrder[node_id]];
+                    if (src_val >= multipliers.den) {
+                        red_cost -= SRCDuals[idx];
+                        src_val -= multipliers.den;
                     }
                 }
-#endif
             }
+#endif
 
-            // Adjust for arc duals if in Stage::Four
+            // --- Arc and Branching Dual Adjustments ---
 #if defined(RCC) || defined(EXACT_RCC)
-            if (last_node) {
-                auto arc_dual = arc_duals.getDual(last_node, node_id);
-                red_cost -= arc_dual;
+            if (last_node != -1) {
+                red_cost -= arc_duals.getDual(last_node, node_id);
             }
 #endif
-
-            // Adjust for branching duals if they exist
-            if (branching_duals->size() > 0 && last_node) {
+            if (branching_duals->size() > 0 && last_node != -1) {
                 red_cost -= branching_duals->getDual(last_node, node_id);
             }
 
-            // Move to the parent node and update last_node
-            last_node = node_id;
+            last_node = node_id;  // Update last_node.
         }
 
+        // Set final label properties.
         new_label->cost = red_cost;
         new_label->real_cost = real_cost;
         new_label->parent = nullptr;
         new_label->node_id = L->node_id;
-        new_label->nodes_covered = L->nodes_covered;
         new_label->is_extended = false;
         new_label->resources = L->resources;
         new_label->SRCmap = updated_SRCmap;
+        new_label->fresh = false;
 
-        // Bucket number for the new label
+        // Determine bucket number for the new label.
         std::vector<double> new_resources(options.resources.size());
         for (size_t i = 0; i < options.resources.size(); ++i) {
             new_resources[i] = new_label->resources[i];
@@ -1283,10 +1288,9 @@ class BucketGraph {
                         : get_bucket_number<Direction::Backward>(
                               new_label->node_id, new_resources);
         new_label->vertex = bucket;
-        new_label->fresh = false;
 
         return new_label;
-    };
+    }
 
     // Define types for better readability
     using AdjList =
@@ -1324,67 +1328,249 @@ class BucketGraph {
 
     bool shallUpdateStep() {
         int update_ctr = 0;
-
         ankerl::unordered_dense::set<int> updated_buckets;
-        for (size_t b = 0; b < fw_buckets.size(); b++) {
-            if (fw_buckets[b].shall_split || bw_buckets[b].shall_split) {
-                auto inner_id = fw_buckets[b].node_id;
-                if (inner_id != options.depot &&
-                    inner_id != options.end_depot) {
-                    if (updated_buckets.contains(inner_id)) {
-                        continue;
-                    }
 
-                    if (fw_bucket_splits[inner_id] == 100) {
-                        continue;
-                    }
-                    auto update_target =
-                        std::min(fw_bucket_splits[inner_id] * 2, 100);
-                    fw_bucket_splits[inner_id] = update_target;
-                    bw_bucket_splits[inner_id] = update_target;
-                    updated_buckets.insert(inner_id);
-                    update_ctr++;
+        // Iterate over all buckets and check if either forward or backward
+        // bucket indicates a split is needed.
+        for (size_t b = 0; b < fw_buckets.size(); ++b) {
+            if (fw_buckets[b].shall_split || bw_buckets[b].shall_split) {
+                const int inner_id = fw_buckets[b].node_id;
+                // Skip depot buckets.
+                if (inner_id == options.depot ||
+                    inner_id == options.end_depot) {
+                    continue;
                 }
+                // If this node was already updated, skip it.
+                if (updated_buckets.contains(inner_id)) {
+                    continue;
+                }
+                // If the bucket split value is already at maximum (100), skip.
+                if (fw_bucket_splits[inner_id] == 100) {
+                    continue;
+                }
+                // Update the bucket splits by doubling the current value,
+                // capped at 100.
+                const int update_target =
+                    std::min(fw_bucket_splits[inner_id] * 2, 100);
+                fw_bucket_splits[inner_id] = update_target;
+                bw_bucket_splits[inner_id] = update_target;
+                updated_buckets.insert(inner_id);
+                update_ctr++;
             }
         }
 
+        // If we have reached a significant number of updates and we haven't
+        // accumulated too many cuts, then update bucket splits.
         const int CHANGE_THRESHOLD = nodes.size() / 6;
         if (update_ctr >= CHANGE_THRESHOLD && cut_storage->size() < 40) {
+            // Clear union caches.
             fw_union_cache.clear();
             bw_union_cache.clear();
             print_info("Updating bucket splits with {} changes\n", update_ctr);
-            // reset_fixed();
-            // reset_fixed_buckets();
 
+            // Redefine buckets in parallel for both forward and backward
+            // directions.
             PARALLEL_SECTIONS(
                 work, bi_sched,
                 SECTION {
-                    // Section 1: Forward direction
+                    // Forward bucket redefinition.
                     define_buckets<Direction::Forward>();
                 },
                 SECTION {
-                    // Section 2: Backward direction
+                    // Backward bucket redefinition.
                     define_buckets<Direction::Backward>();
                 });
 
+            // Regenerate arcs after updating bucket splits.
             generate_arcs();
 
+            // Process jump bucket arcs in parallel.
             PARALLEL_SECTIONS(
                 workB, bi_sched,
-                SECTION {
-                    // Forward direction processing
-                    ObtainJumpBucketArcs<Direction::Forward>();
-                },
-                SECTION {
-                    // Backward direction processing
-                    ObtainJumpBucketArcs<Direction::Backward>();
-                });
-            // fmt::print("Generated arcs\n");
+                SECTION { ObtainJumpBucketArcs<Direction::Forward>(); },
+                SECTION { ObtainJumpBucketArcs<Direction::Backward>(); });
 
-            // fixed = false;
             return true;
         }
         return false;
+    }
+
+    template <Direction D>
+    void define_buckets(const int fixed_num_buckets) {
+        // Get references to forward/backward buckets.
+        auto &buckets = assign_buckets<D>(fw_buckets, bw_buckets);
+        buckets.clear();
+
+        // Also clear the fixed bitmap (if used elsewhere).
+        auto &fixed_buckets_bitmap =
+            assign_buckets<D>(fw_fixed_buckets_bitmap, bw_fixed_buckets_bitmap);
+        fixed_buckets_bitmap.clear();
+
+        // Get other direction-specific containers.
+        const int num_intervals =
+            options.main_resources.size();  // number of resource dimensions
+        auto &num_buckets = assign_buckets<D>(num_buckets_fw, num_buckets_bw);
+        auto &num_buckets_index =
+            assign_buckets<D>(num_buckets_index_fw, num_buckets_index_bw);
+        auto &node_interval_trees =
+            assign_buckets<D>(fw_node_interval_trees, bw_node_interval_trees);
+        auto &buckets_size =
+            assign_buckets<D>(fw_buckets_size, bw_buckets_size);
+        auto &bucket_splits =
+            assign_buckets<D>(fw_bucket_splits, bw_bucket_splits);
+
+        // Pre-allocate per-node containers.
+        const size_t num_nodes = nodes.size();
+        num_buckets.resize(num_nodes);
+        num_buckets_index.resize(num_nodes);
+        node_interval_trees.assign(num_nodes, SplayTree());
+
+        // Lambda to calculate an interval for a given resource dimension.
+        // Rounding is applied after computing boundaries.
+        auto calculate_interval =
+            [&](double lb, double ub, double base_interval, int pos,
+                int max_interval,
+                bool is_forward) -> std::pair<double, double> {
+            double start, end;
+            if (is_forward) {
+                start = (pos == 0) ? lb : lb + pos * base_interval;
+                end = (pos == max_interval - 1)
+                          ? ub
+                          : lb + (pos + 1) * base_interval;
+            } else {
+                start = (pos == max_interval - 1)
+                            ? lb
+                            : ub - (pos + 1) * base_interval;
+                end = (pos == 0) ? ub : ub - pos * base_interval;
+            }
+            return {roundToTwoDecimalPlaces(start),
+                    roundToTwoDecimalPlaces(end)};
+        };
+
+        int bucket_index = 0;
+        int cum_sum = 0;
+        std::vector<double> interval_start(num_intervals);
+        std::vector<double> interval_end(num_intervals);
+        // "pos" holds the current combination indices when multi-dimensional.
+        std::vector<int> pos(num_intervals, 0);
+
+        // Process each node (job) to define its buckets.
+        for (const auto &VRPNode : nodes) {
+            // Compute the number of splits for each resource dimension.
+            // For a single dimension, we use the fixed number directly.
+            // For multiple dimensions we choose an equal split in each
+            // dimension.
+            std::vector<int> node_split_counts(num_intervals, 1);
+            if (num_intervals == 1) {
+                node_split_counts[0] = fixed_num_buckets;
+            } else {
+                // Compute an equal split count per dimension (rounded).
+                int equal_split =
+                    std::max(1, static_cast<int>(std::round(std::pow(
+                                    fixed_num_buckets, 1.0 / num_intervals))));
+                for (int r = 0; r < num_intervals; ++r) {
+                    node_split_counts[r] = equal_split;
+                }
+                // Adjust the first dimension if the product is less than
+                // fixed_num_buckets.
+                int product = 1;
+                for (int r = 0; r < num_intervals; ++r) {
+                    product *= node_split_counts[r];
+                }
+                if (product < fixed_num_buckets) {
+                    int factor = fixed_num_buckets / product;
+                    node_split_counts[0] *= factor;
+                }
+            }
+
+            // Compute the width (base interval) for each resource dimension.
+            std::vector<double> node_base_interval(num_intervals);
+            for (int r = 0; r < num_intervals; ++r) {
+                node_base_interval[r] =
+                    (VRPNode.ub[r] - VRPNode.lb[r]) /
+                    static_cast<double>(node_split_counts[r]);
+            }
+
+            // Optionally store the per-node split information.
+            // (Here we store just the first dimension's split count; you could
+            // store the full vector.)
+            bucket_splits[VRPNode.id] = (num_intervals == 1)
+                                            ? node_split_counts[0]
+                                            : node_split_counts[0];
+
+            SplayTree node_tree;
+            int n_buckets = 0;
+
+            if (num_intervals == 1) {
+                // Single-dimensional splitting.
+                for (int j = 0; j < node_split_counts[0]; ++j) {
+                    auto [start, end] = calculate_interval(
+                        VRPNode.lb[0], VRPNode.ub[0], node_base_interval[0], j,
+                        node_split_counts[0], D == Direction::Forward);
+                    // Clamp to the node's bounds.
+                    if constexpr (D == Direction::Backward) {
+                        start = std::max(start, VRPNode.lb[0]);
+                    } else {
+                        end = std::min(end, VRPNode.ub[0]);
+                    }
+                    buckets.push_back(Bucket(VRPNode.id,
+                                             std::vector<double>{start},
+                                             std::vector<double>{end}));
+                    node_tree.insert(std::vector<double>{start},
+                                     std::vector<double>{end}, bucket_index++);
+                    n_buckets++;
+                    cum_sum++;
+                }
+            } else {
+                // Multi-dimensional splitting.
+                std::fill(pos.begin(), pos.end(), 0);
+                while (true) {
+                    for (int r = 0; r < num_intervals; ++r) {
+                        auto [start, end] = calculate_interval(
+                            VRPNode.lb[r], VRPNode.ub[r], node_base_interval[r],
+                            pos[r], node_split_counts[r],
+                            D == Direction::Forward);
+                        interval_start[r] = start;
+                        interval_end[r] = end;
+                        // Optionally clamp to global resource bounds.
+                        if constexpr (D == Direction::Backward) {
+                            interval_start[r] =
+                                std::max(interval_start[r], R_min[r]);
+                        } else {
+                            interval_end[r] =
+                                std::min(interval_end[r], R_max[r]);
+                        }
+                    }
+                    buckets.push_back(
+                        Bucket(VRPNode.id, interval_start, interval_end));
+                    node_tree.insert(interval_start, interval_end,
+                                     bucket_index++);
+                    n_buckets++;
+                    cum_sum++;
+
+                    // Generate next combination of splits.
+                    int i = 0;
+                    while (i < num_intervals) {
+                        ++pos[i];
+                        if (pos[i] < node_split_counts[i]) {
+                            break;
+                        } else {
+                            pos[i] = 0;
+                            ++i;
+                        }
+                    }
+                    if (i == num_intervals) break;
+                }
+            }
+
+            // Update per-node bucket bookkeeping.
+            num_buckets[VRPNode.id] = n_buckets;
+            num_buckets_index[VRPNode.id] = cum_sum - n_buckets;
+            node_interval_trees[VRPNode.id] = node_tree;
+        }
+
+        // Update the overall bucket count.
+        buckets_size = buckets.size();
     }
 
    private:

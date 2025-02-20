@@ -362,9 +362,8 @@ class MIPProblem {
         auto newVar =
             std::make_shared<baldesVar>(var_name, type, lb, ub, obj_coeff);
         newVar->set_index(index);
-        variables.emplace_back(newVar);
-        var_name_to_index.emplace(
-            var_name, index);  // Using emplace instead of [] operator
+        variables.push_back(newVar);
+        var_name_to_index.emplace(var_name, index);
 #ifdef GUROBI
         gurobiCache->addVariable(newVar);
 #endif
@@ -437,39 +436,35 @@ class MIPProblem {
 
     baldesCtrPtr add_constraint(const LinearExpression &expression, double rhs,
                                 char relation) {
-        int constraint_index = constraints.size();  // Get the current index
-        // Add the constraint to the list of constraints and set its index
+        // Determine the new constraint's index.
+        int constraint_index = constraints.size();
+
+        // Create the new constraint and add it to the Gurobi cache (if
+        // applicable).
         auto new_constraint =
             std::make_shared<baldesCtr>(expression, rhs, relation);
-
 #ifdef GUROBI
         gurobiCache->addConstraint(new_constraint);
 #endif
 
+        // Record the RHS value and set the constraint index.
         b_vec.push_back(rhs);
-        new_constraint->set_index(
-            constraint_index);  // Set the constraint's index
+        new_constraint->set_index(constraint_index);
+        constraints.push_back(new_constraint);
 
-        constraints.push_back(new_constraint);  // Add to constraints list
-
-        // Convert the LinearExpression to sparse row format and add to the
-        // sparse matrix
+        // Prepare for batch insertion into the sparse matrix.
         int row_index = constraint_index;
-        // sparse_matrix.num_rows++;
+        const auto &terms = expression.get_terms();
 
-        // Assuming you have many variables, use a more efficient lookup
-        // like a map Original individual insertions
         std::vector<int> batch_rows;
         std::vector<int> batch_cols;
         std::vector<double> batch_values;
+        batch_rows.reserve(terms.size());
+        batch_cols.reserve(terms.size());
+        batch_values.reserve(terms.size());
 
-        // Pre-allocate vectors with expected size
-        batch_rows.reserve(expression.get_terms().size());
-        batch_cols.reserve(expression.get_terms().size());
-        batch_values.reserve(expression.get_terms().size());
-
-        // Collect all terms for batch insertion
-        for (const auto &[var_name, coeff] : expression.get_terms()) {
+        // Collect terms for batch insertion.
+        for (const auto &[var_name, coeff] : terms) {
             auto it = var_name_to_index.find(var_name);
             if (it != var_name_to_index.end()) {
                 batch_rows.push_back(row_index);
@@ -477,23 +472,21 @@ class MIPProblem {
                 batch_values.push_back(coeff);
             } else {
                 fmt::print(
-                    "baldesVar {} not found in the problem's variables "
-                    "list!\n",
+                    "baldesVar {} not found in the problem's variables list!\n",
                     var_name);
             }
         }
 
-        // Perform batch insertion
+        // Batch insert the collected terms into the sparse matrix.
         sparse_matrix.insert_batch(batch_rows, batch_cols, batch_values);
 
-        // Update row start for CRS
-        // sparse_matrix.buildRowStart();
         return new_constraint;
     }
 
     baldesCtrPtr add_constraint(baldesCtrPtr constraint,
                                 const std::string &name) {
-        int constraint_index = constraints.size();  // Get the current index
+        // Set the new constraint's index and name.
+        int constraint_index = constraints.size();
         constraint->set_index(constraint_index);
         constraint->set_name(name);
 
@@ -501,38 +494,37 @@ class MIPProblem {
         gurobiCache->addConstraint(constraint);
 #endif
 
-        // Add the constraint to the list
+        // Add the constraint to our list and record its RHS.
         constraints.push_back(constraint);
         b_vec.push_back(constraint->get_rhs());
-        // Get the expression and relation (assuming it needs to be used
-        // later)
-        const LinearExpression &expression = constraint->get_expression();
 
-        // Add terms of the expression into the sparse matrix
+        // Retrieve the linear expression for later use.
+        const LinearExpression &expression = constraint->get_expression();
         int row_index = constraint_index;
 
-        // Prepare batch vectors
+        // Prepare vectors for batch insertion into the sparse matrix.
         std::vector<int> batch_rows;
         std::vector<int> batch_cols;
         std::vector<double> batch_values;
+        auto numTerms = expression.get_terms().size();
+        batch_rows.reserve(numTerms);
+        batch_cols.reserve(numTerms);
+        batch_values.reserve(numTerms);
 
-        // Pre-allocate space
-        batch_rows.reserve(expression.get_terms().size());
-        batch_cols.reserve(expression.get_terms().size());
-        batch_values.reserve(expression.get_terms().size());
-
-        // Collect terms for batch insertion
+        // Collect all terms (variable name and coefficient) for this
+        // constraint.
         for (const auto &[var_name, coeff] : expression.get_terms()) {
+            // Use the lookup to get the column index for this variable.
             int col_index = var_name_to_index[var_name];
             batch_rows.push_back(row_index);
             batch_cols.push_back(col_index);
             batch_values.push_back(coeff);
         }
 
-        // Perform batch insertion
+        // Insert the batch of coefficients into the sparse matrix.
         sparse_matrix.insert_batch(batch_rows, batch_cols, batch_values);
 
-        // Return reference to the added constraint
+        // Return the newly added constraint.
         return constraints.back();
     }
 
@@ -591,28 +583,23 @@ class MIPProblem {
 
     // Main implementation that does the actual deletion work
     void delete_constraint(int constraint_index) {
-        // Delete the row from the sparse matrix
+        // Delete the row from the sparse matrix.
         sparse_matrix.delete_row(constraint_index);
 
 #ifdef GUROBI
         gurobiCache->deleteConstraint(constraint_index);
 #endif
 
-        // Erase the constraint from the constraints vector and b_vec
-        // atomically
+        // Erase the constraint and its right-hand side value.
         constraints.erase(constraints.begin() + constraint_index);
         b_vec.erase(b_vec.begin() + constraint_index);
 
-        // Update the indices of the remaining constraints
-        // Consider using parallel processing if constraints.size() is very
-        // large
+        // Update indices for the remaining constraints.
+        // If constraints.size() is large, this loop might be parallelized.
         for (int i = constraint_index; i < static_cast<int>(constraints.size());
              ++i) {
-            auto &constraint = constraints[i];
-            if (constraint) {  // null check
-                int old_index = constraint->index();
-                constraint->set_index(i);
-
+            if (constraints[i]) {
+                constraints[i]->set_index(i);
             } else {
                 std::cerr << "Null constraint found at position " << i
                           << std::endl;
@@ -687,70 +674,78 @@ class MIPProblem {
     }
 
     void chgCoeff(int constraintIndex, const std::vector<double> &values) {
-        if (constraintIndex < 0 || constraintIndex >= constraints.size()) {
+        // Check for a valid constraint index.
+        if (constraintIndex < 0 ||
+            constraintIndex >= static_cast<int>(constraints.size())) {
             fmt::print("Invalid constraint index: {}\n", constraintIndex);
             throw std::out_of_range("Invalid constraint index");
         }
 
 #ifdef GUROBI
+        // Modify constraint in the GUROBI cache.
         gurobiCache->modifyConstraint(constraintIndex, values);
 #endif
 
-        // Get the constraint that is being modified
+        // Retrieve the constraint and its linear expression.
         baldesCtrPtr constraint = constraints[constraintIndex];
         LinearExpression &expression = constraint->get_expression();
 
-        // Iterate over the values and only update changed entries
-        for (int i = 0; i < values.size(); ++i) {
+        // Iterate over each term in the coefficient vector.
+        for (size_t i = 0; i < values.size(); ++i) {
             double new_value = values[i];
 
-            // Update the sparse matrix only if the value has changed
-            sparse_matrix.modify_or_delete(constraintIndex, i, new_value);
+            // Update the sparse matrix with the new value.
+            sparse_matrix.modify_or_delete(constraintIndex, static_cast<int>(i),
+                                           new_value);
 
+            // Retrieve the variable's name based on its index.
             const std::string &var_name = variables[i]->get_name();
 
-            // Update or remove terms in the LinearExpression
+            // Update the linear expression:
+            // If the coefficient is nonzero, add or update the term.
+            // Otherwise, remove the term from the expression.
             if (new_value != 0.0) {
-                expression.add_or_update_term(
-                    var_name,
-                    new_value);  // Optimized to add/update the term
+                expression.add_or_update_term(var_name, new_value);
             } else {
-                expression.remove_term(
-                    var_name);  // Remove the term if the value is 0
+                expression.remove_term(var_name);
             }
         }
 
-        // Rebuild the CRS structure once after all updates
+        // Optionally, rebuild the sparse matrix's row start pointers.
         // sparse_matrix.buildRowStart();
     }
 
     void chgCoeff(int constraintIndex, int variableIndex, double value) {
-        if (constraintIndex < 0 || constraintIndex >= constraints.size() ||
-            variableIndex < 0 || variableIndex >= variables.size()) {
+        // Validate indices.
+        if (constraintIndex < 0 ||
+            constraintIndex >= static_cast<int>(constraints.size()) ||
+            variableIndex < 0 ||
+            variableIndex >= static_cast<int>(variables.size())) {
             throw std::out_of_range("Invalid constraint or variable index");
         }
 
 #ifdef GUROBI
+        // Update the coefficient in the GUROBI cache.
         gurobiCache->modifyCoefficient(constraintIndex, variableIndex, value);
 #endif
 
-        // Update the sparse matrix only if the value has changed
+        // Update the sparse matrix: either modify the coefficient or delete the
+        // entry if zero.
         sparse_matrix.modify_or_delete(constraintIndex, variableIndex, value);
 
-        // Update the LinearExpression in the corresponding baldesCtr
+        // Retrieve the constraint and its linear expression.
         baldesCtrPtr constraint = constraints[constraintIndex];
         LinearExpression &expression = constraint->get_expression();
 
+        // Get the variable's name for lookup.
         const std::string &var_name = variables[variableIndex]->get_name();
 
-        // Update or remove terms in the LinearExpression
+        // Update the linear expression: add or update the term if nonzero;
+        // remove otherwise.
         if (value != 0.0) {
-            expression.add_or_update_term(
-                var_name,
-                value);  // Add or update the term (variable, coefficient)
+            expression.add_or_update_term(var_name, value);
         } else {
-            expression.remove_term(
-                var_name);  // Remove the term if the value is 0
+            expression.remove_term(var_name);
         }
     }
 

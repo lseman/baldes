@@ -98,6 +98,7 @@ class BNBNode : public std::enable_shared_from_this<BNBNode> {
     std::vector<std::vector<int>> bestRoutes;
 
     int depth = 0;
+    int numK = 0;
     int numConstrs = 0;
 
     MIPProblem mip = MIPProblem("node", 0, 0);

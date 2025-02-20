@@ -79,7 +79,7 @@ class Stabilization {
     double lag_gap = 0.0;
     double lag_gap_prev = -std::numeric_limits<double>::infinity();
 
-    int numK = 8;
+    int numK = 10;
 
     int sizeDual;
 
@@ -123,7 +123,7 @@ class Stabilization {
 
     double _misprice_schedule(int nb_misprices, double base_alpha) {
         double alpha = 1.0 - (nb_misprices + 1) * (1 - base_alpha);
-        if (nb_misprices > 5 || alpha <= 1e-3) {
+        if (nb_misprices > 10 || alpha <= 1e-3) {
             alpha = 0.0;  // Deactivate stabilization
         }
         duals_in = duals_sep;
@@ -180,16 +180,20 @@ class Stabilization {
     DualSolution getStabDualSolAdvanced(const DualSolution &input_duals) {
         constexpr double EPSILON = 1e-12;
 
+        // Use only the first sizeDual elements from input_duals.
         DualSolution nodeDuals(input_duals.begin(),
                                input_duals.begin() + sizeDual);
 
+        // If stabilization center or subgradient are not available, return the
+        // input.
         if (cur_stab_center.empty() || subgradient.empty()) {
             return input_duals;
         }
 
         const size_t n = nodeDuals.size();
 
-        // Step 1: π˜ = πin + (1−α)(πout − πin)
+        // Step 1: pi_tilde = cur_stab_center + (1 - cur_alpha)*(nodeDuals -
+        // cur_stab_center)
         DualSolution pi_tilde(n);
         for (size_t i = 0; i < n; ++i) {
             pi_tilde[i] =
@@ -197,52 +201,64 @@ class Stabilization {
                 (1.0 - cur_alpha) * (nodeDuals[i] - cur_stab_center[i]);
         }
 
-        // Step 2: πg = πin + (gin/||gin||) * ||πout − πin||
-        double norm_in_out = 0.0;
-        for (size_t i = 0; i < n; ++i) {
-            double diff = nodeDuals[i] - cur_stab_center[i];
-            norm_in_out += diff * diff;
-        }
-        norm_in_out = std::sqrt(norm_in_out + EPSILON);
+        // Step 2: Compute norm_in_out = ||nodeDuals - cur_stab_center||
+        double norm_in_out =
+            std::sqrt(std::inner_product(nodeDuals.begin(), nodeDuals.end(),
+                                         cur_stab_center.begin(), 0.0,
+                                         std::plus<double>(),
+                                         [](double a, double b) {
+                                             double d = a - b;
+                                             return d * d;
+                                         }) +
+                      EPSILON);
 
+        // Compute pi_g = cur_stab_center +
+        // (subgradient/subgradient_norm)*norm_in_out
         DualSolution pi_g(n);
         for (size_t i = 0; i < n; ++i) {
             pi_g[i] = cur_stab_center[i] +
                       (subgradient[i] / subgradient_norm) * norm_in_out;
         }
 
-        // Step 3: ρ = βπg + (1−β)πout
+        // Step 3: rho = beta*pi_g + (1 - beta)*nodeDuals
         DualSolution rho(n);
         for (size_t i = 0; i < n; ++i) {
             rho[i] = beta * pi_g[i] + (1.0 - beta) * nodeDuals[i];
         }
 
-        // Calculate ||π˜ − πin||
-        double norm_tilde_in = 0.0;
-        for (size_t i = 0; i < n; ++i) {
-            double diff = pi_tilde[i] - cur_stab_center[i];
-            norm_tilde_in += diff * diff;
-        }
-        norm_tilde_in = std::sqrt(norm_tilde_in + EPSILON);
+        // Compute norm_tilde_in = ||pi_tilde - cur_stab_center||
+        double norm_tilde_in =
+            std::sqrt(std::inner_product(pi_tilde.begin(), pi_tilde.end(),
+                                         cur_stab_center.begin(), 0.0,
+                                         std::plus<double>(),
+                                         [](double a, double b) {
+                                             double d = a - b;
+                                             return d * d;
+                                         }) +
+                      EPSILON);
 
-        // Calculate ||ρ − πin||
-        double norm_rho_in = 0.0;
-        for (size_t i = 0; i < n; ++i) {
-            double diff = rho[i] - cur_stab_center[i];
-            norm_rho_in += diff * diff;
-        }
-        norm_rho_in = std::sqrt(norm_rho_in + EPSILON);
+        // Compute norm_rho_in = ||rho - cur_stab_center||
+        double norm_rho_in = std::sqrt(
+            std::inner_product(rho.begin(), rho.end(), cur_stab_center.begin(),
+                               0.0, std::plus<double>(),
+                               [](double a, double b) {
+                                   double d = a - b;
+                                   return d * d;
+                               }) +
+            EPSILON);
 
-        // Step 4: πsep = πin + (||π˜ − πin||/||ρ − πin||)(ρ − πin)
+        // Step 4: new_duals = cur_stab_center + (norm_tilde_in / norm_rho_in) *
+        // (rho - cur_stab_center)
         DualSolution new_duals(n);
         for (size_t i = 0; i < n; ++i) {
             new_duals[i] =
                 cur_stab_center[i] +
                 (norm_tilde_in / norm_rho_in) * (rho[i] - cur_stab_center[i]);
-            new_duals[i] =
-                std::max(0.0, new_duals[i]);  // Project onto positive orthant
+            new_duals[i] = std::max(
+                0.0, new_duals[i]);  // Project onto the positive orthant.
         }
 
+        // Store the new dual solutions in smoothing variables.
         smooth_dual_sol = new_duals;
         duals_sep = new_duals;
         return new_duals;
@@ -251,42 +267,51 @@ class Stabilization {
     static constexpr double EPSILON = 1e-12;
 
     bool dynamic_alpha_schedule(const ModelData &dados) {
+        constexpr double DOT_TOLERANCE = 1e-3;
         const size_t n = cur_stab_center.size();
 
-        double relative_distance = norm(smooth_dual_sol, cur_stab_center) /
-                                   (std::abs(lp_obj) + EPSILON);
-        if (relative_distance < NORM_TOLERANCE) {
+        // Compute relative distance: ||smooth_dual_sol - cur_stab_center|| /
+        // |lp_obj|
+        double rel_distance = norm(smooth_dual_sol, cur_stab_center) /
+                              (std::abs(lp_obj) + EPSILON);
+        if (rel_distance < NORM_TOLERANCE) {
             alpha = 0.0;
             return false;
         }
 
+        // Compute the difference vector (direction = smooth_dual_sol -
+        // cur_stab_center)
         std::vector<double> direction(n);
-        double direction_norm = 0.0;
-
-        for (size_t i = 0; i < n; i++) {
+        for (size_t i = 0; i < n; ++i) {
             direction[i] = smooth_dual_sol[i] - cur_stab_center[i];
-            direction_norm += direction[i] * direction[i];
         }
-        direction_norm = std::sqrt(direction_norm + EPSILON);
 
-        if (direction_norm < EPSILON || subgradient_norm < EPSILON) {
+        // Compute norm of direction vector using inner_product
+        double dir_norm =
+            std::sqrt(std::inner_product(direction.begin(), direction.end(),
+                                         direction.begin(), 0.0) +
+                      EPSILON);
+        if (dir_norm < EPSILON || subgradient_norm < EPSILON) {
             return false;
         }
 
+        // Normalize the direction and the subgradient vectors.
         std::vector<double> normalized_direction(n);
         std::vector<double> normalized_subgradient(n);
-
-        for (size_t i = 0; i < n; i++) {
-            normalized_direction[i] = direction[i] / direction_norm;
+        for (size_t i = 0; i < n; ++i) {
+            normalized_direction[i] = direction[i] / dir_norm;
             normalized_subgradient[i] = subgradient[i] / subgradient_norm;
         }
 
-        double cos_angle = 0.0;
-        for (size_t i = 0; i < n; i++) {
-            cos_angle += normalized_direction[i] * normalized_subgradient[i];
-        }
+        // Compute the cosine of the angle between normalized_direction and
+        // normalized_subgradient.
+        double cos_angle = std::inner_product(
+            normalized_direction.begin(), normalized_direction.end(),
+            normalized_subgradient.begin(), 0.0);
 
-        return cos_angle < 1e-3;
+        // If the cosine of the angle is very close to zero, then the vectors
+        // are nearly orthogonal.
+        return cos_angle < DOT_TOLERANCE;
     }
 
     void update_subgradient(const ModelData &dados,
@@ -295,11 +320,10 @@ class Stabilization {
         size_t number_of_rows = nodeDuals.size();
         new_rows.assign(number_of_rows, 0.0);
 
-        for (const auto &col : best_pricing_cols) {
-            for (const auto &node : col->nodes_covered) {
-                if (node > 0 && node != N_SIZE - 1) {
-                    new_rows[node - 1] += 1.0;
-                }
+        auto col = best_pricing_cols[0];
+        for (const auto &node : col->nodes_covered) {
+            if (node > 0 && node != N_SIZE - 1) {
+                new_rows[node - 1] += 1.0;
             }
         }
 
@@ -375,7 +399,7 @@ class Stabilization {
         //     base_alpha = 0.0;
         // }
 
-        if (lag_gap < lag_gap_prev) {
+        if (lag_gap <= lag_gap_prev) {
             stab_center_for_next_iteration = smooth_dual_sol;
             cut_added = false;
         } else {
