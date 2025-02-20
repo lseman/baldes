@@ -1,0 +1,11 @@
+<map id="IteratedLocalSearch" name="IteratedLocalSearch">
+<area shape="rect" id="Node000001" title=" " alt="" coords="101,183,240,208"/>
+<area shape="rect" id="Node000002" href="$structInstanceData.html" title="A structure to hold various data related to an instance of a problem." alt="" coords="5,94,104,120"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="80,128,115,157,151,180,148,184,112,161,76,132"/>
+<area shape="rect" id="Node000003" href="$classCutStorage.html" title="Manages the storage and operations related to cuts in a solver." alt="" coords="127,94,214,120"/>
+<area shape="poly" id="edge2_Node000001_Node000003" title=" " alt="" coords="173,135,173,182,168,182,168,135"/>
+<area shape="rect" id="Node000004" href="$structCutStorage_1_1SegmentMasks.html" title=" " alt="" coords="79,5,262,31"/>
+<area shape="poly" id="edge3_Node000003_Node000004" title=" " alt="" coords="173,47,173,94,168,94,168,47"/>
+<area shape="rect" id="Node000005" href="$classXoroshiro128Plus.html" title=" " alt="" coords="238,94,362,120"/>
+<area shape="poly" id="edge4_Node000001_Node000005" title=" " alt="" coords="281,133,248,161,203,184,201,180,245,156,277,129"/>
+</map>

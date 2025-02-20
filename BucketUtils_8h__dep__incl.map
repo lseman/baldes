@@ -1,0 +1,29 @@
+<map id="BucketUtils.h" name="BucketUtils.h">
+<area shape="rect" id="Node000001" title="Header file for utilities related to the Bucket Graph in the Vehicle Routing Problem (VRP)." alt="" coords="313,5,412,31"/>
+<area shape="rect" id="Node000002" href="$BCP_8h.html" title="Header file for the BCP class." alt="" coords="136,153,195,178"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="336,43,183,154,180,150,332,38"/>
+<area shape="rect" id="Node000008" href="$BucketBindings_8cpp.html" title="Python bindings for the BucketGraph, VRPNode, Label, PSTEPDuals, and BucketOptions classes using pybi..." alt="" coords="219,153,355,178"/>
+<area shape="poly" id="edge9_Node000001_Node000008" title=" " alt="" coords="334,42,316,60,301,80,294,99,290,119,289,153,283,152,285,118,289,97,296,78,312,56,331,38"/>
+<area shape="rect" id="Node000009" href="$BucketGraph_8cpp.html" title="Implementation of the BucketGraph class and related structures for solving vehicle routing problems (..." alt="" coords="380,153,501,178"/>
+<area shape="poly" id="edge10_Node000001_Node000009" title=" " alt="" coords="396,39,415,56,431,78,438,97,442,118,444,152,438,153,437,118,433,99,426,80,411,60,392,43"/>
+<area shape="rect" id="Node000010" href="$BucketPSTEP_8cpp.html" title=" " alt="" coords="525,153,654,178"/>
+<area shape="poly" id="edge11_Node000001_Node000010" title=" " alt="" coords="396,38,572,150,569,154,393,42"/>
+<area shape="rect" id="Node000011" href="$BucketSolve_8h.html" title="Defines the BucketGraph class and its solving methods for optimization problems." alt="" coords="310,79,416,105"/>
+<area shape="poly" id="edge12_Node000001_Node000011" title=" " alt="" coords="366,46,366,79,360,79,360,46"/>
+<area shape="rect" id="Node000003" href="$BCP_8cpp.html" title=" " alt="" coords="5,300,78,326"/>
+<area shape="poly" id="edge2_Node000002_Node000003" title=" " alt="" coords="124,186,94,204,69,228,58,246,51,265,45,300,40,299,46,264,54,244,65,225,91,200,121,182"/>
+<area shape="rect" id="Node000004" href="$BNB_8h.html" title=" " alt="" coords="244,226,303,252"/>
+<area shape="poly" id="edge3_Node000002_Node000004" title=" " alt="" coords="198,185,257,224,254,228,195,190"/>
+<area shape="rect" id="Node000005" href="$Baldes_8cpp.html" title=" " alt="" coords="230,300,315,326"/>
+<area shape="poly" id="edge5_Node000002_Node000005" title=" " alt="" coords="185,189,265,298,261,301,181,193"/>
+<area shape="rect" id="Node000006" href="$Branching_8h.html" title=" " alt="" coords="80,226,169,252"/>
+<area shape="poly" id="edge6_Node000002_Node000006" title=" " alt="" coords="153,193,133,227,129,225,149,190"/>
+<area shape="poly" id="edge4_Node000004_Node000005" title=" " alt="" coords="276,268,275,300,270,299,270,267"/>
+<area shape="poly" id="edge7_Node000006_Node000003" title=" " alt="" coords="100,265,57,302,54,298,97,260"/>
+<area shape="rect" id="Node000007" href="$Branching_8cpp.html" title=" " alt="" coords="102,300,205,326"/>
+<area shape="poly" id="edge8_Node000006_Node000007" title=" " alt="" coords="137,265,151,299,146,301,132,267"/>
+<area shape="poly" id="edge13_Node000011_Node000002" title=" " alt="" coords="316,113,196,156,194,151,314,108"/>
+<area shape="poly" id="edge14_Node000011_Node000008" title=" " alt="" coords="341,117,301,154,298,150,337,114"/>
+<area shape="poly" id="edge15_Node000011_Node000009" title=" " alt="" coords="389,114,429,150,425,154,385,117"/>
+<area shape="poly" id="edge16_Node000011_Node000010" title=" " alt="" coords="417,107,552,150,550,155,415,112"/>
+</map>

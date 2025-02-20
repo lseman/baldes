@@ -1,0 +1,24 @@
+<map id="BucketGraph" name="BucketGraph">
+<area shape="rect" id="Node000001" title="Represents a graph structure used for bucket&#45;based optimization in a solver." alt="" coords="363,286,460,312"/>
+<area shape="rect" id="Node000002" href="$classCostFunction.html" title=" " alt="" coords="5,183,104,208"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="75,219,98,241,126,260,170,272,233,282,363,293,363,298,233,287,169,278,124,265,95,245,71,223"/>
+<area shape="rect" id="Node000003" href="$structBucketOptions.html" title=" " alt="" coords="128,183,235,208"/>
+<area shape="poly" id="edge2_Node000001_Node000003" title=" " alt="" coords="206,217,234,240,267,260,315,278,363,289,362,294,314,283,264,265,231,244,202,221"/>
+<area shape="rect" id="Node000004" href="$structPSTEPDuals.html" title="A structure to manage dual values for arcs and nodes in a network." alt="" coords="259,183,356,208"/>
+<area shape="poly" id="edge3_Node000001_Node000004" title=" " alt="" coords="316,223,323,243,335,261,352,274,371,283,369,288,349,278,332,264,319,245,311,225"/>
+<area shape="rect" id="Node000005" href="$classArcList.html" title=" " alt="" coords="380,183,444,208"/>
+<area shape="poly" id="edge4_Node000001_Node000005" title=" " alt="" coords="414,224,414,286,409,286,409,224"/>
+<area shape="rect" id="Node000006" href="$classIteratedLocalSearch.html" title=" " alt="" coords="468,183,606,208"/>
+<area shape="poly" id="edge5_Node000001_Node000006" title=" " alt="" coords="528,224,514,245,496,264,476,278,454,288,452,283,473,273,493,260,510,242,523,221"/>
+<area shape="rect" id="Node000007" href="$structInstanceData.html" title="A structure to hold various data related to an instance of a problem." alt="" coords="328,94,426,120"/>
+<area shape="poly" id="edge6_Node000006_Node000007" title=" " alt="" coords="407,127,454,156,506,180,503,184,452,161,404,131"/>
+<area shape="rect" id="Node000008" href="$classCutStorage.html" title="Manages the storage and operations related to cuts in a solver." alt="" coords="605,94,691,120"/>
+<area shape="poly" id="edge10_Node000001_Node000008" title=" " alt="" coords="648,136,639,173,621,210,586,243,545,267,501,283,461,293,460,288,500,278,542,262,583,239,616,207,634,171,643,134"/>
+<area shape="poly" id="edge7_Node000006_Node000008" title=" " alt="" coords="593,129,567,146,552,164,544,183,539,181,548,161,563,142,590,124"/>
+<area shape="rect" id="Node000009" href="$structCutStorage_1_1SegmentMasks.html" title=" " alt="" coords="556,5,740,31"/>
+<area shape="poly" id="edge8_Node000008_Node000009" title=" " alt="" coords="650,47,650,94,645,94,645,47"/>
+<area shape="rect" id="Node000010" href="$classXoroshiro128Plus.html" title=" " alt="" coords="450,94,574,120"/>
+<area shape="poly" id="edge9_Node000006_Node000010" title=" " alt="" coords="513,135,516,158,529,181,525,184,511,160,507,136"/>
+<area shape="rect" id="Node000011" href="$classUnionFind.html" title=" " alt="" coords="749,183,829,208"/>
+<area shape="poly" id="edge11_Node000001_Node000011" title=" " alt="" coords="762,220,721,244,674,265,618,280,561,290,461,299,461,294,560,285,617,275,672,260,719,239,759,215"/>
+</map>

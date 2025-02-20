@@ -1,0 +1,12 @@
+<map id="BucketGraph::generate_arcs" name="BucketGraph::generate_arcs">
+<area shape="rect" id="Node000001" title="Generates arcs in the bucket graph based on the specified direction." alt="" coords="5,81,191,107"/>
+<area shape="rect" id="Node000002" href="$classBucketGraph.html#a42e016ec947d0a75ffa73ceab03207d7" title="Represents a bucket in the Bucket Graph. Adds an arc to the bucket graph." alt="" coords="244,5,393,31"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="137,78,263,34,265,39,139,83"/>
+<area shape="rect" id="Node000003" href="$classBucketGraph.html#af129eff306551dc7cc7fe00b919bbbd0" title="Assigns the buckets based on the specified direction." alt="" coords="446,103,587,144"/>
+<area shape="poly" id="edge2_Node000001_Node000003" title=" " alt="" coords="191,86,291,85,398,92,431,97,430,102,398,97,291,90,191,91"/>
+<area shape="rect" id="Node000004" href="$classBucketGraph.html#ad15267e0cffaa8dc5222028409c9e082" title=" " alt="" coords="251,107,386,132"/>
+<area shape="poly" id="edge3_Node000001_Node000004" title=" " alt="" coords="191,102,236,107,235,113,191,107"/>
+<area shape="rect" id="Node000005" href="$classBucketGraph.html#aa1272b542e38efd60f4fe2ba7fc01d52" title=" " alt="" coords="239,156,398,197"/>
+<area shape="poly" id="edge4_Node000001_Node000005" title=" " alt="" coords="136,105,249,148,247,153,134,110"/>
+<area shape="poly" id="edge5_Node000005_Node000003" title=" " alt="" coords="396,153,431,144,432,149,397,158"/>
+</map>

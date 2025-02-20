@@ -1,0 +1,17 @@
+<map id="BucketGraph::BucketArcElimination" name="BucketGraph::BucketArcElimination">
+<area shape="rect" id="Node000001" title="Eliminates bucket arcs based on a given threshold." alt="" coords="5,77,233,103"/>
+<area shape="rect" id="Node000002" href="$classBucketGraph.html#af129eff306551dc7cc7fe00b919bbbd0" title="Assigns the buckets based on the specified direction." alt="" coords="757,40,899,81"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="145,74,206,48,280,26,400,8,494,3,589,10,710,26,748,33,747,38,709,31,589,15,494,9,400,13,281,31,207,53,147,79"/>
+<area shape="rect" id="Node000003" href="$classBucketGraph.html#a07082dcbaab12cbea07fbe16acee9bcf" title="Get the opposite bucket number for a given bucket index." alt="" coords="299,40,476,81"/>
+<area shape="poly" id="edge2_Node000001_Node000003" title=" " alt="" coords="233,75,283,69,284,74,233,80"/>
+<area shape="rect" id="Node000005" href="$Definitions_8h.html#a086546d06aa565cdd48f436973ebc496" title="Prints an informational message with a specific format." alt="" coords="350,105,424,131"/>
+<area shape="poly" id="edge5_Node000001_Node000005" title=" " alt="" coords="233,99,335,110,334,115,233,104"/>
+<area shape="rect" id="Node000006" href="$classBucketGraph.html#a394e55293111f386caf44ed9e67c5653" title=" " alt="" coords="281,154,494,180"/>
+<area shape="poly" id="edge6_Node000001_Node000006" title=" " alt="" coords="158,100,281,140,309,148,307,153,280,146,156,106"/>
+<area shape="rect" id="Node000004" href="$classBucketGraph.html#abb791c45d27a9425607480e3101f7d28" title=" " alt="" coords="542,40,709,81"/>
+<area shape="poly" id="edge3_Node000003_Node000004" title=" " alt="" coords="476,58,527,58,527,63,476,63"/>
+<area shape="poly" id="edge4_Node000004_Node000002" title=" " alt="" coords="710,58,742,58,742,63,710,63"/>
+<area shape="poly" id="edge7_Node000006_Node000002" title=" " alt="" coords="447,151,493,140,709,90,742,81,743,86,710,95,495,146,448,156"/>
+<area shape="rect" id="Node000007" href="$classBucketGraph.html#ad15267e0cffaa8dc5222028409c9e082" title=" " alt="" coords="558,156,693,181"/>
+<area shape="poly" id="edge8_Node000006_Node000007" title=" " alt="" coords="494,165,543,165,543,171,494,170"/>
+</map>

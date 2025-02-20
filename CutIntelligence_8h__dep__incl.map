@@ -1,0 +1,20 @@
+<map id="CutIntelligence.h" name="CutIntelligence.h">
+<area shape="rect" id="Node000001" title=" " alt="" coords="258,5,375,31"/>
+<area shape="rect" id="Node000002" href="$HeuristicHighOrder_8h.html" title=" " alt="" coords="192,79,334,105"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="301,45,274,80,270,77,297,42"/>
+<area shape="rect" id="Node000003" href="$SRC_8cpp.html" title="Implementation of functions and classes for solving VRP problems using Limited Memory Rank&#45;1 Cuts." alt="" coords="263,300,336,326"/>
+<area shape="poly" id="edge11_Node000001_Node000003" title=" " alt="" coords="335,44,349,78,353,111,353,144,342,208,324,263,308,300,303,298,319,261,337,207,348,144,348,111,343,80,330,46"/>
+<area shape="poly" id="edge2_Node000002_Node000003" title=" " alt="" coords="271,119,277,152,300,299,295,300,271,153,266,120"/>
+<area shape="rect" id="Node000004" href="$SRC_8h.html" title="Definitions for handling cuts and optimizations for the Vehicle Routing Problem with Time Windows (VR..." alt="" coords="204,153,262,178"/>
+<area shape="poly" id="edge3_Node000002_Node000004" title=" " alt="" coords="246,119,233,153,228,151,241,117"/>
+<area shape="poly" id="edge7_Node000004_Node000002" title=" " alt="" coords="250,138,263,104,268,106,255,140"/>
+<area shape="poly" id="edge10_Node000004_Node000003" title=" " alt="" coords="247,191,296,298,291,301,242,193"/>
+<area shape="rect" id="Node000005" href="$BucketSolve_8h.html" title="Defines the BucketGraph class and its solving methods for optimization problems." alt="" coords="5,300,111,326"/>
+<area shape="poly" id="edge4_Node000004_Node000005" title=" " alt="" coords="188,169,151,173,110,183,72,200,55,213,42,228,35,245,37,264,53,299,48,301,32,265,30,244,37,225,52,209,69,196,108,178,150,168,188,164"/>
+<area shape="rect" id="Node000015" href="$BucketUtils_8h.html" title="Header file for utilities related to the Bucket Graph in the Vehicle Routing Problem (VRP)." alt="" coords="51,226,150,252"/>
+<area shape="poly" id="edge5_Node000004_Node000015" title=" " alt="" coords="199,188,124,228,122,223,196,184"/>
+<area shape="rect" id="Node000016" href="$Node_8h.html" title="Node class implementation." alt="" coords="175,226,237,252"/>
+<area shape="poly" id="edge8_Node000004_Node000016" title=" " alt="" coords="225,194,213,227,208,225,220,192"/>
+<area shape="poly" id="edge6_Node000015_Node000005" title=" " alt="" coords="88,267,67,301,63,298,84,264"/>
+<area shape="poly" id="edge9_Node000016_Node000003" title=" " alt="" coords="236,260,285,298,282,302,232,264"/>
+</map>

@@ -1,0 +1,5 @@
+<map id="IPSolver::start_linear_solver" name="IPSolver::start_linear_solver">
+<area shape="rect" id="Node000001" title=" " alt="" coords="5,5,147,46"/>
+<area shape="rect" id="Node000002" href="$classIPSolver.html#ad6ab576c321bd6a0506d9c5bf8362f1a" title="Converts a dense vector to a sparse diagonal matrix." alt="" coords="195,5,371,46"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="147,23,179,23,179,28,147,28"/>
+</map>
