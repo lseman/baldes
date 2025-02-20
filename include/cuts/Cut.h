@@ -13,6 +13,7 @@
 #pragma once
 #include "Common.h"
 #include "Definitions.h"
+#include "Label.h"
 #include "miphandler/Constraint.h"
 
 struct SRCPermutation {
@@ -142,27 +143,28 @@ using Cuts = std::vector<Cut>;
  * memory.
  *
  */
+
+struct ActiveCutInfo {
+    size_t index;        // Original index in cuts vector
+    const Cut *cut_ptr;  // Pointer to the cut
+    double dual_value;   // Cached dual value
+    CutType type;        // Type of the cut
+
+    ActiveCutInfo(size_t idx, const Cut *ptr, double dual, CutType type)
+        : index(idx), cut_ptr(ptr), dual_value(dual), type(type) {}
+
+    bool isSRCset(int i, int j) const {
+        return cut_ptr->baseSet[i / 64] & (1ULL << (i % 64)) &&
+               cut_ptr->baseSet[j / 64] & (1ULL << (j % 64));
+    }
+    bool isSRCset(int i) const {
+        return cut_ptr->baseSet[i / 64] & (1ULL << (i % 64));
+    };
+};
 class CutStorage {
    public:
     int latest_column = 0;
-
-    struct ActiveCutInfo {
-        size_t index;        // Original index in cuts vector
-        const Cut *cut_ptr;  // Pointer to the cut
-        double dual_value;   // Cached dual value
-        CutType type;        // Type of the cut
-
-        ActiveCutInfo(size_t idx, const Cut *ptr, double dual, CutType type)
-            : index(idx), cut_ptr(ptr), dual_value(dual), type(type) {}
-
-        bool isSRCset(int i, int j) const {
-            return cut_ptr->baseSet[i / 64] & (1ULL << (i % 64)) &&
-                   cut_ptr->baseSet[j / 64] & (1ULL << (j % 64));
-        }
-        bool isSRCset(int i) const {
-            return cut_ptr->baseSet[i / 64] & (1ULL << (i % 64));
-        }
-    };
+    bool busy = false;
 
     struct SegmentMasks {
         constexpr static size_t n_segments = (N_SIZE + 63) / 64;
@@ -188,16 +190,19 @@ class CutStorage {
             }
         }
         void precompute(const std::vector<ActiveCutInfo> &active_cuts) {
+            // Determine the number of cuts and compute the overall cut limit
+            // mask.
             n_cuts = active_cuts.size();
             cut_limit_mask = (n_cuts >= 64) ? ~0ULL : ((1ULL << n_cuts) - 1);
 
-            // Precompute bit masks once
+            // Precompute individual bit masks for each cut.
             std::vector<uint64_t> cut_bit_masks(n_cuts);
             for (size_t i = 0; i < n_cuts; ++i) {
                 cut_bit_masks[i] = 1ULL << i;
             }
 
-            // Resize and zero-initialize
+            // Resize and initialize mask matrices for all segments and bit
+            // positions.
             neighbor_masks.assign(n_segments,
                                   std::vector<uint64_t>(n_bit_positions, 0));
             base_set_masks.assign(n_segments,
@@ -205,19 +210,24 @@ class CutStorage {
             valid_cut_masks.assign(n_segments,
                                    std::vector<uint64_t>(n_bit_positions, 0));
 
-            // Iterate over segments and bit positions
+            // Iterate over each segment.
             for (size_t segment = 0; segment < n_segments; ++segment) {
+                // Determine the number of bits to process in this segment.
                 size_t bit_limit =
-                    (segment == n_segments - 1) ? (N_SIZE % 64) : 64;
+                    (segment == n_segments - 1 && (N_SIZE % 64) != 0)
+                        ? (N_SIZE % 64)
+                        : 64;
 
+                // Process each bit position within the segment.
                 for (size_t bit_pos = 0; bit_pos < bit_limit; ++bit_pos) {
                     const uint64_t bit_mask = 1ULL << bit_pos;
                     uint64_t neighbor_bits = 0;
                     uint64_t base_bits = 0;
 
+                    // For each active cut, check if the bit is set in the
+                    // neighbor or base set.
                     for (size_t cut_idx = 0; cut_idx < n_cuts; ++cut_idx) {
                         const auto &cut = *active_cuts[cut_idx].cut_ptr;
-
                         if (cut.neighbors[segment] & bit_mask) {
                             neighbor_bits |= cut_bit_masks[cut_idx];
                         }
@@ -226,14 +236,13 @@ class CutStorage {
                         }
                     }
 
-                    // Store with cut limit applied
+                    // Apply the cut limit mask and store the computed values.
                     neighbor_masks[segment][bit_pos] =
-                        (neighbor_bits & cut_limit_mask);
+                        neighbor_bits & cut_limit_mask;
                     base_set_masks[segment][bit_pos] =
-                        (base_bits & cut_limit_mask);
+                        base_bits & cut_limit_mask;
                     valid_cut_masks[segment][bit_pos] =
-                        (neighbor_bits & base_bits & cut_limit_mask) &
-                        cut_limit_mask;
+                        (neighbor_bits & base_bits) & cut_limit_mask;
                 }
             }
         }
@@ -301,23 +310,25 @@ class CutStorage {
 
     // Remove a cut by index
     void removeCut(int cutIndex) {
-        if (cutIndex < 0 || cutIndex >= cuts.size()) {
+        // Validate cutIndex.
+        if (cutIndex < 0 || cutIndex >= static_cast<int>(cuts.size())) {
             std::cerr << "Cut index " << cutIndex << " is out of bounds."
                       << std::endl;
             return;
         }
 
-        // Erase the cut from the cuts vector
+        // Remove the cut from the 'cuts' vector.
         cuts.erase(cuts.begin() + cutIndex);
 
-        // Update IDs for remaining cuts
+        // Update the IDs for remaining cuts: any cut with an ID greater than
+        // the removed index gets decremented.
         for (auto &cut : cuts) {
             if (cut.id > cutIndex) {
                 cut.id--;
             }
         }
 
-        // Remove the corresponding entry from the map
+        // Remove the corresponding entry from the cutMaster_to_cut_map.
         auto it = std::find_if(
             cutMaster_to_cut_map.begin(), cutMaster_to_cut_map.end(),
             [cutIndex](const auto &pair) { return pair.second == cutIndex; });
@@ -330,7 +341,8 @@ class CutStorage {
             return;
         }
 
-        // Update indices in the map for all subsequent cuts
+        // Update indices in cutMaster_to_cut_map for all entries with indices
+        // greater than the removed cutIndex.
         for (auto &entry : cutMaster_to_cut_map) {
             if (entry.second > cutIndex) {
                 entry.second--;
@@ -381,33 +393,46 @@ class CutStorage {
         std::vector<double> alphas;
         alphas.reserve(cuts.size());
 
-        for (const auto &c : cuts) {
+        // Process each cut in the cuts collection.
+        for (const auto &cut : cuts) {
             double alpha = 0.0;
-            int S = 0;
-            auto den = c.p.den;
-            auto AM = c.neighbors;
-            auto C = c.baseSet;
-            auto p = c.p;
-            auto order = c.baseSetOrder;
+            int runningSum = 0;
 
+            // Extract constants from the current cut.
+            const int denominator = cut.p.den;
+            const auto &neighborsBitset =
+                cut.neighbors;  // Bitset: neighbors indicator.
+            const auto &baseSetBitset =
+                cut.baseSet;              // Bitset: base set indicator.
+            const auto &pValues = cut.p;  // Contains numerator vector (p.num).
+            const auto &baseSetOrder =
+                cut.baseSetOrder;  // Mapping from node id to its order.
+
+            // Iterate through internal nodes of the route (skip first and
+            // last).
             for (size_t j = 1; j < P.size() - 1; ++j) {
-                int vj = P[j];
+                const int nodeId = P[j];
 
-                // Check if the node vj is in AM (bitwise check)
-                if (!(AM[vj / 64] & (1ULL << (vj % 64)))) {
-                    S = 0;  // Reset S if vj is not in AM
-                } else if (C[vj / 64] & (1ULL << (vj % 64))) {
-                    // Get the position of vj in C by counting the set
-                    // bits up to vj
-                    int pos = order[vj];
-                    S += p.num[pos];
-                    if (S >= den) {
-                        S -= den;
-                        alpha += 1;
+                // Bitwise check: is nodeId in the neighbor set?
+                if (!(neighborsBitset[nodeId / 64] & (1ULL << (nodeId % 64)))) {
+                    runningSum = 0;  // Reset the sum if the node is not in the
+                                     // neighbor set.
+                }
+                // Else, if nodeId belongs to the base set...
+                else if (baseSetBitset[nodeId / 64] & (1ULL << (nodeId % 64))) {
+                    // Determine the position of nodeId in the base set using
+                    // the order mapping.
+                    const int pos = baseSetOrder[nodeId];
+                    runningSum += pValues.num[pos];
+
+                    // If running sum exceeds or equals the denominator, update
+                    // alpha.
+                    if (runningSum >= denominator) {
+                        runningSum -= denominator;
+                        alpha += 1.0;
                     }
                 }
             }
-
             alphas.push_back(alpha);
         }
 
@@ -434,17 +459,76 @@ class CutStorage {
     std::vector<ActiveCutInfo> active_cuts;  // Cuts with positive duals
 
     void updateActiveCuts() {
+        // Clear existing active cuts and pre-allocate memory based on the total
+        // number of cuts.
         active_cuts.clear();
-        active_cuts.reserve(cuts.size());  // Pre-allocate for efficiency
+        active_cuts.reserve(cuts.size());
 
+        // Iterate through all cuts and add those with significant dual values.
         for (size_t i = 0; i < cuts.size(); ++i) {
-            if (i < SRCDuals.size() && std::abs(SRCDuals[i]) > 1e-2) {
+            if (i < SRCDuals.size() && std::abs(SRCDuals[i]) > 0) {
+                // Emplace active cut with its index, pointer to the cut, dual
+                // value, and type.
                 active_cuts.emplace_back(i, &cuts[i], SRCDuals[i],
                                          cuts[i].type);
             }
         }
 
-        // Pre-compute bitmasks for all cuts in the all the segments
+        // Precompute bit masks for all active cuts over all segments.
         segment_masks.precompute(active_cuts);
+    }
+
+   public:
+    void updateRedCost(std::vector<Label *> labels) {
+        const auto active_cuts = getActiveCuts();
+
+        const auto n_cuts = activeSize();
+        const auto all_cuts = size();
+
+        if (n_cuts == 0) return;
+
+        for (auto label : labels) {
+            label->SRCmap.resize(all_cuts, 0.0);
+            for (auto node_id : label->nodes_covered) {
+                double total_cost_update = 0.0;
+                const size_t segment = node_id >> 6;
+                const size_t bit_position = node_id & 63;
+
+                auto &masks = getSegmentMasks();
+                const auto cut_limit_mask = masks.get_cut_limit_mask();
+                uint64_t valid_cuts =
+                    masks.get_valid_cut_mask(segment, bit_position);
+                valid_cuts &= cut_limit_mask;  // Safeguard
+
+                while (valid_cuts) {
+                    const int cut_idx = __builtin_ctzll(valid_cuts);
+                    const auto &active_cut = active_cuts[cut_idx];
+                    const auto &cut = *active_cut.cut_ptr;
+                    auto &src_map_value = label->SRCmap[active_cut.index];
+                    src_map_value += cut.p.num[cut.baseSetOrder[node_id]];
+                    if (src_map_value >= cut.p.den) {
+                        src_map_value -= cut.p.den;
+                        total_cost_update -= active_cut.dual_value;
+                    }
+                    valid_cuts &= (valid_cuts - 1);
+                }
+
+                uint64_t to_clear =
+                    (~masks.get_neighbor_mask(segment, bit_position)) &
+                    cut_limit_mask;
+                while (to_clear) {
+                    const int cut_idx = __builtin_ctzll(to_clear);
+                    if (cut_idx >= n_cuts) {
+                        fmt::print(
+                            "Warning: Invalid clear_idx {} >= n_cuts {}\n",
+                            cut_idx, n_cuts);
+                        break;
+                    }
+                    label->SRCmap[active_cuts[cut_idx].index] = 0.0;
+                    to_clear &= (to_clear - 1);
+                }
+                label->cost += total_cost_update;
+            }
+        }
     }
 };

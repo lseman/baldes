@@ -21,58 +21,116 @@ constexpr double REHEATING_FACTOR = 1.5;
 constexpr int REHEAT_INTERVAL = 50;
 }  // namespace LocalSearchConfig
 
-// Permutation structures and helper functions
+// Permutation structure: stores a vector of numerators and a denominator.
 struct Permutation {
     std::vector<int> num;
     int den;
 
     Permutation(const std::vector<int> &n, int d) : num(n), den(d) {}
+    Permutation() = default;
 };
-inline std::vector<Permutation> getPermutationsForSize5() {
-    static const std::vector<std::pair<std::vector<int>, int>> base_perms = {
-        {{2, 2, 1, 1, 1}, 4},
-        {{3, 1, 1, 1, 1}, 4},
-        {{3, 2, 2, 1, 1}, 5},
-        {{2, 2, 1, 1, 1}, 3},
-        {{3, 3, 2, 2, 1}, 4}};
 
-    // Pre-calculate total size needed (can be computed at compile-time)
-    constexpr size_t total_perms =
-        10 + 5 + 30 + 10 + 30;  // Based on unique permutations possible
+// Helper function: convert an std::array to an std::vector using only the first
+// 'size' elements.
+template <size_t N>
+constexpr std::vector<int> to_vector(const std::array<int, N> &arr,
+                                     size_t size) {
+    std::vector<int> result;
+    result.reserve(size);
+    for (size_t i = 0; i < size; ++i) {
+        result.push_back(arr[i]);
+    }
+    return result;
+}
+
+// Helper function: generate all permutations of the first N elements of the
+// 'base' array, with the given denominator, and return a pair of the
+// permutation array and the count.
+template <size_t N>
+constexpr auto generate_permutations(const std::array<int, N> &base, int den) {
+    // We assume 120 is sufficient (i.e. 5! for N==5)
+    std::array<Permutation, 120> result{};
+    size_t count = 0;
+
+    // Create a working copy; if N is less than 5, pad the remaining entries
+    // with 0.
+    std::array<int, 5> current{};
+    std::copy(base.begin(), base.end(), current.begin());
+    if constexpr (N < 5) {
+        std::fill(current.begin() + N, current.end(), 0);
+    }
+
+    // Generate permutations over the first N elements.
+    do {
+        std::vector<int> vec = to_vector(current, N);
+        result[count++] = Permutation(vec, den);
+    } while (std::next_permutation(current.begin(), current.begin() + N));
+
+    return std::make_pair(result, count);
+}
+
+constexpr auto getPermutationsForSize3() {
+    constexpr std::array<int, 3> base{{1, 1, 1}};
+    auto [perms, count] = generate_permutations(base, 2);
+
+    std::vector<Permutation> result;
+    result.reserve(1);
+    for (size_t i = 0; i < count; ++i) {
+        result.push_back(perms[i]);
+    }
+    return result;
+}
+// Generate all permutations for a candidate set of size 5 using a set of base
+// permutations.
+constexpr auto getPermutationsForSize5() {
+    // Each pair holds a base array (of 5 elements) and a denominator.
+    constexpr std::array<std::pair<std::array<int, 5>, int>, 5> base_perms{
+        {{{{2, 2, 1, 1, 1}}, 4},
+         {{{3, 1, 1, 1, 1}}, 4},
+         {{{3, 2, 2, 1, 1}}, 5},
+         {{{2, 2, 2, 1, 1}}, 3},
+         {{{3, 3, 2, 2, 1}}, 4}}};
+
+    constexpr size_t total_perms = 10 + 5 + 30 + 10 + 30;
     std::vector<Permutation> all_perms;
     all_perms.reserve(total_perms);
 
+    // For each base, generate its permutations and append them to all_perms.
     for (const auto &[nums, den] : base_perms) {
-        std::vector<int> p = nums;
-        do {
-            all_perms.emplace_back(p, den);
-        } while (std::next_permutation(p.begin(), p.end()));
+        auto [perms, count] = generate_permutations(nums, den);
+        for (size_t i = 0; i < count; ++i) {
+            all_perms.push_back(perms[i]);
+        }
     }
+
     return all_perms;
 }
 
-inline std::vector<Permutation> getPermutationsForSize4() {
-    static const std::vector<int> base = {2, 1, 1, 1};
-    std::vector<Permutation> perms;
-    perms.reserve(4);  // We know exactly how many permutations we'll get
+// Generate all permutations for a candidate set of size 4.
+constexpr auto getPermutationsForSize4() {
+    constexpr std::array<int, 4> base{{2, 1, 1, 1}};
+    auto [perms, count] = generate_permutations(base, 3);
 
-    std::vector<int> p = base;
-    do {
-        perms.emplace_back(p, 3);
-    } while (std::next_permutation(p.begin(), p.end()));
-    return perms;
+    std::vector<Permutation> result;
+    result.reserve(4);
+    for (size_t i = 0; i < count; ++i) {
+        result.push_back(perms[i]);
+    }
+    return result;
 }
 
-// Custom hash function for vector<int>
 namespace std {
 template <>
-struct hash<vector<int>> {
-    size_t operator()(const vector<int> &v) const {
-        size_t seed = v.size();
-        for (const int &i : v) {
-            seed ^= hash<int>{}(i) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+struct hash<std::vector<int>> {
+    size_t operator()(const std::vector<int> &v) const {
+        // Handle empty vectors.
+        if (v.empty()) {
+            return 0;
         }
-        return seed;
+        // Compute the hash using XXH64.
+        // v.data() returns a pointer to contiguous storage.
+        // The length is v.size() * sizeof(int) bytes.
+        return static_cast<size_t>(XXH64(v.data(), v.size() * sizeof(int), 0));
     }
 };
 }  // namespace std
@@ -87,7 +145,7 @@ struct NodeScore {
     NodeScore(int i, int j, double c) : node(i), other_node(j), cost_score(c) {}
 
     bool operator<(const NodeScore &other) const {
-        return cost_score > other.cost_score;
+        return cost_score < other.cost_score;
     }
 };
 
@@ -110,43 +168,19 @@ struct CandidateSet {
 
     // Less than operator for std::set
     bool operator<(const CandidateSet &other) const {
-        return nodes < other.nodes;  // Compare only nodes for ordering
-    }
-
-    std::unordered_map<int, double>
-        neighbor_scores;  // Track scores for each neighbor
-    std::vector<std::pair<int, int>>
-        tabu_moves;  // Store (position, node) pairs
-
-    double best_violation_seen = 0.0;  // Track best violation for aspiration
-
-    // Method to update neighbor scores based on node_scores
-    void updateNeighborScores(const std::vector<std::set<int>> &node_scores) {
-        neighbor_scores.clear();
-        for (int node : nodes) {
-            for (int potential_neighbor : node_scores[node]) {
-                if (std::find(nodes.begin(), nodes.end(), potential_neighbor) ==
-                    nodes.end()) {
-                    neighbor_scores[potential_neighbor]++;
-                }
-            }
+        auto a = *this;
+        auto b = other;
+        if (a.nodes == b.nodes && a.perm.num == b.perm.num &&
+            a.perm.den == b.perm.den) {
+            // If they're the same, keep the one with higher violation
+            // by making it "less than" so it wins
+            return a.violation > b.violation;
         }
-    }
 
-    // Method to get promising neighbors sorted by score
-    std::vector<int> getPromisingNeighbors(int k = 10) const {
-        std::vector<std::pair<int, double>> scored_neighbors(
-            neighbor_scores.begin(), neighbor_scores.end());
-
-        pdqsort(
-            scored_neighbors.begin(), scored_neighbors.end(),
-            [](const auto &a, const auto &b) { return a.second > b.second; });
-
-        std::vector<int> result;
-        for (int i = 0; i < std::min(k, (int)scored_neighbors.size()); ++i) {
-            result.push_back(scored_neighbors[i].first);
-        }
-        return result;
+        // For different elements, establish consistent ordering
+        if (a.nodes != b.nodes) return a.nodes < b.nodes;
+        if (a.perm.num != b.perm.num) return a.perm.num < b.perm.num;
+        return a.perm.den < b.perm.den;
     }
 };
 

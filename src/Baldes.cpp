@@ -275,6 +275,7 @@ int main(int argc, char *argv[]) {
 
     std::vector<Path> paths;
     std::vector<Label *> labels;
+    ankerl::unordered_dense::set<Path, PathHash> pathSet;
 
     // convert initial routes to labels
     int labelID = 0;
@@ -297,6 +298,7 @@ int main(int argc, char *argv[]) {
         path.route[path.route.size() - 1] = N_SIZE - 1;
         path.cost = label->cost;
         paths.push_back(path);
+        pathSet.insert(path);
     };
     std::for_each(initialRoutesHGS.begin(), initialRoutesHGS.end(),
                   process_route);
@@ -319,6 +321,8 @@ int main(int argc, char *argv[]) {
     node->mip = mip;
     node->instance = instance;
     node->integer_sol = hgs->getBestCost();
+    node->numK = hgs->getBestRoutes().size();
+    node->pathSet = pathSet;
     // node->bestRoutes = topRoutes;
 
     BranchAndBound solver(std::move(problem),

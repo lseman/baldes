@@ -196,43 +196,59 @@ BucketGraph::BucketGraph(const std::vector<VRPNode> &nodes,
 std::vector<int> BucketGraph::computePhi(int &bucket_id, bool fw) {
     std::vector<int> phi;
 
-    // Ensure bucket_id is within valid bounds
+    // Get references based on the direction.
     auto &buckets = fw ? fw_buckets : bw_buckets;
-    auto &fixed_buckets = fw ? fw_fixed_buckets : bw_fixed_buckets;
     auto &node_interval_trees =
         fw ? fw_node_interval_trees : bw_node_interval_trees;
-    auto &bucket_splits = fw ? fw_bucket_splits : bw_bucket_splits;
+
+    // Multi-dimensional resource case.
     if (options.resources.size() > 1) {
-        if (bucket_id >= buckets.size() || bucket_id < 0) return phi;
+        if (bucket_id < 0 || bucket_id >= static_cast<int>(buckets.size()))
+            return phi;
 
-        std::vector<double> total_ranges(intervals.size());
-        std::vector<double> base_intervals(intervals.size());
+        const int n_dims = static_cast<int>(intervals.size());
+        std::vector<double> base_intervals(n_dims, 0.0);
 
-        for (int r = 0; r < intervals.size(); ++r) {
-            total_ranges[r] =
-                R_max[r] - R_min[r];  // Ensure integer type for total range
-            base_intervals[r] = total_ranges[r] / bucket_splits[bucket_id];
-        }
-
-        // Get the node ID and current bucket
+        // Get the node associated with the current bucket.
         int node_id = buckets[bucket_id].node_id;
-        auto &current_bucket = buckets[bucket_id];
+        const VRPNode &node = nodes[node_id];
 
-        // Retrieve the pre-built Splay Tree for this node
-        auto &node_tree = node_interval_trees[node_id];
-
-        // Search for matching intervals using the existing Splay Tree
-        auto target = fw ? current_bucket.lb : current_bucket.ub;
-        std::vector<double> target_low = current_bucket.lb;
-        for (int r = 0; r < intervals.size(); ++r) {
-            target[r] -= base_intervals[r];  // Adjust for the base intervals
+        // Recompute splits and base intervals per dimension using the same
+        // logic as in define_buckets.
+        for (int r = 0; r < n_dims; ++r) {
+            double full_range = R_max[r] - R_min[r];
+            double node_range = node.ub[r] - node.lb[r];
+            int splits = 1;
+            if (std::fabs(full_range) >
+                std::numeric_limits<double>::epsilon()) {
+                double splits_d =
+                    (node_range * intervals[r].interval) / full_range;
+                splits = std::max(1, static_cast<int>(std::round(splits_d)));
+            }
+            base_intervals[r] = node_range / static_cast<double>(splits);
         }
-        TreeNode *found_node = node_tree.find(target);
+
+        // Start with the current bucket's baseline.
+        const auto &current_bucket = buckets[bucket_id];
+        std::vector<double> target = fw ? current_bucket.lb : current_bucket.ub;
+
+        // Adjust the target vector by one base interval for each dimension.
+        // For forward, shift left (i.e. subtract) but do not go below the
+        // node's lb. For backward, shift right (i.e. add) but do not exceed the
+        // node's ub.
+        for (int r = 0; r < n_dims; ++r) {
+            if (fw)
+                target[r] = std::max(node.lb[r], target[r] - base_intervals[r]);
+            else
+                target[r] = std::min(node.ub[r], target[r] + base_intervals[r]);
+        }
+
+        // Look up the candidate bucket in the node's interval tree.
+        TreeNode *found_node = node_interval_trees[node_id].find(target);
         if (found_node != nullptr &&
             buckets[found_node->bucket_index].node_id == node_id) {
-            // Check if the found bucket is fixed
 #ifdef FIX_BUCKETS
-            auto not_fixed = fw ? is_bucket_not_fixed_forward(
+            bool not_fixed = fw ? is_bucket_not_fixed_forward(
                                       bucket_id, found_node->bucket_index)
                                 : is_bucket_not_fixed_backward(
                                       bucket_id, found_node->bucket_index);
@@ -242,18 +258,20 @@ std::vector<int> BucketGraph::computePhi(int &bucket_id, bool fw) {
                 phi.push_back(found_node->bucket_index);
             }
         }
-    } else {
-        // Handle the case where R_SIZE == 1 with a simpler approach
-        int smaller = bucket_id - 1;
-
-        if (smaller >= 0 &&
-            buckets[smaller].node_id == buckets[bucket_id].node_id) {
+    }
+    // Single-resource case (simpler).
+    else {
+        int neighbor = bucket_id - 1;
+        if (neighbor >= 0 && neighbor < static_cast<int>(buckets.size()) &&
+            buckets[neighbor].node_id == buckets[bucket_id].node_id) {
 #ifdef FIX_BUCKETS
-            if (fw ? is_bucket_not_fixed_forward(smaller, bucket_id)
-                   : is_bucket_not_fixed_backward(smaller, bucket_id))
+            bool not_fixed =
+                fw ? is_bucket_not_fixed_forward(neighbor, bucket_id)
+                   : is_bucket_not_fixed_backward(neighbor, bucket_id);
+            if (not_fixed)
 #endif
             {
-                phi.push_back(smaller);
+                phi.push_back(neighbor);
             }
         }
     }
@@ -265,52 +283,47 @@ std::vector<int> BucketGraph::computePhi(int &bucket_id, bool fw) {
  *
  */
 void BucketGraph::calculate_neighborhoods(size_t num_closest) {
-    size_t num_nodes = nodes.size();
+    const size_t num_nodes = nodes.size();
 
-    // Initialize the neighborhood bitmaps as vectors of uint64_t for
-    // forward and backward neighborhoods
-    neighborhoods_bitmap.resize(num_nodes);  // Forward neighborhood
+    // Resize the neighborhoods_bitmap vector so that there's one bitmap per
+    // node.
+    neighborhoods_bitmap.resize(num_nodes);
 
+    // Pre-calculate the number of segments needed (each segment is 64 bits).
+    const size_t num_segments = (num_nodes + 63) / 64;
+
+    // Process each node to compute its neighborhood.
     for (size_t i = 0; i < num_nodes; ++i) {
-        std::vector<std::pair<double, size_t>>
-            forward_distances;  // Distances for forward neighbors
+        // Create a vector of (distance, node_index) pairs for node i.
+        std::vector<std::pair<double, size_t>> forward_distances;
+        forward_distances.reserve(num_nodes - 1);
 
         for (size_t j = 0; j < num_nodes; ++j) {
-            if (i != j) {
-                // Forward distance (i -> j)
-                double forward_distance = getcij(i, j);
-                forward_distances.push_back({forward_distance, j});
-            }
+            if (i == j) continue;
+            double distance = getcij(i, j);
+            forward_distances.push_back({distance, j});
         }
 
-        // Sort distances to find the closest nodes
-        pdqsort(forward_distances.begin(), forward_distances.end());
+        // Sort distances to obtain the closest nodes first.
+        pdqsort(forward_distances.begin(), forward_distances.end(),
+                [](const auto &a, const auto &b) { return a.first < b.first; });
 
-        // Initialize the neighborhood bitmap vector for node i (forward and
-        // backward)
-        size_t num_segments = (num_nodes + 63) / 64;
-        neighborhoods_bitmap[i].resize(num_segments,
-                                       0);  // Resizing for forward bitmap
+        // Initialize the neighborhood bitmap for node i with all segments set
+        // to zero.
+        neighborhoods_bitmap[i].assign(num_segments, 0ULL);
 
-        // Include the node itself in both forward and backward
-        // neighborhoods
-        size_t segment_self = i >> 6;
-        size_t bit_position_self = i & 63;
-        neighborhoods_bitmap[i][segment_self] |=
-            (1ULL << bit_position_self);  // Forward
+        // Always include the node itself in its neighborhood.
+        size_t self_segment = i >> 6;
+        size_t self_bit = i & 63;
+        neighborhoods_bitmap[i][self_segment] |= (1ULL << self_bit);
 
-        // Map the top 'num_closest' closest nodes for forward and set them
-        // in the backward neighborhoods
+        // Add the top 'num_closest' closest nodes as forward neighbors.
         for (size_t k = 0; k < num_closest && k < forward_distances.size();
              ++k) {
-            size_t node_index = forward_distances[k].second;
-
-            // Determine the segment and the bit within the segment for the
-            // node_index (forward)
-            size_t segment = node_index >> 6;
-            size_t bit_position = node_index & 63;
-            neighborhoods_bitmap[i][segment] |=
-                (1ULL << bit_position);  // Forward neighbor
+            size_t neighbor_index = forward_distances[k].second;
+            size_t segment = neighbor_index >> 6;
+            size_t bit_position = neighbor_index & 63;
+            neighborhoods_bitmap[i][segment] |= (1ULL << bit_position);
         }
     }
 }
@@ -328,36 +341,38 @@ void BucketGraph::calculate_neighborhoods(size_t num_closest) {
 void BucketGraph::augment_ng_memories(std::vector<double> &solution,
                                       std::vector<Path> &paths, bool aggressive,
                                       int eta1, int eta2, int eta_max, int nC) {
-    // Pre-allocate with estimated size to avoid reallocations
+    // Pre-allocate an estimated number of cycles (assume about 25% of paths
+    // have cycles)
     std::vector<std::vector<uint16_t>> cycles;
-    cycles.reserve(paths.size() /
-                   4);  // Estimate 25% of paths might have cycles
+    cycles.reserve(paths.size() / 4);
 
     // Detect cycles in fractional paths
-    for (size_t col = 0; col < paths.size(); ++col) {
-        const double epsilon = 1e-2;
-        if (solution[col] <= epsilon || solution[col] >= 1 - epsilon) continue;
+    for (size_t pathIndex = 0; pathIndex < paths.size(); ++pathIndex) {
+        // Skip paths that are nearly integral.
+        const double epsilon = 1e-3;
+        if (solution[pathIndex] <= epsilon) continue;
 
-        const auto &path = paths[col];
+        const auto &path = paths[pathIndex];
         ankerl::unordered_dense::map<uint16_t, int> visited_clients;
         visited_clients.reserve(path.size());
 
+        // Iterate over the nodes in the path to detect cycles.
         for (size_t i = 0; i < path.size(); ++i) {
-            const uint16_t client = static_cast<uint16_t>(path[i]);
+            uint16_t client = path[i];
+            // Skip depot nodes.
             if (client == 0 || client == N_SIZE - 1) continue;
 
             auto it = visited_clients.find(client);
             if (it != visited_clients.end()) {
-                // Cycle found - extract it
+                // Cycle found: extract the cycle from the first occurrence to
+                // the current index.
                 std::vector<uint16_t> cycle;
                 cycle.reserve(i - it->second + 1);
-
-                for (size_t j = it->second; j <= i; ++j) {
-                    cycle.push_back(static_cast<uint16_t>(path[j]));
+                for (size_t j = static_cast<size_t>(it->second); j <= i; ++j) {
+                    cycle.push_back(path[j]);
                 }
-
-                cycles.push_back(cycle);
-                break;
+                cycles.push_back(std::move(cycle));
+                break;  // Process only one cycle per path.
             }
             visited_clients[client] = i;
         }
@@ -365,16 +380,18 @@ void BucketGraph::augment_ng_memories(std::vector<double> &solution,
 
     if (cycles.empty()) return;
 
-    // Sort cycles by size
+    // Sort cycles by increasing size (small cycles are processed first)
     pdqsort(cycles.begin(), cycles.end(),
             [](const auto &a, const auto &b) { return a.size() < b.size(); });
 
-    // Process cycles
     int forbidden_count = 0;
 
-    // Lambda for counting bits in neighborhoods
+    // Lambda: count the number of set bits in the neighborhoods bitmap for a
+    // node.
     auto count_neighborhood_bits = [this, eta_max](uint16_t node) -> int {
         int count = 0;
+        // neighborhoods_bitmap[node] is assumed to be a vector of uint64_t
+        // segments.
         for (const auto &segment : neighborhoods_bitmap[node]) {
             count += __builtin_popcountll(segment);
             if (count >= eta_max) return count;
@@ -382,22 +399,28 @@ void BucketGraph::augment_ng_memories(std::vector<double> &solution,
         return count;
     };
 
+    // Process each detected cycle.
     for (const auto &cycle : cycles) {
         if (cycle.empty()) continue;
 
-        // Check if cycle can be forbidden
         bool can_forbid = true;
-        for (const uint16_t node : cycle) {
+        // Check each node in the cycle to see if the neighborhood bit count is
+        // below eta_max.
+        for (uint16_t node : cycle) {
             if (count_neighborhood_bits(node) >= eta_max) {
                 can_forbid = false;
                 break;
             }
         }
 
-        if (can_forbid && (cycle.size() <= eta1 || forbidden_count < eta2)) {
-            // Convert uint16_t vector to int vector for forbidCycle
+        // If the cycle qualifies (small cycle or limited forbidden count),
+        // forbid it.
+        if (can_forbid && (cycle.size() <= static_cast<size_t>(eta1) ||
+                           forbidden_count < eta2)) {
+            // Convert cycle from uint16_t to int vector (if needed by
+            // forbidCycle)
             std::vector<int> int_cycle(cycle.begin(), cycle.end());
-            forbidCycle(int_cycle, aggressive);
+            forbidCycle(int_cycle, false);
             if (++forbidden_count >= eta2) break;
         }
     }
@@ -413,18 +436,23 @@ void BucketGraph::augment_ng_memories(std::vector<double> &solution,
  *
  */
 void BucketGraph::forbidCycle(const std::vector<int> &cycle, bool aggressive) {
+    // If the cycle is too short, there is nothing to forbid.
+    if (cycle.size() < 2) return;
+
+    // Process each adjacent pair in the cycle.
     for (size_t i = 0; i < cycle.size() - 1; ++i) {
         int v1 = cycle[i];
         int v2 = cycle[i + 1];
 
-        // Update the bitmap to forbid v2 in the neighborhood of v1
-        size_t segment = v2 >> 6;
-        size_t bit_position = v2 & 63;
+        // Forbid v2 in the neighborhood of v1.
+        size_t segment = static_cast<size_t>(v2) >> 6;
+        size_t bit_position = static_cast<size_t>(v2) & 63;
         neighborhoods_bitmap[v1][segment] |= (1ULL << bit_position);
 
         if (aggressive) {
-            segment = v1 >> 6;
-            bit_position = v1 & 63;
+            // Additionally, forbid v1 in the neighborhood of v2.
+            segment = static_cast<size_t>(v1) >> 6;
+            bit_position = static_cast<size_t>(v1) & 63;
             neighborhoods_bitmap[v2][segment] |= (1ULL << bit_position);
         }
     }
@@ -836,9 +864,9 @@ void BucketGraph::setup() {
         set_adjacency_list_manual();
     }
     generate_arcs();
-    for (auto &VRPNode : nodes) {
-        VRPNode.sort_arcs();
-    }
+    // for (auto &VRPNode : nodes) {
+    //     VRPNode.sort_arcs();
+    // }
 
 #ifdef SCHRODINGER
     sPool.distance_matrix = distance_matrix;

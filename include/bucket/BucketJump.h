@@ -42,20 +42,25 @@ void BucketGraph::UpdateBucketsSet(const double theta, const Label *label,
                                    ankerl::unordered_dense::set<int> &Bbidi,
                                    int &current_bucket,
                                    std::vector<uint64_t> &Bvisited) {
-    // Precompute values and assign references for the direction-specific data
-
+    // Select direction-specific data.
     auto &Phi_opposite = assign_buckets<D>(Phi_bw, Phi_fw);
     auto &buckets_opposite = assign_buckets<D>(bw_buckets, fw_buckets);
     auto &c_bar_opposite = assign_buckets<D>(bw_c_bar, fw_c_bar);
 
+    // Cache label values to avoid repeated member lookups.
     const int bucketLnode = label->node_id;
-    std::vector<int> bucket_stack;
-    bucket_stack.reserve(10);  // Pre-allocate space for the stack
-    bucket_stack.push_back(current_bucket);
+    const double label_cost = label->cost;
+    const auto &label_bitmap = label->visited_bitmap;
+    const size_t n_bitmap = label_bitmap.size();
 
-    // Lambda to compare bitmaps
-    auto bitmaps_conflict = [&](const Label *L1, const Label *L2) {
-        for (size_t i = 0; i < L1->visited_bitmap.size(); ++i) {
+    // Precompute a flag for direction (avoid repeated ternary operators).
+    constexpr bool forward = (D == Direction::Forward);
+
+    // Inline helper function for bitmap conflict check.
+    auto bitmapsConflict = [n_bitmap](const Label *L1,
+                                      const Label *L2) -> bool {
+        // Assume both L1 and L2 have the same sized visited_bitmap.
+        for (size_t i = 0; i < n_bitmap; ++i) {
             if ((L1->visited_bitmap[i] & L2->visited_bitmap[i]) != 0) {
                 return true;
             }
@@ -63,101 +68,94 @@ void BucketGraph::UpdateBucketsSet(const double theta, const Label *label,
         return false;
     };
 
+    // Use a local DFS stack to traverse buckets.
+    std::vector<int> bucket_stack;
+    bucket_stack.reserve(10);
+    bucket_stack.push_back(current_bucket);
+
+    // Process buckets until the stack is empty.
     while (!bucket_stack.empty()) {
-        int curr_bucket = bucket_stack.back();
+        const int curr_bucket = bucket_stack.back();
         bucket_stack.pop_back();
-        const size_t segment =
-            curr_bucket >> 6;  // Determine the segment for the current bucket
-        const size_t bit_position =
-            curr_bucket & 63;  // Determine the bit position within the segment
-        Bvisited[segment] |=
-            (1ULL << bit_position);  // Set the bit corresponding to the current
-                                     // bucket as visited
-        // print current bucket
+
+        // Mark the current bucket as visited.
+        const size_t segment = curr_bucket >> 6;
+        const size_t bit_pos = curr_bucket & 63;
+        Bvisited[segment] |= (1ULL << bit_pos);
+
+        // Get the opposite bucket’s label and node id.
         const int bucketLprimenode = buckets_opposite[curr_bucket].node_id;
         double cost = getcij(bucketLnode, bucketLprimenode);
 
+        // Optionally adjust cost with arc duals if RCC mode is enabled.
         RCC_MODE_BLOCK(auto arc_dual =
                            arc_duals.getDual(bucketLnode, bucketLprimenode);
                        cost -= arc_dual;)
-        // Stop exploring if the cost exceeds the threshold
-        if (label->cost + cost + c_bar_opposite[curr_bucket] >= theta) {
-            continue;
-        }
 
-        // Only process if bucket is not already in Bbidi
+        // Skip if the accumulated cost plus lower bound exceeds theta.
+        if (label_cost + cost + c_bar_opposite[curr_bucket] >= theta) continue;
+
+        // Process this bucket only if it hasn't been processed already.
         if (Bbidi.insert(curr_bucket).second) {
-            const auto opposite_labels =
+            const auto &opposite_labels =
                 buckets_opposite[curr_bucket].get_labels();
-            for (const auto &L : opposite_labels) {
-                if (label->node_id == L->node_id ||
-                    bitmaps_conflict(label, L)) {
-                    continue;  // Skip labels with the same node ID or
-                               // conflicting bitmaps
-                }
+            for (const auto &L_opposite : opposite_labels) {
+                // Skip labels from the same node or with conflicting visited
+                // bitmaps.
+                if (bucketLnode == L_opposite->node_id ||
+                    bitmapsConflict(label, L_opposite))
+                    continue;
 
-                const VRPNode &L_last_node = (D == Direction::Forward)
-                                                 ? nodes[label->node_id]
-                                                 : nodes[L->node_id];
+                // Determine the reference node for resource checks.
+                const VRPNode &ref_node =
+                    forward ? nodes[bucketLnode] : nodes[L_opposite->node_id];
 
                 bool violated = false;
-                for (auto r = 0; r < options.resources.size(); ++r) {
+                // Use a local copy of resources if needed.
+                const size_t num_resources = options.resources.size();
+                for (size_t r = 0; r < num_resources; ++r) {
                     if (options.resources[r] == "time") {
+                        // For time, add cost and the node's duration.
                         const double time_constraint =
-                            (D == Direction::Forward)
-                                ? label->resources[TIME_INDEX] + cost +
-                                      L_last_node.duration
-                                : L->resources[TIME_INDEX] + cost +
-                                      L_last_node.duration;
-
+                            forward ? label->resources[TIME_INDEX] + cost +
+                                          ref_node.duration
+                                    : L_opposite->resources[TIME_INDEX] + cost +
+                                          ref_node.duration;
                         if (time_constraint >
-                            ((D == Direction::Forward)
-                                 ? L->resources[TIME_INDEX]
-                                 : label->resources[TIME_INDEX])) {
+                            (forward ? L_opposite->resources[TIME_INDEX]
+                                     : label->resources[TIME_INDEX])) {
                             violated = true;
                             break;
                         }
                     } else {
                         const double resource_constraint =
-                            (D == Direction::Forward)
-                                ? label->resources[r] +
-                                      L_last_node.consumption[r]
-                                : L->resources[r] + L_last_node.consumption[r];
-
-                        if (resource_constraint > ((D == Direction::Forward)
-                                                       ? L->resources[r]
-                                                       : label->resources[r])) {
+                            forward
+                                ? label->resources[r] + ref_node.consumption[r]
+                                : L_opposite->resources[r] +
+                                      ref_node.consumption[r];
+                        if (resource_constraint >
+                            (forward ? L_opposite->resources[r]
+                                     : label->resources[r])) {
                             violated = true;
                             break;
                         }
                     }
                 }
 
-                if (violated) {
-                    continue;
-                }
+                if (violated) continue;
 
-                // Insert the current bucket into Bbidi if the total cost is
-                // below theta
-                if (label->cost + cost + L->cost < theta) {
+                // If the merged cost is below theta, record this bucket.
+                if (label_cost + cost + L_opposite->cost < theta)
                     Bbidi.emplace(curr_bucket);
-                }
             }
         }
 
-        // Add neighboring buckets to the stack, only if not visited
+        // Add unvisited neighbor buckets.
         for (int b_prime : Phi_opposite[curr_bucket]) {
-            const size_t segment_prime =
-                b_prime >>
-                6;  // Determine the segment for the neighboring bucket
-            const size_t bit_position_prime =
-                b_prime & 63;  // Determine the bit position within the segment
-
-            // If the neighboring bucket hasn't been visited, push it onto the
-            // stack
-            if ((Bvisited[segment_prime] & (1ULL << bit_position_prime)) == 0) {
+            const size_t seg_prime = b_prime >> 6;
+            const size_t bit_prime = b_prime & 63;
+            if ((Bvisited[seg_prime] & (1ULL << bit_prime)) == 0)
                 bucket_stack.push_back(b_prime);
-            }
         }
     }
 }
@@ -174,8 +172,7 @@ void BucketGraph::UpdateBucketsSet(const double theta, const Label *label,
  */
 template <Direction D>
 void BucketGraph::BucketArcElimination(double theta) {
-    // Assign forward or backward buckets, adjacency lists, and fixed buckets
-    // based on direction
+    // Select direction-specific containers.
     auto &buckets = assign_buckets<D>(fw_buckets, bw_buckets);
     auto &Phi = assign_buckets<D>(Phi_fw, Phi_bw);
     auto &Phi_opposite = assign_buckets<D>(Phi_bw, Phi_fw);
@@ -183,90 +180,92 @@ void BucketGraph::BucketArcElimination(double theta) {
     auto &buckets_size = assign_buckets<D>(fw_buckets_size, bw_buckets_size);
     auto &fixed_buckets_bitmap =
         assign_buckets<D>(fw_fixed_buckets_bitmap, bw_fixed_buckets_bitmap);
-    // Reset fixed_buckets
-    auto n_buckets = buckets_size;
 
-    // for (auto &fb : fixed_buckets) { std::fill(fb.begin(), fb.end(), 0); }
-    //  set fixed_buckets_bitmap all to 0
+    // Reset fixed buckets bitmap.
     fixed_buckets_bitmap.assign(fixed_buckets_bitmap.size(), 0);
+    const int n_buckets = buckets_size;
+    // Compute the number of 64-bit segments for bitmaps.
+    const size_t n_segments = (buckets_size + 63) / 64;
 
+    // Define ArcMap to store arc information.
     using ArcMap =
         ankerl::unordered_dense::map<std::pair<std::pair<int, int>, int>,
                                      ankerl::unordered_dense::set<int>,
                                      arc_map_hash>;
-
     ArcMap local_B_Ba_b;
     int removed_arcs = 0;
 
+    // Helper: create an arc key from two node IDs and a bucket.
     auto create_arc_key = [](int from, int to, int b) {
         return std::make_pair(std::make_pair(from, to), b);
     };
 
-    // Function to process jump arcs
+    // Helper lambda to quickly reset a bitmap vector.
+    auto reset_bitmap = [&](std::vector<uint64_t> &bitmap) {
+        // Using memset since our vector is contiguous.
+        if (!bitmap.empty())
+            std::memset(bitmap.data(), 0, bitmap.size() * sizeof(uint64_t));
+    };
+
+    // Lambda: Process jump arcs for bucket 'b'.
     auto process_jump_arcs = [&](int b) {
         const auto &jump_arcs = buckets[b].template get_jump_arcs<D>();
-        if (!jump_arcs.empty()) {
-            const size_t n_segments = buckets_size / 64 + 1;
-            std::vector<uint64_t> Bvisited(n_segments, 0);
-            auto labels = buckets[b].get_labels();
-            for (const auto &a : jump_arcs) {
-                auto increment = a.resource_increment;
+        if (jump_arcs.empty()) return;
 
-                // auto arc_key    =
-                // std::make_pair(std::make_pair(a.base_bucket, a.jump_bucket),
-                // b);
-                auto arc_key = create_arc_key(a.base_bucket, a.jump_bucket, b);
-                int b_opposite =
-                    get_opposite_bucket_number<D>(a.jump_bucket, increment);
+        std::vector<uint64_t> Bvisited(n_segments, 0);
+        auto labels = buckets[b].get_labels();
 
-                auto &Bidi_map = local_B_Ba_b[arc_key];
+        for (const auto &a : jump_arcs) {
+            auto increment = a.resource_increment;
+            auto arc_key = create_arc_key(a.base_bucket, a.jump_bucket, b);
+            int b_opposite =
+                get_opposite_bucket_number<D>(a.jump_bucket, increment);
+            auto &Bidi_map = local_B_Ba_b[arc_key];
 
-                for (auto &L_item : labels) {
-                    Bidi_map.insert(b);
-                    if (!Bvisited.empty()) {
-                        std::memset(Bvisited.data(), 0,
-                                    Bvisited.size() * sizeof(uint64_t));
-                    }
-                    UpdateBucketsSet<D>(theta, L_item, Bidi_map, b_opposite,
-                                        Bvisited);
-                }
+            // Process each label in the current bucket.
+            for (auto &L_item : labels) {
+                Bidi_map.insert(b);
+                // Reset Bvisited for each UpdateBucketsSet call.
+                reset_bitmap(Bvisited);
+                UpdateBucketsSet<D>(theta, L_item, Bidi_map, b_opposite,
+                                    Bvisited);
             }
         }
     };
 
-    // Function to process bucket arcs
+    // Lambda: Process bucket arcs for bucket 'b'.
     auto process_bucket_arcs = [&](int b) {
         const auto &bucket_arcs = buckets[b].template get_bucket_arcs<D>();
-        auto labels = buckets[b].get_labels();
+        if (bucket_arcs.empty()) return;
 
-        const size_t n_segments = buckets_size / 64 + 1;
+        auto labels = buckets[b].get_labels();
         std::vector<uint64_t> Bvisited(n_segments, 0);
 
         for (const auto &a : bucket_arcs) {
-            std::vector<double> increment(options.resources.size(), 0);
-            // print increment.size
-            for (int r = 0; r < options.resources.size(); ++r) {
-                if constexpr (D == Direction::Forward) {
+            // Build the resource increment vector.
+            std::vector<double> increment(options.resources.size(), 0.0);
+            for (size_t r = 0; r < options.resources.size(); ++r) {
+                if constexpr (D == Direction::Forward)
                     increment[r] = buckets[b].lb[r] + a.resource_increment[r];
-                } else {
+                else
                     increment[r] = buckets[b].ub[r] - a.resource_increment[r];
-                }
             }
+
             auto arc_key = create_arc_key(buckets[a.from_bucket].node_id,
                                           buckets[a.to_bucket].node_id, b);
             int b_opposite =
                 get_opposite_bucket_number<D>(a.to_bucket, increment);
             auto &Bidi_map = local_B_Ba_b[arc_key];
 
+            // Process each label in bucket 'b'.
             for (auto &L_item : labels) {
                 Bidi_map.insert(b);
-                std::memset(Bvisited.data(), 0,
-                            Bvisited.size() * sizeof(uint64_t));
+                reset_bitmap(Bvisited);
                 UpdateBucketsSet<D>(theta, L_item, Bidi_map, b_opposite,
                                     Bvisited);
             }
 
-            // Check for opposite direction arcs
+            // Check if the opposite direction contains arcs.
             if (auto it = local_B_Ba_b.find(arc_key);
                 it != local_B_Ba_b.end()) {
                 auto &Bidi_map_opposite = it->second;
@@ -276,31 +275,31 @@ void BucketGraph::BucketArcElimination(double theta) {
                         return Bidi_map_opposite.find(b_prime) !=
                                Bidi_map_opposite.end();
                     });
-
                 if (!contains && Bidi_map_opposite.find(b_opposite) ==
                                      Bidi_map_opposite.end()) {
-                    size_t bit_pos = a.from_bucket * n_buckets + a.to_bucket;
+                    size_t bit_pos =
+                        static_cast<size_t>(a.from_bucket) * n_buckets +
+                        a.to_bucket;
                     fixed_buckets_bitmap[bit_pos / 64] |=
                         (1ULL << (bit_pos % 64));
-
                     ++removed_arcs;
                 }
             }
         }
     };
 
-    // Process each bucket
+    // Process each bucket.
     for (int b = 0; b < buckets_size; ++b) {
+        // Process node arcs.
         const auto &node_arcs =
             nodes[buckets[b].node_id].template get_arcs<D>();
-
-        // Process node arcs
         for (const auto &a : node_arcs) {
             auto arc_key = std::make_pair(std::make_pair(a.from, a.to), b);
             auto &Bidi_map = local_B_Ba_b[arc_key];
 
             if (!Phi[b].empty()) {
                 Bidi_map.insert(b);
+                // Merge neighbor bucket arcs.
                 for (const auto &b_prime : Phi[b]) {
                     auto neighbor_key =
                         std::make_pair(std::make_pair(a.from, a.to), b_prime);
@@ -312,17 +311,16 @@ void BucketGraph::BucketArcElimination(double theta) {
             }
         }
 
-        // Process jump and bucket arcs using separate functions
+        // Process jump arcs and bucket arcs.
         process_jump_arcs(b);
         process_bucket_arcs(b);
     }
 
-    // Print the number of arcs removed
-    if constexpr (D == Direction::Forward) {
+    // Print the total number of removed arcs.
+    if constexpr (D == Direction::Forward)
         print_info("[Fw] removed arcs: {}\n", removed_arcs);
-    } else {
+    else
         print_info("[Bw] removed arcs: {}\n", removed_arcs);
-    }
 }
 
 /**
@@ -338,46 +336,45 @@ void BucketGraph::BucketArcElimination(double theta) {
  */
 template <Direction D>
 void BucketGraph::ObtainJumpBucketArcs() {
-    // Assign forward or backward buckets, fixed buckets, bucket indices, and
-    // Phi (adjacency list) based on direction
+    // Select direction-specific containers.
     auto &buckets = assign_buckets<D>(fw_buckets, bw_buckets);
     auto &fixed_buckets = assign_buckets<D>(fw_fixed_buckets, bw_fixed_buckets);
-    auto &num_buckets_index =
+    auto &num_buckets_idx =
         assign_buckets<D>(num_buckets_index_fw, num_buckets_index_bw);
     auto &num_buckets = assign_buckets<D>(num_buckets_fw, num_buckets_bw);
     auto &Phi = assign_buckets<D>(Phi_fw, Phi_bw);
     auto &buckets_size = assign_buckets<D>(fw_buckets_size, bw_buckets_size);
 
-    int arc_counter = 0;      // Counter for jump arcs added
-    int missing_counter = 0;  // Counter for missing paths
+    int arc_counter = 0;      // Count of jump arcs added
+    int missing_counter = 0;  // Count of missing paths
 
-    // iterate over all nodes and clear jump arcs
+    // Clear jump arcs for all nodes.
     for (auto &node : nodes) {
         node.clear_jump_arcs<D>();
     }
 
-    // Loop through all buckets
+    // Process each bucket.
     for (int b = 0; b < buckets_size; ++b) {
-        std::vector<int> B_bar;  // Temporary storage for valid bucket indices
+        std::vector<int>
+            B_bar;  // Temporary storage for valid adjacent bucket indices
 
-        // Cache the current bucket's node ID and arcs
         const int current_node_id = buckets[b].node_id;
-        const auto &arcs = buckets[b].template get_bucket_arcs<D>();
-        const auto &original_arcs =
-            nodes[current_node_id].template get_arcs<D>();
+        const auto &bucket_arcs = buckets[b].template get_bucket_arcs<D>();
+        const auto &orig_arcs = nodes[current_node_id].template get_arcs<D>();
 
-        if (arcs.empty()) {
+        // Skip if there are no bucket arcs.
+        if (bucket_arcs.empty()) {
             continue;
-        }  // Skip if no arcs in the current bucket
+        }
 
-        // Process each original arc for the current node
-        for (const auto &orig_arc : original_arcs) {
+        // For each original arc from the current node...
+        for (const auto &orig_arc : orig_arcs) {
             const int from_node = orig_arc.from;
             const int to_node = orig_arc.to;
             bool have_path = false;
 
-            // Check if the path exists in the current bucket arcs
-            for (const auto &gamma : arcs) {
+            // Check if the current bucket arcs contain the desired path.
+            for (const auto &gamma : bucket_arcs) {
                 if (is_bucket_fixed<D>(gamma.from_bucket, gamma.to_bucket)) {
                     continue;
                 }
@@ -387,79 +384,85 @@ void BucketGraph::ObtainJumpBucketArcs() {
 
                 if (from_node == from_node_b && to_node == to_node_b) {
                     have_path = true;
-                    break;  // Path found, exit early
+                    break;  // Path found: no need to search further.
                 }
             }
 
-            // If no path was found, find a jump arc
+            // If no valid path was found, try to obtain a jump arc.
             if (!have_path) {
-                ++missing_counter;  // Increment missing path counter
+                ++missing_counter;
 
-                // Cache the starting bucket and the number of buckets for this
-                // node
-                const int start_bucket = num_buckets_index[current_node_id];
+                // Determine bucket range for the current node.
+                const int start_bucket = num_buckets_idx[current_node_id];
                 const int node_buckets = num_buckets[current_node_id];
 
-                auto process_bucket = [&](int b, int b_prime) {
-                    // Check if b_prime is adjacent to b in Phi
-                    const auto &phi_b_prime = Phi[b_prime];
-                    if (std::find(phi_b_prime.begin(), phi_b_prime.end(), b) ==
-                        phi_b_prime.end()) {
-                        return;  // Not adjacent, skip
-                    }
+                // Lambda to process candidate adjacent buckets.
+                auto process_bucket = [&](int current_b, int candidate_b) {
+                    // Only proceed if candidate bucket is adjacent (per Phi).
+                    const auto &phi_candidate = Phi[candidate_b];
+                    if (std::find(phi_candidate.begin(), phi_candidate.end(),
+                                  current_b) == phi_candidate.end())
+                        return;
 
-                    // Check arcs in the adjacent bucket b_prime
-                    const auto &arcs_prime =
-                        buckets[b_prime].template get_bucket_arcs<D>();
-                    for (const auto &gamma_prime : arcs_prime) {
-                        if (is_bucket_fixed<D>(gamma_prime.from_bucket,
-                                               gamma_prime.to_bucket)) {
+                    // Check candidate bucket's arcs.
+                    const auto &candidate_arcs =
+                        buckets[candidate_b].template get_bucket_arcs<D>();
+                    for (const auto &gamma_candidate : candidate_arcs) {
+                        if (is_bucket_fixed<D>(gamma_candidate.from_bucket,
+                                               gamma_candidate.to_bucket))
                             continue;
-                        }
 
-                        const int from_node_prime =
-                            buckets[gamma_prime.from_bucket].node_id;
-                        const int to_node_prime =
-                            buckets[gamma_prime.to_bucket].node_id;
+                        const int from_node_candidate =
+                            buckets[gamma_candidate.from_bucket].node_id;
+                        const int to_node_candidate =
+                            buckets[gamma_candidate.to_bucket].node_id;
 
-                        // If the arc matches, add a jump arc
-                        if (from_node == from_node_prime &&
-                            to_node == to_node_prime) {
-                            B_bar.push_back(
-                                b_prime);  // Add the valid bucket to B_bar
-
-                            // Wrap the resource increment in a vector
+                        // If the candidate arc matches the original arc...
+                        if (from_node == from_node_candidate &&
+                            to_node == to_node_candidate) {
+                            B_bar.push_back(candidate_b);
                             const std::vector<double> res =
-                                gamma_prime.resource_increment;
-                            const double cost = gamma_prime.cost_increment;
+                                gamma_candidate.resource_increment;
+                            const double cost = gamma_candidate.cost_increment;
 
-                            buckets[b].template add_jump_arc<D>(b, b_prime, res,
-                                                                cost);
-                            nodes[buckets[b].node_id].template add_jump_arc<D>(
-                                b, b_prime, res, cost, to_node);
-                            ++arc_counter;  // Increment the jump arc counter
+                            // Add jump arcs both in the bucket and at the node
+                            // level.
+                            buckets[current_b].template add_jump_arc<D>(
+                                current_b, candidate_b, res, cost);
+                            nodes[buckets[current_b].node_id]
+                                .template add_jump_arc<D>(
+                                    current_b, candidate_b, res, cost, to_node);
+                            ++arc_counter;
                         }
                     }
                 };
 
+                // Process candidate buckets. For now both directions use
+                // increasing index. (For backward direction, adjust the loop as
+                // needed.)
                 if constexpr (D == Direction::Forward) {
-                    // Forward direction: incrementing buckets
-                    for (int b_prime = b + 1;
-                         b_prime < start_bucket + node_buckets; ++b_prime) {
-                        process_bucket(b, b_prime);
+                    for (int candidate_b = b + 1;
+                         candidate_b < start_bucket + node_buckets;
+                         ++candidate_b) {
+                        process_bucket(b, candidate_b);
                     }
                 } else {
-                    // Backward direction: decrementing buckets
-                    // for (int b_prime = b - 1; b_prime >= start_bucket;
-                    // --b_prime) { process_bucket(b, b_prime); }
-                    for (int b_prime = b + 1;
-                         b_prime < start_bucket + node_buckets; ++b_prime) {
-                        process_bucket(b, b_prime);
+                    // Uncomment and adjust if backward should iterate in
+                    // reverse order. for (int candidate_b = b - 1; candidate_b
+                    // >= start_bucket; --candidate_b) {
+                    //     process_bucket(b, candidate_b);
+                    // }
+                    for (int candidate_b = b + 1;
+                         candidate_b < start_bucket + node_buckets;
+                         ++candidate_b) {
+                        process_bucket(b, candidate_b);
                     }
                 }
             }
         }
     }
+
+    // Print summary of jump arcs added.
     CONDITIONAL(D, print_info("[Fw] added {} jump arcs\n", arc_counter),
                 print_info("[Bw] added {} jump arcs\n", arc_counter));
 }

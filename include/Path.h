@@ -19,9 +19,8 @@
 
 struct Path {
     // Use a more memory-efficient container for small integers
-    std::vector<uint16_t>
-        route;   // Changed from vector<int> assuming route nodes are < 65536
-    float cost;  // Changed from double unless high precision is needed
+    std::vector<uint16_t> route;  // Assuming route nodes are < 65536
+    float cost;                   // Using float for cost
     float red_cost = std::numeric_limits<float>::max();
     float frac_x = 0.0f;
 
@@ -31,26 +30,25 @@ struct Path {
     }
 
     // Default constructor
-    Path() : route({}), cost(0.0f) {}
+    Path() : route{}, cost(0.0f) {}
 
     // Constructor with vector<int> and double cost
     Path(const std::vector<int> &r, double c) : cost(static_cast<float>(c)) {
-        route.reserve(r.size());
-        for (const int val : r) {
-            route.push_back(static_cast<uint16_t>(val));
-        }
+        route.resize(r.size());
+        std::transform(r.begin(), r.end(), route.begin(),
+                       [](int val) { return static_cast<uint16_t>(val); });
         precomputeArcsAsync();  // Run precomputeArcs in the background
     }
 
     // Constructor with vector<uint16_t> and float cost
     Path(const std::vector<uint16_t> &r, float c) : route(r), cost(c) {
-        precomputeArcsAsync();  // Run precomputeArcs in the background
+        precomputeArcsAsync();
     }
 
     // Constructor with vector<uint16_t> and double cost
     Path(const std::vector<uint16_t> &r, double c)
         : route(r), cost(static_cast<float>(c)) {
-        precomputeArcsAsync();  // Run precomputeArcs in the background
+        precomputeArcsAsync();
     }
 
     // Iterator methods
@@ -68,7 +66,7 @@ struct Path {
 
     // Count occurrences of a specific node in the route
     int countOccurrences(uint16_t i) const {
-        return std::count(route.begin(), route.end(), i);
+        return static_cast<int>(std::count(route.begin(), route.end(), i));
     }
 
     // Count occurrences of a specific arc (i -> j) in the route
@@ -77,7 +75,7 @@ struct Path {
         const size_t sz = route.size();
         for (size_t n = 1; n < sz; ++n) {
             if (route[n - 1] == i && route[n] == j) {
-                times++;
+                ++times;
             }
         }
         return times;
@@ -95,14 +93,15 @@ struct Path {
 
     struct ArcKeyHash {
         size_t operator()(const ArcKey &key) const {
-            return (size_t)key.from << 16 | key.to;
+            // Simple hash: combine from and to into a 32-bit value
+            return (static_cast<size_t>(key.from) << 16) | key.to;
         }
     };
 
-    // Replace std::pair with our more compact ArcKey
+    // More compact map to count arcs.
     ankerl::unordered_dense::map<ArcKey, uint16_t, ArcKeyHash> arcMap;
 
-    // Add an arc to the arcMap
+    // Add an arc (i -> j) to the arcMap.
     void addArc(uint16_t i, uint16_t j) {
         ArcKey arc{i, j};
         auto it = arcMap.find(arc);
@@ -113,15 +112,16 @@ struct Path {
         }
     }
 
-    // Precompute arcs (actual implementation)
+    // Precompute arcs (iterates over the route and counts arcs)
     void precomputeArcs() {
-        arcMap.reserve(route.size() - 1);  // Pre-allocate expected size
-        for (size_t n = 0; n < route.size() - 1; ++n) {
+        // Pre-allocate expected size for better performance.
+        arcMap.reserve(route.size() > 0 ? route.size() - 1 : 0);
+        for (size_t n = 0; n + 1 < route.size(); ++n) {
             addArc(route[n], route[n + 1]);
         }
     }
 
-    // Run precomputeArcs asynchronously
+    // Run precomputeArcs asynchronously.
     std::future<void> precomputeArcsAsync() {
         return std::async(std::launch::async, [this]() { precomputeArcs(); });
     }

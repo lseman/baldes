@@ -44,9 +44,9 @@ struct BucketOptions {
     std::vector<int> resource_type = {1};
     std::vector<int> or_resources = {1};
 
-    int n_warm_start = 1000;
+    double n_warm_start = 0.3;
 
-    bool warm_start = true;
+    bool warm_start = false;
 
     // EVRP options
     int battery_capacity = 100;
@@ -388,7 +388,12 @@ auto parallel_sections(Scheduler &scheduler, Tasks &&...tasks) {
     }
 
 inline double roundToTwoDecimalPlaces(double value) {
-    return std::round(value * 100.0) / 100.0;
+    // Check if value is finite (avoid NaN or infinity issues)
+    if (!std::isfinite(value)) {
+        return value;
+    }
+    // Scale, round to nearest integer (using long long), then scale back.
+    return static_cast<double>(std::llround(value * 100.0)) / 100.0;
 }
 
 #ifdef IPM

@@ -131,11 +131,11 @@ cpmaddpackage(
 )
 
 # libcuckoo
-cpmaddpackage(
-  NAME libcuckoo
-  GITHUB_REPOSITORY efficient/libcuckoo
-  GIT_TAG origin/master
-)
+# cpmaddpackage(
+#   NAME libcuckoo
+#   GITHUB_REPOSITORY efficient/libcuckoo
+#   GIT_TAG origin/master
+# )
 
 # Highs
 if(HIGHS)
@@ -361,7 +361,7 @@ include_directories(${GUROBI_HOME}/include)
 #-------------------------------------------------------------------------------
 # Targets
 #-------------------------------------------------------------------------------
-set(COMMON_LIBRARIES stdexec fmt xxhash libcuckoo)
+set(COMMON_LIBRARIES stdexec fmt xxhash)
 
 set(GUROBI_VERSION_MAJOR 120) # Adjust based on Gurobi version
 if(APPLE)

@@ -21,7 +21,7 @@ class IteratedLocalSearch {
    public:
     InstanceData instance;
     std::vector<VRPNode> nodes;
-    CutStorage *cut_storage = new CutStorage();
+    CutStorage *cut_storage = nullptr;
 
     // default default initialization passing InstanceData &instance
     IteratedLocalSearch(const InstanceData &instance)
@@ -518,26 +518,27 @@ class IteratedLocalSearch {
     void update_operator_weights(double decay_factor = 0.9,
                                  double reward_factor = 0.1,
                                  double min_weight = 0.01) {
-        // Calculate total improvement and success count for normalization
+        // Calculate the total improvement and total success counts.
         const double total_improvement = std::accumulate(
             operator_improvements.begin(), operator_improvements.end(), 0.0);
         const int total_successes = std::accumulate(
             operator_success_count.begin(), operator_success_count.end(), 0);
 
+        // Only update if there is any recorded improvement or success.
         if (total_improvement > 0 || total_successes > 0) {
             const double inv_total_improvement =
-                (total_improvement > 0) ? 1.0 / total_improvement : 0.0;
+                (total_improvement > 0) ? (1.0 / total_improvement) : 0.0;
             const double inv_total_successes =
-                (total_successes > 0) ? 1.0 / total_successes : 0.0;
+                (total_successes > 0) ? (1.0 / total_successes) : 0.0;
 
+            // Update each operator weight using decay and reward based on
+            // normalized metrics.
             for (size_t i = 0; i < operator_weights.size(); ++i) {
-                // Calculate normalized improvement and success rate
                 const double normalized_improvement =
                     operator_improvements[i] * inv_total_improvement;
                 const double success_rate =
                     operator_success_count[i] * inv_total_successes;
 
-                // Update weight with decay and reward
                 operator_weights[i] = std::max(
                     min_weight, decay_factor * operator_weights[i] +
                                     reward_factor * (normalized_improvement +
@@ -545,7 +546,7 @@ class IteratedLocalSearch {
             }
         }
 
-        // Normalize weights to sum to 1
+        // Normalize the weights so that they sum to 1.
         const double total_weight = std::accumulate(
             operator_weights.begin(), operator_weights.end(), 0.0);
         if (total_weight > 0) {
@@ -554,37 +555,41 @@ class IteratedLocalSearch {
             }
         }
 
-        // Reset improvements and success counts for the next iteration
+        // Reset improvements and success counts for the next iteration.
         std::fill(operator_improvements.begin(), operator_improvements.end(),
                   0.0);
         std::fill(operator_success_count.begin(), operator_success_count.end(),
                   0);
     }
 
-    exec::static_thread_pool pool = exec::static_thread_pool(2);
+    exec::static_thread_pool pool =
+        exec::static_thread_pool(std::thread::hardware_concurrency() / 4);
     exec::static_thread_pool::scheduler sched = pool.get_scheduler();
 
+    Xoroshiro128Plus rng;  // Custom RNG with default seed
+
     std::vector<Label *> perturbation(const std::vector<Label *> &paths) {
+        // Copy the input paths as the baseline best solution.
         std::vector<Label *> best = paths;
         std::vector<Label *> best_new;
-        Xoroshiro128Plus rng;  // Instantiate the custom RNG with default seed
-        bool is_stuck = false;
 
+        bool is_stuck = false;
+        // Initialize best costs for each path to a large value.
         std::vector<double> best_costs(paths.size(),
                                        std::numeric_limits<double>::max());
 
-        // Store tasks for parallel processing
+        // Build the list of tasks for parallel processing.
+        // Each task is a tuple containing two Label pointers and two indices.
         std::vector<std::tuple<const Label *, const Label *, size_t, size_t>>
             tasks;
-
         for (const Label *label_i : best) {
             for (const Label *label_j : best) {
                 if (label_i == label_j) continue;
                 const auto &route_i = label_i->nodes_covered;
                 const auto &route_j = label_j->nodes_covered;
-
+                // Skip if routes are too short.
                 if (route_i.size() < 3 || route_j.size() < 3) continue;
-
+                // Generate tasks for valid internal positions.
                 for (size_t k = 1; k < route_i.size() - 1; ++k) {
                     for (size_t l = 1; l < route_j.size() - 1; ++l) {
                         tasks.emplace_back(label_i, label_j, k, l);
@@ -593,74 +598,71 @@ class IteratedLocalSearch {
             }
         }
 
-        // Parallelize the task processing
-        std::mutex best_new_mutex;  // Mutex to protect access to best_new and
-                                    // operator_improvements
-        std::mutex operator_mutex;  // Mutex to protect operator improvements
+        // Mutexes to protect shared resources in the parallel region.
+        std::mutex best_new_mutex;  // Protects best_new updates.
+        std::mutex operator_mutex;  // Protects updates to operator metrics.
 
-        // Define chunk size to balance load
-        const int chunk_size =
-            1;  // Adjust chunk size based on performance experiments
+        // Define the chunk size to balance load across tasks.
+        const size_t chunk_size = 1;  // Adjust chunk size based on experiments.
 
-        // Parallel execution in chunks
+        // Use stdexec's bulk sender to execute tasks in parallel.
         auto bulk_sender = stdexec::bulk(
             stdexec::just(), (tasks.size() + chunk_size - 1) / chunk_size,
             [&best_new, &best_new_mutex, &operator_mutex, &tasks, chunk_size,
-             &rng, this](std::size_t chunk_idx) {
-                size_t start_idx = chunk_idx * chunk_size;
-                size_t end_idx = std::min(start_idx + chunk_size, tasks.size());
+             this](std::size_t chunk_idx) {
+                // Determine the task range for this chunk.
+                const size_t start_idx = chunk_idx * chunk_size;
+                const size_t end_idx =
+                    std::min(start_idx + chunk_size, tasks.size());
 
+                // Process each task in the chunk.
                 for (size_t task_idx = start_idx; task_idx < end_idx;
                      ++task_idx) {
                     const auto &[label_i, label_j, k, l] = tasks[task_idx];
                     const auto &route_i = label_i->getRoute();
                     const auto &route_j = label_j->getRoute();
 
-                    // check route size, if less than 3 then continue
+                    // Skip tasks with routes that are too short.
                     if (route_i.size() < 3 || route_j.size() < 3) continue;
-                    // Select operator based on weights
+
+                    // Select the operator based on its weight.
                     int op_idx = select_operator(rng);
 
-                    // Apply the selected operator using the correct syntax for
-                    // member function pointers
+                    // Apply the chosen operator.
                     auto [new_route_i, new_route_j] =
                         apply_operator(op_idx, route_i, route_j, k, l);
-
                     if (new_route_i.empty() || new_route_j.empty()) continue;
 
+                    // Compute new route costs.
                     auto cost_i = compute_cost(new_route_i);
                     auto cost_j = compute_cost(new_route_j);
-                    Path new_path_i = Path{new_route_i, cost_i.first};
-                    Path new_path_j = Path{new_route_j, cost_j.first};
+                    Path new_path_i{new_route_i, cost_i.first};
+                    Path new_path_j{new_route_j, cost_j.first};
 
-                    // Lambda function to add an improved label to best_new
+                    // Lambda to update a label if an improvement is found.
                     auto add_improved_label =
                         [&](const auto &path, const auto &cost,
                             const Label *label, int op_idx) {
                             double new_cost = cost.second;
                             double current_cost = label->cost;
-
-                            // Check if the new cost is better
+                            // Accept improvement if sufficiently better.
                             if (new_cost < current_cost - 1e-3) {
-                                // fmt::print("Improvement: {} -> {}\n",
-                                // current_cost, new_cost);
-
-                                // Lock to update operator performance
+                                // Update operator performance metrics under
+                                // lock.
                                 {
                                     std::lock_guard<std::mutex> lock(
                                         operator_mutex);
                                     operator_improvements[op_idx] +=
                                         current_cost - new_cost;
-                                    operator_success_count[op_idx] +=
-                                        1;  // Increment success count
+                                    operator_success_count[op_idx] += 1;
                                 }
-
+                                // Create a new improved label.
                                 auto best_new_label = new Label();
                                 best_new_label->addRoute(path.route);
                                 best_new_label->real_cost = cost.first;
                                 best_new_label->cost = new_cost;
-
-                                // Lock to update best_new
+                                // Insert the new label into best_new under
+                                // lock.
                                 {
                                     std::lock_guard<std::mutex> lock(
                                         best_new_mutex);
@@ -669,8 +671,7 @@ class IteratedLocalSearch {
                             }
                         };
 
-                    // Outside the lambda: check feasibility and improvements
-                    // separately
+                    // Check feasibility and update improvements.
                     if (is_feasible(new_path_i)) {
                         add_improved_label(new_path_i, cost_i, label_i, op_idx);
                     }
@@ -680,14 +681,15 @@ class IteratedLocalSearch {
                 }
             });
 
-        // Submit work to the thread pool
+        // Submit the bulk work to the thread pool scheduler and wait for
+        // completion.
         auto work = stdexec::starts_on(sched, bulk_sender);
         stdexec::sync_wait(std::move(work));
 
-        // Update operator weights based on performance
+        // Update the operator weights based on the collected performance.
         update_operator_weights();
 
-        // Sort and limit to top solutions
+        // Sort the improved labels and keep only the top N_ADD solutions.
         pdqsort(
             best_new.begin(), best_new.end(),
             [](const Label *a, const Label *b) { return a->cost < b->cost; });
@@ -717,68 +719,60 @@ class IteratedLocalSearch {
 
    private:
     // Feasibility check and cost computation functions
-    bool is_feasible(Path &route) const {
-        double time = 0.0;
-        double capacity = 0.0;
+    bool is_feasible(const Path &route) const {
+        double current_time = 0.0;
+        double current_capacity = 0.0;
         const double total_capacity = instance.q;
 
-        // Ensure the route starts at depot 0 and ends at the last node (depot
-        // N_SIZE - 1)
+        // Ensure the route starts at depot 0 and ends at depot N_SIZE - 1.
         if (route.route.front() != 0 || route.route.back() != N_SIZE - 1) {
-            return false;  // Infeasible if the route doesn't start and end at
-                           // the depots
+            return false;
         }
 
-        // Preallocate and reuse the Bvisited bitset for tracking visited nodes
+        // Prepare a thread-local bitset for tracking visited nodes.
         const size_t n_segments = N_SIZE / 64 + 1;
-        static thread_local std::vector<uint64_t> Bvisited(
-            n_segments, 0);  // Use thread-local to avoid reallocation
+        static thread_local std::vector<uint64_t> visited(n_segments, 0);
+        std::fill(visited.begin(), visited.end(), 0);
 
-        // Reset visited nodes tracker
-        std::fill(Bvisited.begin(), Bvisited.end(), 0);
+        // Iterate through the route to check time windows, capacity, and
+        // visits.
+        for (size_t i = 0; i < route.route.size() - 1; ++i) {
+            int source_id = route.route[i];
+            int target_id = route.route[i + 1];
 
-        // Precompute cij values (store them in memory if possible for faster
-        // access)
-        for (size_t i = 0; i < route.size() - 1; ++i) {
-            const int source_id = route[i];
-            const int target_id = route[i + 1];
+            // Determine the bitset segment and position for the source node.
+            size_t segment = source_id >> 6;
+            size_t bit_position = source_id & 63;
 
-            // Directly access the segment and bit position for the visited node
-            const size_t segment = source_id >> 6;
-            const size_t bit_position = source_id & 63;
-
-            // Check if node has been visited
-            if (Bvisited[segment] & (1ULL << bit_position)) {
-                return false;  // Node was already visited, route is infeasible
+            // Check if the source node has already been visited.
+            if (visited[segment] & (1ULL << bit_position)) {
+                return false;
             }
 
-            // Mark node as visited
-            Bvisited[segment] |= (1ULL << bit_position);
+            // Mark the source node as visited.
+            visited[segment] |= (1ULL << bit_position);
 
             const auto &source = nodes[source_id];
             const auto &target = nodes[target_id];
 
-            // Use cached or precomputed values for cij
+            // Compute travel time and arrival time.
             double travel_time =
                 source.duration + instance.getcij(source_id, target_id);
-            double start_time =
-                std::max(static_cast<double>(target.lb[0]), time + travel_time);
+            double arrival_time = std::max(static_cast<double>(target.lb[0]),
+                                           current_time + travel_time);
 
-            // If the start time exceeds the due date of the target customer,
-            // it's infeasible
-            if (start_time > target.ub[0]) {
-                return false;  // Time window violation
+            // Check the time window for the target node.
+            if (arrival_time > target.ub[0]) {
+                return false;
             }
 
-            time = start_time;  // Update time for next node
-
-            // Update the capacity and check if it exceeds the total capacity
-            capacity += source.demand;
-            if (capacity > total_capacity) {
-                return false;  // Capacity exceeded
+            // Update time and capacity.
+            current_time = arrival_time;
+            current_capacity += source.demand;
+            if (current_capacity > total_capacity) {
+                return false;
             }
         }
-
         return true;
     }
 
