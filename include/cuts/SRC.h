@@ -76,6 +76,37 @@ class LimitedMemoryRank1Cuts {
     ArcDuals arc_duals;
     void setArcDuals(const ArcDuals &arc_duals) { this->arc_duals = arc_duals; }
 #endif
+    int last_path_idx = 0;
+
+    std::vector<std::vector<int>> vertex_route_map;
+    void initializeVertexRouteMap() {
+        // Initialize the vertex_route_map with N_SIZE rows and allPaths.size()
+        // columns, all set to 0.
+        if (last_path_idx == 0) {
+            vertex_route_map.assign(N_SIZE,
+                                    std::vector<int>(allPaths.size(), 0));
+        } else {
+            // assign 0 from last_path_idx to allPaths.size()
+            for (size_t i = 0; i < N_SIZE; ++i) {
+                vertex_route_map[i].resize(allPaths.size());
+                for (size_t j = last_path_idx; j < allPaths.size(); ++j) {
+                    vertex_route_map[i][j] = 0;
+                }
+            }
+        }
+
+        // Populate the map: for each path, count the appearance of each vertex.
+        for (size_t r = last_path_idx; r < allPaths.size(); ++r) {
+            for (const auto &vertex : allPaths[r].route) {
+                // Only consider vertices that are not the depot (assumed at
+                // indices 0 and N_SIZE-1).
+                if (vertex > 0 && vertex < N_SIZE - 1) {
+                    ++vertex_route_map[vertex][r];
+                }
+            }
+        }
+        last_path_idx = allPaths.size();
+    }
 
     Xoroshiro128Plus rp;  // Seed it (you can change the seed)
 
@@ -127,7 +158,6 @@ class LimitedMemoryRank1Cuts {
     void separate(const SparseMatrix &A, const std::vector<double> &x);
 
     ankerl::unordered_dense::map<int, std::vector<int>> row_indices_map;
-    int last_path_idx = 0;
     /**
      * @brief Computes the limited memory coefficient based on the given
      * parameters.
@@ -152,70 +182,54 @@ class LimitedMemoryRank1Cuts {
 
     void separateR1C1(const SparseMatrix &A, const std::vector<double> &x) {
         // === Step 1: Extract Potential Cuts from allPaths ===
-        std::vector<std::pair<double, int>> tmp_cuts;
-        tmp_cuts.reserve(
-            allPaths.size());  // Reserve conservatively based on solution size.
-
+        const size_t nPaths = allPaths.size();
         const int JOBS = std::thread::hardware_concurrency();
-        const int chunk_size = (allPaths.size() + JOBS - 1) / JOBS;
+        const int chunk_size = (nPaths + JOBS - 1) / JOBS;
+        const size_t num_chunks = (nPaths + chunk_size - 1) / chunk_size;
 
-        // Mutex to protect access to tmp_cuts (using nsync if defined).
-#ifdef NSYNC
-        nsync::nsync_mu cuts_mutex = NSYNC_MU_INIT;
-#else
-        std::mutex cuts_mutex;
-#endif
+        // Reserve per-chunk storage to avoid locking.
+        std::vector<std::vector<std::pair<double, int>>> chunk_cuts(num_chunks);
+        for (auto &vec : chunk_cuts) {
+            vec.reserve(10);  // Reserve an estimate; adjust as needed.
+        }
 
         // Parallel execution in chunks over allPaths.
         auto bulk_sender = stdexec::bulk(
-            stdexec::just(), (allPaths.size() + chunk_size - 1) / chunk_size,
-            [&](std::size_t chunk_idx) {
+            stdexec::just(), num_chunks, [&](std::size_t chunk_idx) {
                 size_t start_idx = chunk_idx * chunk_size;
-                size_t end_idx =
-                    std::min(start_idx + chunk_size, allPaths.size());
+                size_t end_idx = std::min(start_idx + chunk_size, nPaths);
 
                 // Local vector for storing cuts computed in this chunk.
                 std::vector<std::pair<double, int>> local_cuts;
+                local_cuts.reserve(chunk_size);
                 // Temporary map to count occurrences of nodes in a given path.
-                ankerl::unordered_dense::map<int, int> vis_map;
 
                 // Process each path in this chunk.
                 for (size_t i = start_idx; i < end_idx; ++i) {
-                    const auto &path = allPaths[i];
-                    vis_map.clear();
-                    // Count occurrences of each node in the route.
-                    for (int node : path.route) {
-                        ++vis_map[node];
-                    }
-                    // For nodes that appear more than once, compute a cut
-                    // value.
-                    for (const auto &[node, count] : vis_map) {
-                        if (count > 1) {
-                            // Calculate fractional cut value using floor
-                            // division.
-                            double cut_value = std::floor(count * 0.5) * x[i];
-                            if (cut_value > 1.0 + 1e-3) {  // Tolerance check.
+                    for (auto node : allPaths[i].route) {
+                        if (vertex_route_map[node][i] >= 2) {
+                            // Calculate the lhs value for the current path.
+                            double cut_value = x[i];
+                            if (cut_value > 1e-3) {  // Tolerance check.
                                 local_cuts.emplace_back(cut_value, node);
                             }
                         }
                     }
                 }
 
-            // Merge local cuts into the global temporary cuts vector.
-#ifdef NSYNC
-                nsync::nsync_mu_lock(&cuts_mutex);
-#else
-                std::lock_guard<std::mutex> lock(cuts_mutex);
-#endif
-                tmp_cuts.insert(tmp_cuts.end(), local_cuts.begin(),
-                                local_cuts.end());
-#ifdef NSYNC
-                nsync::nsync_mu_unlock(&cuts_mutex);
-#endif
+                // Save the local cuts into the per-chunk vector.
+                chunk_cuts[chunk_idx] = std::move(local_cuts);
             });
 
+        // Submit the bulk work and wait for all tasks to complete.
         auto work = stdexec::starts_on(sched, bulk_sender);
         stdexec::sync_wait(std::move(work));
+
+        // Merge results from all chunks.
+        std::vector<std::pair<double, int>> tmp_cuts;
+        for (const auto &vec : chunk_cuts) {
+            tmp_cuts.insert(tmp_cuts.end(), vec.begin(), vec.end());
+        }
 
         // Early return if no cuts were found.
         if (tmp_cuts.empty()) return;
@@ -228,9 +242,9 @@ class LimitedMemoryRank1Cuts {
                const std::pair<double, int> &b) { return a.first > b.first; });
 
         // === Step 3: Generate and Add the Best Cut ===
-        // We'll generate cut coefficients only for the top cut.
+        // Only generate coefficients for the top cut.
         const int cuts_to_apply =
-            std::min(static_cast<int>(tmp_cuts.size()), 1);
+            std::min(static_cast<int>(tmp_cuts.size()), 3);
         std::vector<double> coefficients_aux(allPaths.size(), 0.0);
 
         // Setup a simple SRCPermutation for the cut.
@@ -258,7 +272,7 @@ class LimitedMemoryRank1Cuts {
             // Compute coefficients for each path based on the current cut.
             coefficients_aux.assign(allPaths.size(), 0.0);
             for (size_t j = 0; j < allPaths.size(); ++j) {
-                auto &clients = allPaths[j].route;
+                const auto &clients = allPaths[j].route;
                 coefficients_aux[j] =
                     computeLimitedMemoryCoefficient(C, AM, p, clients, order);
             }
@@ -267,6 +281,7 @@ class LimitedMemoryRank1Cuts {
             Cut cut(C, AM, coefficients_aux, p);
             cut.baseSetOrder = order;
             cut.type = CutType::OneRow;
+
             // Add the cut to the cut storage.
             cutStorage.addCut(cut);
         }

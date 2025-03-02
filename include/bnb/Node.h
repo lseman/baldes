@@ -23,6 +23,8 @@
 #include "Hashes.h"
 #include "Path.h"
 #include "SRC.h"
+#include "Serializer.h"
+#include "State.h"
 #include "VRPCandidate.h"
 #include "miphandler/Constraint.h"
 
@@ -291,11 +293,11 @@ class BNBNode : public std::enable_shared_from_this<BNBNode> {
     }
 
     double getSlack(int constraintIndex, const std::vector<double> &solution) {
-#if defined(IPM)
-        return mip.getSlack(constraintIndex, solution);
-#elif defined(GUROBI)
+        // #if defined(IPM)
+        // return mip.getSlack(constraintIndex, solution);
+        // #elif defined(GUROBI)
         return solver->getSlack(constraintIndex);
-#endif
+        // #endif
     }
 
     // Binarize all variables (set to binary type)
@@ -554,4 +556,29 @@ class BNBNode : public std::enable_shared_from_this<BNBNode> {
         return solver->getBasicVariableIndices();
     }
 #endif
+
+    bool loadedState = false;
+
+    void loadState() {
+        Snapshot snapshot;
+        serializer::Serializer<Snapshot>::fromFile(snapshot, "snapshot.bin");
+        paths = snapshot.paths;
+        r1c->cutStorage = snapshot.cutStorage;
+        auto cutStorage = r1c->cutStorage;
+        // print cutStorage.size()
+        fmt::print("CutStorage size: {}\n", cutStorage.size());
+        // print paths.size
+        fmt::print("Paths size: {}\n", paths.size());
+        loadedState = true;
+        integer_sol = 10301;
+        numK = 9;
+    }
+    void saveState() {
+        auto cutStorage = r1c->cutStorage;
+        Snapshot snapshot;
+        snapshot.paths = paths;
+        snapshot.cutStorage = cutStorage;
+
+        serializer::Serializer<Snapshot>::toFile(snapshot, "snapshot.bin");
+    }
 };

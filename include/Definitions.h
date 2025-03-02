@@ -19,6 +19,14 @@ struct ReducedCostResult {
     std::vector<int> col;
 };
 
+constexpr int AVX_LIM = 10000;
+
+struct CycleData {
+    std::vector<uint16_t> cycle;
+    int last_used_iteration;
+    int usage_count;
+};
+
 struct BucketOptions {
     int depot = 0;
     int end_depot = N_SIZE - 1;
@@ -44,7 +52,7 @@ struct BucketOptions {
     std::vector<int> resource_type = {1};
     std::vector<int> or_resources = {1};
 
-    double n_warm_start = 0.3;
+    double n_warm_start = 0.7;
 
     bool warm_start = false;
 

@@ -56,6 +56,37 @@ void BucketGraph::UpdateBucketsSet(const double theta, const Label *label,
     // Precompute a flag for direction (avoid repeated ternary operators).
     constexpr bool forward = (D == Direction::Forward);
 
+    // Lambda to check if the visited bitmaps of L and L_bw overlap.
+    auto overlapsVisited = [n_bitmap, this](const Label *L,
+                                            const Label *L_bw) -> bool {
+        // Make a local copy of the visited bitmap.
+        auto visited_bitmap = L->visited_bitmap;
+
+        // check if visited_bitmap overlaps at all
+        for (size_t i = 0; i < n_bitmap; ++i) {
+            if ((visited_bitmap[i] & L_bw->visited_bitmap[i]) != 0) {
+                return true;
+            }
+        }
+        // Iterate in reverse over nodes_covered without allocating a new
+        // vector.
+        // for (auto it = L_bw->nodes_covered.rbegin();
+        //      it != L_bw->nodes_covered.rend(); ++it) {
+        //     uint16_t node_id = *it;
+        //     if (node_id == L->node_id ||
+        //         is_node_visited(visited_bitmap, node_id))
+        //         return true;
+        //     // Update the bitmap for each 64-bit word.
+        //     for (size_t i = 0; i < visited_bitmap.size(); ++i) {
+        //         uint64_t &current_visited = visited_bitmap[i];
+        //         if (current_visited != 0)
+        //             current_visited &= neighborhoods_bitmap[node_id][i];
+        //     }
+        //     set_node_visited(visited_bitmap, node_id);
+        // }
+        return false;
+    };
+
     // Inline helper function for bitmap conflict check.
     auto bitmapsConflict = [n_bitmap](const Label *L1,
                                       const Label *L2) -> bool {
@@ -93,7 +124,9 @@ void BucketGraph::UpdateBucketsSet(const double theta, const Label *label,
                        cost -= arc_dual;)
 
         // Skip if the accumulated cost plus lower bound exceeds theta.
-        if (label_cost + cost + c_bar_opposite[curr_bucket] >= theta) continue;
+        if (numericutils::gt(label_cost + cost + c_bar_opposite[curr_bucket],
+                             theta))
+            continue;
 
         // Process this bucket only if it hasn't been processed already.
         if (Bbidi.insert(curr_bucket).second) {
@@ -102,9 +135,18 @@ void BucketGraph::UpdateBucketsSet(const double theta, const Label *label,
             for (const auto &L_opposite : opposite_labels) {
                 // Skip labels from the same node or with conflicting visited
                 // bitmaps.
-                if (bucketLnode == L_opposite->node_id ||
-                    bitmapsConflict(label, L_opposite))
-                    continue;
+                // if (bucketLnode == L_opposite->node_id ||
+                // bitmapsConflict(label, L_opposite))
+                // continue;
+                if (bucketLnode == L_opposite->node_id) continue;
+
+                if constexpr (D == Direction::Forward) {
+                    // Skip if the visited bitmaps overlap.
+                    if (overlapsVisited(label, L_opposite)) continue;
+                } else {
+                    // Skip if the visited bitmaps overlap.
+                    if (overlapsVisited(L_opposite, label)) continue;
+                }
 
                 // Determine the reference node for resource checks.
                 const VRPNode &ref_node =
@@ -121,9 +163,10 @@ void BucketGraph::UpdateBucketsSet(const double theta, const Label *label,
                                           ref_node.duration
                                     : L_opposite->resources[TIME_INDEX] + cost +
                                           ref_node.duration;
-                        if (time_constraint >
-                            (forward ? L_opposite->resources[TIME_INDEX]
-                                     : label->resources[TIME_INDEX])) {
+                        if (numericutils::gt(
+                                time_constraint,
+                                forward ? L_opposite->resources[TIME_INDEX]
+                                        : label->resources[TIME_INDEX])) {
                             violated = true;
                             break;
                         }
@@ -133,9 +176,9 @@ void BucketGraph::UpdateBucketsSet(const double theta, const Label *label,
                                 ? label->resources[r] + ref_node.consumption[r]
                                 : L_opposite->resources[r] +
                                       ref_node.consumption[r];
-                        if (resource_constraint >
-                            (forward ? L_opposite->resources[r]
-                                     : label->resources[r])) {
+                        if (numericutils::gt(resource_constraint,
+                                             forward ? L_opposite->resources[r]
+                                                     : label->resources[r])) {
                             violated = true;
                             break;
                         }
@@ -145,8 +188,10 @@ void BucketGraph::UpdateBucketsSet(const double theta, const Label *label,
                 if (violated) continue;
 
                 // If the merged cost is below theta, record this bucket.
-                if (label_cost + cost + L_opposite->cost < theta)
+                if (numericutils::lt(label_cost + cost + L_opposite->cost,
+                                     theta)) {
                     Bbidi.emplace(curr_bucket);
+                }
             }
         }
 
@@ -163,11 +208,11 @@ void BucketGraph::UpdateBucketsSet(const double theta, const Label *label,
 /**
  * @brief Eliminates bucket arcs based on a given threshold.
  *
- * This function performs bucket arc elimination in either the forward or
- * backward direction, depending on the template parameter `D`. It resets all
- * elements in the fixed buckets to 0, prints information about the direction of
- * elimination, and processes arcs to update the local bucket arc map and fixed
- * buckets.
+ * This function performs bucket arc elimination in either the forward
+ * or backward direction, depending on the template parameter `D`. It
+ * resets all elements in the fixed buckets to 0, prints information
+ * about the direction of elimination, and processes arcs to update the
+ * local bucket arc map and fixed buckets.
  *
  */
 template <Direction D>
@@ -213,7 +258,7 @@ void BucketGraph::BucketArcElimination(double theta) {
         if (jump_arcs.empty()) return;
 
         std::vector<uint64_t> Bvisited(n_segments, 0);
-        auto labels = buckets[b].get_labels();
+        auto labels = buckets[b].get_non_dominated_labels();
 
         for (const auto &a : jump_arcs) {
             auto increment = a.resource_increment;
@@ -238,7 +283,7 @@ void BucketGraph::BucketArcElimination(double theta) {
         const auto &bucket_arcs = buckets[b].template get_bucket_arcs<D>();
         if (bucket_arcs.empty()) return;
 
-        auto labels = buckets[b].get_labels();
+        auto labels = buckets[b].get_non_dominated_labels();
         std::vector<uint64_t> Bvisited(n_segments, 0);
 
         for (const auto &a : bucket_arcs) {
@@ -314,6 +359,13 @@ void BucketGraph::BucketArcElimination(double theta) {
         // Process jump arcs and bucket arcs.
         process_jump_arcs(b);
         process_bucket_arcs(b);
+
+        // iterate over fixed buckets and remove them
+        for (int b_prime = 0; b_prime < buckets_size; ++b_prime) {
+            if (is_bucket_fixed<D>(b, b_prime)) {
+                buckets[b].template remove_bucket_arc<D>(b, b_prime);
+            }
+        }
     }
 
     // Print the total number of removed arcs.
@@ -326,12 +378,13 @@ void BucketGraph::BucketArcElimination(double theta) {
 /**
  * @brief Obtains jump bucket arcs for the BucketGraph.
  *
- * This function iterates over each bucket in the BucketGraph and adds jump arcs
- * to the set of buckets. It checks if each arc exists in the given Gamma vector
- * for the current bucket. If an arc exists, it adds the corresponding bucket to
- * the set of buckets to add jump arcs to. It then removes the
- * non-component-wise minimal buckets from the set. Finally, it adds jump arcs
- * from the current bucket to each bucket in the set.
+ * This function iterates over each bucket in the BucketGraph and adds
+ * jump arcs to the set of buckets. It checks if each arc exists in the
+ * given Gamma vector for the current bucket. If an arc exists, it adds
+ * the corresponding bucket to the set of buckets to add jump arcs to.
+ * It then removes the non-component-wise minimal buckets from the set.
+ * Finally, it adds jump arcs from the current bucket to each bucket in
+ * the set.
  *
  */
 template <Direction D>
@@ -355,8 +408,8 @@ void BucketGraph::ObtainJumpBucketArcs() {
 
     // Process each bucket.
     for (int b = 0; b < buckets_size; ++b) {
-        std::vector<int>
-            B_bar;  // Temporary storage for valid adjacent bucket indices
+        std::vector<int> B_bar;  // Temporary storage for valid adjacent
+                                 // bucket indices
 
         const int current_node_id = buckets[b].node_id;
         const auto &bucket_arcs = buckets[b].template get_bucket_arcs<D>();
@@ -373,7 +426,8 @@ void BucketGraph::ObtainJumpBucketArcs() {
             const int to_node = orig_arc.to;
             bool have_path = false;
 
-            // Check if the current bucket arcs contain the desired path.
+            // Check if the current bucket arcs contain the desired
+            // path.
             for (const auto &gamma : bucket_arcs) {
                 if (is_bucket_fixed<D>(gamma.from_bucket, gamma.to_bucket)) {
                     continue;
@@ -398,7 +452,8 @@ void BucketGraph::ObtainJumpBucketArcs() {
 
                 // Lambda to process candidate adjacent buckets.
                 auto process_bucket = [&](int current_b, int candidate_b) {
-                    // Only proceed if candidate bucket is adjacent (per Phi).
+                    // Only proceed if candidate bucket is adjacent (per
+                    // Phi).
                     const auto &phi_candidate = Phi[candidate_b];
                     if (std::find(phi_candidate.begin(), phi_candidate.end(),
                                   current_b) == phi_candidate.end())
@@ -417,29 +472,33 @@ void BucketGraph::ObtainJumpBucketArcs() {
                         const int to_node_candidate =
                             buckets[gamma_candidate.to_bucket].node_id;
 
-                        // If the candidate arc matches the original arc...
+                        // If the candidate arc matches the original
+                        // arc...
                         if (from_node == from_node_candidate &&
                             to_node == to_node_candidate) {
                             B_bar.push_back(candidate_b);
-                            const std::vector<double> res =
+                            std::vector<double> res =
                                 gamma_candidate.resource_increment;
+
                             const double cost = gamma_candidate.cost_increment;
 
-                            // Add jump arcs both in the bucket and at the node
-                            // level.
+                            // Add jump arcs both in the bucket and at
+                            // the node level.
                             buckets[current_b].template add_jump_arc<D>(
                                 current_b, candidate_b, res, cost);
                             nodes[buckets[current_b].node_id]
                                 .template add_jump_arc<D>(
                                     current_b, candidate_b, res, cost, to_node);
+                            buckets[current_b].template add_bucket_arc<D>(
+                                current_b, candidate_b, res, cost, true);
                             ++arc_counter;
                         }
                     }
                 };
 
-                // Process candidate buckets. For now both directions use
-                // increasing index. (For backward direction, adjust the loop as
-                // needed.)
+                // Process candidate buckets. For now both directions
+                // use increasing index. (For backward direction, adjust
+                // the loop as needed.)
                 if constexpr (D == Direction::Forward) {
                     for (int candidate_b = b + 1;
                          candidate_b < start_bucket + node_buckets;
@@ -447,10 +506,12 @@ void BucketGraph::ObtainJumpBucketArcs() {
                         process_bucket(b, candidate_b);
                     }
                 } else {
-                    // Uncomment and adjust if backward should iterate in
-                    // reverse order. for (int candidate_b = b - 1; candidate_b
-                    // >= start_bucket; --candidate_b) {
-                    //     process_bucket(b, candidate_b);
+                    // Uncomment and adjust if backward should iterate
+                    // in reverse order.
+                    // for (int candidate_b = b - 1; candidate_b >=
+                    // start_bucket;
+                    // --candidate_b) {
+                    // process_bucket(b, candidate_b);
                     // }
                     for (int candidate_b = b + 1;
                          candidate_b < start_bucket + node_buckets;

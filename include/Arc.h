@@ -84,7 +84,7 @@ struct BucketArc {
     int to_bucket;
     std::vector<double> resource_increment;
     double cost_increment;
-    bool fixed = false;
+    bool jump = false;
 
     bool operator==(const BucketArc &other) const {
         return from_bucket == other.from_bucket && to_bucket == other.to_bucket;
@@ -105,7 +105,7 @@ struct BucketArc {
             return cost_increment < other.cost_increment;
         if (resource_increment != other.resource_increment)
             return resource_increment < other.resource_increment;
-        return fixed < other.fixed;
+        return jump < other.jump;
     }
 
     ~BucketArc() {
@@ -236,4 +236,3 @@ class RawArcList {
    private:
     std::vector<RawArc> predefined_arcs;  // List of predefined arcs
 };
-

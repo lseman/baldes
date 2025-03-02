@@ -993,34 +993,26 @@ class MIPProblem {
     void update() { sparse_matrix.buildRowStart(); }
 
     double getSlack(int row, const std::vector<double> &solution) {
-        // Ensure the sparse matrix row structure is built (we stay in COO
-        // mode)
-        auto rhs =
-            constraints[row]
-                ->get_rhs();  // Get the right-hand side value for this row
+        // Get the right-hand side value for this row.
+        const double rhs = constraints[row]->get_rhs();
+        double dot_product = 0.0;
 
-        // Compute the dot product of the solution vector and the specified
-        // row
-        double row_value = 0.0;
+        // Cache local references to the COO arrays.
+        const auto &rows = sparse_matrix.rows;
+        const auto &cols = sparse_matrix.cols;
+        const auto &values = sparse_matrix.values;
+        const size_t nnz = rows.size();
 
-        // Iterate through the non-zero elements in COO format
-        for (size_t i = 0; i < sparse_matrix.rows.size(); ++i) {
-            if (sparse_matrix.rows[i] == row) {
-                int col_index =
-                    sparse_matrix.cols[i];  // Get the column index for the
-                                            // current element
-                double value =
-                    sparse_matrix
-                        .values[i];  // Get the value of the current element
-
-                // Perform the dot product with the corresponding element in
-                // the solution vector
-                row_value += value * solution[col_index];
+        // Iterate through the non-zero elements in COO format.
+        for (size_t i = 0; i < nnz; ++i) {
+            if (rows[i] == row) {
+                // Use the cached column and value to update the dot product.
+                dot_product += values[i] * solution[cols[i]];
             }
         }
 
         // Return the slack: rhs - (dot product of the row and solution)
-        return rhs - row_value;
+        return rhs - dot_product;
     }
 
     double getRC(int col, const std::vector<double> &dual_solution) {
@@ -1138,37 +1130,36 @@ class MIPProblem {
 
     std::vector<char> get_vtypes() const {
         std::vector<char> vtypes;
-        vtypes.reserve(variables.size());  // Reserve space upfront
+        vtypes.reserve(variables.size());
         for (const auto &var : variables) {
-            if (var->get_type() == VarType::Continuous) {
-                vtypes.push_back('C');
-            } else if (var->get_type() == VarType::Integer) {
-                vtypes.push_back('I');
-            } else if (var->get_type() == VarType::Binary) {
-                vtypes.push_back('B');
+            switch (var->get_type()) {
+                case VarType::Continuous:
+                    vtypes.push_back('C');
+                    break;
+                case VarType::Integer:
+                    vtypes.push_back('I');
+                    break;
+                case VarType::Binary:
+                    vtypes.push_back('B');
+                    break;
             }
         }
         return vtypes;
     }
 
     std::vector<double> get_lb() const {
-        std::vector<double> lb;
-        lb.reserve(variables.size());  // Reserve space upfront
-        std::transform(variables.begin(), variables.end(),
-                       std::back_inserter(lb),
+        std::vector<double> lb(variables.size());
+        std::transform(variables.begin(), variables.end(), lb.begin(),
                        [](const baldesVarPtr var) { return var->get_lb(); });
         return lb;
     }
 
     std::vector<double> get_ub() const {
-        std::vector<double> ub;
-        ub.reserve(variables.size());  // Reserve space upfront
-        std::transform(variables.begin(), variables.end(),
-                       std::back_inserter(ub),
+        std::vector<double> ub(variables.size());
+        std::transform(variables.begin(), variables.end(), ub.begin(),
                        [](const baldesVarPtr var) { return var->get_ub(); });
         return ub;
     }
-
     ModelData extractModelDataSparse() {
         // sparse_matrix.buildRowStart(); // Build the row start structure
         // for CRS format

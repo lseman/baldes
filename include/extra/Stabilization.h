@@ -320,16 +320,26 @@ class Stabilization {
         size_t number_of_rows = nodeDuals.size();
         new_rows.assign(number_of_rows, 0.0);
 
-        auto col = best_pricing_cols[0];
-        for (const auto &node : col->nodes_covered) {
-            if (node > 0 && node != N_SIZE - 1) {
-                new_rows[node - 1] += 1.0;
+        auto cols_to_check =
+            std::min(numK, static_cast<int>(best_pricing_cols.size()));
+        for (size_t i = 0; i < cols_to_check; ++i) {
+            const auto &col = best_pricing_cols[i];
+            for (const auto &node : col->nodes_covered) {
+                if (node > 0 && node != N_SIZE - 1) {
+                    new_rows[node - 1] += 1.0;
+                }
             }
         }
 
         subgradient.assign(number_of_rows, 0.0);
         for (size_t i = 0; i < number_of_rows; ++i) {
-            subgradient[i] = dados.b[i] - numK * new_rows[i];
+            // If the relation is '<', treat it as a "≤" constraint.
+            if (dados.sense[i] == '<') {
+                subgradient[i] = new_rows[i] - dados.b[i];
+            } else {
+                // For '>' (i.e., "≥") or '=', compute as before.
+                subgradient[i] = dados.b[i] - new_rows[i];
+            }
         }
 
         subgradient_norm = norm(subgradient);
@@ -360,7 +370,7 @@ class Stabilization {
             no_progress_count = 0;
         }
 
-        if (!historical_avg.empty()) {
+        if (!historical_avg.empty() && nb_misprices == 0) {
             // Dynamic weighting based on optimization progress
             double pw = std::min(
                 0.9, std::max(0.1, std::abs(lag_gap) /
@@ -399,12 +409,12 @@ class Stabilization {
         //     base_alpha = 0.0;
         // }
 
-        if (lag_gap <= lag_gap_prev) {
-            stab_center_for_next_iteration = smooth_dual_sol;
-            cut_added = false;
-        } else {
-            stab_center_for_next_iteration = cur_stab_center;
-        }
+        // if (lag_gap <= lag_gap_prev || cut_added) {
+        stab_center_for_next_iteration = smooth_dual_sol;
+        cut_added = false;
+        // } else {
+        // stab_center_for_next_iteration = cur_stab_center;
+        // }
 
         lag_gap_prev = lag_gap;
 

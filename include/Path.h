@@ -16,6 +16,7 @@
 #include "Arc.h"
 #include "Common.h"
 #include "RNG.h"
+#include "Serializer.h"
 
 struct Path {
     // Use a more memory-efficient container for small integers
@@ -31,6 +32,8 @@ struct Path {
 
     // Default constructor
     Path() : route{}, cost(0.0f) {}
+
+    REFLECT(route, cost, red_cost)
 
     // Constructor with vector<int> and double cost
     Path(const std::vector<int> &r, double c) : cost(static_cast<float>(c)) {
@@ -124,6 +127,11 @@ struct Path {
     // Run precomputeArcs asynchronously.
     std::future<void> precomputeArcsAsync() {
         return std::async(std::launch::async, [this]() { precomputeArcs(); });
+    }
+
+    std::vector<int> getIntVector() {
+        std::vector<int> intRoute(route.begin(), route.end());
+        return intRoute;
     }
 };
 

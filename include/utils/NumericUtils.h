@@ -4,37 +4,50 @@
 #include <cstdlib>
 namespace numericutils {
 // Define the epsilon value for floating-point comparisons
-constexpr double eps = 1e-3;
+constexpr double eps = 1e-9;
 
 constexpr double half = 0.5;
 
-// Define a function to compare two floating-point values within a threshold
-inline bool compare_within_threshold(double a, double b, double threshold = eps) { return std::abs(a - b) < threshold; }
-
-// Define a function to compare two floating-point values within a threshold
-inline bool compare_within_threshold(float a, float b, float threshold = eps) { return std::abs(a - b) < threshold; }
-
-// Define a function to compare two floating-point values within a threshold
-inline bool compare_within_threshold(int a, int b, int threshold = 0) { return std::abs(a - b) < threshold; }
-
-// Define a function to compare two floating-point values within a threshold
-inline bool compare_within_threshold(long a, long b, long threshold = 0) { return std::abs(a - b) < threshold; }
-
-// Define a function to compare two floating-point values within a threshold
-inline bool compare_within_threshold(long long a, long long b, long long threshold = 0) {
-    return std::abs(a - b) < threshold;
+// Define greater than: returns true if a is greater than b by more than
+// threshold.
+inline bool gt(double a, double b, double threshold = eps) {
+    return (a - b) > threshold;
 }
 
-// define greater than
-inline bool greater_than(double a, double b, double threshold = eps) { return a - b > threshold; }
+// Define less than: returns true if a is less than b by more than threshold.
+inline bool lt(double a, double b, double threshold = eps) {
+    return (a - b) < -threshold;
+}
 
-// define less than
-inline bool less_than(double a, double b, double threshold = eps) { return a - b < -threshold; }
+// Define greater than or equal: returns true if a is either nearly equal to b
+// or greater than b (using threshold for near equality).
+inline bool gte(double a, double b, double threshold = eps) {
+    return a > b - threshold;
+}
 
-// define greater than or equal
-inline bool greater_than_or_equal(double a, double b, double threshold = eps) { return a - b > -threshold; }
+// Define less than or equal: returns true if a is either nearly equal to b
+// or less than b (using threshold for near equality).
+inline bool lte(double a, double b, double threshold = eps) {
+    return a < b + threshold;
+}
 
-// define less than or equal
-inline bool less_than_or_equal(double a, double b, double threshold = eps) { return a - b < threshold; }
+inline bool isZero(double a, double threshold = eps) {
+    return std::abs(a) < threshold;
+}
 
-} // namespace numericutils
+inline bool exact_lte(double a, double b, double threshold = eps) {
+    return a <= b;
+}  // namespace numericutils
+
+inline bool exact_gte(double a, double b, double threshold = eps) {
+    return a >= b;
+}
+
+inline bool exact_lt(double a, double b, double threshold = eps) {
+    return a < b;
+}
+
+inline bool exact_gt(double a, double b, double threshold = eps) {
+    return a > b;
+}
+};  // namespace numericutils

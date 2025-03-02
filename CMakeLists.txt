@@ -8,6 +8,12 @@ else()
     message(WARNING "ccache not found, compilation will not be cached.")
 endif()
 
+set(CMAKE_CXX_COMPILER
+"/data/toolchain/llvm/stage2-prof-use-lto/install/bin/clang++"  CACHE PATH "C compiler" FORCE)
+set(CMAKE_C_COMPILER
+"/data/toolchain/llvm/stage2-prof-use-lto/install/bin/clang"  CACHE PATH "C compiler" FORCE)
+
+
 project(BALDES LANGUAGES C CXX)
 
 #-------------------------------------------------------------------------------
@@ -23,8 +29,8 @@ set(CMAKE_CUDA_STANDARD_REQUIRED OFF)
 set(CMAKE_CUDA_EXTENSIONS OFF)
 
 # Check for Clang
-find_program(CLANG_C_COMPILER clang)
-find_program(CLANG_CXX_COMPILER clang++)
+#find_program(CLANG_C_COMPILER clang)
+#find_program(CLANG_CXX_COMPILER clang++)
 
 if(CLANG_C_COMPILER AND CLANG_CXX_COMPILER)
   set(CMAKE_C_COMPILER "${CLANG_C_COMPILER}" CACHE STRING "" FORCE)
@@ -43,6 +49,8 @@ set(CMAKE_CXX_FLAGS_RELEASE "-O3 -march=native -flto -Xclang -Wno-unknown-warnin
 set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "-O3 -g -march=native -flto -funroll-loops -ftree-vectorize -fomit-frame-pointer -ffunction-sections -fdata-sections -fno-signed-zeros -fno-trapping-math -mtune=native -fvectorize -Xclang -Wno-unknown-warning-option")
 set(CMAKE_CXX_FLAGS_DEBUG "-Og -g -Wall -Wextra -Xclang -Wno-unknown-warning-option")
 
+# set LD flags
+set(CMAKE_EXE_LINKER_FLAGS_RELEASE "-flto -fuse-ld=mold -Wl,--gc-sections")
 if(APPLE)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -stdlib=libc++ -std=c++20")
 endif()
@@ -65,28 +73,28 @@ if(NOT COMMAND CPMAddPackage)
 endif()
 
 #xgboost
-CPMAddPackage(
-    NAME xgboost
-    GITHUB_REPOSITORY dmlc/xgboost
-    GIT_TAG v2.1.4
-    OPTIONS
-        "USE_CUDA OFF"
-        "BUILD_STATIC_LIB ON"
-        "BUILD_SHARED_LIB OFF"
-        "FORCE_SHARED_CXX_LIB OFF"
-        "XGBOOST_BUILD_TESTS OFF"
-        "XGBOOST_BUILD_EXAMPLES OFF"
-        "XGBOOST_BUILD_DOC OFF"
-        "XGBOOST_USE_CUDA OFF"
-        "XGBOOST_BUILTIN_PREFETCH_PRESENT OFF"
-        "XGBOOST_MM_PREFETCH_PRESENT OFF"
-        "XGBOOST_BUILD_OBJECTIVES reg_squarederror"  # Only include what you need
-        "XGBOOST_BUILD_METRICS rmse"                 # Only include what you need
-        "XGBOOST_JVM_BINDINGS OFF"
-        "XGBOOST_PYTHON_PACKAGE OFF"
-        "XGBOOST_R_PACKAGE OFF"
-        "USE_OPENMP ON"        # Keep this ON for parallel processing
-)
+# CPMAddPackage(
+#     NAME xgboost
+#     GITHUB_REPOSITORY dmlc/xgboost
+#     GIT_TAG v2.1.4
+#     OPTIONS
+#         "USE_CUDA OFF"
+#         "BUILD_STATIC_LIB ON"
+#         "BUILD_SHARED_LIB OFF"
+#         "FORCE_SHARED_CXX_LIB OFF"
+#         "XGBOOST_BUILD_TESTS OFF"
+#         "XGBOOST_BUILD_EXAMPLES OFF"
+#         "XGBOOST_BUILD_DOC OFF"
+#         "XGBOOST_USE_CUDA OFF"
+#         "XGBOOST_BUILTIN_PREFETCH_PRESENT OFF"
+#         "XGBOOST_MM_PREFETCH_PRESENT OFF"
+#         "XGBOOST_BUILD_OBJECTIVES reg_squarederror"  # Only include what you need
+#         "XGBOOST_BUILD_METRICS rmse"                 # Only include what you need
+#         "XGBOOST_JVM_BINDINGS OFF"
+#         "XGBOOST_PYTHON_PACKAGE OFF"
+#         "XGBOOST_R_PACKAGE OFF"
+#         "USE_OPENMP ON"        # Keep this ON for parallel processing
+# )
 
 # stdexec
 cpmaddpackage(

@@ -111,17 +111,20 @@ void initRMP(MIPProblem *model, VRProblem *problem,
     // Add variables to the model
     model->addVars(lb.data(), ub.data(), obj.data(), vtypes.data(),
                    names.data(), lb.size());
+
     // First set of constraints: Each vertex should be visited at least once
     for (int i = 1; i < instance.getNbVertices(); ++i) {
         LinearExpression lhs;
         for (size_t j = 0; j < heuristicRoutes.size(); ++j) {
-            if (std::find(heuristicRoutes[j].begin(), heuristicRoutes[j].end(),
-                          i) != heuristicRoutes[j].end()) {
-                lhs.addTerm(model->getVar(j), 1.0);
+            // Count the occurrences of vertex i in heuristicRoutes[j]
+            int occurrences = std::count(heuristicRoutes[j].begin(),
+                                         heuristicRoutes[j].end(), i);
+            if (occurrences > 0) {
+                lhs.addTerm(model->getVar(j), occurrences);
             }
         }
         model->add_constraint(lhs, 1.0,
-                              '>');  // baldesCtr: lhs >= 1 (visit the node)
+                              '>');  // lhs >= 1 (visit the node at least once)
     }
 
     // Second part: Ensure the number of vehicles does not exceed the maximum
@@ -217,6 +220,13 @@ int main(int argc, char *argv[]) {
         fmt::print("Fuel consumption rate: {}\n", instance.fuel_consumption);
         fmt::print("Refueling rate: {}\n", instance.refueling_rate);
         fmt::print("Velocity: {}\n", instance.velocity);
+
+    } else if (problem_kind == "load") {
+        if (!VRPTW_read_instance(instance_name, instance)) {
+            std::cerr << "Error reading VRPTW instance\n";
+            return 1;
+        }
+        print_info("VRPTW instance read successfully.\n");
     } else {
         std::cerr << "Unsupported problem kind: " << problem_kind << "\n";
         return 1;
@@ -239,9 +249,13 @@ int main(int argc, char *argv[]) {
     fmt::print("Optimized solution cost: {}\n", optimizedSolution.totalCost);
     */
 
-    auto initialRoutesHGS = hgs->run(instance);
+    std::vector<std::vector<int>> initialRoutesHGS;
+    std::vector<std::vector<int>> topRoutes;
 
-    auto topRoutes = hgs->getBestRoutes();
+    if (problem_kind != "load") {
+        initialRoutesHGS = hgs->run(instance);
+        topRoutes = hgs->getBestRoutes();
+    }
 
     std::vector<VRPNode> nodes;
     nodes.clear();
@@ -304,7 +318,9 @@ int main(int argc, char *argv[]) {
                   process_route);
 
     // print size of initialRoutesHGS
-    initRMP(&mip, problem, initialRoutesHGS);
+    if (problem_kind != "load") {
+        initRMP(&mip, problem, initialRoutesHGS);
+    }
 #ifdef GUROBI
     // auto gurobi_model = mip.toGurobiModel(GurobiEnvSingleton::getInstance());
 #endif
@@ -316,7 +332,16 @@ int main(int argc, char *argv[]) {
     }
 
     BNBNode *node = new BNBNode(mip);
-    node->paths = paths;
+
+    if (problem_kind == "load") {
+        node->loadState();
+        for (auto &path : node->paths) {
+            initialRoutesHGS.push_back(path.getIntVector());
+        }
+        initRMP(&mip, problem, initialRoutesHGS);
+    } else {
+        node->paths = paths;
+    }
     node->problem = problem;
     node->mip = mip;
     node->instance = instance;

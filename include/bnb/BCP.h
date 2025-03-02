@@ -60,7 +60,7 @@
 #define NUMERO_CANDIDATOS 10
 
 #include "RIH.h"
-
+#include "State.h"
 class VRProblem {
    public:
     InstanceData instance;
@@ -71,6 +71,8 @@ class VRProblem {
     ProblemType problemType = ProblemType::vrptw;
 
     int numConstrs = 0;
+
+    Snapshot snapshot;
 
 #ifdef EXACT_RCC
     RCCManager rccManager;
@@ -329,7 +331,8 @@ class VRProblem {
      *
      */
     bool cutHandler(std::shared_ptr<LimitedMemoryRank1Cuts> &r1c, BNBNode *node,
-                    std::vector<baldesCtrPtr> &constraints) {
+                    std::vector<baldesCtrPtr> &constraints,
+                    bool loaded = false) {
         auto &cuts = r1c->cutStorage;
         bool changed = false;
 
@@ -337,22 +340,36 @@ class VRProblem {
         if (cuts.empty()) {
             return false;
         }
-
+        const auto &allPaths = node->paths;
         // Process each cut.
+        auto ctr = 0;
         for (auto &cut : cuts) {
             // If the cut was already added and hasn't been updated, skip it.
-            if (cut.added && !cut.updated) {
+            if ((cut.added && !cut.updated) && !loaded) {
                 continue;
             }
 
             // Mark that at least one cut has been changed.
             changed = true;
-            const int z = cut.id;
-            const auto &coeffs = cut.coefficients;
+            int z;
+            if (!loaded) {
+                z = cut.id;
+            } else {
+                z = ctr++;
+                cut.id = z;
+            }
+
+            std::vector<double> coeffs;
+            if (!loaded) {
+                // coeffs = cut.coefficients;
+                coeffs = cuts.loadCoefficients(allPaths, cut);
+            } else {
+                coeffs = r1c->cutStorage.loadCoefficients(allPaths, cut);
+            }
 
             // If the cut was previously added and now updated, simply change
             // coefficients.
-            if (cut.added && cut.updated) {
+            if ((cut.added && cut.updated) && !loaded) {
                 cut.updated = false;
                 node->chgCoeff(constraints[z], coeffs);
             }
@@ -365,7 +382,8 @@ class VRProblem {
                     }
                 }
                 std::string constraint_name = "SRC_" + std::to_string(z);
-                auto ctr = node->addConstr(lhs <= cut.rhs, constraint_name);
+                auto ctr =
+                    node->addConstr(lhs <= cut.p.getRHS(), constraint_name);
                 constraints.push_back(ctr);
             }
 
@@ -538,7 +556,7 @@ class VRProblem {
         RCC_MODE_BLOCK(auto &rccManager = node->rccManager;)
 
         // Bucket graph parameters.
-        int bucket_interval = 20;
+        int bucket_interval = 50;
         int time_horizon = instance.T_max;
         // (Optionally adjust time_horizon for CVRP, e.g., time_horizon =
         // 50000;)
@@ -639,7 +657,7 @@ class VRProblem {
 
 #ifdef IPM_ACEL
         // Optional IPM acceleration parameters.
-        int base_threshold = 20;
+        int base_threshold = 200;
         int adaptive_threshold;
         bool use_ipm_duals = false;
 #endif
@@ -655,6 +673,20 @@ class VRProblem {
         int non_violated_ctr = 0;
         bool enumerate = false;
         int numK = node->numK;
+
+        if (node->loadedState) {
+            integer_solution = 10301;
+            fmt::print("Loaded state\n");
+            cutHandler(r1c, node, SRCconstraints, true);
+            fmt::print("Loaded cuts\n");
+            bucket_graph->s1 = false;
+            bucket_graph->s4 = true;
+            node->optimize();
+            auto &pathSet = node->pathSet;
+            for (auto path : allPaths) {
+                pathSet.insert(path);
+            }
+        }
 
         for (int iter = 0; iter < max_iter; ++iter) {
             reoptimized = false;
@@ -710,7 +742,10 @@ class VRProblem {
                             non_violated_ctr++;
 
                             if (bucket_graph->A_MAX == N_SIZE) {
-                                if (std::abs(inner_obj) < 1e-3) {
+                                fmt::print(
+                                    "No violated cuts fouund with obj = {}\n",
+                                    inner_obj);
+                                if (std::abs(inner_obj) < 1.0) {
                                     print_info(
                                         "No violated cuts found, calling it a "
                                         "day\n");
@@ -813,7 +848,7 @@ class VRProblem {
                 // Update bucket graph relaxation value and augment neighborhood
                 // memories.
                 bucket_graph->relaxation = lp_obj;
-                bucket_graph->augment_ng_memories(solution, allPaths, true, 5,
+                bucket_graph->augment_ng_memories(solution, allPaths, false, 5,
                                                   100, 16, N_SIZE);
 
                 // SRC cuts: if there are SRC constraints, update their dual
@@ -868,8 +903,8 @@ class VRProblem {
                 // Add RIH paths if available.
                 auto rih_paths = ils.get_labels();
                 if (!rih_paths.empty()) {
-                    auto &cutStorage = r1c->cutStorage;
-                    cutStorage.updateRedCost(rih_paths);
+                    // auto &cutStorage = r1c->cutStorage;
+                    // cutStorage.updateRedCost(rih_paths);
                     double inner_obj_rih = 0.0;
                     auto rih_added =
                         addColumn(node, rih_paths, inner_obj_rih, true);
@@ -1025,7 +1060,6 @@ class VRProblem {
                     updateGraphAndSolve(nodeDuals);
 #ifdef STAB
 
-                    lag_gap = integer_solution - (lp_obj + numK * inner_obj);
                     auto d = 50;
 #ifdef HIGHS
                     gap =
@@ -1043,7 +1077,7 @@ class VRProblem {
                     }
 #endif
                     // fmt::print("Gap: {}\n", gap);
-                    node->optimize(gap);
+                    node->optimize();
                     lp_obj_old = lp_obj;
                     lp_obj = node->getObjVal();
                     nodeDuals = node->getDuals();
@@ -1052,6 +1086,7 @@ class VRProblem {
                     // node->mip.getMostViolatingReducedCost(nodeDuals);
 
                     bucket_graph->gap = lp_obj + numK * inner_obj;
+                    lag_gap = integer_solution - (lp_obj + numK * inner_obj);
 
                     matrix = node->extractModelDataSparse();
                     stab.lp_obj = lp_obj;
@@ -1157,6 +1192,9 @@ class VRProblem {
             }
         }
         bucket_graph->print_statistics();
+        if (!node->loadedState) {
+            node->saveState();
+        }
 
         node->optimize();
         relaxed_result = node->getObjVal();
@@ -1285,7 +1323,7 @@ class VRProblem {
         }
 
         // print distance matrix size
-        bucket_graph->set_distance_matrix(instance.getDistanceMatrix(), 8);
+        bucket_graph->set_distance_matrix(instance.getDistanceMatrix(), 9);
         bucket_graph->branching_duals = branchingDuals;
         bucket_graph->A_MAX = N_SIZE;
 
@@ -1382,7 +1420,7 @@ class VRProblem {
                 }
 
                 bucket_graph->relaxation = lp_obj;
-                bucket_graph->augment_ng_memories(solution, allPaths, true, 5,
+                bucket_graph->augment_ng_memories(solution, allPaths, false, 5,
                                                   100, 16, N_SIZE);
 
                 // Branching duals

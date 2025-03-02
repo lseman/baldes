@@ -240,178 +240,174 @@ Individual::Individual(Params *params, std::string solutionStr)
 
 Individual::Individual(Params *params, bool rcws,
                        std::vector<std::vector<int>> *pattern) {
-    successors = std::vector<int>(params->nbClients + 1);
-    predecessors = std::vector<int>(params->nbClients + 1);
-    chromR = std::vector<std::vector<int>>(params->nbVehicles);
-    chromT = std::vector<int>(params->nbClients);
     this->params = params;
+    int nbClients = params->nbClients;
+    int nbVehicles = params->nbVehicles;
+    // Preallocate and initialize chromosome vectors.
+    successors = std::vector<int>(nbClients + 1);
+    predecessors = std::vector<int>(nbClients + 1);
+    chromR.resize(nbVehicles);
+    chromT = std::vector<int>(nbClients);
 
     if (rcws) {
-        // Initialize helper vectors
-        std::vector<bool> inRoute(params->nbClients + 1, false);
-        std::vector<bool> interior(params->nbClients + 1, false);
-        std::vector<double> load(params->nbVehicles, 0);
-        int nextEmptyRoute = 0;
+        // Helper vectors and mapping: customerRoute maps customer -> route
+        // index.
+        std::vector<bool> inRoute(nbClients + 1, false);
+        std::vector<bool> interior(nbClients + 1, false);
+        std::vector<double> load(nbVehicles, 0.0);
+        std::vector<int> customerRoute(nbClients + 1, -1);
 
-        // Insert pattern if provided
+        int nextEmptyRoute = 0;
+        // If a pattern is provided, insert its routes.
         if (pattern) {
-            for (unsigned r = 0; r < pattern->size(); r++) {
-                if (nextEmptyRoute == params->nbVehicles) {
+            for (size_t r = 0; r < pattern->size(); r++) {
+                // Expand vehicle list if needed.
+                if (nextEmptyRoute == nbVehicles) {
                     chromR.push_back(std::vector<int>());
-                    load.push_back(0);
-                    params->nbVehicles++;
+                    load.push_back(0.0);
+                    nbVehicles++;
+                    params->nbVehicles = nbVehicles;
                 }
-                for (unsigned c = 0; c < (*pattern)[r].size(); c++) {
-                    chromR[nextEmptyRoute].push_back((*pattern)[r][c]);
-                    load[nextEmptyRoute] +=
-                        params->cli[(*pattern)[r][c]].demand;
-                    inRoute[(*pattern)[r][c]] = true;
-                    if (c && c != (*pattern)[r].size() - 1)
-                        interior[(*pattern)[r][c]] = true;
+                for (size_t c = 0; c < (*pattern)[r].size(); c++) {
+                    int customer = (*pattern)[r][c];
+                    chromR[nextEmptyRoute].push_back(customer);
+                    load[nextEmptyRoute] += params->cli[customer].demand;
+                    inRoute[customer] = true;
+                    customerRoute[customer] = nextEmptyRoute;
+                    // Mark as interior if not the first or last customer.
+                    if (c > 0 && c < (*pattern)[r].size() - 1)
+                        interior[customer] = true;
                 }
-                while (nextEmptyRoute < params->nbVehicles &&
+                // Advance to the next empty route.
+                while (nextEmptyRoute < nbVehicles &&
                        !chromR[nextEmptyRoute].empty())
                     nextEmptyRoute++;
             }
         }
 
-        // Process savings list
-        unsigned savingsCount = 0;
-        while (savingsCount < params->savingsList.size()) {
-            Savings s = params->savingsList[savingsCount++];
+        // Process the savings list to merge routes or create new ones.
+        for (size_t sIdx = 0; sIdx < params->savingsList.size(); sIdx++) {
+            Savings s = params->savingsList[sIdx];
             if (s.value <= 0) continue;  // Skip invalid savings
 
-            // Check feasibility and merge routes
-            if (params->cli[s.c1].demand + params->cli[s.c2].demand <=
-                params->vehicleCapacity) {
-                if (!inRoute[s.c1] && !inRoute[s.c2]) {
-                    // Create a new route
-                    if (nextEmptyRoute == params->nbVehicles) {
-                        chromR.push_back(std::vector<int>());
-                        load.push_back(0);
-                        params->nbVehicles++;
+            // Only proceed if combined demand is feasible.
+            if (params->cli[s.c1].demand + params->cli[s.c2].demand >
+                params->vehicleCapacity)
+                continue;
+
+            // Case 1: Neither customer is yet in a route.
+            if (!inRoute[s.c1] && !inRoute[s.c2]) {
+                if (nextEmptyRoute == nbVehicles) {
+                    chromR.push_back(std::vector<int>());
+                    load.push_back(0.0);
+                    nbVehicles++;
+                    params->nbVehicles = nbVehicles;
+                }
+                chromR[nextEmptyRoute].push_back(s.c1);
+                chromR[nextEmptyRoute].push_back(s.c2);
+                load[nextEmptyRoute] +=
+                    params->cli[s.c1].demand + params->cli[s.c2].demand;
+                inRoute[s.c1] = inRoute[s.c2] = true;
+                customerRoute[s.c1] = customerRoute[s.c2] = nextEmptyRoute;
+                while (nextEmptyRoute < nbVehicles &&
+                       !chromR[nextEmptyRoute].empty())
+                    nextEmptyRoute++;
+            }
+            // Case 2: One customer is in a route (at an end) and the other is
+            // not.
+            else if (inRoute[s.c1] && !interior[s.c1] && !inRoute[s.c2]) {
+                int routeIdx = customerRoute[s.c1];
+                if (!chromR[routeIdx].empty()) {
+                    if (chromR[routeIdx].front() == s.c1 &&
+                        load[routeIdx] + params->cli[s.c2].demand <=
+                            params->vehicleCapacity) {
+                        chromR[routeIdx].insert(chromR[routeIdx].begin(), s.c2);
+                        load[routeIdx] += params->cli[s.c2].demand;
+                        inRoute[s.c2] = true;
+                        customerRoute[s.c2] = routeIdx;
+                        if (chromR[routeIdx].size() > 2) interior[s.c1] = true;
+                    } else if (chromR[routeIdx].back() == s.c1 &&
+                               load[routeIdx] + params->cli[s.c2].demand <=
+                                   params->vehicleCapacity) {
+                        chromR[routeIdx].push_back(s.c2);
+                        load[routeIdx] += params->cli[s.c2].demand;
+                        inRoute[s.c2] = true;
+                        customerRoute[s.c2] = routeIdx;
+                        if (chromR[routeIdx].size() > 2) interior[s.c1] = true;
                     }
-                    chromR[nextEmptyRoute].push_back(s.c1);
-                    chromR[nextEmptyRoute].push_back(s.c2);
-                    load[nextEmptyRoute] +=
-                        params->cli[s.c1].demand + params->cli[s.c2].demand;
-                    inRoute[s.c1] = inRoute[s.c2] = true;
-                    while (nextEmptyRoute < params->nbVehicles &&
-                           !chromR[nextEmptyRoute].empty())
-                        nextEmptyRoute++;
-                } else if (inRoute[s.c1] && !interior[s.c1] && !inRoute[s.c2]) {
-                    // Merge s.c2 into the route containing s.c1
-                    for (int r = 0; r < params->nbVehicles; r++) {
-                        if (!chromR[r].empty()) {
-                            if (chromR[r].front() == s.c1) {
-                                if (load[r] + params->cli[s.c2].demand <=
-                                    params->vehicleCapacity) {
-                                    chromR[r].insert(chromR[r].begin(), s.c2);
-                                    load[r] += params->cli[s.c2].demand;
-                                    inRoute[s.c2] = true;
-                                    if (chromR[r].size() > 2)
-                                        interior[s.c1] = true;
-                                }
-                                break;
-                            } else if (chromR[r].back() == s.c1) {
-                                if (load[r] + params->cli[s.c2].demand <=
-                                    params->vehicleCapacity) {
-                                    chromR[r].push_back(s.c2);
-                                    load[r] += params->cli[s.c2].demand;
-                                    inRoute[s.c2] = true;
-                                    if (chromR[r].size() > 2)
-                                        interior[s.c1] = true;
-                                }
-                                break;
-                            }
-                        }
+                }
+            } else if (inRoute[s.c2] && !interior[s.c2] && !inRoute[s.c1]) {
+                int routeIdx = customerRoute[s.c2];
+                if (!chromR[routeIdx].empty()) {
+                    if (chromR[routeIdx].front() == s.c2 &&
+                        load[routeIdx] + params->cli[s.c1].demand <=
+                            params->vehicleCapacity) {
+                        chromR[routeIdx].insert(chromR[routeIdx].begin(), s.c1);
+                        load[routeIdx] += params->cli[s.c1].demand;
+                        inRoute[s.c1] = true;
+                        customerRoute[s.c1] = routeIdx;
+                        if (chromR[routeIdx].size() > 2) interior[s.c2] = true;
+                    } else if (chromR[routeIdx].back() == s.c2 &&
+                               load[routeIdx] + params->cli[s.c1].demand <=
+                                   params->vehicleCapacity) {
+                        chromR[routeIdx].push_back(s.c1);
+                        load[routeIdx] += params->cli[s.c1].demand;
+                        inRoute[s.c1] = true;
+                        customerRoute[s.c1] = routeIdx;
+                        if (chromR[routeIdx].size() > 2) interior[s.c2] = true;
                     }
-                } else if (inRoute[s.c2] && !interior[s.c2] && !inRoute[s.c1]) {
-                    // Merge s.c1 into the route containing s.c2
-                    for (int r = 0; r < params->nbVehicles; r++) {
-                        if (!chromR[r].empty()) {
-                            if (chromR[r].front() == s.c2) {
-                                if (load[r] + params->cli[s.c1].demand <=
-                                    params->vehicleCapacity) {
-                                    chromR[r].insert(chromR[r].begin(), s.c1);
-                                    load[r] += params->cli[s.c1].demand;
-                                    inRoute[s.c1] = true;
-                                    if (chromR[r].size() > 2)
-                                        interior[s.c2] = true;
-                                }
-                                break;
-                            } else if (chromR[r].back() == s.c2) {
-                                if (load[r] + params->cli[s.c1].demand <=
-                                    params->vehicleCapacity) {
-                                    chromR[r].push_back(s.c1);
-                                    load[r] += params->cli[s.c1].demand;
-                                    inRoute[s.c1] = true;
-                                    if (chromR[r].size() > 2)
-                                        interior[s.c2] = true;
-                                }
-                                break;
-                            }
-                        }
+                }
+            }
+            // Case 3: Both customers are in different routes and can be merged.
+            else if (inRoute[s.c1] && !interior[s.c1] && inRoute[s.c2] &&
+                     !interior[s.c2]) {
+                int r1 = customerRoute[s.c1];
+                int r2 = customerRoute[s.c2];
+                if (r1 != r2 &&
+                    load[r1] + load[r2] <= params->vehicleCapacity) {
+                    // Determine proper merge order based on route endpoints.
+                    if (chromR[r1].front() == s.c1 &&
+                        chromR[r2].front() == s.c2) {
+                        chromR[r1].insert(chromR[r1].begin(),
+                                          chromR[r2].rbegin(),
+                                          chromR[r2].rend());
+                    } else if (chromR[r1].back() == s.c1 &&
+                               chromR[r2].front() == s.c2) {
+                        chromR[r1].insert(chromR[r1].end(), chromR[r2].begin(),
+                                          chromR[r2].end());
+                    } else if (chromR[r1].front() == s.c1 &&
+                               chromR[r2].back() == s.c2) {
+                        chromR[r1].insert(chromR[r1].begin(),
+                                          chromR[r2].begin(), chromR[r2].end());
+                    } else if (chromR[r1].back() == s.c1 &&
+                               chromR[r2].back() == s.c2) {
+                        chromR[r1].insert(chromR[r1].end(), chromR[r2].rbegin(),
+                                          chromR[r2].rend());
                     }
-                } else if (inRoute[s.c1] && !interior[s.c1] && inRoute[s.c2] &&
-                           !interior[s.c2]) {
-                    // Merge two routes
-                    int r1 = -1, r2 = -1;
-                    for (int r = 0; r < params->nbVehicles; r++) {
-                        if (!chromR[r].empty()) {
-                            if (chromR[r].front() == s.c1 ||
-                                chromR[r].back() == s.c1)
-                                r1 = r;
-                            if (chromR[r].front() == s.c2 ||
-                                chromR[r].back() == s.c2)
-                                r2 = r;
-                            if (r1 != -1 && r2 != -1) break;
-                        }
-                    }
-                    if (r1 != r2 &&
-                        load[r1] + load[r2] <= params->vehicleCapacity) {
-                        if (chromR[r1].front() == s.c1 &&
-                            chromR[r2].front() == s.c2) {
-                            chromR[r1].insert(chromR[r1].begin(),
-                                              chromR[r2].rbegin(),
-                                              chromR[r2].rend());
-                        } else if (chromR[r1].back() == s.c1 &&
-                                   chromR[r2].front() == s.c2) {
-                            chromR[r1].insert(chromR[r1].end(),
-                                              chromR[r2].begin(),
-                                              chromR[r2].end());
-                        } else if (chromR[r1].front() == s.c1 &&
-                                   chromR[r2].back() == s.c2) {
-                            chromR[r1].insert(chromR[r1].begin(),
-                                              chromR[r2].begin(),
-                                              chromR[r2].end());
-                        } else if (chromR[r1].back() == s.c1 &&
-                                   chromR[r2].back() == s.c2) {
-                            chromR[r1].insert(chromR[r1].end(),
-                                              chromR[r2].rbegin(),
-                                              chromR[r2].rend());
-                        }
-                        load[r1] += load[r2];
-                        chromR[r2].clear();
-                        load[r2] = 0;
-                        interior[s.c1] = interior[s.c2] = true;
-                    }
+                    // Update combined load and update mapping for all customers
+                    // in r2.
+                    load[r1] += load[r2];
+                    for (int cust : chromR[r2]) customerRoute[cust] = r1;
+                    chromR[r2].clear();
+                    load[r2] = 0.0;
+                    interior[s.c1] = interior[s.c2] = true;
                 }
             }
         }
 
-        // Assign unassigned customers to routes
-        for (int i = 1; i <= params->nbClients; i++) {
+        // Assign any remaining customers that are not yet assigned.
+        for (int i = 1; i <= nbClients; i++) {
             if (!inRoute[i]) {
                 int bestRoute = -1;
                 double bestCost = DBL_MAX;
-                for (int r = 0; r < params->nbVehicles; r++) {
-                    if (load[r] + params->cli[i].demand <=
-                        params->vehicleCapacity) {
+                // Evaluate each route that is not empty.
+                for (int r = 0; r < nbVehicles; r++) {
+                    if (!chromR[r].empty() && load[r] + params->cli[i].demand <=
+                                                  params->vehicleCapacity) {
                         double cost = params->timeCost[chromR[r].back()][i];
                         if (cost < bestCost) {
-                            bestRoute = r;
                             bestCost = cost;
+                            bestRoute = r;
                         }
                     }
                 }
@@ -419,22 +415,23 @@ Individual::Individual(Params *params, bool rcws,
                     chromR[bestRoute].push_back(i);
                     load[bestRoute] += params->cli[i].demand;
                     inRoute[i] = true;
+                    customerRoute[i] = bestRoute;
                 }
             }
         }
 
-        // Flatten chromR into chromT
-        int c = 0;
+        // Flatten the route representation into a single chromosome.
+        int idx = 0;
         for (const auto &route : chromR) {
             for (int customer : route) {
-                chromT[c++] = customer;
+                if (idx < nbClients) chromT[idx++] = customer;
             }
         }
 
         evaluateCompleteCost();
     } else {
-        // Initialize with a random permutation
-        for (int i = 0; i < params->nbClients; i++) chromT[i] = i + 1;
+        // If not using rcws, initialize with a random permutation.
+        for (int i = 0; i < nbClients; i++) chromT[i] = i + 1;
         std::shuffle(chromT.begin(), chromT.end(), params->ran);
         myCostSol.penalizedCost = 1.e30;
     }

@@ -1,6 +1,7 @@
 #pragma once
 
 // Move config outside as namespace constants
+#include "Cut.h"
 namespace LocalSearchConfig {
 constexpr double MIN_WEIGHT = 0.01;
 constexpr int SEGMENT_SIZE = 20;
@@ -11,7 +12,8 @@ constexpr double DIVERSITY_WEIGHT = 0.3;
 constexpr double BASE_ACCEPTANCE_RATE = 0.3;
 constexpr double MIN_ACCEPTANCE_RATE = 0.1;
 constexpr double MAX_ACCEPTANCE_RATE = 0.5;
-constexpr int MAX_REMOVE_COUNT = 3;
+constexpr int MAX_REMOVE_COUNT = 2;
+constexpr int MAX_ADD_COUNT = 2;
 constexpr double IMPROVEMENT_BONUS = 1.5;
 constexpr double MAX_DETERIORATION = 0.1;
 constexpr double OPERATOR_LEARNING_RATE = 0.1;
@@ -19,104 +21,114 @@ constexpr double INITIAL_TEMPERATURE = 100.0;
 constexpr double COOLING_RATE = 0.95;
 constexpr double REHEATING_FACTOR = 1.5;
 constexpr int REHEAT_INTERVAL = 50;
+constexpr int MIN_RANK = 3;
+constexpr int MAX_RANK = 5;
 }  // namespace LocalSearchConfig
 
-// Permutation structure: stores a vector of numerators and a denominator.
-struct Permutation {
-    std::vector<int> num;
-    int den;
-
-    Permutation(const std::vector<int> &n, int d) : num(n), den(d) {}
-    Permutation() = default;
-};
-
-// Helper function: convert an std::array to an std::vector using only the first
-// 'size' elements.
-template <size_t N>
-constexpr std::vector<int> to_vector(const std::array<int, N> &arr,
-                                     size_t size) {
-    std::vector<int> result;
-    result.reserve(size);
-    for (size_t i = 0; i < size; ++i) {
-        result.push_back(arr[i]);
-    }
-    return result;
-}
-
-// Helper function: generate all permutations of the first N elements of the
-// 'base' array, with the given denominator, and return a pair of the
-// permutation array and the count.
-template <size_t N>
-constexpr auto generate_permutations(const std::array<int, N> &base, int den) {
-    // We assume 120 is sufficient (i.e. 5! for N==5)
-    std::array<Permutation, 120> result{};
-    size_t count = 0;
-
-    // Create a working copy; if N is less than 5, pad the remaining entries
-    // with 0.
-    std::array<int, 5> current{};
-    std::copy(base.begin(), base.end(), current.begin());
-    if constexpr (N < 5) {
-        std::fill(current.begin() + N, current.end(), 0);
-    }
-
-    // Generate permutations over the first N elements.
+// Inline helper function: Given a base vector and a denominator, generate all
+// unique runtime permutations (using std::next_permutation) and return them as
+// a vector of Permutations.
+inline std::vector<SRCPermutation> generateRuntimePermutations(
+    const std::vector<int> &base, int den) {
+    std::vector<SRCPermutation> perms;
+    std::vector<int> temp = base;
+    std::sort(temp.begin(), temp.end());
     do {
-        std::vector<int> vec = to_vector(current, N);
-        result[count++] = Permutation(vec, den);
-    } while (std::next_permutation(current.begin(), current.begin() + N));
-
-    return std::make_pair(result, count);
+        perms.emplace_back(temp, den);
+    } while (std::next_permutation(temp.begin(), temp.end()));
+    return perms;
 }
 
-constexpr auto getPermutationsForSize3() {
-    constexpr std::array<int, 3> base{{1, 1, 1}};
-    auto [perms, count] = generate_permutations(base, 2);
+// Inline genetic generator: For a given candidate size, apply several heuristic
+// plans, generate permutations for each plan, and return all as a vector of
+// Permutations. This function mimics the structure of the reference generator
+// with plans 0 through 6.
+inline std::vector<SRCPermutation> generateGeneticPermutations(
+    int candidateSize) {
+    std::vector<SRCPermutation> allPerms;
 
-    std::vector<Permutation> result;
-    result.reserve(1);
-    for (size_t i = 0; i < count; ++i) {
-        result.push_back(perms[i]);
+    // Plan 0: For candidate sizes that are odd.
+    if (candidateSize % 2 != 0) {
+        std::vector<int> base(candidateSize, 1);
+        int den = 2;  // Example: denominator 2
+        auto perms = generateRuntimePermutations(base, den);
+        allPerms.insert(allPerms.end(), perms.begin(), perms.end());
     }
-    return result;
-}
-// Generate all permutations for a candidate set of size 5 using a set of base
-// permutations.
-constexpr auto getPermutationsForSize5() {
-    // Each pair holds a base array (of 5 elements) and a denominator.
-    constexpr std::array<std::pair<std::array<int, 5>, int>, 5> base_perms{
-        {{{{2, 2, 1, 1, 1}}, 4},
-         {{{3, 1, 1, 1, 1}}, 4},
-         {{{3, 2, 2, 1, 1}}, 5},
-         {{{2, 2, 2, 1, 1}}, 3},
-         {{{3, 3, 2, 2, 1}}, 4}}};
 
-    constexpr size_t total_perms = 10 + 5 + 30 + 10 + 30;
-    std::vector<Permutation> all_perms;
-    all_perms.reserve(total_perms);
+    // Plan 1: When (candidateSize - 2) is divisible by 3 and candidateSize
+    // >= 5.
+    if (candidateSize >= 5 && ((candidateSize - 2) % 3 == 0)) {
+        std::vector<int> base(candidateSize, 1);
+        int den = 3;  // Example: denominator 3
+        auto perms = generateRuntimePermutations(base, den);
+        allPerms.insert(allPerms.end(), perms.begin(), perms.end());
+    }
 
-    // For each base, generate its permutations and append them to all_perms.
-    for (const auto &[nums, den] : base_perms) {
-        auto [perms, count] = generate_permutations(nums, den);
-        for (size_t i = 0; i < count; ++i) {
-            all_perms.push_back(perms[i]);
+    // Plan 2: For candidateSize >= 5.
+    // Modify the base: set the first two entries to (candidateSize - 3) and the
+    // third to 2.
+    if (candidateSize >= 5) {
+        std::vector<int> base(candidateSize, 1);
+        base[0] = candidateSize - 3;
+        base[1] = candidateSize - 3;
+        if (candidateSize >= 3) {
+            base[2] = 2;
         }
+        int den = candidateSize - 2;  // Example denominator
+        auto perms = generateRuntimePermutations(base, den);
+        allPerms.insert(allPerms.end(), perms.begin(), perms.end());
     }
 
-    return all_perms;
-}
-
-// Generate all permutations for a candidate set of size 4.
-constexpr auto getPermutationsForSize4() {
-    constexpr std::array<int, 4> base{{2, 1, 1, 1}};
-    auto [perms, count] = generate_permutations(base, 3);
-
-    std::vector<Permutation> result;
-    result.reserve(4);
-    for (size_t i = 0; i < count; ++i) {
-        result.push_back(perms[i]);
+    // Plan 3: For candidateSize >= 5.
+    // Modify the base: set the first two entries to (candidateSize - 2) and the
+    // next two to 2.
+    if (candidateSize >= 5 && candidateSize >= 4) {
+        std::vector<int> base(candidateSize, 1);
+        base[0] = candidateSize - 2;
+        base[1] = candidateSize - 2;
+        base[2] = 2;
+        base[3] = 2;
+        int den = candidateSize - 1;  // Example denominator
+        auto perms = generateRuntimePermutations(base, den);
+        allPerms.insert(allPerms.end(), perms.begin(), perms.end());
     }
-    return result;
+
+    // Plan 4: For candidateSize >= 5.
+    // Modify the base: set the first element to (candidateSize - 3) and the
+    // second to 2.
+    if (candidateSize >= 5) {
+        std::vector<int> base(candidateSize, 1);
+        base[0] = candidateSize - 3;
+        if (candidateSize >= 2) base[1] = 2;
+        int den = candidateSize - 1;
+        auto perms = generateRuntimePermutations(base, den);
+        allPerms.insert(allPerms.end(), perms.begin(), perms.end());
+    }
+
+    // Plan 5: For candidateSize >= 4.
+    // Modify the base: set the first element to (candidateSize - 2).
+    if (candidateSize >= 4) {
+        std::vector<int> base(candidateSize, 1);
+        base[0] = candidateSize - 2;
+        int den = candidateSize - 1;
+        auto perms = generateRuntimePermutations(base, den);
+        allPerms.insert(allPerms.end(), perms.begin(), perms.end());
+    }
+
+    // Plan 6: For candidateSize >= 5.
+    // Modify the base: set the first element to (candidateSize - 2) and the
+    // next two to 2.
+    if (candidateSize >= 5 && candidateSize >= 3) {
+        std::vector<int> base(candidateSize, 1);
+        base[0] = candidateSize - 2;
+        base[1] = 2;
+        base[2] = 2;
+        int den = candidateSize;  // Example denominator
+        auto perms = generateRuntimePermutations(base, den);
+        allPerms.insert(allPerms.end(), perms.begin(), perms.end());
+    }
+
+    return allPerms;
 }
 
 namespace std {
@@ -150,14 +162,19 @@ struct NodeScore {
 };
 
 struct CandidateSet {
-    std::vector<int> nodes;
+    ankerl::unordered_dense::set<int> nodes;
     double violation;
-    Permutation perm;
-    std::vector<int> neighbor;
+    SRCPermutation perm;
+    ankerl::unordered_dense::set<int> neighbor;
     double rhs = 0.0;
 
-    CandidateSet(const std::vector<int> &n, double v, const Permutation &p,
-                 const std::vector<int> &neigh, double r = 0.0)
+    // CandidateSet(const std::vector<int> &n, double v, const Permutation &p,
+    //              const std::vector<int> &neigh, double r = 0.0)
+    //     : nodes(n), violation(v), perm(p), neighbor(neigh), rhs(r) {}
+
+    CandidateSet(const ankerl::unordered_dense::set<int> &n, double v,
+                 const SRCPermutation &p,
+                 const ankerl::unordered_dense::set<int> &neigh, double r = 0.0)
         : nodes(n), violation(v), perm(p), neighbor(neigh), rhs(r) {}
 
     // Equality operator for comparison
@@ -178,7 +195,7 @@ struct CandidateSet {
         }
 
         // For different elements, establish consistent ordering
-        if (a.nodes != b.nodes) return a.nodes < b.nodes;
+        if (a.nodes != b.nodes) return a.nodes.size() < b.nodes.size();
         if (a.perm.num != b.perm.num) return a.perm.num < b.perm.num;
         return a.perm.den < b.perm.den;
     }
@@ -195,7 +212,7 @@ struct CandidateSetCompare {
         }
 
         // For different elements, establish consistent ordering
-        if (a.nodes != b.nodes) return a.nodes < b.nodes;
+        if (a.nodes != b.nodes) return a.nodes.size() < b.nodes.size();
         if (a.perm.num != b.perm.num) return a.perm.num < b.perm.num;
         return a.perm.den < b.perm.den;
     }
@@ -207,14 +224,45 @@ struct CandidateSetHasher {
         XXH3_state_t *state = XXH3_createState();
         assert(state != nullptr);
         XXH3_64bits_reset(state);
-        XXH3_64bits_update(state, cs.nodes.data(),
-                           cs.nodes.size() * sizeof(int));
+        // Convert unordered nodes to a sorted vector.
+        std::vector<int> sorted_nodes(cs.nodes.begin(), cs.nodes.end());
+        std::sort(sorted_nodes.begin(), sorted_nodes.end());
+        XXH3_64bits_update(state, sorted_nodes.data(),
+                           sorted_nodes.size() * sizeof(int));
+        // Hash the permutation numerator (assumed to be a vector<int>).
         XXH3_64bits_update(state, cs.perm.num.data(),
                            cs.perm.num.size() * sizeof(int));
+        // Hash the permutation denominator.
         XXH3_64bits_update(state, &cs.perm.den, sizeof(int));
         uint64_t hash = XXH3_64bits_digest(state);
         XXH3_freeState(state);
         return hash;
     }
+
     uint64_t mixed_hash(const CandidateSet &cs) const { return operator()(cs); }
 };
+
+namespace std {
+template <>
+struct hash<CandidateSet> {
+    size_t operator()(const CandidateSet &cs) const {
+        // Create a state for the hash.
+        XXH3_state_t *state = XXH3_createState();
+        assert(state != nullptr);
+        XXH3_64bits_reset(state);
+        // Convert unordered nodes to a sorted vector.
+        std::vector<int> sorted_nodes(cs.nodes.begin(), cs.nodes.end());
+        std::sort(sorted_nodes.begin(), sorted_nodes.end());
+        XXH3_64bits_update(state, sorted_nodes.data(),
+                           sorted_nodes.size() * sizeof(int));
+        // Hash the permutation numerator (assumed to be a vector<int>).
+        XXH3_64bits_update(state, cs.perm.num.data(),
+                           cs.perm.num.size() * sizeof(int));
+        // Hash the permutation denominator.
+        XXH3_64bits_update(state, &cs.perm.den, sizeof(int));
+        uint64_t hash_val = XXH3_64bits_digest(state);
+        XXH3_freeState(state);
+        return hash_val;
+    }
+};
+}  // namespace std

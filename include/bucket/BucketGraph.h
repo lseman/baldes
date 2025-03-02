@@ -83,6 +83,7 @@ class BucketGraph {
    public:
     double threshold = -1.5;
 
+    int n_segments = 0;
     std::mutex merge_mutex;
 
     static  // Precompute bitmask lookup table at compile time
@@ -283,8 +284,9 @@ class BucketGraph {
     exec::static_thread_pool bi_pool = exec::static_thread_pool(2);
     exec::static_thread_pool::scheduler bi_sched = bi_pool.get_scheduler();
 
+    const int MERGE_SCHED_CONCURRENCY = 1;
     exec::static_thread_pool merge_pool =
-        exec::static_thread_pool(std::thread::hardware_concurrency());
+        exec::static_thread_pool(MERGE_SCHED_CONCURRENCY);
     exec::static_thread_pool::scheduler merge_sched =
         merge_pool.get_scheduler();
 
@@ -500,8 +502,8 @@ class BucketGraph {
     void print_statistics();
     void generate_arcs();
 
-    ankerl::unordered_dense::map<int, int> fw_bucket_splits;
-    ankerl::unordered_dense::map<int, int> bw_bucket_splits;
+    ankerl::unordered_dense::map<int, std::vector<int>> fw_bucket_splits;
+    ankerl::unordered_dense::map<int, std::vector<int>> bw_bucket_splits;
 
     template <Symmetry SYM = Symmetry::Asymmetric>
     void set_adjacency_list();
@@ -848,36 +850,41 @@ class BucketGraph {
                                   const Label *bw_label) {
         if (!fw_label || !bw_label) return false;
 
-        // Cache resources and node data
+        // Cache resources and node data.
         const auto &fw_resources = fw_label->resources;
         const auto &bw_resources = bw_label->resources;
-        const struct VRPNode &VRPNode = nodes[fw_label->node_id];
+        const auto &node = nodes[fw_label->node_id];
 
-        // Time feasibility check
-        for (auto r = 0; r < options.resources.size(); ++r) {
-            if (options.resources[r] != "time") {
-                continue;
-            }
-            const auto time_fw = fw_resources[r];
-            const auto time_bw = bw_resources[r];
-            const auto travel_time =
-                getcij(fw_label->node_id, bw_label->node_id);
-            if (time_fw + travel_time + VRPNode.duration > time_bw) {
+        const size_t n_resources = options.resources.size();
+
+        // Compute travel time only once.
+        const auto travel_time = getcij(fw_label->node_id, bw_label->node_id);
+
+        // Assuming the "time" resource is at a known index (e.g., index 0).
+        // If not, you can either iterate to find it once or precompute a
+        // boolean array.
+        if (n_resources > 0 && options.resources[0] == "time") {
+            // Check time feasibility.
+            if (numericutils::gt(fw_resources[0] + travel_time + node.duration,
+                                 bw_resources[0]))
                 return false;
+        } else {
+            // Fallback: iterate to check any resource named "time".
+            for (size_t r = 0; r < n_resources; ++r) {
+                if (options.resources[r] == "time") {
+                    if (numericutils::gt(
+                            fw_resources[r] + travel_time + node.duration,
+                            bw_resources[r]))
+                        return false;
+                }
             }
         }
 
-        // Resource feasibility check (if applicable)
-        if (options.resources.size() > 1) {
-            for (size_t i = 1; i < options.resources.size(); ++i) {
-                const auto resource_fw = fw_resources[i];
-                const auto resource_bw = bw_resources[i];
-                const auto demand = VRPNode.demand;
-
-                if (resource_fw + demand > resource_bw) {
-                    return false;
-                }
-            }
+        // Check additional resource feasibility (assuming resources[0] is
+        // "time") and additional resources (from index 1 onward) represent
+        // capacity constraints.
+        for (size_t i = 1; i < n_resources; ++i) {
+            if (fw_resources[i] + node.demand > bw_resources[i]) return false;
         }
 
         return true;
@@ -1065,13 +1072,12 @@ class BucketGraph {
 
     template <Direction D, Stage S, ArcType A, Mutability M, Full F>
     inline std::vector<Label *> Extend(
-        std::conditional_t<M == Mutability::Mut, Label *, const Label *>
+        const std::conditional_t<M == Mutability::Mut, Label *, const Label *>
             L_prime,
         const std::conditional_t<
             A == ArcType::Bucket, BucketArc,
             std::conditional_t<A == ArcType::Jump, JumpArc, Arc>> &gamma,
-        int depth = 0) noexcept;
-
+        std::vector<Label *> *output_buffer = nullptr, int depth = 0) noexcept;
     template <Direction D, Stage S>
     bool is_dominated(const Label *new_label, const Label *labels) noexcept;
 
@@ -1344,17 +1350,21 @@ class BucketGraph {
                 if (updated_buckets.contains(inner_id)) {
                     continue;
                 }
-                // If the bucket split value is already at maximum (100), skip.
-                if (fw_bucket_splits[inner_id] == 100) {
-                    continue;
+                for (auto r = 0; r < options.resources.size(); ++r) {
+                    // If the bucket split value is already at maximum (100),
+                    // skip.(127)
+                    //
+                    if (fw_bucket_splits[inner_id][r] == 100) {
+                        continue;
+                    }
+                    // Update the bucket splits by doubling the current value,
+                    // capped at 100.
+                    const int update_target =
+                        std::min(fw_bucket_splits[inner_id][r] * 2, 100);
+                    fw_bucket_splits[inner_id][r] = update_target;
+                    bw_bucket_splits[inner_id][r] = update_target;
+                    updated_buckets.insert(inner_id);
                 }
-                // Update the bucket splits by doubling the current value,
-                // capped at 100.
-                const int update_target =
-                    std::min(fw_bucket_splits[inner_id] * 2, 100);
-                fw_bucket_splits[inner_id] = update_target;
-                bw_bucket_splits[inner_id] = update_target;
-                updated_buckets.insert(inner_id);
                 update_ctr++;
             }
         }
@@ -1451,7 +1461,8 @@ class BucketGraph {
         int cum_sum = 0;
         std::vector<double> interval_start(num_intervals);
         std::vector<double> interval_end(num_intervals);
-        // "pos" holds the current combination indices when multi-dimensional.
+        // "pos" holds the current combination indices when
+        // multi-dimensional.
         std::vector<int> pos(num_intervals, 0);
 
         // Process each node (job) to define its buckets.
@@ -1483,7 +1494,8 @@ class BucketGraph {
                 }
             }
 
-            // Compute the width (base interval) for each resource dimension.
+            // Compute the width (base interval) for each resource
+            // dimension.
             std::vector<double> node_base_interval(num_intervals);
             for (int r = 0; r < num_intervals; ++r) {
                 node_base_interval[r] =
@@ -1492,8 +1504,8 @@ class BucketGraph {
             }
 
             // Optionally store the per-node split information.
-            // (Here we store just the first dimension's split count; you could
-            // store the full vector.)
+            // (Here we store just the first dimension's split count; you
+            // could store the full vector.)
             bucket_splits[VRPNode.id] = (num_intervals == 1)
                                             ? node_split_counts[0]
                                             : node_split_counts[0];
@@ -1572,6 +1584,10 @@ class BucketGraph {
         // Update the overall bucket count.
         buckets_size = buckets.size();
     }
+
+    void prune_ng_cycles(int max_age, int min_usage, int current_iteration);
+    std::vector<CycleData> ng_cycles;
+    int ng_iteration_counter = 0;
 
    private:
     std::vector<Interval> intervals;
