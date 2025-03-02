@@ -518,48 +518,51 @@ class IteratedLocalSearch {
     void update_operator_weights(double decay_factor = 0.9,
                                  double reward_factor = 0.1,
                                  double min_weight = 0.01) {
-        // Calculate the total improvement and total success counts.
-        const double total_improvement = std::accumulate(
-            operator_improvements.begin(), operator_improvements.end(), 0.0);
-        const int total_successes = std::accumulate(
-            operator_success_count.begin(), operator_success_count.end(), 0);
+        // First, compute total improvement and total successes.
+        double total_improvement = 0.0;
+        int total_successes = 0;
+        const size_t n = operator_weights.size();
+        for (size_t i = 0; i < n; ++i) {
+            total_improvement += operator_improvements[i];
+            total_successes += operator_success_count[i];
+        }
 
-        // Only update if there is any recorded improvement or success.
+        // Only update weights if we have any recorded improvement or success.
         if (total_improvement > 0 || total_successes > 0) {
             const double inv_total_improvement =
                 (total_improvement > 0) ? (1.0 / total_improvement) : 0.0;
             const double inv_total_successes =
                 (total_successes > 0) ? (1.0 / total_successes) : 0.0;
 
-            // Update each operator weight using decay and reward based on
-            // normalized metrics.
-            for (size_t i = 0; i < operator_weights.size(); ++i) {
-                const double normalized_improvement =
+            // Update each operator weight and accumulate the total weight.
+            double total_weight = 0.0;
+            for (size_t i = 0; i < n; ++i) {
+                double normalized_improvement =
                     operator_improvements[i] * inv_total_improvement;
-                const double success_rate =
+                double success_rate =
                     operator_success_count[i] * inv_total_successes;
-
-                operator_weights[i] = std::max(
-                    min_weight, decay_factor * operator_weights[i] +
-                                    reward_factor * (normalized_improvement +
-                                                     success_rate));
+                double new_weight =
+                    decay_factor * operator_weights[i] +
+                    reward_factor * (normalized_improvement + success_rate);
+                // Ensure a minimum weight.
+                operator_weights[i] =
+                    (new_weight < min_weight) ? min_weight : new_weight;
+                total_weight += operator_weights[i];
             }
-        }
 
-        // Normalize the weights so that they sum to 1.
-        const double total_weight = std::accumulate(
-            operator_weights.begin(), operator_weights.end(), 0.0);
-        if (total_weight > 0) {
-            for (auto &weight : operator_weights) {
-                weight /= total_weight;
+            // Normalize the weights so that they sum to 1.
+            if (total_weight > 0.0) {
+                for (size_t i = 0; i < n; ++i) {
+                    operator_weights[i] /= total_weight;
+                }
             }
         }
 
         // Reset improvements and success counts for the next iteration.
-        std::fill(operator_improvements.begin(), operator_improvements.end(),
-                  0.0);
-        std::fill(operator_success_count.begin(), operator_success_count.end(),
-                  0);
+        for (size_t i = 0; i < n; ++i) {
+            operator_improvements[i] = 0.0;
+            operator_success_count[i] = 0;
+        }
     }
 
     exec::static_thread_pool pool =
@@ -567,6 +570,7 @@ class IteratedLocalSearch {
     exec::static_thread_pool::scheduler sched = pool.get_scheduler();
 
     Xoroshiro128Plus rng;  // Custom RNG with default seed
+    std::mutex operator_mutex;
 
     std::vector<Label *> perturbation(const std::vector<Label *> &paths) {
         // Copy the input paths as the baseline best solution.
@@ -578,10 +582,12 @@ class IteratedLocalSearch {
         std::vector<double> best_costs(paths.size(),
                                        std::numeric_limits<double>::max());
 
-        // Build the list of tasks for parallel processing.
-        // Each task is a tuple containing two Label pointers and two indices.
+        // Reserve an approximate number of tasks if possible.
         std::vector<std::tuple<const Label *, const Label *, size_t, size_t>>
             tasks;
+        tasks.reserve(paths.size() * paths.size() *
+                      4);  // adjust estimate as needed
+
         for (const Label *label_i : best) {
             for (const Label *label_j : best) {
                 if (label_i == label_j) continue;
@@ -598,34 +604,38 @@ class IteratedLocalSearch {
             }
         }
 
-        // Mutexes to protect shared resources in the parallel region.
-        std::mutex best_new_mutex;  // Protects best_new updates.
-        std::mutex operator_mutex;  // Protects updates to operator metrics.
-
-        // Define the chunk size to balance load across tasks.
+        // We'll use per-chunk local storage to avoid locking per improvement.
+        const size_t num_tasks = tasks.size();
         const size_t chunk_size = 1;  // Adjust chunk size based on experiments.
+        const size_t num_chunks = (num_tasks + chunk_size - 1) / chunk_size;
 
-        // Use stdexec's bulk sender to execute tasks in parallel.
+        // Prepare a vector of per-chunk improved labels.
+        std::vector<std::vector<Label *>> local_best_new(num_chunks);
+
+        // Optionally, you can also create per-chunk accumulators for operator
+        // metrics. For brevity, we'll leave operator metric updates using
+        // locks.
+
         auto bulk_sender = stdexec::bulk(
-            stdexec::just(), (tasks.size() + chunk_size - 1) / chunk_size,
-            [&best_new, &best_new_mutex, &operator_mutex, &tasks, chunk_size,
-             this](std::size_t chunk_idx) {
-                // Determine the task range for this chunk.
+            stdexec::just(), num_chunks,
+            [&tasks, chunk_size, &local_best_new, this](std::size_t chunk_idx) {
                 const size_t start_idx = chunk_idx * chunk_size;
                 const size_t end_idx =
                     std::min(start_idx + chunk_size, tasks.size());
 
-                // Process each task in the chunk.
+                // Local vector to accumulate improved labels.
+                std::vector<Label *> local_improvements;
+                local_improvements.reserve(10);
+
                 for (size_t task_idx = start_idx; task_idx < end_idx;
                      ++task_idx) {
                     const auto &[label_i, label_j, k, l] = tasks[task_idx];
                     const auto &route_i = label_i->getRoute();
                     const auto &route_j = label_j->getRoute();
 
-                    // Skip tasks with routes that are too short.
                     if (route_i.size() < 3 || route_j.size() < 3) continue;
 
-                    // Select the operator based on its weight.
+                    // Select operator based on its weight.
                     int op_idx = select_operator(rng);
 
                     // Apply the chosen operator.
@@ -641,14 +651,13 @@ class IteratedLocalSearch {
 
                     // Lambda to update a label if an improvement is found.
                     auto add_improved_label =
-                        [&](const auto &path, const auto &cost,
-                            const Label *label, int op_idx) {
+                        [&](const Path &path,
+                            const std::pair<double, double> &cost,
+                            const Label *orig_label, int op_idx) {
                             double new_cost = cost.second;
-                            double current_cost = label->cost;
-                            // Accept improvement if sufficiently better.
+                            double current_cost = orig_label->cost;
                             if (new_cost < current_cost - 1e-3) {
-                                // Update operator performance metrics under
-                                // lock.
+                                // Update operator performance metrics.
                                 {
                                     std::lock_guard<std::mutex> lock(
                                         operator_mutex);
@@ -661,30 +670,27 @@ class IteratedLocalSearch {
                                 best_new_label->addRoute(path.route);
                                 best_new_label->real_cost = cost.first;
                                 best_new_label->cost = new_cost;
-                                // Insert the new label into best_new under
-                                // lock.
-                                {
-                                    std::lock_guard<std::mutex> lock(
-                                        best_new_mutex);
-                                    best_new.push_back(best_new_label);
-                                }
+                                local_improvements.push_back(best_new_label);
                             }
                         };
 
-                    // Check feasibility and update improvements.
-                    if (is_feasible(new_path_i)) {
+                    if (is_feasible(new_path_i))
                         add_improved_label(new_path_i, cost_i, label_i, op_idx);
-                    }
-                    if (is_feasible(new_path_j)) {
+                    if (is_feasible(new_path_j))
                         add_improved_label(new_path_j, cost_j, label_j, op_idx);
-                    }
                 }
+                // Save the local improvements for this chunk.
+                local_best_new[chunk_idx] = std::move(local_improvements);
             });
 
-        // Submit the bulk work to the thread pool scheduler and wait for
-        // completion.
+        // Submit work and wait for completion.
         auto work = stdexec::starts_on(sched, bulk_sender);
         stdexec::sync_wait(std::move(work));
+
+        // Merge local improvements into the global best_new vector.
+        for (auto &vec : local_best_new) {
+            best_new.insert(best_new.end(), vec.begin(), vec.end());
+        }
 
         // Update the operator weights based on the collected performance.
         update_operator_weights();
@@ -723,50 +729,54 @@ class IteratedLocalSearch {
         double current_time = 0.0;
         double current_capacity = 0.0;
         const double total_capacity = instance.q;
+        const size_t route_size = route.route.size();
 
         // Ensure the route starts at depot 0 and ends at depot N_SIZE - 1.
-        if (route.route.front() != 0 || route.route.back() != N_SIZE - 1) {
+        if (route_size < 2 || route.route.front() != 0 ||
+            route.route.back() != N_SIZE - 1) {
             return false;
         }
 
         // Prepare a thread-local bitset for tracking visited nodes.
-        const size_t n_segments = N_SIZE / 64 + 1;
+        const size_t n_segments = (N_SIZE >> 6) + 1;  // Same as N_SIZE/64 + 1.
         static thread_local std::vector<uint64_t> visited(n_segments, 0);
         std::fill(visited.begin(), visited.end(), 0);
 
-        // Iterate through the route to check time windows, capacity, and
-        // visits.
-        for (size_t i = 0; i < route.route.size() - 1; ++i) {
-            int source_id = route.route[i];
-            int target_id = route.route[i + 1];
+        // Cache pointer to the route data to avoid repeated bounds checking.
+        const uint16_t *const rdata = route.route.data();
+
+        // Iterate through the route.
+        for (size_t i = 0; i < route_size - 1; ++i) {
+            const int source_id = rdata[i];
+            const int target_id = rdata[i + 1];
 
             // Determine the bitset segment and position for the source node.
-            size_t segment = source_id >> 6;
-            size_t bit_position = source_id & 63;
+            const size_t segment = source_id >> 6;
+            const size_t bit_position = source_id & 63;
 
             // Check if the source node has already been visited.
             if (visited[segment] & (1ULL << bit_position)) {
                 return false;
             }
-
             // Mark the source node as visited.
             visited[segment] |= (1ULL << bit_position);
 
+            // Cache node references.
             const auto &source = nodes[source_id];
             const auto &target = nodes[target_id];
 
             // Compute travel time and arrival time.
-            double travel_time =
+            const double travel_time =
                 source.duration + instance.getcij(source_id, target_id);
-            double arrival_time = std::max(static_cast<double>(target.lb[0]),
-                                           current_time + travel_time);
+            const double arrival_time = std::max(
+                static_cast<double>(target.lb[0]), current_time + travel_time);
 
             // Check the time window for the target node.
             if (arrival_time > target.ub[0]) {
                 return false;
             }
 
-            // Update time and capacity.
+            // Update current time and capacity.
             current_time = arrival_time;
             current_capacity += source.demand;
             if (current_capacity > total_capacity) {
@@ -777,77 +787,32 @@ class IteratedLocalSearch {
     }
 
     std::pair<double, double> compute_cost(const std::vector<uint16_t> &route) {
-        double cost = 0;
-        double red_cost = 0;
+        const size_t n = route.size();
+        if (n < 2) return {0.0, 0.0};
 
-        auto &cutter = cut_storage;  // Access the cut storage manager
-        auto &SRCDuals =
-            cutter->SRCDuals;  // Access the dual values for the SRC cuts
-        auto theSize = SRCDuals.size();
-        SRC_MODE_BLOCK(std::vector<int> SRCmap; SRCmap.resize(theSize, 0.0);)
+        double cost = 0.0;
+        double red_cost = 0.0;
+        const uint16_t *const rdata = route.data();
 
-        for (size_t i = 0; i < route.size() - 1; ++i) {
-            auto travel_cost = instance.getcij(route[i], route[i + 1]);
-            auto node = route[i];
-            cost += travel_cost;
-            // If the reduced cost should be based on travel cost minus
-            // node-specific costs, we subtract that here
-            red_cost += travel_cost - nodes[route[i]].cost;
+        for (size_t i = 0; i < n - 1; ++i) {
+            // Cache current and next route entries.
+            const uint16_t cur = rdata[i];
+            const uint16_t nxt = rdata[i + 1];
 
-            //     SRC_MODE_BLOCK(
-            //         const size_t segment =
-            //             node >> 6;  // Determine the segment in the bitmap
-            //         const size_t bit_position =
-            //             node & 63;  // Determine the bit position in the
-            //             segment
+            // Compute travel cost between the current and next node.
+            const double travel = instance.getcij(cur, nxt);
 
-            //         const uint64_t bit_mask =
-            //             1ULL << bit_position;  // Precompute bit shift for
-            //             the
-            //                                    // node's position
-            //         for (size_t idx = 0; idx < theSize; ++idx) {
-            //             if (SRCDuals[idx] > -1e-3) {
-            //                 continue;
-            //             }  // Skip non-SRC cuts
+            // Add travel cost.
+            cost += travel;
 
-            //             const auto &cut = cutter->get_cut(
-            //                 idx);  // Use indexed access instead of iterator
-            //             const auto &baseSet = cut.baseSet;
-            //             const auto &baseSetorder = cut.baseSetOrder;
-            //             const auto &neighbors = cut.neighbors;
-            //             const auto &multipliers = cut.p;
-
-            //             // Apply SRC logic: Update the SRC map based on
-            //             neighbors
-            //             // and base set
-            //             const bool bitIsSet = neighbors[segment] & bit_mask;
-            //             auto &src_map_value =
-            //                 SRCmap[idx];  // Use reference to avoid multiple
-            //                               // accesses
-            //             if (!bitIsSet) {
-            //                 src_map_value = 0.0;  // Reset the SRC map value
-            //                 continue;
-            //             }
-
-            //             const bool bitIsSet2 = baseSet[segment] & bit_mask;
-
-            //             if (bitIsSet2) {
-            //                 auto &den = multipliers.den;
-            //                 src_map_value +=
-            //                 multipliers.num[baseSetorder[node]]; if
-            //                 (src_map_value >= den) {
-            //                     red_cost -=
-            //                         SRCDuals[idx];  // Apply the SRC dual
-            //                         value if
-            //                                         // threshold is exceeded
-            //                     src_map_value -= den;  // Reset the SRC map
-            //                     value
-            //                 }
-            //             }
-            //         })
+            // Subtract node-specific cost from travel cost to compute reduced
+            // cost.
+            red_cost += travel - nodes[cur].cost;
         }
+
         return {cost, red_cost};
     }
+
     // Task queue and synchronization primitives
     TaskQueue<Label *, IteratedLocalSearch> task_queue;
     std::mutex queue_mutex;

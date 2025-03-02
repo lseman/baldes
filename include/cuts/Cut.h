@@ -14,12 +14,15 @@
 #include "Common.h"
 #include "Definitions.h"
 #include "Label.h"
+#include "Path.h"
+#include "Serializer.h"
 #include "miphandler/Constraint.h"
-
 struct SRCPermutation {
     std::vector<int> num;
     std::vector<double> frac;
     int den;
+
+    REFLECT(num, den, frac);
     // Default constructor
     SRCPermutation() = default;
 
@@ -99,6 +102,9 @@ struct Cut {
     }
     double rhs = 1;
     int id = -1;
+
+    REFLECT(baseSet, neighbors, coefficients, p, baseSetOrder, id)
+
     bool added = false;
     bool updated = false;
     CutType type = CutType::ThreeRow;
@@ -213,10 +219,15 @@ class CutStorage {
             // Iterate over each segment.
             for (size_t segment = 0; segment < n_segments; ++segment) {
                 // Determine the number of bits to process in this segment.
-                size_t bit_limit =
+                const size_t bit_limit =
                     (segment == n_segments - 1 && (N_SIZE % 64) != 0)
                         ? (N_SIZE % 64)
                         : 64;
+
+                // Cache references to the current segment's mask vectors.
+                auto &nbr_mask_vec = neighbor_masks[segment];
+                auto &base_mask_vec = base_set_masks[segment];
+                auto &valid_mask_vec = valid_cut_masks[segment];
 
                 // Process each bit position within the segment.
                 for (size_t bit_pos = 0; bit_pos < bit_limit; ++bit_pos) {
@@ -224,24 +235,20 @@ class CutStorage {
                     uint64_t neighbor_bits = 0;
                     uint64_t base_bits = 0;
 
-                    // For each active cut, check if the bit is set in the
-                    // neighbor or base set.
+                    // Loop over each active cut.
                     for (size_t cut_idx = 0; cut_idx < n_cuts; ++cut_idx) {
+                        // Cache pointer to current cut.
                         const auto &cut = *active_cuts[cut_idx].cut_ptr;
-                        if (cut.neighbors[segment] & bit_mask) {
+                        if (cut.neighbors[segment] & bit_mask)
                             neighbor_bits |= cut_bit_masks[cut_idx];
-                        }
-                        if (cut.baseSet[segment] & bit_mask) {
+                        if (cut.baseSet[segment] & bit_mask)
                             base_bits |= cut_bit_masks[cut_idx];
-                        }
                     }
 
-                    // Apply the cut limit mask and store the computed values.
-                    neighbor_masks[segment][bit_pos] =
-                        neighbor_bits & cut_limit_mask;
-                    base_set_masks[segment][bit_pos] =
-                        base_bits & cut_limit_mask;
-                    valid_cut_masks[segment][bit_pos] =
+                    // Apply the cut limit mask and store computed values.
+                    nbr_mask_vec[bit_pos] = neighbor_bits & cut_limit_mask;
+                    base_mask_vec[bit_pos] = base_bits & cut_limit_mask;
+                    valid_mask_vec[bit_pos] =
                         (neighbor_bits & base_bits) & cut_limit_mask;
                 }
             }
@@ -390,43 +397,39 @@ class CutStorage {
     // Compute limited memory coefficients for a given set of cuts
     std::vector<double> computeLimitedMemoryCoefficients(
         const std::vector<uint16_t> &P) const {
+        const size_t P_size = P.size();
         std::vector<double> alphas;
         alphas.reserve(cuts.size());
 
-        // Process each cut in the cuts collection.
+        // Get a raw pointer to the data in P.
+        const uint16_t *P_data = P.data();
+
+        // Process each cut.
         for (const auto &cut : cuts) {
             double alpha = 0.0;
             int runningSum = 0;
-
-            // Extract constants from the current cut.
             const int denominator = cut.p.den;
-            const auto &neighborsBitset =
-                cut.neighbors;  // Bitset: neighbors indicator.
-            const auto &baseSetBitset =
-                cut.baseSet;              // Bitset: base set indicator.
-            const auto &pValues = cut.p;  // Contains numerator vector (p.num).
-            const auto &baseSetOrder =
-                cut.baseSetOrder;  // Mapping from node id to its order.
+            // Cache pointers to the bitset arrays.
+            const uint64_t *neighborsBitset = cut.neighbors.data();
+            const uint64_t *baseSetBitset = cut.baseSet.data();
+            const auto &pValues = cut.p.num;
+            const auto &baseSetOrder = cut.baseSetOrder;
 
-            // Iterate through internal nodes of the route (skip first and
-            // last).
-            for (size_t j = 1; j < P.size() - 1; ++j) {
-                const int nodeId = P[j];
+            // Iterate from 1 to P_size-2 (skipping first and last).
+            for (size_t j = 1; j < P_size - 1; ++j) {
+                const int nodeId = P_data[j];
+                // Compute the word index and bit mask for nodeId.
+                const size_t word = nodeId >> 6;
+                const uint64_t bit_mask = 1ULL << (nodeId & 63);
 
-                // Bitwise check: is nodeId in the neighbor set?
-                if (!(neighborsBitset[nodeId / 64] & (1ULL << (nodeId % 64)))) {
-                    runningSum = 0;  // Reset the sum if the node is not in the
-                                     // neighbor set.
+                // If the node is not in the neighbor set, reset runningSum.
+                if (!(neighborsBitset[word] & bit_mask)) {
+                    runningSum = 0;
                 }
-                // Else, if nodeId belongs to the base set...
-                else if (baseSetBitset[nodeId / 64] & (1ULL << (nodeId % 64))) {
-                    // Determine the position of nodeId in the base set using
-                    // the order mapping.
+                // Else, if the node is in the base set.
+                else if (baseSetBitset[word] & bit_mask) {
                     const int pos = baseSetOrder[nodeId];
-                    runningSum += pValues.num[pos];
-
-                    // If running sum exceeds or equals the denominator, update
-                    // alpha.
+                    runningSum += pValues[pos];
                     if (runningSum >= denominator) {
                         runningSum -= denominator;
                         alpha += 1.0;
@@ -435,10 +438,88 @@ class CutStorage {
             }
             alphas.push_back(alpha);
         }
-
         return alphas;
     }
 
+    /**
+     * @brief Computes a unique cut key based on the provided base set and
+     * multipliers.
+     *
+     * This function generates a hash value that uniquely identifies the
+     * combination of the base set and multipliers. The base set is an array of
+     * uint64_t values, and the multipliers are a vector of double values. The
+     * order of elements in both the base set and multipliers is preserved
+     * during hashing.
+     *
+     */
+    std::size_t compute_cut_key(const std::array<uint64_t, num_words> &baseSet,
+                                const std::vector<int> &perm_num,
+                                const int perm_den) {
+        XXH3_state_t *state = XXH3_createState();
+        assert(state != nullptr);
+        XXH3_64bits_reset(state);
+
+        // Hash baseSet (array of uint64_t)
+        XXH3_64bits_update(state, baseSet.data(),
+                           baseSet.size() * sizeof(uint64_t));
+        // Hash perm_num
+        XXH3_64bits_update(state, perm_num.data(),
+                           perm_num.size() * sizeof(int));
+        // Hash perm_den
+        XXH3_64bits_update(state, &perm_den, sizeof(int));
+
+        std::size_t cut_key = XXH3_64bits_digest(state);
+        XXH3_freeState(state);
+        return cut_key;
+    }
+
+    // Compute coefficients for a single cut given a vector of paths
+    std::vector<double> loadCoefficients(const std::vector<Path> &allPaths,
+                                         Cut &cut) {
+        std::vector<double> coefficients;
+        coefficients.assign(allPaths.size(), 0.0);
+        for (auto idx = 0; idx < allPaths.size(); ++idx) {
+            const auto &clients = allPaths[idx].route;
+            const size_t P_size = clients.size();
+            const uint16_t *P_data = clients.data();
+            double alpha = 0.0;
+            int runningSum = 0;
+            const int denominator = cut.p.den;
+            // Cache pointers to the bitset arrays.
+            const uint64_t *neighborsBitset = cut.neighbors.data();
+            const uint64_t *baseSetBitset = cut.baseSet.data();
+            const auto &pValues = cut.p.num;
+            const auto &baseSetOrder = cut.baseSetOrder;
+
+            // Iterate from 1 to P_size-2 (skipping first and last).
+            for (size_t j = 1; j < P_size - 1; ++j) {
+                const int nodeId = P_data[j];
+                // Compute the word index and bit mask for nodeId.
+                const size_t word = nodeId >> 6;
+                const uint64_t bit_mask = 1ULL << (nodeId & 63);
+
+                // If the node is not in the neighbor set, reset runningSum.
+                if (!(neighborsBitset[word] & bit_mask)) {
+                    runningSum = 0;
+                }
+                // Else, if the node is in the base set.
+                else if (baseSetBitset[word] & bit_mask) {
+                    const int pos = baseSetOrder[nodeId];
+                    runningSum += pValues[pos];
+                    if (runningSum >= denominator) {
+                        runningSum -= denominator;
+                        alpha += 1.0;
+                    }
+                }
+            }
+            coefficients[idx] = alpha;
+        }
+
+        // adjust cut stuff
+        // cut.key = compute_cut_key(cut.baseSet, cut.p.num, cut.p.den);
+        // cutMaster_to_cut_map[cut.key] = cut.id;
+        return coefficients;
+    }
     // Generate a cut key
     std::size_t generateCutKey(const int &cutMaster,
                                const std::vector<bool> &baseSetStr) const {
@@ -449,26 +530,28 @@ class CutStorage {
         return key;
     }
     std::vector<double> SRCDuals;  // Dual values for SRC
+    ankerl::unordered_dense::map<std::size_t, int>
+        cutMaster_to_cut_map;  // Map from cut key to cut index
 
    private:
     std::vector<Cut> cuts;  // Storage for cuts
-    ankerl::unordered_dense::map<std::size_t, int>
-        cutMaster_to_cut_map;  // Map from cut key to cut index
+
     ankerl::unordered_dense::map<std::size_t, std::vector<int>>
         indexCuts;  // Additional index for cuts (if needed)
     std::vector<ActiveCutInfo> active_cuts;  // Cuts with positive duals
 
     void updateActiveCuts() {
-        // Clear existing active cuts and pre-allocate memory based on the total
-        // number of cuts.
+        // Clear existing active cuts and pre-allocate memory based on
+        // the total number of cuts.
         active_cuts.clear();
         active_cuts.reserve(cuts.size());
 
-        // Iterate through all cuts and add those with significant dual values.
+        // Iterate through all cuts and add those with significant dual
+        // values.
         for (size_t i = 0; i < cuts.size(); ++i) {
             if (i < SRCDuals.size() && std::abs(SRCDuals[i]) > 0) {
-                // Emplace active cut with its index, pointer to the cut, dual
-                // value, and type.
+                // Emplace active cut with its index, pointer to the
+                // cut, dual value, and type.
                 active_cuts.emplace_back(i, &cuts[i], SRCDuals[i],
                                          cuts[i].type);
             }
@@ -479,6 +562,14 @@ class CutStorage {
     }
 
    public:
+    REFLECT(cuts)
+
+    void printCuts() {
+        for (auto &cut : cuts) {
+            cut.printCut();
+        }
+    }
+
     void updateRedCost(std::vector<Label *> labels) {
         const auto active_cuts = getActiveCuts();
 
@@ -520,7 +611,8 @@ class CutStorage {
                     const int cut_idx = __builtin_ctzll(to_clear);
                     if (cut_idx >= n_cuts) {
                         fmt::print(
-                            "Warning: Invalid clear_idx {} >= n_cuts {}\n",
+                            "Warning: Invalid clear_idx {} >= n_cuts "
+                            "{}\n",
                             cut_idx, n_cuts);
                         break;
                     }

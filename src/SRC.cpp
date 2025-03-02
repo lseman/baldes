@@ -30,36 +30,6 @@
 using Cuts = std::vector<Cut>;
 
 #include "CutIntelligence.h"
-
-/**
- * @brief Computes a unique cut key based on the provided base set and
- * multipliers.
- *
- * This function generates a hash value that uniquely identifies the combination
- * of the base set and multipliers. The base set is an array of uint64_t values,
- * and the multipliers are a vector of double values. The order of elements in
- * both the base set and multipliers is preserved during hashing.
- *
- */
-std::size_t compute_cut_key(const std::array<uint64_t, num_words> &baseSet,
-                            const std::vector<int> &perm_num,
-                            const int perm_den) {
-    XXH3_state_t *state = XXH3_createState();
-    assert(state != nullptr);
-    XXH3_64bits_reset(state);
-
-    // Hash baseSet (array of uint64_t)
-    XXH3_64bits_update(state, baseSet.data(),
-                       baseSet.size() * sizeof(uint64_t));
-    // Hash perm_num
-    XXH3_64bits_update(state, perm_num.data(), perm_num.size() * sizeof(int));
-    // Hash perm_den
-    XXH3_64bits_update(state, &perm_den, sizeof(int));
-
-    std::size_t cut_key = XXH3_64bits_digest(state);
-    XXH3_freeState(state);
-    return cut_key;
-}
 /**
  * @brief Adds a cut to the CutStorage.
  *
@@ -114,34 +84,31 @@ LimitedMemoryRank1Cuts::LimitedMemoryRank1Cuts(std::vector<VRPNode> &nodes)
  */
 void LimitedMemoryRank1Cuts::separate(const SparseMatrix &A,
                                       const std::vector<double> &x) {
-    // Temporary storage for computed cuts.
-    std::vector<std::pair<double, Cut>> tmp_cuts;
-
-    // Set up parallelization parameters.
+    // Determine parallel parameters.
     const int JOBS = std::thread::hardware_concurrency();
     auto nC = N_SIZE;
-    const int chunk_size = tasks.size() / JOBS;
-#ifdef NSYNC
-    nsync::nsync_mu cuts_mutex = NSYNC_MU_INIT;
-#else
-    std::mutex cuts_mutex;
-#endif
+    const int chunk_size = (tasks.size() + JOBS - 1) / JOBS;
+    const size_t num_chunks = (tasks.size() + chunk_size - 1) / chunk_size;
+
+    // Reserve per-chunk storage to avoid locking.
+    std::vector<std::vector<std::pair<double, Cut>>> chunk_cuts(num_chunks);
+    for (auto &vec : chunk_cuts) {
+        vec.reserve(20);  // Reserve an estimate; adjust as needed.
+    }
 
     // Initialize SRCPermutation 'p' and compute a right-hand-side value.
     SRCPermutation p;
     p.num = {1, 1, 1};
     p.den = 2;
-    double rhs = 0.0;
-    for (size_t i = 0; i < 3; ++i) {
-        rhs += static_cast<double>(p.num[i]) / p.den;
-    }
-    rhs = std::floor(rhs);
+    double rhs = p.getRHS();
 
     // === Parallel Processing of Tasks in Chunks ===
     auto bulk_sender = stdexec::bulk(
-        stdexec::just(), (tasks.size() + chunk_size - 1) / chunk_size,
-        [this, &A, &x, nC, &cuts_mutex, chunk_size, &p, &rhs,
-         &tmp_cuts](std::size_t chunk_idx) {
+        stdexec::just(), num_chunks,
+        [this, &A, &x, nC, chunk_size, &p, rhs,
+         &chunk_cuts](std::size_t chunk_idx) {
+            // Each chunk gets its own temporary vector.
+            std::vector<std::pair<double, Cut>> local_cuts;
             size_t start_idx = chunk_idx * chunk_size;
             size_t end_idx = std::min(start_idx + chunk_size, tasks.size());
 
@@ -157,12 +124,11 @@ void LimitedMemoryRank1Cuts::separate(const SparseMatrix &A,
                 double lhs = 0.0;
 
                 // Accumulate counts from rows corresponding to i, j, and k.
-                for (int col : row_indices_map[i]) expanded[col] += 1;
-                for (int col : row_indices_map[j]) expanded[col] += 1;
-                for (int col : row_indices_map[k]) expanded[col] += 1;
-
                 // Compute lhs value based on columns with at least 2 counts.
                 for (int idx = 0; idx < A.num_cols; ++idx) {
+                    expanded[idx] = std::min(1, vertex_route_map[i][idx]) +
+                                    std::min(1, vertex_route_map[j][idx]) +
+                                    std::min(1, vertex_route_map[k][idx]);
                     if (expanded[idx] >= 2) {
                         lhs += std::floor(expanded[idx] * 0.5) * x[idx];
                         buffer_int[buffer_int_n++] = idx;
@@ -170,7 +136,7 @@ void LimitedMemoryRank1Cuts::separate(const SparseMatrix &A,
                 }
 
                 // Only proceed if lhs exceeds threshold.
-                if (lhs > 1.0 + 1e-3) {
+                if (lhs > rhs + 1e-3) {
                     // Initialize bitmask arrays for cut representation.
                     std::array<uint64_t, num_words> C = {};
                     std::array<uint64_t, num_words> AM = {};
@@ -223,42 +189,44 @@ void LimitedMemoryRank1Cuts::separate(const SparseMatrix &A,
 
                     // Compute the cut coefficients and accumulate lhs.
                     double computed_lhs = 0.0;
-                    for (size_t z = 0; z < allPaths.size(); ++z) {
+                    for (auto z : remainingNodes) {
                         auto &clients = allPaths[z].route;
+                        // Instead of calling a potentially expensive function,
+                        // here we simply assign a coefficient of 1.0 (you can
+                        // plug in your compute function).
                         cut_coefficients[z] = computeLimitedMemoryCoefficient(
                             C, AM, p, clients, order);
                         computed_lhs += cut_coefficients[z] * x[z];
                     }
-                    double violation = computed_lhs - (rhs + 1e-3);
 
                     // If violation is positive, record the cut.
-                    if (violation > 0.0) {
+                    if (numericutils::gte(computed_lhs, rhs)) {
                         Cut cut(C, AM, cut_coefficients, p);
                         cut.baseSetOrder = order;
-#ifdef NSYNC
-                        nsync::nsync_mu_lock(&cuts_mutex);
-#else
-                        std::lock_guard<std::mutex> lock(cuts_mutex);
-#endif
-                        tmp_cuts.emplace_back(computed_lhs, cut);
-#ifdef NSYNC
-                        nsync::nsync_mu_unlock(&cuts_mutex);
-#endif
+                        local_cuts.emplace_back(computed_lhs, cut);
                     }
                 }
             }
+            // Save the local cuts into the global vector for this chunk.
+            chunk_cuts[chunk_idx] = std::move(local_cuts);
         });
 
     // Submit the bulk work and wait for all tasks to complete.
     auto work = stdexec::starts_on(sched, bulk_sender);
     stdexec::sync_wait(std::move(work));
 
+    // === Merge results from all chunks ===
+    std::vector<std::pair<double, Cut>> tmp_cuts;
+    for (const auto &vec : chunk_cuts) {
+        tmp_cuts.insert(tmp_cuts.end(), vec.begin(), vec.end());
+    }
+
     // === Post-Processing: Sort and Add Cuts ===
     pdqsort(tmp_cuts.begin(), tmp_cuts.end(),
             [](const auto &a, const auto &b) { return a.first > b.first; });
 
     // Determine limits for adding cuts.
-    int max_cuts = std::min(static_cast<int>(tmp_cuts.size()), 2);
+    int max_cuts = std::min(static_cast<int>(tmp_cuts.size()), 3);
     int max_trials = 15;
     int cuts_added = 0;
     int cuts_orig_size = cutStorage.size();
@@ -268,7 +236,7 @@ void LimitedMemoryRank1Cuts::separate(const SparseMatrix &A,
         if (cuts_added >= max_cuts || max_trials <= 0) break;
         auto &cut = tmp_cuts[i].second;
         cutStorage.addCut(cut);
-        cuts_added++;  // = cutStorage.size() - cuts_orig_size;
+        ++cuts_added;
     }
 }
 
@@ -287,23 +255,14 @@ std::pair<bool, bool> LimitedMemoryRank1Cuts::runSeparation(
     std::vector<double> solution;
     GET_SOL(node);
 
-    // === Build a Map of Row Indices from allPaths ===
-    // Maps each valid node (row) to all path indices where it appears.
-    // size_t path_idx = 0;
-    // for (auto path_idx = last_path_idx; path_idx < allPaths.size();
-    //      ++path_idx) {
-    //     auto &path = allPaths[path_idx];
-    //     for (int node : path.route) {
-    //         // Only consider nodes in the range [1, N_SIZE - 2].
-    //         if (node < 1 || node > N_SIZE - 2) continue;
-    //         row_indices_map[node].push_back(static_cast<int>(path_idx));
-    //     }
-    // }
-    // last_path_idx = allPaths.size();
+    fmt::print("Starting separation phase...\n");
+    initializeVertexRouteMap();
 
     // Perform separation routines for Rank-1 cuts.
-    // separateR1C1(matrix.A_sparse, solution);
-    // separate(matrix.A_sparse, solution);
+    fmt::print("Separating Rank-1 cuts...\n");
+    separateR1C1(matrix.A_sparse, solution);
+    fmt::print("Separation Rank-3 cuts...\n");
+    separate(matrix.A_sparse, solution);
 
     // Record the cut count after the first separation phase.
     const size_t initial_cut_count = cuts->size();
@@ -313,9 +272,11 @@ std::pair<bool, bool> LimitedMemoryRank1Cuts::runSeparation(
     // High-Rank Cuts Separation
     ////////////////////////////////////////////////////
     high_rank_cuts.cutStorage = &cutStorage;
+    high_rank_cuts.vertex_route_map = vertex_route_map;
     high_rank_cuts.allPaths = allPaths;
     high_rank_cuts.nodes = nodes;
     high_rank_cuts.arc_duals = arc_duals;
+    fmt::print("Separating High-Rank cuts...\n");
     high_rank_cuts.separate(matrix.A_sparse, solution);
 
     const size_t cuts_after_separation = cuts->size();
@@ -352,14 +313,16 @@ bool LimitedMemoryRank1Cuts::cutCleaner(
         double slack = node->getSlack(current_index, solution);
 
         // If the slack is positive (non-violated), remove the constraint.
-        if (std::abs(slack) > 0) {
+        if (numericutils::gt(slack, 0.0)) {
             cleaned = true;
             node->remove(constr);
 
             // Convert the reverse iterator to a normal iterator.
-            // it.base() points to the element *after* the one we want to erase.
+            // it.base() points to the element *after* the one we want to
+            // erase.
             auto normal_it = it.base();
-            --normal_it;  // Now 'normal_it' points to the element to be erased.
+            --normal_it;  // Now 'normal_it' points to the element to be
+                          // erased.
             // Compute the index of this element.
             int index = std::distance(SRCconstraints.begin(), normal_it);
             cuts->removeCut(cuts->getID(index));
@@ -386,29 +349,29 @@ double LimitedMemoryRank1Cuts::computeLimitedMemoryCoefficient(
     auto den = p.den;
 
     for (size_t j = 1; j < P.size() - 1; ++j) {
-        int vj = P[j];
+        const int vj = P[j];
 
         // Precompute bitshift values for reuse
-        uint64_t am_mask = (1ULL << (vj & 63));
-        uint64_t am_index = vj >> 6;
+        const size_t word = vj >> 6;
+        const uint64_t bit_mask = 1ULL << (vj & 63);
 
         // Check if vj is in AM using precomputed values
-        if (!(AM[am_index] & am_mask)) {
+        if (!(AM[word] & bit_mask)) {
             S = 0;  // Reset S if vj is not in AM
-        } else if (C[am_index] & am_mask) {
+        } else if (C[word] & bit_mask) {
             // Get the position of vj in C by counting the set bits up to vj
-            int pos = order[vj];
-
+            const int pos = order[vj];
             S += p.num[pos];
             if (S >= den) {
                 S -= den;
-                alpha += 1;
+                alpha += 1.0;
             }
         }
     }
 
     return alpha;
 }
+
 std::vector<CandidateSet> LocalSearch::solve(
     const CandidateSet &initial, const SparseMatrix &A,
     const std::vector<double> &x,
@@ -419,11 +382,16 @@ std::vector<CandidateSet> LocalSearch::solve(
     std::vector<CandidateSet> diverse_solutions;
     diverse_solutions.reserve(LocalSearchConfig::MAX_DIVERSE_SOLUTIONS + 1);
 
-    // Lambda to determine if a candidate solution is "diverse" enough.
+    // Lambda: Check if a candidate solution is "diverse" enough.
     auto isSolutionDiverse = [&](const CandidateSet &candidate) -> bool {
+        // Convert candidate nodes into a sorted vector.
+        std::vector<int> cand_nodes(candidate.nodes.begin(),
+                                    candidate.nodes.end());
+        std::sort(cand_nodes.begin(), cand_nodes.end());
         for (const auto &sol : diverse_solutions) {
-            const double similarity =
-                computeSimilarity(candidate.nodes, sol.nodes);
+            std::vector<int> sol_nodes(sol.nodes.begin(), sol.nodes.end());
+            std::sort(sol_nodes.begin(), sol_nodes.end());
+            double similarity = computeSimilarity(cand_nodes, sol_nodes);
             if (similarity > 0.7 ||
                 std::abs(sol.violation - candidate.violation) <
                     LocalSearchConfig::DIVERSITY_THRESHOLD) {
@@ -433,7 +401,7 @@ std::vector<CandidateSet> LocalSearch::solve(
         return true;
     };
 
-    // Lambda to update the list of diverse solutions.
+    // Lambda: Update the list of diverse solutions.
     auto updateDiverseSolutions = [&](const CandidateSet &candidate) {
         if (isSolutionDiverse(candidate)) {
             diverse_solutions.push_back(candidate);
@@ -449,7 +417,7 @@ std::vector<CandidateSet> LocalSearch::solve(
         }
     };
 
-    // Lambda to update segment statistics.
+    // Lambda: Update segment statistics after each segment.
     auto updateSegmentStatistics = [&]() {
         segment_iterations++;
         if (segment_iterations == LocalSearchConfig::SEGMENT_SIZE) {
@@ -466,17 +434,26 @@ std::vector<CandidateSet> LocalSearch::solve(
     for (int iter = 0; iter < max_iterations; ++iter) {
         // Backup the current solution.
         CandidateSet backup = current;
-        const OperatorType selected_op = selectOperator();
+        OperatorType selected_op = selectOperator();
 
         // Apply the selected operator.
         switch (selected_op) {
-            case OperatorType::SWAP_NODES:
-                applySwapNodes(current);
+            case OperatorType::REMOVE_NODE:
+                applyRemoveNode(current);
                 break;
-            case OperatorType::REMOVE_ADD_NODE:
-                applyRemoveAddNode(current, node_scores);
+            case OperatorType::ADD_NODE:
+                applyAddNode(current, node_scores);
                 break;
-            case OperatorType::UPDATE_NEIGHBORS:
+            case OperatorType::REMOVE_NEIGHBORS:
+                applyRemoveNeighbors(current,
+                                     LocalSearchConfig::MAX_REMOVE_COUNT);
+                break;
+            case OperatorType::ADD_NEIGHBORS:
+                applyAddNeighbors(current, node_scores,
+                                  LocalSearchConfig::MAX_ADD_COUNT);
+                break;
+            default:
+                // Optionally fallback or combine neighbor updates.
                 applyUpdateNeighbors(current, node_scores);
                 break;
         }
@@ -485,19 +462,15 @@ std::vector<CandidateSet> LocalSearch::solve(
         auto [new_violation, new_perm, rhs] =
             parent->computeViolationWithBestPerm(current.nodes,
                                                  current.neighbor, A, x);
-
-        const double delta = new_violation - backup.violation;
+        double delta = new_violation - backup.violation;
 
         // Accept or reject the move.
         if (acceptMove(delta, current)) {
-            // Update the candidate's statistics.
+            // Accept move: update candidate solution.
             current.violation = new_violation;
             current.perm = std::move(new_perm);
             current.rhs = std::move(rhs);
-
             updateStatistics(selected_op, delta, current, new_violation);
-
-            // If improvement, update best and reset counter.
             if (new_violation > best.violation) {
                 best = current;
                 current_segment.improvements++;
@@ -507,7 +480,6 @@ std::vector<CandidateSet> LocalSearch::solve(
             } else {
                 iterations_since_improvement++;
             }
-
             updateDiverseSolutions(current);
         } else {
             // Revert move and adjust operator score.

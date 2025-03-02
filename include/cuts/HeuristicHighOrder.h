@@ -41,16 +41,26 @@ class HighRankCuts {
     exec::static_thread_pool::scheduler sched = pool.get_scheduler();
 
     // Add vertex-route mapping
-    std::vector<std::vector<int>> vertex_route_map;
     std::map<std::vector<int>, double> candidate_cache;
-
+    int last_path_idx = 0;
     void initializeVertexRouteMap() {
         // Initialize the vertex_route_map with N_SIZE rows and allPaths.size()
         // columns, all set to 0.
-        vertex_route_map.assign(N_SIZE, std::vector<int>(allPaths.size(), 0));
+        if (last_path_idx == 0) {
+            vertex_route_map.assign(N_SIZE,
+                                    std::vector<int>(allPaths.size(), 0));
+        } else {
+            // assign 0 from last_path_idx to allPaths.size()
+            for (size_t i = 0; i < N_SIZE; ++i) {
+                vertex_route_map[i].resize(allPaths.size());
+                for (size_t j = last_path_idx; j < allPaths.size(); ++j) {
+                    vertex_route_map[i][j] = 0;
+                }
+            }
+        }
 
         // Populate the map: for each path, count the appearance of each vertex.
-        for (size_t r = 0; r < allPaths.size(); ++r) {
+        for (size_t r = last_path_idx; r < allPaths.size(); ++r) {
             for (const auto &vertex : allPaths[r].route) {
                 // Only consider vertices that are not the depot (assumed at
                 // indices 0 and N_SIZE-1).
@@ -59,6 +69,7 @@ class HighRankCuts {
                 }
             }
         }
+        last_path_idx = allPaths.size();
     }
 
     ////////////////////////////////////////////////////////////////////////////
@@ -83,244 +94,232 @@ class HighRankCuts {
                                  CandidateSetCompare>
     generateCandidates(const std::vector<std::vector<int>> &scores,
                        const SparseMatrix &A, const std::vector<double> &x) {
-        // Thread-local storage to avoid contention.
+        // Thread-local data for each thread.
         struct ThreadLocalData {
             ankerl::unordered_dense::set<CandidateSet, CandidateSetHasher,
                                          CandidateSetCompare>
                 candidates;
-            ankerl::unordered_dense::map<std::vector<int>, double>
-                candidate_cache;
-            ThreadLocalData() {
-                // Pre-reserve to reduce rehashing.
+            ankerl::unordered_dense::map<CandidateSet, double> candidate_cache;
+            // Precomputed sum for each vertex (if applicable) to avoid repeated
+            // accumulation.
+            std::vector<int> precomputedScoreSums;
+            ThreadLocalData(size_t nVertices) {
                 candidates.reserve(1000);
                 candidate_cache.reserve(1000);
+                precomputedScoreSums.resize(nVertices, 0);
             }
         };
 
-        // Get the number of hardware threads.
-        const int JOBS = std::thread::hardware_concurrency();
-        // Create one ThreadLocalData per hardware thread.
-        std::vector<ThreadLocalData> threadData(JOBS);
+        const size_t numThreads = std::thread::hardware_concurrency();
+        // For precomputed score sums (assuming scores size equals N_SIZE).
+        std::vector<int> globalScoreSums;
+        globalScoreSums.reserve(scores.size());
+        for (const auto &row : scores) {
+            globalScoreSums.push_back(
+                std::accumulate(row.begin(), row.end(), 0));
+        }
 
-        // Final candidate set to be returned.
+        // Create thread-local storage and initialize each with precomputed
+        // sums.
+        std::vector<ThreadLocalData> threadData;
+        for (size_t t = 0; t < numThreads; ++t) {
+            threadData.emplace_back(scores.size());
+            threadData.back().precomputedScoreSums = globalScoreSums;
+        }
+
         ankerl::unordered_dense::set<CandidateSet, CandidateSetHasher,
                                      CandidateSetCompare>
             finalCandidates;
+        finalCandidates.reserve(numThreads * 1000);
 
-        // Bulk sender: parallelize over vertices (exclude first and last).
-        auto bulk_sender =
-            stdexec::bulk(stdexec::just(), (N_SIZE - 2), [&](std::size_t i) {
-                // Skip if vertex is first or last.
-                if (i == 0 || i == N_SIZE - 1) return;
+        // Use a lambda that accepts an explicit thread index.
+        auto process_vertex = [&](std::size_t i, size_t threadID) {
+            // Skip first and last vertices.
+            if (i == 0 || i == N_SIZE - 1) return;
+            auto &localData = threadData[threadID % numThreads];
 
-                // Obtain a thread-local index using a thread_local atomic
-                // counter.
-                thread_local size_t threadIndex = []() -> size_t {
-                    static std::atomic<size_t> counter{0};
-                    return counter.fetch_add(1);
-                }();
-                auto &localData = threadData[threadIndex % JOBS];
+            // Build a lookup for heuristic memory from scores[i].
+            const auto &heuristic_memory = scores[i];
+            ankerl::unordered_dense::set<int> heuristic_memory_lookup(
+                heuristic_memory.begin(), heuristic_memory.end());
 
-                // Build a lookup (set) for the heuristic memory of vertex i.
-                const auto &heuristic_memory = scores[i];
-                ankerl::unordered_dense::set<int> heuristic_memory_lookup(
-                    heuristic_memory.begin(), heuristic_memory.end());
+            // Build the working set from routes that contain vertex i.
+            ankerl::unordered_dense::set<int> working_set;
+            working_set.reserve(
+                std::min<size_t>(MAX_WORKING_SET_SIZE, allPaths.size()));
+            for (size_t r = 0; r < allPaths.size(); ++r) {
+                if (vertex_route_map[i][r] <= 0) continue;
+                for (const auto &v : allPaths[r].route) {
+                    if (v > 0 && v < N_SIZE - 1 &&
+                        heuristic_memory_lookup.contains(v))
+                        working_set.insert(v);
+                }
+            }
 
-                // Build the working set from routes that contain vertex i.
-                std::vector<int> working_set;
-                working_set.reserve(
-                    std::min(static_cast<size_t>(MAX_WORKING_SET_SIZE),
-                             allPaths.size()));
-                for (size_t r = 0; r < allPaths.size(); ++r) {
-                    // vertex_route_map[i][r] indicates if route r contains
-                    // vertex i.
-                    if (vertex_route_map[i][r] <= 0) continue;
-                    for (const auto &v : allPaths[r].route) {
-                        // Consider only valid vertices that are in heuristic
-                        // memory.
-                        if (v > 0 && v < N_SIZE - 1 &&
-                            heuristic_memory_lookup.count(v)) {
-                            working_set.push_back(v);
+            // Limit working_set size using a heuristic if necessary.
+            if (working_set.size() > MAX_WORKING_SET_SIZE) {
+                std::vector<int> working_set_vec(working_set.begin(),
+                                                 working_set.end());
+                std::nth_element(working_set_vec.begin(),
+                                 working_set_vec.begin() + MAX_WORKING_SET_SIZE,
+                                 working_set_vec.end(), [&](int a, int b) {
+                                     return localData.precomputedScoreSums[a] <
+                                            localData.precomputedScoreSums[b];
+                                 });
+                working_set_vec.resize(MAX_WORKING_SET_SIZE);
+                working_set = ankerl::unordered_dense::set<int>(
+                    working_set_vec.begin(), working_set_vec.end());
+            }
+
+            // Helper lambda to process a candidate set.
+            auto process_candidate =
+                [&](const ankerl::unordered_dense::set<int> &candidate_nodes) {
+                    if (candidate_nodes.size() < MIN_RANK ||
+                        candidate_nodes.size() > MAX_RANK)
+                        return false;
+                    CandidateSet temp_candidate(
+                        candidate_nodes,
+                        0.0,                    // dummy violation
+                        SRCPermutation({}, 0),  // dummy permutation
+                        heuristic_memory_lookup, 0.0);
+                    // Check cache to avoid duplicate work.
+                    auto cache_it =
+                        localData.candidate_cache.find(temp_candidate);
+                    double violation = 0.0;
+                    SRCPermutation perm({}, 0);
+                    double rhs = 0.0;
+                    if (cache_it != localData.candidate_cache.end()) {
+                        violation = cache_it->second;
+                    } else {
+                        std::tie(violation, perm, rhs) =
+                            computeViolationWithBestPerm(
+                                candidate_nodes, heuristic_memory_lookup, A, x);
+                        localData.candidate_cache.emplace(
+                            CandidateSet(candidate_nodes, violation, perm,
+                                         heuristic_memory_lookup, rhs),
+                            violation);
+                    }
+                    if (violation > 1e-3) {
+                        CandidateSet candidate_set(
+                            candidate_nodes, violation, perm,
+                            heuristic_memory_lookup, rhs);
+                        localData.candidates.emplace(std::move(candidate_set));
+                        return true;
+                    }
+                    return false;
+                };
+
+            // --- 1. Generate candidate sets for routes that do NOT contain
+            // vertex i ---
+            for (size_t r = 0; r < allPaths.size(); ++r) {
+                if (vertex_route_map[i][r] > 0)
+                    continue;  // Only process routes missing vertex i
+
+                // Start candidate set with vertex i.
+                ankerl::unordered_dense::set<int> candidate_nodes;
+                candidate_nodes.insert(static_cast<int>(i));
+                candidate_nodes.insert(working_set.begin(), working_set.end());
+
+                process_candidate(candidate_nodes);
+            }
+
+            // --- 2. Generate additional candidate sets by combining vertices
+            // ---
+            if (working_set.size() > 1) {
+                size_t combination_count = 0;
+                std::vector<int> working_set_vec(working_set.begin(),
+                                                 working_set.end());
+                // Generate combinations of size k.
+                for (size_t k = 2;
+                     k <= MAX_RANK && combination_count < MAX_COMBINATIONS;
+                     ++k) {
+                    if (k > working_set_vec.size()) break;
+                    // Initialize combination bitmask: k ones.
+                    uint32_t mask = (1u << k) - 1;
+                    while (mask < (1u << working_set_vec.size()) &&
+                           combination_count < MAX_COMBINATIONS) {
+                        ankerl::unordered_dense::set<int> candidate_nodes;
+                        candidate_nodes.insert(static_cast<int>(i));
+                        // Insert vertices corresponding to bits set in mask.
+                        for (size_t bit = 0; bit < working_set_vec.size();
+                             ++bit) {
+                            if (mask & (1u << bit))
+                                candidate_nodes.insert(working_set_vec[bit]);
                         }
+                        if (process_candidate(candidate_nodes))
+                            ++combination_count;
+
+                        // Gosper’s hack to get next combination.
+                        uint32_t c = mask & -mask;
+                        uint32_t r = mask + c;
+                        if (c == 0) break;  // safeguard against infinite loop
+                        mask = (((r ^ mask) >> 2) / c) | r;
                     }
                 }
-                // Create a vector version of heuristic_memory for later use.
-                std::vector<int> heuristic_memory_vector(
-                    heuristic_memory.begin(), heuristic_memory.end());
+            }
+        };
 
-                // Remove duplicates and sort working_set.
-                pdqsort(working_set.begin(), working_set.end());
-                working_set.erase(
-                    std::unique(working_set.begin(), working_set.end()),
-                    working_set.end());
-
-                // Limit working_set size using a heuristic based on total
-                // score.
-                if (working_set.size() > MAX_WORKING_SET_SIZE) {
-                    std::nth_element(
-                        working_set.begin(),
-                        working_set.begin() + MAX_WORKING_SET_SIZE,
-                        working_set.end(),
-                        [&scores](const int &a, const int &b) {
-                            int sum_a = std::accumulate(scores[a].begin(),
-                                                        scores[a].end(), 0);
-                            int sum_b = std::accumulate(scores[b].begin(),
-                                                        scores[b].end(), 0);
-                            return sum_a < sum_b;
-                        });
-                    working_set.resize(MAX_WORKING_SET_SIZE);
-                }
-
-                // --- Generate candidate sets based on working_set ---
-                // For each route that does NOT contain vertex i.
-                for (size_t r = 0; r < allPaths.size(); ++r) {
-                    if (vertex_route_map[i][r] > 0)
-                        continue;  // Only process routes that do NOT contain
-                                   // vertex i.
-                    // Start candidate_set with vertex i.
-                    std::vector<int> candidate_set = {static_cast<int>(i)};
-                    candidate_set.reserve(working_set.size() + 1);
-                    // Append working_set vertices.
-                    for (const auto &v : working_set) {
-                        candidate_set.push_back(v);
-                    }
-                    // Only consider candidate sets with valid size.
-                    if (candidate_set.size() >= MIN_RANK &&
-                        candidate_set.size() <= MAX_RANK) {
-                        pdqsort(candidate_set.begin(), candidate_set.end());
-                        // Check candidate cache.
-                        auto cache_it =
-                            localData.candidate_cache.find(candidate_set);
-                        if (cache_it != localData.candidate_cache.end()) {
-                            if (cache_it->second > 1e-3) {
-                                auto [violation, perm, rhs] =
-                                    computeViolationWithBestPerm(
-                                        candidate_set, heuristic_memory_vector,
-                                        A, x);
-                                localData.candidates.emplace(
-                                    candidate_set, violation, perm,
-                                    heuristic_memory_vector, rhs);
-                            }
-                        } else {
-                            auto [violation, perm, rhs] =
-                                computeViolationWithBestPerm(
-                                    candidate_set, heuristic_memory_vector, A,
-                                    x);
-                            localData.candidate_cache[candidate_set] =
-                                violation;
-                            if (violation > 1e-3) {
-                                localData.candidates.emplace(
-                                    candidate_set, violation, perm,
-                                    heuristic_memory_vector, rhs);
-                            }
-                        }
-                    }
-                }
-
-                // --- Generate additional candidate sets by combining vertices
-                // from working_set ---
-                if (working_set.size() > 1) {
-                    size_t combination_count = 0;
-                    for (size_t k = 2;
-                         k <= MAX_RANK && combination_count < MAX_COMBINATIONS;
-                         ++k) {
-                        if (k > working_set.size()) break;
-                        // Start with a bitmask with the k lowest bits set.
-                        uint32_t mask = (1u << k) - 1;
-                        while (mask < (1u << working_set.size()) &&
-                               combination_count < MAX_COMBINATIONS) {
-                            std::vector<int> candidate_set = {
-                                static_cast<int>(i)};
-                            candidate_set.reserve(k + 1);
-                            // Extract candidate vertices based on the current
-                            // bitmask.
-                            for (size_t bit = 0; bit < working_set.size();
-                                 ++bit) {
-                                if (mask & (1u << bit)) {
-                                    candidate_set.push_back(working_set[bit]);
-                                }
-                            }
-                            if (candidate_set.size() >= MIN_RANK &&
-                                candidate_set.size() <= MAX_RANK) {
-                                pdqsort(candidate_set.begin(),
-                                        candidate_set.end());
-                                auto cache_it = localData.candidate_cache.find(
-                                    candidate_set);
-                                if (cache_it !=
-                                    localData.candidate_cache.end()) {
-                                    if (cache_it->second > 1e-3) {
-                                        auto [violation, perm, rhs] =
-                                            computeViolationWithBestPerm(
-                                                candidate_set,
-                                                heuristic_memory_vector, A, x);
-                                        localData.candidates.emplace(
-                                            candidate_set, violation, perm,
-                                            heuristic_memory_vector, rhs);
-                                        combination_count++;
-                                    }
-                                } else {
-                                    auto [violation, perm, rhs] =
-                                        computeViolationWithBestPerm(
-                                            candidate_set,
-                                            heuristic_memory_vector, A, x);
-                                    localData.candidate_cache[candidate_set] =
-                                        violation;
-                                    if (violation > 1e-3) {
-                                        localData.candidates.emplace(
-                                            candidate_set, violation, perm,
-                                            heuristic_memory_vector, rhs);
-                                        combination_count++;
-                                    }
-                                }
-                            }
-                            // Generate the next combination using Gosper's
-                            // hack.
-                            uint32_t rightmost_one = mask & -mask;
-                            uint32_t next_higher_one = mask + rightmost_one;
-                            uint32_t rightmost_ones = mask ^ next_higher_one;
-                            uint32_t shifted_ones =
-                                (rightmost_ones >> 2) / rightmost_one;
-                            mask = next_higher_one | shifted_ones;
-                        }
-                    }
+        // Parallelize over vertices. Here we assign explicit thread indices.
+        std::vector<std::thread> threads;
+        std::atomic_size_t vertexIndex{1};  // starting from 1; skipping index 0
+        for (size_t t = 0; t < numThreads; ++t) {
+            threads.emplace_back([&, t]() {
+                while (true) {
+                    size_t i = vertexIndex.fetch_add(1);
+                    if (i >= N_SIZE - 1) break;
+                    process_vertex(i, t);
                 }
             });
+        }
+        for (auto &th : threads) th.join();
 
-        // Submit the bulk sender on the scheduler and wait for all tasks to
-        // complete.
-        auto work = stdexec::starts_on(sched, std::move(bulk_sender));
-        stdexec::sync_wait(std::move(work));
-
-        // Merge thread-local candidate sets into the final candidate set.
-        for (auto &data : threadData) {
+        // Merge thread-local candidate sets into finalCandidates.
+        for (const auto &data : threadData) {
             finalCandidates.insert(data.candidates.begin(),
                                    data.candidates.end());
         }
         return finalCandidates;
     }
 
-    std::vector<Permutation> getPermutations(const int RANK) const {
-        if (RANK == 3) {
-            return getPermutationsForSize3();
-        } else if (RANK == 4) {
-            return getPermutationsForSize4();
-        } else if (RANK == 5) {
-            return getPermutationsForSize5();
+    ankerl::unordered_dense::map<int, std::vector<SRCPermutation>>
+        permutations_cache;
+
+    std::vector<SRCPermutation> getPermutations(const int RANK) {
+        // check if permutations are already computed
+        if (permutations_cache.find(RANK) == permutations_cache.end()) {
+            std::throw_with_nested(std::runtime_error("Permutations for rank " +
+                                                      std::to_string(RANK) +
+                                                      " not found in cache"));
         }
-        return {};
+        return permutations_cache[RANK];
+        // return perms;
+        // if (RANK == 3) {
+        //     return getPermutationsForSize3();
+        // } else if (RANK == 4) {
+        //     return getPermutationsForSize4();
+        // } else if (RANK == 5) {
+        //     return getPermutationsForSize5();
+        // }
+        // return {};
     }
 
    public:
-    std::tuple<double, Permutation, double> computeViolationWithBestPerm(
-        const std::vector<int> &nodes, const std::vector<int> &memory,
-        const SparseMatrix &A, const std::vector<double> &x) {
+    std::vector<std::vector<int>> vertex_route_map;
+
+    std::tuple<double, SRCPermutation, double> computeViolationWithBestPerm(
+        ankerl::unordered_dense::set<int> nodes,
+        ankerl::unordered_dense::set<int> memory, const SparseMatrix &A,
+        const std::vector<double> &x) {
         static constexpr double EPSILON = 1e-3;
-        const int RANK = static_cast<int>(nodes.size());
+        // Convert nodes set to a sorted vector to allow indexed access.
+        std::vector<int> node_vec(nodes.begin(), nodes.end());
+        std::sort(node_vec.begin(), node_vec.end());
+        const int RANK = static_cast<int>(node_vec.size());
 
         // Initialize result variables.
         double best_violation = 0.0;
         double best_rhs = 0.0;
-        const Permutation *best_perm = nullptr;
+        const SRCPermutation *best_perm = nullptr;
 
         // Initialize bit arrays for efficient set operations.
         std::array<uint64_t, num_words>
@@ -334,7 +333,7 @@ class HighRankCuts {
 
         // Populate candidate_bits and node_order based on candidate nodes.
         for (int i = 0; i < RANK; ++i) {
-            const int node = nodes[i];
+            const int node = node_vec[i];
             const int word_idx = node / 64;
             const uint64_t bit_mask = bit_mask_lookup[node % 64];
 
@@ -359,12 +358,7 @@ class HighRankCuts {
         // Evaluate each permutation.
         for (const auto &perm : permutations) {
             // Compute the RHS value from the permutation.
-            double rhs = 0.0;
-            for (int i = 0; i < RANK; ++i) {
-                rhs += static_cast<double>(perm.num[i]) / perm.den;
-            }
-            rhs = std::floor(rhs);
-
+            double rhs = perm.getRHS();
             // Create an SRCPermutation from the current permutation.
             const SRCPermutation src_perm{perm.num, perm.den};
 
@@ -377,14 +371,14 @@ class HighRankCuts {
                 const double x_val = x[path_idx];
 
                 // If the path's x value is effectively zero, skip computation.
-                if (std::abs(x_val) < std::numeric_limits<double>::epsilon()) {
+                if (numericutils::isZero(x_val)) {
                     cut_coefficients.push_back(0.0);
                     continue;
                 }
 
-                // Compute the coefficient using the candidate bits, augmented
-                // memory, current permutation, route from the path, and the
-                // node ordering.
+                // Compute the coefficient using candidate_bits,
+                // augmented_memory_bits, current permutation, the route from
+                // the path, and the node ordering.
                 const double coeff = computeLimitedMemoryCoefficient(
                     candidate_bits, augmented_memory_bits, src_perm,
                     allPaths[path_idx].route, node_order);
@@ -404,7 +398,7 @@ class HighRankCuts {
 
         // Return the best violation, corresponding permutation (or default if
         // none), and best rhs.
-        return {best_violation, best_perm ? *best_perm : Permutation({}, 0),
+        return {best_violation, best_perm ? *best_perm : SRCPermutation({}, 0),
                 best_rhs};
     }
 
@@ -436,6 +430,10 @@ class HighRankCuts {
         // allPaths).
         std::vector<double> cut_coefficients(allPaths.size());
         for (size_t i = 0; i < allPaths.size(); ++i) {
+            // if (solution[i] < 1e-3) {
+            // cut_coefficients[i] = 0.0;
+            // continue;
+            // }
             cut_coefficients[i] = computeLimitedMemoryCoefficient(
                 C, AM, p, allPaths[i].route, order);
         }
@@ -461,7 +459,12 @@ class HighRankCuts {
    public:
     // HighRankCuts() { ml_scorer = std::make_unique<AdaptiveNodeScorer>();
     // }
-    HighRankCuts() = default;
+    HighRankCuts() {
+        for (int i = MIN_RANK; i <= MAX_RANK; ++i) {
+            fmt::print("Generating permutations for rank {}\n", i);
+            permutations_cache[i] = generateGeneticPermutations(i);
+        }
+    }
 
     CutStorage *cutStorage = nullptr;
 
@@ -473,9 +476,12 @@ class HighRankCuts {
     std::vector<std::vector<double>> distances;
     ankerl::unordered_dense::map<int, std::vector<int>> row_indices_map;
 
+    std::vector<double> solution;
+
     void separate(const SparseMatrix &A, const std::vector<double> &x) {
         // Initialize route mapping and compute node scores.
-        initializeVertexRouteMap();
+        // initializeVertexRouteMap();
+        solution = x;
         auto node_scores = computeNodeScores(A, x);
 
         // Generate candidate sets using the computed node scores.
@@ -523,7 +529,7 @@ class HighRankCuts {
         stdexec::sync_wait(std::move(work));
 
         // Provide feedback using the improved candidates.
-        // ml_scorer.provideFeedback(improved_candidates);
+        ml_scorer.provideFeedback(improved_candidates);
 
         // Process and sort unique candidates based on violation.
         int initial_cut_size = cutStorage->size();
@@ -549,8 +555,8 @@ class HighRankCuts {
                 order[node] = ordering++;
             }
             addCutToCutStorage(candidate, order);
-            cuts_added = cutStorage->size() - cuts_orig_size;
-            --max_trials;
+            cuts_added++;  // = cutStorage->size() - cuts_orig_size;
+            // --max_trials;
         }
         int final_cut_size = cutStorage->size();
 
@@ -580,27 +586,27 @@ class HighRankCuts {
 
         // Loop over the positions in P, ignoring the first and last elements.
         for (size_t j = 1; j < P.size() - 1; ++j) {
-            int vertex = P[j];
+            const int vertex = P[j];
 
             // Determine the bit mask and word index for the vertex.
-            const uint64_t mask = bit_mask_lookup[vertex % 64];
             const size_t word_index = vertex >> 6;
+            const uint64_t bit_mask = 1ULL << (vertex & 63);
 
             // If the augmented memory does not contain the vertex, reset
             // cumulative sum.
-            if (!(AM[word_index] & mask)) {
+            if (!(AM[word_index] & bit_mask)) {
                 cumulative_sum = 0;
             }
             // Otherwise, if the candidate set contains the vertex,
             // add the corresponding numerator from the permutation.
-            else if (C[word_index] & mask) {
+            else if (C[word_index] & bit_mask) {
                 int pos = order[vertex];
                 cumulative_sum += p.num[pos];
                 // If cumulative sum exceeds or equals the denominator, update
                 // alpha.
                 if (cumulative_sum >= denominator) {
                     cumulative_sum -= denominator;
-                    alpha += 1;
+                    alpha += 1.0;
                 }
             }
         }

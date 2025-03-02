@@ -83,7 +83,7 @@ BucketArc::BucketArc(int from, int to, const std::vector<double> &res_inc,
       to_bucket(to),
       resource_increment(res_inc),
       cost_increment(cost_inc),
-      fixed(fixed) {}
+      jump(fixed) {}
 
 JumpArc::JumpArc(int base, int jump, const std::vector<double> &res_inc,
                  double cost_inc)
@@ -261,7 +261,7 @@ std::vector<int> BucketGraph::computePhi(int &bucket_id, bool fw) {
     }
     // Single-resource case (simpler).
     else {
-        int neighbor = bucket_id - 1;
+        int neighbor = fw ? bucket_id - 1 : bucket_id - 1;
         if (neighbor >= 0 && neighbor < static_cast<int>(buckets.size()) &&
             buckets[neighbor].node_id == buckets[bucket_id].node_id) {
 #ifdef FIX_BUCKETS
@@ -328,6 +328,56 @@ void BucketGraph::calculate_neighborhoods(size_t num_closest) {
     }
 }
 
+void BucketGraph::prune_ng_cycles(int max_age, int min_usage,
+                                  int current_iteration) {
+    for (auto it = ng_cycles.begin(); it != ng_cycles.end();) {
+        if (current_iteration - it->last_used_iteration > max_age &&
+            it->usage_count < min_usage) {
+            // Remove the corresponding forbidden edges from the
+            // neighborhoods_bitmap.
+            for (size_t i = 0; i < it->cycle.size() - 1; ++i) {
+                int v1 = it->cycle[i];
+                int v2 = it->cycle[i + 1];
+                // Clear the bit corresponding to v2 in the neighborhood of
+                // v1.
+                size_t segment = static_cast<size_t>(v2) >> 6;
+                size_t bit_position = static_cast<size_t>(v2) & 63;
+                neighborhoods_bitmap[v1][segment] &=
+                    ~bit_mask_lookup[bit_position];
+
+                // If your approach was aggressive, also clear the reverse.
+                segment = static_cast<size_t>(v1) >> 6;
+                bit_position = static_cast<size_t>(v1) & 63;
+                neighborhoods_bitmap[v2][segment] &=
+                    ~bit_mask_lookup[bit_position];
+            }
+            it = ng_cycles.erase(it);
+        } else {
+            ++it;
+        }
+    }
+}
+
+inline bool cycleMatchesCurrentSolution(const std::vector<uint16_t> &cycle,
+                                        const std::vector<double> &solution,
+                                        const std::vector<Path> &paths) {
+    const double epsilon = 1e-3;
+    // Iterate over all paths.
+    for (size_t pathIndex = 0; pathIndex < paths.size(); ++pathIndex) {
+        // Only consider paths with significant weight.
+        if (solution[pathIndex] <= epsilon) continue;
+
+        const auto &path = paths[pathIndex];
+
+        // Use std::search to see if the cycle appears as a contiguous
+        // subsequence in the path.
+        if (std::search(path.begin(), path.end(), cycle.begin(), cycle.end()) !=
+            path.end()) {
+            return true;  // Cycle found in this path.
+        }
+    }
+    return false;  // No matching path found for the cycle.
+}
 /**
  * Augments the memories in the BucketGraph.
  *
@@ -341,17 +391,23 @@ void BucketGraph::calculate_neighborhoods(size_t num_closest) {
 void BucketGraph::augment_ng_memories(std::vector<double> &solution,
                                       std::vector<Path> &paths, bool aggressive,
                                       int eta1, int eta2, int eta_max, int nC) {
-    // Pre-allocate an estimated number of cycles (assume about 25% of paths
-    // have cycles)
+    // Pre-allocate an estimated number of cycles.
     std::vector<std::vector<uint16_t>> cycles;
     cycles.reserve(paths.size() / 4);
+    ng_iteration_counter++;
 
-    // Detect cycles in fractional paths
+    // // When a cycle is encountered in the current solution:
+    // for (auto &data : ng_cycles) {
+    //     if (cycleMatchesCurrentSolution(data.cycle, solution, paths)) {
+    //         data.last_used_iteration = ng_iteration_counter;
+    //         data.usage_count++;
+    //     }
+    // }
+
+    // Detect cycles in fractional paths.
     for (size_t pathIndex = 0; pathIndex < paths.size(); ++pathIndex) {
-        // Skip paths that are nearly integral.
         const double epsilon = 1e-3;
         if (solution[pathIndex] <= epsilon) continue;
-
         const auto &path = paths[pathIndex];
         ankerl::unordered_dense::map<uint16_t, int> visited_clients;
         visited_clients.reserve(path.size());
@@ -361,51 +417,57 @@ void BucketGraph::augment_ng_memories(std::vector<double> &solution,
             uint16_t client = path[i];
             // Skip depot nodes.
             if (client == 0 || client == N_SIZE - 1) continue;
-
             auto it = visited_clients.find(client);
             if (it != visited_clients.end()) {
-                // Cycle found: extract the cycle from the first occurrence to
-                // the current index.
+                // Cycle found: extract cycle from first occurrence to current
+                // index.
                 std::vector<uint16_t> cycle;
                 cycle.reserve(i - it->second + 1);
-                for (size_t j = static_cast<size_t>(it->second); j <= i; ++j) {
+                for (size_t j = it->second; j <= i; ++j)
                     cycle.push_back(path[j]);
-                }
+                // check if cycles has repeated clients, if so, discard it
+                // if (std::set<uint16_t>(cycle.begin(), cycle.end()).size() !=
+                //     cycle.size())
+                //     continue;
                 cycles.push_back(std::move(cycle));
                 break;  // Process only one cycle per path.
             }
             visited_clients[client] = i;
         }
     }
-
     if (cycles.empty()) return;
 
-    // Sort cycles by increasing size (small cycles are processed first)
+    // Sort cycles by increasing size (small cycles processed first).
     pdqsort(cycles.begin(), cycles.end(),
-            [](const auto &a, const auto &b) { return a.size() < b.size(); });
+            [](const auto &a, const auto &b) { return a.size() > b.size(); });
 
     int forbidden_count = 0;
 
-    // Lambda: count the number of set bits in the neighborhoods bitmap for a
-    // node.
-    auto count_neighborhood_bits = [this, eta_max](uint16_t node) -> int {
+    // Cache neighborhood bit counts to avoid redundant __builtin_popcountll
+    // calls.
+    std::vector<int> cached_counts(N_SIZE, -1);
+    auto count_neighborhood_bits = [this, eta_max,
+                                    &cached_counts](uint16_t node) -> int {
+        if (cached_counts[node] >= 0) return cached_counts[node];
         int count = 0;
-        // neighborhoods_bitmap[node] is assumed to be a vector of uint64_t
-        // segments.
         for (const auto &segment : neighborhoods_bitmap[node]) {
             count += __builtin_popcountll(segment);
-            if (count >= eta_max) return count;
+            if (count >= eta_max) break;
         }
+        cached_counts[node] = count;
         return count;
     };
+
+    // Adapt thresholds based on the aggressive flag.
+    int effective_eta1 = eta1;
+    int effective_eta2 = eta2;
 
     // Process each detected cycle.
     for (const auto &cycle : cycles) {
         if (cycle.empty()) continue;
 
         bool can_forbid = true;
-        // Check each node in the cycle to see if the neighborhood bit count is
-        // below eta_max.
+        // Check if any node in the cycle has too many neighbor bits.
         for (uint16_t node : cycle) {
             if (count_neighborhood_bits(node) >= eta_max) {
                 can_forbid = false;
@@ -413,15 +475,40 @@ void BucketGraph::augment_ng_memories(std::vector<double> &solution,
             }
         }
 
-        // If the cycle qualifies (small cycle or limited forbidden count),
-        // forbid it.
-        if (can_forbid && (cycle.size() <= static_cast<size_t>(eta1) ||
-                           forbidden_count < eta2)) {
-            // Convert cycle from uint16_t to int vector (if needed by
-            // forbidCycle)
+        // If the cycle qualifies (i.e. it's small enough or we haven't
+        // forbidden too many cycles yet).
+        if (can_forbid && (static_cast<int>(cycle.size()) <= effective_eta1 ||
+                           forbidden_count < effective_eta2)) {
+            // ng_cycles.push_back({cycle, ng_iteration_counter, 1});
             std::vector<int> int_cycle(cycle.begin(), cycle.end());
-            forbidCycle(int_cycle, false);
-            if (++forbidden_count >= eta2) break;
+            forbidCycle(int_cycle, aggressive);
+            ++forbidden_count;
+            if (forbidden_count >= effective_eta2) break;
+        }
+    }
+    // If no cycle was added, try again without effective_eta1 restriction.
+    if (forbidden_count == 0) {
+        for (const auto &cycle : cycles) {
+            if (cycle.empty()) continue;
+
+            bool can_forbid = true;
+            // Check if any node in the cycle has too many neighbor bits.
+            for (uint16_t node : cycle) {
+                if (count_neighborhood_bits(node) >= eta_max) {
+                    can_forbid = false;
+                    break;
+                }
+            }
+
+            // If the cycle qualifies (i.e. it's small enough or we haven't
+            // forbidden too many cycles yet).
+            if (can_forbid && forbidden_count < effective_eta2) {
+                // ng_cycles.push_back({cycle, ng_iteration_counter, 1});
+                std::vector<int> int_cycle(cycle.begin(), cycle.end());
+                forbidCycle(int_cycle, aggressive);
+                ++forbidden_count;
+                if (forbidden_count >= effective_eta2) break;
+            }
         }
     }
 }
@@ -447,13 +534,13 @@ void BucketGraph::forbidCycle(const std::vector<int> &cycle, bool aggressive) {
         // Forbid v2 in the neighborhood of v1.
         size_t segment = static_cast<size_t>(v2) >> 6;
         size_t bit_position = static_cast<size_t>(v2) & 63;
-        neighborhoods_bitmap[v1][segment] |= (1ULL << bit_position);
+        neighborhoods_bitmap[v1][segment] |= bit_mask_lookup[bit_position];
 
         if (aggressive) {
             // Additionally, forbid v1 in the neighborhood of v2.
             segment = static_cast<size_t>(v1) >> 6;
             bit_position = static_cast<size_t>(v1) & 63;
-            neighborhoods_bitmap[v2][segment] |= (1ULL << bit_position);
+            neighborhoods_bitmap[v2][segment] |= bit_mask_lookup[bit_position];
         }
     }
 }
@@ -864,9 +951,9 @@ void BucketGraph::setup() {
         set_adjacency_list_manual();
     }
     generate_arcs();
-    // for (auto &VRPNode : nodes) {
-    //     VRPNode.sort_arcs();
-    // }
+    for (auto &VRPNode : nodes) {
+        VRPNode.assignSCCIds(nodes);
+    }
 
 #ifdef SCHRODINGER
     sPool.distance_matrix = distance_matrix;
@@ -988,11 +1075,11 @@ std::vector<Label *> BucketGraph::extend_path(const std::vector<int> &path,
     std::vector<Label *> new_labels;
     const auto &arcs = nodes[label->node_id].get_arcs<Direction::Forward>();
     for (const auto &arc : arcs) {
-        auto labels = Extend<Direction::Forward, Stage::Extend, ArcType::Node,
-                             Mutability::Mut, Full::Partial>(label, arc);
-        for (auto new_label : labels) {
-            new_labels.push_back(new_label);
-        }
+        auto new_labels =
+            Extend<Direction::Forward, Stage::Extend, ArcType::Node,
+                   Mutability::Mut, Full::Partial>(label, arc);
+        new_labels.insert(new_labels.end(), new_labels.begin(),
+                          new_labels.end());
     }
 
     // std::vector<Label *> new_labels_to_return;

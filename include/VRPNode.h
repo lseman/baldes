@@ -73,62 +73,159 @@ struct VRPNode {
           cost(c),
           demand(d) {}
 
+    // -----------------------------
+    // SCC Computation Support
+    // -----------------------------
+    /**
+     * @brief Compute the strongly connected components (SCCs) for a VRP graph.
+     *
+     * Given a vector of VRPNodes, this function builds a graph using each
+     * node's forward arcs (assumed to represent directed edges from node.id to
+     * arc.to), and runs Tarjan's algorithm to compute the SCCs.
+     *
+     * @param nodes The vector of VRPNodes representing the VRP.
+     * @return A vector of SCCs, each SCC is a vector of node IDs.
+     */
+    static std::vector<std::vector<int>> computeSCCs(
+        const std::vector<VRPNode> &nodes) {
+        int V = nodes.size();
+        // Build adjacency list: vertices are nodes (using node.id) and an edge
+        // exists from u to v if there is a forward arc from node u to node v.
+        std::vector<std::vector<int>> graph(V);
+        for (const auto &node : nodes) {
+            for (const auto &arc : node.fw_arcs) {
+                // Assumes that node.id is in [0, V-1] and arc.to corresponds to
+                // another node's id.
+                graph[node.id].push_back(arc.to);
+            }
+        }
+
+        std::vector<int> disc(V, -1), low(V, -1);
+        std::vector<bool> inStack(V, false);
+        std::stack<int> st;
+        std::vector<std::vector<int>> sccs;
+        int time = 0;
+
+        // Tarjan's recursive helper.
+        std::function<void(int)> tarjanUtil = [&](int u) {
+            disc[u] = low[u] = time++;
+            st.push(u);
+            inStack[u] = true;
+
+            for (int v : graph[u]) {
+                if (disc[v] == -1) {
+                    tarjanUtil(v);
+                    low[u] = std::min(low[u], low[v]);
+                } else if (inStack[v]) {
+                    low[u] = std::min(low[u], disc[v]);
+                }
+            }
+            if (low[u] == disc[u]) {
+                std::vector<int> scc;
+                while (true) {
+                    int w = st.top();
+                    st.pop();
+                    inStack[w] = false;
+                    scc.push_back(w);
+                    if (w == u) break;
+                }
+                sccs.push_back(scc);
+            }
+        };
+
+        for (int i = 0; i < V; i++) {
+            if (disc[i] == -1) tarjanUtil(i);
+        }
+        return sccs;
+    }
+    int sccId = -1;
+
+    /**
+     * @brief Assigns SCC IDs to a vector of VRPNodes.
+     *
+     * This method computes the SCCs for the given VRP nodes and then assigns
+     * each node an SCC identifier (starting from 0) based on the SCC it belongs
+     * to.
+     *
+     * @param nodes The vector of VRPNodes to update.
+     */
+    static void assignSCCIds(std::vector<VRPNode> &nodes) {
+        auto sccs = computeSCCs(nodes);
+        for (size_t id = 0; id < sccs.size(); id++) {
+            for (int nodeId : sccs[id]) {
+                nodes[nodeId].sccId = id;
+            }
+        }
+    }
+
     template <Direction D>
     void sort_arcs_by_scores(
         const ankerl::unordered_dense::map<Arc, int, arc_hash> &arc_scores,
         std::vector<VRPNode> &nodes, std::vector<ActiveCutInfo> &cuts) {
-        // Helper lambda to compute a score for a given arc.
-        // Note: 'cuts' is captured by reference to avoid copying.
+        // Helper lambda: compute a score for a given arc.
+        // The base score is defined as the negative cost (scaled) of the
+        // destination node. If the arc is found in arc_scores, add its
+        // bonus/penalty. If any cut applies (i.e. the arc is in the SRC set for
+        // the cut), override the score.
         auto get_score = [&arc_scores, &nodes,
                           &cuts](const Arc &arc) -> double {
-            // Base score: cost of the destination node divided by 100.
-            double score = -nodes[arc.to].cost / 100.0;
-
-            // Add additional score if arc is present in arc_scores.
+            // Start with a base score as before.
+            double score = nodes[arc.to].cost / 10.0;
             if (auto it = arc_scores.find(arc); it != arc_scores.end()) {
                 score += it->second;
             }
-
-            // If any cut applies to this arc, override score with the cut's
-            // dual value.
             for (const auto &cut : cuts) {
-                if (cut.isSRCset(arc.from, arc.to)) {
-                    score = -cut.dual_value / 100.0;
+                if (cut.type == CutType::ThreeRow &&
+                    cut.isSRCset(arc.from, arc.to)) {
+                    score += cut.dual_value / 10.0;
                     break;
                 }
             }
+            // // Incorporate SCC information.
+            // // For example, if the source and destination are in different
+            // SCCs,
+            // // subtract a penalty.
+            // if (nodes[arc.from].sccId != nodes[arc.to].sccId) {
+            //     // The penalty value can be tuned.
+            //     score -= 5.0;
+            // } else {
+            //     // Optionally, add a bonus if within the same SCC.
+            //     score += 1.0;
+            // }
             return score;
         };
 
-        // Sort arcs within strongly connected components.
-        if constexpr (D == Direction::Forward) {
-            for (auto &arcs : fw_arcs_scc) {
-                pdqsort(arcs.begin(), arcs.end(),
-                        [&](const Arc &a, const Arc &b) {
-                            return get_score(a) > get_score(b);
-                        });
-            }
-        } else {
-            for (auto &arcs : bw_arcs_scc) {
-                pdqsort(arcs.begin(), arcs.end(),
-                        [&](const Arc &a, const Arc &b) {
-                            return get_score(a) > get_score(b);
-                        });
-            }
-        }
+        // --- Sort arcs within strongly connected components ---
+        // (Assumes that if D==Direction::Forward, fw_arcs_scc holds the forward
+        // SCCs; otherwise, bw_arcs_scc holds the backward SCCs.)
+        // if constexpr (D == Direction::Forward) {
+        //     for (auto &arcs : fw_arcs_scc) {
+        //         pdqsort(arcs.begin(), arcs.end(),
+        //                 [&](const Arc &a, const Arc &b) {
+        //                     return get_score(a) > get_score(b);
+        //                 });
+        //     }
+        // } else {
+        //     for (auto &arcs : bw_arcs_scc) {
+        //         pdqsort(arcs.begin(), arcs.end(),
+        //                 [&](const Arc &a, const Arc &b) {
+        //                     return get_score(a) > get_score(b);
+        //                 });
+        //     }
+        // }
 
-        // Sort the main list of arcs.
-        if constexpr (D == Direction::Forward) {
-            pdqsort(fw_arcs.begin(), fw_arcs.end(),
-                    [&](const Arc &a, const Arc &b) {
-                        return get_score(a) > get_score(b);
-                    });
-        } else {
-            pdqsort(bw_arcs.begin(), bw_arcs.end(),
-                    [&](const Arc &a, const Arc &b) {
-                        return get_score(a) > get_score(b);
-                    });
-        }
+        // // --- Sort the main list of arcs ---
+        // if constexpr (D == Direction::Forward) {
+        //     pdqsort(fw_arcs.begin(), fw_arcs.end(),
+        //             [&](const Arc &a, const Arc &b) {
+        //                 return get_score(a) > get_score(b);
+        //             });
+        // } else {
+        //     pdqsort(bw_arcs.begin(), bw_arcs.end(),
+        //             [&](const Arc &a, const Arc &b) {
+        //                 return get_score(a) > get_score(b);
+        //             });
+        // }
     }
 
     /**

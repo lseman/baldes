@@ -132,89 +132,88 @@ void Genetic::doOXcrossover(
     Individual *result,
     std::pair<const Individual *, const Individual *> parents, int start,
     int end) {
-    // Cache frequently accessed values
+    // Cache frequently accessed values.
     const int nbClients = params->nbClients;
-    const auto *parent1 = parents.first;
-    const auto *parent2 = parents.second;
-    auto &chromT = result->chromT;  // Avoid repeated array access
+    const Individual *parent1 = parents.first;
+    const Individual *parent2 = parents.second;
+    auto &child = result->chromT;
+    child.resize(nbClients);  // Ensure proper size
 
-    // Pre-calculate modulo values
-    const int idxEnd = (end + 1) % nbClients;
+    // Create a boolean array to mark which clients have been copied.
+    std::vector<bool> used(nbClients, false);
 
-    // Use a dynamic bitset for O(1) lookup
-    std::vector<bool> freqClient(nbClients, false);  // Track used clients
-
-    // First phase: Copy segment from parent1
+    // --- Phase 1: Copy the segment from parent1 ---
     if (start <= end) {
-        // No wrap-around case - use std::copy
-        const int segmentLength = end - start + 1;
-        std::copy(&parent1->chromT[start],
-                  &parent1->chromT[start] + segmentLength, &chromT[start]);
-        for (int j = start; j <= end; ++j) {
-            freqClient[parent1->chromT[j]] = true;
+        // Non-wrap-around: simply copy from index 'start' to 'end'.
+        for (int i = start; i <= end; ++i) {
+            child[i] = parent1->chromT[i];
+            used[parent1->chromT[i]] = true;
         }
     } else {
-        // Handle wrap-around case
-        int j = start;
+        // Wrap-around: copy from 'start' to end of chromosome, then from index
+        // 0 to 'end'.
+        int i = start;
         do {
-            const int elem = parent1->chromT[j];
-            chromT[j] = elem;
-            freqClient[elem] = true;
-            j = j + 1;
-            if (j >= nbClients) j = 0;
-        } while (j != idxEnd);
+            child[i] = parent1->chromT[i];
+            used[parent1->chromT[i]] = true;
+            i = (i + 1) % nbClients;
+        } while (i != (end + 1) % nbClients);
     }
 
-    // Second phase: Fill remaining elements from parent2
-    int j = idxEnd;
-    for (int i = idxEnd; j != start; i = (i + 1) % nbClients) {
-        const int candidate = parent2->chromT[i];
-        if (!freqClient[candidate]) {
-            chromT[j] = candidate;
-            j = j + 1;
-            if (j >= nbClients) j = 0;
+    // --- Phase 2: Fill in remaining genes from parent2 ---
+    // Start filling the child from position (end+1) mod nbClients.
+    int posChild = (end + 1) % nbClients;
+    // In parent2, start scanning from (end+1) mod nbClients.
+    for (int posP2 = (end + 1) % nbClients;; posP2 = (posP2 + 1) % nbClients) {
+        int candidate = parent2->chromT[posP2];
+        if (!used[candidate]) {
+            child[posChild] = candidate;
+            posChild = (posChild + 1) % nbClients;
         }
+        // Once we have scanned all positions in parent2, break out.
+        if (posP2 == end) break;
     }
 
-    // Complete the individual using Split algorithm
+    // Finalize the individual using the Split algorithm.
     split->generalSplit(result, params->nbVehicles);
 }
 
 Individual *Genetic::crossoverSREX(
     std::pair<const Individual *, const Individual *> parents) {
-    // Get the number of routes of both parents
+    // --- Phase 1: Select Routes to Replace ---
+    // Get the number of routes in each parent.
     int nOfRoutesA = parents.first->myCostSol.nbRoutes;
     int nOfRoutesB = parents.second->myCostSol.nbRoutes;
 
-    // Picking the start index of routes to replace of parent A
-    // We like to replace routes with a large overlap of tasks, so we choose
-    // adjacent routes (they are sorted on polar angle)
+    // Choose a starting route index in Parent A.
     int startA = params->rng() % nOfRoutesA;
+    // Determine the number of adjacent routes to move.
     int nOfMovedRoutes =
-        std::min(nOfRoutesA, nOfRoutesB) == 1
+        (std::min(nOfRoutesA, nOfRoutesB) == 1)
             ? 1
-            : params->rng() % (std::min(nOfRoutesA - 1, nOfRoutesB - 1)) +
-                  1;  // Prevent not moving any routes
-    int startB = startA < nOfRoutesB ? startA : 0;
+            : params->rng() % (std::min(nOfRoutesA - 1, nOfRoutesB - 1)) + 1;
+    // For Parent B, align the starting route index if possible.
+    int startB = (startA < nOfRoutesB) ? startA : 0;
 
+    // Collect clients from the selected routes.
     ankerl::unordered_dense::set<int> clientsInSelectedA;
     for (int r = 0; r < nOfMovedRoutes; r++) {
-        // Insert the first
-        clientsInSelectedA.insert(
-            parents.first->chromR[(startA + r) % nOfRoutesA].begin(),
-            parents.first->chromR[(startA + r) % nOfRoutesA].end());
+        int routeIdx = (startA + r) % nOfRoutesA;
+        clientsInSelectedA.insert(parents.first->chromR[routeIdx].begin(),
+                                  parents.first->chromR[routeIdx].end());
     }
 
     ankerl::unordered_dense::set<int> clientsInSelectedB;
     for (int r = 0; r < nOfMovedRoutes; r++) {
-        clientsInSelectedB.insert(
-            parents.second->chromR[(startB + r) % nOfRoutesB].begin(),
-            parents.second->chromR[(startB + r) % nOfRoutesB].end());
+        int routeIdx = (startB + r) % nOfRoutesB;
+        clientsInSelectedB.insert(parents.second->chromR[routeIdx].begin(),
+                                  parents.second->chromR[routeIdx].end());
     }
 
+    // --- Phase 2: Local Improvement by Shifting the Selected Routes ---
     bool improved = true;
     while (improved) {
-        // Cache route indices with efficient modulo
+        // Compute indices for adjacent routes (with modulo arithmetic).
         const int idxALeft = (startA - 1 + nOfRoutesA) % nOfRoutesA;
         const int idxARight = (startA + nOfMovedRoutes) % nOfRoutesA;
         const int idxALastMoved = (startA + nOfMovedRoutes - 1) % nOfRoutesA;
@@ -222,25 +221,26 @@ Individual *Genetic::crossoverSREX(
         const int idxBRight = (startB + nOfMovedRoutes) % nOfRoutesB;
         const int idxBLastMoved = (startB - 1 + nOfMovedRoutes) % nOfRoutesB;
 
-        // Fast client counting using contains() instead of find()
+        // Helper lambda for fast client counting.
         auto countClients =
             [](const std::vector<int> &route,
                const ankerl::unordered_dense::set<int> &clientSet,
-               bool countOutside) {
-                int count = 0;
-                for (int c : route) {
-                    count += (clientSet.contains(c) != countOutside);
-                }
-                return count;
-            };
+               bool countOutside) -> int {
+            int count = 0;
+            for (int c : route) {
+                // If countOutside is true, count clients NOT in the set.
+                count += (clientSet.contains(c) != countOutside);
+            }
+            return count;
+        };
 
-        // Cache parent pointers and commonly accessed routes
+        // Cache parent pointers and their routes.
         const auto &parentA = parents.first;
         const auto &parentB = parents.second;
         const auto &routesA = parentA->chromR;
         const auto &routesB = parentB->chromR;
 
-        // Calculate all counts in one batch for better cache utilization
+        // Batch count differences at boundaries.
         const int leftAFirst =
             countClients(routesA[idxALeft], clientsInSelectedB, true);
         const int leftASecond =
@@ -259,7 +259,6 @@ Individual *Genetic::crossoverSREX(
         const int rightBSecond =
             countClients(routesB[idxBRight], clientsInSelectedA, false);
 
-        // Calculate the differences
         const int differenceALeft = leftAFirst - leftASecond;
         const int differenceARight = rightAFirst - rightASecond;
         const int differenceBLeft = leftBFirst - leftBSecond;
@@ -268,176 +267,134 @@ Individual *Genetic::crossoverSREX(
         const int bestDifference =
             std::min({differenceALeft, differenceARight, differenceBLeft,
                       differenceBRight});
-        // Avoiding infinite loop by adding a guard in case nothing changes
+
         if (bestDifference < 0) {
-            // Cache frequently used values and references
-            const auto &routesA = parents.first->chromR;
-            const auto &routesB = parents.second->chromR;
-
-            // Determine which difference matches and perform corresponding
-            // update
+            // Update the selection boundaries based on which difference is
+            // best.
             if (bestDifference == differenceALeft) {
-                const int removeIdx =
-                    (startA + nOfMovedRoutes - 1) % nOfRoutesA;
-                const int addIdx = (startA - 1 + nOfRoutesA) % nOfRoutesA;
-
-                // Batch remove and insert for better cache usage
-                for (int c : routesA[removeIdx]) {
-                    clientsInSelectedA.erase(
-                        c);  // erase() is safe even if element doesn't exist
-                }
+                // Shift selection to the left in Parent A.
+                int removeIdx = (startA + nOfMovedRoutes - 1) % nOfRoutesA;
+                int addIdx = (startA - 1 + nOfRoutesA) % nOfRoutesA;
+                for (int c : routesA[removeIdx]) clientsInSelectedA.erase(c);
                 startA = addIdx;
                 clientsInSelectedA.insert(routesA[startA].begin(),
                                           routesA[startA].end());
-
             } else if (bestDifference == differenceARight) {
-                const int removeIdx = startA;
-
-                // Batch remove
-                for (int c : routesA[removeIdx]) {
-                    clientsInSelectedA.erase(c);
-                }
+                // Shift selection to the right in Parent A.
+                int removeIdx = startA;
+                for (int c : routesA[removeIdx]) clientsInSelectedA.erase(c);
                 startA = (startA + 1) % nOfRoutesA;
-
-                // Batch insert
-                const int addIdx = (startA + nOfMovedRoutes - 1) % nOfRoutesA;
+                int addIdx = (startA + nOfMovedRoutes - 1) % nOfRoutesA;
                 clientsInSelectedA.insert(routesA[addIdx].begin(),
                                           routesA[addIdx].end());
-
             } else if (bestDifference == differenceBLeft) {
-                const int removeIdx =
-                    (startB + nOfMovedRoutes - 1) % nOfRoutesB;
-                const int addIdx = (startB - 1 + nOfRoutesB) % nOfRoutesB;
-
-                // Batch remove and insert
-                for (int c : routesB[removeIdx]) {
-                    clientsInSelectedB.erase(c);
-                }
+                // Shift selection to the left in Parent B.
+                int removeIdx = (startB + nOfMovedRoutes - 1) % nOfRoutesB;
+                int addIdx = (startB - 1 + nOfRoutesB) % nOfRoutesB;
+                for (int c : routesB[removeIdx]) clientsInSelectedB.erase(c);
                 startB = addIdx;
                 clientsInSelectedB.insert(routesB[startB].begin(),
                                           routesB[startB].end());
-
             } else {  // bestDifference == differenceBRight
-                const int removeIdx = startB;
-
-                // Batch remove
-                for (int c : routesB[removeIdx]) {
-                    clientsInSelectedB.erase(c);
-                }
+                // Shift selection to the right in Parent B.
+                int removeIdx = startB;
+                for (int c : routesB[removeIdx]) clientsInSelectedB.erase(c);
                 startB = (startB + 1) % nOfRoutesB;
-
-                // Batch insert
-                const int addIdx = (startB + nOfMovedRoutes - 1) % nOfRoutesB;
+                int addIdx = (startB + nOfMovedRoutes - 1) % nOfRoutesB;
                 clientsInSelectedB.insert(routesB[addIdx].begin(),
                                           routesB[addIdx].end());
             }
-
         } else {
             improved = false;
         }
     }
 
-    // Identify differences between route sets
+    // --- Phase 3: Identify Differences Between Selected Routes ---
     std::vector<int> clientsInSelectedANotBVec;
     std::vector<int> clientsInSelectedBNotAVec;
-
-    // Convert sets to sorted vectors for efficient set operations
-    auto getSortedVec = [](const ankerl::unordered_dense::set<int> &set) {
-        std::vector<int> vec(set.begin(), set.end());
+    auto getSortedVec = [](const ankerl::unordered_dense::set<int> &s) {
+        std::vector<int> vec(s.begin(), s.end());
         pdqsort(vec.begin(), vec.end());
         return vec;
     };
 
-    // Create sorted vectors once and reuse
     const auto sortedVecA = getSortedVec(clientsInSelectedA);
     const auto sortedVecB = getSortedVec(clientsInSelectedB);
 
-    // Calculate A - B
-    clientsInSelectedANotBVec.clear();
-    clientsInSelectedANotBVec.reserve(clientsInSelectedA.size());
+    // Compute set differences: A - B.
     std::set_difference(sortedVecA.begin(), sortedVecA.end(),
                         sortedVecB.begin(), sortedVecB.end(),
                         std::back_inserter(clientsInSelectedANotBVec));
-
-    // Calculate B - A
-    clientsInSelectedBNotAVec.clear();
-    clientsInSelectedBNotAVec.reserve(clientsInSelectedB.size());
+    // And B - A.
     std::set_difference(sortedVecB.begin(), sortedVecB.end(),
                         sortedVecA.begin(), sortedVecA.end(),
                         std::back_inserter(clientsInSelectedBNotAVec));
 
-    // Convert vector to unordered_set
+    // Convert one of the differences into an unordered set for fast lookup.
     ankerl::unordered_dense::set<int> clientsInSelectedBNotA(
         clientsInSelectedBNotAVec.begin(), clientsInSelectedBNotAVec.end());
 
-    // Replace selected routes from parent B into parent A
+    // --- Phase 4: Build Offspring by Replacing Selected Routes ---
+    // Replace the selected routes in Parent A with those from Parent B.
     for (int r = 0; r < nOfMovedRoutes; r++) {
         int indexA = (startA + r) % nOfRoutesA;
         int indexB = (startB + r) % nOfRoutesB;
-
         auto &offspring0Route = candidateOffsprings[0]->chromR[indexA];
         auto &offspring1Route = candidateOffsprings[1]->chromR[indexA];
 
-        offspring0Route.clear();  // Clears but retains capacity
+        offspring0Route.clear();
         offspring1Route.clear();
 
-        // Batch lookup: Make the lookup set cache-friendly by processing the
-        // route once
+        // For offspring 0: Copy the entire route from Parent B.
         for (int c : parents.second->chromR[indexB]) {
-            offspring0Route.push_back(c);  // Always copy into offspring 0
-
-            // Efficiently check presence in clientsInSelectedBNotA and copy
-            // into offspring 1 if absent
-            if (!clientsInSelectedBNotA.contains(
-                    c)) {  // `contains` is cleaner and faster in modern C++20
+            offspring0Route.push_back(c);
+        }
+        // For offspring 1: Copy only clients not in clientsInSelectedBNotA.
+        for (int c : parents.second->chromR[indexB]) {
+            if (!clientsInSelectedBNotA.contains(c))
                 offspring1Route.push_back(c);
-            }
         }
     }
 
-    // Move routes from parent A that are kept
+    // For routes not replaced, inherit from Parent A.
     for (int r = nOfMovedRoutes; r < nOfRoutesA; r++) {
         int indexA = (startA + r) % nOfRoutesA;
-
         auto &offspring0Route = candidateOffsprings[0]->chromR[indexA];
         auto &offspring1Route = candidateOffsprings[1]->chromR[indexA];
-
-        offspring0Route.clear();  // Keeps capacity
+        offspring0Route.clear();
         offspring1Route.clear();
-
-        // Iterate over the route in parent A
         for (int c : parents.first->chromR[indexA]) {
-            if (!clientsInSelectedBNotA.contains(
-                    c)) {  // Use contains() in C++20
-                offspring0Route.push_back(
-                    c);  // Only add to offspring 0 if not in set
-            }
-            offspring1Route.push_back(c);  // Always add to offspring 1
+            if (!clientsInSelectedBNotA.contains(c))
+                offspring0Route.push_back(c);
+            offspring1Route.push_back(c);
         }
     }
 
-    // Delete any remaining routes that still lived in offspring
+    // Clear any routes beyond Parent A's route count.
     for (int r = nOfRoutesA; r < params->nbVehicles; r++) {
         candidateOffsprings[0]->chromR[r].clear();
         candidateOffsprings[1]->chromR[r].clear();
     }
 
-    // Step 3: Insert unplanned clients (those that were in the removed routes
-    // of A but not the inserted routes of B)
+    // --- Phase 5: Insert Unplanned Clients ---
+    // Insert clients that were in Parent A's removed routes but not in the
+    // inserted routes.
     insertUnplannedTasks(candidateOffsprings[0], clientsInSelectedANotBVec);
     insertUnplannedTasks(candidateOffsprings[1], clientsInSelectedANotBVec);
 
     candidateOffsprings[0]->evaluateCompleteCost();
     candidateOffsprings[1]->evaluateCompleteCost();
 
-    return candidateOffsprings[0]->myCostSol.penalizedCost <
-                   candidateOffsprings[1]->myCostSol.penalizedCost
+    // Return the offspring with the lower penalized cost.
+    return (candidateOffsprings[0]->myCostSol.penalizedCost <
+            candidateOffsprings[1]->myCostSol.penalizedCost)
                ? candidateOffsprings[0]
                : candidateOffsprings[1];
 }
 
 void Genetic::insertUnplannedTasks(Individual *offspring,
                                    const std::vector<int> &unplannedTasks) {
+    // Collect indices of non-empty routes.
     std::vector<int> nonEmptyRoutes;
     nonEmptyRoutes.reserve(params->nbVehicles);
     for (int r = 0; r < params->nbVehicles; r++) {
@@ -449,79 +406,90 @@ void Genetic::insertUnplannedTasks(Individual *offspring,
     const auto &timeCost = params->timeCost;
     const auto &clients = params->cli;
 
+    // Structure to record an insertion candidate.
     struct InsertionPoint {
         int routeIdx;
-        int position;
-        int cost;
-
+        int position;  // Position in the route where the client will be
+                       // inserted.
+        int cost;      // Additional cost for insertion.
         bool operator<(const InsertionPoint &other) const {
             return cost < other.cost;
         }
     };
 
+    // Reserve space for potential insertion points.
     std::vector<InsertionPoint> insertionPoints;
     insertionPoints.reserve(100);
 
+    // Process each unplanned task.
     for (int client : unplannedTasks) {
         const auto &clientData = clients[client];
-        const int earliestArrival = clientData.earliestArrival;
-        const int latestArrival = clientData.latestArrival;
+        const int clientEarliest = clientData.earliestArrival;
+        const int clientLatest = clientData.latestArrival;
 
-        insertionPoints.clear();
+        insertionPoints.clear();  // Reset candidates for current client.
 
+        // Evaluate each non-empty route.
         for (int routeIdx : nonEmptyRoutes) {
             const auto &route = offspring->chromR[routeIdx];
             const int routeSize = static_cast<int>(route.size());
 
-            // Check insertion at start
-            const int firstClient = route[0];
-            const int distToFirst = timeCost.get(client, firstClient);
-            const int origDistToFirst = timeCost.get(0, firstClient);
-
-            if (earliestArrival + distToFirst <
+            // --- Check insertion at the beginning of the route ---
+            // Consider inserting before the first client.
+            int firstClient = route[0];
+            int costToClient = timeCost.get(0, client);
+            int costClientToFirst = timeCost.get(client, firstClient);
+            int origCost = timeCost.get(0, firstClient);
+            // Check feasibility: arrival at first client should not exceed its
+            // latest arrival.
+            if (clientEarliest + costClientToFirst <
                 clients[firstClient].latestArrival) {
                 insertionPoints.push_back(
-                    {routeIdx, 0,
-                     timeCost.get(0, client) + distToFirst - origDistToFirst});
+                    {routeIdx, 0, costToClient + costClientToFirst - origCost});
             }
 
-            // Check insertions between clients
+            // --- Check insertion between clients ---
             int prevClient = route[0];
-            int prevEarliestArrival = clients[prevClient].earliestArrival;
-
+            int prevEarliest = clients[prevClient].earliestArrival;
             for (int pos = 1; pos < routeSize; pos++) {
-                const int nextClient = route[pos];
-                const int distFromPrev = timeCost.get(prevClient, client);
-                const int distToNext = timeCost.get(client, nextClient);
-                const int origDist = timeCost.get(prevClient, nextClient);
-
-                if (prevEarliestArrival + distFromPrev < latestArrival &&
-                    earliestArrival + distToNext <
+                int nextClient = route[pos];
+                int costFromPrev = timeCost.get(prevClient, client);
+                int costToNext = timeCost.get(client, nextClient);
+                int origCostBetween = timeCost.get(prevClient, nextClient);
+                // Feasibility: arrival after previous client and before next
+                // client's latest.
+                if (prevEarliest + costFromPrev < clientLatest &&
+                    clientEarliest + costToNext <
                         clients[nextClient].latestArrival) {
                     insertionPoints.push_back(
-                        {routeIdx, pos, distFromPrev + distToNext - origDist});
+                        {routeIdx, pos,
+                         costFromPrev + costToNext - origCostBetween});
                 }
-
                 prevClient = nextClient;
-                prevEarliestArrival = clients[prevClient].earliestArrival;
+                prevEarliest = clients[prevClient].earliestArrival;
             }
 
-            // Check insertion at end
-            const int lastClient = route.back();
-            const int distFromLast = timeCost.get(lastClient, client);
-
-            if (clients[lastClient].earliestArrival + distFromLast <
-                latestArrival) {
+            // --- Check insertion at the end of the route ---
+            int lastClient = route.back();
+            int costFromLast = timeCost.get(lastClient, client);
+            // Feasibility: arrival at client from last client within client's
+            // time window.
+            if (clients[lastClient].earliestArrival + costFromLast <
+                clientLatest) {
+                int costFromClientToDepot = timeCost.get(client, 0);
+                int origCostFromLastToDepot = timeCost.get(lastClient, 0);
                 insertionPoints.push_back({routeIdx, routeSize,
-                                           distFromLast +
-                                               timeCost.get(client, 0) -
-                                               timeCost.get(lastClient, 0)});
+                                           costFromLast +
+                                               costFromClientToDepot -
+                                               origCostFromLastToDepot});
             }
         }
 
+        // If any valid insertion points exist, choose the one with minimum
+        // cost.
         if (!insertionPoints.empty()) {
-            const auto bestPoint = std::min_element(insertionPoints.begin(),
-                                                    insertionPoints.end());
+            auto bestPoint = std::min_element(insertionPoints.begin(),
+                                              insertionPoints.end());
             auto &targetRoute = offspring->chromR[bestPoint->routeIdx];
             targetRoute.insert(targetRoute.begin() + bestPoint->position,
                                client);

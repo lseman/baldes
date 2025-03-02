@@ -27,11 +27,11 @@ inline bool process_disposable_resource(double &new_resource,
     if constexpr (D == Direction::Forward) {
         new_resource = std::max(initial_resource + increment, lb);
         // new_resource = roundToTwoDecimalPlaces(new_resource);
-        return new_resource <= ub;
+        return numericutils::lte(new_resource, ub);
     } else {
         new_resource = std::min(initial_resource - increment, ub);
         // new_resource = roundToTwoDecimalPlaces(new_resource);
-        return new_resource >= lb;
+        return numericutils::gte(new_resource, lb);
     }
 }
 
