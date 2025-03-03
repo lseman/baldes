@@ -1,0 +1,41 @@
+<map id="BucketGraph::run_labeling_algorithms" name="BucketGraph::run_labeling_algorithms">
+<area shape="rect" id="Node000001" title="Runs forward and backward labeling algorithms in parallel and synchronizes the results." alt="" coords="5,412,178,453"/>
+<area shape="rect" id="Node000002" href="$classBucketGraph.html#aa05e883574a58a277e1dbf8cfcdcde11" title=" " alt="" coords="226,304,373,345"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="131,410,244,350,246,355,134,414"/>
+<area shape="rect" id="Node000003" href="$classBucketGraph.html#af129eff306551dc7cc7fe00b919bbbd0" title="Assigns the buckets based on the specified direction." alt="" coords="1214,264,1355,305"/>
+<area shape="poly" id="edge2_Node000002_Node000003" title=" " alt="" coords="331,343,373,371,422,397,484,423,533,440,584,452,650,462,798,488,860,499,918,505,974,505,1032,496,1094,475,1165,441,1199,416,1227,384,1250,349,1266,318,1271,320,1254,352,1232,387,1202,420,1167,446,1096,480,1033,501,974,510,917,510,859,504,797,493,649,467,583,457,531,445,482,428,420,402,370,376,328,348"/>
+<area shape="rect" id="Node000004" href="$BucketAVX_8h.html#aef66db705d83215d2e94e4ed0c85d827" title=" " alt="" coords="424,44,599,85"/>
+<area shape="poly" id="edge3_Node000002_Node000004" title=" " alt="" coords="304,303,319,262,343,208,376,152,419,102,433,91,436,95,423,105,380,155,348,211,324,264,309,305"/>
+<area shape="rect" id="Node000007" href="$classBucketGraph.html#a2e4721037bb8d7cf0211c53f0112bec7" title=" " alt="" coords="423,223,599,264"/>
+<area shape="poly" id="edge6_Node000002_Node000007" title=" " alt="" coords="349,301,420,273,436,267,437,272,422,278,351,306"/>
+<area shape="rect" id="Node000008" href="$classBucketGraph.html#abc324fb45e794482eb642adb8b0f664d" title="Retrieves the best label from the bucket graph based on the given topological order,..." alt="" coords="969,92,1122,133"/>
+<area shape="poly" id="edge7_Node000002_Node000008" title=" " alt="" coords="314,302,358,254,387,230,420,209,488,180,559,156,632,138,704,125,841,111,953,108,953,113,841,117,705,131,633,144,560,161,489,185,422,214,390,234,362,258,318,306"/>
+<area shape="rect" id="Node000009" href="$classBucketGraph.html#a469baec04539f3c8ae984f5558fbfc25" title=" " alt="" coords="421,312,601,338"/>
+<area shape="poly" id="edge9_Node000002_Node000009" title=" " alt="" coords="373,322,405,322,405,328,373,328"/>
+<area shape="rect" id="Node000005" href="$BucketAVX_8h.html#a1055d33f3fa0023a7782b354c84f30d6" title=" " alt="" coords="723,5,803,31"/>
+<area shape="poly" id="edge4_Node000004_Node000005" title=" " alt="" coords="599,46,707,26,708,31,600,51"/>
+<area shape="rect" id="Node000006" href="$BucketAVX_8h.html#a4f6006d66fa23bc62965a93c057360af" title=" " alt="" coords="698,55,828,80"/>
+<area shape="poly" id="edge5_Node000004_Node000006" title=" " alt="" coords="599,63,683,64,683,69,599,68"/>
+<area shape="poly" id="edge8_Node000008_Node000003" title=" " alt="" coords="1123,123,1167,143,1198,166,1225,195,1266,250,1262,253,1221,198,1195,170,1165,147,1121,128"/>
+<area shape="poly" id="edge21_Node000009_Node000009" title=" " alt="" coords="476,313,469,303,473,294,488,287,511,285,537,288,550,295,548,300,536,293,511,291,489,293,477,297,474,303,480,310"/>
+<area shape="rect" id="Node000010" href="$classBucketGraph.html#a8153a13e14a6233434a3f7ef3230f8b8" title=" " alt="" coords="681,412,845,453"/>
+<area shape="poly" id="edge10_Node000009_Node000010" title=" " alt="" coords="537,336,650,392,682,404,681,409,648,397,535,341"/>
+<area shape="rect" id="Node000028" href="$classBucketGraph.html#a1546f6d1eec5a80afaed3be7ccda0d4a" title=" " alt="" coords="957,391,1134,432"/>
+<area shape="poly" id="edge19_Node000009_Node000028" title=" " alt="" coords="595,336,942,392,941,397,595,341"/>
+<area shape="rect" id="Node000012" href="$classBucketGraph.html#a395e609a3dcdb495e2a43da1742af7bd" title="Eliminates bucket arcs based on a given threshold." alt="" coords="649,261,877,287"/>
+<area shape="poly" id="edge14_Node000009_Node000012" title=" " alt="" coords="578,309,680,288,681,293,579,314"/>
+<area shape="rect" id="Node000013" href="$classBucketGraph.html#a07082dcbaab12cbea07fbe16acee9bcf" title="Get the opposite bucket number for a given bucket index." alt="" coords="957,207,1134,248"/>
+<area shape="poly" id="edge20_Node000009_Node000013" title=" " alt="" coords="535,309,648,246,724,230,801,221,875,217,941,218,941,223,875,223,801,226,725,235,650,251,538,314"/>
+<area shape="rect" id="Node000017" href="$classBucketGraph.html#a394e55293111f386caf44ed9e67c5653" title=" " alt="" coords="939,323,1152,348"/>
+<area shape="poly" id="edge24_Node000009_Node000017" title=" " alt="" coords="602,324,924,330,923,336,601,329"/>
+<area shape="rect" id="Node000025" href="$classBucketGraph.html#a84a8345b541e0e44e44e6215a9cdc779" title="Obtains jump bucket arcs for the BucketGraph." alt="" coords="925,157,1166,183"/>
+<area shape="poly" id="edge22_Node000009_Node000025" title=" " alt="" coords="542,309,571,294,600,274,613,258,622,242,631,227,648,213,711,186,778,169,845,161,909,158,909,163,846,166,779,175,713,191,651,218,635,231,626,245,618,261,603,277,574,298,544,314"/>
+<area shape="poly" id="edge13_Node000010_Node000001" title=" " alt="" coords="680,436,194,436,194,430,680,430"/>
+<area shape="poly" id="edge12_Node000010_Node000002" title=" " alt="" coords="680,416,387,348,388,343,681,411"/>
+<area shape="poly" id="edge11_Node000010_Node000028" title=" " alt="" coords="845,424,941,417,942,422,846,429"/>
+<area shape="poly" id="edge15_Node000012_Node000003" title=" " alt="" coords="877,274,1198,280,1198,286,877,279"/>
+<area shape="poly" id="edge16_Node000012_Node000013" title=" " alt="" coords="845,258,941,242,942,247,846,263"/>
+<area shape="poly" id="edge17_Node000012_Node000017" title=" " alt="" coords="826,285,969,316,968,321,825,290"/>
+<area shape="poly" id="edge18_Node000017_Node000003" title=" " alt="" coords="1109,319,1198,300,1199,306,1110,325"/>
+<area shape="poly" id="edge23_Node000025_Node000003" title=" " alt="" coords="1133,181,1167,193,1214,221,1253,252,1250,256,1211,225,1165,198,1131,186"/>
+</map>

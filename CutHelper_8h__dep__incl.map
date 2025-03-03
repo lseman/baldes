@@ -1,0 +1,15 @@
+<map id="CutHelper.h" name="CutHelper.h">
+<area shape="rect" id="Node000001" title=" " alt="" coords="80,5,169,31"/>
+<area shape="rect" id="Node000002" href="$CutIntelligence_8h.html" title=" " alt="" coords="114,79,231,105"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="143,42,167,77,162,80,139,45"/>
+<area shape="rect" id="Node000003" href="$HeuristicHighOrder_8h.html" title=" " alt="" coords="5,153,148,178"/>
+<area shape="poly" id="edge8_Node000001_Node000003" title=" " alt="" coords="117,46,104,80,82,153,77,152,99,78,112,44"/>
+<area shape="poly" id="edge2_Node000002_Node000003" title=" " alt="" coords="146,116,94,154,91,150,143,112"/>
+<area shape="rect" id="Node000004" href="$SRC_8cpp.html" title="Implementation of functions and classes for solving VRP problems using Limited Memory Rank&#45;1 Cuts." alt="" coords="62,300,134,326"/>
+<area shape="poly" id="edge7_Node000002_Node000004" title=" " alt="" coords="173,121,164,183,155,219,142,253,126,280,110,301,106,298,122,277,137,251,150,217,159,182,168,120"/>
+<area shape="poly" id="edge3_Node000003_Node000004" title=" " alt="" coords="66,193,58,221,59,251,72,277,88,298,84,301,67,280,54,253,52,221,61,192"/>
+<area shape="rect" id="Node000005" href="$SRC_8h.html" title="Definitions for handling cuts and optimizations for the Vehicle Routing Problem with Time Windows (VR..." alt="" coords="69,226,127,252"/>
+<area shape="poly" id="edge4_Node000003_Node000005" title=" " alt="" coords="78,193,90,225,85,227,73,194"/>
+<area shape="poly" id="edge5_Node000005_Node000003" title=" " alt="" coords="96,212,84,179,89,178,101,210"/>
+<area shape="poly" id="edge6_Node000005_Node000004" title=" " alt="" coords="100,267,100,300,95,300,95,267"/>
+</map>

@@ -1,0 +1,6 @@
+<map id="CutStorage::removeCut" name="CutStorage::removeCut">
+<area shape="rect" id="Node000001" title=" " alt="" coords="5,29,161,55"/>
+<area shape="poly" id="edge2_Node000001_Node000001" title=" " alt="" coords="50,30,44,21,47,11,61,5,83,3,107,5,120,12,117,17,106,10,83,8,62,10,51,15,49,20,54,27"/>
+<area shape="rect" id="Node000002" href="$classCutStorage.html#a6c546f704d593f06544a3e7aed508dc8" title="Computes a unique cut key based on the provided base set and multipliers." alt="" coords="209,22,351,62"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="161,40,194,40,194,45,161,45"/>
+</map>

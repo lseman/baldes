@@ -1,0 +1,24 @@
+<map id="BucketGraph::BucketArcElimination" name="BucketGraph::BucketArcElimination">
+<area shape="rect" id="Node000001" title="Eliminates bucket arcs based on a given threshold." alt="" coords="5,126,233,152"/>
+<area shape="rect" id="Node000002" href="$classBucketGraph.html#af129eff306551dc7cc7fe00b919bbbd0" title="Assigns the buckets based on the specified direction." alt="" coords="757,83,899,123"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="134,124,195,79,236,56,280,39,399,11,448,5,494,3,541,6,591,13,710,39,750,53,786,72,783,77,748,58,709,44,590,18,540,11,494,8,448,10,400,16,281,44,238,61,198,84,137,128"/>
+<area shape="rect" id="Node000003" href="$classBucketGraph.html#a07082dcbaab12cbea07fbe16acee9bcf" title="Get the opposite bucket number for a given bucket index." alt="" coords="299,53,476,94"/>
+<area shape="poly" id="edge2_Node000001_Node000003" title=" " alt="" coords="174,123,285,96,287,101,175,128"/>
+<area shape="rect" id="Node000005" href="$classBucketGraph.html#aa1272b542e38efd60f4fe2ba7fc01d52" title=" " alt="" coords="308,119,467,159"/>
+<area shape="poly" id="edge5_Node000001_Node000005" title=" " alt="" coords="233,136,292,136,292,142,233,142"/>
+<area shape="rect" id="Node000006" href="$Definitions_8h.html#a086546d06aa565cdd48f436973ebc496" title="Prints an informational message with a specific format." alt="" coords="350,184,424,209"/>
+<area shape="poly" id="edge7_Node000001_Node000006" title=" " alt="" coords="183,150,336,183,335,188,182,155"/>
+<area shape="rect" id="Node000007" href="$classBucketGraph.html#a394e55293111f386caf44ed9e67c5653" title=" " alt="" coords="281,233,494,259"/>
+<area shape="poly" id="edge8_Node000001_Node000007" title=" " alt="" coords="143,150,204,184,282,219,302,226,300,231,280,224,202,189,141,155"/>
+<area shape="rect" id="Node000004" href="$classBucketGraph.html#abb791c45d27a9425607480e3101f7d28" title=" " alt="" coords="542,53,709,94"/>
+<area shape="poly" id="edge3_Node000003_Node000004" title=" " alt="" coords="476,71,527,71,527,76,476,76"/>
+<area shape="poly" id="edge4_Node000004_Node000002" title=" " alt="" coords="710,83,743,88,742,93,710,89"/>
+<area shape="poly" id="edge6_Node000005_Node000002" title=" " alt="" coords="467,130,742,107,742,113,468,135"/>
+<area shape="poly" id="edge9_Node000007_Node000002" title=" " alt="" coords="452,230,493,219,613,179,756,127,758,132,614,184,495,224,454,235"/>
+<area shape="rect" id="Node000008" href="$classBucketGraph.html#ad15267e0cffaa8dc5222028409c9e082" title=" " alt="" coords="558,220,693,245"/>
+<area shape="poly" id="edge10_Node000007_Node000008" title=" " alt="" coords="494,237,543,234,543,240,495,242"/>
+<area shape="rect" id="Node000009" href="$namespacenumericutils.html#a30fadd8aa82c3a907ce52a6c1735a378" title=" " alt="" coords="572,269,680,295"/>
+<area shape="poly" id="edge11_Node000007_Node000009" title=" " alt="" coords="477,257,556,269,556,274,476,262"/>
+<area shape="rect" id="Node000010" href="$namespacenumericutils.html#a2124ad1e887fe39c413948ee927c879e" title=" " alt="" coords="574,318,678,344"/>
+<area shape="poly" id="edge12_Node000007_Node000010" title=" " alt="" coords="420,257,543,305,561,311,560,316,541,310,418,262"/>
+</map>
