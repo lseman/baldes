@@ -181,30 +181,29 @@ class CustomSimplicialLDLT {
 
     template <bool DoLDLT, bool NonHermitian>
     void factorize_preordered(const CholMatrixType &ap) {
+        // Matrix size and pointers into the factorized matrix storage.
         const StorageIndex size = StorageIndex(ap.rows());
         const StorageIndex *Lp = m_matrix.outerIndexPtr();
         StorageIndex *Li = m_matrix.innerIndexPtr();
         Scalar *Lx = m_matrix.valuePtr();
 
-        // Keep original aligned vectors
+        // Temporary aligned storage for working vectors.
         alignas(64) std::vector<Scalar> y(size, Scalar(0));
         alignas(64) std::vector<StorageIndex> pattern(size, 0);
         alignas(64) std::vector<StorageIndex> tags(size, 0);
-
         m_diag.resize(size);
 
-        // Preallocate thread-local storage
+        // Preallocate thread-local storage for the main factorization loop.
         const int hardware_threads = std::thread::hardware_concurrency();
         std::vector<std::vector<Scalar>> y_local_storage(
             hardware_threads, std::vector<Scalar>(size, Scalar(0)));
-        // std::vector<bool> thread_ok(hardware_threads, true);
 
-        // Precompute patterns for each column
+        // Precompute the elimination patterns for each column.
+        // (Sequential due to dependencies in the tags vector.)
         std::vector<std::vector<StorageIndex>> column_patterns(size);
         for (StorageIndex k = 0; k < size; ++k) {
             StorageIndex top = size;
             tags[k] = k;
-
             for (typename CholMatrixType::InnerIterator it(ap, k); it; ++it) {
                 StorageIndex i = it.index();
                 if (i <= k) {
@@ -222,21 +221,23 @@ class CustomSimplicialLDLT {
             column_patterns[k].assign(pattern.begin() + top, pattern.end());
         }
 
-        // Use NVIDIA bulk sender for parallelism
+        // Parallel factorization of each column using a bulk sender.
         auto bulk_sender = stdexec::bulk(
-            stdexec::just(), size,  // Process each column as a separate task
+            stdexec::just(),
+            size,  // Each column is processed as an independent task.
             [this, &y, &tags, Lp, Li, Lx, size, &ap, &y_local_storage,
              hardware_threads, &column_patterns](std::size_t k) {
-                // Use thread-local storage
+                // Identify thread-local storage using a hash of the thread id.
                 size_t thread_id =
                     std::hash<std::thread::id>{}(std::this_thread::get_id()) %
                     hardware_threads;
                 auto &y_local = y_local_storage[thread_id];
 
+                // Reinitialize the tag for column k and count nonzeros.
                 tags[k] = k;
                 m_nonZerosPerCol[k] = 0;
 
-                // Process column k using local buffer
+                // Accumulate contributions from the original matrix.
                 for (typename CholMatrixType::InnerIterator it(ap, k); it;
                      ++it) {
                     StorageIndex i = it.index();
@@ -245,22 +246,24 @@ class CustomSimplicialLDLT {
                     }
                 }
 
+                // Compute the shifted diagonal element.
                 DiagonalScalar d =
                     getDiag(y_local[k]) * m_shiftScale + m_shiftOffset;
                 y_local[k] = Scalar(0);
 
+                // Use the precomputed pattern to update off-diagonals.
                 const auto &pattern = column_patterns[k];
                 for (StorageIndex i : pattern) {
                     const Scalar yi = y_local[i];
                     y_local[i] = Scalar(0);
-
                     if (yi != Scalar(0)) {
                         const Scalar diag_i =
-                            getDiag(m_diag[i]);  // Cache this value
+                            getDiag(m_diag[i]);  // Cache diagonal value.
                         const Scalar l_ki = yi / diag_i;
                         const StorageIndex p2 = Lp[i] + m_nonZerosPerCol[i];
 
-                        // Sparse update with potential SIMD optimization
+                        // Update entries in the local buffer (SIMD-friendly
+                        // inner loop hint).
                         for (StorageIndex p = Lp[i]; p < p2; ++p) {
                             y_local[Li[p]] -= getSymm(Lx[p]) * yi;
                         }
@@ -271,25 +274,13 @@ class CustomSimplicialLDLT {
                         ++m_nonZerosPerCol[i];
                     }
                 }
-
                 m_diag[k] = d;
-                // if (d == RealScalar(0)) {
-                // thread_ok[thread_id] = false;
-                // }
             });
 
         stdexec::sync_wait(stdexec::when_all(bulk_sender));
 
-        // Aggregate thread results
-        bool all_ok = true;
-        // for (bool t_ok : thread_ok) {
-        //     if (!t_ok) {
-        //         all_ok = false;
-        //         break;
-        //     }
-        // }
-
-        m_info = all_ok ? Success : NumericalIssue;
+        // Finalize factorization status.
+        m_info = Success;
         m_factorizationIsOk = true;
     }
 

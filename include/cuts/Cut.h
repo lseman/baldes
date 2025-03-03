@@ -315,6 +315,12 @@ class CutStorage {
         }
     }
 
+    void removeCut(Cut *cut) {
+        cut->key = compute_cut_key(cut->baseSet, cut->p.num, cut->p.den);
+        cutMaster_to_cut_map[cut->key] = cut->id;
+        removeCut(cut->id);
+    }
+
     // Remove a cut by index
     void removeCut(int cutIndex) {
         // Validate cutIndex.
@@ -406,6 +412,10 @@ class CutStorage {
 
         // Process each cut.
         for (const auto &cut : cuts) {
+            if (cut.p.num.size() == 1) {
+                alphas.push_back(0.0);
+                continue;
+            }
             double alpha = 0.0;
             int runningSum = 0;
             const int denominator = cut.p.den;
@@ -475,7 +485,7 @@ class CutStorage {
 
     // Compute coefficients for a single cut given a vector of paths
     std::vector<double> loadCoefficients(const std::vector<Path> &allPaths,
-                                         Cut &cut) {
+                                         Cut &cut, bool loaded = false) {
         std::vector<double> coefficients;
         coefficients.assign(allPaths.size(), 0.0);
         for (auto idx = 0; idx < allPaths.size(); ++idx) {
@@ -516,8 +526,10 @@ class CutStorage {
         }
 
         // adjust cut stuff
-        // cut.key = compute_cut_key(cut.baseSet, cut.p.num, cut.p.den);
-        // cutMaster_to_cut_map[cut.key] = cut.id;
+        if (loaded) {
+            cut.key = compute_cut_key(cut.baseSet, cut.p.num, cut.p.den);
+            cutMaster_to_cut_map[cut.key] = cut.id;
+        }
         return coefficients;
     }
     // Generate a cut key

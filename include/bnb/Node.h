@@ -293,10 +293,10 @@ class BNBNode : public std::enable_shared_from_this<BNBNode> {
     }
 
     double getSlack(int constraintIndex, const std::vector<double> &solution) {
-        // #if defined(IPM)
-        // return mip.getSlack(constraintIndex, solution);
-        // #elif defined(GUROBI)
-        return solver->getSlack(constraintIndex);
+        // #if !defined(GUROBI)
+        return mip.getSlack(constraintIndex, solution);
+        // #else
+        // return solver->getSlack(constraintIndex);
         // #endif
     }
 

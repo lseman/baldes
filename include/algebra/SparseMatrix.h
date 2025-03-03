@@ -16,7 +16,7 @@
 
 #include "Common.h"  // Your common definitions
 
-#if defined(IPM)
+#if defined(IPM) || defined(IPM_ACEL)
 #include <Eigen/Sparse>
 #endif
 
@@ -473,7 +473,7 @@ struct SparseMatrix {
         }
     }
 
-#if defined(IPM)
+#if defined(IPM) || defined(IPM_ACEL)
     // Convert to Eigen's SparseMatrix (const version) for IPM routines.
     Eigen::SparseMatrix<double> toEigenSparseMatrix() const {
         Eigen::SparseMatrix<double> eigenMatrix(num_rows, num_cols);

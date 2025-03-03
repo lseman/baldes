@@ -1,5 +1,4 @@
 #include "Definitions.h"
-#include "PDHG.h"
 
 #define EIGEN_INITIALIZE_MATRICES_BY_ZERO
 
@@ -299,15 +298,12 @@ void IPSolver::solve_newton_system(
         xi_d_mod.resize(xi_d.size());
     }
 
-// Use vectorized operations for division
-#pragma omp parallel sections
+    // Use vectorized operations for division
     {
-#pragma omp section
         {
             // Compute xi_d_mod = xi_d - xi_xs./iter_x efficiently
             xi_d_mod = xi_d.array() - (xi_xs.array() / iter_x.array());
         }
-#pragma omp section
         {
             // Pre-compute xi_u_copy = xi_u - xi_vw./iter_w
             Eigen::VectorXd xi_u_copy =
@@ -442,68 +438,55 @@ double IPSolver::max_alpha(const Eigen::VectorXd &x, const Eigen::VectorXd &dx,
  *
  */
 void IPSolver::run_optimization(ModelData &model, const double tol) {
+    // Get optimization data
     auto componentes = convertToOptimizationData(model);
+    const Eigen::SparseMatrix<double> &As = componentes.As;
+    const Eigen::VectorXd &bs = componentes.bs;
+    const Eigen::VectorXd &cs = componentes.cs;
+    const Eigen::VectorXd &lo = componentes.lo;
+    const Eigen::VectorXd &hi = componentes.hi;
+    const Eigen::VectorXd &sense = componentes.sense;
 
-    Eigen::SparseMatrix<double> As = componentes.As;
-    Eigen::VectorXd bs = componentes.bs;
-    Eigen::VectorXd cs = componentes.cs;
-    Eigen::VectorXd lo = componentes.lo;
-    Eigen::VectorXd hi = componentes.hi;
-    Eigen::VectorXd sense = componentes.sense;
-
-    int nv_orig = cs.size();
+    const int nv_orig = cs.size();
 
     // Convert to standard form
     Eigen::SparseMatrix<double> A;
-    Eigen::VectorXd b;
-    Eigen::VectorXd c;
+    Eigen::VectorXd b, c;
     convert_to_standard_form(As, bs, cs, lo, hi, sense, A, b, c);
 
-    int n = A.cols();
-    int m = A.rows();
+    const int n = A.cols();
+    const int m = A.rows();
+    const int max_iter = 500;
 
-    // Tolerance and maximum iterations
-    int max_iter = 100;
-
-    // Initialize vectors and scalars
+    // Initialize primal/dual variables
     Eigen::VectorXd x = Eigen::VectorXd::Ones(n);
     Eigen::VectorXd lambda = Eigen::VectorXd::Zero(m);
     Eigen::VectorXd s = Eigen::VectorXd::Ones(n);
-
     warm_start = false;
     n_slacks_old = n_slacks;
 
-    // Initialize ubi and ubv
-    Eigen::VectorXi ubi;
-    Eigen::VectorXd ubv;
-    int count = 0;
-    for (int i = 0; i < hi.size(); i++) {
-        if (hi[i] != std::numeric_limits<double>::infinity()) {
-            count++;
-        }
-    }
-
-    Eigen::VectorXi tempUbi(count);
-    Eigen::VectorXd tempUbv(count);
-
+    // Combine loops to determine finite upper bounds (hi) and record their
+    // indices and values
     double infty = std::numeric_limits<double>::infinity();
-    count = 0;
-    for (int i = 0; i < hi.size(); i++) {
+    std::vector<int> indices;
+    std::vector<double> ubv_std;
+    indices.reserve(hi.size());
+    ubv_std.reserve(hi.size());
+    for (int i = 0; i < hi.size(); ++i) {
         if (hi[i] != infty) {
-            tempUbi[count] = i;
-            tempUbv[count] = hi[i];
-            count++;
+            indices.push_back(i);
+            ubv_std.push_back(hi[i]);
         }
     }
-    ubi = tempUbi;
-    ubv = tempUbv;
+    Eigen::VectorXi ubi = Eigen::Map<Eigen::VectorXi>(
+        indices.data(), static_cast<int>(indices.size()));
+    Eigen::VectorXd ubv = Eigen::Map<Eigen::VectorXd>(
+        ubv_std.data(), static_cast<int>(ubv_std.size()));
 
+    // Initialize additional vectors
     Eigen::VectorXd v = Eigen::VectorXd::Ones(ubv.size());
     Eigen::VectorXd w = Eigen::VectorXd::Ones(ubv.size());
-
-    double tau = 1.0;
-    double kappa = 1.0;
-
+    double tau = 1.0, kappa = 1.0;
     Eigen::VectorXd regP = Eigen::VectorXd::Ones(n);
     Eigen::VectorXd regD = Eigen::VectorXd::Ones(m);
     double regG = 1.0;
@@ -511,42 +494,48 @@ void IPSolver::run_optimization(ModelData &model, const double tol) {
     ls.reset();
     start_linear_solver(ls, A);
 
-    int nc = A.rows();
-    int nv = A.cols();
-    int nu = ubi.size();
+    const int nc = A.rows();
+    const int nv = A.cols();
+    const int nu = ubi.size();
 
-    Eigen::VectorXd delta_x(nv), delta_y(nc), delta_z(nu);
+    // Preallocate vectors (reuse storage in each iteration)
+    Eigen::VectorXd delta_x = Eigen::VectorXd::Zero(nv);
+    Eigen::VectorXd delta_y = Eigen::VectorXd::Zero(nc);
+    Eigen::VectorXd delta_z = Eigen::VectorXd::Zero(nu);
     Residuals res;
 
-    double r_min = std::sqrt(std::numeric_limits<double>::epsilon());
-    int attempt = 0, ncor = 0;
+    const double r_min = std::sqrt(std::numeric_limits<double>::epsilon());
+    int ncor = 0;
     double _p, _d, _g, mu;
     double alpha, alpha_c, alpha_;
     double beta, gamma, damping, oneMinusAlpha;
     double mu_l, mu_u, taukappa, t0;
     Eigen::VectorXd theta_vw, theta_xs;
-    Eigen::VectorXd xi_p, xi_d, xi_u, xi_xs, xi_vw;
-    Eigen::VectorXd Delta_x(x.size()), Delta_lambda(lambda.size()),
-        Delta_w(w.size()), Delta_s(s.size()), Delta_v(v.size());
-    double Delta_tau, Delta_kappa;
-    Eigen::VectorXd Delta_x_c(x.size()), Delta_lambda_c(lambda.size()),
-        Delta_w_c(w.size()), Delta_s_c(s.size()), Delta_v_c(v.size());
-    double Delta_tau_c, Delta_kappa_c;
+    Eigen::VectorXd Delta_x = Eigen::VectorXd::Zero(x.size());
+    Eigen::VectorXd Delta_lambda = Eigen::VectorXd::Zero(lambda.size());
+    Eigen::VectorXd Delta_w = Eigen::VectorXd::Zero(w.size());
+    Eigen::VectorXd Delta_s = Eigen::VectorXd::Zero(s.size());
+    Eigen::VectorXd Delta_v = Eigen::VectorXd::Zero(v.size());
+    double Delta_tau = 0.0, Delta_kappa = 0.0;
+    Eigen::VectorXd Delta_x_c = Eigen::VectorXd::Zero(x.size());
+    Eigen::VectorXd Delta_lambda_c = Eigen::VectorXd::Zero(lambda.size());
+    Eigen::VectorXd Delta_w_c = Eigen::VectorXd::Zero(w.size());
+    Eigen::VectorXd Delta_s_c = Eigen::VectorXd::Zero(s.size());
+    Eigen::VectorXd Delta_v_c = Eigen::VectorXd::Zero(v.size());
+    double Delta_tau_c = 0.0, Delta_kappa_c = 0.0;
     Eigen::VectorXd xs, vw, t_xs, t_vw;
-    Eigen::ArrayXd t_xs_lower, t_xs_upper, t_vw_lower, t_vw_upper;
-    double delta_0, bl_dot_lambda, correction;
+    double delta_0, bl_dot_lambda;
     bool saved_interior_solution_bool = false;
 
     // Adaptive tolerance parameters
-    const double initial_tol = 1e-6;  // Initial tolerance
-    const double min_tol = 1e-10;     // Minimum tolerance
-    const double scale_factor = 0.1;  // Scaling factor for adaptive tolerance
+    double adaptive_tol = 1e-9;
 
+    // Main optimization loop
     for (int k = 0; k < max_iter; ++k) {
         ncor = 0;
         beta = 0.1;
 
-        // Batch zero initialization
+        // Zero out temporary vectors (reuse allocated memory)
         delta_x.setZero();
         delta_y.setZero();
         delta_z.setZero();
@@ -555,69 +544,61 @@ void IPSolver::run_optimization(ModelData &model, const double tol) {
         Delta_w.setZero();
         Delta_s.setZero();
         Delta_v.setZero();
-        Delta_tau = Delta_kappa = 0.0;
+        Delta_tau = 0.0;
+        Delta_kappa = 0.0;
 
-        // Update residuals without vbv and vbi
+        // Update residuals and compute centrality measure
         update_residuals(res, x, lambda, s, v, w, A, b, c, ubv, ubi, tau,
                          kappa);
         mu = (tau * kappa + x.dot(s)) / (n + nu + 1.0);
 
-        // Efficient residual calculations
-        double rp_norm = res.rp.lpNorm<Eigen::Infinity>();
-        double ru_norm = res.ru.lpNorm<Eigen::Infinity>();
-        double rd_norm = res.rd.lpNorm<Eigen::Infinity>();
-        double b_norm = b.lpNorm<Eigen::Infinity>();
-        double ubv_norm = ubv.lpNorm<Eigen::Infinity>();
-        double c_norm = c.lpNorm<Eigen::Infinity>();
-
-        // Adaptive tolerance computation
-        double adaptive_tol = std::max(min_tol, initial_tol * scale_factor);
+        // Compute norms for convergence criteria (using Eigen’s vectorized norm
+        // computations)
+        const double rp_norm = res.rp.lpNorm<Eigen::Infinity>();
+        const double ru_norm = res.ru.lpNorm<Eigen::Infinity>();
+        const double rd_norm = res.rd.lpNorm<Eigen::Infinity>();
+        const double b_norm = b.lpNorm<Eigen::Infinity>();
+        const double ubv_norm = ubv.lpNorm<Eigen::Infinity>();
+        const double c_norm = c.lpNorm<Eigen::Infinity>();
 
         // Combined residual computations
         bl_dot_lambda = b.dot(lambda) - ubv.dot(w);
-        _p = std::fmax(rp_norm / (tau * (1.0 + b_norm)),
-                       ru_norm / (tau * (1.0 + ubv_norm)));
+        _p = std::max(rp_norm / (tau * (1.0 + b_norm)),
+                      ru_norm / (tau * (1.0 + ubv_norm)));
         _d = rd_norm / (tau * (1.0 + c_norm));
         _g = std::abs(c.dot(x) - bl_dot_lambda) /
              (tau + std::abs(bl_dot_lambda));
 
-        // Save interior solution if residuals are small
-        if (!saved_interior_solution_bool &&
-            (_d <= adaptive_tol && _g <= adaptive_tol * 2)) {
-            save_interior_solution(x, lambda, w, s, v, tau, kappa);
-            saved_interior_solution_bool = true;
-            warm_start = true;
-        }
+        // Save interior solution if conditions are met
+        // if (!saved_interior_solution_bool &&
+        //     (_d <= adaptive_tol && _g <= adaptive_tol * 2)) {
+        //     save_interior_solution(x, lambda, w, s, v, tau, kappa);
+        //     saved_interior_solution_bool = true;
+        //     warm_start = true;
+        // }
+        if (_d <= adaptive_tol && _g <= tol) break;
+        // adaptive_tol = std::max(min_tol, adaptive_tol * scale_factor);
 
-        // Check convergence with adaptive tolerance
-        if (_p <= adaptive_tol && _d <= adaptive_tol && _g <= tol) break;
-
-        // Update adaptive tolerance for the next iteration
-        adaptive_tol = std::max(min_tol, adaptive_tol * scale_factor);
-
-        // Efficient scaling computations
+        // Compute scaling factors
         theta_vw = w.cwiseQuotient(v);
         theta_xs = s.cwiseQuotient(x);
         for (int i = 0; i < ubi.size(); ++i) {
             theta_xs[ubi[i]] += theta_vw[i];
         }
 
-        // Update regularizations dynamically
+        // Update regularization dynamically (reuse regP/regD to avoid extra
+        // allocation)
         for (int attempt = 0; attempt < 3; ++attempt) {
-            // Adjust regularization based on solver performance
             regP = (regP / 10.0).cwiseMax(r_min);
             regD = (regD / 10.0).cwiseMax(r_min);
             regG = std::max(r_min, regG / 10.0);
-
-            // Update linear solver with new regularization
             if (update_linear_solver(ls, theta_xs, regP, regD) == 0) break;
-
-            // Increase regularization if solver fails
             regP *= 100.0;
             regD *= 100.0;
             regG *= 100.0;
         }
 
+        // Solve the augmented system
         solve_augsys(delta_x, delta_y, delta_z, ls, theta_vw, ubi, b, c, ubv);
         delta_0 = regG + kappa / tau - delta_x.dot(c) + delta_y.dot(b) -
                   delta_z.dot(ubv);
@@ -632,14 +613,12 @@ void IPSolver::run_optimization(ModelData &model, const double tol) {
 
         alpha = max_alpha(x, Delta_x, v, Delta_v, s, Delta_s, w, Delta_w, tau,
                           Delta_tau, kappa, Delta_kappa);
-
         oneMinusAlpha = 1.0 - alpha;
-        gamma = std::fmax(
-            oneMinusAlpha * oneMinusAlpha * std::fmin(beta, oneMinusAlpha),
-            0.1);
+        gamma = std::max(
+            oneMinusAlpha * oneMinusAlpha * std::min(beta, oneMinusAlpha), 0.1);
         damping = 1.0 - gamma;
 
-        // Second Newton solve with damping
+        // Second (damped) Newton solve
         solve_newton_system(
             Delta_x, Delta_lambda, Delta_w, Delta_s, Delta_v, Delta_tau,
             Delta_kappa, ls, theta_vw, b, c, ubi, ubv, delta_x, delta_y,
@@ -654,14 +633,13 @@ void IPSolver::run_optimization(ModelData &model, const double tol) {
         alpha = max_alpha(x, Delta_x, v, Delta_v, s, Delta_s, w, Delta_w, tau,
                           Delta_tau, kappa, Delta_kappa);
 
-        // High order corrections
+        // High-order correction steps
         while (ncor <= 2 && alpha < 0.9995) {
             ncor++;
             alpha_ = std::min(1.0, 2.0 * alpha);
             mu_l = beta * mu * gamma;
             mu_u = gamma * mu / beta;
 
-            // Compute products and corrections
             xs = x + alpha_ * Delta_x;
             xs.array() *= (s + alpha_ * Delta_s).array();
             vw = v + alpha_ * Delta_v;
@@ -679,14 +657,13 @@ void IPSolver::run_optimization(ModelData &model, const double tol) {
             taukappa =
                 (tau + alpha_ * Delta_tau) * (kappa + alpha_ * Delta_kappa);
             t0 = std::clamp(taukappa, mu_l, mu_u) - taukappa;
-
             const double sum_correction =
                 (t_xs.sum() + t_vw.sum() + t0) / (nv + nu + 1);
             t_xs.array() -= sum_correction;
             t_vw.array() -= sum_correction;
             t0 -= sum_correction;
 
-            // Save current directions
+            // Save current directions before correction
             Delta_x_c = Delta_x;
             Delta_lambda_c = Delta_lambda;
             Delta_w_c = Delta_w;
@@ -707,8 +684,7 @@ void IPSolver::run_optimization(ModelData &model, const double tol) {
             alpha_c =
                 max_alpha(x, Delta_x_c, v, Delta_v_c, s, Delta_s_c, w,
                           Delta_w_c, tau, Delta_tau_c, kappa, Delta_kappa_c);
-
-            if (alpha_c > alpha_) {
+            if (alpha_c > alpha) {
                 Delta_x = Delta_x_c;
                 Delta_lambda = Delta_lambda_c;
                 Delta_w = Delta_w_c;
@@ -718,11 +694,10 @@ void IPSolver::run_optimization(ModelData &model, const double tol) {
                 Delta_kappa = Delta_kappa_c;
                 alpha = alpha_c;
             }
-
             if (alpha_c < 1.1 * alpha_) break;
         }
 
-        // Final update step
+        // Final update step (with slight back-off)
         alpha *= 0.9995;
         x += alpha * Delta_x;
         lambda += alpha * Delta_lambda;
@@ -737,11 +712,9 @@ void IPSolver::run_optimization(ModelData &model, const double tol) {
     const double inv_tau = 1.0 / tau;
     Eigen::VectorXd original_x(As.cols());
     int free_var = 0;
-
     for (int j = 0; j < lo.size(); ++j) {
         const double l = lo[j];
         const double h = hi[j];
-
         if (l == -infty && h == infty) {
             original_x[j] = (x[j + free_var] - x[nv_orig + free_var]) * inv_tau;
             ++free_var;
@@ -754,7 +727,6 @@ void IPSolver::run_optimization(ModelData &model, const double tol) {
         }
     }
 
-    // Final objective computation and output
     objVal = cs.dot(original_x);
     lambda *= inv_tau;
     dual_vals.assign(lambda.data(), lambda.data() + lambda.size());
