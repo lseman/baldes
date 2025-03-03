@@ -186,6 +186,10 @@ void LimitedMemoryRank1Cuts::separate(const SparseMatrix &A,
                             }
                         }
                     }
+                    // set all AM vector to 1
+                    for (int node_idx = 0; node_idx < N_SIZE; ++node_idx) {
+                        AM[node_idx / 64] |= (1ULL << (node_idx % 64));
+                    }
 
                     // Compute the cut coefficients and accumulate lhs.
                     double computed_lhs = 0.0;
@@ -255,13 +259,13 @@ std::pair<bool, bool> LimitedMemoryRank1Cuts::runSeparation(
     std::vector<double> solution;
     GET_SOL(node);
 
-    fmt::print("Starting separation phase...\n");
+    // fmt::print("Starting separation phase...\n");
     initializeVertexRouteMap();
 
     // Perform separation routines for Rank-1 cuts.
-    fmt::print("Separating Rank-1 cuts...\n");
+    // fmt::print("Separating Rank-1 cuts...\n");
     separateR1C1(matrix.A_sparse, solution);
-    fmt::print("Separation Rank-3 cuts...\n");
+    // fmt::print("Separation Rank-3 cuts...\n");
     separate(matrix.A_sparse, solution);
 
     // Record the cut count after the first separation phase.
@@ -276,7 +280,7 @@ std::pair<bool, bool> LimitedMemoryRank1Cuts::runSeparation(
     high_rank_cuts.allPaths = allPaths;
     high_rank_cuts.nodes = nodes;
     high_rank_cuts.arc_duals = arc_duals;
-    fmt::print("Separating High-Rank cuts...\n");
+    // fmt::print("Separating High-Rank cuts...\n");
     high_rank_cuts.separate(matrix.A_sparse, solution);
 
     const size_t cuts_after_separation = cuts->size();
@@ -305,6 +309,7 @@ bool LimitedMemoryRank1Cuts::cutCleaner(
     // if (cuts->busy) return false;
 
     GET_SOL(node);  // Retrieves the solution into 'solution'.
+    // print soltuino size
 
     // Traverse SRCconstraints in reverse.
     for (auto it = SRCconstraints.rbegin(); it != SRCconstraints.rend();) {
@@ -392,7 +397,7 @@ std::vector<CandidateSet> LocalSearch::solve(
             std::vector<int> sol_nodes(sol.nodes.begin(), sol.nodes.end());
             std::sort(sol_nodes.begin(), sol_nodes.end());
             double similarity = computeSimilarity(cand_nodes, sol_nodes);
-            if (similarity > 0.7 ||
+            if (similarity > 0.9 ||
                 std::abs(sol.violation - candidate.violation) <
                     LocalSearchConfig::DIVERSITY_THRESHOLD) {
                 return false;

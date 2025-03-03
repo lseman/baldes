@@ -51,6 +51,10 @@
 #include "ipm/IPSolver.h"
 #endif
 
+#if defined(IPM_ACEL)
+#include "ipm/IPSolver.h"
+#endif
+
 #ifdef TR
 #include "TR.h"
 #endif
@@ -210,11 +214,20 @@ class VRProblem {
         auto &allPaths = node->paths;
         auto &SRCconstraints = node->SRCconstraints;
 
-        // Containers to collect bounds, costs, columns, etc.
-        std::vector<double> lb, ub, obj;
+        // Reserve capacity for data-collecting containers.
+        const size_t reserveSize = (!enumerate ? N_ADD : 1000);
+        std::vector<double> lb;
+        lb.reserve(reserveSize);
+        std::vector<double> ub;
+        ub.reserve(reserveSize);
+        std::vector<double> obj;
+        obj.reserve(reserveSize);
         std::vector<MIPColumn> cols;
+        cols.reserve(reserveSize);
         std::vector<std::string> names;
+        names.reserve(reserveSize);
         std::vector<VarType> vtypes;
+        vtypes.reserve(reserveSize);
 
         auto &pathSet = node->pathSet;
         inner_obj = 0.0;
@@ -242,26 +255,31 @@ class VRProblem {
             if (enumerate && counter > 1000) break;
             pathSet.insert(path);
 
-            // Reset coefficients for this column.
-            std::fill(coluna.begin(), coluna.end(), 0.0);
-
             double travel_cost = label->real_cost;
             std::string name = "x[" + std::to_string(allPaths.size()) + "]";
             MIPColumn col;
 
             // --- Step 1: Compute coefficients for node constraints ---
-            // Increment the coefficient for each node in the route (except
-            // depot nodes).
+            // Instead of resetting the full vector, track only the indices that
+            // are updated.
+            std::vector<int> updatedIndices;
+            updatedIndices.reserve(label->nodes_covered.size());
             for (const auto &n : label->nodes_covered) {
                 if (likely(n > 0 && n != N_SIZE - 1)) {
-                    coluna[n - 1]++;
+                    int idx = n - 1;
+                    if (coluna[idx] == 0.0) {
+                        updatedIndices.push_back(idx);
+                    }
+                    coluna[idx]++;
                 }
             }
-            // Add non-zero terms to the column.
-            for (int i = 0; i < N_SIZE - 2; i++) {
-                if (coluna[i] != 0.0) {
-                    col.addTerm(i, coluna[i]);
+            // Add non-zero terms for updated indices and reset them for the
+            // next iteration.
+            for (int idx : updatedIndices) {
+                if (coluna[idx] != 0.0) {
+                    col.addTerm(idx, coluna[idx]);
                 }
+                coluna[idx] = 0.0;
             }
             // Add vehicle constraint term.
             col.addTerm(N_SIZE - 2, 1.0);
@@ -271,9 +289,7 @@ class VRProblem {
                 auto vec = cuts.computeLimitedMemoryCoefficients(path.route);
                 if (!vec.empty()) {
                     for (int i = 0; i < vec.size(); i++) {
-                        // if (std::abs(vec[i]) > 1e-3) {
                         col.addTerm(SRCconstraints[i]->index(), vec[i]);
-                        // }
                     }
                 }
             });
@@ -343,6 +359,8 @@ class VRProblem {
         const auto &allPaths = node->paths;
         // Process each cut.
         auto ctr = 0;
+
+        std::vector<Cut *> cutsToBeRemoved;
         for (auto &cut : cuts) {
             // If the cut was already added and hasn't been updated, skip it.
             if ((cut.added && !cut.updated) && !loaded) {
@@ -359,12 +377,19 @@ class VRProblem {
                 cut.id = z;
             }
 
+            auto cutSize = cut.p.num.size();
+            if (loaded && (cutSize == 1)) {
+                // delete the cut
+                cutsToBeRemoved.push_back(&cut);
+                continue;
+            }
+
             std::vector<double> coeffs;
             if (!loaded) {
                 // coeffs = cut.coefficients;
-                coeffs = cuts.loadCoefficients(allPaths, cut);
+                coeffs = cut.coefficients;
             } else {
-                coeffs = r1c->cutStorage.loadCoefficients(allPaths, cut);
+                coeffs = r1c->cutStorage.loadCoefficients(allPaths, cut, true);
             }
 
             // If the cut was previously added and now updated, simply change
@@ -392,6 +417,10 @@ class VRProblem {
             cut.updated = false;
         }
 
+        // iterate in reverse order to avoid invalidating indices
+        for (int i = cutsToBeRemoved.size() - 1; i >= 0; i--) {
+            r1c->cutStorage.removeCut(cutsToBeRemoved[i]);
+        }
         return changed;
     }
 
@@ -619,7 +648,7 @@ class VRProblem {
 
         // Define stopping criteria and initialization for the iterative column
         // generation.
-        const double gap = 1e-6;
+        double gap = 1e-6;
         bool ss = false;
         int stage = 1;
         bool misprice = true;
@@ -657,9 +686,11 @@ class VRProblem {
 
 #ifdef IPM_ACEL
         // Optional IPM acceleration parameters.
-        int base_threshold = 200;
+        int base_threshold = 5;
         int adaptive_threshold;
         bool use_ipm_duals = false;
+        IPSolver *ipm_solver = new IPSolver();
+
 #endif
 
         // Additional flags and counters.
@@ -743,7 +774,7 @@ class VRProblem {
 
                             if (bucket_graph->A_MAX == N_SIZE) {
                                 fmt::print(
-                                    "No violated cuts fouund with obj = {}\n",
+                                    "No violated cuts found with obj = {}\n",
                                     inner_obj);
                                 if (std::abs(inner_obj) < 1.0) {
                                     print_info(
@@ -780,6 +811,9 @@ class VRProblem {
                 bucket_graph->ss = false;
             } else if (cuts_enabled) {
                 // If cuts were already enabled, try cleaning them.
+#ifdef IPM
+                RUN_OPTIMIZATION(node, 1e-6);
+#endif
                 bool cleared = r1c->cutCleaner(node, SRCconstraints);
                 // bool cleared = false;
                 if (cleared) {
@@ -800,7 +834,7 @@ class VRProblem {
 #if defined(STAB) && defined(IPM)
             if (stage >= 4) {
 #endif
-                double d = 1;
+                double d = 10;
                 matrix = node->extractModelDataSparse();
                 double obj_change = std::abs(lp_obj - lp_obj_old);
                 // fmt::print("Objective change: {}\n", obj_change);
@@ -824,6 +858,7 @@ class VRProblem {
                 gap = std::clamp(
                     gap, 1e-8,
                     1e-1);  // Clamping gap to be between 1e-6 and 1e-2
+                fmt::print("Gap: {}\n", gap);
                 node->ipSolver->run_optimization(matrix, gap);
 
                 lp_obj_old = lp_obj;
@@ -926,8 +961,24 @@ class VRProblem {
 
 #if defined(STAB) && defined(IPM)
             if (stage >= 4) {
-                updateGraphAndSolve();
+                updateGraphAndSolve(nodeDuals);
+
+                if (colAdded == 0 && non_violated_cuts) {
+                    print_info(
+                        "No columns and no violated cuts found, calling it a "
+                        "day\n");
+                    break;
+                }
+
+                if ((colAdded == 0 || inner_obj > -1.0) && stage == 4) {
+                    force_cuts = true;
+                }
+
+                if (colAdded == 0) {
+                    force_cuts = true;
+                }
             }
+
 #endif
 
 #ifdef STAB
@@ -1009,8 +1060,8 @@ class VRProblem {
                             gap = std::clamp(gap, 1e-8, 1e-1);
 
                             // Run optimization and adjust duals
-                            ipm_solver.run_optimization(matrix, gap);
-                            nodeDuals = ipm_solver.getDuals();
+                            ipm_solver->run_optimization(matrix, gap);
+                            nodeDuals = ipm_solver->getDuals();
                             for (auto &dual : nodeDuals) {
                                 dual = -dual;
                             }
@@ -1024,29 +1075,29 @@ class VRProblem {
                         iter_non_improv += 1;
                         if (iter_non_improv > adaptive_threshold) {
                             if (stab.alpha > 0) {
-                                // print_info(
-                                // "No improvement in the last "
-                                // "iterations, "
-                                // "generating dual perturbation with "
-                                // "IPM\n");
-
                                 print_info(
                                     "No improvement in the last "
                                     "iterations, "
-                                    "forcing cuts\n");
+                                    "generating dual perturbation with "
+                                    "IPM\n");
+
+                                // print_info(
+                                //     "No improvement in the last "
+                                //     "iterations, "
+                                //     "forcing cuts\n");
+                                //
                                 force_cuts = true;
 
                                 // create small perturbation random perturbation
                                 // on nodeDuals
-                                for (auto &dual : nodeDuals) {
-                                    if (std::abs(dual) > 1e-3) {
-                                        dual *= (1.0 + dis(gen));
-                                    }
-                                }
-                                // updateGapAndRunOptimization(
-                                //     node, lp_obj, inner_obj, ipm_solver,
-                                //     iter_non_improv, use_ipm_duals,
-                                //     nodeDuals);
+                                // for (auto &dual : nodeDuals) {
+                                //     if (std::abs(dual) > 1e-3) {
+                                //         dual *= (1.0 + dis(gen));
+                                //     }
+                                // }
+                                updateGapAndRunOptimization(
+                                    node, lp_obj, inner_obj, ipm_solver,
+                                    iter_non_improv, use_ipm_duals, nodeDuals);
                                 stab.define_smooth_dual_sol(nodeDuals);
                                 iter_non_improv = 0;
                                 // use_ipm_duals = true;
@@ -1111,7 +1162,9 @@ class VRProblem {
                 }
 
                 if (colAdded == 0 && non_violated_cuts) {
-                    print_info("No violated cuts found, calling it a day\n");
+                    print_info(
+                        "No columns and no violated cuts found, calling it a "
+                        "day\n");
                     break;
                 }
 

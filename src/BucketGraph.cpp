@@ -425,10 +425,6 @@ void BucketGraph::augment_ng_memories(std::vector<double> &solution,
                 cycle.reserve(i - it->second + 1);
                 for (size_t j = it->second; j <= i; ++j)
                     cycle.push_back(path[j]);
-                // check if cycles has repeated clients, if so, discard it
-                // if (std::set<uint16_t>(cycle.begin(), cycle.end()).size() !=
-                //     cycle.size())
-                //     continue;
                 cycles.push_back(std::move(cycle));
                 break;  // Process only one cycle per path.
             }
@@ -439,7 +435,7 @@ void BucketGraph::augment_ng_memories(std::vector<double> &solution,
 
     // Sort cycles by increasing size (small cycles processed first).
     pdqsort(cycles.begin(), cycles.end(),
-            [](const auto &a, const auto &b) { return a.size() > b.size(); });
+            [](const auto &a, const auto &b) { return a.size() < b.size(); });
 
     int forbidden_count = 0;
 

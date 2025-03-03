@@ -33,7 +33,7 @@ class HighRankCuts {
    private:
     static constexpr int MIN_RANK = 3;
     static constexpr int MAX_RANK = 5;
-    static constexpr int MAX_COMBINATIONS = 10;
+    static constexpr int MAX_COMBINATIONS = 6;
     static constexpr int MAX_WORKING_SET_SIZE = 12;
 
     exec::static_thread_pool pool =
@@ -310,11 +310,11 @@ class HighRankCuts {
         ankerl::unordered_dense::set<int> nodes,
         ankerl::unordered_dense::set<int> memory, const SparseMatrix &A,
         const std::vector<double> &x) {
-        static constexpr double EPSILON = 1e-3;
+        static constexpr double EPSILON = 1e-6;
         // Convert nodes set to a sorted vector to allow indexed access.
-        std::vector<int> node_vec(nodes.begin(), nodes.end());
-        std::sort(node_vec.begin(), node_vec.end());
-        const int RANK = static_cast<int>(node_vec.size());
+        // std::vector<int> node_vec(nodes.begin(), nodes.end());
+        // std::sort(node_vec.begin(), node_vec.end());
+        const int RANK = static_cast<int>(nodes.size());
 
         // Initialize result variables.
         double best_violation = 0.0;
@@ -332,14 +332,14 @@ class HighRankCuts {
         std::vector<int> node_order(N_SIZE, -1);
 
         // Populate candidate_bits and node_order based on candidate nodes.
-        for (int i = 0; i < RANK; ++i) {
-            const int node = node_vec[i];
+        int i = 0;
+        for (auto node : nodes) {
             const int word_idx = node / 64;
             const uint64_t bit_mask = bit_mask_lookup[node % 64];
 
             candidate_bits[word_idx] |= bit_mask;
             augmented_memory_bits[word_idx] |= bit_mask;
-            node_order[node] = i;
+            node_order[node] = i++;
         }
 
         // Add memory nodes to augmented_memory_bits.
@@ -352,7 +352,7 @@ class HighRankCuts {
         const auto &permutations = getPermutations(RANK);
 
         // Pre-allocate a vector for storing cut coefficients.
-        std::vector<double> cut_coefficients;
+        std::vector<int> cut_coefficients;
         cut_coefficients.reserve(allPaths.size());
 
         // Evaluate each permutation.
@@ -363,7 +363,7 @@ class HighRankCuts {
             const SRCPermutation src_perm{perm.num, perm.den};
 
             // Reset coefficient vector and accumulator for LHS.
-            cut_coefficients.clear();
+            // cut_coefficients.clear();
             double lhs = 0.0;
 
             // Process each path from the global allPaths container.
@@ -372,17 +372,17 @@ class HighRankCuts {
 
                 // If the path's x value is effectively zero, skip computation.
                 if (numericutils::isZero(x_val)) {
-                    cut_coefficients.push_back(0.0);
+                    // cut_coefficients.push_back(0.0);
                     continue;
                 }
 
                 // Compute the coefficient using candidate_bits,
                 // augmented_memory_bits, current permutation, the route from
                 // the path, and the node ordering.
-                const double coeff = computeLimitedMemoryCoefficient(
+                const int coeff = computeLimitedMemoryCoefficient(
                     candidate_bits, augmented_memory_bits, src_perm,
                     allPaths[path_idx].route, node_order);
-                cut_coefficients.push_back(coeff);
+                // cut_coefficients.push_back(coeff);
                 lhs += coeff * x_val;
             }
 
@@ -446,6 +446,7 @@ class HighRankCuts {
         const auto cut_rank = candidate.nodes.size();
         if (cut_rank == 4) {
             cut.type = CutType::FourRow;
+            // return;
         } else if (cut_rank == 5) {
             cut.type = CutType::FiveRow;
         }
@@ -479,48 +480,61 @@ class HighRankCuts {
     std::vector<double> solution;
 
     void separate(const SparseMatrix &A, const std::vector<double> &x) {
-        // Initialize route mapping and compute node scores.
-        // initializeVertexRouteMap();
+        // Set the solution.
         solution = x;
+
+        // Compute node scores.
         auto node_scores = computeNodeScores(A, x);
 
-        // Generate candidate sets using the computed node scores.
-        auto candidates = generateCandidates(node_scores, A, x);
+        // Generate candidate sets.
+        // (Assuming generateCandidates returns a container type that is not
+        // random access.)
+        auto candidates_set = generateCandidates(node_scores, A, x);
+        std::vector<CandidateSet> candidates(candidates_set.begin(),
+                                             candidates_set.end());
 
         // Prepare for parallel local search.
-        const int JOBS = std::thread::hardware_concurrency();
+        const size_t num_candidates = candidates.size();
         std::mutex candidates_mutex;
         ankerl::unordered_dense::set<CandidateSet, CandidateSetHasher,
                                      CandidateSetCompare>
             improved_candidates;
 
-        // Parallelize the local search on each candidate.
+        // Parallelize the local search using stdexec::bulk.
         auto bulk_sender = stdexec::bulk(
-            stdexec::just(), candidates.size(),
-            [this, &A, &x, &candidates_mutex, &node_scores,
-             &improved_candidates, &candidates](std::size_t idx) {
+            stdexec::just(), num_candidates,
+            [this, &A, &x, &node_scores, &improved_candidates, &candidates,
+             &candidates_mutex](std::size_t idx) {
+                // Each thread creates its own LocalSearch object.
                 LocalSearch local_search(this);
 
-                // Retrieve candidate at position idx.
-                auto it = candidates.begin();
-                std::advance(it, idx);
-                const auto rhs = it->rhs;
-                const auto violation = it->violation;
+                // Retrieve candidate via index.
+                const CandidateSet &current_candidate = candidates[idx];
+                const auto current_violation = current_candidate.violation;
 
-                // Perform local search to potentially improve the candidate.
-                auto improved_list = local_search.solve(*it, A, x, node_scores);
+                // Perform local search to get potential improvements.
+                auto improved_list =
+                    local_search.solve(current_candidate, A, x, node_scores);
 
-                bool improved_found = false;
-                for (const auto &improved : improved_list) {
-                    if (improved.violation > violation) {
-                        improved_found = true;
-                        std::lock_guard<std::mutex> lock(candidates_mutex);
-                        improved_candidates.insert(improved);
+                // Collect improved candidates locally to reduce locking
+                // frequency.
+                std::vector<CandidateSet> local_improved;
+                for (const auto &candidate : improved_list) {
+                    if (candidate.violation > current_violation) {
+                        local_improved.push_back(candidate);
                     }
                 }
-                if (!improved_found) {
+                if (local_improved.empty()) {
+                    local_improved.push_back(current_candidate);
+                }
+
+                // Insert all local improved candidates into the global set with
+                // one lock.
+                {
                     std::lock_guard<std::mutex> lock(candidates_mutex);
-                    improved_candidates.insert(*it);
+                    for (const auto &candidate : local_improved) {
+                        improved_candidates.insert(candidate);
+                    }
                 }
             });
 
@@ -540,9 +554,9 @@ class HighRankCuts {
                     return a.violation > b.violation;
                 });
 
-        // Limit the number of cuts to add (max_cuts), and try up to max_trials.
+        // Add cuts from top candidates. Limit the total added to max_cuts (and
+        // try up to max_trials).
         const int max_cuts = 10;
-        int cuts_orig_size = cutStorage->size();
         int cuts_added = 0;
         int max_trials = 50;
         for (const auto &candidate : unique_candidates) {
@@ -555,8 +569,9 @@ class HighRankCuts {
                 order[node] = ordering++;
             }
             addCutToCutStorage(candidate, order);
-            cuts_added++;  // = cutStorage->size() - cuts_orig_size;
-            // --max_trials;
+            ++cuts_added;
+            // Optionally decrement max_trials if further limiting is desired.
+            --max_trials;
         }
         int final_cut_size = cutStorage->size();
 
@@ -576,11 +591,11 @@ class HighRankCuts {
         return masks;
     }();
 
-    double computeLimitedMemoryCoefficient(
+    int computeLimitedMemoryCoefficient(
         const std::array<uint64_t, num_words> &C,
         const std::array<uint64_t, num_words> &AM, const SRCPermutation &p,
         const std::vector<uint16_t> &P, std::vector<int> &order) noexcept {
-        double alpha = 0.0;
+        int alpha = 0.0;
         int cumulative_sum = 0;
         const int denominator = p.den;
 
@@ -606,7 +621,7 @@ class HighRankCuts {
                 // alpha.
                 if (cumulative_sum >= denominator) {
                     cumulative_sum -= denominator;
-                    alpha += 1.0;
+                    alpha += 1;
                 }
             }
         }

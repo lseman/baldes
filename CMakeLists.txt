@@ -8,10 +8,10 @@ else()
     message(WARNING "ccache not found, compilation will not be cached.")
 endif()
 
-set(CMAKE_CXX_COMPILER
-"/data/toolchain/llvm/stage2-prof-use-lto/install/bin/clang++"  CACHE PATH "C compiler" FORCE)
-set(CMAKE_C_COMPILER
-"/data/toolchain/llvm/stage2-prof-use-lto/install/bin/clang"  CACHE PATH "C compiler" FORCE)
+# set(CMAKE_CXX_COMPILER
+# "/data/toolchain/llvm/stage2-prof-use-lto/install/bin/clang++"  CACHE PATH "C compiler" FORCE)
+# set(CMAKE_C_COMPILER
+# "/data/toolchain/llvm/stage2-prof-use-lto/install/bin/clang"  CACHE PATH "C compiler" FORCE)
 
 
 project(BALDES LANGUAGES C CXX)
@@ -164,7 +164,7 @@ if(WITH_PYTHON)
   )
 endif()
 
-if(IPM)
+if(IPM OR IPM_ACEL)
   cpmaddpackage(
     NAME
     Eigen
@@ -302,7 +302,7 @@ if(RCC)
   list(APPEND EXECUTABLE_SOURCES ${CVRPSEP_SOURCES} src/RCC.cpp)
 endif()
 
-if(IPM)
+if(IPM OR IPM_ACEL)
   list(APPEND EXECUTABLE_SOURCES ${IPM_SOURCES})
 endif()
 

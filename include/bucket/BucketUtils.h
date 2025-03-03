@@ -141,7 +141,7 @@ inline int BucketGraph::get_bucket_number(
     }
 
     // check if buckets[bucket_number] contains the resource_vec
-    if (!buckets[bucket_number].contains(resource_values_vec)) {
+    if (unlikely(!buckets[bucket_number].contains(resource_values_vec))) {
         // print resource_values_vec
         for (auto val : resource_values_vec) {
             fmt::print("{}\n", val);
@@ -274,6 +274,8 @@ void BucketGraph::define_buckets() {
                                                : ub - (pos + 1) * base_interval;
             end = (pos == 0) ? ub : ub - pos * base_interval;
         }
+        start = roundToTwoDecimalPlaces(start);
+        end = roundToTwoDecimalPlaces(end);
         return {start, end};
     };
 
@@ -693,27 +695,27 @@ void BucketGraph::ConcatenateLabel(const Label *L, int &b,
         auto visited_bitmap = L->visited_bitmap;
 
         // check if visited_bitmap overlaps
-        for (size_t i = 0; i < bitmap_size; ++i) {
-            if (visited_bitmap[i] & L_bw->visited_bitmap[i]) {
-                return true;
-            }
-        }
-        // Iterate in reverse over nodes_covered without allocating a new
-        // vector.
-        //     for (auto it = L_bw->nodes_covered.rbegin();
-        //          it != L_bw->nodes_covered.rend(); ++it) {
-        //         uint16_t node_id = *it;
-        //         if (node_id == L->node_id ||
-        //             is_node_visited(visited_bitmap, node_id))
-        //             return true;
-        //         // Update the bitmap for each 64-bit word.
-        //         for (size_t i = 0; i < visited_bitmap.size(); ++i) {
-        //             uint64_t &current_visited = visited_bitmap[i];
-        //             if (current_visited != 0)
-        //                 current_visited &= neighborhoods_bitmap[node_id][i];
-        //         }
-        //         set_node_visited(visited_bitmap, node_id);
+        // for (size_t i = 0; i < bitmap_size; ++i) {
+        //     if (visited_bitmap[i] & L_bw->visited_bitmap[i]) {
+        //         return true;
         //     }
+        // }
+        // // Iterate in reverse over nodes_covered without allocating a new
+        // vector.
+        for (auto it = L_bw->nodes_covered.rbegin();
+             it != L_bw->nodes_covered.rend(); ++it) {
+            uint16_t node_id = *it;
+            if (node_id == L->node_id ||
+                is_node_visited(visited_bitmap, node_id))
+                return true;
+            // Update the bitmap for each 64-bit word.
+            for (size_t i = 0; i < visited_bitmap.size(); ++i) {
+                uint64_t &current_visited = visited_bitmap[i];
+                if (current_visited != 0)
+                    current_visited &= neighborhoods_bitmap[node_id][i];
+            }
+            set_node_visited(visited_bitmap, node_id);
+        }
         return false;
     };
 
@@ -1076,6 +1078,17 @@ void BucketGraph::bucket_fixing() {
         fmt::print("\033[34m_STARTING BUCKET FIXING PROCEDURE\033[0m\n");
         fixed = true;
 
+        // Compute gap and check feasibility (if gap is negative, exit
+        // early).
+        gap = std::ceil(incumbent - (relaxation + std::min(0.0, min_red_cost)));
+        if (gap < 0) {
+            fmt::print(
+                "\033[34m_BUCKET FIXING PROCEDURE CAN'T BE EXECUTED DUE TO "
+                "GAP\033[0m\n");
+            fmt::print("gap: {}\n", gap);
+            return;
+        }
+
         // Initialize common structures, arc scores, warm labels, etc.
         common_initialization();
 
@@ -1088,18 +1101,6 @@ void BucketGraph::bucket_fixing() {
         // Run labeling algorithms for Stage Four with full mode.
         run_labeling_algorithms<Stage::Four, Full::Full>(forward_cbar,
                                                          backward_cbar);
-
-        // Compute gap and check feasibility (if gap is negative, exit
-        // early).
-        gap = std::ceil(incumbent - (relaxation + std::min(0.0, min_red_cost)));
-        if (gap < 0) {
-            fmt::print(
-                "\033[34m_BUCKET FIXING PROCEDURE CAN'T BE EXECUTED DUE TO "
-                "GAP\033[0m\n");
-            fmt::print("gap: {}\n", gap);
-            return;
-        }
-
         // Save computed c_bar values.
         fw_c_bar = forward_cbar;
         bw_c_bar = backward_cbar;
