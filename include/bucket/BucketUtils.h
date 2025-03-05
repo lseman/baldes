@@ -775,8 +775,8 @@ void BucketGraph::ConcatenateLabel(const Label *L, int &b,
         }
 
         // Retrieve labels in the current bucket.
-        const auto &bucket = other_buckets[current_bucket];
-        const auto labels = bucket.get_labels();
+        auto &bucket = other_buckets[current_bucket];
+        auto labels = bucket.get_labels();
         if (labels.empty()) continue;
 
         // Process each label in the current bucket.
@@ -1180,7 +1180,7 @@ void BucketGraph::heuristic_fixing() {
 
     // Find minimum cost label for each node directly from buckets
     // without creating intermediate label maps
-    for (const auto &bucket : fw_buckets) {
+    for (auto &bucket : fw_buckets) {
         for (const Label *label : bucket.get_labels()) {
             const size_t node_id = label->node_id;
             if (!min_fw_labels[node_id] ||
@@ -1190,7 +1190,7 @@ void BucketGraph::heuristic_fixing() {
         }
     }
 
-    for (const auto &bucket : bw_buckets) {
+    for (auto &bucket : bw_buckets) {
         for (const Label *label : bucket.get_labels()) {
             const size_t node_id = label->node_id;
             if (!min_bw_labels[node_id] ||

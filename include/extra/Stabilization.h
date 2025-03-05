@@ -316,32 +316,54 @@ class Stabilization {
 
     void update_subgradient(const ModelData &dados,
                             const DualSolution &nodeDuals,
-                            const std::vector<Label *> &best_pricing_cols) {
+                            const std::vector<Label *> &best_pricing_cols,
+                            bool use_weighted_update = true) {
         size_t number_of_rows = nodeDuals.size();
         new_rows.assign(number_of_rows, 0.0);
 
+        // Determine how many columns to check.
         auto cols_to_check =
             std::min(numK, static_cast<int>(best_pricing_cols.size()));
         for (size_t i = 0; i < cols_to_check; ++i) {
             const auto &col = best_pricing_cols[i];
+
+            // Compute a weight for this column.
+            double weight = 1.0;
+            if (use_weighted_update) {
+                // weight inversely proportional to cost
+                weight = 1.0 / (1.0 + std::abs(col->cost));
+            }
+
+            // Accumulate coverage for nodes that are not the artificial start
+            // or end.
             for (const auto &node : col->nodes_covered) {
                 if (node > 0 && node != N_SIZE - 1) {
-                    new_rows[node - 1] += 1.0;
+                    new_rows[node - 1] += weight;
                 }
             }
         }
 
+        // Compute the raw subgradient based on the constraint senses.
         subgradient.assign(number_of_rows, 0.0);
         for (size_t i = 0; i < number_of_rows; ++i) {
-            // If the relation is '<', treat it as a "≤" constraint.
             if (dados.sense[i] == '<') {
                 subgradient[i] = new_rows[i] - dados.b[i];
-            } else {
-                // For '>' (i.e., "≥") or '=', compute as before.
+            } else if (dados.sense[i] == '>') {
                 subgradient[i] = dados.b[i] - new_rows[i];
+            } else {
+                subgradient[i] = std::abs(dados.b[i] - new_rows[i]);
             }
         }
 
+        // Optionally, blend the computed subgradient with the current duals.
+        // This can help smooth the updates over iterations.
+        // for (size_t i = 0; i < number_of_rows; ++i) {
+        // Here we use a simple average. You might use a different
+        // combination or a momentum term.
+        // subgradient[i] = 0.5 * subgradient[i] + 0.5 * nodeDuals[i];
+        // }
+
+        // Recompute the norm of the subgradient.
         subgradient_norm = norm(subgradient);
     }
 
@@ -360,7 +382,7 @@ class Stabilization {
         std::vector<double> nodeDuals(input_duals.begin(),
                                       input_duals.begin() + sizeDual);
 
-        mp_manager.updatePool(nodeDuals, -lag_gap);
+        mp_manager.updatePool(nodeDuals, lag_gap);
         DualSolution historical_avg = mp_manager.getWeightedSolution();
 
         // // check for progress within a threshold
@@ -370,26 +392,25 @@ class Stabilization {
         //     no_progress_count = 0;
         // }
 
-        // if (!historical_avg.empty() && nb_misprices == 0) {
-        //     // Dynamic weighting based on optimization progress
-        //     double pw = std::min(
-        //         0.9, std::max(0.1, std::abs(lag_gap) /
-        //                                (std::abs(lag_gap_prev) + 1e-10)));
+        if (!historical_avg.empty() && nb_misprices == 0) {
+            // Dynamic weighting based on optimization progress
+            double pw = std::min(
+                0.9, std::max(0.1, std::abs(lag_gap) /
+                                       (std::abs(lag_gap_prev) + 1e-10)));
 
-        //     // fmt::print("Progress weight: {}\n", pw);
+            // fmt::print("Progress weight: {}\n", pw);
 
-        //     // Scale historical weight based on
-        //     // pool quality
-        //     // double historical_weight = (1.0
-        //     // - progress_weight);
+            // Scale historical weight based on
+            // pool quality
+            // double historical_weight = (1.0
+            // - progress_weight);
 
-        //     // Blend solutions with adaptive
-        //     // weights
-        //     for (size_t i = 0; i < nodeDuals.size(); ++i) {
-        //         nodeDuals[i] = pw * nodeDuals[i] + (1 - pw) *
-        //         historical_avg[i];
-        //     }
-        // }
+            // Blend solutions with adaptive
+            // weights
+            for (size_t i = 0; i < nodeDuals.size(); ++i) {
+                nodeDuals[i] = pw * nodeDuals[i] + (1 - pw) * historical_avg[i];
+            }
+        }
 
         if (nb_misprices == 0) {
             update_subgradient(dados, nodeDuals, best_pricing_cols);

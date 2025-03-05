@@ -13,18 +13,23 @@
 #include "SparseMatrix.h"
 #include "ankerl/unordered_dense.h"
 
+// General definitions
+constexpr int AVX_LIM = 8;
+constexpr int MIN_RANK = 3;
+constexpr int MAX_RANK = 5;
+// End of general definitions
+
 struct ReducedCostResult {
     double value;
     int column_index;
     std::vector<int> col;
 };
 
-constexpr int AVX_LIM = 10000;
-
 struct CycleData {
     std::vector<uint16_t> cycle;
     int last_used_iteration;
     int usage_count;
+    double metric;
 };
 
 struct BucketOptions {
@@ -33,6 +38,7 @@ struct BucketOptions {
     int pstep = false;
     int max_path_size = N_SIZE / 2;
     int min_path_size = N_SIZE / 2;
+    bool verbose = false;
 
     int pstep_depot = 0;
     int pstep_end_depot = N_SIZE - 1;
@@ -54,7 +60,7 @@ struct BucketOptions {
 
     double n_warm_start = 0.7;
 
-    bool warm_start = false;
+    bool warm_start = true;
 
     // EVRP options
     int battery_capacity = 100;

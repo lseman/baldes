@@ -284,7 +284,7 @@ class BucketGraph {
     exec::static_thread_pool bi_pool = exec::static_thread_pool(2);
     exec::static_thread_pool::scheduler bi_sched = bi_pool.get_scheduler();
 
-    const int MERGE_SCHED_CONCURRENCY = 1;
+    const int MERGE_SCHED_CONCURRENCY = std::thread::hardware_concurrency();
     exec::static_thread_pool merge_pool =
         exec::static_thread_pool(MERGE_SCHED_CONCURRENCY);
     exec::static_thread_pool::scheduler merge_sched =
@@ -299,8 +299,6 @@ class BucketGraph {
     int bw_buckets_size = 0;
 
     std::vector<uint64_t> fixed_arcs_bitmap;
-    std::vector<std::vector<bool>> fw_fixed_buckets;
-    std::vector<std::vector<bool>> bw_fixed_buckets;
     std::vector<uint64_t>
         fw_fixed_buckets_bitmap;  // Bitmap for fixed bucket arcs
     std::vector<uint64_t>
@@ -390,8 +388,8 @@ class BucketGraph {
     // Statistics
     int stat_n_labels_fw = 0;
     int stat_n_labels_bw = 0;
-    int stat_n_dom_fw = 0;
-    int stat_n_dom_bw = 0;
+    uint stat_n_dom_fw = 0;
+    uint stat_n_dom_bw = 0;
 
     std::vector<double> R_max;
     std::vector<double> R_min;
@@ -1068,7 +1066,7 @@ class BucketGraph {
     bool DominatedInCompWiseSmallerBuckets(const Label *L, int bucket,
                                            const std::vector<double> &c_bar,
                                            std::vector<uint64_t> &Bvisited,
-                                           int &stat_n_dom) noexcept;
+                                           uint &stat_n_dom) noexcept;
 
     template <Direction D, Stage S, ArcType A, Mutability M, Full F>
     inline std::vector<Label *> Extend(

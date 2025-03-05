@@ -495,6 +495,8 @@ class CutStorage {
             double alpha = 0.0;
             int runningSum = 0;
             const int denominator = cut.p.den;
+            auto cutSize = cut.p.num.size();
+
             // Cache pointers to the bitset arrays.
             const uint64_t *neighborsBitset = cut.neighbors.data();
             const uint64_t *baseSetBitset = cut.baseSet.data();
@@ -562,6 +564,9 @@ class CutStorage {
         // values.
         for (size_t i = 0; i < cuts.size(); ++i) {
             if (i < SRCDuals.size() && std::abs(SRCDuals[i]) > 0) {
+                // if (cuts[i].p.num.size() == 1) {
+                // continue;
+                // }
                 // Emplace active cut with its index, pointer to the
                 // cut, dual value, and type.
                 active_cuts.emplace_back(i, &cuts[i], SRCDuals[i],

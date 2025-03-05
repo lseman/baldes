@@ -378,8 +378,9 @@ class VRProblem {
             }
 
             auto cutSize = cut.p.num.size();
-            if (loaded && (cutSize == 1)) {
-                // delete the cut
+            if (loaded && (cutSize == 3 || cutSize == 4 || cutSize == 5)) {
+                fmt::print("Cut size is {}, skipping...\n", cutSize);
+                //     // delete the cut
                 cutsToBeRemoved.push_back(&cut);
                 continue;
             }
@@ -407,9 +408,14 @@ class VRProblem {
                     }
                 }
                 std::string constraint_name = "SRC_" + std::to_string(z);
-                auto ctr =
-                    node->addConstr(lhs <= cut.p.getRHS(), constraint_name);
-                constraints.push_back(ctr);
+                if (cutSize == 1) {
+                    auto ctr = node->addConstr(lhs == 0, constraint_name);
+                    constraints.push_back(ctr);
+                } else {
+                    auto ctr =
+                        node->addConstr(lhs <= cut.p.getRHS(), constraint_name);
+                    constraints.push_back(ctr);
+                }
             }
 
             // In either case, mark the cut as added and reset its updated flag.
@@ -705,6 +711,7 @@ class VRProblem {
         bool enumerate = false;
         int numK = node->numK;
 
+        bool integer = false;
         if (node->loadedState) {
             integer_solution = 10301;
             fmt::print("Loaded state\n");
@@ -883,9 +890,11 @@ class VRProblem {
                 // Update bucket graph relaxation value and augment neighborhood
                 // memories.
                 bucket_graph->relaxation = lp_obj;
-                bucket_graph->augment_ng_memories(solution, allPaths, false, 5,
-                                                  100, 16, N_SIZE);
 
+                if (!integer) {
+                    bucket_graph->augment_ng_memories(solution, allPaths, false,
+                                                      5, 100, 16, N_SIZE);
+                }
                 // SRC cuts: if there are SRC constraints, update their dual
                 // values.
                 SRC_MODE_BLOCK(if (!SRCconstraints.empty()) {
@@ -1011,7 +1020,7 @@ class VRProblem {
                     solution = node->extractSolution();
 #endif
 
-                    bool integer = true;
+                    integer = true;
 #ifdef TR
                     if (TRstop)
 #endif

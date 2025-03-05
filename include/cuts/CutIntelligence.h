@@ -79,8 +79,7 @@ class LocalSearch {
     void applyRemoveNode(CandidateSet &current) {
         std::vector<int> nodes_vec(current.nodes.begin(), current.nodes.end());
         // if nodes_vec.size() = MIN_RANK, do not remove any nodes.
-        if (nodes_vec.size() > 1 &&
-            nodes_vec.size() > LocalSearchConfig::MIN_RANK) {
+        if (nodes_vec.size() > 1 && nodes_vec.size() > MIN_RANK) {
             std::uniform_int_distribution<> node_dist(0, nodes_vec.size() - 1);
             int remove_pos = node_dist(rng);
             nodes_vec.erase(nodes_vec.begin() + remove_pos);
@@ -102,7 +101,7 @@ class LocalSearch {
         std::vector<int> potential;
 
         // if nodes_vec.size() = MAX_RANK, do not add any nodes.
-        if (nodes_vec.size() >= LocalSearchConfig::MAX_RANK) return;
+        if (nodes_vec.size() >= MAX_RANK) return;
         // Candidates are those in neighbor set but not in nodes.
         for (int candidate : current.neighbor) {
             if (current.nodes.find(candidate) == current.nodes.end()) {

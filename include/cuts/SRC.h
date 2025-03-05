@@ -265,7 +265,7 @@ class LimitedMemoryRank1Cuts {
             C[node / 64] |= (1ULL << (node % 64));
 
             // Define AM: for this simple cut, mark all nodes.
-            for (int node_idx = 0; node_idx < N_SIZE; ++node_idx) {
+            for (int node_idx = 0; node_idx <= N_SIZE; ++node_idx) {
                 AM[node_idx / 64] |= (1ULL << (node_idx % 64));
             }
 

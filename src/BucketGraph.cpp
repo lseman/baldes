@@ -388,26 +388,20 @@ inline bool cycleMatchesCurrentSolution(const std::vector<uint16_t> &cycle,
  * the number of forbidden cycles based on the given parameters.
  *
  */
+
 void BucketGraph::augment_ng_memories(std::vector<double> &solution,
                                       std::vector<Path> &paths, bool aggressive,
                                       int eta1, int eta2, int eta_max, int nC) {
     // Pre-allocate an estimated number of cycles.
-    std::vector<std::vector<uint16_t>> cycles;
+    std::vector<CycleData> cycles;
     cycles.reserve(paths.size() / 4);
     ng_iteration_counter++;
-
-    // // When a cycle is encountered in the current solution:
-    // for (auto &data : ng_cycles) {
-    //     if (cycleMatchesCurrentSolution(data.cycle, solution, paths)) {
-    //         data.last_used_iteration = ng_iteration_counter;
-    //         data.usage_count++;
-    //     }
-    // }
 
     // Detect cycles in fractional paths.
     for (size_t pathIndex = 0; pathIndex < paths.size(); ++pathIndex) {
         const double epsilon = 1e-3;
-        if (solution[pathIndex] <= epsilon) continue;
+        double sol_val = solution[pathIndex];
+        if (sol_val <= epsilon) continue;
         const auto &path = paths[pathIndex];
         ankerl::unordered_dense::map<uint16_t, int> visited_clients;
         visited_clients.reserve(path.size());
@@ -425,7 +419,15 @@ void BucketGraph::augment_ng_memories(std::vector<double> &solution,
                 cycle.reserve(i - it->second + 1);
                 for (size_t j = it->second; j <= i; ++j)
                     cycle.push_back(path[j]);
-                cycles.push_back(std::move(cycle));
+
+                CycleData data;
+                data.cycle = std::move(cycle);
+                // Option 1: Use raw solution value as violation score.
+                // data.metric = sol_val;
+                // Option 2: Use fractionality (how far is sol_val from an
+                // integer).
+                data.metric = std::min(sol_val, 1.0 - sol_val);
+                cycles.push_back(std::move(data));
                 break;  // Process only one cycle per path.
             }
             visited_clients[client] = i;
@@ -433,9 +435,12 @@ void BucketGraph::augment_ng_memories(std::vector<double> &solution,
     }
     if (cycles.empty()) return;
 
-    // Sort cycles by increasing size (small cycles processed first).
+    // Sort cycles by descending metric value (i.e. cycles with highest
+    // violation or fractionality first).
     pdqsort(cycles.begin(), cycles.end(),
-            [](const auto &a, const auto &b) { return a.size() < b.size(); });
+            [](const CycleData &a, const CycleData &b) {
+                return a.metric > b.metric;
+            });
 
     int forbidden_count = 0;
 
@@ -459,7 +464,8 @@ void BucketGraph::augment_ng_memories(std::vector<double> &solution,
     int effective_eta2 = eta2;
 
     // Process each detected cycle.
-    for (const auto &cycle : cycles) {
+    for (const auto &data : cycles) {
+        const auto &cycle = data.cycle;
         if (cycle.empty()) continue;
 
         bool can_forbid = true;
@@ -471,35 +477,29 @@ void BucketGraph::augment_ng_memories(std::vector<double> &solution,
             }
         }
 
-        // If the cycle qualifies (i.e. it's small enough or we haven't
-        // forbidden too many cycles yet).
+        // If the cycle qualifies based on its size or our current count.
         if (can_forbid && (static_cast<int>(cycle.size()) <= effective_eta1 ||
                            forbidden_count < effective_eta2)) {
-            // ng_cycles.push_back({cycle, ng_iteration_counter, 1});
             std::vector<int> int_cycle(cycle.begin(), cycle.end());
             forbidCycle(int_cycle, aggressive);
             ++forbidden_count;
             if (forbidden_count >= effective_eta2) break;
         }
     }
-    // If no cycle was added, try again without effective_eta1 restriction.
+    // If no cycle was added, try again without the effective_eta1 restriction.
     if (forbidden_count == 0) {
-        for (const auto &cycle : cycles) {
+        for (const auto &data : cycles) {
+            const auto &cycle = data.cycle;
             if (cycle.empty()) continue;
 
             bool can_forbid = true;
-            // Check if any node in the cycle has too many neighbor bits.
             for (uint16_t node : cycle) {
                 if (count_neighborhood_bits(node) >= eta_max) {
                     can_forbid = false;
                     break;
                 }
             }
-
-            // If the cycle qualifies (i.e. it's small enough or we haven't
-            // forbidden too many cycles yet).
             if (can_forbid && forbidden_count < effective_eta2) {
-                // ng_cycles.push_back({cycle, ng_iteration_counter, 1});
                 std::vector<int> int_cycle(cycle.begin(), cycle.end());
                 forbidCycle(int_cycle, aggressive);
                 ++forbidden_count;
