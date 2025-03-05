@@ -187,19 +187,28 @@ void LimitedMemoryRank1Cuts::separate(const SparseMatrix &A,
                         }
                     }
                     // set all AM vector to 1
-                    for (int node_idx = 0; node_idx < N_SIZE; ++node_idx) {
-                        AM[node_idx / 64] |= (1ULL << (node_idx % 64));
-                    }
+                    // for (int node_idx = 0; node_idx < N_SIZE; ++node_idx) {
+                    // AM[node_idx / 64] |= (1ULL << (node_idx % 64));
+                    // }
 
                     // Compute the cut coefficients and accumulate lhs.
                     double computed_lhs = 0.0;
                     for (auto z : remainingNodes) {
                         auto &clients = allPaths[z].route;
-                        // Instead of calling a potentially expensive function,
-                        // here we simply assign a coefficient of 1.0 (you can
-                        // plug in your compute function).
-                        cut_coefficients[z] = computeLimitedMemoryCoefficient(
-                            C, AM, p, clients, order);
+                        auto ctr = 0;
+                        for (auto client : C_index) {
+                            if (std::find(clients.begin(), clients.end(),
+                                          client) != clients.end()) {
+                                ctr++;
+                            }
+                        }
+
+                        if (ctr >= 2) {
+                            cut_coefficients[z] = 1.0;
+                        }
+                        // cut_coefficients[z] =
+                        // computeLimitedMemoryCoefficient( C, AM, p, clients,
+                        // order);
                         computed_lhs += cut_coefficients[z] * x[z];
                     }
 

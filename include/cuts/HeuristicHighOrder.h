@@ -31,9 +31,7 @@
 
 class HighRankCuts {
    private:
-    static constexpr int MIN_RANK = 3;
-    static constexpr int MAX_RANK = 5;
-    static constexpr int MAX_COMBINATIONS = 6;
+    static constexpr int MAX_COMBINATIONS = 4;
     static constexpr int MAX_WORKING_SET_SIZE = 12;
 
     exec::static_thread_pool pool =
@@ -84,12 +82,6 @@ class HighRankCuts {
 
         return scores;
     }
-    // std::vector<std::vector<int>> computeNodeScores(
-    //     const SparseMatrix &A, const std::vector<double> &x) {
-    //     return ml_scorer->computeNodeScores(A, x, distances, nodes,
-    //     arc_duals,
-    //                                         *cutStorage);
-    // }
     ankerl::unordered_dense::set<CandidateSet, CandidateSetHasher,
                                  CandidateSetCompare>
     generateCandidates(const std::vector<std::vector<int>> &scores,

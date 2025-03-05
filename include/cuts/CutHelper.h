@@ -21,8 +21,6 @@ constexpr double INITIAL_TEMPERATURE = 100.0;
 constexpr double COOLING_RATE = 0.95;
 constexpr double REHEATING_FACTOR = 1.5;
 constexpr int REHEAT_INTERVAL = 50;
-constexpr int MIN_RANK = 3;
-constexpr int MAX_RANK = 5;
 }  // namespace LocalSearchConfig
 
 // Inline helper function: Given a base vector and a denominator, generate all

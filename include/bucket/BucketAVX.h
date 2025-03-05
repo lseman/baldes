@@ -76,9 +76,9 @@ inline std::experimental::simd<T> load_simd(const Container &source,
 template <Direction D, Stage S>
 inline bool check_dominance_against_vector(
     const Label *__restrict__ new_label,
-    const std::vector<Label *> &__restrict__ labels,
+    const std::pmr::vector<Label *> &__restrict__ labels,
     const CutStorage *__restrict__ cut_storage, int r_size,
-    int &__restrict__ stat_n_dom) noexcept {
+    uint &__restrict__ stat_n_dom) noexcept {
     constexpr double EPSILON = 1e-3;
     using namespace std::experimental;
 

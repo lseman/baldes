@@ -49,8 +49,8 @@ class MultiPointManager {
     std::shared_ptr<StabilityPoint> best_point;
 
     void updateObjectiveBounds(double obj_value) {
-        best_objective = std::max(best_objective, obj_value);
-        worst_objective = std::min(worst_objective, obj_value);
+        best_objective = std::min(best_objective, obj_value);
+        worst_objective = std::max(worst_objective, obj_value);
     }
 
     void updateMetrics(double improvement) {
@@ -67,13 +67,14 @@ class MultiPointManager {
     }
 
     void updatePointQualities() {
-        double obj_range = best_objective - worst_objective + EPSILON;
+        double obj_range = worst_objective - best_objective + EPSILON;
+
         double obj_factor = QUALITY_OBJ_WEIGHT / obj_range;
         double age_factor = 1.0 - QUALITY_OBJ_WEIGHT;
 
         for (auto& point : stability_points) {
             point.quality_score =
-                obj_factor * (point.objective_value - worst_objective) +
+                obj_factor * (worst_objective - point.objective_value) +
                 age_factor * std::exp(-AGE_DECAY_RATE * point.age);
         }
     }
@@ -121,7 +122,7 @@ class MultiPointManager {
 
     void updateBestPoint() {
         if (!stability_points.empty()) {
-            best_point = std::make_shared<StabilityPoint>(*std::max_element(
+            best_point = std::make_shared<StabilityPoint>(*std::min_element(
                 stability_points.begin(), stability_points.end(),
                 [](const auto& a, const auto& b) {
                     return a.objective_value < b.objective_value;
@@ -133,8 +134,8 @@ class MultiPointManager {
     explicit MultiPointManager(size_t n)
         : current_pool_size(MIN_POOL_SIZE + 2),
           active(true),
-          best_objective(-std::numeric_limits<double>::infinity()),
-          worst_objective(std::numeric_limits<double>::infinity()),
+          best_objective(std::numeric_limits<double>::infinity()),
+          worst_objective(-std::numeric_limits<double>::infinity()),
           conv_threshold(FAST_CONV_THRESHOLD),
           solution_size(n),
           improvement_history(HISTORY_SIZE, 0.0),
@@ -148,15 +149,23 @@ class MultiPointManager {
         if (!active || new_point.empty() || new_point.size() != solution_size)
             return;
 
+        // Update any bounds related to the objective value.
         updateObjectiveBounds(obj_value);
+
+        // For minimization, a lower objective is better.
+        // Use positive infinity as the default best value if no best point
+        // exists.
+        double prev_best = best_point ? best_point->objective_value
+                                      : std::numeric_limits<double>::infinity();
+
+        // Compute the relative improvement: (prev_best - new_value) /
+        // (|prev_best| + EPSILON)
         double improvement =
-            std::abs((obj_value -
-                      (best_point ? best_point->objective_value
-                                  : -std::numeric_limits<double>::infinity())) /
-                     (std::abs(best_point ? best_point->objective_value : 0.0) +
-                      EPSILON));
+            std::abs((prev_best - obj_value) / (std::abs(prev_best) + EPSILON));
         updateMetrics(improvement);
 
+        // Check convergence: if improvement is below threshold over a number of
+        // iterations, deactivate.
         if (improvement < conv_threshold && improvement_history.back() != 0.0 &&
             std::all_of(
                 improvement_history.begin(), improvement_history.end(),
@@ -167,6 +176,7 @@ class MultiPointManager {
 
         adjustPoolSize(improvement);
 
+        // If the new point is good enough to be added to the pool, add it.
         if (shouldAddPoint(new_point, obj_value)) {
             addPoint(new_point, obj_value);
             updatePointQualities();
