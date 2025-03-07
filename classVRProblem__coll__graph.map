@@ -1,0 +1,11 @@
+<map id="VRProblem" name="VRProblem">
+<area shape="rect" id="Node000001" title=" " alt="" coords="52,271,140,297"/>
+<area shape="rect" id="Node000002" href="$structInstanceData.html" title="A structure to hold various data related to an instance of a problem." alt="" coords="5,183,104,208"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="64,223,73,246,88,269,84,272,68,249,59,225"/>
+<area shape="rect" id="Node000003" href="$structSnapshot.html" title=" " alt="" coords="128,183,205,208"/>
+<area shape="poly" id="edge2_Node000001_Node000003" title=" " alt="" coords="149,222,108,273,104,269,145,218"/>
+<area shape="rect" id="Node000004" href="$classCutStorage.html" title="Manages the storage and operations related to cuts in a solver." alt="" coords="123,94,210,120"/>
+<area shape="poly" id="edge3_Node000003_Node000004" title=" " alt="" coords="169,135,169,182,164,182,164,135"/>
+<area shape="rect" id="Node000005" href="$structCutStorage_1_1SegmentMasks.html" title=" " alt="" coords="75,5,258,31"/>
+<area shape="poly" id="edge4_Node000004_Node000005" title=" " alt="" coords="169,47,169,94,164,94,164,47"/>
+</map>

@@ -1,0 +1,21 @@
+<map id="BucketGraph::ConcatenateLabel" name="BucketGraph::ConcatenateLabel">
+<area shape="rect" id="Node000001" title=" " alt="" coords="5,185,182,226"/>
+<area shape="rect" id="Node000002" href="$classBucketGraph.html#a2a66984a5d0225286c0598b884772f8c" title=" " alt="" coords="236,5,377,46"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="109,183,159,125,192,92,228,62,243,52,246,56,231,66,196,96,163,129,113,187"/>
+<area shape="rect" id="Node000003" href="$classBucketGraph.html#a858b68317a9a0a60723698509d78d575" title="Checks the feasibility of a given forward and backward label." alt="" coords="237,185,376,226"/>
+<area shape="poly" id="edge2_Node000001_Node000003" title=" " alt="" coords="182,203,222,203,222,208,182,208"/>
+<area shape="rect" id="Node000004" href="$classBucketGraph.html#ad15267e0cffaa8dc5222028409c9e082" title=" " alt="" coords="431,128,565,153"/>
+<area shape="poly" id="edge7_Node000001_Node000004" title=" " alt="" coords="113,183,162,141,194,121,229,106,287,95,346,97,401,107,448,120,447,125,400,112,345,102,287,101,230,111,197,126,166,145,117,187"/>
+<area shape="rect" id="Node000006" href="$classBucketGraph.html#a7d2d975e13b1fdeaafca99aa6fb29486" title=" " alt="" coords="230,120,383,161"/>
+<area shape="poly" id="edge5_Node000001_Node000006" title=" " alt="" coords="161,182,222,163,224,168,163,187"/>
+<area shape="rect" id="Node000007" href="$namespacenumericutils.html#a8d554fdb4468068ab99dc7a219308492" title=" " alt="" coords="249,250,364,276"/>
+<area shape="poly" id="edge8_Node000001_Node000007" title=" " alt="" coords="172,224,242,243,240,248,171,229"/>
+<area shape="rect" id="Node000008" href="$namespacenumericutils.html#a2124ad1e887fe39c413948ee927c879e" title=" " alt="" coords="254,300,358,325"/>
+<area shape="poly" id="edge9_Node000001_Node000008" title=" " alt="" coords="126,224,174,255,231,286,244,291,242,296,229,291,171,260,123,229"/>
+<area shape="rect" id="Node000009" href="$namespacenumericutils.html#afa1d31c5f18a361509ba1faacca5feb4" title=" " alt="" coords="251,349,362,374"/>
+<area shape="poly" id="edge10_Node000001_Node000009" title=" " alt="" coords="113,225,162,280,195,310,231,335,239,340,237,345,228,340,192,314,158,284,109,228"/>
+<area shape="poly" id="edge3_Node000003_Node000004" title=" " alt="" coords="367,182,443,156,444,161,369,187"/>
+<area shape="rect" id="Node000005" href="$namespacenumericutils.html#a30fadd8aa82c3a907ce52a6c1735a378" title=" " alt="" coords="444,193,552,218"/>
+<area shape="poly" id="edge4_Node000003_Node000005" title=" " alt="" coords="376,203,428,203,428,208,376,208"/>
+<area shape="poly" id="edge6_Node000006_Node000004" title=" " alt="" coords="384,138,415,138,415,143,384,143"/>
+</map>

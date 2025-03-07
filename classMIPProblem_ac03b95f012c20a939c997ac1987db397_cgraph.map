@@ -1,0 +1,9 @@
+<map id="MIPProblem::chgCoeff" name="MIPProblem::chgCoeff">
+<area shape="rect" id="Node000001" title=" " alt="" coords="5,42,156,68"/>
+<area shape="rect" id="Node000002" href="$classMIPProblem.html#af77d84a36fde97467ad7069ea2a230f8" title=" " alt="" coords="204,42,354,68"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="156,52,188,52,188,58,156,58"/>
+<area shape="rect" id="Node000003" href="$classLinearExpression.html#a931036cafcd17fe3553ffd79468da49e" title=" " alt="" coords="430,5,577,46"/>
+<area shape="poly" id="edge2_Node000002_Node000003" title=" " alt="" coords="354,43,414,35,415,40,355,48"/>
+<area shape="rect" id="Node000004" href="$classLinearExpression.html#a055d01a2c6ce59aad0e6ec6595159ed8" title=" " alt="" coords="402,70,604,96"/>
+<area shape="poly" id="edge3_Node000002_Node000004" title=" " alt="" coords="355,62,387,66,386,71,354,67"/>
+</map>

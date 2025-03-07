@@ -1,0 +1,10 @@
+<map id="BucketGraph::ObtainJumpBucketArcs" name="BucketGraph::ObtainJumpBucketArcs">
+<area shape="rect" id="Node000001" title="Obtains jump bucket arcs for the BucketGraph." alt="" coords="5,41,247,66"/>
+<area shape="rect" id="Node000002" href="$classBucketGraph.html#af129eff306551dc7cc7fe00b919bbbd0" title="Assigns the buckets based on the specified direction." alt="" coords="502,5,643,46"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="183,38,294,19,374,16,454,19,487,20,486,25,454,24,374,21,295,24,184,43"/>
+<area shape="rect" id="Node000003" href="$classBucketGraph.html#aa1272b542e38efd60f4fe2ba7fc01d52" title=" " alt="" coords="295,33,454,74"/>
+<area shape="poly" id="edge2_Node000001_Node000003" title=" " alt="" coords="247,51,279,51,279,56,247,56"/>
+<area shape="rect" id="Node000004" href="$Definitions_8h.html#a086546d06aa565cdd48f436973ebc496" title="Prints an informational message with a specific format." alt="" coords="337,98,412,124"/>
+<area shape="poly" id="edge4_Node000001_Node000004" title=" " alt="" coords="186,65,323,97,322,102,184,70"/>
+<area shape="poly" id="edge3_Node000003_Node000002" title=" " alt="" coords="454,40,486,35,487,40,455,45"/>
+</map>

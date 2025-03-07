@@ -1,0 +1,9 @@
+<map id="Graphical Class Hierarchy" name="Graphical Class Hierarchy">
+<area shape="rect" id="Node000000" href="$classSolverInterface.html" title=" " alt="" coords="5,55,115,80"/>
+<area shape="rect" id="Node000001" href="$classGurobiSolver.html" title=" " alt="" coords="163,5,259,31"/>
+<area shape="poly" id="edge1_Node000000_Node000001" title=" " alt="" coords="115,47,168,29,170,34,117,52"/>
+<area shape="rect" id="Node000002" href="$classHighsSolver.html" title=" " alt="" coords="165,55,257,80"/>
+<area shape="poly" id="edge2_Node000000_Node000002" title=" " alt="" coords="131,65,164,65,164,70,131,70"/>
+<area shape="rect" id="Node000003" href="$classIPMSolver.html" title=" " alt="" coords="170,104,252,130"/>
+<area shape="poly" id="edge3_Node000000_Node000003" title=" " alt="" coords="117,83,170,101,168,106,115,88"/>
+</map>

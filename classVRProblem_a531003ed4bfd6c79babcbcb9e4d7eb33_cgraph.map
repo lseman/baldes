@@ -1,0 +1,17 @@
+<map id="VRProblem::addPath" name="VRProblem::addPath">
+<area shape="rect" id="Node000001" title=" " alt="" coords="5,153,147,179"/>
+<area shape="rect" id="Node000002" href="$classMIPColumn.html#ade479a0c70a0f077ebdac6c2b5677283" title=" " alt="" coords="246,5,392,31"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="84,151,126,96,157,65,193,40,230,26,232,31,196,45,161,70,130,100,88,154"/>
+<area shape="rect" id="Node000003" href="$classBNBNode.html#adaa61c7ee649303ac9ebefecc32101dd" title=" " alt="" coords="252,55,386,80"/>
+<area shape="poly" id="edge2_Node000001_Node000003" title=" " alt="" coords="92,151,136,119,194,89,236,76,237,81,196,94,139,124,95,155"/>
+<area shape="rect" id="Node000004" href="$classRCCManager.html#a3125b0bd609b397e71873c072ef20b1f" title=" " alt="" coords="195,104,443,130"/>
+<area shape="poly" id="edge3_Node000001_Node000004" title=" " alt="" coords="138,150,194,138,232,131,233,136,195,143,139,155"/>
+<area shape="rect" id="Node000005" href="$classRCCManager.html#a28d315c74656a4bfea52a8591b44c26f" title=" " alt="" coords="227,153,411,179"/>
+<area shape="poly" id="edge4_Node000001_Node000005" title=" " alt="" coords="147,164,211,164,211,169,147,169"/>
+<area shape="rect" id="Node000006" href="$classBNBNode.html#a8e9719a49d2b149441b61ee4aa790fa2" title=" " alt="" coords="244,203,394,228"/>
+<area shape="poly" id="edge5_Node000001_Node000006" title=" " alt="" coords="139,177,195,189,233,197,232,202,194,194,138,182"/>
+<area shape="rect" id="Node000007" href="$classBNBNode.html#a04a0757f406626dd8880a5b83b084bed" title=" " alt="" coords="249,252,389,278"/>
+<area shape="poly" id="edge6_Node000001_Node000007" title=" " alt="" coords="95,177,139,208,196,238,234,250,233,255,194,243,136,213,92,182"/>
+<area shape="rect" id="Node000008" href="$classBNBNode.html#a826ed1319c03caf3030806fd80098063" title=" " alt="" coords="256,301,382,327"/>
+<area shape="poly" id="edge7_Node000001_Node000008" title=" " alt="" coords="88,178,130,232,161,263,196,288,241,304,240,309,193,293,157,267,126,236,84,181"/>
+</map>

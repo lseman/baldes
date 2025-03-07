@@ -1,0 +1,35 @@
+<map id="State.h" name="State.h">
+<area shape="rect" id="Node000001" title=" " alt="" coords="119,5,181,31"/>
+<area shape="rect" id="Node000002" href="$BCP_8h.html" title="Header file for the BCP class." alt="" coords="105,226,163,252"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="135,45,107,94,94,123,85,153,82,166,84,177,101,204,121,224,117,228,96,207,79,179,77,166,79,152,89,121,102,92,131,43"/>
+<area shape="rect" id="Node000008" href="$Node_8h.html" title="Node class implementation." alt="" coords="263,79,325,105"/>
+<area shape="poly" id="edge9_Node000001_Node000008" title=" " alt="" coords="189,36,271,76,268,81,187,41"/>
+<area shape="rect" id="Node000003" href="$BCP_8cpp.html" title=" " alt="" coords="174,374,246,399"/>
+<area shape="poly" id="edge2_Node000002_Node000003" title=" " alt="" coords="150,265,206,372,201,374,145,267"/>
+<area shape="rect" id="Node000004" href="$BNB_8h.html" title=" " alt="" coords="30,300,89,326"/>
+<area shape="poly" id="edge3_Node000002_Node000004" title=" " alt="" coords="112,265,74,302,70,298,109,261"/>
+<area shape="rect" id="Node000005" href="$Baldes_8cpp.html" title=" " alt="" coords="17,374,102,399"/>
+<area shape="poly" id="edge5_Node000002_Node000005" title=" " alt="" coords="128,268,103,327,71,375,66,372,98,324,123,266"/>
+<area shape="rect" id="Node000006" href="$Branching_8h.html" title=" " alt="" coords="281,300,371,326"/>
+<area shape="poly" id="edge6_Node000002_Node000006" title=" " alt="" coords="179,254,294,297,293,302,177,259"/>
+<area shape="poly" id="edge4_Node000004_Node000005" title=" " alt="" coords="62,341,62,373,57,373,57,341"/>
+<area shape="poly" id="edge7_Node000006_Node000003" title=" " alt="" coords="295,336,231,375,228,371,292,332"/>
+<area shape="rect" id="Node000007" href="$Branching_8cpp.html" title=" " alt="" coords="316,374,419,399"/>
+<area shape="poly" id="edge8_Node000006_Node000007" title=" " alt="" coords="343,338,363,372,358,375,338,340"/>
+<area shape="poly" id="edge10_Node000008_Node000002" title=" " alt="" coords="271,117,149,228,145,224,268,113"/>
+<area shape="poly" id="edge11_Node000008_Node000004" title=" " alt="" coords="248,95,207,99,163,108,120,126,101,139,84,154,72,171,64,190,56,231,56,270,60,299,54,300,51,270,51,231,59,189,68,169,80,151,97,135,117,121,161,103,206,93,247,90"/>
+<area shape="poly" id="edge12_Node000008_Node000005" title=" " alt="" coords="247,95,204,98,155,108,106,126,84,139,64,155,30,194,12,232,9,274,20,325,33,351,50,372,45,375,29,354,15,327,4,275,7,231,25,191,60,151,81,134,104,121,153,102,203,93,247,90"/>
+<area shape="poly" id="edge14_Node000008_Node000006" title=" " alt="" coords="325,113,341,130,354,152,360,172,362,194,357,236,346,273,335,300,330,298,341,271,352,235,356,194,354,173,349,154,337,134,321,117"/>
+<area shape="poly" id="edge13_Node000008_Node000007" title=" " alt="" coords="341,91,424,94,522,103,611,121,645,134,668,151,681,170,687,190,686,209,679,227,652,261,610,292,559,319,506,342,411,376,409,371,504,337,557,314,607,287,648,257,675,224,681,208,681,191,676,173,664,155,643,139,610,126,521,108,423,99,340,96"/>
+<area shape="rect" id="Node000009" href="$ExactRCC_8h.html" title=" " alt="" coords="249,153,339,178"/>
+<area shape="poly" id="edge15_Node000008_Node000009" title=" " alt="" coords="297,120,297,152,291,152,291,120"/>
+<area shape="rect" id="Node000010" href="$Problem_8h.html" title=" " alt="" coords="94,153,174,178"/>
+<area shape="poly" id="edge16_Node000008_Node000010" title=" " alt="" coords="254,114,162,155,160,150,252,109"/>
+<area shape="rect" id="Node000011" href="$RCC_8cpp.html" title=" " alt="" coords="414,153,486,178"/>
+<area shape="poly" id="edge18_Node000008_Node000011" title=" " alt="" coords="335,109,424,150,422,154,333,114"/>
+<area shape="rect" id="Node000012" href="$SRC_8cpp.html" title="Implementation of functions and classes for solving VRP problems using Limited Memory Rank&#45;1 Cuts." alt="" coords="510,153,582,178"/>
+<area shape="poly" id="edge19_Node000008_Node000012" title=" " alt="" coords="340,103,510,151,509,156,339,109"/>
+<area shape="rect" id="Node000013" href="$TR_8h.html" title=" " alt="" coords="606,153,654,178"/>
+<area shape="poly" id="edge20_Node000008_Node000013" title=" " alt="" coords="341,98,457,119,595,150,606,153,605,158,593,155,456,125,340,103"/>
+<area shape="poly" id="edge17_Node000010_Node000002" title=" " alt="" coords="137,194,137,226,131,226,131,194"/>
+</map>

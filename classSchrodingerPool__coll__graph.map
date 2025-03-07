@@ -1,0 +1,5 @@
+<map id="SchrodingerPool" name="SchrodingerPool">
+<area shape="rect" id="Node000001" title="Manages a pool of paths with a limited lifespan, computes reduced costs, and filters paths based on t..." alt="" coords="48,109,165,135"/>
+<area shape="rect" id="Node000002" href="$classTaskQueue.html" title=" " alt="" coords="5,5,208,46"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="109,61,109,109,104,109,104,61"/>
+</map>

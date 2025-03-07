@@ -1,0 +1,7 @@
+<map id="BucketGraph::define_buckets" name="BucketGraph::define_buckets">
+<area shape="rect" id="Node000001" title="Defines the buckets for the BucketGraph." alt="" coords="5,35,143,75"/>
+<area shape="rect" id="Node000002" href="$classBucketGraph.html#af129eff306551dc7cc7fe00b919bbbd0" title="Assigns the buckets based on the specified direction." alt="" coords="210,5,352,46"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="143,43,194,35,195,40,144,48"/>
+<area shape="rect" id="Node000003" href="$Definitions_8h.html#a59e29a115ea52c2f99d3ff52f83cb3cf" title=" " alt="" coords="191,70,371,96"/>
+<area shape="poly" id="edge2_Node000001_Node000003" title=" " alt="" coords="144,62,175,66,175,71,143,67"/>
+</map>

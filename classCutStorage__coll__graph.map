@@ -1,0 +1,5 @@
+<map id="CutStorage" name="CutStorage">
+<area shape="rect" id="Node000001" title="Manages the storage and operations related to cuts in a solver." alt="" coords="54,94,140,120"/>
+<area shape="rect" id="Node000002" href="$structCutStorage_1_1SegmentMasks.html" title=" " alt="" coords="5,5,189,31"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="100,47,100,94,94,94,94,47"/>
+</map>

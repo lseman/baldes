@@ -1,0 +1,5 @@
+<map id="Branching::selectCandidatesPhase0" name="Branching::selectCandidatesPhase0">
+<area shape="rect" id="Node000001" title="This function implements the new branching logic for selecting candidates in Phase 0." alt="" coords="5,5,191,46"/>
+<area shape="rect" id="Node000002" href="$structInstanceData.html#a8c2987f0a1fcc42b1981f7599ee944d7" title="Retrieves the distance value between two points." alt="" coords="239,13,374,38"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="191,23,223,23,223,28,191,28"/>
+</map>

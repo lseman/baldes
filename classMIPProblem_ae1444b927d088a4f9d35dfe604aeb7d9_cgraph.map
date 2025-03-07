@@ -1,0 +1,13 @@
+<map id="MIPProblem::extractModelDataSparse" name="MIPProblem::extractModelDataSparse">
+<area shape="rect" id="Node000001" title=" " alt="" coords="5,96,179,137"/>
+<area shape="rect" id="Node000002" href="$classMIPProblem.html#ab90d73fab03bc3983fe3b263c447eb9b" title=" " alt="" coords="244,5,376,31"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="124,94,171,66,226,40,241,34,243,39,228,45,174,71,127,98"/>
+<area shape="rect" id="Node000003" href="$classMIPProblem.html#a5f3fa530fb8a6061e1d294a1857dd250" title=" " alt="" coords="243,55,377,80"/>
+<area shape="poly" id="edge2_Node000001_Node000003" title=" " alt="" coords="178,95,235,82,236,87,180,100"/>
+<area shape="rect" id="Node000004" href="$classMIPProblem.html#a00841d8835fad12f1b35e83d7b5cf9a5" title=" " alt="" coords="227,104,393,130"/>
+<area shape="poly" id="edge3_Node000001_Node000004" title=" " alt="" coords="179,114,211,114,211,120,179,120"/>
+<area shape="rect" id="Node000005" href="$classMIPProblem.html#a94d7739fb700ed6194d73ddea3a870e8" title=" " alt="" coords="241,153,379,179"/>
+<area shape="poly" id="edge4_Node000001_Node000005" title=" " alt="" coords="180,134,236,147,235,152,178,139"/>
+<area shape="rect" id="Node000006" href="$classMIPProblem.html#a29674f674d7f14b118a031cdf734611e" title=" " alt="" coords="229,203,391,228"/>
+<area shape="poly" id="edge5_Node000001_Node000006" title=" " alt="" coords="127,135,174,163,228,189,243,195,241,200,226,194,171,167,124,140"/>
+</map>

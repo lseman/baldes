@@ -1,0 +1,5 @@
+<map id="BucketGraph::split_buckets" name="BucketGraph::split_buckets">
+<area shape="rect" id="Node000001" title=" " alt="" coords="5,5,133,46"/>
+<area shape="rect" id="Node000002" href="$classBucketGraph.html#af129eff306551dc7cc7fe00b919bbbd0" title="Assigns the buckets based on the specified direction." alt="" coords="181,5,322,46"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="133,23,165,23,165,28,133,28"/>
+</map>

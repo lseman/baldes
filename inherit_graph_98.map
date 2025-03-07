@@ -1,0 +1,7 @@
+<map id="Graphical Class Hierarchy" name="Graphical Class Hierarchy">
+<area shape="rect" id="Node000000" title=" " alt="" coords="5,23,135,64"/>
+<area shape="rect" id="Node000001" href="$classBNBNode.html" title="Represents a node in a tree structure./." alt="" coords="183,5,263,31"/>
+<area shape="poly" id="edge4_Node000000_Node000001" title=" " alt="" coords="150,28,182,22,183,27,151,33"/>
+<area shape="rect" id="Node000002" href="$classbaldesVar.html" title="Represents a decision variable in a mathematical optimization problem." alt="" coords="183,55,262,80"/>
+<area shape="poly" id="edge5_Node000000_Node000002" title=" " alt="" coords="150,53,183,59,182,64,149,59"/>
+</map>

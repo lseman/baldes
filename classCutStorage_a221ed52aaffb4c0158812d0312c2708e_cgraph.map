@@ -1,0 +1,11 @@
+<map id="CutStorage::updateRedCost" name="CutStorage::updateRedCost">
+<area shape="rect" id="Node000001" title=" " alt="" coords="5,80,187,106"/>
+<area shape="rect" id="Node000002" href="$classCutStorage.html#a2f71dd47977fd6afeefd08cb629507a6" title=" " alt="" coords="259,5,412,31"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="129,77,234,40,258,33,259,38,235,45,131,82"/>
+<area shape="rect" id="Node000003" href="$classCutStorage.html#a5661b2dd9924180da3dd03cc2d63bd2c" title=" " alt="" coords="248,55,422,80"/>
+<area shape="poly" id="edge2_Node000001_Node000003" title=" " alt="" coords="187,81,232,76,233,81,187,86"/>
+<area shape="rect" id="Node000004" href="$classCutStorage.html#a15f327661a09fb046419065bc0de8d96" title=" " alt="" coords="235,104,436,130"/>
+<area shape="poly" id="edge3_Node000001_Node000004" title=" " alt="" coords="187,99,219,103,219,108,187,105"/>
+<area shape="rect" id="Node000005" href="$classCutStorage.html#a8e89d9944e00cab31fc1b78554505c07" title=" " alt="" coords="278,153,393,179"/>
+<area shape="poly" id="edge4_Node000001_Node000005" title=" " alt="" coords="132,104,235,140,263,147,262,153,234,145,131,109"/>
+</map>

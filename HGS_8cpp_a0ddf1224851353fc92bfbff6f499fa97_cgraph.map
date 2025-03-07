@@ -1,0 +1,17 @@
+<map id="main" name="main">
+<area shape="rect" id="Node000001" title=" " alt="" coords="5,104,55,130"/>
+<area shape="rect" id="Node000002" href="$Reader_8h.html#acf4aebf34484c897a09b414bebeb1836" title=" " alt="" coords="108,5,254,31"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="38,102,64,71,101,40,110,35,112,40,104,44,68,75,42,106"/>
+<area shape="rect" id="Node000003" href="$Definitions_8h.html#a064e59f67e1c74ad38938bd6bd7a9210" title="Prints a formatted heuristic message with a specific color scheme." alt="" coords="142,55,220,80"/>
+<area shape="poly" id="edge2_Node000001_Node000003" title=" " alt="" coords="54,106,102,89,126,81,128,86,104,94,56,111"/>
+<area shape="rect" id="Node000004" href="$Definitions_8h.html#a086546d06aa565cdd48f436973ebc496" title="Prints an informational message with a specific format." alt="" coords="144,104,218,130"/>
+<area shape="poly" id="edge3_Node000001_Node000004" title=" " alt="" coords="55,114,128,114,128,120,55,120"/>
+<area shape="rect" id="Node000005" href="$Definitions_8h.html#a34d3019826196b2f1308af4e99370298" title="Prints the BALDES banner with formatted text." alt="" coords="138,153,224,179"/>
+<area shape="poly" id="edge4_Node000001_Node000005" title=" " alt="" coords="56,123,104,140,123,146,122,151,102,145,54,128"/>
+<area shape="rect" id="Node000006" href="$Reader_8h.html#aa609fd8e9fe0e5c687273a27834e9c14" title=" " alt="" coords="103,203,259,228"/>
+<area shape="poly" id="edge5_Node000001_Node000006" title=" " alt="" coords="42,128,68,159,104,189,112,194,110,198,101,194,64,163,38,132"/>
+<area shape="rect" id="Node000007" href="$Reader_8h.html#aba12fb635d3f4c4fe794fa18cbda98ca" title=" " alt="" coords="359,177,459,203"/>
+<area shape="poly" id="edge6_Node000006_Node000007" title=" " alt="" coords="259,204,343,195,344,200,259,210"/>
+<area shape="rect" id="Node000008" href="$Reader_8h.html#aef54cee0a50255ed1a50ed2fbefadf74" title="Reduces the time windows for the vertices in the VRPTW instance." alt="" coords="307,227,511,252"/>
+<area shape="poly" id="edge7_Node000006_Node000008" title=" " alt="" coords="259,221,292,224,291,230,259,226"/>
+</map>

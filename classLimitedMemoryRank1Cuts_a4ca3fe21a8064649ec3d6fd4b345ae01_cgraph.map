@@ -1,0 +1,17 @@
+<map id="LimitedMemoryRank1Cuts::runSeparation" name="LimitedMemoryRank1Cuts::runSeparation">
+<area shape="rect" id="Node000001" title=" " alt="" coords="5,104,180,145"/>
+<area shape="rect" id="Node000002" href="$classBNBNode.html#a234c0a33d282f8ec5d1017de8c99a037" title=" " alt="" coords="228,5,415,46"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="133,101,227,57,244,49,246,54,229,61,135,106"/>
+<area shape="rect" id="Node000003" href="$classLimitedMemoryRank1Cuts.html#a0c8178e5e367d5d5124555500f650f97" title=" " alt="" coords="234,71,408,111"/>
+<area shape="poly" id="edge2_Node000001_Node000003" title=" " alt="" coords="180,109,218,103,219,109,180,114"/>
+<area shape="rect" id="Node000004" href="$classLimitedMemoryRank1Cuts.html#a0874059ad71694c574998b73fd797c5f" title="Separates the given solution vector into cuts using Limited Memory Rank&#45;1 Cuts." alt="" coords="234,136,408,177"/>
+<area shape="poly" id="edge3_Node000001_Node000004" title=" " alt="" coords="180,134,219,139,218,145,180,139"/>
+<area shape="rect" id="Node000007" href="$classLimitedMemoryRank1Cuts.html#a33d300a3b76e5e2f109130dacaa8141d" title=" " alt="" coords="234,201,408,242"/>
+<area shape="poly" id="edge6_Node000001_Node000007" title=" " alt="" coords="136,143,229,186,246,193,244,198,227,191,134,148"/>
+<area shape="rect" id="Node000005" href="$structSRCPermutation.html#a7c2eee29003a81f6c79aeb63729838dd" title=" " alt="" coords="491,98,661,124"/>
+<area shape="poly" id="edge4_Node000004_Node000005" title=" " alt="" coords="409,138,484,125,485,130,410,143"/>
+<area shape="rect" id="Node000006" href="$namespacenumericutils.html#a8d554fdb4468068ab99dc7a219308492" title=" " alt="" coords="518,148,634,173"/>
+<area shape="poly" id="edge5_Node000004_Node000006" title=" " alt="" coords="409,155,503,157,503,162,409,160"/>
+<area shape="rect" id="Node000008" href="$classLimitedMemoryRank1Cuts.html#a267d89d8d4d4ba61fa2bf551dd041a9c" title="Computes the limited memory coefficient based on the given parameters." alt="" coords="463,201,689,242"/>
+<area shape="poly" id="edge7_Node000007_Node000008" title=" " alt="" coords="409,219,447,219,447,224,409,224"/>
+</map>

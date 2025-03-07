@@ -1,0 +1,9 @@
+<map id="BucketGraph::BucketGraph" name="BucketGraph::BucketGraph">
+<area shape="rect" id="Node000001" title=" " alt="" coords="5,42,185,68"/>
+<area shape="rect" id="Node000002" href="$classBucketGraph.html#a5d04c8a2da52796e87c1b443aa221a76" title="Defines the buckets for the BucketGraph." alt="" coords="233,35,370,75"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="185,52,217,52,217,58,185,58"/>
+<area shape="rect" id="Node000003" href="$classBucketGraph.html#af129eff306551dc7cc7fe00b919bbbd0" title="Assigns the buckets based on the specified direction." alt="" coords="438,5,579,46"/>
+<area shape="poly" id="edge2_Node000002_Node000003" title=" " alt="" coords="370,43,422,35,423,40,371,48"/>
+<area shape="rect" id="Node000004" href="$Definitions_8h.html#a59e29a115ea52c2f99d3ff52f83cb3cf" title=" " alt="" coords="418,70,598,96"/>
+<area shape="poly" id="edge3_Node000002_Node000004" title=" " alt="" coords="371,62,403,66,402,71,370,67"/>
+</map>

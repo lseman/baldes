@@ -1,0 +1,11 @@
+<map id="HighRankCuts::separate" name="HighRankCuts::separate">
+<area shape="rect" id="Node000001" title=" " alt="" coords="5,70,167,96"/>
+<area shape="rect" id="Node000002" href="$classHighRankCuts.html#a24127cfb993f49eece6de67d4e0a760c" title=" " alt="" coords="215,5,402,46"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="138,67,211,48,213,53,140,72"/>
+<area shape="rect" id="Node000004" href="$Definitions_8h.html#ae7a1dede4b1a1d5175d2cfa359459e3c" title="Prints a formatted message with a specific prefix." alt="" coords="273,70,344,96"/>
+<area shape="poly" id="edge3_Node000001_Node000004" title=" " alt="" coords="167,80,257,80,257,86,167,86"/>
+<area shape="rect" id="Node000005" href="$classLocalSearch.html#a7a972b9d1a1247d8feef51038900b0f4" title=" " alt="" coords="243,120,374,145"/>
+<area shape="poly" id="edge4_Node000001_Node000005" title=" " alt="" coords="148,94,233,113,231,118,147,99"/>
+<area shape="rect" id="Node000003" href="$classHighRankCuts.html#a0d44138aa45c55a87aa3efa04048ba1d" title=" " alt="" coords="450,5,654,46"/>
+<area shape="poly" id="edge2_Node000002_Node000003" title=" " alt="" coords="403,23,434,23,434,28,403,28"/>
+</map>

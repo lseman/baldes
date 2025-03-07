@@ -1,0 +1,13 @@
+<map id="TrustRegion::setup" name="TrustRegion::setup">
+<area shape="rect" id="Node000001" title=" " alt="" coords="5,80,135,106"/>
+<area shape="rect" id="Node000002" href="$classBNBNode.html#a58adcc5f912a44be604d0e11063d7926" title=" " alt="" coords="194,5,321,31"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="97,77,182,40,197,34,199,39,184,45,100,82"/>
+<area shape="rect" id="Node000003" href="$classBNBNode.html#a1bed7031f27bac7f4a80424438c5d5f6" title=" " alt="" coords="189,55,326,80"/>
+<area shape="poly" id="edge2_Node000001_Node000003" title=" " alt="" coords="135,81,173,76,174,81,135,87"/>
+<area shape="rect" id="Node000004" href="$classBNBNode.html#a8e9719a49d2b149441b61ee4aa790fa2" title=" " alt="" coords="183,104,332,130"/>
+<area shape="poly" id="edge3_Node000001_Node000004" title=" " alt="" coords="135,98,167,103,167,108,135,104"/>
+<area shape="rect" id="Node000005" href="$classBNBNode.html#abb76f5afa8990290b262a0750cede865" title=" " alt="" coords="190,153,324,179"/>
+<area shape="poly" id="edge4_Node000001_Node000005" title=" " alt="" coords="100,104,184,140,199,145,197,150,182,145,98,109"/>
+<area shape="rect" id="Node000006" href="$classGurobiEnvSingleton.html#a49c3ce63088629c2246dec252a73df16" title=" " alt="" coords="380,146,515,186"/>
+<area shape="poly" id="edge5_Node000005_Node000006" title=" " alt="" coords="325,164,364,164,364,169,325,169"/>
+</map>

@@ -1,0 +1,9 @@
+<map id="VRProblem::printSolution" name="VRProblem::printSolution">
+<area shape="rect" id="Node000001" title=" " alt="" coords="5,55,171,80"/>
+<area shape="rect" id="Node000002" href="$classVRProblem.html#a61b5e5832a71fe88db990aee2427dcb0" title=" " alt="" coords="225,5,370,31"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="145,51,224,33,225,38,146,57"/>
+<area shape="rect" id="Node000003" href="$classBNBNode.html#adf352e13be92c0f0838047be84df3bba" title=" " alt="" coords="219,55,376,80"/>
+<area shape="poly" id="edge2_Node000001_Node000003" title=" " alt="" coords="171,65,203,65,203,70,171,70"/>
+<area shape="rect" id="Node000004" href="$classLogger.html#a8e28e412872f37249d1b6d6209444c57" title=" " alt="" coords="255,104,340,130"/>
+<area shape="poly" id="edge3_Node000001_Node000004" title=" " alt="" coords="146,78,241,101,239,106,145,84"/>
+</map>

@@ -1,0 +1,5 @@
+<map id="BucketGraph::get_best_label" name="BucketGraph::get_best_label">
+<area shape="rect" id="Node000001" title="Retrieves the best label from the bucket graph based on the given topological order,..." alt="" coords="5,5,159,46"/>
+<area shape="rect" id="Node000002" href="$classBucketGraph.html#af129eff306551dc7cc7fe00b919bbbd0" title="Assigns the buckets based on the specified direction." alt="" coords="207,5,348,46"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="159,23,191,23,191,28,159,28"/>
+</map>
