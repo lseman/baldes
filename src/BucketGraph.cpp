@@ -252,7 +252,7 @@ std::vector<int> BucketGraph::computePhi(int &bucket_id, bool fw) {
                                       bucket_id, found_node->bucket_index)
                                 : is_bucket_not_fixed_backward(
                                       bucket_id, found_node->bucket_index);
-            if (not_fixed)
+            // if (not_fixed)
 #endif
             {
                 phi.push_back(found_node->bucket_index);
@@ -268,7 +268,7 @@ std::vector<int> BucketGraph::computePhi(int &bucket_id, bool fw) {
             bool not_fixed =
                 fw ? is_bucket_not_fixed_forward(neighbor, bucket_id)
                    : is_bucket_not_fixed_backward(neighbor, bucket_id);
-            if (not_fixed)
+            // if (not_fixed)
 #endif
             {
                 phi.push_back(neighbor);
@@ -1071,11 +1071,10 @@ std::vector<Label *> BucketGraph::extend_path(const std::vector<int> &path,
     std::vector<Label *> new_labels;
     const auto &arcs = nodes[label->node_id].get_arcs<Direction::Forward>();
     for (const auto &arc : arcs) {
-        auto new_labels =
+        auto new_label =
             Extend<Direction::Forward, Stage::Extend, ArcType::Node,
                    Mutability::Mut, Full::Partial>(label, arc);
-        new_labels.insert(new_labels.end(), new_labels.begin(),
-                          new_labels.end());
+        new_labels.insert(new_labels.end(), new_label);
     }
 
     // std::vector<Label *> new_labels_to_return;

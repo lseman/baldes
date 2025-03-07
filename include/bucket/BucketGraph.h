@@ -1069,13 +1069,13 @@ class BucketGraph {
                                            uint &stat_n_dom) noexcept;
 
     template <Direction D, Stage S, ArcType A, Mutability M, Full F>
-    inline std::vector<Label *> Extend(
+    inline auto Extend(
         const std::conditional_t<M == Mutability::Mut, Label *, const Label *>
             L_prime,
         const std::conditional_t<
             A == ArcType::Bucket, BucketArc,
             std::conditional_t<A == ArcType::Jump, JumpArc, Arc>> &gamma,
-        std::vector<Label *> *output_buffer = nullptr, int depth = 0) noexcept;
+        int depth = 0) noexcept;
     template <Direction D, Stage S>
     bool is_dominated(const Label *new_label, const Label *labels) noexcept;
 
@@ -1440,17 +1440,16 @@ class BucketGraph {
                 int max_interval,
                 bool is_forward) -> std::pair<double, double> {
             double start, end;
-            if (is_forward) {
-                start = (pos == 0) ? lb : lb + pos * base_interval;
-                end = (pos == max_interval - 1)
-                          ? ub
-                          : lb + (pos + 1) * base_interval;
-            } else {
-                start = (pos == max_interval - 1)
-                            ? lb
-                            : ub - (pos + 1) * base_interval;
-                end = (pos == 0) ? ub : ub - pos * base_interval;
-            }
+            // if (is_forward) {
+            start = (pos == 0) ? lb : lb + pos * base_interval;
+            end =
+                (pos == max_interval - 1) ? ub : lb + (pos + 1) * base_interval;
+            // } else {
+            //     start = (pos == max_interval - 1)
+            //                 ? lb
+            //                 : ub - (pos + 1) * base_interval;
+            //     end = (pos == 0) ? ub : ub - pos * base_interval;
+            // }
             return {roundToTwoDecimalPlaces(start),
                     roundToTwoDecimalPlaces(end)};
         };

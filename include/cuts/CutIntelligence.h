@@ -414,16 +414,16 @@ class AdaptiveNodeScorer {
                         }
                     }
                 }
-            } else if (cut.type == CutType::OneRow) {
-                for (int i = 1; i < N_SIZE - 1; ++i) {
-                    if (cut.isSRCset(i)) {
-                        for (int j = 1; j < N_SIZE - 1; ++j) {
-                            if (i != j) {
-                                cut_adjustments[i][j] -= cut.dual_value;
-                            }
-                        }
-                    }
-                }
+                // } else if (cut.type == CutType::OneRow) {
+                //     for (int i = 1; i < N_SIZE - 1; ++i) {
+                //         if (cut.isSRCset(i)) {
+                //             for (int j = 1; j < N_SIZE - 1; ++j) {
+                //                 if (i != j) {
+                //                     cut_adjustments[i][j] -= cut.dual_value;
+                //                 }
+                //             }
+                //         }
+                //     }
             }
         }
 

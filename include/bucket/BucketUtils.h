@@ -695,27 +695,27 @@ void BucketGraph::ConcatenateLabel(const Label *L, int &b,
         auto visited_bitmap = L->visited_bitmap;
 
         // check if visited_bitmap overlaps
-        // for (size_t i = 0; i < bitmap_size; ++i) {
-        //     if (visited_bitmap[i] & L_bw->visited_bitmap[i]) {
-        //         return true;
-        //     }
-        // }
-        // // Iterate in reverse over nodes_covered without allocating a new
-        // vector.
-        for (auto it = L_bw->nodes_covered.rbegin();
-             it != L_bw->nodes_covered.rend(); ++it) {
-            uint16_t node_id = *it;
-            if (node_id == L->node_id ||
-                is_node_visited(visited_bitmap, node_id))
+        for (size_t i = 0; i < bitmap_size; ++i) {
+            if (visited_bitmap[i] & L_bw->visited_bitmap[i]) {
                 return true;
-            // Update the bitmap for each 64-bit word.
-            for (size_t i = 0; i < visited_bitmap.size(); ++i) {
-                uint64_t &current_visited = visited_bitmap[i];
-                if (current_visited != 0)
-                    current_visited &= neighborhoods_bitmap[node_id][i];
             }
-            set_node_visited(visited_bitmap, node_id);
         }
+        // Iterate in reverse over nodes_covered without allocating a new
+        // vector.
+        // for (auto it = L_bw->nodes_covered.rbegin();
+        //      it != L_bw->nodes_covered.rend(); ++it) {
+        //     uint16_t node_id = *it;
+        //     if (node_id == L->node_id ||
+        //         is_node_visited(visited_bitmap, node_id))
+        //         return true;
+        //     // Update the bitmap for each 64-bit word.
+        //     for (size_t i = 0; i < visited_bitmap.size(); ++i) {
+        //         uint64_t &current_visited = visited_bitmap[i];
+        //         if (current_visited != 0)
+        //             current_visited &= neighborhoods_bitmap[node_id][i];
+        //     }
+        //     set_node_visited(visited_bitmap, node_id);
+        // }
         return false;
     };
 

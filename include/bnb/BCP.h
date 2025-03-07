@@ -378,7 +378,8 @@ class VRProblem {
             }
 
             auto cutSize = cut.p.num.size();
-            if (loaded && (cutSize == 3 || cutSize == 4 || cutSize == 5)) {
+            if (loaded &&
+                (cutSize == 1)) {  // || cutSize == 4 || cutSize == 5)) {
                 fmt::print("Cut size is {}, skipping...\n", cutSize);
                 //     // delete the cut
                 cutsToBeRemoved.push_back(&cut);
@@ -1204,16 +1205,15 @@ class VRProblem {
             RCC_MODE_BLOCK(n_rcc_cuts = rccManager->size();)
 
 #ifdef GUROBI
-            // if (allPaths.size() > 1000) {
-            //     fmt::print("Reducing non-basic variables\n");
-            //     auto &pathSet = node->pathSet;
-            //     auto toRemoveIndices =
-            //     node->mip.reduceNonBasicVariables(0.8); for (auto &index :
-            //     toRemoveIndices) {
-            //         allPaths.erase(allPaths.begin() + index);
-            //         pathSet.erase(pathSet.begin() + index);
-            //     }
-            // }
+            if (allPaths.size() > 5000) {
+                fmt::print("Reducing non-basic variables\n");
+                auto &pathSet = node->pathSet;
+                auto toRemoveIndices = node->mip.reduceNonBasicVariables(0.8);
+                for (auto &index : toRemoveIndices) {
+                    allPaths.erase(allPaths.begin() + index);
+                    pathSet.erase(pathSet.begin() + index);
+                }
+            }
 #endif
 
 #ifdef TR
