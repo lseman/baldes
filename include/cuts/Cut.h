@@ -412,10 +412,10 @@ class CutStorage {
 
         // Process each cut.
         for (const auto &cut : cuts) {
-            if (cut.p.num.size() == 1) {
-                alphas.push_back(0.0);
-                continue;
-            }
+            // if (cut.p.num.size() == 1) {
+            // alphas.push_back(0.0);
+            // continue;
+            // }
             double alpha = 0.0;
             int runningSum = 0;
             const int denominator = cut.p.den;

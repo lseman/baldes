@@ -353,13 +353,12 @@ std::vector<double> BucketGraph::labeling_algorithm() {
                             __builtin_prefetch(&node_arcs[arc_idx + 4], 0, 3);
                         }
 
-                        extended_labels.clear();
-                        extended_labels =
+                        auto new_label =
                             Extend<D, S, ArcType::Bucket, Mutability::Mut, F>(
-                                label, arc, &extended_labels);
+                                label, arc);
 
                         // Process each new label produced by the extension.
-                        for (Label *new_label : extended_labels) {
+                        if (new_label != nullptr) {
                             ++stat_n_labels;
                             const int to_bucket = new_label->vertex;
                             auto &mother_bucket = buckets[to_bucket];
@@ -711,21 +710,18 @@ std::vector<Label *> BucketGraph::bi_labeling_algorithm() {
                         }
 
                         // Extend the label along the current arc.
-                        auto Ls =
+                        auto L_prime =
                             Extend<Direction::Forward, S, ArcType::Bucket,
                                    Mutability::Const, Full::Reverse>(L, arc);
 
                         // Process each extended label.
-                        if (!Ls.empty()) {
-                            for (Label *L_prime : Ls) {
-                                int bucket_to_process =
-                                    L_prime->vertex;  // mutable copy if needed
+                        if (L_prime != -1) {
+                            int bucket_to_process = L_prime;
 
-                                // Concatenate the label with bucket
-                                // information, updating best_cost.
-                                ConcatenateLabel<S, SYM>(L, bucket_to_process,
-                                                         best_cost);
-                            }
+                            // Concatenate the label with bucket
+                            // information, updating best_cost.
+                            ConcatenateLabel<S, SYM>(L, bucket_to_process,
+                                                     best_cost);
                         }
                     }
                 }
@@ -785,20 +781,17 @@ std::vector<Label *> BucketGraph::bi_labeling_algorithm() {
  *
  */
 template <Direction D, Stage S, ArcType A, Mutability M, Full F>
-
-inline std::vector<Label *> BucketGraph::Extend(
+inline auto BucketGraph::Extend(
     const std::conditional_t<M == Mutability::Mut, Label *, const Label *>
         L_prime,
     const std::conditional_t<
         A == ArcType::Bucket, BucketArc,
         std::conditional_t<A == ArcType::Jump, JumpArc, Arc>> &gamma,
-    std::vector<Label *> *output_buffer, int depth) noexcept {
+    int depth) noexcept {
     // Pre-allocated result vector to avoid allocations for the common case of
     // 0-1 results
     static thread_local std::vector<Label *> result_vector;
-    std::vector<Label *> &result =
-        output_buffer ? *output_buffer : result_vector;
-    result.clear();
+    Label *result = nullptr;
 
     // Prepare temporary resource storage (resize to current resources size)
     static thread_local std::vector<double> new_resources;
@@ -841,16 +834,24 @@ inline std::vector<Label *> BucketGraph::Extend(
 
     // Early rejection: if we loop back or the node was already visited
     if (node_id == initial_node_id ||
-        is_node_visited(L_prime->visited_bitmap, node_id))
-        return result;
+        is_node_visited(L_prime->visited_bitmap, node_id)) {
+        if constexpr (F == Full::Reverse)
+            return -1;
+        else
+            return result;
+    }
 
     // For stages where fixed arcs matter
     if constexpr (S >= Stage::Three || S == Stage::Eliminate) {
         if ((D == Direction::Forward &&
              is_arc_fixed(initial_node_id, node_id)) ||
             (D == Direction::Backward &&
-             is_arc_fixed(node_id, initial_node_id)))
-            return result;
+             is_arc_fixed(node_id, initial_node_id))) {
+            if constexpr (F == Full::Reverse)
+                return -1;
+            else
+                return result;
+        }
     }
 
     // Process resources (feasibility check)
@@ -861,8 +862,12 @@ inline std::vector<Label *> BucketGraph::Extend(
                         n_resources * sizeof(double));
 
             if (!process_all_resources<D>(new_resources, initial_resources,
-                                          gamma, nodes[node_id], n_resources))
-                return result;
+                                          gamma, nodes[node_id], n_resources)) {
+                if constexpr (F == Full::Reverse)
+                    return -1;
+                else
+                    return result;
+            }
         } else {
             auto &buckets = assign_buckets<D>(fw_buckets, bw_buckets);
             const auto &bucket = buckets[gamma.jump_bucket];
@@ -872,7 +877,10 @@ inline std::vector<Label *> BucketGraph::Extend(
                         std::max(new_resources[i] + gamma.resource_increment[i],
                                  static_cast<double>(bucket.lb[i]));
                     if (numericutils::gt(new_resources[i], bucket.ub[i])) {
-                        return {};
+                        if constexpr (F == Full::Reverse)
+                            return -1;
+                        else
+                            return nullptr;
                     }
 
                 } else {
@@ -880,7 +888,10 @@ inline std::vector<Label *> BucketGraph::Extend(
                         std::min(new_resources[i] - gamma.resource_increment[i],
                                  static_cast<double>(bucket.ub[i]));
                     if (numericutils::lt(new_resources[i], bucket.lb[i])) {
-                        return {};
+                        if constexpr (F == Full::Reverse)
+                            return -1;
+                        else
+                            return nullptr;
                     }
                 }
             }
@@ -894,8 +905,12 @@ inline std::vector<Label *> BucketGraph::Extend(
             n_visited += __builtin_popcountll(bitmap);
         if (n_visited > options.max_path_size ||
             (n_visited == options.max_path_size &&
-             node_id != options.end_depot))
-            return result;
+             node_id != options.end_depot)) {
+            if constexpr (F == Full::Reverse)
+                return -1;
+            else
+                return result;
+        }
     }
 
     // Get bucket number for the new label
@@ -908,33 +923,14 @@ inline std::vector<Label *> BucketGraph::Extend(
         to_bucket = get_bucket_number<D>(node_id, new_resources);
     }
 
-    // #ifdef FIX_BUCKETS
-    //     // If bucket is fixed (for Stage::Four) and not a jump arc, try jump
-    //     arcs
-    //     // recursively
-    //     if constexpr (S == Stage::Four && A != ArcType::Jump &&
-    //                   A != ArcType::Bucket) {
-    //         if (is_bucket_fixed<D>(L_prime->vertex, to_bucket)) {
-    //             static thread_local std::vector<Label *> jump_result;
-    //             jump_result.clear();
+    // Handle Reverse mode early
+    if constexpr (F == Full::Reverse) {
+        if (new_resources[options.main_resources[0]] <=
+            std::floor(q_star[options.main_resources[0]]))
+            return -1;
 
-    //             auto jump_arcs =
-    //                 nodes[initial_node_id].template
-    //                 get_jump_arcs<D>(node_id);
-    //             for (const auto &jump_arc : jump_arcs) {
-    //                 auto extended_labels =
-    //                     Extend<D, S, ArcType::Jump, Mutability::Const, F>(
-    //                         L_prime, jump_arc, &jump_result, depth + 1);
-
-    //                 if (!extended_labels.empty()) {
-    //                     result.insert(result.end(), extended_labels.begin(),
-    //                                   extended_labels.end());
-    //                 }
-    //             }
-    //             return result;
-    //         }
-    //     }
-    // #endif
+        return to_bucket;
+    }
 
     // Calculate new cost
 #ifdef CUSTOM_COST
@@ -984,18 +980,6 @@ inline std::vector<Label *> BucketGraph::Extend(
         }
     })
 
-    // Handle Reverse mode early
-    if constexpr (F == Full::Reverse) {
-        if (new_resources[options.main_resources[0]] <=
-            std::floor(q_star[options.main_resources[0]]))
-            return result;
-
-        auto new_label = new Label();
-        new_label->vertex = to_bucket;
-        result.push_back(new_label);
-        return result;
-    }
-
     // Create and initialize a new label
     auto &label_pool = assign_buckets<D>(label_pool_fw, label_pool_bw);
     auto new_label = label_pool->acquire();
@@ -1040,8 +1024,11 @@ inline std::vector<Label *> BucketGraph::Extend(
         const auto active_cuts = cutter->getActiveCuts();
         const auto n_cuts = cutter->activeSize();
         if (__builtin_expect(n_cuts == 0, 0)) {  // Branch prediction: unlikely
-            result.push_back(new_label);
-            return result;
+            if constexpr (F == Full::Reverse) {
+                return -1;
+            } else {
+                return new_label;
+            }
         }
 
         double total_cost_update = 0.0;
@@ -1140,10 +1127,12 @@ inline std::vector<Label *> BucketGraph::Extend(
         new_label->cost += total_cost_update;
     }
 #endif
-    result.push_back(new_label);
-    return result;
+    if constexpr (F != Full::Reverse) {
+        return new_label;
+    } else {
+        return -1;
+    }
 }
-
 /**
  * @brief Checks if a label is dominated by a new label based on cost
  * and resource conditions.

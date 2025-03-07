@@ -275,10 +275,10 @@ std::pair<bool, bool> LimitedMemoryRank1Cuts::runSeparation(
     // fmt::print("Separating Rank-1 cuts...\n");
     separateR1C1(matrix.A_sparse, solution);
     // fmt::print("Separation Rank-3 cuts...\n");
+    const size_t initial_cut_count = cuts->size();
     separate(matrix.A_sparse, solution);
 
     // Record the cut count after the first separation phase.
-    const size_t initial_cut_count = cuts->size();
     int rank3_cuts_size = static_cast<int>(cuts->size() - initial_cut_count);
 
     ////////////////////////////////////////////////////

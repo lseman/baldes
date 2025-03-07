@@ -261,9 +261,9 @@ void BucketGraph::BucketArcElimination(double theta) {
 
         for (const auto &a : jump_arcs) {
             auto increment = a.resource_increment;
-            auto arc_key = create_arc_key(a.base_bucket, a.jump_bucket, b);
+            auto arc_key = create_arc_key(a.from_bucket, a.to_bucket, b);
             int b_opposite =
-                get_opposite_bucket_number<D>(a.jump_bucket, increment);
+                get_opposite_bucket_number<D>(a.to_bucket, increment);
             auto &Bidi_map = local_B_Ba_b[arc_key];
 
             // Process each label in the current bucket.
@@ -282,7 +282,7 @@ void BucketGraph::BucketArcElimination(double theta) {
         const auto &bucket_arcs = buckets[b].template get_bucket_arcs<D>();
         if (bucket_arcs.empty()) return;
 
-        auto labels = buckets[b].get_non_dominated_labels();
+        auto labels = buckets[b].get_labels();
         std::vector<uint64_t> Bvisited(n_segments, 0);
 
         for (const auto &a : bucket_arcs) {

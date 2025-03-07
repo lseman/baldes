@@ -265,12 +265,24 @@ struct alignas(64) Bucket {
     }
 
     template <Direction dir>
-    std::vector<JumpArc> &get_jump_arcs() {
+    std::vector<BucketArc> get_jump_arcs() {
+        std::vector<BucketArc> jump_arcs;
         if constexpr (dir == Direction::Forward) {
-            return fw_jump_arcs;
+            // populate jump_arcs with fw_bucket_arcs in which jump is true
+            for (const auto &arc : fw_bucket_arcs) {
+                if (arc.jump) {
+                    jump_arcs.push_back(arc);
+                }
+            }
         } else {
-            return bw_jump_arcs;
+            // populate jump_arcs with bw_bucket_arcs in which jump is true
+            for (const auto &arc : bw_bucket_arcs) {
+                if (arc.jump) {
+                    jump_arcs.push_back(arc);
+                }
+            }
         }
+        return jump_arcs;
     }
 
     template <Direction dir>
