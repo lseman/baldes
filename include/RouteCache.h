@@ -1,13 +1,11 @@
 #pragma once
 
 #include <ankerl/unordered_dense.h>
-#include <mutex>
-#include <xxhash.h>
 #include <memory>
-#include <vector>
-#include <thread>
-#include <atomic>
+#include <mutex>
 #include <shared_mutex>
+#include <vector>
+#include <xxhash.h>
 
 class RouteCache {
 private:
@@ -30,7 +28,7 @@ private:
     CacheMap map;
     mutable std::shared_mutex map_mutex; // Mutex for thread-safe map operations
 
-    static thread_local std::pair<std::vector<int>, EntryPtr> local_cache;
+    inline static thread_local std::pair<std::vector<int>, EntryPtr> local_cache;
 
 public:
     bool try_get(const std::vector<int> &key, std::vector<std::vector<int>> &out_value) {
@@ -77,4 +75,3 @@ public:
         map.clear();
     }
 };
-

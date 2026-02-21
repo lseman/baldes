@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.16)
+cmake_minimum_required(VERSION 3.5)
 find_program(CCACHE_PROGRAM ccache)
 if(CCACHE_PROGRAM)
     set_property(GLOBAL PROPERTY RULE_LAUNCH_COMPILE "${CCACHE_PROGRAM}")
@@ -8,10 +8,10 @@ else()
     message(WARNING "ccache not found, compilation will not be cached.")
 endif()
 
-# set(CMAKE_CXX_COMPILER
-# "/data/toolchain/llvm/stage2-prof-use-lto/install/bin/clang++"  CACHE PATH "C compiler" FORCE)
-# set(CMAKE_C_COMPILER
-# "/data/toolchain/llvm/stage2-prof-use-lto/install/bin/clang"  CACHE PATH "C compiler" FORCE)
+set(CMAKE_CXX_COMPILER
+ "/data/toolchain/llvm/stage2-prof-use-lto/install/bin/clang++"  CACHE PATH "C compiler" FORCE)
+ set(CMAKE_C_COMPILER
+ "/data/toolchain/llvm/stage2-prof-use-lto/install/bin/clang"  CACHE PATH "C compiler" FORCE)
 
 
 project(BALDES LANGUAGES C CXX)
@@ -45,9 +45,9 @@ if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
   string(REPLACE "-fconcepts-diagnostics-depth=10" "" CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
 endif()
 
-set(CMAKE_CXX_FLAGS_RELEASE "-O3 -march=native -flto -Xclang -Wno-unknown-warning-option")
-set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "-O3 -g -march=native -flto -funroll-loops -ftree-vectorize -fomit-frame-pointer -ffunction-sections -fdata-sections -fno-signed-zeros -fno-trapping-math -mtune=native -fvectorize -Xclang -Wno-unknown-warning-option")
-set(CMAKE_CXX_FLAGS_DEBUG "-Og -g -Wall -Wextra -Xclang -Wno-unknown-warning-option")
+# set(CMAKE_CXX_FLAGS_RELEASE "-O3 -march=native -flto -Xclang -Wno-unknown-warning-option")
+# set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "-O3 -g -march=native -flto -funroll-loops -ftree-vectorize -fomit-frame-pointer -ffunction-sections -fdata-sections -fno-signed-zeros -fno-trapping-math -mtune=native -fvectorize -Xclang -Wno-unknown-warning-option")
+# set(CMAKE_CXX_FLAGS_DEBUG "-Og -g -Wall -Wextra -Xclang -Wno-unknown-warning-option")
 
 # set LD flags
 set(CMAKE_EXE_LINKER_FLAGS_RELEASE "-flto -fuse-ld=mold -Wl,--gc-sections")
@@ -55,7 +55,9 @@ if(APPLE)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -stdlib=libc++ -std=c++20")
 endif()
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-error=unknown-argument -Wno-error=unused-command-line-argument")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
+
+# (Wno-error=unknown-argument -Wno-error=unused-command-line-argument")
 
 #-------------------------------------------------------------------------------
 # Dependencies
@@ -97,13 +99,12 @@ endif()
 # )
 
 # stdexec
-cpmaddpackage(
+  cpmaddpackage(
   NAME stdexec
   GITHUB_REPOSITORY NVIDIA/stdexec
   GIT_TAG main
   OPTIONS "STDEXEC_BUILD_TESTS OFF" "STDEXEC_BUILD_EXAMPLES OFF" "STDEXEC_BUILD_BENCHMARKS OFF" "STDEXEC_BUILD_DOCS OFF" "BUILD_TESTING OFF"
 )
-
 # fmt
 cpmaddpackage(
   NAME fmt
@@ -216,7 +217,7 @@ option(HIGHS "Enable HIGHS" ON)
 option(NSYNC "Enable nsync" OFF)
 option(CHOLMOD "Enable cholmod" OFF)
 option(IPM_ACEL "Enable ipm acelleration" OFF)
-option(BALDES "Enable baldes compilation" ON)
+option(BALDES "Enable baldes compilation" OFF)
 option(HGS "Enable HGS" OFF)
 option(CUSTOM_COST "Enable custom cost" OFF)
 
@@ -371,7 +372,7 @@ include_directories(${GUROBI_HOME}/include)
 #-------------------------------------------------------------------------------
 set(COMMON_LIBRARIES stdexec fmt xxhash)
 
-set(GUROBI_VERSION_MAJOR 120) # Adjust based on Gurobi version
+set(GUROBI_VERSION_MAJOR 130) # Adjust based on Gurobi version
 if(APPLE)
   # macOS detected, use .dylib for linking
   list(APPEND COMMON_LIBRARIES ${GUROBI_HOME}/lib/libgurobi_c++.a
@@ -398,7 +399,7 @@ if(BALDES)
   target_compile_options(baldes PRIVATE -Wno-c++26-extensions -Wno-deprecated-declarations)
 target_link_libraries(baldes PRIVATE ${COMMON_LIBRARIES})
 
-    target_precompile_headers(baldes PRIVATE include/Common.h)
+    # target_precompile_headers(baldes PRIVATE include/Common.h)
 # target_link_libraries(baldes PRIVATE CUDA::cudart CUDA::cusparse)
 
   if(JEMALLOC)
@@ -430,12 +431,13 @@ endif()
 if(MTW)
   add_executable(vrpmtw mtw/VRPMTW.cpp ${EXECUTABLE_SOURCES} ${HGS_SOURCES} ${FPSOURCE})
   target_compile_options(vrpmtw PRIVATE -Wno-c++26-extensions -Wno-deprecated-declarations)
-  target_link_libraries(vrpmtw PRIVATE stdexec fmt xxhash mdspan libcuckoo)
+  target_link_libraries(vrpmtw PRIVATE stdexec fmt xxhash)
 endif()
 
 if(WITH_PYTHON)
   pybind11_add_module(pybaldes src/BucketBindings.cpp src/BCP.cpp src/BucketGraph.cpp src/MIPHandler.cpp src/Branching.cpp ${EXECUTABLE_SOURCES})
-  target_link_libraries(pybaldes PRIVATE stdexec fmt xxhash mdspan libcuckoo pybind11::module)
+  target_link_libraries(pybaldes PRIVATE stdexec fmt xxhash pybind11::module)
+target_link_libraries(pybaldes PRIVATE ${COMMON_LIBRARIES})
   set_target_properties(pybaldes PROPERTIES POSITION_INDEPENDENT_CODE ON PREFIX "")
   target_compile_options(pybaldes PRIVATE -Wno-c++26-extensions -Wno-deprecated-declarations)
 
@@ -446,6 +448,6 @@ endif()
 
 if(HGS)
   add_executable(hgs src/HGS.cpp ${HGS_SOURCES} ${FPSOURCE})
-  target_link_libraries(hgs PRIVATE stdexec fmt xxhash mdspan libcuckoo)
+  target_link_libraries(hgs PRIVATE stdexec fmt xxhash)
   target_compile_options(hgs PRIVATE -Wno-c++26-extensions -Wno-deprecated-declarations)
 endif()
