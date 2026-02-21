@@ -43,6 +43,10 @@
  */
 class Stabilization {
    public:
+    static constexpr double kAlphaMin = 0.02;
+    static constexpr double kAlphaMax = 0.90;
+    static constexpr double kAlphaEps = 1e-3;
+
     double alpha;  // Current alpha parameter
     int t;         // Iteration counter
 
@@ -94,12 +98,17 @@ class Stabilization {
 
     void update_stabilization_after_misprice() {
         nb_misprices++;
-        alpha = _misprice_schedule(nb_misprices, base_alpha);
-        cur_alpha = alpha;
+        cur_alpha = _misprice_schedule(nb_misprices, base_alpha);
+        alpha = cur_alpha;
+        // As proposed in the paper for mis-pricing sequences, disable
+        // directional smoothing after a misprice.
         beta = 0.0;
     }
 
     void update_stabilization_after_iter(const DualSolution &new_center) {
+        if (!new_center.empty() && cur_stab_center.empty()) {
+            cur_stab_center = new_center;
+        }
         if (!stab_center_for_next_iteration.empty()) {
             cur_stab_center = stab_center_for_next_iteration;
             stab_center_for_next_iteration.clear();
@@ -109,21 +118,23 @@ class Stabilization {
     bool update_stabilization_after_master_optim(
         const DualSolution &new_center) {
         nb_misprices = 0;
-        cur_alpha = 0;
+        cur_alpha = std::clamp(base_alpha, kAlphaMin, kAlphaMax);
 
         if (cur_stab_center.empty()) {
             cur_stab_center = new_center;
+            smooth_dual_sol = new_center;
             return false;
         }
-        cur_alpha = base_alpha;
         return cur_alpha > 0;
     }
 
     void reset_misprices() { nb_misprices = 0; }
 
     double _misprice_schedule(int nb_misprices, double base_alpha) {
-        double alpha = 1.0 - (nb_misprices + 1) * (1 - base_alpha);
-        if (nb_misprices > 10 || alpha <= 1e-3) {
+        // Table 1 (left): alpha_tilde = [1 - k * (1 - alpha)]_+
+        const int k = std::max(1, nb_misprices);
+        double alpha = std::max(0.0, 1.0 - k * (1.0 - base_alpha));
+        if (nb_misprices > 20 || alpha <= kAlphaEps) {
             alpha = 0.0;  // Deactivate stabilization
         }
         duals_in = duals_sep;
@@ -131,10 +142,10 @@ class Stabilization {
     }
 
     Stabilization(double base_alpha, DualSolution &mast_dual_sol)
-        : alpha(base_alpha),
+        : alpha(std::clamp(base_alpha, kAlphaMin, kAlphaMax)),
           t(0),
-          base_alpha(base_alpha),
-          cur_alpha(base_alpha),
+          base_alpha(std::clamp(base_alpha, kAlphaMin, kAlphaMax)),
+          cur_alpha(std::clamp(base_alpha, kAlphaMin, kAlphaMax)),
           nb_misprices(0),
           cur_stab_center(mast_dual_sol),
           mp_manager(mast_dual_sol.size()) {
@@ -142,22 +153,96 @@ class Stabilization {
         valid_dual_bound = std::numeric_limits<double>::infinity();
         beta = 0.0;
         sizeDual = mast_dual_sol.size();
+        smooth_dual_sol = mast_dual_sol;
     }
 
     DualSolution getStabDualSol(const DualSolution &input_duals) {
-        std::vector<double> master_dual;
-        master_dual.assign(input_duals.begin(), input_duals.begin() + sizeDual);
+        if (input_duals.empty()) {
+            return input_duals;
+        }
+        DualSolution pi_out;
+        pi_out.assign(input_duals.begin(), input_duals.begin() + sizeDual);
         if (cur_stab_center.empty()) {
-            return master_dual;
+            return pi_out;
         }
-        DualSolution stab_dual_sol(master_dual.size());
-        for (size_t i = 0; i < master_dual.size(); ++i) {
-            stab_dual_sol[i] =
-                std::max(0.0, cur_alpha * cur_stab_center[i] +
-                                  (1 - cur_alpha) * master_dual[i]);
+        if (cur_alpha <= 0.0) {
+            smooth_dual_sol = pi_out;
+            duals_sep = pi_out;
+            return pi_out;
         }
-        smooth_dual_sol = stab_dual_sol;
-        return stab_dual_sol;
+
+        // Non-directional smoothing:
+        // pi_tilde = alpha * pi_in + (1-alpha) * pi_out
+        const size_t n = pi_out.size();
+        DualSolution pi_tilde(n);
+        for (size_t i = 0; i < n; ++i) {
+            pi_tilde[i] =
+                cur_alpha * cur_stab_center[i] + (1.0 - cur_alpha) * pi_out[i];
+        }
+
+        // If directional components are unavailable, return pi_tilde projected
+        // to the positive orthant.
+        if (subgradient.empty() || subgradient_norm <= EPSILON || beta <= 0.0) {
+            for (double &v : pi_tilde) v = std::max(0.0, v);
+            smooth_dual_sol = pi_tilde;
+            duals_sep = pi_tilde;
+            return pi_tilde;
+        }
+
+        // Directional smoothing (Table 2):
+        // pi_g = pi_in + (g_in / ||g_in||) * ||pi_out - pi_in||
+        // rho = beta*pi_g + (1-beta)*pi_out
+        // pi_sep = (pi_in + ||pi_tilde-pi_in||/||rho-pi_in|| * (rho-pi_in))_+
+        const double norm_in_out =
+            std::sqrt(std::inner_product(
+                          pi_out.begin(), pi_out.end(), cur_stab_center.begin(),
+                          0.0, std::plus<double>(),
+                          [](double a, double b) {
+                              const double d = a - b;
+                              return d * d;
+                          }) +
+                      EPSILON);
+
+        DualSolution pi_g(n);
+        for (size_t i = 0; i < n; ++i) {
+            pi_g[i] = cur_stab_center[i] +
+                      (subgradient[i] / subgradient_norm) * norm_in_out;
+        }
+
+        DualSolution rho(n);
+        for (size_t i = 0; i < n; ++i) {
+            rho[i] = beta * pi_g[i] + (1.0 - beta) * pi_out[i];
+        }
+
+        const double norm_tilde_in =
+            std::sqrt(std::inner_product(
+                          pi_tilde.begin(), pi_tilde.end(),
+                          cur_stab_center.begin(), 0.0, std::plus<double>(),
+                          [](double a, double b) {
+                              const double d = a - b;
+                              return d * d;
+                          }) +
+                      EPSILON);
+        const double norm_rho_in =
+            std::sqrt(std::inner_product(
+                          rho.begin(), rho.end(), cur_stab_center.begin(), 0.0,
+                          std::plus<double>(),
+                          [](double a, double b) {
+                              const double d = a - b;
+                              return d * d;
+                          }) +
+                      EPSILON);
+
+        DualSolution pi_sep(n);
+        for (size_t i = 0; i < n; ++i) {
+            pi_sep[i] = cur_stab_center[i] +
+                        (norm_tilde_in / norm_rho_in) *
+                            (rho[i] - cur_stab_center[i]);
+            pi_sep[i] = std::max(0.0, pi_sep[i]);
+        }
+        smooth_dual_sol = pi_sep;
+        duals_sep = pi_sep;
+        return pi_sep;
     }
 
     inline double norm(const std::vector<double> &vector) {
@@ -178,90 +263,7 @@ class Stabilization {
     }
 
     DualSolution getStabDualSolAdvanced(const DualSolution &input_duals) {
-        constexpr double EPSILON = 1e-12;
-
-        // Use only the first sizeDual elements from input_duals.
-        DualSolution nodeDuals(input_duals.begin(),
-                               input_duals.begin() + sizeDual);
-
-        // If stabilization center or subgradient are not available, return the
-        // input.
-        if (cur_stab_center.empty() || subgradient.empty()) {
-            return input_duals;
-        }
-
-        const size_t n = nodeDuals.size();
-
-        // Step 1: pi_tilde = cur_stab_center + (1 - cur_alpha)*(nodeDuals -
-        // cur_stab_center)
-        DualSolution pi_tilde(n);
-        for (size_t i = 0; i < n; ++i) {
-            pi_tilde[i] =
-                cur_stab_center[i] +
-                (1.0 - cur_alpha) * (nodeDuals[i] - cur_stab_center[i]);
-        }
-
-        // Step 2: Compute norm_in_out = ||nodeDuals - cur_stab_center||
-        double norm_in_out =
-            std::sqrt(std::inner_product(nodeDuals.begin(), nodeDuals.end(),
-                                         cur_stab_center.begin(), 0.0,
-                                         std::plus<double>(),
-                                         [](double a, double b) {
-                                             double d = a - b;
-                                             return d * d;
-                                         }) +
-                      EPSILON);
-
-        // Compute pi_g = cur_stab_center +
-        // (subgradient/subgradient_norm)*norm_in_out
-        DualSolution pi_g(n);
-        for (size_t i = 0; i < n; ++i) {
-            pi_g[i] = cur_stab_center[i] +
-                      (subgradient[i] / subgradient_norm) * norm_in_out;
-        }
-
-        // Step 3: rho = beta*pi_g + (1 - beta)*nodeDuals
-        DualSolution rho(n);
-        for (size_t i = 0; i < n; ++i) {
-            rho[i] = beta * pi_g[i] + (1.0 - beta) * nodeDuals[i];
-        }
-
-        // Compute norm_tilde_in = ||pi_tilde - cur_stab_center||
-        double norm_tilde_in =
-            std::sqrt(std::inner_product(pi_tilde.begin(), pi_tilde.end(),
-                                         cur_stab_center.begin(), 0.0,
-                                         std::plus<double>(),
-                                         [](double a, double b) {
-                                             double d = a - b;
-                                             return d * d;
-                                         }) +
-                      EPSILON);
-
-        // Compute norm_rho_in = ||rho - cur_stab_center||
-        double norm_rho_in = std::sqrt(
-            std::inner_product(rho.begin(), rho.end(), cur_stab_center.begin(),
-                               0.0, std::plus<double>(),
-                               [](double a, double b) {
-                                   double d = a - b;
-                                   return d * d;
-                               }) +
-            EPSILON);
-
-        // Step 4: new_duals = cur_stab_center + (norm_tilde_in / norm_rho_in) *
-        // (rho - cur_stab_center)
-        DualSolution new_duals(n);
-        for (size_t i = 0; i < n; ++i) {
-            new_duals[i] =
-                cur_stab_center[i] +
-                (norm_tilde_in / norm_rho_in) * (rho[i] - cur_stab_center[i]);
-            new_duals[i] = std::max(
-                0.0, new_duals[i]);  // Project onto the positive orthant.
-        }
-
-        // Store the new dual solutions in smoothing variables.
-        smooth_dual_sol = new_duals;
-        duals_sep = new_duals;
-        return new_duals;
+        return getStabDualSol(input_duals);
     }
 
     static constexpr double EPSILON = 1e-12;
@@ -414,29 +416,54 @@ class Stabilization {
 
         if (nb_misprices == 0) {
             update_subgradient(dados, nodeDuals, best_pricing_cols);
-            bool should_increase = dynamic_alpha_schedule(dados);
-            constexpr double ALPHA_FACTOR = 0.1;
-
-            alpha = should_increase
-                        ? std::min(0.99, alpha + (1.0 - alpha) * ALPHA_FACTOR)
-                        : std::max(0.0, alpha / 1.1);
-
-            if (!std::isnan(alpha) && !std::isinf(alpha)) {
-                base_alpha = alpha;
-            }
         }
 
-        // if (no_progress_count > NO_PROGRESS_THRESHOLD) {
-        //     alpha = 0.0;
-        //     base_alpha = 0.0;
-        // }
+        if (nb_misprices == 0) {
+            // Dynamic alpha schedule (Table 1 right):
+            // if g_sep · (pi_out - pi_in) > 0 -> fincr(alpha)
+            // else -> fdecr(alpha)
+            double g_dot_dir = 0.0;
+            if (!subgradient.empty() && subgradient.size() == nodeDuals.size() &&
+                !cur_stab_center.empty()) {
+                for (size_t i = 0; i < nodeDuals.size(); ++i) {
+                    g_dot_dir +=
+                        subgradient[i] * (nodeDuals[i] - cur_stab_center[i]);
+                }
+            }
 
-        // if (lag_gap <= lag_gap_prev || cut_added) {
-        stab_center_for_next_iteration = smooth_dual_sol;
+            auto fincr = [](double a) { return a + (1.0 - a) * 0.1; };
+            auto fdecr = [](double a) {
+                if (a >= 0.5) return a / 1.1;
+                return std::max(0.0, a - (1.0 - a) * 0.1);
+            };
+            alpha = (g_dot_dir > 0.0) ? fincr(alpha) : fdecr(alpha);
+            alpha = std::clamp(alpha, 0.0, kAlphaMax);
+            base_alpha = std::clamp(alpha, kAlphaMin, kAlphaMax);
+
+            // Adaptive beta schedule (Section directional smoothing):
+            // beta = cos(gamma) between (pi_out - pi_in) and (pi_g - pi_in).
+            if (!subgradient.empty() && subgradient_norm > EPSILON &&
+                !cur_stab_center.empty()) {
+                double dir_norm_sq = 0.0;
+                double dot = 0.0;
+                for (size_t i = 0; i < nodeDuals.size(); ++i) {
+                    const double d = nodeDuals[i] - cur_stab_center[i];
+                    dir_norm_sq += d * d;
+                    dot += d * subgradient[i];
+                }
+                const double dir_norm = std::sqrt(dir_norm_sq + EPSILON);
+                beta = std::clamp(dot / (dir_norm * subgradient_norm), 0.0, 1.0);
+            } else {
+                beta = 0.0;
+            }
+
+            // In-point update between master iterations.
+            stab_center_for_next_iteration = smooth_dual_sol;
+        } else {
+            // During mispricing sequence keep in-point fixed.
+            stab_center_for_next_iteration = cur_stab_center;
+        }
         cut_added = false;
-        // } else {
-        // stab_center_for_next_iteration = cur_stab_center;
-        // }
 
         lag_gap_prev = lag_gap;
 

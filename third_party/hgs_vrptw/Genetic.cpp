@@ -127,56 +127,101 @@ Individual *Genetic::crossoverOX(
                ? candidateOffsprings[2]
                : candidateOffsprings[3];
 }
-
 void Genetic::doOXcrossover(
-    Individual *result,
-    std::pair<const Individual *, const Individual *> parents, int start,
-    int end) {
-    // Cache frequently accessed values.
-    const int nbClients = params->nbClients;
-    const Individual *parent1 = parents.first;
-    const Individual *parent2 = parents.second;
-    auto &child = result->chromT;
-    child.resize(nbClients);  // Ensure proper size
+    Individual* result,
+    std::pair<const Individual*, const Individual*> parents,
+    int start, int end)
+{
+    const int n = params->nbClients;
+    const auto* p1 = parents.first;
+    const auto* p2 = parents.second;
 
-    // Create a boolean array to mark which clients have been copied.
-    std::vector<bool> used(nbClients, false);
+    auto& child = result->chromT;
+    child.resize(n); // size, not just capacity
 
-    // --- Phase 1: Copy the segment from parent1 ---
-    if (start <= end) {
-        // Non-wrap-around: simply copy from index 'start' to 'end'.
-        for (int i = start; i <= end; ++i) {
-            child[i] = parent1->chromT[i];
-            used[parent1->chromT[i]] = true;
-        }
-    } else {
-        // Wrap-around: copy from 'start' to end of chromosome, then from index
-        // 0 to 'end'.
-        int i = start;
-        do {
-            child[i] = parent1->chromT[i];
-            used[parent1->chromT[i]] = true;
-            i = (i + 1) % nbClients;
-        } while (i != (end + 1) % nbClients);
+    // --- Basic sanity ---
+    assert(n > 0);
+    assert(p1->chromT.size() == static_cast<size_t>(n));
+    assert(p2->chromT.size() == static_cast<size_t>(n));
+    assert(0 <= start && start < n);
+    assert(0 <= end   && end   < n);
+
+    // Detect gene domain: 0..n-1 or 1..n (depot handling varies per codebase)
+    int minGene = p1->chromT[0], maxGene = p1->chromT[0];
+    for (int g : p1->chromT) { minGene = std::min(minGene, g); maxGene = std::max(maxGene, g); }
+    for (int g : p2->chromT) { minGene = std::min(minGene, g); maxGene = std::max(maxGene, g); }
+
+    // Case A: genes in [0..n-1] -> used size n, index = g
+    // Case B: genes in [1..n]   -> used size n+1, index = g
+    // If depot 0 appears together with 1..n, size n+1 and index = g is safe.
+    const bool one_based = (minGene >= 1 && maxGene <= n);
+    const bool zero_based = (minGene >= 0 && maxGene <= n - 1);
+    assert(one_based || zero_based); // if this trips, your gene domain is inconsistent
+
+    const int usedSize = one_based ? (n + 1) : n;
+    auto idx = [&](int g) -> int {
+        // map gene to used[] index
+        return one_based ? g : g; // both index by g, but size differs
+    };
+
+    std::vector<bool> used(usedSize, false);  // marks which genes are already placed
+    std::vector<bool> filled(n, false);       // marks which positions in child are filled
+
+    // --- Phase 1: copy segment from p1 (inclusive, with wrap support) ---
+    int i = start;
+    while (true) {
+        const int gene = p1->chromT[i];
+        // Bounds check before touching used[]
+        assert(0 <= idx(gene) && idx(gene) < usedSize);
+        child[i]   = gene;
+        filled[i]  = true;
+        used[idx(gene)] = true;
+
+        if (i == end) break;
+        i = (i + 1) % n;
     }
 
-    // --- Phase 2: Fill in remaining genes from parent2 ---
-    // Start filling the child from position (end+1) mod nbClients.
-    int posChild = (end + 1) % nbClients;
-    // In parent2, start scanning from (end+1) mod nbClients.
-    for (int posP2 = (end + 1) % nbClients;; posP2 = (posP2 + 1) % nbClients) {
-        int candidate = parent2->chromT[posP2];
-        if (!used[candidate]) {
-            child[posChild] = candidate;
-            posChild = (posChild + 1) % nbClients;
+    // --- Phase 2: fill remaining positions from p2, skipping already used genes
+    int write = (end + 1) % n;
+    int read  = (end + 1) % n;
+    int placed = 0;
+    // placed = # genes copied in phase 1
+    if (start <= end) placed = end - start + 1;
+    else              placed = (n - start) + (end + 1);
+
+    while (placed < n) {
+        const int g = p2->chromT[read];
+        assert(0 <= idx(g) && idx(g) < usedSize);
+
+        if (!used[idx(g)]) {
+            // find next empty child slot
+            while (filled[write]) write = (write + 1) % n;
+
+            child[write]  = g;
+            filled[write] = true;
+            used[idx(g)]  = true;
+            ++placed;
+            write = (write + 1) % n;
         }
-        // Once we have scanned all positions in parent2, break out.
-        if (posP2 == end) break;
+        read = (read + 1) % n;
     }
 
-    // Finalize the individual using the Split algorithm.
+    // (optional) final permutation sanity
+    #ifndef NDEBUG
+    {
+        std::vector<char> seen(usedSize, 0);
+        for (int k = 0; k < n; ++k) {
+            int g = child[k];
+            assert(0 <= idx(g) && idx(g) < usedSize);
+            assert(!seen[idx(g)]);
+            seen[idx(g)] = 1;
+        }
+    }
+    #endif
+
     split->generalSplit(result, params->nbVehicles);
 }
+
 
 Individual *Genetic::crossoverSREX(
     std::pair<const Individual *, const Individual *> parents) {

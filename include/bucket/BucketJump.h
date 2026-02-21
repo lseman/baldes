@@ -87,21 +87,10 @@ void BucketGraph::UpdateBucketsSet(const double theta, const Label *label,
         return false;
     };
 
-    // Inline helper function for bitmap conflict check.
-    auto bitmapsConflict = [n_bitmap](const Label *L1,
-                                      const Label *L2) -> bool {
-        // Assume both L1 and L2 have the same sized visited_bitmap.
-        for (size_t i = 0; i < n_bitmap; ++i) {
-            if ((L1->visited_bitmap[i] & L2->visited_bitmap[i]) != 0) {
-                return true;
-            }
-        }
-        return false;
-    };
-
     // Use a local DFS stack to traverse buckets.
-    std::vector<int> bucket_stack;
-    bucket_stack.reserve(10);
+    static thread_local std::vector<int> bucket_stack;
+    bucket_stack.clear();
+    bucket_stack.reserve(32);
     bucket_stack.push_back(current_bucket);
 
     // Process buckets until the stack is empty.
@@ -109,9 +98,14 @@ void BucketGraph::UpdateBucketsSet(const double theta, const Label *label,
         const int curr_bucket = bucket_stack.back();
         bucket_stack.pop_back();
 
-        // Mark the current bucket as visited.
+        // Skip if already visited.
         const size_t segment = curr_bucket >> 6;
         const size_t bit_pos = curr_bucket & 63;
+        if ((Bvisited[segment] & (1ULL << bit_pos)) != 0) {
+            continue;
+        }
+
+        // Mark the current bucket as visited.
         Bvisited[segment] |= (1ULL << bit_pos);
 
         // Get the opposite bucket’s label and node id.
@@ -128,70 +122,58 @@ void BucketGraph::UpdateBucketsSet(const double theta, const Label *label,
                              theta))
             continue;
 
-        // Process this bucket only if it hasn't been processed already.
-        if (Bbidi.insert(curr_bucket).second) {
-            const auto &opposite_labels =
-                buckets_opposite[curr_bucket].get_labels();
-            for (const auto &L_opposite : opposite_labels) {
-                // Skip labels from the same node or with conflicting visited
-                // bitmaps.
-                // if (bucketLnode == L_opposite->node_id ||
-                // bitmapsConflict(label, L_opposite))
-                // continue;
-                if (bucketLnode == L_opposite->node_id) continue;
+        const auto &opposite_labels = buckets_opposite[curr_bucket].get_labels();
+        for (const auto &L_opposite : opposite_labels) {
+            // Skip labels from the same node.
+            if (bucketLnode == L_opposite->node_id) continue;
 
-                if constexpr (D == Direction::Forward) {
-                    // Skip if the visited bitmaps overlap.
-                    if (overlapsVisited(label, L_opposite)) continue;
+            if constexpr (D == Direction::Forward) {
+                if (overlapsVisited(label, L_opposite)) continue;
+            } else {
+                if (overlapsVisited(L_opposite, label)) continue;
+            }
+
+            // Determine the reference node for resource checks.
+            const VRPNode &ref_node =
+                forward ? nodes[bucketLnode] : nodes[L_opposite->node_id];
+
+            bool violated = false;
+            const size_t num_resources = options.resources.size();
+            for (size_t r = 0; r < num_resources; ++r) {
+                if (options.resources[r] == "time") {
+                    const double time_constraint =
+                        forward ? label->resources[TIME_INDEX] + cost +
+                                      ref_node.duration
+                                : L_opposite->resources[TIME_INDEX] + cost +
+                                      ref_node.duration;
+                    if (numericutils::gt(
+                            time_constraint,
+                            forward ? L_opposite->resources[TIME_INDEX]
+                                    : label->resources[TIME_INDEX])) {
+                        violated = true;
+                        break;
+                    }
                 } else {
-                    // Skip if the visited bitmaps overlap.
-                    if (overlapsVisited(L_opposite, label)) continue;
-                }
-
-                // Determine the reference node for resource checks.
-                const VRPNode &ref_node =
-                    forward ? nodes[bucketLnode] : nodes[L_opposite->node_id];
-
-                bool violated = false;
-                // Use a local copy of resources if needed.
-                const size_t num_resources = options.resources.size();
-                for (size_t r = 0; r < num_resources; ++r) {
-                    if (options.resources[r] == "time") {
-                        // For time, add cost and the node's duration.
-                        const double time_constraint =
-                            forward ? label->resources[TIME_INDEX] + cost +
-                                          ref_node.duration
-                                    : L_opposite->resources[TIME_INDEX] + cost +
-                                          ref_node.duration;
-                        if (numericutils::gt(
-                                time_constraint,
-                                forward ? L_opposite->resources[TIME_INDEX]
-                                        : label->resources[TIME_INDEX])) {
-                            violated = true;
-                            break;
-                        }
-                    } else {
-                        const double resource_constraint =
-                            forward
-                                ? label->resources[r] + ref_node.consumption[r]
+                    const double resource_constraint =
+                        forward ? label->resources[r] + ref_node.consumption[r]
                                 : L_opposite->resources[r] +
                                       ref_node.consumption[r];
-                        if (numericutils::gt(resource_constraint,
-                                             forward ? L_opposite->resources[r]
-                                                     : label->resources[r])) {
-                            violated = true;
-                            break;
-                        }
+                    if (numericutils::gt(resource_constraint,
+                                         forward ? L_opposite->resources[r]
+                                                 : label->resources[r])) {
+                        violated = true;
+                        break;
                     }
                 }
+            }
 
-                if (violated) continue;
+            if (violated) continue;
 
-                // If the merged cost is below theta, record this bucket.
-                if (numericutils::lt(label_cost + cost + L_opposite->cost,
-                                     theta)) {
-                    Bbidi.emplace(curr_bucket);
-                }
+            // Record only buckets that have at least one theta-compatible
+            // label pair.
+            if (numericutils::lt(label_cost + cost + L_opposite->cost, theta)) {
+                Bbidi.emplace(curr_bucket);
+                break;
             }
         }
 
@@ -251,24 +233,62 @@ void BucketGraph::BucketArcElimination(double theta) {
             std::memset(bitmap.data(), 0, bitmap.size() * sizeof(uint64_t));
     };
 
+    // Check if there exists b' in BB such that b' <= bb_arr in the preorder
+    // induced by Phi_opposite (i.e., reachable from bb_arr through Phi*).
+    auto has_compatible_predecessor =
+        [&](int bb_arr, const ankerl::unordered_dense::set<int> &BB) -> bool {
+        if (BB.find(bb_arr) != BB.end()) return true;
+
+        std::vector<int> stack;
+        stack.push_back(bb_arr);
+        std::vector<uint64_t> visited(n_segments, 0ULL);
+
+        while (!stack.empty()) {
+            const int curr = stack.back();
+            stack.pop_back();
+            const size_t seg = static_cast<size_t>(curr) >> 6;
+            const uint64_t mask = 1ULL << (curr & 63);
+            if (visited[seg] & mask) continue;
+            visited[seg] |= mask;
+
+            if (BB.find(curr) != BB.end()) return true;
+
+            for (int pred : Phi_opposite[curr]) {
+                const size_t pseg = static_cast<size_t>(pred) >> 6;
+                const uint64_t pmask = 1ULL << (pred & 63);
+                if ((visited[pseg] & pmask) == 0) {
+                    stack.push_back(pred);
+                }
+            }
+        }
+        return false;
+    };
+
     // Lambda: Process jump arcs for bucket 'b'.
     auto process_jump_arcs = [&](int b) {
         const auto &jump_arcs = buckets[b].template get_jump_arcs<D>();
         if (jump_arcs.empty()) return;
 
         std::vector<uint64_t> Bvisited(n_segments, 0);
-        auto labels = buckets[b].get_labels();
+        const auto &labels = buckets[b].get_labels();
 
         for (const auto &a : jump_arcs) {
-            auto increment = a.resource_increment;
-            auto arc_key = create_arc_key(a.from_bucket, a.to_bucket, b);
+            std::vector<double> increment(options.resources.size(), 0.0);
+            for (size_t r = 0; r < options.resources.size(); ++r) {
+                if constexpr (D == Direction::Forward)
+                    increment[r] = buckets[b].lb[r] + a.resource_increment[r];
+                else
+                    increment[r] = buckets[b].ub[r] - a.resource_increment[r];
+            }
+
+            auto arc_key = create_arc_key(buckets[a.from_bucket].node_id,
+                                          buckets[a.to_bucket].node_id, b);
             int b_opposite =
                 get_opposite_bucket_number<D>(a.to_bucket, increment);
             auto &Bidi_map = local_B_Ba_b[arc_key];
 
             // Process each label in the current bucket.
             for (auto &L_item : labels) {
-                Bidi_map.insert(b);
                 // Reset Bvisited for each UpdateBucketsSet call.
                 reset_bitmap(Bvisited);
                 UpdateBucketsSet<D>(theta, L_item, Bidi_map, b_opposite,
@@ -282,7 +302,7 @@ void BucketGraph::BucketArcElimination(double theta) {
         const auto &bucket_arcs = buckets[b].template get_bucket_arcs<D>();
         if (bucket_arcs.empty()) return;
 
-        auto labels = buckets[b].get_labels();
+        const auto &labels = buckets[b].get_labels();
         std::vector<uint64_t> Bvisited(n_segments, 0);
 
         for (const auto &a : bucket_arcs) {
@@ -303,31 +323,18 @@ void BucketGraph::BucketArcElimination(double theta) {
 
             // Process each label in bucket 'b'.
             for (auto &L_item : labels) {
-                Bidi_map.insert(b);
                 reset_bitmap(Bvisited);
                 UpdateBucketsSet<D>(theta, L_item, Bidi_map, b_opposite,
                                     Bvisited);
             }
 
-            // Check if the opposite direction contains arcs.
-            if (auto it = local_B_Ba_b.find(arc_key);
-                it != local_B_Ba_b.end()) {
-                auto &Bidi_map_opposite = it->second;
-                bool contains = std::any_of(
-                    Phi_opposite[b_opposite].begin(),
-                    Phi_opposite[b_opposite].end(), [&](int b_prime) {
-                        return Bidi_map_opposite.find(b_prime) !=
-                               Bidi_map_opposite.end();
-                    });
-                if (!contains && Bidi_map_opposite.find(b_opposite) ==
-                                     Bidi_map_opposite.end()) {
-                    size_t bit_pos =
-                        static_cast<size_t>(a.from_bucket) * n_buckets +
-                        a.to_bucket;
-                    fixed_buckets_bitmap[bit_pos / 64] |=
-                        (1ULL << (bit_pos % 64));
-                    ++removed_arcs;
-                }
+            // Fix gamma if there is no compatible predecessor bucket in BB.
+            if (!has_compatible_predecessor(b_opposite, Bidi_map)) {
+                const size_t bit_pos =
+                    static_cast<size_t>(a.from_bucket) * n_buckets +
+                    a.to_bucket;
+                fixed_buckets_bitmap[bit_pos / 64] |= (1ULL << (bit_pos % 64));
+                ++removed_arcs;
             }
         }
     };
@@ -342,7 +349,6 @@ void BucketGraph::BucketArcElimination(double theta) {
             auto &Bidi_map = local_B_Ba_b[arc_key];
 
             if (!Phi[b].empty()) {
-                Bidi_map.insert(b);
                 // Merge neighbor bucket arcs.
                 for (const auto &b_prime : Phi[b]) {
                     auto neighbor_key =
@@ -494,9 +500,7 @@ void BucketGraph::ObtainJumpBucketArcs() {
                     }
                 };
 
-                // Process candidate buckets. For now both directions
-                // use increasing index. (For backward direction, adjust
-                // the loop as needed.)
+                // Process candidate buckets according to direction.
                 if constexpr (D == Direction::Forward) {
                     for (int candidate_b = b + 1;
                          candidate_b < start_bucket + node_buckets;
@@ -504,16 +508,8 @@ void BucketGraph::ObtainJumpBucketArcs() {
                         process_bucket(b, candidate_b);
                     }
                 } else {
-                    // Uncomment and adjust if backward should iterate
-                    // in reverse order.
-                    // for (int candidate_b = b - 1; candidate_b >=
-                    // start_bucket;
-                    // --candidate_b) {
-                    // process_bucket(b, candidate_b);
-                    // }
-                    for (int candidate_b = b + 1;
-                         candidate_b < start_bucket + node_buckets;
-                         ++candidate_b) {
+                    for (int candidate_b = b - 1; candidate_b >= start_bucket;
+                         --candidate_b) {
                         process_bucket(b, candidate_b);
                     }
                 }

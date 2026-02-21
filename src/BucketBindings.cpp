@@ -136,7 +136,7 @@ PYBIND11_MODULE(pybaldes, m) {
         .def("setOptions", &BucketGraph::setOptions, "options"_a)
         .def("setArcs", &BucketGraph::setManualArcs, "arcs"_a)
         .def("phaseFour",
-             &BucketGraph::bi_labeling_algorithm<Stage::Eliminate,
+             &BucketGraph::bi_labeling_algorithm<Stage::Four,
                                                  Symmetry::Asymmetric>,
              py::return_value_policy::reference)
         .def(
@@ -303,32 +303,4 @@ PYBIND11_MODULE(pybaldes, m) {
                                &ParametersBuilder::with<int>))
         .def("build", &ParametersBuilder::build);
 
-    // Bind CostFunction
-    py::class_<CostFunction>(m, "CostFunction")
-        .def(py::init<>())
-        .def(py::init<
-             const std::function<double(const GenericParameters &)> &>())
-        .def(
-            "set_cost_function",
-            [](CostFunction &self, py::function func) {
-                self.set_cost_function([func](const GenericParameters &params) {
-                    py::gil_scoped_acquire gil;
-                    return py::cast<double>(func(params));
-                });
-            })
-        .def("calculate_cost", py::overload_cast<const GenericParameters &>(
-                                   &CostFunction::calculate_cost, py::const_))
-        .def("calculate_cost", py::overload_cast<double, int>(
-                                   &CostFunction::calculate_cost, py::const_));
-
-    // Add to your BucketGraph class
-    py::class_<BucketGraph>(m, "BucketGraph")
-        // ... (existing bindings) ...
-        .def("set_cost_function", [](BucketGraph &self, py::function func) {
-            self.cost_calculator.set_cost_function(
-                [func](const GenericParameters &params) {
-                    py::gil_scoped_acquire gil;
-                    return py::cast<double>(func(params));
-                });
-        });
 }
