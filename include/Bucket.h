@@ -33,77 +33,47 @@
  */
 struct alignas(64) Bucket {
     // Hot data - frequently accessed (kept in first cache line)
-    int depth{0};
-    int node_id{-1};
-    bool is_split{false};
+    int    depth{0};
+    int    node_id{-1};
+    bool   is_split{false};
     double min_cost{std::numeric_limits<double>::max()};
-    char padding[32];  // Ensure alignment
+    char   padding[32]; // Ensure alignment
 
     // Container for labels; this will always be kept sorted by cost.
     std::pmr::vector<Label *> labels;
 
     // Virtual split: an index that logically partitions the labels vector.
     size_t virtual_split_index = 0;
-    bool is_virtual_split = false;
+    bool   is_virtual_split    = false;
 
     // Cold data - less frequently accessed
-    std::vector<double> lb;
-    std::vector<double> ub;
-    std::vector<Arc> fw_arcs;
-    std::vector<Arc> bw_arcs;
-    std::vector<BucketArc> fw_bucket_arcs;
-    std::vector<BucketArc> bw_bucket_arcs;
-    std::vector<JumpArc> fw_jump_arcs;
-    std::vector<JumpArc> bw_jump_arcs;
+    std::vector<double>     lb;
+    std::vector<double>     ub;
+    std::vector<Arc>        fw_arcs;
+    std::vector<Arc>        bw_arcs;
+    std::vector<BucketArc>  fw_bucket_arcs;
+    std::vector<BucketArc>  bw_bucket_arcs;
+    std::vector<JumpArc>    fw_jump_arcs;
+    std::vector<JumpArc>    bw_jump_arcs;
     std::array<Bucket *, 2> sub_buckets;
-    std::vector<Label *> labels_flush;
-    bool shall_split = false;
+    std::vector<Label *>    labels_flush;
+    bool                    shall_split = false;
 
     double get_lb() const { return lb[0]; }
     double get_ub() const { return ub[0]; }
 
-    Bucket(const Bucket &other) : labels(other.labels) {
-        // Deep copy or other operations, if needed
-        // Perform deep copy of all relevant members
-        labels = other.labels;
-        node_id = other.node_id;
-        lb = other.lb;
-        ub = other.ub;
-        fw_arcs = other.fw_arcs;
-        bw_arcs = other.bw_arcs;
-        fw_bucket_arcs = other.fw_bucket_arcs;
-        bw_bucket_arcs = other.bw_bucket_arcs;
-        fw_jump_arcs = other.fw_jump_arcs;
-        bw_jump_arcs = other.bw_jump_arcs;
-    }
+    Bucket(const Bucket &other)                = default;
+    Bucket &operator=(const Bucket &other)     = default;
+    Bucket(Bucket &&other) noexcept            = default;
+    Bucket &operator=(Bucket &&other) noexcept = default;
 
-    Bucket &operator=(const Bucket &other) {
-        if (this == &other) return *this;  // Handle self-assignment
-
-        // Perform deep copy of all relevant members
-        node_id = other.node_id;
-        lb = other.lb;
-        ub = other.ub;
-        fw_arcs = other.fw_arcs;
-        bw_arcs = other.bw_arcs;
-        fw_bucket_arcs = other.fw_bucket_arcs;
-        bw_bucket_arcs = other.bw_bucket_arcs;
-        fw_jump_arcs = other.fw_jump_arcs;
-        bw_jump_arcs = other.bw_jump_arcs;
-        labels = other.labels;
-
-        return *this;
-    }
-
-    double min_split_range = 0.5;
+    double               min_split_range  = 0.5;
     static constexpr int MAX_BUCKET_DEPTH = 1;
 
     inline void activate_virtual_split_assume_sorted() noexcept {
         if (labels.size() < 2 || is_virtual_split) return;
         virtual_split_index = labels.size() / 2;
-        if (virtual_split_index >= labels.size()) {
-            virtual_split_index = labels.size() - 1;
-        }
+        if (virtual_split_index >= labels.size()) { virtual_split_index = labels.size() - 1; }
         is_virtual_split = true;
     }
 
@@ -113,14 +83,10 @@ struct alignas(64) Bucket {
         if (labels.size() < 2 || is_virtual_split) return;
 
         // Ensure labels are sorted by cost.
-        pdqsort(
-            labels.begin(), labels.end(),
-            [](const Label *a, const Label *b) { return a->cost < b->cost; });
+        pdqsort(labels.begin(), labels.end(), [](const Label *a, const Label *b) { return a->cost < b->cost; });
         // Set the virtual split index at the median.
         virtual_split_index = labels.size() / 2;
-        if (virtual_split_index >= labels.size()) {
-            virtual_split_index = labels.size() - 1;
-        }
+        if (virtual_split_index >= labels.size()) { virtual_split_index = labels.size() - 1; }
         is_virtual_split = true;
     }
 
@@ -140,10 +106,9 @@ struct alignas(64) Bucket {
             labels.insert(labels.begin(), label);
             pos = 0;
         } else {
-            auto it = std::lower_bound(
-                labels.begin(), labels.end(), label->cost,
-                [](const Label *a, double cost) { return a->cost < cost; });
-            pos = static_cast<size_t>(std::distance(labels.begin(), it));
+            auto it = std::lower_bound(labels.begin(), labels.end(), label->cost,
+                                       [](const Label *a, double cost) { return a->cost < cost; });
+            pos     = static_cast<size_t>(std::distance(labels.begin(), it));
             labels.insert(it, label);
         }
 
@@ -165,24 +130,14 @@ struct alignas(64) Bucket {
 
         if (is_virtual_split) {
             const size_t split = std::min(virtual_split_index, labels.size());
-            if (split > 0 && split < labels.size() &&
-                label->cost <= labels[split]->cost) {
-                auto it = std::lower_bound(
-                    labels.begin(),
-                    labels.begin() + static_cast<std::ptrdiff_t>(split),
-                    label->cost,
-                    [](const Label *a, double cost) {
-                        return a->cost < cost;
-                    });
+            if (split > 0 && split < labels.size() && label->cost <= labels[split]->cost) {
+                auto it = std::lower_bound(labels.begin(), labels.begin() + static_cast<std::ptrdiff_t>(split),
+                                           label->cost, [](const Label *a, double cost) { return a->cost < cost; });
                 labels.insert(it, label);
                 ++virtual_split_index;
             } else {
-                auto it = std::lower_bound(
-                    labels.begin() + static_cast<std::ptrdiff_t>(split),
-                    labels.end(), label->cost,
-                    [](const Label *a, double cost) {
-                        return a->cost < cost;
-                    });
+                auto it = std::lower_bound(labels.begin() + static_cast<std::ptrdiff_t>(split), labels.end(),
+                                           label->cost, [](const Label *a, double cost) { return a->cost < cost; });
                 labels.insert(it, label);
             }
         } else {
@@ -191,11 +146,8 @@ struct alignas(64) Bucket {
             } else if (label->cost <= labels.front()->cost) {
                 labels.insert(labels.begin(), label);
             } else {
-                auto it = std::lower_bound(
-                    labels.begin(), labels.end(), label->cost,
-                    [](const Label *a, double cost) {
-                        return a->cost < cost;
-                    });
+                auto it = std::lower_bound(labels.begin(), labels.end(), label->cost,
+                                           [](const Label *a, double cost) { return a->cost < cost; });
                 labels.insert(it, label);
             }
             if (labels.size() >= BUCKET_CAPACITY) shall_split = true;
@@ -227,10 +179,7 @@ struct alignas(64) Bucket {
     // bucket. The dominance_func is a lambda or function that performs the
     // actual check on a given set of labels.
     template <typename DominanceFunc>
-    bool check_dominance(
-        const Label *new_label,
-        DominanceFunc &&dominance_func,
-        uint &stat_n_dom) const noexcept {
+    bool check_dominance(const Label *new_label, DominanceFunc &&dominance_func, uint &stat_n_dom) const noexcept {
         if (!new_label) return false;
         if (labels.empty()) return false;
         // Early exit: if the bucket's best cost is higher than the new label's
@@ -238,36 +187,23 @@ struct alignas(64) Bucket {
         if (labels.front()->cost > new_label->cost) return false;
 
         if (!is_virtual_split) {
-            return dominance_func(std::span<Label *const>(labels.data(),
-                                                          labels.size()),
-                                  stat_n_dom);
+            return dominance_func(std::span<Label *const>(labels.data(), labels.size()), stat_n_dom);
         } else {
             // For a virtual split, check each half separately without copying.
-            auto *label_ptr = labels.data();
-            const size_t split = std::min(virtual_split_index, labels.size());
+            auto        *label_ptr = labels.data();
+            const size_t split     = std::min(virtual_split_index, labels.size());
             if (split == 0 || split >= labels.size()) {
-                return dominance_func(std::span<Label *const>(
-                                          label_ptr, labels.size()),
-                                      stat_n_dom);
+                return dominance_func(std::span<Label *const>(label_ptr, labels.size()), stat_n_dom);
             }
-            if (dominance_func(
-                    std::span<Label *const>(label_ptr, split),
-                    stat_n_dom)) {
-                return true;
-            }
-            return dominance_func(
-                std::span<Label *const>(label_ptr + split,
-                                        labels.size() - split),
-                stat_n_dom);
+            if (dominance_func(std::span<Label *const>(label_ptr, split), stat_n_dom)) { return true; }
+            return dominance_func(std::span<Label *const>(label_ptr + split, labels.size() - split), stat_n_dom);
         }
     }
 
     bool is_empty() const noexcept { return labels.empty(); }
 
     void sort() {
-        pdqsort(
-            labels.begin(), labels.end(),
-            [](const Label *a, const Label *b) { return a->cost < b->cost; });
+        pdqsort(labels.begin(), labels.end(), [](const Label *a, const Label *b) { return a->cost < b->cost; });
     }
 
     /**
@@ -279,38 +215,27 @@ struct alignas(64) Bucket {
      *
      */
     template <Direction D>
-    void add_bucket_arc(int from_bucket, int to_bucket,
-                        const std::vector<double> &res_inc, double cost_inc,
+    void add_bucket_arc(int from_bucket, int to_bucket, const std::vector<double> &res_inc, double cost_inc,
                         bool fixed) {
         if constexpr (D == Direction::Forward) {
-            fw_bucket_arcs.emplace_back(from_bucket, to_bucket, res_inc,
-                                        cost_inc, fixed);
+            fw_bucket_arcs.emplace_back(from_bucket, to_bucket, res_inc, cost_inc, fixed);
         } else {
-            bw_bucket_arcs.emplace_back(from_bucket, to_bucket, res_inc,
-                                        cost_inc, fixed);
+            bw_bucket_arcs.emplace_back(from_bucket, to_bucket, res_inc, cost_inc, fixed);
         }
     }
 
     template <Direction D>
     void remove_bucket_arc(int from_bucket, int to_bucket) {
         if constexpr (D == Direction::Forward) {
-            auto it =
-                std::ranges::find_if(fw_bucket_arcs, [&](const BucketArc &arc) {
-                    return arc.from_bucket == from_bucket &&
-                           arc.to_bucket == to_bucket && arc.jump == false;
-                });
-            if (it != fw_bucket_arcs.end()) {
-                fw_bucket_arcs.erase(it);
-            }
+            auto it = std::ranges::find_if(fw_bucket_arcs, [&](const BucketArc &arc) {
+                return arc.from_bucket == from_bucket && arc.to_bucket == to_bucket && arc.jump == false;
+            });
+            if (it != fw_bucket_arcs.end()) { fw_bucket_arcs.erase(it); }
         } else {
-            auto it =
-                std::ranges::find_if(bw_bucket_arcs, [&](const BucketArc &arc) {
-                    return arc.from_bucket == from_bucket &&
-                           arc.to_bucket == to_bucket && arc.jump == false;
-                });
-            if (it != bw_bucket_arcs.end()) {
-                bw_bucket_arcs.erase(it);
-            }
+            auto it = std::ranges::find_if(bw_bucket_arcs, [&](const BucketArc &arc) {
+                return arc.from_bucket == from_bucket && arc.to_bucket == to_bucket && arc.jump == false;
+            });
+            if (it != bw_bucket_arcs.end()) { bw_bucket_arcs.erase(it); }
         }
     }
 
@@ -320,16 +245,12 @@ struct alignas(64) Bucket {
         if constexpr (dir == Direction::Forward) {
             // populate jump_arcs with fw_bucket_arcs in which jump is true
             for (const auto &arc : fw_bucket_arcs) {
-                if (arc.jump) {
-                    jump_arcs.push_back(arc);
-                }
+                if (arc.jump) { jump_arcs.push_back(arc); }
             }
         } else {
             // populate jump_arcs with bw_bucket_arcs in which jump is true
             for (const auto &arc : bw_bucket_arcs) {
-                if (arc.jump) {
-                    jump_arcs.push_back(arc);
-                }
+                if (arc.jump) { jump_arcs.push_back(arc); }
             }
         }
         return jump_arcs;
@@ -352,10 +273,9 @@ struct alignas(64) Bucket {
     // create default constructor
     Bucket() {}
 
-    bool contains(std::vector<double> &resource_values_vec) const noexcept {
+    bool contains(const std::vector<double> &resource_values_vec) const noexcept {
         for (size_t i = 0; i < resource_values_vec.size(); ++i) {
-            if (numericutils::lt(resource_values_vec[i], lb[i]) ||
-                numericutils::gt(resource_values_vec[i], ub[i])) {
+            if (numericutils::lt(resource_values_vec[i], lb[i]) || numericutils::gt(resource_values_vec[i], ub[i])) {
                 return false;
             }
         }
@@ -373,14 +293,12 @@ struct alignas(64) Bucket {
         return result;
     }
 
-    constexpr static const auto is_unextended = [](Label *label) {
-        return !label->is_extended;
-    };
+    constexpr static const auto is_unextended = [](Label *label) { return !label->is_extended; };
 
     void clear() {
-        sub_buckets = {};
-        is_split = false;
-        shall_split = false;
+        sub_buckets      = {};
+        is_split         = false;
+        shall_split      = false;
         is_virtual_split = false;
         labels.clear();
         virtual_split_index = 0;
@@ -412,28 +330,22 @@ struct alignas(64) Bucket {
         sub_buckets = {};
         labels.clear();
 
-        is_split = false;
-        shall_split = false;
-        is_virtual_split = false;
+        is_split            = false;
+        shall_split         = false;
+        is_virtual_split    = false;
         virtual_split_index = 0;
     }
 
     [[nodiscard]] bool empty() const { return labels.empty(); }
 
     template <Direction D>
-    void add_jump_arc(int from_bucket, int to_bucket,
-                      const std::vector<double> &res_inc, double cost_inc) {
+    void add_jump_arc(int from_bucket, int to_bucket, const std::vector<double> &res_inc, double cost_inc) {
         if constexpr (D == Direction::Forward) {
-            fw_jump_arcs.emplace_back(from_bucket, to_bucket, res_inc,
-                                      cost_inc);
+            fw_jump_arcs.emplace_back(from_bucket, to_bucket, res_inc, cost_inc);
         } else {
-            bw_jump_arcs.emplace_back(from_bucket, to_bucket, res_inc,
-                                      cost_inc);
+            bw_jump_arcs.emplace_back(from_bucket, to_bucket, res_inc, cost_inc);
         }
     }
 
-    ~Bucket() {
-        reset();  // Ensure all elements are cleared
-        // pool.release(); // Explicitly release the memory pool resources
-    }
+    ~Bucket() = default;
 };
