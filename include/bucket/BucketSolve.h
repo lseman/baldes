@@ -29,7 +29,6 @@
 #include "BucketJump.h"
 #include "BucketRes.h"
 #include "Definitions.h"
-#include "Trees.h"
 #include "cuts/SRC.h"
 
 #ifdef __AVX2__
@@ -1258,7 +1257,7 @@ Label *BucketGraph::compute_label(const Label *L, const Label *L_prime, double r
     double real_cost = L->real_cost + L_prime->real_cost + cij_cost;
 
     // Acquire a new label from the pool and initialize its cost fields.
-    auto new_label       = new Label();
+    auto new_label       = label_pool_fw->acquire();
     new_label->cost      = red_cost;
     new_label->real_cost = real_cost;
 

@@ -15,6 +15,7 @@
 #cmakedefine SRC
 #cmakedefine UNREACHABLE_DOMINANCE
 #cmakedefine SORTED_LABELS
+#cmakedefine INTRUSIVE_BUCKET_LABELS
 #cmakedefine MCD
 #cmakedefine FIX_BUCKETS
 #cmakedefine IPM
@@ -40,4 +41,4 @@
 #define N_ADD @N_ADD@
 #define HGS_TIME @HGS_TIME@
 #define VERBOSE_LEVEL @VERBOSE_LEVEL@
-#endif  // CONFIG_H
+#endif // CONFIG_H
