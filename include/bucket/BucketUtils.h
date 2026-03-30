@@ -586,12 +586,13 @@ template <Stage S, Symmetry SYM>
 void BucketGraph::ConcatenateLabel(const Label *L, int &b, std::atomic<double> &best_cost) {
     // Determine the number of segments needed for the bucket visited
     // bitmap.
-    const size_t          n_segments = (fw_buckets_size + 63) / 64;
-    std::vector<uint64_t> Bvisited(n_segments, 0);
+    const size_t n_segments = (fw_buckets_size + 63) / 64;
+    static thread_local std::vector<uint64_t> Bvisited;
+    Bvisited.assign(n_segments, 0);
 
     // Use thread_local storage for the bucket stack to avoid reallocations.
     static thread_local std::vector<int> bucket_stack;
-    bucket_stack.reserve(R_SIZE); // Reserve once at initialization
+    if (bucket_stack.capacity() < 64) bucket_stack.reserve(64);
     bucket_stack.clear();         // Clear for reuse
     bucket_stack.push_back(b);
 
@@ -600,11 +601,8 @@ void BucketGraph::ConcatenateLabel(const Label *L, int &b, std::atomic<double> &
     auto &other_c_bar   = assign_symmetry<SYM>(fw_c_bar, bw_c_bar);
 
     // Cache frequently accessed values.
-    const int    L_node_id   = L->node_id;
-    const auto  &L_resources = L->resources;
-    const auto  &L_last_node = nodes[L_node_id];
-    const double L_cost      = L->cost;
-    const size_t bitmap_size = L->visited_bitmap.size();
+    const int    L_node_id = L->node_id;
+    const double L_cost    = L->cost;
 
     // Pre-compute if branching is active.
     const bool has_branching = !branching_duals->empty();
@@ -615,34 +613,6 @@ void BucketGraph::ConcatenateLabel(const Label *L, int &b, std::atomic<double> &
     if constexpr (S > Stage::Three) { cutter = cut_storage; }
     const auto active_cuts = cutter->getActiveCuts();
 #endif
-
-    // Lambda to check if the visited bitmaps of L and L_bw overlap.
-    auto overlapsVisited = [bitmap_size, this](const Label *L, const Label *L_bw) -> bool {
-        // Make a local copy of the visited bitmap.
-        auto visited_bitmap = L->visited_bitmap;
-
-        // check if visited_bitmap overlaps
-        for (size_t i = 0; i < bitmap_size; ++i) {
-            if (visited_bitmap[i] & L_bw->visited_bitmap[i]) { return true; }
-        }
-        // Iterate in reverse over nodes_covered without allocating a new
-        // vector.
-        // for (auto it = L_bw->nodes_covered.rbegin();
-        //      it != L_bw->nodes_covered.rend(); ++it) {
-        //     uint16_t node_id = *it;
-        //     if (node_id == L->node_id ||
-        //         is_node_visited(visited_bitmap, node_id))
-        //         return true;
-        //     // Update the bitmap for each 64-bit word.
-        //     for (size_t i = 0; i < visited_bitmap.size(); ++i) {
-        //         uint64_t &current_visited = visited_bitmap[i];
-        //         if (current_visited != 0)
-        //             current_visited &= neighborhoods_bitmap[node_id][i];
-        //     }
-        //     set_node_visited(visited_bitmap, node_id);
-        // }
-        return false;
-    };
 
 // Lambda to apply SRC adjustments to total_cost (only for Stage::Four).
 #if defined(SRC)
@@ -690,8 +660,8 @@ void BucketGraph::ConcatenateLabel(const Label *L, int &b, std::atomic<double> &
         }
 
         // Retrieve labels in the current bucket.
-        auto &bucket = other_buckets[current_bucket];
-        auto  labels = bucket.get_labels();
+        const auto &bucket = other_buckets[current_bucket];
+        const auto &labels = bucket.get_labels();
         if (labels.empty()) continue;
 
         // Process each label in the current bucket.
@@ -1320,20 +1290,11 @@ void BucketGraph::common_initialization() {
         arc_scores[node.id].clear();
     }
 
-    // --- Warm start: collect best labels from buckets ---
     auto &warm_labels   = assign_buckets<D>(fw_warm_labels, bw_warm_labels);
     auto &buckets_size  = assign_buckets<D>(fw_buckets_size, bw_buckets_size);
     auto &buckets       = assign_buckets<D>(fw_buckets, bw_buckets);
     auto &c_bar         = assign_buckets<D>(fw_c_bar, bw_c_bar);
     auto &bucket_splits = assign_buckets<D>(fw_bucket_splits, bw_bucket_splits);
-
-    if (!merged_labels.empty() && options.warm_start && !just_fixed) {
-        warm_labels.clear();
-        warm_labels.reserve(buckets_size);
-        for (int bucket = 0; bucket < buckets_size; ++bucket) {
-            if (auto *label = buckets[bucket].get_best_label()) { warm_labels.push_back(label); }
-        }
-    }
 
     // --- Initialize c_bar vector ---
     c_bar.resize(buckets_size, std::numeric_limits<double>::infinity());
@@ -1349,28 +1310,22 @@ void BucketGraph::common_initialization() {
 
     // --- Warm start processing: sort warm_labels and compute reduced costs
     // ---
-    if (options.warm_start && !just_fixed) {
+    if (options.warm_start && !just_fixed && !warm_labels.empty()) {
         pdqsort(warm_labels.begin(), warm_labels.end(),
-                [](const Label *a, const Label *b) { return a->cost < b->cost; });
-
-        std::vector<Label *> processed_labels;
+                [](const WarmLabelState &a, const WarmLabelState &b) { return a.cost < b.cost; });
         const size_t         process_size =
             std::min(warm_labels.size(), static_cast<size_t>(options.n_warm_start * warm_labels.size()));
         for (size_t i = 0; i < process_size; ++i) {
-            auto label = warm_labels[i];
-            // Uncomment if you want to skip non-fresh labels.
-            // if (!label->fresh) continue;
-            auto new_label = compute_red_cost(label, D == Direction::Forward);
+            auto new_label = compute_red_cost(warm_labels[i], D == Direction::Forward);
             if (new_label != nullptr) {
                 if constexpr (D == Direction::Forward) {
                     fw_buckets[new_label->vertex].add_sorted_label(new_label);
                 } else {
                     bw_buckets[new_label->vertex].add_sorted_label(new_label);
                 }
-                processed_labels.push_back(new_label);
             }
         }
-        warm_labels = std::move(processed_labels);
+        warm_labels.clear();
     }
 
     // --- Prepare interval arrays and compute per-resource splits for depot

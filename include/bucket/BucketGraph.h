@@ -81,6 +81,13 @@ class BucketGraph {
     Stats stats;
 
 public:
+    struct WarmLabelState {
+        double                     cost      = 0.0;
+        int                        node_id   = -1;
+        std::array<double, R_SIZE> resources = {};
+        std::vector<uint16_t>      nodes_covered;
+    };
+
     double threshold = -1.5;
 
     int        n_segments = 0;
@@ -451,8 +458,8 @@ public:
             work, bi_sched, SECTION { common_initialization<Direction::Forward>(); },
             SECTION { common_initialization<Direction::Backward>(); });
     }
-    std::vector<Label *> fw_warm_labels;
-    std::vector<Label *> bw_warm_labels;
+    std::vector<WarmLabelState> fw_warm_labels;
+    std::vector<WarmLabelState> bw_warm_labels;
 
     void setup();
     void print_statistics();
@@ -490,6 +497,29 @@ public:
 
     template <Stage state, Full fullness>
     void run_labeling_algorithms(std::vector<double> &forward_cbar, std::vector<double> &backward_cbar);
+
+    template <Direction D>
+    void capture_warm_start_labels() {
+        auto &warm_labels  = assign_buckets<D>(fw_warm_labels, bw_warm_labels);
+        auto &buckets      = assign_buckets<D>(fw_buckets, bw_buckets);
+        auto &buckets_size = assign_buckets<D>(fw_buckets_size, bw_buckets_size);
+
+        warm_labels.clear();
+        if (!options.warm_start || just_fixed) return;
+
+        warm_labels.reserve(buckets_size);
+        for (int bucket = 0; bucket < buckets_size; ++bucket) {
+            const Label *label = buckets[bucket].get_best_label();
+            if (!label) continue;
+
+            WarmLabelState snapshot;
+            snapshot.cost          = label->cost;
+            snapshot.node_id       = label->node_id;
+            snapshot.resources     = label->resources;
+            snapshot.nodes_covered = label->nodes_covered;
+            warm_labels.push_back(std::move(snapshot));
+        }
+    }
 
     template <Stage S>
     void bucket_fixing();
@@ -713,8 +743,8 @@ public:
      * the pools for reuse.
      */
     void reset_pool() {
-        label_pool_fw->reset();
-        label_pool_bw->reset();
+        label_pool_fw->fast_reset();
+        label_pool_bw->fast_reset();
     }
 
     /**
@@ -1062,13 +1092,13 @@ public:
 
     std::vector<Label *> extend_path(const std::vector<int> &path, std::vector<double> &resources);
 
-    Label *compute_red_cost(Label *L, bool fw) {
+    Label *compute_red_cost(const WarmLabelState &L, bool fw) {
         // Calculate main and reduced costs.
         double real_cost = 0.0;
         double red_cost  = 0.0;
 
         // Check main resource feasibility.
-        const double main_resource = L->resources[options.main_resources[0]];
+        const double main_resource = L.resources[options.main_resources[0]];
         const double q_star_value  = q_star[options.main_resources[0]];
         if (fw) {
             if (main_resource > q_star_value) return nullptr;
@@ -1077,7 +1107,7 @@ public:
         }
 
         // Ensure sufficient nodes in the route.
-        if (L->nodes_covered.size() <= 3) return nullptr;
+        if (L.nodes_covered.size() <= 3) return nullptr;
 
         // Initialize an empty SRCmap vector with size equal to the current
         // number of cuts.
@@ -1086,14 +1116,13 @@ public:
         // Prepare new label.
         auto pool      = fw ? label_pool_fw : label_pool_bw;
         auto new_label = pool->acquire();
-        new_label->nodes_covered.clear();
-        new_label->nodes_covered = L->nodes_covered; // Copy the route
+        new_label->nodes_covered = L.nodes_covered; // Copy the route
 
         // Variables to keep track of costs.
         int last_node = -1;
 
         // Traverse the nodes in the route (from current label to root).
-        for (auto node_id : L->nodes_covered) {
+        for (auto node_id : L.nodes_covered) {
             // --- NG-route Feasibility Check ---
             // Clear visited bitmap in the neighborhood of node_id.
             for (size_t seg = 0, limit = new_label->visited_bitmap.size(); seg < limit; ++seg) {
@@ -1160,9 +1189,9 @@ public:
         new_label->cost        = red_cost;
         new_label->real_cost   = real_cost;
         new_label->parent      = nullptr;
-        new_label->node_id     = L->node_id;
+        new_label->node_id     = L.node_id;
         new_label->is_extended = false;
-        new_label->resources   = L->resources;
+        new_label->resources   = L.resources;
         new_label->SRCmap      = updated_SRCmap;
         new_label->fresh       = false;
 

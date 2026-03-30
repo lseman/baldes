@@ -528,8 +528,13 @@ public:
 
             std::vector<double> coeffs;
             if (!loaded) {
-                // coeffs = cut.coefficients;
-                coeffs = cut.coefficients;
+                if (cut.coefficients.size() == allPaths.size()) {
+                    coeffs = cut.coefficients;
+                } else if ((cut.added && cut.updated) ||
+                           !cut.hasSparseCoefficients()) {
+                    coeffs = r1c->cutStorage.loadCoefficients(allPaths, cut);
+                    cut.coefficients = coeffs;
+                }
             } else {
                 coeffs = r1c->cutStorage.loadCoefficients(allPaths, cut, true);
             }
@@ -543,8 +548,17 @@ public:
             // Otherwise, build and add the new constraint.
             else {
                 LinearExpression lhs;
-                for (size_t i = 0; i < coeffs.size(); ++i) {
-                    if (coeffs[i] != 0) { lhs += node->getVar(i) * coeffs[i]; }
+                if (!loaded && cut.hasSparseCoefficients() &&
+                    cut.coefficients.size() != allPaths.size()) {
+                    for (size_t idx = 0; idx < cut.coefficient_indices.size();
+                         ++idx) {
+                        lhs += node->getVar(cut.coefficient_indices[idx]) *
+                               cut.coefficient_values[idx];
+                    }
+                } else {
+                    for (size_t i = 0; i < coeffs.size(); ++i) {
+                        if (coeffs[i] != 0) { lhs += node->getVar(i) * coeffs[i]; }
+                    }
                 }
                 std::string constraint_name = "SRC_" + std::to_string(z);
                 if (cutSize == 1) {
