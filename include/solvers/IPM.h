@@ -26,9 +26,9 @@ public:
 
     double getObjVal() const override { return ipm.getObjective(); }
 
-    double getVarValue(int i) const override { return ipm.getPrimals()[i]; }
+    double getVarValue(int i) const override { return ipm.getPrimalsRef()[i]; }
 
-    double getDualVal(int i) const override { return ipm.getDuals()[i]; }
+    double getDualVal(int i) const override { return ipm.getDualsRef()[i]; }
 
     double getSlack(int i) const override { return 0.0; }
 

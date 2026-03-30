@@ -494,6 +494,9 @@ void IPSolver::run_optimization(ModelData &model, const double tol) {
     const int nc = A.rows();
     const int nv = A.cols();
     const int nu = ubi.size();
+    const double b_norm = b.lpNorm<Eigen::Infinity>();
+    const double ubv_norm = ubv.lpNorm<Eigen::Infinity>();
+    const double c_norm = c.lpNorm<Eigen::Infinity>();
 
     // Preallocate vectors (reuse storage in each iteration)
     Eigen::VectorXd delta_x = Eigen::VectorXd::Zero(nv);
@@ -520,6 +523,9 @@ void IPSolver::run_optimization(ModelData &model, const double tol) {
     Eigen::VectorXd Delta_s_c = Eigen::VectorXd::Zero(s.size());
     Eigen::VectorXd Delta_v_c = Eigen::VectorXd::Zero(v.size());
     double Delta_tau_c = 0.0, Delta_kappa_c = 0.0;
+    const Eigen::VectorXd zero_rp = Eigen::VectorXd::Zero(nc);
+    const Eigen::VectorXd zero_ru = Eigen::VectorXd::Zero(nu);
+    const Eigen::VectorXd zero_rd = Eigen::VectorXd::Zero(nv);
     Eigen::VectorXd xs, vw, t_xs, t_vw;
     double delta_0, bl_dot_lambda;
     bool saved_interior_solution_bool = false;
@@ -554,10 +560,6 @@ void IPSolver::run_optimization(ModelData &model, const double tol) {
         const double rp_norm = res.rp.lpNorm<Eigen::Infinity>();
         const double ru_norm = res.ru.lpNorm<Eigen::Infinity>();
         const double rd_norm = res.rd.lpNorm<Eigen::Infinity>();
-        const double b_norm = b.lpNorm<Eigen::Infinity>();
-        const double ubv_norm = ubv.lpNorm<Eigen::Infinity>();
-        const double c_norm = c.lpNorm<Eigen::Infinity>();
-
         // Combined residual computations
         bl_dot_lambda = b.dot(lambda) - ubv.dot(w);
         _p = std::max(rp_norm / (tau * (1.0 + b_norm)),
@@ -674,9 +676,7 @@ void IPSolver::run_optimization(ModelData &model, const double tol) {
                 Delta_x_c, Delta_lambda_c, Delta_w_c, Delta_s_c, Delta_v_c,
                 Delta_tau_c, Delta_kappa_c, ls, theta_vw, b, c, ubi, ubv,
                 delta_x, delta_y, delta_z, delta_0, x, lambda, w, s, v, tau,
-                kappa, Eigen::VectorXd::Zero(res.rp.size()),
-                Eigen::VectorXd::Zero(res.ru.size()),
-                Eigen::VectorXd::Zero(res.rd.size()), 0, -t_xs, -t_vw, -t0);
+                kappa, zero_rp, zero_ru, zero_rd, 0, -t_xs, -t_vw, -t0);
 
             alpha_c =
                 max_alpha(x, Delta_x_c, v, Delta_v_c, s, Delta_s_c, w,
@@ -860,13 +860,11 @@ int IPSolver::update_linear_solver(SparseSolver &ls,
     ls.regD = regD;
 
     // Update S. S is stored as upper-triangular and only its diagonal changes.
-    Eigen::VectorXd combinedValues(ls.n + ls.m);
-    combinedValues.head(ls.n) = -theta - regP;
-    combinedValues.tail(ls.m) = regD;
-
-    // Efficiently update diagonal elements
-    for (int i = 0; i < combinedValues.size(); i++) {
-        ls.S.coeffRef(i, i) = combinedValues[i];
+    for (int i = 0; i < ls.n; ++i) {
+        ls.S.coeffRef(i, i) = -theta[i] - regP[i];
+    }
+    for (int i = 0; i < ls.m; ++i) {
+        ls.S.coeffRef(ls.n + i, ls.n + i) = regD[i];
     }
 
     // Refactorize
@@ -881,7 +879,7 @@ int IPSolver::update_linear_solver(SparseSolver &ls,
  *
  */
 void IPSolver::start_linear_solver(SparseSolver &ls,
-                                   const Eigen::SparseMatrix<double> A) {
+                                   const Eigen::SparseMatrix<double> &A) {
     ls.A = A;
     ls.m = A.rows();
     ls.n = A.cols();

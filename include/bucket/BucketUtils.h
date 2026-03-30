@@ -597,6 +597,8 @@ void BucketGraph::ConcatenateLabel(const Label *L, int &b, std::atomic<double> &
     bucket_stack.clear();         // Clear for reuse
     bucket_stack.push_back(b);
 
+    static thread_local std::vector<std::pair<const Label *, double>> merge_candidates;
+
     // Choose symmetric buckets and cost-bar arrays based on symmetry.
     auto &other_buckets = assign_symmetry<SYM>(fw_buckets, bw_buckets);
     auto &other_c_bar   = assign_symmetry<SYM>(fw_c_bar, bw_c_bar);
@@ -666,6 +668,8 @@ void BucketGraph::ConcatenateLabel(const Label *L, int &b, std::atomic<double> &
         const auto &bucket = other_buckets[current_bucket];
         const auto &labels = bucket.get_labels();
         if (labels.empty()) continue;
+        merge_candidates.clear();
+        if (merge_candidates.capacity() < labels.size()) { merge_candidates.reserve(labels.size()); }
 
         // Process each label in the current bucket.
         for (const Label *L_bw : labels) {
@@ -692,19 +696,22 @@ void BucketGraph::ConcatenateLabel(const Label *L, int &b, std::atomic<double> &
             }
 
             if (!cost_acceptable) { continue; }
-            // Serialize the shared best-cost / merged-label update once.
-            {
-                std::lock_guard<std::mutex> lock(merge_mutex);
+            merge_candidates.emplace_back(L_bw, total_cost);
+        }
 
-                double current_best = best_cost.load(std::memory_order_relaxed);
-                if (numericutils::lt(total_cost, current_best)) {
-                    best_cost.store(total_cost, std::memory_order_relaxed);
-                    current_best = total_cost;
+        if (!merge_candidates.empty()) {
+            // Replay accepted candidates in order under one lock.
+            std::lock_guard<std::mutex> lock(merge_mutex);
+
+            double current_best = best_cost.load(std::memory_order_relaxed);
+            for (const auto &[candidate_label, candidate_cost] : merge_candidates) {
+                if (numericutils::lt(candidate_cost, current_best)) {
+                    best_cost.store(candidate_cost, std::memory_order_relaxed);
+                    current_best = candidate_cost;
                 }
 
-                // Add label if still an improvement.
-                if (numericutils::lte(total_cost, current_best)) {
-                    auto pbest = compute_label<S>(L, L_bw, total_cost);
+                if (numericutils::lte(candidate_cost, current_best)) {
+                    auto pbest = compute_label<S>(L, candidate_label, candidate_cost);
                     merged_labels.push_back(pbest);
                 }
             }

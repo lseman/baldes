@@ -26,7 +26,7 @@ struct Path {
 
     // Equality operator
     bool operator==(const Path &other) const {
-        return route == other.route && cost == other.cost;
+        return route == other.route;
     }
 
     // Default constructor
