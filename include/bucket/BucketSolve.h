@@ -592,12 +592,12 @@ std::vector<Label *> BucketGraph::bi_labeling_algorithm() {
         } else {
             best_label->cost      = 0.0;
             best_label->real_cost = std::numeric_limits<double>::infinity();
-            best_label->nodes_covered.clear();
+            best_label->clearRoute();
         }
     } else {
         best_label->cost      = best_label->real_cost;
         best_label->real_cost = std::numeric_limits<double>::infinity();
-        best_label->nodes_covered.clear();
+        best_label->clearRoute();
     }
     merged_labels.push_back(best_label);
 
@@ -671,8 +671,9 @@ std::vector<Label *> BucketGraph::bi_labeling_algorithm() {
         const int         end_idx     = std::min(N_ADD + N_ADD, labels_size);
         paths.reserve(end_idx - N_ADD);
         for (int i = N_ADD; i < end_idx; ++i) {
-            if (merged_labels[i]->nodes_covered.size() <= 3) continue;
-            paths.emplace_back(merged_labels[i]->nodes_covered, merged_labels[i]->real_cost);
+            const auto &route = merged_labels[i]->getRoute();
+            if (route.size() <= 3) continue;
+            paths.emplace_back(route, merged_labels[i]->real_cost);
         }
         sPool.add_paths(paths);
         sPool.iterate();
@@ -1258,22 +1259,21 @@ Label *BucketGraph::compute_label(const Label *L, const Label *L_prime, double r
     // Compute cost values
     double cij_cost  = getcij(L->node_id, L_prime->node_id);
     double real_cost = L->real_cost + L_prime->real_cost + cij_cost;
+    const auto &forward_route  = L->nodes_covered;
+    const auto &backward_route = L_prime->nodes_covered;
 
     // Acquire a new label from the pool and initialize its cost fields.
     auto new_label       = label_pool_fw->acquire();
     new_label->cost      = red_cost;
     new_label->real_cost = real_cost;
+    new_label->parent    = nullptr;
 
-    // Preallocate the vector to the final size.
-    size_t total_size = L->nodes_covered.size() + L_prime->nodes_covered.size();
-    new_label->nodes_covered.resize(total_size);
-
-    // Copy the nodes from L.
-    std::copy(L->nodes_covered.begin(), L->nodes_covered.end(), new_label->nodes_covered.begin());
-
-    // Copy the nodes from L_prime in reverse order.
-    std::copy(L_prime->nodes_covered.rbegin(), L_prime->nodes_covered.rend(),
-              new_label->nodes_covered.begin() + L->nodes_covered.size());
+    // Reuse pooled vector capacity and avoid zero-filling before overwrite.
+    auto &merged_route = new_label->nodes_covered;
+    merged_route.clear();
+    merged_route.reserve(forward_route.size() + backward_route.size());
+    merged_route.insert(merged_route.end(), forward_route.begin(), forward_route.end());
+    merged_route.insert(merged_route.end(), backward_route.rbegin(), backward_route.rend());
 
     return new_label;
 }

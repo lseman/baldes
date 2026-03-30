@@ -268,79 +268,76 @@ void IPSolver::solve_augsys(Eigen::VectorXd &delta_x, Eigen::VectorXd &delta_y,
  * the augmented system using the provided sparse solver.
  *
  */
+/**
+ * @brief Solves the Newton system for the interior point method.
+ *
+ * This version eliminates redundant computations, improves clarity,
+ * reduces temporary allocations, and fixes scoping issues from the original.
+ */
 void IPSolver::solve_newton_system(
-    Eigen::VectorXd &Delta_x, Eigen::VectorXd &Delta_lambda,
-    Eigen::VectorXd &Delta_w, Eigen::VectorXd &Delta_s,
-    Eigen::VectorXd &Delta_v, double &Delta_tau, double &Delta_kappa,
-    SparseSolver &ls, const Eigen::VectorXd &theta_vw, const Eigen::VectorXd &b,
-    const Eigen::VectorXd &c, const Eigen::VectorXi &ubi,
-    const Eigen::VectorXd &ubv, const Eigen::VectorXd &delta_x,
-    const Eigen::VectorXd &delta_y, const Eigen::VectorXd &delta_w,
-    double delta_0, const Eigen::VectorXd &iter_x,
-    const Eigen::VectorXd &iter_lambda, const Eigen::VectorXd &iter_w,
-    const Eigen::VectorXd &iter_s, const Eigen::VectorXd &iter_v,
-    double iter_tau, double iter_kappa, const Eigen::VectorXd &xi_p,
-    const Eigen::VectorXd &xi_u, const Eigen::VectorXd &xi_d, double xi_g,
-    const Eigen::VectorXd &xi_xs, const Eigen::VectorXd &xi_vw,
-    double xi_tau_kappa) {
-    Eigen::VectorXd xi_d_copy =
-        xi_d - (xi_xs.array() / iter_x.array()).matrix();
-    Eigen::VectorXd xi_u_copy =
-        xi_u - (xi_vw.array() / iter_w.array()).matrix();
-
-    // Pre-compute frequently used values
-    const double inv_tau = 1.0 / iter_tau;
+    Eigen::VectorXd &Delta_x,
+    Eigen::VectorXd &Delta_lambda,
+    Eigen::VectorXd &Delta_w,
+    Eigen::VectorXd &Delta_s,
+    Eigen::VectorXd &Delta_v,
+    double &Delta_tau,
+    double &Delta_kappa,
+    SparseSolver &ls,
+    const Eigen::VectorXd &theta_vw,
+    const Eigen::VectorXd &b,
+    const Eigen::VectorXd &c,
+    const Eigen::VectorXi &ubi,
+    const Eigen::VectorXd &ubv,
+    const Eigen::VectorXd &delta_x,      // from affine step
+    const Eigen::VectorXd &delta_y,
+    const Eigen::VectorXd &delta_z,
+    double delta_0,
+    const Eigen::VectorXd &iter_x,
+    const Eigen::VectorXd &iter_lambda,
+    const Eigen::VectorXd &iter_w,
+    const Eigen::VectorXd &iter_s,
+    const Eigen::VectorXd &iter_v,
+    double iter_tau,
+    double iter_kappa,
+    const Eigen::VectorXd &xi_p,
+    const Eigen::VectorXd &xi_u,
+    const Eigen::VectorXd &xi_d,
+    double xi_g,
+    const Eigen::VectorXd &xi_xs,
+    const Eigen::VectorXd &xi_vw,
+    double xi_tau_kappa)
+{
+    const double inv_tau   = 1.0 / iter_tau;
     const double inv_kappa = 1.0 / iter_kappa;
 
-    // Pre-allocate vectors to avoid reallocations
-    static Eigen::VectorXd xi_d_mod;
-    if (xi_d_mod.size() != xi_d.size()) {
-        xi_d_mod.resize(xi_d.size());
-    }
+    // Precompute modified right-hand sides (avoid redundant array expressions)
+    Eigen::VectorXd xi_d_mod = xi_d.array() - (xi_xs.array() / iter_x.array());
+    Eigen::VectorXd xi_u_mod = xi_u.array() - (xi_vw.array() / iter_w.array());
 
-    // Use vectorized operations for division
-    {
-        {
-            // Compute xi_d_mod = xi_d - xi_xs./iter_x efficiently
-            xi_d_mod = xi_d.array() - (xi_xs.array() / iter_x.array());
-        }
-        {
-            // Pre-compute xi_u_copy = xi_u - xi_vw./iter_w
-            Eigen::VectorXd xi_u_copy =
-                xi_u - (xi_vw.array() / iter_w.array()).matrix();
+    // Solve the augmented system with modified RHS
+    solve_augsys(Delta_x, Delta_lambda, Delta_w, ls, theta_vw, ubi,
+                 xi_p, xi_d_mod, xi_u_mod);
 
-            // Call solve_augsys with pre-computed values
-            solve_augsys(Delta_x, Delta_lambda, Delta_w, ls, theta_vw, ubi,
-                         xi_p, xi_d_mod, xi_u_copy);
-        }
-    }
-
-    // Compute Delta_tau using efficient dot products
-    const double c_dot_Delta_x = c.dot(Delta_x);
+    // Compute Delta_tau using dot products (very cheap)
+    const double c_dot_Delta_x    = c.dot(Delta_x);
     const double b_dot_Delta_lambda = b.dot(Delta_lambda);
-    const double ubv_dot_Delta_w = ubv.dot(Delta_w);
+    const double ubv_dot_Delta_w  = ubv.dot(Delta_w);
 
     Delta_tau = (xi_g + xi_tau_kappa * inv_tau + c_dot_Delta_x -
-                 b_dot_Delta_lambda + ubv_dot_Delta_w) /
-                delta_0;
+                 b_dot_Delta_lambda + ubv_dot_Delta_w) / delta_0;
+
     Delta_kappa = (xi_tau_kappa - iter_kappa * Delta_tau) * inv_tau;
 
-    // Update vectors using vectorized operations
-    {
-        {
-            Delta_x.array() += Delta_tau * delta_x.array();
-            Delta_lambda.array() += Delta_tau * delta_y.array();
-            Delta_w.array() += Delta_tau * delta_w.array();
-        }
-        {
-            // Compute Delta_s and Delta_v using vectorized operations
-            Delta_s = (xi_xs.array() - iter_s.array() * Delta_x.array()) /
-                      iter_x.array();
-            Delta_v = (xi_vw.array() - iter_v.array() * Delta_w.array()) /
-                      iter_w.array();
-        }
-    }
+    // Final updates using vectorized operations
+    Delta_x.array()     += Delta_tau * delta_x.array();
+    Delta_lambda.array() += Delta_tau * delta_y.array();
+    Delta_w.array()     += Delta_tau * delta_z.array();   // Note: delta_z, not delta_w
+
+    // Compute Delta_s and Delta_v (complementarity residuals)
+    Delta_s = (xi_xs.array() - iter_s.array() * Delta_x.array()) / iter_x.array();
+    Delta_v = (xi_vw.array() - iter_v.array() * Delta_w.array()) / iter_w.array();
 }
+
 /**
  * @brief Computes the maximum step size (alpha) for a single direction vector.
  *

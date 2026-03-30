@@ -16,7 +16,7 @@ void MIPProblem::addVars(const double *lb, const double *ub, const double *obj,
         int col_index = variables.size() - 1;
 
         // Get the nonzero terms from the MIP column.
-        auto terms = cols[i].getTerms();
+        const auto &terms = cols[i].getTerms();
 
         // Reserve space for batch insertion based on the number of terms.
         std::vector<int> batch_rows;
@@ -26,30 +26,20 @@ void MIPProblem::addVars(const double *lb, const double *ub, const double *obj,
         batch_cols.reserve(terms.size());
         batch_values.reserve(terms.size());
 
-        // Cache the number of constraints.
-        const size_t numCons = constraints.size();
-        // Create a vector of vectors for constraint updates.
-        std::vector<std::vector<std::pair<int, double>>> constraint_updates(
-            numCons);
-
         // Collect all terms for this variable.
         for (const auto &[row_index, value] : terms) {
             batch_rows.push_back(row_index);
             batch_cols.push_back(col_index);
             batch_values.push_back(value);
-
-            if (row_index < numCons) {  // Safety check.
-                constraint_updates[row_index].emplace_back(col_index, value);
-            }
         }
 
         // Perform batch insertion into the sparse matrix.
         sparse_matrix.insert_batch(batch_rows, batch_cols, batch_values);
 
-        // Update constraints with the new variable's coefficients.
-        for (size_t row = 0; row < numCons; ++row) {
-            for (const auto &[col_idx, val] : constraint_updates[row]) {
-                constraints[row]->addTerm(variables[col_idx], val);
+        // Update only the touched constraints instead of scanning every row.
+        for (const auto &[row_index, value] : terms) {
+            if (static_cast<size_t>(row_index) < constraints.size()) {
+                constraints[row_index]->addTerm(variables[col_index], value);
             }
         }
     }

@@ -591,8 +591,8 @@ class IteratedLocalSearch {
         for (const Label *label_i : best) {
             for (const Label *label_j : best) {
                 if (label_i == label_j) continue;
-                const auto &route_i = label_i->nodes_covered;
-                const auto &route_j = label_j->nodes_covered;
+                const auto &route_i = label_i->getRoute();
+                const auto &route_j = label_j->getRoute();
                 // Skip if routes are too short.
                 if (route_i.size() < 3 || route_j.size() < 3) continue;
                 // Generate tasks for valid internal positions.

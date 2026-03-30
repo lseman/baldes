@@ -603,7 +603,7 @@ class CutStorage {
 
         for (auto label : labels) {
             label->SRCmap.resize(all_cuts, 0.0);
-            for (auto node_id : label->nodes_covered) {
+            for (auto node_id : label->getRoute()) {
                 double total_cost_update = 0.0;
                 const size_t segment = node_id >> 6;
                 const size_t bit_position = node_id & 63;

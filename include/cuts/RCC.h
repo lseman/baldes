@@ -72,9 +72,11 @@ public:
 
     std::vector<double> computeRCCCoefficients(const std::vector<uint16_t> &label) {
         std::vector<double> coeffs(cuts_.size(), 0);
+        if (label.size() < 2 || cuts_.empty()) { return coeffs; }
 
         // Precompute the pairs of consecutive nodes in the label
         ankerl::unordered_dense::set<std::pair<int, int>> label_arcs;
+        label_arcs.reserve(label.size() - 1);
         for (int j = 0; j < label.size() - 1; j++) { label_arcs.insert({label[j], label[j + 1]}); }
 
         // Iterate over cuts
