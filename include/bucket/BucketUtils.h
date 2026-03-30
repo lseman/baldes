@@ -848,6 +848,11 @@ void BucketGraph::SCC_handler() {
         }
     }
 
+    std::vector<int> bucket_scc_rank(buckets.size(), -1);
+    for (size_t rank = 0; rank < ordered_sccs.size(); ++rank) {
+        for (int bucket : ordered_sccs[rank]) { bucket_scc_rank[bucket] = static_cast<int>(rank); }
+    }
+
     // Build union-find structure for SCCs using the ordered SCCs.
     UnionFind uf(ordered_sccs);
     if constexpr (D == Direction::Forward) {
@@ -855,12 +860,14 @@ void BucketGraph::SCC_handler() {
         fw_topological_order = topological_order;
         fw_sccs              = sccs;
         fw_sccs_sorted       = sorted_sccs;
+        fw_bucket_scc_rank   = std::move(bucket_scc_rank);
         fw_union_find        = uf;
     } else {
         bw_ordered_sccs      = ordered_sccs;
         bw_topological_order = topological_order;
         bw_sccs              = sccs;
         bw_sccs_sorted       = sorted_sccs;
+        bw_bucket_scc_rank   = std::move(bucket_scc_rank);
         bw_union_find        = uf;
     }
 }
