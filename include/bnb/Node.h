@@ -120,7 +120,8 @@ class BNBNode : public std::enable_shared_from_this<BNBNode> {
                    using RCCManagerPtr = std::shared_ptr<RCCManager>;
                    RCCManagerPtr rccManager = std::make_shared<RCCManager>();)
 
-    void addPath(Path path) { paths.emplace_back(path); }
+    void addPath(const Path &path) { paths.emplace_back(path); }
+    void addPath(Path &&path) { paths.emplace_back(std::move(path)); }
 
     std::vector<VRPCandidate *> candidates;
     std::vector<BNBNode *> children;

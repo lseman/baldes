@@ -338,7 +338,7 @@ class Stabilization {
 
             // Accumulate coverage for nodes that are not the artificial start
             // or end.
-            for (const auto &node : col->nodes_covered) {
+            for (const auto &node : col->getRoute()) {
                 if (node > 0 && node != N_SIZE - 1) {
                     new_rows[node - 1] += weight;
                 }

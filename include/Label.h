@@ -36,7 +36,7 @@ struct Label {
     double                     cost          = 0.0;
     double                     real_cost     = 0.0;
     std::array<double, R_SIZE> resources     = {};
-    std::vector<uint16_t>      nodes_covered = {}; // Add nodes_covered to Label
+    std::vector<uint16_t>      nodes_covered = {};
     int                        node_id       = -1; // Add node_id to Label
     Label                     *parent        = nullptr;
     bool                       fresh         = true;
@@ -62,14 +62,21 @@ struct Label {
     void set_extended(bool extended) { is_extended = extended; }
     void set_dominated(bool dominated) { is_dominated = dominated; }
 
-    auto &getRoute() const { return nodes_covered; }
+    const auto &getRoute() const { return nodes_covered; }
+
+    void clearRoute() noexcept {
+        nodes_covered.clear();
+        parent = nullptr;
+    }
 
     void addRoute(const std::vector<int> &route) {
         nodes_covered.insert(nodes_covered.end(), route.begin(), route.end());
+        parent = nullptr;
     }
 
     void addRoute(const std::vector<uint16_t> &route) {
         nodes_covered.insert(nodes_covered.end(), route.begin(), route.end());
+        parent = nullptr;
     }
     /**
      * @brief Checks if a node has been visited.
@@ -111,7 +118,10 @@ struct Label {
         SRC_MODE_BLOCK(SRCmap.clear();)
     }
 
-    void addNode(int node) { nodes_covered.push_back(node); }
+    void addNode(int node) {
+        nodes_covered.push_back(node);
+        parent = nullptr;
+    }
 
     /**
      * @brief Initializes the object with the given parameters.

@@ -8,7 +8,6 @@
 
 #include <algorithm>
 #include <cstdint>
-#include <future>  // For std::async and std::future
 #include <iostream>
 #include <limits>
 #include <vector>
@@ -40,19 +39,14 @@ struct Path {
         route.resize(r.size());
         std::transform(r.begin(), r.end(), route.begin(),
                        [](int val) { return static_cast<uint16_t>(val); });
-        precomputeArcsAsync();  // Run precomputeArcs in the background
     }
 
     // Constructor with vector<uint16_t> and float cost
-    Path(const std::vector<uint16_t> &r, float c) : route(r), cost(c) {
-        precomputeArcsAsync();
-    }
+    Path(const std::vector<uint16_t> &r, float c) : route(r), cost(c) {}
 
     // Constructor with vector<uint16_t> and double cost
     Path(const std::vector<uint16_t> &r, double c)
-        : route(r), cost(static_cast<float>(c)) {
-        precomputeArcsAsync();
-    }
+        : route(r), cost(static_cast<float>(c)) {}
 
     // Iterator methods
     auto begin() { return route.begin(); }
@@ -122,11 +116,6 @@ struct Path {
         for (size_t n = 0; n + 1 < route.size(); ++n) {
             addArc(route[n], route[n + 1]);
         }
-    }
-
-    // Run precomputeArcs asynchronously.
-    std::future<void> precomputeArcsAsync() {
-        return std::async(std::launch::async, [this]() { precomputeArcs(); });
     }
 
     std::vector<int> getIntVector() {

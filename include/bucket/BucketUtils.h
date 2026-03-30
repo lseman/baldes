@@ -588,7 +588,8 @@ void BucketGraph::ConcatenateLabel(const Label *L, int &b, std::atomic<double> &
     // bitmap.
     const size_t n_segments = (fw_buckets_size + 63) / 64;
     static thread_local std::vector<uint64_t> Bvisited;
-    Bvisited.assign(n_segments, 0);
+    if (Bvisited.size() != n_segments) { Bvisited.resize(n_segments); }
+    std::memset(Bvisited.data(), 0, n_segments * sizeof(uint64_t));
 
     // Use thread_local storage for the bucket stack to avoid reallocations.
     static thread_local std::vector<int> bucket_stack;
@@ -653,8 +654,10 @@ void BucketGraph::ConcatenateLabel(const Label *L, int &b, std::atomic<double> &
         const double path_cost = L_cost + travel_cost;
         const double bound     = other_c_bar[current_bucket];
 
+        const double prune_limit = best_cost.load(std::memory_order_relaxed);
+
         // Early bound check.
-        if ((S != Stage::Enumerate && numericutils::gte(path_cost + bound, best_cost.load())) ||
+        if ((S != Stage::Enumerate && numericutils::gte(path_cost + bound, prune_limit)) ||
             (S == Stage::Enumerate && numericutils::gte(path_cost + bound, gap))) {
             continue;
         }
@@ -678,7 +681,7 @@ void BucketGraph::ConcatenateLabel(const Label *L, int &b, std::atomic<double> &
             // Apply SRC adjustments if in Stage Four.
             total_cost = applySRCAdjustments(total_cost, L, L_bw);
 #endif
-            double latest_best = best_cost.load();
+            double latest_best = best_cost.load(std::memory_order_relaxed);
 
             // Filter based on total cost against best known cost or gap.
             bool cost_acceptable;
@@ -689,34 +692,29 @@ void BucketGraph::ConcatenateLabel(const Label *L, int &b, std::atomic<double> &
             }
 
             if (!cost_acceptable) { continue; }
-            // Use critical section only when necessary
+            // Serialize the shared best-cost / merged-label update once.
             {
                 std::lock_guard<std::mutex> lock(merge_mutex);
 
-                // Use atomic compare-exchange loop with exponential backoff
-                double expected        = best_cost.load();
-                int    backoff_counter = 0;
-
-                while (numericutils::lt(total_cost, expected) &&
-                       !best_cost.compare_exchange_weak(expected, total_cost)) {
-                    // Simple exponential backoff to reduce contention
-                    if (++backoff_counter > 3) {
-                        for (int i = 0; i < (1 << (backoff_counter - 3)); ++i) {
-                            _mm_pause(); // CPU hint to reduce power in spin
-                                         // loops
-                        }
-                    }
+                double current_best = best_cost.load(std::memory_order_relaxed);
+                if (numericutils::lt(total_cost, current_best)) {
+                    best_cost.store(total_cost, std::memory_order_relaxed);
+                    current_best = total_cost;
                 }
 
-                // Add label if still an improvement
-                if (numericutils::lte(total_cost, best_cost.load())) {
+                // Add label if still an improvement.
+                if (numericutils::lte(total_cost, current_best)) {
                     auto pbest = compute_label<S>(L, L_bw, total_cost);
                     merged_labels.push_back(pbest);
                 }
             }
         }
         // Add neighbor buckets to the stack if they have not been visited.
-        for (int b_prime : Phi_bw[current_bucket]) {
+        const auto &neighbors = Phi_bw[current_bucket];
+        if (bucket_stack.capacity() < bucket_stack.size() + neighbors.size()) {
+            bucket_stack.reserve(bucket_stack.size() + neighbors.size());
+        }
+        for (int b_prime : neighbors) {
             const size_t   seg_prime  = b_prime >> 6;
             const uint64_t mask_prime = bit_mask_lookup[b_prime & 63];
             if (!(Bvisited[seg_prime] & mask_prime)) { bucket_stack.push_back(b_prime); }
@@ -1375,7 +1373,7 @@ void BucketGraph::common_initialization() {
                 }
                 depot->initialize(calculated_index, 0.0, interval_bounds, depot_id);
                 depot->is_extended = false;
-                depot->nodes_covered.push_back(depot_id);
+                depot->addNode(depot_id);
                 set_node_visited(depot->visited_bitmap, depot_id);
                 SRC_MODE_BLOCK(depot->SRCmap.assign(cut_storage->SRCDuals.size(), 0);)
                 buckets[calculated_index].add_label(depot);

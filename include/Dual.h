@@ -86,8 +86,9 @@ public:
         if (type == CandidateType::Edge) { arcDuals_.setDual(arc, dualValue); }
     }
 
-    std::vector<double> computeCoefficients(const std::vector<uint16_t> route) {
+    std::vector<double> computeCoefficients(const std::vector<uint16_t> &route) {
         std::vector<double> coefficients;
+        coefficients.reserve(branchingCandidates_.size());
         for (auto candidate : branchingCandidates_) {
             if (candidate->getCandidateType() == CandidateType::Node) {
                 bool has_node = false;
@@ -154,7 +155,7 @@ public:
 
     void computeDuals(BNBNode *model, double threshold = 1e-3);
 
-    auto getBranchingbaldesCtrs() { return branchingbaldesCtrs_; }
+    const auto &getBranchingbaldesCtrs() const { return branchingbaldesCtrs_; }
 
     // define size as size of branchingCandidates_
     int size() { return branchingCandidates_.size(); }

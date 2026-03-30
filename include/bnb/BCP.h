@@ -252,7 +252,7 @@ public:
 #endif
     }
 
-    inline int addPath(BNBNode *node, const std::vector<Path> paths, bool enumerate = false) {
+    inline int addPath(BNBNode *node, const std::vector<Path> &paths, bool enumerate = false) {
         // Setup mode-specific objects.
         SRC_MODE_BLOCK(auto &r1c = node->r1c; auto &cuts = r1c->cutStorage;)
         RCC_MODE_BLOCK(auto &rccManager = node->rccManager;)
@@ -272,34 +272,42 @@ public:
         std::vector<std::string> names;
         std::vector<VarType>     vtypes;
         auto                    &pathSet = node->pathSet;
+        allPaths.reserve(allPaths.size() + std::min<size_t>(paths.size(), 10));
+        pathSet.reserve(pathSet.size() + std::min<size_t>(paths.size(), 10));
 
         auto counter = 0;
+        std::vector<int> updatedIndices;
+        updatedIndices.reserve(N_SIZE);
         // Process each candidate path.
         for (auto &label : paths) {
+            if (counter >= 10) break;
+
             // Skip if the route is empty or if (in non-enumeration mode) the
             // cost is positive.
             if (label.route.empty()) continue;
 
-            if (pathSet.find(label) != pathSet.end()) continue;
+            if (!pathSet.emplace(label).second) continue;
 
             counter++;
-            if (counter > 10) break;
-            pathSet.insert(label);
-
-            // Reset coefficients for this candidate.
-            std::fill(coluna.begin(), coluna.end(), 0.0);
 
             double      travel_cost = label.cost;
             std::string var_name    = "x[" + std::to_string(allPaths.size()) + "]";
             MIPColumn   col;
+            col.reserve(label.route.size() + 8);
 
             // Step 1: Build node coefficient vector.
+            updatedIndices.clear();
             for (const auto &node_val : label.route) {
                 // Skip depot nodes.
-                if (likely(node_val > 0 && node_val != N_SIZE - 1)) { coluna[node_val - 1]++; }
+                if (likely(node_val > 0 && node_val != N_SIZE - 1)) {
+                    int idx = node_val - 1;
+                    if (coluna[idx] == 0.0) { updatedIndices.push_back(idx); }
+                    coluna[idx]++;
+                }
             }
-            for (int i = 0; i < N_SIZE - 2; i++) {
-                if (coluna[i] != 0.0) col.addTerm(i, coluna[i]);
+            for (int idx : updatedIndices) {
+                if (coluna[idx] != 0.0) { col.addTerm(idx, coluna[idx]); }
+                coluna[idx] = 0.0;
             }
             // Add the vehicle constraint term.
             col.addTerm(N_SIZE - 2, 1.0);
@@ -316,11 +324,11 @@ public:
 
             // Step 3: Add RCC cut terms.
             RCC_MODE_BLOCK({
-                auto RCCvec         = rccManager->computeRCCCoefficients(label.route);
-                auto RCCconstraints = rccManager->getbaldesCtrs();
+                auto RCCvec = rccManager->computeRCCCoefficients(label.route);
                 if (!RCCvec.empty()) {
+                    const auto &rccCuts = rccManager->getCuts();
                     for (int i = 0; i < static_cast<int>(RCCvec.size()); i++) {
-                        if (std::abs(RCCvec[i]) > 1e-3) { col.addTerm(RCCconstraints[i]->index(), RCCvec[i]); }
+                        if (std::abs(RCCvec[i]) > 1e-3) { col.addTerm(rccCuts[i].ctr->index(), RCCvec[i]); }
                     }
                 }
             });
@@ -329,7 +337,7 @@ public:
             auto &branching    = node->branchingDuals;
             auto  branchingVec = branching->computeCoefficients(label.route);
             if (!branchingVec.empty()) {
-                auto branchingCtrs = branching->getBranchingbaldesCtrs();
+                const auto &branchingCtrs = branching->getBranchingbaldesCtrs();
                 for (int i = 0; i < static_cast<int>(branchingVec.size()); i++) {
                     if (std::abs(branchingVec[i]) > 1e-3) { col.addTerm(branchingCtrs[i]->index(), branchingVec[i]); }
                 }
@@ -339,8 +347,8 @@ public:
             lb.push_back(0.0);
             ub.push_back(1.0);
             obj.push_back(travel_cost);
-            cols.push_back(col);
-            names.push_back(var_name);
+            cols.emplace_back(std::move(col));
+            names.emplace_back(std::move(var_name));
             vtypes.push_back(VarType::Continuous);
 
             // Save the path in the node's path set to avoid duplicates.
@@ -388,39 +396,44 @@ public:
         vtypes.reserve(reserveSize);
 
         auto &pathSet = node->pathSet;
+        allPaths.reserve(allPaths.size() + reserveSize);
+        pathSet.reserve(pathSet.size() + reserveSize);
         inner_obj     = 0.0;
         int counter   = 0;
+        std::vector<int> updatedIndices;
+        updatedIndices.reserve(N_SIZE);
 
         // Process each candidate label (column)
         for (auto &label : columns) {
+            if (!enumerate && counter >= N_ADD - 1) break;
+            if (enumerate && counter >= 1000) break;
+
+            const auto &route = label->getRoute();
             // Skip labels with an empty route or (if not enumerating) with
             // positive cost.
-            if (label->nodes_covered.empty()) continue;
+            if (route.empty()) continue;
             if (!enumerate && label->cost >= 0) continue;
 
             // Build a Path object from the label.
-            Path path(label->getRoute(), label->real_cost);
+            Path path(route, label->real_cost);
 
             // Avoid duplicate paths.
-            if (pathSet.find(path) != pathSet.end()) continue;
+            if (!pathSet.emplace(path).second) continue;
 
             // Update inner objective if improved.
             if (label->cost < inner_obj) { inner_obj = label->cost; }
             counter++;
-            if (!enumerate && counter > N_ADD - 1) break;
-            if (enumerate && counter > 1000) break;
-            pathSet.insert(path);
 
             double      travel_cost = label->real_cost;
             std::string name        = "x[" + std::to_string(allPaths.size()) + "]";
             MIPColumn   col;
+            col.reserve(route.size() + 8);
 
             // --- Step 1: Compute coefficients for node constraints ---
             // Instead of resetting the full vector, track only the indices that
             // are updated.
-            std::vector<int> updatedIndices;
-            updatedIndices.reserve(label->nodes_covered.size());
-            for (const auto &n : label->nodes_covered) {
+            updatedIndices.clear();
+            for (const auto &n : route) {
                 if (likely(n > 0 && n != N_SIZE - 1)) {
                     int idx = n - 1;
                     if (coluna[idx] == 0.0) { updatedIndices.push_back(idx); }
@@ -448,9 +461,9 @@ public:
             RCC_MODE_BLOCK({
                 auto RCCvec = rccManager->computeRCCCoefficients(path.route);
                 if (!RCCvec.empty()) {
-                    auto RCCconstraints = rccManager->getbaldesCtrs();
+                    const auto &rccCuts = rccManager->getCuts();
                     for (int i = 0; i < RCCvec.size(); i++) {
-                        if (std::abs(RCCvec[i]) > 1e-3) { col.addTerm(RCCconstraints[i]->index(), RCCvec[i]); }
+                        if (std::abs(RCCvec[i]) > 1e-3) { col.addTerm(rccCuts[i].ctr->index(), RCCvec[i]); }
                     }
                 }
             });
@@ -459,7 +472,7 @@ public:
             auto &branching    = node->branchingDuals;
             auto  branchingVec = branching->computeCoefficients(path.route);
             if (!branchingVec.empty()) {
-                auto branchingbaldesCtrs = branching->getBranchingbaldesCtrs();
+                const auto &branchingbaldesCtrs = branching->getBranchingbaldesCtrs();
                 for (int i = 0; i < branchingVec.size(); i++) {
                     if (std::abs(branchingVec[i]) > 1e-3) {
                         col.addTerm(branchingbaldesCtrs[i]->index(), branchingVec[i]);
@@ -471,12 +484,12 @@ public:
             lb.push_back(0.0);
             ub.push_back(1.0);
             obj.push_back(travel_cost);
-            cols.push_back(col);
-            names.push_back(name);
+            cols.emplace_back(std::move(col));
+            names.emplace_back(std::move(name));
             vtypes.push_back(VarType::Continuous);
 
             // Store the path in the node to avoid duplicate paths.
-            node->addPath(path);
+            node->addPath(std::move(path));
         }
 
         // Add the new columns to the MIP model if any were generated.

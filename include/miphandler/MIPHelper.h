@@ -26,6 +26,8 @@ using baldesVarPtr = std::shared_ptr<baldesVar>;
 using LinearExpPtr = std::shared_ptr<LinearExpression>;
 class MIPColumn {
    public:
+    void reserve(size_t count) { terms.reserve(count); }
+
     // Add a term to the column (row index and coefficient)
     void addTerm(int row_index, double value) {
         if (value != 0.0) {
@@ -35,7 +37,7 @@ class MIPColumn {
 
     // Clear the column for reuse
     void clear() { terms.clear(); }
-    std::vector<std::pair<int, double>> getTerms() const { return terms; }
+    const std::vector<std::pair<int, double>> &getTerms() const { return terms; }
 
     std::pair<int, double> get_term(size_t index) const {
         if (index >= terms.size()) {
