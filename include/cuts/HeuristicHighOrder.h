@@ -42,6 +42,11 @@ class HighRankCuts {
     std::map<std::vector<int>, double> candidate_cache;
     int last_path_idx = 0;
     void initializeVertexRouteMap() {
+        if (last_path_idx == 0) {
+            row_indices_map.clear();
+            row_indices_map.reserve(N_SIZE);
+        }
+
         // Initialize the vertex_route_map with N_SIZE rows and allPaths.size()
         // columns, all set to 0.
         if (last_path_idx == 0) {
@@ -58,14 +63,25 @@ class HighRankCuts {
         }
 
         // Populate the map: for each path, count the appearance of each vertex.
+        std::vector<unsigned char> seen_in_path(N_SIZE, 0);
+        std::vector<int>           touched_vertices;
         for (size_t r = last_path_idx; r < allPaths.size(); ++r) {
             for (const auto &vertex : allPaths[r].route) {
                 // Only consider vertices that are not the depot (assumed at
                 // indices 0 and N_SIZE-1).
                 if (vertex > 0 && vertex < N_SIZE - 1) {
                     ++vertex_route_map[vertex][r];
+                    if (!seen_in_path[vertex]) {
+                        seen_in_path[vertex] = 1;
+                        touched_vertices.push_back(vertex);
+                        row_indices_map[vertex].push_back(static_cast<int>(r));
+                    }
                 }
             }
+            for (int vertex : touched_vertices) {
+                seen_in_path[vertex] = 0;
+            }
+            touched_vertices.clear();
         }
         last_path_idx = allPaths.size();
     }
@@ -139,12 +155,14 @@ class HighRankCuts {
             ankerl::unordered_dense::set<int> working_set;
             working_set.reserve(
                 std::min<size_t>(MAX_WORKING_SET_SIZE, allPaths.size()));
-            for (size_t r = 0; r < allPaths.size(); ++r) {
-                if (vertex_route_map[i][r] <= 0) continue;
-                for (const auto &v : allPaths[r].route) {
-                    if (v > 0 && v < N_SIZE - 1 &&
-                        heuristic_memory_lookup.contains(v))
-                        working_set.insert(v);
+            if (auto row_it = row_indices_map.find(static_cast<int>(i));
+                row_it != row_indices_map.end()) {
+                for (int r : row_it->second) {
+                    for (const auto &v : allPaths[r].route) {
+                        if (v > 0 && v < N_SIZE - 1 &&
+                            heuristic_memory_lookup.contains(v))
+                            working_set.insert(v);
+                    }
                 }
             }
 
@@ -203,17 +221,14 @@ class HighRankCuts {
 
             // --- 1. Generate candidate sets for routes that do NOT contain
             // vertex i ---
-            for (size_t r = 0; r < allPaths.size(); ++r) {
-                if (vertex_route_map[i][r] > 0)
-                    continue;  // Only process routes missing vertex i
-
-                // Start candidate set with vertex i.
-                ankerl::unordered_dense::set<int> candidate_nodes;
-                candidate_nodes.insert(static_cast<int>(i));
-                candidate_nodes.insert(working_set.begin(), working_set.end());
-
-                process_candidate(candidate_nodes);
-            }
+            // Start candidate generation with the root node plus the working
+            // set once, instead of redundantly regenerating the same candidate
+            // for every route that misses i.
+            ankerl::unordered_dense::set<int> root_candidate_nodes;
+            root_candidate_nodes.insert(static_cast<int>(i));
+            root_candidate_nodes.insert(working_set.begin(),
+                                        working_set.end());
+            process_candidate(root_candidate_nodes);
 
             // --- 2. Generate additional candidate sets by combining vertices
             // ---
@@ -276,7 +291,7 @@ class HighRankCuts {
     ankerl::unordered_dense::map<int, std::vector<SRCPermutation>>
         permutations_cache;
 
-    std::vector<SRCPermutation> getPermutations(const int RANK) {
+    const std::vector<SRCPermutation> &getPermutations(const int RANK) {
         // check if permutations are already computed
         if (permutations_cache.find(RANK) == permutations_cache.end()) {
             std::throw_with_nested(std::runtime_error("Permutations for rank " +
@@ -343,10 +358,6 @@ class HighRankCuts {
         // Get all permutations for the given rank (compute once).
         const auto &permutations = getPermutations(RANK);
 
-        // Pre-allocate a vector for storing cut coefficients.
-        std::vector<int> cut_coefficients;
-        cut_coefficients.reserve(allPaths.size());
-
         // Evaluate each permutation.
         for (const auto &perm : permutations) {
             // Compute the RHS value from the permutation.
@@ -359,14 +370,8 @@ class HighRankCuts {
             double lhs = 0.0;
 
             // Process each path from the global allPaths container.
-            for (size_t path_idx = 0; path_idx < allPaths.size(); ++path_idx) {
+            for (int path_idx : nonzero_paths) {
                 const double x_val = x[path_idx];
-
-                // If the path's x value is effectively zero, skip computation.
-                if (numericutils::isZero(x_val)) {
-                    // cut_coefficients.push_back(0.0);
-                    continue;
-                }
 
                 // Compute the coefficient using candidate_bits,
                 // augmented_memory_bits, current permutation, the route from
@@ -418,21 +423,27 @@ class HighRankCuts {
         p.num = candidate.perm.num;
         p.den = candidate.perm.den;
 
-        // Pre-allocate the cut coefficients vector (one value per path in
-        // allPaths).
-        std::vector<double> cut_coefficients(allPaths.size());
+        // Store only the nonzero coefficients. This keeps high-order cuts
+        // lighter in memory while still allowing us to build the initial
+        // master constraint exactly.
+        std::vector<int>    coefficient_indices;
+        std::vector<double> coefficient_values;
+        coefficient_indices.reserve(allPaths.size() / 8 + 1);
+        coefficient_values.reserve(allPaths.size() / 8 + 1);
         for (size_t i = 0; i < allPaths.size(); ++i) {
-            // if (solution[i] < 1e-3) {
-            // cut_coefficients[i] = 0.0;
-            // continue;
-            // }
-            cut_coefficients[i] = computeLimitedMemoryCoefficient(
+            const double coeff = computeLimitedMemoryCoefficient(
                 C, AM, p, allPaths[i].route, order);
+            if (!numericutils::isZero(coeff)) {
+                coefficient_indices.push_back(static_cast<int>(i));
+                coefficient_values.push_back(coeff);
+            }
         }
 
         // Construct the Cut object using the candidate data.
-        Cut cut(C, AM, cut_coefficients, p);
+        Cut cut(C, AM, {}, p);
         cut.baseSetOrder = order;
+        cut.coefficient_indices = std::move(coefficient_indices);
+        cut.coefficient_values = std::move(coefficient_values);
 
         // Set the cut type based on the number of candidate nodes.
         const auto cut_rank = candidate.nodes.size();
@@ -468,12 +479,21 @@ class HighRankCuts {
     std::vector<VRPNode> nodes;
     std::vector<std::vector<double>> distances;
     ankerl::unordered_dense::map<int, std::vector<int>> row_indices_map;
+    std::vector<int>                                     nonzero_paths;
 
     std::vector<double> solution;
 
     void separate(const SparseMatrix &A, const std::vector<double> &x) {
         // Set the solution.
         solution = x;
+        initializeVertexRouteMap();
+        nonzero_paths.clear();
+        nonzero_paths.reserve(x.size());
+        for (size_t path_idx = 0; path_idx < x.size(); ++path_idx) {
+            if (!numericutils::isZero(x[path_idx])) {
+                nonzero_paths.push_back(static_cast<int>(path_idx));
+            }
+        }
 
         // Compute node scores.
         auto node_scores = computeNodeScores(A, x);

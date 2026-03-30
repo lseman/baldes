@@ -1,17 +1,17 @@
 cmake_minimum_required(VERSION 3.5)
 find_program(CCACHE_PROGRAM ccache)
 if(CCACHE_PROGRAM)
-    set_property(GLOBAL PROPERTY RULE_LAUNCH_COMPILE "${CCACHE_PROGRAM}")
-    set_property(GLOBAL PROPERTY RULE_LAUNCH_LINK "${CCACHE_PROGRAM}")
-    message(STATUS "Using ccache for faster compilation: ${CCACHE_PROGRAM}")
+  set_property(GLOBAL PROPERTY RULE_LAUNCH_COMPILE "${CCACHE_PROGRAM}")
+  set_property(GLOBAL PROPERTY RULE_LAUNCH_LINK "${CCACHE_PROGRAM}")
+  message(STATUS "Using ccache for faster compilation: ${CCACHE_PROGRAM}")
 else()
-    message(WARNING "ccache not found, compilation will not be cached.")
+  message(WARNING "ccache not found, compilation will not be cached.")
 endif()
 
 set(CMAKE_CXX_COMPILER
- "/data/toolchain/llvm/stage2-prof-use-lto/install/bin/clang++"  CACHE PATH "C compiler" FORCE)
- set(CMAKE_C_COMPILER
- "/data/toolchain/llvm/stage2-prof-use-lto/install/bin/clang"  CACHE PATH "C compiler" FORCE)
+  "/data/toolchain/llvm/stage2-prof-use-lto/install/bin/clang++" CACHE PATH "C compiler" FORCE)
+set(CMAKE_C_COMPILER
+  "/data/toolchain/llvm/stage2-prof-use-lto/install/bin/clang" CACHE PATH "C compiler" FORCE)
 
 
 project(BALDES LANGUAGES C CXX)
@@ -99,7 +99,7 @@ endif()
 # )
 
 # stdexec
-  cpmaddpackage(
+cpmaddpackage(
   NAME stdexec
   GITHUB_REPOSITORY NVIDIA/stdexec
   GIT_TAG main
@@ -247,51 +247,55 @@ configure_file(${CMAKE_CURRENT_SOURCE_DIR}/config.h.in ${CMAKE_CURRENT_BINARY_DI
 # Source Files
 #-------------------------------------------------------------------------------
 set(SOURCES
-    src/BCP.cpp
-    src/BucketGraph.cpp
-    src/MIPHandler.cpp
-    src/Branching.cpp
-    src/BucketPSTEP.cpp
+  src/BCP.cpp
+  src/BucketGraph.cpp
+  src/MIPHandler.cpp
+  src/Branching.cpp
+  src/BucketPSTEP.cpp
 )
 
 set(CVRPSEP_SOURCES
-    third_party/cvrpsep/basegrph.cpp
-    third_party/cvrpsep/capsep.cpp
-    third_party/cvrpsep/cnstrmgr.cpp
-    third_party/cvrpsep/memmod.cpp
-    third_party/cvrpsep/compcuts.cpp
-    third_party/cvrpsep/strngcmp.cpp
-    third_party/cvrpsep/compress.cpp
-    third_party/cvrpsep/cutbase.cpp
-    third_party/cvrpsep/fcapfix.cpp
-    third_party/cvrpsep/mxf.cpp
-    third_party/cvrpsep/combsep.cpp
-    third_party/cvrpsep/fcits.cpp
-    third_party/cvrpsep/grsearch.cpp
-    third_party/cvrpsep/sort.cpp
+  third_party/cvrpsep/basegrph.cpp
+  third_party/cvrpsep/capsep.cpp
+  third_party/cvrpsep/cnstrmgr.cpp
+  third_party/cvrpsep/binpack.cpp
+  third_party/cvrpsep/blocks.cpp
+  third_party/cvrpsep/twomatch.cpp
+  third_party/cvrpsep/strcomb.cpp
+  third_party/cvrpsep/memmod.cpp
+  third_party/cvrpsep/compcuts.cpp
+  third_party/cvrpsep/strngcmp.cpp
+  third_party/cvrpsep/compress.cpp
+  third_party/cvrpsep/cutbase.cpp
+  third_party/cvrpsep/fcapfix.cpp
+  third_party/cvrpsep/mxf.cpp
+  third_party/cvrpsep/combsep.cpp
+  third_party/cvrpsep/fcits.cpp
+  third_party/cvrpsep/grsearch.cpp
+  third_party/cvrpsep/sort.cpp
 )
 
 set(HGS_SOURCES
-    third_party/hgs_vrptw/Genetic.cpp
-    third_party/hgs_vrptw/Individual.cpp
-    third_party/hgs_vrptw/LocalSearch.cpp
-    third_party/hgs_vrptw/Params.cpp
-    third_party/hgs_vrptw/Population.cpp
-    third_party/hgs_vrptw/Split.cpp
+  third_party/hgs_vrptw/Genetic.cpp
+  third_party/hgs_vrptw/Individual.cpp
+  third_party/hgs_vrptw/LocalSearch.cpp
+  third_party/hgs_vrptw/Params.cpp
+  third_party/hgs_vrptw/Population.cpp
+  third_party/hgs_vrptw/Split.cpp
 )
 
 set(FPSOURCE
-    third_party/fpmax/fpmax.cpp
-    third_party/fpmax/buffer.cpp
-    third_party/fpmax/data.cpp
-    third_party/fpmax/fsout.cpp
-    third_party/fpmax/fp_tree.cpp
-    third_party/fpmax/fp_node.cpp
+  third_party/fpmax/fpmax.cpp
+  third_party/fpmax/buffer.cpp
+  third_party/fpmax/data.cpp
+  third_party/fpmax/fsout.cpp
+  third_party/fpmax/fp_tree.cpp
+  third_party/fpmax/fp_node.cpp
 )
 
 set(MUSSPSOURCE
-    third_party/muSSP/Graph.cpp
-    third_party/muSSP/Sink.cpp
+  third_party/muSSP/Graph.cpp
+  third_party/muSSP/Sink.cpp
 )
 
 set(IPM_SOURCES src/IPSolver.cpp)
@@ -318,21 +322,21 @@ endif()
 
 # Include directories for third-party libraries
 include_directories(
-    ${CMAKE_CURRENT_SOURCE_DIR}/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/include/bucket
-    ${CMAKE_CURRENT_SOURCE_DIR}/include/algebra
-    ${CMAKE_CURRENT_SOURCE_DIR}/include/cuts
-    ${CMAKE_CURRENT_SOURCE_DIR}/include/extra
-    ${CMAKE_CURRENT_SOURCE_DIR}/include/utils
-    ${CMAKE_CURRENT_SOURCE_DIR}/third_party/hgs_vrptw  # Add this line
-    ${CMAKE_CURRENT_SOURCE_DIR}/third_party/cvrpsep
-    ${CMAKE_CURRENT_SOURCE_DIR}/third_party/fpmax
-    ${CMAKE_CURRENT_SOURCE_DIR}/third_party/muSSP
+  ${CMAKE_CURRENT_SOURCE_DIR}/include
+  ${CMAKE_CURRENT_SOURCE_DIR}/include/bucket
+  ${CMAKE_CURRENT_SOURCE_DIR}/include/algebra
+  ${CMAKE_CURRENT_SOURCE_DIR}/include/cuts
+  ${CMAKE_CURRENT_SOURCE_DIR}/include/extra
+  ${CMAKE_CURRENT_SOURCE_DIR}/include/utils
+  ${CMAKE_CURRENT_SOURCE_DIR}/third_party/hgs_vrptw # Add this line
+  ${CMAKE_CURRENT_SOURCE_DIR}/third_party/cvrpsep
+  ${CMAKE_CURRENT_SOURCE_DIR}/third_party/fpmax
+  ${CMAKE_CURRENT_SOURCE_DIR}/third_party/muSSP
 )
 
 configure_file(
-  ${CMAKE_CURRENT_SOURCE_DIR}/config.h.in  # Input template file
-  ${CMAKE_CURRENT_BINARY_DIR}/config.h     # Output file
+  ${CMAKE_CURRENT_SOURCE_DIR}/config.h.in # Input template file
+  ${CMAKE_CURRENT_BINARY_DIR}/config.h # Output file
 )
 
 # Include the generated config.h file
@@ -377,12 +381,12 @@ set(GUROBI_VERSION_MAJOR 130) # Adjust based on Gurobi version
 if(APPLE)
   # macOS detected, use .dylib for linking
   list(APPEND COMMON_LIBRARIES ${GUROBI_HOME}/lib/libgurobi_c++.a
-       ${GUROBI_HOME}/lib/libgurobi100.dylib)
+    ${GUROBI_HOME}/lib/libgurobi100.dylib)
 else()
   # Non-macOS (Linux or other platforms), use .so and .a files
 
   list(APPEND COMMON_LIBRARIES ${GUROBI_HOME}/lib/libgurobi_c++.a
-       ${GUROBI_HOME}/lib/libgurobi${GUROBI_VERSION_MAJOR}.so tbb)
+    ${GUROBI_HOME}/lib/libgurobi${GUROBI_VERSION_MAJOR}.so tbb)
 endif()
 
 
@@ -398,10 +402,10 @@ endif()
 if(BALDES)
   add_executable(baldes src/Baldes.cpp ${EXECUTABLE_SOURCES})
   target_compile_options(baldes PRIVATE -Wno-c++26-extensions -Wno-deprecated-declarations)
-target_link_libraries(baldes PRIVATE ${COMMON_LIBRARIES})
+  target_link_libraries(baldes PRIVATE ${COMMON_LIBRARIES})
 
-    # target_precompile_headers(baldes PRIVATE include/Common.h)
-# target_link_libraries(baldes PRIVATE CUDA::cudart CUDA::cusparse)
+  # target_precompile_headers(baldes PRIVATE include/Common.h)
+  # target_link_libraries(baldes PRIVATE CUDA::cudart CUDA::cusparse)
 
   if(JEMALLOC)
     find_library(MIMALLOC_LIBRARY MIMALLOC)
@@ -414,14 +418,14 @@ target_link_libraries(baldes PRIVATE ${COMMON_LIBRARIES})
     target_include_directories(baldes PRIVATE ${Eigen_SOURCE_DIR} ${Eigen_SOURCE_DIR}/unsupported)
   endif()
 
-if(GUROBI)
-target_link_libraries(baldes PRIVATE gurobi_c++)
-endif()
+  if(GUROBI)
+    target_link_libraries(baldes PRIVATE gurobi_c++)
+  endif()
 
-      # Set CUDA-specific properties
+  # Set CUDA-specific properties
   set_target_properties(baldes PROPERTIES
-      CUDA_SEPARABLE_COMPILATION ON
-      CUDA_ARCHITECTURES 75  # Set the compute capability of your GPU
+    CUDA_SEPARABLE_COMPILATION ON
+    CUDA_ARCHITECTURES 75 # Set the compute capability of your GPU
   )
 endif()
 
@@ -438,7 +442,7 @@ endif()
 if(WITH_PYTHON)
   pybind11_add_module(pybaldes src/BucketBindings.cpp src/BCP.cpp src/BucketGraph.cpp src/MIPHandler.cpp src/Branching.cpp ${EXECUTABLE_SOURCES})
   target_link_libraries(pybaldes PRIVATE stdexec fmt xxhash pybind11::module)
-target_link_libraries(pybaldes PRIVATE ${COMMON_LIBRARIES})
+  target_link_libraries(pybaldes PRIVATE ${COMMON_LIBRARIES})
   set_target_properties(pybaldes PROPERTIES POSITION_INDEPENDENT_CODE ON PREFIX "")
   target_compile_options(pybaldes PRIVATE -Wno-c++26-extensions -Wno-deprecated-declarations)
 

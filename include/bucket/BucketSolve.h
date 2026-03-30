@@ -562,6 +562,11 @@ std::vector<Label *> BucketGraph::bi_labeling_algorithm() {
         // heuristic_fixing<S>();
     }
 
+    if (options.warm_start && !just_fixed) {
+        capture_warm_start_labels<Direction::Forward>();
+        capture_warm_start_labels<Direction::Backward>();
+    }
+
     // Reset pools and perform common initialization.
     reset_pool();
     common_initialization();
@@ -879,8 +884,6 @@ inline auto BucketGraph::Extend(const std::conditional_t<M == Mutability::Mut, L
     new_label->initialize(to_bucket, new_cost, new_resources, node_id);
     new_label->vertex    = to_bucket;
     new_label->real_cost = L_prime->real_cost + distance; // Use cached distance
-
-    if constexpr (M == Mutability::Mut) { L_prime->children.push_back(new_label); }
 
     // Update visited bitmap: intersect parent's visited bits with neighborhood
     // mask

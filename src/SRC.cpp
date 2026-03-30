@@ -84,9 +84,10 @@ LimitedMemoryRank1Cuts::LimitedMemoryRank1Cuts(std::vector<VRPNode> &nodes)
  */
 void LimitedMemoryRank1Cuts::separate(const SparseMatrix &A,
                                       const std::vector<double> &x) {
+    if (tasks.empty() || A.num_cols == 0 || allPaths.empty()) return;
+
     // Determine parallel parameters.
     const int JOBS = std::thread::hardware_concurrency();
-    auto nC = N_SIZE;
     const int chunk_size = (tasks.size() + JOBS - 1) / JOBS;
     const size_t num_chunks = (tasks.size() + chunk_size - 1) / chunk_size;
 
@@ -105,10 +106,17 @@ void LimitedMemoryRank1Cuts::separate(const SparseMatrix &A,
     // === Parallel Processing of Tasks in Chunks ===
     auto bulk_sender = stdexec::bulk(
         stdexec::just(), num_chunks,
-        [this, &A, &x, nC, chunk_size, &p, rhs,
+        [this, &A, &x, chunk_size, &p, rhs,
          &chunk_cuts](std::size_t chunk_idx) {
             // Each chunk gets its own temporary vector.
             std::vector<std::pair<double, Cut>> local_cuts;
+            std::vector<int>                    expanded(A.num_cols, 0);
+            std::vector<int>                    touched_paths;
+            std::vector<int>                    candidate_paths;
+            std::vector<double>                 candidate_coefficients;
+            touched_paths.reserve(256);
+            candidate_paths.reserve(128);
+            candidate_coefficients.reserve(128);
             size_t start_idx = chunk_idx * chunk_size;
             size_t end_idx = std::min(start_idx + chunk_size, tasks.size());
 
@@ -116,22 +124,28 @@ void LimitedMemoryRank1Cuts::separate(const SparseMatrix &A,
             for (size_t task_idx = start_idx; task_idx < end_idx; ++task_idx) {
                 // Unpack task parameters (i, j, k).
                 const auto &[i, j, k] = tasks[task_idx];
-
-                // Initialize a vector to count occurrences for each column.
-                std::vector<int> expanded(A.num_cols, 0);
-                std::vector<int> buffer_int(A.num_cols);
-                int buffer_int_n = 0;
                 double lhs = 0.0;
+                candidate_paths.clear();
 
-                // Accumulate counts from rows corresponding to i, j, and k.
-                // Compute lhs value based on columns with at least 2 counts.
-                for (int idx = 0; idx < A.num_cols; ++idx) {
-                    expanded[idx] = std::min(1, vertex_route_map[i][idx]) +
-                                    std::min(1, vertex_route_map[j][idx]) +
-                                    std::min(1, vertex_route_map[k][idx]);
-                    if (expanded[idx] >= 2) {
-                        lhs += std::floor(expanded[idx] * 0.5) * x[idx];
-                        buffer_int[buffer_int_n++] = idx;
+                const auto accumulate_node_paths = [&](int customer) {
+                    if (auto it = row_indices_map.find(customer);
+                        it != row_indices_map.end()) {
+                        for (int path_idx : it->second) {
+                            if (expanded[path_idx]++ == 0) {
+                                touched_paths.push_back(path_idx);
+                            }
+                        }
+                    }
+                };
+
+                accumulate_node_paths(i);
+                accumulate_node_paths(j);
+                accumulate_node_paths(k);
+
+                for (int path_idx : touched_paths) {
+                    if (expanded[path_idx] >= 2) {
+                        lhs += x[path_idx];
+                        candidate_paths.push_back(path_idx);
                     }
                 }
 
@@ -144,33 +158,26 @@ void LimitedMemoryRank1Cuts::separate(const SparseMatrix &A,
                     int ordering = 0;
 
                     // Build the base cut indices from the task parameters.
-                    std::vector<int> C_index = {i, j, k};
+                    std::array<int, 3> C_index = {i, j, k};
                     for (int node : C_index) {
                         C[node / 64] |= (1ULL << (node % 64));
                         AM[node / 64] |= (1ULL << (node % 64));
                         order[node] = ordering++;
                     }
-                    // Get the remaining nodes from buffer_int.
-                    std::vector<int> remainingNodes(
-                        buffer_int.begin(), buffer_int.begin() + buffer_int_n);
-
-                    // Initialize cut coefficients for all paths.
-                    std::vector<double> cut_coefficients(allPaths.size(), 0.0);
-
-                    // Build a set from the base cut indices.
-                    ankerl::unordered_dense::set<int> C_set(C_index.begin(),
-                                                            C_index.end());
+                    const auto is_base_node = [&](int customer) {
+                        return customer == i || customer == j || customer == k;
+                    };
 
                     // Update AM based on the positions of nodes in each
                     // consumer path.
-                    for (int node : remainingNodes) {
-                        auto &consumers = allPaths[node];  // Access consumers.
+                    for (int path_idx : candidate_paths) {
+                        const auto &consumers = allPaths[path_idx].route;
                         int first = -1, second = -1;
                         // Identify first and second occurrences of elements
                         // from C_set.
                         for (size_t pos = 1; pos < consumers.size() - 1;
                              ++pos) {
-                            if (C_set.contains(consumers[pos])) {
+                            if (is_base_node(consumers[pos])) {
                                 if (first == -1) {
                                     first = pos;
                                 } else {
@@ -191,34 +198,38 @@ void LimitedMemoryRank1Cuts::separate(const SparseMatrix &A,
                     // AM[node_idx / 64] |= (1ULL << (node_idx % 64));
                     // }
 
-                    // Compute the cut coefficients and accumulate lhs.
-                    double computed_lhs = 0.0;
-                    for (auto z : remainingNodes) {
-                        auto &clients = allPaths[z].route;
-                        auto ctr = 0;
-                        for (auto client : C_index) {
-                            if (std::find(clients.begin(), clients.end(),
-                                          client) != clients.end()) {
-                                ctr++;
+                    double exact_lhs = 0.0;
+                    candidate_coefficients.clear();
+                    candidate_coefficients.reserve(candidate_paths.size());
+                    for (int path_idx : candidate_paths) {
+                        const auto &clients = allPaths[path_idx].route;
+                        const double coeff = computeLimitedMemoryCoefficient(
+                            C, AM, p, clients, order);
+                        candidate_coefficients.push_back(coeff);
+                        exact_lhs += coeff * x[path_idx];
+                    }
+
+                    // If the exact limited-memory evaluation is still violated,
+                    // materialize the full coefficient vector and store the cut.
+                    if (numericutils::gte(exact_lhs, rhs)) {
+                        std::vector<double> cut_coefficients(allPaths.size(),
+                                                             0.0);
+                        for (size_t idx = 0; idx < candidate_paths.size();
+                             ++idx) {
+                            if (!numericutils::isZero(
+                                    candidate_coefficients[idx])) {
+                                cut_coefficients[candidate_paths[idx]] =
+                                    candidate_coefficients[idx];
                             }
                         }
-
-                        if (ctr >= 2) {
-                            cut_coefficients[z] = 1.0;
-                        }
-                        // cut_coefficients[z] =
-                        // computeLimitedMemoryCoefficient( C, AM, p, clients,
-                        // order);
-                        computed_lhs += cut_coefficients[z] * x[z];
-                    }
-
-                    // If violation is positive, record the cut.
-                    if (numericutils::gte(computed_lhs, rhs)) {
                         Cut cut(C, AM, cut_coefficients, p);
                         cut.baseSetOrder = order;
-                        local_cuts.emplace_back(computed_lhs, cut);
+                        local_cuts.emplace_back(exact_lhs, cut);
                     }
                 }
+
+                for (int path_idx : touched_paths) { expanded[path_idx] = 0; }
+                touched_paths.clear();
             }
             // Save the local cuts into the global vector for this chunk.
             chunk_cuts[chunk_idx] = std::move(local_cuts);

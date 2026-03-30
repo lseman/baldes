@@ -74,6 +74,8 @@ struct Cut {
     std::array<uint64_t, num_words> neighbors;  // Bit-level neighbors
     std::vector<int> baseSetOrder;              // Order for baseSet
     std::vector<double> coefficients;           // Cut coefficients
+    std::vector<int> coefficient_indices;       // Sparse coefficient indices
+    std::vector<double> coefficient_values;     // Sparse coefficient values
     SRCPermutation p = {{1, 1, 1, 1}, 2};
     // SRCPermutation p = {{1.0 / 2.0, 1.0 / 2.0, 1.0 / 2.0}};
 
@@ -136,6 +138,10 @@ struct Cut {
 
     // Define size of the cut
     size_t size() const { return coefficients.size(); }
+    bool hasSparseCoefficients() const noexcept {
+        return !coefficient_indices.empty() &&
+               coefficient_indices.size() == coefficient_values.size();
+    }
 };
 
 using Cuts = std::vector<Cut>;

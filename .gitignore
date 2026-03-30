@@ -87,3 +87,6 @@ _deps
 /CMakeCache.txt
 /mip.log
 /main
+RouteOpt/
+CLAUDE.md
+.codex

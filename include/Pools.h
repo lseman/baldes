@@ -248,6 +248,18 @@ public:
             return label;
         }
 
+        // Reuse an existing block after fast_reset() before growing.
+        while (current_block_idx + 1 < memory_blocks.size()) {
+            ++current_block_idx;
+            auto &next_block = memory_blocks[current_block_idx];
+            if (next_block.used < BLOCK_SIZE) {
+                label = &next_block.data[next_block.used];
+                ++next_block.used;
+                label->reset();
+                return label;
+            }
+        }
+
         // Need a new block
         memory_blocks.emplace_back();
         current_block_idx = memory_blocks.size() - 1;
@@ -295,9 +307,13 @@ public:
                 current_block.used += to_allocate;
                 acquired += to_allocate;
             } else {
-                // Need new block
-                memory_blocks.emplace_back();
-                current_block_idx = memory_blocks.size() - 1;
+                // Reuse an existing block after fast_reset() before growing.
+                if (current_block_idx + 1 < memory_blocks.size()) {
+                    ++current_block_idx;
+                } else {
+                    memory_blocks.emplace_back();
+                    current_block_idx = memory_blocks.size() - 1;
+                }
             }
         }
     }

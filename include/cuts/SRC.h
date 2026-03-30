@@ -79,6 +79,11 @@ public:
 
     std::vector<std::vector<int>> vertex_route_map;
     void                          initializeVertexRouteMap() {
+        if (last_path_idx == 0) {
+            row_indices_map.clear();
+            row_indices_map.reserve(N_SIZE);
+        }
+
         // Initialize the vertex_route_map with N_SIZE rows and allPaths.size()
         // columns, all set to 0.
         if (last_path_idx == 0) {
@@ -92,12 +97,23 @@ public:
         }
 
         // Populate the map: for each path, count the appearance of each vertex.
+        std::vector<unsigned char> seen_in_path(N_SIZE, 0);
+        std::vector<int>           touched_vertices;
         for (size_t r = last_path_idx; r < allPaths.size(); ++r) {
             for (const auto &vertex : allPaths[r].route) {
                 // Only consider vertices that are not the depot (assumed at
                 // indices 0 and N_SIZE-1).
-                if (vertex > 0 && vertex < N_SIZE - 1) { ++vertex_route_map[vertex][r]; }
+                if (vertex > 0 && vertex < N_SIZE - 1) {
+                    ++vertex_route_map[vertex][r];
+                    if (!seen_in_path[vertex]) {
+                        seen_in_path[vertex] = 1;
+                        touched_vertices.push_back(vertex);
+                        row_indices_map[vertex].push_back(static_cast<int>(r));
+                    }
+                }
             }
+            for (int vertex : touched_vertices) { seen_in_path[vertex] = 0; }
+            touched_vertices.clear();
         }
         last_path_idx = allPaths.size();
     }
@@ -108,8 +124,17 @@ public:
     LimitedMemoryRank1Cuts(std::vector<VRPNode> &nodes);
 
     LimitedMemoryRank1Cuts(const LimitedMemoryRank1Cuts &other)
-        : rp(other.rp), cutStorage(other.cutStorage), allPaths(other.allPaths), labels(other.labels),
-          labels_counter(other.labels_counter), nodes(other.nodes) {}
+        : rp(other.rp),
+          last_path_idx(other.last_path_idx),
+          vertex_route_map(other.vertex_route_map),
+          cutStorage(other.cutStorage),
+          allPaths(other.allPaths),
+          labels(other.labels),
+          labels_counter(other.labels_counter),
+          row_indices_map(other.row_indices_map),
+          nodes(other.nodes),
+          cutType(other.cutType),
+          tasks(other.tasks) {}
 
     void setDuals(const std::vector<double> &duals) {
         // print nodes.size

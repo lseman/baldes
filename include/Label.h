@@ -48,9 +48,6 @@ struct Label {
 #ifdef UNREACHABLE_DOMINANCE
     std::array<uint64_t, num_words> unreachable_bitmap = {0};
 #endif
-    std::vector<Label *> children;
-
-    // std::vector<Label *> children;
     // Constructor with node_id
     Label(int v, double c, const std::vector<double> &res, int pred, int node_id)
         : vertex(v), cost(c), resources({res[0]}), node_id(node_id) {}
@@ -101,9 +98,8 @@ struct Label {
         // Reset resources container (assuming operator= clears properly)
         resources = {};
 
-        // Clear route and child links; keep capacity for amortized reuse.
+        // Clear route storage; keep capacity for amortized reuse.
         nodes_covered.clear();
-        children.clear();
 
         // Zero out the bitmaps efficiently.
         std::memset(visited_bitmap.data(), 0, visited_bitmap.size() * sizeof(uint64_t));

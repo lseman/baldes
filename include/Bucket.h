@@ -173,6 +173,7 @@ struct alignas(64) Bucket {
     }
 
     std::pmr::vector<Label *> &get_labels() noexcept { return labels; }
+    const std::pmr::vector<Label *> &get_labels() const noexcept { return labels; }
 
     // --- Dominance Check ---
     // Checks whether a new label is dominated by any labels already in the
