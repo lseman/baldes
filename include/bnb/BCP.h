@@ -869,6 +869,7 @@ public:
             bucket_graph->s4 = true;
             node->optimize();
             auto &pathSet = node->pathSet;
+            pathSet.reserve(pathSet.size() + allPaths.size());
             for (auto path : allPaths) { pathSet.insert(path); }
         }
 

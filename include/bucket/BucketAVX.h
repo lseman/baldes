@@ -10,23 +10,7 @@
 #include "Definitions.h"
 #include "Pools.h"
 
-namespace {
-constexpr double EPSILON     = -1e-3;
-constexpr size_t UNROLL_SIZE = 4;
-} // namespace
-
 using simd_double = std::experimental::native_simd<double>;
-using simd_abi    = std::experimental::simd_abi::native<double>;
-
-// Helper function for loading SIMD with correct type
-inline simd_double load_simd_values(const std::span<const double> &source, size_t start_index) {
-    constexpr size_t                                   simd_register_size = simd_double::size();
-    alignas(64) std::array<double, simd_register_size> buffer             = {};
-
-    for (size_t i = 0; i < simd_register_size; ++i) { buffer[i] = source[start_index + i]; }
-
-    return simd_double(buffer.data(), std::experimental::vector_aligned);
-}
 
 template <typename T, typename Container>
 inline std::experimental::simd<T> load_simd_generic(const Container &source, size_t start_index,
@@ -64,24 +48,21 @@ inline std::experimental::simd<T> load_simd(const Container &source, size_t star
 
 template <Direction D, Stage S>
 inline bool check_dominance_against_vector(const Label *__restrict__ new_label, std::span<Label *const> labels,
-                                           const CutStorage *__restrict__ cut_storage, int              r_size,
+                                           const CutStorage *__restrict__ cut_storage,
                                            uint &__restrict__ stat_n_dom) noexcept {
-    constexpr double EPSILON = 1e-3;
     using namespace std::experimental;
 
     // Cache invariant data and sizes upfront
-    const size_t       num_labels = labels.size();
-    const size_t       simd_width = simd<double>::size();
-    const double       new_cost   = new_label->cost;
-    const simd<double> new_cost_simd(new_cost);
+    constexpr double    tolerance = numericutils::eps;
+    const size_t        num_labels = labels.size();
+    const size_t        simd_width = simd<double>::size();
+    const double        new_cost   = new_label->cost;
+    const simd<double>  new_cost_simd(new_cost);
+    const simd<double>  tolerance_simd(tolerance);
     const auto        &new_resources = new_label->resources;
     const size_t       num_resources = new_resources.size();
     const auto        &new_visited   = new_label->visited_bitmap;
     const size_t       bitmap_size   = new_visited.size();
-
-    // Pre-allocated SIMD buffers (align for better performance)
-    alignas(64) std::array<double, simd<double>::size()> resources_buffer;
-    alignas(64) std::array<double, simd<double>::size()> new_resources_buffer;
 
 // SRC optimization - precompute if SRC is active
 #ifdef SRC
@@ -98,14 +79,12 @@ inline bool check_dominance_against_vector(const Label *__restrict__ new_label, 
         simd<double> label_costs = load_simd<double>(labels, i, simd_width, [](const Label *lbl) { return lbl->cost; });
 
         // Fast check: if all costs exceed new_cost, skip the entire chunk
-        auto cost_mask = (label_costs + EPSILON <= new_cost_simd);
+        auto cost_mask = (label_costs <= (new_cost_simd + tolerance_simd));
         if (!any_of(cost_mask)) continue;
 
         // For each label in this SIMD chunk that passed cost check
         for (size_t j = 0; j < simd_width; ++j) {
             if (!cost_mask[j]) continue;
-
-            stat_n_dom++; // Track potential domination stats
 
             const Label *label           = labels[i + j];
             const auto  &label_resources = label->resources;
@@ -123,12 +102,12 @@ inline bool check_dominance_against_vector(const Label *__restrict__ new_label, 
                     simd<double> new_label_res = load_simd_generic<double>(new_resources, k, simd_width);
 
                     if constexpr (D == Direction::Forward) {
-                        if (!all_of(label_res <= (new_label_res + EPSILON))) {
+                        if (!all_of(label_res <= (new_label_res + tolerance_simd))) {
                             dominated = false;
                             break;
                         }
                     } else {
-                        if (!all_of(label_res >= (new_label_res - EPSILON))) {
+                        if (!all_of(label_res >= (new_label_res - tolerance_simd))) {
                             dominated = false;
                             break;
                         }
@@ -141,12 +120,12 @@ inline bool check_dominance_against_vector(const Label *__restrict__ new_label, 
                     for (size_t k = 0; k < simd_resource_remainder; ++k) {
                         const size_t idx = base_idx + k;
                         if constexpr (D == Direction::Forward) {
-                            if (label_resources[idx] > new_resources[idx] + EPSILON) {
+                            if (numericutils::gt(label_resources[idx], new_resources[idx])) {
                                 dominated = false;
                                 break;
                             }
                         } else {
-                            if (label_resources[idx] < new_resources[idx] - EPSILON) {
+                            if (numericutils::lt(label_resources[idx], new_resources[idx])) {
                                 dominated = false;
                                 break;
                             }
@@ -158,12 +137,12 @@ inline bool check_dominance_against_vector(const Label *__restrict__ new_label, 
                 // prediction
                 for (size_t k = 0; k < num_resources; ++k) {
                     if constexpr (D == Direction::Forward) {
-                        if (label_resources[k] > new_resources[k] + EPSILON) {
+                        if (numericutils::gt(label_resources[k], new_resources[k])) {
                             dominated = false;
                             break;
                         }
                     } else {
-                        if (label_resources[k] < new_resources[k] - EPSILON) {
+                        if (numericutils::lt(label_resources[k], new_resources[k])) {
                             dominated = false;
                             break;
                         }
@@ -263,7 +242,7 @@ inline bool check_dominance_against_vector(const Label *__restrict__ new_label, 
 
                         // Check if we can early-break based on accumulated sum
                         partial_sumSRC = reduce(sumSRC_simd);
-                        if (label->cost - partial_sumSRC > new_label->cost + EPSILON) {
+                        if (numericutils::gt(label->cost - partial_sumSRC, new_cost)) {
                             early_break = true;
                             break;
                         }
@@ -278,7 +257,7 @@ inline bool check_dominance_against_vector(const Label *__restrict__ new_label, 
 
                             if (label->SRCmap[cut_idx] > new_label->SRCmap[cut_idx]) {
                                 partial_sumSRC += active_cut.dual_value;
-                                if (label->cost - partial_sumSRC > new_cost + EPSILON) {
+                                if (numericutils::gt(label->cost - partial_sumSRC, new_cost)) {
                                     early_break = true;
                                     break;
                                 }
@@ -296,7 +275,10 @@ inline bool check_dominance_against_vector(const Label *__restrict__ new_label, 
 #endif
 
             // If we reach here and dominated is still true, we found domination
-            if (dominated) return true;
+            if (dominated) {
+                stat_n_dom++;
+                return true;
+            }
         }
     }
 
@@ -305,7 +287,7 @@ inline bool check_dominance_against_vector(const Label *__restrict__ new_label, 
         const Label *label = labels[i];
 
         // Cost check
-        if (label->cost > new_cost) continue;
+        if (numericutils::gt(label->cost, new_cost)) continue;
 
         bool        dominated       = true;
         const auto &label_resources = label->resources;
@@ -313,12 +295,12 @@ inline bool check_dominance_against_vector(const Label *__restrict__ new_label, 
         // Resource check
         for (size_t k = 0; k < num_resources; ++k) {
             if constexpr (D == Direction::Forward) {
-                if (label_resources[k] > new_resources[k] + EPSILON) {
+                if (numericutils::gt(label_resources[k], new_resources[k])) {
                     dominated = false;
                     break;
                 }
             } else {
-                if (label_resources[k] < new_resources[k] - EPSILON) {
+                if (numericutils::lt(label_resources[k], new_resources[k])) {
                     dominated = false;
                     break;
                 }
@@ -353,7 +335,7 @@ inline bool check_dominance_against_vector(const Label *__restrict__ new_label, 
 
                     if (label->SRCmap[idx] > new_label->SRCmap[idx]) {
                         sumSRC += active_cut.dual_value;
-                        if (label->cost - sumSRC > new_cost + EPSILON) {
+                        if (numericutils::gt(label->cost - sumSRC, new_cost)) {
                             early_break = true;
                             break;
                         }

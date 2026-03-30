@@ -290,6 +290,7 @@ int main(int argc, char *argv[]) {
     std::vector<Path> paths;
     std::vector<Label *> labels;
     ankerl::unordered_dense::set<Path, PathHash> pathSet;
+    pathSet.reserve(initialRoutesHGS.size());
 
     // convert initial routes to labels
     int labelID = 0;

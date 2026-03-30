@@ -1116,7 +1116,10 @@ public:
         // Prepare new label.
         auto pool      = fw ? label_pool_fw : label_pool_bw;
         auto new_label = pool->acquire();
-        new_label->nodes_covered = L.nodes_covered; // Copy the route
+        auto &route = new_label->nodes_covered;
+        route.clear();
+        route.reserve(L.nodes_covered.size());
+        route.insert(route.end(), L.nodes_covered.begin(), L.nodes_covered.end());
 
         // Variables to keep track of costs.
         int last_node = -1;

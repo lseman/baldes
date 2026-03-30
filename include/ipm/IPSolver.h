@@ -195,6 +195,8 @@ class IPSolver {
     std::vector<double> primal_vals;
     double objVal;
 
+    const std::vector<double> &getDualsRef() const { return dual_vals; }
+    const std::vector<double> &getPrimalsRef() const { return primal_vals; }
     std::vector<double> getDuals() const { return dual_vals; }
     std::vector<double> getPrimals() const { return primal_vals; }
     double getObjective() const { return objVal; }
@@ -304,7 +306,7 @@ class IPSolver {
     // Method to start the linear solver by initializing necessary data
     // structures and performing factorization
     void start_linear_solver(SparseSolver &ls,
-                             const Eigen::SparseMatrix<double> A);
+                             const Eigen::SparseMatrix<double> &A);
 
     ScalingFactors ruiz_scaling(Eigen::SparseMatrix<double> &A,
                                 Eigen::VectorXd &b, Eigen::VectorXd &c,

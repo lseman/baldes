@@ -371,7 +371,7 @@ std::vector<double> BucketGraph::labeling_algorithm() {
 #ifdef __AVX2__
                                     if (labels.size() >= AVX_LIM)
                                         return check_dominance_against_vector<D, S>(
-                                            new_label, labels, cut_storage, options.resources.size(), stat_n_dom);
+                                            new_label, labels, cut_storage, stat_n_dom);
                                     else
 #endif
                                     {
@@ -902,10 +902,12 @@ inline auto BucketGraph::Extend(const std::conditional_t<M == Mutability::Mut, L
 
     set_node_visited(new_label->visited_bitmap, node_id);
 
-    // Update the path (nodes covered) by copying parent's path and adding
-    // current node
-    new_label->nodes_covered = L_prime->nodes_covered;
-    new_label->nodes_covered.push_back(node_id);
+    // Reuse pooled vector capacity when extending the route.
+    auto &extended_route = new_label->nodes_covered;
+    extended_route.clear();
+    extended_route.reserve(L_prime->nodes_covered.size() + 1);
+    extended_route.insert(extended_route.end(), L_prime->nodes_covered.begin(), L_prime->nodes_covered.end());
+    extended_route.push_back(node_id);
 
 #if defined(SRC)
     if constexpr (S == Stage::Four || S == Stage::Enumerate) {
@@ -1139,7 +1141,6 @@ inline bool BucketGraph::DominatedInCompWiseSmallerBuckets(const Label *__restri
     // Cache frequently used label properties
     const int    b_L        = L->vertex;
     const double label_cost = L->cost;
-    const size_t res_size   = options.resources.size();
 
     // Use static thread-local stack to avoid repeated allocations
     static thread_local std::vector<int> stack_buffer;
@@ -1154,7 +1155,7 @@ inline bool BucketGraph::DominatedInCompWiseSmallerBuckets(const Label *__restri
     auto inline_check_dominance = [&](std::span<Label *const> labels, uint &n_dom) -> bool {
 #ifdef __AVX2__
         if (labels.size() >= AVX_LIM)
-            return check_dominance_against_vector<D, S>(L, labels, cut_storage, res_size, n_dom);
+            return check_dominance_against_vector<D, S>(L, labels, cut_storage, n_dom);
 #endif
         const size_t size = labels.size();
         size_t       i    = 0;
