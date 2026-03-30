@@ -37,6 +37,7 @@ struct Label {
     double                     real_cost     = 0.0;
     std::array<double, R_SIZE> resources     = {};
     std::vector<uint16_t>      nodes_covered = {};
+    int                        path_len      = 0;
     int                        node_id       = -1; // Add node_id to Label
     Label                     *parent        = nullptr;
     bool                       fresh         = true;
@@ -66,16 +67,19 @@ struct Label {
 
     void clearRoute() noexcept {
         nodes_covered.clear();
+        path_len = 0;
         parent = nullptr;
     }
 
     void addRoute(const std::vector<int> &route) {
         nodes_covered.insert(nodes_covered.end(), route.begin(), route.end());
+        path_len = static_cast<int>(nodes_covered.size());
         parent = nullptr;
     }
 
     void addRoute(const std::vector<uint16_t> &route) {
         nodes_covered.insert(nodes_covered.end(), route.begin(), route.end());
+        path_len = static_cast<int>(nodes_covered.size());
         parent = nullptr;
     }
     /**
@@ -98,6 +102,7 @@ struct Label {
         cost         = 0.0;
         node_id      = -1;
         real_cost    = 0.0;
+        path_len     = 0;
         parent       = nullptr;
         is_extended  = false;
         is_dominated = false;
@@ -120,6 +125,7 @@ struct Label {
 
     void addNode(int node) {
         nodes_covered.push_back(node);
+        path_len = static_cast<int>(nodes_covered.size());
         parent = nullptr;
     }
 
@@ -136,6 +142,7 @@ struct Label {
         std::copy(resources.begin(), resources.end(), this->resources.begin());
 
         this->node_id = node_id;
+        this->path_len = 0;
     }
 
     bool operator>(const Label &other) const { return cost > other.cost; }

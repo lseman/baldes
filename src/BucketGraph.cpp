@@ -917,6 +917,7 @@ Label *BucketGraph::compute_mono_label(const Label *L) {
     auto new_label           = label_pool_fw->acquire();
     new_label->cost          = L->cost;      // Use the cost from L
     new_label->real_cost     = L->real_cost; // Use the real cost from L
+    new_label->path_len      = L->path_len;
     auto &route = new_label->nodes_covered;
     route.clear();
     route.reserve(L->nodes_covered.size());

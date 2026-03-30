@@ -86,6 +86,7 @@ public:
         int                        node_id   = -1;
         std::array<double, R_SIZE> resources = {};
         std::vector<uint16_t>      nodes_covered;
+        int                        path_len  = 0;
     };
 
     double threshold = -1.5;
@@ -100,9 +101,6 @@ public:
                 for (size_t i = 0; i < 64; ++i) { masks[i] = 1ULL << i; }
                 return masks;
             }();
-
-    ankerl::unordered_dense::map<std::pair<int, int>, bool> fw_union_cache;
-    ankerl::unordered_dense::map<std::pair<int, int>, bool> bw_union_cache;
 
     CostFunction                                                  cost_calculator;
     std::vector<ankerl::unordered_dense::map<Arc, int, arc_hash>> fw_arc_scores; // Track arc performance
@@ -257,6 +255,8 @@ public:
     std::vector<std::vector<int>> bw_sccs;
     std::vector<std::vector<int>> fw_sccs_sorted;
     std::vector<std::vector<int>> bw_sccs_sorted;
+    std::vector<int>              fw_bucket_scc_rank;
+    std::vector<int>              bw_bucket_scc_rank;
 
     std::vector<double> fw_base_intervals; // Forward base intervals for each node
     std::vector<double> bw_base_intervals; // Backward base intervals for each node
@@ -517,6 +517,7 @@ public:
             snapshot.node_id       = label->node_id;
             snapshot.resources     = label->resources;
             snapshot.nodes_covered = label->nodes_covered;
+            snapshot.path_len      = label->path_len;
             warm_labels.push_back(std::move(snapshot));
         }
     }
@@ -993,7 +994,8 @@ public:
 
     template <Direction D, Stage S>
     bool DominatedInCompWiseSmallerBuckets(const Label *L, int bucket, const std::vector<double> &c_bar,
-                                           std::vector<uint64_t> &Bvisited, uint &stat_n_dom) noexcept;
+                                           std::vector<uint64_t> &Bvisited, std::vector<uint32_t> &touched_segments,
+                                           uint &stat_n_dom) noexcept;
 
     template <Direction D, Stage S, ArcType A, Mutability M, Full F>
     inline auto Extend(const std::conditional_t<M == Mutability::Mut, Label *, const Label *>          L_prime,
@@ -1107,7 +1109,7 @@ public:
         }
 
         // Ensure sufficient nodes in the route.
-        if (L.nodes_covered.size() <= 3) return nullptr;
+        if (L.path_len <= 3) return nullptr;
 
         // Initialize an empty SRCmap vector with size equal to the current
         // number of cuts.
@@ -1120,6 +1122,7 @@ public:
         route.clear();
         route.reserve(L.nodes_covered.size());
         route.insert(route.end(), L.nodes_covered.begin(), L.nodes_covered.end());
+        new_label->path_len = L.path_len;
 
         // Variables to keep track of costs.
         int last_node = -1;
@@ -1270,9 +1273,6 @@ public:
         // accumulated too many cuts, then update bucket splits.
         const int CHANGE_THRESHOLD = nodes.size() / 6;
         if (update_ctr >= CHANGE_THRESHOLD && cut_storage->size() < 40) {
-            // Clear union caches.
-            fw_union_cache.clear();
-            bw_union_cache.clear();
             print_info("Updating bucket splits with {} changes\n", update_ctr);
 
             // Redefine buckets in parallel for both forward and backward

@@ -223,6 +223,8 @@ std::vector<double> BucketGraph::labeling_algorithm() {
     // Pre-calculate bitmap segments for dominance-checking.
     const size_t          n_segments = (n_buckets + 63) >> 6;
     std::vector<uint64_t> Bvisited(n_segments, 0);
+    std::vector<uint32_t> touched_segments;
+    touched_segments.reserve(std::min<size_t>(n_segments, 64));
 
     // Preallocate vector for extended labels to avoid repeated allocations.
     std::vector<Label *> extended_labels;
@@ -299,14 +301,14 @@ std::vector<double> BucketGraph::labeling_algorithm() {
                         }
                     }
 
-                    // Clear the bitmap using memset (faster than std::fill for
-                    // large arrays).
-                    std::memset(Bvisited.data(), 0, n_segments * sizeof(uint64_t));
+                    for (uint32_t segment_idx : touched_segments) { Bvisited[segment_idx] = 0; }
+                    touched_segments.clear();
 
                     // Check if the label is dominated by labels in smaller
                     // buckets.
                     if constexpr (F != Full::TSP) {
-                        if (DominatedInCompWiseSmallerBuckets<D, S>(label, bucket, c_bar, Bvisited, stat_n_dom))
+                        if (DominatedInCompWiseSmallerBuckets<D, S>(label, bucket, c_bar, Bvisited, touched_segments,
+                                                                    stat_n_dom))
                             continue;
                     }
 
@@ -809,9 +811,9 @@ inline auto BucketGraph::Extend(const std::conditional_t<M == Mutability::Mut, L
 
     // For PSTEP/TSP: Check path length constraints
     if constexpr (F == Full::PSTEP || F == Full::TSP) {
-        int n_visited = 0;
-        for (const auto &bitmap : L_prime->visited_bitmap) n_visited += __builtin_popcountll(bitmap);
-        if (n_visited > options.max_path_size || (n_visited == options.max_path_size && node_id != options.end_depot)) {
+        const int next_path_len = L_prime->path_len + 1;
+        if (next_path_len > options.max_path_size ||
+            (next_path_len == options.max_path_size && node_id != options.end_depot)) {
             if constexpr (F == Full::Reverse)
                 return -1;
             else
@@ -851,9 +853,7 @@ inline auto BucketGraph::Extend(const std::conditional_t<M == Mutability::Mut, L
     if constexpr (F != Full::PSTEP) {
         new_cost -= VRPNode.cost;
     } else {
-        int n_visited = 0;
-        for (const auto &bitmap : L_prime->visited_bitmap) n_visited += __builtin_popcountll(bitmap);
-        if (n_visited > 1 && initial_node_id != options.depot) {
+        if (L_prime->path_len > 1 && initial_node_id != options.depot) {
             const auto three_two_dual = pstep_duals.getThreeTwoDualValue(initial_node_id);
             new_cost += three_two_dual + pstep_duals.getThreeThreeDualValue(initial_node_id);
         }
@@ -885,6 +885,7 @@ inline auto BucketGraph::Extend(const std::conditional_t<M == Mutability::Mut, L
     new_label->initialize(to_bucket, new_cost, new_resources, node_id);
     new_label->vertex    = to_bucket;
     new_label->real_cost = L_prime->real_cost + distance; // Use cached distance
+    new_label->path_len  = L_prime->path_len + 1;
 
     // Update visited bitmap: intersect parent's visited bits with neighborhood
     // mask
@@ -1131,16 +1132,17 @@ template <Direction D, Stage S>
 inline bool BucketGraph::DominatedInCompWiseSmallerBuckets(const Label *__restrict__ L, int bucket,
                                                            const std::vector<double> &__restrict__ c_bar,
                                                            std::vector<uint64_t> &__restrict__ Bvisited,
+                                                           std::vector<uint32_t> &touched_segments,
                                                            uint &stat_n_dom) noexcept {
     // Cache direction-specific data
-    const auto &buckets     = assign_buckets<D>(fw_buckets, bw_buckets);
-    const auto &Phi         = assign_buckets<D>(Phi_fw, Phi_bw);
-    const auto &uf          = assign_buckets<D>(fw_union_find, bw_union_find);
-    auto       &union_cache = assign_buckets<D>(fw_union_cache, bw_union_cache);
+    const auto &buckets          = assign_buckets<D>(fw_buckets, bw_buckets);
+    const auto &Phi              = assign_buckets<D>(Phi_fw, Phi_bw);
+    const auto &bucket_scc_rank  = assign_buckets<D>(fw_bucket_scc_rank, bw_bucket_scc_rank);
 
     // Cache frequently used label properties
     const int    b_L        = L->vertex;
     const double label_cost = L->cost;
+    const int    label_rank = bucket_scc_rank[b_L];
 
     // Use static thread-local stack to avoid repeated allocations
     static thread_local std::vector<int> stack_buffer;
@@ -1188,11 +1190,12 @@ inline bool BucketGraph::DominatedInCompWiseSmallerBuckets(const Label *__restri
         if (unlikely(Bvisited[segment] & bit)) continue;
 
         // Mark as visited
+        if (Bvisited[segment] == 0) { touched_segments.push_back(static_cast<uint32_t>(segment)); }
         Bvisited[segment] |= bit;
 
         // Fast path: if label cost is lower and bucket precedes L in the SCC
         // order, return early
-        if (likely(label_cost < c_bar[current_bucket] && ::precedes(current_bucket, b_L, uf, union_cache)))
+        if (likely(label_cost < c_bar[current_bucket] && bucket_scc_rank[current_bucket] < label_rank))
             return false;
 
         // Skip dominance check for L's own bucket
@@ -1268,6 +1271,7 @@ Label *BucketGraph::compute_label(const Label *L, const Label *L_prime, double r
     new_label->cost      = red_cost;
     new_label->real_cost = real_cost;
     new_label->parent    = nullptr;
+    new_label->path_len  = L->path_len + L_prime->path_len;
 
     // Reuse pooled vector capacity and avoid zero-filling before overwrite.
     auto &merged_route = new_label->nodes_covered;
