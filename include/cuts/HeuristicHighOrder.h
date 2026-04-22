@@ -549,32 +549,47 @@ public:
         int       cumulative_sum = 0;
         const int denominator    = p.den;
 
-        // Loop over the positions in P, ignoring the first and last elements.
+#if defined(SRC_MEMORY_MODE_ARC)
+        // Arc memory mode: update only when the current arc belongs to the cut.
         for (size_t j = 1; j < P.size() - 1; ++j) {
-            const int vertex = P[j];
+            const int vertex      = P[j];
+            const int prev_vertex = P[j - 1];
 
-            // Determine the bit mask and word index for the vertex.
-            const size_t   word_index = vertex >> 6;
-            const uint64_t bit_mask   = 1ULL << (vertex & 63);
+            const size_t   word_index    = vertex >> 6;
+            const uint64_t bit_mask      = 1ULL << (vertex & 63);
+            const size_t   prev_word     = prev_vertex >> 6;
+            const uint64_t prev_bit_mask = 1ULL << (prev_vertex & 63);
 
-            // If the augmented memory does not contain the vertex, reset
-            // cumulative sum.
-            if (!(AM[word_index] & bit_mask)) {
+            if (!(AM[word_index] & bit_mask) || !(AM[prev_word] & prev_bit_mask)) {
                 cumulative_sum = 0;
-            }
-            // Otherwise, if the candidate set contains the vertex,
-            // add the corresponding numerator from the permutation.
-            else if (C[word_index] & bit_mask) {
+            } else if ((C[word_index] & bit_mask) && (C[prev_word] & prev_bit_mask)) {
                 int pos = order[vertex];
                 cumulative_sum += p.num[pos];
-                // If cumulative sum exceeds or equals the denominator, update
-                // alpha.
                 if (cumulative_sum >= denominator) {
                     cumulative_sum -= denominator;
                     alpha += 1;
                 }
             }
         }
+#else
+        for (size_t j = 1; j < P.size() - 1; ++j) {
+            const int vertex = P[j];
+
+            const size_t   word_index = vertex >> 6;
+            const uint64_t bit_mask   = 1ULL << (vertex & 63);
+
+            if (!(AM[word_index] & bit_mask)) {
+                cumulative_sum = 0;
+            } else if (C[word_index] & bit_mask) {
+                int pos = order[vertex];
+                cumulative_sum += p.num[pos];
+                if (cumulative_sum >= denominator) {
+                    cumulative_sum -= denominator;
+                    alpha += 1;
+                }
+            }
+        }
+#endif
 
         return alpha;
     }

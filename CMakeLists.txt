@@ -221,7 +221,8 @@ option(IPM_ACEL "Enable ipm acelleration" OFF)
 option(BALDES "Enable baldes compilation" OFF)
 option(HGS "Enable HGS" OFF)
 option(CUSTOM_COST "Enable custom cost" OFF)
-
+option(SRC_MEMORY_MODE_NODE "Use node-memory heuristics for SRC cuts" ON)
+option(SRC_MEMORY_MODE_ARC "Use arc-memory heuristics for SRC cuts" OFF)
 # Resource Definitions
 set(R_SIZE 1 CACHE STRING "Number of resources")
 set(N_SIZE 102 CACHE STRING "Number of nodes")
@@ -239,6 +240,11 @@ execute_process(
   OUTPUT_STRIP_TRAILING_WHITESPACE
 )
 add_definitions(-DGIT_COMMIT_HASH="${GIT_COMMIT_HASH}")
+if(DSRC_MEMORY_MODE_ARC)
+  add_definitions(-DSRC_MEMORY_MODE_ARC)
+else()
+  add_definitions(-DSRC_MEMORY_MODE_NODE)
+endif()
 
 # Configure the config.h file
 configure_file(${CMAKE_CURRENT_SOURCE_DIR}/config.h.in ${CMAKE_CURRENT_BINARY_DIR}/config.h)

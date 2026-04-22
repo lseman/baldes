@@ -7,72 +7,67 @@
 #include "VRPNode.h"
 #include <unordered_set>
 
-class HighRankCuts;  // Forward declaration
+class HighRankCuts; // Forward declaration
 
 class LocalSearch {
-   private:
+private:
     // -----------------------
     // Configuration and Types
     // -----------------------
-    enum class OperatorType : uint8_t {
-        REMOVE_NODE,
-        ADD_NODE,
-        REMOVE_NEIGHBORS,
-        ADD_NEIGHBORS,
-        SWAP_NODE
-    };
+    enum class OperatorType : uint8_t { REMOVE_NODE, ADD_NODE, REMOVE_NEIGHBORS, ADD_NEIGHBORS, SWAP_NODE };
 
     struct OperatorStats {
-        double score = 1.0;
-        int32_t usage = 0;
-        int32_t success = 0;
-        double avg_improvement = 0.0;
+        double  score           = 1.0;
+        int32_t usage           = 0;
+        int32_t success         = 0;
+        double  avg_improvement = 0.0;
     };
 
     struct SegmentStats {
-        double avg_violation = 0.0;
-        double best_violation = 0.0;
-        int32_t improvements = 0;
+        double  avg_violation  = 0.0;
+        double  best_violation = 0.0;
+        int32_t improvements   = 0;
         int32_t accepted_moves = 0;
     };
 
     // ---------------------------
     // Member Variables / Counters
     // ---------------------------
-    std::array<OperatorStats, 5> operators;  // one for each operator type
-    std::deque<SegmentStats> history;        // search history over segments
-    SegmentStats current_segment{};          // current segment statistics
+    std::array<OperatorStats, 5> operators;         // one for each operator type
+    std::deque<SegmentStats>     history;           // search history over segments
+    SegmentStats                 current_segment{}; // current segment statistics
 
-    Xoroshiro128Plus rng;                  // Random number generator
-    int iterations_since_improvement = 0;  // Iterations since last improvement
-    int segment_iterations = 0;            // Iterations in current segment
+    Xoroshiro128Plus rng;                              // Random number generator
+    int              iterations_since_improvement = 0; // Iterations since last improvement
+    int              segment_iterations           = 0; // Iterations in current segment
 
-    double temperature;  // Temperature for simulated annealing
+    double temperature; // Temperature for simulated annealing
 
-    HighRankCuts *parent;  // Pointer to parent HighRankCuts instance
+    HighRankCuts *parent; // Pointer to parent HighRankCuts instance
 
     // -----------------------
     // Helper Functions
     // -----------------------
     // Compute the similarity between two sets based on their intersection size.
-    static double computeSimilarity(const std::vector<int> &set1,
-                                    const std::vector<int> &set2) {
+    static double computeSimilarity(const std::vector<int> &set1, const std::vector<int> &set2) {
         std::vector<int> intersection;
-        std::set_intersection(set1.begin(), set1.end(), set2.begin(),
-                              set2.end(), std::back_inserter(intersection));
+        std::set_intersection(set1.begin(), set1.end(), set2.begin(), set2.end(), std::back_inserter(intersection));
         return 2.0 * intersection.size() / (set1.size() + set2.size());
     }
 
     // Select an operator based on current operator scores.
-    // The SWAP_NODE operator is currently disabled while keeping the code
-    // path in place for future reactivation.
     OperatorType selectOperator() {
         std::vector<double> weights;
-        for (size_t i = 0; i < operators.size(); ++i) {
-            if (i == static_cast<size_t>(OperatorType::SWAP_NODE)) {
+#if defined(SRC_MEMORY_MODE_ARC)
+        const bool use_swap = true;
+#else
+        const bool use_swap = false;
+#endif
+        for (size_t idx = 0; idx < operators.size(); ++idx) {
+            if (idx == static_cast<size_t>(OperatorType::SWAP_NODE) && !use_swap) {
                 weights.push_back(0.0);
             } else {
-                weights.push_back(operators[i].score);
+                weights.push_back(operators[idx].score);
             }
         }
         std::discrete_distribution<> dist(weights.begin(), weights.end());
@@ -89,22 +84,18 @@ class LocalSearch {
         // if nodes_vec.size() = MIN_RANK, do not remove any nodes.
         if (nodes_vec.size() > 1 && nodes_vec.size() > MIN_RANK) {
             std::uniform_int_distribution<> node_dist(0, nodes_vec.size() - 1);
-            int remove_pos = node_dist(rng);
+            int                             remove_pos = node_dist(rng);
             nodes_vec.erase(nodes_vec.begin() + remove_pos);
-            current.nodes = ankerl::unordered_dense::set<int>(nodes_vec.begin(),
-                                                              nodes_vec.end());
+            current.nodes = ankerl::unordered_dense::set<int>(nodes_vec.begin(), nodes_vec.end());
             // Ensure that candidate nodes always appear in the neighbor set.
-            for (const int &node : nodes_vec) {
-                current.neighbor.insert(node);
-            }
+            for (const int &node : nodes_vec) { current.neighbor.insert(node); }
         }
     }
 
     // Operator: Add a Node.
     // Add one node from the neighbor set that is not already in the candidate
     // set.
-    void applyAddNode(CandidateSet &current,
-                      const std::vector<std::vector<NodeScore>> &node_scores) {
+    void applyAddNode(CandidateSet &current, const std::vector<std::vector<NodeScore>> &node_scores) {
         std::vector<int> nodes_vec(current.nodes.begin(), current.nodes.end());
         std::vector<int> potential;
 
@@ -112,38 +103,35 @@ class LocalSearch {
         if (nodes_vec.size() >= MAX_RANK) return;
         // Candidates are those in neighbor set but not in nodes.
         for (int candidate : current.neighbor) {
-            if (current.nodes.find(candidate) == current.nodes.end()) {
-                potential.push_back(candidate);
-            }
+            if (current.nodes.find(candidate) == current.nodes.end()) { potential.push_back(candidate); }
         }
         if (!potential.empty()) {
             // Prefer candidates with better node-score support when available.
-            int chosen = potential.front();
+            int    chosen     = potential.front();
             double best_score = std::numeric_limits<double>::infinity();
             for (int candidate : potential) {
                 if (candidate >= 0 && candidate < static_cast<int>(node_scores.size())) {
                     for (const auto &score : node_scores[candidate]) {
                         if (score.cost_score < best_score) {
                             best_score = score.cost_score;
-                            chosen = candidate;
+                            chosen     = candidate;
                         }
                     }
                 }
             }
             nodes_vec.push_back(chosen);
-            current.nodes = ankerl::unordered_dense::set<int>(nodes_vec.begin(),
-                                                              nodes_vec.end());
+            current.nodes = ankerl::unordered_dense::set<int>(nodes_vec.begin(), nodes_vec.end());
             // Re-add candidate nodes to neighbor set.
-            for (const int &node : nodes_vec) {
-                current.neighbor.insert(node);
-            }
+            for (const int &node : nodes_vec) { current.neighbor.insert(node); }
         }
     }
 
     // Operator: Swap a node.
     // Replace one candidate node with a neighbor node to keep rank constant.
-    void applySwapNode(CandidateSet &current,
-                       const std::vector<std::vector<NodeScore>> &node_scores) {
+    void applySwapNode(CandidateSet &current, const std::vector<std::vector<NodeScore>> &node_scores) {
+#if !defined(SRC_MEMORY_MODE_ARC)
+        return;
+#else
         if (current.nodes.size() <= static_cast<size_t>(MIN_RANK)) return;
         std::vector<int> nodes_vec(current.nodes.begin(), current.nodes.end());
         std::vector<int> removable(nodes_vec.begin(), nodes_vec.end());
@@ -167,61 +155,47 @@ class LocalSearch {
                 return;
             }
         }
+#endif
     }
 
     // Operator: Remove Neighbors.
     void applyRemoveNeighbors(CandidateSet &current, int remove_count) {
-        std::vector<int> neighbor_vec(current.neighbor.begin(),
-                                      current.neighbor.end());
+        std::vector<int> neighbor_vec(current.neighbor.begin(), current.neighbor.end());
         std::shuffle(neighbor_vec.begin(), neighbor_vec.end(), rng);
-        int actual_remove =
-            std::min(remove_count, static_cast<int>(neighbor_vec.size()));
-        neighbor_vec.erase(neighbor_vec.begin(),
-                           neighbor_vec.begin() + actual_remove);
-        current.neighbor = ankerl::unordered_dense::set<int>(
-            neighbor_vec.begin(), neighbor_vec.end());
+        int actual_remove = std::min(remove_count, static_cast<int>(neighbor_vec.size()));
+        neighbor_vec.erase(neighbor_vec.begin(), neighbor_vec.begin() + actual_remove);
+        current.neighbor = ankerl::unordered_dense::set<int>(neighbor_vec.begin(), neighbor_vec.end());
         // Re-add candidate nodes.
-        for (const int &node : current.nodes) {
-            current.neighbor.insert(node);
-        }
+        for (const int &node : current.nodes) { current.neighbor.insert(node); }
     }
 
     // Operator: Add Neighbors.
-    void applyAddNeighbors(CandidateSet &current,
-                           const std::vector<std::vector<NodeScore>> &node_scores,
+    void applyAddNeighbors(CandidateSet &current, const std::vector<std::vector<NodeScore>> &node_scores,
                            int add_count) {
         std::vector<int> nodes_vec(current.nodes.begin(), current.nodes.end());
         std::sort(nodes_vec.begin(), nodes_vec.end());
-        std::vector<int> potential_neighbors;
+        std::vector<int>        potential_neighbors;
         std::unordered_set<int> visited;
         for (const int &node : nodes_vec) {
             for (const auto &score : node_scores[node]) {
                 int neighbor = score.node;
                 if (!std::binary_search(nodes_vec.begin(), nodes_vec.end(), neighbor) &&
-                    current.neighbor.find(neighbor) == current.neighbor.end() &&
-                    !visited.count(neighbor)) {
+                    current.neighbor.find(neighbor) == current.neighbor.end() && !visited.count(neighbor)) {
                     visited.insert(neighbor);
                     potential_neighbors.push_back(neighbor);
                 }
             }
         }
-        std::shuffle(potential_neighbors.begin(), potential_neighbors.end(),
-                     rng);
-        int actual_add =
-            std::min(add_count, static_cast<int>(potential_neighbors.size()));
-        for (int i = 0; i < actual_add; ++i) {
-            current.neighbor.insert(potential_neighbors[i]);
-        }
+        std::shuffle(potential_neighbors.begin(), potential_neighbors.end(), rng);
+        int actual_add = std::min(add_count, static_cast<int>(potential_neighbors.size()));
+        for (int i = 0; i < actual_add; ++i) { current.neighbor.insert(potential_neighbors[i]); }
     }
 
     // Optionally, you can also define a combined operator for updating
     // neighbors.
-    void applyUpdateNeighbors(
-        CandidateSet &current,
-        const std::vector<std::vector<NodeScore>> &node_scores) {
+    void applyUpdateNeighbors(CandidateSet &current, const std::vector<std::vector<NodeScore>> &node_scores) {
         applyRemoveNeighbors(current, LocalSearchConfig::MAX_REMOVE_COUNT);
-        applyAddNeighbors(current, node_scores,
-                          LocalSearchConfig::MAX_ADD_COUNT);
+        applyAddNeighbors(current, node_scores, LocalSearchConfig::MAX_ADD_COUNT);
     }
 
     // ---------------------------
@@ -230,60 +204,45 @@ class LocalSearch {
     bool acceptMove(double delta, const CandidateSet &current) {
         if (delta > 0) return true;
         std::uniform_real_distribution<double> dist(0.0, 1.0);
-        double acceptance_prob = std::exp(delta / temperature);
+        double                                 acceptance_prob = std::exp(delta / temperature);
         if (history.size() >= 2) {
             double recent_improvement_rate =
-                static_cast<double>(history.back().improvements) /
-                LocalSearchConfig::SEGMENT_SIZE;
+                static_cast<double>(history.back().improvements) / LocalSearchConfig::SEGMENT_SIZE;
             double acceptance_rate =
-                std::clamp(0.4 * (1.0 - recent_improvement_rate),
-                           LocalSearchConfig::MIN_ACCEPTANCE_RATE,
+                std::clamp(0.4 * (1.0 - recent_improvement_rate), LocalSearchConfig::MIN_ACCEPTANCE_RATE,
                            LocalSearchConfig::MAX_ACCEPTANCE_RATE);
             double avg_recent_violation =
                 std::accumulate(history.begin(), history.end(), 0.0,
-                                [](double sum, const SegmentStats &seg) {
-                                    return sum + seg.avg_violation;
-                                }) /
+                                [](double sum, const SegmentStats &seg) { return sum + seg.avg_violation; }) /
                 history.size();
             if (current.violation < avg_recent_violation) {
-                return (dist(rng) < acceptance_rate *
-                                        LocalSearchConfig::IMPROVEMENT_BONUS) &&
-                       (delta >
-                        -std::abs(current.violation *
-                                  LocalSearchConfig::MAX_DETERIORATION));
+                return (dist(rng) < acceptance_rate * LocalSearchConfig::IMPROVEMENT_BONUS) &&
+                       (delta > -std::abs(current.violation * LocalSearchConfig::MAX_DETERIORATION));
             }
             return (dist(rng) < acceptance_rate) &&
-                   (delta > -std::abs(current.violation *
-                                      LocalSearchConfig::MAX_DETERIORATION));
+                   (delta > -std::abs(current.violation * LocalSearchConfig::MAX_DETERIORATION));
         }
         return dist(rng) < acceptance_prob;
     }
 
-    void updateStatistics(OperatorType op, double delta, CandidateSet &current,
-                          double new_violation) {
+    void updateStatistics(OperatorType op, double delta, CandidateSet &current, double new_violation) {
         auto &op_stats = operators[static_cast<size_t>(op)];
         op_stats.usage++;
         if (delta > 0) {
             op_stats.success++;
-            op_stats.avg_improvement =
-                0.9 * op_stats.avg_improvement + 0.1 * delta;
+            op_stats.avg_improvement = 0.9 * op_stats.avg_improvement + 0.1 * delta;
         }
-        op_stats.score = std::max(
-            LocalSearchConfig::MIN_WEIGHT,
-            op_stats.score * (1 - LocalSearchConfig::OPERATOR_LEARNING_RATE) +
-                LocalSearchConfig::OPERATOR_LEARNING_RATE *
-                    (1.0 + std::max(0.0, delta)));
+        op_stats.score = std::max(LocalSearchConfig::MIN_WEIGHT,
+                                  op_stats.score * (1 - LocalSearchConfig::OPERATOR_LEARNING_RATE) +
+                                      LocalSearchConfig::OPERATOR_LEARNING_RATE * (1.0 + std::max(0.0, delta)));
         current_segment.accepted_moves++;
         current_segment.avg_violation =
-            (current_segment.avg_violation * segment_iterations +
-             new_violation) /
-            (segment_iterations + 1);
+            (current_segment.avg_violation * segment_iterations + new_violation) / (segment_iterations + 1);
     }
 
     void updateTemperature() {
         temperature *= LocalSearchConfig::COOLING_RATE;
-        if (iterations_since_improvement >=
-            LocalSearchConfig::REHEAT_INTERVAL) {
+        if (iterations_since_improvement >= LocalSearchConfig::REHEAT_INTERVAL) {
             temperature *= LocalSearchConfig::REHEATING_FACTOR;
             iterations_since_improvement = 0;
         }
@@ -291,87 +250,72 @@ class LocalSearch {
 
     void strategicRestart(CandidateSet &current, const CandidateSet &best,
                           std::vector<CandidateSet> &diverse_solutions) {
-        if (iterations_since_improvement > LocalSearchConfig::SEGMENT_SIZE &&
-            !diverse_solutions.empty()) {
+        if (iterations_since_improvement > LocalSearchConfig::SEGMENT_SIZE && !diverse_solutions.empty()) {
             std::vector<std::pair<double, size_t>> restart_candidates;
             for (size_t i = 0; i < diverse_solutions.size(); ++i) {
-                const auto &sol = diverse_solutions[i];
-                double quality_score = sol.violation / best.violation;
-                double diversity_score = 0.0;
+                const auto &sol             = diverse_solutions[i];
+                double      quality_score   = sol.violation / best.violation;
+                double      diversity_score = 0.0;
                 for (const auto &other : diverse_solutions) {
                     if (&other != &sol) {
                         double structural_div =
-                            1.0 - computeSimilarity(
-                                      std::vector<int>(sol.nodes.begin(),
-                                                       sol.nodes.end()),
-                                      std::vector<int>(other.nodes.begin(),
-                                                       other.nodes.end()));
-                        double violation_div =
-                            std::abs(other.violation - sol.violation);
-                        diversity_score +=
-                            0.5 * (structural_div + violation_div);
+                            1.0 - computeSimilarity(std::vector<int>(sol.nodes.begin(), sol.nodes.end()),
+                                                    std::vector<int>(other.nodes.begin(), other.nodes.end()));
+                        double violation_div = std::abs(other.violation - sol.violation);
+                        diversity_score += 0.5 * (structural_div + violation_div);
                     }
                 }
-                restart_candidates.emplace_back(
-                    quality_score * LocalSearchConfig::QUALITY_WEIGHT +
-                        diversity_score * LocalSearchConfig::DIVERSITY_WEIGHT,
-                    i);
+                restart_candidates.emplace_back(quality_score * LocalSearchConfig::QUALITY_WEIGHT +
+                                                    diversity_score * LocalSearchConfig::DIVERSITY_WEIGHT,
+                                                i);
             }
             pdqsort(restart_candidates.begin(), restart_candidates.end());
-            current = diverse_solutions[restart_candidates.back().second];
+            current                      = diverse_solutions[restart_candidates.back().second];
             iterations_since_improvement = 0;
-            temperature = LocalSearchConfig::INITIAL_TEMPERATURE;
+            temperature                  = LocalSearchConfig::INITIAL_TEMPERATURE;
         }
     }
 
-   public:
+public:
     // -----------------
     // Public Interface
     // -----------------
     explicit LocalSearch(HighRankCuts *p)
-        : rng(std::random_device{}()),
-          temperature(LocalSearchConfig::INITIAL_TEMPERATURE),
-          parent(p) {}
+        : rng(std::random_device{}()), temperature(LocalSearchConfig::INITIAL_TEMPERATURE), parent(p) {}
 
     // Main local search solver function.
-    std::vector<CandidateSet> solve(
-        const CandidateSet &initial, const SparseMatrix &A,
-        const std::vector<double> &x,
-        const std::vector<std::vector<NodeScore>> &node_scores,
-        int max_iterations = 50);
+    std::vector<CandidateSet> solve(const CandidateSet &initial, const SparseMatrix &A, const std::vector<double> &x,
+                                    const std::vector<std::vector<NodeScore>> &node_scores, int max_iterations = 50);
 };
 
-constexpr int MAX_CANDIDATES_PER_NODE = 25;
-constexpr double LEARNING_RATE = 0.1;
-constexpr double HISTORY_WEIGHT = 0.8;
-constexpr double DECAY_FACTOR = 0.95;  // Decay old feedback
+constexpr int    MAX_CANDIDATES_PER_NODE = 25;
+constexpr double LEARNING_RATE           = 0.1;
+constexpr double HISTORY_WEIGHT          = 0.8;
+constexpr double DECAY_FACTOR            = 0.95; // Decay old feedback
 
 class AdaptiveNodeScorer {
-   private:
+private:
     struct NodePairStats {
-        double success_count = 0;
+        double success_count   = 0;
         double total_violation = 0;
-        double avg_violation = 0;
-        int occurrences = 0;
+        double avg_violation   = 0;
+        int    occurrences     = 0;
     };
 
     // Track historical pair statistics and neighbor relevance scores.
     ankerl::unordered_dense::map<std::pair<int, int>, NodePairStats> pair_stats;
-    ankerl::unordered_dense::map<int, double> neighbor_scores;
+    ankerl::unordered_dense::map<int, double>                        neighbor_scores;
 
-    static constexpr double LEARNING_RATE = 0.1;
-    static constexpr double HISTORY_WEIGHT = 0.8;
-    static constexpr double DECAY_FACTOR =
-        0.95;  // Decay factor for old feedback
-    static constexpr double NEIGHBOR_WEIGHT =
-        0.5;  // Weight for neighbor relevance
+    static constexpr double LEARNING_RATE   = 0.1;
+    static constexpr double HISTORY_WEIGHT  = 0.8;
+    static constexpr double DECAY_FACTOR    = 0.95; // Decay factor for old feedback
+    static constexpr double NEIGHBOR_WEIGHT = 0.5;  // Weight for neighbor relevance
 
     // Retrieve historical score for a pair (node_i, node_j) based on prior
     // feedback.
     double getHistoricalScore(int node_i, int node_j) const {
-        auto key =
-            std::make_pair(std::min(node_i, node_j), std::max(node_i, node_j));
-        auto it = pair_stats.find(key);
+        auto key = std::make_pair(std::min(node_i, node_j), std::max(node_i, node_j));
+        auto it  = pair_stats.find(key);
         if (it != pair_stats.end() && it->second.occurrences > 0) {
             const auto &stats = it->second;
             return stats.avg_violation * std::log1p(stats.success_count);
@@ -385,25 +329,20 @@ class AdaptiveNodeScorer {
         return (it != neighbor_scores.end()) ? it->second : 0.0;
     }
 
-   public:
+public:
     // Update feedback statistics from the provided candidate set.
     void provideFeedback(
-        const ankerl::unordered_dense::set<CandidateSet, CandidateSetHasher,
-                                           CandidateSetCompare> &candidates) {
+        const ankerl::unordered_dense::set<CandidateSet, CandidateSetHasher, CandidateSetCompare> &candidates) {
         // Convert candidate set to vector and sort by violation in
         // descending
         // order.
-        std::vector<CandidateSet> candidate_vec(candidates.begin(),
-                                                candidates.end());
+        std::vector<CandidateSet> candidate_vec(candidates.begin(), candidates.end());
         pdqsort(candidate_vec.begin(), candidate_vec.end(),
-                [](const auto &a, const auto &b) {
-                    return a.violation > b.violation;
-                });
+                [](const auto &a, const auto &b) { return a.violation > b.violation; });
 
         // Use top 20% of candidates for feedback.
         const int max_feedback_candidates =
-            std::min(static_cast<int>(candidate_vec.size()),
-                     static_cast<int>(candidate_vec.size() * 0.2));
+            std::min(static_cast<int>(candidate_vec.size()), static_cast<int>(candidate_vec.size() * 0.2));
 
         for (int idx = 0; idx < max_feedback_candidates; ++idx) {
             const auto &candidate = candidate_vec[idx];
@@ -418,42 +357,46 @@ class AdaptiveNodeScorer {
                     auto b = *std::next(candidate.nodes.begin(), j);
                     // Optionally ensure a consistent ordering (e.g., always the
                     // smaller one first)
-                    std::pair<int, int> key = std::minmax(a, b);
-                    auto &stats = pair_stats[key];
+                    std::pair<int, int> key   = std::minmax(a, b);
+                    auto               &stats = pair_stats[key];
 
-                    stats.success_count =
-                        stats.success_count * DECAY_FACTOR + 1;
-                    stats.total_violation =
-                        stats.total_violation * DECAY_FACTOR +
-                        candidate.violation;
+                    stats.success_count   = stats.success_count * DECAY_FACTOR + 1;
+                    stats.total_violation = stats.total_violation * DECAY_FACTOR + candidate.violation;
                     stats.occurrences += 1;
-                    stats.avg_violation =
-                        stats.total_violation / stats.occurrences;
+                    stats.avg_violation = stats.total_violation / stats.occurrences;
                 }
             }
 
             // Update neighbor scores for candidate neighbors.
             for (int node : candidate.nodes) {
                 for (int neighbor : candidate.neighbor) {
-                    neighbor_scores[neighbor] =
-                        neighbor_scores[neighbor] * DECAY_FACTOR + 1;
+                    neighbor_scores[neighbor] = neighbor_scores[neighbor] * DECAY_FACTOR + 1;
                 }
             }
         }
     }
 
     // Compute node scores for each vertex using problem data and feedback.
-    std::vector<std::vector<NodeScore>> computeNodeScores(
-        const SparseMatrix &A, const std::vector<double> &x,
-        const std::vector<std::vector<double>> &distances,
-        const std::vector<VRPNode> &nodes, const ArcDuals &arc_duals,
-        const CutStorage &cutStorage) {
+    std::vector<std::vector<NodeScore>> computeNodeScores(const SparseMatrix &A, const std::vector<double> &x,
+                                                          const std::vector<std::vector<double>> &distances,
+                                                          const std::vector<VRPNode> &nodes, const ArcDuals &arc_duals,
+                                                          const CutStorage &cutStorage) {
         std::vector<std::vector<NodeScore>> scores(N_SIZE);
-        const auto &active_cuts = cutStorage.getActiveCuts();
+        const auto                         &active_cuts = cutStorage.getActiveCuts();
 
+#if defined(SRC_MEMORY_MODE_NODE)
+        // Pre-calculate node-based adjustments from active cuts.
+        std::vector<double> node_adjustments(N_SIZE, 0.0);
+        for (const auto &cut : active_cuts) {
+            if (cut.type == CutType::ThreeRow) {
+                for (int i = 1; i < N_SIZE - 1; ++i) {
+                    if (cut.isSRCset(i)) { node_adjustments[i] -= cut.dual_value; }
+                }
+            }
+        }
+#else
         // Pre-calculate adjustments from active cuts.
-        std::vector<std::vector<double>> cut_adjustments(
-            N_SIZE, std::vector<double>(N_SIZE, 0.0));
+        std::vector<std::vector<double>> cut_adjustments(N_SIZE, std::vector<double>(N_SIZE, 0.0));
         for (const auto &cut : active_cuts) {
             if (cut.type == CutType::ThreeRow) {
                 for (int i = 1; i < N_SIZE - 1; ++i) {
@@ -464,18 +407,9 @@ class AdaptiveNodeScorer {
                         }
                     }
                 }
-                // } else if (cut.type == CutType::OneRow) {
-                //     for (int i = 1; i < N_SIZE - 1; ++i) {
-                //         if (cut.isSRCset(i)) {
-                //             for (int j = 1; j < N_SIZE - 1; ++j) {
-                //                 if (i != j) {
-                //                     cut_adjustments[i][j] -= cut.dual_value;
-                //                 }
-                //             }
-                //         }
-                //     }
             }
         }
+#endif
 
         // Compute scores for each vertex i (ignoring depot vertices).
         for (int i = 1; i < N_SIZE - 1; ++i) {
@@ -485,11 +419,17 @@ class AdaptiveNodeScorer {
             for (int j = 1; j < N_SIZE - 1; ++j) {
                 if (i == j) continue;
 
+#if defined(SRC_MEMORY_MODE_NODE)
+                // Base score incorporates distance, node costs, and node-level
+                // cut memory adjustments.
+                double base_score =
+                    distances[i][j] - (nodes[i].cost + nodes[j].cost) / 2.0 + node_adjustments[i] + node_adjustments[j];
+#else
                 // Base score incorporates distance, node costs, arc duals, and
                 // cut adjustments.
-                double base_score =
-                    distances[i][j] - (nodes[i].cost + nodes[j].cost) / 2.0 -
-                    arc_duals.getDual(i, j) + cut_adjustments[i][j];
+                double base_score = distances[i][j] - (nodes[i].cost + nodes[j].cost) / 2.0 - arc_duals.getDual(i, j) +
+                                    cut_adjustments[i][j];
+#endif
 
                 // // Incorporate historical performance and neighbor relevance.
                 // double historical_score = getHistoricalScore(i, j);
@@ -511,18 +451,12 @@ class AdaptiveNodeScorer {
             // Sort candidates for vertex i by score (lowest scores are best).
             std::partial_sort(
                 node_scores.begin(),
-                node_scores.begin() +
-                    std::min(MAX_CANDIDATES_PER_NODE,
-                             static_cast<int>(node_scores.size())),
-                node_scores.end(), [](const auto &a, const auto &b) {
-                    return a.cost_score < b.cost_score;
-                });
+                node_scores.begin() + std::min(MAX_CANDIDATES_PER_NODE, static_cast<int>(node_scores.size())),
+                node_scores.end(), [](const auto &a, const auto &b) { return a.cost_score < b.cost_score; });
 
-            // Store top candidate node indices.
+            // Store top candidate node scores.
             auto &i_scores = scores[i];
-            for (int j = 0; j < std::min(MAX_CANDIDATES_PER_NODE,
-                                         static_cast<int>(node_scores.size()));
-                 ++j) {
+            for (int j = 0; j < std::min(MAX_CANDIDATES_PER_NODE, static_cast<int>(node_scores.size())); ++j) {
                 i_scores.push_back(node_scores[j]);
             }
         }
