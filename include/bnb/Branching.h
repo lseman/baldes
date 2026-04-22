@@ -205,7 +205,7 @@ public:
         std::vector<BranchingQueueItem> results;
         std::mutex                      results_mutex; // Mutex to protect shared results
 
-        const int                JOBS = std::thread::hardware_concurrency();
+        const unsigned           JOBS = std::max(1u, std::thread::hardware_concurrency());
         exec::static_thread_pool pool(JOBS); // Pool with concurrent threads
         auto                     sched = pool.get_scheduler();
 
@@ -464,12 +464,13 @@ public:
         print_branching("Phase 1: evaluating candidates by RMP relaxation...\n");
         auto phase1Candidates = evaluateWithBranching(node, phase0Candidates);
 
-        // TODO: add logic to select the best candidates from phase1Candidates
         print_branching("Phase 2: evaluating candidates with heuristic CG...\n");
         auto phase2Candidates = evaluateWithCG(node, phase1Candidates, problem);
 
         print_branching("Generating VRP candidates...\n");
-        auto generatedCandidates = generateVRPCandidates(node, phase1Candidates);
+        const auto &finalCandidates =
+            phase2Candidates.empty() ? phase1Candidates : phase2Candidates;
+        auto generatedCandidates = generateVRPCandidates(node, finalCandidates);
         candidates.insert(candidates.end(), generatedCandidates.begin(), generatedCandidates.end());
 
         // for (auto &c : candidates) { c->print(); }
