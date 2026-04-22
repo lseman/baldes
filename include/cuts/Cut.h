@@ -322,8 +322,7 @@ class CutStorage {
     }
 
     void removeCut(Cut *cut) {
-        cut->key = compute_cut_key(cut->baseSet, cut->p.num, cut->p.den);
-        cutMaster_to_cut_map[cut->key] = cut->id;
+        if (!cut) return;
         removeCut(cut->id);
     }
 
@@ -338,6 +337,11 @@ class CutStorage {
 
         // Remove the cut from the 'cuts' vector.
         cuts.erase(cuts.begin() + cutIndex);
+
+        // Remove the associated dual if it exists.
+        if (cutIndex < static_cast<int>(SRCDuals.size())) {
+            SRCDuals.erase(SRCDuals.begin() + cutIndex);
+        }
 
         // Update the IDs for remaining cuts: any cut with an ID greater than
         // the removed index gets decremented.
@@ -373,6 +377,19 @@ class CutStorage {
     void setDuals(const std::vector<double> &duals) {
         SRCDuals = duals;
         updateActiveCuts();
+    }
+
+    void pruneLowDualCuts(double threshold) {
+        if (cuts.empty() || SRCDuals.empty()) return;
+        bool removed = false;
+        for (int i = static_cast<int>(cuts.size()) - 1; i >= 0; --i) {
+            if (i < static_cast<int>(SRCDuals.size()) &&
+                std::abs(SRCDuals[i]) < threshold) {
+                removeCut(i);
+                removed = true;
+            }
+        }
+        if (removed) updateActiveCuts();
     }
 
     // Get the number of cuts
