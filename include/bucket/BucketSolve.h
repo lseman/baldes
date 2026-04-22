@@ -204,7 +204,6 @@ std::vector<double> BucketGraph::labeling_algorithm() {
     // Cache bucket and auxiliary structure references to avoid repeated
     // lookups.
     auto       &buckets           = assign_buckets<D>(fw_buckets, bw_buckets);
-    const auto &ordered_sccs      = assign_buckets<D>(fw_ordered_sccs, bw_ordered_sccs);
     const auto &topological_order = assign_buckets<D>(fw_topological_order, bw_topological_order);
     const auto &sccs              = assign_buckets<D>(fw_sccs, bw_sccs);
     const auto &Phi               = assign_buckets<D>(Phi_fw, Phi_bw);
@@ -225,10 +224,14 @@ std::vector<double> BucketGraph::labeling_algorithm() {
     std::vector<uint64_t> Bvisited(n_segments, 0);
     std::vector<uint32_t> touched_segments;
     touched_segments.reserve(std::min<size_t>(n_segments, 64));
+    std::vector<int> bucket_pos_in_scc(n_buckets, -1);
 
-    // Preallocate vector for extended labels to avoid repeated allocations.
-    std::vector<Label *> extended_labels;
-    extended_labels.reserve(64);
+    // Process only newly queued labels while preserving the bucket order
+    // inside each SCC.
+    std::vector<std::vector<Label *>> pending_labels_by_bucket;
+    std::vector<size_t>               pending_label_cursor;
+    std::vector<uint8_t>              bucket_is_active;
+    std::vector<int>                  active_bucket_heap;
 
     // Precompute main resource index and q_star value for partial solutions.
     constexpr bool is_partial     = (F == Full::Partial);
@@ -246,228 +249,237 @@ std::vector<double> BucketGraph::labeling_algorithm() {
 
     // Process each strongly connected component (SCC) in topological order.
     for (const auto &scc_index : topological_order) {
-        // Prefetch the SCC data
-        __builtin_prefetch(&sorted_sccs[scc_index], 0, 3);
+        const auto &scc_buckets = sorted_sccs[scc_index];
+        if (scc_buckets.empty()) continue;
 
-        bool all_ext = false;
-        do {
-            all_ext                 = true; // Assume no new extensions until one occurs.
-            const auto &scc_buckets = sorted_sccs[scc_index];
+        pending_labels_by_bucket.clear();
+        pending_labels_by_bucket.resize(scc_buckets.size());
+        pending_label_cursor.assign(scc_buckets.size(), 0);
+        bucket_is_active.assign(scc_buckets.size(), 0);
+        active_bucket_heap.clear();
 
-            // Prefetch the first few buckets
-            if (!scc_buckets.empty()) {
-                for (size_t i = 0; i < std::min(size_t(4), scc_buckets.size()); ++i) {
-                    __builtin_prefetch(&buckets[scc_buckets[i]], 0, 3);
-                }
+        auto activate_bucket = [&](int bucket_pos) {
+            if (bucket_pos < 0 || bucket_is_active[bucket_pos]) return;
+            bucket_is_active[bucket_pos] = 1;
+            active_bucket_heap.push_back(bucket_pos);
+            std::push_heap(active_bucket_heap.begin(), active_bucket_heap.end(), std::greater<int>());
+        };
+
+        for (size_t bucket_idx = 0; bucket_idx < scc_buckets.size(); ++bucket_idx) {
+            const int bucket = scc_buckets[bucket_idx];
+            bucket_pos_in_scc[bucket] = static_cast<int>(bucket_idx);
+
+            const auto &bucket_labels = buckets[bucket].get_labels();
+            auto       &pending_labels = pending_labels_by_bucket[bucket_idx];
+            pending_labels.reserve(bucket_labels.size());
+
+            for (Label *label : bucket_labels) {
+                if (!label->is_extended && !label->is_dominated) pending_labels.push_back(label);
             }
 
-            for (size_t bucket_idx = 0; bucket_idx < scc_buckets.size(); ++bucket_idx) {
-                const auto bucket = scc_buckets[bucket_idx];
+            if (!pending_labels.empty()) activate_bucket(static_cast<int>(bucket_idx));
+        }
 
-                // Prefetch next bucket if available
-                if (bucket_idx + 4 < scc_buckets.size()) {
-                    __builtin_prefetch(&buckets[scc_buckets[bucket_idx + 4]], 0, 3);
-                }
+        while (!active_bucket_heap.empty()) {
+            std::pop_heap(active_bucket_heap.begin(), active_bucket_heap.end(), std::greater<int>());
+            const int bucket_idx = active_bucket_heap.back();
+            active_bucket_heap.pop_back();
 
-                const auto &bucket_labels = buckets[bucket].get_labels();
+            const int  bucket         = scc_buckets[bucket_idx];
+            auto      &pending_labels = pending_labels_by_bucket[bucket_idx];
+            size_t    &pending_cursor = pending_label_cursor[bucket_idx];
 
-                // Prefetch the first few labels
-                if (!bucket_labels.empty()) {
-                    for (size_t i = 0; i < std::min(size_t(4), bucket_labels.size()); ++i) {
-                        __builtin_prefetch(bucket_labels[i], 0, 3);
-                    }
-                }
+            while (pending_cursor < pending_labels.size()) {
+                Label *label = pending_labels[pending_cursor++];
 
-                for (size_t label_idx = 0; label_idx < bucket_labels.size(); ++label_idx) {
-                    Label *label = bucket_labels[label_idx];
+                // Skip labels already processed.
+                if (__builtin_expect(label->is_extended || label->is_dominated, 0)) continue;
 
-                    // Prefetch next label if available
-                    if (label_idx + 4 < bucket_labels.size()) {
-                        __builtin_prefetch(bucket_labels[label_idx + 4], 0, 3);
-                    }
-
-                    // Skip labels already processed.
-                    if (__builtin_expect(label->is_extended || label->is_dominated, 0)) continue;
-
-                    // For partial solutions, check resource feasibility.
-                    if constexpr (F != Full::PSTEP && F != Full::TSP) {
-                        if constexpr (is_partial) {
-                            const auto main_resource = label->resources[main_res_index];
-                            if ((D == Direction::Forward && main_resource > q_star_value) ||
-                                (D == Direction::Backward && main_resource <= q_star_value)) {
-                                label->set_extended(true);
-                                continue;
-                            }
-                        }
-                    }
-
-                    for (uint32_t segment_idx : touched_segments) { Bvisited[segment_idx] = 0; }
-                    touched_segments.clear();
-
-                    // Check if the label is dominated by labels in smaller
-                    // buckets.
-                    if constexpr (F != Full::TSP) {
-                        if (DominatedInCompWiseSmallerBuckets<D, S>(label, bucket, c_bar, Bvisited, touched_segments,
-                                                                    stat_n_dom))
+                // For partial solutions, check resource feasibility.
+                if constexpr (F != Full::PSTEP && F != Full::TSP) {
+                    if constexpr (is_partial) {
+                        const auto main_resource = label->resources[main_res_index];
+                        if ((D == Direction::Forward && main_resource > q_star_value) ||
+                            (D == Direction::Backward && main_resource <= q_star_value)) {
+                            label->set_extended(true);
                             continue;
-                    }
-
-                    // Retrieve outgoing arcs for the current label.
-                    const auto &node_arcs = buckets[bucket].template get_bucket_arcs<D>();
-                    if (__builtin_expect(node_arcs.empty(), 0)) {
-                        label->set_extended(true);
-                        continue;
-                    }
-
-                    // Prefetch first few arcs
-                    if (!node_arcs.empty()) {
-                        for (size_t i = 0; i < std::min(size_t(4), node_arcs.size()); ++i) {
-                            __builtin_prefetch(&node_arcs[i], 0, 3);
                         }
                     }
+                }
 
-                    for (size_t arc_idx = 0; arc_idx < node_arcs.size(); ++arc_idx) {
-                        const auto &arc = node_arcs[arc_idx];
+                for (uint32_t segment_idx : touched_segments) { Bvisited[segment_idx] = 0; }
+                touched_segments.clear();
 
-                        // Prefetch next arc if available
-                        if (arc_idx + 4 < node_arcs.size()) { __builtin_prefetch(&node_arcs[arc_idx + 4], 0, 3); }
+                // Check if the label is dominated by labels in smaller
+                // buckets.
+                if constexpr (F != Full::TSP) {
+                    if (DominatedInCompWiseSmallerBuckets<D, S>(label, bucket, c_bar, Bvisited, touched_segments,
+                                                                stat_n_dom))
+                        continue;
+                }
 
-                        auto new_label = Extend<D, S, ArcType::Bucket, Mutability::Mut, F>(label, arc);
+                // Retrieve outgoing arcs for the current label.
+                const auto &node_arcs = buckets[bucket].template get_bucket_arcs<D>();
+                if (__builtin_expect(node_arcs.empty(), 0)) {
+                    label->set_extended(true);
+                    continue;
+                }
 
-                        // Process each new label produced by the extension.
-                        if (new_label != nullptr) {
-                            ++stat_n_labels;
-                            const int to_bucket     = new_label->vertex;
-                            auto     &mother_bucket = buckets[to_bucket];
+                // Prefetch first few arcs
+                if (!node_arcs.empty()) {
+                    for (size_t i = 0; i < std::min(size_t(4), node_arcs.size()); ++i) {
+                        __builtin_prefetch(&node_arcs[i], 0, 3);
+                    }
+                }
 
-                            // Prefetch the mother bucket and its labels
-                            __builtin_prefetch(&mother_bucket, 0, 3);
+                for (size_t arc_idx = 0; arc_idx < node_arcs.size(); ++arc_idx) {
+                    const auto &arc = node_arcs[arc_idx];
 
-                            const auto &to_bucket_labels = mother_bucket.get_labels();
+                    // Prefetch next arc if available
+                    if (arc_idx + 4 < node_arcs.size()) { __builtin_prefetch(&node_arcs[arc_idx + 4], 0, 3); }
 
-                            // Prefetch first few destination bucket labels
-                            if (!to_bucket_labels.empty()) {
-                                for (size_t i = 0; i < std::min(size_t(4), to_bucket_labels.size()); ++i) {
-                                    __builtin_prefetch(to_bucket_labels[i], 0, 3);
+                    auto new_label = Extend<D, S, ArcType::Bucket, Mutability::Mut, F>(label, arc);
+
+                    // Process each new label produced by the extension.
+                    if (new_label != nullptr) {
+                        ++stat_n_labels;
+                        const int to_bucket     = new_label->vertex;
+                        auto     &mother_bucket = buckets[to_bucket];
+
+                        // Prefetch the mother bucket and its labels
+                        __builtin_prefetch(&mother_bucket, 0, 3);
+
+                        const auto &to_bucket_labels = mother_bucket.get_labels();
+
+                        // Prefetch first few destination bucket labels
+                        if (!to_bucket_labels.empty()) {
+                            for (size_t i = 0; i < std::min(size_t(4), to_bucket_labels.size()); ++i) {
+                                __builtin_prefetch(to_bucket_labels[i], 0, 3);
+                            }
+                        }
+
+                        bool dominated = false;
+                        if constexpr (S == Stage::One) {
+                            // Stage One: mark higher-cost labels as
+                            // dominated.
+                            for (auto *existing_label : to_bucket_labels) {
+                                if (existing_label->is_dominated) continue;
+                                if (label->cost < existing_label->cost)
+                                    existing_label->set_dominated(true);
+                                else {
+                                    dominated = true;
+                                    break;
                                 }
                             }
-
-                            bool dominated = false;
-                            if constexpr (S == Stage::One) {
-                                // Stage One: mark higher-cost labels as
-                                // dominated.
-                                for (auto *existing_label : to_bucket_labels) {
-                                    if (existing_label->is_dominated) continue;
-                                    if (label->cost < existing_label->cost)
-                                        existing_label->set_dominated(true);
-                                    else {
-                                        dominated = true;
-                                        break;
-                                    }
-                                }
-                            } else {
-                                // Later stages: use a SIMD-friendly, unrolled
-                                // loop.
-                                auto check_dominance_in_bucket = [&](std::span<Label *const> labels,
-                                                                     uint                   &stat_n_dom) -> bool {
+                        } else {
+                            // Later stages: use a SIMD-friendly, unrolled
+                            // loop.
+                            auto check_dominance_in_bucket = [&](std::span<Label *const> labels,
+                                                                 uint                   &stat_n_dom) -> bool {
 #ifdef __AVX2__
-                                    if (labels.size() >= AVX_LIM)
-                                        return check_dominance_against_vector<D, S>(
-                                            new_label, labels, cut_storage, stat_n_dom);
-                                    else
+                                if (labels.size() >= AVX_LIM)
+                                    return check_dominance_against_vector<D, S>(
+                                        new_label, labels, cut_storage, stat_n_dom);
+                                else
 #endif
-                                    {
-                                        const size_t size = labels.size();
-                                        size_t       i    = 0;
+                                {
+                                    const size_t size = labels.size();
+                                    size_t       i    = 0;
 
-                                        // Process one label at a time but with
-                                        // prefetching ahead
-                                        for (; i < size; ++i) {
-                                            // Prefetch several labels ahead for
-                                            // better memory access patterns
-                                            if (i + 8 < size) { __builtin_prefetch(labels[i + 8], 0, 3); }
+                                    // Process one label at a time but with
+                                    // prefetching ahead
+                                    for (; i < size; ++i) {
+                                        // Prefetch several labels ahead for
+                                        // better memory access patterns
+                                        if (i + 8 < size) { __builtin_prefetch(labels[i + 8], 0, 3); }
 
-                                            // Process one label with branch
-                                            // prediction hint
-                                            Label *current_label = labels[i];
-                                            if (__builtin_expect(!current_label->is_dominated, 1)) {
-                                                // Cache access to current_label
-                                                // to avoid multiple
-                                                // dereferences
-                                                if (is_dominated<D, S>(new_label, current_label)) {
-                                                    ++stat_n_dom;
-                                                    return true;
-                                                }
+                                        // Process one label with branch
+                                        // prediction hint
+                                        Label *current_label = labels[i];
+                                        if (__builtin_expect(!current_label->is_dominated, 1)) {
+                                            // Cache access to current_label
+                                            // to avoid multiple
+                                            // dereferences
+                                            if (is_dominated<D, S>(new_label, current_label)) {
+                                                ++stat_n_dom;
+                                                return true;
                                             }
                                         }
-                                        return false;
                                     }
-                                };
-                                dominated =
-                                    mother_bucket.check_dominance(new_label, check_dominance_in_bucket, stat_n_dom);
+                                    return false;
+                                }
+                            };
+                            dominated =
+                                mother_bucket.check_dominance(new_label, check_dominance_in_bucket, stat_n_dom);
+                        }
+
+                        if (!dominated) {
+                            // Reuse thread-local vector to avoid
+                            // re-allocation.
+                            tl_labels_to_dominate.clear();
+
+                            const size_t to_bucket_size = to_bucket_labels.size();
+                            size_t       i              = 0;
+
+                            // Process dominance checks in blocks for better
+                            // cache usage
+                            for (; i + 3 < to_bucket_size; i += 4) {
+                                // Prefetch ahead
+                                if (i + 8 < to_bucket_size) {
+                                    __builtin_prefetch(to_bucket_labels[i + 4], 0, 3);
+                                    __builtin_prefetch(to_bucket_labels[i + 5], 0, 3);
+                                    __builtin_prefetch(to_bucket_labels[i + 6], 0, 3);
+                                    __builtin_prefetch(to_bucket_labels[i + 7], 0, 3);
+                                }
+
+                                auto *l0 = to_bucket_labels[i];
+                                auto *l1 = to_bucket_labels[i + 1];
+                                auto *l2 = to_bucket_labels[i + 2];
+                                auto *l3 = to_bucket_labels[i + 3];
+
+                                if (!l0->is_dominated && is_dominated<D, S>(l0, new_label))
+                                    tl_labels_to_dominate.push_back(l0);
+                                if (!l1->is_dominated && is_dominated<D, S>(l1, new_label))
+                                    tl_labels_to_dominate.push_back(l1);
+                                if (!l2->is_dominated && is_dominated<D, S>(l2, new_label))
+                                    tl_labels_to_dominate.push_back(l2);
+                                if (!l3->is_dominated && is_dominated<D, S>(l3, new_label))
+                                    tl_labels_to_dominate.push_back(l3);
                             }
 
-                            if (!dominated) {
-                                // Reuse thread-local vector to avoid
-                                // re-allocation.
-                                tl_labels_to_dominate.clear();
+                            // Process remaining labels
+                            for (; i < to_bucket_size; ++i) {
+                                auto *existing_label = to_bucket_labels[i];
+                                if (!existing_label->is_dominated && is_dominated<D, S>(existing_label, new_label))
+                                    tl_labels_to_dominate.push_back(existing_label);
+                            }
 
-                                const size_t to_bucket_size = to_bucket_labels.size();
-                                size_t       i              = 0;
+                            // Mark dominated labels in batch
+                            for (auto *existing_label : tl_labels_to_dominate) existing_label->set_dominated(true);
 
-                                // Process dominance checks in blocks for better
-                                // cache usage
-                                for (; i + 3 < to_bucket_size; i += 4) {
-                                    // Prefetch ahead
-                                    if (i + 8 < to_bucket_size) {
-                                        __builtin_prefetch(to_bucket_labels[i + 4], 0, 3);
-                                        __builtin_prefetch(to_bucket_labels[i + 5], 0, 3);
-                                        __builtin_prefetch(to_bucket_labels[i + 6], 0, 3);
-                                        __builtin_prefetch(to_bucket_labels[i + 7], 0, 3);
-                                    }
-
-                                    auto *l0 = to_bucket_labels[i];
-                                    auto *l1 = to_bucket_labels[i + 1];
-                                    auto *l2 = to_bucket_labels[i + 2];
-                                    auto *l3 = to_bucket_labels[i + 3];
-
-                                    if (!l0->is_dominated && is_dominated<D, S>(l0, new_label))
-                                        tl_labels_to_dominate.push_back(l0);
-                                    if (!l1->is_dominated && is_dominated<D, S>(l1, new_label))
-                                        tl_labels_to_dominate.push_back(l1);
-                                    if (!l2->is_dominated && is_dominated<D, S>(l2, new_label))
-                                        tl_labels_to_dominate.push_back(l2);
-                                    if (!l3->is_dominated && is_dominated<D, S>(l3, new_label))
-                                        tl_labels_to_dominate.push_back(l3);
-                                }
-
-                                // Process remaining labels
-                                for (; i < to_bucket_size; ++i) {
-                                    auto *existing_label = to_bucket_labels[i];
-                                    if (!existing_label->is_dominated && is_dominated<D, S>(existing_label, new_label))
-                                        tl_labels_to_dominate.push_back(existing_label);
-                                }
-
-                                // Mark dominated labels in batch
-                                for (auto *existing_label : tl_labels_to_dominate) existing_label->set_dominated(true);
-
-                                ++n_labels;
+                            ++n_labels;
 #ifdef SORTED_LABELS
-                                mother_bucket.add_sorted_label(new_label);
+                            mother_bucket.add_sorted_label(new_label);
 #elif defined(LIMITED_BUCKETS)
-                                mother_bucket.sorted_label(new_label, BUCKET_CAPACITY);
+                            mother_bucket.sorted_label(new_label, BUCKET_CAPACITY);
 #else
-                                mother_bucket.add_label(new_label);
+                            mother_bucket.add_label(new_label);
 #endif
-                                // Mark that a new extension was added.
-                                all_ext = false;
+                            const int to_bucket_pos = bucket_pos_in_scc[to_bucket];
+                            if (to_bucket_pos != -1) {
+                                pending_labels_by_bucket[to_bucket_pos].push_back(new_label);
+                                activate_bucket(to_bucket_pos);
                             }
                         }
                     }
-                    label->set_extended(true);
                 }
+                label->set_extended(true);
             }
-        } while (!all_ext);
+
+            bucket_is_active[bucket_idx] = 0;
+        }
+
+        for (const int bucket : scc_buckets) { bucket_pos_in_scc[bucket] = -1; }
 
         // Update c_bar values for all buckets in the current SCC.
         auto sorted_buckets = sorted_sccs[scc_index];

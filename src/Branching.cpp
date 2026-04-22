@@ -6,27 +6,25 @@ void BranchingDuals::computeDuals(BNBNode *model, double threshold) {
     arcDuals_  = ArcDuals();
     nodeDuals_ = NodeDuals();
 
-    // First pass: Compute dual values and store them
-    for (int i = 0; i < branchingCandidates_.size(); ++i) {
-        size_t size = std::min(branchingCandidates_.size(), branchingbaldesCtrs_.size());
+    const size_t size = std::min(branchingCandidates_.size(), branchingbaldesCtrs_.size());
 
-        for (size_t i = 0; i < size; ++i) {
-            auto candidate = branchingCandidates_[i];
-            auto ctr       = branchingbaldesCtrs_[i];
+    // Compute dual contributions once per active branching constraint.
+    for (size_t i = 0; i < size; ++i) {
+        auto candidate = branchingCandidates_[i];
+        auto ctr       = branchingbaldesCtrs_[i];
 
-            double dualValue = model->getDualVal(ctr->index());
+        double dualValue = model->getDualVal(ctr->index());
 
-            // TODO: check sign direction
-            if (candidate->boundType == BranchingDirection::Less) { dualValue = -dualValue; }
+        // TODO: check sign direction
+        if (candidate->boundType == BranchingDirection::Less) { dualValue = -dualValue; }
 
-            if (std::abs(dualValue) < threshold) { continue; }
+        if (std::abs(dualValue) < threshold) { continue; }
 
-            if (candidate->getCandidateType() == CandidateType::Edge) {
-                RawArc arc(candidate->sourceNode, candidate->targetNode);
-                arcDuals_.setOrIncrementDual(arc, dualValue);
-            } else if (candidate->getCandidateType() == CandidateType::Node) {
-                nodeDuals_.setOrIncrementDual(candidate->targetNode, dualValue);
-            }
+        if (candidate->getCandidateType() == CandidateType::Edge) {
+            RawArc arc(candidate->sourceNode, candidate->targetNode);
+            arcDuals_.setOrIncrementDual(arc, dualValue);
+        } else if (candidate->getCandidateType() == CandidateType::Node) {
+            nodeDuals_.setOrIncrementDual(candidate->targetNode, dualValue);
         }
     }
 }
@@ -36,13 +34,13 @@ Branching::evaluateWithCG(BNBNode *node, const std::vector<BranchingQueueItem> &
     std::vector<BranchingQueueItem> results;
     std::mutex                      results_mutex; // Mutex to protect shared results
 
-    const int                JOBS = std::thread::hardware_concurrency();
+    const unsigned           JOBS = std::max(1u, std::thread::hardware_concurrency());
     exec::static_thread_pool pool(JOBS); // Pool with concurrent threads
     auto                     sched = pool.get_scheduler();
 
     // Define chunk size based on performance tuning (adjust as needed)
     const int chunk_size   = 10;
-    auto      total_chunks = phase1Candidates.size() / JOBS;
+    auto      total_chunks = (phase1Candidates.size() + chunk_size - 1) / chunk_size;
 
     // Parallel bulk execution
     auto bulk_sender = stdexec::bulk(
