@@ -1,0 +1,7 @@
+<map id="Snapshot" name="Snapshot">
+<area shape="rect" id="Node000001" title=" " alt="" coords="59,199,135,224"/>
+<area shape="rect" id="Node000002" href="$classCutStorage.html" title="Manages the storage and operations related to cuts in a solver." alt="" coords="54,102,140,128"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="100,143,100,198,94,198,94,143"/>
+<area shape="rect" id="Node000003" href="$structCutStorage_1_1SegmentMasks.html" title=" " alt="" coords="5,5,189,31"/>
+<area shape="poly" id="edge2_Node000002_Node000003" title=" " alt="" coords="100,46,100,101,94,101,94,46"/>
+</map>

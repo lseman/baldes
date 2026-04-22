@@ -1,0 +1,32 @@
+<map id="Node.h" name="Node.h">
+<area shape="rect" id="Node000001" title="Node class implementation." alt="" coords="254,5,316,31"/>
+<area shape="rect" id="Node000002" href="$BCP_8h.html" title="Header file for the BCP class." alt="" coords="112,153,170,178"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="239,24,207,30,173,40,141,56,117,80,111,98,114,117,133,151,129,153,109,118,106,97,112,78,138,52,171,35,205,24,238,19"/>
+<area shape="rect" id="Node000004" href="$BNB_8h.html" title=" " alt="" coords="19,226,79,252"/>
+<area shape="poly" id="edge9_Node000001_Node000004" title=" " alt="" coords="239,26,206,32,170,42,135,58,104,81,79,117,63,158,55,197,52,226,47,226,50,196,58,156,74,114,100,77,132,53,168,37,205,26,238,20"/>
+<area shape="rect" id="Node000005" href="$Baldes_8cpp.html" title=" " alt="" coords="6,300,92,326"/>
+<area shape="poly" id="edge10_Node000001_Node000005" title=" " alt="" coords="239,25,201,30,158,40,116,57,79,81,47,113,30,145,20,181,10,227,8,239,10,251,23,277,39,298,35,301,19,280,5,253,3,239,5,226,15,179,25,143,43,110,75,77,114,52,157,35,200,25,238,19"/>
+<area shape="rect" id="Node000006" href="$Branching_8h.html" title=" " alt="" coords="204,226,294,252"/>
+<area shape="poly" id="edge12_Node000001_Node000006" title=" " alt="" coords="280,46,272,80,259,163,253,226,247,226,254,162,266,78,275,45"/>
+<area shape="rect" id="Node000007" href="$Branching_8cpp.html" title=" " alt="" coords="324,300,427,326"/>
+<area shape="poly" id="edge11_Node000001_Node000007" title=" " alt="" coords="331,33,362,51,386,78,399,107,405,139,407,172,405,204,395,261,383,300,378,299,389,259,400,203,402,172,400,140,394,109,381,80,358,55,329,37"/>
+<area shape="rect" id="Node000008" href="$ExactRCC_8h.html" title=" " alt="" coords="281,79,371,105"/>
+<area shape="poly" id="edge13_Node000001_Node000008" title=" " alt="" coords="302,43,322,77,317,80,297,46"/>
+<area shape="rect" id="Node000009" href="$Problem_8h.html" title=" " alt="" coords="127,79,206,105"/>
+<area shape="poly" id="edge14_Node000001_Node000009" title=" " alt="" coords="253,42,188,81,185,76,251,37"/>
+<area shape="rect" id="Node000010" href="$RCC_8cpp.html" title=" " alt="" coords="446,79,518,105"/>
+<area shape="poly" id="edge16_Node000001_Node000010" title=" " alt="" coords="332,33,450,76,448,81,330,38"/>
+<area shape="rect" id="Node000011" href="$SRC_8cpp.html" title="Implementation of functions and classes for solving VRP problems using Limited Memory Rank&#45;1 Cuts." alt="" coords="542,79,614,105"/>
+<area shape="poly" id="edge17_Node000001_Node000011" title=" " alt="" coords="332,28,542,79,541,84,330,33"/>
+<area shape="rect" id="Node000012" href="$TR_8h.html" title=" " alt="" coords="638,79,686,105"/>
+<area shape="poly" id="edge18_Node000001_Node000012" title=" " alt="" coords="332,23,465,44,627,76,638,80,637,85,626,82,465,49,332,28"/>
+<area shape="rect" id="Node000003" href="$BCP_8cpp.html" title=" " alt="" coords="162,300,234,326"/>
+<area shape="poly" id="edge2_Node000002_Node000003" title=" " alt="" coords="154,192,196,299,191,300,149,194"/>
+<area shape="poly" id="edge3_Node000002_Node000004" title=" " alt="" coords="115,190,66,228,63,224,112,186"/>
+<area shape="poly" id="edge5_Node000002_Node000005" title=" " alt="" coords="129,193,93,253,60,301,56,298,88,251,124,190"/>
+<area shape="poly" id="edge6_Node000002_Node000006" title=" " alt="" coords="174,185,232,224,229,228,171,190"/>
+<area shape="poly" id="edge4_Node000004_Node000005" title=" " alt="" coords="52,267,52,300,46,300,46,267"/>
+<area shape="poly" id="edge7_Node000006_Node000003" title=" " alt="" coords="234,266,209,301,205,298,230,263"/>
+<area shape="poly" id="edge8_Node000006_Node000007" title=" " alt="" coords="285,258,355,297,353,302,282,262"/>
+<area shape="poly" id="edge15_Node000009_Node000002" title=" " alt="" coords="160,120,148,153,143,151,155,118"/>
+</map>

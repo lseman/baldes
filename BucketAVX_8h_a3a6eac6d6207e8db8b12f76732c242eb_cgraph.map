@@ -1,0 +1,11 @@
+<map id="check_dominance_against_vector" name="check_dominance_against_vector">
+<area shape="rect" id="Node000001" title=" " alt="" coords="5,72,181,113"/>
+<area shape="rect" id="Node000002" href="$namespacenumericutils.html#a30fadd8aa82c3a907ce52a6c1735a378" title=" " alt="" coords="239,5,348,31"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="149,69,242,34,244,39,151,74"/>
+<area shape="rect" id="Node000003" href="$BucketAVX_8h.html#a1055d33f3fa0023a7782b354c84f30d6" title=" " alt="" coords="253,55,334,80"/>
+<area shape="poly" id="edge2_Node000001_Node000003" title=" " alt="" coords="181,79,238,72,238,77,181,84"/>
+<area shape="rect" id="Node000004" href="$BucketAVX_8h.html#a4f6006d66fa23bc62965a93c057360af" title=" " alt="" coords="229,104,358,130"/>
+<area shape="poly" id="edge3_Node000001_Node000004" title=" " alt="" coords="181,101,214,105,213,110,181,106"/>
+<area shape="rect" id="Node000005" href="$namespacenumericutils.html#a2124ad1e887fe39c413948ee927c879e" title=" " alt="" coords="241,153,346,179"/>
+<area shape="poly" id="edge4_Node000001_Node000005" title=" " alt="" coords="151,111,242,145,241,150,150,116"/>
+</map>

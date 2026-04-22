@@ -1,0 +1,6 @@
+<map id="CutStorage::pruneLowDualCuts" name="CutStorage::pruneLowDualCuts">
+<area shape="rect" id="Node000001" title=" " alt="" coords="5,29,208,55"/>
+<area shape="rect" id="Node000002" href="$classCutStorage.html#a4439d72adc244e8ee7c120dc2b99f0dd" title=" " alt="" coords="256,29,411,55"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="208,40,240,40,240,45,208,45"/>
+<area shape="poly" id="edge2_Node000002_Node000002" title=" " alt="" coords="296,31,288,21,293,11,308,5,333,3,361,5,375,12,373,17,360,10,333,8,309,10,296,15,294,20,300,27"/>
+</map>

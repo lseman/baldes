@@ -1,0 +1,7 @@
+<map id="CachedCut" name="CachedCut">
+<area shape="rect" id="Node000001" title=" " alt="" coords="22,199,107,224"/>
+<area shape="rect" id="Node000002" href="$structCut.html" title="Represents a cut in the optimization problem." alt="" coords="44,102,85,128"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="67,143,67,198,62,198,62,143"/>
+<area shape="rect" id="Node000003" href="$structSRCPermutation.html" title=" " alt="" coords="5,5,124,31"/>
+<area shape="poly" id="edge2_Node000002_Node000003" title=" " alt="" coords="67,46,67,101,62,101,62,46"/>
+</map>

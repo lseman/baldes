@@ -1,0 +1,19 @@
+<map id="CutIntelligence.h" name="CutIntelligence.h">
+<area shape="rect" id="Node000001" title=" " alt="" coords="262,5,379,31"/>
+<area shape="rect" id="Node000002" href="$HeuristicHighOrder_8h.html" title=" " alt="" coords="196,79,338,105"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="305,45,278,80,274,77,301,42"/>
+<area shape="rect" id="Node000003" href="$SRC_8cpp.html" title="Implementation of functions and classes for solving VRP problems using Limited Memory Rank&#45;1 Cuts." alt="" coords="263,300,336,326"/>
+<area shape="poly" id="edge10_Node000001_Node000003" title=" " alt="" coords="339,44,353,78,353,105,343,163,330,219,306,300,301,299,325,218,338,162,347,104,347,80,334,46"/>
+<area shape="poly" id="edge2_Node000002_Node000003" title=" " alt="" coords="274,120,300,299,295,300,269,120"/>
+<area shape="rect" id="Node000004" href="$SRC_8h.html" title="Definitions for handling cuts and optimizations for the Vehicle Routing Problem with Time Windows (VR..." alt="" coords="177,153,235,178"/>
+<area shape="poly" id="edge3_Node000002_Node000004" title=" " alt="" coords="249,118,218,154,214,150,245,115"/>
+<area shape="poly" id="edge9_Node000004_Node000003" title=" " alt="" coords="226,190,251,225,295,298,290,301,246,228,222,193"/>
+<area shape="rect" id="Node000005" href="$BucketSolve_8h.html" title="Defines the BucketGraph class and its solving methods for optimization problems." alt="" coords="5,300,111,326"/>
+<area shape="poly" id="edge4_Node000004_Node000005" title=" " alt="" coords="162,172,130,177,97,187,66,204,42,228,35,245,37,264,53,299,48,301,32,266,30,245,37,225,63,200,95,182,129,172,161,167"/>
+<area shape="rect" id="Node000015" href="$BucketUtils_8h.html" title="Header file for utilities related to the Bucket Graph in the Vehicle Routing Problem (VRP)." alt="" coords="51,226,150,252"/>
+<area shape="poly" id="edge5_Node000004_Node000015" title=" " alt="" coords="177,190,120,228,117,224,174,185"/>
+<area shape="rect" id="Node000016" href="$Node_8h.html" title="Node class implementation." alt="" coords="175,226,237,252"/>
+<area shape="poly" id="edge7_Node000004_Node000016" title=" " alt="" coords="209,194,209,226,203,226,203,194"/>
+<area shape="poly" id="edge6_Node000015_Node000005" title=" " alt="" coords="88,267,67,301,63,298,84,264"/>
+<area shape="poly" id="edge8_Node000016_Node000003" title=" " alt="" coords="236,260,285,298,282,302,232,264"/>
+</map>

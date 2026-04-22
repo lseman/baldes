@@ -1,0 +1,21 @@
+<map id="VRProblem::addColumn" name="VRProblem::addColumn">
+<area shape="rect" id="Node000001" title=" " alt="" coords="5,203,164,228"/>
+<area shape="rect" id="Node000002" href="$classBNBNode.html#aa12be3869431139b74f044ea529f73fd" title=" " alt="" coords="269,5,403,31"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="89,201,105,168,131,123,166,78,210,40,231,29,253,22,255,28,233,34,213,44,170,82,135,126,110,170,94,203"/>
+<area shape="rect" id="Node000003" href="$classMIPColumn.html#ade479a0c70a0f077ebdac6c2b5677283" title=" " alt="" coords="263,55,409,80"/>
+<area shape="poly" id="edge2_Node000001_Node000003" title=" " alt="" coords="93,200,139,146,172,115,210,89,247,75,249,80,213,94,176,119,143,149,97,204"/>
+<area shape="rect" id="Node000004" href="$classBNBNode.html#adaa61c7ee649303ac9ebefecc32101dd" title=" " alt="" coords="269,104,403,130"/>
+<area shape="poly" id="edge3_Node000001_Node000004" title=" " alt="" coords="102,200,150,169,211,138,253,126,254,131,213,143,152,173,105,205"/>
+<area shape="rect" id="Node000005" href="$classRCCManager.html#a3125b0bd609b397e71873c072ef20b1f" title=" " alt="" coords="212,153,460,179"/>
+<area shape="poly" id="edge4_Node000001_Node000005" title=" " alt="" coords="152,199,211,188,250,180,251,185,212,193,153,205"/>
+<area shape="rect" id="Node000006" href="$classBNBNode.html#a8e9719a49d2b149441b61ee4aa790fa2" title=" " alt="" coords="261,203,410,228"/>
+<area shape="poly" id="edge5_Node000001_Node000006" title=" " alt="" coords="164,213,245,213,245,218,164,218"/>
+<area shape="rect" id="Node000007" href="$classRCCManager.html#a9d7a5b2b357c02c32bd9869be95745d6" title=" " alt="" coords="261,252,410,278"/>
+<area shape="poly" id="edge6_Node000001_Node000007" title=" " alt="" coords="153,226,212,238,251,246,250,251,211,243,152,232"/>
+<area shape="rect" id="Node000008" href="$classBNBNode.html#a04a0757f406626dd8880a5b83b084bed" title=" " alt="" coords="266,301,406,327"/>
+<area shape="poly" id="edge7_Node000001_Node000008" title=" " alt="" coords="105,226,152,258,213,288,251,299,250,304,211,293,150,262,102,231"/>
+<area shape="rect" id="Node000009" href="$classMIPColumn.html#ae0f44687df980e7b766c8153f85a4df5" title=" " alt="" coords="267,351,405,376"/>
+<area shape="poly" id="edge8_Node000001_Node000009" title=" " alt="" coords="97,227,143,282,176,312,213,337,252,352,251,357,210,342,172,316,139,285,93,231"/>
+<area shape="rect" id="Node000010" href="$classBNBNode.html#a826ed1319c03caf3030806fd80098063" title=" " alt="" coords="273,400,398,426"/>
+<area shape="poly" id="edge9_Node000001_Node000010" title=" " alt="" coords="94,228,110,261,135,305,170,349,213,387,235,397,259,405,257,410,233,402,210,391,166,353,131,308,105,263,89,230"/>
+</map>

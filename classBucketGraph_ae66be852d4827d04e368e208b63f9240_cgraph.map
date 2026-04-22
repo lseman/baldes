@@ -1,0 +1,20 @@
+<map id="BucketGraph::common_initialization" name="BucketGraph::common_initialization">
+<area shape="rect" id="Node000001" title=" " alt="" coords="5,128,159,169"/>
+<area shape="rect" id="Node000002" href="$classBucketGraph.html#a8b934dd825af2c3536269ac190b398b3" title="Initializes the BucketGraph by clearing previous data and setting up forward and backward buckets." alt="" coords="207,128,360,169"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="159,146,191,146,191,151,159,151"/>
+<area shape="rect" id="Node000003" href="$classBucketGraph.html#af129eff306551dc7cc7fe00b919bbbd0" title="Assigns the buckets based on the specified direction." alt="" coords="825,5,966,46"/>
+<area shape="poly" id="edge2_Node000002_Node000003" title=" " alt="" coords="323,125,447,68,527,40,609,19,656,13,693,13,777,19,809,20,809,25,777,24,692,19,656,18,610,24,528,45,449,73,325,130"/>
+<area shape="rect" id="Node000004" href="$classBucketGraph.html#a271b281faa2c8270516e07c91cb4edb4" title=" " alt="" coords="408,128,561,169"/>
+<area shape="poly" id="edge3_Node000002_Node000004" title=" " alt="" coords="360,146,393,146,393,151,360,151"/>
+<area shape="rect" id="Node000008" href="$classBucketGraph.html#ad36a543a58c7d3cd4ded313dd5069f03" title="Marks a node as visited in the bitmap." alt="" coords="615,221,771,262"/>
+<area shape="poly" id="edge10_Node000002_Node000008" title=" " alt="" coords="361,166,409,178,600,220,599,225,407,183,360,171"/>
+<area shape="rect" id="Node000005" href="$classBucketGraph.html#abb791c45d27a9425607480e3101f7d28" title=" " alt="" coords="609,33,777,74"/>
+<area shape="poly" id="edge4_Node000004_Node000005" title=" " alt="" coords="523,125,608,83,620,78,623,83,610,88,526,130"/>
+<area shape="rect" id="Node000006" href="$classBucketGraph.html#ad15267e0cffaa8dc5222028409c9e082" title=" " alt="" coords="626,98,760,124"/>
+<area shape="poly" id="edge6_Node000004_Node000006" title=" " alt="" coords="562,132,610,123,611,128,562,137"/>
+<area shape="rect" id="Node000007" href="$classArcDuals.html#ac75e53f0c4f24e6aca539c544e9f8109" title=" " alt="" coords="631,172,755,197"/>
+<area shape="poly" id="edge7_Node000004_Node000007" title=" " alt="" coords="562,159,616,168,615,174,562,164"/>
+<area shape="poly" id="edge9_Node000004_Node000008" title=" " alt="" coords="528,167,610,207,623,213,621,218,608,212,526,172"/>
+<area shape="poly" id="edge5_Node000005_Node000003" title=" " alt="" coords="777,39,809,35,810,40,778,45"/>
+<area shape="poly" id="edge8_Node000007_Node000007" title=" " alt="" coords="659,173,653,163,657,153,670,147,693,145,718,148,731,154,728,159,716,153,693,150,672,152,660,157,658,162,663,170"/>
+</map>

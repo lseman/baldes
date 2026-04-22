@@ -1,0 +1,17 @@
+<map id="BNBNode" name="BNBNode">
+<area shape="rect" id="Node000001" title="Represents a node in a tree structure./." alt="" coords="219,310,299,336"/>
+<area shape="poly" id="edge8_Node000001_Node000001" title=" " alt="" coords="316,314,326,323,318,332,300,335,299,330,315,328,321,323,313,318"/>
+<area shape="rect" id="Node000002" title=" " alt="" coords="5,199,169,239"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="134,245,199,284,239,307,237,312,196,289,131,250"/>
+<area shape="rect" id="Node000003" href="$classVRProblem.html" title=" " alt="" coords="298,206,385,232"/>
+<area shape="poly" id="edge2_Node000001_Node000003" title=" " alt="" coords="325,246,271,311,267,308,320,242"/>
+<area shape="rect" id="Node000004" href="$structInstanceData.html" title="A structure to hold various data related to an instance of a problem." alt="" coords="178,102,276,128"/>
+<area shape="poly" id="edge6_Node000001_Node000004" title=" " alt="" coords="227,143,227,188,231,239,242,278,256,309,251,311,237,279,226,240,221,189,222,143"/>
+<area shape="poly" id="edge3_Node000003_Node000004" title=" " alt="" coords="249,138,284,173,325,204,322,208,280,177,245,141"/>
+<area shape="rect" id="Node000005" href="$structSnapshot.html" title=" " alt="" coords="310,102,386,128"/>
+<area shape="poly" id="edge4_Node000003_Node000005" title=" " alt="" coords="349,144,345,206,340,205,344,143"/>
+<area shape="rect" id="Node000006" href="$classCutStorage.html" title="Manages the storage and operations related to cuts in a solver." alt="" coords="305,5,392,31"/>
+<area shape="poly" id="edge5_Node000005_Node000006" title=" " alt="" coords="351,46,351,101,346,101,346,46"/>
+<area shape="rect" id="Node000008" href="$classMIPProblem.html" title=" " alt="" coords="410,206,503,232"/>
+<area shape="poly" id="edge7_Node000001_Node000008" title=" " alt="" coords="433,244,402,267,366,289,301,314,299,309,363,284,399,262,430,239"/>
+</map>

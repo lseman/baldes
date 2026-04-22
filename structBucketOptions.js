@@ -1,0 +1,27 @@
+var structBucketOptions =
+[
+    [ "battery_capacity", "structBucketOptions.html#a07c3dabeed73d0cafd3fb3b9a8d7c493", null ],
+    [ "bucket_fixing", "structBucketOptions.html#a1faded307bc58ebc006540153ccc2fb0", null ],
+    [ "depot", "structBucketOptions.html#abdd9cd44f4323b48948c1476a58e4890", null ],
+    [ "end_depot", "structBucketOptions.html#a1464a17337f37b76cd77fbcd80095685", null ],
+    [ "main_resources", "structBucketOptions.html#a7cb33e9352864e73ca0236ac5f255408", null ],
+    [ "manual_arcs", "structBucketOptions.html#a63a06654da7292fa9bfe6a1733770d8f", null ],
+    [ "max_path_size", "structBucketOptions.html#ac58e549feb8958cc88c3fbfd594459e8", null ],
+    [ "max_recharge_time", "structBucketOptions.html#a1c4b1bc630120d3beddd08fbf12807f5", null ],
+    [ "max_recharges", "structBucketOptions.html#a25f1b15faac9cbc36175a2ed11d98ee3", null ],
+    [ "min_path_size", "structBucketOptions.html#ac62b9aab651372644fc82b5098126300", null ],
+    [ "n_warm_start", "structBucketOptions.html#a6f5669f91115fe3eeb30536a6d4868f6", null ],
+    [ "or_resources", "structBucketOptions.html#a729e0ce700bc1ec2721bf6804f0ce708", null ],
+    [ "pstep", "structBucketOptions.html#a2e623c84907427c6038493ecaa09c1f0", null ],
+    [ "pstep_depot", "structBucketOptions.html#a8c9de224ce464946db9c79bd2983478a", null ],
+    [ "pstep_end_depot", "structBucketOptions.html#aa358f949b7d1595b62b19090c93e33c0", null ],
+    [ "resource_type", "structBucketOptions.html#a673554f1d9ce0931f1382273192c46c3", null ],
+    [ "resources", "structBucketOptions.html#add2098953ea3aa1a1ac250eda374d425", null ],
+    [ "size", "structBucketOptions.html#a101e2ff175d62615eeaeb8f4201a0a3c", null ],
+    [ "symmetric", "structBucketOptions.html#a752d9ad48d6b8b9efaa4d5cdce80d19f", null ],
+    [ "three_five_sign", "structBucketOptions.html#a32598dc4943be1d63527590d51f7bf55", null ],
+    [ "three_three_sign", "structBucketOptions.html#a0f94d5726eef9e2f669804c854c87eed", null ],
+    [ "three_two_sign", "structBucketOptions.html#ab1d45645dee6f03d717e5d291aeea379", null ],
+    [ "verbose", "structBucketOptions.html#a06aeb73b0da8c26e191c62e3512121a7", null ],
+    [ "warm_start", "structBucketOptions.html#a5f65cdf5f8be69a9496868b0526d1bcc", null ]
+];

@@ -1,0 +1,5 @@
+<map id="VRProblem::detectIntegerMasterSolution" name="VRProblem::detectIntegerMasterSolution">
+<area shape="rect" id="Node000001" title=" " alt="" coords="5,5,175,46"/>
+<area shape="rect" id="Node000002" href="$structSparseMatrix.html#ac26c4929ac60060aaff5424264e22c53" title=" " alt="" coords="223,13,370,38"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="175,23,207,23,207,28,175,28"/>
+</map>

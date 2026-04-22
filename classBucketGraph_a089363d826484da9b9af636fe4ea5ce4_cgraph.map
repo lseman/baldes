@@ -1,0 +1,9 @@
+<map id="BucketGraph::mono_initialization" name="BucketGraph::mono_initialization">
+<area shape="rect" id="Node000001" title="Initializes the BucketGraph for the mono&#45;directional case." alt="" coords="5,70,215,96"/>
+<area shape="rect" id="Node000002" href="$classBucketGraph.html#af129eff306551dc7cc7fe00b919bbbd0" title="Assigns the buckets based on the specified direction." alt="" coords="282,5,424,46"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="167,67,266,43,268,48,168,72"/>
+<area shape="rect" id="Node000003" href="$Definitions_8h.html#a59e29a115ea52c2f99d3ff52f83cb3cf" title=" " alt="" coords="263,70,443,96"/>
+<area shape="poly" id="edge2_Node000001_Node000003" title=" " alt="" coords="215,80,247,80,247,86,215,86"/>
+<area shape="rect" id="Node000004" href="$classBucketGraph.html#ad36a543a58c7d3cd4ded313dd5069f03" title="Marks a node as visited in the bitmap." alt="" coords="275,120,431,161"/>
+<area shape="poly" id="edge3_Node000001_Node000004" title=" " alt="" coords="168,94,260,116,259,121,167,99"/>
+</map>
