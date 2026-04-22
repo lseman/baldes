@@ -400,7 +400,7 @@ double LimitedMemoryRank1Cuts::computeLimitedMemoryCoefficient(
 std::vector<CandidateSet> LocalSearch::solve(
     const CandidateSet &initial, const SparseMatrix &A,
     const std::vector<double> &x,
-    const std::vector<std::vector<int>> &node_scores, int max_iterations) {
+    const std::vector<std::vector<NodeScore>> &node_scores, int max_iterations) {
     // Initialize best and current candidate sets.
     CandidateSet best = initial;
     CandidateSet current = initial;
@@ -477,8 +477,10 @@ std::vector<CandidateSet> LocalSearch::solve(
                 applyAddNeighbors(current, node_scores,
                                   LocalSearchConfig::MAX_ADD_COUNT);
                 break;
+            case OperatorType::SWAP_NODE:
+                applySwapNode(current, node_scores);
+                break;
             default:
-                // Optionally fallback or combine neighbor updates.
                 applyUpdateNeighbors(current, node_scores);
                 break;
         }

@@ -5,6 +5,7 @@
 #include "RNG.h"
 #include "SparseMatrix.h"
 #include "VRPNode.h"
+#include <unordered_set>
 
 class HighRankCuts;  // Forward declaration
 
@@ -17,7 +18,8 @@ class LocalSearch {
         REMOVE_NODE,
         ADD_NODE,
         REMOVE_NEIGHBORS,
-        ADD_NEIGHBORS
+        ADD_NEIGHBORS,
+        SWAP_NODE
     };
 
     struct OperatorStats {
@@ -37,7 +39,7 @@ class LocalSearch {
     // ---------------------------
     // Member Variables / Counters
     // ---------------------------
-    std::array<OperatorStats, 4> operators;  // one for each operator type
+    std::array<OperatorStats, 5> operators;  // one for each operator type
     std::deque<SegmentStats> history;        // search history over segments
     SegmentStats current_segment{};          // current segment statistics
 
@@ -62,10 +64,16 @@ class LocalSearch {
     }
 
     // Select an operator based on current operator scores.
+    // The SWAP_NODE operator is currently disabled while keeping the code
+    // path in place for future reactivation.
     OperatorType selectOperator() {
         std::vector<double> weights;
-        for (const auto &op : operators) {
-            weights.push_back(op.score);
+        for (size_t i = 0; i < operators.size(); ++i) {
+            if (i == static_cast<size_t>(OperatorType::SWAP_NODE)) {
+                weights.push_back(0.0);
+            } else {
+                weights.push_back(operators[i].score);
+            }
         }
         std::discrete_distribution<> dist(weights.begin(), weights.end());
         return static_cast<OperatorType>(dist(rng));
@@ -96,7 +104,7 @@ class LocalSearch {
     // Add one node from the neighbor set that is not already in the candidate
     // set.
     void applyAddNode(CandidateSet &current,
-                      const std::vector<std::vector<int>> &node_scores) {
+                      const std::vector<std::vector<NodeScore>> &node_scores) {
         std::vector<int> nodes_vec(current.nodes.begin(), current.nodes.end());
         std::vector<int> potential;
 
@@ -109,15 +117,54 @@ class LocalSearch {
             }
         }
         if (!potential.empty()) {
-            std::shuffle(potential.begin(), potential.end(), rng);
-            // Optionally, one could score potential nodes using node_scores.
+            // Prefer candidates with better node-score support when available.
             int chosen = potential.front();
+            double best_score = std::numeric_limits<double>::infinity();
+            for (int candidate : potential) {
+                if (candidate >= 0 && candidate < static_cast<int>(node_scores.size())) {
+                    for (const auto &score : node_scores[candidate]) {
+                        if (score.cost_score < best_score) {
+                            best_score = score.cost_score;
+                            chosen = candidate;
+                        }
+                    }
+                }
+            }
             nodes_vec.push_back(chosen);
             current.nodes = ankerl::unordered_dense::set<int>(nodes_vec.begin(),
                                                               nodes_vec.end());
             // Re-add candidate nodes to neighbor set.
             for (const int &node : nodes_vec) {
                 current.neighbor.insert(node);
+            }
+        }
+    }
+
+    // Operator: Swap a node.
+    // Replace one candidate node with a neighbor node to keep rank constant.
+    void applySwapNode(CandidateSet &current,
+                       const std::vector<std::vector<NodeScore>> &node_scores) {
+        if (current.nodes.size() <= static_cast<size_t>(MIN_RANK)) return;
+        std::vector<int> nodes_vec(current.nodes.begin(), current.nodes.end());
+        std::vector<int> removable(nodes_vec.begin(), nodes_vec.end());
+        std::shuffle(removable.begin(), removable.end(), rng);
+
+        for (int remove : removable) {
+            std::vector<int> neighbor_candidates;
+            for (const auto &score : node_scores[remove]) {
+                int neighbor = score.node;
+                if (current.nodes.find(neighbor) == current.nodes.end() &&
+                    current.neighbor.find(neighbor) == current.neighbor.end()) {
+                    neighbor_candidates.push_back(neighbor);
+                }
+            }
+            if (!neighbor_candidates.empty()) {
+                int add_node = neighbor_candidates[rng() % neighbor_candidates.size()];
+                current.nodes.erase(remove);
+                current.nodes.insert(add_node);
+                current.neighbor.insert(remove);
+                current.neighbor.insert(add_node);
+                return;
             }
         }
     }
@@ -141,16 +188,19 @@ class LocalSearch {
 
     // Operator: Add Neighbors.
     void applyAddNeighbors(CandidateSet &current,
-                           const std::vector<std::vector<int>> &node_scores,
+                           const std::vector<std::vector<NodeScore>> &node_scores,
                            int add_count) {
         std::vector<int> nodes_vec(current.nodes.begin(), current.nodes.end());
         std::sort(nodes_vec.begin(), nodes_vec.end());
         std::vector<int> potential_neighbors;
+        std::unordered_set<int> visited;
         for (const int &node : nodes_vec) {
-            for (const int &neighbor : node_scores[node]) {
-                if (!std::binary_search(nodes_vec.begin(), nodes_vec.end(),
-                                        neighbor) &&
-                    current.neighbor.find(neighbor) == current.neighbor.end()) {
+            for (const auto &score : node_scores[node]) {
+                int neighbor = score.node;
+                if (!std::binary_search(nodes_vec.begin(), nodes_vec.end(), neighbor) &&
+                    current.neighbor.find(neighbor) == current.neighbor.end() &&
+                    !visited.count(neighbor)) {
+                    visited.insert(neighbor);
                     potential_neighbors.push_back(neighbor);
                 }
             }
@@ -168,7 +218,7 @@ class LocalSearch {
     // neighbors.
     void applyUpdateNeighbors(
         CandidateSet &current,
-        const std::vector<std::vector<int>> &node_scores) {
+        const std::vector<std::vector<NodeScore>> &node_scores) {
         applyRemoveNeighbors(current, LocalSearchConfig::MAX_REMOVE_COUNT);
         applyAddNeighbors(current, node_scores,
                           LocalSearchConfig::MAX_ADD_COUNT);
@@ -287,7 +337,7 @@ class LocalSearch {
     std::vector<CandidateSet> solve(
         const CandidateSet &initial, const SparseMatrix &A,
         const std::vector<double> &x,
-        const std::vector<std::vector<int>> &node_scores,
+        const std::vector<std::vector<NodeScore>> &node_scores,
         int max_iterations = 50);
 };
 
@@ -393,12 +443,12 @@ class AdaptiveNodeScorer {
     }
 
     // Compute node scores for each vertex using problem data and feedback.
-    std::vector<std::vector<int>> computeNodeScores(
+    std::vector<std::vector<NodeScore>> computeNodeScores(
         const SparseMatrix &A, const std::vector<double> &x,
         const std::vector<std::vector<double>> &distances,
         const std::vector<VRPNode> &nodes, const ArcDuals &arc_duals,
         const CutStorage &cutStorage) {
-        std::vector<std::vector<int>> scores(N_SIZE);
+        std::vector<std::vector<NodeScore>> scores(N_SIZE);
         const auto &active_cuts = cutStorage.getActiveCuts();
 
         // Pre-calculate adjustments from active cuts.
@@ -429,7 +479,7 @@ class AdaptiveNodeScorer {
 
         // Compute scores for each vertex i (ignoring depot vertices).
         for (int i = 1; i < N_SIZE - 1; ++i) {
-            std::vector<std::pair<int, double>> node_scores;
+            std::vector<NodeScore> node_scores;
             node_scores.reserve(N_SIZE - 2);
 
             for (int j = 1; j < N_SIZE - 1; ++j) {
@@ -455,7 +505,7 @@ class AdaptiveNodeScorer {
                 //     HISTORY_WEIGHT * confidence * historical_score +
                 //     NEIGHBOR_WEIGHT * neighbor_score;
 
-                node_scores.emplace_back(j, base_score);
+                node_scores.emplace_back(j, i, base_score);
             }
 
             // Sort candidates for vertex i by score (lowest scores are best).
@@ -465,7 +515,7 @@ class AdaptiveNodeScorer {
                     std::min(MAX_CANDIDATES_PER_NODE,
                              static_cast<int>(node_scores.size())),
                 node_scores.end(), [](const auto &a, const auto &b) {
-                    return a.second < b.second;
+                    return a.cost_score < b.cost_score;
                 });
 
             // Store top candidate node indices.
@@ -473,7 +523,7 @@ class AdaptiveNodeScorer {
             for (int j = 0; j < std::min(MAX_CANDIDATES_PER_NODE,
                                          static_cast<int>(node_scores.size()));
                  ++j) {
-                i_scores.push_back(node_scores[j].first);
+                i_scores.push_back(node_scores[j]);
             }
         }
 

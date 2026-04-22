@@ -44,85 +44,76 @@ inline std::vector<SRCPermutation> generateRuntimePermutations(
 inline std::vector<SRCPermutation> generateGeneticPermutations(
     int candidateSize) {
     std::vector<SRCPermutation> allPerms;
+    std::vector<std::pair<std::vector<int>, int>> plans;
 
-    // Plan 0: For candidate sizes that are odd.
-    if (candidateSize % 2 != 0) {
-        std::vector<int> base(candidateSize, 1);
-        int den = 2;  // Example: denominator 2
-        auto perms = generateRuntimePermutations(base, den);
-        allPerms.insert(allPerms.end(), perms.begin(), perms.end());
+    // Basic rank-3 and rank-5 patterns rely on small denominators.
+    plans.emplace_back(std::vector<int>(candidateSize, 1), 2);
+
+    if (candidateSize >= 4) {
+        plans.emplace_back(std::vector<int>(candidateSize, 1), 3);
+        plans.emplace_back(std::vector<int>(candidateSize, 1), 4);
     }
 
-    // Plan 1: When (candidateSize - 2) is divisible by 3 and candidateSize
-    // >= 5.
-    if (candidateSize >= 5 && ((candidateSize - 2) % 3 == 0)) {
-        std::vector<int> base(candidateSize, 1);
-        int den = 3;  // Example: denominator 3
-        auto perms = generateRuntimePermutations(base, den);
-        allPerms.insert(allPerms.end(), perms.begin(), perms.end());
-    }
-
-    // Plan 2: For candidateSize >= 5.
-    // Modify the base: set the first two entries to (candidateSize - 3) and the
-    // third to 2.
     if (candidateSize >= 5) {
-        std::vector<int> base(candidateSize, 1);
-        base[0] = candidateSize - 3;
-        base[1] = candidateSize - 3;
-        if (candidateSize >= 3) {
-            base[2] = 2;
-        }
-        int den = candidateSize - 2;  // Example denominator
-        auto perms = generateRuntimePermutations(base, den);
-        allPerms.insert(allPerms.end(), perms.begin(), perms.end());
+        plans.emplace_back(std::vector<int>(candidateSize, 1), 5);
     }
 
-    // Plan 3: For candidateSize >= 5.
-    // Modify the base: set the first two entries to (candidateSize - 2) and the
-    // next two to 2.
-    if (candidateSize >= 5 && candidateSize >= 4) {
-        std::vector<int> base(candidateSize, 1);
+    if (candidateSize >= 4) {
+        auto base = std::vector<int>(candidateSize, 1);
+        base[0] = candidateSize - 2;
+        plans.emplace_back(base, candidateSize - 1);
+        plans.emplace_back(base, candidateSize);
+        plans.emplace_back(base, candidateSize + 1);
+    }
+
+    if (candidateSize >= 5) {
+        auto base = std::vector<int>(candidateSize, 1);
+        base[0] = candidateSize - 3;
+        base[1] = 2;
+        plans.emplace_back(base, candidateSize - 1);
+        plans.emplace_back(base, candidateSize);
+    }
+
+    if (candidateSize >= 5) {
+        auto base = std::vector<int>(candidateSize, 1);
         base[0] = candidateSize - 2;
         base[1] = candidateSize - 2;
-        base[2] = 2;
-        base[3] = 2;
-        int den = candidateSize - 1;  // Example denominator
-        auto perms = generateRuntimePermutations(base, den);
-        allPerms.insert(allPerms.end(), perms.begin(), perms.end());
+        if (candidateSize >= 3) base[2] = 2;
+        plans.emplace_back(base, candidateSize - 2);
+        plans.emplace_back(base, candidateSize - 1);
     }
 
-    // Plan 4: For candidateSize >= 5.
-    // Modify the base: set the first element to (candidateSize - 3) and the
-    // second to 2.
     if (candidateSize >= 5) {
-        std::vector<int> base(candidateSize, 1);
-        base[0] = candidateSize - 3;
-        if (candidateSize >= 2) base[1] = 2;
-        int den = candidateSize - 1;
-        auto perms = generateRuntimePermutations(base, den);
-        allPerms.insert(allPerms.end(), perms.begin(), perms.end());
-    }
-
-    // Plan 5: For candidateSize >= 4.
-    // Modify the base: set the first element to (candidateSize - 2).
-    if (candidateSize >= 4) {
-        std::vector<int> base(candidateSize, 1);
-        base[0] = candidateSize - 2;
-        int den = candidateSize - 1;
-        auto perms = generateRuntimePermutations(base, den);
-        allPerms.insert(allPerms.end(), perms.begin(), perms.end());
-    }
-
-    // Plan 6: For candidateSize >= 5.
-    // Modify the base: set the first element to (candidateSize - 2) and the
-    // next two to 2.
-    if (candidateSize >= 5 && candidateSize >= 3) {
-        std::vector<int> base(candidateSize, 1);
+        auto base = std::vector<int>(candidateSize, 1);
         base[0] = candidateSize - 2;
         base[1] = 2;
         base[2] = 2;
-        int den = candidateSize;  // Example denominator
-        auto perms = generateRuntimePermutations(base, den);
+        plans.emplace_back(base, candidateSize);
+    }
+
+    if (candidateSize >= 4) {
+        auto base = std::vector<int>(candidateSize, 1);
+        base[0] = candidateSize - 2;
+        base[1] = candidateSize - 2;
+        base[2] = 2;
+        if (candidateSize >= 4) base[3] = 2;
+        plans.emplace_back(base, candidateSize - 1);
+        plans.emplace_back(base, candidateSize);
+    }
+
+    // Deduplicate plans by base/den pair.
+    std::vector<std::pair<std::vector<int>, int>> unique_plans;
+    for (auto &plan : plans) {
+        bool found = false;
+        for (const auto &existing : unique_plans) {
+            if (existing.second == plan.second && existing.first == plan.first) {
+                found = true;
+                break;
+            }
+        }
+        if (found) continue;
+        unique_plans.emplace_back(plan);
+        auto perms = generateRuntimePermutations(plan.first, plan.second);
         allPerms.insert(allPerms.end(), perms.begin(), perms.end());
     }
 

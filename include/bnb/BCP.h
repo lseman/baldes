@@ -275,7 +275,7 @@ public:
         allPaths.reserve(allPaths.size() + std::min<size_t>(paths.size(), 10));
         pathSet.reserve(pathSet.size() + std::min<size_t>(paths.size(), 10));
 
-        auto counter = 0;
+        auto             counter = 0;
         std::vector<int> updatedIndices;
         updatedIndices.reserve(N_SIZE);
         // Process each candidate path.
@@ -398,8 +398,8 @@ public:
         auto &pathSet = node->pathSet;
         allPaths.reserve(allPaths.size() + reserveSize);
         pathSet.reserve(pathSet.size() + reserveSize);
-        inner_obj     = 0.0;
-        int counter   = 0;
+        inner_obj                = 0.0;
+        int              counter = 0;
         std::vector<int> updatedIndices;
         updatedIndices.reserve(N_SIZE);
 
@@ -543,9 +543,8 @@ public:
             if (!loaded) {
                 if (cut.coefficients.size() == allPaths.size()) {
                     coeffs = cut.coefficients;
-                } else if ((cut.added && cut.updated) ||
-                           !cut.hasSparseCoefficients()) {
-                    coeffs = r1c->cutStorage.loadCoefficients(allPaths, cut);
+                } else if ((cut.added && cut.updated) || !cut.hasSparseCoefficients()) {
+                    coeffs           = r1c->cutStorage.loadCoefficients(allPaths, cut);
                     cut.coefficients = coeffs;
                 }
             } else {
@@ -561,12 +560,9 @@ public:
             // Otherwise, build and add the new constraint.
             else {
                 LinearExpression lhs;
-                if (!loaded && cut.hasSparseCoefficients() &&
-                    cut.coefficients.size() != allPaths.size()) {
-                    for (size_t idx = 0; idx < cut.coefficient_indices.size();
-                         ++idx) {
-                        lhs += node->getVar(cut.coefficient_indices[idx]) *
-                               cut.coefficient_values[idx];
+                if (!loaded && cut.hasSparseCoefficients() && cut.coefficients.size() != allPaths.size()) {
+                    for (size_t idx = 0; idx < cut.coefficient_indices.size(); ++idx) {
+                        lhs += node->getVar(cut.coefficient_indices[idx]) * cut.coefficient_values[idx];
                     }
                 } else {
                     for (size_t i = 0; i < coeffs.size(); ++i) {
@@ -1224,17 +1220,17 @@ public:
             SRC_MODE_BLOCK(n_cuts = cuts->size();)
             RCC_MODE_BLOCK(n_rcc_cuts = rccManager->size();)
 
-#ifdef GUROBI
-            if (allPaths.size() > 5000) {
-                fmt::print("Reducing non-basic variables\n");
-                auto &pathSet         = node->pathSet;
-                auto  toRemoveIndices = node->mip.reduceNonBasicVariables(0.8);
-                for (auto &index : toRemoveIndices) {
-                    allPaths.erase(allPaths.begin() + index);
-                    pathSet.erase(pathSet.begin() + index);
-                }
-            }
-#endif
+            // #ifdef GUROBI
+            //             if (allPaths.size() > 5000) {
+            //                 fmt::print("Reducing non-basic variables\n");
+            //                 auto &pathSet         = node->pathSet;
+            //                 auto  toRemoveIndices = node->mip.reduceNonBasicVariables(0.8);
+            //                 for (auto &index : toRemoveIndices) {
+            //                     allPaths.erase(allPaths.begin() + index);
+            //                     pathSet.erase(pathSet.begin() + index);
+            //                 }
+            //             }
+            // #endif
 
 #ifdef TR
             tr_val = v;
