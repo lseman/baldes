@@ -266,10 +266,10 @@ std::vector<double> BucketGraph::labeling_algorithm() {
         };
 
         for (size_t bucket_idx = 0; bucket_idx < scc_buckets.size(); ++bucket_idx) {
-            const int bucket = scc_buckets[bucket_idx];
+            const int bucket          = scc_buckets[bucket_idx];
             bucket_pos_in_scc[bucket] = static_cast<int>(bucket_idx);
 
-            const auto &bucket_labels = buckets[bucket].get_labels();
+            const auto &bucket_labels  = buckets[bucket].get_labels();
             auto       &pending_labels = pending_labels_by_bucket[bucket_idx];
             pending_labels.reserve(bucket_labels.size());
 
@@ -285,9 +285,9 @@ std::vector<double> BucketGraph::labeling_algorithm() {
             const int bucket_idx = active_bucket_heap.back();
             active_bucket_heap.pop_back();
 
-            const int  bucket         = scc_buckets[bucket_idx];
-            auto      &pending_labels = pending_labels_by_bucket[bucket_idx];
-            size_t    &pending_cursor = pending_label_cursor[bucket_idx];
+            const int bucket         = scc_buckets[bucket_idx];
+            auto     &pending_labels = pending_labels_by_bucket[bucket_idx];
+            size_t   &pending_cursor = pending_label_cursor[bucket_idx];
 
             while (pending_cursor < pending_labels.size()) {
                 Label *label = pending_labels[pending_cursor++];
@@ -378,8 +378,8 @@ std::vector<double> BucketGraph::labeling_algorithm() {
                                                                  uint                   &stat_n_dom) -> bool {
 #ifdef __AVX2__
                                 if (labels.size() >= AVX_LIM)
-                                    return check_dominance_against_vector<D, S>(
-                                        new_label, labels, cut_storage, stat_n_dom);
+                                    return check_dominance_against_vector<D, S>(new_label, labels, cut_storage,
+                                                                                stat_n_dom);
                                 else
 #endif
                                 {
@@ -409,8 +409,7 @@ std::vector<double> BucketGraph::labeling_algorithm() {
                                     return false;
                                 }
                             };
-                            dominated =
-                                mother_bucket.check_dominance(new_label, check_dominance_in_bucket, stat_n_dom);
+                            dominated = mother_bucket.check_dominance(new_label, check_dominance_in_bucket, stat_n_dom);
                         }
 
                         if (!dominated) {
@@ -970,14 +969,23 @@ inline auto BucketGraph::Extend(const std::conditional_t<M == Mutability::Mut, L
                         __builtin_prefetch(active_cuts[next_cut_idx].cut_ptr, 0, 3);
                     }
 
+#if defined(SRC_MEMORY_MODE_ARC)
+                    auto &src_map_value = new_label->SRCmap[active_cut.index];
+                    if (L_prime->node_id != -1 && cut.isSRCset(L_prime->node_id, node_id)) {
+                        const double num_value = cut.p.num[cut.baseSetOrder[node_id]];
+                        src_map_value += num_value;
+                        const bool overflow = src_map_value >= cut.p.den;
+                        src_map_value -= overflow ? cut.p.den : 0;
+                        total_cost_update -= overflow ? active_cut.dual_value : 0;
+                    }
+#else
                     auto        &src_map_value = new_label->SRCmap[active_cut.index];
                     const double num_value     = cut.p.num[cut.baseSetOrder[node_id]];
                     src_map_value += num_value;
-
-                    // Use branchless version when possible
                     const bool overflow = src_map_value >= cut.p.den;
                     src_map_value -= overflow ? cut.p.den : 0;
                     total_cost_update -= overflow ? active_cut.dual_value : 0;
+#endif
 
                     remaining_cuts &= (remaining_cuts - 1); // Clear processed bit
                 }
@@ -989,12 +997,24 @@ inline auto BucketGraph::Extend(const std::conditional_t<M == Mutability::Mut, L
                 const auto &active_cut = active_cuts[cut_idx];
                 const auto &cut        = *active_cut.cut_ptr;
 
+#if defined(SRC_MEMORY_MODE_ARC)
+                auto &src_map_value = new_label->SRCmap[active_cut.index];
+                if (L_prime->node_id != -1 && cut.isSRCset(L_prime->node_id, node_id)) {
+                    const double num_value = cut.p.num[cut.baseSetOrder[node_id]];
+                    src_map_value += num_value;
+                    if (src_map_value >= cut.p.den) {
+                        src_map_value -= cut.p.den;
+                        total_cost_update -= active_cut.dual_value;
+                    }
+                }
+#else
                 auto &src_map_value = new_label->SRCmap[active_cut.index];
                 src_map_value += cut.p.num[cut.baseSetOrder[node_id]];
                 if (src_map_value >= cut.p.den) {
                     src_map_value -= cut.p.den;
                     total_cost_update -= active_cut.dual_value;
                 }
+#endif
                 remaining_cuts &= (remaining_cuts - 1);
             }
         }
@@ -1145,11 +1165,11 @@ inline bool BucketGraph::DominatedInCompWiseSmallerBuckets(const Label *__restri
                                                            const std::vector<double> &__restrict__ c_bar,
                                                            std::vector<uint64_t> &__restrict__ Bvisited,
                                                            std::vector<uint32_t> &touched_segments,
-                                                           uint &stat_n_dom) noexcept {
+                                                           uint                  &stat_n_dom) noexcept {
     // Cache direction-specific data
-    const auto &buckets          = assign_buckets<D>(fw_buckets, bw_buckets);
-    const auto &Phi              = assign_buckets<D>(Phi_fw, Phi_bw);
-    const auto &bucket_scc_rank  = assign_buckets<D>(fw_bucket_scc_rank, bw_bucket_scc_rank);
+    const auto &buckets         = assign_buckets<D>(fw_buckets, bw_buckets);
+    const auto &Phi             = assign_buckets<D>(Phi_fw, Phi_bw);
+    const auto &bucket_scc_rank = assign_buckets<D>(fw_bucket_scc_rank, bw_bucket_scc_rank);
 
     // Cache frequently used label properties
     const int    b_L        = L->vertex;
@@ -1168,8 +1188,7 @@ inline bool BucketGraph::DominatedInCompWiseSmallerBuckets(const Label *__restri
     // Inline dominance check function to avoid lambda overhead
     auto inline_check_dominance = [&](std::span<Label *const> labels, uint &n_dom) -> bool {
 #ifdef __AVX2__
-        if (labels.size() >= AVX_LIM)
-            return check_dominance_against_vector<D, S>(L, labels, cut_storage, n_dom);
+        if (labels.size() >= AVX_LIM) return check_dominance_against_vector<D, S>(L, labels, cut_storage, n_dom);
 #endif
         const size_t size = labels.size();
         size_t       i    = 0;
@@ -1207,8 +1226,7 @@ inline bool BucketGraph::DominatedInCompWiseSmallerBuckets(const Label *__restri
 
         // Fast path: if label cost is lower and bucket precedes L in the SCC
         // order, return early
-        if (likely(label_cost < c_bar[current_bucket] && bucket_scc_rank[current_bucket] < label_rank))
-            return false;
+        if (likely(label_cost < c_bar[current_bucket] && bucket_scc_rank[current_bucket] < label_rank)) return false;
 
         // Skip dominance check for L's own bucket
         if (b_L != current_bucket) {
@@ -1273,8 +1291,8 @@ void BucketGraph::run_labeling_algorithms(std::vector<double> &forward_cbar, std
 template <Stage S>
 Label *BucketGraph::compute_label(const Label *L, const Label *L_prime, double red_cost) {
     // Compute cost values
-    double cij_cost  = getcij(L->node_id, L_prime->node_id);
-    double real_cost = L->real_cost + L_prime->real_cost + cij_cost;
+    double      cij_cost       = getcij(L->node_id, L_prime->node_id);
+    double      real_cost      = L->real_cost + L_prime->real_cost + cij_cost;
     const auto &forward_route  = L->nodes_covered;
     const auto &backward_route = L_prime->nodes_covered;
 

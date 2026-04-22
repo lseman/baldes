@@ -86,7 +86,7 @@ public:
         int                        node_id   = -1;
         std::array<double, R_SIZE> resources = {};
         std::vector<uint16_t>      nodes_covered;
-        int                        path_len  = 0;
+        int                        path_len = 0;
     };
 
     double threshold = -1.5;
@@ -1116,9 +1116,9 @@ public:
         std::vector<uint16_t> updated_SRCmap(cut_storage->size(), 0);
 
         // Prepare new label.
-        auto pool      = fw ? label_pool_fw : label_pool_bw;
-        auto new_label = pool->acquire();
-        auto &route = new_label->nodes_covered;
+        auto  pool      = fw ? label_pool_fw : label_pool_bw;
+        auto  new_label = pool->acquire();
+        auto &route     = new_label->nodes_covered;
         route.clear();
         route.reserve(L.nodes_covered.size());
         route.insert(route.end(), L.nodes_covered.begin(), L.nodes_covered.end());
@@ -1155,20 +1155,26 @@ public:
 
 #if defined(SRC)
             for (std::size_t idx = 0; idx < cutter->size(); ++idx) {
-                const auto &cut = cutter->getCut(idx);
-                // Retrieve base set and order information.
+                const auto &cut          = cutter->getCut(idx);
                 const auto &baseSet      = cut.baseSet;
                 const auto &baseSetOrder = cut.baseSetOrder;
                 const auto &neighbors    = cut.neighbors;
                 const auto &multipliers  = cut.p;
 
-                // If the current node is not in the neighbor set, reset SRCmap
-                // value.
                 if (!(neighbors[segment] & bit_mask)) {
                     updated_SRCmap[idx] = 0;
                     continue;
                 }
-                // If the current node is in the base set, update SRC value.
+#if defined(SRC_MEMORY_MODE_ARC)
+                if (last_node != -1 && cut.isSRCset(last_node, node_id)) {
+                    auto &src_val = updated_SRCmap[idx];
+                    src_val += multipliers.num[baseSetOrder[node_id]];
+                    if (src_val >= multipliers.den) {
+                        red_cost -= SRCDuals[idx];
+                        src_val -= multipliers.den;
+                    }
+                }
+#else
                 if (baseSet[segment] & bit_mask) {
                     auto &src_val = updated_SRCmap[idx];
                     src_val += multipliers.num[baseSetOrder[node_id]];
@@ -1177,6 +1183,7 @@ public:
                         src_val -= multipliers.den;
                     }
                 }
+#endif
             }
 #endif
 

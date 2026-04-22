@@ -18,9 +18,9 @@
 #include "Serializer.h"
 #include "miphandler/Constraint.h"
 struct SRCPermutation {
-    std::vector<int> num;
+    std::vector<int>    num;
     std::vector<double> frac;
-    int den;
+    int                 den;
 
     REFLECT(num, den, frac);
     // Default constructor
@@ -33,9 +33,7 @@ struct SRCPermutation {
     // Function to compute RHS
     double getRHS() const {
         double rhs = 0;
-        for (size_t i = 0; i < num.size(); ++i) {
-            rhs += static_cast<double>(num[i]) / static_cast<double>(den);
-        }
+        for (size_t i = 0; i < num.size(); ++i) { rhs += static_cast<double>(num[i]) / static_cast<double>(den); }
         return std::floor(rhs);
     }
 
@@ -47,17 +45,13 @@ struct SRCPermutation {
     // Swap function for SRCPermutation
     void swap(SRCPermutation &other) {
         // Swap each corresponding element in the num and den vectors
-        for (size_t i = 0; i < num.size(); ++i) {
-            std::swap(num[i], other.num[i]);
-        }
+        for (size_t i = 0; i < num.size(); ++i) { std::swap(num[i], other.num[i]); }
         std::swap(den, other.den);
         // std::swap(frac, other.frac);
     }
 
     // Support next_permutation for the 'num' vector
-    bool next_permutation() {
-        return std::next_permutation(num.begin(), num.end());
-    }
+    bool next_permutation() { return std::next_permutation(num.begin(), num.end()); }
 };
 
 /**
@@ -69,78 +63,70 @@ struct SRCPermutation {
  *
  */
 struct Cut {
-    int cutMaster;
-    std::array<uint64_t, num_words> baseSet;    // Bit-level baseSet
-    std::array<uint64_t, num_words> neighbors;  // Bit-level neighbors
-    std::vector<int> baseSetOrder;              // Order for baseSet
-    std::vector<double> coefficients;           // Cut coefficients
-    std::vector<int> coefficient_indices;       // Sparse coefficient indices
-    std::vector<double> coefficient_values;     // Sparse coefficient values
-    SRCPermutation p = {{1, 1, 1, 1}, 2};
+    int                             cutMaster;
+    std::array<uint64_t, num_words> baseSet;             // Bit-level baseSet
+    std::array<uint64_t, num_words> neighbors;           // Bit-level neighbors
+    std::vector<int>                baseSetOrder;        // Order for baseSet
+    std::vector<double>             coefficients;        // Cut coefficients
+    std::vector<int>                coefficient_indices; // Sparse coefficient indices
+    std::vector<double>             coefficient_values;  // Sparse coefficient values
+    SRCPermutation                  p = {{1, 1, 1, 1}, 2};
     // SRCPermutation p = {{1.0 / 2.0, 1.0 / 2.0, 1.0 / 2.0}};
 
     void printCut() const {
         fmt::print("BaseSet: ");
         // print the bit position where the bit is set
         for (int i = 0; i < N_SIZE; ++i) {
-            if (baseSet[i / 64] & (1ULL << (i % 64))) {
-                fmt::print("{} ", i);
-            }
+            if (baseSet[i / 64] & (1ULL << (i % 64))) { fmt::print("{} ", i); }
         }
         fmt::print("\n");
         fmt::print("Neighbors: ");
         for (int i = 0; i < N_SIZE; ++i) {
-            if (neighbors[i / 64] & (1ULL << (i % 64))) {
-                fmt::print("{} ", i);
-            }
+            if (neighbors[i / 64] & (1ULL << (i % 64))) { fmt::print("{} ", i); }
         }
         fmt::print("\n");
         // print the p.num and p.den
         fmt::print("Permutation: ");
-        for (auto &i : p.num) {
-            fmt::print("{} ", i);
-        }
+        for (auto &i : p.num) { fmt::print("{} ", i); }
         fmt::print("| {}\n", p.den);
     }
+
+    bool isSRCset(int i, int j) const {
+        return baseSet[i / 64] & (1ULL << (i % 64)) && baseSet[j / 64] & (1ULL << (j % 64));
+    }
+
+    bool isSRCset(int i) const { return baseSet[i / 64] & (1ULL << (i % 64)); }
+
     double rhs = 1;
-    int id = -1;
+    int    id  = -1;
 
     REFLECT(baseSet, neighbors, coefficients, p, baseSetOrder, id)
 
-    bool added = false;
-    bool updated = false;
-    CutType type = CutType::ThreeRow;
+    bool         added   = false;
+    bool         updated = false;
+    CutType      type    = CutType::ThreeRow;
     baldesCtrPtr grbConstr;
-    size_t key;
+    size_t       key;
     // Default constructor
     Cut() = default;
 
     // constructor to receive array
-    Cut(const std::array<uint64_t, num_words> baseSetInput,
-        const std::array<uint64_t, num_words> &neighborsInput,
+    Cut(const std::array<uint64_t, num_words> baseSetInput, const std::array<uint64_t, num_words> &neighborsInput,
         const std::vector<double> &coefficients)
-        : baseSet(baseSetInput),
-          neighbors(neighborsInput),
-          coefficients(coefficients) {
+        : baseSet(baseSetInput), neighbors(neighborsInput), coefficients(coefficients) {
         rhs = p.getRHS();
     }
 
-    Cut(const std::array<uint64_t, num_words> baseSetInput,
-        const std::array<uint64_t, num_words> &neighborsInput,
-        const std::vector<double> &coefficients,
-        const SRCPermutation &multipliers)
-        : baseSet(baseSetInput),
-          neighbors(neighborsInput),
-          coefficients(coefficients),
-          p(multipliers) {
+    Cut(const std::array<uint64_t, num_words> baseSetInput, const std::array<uint64_t, num_words> &neighborsInput,
+        const std::vector<double> &coefficients, const SRCPermutation &multipliers)
+        : baseSet(baseSetInput), neighbors(neighborsInput), coefficients(coefficients), p(multipliers) {
         rhs = p.getRHS();
     }
 
     // Define size of the cut
     size_t size() const { return coefficients.size(); }
-    bool hasSparseCoefficients() const noexcept {
-        return !coefficient_indices.empty() &&
-               coefficient_indices.size() == coefficient_values.size();
+    bool   hasSparseCoefficients() const noexcept {
+        return !coefficient_indices.empty() && coefficient_indices.size() == coefficient_values.size();
     }
 };
 
@@ -157,39 +143,33 @@ using Cuts = std::vector<Cut>;
  */
 
 struct ActiveCutInfo {
-    size_t index;        // Original index in cuts vector
-    const Cut *cut_ptr;  // Pointer to the cut
-    double dual_value;   // Cached dual value
-    CutType type;        // Type of the cut
+    size_t     index;      // Original index in cuts vector
+    const Cut *cut_ptr;    // Pointer to the cut
+    double     dual_value; // Cached dual value
+    CutType    type;       // Type of the cut
 
     ActiveCutInfo(size_t idx, const Cut *ptr, double dual, CutType type)
         : index(idx), cut_ptr(ptr), dual_value(dual), type(type) {}
 
     bool isSRCset(int i, int j) const {
-        return cut_ptr->baseSet[i / 64] & (1ULL << (i % 64)) &&
-               cut_ptr->baseSet[j / 64] & (1ULL << (j % 64));
+        return cut_ptr->baseSet[i / 64] & (1ULL << (i % 64)) && cut_ptr->baseSet[j / 64] & (1ULL << (j % 64));
     }
-    bool isSRCset(int i) const {
-        return cut_ptr->baseSet[i / 64] & (1ULL << (i % 64));
-    };
+    bool isSRCset(int i) const { return cut_ptr->baseSet[i / 64] & (1ULL << (i % 64)); };
 };
 class CutStorage {
-   public:
-    int latest_column = 0;
-    bool busy = false;
+public:
+    int  latest_column = 0;
+    bool busy          = false;
 
     struct SegmentMasks {
-        constexpr static size_t n_segments = (N_SIZE + 63) / 64;
-        constexpr static size_t n_bit_positions = 64;
-        std::vector<std::vector<uint64_t>>
-            neighbor_masks;  // [segment][bit_position]
-        std::vector<std::vector<uint64_t>>
-            base_set_masks;       // [segment][bit_position]
-        size_t n_cuts;            // Keep track of number of cuts for safety
-        uint64_t cut_limit_mask;  // Mask to limit the number of cuts
+        constexpr static size_t            n_segments      = (N_SIZE + 63) / 64;
+        constexpr static size_t            n_bit_positions = 64;
+        std::vector<std::vector<uint64_t>> neighbor_masks; // [segment][bit_position]
+        std::vector<std::vector<uint64_t>> base_set_masks; // [segment][bit_position]
+        size_t                             n_cuts;         // Keep track of number of cuts for safety
+        uint64_t                           cut_limit_mask; // Mask to limit the number of cuts
 
-        std::vector<std::vector<uint64_t>>
-            valid_cut_masks;  // [segment][bit_position] - NEW!
+        std::vector<std::vector<uint64_t>> valid_cut_masks; // [segment][bit_position] - NEW!
 
         SegmentMasks() : n_cuts(0) {
             neighbor_masks.resize(n_segments);
@@ -204,58 +184,47 @@ class CutStorage {
         void precompute(const std::vector<ActiveCutInfo> &active_cuts) {
             // Determine the number of cuts and compute the overall cut limit
             // mask.
-            n_cuts = active_cuts.size();
+            n_cuts         = active_cuts.size();
             cut_limit_mask = (n_cuts >= 64) ? ~0ULL : ((1ULL << n_cuts) - 1);
 
             // Precompute individual bit masks for each cut.
             std::vector<uint64_t> cut_bit_masks(n_cuts);
-            for (size_t i = 0; i < n_cuts; ++i) {
-                cut_bit_masks[i] = 1ULL << i;
-            }
+            for (size_t i = 0; i < n_cuts; ++i) { cut_bit_masks[i] = 1ULL << i; }
 
             // Resize and initialize mask matrices for all segments and bit
             // positions.
-            neighbor_masks.assign(n_segments,
-                                  std::vector<uint64_t>(n_bit_positions, 0));
-            base_set_masks.assign(n_segments,
-                                  std::vector<uint64_t>(n_bit_positions, 0));
-            valid_cut_masks.assign(n_segments,
-                                   std::vector<uint64_t>(n_bit_positions, 0));
+            neighbor_masks.assign(n_segments, std::vector<uint64_t>(n_bit_positions, 0));
+            base_set_masks.assign(n_segments, std::vector<uint64_t>(n_bit_positions, 0));
+            valid_cut_masks.assign(n_segments, std::vector<uint64_t>(n_bit_positions, 0));
 
             // Iterate over each segment.
             for (size_t segment = 0; segment < n_segments; ++segment) {
                 // Determine the number of bits to process in this segment.
-                const size_t bit_limit =
-                    (segment == n_segments - 1 && (N_SIZE % 64) != 0)
-                        ? (N_SIZE % 64)
-                        : 64;
+                const size_t bit_limit = (segment == n_segments - 1 && (N_SIZE % 64) != 0) ? (N_SIZE % 64) : 64;
 
                 // Cache references to the current segment's mask vectors.
-                auto &nbr_mask_vec = neighbor_masks[segment];
-                auto &base_mask_vec = base_set_masks[segment];
+                auto &nbr_mask_vec   = neighbor_masks[segment];
+                auto &base_mask_vec  = base_set_masks[segment];
                 auto &valid_mask_vec = valid_cut_masks[segment];
 
                 // Process each bit position within the segment.
                 for (size_t bit_pos = 0; bit_pos < bit_limit; ++bit_pos) {
-                    const uint64_t bit_mask = 1ULL << bit_pos;
-                    uint64_t neighbor_bits = 0;
-                    uint64_t base_bits = 0;
+                    const uint64_t bit_mask      = 1ULL << bit_pos;
+                    uint64_t       neighbor_bits = 0;
+                    uint64_t       base_bits     = 0;
 
                     // Loop over each active cut.
                     for (size_t cut_idx = 0; cut_idx < n_cuts; ++cut_idx) {
                         // Cache pointer to current cut.
                         const auto &cut = *active_cuts[cut_idx].cut_ptr;
-                        if (cut.neighbors[segment] & bit_mask)
-                            neighbor_bits |= cut_bit_masks[cut_idx];
-                        if (cut.baseSet[segment] & bit_mask)
-                            base_bits |= cut_bit_masks[cut_idx];
+                        if (cut.neighbors[segment] & bit_mask) neighbor_bits |= cut_bit_masks[cut_idx];
+                        if (cut.baseSet[segment] & bit_mask) base_bits |= cut_bit_masks[cut_idx];
                     }
 
                     // Apply the cut limit mask and store computed values.
-                    nbr_mask_vec[bit_pos] = neighbor_bits & cut_limit_mask;
-                    base_mask_vec[bit_pos] = base_bits & cut_limit_mask;
-                    valid_mask_vec[bit_pos] =
-                        (neighbor_bits & base_bits) & cut_limit_mask;
+                    nbr_mask_vec[bit_pos]   = neighbor_bits & cut_limit_mask;
+                    base_mask_vec[bit_pos]  = base_bits & cut_limit_mask;
+                    valid_mask_vec[bit_pos] = (neighbor_bits & base_bits) & cut_limit_mask;
                 }
             }
         }
@@ -316,9 +285,7 @@ class CutStorage {
 
     // Print all cuts
     void printCuts() const {
-        for (const auto &cut : cuts) {
-            cut.printCut();
-        }
+        for (const auto &cut : cuts) { cut.printCut(); }
     }
 
     void removeCut(Cut *cut) {
@@ -330,8 +297,7 @@ class CutStorage {
     void removeCut(int cutIndex) {
         // Validate cutIndex.
         if (cutIndex < 0 || cutIndex >= static_cast<int>(cuts.size())) {
-            std::cerr << "Cut index " << cutIndex << " is out of bounds."
-                      << std::endl;
+            std::cerr << "Cut index " << cutIndex << " is out of bounds." << std::endl;
             return;
         }
 
@@ -339,37 +305,29 @@ class CutStorage {
         cuts.erase(cuts.begin() + cutIndex);
 
         // Remove the associated dual if it exists.
-        if (cutIndex < static_cast<int>(SRCDuals.size())) {
-            SRCDuals.erase(SRCDuals.begin() + cutIndex);
-        }
+        if (cutIndex < static_cast<int>(SRCDuals.size())) { SRCDuals.erase(SRCDuals.begin() + cutIndex); }
 
         // Update the IDs for remaining cuts: any cut with an ID greater than
         // the removed index gets decremented.
         for (auto &cut : cuts) {
-            if (cut.id > cutIndex) {
-                cut.id--;
-            }
+            if (cut.id > cutIndex) { cut.id--; }
         }
 
         // Remove the corresponding entry from the cutMaster_to_cut_map.
-        auto it = std::find_if(
-            cutMaster_to_cut_map.begin(), cutMaster_to_cut_map.end(),
-            [cutIndex](const auto &pair) { return pair.second == cutIndex; });
+        auto it = std::find_if(cutMaster_to_cut_map.begin(), cutMaster_to_cut_map.end(),
+                               [cutIndex](const auto &pair) { return pair.second == cutIndex; });
 
         if (it != cutMaster_to_cut_map.end()) {
             cutMaster_to_cut_map.erase(it);
         } else {
-            std::cerr << "Cut index " << cutIndex
-                      << " not found in cutMaster_to_cut_map." << std::endl;
+            std::cerr << "Cut index " << cutIndex << " not found in cutMaster_to_cut_map." << std::endl;
             return;
         }
 
         // Update indices in cutMaster_to_cut_map for all entries with indices
         // greater than the removed cutIndex.
         for (auto &entry : cutMaster_to_cut_map) {
-            if (entry.second > cutIndex) {
-                entry.second--;
-            }
+            if (entry.second > cutIndex) { entry.second--; }
         }
     }
 
@@ -383,8 +341,7 @@ class CutStorage {
         if (cuts.empty() || SRCDuals.empty()) return;
         bool removed = false;
         for (int i = static_cast<int>(cuts.size()) - 1; i >= 0; --i) {
-            if (i < static_cast<int>(SRCDuals.size()) &&
-                std::abs(SRCDuals[i]) < threshold) {
+            if (i < static_cast<int>(SRCDuals.size()) && std::abs(SRCDuals[i]) < threshold) {
                 removeCut(i);
                 removed = true;
             }
@@ -406,11 +363,10 @@ class CutStorage {
     bool empty() const noexcept { return cuts.empty(); }
 
     // Check if a cut exists for the given cut key
-    std::pair<int, std::vector<double>> cutExists(
-        const std::size_t &cut_key) const {
+    std::pair<int, std::vector<double>> cutExists(const std::size_t &cut_key) const {
         auto it = cutMaster_to_cut_map.find(cut_key);
         if (it != cutMaster_to_cut_map.end()) {
-            auto tam = cuts[it->second].size();
+            auto tam    = cuts[it->second].size();
             auto coeffs = cuts[it->second].coefficients;
             return {tam, coeffs};
         }
@@ -424,43 +380,34 @@ class CutStorage {
     }
 
     // Compute limited memory coefficients for a given set of cuts
-    std::vector<double> computeLimitedMemoryCoefficients(
-        const std::vector<uint16_t> &P) const {
-        const size_t P_size = P.size();
+    std::vector<double> computeLimitedMemoryCoefficients(const std::vector<uint16_t> &P) const {
+        const size_t        P_size = P.size();
         std::vector<double> alphas;
         alphas.reserve(cuts.size());
 
-        // Get a raw pointer to the data in P.
         const uint16_t *P_data = P.data();
 
-        // Process each cut.
         for (const auto &cut : cuts) {
-            // if (cut.p.num.size() == 1) {
-            // alphas.push_back(0.0);
-            // continue;
-            // }
-            double alpha = 0.0;
-            int runningSum = 0;
-            const int denominator = cut.p.den;
-            // Cache pointers to the bitset arrays.
+            double          alpha           = 0.0;
+            int             runningSum      = 0;
+            const int       denominator     = cut.p.den;
             const uint64_t *neighborsBitset = cut.neighbors.data();
-            const uint64_t *baseSetBitset = cut.baseSet.data();
-            const auto &pValues = cut.p.num;
-            const auto &baseSetOrder = cut.baseSetOrder;
+            const uint64_t *baseSetBitset   = cut.baseSet.data();
+            const auto     &pValues         = cut.p.num;
+            const auto     &baseSetOrder    = cut.baseSetOrder;
 
-            // Iterate from 1 to P_size-2 (skipping first and last).
+#if defined(SRC_MEMORY_MODE_ARC)
             for (size_t j = 1; j < P_size - 1; ++j) {
-                const int nodeId = P_data[j];
-                // Compute the word index and bit mask for nodeId.
-                const size_t word = nodeId >> 6;
-                const uint64_t bit_mask = 1ULL << (nodeId & 63);
+                const int      nodeId    = P_data[j];
+                const int      prevNode  = P_data[j - 1];
+                const size_t   word      = nodeId >> 6;
+                const uint64_t bit_mask  = 1ULL << (nodeId & 63);
+                const size_t   prev_word = prevNode >> 6;
+                const uint64_t prev_mask = 1ULL << (prevNode & 63);
 
-                // If the node is not in the neighbor set, reset runningSum.
-                if (!(neighborsBitset[word] & bit_mask)) {
+                if (!(neighborsBitset[word] & bit_mask) || !(neighborsBitset[prev_word] & prev_mask)) {
                     runningSum = 0;
-                }
-                // Else, if the node is in the base set.
-                else if (baseSetBitset[word] & bit_mask) {
+                } else if ((baseSetBitset[word] & bit_mask) && (baseSetBitset[prev_word] & prev_mask)) {
                     const int pos = baseSetOrder[nodeId];
                     runningSum += pValues[pos];
                     if (runningSum >= denominator) {
@@ -469,6 +416,24 @@ class CutStorage {
                     }
                 }
             }
+#else
+            for (size_t j = 1; j < P_size - 1; ++j) {
+                const int      nodeId   = P_data[j];
+                const size_t   word     = nodeId >> 6;
+                const uint64_t bit_mask = 1ULL << (nodeId & 63);
+
+                if (!(neighborsBitset[word] & bit_mask)) {
+                    runningSum = 0;
+                } else if (baseSetBitset[word] & bit_mask) {
+                    const int pos = baseSetOrder[nodeId];
+                    runningSum += pValues[pos];
+                    if (runningSum >= denominator) {
+                        runningSum -= denominator;
+                        alpha += 1.0;
+                    }
+                }
+            }
+#endif
             alphas.push_back(alpha);
         }
         return alphas;
@@ -485,19 +450,16 @@ class CutStorage {
      * during hashing.
      *
      */
-    std::size_t compute_cut_key(const std::array<uint64_t, num_words> &baseSet,
-                                const std::vector<int> &perm_num,
+    std::size_t compute_cut_key(const std::array<uint64_t, num_words> &baseSet, const std::vector<int> &perm_num,
                                 const int perm_den) {
         XXH3_state_t *state = XXH3_createState();
         assert(state != nullptr);
         XXH3_64bits_reset(state);
 
         // Hash baseSet (array of uint64_t)
-        XXH3_64bits_update(state, baseSet.data(),
-                           baseSet.size() * sizeof(uint64_t));
+        XXH3_64bits_update(state, baseSet.data(), baseSet.size() * sizeof(uint64_t));
         // Hash perm_num
-        XXH3_64bits_update(state, perm_num.data(),
-                           perm_num.size() * sizeof(int));
+        XXH3_64bits_update(state, perm_num.data(), perm_num.size() * sizeof(int));
         // Hash perm_den
         XXH3_64bits_update(state, &perm_den, sizeof(int));
 
@@ -507,30 +469,50 @@ class CutStorage {
     }
 
     // Compute coefficients for a single cut given a vector of paths
-    std::vector<double> loadCoefficients(const std::vector<Path> &allPaths,
-                                         Cut &cut, bool loaded = false) {
+    std::vector<double> loadCoefficients(const std::vector<Path> &allPaths, Cut &cut, bool loaded = false) {
         std::vector<double> coefficients;
         coefficients.assign(allPaths.size(), 0.0);
         for (auto idx = 0; idx < allPaths.size(); ++idx) {
-            const auto &clients = allPaths[idx].route;
-            const size_t P_size = clients.size();
-            const uint16_t *P_data = clients.data();
-            double alpha = 0.0;
-            int runningSum = 0;
-            const int denominator = cut.p.den;
-            auto cutSize = cut.p.num.size();
+            const auto     &clients     = allPaths[idx].route;
+            const size_t    P_size      = clients.size();
+            const uint16_t *P_data      = clients.data();
+            double          alpha       = 0.0;
+            int             runningSum  = 0;
+            const int       denominator = cut.p.den;
+            auto            cutSize     = cut.p.num.size();
 
             // Cache pointers to the bitset arrays.
             const uint64_t *neighborsBitset = cut.neighbors.data();
-            const uint64_t *baseSetBitset = cut.baseSet.data();
-            const auto &pValues = cut.p.num;
-            const auto &baseSetOrder = cut.baseSetOrder;
+            const uint64_t *baseSetBitset   = cut.baseSet.data();
+            const auto     &pValues         = cut.p.num;
+            const auto     &baseSetOrder    = cut.baseSetOrder;
 
             // Iterate from 1 to P_size-2 (skipping first and last).
+#if defined(SRC_MEMORY_MODE_ARC)
+            for (size_t j = 1; j < P_size - 1; ++j) {
+                const int      nodeId    = P_data[j];
+                const int      prevNode  = P_data[j - 1];
+                const size_t   word      = nodeId >> 6;
+                const uint64_t bit_mask  = 1ULL << (nodeId & 63);
+                const size_t   prev_word = prevNode >> 6;
+                const uint64_t prev_mask = 1ULL << (prevNode & 63);
+
+                if (!(neighborsBitset[word] & bit_mask) || !(neighborsBitset[prev_word] & prev_mask)) {
+                    runningSum = 0;
+                } else if ((baseSetBitset[word] & bit_mask) && (baseSetBitset[prev_word] & prev_mask)) {
+                    const int pos = baseSetOrder[nodeId];
+                    runningSum += pValues[pos];
+                    if (runningSum >= denominator) {
+                        runningSum -= denominator;
+                        alpha += 1.0;
+                    }
+                }
+            }
+#else
             for (size_t j = 1; j < P_size - 1; ++j) {
                 const int nodeId = P_data[j];
                 // Compute the word index and bit mask for nodeId.
-                const size_t word = nodeId >> 6;
+                const size_t   word     = nodeId >> 6;
                 const uint64_t bit_mask = 1ULL << (nodeId & 63);
 
                 // If the node is not in the neighbor set, reset runningSum.
@@ -547,35 +529,31 @@ class CutStorage {
                     }
                 }
             }
+#endif
             coefficients[idx] = alpha;
         }
 
         // adjust cut stuff
         if (loaded) {
-            cut.key = compute_cut_key(cut.baseSet, cut.p.num, cut.p.den);
+            cut.key                       = compute_cut_key(cut.baseSet, cut.p.num, cut.p.den);
             cutMaster_to_cut_map[cut.key] = cut.id;
         }
         return coefficients;
     }
     // Generate a cut key
-    std::size_t generateCutKey(const int &cutMaster,
-                               const std::vector<bool> &baseSetStr) const {
+    std::size_t generateCutKey(const int &cutMaster, const std::vector<bool> &baseSetStr) const {
         std::size_t key = cutMaster;
-        for (bool b : baseSetStr) {
-            key = (key << 1) | b;
-        }
+        for (bool b : baseSetStr) { key = (key << 1) | b; }
         return key;
     }
-    std::vector<double> SRCDuals;  // Dual values for SRC
-    ankerl::unordered_dense::map<std::size_t, int>
-        cutMaster_to_cut_map;  // Map from cut key to cut index
+    std::vector<double>                            SRCDuals;             // Dual values for SRC
+    ankerl::unordered_dense::map<std::size_t, int> cutMaster_to_cut_map; // Map from cut key to cut index
 
-   private:
-    std::vector<Cut> cuts;  // Storage for cuts
+private:
+    std::vector<Cut> cuts; // Storage for cuts
 
-    ankerl::unordered_dense::map<std::size_t, std::vector<int>>
-        indexCuts;  // Additional index for cuts (if needed)
-    std::vector<ActiveCutInfo> active_cuts;  // Cuts with positive duals
+    ankerl::unordered_dense::map<std::size_t, std::vector<int>> indexCuts;   // Additional index for cuts (if needed)
+    std::vector<ActiveCutInfo>                                  active_cuts; // Cuts with positive duals
 
     void updateActiveCuts() {
         // Clear existing active cuts and pre-allocate memory based on
@@ -592,8 +570,7 @@ class CutStorage {
                 // }
                 // Emplace active cut with its index, pointer to the
                 // cut, dual value, and type.
-                active_cuts.emplace_back(i, &cuts[i], SRCDuals[i],
-                                         cuts[i].type);
+                active_cuts.emplace_back(i, &cuts[i], SRCDuals[i], cuts[i].type);
             }
         }
 
@@ -601,65 +578,75 @@ class CutStorage {
         segment_masks.precompute(active_cuts);
     }
 
-   public:
+public:
     REFLECT(cuts)
 
     void printCuts() {
-        for (auto &cut : cuts) {
-            cut.printCut();
-        }
+        for (auto &cut : cuts) { cut.printCut(); }
     }
 
     void updateRedCost(std::vector<Label *> labels) {
         const auto active_cuts = getActiveCuts();
 
-        const auto n_cuts = activeSize();
+        const auto n_cuts   = activeSize();
         const auto all_cuts = size();
 
         if (n_cuts == 0) return;
 
         for (auto label : labels) {
             label->SRCmap.resize(all_cuts, 0.0);
+            int prev_node = -1;
             for (auto node_id : label->getRoute()) {
-                double total_cost_update = 0.0;
-                const size_t segment = node_id >> 6;
-                const size_t bit_position = node_id & 63;
+                double       total_cost_update = 0.0;
+                const size_t segment           = node_id >> 6;
+                const size_t bit_position      = node_id & 63;
 
-                auto &masks = getSegmentMasks();
+                auto      &masks          = getSegmentMasks();
                 const auto cut_limit_mask = masks.get_cut_limit_mask();
-                uint64_t valid_cuts =
-                    masks.get_valid_cut_mask(segment, bit_position);
-                valid_cuts &= cut_limit_mask;  // Safeguard
+                uint64_t   valid_cuts     = masks.get_valid_cut_mask(segment, bit_position);
+                valid_cuts &= cut_limit_mask; // Safeguard
 
                 while (valid_cuts) {
-                    const int cut_idx = __builtin_ctzll(valid_cuts);
-                    const auto &active_cut = active_cuts[cut_idx];
-                    const auto &cut = *active_cut.cut_ptr;
-                    auto &src_map_value = label->SRCmap[active_cut.index];
+                    const int   cut_idx       = __builtin_ctzll(valid_cuts);
+                    const auto &active_cut    = active_cuts[cut_idx];
+                    const auto &cut           = *active_cut.cut_ptr;
+                    auto       &src_map_value = label->SRCmap[active_cut.index];
+#if defined(SRC_MEMORY_MODE_ARC)
+                    if (prev_node >= 0) {
+                        const size_t   prev_word = prev_node >> 6;
+                        const uint64_t prev_mask = 1ULL << (prev_node & 63);
+                        if ((cut.baseSet[prev_word] & prev_mask) && (cut.baseSet[segment] & (1ULL << (node_id & 63)))) {
+                            src_map_value += cut.p.num[cut.baseSetOrder[node_id]];
+                            if (src_map_value >= cut.p.den) {
+                                src_map_value -= cut.p.den;
+                                total_cost_update -= active_cut.dual_value;
+                            }
+                        }
+                    }
+#else
                     src_map_value += cut.p.num[cut.baseSetOrder[node_id]];
                     if (src_map_value >= cut.p.den) {
                         src_map_value -= cut.p.den;
                         total_cost_update -= active_cut.dual_value;
                     }
+#endif
                     valid_cuts &= (valid_cuts - 1);
                 }
 
-                uint64_t to_clear =
-                    (~masks.get_neighbor_mask(segment, bit_position)) &
-                    cut_limit_mask;
+                uint64_t to_clear = (~masks.get_neighbor_mask(segment, bit_position)) & cut_limit_mask;
                 while (to_clear) {
                     const int cut_idx = __builtin_ctzll(to_clear);
                     if (cut_idx >= n_cuts) {
-                        fmt::print(
-                            "Warning: Invalid clear_idx {} >= n_cuts "
-                            "{}\n",
-                            cut_idx, n_cuts);
+                        fmt::print("Warning: Invalid clear_idx {} >= n_cuts "
+                                   "{}\n",
+                                   cut_idx, n_cuts);
                         break;
                     }
                     label->SRCmap[active_cuts[cut_idx].index] = 0.0;
                     to_clear &= (to_clear - 1);
                 }
                 label->cost += total_cost_update;
+                prev_node = node_id;
             }
         }
     }
