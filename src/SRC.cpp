@@ -285,8 +285,8 @@ std::pair<bool, bool> LimitedMemoryRank1Cuts::runSeparation(BNBNode *node, std::
     ////////////////////////////////////////////////////
     // Optionally, clean non-violated cuts (currently disabled)
     ////////////////////////////////////////////////////
-    // bool cleared = cutCleaner(node, SRCconstraints);
-    bool cleared = false;
+    bool cleared = cutCleaner(node, SRCconstraints);
+    // bool cleared = false;
 
     // Calculate how many cuts were removed (if any)
     const size_t n_cuts_removed = cuts_after_separation - cuts->size();

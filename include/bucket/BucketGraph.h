@@ -350,6 +350,11 @@ public:
     std::vector<double> fw_c_bar;
     std::vector<double> bw_c_bar;
 
+    std::vector<std::vector<double>> fw_rc2_bin;
+    std::vector<std::vector<double>> bw_rc2_bin;
+    std::vector<std::vector<double>> fw_rc2_till_this_bin;
+    std::vector<std::vector<double>> bw_rc2_till_this_bin;
+
     int n_fw_labels = 0;
     int n_bw_labels = 0;
 
