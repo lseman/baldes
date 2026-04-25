@@ -13,8 +13,11 @@
 
 #pragma once
 
+#include <algorithm>
 #include <deque>
 #include <exec/static_thread_pool.hpp>
+#include <memory>
+#include <new>
 #include <exec/task.hpp>
 #include <stdexec/execution.hpp>
 
@@ -153,119 +156,56 @@ public:
  */
 class LabelPool {
 private:
-    static constexpr size_t BLOCK_SIZE      = 256; // Increased for better amortization
-    static constexpr size_t CACHE_LINE_SIZE = 64;
+    using Index = uint32_t;
 
-    // Align MemoryBlock to cache line for better performance
-    struct alignas(CACHE_LINE_SIZE) MemoryBlock {
-        std::unique_ptr<Label[]> data;
-        size_t                   used; // Number of labels allocated from this block
+    size_t max_pool_size{};
+    Label *arena{nullptr};
+    size_t constructed_count{};
+    size_t next_unused{};
 
-        MemoryBlock() : data(std::make_unique<Label[]>(BLOCK_SIZE)), used(0) {}
+    std::vector<Index> free_indices;
+    size_t             free_list_size{};
 
-        // Disable copy, enable move
-        MemoryBlock(const MemoryBlock &)                = delete;
-        MemoryBlock &operator=(const MemoryBlock &)     = delete;
-        MemoryBlock(MemoryBlock &&) noexcept            = default;
-        MemoryBlock &operator=(MemoryBlock &&) noexcept = default;
-    };
+    [[nodiscard]] inline Index pointer_to_index(const Label *label) const noexcept {
+        return static_cast<Index>(label - arena);
+    }
 
-    size_t pool_size;
-    size_t max_pool_size;
+    [[nodiscard]] inline Label *label_at(Index index) noexcept { return arena + index; }
 
-    std::vector<MemoryBlock> memory_blocks;
+    [[nodiscard]] inline const Label *label_at(Index index) const noexcept { return arena + index; }
 
-    // free_list holds pointers to labels that are available for reuse
-    // Use raw array with index-based management for better cache locality
-    std::vector<Label *> free_list;
-    size_t               free_list_size; // Track size separately to avoid .size() calls
-
-    // Track in-use labels only when needed (removed for performance)
-    // Most use cases don't need this tracking
-
-    // Current block index for fast allocation
-    size_t current_block_idx;
-
-    // Allocate 'count' new labels and add them to the free list
-    void allocate_labels(size_t count) {
-        const size_t blocks_needed = (count + BLOCK_SIZE - 1) / BLOCK_SIZE;
-
-        // Reserve capacity once to avoid multiple reallocations
-        memory_blocks.reserve(memory_blocks.size() + blocks_needed);
-        free_list.reserve(free_list.size() + count);
-
-        for (size_t b = 0; b < blocks_needed; ++b) {
-            memory_blocks.emplace_back();
-            auto &block = memory_blocks.back();
-
-            // Calculate labels to allocate in this block
-            const size_t remaining_count = count - b * BLOCK_SIZE;
-            const size_t alloc_in_block  = std::min(remaining_count, BLOCK_SIZE);
-
-            // Batch add pointers to free list
-            Label *base_ptr = block.data.get();
-            for (size_t i = 0; i < alloc_in_block; ++i) { free_list.push_back(base_ptr + i); }
-
-            block.used = alloc_in_block;
-            free_list_size += alloc_in_block;
+    inline void construct_until(size_t count) {
+        while (constructed_count < count) {
+            std::construct_at(arena + constructed_count);
+            ++constructed_count;
         }
-
-        current_block_idx = memory_blocks.size() - 1;
     }
 
 public:
     explicit LabelPool(size_t initial_pool_size, size_t max_pool_size = 5000000)
-        : pool_size(initial_pool_size), max_pool_size(max_pool_size), free_list_size(0), current_block_idx(0) {
+        : max_pool_size(std::max(initial_pool_size, max_pool_size)) {
 
-        // Pre-allocate with some headroom to reduce reallocations
-        const size_t reserve_size = initial_pool_size + (initial_pool_size >> 2); // +25%
-        memory_blocks.reserve((reserve_size + BLOCK_SIZE - 1) / BLOCK_SIZE);
-        free_list.reserve(reserve_size);
-
-        allocate_labels(pool_size);
+        arena = static_cast<Label *>(::operator new[](this->max_pool_size * sizeof(Label), std::align_val_t{alignof(Label)}));
+        free_indices.reserve(initial_pool_size);
+        construct_until(initial_pool_size);
+        next_unused = initial_pool_size;
+        for (Index i = 0; i < static_cast<Index>(initial_pool_size); ++i) { free_indices.push_back(i); }
+        free_list_size = initial_pool_size;
     }
 
     // Fast acquire with minimal branching
     [[nodiscard]] inline Label *acquire() noexcept {
-        Label *label;
-
-        // Fast path: reuse from free list
         if (__builtin_expect(free_list_size > 0, 1)) {
-            --free_list_size;
-            label = free_list[free_list_size];
+            Label *label = label_at(free_indices[--free_list_size]);
             label->reset();
             return label;
         }
 
-        // Slow path: allocate from current block or create new block
-        auto &current_block = memory_blocks[current_block_idx];
+        if (__builtin_expect(next_unused >= max_pool_size, 0)) { std::abort(); }
 
-        if (__builtin_expect(current_block.used < BLOCK_SIZE, 1)) {
-            // Use next available label from current block
-            label = &current_block.data[current_block.used];
-            ++current_block.used;
-            label->reset();
-            return label;
-        }
-
-        // Reuse an existing block after fast_reset() before growing.
-        while (current_block_idx + 1 < memory_blocks.size()) {
-            ++current_block_idx;
-            auto &next_block = memory_blocks[current_block_idx];
-            if (next_block.used < BLOCK_SIZE) {
-                label = &next_block.data[next_block.used];
-                ++next_block.used;
-                label->reset();
-                return label;
-            }
-        }
-
-        // Need a new block
-        memory_blocks.emplace_back();
-        current_block_idx = memory_blocks.size() - 1;
-        auto &new_block   = memory_blocks[current_block_idx];
-        label             = &new_block.data[0];
-        new_block.used    = 1;
+        const size_t index = next_unused++;
+        construct_until(next_unused);
+        Label *label = arena + index;
         label->reset();
         return label;
     }
@@ -278,10 +218,8 @@ public:
         if (free_list_size > 0) {
             const size_t from_free = std::min(count, free_list_size);
 
-            // Copy pointers in batch
             for (size_t i = 0; i < from_free; ++i) {
-                --free_list_size;
-                Label *label = free_list[free_list_size];
+                Label *label = label_at(free_indices[--free_list_size]);
                 label->reset();
                 out_labels[i] = label;
             }
@@ -291,114 +229,77 @@ public:
 
         // Then allocate remaining from blocks
         while (acquired < count) {
-            auto &current_block = memory_blocks[current_block_idx];
+            if (__builtin_expect(next_unused >= max_pool_size, 0)) { std::abort(); }
+            const size_t available   = max_pool_size - next_unused;
+            const size_t to_allocate = std::min(count - acquired, available);
+            const size_t base_index  = next_unused;
+            next_unused += to_allocate;
+            construct_until(next_unused);
 
-            if (current_block.used < BLOCK_SIZE) {
-                const size_t available   = BLOCK_SIZE - current_block.used;
-                const size_t to_allocate = std::min(count - acquired, available);
-
-                // Batch allocate from current block
-                Label *base_ptr = &current_block.data[current_block.used];
-                for (size_t i = 0; i < to_allocate; ++i) {
-                    (base_ptr + i)->reset();
-                    out_labels[acquired + i] = base_ptr + i;
-                }
-
-                current_block.used += to_allocate;
-                acquired += to_allocate;
-            } else {
-                // Reuse an existing block after fast_reset() before growing.
-                if (current_block_idx + 1 < memory_blocks.size()) {
-                    ++current_block_idx;
-                } else {
-                    memory_blocks.emplace_back();
-                    current_block_idx = memory_blocks.size() - 1;
-                }
+            Label *base_ptr = arena + base_index;
+            for (size_t i = 0; i < to_allocate; ++i) {
+                (base_ptr + i)->reset();
+                out_labels[acquired + i] = base_ptr + i;
             }
+            acquired += to_allocate;
         }
     }
 
     // Fast release without tracking in-use labels
     inline void release(Label *label) noexcept {
-        if (__builtin_expect(free_list_size >= free_list.size(), 0)) {
-            free_list.push_back(label);
-            ++free_list_size;
-            return;
-        }
-        free_list[free_list_size] = label;
-        ++free_list_size;
+        if (!label) return;
+        if (__builtin_expect(free_list_size >= free_indices.size(), 0)) { free_indices.resize(free_list_size + 1); }
+        free_indices[free_list_size++] = pointer_to_index(label);
     }
 
     // Batch release for better performance
     inline void release_batch(Label **labels, size_t count) noexcept {
         // Ensure capacity
-        if (__builtin_expect(free_list.size() < free_list_size + count, 0)) {
-            free_list.resize(free_list_size + count);
+        if (__builtin_expect(free_indices.size() < free_list_size + count, 0)) {
+            free_indices.resize(free_list_size + count);
         }
 
-        // Batch copy pointers
-        std::memcpy(&free_list[free_list_size], labels, count * sizeof(Label *));
+        for (size_t i = 0; i < count; ++i) { free_indices[free_list_size + i] = pointer_to_index(labels[i]); }
         free_list_size += count;
     }
 
     // Reset the pool - optimized version
     inline void reset() noexcept {
-        size_t total_used = 0;
-        for (const auto &block : memory_blocks) { total_used += block.used; }
-
-        if (free_list.size() < total_used) { free_list.resize(total_used); }
-
-        free_list_size = 0;
-        for (auto &block : memory_blocks) {
-            Label *base_ptr = block.data.get();
-            for (size_t i = 0; i < block.used; ++i) { free_list[free_list_size++] = base_ptr + i; }
-        }
-
-        current_block_idx = memory_blocks.empty() ? 0 : memory_blocks.size() - 1;
+        if (free_indices.size() < next_unused) { free_indices.resize(next_unused); }
+        for (Index i = 0; i < static_cast<Index>(next_unused); ++i) { free_indices[i] = i; }
+        free_list_size = next_unused;
     }
 
     // Fast reset without rebuilding free list (for scenarios where we'll allocate fresh)
     inline void fast_reset() noexcept {
-        free_list_size    = 0;
-        current_block_idx = 0;
-
-        // Reset block usage counters
-        for (auto &block : memory_blocks) { block.used = 0; }
+        free_list_size = 0;
+        next_unused    = 0;
     }
 
     // Get statistics
     [[nodiscard]] inline size_t get_free_count() const noexcept { return free_list_size; }
 
-    [[nodiscard]] inline size_t get_total_capacity() const noexcept {
-        size_t capacity = 0;
-        for (const auto &block : memory_blocks) { capacity += block.used; }
-        return capacity;
-    }
+    [[nodiscard]] inline size_t get_total_capacity() const noexcept { return max_pool_size; }
 
-    [[nodiscard]] inline size_t get_memory_usage() const noexcept {
-        return memory_blocks.size() * BLOCK_SIZE * sizeof(Label);
-    }
+    [[nodiscard]] inline size_t get_memory_usage() const noexcept { return max_pool_size * sizeof(Label); }
 
     // Cleanup all allocated memory
     void cleanup() noexcept {
-        free_list.clear();
+        if (arena) {
+            for (size_t i = 0; i < constructed_count; ++i) { std::destroy_at(arena + i); }
+            ::operator delete[](arena, std::align_val_t{alignof(Label)});
+        }
+        arena             = nullptr;
+        constructed_count = 0;
+        next_unused       = 0;
+        free_indices.clear();
         free_list_size = 0;
-        memory_blocks.clear();
-        current_block_idx = 0;
     }
 
     // Shrink to fit - reduce memory usage by removing unused blocks
     void shrink_to_fit() {
-        // Remove empty trailing blocks
-        while (!memory_blocks.empty() && memory_blocks.back().used == 0) { memory_blocks.pop_back(); }
-
-        // Shrink free list
-        free_list.resize(free_list_size);
-        free_list.shrink_to_fit();
-
-        memory_blocks.shrink_to_fit();
-
-        if (!memory_blocks.empty()) { current_block_idx = memory_blocks.size() - 1; }
+        free_indices.resize(free_list_size);
+        free_indices.shrink_to_fit();
     }
 
     ~LabelPool() { cleanup(); }
