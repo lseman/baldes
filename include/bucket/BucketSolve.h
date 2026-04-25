@@ -269,11 +269,15 @@ std::vector<double> BucketGraph::labeling_algorithm() {
             const int bucket          = scc_buckets[bucket_idx];
             bucket_pos_in_scc[bucket] = static_cast<int>(bucket_idx);
 
-            const auto &bucket_labels  = buckets[bucket].get_labels();
+            const auto &bucket_labels  = buckets[bucket].get_sorted_labels();
+            const auto &extra_labels   = buckets[bucket].get_extra_labels();
             auto       &pending_labels = pending_labels_by_bucket[bucket_idx];
-            pending_labels.reserve(bucket_labels.size());
+            pending_labels.reserve(bucket_labels.size() + extra_labels.size());
 
             for (Label *label : bucket_labels) {
+                if (!label->is_extended && !label->is_dominated) pending_labels.push_back(label);
+            }
+            for (Label *label : extra_labels) {
                 if (!label->is_extended && !label->is_dominated) pending_labels.push_back(label);
             }
 
@@ -349,7 +353,8 @@ std::vector<double> BucketGraph::labeling_algorithm() {
                         // Prefetch the mother bucket and its labels
                         __builtin_prefetch(&mother_bucket, 0, 3);
 
-                        const auto &to_bucket_labels = mother_bucket.get_labels();
+                        const auto &to_bucket_labels = mother_bucket.get_sorted_labels();
+                        const auto &to_bucket_extra  = mother_bucket.get_extra_labels();
 
                         // Prefetch first few destination bucket labels
                         if (!to_bucket_labels.empty()) {
@@ -369,6 +374,17 @@ std::vector<double> BucketGraph::labeling_algorithm() {
                                 else {
                                     dominated = true;
                                     break;
+                                }
+                            }
+                            if (!dominated) {
+                                for (auto *existing_label : to_bucket_extra) {
+                                    if (existing_label->is_dominated) continue;
+                                    if (label->cost < existing_label->cost)
+                                        existing_label->set_dominated(true);
+                                    else {
+                                        dominated = true;
+                                        break;
+                                    }
                                 }
                             }
                         } else {
@@ -415,7 +431,21 @@ std::vector<double> BucketGraph::labeling_algorithm() {
                                     return false;
                                 }
                             };
-                            dominated = mother_bucket.check_dominance(new_label, check_dominance_in_bucket, stat_n_dom);
+                            auto check_extra_dominance = [&](std::span<Label *const> labels,
+                                                             uint                   &stat_n_dom) -> bool {
+                                for (Label *current_label : labels) {
+                                    if (__builtin_expect(current_label->is_dominated, 0)) continue;
+                                    if (numericutils::gt(current_label->cost, new_label->cost + numericutils::eps))
+                                        continue;
+                                    if (is_dominated<D, S>(new_label, current_label)) {
+                                        ++stat_n_dom;
+                                        return true;
+                                    }
+                                }
+                                return false;
+                            };
+                            dominated = mother_bucket.check_dominance(new_label, check_dominance_in_bucket,
+                                                                      check_extra_dominance, stat_n_dom);
                         }
 
                         if (!dominated) {
@@ -463,6 +493,14 @@ std::vector<double> BucketGraph::labeling_algorithm() {
                                 auto *existing_label = to_bucket_labels[i];
                                 if (!existing_label->is_dominated && is_dominated<D, S>(existing_label, new_label))
                                     tl_labels_to_dominate.push_back(existing_label);
+                            }
+
+                            for (auto *existing_label : to_bucket_extra) {
+                                if (!existing_label->is_dominated &&
+                                    numericutils::gte(existing_label->cost, new_label->cost - numericutils::eps) &&
+                                    is_dominated<D, S>(existing_label, new_label)) {
+                                    tl_labels_to_dominate.push_back(existing_label);
+                                }
                             }
 
                             // Mark dominated labels in batch
@@ -1233,6 +1271,18 @@ inline bool BucketGraph::DominatedInCompWiseSmallerBuckets(const Label *__restri
         return false;
     };
 
+    auto inline_check_extra_dominance = [&](std::span<Label *const> labels, uint &n_dom) -> bool {
+        for (Label *label : labels) {
+            if (label->is_dominated) continue;
+            if (numericutils::gt(label->cost, L->cost + numericutils::eps)) continue;
+            if (is_dominated<D, S>(L, label)) {
+                ++n_dom;
+                return true;
+            }
+        }
+        return false;
+    };
+
     // Main DFS traversal loop
     while (!stack_buffer.empty()) {
         const int current_bucket = stack_buffer.back();
@@ -1270,7 +1320,8 @@ inline bool BucketGraph::DominatedInCompWiseSmallerBuckets(const Label *__restri
         // Skip dominance check for L's own bucket
         if (b_L != current_bucket) {
             const auto &mother_bucket = buckets[current_bucket];
-            if (mother_bucket.check_dominance(L, inline_check_dominance, stat_n_dom)) return true;
+            if (mother_bucket.check_dominance(L, inline_check_dominance, inline_check_extra_dominance, stat_n_dom))
+                return true;
         }
 
         // Process neighbor buckets using pointer arithmetic and prefetching

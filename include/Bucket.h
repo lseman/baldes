@@ -39,12 +39,15 @@ struct alignas(64) Bucket {
     double min_cost{std::numeric_limits<double>::max()};
     char   padding[32]; // Ensure alignment
 
-    // Container for labels; this will always be kept sorted by cost.
-    std::pmr::vector<Label *> labels;
+    // Committed labels are kept sorted by reduced cost. Fresh labels are
+    // staged separately so insertion stays amortized O(1); they are merged
+    // into labels only when a fully sorted view is required.
+    mutable std::pmr::vector<Label *> labels;
+    mutable std::pmr::vector<Label *> extra_labels;
 
     // Virtual split: an index that logically partitions the labels vector.
-    size_t virtual_split_index = 0;
-    bool   is_virtual_split    = false;
+    mutable size_t virtual_split_index = 0;
+    mutable bool   is_virtual_split    = false;
 
     // Cold data - less frequently accessed
     std::vector<double>     lb;
@@ -57,7 +60,7 @@ struct alignas(64) Bucket {
     std::vector<JumpArc>    bw_jump_arcs;
     std::array<Bucket *, 2> sub_buckets;
     std::vector<Label *>    labels_flush;
-    bool                    shall_split = false;
+    mutable bool            shall_split = false;
 
     double get_lb() const { return lb[0]; }
     double get_ub() const { return ub[0]; }
@@ -70,7 +73,7 @@ struct alignas(64) Bucket {
     double               min_split_range  = 0.5;
     static constexpr int MAX_BUCKET_DEPTH = 1;
 
-    inline void activate_virtual_split_assume_sorted() noexcept {
+    inline void activate_virtual_split_assume_sorted() const noexcept {
         if (labels.size() < 2 || is_virtual_split) return;
         virtual_split_index = labels.size() / 2;
         if (virtual_split_index >= labels.size()) { virtual_split_index = labels.size() - 1; }
@@ -80,6 +83,7 @@ struct alignas(64) Bucket {
     // --- Virtual Splitting ---
     // When the bucket reaches capacity, we virtually split it.
     void virtual_split() noexcept {
+        flush_extra_labels();
         if (labels.size() < 2 || is_virtual_split) return;
 
         // Ensure labels are sorted by cost.
@@ -90,120 +94,115 @@ struct alignas(64) Bucket {
         is_virtual_split = true;
     }
 
+    void flush_extra_labels() const {
+        if (extra_labels.empty()) return;
+
+        const auto old_size = labels.size();
+        labels.insert(labels.end(), extra_labels.begin(), extra_labels.end());
+        pdqsort(labels.begin() + static_cast<std::ptrdiff_t>(old_size), labels.end(),
+                [](const Label *a, const Label *b) { return a->cost < b->cost; });
+        std::inplace_merge(labels.begin(), labels.begin() + static_cast<std::ptrdiff_t>(old_size), labels.end(),
+                           [](const Label *a, const Label *b) { return a->cost < b->cost; });
+        extra_labels.clear();
+
+        is_virtual_split    = false;
+        virtual_split_index = 0;
+        if (labels.size() >= BUCKET_CAPACITY) {
+            shall_split = true;
+            activate_virtual_split_assume_sorted();
+        }
+    }
+
     // --- Insertion ---
-    // Adds a label into the bucket in sorted order.
-    // This method will update the virtual split when needed.
+    // Stage fresh labels in an unsorted tier; sorted access materializes them
+    // lazily through flush_extra_labels().
     void add_sorted_label(Label *label) noexcept {
         if (!label) return;
 
-        size_t pos = 0;
-        if (labels.empty()) {
-            labels.push_back(label);
-        } else if (label->cost >= labels.back()->cost) {
-            pos = labels.size();
-            labels.push_back(label);
-        } else if (label->cost <= labels.front()->cost) {
-            labels.insert(labels.begin(), label);
-            pos = 0;
-        } else {
-            auto it = std::lower_bound(labels.begin(), labels.end(), label->cost,
-                                       [](const Label *a, double cost) { return a->cost < cost; });
-            pos     = static_cast<size_t>(std::distance(labels.begin(), it));
-            labels.insert(it, label);
-        }
-
-        if (is_virtual_split) {
-            if (pos <= virtual_split_index) ++virtual_split_index;
-            return;
-        }
-
-        if (labels.size() >= BUCKET_CAPACITY) {
+        extra_labels.push_back(label);
+        if (labels.size() + extra_labels.size() >= BUCKET_CAPACITY) {
             shall_split = true;
-            // add_sorted_label preserves ordering; avoid re-sorting here.
-            activate_virtual_split_assume_sorted();
         }
     }
 
     // For cases where sorted order isn’t required on insertion.
     void add_label(Label *label) noexcept {
-        if (!label) return;
-
-        if (is_virtual_split) {
-            const size_t split = std::min(virtual_split_index, labels.size());
-            if (split > 0 && split < labels.size() && label->cost <= labels[split]->cost) {
-                auto it = std::lower_bound(labels.begin(), labels.begin() + static_cast<std::ptrdiff_t>(split),
-                                           label->cost, [](const Label *a, double cost) { return a->cost < cost; });
-                labels.insert(it, label);
-                ++virtual_split_index;
-            } else {
-                auto it = std::lower_bound(labels.begin() + static_cast<std::ptrdiff_t>(split), labels.end(),
-                                           label->cost, [](const Label *a, double cost) { return a->cost < cost; });
-                labels.insert(it, label);
-            }
-        } else {
-            if (labels.empty() || label->cost >= labels.back()->cost) {
-                labels.push_back(label);
-            } else if (label->cost <= labels.front()->cost) {
-                labels.insert(labels.begin(), label);
-            } else {
-                auto it = std::lower_bound(labels.begin(), labels.end(), label->cost,
-                                           [](const Label *a, double cost) { return a->cost < cost; });
-                labels.insert(it, label);
-            }
-            if (labels.size() >= BUCKET_CAPACITY) shall_split = true;
-            if (labels.size() >= BUCKET_CAPACITY && depth < MAX_BUCKET_DEPTH) {
-                // Insertion above keeps full vector cost-sorted.
-                activate_virtual_split_assume_sorted();
-            }
-        }
+        add_sorted_label(label);
     }
 
     // --- Retrieval ---
     // Returns the best (i.e. minimum cost) label cost in this bucket.
     double get_cb() const noexcept {
-        if (labels.empty()) return std::numeric_limits<double>::max();
-        // Since labels are kept sorted, the first element has the minimal cost.
-        return labels.front()->cost;
+        double best = labels.empty() ? std::numeric_limits<double>::max() : labels.front()->cost;
+        for (const Label *label : extra_labels) { best = std::min(best, label->cost); }
+        return best;
     }
 
     // Returns the best label pointer.
     Label *get_best_label() noexcept {
-        if (labels.empty()) return nullptr;
-        return labels.front();
+        Label *best = labels.empty() ? nullptr : labels.front();
+        for (Label *label : extra_labels) {
+            if (best == nullptr || label->cost < best->cost) best = label;
+        }
+        return best;
     }
 
-    std::pmr::vector<Label *> &get_labels() noexcept { return labels; }
-    const std::pmr::vector<Label *> &get_labels() const noexcept { return labels; }
+    std::pmr::vector<Label *> &get_labels() {
+        flush_extra_labels();
+        return labels;
+    }
+
+    const std::pmr::vector<Label *> &get_labels() const {
+        flush_extra_labels();
+        return labels;
+    }
+
+    const std::pmr::vector<Label *> &get_sorted_labels() const noexcept { return labels; }
+    const std::pmr::vector<Label *> &get_extra_labels() const noexcept { return extra_labels; }
+
+    [[nodiscard]] size_t size() const noexcept { return labels.size() + extra_labels.size(); }
 
     // --- Dominance Check ---
     // Checks whether a new label is dominated by any labels already in the
     // bucket. The dominance_func is a lambda or function that performs the
     // actual check on a given set of labels.
-    template <typename DominanceFunc>
-    bool check_dominance(const Label *new_label, DominanceFunc &&dominance_func, uint &stat_n_dom) const noexcept {
+    template <typename SortedDominanceFunc, typename ExtraDominanceFunc>
+    bool check_dominance(const Label *new_label, SortedDominanceFunc &&sorted_dominance_func,
+                         ExtraDominanceFunc &&extra_dominance_func, uint &stat_n_dom) const noexcept {
         if (!new_label) return false;
-        if (labels.empty()) return false;
+        if (labels.empty() && extra_labels.empty()) return false;
         // Early exit: if the bucket's best cost is higher than the new label's
         // cost, it cannot be dominated.
-        if (labels.front()->cost > new_label->cost) return false;
+        if (get_cb() > new_label->cost) return false;
 
-        if (!is_virtual_split) {
-            return dominance_func(std::span<Label *const>(labels.data(), labels.size()), stat_n_dom);
-        } else {
+        if (!labels.empty() && !is_virtual_split) {
+            if (sorted_dominance_func(std::span<Label *const>(labels.data(), labels.size()), stat_n_dom)) {
+                return true;
+            }
+        } else if (!labels.empty()) {
             // For a virtual split, check each half separately without copying.
             auto        *label_ptr = labels.data();
             const size_t split     = std::min(virtual_split_index, labels.size());
             if (split == 0 || split >= labels.size()) {
-                return dominance_func(std::span<Label *const>(label_ptr, labels.size()), stat_n_dom);
+                if (sorted_dominance_func(std::span<Label *const>(label_ptr, labels.size()), stat_n_dom)) {
+                    return true;
+                }
+            } else {
+                if (sorted_dominance_func(std::span<Label *const>(label_ptr, split), stat_n_dom)) { return true; }
+                if (sorted_dominance_func(std::span<Label *const>(label_ptr + split, labels.size() - split),
+                                          stat_n_dom)) {
+                    return true;
+                }
             }
-            if (dominance_func(std::span<Label *const>(label_ptr, split), stat_n_dom)) { return true; }
-            return dominance_func(std::span<Label *const>(label_ptr + split, labels.size() - split), stat_n_dom);
         }
+        if (extra_labels.empty()) return false;
+        return extra_dominance_func(std::span<Label *const>(extra_labels.data(), extra_labels.size()), stat_n_dom);
     }
 
-    bool is_empty() const noexcept { return labels.empty(); }
+    bool is_empty() const noexcept { return labels.empty() && extra_labels.empty(); }
 
     void sort() {
+        flush_extra_labels();
         pdqsort(labels.begin(), labels.end(), [](const Label *a, const Label *b) { return a->cost < b->cost; });
     }
 
@@ -269,6 +268,7 @@ struct alignas(64) Bucket {
     Bucket(int node_id, std::vector<double> lb, std::vector<double> ub)
         : node_id(node_id), lb(std::move(lb)), ub(std::move(ub)) {
         labels.reserve(256);
+        extra_labels.reserve(64);
     }
 
     // create default constructor
@@ -288,7 +288,11 @@ struct alignas(64) Bucket {
     // Returns all non-dominated labels from the bucket.
     std::vector<Label *> get_non_dominated_labels() const noexcept {
         std::vector<Label *> result;
+        result.reserve(labels.size() + extra_labels.size());
         for (Label *l : labels) {
+            if (!l->is_dominated) result.push_back(l);
+        }
+        for (Label *l : extra_labels) {
             if (!l->is_dominated) result.push_back(l);
         }
         return result;
@@ -302,6 +306,7 @@ struct alignas(64) Bucket {
         shall_split      = false;
         is_virtual_split = false;
         labels.clear();
+        extra_labels.clear();
         virtual_split_index = 0;
     }
 
@@ -330,6 +335,7 @@ struct alignas(64) Bucket {
         bw_jump_arcs.clear();
         sub_buckets = {};
         labels.clear();
+        extra_labels.clear();
 
         is_split            = false;
         shall_split         = false;
@@ -337,7 +343,7 @@ struct alignas(64) Bucket {
         virtual_split_index = 0;
     }
 
-    [[nodiscard]] bool empty() const { return labels.empty(); }
+    [[nodiscard]] bool empty() const { return labels.empty() && extra_labels.empty(); }
 
     template <Direction D>
     void add_jump_arc(int from_bucket, int to_bucket, const std::vector<double> &res_inc, double cost_inc) {
