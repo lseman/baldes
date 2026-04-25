@@ -12,6 +12,76 @@
 #pragma once
 #include "Common.h"
 
+#include <cassert>
+#include <stdexcept>
+
+#ifdef SRC
+struct SRCMap {
+    std::array<uint16_t, MAX_SRC_CUTS> values = {};
+    std::size_t                        logical_size = 0;
+
+    SRCMap() = default;
+
+    explicit SRCMap(std::size_t n, uint16_t value = 0) { assign(n, value); }
+
+    SRCMap(const std::vector<uint16_t> &src) { *this = src; }
+
+    SRCMap &operator=(const std::vector<uint16_t> &src) {
+        ensure_capacity(src.size());
+        std::copy(src.begin(), src.end(), values.begin());
+        logical_size = src.size();
+        return *this;
+    }
+
+    static void ensure_capacity(std::size_t n) {
+        if (unlikely(n > MAX_SRC_CUTS)) {
+            throw std::length_error("SRCMap capacity exceeded; increase MAX_SRC_CUTS");
+        }
+    }
+
+    void clear() noexcept {
+        logical_size = 0;
+    }
+
+    void resize(std::size_t n, uint16_t value = 0) {
+        ensure_capacity(n);
+        assert(n <= MAX_SRC_CUTS);
+        if (n > logical_size) {
+            std::fill(values.begin() + static_cast<std::ptrdiff_t>(logical_size),
+                      values.begin() + static_cast<std::ptrdiff_t>(n), value);
+        }
+        logical_size = n;
+    }
+
+    void assign(std::size_t n, uint16_t value) {
+        ensure_capacity(n);
+        assert(n <= MAX_SRC_CUTS);
+        std::fill(values.begin(), values.begin() + static_cast<std::ptrdiff_t>(n), value);
+        logical_size = n;
+    }
+
+    [[nodiscard]] std::size_t size() const noexcept { return logical_size; }
+    [[nodiscard]] bool        empty() const noexcept { return logical_size == 0; }
+
+    uint16_t       *data() noexcept { return values.data(); }
+    const uint16_t *data() const noexcept { return values.data(); }
+
+    uint16_t &operator[](std::size_t idx) noexcept {
+        assert(idx < MAX_SRC_CUTS);
+        return values[idx];
+    }
+
+    const uint16_t &operator[](std::size_t idx) const noexcept {
+        assert(idx < MAX_SRC_CUTS);
+        return values[idx];
+    }
+
+    [[nodiscard]] std::vector<uint16_t> to_vector() const {
+        return {values.begin(), values.begin() + static_cast<std::ptrdiff_t>(logical_size)};
+    }
+};
+#endif
+
 /**
  * @struct Label
  * @brief Represents a label used in a solver.
@@ -42,7 +112,7 @@ struct Label {
     Label                     *parent        = nullptr;
     bool                       fresh         = true;
     bool                       is_dominated  = false;
-    SRC_MODE_BLOCK(std::vector<uint16_t> SRCmap;)
+    SRC_MODE_BLOCK(SRCMap SRCmap;)
 
     // uint64_t             visited_bitmap; // Bitmap for visited nodes
     std::array<uint64_t, num_words> visited_bitmap = {0};
