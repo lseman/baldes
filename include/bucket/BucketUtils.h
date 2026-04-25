@@ -332,7 +332,45 @@ void BucketGraph::define_buckets() {
         if constexpr (D == Direction::Forward) { n_segments = (n_buckets + 63) >> 6; }
     }
 
-    // 5. Process fixed bucket ranges (if available).
+    // 5. Precompute RC2 bucket metadata for whole-bucket prune.
+    // Forward dominance needs candidate rc2 <= label rc2, so keep a prefix
+    // minimum of bucket lower bounds. Backward dominance needs candidate rc2 >=
+    // label rc2, so keep a prefix maximum of bucket upper bounds.
+    auto &rc2_bin           = assign_buckets<D>(fw_rc2_bin, bw_rc2_bin);
+    auto &rc2_till_this_bin = assign_buckets<D>(fw_rc2_till_this_bin, bw_rc2_till_this_bin);
+    rc2_bin.assign(num_nodes, {});
+    rc2_till_this_bin.assign(num_nodes, {});
+    for (int node_id = 0; node_id < static_cast<int>(num_nodes); ++node_id) {
+        int count = num_buckets[node_id];
+        rc2_bin[node_id].assign(count, 0.0);
+        rc2_till_this_bin[node_id].assign(count, 0.0);
+        if (count == 0) continue;
+
+        for (int local_b = 0; local_b < count; ++local_b) {
+            int         global_b  = num_buckets_index[node_id] + local_b;
+            const auto &bucket    = buckets[global_b];
+            double      rc2_value = 0.0;
+            if constexpr (D == Direction::Forward) {
+                if (bucket.lb.size() > 1) { rc2_value = bucket.lb[1]; }
+            } else {
+                if (bucket.ub.size() > 1) { rc2_value = bucket.ub[1]; }
+            }
+            rc2_bin[node_id][local_b] = rc2_value;
+            if (local_b == 0) {
+                rc2_till_this_bin[node_id][local_b] = rc2_value;
+            } else {
+                if constexpr (D == Direction::Forward) {
+                    rc2_till_this_bin[node_id][local_b] =
+                        std::min(rc2_till_this_bin[node_id][local_b - 1], rc2_value);
+                } else {
+                    rc2_till_this_bin[node_id][local_b] =
+                        std::max(rc2_till_this_bin[node_id][local_b - 1], rc2_value);
+                }
+            }
+        }
+    }
+
+    // 6. Process fixed bucket ranges (if available).
     if (!node_pair_fixed_ranges.empty()) {
         size_t new_size              = buckets.size();
         size_t required_bitmap_words = std::max(size_t(1), ((new_size * new_size) + 63) / 64);
@@ -586,7 +624,7 @@ template <Stage S, Symmetry SYM>
 void BucketGraph::ConcatenateLabel(const Label *L, int &b, std::atomic<double> &best_cost) {
     // Determine the number of segments needed for the bucket visited
     // bitmap.
-    const size_t n_segments = (fw_buckets_size + 63) / 64;
+    const size_t                              n_segments = (fw_buckets_size + 63) / 64;
     static thread_local std::vector<uint64_t> Bvisited;
     if (Bvisited.size() != n_segments) { Bvisited.resize(n_segments); }
     std::memset(Bvisited.data(), 0, n_segments * sizeof(uint64_t));
@@ -594,7 +632,7 @@ void BucketGraph::ConcatenateLabel(const Label *L, int &b, std::atomic<double> &
     // Use thread_local storage for the bucket stack to avoid reallocations.
     static thread_local std::vector<int> bucket_stack;
     if (bucket_stack.capacity() < 64) bucket_stack.reserve(64);
-    bucket_stack.clear();         // Clear for reuse
+    bucket_stack.clear(); // Clear for reuse
     bucket_stack.push_back(b);
 
     static thread_local std::vector<std::pair<const Label *, double>> merge_candidates;
@@ -1325,7 +1363,7 @@ void BucketGraph::common_initialization() {
     if (options.warm_start && !just_fixed && !warm_labels.empty()) {
         pdqsort(warm_labels.begin(), warm_labels.end(),
                 [](const WarmLabelState &a, const WarmLabelState &b) { return a.cost < b.cost; });
-        const size_t         process_size =
+        const size_t process_size =
             std::min(warm_labels.size(), static_cast<size_t>(options.n_warm_start * warm_labels.size()));
         for (size_t i = 0; i < process_size; ++i) {
             auto new_label = compute_red_cost(warm_labels[i], D == Direction::Forward);

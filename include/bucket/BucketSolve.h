@@ -1167,9 +1167,13 @@ inline bool BucketGraph::DominatedInCompWiseSmallerBuckets(const Label *__restri
                                                            std::vector<uint32_t> &touched_segments,
                                                            uint                  &stat_n_dom) noexcept {
     // Cache direction-specific data
-    const auto &buckets         = assign_buckets<D>(fw_buckets, bw_buckets);
-    const auto &Phi             = assign_buckets<D>(Phi_fw, Phi_bw);
-    const auto &bucket_scc_rank = assign_buckets<D>(fw_bucket_scc_rank, bw_bucket_scc_rank);
+    const auto &buckets           = assign_buckets<D>(fw_buckets, bw_buckets);
+    const auto &Phi               = assign_buckets<D>(Phi_fw, Phi_bw);
+    const auto &bucket_scc_rank   = assign_buckets<D>(fw_bucket_scc_rank, bw_bucket_scc_rank);
+    const auto &num_buckets_index = assign_buckets<D>(num_buckets_index_fw, num_buckets_index_bw);
+    const auto &num_buckets       = assign_buckets<D>(num_buckets_fw, num_buckets_bw);
+    const auto &rc2_bin           = assign_buckets<D>(fw_rc2_bin, bw_rc2_bin);
+    const auto &rc2_till_this_bin = assign_buckets<D>(fw_rc2_till_this_bin, bw_rc2_till_this_bin);
 
     // Cache frequently used label properties
     const int    b_L        = L->vertex;
@@ -1228,6 +1232,22 @@ inline bool BucketGraph::DominatedInCompWiseSmallerBuckets(const Label *__restri
         // order, return early
         if (likely(label_cost < c_bar[current_bucket] && bucket_scc_rank[current_bucket] < label_rank)) return false;
 
+        // Whole-bucket prune: if no label in this bucket or any predecessor bin
+        // at this node can dominate L in the second resource, skip it entirely.
+        if (options.resources.size() > 1) {
+            const auto &bucket       = buckets[current_bucket];
+            const int   node_id      = bucket.node_id;
+            const int   local_bucket = current_bucket - num_buckets_index[node_id];
+            if (local_bucket >= 0 && local_bucket < num_buckets[node_id]) {
+                const double label_rc2 = L->resources[1];
+                if constexpr (D == Direction::Forward) {
+                    if (numericutils::gt(rc2_till_this_bin[node_id][local_bucket], label_rc2)) { continue; }
+                } else {
+                    if (numericutils::lt(rc2_till_this_bin[node_id][local_bucket], label_rc2)) { continue; }
+                }
+            }
+        }
+
         // Skip dominance check for L's own bucket
         if (b_L != current_bucket) {
             const auto &mother_bucket = buckets[current_bucket];
@@ -1240,7 +1260,19 @@ inline bool BucketGraph::DominatedInCompWiseSmallerBuckets(const Label *__restri
         const int   *neighbor_ptr = neighbors.data();
         const int   *neighbor_end = neighbor_ptr + n_neighbors;
         for (; neighbor_ptr != neighbor_end; ++neighbor_ptr) {
-            const int      b_prime  = *neighbor_ptr;
+            const int   b_prime = *neighbor_ptr;
+            const auto &bucket  = buckets[b_prime];
+            const int   node_id = bucket.node_id;
+            const int   local_b = b_prime - num_buckets_index[node_id];
+            if (options.resources.size() > 1 && local_b >= 0 && local_b < num_buckets[node_id]) {
+                const double label_rc2 = L->resources[1];
+                if constexpr (D == Direction::Forward) {
+                    if (numericutils::gt(rc2_till_this_bin[node_id][local_b], label_rc2)) { continue; }
+                } else {
+                    if (numericutils::lt(rc2_till_this_bin[node_id][local_b], label_rc2)) { continue; }
+                }
+            }
+
             const size_t   word_idx = static_cast<size_t>(b_prime) >> 6;
             const uint64_t mask     = bit_mask_lookup_ptr[b_prime & 63];
             __builtin_prefetch(&Bvisited[word_idx], 0,
