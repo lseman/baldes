@@ -376,6 +376,12 @@ std::vector<double> BucketGraph::labeling_algorithm() {
                             // loop.
                             auto check_dominance_in_bucket = [&](std::span<Label *const> labels,
                                                                  uint                   &stat_n_dom) -> bool {
+                                const auto scan_end =
+                                    std::upper_bound(labels.begin(), labels.end(), new_label->cost + numericutils::eps,
+                                                     [](double cost, const Label *label) {
+                                                         return cost < label->cost;
+                                                     });
+                                labels = labels.first(static_cast<size_t>(scan_end - labels.begin()));
 #ifdef __AVX2__
                                 if (labels.size() >= AVX_LIM)
                                     return check_dominance_against_vector<D, S>(new_label, labels, cut_storage,
@@ -383,15 +389,15 @@ std::vector<double> BucketGraph::labeling_algorithm() {
                                 else
 #endif
                                 {
-                                    const size_t size = labels.size();
-                                    size_t       i    = 0;
+                                    const size_t scan_size = labels.size();
+                                    size_t       i         = 0;
 
                                     // Process one label at a time but with
                                     // prefetching ahead
-                                    for (; i < size; ++i) {
+                                    for (; i < scan_size; ++i) {
                                         // Prefetch several labels ahead for
                                         // better memory access patterns
-                                        if (i + 8 < size) { __builtin_prefetch(labels[i + 8], 0, 3); }
+                                        if (i + 8 < scan_size) { __builtin_prefetch(labels[i + 8], 0, 3); }
 
                                         // Process one label with branch
                                         // prediction hint
@@ -418,7 +424,13 @@ std::vector<double> BucketGraph::labeling_algorithm() {
                             tl_labels_to_dominate.clear();
 
                             const size_t to_bucket_size = to_bucket_labels.size();
-                            size_t       i              = 0;
+                            auto         scan_it =
+                                std::lower_bound(to_bucket_labels.begin(), to_bucket_labels.end(),
+                                                 new_label->cost - numericutils::eps,
+                                                 [](const Label *label, double cost) {
+                                                     return label->cost < cost;
+                                                 });
+                            size_t       i              = static_cast<size_t>(scan_it - to_bucket_labels.begin());
 
                             // Process dominance checks in blocks for better
                             // cache usage
@@ -1074,16 +1086,19 @@ inline bool BucketGraph::is_dominated(const Label *__restrict new_label, const L
     const size_t n_res = options.resources.size();
     if constexpr (D == Direction::Forward) {
         // In the Forward direction, each resource value of 'label' must
-        // not exceed that of 'new_label'
-        for (size_t i = 0; i < n_res; ++i) {
+        // not exceed that of 'new_label'. Check resource 0 last because bucket
+        // traversal already gives it partial ordering.
+        for (size_t i = 1; i < n_res; ++i) {
             if (numericutils::gt(lbl_res[i], new_res[i])) { return false; }
         }
+        if (n_res > 0 && numericutils::gt(lbl_res[0], new_res[0])) { return false; }
     } else if constexpr (D == Direction::Backward) {
         // In the Backward direction, each resource value of 'label'
-        // must not be less than that of 'new_label'
-        for (size_t i = 0; i < n_res; ++i) {
+        // must not be less than that of 'new_label'. Check resource 0 last.
+        for (size_t i = 1; i < n_res; ++i) {
             if (numericutils::lt(lbl_res[i], new_res[i])) { return false; }
         }
+        if (n_res > 0 && numericutils::lt(lbl_res[0], new_res[0])) { return false; }
     }
 
     // visits of label.
@@ -1191,6 +1206,10 @@ inline bool BucketGraph::DominatedInCompWiseSmallerBuckets(const Label *__restri
 
     // Inline dominance check function to avoid lambda overhead
     auto inline_check_dominance = [&](std::span<Label *const> labels, uint &n_dom) -> bool {
+        const auto scan_end =
+            std::upper_bound(labels.begin(), labels.end(), L->cost + numericutils::eps,
+                             [](double cost, const Label *label) { return cost < label->cost; });
+        labels = labels.first(static_cast<size_t>(scan_end - labels.begin()));
 #ifdef __AVX2__
         if (labels.size() >= AVX_LIM) return check_dominance_against_vector<D, S>(L, labels, cut_storage, n_dom);
 #endif
