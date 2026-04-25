@@ -88,7 +88,11 @@ PYBIND11_MODULE(pybaldes, m) {
         .def_readwrite("unreachable_bitmap", &Label::unreachable_bitmap)
 #endif
 
-            SRC_MODE_BLOCK(.def_readwrite("SRCmap", &Label::SRCmap))
+            SRC_MODE_BLOCK(.def_property("SRCmap",
+                                          [](const Label &label) { return label.SRCmap.to_vector(); },
+                                          [](Label &label, const std::vector<uint16_t> &src_map) {
+                                              label.SRCmap = src_map;
+                                          }))
         .def("set_extended", &Label::set_extended)
         .def("visits", &Label::visits)
         .def("reset", &Label::reset)

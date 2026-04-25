@@ -35,6 +35,7 @@
 // Define constants for resource sizes
 #define R_SIZE @R_SIZE@
 #define N_SIZE @N_SIZE@
+#define MAX_SRC_CUTS @MAX_SRC_CUTS@
 #define BUCKET_CAPACITY @BUCKET_CAPACITY@
 #define TIME_INDEX @TIME_INDEX@
 #define DEMAND_INDEX @DEMAND_INDEX@
