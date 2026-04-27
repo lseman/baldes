@@ -386,48 +386,86 @@ void BucketGraph::ObtainJumpBucketArcs() {
                 ++missing_counter;
 
                 // Determine bucket range for the current node.
-                const int start_bucket = num_buckets_idx[current_node_id];
-                const int node_buckets = num_buckets[current_node_id];
+                const int   start_bucket  = num_buckets_idx[current_node_id];
+                const int   node_buckets  = num_buckets[current_node_id];
+                const auto &bucket_splits = assign_buckets<D>(fw_bucket_splits, bw_bucket_splits)[current_node_id];
+                const auto  decode_pos    = [&](int bucket_id) {
+                    std::vector<int> pos(bucket_splits.size(), 0);
+                    int              local_bucket = bucket_id - start_bucket;
+                    for (size_t r = 0; r < bucket_splits.size(); ++r) {
+                        pos[r] = local_bucket % bucket_splits[r];
+                        local_bucket /= bucket_splits[r];
+                    }
+                    return pos;
+                };
+                const auto current_pos = decode_pos(b);
 
-                // Lambda to process candidate adjacent buckets.
-                auto process_bucket = [&](int current_b, int candidate_b) {
-                    // Only proceed if candidate bucket is adjacent (per
-                    // Phi).
-                    const auto &phi_candidate = Phi[candidate_b];
-                    if (std::find(phi_candidate.begin(), phi_candidate.end(), current_b) == phi_candidate.end()) return;
+                auto is_componentwise_successor = [&](const std::vector<int> &candidate_pos) {
+                    bool strictly_larger = false;
+                    for (size_t r = 0; r < candidate_pos.size(); ++r) {
+                        if (candidate_pos[r] < current_pos[r]) return false;
+                        if (candidate_pos[r] > current_pos[r]) strictly_larger = true;
+                    }
+                    return strictly_larger;
+                };
 
-                    // Check candidate bucket's arcs.
+                auto is_componentwise_minimal = [&](const std::vector<int>              &candidate_pos,
+                                                    const std::vector<std::vector<int>> &all_positions) {
+                    for (const auto &other_pos : all_positions) {
+                        if (&other_pos == &candidate_pos) continue;
+                        bool leq    = true;
+                        bool strict = false;
+                        for (size_t r = 0; r < candidate_pos.size(); ++r) {
+                            if (other_pos[r] > candidate_pos[r]) {
+                                leq = false;
+                                break;
+                            }
+                            if (other_pos[r] < candidate_pos[r]) strict = true;
+                        }
+                        if (leq && strict) return false;
+                    }
+                    return true;
+                };
+
+                std::vector<int>                 candidate_buckets;
+                std::vector<std::vector<int>>    candidate_positions;
+                std::vector<std::vector<double>> candidate_res;
+                std::vector<double>              candidate_costs;
+                candidate_buckets.reserve(node_buckets);
+
+                for (int candidate_b = b + 1; candidate_b < start_bucket + node_buckets; ++candidate_b) {
+                    const auto candidate_pos = decode_pos(candidate_b);
+                    if (!is_componentwise_successor(candidate_pos)) continue;
+
                     const auto &candidate_arcs = buckets[candidate_b].template get_bucket_arcs<D>();
                     for (const auto &gamma_candidate : candidate_arcs) {
                         if (is_bucket_fixed<D>(gamma_candidate.from_bucket, gamma_candidate.to_bucket)) continue;
 
                         const int from_node_candidate = buckets[gamma_candidate.from_bucket].node_id;
                         const int to_node_candidate   = buckets[gamma_candidate.to_bucket].node_id;
-
-                        // If the candidate arc matches the original
-                        // arc...
                         if (from_node == from_node_candidate && to_node == to_node_candidate) {
-                            B_bar.push_back(candidate_b);
-                            std::vector<double> res = gamma_candidate.resource_increment;
-
-                            const double cost = gamma_candidate.cost_increment;
-
-                            // Add jump arcs both in the bucket and at
-                            // the node level.
-                            buckets[current_b].template add_jump_arc<D>(current_b, candidate_b, res, cost);
-                            nodes[buckets[current_b].node_id].template add_jump_arc<D>(current_b, candidate_b, res,
-                                                                                       cost, to_node);
-                            buckets[current_b].template add_bucket_arc<D>(current_b, candidate_b, res, cost, true);
-                            ++arc_counter;
+                            candidate_buckets.push_back(candidate_b);
+                            candidate_positions.push_back(candidate_pos);
+                            candidate_res.push_back(gamma_candidate.resource_increment);
+                            candidate_costs.push_back(gamma_candidate.cost_increment);
+                            break;
                         }
                     }
-                };
+                }
 
-                // Process successor candidates within the same node block.
-                // A valid candidate must still satisfy Phi-adjacency inside
-                // process_bucket.
-                for (int candidate_b = b + 1; candidate_b < start_bucket + node_buckets; ++candidate_b) {
-                    process_bucket(b, candidate_b);
+                // Keep only component-wise minimal candidates among the larger buckets.
+                for (size_t i = 0; i < candidate_buckets.size(); ++i) {
+                    if (!is_componentwise_minimal(candidate_positions[i], candidate_positions)) continue;
+
+                    const int candidate_b = candidate_buckets[i];
+                    B_bar.push_back(candidate_b);
+                    std::vector<double> res  = candidate_res[i];
+                    const double        cost = candidate_costs[i];
+
+                    buckets[b].template add_jump_arc<D>(b, candidate_b, res, cost);
+                    nodes[buckets[b].node_id].template add_jump_arc<D>(b, candidate_b, res, cost, orig_arc.to);
+                    buckets[b].template add_bucket_arc<D>(b, candidate_b, res, cost, true);
+                    ++arc_counter;
                 }
             }
         }
