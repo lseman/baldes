@@ -88,17 +88,26 @@ inline int BucketGraph::get_bucket_number(int node, std::vector<double> &resourc
 
         // Determine the number of splits (i.e. intervals) for resource r.
         int    splits = std::max(1, static_cast<int>(std::round((node_range / full_range) * intervals[r].interval)));
-        double interval_width = node_range / splits;
+        double interval_width =
+            (splits == 0 || std::fabs(node_range) < std::numeric_limits<double>::epsilon()) ? 1.0 : node_range / splits;
 
         int pos = 0;
         if constexpr (D == Direction::Forward) {
             // Compute the bucket "digit" from the lower bound.
-            pos =
-                std::min(splits - 1, static_cast<int>(std::floor((resource_values_vec[r] - node_lb) / interval_width)));
+            if (std::fabs(interval_width) < std::numeric_limits<double>::epsilon()) {
+                pos = 0;
+            } else {
+                pos = std::min(splits - 1,
+                               static_cast<int>(std::floor((resource_values_vec[r] - node_lb) / interval_width)));
+            }
         } else { // Direction::Backward
             // For backward, we consider the distance from the upper bound.
-            pos =
-                std::min(splits - 1, static_cast<int>(std::floor((node_ub - resource_values_vec[r]) / interval_width)));
+            if (std::fabs(interval_width) < std::numeric_limits<double>::epsilon()) {
+                pos = 0;
+            } else {
+                pos = std::min(splits - 1,
+                               static_cast<int>(std::floor((node_ub - resource_values_vec[r]) / interval_width)));
+            }
         }
 
         bucket_number += pos * multiplier;
@@ -452,7 +461,7 @@ void BucketGraph::generate_arcs() {
                 } else {
                     double max_calc = std::max(buckets[from_bucket].lb[r] + res_inc[r], next_node.lb[r]);
                     if (numericutils::lt(max_calc, buckets[to_bucket].lb[r]) ||
-                        numericutils::gte(max_calc, buckets[to_bucket].lb[r] + next_node_base[r])) {
+                        numericutils::gt(max_calc, buckets[to_bucket].ub[r])) {
                         valid = false;
                     }
                 }
@@ -466,7 +475,7 @@ void BucketGraph::generate_arcs() {
                 } else {
                     double min_calc = std::min(buckets[from_bucket].ub[r] - res_inc[r], next_node.ub[r]);
                     if (numericutils::gt(min_calc, buckets[to_bucket].ub[r]) ||
-                        numericutils::lte(min_calc, buckets[to_bucket].ub[r] - next_node_base[r])) {
+                        numericutils::lt(min_calc, buckets[to_bucket].lb[r])) {
                         valid = false;
                     }
                 }
@@ -499,8 +508,8 @@ void BucketGraph::generate_arcs() {
         for (int i = 0; i < num_buckets[node.id]; ++i) {
             int from_bucket = i + num_buckets_idx[node.id];
             // Process each outgoing arc.
-            for (const auto &arc : nodes) {
-                const auto &next_node = arc;
+            for (const auto &arc : arcs) {
+                const auto &next_node = nodes[arc.to];
                 // Avoid self-loop.
                 if (node.id == next_node.id) continue;
 
@@ -516,12 +525,7 @@ void BucketGraph::generate_arcs() {
                 // Iterate over buckets in the next node.
                 for (int j = 0; j < num_buckets[next_node.id]; ++j) {
                     int to_bucket = j + num_buckets_idx[next_node.id];
-                    // if (from_bucket == to_bucket ||
-                    //     is_bucket_fixed<D>(from_bucket, to_bucket)) {
-                    //     continue;
-                    // }
                     if (from_bucket == to_bucket) { continue; }
-                    // // Validate and add arc if valid.
                     if (try_add_arc(node, from_bucket, next_node, to_bucket, curr_node_base, next_node_base, res_inc,
                                     cost_inc)) {
                         local_arcs.emplace_back(from_bucket, to_bucket);
@@ -802,9 +806,9 @@ void BucketGraph::SCC_handler() {
     auto sorted_sccs = sccs; // Make a copy
     for (auto &scc : sorted_sccs) {
         if constexpr (D == Direction::Forward) {
-            pdqsort(scc.begin(), scc.end(), [&buckets](int a, int b) { return buckets[a].lb[0] < buckets[b].lb[0]; });
+            pdqsort(scc.begin(), scc.end(), [&buckets](int a, int b) { return buckets[a].lb < buckets[b].lb; });
         } else {
-            pdqsort(scc.begin(), scc.end(), [&buckets](int a, int b) { return buckets[a].ub[0] > buckets[b].ub[0]; });
+            pdqsort(scc.begin(), scc.end(), [&buckets](int a, int b) { return buckets[a].ub > buckets[b].ub; });
         }
     }
 

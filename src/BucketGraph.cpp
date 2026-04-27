@@ -145,38 +145,54 @@ std::vector<int> BucketGraph::computePhi(int &bucket_id, bool fw) {
             base_intervals[r] = node_range / static_cast<double>(splits);
         }
 
-        const auto         &current_bucket = buckets[bucket_id];
-        std::vector<double> target(n_dims, 0.0);
+        auto       &num_buckets_index = fw ? num_buckets_index_fw : num_buckets_index_bw;
+        const auto &current_bucket    = buckets[bucket_id];
+        int         local_bucket      = bucket_id - num_buckets_index[node_id];
 
-        // Use direction-consistent anchors:
-        // - Forward buckets are indexed low→high, so predecessor is one step
-        //   down from lb.
-        // - Backward buckets are indexed high→low, so predecessor is one step
-        //   up from ub.
-        for (int r = 0; r < n_dims; ++r) { target[r] = fw ? current_bucket.lb[r] : current_bucket.ub[r]; }
-
-        // Adjust the target vector by one base interval for each dimension.
-        // Forward predecessor: lower-resource bucket.
-        // Backward predecessor (high→low indexing): higher-resource bucket.
+        // Reconstruct the local multi-dimensional position vector for the
+        // current bucket using the same mixed-radix scheme as get_bucket_number.
+        std::vector<int> pos(n_dims, 0);
+        int              rem = local_bucket;
         for (int r = 0; r < n_dims; ++r) {
-            if (fw)
-                target[r] = std::max(node.lb[r], target[r] - base_intervals[r]);
-            else
-                target[r] = std::min(node.ub[r], target[r] + base_intervals[r]);
+            double full_range = R_max[r] - R_min[r];
+            double node_range = node.ub[r] - node.lb[r];
+            int    splits     = 1;
+            if (std::fabs(full_range) > std::numeric_limits<double>::epsilon()) {
+                splits = std::max(1, static_cast<int>(std::round((node_range * intervals[r].interval) / full_range)));
+            }
+            pos[r] = rem % splits;
+            rem /= splits;
         }
 
-        // Closed-form lookup consistent with direction-specific bucket
-        // indexing.
-        int candidate_bucket = fw ? get_bucket_number<Direction::Forward>(node_id, target)
-                                  : get_bucket_number<Direction::Backward>(node_id, target);
-        if (candidate_bucket >= 0 && candidate_bucket < static_cast<int>(buckets.size()) &&
-            candidate_bucket != bucket_id && buckets[candidate_bucket].node_id == node_id) {
+        // Build Phi by exploring each dimension independently.
+        for (int r = 0; r < n_dims; ++r) {
+            if (pos[r] == 0) continue;
+            std::vector<int> neighbor_pos = pos;
+            neighbor_pos[r]--;
+
+            int candidate_bucket = num_buckets_index[node_id];
+            int multiplier       = 1;
+            for (int s = 0; s < n_dims; ++s) {
+                double full_range = R_max[s] - R_min[s];
+                double node_range = node.ub[s] - node.lb[s];
+                int    splits     = 1;
+                if (std::fabs(full_range) > std::numeric_limits<double>::epsilon()) {
+                    splits =
+                        std::max(1, static_cast<int>(std::round((node_range * intervals[s].interval) / full_range)));
+                }
+                candidate_bucket += neighbor_pos[s] * multiplier;
+                multiplier *= splits;
+            }
+
+            if (candidate_bucket >= 0 && candidate_bucket < static_cast<int>(buckets.size()) &&
+                buckets[candidate_bucket].node_id == node_id) {
 #ifdef FIX_BUCKETS
-            bool not_fixed = fw ? is_bucket_not_fixed_forward(bucket_id, candidate_bucket)
-                                : is_bucket_not_fixed_backward(bucket_id, candidate_bucket);
-            // if (not_fixed)
+                bool not_fixed = fw ? is_bucket_not_fixed_forward(bucket_id, candidate_bucket)
+                                    : is_bucket_not_fixed_backward(bucket_id, candidate_bucket);
+                // if (not_fixed)
 #endif
-            { phi.push_back(candidate_bucket); }
+                { phi.push_back(candidate_bucket); }
+            }
         }
     }
     // Single-resource case (simpler).

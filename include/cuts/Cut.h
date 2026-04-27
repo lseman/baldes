@@ -85,7 +85,10 @@ struct Cut {
     }
 
     bool isSRCset(int i, int j) const {
-        return baseSet[i / 64] & (1ULL << (i % 64)) && baseSet[j / 64] & (1ULL << (j % 64));
+        const uint64_t mask_i = 1ULL << (i % 64);
+        const uint64_t mask_j = 1ULL << (j % 64);
+        return (baseSet[i / 64] & mask_i) && (baseSet[j / 64] & mask_j) && (neighbors[i / 64] & mask_i) &&
+               (neighbors[j / 64] & mask_j);
     }
 
     bool isSRCset(int i) const { return baseSet[i / 64] & (1ULL << (i % 64)); }
@@ -146,7 +149,10 @@ struct ActiveCutInfo {
         : index(active_idx), cut_index(cut_idx), cut_ptr(ptr), dual_value(dual), type(type) {}
 
     bool isSRCset(int i, int j) const {
-        return cut_ptr->baseSet[i / 64] & (1ULL << (i % 64)) && cut_ptr->baseSet[j / 64] & (1ULL << (j % 64));
+        const uint64_t mask_i = 1ULL << (i % 64);
+        const uint64_t mask_j = 1ULL << (j % 64);
+        return (cut_ptr->baseSet[i / 64] & mask_i) && (cut_ptr->baseSet[j / 64] & mask_j) &&
+               (cut_ptr->neighbors[i / 64] & mask_i) && (cut_ptr->neighbors[j / 64] & mask_j);
     }
     bool isSRCset(int i) const { return cut_ptr->baseSet[i / 64] & (1ULL << (i % 64)); };
 };
