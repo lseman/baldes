@@ -66,7 +66,7 @@ public:
      * @return List of branching candidates
      */
     static std::vector<BranchingQueueItem> calculateAggregatedbaldesVars(BNBNode *node, const InstanceData *instance,
-                                                                        std::vector<VRPNode> &nodes) {
+                                                                         std::vector<VRPNode> &nodes) {
         std::vector<BranchingQueueItem> queueItems;
         auto                            LPSolution = node->extractSolution();
         auto                            routes     = node->getPaths();
@@ -163,7 +163,7 @@ public:
         return queueItems;
     }
     static void addbaldesCtrForCandidate(BNBNode *childNode, const BranchingQueueItem &item, double bound,
-                                          BranchingDirection direction) {
+                                         BranchingDirection direction) {
         if (item.candidateType == CandidateType::Vehicle) {
             childNode->addBranchingbaldesCtr(bound, direction, CandidateType::Vehicle);
         } else if (item.candidateType == CandidateType::Node) {
@@ -177,9 +177,8 @@ public:
     }
 
     // Apply branching constraints based on the fractional value of the candidate
-    static std::pair<BNBNode *, BNBNode *> applyBranchingbaldesCtrs(BNBNode                  *parentNode,
-                                                                     const BranchingQueueItem &item,
-                                                                     double fractionalValue, CandidateType type) {
+    static std::pair<BNBNode *, BNBNode *> applyBranchingbaldesCtrs(BNBNode *parentNode, const BranchingQueueItem &item,
+                                                                    double fractionalValue, CandidateType type) {
         BNBNode *childNode1 = parentNode->newChild();
         BNBNode *childNode2 = parentNode->newChild();
 
@@ -468,9 +467,8 @@ public:
         auto phase2Candidates = evaluateWithCG(node, phase1Candidates, problem);
 
         print_branching("Generating VRP candidates...\n");
-        const auto &finalCandidates =
-            phase2Candidates.empty() ? phase1Candidates : phase2Candidates;
-        auto generatedCandidates = generateVRPCandidates(node, finalCandidates);
+        const auto &finalCandidates     = phase2Candidates.empty() ? phase1Candidates : phase2Candidates;
+        auto        generatedCandidates = generateVRPCandidates(node, finalCandidates);
         candidates.insert(candidates.end(), generatedCandidates.begin(), generatedCandidates.end());
 
         // for (auto &c : candidates) { c->print(); }

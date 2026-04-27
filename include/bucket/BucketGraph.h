@@ -369,6 +369,18 @@ public:
     uint stat_n_dom_fw    = 0;
     uint stat_n_dom_bw    = 0;
 
+    static constexpr size_t                   PROFILE_STAGE_COUNT = static_cast<size_t>(Stage::Enumerate) + 1;
+    std::array<uint64_t, PROFILE_STAGE_COUNT> profile_dominance_checks_fw{};
+    std::array<uint64_t, PROFILE_STAGE_COUNT> profile_dominance_checks_bw{};
+    std::array<uint64_t, PROFILE_STAGE_COUNT> profile_inner_bin_scan_labels_fw{};
+    std::array<uint64_t, PROFILE_STAGE_COUNT> profile_inner_bin_scan_labels_bw{};
+    std::array<uint64_t, PROFILE_STAGE_COUNT> profile_inner_bin_scan_events_fw{};
+    std::array<uint64_t, PROFILE_STAGE_COUNT> profile_inner_bin_scan_events_bw{};
+    std::array<uint64_t, PROFILE_STAGE_COUNT> profile_labels_tested_fw{};
+    std::array<uint64_t, PROFILE_STAGE_COUNT> profile_labels_tested_bw{};
+    std::array<uint64_t, PROFILE_STAGE_COUNT> profile_labels_survived_fw{};
+    std::array<uint64_t, PROFILE_STAGE_COUNT> profile_labels_survived_bw{};
+
     std::vector<double>                R_max;
     std::vector<double>                R_min;
     std::vector<std::vector<uint64_t>> neighborhoods_bitmap; // Bitmap for neighborhoods of each
@@ -459,6 +471,7 @@ public:
     void common_initialization();
 
     void common_initialization() {
+        if (options.profile_labeling) { profile_reset_labeling_metrics(); }
         PARALLEL_SECTIONS(
             work, bi_sched, SECTION { common_initialization<Direction::Forward>(); },
             SECTION { common_initialization<Direction::Backward>(); });
@@ -468,6 +481,12 @@ public:
 
     void setup();
     void print_statistics();
+    void print_labeling_profile();
+    void profile_reset_labeling_metrics() noexcept;
+    void profile_record_dominance_check(Direction D, Stage S) noexcept;
+    void profile_record_inner_bin_scan(Direction D, Stage S, uint64_t scanned_labels) noexcept;
+    void profile_record_new_label(Direction D, Stage S) noexcept;
+    void profile_record_non_dominated_label(Direction D, Stage S) noexcept;
     void generate_arcs();
 
     ankerl::unordered_dense::map<int, std::vector<int>> fw_bucket_splits;
@@ -1116,9 +1135,9 @@ public:
         // Ensure sufficient nodes in the route.
         if (L.path_len <= 3) return nullptr;
 
-        // Initialize an empty SRCmap vector with size equal to the current
-        // number of cuts.
-        std::vector<uint16_t> updated_SRCmap(cut_storage->size(), 0);
+        // Initialize an empty SRCmap vector with one slot per pricing-active
+        // cut. Stored cuts with tiny duals are ignored by pricing.
+        std::vector<uint16_t> updated_SRCmap(cut_storage->activeSize(), 0);
 
         // Prepare new label.
         auto  pool      = fw ? label_pool_fw : label_pool_bw;
@@ -1153,18 +1172,30 @@ public:
             red_cost -= nodes[node_id].cost;
 
             // --- SRC Logic ---
-            size_t         segment  = node_id >> 6;
-            const uint64_t bit_mask = bit_mask_lookup[node_id & 63];
-            auto          &cutter   = cut_storage;
-            auto          &SRCDuals = cutter->SRCDuals;
+            size_t         segment     = node_id >> 6;
+            const uint64_t bit_mask    = bit_mask_lookup[node_id & 63];
+            auto          &cutter      = cut_storage;
+            const auto     active_cuts = cutter->getActiveCuts();
 
 #if defined(SRC)
-            for (std::size_t idx = 0; idx < cutter->size(); ++idx) {
-                const auto &cut          = cutter->getCut(idx);
-                const auto &baseSet      = cut.baseSet;
-                const auto &baseSetOrder = cut.baseSetOrder;
-                const auto &neighbors    = cut.neighbors;
-                const auto &multipliers  = cut.p;
+#if !defined(SRC_MEMORY_MODE_ARC)
+            for (const auto &update : cutter->getSRCNodeUpdates(node_id)) {
+                auto &src_val = updated_SRCmap[update.active_idx];
+                src_val += update.add;
+                if (src_val >= update.den) {
+                    red_cost -= update.dual;
+                    src_val -= update.den;
+                }
+            }
+            for (const auto active_idx : cutter->getSRCNodeClears(node_id)) { updated_SRCmap[active_idx] = 0; }
+#else
+            for (const auto &active_cut : active_cuts) {
+                const size_t idx          = active_cut.index;
+                const auto  &cut          = *active_cut.cut_ptr;
+                const auto  &baseSet      = cut.baseSet;
+                const auto  &baseSetOrder = cut.baseSetOrder;
+                const auto  &neighbors    = cut.neighbors;
+                const auto  &multipliers  = cut.p;
 
                 if (!(neighbors[segment] & bit_mask)) {
                     updated_SRCmap[idx] = 0;
@@ -1175,7 +1206,7 @@ public:
                     auto &src_val = updated_SRCmap[idx];
                     src_val += multipliers.num[baseSetOrder[node_id]];
                     if (src_val >= multipliers.den) {
-                        red_cost -= SRCDuals[idx];
+                        red_cost -= active_cut.dual_value;
                         src_val -= multipliers.den;
                     }
                 }
@@ -1184,12 +1215,13 @@ public:
                     auto &src_val = updated_SRCmap[idx];
                     src_val += multipliers.num[baseSetOrder[node_id]];
                     if (src_val >= multipliers.den) {
-                        red_cost -= SRCDuals[idx];
+                        red_cost -= active_cut.dual_value;
                         src_val -= multipliers.den;
                     }
                 }
 #endif
             }
+#endif
 #endif
 
             // --- Arc and Branching Dual Adjustments ---

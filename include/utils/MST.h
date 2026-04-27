@@ -24,21 +24,20 @@
 #include "VRPNode.h"
 
 class MST {
-   public:
-    using Arc = std::tuple<double, int, int>;  // weight, from_node, to_node
+public:
+    using Arc = std::tuple<double, int, int>; // weight, from_node, to_node
 
-    MST(const std::vector<VRPNode> &nodes,
-        std::function<double(int, int)> get_cost)
+    MST(const std::vector<VRPNode> &nodes, std::function<double(int, int)> get_cost)
         : nodes_(nodes), getcij(get_cost) {}
 
     // Function to compute the MST using Prim's algorithm
     std::vector<Arc> compute_mst() {
         std::priority_queue<Arc, std::vector<Arc>, std::greater<Arc>> min_heap;
-        std::vector<bool> in_mst(nodes_.size(), false);
-        std::vector<Arc> mst;
+        std::vector<bool>                                             in_mst(nodes_.size(), false);
+        std::vector<Arc>                                              mst;
         mst.reserve(nodes_.size() - 1);
 
-        int start_node = 0;
+        int start_node     = 0;
         in_mst[start_node] = true;
         add_adjacent_arcs(start_node, min_heap);
 
@@ -63,15 +62,11 @@ class MST {
 
         // Calculate average and standard deviation of edge weights in the MST
         double sum = 0.0;
-        for (const auto &[weight, from, to] : mst) {
-            sum += weight;
-        }
+        for (const auto &[weight, from, to] : mst) { sum += weight; }
         double avg = sum / mst.size();
 
         double sum_sq = 0.0;
-        for (const auto &[weight, from, to] : mst) {
-            sum_sq += std::pow(weight - avg, 2);
-        }
+        for (const auto &[weight, from, to] : mst) { sum_sq += std::pow(weight - avg, 2); }
         double std_dev = std::sqrt(sum_sq / mst.size());
 
         // Threshold Θ = avg(T) + θ * std(T)
@@ -81,24 +76,19 @@ class MST {
         std::vector<Arc> filtered_edges;
         filtered_edges.reserve(mst.size());
         for (const auto &[weight, from, to] : mst) {
-            if (weight <= threshold) {
-                filtered_edges.emplace_back(weight, from, to);
-            }
+            if (weight <= threshold) { filtered_edges.emplace_back(weight, from, to); }
         }
 
         // Find the connected components (clusters) in the filtered MST
         return find_clusters(filtered_edges);
     }
 
-   private:
-    const std::vector<VRPNode> &nodes_;
-    std::function<double(int, int)>
-        getcij;  // Store the reference to the getcij function
+private:
+    const std::vector<VRPNode>     &nodes_;
+    std::function<double(int, int)> getcij; // Store the reference to the getcij function
 
     // Helper function to add adjacent arcs of a node to the priority queue
-    void add_adjacent_arcs(int node_id,
-                           std::priority_queue<Arc, std::vector<Arc>,
-                                               std::greater<Arc>> &min_heap) {
+    void add_adjacent_arcs(int node_id, std::priority_queue<Arc, std::vector<Arc>, std::greater<Arc>> &min_heap) {
         const auto &node = nodes_[node_id];
 
         for (const auto &next_node : nodes_) {
@@ -112,24 +102,16 @@ class MST {
     // Helper function to find connected components (clusters) from the filtered
     // edges
     std::vector<std::vector<int>> find_clusters(const std::vector<Arc> &edges) {
-        UnionFind uf(
-            nodes_
-                .size());  // Use a union-find data structure to track clusters
-        for (const auto &[weight, from, to] : edges) {
-            uf.union_sets(from, to);
-        }
+        UnionFind uf(nodes_.size()); // Use a union-find data structure to track clusters
+        for (const auto &[weight, from, to] : edges) { uf.union_sets(from, to); }
 
         // Gather the clusters based on the union-find structure
         std::vector<std::vector<int>> clusters(nodes_.size());
-        for (int i = 0; i < nodes_.size(); ++i) {
-            clusters[uf.find(i)].push_back(i);
-        }
+        for (int i = 0; i < nodes_.size(); ++i) { clusters[uf.find(i)].push_back(i); }
 
         // Remove empty clusters
         clusters.erase(std::remove_if(clusters.begin(), clusters.end(),
-                                      [](const std::vector<int> &cluster) {
-                                          return cluster.empty();
-                                      }),
+                                      [](const std::vector<int> &cluster) { return cluster.empty(); }),
                        clusters.end());
 
         return clusters;
@@ -137,7 +119,7 @@ class MST {
 
     // Union-Find class for finding connected components
     class UnionFind {
-       public:
+    public:
         UnionFind(int n) : parent(n), rank(n, 0) {
             for (int i = 0; i < n; ++i) parent[i] = i;
         }
@@ -162,7 +144,7 @@ class MST {
             }
         }
 
-       private:
+    private:
         std::vector<int> parent;
         std::vector<int> rank;
     };

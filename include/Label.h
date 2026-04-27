@@ -17,7 +17,7 @@
 
 #ifdef SRC
 struct SRCMap {
-    std::array<uint16_t, MAX_SRC_CUTS> values = {};
+    std::array<uint16_t, MAX_SRC_CUTS> values       = {};
     std::size_t                        logical_size = 0;
 
     SRCMap() = default;
@@ -34,14 +34,10 @@ struct SRCMap {
     }
 
     static void ensure_capacity(std::size_t n) {
-        if (unlikely(n > MAX_SRC_CUTS)) {
-            throw std::length_error("SRCMap capacity exceeded; increase MAX_SRC_CUTS");
-        }
+        if (unlikely(n > MAX_SRC_CUTS)) { throw std::length_error("SRCMap capacity exceeded; increase MAX_SRC_CUTS"); }
     }
 
-    void clear() noexcept {
-        logical_size = 0;
-    }
+    void clear() noexcept { logical_size = 0; }
 
     void resize(std::size_t n, uint16_t value = 0) {
         ensure_capacity(n);
@@ -138,19 +134,19 @@ struct Label {
     void clearRoute() noexcept {
         nodes_covered.clear();
         path_len = 0;
-        parent = nullptr;
+        parent   = nullptr;
     }
 
     void addRoute(const std::vector<int> &route) {
         nodes_covered.insert(nodes_covered.end(), route.begin(), route.end());
         path_len = static_cast<int>(nodes_covered.size());
-        parent = nullptr;
+        parent   = nullptr;
     }
 
     void addRoute(const std::vector<uint16_t> &route) {
         nodes_covered.insert(nodes_covered.end(), route.begin(), route.end());
         path_len = static_cast<int>(nodes_covered.size());
-        parent = nullptr;
+        parent   = nullptr;
     }
     /**
      * @brief Checks if a node has been visited.
@@ -196,7 +192,7 @@ struct Label {
     void addNode(int node) {
         nodes_covered.push_back(node);
         path_len = static_cast<int>(nodes_covered.size());
-        parent = nullptr;
+        parent   = nullptr;
     }
 
     /**
@@ -211,7 +207,7 @@ struct Label {
         // same size as the input
         std::copy(resources.begin(), resources.end(), this->resources.begin());
 
-        this->node_id = node_id;
+        this->node_id  = node_id;
         this->path_len = 0;
     }
 

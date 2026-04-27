@@ -4,7 +4,7 @@
  */
 
 #pragma once
-#include <ankerl/unordered_dense.h>  // For ankerl::unordered_dense::map
+#include <ankerl/unordered_dense.h> // For ankerl::unordered_dense::map
 
 #include <algorithm>
 #include <cstdint>
@@ -19,15 +19,13 @@
 
 struct Path {
     // Use a more memory-efficient container for small integers
-    std::vector<uint16_t> route;  // Assuming route nodes are < 65536
-    float cost;                   // Using float for cost
-    float red_cost = std::numeric_limits<float>::max();
-    float frac_x = 0.0f;
+    std::vector<uint16_t> route; // Assuming route nodes are < 65536
+    float                 cost;  // Using float for cost
+    float                 red_cost = std::numeric_limits<float>::max();
+    float                 frac_x   = 0.0f;
 
     // Equality operator
-    bool operator==(const Path &other) const {
-        return route == other.route;
-    }
+    bool operator==(const Path &other) const { return route == other.route; }
 
     // Default constructor
     Path() : route{}, cost(0.0f) {}
@@ -37,43 +35,35 @@ struct Path {
     // Constructor with vector<int> and double cost
     Path(const std::vector<int> &r, double c) : cost(static_cast<float>(c)) {
         route.resize(r.size());
-        std::transform(r.begin(), r.end(), route.begin(),
-                       [](int val) { return static_cast<uint16_t>(val); });
+        std::transform(r.begin(), r.end(), route.begin(), [](int val) { return static_cast<uint16_t>(val); });
     }
 
     // Constructor with vector<uint16_t> and float cost
     Path(const std::vector<uint16_t> &r, float c) : route(r), cost(c) {}
 
     // Constructor with vector<uint16_t> and double cost
-    Path(const std::vector<uint16_t> &r, double c)
-        : route(r), cost(static_cast<float>(c)) {}
+    Path(const std::vector<uint16_t> &r, double c) : route(r), cost(static_cast<float>(c)) {}
 
     // Iterator methods
-    auto begin() { return route.begin(); }
-    auto end() { return route.end(); }
-    auto begin() const { return route.begin(); }
-    auto end() const { return route.end(); }
-    auto size() const { return route.size(); }
+    auto     begin() { return route.begin(); }
+    auto     end() { return route.end(); }
+    auto     begin() const { return route.begin(); }
+    auto     end() const { return route.end(); }
+    auto     size() const { return route.size(); }
     uint16_t operator[](size_t i) const { return route[i]; }
 
     // Check if the route contains a specific node
-    bool contains(uint16_t i) const {
-        return std::find(route.begin(), route.end(), i) != route.end();
-    }
+    bool contains(uint16_t i) const { return std::find(route.begin(), route.end(), i) != route.end(); }
 
     // Count occurrences of a specific node in the route
-    int countOccurrences(uint16_t i) const {
-        return static_cast<int>(std::count(route.begin(), route.end(), i));
-    }
+    int countOccurrences(uint16_t i) const { return static_cast<int>(std::count(route.begin(), route.end(), i)); }
 
     // Count occurrences of a specific arc (i -> j) in the route
     int timesArc(uint16_t i, uint16_t j) const {
-        int times = 0;
-        const size_t sz = route.size();
+        int          times = 0;
+        const size_t sz    = route.size();
         for (size_t n = 1; n < sz; ++n) {
-            if (route[n - 1] == i && route[n] == j) {
-                ++times;
-            }
+            if (route[n - 1] == i && route[n] == j) { ++times; }
         }
         return times;
     }
@@ -83,9 +73,7 @@ struct Path {
         uint16_t from;
         uint16_t to;
 
-        bool operator==(const ArcKey &other) const {
-            return from == other.from && to == other.to;
-        }
+        bool operator==(const ArcKey &other) const { return from == other.from && to == other.to; }
     };
 
     struct ArcKeyHash {
@@ -101,7 +89,7 @@ struct Path {
     // Add an arc (i -> j) to the arcMap.
     void addArc(uint16_t i, uint16_t j) {
         ArcKey arc{i, j};
-        auto it = arcMap.find(arc);
+        auto   it = arcMap.find(arc);
         if (it != arcMap.end()) {
             it->second++;
         } else {
@@ -113,9 +101,7 @@ struct Path {
     void precomputeArcs() {
         // Pre-allocate expected size for better performance.
         arcMap.reserve(route.size() > 0 ? route.size() - 1 : 0);
-        for (size_t n = 0; n + 1 < route.size(); ++n) {
-            addArc(route[n], route[n + 1]);
-        }
+        for (size_t n = 0; n + 1 < route.size(); ++n) { addArc(route[n], route[n + 1]); }
     }
 
     std::vector<int> getIntVector() {

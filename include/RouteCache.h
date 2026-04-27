@@ -25,7 +25,7 @@ private:
     using EntryPtr = std::shared_ptr<Entry>;
     using CacheMap = ankerl::unordered_dense::map<std::vector<int>, EntryPtr, Hasher>;
 
-    CacheMap map;
+    CacheMap                  map;
     mutable std::shared_mutex map_mutex; // Mutex for thread-safe map operations
 
     inline static thread_local std::pair<std::vector<int>, EntryPtr> local_cache;
@@ -40,10 +40,10 @@ public:
 
         // Acquire shared lock for map lookup
         std::shared_lock lock(map_mutex);
-        auto it = map.find(key);
+        auto             it = map.find(key);
         if (it == map.end() || !it->second) return false;
 
-        out_value = it->second->value;
+        out_value   = it->second->value;
         local_cache = {key, it->second}; // Update thread-local cache
         return true;
     }
@@ -62,9 +62,7 @@ public:
         local_cache = {it->first, new_entry};
     }
 
-    static void invalidate_local_cache() noexcept {
-        local_cache = {{}, nullptr};
-    }
+    static void invalidate_local_cache() noexcept { local_cache = {{}, nullptr}; }
 
     void clear() {
         // Invalidate thread-local cache

@@ -216,6 +216,8 @@ std::vector<double> BucketGraph::labeling_algorithm() {
     auto       &arc_scores        = assign_buckets<D>(fw_arc_scores, bw_arc_scores);
     auto       &best_label        = assign_buckets<D>(fw_best_label, bw_best_label);
 
+    const bool profile_labeling = options.profile_labeling;
+
     // Reset the total label count.
     n_labels = 0;
 
@@ -317,6 +319,7 @@ std::vector<double> BucketGraph::labeling_algorithm() {
                 // Check if the label is dominated by labels in smaller
                 // buckets.
                 if constexpr (F != Full::TSP) {
+                    if (profile_labeling) profile_record_dominance_check(D, S);
                     if (DominatedInCompWiseSmallerBuckets<D, S>(label, bucket, c_bar, Bvisited, touched_segments,
                                                                 stat_n_dom))
                         continue;
@@ -347,8 +350,11 @@ std::vector<double> BucketGraph::labeling_algorithm() {
                     // Process each new label produced by the extension.
                     if (new_label != nullptr) {
                         ++stat_n_labels;
-                        const int to_bucket     = new_label->vertex;
-                        auto     &mother_bucket = buckets[to_bucket];
+                        const int to_bucket         = new_label->vertex;
+                        auto     &mother_bucket     = buckets[to_bucket];
+                        uint64_t  bucket_scan_count = 0;
+
+                        if (profile_labeling) { profile_record_new_label(D, S); }
 
                         // Prefetch the mother bucket and its labels
                         __builtin_prefetch(&mother_bucket, 0, 3);
@@ -368,6 +374,7 @@ std::vector<double> BucketGraph::labeling_algorithm() {
                             // Stage One: mark higher-cost labels as
                             // dominated.
                             for (auto *existing_label : to_bucket_labels) {
+                                ++bucket_scan_count;
                                 if (existing_label->is_dominated) continue;
                                 if (label->cost < existing_label->cost)
                                     existing_label->set_dominated(true);
@@ -378,6 +385,7 @@ std::vector<double> BucketGraph::labeling_algorithm() {
                             }
                             if (!dominated) {
                                 for (auto *existing_label : to_bucket_extra) {
+                                    ++bucket_scan_count;
                                     if (existing_label->is_dominated) continue;
                                     if (label->cost < existing_label->cost)
                                         existing_label->set_dominated(true);
@@ -387,125 +395,101 @@ std::vector<double> BucketGraph::labeling_algorithm() {
                                     }
                                 }
                             }
+                            if (profile_labeling) {
+                                profile_record_dominance_check(D, S);
+                                profile_record_inner_bin_scan(D, S, bucket_scan_count);
+                                if (D == Direction::Forward) {
+                                    dominance_checks_per_bucket[to_bucket] += static_cast<int>(bucket_scan_count);
+                                }
+                            }
                         } else {
-                            // Later stages: use a SIMD-friendly, unrolled
-                            // loop.
-                            auto check_dominance_in_bucket = [&](std::span<Label *const> labels,
-                                                                 uint                   &stat_n_dom) -> bool {
-                                const auto scan_end =
-                                    std::upper_bound(labels.begin(), labels.end(), new_label->cost + numericutils::eps,
-                                                     [](double cost, const Label *label) {
-                                                         return cost < label->cost;
-                                                     });
-                                labels = labels.first(static_cast<size_t>(scan_end - labels.begin()));
-#ifdef __AVX2__
-                                if (labels.size() >= AVX_LIM)
-                                    return check_dominance_against_vector<D, S>(new_label, labels, cut_storage,
-                                                                                stat_n_dom);
-                                else
-#endif
-                                {
-                                    const size_t scan_size = labels.size();
-                                    size_t       i         = 0;
+                            uint64_t inner_scan_count = 0;
 
-                                    // Process one label at a time but with
-                                    // prefetching ahead
-                                    for (; i < scan_size; ++i) {
-                                        // Prefetch several labels ahead for
-                                        // better memory access patterns
-                                        if (i + 8 < scan_size) { __builtin_prefetch(labels[i + 8], 0, 3); }
+                            // RC-bracketed single-pass dominance (port from
+                            // RouteOpt dominance.hpp doDominance). The sorted
+                            // tier is RC-sorted; we walk it once, dispatching
+                            // by cost relation to new_label:
+                            //   existing.cost < new.cost - eps -> only check
+                            //     is_dominated(existing, new) (cheap label
+                            //     can dominate expensive one only if
+                            //     resources/visited line up). If true,
+                            //     new_label is dominated -> stop.
+                            //   existing.cost > new.cost + eps -> only check
+                            //     is_dominated(new, existing). If true, mark
+                            //     existing dominated and continue.
+                            //   in bracket -> check both directions.
+                            const double cost_lo = new_label->cost - numericutils::eps;
+                            const double cost_hi = new_label->cost + numericutils::eps;
 
-                                        // Process one label with branch
-                                        // prediction hint
-                                        Label *current_label = labels[i];
-                                        if (__builtin_expect(!current_label->is_dominated, 1)) {
-                                            // Cache access to current_label
-                                            // to avoid multiple
-                                            // dereferences
-                                            if (is_dominated<D, S>(new_label, current_label)) {
-                                                ++stat_n_dom;
-                                                return true;
-                                            }
-                                        }
-                                    }
-                                    return false;
-                                }
-                            };
-                            auto check_extra_dominance = [&](std::span<Label *const> labels,
-                                                             uint                   &stat_n_dom) -> bool {
-                                for (Label *current_label : labels) {
-                                    if (__builtin_expect(current_label->is_dominated, 0)) continue;
-                                    if (numericutils::gt(current_label->cost, new_label->cost + numericutils::eps))
-                                        continue;
-                                    if (is_dominated<D, S>(new_label, current_label)) {
+                            // Forward path: walk sorted committed labels once.
+                            const size_t to_bucket_size = to_bucket_labels.size();
+                            size_t       i              = 0;
+                            for (; i < to_bucket_size; ++i) {
+                                if (i + 8 < to_bucket_size) { __builtin_prefetch(to_bucket_labels[i + 8], 0, 3); }
+                                Label *cur = to_bucket_labels[i];
+                                ++inner_scan_count;
+                                if (__builtin_expect(cur->is_dominated, 0)) continue;
+                                const double cur_cost = cur->cost;
+                                if (cur_cost < cost_lo) {
+                                    // cheaper -> only "cur dominates new" is
+                                    // possible.
+                                    if (is_dominated<D, S>(new_label, cur)) {
                                         ++stat_n_dom;
-                                        return true;
+                                        dominated = true;
+                                        break;
+                                    }
+                                } else if (cur_cost > cost_hi) {
+                                    // pricier -> only "new dominates cur".
+                                    if (is_dominated<D, S>(cur, new_label)) { cur->set_dominated(true); }
+                                } else {
+                                    // bracket -> check both.
+                                    if (is_dominated<D, S>(new_label, cur)) {
+                                        ++stat_n_dom;
+                                        dominated = true;
+                                        break;
+                                    }
+                                    if (is_dominated<D, S>(cur, new_label)) { cur->set_dominated(true); }
+                                }
+                            }
+
+                            // Extra (unsorted) tier: same trichotomy without
+                            // sort assumptions. Only walked if not dominated
+                            // by the sorted tier.
+                            if (!dominated) {
+                                for (Label *cur : to_bucket_extra) {
+                                    ++inner_scan_count;
+                                    if (__builtin_expect(cur->is_dominated, 0)) continue;
+                                    const double cur_cost = cur->cost;
+                                    if (cur_cost < cost_lo) {
+                                        if (is_dominated<D, S>(new_label, cur)) {
+                                            ++stat_n_dom;
+                                            dominated = true;
+                                            break;
+                                        }
+                                    } else if (cur_cost > cost_hi) {
+                                        if (is_dominated<D, S>(cur, new_label)) { cur->set_dominated(true); }
+                                    } else {
+                                        if (is_dominated<D, S>(new_label, cur)) {
+                                            ++stat_n_dom;
+                                            dominated = true;
+                                            break;
+                                        }
+                                        if (is_dominated<D, S>(cur, new_label)) { cur->set_dominated(true); }
                                     }
                                 }
-                                return false;
-                            };
-                            dominated = mother_bucket.check_dominance(new_label, check_dominance_in_bucket,
-                                                                      check_extra_dominance, stat_n_dom);
+                            }
+                            if (profile_labeling) {
+                                profile_record_dominance_check(D, S);
+                                profile_record_inner_bin_scan(D, S, inner_scan_count);
+                                if (D == Direction::Forward) {
+                                    dominance_checks_per_bucket[to_bucket] += static_cast<int>(inner_scan_count);
+                                }
+                            }
                         }
 
                         if (!dominated) {
-                            // Reuse thread-local vector to avoid
-                            // re-allocation.
-                            tl_labels_to_dominate.clear();
-
-                            const size_t to_bucket_size = to_bucket_labels.size();
-                            auto         scan_it =
-                                std::lower_bound(to_bucket_labels.begin(), to_bucket_labels.end(),
-                                                 new_label->cost - numericutils::eps,
-                                                 [](const Label *label, double cost) {
-                                                     return label->cost < cost;
-                                                 });
-                            size_t       i              = static_cast<size_t>(scan_it - to_bucket_labels.begin());
-
-                            // Process dominance checks in blocks for better
-                            // cache usage
-                            for (; i + 3 < to_bucket_size; i += 4) {
-                                // Prefetch ahead
-                                if (i + 8 < to_bucket_size) {
-                                    __builtin_prefetch(to_bucket_labels[i + 4], 0, 3);
-                                    __builtin_prefetch(to_bucket_labels[i + 5], 0, 3);
-                                    __builtin_prefetch(to_bucket_labels[i + 6], 0, 3);
-                                    __builtin_prefetch(to_bucket_labels[i + 7], 0, 3);
-                                }
-
-                                auto *l0 = to_bucket_labels[i];
-                                auto *l1 = to_bucket_labels[i + 1];
-                                auto *l2 = to_bucket_labels[i + 2];
-                                auto *l3 = to_bucket_labels[i + 3];
-
-                                if (!l0->is_dominated && is_dominated<D, S>(l0, new_label))
-                                    tl_labels_to_dominate.push_back(l0);
-                                if (!l1->is_dominated && is_dominated<D, S>(l1, new_label))
-                                    tl_labels_to_dominate.push_back(l1);
-                                if (!l2->is_dominated && is_dominated<D, S>(l2, new_label))
-                                    tl_labels_to_dominate.push_back(l2);
-                                if (!l3->is_dominated && is_dominated<D, S>(l3, new_label))
-                                    tl_labels_to_dominate.push_back(l3);
-                            }
-
-                            // Process remaining labels
-                            for (; i < to_bucket_size; ++i) {
-                                auto *existing_label = to_bucket_labels[i];
-                                if (!existing_label->is_dominated && is_dominated<D, S>(existing_label, new_label))
-                                    tl_labels_to_dominate.push_back(existing_label);
-                            }
-
-                            for (auto *existing_label : to_bucket_extra) {
-                                if (!existing_label->is_dominated &&
-                                    numericutils::gte(existing_label->cost, new_label->cost - numericutils::eps) &&
-                                    is_dominated<D, S>(existing_label, new_label)) {
-                                    tl_labels_to_dominate.push_back(existing_label);
-                                }
-                            }
-
-                            // Mark dominated labels in batch
-                            for (auto *existing_label : tl_labels_to_dominate) existing_label->set_dominated(true);
-
+                            if (profile_labeling) profile_record_non_dominated_label(D, S);
+                            if (D == Direction::Forward) { ++non_dominated_labels_per_bucket; }
                             ++n_labels;
 #ifdef SORTED_LABELS
                             mother_bucket.add_sorted_label(new_label);
@@ -995,6 +979,17 @@ inline auto BucketGraph::Extend(const std::conditional_t<M == Mutability::Mut, L
         __builtin_prefetch(active_cuts.data(), 0, 3);
         __builtin_prefetch(new_label->SRCmap.data(), 1, 3); // 1 = read-write
 
+#if !defined(SRC_MEMORY_MODE_ARC)
+        for (const auto &update : cutter->getSRCNodeUpdates(node_id)) {
+            auto &src_map_value = new_label->SRCmap[update.active_idx];
+            src_map_value += update.add;
+            const bool overflow = src_map_value >= update.den;
+            src_map_value -= overflow ? update.den : 0;
+            total_cost_update -= overflow ? update.dual : 0;
+        }
+
+        for (const auto active_idx : cutter->getSRCNodeClears(node_id)) { new_label->SRCmap[active_idx] = 0; }
+#else
         const auto     cut_limit_mask = masks.get_cut_limit_mask();
         const uint64_t valid_cuts     = masks.get_valid_cut_mask(segment, bit_position) & cut_limit_mask;
 
@@ -1091,6 +1086,7 @@ inline auto BucketGraph::Extend(const std::conditional_t<M == Mutability::Mut, L
                 to_clear &= (to_clear - 1);
             }
         }
+#endif
 
         new_label->cost += total_cost_update;
     }
@@ -1227,6 +1223,7 @@ inline bool BucketGraph::DominatedInCompWiseSmallerBuckets(const Label *__restri
     const auto &num_buckets       = assign_buckets<D>(num_buckets_fw, num_buckets_bw);
     const auto &rc2_bin           = assign_buckets<D>(fw_rc2_bin, bw_rc2_bin);
     const auto &rc2_till_this_bin = assign_buckets<D>(fw_rc2_till_this_bin, bw_rc2_till_this_bin);
+    const bool  profile_labeling  = options.profile_labeling;
 
     // Cache frequently used label properties
     const int    b_L        = L->vertex;
@@ -1244,10 +1241,10 @@ inline bool BucketGraph::DominatedInCompWiseSmallerBuckets(const Label *__restri
 
     // Inline dominance check function to avoid lambda overhead
     auto inline_check_dominance = [&](std::span<Label *const> labels, uint &n_dom) -> bool {
-        const auto scan_end =
-            std::upper_bound(labels.begin(), labels.end(), L->cost + numericutils::eps,
-                             [](double cost, const Label *label) { return cost < label->cost; });
-        labels = labels.first(static_cast<size_t>(scan_end - labels.begin()));
+        const auto scan_end = std::upper_bound(labels.begin(), labels.end(), L->cost + numericutils::eps,
+                                               [](double cost, const Label *label) { return cost < label->cost; });
+        labels              = labels.first(static_cast<size_t>(scan_end - labels.begin()));
+        if (profile_labeling) profile_record_inner_bin_scan(D, S, labels.size());
 #ifdef __AVX2__
         if (labels.size() >= AVX_LIM) return check_dominance_against_vector<D, S>(L, labels, cut_storage, n_dom);
 #endif
@@ -1272,6 +1269,7 @@ inline bool BucketGraph::DominatedInCompWiseSmallerBuckets(const Label *__restri
     };
 
     auto inline_check_extra_dominance = [&](std::span<Label *const> labels, uint &n_dom) -> bool {
+        if (profile_labeling) profile_record_inner_bin_scan(D, S, labels.size());
         for (Label *label : labels) {
             if (label->is_dominated) continue;
             if (numericutils::gt(label->cost, L->cost + numericutils::eps)) continue;

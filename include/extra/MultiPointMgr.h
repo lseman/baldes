@@ -12,44 +12,43 @@
 #include "Definitions.h"
 
 class MultiPointManager {
-   private:
-    static constexpr double EPSILON = 1e-12;
+private:
+    static constexpr double EPSILON             = 1e-12;
     static constexpr double FAST_CONV_THRESHOLD = 5e-2;
-    static constexpr size_t MIN_POOL_SIZE = 3;
-    static constexpr size_t MAX_POOL_SIZE = 10;
-    static constexpr double MIN_IMPROVEMENT = 1e-2;
-    static constexpr size_t HISTORY_SIZE = 10;
-    static constexpr double AGE_DECAY_RATE = 0.5;
-    static constexpr double QUALITY_OBJ_WEIGHT = 0.7;
-    static constexpr double LEARNING_RATE = 0.1;
-    static constexpr double CONVERGENCE_FACTOR = 0.9;
+    static constexpr size_t MIN_POOL_SIZE       = 3;
+    static constexpr size_t MAX_POOL_SIZE       = 10;
+    static constexpr double MIN_IMPROVEMENT     = 1e-2;
+    static constexpr size_t HISTORY_SIZE        = 10;
+    static constexpr double AGE_DECAY_RATE      = 0.5;
+    static constexpr double QUALITY_OBJ_WEIGHT  = 0.7;
+    static constexpr double LEARNING_RATE       = 0.1;
+    static constexpr double CONVERGENCE_FACTOR  = 0.9;
 
     struct StabilityPoint {
         DualSolution duals;
-        double objective_value;
-        int age;
-        double quality_score;
+        double       objective_value;
+        int          age;
+        double       quality_score;
 
         // Default constructor
-        StabilityPoint()
-            : duals(), objective_value(0.0), age(0), quality_score(0.0) {}
+        StabilityPoint() : duals(), objective_value(0.0), age(0), quality_score(0.0) {}
 
-        StabilityPoint(const DualSolution& d, double obj)
+        StabilityPoint(const DualSolution &d, double obj)
             : duals(d), objective_value(obj), age(0), quality_score(0.0) {}
     };
 
-    size_t current_pool_size;
-    bool active;
-    double best_objective;
-    double worst_objective;
-    double conv_threshold;
-    size_t solution_size;
-    std::vector<StabilityPoint> stability_points;
-    std::deque<double> improvement_history;
+    size_t                          current_pool_size;
+    bool                            active;
+    double                          best_objective;
+    double                          worst_objective;
+    double                          conv_threshold;
+    size_t                          solution_size;
+    std::vector<StabilityPoint>     stability_points;
+    std::deque<double>              improvement_history;
     std::shared_ptr<StabilityPoint> best_point;
 
     void updateObjectiveBounds(double obj_value) {
-        best_objective = std::min(best_objective, obj_value);
+        best_objective  = std::min(best_objective, obj_value);
         worst_objective = std::max(worst_objective, obj_value);
     }
 
@@ -72,38 +71,30 @@ class MultiPointManager {
         double obj_factor = QUALITY_OBJ_WEIGHT / obj_range;
         double age_factor = 1.0 - QUALITY_OBJ_WEIGHT;
 
-        for (auto& point : stability_points) {
-            point.quality_score =
-                obj_factor * (worst_objective - point.objective_value) +
-                age_factor * std::exp(-AGE_DECAY_RATE * point.age);
+        for (auto &point : stability_points) {
+            point.quality_score = obj_factor * (worst_objective - point.objective_value) +
+                                  age_factor * std::exp(-AGE_DECAY_RATE * point.age);
         }
     }
 
     void maintainPoolSize() {
         if (stability_points.size() > current_pool_size) {
-            std::partial_sort(stability_points.begin(),
-                              stability_points.begin() + current_pool_size,
+            std::partial_sort(stability_points.begin(), stability_points.begin() + current_pool_size,
                               stability_points.end(),
-                              [](const auto& a, const auto& b) {
-                                  return a.quality_score > b.quality_score;
-                              });
+                              [](const auto &a, const auto &b) { return a.quality_score > b.quality_score; });
             stability_points.resize(current_pool_size);
         }
     }
 
-    bool shouldAddPoint(const DualSolution& new_point, double obj_value) const {
-        return std::none_of(
-            stability_points.begin(), stability_points.end(),
-            [&](const auto& point) {
-                return vectorNorm(point.duals, new_point) < EPSILON ||
-                       std::abs(point.objective_value - obj_value) <
-                           MIN_IMPROVEMENT;
-            });
+    bool shouldAddPoint(const DualSolution &new_point, double obj_value) const {
+        return std::none_of(stability_points.begin(), stability_points.end(), [&](const auto &point) {
+            return vectorNorm(point.duals, new_point) < EPSILON ||
+                   std::abs(point.objective_value - obj_value) < MIN_IMPROVEMENT;
+        });
     }
 
-    double vectorNorm(const DualSolution& v1, const DualSolution& v2) const {
-        return std::sqrt(std::transform_reduce(v1.begin(), v1.end(), v2.begin(),
-                                               0.0, std::plus<>(),
+    double vectorNorm(const DualSolution &v1, const DualSolution &v2) const {
+        return std::sqrt(std::transform_reduce(v1.begin(), v1.end(), v2.begin(), 0.0, std::plus<>(),
                                                [](double a, double b) {
                                                    double diff = b - a;
                                                    return diff * diff;
@@ -111,43 +102,32 @@ class MultiPointManager {
                          EPSILON);
     }
 
-    void addPoint(const DualSolution& new_point, double obj_value) {
+    void addPoint(const DualSolution &new_point, double obj_value) {
         stability_points.emplace_back(new_point, obj_value);
-        for (auto& point : stability_points) {
-            if (&point != &stability_points.back()) {
-                point.age++;
-            }
+        for (auto &point : stability_points) {
+            if (&point != &stability_points.back()) { point.age++; }
         }
     }
 
     void updateBestPoint() {
         if (!stability_points.empty()) {
-            best_point = std::make_shared<StabilityPoint>(*std::min_element(
-                stability_points.begin(), stability_points.end(),
-                [](const auto& a, const auto& b) {
-                    return a.objective_value < b.objective_value;
-                }));
+            best_point = std::make_shared<StabilityPoint>(
+                *std::min_element(stability_points.begin(), stability_points.end(),
+                                  [](const auto &a, const auto &b) { return a.objective_value < b.objective_value; }));
         }
     }
 
-   public:
+public:
     explicit MultiPointManager(size_t n)
-        : current_pool_size(MIN_POOL_SIZE + 2),
-          active(true),
-          best_objective(std::numeric_limits<double>::infinity()),
-          worst_objective(-std::numeric_limits<double>::infinity()),
-          conv_threshold(FAST_CONV_THRESHOLD),
-          solution_size(n),
-          improvement_history(HISTORY_SIZE, 0.0),
-          best_point(nullptr) {
-        if (n == 0)
-            throw std::invalid_argument("Solution size must be positive");
+        : current_pool_size(MIN_POOL_SIZE + 2), active(true), best_objective(std::numeric_limits<double>::infinity()),
+          worst_objective(-std::numeric_limits<double>::infinity()), conv_threshold(FAST_CONV_THRESHOLD),
+          solution_size(n), improvement_history(HISTORY_SIZE, 0.0), best_point(nullptr) {
+        if (n == 0) throw std::invalid_argument("Solution size must be positive");
         stability_points.reserve(MAX_POOL_SIZE);
     }
 
-    void updatePool(const DualSolution& new_point, double obj_value) {
-        if (!active || new_point.empty() || new_point.size() != solution_size)
-            return;
+    void updatePool(const DualSolution &new_point, double obj_value) {
+        if (!active || new_point.empty() || new_point.size() != solution_size) return;
 
         // Update any bounds related to the objective value.
         updateObjectiveBounds(obj_value);
@@ -155,13 +135,11 @@ class MultiPointManager {
         // For minimization, a lower objective is better.
         // Use positive infinity as the default best value if no best point
         // exists.
-        double prev_best = best_point ? best_point->objective_value
-                                      : std::numeric_limits<double>::infinity();
+        double prev_best = best_point ? best_point->objective_value : std::numeric_limits<double>::infinity();
 
         // Compute the relative improvement: (prev_best - new_value) /
         // (|prev_best| + EPSILON)
-        double improvement =
-            std::abs((prev_best - obj_value) / (std::abs(prev_best) + EPSILON));
+        double improvement = std::abs((prev_best - obj_value) / (std::abs(prev_best) + EPSILON));
         updateMetrics(improvement);
 
         // Check convergence: if improvement is below threshold over a number of
@@ -186,50 +164,41 @@ class MultiPointManager {
     }
 
     DualSolution getWeightedSolution() const {
-        if (stability_points.empty()) {
-            return DualSolution(solution_size, 0.0);
-        }
+        if (stability_points.empty()) { return DualSolution(solution_size, 0.0); }
 
-        if ((improvement_history.back() < conv_threshold) && best_point) {
-            return best_point->duals;
-        }
+        if ((improvement_history.back() < conv_threshold) && best_point) { return best_point->duals; }
 
         std::vector<double> weights;
-        double total_weight = 0.0;
-        for (const auto& point : stability_points) {
+        double              total_weight = 0.0;
+        for (const auto &point : stability_points) {
             weights.push_back(point.quality_score);
             total_weight += point.quality_score;
         }
 
-        if (total_weight <= EPSILON) {
-            return DualSolution(solution_size, 0.0);
-        }
+        if (total_weight <= EPSILON) { return DualSolution(solution_size, 0.0); }
 
         DualSolution result(solution_size, 0.0);
         for (size_t i = 0; i < stability_points.size(); i++) {
             double normalized_weight = weights[i] / total_weight;
-            std::transform(stability_points[i].duals.begin(),
-                           stability_points[i].duals.end(), result.begin(),
+            std::transform(stability_points[i].duals.begin(), stability_points[i].duals.end(), result.begin(),
                            result.begin(),
-                           [normalized_weight](double x, double y) {
-                               return y + normalized_weight * x;
-                           });
+                           [normalized_weight](double x, double y) { return y + normalized_weight * x; });
         }
         return result;
     }
 
-    bool isActive() const { return active; }
-    void deactivate() { active = false; }
+    bool   isActive() const { return active; }
+    void   deactivate() { active = false; }
     size_t getPoolSize() const { return stability_points.size(); }
 
     void clear() {
         stability_points.clear();
         improvement_history.assign(HISTORY_SIZE, 0.0);
         current_pool_size = MIN_POOL_SIZE + 2;
-        active = true;
-        best_objective = -std::numeric_limits<double>::infinity();
-        worst_objective = std::numeric_limits<double>::infinity();
-        conv_threshold = FAST_CONV_THRESHOLD;
-        best_point = nullptr;
+        active            = true;
+        best_objective    = -std::numeric_limits<double>::infinity();
+        worst_objective   = std::numeric_limits<double>::infinity();
+        conv_threshold    = FAST_CONV_THRESHOLD;
+        best_point        = nullptr;
     }
 };

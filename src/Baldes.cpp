@@ -68,15 +68,14 @@
  * 10. Stores and returns the model data including constraint matrix, bounds,
  * variable types, and names.
  */
-void initRMP(MIPProblem *model, VRProblem *problem,
-             std::vector<std::vector<int>> &heuristicRoutes) {
+void initRMP(MIPProblem *model, VRProblem *problem, std::vector<std::vector<int>> &heuristicRoutes) {
     auto instance = problem->instance;
-    int Um = problem->instance.nV;  // Max number of vehicles
+    int  Um       = problem->instance.nV; // Max number of vehicles
 
-    std::vector<MIPColumn> lambdaCols;
-    std::vector<double> lb, ub, obj;
+    std::vector<MIPColumn>   lambdaCols;
+    std::vector<double>      lb, ub, obj;
     std::vector<std::string> names;
-    std::vector<VarType> vtypes;
+    std::vector<VarType>     vtypes;
 
     // Lambda function to compute the cost of a route
     auto costCalc = [&](const std::vector<int> &route) {
@@ -86,54 +85,47 @@ void initRMP(MIPProblem *model, VRProblem *problem,
             const auto &target = route[i + 1];
             distance += instance.getcij(source, target);
         }
-        distance += instance.getcij(route.back(), 0);  // Return to the depot
+        distance += instance.getcij(route.back(), 0); // Return to the depot
         return distance;
     };
 
     // Create a decision variable for each heuristic-generated route
     int id = 0;
     for (const auto &column : heuristicRoutes) {
-        int routeID = id;
-        std::string name = "x[" + std::to_string(routeID) + "]";
-        double cost = costCalc(column);
+        int         routeID = id;
+        std::string name    = "x[" + std::to_string(routeID) + "]";
+        double      cost    = costCalc(column);
 
         // Store the column and variable data
         lb.push_back(0.0);
         ub.push_back(1.0);
         obj.push_back(cost);
         names.push_back(name);
-        vtypes.push_back(
-            VarType::Continuous);  // Assuming VarType::Continuous is used
+        vtypes.push_back(VarType::Continuous); // Assuming VarType::Continuous is used
 
         id++;
     }
 
     // Add variables to the model
-    model->addVars(lb.data(), ub.data(), obj.data(), vtypes.data(),
-                   names.data(), lb.size());
+    model->addVars(lb.data(), ub.data(), obj.data(), vtypes.data(), names.data(), lb.size());
 
     // First set of constraints: Each vertex should be visited at least once
     for (int i = 1; i < instance.getNbVertices(); ++i) {
         LinearExpression lhs;
         for (size_t j = 0; j < heuristicRoutes.size(); ++j) {
             // Count the occurrences of vertex i in heuristicRoutes[j]
-            int occurrences = std::count(heuristicRoutes[j].begin(),
-                                         heuristicRoutes[j].end(), i);
-            if (occurrences > 0) {
-                lhs.addTerm(model->getVar(j), occurrences);
-            }
+            int occurrences = std::count(heuristicRoutes[j].begin(), heuristicRoutes[j].end(), i);
+            if (occurrences > 0) { lhs.addTerm(model->getVar(j), occurrences); }
         }
         model->add_constraint(lhs, 1.0,
-                              '>');  // lhs >= 1 (visit the node at least once)
+                              '>'); // lhs >= 1 (visit the node at least once)
     }
 
     // Second part: Ensure the number of vehicles does not exceed the maximum
     LinearExpression vehicle_constraint_lhs;
-    for (size_t j = 0; j < heuristicRoutes.size(); ++j) {
-        vehicle_constraint_lhs.addTerm(model->getVar(j), 1.0);
-    }
+    for (size_t j = 0; j < heuristicRoutes.size(); ++j) { vehicle_constraint_lhs.addTerm(model->getVar(j), 1.0); }
     model->add_constraint(vehicle_constraint_lhs, static_cast<double>(Um),
-                          '<');  // baldesCtr: sum(lambda) <= Um
+                          '<'); // baldesCtr: sum(lambda) <= Um
 
     // Set the objective to minimize
     model->setObjectiveSense(ObjectiveType::Minimize);
@@ -150,9 +142,7 @@ void initRMP(MIPProblem *model, VRProblem *problem,
 void printDistanceMatrix(const std::vector<std::vector<double>> &distance) {
     print_info("Printing distance matrix");
     for (int i = 0; i < distance.size(); i++) {
-        for (int j = 0; j < distance[i].size(); j++) {
-            std::cout << std::setw(10) << distance[i][j] << " ";
-        }
+        for (int j = 0; j < distance[i].size(); j++) { std::cout << std::setw(10) << distance[i][j] << " "; }
         std::cout << std::endl;
     }
 }
@@ -181,8 +171,7 @@ void printDistanceMatrix(const std::vector<std::vector<double>> &distance) {
 using HGSptr = std::shared_ptr<HGS>;
 int main(int argc, char *argv[]) {
     if (argc < 3) {
-        std::cerr << "Usage: " << argv[0] << " <problem_kind> <instance_name>"
-                  << std::endl;
+        std::cerr << "Usage: " << argv[0] << " <problem_kind> <instance_name>" << std::endl;
         return 1;
     }
 
@@ -192,7 +181,7 @@ int main(int argc, char *argv[]) {
     fmt::print("\033[34m_PREPARING THE ROOM \033[0m");
     fmt::print("\n");
 
-    std::string problem_kind = argv[1];
+    std::string problem_kind  = argv[1];
     std::string instance_name = argv[2];
 
     // Initialize the instance data and print the problem kind
@@ -230,11 +219,10 @@ int main(int argc, char *argv[]) {
     } else {
         std::cerr << "Unsupported problem kind: " << problem_kind << "\n";
         return 1;
-    }  // py::scoped_interpreter guard{};
+    } // py::scoped_interpreter guard{};
 
     Logger::init("logfile.txt");
-    Logger::log("Starting the BCP algorithm for the {} problem \n",
-                instance_name);
+    Logger::log("Starting the BCP algorithm for the {} problem \n", instance_name);
 
     print_heur("Initializing heuristic solver for initial solution\n");
 
@@ -254,17 +242,17 @@ int main(int argc, char *argv[]) {
 
     if (problem_kind != "load") {
         initialRoutesHGS = hgs->run(instance);
-        topRoutes = hgs->getBestRoutes();
+        topRoutes        = hgs->getBestRoutes();
     }
 
     std::vector<VRPNode> nodes;
     nodes.clear();
     for (int k = 0; k < instance.nN; ++k) {
-        int start_time = instance.window_open[k];
-        int end_time = instance.window_close[k];
-        double duration = instance.service_time[k];
-        double demand = instance.demand[k];
-        double cost = 0;  // Assuming cost can be derived or set as needed
+        int    start_time = instance.window_open[k];
+        int    end_time   = instance.window_close[k];
+        double duration   = instance.service_time[k];
+        double demand     = instance.demand[k];
+        double cost       = 0; // Assuming cost can be derived or set as needed
         nodes.emplace_back(k, start_time, end_time, duration, cost, demand);
         nodes[k].set_location(instance.x_coord[k], instance.y_coord[k]);
         if (instance.problem_type == ProblemType::vrptw) {
@@ -285,23 +273,21 @@ int main(int argc, char *argv[]) {
     VRProblem *problem = new VRProblem();
 
     problem->instance = instance;
-    problem->nodes = nodes;
+    problem->nodes    = nodes;
 
-    std::vector<Path> paths;
-    std::vector<Label *> labels;
+    std::vector<Path>                            paths;
+    std::vector<Label *>                         labels;
     ankerl::unordered_dense::set<Path, PathHash> pathSet;
     pathSet.reserve(initialRoutesHGS.size());
 
     // convert initial routes to labels
-    int labelID = 0;
-    int labels_counter = 0;
-    auto process_route = [&](const std::vector<int> &route) {
+    int  labelID        = 0;
+    int  labels_counter = 0;
+    auto process_route  = [&](const std::vector<int> &route) {
         auto label = new Label();
         label->addRoute(route);
         // calculate total distance
-        for (int i = 0; i < route.size() - 1; i++) {
-            label->cost += instance.getcij(route[i], route[i + 1]);
-        }
+        for (int i = 0; i < route.size() - 1; i++) { label->cost += instance.getcij(route[i], route[i + 1]); }
         // label->cost         = route.total_distance();
         labelID++;
         labels.push_back(label);
@@ -311,17 +297,14 @@ int main(int argc, char *argv[]) {
         path.route.assign(route.begin(), route.end());
         // change last element of the route
         path.route[path.route.size() - 1] = N_SIZE - 1;
-        path.cost = label->cost;
+        path.cost                         = label->cost;
         paths.push_back(path);
         pathSet.insert(path);
     };
-    std::for_each(initialRoutesHGS.begin(), initialRoutesHGS.end(),
-                  process_route);
+    std::for_each(initialRoutesHGS.begin(), initialRoutesHGS.end(), process_route);
 
     // print size of initialRoutesHGS
-    if (problem_kind != "load") {
-        initRMP(&mip, problem, initialRoutesHGS);
-    }
+    if (problem_kind != "load") { initRMP(&mip, problem, initialRoutesHGS); }
 #ifdef GUROBI
     // auto gurobi_model = mip.toGurobiModel(GurobiEnvSingleton::getInstance());
 #endif
@@ -336,23 +319,21 @@ int main(int argc, char *argv[]) {
 
     if (problem_kind == "load") {
         node->loadState();
-        for (auto &path : node->paths) {
-            initialRoutesHGS.push_back(path.getIntVector());
-        }
+        for (auto &path : node->paths) { initialRoutesHGS.push_back(path.getIntVector()); }
         initRMP(&mip, problem, initialRoutesHGS);
     } else {
         node->paths = paths;
     }
-    node->problem = problem;
-    node->mip = mip;
-    node->instance = instance;
+    node->problem     = problem;
+    node->mip         = mip;
+    node->instance    = instance;
     node->integer_sol = hgs->getBestCost();
-    node->numK = hgs->getBestRoutes().size();
-    node->pathSet = pathSet;
+    node->numK        = hgs->getBestRoutes().size();
+    node->pathSet     = pathSet;
     // node->bestRoutes = topRoutes;
 
     BranchAndBound solver(std::move(problem),
-                          BNBNodeSelectionStrategy::DFS);  // Choose
+                          BNBNodeSelectionStrategy::DFS); // Choose
     solver.setRootNode(node);
     solver.solve();
 

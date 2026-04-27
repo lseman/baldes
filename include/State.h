@@ -8,7 +8,7 @@
 struct Snapshot {
     Snapshot() = default;
     std::vector<Path> paths;
-    CutStorage cutStorage;
+    CutStorage        cutStorage;
 
     REFLECT(paths, cutStorage);
 };

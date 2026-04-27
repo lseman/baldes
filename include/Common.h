@@ -22,7 +22,6 @@
 
 #include <execution>
 
-
 #include <algorithm>
 #include <array>
 #include <cstring>
@@ -32,10 +31,10 @@
 #include <map>
 #include <memory>
 #include <mutex>
-#include <ranges>
-#include <vector>
 #include <queue>
+#include <ranges>
 #include <string_view>
+#include <vector>
 
 #include "ankerl/unordered_dense.h"
 

@@ -5,7 +5,6 @@
 #include "Path.h"
 #include "VRPNode.h"
 
-
 /**
  * @struct PSTEPDuals
  * @brief A structure to manage dual values for arcs and nodes in a network.
@@ -64,22 +63,15 @@ struct PSTEPDuals {
         if (it != three_three_Duals.end()) { return it->second; }
         return 0.0; // Default value if node is not found
     }
-    
 
     void printDuals() {
         fmt::print("Arc duals:\n");
-        for (const auto &[arc, value] : arcDuals) {
-            fmt::print("({}, {}): {}\n", arc.first, arc.second, value);
-        }
+        for (const auto &[arc, value] : arcDuals) { fmt::print("({}, {}): {}\n", arc.first, arc.second, value); }
 
         fmt::print("Three two duals:\n");
-        for (const auto &[node, value] : three_two_Duals) {
-            fmt::print("{}: {}\n", node, value);
-        }
+        for (const auto &[node, value] : three_two_Duals) { fmt::print("{}: {}\n", node, value); }
 
         fmt::print("Three three duals:\n");
-        for (const auto &[node, value] : three_three_Duals) {
-            fmt::print("{}: {}\n", node, value);
-        }
+        for (const auto &[node, value] : three_three_Duals) { fmt::print("{}: {}\n", node, value); }
     }
 };

@@ -67,20 +67,19 @@ class VRProblem;
  * generating a unique identifier and creating new child nodes.
  */
 class BNBNode : public std::enable_shared_from_this<BNBNode> {
-   private:
-    mutable std::mutex
-        mtx;  // mutable allows for locking in const methods if needed
+private:
+    mutable std::mutex mtx; // mutable allows for locking in const methods if needed
     // Highs              highs;
     //     create shared mutex
     mutable std::shared_mutex mtx2;
-    ModelData matrices;
+    ModelData                 matrices;
 
-    bool farkas = false;
-    bool ip = false;
-    bool misprice = false;
-    bool pureip = false;
+    bool farkas      = false;
+    bool ip          = false;
+    bool misprice    = false;
+    bool pureip      = false;
     bool initialized = false;
-    bool prune = false;
+    bool prune       = false;
     // define uuid
     std::string uuid;
 
@@ -88,44 +87,41 @@ class BNBNode : public std::enable_shared_from_this<BNBNode> {
 
     SolverInterface *solver = nullptr;
 
-   public:
+public:
 #ifdef IPM
     IPSolver *ipSolver = nullptr;
 #endif
 
-    double integer_sol = std::numeric_limits<double>::max();
-    VRProblem *problem;
+    double       integer_sol = std::numeric_limits<double>::max();
+    VRProblem   *problem;
     InstanceData instance;
 
     std::vector<std::vector<int>> bestRoutes;
 
-    int depth = 0;
-    int numK = 0;
+    int depth      = 0;
+    int numK       = 0;
     int numConstrs = 0;
 
     MIPProblem mip = MIPProblem("node", 0, 0);
 
     // node specific
     SRC_MODE_BLOCK(std::vector<baldesCtrPtr> SRCconstraints;
-                   using LimitedMemoryRank1CutsPtr =
-                       std::shared_ptr<LimitedMemoryRank1Cuts>;
-                   LimitedMemoryRank1CutsPtr r1c =
-                       std::make_shared<LimitedMemoryRank1Cuts>();)
+                   using LimitedMemoryRank1CutsPtr = std::shared_ptr<LimitedMemoryRank1Cuts>;
+                   LimitedMemoryRank1CutsPtr r1c   = std::make_shared<LimitedMemoryRank1Cuts>();)
 
-    ModelData matrix;
-    std::vector<Path> paths;
+    ModelData                                    matrix;
+    std::vector<Path>                            paths;
     ankerl::unordered_dense::set<Path, PathHash> pathSet;
 
-    RCC_MODE_BLOCK(CnstrMgrPointer oldCutsCMP = nullptr;
-                   using RCCManagerPtr = std::shared_ptr<RCCManager>;
-                   RCCManagerPtr rccManager = std::make_shared<RCCManager>();)
+    RCC_MODE_BLOCK(CnstrMgrPointer oldCutsCMP = nullptr; using RCCManagerPtr = std::shared_ptr<RCCManager>;
+                   RCCManagerPtr   rccManager                                = std::make_shared<RCCManager>();)
 
     void addPath(const Path &path) { paths.emplace_back(path); }
     void addPath(Path &&path) { paths.emplace_back(std::move(path)); }
 
     std::vector<VRPCandidate *> candidates;
-    std::vector<BNBNode *> children;
-    BNBNode *parent = nullptr;
+    std::vector<BNBNode *>      children;
+    BNBNode                    *parent = nullptr;
     std::vector<VRPCandidate *> raisedVRPChildren;
 
     explicit BNBNode(const MIPProblem eModel) {
@@ -136,17 +132,15 @@ class BNBNode : public std::enable_shared_from_this<BNBNode> {
 
 #ifdef HIGHS
         auto highsmodel = mip.toHighsModel();
-        solver = new HighsSolver(highsmodel);
+        solver          = new HighsSolver(highsmodel);
 #endif
 #ifdef GUROBI
-        auto gurobi_model =
-            mip.toGurobiModel(GurobiEnvSingleton::getInstance());
-        solver = new GurobiSolver(gurobi_model);
+        auto gurobi_model = mip.toGurobiModel(GurobiEnvSingleton::getInstance());
+        solver            = new GurobiSolver(gurobi_model);
 #endif
-        uuid = generateUUID();
+        uuid              = generateUUID();
         this->initialized = true;
-        RCC_MODE_BLOCK(
-            CMGR_CreateCMgr(&oldCutsCMP, 100);  // For old cuts, if needed
+        RCC_MODE_BLOCK(CMGR_CreateCMgr(&oldCutsCMP, 100); // For old cuts, if needed
         )
     };
 
@@ -168,9 +162,7 @@ class BNBNode : public std::enable_shared_from_this<BNBNode> {
 
     std::vector<BNBNode *> getChildren() { return children; }
 
-    std::vector<std::vector<double>> getDistanceMatrix() {
-        return instance.getDistanceMatrix();
-    }
+    std::vector<std::vector<double>> getDistanceMatrix() { return instance.getDistanceMatrix(); }
 
     /**
      * Generates a Universally Unique Identifier (UUID) as a string.
@@ -179,7 +171,7 @@ class BNBNode : public std::enable_shared_from_this<BNBNode> {
      */
     std::string generateUUID() {
         // Create an instance of Xoroshiro128Plus with a seed
-        Xoroshiro128Plus rng;  // You can use any seed you prefer
+        Xoroshiro128Plus rng; // You can use any seed you prefer
 
         std::stringstream ss;
         ss << std::hex;
@@ -199,9 +191,7 @@ class BNBNode : public std::enable_shared_from_this<BNBNode> {
     // define hasCandidate to see if the candidate already exists
     bool hasCandidate(VRPCandidate *candidate) {
         for (const auto *c : candidates) {
-            if (c == candidate) {
-                return true;
-            }
+            if (c == candidate) { return true; }
         }
         return false;
     }
@@ -211,9 +201,7 @@ class BNBNode : public std::enable_shared_from_this<BNBNode> {
         raisedVRPChildren.push_back(candidate);
     }
 
-    void setCandidatos(std::vector<VRPCandidate *> candidatos) {
-        candidates = candidatos;
-    }
+    void setCandidatos(std::vector<VRPCandidate *> candidatos) { candidates = candidatos; }
 
     void addCandidate(VRPCandidate *candidate) {
         // Add the candidate to the list of candidates
@@ -228,21 +216,20 @@ class BNBNode : public std::enable_shared_from_this<BNBNode> {
         // Create a new child node
         auto child = new BNBNode(*emipClone);
         // Set the parent of the child node to this node
-        child->parent = this;
-        child->paths = paths;
+        child->parent            = this;
+        child->paths             = paths;
         child->historyCandidates = historyCandidates;
-        child->candidates = candidates;
-        child->r1c = std::make_shared<LimitedMemoryRank1Cuts>(*r1c);
-        child->rccManager = rccManager->clone();
-        child->instance = instance;
+        child->candidates        = candidates;
+        child->r1c               = std::make_shared<LimitedMemoryRank1Cuts>(*r1c);
+        child->rccManager        = rccManager->clone();
+        child->instance          = instance;
         child->SRCconstraints.clear();
-        child->SRCconstraints.reserve(
-            SRCconstraints.size());  // Reserve space if size is known
+        child->SRCconstraints.reserve(SRCconstraints.size()); // Reserve space if size is known
         child->depth = depth + 1;
         child->prune = false;
 
         child->SRCconstraints = child->mip.getSRCconstraints();
-        auto RCCconstraints = child->mip.getRCCconstraints();
+        auto RCCconstraints   = child->mip.getRCCconstraints();
 
         child->rccManager->setCutCtrs(RCCconstraints);
 
@@ -253,9 +240,7 @@ class BNBNode : public std::enable_shared_from_this<BNBNode> {
     }
 
     void clearSRC() {
-        for (auto c : SRCconstraints) {
-            mip.delete_constraint(c);
-        }
+        for (auto c : SRCconstraints) { mip.delete_constraint(c); }
     }
 
     void addChildren(BNBNode *child) {
@@ -267,9 +252,7 @@ class BNBNode : public std::enable_shared_from_this<BNBNode> {
         // std::lock_guard<std::mutex> lock(mtx);
 
         for (const auto *c : raisedVRPChildren) {
-            if (c == strongCandidate) {
-                return true;
-            }
+            if (c == strongCandidate) { return true; }
         }
         return false;
     }
@@ -281,12 +264,8 @@ class BNBNode : public std::enable_shared_from_this<BNBNode> {
     //////////////////////////////////////////////////
 
     // Change multiple coefficients for a specific constraint
-    void chgCoeff(int constraintIndex, const std::vector<double> &values) {
-        mip.chgCoeff(constraintIndex, values);
-    }
-    void chgCoeff(baldesCtrPtr ctr, const std::vector<double> &values) {
-        mip.chgCoeff(ctr, values);
-    }
+    void chgCoeff(int constraintIndex, const std::vector<double> &values) { mip.chgCoeff(constraintIndex, values); }
+    void chgCoeff(baldesCtrPtr ctr, const std::vector<double> &values) { mip.chgCoeff(ctr, values); }
 
     // Change a single coefficient for a specific constraint and variable
     void chgCoeff(int constraintIndex, int variableIndex, double value) {
@@ -304,37 +283,28 @@ class BNBNode : public std::enable_shared_from_this<BNBNode> {
     // Binarize all variables (set to binary type)
     void binarizeNode() {
         auto &vars = mip.getVars();
-        for (auto var : vars) {
-            var->set_type(VarType::Binary);
-        }
+        for (auto var : vars) { var->set_type(VarType::Binary); }
     }
 
     // Relax all variables (set to continuous type)
     void relaxNode() {
         auto &vars = mip.getVars();
-        for (auto var : vars) {
-            var->set_type(VarType::Continuous);
-        }
+        for (auto var : vars) { var->set_type(VarType::Continuous); }
     }
 
     void remove(baldesCtrPtr ctr) { mip.delete_constraint(ctr); }
     void remove(baldesVarPtr var) { mip.delete_variable(var); }
-    int get_current_index(int unique_id) {
-        return mip.get_current_index(unique_id);
-    }
+    int  get_current_index(int unique_id) { return mip.get_current_index(unique_id); }
 
-    baldesVarPtr addVar(const std::string &name, VarType type, double lb,
-                        double ub, double obj) {
+    baldesVarPtr addVar(const std::string &name, VarType type, double lb, double ub, double obj) {
         return mip.add_variable(name, type, lb, ub, obj);
     }
 
-    void addVars(const double *lb, const double *ub, const double *obj,
-                 const VarType *vtypes, const std::string *names,
+    void addVars(const double *lb, const double *ub, const double *obj, const VarType *vtypes, const std::string *names,
                  const MIPColumn *cols, size_t count) {
         mip.addVars(lb, ub, obj, vtypes, names, cols, count);
     }
-    void addVars(const double *lb, const double *ub, const double *obj,
-                 const VarType *vtypes, const std::string *names,
+    void addVars(const double *lb, const double *ub, const double *obj, const VarType *vtypes, const std::string *names,
                  size_t count) {
         mip.addVars(lb, ub, obj, vtypes, names, count);
     }
@@ -348,12 +318,8 @@ class BNBNode : public std::enable_shared_from_this<BNBNode> {
         throw std::invalid_argument("Unknown attribute");
     }
 
-    void setIntAttr(const std::string &attr, int value) {
-        throw std::invalid_argument("Unknown attribute");
-    }
-    void setDoubleAttr(const std::string &attr, double value) {
-        throw std::invalid_argument("Unknown attribute");
-    }
+    void setIntAttr(const std::string &attr, int value) { throw std::invalid_argument("Unknown attribute"); }
+    void setDoubleAttr(const std::string &attr, double value) { throw std::invalid_argument("Unknown attribute"); }
 
     baldesCtrPtr addConstr(baldesCtrPtr ctr, const std::string &name) {
         ctr = mip.add_constraint(ctr, name);
@@ -361,9 +327,7 @@ class BNBNode : public std::enable_shared_from_this<BNBNode> {
     }
 
     // Remove a constraint
-    void removeConstr(int constraintIndex) {
-        mip.delete_constraint(constraintIndex);
-    }
+    void removeConstr(int constraintIndex) { mip.delete_constraint(constraintIndex); }
 
     // Get a variable by index
     baldesVarPtr getVar(int i) { return mip.getVar(i); }
@@ -377,8 +341,8 @@ class BNBNode : public std::enable_shared_from_this<BNBNode> {
     // Solver Interface
     /////////////////////////////////////////////////////
 
-    int getStatus() { return solver->getStatus(); }
-    double getObjVal() { return solver->getObjVal(); }
+    int                 getStatus() { return solver->getStatus(); }
+    double              getObjVal() { return solver->getObjVal(); }
     std::vector<double> getDuals() { return solver->getDuals(); }
     std::vector<double> extractSolution() { return solver->extractSolution(); }
 
@@ -391,15 +355,15 @@ class BNBNode : public std::enable_shared_from_this<BNBNode> {
         // auto    model = new GRBModel(mip.toGurobiModel(env)); // Pass the
         // retrieved or new environment
         // solver->setModel(mip.toGurobiModel(env));
-        auto model = mip.toGurobiModel(env);  // Returns unique_ptr<GRBModel>
+        auto model = mip.toGurobiModel(env); // Returns unique_ptr<GRBModel>
         solver->setModel(std::any(GRBModelWrapper(std::move(model))));
 
 #endif
         solver->optimize(tol);
     }
     double getVarValue(int i) { return solver->getVarValue(i); }
-    auto getModel() { return &mip; }
-    auto getDualVal(int i) { return solver->getDualVal(i); }
+    auto   getModel() { return &mip; }
+    auto   getDualVal(int i) { return solver->getDualVal(i); }
 
     // Update
     void update() { mip.update(); }
@@ -414,8 +378,7 @@ class BNBNode : public std::enable_shared_from_this<BNBNode> {
             feasible = true;
             return std::make_pair(feasible, getDualObjVal());
         } else {
-            return std::make_pair(feasible,
-                                  -std::numeric_limits<double>::max());
+            return std::make_pair(feasible, -std::numeric_limits<double>::max());
         }
     }
 
@@ -427,19 +390,16 @@ class BNBNode : public std::enable_shared_from_this<BNBNode> {
 
     baldesCtrPtr addBranchingbaldesCtr(
         double rhs, const BranchingDirection &sense, const CandidateType &ctype,
-        std::optional<std::variant<int, std::pair<int, int>, std::vector<int>>>
-            payload = std::nullopt) {
+        std::optional<std::variant<int, std::pair<int, int>, std::vector<int>>> payload = std::nullopt) {
         // Get the decision variables from the MIP problem
-        auto &variables =
-            mip.getVars();         // Assumes mip is a pointer to MIPProblem
-        LinearExpression linExpr;  // Initialize linear expression for MIP
-        std::string name;
+        auto            &variables = mip.getVars(); // Assumes mip is a pointer to MIPProblem
+        LinearExpression linExpr;                   // Initialize linear expression for MIP
+        std::string      name;
 
         if (ctype == CandidateType::Vehicle) {
             for (auto var : variables) {
-                linExpr.add_or_update_term(
-                    var->get_name(),
-                    1.0);  // Add each variable with coefficient 1.0
+                linExpr.add_or_update_term(var->get_name(),
+                                           1.0); // Add each variable with coefficient 1.0
                 name = "branching_vehicle_" + std::to_string(int(rhs));
             }
         } else if (ctype == CandidateType::Node) {
@@ -449,16 +409,11 @@ class BNBNode : public std::enable_shared_from_this<BNBNode> {
                     [&](auto &&arg) {
                         using T = std::decay_t<decltype(arg)>;
                         if constexpr (std::is_same_v<T, int>) {
-                            linExpr.add_or_update_term(
-                                variables[i]->get_name(),
-                                paths[i].contains(arg)
-                                    ? 1.0
-                                    : 0.0);  // Use int payload
-                            name = "branching_node_" + std::to_string(arg) +
-                                   "_" + std::to_string(int(rhs));
+                            linExpr.add_or_update_term(variables[i]->get_name(),
+                                                       paths[i].contains(arg) ? 1.0 : 0.0); // Use int payload
+                            name = "branching_node_" + std::to_string(arg) + "_" + std::to_string(int(rhs));
                         } else {
-                            throw std::invalid_argument(
-                                "Payload for Node must be an int.");
+                            throw std::invalid_argument("Payload for Node must be an int.");
                         }
                     },
                     *payload);
@@ -472,17 +427,12 @@ class BNBNode : public std::enable_shared_from_this<BNBNode> {
                         if constexpr (std::is_same_v<T, std::pair<int, int>>) {
                             linExpr.add_or_update_term(
                                 variables[i]->get_name(),
-                                paths[i].timesArc(arg.first, arg.second)
-                                    ? 1.0
-                                    : 0.0);  // Use pair payload
-                            name = "branching_edge_" +
-                                   std::to_string(arg.first) + "_" +
-                                   std::to_string(arg.second) + "_" +
-                                   std::to_string(int(rhs));
+                                paths[i].timesArc(arg.first, arg.second) ? 1.0 : 0.0); // Use pair payload
+                            name = "branching_edge_" + std::to_string(arg.first) + "_" + std::to_string(arg.second) +
+                                   "_" + std::to_string(int(rhs));
                         } else {
-                            throw std::invalid_argument(
-                                "Payload for Edge must be a std::pair<int, "
-                                "int>.");
+                            throw std::invalid_argument("Payload for Edge must be a std::pair<int, "
+                                                        "int>.");
                         }
                     },
                     *payload);
@@ -498,18 +448,15 @@ class BNBNode : public std::enable_shared_from_this<BNBNode> {
                                 // Assuming `contains` checks if the path
                                 // contains `cluster_ele`
                                 if (paths[i].contains(cluster_ele)) {
-                                    linExpr.add_or_update_term(
-                                        variables[i]->get_name(),
-                                        1.0);  // Add term with coefficient 1.0
+                                    linExpr.add_or_update_term(variables[i]->get_name(),
+                                                               1.0); // Add term with coefficient 1.0
                                 }
-                                name = "branching_cluster_" +
-                                       std::to_string(cluster_ele) + "_" +
-                                       std::to_string(int(rhs));
+                                name =
+                                    "branching_cluster_" + std::to_string(cluster_ele) + "_" + std::to_string(int(rhs));
                             }
                         } else {
-                            throw std::invalid_argument(
-                                "Payload for Cluster must be a "
-                                "std::vector<int>.");
+                            throw std::invalid_argument("Payload for Cluster must be a "
+                                                        "std::vector<int>.");
                         }
                     },
                     *payload);
@@ -537,15 +484,14 @@ class BNBNode : public std::enable_shared_from_this<BNBNode> {
         // mip->update();
         return constraint;
     }
-    using BranchingDualsPtr = std::shared_ptr<BranchingDuals>;
+    using BranchingDualsPtr          = std::shared_ptr<BranchingDuals>;
     BranchingDualsPtr branchingDuals = std::make_shared<BranchingDuals>();
 
     void enforceBranching() {
         // Iterate over the candidates and enforce the branching constraints
         for (const auto &candidate : candidates) {
-            auto ctr = addBranchingbaldesCtr(
-                candidate->boundValue, candidate->boundType,
-                candidate->candidateType, candidate->payload);
+            auto ctr = addBranchingbaldesCtr(candidate->boundValue, candidate->boundType, candidate->candidateType,
+                                             candidate->payload);
             branchingDuals->addCandidate(candidate, ctr);
         }
         mip.printBranchingbaldesCtr();
@@ -553,9 +499,7 @@ class BNBNode : public std::enable_shared_from_this<BNBNode> {
 
 #ifdef GUROBI
     // Assuming model is your GRBModel and obj is your objective sense
-    std::vector<int> getBasicVariableIndices() {
-        return solver->getBasicVariableIndices();
-    }
+    std::vector<int> getBasicVariableIndices() { return solver->getBasicVariableIndices(); }
 #endif
 
     bool loadedState = false;
@@ -563,7 +507,7 @@ class BNBNode : public std::enable_shared_from_this<BNBNode> {
     void loadState() {
         Snapshot snapshot;
         serializer::Serializer<Snapshot>::fromFile(snapshot, "snapshot.bin");
-        paths = snapshot.paths;
+        paths           = snapshot.paths;
         r1c->cutStorage = snapshot.cutStorage;
         auto cutStorage = r1c->cutStorage;
         // print cutStorage.size()
@@ -572,12 +516,12 @@ class BNBNode : public std::enable_shared_from_this<BNBNode> {
         fmt::print("Paths size: {}\n", paths.size());
         loadedState = true;
         integer_sol = 10301;
-        numK = 9;
+        numK        = 9;
     }
     void saveState() {
-        auto cutStorage = r1c->cutStorage;
+        auto     cutStorage = r1c->cutStorage;
         Snapshot snapshot;
-        snapshot.paths = paths;
+        snapshot.paths      = paths;
         snapshot.cutStorage = cutStorage;
 
         serializer::Serializer<Snapshot>::toFile(snapshot, "snapshot.bin");

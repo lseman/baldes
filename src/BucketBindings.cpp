@@ -38,43 +38,40 @@
 #include "../third_party/small_vector.hpp"
 
 namespace py = pybind11;
-using namespace pybind11::literals;  // Enables _a suffix for named arguments
+using namespace pybind11::literals; // Enables _a suffix for named arguments
 
 PYBIND11_MODULE(pybaldes, m) {
     py::class_<VRPNode>(m, "VRPNode")
-        .def(py::init<>())  // Default constructor
+        .def(py::init<>()) // Default constructor
         .def(py::init<int, int, int, int,
-                      double>())          // Constructor with multiple arguments
-        .def_readwrite("x", &VRPNode::x)  // Expose x
-        .def_readwrite("y", &VRPNode::y)  // Expose y
-        .def_readwrite("id", &VRPNode::id)                  // Expose id
-        .def_readwrite("start_time", &VRPNode::start_time)  // Expose start_time
-        .def_readwrite("end_time", &VRPNode::end_time)      // Expose end_time
-        .def_readwrite("duration", &VRPNode::duration)      // Expose duration
-        .def_readwrite("cost", &VRPNode::cost)              // Expose cost
-        .def_readwrite("demand", &VRPNode::demand)          // Expose demand
-        .def_readwrite(
-            "consumption",
-            &VRPNode::consumption)  // Expose consumption (vector of double)
-        .def_readwrite("lb", &VRPNode::lb)  // Expose lb (vector of int)
-        .def_readwrite("ub", &VRPNode::ub)  // Expose ub (vector of int)
+                      double>())                           // Constructor with multiple arguments
+        .def_readwrite("x", &VRPNode::x)                   // Expose x
+        .def_readwrite("y", &VRPNode::y)                   // Expose y
+        .def_readwrite("id", &VRPNode::id)                 // Expose id
+        .def_readwrite("start_time", &VRPNode::start_time) // Expose start_time
+        .def_readwrite("end_time", &VRPNode::end_time)     // Expose end_time
+        .def_readwrite("duration", &VRPNode::duration)     // Expose duration
+        .def_readwrite("cost", &VRPNode::cost)             // Expose cost
+        .def_readwrite("demand", &VRPNode::demand)         // Expose demand
+        .def_readwrite("consumption",
+                       &VRPNode::consumption) // Expose consumption (vector of double)
+        .def_readwrite("lb", &VRPNode::lb)    // Expose lb (vector of int)
+        .def_readwrite("ub", &VRPNode::ub)    // Expose ub (vector of int)
         .def_readwrite("mtw_lb",
-                       &VRPNode::mtw_lb)  // Expose mtw_lb (vector of int)
+                       &VRPNode::mtw_lb) // Expose mtw_lb (vector of int)
         .def_readwrite("mtw_ub",
-                       &VRPNode::mtw_ub)  // Expose mtw_ub (vector of int)
-        .def_readwrite("identifier", &VRPNode::identifier)  // Expose identifier
+                       &VRPNode::mtw_ub)                   // Expose mtw_ub (vector of int)
+        .def_readwrite("identifier", &VRPNode::identifier) // Expose identifier
         .def("set_location",
-             &VRPNode::set_location)  // Expose set_location function
-        .def("clear_arcs", &VRPNode::clear_arcs)  // Expose clear_arcs function
-        .def("sort_arcs", &VRPNode::sort_arcs);   // Expose sort_arcs function
+             &VRPNode::set_location)             // Expose set_location function
+        .def("clear_arcs", &VRPNode::clear_arcs) // Expose clear_arcs function
+        .def("sort_arcs", &VRPNode::sort_arcs);  // Expose sort_arcs function
     py::class_<Label>(m, "Label")
-        .def(py::init<>())  // Default constructor
-        .def(py::init<int, double, const std::vector<double> &, int, int>(),
-             py::arg("vertex"), py::arg("cost"), py::arg("resources"),
-             py::arg("pred"), py::arg("node_id"))
-        .def(py::init<int, double, const std::vector<double> &, int>(),
-             py::arg("vertex"), py::arg("cost"), py::arg("resources"),
-             py::arg("pred"))
+        .def(py::init<>()) // Default constructor
+        .def(py::init<int, double, const std::vector<double> &, int, int>(), py::arg("vertex"), py::arg("cost"),
+             py::arg("resources"), py::arg("pred"), py::arg("node_id"))
+        .def(py::init<int, double, const std::vector<double> &, int>(), py::arg("vertex"), py::arg("cost"),
+             py::arg("resources"), py::arg("pred"))
         .def_readwrite("is_extended", &Label::is_extended)
         .def_readwrite("vertex", &Label::vertex)
         .def_readwrite("cost", &Label::cost)
@@ -88,50 +85,41 @@ PYBIND11_MODULE(pybaldes, m) {
         .def_readwrite("unreachable_bitmap", &Label::unreachable_bitmap)
 #endif
 
-            SRC_MODE_BLOCK(.def_property("SRCmap",
-                                          [](const Label &label) { return label.SRCmap.to_vector(); },
-                                          [](Label &label, const std::vector<uint16_t> &src_map) {
-                                              label.SRCmap = src_map;
-                                          }))
+            SRC_MODE_BLOCK(.def_property(
+                               "SRCmap", [](const Label &label) { return label.SRCmap.to_vector(); },
+                               [](Label &label, const std::vector<uint16_t> &src_map) { label.SRCmap = src_map; }))
         .def("set_extended", &Label::set_extended)
         .def("visits", &Label::visits)
         .def("reset", &Label::reset)
         .def("addNode", &Label::addNode)
         .def("initialize", &Label::initialize)
         .def("__repr__", [](const Label &label) {
-            return "<bucket_graph.Label vertex=" +
-                   std::to_string(label.vertex) +
+            return "<bucket_graph.Label vertex=" + std::to_string(label.vertex) +
                    " cost=" + std::to_string(label.cost) + ">";
         });
 
     py::class_<BucketGraph>(m, "BucketGraph")
-        .def(py::init<>())  // Default constructor
-        .def(py::init<const std::vector<VRPNode> &, int, int>(), "nodes"_a,
-             "time_horizon"_a, "bucket_interval"_a)
-        .def("setup", &BucketGraph::setup)  // Bind the setup method
+        .def(py::init<>()) // Default constructor
+        .def(py::init<const std::vector<VRPNode> &, int, int>(), "nodes"_a, "time_horizon"_a, "bucket_interval"_a)
+        .def("setup", &BucketGraph::setup) // Bind the setup method
         .def("redefine", &BucketGraph::redefine,
-             "bucket_interval"_a)  // Bind redefine method
-        .def("solve", &BucketGraph::solve<Symmetry::Asymmetric>,
-             py::arg("arg0") = false, py::return_value_policy::reference)
+             "bucket_interval"_a) // Bind redefine method
+        .def("solve", &BucketGraph::solve<Symmetry::Asymmetric>, py::arg("arg0") = false,
+             py::return_value_policy::reference)
         .def("extend_path", &BucketGraph::extend_path, "path"_a, "resources"_a,
-             py::return_value_policy::reference)  // Bind extend_path method
+             py::return_value_policy::reference) // Bind extend_path method
 
         .def("set_adjacency_list",
-             &BucketGraph::set_adjacency_list<
-                 Symmetry::Asymmetric>)            // Bind adjacency list setup
-        .def("get_nodes", &BucketGraph::getNodes)  // Get the nodes in the graph
-        .def("print_statistics", &BucketGraph::print_statistics)  // Print stats
-        .def("set_duals", &BucketGraph::setDuals, "duals"_a)  // Set dual values
-        .def("set_distance_matrix", &BucketGraph::set_distance_matrix,
-             "distance_matrix"_a,
-             "n_ng"_a = 8)                            // Set distance matrix
-        .def("reset_pool", &BucketGraph::reset_pool)  // Reset the label pools
-        .def("phaseOne",
-             &BucketGraph::run_labeling_algorithms<Stage::One, Full::Partial>)
-        .def("phaseTwo",
-             &BucketGraph::run_labeling_algorithms<Stage::Two, Full::Partial>)
-        .def("phaseThree",
-             &BucketGraph::run_labeling_algorithms<Stage::Three, Full::Partial>)
+             &BucketGraph::set_adjacency_list<Symmetry::Asymmetric>) // Bind adjacency list setup
+        .def("get_nodes", &BucketGraph::getNodes)                    // Get the nodes in the graph
+        .def("print_statistics", &BucketGraph::print_statistics)     // Print stats
+        .def("set_duals", &BucketGraph::setDuals, "duals"_a)         // Set dual values
+        .def("set_distance_matrix", &BucketGraph::set_distance_matrix, "distance_matrix"_a,
+             "n_ng"_a = 8)                           // Set distance matrix
+        .def("reset_pool", &BucketGraph::reset_pool) // Reset the label pools
+        .def("phaseOne", &BucketGraph::run_labeling_algorithms<Stage::One, Full::Partial>)
+        .def("phaseTwo", &BucketGraph::run_labeling_algorithms<Stage::Two, Full::Partial>)
+        .def("phaseThree", &BucketGraph::run_labeling_algorithms<Stage::Three, Full::Partial>)
         // .def("setPSTEPDuals", &BucketGraph::setPSTEPduals, "duals"_a)
         .def("solvePSTEP_by_MTZ", &BucketGraph::solvePSTEP_by_MTZ)
         .def("solveTSPTW_by_MTZ", &BucketGraph::solveTSPTW_by_MTZ)
@@ -139,40 +127,29 @@ PYBIND11_MODULE(pybaldes, m) {
         // py::return_value_policy::reference)
         .def("setOptions", &BucketGraph::setOptions, "options"_a)
         .def("setArcs", &BucketGraph::setManualArcs, "arcs"_a)
-        .def("phaseFour",
-             &BucketGraph::bi_labeling_algorithm<Stage::Four,
-                                                 Symmetry::Asymmetric>,
+        .def("phaseFour", &BucketGraph::bi_labeling_algorithm<Stage::Four, Symmetry::Asymmetric>,
              py::return_value_policy::reference)
         .def(
             "update_ng_neighbors",
-            [](BucketGraph &self,
-               const std::vector<std::tuple<int, int>> &conflicts) {
+            [](BucketGraph &self, const std::vector<std::tuple<int, int>> &conflicts) {
                 // Convert Python tuples to C++ pairs
                 std::vector<std::pair<size_t, size_t>> cpp_conflicts;
                 cpp_conflicts.reserve(conflicts.size());
                 for (const auto &conflict : conflicts) {
-                    cpp_conflicts.emplace_back(std::get<0>(conflict),
-                                               std::get<1>(conflict));
+                    cpp_conflicts.emplace_back(std::get<0>(conflict), std::get<1>(conflict));
                 }
                 self.update_neighborhoods(cpp_conflicts);
             },
             "Update NG neighborhoods based on conflicts")
-        .def("get_neighborhood_size", &BucketGraph::get_neighborhood_size,
-             "Get size of neighborhood for given node")
-        .def("get_neighbors", &BucketGraph::get_neighbors,
-             "Get list of neighbors for given node")
-        .def("is_in_neighborhood", &BucketGraph::is_in_neighborhood,
-             "Check if node j is in node i's neighborhood")
+        .def("get_neighborhood_size", &BucketGraph::get_neighborhood_size, "Get size of neighborhood for given node")
+        .def("get_neighbors", &BucketGraph::get_neighbors, "Get list of neighbors for given node")
+        .def("is_in_neighborhood", &BucketGraph::is_in_neighborhood, "Check if node j is in node i's neighborhood")
         .def(
             "set_deleted_arcs",
-            [](BucketGraph &self,
-               const std::vector<std::tuple<int, int>> &arcs) {
+            [](BucketGraph &self, const std::vector<std::tuple<int, int>> &arcs) {
                 // Convert Python tuples to ArcList entries to mark as deleted
                 std::vector<std::pair<int, int>> deleted_arcs;
-                for (const auto &arc : arcs) {
-                    deleted_arcs.emplace_back(std::get<0>(arc),
-                                              std::get<1>(arc));
-                }
+                for (const auto &arc : arcs) { deleted_arcs.emplace_back(std::get<0>(arc), std::get<1>(arc)); }
                 self.set_deleted_arcs(deleted_arcs);
             },
             "Set arcs that should be forbidden/deleted from the graph")
@@ -180,7 +157,7 @@ PYBIND11_MODULE(pybaldes, m) {
             "get_adjacency_list",
             [](BucketGraph &self) {
                 // Convert the C++ adjacency list to a Python dictionary
-                auto adj_list = self.get_adjacency_list<Symmetry::Asymmetric>();
+                auto     adj_list = self.get_adjacency_list<Symmetry::Asymmetric>();
                 py::dict py_adj_list;
 
                 for (const auto &[node, arcs] : adj_list) {
@@ -195,61 +172,49 @@ PYBIND11_MODULE(pybaldes, m) {
                 return py_adj_list;
             },
             "Get the adjacency list as a dictionary")
-        .def("reset_fixed_arcs", &BucketGraph::reset_fixed,
-             "Reset all fixed arcs in the graph");
+        .def("reset_fixed_arcs", &BucketGraph::reset_fixed, "Reset all fixed arcs in the graph");
     // Expose PSTEPDuals class
     py::class_<PSTEPDuals>(m, "PSTEPDuals")
-        .def(py::init<>())  // Default constructor
+        .def(py::init<>()) // Default constructor
         .def("set_arc_dual_values", &PSTEPDuals::setArcDualValues,
-             "values"_a)  // Set arc dual values
+             "values"_a) // Set arc dual values
         .def("set_threetwo_dual_values", &PSTEPDuals::setThreeTwoDualValues,
-             "values"_a)  // Set node dual values
+             "values"_a) // Set node dual values
         .def("set_threethree_dual_values", &PSTEPDuals::setThreeThreeDualValues,
-             "values"_a)  // Set node dual values
+             "values"_a) // Set node dual values
         .def("clear_dual_values",
-             &PSTEPDuals::clearDualValues)  // Clear all dual values
-        .def("__repr__", [](const PSTEPDuals &pstepDuals) {
-            return "<PSTEPDuals with arc and node dual values>";
-        });
+             &PSTEPDuals::clearDualValues) // Clear all dual values
+        .def("__repr__", [](const PSTEPDuals &pstepDuals) { return "<PSTEPDuals with arc and node dual values>"; });
 
     py::class_<BucketOptions>(m, "BucketOptions")
-        .def(py::init<>())                              // Default constructor
-        .def_readwrite("depot", &BucketOptions::depot)  // Expose depot field
+        .def(py::init<>())                             // Default constructor
+        .def_readwrite("depot", &BucketOptions::depot) // Expose depot field
         .def_readwrite("end_depot",
-                       &BucketOptions::end_depot)  // Expose end_depot field
-        .def_readwrite(
-            "max_path_size",
-            &BucketOptions::max_path_size)  // Expose max_path_size field
-        .def_readwrite(
-            "min_path_size",
-            &BucketOptions::min_path_size)  // Expose min_path_size field
-        .def_readwrite(
-            "main_resources",
-            &BucketOptions::main_resources)  // Expose main_resources field
+                       &BucketOptions::end_depot) // Expose end_depot field
+        .def_readwrite("max_path_size",
+                       &BucketOptions::max_path_size) // Expose max_path_size field
+        .def_readwrite("min_path_size",
+                       &BucketOptions::min_path_size) // Expose min_path_size field
+        .def_readwrite("main_resources",
+                       &BucketOptions::main_resources) // Expose main_resources field
         .def_readwrite("resources",
-                       &BucketOptions::resources)     // Expose resources field
-        .def_readwrite("size", &BucketOptions::size)  // Expose size field
-        .def_readwrite(
-            "three_two_sign",
-            &BucketOptions::three_two_sign)  // Expose three_two_sign field
-        .def_readwrite(
-            "three_three_sign",
-            &BucketOptions::three_three_sign)  // Expose three_three_sign field
-        .def_readwrite(
-            "three_five_sign",
-            &BucketOptions::three_five_sign)  // Expose three_five_sign field
+                       &BucketOptions::resources)    // Expose resources field
+        .def_readwrite("size", &BucketOptions::size) // Expose size field
+        .def_readwrite("three_two_sign",
+                       &BucketOptions::three_two_sign) // Expose three_two_sign field
+        .def_readwrite("three_three_sign",
+                       &BucketOptions::three_three_sign) // Expose three_three_sign field
+        .def_readwrite("three_five_sign",
+                       &BucketOptions::three_five_sign) // Expose three_five_sign field
         .def_readwrite("pstep", &BucketOptions::pstep)  // Expose pstep field
-        .def_readwrite(
-            "resource_type",
-            &BucketOptions::resource_type)  // Expose resource_type field
-        .def_readwrite(
-            "bucket_fixing",
-            &BucketOptions::bucket_fixing)  // Expose bucket_fixing field
+        .def_readwrite("resource_type",
+                       &BucketOptions::resource_type) // Expose resource_type field
+        .def_readwrite("bucket_fixing",
+                       &BucketOptions::bucket_fixing) // Expose bucket_fixing field
         .def("__repr__", [](const BucketOptions &options) {
             return "<BucketOptions depot=" + std::to_string(options.depot) +
                    " end_depot=" + std::to_string(options.end_depot) +
-                   " max_path_size=" + std::to_string(options.max_path_size) +
-                   ">";
+                   " max_path_size=" + std::to_string(options.max_path_size) + ">";
         });
 
     py::class_<Arc>(m, "Arc")
@@ -265,10 +230,8 @@ PYBIND11_MODULE(pybaldes, m) {
 
     py::class_<ArcList>(m, "ArcList")
         .def(py::init<>())
-        .def("add_connections", &ArcList::add_connections,
-             py::arg("connections"),
-             py::arg("default_resource_increment") = std::vector<double>{1.0},
-             py::arg("default_cost_increment") = 0.0,
+        .def("add_connections", &ArcList::add_connections, py::arg("connections"),
+             py::arg("default_resource_increment") = std::vector<double>{1.0}, py::arg("default_cost_increment") = 0.0,
              py::arg("default_priority") = 1.0)
         .def("get_arcs", &ArcList::get_arcs);
 
@@ -284,8 +247,7 @@ PYBIND11_MODULE(pybaldes, m) {
         .def_readonly("index", &ParamType<int>::index);
 
     // Helper functions to create parameters
-    m.def("double_param", &param<double>, py::arg("value"),
-          py::arg("index") = 0);
+    m.def("double_param", &param<double>, py::arg("value"), py::arg("index") = 0);
     m.def("int_param", &param<int>, py::arg("value"), py::arg("index") = 0);
 
     // Bind GenericParameters
@@ -293,18 +255,13 @@ PYBIND11_MODULE(pybaldes, m) {
         .def(py::init<>())
         .def("get_double", &GenericParameters::get<double>)
         .def("get_int", &GenericParameters::get<int>)
-        .def("set", py::overload_cast<const ParamType<double> &>(
-                        &GenericParameters::set<double>))
-        .def("set", py::overload_cast<const ParamType<int> &>(
-                        &GenericParameters::set<int>));
+        .def("set", py::overload_cast<const ParamType<double> &>(&GenericParameters::set<double>))
+        .def("set", py::overload_cast<const ParamType<int> &>(&GenericParameters::set<int>));
 
     // Bind ParametersBuilder
     py::class_<ParametersBuilder>(m, "ParametersBuilder")
         .def(py::init<ParamType<double>, ParamType<int>>())
-        .def("with_param", py::overload_cast<const ParamType<double> &>(
-                               &ParametersBuilder::with<double>))
-        .def("with_param", py::overload_cast<const ParamType<int> &>(
-                               &ParametersBuilder::with<int>))
+        .def("with_param", py::overload_cast<const ParamType<double> &>(&ParametersBuilder::with<double>))
+        .def("with_param", py::overload_cast<const ParamType<int> &>(&ParametersBuilder::with<int>))
         .def("build", &ParametersBuilder::build);
-
 }

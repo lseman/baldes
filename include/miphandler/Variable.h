@@ -8,8 +8,8 @@
  *
  */
 #pragma once
-#include <string>
 #include <memory>
+#include <string>
 
 enum class VarType { Continuous, Integer, Binary };
 

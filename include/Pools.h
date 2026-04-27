@@ -16,9 +16,9 @@
 #include <algorithm>
 #include <deque>
 #include <exec/static_thread_pool.hpp>
+#include <exec/task.hpp>
 #include <memory>
 #include <new>
-#include <exec/task.hpp>
 #include <stdexec/execution.hpp>
 
 #include "Common.h"
@@ -185,7 +185,8 @@ public:
     explicit LabelPool(size_t initial_pool_size, size_t max_pool_size = 5000000)
         : max_pool_size(std::max(initial_pool_size, max_pool_size)) {
 
-        arena = static_cast<Label *>(::operator new[](this->max_pool_size * sizeof(Label), std::align_val_t{alignof(Label)}));
+        arena = static_cast<Label *>(
+            ::operator new[](this->max_pool_size * sizeof(Label), std::align_val_t{alignof(Label)}));
         free_indices.reserve(initial_pool_size);
         construct_until(initial_pool_size);
         next_unused = initial_pool_size;
