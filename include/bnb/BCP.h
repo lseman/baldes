@@ -489,9 +489,42 @@ public:
         if (!lb.empty()) {
             node->addVars(lb.data(), ub.data(), obj.data(), vtypes.data(), names.data(), cols.data(), lb.size());
             node->update();
+
+            if (enumerate && node->integer_sol < std::numeric_limits<double>::max()) {
+                applyDeluxingReduction(node, node->getDuals(), node->integer_sol, node->getObjVal());
+            }
         }
 
         return counter;
+    }
+
+    inline void applyDeluxingReduction(BNBNode *node, const std::vector<double> &dual_solution, double upper_bound,
+                                       double lower_bound) {
+        if (upper_bound <= lower_bound) { return; }
+        auto &allPaths = node->paths;
+        if (allPaths.empty()) { return; }
+
+        double gap           = upper_bound - lower_bound;
+        auto   reduced_costs = node->mip.getAllReducedCosts(dual_solution);
+        if (reduced_costs.empty()) { return; }
+
+        std::vector<int> removeIndices;
+        removeIndices.reserve(std::min(allPaths.size(), reduced_costs.size()));
+        for (int i = 0; i < static_cast<int>(allPaths.size()) && i < static_cast<int>(reduced_costs.size()); ++i) {
+            if (reduced_costs[i] > gap) { removeIndices.push_back(i); }
+        }
+        if (removeIndices.empty()) { return; }
+
+        auto &pathSet = node->pathSet;
+        std::sort(removeIndices.begin(), removeIndices.end(), std::greater<int>());
+        for (int idx : removeIndices) {
+            if (idx >= 0 && idx < static_cast<int>(allPaths.size())) {
+                pathSet.erase(allPaths[idx]);
+                allPaths.erase(allPaths.begin() + idx);
+                node->mip.delete_variable(idx);
+            }
+        }
+        node->update();
     }
 
     /**
