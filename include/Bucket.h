@@ -87,7 +87,7 @@ struct alignas(64) Bucket {
         is_virtual_split = true;
     }
 
-    void flush_extra_labels() const {
+    void flush_extra_labels() {
         if (extra_labels.empty()) return;
 
         const auto old_size = labels.size();
@@ -97,6 +97,7 @@ struct alignas(64) Bucket {
         std::inplace_merge(labels.begin(), labels.begin() + static_cast<std::ptrdiff_t>(old_size), labels.end(),
                            [](const Label *a, const Label *b) { return a->cost < b->cost; });
         extra_labels.clear();
+        min_cost = std::numeric_limits<double>::max();
 
         is_virtual_split    = false;
         virtual_split_index = 0;

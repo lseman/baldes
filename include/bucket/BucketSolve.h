@@ -41,7 +41,7 @@ inline std::vector<Label *> BucketGraph::solve(bool trigger) {
         fixed      = false;
     }
 
-    updateSplit(); // Update split values for the bucket graph.
+    // updateSplit(); // Update split values for the bucket graph.
     std::vector<Label *> paths;
 
     //////////////////////////////////////////////////////////////////////
@@ -141,7 +141,7 @@ inline std::vector<Label *> BucketGraph::solveHeuristic() {
     // Initialize the status as not optimal at the start
     status = Status::NotOptimal;
 
-    updateSplit(); // Update the split values for the bucket graph
+    // updateSplit(); // Update the split values for the bucket graph
 
     // Placeholder for the final paths (labels) and inner objective value
     std::vector<Label *> paths;
@@ -1230,28 +1230,28 @@ inline bool BucketGraph::DominatedInCompWiseSmallerBuckets(const Label *__restri
     // Direct pointer to bit mask lookup for fast bit operations
     const uint64_t *const bit_mask_lookup_ptr = bit_mask_lookup.data();
 
-    // Inline dominance check function to avoid lambda overhead
+    // Read-only dominance scan: ask only "does some predecessor label cur
+    // dominate L?". Per Sadykov & Vanderbeck (2021), this routine MUST NOT
+    // mutate labels in compwise-smaller buckets — they belong to already-
+    // processed (or concurrently processed) buckets, and marking them
+    // dominated mid-walk silently drops queued pending labels. Cost is a
+    // necessary condition for cur-dominates-L, so once cur->cost > L.cost
+    // (sorted bin) we can break.
+    const double cost_hi_break = label_cost + numericutils::eps;
+
     auto inline_check_dominance = [&](std::span<Label *const> labels, uint &n_dom) -> bool {
-        const auto scan_end = std::upper_bound(labels.begin(), labels.end(), L->cost + numericutils::eps,
-                                               [](double cost, const Label *label) { return cost < label->cost; });
-        labels              = labels.first(static_cast<size_t>(scan_end - labels.begin()));
-        if (profile_labeling) profile_record_inner_bin_scan(D, S, labels.size());
-#ifdef __AVX2__
-        if (labels.size() >= AVX_LIM) return check_dominance_against_vector<D, S>(L, labels, cut_storage, n_dom);
-#endif
         const size_t size = labels.size();
-        size_t       i    = 0;
-        // Loop unrolling: process 4 labels at a time
-        for (; i + 3 < size; i += 4) {
-            if (is_dominated<D, S>(L, labels[i]) || is_dominated<D, S>(L, labels[i + 1]) ||
-                is_dominated<D, S>(L, labels[i + 2]) || is_dominated<D, S>(L, labels[i + 3])) {
-                ++n_dom;
-                return true;
-            }
-        }
-        // Process remaining labels
-        for (; i < size; ++i) {
-            if (is_dominated<D, S>(L, labels[i])) {
+        if (profile_labeling) profile_record_inner_bin_scan(D, S, size);
+#ifdef __AVX2__
+        if (size >= AVX_LIM) return check_dominance_against_vector<D, S>(L, labels, cut_storage, n_dom);
+#endif
+        for (size_t i = 0; i < size; ++i) {
+            Label *cur = labels[i];
+            // Bin is RC-sorted ascending; once cur is more expensive than L,
+            // no later label can dominate L (cost ordering).
+            if (cur->cost > cost_hi_break) break;
+            if (cur->is_dominated) continue;
+            if (is_dominated<D, S>(L, cur)) {
                 ++n_dom;
                 return true;
             }
@@ -1263,7 +1263,8 @@ inline bool BucketGraph::DominatedInCompWiseSmallerBuckets(const Label *__restri
         if (profile_labeling) profile_record_inner_bin_scan(D, S, labels.size());
         for (Label *label : labels) {
             if (label->is_dominated) continue;
-            if (numericutils::gt(label->cost, L->cost + numericutils::eps)) continue;
+            // extra is unsorted -> no break, just skip.
+            if (label->cost > cost_hi_break) continue;
             if (is_dominated<D, S>(L, label)) {
                 ++n_dom;
                 return true;
