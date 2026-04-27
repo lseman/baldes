@@ -1,14 +1,6 @@
 /*
  * @file Bitset.h
- * @brief This file contains the definition of the Bitset class.
- *
- * This file contains the definition of the Bitset class, which represents a
- * fixed-size bitset. The Bitset class provides methods to set, clear, test,
- * toggle, count, check if all bits are set, check if no bits are set, perform
- * bitwise AND, OR, XOR, and NOT operations, and compare bitsets. It also
- * provides methods to convert to an integer, hash the bitset, and stream the
- * bitset. The Bitset class is implemented using a std::array of uint64_t to
- * store the bits.
+ * @brief Defines the Bitset utility for bit-level operations.
  *
  */
 #pragma once

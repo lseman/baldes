@@ -1,3 +1,11 @@
+/*
+ * @file LDLTCuda.h
+ * @brief Declares LDLTCuda interfaces and types used by the BALDES solver.
+ *
+ * This file declares the LDLTCuda interfaces and helper functions used by the BALDES solver.
+ *
+ */
+
 #ifndef factorize_preordered_cuda_H
 #define factorize_preordered_cuda_H
 

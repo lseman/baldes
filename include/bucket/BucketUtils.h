@@ -1,31 +1,7 @@
 /**
  * @file BucketUtils.h
- * @brief Header file for utilities related to the Bucket Graph in the Vehicle
- * Routing Problem (VRP).
+ * @brief Utility functions for Bucket Graph construction and extension.
  *
- * This file contains various template functions and algorithms for managing
- * buckets in the Bucket Graph. The Bucket Graph is a representation of the VRP
- * problem, where nodes are assigned to "buckets" based on resource intervals,
- * and arcs represent feasible transitions between buckets. The utilities
- * provided include adding arcs, defining buckets, generating arcs, extending
- * labels, and managing strongly connected components (SCCs).
- *
- * Key components:
- * - `add_arc`: Adds directed arcs between buckets based on the direction and
- * resource increments.
- * - `get_bucket_number`: Computes the bucket number for a given node and
- * resource values.
- * - `define_buckets`: Defines the structure and intervals for the buckets based
- * on resource bounds.
- * - `generate_arcs`: Generates arcs between buckets based on resource
- * constraints and feasibility.
- * - `SCC_handler`: Identifies and processes SCCs in the bucket graph.
- * - `Extend`: Extends a label with a given arc, checking for feasibility based
- * on resources.
- *
- * The utilities use template parameters for direction (Forward or Backward),
- * stages, and other configurations, allowing flexible handling of the bucket
- * graph in both directions.
  */
 
 #pragma once
@@ -1351,10 +1327,12 @@ void BucketGraph::common_initialization() {
     // --- Initialize c_bar vector ---
     c_bar.resize(buckets_size, std::numeric_limits<double>::infinity());
 
-    // --- Initialize dominance check counters for forward direction ---
+    // --- Initialize dominance check counters ---
     if constexpr (Direction::Forward == D) {
         dominance_checks_per_bucket.assign(buckets_size + 1, 0);
         non_dominated_labels_per_bucket = 0;
+    } else {
+        non_dominated_labels_per_bucket_bw = 0;
     }
 
     // --- Clear all buckets ---

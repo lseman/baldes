@@ -1,3 +1,11 @@
+/*
+ * @file EvaluatorGPU.h
+ * @brief Declares EvaluatorGPU interfaces and types used by the BALDES solver.
+ *
+ * This file declares the EvaluatorGPU interfaces and helper functions used by the BALDES solver.
+ *
+ */
+
 // SparseSolveTriangularGPU.h
 
 #pragma once

@@ -1,3 +1,11 @@
+/*
+ * @file Branching.cpp
+ * @brief Implements Branching functionality for the BALDES solver.
+ *
+ * This file implements the Branching logic used by the BALDES solver.
+ *
+ */
+
 #include "bnb/Branching.h"
 #include "Dual.h"
 #include "bnb/Node.h"

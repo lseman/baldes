@@ -1,3 +1,11 @@
+/*
+ * @file TSP.h
+ * @brief Declares TSP interfaces and types used by the BALDES solver.
+ *
+ * This file declares the TSP interfaces and helper functions used by the BALDES solver.
+ *
+ */
+
 #pragma once
 #include <fstream>
 #include <iostream>

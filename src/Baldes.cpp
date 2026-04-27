@@ -1,29 +1,7 @@
 /**
- * @file VRPTW.cpp
- * @brief Main implementation for solving the Vehicle Routing Problem with Time
- * Windows (VRPTW).
+ * @file Baldes.cpp
+ * @brief Main entry point for the BALDES branch-cut-and-price solver.
  *
- * This file contains the implementation of the main function and supporting
- * functions for solving the Vehicle Routing Problem with Time Windows (VRPTW).
- * The VRPTW class is used to manage instance data, initialize the Restricted
- * Master Problem (RMP), perform heuristic-based route generation, and apply
- * column generation to iteratively solve the problem.
- *
- * The following steps are carried out:
- * 1. Read the VRPTW instance and parse the problem data.
- * 2. Generate initial solutions using heuristic methods.
- * 3. Convert initial routes into the column generation format.
- * 4. Initialize the Gurobi model and the Restricted Master Problem (RMP).
- * 5. Apply column generation with stabilization to solve the problem
- * iteratively.
- *
- * The implementation relies on the Gurobi optimizer for solving linear
- * programming relaxations, and uses various heuristics such as Iterated Local
- * Search and Savings Heuristic to generate initial solutions.
- *
- * @param argc The number of command line arguments.
- * @param argv The array of command line arguments.
- * @return int Returns 0 on successful execution.
  */
 
 // #include "../third_party/lkh/include/lkh_tsp.hpp"
@@ -146,27 +124,6 @@ void printDistanceMatrix(const std::vector<std::vector<double>> &distance) {
         std::cout << std::endl;
     }
 }
-
-/**
- * @file vrptw.cpp
- * @brief This file contains the main function for solving the Vehicle Routing
- * Problem with Time Windows (VRPTW).
- *
- * The main function performs the following steps:
- * 1. Reads the instance name from the command line arguments.
- * 2. Reads the VRPTW instance data from the specified file.
- * 3. Initializes heuristic solvers for generating initial solutions.
- * 4. Combines solutions from different heuristics.
- * 5. Converts the instance data into a format suitable for optimization.
- * 6. Initializes the Gurobi environment and model.
- * 7. Converts initial routes into labels and paths.
- * 8. Initializes the Restricted Master Problem (RMP) matrix.
- * 9. Solves the Column Generation (CG) problem using the Gurobi model.
- *
- * @param argc The number of command line arguments.
- * @param argv The array of command line arguments.
- * @return int Returns 0 on successful execution.
- */
 
 using HGSptr = std::shared_ptr<HGS>;
 int main(int argc, char *argv[]) {

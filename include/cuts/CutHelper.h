@@ -1,3 +1,11 @@
+/*
+ * @file CutHelper.h
+ * @brief Declares CutHelper interfaces and types used by the BALDES solver.
+ *
+ * This file declares the CutHelper interfaces and helper functions used by the BALDES solver.
+ *
+ */
+
 #pragma once
 
 // Move config outside as namespace constants

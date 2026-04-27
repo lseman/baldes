@@ -1,3 +1,11 @@
+/*
+ * @file SolverInterface.h
+ * @brief Declares SolverInterface interfaces and types used by the BALDES solver.
+ *
+ * This file declares the SolverInterface interfaces and helper functions used by the BALDES solver.
+ *
+ */
+
 #pragma once
 #include <any>
 #include <string>

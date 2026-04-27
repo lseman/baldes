@@ -2,10 +2,6 @@
  * @file MIPHandler.h
  * @brief MIP Problem class implementation
  *
- * This file contains the implementation of the MIPProblem class.
- * The MIPProblem class represents a Mixed-Integer Programming (MIP) problem
- * and provides methods to add variables, constraints, and objective functions.
- *
  */
 
 #pragma once

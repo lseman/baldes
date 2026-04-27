@@ -1,13 +1,6 @@
 /*
  * @file Arc.h
- * @brief This file contains the definition of the Arc struct and related
- * structures.
- *
- * This file contains the definition of the Arc struct, which represents an arc
- * between two nodes in a graph. The Arc struct contains information about the
- * source node, target node, resource increments, cost increment, and other
- * properties of the arc. It also includes related structures such as BucketArc
- * and JumpArc.
+ * @brief Defines Arc and JumpArc types used by bucket graph labeling.
  *
  */
 #pragma once

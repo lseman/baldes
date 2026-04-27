@@ -1,13 +1,6 @@
 /**
  * @file Cut.h
- * @brief This file contains the definition of the Cut struct and CutStorage
- * class.
- *
- * This file contains the definition of the Cut struct, which represents a cut
- * in the optimization problem. The Cut struct holds information about a
- * specific cut, including its base set, neighbors, coefficients, multipliers,
- * and other properties. The CutStorage class manages the storage and operations
- * related to cuts in a solver.
+ * @brief Defines cut structures and storage for solver separation.
  *
  */
 #pragma once

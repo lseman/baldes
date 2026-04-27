@@ -1,3 +1,11 @@
+/*
+ * @file MIPHelper.h
+ * @brief Declares MIPHelper interfaces and types used by the BALDES solver.
+ *
+ * This file declares the MIPHelper interfaces and helper functions used by the BALDES solver.
+ *
+ */
+
 #pragma once
 #include <memory>
 

@@ -1,3 +1,11 @@
+/*
+ * @file Supernodal.h
+ * @brief Declares Supernodal interfaces and types used by the BALDES solver.
+ *
+ * This file declares the Supernodal interfaces and helper functions used by the BALDES solver.
+ *
+ */
+
 #ifndef SUPERNODAL_H
 #define SUPERNODAL_H
 

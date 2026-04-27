@@ -2,10 +2,6 @@
  * @file Constraint.h
  * @brief baldesCtr class implementation
  *
- * This file contains the implementation of the baldesCtr class.
- * The baldesCtr class represents a linear constraint in a mathematical optimization problem.
- * It encapsulates a linear expression, a right-hand side value, and a relational operator to define a constraint.
- *
  */
 
 #pragma once

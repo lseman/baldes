@@ -1,3 +1,11 @@
+/*
+ * @file AMD.h
+ * @brief Declares AMD interfaces and types used by the BALDES solver.
+ *
+ * This file declares the AMD interfaces and helper functions used by the BALDES solver.
+ *
+ */
+
 #include <execution>
 #include <stdexec/execution.hpp>
 #include <vector>

@@ -1,3 +1,11 @@
+/*
+ * @file BCP.cpp
+ * @brief Implements BCP functionality for the BALDES solver.
+ *
+ * This file implements the BCP logic used by the BALDES solver.
+ *
+ */
+
 #include "bnb/BCP.h"
 
 #include "bnb/Branching.h"

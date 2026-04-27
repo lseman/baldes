@@ -1,3 +1,11 @@
+/*
+ * @file BucketPSTEP.cpp
+ * @brief Implements BucketPSTEP functionality for the BALDES solver.
+ *
+ * This file implements the BucketPSTEP logic used by the BALDES solver.
+ *
+ */
+
 #include "Common.h"
 #include "Definitions.h"
 

@@ -1,16 +1,6 @@
 /**
  * @file Reader.h
- * @brief Header file for reading and processing problem instance data, specifically for Vehicle Routing Problem with
- * Time Windows (VRPTW).
- *
- * This file defines the `InstanceData` structure, which holds various data related to a problem instance, such as
- * distances, travel costs, demands, time windows, and other relevant information. It also includes several inline
- * functions for manipulating and processing instance data, such as reducing time windows, deleting arcs, and reading an
- * instance from a file.
- *
- *
- * This file is essential for handling the input and initialization of problem instances, and it ensures that the data
- * is formatted and processed correctly for further use in solving the VRPTW.
+ * @brief Reader utilities for parsing VRP instance data.
  *
  */
 

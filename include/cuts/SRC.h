@@ -1,19 +1,6 @@
 /**
  * @file SRC.h
- * @brief Definitions for handling cuts and optimizations for the Vehicle
- * Routing Problem with Time Windows (VRPTW).
- *
- * This header file contains the structure and class definitions required for
- * the limited memory rank-1 cuts, including the handling of cuts for
- * optimization algorithms used in the Vehicle Routing Problem with Time Windows
- * (VRPTW).
- *
- *
- * It also includes utility functions to compute coefficients, generate cuts,
- * and work with sparse models. The file facilitates the optimization process by
- * allowing computation of limited memory coefficients and the generation of
- * cuts via heuristics. The file makes use of Gurobi for handling constraints in
- * the solver.
+ * @brief Defines limited memory rank-1 cut handling for VRPTW.
  *
  */
 

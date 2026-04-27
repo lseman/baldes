@@ -1,10 +1,6 @@
 /**
  * @file HGS.h
- * @brief This file contains the definition of the HGS class.
- *
- * The HGS class is responsible for running a genetic algorithm to solve a given
- * problem instance. It initializes the necessary data structures, builds an
- * initial population, and executes the genetic algorithm.
+ * @brief Declares the Hybrid Genetic Search (HGS) solver class.
  *
  */
 #pragma once

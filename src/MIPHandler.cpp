@@ -1,3 +1,11 @@
+/*
+ * @file MIPHandler.cpp
+ * @brief Implements MIPHandler functionality for the BALDES solver.
+ *
+ * This file implements the MIPHandler logic used by the BALDES solver.
+ *
+ */
+
 #include "../include/miphandler/MIPHandler.h"
 
 #include <iostream>

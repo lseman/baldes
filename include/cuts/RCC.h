@@ -1,13 +1,6 @@
 /**
  * @file RCC.h
- * @brief Definitions for generating and separating Rounded Capacity Cuts (RCC) in the context of vehicle routing
- * problems.
- *
- * This header file contains the structure and function definitions required for separating Rounded Capacity Cuts (RCCs)
- * using Gurobi's optimization model. RCC separation is an important aspect of optimization algorithms, particularly
- * in vehicle routing problems where capacity constraints must be enforced.
- *
- * The file leverages Gurobi for optimization and constraint management.
+ * @brief Defines Rounded Capacity Cut separation for vehicle routing.
  *
  */
 

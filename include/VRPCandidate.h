@@ -2,13 +2,6 @@
  * @file VRPCandidate.h
  * @brief Header file for the VRPCandidate class
  *
- * This file contains the definition of the VRPCandidate class, which is used to represent a candidate for branching in
- * the branch-and-bound algorithm. The class contains fields to store the source and target nodes of the candidate, the
- * bound value, the bound type (upper or lower bound), and the type of the candidate (Vehicle, Node, or Edge). The class
- * also contains a variant to store different types of data based on the candidate type. The class also contains
- * functions to compute the hash value and equality operator for use in unordered containers, and a print function to
- * display the candidate information.
- *
  */
 #pragma once
 

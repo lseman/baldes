@@ -1,3 +1,11 @@
+/*
+ * @file main.cpp
+ * @brief Implements main functionality for the BALDES solver.
+ *
+ * This file implements the main logic used by the BALDES solver.
+ *
+ */
+
 #include <Eigen/Sparse>
 #include <iomanip>
 #include <iostream>

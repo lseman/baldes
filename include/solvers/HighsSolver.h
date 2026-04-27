@@ -1,3 +1,11 @@
+/*
+ * @file HighsSolver.h
+ * @brief Declares HighsSolver interfaces and types used by the BALDES solver.
+ *
+ * This file declares the HighsSolver interfaces and helper functions used by the BALDES solver.
+ *
+ */
+
 #pragma once
 #include "SolverInterface.h"
 #include <iostream>

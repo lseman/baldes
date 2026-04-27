@@ -1,24 +1,7 @@
 /**
  * @file BucketJump.h
  * @brief Header file for the Bucket Graph's arc elimination and jump arc
- * utilities in Vehicle Routing Problems (VRP).
  *
- * This file provides functions for managing and eliminating arcs in the Bucket
- * Graph based on cost thresholds and other resource constraints. It includes
- * utilities for updating the set of visited buckets, performing arc
- * elimination, and eliminating jump arcs that do not contribute to improving
- * solutions.
- *
- * Key components:
- * - `UpdateBucketsSet`: Updates the set of visited buckets and checks
- * feasibility for adding arcs to the set.
- * - `BucketArcElimination`: Eliminates non-improving arcs from the Bucket Graph
- * based on a threshold (theta).
- *
- * The utilities use template parameters for direction (`Forward` or `Backward`)
- * to handle the arc elimination process in both directions of the Bucket Graph.
- * It leverages parallel processing using Intel's Threading Building Blocks
- * (TBB) for efficient computation.
  */
 
 #pragma once

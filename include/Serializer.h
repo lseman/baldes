@@ -1,3 +1,11 @@
+/*
+ * @file Serializer.h
+ * @brief Declares Serializer interfaces and types used by the BALDES solver.
+ *
+ * This file declares the Serializer interfaces and helper functions used by the BALDES solver.
+ *
+ */
+
 #pragma once
 
 #include <concepts>

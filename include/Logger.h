@@ -1,3 +1,11 @@
+/*
+ * @file Logger.h
+ * @brief Declares Logger interfaces and types used by the BALDES solver.
+ *
+ * This file declares the Logger interfaces and helper functions used by the BALDES solver.
+ *
+ */
+
 #pragma once
 
 #include <fstream>

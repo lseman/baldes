@@ -2,13 +2,6 @@
  * @file BCP.h
  * @brief Header file for the BCP class.
  *
- * This file contains the definition of the BCP class, which represents the
- * Branch-Cut-and-Price (BCP) algorithm. The class provides methods to solve the
- * Vehicle Routing Problem (VRP) using a column generation approach with
- * stabilization and rank-1 cuts. The BCP algorithm iteratively solves the
- * problem by generating columns, adding cuts, and branching on the resulting
- * nodes.
- *
  */
 
 #pragma once

@@ -1,11 +1,6 @@
 /**
  * @file Label.h
- * @brief This file contains the definition of the Label struct and
- * LabelComparator class.
- *
- * The Label struct represents a label used in a solver, containing various
- * properties and methods related to the label. The LabelComparator class
- * provides a comparator for comparing two Label objects based on their cost.
+ * @brief Defines the Label state and comparator used by the solver.
  *
  */
 
