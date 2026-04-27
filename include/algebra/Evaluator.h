@@ -1,3 +1,11 @@
+/*
+ * @file Evaluator.h
+ * @brief Declares Evaluator interfaces and types used by the BALDES solver.
+ *
+ * This file declares the Evaluator interfaces and helper functions used by the BALDES solver.
+ *
+ */
+
 #pragma once
 #include <Eigen/Sparse>
 #include <Eigen/SparseCholesky>

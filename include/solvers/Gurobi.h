@@ -1,3 +1,11 @@
+/*
+ * @file Gurobi.h
+ * @brief Declares Gurobi interfaces and types used by the BALDES solver.
+ *
+ * This file declares the Gurobi interfaces and helper functions used by the BALDES solver.
+ *
+ */
+
 #pragma once
 #include <gurobi_c++.h>
 

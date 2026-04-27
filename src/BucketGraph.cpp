@@ -1,35 +1,7 @@
 /**
  * @file BucketGraph.cpp
- * @brief Implementation of the BucketGraph class and related structures for
- * solving vehicle routing problems (VRP).
+ * @brief Implements BucketGraph routines and support structures for VRP labeling.
  *
- * This file contains the implementation of the BucketGraph class, which is used
- * to manage and solve vehicle routing problems (VRP) using bucket-based graph
- * structures. The file includes the implementation of various constructors,
- * methods, and helper functions for managing arcs, labels, and buckets within
- * the graph.
- *
- * The main components of this file include:
- * - Arc: A structure representing an arc in the graph, with constructors for
- * different configurations.
- * - BucketArc: A structure representing an arc between buckets in the graph.
- * - JumpArc: A structure representing a jump arc between buckets in the graph.
- * - BucketGraph: The main class representing the bucket-based graph for solving
- * VRP, with methods for initialization, label computation, adjacency list
- * setup, and neighborhood calculations.
- *
- * The BucketGraph class provides methods for:
- * - Initializing the graph with nodes, time horizon, and bucket intervals.
- * - Computing new labels based on existing labels.
- * - Computing phi values for buckets in forward and backward directions.
- * - Calculating neighborhoods for nodes based on the number of closest nodes.
- * - Augmenting memories in the graph by identifying and forbidding cycles.
- * - Setting the adjacency list for the graph based on travel costs and resource
- * consumption.
- * - Common initialization tasks for setting up forward and backward buckets.
- *
- * The file also includes detailed documentation comments for each method,
- * explaining their purpose, parameters, and return values.
  */
 
 #include "bucket/BucketGraph.h"

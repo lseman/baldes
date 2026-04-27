@@ -1,3 +1,11 @@
+/*
+ * @file IPSolver.cpp
+ * @brief Implements IPSolver functionality for the BALDES solver.
+ *
+ * This file implements the IPSolver logic used by the BALDES solver.
+ *
+ */
+
 #include "Definitions.h"
 
 #define EIGEN_INITIALIZE_MATRICES_BY_ZERO

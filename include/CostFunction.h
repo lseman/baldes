@@ -1,3 +1,11 @@
+/*
+ * @file CostFunction.h
+ * @brief Declares CostFunction interfaces and types used by the BALDES solver.
+ *
+ * This file declares the CostFunction interfaces and helper functions used by the BALDES solver.
+ *
+ */
+
 #pragma once
 #include <functional>
 #include <tuple>

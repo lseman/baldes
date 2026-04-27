@@ -1,3 +1,11 @@
+/*
+ * @file BucketRes.h
+ * @brief Declares BucketRes interfaces and types used by the BALDES solver.
+ *
+ * This file declares the BucketRes interfaces and helper functions used by the BALDES solver.
+ *
+ */
+
 #pragma once
 #include "BucketGraph.h"
 #include "Common.h"

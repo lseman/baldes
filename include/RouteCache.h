@@ -1,3 +1,11 @@
+/*
+ * @file RouteCache.h
+ * @brief Declares RouteCache interfaces and types used by the BALDES solver.
+ *
+ * This file declares the RouteCache interfaces and helper functions used by the BALDES solver.
+ *
+ */
+
 #pragma once
 
 #include <ankerl/unordered_dense.h>

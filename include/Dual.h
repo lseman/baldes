@@ -1,3 +1,11 @@
+/*
+ * @file Dual.h
+ * @brief Declares Dual interfaces and types used by the BALDES solver.
+ *
+ * This file declares the Dual interfaces and helper functions used by the BALDES solver.
+ *
+ */
+
 #pragma once
 
 #include "Common.h"

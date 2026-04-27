@@ -1,3 +1,11 @@
+/*
+ * @file Stats.h
+ * @brief Declares Stats interfaces and types used by the BALDES solver.
+ *
+ * This file declares the Stats interfaces and helper functions used by the BALDES solver.
+ *
+ */
+
 #pragma once
 
 #include <algorithm>

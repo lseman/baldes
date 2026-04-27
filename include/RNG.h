@@ -1,3 +1,11 @@
+/*
+ * @file RNG.h
+ * @brief Declares RNG interfaces and types used by the BALDES solver.
+ *
+ * This file declares the RNG interfaces and helper functions used by the BALDES solver.
+ *
+ */
+
 #ifndef XOROSHIRO128PLUS_H
 #define XOROSHIRO128PLUS_H
 

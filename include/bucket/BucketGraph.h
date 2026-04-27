@@ -1,29 +1,7 @@
 /**
  * @file BucketGraph.h
- * @brief Defines the BucketGraph class and associated functionalities used in
- * solving vehicle routing problems (VRPs).
+ * @brief Defines the BucketGraph class and its bucket-based VRP labeling functionality.
  *
- * This file contains the definition of the BucketGraph class, a key component
- * used in bucket-based optimization for resource-constrained shortest path
- * problems (RCSPP) and vehicle routing problems (VRPs). The BucketGraph class
- * provides methods for arc generation, label management, dominance checking,
- * feasibility tests, and various operations related to the buckets in both
- * forward and backward directions. It also includes utilities for managing
- * neighborhood relationships, handling strongly connected components (SCCs),
- * and checking non-dominance of labels.
- *
- * Key Components:
- * - `LabelComparator`: A utility class for comparing Label objects based on
- * cost.
- * - `BucketGraph`: The primary class implementing bucket-based graph
- * management.
- * - Functions for parallel arc generation, feasibility checks, and node
- * visitation management.
- * - Support for multiple stages of optimization and various arc types.
- *
- * Additionally, this file includes specialized bitmap operations for tracking
- * visited and unreachable nodes, and provides multiple templates to handle
- * direction (`Forward`/`Backward`) and stage-specific optimization.
  */
 
 #pragma once
@@ -430,6 +408,14 @@ public:
 
     std::vector<int> dominance_checks_per_bucket;
     int              non_dominated_labels_per_bucket;
+    int              non_dominated_labels_per_bucket_bw = 0;
+
+    // Running average of dominance-checks-per-non-dominant-label across
+    // labeling passes. Drives considerRegenerate(): when the average
+    // exceeds REGEN_RATIO_THRESHOLD we halve bucket_interval, mirroring
+    // RouteOpt's regenerateGraphBucket trigger (BucketResizeFactor...).
+    double regen_ratio_sum   = 0.0;
+    int    regen_ratio_count = 0;
 
     // Interval tree to store bucket intervals
     std::vector<SplayTree> fw_node_interval_trees;
@@ -869,19 +855,31 @@ public:
 
     void updateSplit() {
         // Base thresholds and parameters for adjustments.
-        constexpr double BASE_IMBALANCE_THRESHOLD = 0.15; // Slightly lower base threshold.
-        constexpr double MIN_ADJUSTMENT_FACTOR    = 0.02;
-        constexpr double MAX_ADJUSTMENT_FACTOR    = 0.10;
-        constexpr double LEARNING_RATE_DECAY      = 0.99; // Decay factor for learning rate.
-        constexpr double EMA_ALPHA                = 0.1;  // Smoothing factor for EMA.
+        constexpr double BASE_IMBALANCE_THRESHOLD = 0.10; // Lower threshold —
+                                                          // work-weighted signal
+                                                          // is more sensitive
+                                                          // than raw counts.
+        constexpr double MIN_ADJUSTMENT_FACTOR = 0.02;
+        constexpr double MAX_ADJUSTMENT_FACTOR = 0.10;
+        constexpr double EMA_ALPHA             = 0.1; // Smoothing factor for EMA.
 
         // Static variables to persist state across calls.
-        static double learning_rate       = MAX_ADJUSTMENT_FACTOR;
         static double ema_imbalance_ratio = 0.0;
 
-        // Convert label counts to double for ratio computations.
-        const double fw_labels    = static_cast<double>(n_fw_labels);
-        const double bw_labels    = static_cast<double>(n_bw_labels);
+        // Prefer a work-weighted signal: total labels scanned during dominance
+        // walks captures both check count and per-bin depth, which is what the
+        // labeler actually pays for. Fall back to label counts when the
+        // profiler hasn't recorded data yet (first iteration / profiling off).
+        // Sum across stages because Stage 1-3 may be active early and Stage 4
+        // dominates later iterations.
+        uint64_t fw_work = 0, bw_work = 0;
+        for (size_t i = 0; i < PROFILE_STAGE_COUNT; ++i) {
+            fw_work += profile_inner_bin_scan_labels_fw[i];
+            bw_work += profile_inner_bin_scan_labels_bw[i];
+        }
+        const bool   have_work_signal = (fw_work + bw_work) > 0;
+        const double fw_labels    = have_work_signal ? static_cast<double>(fw_work) : static_cast<double>(n_fw_labels);
+        const double bw_labels    = have_work_signal ? static_cast<double>(bw_work) : static_cast<double>(n_bw_labels);
         const double total_labels = fw_labels + bw_labels;
 
         // Skip adjustment if too few labels exist.
@@ -907,14 +905,12 @@ public:
             const double adjustment_factor =
                 MIN_ADJUSTMENT_FACTOR + (MAX_ADJUSTMENT_FACTOR - MIN_ADJUSTMENT_FACTOR) * severity;
 
-            // Decay the learning rate.
-            learning_rate *= LEARNING_RATE_DECAY;
-
             // Compute resource range based on the main resource.
             const double resource_range = R_max[options.main_resources[0]] - R_min[options.main_resources[0]];
 
-            // Base adjustment scales with the resource range and learning rate.
-            const double base_adjustment = adjustment_factor * resource_range * learning_rate;
+            // Base adjustment scales with the resource range; no decay so
+            // adjustments stay aggressive when imbalance persists late.
+            const double base_adjustment = adjustment_factor * resource_range;
 
             // Adjust each split position in q_star.
             for (size_t i = 0; i < q_star.size(); ++i) {
@@ -940,33 +936,61 @@ public:
 
             // Log adjustments if the base adjustment is significant.
             if (std::abs(base_adjustment) > resource_range * 0.05) {
-                print_info("Split adjustment: imbalance={:.3f}, adjustment={:.3f}, "
-                           "learning_rate={:.3f}\n",
-                           ema_imbalance_ratio, base_adjustment, learning_rate);
+                print_info("Split adjustment: imbalance={:.3f}, adjustment={:.3f}\n", ema_imbalance_ratio,
+                           base_adjustment);
             }
         }
     }
 
     std::vector<std::vector<int>> topHeurRoutes;
 
-    bool updateStepSize() {
-        bool updated = false;
-        if (bucket_interval >= 100) { return false; }
-        // compute the mean of dominance_checks_per_bucket
-        double mean_dominance_checks = 0.0;
-        for (size_t i = 0; i < dominance_checks_per_bucket.size(); ++i) {
-            mean_dominance_checks += dominance_checks_per_bucket[i];
-        }
-        auto step_calc = mean_dominance_checks / non_dominated_labels_per_bucket;
-        if (step_calc > 100) {
-            // redefine_counter = 0;
-            print_info("Increasing bucket interval to {}\n", bucket_interval + 25);
-            bucket_interval = bucket_interval + 25;
-            redefine(bucket_interval);
-            updated = true;
-            fixed   = false;
-        }
-        return updated;
+    // Mirrors RouteOpt's considerRegenerateBucketGraph. After each labeling
+    // pass we sample dominance_checks / non_dominant_labels and fold it into a
+    // running average. When the average exceeds REGEN_RATIO_THRESHOLD we halve
+    // bucket_interval (== RouteOpt's step_size /= 2), which doubles the bucket
+    // count and gives finer per-bin partitioning to relieve crowding.
+    //
+    // Guards mirror RouteOpt:
+    //   - need bucket_interval / 2 >= 1 (can still refine)
+    //   - need bucket_interval even (clean halving)
+    //   - need total bucket count below REGEN_BUCKETS_CAP (don't explode)
+    bool considerRegenerate() {
+        constexpr double REGEN_RATIO_THRESHOLD = 800.0;  // RouteOpt's value.
+        constexpr int    REGEN_BUCKETS_CAP     = 200000; // ~10k arcs/vertex
+                                                         // analog for our scale.
+
+        // Sample the most recent labeling pass: total dominance scans across
+        // all forward buckets, divided by non-dominant label count summed over
+        // both directions. Avoids div-by-zero when the pass produced nothing.
+        double total_checks = 0.0;
+        for (int v : dominance_checks_per_bucket) total_checks += v;
+        const int non_dom_total = non_dominated_labels_per_bucket + non_dominated_labels_per_bucket_bw;
+        if (non_dom_total <= 0) return false;
+        const double pass_ratio = total_checks / static_cast<double>(non_dom_total);
+
+        // Update running average.
+        regen_ratio_sum += pass_ratio;
+        ++regen_ratio_count;
+        const double avg_ratio = regen_ratio_sum / regen_ratio_count;
+
+        if (avg_ratio <= REGEN_RATIO_THRESHOLD) return false;
+
+        // Guards.
+        if (bucket_interval <= 1 || (bucket_interval & 1) != 0) return false;
+        const int total_buckets = static_cast<int>(fw_buckets.size() + bw_buckets.size());
+        if (total_buckets >= REGEN_BUCKETS_CAP) return false;
+
+        const int new_interval = bucket_interval / 2;
+        print_info("Halving bucket_interval {} -> {} (avg dom-check ratio {:.1f})\n", bucket_interval, new_interval,
+                   avg_ratio);
+        bucket_interval = new_interval;
+        redefine(bucket_interval);
+
+        // Reset the running average so we judge the new partition on its own.
+        regen_ratio_sum   = 0.0;
+        regen_ratio_count = 0;
+        fixed             = false;
+        return true;
     }
     template <Direction D>
     void add_arc(int from_bucket, int to_bucket, const std::vector<double> &res_inc, double cost_inc);

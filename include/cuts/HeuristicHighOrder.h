@@ -1,3 +1,11 @@
+/*
+ * @file HeuristicHighOrder.h
+ * @brief Declares HeuristicHighOrder interfaces and types used by the BALDES solver.
+ *
+ * This file declares the HeuristicHighOrder interfaces and helper functions used by the BALDES solver.
+ *
+ */
+
 #pragma once
 #include <algorithm>
 #include <limits>

@@ -1,3 +1,11 @@
+/*
+ * @file Original.cpp
+ * @brief Implements Original functionality for the BALDES solver.
+ *
+ * This file implements the Original logic used by the BALDES solver.
+ *
+ */
+
 #include "Definitions.h"
 #include "Reader.h"
 #include "gurobi_c++.h"

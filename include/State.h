@@ -1,3 +1,11 @@
+/*
+ * @file State.h
+ * @brief Declares State interfaces and types used by the BALDES solver.
+ *
+ * This file declares the State interfaces and helper functions used by the BALDES solver.
+ *
+ */
+
 
 #pragma once
 

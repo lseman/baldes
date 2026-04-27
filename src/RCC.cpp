@@ -1,3 +1,11 @@
+/*
+ * @file RCC.cpp
+ * @brief Implements RCC functionality for the BALDES solver.
+ *
+ * This file implements the RCC logic used by the BALDES solver.
+ *
+ */
+
 #include "RCC.h"
 
 #include "Cut.h"

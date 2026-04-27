@@ -1,3 +1,11 @@
+/*
+ * @file POPMUSIC.h
+ * @brief Declares POPMUSIC interfaces and types used by the BALDES solver.
+ *
+ * This file declares the POPMUSIC interfaces and helper functions used by the BALDES solver.
+ *
+ */
+
 #pragma once
 
 #include "HGS.h"

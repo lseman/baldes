@@ -2,12 +2,6 @@
  * @file Node.h
  * @brief Node class implementation
  *
- * This file contains the implementation of the Node class.
- * The Node class is used to represent a node in a tree structure.
- * Each node can have child nodes, and contains state information, objective
- * value, bound value, tree depth, and a unique identifier. It also provides
- * methods for generating a unique identifier and creating new child nodes.
- *
  */
 #pragma once
 

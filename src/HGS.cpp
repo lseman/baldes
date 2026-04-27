@@ -1,25 +1,7 @@
 /**
- * @file VRPTW.cpp
- * @brief Main implementation for solving the Vehicle Routing Problem with Time Windows (VRPTW).
+ * @file HGS.cpp
+ * @brief Main entry point for the Hybrid Genetic Search (HGS) solver.
  *
- * This file contains the implementation of the main function and supporting functions for solving the
- * Vehicle Routing Problem with Time Windows (VRPTW). The VRPTW class is used to manage instance data,
- * initialize the Restricted Master Problem (RMP), perform heuristic-based route generation, and apply column
- * generation to iteratively solve the problem.
- *
- * The following steps are carried out:
- * 1. Read the VRPTW instance and parse the problem data.
- * 2. Generate initial solutions using heuristic methods.
- * 3. Convert initial routes into the column generation format.
- * 4. Initialize the Gurobi model and the Restricted Master Problem (RMP).
- * 5. Apply column generation with stabilization to solve the problem iteratively.
- *
- * The implementation relies on the Gurobi optimizer for solving linear programming relaxations,
- * and uses various heuristics such as Iterated Local Search and Savings Heuristic to generate initial solutions.
- *
- * @param argc The number of command line arguments.
- * @param argv The array of command line arguments.
- * @return int Returns 0 on successful execution.
  */
 
 // #include "../third_party/lkh/include/lkh_tsp.hpp"

@@ -1,3 +1,11 @@
+/*
+ * @file NumericUtils.h
+ * @brief Declares NumericUtils interfaces and types used by the BALDES solver.
+ *
+ * This file declares the NumericUtils interfaces and helper functions used by the BALDES solver.
+ *
+ */
+
 #pragma once
 
 // define numericutils namespace that have eps, comparison within threshold, etc

@@ -1,3 +1,11 @@
+/*
+ * @file LDLT.h
+ * @brief Declares LDLT interfaces and types used by the BALDES solver.
+ *
+ * This file declares the LDLT interfaces and helper functions used by the BALDES solver.
+ *
+ */
+
 #ifndef EIGEN_CUSTOM_SIMPLICIAL_LDLT_H
 #define EIGEN_CUSTOM_SIMPLICIAL_LDLT_H
 

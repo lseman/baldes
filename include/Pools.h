@@ -2,13 +2,6 @@
  * @file Pools.h
  * @brief Defines classes to manage pools of paths and labels.
  *
- * This file defines the SchrodingerPool and LabelPool classes, which manage
- * pools of paths and labels, respectively. The SchrodingerPool class manages a
- * collection of paths with a limited lifespan, computes reduced costs, and
- * filters paths based on their reduced costs. The LabelPool class manages a
- * pool of Label objects, providing methods to acquire and release labels from
- * the pool, as well as resetting the pool to its initial state.
- *
  */
 
 #pragma once

@@ -1,13 +1,6 @@
 /**
- * @file
- * @brief This file contains the implementation of the Minimum Spanning Tree
- * (MST) algorithm for clustering.
- *
- * This file contains the implementation of the Minimum Spanning Tree (MST)
- * algorithm for clustering. The MST algorithm is used to find the minimum
- * spanning tree of a graph and then cluster the nodes based on the edges of the
- * MST. The file includes the implementation of the MST class, which computes
- * the MST using Prim's algorithm and performs clustering based on edge weights.
+ * @file MST.h
+ * @brief Implements the Minimum Spanning Tree clustering algorithm.
  *
  */
 #pragma once

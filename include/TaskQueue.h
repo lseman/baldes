@@ -1,3 +1,11 @@
+/*
+ * @file TaskQueue.h
+ * @brief Declares TaskQueue interfaces and types used by the BALDES solver.
+ *
+ * This file declares the TaskQueue interfaces and helper functions used by the BALDES solver.
+ *
+ */
+
 #pragma once
 #include <algorithm>
 #include <condition_variable>

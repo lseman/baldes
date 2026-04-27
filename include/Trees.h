@@ -1,14 +1,7 @@
 /**
  * @file Trees.h
  * @brief Header file containing the implementation of various tree structures
- * used for interval and multidimensional range queries.
  *
- * The classes provide functionalities for inserting intervals, searching for
- * overlapping intervals, and printing the tree structures for debugging
- * purposes.
- *
- * @note The implementation uses various helper functions for tree operations
- * such as insertion, searching, and splay operations.
  */
 #pragma once
 #include "Definitions.h"

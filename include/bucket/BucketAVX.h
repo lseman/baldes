@@ -1,6 +1,7 @@
 /**
  * @file BucketAVX.h
  * @brief Optimized SIMD-based dominance check for label comparison.
+ *
  */
 #pragma once
 

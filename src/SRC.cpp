@@ -1,16 +1,6 @@
 /**
  * @file SRC.cpp
  * @brief Implementation of functions and classes for solving VRP problems using
- * Limited Memory Rank-1 Cuts.
- *
- * This file contains the implementation of various functions and classes used
- * for solving Vehicle Routing Problems (VRP) using Limited Memory Rank-1 Cuts.
- * The main functionalities include computing unique cut keys, adding cuts to
- * storage, separating solution vectors into cuts, and generating cut
- * coefficients.
- *
- * The implementation leverages parallel processing using thread pools and
- * schedulers to efficiently handle large datasets and complex computations.
  *
  */
 

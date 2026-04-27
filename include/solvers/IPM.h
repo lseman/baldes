@@ -1,3 +1,11 @@
+/*
+ * @file IPM.h
+ * @brief Declares IPM interfaces and types used by the BALDES solver.
+ *
+ * This file declares the IPM interfaces and helper functions used by the BALDES solver.
+ *
+ */
+
 #pragma once
 #include "../include/ipm/IPSolver.h"
 #include "Definitions.h"

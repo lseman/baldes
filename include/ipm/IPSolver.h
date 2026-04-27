@@ -1,3 +1,11 @@
+/*
+ * @file IPSolver.h
+ * @brief Declares IPSolver interfaces and types used by the BALDES solver.
+ *
+ * This file declares the IPSolver interfaces and helper functions used by the BALDES solver.
+ *
+ */
+
 #pragma once
 
 #include <Eigen/Dense>

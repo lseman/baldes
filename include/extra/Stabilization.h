@@ -1,16 +1,6 @@
 /**
  * @file Stabilization.h
  * @brief Defines the Stabilization class for dual stabilization in column
- * generation.
- *
- * This file implements the Stabilization class, which is responsible for
- * handling the stabilization process during column generation in large-scale
- * optimization problems, such as vehicle routing and resource-constrained
- * shortest path problems (RCSPP).
- *
- * The Stabilization class is crucial for improving the convergence of column
- * generation algorithms by stabilizing the dual values and avoiding large
- * oscillations in the dual space.
  *
  */
 

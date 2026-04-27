@@ -1,3 +1,11 @@
+/*
+ * @file PSTEP.h
+ * @brief Declares PSTEP interfaces and types used by the BALDES solver.
+ *
+ * This file declares the PSTEP interfaces and helper functions used by the BALDES solver.
+ *
+ */
+
 #pragma once
 
 #include "Common.h"

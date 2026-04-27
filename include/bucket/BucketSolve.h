@@ -1,25 +1,7 @@
 /**
  * @file BucketSolve.h
- * @brief Defines the BucketGraph class and its solving methods for optimization
- * problems.
+ * @brief Defines the BucketGraph solving methods for bucket-based optimization.
  *
- * This file contains the implementation of the `BucketGraph` class, which
- * solves a multi-stage bi-labeling optimization problem using bucket graphs.
- * The `BucketGraph` class handles:
- *
- * - Solving bucket graph optimization problems using multi-stage labeling
- * algorithms.
- * - Adaptive handling of terminal time adjustments based on label distribution.
- * - Adaptive stage transitions to refine solutions based on inner objectives
- * and iteration counts.
- * - Integration of different arc types (standard, jump, fixed) during label
- * extensions.
- * - Dual management and RCC separation for handling advanced routing
- * optimization constraints.
- *
- * The `BucketGraph` class is designed to solve complex routing problems,
- * leveraging multiple stages, parallelism, and adaptive heuristics to optimize
- * paths while respecting resource constraints.
  */
 
 #pragma once
@@ -116,10 +98,15 @@ inline std::vector<Label *> BucketGraph::solve(bool trigger) {
         // Standard Stage 4 processing.
         paths = bi_labeling_algorithm<Stage::Four>();
         // inner_obj = paths[0]->cost; // (if available)
+
+        // RouteOpt-style adaptive bin refinement: after each Stage 4 pass we
+        // sample dominance-checks-per-non-dominant-label; if the running
+        // average exceeds the threshold, halve bucket_interval. Safe here
+        // because paths only retain labels and parent chains, not the bucket
+        // layout that redefine() rebuilds.
+
         bool rollback = false;
-        if (status != Status::Rollback) {
-            // rollback = shallUpdateStep();
-        }
+        if (status != Status::Rollback) { rollback = considerRegenerate(); }
         if (rollback) {
             status = Status::Rollback;
             return paths;
@@ -489,7 +476,11 @@ std::vector<double> BucketGraph::labeling_algorithm() {
 
                         if (!dominated) {
                             if (profile_labeling) profile_record_non_dominated_label(D, S);
-                            if (D == Direction::Forward) { ++non_dominated_labels_per_bucket; }
+                            if constexpr (D == Direction::Forward) {
+                                ++non_dominated_labels_per_bucket;
+                            } else {
+                                ++non_dominated_labels_per_bucket_bw;
+                            }
                             ++n_labels;
 #ifdef SORTED_LABELS
                             mother_bucket.add_sorted_label(new_label);

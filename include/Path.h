@@ -1,6 +1,7 @@
 /**
  * @file Path.h
  * @brief Memory-optimized implementation of the Path struct.
+ *
  */
 
 #pragma once

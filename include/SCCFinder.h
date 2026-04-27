@@ -2,14 +2,6 @@
  * @file SCCFinder.h
  * @brief Header file for the SCC class, implementing Tarjan's algorithm to find Strongly Connected Components (SCCs).
  *
- * This file defines the SCC class, which is used to find Strongly Connected Components (SCCs) in a directed graph.
- * The graph is represented using an adjacency list, and the class provides several methods to add edges, convert from
- * other graph representations, find SCCs using Tarjan's algorithm, determine the topological order of SCCs, and export
- * the graph and its SCCs to a DOT file for visualization.
- *
- * The SCC class uses an internal stack, low-link values, and vertex indices to efficiently identify SCCs in a graph.
- * It also supports exporting the results in a format suitable for visualization using Graphviz.
- *
  */
 
 #pragma once

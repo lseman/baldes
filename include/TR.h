@@ -1,3 +1,11 @@
+/*
+ * @file TR.h
+ * @brief Declares TR interfaces and types used by the BALDES solver.
+ *
+ * This file declares the TR interfaces and helper functions used by the BALDES solver.
+ *
+ */
+
 #pragma once
 
 #include <algorithm>

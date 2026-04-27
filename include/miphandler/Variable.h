@@ -2,10 +2,6 @@
  * @file Variable.h
  * @brief baldesVar class implementation
  *
- * This file contains the implementation of the baldesVar class.
- * The baldesVar class represents a decision variable in a mathematical optimization problem.
- * It encapsulates the name, type, bounds, and objective coefficient of a decision variable.
- *
  */
 #pragma once
 #include <memory>

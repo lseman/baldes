@@ -2,10 +2,6 @@
  * @file Definitions.h
  * @brief Header file containing definitions and structures for the solver.
  *
- * This file includes various definitions, enumerations, and structures used in
- * the solver. It also provides documentation for each structure and its
- * members, along with methods and operators associated with them.
- *
  */
 #pragma once
 
