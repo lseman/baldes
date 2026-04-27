@@ -124,17 +124,10 @@ public:
     LimitedMemoryRank1Cuts(std::vector<VRPNode> &nodes);
 
     LimitedMemoryRank1Cuts(const LimitedMemoryRank1Cuts &other)
-        : rp(other.rp),
-          last_path_idx(other.last_path_idx),
-          vertex_route_map(other.vertex_route_map),
-          cutStorage(other.cutStorage),
-          allPaths(other.allPaths),
-          labels(other.labels),
-          labels_counter(other.labels_counter),
-          row_indices_map(other.row_indices_map),
-          nodes(other.nodes),
-          cutType(other.cutType),
-          tasks(other.tasks) {}
+        : rp(other.rp), last_path_idx(other.last_path_idx), vertex_route_map(other.vertex_route_map),
+          cutStorage(other.cutStorage), allPaths(other.allPaths), labels(other.labels),
+          labels_counter(other.labels_counter), row_indices_map(other.row_indices_map), nodes(other.nodes),
+          cutType(other.cutType), tasks(other.tasks) {}
 
     void setDuals(const std::vector<double> &duals) {
         // print nodes.size

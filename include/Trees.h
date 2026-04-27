@@ -24,40 +24,29 @@
 constexpr double EPSILON = 1e-3;
 
 class TreeNode {
-   public:
+public:
     // Lower and upper bounds for each dimension.
     // If the dimension is fixed, consider using std::array<double, N> for
     // better performance.
     std::vector<double> low;
     std::vector<double> high;
-    int bucket_index;  // Bucket index for this node.
-    TreeNode* left;
-    TreeNode* right;
-    TreeNode* parent;
+    int                 bucket_index; // Bucket index for this node.
+    TreeNode           *left;
+    TreeNode           *right;
+    TreeNode           *parent;
 
-    TreeNode(const std::vector<double>& low, const std::vector<double>& high,
-             int bucket_index)
-        : low(low),
-          high(high),
-          bucket_index(bucket_index),
-          left(nullptr),
-          right(nullptr),
-          parent(nullptr) {}
+    TreeNode(const std::vector<double> &low, const std::vector<double> &high, int bucket_index)
+        : low(low), high(high), bucket_index(bucket_index), left(nullptr), right(nullptr), parent(nullptr) {}
 
     // Utility function to check if two doubles are nearly equal.
-    inline bool nearlyEqual(double a, double b,
-                            double epsilon = EPSILON) const {
-        return std::fabs(a - b) < epsilon;
-    }
+    inline bool nearlyEqual(double a, double b, double epsilon = EPSILON) const { return std::fabs(a - b) < epsilon; }
 
     // Returns true if the point is inside the hyper-rectangle defined by [low,
     // high].
-    inline bool contains(const std::vector<double>& point) const {
+    inline bool contains(const std::vector<double> &point) const {
         for (size_t i = 0; i < low.size(); ++i) {
             // Allow a little wiggle room with EPSILON.
-            if (point[i] < low[i] - EPSILON || point[i] > high[i] + EPSILON) {
-                return false;
-            }
+            if (point[i] < low[i] - EPSILON || point[i] > high[i] + EPSILON) { return false; }
         }
         return true;
     }
@@ -65,14 +54,12 @@ class TreeNode {
     // Compares the current node's interval with a point.
     // Here we use a lexicographical comparison on the high bounds.
     // Adjust this function if you need a different comparison semantics.
-    inline bool is_less_than(const std::vector<double>& point) const {
+    inline bool is_less_than(const std::vector<double> &point) const {
         // Use lexicographical comparison but with an epsilon tolerance.
         for (size_t i = 0; i < high.size(); ++i) {
-            if (!nearlyEqual(high[i], point[i])) {
-                return high[i] < point[i];
-            }
+            if (!nearlyEqual(high[i], point[i])) { return high[i] < point[i]; }
         }
-        return false;  // They are nearly equal.
+        return false; // They are nearly equal.
     }
 };
 
@@ -90,27 +77,25 @@ class TreeNode {
  *
  */
 class SplayTree {
-   private:
-    TreeNode* root;
+private:
+    TreeNode *root;
 
     // Rotate x up in the tree.
-    inline void rotate(TreeNode* x) {
-        TreeNode* p = x->parent;
-        TreeNode* g = p->parent;
-        bool is_left = (p->left == x);
+    inline void rotate(TreeNode *x) {
+        TreeNode *p       = x->parent;
+        TreeNode *g       = p->parent;
+        bool      is_left = (p->left == x);
 
         // Adjust parent's child pointer.
-        TreeNode* child = is_left ? x->right : x->left;
+        TreeNode *child = is_left ? x->right : x->left;
         if (is_left) {
-            p->left = child;
+            p->left  = child;
             x->right = p;
         } else {
             p->right = child;
-            x->left = p;
+            x->left  = p;
         }
-        if (child) {
-            child->parent = p;
-        }
+        if (child) { child->parent = p; }
 
         // Update parent pointers.
         x->parent = g;
@@ -127,10 +112,10 @@ class SplayTree {
     }
 
     // Splay x to the root.
-    inline void splay(TreeNode* x) {
+    inline void splay(TreeNode *x) {
         while (x->parent) {
-            TreeNode* p = x->parent;
-            TreeNode* g = p->parent;
+            TreeNode *p = x->parent;
+            TreeNode *g = p->parent;
             if (!g) {
                 // Zig step.
                 rotate(x);
@@ -149,7 +134,7 @@ class SplayTree {
 
     // Recursively destroy the tree. For very deep trees, an iterative version
     // might be preferred.
-    void destroyTree(TreeNode* node) {
+    void destroyTree(TreeNode *node) {
         if (node) {
             destroyTree(node->left);
             destroyTree(node->right);
@@ -158,28 +143,25 @@ class SplayTree {
     }
 
     // Recursively copy the tree.
-    TreeNode* copyTree(TreeNode* node, TreeNode* parent = nullptr) {
+    TreeNode *copyTree(TreeNode *node, TreeNode *parent = nullptr) {
         if (!node) return nullptr;
-        TreeNode* newNode =
-            new TreeNode(node->low, node->high, node->bucket_index);
-        newNode->parent = parent;
-        newNode->left = copyTree(node->left, newNode);
-        newNode->right = copyTree(node->right, newNode);
+        TreeNode *newNode = new TreeNode(node->low, node->high, node->bucket_index);
+        newNode->parent   = parent;
+        newNode->left     = copyTree(node->left, newNode);
+        newNode->right    = copyTree(node->right, newNode);
         return newNode;
     }
 
-   public:
+public:
     SplayTree() : root(nullptr) {}
 
     // Copy constructor.
-    SplayTree(const SplayTree& other) : root(nullptr) {
-        if (other.root) {
-            root = copyTree(other.root);
-        }
+    SplayTree(const SplayTree &other) : root(nullptr) {
+        if (other.root) { root = copyTree(other.root); }
     }
 
     // Copy assignment operator.
-    SplayTree& operator=(const SplayTree& other) {
+    SplayTree &operator=(const SplayTree &other) {
         if (this != &other) {
             destroyTree(root);
             root = other.root ? copyTree(other.root) : nullptr;
@@ -191,9 +173,9 @@ class SplayTree {
     ~SplayTree() { destroyTree(root); }
 
     // Find a node whose interval contains the given point.
-    TreeNode* find(const std::vector<double>& point) {
-        TreeNode* curr = root;
-        TreeNode* last = nullptr;
+    TreeNode *find(const std::vector<double> &point) {
+        TreeNode *curr = root;
+        TreeNode *last = nullptr;
         while (curr) {
             last = curr;
             if (curr->contains(point)) {
@@ -207,14 +189,12 @@ class SplayTree {
         return nullptr;
     }
 
-    TreeNode* find_without_splay(const std::vector<double>& point) {
-        TreeNode* curr = root;
-        TreeNode* last = nullptr;
+    TreeNode *find_without_splay(const std::vector<double> &point) {
+        TreeNode *curr = root;
+        TreeNode *last = nullptr;
         while (curr) {
             last = curr;
-            if (curr->contains(point)) {
-                return curr;
-            }
+            if (curr->contains(point)) { return curr; }
             // Move right if point is greater, else left.
             curr = curr->is_less_than(point) ? curr->right : curr->left;
         }
@@ -222,29 +202,28 @@ class SplayTree {
     }
 
     // Query the bucket index for the point.
-    int query(const std::vector<double>& point) {
-        TreeNode* node = find(point);
+    int query(const std::vector<double> &point) {
+        TreeNode *node = find(point);
         return node ? node->bucket_index : -1;
     }
 
-    int queryStatic(const std::vector<double>& point) {
-        TreeNode* node = find_without_splay(point);
+    int queryStatic(const std::vector<double> &point) {
+        TreeNode *node = find_without_splay(point);
         return node ? node->bucket_index : -1;
     }
 
     // Insert a new interval into the splay tree.
-    void insert(const std::vector<double>& low, const std::vector<double>& high,
-                int bucket_index) {
+    void insert(const std::vector<double> &low, const std::vector<double> &high, int bucket_index) {
         if (!root) {
             root = new TreeNode(low, high, bucket_index);
             return;
         }
 
-        TreeNode* curr = root;
+        TreeNode *curr = root;
         while (true) {
             if (low < curr->low) {
                 if (!curr->left) {
-                    curr->left = new TreeNode(low, high, bucket_index);
+                    curr->left         = new TreeNode(low, high, bucket_index);
                     curr->left->parent = curr;
                     splay(curr->left);
                     break;
@@ -252,7 +231,7 @@ class SplayTree {
                 curr = curr->left;
             } else if (low > curr->low) {
                 if (!curr->right) {
-                    curr->right = new TreeNode(low, high, bucket_index);
+                    curr->right         = new TreeNode(low, high, bucket_index);
                     curr->right->parent = curr;
                     splay(curr->right);
                     break;
@@ -260,7 +239,7 @@ class SplayTree {
                 curr = curr->right;
             } else {
                 splay(curr);
-                break;  // Duplicate interval, do nothing.
+                break; // Duplicate interval, do nothing.
             }
         }
     }
@@ -268,13 +247,12 @@ class SplayTree {
     // Utility function to print the tree.
     void print() const { printTree(root, 0); }
 
-   private:
+private:
     // Recursively print the tree in-order with indentation based on depth.
-    void printTree(const TreeNode* node, int depth) const {
+    void printTree(const TreeNode *node, int depth) const {
         if (!node) return;
         printTree(node->right, depth + 1);
-        std::cout << std::string(depth * 2, ' ') << "Bucket "
-                  << node->bucket_index << '\n';
+        std::cout << std::string(depth * 2, ' ') << "Bucket " << node->bucket_index << '\n';
         printTree(node->left, depth + 1);
     }
 };

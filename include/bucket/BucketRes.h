@@ -83,16 +83,12 @@ inline bool process_mtw_resource(double &new_resource, double initial_resource, 
     if constexpr (D == Direction::Forward) {
         for (size_t i = 0; i < theNode.mtw_lb.size(); ++i) {
             new_resource = std::max(initial_resource + increment, theNode.mtw_lb[i]);
-            if (numericutils::lte(new_resource, theNode.mtw_ub[i])) {
-                return true;
-            }
+            if (numericutils::lte(new_resource, theNode.mtw_ub[i])) { return true; }
         }
     } else {
         for (size_t i = 0; i < theNode.mtw_ub.size(); ++i) {
             new_resource = std::min(initial_resource - increment, theNode.mtw_ub[i]);
-            if (numericutils::gte(new_resource, theNode.mtw_lb[i])) {
-                return true;
-            }
+            if (numericutils::gte(new_resource, theNode.mtw_lb[i])) { return true; }
         }
     }
     return false;

@@ -143,13 +143,14 @@ using Cuts = std::vector<Cut>;
  */
 
 struct ActiveCutInfo {
-    size_t     index;      // Original index in cuts vector
+    size_t     index;      // Compact pricing-active index
+    size_t     cut_index;  // Original index in cuts vector
     const Cut *cut_ptr;    // Pointer to the cut
     double     dual_value; // Cached dual value
     CutType    type;       // Type of the cut
 
-    ActiveCutInfo(size_t idx, const Cut *ptr, double dual, CutType type)
-        : index(idx), cut_ptr(ptr), dual_value(dual), type(type) {}
+    ActiveCutInfo(size_t active_idx, size_t cut_idx, const Cut *ptr, double dual, CutType type)
+        : index(active_idx), cut_index(cut_idx), cut_ptr(ptr), dual_value(dual), type(type) {}
 
     bool isSRCset(int i, int j) const {
         return cut_ptr->baseSet[i / 64] & (1ULL << (i % 64)) && cut_ptr->baseSet[j / 64] & (1ULL << (j % 64));
@@ -158,8 +159,16 @@ struct ActiveCutInfo {
 };
 class CutStorage {
 public:
-    int  latest_column = 0;
-    bool busy          = false;
+    int                     latest_column      = 0;
+    bool                    busy               = false;
+    static constexpr double SRC_DUAL_TOLERANCE = 1e-6;
+
+    struct SRCNodeUpdate {
+        uint16_t active_idx;
+        uint16_t add;
+        uint16_t den;
+        double   dual;
+    };
 
     struct SegmentMasks {
         constexpr static size_t            n_segments      = (N_SIZE + 63) / 64;
@@ -252,6 +261,9 @@ public:
 
     auto &getSegmentMasks() { return segment_masks; }
 
+    const auto &getSRCNodeUpdates(int node_id) const noexcept { return src_node_updates[node_id]; }
+    const auto &getSRCNodeClears(int node_id) const noexcept { return src_node_clears[node_id]; }
+
     // Access a cut by index
     Cut &operator[](std::size_t index) {
         assert(index < cuts.size());
@@ -267,6 +279,9 @@ public:
         cutMaster_to_cut_map.clear();
         indexCuts.clear();
         SRCDuals.clear();
+        active_cuts.clear();
+        segment_masks.precompute(active_cuts);
+        precomputeSRCNodeTables();
     }
 
     // Get a cut by index
@@ -554,28 +569,61 @@ private:
 
     ankerl::unordered_dense::map<std::size_t, std::vector<int>> indexCuts;   // Additional index for cuts (if needed)
     std::vector<ActiveCutInfo>                                  active_cuts; // Cuts with positive duals
+    std::array<std::vector<SRCNodeUpdate>, N_SIZE>              src_node_updates;
+    std::array<std::vector<uint16_t>, N_SIZE>                   src_node_clears;
 
-    void updateActiveCuts() {
-        // Clear existing active cuts and pre-allocate memory based on
-        // the total number of cuts.
-        active_cuts.clear();
-        active_cuts.reserve(cuts.size());
+    void precomputeSRCNodeTables() {
+        for (auto &updates : src_node_updates) { updates.clear(); }
+        for (auto &clears : src_node_clears) { clears.clear(); }
 
-        // Iterate through all cuts and add those with significant dual
-        // values.
-        for (size_t i = 0; i < cuts.size(); ++i) {
-            if (i < SRCDuals.size() && std::abs(SRCDuals[i]) > 0) {
-                // if (cuts[i].p.num.size() == 1) {
-                // continue;
-                // }
-                // Emplace active cut with its index, pointer to the
-                // cut, dual value, and type.
-                active_cuts.emplace_back(i, &cuts[i], SRCDuals[i], cuts[i].type);
+        for (int node_id = 0; node_id < N_SIZE; ++node_id) {
+            const size_t   segment = static_cast<size_t>(node_id) >> 6;
+            const uint64_t bit     = 1ULL << (node_id & 63);
+
+            auto &updates = src_node_updates[node_id];
+            auto &clears  = src_node_clears[node_id];
+            updates.reserve(active_cuts.size());
+            clears.reserve(active_cuts.size());
+
+            for (const auto &active_cut : active_cuts) {
+                const auto &cut = *active_cut.cut_ptr;
+                if (!(cut.neighbors[segment] & bit)) {
+                    clears.push_back(static_cast<uint16_t>(active_cut.index));
+                    continue;
+                }
+                if (cut.baseSet[segment] & bit) {
+                    updates.push_back({static_cast<uint16_t>(active_cut.index),
+                                       static_cast<uint16_t>(cut.p.num[cut.baseSetOrder[node_id]]),
+                                       static_cast<uint16_t>(cut.p.den), active_cut.dual_value});
+                }
             }
         }
+    }
 
-        // Precompute bit masks for all active cuts over all segments.
+    void updateActiveCuts() {
+        constexpr size_t max_active_cuts = std::min<size_t>(MAX_SRC_CUTS, 64);
+
+        active_cuts.clear();
+        active_cuts.reserve(std::min(cuts.size(), max_active_cuts));
+
+        std::vector<size_t> candidates;
+        candidates.reserve(std::min(cuts.size(), SRCDuals.size()));
+
+        for (size_t i = 0; i < cuts.size(); ++i) {
+            if (i < SRCDuals.size() && std::abs(SRCDuals[i]) > SRC_DUAL_TOLERANCE) { candidates.push_back(i); }
+        }
+
+        pdqsort(candidates.begin(), candidates.end(),
+                [&](size_t a, size_t b) { return std::abs(SRCDuals[a]) > std::abs(SRCDuals[b]); });
+        if (candidates.size() > max_active_cuts) { candidates.resize(max_active_cuts); }
+
+        for (const size_t cut_idx : candidates) {
+            active_cuts.emplace_back(active_cuts.size(), cut_idx, &cuts[cut_idx], SRCDuals[cut_idx],
+                                     cuts[cut_idx].type);
+        }
+
         segment_masks.precompute(active_cuts);
+        precomputeSRCNodeTables();
     }
 
 public:
@@ -588,18 +636,17 @@ public:
     void updateRedCost(std::vector<Label *> labels) {
         const auto active_cuts = getActiveCuts();
 
-        const auto n_cuts   = activeSize();
-        const auto all_cuts = size();
-
-        if (n_cuts == 0) return;
+        const auto n_cuts = activeSize();
 
         for (auto label : labels) {
-            label->SRCmap.resize(all_cuts, 0.0);
+            label->SRCmap.assign(n_cuts, 0);
+            if (n_cuts == 0) continue;
             int prev_node = -1;
             for (auto node_id : label->getRoute()) {
-                double       total_cost_update = 0.0;
-                const size_t segment           = node_id >> 6;
-                const size_t bit_position      = node_id & 63;
+                double total_cost_update = 0.0;
+#if defined(SRC_MEMORY_MODE_ARC)
+                const size_t segment      = node_id >> 6;
+                const size_t bit_position = node_id & 63;
 
                 auto      &masks          = getSegmentMasks();
                 const auto cut_limit_mask = masks.get_cut_limit_mask();
@@ -642,9 +689,21 @@ public:
                                    cut_idx, n_cuts);
                         break;
                     }
-                    label->SRCmap[active_cuts[cut_idx].index] = 0.0;
+                    label->SRCmap[active_cuts[cut_idx].index] = 0;
                     to_clear &= (to_clear - 1);
                 }
+#else
+                for (const auto &update : getSRCNodeUpdates(node_id)) {
+                    auto &src_map_value = label->SRCmap[update.active_idx];
+                    src_map_value += update.add;
+                    if (src_map_value >= update.den) {
+                        src_map_value -= update.den;
+                        total_cost_update -= update.dual;
+                    }
+                }
+
+                for (const auto active_idx : getSRCNodeClears(node_id)) { label->SRCmap[active_idx] = 0; }
+#endif
                 label->cost += total_cost_update;
                 prev_node = node_id;
             }

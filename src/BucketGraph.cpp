@@ -678,7 +678,7 @@ void BucketGraph::mono_initialization() {
                 depot->cost += pstep_duals.getThreeThreeDualValue(depot_id);
                 depot->addNode(depot_id);
                 set_node_visited(depot->visited_bitmap, depot_id);
-                SRC_MODE_BLOCK(depot->SRCmap.assign(cut_storage->SRCDuals.size(), 0);)
+                SRC_MODE_BLOCK(depot->SRCmap.assign(cut_storage->activeSize(), 0);)
                 buckets[calculated_index].add_label(depot);
                 buckets[calculated_index].node_id = depot_id;
 
@@ -755,7 +755,103 @@ void BucketGraph::print_statistics() {
     // Print the final horizontal line
     fmt::print("+--------------------------------------------------------+\n");
 
+    if (options.profile_labeling) { print_labeling_profile(); }
+
     fmt::print("\n");
+}
+
+void BucketGraph::print_labeling_profile() {
+    if (!options.profile_labeling) return;
+
+    static const std::array<const char *, PROFILE_STAGE_COUNT> stage_names = {"One", "Two", "Three", "Four",
+                                                                              "Enumerate"};
+
+    fmt::print("\n+----------------------------------------------------------------------------------------------+\n");
+    fmt::print("| {:<9} | {:<8} | {:<17} | {:<18} | {:<14} | {:<18} |\n", "Stage", "Dir", "Dom checks",
+               "Avg inner scan", "Tested", "Non-dom ratio");
+    fmt::print("+----------------------------------------------------------------------------------------------+\n");
+    for (size_t i = 0; i < PROFILE_STAGE_COUNT; ++i) {
+        const double avg_fw   = profile_inner_bin_scan_events_fw[i] == 0
+                                    ? 0.0
+                                    : static_cast<double>(profile_inner_bin_scan_labels_fw[i]) /
+                                          static_cast<double>(profile_inner_bin_scan_events_fw[i]);
+        const double avg_bw   = profile_inner_bin_scan_events_bw[i] == 0
+                                    ? 0.0
+                                    : static_cast<double>(profile_inner_bin_scan_labels_bw[i]) /
+                                          static_cast<double>(profile_inner_bin_scan_events_bw[i]);
+        const double ratio_fw = profile_labels_tested_fw[i] == 0 ? 0.0
+                                                                 : static_cast<double>(profile_labels_survived_fw[i]) /
+                                                                       static_cast<double>(profile_labels_tested_fw[i]);
+        const double ratio_bw = profile_labels_tested_bw[i] == 0 ? 0.0
+                                                                 : static_cast<double>(profile_labels_survived_bw[i]) /
+                                                                       static_cast<double>(profile_labels_tested_bw[i]);
+
+        fmt::print("| {:<9} | {:<8} | {:<17} | {:<18.2f} | {:<14} | {:<18.2f} |\n", stage_names[i], "Fwd",
+                   profile_dominance_checks_fw[i], avg_fw, profile_labels_tested_fw[i], ratio_fw);
+        fmt::print("| {:<9} | {:<8} | {:<17} | {:<18.2f} | {:<14} | {:<18.2f} |\n", stage_names[i], "Bwd",
+                   profile_dominance_checks_bw[i], avg_bw, profile_labels_tested_bw[i], ratio_bw);
+        fmt::print(
+            "+----------------------------------------------------------------------------------------------+\n");
+    }
+}
+
+void BucketGraph::profile_reset_labeling_metrics() noexcept {
+    profile_dominance_checks_fw.fill(0);
+    profile_dominance_checks_bw.fill(0);
+    profile_inner_bin_scan_labels_fw.fill(0);
+    profile_inner_bin_scan_labels_bw.fill(0);
+    profile_inner_bin_scan_events_fw.fill(0);
+    profile_inner_bin_scan_events_bw.fill(0);
+    profile_labels_tested_fw.fill(0);
+    profile_labels_tested_bw.fill(0);
+    profile_labels_survived_fw.fill(0);
+    profile_labels_survived_bw.fill(0);
+}
+
+void BucketGraph::profile_record_dominance_check(Direction D, Stage S) noexcept {
+    if (!options.profile_labeling) return;
+    const size_t idx = static_cast<size_t>(S);
+    if (idx >= PROFILE_STAGE_COUNT) return;
+    if (D == Direction::Forward) {
+        profile_dominance_checks_fw[idx]++;
+    } else {
+        profile_dominance_checks_bw[idx]++;
+    }
+}
+
+void BucketGraph::profile_record_inner_bin_scan(Direction D, Stage S, uint64_t scanned_labels) noexcept {
+    if (!options.profile_labeling) return;
+    const size_t idx = static_cast<size_t>(S);
+    if (idx >= PROFILE_STAGE_COUNT) return;
+    if (D == Direction::Forward) {
+        profile_inner_bin_scan_labels_fw[idx] += scanned_labels;
+        profile_inner_bin_scan_events_fw[idx]++;
+    } else {
+        profile_inner_bin_scan_labels_bw[idx] += scanned_labels;
+        profile_inner_bin_scan_events_bw[idx]++;
+    }
+}
+
+void BucketGraph::profile_record_new_label(Direction D, Stage S) noexcept {
+    if (!options.profile_labeling) return;
+    const size_t idx = static_cast<size_t>(S);
+    if (idx >= PROFILE_STAGE_COUNT) return;
+    if (D == Direction::Forward) {
+        profile_labels_tested_fw[idx]++;
+    } else {
+        profile_labels_tested_bw[idx]++;
+    }
+}
+
+void BucketGraph::profile_record_non_dominated_label(Direction D, Stage S) noexcept {
+    if (!options.profile_labeling) return;
+    const size_t idx = static_cast<size_t>(S);
+    if (idx >= PROFILE_STAGE_COUNT) return;
+    if (D == Direction::Forward) {
+        profile_labels_survived_fw[idx]++;
+    } else {
+        profile_labels_survived_bw[idx]++;
+    }
 }
 
 /**
@@ -914,11 +1010,11 @@ void BucketGraph::initInfo() {
  */
 Label *BucketGraph::compute_mono_label(const Label *L) {
     // Directly acquire new_label and set the cost
-    auto new_label           = label_pool_fw->acquire();
-    new_label->cost          = L->cost;      // Use the cost from L
-    new_label->real_cost     = L->real_cost; // Use the real cost from L
-    new_label->path_len      = L->path_len;
-    auto &route = new_label->nodes_covered;
+    auto new_label       = label_pool_fw->acquire();
+    new_label->cost      = L->cost;      // Use the cost from L
+    new_label->real_cost = L->real_cost; // Use the real cost from L
+    new_label->path_len  = L->path_len;
+    auto &route          = new_label->nodes_covered;
     route.clear();
     route.reserve(L->nodes_covered.size());
     route.insert(route.end(), L->nodes_covered.begin(), L->nodes_covered.end());

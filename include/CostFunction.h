@@ -8,7 +8,7 @@ template <typename T>
 struct ParamType {
     using value_type = T;
     size_t index;
-    T value;
+    T      value;
 
     ParamType(T v, size_t idx = 0) : value(v), index(idx) {}
 };
@@ -33,13 +33,13 @@ struct type_to_index<int> {
 };
 
 class GenericParameters {
-   private:
+private:
     std::vector<double> doubles;
-    std::vector<int> ints;
+    std::vector<int>    ints;
 
-   public:
+public:
     template <typename T>
-    void set(const ParamType<T>& p) {
+    void set(const ParamType<T> &p) {
         if constexpr (std::is_same_v<T, double>) {
             if (doubles.size() <= p.index) doubles.resize(p.index + 1);
             doubles[p.index] = p.value;
@@ -61,19 +61,18 @@ class GenericParameters {
 };
 
 class ParametersBuilder {
-   private:
+private:
     GenericParameters params;
 
-   public:
-    ParametersBuilder(ParamType<double> initial_cost, ParamType<int> distance,
-                      ParamType<double> node_id = param(0.0),
+public:
+    ParametersBuilder(ParamType<double> initial_cost, ParamType<int> distance, ParamType<double> node_id = param(0.0),
                       ParamType<double> resources = param(0.0)) {
         params.set(initial_cost);
         params.set(distance);
     }
 
     template <typename T>
-    ParametersBuilder& with(const ParamType<T>& p) {
+    ParametersBuilder &with(const ParamType<T> &p) {
         params.set(p);
         return *this;
     }
@@ -82,39 +81,28 @@ class ParametersBuilder {
 };
 
 class CostFunction {
-   private:
-    using CostFun = std::function<double(const GenericParameters&)>;
+private:
+    using CostFun = std::function<double(const GenericParameters &)>;
     CostFun cost_func;
 
-   public:
+public:
     CostFunction()
-        : cost_func([](const GenericParameters& params) {
-              return params.get<double>(0) + params.get<int>(0);
-          }) {}
+        : cost_func([](const GenericParameters &params) { return params.get<double>(0) + params.get<int>(0); }) {}
 
-    explicit CostFunction(const CostFun& custom_func)
-        : cost_func(custom_func) {}
+    explicit CostFunction(const CostFun &custom_func) : cost_func(custom_func) {}
 
-    void set_cost_function(const CostFun& new_cost_func) {
-        if (!new_cost_func) {
-            throw std::invalid_argument("Cost function cannot be null");
-        }
+    void set_cost_function(const CostFun &new_cost_func) {
+        if (!new_cost_func) { throw std::invalid_argument("Cost function cannot be null"); }
         cost_func = new_cost_func;
     }
 
-    double calculate_cost(const GenericParameters& params) const {
-        if (!cost_func) {
-            throw std::runtime_error("No cost function set");
-        }
+    double calculate_cost(const GenericParameters &params) const {
+        if (!cost_func) { throw std::runtime_error("No cost function set"); }
         return cost_func(params);
     }
 
-    double calculate_cost(double initial_cost, int distance,
-                          double node_id = 0.0,
-                          std::vector<double> resources = {}) {
-        auto params =
-            ParametersBuilder(param<double>(initial_cost), param<int>(distance))
-                .build();
+    double calculate_cost(double initial_cost, int distance, double node_id = 0.0, std::vector<double> resources = {}) {
+        auto params = ParametersBuilder(param<double>(initial_cost), param<int>(distance)).build();
         return calculate_cost(params);
     }
 };

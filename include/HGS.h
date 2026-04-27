@@ -32,22 +32,22 @@
  * initial population, and executes the genetic algorithm.
  */
 class HGS {
-   public:
+public:
     // default constructor
     HGS() = default;
 
     std::vector<std::vector<int>> bestRoutes;
-    double best_cost;
+    double                        best_cost;
 
     std::vector<std::vector<int>> run(const InstanceData &instance) {
         // InstanceData instance;
 
         // Reading the data file and initializing some data structures
         Params params(instance);
-        auto config = params.config;
+        auto   config = params.config;
 
         // Creating the Split and Local Search structures
-        Split split(&params);
+        Split          split(&params);
         HGSLocalSearch localSearch(&params);
 
         // Initial population
@@ -60,8 +60,7 @@ class HGS {
         solver.run(config.nbIter, config.timeLimit);
         // std::cout << "----- GENETIC ALGORITHM FINISHED, TIME SPENT: " <<
         // params.getTimeElapsedSeconds() << std::endl;
-        print_heur("Genetic algorithm finished in {:.2f} seconds\n",
-                   params.getTimeElapsedSeconds());
+        print_heur("Genetic algorithm finished in {:.2f} seconds\n", params.getTimeElapsedSeconds());
 
         auto sol = population.extractFeasibleRoutes();
         // auto sol = population.extractTopBestFeasibleRoutes(50);
@@ -74,5 +73,5 @@ class HGS {
     }
 
     std::vector<std::vector<int>> getBestRoutes() { return bestRoutes; }
-    double getBestCost() { return best_cost; }
+    double                        getBestCost() { return best_cost; }
 };

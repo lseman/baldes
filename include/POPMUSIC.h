@@ -120,7 +120,7 @@ private:
         InstanceData subInstance;
         // Include depot as the first node in subInstance
         // remove duplicated members in Vsp
-        std::sort(Vsp.begin(), Vsp.end());  // Sort the vector
+        std::sort(Vsp.begin(), Vsp.end()); // Sort the vector
         Vsp.erase(std::unique(Vsp.begin(), Vsp.end()), Vsp.end());
         // print Vsp.size
         subInstance.nN = Vsp.size() + 1; // +1 for depot

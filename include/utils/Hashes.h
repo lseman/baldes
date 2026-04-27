@@ -75,14 +75,12 @@ struct VectorIntHash {
 
 struct VectorIntHashCompare {
     using KeyType = std::vector<int>;
-    
+
     // Hash operator for std::unordered_map
-    std::size_t operator()(const KeyType& key) const {
+    std::size_t operator()(const KeyType &key) const {
         return XXH64(key.data(), key.size() * sizeof(int), 0); // Seed = 0
     }
-    
+
     // Equality operator for std::unordered_map
-    bool operator()(const KeyType& lhs, const KeyType& rhs) const {
-        return lhs == rhs;
-    }
+    bool operator()(const KeyType &lhs, const KeyType &rhs) const { return lhs == rhs; }
 };

@@ -6,7 +6,7 @@
 
 // Helper function to create a test matrix with a different pattern
 Eigen::SparseMatrix<double> createTestMatrix(int size) {
-    Eigen::SparseMatrix<double> matrix(size, size);
+    Eigen::SparseMatrix<double>         matrix(size, size);
     std::vector<Eigen::Triplet<double>> triplets;
 
     // Create a positive definite matrix with a different structure
@@ -39,20 +39,20 @@ Eigen::SparseMatrix<double> createTestMatrix(int size) {
 }
 
 // Modified pattern printing to handle new matrix structure
-void printPattern(const Eigen::SparseMatrix<double>& matrix) {
+void printPattern(const Eigen::SparseMatrix<double> &matrix) {
     std::cout << "\nMatrix pattern:" << std::endl;
     for (int i = 0; i < matrix.rows(); i++) {
         for (int j = 0; j < matrix.cols(); j++) {
             double val = matrix.coeff(i, j);
             if (val != 0) {
                 if (val == 6.0)
-                    std::cout << "D ";  // Diagonal
+                    std::cout << "D "; // Diagonal
                 else if (std::abs(val - (-1.0)) < 1e-10)
-                    std::cout << "1 ";  // First off-diagonal
+                    std::cout << "1 "; // First off-diagonal
                 else if (std::abs(val - (-0.8)) < 1e-10)
-                    std::cout << "2 ";  // Second off-diagonal
+                    std::cout << "2 "; // Second off-diagonal
                 else
-                    std::cout << "3 ";  // Third off-diagonal
+                    std::cout << "3 "; // Third off-diagonal
             } else {
                 std::cout << ". ";
             }
@@ -62,7 +62,7 @@ void printPattern(const Eigen::SparseMatrix<double>& matrix) {
 }
 
 // Rest of the helper functions remain the same
-void printVector(const Eigen::VectorXd& v, const std::string& name) {
+void printVector(const Eigen::VectorXd &v, const std::string &name) {
     std::cout << name << ":" << std::endl;
     for (int i = 0; i < v.size(); i++) {
         std::cout << std::setw(12) << std::setprecision(6) << v(i);
@@ -74,8 +74,8 @@ int main() {
     std::cout << std::fixed << std::setprecision(6);
 
     // Create test matrix
-    const int size = 6;  // Increased size for better testing
-    auto matrix = createTestMatrix(size);
+    const int size   = 6; // Increased size for better testing
+    auto      matrix = createTestMatrix(size);
 
     std::cout << "Testing Supernodal Solver" << std::endl;
     std::cout << "=========================" << std::endl;
@@ -93,7 +93,7 @@ int main() {
 
         // Create right-hand side: b = A*ones
         Eigen::VectorXd ones = Eigen::VectorXd::Ones(size);
-        Eigen::VectorXd b = matrix * ones;
+        Eigen::VectorXd b    = matrix * ones;
 
         std::cout << "\nRight-hand side vector (b = A*ones):" << std::endl;
         printVector(b, "b");
@@ -101,18 +101,16 @@ int main() {
         // Solve the system
         Eigen::VectorXd x = solver.solve(b);
 
-        std::cout << "\nSolution vector (should be close to ones):"
-                  << std::endl;
+        std::cout << "\nSolution vector (should be close to ones):" << std::endl;
         printVector(x, "x");
 
         // Compute residual
-        Eigen::VectorXd residual = matrix * x - b;
-        double rel_error = residual.norm() / b.norm();
+        Eigen::VectorXd residual  = matrix * x - b;
+        double          rel_error = residual.norm() / b.norm();
 
         std::cout << "\nVerification:" << std::endl;
         std::cout << "Relative error: " << rel_error << std::endl;
-        std::cout << "Maximum deviation from 1.0: "
-                  << (x - ones).lpNorm<Eigen::Infinity>() << std::endl;
+        std::cout << "Maximum deviation from 1.0: " << (x - ones).lpNorm<Eigen::Infinity>() << std::endl;
 
         if (rel_error < 1e-10) {
             std::cout << "Test PASSED!" << std::endl;
@@ -120,7 +118,7 @@ int main() {
             std::cout << "Test FAILED! Residual too large." << std::endl;
         }
 
-    } catch (const std::exception& e) {
+    } catch (const std::exception &e) {
         std::cout << "Error: " << e.what() << std::endl;
         return 1;
     }

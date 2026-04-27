@@ -24,22 +24,18 @@ class BNBNode;
 class ArcDuals {
 public:
     // Add or update the dual value for an arc
-    void setDual(const RawArc& arc, double dualValue) {
-        arcDuals_[arc] = dualValue;
-    }
+    void setDual(const RawArc &arc, double dualValue) { arcDuals_[arc] = dualValue; }
 
     // Retrieve the dual value for an arc
-    double getDual(int i, int j) const {
-        return getDual(RawArc(i, j));
-    }
+    double getDual(int i, int j) const { return getDual(RawArc(i, j)); }
 
-    double getDual(const RawArc& arc) const {
+    double getDual(const RawArc &arc) const {
         auto it = arcDuals_.find(arc);
         return (it != arcDuals_.end()) ? it->second : 0.0;
     }
 
     // Set or increment dual value in one operation
-    void setOrIncrementDual(const RawArc& arc, double dualValue) {
+    void setOrIncrementDual(const RawArc &arc, double dualValue) {
         arcDuals_[arc] += dualValue; // Will create with 0 + dualValue if not exists
     }
 

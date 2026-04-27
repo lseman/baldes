@@ -6,8 +6,8 @@
 
 class ATSPInstance {
 public:
-    std::string                   name;
-    int                           dimension;
+    std::string                      name;
+    int                              dimension;
     std::vector<std::vector<double>> distance_matrix;
 
     ATSPInstance(const std::string &filename) { parse_instance(filename); }

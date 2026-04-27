@@ -360,11 +360,9 @@ void BucketGraph::define_buckets() {
                 rc2_till_this_bin[node_id][local_b] = rc2_value;
             } else {
                 if constexpr (D == Direction::Forward) {
-                    rc2_till_this_bin[node_id][local_b] =
-                        std::min(rc2_till_this_bin[node_id][local_b - 1], rc2_value);
+                    rc2_till_this_bin[node_id][local_b] = std::min(rc2_till_this_bin[node_id][local_b - 1], rc2_value);
                 } else {
-                    rc2_till_this_bin[node_id][local_b] =
-                        std::max(rc2_till_this_bin[node_id][local_b - 1], rc2_value);
+                    rc2_till_this_bin[node_id][local_b] = std::max(rc2_till_this_bin[node_id][local_b - 1], rc2_value);
                 }
             }
         }
@@ -650,9 +648,8 @@ void BucketGraph::ConcatenateLabel(const Label *L, int &b, std::atomic<double> &
 
 #if defined(SRC)
     // SRC mode setup: Only relevant in Stage::Four.
-    decltype(cut_storage) cutter = nullptr;
-    if constexpr (S > Stage::Three) { cutter = cut_storage; }
-    const auto active_cuts = cutter->getActiveCuts();
+    std::span<const ActiveCutInfo> active_cuts;
+    if constexpr (S > Stage::Three) { active_cuts = cut_storage->getActiveCuts(); }
 #endif
 
 // Lambda to apply SRC adjustments to total_cost (only for Stage::Four).
@@ -703,19 +700,21 @@ void BucketGraph::ConcatenateLabel(const Label *L, int &b, std::atomic<double> &
         }
 
         // Retrieve labels in the current bucket.
-        const auto &bucket = other_buckets[current_bucket];
-        const auto &labels = bucket.get_labels();
-        if (labels.empty()) continue;
+        const auto &bucket       = other_buckets[current_bucket];
+        const auto &labels       = bucket.get_sorted_labels();
+        const auto &extra_labels = bucket.get_extra_labels();
+        const auto  label_count  = labels.size() + extra_labels.size();
+        if (label_count == 0) continue;
         merge_candidates.clear();
-        if (merge_candidates.capacity() < labels.size()) { merge_candidates.reserve(labels.size()); }
+        if (merge_candidates.capacity() < label_count) { merge_candidates.reserve(label_count); }
 
         // Process each label in the current bucket.
-        for (const Label *L_bw : labels) {
+        auto process_label = [&](const Label *L_bw) {
             // Skip invalid labels with combined check
-            if (L_bw == nullptr || L_bw->is_dominated || L_bw->node_id == L_node_id) { continue; }
+            if (L_bw == nullptr || L_bw->is_dominated || L_bw->node_id == L_node_id) { return; }
 
             // Check feasibility
-            if (!check_feasibility(L, L_bw)) { continue; }
+            if (!check_feasibility(L, L_bw)) { return; }
 
             double total_cost = path_cost + L_bw->cost;
 
@@ -733,9 +732,12 @@ void BucketGraph::ConcatenateLabel(const Label *L, int &b, std::atomic<double> &
                 cost_acceptable = numericutils::lt(total_cost, gap);
             }
 
-            if (!cost_acceptable) { continue; }
+            if (!cost_acceptable) { return; }
             merge_candidates.emplace_back(L_bw, total_cost);
-        }
+        };
+
+        for (const Label *L_bw : labels) { process_label(L_bw); }
+        for (const Label *L_bw : extra_labels) { process_label(L_bw); }
 
         if (!merge_candidates.empty()) {
             // Replay accepted candidates in order under one lock.
@@ -1427,7 +1429,7 @@ void BucketGraph::common_initialization() {
                 depot->is_extended = false;
                 depot->addNode(depot_id);
                 set_node_visited(depot->visited_bitmap, depot_id);
-                SRC_MODE_BLOCK(depot->SRCmap.assign(cut_storage->SRCDuals.size(), 0);)
+                SRC_MODE_BLOCK(depot->SRCmap.assign(cut_storage->activeSize(), 0);)
                 buckets[calculated_index].add_label(depot);
                 buckets[calculated_index].node_id = depot_id;
 

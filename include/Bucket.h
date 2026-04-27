@@ -120,22 +120,18 @@ struct alignas(64) Bucket {
         if (!label) return;
 
         extra_labels.push_back(label);
-        if (labels.size() + extra_labels.size() >= BUCKET_CAPACITY) {
-            shall_split = true;
-        }
+        if (label->cost < min_cost) min_cost = label->cost;
+        if (labels.size() + extra_labels.size() >= BUCKET_CAPACITY) { shall_split = true; }
     }
 
     // For cases where sorted order isn’t required on insertion.
-    void add_label(Label *label) noexcept {
-        add_sorted_label(label);
-    }
+    void add_label(Label *label) noexcept { add_sorted_label(label); }
 
     // --- Retrieval ---
     // Returns the best (i.e. minimum cost) label cost in this bucket.
     double get_cb() const noexcept {
-        double best = labels.empty() ? std::numeric_limits<double>::max() : labels.front()->cost;
-        for (const Label *label : extra_labels) { best = std::min(best, label->cost); }
-        return best;
+        const double best_sorted = labels.empty() ? std::numeric_limits<double>::max() : labels.front()->cost;
+        return std::min(best_sorted, min_cost);
     }
 
     // Returns the best label pointer.
@@ -152,10 +148,7 @@ struct alignas(64) Bucket {
         return labels;
     }
 
-    const std::pmr::vector<Label *> &get_labels() const {
-        flush_extra_labels();
-        return labels;
-    }
+    const std::pmr::vector<Label *> &get_labels() const { return labels; }
 
     const std::pmr::vector<Label *> &get_sorted_labels() const noexcept { return labels; }
     const std::pmr::vector<Label *> &get_extra_labels() const noexcept { return extra_labels; }
@@ -308,6 +301,7 @@ struct alignas(64) Bucket {
         labels.clear();
         extra_labels.clear();
         virtual_split_index = 0;
+        min_cost            = std::numeric_limits<double>::max();
     }
 
     /**
@@ -336,6 +330,7 @@ struct alignas(64) Bucket {
         sub_buckets = {};
         labels.clear();
         extra_labels.clear();
+        min_cost = std::numeric_limits<double>::max();
 
         is_split            = false;
         shall_split         = false;

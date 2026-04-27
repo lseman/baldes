@@ -53,12 +53,12 @@ inline bool check_dominance_against_vector(const Label *__restrict__ new_label, 
     using namespace std::experimental;
 
     // Cache invariant data and sizes upfront
-    constexpr double    tolerance = numericutils::eps;
-    const size_t        num_labels = labels.size();
-    const size_t        simd_width = simd<double>::size();
-    const double        new_cost   = new_label->cost;
-    const simd<double>  new_cost_simd(new_cost);
-    const simd<double>  tolerance_simd(tolerance);
+    constexpr double   tolerance  = numericutils::eps;
+    const size_t       num_labels = labels.size();
+    const size_t       simd_width = simd<double>::size();
+    const double       new_cost   = new_label->cost;
+    const simd<double> new_cost_simd(new_cost);
+    const simd<double> tolerance_simd(tolerance);
     const auto        &new_resources = new_label->resources;
     const size_t       num_resources = new_resources.size();
     const auto        &new_visited   = new_label->visited_bitmap;
@@ -114,56 +114,56 @@ inline bool check_dominance_against_vector(const Label *__restrict__ new_label, 
                     }
                 }
 
-	                // Handle remaining resources
-	                if (dominated && simd_resource_remainder > 0) {
-	                    const size_t base_idx = simd_resource_blocks * simd_width;
-	                    for (size_t k = 0; k < simd_resource_remainder; ++k) {
-	                        const size_t idx = base_idx + k;
-	                        if (idx == 0) continue;
-	                        if constexpr (D == Direction::Forward) {
-	                            if (numericutils::gt(label_resources[idx], new_resources[idx])) {
-	                                dominated = false;
-	                                break;
-	                            }
-	                        } else {
-	                            if (numericutils::lt(label_resources[idx], new_resources[idx])) {
-	                                dominated = false;
-	                                break;
-	                            }
-	                        }
-	                    }
-	                    if (dominated && num_resources > 0) {
-	                        if constexpr (D == Direction::Forward) {
-	                            if (numericutils::gt(label_resources[0], new_resources[0])) { dominated = false; }
-	                        } else {
-	                            if (numericutils::lt(label_resources[0], new_resources[0])) { dominated = false; }
-	                        }
-	                    }
-	                }
-	            } else {
-	                // Scalar processing for small resource sets - better for branch
-	                // prediction
-	                for (size_t k = 1; k < num_resources; ++k) {
-	                    if constexpr (D == Direction::Forward) {
-	                        if (numericutils::gt(label_resources[k], new_resources[k])) {
-	                            dominated = false;
-	                            break;
-	                        }
-	                    } else {
-	                        if (numericutils::lt(label_resources[k], new_resources[k])) {
-	                            dominated = false;
-	                            break;
-	                        }
-	                    }
-	                }
-	                if (dominated && num_resources > 0) {
-	                    if constexpr (D == Direction::Forward) {
-	                        if (numericutils::gt(label_resources[0], new_resources[0])) { dominated = false; }
-	                    } else {
-	                        if (numericutils::lt(label_resources[0], new_resources[0])) { dominated = false; }
-	                    }
-	                }
-	            }
+                // Handle remaining resources
+                if (dominated && simd_resource_remainder > 0) {
+                    const size_t base_idx = simd_resource_blocks * simd_width;
+                    for (size_t k = 0; k < simd_resource_remainder; ++k) {
+                        const size_t idx = base_idx + k;
+                        if (idx == 0) continue;
+                        if constexpr (D == Direction::Forward) {
+                            if (numericutils::gt(label_resources[idx], new_resources[idx])) {
+                                dominated = false;
+                                break;
+                            }
+                        } else {
+                            if (numericutils::lt(label_resources[idx], new_resources[idx])) {
+                                dominated = false;
+                                break;
+                            }
+                        }
+                    }
+                    if (dominated && num_resources > 0) {
+                        if constexpr (D == Direction::Forward) {
+                            if (numericutils::gt(label_resources[0], new_resources[0])) { dominated = false; }
+                        } else {
+                            if (numericutils::lt(label_resources[0], new_resources[0])) { dominated = false; }
+                        }
+                    }
+                }
+            } else {
+                // Scalar processing for small resource sets - better for branch
+                // prediction
+                for (size_t k = 1; k < num_resources; ++k) {
+                    if constexpr (D == Direction::Forward) {
+                        if (numericutils::gt(label_resources[k], new_resources[k])) {
+                            dominated = false;
+                            break;
+                        }
+                    } else {
+                        if (numericutils::lt(label_resources[k], new_resources[k])) {
+                            dominated = false;
+                            break;
+                        }
+                    }
+                }
+                if (dominated && num_resources > 0) {
+                    if constexpr (D == Direction::Forward) {
+                        if (numericutils::gt(label_resources[0], new_resources[0])) { dominated = false; }
+                    } else {
+                        if (numericutils::lt(label_resources[0], new_resources[0])) { dominated = false; }
+                    }
+                }
+            }
 
             // Skip further checks if not dominated based on resources
             if (!dominated) continue;
@@ -305,31 +305,31 @@ inline bool check_dominance_against_vector(const Label *__restrict__ new_label, 
         if (numericutils::gt(label->cost, new_cost)) continue;
 
         bool        dominated       = true;
-	        const auto &label_resources = label->resources;
+        const auto &label_resources = label->resources;
 
-	        // Resource check
-	        for (size_t k = 1; k < num_resources; ++k) {
-	            if constexpr (D == Direction::Forward) {
-	                if (numericutils::gt(label_resources[k], new_resources[k])) {
-	                    dominated = false;
-	                    break;
-	                }
-	            } else {
-	                if (numericutils::lt(label_resources[k], new_resources[k])) {
-	                    dominated = false;
-	                    break;
-	                }
-	            }
-	        }
-	        if (dominated && num_resources > 0) {
-	            if constexpr (D == Direction::Forward) {
-	                if (numericutils::gt(label_resources[0], new_resources[0])) { dominated = false; }
-	            } else {
-	                if (numericutils::lt(label_resources[0], new_resources[0])) { dominated = false; }
-	            }
-	        }
+        // Resource check
+        for (size_t k = 1; k < num_resources; ++k) {
+            if constexpr (D == Direction::Forward) {
+                if (numericutils::gt(label_resources[k], new_resources[k])) {
+                    dominated = false;
+                    break;
+                }
+            } else {
+                if (numericutils::lt(label_resources[k], new_resources[k])) {
+                    dominated = false;
+                    break;
+                }
+            }
+        }
+        if (dominated && num_resources > 0) {
+            if constexpr (D == Direction::Forward) {
+                if (numericutils::gt(label_resources[0], new_resources[0])) { dominated = false; }
+            } else {
+                if (numericutils::lt(label_resources[0], new_resources[0])) { dominated = false; }
+            }
+        }
 
-	        if (!dominated) continue;
+        if (!dominated) continue;
 
         // Visited nodes check
         if constexpr (S == Stage::Three || S == Stage::Four || S == Stage::Enumerate) {

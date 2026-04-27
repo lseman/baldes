@@ -25,53 +25,47 @@
  * `setDuals` method allows updating the cost of the node.
  */
 struct VRPNode {
-    double x;
-    double y;
-    int id;
-    double start_time;
-    double end_time;
-    double duration;
-    double cost = 0.0;
-    double demand;
-    std::vector<double> lb;
-    std::vector<double> ub;
-    std::vector<double> mtw_lb;
-    std::vector<double> mtw_ub;
-    std::vector<Arc> fw_arcs;
-    std::vector<Arc> bw_arcs;
+    double                        x;
+    double                        y;
+    int                           id;
+    double                        start_time;
+    double                        end_time;
+    double                        duration;
+    double                        cost = 0.0;
+    double                        demand;
+    std::vector<double>           lb;
+    std::vector<double>           ub;
+    std::vector<double>           mtw_lb;
+    std::vector<double>           mtw_ub;
+    std::vector<Arc>              fw_arcs;
+    std::vector<Arc>              bw_arcs;
     std::vector<std::vector<Arc>> fw_arcs_scc;
     std::vector<std::vector<Arc>> bw_arcs_scc;
-    std::vector<JumpArc> fw_jump_arcs;
-    std::vector<JumpArc> bw_jump_arcs;
-    std::string identifier;
+    std::vector<JumpArc>          fw_jump_arcs;
+    std::vector<JumpArc>          bw_jump_arcs;
+    std::string                   identifier;
 
     bool is_station = false;
 
     std::string track_id;
-    int subject;
-    int week;
-    int year;
-    double duration_min;
-    int setup_time;
-    int teardown_time;
-    long long time_window_start;
-    long long time_window_end;
+    int         subject;
+    int         week;
+    int         year;
+    double      duration_min;
+    int         setup_time;
+    int         teardown_time;
+    long long   time_window_start;
+    long long   time_window_end;
 
     std::vector<double> consumption;
 
     // default constructor
     VRPNode() = default;
 
-    VRPNode(int i, int st, int et, int dur, double c)
-        : id(i), start_time(st), end_time(et), duration(dur), cost(c) {}
+    VRPNode(int i, int st, int et, int dur, double c) : id(i), start_time(st), end_time(et), duration(dur), cost(c) {}
 
     VRPNode(int i, int st, int et, int dur, double c, double d)
-        : id(i),
-          start_time(st),
-          end_time(et),
-          duration(dur),
-          cost(c),
-          demand(d) {}
+        : id(i), start_time(st), end_time(et), duration(dur), cost(c), demand(d) {}
 
     // -----------------------------
     // SCC Computation Support
@@ -86,8 +80,7 @@ struct VRPNode {
      * @param nodes The vector of VRPNodes representing the VRP.
      * @return A vector of SCCs, each SCC is a vector of node IDs.
      */
-    static std::vector<std::vector<int>> computeSCCs(
-        const std::vector<VRPNode> &nodes) {
+    static std::vector<std::vector<int>> computeSCCs(const std::vector<VRPNode> &nodes) {
         int V = nodes.size();
         // Build adjacency list: vertices are nodes (using node.id) and an edge
         // exists from u to v if there is a forward arc from node u to node v.
@@ -100,11 +93,11 @@ struct VRPNode {
             }
         }
 
-        std::vector<int> disc(V, -1), low(V, -1);
-        std::vector<bool> inStack(V, false);
-        std::stack<int> st;
+        std::vector<int>              disc(V, -1), low(V, -1);
+        std::vector<bool>             inStack(V, false);
+        std::stack<int>               st;
         std::vector<std::vector<int>> sccs;
-        int time = 0;
+        int                           time = 0;
 
         // Tarjan's recursive helper.
         std::function<void(int)> tarjanUtil = [&](int u) {
@@ -152,31 +145,24 @@ struct VRPNode {
     static void assignSCCIds(std::vector<VRPNode> &nodes) {
         auto sccs = computeSCCs(nodes);
         for (size_t id = 0; id < sccs.size(); id++) {
-            for (int nodeId : sccs[id]) {
-                nodes[nodeId].sccId = id;
-            }
+            for (int nodeId : sccs[id]) { nodes[nodeId].sccId = id; }
         }
     }
 
     template <Direction D>
-    void sort_arcs_by_scores(
-        const ankerl::unordered_dense::map<Arc, int, arc_hash> &arc_scores,
-        std::vector<VRPNode> &nodes, std::vector<ActiveCutInfo> &cuts) {
+    void sort_arcs_by_scores(const ankerl::unordered_dense::map<Arc, int, arc_hash> &arc_scores,
+                             std::vector<VRPNode> &nodes, std::vector<ActiveCutInfo> &cuts) {
         // Helper lambda: compute a score for a given arc.
         // The base score is defined as the negative cost (scaled) of the
         // destination node. If the arc is found in arc_scores, add its
         // bonus/penalty. If any cut applies (i.e. the arc is in the SRC set for
         // the cut), override the score.
-        auto get_score = [&arc_scores, &nodes,
-                          &cuts](const Arc &arc) -> double {
+        auto get_score = [&arc_scores, &nodes, &cuts](const Arc &arc) -> double {
             // Start with a base score as before.
             double score = nodes[arc.to].cost / 10.0;
-            if (auto it = arc_scores.find(arc); it != arc_scores.end()) {
-                score += it->second;
-            }
+            if (auto it = arc_scores.find(arc); it != arc_scores.end()) { score += it->second; }
             for (const auto &cut : cuts) {
-                if (cut.type == CutType::ThreeRow &&
-                    cut.isSRCset(arc.from, arc.to)) {
+                if (cut.type == CutType::ThreeRow && cut.isSRCset(arc.from, arc.to)) {
                     score += cut.dual_value / 10.0;
                     break;
                 }
@@ -237,14 +223,11 @@ struct VRPNode {
      * increment.
      *
      */
-    void add_arc(int from_bucket, int to_bucket, std::vector<double> res_inc,
-                 double cost_inc, bool fw) {
+    void add_arc(int from_bucket, int to_bucket, std::vector<double> res_inc, double cost_inc, bool fw) {
         if (fw) {
-            fw_arcs.push_back(
-                {from_bucket, to_bucket, std::move(res_inc), cost_inc});
+            fw_arcs.push_back({from_bucket, to_bucket, std::move(res_inc), cost_inc});
         } else {
-            bw_arcs.push_back(
-                {from_bucket, to_bucket, std::move(res_inc), cost_inc});
+            bw_arcs.push_back({from_bucket, to_bucket, std::move(res_inc), cost_inc});
         }
     }
 
@@ -258,39 +241,30 @@ struct VRPNode {
      */
     template <Direction D>
 
-    void add_arc(int from_bucket, int to_bucket, std::vector<double> res_inc,
-                 double cost_inc, bool fixed) {
+    void add_arc(int from_bucket, int to_bucket, std::vector<double> res_inc, double cost_inc, bool fixed) {
         if constexpr (D == Direction::Forward) {
-            fw_arcs.push_back(
-                {from_bucket, to_bucket, std::move(res_inc), cost_inc, fixed});
+            fw_arcs.push_back({from_bucket, to_bucket, std::move(res_inc), cost_inc, fixed});
         } else {
-            bw_arcs.push_back(
-                {from_bucket, to_bucket, std::move(res_inc), cost_inc, fixed});
+            bw_arcs.push_back({from_bucket, to_bucket, std::move(res_inc), cost_inc, fixed});
         }
     }
 
     template <Direction D>
-    void add_arc(int from_bucket, int to_bucket, std::vector<double> res_inc,
-                 double cost_inc, double priority) {
+    void add_arc(int from_bucket, int to_bucket, std::vector<double> res_inc, double cost_inc, double priority) {
         if constexpr (D == Direction::Forward) {
-            fw_arcs.push_back({from_bucket, to_bucket, std::move(res_inc),
-                               cost_inc, priority});
+            fw_arcs.push_back({from_bucket, to_bucket, std::move(res_inc), cost_inc, priority});
         } else {
-            bw_arcs.push_back({from_bucket, to_bucket, std::move(res_inc),
-                               cost_inc, priority});
+            bw_arcs.push_back({from_bucket, to_bucket, std::move(res_inc), cost_inc, priority});
         }
     }
 
     template <Direction D>
-    void add_jump_arc(int from_bucket, int to_bucket,
-                      const std::vector<double> &res_inc, double cost_inc,
+    void add_jump_arc(int from_bucket, int to_bucket, const std::vector<double> &res_inc, double cost_inc,
                       int to_job = -1) {
         if constexpr (D == Direction::Forward) {
-            fw_jump_arcs.emplace_back(from_bucket, to_bucket, res_inc, cost_inc,
-                                      to_job);
+            fw_jump_arcs.emplace_back(from_bucket, to_bucket, res_inc, cost_inc, to_job);
         } else {
-            bw_jump_arcs.emplace_back(from_bucket, to_bucket, res_inc, cost_inc,
-                                      to_job);
+            bw_jump_arcs.emplace_back(from_bucket, to_bucket, res_inc, cost_inc, to_job);
         }
     }
 
@@ -301,13 +275,9 @@ struct VRPNode {
      * the `bw_arcs` in ascending order of priority.
      */
     void sort_arcs() {
-        std::sort(
-            fw_arcs.begin(), fw_arcs.end(),
-            [](const Arc &a, const Arc &b) { return a.priority > b.priority; });
+        std::sort(fw_arcs.begin(), fw_arcs.end(), [](const Arc &a, const Arc &b) { return a.priority > b.priority; });
 
-        std::sort(
-            bw_arcs.begin(), bw_arcs.end(),
-            [](const Arc &a, const Arc &b) { return a.priority < b.priority; });
+        std::sort(bw_arcs.begin(), bw_arcs.end(), [](const Arc &a, const Arc &b) { return a.priority < b.priority; });
     }
 
     /**
@@ -336,12 +306,9 @@ struct VRPNode {
 
     template <Direction dir>
     inline auto get_jump_arcs(int to_job) const {
-        const auto &jump_arcs =
-            (dir == Direction::Forward) ? fw_jump_arcs : bw_jump_arcs;
+        const auto &jump_arcs = (dir == Direction::Forward) ? fw_jump_arcs : bw_jump_arcs;
         // Directly construct the filter view
-        return std::ranges::views::filter(
-            jump_arcs,
-            [to_job](const JumpArc &arc) { return arc.to_job == to_job; });
+        return std::ranges::views::filter(jump_arcs, [to_job](const JumpArc &arc) { return arc.to_job == to_job; });
     }
 
     /**
@@ -351,8 +318,7 @@ struct VRPNode {
      */
     template <Direction dir>
     inline std::span<const Arc> get_arcs(int scc) const {
-        const auto &arcs =
-            (dir == Direction::Forward) ? fw_arcs_scc[scc] : bw_arcs_scc[scc];
+        const auto &arcs = (dir == Direction::Forward) ? fw_arcs_scc[scc] : bw_arcs_scc[scc];
         return std::span<const Arc>(arcs);
     }
 
