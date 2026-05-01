@@ -225,19 +225,27 @@ void BucketGraph::BucketArcElimination(double theta) {
 
         std::vector<uint64_t> Bvisited(n_segments, 0);
         const auto           &labels = buckets[b].get_labels();
+        const size_t          n_main = options.main_resources.size();
 
         for (const auto &a : bucket_arcs) {
             if (!a.jump) continue;
-            std::vector<double> increment(options.resources.size(), 0.0);
-            for (size_t r = 0; r < options.resources.size(); ++r) {
-                if constexpr (D == Direction::Forward)
-                    increment[r] = buckets[b].lb[r] + a.resource_increment[r];
-                else
-                    increment[r] = buckets[b].ub[r] - a.resource_increment[r];
+            const int to_node = a.jump_to_node >= 0 ? a.jump_to_node : buckets[a.to_bucket].node_id;
+            if (to_node < 0) continue;
+
+            std::vector<double> arrival(n_main, 0.0);
+            for (size_t r = 0; r < n_main; ++r) {
+                if constexpr (D == Direction::Forward) {
+                    arrival[r] =
+                        std::max(buckets[a.to_bucket].lb[r] + a.resource_increment[r], nodes[to_node].lb[r]);
+                } else {
+                    arrival[r] =
+                        std::min(buckets[a.to_bucket].ub[r] - a.resource_increment[r], nodes[to_node].ub[r]);
+                }
             }
 
-            auto  arc_key    = create_arc_key(buckets[a.from_bucket].node_id, buckets[a.to_bucket].node_id, b);
-            int   b_opposite = get_opposite_bucket_number<D>(a.to_bucket, increment);
+            auto  arc_key    = create_arc_key(buckets[a.from_bucket].node_id, to_node, b);
+            int   b_opposite = (D == Direction::Forward) ? get_bucket_number<Direction::Backward>(to_node, arrival)
+                                                         : get_bucket_number<Direction::Forward>(to_node, arrival);
             auto &Bidi_map   = local_B_Ba_b[arc_key];
 
             // Process each label in the current bucket.
@@ -256,11 +264,14 @@ void BucketGraph::BucketArcElimination(double theta) {
 
         const auto           &labels = buckets[b].get_labels();
         std::vector<uint64_t> Bvisited(n_segments, 0);
+        const size_t          n_main = options.main_resources.size();
 
         for (const auto &a : bucket_arcs) {
+            if (a.jump) continue;
+
             // Build the resource increment vector.
-            std::vector<double> increment(options.resources.size(), 0.0);
-            for (size_t r = 0; r < options.resources.size(); ++r) {
+            std::vector<double> increment(n_main, 0.0);
+            for (size_t r = 0; r < n_main; ++r) {
                 if constexpr (D == Direction::Forward)
                     increment[r] = buckets[b].lb[r] + a.resource_increment[r];
                 else
@@ -400,27 +411,40 @@ void BucketGraph::ObtainJumpBucketArcs() {
                 };
                 const auto current_pos = decode_pos(b);
 
-                auto is_componentwise_successor = [&](const std::vector<int> &candidate_pos) {
+                auto is_jump_candidate = [&](const std::vector<int> &candidate_pos) {
                     bool strictly_larger = false;
                     for (size_t r = 0; r < candidate_pos.size(); ++r) {
-                        if (candidate_pos[r] < current_pos[r]) return false;
-                        if (candidate_pos[r] > current_pos[r]) strictly_larger = true;
+                        if constexpr (D == Direction::Forward) {
+                            if (candidate_pos[r] < current_pos[r]) return false;
+                            if (candidate_pos[r] > current_pos[r]) strictly_larger = true;
+                        } else {
+                            if (candidate_pos[r] > current_pos[r]) return false;
+                            if (candidate_pos[r] < current_pos[r]) strictly_larger = true;
+                        }
                     }
                     return strictly_larger;
                 };
 
-                auto is_componentwise_minimal = [&](const std::vector<int>              &candidate_pos,
+                auto is_componentwise_closest = [&](const std::vector<int>              &candidate_pos,
                                                     const std::vector<std::vector<int>> &all_positions) {
                     for (const auto &other_pos : all_positions) {
                         if (&other_pos == &candidate_pos) continue;
                         bool leq    = true;
                         bool strict = false;
                         for (size_t r = 0; r < candidate_pos.size(); ++r) {
-                            if (other_pos[r] > candidate_pos[r]) {
-                                leq = false;
-                                break;
+                            if constexpr (D == Direction::Forward) {
+                                if (other_pos[r] > candidate_pos[r]) {
+                                    leq = false;
+                                    break;
+                                }
+                                if (other_pos[r] < candidate_pos[r]) strict = true;
+                            } else {
+                                if (other_pos[r] < candidate_pos[r]) {
+                                    leq = false;
+                                    break;
+                                }
+                                if (other_pos[r] > candidate_pos[r]) strict = true;
                             }
-                            if (other_pos[r] < candidate_pos[r]) strict = true;
                         }
                         if (leq && strict) return false;
                     }
@@ -433,9 +457,12 @@ void BucketGraph::ObtainJumpBucketArcs() {
                 std::vector<double>              candidate_costs;
                 candidate_buckets.reserve(node_buckets);
 
-                for (int candidate_b = b + 1; candidate_b < start_bucket + node_buckets; ++candidate_b) {
+                const int scan_begin = (D == Direction::Forward) ? b + 1 : b - 1;
+                const int scan_end   = (D == Direction::Forward) ? start_bucket + node_buckets : start_bucket - 1;
+                const int scan_step  = (D == Direction::Forward) ? 1 : -1;
+                for (int candidate_b = scan_begin; candidate_b != scan_end; candidate_b += scan_step) {
                     const auto candidate_pos = decode_pos(candidate_b);
-                    if (!is_componentwise_successor(candidate_pos)) continue;
+                    if (!is_jump_candidate(candidate_pos)) continue;
 
                     const auto &candidate_arcs = buckets[candidate_b].template get_bucket_arcs<D>();
                     for (const auto &gamma_candidate : candidate_arcs) {
@@ -453,9 +480,10 @@ void BucketGraph::ObtainJumpBucketArcs() {
                     }
                 }
 
-                // Keep only component-wise minimal candidates among the larger buckets.
+                // Keep the closest component-wise candidates: minimal larger buckets
+                // forward, maximal smaller buckets backward.
                 for (size_t i = 0; i < candidate_buckets.size(); ++i) {
-                    if (!is_componentwise_minimal(candidate_positions[i], candidate_positions)) continue;
+                    if (!is_componentwise_closest(candidate_positions[i], candidate_positions)) continue;
 
                     const int candidate_b = candidate_buckets[i];
                     B_bar.push_back(candidate_b);
@@ -464,7 +492,7 @@ void BucketGraph::ObtainJumpBucketArcs() {
 
                     buckets[b].template add_jump_arc<D>(b, candidate_b, res, cost);
                     nodes[buckets[b].node_id].template add_jump_arc<D>(b, candidate_b, res, cost, orig_arc.to);
-                    buckets[b].template add_bucket_arc<D>(b, candidate_b, res, cost, true);
+                    buckets[b].template add_bucket_arc<D>(b, candidate_b, res, cost, true, orig_arc.to);
                     ++arc_counter;
                 }
             }

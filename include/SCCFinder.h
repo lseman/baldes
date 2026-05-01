@@ -38,6 +38,16 @@ public:
         adj[v].push_back(w);
     }
 
+    void addVertex(int v) {
+        if (v >= adj.size()) {
+            int newSize = v + 1;
+            adj.resize(newSize);
+            index.resize(newSize, -1);
+            lowlink.resize(newSize, -1);
+            onStack.resize(newSize, false);
+        }
+    }
+
     /**
      * @brief Converts an unordered map representation of a graph into an internal graph representation.
      *
@@ -49,6 +59,7 @@ public:
     void convertFromUnorderedMap(const ankerl::unordered_dense::map<int, std::vector<int>> &map) {
         for (const auto &pair : map) {
             int v = pair.first;
+            addVertex(v);
             for (int w : pair.second) { addEdge(v, w); }
         }
     }

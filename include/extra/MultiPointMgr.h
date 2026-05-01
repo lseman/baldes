@@ -172,7 +172,7 @@ public:
     }
 
     DualSolution getWeightedSolution() const {
-        if (stability_points.empty()) { return DualSolution(solution_size, 0.0); }
+        if (stability_points.empty()) { return DualSolution(); }
 
         if ((improvement_history.back() < conv_threshold) && best_point) { return best_point->duals; }
 
@@ -204,8 +204,8 @@ public:
         improvement_history.assign(HISTORY_SIZE, 0.0);
         current_pool_size = MIN_POOL_SIZE + 2;
         active            = true;
-        best_objective    = -std::numeric_limits<double>::infinity();
-        worst_objective   = std::numeric_limits<double>::infinity();
+        best_objective    = std::numeric_limits<double>::infinity();
+        worst_objective   = -std::numeric_limits<double>::infinity();
         conv_threshold    = FAST_CONV_THRESHOLD;
         best_point        = nullptr;
     }

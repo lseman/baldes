@@ -21,7 +21,6 @@
 #include <numeric> // For std::iota
 #include <vector>
 
-#include "MultiPointMgr.h"
 #define NORM_TOLERANCE 1e-4
 
 /**
@@ -78,9 +77,7 @@ public:
 
     double lp_obj = 0.0;
 
-    ReducedCostResult rc;
-
-    MultiPointManager   mp_manager;
+    ReducedCostResult   rc;
     std::vector<double> stab_constraint_values;
 
     bool cut_added = false;
@@ -130,8 +127,7 @@ public:
     Stabilization(double base_alpha, DualSolution &mast_dual_sol)
         : alpha(std::clamp(base_alpha, kAlphaMin, kAlphaMax)), t(0),
           base_alpha(std::clamp(base_alpha, kAlphaMin, kAlphaMax)),
-          cur_alpha(std::clamp(base_alpha, kAlphaMin, kAlphaMax)), nb_misprices(0), cur_stab_center(mast_dual_sol),
-          mp_manager(mast_dual_sol.size()) {
+          cur_alpha(std::clamp(base_alpha, kAlphaMin, kAlphaMax)), nb_misprices(0), cur_stab_center(mast_dual_sol) {
         pseudo_dual_bound = std::numeric_limits<double>::infinity();
         valid_dual_bound  = std::numeric_limits<double>::infinity();
         beta              = 0.0;
@@ -324,40 +320,13 @@ public:
     const int NO_PROGRESS_THRESHOLD = 50;
 
     void update_stabilization_after_pricing_optim(const ModelData &dados, const DualSolution &input_duals,
-                                                  const double &lag_gap, std::vector<Label *> best_pricing_cols) {
+                                                  const double               &lag_gap,
+                                                  const std::vector<Label *> &best_pricing_cols) {
         std::vector<double> nodeDuals(input_duals.begin(), input_duals.begin() + sizeDual);
 
-        mp_manager.updatePool(nodeDuals, lag_gap);
-        DualSolution historical_avg = mp_manager.getWeightedSolution();
-
-        // // check for progress within a threshold
-        // if (std::abs(lp_obj - lp_obj_prev) < 1e-3) {
-        //     no_progress_count++;
-        // } else {
-        //     no_progress_count = 0;
-        // }
-
-        if (!historical_avg.empty() && nb_misprices == 0) {
-            // Dynamic weighting based on optimization progress
-            double pw = std::min(0.9, std::max(0.1, std::abs(lag_gap) / (std::abs(lag_gap_prev) + 1e-10)));
-
-            // fmt::print("Progress weight: {}\n", pw);
-
-            // Scale historical weight based on
-            // pool quality
-            // double historical_weight = (1.0
-            // - progress_weight);
-
-            // Blend solutions with adaptive
-            // weights
-            for (size_t i = 0; i < nodeDuals.size(); ++i) {
-                nodeDuals[i] = pw * nodeDuals[i] + (1 - pw) * historical_avg[i];
-            }
-        }
-
-        if (nb_misprices == 0) { update_subgradient(dados, nodeDuals, best_pricing_cols); }
-
         if (nb_misprices == 0) {
+            update_subgradient(dados, nodeDuals, best_pricing_cols);
+
             // Dynamic alpha schedule (Table 1 right):
             // if g_sep · (pi_out - pi_in) > 0 -> fincr(alpha)
             // else -> fdecr(alpha)
@@ -412,7 +381,6 @@ public:
     bool shouldExit() { return cur_alpha < 1e-3; }
 
     void cleanup() {
-        mp_manager.clear();
         stab_constraint_values.clear();
         smooth_dual_sol.clear();
         subgradient.clear();

@@ -409,7 +409,7 @@ public:
             if (cut.type == CutType::ThreeRow) {
                 for (int i = 1; i < N_SIZE - 1; ++i) {
                     for (int j = i + 1; j < N_SIZE - 1; ++j) {
-                        if (cut.isSRCset(i, j)) {
+                        if (cut.isSRCMemoryArc(i, j)) {
                             cut_adjustments[i][j] -= cut.dual_value;
                             cut_adjustments[j][i] -= cut.dual_value;
                         }

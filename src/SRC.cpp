@@ -20,6 +20,39 @@
 using Cuts = std::vector<Cut>;
 
 #include "CutIntelligence.h"
+
+namespace {
+constexpr double SRC_SEPARATION_TOL          = 1e-3;
+constexpr int    MAX_RANK3_CUTS_PER_ROUND    = 2;
+constexpr int    MAX_VERTEX_RELATED_SRC_CUTS = 8;
+
+std::vector<int> collect_cut_nodes(const Cut &cut, bool include_neighbors = false) {
+    std::vector<int> nodes;
+    nodes.reserve(cut.p.num.size());
+    for (int node = 1; node < N_SIZE - 1; ++node) {
+        const size_t   segment = static_cast<size_t>(node) >> 6;
+        const uint64_t bit     = 1ULL << (node & 63);
+        if ((cut.baseSet[segment] & bit) || (include_neighbors && (cut.neighbors[segment] & bit))) {
+            nodes.push_back(node);
+        }
+    }
+    return nodes;
+}
+
+void set_sparse_coefficients(Cut &cut, const std::vector<int> &indices, const std::vector<double> &values) {
+    cut.coefficient_indices.clear();
+    cut.coefficient_values.clear();
+    cut.coefficient_indices.reserve(indices.size());
+    cut.coefficient_values.reserve(values.size());
+    for (size_t idx = 0; idx < indices.size(); ++idx) {
+        if (!numericutils::isZero(values[idx])) {
+            cut.coefficient_indices.push_back(indices[idx]);
+            cut.coefficient_values.push_back(values[idx]);
+        }
+    }
+}
+} // namespace
+
 /**
  * @brief Adds a cut to the CutStorage.
  *
@@ -51,10 +84,8 @@ void CutStorage::addCut(Cut &cut) {
         cut.id = cuts.size();
         cuts.push_back(cut);
         cutMaster_to_cut_map[cut.key] = cut.id;
+        indexCuts[cut.key].push_back(cut.id);
     }
-
-    // Safely update indexCuts with the cut's id.
-    indexCuts[cut.key].push_back(cut.id);
 }
 
 LimitedMemoryRank1Cuts::LimitedMemoryRank1Cuts(std::vector<VRPNode> &nodes) : nodes(nodes) {}
@@ -72,7 +103,7 @@ void LimitedMemoryRank1Cuts::separate(const SparseMatrix &A, const std::vector<d
     if (tasks.empty() || A.num_cols == 0 || allPaths.empty()) return;
 
     // Determine parallel parameters.
-    const int    JOBS       = std::thread::hardware_concurrency();
+    const int    JOBS       = std::max(1u, std::thread::hardware_concurrency());
     const int    chunk_size = (tasks.size() + JOBS - 1) / JOBS;
     const size_t num_chunks = (tasks.size() + chunk_size - 1) / chunk_size;
 
@@ -93,7 +124,7 @@ void LimitedMemoryRank1Cuts::separate(const SparseMatrix &A, const std::vector<d
         stdexec::just(), num_chunks, [this, &A, &x, chunk_size, &p, rhs, &chunk_cuts](std::size_t chunk_idx) {
             // Each chunk gets its own temporary vector.
             std::vector<std::pair<double, Cut>> local_cuts;
-            std::vector<int>                    expanded(A.num_cols, 0);
+            std::vector<int>                    expanded(allPaths.size(), 0);
             std::vector<int>                    touched_paths;
             std::vector<int>                    candidate_paths;
             std::vector<double>                 candidate_coefficients;
@@ -113,6 +144,7 @@ void LimitedMemoryRank1Cuts::separate(const SparseMatrix &A, const std::vector<d
                 const auto accumulate_node_paths = [&](int customer) {
                     if (auto it = row_indices_map.find(customer); it != row_indices_map.end()) {
                         for (int path_idx : it->second) {
+                            if (path_idx < 0 || static_cast<size_t>(path_idx) >= allPaths.size()) continue;
                             if (expanded[path_idx]++ == 0) { touched_paths.push_back(path_idx); }
                         }
                     }
@@ -178,24 +210,21 @@ void LimitedMemoryRank1Cuts::separate(const SparseMatrix &A, const std::vector<d
                     candidate_coefficients.clear();
                     candidate_coefficients.reserve(candidate_paths.size());
                     for (int path_idx : candidate_paths) {
+                        if (static_cast<size_t>(path_idx) >= x.size()) {
+                            candidate_coefficients.push_back(0.0);
+                            continue;
+                        }
                         const auto  &clients = allPaths[path_idx].route;
                         const double coeff   = computeLimitedMemoryCoefficient(C, AM, p, clients, order);
                         candidate_coefficients.push_back(coeff);
                         exact_lhs += coeff * x[path_idx];
                     }
 
-                    // If the exact limited-memory evaluation is still violated,
-                    // materialize the full coefficient vector and store the cut.
-                    if (numericutils::gte(exact_lhs, rhs)) {
-                        std::vector<double> cut_coefficients(allPaths.size(), 0.0);
-                        for (size_t idx = 0; idx < candidate_paths.size(); ++idx) {
-                            if (!numericutils::isZero(candidate_coefficients[idx])) {
-                                cut_coefficients[candidate_paths[idx]] = candidate_coefficients[idx];
-                            }
-                        }
-                        Cut cut(C, AM, cut_coefficients, p);
+                    if (exact_lhs > rhs + SRC_SEPARATION_TOL) {
+                        Cut cut(C, AM, {}, p);
                         cut.baseSetOrder = order;
-                        local_cuts.emplace_back(exact_lhs, cut);
+                        set_sparse_coefficients(cut, candidate_paths, candidate_coefficients);
+                        local_cuts.emplace_back(exact_lhs - rhs, cut);
                     }
                 }
 
@@ -217,17 +246,38 @@ void LimitedMemoryRank1Cuts::separate(const SparseMatrix &A, const std::vector<d
     // === Post-Processing: Sort and Add Cuts ===
     pdqsort(tmp_cuts.begin(), tmp_cuts.end(), [](const auto &a, const auto &b) { return a.first > b.first; });
 
-    // Determine limits for adding cuts.
-    int max_cuts       = std::min(static_cast<int>(tmp_cuts.size()), 3);
-    int max_trials     = 15;
-    int cuts_added     = 0;
-    int cuts_orig_size = cutStorage.size();
+    std::vector<int> vertex_cut_budget(N_SIZE, MAX_VERTEX_RELATED_SRC_CUTS);
+    for (const auto &existing_cut : cutStorage) {
+        for (int node : collect_cut_nodes(existing_cut, false)) {
+            if (node >= 0 && node < N_SIZE) { --vertex_cut_budget[node]; }
+        }
+    }
 
-    // Add cuts from tmp_cuts, up to limits.
-    for (int i = 0; i < static_cast<int>(tmp_cuts.size()); ++i) {
-        if (cuts_added >= max_cuts || max_trials <= 0) break;
-        auto &cut = tmp_cuts[i].second;
+    int cuts_added = 0;
+    int max_trials = 15;
+    for (auto &candidate : tmp_cuts) {
+        if (cuts_added >= MAX_RANK3_CUTS_PER_ROUND || max_trials <= 0) break;
+        if (candidate.first <= SRC_SEPARATION_TOL) break;
+
+        auto &cut = candidate.second;
+        cut.key   = cutStorage.compute_cut_key(cut.baseSet, cut.p.num, cut.p.den);
+        if (cutStorage.cutExists(cut.key).first >= 0) { continue; }
+
+        auto nodes = collect_cut_nodes(cut, false);
+        bool keep  = true;
+        for (int node : nodes) {
+            if (node >= 0 && node < N_SIZE && vertex_cut_budget[node] <= 0) {
+                keep = false;
+                break;
+            }
+        }
+        if (!keep) { continue; }
+
+        --max_trials;
         cutStorage.addCut(cut);
+        for (int node : nodes) {
+            if (node >= 0 && node < N_SIZE) { --vertex_cut_budget[node]; }
+        }
         ++cuts_added;
     }
 }
@@ -255,6 +305,9 @@ std::pair<bool, bool> LimitedMemoryRank1Cuts::runSeparation(BNBNode *node, std::
     // fmt::print("Separation Rank-3 cuts...\n");
     const size_t initial_cut_count = cuts->size();
     separate(matrix.A_sparse, solution);
+    // Adjacency-based rank-3 separation (RouteOpt generateR1C3 style):
+    // focuses on triples where nodes are structurally adjacent in routes.
+    separateR1C3Adjacency(matrix.A_sparse, solution);
 
     // Record the cut count after the first separation phase.
     int rank3_cuts_size = static_cast<int>(cuts->size() - initial_cut_count);
@@ -283,7 +336,232 @@ std::pair<bool, bool> LimitedMemoryRank1Cuts::runSeparation(BNBNode *node, std::
 
     // Determine if any cuts have changed compared to before the separation.
     bool cuts_changed = (cuts_before != cuts->size());
+    if (!cuts_changed) {
+        for (const auto &cut : *cuts) {
+            if (!cut.added || cut.updated) {
+                cuts_changed = true;
+                break;
+            }
+        }
+    }
     return std::make_pair(cuts_changed, cleared);
+}
+
+/**
+ * @brief Adjacency-based rank-3 SRC separator (RouteOpt generateR1C3 style).
+ *
+ * For each customer pair (i,j):
+ *   - If (i,j) are consecutive in some route  → candidate k's = union of their adjacency lists
+ *   - Otherwise                               → candidate k's = intersection of their adjacency lists
+ * Violation is screened with the fast floor formula Σ_r ⌊(v_i+v_j+v_k)/2⌋·x_r.
+ * Promising triples are then re-evaluated with the exact limited-memory coefficient
+ * before being added to the cut storage.
+ *
+ * This is called in addition to separate() and typically finds cuts with strong
+ * structural locality that the O(n³) enumeration may reach less efficiently.
+ */
+void LimitedMemoryRank1Cuts::separateR1C3Adjacency(const SparseMatrix &A, const std::vector<double> &x) {
+    if (allPaths.empty() || x.empty()) return;
+
+    const int all_num_routes = static_cast<int>(allPaths.size());
+
+    // ── Build adjacency graph ────────────────────────────────────────────────
+    // i_connections[v] = sorted list of customer nodes appearing consecutively
+    // with v in any route.  Depot nodes (0 and N_SIZE-1) are excluded.
+    std::vector<std::vector<int>> i_connections(N_SIZE);
+    for (const auto &path : allPaths) {
+        const auto &route = path.route;
+        for (int pos = 0; pos + 1 < static_cast<int>(route.size()); ++pos) {
+            const int u = route[pos], v = route[pos + 1];
+            if (u > 0 && u < N_SIZE - 1 && v > 0 && v < N_SIZE - 1) {
+                i_connections[u].push_back(v);
+                i_connections[v].push_back(u);
+            }
+        }
+    }
+    for (int v = 0; v < N_SIZE; ++v) {
+        std::sort(i_connections[v].begin(), i_connections[v].end());
+        i_connections[v].erase(std::unique(i_connections[v].begin(), i_connections[v].end()),
+                               i_connections[v].end());
+    }
+
+    // ── Standard rank-3 permutation ─────────────────────────────────────────
+    SRCPermutation p;
+    p.num      = {1, 1, 1};
+    p.den      = 2;
+    const double rhs = p.getRHS(); // = 1.0
+
+    // ── Screening pass: collect violated (i,j,k) triples ───────────────────
+    std::vector<std::pair<double, std::array<int, 3>>> cut_candidates;
+    cut_candidates.reserve(1024);
+
+    std::vector<int>  v_tmp;                          // candidate k nodes
+    std::vector<int>  v_tmp2(all_num_routes, 0);      // visit-count accumulator
+    std::vector<int>  touched_routes;                 // routes with v_tmp2 > 0
+    std::vector<bool> in_touched(all_num_routes, false);
+    touched_routes.reserve(256);
+
+    for (int i = 1; i < N_SIZE - 1; ++i) {
+        if (i_connections[i].empty()) continue;
+        for (int j = i + 1; j < N_SIZE - 1; ++j) {
+            if (i_connections[j].empty()) continue;
+
+            // Generate candidate k set
+            v_tmp.clear();
+            const bool ij_adjacent =
+                std::binary_search(i_connections[i].begin(), i_connections[i].end(), j);
+            if (ij_adjacent) {
+                std::set_union(i_connections[i].begin(), i_connections[i].end(),
+                               i_connections[j].begin(), i_connections[j].end(),
+                               std::back_inserter(v_tmp));
+            } else {
+                std::set_intersection(i_connections[i].begin(), i_connections[i].end(),
+                                      i_connections[j].begin(), i_connections[j].end(),
+                                      std::back_inserter(v_tmp));
+            }
+            if (v_tmp.empty()) continue;
+
+            // Accumulate visit counts for i and j
+            touched_routes.clear();
+            if (auto it = row_indices_map.find(i); it != row_indices_map.end()) {
+                for (int r : it->second) {
+                    if (!in_touched[r]) { in_touched[r] = true; touched_routes.push_back(r); }
+                    v_tmp2[r] += vertex_route_map[i][r];
+                }
+            }
+            if (auto it = row_indices_map.find(j); it != row_indices_map.end()) {
+                for (int r : it->second) {
+                    if (!in_touched[r]) { in_touched[r] = true; touched_routes.push_back(r); }
+                    v_tmp2[r] += vertex_route_map[j][r];
+                }
+            }
+
+            for (int k : v_tmp) {
+                if (k <= j || k <= 0 || k >= N_SIZE - 1) continue;
+
+                // Temporarily add k's visits
+                if (auto it = row_indices_map.find(k); it != row_indices_map.end()) {
+                    for (int r : it->second) {
+                        if (!in_touched[r]) { in_touched[r] = true; touched_routes.push_back(r); }
+                        v_tmp2[r] += vertex_route_map[k][r];
+                    }
+                }
+
+                // Floor-formula violation screening
+                double vio = -rhs;
+                for (int r : touched_routes) {
+                    if (v_tmp2[r] >= 2 && static_cast<size_t>(r) < x.size())
+                        vio += (v_tmp2[r] / 2) * x[r];
+                }
+
+                // Remove k's visits (restore (i,j)-only state)
+                if (auto it = row_indices_map.find(k); it != row_indices_map.end()) {
+                    for (int r : it->second) v_tmp2[r] -= vertex_route_map[k][r];
+                }
+
+                if (vio > SRC_SEPARATION_TOL) {
+                    cut_candidates.emplace_back(vio, std::array<int, 3>{i, j, k});
+                }
+            }
+
+            // Reset accumulators for the next (i,j) pair
+            for (int r : touched_routes) { v_tmp2[r] = 0; in_touched[r] = false; }
+        }
+    }
+
+    if (cut_candidates.empty()) return;
+
+    // Sort by descending violation
+    pdqsort(cut_candidates.begin(), cut_candidates.end(),
+            [](const auto &a, const auto &b) { return a.first > b.first; });
+
+    // ── Budget tracking (mirror the logic in separate()) ────────────────────
+    std::vector<int> vertex_cut_budget(N_SIZE, MAX_VERTEX_RELATED_SRC_CUTS);
+    for (const auto &existing_cut : cutStorage) {
+        for (int node : collect_cut_nodes(existing_cut, false)) {
+            if (node >= 0 && node < N_SIZE) --vertex_cut_budget[node];
+        }
+    }
+
+    // ── Exact evaluation + insertion ────────────────────────────────────────
+    int cuts_added = 0;
+    int max_trials = 15;
+
+    for (const auto &[rough_vio, ijk] : cut_candidates) {
+        if (cuts_added >= MAX_RANK3_CUTS_PER_ROUND || max_trials <= 0) break;
+        if (rough_vio <= SRC_SEPARATION_TOL) break;
+
+        const int i = ijk[0], j = ijk[1], k = ijk[2];
+
+        // Build base set C and initial memory AM = C
+        std::array<uint64_t, num_words> C     = {};
+        std::array<uint64_t, num_words> AM    = {};
+        std::vector<int>                order(N_SIZE, -1);
+        int                             ordering = 0;
+        for (int node : {i, j, k}) {
+            C[node / 64]  |= (1ULL << (node % 64));
+            AM[node / 64] |= (1ULL << (node % 64));
+            order[node] = ordering++;
+        }
+
+        // Grow AM: add intermediate nodes between the first two cut-vertex
+        // visits in every route with x > 0.
+        const auto is_base_node = [&](int n) noexcept { return n == i || n == j || n == k; };
+        for (int r = 0; r < all_num_routes; ++r) {
+            if (static_cast<size_t>(r) >= x.size() || numericutils::isZero(x[r])) continue;
+            const auto &route = allPaths[r].route;
+            int first = -1, second = -1;
+            for (int pos = 1; pos + 1 < static_cast<int>(route.size()); ++pos) {
+                if (is_base_node(route[pos])) {
+                    if (first < 0) first = pos;
+                    else { second = pos; break; }
+                }
+            }
+            if (second < 0) continue;
+            for (int inner = first + 1; inner < second; ++inner) {
+                const int node = route[inner];
+                AM[node / 64] |= (1ULL << (node % 64));
+            }
+        }
+
+        // Compute exact violation with the limited-memory coefficient
+        double              exact_vio = -rhs;
+        std::vector<int>    cand_paths;
+        std::vector<double> cand_coeffs;
+        for (int r = 0; r < all_num_routes; ++r) {
+            if (static_cast<size_t>(r) >= x.size() || numericutils::isZero(x[r])) continue;
+            const double coeff = computeLimitedMemoryCoefficient(C, AM, p, allPaths[r].route, order);
+            if (!numericutils::isZero(coeff)) {
+                exact_vio += coeff * x[r];
+                cand_paths.push_back(r);
+                cand_coeffs.push_back(coeff);
+            }
+        }
+
+        if (exact_vio <= SRC_SEPARATION_TOL) { --max_trials; continue; }
+
+        Cut cut(C, AM, {}, p);
+        cut.baseSetOrder = order;
+        cut.type         = CutType::ThreeRow;
+        set_sparse_coefficients(cut, cand_paths, cand_coeffs);
+
+        cut.key = cutStorage.compute_cut_key(cut.baseSet, cut.p.num, cut.p.den);
+        if (cutStorage.cutExists(cut.key).first >= 0) { --max_trials; continue; }
+
+        const auto nodes_in_cut = collect_cut_nodes(cut, false);
+        bool       keep         = true;
+        for (int node : nodes_in_cut) {
+            if (node >= 0 && node < N_SIZE && vertex_cut_budget[node] <= 0) { keep = false; break; }
+        }
+        if (!keep) { --max_trials; continue; }
+
+        --max_trials;
+        cutStorage.addCut(cut);
+        for (int node : nodes_in_cut) {
+            if (node >= 0 && node < N_SIZE) --vertex_cut_budget[node];
+        }
+        ++cuts_added;
+    }
 }
 
 bool LimitedMemoryRank1Cuts::cutCleaner(BNBNode *node, std::vector<baldesCtrPtr> &SRCconstraints) {
@@ -350,7 +628,8 @@ double LimitedMemoryRank1Cuts::computeLimitedMemoryCoefficient(const std::array<
 
         if (!(AM[word] & bit_mask) || !(AM[prev_word] & prev_mask)) {
             S = 0; // Reset S if vj or previous node is not in AM
-        } else if ((C[word] & bit_mask) && (C[prev_word] & prev_mask)) {
+        }
+        if (C[word] & bit_mask) {
             const int pos = order[vj];
             S += p.num[pos];
             if (S >= den) {

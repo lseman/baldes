@@ -158,10 +158,6 @@ struct alignas(64) Bucket {
                          ExtraDominanceFunc &&extra_dominance_func, uint &stat_n_dom) const noexcept {
         if (!new_label) return false;
         if (labels.empty() && extra_labels.empty()) return false;
-        // Early exit: if the bucket's best cost is higher than the new label's
-        // cost, it cannot be dominated.
-        if (get_cb() > new_label->cost) return false;
-
         if (!labels.empty() && !is_virtual_split) {
             if (sorted_dominance_func(std::span<Label *const>(labels.data(), labels.size()), stat_n_dom)) {
                 return true;
@@ -203,11 +199,11 @@ struct alignas(64) Bucket {
      */
     template <Direction D>
     void add_bucket_arc(int from_bucket, int to_bucket, const std::vector<double> &res_inc, double cost_inc,
-                        bool fixed) {
+                        bool fixed, int jump_to_node = -1) {
         if constexpr (D == Direction::Forward) {
-            fw_bucket_arcs.emplace_back(from_bucket, to_bucket, res_inc, cost_inc, fixed);
+            fw_bucket_arcs.emplace_back(from_bucket, to_bucket, res_inc, cost_inc, fixed, jump_to_node);
         } else {
-            bw_bucket_arcs.emplace_back(from_bucket, to_bucket, res_inc, cost_inc, fixed);
+            bw_bucket_arcs.emplace_back(from_bucket, to_bucket, res_inc, cost_inc, fixed, jump_to_node);
         }
     }
 

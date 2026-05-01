@@ -122,6 +122,70 @@ inline std::vector<SRCPermutation> generateGeneticPermutations(int candidateSize
     return allPerms;
 }
 
+inline std::vector<SRCPermutation> generateExactPermutations(int candidateSize) {
+    std::vector<std::pair<std::vector<int>, int>> plans;
+    auto                                          add_plan = [&](std::vector<int> base, int den) {
+        if (den < 2) return;
+        plans.emplace_back(std::move(base), den);
+    };
+
+    if (candidateSize % 2 == 1) { add_plan(std::vector<int>(candidateSize, 1), 2); }
+
+    if (candidateSize >= 5 && (candidateSize - 2) % 3 == 0) { add_plan(std::vector<int>(candidateSize, 1), 3); }
+
+    if (candidateSize >= 4) {
+        auto plan = std::vector<int>(candidateSize, 1);
+        plan[0]   = candidateSize - 2;
+        add_plan(plan, candidateSize - 1);
+    }
+
+    if (candidateSize >= 5) {
+        auto plan2 = std::vector<int>(candidateSize, 1);
+        plan2[0]   = candidateSize - 3;
+        plan2[1]   = candidateSize - 3;
+        plan2[2]   = 2;
+        add_plan(plan2, candidateSize - 2);
+
+        auto plan3 = std::vector<int>(candidateSize, 1);
+        plan3[0]   = candidateSize - 2;
+        plan3[1]   = candidateSize - 2;
+        plan3[2]   = 2;
+        plan3[3]   = 2;
+        add_plan(plan3, candidateSize - 1);
+
+        auto plan4 = std::vector<int>(candidateSize, 1);
+        plan4[0]   = candidateSize - 3;
+        plan4[1]   = 2;
+        add_plan(plan4, candidateSize - 1);
+
+        auto plan6 = std::vector<int>(candidateSize, 1);
+        plan6[0]   = candidateSize - 2;
+        plan6[1]   = 2;
+        plan6[2]   = 2;
+        add_plan(plan6, candidateSize);
+    }
+
+    if (candidateSize >= 4) {
+        auto plan5 = std::vector<int>(candidateSize, 1);
+        plan5[0]   = candidateSize - 2;
+        add_plan(plan5, candidateSize - 1);
+    }
+
+    std::sort(plans.begin(), plans.end(), [](const auto &a, const auto &b) {
+        if (a.second != b.second) return a.second < b.second;
+        return a.first < b.first;
+    });
+    plans.erase(std::unique(plans.begin(), plans.end()), plans.end());
+
+    std::vector<SRCPermutation> allPerms;
+    for (auto &plan : plans) {
+        auto perms = generateRuntimePermutations(plan.first, plan.second);
+        allPerms.insert(allPerms.end(), perms.begin(), perms.end());
+    }
+
+    return allPerms;
+}
+
 namespace std {
 template <>
 struct hash<std::vector<int>> {
@@ -163,9 +227,18 @@ struct CandidateSet {
                  const ankerl::unordered_dense::set<int> &neigh, double r = 0.0)
         : nodes(n), violation(v), perm(p), neighbor(neigh), rhs(r) {}
 
+    CandidateSet(const std::vector<int> &n, double v, const SRCPermutation &p,
+                 const ankerl::unordered_dense::set<int> &neigh, double r = 0.0)
+        : nodes(n.begin(), n.end()), violation(v), perm(p), neighbor(neigh), rhs(r) {}
+
+    CandidateSet(const std::vector<int> &n, double v, const SRCPermutation &p, const std::vector<int> &neigh,
+                 double r = 0.0)
+        : nodes(n.begin(), n.end()), violation(v), perm(p), neighbor(neigh.begin(), neigh.end()), rhs(r) {}
+
     // Equality operator for comparison
     bool operator==(const CandidateSet &other) const {
-        return nodes == other.nodes && perm.den == other.perm.den && perm.num == other.perm.num;
+        return nodes == other.nodes && neighbor == other.neighbor && perm.den == other.perm.den &&
+               perm.num == other.perm.num;
     }
 
     // Less than operator for std::set
@@ -188,7 +261,7 @@ struct CandidateSet {
 struct CandidateSetCompare {
     bool operator()(const CandidateSet &a, const CandidateSet &b) const {
         // First check if they represent the same core elements
-        if (a.nodes == b.nodes && a.perm.num == b.perm.num && a.perm.den == b.perm.den) {
+        if (a.nodes == b.nodes && a.perm.num == b.perm.num && a.perm.den == b.perm.den && a.neighbor == b.neighbor) {
             // If they're the same, keep the one with higher violation
             // by making it "less than" so it wins
             return a.violation > b.violation;
@@ -197,7 +270,13 @@ struct CandidateSetCompare {
         // For different elements, establish consistent ordering
         if (a.nodes != b.nodes) return a.nodes.size() < b.nodes.size();
         if (a.perm.num != b.perm.num) return a.perm.num < b.perm.num;
-        return a.perm.den < b.perm.den;
+        if (a.perm.den != b.perm.den) return a.perm.den < b.perm.den;
+        if (a.neighbor.size() != b.neighbor.size()) return a.neighbor.size() < b.neighbor.size();
+        std::vector<int> a_neigh(a.neighbor.begin(), a.neighbor.end());
+        std::vector<int> b_neigh(b.neighbor.begin(), b.neighbor.end());
+        std::sort(a_neigh.begin(), a_neigh.end());
+        std::sort(b_neigh.begin(), b_neigh.end());
+        return a_neigh < b_neigh;
     }
 };
 
@@ -207,10 +286,13 @@ struct CandidateSetHasher {
         XXH3_state_t *state = XXH3_createState();
         assert(state != nullptr);
         XXH3_64bits_reset(state);
-        // Convert unordered nodes to a sorted vector.
+        // Convert unordered nodes and neighbors to sorted vectors.
         std::vector<int> sorted_nodes(cs.nodes.begin(), cs.nodes.end());
         std::sort(sorted_nodes.begin(), sorted_nodes.end());
         XXH3_64bits_update(state, sorted_nodes.data(), sorted_nodes.size() * sizeof(int));
+        std::vector<int> sorted_neighbor(cs.neighbor.begin(), cs.neighbor.end());
+        std::sort(sorted_neighbor.begin(), sorted_neighbor.end());
+        XXH3_64bits_update(state, sorted_neighbor.data(), sorted_neighbor.size() * sizeof(int));
         // Hash the permutation numerator (assumed to be a vector<int>).
         XXH3_64bits_update(state, cs.perm.num.data(), cs.perm.num.size() * sizeof(int));
         // Hash the permutation denominator.
@@ -235,6 +317,9 @@ struct hash<CandidateSet> {
         std::vector<int> sorted_nodes(cs.nodes.begin(), cs.nodes.end());
         std::sort(sorted_nodes.begin(), sorted_nodes.end());
         XXH3_64bits_update(state, sorted_nodes.data(), sorted_nodes.size() * sizeof(int));
+        std::vector<int> sorted_neighbor(cs.neighbor.begin(), cs.neighbor.end());
+        std::sort(sorted_neighbor.begin(), sorted_neighbor.end());
+        XXH3_64bits_update(state, sorted_neighbor.data(), sorted_neighbor.size() * sizeof(int));
         // Hash the permutation numerator (assumed to be a vector<int>).
         XXH3_64bits_update(state, cs.perm.num.data(), cs.perm.num.size() * sizeof(int));
         // Hash the permutation denominator.
