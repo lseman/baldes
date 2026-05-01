@@ -240,7 +240,7 @@ execute_process(
   OUTPUT_STRIP_TRAILING_WHITESPACE
 )
 add_definitions(-DGIT_COMMIT_HASH="${GIT_COMMIT_HASH}")
-if(DSRC_MEMORY_MODE_ARC)
+if(SRC_MEMORY_MODE_ARC)
   add_definitions(-DSRC_MEMORY_MODE_ARC)
 else()
   add_definitions(-DSRC_MEMORY_MODE_NODE)

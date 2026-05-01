@@ -35,6 +35,10 @@ BucketArc::BucketArc(int from, int to, const std::vector<double> &res_inc, doubl
 BucketArc::BucketArc(int from, int to, const std::vector<double> &res_inc, double cost_inc, bool fixed)
     : from_bucket(from), to_bucket(to), resource_increment(res_inc), cost_increment(cost_inc), jump(fixed) {}
 
+BucketArc::BucketArc(int from, int to, const std::vector<double> &res_inc, double cost_inc, bool fixed, int to_node)
+    : from_bucket(from), to_bucket(to), resource_increment(res_inc), cost_increment(cost_inc), jump(fixed),
+      jump_to_node(to_node) {}
+
 JumpArc::JumpArc(int base, int jump, const std::vector<double> &res_inc, double cost_inc)
     : base_bucket(base), jump_bucket(jump), resource_increment(res_inc), cost_increment(cost_inc) {}
 

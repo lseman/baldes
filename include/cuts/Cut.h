@@ -92,6 +92,9 @@ struct Cut {
     }
 
     bool isSRCset(int i) const { return baseSet[i / 64] & (1ULL << (i % 64)); }
+    bool isSRCMemoryNode(int i) const { return neighbors[i / 64] & (1ULL << (i % 64)); }
+    bool isSRCMemoryArc(int i, int j) const { return i >= 0 && j >= 0 && isSRCMemoryNode(i) && isSRCMemoryNode(j); }
+    int  srcMultiplier(int node) const { return p.num[baseSetOrder[node]]; }
 
     double rhs = 1;
     int    id  = -1;
@@ -155,6 +158,10 @@ struct ActiveCutInfo {
                (cut_ptr->neighbors[i / 64] & mask_i) && (cut_ptr->neighbors[j / 64] & mask_j);
     }
     bool isSRCset(int i) const { return cut_ptr->baseSet[i / 64] & (1ULL << (i % 64)); };
+    bool isSRCMemoryNode(int i) const { return cut_ptr->neighbors[i / 64] & (1ULL << (i % 64)); }
+    bool isSRCMemoryArc(int i, int j) const {
+        return i >= 0 && j >= 0 && isSRCMemoryNode(i) && isSRCMemoryNode(j);
+    }
 };
 class CutStorage {
 public:
@@ -321,28 +328,14 @@ public:
         // Remove the associated dual if it exists.
         if (cutIndex < static_cast<int>(SRCDuals.size())) { SRCDuals.erase(SRCDuals.begin() + cutIndex); }
 
-        // Update the IDs for remaining cuts: any cut with an ID greater than
-        // the removed index gets decremented.
-        for (auto &cut : cuts) {
-            if (cut.id > cutIndex) { cut.id--; }
+        cutMaster_to_cut_map.clear();
+        indexCuts.clear();
+        for (int idx = 0; idx < static_cast<int>(cuts.size()); ++idx) {
+            cuts[idx].id                       = idx;
+            cutMaster_to_cut_map[cuts[idx].key] = idx;
+            indexCuts[cuts[idx].key].push_back(idx);
         }
-
-        // Remove the corresponding entry from the cutMaster_to_cut_map.
-        auto it = std::find_if(cutMaster_to_cut_map.begin(), cutMaster_to_cut_map.end(),
-                               [cutIndex](const auto &pair) { return pair.second == cutIndex; });
-
-        if (it != cutMaster_to_cut_map.end()) {
-            cutMaster_to_cut_map.erase(it);
-        } else {
-            std::cerr << "Cut index " << cutIndex << " not found in cutMaster_to_cut_map." << std::endl;
-            return;
-        }
-
-        // Update indices in cutMaster_to_cut_map for all entries with indices
-        // greater than the removed cutIndex.
-        for (auto &entry : cutMaster_to_cut_map) {
-            if (entry.second > cutIndex) { entry.second--; }
-        }
+        updateActiveCuts();
     }
 
     // Set dual values for SRC
@@ -421,7 +414,8 @@ public:
 
                 if (!(neighborsBitset[word] & bit_mask) || !(neighborsBitset[prev_word] & prev_mask)) {
                     runningSum = 0;
-                } else if ((baseSetBitset[word] & bit_mask) && (baseSetBitset[prev_word] & prev_mask)) {
+                }
+                if (baseSetBitset[word] & bit_mask) {
                     const int pos = baseSetOrder[nodeId];
                     runningSum += pValues[pos];
                     if (runningSum >= denominator) {
@@ -513,7 +507,8 @@ public:
 
                 if (!(neighborsBitset[word] & bit_mask) || !(neighborsBitset[prev_word] & prev_mask)) {
                     runningSum = 0;
-                } else if ((baseSetBitset[word] & bit_mask) && (baseSetBitset[prev_word] & prev_mask)) {
+                }
+                if (baseSetBitset[word] & bit_mask) {
                     const int pos = baseSetOrder[nodeId];
                     runningSum += pValues[pos];
                     if (runningSum >= denominator) {
@@ -644,52 +639,17 @@ public:
             for (auto node_id : label->getRoute()) {
                 double total_cost_update = 0.0;
 #if defined(SRC_MEMORY_MODE_ARC)
-                const size_t segment      = node_id >> 6;
-                const size_t bit_position = node_id & 63;
-
-                auto      &masks          = getSegmentMasks();
-                const auto cut_limit_mask = masks.get_cut_limit_mask();
-                uint64_t   valid_cuts     = masks.get_valid_cut_mask(segment, bit_position);
-                valid_cuts &= cut_limit_mask; // Safeguard
-
-                while (valid_cuts) {
-                    const int   cut_idx       = __builtin_ctzll(valid_cuts);
-                    const auto &active_cut    = active_cuts[cut_idx];
+                for (const auto &active_cut : active_cuts) {
                     const auto &cut           = *active_cut.cut_ptr;
                     auto       &src_map_value = label->SRCmap[active_cut.index];
-#if defined(SRC_MEMORY_MODE_ARC)
-                    if (prev_node >= 0) {
-                        const size_t   prev_word = prev_node >> 6;
-                        const uint64_t prev_mask = 1ULL << (prev_node & 63);
-                        if ((cut.baseSet[prev_word] & prev_mask) && (cut.baseSet[segment] & (1ULL << (node_id & 63)))) {
-                            src_map_value += cut.p.num[cut.baseSetOrder[node_id]];
-                            if (src_map_value >= cut.p.den) {
-                                src_map_value -= cut.p.den;
-                                total_cost_update -= active_cut.dual_value;
-                            }
+                    if (!cut.isSRCMemoryArc(prev_node, node_id)) { src_map_value = 0; }
+                    if (cut.isSRCset(node_id)) {
+                        src_map_value += cut.srcMultiplier(node_id);
+                        if (src_map_value >= cut.p.den) {
+                            src_map_value -= cut.p.den;
+                            total_cost_update -= active_cut.dual_value;
                         }
                     }
-#else
-                    src_map_value += cut.p.num[cut.baseSetOrder[node_id]];
-                    if (src_map_value >= cut.p.den) {
-                        src_map_value -= cut.p.den;
-                        total_cost_update -= active_cut.dual_value;
-                    }
-#endif
-                    valid_cuts &= (valid_cuts - 1);
-                }
-
-                uint64_t to_clear = (~masks.get_neighbor_mask(segment, bit_position)) & cut_limit_mask;
-                while (to_clear) {
-                    const int cut_idx = __builtin_ctzll(to_clear);
-                    if (cut_idx >= n_cuts) {
-                        fmt::print("Warning: Invalid clear_idx {} >= n_cuts "
-                                   "{}\n",
-                                   cut_idx, n_cuts);
-                        break;
-                    }
-                    label->SRCmap[active_cuts[cut_idx].index] = 0;
-                    to_clear &= (to_clear - 1);
                 }
 #else
                 for (const auto &update : getSRCNodeUpdates(node_id)) {

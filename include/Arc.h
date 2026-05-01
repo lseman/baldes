@@ -72,6 +72,7 @@ struct BucketArc {
     std::vector<double> resource_increment;
     double              cost_increment;
     bool                jump = false;
+    int                 jump_to_node = -1;
 
     bool operator==(const BucketArc &other) const {
         return from_bucket == other.from_bucket && to_bucket == other.to_bucket;
@@ -80,6 +81,8 @@ struct BucketArc {
     BucketArc(int from, int to, const std::vector<double> &res_inc, double cost_inc);
 
     BucketArc(int from, int to, const std::vector<double> &res_inc, double cost_inc, bool fixed);
+
+    BucketArc(int from, int to, const std::vector<double> &res_inc, double cost_inc, bool fixed, int to_node);
 
     // Overload < operator for map comparison
     bool operator<(const BucketArc &other) const {

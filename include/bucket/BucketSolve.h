@@ -41,7 +41,7 @@ inline std::vector<Label *> BucketGraph::solve(bool trigger) {
         fixed      = false;
     }
 
-    // updateSplit(); // Update split values for the bucket graph.
+    updateSplit(); // Update split values for the bucket graph.
     std::vector<Label *> paths;
 
     //////////////////////////////////////////////////////////////////////
@@ -127,9 +127,20 @@ inline std::vector<Label *> BucketGraph::solve(bool trigger) {
     else if (s5 && depth == 0) {
         stage = 5;
         print_info("Starting enumeration with gap {}\n", gap);
+        enumeration_failed.store(false, std::memory_order_relaxed);
         paths = bi_labeling_algorithm<Stage::Enumerate>();
-        print_info("Finished enumeration with {} paths\n", paths.size());
-        status = Status::Optimal;
+        if (paths.size() > static_cast<size_t>(enumeration_policy.max_routes)) {
+            paths.resize(static_cast<size_t>(enumeration_policy.max_routes));
+            enumeration_failed.store(true, std::memory_order_relaxed);
+        }
+        print_info("Finished enumeration with {} paths{}\n", paths.size(), enumerationFailed() ? " (cap reached)" : "");
+        if (enumerationFailed()) {
+            s4     = true;
+            s5     = false;
+            status = Status::NotOptimal;
+        } else {
+            status = Status::Optimal;
+        }
     }
 
     // Increment the iteration counter.
@@ -336,6 +347,13 @@ std::vector<double> BucketGraph::labeling_algorithm() {
 
                     // Process each new label produced by the extension.
                     if (new_label != nullptr) {
+                        if constexpr (S == Stage::Enumerate) {
+                            if (n_labels >= enumeration_policy.max_labels_per_direction) {
+                                enumeration_failed.store(true, std::memory_order_relaxed);
+                                label->set_extended(true);
+                                continue;
+                            }
+                        }
                         ++stat_n_labels;
                         const int to_bucket         = new_label->vertex;
                         auto     &mother_bucket     = buckets[to_bucket];
@@ -363,7 +381,7 @@ std::vector<double> BucketGraph::labeling_algorithm() {
                             for (auto *existing_label : to_bucket_labels) {
                                 ++bucket_scan_count;
                                 if (existing_label->is_dominated) continue;
-                                if (label->cost < existing_label->cost)
+                                if (new_label->cost < existing_label->cost)
                                     existing_label->set_dominated(true);
                                 else {
                                     dominated = true;
@@ -374,7 +392,7 @@ std::vector<double> BucketGraph::labeling_algorithm() {
                                 for (auto *existing_label : to_bucket_extra) {
                                     ++bucket_scan_count;
                                     if (existing_label->is_dominated) continue;
-                                    if (label->cost < existing_label->cost)
+                                    if (new_label->cost < existing_label->cost)
                                         existing_label->set_dominated(true);
                                     else {
                                         dominated = true;
@@ -392,6 +410,11 @@ std::vector<double> BucketGraph::labeling_algorithm() {
                         } else {
                             uint64_t inner_scan_count = 0;
 
+#if defined(SRC)
+                            constexpr bool src_adjusted_dominance = (S == Stage::Four || S == Stage::Enumerate);
+#else
+                            constexpr bool src_adjusted_dominance = false;
+#endif
                             // RC-bracketed single-pass dominance (port from
                             // RouteOpt dominance.hpp doDominance). The sorted
                             // tier is RC-sorted; we walk it once, dispatching
@@ -417,7 +440,14 @@ std::vector<double> BucketGraph::labeling_algorithm() {
                                 ++inner_scan_count;
                                 if (__builtin_expect(cur->is_dominated, 0)) continue;
                                 const double cur_cost = cur->cost;
-                                if (cur_cost < cost_lo) {
+                                if constexpr (src_adjusted_dominance) {
+                                    if (is_dominated<D, S>(new_label, cur)) {
+                                        ++stat_n_dom;
+                                        dominated = true;
+                                        break;
+                                    }
+                                    if (is_dominated<D, S>(cur, new_label)) { cur->set_dominated(true); }
+                                } else if (cur_cost < cost_lo) {
                                     // cheaper -> only "cur dominates new" is
                                     // possible.
                                     if (is_dominated<D, S>(new_label, cur)) {
@@ -447,7 +477,14 @@ std::vector<double> BucketGraph::labeling_algorithm() {
                                     ++inner_scan_count;
                                     if (__builtin_expect(cur->is_dominated, 0)) continue;
                                     const double cur_cost = cur->cost;
-                                    if (cur_cost < cost_lo) {
+                                    if constexpr (src_adjusted_dominance) {
+                                        if (is_dominated<D, S>(new_label, cur)) {
+                                            ++stat_n_dom;
+                                            dominated = true;
+                                            break;
+                                        }
+                                        if (is_dominated<D, S>(cur, new_label)) { cur->set_dominated(true); }
+                                    } else if (cur_cost < cost_lo) {
                                         if (is_dominated<D, S>(new_label, cur)) {
                                             ++stat_n_dom;
                                             dominated = true;
@@ -509,10 +546,10 @@ std::vector<double> BucketGraph::labeling_algorithm() {
         auto sorted_buckets = sorted_sccs[scc_index];
         if constexpr (D == Direction::Forward) {
             pdqsort(sorted_buckets.begin(), sorted_buckets.end(),
-                    [&](int a, int b) { return buckets[a].get_lb() < buckets[b].get_lb(); });
+                    [&](int a, int b) { return buckets[a].lb < buckets[b].lb; });
         } else {
             pdqsort(sorted_buckets.begin(), sorted_buckets.end(),
-                    [&](int a, int b) { return buckets[a].get_ub() > buckets[b].get_ub(); });
+                    [&](int a, int b) { return buckets[a].ub > buckets[b].ub; });
         }
 
         // Prefetch data for c_bar updates
@@ -625,7 +662,9 @@ std::vector<Label *> BucketGraph::bi_labeling_algorithm() {
     if constexpr (SYM == Symmetry::Asymmetric) {
         // Compute the best label if the forward and backward labels are
         // feasible.
-        if (check_feasibility(fw_best_label, bw_best_label)) {
+        if (fw_best_label->node_id != bw_best_label->node_id &&
+            !visited_overlap(fw_best_label->visited_bitmap, bw_best_label->visited_bitmap) &&
+            check_feasibility(fw_best_label, bw_best_label)) {
             best_label = compute_label<S>(fw_best_label, bw_best_label);
         } else {
             best_label->cost      = 0.0;
@@ -646,7 +685,7 @@ std::vector<Label *> BucketGraph::bi_labeling_algorithm() {
 
     // === Parallel Bucket Processing ===
     // Choose a chunk size based on hardware concurrency.
-    const size_t chunk_size = fw_buckets_size / MERGE_SCHED_CONCURRENCY; // 1/4 of buckets per core
+    const size_t chunk_size = std::max<size_t>(1, fw_buckets_size / MERGE_SCHED_CONCURRENCY);
     const size_t n_chunks   = (fw_buckets_size + chunk_size - 1) / chunk_size;
 
     auto bulk_sender = stdexec::bulk(
@@ -669,7 +708,8 @@ std::vector<Label *> BucketGraph::bi_labeling_algorithm() {
                     // nodes[L->node_id].get_arcs<Direction::Forward>();
                     const auto &to_arcs = fw_buckets[bucket].template get_bucket_arcs<Direction::Forward>();
                     for (const auto &arc : to_arcs) {
-                        const int to_node = fw_buckets[arc.to_bucket].node_id;
+                        const int to_node = arc.jump ? arc.jump_to_node : fw_buckets[arc.to_bucket].node_id;
+                        if (to_node < 0) continue;
                         if constexpr (S >= Stage::Three || S == Stage::Eliminate) {
                             if (is_arc_fixed(L->node_id, to_node)) continue;
                         }
@@ -680,11 +720,37 @@ std::vector<Label *> BucketGraph::bi_labeling_algorithm() {
 
                         // Process each extended label.
                         if (L_prime != -1) {
-                            int bucket_to_process = L_prime;
+                            int         bucket_to_process = L_prime;
+                            SpliceState splice_state;
+                            splice_state.resources = L->resources;
+
+                            std::array<double, R_SIZE> base_resources = L->resources;
+                            if (arc.jump) {
+                                const auto &jump_bucket = fw_buckets[arc.to_bucket];
+                                for (size_t r = 0; r < options.resources.size(); ++r) {
+                                    base_resources[r] = std::max(base_resources[r], jump_bucket.lb[r]);
+                                }
+                            }
+
+                            std::vector<double> splice_resources(options.resources.size());
+                            if (!process_all_resources<Direction::Forward>(splice_resources, base_resources, arc,
+                                                                           nodes[to_node], options.resources.size())) {
+                                continue;
+                            }
+                            for (size_t r = 0; r < options.resources.size(); ++r) {
+                                splice_state.resources[r] = splice_resources[r];
+                            }
+
+#if defined(SRC)
+                            if constexpr (S == Stage::Four || S == Stage::Enumerate) {
+                                splice_state.SRCmap  = L->SRCmap;
+                                splice_state.has_src = true;
+                            }
+#endif
 
                             // Concatenate the label with bucket
                             // information, updating best_cost.
-                            ConcatenateLabel<S, SYM>(L, bucket_to_process, best_cost);
+                            ConcatenateLabel<S, SYM>(L, bucket_to_process, best_cost, &splice_state);
                         }
                     }
                 }
@@ -762,27 +828,38 @@ inline auto BucketGraph::Extend(const std::conditional_t<M == Mutability::Mut, L
     const auto  &initial_resources = L_prime->resources; // Use reference instead of copy
     const double initial_cost      = L_prime->cost;
 
-    // Determine target node ID based on arc type
-    int node_id;
+    // Determine target node ID based on arc type. A bucket jump arc is stored
+    // as a marked BucketArc whose to_bucket is the jump bucket and whose
+    // jump_to_node is the head of the original arc.
+    int  node_id;
+    int  jump_bucket_id = -1;
+    bool is_jump_arc    = false;
     if constexpr (A == ArcType::Bucket) {
-        node_id = assign_buckets<D>(fw_buckets, bw_buckets)[gamma.to_bucket].node_id;
+        if (gamma.jump) {
+            if (gamma.jump_to_node < 0) {
+                if constexpr (F == Full::Reverse)
+                    return -1;
+                else
+                    return result;
+            }
+            node_id        = gamma.jump_to_node;
+            jump_bucket_id = gamma.to_bucket;
+            is_jump_arc    = true;
+        } else {
+            node_id = assign_buckets<D>(fw_buckets, bw_buckets)[gamma.to_bucket].node_id;
+        }
     } else if constexpr (A == ArcType::Node) {
         node_id = gamma.to;
     } else { // Jump arc
-        auto &buckets      = assign_buckets<D>(fw_buckets, bw_buckets);
-        node_id            = buckets[gamma.jump_bucket].node_id;
-        const auto &bucket = buckets[gamma.jump_bucket];
-
-        // Fast copy the resources
-        std::memcpy(new_resources.data(), initial_resources.data(), n_resources * sizeof(double));
-
-        // Update resource bounds based on jump bucket properties
-        for (size_t i = 0; i < n_resources; ++i) {
-            if constexpr (D == Direction::Forward) {
-                new_resources[i] = std::max(new_resources[i], static_cast<double>(bucket.lb[i]));
-            } else {
-                new_resources[i] = std::min(new_resources[i], static_cast<double>(bucket.ub[i]));
-            }
+        auto &buckets  = assign_buckets<D>(fw_buckets, bw_buckets);
+        node_id        = gamma.to_job;
+        jump_bucket_id = gamma.jump_bucket;
+        is_jump_arc    = true;
+        if (node_id < 0 || jump_bucket_id < 0 || jump_bucket_id >= static_cast<int>(buckets.size())) {
+            if constexpr (F == Full::Reverse)
+                return -1;
+            else
+                return result;
         }
     }
 
@@ -807,40 +884,41 @@ inline auto BucketGraph::Extend(const std::conditional_t<M == Mutability::Mut, L
 
     // Process resources (feasibility check)
     if constexpr (F != Full::TSP) {
+        auto process_jump_resources = [&]() -> bool {
+            auto &buckets = assign_buckets<D>(fw_buckets, bw_buckets);
+            if (jump_bucket_id < 0 || jump_bucket_id >= static_cast<int>(buckets.size())) return false;
+            const auto &jump_bucket = buckets[jump_bucket_id];
+
+            std::array<double, R_SIZE> jumped_resources = initial_resources;
+            for (size_t i = 0; i < n_resources; ++i) {
+                if constexpr (D == Direction::Forward) {
+                    jumped_resources[i] = std::max(jumped_resources[i], static_cast<double>(jump_bucket.lb[i]));
+                } else {
+                    jumped_resources[i] = std::min(jumped_resources[i], static_cast<double>(jump_bucket.ub[i]));
+                }
+            }
+            return process_all_resources<D>(new_resources, jumped_resources, gamma, nodes[node_id], n_resources);
+        };
+
         if constexpr (A != ArcType::Jump) {
             // Only copy resources for non-jump arcs (jump arcs already copied)
             std::memcpy(new_resources.data(), initial_resources.data(), n_resources * sizeof(double));
 
-            if (!process_all_resources<D>(new_resources, initial_resources, gamma, nodes[node_id], n_resources)) {
+            const bool feasible = is_jump_arc ? process_jump_resources()
+                                              : process_all_resources<D>(new_resources, initial_resources, gamma,
+                                                                         nodes[node_id], n_resources);
+            if (!feasible) {
                 if constexpr (F == Full::Reverse)
                     return -1;
                 else
                     return result;
             }
         } else {
-            auto       &buckets = assign_buckets<D>(fw_buckets, bw_buckets);
-            const auto &bucket  = buckets[gamma.jump_bucket];
-            for (size_t i = 0; i < n_resources; ++i) {
-                if constexpr (D == Direction::Forward) {
-                    new_resources[i] =
-                        std::max(new_resources[i] + gamma.resource_increment[i], static_cast<double>(bucket.lb[i]));
-                    if (numericutils::gt(new_resources[i], bucket.ub[i])) {
-                        if constexpr (F == Full::Reverse)
-                            return -1;
-                        else
-                            return nullptr;
-                    }
-
-                } else {
-                    new_resources[i] =
-                        std::min(new_resources[i] - gamma.resource_increment[i], static_cast<double>(bucket.ub[i]));
-                    if (numericutils::lt(new_resources[i], bucket.lb[i])) {
-                        if constexpr (F == Full::Reverse)
-                            return -1;
-                        else
-                            return nullptr;
-                    }
-                }
+            if (!process_jump_resources()) {
+                if constexpr (F == Full::Reverse)
+                    return -1;
+                else
+                    return result;
             }
         }
     }
@@ -862,7 +940,7 @@ inline auto BucketGraph::Extend(const std::conditional_t<M == Mutability::Mut, L
     if constexpr (A == ArcType::Bucket) {
         to_bucket = get_bucket_number<D>(node_id, new_resources);
     } else if constexpr (A == ArcType::Jump) {
-        to_bucket = gamma.jump_bucket;
+        to_bucket = get_bucket_number<D>(node_id, new_resources);
     } else if constexpr (A == ArcType::Node) {
         to_bucket = get_bucket_number<D>(node_id, new_resources);
     }
@@ -960,17 +1038,15 @@ inline auto BucketGraph::Extend(const std::conditional_t<M == Mutability::Mut, L
             }
         }
 
-        double       total_cost_update = 0.0;
-        const size_t segment           = node_id >> 6;
-        const size_t bit_position      = node_id & 63;
+        double total_cost_update = 0.0;
 
         // Prefetch critical data structures
-        auto &masks = cutter->getSegmentMasks();
-        __builtin_prefetch(&masks, 0, 3);
         __builtin_prefetch(active_cuts.data(), 0, 3);
         __builtin_prefetch(new_label->SRCmap.data(), 1, 3); // 1 = read-write
 
 #if !defined(SRC_MEMORY_MODE_ARC)
+        auto &masks = cutter->getSegmentMasks();
+        __builtin_prefetch(&masks, 0, 3);
         for (const auto &update : cutter->getSRCNodeUpdates(node_id)) {
             auto &src_map_value = new_label->SRCmap[update.active_idx];
             src_map_value += update.add;
@@ -981,100 +1057,16 @@ inline auto BucketGraph::Extend(const std::conditional_t<M == Mutability::Mut, L
 
         for (const auto active_idx : cutter->getSRCNodeClears(node_id)) { new_label->SRCmap[active_idx] = 0; }
 #else
-        const auto     cut_limit_mask = masks.get_cut_limit_mask();
-        const uint64_t valid_cuts     = masks.get_valid_cut_mask(segment, bit_position) & cut_limit_mask;
-
-        // Skip processing if no valid cuts
-        if (__builtin_expect(valid_cuts != 0,
-                             1)) { // Branch prediction: likely
-            // Process valid cuts (4 at a time if possible)
-            uint64_t remaining_cuts = valid_cuts;
-
-            // Process blocks of 4 cuts if available (manual loop unrolling)
-            while (__builtin_popcountll(remaining_cuts) >= 4) {
-                for (int i = 0; i < 4; i++) {
-                    const int   cut_idx    = __builtin_ctzll(remaining_cuts);
-                    const auto &active_cut = active_cuts[cut_idx];
-                    const auto &cut        = *active_cut.cut_ptr;
-
-                    // Prefetch the next cut data we'll need
-                    if (i < 3) {
-                        uint64_t  next_bits    = remaining_cuts & (remaining_cuts - 1);
-                        const int next_cut_idx = __builtin_ctzll(next_bits);
-                        __builtin_prefetch(&active_cuts[next_cut_idx], 0, 3);
-                        __builtin_prefetch(active_cuts[next_cut_idx].cut_ptr, 0, 3);
-                    }
-
-#if defined(SRC_MEMORY_MODE_ARC)
-                    auto &src_map_value = new_label->SRCmap[active_cut.index];
-                    if (L_prime->node_id != -1 && cut.isSRCset(L_prime->node_id, node_id)) {
-                        const double num_value = cut.p.num[cut.baseSetOrder[node_id]];
-                        src_map_value += num_value;
-                        const bool overflow = src_map_value >= cut.p.den;
-                        src_map_value -= overflow ? cut.p.den : 0;
-                        total_cost_update -= overflow ? active_cut.dual_value : 0;
-                    }
-#else
-                    auto        &src_map_value = new_label->SRCmap[active_cut.index];
-                    const double num_value     = cut.p.num[cut.baseSetOrder[node_id]];
-                    src_map_value += num_value;
-                    const bool overflow = src_map_value >= cut.p.den;
-                    src_map_value -= overflow ? cut.p.den : 0;
-                    total_cost_update -= overflow ? active_cut.dual_value : 0;
-#endif
-
-                    remaining_cuts &= (remaining_cuts - 1); // Clear processed bit
-                }
-            }
-
-            // Process remaining cuts (less than 4)
-            while (remaining_cuts) {
-                const int   cut_idx    = __builtin_ctzll(remaining_cuts);
-                const auto &active_cut = active_cuts[cut_idx];
-                const auto &cut        = *active_cut.cut_ptr;
-
-#if defined(SRC_MEMORY_MODE_ARC)
-                auto &src_map_value = new_label->SRCmap[active_cut.index];
-                if (L_prime->node_id != -1 && cut.isSRCset(L_prime->node_id, node_id)) {
-                    const double num_value = cut.p.num[cut.baseSetOrder[node_id]];
-                    src_map_value += num_value;
-                    if (src_map_value >= cut.p.den) {
-                        src_map_value -= cut.p.den;
-                        total_cost_update -= active_cut.dual_value;
-                    }
-                }
-#else
-                auto &src_map_value = new_label->SRCmap[active_cut.index];
-                src_map_value += cut.p.num[cut.baseSetOrder[node_id]];
+        for (const auto &active_cut : active_cuts) {
+            const auto &cut           = *active_cut.cut_ptr;
+            auto       &src_map_value = new_label->SRCmap[active_cut.index];
+            if (!cut.isSRCMemoryArc(L_prime->node_id, node_id)) { src_map_value = 0; }
+            if (cut.isSRCset(node_id)) {
+                src_map_value += cut.srcMultiplier(node_id);
                 if (src_map_value >= cut.p.den) {
                     src_map_value -= cut.p.den;
                     total_cost_update -= active_cut.dual_value;
                 }
-#endif
-                remaining_cuts &= (remaining_cuts - 1);
-            }
-        }
-
-        // Process cuts to clear
-        uint64_t to_clear = (~masks.get_neighbor_mask(segment, bit_position)) & cut_limit_mask;
-
-        if (__builtin_expect(to_clear != 0, 1)) { // Branch prediction: likely
-            // Use vectorization for clearing multiple cuts when possible
-            constexpr int vector_size = 8; // Process 8 cuts at a time if possible
-
-            while (__builtin_popcountll(to_clear) >= vector_size) {
-                for (int i = 0; i < vector_size; i++) {
-                    const int cut_idx                             = __builtin_ctzll(to_clear);
-                    new_label->SRCmap[active_cuts[cut_idx].index] = 0.0;
-                    to_clear &= (to_clear - 1);
-                }
-            }
-
-            // Process remaining cuts to clear
-            while (to_clear) {
-                const int cut_idx                             = __builtin_ctzll(to_clear);
-                new_label->SRCmap[active_cuts[cut_idx].index] = 0.0;
-                to_clear &= (to_clear - 1);
             }
         }
 #endif
@@ -1097,7 +1089,13 @@ template <Direction D, Stage S>
 inline bool BucketGraph::is_dominated(const Label *__restrict new_label, const Label *__restrict label) noexcept {
     // A label cannot dominate if its cost is higher.
     // const double cost_diff = label->cost - new_label->cost;
+#if defined(SRC)
+    if constexpr (!(S == Stage::Four || S == Stage::Enumerate)) {
+        if (numericutils::gt(label->cost, new_label->cost)) { return false; }
+    }
+#else
     if (numericutils::gt(label->cost, new_label->cost)) { return false; }
+#endif
 
     // Compare resource vectors.
     const auto *__restrict new_res = new_label->resources.data();
@@ -1158,11 +1156,9 @@ inline bool BucketGraph::is_dominated(const Label *__restrict new_label, const L
         for (size_t i = 0; i < n; ++i) {
             const auto &cut = active_cuts[i];
             // Branch prediction hint: likely false.
-            if (__builtin_expect(lbl_srcs[cut.index] > new_lbl_srcs[cut.index], 0)) {
-                dual_sum += cut.dual_value;
-                if (__builtin_expect((numericutils::gt(local_cost_diff, dual_sum)), 0)) { return false; }
-            }
+            if (__builtin_expect(lbl_srcs[cut.index] > new_lbl_srcs[cut.index], 0)) { dual_sum += cut.dual_value; }
         }
+        return !numericutils::gt(local_cost_diff, dual_sum);
     }
 #endif
     return true;
@@ -1238,18 +1234,27 @@ inline bool BucketGraph::DominatedInCompWiseSmallerBuckets(const Label *__restri
     // necessary condition for cur-dominates-L, so once cur->cost > L.cost
     // (sorted bin) we can break.
     const double cost_hi_break = label_cost + numericutils::eps;
+#if defined(SRC)
+    constexpr bool src_adjusted_dominance = (S == Stage::Four || S == Stage::Enumerate);
+#else
+    constexpr bool src_adjusted_dominance = false;
+#endif
 
     auto inline_check_dominance = [&](std::span<Label *const> labels, uint &n_dom) -> bool {
         const size_t size = labels.size();
         if (profile_labeling) profile_record_inner_bin_scan(D, S, size);
 #ifdef __AVX2__
-        if (size >= AVX_LIM) return check_dominance_against_vector<D, S>(L, labels, cut_storage, n_dom);
+        if constexpr (!src_adjusted_dominance) {
+            if (size >= AVX_LIM) return check_dominance_against_vector<D, S>(L, labels, cut_storage, n_dom);
+        }
 #endif
         for (size_t i = 0; i < size; ++i) {
             Label *cur = labels[i];
             // Bin is RC-sorted ascending; once cur is more expensive than L,
             // no later label can dominate L (cost ordering).
-            if (cur->cost > cost_hi_break) break;
+            if constexpr (!src_adjusted_dominance) {
+                if (cur->cost > cost_hi_break) break;
+            }
             if (cur->is_dominated) continue;
             if (is_dominated<D, S>(L, cur)) {
                 ++n_dom;
@@ -1264,7 +1269,9 @@ inline bool BucketGraph::DominatedInCompWiseSmallerBuckets(const Label *__restri
         for (Label *label : labels) {
             if (label->is_dominated) continue;
             // extra is unsorted -> no break, just skip.
-            if (label->cost > cost_hi_break) continue;
+            if constexpr (!src_adjusted_dominance) {
+                if (label->cost > cost_hi_break) continue;
+            }
             if (is_dominated<D, S>(L, label)) {
                 ++n_dom;
                 return true;

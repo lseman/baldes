@@ -6,6 +6,7 @@
 
 #pragma once
 
+#include <atomic>
 #include <condition_variable>
 
 #include "Bucket.h"
@@ -212,6 +213,22 @@ public:
     Status               status     = Status::NotOptimal;
     std::vector<Label *> merged_labels_rih;
     int                  A_MAX = N_SIZE;
+
+    struct EnumerationPolicy {
+        bool   enabled                     = true;
+        bool   require_nonnegative_pricing = false;
+        double max_relative_gap            = 0.02;
+        double force_relative_gap          = 0.005;
+        int    min_exact_iterations        = 2;
+        int    min_stable_cut_passes       = 1;
+        int    max_bucket_arcs_per_node    = 10000;
+        int    max_total_bucket_arcs       = 1000000;
+        int    max_labels_per_direction    = 2000000;
+        int    max_routes                  = 1000;
+    };
+
+    EnumerationPolicy enumeration_policy{};
+    std::atomic_bool  enumeration_failed{false};
 
 #ifdef RIH
     std::thread rih_thread;
@@ -487,10 +504,60 @@ public:
     template <Stage S>
     Label *compute_label(const Label *L, const Label *L_prime, double cost = 0.0);
 
+    struct SpliceState {
+        std::array<double, R_SIZE> resources = {};
+        double                     cost_delta = 0.0;
+        SRC_MODE_BLOCK(SRCMap SRCmap; bool has_src = false;)
+    };
+
     bool   BucketSetContains(const std::set<int> &bucket_set, const int &bucket);
     void   setSplit(const std::vector<double> q_star) { this->q_star = q_star; }
     int    getStage() const { return stage; }
     Status getStatus() const { return status; }
+    bool   enumerationFailed() const noexcept { return enumeration_failed.load(std::memory_order_relaxed); }
+
+    size_t current_bucket_arc_count() const noexcept {
+        size_t count = 0;
+        for (const auto &bucket : fw_buckets) { count += bucket.fw_bucket_arcs.size(); }
+        for (const auto &bucket : bw_buckets) { count += bucket.bw_bucket_arcs.size(); }
+        return count;
+    }
+
+    double relative_gap_to_incumbent(double lower_bound) const noexcept {
+        if (!std::isfinite(incumbent) || !std::isfinite(lower_bound)) return std::numeric_limits<double>::infinity();
+        const double denom = std::max(1.0, std::abs(incumbent));
+        return std::max(0.0, incumbent - lower_bound) / denom;
+    }
+
+    bool shouldAttemptEnumeration(double lower_bound, bool cuts_stable, int exact_iterations,
+                                  bool no_negative_pricing) const noexcept {
+        if (!enumeration_policy.enabled || depth != 0) return false;
+        if (s5 || stage >= 5) return false;
+        if (!cuts_stable) return false;
+
+        const double rel_gap = relative_gap_to_incumbent(lower_bound);
+        if (!std::isfinite(rel_gap) || rel_gap > enumeration_policy.max_relative_gap) return false;
+
+        const bool force_gap = rel_gap <= enumeration_policy.force_relative_gap;
+        if (!force_gap && exact_iterations < enumeration_policy.min_exact_iterations) return false;
+        if (enumeration_policy.require_nonnegative_pricing && !no_negative_pricing && !force_gap) return false;
+
+        const size_t arc_count = current_bucket_arc_count();
+        if (arc_count > static_cast<size_t>(enumeration_policy.max_total_bucket_arcs)) return false;
+        const size_t denom = std::max<size_t>(1, nodes.size());
+        if (arc_count / denom > static_cast<size_t>(enumeration_policy.max_bucket_arcs_per_node)) return false;
+
+        return true;
+    }
+
+    void enableEnumeration(double lower_bound) noexcept {
+        s1 = s2 = s3 = s4 = false;
+        s5                 = true;
+        ss                 = false;
+        transition         = false;
+        enumeration_failed.store(false, std::memory_order_relaxed);
+        gap = std::max(0.0, incumbent - lower_bound);
+    }
 
     void forbidCycle(const std::vector<int> &cycle, bool aggressive);
     void augment_ng_memories(std::vector<double> &solution, std::vector<Path> &paths, bool aggressive, int eta1,
@@ -553,6 +620,14 @@ public:
                                          // contains the node_id
         int bit_position = node_id & 63; // Determine the bit position within that segment
         return (bitmap[word_index] & (1ULL << bit_position)) != 0;
+    }
+
+    static inline bool visited_overlap(const std::array<uint64_t, num_words> &lhs,
+                                       const std::array<uint64_t, num_words> &rhs) {
+        for (size_t i = 0; i < lhs.size(); ++i) {
+            if ((lhs[i] & rhs[i]) != 0) return true;
+        }
+        return false;
     }
 
     /**
@@ -815,11 +890,12 @@ public:
      * constraints and node durations.
      *
      */
-    inline bool check_feasibility(const Label *fw_label, const Label *bw_label) {
+    inline bool check_feasibility(const Label *fw_label, const Label *bw_label,
+                                  const SpliceState *splice_state = nullptr) {
         if (!fw_label || !bw_label) return false;
 
         // Cache resources and node data.
-        const auto &fw_resources = fw_label->resources;
+        const auto &fw_resources = splice_state ? splice_state->resources : fw_label->resources;
         const auto &bw_resources = bw_label->resources;
         const auto &node         = nodes[fw_label->node_id];
 
@@ -833,12 +909,14 @@ public:
         // boolean array.
         if (n_resources > 0 && options.resources[0] == "time") {
             // Check time feasibility.
-            if (numericutils::gt(fw_resources[0] + travel_time + node.duration, bw_resources[0])) return false;
+            const double fw_time = splice_state ? fw_resources[0] : fw_resources[0] + travel_time + node.duration;
+            if (numericutils::gt(fw_time, bw_resources[0])) return false;
         } else {
             // Fallback: iterate to check any resource named "time".
             for (size_t r = 0; r < n_resources; ++r) {
                 if (options.resources[r] == "time") {
-                    if (numericutils::gt(fw_resources[r] + travel_time + node.duration, bw_resources[r])) return false;
+                    const double fw_time = splice_state ? fw_resources[r] : fw_resources[r] + travel_time + node.duration;
+                    if (numericutils::gt(fw_time, bw_resources[r])) return false;
                 }
             }
         }
@@ -847,7 +925,8 @@ public:
         // "time") and additional resources (from index 1 onward) represent
         // capacity constraints.
         for (size_t i = 1; i < n_resources; ++i) {
-            if (fw_resources[i] + node.demand > bw_resources[i]) return false;
+            const double fw_resource = splice_state ? fw_resources[i] : fw_resources[i] + node.demand;
+            if (fw_resource > bw_resources[i]) return false;
         }
 
         return true;
@@ -1057,7 +1136,8 @@ public:
     std::vector<Label *> bi_labeling_algorithm();
 
     template <Stage S, Symmetry SYM = Symmetry::Asymmetric>
-    void ConcatenateLabel(const Label *L, int &b, std::atomic<double> &best_cost);
+    void ConcatenateLabel(const Label *L, int &b, std::atomic<double> &best_cost,
+                          const SpliceState *splice_state = nullptr);
 
     template <Direction D>
     void UpdateBucketsSet(double theta, const Label *label, ankerl::unordered_dense::set<int> &Bbidi,
@@ -1214,36 +1294,18 @@ public:
             for (const auto active_idx : cutter->getSRCNodeClears(node_id)) { updated_SRCmap[active_idx] = 0; }
 #else
             for (const auto &active_cut : active_cuts) {
-                const size_t idx          = active_cut.index;
-                const auto  &cut          = *active_cut.cut_ptr;
-                const auto  &baseSet      = cut.baseSet;
-                const auto  &baseSetOrder = cut.baseSetOrder;
-                const auto  &neighbors    = cut.neighbors;
-                const auto  &multipliers  = cut.p;
+                const size_t idx = active_cut.index;
+                const auto  &cut = *active_cut.cut_ptr;
 
-                if (!(neighbors[segment] & bit_mask)) {
-                    updated_SRCmap[idx] = 0;
-                    continue;
-                }
-#if defined(SRC_MEMORY_MODE_ARC)
-                if (last_node != -1 && cut.isSRCset(last_node, node_id)) {
-                    auto &src_val = updated_SRCmap[idx];
-                    src_val += multipliers.num[baseSetOrder[node_id]];
-                    if (src_val >= multipliers.den) {
+                auto &src_val = updated_SRCmap[idx];
+                if (!cut.isSRCMemoryArc(last_node, node_id)) { src_val = 0; }
+                if (cut.isSRCset(node_id)) {
+                    src_val += cut.srcMultiplier(node_id);
+                    if (src_val >= cut.p.den) {
                         red_cost -= active_cut.dual_value;
-                        src_val -= multipliers.den;
+                        src_val -= cut.p.den;
                     }
                 }
-#else
-                if (baseSet[segment] & bit_mask) {
-                    auto &src_val = updated_SRCmap[idx];
-                    src_val += multipliers.num[baseSetOrder[node_id]];
-                    if (src_val >= multipliers.den) {
-                        red_cost -= active_cut.dual_value;
-                        src_val -= multipliers.den;
-                    }
-                }
-#endif
             }
 #endif
 #endif

@@ -78,6 +78,11 @@ public:
     static constexpr double kVarIntegralityTol = 1e-6;
     static constexpr double kBinaryTol         = 1e-5;
     static constexpr double kRowFeasTol        = 1e-5;
+    static constexpr double kPricingTol        = 1e-6;
+
+    static inline bool hasNegativeReducedCost(double inner_obj, double tol = kPricingTol) {
+        return std::isfinite(inner_obj) && inner_obj < -tol;
+    }
 
     static inline bool isIntegerSolution(const std::vector<double> &solution, double tol = kVarIntegralityTol) {
         for (double x : solution) {
@@ -194,14 +199,17 @@ public:
 
         if (!integer) { bucket_graph->augment_ng_memories(solution, allPaths, false, 5, 100, 16, N_SIZE); }
 
-        // SRC cuts: if there are SRC constraints, update their dual values.
-        SRC_MODE_BLOCK(if (!SRCconstraints.empty()) {
-            std::vector<double> cutDuals;
-            cutDuals.reserve(SRCconstraints.size());
-            for (size_t i = 0; i < SRCconstraints.size(); ++i) {
+        // SRC cuts: always update stored dual values, even if no SRC constraints
+        // are currently in the model. This avoids stale active cuts leaking into
+        // reduced-cost pricing after cut cleanup.
+        SRC_MODE_BLOCK({
+            std::vector<double> cutDuals(cuts.size(), 0.0);
+            const auto          n_duals = std::min(SRCconstraints.size(), cuts.size());
+            for (size_t i = 0; i < n_duals; ++i) {
                 auto constr = SRCconstraints[i];
-                auto index  = constr->index();
-                cutDuals.push_back(originDuals[index]);
+                if (constr->index() < static_cast<int>(originDuals.size())) {
+                    cutDuals[i] = originDuals[constr->index()];
+                }
             }
             cuts.setDuals(cutDuals);
         })
@@ -309,7 +317,8 @@ public:
             SRC_MODE_BLOCK({
                 auto vec = cuts.computeLimitedMemoryCoefficients(label.route);
                 if (!vec.empty()) {
-                    for (int i = 0; i < static_cast<int>(vec.size()); i++) {
+                    const size_t n_terms = std::min(vec.size(), SRCconstraints.size());
+                    for (size_t i = 0; i < n_terms; ++i) {
                         if (std::abs(vec[i]) > 1e-3) { col.addTerm(SRCconstraints[i]->index(), vec[i]); }
                     }
                 }
@@ -446,7 +455,10 @@ public:
             SRC_MODE_BLOCK({
                 auto vec = cuts.computeLimitedMemoryCoefficients(path.route);
                 if (!vec.empty()) {
-                    for (int i = 0; i < vec.size(); i++) { col.addTerm(SRCconstraints[i]->index(), vec[i]); }
+                    const size_t n_terms = std::min(vec.size(), SRCconstraints.size());
+                    for (size_t i = 0; i < n_terms; ++i) {
+                        if (std::abs(vec[i]) > 1e-3) { col.addTerm(SRCconstraints[i]->index(), vec[i]); }
+                    }
                 }
             });
 
@@ -542,7 +554,7 @@ public:
         // Process each cut.
         auto ctr = 0;
 
-        std::vector<Cut *> cutsToBeRemoved;
+        std::vector<int> cutsToBeRemoved;
         for (auto &cut : cuts) {
             // If the cut was already added and hasn't been updated, skip it.
             if ((cut.added && !cut.updated) && !loaded) { continue; }
@@ -561,7 +573,7 @@ public:
             if (loaded && (cutSize == 1)) { // || cutSize == 4 || cutSize == 5)) {
                 fmt::print("Cut size is {}, skipping...\n", cutSize);
                 //     // delete the cut
-                cutsToBeRemoved.push_back(&cut);
+                cutsToBeRemoved.push_back(cut.id);
                 continue;
             }
 
@@ -611,7 +623,8 @@ public:
         }
 
         // iterate in reverse order to avoid invalidating indices
-        for (int i = cutsToBeRemoved.size() - 1; i >= 0; i--) { r1c->cutStorage.removeCut(cutsToBeRemoved[i]); }
+        std::sort(cutsToBeRemoved.begin(), cutsToBeRemoved.end(), std::greater<int>());
+        for (int cut_id : cutsToBeRemoved) { r1c->cutStorage.removeCut(cut_id); }
         return changed;
     }
 
@@ -881,6 +894,7 @@ public:
         int                 non_violated_ctr  = 0;
         bool                enumerate         = false;
         int                 numK              = node->numK;
+        int                 exact_pricing_passes = 0;
 
         bool integer = false;
         if (node->loadedState) {
@@ -954,10 +968,28 @@ public:
 
                             if (bucket_graph->A_MAX == N_SIZE) {
                                 fmt::print("No violated cuts found with obj = {}\n", inner_obj);
-                                if (std::abs(inner_obj) < 1.0) {
-                                    print_info("No violated cuts found, calling it a "
-                                               "day\n");
-                                    break;
+                                if (!hasNegativeReducedCost(inner_obj)) {
+                                    const double pricing_lower_bound =
+                                        lp_obj + numK * std::min(0.0, inner_obj);
+                                    const bool cuts_stable =
+                                        non_violated_ctr >= bucket_graph->enumeration_policy.min_stable_cut_passes;
+                                    if (!enumerate &&
+                                        bucket_graph->shouldAttemptEnumeration(pricing_lower_bound, cuts_stable,
+                                                                               exact_pricing_passes, true)) {
+                                        const double rel_gap =
+                                            bucket_graph->relative_gap_to_incumbent(pricing_lower_bound);
+                                        print_info("Stable cuts and relative gap {:.4f}; trying enumeration\n",
+                                                   rel_gap);
+                                        bucket_graph->enableEnumeration(pricing_lower_bound);
+                                        enumerate = true;
+                                    } else {
+                                        print_info("No violated cuts found, calling it a "
+                                                   "day\n");
+                                        break;
+                                    }
+                                } else {
+                                    print_info("No violated cuts found, but pricing is still negative; continuing "
+                                               "column generation\n");
                                 }
                             } else {
                                 // Increase the active set size.
@@ -1036,8 +1068,8 @@ public:
                 for (auto &dual : nodeDuals) { dual = -dual; }
 #endif
 #if defined(STAB) && !defined(IPM)
-                nodeDuals        = node->getDuals();
-                auto originDuals = nodeDuals;
+                nodeDuals   = node->getDuals();
+                originDuals = nodeDuals;
 #endif
 
 #if defined(STAB) && defined(IPM)
@@ -1056,8 +1088,25 @@ public:
                                     &ils
 #endif
                 );
+                if (bucket_graph->enumerationFailed()) {
+                    enumerate = false;
+                    print_info("Enumeration cap reached; falling back to exact pricing\n");
+                }
 
-                if (colAdded == 0 && non_violated_cuts) {
+                if (colAdded == 0 && non_violated_cuts && !hasNegativeReducedCost(inner_obj)) {
+                    const double pricing_lower_bound = lp_obj + numK * std::min(0.0, inner_obj);
+                    const bool cuts_stable =
+                        bucket_graph->A_MAX == N_SIZE &&
+                        non_violated_ctr >= bucket_graph->enumeration_policy.min_stable_cut_passes;
+                    if (!enumerate && bucket_graph->shouldAttemptEnumeration(pricing_lower_bound, cuts_stable,
+                                                                             exact_pricing_passes, true)) {
+                        const double rel_gap = bucket_graph->relative_gap_to_incumbent(pricing_lower_bound);
+                        print_info("Stable cuts and relative gap {:.4f}; trying enumeration\n", rel_gap);
+                        bucket_graph->enableEnumeration(pricing_lower_bound);
+                        enumerate = true;
+                        continue;
+                    }
+
                     print_info("No columns and no violated cuts found, calling it a "
                                "day\n");
                     break;
@@ -1077,7 +1126,7 @@ public:
 
                 // define numK as the number of non-zero vars in solution
                 numK              = std::ceil(std::accumulate(solution.begin(), solution.end(), 0.0));
-                double newBound   = lp_obj + numK * inner_obj;
+                double newBound   = lp_obj + numK * std::min(0.0, inner_obj);
                 lag_gap           = integer_solution - newBound;
                 bucket_graph->gap = lag_gap;
                 stab.set_pseudo_dual_bound(newBound);
@@ -1085,13 +1134,6 @@ public:
                 stab.update_stabilization_after_master_optim(nodeDuals);
                 stab.setObj(lp_obj);
 
-                if (non_violated_ctr >= 10000) {
-                    print_info("No violated cuts found, calling enumeration...\n");
-                    bucket_graph->s4  = false;
-                    bucket_graph->s5  = true;
-                    enumerate         = true;
-                    bucket_graph->gap = lp_obj + numK * inner_obj;
-                }
                 misprice = true;
                 while (misprice) {
                     nodeDuals = stab.getStabDualSol(nodeDuals);
@@ -1175,6 +1217,10 @@ public:
                                         &ils
 #endif
                     );
+                    if (bucket_graph->enumerationFailed()) {
+                        enumerate = false;
+                        print_info("Enumeration cap reached; falling back to exact pricing\n");
+                    }
 #ifdef STAB
 
                     auto d = 50;
@@ -1194,8 +1240,8 @@ public:
                     // auto RC =
                     // node->mip.getMostViolatingReducedCost(nodeDuals);
 
-                    bucket_graph->gap = lp_obj + numK * inner_obj;
-                    lag_gap           = integer_solution - (lp_obj + numK * inner_obj);
+                    bucket_graph->gap = lp_obj + numK * std::min(0.0, inner_obj);
+                    lag_gap           = integer_solution - (lp_obj + numK * std::min(0.0, inner_obj));
 
                     matrix      = node->extractModelDataSparse();
                     stab.lp_obj = lp_obj;
@@ -1211,12 +1257,39 @@ public:
                     }
                 }
 
+                if (stage == 4) { ++exact_pricing_passes; }
+
+                const double pricing_lower_bound = lp_obj + numK * std::min(0.0, inner_obj);
+                const bool   no_negative_pricing = colAdded == 0 && !hasNegativeReducedCost(inner_obj);
+                const bool   cuts_stable =
+                    non_violated_cuts && bucket_graph->A_MAX == N_SIZE &&
+                    non_violated_ctr >= bucket_graph->enumeration_policy.min_stable_cut_passes;
+                if (!enumerate && bucket_graph->shouldAttemptEnumeration(pricing_lower_bound, cuts_stable,
+                                                                         exact_pricing_passes, no_negative_pricing)) {
+                    const double rel_gap = bucket_graph->relative_gap_to_incumbent(pricing_lower_bound);
+                    print_info("{} and relative gap {:.4f}; trying enumeration (pricing {:.6g})\n",
+                               no_negative_pricing ? "No negative pricing/cuts" : "Stable cuts/small gap", rel_gap,
+                               inner_obj);
+                    bucket_graph->enableEnumeration(pricing_lower_bound);
+                    enumerate = true;
+                    continue;
+                }
+
                 if (bucket_graph->getStatus() == Status::Optimal) {
                     print_info("Optimal solution found\n");
                     break;
                 }
 
-                if (colAdded == 0 && non_violated_cuts) {
+                if (colAdded == 0 && non_violated_cuts && !hasNegativeReducedCost(inner_obj)) {
+                    if (!enumerate && bucket_graph->shouldAttemptEnumeration(pricing_lower_bound, cuts_stable,
+                                                                             exact_pricing_passes, true)) {
+                        const double rel_gap = bucket_graph->relative_gap_to_incumbent(pricing_lower_bound);
+                        print_info("Stable cuts and relative gap {:.4f}; trying enumeration\n", rel_gap);
+                        bucket_graph->enableEnumeration(pricing_lower_bound);
+                        enumerate = true;
+                        continue;
+                    }
+
                     print_info("No columns and no violated cuts found, calling it a "
                                "day\n");
                     break;
