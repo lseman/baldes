@@ -92,22 +92,14 @@ inline int BucketGraph::get_bucket_number(int node, std::vector<double> &resourc
             (splits == 0 || std::fabs(node_range) < std::numeric_limits<double>::epsilon()) ? 1.0 : node_range / splits;
 
         int pos = 0;
-        if constexpr (D == Direction::Forward) {
-            // Compute the bucket "digit" from the lower bound.
-            if (std::fabs(interval_width) < std::numeric_limits<double>::epsilon()) {
-                pos = 0;
-            } else {
-                pos = std::min(splits - 1,
-                               static_cast<int>(std::floor((resource_values_vec[r] - node_lb) / interval_width)));
-            }
-        } else { // Direction::Backward
-            // For backward, we consider the distance from the upper bound.
-            if (std::fabs(interval_width) < std::numeric_limits<double>::epsilon()) {
-                pos = 0;
-            } else {
-                pos = std::min(splits - 1,
-                               static_cast<int>(std::floor((node_ub - resource_values_vec[r]) / interval_width)));
-            }
+        // Keep bucket indices increasing with resource value in both
+        // directions, matching RouteOpt's bin convention. Backward dominance
+        // then walks toward b + 1 instead of relying on reversed bucket order.
+        if (std::fabs(interval_width) < std::numeric_limits<double>::epsilon()) {
+            pos = 0;
+        } else {
+            pos = std::clamp(static_cast<int>(std::floor((resource_values_vec[r] - node_lb) / interval_width)), 0,
+                             splits - 1);
         }
 
         bucket_number += pos * multiplier;
@@ -219,17 +211,11 @@ void BucketGraph::define_buckets() {
     auto calculate_interval = [&](double lb, double ub, double base_interval, int pos, int max_intervals,
                                   bool is_forward) -> std::pair<double, double> {
         double start, end;
-        if (is_forward) {
-            // For the first interval, start exactly at lb.
-            start = (pos == 0) ? lb : lb + pos * base_interval;
-            // For the last interval, end exactly at ub.
-            end = (pos == max_intervals - 1) ? ub : lb + (pos + 1) * base_interval;
-        } else {
-            // For Backward: first interval gets ub exactly, last gets lb
-            // exactly.
-            start = (pos == max_intervals - 1) ? lb : ub - (pos + 1) * base_interval;
-            end   = (pos == 0) ? ub : ub - pos * base_interval;
-        }
+        (void)is_forward;
+        // RouteOpt keeps bucket indices increasing with resource value for
+        // both directions; only the dominance walk changes direction.
+        start = (pos == 0) ? lb : lb + pos * base_interval;
+        end   = (pos == max_intervals - 1) ? ub : lb + (pos + 1) * base_interval;
         start = roundToTwoDecimalPlaces(start);
         end   = roundToTwoDecimalPlaces(end);
         return {start, end};
@@ -341,13 +327,22 @@ void BucketGraph::define_buckets() {
                 if (bucket.ub.size() > 1) { rc2_value = bucket.ub[1]; }
             }
             rc2_bin[node_id][local_b] = rc2_value;
-            if (local_b == 0) {
-                rc2_till_this_bin[node_id][local_b] = rc2_value;
-            } else {
-                if constexpr (D == Direction::Forward) {
-                    rc2_till_this_bin[node_id][local_b] = std::min(rc2_till_this_bin[node_id][local_b - 1], rc2_value);
+            if constexpr (D == Direction::Forward) {
+                if (local_b == 0) {
+                    rc2_till_this_bin[node_id][local_b] = rc2_value;
                 } else {
-                    rc2_till_this_bin[node_id][local_b] = std::max(rc2_till_this_bin[node_id][local_b - 1], rc2_value);
+                    rc2_till_this_bin[node_id][local_b] = std::min(rc2_till_this_bin[node_id][local_b - 1], rc2_value);
+                }
+            }
+        }
+        if constexpr (D == Direction::Backward) {
+            for (int local_b = count - 1; local_b >= 0; --local_b) {
+                const double rc2_value = rc2_bin[node_id][local_b];
+                if (local_b == count - 1) {
+                    rc2_till_this_bin[node_id][local_b] = rc2_value;
+                } else {
+                    rc2_till_this_bin[node_id][local_b] =
+                        std::max(rc2_till_this_bin[node_id][local_b + 1], rc2_value);
                 }
             }
         }
@@ -1312,10 +1307,6 @@ void BucketGraph::set_adjacency_list() {
  */
 template <Direction D>
 void BucketGraph::common_initialization() {
-    // --- Pre-allocate and clear temporary vectors ---
-    merged_labels.clear();
-    merged_labels.reserve(50);
-
     // Retrieve active cuts and build a vector of ActiveCutInfo.
     auto                      &cutter      = cut_storage;
     const auto                 active_cuts = cutter->getActiveCuts();

@@ -131,6 +131,7 @@ std::vector<int> BucketGraph::computePhi(int &bucket_id, bool fw) {
 
         const int           n_dims = static_cast<int>(intervals.size());
         std::vector<double> base_intervals(n_dims, 0.0);
+        std::vector<int>    splits_per_dim(n_dims, 1);
 
         // Get the node associated with the current bucket.
         int            node_id = buckets[bucket_id].node_id;
@@ -146,44 +147,39 @@ std::vector<int> BucketGraph::computePhi(int &bucket_id, bool fw) {
                 double splits_d = (node_range * intervals[r].interval) / full_range;
                 splits          = std::max(1, static_cast<int>(std::round(splits_d)));
             }
+            splits_per_dim[r] = splits;
             base_intervals[r] = node_range / static_cast<double>(splits);
         }
 
-        auto       &num_buckets_index = fw ? num_buckets_index_fw : num_buckets_index_bw;
-        const auto &current_bucket    = buckets[bucket_id];
-        int         local_bucket      = bucket_id - num_buckets_index[node_id];
+        auto &num_buckets_index = fw ? num_buckets_index_fw : num_buckets_index_bw;
+        int   local_bucket      = bucket_id - num_buckets_index[node_id];
 
         // Reconstruct the local multi-dimensional position vector for the
         // current bucket using the same mixed-radix scheme as get_bucket_number.
         std::vector<int> pos(n_dims, 0);
         int              rem = local_bucket;
         for (int r = 0; r < n_dims; ++r) {
-            double full_range = R_max[r] - R_min[r];
-            double node_range = node.ub[r] - node.lb[r];
-            int    splits     = 1;
-            if (std::fabs(full_range) > std::numeric_limits<double>::epsilon()) {
-                splits = std::max(1, static_cast<int>(std::round((node_range * intervals[r].interval) / full_range)));
-            }
+            const int splits = splits_per_dim[r];
             pos[r] = rem % splits;
             rem /= splits;
         }
 
-        // Build Phi by exploring each dimension independently.
+        // Build Phi by exploring each dimension independently. Bucket indices
+        // increase with resource value in both directions, so RouteOpt-style
+        // dominance walks to b - 1 forward and b + 1 backward.
         for (int r = 0; r < n_dims; ++r) {
-            if (pos[r] == 0) continue;
+            if (fw) {
+                if (pos[r] == 0) continue;
+            } else {
+                if (pos[r] + 1 >= splits_per_dim[r]) continue;
+            }
             std::vector<int> neighbor_pos = pos;
-            neighbor_pos[r]--;
+            neighbor_pos[r] += fw ? -1 : 1;
 
             int candidate_bucket = num_buckets_index[node_id];
             int multiplier       = 1;
             for (int s = 0; s < n_dims; ++s) {
-                double full_range = R_max[s] - R_min[s];
-                double node_range = node.ub[s] - node.lb[s];
-                int    splits     = 1;
-                if (std::fabs(full_range) > std::numeric_limits<double>::epsilon()) {
-                    splits =
-                        std::max(1, static_cast<int>(std::round((node_range * intervals[s].interval) / full_range)));
-                }
+                const int splits = splits_per_dim[s];
                 candidate_bucket += neighbor_pos[s] * multiplier;
                 multiplier *= splits;
             }
@@ -202,10 +198,9 @@ std::vector<int> BucketGraph::computePhi(int &bucket_id, bool fw) {
     // Single-resource case (simpler).
     else {
         // Forward: predecessor = lower-resource bucket (bucket_id - 1).
-        // Backward (high→low indexing): predecessor is also one index lower,
-        // because lower index means higher resource.
-        int  neighbor       = bucket_id - 1;
-        bool valid_neighbor = (neighbor >= 0);
+        // Backward: predecessor = higher-resource bucket (bucket_id + 1).
+        int  neighbor       = fw ? bucket_id - 1 : bucket_id + 1;
+        bool valid_neighbor = fw ? (neighbor >= 0) : (neighbor < static_cast<int>(buckets.size()));
         if (valid_neighbor && neighbor >= 0 && neighbor < static_cast<int>(buckets.size()) &&
             buckets[neighbor].node_id == buckets[bucket_id].node_id) {
 #ifdef FIX_BUCKETS

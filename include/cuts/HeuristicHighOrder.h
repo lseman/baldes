@@ -37,6 +37,10 @@
 // }  // namespace std
 
 class HighRankCuts {
+public:
+    // Convenience alias — used by separate() and helpers.
+    using SeedMap = std::unordered_map<std::vector<int>, std::vector<int>, std::hash<std::vector<int>>>;
+
 private:
     static constexpr int MAX_COMBINATIONS     = 5;
     static constexpr int MAX_WORKING_SET_SIZE = 12;
@@ -124,8 +128,8 @@ private:
         }
     }
 
-    std::unordered_map<std::vector<int>, std::vector<int>, std::hash<std::vector<int>>> constructHighRankSeeds() {
-        std::unordered_map<std::vector<int>, std::vector<int>, std::hash<std::vector<int>>> seed_map;
+    SeedMap constructHighRankSeeds() {
+        SeedMap seed_map;
         if (allPaths.empty()) return seed_map;
 
         // Build route appearances for each node.
@@ -530,9 +534,8 @@ private:
     }
 
     ankerl::unordered_dense::set<CandidateSet, CandidateSetHasher, CandidateSetCompare>
-    generateSeedCandidates(const SparseMatrix &A, const std::vector<double> &x) {
+    generateSeedCandidates(const SparseMatrix &A, const std::vector<double> &x, const SeedMap &seed_map) {
         ankerl::unordered_dense::set<CandidateSet, CandidateSetHasher, CandidateSetCompare> seeds;
-        auto seed_map = constructHighRankSeeds();
         for (auto &seed_pair : seed_map) {
             const auto                       &candidate_nodes = seed_pair.first;
             const auto                       &memory_nodes    = seed_pair.second;
@@ -859,231 +862,263 @@ private:
     }
 
     // ── RouteOpt-style greedy high-dim cut search ─────────────────────────────
-    // For each seed from constructHighRankSeeds(), this runs a deterministic
-    // add/remove/swap local search restricted to one plan group at a time.
-    // Swap stays within the same plan group (O(|plan_perms|) per step).
-    // Add/remove re-evaluates all plan groups at the new rank (O(|all_plans|)).
-    // Terminates when no improving move exists (guaranteed convergence).
-    void getHighDimCutsRouteOpt(const std::vector<double> &x) {
-        if (allPaths.empty() || plan_groups_map.empty()) return;
-
-        auto seed_map = constructHighRankSeeds();
-        if (seed_map.empty()) return;
+    // For each seed the function runs a deterministic add/remove/swap greedy
+    // local search restricted to one plan group at a time.
+    //
+    // Performance notes (vs. previous version):
+    //  • Seeds are processed in parallel via stdexec::bulk.
+    //  • SWAP step uses a precomputed C_base/AM_base and flips only 2 bits per
+    //    candidate (O(1)) instead of rebuilding O(rank) from scratch.
+    //  • Working neighbourhood is a sorted std::vector for cache-friendly scan.
+    //  • Seeds are built exactly once and reused from separate().
+    void getHighDimCutsRouteOpt(const std::vector<double> &x, const SeedMap &seed_map) {
+        if (allPaths.empty() || plan_groups_map.empty() || seed_map.empty()) return;
 
         struct HarvestedCut {
-            double                            vio;
+            double                            vio  = 0.0;
             std::vector<int>                  nodes;
             ankerl::unordered_dense::set<int> mem;
             const SRCPermutation             *perm = nullptr;
         };
-        std::vector<HarvestedCut> harvested;
-        harvested.reserve(seed_map.size() * 2);
 
-        thread_local std::vector<int> cand_paths;
-        thread_local std::vector<int> no2;
-        if (no2.size() < N_SIZE) no2.assign(N_SIZE, -1);
+        // Flatten to vector so stdexec::bulk can address by index.
+        using SeedPair = std::pair<std::vector<int>, std::vector<int>>;
+        std::vector<SeedPair> seeds_vec(seed_map.begin(), seed_map.end());
 
-        for (auto &[nodes_vec, mem_vec] : seed_map) {
-            if (nodes_vec.empty()) continue;
-            const int RANK = static_cast<int>(nodes_vec.size());
-            if (RANK < MIN_RANK || RANK > MAX_RANK) continue;
-            if (plan_groups_map.find(RANK) == plan_groups_map.end()) continue;
+        std::vector<HarvestedCut> all_harvested;
+        all_harvested.reserve(seeds_vec.size());
+        std::mutex harvest_mutex;
 
-            ankerl::unordered_dense::set<int> cur_mem(mem_vec.begin(), mem_vec.end());
-            std::vector<int>                  cur_nodes = nodes_vec; // sorted
+        // ── parallel over seeds ───────────────────────────────────────────────
+        auto bulk_sender = stdexec::bulk(
+            stdexec::just(), seeds_vec.size(),
+            [&](std::size_t idx) {
+                const auto &[nodes_vec, mem_vec] = seeds_vec[idx];
+                if (nodes_vec.empty()) return;
+                const int RANK = static_cast<int>(nodes_vec.size());
+                if (RANK < MIN_RANK || RANK > MAX_RANK) return;
+                if (plan_groups_map.find(RANK) == plan_groups_map.end()) return;
 
-            collectCandidatePathUnion(cur_nodes, cand_paths);
-            if (cand_paths.empty()) continue;
+                // Thread-local scratch storage (one copy per OS thread).
+                thread_local std::vector<int> cand_paths;
+                thread_local std::vector<int> no2;
+                if (no2.size() < N_SIZE) no2.assign(N_SIZE, -1);
 
-            auto [cur_vio, cur_gi, cur_perm] = findBestPlanGroupIdx(cur_nodes, cur_mem, cand_paths, x);
-            if (cur_vio <= 1e-4 || cur_gi < 0) continue;
+                ankerl::unordered_dense::set<int> cur_mem(mem_vec.begin(), mem_vec.end());
+                std::vector<int>                  cur_nodes = nodes_vec; // sorted
 
-            // Working neighbourhood: heuristic neighbours of all base nodes
-            // that are NOT already in cur_nodes.
-            ankerl::unordered_dense::set<int> w_no_c;
-            for (int n : cur_nodes) {
-                if (n >= static_cast<int>(rank1_sep_heur_mem4_vertex.size())) continue;
-                for (int nb : rank1_sep_heur_mem4_vertex[n]) {
-                    if (nb > 0 && nb < N_SIZE - 1 &&
-                        !std::binary_search(cur_nodes.begin(), cur_nodes.end(), nb))
-                        w_no_c.insert(nb);
+                collectCandidatePathUnion(cur_nodes, cand_paths);
+                if (cand_paths.empty()) return;
+
+                auto [cur_vio, cur_gi, cur_perm] = findBestPlanGroupIdx(cur_nodes, cur_mem, cand_paths, x);
+                if (cur_vio <= 1e-4 || cur_gi < 0) return;
+
+                // ── working neighbourhood as sorted small-vector ──────────────
+                std::vector<int> w_no_c;
+                w_no_c.reserve(32);
+                const auto w_insert = [&](int n) {
+                    auto it = std::lower_bound(w_no_c.begin(), w_no_c.end(), n);
+                    if (it == w_no_c.end() || *it != n) w_no_c.insert(it, n);
+                };
+                const auto w_erase = [&](int n) {
+                    auto it = std::lower_bound(w_no_c.begin(), w_no_c.end(), n);
+                    if (it != w_no_c.end() && *it == n) w_no_c.erase(it);
+                };
+                for (int n : cur_nodes) {
+                    if (n >= static_cast<int>(rank1_sep_heur_mem4_vertex.size())) continue;
+                    for (int nb : rank1_sep_heur_mem4_vertex[n]) {
+                        if (nb > 0 && nb < N_SIZE - 1 &&
+                            !std::binary_search(cur_nodes.begin(), cur_nodes.end(), nb))
+                            w_insert(nb);
+                    }
                 }
-            }
-            for (int n : mem_vec) {
-                if (n > 0 && n < N_SIZE - 1 &&
-                    !std::binary_search(cur_nodes.begin(), cur_nodes.end(), n))
-                    w_no_c.insert(n);
-            }
+                for (int n : mem_vec) {
+                    if (n > 0 && n < N_SIZE - 1 &&
+                        !std::binary_search(cur_nodes.begin(), cur_nodes.end(), n))
+                        w_insert(n);
+                }
 
-            // Greedy loop: keep taking the best improving move until convergence.
-            constexpr int MAX_GREEDY_STEPS = 8;
-            for (int step = 0; step < MAX_GREEDY_STEPS; ++step) {
-                double best_delta = 1e-5; // minimum improvement to accept a move
-                int    best_type  = 0;    // 0=stay, 1=add, 2=remove, 3=swap
-                int    best_add   = -1, best_rem = -1;
-                int    best_swap_out = -1, best_swap_in = -1;
+                // ── greedy loop ───────────────────────────────────────────────
+                constexpr int MAX_GREEDY_STEPS = 8;
+                for (int step = 0; step < MAX_GREEDY_STEPS; ++step) {
+                    double best_delta    = 1e-5;
+                    int    best_type     = 0; // 0=stay, 1=add, 2=remove, 3=swap
+                    int    best_add      = -1, best_rem = -1;
+                    int    best_swap_out = -1, best_swap_in = -1;
+                    const int cur_rank   = static_cast<int>(cur_nodes.size());
 
-                const int cur_rank = static_cast<int>(cur_nodes.size());
+                    // ── SWAP (rank unchanged → same plan group) ───────────────
+                    // Precompute C_base/AM_base once; flip 2 bits per candidate.
+                    {
+                        auto pgit = plan_groups_map.find(cur_rank);
+                        if (pgit != plan_groups_map.end() && cur_gi >= 0 &&
+                            cur_gi < static_cast<int>(pgit->second.size())) {
+                            const auto &pg = pgit->second[cur_gi];
 
-                // ── SWAP (rank unchanged → same plan group) ──────────────────
-                {
-                    const auto &pg_groups = plan_groups_map.at(cur_rank);
-                    if (cur_gi >= 0 && cur_gi < static_cast<int>(pg_groups.size())) {
-                        const auto &pg = pg_groups[cur_gi];
-                        std::array<uint64_t, num_words> C{}, AM{};
-                        int pos2 = 0;
-                        for (int n : cur_nodes) {
-                            C[n / 64] |= bit_mask_lookup[n % 64];
-                            AM[n / 64] |= bit_mask_lookup[n % 64];
-                            no2[n] = pos2++;
-                        }
-                        for (int n : cur_mem) AM[n / 64] |= bit_mask_lookup[n % 64];
+                            std::array<uint64_t, num_words> C_base{}, AM_base{};
+                            for (int i = 0; i < cur_rank; ++i) {
+                                const int n = cur_nodes[i];
+                                C_base[n / 64]  |= bit_mask_lookup[n % 64];
+                                AM_base[n / 64] |= bit_mask_lookup[n % 64];
+                            }
+                            for (int n : cur_mem) AM_base[n / 64] |= bit_mask_lookup[n % 64];
 
-                        for (int out_idx = 0; out_idx < cur_rank; ++out_idx) {
-                            const int out_node = cur_nodes[out_idx];
-                            for (int in_node : w_no_c) {
-                                // Build swapped node set
-                                std::vector<int> new_nodes = cur_nodes;
-                                new_nodes[out_idx]         = in_node;
-                                std::sort(new_nodes.begin(), new_nodes.end());
+                            for (int out_idx = 0; out_idx < cur_rank; ++out_idx) {
+                                const int out_node = cur_nodes[out_idx];
+                                for (const int in_node : w_no_c) {
+                                    // Build swapped node set
+                                    std::vector<int> new_nodes = cur_nodes;
+                                    new_nodes[out_idx]         = in_node;
+                                    std::sort(new_nodes.begin(), new_nodes.end());
 
-                                // Set up bits for new_nodes
-                                std::array<uint64_t, num_words> C2{}, AM2{};
-                                int                             pos3 = 0;
-                                for (int n : new_nodes) {
-                                    C2[n / 64] |= bit_mask_lookup[n % 64];
-                                    AM2[n / 64] |= bit_mask_lookup[n % 64];
-                                    no2[n] = pos3++;
-                                }
-                                for (int n : cur_mem) AM2[n / 64] |= bit_mask_lookup[n % 64];
+                                    // C2/AM2: O(1) bit-flip from base
+                                    std::array<uint64_t, num_words> C2  = C_base;
+                                    C2[out_node / 64] &= ~bit_mask_lookup[out_node % 64];
+                                    C2[in_node / 64]  |=  bit_mask_lookup[in_node  % 64];
 
-                                collectCandidatePathUnion(new_nodes, cand_paths);
-                                const SRCPermutation *pp = nullptr;
-                                double                vio2 =
-                                    evalPlanGroup(C2, AM2, no2, cand_paths, pg, x, pp);
-                                for (int n : new_nodes) no2[n] = -1; // cleanup new_nodes
-                                if (vio2 - cur_vio > best_delta) {
-                                    best_delta    = vio2 - cur_vio;
-                                    best_type     = 3;
-                                    best_swap_out = out_node;
-                                    best_swap_in  = in_node;
+                                    std::array<uint64_t, num_words> AM2 = AM_base;
+                                    if (!cur_mem.count(out_node))
+                                        AM2[out_node / 64] &= ~bit_mask_lookup[out_node % 64];
+                                    AM2[in_node / 64] |= bit_mask_lookup[in_node % 64];
+
+                                    // no2: rebuild for new_nodes (O(rank), necessary)
+                                    int pos3 = 0;
+                                    for (int n : new_nodes) no2[n] = pos3++;
+
+                                    collectCandidatePathUnion(new_nodes, cand_paths);
+                                    const SRCPermutation *pp  = nullptr;
+                                    const double          vio2 =
+                                        evalPlanGroup(C2, AM2, no2, cand_paths, pg, x, pp);
+                                    for (int n : new_nodes) no2[n] = -1;
+
+                                    if (vio2 - cur_vio > best_delta) {
+                                        best_delta    = vio2 - cur_vio;
+                                        best_type     = 3;
+                                        best_swap_out = out_node;
+                                        best_swap_in  = in_node;
+                                    }
                                 }
                             }
+                            // No outer no2 cleanup needed — we never set it in the outer loop.
                         }
-                        for (int n : cur_nodes) no2[n] = -1; // cleanup cur setup
                     }
-                }
 
-                // ── ADD (rank increases → re-find plan) ──────────────────────
-                if (cur_rank < MAX_RANK) {
-                    for (int nb : w_no_c) {
-                        std::vector<int> new_nodes = cur_nodes;
-                        new_nodes.push_back(nb);
-                        std::sort(new_nodes.begin(), new_nodes.end());
-                        collectCandidatePathUnion(new_nodes, cand_paths);
-                        auto [vio2, gi2, pp2] = findBestPlanGroupIdx(new_nodes, cur_mem, cand_paths, x);
-                        if (vio2 - cur_vio > best_delta) {
-                            best_delta = vio2 - cur_vio;
-                            best_type  = 1;
-                            best_add   = nb;
+                    // ── ADD (rank increases → re-find plan) ───────────────────
+                    if (cur_rank < MAX_RANK) {
+                        for (const int nb : w_no_c) {
+                            std::vector<int> new_nodes = cur_nodes;
+                            new_nodes.push_back(nb);
+                            std::sort(new_nodes.begin(), new_nodes.end());
+                            collectCandidatePathUnion(new_nodes, cand_paths);
+                            auto [vio2, gi2, pp2] =
+                                findBestPlanGroupIdx(new_nodes, cur_mem, cand_paths, x);
+                            if (vio2 - cur_vio > best_delta) {
+                                best_delta = vio2 - cur_vio;
+                                best_type  = 1;
+                                best_add   = nb;
+                            }
                         }
                     }
-                }
 
-                // ── REMOVE (rank decreases → re-find plan) ───────────────────
-                if (cur_rank > MIN_RANK) {
-                    for (int ri = 0; ri < cur_rank; ++ri) {
-                        std::vector<int> new_nodes;
-                        new_nodes.reserve(cur_rank - 1);
-                        for (int j2 = 0; j2 < cur_rank; ++j2)
-                            if (j2 != ri) new_nodes.push_back(cur_nodes[j2]);
-                        collectCandidatePathUnion(new_nodes, cand_paths);
-                        // Small bonus for remove: simpler cut is cheaper in pricing.
-                        auto [vio2, gi2, pp2] = findBestPlanGroupIdx(new_nodes, cur_mem, cand_paths, x);
-                        if (vio2 - cur_vio > best_delta + 5e-5) {
-                            best_delta = vio2 - cur_vio;
-                            best_type  = 2;
-                            best_rem   = cur_nodes[ri];
+                    // ── REMOVE (rank decreases → re-find plan) ────────────────
+                    if (cur_rank > MIN_RANK) {
+                        for (int ri = 0; ri < cur_rank; ++ri) {
+                            std::vector<int> new_nodes;
+                            new_nodes.reserve(cur_rank - 1);
+                            for (int j2 = 0; j2 < cur_rank; ++j2)
+                                if (j2 != ri) new_nodes.push_back(cur_nodes[j2]);
+                            collectCandidatePathUnion(new_nodes, cand_paths);
+                            auto [vio2, gi2, pp2] =
+                                findBestPlanGroupIdx(new_nodes, cur_mem, cand_paths, x);
+                            // Small bonus: simpler cut is cheaper in pricing.
+                            if (vio2 - cur_vio > best_delta + 5e-5) {
+                                best_delta = vio2 - cur_vio;
+                                best_type  = 2;
+                                best_rem   = cur_nodes[ri];
+                            }
                         }
                     }
-                }
 
-                if (best_type == 0) break; // Converged
+                    if (best_type == 0) break; // converged
 
-                // Apply best move
-                if (best_type == 1) {
-                    cur_nodes.push_back(best_add);
-                    std::sort(cur_nodes.begin(), cur_nodes.end());
-                    w_no_c.erase(best_add);
-                    // Add heuristic neighbours of the new node to w_no_c
-                    if (best_add < static_cast<int>(rank1_sep_heur_mem4_vertex.size())) {
-                        for (int nb : rank1_sep_heur_mem4_vertex[best_add]) {
-                            if (nb > 0 && nb < N_SIZE - 1 &&
-                                !std::binary_search(cur_nodes.begin(), cur_nodes.end(), nb))
-                                w_no_c.insert(nb);
+                    // ── apply best move ───────────────────────────────────────
+                    if (best_type == 1) { // ADD
+                        cur_nodes.push_back(best_add);
+                        std::sort(cur_nodes.begin(), cur_nodes.end());
+                        w_erase(best_add);
+                        if (best_add < static_cast<int>(rank1_sep_heur_mem4_vertex.size())) {
+                            for (int nb : rank1_sep_heur_mem4_vertex[best_add]) {
+                                if (nb > 0 && nb < N_SIZE - 1 &&
+                                    !std::binary_search(cur_nodes.begin(), cur_nodes.end(), nb))
+                                    w_insert(nb);
+                            }
                         }
-                    }
-                    collectCandidatePathUnion(cur_nodes, cand_paths);
-                    auto [vio2, gi2, pp2] = findBestPlanGroupIdx(cur_nodes, cur_mem, cand_paths, x);
-                    cur_vio = vio2; cur_gi = gi2; cur_perm = pp2;
-                } else if (best_type == 2) {
-                    auto it2 = std::find(cur_nodes.begin(), cur_nodes.end(), best_rem);
-                    if (it2 != cur_nodes.end()) {
-                        w_no_c.insert(best_rem);
-                        cur_nodes.erase(it2);
-                    }
-                    collectCandidatePathUnion(cur_nodes, cand_paths);
-                    auto [vio2, gi2, pp2] = findBestPlanGroupIdx(cur_nodes, cur_mem, cand_paths, x);
-                    cur_vio = vio2; cur_gi = gi2; cur_perm = pp2;
-                } else { // swap
-                    auto it2 = std::find(cur_nodes.begin(), cur_nodes.end(), best_swap_out);
-                    if (it2 != cur_nodes.end()) *it2 = best_swap_in;
-                    std::sort(cur_nodes.begin(), cur_nodes.end());
-                    w_no_c.erase(best_swap_in);
-                    w_no_c.insert(best_swap_out);
-                    // Swap keeps rank → use same plan group
-                    const int new_rank = static_cast<int>(cur_nodes.size());
-                    auto      pgit     = plan_groups_map.find(new_rank);
-                    if (pgit != plan_groups_map.end() && cur_gi >= 0 &&
-                        cur_gi < static_cast<int>(pgit->second.size())) {
-                        const auto &pg = pgit->second[cur_gi];
-                        std::array<uint64_t, num_words> C2{}, AM2{};
-                        int                             pos3 = 0;
-                        for (int n : cur_nodes) {
-                            C2[n / 64] |= bit_mask_lookup[n % 64];
-                            AM2[n / 64] |= bit_mask_lookup[n % 64];
-                            no2[n] = pos3++;
-                        }
-                        for (int n : cur_mem) AM2[n / 64] |= bit_mask_lookup[n % 64];
-                        collectCandidatePathUnion(cur_nodes, cand_paths);
-                        const SRCPermutation *pp2 = nullptr;
-                        cur_vio                   = evalPlanGroup(C2, AM2, no2, cand_paths, pg, x, pp2);
-                        cur_perm                  = pp2;
-                        for (int n : cur_nodes) no2[n] = -1;
-                    } else {
                         collectCandidatePathUnion(cur_nodes, cand_paths);
                         auto [vio2, gi2, pp2] = findBestPlanGroupIdx(cur_nodes, cur_mem, cand_paths, x);
                         cur_vio = vio2; cur_gi = gi2; cur_perm = pp2;
+
+                    } else if (best_type == 2) { // REMOVE
+                        auto it2 = std::find(cur_nodes.begin(), cur_nodes.end(), best_rem);
+                        if (it2 != cur_nodes.end()) {
+                            w_insert(best_rem);
+                            cur_nodes.erase(it2);
+                        }
+                        collectCandidatePathUnion(cur_nodes, cand_paths);
+                        auto [vio2, gi2, pp2] = findBestPlanGroupIdx(cur_nodes, cur_mem, cand_paths, x);
+                        cur_vio = vio2; cur_gi = gi2; cur_perm = pp2;
+
+                    } else { // SWAP
+                        auto it2 = std::find(cur_nodes.begin(), cur_nodes.end(), best_swap_out);
+                        if (it2 != cur_nodes.end()) *it2 = best_swap_in;
+                        std::sort(cur_nodes.begin(), cur_nodes.end());
+                        w_erase(best_swap_in);
+                        w_insert(best_swap_out);
+                        // Same rank → stay in same plan group, re-eval incrementally
+                        const int new_rank = static_cast<int>(cur_nodes.size());
+                        auto      pgit2    = plan_groups_map.find(new_rank);
+                        if (pgit2 != plan_groups_map.end() && cur_gi >= 0 &&
+                            cur_gi < static_cast<int>(pgit2->second.size())) {
+                            const auto &pg2 = pgit2->second[cur_gi];
+                            std::array<uint64_t, num_words> C3{}, AM3{};
+                            int pos3 = 0;
+                            for (int n : cur_nodes) {
+                                C3[n / 64]  |= bit_mask_lookup[n % 64];
+                                AM3[n / 64] |= bit_mask_lookup[n % 64];
+                                no2[n] = pos3++;
+                            }
+                            for (int n : cur_mem) AM3[n / 64] |= bit_mask_lookup[n % 64];
+                            collectCandidatePathUnion(cur_nodes, cand_paths);
+                            const SRCPermutation *pp2 = nullptr;
+                            cur_vio  = evalPlanGroup(C3, AM3, no2, cand_paths, pg2, x, pp2);
+                            cur_perm = pp2;
+                            for (int n : cur_nodes) no2[n] = -1;
+                        } else {
+                            collectCandidatePathUnion(cur_nodes, cand_paths);
+                            auto [vio2, gi2, pp2] =
+                                findBestPlanGroupIdx(cur_nodes, cur_mem, cand_paths, x);
+                            cur_vio = vio2; cur_gi = gi2; cur_perm = pp2;
+                        }
                     }
+                } // end greedy steps
+
+                if (cur_vio > 1e-4 && cur_perm != nullptr) {
+                    std::lock_guard<std::mutex> lock(harvest_mutex);
+                    all_harvested.push_back({cur_vio, cur_nodes, std::move(cur_mem), cur_perm});
                 }
-            } // end greedy steps
+            }); // end bulk lambda
 
-            if (cur_vio > 1e-4 && cur_perm != nullptr) {
-                harvested.push_back({cur_vio, cur_nodes, cur_mem, cur_perm});
-            }
-        } // end seed loop
+        stdexec::sync_wait(stdexec::starts_on(sched, std::move(bulk_sender)));
 
-        if (harvested.empty()) return;
+        if (all_harvested.empty()) return;
 
-        pdqsort(harvested.begin(), harvested.end(),
+        pdqsort(all_harvested.begin(), all_harvested.end(),
                 [](const auto &a, const auto &b) { return a.vio > b.vio; });
 
         constexpr int MAX_GREEDY_CUTS = 6;
         int           added           = 0;
-        for (const auto &hc : harvested) {
-            if (added >= MAX_GREEDY_CUTS) break;
-            if (hc.vio <= 1e-4) break;
-            if (hc.perm == nullptr) continue;
+        for (const auto &hc : all_harvested) {
+            if (added >= MAX_GREEDY_CUTS || hc.vio <= 1e-4) break;
+            if (!hc.perm) continue;
             CandidateSet cs(hc.nodes, hc.vio, *hc.perm, hc.mem, hc.perm->getRHS());
             if (addCutToCutStorage(cs, x)) ++added;
         }
@@ -1452,8 +1487,11 @@ public:
         // Generate candidate sets.
         // (Assuming generateCandidates returns a container type that is not
         // random access.)
+        // Seeds are built once here and reused by generateSeedCandidates and
+        // getHighDimCutsRouteOpt to avoid the expensive O(N×R) construction twice.
+        auto seed_map                     = constructHighRankSeeds();
         auto candidates_set               = generateCandidates(node_scores, A, x);
-        auto seed_candidates              = generateSeedCandidates(A, x);
+        auto seed_candidates              = generateSeedCandidates(A, x, seed_map);
         auto route_seed_candidates        = generateRouteSupportSeeds(A, x, node_scores);
         auto lifted_seed_candidates       = generateLiftedCutSeeds(A, x, node_scores);
         auto cooccurrence_seed_candidates = generateFractionalCooccurrenceSeeds(A, x, node_scores);
@@ -1570,7 +1608,8 @@ public:
 
         // RouteOpt-style deterministic greedy search: runs AFTER the SA pass
         // so it can polish seeds that the stochastic search may have missed.
-        getHighDimCutsRouteOpt(x);
+        // Reuses the seed_map built at the top of separate() — no extra construction.
+        getHighDimCutsRouteOpt(x, seed_map);
 
         // Print summary of the candidate processing.
         print_cut("Candidates: {} | Improved Candidates: {} | Added {} SRC 3-4-5 "
