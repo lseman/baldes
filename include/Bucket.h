@@ -248,6 +248,17 @@ struct alignas(64) Bucket {
         }
     }
 
+    template <Direction dir>
+    void clear_generated_jump_arcs() {
+        if constexpr (dir == Direction::Forward) {
+            fw_jump_arcs.clear();
+            std::erase_if(fw_bucket_arcs, [](const BucketArc &arc) { return arc.jump; });
+        } else {
+            bw_jump_arcs.clear();
+            std::erase_if(bw_bucket_arcs, [](const BucketArc &arc) { return arc.jump; });
+        }
+    }
+
     Bucket(int node_id, std::vector<double> lb, std::vector<double> ub)
         : node_id(node_id), lb(std::move(lb)), ub(std::move(ub)) {
         labels.reserve(256);

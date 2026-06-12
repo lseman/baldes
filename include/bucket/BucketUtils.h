@@ -92,14 +92,20 @@ inline int BucketGraph::get_bucket_number(int node, std::vector<double> &resourc
             (splits == 0 || std::fabs(node_range) < std::numeric_limits<double>::epsilon()) ? 1.0 : node_range / splits;
 
         int pos = 0;
-        // Keep bucket indices increasing with resource value in both
-        // directions, matching RouteOpt's bin convention. Backward dominance
-        // then walks toward b + 1 instead of relying on reversed bucket order.
-        if (std::fabs(interval_width) < std::numeric_limits<double>::epsilon()) {
-            pos = 0;
+        if constexpr (D == Direction::Forward) {
+            if (std::fabs(interval_width) < std::numeric_limits<double>::epsilon()) {
+                pos = 0;
+            } else {
+                pos = std::clamp(static_cast<int>(std::floor((resource_values_vec[r] - node_lb) / interval_width)), 0,
+                                 splits - 1);
+            }
         } else {
-            pos = std::clamp(static_cast<int>(std::floor((resource_values_vec[r] - node_lb) / interval_width)), 0,
-                             splits - 1);
+            if (std::fabs(interval_width) < std::numeric_limits<double>::epsilon()) {
+                pos = 0;
+            } else {
+                pos = std::clamp(static_cast<int>(std::floor((node_ub - resource_values_vec[r]) / interval_width)), 0,
+                                 splits - 1);
+            }
         }
 
         bucket_number += pos * multiplier;
@@ -211,11 +217,13 @@ void BucketGraph::define_buckets() {
     auto calculate_interval = [&](double lb, double ub, double base_interval, int pos, int max_intervals,
                                   bool is_forward) -> std::pair<double, double> {
         double start, end;
-        (void)is_forward;
-        // RouteOpt keeps bucket indices increasing with resource value for
-        // both directions; only the dominance walk changes direction.
-        start = (pos == 0) ? lb : lb + pos * base_interval;
-        end   = (pos == max_intervals - 1) ? ub : lb + (pos + 1) * base_interval;
+        if (is_forward) {
+            start = (pos == 0) ? lb : lb + pos * base_interval;
+            end   = (pos == max_intervals - 1) ? ub : lb + (pos + 1) * base_interval;
+        } else {
+            start = (pos == max_intervals - 1) ? lb : ub - (pos + 1) * base_interval;
+            end   = (pos == 0) ? ub : ub - pos * base_interval;
+        }
         start = roundToTwoDecimalPlaces(start);
         end   = roundToTwoDecimalPlaces(end);
         return {start, end};
@@ -305,8 +313,8 @@ void BucketGraph::define_buckets() {
 
     // 5. Precompute RC2 bucket metadata for whole-bucket prune.
     // Forward dominance needs candidate rc2 <= label rc2, so keep a prefix
-    // minimum of bucket lower bounds. Backward dominance needs candidate rc2 >=
-    // label rc2, so keep a prefix maximum of bucket upper bounds.
+    // minimum of bucket lower bounds. Backward buckets are reversed, so
+    // candidate rc2 >= label rc2 also lives in the prefix.
     auto &rc2_bin           = assign_buckets<D>(fw_rc2_bin, bw_rc2_bin);
     auto &rc2_till_this_bin = assign_buckets<D>(fw_rc2_till_this_bin, bw_rc2_till_this_bin);
     rc2_bin.assign(num_nodes, {});
@@ -327,22 +335,13 @@ void BucketGraph::define_buckets() {
                 if (bucket.ub.size() > 1) { rc2_value = bucket.ub[1]; }
             }
             rc2_bin[node_id][local_b] = rc2_value;
-            if constexpr (D == Direction::Forward) {
-                if (local_b == 0) {
-                    rc2_till_this_bin[node_id][local_b] = rc2_value;
-                } else {
+            if (local_b == 0) {
+                rc2_till_this_bin[node_id][local_b] = rc2_value;
+            } else {
+                if constexpr (D == Direction::Forward) {
                     rc2_till_this_bin[node_id][local_b] = std::min(rc2_till_this_bin[node_id][local_b - 1], rc2_value);
-                }
-            }
-        }
-        if constexpr (D == Direction::Backward) {
-            for (int local_b = count - 1; local_b >= 0; --local_b) {
-                const double rc2_value = rc2_bin[node_id][local_b];
-                if (local_b == count - 1) {
-                    rc2_till_this_bin[node_id][local_b] = rc2_value;
                 } else {
-                    rc2_till_this_bin[node_id][local_b] =
-                        std::max(rc2_till_this_bin[node_id][local_b + 1], rc2_value);
+                    rc2_till_this_bin[node_id][local_b] = std::max(rc2_till_this_bin[node_id][local_b - 1], rc2_value);
                 }
             }
         }

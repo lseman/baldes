@@ -164,17 +164,11 @@ std::vector<int> BucketGraph::computePhi(int &bucket_id, bool fw) {
             rem /= splits;
         }
 
-        // Build Phi by exploring each dimension independently. Bucket indices
-        // increase with resource value in both directions, so RouteOpt-style
-        // dominance walks to b - 1 forward and b + 1 backward.
+        // Build Phi by exploring each dimension independently.
         for (int r = 0; r < n_dims; ++r) {
-            if (fw) {
-                if (pos[r] == 0) continue;
-            } else {
-                if (pos[r] + 1 >= splits_per_dim[r]) continue;
-            }
+            if (pos[r] == 0) continue;
             std::vector<int> neighbor_pos = pos;
-            neighbor_pos[r] += fw ? -1 : 1;
+            --neighbor_pos[r];
 
             int candidate_bucket = num_buckets_index[node_id];
             int multiplier       = 1;
@@ -197,10 +191,10 @@ std::vector<int> BucketGraph::computePhi(int &bucket_id, bool fw) {
     }
     // Single-resource case (simpler).
     else {
-        // Forward: predecessor = lower-resource bucket (bucket_id - 1).
-        // Backward: predecessor = higher-resource bucket (bucket_id + 1).
-        int  neighbor       = fw ? bucket_id - 1 : bucket_id + 1;
-        bool valid_neighbor = fw ? (neighbor >= 0) : (neighbor < static_cast<int>(buckets.size()));
+        // Forward: predecessor = lower-resource bucket. Backward buckets use
+        // high-to-low indexing, so the predecessor is also one index lower.
+        int  neighbor       = bucket_id - 1;
+        bool valid_neighbor = neighbor >= 0;
         if (valid_neighbor && neighbor >= 0 && neighbor < static_cast<int>(buckets.size()) &&
             buckets[neighbor].node_id == buckets[bucket_id].node_id) {
 #ifdef FIX_BUCKETS

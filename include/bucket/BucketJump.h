@@ -357,20 +357,24 @@ void BucketGraph::ObtainJumpBucketArcs() {
     int arc_counter     = 0; // Count of jump arcs added
     int missing_counter = 0; // Count of missing paths
 
-    // Clear jump arcs for all nodes.
+    // Clear generated jump arcs from the previous jump-arc build. Jump arcs
+    // are also mirrored as marked BucketArc entries for the labeler.
     for (auto &node : nodes) { node.clear_jump_arcs<D>(); }
+    for (auto &bucket : buckets) { bucket.template clear_generated_jump_arcs<D>(); }
 
-    // Process each bucket.
-    for (int b = 0; b < buckets_size; ++b) {
+    // Bucket ids encode kappa in the paper's order. Jump arcs satisfy
+    // base < jump in kappa order for both senses; for backward this means a
+    // lower upper bound, with Extend applying q <- min(q, u_jump).
+    const int loop_begin = 0;
+    const int loop_end   = buckets_size;
+    const int loop_step  = 1;
+    for (int b = loop_begin; b != loop_end; b += loop_step) {
         std::vector<int> B_bar; // Temporary storage for valid adjacent
                                 // bucket indices
 
         const int   current_node_id = buckets[b].node_id;
         const auto &bucket_arcs     = buckets[b].template get_bucket_arcs<D>();
         const auto &orig_arcs       = nodes[current_node_id].template get_arcs<D>();
-
-        // Skip if there are no bucket arcs.
-        if (bucket_arcs.empty()) { continue; }
 
         // For each original arc from the current node...
         for (const auto &orig_arc : orig_arcs) {
@@ -412,17 +416,12 @@ void BucketGraph::ObtainJumpBucketArcs() {
                 const auto current_pos = decode_pos(b);
 
                 auto is_jump_candidate = [&](const std::vector<int> &candidate_pos) {
-                    bool strictly_larger = false;
+                    bool strict = false;
                     for (size_t r = 0; r < candidate_pos.size(); ++r) {
-                        if constexpr (D == Direction::Forward) {
-                            if (candidate_pos[r] < current_pos[r]) return false;
-                            if (candidate_pos[r] > current_pos[r]) strictly_larger = true;
-                        } else {
-                            if (candidate_pos[r] > current_pos[r]) return false;
-                            if (candidate_pos[r] < current_pos[r]) strictly_larger = true;
-                        }
+                        if (candidate_pos[r] < current_pos[r]) return false;
+                        if (candidate_pos[r] > current_pos[r]) strict = true;
                     }
-                    return strictly_larger;
+                    return strict;
                 };
 
                 auto is_componentwise_closest = [&](const std::vector<int>              &candidate_pos,
@@ -432,19 +431,11 @@ void BucketGraph::ObtainJumpBucketArcs() {
                         bool leq    = true;
                         bool strict = false;
                         for (size_t r = 0; r < candidate_pos.size(); ++r) {
-                            if constexpr (D == Direction::Forward) {
-                                if (other_pos[r] > candidate_pos[r]) {
-                                    leq = false;
-                                    break;
-                                }
-                                if (other_pos[r] < candidate_pos[r]) strict = true;
-                            } else {
-                                if (other_pos[r] < candidate_pos[r]) {
-                                    leq = false;
-                                    break;
-                                }
-                                if (other_pos[r] > candidate_pos[r]) strict = true;
+                            if (other_pos[r] > candidate_pos[r]) {
+                                leq = false;
+                                break;
                             }
+                            if (other_pos[r] < candidate_pos[r]) strict = true;
                         }
                         if (leq && strict) return false;
                     }
@@ -457,9 +448,9 @@ void BucketGraph::ObtainJumpBucketArcs() {
                 std::vector<double>              candidate_costs;
                 candidate_buckets.reserve(node_buckets);
 
-                const int scan_begin = (D == Direction::Forward) ? b + 1 : b - 1;
-                const int scan_end   = (D == Direction::Forward) ? start_bucket + node_buckets : start_bucket - 1;
-                const int scan_step  = (D == Direction::Forward) ? 1 : -1;
+                const int scan_begin = b + 1;
+                const int scan_end   = start_bucket + node_buckets;
+                const int scan_step  = 1;
                 for (int candidate_b = scan_begin; candidate_b != scan_end; candidate_b += scan_step) {
                     const auto candidate_pos = decode_pos(candidate_b);
                     if (!is_jump_candidate(candidate_pos)) continue;
@@ -480,8 +471,8 @@ void BucketGraph::ObtainJumpBucketArcs() {
                     }
                 }
 
-                // Keep the closest component-wise candidates: minimal larger buckets
-                // forward, maximal smaller buckets backward.
+                // Keep the closest component-wise candidates: minimal
+                // kappa-larger buckets.
                 for (size_t i = 0; i < candidate_buckets.size(); ++i) {
                     if (!is_componentwise_closest(candidate_positions[i], candidate_positions)) continue;
 
