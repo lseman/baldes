@@ -1462,9 +1462,13 @@ public:
         auto calculate_interval = [&](double lb, double ub, double base_interval, int pos, int max_interval,
                                       bool is_forward) -> std::pair<double, double> {
             double start, end;
-            (void)is_forward;
-            start = (pos == 0) ? lb : lb + pos * base_interval;
-            end   = (pos == max_interval - 1) ? ub : lb + (pos + 1) * base_interval;
+            if (is_forward) {
+                start = (pos == 0) ? lb : lb + pos * base_interval;
+                end   = (pos == max_interval - 1) ? ub : lb + (pos + 1) * base_interval;
+            } else {
+                start = (pos == max_interval - 1) ? lb : ub - (pos + 1) * base_interval;
+                end   = (pos == 0) ? ub : ub - pos * base_interval;
+            }
             return {roundToTwoDecimalPlaces(start), roundToTwoDecimalPlaces(end)};
         };
 
