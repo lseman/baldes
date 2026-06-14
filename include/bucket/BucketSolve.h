@@ -364,6 +364,7 @@ std::vector<double> BucketGraph::labeling_algorithm() {
                         // Prefetch the mother bucket and its labels
                         __builtin_prefetch(&mother_bucket, 0, 3);
 
+                        mother_bucket.flush_extra_labels_if_large();
                         const auto &to_bucket_labels = mother_bucket.get_sorted_labels();
                         const auto &to_bucket_extra  = mother_bucket.get_extra_labels();
 
@@ -540,7 +541,10 @@ std::vector<double> BucketGraph::labeling_algorithm() {
             bucket_is_active[bucket_idx] = 0;
         }
 
-        for (const int bucket : scc_buckets) { bucket_pos_in_scc[bucket] = -1; }
+        for (const int bucket : scc_buckets) {
+            bucket_pos_in_scc[bucket] = -1;
+            buckets[bucket].compact_dominated_labels();
+        }
 
         // Update c_bar values for all buckets in the current SCC.
         auto sorted_buckets = sorted_sccs[scc_index];

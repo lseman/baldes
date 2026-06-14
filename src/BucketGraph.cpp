@@ -30,14 +30,19 @@ Arc::Arc(int from, int to, const std::vector<double> &res_inc, double cost_inc, 
     : from(from), to(to), resource_increment(res_inc), cost_increment(cost_inc), priority(priority) {}
 
 BucketArc::BucketArc(int from, int to, const std::vector<double> &res_inc, double cost_inc)
-    : from_bucket(from), to_bucket(to), resource_increment(res_inc), cost_increment(cost_inc) {}
+    : from_bucket(from), to_bucket(to), cost_increment(cost_inc) {
+    std::copy_n(res_inc.begin(), std::min(res_inc.size(), resource_increment.size()), resource_increment.begin());
+}
 
 BucketArc::BucketArc(int from, int to, const std::vector<double> &res_inc, double cost_inc, bool fixed)
-    : from_bucket(from), to_bucket(to), resource_increment(res_inc), cost_increment(cost_inc), jump(fixed) {}
+    : from_bucket(from), to_bucket(to), cost_increment(cost_inc), jump(fixed) {
+    std::copy_n(res_inc.begin(), std::min(res_inc.size(), resource_increment.size()), resource_increment.begin());
+}
 
 BucketArc::BucketArc(int from, int to, const std::vector<double> &res_inc, double cost_inc, bool fixed, int to_node)
-    : from_bucket(from), to_bucket(to), resource_increment(res_inc), cost_increment(cost_inc), jump(fixed),
-      jump_to_node(to_node) {}
+    : from_bucket(from), to_bucket(to), cost_increment(cost_inc), jump(fixed), jump_to_node(to_node) {
+    std::copy_n(res_inc.begin(), std::min(res_inc.size(), resource_increment.size()), resource_increment.begin());
+}
 
 JumpArc::JumpArc(int base, int jump, const std::vector<double> &res_inc, double cost_inc)
     : base_bucket(base), jump_bucket(jump), resource_increment(res_inc), cost_increment(cost_inc) {}
@@ -164,7 +169,11 @@ std::vector<int> BucketGraph::computePhi(int &bucket_id, bool fw) {
             rem /= splits;
         }
 
-        // Build Phi by exploring each dimension independently.
+        // Build Phi in the paper's kappa order. Forward buckets have
+        // lb = l_v + kappa * d; backward buckets have ub = u_v - kappa * d.
+        // In both senses Phi_b contains adjacent component-wise smaller
+        // buckets, i.e. kappa' = kappa - e_r. For backward this is a higher
+        // physical resource interval, but still a smaller kappa.
         for (int r = 0; r < n_dims; ++r) {
             if (pos[r] == 0) continue;
             std::vector<int> neighbor_pos = pos;
@@ -191,8 +200,9 @@ std::vector<int> BucketGraph::computePhi(int &bucket_id, bool fw) {
     }
     // Single-resource case (simpler).
     else {
-        // Forward: predecessor = lower-resource bucket. Backward buckets use
-        // high-to-low indexing, so the predecessor is also one index lower.
+        // Phi is kappa - 1 for both senses. Because backward buckets are stored
+        // in paper kappa order (kappa 0 is the interval touching u_v), this is
+        // also bucket_id - 1 even though physical resource values go up.
         int  neighbor       = bucket_id - 1;
         bool valid_neighbor = neighbor >= 0;
         if (valid_neighbor && neighbor >= 0 && neighbor < static_cast<int>(buckets.size()) &&

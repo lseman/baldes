@@ -69,7 +69,7 @@ struct arc_hash {
 struct BucketArc {
     int                 from_bucket;
     int                 to_bucket;
-    std::vector<double> resource_increment;
+    std::array<double, R_SIZE> resource_increment{};
     double              cost_increment;
     bool                jump = false;
     int                 jump_to_node = -1;
@@ -91,10 +91,6 @@ struct BucketArc {
         if (cost_increment != other.cost_increment) return cost_increment < other.cost_increment;
         if (resource_increment != other.resource_increment) return resource_increment < other.resource_increment;
         return jump < other.jump;
-    }
-
-    ~BucketArc() {
-        resource_increment.clear(); // Explicitly clear to release vector memory if pooled
     }
 };
 
