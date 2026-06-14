@@ -107,6 +107,40 @@ struct alignas(64) Bucket {
         }
     }
 
+    bool should_flush_extra_labels() const noexcept {
+        if (extra_labels.empty()) return false;
+        return extra_labels.size() >= 64 || extra_labels.size() * 4 >= std::max<size_t>(labels.size(), 1);
+    }
+
+    void flush_extra_labels_if_large() {
+        if (should_flush_extra_labels()) flush_extra_labels();
+    }
+
+    size_t compact_dominated_labels() {
+        size_t removed = 0;
+
+        const auto compact = [&removed](auto &label_vec) {
+            const auto old_size = label_vec.size();
+            std::erase_if(label_vec, [](const Label *label) { return label == nullptr || label->is_dominated; });
+            removed += old_size - label_vec.size();
+        };
+
+        compact(labels);
+        compact(extra_labels);
+
+        min_cost = std::numeric_limits<double>::max();
+        for (Label *label : extra_labels) {
+            if (label && label->cost < min_cost) min_cost = label->cost;
+        }
+
+        is_virtual_split    = false;
+        virtual_split_index = 0;
+        shall_split         = labels.size() + extra_labels.size() >= BUCKET_CAPACITY;
+        if (labels.size() >= BUCKET_CAPACITY) { activate_virtual_split_assume_sorted(); }
+
+        return removed;
+    }
+
     // --- Insertion ---
     // Stage fresh labels in an unsorted tier; sorted access materializes them
     // lazily through flush_extra_labels().

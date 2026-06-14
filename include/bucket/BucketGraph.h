@@ -428,9 +428,9 @@ public:
     int              non_dominated_labels_per_bucket_bw = 0;
 
     // Running average of dominance-checks-per-non-dominant-label across
-    // labeling passes. Drives considerRegenerate(): when the average
-    // exceeds REGEN_RATIO_THRESHOLD we halve bucket_interval, mirroring
-    // RouteOpt's regenerateGraphBucket trigger (BucketResizeFactor...).
+    // labeling passes. Drives considerRegenerate(): when the average exceeds
+    // REGEN_RATIO_THRESHOLD, increase bucket_interval, which is BALDES'
+    // bucket-count parameter xi, to get finer per-bin partitioning.
     double regen_ratio_sum   = 0.0;
     int    regen_ratio_count = 0;
 
@@ -1025,15 +1025,13 @@ public:
 
     std::vector<std::vector<int>> topHeurRoutes;
 
-    // Mirrors RouteOpt's considerRegenerateBucketGraph. After each labeling
-    // pass we sample dominance_checks / non_dominant_labels and fold it into a
-    // running average. When the average exceeds REGEN_RATIO_THRESHOLD we halve
-    // bucket_interval (== RouteOpt's step_size /= 2), which doubles the bucket
-    // count and gives finer per-bin partitioning to relieve crowding.
+    // Mirrors the paper's A+ bucket refinement. After each labeling pass we
+    // sample dominance_checks / non_dominant_labels and fold it into a running
+    // average. When the average exceeds REGEN_RATIO_THRESHOLD we double
+    // bucket_interval. In BALDES this value is xi-like bucket density, not a
+    // physical step size, so doubling it gives finer per-bin partitioning.
     //
     // Guards mirror RouteOpt:
-    //   - need bucket_interval / 2 >= 1 (can still refine)
-    //   - need bucket_interval even (clean halving)
     //   - need total bucket count below REGEN_BUCKETS_CAP (don't explode)
     bool considerRegenerate() {
         constexpr double REGEN_RATIO_THRESHOLD = 800.0;  // RouteOpt's value.
@@ -1057,12 +1055,12 @@ public:
         if (avg_ratio <= REGEN_RATIO_THRESHOLD) return false;
 
         // Guards.
-        if (bucket_interval <= 1 || (bucket_interval & 1) != 0) return false;
         const int total_buckets = static_cast<int>(fw_buckets.size() + bw_buckets.size());
         if (total_buckets >= REGEN_BUCKETS_CAP) return false;
 
-        const int new_interval = bucket_interval / 2;
-        print_info("Halving bucket_interval {} -> {} (avg dom-check ratio {:.1f})\n", bucket_interval, new_interval,
+        if (bucket_interval > std::numeric_limits<int>::max() / 2) return false;
+        const int new_interval = bucket_interval * 2;
+        print_info("Refining bucket_interval {} -> {} (avg dom-check ratio {:.1f})\n", bucket_interval, new_interval,
                    avg_ratio);
         bucket_interval = new_interval;
         redefine(bucket_interval);

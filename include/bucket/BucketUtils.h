@@ -213,7 +213,12 @@ void BucketGraph::define_buckets() {
     num_buckets_index.resize(num_nodes);
     node_interval_trees.assign(num_nodes, SplayTree());
 
-    // Lambda to calculate an interval for one dimension.
+    // Lambda to calculate an interval for one dimension. Backward buckets are
+    // deliberately emitted in the paper's kappa order:
+    //   kappa = 0 -> interval ending at u_v,
+    //   kappa = 1 -> next lower interval, ...
+    // This keeps component-wise smaller buckets equal to smaller local bucket
+    // positions in both forward and backward arrays.
     auto calculate_interval = [&](double lb, double ub, double base_interval, int pos, int max_intervals,
                                   bool is_forward) -> std::pair<double, double> {
         double start, end;
@@ -394,14 +399,13 @@ void BucketGraph::define_buckets() {
  */
 template <Direction D>
 void BucketGraph::generate_arcs() {
-    // Mutex for protecting global bucket updates.
-    std::mutex buckets_mutex;
-
     // Clear the appropriate graph.
     if constexpr (D == Direction::Forward) {
         fw_bucket_graph.clear();
+        fw_arcs.clear();
     } else {
         bw_bucket_graph.clear();
+        bw_arcs.clear();
     }
 
     // Resolve references based on the direction.
@@ -471,12 +475,7 @@ void BucketGraph::generate_arcs() {
         }
         if (valid) {
             const int to_bucket = get_bucket_number<D>(next_node.id, head_resource);
-            // Add the arc to the global structure.
-            {
-                std::lock_guard<std::mutex> lock(buckets_mutex);
-                add_arc<D>(from_bucket, to_bucket, res_inc, cost_inc);
-                buckets[from_bucket].template add_bucket_arc<D>(from_bucket, to_bucket, res_inc, cost_inc, false);
-            }
+            buckets[from_bucket].template add_bucket_arc<D>(from_bucket, to_bucket, res_inc, cost_inc, false);
         }
         return valid;
     };
@@ -534,6 +533,29 @@ void BucketGraph::generate_arcs() {
 
     auto work = stdexec::starts_on(sched, bulk_sender);
     stdexec::sync_wait(std::move(work));
+
+    auto &bucket_graph = assign_buckets<D>(fw_bucket_graph, bw_bucket_graph);
+    auto &global_arcs  = assign_buckets<D>(fw_arcs, bw_arcs);
+    bucket_graph.clear();
+    global_arcs.clear();
+    bucket_graph.reserve(buckets.size());
+
+    size_t arc_count = 0;
+    for (int b = 0; b < static_cast<int>(buckets.size()); ++b) {
+        const auto &bucket_arcs = buckets[b].template get_bucket_arcs<D>();
+        arc_count += bucket_arcs.size();
+    }
+    global_arcs.reserve(arc_count);
+
+    for (int b = 0; b < static_cast<int>(buckets.size()); ++b) {
+        auto       &neighbors   = bucket_graph[b];
+        const auto &bucket_arcs = buckets[b].template get_bucket_arcs<D>();
+        neighbors.reserve(bucket_arcs.size());
+        for (const auto &arc : bucket_arcs) {
+            neighbors.push_back(arc.to_bucket);
+            global_arcs.push_back(arc);
+        }
+    }
 }
 
 /**
@@ -770,7 +792,11 @@ void BucketGraph::SCC_handler() {
     auto &buckets      = assign_buckets<D>(fw_buckets, bw_buckets);
     auto &bucket_graph = assign_buckets<D>(fw_bucket_graph, bw_bucket_graph);
 
-    // Build an extended bucket graph from bucket_graph using Phi.
+    // Build the paper's extended graph. Phi[i] stores adjacent
+    // component-wise smaller buckets b' for bucket i, while Gamma^Phi contains
+    // arcs (b', i). This direction is used only for SCC/topological ordering;
+    // dominance, concatenation, and elimination walks traverse Phi from i to
+    // its smaller-kappa predecessors.
     ankerl::unordered_dense::map<int, std::vector<int>> extended_bucket_graph = bucket_graph;
     for (size_t i = 0; i < buckets.size(); ++i) {
         extended_bucket_graph[static_cast<int>(i)];
@@ -1055,6 +1081,7 @@ void BucketGraph::heuristic_fixing() {
     // without creating intermediate label maps
     for (auto &bucket : fw_buckets) {
         for (const Label *label : bucket.get_labels()) {
+            if (label == nullptr || label->is_dominated) continue;
             const size_t node_id = label->node_id;
             if (!min_fw_labels[node_id] || label->cost < min_fw_labels[node_id]->cost) {
                 min_fw_labels[node_id] = label;
@@ -1064,6 +1091,7 @@ void BucketGraph::heuristic_fixing() {
 
     for (auto &bucket : bw_buckets) {
         for (const Label *label : bucket.get_labels()) {
+            if (label == nullptr || label->is_dominated) continue;
             const size_t node_id = label->node_id;
             if (!min_bw_labels[node_id] || label->cost < min_bw_labels[node_id]->cost) {
                 min_bw_labels[node_id] = label;

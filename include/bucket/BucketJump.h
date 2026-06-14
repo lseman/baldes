@@ -96,6 +96,8 @@ void BucketGraph::UpdateBucketsSet(const double theta, const Label *label, anker
 
         const auto &opposite_labels = buckets_opposite[curr_bucket].get_labels();
         for (const auto &L_opposite : opposite_labels) {
+            if (L_opposite == nullptr || L_opposite->is_dominated) continue;
+
             // Skip labels from the same node.
             if (bucketLnode == L_opposite->node_id) continue;
 
@@ -250,6 +252,8 @@ void BucketGraph::BucketArcElimination(double theta) {
 
             // Process each label in the current bucket.
             for (auto &L_item : labels) {
+                if (L_item == nullptr || L_item->is_dominated) continue;
+
                 // Reset Bvisited for each UpdateBucketsSet call.
                 reset_bitmap(Bvisited);
                 UpdateBucketsSet<D>(theta, L_item, Bidi_map, b_opposite, Bvisited);
@@ -284,6 +288,8 @@ void BucketGraph::BucketArcElimination(double theta) {
 
             // Process each label in bucket 'b'.
             for (auto &L_item : labels) {
+                if (L_item == nullptr || L_item->is_dominated) continue;
+
                 reset_bitmap(Bvisited);
                 UpdateBucketsSet<D>(theta, L_item, Bidi_map, b_opposite, Bvisited);
             }
@@ -363,8 +369,9 @@ void BucketGraph::ObtainJumpBucketArcs() {
     for (auto &bucket : buckets) { bucket.template clear_generated_jump_arcs<D>(); }
 
     // Bucket ids encode kappa in the paper's order. Jump arcs satisfy
-    // base < jump in kappa order for both senses; for backward this means a
-    // lower upper bound, with Extend applying q <- min(q, u_jump).
+    // b_base \prec b_jump in kappa order for both senses. For backward buckets
+    // this means jumping to a numerically larger kappa / lower physical upper
+    // bound, with Extend applying q <- min(q, u_jump).
     const int loop_begin = 0;
     const int loop_end   = buckets_size;
     const int loop_step  = 1;
@@ -442,10 +449,10 @@ void BucketGraph::ObtainJumpBucketArcs() {
                     return true;
                 };
 
-                std::vector<int>                 candidate_buckets;
-                std::vector<std::vector<int>>    candidate_positions;
-                std::vector<std::vector<double>> candidate_res;
-                std::vector<double>              candidate_costs;
+                std::vector<int>                         candidate_buckets;
+                std::vector<std::vector<int>>            candidate_positions;
+                std::vector<std::array<double, R_SIZE>>  candidate_res;
+                std::vector<double>                      candidate_costs;
                 candidate_buckets.reserve(node_buckets);
 
                 const int scan_begin = b + 1;
@@ -472,13 +479,17 @@ void BucketGraph::ObtainJumpBucketArcs() {
                 }
 
                 // Keep the closest component-wise candidates: minimal
-                // kappa-larger buckets.
+                // kappa-larger buckets. This is the paper's B-dot front; it is
+                // direction-independent because backward buckets were already
+                // built as u_v - kappa*d.
                 for (size_t i = 0; i < candidate_buckets.size(); ++i) {
                     if (!is_componentwise_closest(candidate_positions[i], candidate_positions)) continue;
 
                     const int candidate_b = candidate_buckets[i];
                     B_bar.push_back(candidate_b);
-                    std::vector<double> res  = candidate_res[i];
+                    std::vector<double> res(candidate_res[i].begin(),
+                                            candidate_res[i].begin() +
+                                                static_cast<std::ptrdiff_t>(options.main_resources.size()));
                     const double        cost = candidate_costs[i];
 
                     buckets[b].template add_jump_arc<D>(b, candidate_b, res, cost);
