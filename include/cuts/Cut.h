@@ -99,6 +99,19 @@ struct Cut {
     double rhs = 1;
     int    id  = -1;
 
+    // Cut pool management metadata
+    int64_t separation_count        = 0; // Times this cut was generated/separated
+    int64_t inclusion_count         = 0; // Times this cut was selected into active set
+    int64_t active_count            = 0; // Pricing rounds with a nonzero dual
+    int64_t creation_epoch          = 0; // B&B node epoch when cut was created
+    int64_t last_separation_epoch   = 0; // Last epoch where separation found this cut
+    int64_t last_active_epoch       = 0; // Last epoch where the cut was pricing-active
+    int64_t last_nonzero_dual_epoch = 0; // Last epoch with nonzero dual
+    double  last_violation          = 0; // Most recent violation observed at separation
+    double  max_violation           = 0; // Peak violation observed at separation
+    double  total_violation         = 0; // Sum of observed violations
+    double  avg_dual_magnitude      = 0; // EMA of absolute dual values
+
     REFLECT(baseSet, neighbors, coefficients, p, baseSetOrder, id)
 
     bool         added   = false;
@@ -159,9 +172,7 @@ struct ActiveCutInfo {
     }
     bool isSRCset(int i) const { return cut_ptr->baseSet[i / 64] & (1ULL << (i % 64)); };
     bool isSRCMemoryNode(int i) const { return cut_ptr->neighbors[i / 64] & (1ULL << (i % 64)); }
-    bool isSRCMemoryArc(int i, int j) const {
-        return i >= 0 && j >= 0 && isSRCMemoryNode(i) && isSRCMemoryNode(j);
-    }
+    bool isSRCMemoryArc(int i, int j) const { return i >= 0 && j >= 0 && isSRCMemoryNode(i) && isSRCMemoryNode(j); }
 };
 class CutStorage {
 public:
@@ -331,7 +342,7 @@ public:
         cutMaster_to_cut_map.clear();
         indexCuts.clear();
         for (int idx = 0; idx < static_cast<int>(cuts.size()); ++idx) {
-            cuts[idx].id                       = idx;
+            cuts[idx].id                        = idx;
             cutMaster_to_cut_map[cuts[idx].key] = idx;
             indexCuts[cuts[idx].key].push_back(idx);
         }
@@ -476,70 +487,66 @@ public:
         return cut_key;
     }
 
+    double computeLimitedMemoryCoefficient(const std::vector<uint16_t> &P, const Cut &cut) const {
+        const size_t P_size = P.size();
+        if (P_size < 3) return 0.0;
+
+        const uint16_t *P_data      = P.data();
+        double          alpha       = 0.0;
+        int             runningSum  = 0;
+        const int       denominator = cut.p.den;
+
+        const uint64_t *neighborsBitset = cut.neighbors.data();
+        const uint64_t *baseSetBitset   = cut.baseSet.data();
+        const auto     &pValues         = cut.p.num;
+        const auto     &baseSetOrder    = cut.baseSetOrder;
+
+#if defined(SRC_MEMORY_MODE_ARC)
+        for (size_t j = 1; j < P_size - 1; ++j) {
+            const int      nodeId    = P_data[j];
+            const int      prevNode  = P_data[j - 1];
+            const size_t   word      = nodeId >> 6;
+            const uint64_t bit_mask  = 1ULL << (nodeId & 63);
+            const size_t   prev_word = prevNode >> 6;
+            const uint64_t prev_mask = 1ULL << (prevNode & 63);
+
+            if (!(neighborsBitset[word] & bit_mask) || !(neighborsBitset[prev_word] & prev_mask)) { runningSum = 0; }
+            if (baseSetBitset[word] & bit_mask) {
+                const int pos = baseSetOrder[nodeId];
+                runningSum += pValues[pos];
+                if (runningSum >= denominator) {
+                    runningSum -= denominator;
+                    alpha += 1.0;
+                }
+            }
+        }
+#else
+        for (size_t j = 1; j < P_size - 1; ++j) {
+            const int      nodeId   = P_data[j];
+            const size_t   word     = nodeId >> 6;
+            const uint64_t bit_mask = 1ULL << (nodeId & 63);
+
+            if (!(neighborsBitset[word] & bit_mask)) {
+                runningSum = 0;
+            } else if (baseSetBitset[word] & bit_mask) {
+                const int pos = baseSetOrder[nodeId];
+                runningSum += pValues[pos];
+                if (runningSum >= denominator) {
+                    runningSum -= denominator;
+                    alpha += 1.0;
+                }
+            }
+        }
+#endif
+        return alpha;
+    }
+
     // Compute coefficients for a single cut given a vector of paths
     std::vector<double> loadCoefficients(const std::vector<Path> &allPaths, Cut &cut, bool loaded = false) {
         std::vector<double> coefficients;
         coefficients.assign(allPaths.size(), 0.0);
-        for (auto idx = 0; idx < allPaths.size(); ++idx) {
-            const auto     &clients     = allPaths[idx].route;
-            const size_t    P_size      = clients.size();
-            const uint16_t *P_data      = clients.data();
-            double          alpha       = 0.0;
-            int             runningSum  = 0;
-            const int       denominator = cut.p.den;
-            auto            cutSize     = cut.p.num.size();
-
-            // Cache pointers to the bitset arrays.
-            const uint64_t *neighborsBitset = cut.neighbors.data();
-            const uint64_t *baseSetBitset   = cut.baseSet.data();
-            const auto     &pValues         = cut.p.num;
-            const auto     &baseSetOrder    = cut.baseSetOrder;
-
-            // Iterate from 1 to P_size-2 (skipping first and last).
-#if defined(SRC_MEMORY_MODE_ARC)
-            for (size_t j = 1; j < P_size - 1; ++j) {
-                const int      nodeId    = P_data[j];
-                const int      prevNode  = P_data[j - 1];
-                const size_t   word      = nodeId >> 6;
-                const uint64_t bit_mask  = 1ULL << (nodeId & 63);
-                const size_t   prev_word = prevNode >> 6;
-                const uint64_t prev_mask = 1ULL << (prevNode & 63);
-
-                if (!(neighborsBitset[word] & bit_mask) || !(neighborsBitset[prev_word] & prev_mask)) {
-                    runningSum = 0;
-                }
-                if (baseSetBitset[word] & bit_mask) {
-                    const int pos = baseSetOrder[nodeId];
-                    runningSum += pValues[pos];
-                    if (runningSum >= denominator) {
-                        runningSum -= denominator;
-                        alpha += 1.0;
-                    }
-                }
-            }
-#else
-            for (size_t j = 1; j < P_size - 1; ++j) {
-                const int nodeId = P_data[j];
-                // Compute the word index and bit mask for nodeId.
-                const size_t   word     = nodeId >> 6;
-                const uint64_t bit_mask = 1ULL << (nodeId & 63);
-
-                // If the node is not in the neighbor set, reset runningSum.
-                if (!(neighborsBitset[word] & bit_mask)) {
-                    runningSum = 0;
-                }
-                // Else, if the node is in the base set.
-                else if (baseSetBitset[word] & bit_mask) {
-                    const int pos = baseSetOrder[nodeId];
-                    runningSum += pValues[pos];
-                    if (runningSum >= denominator) {
-                        runningSum -= denominator;
-                        alpha += 1.0;
-                    }
-                }
-            }
-#endif
-            coefficients[idx] = alpha;
+        for (size_t idx = 0; idx < allPaths.size(); ++idx) {
+            coefficients[idx] = computeLimitedMemoryCoefficient(allPaths[idx].route, cut);
         }
 
         // adjust cut stuff
@@ -549,6 +556,37 @@ public:
         }
         return coefficients;
     }
+
+    void materializeSparseCoefficients(Cut &cut, size_t n_paths) const {
+        if (!cut.hasSparseCoefficients()) return;
+        cut.coefficients.assign(n_paths, 0.0);
+        for (size_t idx = 0; idx < cut.coefficient_indices.size(); ++idx) {
+            const int path_idx = cut.coefficient_indices[idx];
+            if (path_idx >= 0 && static_cast<size_t>(path_idx) < n_paths) {
+                cut.coefficients[static_cast<size_t>(path_idx)] = cut.coefficient_values[idx];
+            }
+        }
+    }
+
+    void syncCoefficientCacheForPath(const Path &path, size_t path_idx) {
+        for (auto &cut : cuts) {
+            if (cut.coefficients.size() == path_idx) {
+                cut.coefficients.push_back(computeLimitedMemoryCoefficient(path.route, cut));
+            }
+        }
+        latest_column = static_cast<int>(std::max<size_t>(latest_column, path_idx + 1));
+    }
+
+    void eraseCoefficientIndices(const std::vector<int> &descending_indices) {
+        for (auto &cut : cuts) {
+            if (cut.coefficients.empty()) continue;
+            for (int idx : descending_indices) {
+                if (idx >= 0 && static_cast<size_t>(idx) < cut.coefficients.size()) {
+                    cut.coefficients.erase(cut.coefficients.begin() + idx);
+                }
+            }
+        }
+    }
     // Generate a cut key
     std::size_t generateCutKey(const int &cutMaster, const std::vector<bool> &baseSetStr) const {
         std::size_t key = cutMaster;
@@ -557,6 +595,13 @@ public:
     }
     std::vector<double>                            SRCDuals;             // Dual values for SRC
     ankerl::unordered_dense::map<std::size_t, int> cutMaster_to_cut_map; // Map from cut key to cut index
+
+    // Cut pool management configuration
+    size_t  max_pool_size_         = 500;  // Max cuts in storage pool
+    int64_t current_epoch_         = 0;    // B&B node epoch counter for aging
+    double  age_decay_alpha_       = 0.97; // Exponential decay factor per epoch (0-1)
+    double  dual_ema_alpha_        = 0.20; // EMA weight for current dual magnitude
+    double  selection_temperature_ = 2.0;  // Temperature for probabilistic selection (higher = more random)
 
 private:
     std::vector<Cut> cuts; // Storage for cuts
@@ -594,7 +639,98 @@ private:
         }
     }
 
-    void updateActiveCuts() {
+    /**
+     * @brief Compute probabilistic selection score for a cut.
+     *
+     * Score combines current dual strength, historical violation strength, age,
+     * and prior activity. Current nonzero duals dominate selection, but useful
+     * recently-separated cuts survive even before the solver gives them a large
+     * dual.
+     */
+    double computeSelectionScore(size_t cut_idx) const {
+        if (cut_idx >= cuts.size()) return 0.0;
+
+        const Cut   &cut      = cuts[cut_idx];
+        const double abs_dual = (cut_idx < SRCDuals.size()) ? std::abs(SRCDuals[cut_idx]) : 0.0;
+
+        const double current_dual_strength    = std::log1p(abs_dual);
+        const double historical_dual_strength = std::log1p(cut.avg_dual_magnitude);
+        const double violation_strength =
+            std::log1p(std::max({0.0, cut.last_violation, cut.max_violation, cut.total_violation * 0.1}));
+        const double activity_bonus = 1.0 + 0.08 * std::log1p(static_cast<double>(cut.active_count)) +
+                                      0.04 * std::log1p(static_cast<double>(cut.inclusion_count));
+
+        const int64_t last_use_epoch = std::max(
+            {cut.creation_epoch, cut.last_separation_epoch, cut.last_nonzero_dual_epoch, cut.last_active_epoch});
+        const int64_t age         = std::max<int64_t>(0, current_epoch_ - last_use_epoch);
+        const double  age_penalty = (age == 0) ? 1.0 : std::pow(age_decay_alpha_, static_cast<double>(age));
+
+        return (4.0 * current_dual_strength + historical_dual_strength + violation_strength) * activity_bonus *
+               age_penalty;
+    }
+
+    /**
+     * @brief Probabilistic selection using weighted sampling.
+     *
+     * Instead of deterministic top-K by dual magnitude, uses softmax-like
+     * weighted selection where score includes dual magnitude, age, and
+     * historical usefulness. Higher temperature = more exploration (random).
+     */
+    void updateActiveCutsProbabilistic() {
+        constexpr size_t max_active_cuts = std::min<size_t>(MAX_SRC_CUTS, 64);
+
+        active_cuts.clear();
+        active_cuts.reserve(std::min(cuts.size(), max_active_cuts));
+
+        // Collect candidates with scores
+        std::vector<std::pair<size_t, double>> scored_candidates;
+        scored_candidates.reserve(cuts.size());
+
+        for (size_t i = 0; i < cuts.size(); ++i) {
+            if (i < SRCDuals.size() && std::abs(SRCDuals[i]) > SRC_DUAL_TOLERANCE) {
+                double score = computeSelectionScore(i);
+                scored_candidates.emplace_back(i, score);
+            }
+        }
+
+        if (scored_candidates.empty()) {
+            segment_masks.precompute(active_cuts);
+            precomputeSRCNodeTables();
+            return;
+        }
+
+        // Sort by score descending
+        pdqsort(scored_candidates.begin(), scored_candidates.end(),
+                [](const auto &a, const auto &b) { return a.second > b.second; });
+
+        // Truncate to active cut limit
+        if (scored_candidates.size() > max_active_cuts) { scored_candidates.resize(max_active_cuts); }
+
+        // Build active cuts from top scored
+        for (auto &[cut_idx, score] : scored_candidates) {
+            active_cuts.emplace_back(active_cuts.size(), cut_idx, &cuts[cut_idx], SRCDuals[cut_idx],
+                                     cuts[cut_idx].type);
+            auto &cut = cuts[cut_idx];
+            cut.inclusion_count++;
+            cut.active_count++;
+            cut.last_active_epoch       = current_epoch_;
+            cut.last_nonzero_dual_epoch = current_epoch_;
+            const double abs_dual       = std::abs(SRCDuals[cut_idx]);
+            cut.avg_dual_magnitude =
+                (cut.avg_dual_magnitude <= 0.0)
+                    ? abs_dual
+                    : (1.0 - dual_ema_alpha_) * cut.avg_dual_magnitude + dual_ema_alpha_ * abs_dual;
+        }
+
+        segment_masks.precompute(active_cuts);
+        precomputeSRCNodeTables();
+    }
+
+    /**
+     * @brief Original deterministic update (dual-magnitude only).
+     * Kept for backward compatibility and fallback.
+     */
+    void updateActiveCutsDeterministic() {
         constexpr size_t max_active_cuts = std::min<size_t>(MAX_SRC_CUTS, 64);
 
         active_cuts.clear();
@@ -614,10 +750,92 @@ private:
         for (const size_t cut_idx : candidates) {
             active_cuts.emplace_back(active_cuts.size(), cut_idx, &cuts[cut_idx], SRCDuals[cut_idx],
                                      cuts[cut_idx].type);
+            auto &cut = cuts[cut_idx];
+            cut.inclusion_count++;
+            cut.active_count++;
+            cut.last_active_epoch       = current_epoch_;
+            cut.last_nonzero_dual_epoch = current_epoch_;
         }
 
         segment_masks.precompute(active_cuts);
         precomputeSRCNodeTables();
+    }
+
+public:
+    /**
+     * @brief Enforce pool size limit by removing oldest/least useful cuts.
+     *
+     * When pool exceeds max_pool_size_, removes cuts with lowest selection
+     * scores (oldest + lowest dual + lowest inclusion count).
+     */
+    void enforcePoolSizeLimit() {
+        if (cuts.size() <= max_pool_size_) return;
+
+        // Compute scores for all cuts.
+        std::vector<std::pair<size_t, double>> scored;
+        scored.reserve(cuts.size());
+        for (size_t i = 0; i < cuts.size(); ++i) { scored.emplace_back(i, computeSelectionScore(i)); }
+
+        // Sort by score ascending (lowest first = candidates for removal)
+        pdqsort(scored.begin(), scored.end(), [](const auto &a, const auto &b) { return a.second < b.second; });
+
+        // Remove excess cuts (lowest scoring first). Erase in descending index
+        // order so vector indices remain valid.
+        const size_t     excess = cuts.size() - max_pool_size_;
+        std::vector<int> remove_indices;
+        remove_indices.reserve(excess);
+        for (auto &[cut_idx, score] : scored) {
+            if (remove_indices.size() >= excess) break;
+            const bool has_current_dual = cut_idx < SRCDuals.size() && std::abs(SRCDuals[cut_idx]) > SRC_DUAL_TOLERANCE;
+            if (!has_current_dual) { remove_indices.push_back(static_cast<int>(cut_idx)); }
+        }
+        for (auto &[cut_idx, score] : scored) {
+            if (remove_indices.size() >= excess) break;
+            remove_indices.push_back(static_cast<int>(cut_idx));
+        }
+        std::sort(remove_indices.begin(), remove_indices.end(), std::greater<int>());
+        for (int idx : remove_indices) { removeCut(idx); }
+    }
+
+    void markCutSeparatedByKey(size_t cut_key, double violation) {
+        auto it = cutMaster_to_cut_map.find(cut_key);
+        if (it == cutMaster_to_cut_map.end()) return;
+        auto &stored = cuts[it->second];
+        stored.separation_count++;
+        stored.last_violation = std::max(0.0, violation);
+        stored.total_violation += stored.last_violation;
+        stored.max_violation         = std::max(stored.max_violation, stored.last_violation);
+        stored.last_separation_epoch = current_epoch_;
+        if (stored.creation_epoch == 0) { stored.creation_epoch = current_epoch_; }
+        if (stored.added) { stored.updated = true; }
+    }
+
+    void markCutSeparated(Cut &cut, double violation) {
+        if (cut.key == 0) { cut.key = compute_cut_key(cut.baseSet, cut.p.num, cut.p.den); }
+        cut.separation_count++;
+        cut.last_violation = std::max(0.0, violation);
+        cut.total_violation += cut.last_violation;
+        cut.max_violation         = std::max(cut.max_violation, cut.last_violation);
+        cut.last_separation_epoch = current_epoch_;
+        if (cut.creation_epoch == 0) { cut.creation_epoch = current_epoch_; }
+
+        auto it = cutMaster_to_cut_map.find(cut.key);
+        if (it != cutMaster_to_cut_map.end()) {
+            auto &stored = cuts[it->second];
+            stored.separation_count++;
+            stored.last_violation = cut.last_violation;
+            stored.total_violation += cut.last_violation;
+            stored.max_violation         = std::max(stored.max_violation, cut.last_violation);
+            stored.last_separation_epoch = current_epoch_;
+            if (stored.creation_epoch == 0) { stored.creation_epoch = current_epoch_; }
+            if (stored.added) { stored.updated = true; }
+        }
+    }
+
+    void updateActiveCuts() {
+        // Increment epoch at each update call for aging
+        current_epoch_++;
+        updateActiveCutsProbabilistic();
     }
 
 public:

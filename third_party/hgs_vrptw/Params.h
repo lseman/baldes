@@ -31,6 +31,7 @@ SOFTWARE.*/
 #include <limits.h>
 #include <numeric>
 #include <random>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -204,6 +205,13 @@ public:
     std::vector<Savings> savingsList; // Savings list used in the Clarke & Wright heuristic
     std::minstd_rand ran; // Using the fastest and simplest LCG. The quality of random numbers is not critical for the
                           // LS, but speed is
+
+    // Iterative CG integration fields (set by BALDES, read by Split/LS)
+    const std::vector<double> *duals_ptr = nullptr;                          // Node duals from master LP
+#ifdef ITERATIVE_HGS
+    const std::vector<std::pair<int, int>> *forbidden_edges_ptr = nullptr;   // Edges to forbid (legacy)
+    const std::set<long long> *forbidden_edges_set = nullptr;                // O(1) forbidden arc lookup
+#endif
 
     // Initialization from a given data set
     Params(const std::string &path_location);

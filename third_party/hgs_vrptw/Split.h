@@ -23,6 +23,7 @@ SOFTWARE.*/
 #ifndef SPLIT_H
 #define SPLIT_H
 
+#include <limits>
 #include <utility>
 #include <vector>
 
@@ -36,9 +37,10 @@ struct ClientSplit {
     int d0_x;        // The distance from the depot to the client
     int dx_0;        // The distance from the client to the depot
     int dnext;       // The distance from the client to the next client
+    int custNum;     // Original customer number (1-based) in the giant tour
 
     // Constructor, initializing everything with zero
-    ClientSplit() : demand(0), serviceTime(0), d0_x(0), dx_0(0), dnext(0) {}
+    ClientSplit() : demand(0), serviceTime(0), d0_x(0), dx_0(0), dnext(0), custNum(0) {}
 };
 
 struct Trivial_Deque {
@@ -110,13 +112,49 @@ private:
 
     // To be called with i < j only
     // Computes the cost of propagating the label i until j
+#ifdef ITERATIVE_HGS
+    // Dual bias: prefer arcs that cover high-dual nodes (more needed by master LP)
+    // Forbidden edges: arcs between customer numbers can be forbidden
+    inline double propagate(int i, int j, int k) {
+        // O(1) forbidden arc lookup using customer numbers (not tour positions)
+        if (params->forbidden_edges_set && i + 1 <= params->nbClients && j <= params->nbClients) {
+            int       from_cust = cliSplit[i + 1].custNum;
+            int       to_cust   = cliSplit[j].custNum;
+            long long arc_key   = (static_cast<long long>(from_cust) << 32) | static_cast<unsigned int>(to_cust);
+            if (params->forbidden_edges_set->count(arc_key)) { return std::numeric_limits<double>::max(); }
+        }
+
+        double distDiff = sumDistance[j] - sumDistance[i + 1];
+        double loadDiff = sumLoad[j] - sumLoad[i];
+
+        double base_cost = potential[k][i] + distDiff + cliSplit[i + 1].d0_x + cliSplit[j].dx_0 +
+                           params->penaltyCapacity * std::max(loadDiff - params->vehicleCapacity, 0.0);
+
+        // Dual bias: subtract proportional to sum of duals of customers in [i+1, j]
+        // duals indexed by customer number (1-based), use cliSplit[c].custNum
+        if (params->duals_ptr && !params->duals_ptr->empty()) {
+            double dual_sum = 0.0;
+            for (int c = i + 1; c <= j; ++c) {
+                int cust = cliSplit[c].custNum;
+                if (cust >= 1 && cust < static_cast<int>(params->duals_ptr->size())) {
+                    dual_sum += (*params->duals_ptr)[cust];
+                }
+            }
+            constexpr double DUAL_BIAS_SCALE = 0.01;
+            base_cost -= dual_sum * DUAL_BIAS_SCALE;
+        }
+
+        return base_cost;
+    }
+#else
     inline double propagate(int i, int j, int k) {
         double distDiff = sumDistance[j] - sumDistance[i + 1];
         double loadDiff = sumLoad[j] - sumLoad[i];
 
         return potential[k][i] + distDiff + cliSplit[i + 1].d0_x + cliSplit[j].dx_0 +
-               params->penaltyCapacity * std::max(loadDiff - params->vehicleCapacity, 0.0); // Explicitly using 0.0
+               params->penaltyCapacity * std::max(loadDiff - params->vehicleCapacity, 0.0);
     }
+#endif
 
     // Tests if i dominates j as a predecessor for all nodes x >= j+1
     // We assume that i < j

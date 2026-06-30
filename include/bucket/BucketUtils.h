@@ -449,7 +449,7 @@ void BucketGraph::generate_arcs() {
     // bucket boundaries.
     auto try_add_arc = [&](int from_bucket, const VRPNode &next_node, const std::vector<double> &res_inc,
                            double cost_inc) -> bool {
-        bool valid = true;
+        bool                valid = true;
         std::vector<double> head_resource(res_inc.size(), 0.0);
         if constexpr (D == Direction::Forward) {
             for (int r = 0; r < res_inc.size() && valid; ++r) {
@@ -671,11 +671,14 @@ void BucketGraph::ConcatenateLabel(const Label *L, int &b, std::atomic<double> &
         const double path_cost = L_cost + travel_cost + (splice_state ? splice_state->cost_delta : 0.0);
         const double bound     = other_c_bar[current_bucket];
 
-        const double prune_limit = best_cost.load(std::memory_order_relaxed);
+        double prune_limit = best_cost.load(std::memory_order_relaxed);
+        if constexpr (S == Stage::Enumerate) {
+            prune_limit = std::min(gap, enumeration_route_cutoff.load(std::memory_order_relaxed));
+        }
 
         // Early bound check.
         if ((S != Stage::Enumerate && numericutils::gte(path_cost + bound, prune_limit)) ||
-            (S == Stage::Enumerate && numericutils::gte(path_cost + bound, gap))) {
+            (S == Stage::Enumerate && numericutils::gte(path_cost + bound, prune_limit))) {
             continue;
         }
 
@@ -690,6 +693,7 @@ void BucketGraph::ConcatenateLabel(const Label *L, int &b, std::atomic<double> &
 
         // Process each label in the current bucket.
         auto process_label = [&](const Label *L_bw) {
+            concatenation_labels_tested.fetch_add(1, std::memory_order_relaxed);
             // Skip invalid labels with combined check
             if (L_bw == nullptr || L_bw->is_dominated || L_bw->node_id == L_node_id) { return; }
             if (visited_overlap(L->visited_bitmap, L_bw->visited_bitmap)) { return; }
@@ -724,11 +728,13 @@ void BucketGraph::ConcatenateLabel(const Label *L, int &b, std::atomic<double> &
             if constexpr (S != Stage::Enumerate) {
                 cost_acceptable = numericutils::lt(total_cost, latest_best);
             } else {
-                cost_acceptable = numericutils::lt(total_cost, gap);
+                const double cutoff = std::min(gap, enumeration_route_cutoff.load(std::memory_order_relaxed));
+                cost_acceptable     = numericutils::lt(total_cost, cutoff);
             }
 
             if (!cost_acceptable) { return; }
             merge_candidates.emplace_back(L_bw, total_cost);
+            concatenation_labels_accepted.fetch_add(1, std::memory_order_relaxed);
         };
 
         for (const Label *L_bw : labels) { process_label(L_bw); }
@@ -741,12 +747,37 @@ void BucketGraph::ConcatenateLabel(const Label *L, int &b, std::atomic<double> &
             double current_best = best_cost.load(std::memory_order_relaxed);
             for (const auto &[candidate_label, candidate_cost] : merge_candidates) {
                 if constexpr (S == Stage::Enumerate) {
+                    const size_t route_limit = static_cast<size_t>(std::max(1, enumeration_policy.max_routes)) + 1;
+                    const double cutoff      = std::min(gap, enumeration_route_cutoff.load(std::memory_order_relaxed));
+                    if (!numericutils::lt(candidate_cost, cutoff)) continue;
+
                     if (numericutils::lt(candidate_cost, current_best)) {
                         best_cost.store(candidate_cost, std::memory_order_relaxed);
                         current_best = candidate_cost;
                     }
-                    auto pbest = compute_label<S>(L, candidate_label, candidate_cost);
-                    merged_labels.push_back(pbest);
+
+                    if (merged_labels.size() < route_limit) {
+                        auto pbest = compute_label<S>(L, candidate_label, candidate_cost);
+                        merged_labels.push_back(pbest);
+                    } else {
+                        auto worst_it =
+                            std::max_element(merged_labels.begin(), merged_labels.end(),
+                                             [](const Label *a, const Label *b) { return a->cost < b->cost; });
+                        if (worst_it == merged_labels.end() || !numericutils::lt(candidate_cost, (*worst_it)->cost)) {
+                            continue;
+                        }
+                        auto pbest = compute_label<S>(L, candidate_label, candidate_cost);
+                        *worst_it  = pbest;
+                    }
+
+                    if (merged_labels.size() >= route_limit) {
+                        auto worst_it =
+                            std::max_element(merged_labels.begin(), merged_labels.end(),
+                                             [](const Label *a, const Label *b) { return a->cost < b->cost; });
+                        if (worst_it != merged_labels.end()) {
+                            enumeration_route_cutoff.store((*worst_it)->cost, std::memory_order_relaxed);
+                        }
+                    }
                 } else {
                     if (numericutils::lt(candidate_cost, current_best)) {
                         best_cost.store(candidate_cost, std::memory_order_relaxed);
@@ -1388,7 +1419,7 @@ void BucketGraph::common_initialization() {
         warm_labels.clear();
     }
 
-    const int depot_id = (D == Direction::Forward) ? options.depot : options.end_depot;
+    const int depot_id   = (D == Direction::Forward) ? options.depot : options.end_depot;
     auto     &depot_node = nodes[depot_id];
 
     std::vector<double> initial_resources(options.main_resources.size(), 0.0);

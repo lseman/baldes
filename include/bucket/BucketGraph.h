@@ -200,13 +200,14 @@ public:
     template <Direction D, typename Gamma, typename VRPNode>
     constexpr bool       process_resource(double &new_resource, const std::array<double, R_SIZE> &initial_resources,
                                           const Gamma &gamma, const VRPNode &theNode, size_t I);
-    bool                 s1    = true;
-    bool                 s2    = false;
-    bool                 s3    = false;
-    bool                 s4    = false;
-    bool                 s5    = false;
-    bool                 ss    = false;
-    int                  stage = 1;
+    bool                 s1            = true;
+    bool                 s2            = false;
+    bool                 s3            = false;
+    bool                 s4            = false;
+    bool                 s5            = false;
+    bool                 ss            = false;
+    int                  stage         = 1;
+    PricingPhase         pricing_phase = PricingPhase::Labeling;
     std::vector<double>  q_star;
     int                  iter       = 0;
     bool                 transition = false;
@@ -333,6 +334,11 @@ public:
     std::vector<BucketArc>        fw_arcs;
     std::vector<BucketArc>        bw_arcs;
     std::vector<Label *>          merged_labels;
+    std::atomic<double>           enumeration_route_cutoff{std::numeric_limits<double>::infinity()};
+    std::atomic<uint64_t>         concatenation_labels_tested{0};
+    std::atomic<uint64_t>         concatenation_labels_accepted{0};
+    uint64_t                      last_concatenation_labels_tested   = 0;
+    uint64_t                      last_concatenation_labels_accepted = 0;
     std::vector<std::vector<int>> neighborhoods;
 
     std::vector<std::vector<double>> distance_matrix;
@@ -476,6 +482,12 @@ public:
     void common_initialization() {
         merged_labels.clear();
         merged_labels.reserve(50);
+        enumeration_route_cutoff.store(std::numeric_limits<double>::infinity(), std::memory_order_relaxed);
+        pricing_phase = PricingPhase::Labeling;
+        concatenation_labels_tested.store(0, std::memory_order_relaxed);
+        concatenation_labels_accepted.store(0, std::memory_order_relaxed);
+        last_concatenation_labels_tested   = 0;
+        last_concatenation_labels_accepted = 0;
         if (options.profile_labeling) { profile_reset_labeling_metrics(); }
         PARALLEL_SECTIONS(
             work, bi_sched, SECTION { common_initialization<Direction::Forward>(); },
@@ -507,16 +519,27 @@ public:
     Label *compute_label(const Label *L, const Label *L_prime, double cost = 0.0);
 
     struct SpliceState {
-        std::array<double, R_SIZE> resources = {};
+        std::array<double, R_SIZE> resources  = {};
         double                     cost_delta = 0.0;
         SRC_MODE_BLOCK(SRCMap SRCmap; bool has_src = false;)
     };
 
-    bool   BucketSetContains(const std::set<int> &bucket_set, const int &bucket);
-    void   setSplit(const std::vector<double> q_star) { this->q_star = q_star; }
-    int    getStage() const { return stage; }
-    Status getStatus() const { return status; }
-    bool   enumerationFailed() const noexcept { return enumeration_failed.load(std::memory_order_relaxed); }
+    bool         BucketSetContains(const std::set<int> &bucket_set, const int &bucket);
+    void         setSplit(const std::vector<double> q_star) { this->q_star = q_star; }
+    int          getStage() const { return stage; }
+    Status       getStatus() const { return status; }
+    bool         enumerationFailed() const noexcept { return enumeration_failed.load(std::memory_order_relaxed); }
+    PricingPhase getPricingPhase() const noexcept { return pricing_phase; }
+    const char  *getPricingPhaseName() const noexcept {
+        switch (pricing_phase) {
+        case PricingPhase::Labeling: return "label";
+        case PricingPhase::Concatenate: return "concat";
+        case PricingPhase::Enumerate: return "enum";
+        }
+        return "unknown";
+    }
+    uint64_t getLastConcatenationLabelsTested() const noexcept { return last_concatenation_labels_tested; }
+    uint64_t getLastConcatenationLabelsAccepted() const noexcept { return last_concatenation_labels_accepted; }
 
     size_t current_bucket_arc_count() const noexcept {
         size_t count = 0;
@@ -554,9 +577,9 @@ public:
 
     void enableEnumeration(double lower_bound) noexcept {
         s1 = s2 = s3 = s4 = false;
-        s5                 = true;
-        ss                 = false;
-        transition         = false;
+        s5                = true;
+        ss                = false;
+        transition        = false;
         enumeration_failed.store(false, std::memory_order_relaxed);
         gap = std::max(0.0, incumbent - lower_bound);
     }
@@ -917,7 +940,8 @@ public:
             // Fallback: iterate to check any resource named "time".
             for (size_t r = 0; r < n_resources; ++r) {
                 if (options.resources[r] == "time") {
-                    const double fw_time = splice_state ? fw_resources[r] : fw_resources[r] + travel_time + node.duration;
+                    const double fw_time =
+                        splice_state ? fw_resources[r] : fw_resources[r] + travel_time + node.duration;
                     if (numericutils::gt(fw_time, bw_resources[r])) return false;
                 }
             }
