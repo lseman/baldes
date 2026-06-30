@@ -200,14 +200,13 @@ public:
     template <Direction D, typename Gamma, typename VRPNode>
     constexpr bool       process_resource(double &new_resource, const std::array<double, R_SIZE> &initial_resources,
                                           const Gamma &gamma, const VRPNode &theNode, size_t I);
-    bool                 s1            = true;
-    bool                 s2            = false;
-    bool                 s3            = false;
-    bool                 s4            = false;
-    bool                 s5            = false;
-    bool                 ss            = false;
-    int                  stage         = 1;
-    PricingPhase         pricing_phase = PricingPhase::Labeling;
+    bool                 s1    = true;
+    bool                 s2    = false;
+    bool                 s3    = false;
+    bool                 s4    = false;
+    bool                 s5    = false;
+    bool                 ss    = false;
+    int                  stage = 1;
     std::vector<double>  q_star;
     int                  iter       = 0;
     bool                 transition = false;
@@ -483,7 +482,6 @@ public:
         merged_labels.clear();
         merged_labels.reserve(50);
         enumeration_route_cutoff.store(std::numeric_limits<double>::infinity(), std::memory_order_relaxed);
-        pricing_phase = PricingPhase::Labeling;
         concatenation_labels_tested.store(0, std::memory_order_relaxed);
         concatenation_labels_accepted.store(0, std::memory_order_relaxed);
         last_concatenation_labels_tested   = 0;
@@ -524,20 +522,11 @@ public:
         SRC_MODE_BLOCK(SRCMap SRCmap; bool has_src = false;)
     };
 
-    bool         BucketSetContains(const std::set<int> &bucket_set, const int &bucket);
-    void         setSplit(const std::vector<double> q_star) { this->q_star = q_star; }
-    int          getStage() const { return stage; }
-    Status       getStatus() const { return status; }
-    bool         enumerationFailed() const noexcept { return enumeration_failed.load(std::memory_order_relaxed); }
-    PricingPhase getPricingPhase() const noexcept { return pricing_phase; }
-    const char  *getPricingPhaseName() const noexcept {
-        switch (pricing_phase) {
-        case PricingPhase::Labeling: return "label";
-        case PricingPhase::Concatenate: return "concat";
-        case PricingPhase::Enumerate: return "enum";
-        }
-        return "unknown";
-    }
+    bool     BucketSetContains(const std::set<int> &bucket_set, const int &bucket);
+    void     setSplit(const std::vector<double> q_star) { this->q_star = q_star; }
+    int      getStage() const { return stage; }
+    Status   getStatus() const { return status; }
+    bool     enumerationFailed() const noexcept { return enumeration_failed.load(std::memory_order_relaxed); }
     uint64_t getLastConcatenationLabelsTested() const noexcept { return last_concatenation_labels_tested; }
     uint64_t getLastConcatenationLabelsAccepted() const noexcept { return last_concatenation_labels_accepted; }
 

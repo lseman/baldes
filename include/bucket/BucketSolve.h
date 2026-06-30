@@ -125,8 +125,7 @@ inline std::vector<Label *> BucketGraph::solve(bool trigger) {
     }
     // ----- Stage 5: Enumeration -----
     else if (s5 && depth == 0) {
-        stage         = 5;
-        pricing_phase = PricingPhase::Enumerate;
+        stage = 5;
         print_info("Starting enumeration with gap {}\n", gap);
         enumeration_failed.store(false, std::memory_order_relaxed);
         paths = bi_labeling_algorithm<Stage::Enumerate>();
@@ -659,7 +658,6 @@ std::vector<Label *> BucketGraph::bi_labeling_algorithm() {
     std::vector<double> backward_cbar(bw_buckets.size());
 
     // Run the labeling algorithms.
-    pricing_phase = (S == Stage::Enumerate) ? PricingPhase::Enumerate : PricingPhase::Labeling;
     if constexpr (SYM == Symmetry::Asymmetric) {
         run_labeling_algorithms<S, Full::Partial>(forward_cbar, backward_cbar);
     } else {
@@ -693,7 +691,6 @@ std::vector<Label *> BucketGraph::bi_labeling_algorithm() {
     std::atomic<size_t> non_dominated_labels_per_bucket{0};
     concatenation_labels_tested.store(0, std::memory_order_relaxed);
     concatenation_labels_accepted.store(0, std::memory_order_relaxed);
-    if constexpr (S != Stage::Enumerate) { pricing_phase = PricingPhase::Concatenate; }
 
     // === Parallel Bucket Processing ===
     // Choose a chunk size based on hardware concurrency.
