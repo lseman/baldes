@@ -152,8 +152,7 @@ public:
     static inline void printCgProgress(int iter, double lp_obj, double inner_obj, int n_cuts, int n_rcc_cuts,
                                        int col_added, int stage, double lag_gap, double cur_alpha, double tr_val,
                                        double gap, double integer_solution, double bucketgraph_th,
-                                       const char *pricing_phase = "label", uint64_t concat_tested = 0,
-                                       uint64_t concat_accepted = 0) {
+                                       uint64_t concat_tested = 0, uint64_t concat_accepted = 0) {
         constexpr int threshold   = 1000000;
         std::string   lag_gap_str = (lag_gap > threshold) ? "∞" : fmt::format("{:10.4f}", lag_gap);
         std::string   int_sol_str;
@@ -167,21 +166,21 @@ public:
 
         fmt::print("| It.: {:4} | Obj.: {:8.2f} | Price: {:9.2f} | SRC: {:3} "
                    "| RCC: {:3} | Paths: {:3} | "
-                   "Stage: {:1} | Ph: {:>6} | Cat: {:5}/{:<5} | "
+                   "Stage: {:1} | Cat: {:5}/{:<5} | "
                    "Lag.: {:>10} | α: {:4.2f} | tr: {:2.2f} | gap: {:2.4f} "
                    "| Int.: {:>4} | Th: {:4.2f} |\n",
-                   iter, lp_obj, inner_obj, n_cuts, n_rcc_cuts, col_added, stage, pricing_phase, concat_accepted,
-                   concat_tested, lag_gap_str, cur_alpha, tr_val, gap, int_sol_str, bucketgraph_th);
+                   iter, lp_obj, inner_obj, n_cuts, n_rcc_cuts, col_added, stage, concat_accepted, concat_tested,
+                   lag_gap_str, cur_alpha, tr_val, gap, int_sol_str, bucketgraph_th);
 
         Logger::log("| It.: {:4} | Obj.: {:8.2f} | Price: {:9.2f} | SRC: "
                     "{:3} "
                     "| RCC: {:3} | Paths: {:3} | "
-                    "Stage: {:1} | Ph: {:>6} | Cat: {:5}/{:<5} | "
+                    "Stage: {:1} | Cat: {:5}/{:<5} | "
                     "Lag.: {:10.4f} | α: {:4.2f} | tr: {:2.2f} | gap: "
                     "{:2.4f} "
                     "|\n",
-                    iter, lp_obj, inner_obj, n_cuts, n_rcc_cuts, col_added, stage, pricing_phase, concat_accepted,
-                    concat_tested, lag_gap, cur_alpha, tr_val, gap);
+                    iter, lp_obj, inner_obj, n_cuts, n_rcc_cuts, col_added, stage, concat_accepted, concat_tested,
+                    lag_gap, cur_alpha, tr_val, gap);
     }
 
     struct PricingStateMachine {
@@ -1615,7 +1614,7 @@ public:
             auto bucketgraph_th = bucket_graph->threshold;
             if (iter % 10 == 0) {
                 printCgProgress(iter, lp_obj, inner_obj, n_cuts, n_rcc_cuts, colAdded, stage, lag_gap, cur_alpha,
-                                tr_val, gap, integer_solution, bucketgraph_th, bucket_graph->getPricingPhaseName(),
+                                tr_val, gap, integer_solution, bucketgraph_th,
                                 bucket_graph->getLastConcatenationLabelsTested(),
                                 bucket_graph->getLastConcatenationLabelsAccepted());
             }
