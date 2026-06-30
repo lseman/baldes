@@ -8,6 +8,7 @@
 
 #include <atomic>
 #include <condition_variable>
+#include <cstring>
 
 #include "Bucket.h"
 #include "CostFunction.h"
@@ -230,6 +231,68 @@ public:
     EnumerationPolicy enumeration_policy{};
     std::atomic_bool  enumeration_failed{false};
 
+    struct BucketPricingResult {
+        std::vector<Label *> labels;
+        double               best_reduced_cost             = std::numeric_limits<double>::infinity();
+        uint64_t             concatenation_labels_tested   = 0;
+        uint64_t             concatenation_labels_accepted = 0;
+        bool                 enumeration_failed            = false;
+        bool                 skip_stage_transition         = false;
+    };
+
+    struct BucketDirectionalBounds {
+        std::vector<double> forward;
+        std::vector<double> backward;
+    };
+
+    struct BucketPricingPass {
+        BucketDirectionalBounds bounds;
+        std::atomic<double>     best_cost{0.0};
+        std::atomic<size_t>     non_dominated_labels{0};
+
+        BucketPricingPass(size_t fw_size, size_t bw_size)
+            : bounds{std::vector<double>(fw_size), std::vector<double>(bw_size)} {}
+    };
+
+    struct BucketStageDecision {
+        Stage stage     = Stage::One;
+        bool  available = false;
+    };
+
+    struct ConcatenationCandidate {
+        const Label *label = nullptr;
+        double       cost  = 0.0;
+    };
+
+    struct ConcatenationStats {
+        uint64_t labels_tested   = 0;
+        uint64_t labels_accepted = 0;
+    };
+
+    struct ConcatenationScratch {
+        std::vector<uint64_t>               visited_buckets;
+        std::vector<int>                    bucket_stack;
+        std::vector<ConcatenationCandidate> candidates;
+        ConcatenationStats                  stats;
+
+        void reset(size_t n_segments, int start_bucket) {
+            if (visited_buckets.size() != n_segments) { visited_buckets.resize(n_segments); }
+            std::memset(visited_buckets.data(), 0, n_segments * sizeof(uint64_t));
+
+            if (bucket_stack.capacity() < 64) bucket_stack.reserve(64);
+            bucket_stack.clear();
+            bucket_stack.push_back(start_bucket);
+
+            candidates.clear();
+            stats = {};
+        }
+
+        void prepare_candidates(size_t label_count) {
+            candidates.clear();
+            if (candidates.capacity() < label_count) { candidates.reserve(label_count); }
+        }
+    };
+
 #ifdef RIH
     std::thread rih_thread;
 #endif
@@ -344,8 +407,8 @@ public:
     std::vector<std::vector<int>>    Phi_fw;
     std::vector<std::vector<int>>    Phi_bw;
 
-    ankerl::unordered_dense::map<int, std::vector<int>> fw_bucket_graph;
-    ankerl::unordered_dense::map<int, std::vector<int>> bw_bucket_graph;
+    std::vector<std::vector<int>> fw_bucket_graph;
+    std::vector<std::vector<int>> bw_bucket_graph;
 
     std::vector<double> fw_c_bar;
     std::vector<double> bw_c_bar;
@@ -473,6 +536,18 @@ public:
     template <Symmetry SYM = Symmetry::Asymmetric>
     std::vector<Label *> solve(bool trigger = false);
 
+    BucketStageDecision current_bucket_pricing_stage() const noexcept;
+
+    void activate_bucket_pricing_stage(Stage next_stage) noexcept;
+
+    template <Symmetry SYM = Symmetry::Asymmetric>
+    BucketPricingResult execute_bucket_pricing_stage(Stage active_stage);
+
+    BucketPricingResult make_bucket_pricing_result(std::vector<Label *> labels,
+                                                   bool skip_stage_transition = false) const;
+
+    void transition_after_bucket_pricing(Stage active_stage, const BucketPricingResult &result);
+
     std::vector<Label *> solveHeuristic();
 
     template <Direction D>
@@ -486,7 +561,6 @@ public:
         concatenation_labels_accepted.store(0, std::memory_order_relaxed);
         last_concatenation_labels_tested   = 0;
         last_concatenation_labels_accepted = 0;
-        if (options.profile_labeling) { profile_reset_labeling_metrics(); }
         PARALLEL_SECTIONS(
             work, bi_sched, SECTION { common_initialization<Direction::Forward>(); },
             SECTION { common_initialization<Direction::Backward>(); });
@@ -527,6 +601,7 @@ public:
     int      getStage() const { return stage; }
     Status   getStatus() const { return status; }
     bool     enumerationFailed() const noexcept { return enumeration_failed.load(std::memory_order_relaxed); }
+    void     clearEnumerationFailure() noexcept { enumeration_failed.store(false, std::memory_order_relaxed); }
     uint64_t getLastConcatenationLabelsTested() const noexcept { return last_concatenation_labels_tested; }
     uint64_t getLastConcatenationLabelsAccepted() const noexcept { return last_concatenation_labels_accepted; }
 
@@ -1148,9 +1223,43 @@ public:
     template <Stage S, Symmetry SYM = Symmetry::Asymmetric>
     std::vector<Label *> bi_labeling_algorithm();
 
+    template <Stage S>
+    void prepare_pricing_stage();
+
+    template <Stage S>
+    void initialize_pricing_pass();
+
     template <Stage S, Symmetry SYM = Symmetry::Asymmetric>
-    void ConcatenateLabel(const Label *L, int &b, std::atomic<double> &best_cost,
-                          const SpliceState *splice_state = nullptr);
+    void run_directional_pricing(BucketDirectionalBounds &bounds);
+
+    template <Stage S, Symmetry SYM = Symmetry::Asymmetric>
+    Label *make_initial_merged_label();
+
+    template <Stage S, Symmetry SYM = Symmetry::Asymmetric>
+    void concatenate_pricing_pass(BucketPricingPass &pass);
+
+    template <Stage S, Symmetry SYM = Symmetry::Asymmetric>
+    void concatenate_from_forward_arc(const Label *label, const BucketArc &arc, BucketPricingPass &pass);
+
+    template <Stage S>
+    BucketPricingResult finalize_pricing_pass();
+
+    template <Stage S>
+    void publish_concatenation_candidates(const Label *forward_label,
+                                          std::span<const ConcatenationCandidate> candidates,
+                                          std::atomic<double> &best_cost);
+
+    template <Stage S>
+    bool collect_concatenation_candidate(const Label *forward_label, const Label *backward_label, double path_cost,
+                                         const SpliceState *splice_state,
+                                         [[maybe_unused]] std::span<const ActiveCutInfo> active_cuts,
+                                         std::atomic<double> &best_cost, ConcatenationScratch &scratch);
+
+    void push_unvisited_phi_neighbors(std::span<const int> neighbors, ConcatenationScratch &scratch) const;
+
+    template <Stage S, Symmetry SYM = Symmetry::Asymmetric>
+    void concatenate_label_from_bucket(const Label *L, int b, std::atomic<double> &best_cost,
+                                       const SpliceState *splice_state = nullptr);
 
     template <Direction D>
     void UpdateBucketsSet(double theta, const Label *label, ankerl::unordered_dense::set<int> &Bbidi,

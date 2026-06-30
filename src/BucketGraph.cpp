@@ -889,6 +889,8 @@ void BucketGraph::generate_arcs() {
  *
  */
 void BucketGraph::setup() {
+    if (options.profile_labeling) { profile_reset_labeling_metrics(); }
+
     PARALLEL_SECTIONS(
         work, bi_sched, SECTION { define_buckets<Direction::Forward>(); },
         SECTION { define_buckets<Direction::Backward>(); });

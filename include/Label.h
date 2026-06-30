@@ -91,25 +91,27 @@ struct SRCMap {
  * The struct overloads the equality and greater than operators for comparison.
  */
 struct Label {
-    // int                   id;
-    bool                       is_extended = false;
-    int                        vertex;
-    double                     cost          = 0.0;
-    double                     real_cost     = 0.0;
-    std::array<double, R_SIZE> resources     = {};
-    std::vector<uint16_t>      nodes_covered = {};
-    int                        path_len      = 0;
-    int                        node_id       = -1; // Add node_id to Label
-    Label                     *parent        = nullptr;
-    bool                       fresh         = true;
-    bool                       is_dominated  = false;
-    SRC_MODE_BLOCK(SRCMap SRCmap;)
-
-    // uint64_t             visited_bitmap; // Bitmap for visited nodes
+    // Hot dominance/extension data. Keep the fields most frequently read by
+    // dominance scans close together; route reconstruction stays below.
+    double                          cost           = 0.0;
+    double                          real_cost      = 0.0;
+    std::array<double, R_SIZE>      resources      = {};
     std::array<uint64_t, num_words> visited_bitmap = {0};
 #ifdef UNREACHABLE_DOMINANCE
     std::array<uint64_t, num_words> unreachable_bitmap = {0};
 #endif
+    SRC_MODE_BLOCK(SRCMap SRCmap;)
+
+    int    vertex       = -1;
+    int    node_id      = -1;
+    int    path_len     = 0;
+    Label *parent       = nullptr;
+    bool   is_extended  = false;
+    bool   is_dominated = false;
+    bool   fresh        = true;
+
+    // Cold route materialization data.
+    std::vector<uint16_t> nodes_covered = {};
     // Constructor with node_id
     Label(int v, double c, const std::vector<double> &res, int pred, int node_id)
         : vertex(v), cost(c), resources({res[0]}), node_id(node_id) {}
