@@ -6,6 +6,7 @@
 #pragma once
 
 #include <algorithm>
+#include <array>
 #include <memory_resource>
 #include <span>
 
@@ -24,6 +25,12 @@
  * arcs, add labels, remove labels, get labels, clear labels, reset labels, and
  * clear arcs.
  */
+struct BucketLabelSoAView {
+    std::span<Label *const>                    labels;
+    std::span<const double>                    costs;
+    std::array<std::span<const double>, R_SIZE> resources;
+};
+
 struct alignas(64) Bucket {
     // Hot data - frequently accessed (kept in first cache line)
     int    depth{0};
@@ -37,6 +44,9 @@ struct alignas(64) Bucket {
     // into labels only when a fully sorted view is required.
     mutable std::pmr::vector<Label *> labels;
     mutable std::pmr::vector<Label *> extra_labels;
+    mutable std::vector<double>       soa_costs;
+    mutable std::array<std::vector<double>, R_SIZE> soa_resources;
+    mutable bool                      soa_valid = false;
 
     // Virtual split: an index that logically partitions the labels vector.
     mutable size_t virtual_split_index = 0;
@@ -66,6 +76,32 @@ struct alignas(64) Bucket {
     double               min_split_range  = 0.5;
     static constexpr int MAX_BUCKET_DEPTH = 1;
 
+    void invalidate_label_cache() const noexcept { soa_valid = false; }
+
+    void ensure_label_cache() const {
+        if (soa_valid && soa_costs.size() == labels.size()) return;
+
+        soa_costs.resize(labels.size());
+        for (auto &resource_values : soa_resources) { resource_values.resize(labels.size()); }
+
+        for (size_t i = 0; i < labels.size(); ++i) {
+            const Label *label = labels[i];
+            soa_costs[i]       = label->cost;
+            for (size_t r = 0; r < R_SIZE; ++r) { soa_resources[r][i] = label->resources[r]; }
+        }
+        soa_valid = true;
+    }
+
+    BucketLabelSoAView make_label_soa_view(size_t offset, size_t count) const noexcept {
+        BucketLabelSoAView view{};
+        view.labels = std::span<Label *const>(labels.data() + offset, count);
+        view.costs  = std::span<const double>(soa_costs.data() + offset, count);
+        for (size_t r = 0; r < R_SIZE; ++r) {
+            view.resources[r] = std::span<const double>(soa_resources[r].data() + offset, count);
+        }
+        return view;
+    }
+
     inline void activate_virtual_split_assume_sorted() const noexcept {
         if (labels.size() < 2 || is_virtual_split) return;
         virtual_split_index = labels.size() / 2;
@@ -81,6 +117,7 @@ struct alignas(64) Bucket {
 
         // Ensure labels are sorted by cost.
         pdqsort(labels.begin(), labels.end(), [](const Label *a, const Label *b) { return a->cost < b->cost; });
+        invalidate_label_cache();
         // Set the virtual split index at the median.
         virtual_split_index = labels.size() / 2;
         if (virtual_split_index >= labels.size()) { virtual_split_index = labels.size() - 1; }
@@ -97,6 +134,7 @@ struct alignas(64) Bucket {
         std::inplace_merge(labels.begin(), labels.begin() + static_cast<std::ptrdiff_t>(old_size), labels.end(),
                            [](const Label *a, const Label *b) { return a->cost < b->cost; });
         extra_labels.clear();
+        invalidate_label_cache();
         min_cost = std::numeric_limits<double>::max();
 
         is_virtual_split    = false;
@@ -127,6 +165,7 @@ struct alignas(64) Bucket {
 
         compact(labels);
         compact(extra_labels);
+        if (removed > 0) invalidate_label_cache();
 
         min_cost = std::numeric_limits<double>::max();
         for (Label *label : extra_labels) {
@@ -216,11 +255,37 @@ struct alignas(64) Bucket {
         return extra_dominance_func(std::span<Label *const>(extra_labels.data(), extra_labels.size()), stat_n_dom);
     }
 
+    template <typename SortedDominanceFunc, typename ExtraDominanceFunc>
+    bool check_dominance_soa(const Label *new_label, SortedDominanceFunc &&sorted_dominance_func,
+                             ExtraDominanceFunc &&extra_dominance_func, uint &stat_n_dom) const {
+        if (!new_label) return false;
+        if (labels.empty() && extra_labels.empty()) return false;
+        if (!labels.empty()) {
+            ensure_label_cache();
+            if (!is_virtual_split) {
+                if (sorted_dominance_func(make_label_soa_view(0, labels.size()), stat_n_dom)) { return true; }
+            } else {
+                const size_t split = std::min(virtual_split_index, labels.size());
+                if (split == 0 || split >= labels.size()) {
+                    if (sorted_dominance_func(make_label_soa_view(0, labels.size()), stat_n_dom)) { return true; }
+                } else {
+                    if (sorted_dominance_func(make_label_soa_view(0, split), stat_n_dom)) { return true; }
+                    if (sorted_dominance_func(make_label_soa_view(split, labels.size() - split), stat_n_dom)) {
+                        return true;
+                    }
+                }
+            }
+        }
+        if (extra_labels.empty()) return false;
+        return extra_dominance_func(std::span<Label *const>(extra_labels.data(), extra_labels.size()), stat_n_dom);
+    }
+
     bool is_empty() const noexcept { return labels.empty() && extra_labels.empty(); }
 
     void sort() {
         flush_extra_labels();
         pdqsort(labels.begin(), labels.end(), [](const Label *a, const Label *b) { return a->cost < b->cost; });
+        invalidate_label_cache();
     }
 
     /**
@@ -335,6 +400,7 @@ struct alignas(64) Bucket {
         is_virtual_split = false;
         labels.clear();
         extra_labels.clear();
+        invalidate_label_cache();
         virtual_split_index = 0;
         min_cost            = std::numeric_limits<double>::max();
     }
@@ -365,6 +431,7 @@ struct alignas(64) Bucket {
         sub_buckets = {};
         labels.clear();
         extra_labels.clear();
+        invalidate_label_cache();
         min_cost = std::numeric_limits<double>::max();
 
         is_split            = false;

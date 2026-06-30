@@ -125,7 +125,8 @@ inline std::vector<Label *> BucketGraph::solve(bool trigger) {
     }
     // ----- Stage 5: Enumeration -----
     else if (s5 && depth == 0) {
-        stage = 5;
+        stage         = 5;
+        pricing_phase = PricingPhase::Enumerate;
         print_info("Starting enumeration with gap {}\n", gap);
         enumeration_failed.store(false, std::memory_order_relaxed);
         paths = bi_labeling_algorithm<Stage::Enumerate>();
@@ -649,12 +650,16 @@ std::vector<Label *> BucketGraph::bi_labeling_algorithm() {
     // Reset pools and perform common initialization.
     reset_pool();
     common_initialization();
+    if constexpr (S == Stage::Enumerate) {
+        merged_labels.reserve(static_cast<size_t>(enumeration_policy.max_routes) + 1);
+    }
 
     // Pre-allocate c-bar vectors for forward and backward buckets.
     std::vector<double> forward_cbar(fw_buckets.size());
     std::vector<double> backward_cbar(bw_buckets.size());
 
     // Run the labeling algorithms.
+    pricing_phase = (S == Stage::Enumerate) ? PricingPhase::Enumerate : PricingPhase::Labeling;
     if constexpr (SYM == Symmetry::Asymmetric) {
         run_labeling_algorithms<S, Full::Partial>(forward_cbar, backward_cbar);
     } else {
@@ -686,6 +691,9 @@ std::vector<Label *> BucketGraph::bi_labeling_algorithm() {
     // count.
     std::atomic<double> best_cost{0.0};
     std::atomic<size_t> non_dominated_labels_per_bucket{0};
+    concatenation_labels_tested.store(0, std::memory_order_relaxed);
+    concatenation_labels_accepted.store(0, std::memory_order_relaxed);
+    if constexpr (S != Stage::Enumerate) { pricing_phase = PricingPhase::Concatenate; }
 
     // === Parallel Bucket Processing ===
     // Choose a chunk size based on hardware concurrency.
@@ -765,6 +773,8 @@ std::vector<Label *> BucketGraph::bi_labeling_algorithm() {
     // completion.
     auto work = stdexec::starts_on(merge_sched, bulk_sender);
     stdexec::sync_wait(std::move(work));
+    last_concatenation_labels_tested   = concatenation_labels_tested.load(std::memory_order_relaxed);
+    last_concatenation_labels_accepted = concatenation_labels_accepted.load(std::memory_order_relaxed);
 
     // === Post-processing and Sorting ===
     // Sort merged labels based on cost (ascending order).
@@ -1220,6 +1230,8 @@ inline bool BucketGraph::DominatedInCompWiseSmallerBuckets(const Label *__restri
     const int    b_L        = L->vertex;
     const double label_cost = L->cost;
     const int    label_rank = bucket_scc_rank[b_L];
+    const auto  &label_res  = L->resources;
+    const size_t n_res      = options.resources.size();
 
     // Use static thread-local stack to avoid repeated allocations
     static thread_local std::vector<int> stack_buffer;
@@ -1244,21 +1256,41 @@ inline bool BucketGraph::DominatedInCompWiseSmallerBuckets(const Label *__restri
     constexpr bool src_adjusted_dominance = false;
 #endif
 
-    auto inline_check_dominance = [&](std::span<Label *const> labels, uint &n_dom) -> bool {
-        const size_t size = labels.size();
+    auto inline_check_dominance = [&](const BucketLabelSoAView &view, uint &n_dom) -> bool {
+        const size_t size = view.labels.size();
         if (profile_labeling) profile_record_inner_bin_scan(D, S, size);
-#ifdef __AVX2__
-        if constexpr (!src_adjusted_dominance) {
-            if (size >= AVX_LIM) return check_dominance_against_vector<D, S>(L, labels, cut_storage, n_dom);
-        }
-#endif
         for (size_t i = 0; i < size; ++i) {
-            Label *cur = labels[i];
             // Bin is RC-sorted ascending; once cur is more expensive than L,
             // no later label can dominate L (cost ordering).
             if constexpr (!src_adjusted_dominance) {
-                if (cur->cost > cost_hi_break) break;
+                if (view.costs[i] > cost_hi_break) break;
             }
+
+            bool resource_candidate = true;
+            if constexpr (D == Direction::Forward) {
+                for (size_t r = 1; r < n_res; ++r) {
+                    if (numericutils::gt(view.resources[r][i], label_res[r])) {
+                        resource_candidate = false;
+                        break;
+                    }
+                }
+                if (resource_candidate && n_res > 0 && numericutils::gt(view.resources[0][i], label_res[0])) {
+                    resource_candidate = false;
+                }
+            } else {
+                for (size_t r = 1; r < n_res; ++r) {
+                    if (numericutils::lt(view.resources[r][i], label_res[r])) {
+                        resource_candidate = false;
+                        break;
+                    }
+                }
+                if (resource_candidate && n_res > 0 && numericutils::lt(view.resources[0][i], label_res[0])) {
+                    resource_candidate = false;
+                }
+            }
+            if (!resource_candidate) continue;
+
+            Label *cur = view.labels[i];
             if (cur->is_dominated) continue;
             if (is_dominated<D, S>(L, cur)) {
                 ++n_dom;
@@ -1321,7 +1353,7 @@ inline bool BucketGraph::DominatedInCompWiseSmallerBuckets(const Label *__restri
         // Skip dominance check for L's own bucket
         if (b_L != current_bucket) {
             const auto &mother_bucket = buckets[current_bucket];
-            if (mother_bucket.check_dominance(L, inline_check_dominance, inline_check_extra_dominance, stat_n_dom))
+            if (mother_bucket.check_dominance_soa(L, inline_check_dominance, inline_check_extra_dominance, stat_n_dom))
                 return true;
         }
 

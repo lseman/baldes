@@ -8,16 +8,18 @@
 #include "Split.h"
 void Split::generalSplit(Individual *indiv, int nbMaxVehicles) {
     // Do not apply Split with fewer vehicles than the trivial (LP) bin packing bound
-    maxVehicles = std::max(nbMaxVehicles, static_cast<int>(std::ceil(params->totalDemand / params->vehicleCapacity)));
+    maxVehicles =
+        std::min(params->nbVehicles,
+                 std::max(nbMaxVehicles, static_cast<int>(std::ceil(params->totalDemand / params->vehicleCapacity))));
 
     // Pre-fetch some useful values
-    //const int nbClients = params->nbClients;
+    // const int nbClients = params->nbClients;
 
     // Ensure vectors are resized properly to accommodate index 1 to nbClients
-    //cliSplit.resize(nbClients + 1); // cliSplit should be resized before access
-    //sumLoad.resize(nbClients + 1, 0);
-    //sumService.resize(nbClients + 1, 0);
-    //sumDistance.resize(nbClients + 1, 0);
+    // cliSplit.resize(nbClients + 1); // cliSplit should be resized before access
+    // sumLoad.resize(nbClients + 1, 0);
+    // sumService.resize(nbClients + 1, 0);
+    // sumDistance.resize(nbClients + 1, 0);
 
     // Loop over all clients, excluding the depot
     for (int i = 1; i <= params->nbClients; i++) {
@@ -28,6 +30,7 @@ void Split::generalSplit(Individual *indiv, int nbMaxVehicles) {
         cliSplit[i].serviceTime = params->cli[chromIdx].serviceDuration;
         cliSplit[i].d0_x        = params->timeCost.get(0, chromIdx);
         cliSplit[i].dx_0        = params->timeCost.get(chromIdx, 0);
+        cliSplit[i].custNum     = chromIdx;
 
         // The distance to the next client is INT_MIN for the last client
         if (i < params->nbClients) {
@@ -42,15 +45,25 @@ void Split::generalSplit(Individual *indiv, int nbMaxVehicles) {
         sumDistance[i] = sumDistance[i - 1] + cliSplit[i - 1].dnext;
     }
 
-    // Try Simple Split, then fall back to Split with Limited Fleet if needed
-    if (splitSimple(indiv) == 0) {
-        splitLF(indiv);
+    // Try Simple Split, then fall back to Split with Limited Fleet if needed.
+    bool splitOk = splitSimple(indiv) != 0;
+    if (!splitOk) { splitOk = splitLF(indiv) != 0; }
+
+#ifdef ITERATIVE_HGS
+    if (!splitOk && params->forbidden_edges_set) {
+        const auto *savedForbiddenSet = params->forbidden_edges_set;
+        params->forbidden_edges_set   = nullptr;
+        splitOk                       = splitSimple(indiv) != 0;
+        if (!splitOk) { splitOk = splitLF(indiv) != 0; }
+        params->forbidden_edges_set = savedForbiddenSet;
     }
+#endif
+
+    if (!splitOk) { throw std::string("ERROR : no Split solution has been propagated until the last node"); }
 
     // Build up the rest of the Individual structure
     indiv->evaluateCompleteCost();
 }
-
 
 int Split::splitSimple(Individual *indiv) {
     // Reinitialize the potential structure
@@ -119,9 +132,7 @@ int Split::splitSimple(Individual *indiv) {
 
     // Check if the cost of the last client is still very large. In that case, the Split algorithm did not reach the
     // last client
-    if (potential[0][params->nbClients] > 1.e29) {
-        throw std::string("ERROR : no Split solution has been propagated until the last node");
-    }
+    if (potential[0][params->nbClients] > 1.e29) { return 0; }
 
     // Filling the chromR structure
     // First clear some chromR vectors. In practice, maxVehicles equals nbVehicles. Then, this loop is not needed and
@@ -217,6 +228,7 @@ int Split::splitLF(Individual *indiv) {
                         // Remove elements dominated by i from the back
                         while (queue.size() > 0 && dominatesRight(back, i, k)) {
                             queue.pop_back();
+                            if (queue.size() == 0) break;
                             back = queue.get_back(); // Update back for the next check
                         }
                         queue.push_back(i);
@@ -236,8 +248,7 @@ int Split::splitLF(Individual *indiv) {
         }
     }
 
-    if (potential[maxVehicles][params->nbClients] > 1.e29)
-        throw std::string("ERROR : no Split solution has been propagated until the last node");
+    if (potential[maxVehicles][params->nbClients] > 1.e29) return 0;
 
     // It could be cheaper to use a smaller number of vehicles
     double minCost  = potential[maxVehicles][params->nbClients];

@@ -91,3 +91,5 @@ RouteOpt/
 CLAUDE.md
 .codex
 bucket-graph-spprc/
+ariadne.db
+*.md

@@ -52,6 +52,9 @@
 #include "TR.h"
 #endif
 
+#ifdef ITERATIVE_HGS
+#include "HGS.h"
+#endif
 #include "Logger.h"
 
 #define NUMERO_CANDIDATOS 10
@@ -148,7 +151,9 @@ public:
 
     static inline void printCgProgress(int iter, double lp_obj, double inner_obj, int n_cuts, int n_rcc_cuts,
                                        int col_added, int stage, double lag_gap, double cur_alpha, double tr_val,
-                                       double gap, double integer_solution, double bucketgraph_th) {
+                                       double gap, double integer_solution, double bucketgraph_th,
+                                       const char *pricing_phase = "label", uint64_t concat_tested = 0,
+                                       uint64_t concat_accepted = 0) {
         constexpr int threshold   = 1000000;
         std::string   lag_gap_str = (lag_gap > threshold) ? "∞" : fmt::format("{:10.4f}", lag_gap);
         std::string   int_sol_str;
@@ -162,21 +167,297 @@ public:
 
         fmt::print("| It.: {:4} | Obj.: {:8.2f} | Price: {:9.2f} | SRC: {:3} "
                    "| RCC: {:3} | Paths: {:3} | "
-                   "Stage: {:1} | "
+                   "Stage: {:1} | Ph: {:>6} | Cat: {:5}/{:<5} | "
                    "Lag.: {:>10} | α: {:4.2f} | tr: {:2.2f} | gap: {:2.4f} "
                    "| Int.: {:>4} | Th: {:4.2f} |\n",
-                   iter, lp_obj, inner_obj, n_cuts, n_rcc_cuts, col_added, stage, lag_gap_str, cur_alpha, tr_val, gap,
-                   int_sol_str, bucketgraph_th);
+                   iter, lp_obj, inner_obj, n_cuts, n_rcc_cuts, col_added, stage, pricing_phase, concat_accepted,
+                   concat_tested, lag_gap_str, cur_alpha, tr_val, gap, int_sol_str, bucketgraph_th);
 
         Logger::log("| It.: {:4} | Obj.: {:8.2f} | Price: {:9.2f} | SRC: "
                     "{:3} "
                     "| RCC: {:3} | Paths: {:3} | "
-                    "Stage: {:1} | "
+                    "Stage: {:1} | Ph: {:>6} | Cat: {:5}/{:<5} | "
                     "Lag.: {:10.4f} | α: {:4.2f} | tr: {:2.2f} | gap: "
                     "{:2.4f} "
                     "|\n",
-                    iter, lp_obj, inner_obj, n_cuts, n_rcc_cuts, col_added, stage, lag_gap, cur_alpha, tr_val, gap);
+                    iter, lp_obj, inner_obj, n_cuts, n_rcc_cuts, col_added, stage, pricing_phase, concat_accepted,
+                    concat_tested, lag_gap, cur_alpha, tr_val, gap);
     }
+
+    struct PricingStateMachine {
+        bool enumerate            = false;
+        int  exact_pricing_passes = 0;
+        int  hgs_interval         = 5;
+
+        void recordPricingStage(int stage) {
+            if (stage == 4) { ++exact_pricing_passes; }
+        }
+
+        bool handleEnumerationFailure(BucketGraph *bucket_graph) {
+            if (!bucket_graph->enumerationFailed()) return false;
+            enumerate = false;
+            print_info("Enumeration cap reached; falling back to exact pricing\n");
+            return true;
+        }
+
+        static double lowerBound(double lp_obj, int numK, double inner_obj) {
+            return lp_obj + numK * std::min(0.0, inner_obj);
+        }
+
+        static bool cutsStable(const BucketGraph *bucket_graph, bool non_violated_cuts, int non_violated_ctr) {
+            return non_violated_cuts && bucket_graph->A_MAX == N_SIZE &&
+                   non_violated_ctr >= bucket_graph->enumeration_policy.min_stable_cut_passes;
+        }
+
+        bool maybeStartEnumeration(BucketGraph *bucket_graph, double pricing_lower_bound, bool cuts_stable,
+                                   bool no_negative_pricing, double inner_obj) {
+            if (enumerate) return false;
+            if (!bucket_graph->shouldAttemptEnumeration(pricing_lower_bound, cuts_stable, exact_pricing_passes,
+                                                        no_negative_pricing)) {
+                return false;
+            }
+
+            const double rel_gap = bucket_graph->relative_gap_to_incumbent(pricing_lower_bound);
+            print_info("{} and relative gap {:.4f}; trying enumeration (pricing {:.6g})\n",
+                       no_negative_pricing ? "No negative pricing/cuts" : "Stable cuts/small gap", rel_gap, inner_obj);
+            bucket_graph->enableEnumeration(pricing_lower_bound);
+            enumerate = true;
+            return true;
+        }
+
+        bool shouldForceCuts(int colAdded, double inner_obj, int stage) const {
+            return stage == 4 && (colAdded == 0 || inner_obj > -1.0);
+        }
+
+        bool shouldRunHGS(int iter, int stage, int colAdded) const {
+            if (enumerate) return false;
+            if (colAdded == 0) return true;
+            if (stage >= 4) return iter % hgs_interval == 0;
+            return false;
+        }
+    };
+
+#ifdef ITERATIVE_HGS
+    struct HGSIntegrationStats {
+        int raw_routes         = 0;
+        int invalid_routes     = 0;
+        int duplicate_routes   = 0;
+        int nonnegative_routes = 0;
+        int accepted_routes    = 0;
+        int added_columns      = 0;
+    };
+
+    std::vector<double> buildHGSDuals(const std::vector<double> &nodeDuals) const {
+        const int           dual_size = std::max(N_SIZE, static_cast<int>(instance.getNbVertices()));
+        std::vector<double> hgs_duals(static_cast<size_t>(dual_size), 0.0);
+        const int           customer_limit = std::min(N_SIZE - 1, dual_size);
+        for (int customer = 1; customer < customer_limit; ++customer) {
+            const int dual_idx = customer - 1;
+            if (dual_idx < static_cast<int>(nodeDuals.size())) { hgs_duals[customer] = nodeDuals[dual_idx]; }
+        }
+        return hgs_duals;
+    }
+
+    std::vector<std::pair<int, int>> collectHGSAvoidEdges(const HGS &hgs, int max_edges = 256) const {
+        std::vector<std::pair<int, int>> avoid_edges;
+        avoid_edges.reserve(static_cast<size_t>(max_edges));
+        const int num_nodes = static_cast<int>(nodes.size());
+        for (int i = 1; i < num_nodes && static_cast<int>(avoid_edges.size()) < max_edges; ++i) {
+            for (int j = 1; j < num_nodes && static_cast<int>(avoid_edges.size()) < max_edges; ++j) {
+                if (i == j) continue;
+                auto it = hgs.arc_stats.find(HGS::arcKey(i, j));
+                if (it == hgs.arc_stats.end() || it->second.total_instances <= 0) continue;
+                if (HGS::shouldFixArc(static_cast<int>(it->second.total_instances), it->second.avoidance_count, 0.75)) {
+                    avoid_edges.emplace_back(i, j);
+                }
+            }
+        }
+        return avoid_edges;
+    }
+
+    static bool normalizeHGSRoute(const std::vector<int> &raw_route, std::vector<int> &route) {
+        route.clear();
+        if (raw_route.size() < 3 || raw_route.front() != 0) return false;
+
+        route.reserve(raw_route.size());
+        route.push_back(0);
+        std::vector<unsigned char> seen(static_cast<size_t>(N_SIZE), 0);
+        for (size_t idx = 1; idx + 1 < raw_route.size(); ++idx) {
+            const int node = raw_route[idx];
+            if (node <= 0 || node >= N_SIZE - 1) return false;
+            if (seen[static_cast<size_t>(node)]) return false;
+            seen[static_cast<size_t>(node)] = 1;
+            route.push_back(node);
+        }
+        if (route.size() < 2) return false;
+        route.push_back(N_SIZE - 1);
+        return true;
+    }
+
+    double routeTravelCost(const std::vector<int> &route) const {
+        double cost = 0.0;
+        for (size_t i = 0; i + 1 < route.size(); ++i) {
+            const int from = route[i] == N_SIZE - 1 ? 0 : route[i];
+            const int to   = route[i + 1] == N_SIZE - 1 ? 0 : route[i + 1];
+            cost += instance.getcij(from, to);
+        }
+        return cost;
+    }
+
+    double routeReducedCost(BNBNode *node, const std::vector<int> &route, double travel_cost,
+                            const std::vector<double> &pricing_duals) {
+        double rc = travel_cost;
+
+        for (int node_id : route) {
+            if (node_id <= 0 || node_id >= N_SIZE - 1) continue;
+            const int row = node_id - 1;
+            if (row >= 0 && row < static_cast<int>(pricing_duals.size())) { rc -= pricing_duals[row]; }
+        }
+        if (N_SIZE - 2 >= 0 && N_SIZE - 2 < static_cast<int>(pricing_duals.size())) { rc -= pricing_duals[N_SIZE - 2]; }
+
+        Path path(route, travel_cost);
+        SRC_MODE_BLOCK({
+            auto        &cuts           = node->r1c->cutStorage;
+            auto        &SRCconstraints = node->SRCconstraints;
+            auto         coeffs         = cuts.computeLimitedMemoryCoefficients(path.route);
+            const size_t n_terms        = std::min(coeffs.size(), SRCconstraints.size());
+            for (size_t i = 0; i < n_terms; ++i) {
+                const int row = SRCconstraints[i]->index();
+                if (row >= 0 && row < static_cast<int>(pricing_duals.size())) { rc -= coeffs[i] * pricing_duals[row]; }
+            }
+        });
+
+        RCC_MODE_BLOCK({
+            auto        &rccManager = node->rccManager;
+            auto         coeffs     = rccManager->computeRCCCoefficients(path.route);
+            const auto  &cuts       = rccManager->getCuts();
+            const size_t n_terms    = std::min(coeffs.size(), cuts.size());
+            for (size_t i = 0; i < n_terms; ++i) {
+                const int row = cuts[i].ctr->index();
+                if (row >= 0 && row < static_cast<int>(pricing_duals.size())) { rc -= coeffs[i] * pricing_duals[row]; }
+            }
+        });
+
+        auto        &branching = node->branchingDuals;
+        auto         coeffs    = branching->computeCoefficients(path.route);
+        const auto  &ctrs      = branching->getBranchingbaldesCtrs();
+        const size_t n_terms   = std::min(coeffs.size(), ctrs.size());
+        for (size_t i = 0; i < n_terms; ++i) {
+            const int row = ctrs[i]->index();
+            if (row >= 0 && row < static_cast<int>(pricing_duals.size())) { rc -= coeffs[i] * pricing_duals[row]; }
+        }
+
+        return rc;
+    }
+
+    void recordHGSArcStats(HGS &hgs, const std::vector<std::vector<int>> &raw_routes) const {
+        const int num_nodes = static_cast<int>(nodes.size());
+        struct DistIdx {
+            double d;
+            int    idx;
+        };
+
+        for (const auto &route : raw_routes) {
+            for (size_t k = 0; k + 1 < route.size(); ++k) { hgs.recordArcUsage(route[k], route[k + 1]); }
+            for (size_t ki = 0; ki < route.size(); ++ki) {
+                const int ci = route[ki];
+                if (ci <= 0 || ci >= num_nodes) continue;
+                const int taken_j = (ki + 1 < route.size()) ? route[ki + 1] : -1;
+
+                std::vector<DistIdx> neighbors;
+                neighbors.reserve(static_cast<size_t>(std::max(0, num_nodes - 2)));
+                for (int j = 1; j < num_nodes; ++j) {
+                    if (j != ci) { neighbors.push_back({instance.getcij(ci, j), j}); }
+                }
+                std::sort(neighbors.begin(), neighbors.end(),
+                          [](const DistIdx &a, const DistIdx &b) { return a.d < b.d; });
+
+                constexpr int nbGranular = 40;
+                for (int k = 0; k < std::min(nbGranular, static_cast<int>(neighbors.size())); ++k) {
+                    const int cj = neighbors[k].idx;
+                    if (cj != taken_j) { hgs.recordArcAvoidance(ci, cj); }
+                }
+            }
+        }
+    }
+
+    HGSIntegrationStats runIterativeHGSAndAddColumns(HGS &hgs, BNBNode *node, BucketGraph *bucket_graph,
+                                                     const std::vector<double> &nodeDuals,
+                                                     const std::vector<double> &originDuals, double &integer_solution,
+                                                     int &colAdded) {
+        HGSIntegrationStats stats;
+        const auto          hgs_duals   = buildHGSDuals(nodeDuals);
+        const auto          avoid_edges = collectHGSAvoidEdges(hgs);
+
+        std::vector<std::vector<int>> hgs_routes;
+        try {
+            hgs_routes = hgs.runIterative(instance, hgs_duals, avoid_edges, 500, 2.0);
+        } catch (const std::exception &e) {
+            print_heur("Iterative HGS skipped after exception: {}\n", e.what());
+            return stats;
+        } catch (const std::string &e) {
+            print_heur("Iterative HGS skipped after exception: {}\n", e);
+            return stats;
+        } catch (...) {
+            print_heur("Iterative HGS skipped after unknown exception\n");
+            return stats;
+        }
+
+        stats.raw_routes = static_cast<int>(hgs_routes.size());
+        if (hgs_routes.empty()) return stats;
+        recordHGSArcStats(hgs, hgs_routes);
+
+        const std::vector<double>           pricing_duals = originDuals.empty() ? node->getDuals() : originDuals;
+        std::vector<std::unique_ptr<Label>> owned_labels;
+        std::vector<Label *>                hgs_labels;
+        owned_labels.reserve(hgs_routes.size());
+        hgs_labels.reserve(hgs_routes.size());
+
+        std::vector<int> route;
+        for (const auto &raw_route : hgs_routes) {
+            if (!normalizeHGSRoute(raw_route, route)) {
+                ++stats.invalid_routes;
+                continue;
+            }
+
+            const double travel_cost  = routeTravelCost(route);
+            const double reduced_cost = routeReducedCost(node, route, travel_cost, pricing_duals);
+            if (!hasNegativeReducedCost(reduced_cost)) {
+                ++stats.nonnegative_routes;
+                continue;
+            }
+
+            Path path(route, travel_cost);
+            if (node->pathSet.find(path) != node->pathSet.end()) {
+                ++stats.duplicate_routes;
+                continue;
+            }
+
+            auto label       = std::make_unique<Label>();
+            label->real_cost = travel_cost;
+            label->cost      = reduced_cost;
+            label->addRoute(route);
+            hgs_labels.push_back(label.get());
+            owned_labels.push_back(std::move(label));
+            ++stats.accepted_routes;
+        }
+
+        if (!hgs_labels.empty()) {
+            double hgs_inner    = 0.0;
+            stats.added_columns = addColumn(node, hgs_labels, hgs_inner, false);
+            colAdded += stats.added_columns;
+        }
+
+        if (std::isfinite(hgs.best_cost) && hgs.best_cost < integer_solution) {
+            print_heur("HGS improved incumbent: {:.2f} -> {:.2f}\n", integer_solution, hgs.best_cost);
+            integer_solution        = hgs.best_cost;
+            node->integer_sol       = hgs.best_cost;
+            bucket_graph->incumbent = hgs.best_cost;
+        }
+
+        return stats;
+    }
+#endif
 
     inline void updateGraphAndSolve(BNBNode *node, BucketGraph *bucket_graph, std::vector<double> &solution,
                                     std::vector<Path> &allPaths, bool integer, double lp_obj,
@@ -354,6 +635,7 @@ public:
             vtypes.push_back(VarType::Continuous);
 
             // Save the path in the node's path set to avoid duplicates.
+            SRC_MODE_BLOCK(cuts.syncCoefficientCacheForPath(label, allPaths.size());)
             node->addPath(label);
         }
 
@@ -494,6 +776,7 @@ public:
             vtypes.push_back(VarType::Continuous);
 
             // Store the path in the node to avoid duplicate paths.
+            SRC_MODE_BLOCK(cuts.syncCoefficientCacheForPath(path, allPaths.size());)
             node->addPath(std::move(path));
         }
 
@@ -529,6 +812,7 @@ public:
 
         auto &pathSet = node->pathSet;
         std::sort(removeIndices.begin(), removeIndices.end(), std::greater<int>());
+        SRC_MODE_BLOCK(node->r1c->cutStorage.eraseCoefficientIndices(removeIndices);)
         for (int idx : removeIndices) {
             if (idx >= 0 && idx < static_cast<int>(allPaths.size())) {
                 pathSet.erase(allPaths[idx]);
@@ -618,6 +902,9 @@ public:
             }
 
             // In either case, mark the cut as added and reset its updated flag.
+            if (!loaded && cut.hasSparseCoefficients() && cut.coefficients.size() != allPaths.size()) {
+                cuts.materializeSparseCoefficients(cut, allPaths.size());
+            }
             cut.added   = true;
             cut.updated = false;
         }
@@ -836,6 +1123,11 @@ public:
         // Setup the bucket graph for the column generation process.
         bucket_graph->setup();
 
+#ifdef ITERATIVE_HGS
+        // Iterative HGS instance for CG integration
+        auto hgs = std::make_shared<HGS>();
+#endif
+
         // Define stopping criteria and initialization for the iterative column
         // generation.
         double               gap       = 1e-6;
@@ -892,9 +1184,8 @@ public:
         bool                force_cuts        = false;
         bool                non_violated_cuts = false;
         int                 non_violated_ctr  = 0;
-        bool                enumerate         = false;
-        int                 numK              = node->numK;
-        int                 exact_pricing_passes = 0;
+        PricingStateMachine pricing_policy;
+        int                 numK = node->numK;
 
         bool integer = false;
         if (node->loadedState) {
@@ -970,18 +1261,11 @@ public:
                                 fmt::print("No violated cuts found with obj = {}\n", inner_obj);
                                 if (!hasNegativeReducedCost(inner_obj)) {
                                     const double pricing_lower_bound =
-                                        lp_obj + numK * std::min(0.0, inner_obj);
-                                    const bool cuts_stable =
-                                        non_violated_ctr >= bucket_graph->enumeration_policy.min_stable_cut_passes;
-                                    if (!enumerate &&
-                                        bucket_graph->shouldAttemptEnumeration(pricing_lower_bound, cuts_stable,
-                                                                               exact_pricing_passes, true)) {
-                                        const double rel_gap =
-                                            bucket_graph->relative_gap_to_incumbent(pricing_lower_bound);
-                                        print_info("Stable cuts and relative gap {:.4f}; trying enumeration\n",
-                                                   rel_gap);
-                                        bucket_graph->enableEnumeration(pricing_lower_bound);
-                                        enumerate = true;
+                                        PricingStateMachine::lowerBound(lp_obj, numK, inner_obj);
+                                    const bool cuts_stable = PricingStateMachine::cutsStable(
+                                        bucket_graph.get(), non_violated_cuts, non_violated_ctr);
+                                    if (pricing_policy.maybeStartEnumeration(bucket_graph.get(), pricing_lower_bound,
+                                                                             cuts_stable, true, inner_obj)) {
                                     } else {
                                         print_info("No violated cuts found, calling it a "
                                                    "day\n");
@@ -1082,28 +1366,21 @@ public:
 #if defined(STAB) && defined(IPM)
             if (stage >= 4) {
                 updateGraphAndSolve(node, bucket_graph.get(), solution, allPaths, integer, lp_obj, nodeDuals,
-                                    originDuals, SRCconstraints, stage, ss, paths, inner_obj, colAdded, enumerate
+                                    originDuals, SRCconstraints, stage, ss, paths, inner_obj, colAdded,
+                                    pricing_policy.enumerate
 #ifdef RIH
                                     ,
                                     &ils
 #endif
                 );
-                if (bucket_graph->enumerationFailed()) {
-                    enumerate = false;
-                    print_info("Enumeration cap reached; falling back to exact pricing\n");
-                }
+                pricing_policy.handleEnumerationFailure(bucket_graph.get());
 
                 if (colAdded == 0 && non_violated_cuts && !hasNegativeReducedCost(inner_obj)) {
-                    const double pricing_lower_bound = lp_obj + numK * std::min(0.0, inner_obj);
-                    const bool cuts_stable =
-                        bucket_graph->A_MAX == N_SIZE &&
-                        non_violated_ctr >= bucket_graph->enumeration_policy.min_stable_cut_passes;
-                    if (!enumerate && bucket_graph->shouldAttemptEnumeration(pricing_lower_bound, cuts_stable,
-                                                                             exact_pricing_passes, true)) {
-                        const double rel_gap = bucket_graph->relative_gap_to_incumbent(pricing_lower_bound);
-                        print_info("Stable cuts and relative gap {:.4f}; trying enumeration\n", rel_gap);
-                        bucket_graph->enableEnumeration(pricing_lower_bound);
-                        enumerate = true;
+                    const double pricing_lower_bound = PricingStateMachine::lowerBound(lp_obj, numK, inner_obj);
+                    const bool   cuts_stable =
+                        PricingStateMachine::cutsStable(bucket_graph.get(), non_violated_cuts, non_violated_ctr);
+                    if (pricing_policy.maybeStartEnumeration(bucket_graph.get(), pricing_lower_bound, cuts_stable, true,
+                                                             inner_obj)) {
                         continue;
                     }
 
@@ -1112,7 +1389,7 @@ public:
                     break;
                 }
 
-                if ((colAdded == 0 || inner_obj > -1.0) && stage == 4) { force_cuts = true; }
+                if (pricing_policy.shouldForceCuts(colAdded, inner_obj, stage)) { force_cuts = true; }
 
                 if (colAdded == 0) { force_cuts = true; }
             }
@@ -1211,16 +1488,28 @@ public:
 #endif
 
                     updateGraphAndSolve(node, bucket_graph.get(), solution, allPaths, integer, lp_obj, nodeDuals,
-                                        originDuals, SRCconstraints, stage, ss, paths, inner_obj, colAdded, enumerate
+                                        originDuals, SRCconstraints, stage, ss, paths, inner_obj, colAdded,
+                                        pricing_policy.enumerate
 #ifdef RIH
                                         ,
                                         &ils
 #endif
                     );
-                    if (bucket_graph->enumerationFailed()) {
-                        enumerate = false;
-                        print_info("Enumeration cap reached; falling back to exact pricing\n");
+                    pricing_policy.handleEnumerationFailure(bucket_graph.get());
+
+#ifdef ITERATIVE_HGS
+                    if (pricing_policy.shouldRunHGS(iter, stage, colAdded)) {
+                        const auto hgs_stats = runIterativeHGSAndAddColumns(*hgs, node, bucket_graph.get(), nodeDuals,
+                                                                            originDuals, integer_solution, colAdded);
+                        if (hgs_stats.raw_routes > 0) {
+                            print_heur("Iterative HGS routes: raw {} accepted {} added {} skipped invalid {} duplicate "
+                                       "{} nonneg {}\n",
+                                       hgs_stats.raw_routes, hgs_stats.accepted_routes, hgs_stats.added_columns,
+                                       hgs_stats.invalid_routes, hgs_stats.duplicate_routes,
+                                       hgs_stats.nonnegative_routes);
+                        }
                     }
+#endif
 #ifdef STAB
 
                     auto d = 50;
@@ -1257,21 +1546,14 @@ public:
                     }
                 }
 
-                if (stage == 4) { ++exact_pricing_passes; }
+                pricing_policy.recordPricingStage(stage);
 
-                const double pricing_lower_bound = lp_obj + numK * std::min(0.0, inner_obj);
+                const double pricing_lower_bound = PricingStateMachine::lowerBound(lp_obj, numK, inner_obj);
                 const bool   no_negative_pricing = colAdded == 0 && !hasNegativeReducedCost(inner_obj);
                 const bool   cuts_stable =
-                    non_violated_cuts && bucket_graph->A_MAX == N_SIZE &&
-                    non_violated_ctr >= bucket_graph->enumeration_policy.min_stable_cut_passes;
-                if (!enumerate && bucket_graph->shouldAttemptEnumeration(pricing_lower_bound, cuts_stable,
-                                                                         exact_pricing_passes, no_negative_pricing)) {
-                    const double rel_gap = bucket_graph->relative_gap_to_incumbent(pricing_lower_bound);
-                    print_info("{} and relative gap {:.4f}; trying enumeration (pricing {:.6g})\n",
-                               no_negative_pricing ? "No negative pricing/cuts" : "Stable cuts/small gap", rel_gap,
-                               inner_obj);
-                    bucket_graph->enableEnumeration(pricing_lower_bound);
-                    enumerate = true;
+                    PricingStateMachine::cutsStable(bucket_graph.get(), non_violated_cuts, non_violated_ctr);
+                if (pricing_policy.maybeStartEnumeration(bucket_graph.get(), pricing_lower_bound, cuts_stable,
+                                                         no_negative_pricing, inner_obj)) {
                     continue;
                 }
 
@@ -1281,12 +1563,8 @@ public:
                 }
 
                 if (colAdded == 0 && non_violated_cuts && !hasNegativeReducedCost(inner_obj)) {
-                    if (!enumerate && bucket_graph->shouldAttemptEnumeration(pricing_lower_bound, cuts_stable,
-                                                                             exact_pricing_passes, true)) {
-                        const double rel_gap = bucket_graph->relative_gap_to_incumbent(pricing_lower_bound);
-                        print_info("Stable cuts and relative gap {:.4f}; trying enumeration\n", rel_gap);
-                        bucket_graph->enableEnumeration(pricing_lower_bound);
-                        enumerate = true;
+                    if (pricing_policy.maybeStartEnumeration(bucket_graph.get(), pricing_lower_bound, cuts_stable, true,
+                                                             inner_obj)) {
                         continue;
                     }
 
@@ -1295,7 +1573,7 @@ public:
                     break;
                 }
 
-                if ((colAdded == 0 || inner_obj > -1.0) && stage == 4) { force_cuts = true; }
+                if (pricing_policy.shouldForceCuts(colAdded, inner_obj, stage)) { force_cuts = true; }
 
                 stab.update_stabilization_after_iter(nodeDuals);
 #if defined(STAB) && defined(IPM)
@@ -1337,7 +1615,9 @@ public:
             auto bucketgraph_th = bucket_graph->threshold;
             if (iter % 10 == 0) {
                 printCgProgress(iter, lp_obj, inner_obj, n_cuts, n_rcc_cuts, colAdded, stage, lag_gap, cur_alpha,
-                                tr_val, gap, integer_solution, bucketgraph_th);
+                                tr_val, gap, integer_solution, bucketgraph_th, bucket_graph->getPricingPhaseName(),
+                                bucket_graph->getLastConcatenationLabelsTested(),
+                                bucket_graph->getLastConcatenationLabelsAccepted());
             }
         }
         bucket_graph->print_statistics();

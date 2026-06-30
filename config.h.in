@@ -31,6 +31,7 @@
 #cmakedefine NSYNC
 #cmakedefine IPM_ACEL
 #cmakedefine CUSTOM_COST
+#cmakedefine ITERATIVE_HGS
 
 // Define constants for resource sizes
 #define R_SIZE @R_SIZE@
@@ -42,4 +43,4 @@
 #define N_ADD @N_ADD@
 #define HGS_TIME @HGS_TIME@
 #define VERBOSE_LEVEL @VERBOSE_LEVEL@
-#endif // CONFIG_H
+#endif  // CONFIG_H

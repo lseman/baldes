@@ -223,6 +223,7 @@ option(HGS "Enable HGS" OFF)
 option(CUSTOM_COST "Enable custom cost" OFF)
 option(SRC_MEMORY_MODE_NODE "Use node-memory heuristics for SRC cuts" ON)
 option(SRC_MEMORY_MODE_ARC "Use arc-memory heuristics for SRC cuts" OFF)
+option(ITERATIVE_HGS "Enable iterative HGS" ON)
 # Resource Definitions
 set(R_SIZE 1 CACHE STRING "Number of resources")
 set(N_SIZE 102 CACHE STRING "Number of nodes")
