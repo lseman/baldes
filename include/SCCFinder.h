@@ -64,6 +64,13 @@ public:
         }
     }
 
+    void convertFromAdjacency(const std::vector<std::vector<int>> &graph) {
+        adj.assign(graph.begin(), graph.end());
+        index.assign(adj.size(), -1);
+        lowlink.assign(adj.size(), -1);
+        onStack.assign(adj.size(), false);
+    }
+
     /**
      * @brief Finds and returns all Strongly Connected Components (SCCs) in the graph using Tarjan's algorithm.
      *

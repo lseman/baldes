@@ -149,7 +149,8 @@ public:
  */
 class LabelPool {
 private:
-    using Index = uint32_t;
+    using Index                                  = uint32_t;
+    static constexpr size_t construct_batch_size = 4096;
 
     size_t max_pool_size{};
     Label *arena{nullptr};
@@ -172,6 +173,13 @@ private:
             std::construct_at(arena + constructed_count);
             ++constructed_count;
         }
+    }
+
+    inline void construct_for_next_unused(size_t required_count) {
+        if (required_count <= constructed_count) return;
+        const size_t target_count =
+            std::min(max_pool_size, std::max(required_count, constructed_count + construct_batch_size));
+        construct_until(target_count);
     }
 
 public:
@@ -198,7 +206,7 @@ public:
         if (__builtin_expect(next_unused >= max_pool_size, 0)) { std::abort(); }
 
         const size_t index = next_unused++;
-        construct_until(next_unused);
+        construct_for_next_unused(next_unused);
         Label *label = arena + index;
         label->reset();
         return label;
@@ -228,7 +236,7 @@ public:
             const size_t to_allocate = std::min(count - acquired, available);
             const size_t base_index  = next_unused;
             next_unused += to_allocate;
-            construct_until(next_unused);
+            construct_for_next_unused(next_unused);
 
             Label *base_ptr = arena + base_index;
             for (size_t i = 0; i < to_allocate; ++i) {

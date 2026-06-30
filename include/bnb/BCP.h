@@ -187,6 +187,8 @@ public:
         bool enumerate            = false;
         int  exact_pricing_passes = 0;
         int  hgs_interval         = 5;
+        int  failed_enumerations  = 0;
+        int  retry_enumeration_at = 0;
 
         void recordPricingStage(int stage) {
             if (stage == 4) { ++exact_pricing_passes; }
@@ -195,6 +197,9 @@ public:
         bool handleEnumerationFailure(BucketGraph *bucket_graph) {
             if (!bucket_graph->enumerationFailed()) return false;
             enumerate = false;
+            ++failed_enumerations;
+            retry_enumeration_at = exact_pricing_passes + std::min(10, std::max(1, failed_enumerations));
+            bucket_graph->clearEnumerationFailure();
             print_info("Enumeration cap reached; falling back to exact pricing\n");
             return true;
         }
@@ -211,6 +216,7 @@ public:
         bool maybeStartEnumeration(BucketGraph *bucket_graph, double pricing_lower_bound, bool cuts_stable,
                                    bool no_negative_pricing, double inner_obj) {
             if (enumerate) return false;
+            if (exact_pricing_passes < retry_enumeration_at) return false;
             if (!bucket_graph->shouldAttemptEnumeration(pricing_lower_bound, cuts_stable, exact_pricing_passes,
                                                         no_negative_pricing)) {
                 return false;
