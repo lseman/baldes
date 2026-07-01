@@ -67,7 +67,7 @@ inline bool check_dominance_against_vector(const Label *__restrict__ new_label, 
 
 // SRC optimization - precompute if SRC is active
 #ifdef SRC
-    const bool   has_src = (S == Stage::Four || S == Stage::Enumerate) && cut_storage && !cut_storage->SRCDuals.empty();
+    const bool   has_src = (S == Stage::Four || S == Stage::Enumerate) && cut_storage && cut_storage->activeSize() > 0;
     const auto   active_cuts   = has_src ? cut_storage->getActiveCuts() : decltype(cut_storage->getActiveCuts())();
     const int    cut_size      = has_src ? cut_storage->activeSize() : 0;
     const size_t simd_cut_size = cut_size - (cut_size % simd_width);
@@ -79,8 +79,14 @@ inline bool check_dominance_against_vector(const Label *__restrict__ new_label, 
         // Load all label costs in one SIMD operation
         simd<double> label_costs = load_simd<double>(labels, i, simd_width, [](const Label *lbl) { return lbl->cost; });
 
-        // Fast check: if all costs exceed new_cost, skip the entire chunk
-        auto cost_mask = (label_costs <= (new_cost_simd + tolerance_simd));
+        // Fast raw-cost check is valid only when SRC dual compensation is not
+        // active. With SRC, a label with higher raw reduced cost may still
+        // dominate after subtracting applicable cut duals.
+#ifdef SRC
+        const auto cost_mask = has_src ? (label_costs == label_costs) : (label_costs <= (new_cost_simd + tolerance_simd));
+#else
+        const auto cost_mask = (label_costs <= (new_cost_simd + tolerance_simd));
+#endif
         if (!any_of(cost_mask)) continue;
 
         // For each label in this SIMD chunk that passed cost check
@@ -88,6 +94,7 @@ inline bool check_dominance_against_vector(const Label *__restrict__ new_label, 
             if (!cost_mask[j]) continue;
 
             const Label *label           = labels[i + j];
+            if (label->is_dominated) continue;
             const auto  &label_resources = label->resources;
             bool         dominated       = true;
 
@@ -301,9 +308,14 @@ inline bool check_dominance_against_vector(const Label *__restrict__ new_label, 
     // Process remaining labels using scalar code
     for (; i < num_labels; ++i) {
         const Label *label = labels[i];
+        if (label->is_dominated) continue;
 
         // Cost check
+#ifdef SRC
+        if (!has_src && numericutils::gt(label->cost, new_cost)) continue;
+#else
         if (numericutils::gt(label->cost, new_cost)) continue;
+#endif
 
         bool        dominated       = true;
         const auto &label_resources = label->resources;

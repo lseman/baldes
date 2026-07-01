@@ -214,6 +214,8 @@ public:
     Status               status     = Status::NotOptimal;
     std::vector<Label *> merged_labels_rih;
     int                  A_MAX = N_SIZE;
+    double               split_imbalance_ema = 0.0;
+    int                  last_split_update_iter = -1000000;
 
     struct EnumerationPolicy {
         bool   enabled                     = true;
@@ -238,6 +240,7 @@ public:
         uint64_t             concatenation_labels_accepted = 0;
         bool                 enumeration_failed            = false;
         bool                 skip_stage_transition         = false;
+        bool                 pricing_truncated             = false;
     };
 
     struct BucketDirectionalBounds {
@@ -399,6 +402,8 @@ public:
     std::atomic<double>           enumeration_route_cutoff{std::numeric_limits<double>::infinity()};
     std::atomic<uint64_t>         concatenation_labels_tested{0};
     std::atomic<uint64_t>         concatenation_labels_accepted{0};
+    std::atomic<uint64_t>         pricing_candidate_hits{0};
+    std::atomic_bool              pricing_truncated{false};
     uint64_t                      last_concatenation_labels_tested   = 0;
     uint64_t                      last_concatenation_labels_accepted = 0;
     std::vector<std::vector<int>> neighborhoods;
@@ -559,6 +564,8 @@ public:
         enumeration_route_cutoff.store(std::numeric_limits<double>::infinity(), std::memory_order_relaxed);
         concatenation_labels_tested.store(0, std::memory_order_relaxed);
         concatenation_labels_accepted.store(0, std::memory_order_relaxed);
+        pricing_candidate_hits.store(0, std::memory_order_relaxed);
+        pricing_truncated.store(false, std::memory_order_relaxed);
         last_concatenation_labels_tested   = 0;
         last_concatenation_labels_accepted = 0;
         PARALLEL_SECTIONS(
@@ -1029,12 +1036,10 @@ public:
                                                           // work-weighted signal
                                                           // is more sensitive
                                                           // than raw counts.
-        constexpr double MIN_ADJUSTMENT_FACTOR = 0.02;
-        constexpr double MAX_ADJUSTMENT_FACTOR = 0.10;
+        constexpr double MIN_ADJUSTMENT_FACTOR = 0.002;
+        constexpr double MAX_ADJUSTMENT_FACTOR = 0.015;
         constexpr double EMA_ALPHA             = 0.1; // Smoothing factor for EMA.
-
-        // Static variables to persist state across calls.
-        static double ema_imbalance_ratio = 0.0;
+        constexpr int    SPLIT_UPDATE_COOLDOWN = 5;
 
         // Prefer a work-weighted signal: total labels scanned during dominance
         // walks captures both check count and per-bin depth, which is what the
@@ -1061,15 +1066,18 @@ public:
         const double imbalance_ratio = std::abs(fw_ratio - bw_ratio);
 
         // Update exponential moving average (EMA) of the imbalance ratio.
-        ema_imbalance_ratio = EMA_ALPHA * imbalance_ratio + (1.0 - EMA_ALPHA) * ema_imbalance_ratio;
+        split_imbalance_ema = EMA_ALPHA * imbalance_ratio + (1.0 - EMA_ALPHA) * split_imbalance_ema;
 
-        // Dynamic threshold decreases as total_labels increase.
-        const double dynamic_threshold = BASE_IMBALANCE_THRESHOLD * std::exp(-total_labels / 1000.0);
+        // Keep a real dead-band even on large passes. Letting the threshold
+        // decay to zero makes q_star chase noise and creates concat churn.
+        const double dynamic_threshold =
+            std::max(0.03, BASE_IMBALANCE_THRESHOLD * std::exp(-total_labels / 50000.0));
+        if (iter - last_split_update_iter < SPLIT_UPDATE_COOLDOWN) return;
 
         // Only adjust split if the imbalance exceeds the dynamic threshold.
-        if (ema_imbalance_ratio > dynamic_threshold) {
+        if (split_imbalance_ema > dynamic_threshold) {
             // Severity scales between 0 and 1.
-            const double severity = (ema_imbalance_ratio - dynamic_threshold) / (1.0 - dynamic_threshold);
+            const double severity = (split_imbalance_ema - dynamic_threshold) / (1.0 - dynamic_threshold);
 
             // Adaptive adjustment factor increases with severity.
             const double adjustment_factor =
@@ -1081,6 +1089,7 @@ public:
             // Base adjustment scales with the resource range; no decay so
             // adjustments stay aggressive when imbalance persists late.
             const double base_adjustment = adjustment_factor * resource_range;
+            last_split_update_iter       = iter;
 
             // Adjust each split position in q_star.
             for (size_t i = 0; i < q_star.size(); ++i) {
@@ -1105,8 +1114,8 @@ public:
             }
 
             // Log adjustments if the base adjustment is significant.
-            if (std::abs(base_adjustment) > resource_range * 0.05) {
-                print_info("Split adjustment: imbalance={:.3f}, adjustment={:.3f}\n", ema_imbalance_ratio,
+            if (std::abs(base_adjustment) > resource_range * 0.01) {
+                print_info("Split adjustment: imbalance={:.3f}, adjustment={:.3f}\n", split_imbalance_ema,
                            base_adjustment);
             }
         }
@@ -1257,6 +1266,7 @@ public:
     bool collect_concatenation_candidate(const Label *forward_label, const Label *backward_label, double path_cost,
                                          const SpliceState *splice_state,
                                          [[maybe_unused]] std::span<const ActiveCutInfo> active_cuts,
+                                         [[maybe_unused]] double max_src_splice_discount,
                                          std::atomic<double> &best_cost, ConcatenationScratch &scratch);
 
     void push_unvisited_phi_neighbors(std::span<const int> neighbors, ConcatenationScratch &scratch) const;

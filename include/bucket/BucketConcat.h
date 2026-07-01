@@ -80,8 +80,16 @@ template <Stage S>
 bool BucketGraph::collect_concatenation_candidate(const Label *forward_label, const Label *backward_label,
                                                   double path_cost, const SpliceState *splice_state,
                                                   [[maybe_unused]] std::span<const ActiveCutInfo> active_cuts,
+                                                  [[maybe_unused]] double max_src_splice_discount,
                                                   std::atomic<double> &best_cost, ConcatenationScratch &scratch) {
     ++scratch.stats.labels_tested;
+    if constexpr (S == Stage::Four) {
+        constexpr uint64_t kStageFourLocalScanBudget = 25000;
+        if (scratch.stats.labels_tested > kStageFourLocalScanBudget) {
+            pricing_truncated.store(true, std::memory_order_relaxed);
+            return false;
+        }
+    }
 
     const int forward_node_id = forward_label->node_id;
     if (backward_label == nullptr || backward_label->is_dominated || backward_label->node_id == forward_node_id) {
@@ -89,15 +97,18 @@ bool BucketGraph::collect_concatenation_candidate(const Label *forward_label, co
     }
 
     double total_cost = path_cost + backward_label->cost;
-    if constexpr (!(S == Stage::Four || S == Stage::Enumerate)) {
-        if (!numericutils::lt(total_cost, best_cost.load(std::memory_order_relaxed))) { return false; }
-    }
-
-    if (visited_overlap(forward_label->visited_bitmap, backward_label->visited_bitmap)) { return false; }
-    if (!check_feasibility(forward_label, backward_label, splice_state)) { return false; }
 
 #if defined(SRC)
     if constexpr (S == Stage::Four || S == Stage::Enumerate) {
+        const double prune_limit =
+            (S == Stage::Enumerate) ? std::min(gap, enumeration_route_cutoff.load(std::memory_order_relaxed))
+                                    : best_cost.load(std::memory_order_relaxed);
+        if (!numericutils::lt(total_cost - max_src_splice_discount, prune_limit)) { return false; }
+
+        // In SRC stages the raw splice cost may be too pessimistic because
+        // concatenating the two partial paths can trigger additional SRC dual
+        // reductions. Apply the exact splice adjustment before the expensive
+        // bitmap/resource checks, then use the adjusted cost for safe pruning.
         for (const auto &active_cut : active_cuts) {
             const auto  &cut  = *active_cut.cut_ptr;
             const size_t idx  = active_cut.index;
@@ -110,8 +121,11 @@ bool BucketGraph::collect_concatenation_candidate(const Label *forward_label, co
                                      : forward_label->SRCmap[idx] + backward_label->SRCmap[idx] >= cut.p.den;
             if (cut_hit) { total_cost -= dual; }
         }
-    }
+    } else
 #endif
+    {
+        if (!numericutils::lt(total_cost, best_cost.load(std::memory_order_relaxed))) { return false; }
+    }
 
     bool cost_acceptable;
     if constexpr (S != Stage::Enumerate) {
@@ -122,8 +136,16 @@ bool BucketGraph::collect_concatenation_candidate(const Label *forward_label, co
     }
 
     if (!cost_acceptable) { return false; }
+    if (visited_overlap(forward_label->visited_bitmap, backward_label->visited_bitmap)) { return false; }
+    if (!check_feasibility(forward_label, backward_label, splice_state)) { return false; }
+
     scratch.candidates.push_back({backward_label, total_cost});
     ++scratch.stats.labels_accepted;
+    if constexpr (S == Stage::Four) {
+        constexpr uint64_t kStageFourCandidateCap = static_cast<uint64_t>(N_ADD) + 2ULL;
+        const uint64_t     hits = pricing_candidate_hits.fetch_add(1, std::memory_order_relaxed) + 1;
+        if (hits >= kStageFourCandidateCap) { pricing_truncated.store(true, std::memory_order_relaxed); }
+    }
     return true;
 }
 
@@ -147,7 +169,23 @@ void BucketGraph::concatenate_label_from_bucket(const Label *L, int b, std::atom
     if constexpr (S > Stage::Three) { active_cuts = cut_storage->getActiveCuts(); }
 #endif
 
+    double max_src_splice_discount = 0.0;
+#if defined(SRC)
+    if constexpr (S == Stage::Four || S == Stage::Enumerate) {
+        const SRCMap &src_map = (splice_state && splice_state->has_src) ? splice_state->SRCmap : L->SRCmap;
+        for (const auto &active_cut : active_cuts) {
+            if (active_cut.dual_value <= 0.0) continue;
+            if (src_map[active_cut.index] == 0) continue;
+            max_src_splice_discount += active_cut.dual_value;
+        }
+    }
+#endif
+
     while (!scratch.bucket_stack.empty()) {
+        if constexpr (S == Stage::Four) {
+            if (pricing_truncated.load(std::memory_order_relaxed)) break;
+        }
+
         const int current_bucket = scratch.bucket_stack.back();
         scratch.bucket_stack.pop_back();
 
@@ -172,10 +210,14 @@ void BucketGraph::concatenate_label_from_bucket(const Label *L, int b, std::atom
             prune_limit = std::min(gap, enumeration_route_cutoff.load(std::memory_order_relaxed));
         }
 
-        if ((S != Stage::Enumerate && numericutils::gte(path_cost + bound, prune_limit)) ||
-            (S == Stage::Enumerate && numericutils::gte(path_cost + bound, prune_limit))) {
-            continue;
+        double bucket_bound_cost = path_cost + bound;
+#if defined(SRC)
+        if constexpr (S == Stage::Four || S == Stage::Enumerate) {
+            bucket_bound_cost -= max_src_splice_discount;
         }
+#endif
+
+        if (numericutils::gte(bucket_bound_cost, prune_limit)) { continue; }
 
         const auto &bucket       = other_buckets[current_bucket];
         const auto &labels       = bucket.get_sorted_labels();
@@ -185,10 +227,18 @@ void BucketGraph::concatenate_label_from_bucket(const Label *L, int b, std::atom
         scratch.prepare_candidates(label_count);
 
         for (const Label *L_bw : labels) {
-            collect_concatenation_candidate<S>(L, L_bw, path_cost, splice_state, active_cuts, best_cost, scratch);
+            if constexpr (S == Stage::Four) {
+                if (pricing_truncated.load(std::memory_order_relaxed)) break;
+            }
+            collect_concatenation_candidate<S>(L, L_bw, path_cost, splice_state, active_cuts, max_src_splice_discount,
+                                               best_cost, scratch);
         }
         for (const Label *L_bw : extra_labels) {
-            collect_concatenation_candidate<S>(L, L_bw, path_cost, splice_state, active_cuts, best_cost, scratch);
+            if constexpr (S == Stage::Four) {
+                if (pricing_truncated.load(std::memory_order_relaxed)) break;
+            }
+            collect_concatenation_candidate<S>(L, L_bw, path_cost, splice_state, active_cuts, max_src_splice_discount,
+                                               best_cost, scratch);
         }
 
         publish_concatenation_candidates<S>(L, scratch.candidates, best_cost);
