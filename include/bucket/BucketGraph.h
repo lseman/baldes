@@ -1220,6 +1220,9 @@ public:
     template <Direction D, Stage S>
     bool is_dominated(const Label *new_label, const Label *labels) noexcept;
 
+    template <Direction D, Stage S>
+    bool dominates_resource_path(const Label *new_label, const Label *label) noexcept;
+
     template <Stage S, Symmetry SYM = Symmetry::Asymmetric>
     std::vector<Label *> bi_labeling_algorithm();
 
