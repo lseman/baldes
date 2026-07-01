@@ -62,11 +62,14 @@ void Genetic::run(int maxIterNonProd, int timeLimit) {
         // Update non-productive iteration counter
         nbIterNonProd = isNewBest ? 1 : nbIterNonProd + 1;
 
-        // Periodic operations - using bitwise operations for modulo
-        if (!(nbIter & 0x63)) {  // equivalent to nbIter % 100 == 0
+        // Periodic operations
+        if (nbIter % 100 == 0) {
             population->managePenalties();
         }
-        if (!(nbIter & 0x1FF)) {  // equivalent to nbIter % 500 == 0
+        const int logInterval = params->config.logPoolInterval > 0
+                                    ? params->config.logPoolInterval
+                                    : 500;
+        if (logInterval > 0 && nbIter % logInterval == 0) {
             population->printState(nbIter, nbIterNonProd);
         }
 

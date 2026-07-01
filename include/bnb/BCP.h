@@ -231,7 +231,7 @@ public:
         }
 
         bool shouldForceCuts(int colAdded, double inner_obj, int stage) const {
-            return stage == 4 && (colAdded == 0 || inner_obj > -1.0);
+            return stage == 4 && colAdded == 0 && !hasNegativeReducedCost(inner_obj);
         }
 
         bool shouldRunHGS(int iter, int stage, int colAdded) const {
@@ -453,11 +453,26 @@ public:
             colAdded += stats.added_columns;
         }
 
-        if (std::isfinite(hgs.best_cost) && hgs.best_cost < integer_solution) {
-            print_heur("HGS improved incumbent: {:.2f} -> {:.2f}\n", integer_solution, hgs.best_cost);
-            integer_solution        = hgs.best_cost;
-            node->integer_sol       = hgs.best_cost;
-            bucket_graph->incumbent = hgs.best_cost;
+        double hgs_incumbent = hgs.best_cost;
+        const auto best_hgs_routes = hgs.getBestRoutes();
+        if (!best_hgs_routes.empty()) {
+            double route_cost = 0.0;
+            bool   valid_cost = true;
+            for (const auto &raw_route : best_hgs_routes) {
+                if (!normalizeHGSRoute(raw_route, route)) {
+                    valid_cost = false;
+                    break;
+                }
+                route_cost += routeTravelCost(route);
+            }
+            if (valid_cost) { hgs_incumbent = route_cost; }
+        }
+
+        if (std::isfinite(hgs_incumbent) && hgs_incumbent < integer_solution) {
+            print_heur("HGS improved incumbent: {:.2f} -> {:.2f}\n", integer_solution, hgs_incumbent);
+            integer_solution        = hgs_incumbent;
+            node->integer_sol       = hgs_incumbent;
+            bucket_graph->incumbent = hgs_incumbent;
         }
 
         return stats;
@@ -1396,7 +1411,7 @@ public:
 
                 if (pricing_policy.shouldForceCuts(colAdded, inner_obj, stage)) { force_cuts = true; }
 
-                if (colAdded == 0) { force_cuts = true; }
+                if (colAdded == 0 && !hasNegativeReducedCost(inner_obj)) { force_cuts = true; }
             }
 
 #endif
@@ -1471,7 +1486,7 @@ public:
                                 //     "iterations, "
                                 //     "forcing cuts\n");
                                 //
-                                force_cuts = true;
+                                if (!hasNegativeReducedCost(inner_obj)) { force_cuts = true; }
 
                                 // create small perturbation random perturbation
                                 // on nodeDuals

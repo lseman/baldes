@@ -394,14 +394,9 @@ void Population::managePenalties() {
     }
 }
 
-Individual *Population::getBinaryTournament() {
+Individual *Population::getBinaryTournamentNoFitnessUpdate() {
     Individual *individual1;
     Individual *individual2;
-
-    // Update the fitness values of all the individuals (feasible and
-    // infeasible)
-    updateBiasedFitnesses(feasibleSubpopulation);
-    updateBiasedFitnesses(infeasibleSubpopulation);
 
     // Pick a first random number individual from the total population (of both
     // feasible and infeasible individuals)
@@ -433,17 +428,28 @@ Individual *Population::getBinaryTournament() {
     }
 }
 
+Individual *Population::getBinaryTournament() {
+    // Update the fitness values of all the individuals (feasible and
+    // infeasible)
+    updateBiasedFitnesses(feasibleSubpopulation);
+    updateBiasedFitnesses(infeasibleSubpopulation);
+    return getBinaryTournamentNoFitnessUpdate();
+}
+
 std::pair<Individual *, Individual *>
 Population::getNonIdenticalParentsBinaryTournament() {
+    updateBiasedFitnesses(feasibleSubpopulation);
+    updateBiasedFitnesses(infeasibleSubpopulation);
+
     // Pick two individual using a binary tournament
-    Individual *parentA = getBinaryTournament();
-    Individual *parentB = getBinaryTournament();
+    Individual *parentA = getBinaryTournamentNoFitnessUpdate();
+    Individual *parentB = getBinaryTournamentNoFitnessUpdate();
     int num_tries = 1;
     // Pick two other individuals as long as they are identical (try at most 9
     // times)
     while (parentA->brokenPairsDistance(parentB) < MY_EPSILON &&
            num_tries < 10) {
-        parentB = getBinaryTournament();
+        parentB = getBinaryTournamentNoFitnessUpdate();
         num_tries++;
     }
 

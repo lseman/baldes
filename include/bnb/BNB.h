@@ -101,13 +101,16 @@ public:
 
     void setRootNode(BNBNode *rootBNBNode) {
         this->rootBNBNode = rootBNBNode;
+        if (std::isfinite(rootBNBNode->integer_sol)) {
+            globalBestObjective.store(rootBNBNode->integer_sol, std::memory_order_release);
+        }
         addBNBNode(rootBNBNode);
     }
 
     void updateGlobalBest(double objectiveValue, BNBNode *currentBNBNode, double boundValue) {
-        // Use atomic compare and swap for updating global best objective
+        // Minimization incumbent update.
         double prevGlobalBest = globalBestObjective.load(std::memory_order_acquire);
-        while (objectiveValue > prevGlobalBest &&
+        while (objectiveValue < prevGlobalBest &&
                !globalBestObjective.compare_exchange_weak(prevGlobalBest, objectiveValue, std::memory_order_release)) {
             // Repeat until update is successful
         }
@@ -129,7 +132,7 @@ public:
 
         if (isSolutionFound()) return; // Check again after a potentially long operation
 
-        if (currentBNBNode->getPrune() || boundValue < globalBestObjective.load()) {
+        if (currentBNBNode->getPrune() || boundValue > globalBestObjective.load()) {
             return; // BNBNode can be pruned
         }
 
@@ -229,7 +232,7 @@ public:
                 break;
             }
 
-            if (objectiveValue > globalBestObjective.load()) {
+            if (objectiveValue < globalBestObjective.load()) {
                 globalBestObjective.store(objectiveValue, std::memory_order_release);
             }
 

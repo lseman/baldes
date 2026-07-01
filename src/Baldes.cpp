@@ -6,6 +6,8 @@
 
 // #include "../third_party/lkh/include/lkh_tsp.hpp"
 
+#include <cmath>
+#include <limits>
 #include <string>
 #include <vector>
 
@@ -260,6 +262,16 @@ int main(int argc, char *argv[]) {
     };
     std::for_each(initialRoutesHGS.begin(), initialRoutesHGS.end(), process_route);
 
+    auto route_collection_cost = [&](const std::vector<std::vector<int>> &routes) {
+        double total = 0.0;
+        if (routes.empty()) return std::numeric_limits<double>::infinity();
+        for (const auto &route : routes) {
+            if (route.size() < 2) return std::numeric_limits<double>::infinity();
+            for (size_t i = 0; i + 1 < route.size(); ++i) { total += instance.getcij(route[i], route[i + 1]); }
+        }
+        return total;
+    };
+
     // print size of initialRoutesHGS
     if (problem_kind != "load") { initRMP(&mip, problem, initialRoutesHGS); }
 #ifdef GUROBI
@@ -284,8 +296,9 @@ int main(int argc, char *argv[]) {
     node->problem     = problem;
     node->mip         = mip;
     node->instance    = instance;
-    node->integer_sol = hgs->getBestCost();
-    node->numK        = hgs->getBestRoutes().size();
+    const double best_route_cost = route_collection_cost(topRoutes);
+    node->integer_sol            = std::isfinite(best_route_cost) ? best_route_cost : hgs->getBestCost();
+    node->numK                   = topRoutes.size();
     node->pathSet     = pathSet;
     // node->bestRoutes = topRoutes;
 

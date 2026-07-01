@@ -7,6 +7,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cassert>
 #include <memory_resource>
 #include <span>
 
@@ -129,10 +130,18 @@ struct alignas(64) Bucket {
 
         const auto old_size = labels.size();
         labels.insert(labels.end(), extra_labels.begin(), extra_labels.end());
+#ifndef NDEBUG
+        assert(std::is_sorted(labels.begin(), labels.begin() + static_cast<std::ptrdiff_t>(old_size),
+                              [](const Label *a, const Label *b) { return a->cost < b->cost; }));
+#endif
         pdqsort(labels.begin() + static_cast<std::ptrdiff_t>(old_size), labels.end(),
                 [](const Label *a, const Label *b) { return a->cost < b->cost; });
         std::inplace_merge(labels.begin(), labels.begin() + static_cast<std::ptrdiff_t>(old_size), labels.end(),
                            [](const Label *a, const Label *b) { return a->cost < b->cost; });
+#ifndef NDEBUG
+        assert(std::is_sorted(labels.begin(), labels.end(),
+                              [](const Label *a, const Label *b) { return a->cost < b->cost; }));
+#endif
         extra_labels.clear();
         invalidate_label_cache();
         min_cost = std::numeric_limits<double>::max();

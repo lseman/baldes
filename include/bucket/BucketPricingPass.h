@@ -62,23 +62,11 @@ void BucketGraph::run_directional_pricing(BucketDirectionalBounds &bounds) {
 
 template <Stage S, Symmetry SYM>
 Label *BucketGraph::make_initial_merged_label() {
-    auto best_label = label_pool_fw->acquire();
-    if constexpr (SYM == Symmetry::Asymmetric) {
-        if (fw_best_label->node_id != bw_best_label->node_id &&
-            !visited_overlap(fw_best_label->visited_bitmap, bw_best_label->visited_bitmap) &&
-            check_feasibility(fw_best_label, bw_best_label)) {
-            best_label = compute_label<S>(fw_best_label, bw_best_label);
-        } else {
-            best_label->cost      = 0.0;
-            best_label->real_cost = std::numeric_limits<double>::infinity();
-            best_label->clearRoute();
-        }
-    } else {
-        best_label->cost      = best_label->real_cost;
-        best_label->real_cost = std::numeric_limits<double>::infinity();
-        best_label->clearRoute();
-    }
-    return best_label;
+    auto label       = label_pool_fw->acquire();
+    label->cost      = 0.0;
+    label->real_cost = std::numeric_limits<double>::infinity();
+    label->clearRoute();
+    return label;
 }
 
 template <Stage S, Symmetry SYM>
