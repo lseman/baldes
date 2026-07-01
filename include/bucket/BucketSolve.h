@@ -310,41 +310,115 @@ std::vector<double> BucketGraph::labeling_algorithm() {
                             const double cost_lo = new_label->cost - numericutils::eps;
                             const double cost_hi = new_label->cost + numericutils::eps;
 
+                            auto label_cost_less = [](const Label *label, double value) {
+                                return label->cost < value;
+                            };
+
+                            auto scan_new_dominated_by = [&](size_t begin, size_t end) {
+                                for (size_t i = begin; i < end; ++i) {
+                                    if (i + 8 < end) { __builtin_prefetch(to_bucket_labels[i + 8], 0, 3); }
+                                    Label *cur = to_bucket_labels[i];
+                                    ++inner_scan_count;
+                                    if (__builtin_expect(cur->is_dominated, 0)) continue;
+                                    if (dominates_resource_path<D, S>(new_label, cur)) {
+                                        ++stat_n_dom;
+                                        dominated = true;
+                                        break;
+                                    }
+                                }
+                            };
+
+                            auto scan_existing_dominated_by_new = [&](size_t begin, size_t end) {
+                                for (size_t i = begin; i < end; ++i) {
+                                    if (i + 8 < end) { __builtin_prefetch(to_bucket_labels[i + 8], 0, 3); }
+                                    Label *cur = to_bucket_labels[i];
+                                    ++inner_scan_count;
+                                    if (__builtin_expect(cur->is_dominated, 0)) continue;
+                                    if (dominates_resource_path<D, S>(cur, new_label)) { cur->set_dominated(true); }
+                                }
+                            };
+
+                            auto scan_bracket = [&](size_t begin, size_t end) {
+                                for (size_t i = begin; i < end; ++i) {
+                                    if (i + 8 < end) { __builtin_prefetch(to_bucket_labels[i + 8], 0, 3); }
+                                    Label *cur = to_bucket_labels[i];
+                                    ++inner_scan_count;
+                                    if (__builtin_expect(cur->is_dominated, 0)) continue;
+                                    if (is_dominated<D, S>(new_label, cur)) {
+                                        ++stat_n_dom;
+                                        dominated = true;
+                                        break;
+                                    }
+                                    if (is_dominated<D, S>(cur, new_label)) { cur->set_dominated(true); }
+                                }
+                            };
+
                             // Forward path: walk sorted committed labels once.
                             const size_t to_bucket_size = to_bucket_labels.size();
-                            size_t       i              = 0;
-                            for (; i < to_bucket_size; ++i) {
-                                if (i + 8 < to_bucket_size) { __builtin_prefetch(to_bucket_labels[i + 8], 0, 3); }
-                                Label *cur = to_bucket_labels[i];
-                                ++inner_scan_count;
-                                if (__builtin_expect(cur->is_dominated, 0)) continue;
-                                const double cur_cost = cur->cost;
-                                if constexpr (src_adjusted_dominance) {
+                            if constexpr (src_adjusted_dominance) {
+                                for (size_t i = 0; i < to_bucket_size; ++i) {
+                                    if (i + 8 < to_bucket_size) {
+                                        __builtin_prefetch(to_bucket_labels[i + 8], 0, 3);
+                                    }
+                                    Label *cur = to_bucket_labels[i];
+                                    ++inner_scan_count;
+                                    if (__builtin_expect(cur->is_dominated, 0)) continue;
                                     if (is_dominated<D, S>(new_label, cur)) {
                                         ++stat_n_dom;
                                         dominated = true;
                                         break;
                                     }
                                     if (is_dominated<D, S>(cur, new_label)) { cur->set_dominated(true); }
-                                } else if (cur_cost < cost_lo) {
-                                    // cheaper -> only "cur dominates new" is
-                                    // possible.
-                                    if (is_dominated<D, S>(new_label, cur)) {
-                                        ++stat_n_dom;
-                                        dominated = true;
-                                        break;
+                                }
+                            } else {
+                                static constexpr size_t kLinearCostBracketScanLimit = 32;
+                                if (to_bucket_size <= kLinearCostBracketScanLimit) {
+                                    for (size_t i = 0; i < to_bucket_size; ++i) {
+                                        if (i + 8 < to_bucket_size) {
+                                            __builtin_prefetch(to_bucket_labels[i + 8], 0, 3);
+                                        }
+                                        Label *cur = to_bucket_labels[i];
+                                        ++inner_scan_count;
+                                        if (__builtin_expect(cur->is_dominated, 0)) continue;
+                                        const double cur_cost = cur->cost;
+                                        if (cur_cost < cost_lo) {
+                                            if (dominates_resource_path<D, S>(new_label, cur)) {
+                                                ++stat_n_dom;
+                                                dominated = true;
+                                                break;
+                                            }
+                                        } else if (cur_cost > cost_hi) {
+                                            if (dominates_resource_path<D, S>(cur, new_label)) {
+                                                cur->set_dominated(true);
+                                            }
+                                        } else {
+                                            if (is_dominated<D, S>(new_label, cur)) {
+                                                ++stat_n_dom;
+                                                dominated = true;
+                                                break;
+                                            }
+                                            if (is_dominated<D, S>(cur, new_label)) { cur->set_dominated(true); }
+                                        }
                                     }
-                                } else if (cur_cost > cost_hi) {
-                                    // pricier -> only "new dominates cur".
-                                    if (is_dominated<D, S>(cur, new_label)) { cur->set_dominated(true); }
                                 } else {
-                                    // bracket -> check both.
-                                    if (is_dominated<D, S>(new_label, cur)) {
-                                        ++stat_n_dom;
-                                        dominated = true;
-                                        break;
+                                    const auto bracket_begin_it =
+                                        std::lower_bound(to_bucket_labels.begin(), to_bucket_labels.end(), cost_lo,
+                                                         label_cost_less);
+                                    const auto expensive_begin_it =
+                                        std::upper_bound(to_bucket_labels.begin(), to_bucket_labels.end(), cost_hi,
+                                                         [](double value, const Label *label) {
+                                                             return value < label->cost;
+                                                         });
+                                    const size_t bracket_begin =
+                                        static_cast<size_t>(std::distance(to_bucket_labels.begin(), bracket_begin_it));
+                                    const size_t expensive_begin = static_cast<size_t>(
+                                        std::distance(to_bucket_labels.begin(), expensive_begin_it));
+
+                                    scan_new_dominated_by(0, bracket_begin);
+                                    if (!dominated) { scan_bracket(bracket_begin, expensive_begin); }
+                                    if (!dominated) {
+                                        scan_existing_dominated_by_new(expensive_begin, to_bucket_size);
                                     }
-                                    if (is_dominated<D, S>(cur, new_label)) { cur->set_dominated(true); }
                                 }
                             }
 
@@ -364,13 +438,15 @@ std::vector<double> BucketGraph::labeling_algorithm() {
                                         }
                                         if (is_dominated<D, S>(cur, new_label)) { cur->set_dominated(true); }
                                     } else if (cur_cost < cost_lo) {
-                                        if (is_dominated<D, S>(new_label, cur)) {
+                                        if (dominates_resource_path<D, S>(new_label, cur)) {
                                             ++stat_n_dom;
                                             dominated = true;
                                             break;
                                         }
                                     } else if (cur_cost > cost_hi) {
-                                        if (is_dominated<D, S>(cur, new_label)) { cur->set_dominated(true); }
+                                        if (dominates_resource_path<D, S>(cur, new_label)) {
+                                            cur->set_dominated(true);
+                                        }
                                     } else {
                                         if (is_dominated<D, S>(new_label, cur)) {
                                             ++stat_n_dom;
@@ -424,15 +500,10 @@ std::vector<double> BucketGraph::labeling_algorithm() {
             buckets[bucket].compact_dominated_labels();
         }
 
-        // Update c_bar values for all buckets in the current SCC.
-        auto sorted_buckets = sorted_sccs[scc_index];
-        if constexpr (D == Direction::Forward) {
-            pdqsort(sorted_buckets.begin(), sorted_buckets.end(),
-                    [&](int a, int b) { return buckets[a].lb < buckets[b].lb; });
-        } else {
-            pdqsort(sorted_buckets.begin(), sorted_buckets.end(),
-                    [&](int a, int b) { return buckets[a].ub > buckets[b].ub; });
-        }
+        // Update c_bar values for all buckets in the current SCC. The topology
+        // builder already stores these buckets in direction-specific resource
+        // order, so avoid copying and sorting them on every labeling pass.
+        const auto &sorted_buckets = sorted_sccs[scc_index];
 
         // Prefetch data for c_bar updates
         if (!sorted_buckets.empty()) {
@@ -777,17 +848,8 @@ inline auto BucketGraph::Extend(const std::conditional_t<M == Mutability::Mut, L
  *
  */
 template <Direction D, Stage S>
-inline bool BucketGraph::is_dominated(const Label *__restrict new_label, const Label *__restrict label) noexcept {
-    // A label cannot dominate if its cost is higher.
-    // const double cost_diff = label->cost - new_label->cost;
-#if defined(SRC)
-    if constexpr (!(S == Stage::Four || S == Stage::Enumerate)) {
-        if (numericutils::gt(label->cost, new_label->cost)) { return false; }
-    }
-#else
-    if (numericutils::gt(label->cost, new_label->cost)) { return false; }
-#endif
-
+inline bool BucketGraph::dominates_resource_path(const Label *__restrict new_label,
+                                                 const Label *__restrict label) noexcept {
     // Compare resource vectors.
     const auto *__restrict new_res = new_label->resources.data();
     const auto *__restrict lbl_res = label->resources.data();
@@ -829,6 +891,23 @@ inline bool BucketGraph::is_dominated(const Label *__restrict new_label, const L
             if ((label->visited_bitmap[i] & new_label->visited_bitmap[i]) != label->visited_bitmap[i]) { return false; }
         }
     }
+    return true;
+}
+
+template <Direction D, Stage S>
+inline bool BucketGraph::is_dominated(const Label *__restrict new_label, const Label *__restrict label) noexcept {
+    // A label cannot dominate if its cost is higher.
+    // const double cost_diff = label->cost - new_label->cost;
+#if defined(SRC)
+    if constexpr (!(S == Stage::Four || S == Stage::Enumerate)) {
+        if (numericutils::gt(label->cost, new_label->cost)) { return false; }
+    }
+#else
+    if (numericutils::gt(label->cost, new_label->cost)) { return false; }
+#endif
+
+    if (!dominates_resource_path<D, S>(new_label, label)) { return false; }
+
 #ifdef SRC
     // For Stage Four or Enumerate, apply additional SRC-based cost
     // adjustments.

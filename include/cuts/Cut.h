@@ -763,10 +763,12 @@ private:
 
 public:
     /**
-     * @brief Enforce pool size limit by removing oldest/least useful cuts.
+     * @brief Enforce pool size limit for cuts that are not in the LP yet.
      *
-     * When pool exceeds max_pool_size_, removes cuts with lowest selection
-     * scores (oldest + lowest dual + lowest inclusion count).
+     * Cuts with an LP row must be removed together with their model constraint
+     * and the caller-owned SRCconstraints vector. This storage-only eviction is
+     * therefore limited to pending cuts; active/model cuts are cleaned by
+     * LimitedMemoryRank1Cuts::cutCleaner.
      */
     void enforcePoolSizeLimit() {
         if (cuts.size() <= max_pool_size_) return;
@@ -774,21 +776,19 @@ public:
         // Compute scores for all cuts.
         std::vector<std::pair<size_t, double>> scored;
         scored.reserve(cuts.size());
-        for (size_t i = 0; i < cuts.size(); ++i) { scored.emplace_back(i, computeSelectionScore(i)); }
+        for (size_t i = 0; i < cuts.size(); ++i) {
+            if (!cuts[i].added) { scored.emplace_back(i, computeSelectionScore(i)); }
+        }
+        if (scored.empty()) return;
 
         // Sort by score ascending (lowest first = candidates for removal)
         pdqsort(scored.begin(), scored.end(), [](const auto &a, const auto &b) { return a.second < b.second; });
 
-        // Remove excess cuts (lowest scoring first). Erase in descending index
-        // order so vector indices remain valid.
-        const size_t     excess = cuts.size() - max_pool_size_;
+        // Remove excess pending cuts (lowest scoring first). Erase in
+        // descending index order so vector indices remain valid.
+        const size_t     excess = std::min(cuts.size() - max_pool_size_, scored.size());
         std::vector<int> remove_indices;
         remove_indices.reserve(excess);
-        for (auto &[cut_idx, score] : scored) {
-            if (remove_indices.size() >= excess) break;
-            const bool has_current_dual = cut_idx < SRCDuals.size() && std::abs(SRCDuals[cut_idx]) > SRC_DUAL_TOLERANCE;
-            if (!has_current_dual) { remove_indices.push_back(static_cast<int>(cut_idx)); }
-        }
         for (auto &[cut_idx, score] : scored) {
             if (remove_indices.size() >= excess) break;
             remove_indices.push_back(static_cast<int>(cut_idx));
