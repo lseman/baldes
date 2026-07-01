@@ -1,0 +1,7 @@
+<map id="EVRP_read_instance" name="EVRP_read_instance">
+<area shape="rect" id="Node000001" title=" " alt="" coords="5,42,150,68"/>
+<area shape="rect" id="Node000002" href="$Reader_8h.html#a99064a935f6e89ab617d45b00b26dec1" title=" " alt="" coords="223,5,377,46"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="150,43,207,35,208,41,151,48"/>
+<area shape="rect" id="Node000003" href="$Reader_8h.html#aef54cee0a50255ed1a50ed2fbefadf74" title="Reduces the time windows for the vertices in the VRPTW instance." alt="" coords="198,70,402,96"/>
+<area shape="poly" id="edge2_Node000001_Node000003" title=" " alt="" coords="150,61,183,66,182,71,150,67"/>
+</map>

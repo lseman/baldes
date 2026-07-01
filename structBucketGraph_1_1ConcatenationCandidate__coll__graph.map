@@ -1,0 +1,6 @@
+<map id="BucketGraph::ConcatenationCandidate" name="BucketGraph::ConcatenationCandidate">
+<area shape="rect" id="Node000001" title=" " alt="" coords="5,102,192,143"/>
+<area shape="rect" id="Node000002" href="$structLabel.html" title="Represents a label used in a solver." alt="" coords="72,5,125,31"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="101,46,101,102,96,102,96,46"/>
+<area shape="poly" id="edge2_Node000002_Node000002" title=" " alt="" coords="142,8,149,12,152,19,143,28,126,30,125,24,141,23,147,18,145,15,140,13"/>
+</map>

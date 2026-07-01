@@ -1,0 +1,13 @@
+<map id="BNBNode::solveRestrictedMasterLP" name="BNBNode::solveRestrictedMasterLP">
+<area shape="rect" id="Node000001" title=" " alt="" coords="5,72,182,113"/>
+<area shape="rect" id="Node000002" href="$classBNBNode.html#a33d2c1c840d8ba9794f5ff4d83949727" title=" " alt="" coords="230,5,399,31"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="147,69,229,40,249,33,250,38,231,45,149,74"/>
+<area shape="rect" id="Node000003" href="$classBNBNode.html#a6581837245535f5aa0986dcc0ae4fb07" title=" " alt="" coords="243,55,386,80"/>
+<area shape="poly" id="edge2_Node000001_Node000003" title=" " alt="" coords="182,80,227,75,228,80,183,85"/>
+<area shape="rect" id="Node000004" href="$classBNBNode.html#abb76f5afa8990290b262a0750cede865" title=" " alt="" coords="247,104,382,130"/>
+<area shape="poly" id="edge3_Node000001_Node000004" title=" " alt="" coords="183,100,232,105,231,111,182,105"/>
+<area shape="rect" id="Node000006" href="$classBNBNode.html#a93bf363e7ba8aa5c7dd4ee56a81189b3" title=" " alt="" coords="242,153,386,179"/>
+<area shape="poly" id="edge5_Node000001_Node000006" title=" " alt="" coords="150,111,231,140,250,146,249,151,229,145,148,116"/>
+<area shape="rect" id="Node000005" href="$classGurobiEnvSingleton.html#a49c3ce63088629c2246dec252a73df16" title=" " alt="" coords="447,96,582,137"/>
+<area shape="poly" id="edge4_Node000004_Node000005" title=" " alt="" coords="382,114,432,114,432,120,382,120"/>
+</map>

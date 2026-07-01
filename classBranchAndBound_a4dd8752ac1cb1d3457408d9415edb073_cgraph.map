@@ -1,0 +1,25 @@
+<map id="BranchAndBound::processBNBNode" name="BranchAndBound::processBNBNode">
+<area shape="rect" id="Node000001" title=" " alt="" coords="5,133,239,159"/>
+<area shape="rect" id="Node000002" href="$classBranchAndBound.html#a8dce95e87fb61eede4b005e055864663" title=" " alt="" coords="319,5,486,31"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="138,131,201,86,242,61,286,40,304,33,306,38,288,45,244,66,204,90,141,135"/>
+<area shape="rect" id="Node000004" href="$classBNBNode.html#aac35166d36684e32a7bdfa6c4c4ef41b" title=" " alt="" coords="309,55,496,80"/>
+<area shape="poly" id="edge3_Node000001_Node000004" title=" " alt="" coords="158,130,286,89,315,82,316,87,287,94,160,135"/>
+<area shape="rect" id="Node000007" href="$classBNBNode.html#aea7c19032bda3aaa1d5002a506b22f70" title=" " alt="" coords="333,104,472,130"/>
+<area shape="poly" id="edge6_Node000001_Node000007" title=" " alt="" coords="239,131,317,123,318,128,239,137"/>
+<area shape="rect" id="Node000008" href="$classBranchAndBound.html#a4aee56d21009ae41bc9d1a25331ce63f" title=" " alt="" coords="310,154,495,194"/>
+<area shape="poly" id="edge7_Node000001_Node000008" title=" " alt="" coords="239,155,294,161,294,166,239,160"/>
+<area shape="rect" id="Node000009" href="$classBNBNode.html#ab885178fe3620191190f1b166016b7c5" title=" " alt="" coords="346,219,458,244"/>
+<area shape="poly" id="edge8_Node000001_Node000009" title=" " alt="" coords="157,157,217,180,287,204,332,215,331,220,286,209,215,185,155,162"/>
+<area shape="rect" id="Node000010" href="$classBranchAndBound.html#aa1ff580eba5f8fdfce63d3c5223dc4d4" title=" " alt="" coords="287,268,518,294"/>
+<area shape="poly" id="edge9_Node000001_Node000010" title=" " alt="" coords="140,157,202,205,243,232,288,254,304,261,303,266,286,259,241,236,199,210,137,161"/>
+<area shape="rect" id="Node000003" href="$classBNBNode.html#af5035c88619967009f8a770fb8e18c57" title=" " alt="" coords="600,5,752,31"/>
+<area shape="poly" id="edge2_Node000002_Node000003" title=" " alt="" coords="486,16,585,16,585,21,486,21"/>
+<area shape="rect" id="Node000005" href="$classBNBNode.html#a88d143f3bb4f20f932a519fa2d685e97" title=" " alt="" coords="566,55,786,80"/>
+<area shape="poly" id="edge4_Node000004_Node000005" title=" " alt="" coords="497,65,551,65,551,70,497,70"/>
+<area shape="rect" id="Node000006" href="$classLinearExpression.html#a931036cafcd17fe3553ffd79468da49e" title=" " alt="" coords="834,47,982,88"/>
+<area shape="poly" id="edge5_Node000005_Node000006" title=" " alt="" coords="787,65,819,65,819,70,787,70"/>
+<area shape="rect" id="Node000011" href="$classBranchAndBound.html#a0d57f6ba3e906c77cfadae558cf8bad5" title=" " alt="" coords="574,231,778,272"/>
+<area shape="poly" id="edge10_Node000010_Node000011" title=" " alt="" coords="518,266,558,261,558,267,519,271"/>
+<area shape="rect" id="Node000012" href="$Definitions_8h.html#a086546d06aa565cdd48f436973ebc496" title="Prints an informational message with a specific format." alt="" coords="639,296,713,322"/>
+<area shape="poly" id="edge11_Node000010_Node000012" title=" " alt="" coords="519,290,624,301,623,306,518,295"/>
+</map>

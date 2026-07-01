@@ -1,0 +1,7 @@
+<map id="LabelPool::acquire_batch" name="LabelPool::acquire_batch">
+<area shape="rect" id="Node000001" title=" " alt="" coords="5,23,133,64"/>
+<area shape="rect" id="Node000002" href="$structLabel.html#a09ab6e2211ea2dc90992dc2d0854ef20" title="Resets the state of the object to its initial values." alt="" coords="194,5,282,31"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="133,31,178,24,179,30,134,37"/>
+<area shape="rect" id="Node000003" href="$classLabelPool.html#a0299b4f3e653a083b2db4816dd7dcda6" title=" " alt="" coords="181,55,295,80"/>
+<area shape="poly" id="edge2_Node000001_Node000003" title=" " alt="" coords="134,50,166,55,165,60,133,55"/>
+</map>

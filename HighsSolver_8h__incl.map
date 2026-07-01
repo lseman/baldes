@@ -1,0 +1,15 @@
+<map id="HighsSolver.h" name="HighsSolver.h">
+<area shape="rect" id="Node000001" title=" " alt="" coords="167,5,269,31"/>
+<area shape="rect" id="Node000002" href="$SolverInterface_8h.html" title=" " alt="" coords="38,79,158,105"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="199,34,133,73,130,68,196,29"/>
+<area shape="rect" id="Node000006" title=" " alt="" coords="182,79,254,105"/>
+<area shape="poly" id="edge5_Node000001_Node000006" title=" " alt="" coords="221,31,221,63,215,63,215,31"/>
+<area shape="rect" id="Node000007" title=" " alt="" coords="277,79,343,105"/>
+<area shape="poly" id="edge6_Node000001_Node000007" title=" " alt="" coords="235,29,284,67,281,72,232,34"/>
+<area shape="rect" id="Node000003" title=" " alt="" coords="5,153,47,178"/>
+<area shape="poly" id="edge2_Node000002_Node000003" title=" " alt="" coords="88,107,51,143,47,140,84,103"/>
+<area shape="rect" id="Node000004" title=" " alt="" coords="71,153,125,178"/>
+<area shape="poly" id="edge3_Node000002_Node000004" title=" " alt="" coords="101,105,101,137,95,137,95,105"/>
+<area shape="rect" id="Node000005" title=" " alt="" coords="149,153,207,178"/>
+<area shape="poly" id="edge4_Node000002_Node000005" title=" " alt="" coords="113,103,155,140,152,144,110,107"/>
+</map>

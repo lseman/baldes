@@ -1,0 +1,8 @@
+<map id="BucketGraph::knapsackBound" name="BucketGraph::knapsackBound">
+<area shape="rect" id="Node000001" title=" " alt="" coords="5,29,202,55"/>
+<area shape="poly" id="edge3_Node000001_Node000001" title=" " alt="" coords="67,31,59,21,64,11,79,5,104,3,131,5,145,12,142,17,129,10,103,8,80,10,67,15,64,20,71,27"/>
+<area shape="rect" id="Node000002" href="$classBucketGraph.html#a7d2d975e13b1fdeaafca99aa6fb29486" title=" " alt="" coords="250,22,403,62"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="202,40,234,40,234,45,202,45"/>
+<area shape="rect" id="Node000003" href="$classBucketGraph.html#ad15267e0cffaa8dc5222028409c9e082" title=" " alt="" coords="451,29,585,55"/>
+<area shape="poly" id="edge2_Node000002_Node000003" title=" " alt="" coords="404,40,435,40,435,45,404,45"/>
+</map>

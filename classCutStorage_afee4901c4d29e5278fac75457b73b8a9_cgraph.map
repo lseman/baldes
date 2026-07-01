@@ -1,0 +1,7 @@
+<map id="CutStorage::loadCoefficients" name="CutStorage::loadCoefficients">
+<area shape="rect" id="Node000001" title=" " alt="" coords="5,46,189,72"/>
+<area shape="rect" id="Node000002" href="$classCutStorage.html#a6c546f704d593f06544a3e7aed508dc8" title="Computes a unique cut key based on the provided base set and multipliers." alt="" coords="258,5,400,46"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="189,43,242,35,243,41,189,48"/>
+<area shape="rect" id="Node000003" href="$classCutStorage.html#ae3c9d08a71c6e3e50586322a4cf74a02" title=" " alt="" coords="237,71,422,111"/>
+<area shape="poly" id="edge2_Node000001_Node000003" title=" " alt="" coords="189,69,221,73,221,79,189,74"/>
+</map>

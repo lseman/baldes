@@ -1,0 +1,9 @@
+<map id="VRProblem::PricingStateMachine::handleEnumerationFailure" name="VRProblem::PricingStateMachine::handleEnumerationFailure">
+<area shape="rect" id="Node000001" title=" " alt="" coords="5,71,219,111"/>
+<area shape="rect" id="Node000002" href="$classBucketGraph.html#aa28d224fbca7a33f59de21391f4296eb" title=" " alt="" coords="267,5,470,46"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="194,67,270,48,272,53,195,73"/>
+<area shape="rect" id="Node000003" href="$classBucketGraph.html#aba7596250c7680ead43e32fd5f782147" title=" " alt="" coords="281,71,456,111"/>
+<area shape="poly" id="edge2_Node000001_Node000003" title=" " alt="" coords="219,88,266,88,266,94,219,94"/>
+<area shape="rect" id="Node000004" href="$Definitions_8h.html#a086546d06aa565cdd48f436973ebc496" title="Prints an informational message with a specific format." alt="" coords="331,136,406,161"/>
+<area shape="poly" id="edge3_Node000001_Node000004" title=" " alt="" coords="207,109,317,134,316,139,205,115"/>
+</map>

@@ -1,0 +1,14 @@
+<map id="BucketGraph::DominatedInCompWiseSmallerBuckets" name="BucketGraph::DominatedInCompWiseSmallerBuckets">
+<area shape="rect" id="Node000001" title="Determines if a label is dominated in component&#45;wise smaller buckets." alt="" coords="5,136,182,177"/>
+<area shape="rect" id="Node000002" href="$classBucketGraph.html#af129eff306551dc7cc7fe00b919bbbd0" title="Assigns the buckets based on the specified direction." alt="" coords="249,5,390,46"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="117,133,167,95,228,55,238,50,241,55,231,60,170,99,120,138"/>
+<area shape="rect" id="Node000003" href="$namespacenumericutils.html#a30fadd8aa82c3a907ce52a6c1735a378" title=" " alt="" coords="266,70,374,96"/>
+<area shape="poly" id="edge2_Node000001_Node000003" title=" " alt="" coords="147,133,229,104,250,98,252,103,230,110,149,138"/>
+<area shape="rect" id="Node000004" href="$classBucketGraph.html#a469baec04539f3c8ae984f5558fbfc25" title=" " alt="" coords="230,144,410,169"/>
+<area shape="poly" id="edge3_Node000001_Node000004" title=" " alt="" coords="182,154,214,154,214,159,182,159"/>
+<area shape="rect" id="Node000005" href="$namespacenumericutils.html#a2124ad1e887fe39c413948ee927c879e" title=" " alt="" coords="268,193,372,218"/>
+<area shape="poly" id="edge5_Node000001_Node000005" title=" " alt="" coords="183,173,253,189,252,194,181,178"/>
+<area shape="rect" id="Node000006" href="$classBucketGraph.html#a9b9b2117b5e749ba9a5d7cc66e1c021c" title=" " alt="" coords="241,243,399,283"/>
+<area shape="poly" id="edge6_Node000001_Node000006" title=" " alt="" coords="130,175,231,229,243,234,241,239,229,233,128,180"/>
+<area shape="poly" id="edge4_Node000004_Node000004" title=" " alt="" coords="282,145,275,135,279,125,295,119,320,117,347,120,362,126,359,131,346,125,320,122,296,124,283,129,280,134,286,141"/>
+</map>

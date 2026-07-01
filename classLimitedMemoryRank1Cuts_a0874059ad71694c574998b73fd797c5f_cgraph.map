@@ -1,0 +1,7 @@
+<map id="LimitedMemoryRank1Cuts::separate" name="LimitedMemoryRank1Cuts::separate">
+<area shape="rect" id="Node000001" title="Separates the given solution vector into cuts using Limited Memory Rank&#45;1 Cuts." alt="" coords="5,35,180,75"/>
+<area shape="rect" id="Node000002" href="$classLimitedMemoryRank1Cuts.html#a267d89d8d4d4ba61fa2bf551dd041a9c" title="Computes the limited memory coefficient based on the given parameters." alt="" coords="228,5,454,46"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="180,42,212,38,212,44,180,47"/>
+<area shape="rect" id="Node000003" href="$structSRCPermutation.html#a7c2eee29003a81f6c79aeb63729838dd" title=" " alt="" coords="256,70,426,96"/>
+<area shape="poly" id="edge2_Node000001_Node000003" title=" " alt="" coords="180,62,240,69,240,74,180,67"/>
+</map>
