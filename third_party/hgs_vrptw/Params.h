@@ -35,6 +35,7 @@ SOFTWARE.*/
 #include <string>
 #include <vector>
 
+#include "ankerl/unordered_dense.h"
 #include "Definitions.h"
 #include "Matrix.h"
 // #include "xorshift128.h"
@@ -210,7 +211,7 @@ public:
     const std::vector<double> *duals_ptr = nullptr;                          // Node duals from master LP
 #ifdef ITERATIVE_HGS
     const std::vector<std::pair<int, int>> *forbidden_edges_ptr = nullptr;   // Edges to forbid (legacy)
-    const std::set<long long> *forbidden_edges_set = nullptr;                // O(1) forbidden arc lookup
+    const ankerl::unordered_dense::set<long long> *forbidden_edges_set = nullptr; // O(1) forbidden arc lookup
 #endif
 
     // Initialization from a given data set

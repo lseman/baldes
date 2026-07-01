@@ -23,8 +23,13 @@ using Cuts = std::vector<Cut>;
 
 namespace {
 constexpr double SRC_SEPARATION_TOL          = 1e-3;
-constexpr int    MAX_RANK3_CUTS_PER_ROUND    = 2;
 constexpr int    MAX_VERTEX_RELATED_SRC_CUTS = 8;
+
+#ifndef MAX_RANK3_SRC_CUTS_PER_ROUND
+#define MAX_RANK3_SRC_CUTS_PER_ROUND 150
+#endif
+
+constexpr int MAX_RANK3_CUTS_PER_ROUND = MAX_RANK3_SRC_CUTS_PER_ROUND;
 
 std::vector<int> collect_cut_nodes(const Cut &cut, bool include_neighbors = false) {
     std::vector<int> nodes;
@@ -267,7 +272,7 @@ void LimitedMemoryRank1Cuts::separate(const SparseMatrix &A, const std::vector<d
     }
 
     int cuts_added = 0;
-    int max_trials = 15;
+    int max_trials = std::max(15, MAX_RANK3_CUTS_PER_ROUND * 3);
     for (auto &candidate : tmp_cuts) {
         if (cuts_added >= MAX_RANK3_CUTS_PER_ROUND || max_trials <= 0) break;
         if (candidate.first <= SRC_SEPARATION_TOL) break;
@@ -510,13 +515,41 @@ void LimitedMemoryRank1Cuts::separateR1C3Adjacency(const SparseMatrix &A, const 
 
     // ── Exact evaluation + insertion ────────────────────────────────────────
     int cuts_added = 0;
-    int max_trials = 15;
+    int max_trials = std::max(15, MAX_RANK3_CUTS_PER_ROUND * 3);
+
+    std::vector<int> exact_visit_count(all_num_routes, 0);
+    std::vector<int> exact_touched_routes;
+    std::vector<int> exact_candidate_paths;
+    exact_touched_routes.reserve(256);
+    exact_candidate_paths.reserve(256);
 
     for (const auto &[rough_vio, ijk] : cut_candidates) {
         if (cuts_added >= MAX_RANK3_CUTS_PER_ROUND || max_trials <= 0) break;
         if (rough_vio <= SRC_SEPARATION_TOL) break;
 
         const int i = ijk[0], j = ijk[1], k = ijk[2];
+
+        exact_touched_routes.clear();
+        exact_candidate_paths.clear();
+        const auto accumulate_base_visits = [&](int node) {
+            auto row_it = row_indices_map.find(node);
+            if (row_it == row_indices_map.end() || node < 0 || node >= static_cast<int>(vertex_route_map.size())) return;
+            for (int r : row_it->second) {
+                if (r < 0 || r >= all_num_routes || static_cast<size_t>(r) >= vertex_route_map[node].size()) continue;
+                if (exact_visit_count[r] == 0) exact_touched_routes.push_back(r);
+                exact_visit_count[r] += vertex_route_map[node][r];
+            }
+        };
+
+        accumulate_base_visits(i);
+        accumulate_base_visits(j);
+        accumulate_base_visits(k);
+
+        for (int r : exact_touched_routes) {
+            if (exact_visit_count[r] >= 2 && static_cast<size_t>(r) < x.size() && !numericutils::isZero(x[r])) {
+                exact_candidate_paths.push_back(r);
+            }
+        }
 
         // Build base set C and initial memory AM = C
         std::array<uint64_t, num_words> C  = {};
@@ -532,8 +565,7 @@ void LimitedMemoryRank1Cuts::separateR1C3Adjacency(const SparseMatrix &A, const 
         // Grow AM: add intermediate nodes between the first two cut-vertex
         // visits in every route with x > 0.
         const auto is_base_node = [&](int n) noexcept { return n == i || n == j || n == k; };
-        for (int r = 0; r < all_num_routes; ++r) {
-            if (static_cast<size_t>(r) >= x.size() || numericutils::isZero(x[r])) continue;
+        for (int r : exact_candidate_paths) {
             const auto &route = allPaths[r].route;
             int         first = -1, second = -1;
             for (int pos = 1; pos + 1 < static_cast<int>(route.size()); ++pos) {
@@ -557,8 +589,7 @@ void LimitedMemoryRank1Cuts::separateR1C3Adjacency(const SparseMatrix &A, const 
         double              exact_vio = -rhs;
         std::vector<int>    cand_paths;
         std::vector<double> cand_coeffs;
-        for (int r = 0; r < all_num_routes; ++r) {
-            if (static_cast<size_t>(r) >= x.size() || numericutils::isZero(x[r])) continue;
+        for (int r : exact_candidate_paths) {
             const double coeff = computeLimitedMemoryCoefficient(C, AM, p, allPaths[r].route, order);
             if (!numericutils::isZero(coeff)) {
                 exact_vio += coeff * x[r];
@@ -566,6 +597,8 @@ void LimitedMemoryRank1Cuts::separateR1C3Adjacency(const SparseMatrix &A, const 
                 cand_coeffs.push_back(coeff);
             }
         }
+
+        for (int r : exact_touched_routes) exact_visit_count[r] = 0;
 
         if (exact_vio <= SRC_SEPARATION_TOL) {
             --max_trials;

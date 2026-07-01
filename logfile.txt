@@ -1,39 +1,109 @@
-Starting the BCP algorithm for the examples/C203.txt problem 
-| It.:    0 | Obj.:  5887.00 | Price:  -6867.00 | SRC:   0 | RCC:   0 | Paths:  18 | Stage: 1 | Cat:    19/192   | Lag.: 20601.0000 | α: 0.50 | tr: 0.00 | gap: 0.0000 |
-| It.:   10 | Obj.:  5887.00 | Price:  -1712.53 | SRC:   0 | RCC:   0 | Paths:   9 | Stage: 2 | Cat:     9/15    | Lag.:  5137.5925 | α: 0.83 | tr: 0.00 | gap: 0.0000 |
-| It.:   20 | Obj.:  5887.00 | Price:   -565.19 | SRC:   0 | RCC:   0 | Paths:  12 | Stage: 2 | Cat:    14/128   | Lag.:  1695.5583 | α: 0.90 | tr: 0.00 | gap: 0.0000 |
-| It.:   30 | Obj.:  5887.00 | Price:   -373.37 | SRC:   0 | RCC:   0 | Paths:   8 | Stage: 2 | Cat:    13/26    | Lag.:  1120.1197 | α: 0.90 | tr: 0.00 | gap: 0.0000 |
-| It.:   40 | Obj.:  5887.00 | Price:   -291.96 | SRC:   0 | RCC:   0 | Paths:   9 | Stage: 2 | Cat:    14/65    | Lag.:   875.8695 | α: 0.90 | tr: 0.00 | gap: 0.0000 |
-| It.:   50 | Obj.:  5887.00 | Price:   -321.76 | SRC:   0 | RCC:   0 | Paths:   8 | Stage: 2 | Cat:     9/183   | Lag.:   965.2884 | α: 0.88 | tr: 0.00 | gap: 0.0000 |
-| It.:   60 | Obj.:  5887.00 | Price:   -260.68 | SRC:   0 | RCC:   0 | Paths:   8 | Stage: 2 | Cat:     8/36    | Lag.:   782.0534 | α: 0.90 | tr: 0.00 | gap: 0.0000 |
-| It.:   70 | Obj.:  5887.00 | Price:   -192.63 | SRC:   0 | RCC:   0 | Paths:   9 | Stage: 2 | Cat:    21/1003  | Lag.:   577.8849 | α: 0.90 | tr: 0.00 | gap: 0.0000 |
-| It.:   80 | Obj.:  5887.00 | Price:   -173.06 | SRC:   0 | RCC:   0 | Paths:   6 | Stage: 2 | Cat:     8/977   | Lag.:   519.1922 | α: 0.90 | tr: 0.00 | gap: 0.0000 |
-| It.:   90 | Obj.:  5887.00 | Price:   -132.96 | SRC:   0 | RCC:   0 | Paths:   5 | Stage: 2 | Cat:     5/21    | Lag.:   398.8726 | α: 0.90 | tr: 0.00 | gap: 0.0000 |
-| It.:  100 | Obj.:  5887.00 | Price:   -102.17 | SRC:   0 | RCC:   0 | Paths:   9 | Stage: 2 | Cat:    12/36    | Lag.:   306.5178 | α: 0.90 | tr: 0.00 | gap: 0.0000 |
-| It.:  110 | Obj.:  5887.00 | Price:    -99.13 | SRC:   0 | RCC:   0 | Paths:   6 | Stage: 2 | Cat:    18/59    | Lag.:   297.3933 | α: 0.90 | tr: 0.00 | gap: 0.0000 |
-| It.:  120 | Obj.:  5887.00 | Price:    -65.41 | SRC:   0 | RCC:   0 | Paths:   3 | Stage: 2 | Cat:     6/138   | Lag.:   196.2238 | α: 0.90 | tr: 0.00 | gap: 0.0000 |
-| It.:  130 | Obj.:  5887.00 | Price:    -61.17 | SRC:   0 | RCC:   0 | Paths:   3 | Stage: 2 | Cat:     4/396   | Lag.:   183.5145 | α: 0.90 | tr: 0.00 | gap: 0.0000 |
-| It.:  140 | Obj.:  5887.00 | Price:    -43.90 | SRC:   0 | RCC:   0 | Paths:   3 | Stage: 2 | Cat:     7/512   | Lag.:   131.7064 | α: 0.90 | tr: 0.00 | gap: 0.0000 |
-| It.:  150 | Obj.:  5887.00 | Price:    -45.57 | SRC:   0 | RCC:   0 | Paths:   5 | Stage: 2 | Cat:     7/29    | Lag.:   136.7085 | α: 0.89 | tr: 0.00 | gap: 0.0000 |
-| It.:  160 | Obj.:  5887.00 | Price:    -29.01 | SRC:   0 | RCC:   0 | Paths:   3 | Stage: 2 | Cat:     3/37    | Lag.:    87.0285 | α: 0.87 | tr: 0.00 | gap: 0.0000 |
-| It.:  170 | Obj.:  5887.00 | Price:    -45.76 | SRC:   0 | RCC:   0 | Paths:   1 | Stage: 2 | Cat:     3/9     | Lag.:   137.2886 | α: 0.90 | tr: 0.00 | gap: 0.0000 |
-| It.:  180 | Obj.:  5887.00 | Price:    -63.37 | SRC:   0 | RCC:   0 | Paths:   6 | Stage: 2 | Cat:     8/30    | Lag.:   190.1005 | α: 0.90 | tr: 0.00 | gap: 0.0000 |
-| It.:  190 | Obj.:  5887.00 | Price:    -20.74 | SRC:   0 | RCC:   0 | Paths:   3 | Stage: 2 | Cat:     4/227   | Lag.:    62.2330 | α: 0.90 | tr: 0.00 | gap: 0.0000 |
-| It.:  200 | Obj.:  5887.00 | Price:    -23.80 | SRC:   0 | RCC:   0 | Paths:   2 | Stage: 2 | Cat:     3/298   | Lag.:    71.4051 | α: 0.87 | tr: 0.00 | gap: 0.0000 |
-| It.:  210 | Obj.:  5887.00 | Price:     -7.06 | SRC:   0 | RCC:   0 | Paths:   1 | Stage: 2 | Cat:     4/159   | Lag.:    21.1825 | α: 0.90 | tr: 0.00 | gap: 0.0000 |
-| It.:  220 | Obj.:  5887.00 | Price:    -13.15 | SRC:   0 | RCC:   0 | Paths:   1 | Stage: 3 | Cat:     3/276   | Lag.:    39.4354 | α: 0.90 | tr: 0.00 | gap: 0.0000 |
-| It.:  230 | Obj.:  5887.00 | Price:     -4.37 | SRC:   0 | RCC:   0 | Paths:   1 | Stage: 3 | Cat:     4/27    | Lag.:    17.4970 | α: 0.88 | tr: 0.00 | gap: 0.0000 |
-| It.:  240 | Obj.:  5887.00 | Price:    -39.11 | SRC:   0 | RCC:   0 | Paths:   2 | Stage: 3 | Cat:     2/60    | Lag.:   117.3234 | α: 0.82 | tr: 0.00 | gap: 0.0000 |
-| It.:  250 | Obj.:  5887.00 | Price:    -18.50 | SRC:   0 | RCC:   0 | Paths:   4 | Stage: 3 | Cat:     8/165   | Lag.:    55.4887 | α: 0.75 | tr: 0.00 | gap: 0.0000 |
-| It.:  260 | Obj.:  5887.00 | Price:    -24.72 | SRC:   0 | RCC:   0 | Paths:   2 | Stage: 3 | Cat:     2/161   | Lag.:    74.1559 | α: 0.76 | tr: 0.00 | gap: 0.0000 |
-| It.:  270 | Obj.:  5887.00 | Price:     -3.28 | SRC:   0 | RCC:   0 | Paths:   1 | Stage: 3 | Cat:     5/684   | Lag.:     9.8447 | α: 0.90 | tr: 0.00 | gap: 0.0000 |
-| It.:  280 | Obj.:  5887.00 | Price:    -55.87 | SRC:   0 | RCC:   0 | Paths:   4 | Stage: 3 | Cat:    11/1019  | Lag.:   167.6193 | α: 0.71 | tr: 0.00 | gap: 0.0000 |
-| It.:  290 | Obj.:  5887.00 | Price:    -35.43 | SRC:   0 | RCC:   0 | Paths:   4 | Stage: 3 | Cat:     7/1410  | Lag.:   106.2823 | α: 0.84 | tr: 0.00 | gap: 0.0000 |
-| It.:  300 | Obj.:  5887.00 | Price:    -29.61 | SRC:   0 | RCC:   0 | Paths:   2 | Stage: 3 | Cat:     4/54    | Lag.:    88.8208 | α: 0.84 | tr: 0.00 | gap: 0.0000 |
-| It.:  310 | Obj.:  5887.00 | Price:    -18.78 | SRC:   0 | RCC:   0 | Paths:   5 | Stage: 4 | Cat:     8/272   | Lag.:    56.3460 | α: 0.90 | tr: 0.00 | gap: 0.0000 |
-PATH: 0 67 63 62 74 72 61 64 66 69 68 65 49 55 54 53 56 58 60 59 57 40 44 46 45 51 50 52 47 42 41 43 48 101 
-PATH: 0 93 5 75 2 1 99 100 97 92 94 95 98 7 3 4 89 91 88 84 86 83 82 85 76 71 70 73 80 79 81 78 77 96 87 90 101 
-PATH: 0 20 22 24 27 30 29 6 32 33 31 35 37 38 39 36 34 28 26 23 18 19 16 14 12 15 17 13 25 9 11 10 8 21 101 
-Bound: 588.6999999999998 
-Incumbent: 588.7 
-Elapsed time: 9.25
+Starting the BCP algorithm for the build/instances/R201.txt problem 
+| It.:    0 | Obj.: 11432.00 | Price:  -3855.00 | SRC:   0 | RCC:   0 | Paths:  12 | Stage: 1 | Cat:    12/43    | Lag.: 30840.0000 | α: 0.50 | tr: 0.00 | gap: 0.0000 |
+| It.:   10 | Obj.: 11432.00 | Price:   -626.11 | SRC:   0 | RCC:   0 | Paths:  10 | Stage: 2 | Cat:    13/130   | Lag.:  5008.8825 | α: 0.83 | tr: 0.00 | gap: 0.0000 |
+| It.:   20 | Obj.: 11432.00 | Price:   -324.57 | SRC:   0 | RCC:   0 | Paths:   8 | Stage: 2 | Cat:    12/61    | Lag.:  2596.5804 | α: 0.90 | tr: 0.00 | gap: 0.0000 |
+| It.:   30 | Obj.: 11432.00 | Price:   -180.57 | SRC:   0 | RCC:   0 | Paths:   6 | Stage: 2 | Cat:    14/86    | Lag.:  1444.5560 | α: 0.90 | tr: 0.00 | gap: 0.0000 |
+| It.:   40 | Obj.: 11432.00 | Price:   -113.08 | SRC:   0 | RCC:   0 | Paths:   7 | Stage: 2 | Cat:     9/143   | Lag.:   904.6444 | α: 0.90 | tr: 0.00 | gap: 0.0000 |
+| It.:   50 | Obj.: 11432.00 | Price:    -98.76 | SRC:   0 | RCC:   0 | Paths:   3 | Stage: 2 | Cat:     6/63    | Lag.:   790.0890 | α: 0.90 | tr: 0.00 | gap: 0.0000 |
+| It.:   60 | Obj.: 11432.00 | Price:    -55.39 | SRC:   0 | RCC:   0 | Paths:   4 | Stage: 2 | Cat:     7/62    | Lag.:   443.1268 | α: 0.90 | tr: 0.00 | gap: 0.0000 |
+| It.:   70 | Obj.: 11432.00 | Price:    -65.04 | SRC:   0 | RCC:   0 | Paths:   5 | Stage: 2 | Cat:     5/67    | Lag.:   520.2840 | α: 0.88 | tr: 0.00 | gap: 0.0000 |
+| It.:   80 | Obj.: 11432.00 | Price:    -43.44 | SRC:   0 | RCC:   0 | Paths:   2 | Stage: 2 | Cat:     6/30    | Lag.:   347.5034 | α: 0.90 | tr: 0.00 | gap: 0.0000 |
+| It.:   90 | Obj.: 11432.00 | Price:    -33.50 | SRC:   0 | RCC:   0 | Paths:   2 | Stage: 2 | Cat:     3/39    | Lag.:   268.0196 | α: 0.90 | tr: 0.00 | gap: 0.0000 |
+| It.:  100 | Obj.: 11428.48 | Price:    -12.75 | SRC:   0 | RCC:   0 | Paths:   2 | Stage: 2 | Cat:     5/127   | Lag.:   105.4962 | α: 0.84 | tr: 0.00 | gap: 0.0000 |
+| It.:  110 | Obj.: 11424.99 | Price:    -56.65 | SRC:   0 | RCC:   0 | Paths:   5 | Stage: 2 | Cat:     5/30    | Lag.:   460.1802 | α: 0.43 | tr: 0.00 | gap: 0.0000 |
+| It.:  120 | Obj.: 11417.83 | Price:    -24.10 | SRC:   0 | RCC:   0 | Paths:   6 | Stage: 2 | Cat:     7/24    | Lag.:   206.9566 | α: 0.65 | tr: 0.00 | gap: 0.0000 |
+| It.:  130 | Obj.: 11411.87 | Price:    -20.67 | SRC:   0 | RCC:   0 | Paths:   3 | Stage: 2 | Cat:     6/71    | Lag.:   185.4738 | α: 0.88 | tr: 0.00 | gap: 0.0000 |
+| It.:  140 | Obj.: 11409.58 | Price:     -9.46 | SRC:   0 | RCC:   0 | Paths:   4 | Stage: 3 | Cat:     4/271   | Lag.:    98.0684 | α: 0.79 | tr: 0.00 | gap: 0.0000 |
+| It.:  150 | Obj.: 11405.52 | Price:     -5.30 | SRC:   0 | RCC:   0 | Paths:   1 | Stage: 3 | Cat:     3/58    | Lag.:    68.8425 | α: 0.69 | tr: 0.00 | gap: 0.0000 |
+| It.:  160 | Obj.: 11404.24 | Price:     -1.93 | SRC:   0 | RCC:   0 | Paths:   1 | Stage: 3 | Cat:     2/168   | Lag.:    43.2276 | α: 0.81 | tr: 0.00 | gap: 0.0000 |
+| It.:  170 | Obj.: 11403.79 | Price:    -19.36 | SRC:   0 | RCC:   0 | Paths:   2 | Stage: 3 | Cat:     3/175   | Lag.:   183.0675 | α: 0.52 | tr: 0.00 | gap: 0.0000 |
+| It.:  180 | Obj.: 11403.10 | Price:    -37.14 | SRC:   0 | RCC:   0 | Paths:   6 | Stage: 4 | Cat:     8/137   | Lag.:   326.0566 | α: 0.68 | tr: 0.00 | gap: 0.0000 |
+| It.:  190 | Obj.: 11388.99 | Price:    -12.94 | SRC:   0 | RCC:   0 | Paths:   4 | Stage: 4 | Cat:     5/330   | Lag.:   146.5169 | α: 0.70 | tr: 0.00 | gap: 0.0000 |
+| It.:  200 | Obj.: 11386.61 | Price:     -2.65 | SRC:   0 | RCC:   0 | Paths:   2 | Stage: 4 | Cat:     4/211   | Lag.:    66.6180 | α: 0.69 | tr: 0.00 | gap: 0.0000 |
+| It.:  210 | Obj.: 11385.94 | Price:     -1.13 | SRC:   0 | RCC:   0 | Paths:   2 | Stage: 4 | Cat:     3/58    | Lag.:    55.0749 | α: 0.85 | tr: 0.00 | gap: 0.0000 |
+| It.:  220 | Obj.: 11385.93 | Price:     -0.73 | SRC:   0 | RCC:   0 | Paths:   1 | Stage: 4 | Cat:     7/114   | Lag.:    51.8740 | α: 0.61 | tr: 0.00 | gap: 0.0000 |
+| It.:  230 | Obj.: 11385.91 | Price:    -12.89 | SRC:   0 | RCC:   0 | Paths:   4 | Stage: 4 | Cat:     4/246   | Lag.:   149.1969 | α: 0.12 | tr: 0.00 | gap: 0.0000 |
+| It.:  240 | Obj.: 11385.91 | Price:     -1.94 | SRC:   0 | RCC:   0 | Paths:   3 | Stage: 4 | Cat:     5/177   | Lag.:    61.6214 | α: 0.35 | tr: 0.00 | gap: 0.0000 |
+| It.:  250 | Obj.: 11385.91 | Price:     -0.91 | SRC:   0 | RCC:   0 | Paths:   1 | Stage: 4 | Cat:     4/24    | Lag.:    53.3627 | α: 0.38 | tr: 0.00 | gap: 0.0000 |
+| It.:  260 | Obj.: 11385.91 | Price:     -7.35 | SRC:   0 | RCC:   0 | Paths:   2 | Stage: 4 | Cat:     5/75    | Lag.:   104.8789 | α: 0.12 | tr: 0.00 | gap: 0.0000 |
+| It.:  270 | Obj.: 11385.91 | Price:     -5.58 | SRC:   0 | RCC:   0 | Paths:   1 | Stage: 4 | Cat:     2/194   | Lag.:    90.6971 | α: 0.31 | tr: 0.00 | gap: 0.0000 |
+| It.:  280 | Obj.: 11385.91 | Price:    -18.72 | SRC:   0 | RCC:   0 | Paths:   2 | Stage: 4 | Cat:     4/186   | Lag.:   195.8839 | α: 0.02 | tr: 0.00 | gap: 0.0000 |
+| It.:  290 | Obj.: 11385.91 | Price:     -2.69 | SRC:   0 | RCC:   0 | Paths:   3 | Stage: 4 | Cat:     3/19    | Lag.:    67.5896 | α: 0.02 | tr: 0.00 | gap: 0.0000 |
+| It.:  300 | Obj.: 11386.35 | Price:     -8.85 | SRC:   0 | RCC:   1 | Paths:   2 | Stage: 4 | Cat:     7/79    | Lag.:   116.4543 | α: 0.10 | tr: 0.00 | gap: 0.0000 |
+| It.:  310 | Obj.: 11386.35 | Price:     -0.53 | SRC:   0 | RCC:   1 | Paths:   3 | Stage: 4 | Cat:     4/323   | Lag.:    49.8652 | α: 0.12 | tr: 0.00 | gap: 0.0000 |
+| It.:  320 | Obj.: 11386.35 | Price:      0.00 | SRC:   0 | RCC:   1 | Paths:   0 | Stage: 4 | Cat:     0/12    | Lag.:    45.6491 | α: 0.00 | tr: 0.00 | gap: 0.0000 |
+| It.:  330 | Obj.: 11430.40 | Price:   -438.70 | SRC: 136 | RCC:   0 | Paths:  10 | Stage: 4 | Cat:    20/1317  | Lag.:  3511.1823 | α: 0.11 | tr: 0.00 | gap: 0.0000 |
+| It.:  340 | Obj.: 11430.40 | Price:   -166.20 | SRC: 136 | RCC:   0 | Paths:  10 | Stage: 4 | Cat:    21/4872  | Lag.:  1331.2046 | α: 0.10 | tr: 0.00 | gap: 0.0000 |
+| It.:  350 | Obj.: 11430.40 | Price:   -117.01 | SRC: 136 | RCC:   0 | Paths:   9 | Stage: 4 | Cat:    17/417   | Lag.:   937.6766 | α: 0.43 | tr: 0.00 | gap: 0.0000 |
+| It.:  360 | Obj.: 11430.40 | Price:    -48.43 | SRC: 136 | RCC:   0 | Paths:   7 | Stage: 4 | Cat:    11/926   | Lag.:   389.0014 | α: 0.10 | tr: 0.00 | gap: 0.0000 |
+| It.:  370 | Obj.: 11426.90 | Price:    -59.71 | SRC:  89 | RCC:   0 | Paths:   5 | Stage: 4 | Cat:     8/427   | Lag.:   482.8171 | α: 0.14 | tr: 0.00 | gap: 0.0000 |
+| It.:  380 | Obj.: 11423.94 | Price:    -39.89 | SRC:  87 | RCC:   0 | Paths:   7 | Stage: 4 | Cat:     9/691   | Lag.:   327.1901 | α: 0.11 | tr: 0.00 | gap: 0.0000 |
+| It.:  390 | Obj.: 11422.35 | Price:    -46.93 | SRC:  83 | RCC:   0 | Paths:   7 | Stage: 4 | Cat:     7/210   | Lag.:   385.0850 | α: 0.15 | tr: 0.00 | gap: 0.0000 |
+| It.:  400 | Obj.: 11421.63 | Price:    -17.67 | SRC:  78 | RCC:   0 | Paths:   5 | Stage: 4 | Cat:     7/441   | Lag.:   151.7630 | α: 0.19 | tr: 0.00 | gap: 0.0000 |
+| It.:  410 | Obj.: 11420.26 | Price:    -24.23 | SRC:  78 | RCC:   0 | Paths:   5 | Stage: 4 | Cat:     7/255   | Lag.:   205.5898 | α: 0.06 | tr: 0.00 | gap: 0.0000 |
+| It.:  420 | Obj.: 11419.19 | Price:    -18.69 | SRC:  78 | RCC:   0 | Paths:   9 | Stage: 4 | Cat:    21/1768  | Lag.:   162.3423 | α: 0.27 | tr: 0.00 | gap: 0.0000 |
+| It.:  430 | Obj.: 11418.39 | Price:    -11.24 | SRC:  78 | RCC:   0 | Paths:   6 | Stage: 4 | Cat:     9/1431  | Lag.:   103.5465 | α: 0.31 | tr: 0.00 | gap: 0.0000 |
+| It.:  440 | Obj.: 11417.53 | Price:    -15.11 | SRC:  78 | RCC:   0 | Paths:   5 | Stage: 4 | Cat:     9/443   | Lag.:   135.3751 | α: 0.46 | tr: 0.00 | gap: 0.0000 |
+| It.:  450 | Obj.: 11417.51 | Price:    -27.11 | SRC:  78 | RCC:   0 | Paths:   5 | Stage: 4 | Cat:     6/590   | Lag.:   231.3514 | α: 0.49 | tr: 0.00 | gap: 0.0000 |
+| It.:  460 | Obj.: 11417.51 | Price:     -6.98 | SRC:  78 | RCC:   0 | Paths:   2 | Stage: 4 | Cat:     3/104   | Lag.:    70.3445 | α: 0.60 | tr: 0.00 | gap: 0.0000 |
+| It.:  470 | Obj.: 11417.51 | Price:    -21.98 | SRC:  78 | RCC:   0 | Paths:   2 | Stage: 4 | Cat:     8/390   | Lag.:   190.2990 | α: 0.57 | tr: 0.00 | gap: 0.0000 |
+| It.:  480 | Obj.: 11417.51 | Price:    -29.41 | SRC:  78 | RCC:   0 | Paths:   7 | Stage: 4 | Cat:    15/434   | Lag.:   249.7571 | α: 0.59 | tr: 0.00 | gap: 0.0000 |
+| It.:  490 | Obj.: 11417.51 | Price:    -23.10 | SRC:  78 | RCC:   0 | Paths:   2 | Stage: 4 | Cat:     3/896   | Lag.:   199.2542 | α: 0.63 | tr: 0.00 | gap: 0.0000 |
+| It.:  500 | Obj.: 11417.51 | Price:    -18.31 | SRC:  78 | RCC:   0 | Paths:   4 | Stage: 4 | Cat:     6/803   | Lag.:   160.9876 | α: 0.02 | tr: 0.00 | gap: 0.0000 |
+| It.:  510 | Obj.: 11417.25 | Price:    -11.30 | SRC:  78 | RCC:   0 | Paths:   2 | Stage: 4 | Cat:     5/137   | Lag.:   105.1587 | α: 0.36 | tr: 0.00 | gap: 0.0000 |
+| It.:  520 | Obj.: 11417.25 | Price:    -12.02 | SRC:  78 | RCC:   0 | Paths:   5 | Stage: 4 | Cat:     5/150   | Lag.:   110.8945 | α: 0.19 | tr: 0.00 | gap: 0.0000 |
+| It.:  530 | Obj.: 11417.25 | Price:    -26.76 | SRC:  78 | RCC:   0 | Paths:   4 | Stage: 4 | Cat:     6/181   | Lag.:   228.8395 | α: 0.34 | tr: 0.00 | gap: 0.0000 |
+| It.:  540 | Obj.: 11417.25 | Price:     -1.19 | SRC:  78 | RCC:   0 | Paths:   1 | Stage: 4 | Cat:     6/1941  | Lag.:    24.3028 | α: 0.49 | tr: 0.00 | gap: 0.0000 |
+| It.:  550 | Obj.: 11417.25 | Price:     -3.58 | SRC:  78 | RCC:   0 | Paths:   2 | Stage: 4 | Cat:     3/1385  | Lag.:    43.3693 | α: 0.30 | tr: 0.00 | gap: 0.0000 |
+| It.:  560 | Obj.: 11417.25 | Price:    -13.17 | SRC:  78 | RCC:   0 | Paths:   2 | Stage: 4 | Cat:     5/320   | Lag.:   120.1444 | α: 0.34 | tr: 0.00 | gap: 0.0000 |
+| It.:  570 | Obj.: 11417.25 | Price:      0.00 | SRC:  78 | RCC:   0 | Paths:   0 | Stage: 4 | Cat:     0/122   | Lag.:    14.7500 | α: 0.00 | tr: 0.00 | gap: 0.0000 |
+| It.:  580 | Obj.: 11432.00 | Price:    -39.85 | SRC: 106 | RCC:   0 | Paths:   5 | Stage: 4 | Cat:     6/214   | Lag.:   318.7751 | α: 0.14 | tr: 0.00 | gap: 0.0000 |
+| It.:  590 | Obj.: 11432.00 | Price:    -36.18 | SRC: 105 | RCC:   0 | Paths:   5 | Stage: 4 | Cat:    14/2468  | Lag.:   289.4167 | α: 0.33 | tr: 0.00 | gap: 0.0000 |
+| It.:  600 | Obj.: 11432.00 | Price:    -25.49 | SRC: 105 | RCC:   0 | Paths:   4 | Stage: 4 | Cat:     5/668   | Lag.:   203.8871 | α: 0.56 | tr: 0.00 | gap: 0.0000 |
+| It.:  610 | Obj.: 11432.00 | Price:    -17.62 | SRC: 105 | RCC:   0 | Paths:   4 | Stage: 4 | Cat:    12/1439  | Lag.:   140.9991 | α: 0.51 | tr: 0.00 | gap: 0.0000 |
+| It.:  620 | Obj.: 11432.00 | Price:    -42.35 | SRC: 105 | RCC:   0 | Paths:   4 | Stage: 4 | Cat:     4/243   | Lag.:   338.7987 | α: 0.49 | tr: 0.00 | gap: 0.0000 |
+| It.:  630 | Obj.: 11432.00 | Price:    -18.70 | SRC: 105 | RCC:   0 | Paths:   4 | Stage: 4 | Cat:     4/446   | Lag.:   149.6308 | α: 0.36 | tr: 0.00 | gap: 0.0000 |
+| It.:  640 | Obj.: 11432.00 | Price:    -23.63 | SRC: 105 | RCC:   0 | Paths:   5 | Stage: 4 | Cat:     5/746   | Lag.:   189.0769 | α: 0.26 | tr: 0.00 | gap: 0.0000 |
+| It.:  650 | Obj.: 11432.00 | Price:    -22.19 | SRC: 105 | RCC:   0 | Paths:   2 | Stage: 4 | Cat:     8/1704  | Lag.:   177.4952 | α: 0.19 | tr: 0.00 | gap: 0.0000 |
+| It.:  660 | Obj.: 11432.00 | Price:    -12.39 | SRC: 105 | RCC:   0 | Paths:   1 | Stage: 4 | Cat:     5/570   | Lag.:    99.1449 | α: 0.10 | tr: 0.00 | gap: 0.0000 |
+| It.:  670 | Obj.: 11432.00 | Price:     -7.45 | SRC: 105 | RCC:   0 | Paths:   4 | Stage: 4 | Cat:    10/1301  | Lag.:    59.6326 | α: 0.12 | tr: 0.00 | gap: 0.0000 |
+| It.:  680 | Obj.: 11432.00 | Price:    -28.59 | SRC: 105 | RCC:   0 | Paths:   1 | Stage: 4 | Cat:     4/285   | Lag.:   228.7056 | α: 0.35 | tr: 0.00 | gap: 0.0000 |
+| It.:  690 | Obj.: 11432.00 | Price:    -28.58 | SRC: 105 | RCC:   0 | Paths:   3 | Stage: 4 | Cat:     5/233   | Lag.:   228.6763 | α: 0.49 | tr: 0.00 | gap: 0.0000 |
+| It.:  700 | Obj.: 11432.00 | Price:    -46.07 | SRC: 105 | RCC:   0 | Paths:   3 | Stage: 4 | Cat:    11/142   | Lag.:   368.5607 | α: 0.51 | tr: 0.00 | gap: 0.0000 |
+| It.:  710 | Obj.: 11432.00 | Price:    -35.59 | SRC: 105 | RCC:   0 | Paths:   5 | Stage: 4 | Cat:     5/818   | Lag.:   284.6913 | α: 0.42 | tr: 0.00 | gap: 0.0000 |
+| It.:  720 | Obj.: 11432.00 | Price:    -19.63 | SRC: 105 | RCC:   0 | Paths:   2 | Stage: 4 | Cat:     7/793   | Lag.:   157.0403 | α: 0.54 | tr: 0.00 | gap: 0.0000 |
+| It.:  730 | Obj.: 11432.00 | Price:    -64.97 | SRC: 105 | RCC:   0 | Paths:   3 | Stage: 4 | Cat:     8/726   | Lag.:   519.7604 | α: 0.55 | tr: 0.00 | gap: 0.0000 |
+| It.:  740 | Obj.: 11432.00 | Price:    -10.20 | SRC: 105 | RCC:   0 | Paths:   2 | Stage: 4 | Cat:     2/676   | Lag.:    81.6146 | α: 0.19 | tr: 0.00 | gap: 0.0000 |
+| It.:  750 | Obj.: 11432.00 | Price:    -16.57 | SRC: 105 | RCC:   0 | Paths:   2 | Stage: 4 | Cat:     3/247   | Lag.:   132.5344 | α: 0.23 | tr: 0.00 | gap: 0.0000 |
+| It.:  760 | Obj.: 11432.00 | Price:    -10.67 | SRC: 105 | RCC:   0 | Paths:   4 | Stage: 4 | Cat:     6/834   | Lag.:    85.3533 | α: 0.19 | tr: 0.00 | gap: 0.0000 |
+| It.:  770 | Obj.: 11432.00 | Price:     -7.01 | SRC: 105 | RCC:   0 | Paths:   2 | Stage: 4 | Cat:     6/2112  | Lag.:    56.0761 | α: 0.23 | tr: 0.00 | gap: 0.0000 |
+| It.:  780 | Obj.: 11432.00 | Price:    -15.52 | SRC: 105 | RCC:   0 | Paths:   4 | Stage: 4 | Cat:     5/989   | Lag.:   124.1674 | α: 0.10 | tr: 0.00 | gap: 0.0000 |
+| It.:  790 | Obj.: 11432.00 | Price:     -2.84 | SRC: 105 | RCC:   0 | Paths:   1 | Stage: 4 | Cat:     6/1278  | Lag.:    22.7036 | α: 0.53 | tr: 0.00 | gap: 0.0000 |
+| It.:  800 | Obj.: 11432.00 | Price:    -21.21 | SRC: 105 | RCC:   0 | Paths:   3 | Stage: 4 | Cat:     7/239   | Lag.:   169.6406 | α: 0.36 | tr: 0.00 | gap: 0.0000 |
+| It.:  810 | Obj.: 11432.00 | Price:     -6.50 | SRC: 105 | RCC:   0 | Paths:   2 | Stage: 4 | Cat:     2/318   | Lag.:    52.0178 | α: 0.10 | tr: 0.00 | gap: 0.0000 |
+| It.:  820 | Obj.: 11432.00 | Price:    -17.28 | SRC: 105 | RCC:   0 | Paths:   1 | Stage: 4 | Cat:     5/526   | Lag.:   138.2006 | α: 0.35 | tr: 0.00 | gap: 0.0000 |
+| It.:  830 | Obj.: 11432.00 | Price:    -19.04 | SRC: 105 | RCC:   0 | Paths:   8 | Stage: 4 | Cat:    15/1935  | Lag.:   152.3039 | α: 0.10 | tr: 0.00 | gap: 0.0000 |
+| It.:  840 | Obj.: 11432.00 | Price:    -19.08 | SRC: 105 | RCC:   0 | Paths:   5 | Stage: 4 | Cat:     5/666   | Lag.:   152.6495 | α: 0.28 | tr: 0.00 | gap: 0.0000 |
+| It.:  850 | Obj.: 11432.00 | Price:    -14.22 | SRC: 105 | RCC:   0 | Paths:   3 | Stage: 4 | Cat:     5/919   | Lag.:   113.7874 | α: 0.31 | tr: 0.00 | gap: 0.0000 |
+| It.:  860 | Obj.: 11432.00 | Price:    -20.66 | SRC: 105 | RCC:   0 | Paths:   1 | Stage: 4 | Cat:     5/297   | Lag.:   165.2581 | α: 0.55 | tr: 0.00 | gap: 0.0000 |
+| It.:  870 | Obj.: 11432.00 | Price:    -10.62 | SRC: 105 | RCC:   0 | Paths:   4 | Stage: 4 | Cat:     8/1034  | Lag.:    84.9291 | α: 0.43 | tr: 0.00 | gap: 0.0000 |
+| It.:  880 | Obj.: 11432.00 | Price:     -9.73 | SRC: 105 | RCC:   0 | Paths:   2 | Stage: 4 | Cat:     3/5     | Lag.:    77.8213 | α: 0.01 | tr: 0.00 | gap: 0.0000 |
+| It.:  890 | Obj.: 11432.00 | Price:    -10.35 | SRC: 105 | RCC:   0 | Paths:   2 | Stage: 4 | Cat:     4/167   | Lag.:    82.8137 | α: 0.12 | tr: 0.00 | gap: 0.0000 |
+| It.:  900 | Obj.: 11432.00 | Price:     -9.95 | SRC: 105 | RCC:   0 | Paths:   7 | Stage: 4 | Cat:    10/488   | Lag.:    79.6323 | α: 0.10 | tr: 0.00 | gap: 0.0000 |
+| It.:  910 | Obj.: 11432.00 | Price:     -7.48 | SRC: 105 | RCC:   0 | Paths:   3 | Stage: 4 | Cat:     8/2066  | Lag.:    59.8616 | α: 0.19 | tr: 0.00 | gap: 0.0000 |
+| It.:  920 | Obj.: 11432.00 | Price:    -24.75 | SRC: 105 | RCC:   0 | Paths:   3 | Stage: 4 | Cat:     5/612   | Lag.:   197.9776 | α: 0.37 | tr: 0.00 | gap: 0.0000 |
+| It.:  930 | Obj.: 11432.00 | Price:     -0.18 | SRC: 105 | RCC:   0 | Paths:   1 | Stage: 4 | Cat:     8/761   | Lag.:     1.4464 | α: 0.27 | tr: 0.00 | gap: 0.0000 |
+| It.:  940 | Obj.: 11432.00 | Price:     -0.68 | SRC: 105 | RCC:   0 | Paths:   1 | Stage: 4 | Cat:     7/1995  | Lag.:     5.4478 | α: 0.43 | tr: 0.00 | gap: 0.0000 |
+| It.:  950 | Obj.: 11432.00 | Price:     -7.14 | SRC: 105 | RCC:   0 | Paths:   3 | Stage: 4 | Cat:     7/425   | Lag.:    57.1533 | α: 0.27 | tr: 0.00 | gap: 0.0000 |
+| It.:  960 | Obj.: 11432.00 | Price:     -3.32 | SRC: 105 | RCC:   0 | Paths:   1 | Stage: 4 | Cat:     1/319   | Lag.:    26.5457 | α: 0.16 | tr: 0.00 | gap: 0.0000 |
+PATH: 0 52 69 30 90 10 20 66 32 70 1 101 
+PATH: 0 42 15 2 73 21 40 87 57 43 37 97 96 13 58 101 
+PATH: 0 33 65 71 9 51 81 79 78 34 35 68 77 101 
+PATH: 0 72 39 67 23 75 22 41 56 74 4 55 25 24 80 101 
+PATH: 0 5 83 45 82 47 36 49 46 48 101 
+PATH: 0 28 12 29 76 50 3 54 26 101 
+PATH: 0 95 59 92 98 14 38 44 16 61 86 85 99 94 6 53 101 
+PATH: 0 27 31 63 64 11 19 62 88 7 18 8 84 17 91 100 93 60 89 101 
+Bound: 1143.2 
+Incumbent: 1143.2 
+Elapsed time: 61.83

@@ -217,7 +217,7 @@ public:
 
     struct EnumerationPolicy {
         bool   enabled                     = true;
-        bool   require_nonnegative_pricing = false;
+        bool   require_nonnegative_pricing = true;
         double max_relative_gap            = 0.02;
         double force_relative_gap          = 0.005;
         int    min_exact_iterations        = 2;
@@ -627,9 +627,10 @@ public:
         const double rel_gap = relative_gap_to_incumbent(lower_bound);
         if (!std::isfinite(rel_gap) || rel_gap > enumeration_policy.max_relative_gap) return false;
 
+        if (enumeration_policy.require_nonnegative_pricing && !no_negative_pricing) return false;
+
         const bool force_gap = rel_gap <= enumeration_policy.force_relative_gap;
         if (!force_gap && exact_iterations < enumeration_policy.min_exact_iterations) return false;
-        if (enumeration_policy.require_nonnegative_pricing && !no_negative_pricing && !force_gap) return false;
 
         const size_t arc_count = current_bucket_arc_count();
         if (arc_count > static_cast<size_t>(enumeration_policy.max_total_bucket_arcs)) return false;

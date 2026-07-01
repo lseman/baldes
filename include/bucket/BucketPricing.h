@@ -106,7 +106,7 @@ inline void BucketGraph::transition_after_bucket_pricing(Stage active_stage, con
             transition = true;
         }
         break;
-    case Stage::Four:
+    case Stage::Four: {
 #ifdef FIX_BUCKETS
         if (transition) { break; }
 #endif
@@ -115,15 +115,20 @@ inline void BucketGraph::transition_after_bucket_pricing(Stage active_stage, con
             break;
         }
         threshold = stats.computeThreshold(iter, result.best_reduced_cost);
-        if (result.best_reduced_cost > threshold) {
+        constexpr double kExactPricingTol = 1e-6;
+        if (result.best_reduced_cost >= -kExactPricingTol) {
             ss = true;
 #if !defined(SRC) && !defined(SRC3)
             status = Status::Optimal;
 #else
             status = Status::Separation;
 #endif
+        } else {
+            ss     = false;
+            status = Status::NotOptimal;
         }
         break;
+    }
     case Stage::Enumerate:
         if (result.enumeration_failed) {
             activate_bucket_pricing_stage(Stage::Four);

@@ -1142,17 +1142,12 @@ private:
         // return {};
     }
 
-    ankerl::unordered_dense::set<int> buildFullMemory(const std::vector<int> &candidate_nodes) const {
-        ankerl::unordered_dense::set<int> memory;
-        memory.reserve(N_SIZE);
-        std::vector<char> in_candidate(N_SIZE, 0);
-        for (int node : candidate_nodes) {
-            if (node > 0 && node < N_SIZE - 1) in_candidate[node] = 1;
-        }
+    std::array<uint64_t, num_words> buildFullMemoryBits() const {
+        std::array<uint64_t, num_words> memory_bits{};
         for (int node = 1; node < N_SIZE - 1; ++node) {
-            if (!in_candidate[node]) memory.insert(node);
+            memory_bits[node / 64] |= bit_mask_lookup[node % 64];
         }
-        return memory;
+        return memory_bits;
     }
 
     ankerl::unordered_dense::set<int> deriveLimitedMemory(const std::vector<int> &candidate_nodes,
@@ -1223,8 +1218,9 @@ private:
 
     std::optional<CandidateSet> evaluateBaseThenMemory(const std::vector<int> &candidate_nodes,
                                                        const SparseMatrix &A, const std::vector<double> &x) {
-        auto full_memory = buildFullMemory(candidate_nodes);
-        auto [full_violation, full_perm, full_rhs] = computeViolationWithBestPerm(candidate_nodes, full_memory, A, x);
+        auto full_memory_bits = buildFullMemoryBits();
+        auto [full_violation, full_perm, full_rhs] =
+            computeViolationWithBestPermBits(candidate_nodes, full_memory_bits, A, x);
         if (full_violation <= 1e-3) return std::nullopt;
 
         auto limited_memory = deriveLimitedMemory(candidate_nodes, full_perm, x);
@@ -1258,27 +1254,20 @@ private:
         }
     }
 
-public:
-    std::vector<std::vector<int>> vertex_route_map;
-
     std::tuple<double, SRCPermutation, double>
-    computeViolationWithBestPerm(const std::vector<int> &nodes, const ankerl::unordered_dense::set<int> &memory,
-                                 const SparseMatrix &A, const std::vector<double> &x) {
+    computeViolationWithBestPermBits(std::vector<int> node_vec,
+                                     std::array<uint64_t, num_words> augmented_memory_bits,
+                                     const SparseMatrix &, const std::vector<double> &x) {
         static constexpr double EPSILON = 1e-6;
-        std::vector<int>        node_vec(nodes);
         std::sort(node_vec.begin(), node_vec.end());
         const int RANK = static_cast<int>(node_vec.size());
 
-        // Initialize result variables.
         double                best_violation = 0.0;
         double                best_rhs       = 0.0;
         const SRCPermutation *best_perm      = nullptr;
 
-        // Initialize bit arrays for efficient set operations.
-        std::array<uint64_t, num_words> candidate_bits{};        // all bits initially 0
-        std::array<uint64_t, num_words> augmented_memory_bits{}; // all bits initially 0
+        std::array<uint64_t, num_words> candidate_bits{};
 
-        // Create a reusable node order lookup vector; initialize with -1.
         thread_local std::vector<int> node_order;
         if (node_order.size() < N_SIZE) {
             node_order.assign(N_SIZE, -1);
@@ -1286,7 +1275,6 @@ public:
             std::fill(node_order.begin(), node_order.end(), -1);
         }
 
-        // Populate candidate_bits and node_order based on candidate nodes.
         int i = 0;
         for (auto node : node_vec) {
             const int      word_idx = node / 64;
@@ -1297,48 +1285,27 @@ public:
             node_order[node] = i++;
         }
 
-        // Add memory nodes to augmented_memory_bits.
-        for (const int node : memory) {
-            int word_idx = node / 64;
-            augmented_memory_bits[word_idx] |= (1ULL << (node % 64));
-        }
-
-        // Get all permutations for the given rank (compute once).
         const auto &permutations = getPermutations(RANK);
 
         thread_local std::vector<int> candidate_paths;
         collectCandidatePathUnion(node_vec, candidate_paths);
         if (candidate_paths.empty()) { return {0.0, SRCPermutation({}, 0), 0.0}; }
 
-        // Evaluate each permutation.
         for (const auto &perm : permutations) {
-            // Compute the RHS value from the permutation.
-            double rhs = perm.getRHS();
-            // Create an SRCPermutation from the current permutation.
-            const SRCPermutation src_perm{perm.num, perm.den};
+            const double         rhs      = perm.getRHS();
+            const SRCPermutation src_perm = {perm.num, perm.den};
+            double               lhs      = 0.0;
 
-            // Reset coefficient vector and accumulator for LHS.
-            // cut_coefficients.clear();
-            double lhs = 0.0;
-
-            // Only routes touching the base set can receive a nonzero
-            // limited-memory coefficient.
             for (int path_idx : candidate_paths) {
                 if (static_cast<size_t>(path_idx) >= x.size()) continue;
                 const double x_val = x[path_idx];
                 if (numericutils::isZero(x_val)) continue;
 
-                // Compute the coefficient using candidate_bits,
-                // augmented_memory_bits, current permutation, the route from
-                // the path, and the node ordering.
                 const int coeff = computeLimitedMemoryCoefficient(candidate_bits, augmented_memory_bits, src_perm,
                                                                   allPaths[path_idx].route, node_order);
-                // cut_coefficients.push_back(coeff);
                 lhs += coeff * x_val;
             }
 
-            // Compute the violation: the difference between lhs and (rhs +
-            // EPSILON).
             const double violation = lhs - (rhs + EPSILON);
             if (violation > best_violation) {
                 best_violation = violation;
@@ -1347,9 +1314,21 @@ public:
             }
         }
 
-        // Return the best violation, corresponding permutation (or default if
-        // none), and best rhs.
         return {best_violation, best_perm ? *best_perm : SRCPermutation({}, 0), best_rhs};
+    }
+
+public:
+    std::vector<std::vector<int>> vertex_route_map;
+
+    std::tuple<double, SRCPermutation, double>
+    computeViolationWithBestPerm(const std::vector<int> &nodes, const ankerl::unordered_dense::set<int> &memory,
+                                 const SparseMatrix &A, const std::vector<double> &x) {
+        std::array<uint64_t, num_words> augmented_memory_bits{};
+        for (const int node : memory) {
+            int word_idx = node / 64;
+            augmented_memory_bits[word_idx] |= (1ULL << (node % 64));
+        }
+        return computeViolationWithBestPermBits(std::vector<int>(nodes), augmented_memory_bits, A, x);
     }
 
     std::tuple<double, SRCPermutation, double>

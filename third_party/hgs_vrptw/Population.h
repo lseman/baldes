@@ -104,6 +104,10 @@ class Population {
     // Evaluates the biased fitness of all individuals in the population
     void updateBiasedFitnesses(SubPopulation &pop);
 
+    // Selects an individual by binary tournament, assuming biased fitness has
+    // already been refreshed for the current population state.
+    Individual *getBinaryTournamentNoFitnessUpdate();
+
     // Removes the worst individual in terms of biased fitness
     void removeWorstBiasedFitness(SubPopulation &subpop);
 

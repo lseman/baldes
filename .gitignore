@@ -93,3 +93,4 @@ CLAUDE.md
 bucket-graph-spprc/
 ariadne.db
 *.md
+snapshot.bin

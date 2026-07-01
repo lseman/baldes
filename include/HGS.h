@@ -10,7 +10,6 @@
 #include <iostream>
 #include <limits>
 #include <map>
-#include <set>
 #include <vector>
 
 #include "../third_party/hgs_vrptw/Genetic.h"
@@ -106,8 +105,9 @@ public:
         // Build forbidden-edge set for this iteration (O(1) lookup)
         if (!avoidEdges.empty()) {
             params.forbidden_edges_ptr = &avoidEdges;
-            static std::set<long long> forbidden_set;
+            static ankerl::unordered_dense::set<long long> forbidden_set;
             forbidden_set.clear();
+            forbidden_set.reserve(avoidEdges.size());
             for (const auto &edge : avoidEdges) {
                 forbidden_set.insert((static_cast<long long>(edge.first) << 32) |
                                      static_cast<unsigned int>(edge.second));
