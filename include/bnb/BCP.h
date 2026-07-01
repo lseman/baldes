@@ -537,6 +537,10 @@ public:
 
         // Add generated columns.
         colAdded = addColumn(node, paths, inner_obj, enumerate);
+        if (hasNegativeReducedCost(inner_obj)) {
+            ss               = false;
+            bucket_graph->ss = false;
+        }
 
 #ifdef RIH
         if (ils != nullptr) {
@@ -1235,6 +1239,12 @@ public:
             }
 #endif
 
+            if (hasNegativeReducedCost(inner_obj)) {
+                ss = false;
+                force_cuts = false;
+                if (bucket_graph) { bucket_graph->ss = false; }
+            }
+
             if ((ss && !rcc) || force_cuts) {
                 // Reset force flag.
                 force_cuts = false;
@@ -1864,6 +1874,10 @@ public:
 
                 // Adding cols
                 colAdded = addColumn(node, paths, inner_obj, enumerate);
+                if (hasNegativeReducedCost(inner_obj)) {
+                    ss               = false;
+                    bucket_graph->ss = false;
+                }
 
 #ifdef STAB
                 // TODO: check if we should update this before running the

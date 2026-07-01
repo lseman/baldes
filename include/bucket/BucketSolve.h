@@ -294,19 +294,19 @@ std::vector<double> BucketGraph::labeling_algorithm() {
 #else
                             constexpr bool src_adjusted_dominance = false;
 #endif
-                            // RC-bracketed single-pass dominance (port from
-                            // RouteOpt dominance.hpp doDominance). The sorted
-                            // tier is RC-sorted; we walk it once, dispatching
-                            // by cost relation to new_label:
-                            //   existing.cost < new.cost - eps -> only check
-                            //     is_dominated(existing, new) (cheap label
-                            //     can dominate expensive one only if
-                            //     resources/visited line up). If true,
-                            //     new_label is dominated -> stop.
-                            //   existing.cost > new.cost + eps -> only check
-                            //     is_dominated(new, existing). If true, mark
-                            //     existing dominated and continue.
-                            //   in bracket -> check both directions.
+                            // RC-bracketed single-pass dominance (RouteOpt
+                            // dominance.hpp doDominance style). The committed
+                            // tier is RC-sorted; for non-SRC stages, raw cost
+                            // decides which dominance direction is possible:
+                            //   cur.cost < new.cost - eps: only cur can
+                            //     dominate new, so test resource/path dominance
+                            //     of new by cur; stop if true.
+                            //   cur.cost > new.cost + eps: only new can
+                            //     dominate cur, so test resource/path dominance
+                            //     of cur by new; mark cur dominated if true.
+                            //   near-equal costs: test both full predicates.
+                            // SRC stages skip this bracketing because SRC dual
+                            // compensation can overturn raw reduced-cost order.
                             const double cost_lo = new_label->cost - numericutils::eps;
                             const double cost_hi = new_label->cost + numericutils::eps;
 

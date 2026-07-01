@@ -128,14 +128,25 @@ void BucketGraph::concatenate_pricing_pass(BucketPricingPass &pass) {
             const size_t end_bucket   = std::min(start_bucket + chunk_size, static_cast<size_t>(fw_buckets_size));
 
             for (size_t bucket = start_bucket; bucket < end_bucket; ++bucket) {
+                if constexpr (S == Stage::Four) {
+                    if (pricing_truncated.load(std::memory_order_relaxed)) break;
+                }
                 const auto &bucket_labels = fw_buckets[bucket].get_labels();
                 for (const Label *L : bucket_labels) {
+                    if constexpr (S == Stage::Four) {
+                        if (pricing_truncated.load(std::memory_order_relaxed)) break;
+                    }
                     if (L->is_dominated) continue;
 
                     pass.non_dominated_labels.fetch_add(1, std::memory_order_relaxed);
 
                     const auto &to_arcs = fw_buckets[bucket].template get_bucket_arcs<Direction::Forward>();
-                    for (const auto &arc : to_arcs) { concatenate_from_forward_arc<S, SYM>(L, arc, pass); }
+                    for (const auto &arc : to_arcs) {
+                        if constexpr (S == Stage::Four) {
+                            if (pricing_truncated.load(std::memory_order_relaxed)) break;
+                        }
+                        concatenate_from_forward_arc<S, SYM>(L, arc, pass);
+                    }
                 }
             }
         });

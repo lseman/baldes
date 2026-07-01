@@ -48,7 +48,9 @@ inline void BucketGraph::activate_bucket_pricing_stage(Stage next_stage) noexcep
 inline BucketGraph::BucketPricingResult
 BucketGraph::make_bucket_pricing_result(std::vector<Label *> labels, bool skip_stage_transition) const {
     return BucketPricingResult{std::move(labels), inner_obj, last_concatenation_labels_tested,
-                               last_concatenation_labels_accepted, enumerationFailed(), skip_stage_transition};
+                               last_concatenation_labels_accepted, enumerationFailed(),
+                               skip_stage_transition || pricing_truncated.load(std::memory_order_relaxed),
+                               pricing_truncated.load(std::memory_order_relaxed)};
 }
 
 template <Symmetry SYM>
