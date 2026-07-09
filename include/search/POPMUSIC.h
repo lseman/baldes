@@ -8,7 +8,7 @@
 
 #pragma once
 
-#include "core/HGS.h"
+#include "search/HGS.h"
 #include <algorithm>
 #include <chrono>
 #include <cmath>

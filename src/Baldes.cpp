@@ -11,14 +11,14 @@
 #include <string>
 #include <vector>
 
-#include "utils/Reader.h"
 #include "bnb/BCP.h"
 #include "bnb/BNB.h"
 #include "bnb/Node.h"
 #include "core/Definitions.h"
-#include "core/HGS.h"
 #include "core/Logger.h"
 #include "miphandler/MIPHandler.h"
+#include "search/HGS.h"
+#include "utils/Reader.h"
 
 #ifdef GUROBI
 #include "gurobi_c++.h"
