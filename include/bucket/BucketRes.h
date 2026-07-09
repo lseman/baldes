@@ -8,8 +8,8 @@
 
 #pragma once
 #include "BucketGraph.h"
-#include "Common.h"
-#include "Definitions.h"
+#include "math/Common.h"
+#include "core/Definitions.h"
 #include "config.h"
 
 // Resource type enumeration for improved type safety and readability

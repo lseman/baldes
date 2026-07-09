@@ -12,14 +12,14 @@
 #include <sstream>
 #include <variant>
 
-#include "Definitions.h"
-#include "Dual.h"
+#include "core/Definitions.h"
+#include "search/Dual.h"
 #include "Hashes.h"
-#include "Path.h"
+#include "data/Path.h"
 #include "SRC.h"
-#include "Serializer.h"
-#include "State.h"
-#include "VRPCandidate.h"
+#include "routing/Serializer.h"
+#include "core/State.h"
+#include "routing/VRPCandidate.h"
 #include "miphandler/Constraint.h"
 
 // include unordered_dense_map

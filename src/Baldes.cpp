@@ -11,9 +11,8 @@
 #include <string>
 #include <vector>
 
-#include "Definitions.h"
-#include "HGS.h"
-#include "Logger.h"
+#include "core/Definitions.h"#include "core/HGS.h"
+#include "core/Logger.h"
 #include "Reader.h"
 #include "bnb/BCP.h"
 #include "bnb/BNB.h"

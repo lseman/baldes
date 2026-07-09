@@ -11,9 +11,9 @@
 #include <memory_resource>
 #include <span>
 
-#include "Arc.h"
-#include "Definitions.h"
-#include "Label.h"
+#include "data/Arc.h"
+#include "core/Definitions.h"
+#include "data/Label.h"
 #include "NumericUtils.h"
 #include "config.h"
 /**

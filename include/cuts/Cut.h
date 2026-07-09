@@ -4,11 +4,11 @@
  *
  */
 #pragma once
-#include "Common.h"
-#include "Definitions.h"
-#include "Label.h"
-#include "Path.h"
-#include "Serializer.h"
+#include "math/Common.h"
+#include "core/Definitions.h"
+#include "data/Label.h"
+#include "data/Path.h"
+#include "routing/Serializer.h"
 #include "miphandler/Constraint.h"
 struct SRCPermutation {
     std::vector<int>    num;

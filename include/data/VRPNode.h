@@ -4,10 +4,10 @@
  *
  */
 #pragma once
-#include "Arc.h"
-#include "Common.h"
+#include "data/Arc.h"
+#include "math/Common.h"
 #include "Cut.h"
-#include "Definitions.h"
+#include "core/Definitions.h"
 /**
  * @struct VRPNode
  * @brief Represents a node in a Vehicle Routing Problem.

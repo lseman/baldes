@@ -8,10 +8,10 @@
 
 #pragma once
 
-#include "Common.h"
-#include "Label.h"
-#include "Path.h"
-#include "VRPNode.h"
+#include "math/Common.h"
+#include "data/Label.h"
+#include "data/Path.h"
+#include "data/VRPNode.h"
 
 /**
  * @struct PSTEPDuals

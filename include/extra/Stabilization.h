@@ -6,8 +6,8 @@
 
 #pragma once
 
-#include "Definitions.h"
-#include "Pools.h"
+#include "core/Definitions.h"
+#include "core/Pools.h"
 
 #ifdef GUROBI
 #include "gurobi_c++.h"

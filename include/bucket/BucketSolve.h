@@ -10,7 +10,7 @@
 
 #include "BucketJump.h"
 #include "BucketRes.h"
-#include "Definitions.h"
+#include "core/Definitions.h"
 #include "cuts/SRC.h"
 
 #ifdef __AVX2__
@@ -46,9 +46,7 @@ inline std::vector<Label *> BucketGraph::solveHeuristic() {
                                                      // Stage 1 heuristic
         inner_obj = paths[0]->cost;
 
-        // Transition from Stage 1 to Stage 2 if the objective improves or after
-        // 10 iterations
-        if (inner_obj >= -5 || iter >= 10) {
+        if (inner_obj >= -5) {
             s1 = false;
             s2 = true; // Move to Stage 2
         }
@@ -61,9 +59,7 @@ inline std::vector<Label *> BucketGraph::solveHeuristic() {
                                                      // Stage 2 heuristic
         inner_obj = paths[0]->cost;
 
-        // Transition from Stage 2 to Stage 3 if the objective improves or after
-        // 800 iterations
-        if (inner_obj >= -100 || iter > 800) { status = Status::Optimal; }
+        if (inner_obj >= -100) { status = Status::Optimal; }
     }
 
     iter++; // Increment the iteration counter

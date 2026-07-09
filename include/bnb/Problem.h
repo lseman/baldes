@@ -5,8 +5,8 @@
  */
 #pragma once
 
-#include "Definitions.h"
-#include "VRPNode.h"
+#include "core/Definitions.h"
+#include "data/VRPNode.h"
 #include "bnb/Node.h"
 #include <memory>
 

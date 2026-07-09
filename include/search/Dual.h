@@ -8,9 +8,9 @@
 
 #pragma once
 
-#include "Common.h"
+#include "math/Common.h"
 
-#include "Arc.h"
+#include "data/Arc.h"
 #include "Hashes.h"
 
 #include "miphandler/Constraint.h"
@@ -21,7 +21,7 @@
 #include "gurobi_c.h"
 #endif
 
-#include "VRPCandidate.h"
+#include "routing/VRPCandidate.h"
 
 // Forward declare NodeDuals class
 class NodeDuals;

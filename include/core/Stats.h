@@ -15,7 +15,7 @@
 #include <random>
 #include <vector>
 
-#include "RNG.h"
+#include "math/RNG.h"
 
 #pragma once
 

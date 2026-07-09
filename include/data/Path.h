@@ -13,10 +13,10 @@
 #include <limits>
 #include <vector>
 
-#include "Arc.h"
-#include "Common.h"
-#include "RNG.h"
-#include "Serializer.h"
+#include "data/Arc.h"
+#include "math/Common.h"
+#include "math/RNG.h"
+#include "routing/Serializer.h"
 
 struct Path {
     // Use a more memory-efficient container for small integers

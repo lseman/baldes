@@ -10,20 +10,20 @@
 #include <condition_variable>
 #include <cstring>
 
-#include "Bucket.h"
-#include "CostFunction.h"
+#include "data/Bucket.h"
+#include "search/CostFunction.h"
 #include "Cut.h"
-#include "Definitions.h"
-#include "Dual.h"
-#include "PSTEP.h"
-#include "Pools.h"
+#include "core/Definitions.h"
+#include "search/Dual.h"
+#include "search/PSTEP.h"
+#include "core/Pools.h"
 #include "RCC.h"
-#include "RIH.h"
-#include "SCCFinder.h"
-#include "Stats.h"
-#include "Trees.h"
+#include "search/RIH.h"
+#include "graph/SCCFinder.h"
+#include "core/Stats.h"
+#include "data/Trees.h"
 #include "UnionFind.h"
-#include "VRPNode.h"
+#include "data/VRPNode.h"
 
 #define RCESPP_TOL_ZERO 1.E-6
 

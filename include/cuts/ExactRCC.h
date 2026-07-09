@@ -6,7 +6,7 @@
 
 #pragma once
 
-#include "Definitions.h"
+#include "core/Definitions.h"
 #include "bnb/Node.h"
 #include "gurobi_c++.h"
 #include "gurobi_c.h"

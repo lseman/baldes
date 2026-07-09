@@ -12,7 +12,7 @@
 #include <cstdint>
 #include <vector>
 
-#include "Common.h"
+#include "math/Common.h"
 
 class UnionFind {
 private:

@@ -6,7 +6,7 @@
 #pragma once
 #include <functional>
 
-#include "Common.h"
+#include "math/Common.h"
 #include "xxhash.h"
 
 struct Arc {

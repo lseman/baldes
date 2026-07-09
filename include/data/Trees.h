@@ -4,7 +4,7 @@
  *
  */
 #pragma once
-#include "Definitions.h"
+#include "core/Definitions.h"
 #include "utils/NumericUtils.h"
 
 /**

@@ -14,8 +14,8 @@
 #include <vector>
 
 #include "../third_party/concurrentqueue.h"
-#include "Definitions.h"
-#include "Logger.h"
+#include "core/Definitions.h"
+#include "core/Logger.h"
 #include "bnb/BCP.h"
 #include "bnb/Node.h"
 

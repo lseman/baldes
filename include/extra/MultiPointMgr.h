@@ -17,7 +17,7 @@
 #include <stdexcept>
 #include <vector>
 
-#include "Definitions.h"
+#include "core/Definitions.h"
 
 class MultiPointManager {
 private:

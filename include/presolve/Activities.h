@@ -5,7 +5,7 @@
  */
 #pragma once
 
-#include "Definitions.h"
+#include "core/Definitions.h"
 #include <algorithm>
 #include <bitset>
 #include <execution>

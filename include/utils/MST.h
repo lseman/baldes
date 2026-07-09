@@ -13,8 +13,8 @@
 #include <tuple>
 #include <vector>
 
-#include "Common.h"
-#include "VRPNode.h"
+#include "math/Common.h"
+#include "data/VRPNode.h"
 
 class MST {
 public:

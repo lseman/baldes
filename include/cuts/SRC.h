@@ -7,8 +7,8 @@
 #pragma once
 
 #include "Cut.h"
-#include "Definitions.h"
-#include "Pools.h"
+#include "core/Definitions.h"
+#include "core/Pools.h"
 #include "SparseMatrix.h"
 #include "ankerl/unordered_dense.h"
 #include "bucket/BucketGraph.h"
@@ -19,7 +19,7 @@
 #include <cstdint>
 
 #include "HeuristicHighOrder.h"
-#include "RNG.h"
+#include "math/RNG.h"
 // include nsync
 #ifdef NSYNC
 extern "C" {
@@ -40,7 +40,7 @@ struct PairHash;
 
 struct SparseMatrix;
 
-#include "RNG.h"
+#include "math/RNG.h"
 
 /**
  * @class LimitedMemoryRank1Cuts
