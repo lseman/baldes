@@ -17,11 +17,11 @@
 #include <thread>
 #include <vector>
 
-#include "Cut.h"
+#include "cuts/Cut.h"
 #include "data/Label.h"
 #include "data/Path.h"
 #include "math/RNG.h"
-#include "Reader.h"
+#include "utils/Reader.h"
 #include "core/TaskQueue.h"
 #include "data/VRPNode.h"
 

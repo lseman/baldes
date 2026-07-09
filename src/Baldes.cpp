@@ -11,12 +11,13 @@
 #include <string>
 #include <vector>
 
-#include "core/Definitions.h"#include "core/HGS.h"
-#include "core/Logger.h"
-#include "Reader.h"
+#include "utils/Reader.h"
 #include "bnb/BCP.h"
 #include "bnb/BNB.h"
 #include "bnb/Node.h"
+#include "core/Definitions.h"
+#include "core/HGS.h"
+#include "core/Logger.h"
 #include "miphandler/MIPHandler.h"
 
 #ifdef GUROBI
@@ -292,13 +293,13 @@ int main(int argc, char *argv[]) {
     } else {
         node->paths = paths;
     }
-    node->problem     = problem;
-    node->mip         = mip;
-    node->instance    = instance;
+    node->problem                = problem;
+    node->mip                    = mip;
+    node->instance               = instance;
     const double best_route_cost = route_collection_cost(topRoutes);
     node->integer_sol            = std::isfinite(best_route_cost) ? best_route_cost : hgs->getBestCost();
     node->numK                   = topRoutes.size();
-    node->pathSet     = pathSet;
+    node->pathSet                = pathSet;
     // node->bestRoutes = topRoutes;
 
     BranchAndBound solver(std::move(problem),

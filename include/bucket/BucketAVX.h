@@ -7,7 +7,7 @@
 
 #include <experimental/simd>
 
-#include "Cut.h"
+#include "cuts/Cut.h"
 #include "core/Definitions.h"
 #include "core/Pools.h"
 

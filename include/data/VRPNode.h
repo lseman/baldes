@@ -6,7 +6,7 @@
 #pragma once
 #include "data/Arc.h"
 #include "math/Common.h"
-#include "Cut.h"
+#include "cuts/Cut.h"
 #include "core/Definitions.h"
 /**
  * @struct VRPNode

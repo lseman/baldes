@@ -22,7 +22,7 @@
 
 // include CutHelper
 #include "CutHelper.h"
-#include "CutIntelligence.h"
+#include "cuts/CutIntelligence.h"
 
 // namespace std {
 // template <>

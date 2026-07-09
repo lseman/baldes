@@ -19,7 +19,7 @@
 #include "../third_party/hgs_vrptw/Population.h"
 #include "../third_party/hgs_vrptw/Split.h"
 #include "core/Definitions.h"
-#include "Reader.h"
+#include "utils/Reader.h"
 
 /**
  * @struct HGSArcStats

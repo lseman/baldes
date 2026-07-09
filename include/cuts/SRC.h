@@ -6,7 +6,7 @@
 
 #pragma once
 
-#include "Cut.h"
+#include "cuts/Cut.h"
 #include "core/Definitions.h"
 #include "core/Pools.h"
 #include "SparseMatrix.h"
@@ -18,7 +18,7 @@
 //
 #include <cstdint>
 
-#include "HeuristicHighOrder.h"
+#include "cuts/HeuristicHighOrder.h"
 #include "math/RNG.h"
 // include nsync
 #ifdef NSYNC
