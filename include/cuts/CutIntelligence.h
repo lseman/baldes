@@ -7,7 +7,7 @@
  */
 
 #pragma once
-#include "Cut.h"
+#include "cuts/Cut.h"
 #include "CutHelper.h"
 #include "search/Dual.h"
 #include "math/RNG.h"

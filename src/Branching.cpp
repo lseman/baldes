@@ -7,7 +7,8 @@
  */
 
 #include "bnb/Branching.h"
-#include "search/Dual.h"#include "bnb/Node.h"
+#include "search/Dual.h"
+#include "bnb/Node.h"
 
 void BranchingDuals::computeDuals(BNBNode *model, double threshold) {
     arcDuals_  = ArcDuals();

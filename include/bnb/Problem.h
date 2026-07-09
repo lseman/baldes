@@ -10,7 +10,7 @@
 #include "bnb/Node.h"
 #include <memory>
 
-#include "Reader.h"
+#include "utils/Reader.h"
 
 class BNBNode;
 /**

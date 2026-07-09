@@ -9,7 +9,7 @@
 
 #pragma once
 
-#include "Cut.h"
+#include "cuts/Cut.h"
 #include "data/Path.h"
 #include "routing/Serializer.h"
 

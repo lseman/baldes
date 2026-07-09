@@ -9,7 +9,7 @@
 #pragma once
 
 // Move config outside as namespace constants
-#include "Cut.h"
+#include "cuts/Cut.h"
 namespace LocalSearchConfig {
 constexpr double MIN_WEIGHT             = 0.01;
 constexpr int    SEGMENT_SIZE           = 20;

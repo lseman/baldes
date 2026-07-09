@@ -7,10 +7,11 @@
 #include "bucket/BucketGraph.h"
 
 #include "../third_party/pdqsort.h"
-#include "math/Common.h"
-#include "core/Definitions.h"#include "MST.h"
 #include "bucket/BucketSolve.h"
 #include "bucket/BucketUtils.h"
+#include "core/Definitions.h"
+#include "math/Common.h"
+#include "utils/MST.h"
 
 #ifdef GUROBI
 #include "gurobi_c++.h"
@@ -164,7 +165,7 @@ std::vector<int> BucketGraph::computePhi(int &bucket_id, bool fw) {
         int              rem = local_bucket;
         for (int r = 0; r < n_dims; ++r) {
             const int splits = splits_per_dim[r];
-            pos[r] = rem % splits;
+            pos[r]           = rem % splits;
             rem /= splits;
         }
 

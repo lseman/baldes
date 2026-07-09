@@ -7,9 +7,9 @@
 #pragma once
 
 #include "data/Arc.h"
-#include "Cut.h"
+#include "cuts/Cut.h"
 #include "core/Definitions.h"
-#include "RCC.h"
+#include "cuts/RCC.h"
 #include "data/VRPNode.h"
 #include "miphandler/LinExp.h"
 #include "miphandler/MIPHandler.h"
@@ -25,7 +25,7 @@
 #include "extra/Stabilization.h"
 #endif
 
-#include "Reader.h"
+#include "utils/Reader.h"
 #include "bnb/Problem.h"
 
 #ifdef RCC

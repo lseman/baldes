@@ -14,7 +14,7 @@
 
 #include "../third_party/pdqsort.h"
 
-#include "MST.h"
+#include "utils/MST.h"
 #include <omp.h>
 
 #ifdef GUROBI

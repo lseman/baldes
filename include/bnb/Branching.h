@@ -11,9 +11,9 @@
 
 #include "core/Definitions.h"
 
-#include "MST.h"
+#include "utils/MST.h"
 #include "Node.h"
-#include "Reader.h"
+#include "utils/Reader.h"
 #include "routing/VRPCandidate.h"
 
 #include "data/VRPNode.h"

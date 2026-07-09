@@ -7,14 +7,14 @@
 #include <pybind11/stl.h>
 #include <pybind11/stl_bind.h>
 
-#include "data/Arc.h"
-#include "core/Definitions.h"
-#include "search/Dual.h"
-#include "data/Label.h"
-#include "data/VRPNode.h"
 #include "bucket/BucketGraph.h"
 #include "bucket/BucketSolve.h"
 #include "bucket/BucketUtils.h"
+#include "core/Definitions.h"
+#include "data/Arc.h"
+#include "data/Label.h"
+#include "data/VRPNode.h"
+#include "search/Dual.h"
 
 #ifdef GUROBI
 #include "gurobi_c++.h"

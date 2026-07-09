@@ -6,8 +6,9 @@
 
 #include "cuts/SRC.h"
 
-#include "Cut.h"
-#include "core/Definitions.h"#include "HeuristicHighOrder.h"
+#include "cuts/Cut.h"
+#include "core/Definitions.h"
+#include "cuts/HeuristicHighOrder.h"
 #include "bnb/Node.h"
 #ifdef IPM
 #include "ipm/IPSolver.h"
@@ -18,7 +19,7 @@
 #endif
 using Cuts = std::vector<Cut>;
 
-#include "CutIntelligence.h"
+#include "cuts/CutIntelligence.h"
 
 namespace {
 constexpr double SRC_SEPARATION_TOL          = 1e-3;
