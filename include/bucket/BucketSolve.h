@@ -314,6 +314,59 @@ std::vector<double> BucketGraph::labeling_algorithm() {
                             auto label_cost_less = [](const Label *label, double value) { return label->cost < value; };
 
                             auto scan_new_dominated_by = [&](size_t begin, size_t end) {
+#if defined(BALDES_HAS_SIMD)
+                                if constexpr (!src_adjusted_dominance) {
+                                    namespace stdx = std::experimental;
+                                    using simd_d   = stdx::native_simd<double>;
+                                    using mask_d   = typename simd_d::mask_type;
+
+                                    constexpr size_t simd_width = simd_d::size();
+                                    const simd_d     eps(numericutils::eps);
+                                    size_t           i = begin;
+                                    for (; i + simd_width <= end; i += simd_width) {
+                                        mask_d candidate(true);
+                                        if constexpr (D == Direction::Forward) {
+                                            for (size_t r = 1; r < options.resources.size(); ++r) {
+                                                const simd_d res(mother_bucket.soa_resources[r].data() + i,
+                                                                 stdx::element_aligned);
+                                                candidate &= res <= (simd_d(new_label->resources[r]) + eps);
+                                            }
+                                            if (!options.resources.empty()) {
+                                                const simd_d res0(mother_bucket.soa_resources[0].data() + i,
+                                                                  stdx::element_aligned);
+                                                candidate &= res0 <= (simd_d(new_label->resources[0]) + eps);
+                                            }
+                                        } else {
+                                            for (size_t r = 1; r < options.resources.size(); ++r) {
+                                                const simd_d res(mother_bucket.soa_resources[r].data() + i,
+                                                                 stdx::element_aligned);
+                                                candidate &= res >= (simd_d(new_label->resources[r]) - eps);
+                                            }
+                                            if (!options.resources.empty()) {
+                                                const simd_d res0(mother_bucket.soa_resources[0].data() + i,
+                                                                  stdx::element_aligned);
+                                                candidate &= res0 >= (simd_d(new_label->resources[0]) - eps);
+                                            }
+                                        }
+                                        if (!stdx::any_of(candidate)) {
+                                            inner_scan_count += simd_width;
+                                            continue;
+                                        }
+                                        for (size_t lane = 0; lane < simd_width; ++lane) {
+                                            ++inner_scan_count;
+                                            if (!candidate[lane]) continue;
+                                            Label *cur = to_bucket_labels[i + lane];
+                                            if (__builtin_expect(cur->is_dominated, 0)) continue;
+                                            if (dominates_resource_path<D, S>(new_label, cur)) {
+                                                ++stat_n_dom;
+                                                dominated = true;
+                                                return;
+                                            }
+                                        }
+                                    }
+                                    begin = i;
+                                }
+#endif
                                 for (size_t i = begin; i < end; ++i) {
                                     if (i + 8 < end) { __builtin_prefetch(to_bucket_labels[i + 8], 0, 3); }
                                     Label *cur = to_bucket_labels[i];
@@ -328,6 +381,57 @@ std::vector<double> BucketGraph::labeling_algorithm() {
                             };
 
                             auto scan_existing_dominated_by_new = [&](size_t begin, size_t end) {
+#if defined(BALDES_HAS_SIMD)
+                                if constexpr (!src_adjusted_dominance) {
+                                    namespace stdx = std::experimental;
+                                    using simd_d   = stdx::native_simd<double>;
+                                    using mask_d   = typename simd_d::mask_type;
+
+                                    constexpr size_t simd_width = simd_d::size();
+                                    const simd_d     eps(numericutils::eps);
+                                    size_t           i = begin;
+                                    for (; i + simd_width <= end; i += simd_width) {
+                                        mask_d candidate(true);
+                                        if constexpr (D == Direction::Forward) {
+                                            for (size_t r = 1; r < options.resources.size(); ++r) {
+                                                const simd_d res(mother_bucket.soa_resources[r].data() + i,
+                                                                 stdx::element_aligned);
+                                                candidate &= res >= (simd_d(new_label->resources[r]) - eps);
+                                            }
+                                            if (!options.resources.empty()) {
+                                                const simd_d res0(mother_bucket.soa_resources[0].data() + i,
+                                                                  stdx::element_aligned);
+                                                candidate &= res0 >= (simd_d(new_label->resources[0]) - eps);
+                                            }
+                                        } else {
+                                            for (size_t r = 1; r < options.resources.size(); ++r) {
+                                                const simd_d res(mother_bucket.soa_resources[r].data() + i,
+                                                                 stdx::element_aligned);
+                                                candidate &= res <= (simd_d(new_label->resources[r]) + eps);
+                                            }
+                                            if (!options.resources.empty()) {
+                                                const simd_d res0(mother_bucket.soa_resources[0].data() + i,
+                                                                  stdx::element_aligned);
+                                                candidate &= res0 <= (simd_d(new_label->resources[0]) + eps);
+                                            }
+                                        }
+                                        if (!stdx::any_of(candidate)) {
+                                            inner_scan_count += simd_width;
+                                            continue;
+                                        }
+                                        for (size_t lane = 0; lane < simd_width; ++lane) {
+                                            ++inner_scan_count;
+                                            if (!candidate[lane]) continue;
+                                            Label *cur = to_bucket_labels[i + lane];
+                                            if (__builtin_expect(cur->is_dominated, 0)) continue;
+                                            if (dominates_resource_path<D, S>(cur, new_label)) {
+                                                cur->set_dominated(true);
+                                            }
+                                        }
+                                    }
+                                    begin = i;
+                                }
+#endif
                                 for (size_t i = begin; i < end; ++i) {
                                     if (i + 8 < end) { __builtin_prefetch(to_bucket_labels[i + 8], 0, 3); }
                                     Label *cur = to_bucket_labels[i];
@@ -338,6 +442,68 @@ std::vector<double> BucketGraph::labeling_algorithm() {
                             };
 
                             auto scan_bracket = [&](size_t begin, size_t end) {
+#if defined(BALDES_HAS_SIMD)
+                                if constexpr (!src_adjusted_dominance) {
+                                    namespace stdx = std::experimental;
+                                    using simd_d   = stdx::native_simd<double>;
+                                    using mask_d   = typename simd_d::mask_type;
+
+                                    constexpr size_t simd_width = simd_d::size();
+                                    const simd_d     eps(numericutils::eps);
+                                    size_t           i = begin;
+                                    for (; i + simd_width <= end; i += simd_width) {
+                                        mask_d cur_dominates_new(true);
+                                        mask_d new_dominates_cur(true);
+                                        if constexpr (D == Direction::Forward) {
+                                            for (size_t r = 1; r < options.resources.size(); ++r) {
+                                                const simd_d res(mother_bucket.soa_resources[r].data() + i,
+                                                                 stdx::element_aligned);
+                                                cur_dominates_new &= res <= (simd_d(new_label->resources[r]) + eps);
+                                                new_dominates_cur &= res >= (simd_d(new_label->resources[r]) - eps);
+                                            }
+                                            if (!options.resources.empty()) {
+                                                const simd_d res0(mother_bucket.soa_resources[0].data() + i,
+                                                                  stdx::element_aligned);
+                                                cur_dominates_new &= res0 <= (simd_d(new_label->resources[0]) + eps);
+                                                new_dominates_cur &= res0 >= (simd_d(new_label->resources[0]) - eps);
+                                            }
+                                        } else {
+                                            for (size_t r = 1; r < options.resources.size(); ++r) {
+                                                const simd_d res(mother_bucket.soa_resources[r].data() + i,
+                                                                 stdx::element_aligned);
+                                                cur_dominates_new &= res >= (simd_d(new_label->resources[r]) - eps);
+                                                new_dominates_cur &= res <= (simd_d(new_label->resources[r]) + eps);
+                                            }
+                                            if (!options.resources.empty()) {
+                                                const simd_d res0(mother_bucket.soa_resources[0].data() + i,
+                                                                  stdx::element_aligned);
+                                                cur_dominates_new &= res0 >= (simd_d(new_label->resources[0]) - eps);
+                                                new_dominates_cur &= res0 <= (simd_d(new_label->resources[0]) + eps);
+                                            }
+                                        }
+                                        const mask_d candidate = cur_dominates_new | new_dominates_cur;
+                                        if (!stdx::any_of(candidate)) {
+                                            inner_scan_count += simd_width;
+                                            continue;
+                                        }
+                                        for (size_t lane = 0; lane < simd_width; ++lane) {
+                                            ++inner_scan_count;
+                                            if (!candidate[lane]) continue;
+                                            Label *cur = to_bucket_labels[i + lane];
+                                            if (__builtin_expect(cur->is_dominated, 0)) continue;
+                                            if (cur_dominates_new[lane] && is_dominated<D, S>(new_label, cur)) {
+                                                ++stat_n_dom;
+                                                dominated = true;
+                                                return;
+                                            }
+                                            if (new_dominates_cur[lane] && is_dominated<D, S>(cur, new_label)) {
+                                                cur->set_dominated(true);
+                                            }
+                                        }
+                                    }
+                                    begin = i;
+                                }
+#endif
                                 for (size_t i = begin; i < end; ++i) {
                                     if (i + 8 < end) { __builtin_prefetch(to_bucket_labels[i + 8], 0, 3); }
                                     Label *cur = to_bucket_labels[i];
@@ -398,6 +564,9 @@ std::vector<double> BucketGraph::labeling_algorithm() {
                                         }
                                     }
                                 } else {
+#if defined(BALDES_HAS_SIMD)
+                                    mother_bucket.ensure_label_cache();
+#endif
                                     const auto bracket_begin_it = std::lower_bound(
                                         to_bucket_labels.begin(), to_bucket_labels.end(), cost_lo, label_cost_less);
                                     const auto expensive_begin_it = std::upper_bound(
