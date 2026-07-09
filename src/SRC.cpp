@@ -6,10 +6,10 @@
 
 #include "cuts/SRC.h"
 
-#include "cuts/Cut.h"
-#include "core/Definitions.h"
-#include "cuts/HeuristicHighOrder.h"
 #include "bnb/Node.h"
+#include "core/Definitions.h"
+#include "cuts/Cut.h"
+#include "cuts/HeuristicHighOrder.h"
 #ifdef IPM
 #include "ipm/IPSolver.h"
 #endif
@@ -533,7 +533,8 @@ void LimitedMemoryRank1Cuts::separateR1C3Adjacency(const SparseMatrix &A, const 
         exact_candidate_paths.clear();
         const auto accumulate_base_visits = [&](int node) {
             auto row_it = row_indices_map.find(node);
-            if (row_it == row_indices_map.end() || node < 0 || node >= static_cast<int>(vertex_route_map.size())) return;
+            if (row_it == row_indices_map.end() || node < 0 || node >= static_cast<int>(vertex_route_map.size()))
+                return;
             for (int r : row_it->second) {
                 if (r < 0 || r >= all_num_routes || static_cast<size_t>(r) >= vertex_route_map[node].size()) continue;
                 if (exact_visit_count[r] == 0) exact_touched_routes.push_back(r);
