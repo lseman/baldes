@@ -7,10 +7,10 @@
  */
 
 #include "core/Definitions.h"
-#include "utils/Reader.h"
 #include "gurobi_c++.h"
 #include "presolve/Activities.h"
 #include "presolve/Clique.h"
+#include "utils/Reader.h"
 
 GRBModel solve_vrp(const InstanceData &instance) {
     GRBEnv env = GRBEnv(true);
