@@ -10,20 +10,20 @@
 #include <condition_variable>
 #include <cstring>
 
-#include "data/Bucket.h"
-#include "search/CostFunction.h"
-#include "cuts/Cut.h"
+#include "UnionFind.h"
+#include "core/CostFunction.h"
 #include "core/Definitions.h"
+#include "core/Pools.h"
+#include "core/Stats.h"
+#include "cuts/Cut.h"
+#include "cuts/RCC.h"
+#include "data/Bucket.h"
+#include "data/Trees.h"
+#include "data/VRPNode.h"
+#include "graph/SCCFinder.h"
 #include "search/Dual.h"
 #include "search/PSTEP.h"
-#include "core/Pools.h"
-#include "cuts/RCC.h"
 #include "search/RIH.h"
-#include "graph/SCCFinder.h"
-#include "core/Stats.h"
-#include "data/Trees.h"
-#include "UnionFind.h"
-#include "data/VRPNode.h"
 
 #define RCESPP_TOL_ZERO 1.E-6
 
@@ -213,8 +213,8 @@ public:
     bool                 transition = false;
     Status               status     = Status::NotOptimal;
     std::vector<Label *> merged_labels_rih;
-    int                  A_MAX = N_SIZE;
-    double               split_imbalance_ema = 0.0;
+    int                  A_MAX                  = N_SIZE;
+    double               split_imbalance_ema    = 0.0;
     int                  last_split_update_iter = -1000000;
 
     struct EnumerationPolicy {
@@ -549,7 +549,7 @@ public:
     BucketPricingResult execute_bucket_pricing_stage(Stage active_stage);
 
     BucketPricingResult make_bucket_pricing_result(std::vector<Label *> labels,
-                                                   bool skip_stage_transition = false) const;
+                                                   bool                 skip_stage_transition = false) const;
 
     void transition_after_bucket_pricing(Stage active_stage, const BucketPricingResult &result);
 
@@ -1070,8 +1070,7 @@ public:
 
         // Keep a real dead-band even on large passes. Letting the threshold
         // decay to zero makes q_star chase noise and creates concat churn.
-        const double dynamic_threshold =
-            std::max(0.03, BASE_IMBALANCE_THRESHOLD * std::exp(-total_labels / 50000.0));
+        const double dynamic_threshold = std::max(0.03, BASE_IMBALANCE_THRESHOLD * std::exp(-total_labels / 50000.0));
         if (iter - last_split_update_iter < SPLIT_UPDATE_COOLDOWN) return;
 
         // Only adjust split if the imbalance exceeds the dynamic threshold.
@@ -1258,15 +1257,15 @@ public:
     BucketPricingResult finalize_pricing_pass();
 
     template <Stage S>
-    void publish_concatenation_candidates(const Label *forward_label,
+    void publish_concatenation_candidates(const Label                            *forward_label,
                                           std::span<const ConcatenationCandidate> candidates,
-                                          std::atomic<double> &best_cost);
+                                          std::atomic<double>                    &best_cost);
 
     template <Stage S>
     bool collect_concatenation_candidate(const Label *forward_label, const Label *backward_label, double path_cost,
-                                         const SpliceState *splice_state,
+                                         const SpliceState                              *splice_state,
                                          [[maybe_unused]] std::span<const ActiveCutInfo> active_cuts,
-                                         [[maybe_unused]] double max_src_splice_discount,
+                                         [[maybe_unused]] double                         max_src_splice_discount,
                                          std::atomic<double> &best_cost, ConcatenationScratch &scratch);
 
     void push_unvisited_phi_neighbors(std::span<const int> neighbors, ConcatenationScratch &scratch) const;

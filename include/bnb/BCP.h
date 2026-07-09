@@ -53,7 +53,7 @@
 #endif
 
 #ifdef ITERATIVE_HGS
-#include "core/HGS.h"
+#include "search/HGS.h"
 #endif
 #include "core/Logger.h"
 

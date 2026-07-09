@@ -168,7 +168,14 @@ struct alignas(64) Bucket {
 
         const auto compact = [&removed](auto &label_vec) {
             const auto old_size = label_vec.size();
-            std::erase_if(label_vec, [](const Label *label) { return label == nullptr || label->is_dominated; });
+            size_t     write    = 0;
+            for (size_t read = 0; read < label_vec.size(); ++read) {
+                Label *label = label_vec[read];
+                if (label == nullptr || label->is_dominated) continue;
+                if (write != read) label_vec[write] = label;
+                ++write;
+            }
+            label_vec.resize(write);
             removed += old_size - label_vec.size();
         };
 

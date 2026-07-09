@@ -13,6 +13,11 @@
 #include "core/Definitions.h"
 #include "cuts/SRC.h"
 
+#if !defined(BALDES_DISABLE_SIMD) && __has_include(<experimental/simd>)
+#include <experimental/simd>
+#define BALDES_HAS_SIMD 1
+#endif
+
 #ifdef __AVX2__
 #include "BucketAVX.h"
 #endif
@@ -1000,6 +1005,94 @@ inline bool BucketGraph::DominatedInCompWiseSmallerBuckets(const Label *__restri
     auto inline_check_dominance = [&](const BucketLabelSoAView &view, uint &n_dom) -> bool {
         const size_t size = view.labels.size();
         if (profile_labeling) profile_record_inner_bin_scan(D, S, size);
+#if defined(BALDES_HAS_SIMD)
+        if constexpr (!src_adjusted_dominance) {
+            namespace stdx = std::experimental;
+            using simd_d   = stdx::native_simd<double>;
+            using mask_d   = typename simd_d::mask_type;
+
+            constexpr size_t simd_width = simd_d::size();
+            const simd_d     cost_limit(cost_hi_break);
+            const simd_d     eps(numericutils::eps);
+
+            size_t i = 0;
+            for (; i + simd_width <= size; i += simd_width) {
+                const simd_d costs(view.costs.data() + i, stdx::element_aligned);
+                mask_d       candidate = costs <= cost_limit;
+                if (!stdx::any_of(candidate)) {
+                    if (view.costs[i] > cost_hi_break) return false;
+                    continue;
+                }
+
+                if constexpr (D == Direction::Forward) {
+                    for (size_t r = 1; r < n_res; ++r) {
+                        const simd_d res(view.resources[r].data() + i, stdx::element_aligned);
+                        candidate &= res <= (simd_d(label_res[r]) + eps);
+                    }
+                    if (n_res > 0) {
+                        const simd_d res0(view.resources[0].data() + i, stdx::element_aligned);
+                        candidate &= res0 <= (simd_d(label_res[0]) + eps);
+                    }
+                } else {
+                    for (size_t r = 1; r < n_res; ++r) {
+                        const simd_d res(view.resources[r].data() + i, stdx::element_aligned);
+                        candidate &= res >= (simd_d(label_res[r]) - eps);
+                    }
+                    if (n_res > 0) {
+                        const simd_d res0(view.resources[0].data() + i, stdx::element_aligned);
+                        candidate &= res0 >= (simd_d(label_res[0]) - eps);
+                    }
+                }
+
+                if (!stdx::any_of(candidate)) continue;
+                for (size_t lane = 0; lane < simd_width; ++lane) {
+                    if (!candidate[lane]) continue;
+                    Label *cur = view.labels[i + lane];
+                    if (cur->is_dominated) continue;
+                    if (is_dominated<D, S>(L, cur)) {
+                        ++n_dom;
+                        return true;
+                    }
+                }
+            }
+
+            for (; i < size; ++i) {
+                if (view.costs[i] > cost_hi_break) break;
+
+                bool resource_candidate = true;
+                if constexpr (D == Direction::Forward) {
+                    for (size_t r = 1; r < n_res; ++r) {
+                        if (numericutils::gt(view.resources[r][i], label_res[r])) {
+                            resource_candidate = false;
+                            break;
+                        }
+                    }
+                    if (resource_candidate && n_res > 0 && numericutils::gt(view.resources[0][i], label_res[0])) {
+                        resource_candidate = false;
+                    }
+                } else {
+                    for (size_t r = 1; r < n_res; ++r) {
+                        if (numericutils::lt(view.resources[r][i], label_res[r])) {
+                            resource_candidate = false;
+                            break;
+                        }
+                    }
+                    if (resource_candidate && n_res > 0 && numericutils::lt(view.resources[0][i], label_res[0])) {
+                        resource_candidate = false;
+                    }
+                }
+                if (!resource_candidate) continue;
+
+                Label *cur = view.labels[i];
+                if (cur->is_dominated) continue;
+                if (is_dominated<D, S>(L, cur)) {
+                    ++n_dom;
+                    return true;
+                }
+            }
+            return false;
+        }
+#endif
         for (size_t i = 0; i < size; ++i) {
             // Bin is RC-sorted ascending; once cur is more expensive than L,
             // no later label can dominate L (cost ordering).
