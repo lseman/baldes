@@ -18,7 +18,7 @@
 #include "../third_party/hgs_vrptw/Params.h"
 #include "../third_party/hgs_vrptw/Population.h"
 #include "../third_party/hgs_vrptw/Split.h"
-#include "Definitions.h"
+#include "core/Definitions.h"
 #include "Reader.h"
 
 /**

@@ -12,7 +12,7 @@
 #include <Eigen/Sparse>
 #include <Eigen/SparseCholesky>
 
-#include "Definitions.h"
+#include "core/Definitions.h"
 
 #ifdef GUROBI
 #include "gurobi_c++.h"

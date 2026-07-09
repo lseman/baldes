@@ -6,9 +6,9 @@
 
 #pragma once
 
-#include "Definitions.h"
+#include "core/Definitions.h"
 
-#include "Arc.h"
+#include "data/Arc.h"
 #include "Hashes.h"
 
 #include <cmath>
@@ -17,7 +17,7 @@
 #include <set>
 #include <vector>
 
-#include "Dual.h"
+#include "search/Dual.h"
 
 #include <iostream>
 

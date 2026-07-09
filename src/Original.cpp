@@ -6,8 +6,7 @@
  *
  */
 
-#include "Definitions.h"
-#include "Reader.h"
+#include "core/Definitions.h"#include "Reader.h"
 #include "gurobi_c++.h"
 #include "presolve/Activities.h"
 #include "presolve/Clique.h"

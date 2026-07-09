@@ -10,7 +10,7 @@
 
 #include "BucketGraph.h"
 #include "Hashes.h"
-#include "VRPNode.h"
+#include "data/VRPNode.h"
 #include "ankerl/unordered_dense.h"
 /**
  * Updates the set of buckets based on the given parameters.

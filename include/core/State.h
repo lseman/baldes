@@ -10,8 +10,8 @@
 #pragma once
 
 #include "Cut.h"
-#include "Path.h"
-#include "Serializer.h"
+#include "data/Path.h"
+#include "routing/Serializer.h"
 
 struct Snapshot {
     Snapshot() = default;

@@ -6,7 +6,7 @@
 
 #pragma once
 
-#include "Definitions.h"
+#include "core/Definitions.h"
 #include "config.h"
 #include <cmath>
 #include <cstring>

@@ -9,14 +9,14 @@
 
 #include "bnb/BCP.h"
 
-#include "Definitions.h"
+#include "core/Definitions.h"
 
 #include "MST.h"
 #include "Node.h"
 #include "Reader.h"
-#include "VRPCandidate.h"
+#include "routing/VRPCandidate.h"
 
-#include "VRPNode.h"
+#include "data/VRPNode.h"
 #include "ankerl/unordered_dense.h"
 
 #include <optional>

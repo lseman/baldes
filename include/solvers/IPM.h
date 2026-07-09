@@ -8,7 +8,7 @@
 
 #pragma once
 #include "../include/ipm/IPSolver.h"
-#include "Definitions.h"
+#include "core/Definitions.h"
 #include "SolverInterface.h"
 
 class IPMSolver : public SolverInterface {

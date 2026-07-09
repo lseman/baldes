@@ -7,7 +7,7 @@
 #pragma once
 #include <memory>
 
-#include "Definitions.h"
+#include "core/Definitions.h"
 #include "SparseMatrix.h" // Include your SparseMatrix class
 
 #ifdef GUROBI

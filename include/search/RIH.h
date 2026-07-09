@@ -18,12 +18,12 @@
 #include <vector>
 
 #include "Cut.h"
-#include "Label.h"
-#include "Path.h"
-#include "RNG.h"
+#include "data/Label.h"
+#include "data/Path.h"
+#include "math/RNG.h"
 #include "Reader.h"
-#include "TaskQueue.h"
-#include "VRPNode.h"
+#include "core/TaskQueue.h"
+#include "data/VRPNode.h"
 
 class IteratedLocalSearch {
 public:

@@ -97,10 +97,10 @@ inline void BucketGraph::transition_after_bucket_pricing(Stage active_stage, con
 
     switch (active_stage) {
     case Stage::One:
-        if (result.best_reduced_cost >= -1 || iter >= 10) { activate_bucket_pricing_stage(Stage::Two); }
+        if (result.best_reduced_cost >= -1) { activate_bucket_pricing_stage(Stage::Two); }
         break;
     case Stage::Two:
-        if (result.best_reduced_cost >= -10 || iter > 500) { activate_bucket_pricing_stage(Stage::Three); }
+        if (result.best_reduced_cost >= -10) { activate_bucket_pricing_stage(Stage::Three); }
         break;
     case Stage::Three:
         if (result.best_reduced_cost >= -0.5) {

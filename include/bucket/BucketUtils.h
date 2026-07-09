@@ -8,11 +8,11 @@
 
 #include <cstring>
 
-#include "Bucket.h"
+#include "data/Bucket.h"
 #include "BucketJump.h"
-#include "Definitions.h"
+#include "core/Definitions.h"
 #include "MST.h"
-#include "Trees.h"
+#include "data/Trees.h"
 #include "cuts/SRC.h"
 #include "utils/NumericUtils.h"
 

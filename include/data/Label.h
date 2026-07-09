@@ -5,7 +5,7 @@
  */
 
 #pragma once
-#include "Common.h"
+#include "math/Common.h"
 
 #include <cassert>
 #include <stdexcept>

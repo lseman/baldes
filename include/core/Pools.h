@@ -14,11 +14,11 @@
 #include <new>
 #include <stdexec/execution.hpp>
 
-#include "Common.h"
-#include "Label.h"
-#include "Path.h"
-#include "TaskQueue.h"
-#include "VRPNode.h"
+#include "math/Common.h"
+#include "data/Label.h"
+#include "data/Path.h"
+#include "core/TaskQueue.h"
+#include "data/VRPNode.h"
 /**
  * @class SchrodingerPool
  * @brief Manages a pool of paths with a limited lifespan, computes reduced

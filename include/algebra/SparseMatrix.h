@@ -22,7 +22,7 @@
 #include <unordered_map>
 #include <vector>
 
-#include "Common.h" // Your common definitions
+#include "math/Common.h" // Your common definitions
 
 #if defined(IPM) || defined(IPM_ACEL)
 #include <Eigen/Sparse>

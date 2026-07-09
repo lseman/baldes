@@ -6,9 +6,8 @@
  *
  */
 
-#include "Common.h"
-#include "Definitions.h"
-
+#include "math/Common.h"
+#include "core/Definitions.h"
 #include "bucket/BucketGraph.h"
 #include "bucket/BucketSolve.h"
 #include "bucket/BucketUtils.h"

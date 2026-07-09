@@ -6,15 +6,15 @@
 
 #pragma once
 
-#include "Arc.h"
+#include "data/Arc.h"
 #include "Cut.h"
-#include "Definitions.h"
+#include "core/Definitions.h"
 #include "RCC.h"
-#include "VRPNode.h"
+#include "data/VRPNode.h"
 #include "miphandler/LinExp.h"
 #include "miphandler/MIPHandler.h"
 
-// #include "TR.h"
+// #include "search/TR.h"
 #include "bnb/Node.h"
 #include "bucket/BucketGraph.h"
 #include "bucket/BucketSolve.h"
@@ -49,18 +49,18 @@
 #endif
 
 #ifdef TR
-#include "TR.h"
+#include "search/TR.h"
 #endif
 
 #ifdef ITERATIVE_HGS
-#include "HGS.h"
+#include "core/HGS.h"
 #endif
-#include "Logger.h"
+#include "core/Logger.h"
 
 #define NUMERO_CANDIDATOS 10
 
-#include "RIH.h"
-#include "State.h"
+#include "search/RIH.h"
+#include "core/State.h"
 class VRProblem {
 public:
     InstanceData         instance;

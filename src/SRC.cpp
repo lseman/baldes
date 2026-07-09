@@ -7,8 +7,7 @@
 #include "cuts/SRC.h"
 
 #include "Cut.h"
-#include "Definitions.h"
-#include "HeuristicHighOrder.h"
+#include "core/Definitions.h"#include "HeuristicHighOrder.h"
 #include "bnb/Node.h"
 #ifdef IPM
 #include "ipm/IPSolver.h"

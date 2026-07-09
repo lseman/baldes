@@ -13,11 +13,11 @@
 #include <optional>
 #include <unordered_map>
 
-#include "Definitions.h"
-#include "Dual.h"
-#include "Path.h"
-#include "RNG.h"
-#include "VRPNode.h"
+#include "core/Definitions.h"
+#include "search/Dual.h"
+#include "data/Path.h"
+#include "math/RNG.h"
+#include "data/VRPNode.h"
 #include "utils/NumericUtils.h"
 
 // include CutHelper

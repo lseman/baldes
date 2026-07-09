@@ -6,8 +6,7 @@
  *
  */
 
-#include "Definitions.h"
-
+#include "core/Definitions.h"
 #define EIGEN_INITIALIZE_MATRICES_BY_ZERO
 
 #include <omp.h>

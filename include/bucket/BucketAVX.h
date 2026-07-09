@@ -8,8 +8,8 @@
 #include <experimental/simd>
 
 #include "Cut.h"
-#include "Definitions.h"
-#include "Pools.h"
+#include "core/Definitions.h"
+#include "core/Pools.h"
 
 using simd_double = std::experimental::native_simd<double>;
 

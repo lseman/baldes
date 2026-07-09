@@ -5,7 +5,7 @@
  */
 #pragma once
 
-#include "Common.h"
+#include "math/Common.h"
 #include "SparseMatrix.h"
 #include "ankerl/unordered_dense.h"
 

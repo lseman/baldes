@@ -6,7 +6,7 @@
 
 #pragma once
 
-#include "Common.h"
+#include "math/Common.h"
 /**
  * @class SCC
  * @brief A class to find Strongly Connected Components (SCCs) in a directed graph using Tarjan's algorithm.

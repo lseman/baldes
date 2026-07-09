@@ -9,8 +9,7 @@
 #include <string>
 #include <vector>
 
-#include "Definitions.h"
-#include "HGS.h"
+#include "core/Definitions.h"#include "core/HGS.h"
 #include "Reader.h"
 
 using HGSptr = std::shared_ptr<HGS>;

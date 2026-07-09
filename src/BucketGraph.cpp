@@ -7,9 +7,8 @@
 #include "bucket/BucketGraph.h"
 
 #include "../third_party/pdqsort.h"
-#include "Common.h"
-#include "Definitions.h"
-#include "MST.h"
+#include "math/Common.h"
+#include "core/Definitions.h"#include "MST.h"
 #include "bucket/BucketSolve.h"
 #include "bucket/BucketUtils.h"
 
