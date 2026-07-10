@@ -156,6 +156,18 @@ struct Label {
     bool visits(int node_id) const noexcept { return visited_bitmap[node_id / 64] & (1ULL << (node_id % 64)); }
 
     /**
+     * Conservative 64-bit summary used to reject impossible visited-set
+     * subset tests before reading the complete bitmap. If A is a subset of B,
+     * signature(A) is necessarily a subset of signature(B); collisions only
+     * cause a full check, never an incorrect dominance result.
+     */
+    [[nodiscard]] uint64_t visited_signature() const noexcept {
+        uint64_t signature = 0;
+        for (uint64_t word : visited_bitmap) signature |= word;
+        return signature;
+    }
+
+    /**
      * @brief Resets the state of the object to its initial values.
      *
      */

@@ -224,6 +224,7 @@ option(CUSTOM_COST "Enable custom cost" OFF)
 option(SRC_MEMORY_MODE_NODE "Use node-memory heuristics for SRC cuts" ON)
 option(SRC_MEMORY_MODE_ARC "Use arc-memory heuristics for SRC cuts" OFF)
 option(ITERATIVE_HGS "Enable iterative HGS" OFF)
+option(BALDES_DISABLE_SIMD "Disable SIMD dominance prefilters for benchmarking" OFF)
 # Resource Definitions
 set(R_SIZE 1 CACHE STRING "Number of resources")
 set(N_SIZE 102 CACHE STRING "Number of nodes")
@@ -246,6 +247,10 @@ if(SRC_MEMORY_MODE_ARC)
   add_definitions(-DSRC_MEMORY_MODE_ARC)
 else()
   add_definitions(-DSRC_MEMORY_MODE_NODE)
+endif()
+
+if(BALDES_DISABLE_SIMD)
+  add_compile_definitions(BALDES_DISABLE_SIMD)
 endif()
 
 # Configure the config.h file

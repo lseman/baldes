@@ -650,8 +650,8 @@ void BucketGraph::mono_initialization() {
             if (depth == num_intervals) {
                 // All dimensions processed, now initialize for the current
                 // combination
-                auto depot            = label_pool->acquire();
                 int  calculated_index = calculated_index_base + offset;
+                auto depot            = label_pool->acquire(calculated_index);
 
                 // Set interval_bounds to current combination of interval
                 // starts or ends
@@ -757,10 +757,10 @@ void BucketGraph::print_labeling_profile() {
     static const std::array<const char *, PROFILE_STAGE_COUNT> stage_names = {"One", "Two", "Three", "Four",
                                                                               "Enumerate"};
 
-    fmt::print("\n+----------------------------------------------------------------------------------------------+\n");
-    fmt::print("| {:<9} | {:<8} | {:<17} | {:<18} | {:<14} | {:<18} |\n", "Stage", "Dir", "Dom checks",
-               "Avg inner scan", "Tested", "Non-dom ratio");
-    fmt::print("+----------------------------------------------------------------------------------------------+\n");
+    fmt::print("\n+-----------------------------------------------------------------------------------------------------------------+\n");
+    fmt::print("| {:<9} | {:<8} | {:<17} | {:<18} | {:<14} | {:<18} | {:<15} |\n", "Stage", "Dir", "Dom checks",
+               "Avg inner scan", "Tested", "Non-dom ratio", "Sig rejects");
+    fmt::print("+-----------------------------------------------------------------------------------------------------------------+\n");
     for (size_t i = 0; i < PROFILE_STAGE_COUNT; ++i) {
         const double avg_fw   = profile_inner_bin_scan_events_fw[i] == 0
                                     ? 0.0
@@ -777,12 +777,14 @@ void BucketGraph::print_labeling_profile() {
                                                                  : static_cast<double>(profile_labels_survived_bw[i]) /
                                                                        static_cast<double>(profile_labels_tested_bw[i]);
 
-        fmt::print("| {:<9} | {:<8} | {:<17} | {:<18.2f} | {:<14} | {:<18.2f} |\n", stage_names[i], "Fwd",
-                   profile_dominance_checks_fw[i], avg_fw, profile_labels_tested_fw[i], ratio_fw);
-        fmt::print("| {:<9} | {:<8} | {:<17} | {:<18.2f} | {:<14} | {:<18.2f} |\n", stage_names[i], "Bwd",
-                   profile_dominance_checks_bw[i], avg_bw, profile_labels_tested_bw[i], ratio_bw);
+        fmt::print("| {:<9} | {:<8} | {:<17} | {:<18.2f} | {:<14} | {:<18.2f} | {:<15} |\n", stage_names[i], "Fwd",
+                   profile_dominance_checks_fw[i], avg_fw, profile_labels_tested_fw[i], ratio_fw,
+                   profile_signature_rejections_fw[i]);
+        fmt::print("| {:<9} | {:<8} | {:<17} | {:<18.2f} | {:<14} | {:<18.2f} | {:<15} |\n", stage_names[i], "Bwd",
+                   profile_dominance_checks_bw[i], avg_bw, profile_labels_tested_bw[i], ratio_bw,
+                   profile_signature_rejections_bw[i]);
         fmt::print(
-            "+----------------------------------------------------------------------------------------------+\n");
+            "+-----------------------------------------------------------------------------------------------------------------+\n");
     }
 }
 
@@ -797,6 +799,19 @@ void BucketGraph::profile_reset_labeling_metrics() noexcept {
     profile_labels_tested_bw.fill(0);
     profile_labels_survived_fw.fill(0);
     profile_labels_survived_bw.fill(0);
+    profile_signature_rejections_fw.fill(0);
+    profile_signature_rejections_bw.fill(0);
+}
+
+void BucketGraph::profile_record_signature_rejection(Direction D, Stage S) noexcept {
+    if (!options.profile_labeling) return;
+    const size_t idx = static_cast<size_t>(S);
+    if (idx >= PROFILE_STAGE_COUNT) return;
+    if (D == Direction::Forward) {
+        profile_signature_rejections_fw[idx]++;
+    } else {
+        profile_signature_rejections_bw[idx]++;
+    }
 }
 
 void BucketGraph::profile_record_dominance_check(Direction D, Stage S) noexcept {
@@ -1003,7 +1018,7 @@ void BucketGraph::initInfo() {
  */
 Label *BucketGraph::compute_mono_label(const Label *L) {
     // Directly acquire new_label and set the cost
-    auto new_label       = label_pool_fw->acquire();
+    auto new_label       = label_pool_fw->acquire(L->vertex);
     new_label->cost      = L->cost;      // Use the cost from L
     new_label->real_cost = L->real_cost; // Use the real cost from L
     new_label->path_len  = L->path_len;
