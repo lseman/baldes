@@ -448,6 +448,8 @@ public:
     std::array<uint64_t, PROFILE_STAGE_COUNT> profile_labels_tested_bw{};
     std::array<uint64_t, PROFILE_STAGE_COUNT> profile_labels_survived_fw{};
     std::array<uint64_t, PROFILE_STAGE_COUNT> profile_labels_survived_bw{};
+    std::array<uint64_t, PROFILE_STAGE_COUNT> profile_signature_rejections_fw{};
+    std::array<uint64_t, PROFILE_STAGE_COUNT> profile_signature_rejections_bw{};
 
     std::vector<double>                R_max;
     std::vector<double>                R_min;
@@ -581,6 +583,7 @@ public:
     void profile_reset_labeling_metrics() noexcept;
     void profile_record_dominance_check(Direction D, Stage S) noexcept;
     void profile_record_inner_bin_scan(Direction D, Stage S, uint64_t scanned_labels) noexcept;
+    void profile_record_signature_rejection(Direction D, Stage S) noexcept;
     void profile_record_new_label(Direction D, Stage S) noexcept;
     void profile_record_non_dominated_label(Direction D, Stage S) noexcept;
     void generate_arcs();

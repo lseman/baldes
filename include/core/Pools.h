@@ -149,159 +149,110 @@ public:
  */
 class LabelPool {
 private:
-    using Index                                  = uint32_t;
-    static constexpr size_t construct_batch_size = 4096;
+    static constexpr size_t labels_per_block = 64;
+    static constexpr size_t block_alignment  = 64;
 
-    size_t max_pool_size{};
-    Label *arena{nullptr};
-    size_t constructed_count{};
-    size_t next_unused{};
+    struct BucketArena {
+        std::vector<Label *> blocks;
+        size_t               next = 0;
+    };
 
-    std::vector<Index> free_indices;
-    size_t             free_list_size{};
+    size_t                   max_pool_size{};
+    size_t                   labels_in_use{};
+    size_t                   allocated_labels{};
+    std::vector<BucketArena> bucket_arenas;
+    std::vector<Label *>     recycled_labels;
 
-    [[nodiscard]] inline Index pointer_to_index(const Label *label) const noexcept {
-        return static_cast<Index>(label - arena);
+    BucketArena &arena_for(int bucket_id) {
+        const size_t index = bucket_id < 0 ? 0 : static_cast<size_t>(bucket_id) + 1;
+        if (index >= bucket_arenas.size()) bucket_arenas.resize(index + 1);
+        return bucket_arenas[index];
     }
 
-    [[nodiscard]] inline Label *label_at(Index index) noexcept { return arena + index; }
-
-    [[nodiscard]] inline const Label *label_at(Index index) const noexcept { return arena + index; }
-
-    inline void construct_until(size_t count) {
-        while (constructed_count < count) {
-            std::construct_at(arena + constructed_count);
-            ++constructed_count;
-        }
-    }
-
-    inline void construct_for_next_unused(size_t required_count) {
-        if (required_count <= constructed_count) return;
-        const size_t target_count =
-            std::min(max_pool_size, std::max(required_count, constructed_count + construct_batch_size));
-        construct_until(target_count);
+    Label *allocate_block(BucketArena &arena) {
+        if (allocated_labels + labels_per_block > max_pool_size) std::abort();
+        auto *block = static_cast<Label *>(
+            ::operator new[](labels_per_block * sizeof(Label), std::align_val_t{block_alignment}));
+        for (size_t i = 0; i < labels_per_block; ++i) std::construct_at(block + i);
+        arena.blocks.push_back(block);
+        allocated_labels += labels_per_block;
+        return block;
     }
 
 public:
     explicit LabelPool(size_t initial_pool_size, size_t max_pool_size = 5000000)
-        : max_pool_size(std::max(initial_pool_size, max_pool_size)) {
+        : max_pool_size(std::max(initial_pool_size, max_pool_size)), bucket_arenas(1) {}
 
-        arena = static_cast<Label *>(
-            ::operator new[](this->max_pool_size * sizeof(Label), std::align_val_t{alignof(Label)}));
-        free_indices.reserve(initial_pool_size);
-        construct_until(initial_pool_size);
-        next_unused = initial_pool_size;
-        for (Index i = 0; i < static_cast<Index>(initial_pool_size); ++i) { free_indices.push_back(i); }
-        free_list_size = initial_pool_size;
-    }
-
-    // Fast acquire with minimal branching
-    [[nodiscard]] inline Label *acquire() noexcept {
-        if (__builtin_expect(free_list_size > 0, 1)) {
-            Label *label = label_at(free_indices[--free_list_size]);
+    // Destination-aware allocation keeps labels of a bucket in contiguous
+    // cache-line-aligned blocks. bucket_id < 0 uses the fallback arena.
+    [[nodiscard]] inline Label *acquire(int bucket_id = -1) noexcept {
+        if (!recycled_labels.empty()) {
+            Label *label = recycled_labels.back();
+            recycled_labels.pop_back();
             label->reset();
+            ++labels_in_use;
             return label;
         }
 
-        if (__builtin_expect(next_unused >= max_pool_size, 0)) { std::abort(); }
-
-        const size_t index = next_unused++;
-        construct_for_next_unused(next_unused);
-        Label *label = arena + index;
+        if (__builtin_expect(labels_in_use >= max_pool_size, 0)) std::abort();
+        BucketArena &arena = arena_for(bucket_id);
+        const size_t block_index = arena.next / labels_per_block;
+        const size_t slot        = arena.next % labels_per_block;
+        if (block_index == arena.blocks.size()) allocate_block(arena);
+        Label *label = arena.blocks[block_index] + slot;
+        ++arena.next;
+        ++labels_in_use;
         label->reset();
         return label;
     }
 
-    // Batch acquire for better performance when multiple labels needed
-    inline void acquire_batch(Label **out_labels, size_t count) noexcept {
-        size_t acquired = 0;
-
-        // First, acquire from free list
-        if (free_list_size > 0) {
-            const size_t from_free = std::min(count, free_list_size);
-
-            for (size_t i = 0; i < from_free; ++i) {
-                Label *label = label_at(free_indices[--free_list_size]);
-                label->reset();
-                out_labels[i] = label;
-            }
-
-            acquired = from_free;
-        }
-
-        // Then allocate remaining from blocks
-        while (acquired < count) {
-            if (__builtin_expect(next_unused >= max_pool_size, 0)) { std::abort(); }
-            const size_t available   = max_pool_size - next_unused;
-            const size_t to_allocate = std::min(count - acquired, available);
-            const size_t base_index  = next_unused;
-            next_unused += to_allocate;
-            construct_for_next_unused(next_unused);
-
-            Label *base_ptr = arena + base_index;
-            for (size_t i = 0; i < to_allocate; ++i) {
-                (base_ptr + i)->reset();
-                out_labels[acquired + i] = base_ptr + i;
-            }
-            acquired += to_allocate;
-        }
+    inline void acquire_batch(Label **out_labels, size_t count, int bucket_id = -1) noexcept {
+        for (size_t i = 0; i < count; ++i) out_labels[i] = acquire(bucket_id);
     }
 
-    // Fast release without tracking in-use labels
     inline void release(Label *label) noexcept {
         if (!label) return;
-        if (__builtin_expect(free_list_size >= free_indices.size(), 0)) { free_indices.resize(free_list_size + 1); }
-        free_indices[free_list_size++] = pointer_to_index(label);
+        recycled_labels.push_back(label);
+        --labels_in_use;
     }
 
-    // Batch release for better performance
     inline void release_batch(Label **labels, size_t count) noexcept {
-        // Ensure capacity
-        if (__builtin_expect(free_indices.size() < free_list_size + count, 0)) {
-            free_indices.resize(free_list_size + count);
-        }
-
-        for (size_t i = 0; i < count; ++i) { free_indices[free_list_size + i] = pointer_to_index(labels[i]); }
-        free_list_size += count;
+        recycled_labels.reserve(recycled_labels.size() + count);
+        for (size_t i = 0; i < count; ++i) release(labels[i]);
     }
 
-    // Reset the pool - optimized version
-    inline void reset() noexcept {
-        if (free_indices.size() < next_unused) { free_indices.resize(next_unused); }
-        for (Index i = 0; i < static_cast<Index>(next_unused); ++i) { free_indices[i] = i; }
-        free_list_size = next_unused;
-    }
+    inline void reset() noexcept { fast_reset(); }
 
-    // Fast reset without rebuilding free list (for scenarios where we'll allocate fresh)
     inline void fast_reset() noexcept {
-        free_list_size = 0;
-        next_unused    = 0;
+        for (auto &arena : bucket_arenas) arena.next = 0;
+        recycled_labels.clear();
+        labels_in_use = 0;
     }
 
-    // Get statistics
-    [[nodiscard]] inline size_t get_free_count() const noexcept { return free_list_size; }
+    [[nodiscard]] inline size_t get_free_count() const noexcept { return allocated_labels - labels_in_use; }
 
     [[nodiscard]] inline size_t get_total_capacity() const noexcept { return max_pool_size; }
 
-    [[nodiscard]] inline size_t get_memory_usage() const noexcept { return max_pool_size * sizeof(Label); }
+    [[nodiscard]] inline size_t get_memory_usage() const noexcept { return allocated_labels * sizeof(Label); }
 
     // Cleanup all allocated memory
     void cleanup() noexcept {
-        if (arena) {
-            for (size_t i = 0; i < constructed_count; ++i) { std::destroy_at(arena + i); }
-            ::operator delete[](arena, std::align_val_t{alignof(Label)});
+        for (auto &arena : bucket_arenas) {
+            for (Label *block : arena.blocks) {
+                for (size_t i = 0; i < labels_per_block; ++i) std::destroy_at(block + i);
+                ::operator delete[](block, std::align_val_t{block_alignment});
+            }
         }
-        arena             = nullptr;
-        constructed_count = 0;
-        next_unused       = 0;
-        free_indices.clear();
-        free_list_size = 0;
+        bucket_arenas.clear();
+        recycled_labels.clear();
+        allocated_labels = 0;
+        labels_in_use = 0;
     }
 
     // Shrink to fit - reduce memory usage by removing unused blocks
     void shrink_to_fit() {
-        free_indices.resize(free_list_size);
-        free_indices.shrink_to_fit();
+        recycled_labels.shrink_to_fit();
+        for (auto &arena : bucket_arenas) arena.blocks.shrink_to_fit();
     }
 
     ~LabelPool() { cleanup(); }

@@ -874,7 +874,7 @@ void BucketGraph::common_initialization() {
 
     const int initial_bucket = get_bucket_number<D>(depot_id, initial_resources);
     auto     &label_pool     = assign_buckets<D>(label_pool_fw, label_pool_bw);
-    auto      depot_label    = label_pool->acquire();
+    auto      depot_label    = label_pool->acquire(initial_bucket);
     depot_label->initialize(initial_bucket, 0.0, initial_resources, depot_id);
     depot_label->is_extended = false;
     depot_label->addNode(depot_id);

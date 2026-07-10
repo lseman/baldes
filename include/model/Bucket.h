@@ -30,6 +30,7 @@ struct BucketLabelSoAView {
     std::span<Label *const>                    labels;
     std::span<const double>                    costs;
     std::array<std::span<const double>, R_SIZE> resources;
+    std::span<const uint64_t>                   visited_signatures;
 };
 
 struct alignas(64) Bucket {
@@ -47,6 +48,7 @@ struct alignas(64) Bucket {
     mutable std::pmr::vector<Label *> extra_labels;
     mutable std::vector<double>       soa_costs;
     mutable std::array<std::vector<double>, R_SIZE> soa_resources;
+    mutable std::vector<uint64_t>     soa_visited_signatures;
     mutable bool                      soa_valid = false;
 
     // Virtual split: an index that logically partitions the labels vector.
@@ -83,11 +85,13 @@ struct alignas(64) Bucket {
         if (soa_valid && soa_costs.size() == labels.size()) return;
 
         soa_costs.resize(labels.size());
+        soa_visited_signatures.resize(labels.size());
         for (auto &resource_values : soa_resources) { resource_values.resize(labels.size()); }
 
         for (size_t i = 0; i < labels.size(); ++i) {
             const Label *label = labels[i];
             soa_costs[i]       = label->cost;
+            soa_visited_signatures[i] = label->visited_signature();
             for (size_t r = 0; r < R_SIZE; ++r) { soa_resources[r][i] = label->resources[r]; }
         }
         soa_valid = true;
@@ -97,6 +101,8 @@ struct alignas(64) Bucket {
         BucketLabelSoAView view{};
         view.labels = std::span<Label *const>(labels.data() + offset, count);
         view.costs  = std::span<const double>(soa_costs.data() + offset, count);
+        view.visited_signatures =
+            std::span<const uint64_t>(soa_visited_signatures.data() + offset, count);
         for (size_t r = 0; r < R_SIZE; ++r) {
             view.resources[r] = std::span<const double>(soa_resources[r].data() + offset, count);
         }

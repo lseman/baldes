@@ -216,6 +216,12 @@ std::vector<double> BucketGraph::labeling_algorithm() {
                     }
                 }
 
+                // Extend first, then process labels grouped by destination
+                // bucket. This keeps the destination bucket and its SoA cache
+                // hot across the whole group and amortizes staged-tier merges.
+                static thread_local std::vector<Label *> destination_batch;
+                destination_batch.clear();
+                destination_batch.reserve(node_arcs.size());
                 for (size_t arc_idx = 0; arc_idx < node_arcs.size(); ++arc_idx) {
                     const auto &arc = node_arcs[arc_idx];
 
@@ -223,7 +229,14 @@ std::vector<double> BucketGraph::labeling_algorithm() {
                     if (arc_idx + 4 < node_arcs.size()) { __builtin_prefetch(&node_arcs[arc_idx + 4], 0, 3); }
 
                     auto new_label = Extend<D, S, ArcType::Bucket, Mutability::Mut, F>(label, arc);
+                    if (new_label != nullptr) destination_batch.push_back(new_label);
+                }
 
+                std::stable_sort(destination_batch.begin(), destination_batch.end(), [](const Label *a, const Label *b) {
+                    return a->vertex < b->vertex;
+                });
+
+                for (Label *new_label : destination_batch) {
                     // Process each new label produced by the extension.
                     if (new_label != nullptr) {
                         if constexpr (S == Stage::Enumerate) {
@@ -246,6 +259,14 @@ std::vector<double> BucketGraph::labeling_algorithm() {
                         mother_bucket.flush_extra_labels_if_large();
                         const auto &to_bucket_labels = mother_bucket.get_sorted_labels();
                         const auto &to_bucket_extra  = mother_bucket.get_extra_labels();
+                        constexpr bool uses_visited_dominance =
+                            S == Stage::Three || S == Stage::Four || S == Stage::Enumerate;
+                        const uint64_t new_visited_signature = new_label->visited_signature();
+#if defined(BALDES_HAS_SIMD)
+                        if constexpr (uses_visited_dominance) {
+                            if (!to_bucket_labels.empty()) mother_bucket.ensure_label_cache();
+                        }
+#endif
 
                         // Prefetch first few destination bucket labels
                         if (!to_bucket_labels.empty()) {
@@ -355,6 +376,13 @@ std::vector<double> BucketGraph::labeling_algorithm() {
                                         for (size_t lane = 0; lane < simd_width; ++lane) {
                                             ++inner_scan_count;
                                             if (!candidate[lane]) continue;
+                                            if constexpr (uses_visited_dominance) {
+                                                if ((mother_bucket.soa_visited_signatures[i + lane] &
+                                                     ~new_visited_signature) != 0) {
+                                                    if (profile_labeling) profile_record_signature_rejection(D, S);
+                                                    continue;
+                                                }
+                                            }
                                             Label *cur = to_bucket_labels[i + lane];
                                             if (__builtin_expect(cur->is_dominated, 0)) continue;
                                             if (dominates_resource_path<D, S>(new_label, cur)) {
@@ -422,6 +450,13 @@ std::vector<double> BucketGraph::labeling_algorithm() {
                                         for (size_t lane = 0; lane < simd_width; ++lane) {
                                             ++inner_scan_count;
                                             if (!candidate[lane]) continue;
+                                            if constexpr (uses_visited_dominance) {
+                                                if ((new_visited_signature &
+                                                     ~mother_bucket.soa_visited_signatures[i + lane]) != 0) {
+                                                    if (profile_labeling) profile_record_signature_rejection(D, S);
+                                                    continue;
+                                                }
+                                            }
                                             Label *cur = to_bucket_labels[i + lane];
                                             if (__builtin_expect(cur->is_dominated, 0)) continue;
                                             if (dominates_resource_path<D, S>(cur, new_label)) {
@@ -489,6 +524,21 @@ std::vector<double> BucketGraph::labeling_algorithm() {
                                         for (size_t lane = 0; lane < simd_width; ++lane) {
                                             ++inner_scan_count;
                                             if (!candidate[lane]) continue;
+                                            if constexpr (uses_visited_dominance) {
+                                                if (cur_dominates_new[lane] &&
+                                                    (mother_bucket.soa_visited_signatures[i + lane] &
+                                                     ~new_visited_signature) != 0) {
+                                                    cur_dominates_new[lane] = false;
+                                                    if (profile_labeling) profile_record_signature_rejection(D, S);
+                                                }
+                                                if (new_dominates_cur[lane] &&
+                                                    (new_visited_signature &
+                                                     ~mother_bucket.soa_visited_signatures[i + lane]) != 0) {
+                                                    new_dominates_cur[lane] = false;
+                                                    if (profile_labeling) profile_record_signature_rejection(D, S);
+                                                }
+                                                if (!cur_dominates_new[lane] && !new_dominates_cur[lane]) continue;
+                                            }
                                             Label *cur = to_bucket_labels[i + lane];
                                             if (__builtin_expect(cur->is_dominated, 0)) continue;
                                             if (cur_dominates_new[lane] && is_dominated<D, S>(new_label, cur)) {
@@ -916,7 +966,7 @@ inline auto BucketGraph::Extend(const std::conditional_t<M == Mutability::Mut, L
 
     // Create and initialize a new label
     auto &label_pool = assign_buckets<D>(label_pool_fw, label_pool_bw);
-    auto  new_label  = label_pool->acquire();
+    auto  new_label  = label_pool->acquire(to_bucket);
     new_label->initialize(to_bucket, new_cost, new_resources, node_id);
     new_label->vertex    = to_bucket;
     new_label->real_cost = L_prime->real_cost + distance; // Use cached distance
@@ -1147,6 +1197,9 @@ inline bool BucketGraph::DominatedInCompWiseSmallerBuckets(const Label *__restri
     const int    label_rank = bucket_scc_rank[b_L];
     const auto  &label_res  = L->resources;
     const size_t n_res      = options.resources.size();
+    const uint64_t label_visited_signature = L->visited_signature();
+    constexpr bool uses_visited_dominance =
+        S == Stage::Three || S == Stage::Four || S == Stage::Enumerate;
 
     // Use static thread-local stack to avoid repeated allocations
     static thread_local std::vector<int> stack_buffer;
@@ -1216,6 +1269,12 @@ inline bool BucketGraph::DominatedInCompWiseSmallerBuckets(const Label *__restri
                 if (!stdx::any_of(candidate)) continue;
                 for (size_t lane = 0; lane < simd_width; ++lane) {
                     if (!candidate[lane]) continue;
+                    if constexpr (uses_visited_dominance) {
+                        if ((view.visited_signatures[i + lane] & ~label_visited_signature) != 0) {
+                            if (profile_labeling) profile_record_signature_rejection(D, S);
+                            continue;
+                        }
+                    }
                     Label *cur = view.labels[i + lane];
                     if (cur->is_dominated) continue;
                     if (is_dominated<D, S>(L, cur)) {
@@ -1251,6 +1310,13 @@ inline bool BucketGraph::DominatedInCompWiseSmallerBuckets(const Label *__restri
                     }
                 }
                 if (!resource_candidate) continue;
+
+                if constexpr (uses_visited_dominance) {
+                    if ((view.visited_signatures[i] & ~label_visited_signature) != 0) {
+                        if (profile_labeling) profile_record_signature_rejection(D, S);
+                        continue;
+                    }
+                }
 
                 Label *cur = view.labels[i];
                 if (cur->is_dominated) continue;
@@ -1292,6 +1358,13 @@ inline bool BucketGraph::DominatedInCompWiseSmallerBuckets(const Label *__restri
                 }
             }
             if (!resource_candidate) continue;
+
+            if constexpr (uses_visited_dominance) {
+                if ((view.visited_signatures[i] & ~label_visited_signature) != 0) {
+                    if (profile_labeling) profile_record_signature_rejection(D, S);
+                    continue;
+                }
+            }
 
             Label *cur = view.labels[i];
             if (cur->is_dominated) continue;
