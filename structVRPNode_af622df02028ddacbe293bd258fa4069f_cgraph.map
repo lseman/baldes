@@ -1,0 +1,5 @@
+<map id="VRPNode::assignSCCIds" name="VRPNode::assignSCCIds">
+<area shape="rect" id="Node000001" title="Assigns SCC IDs to a vector of VRPNodes." alt="" coords="5,5,174,31"/>
+<area shape="rect" id="Node000002" href="$structVRPNode.html#a4527792eb60e8983029ea82f5886d2e2" title="Compute the strongly connected components (SCCs) for a VRP graph." alt="" coords="222,5,391,31"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="174,16,206,16,206,21,174,21"/>
+</map>

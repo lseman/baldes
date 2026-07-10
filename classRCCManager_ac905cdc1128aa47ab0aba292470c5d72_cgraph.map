@@ -1,0 +1,7 @@
+<map id="RCCManager::selectActiveCuts" name="RCCManager::selectActiveCuts">
+<area shape="rect" id="Node000001" title="Update active cuts with probabilistic scoring. Returns indices of selected cuts sorted by score." alt="" coords="5,42,209,68"/>
+<area shape="rect" id="Node000002" href="$classRCCManager.html#a7bd633c7cd80648ec04e15e42d56c1f2" title="Compute selection score for probabilistic cut selection. Score = dual_strength * age_penalty * inclus..." alt="" coords="257,5,465,46"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="209,41,241,37,241,42,209,46"/>
+<area shape="rect" id="Node000003" href="$classRCCManager.html#a49c227891d47068638f02c2bf7d91614" title=" " alt="" coords="258,70,464,96"/>
+<area shape="poly" id="edge2_Node000001_Node000003" title=" " alt="" coords="209,64,243,67,242,73,209,69"/>
+</map>

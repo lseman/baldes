@@ -1,0 +1,41 @@
+<map id="BucketGraph::extend_path" name="BucketGraph::extend_path">
+<area shape="rect" id="Node000001" title=" " alt="" coords="5,376,179,402"/>
+<area shape="rect" id="Node000002" href="$classBucketGraph.html#ac36d91be18f5093577ee00a38ceb771e" title=" " alt="" coords="227,267,369,293"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="117,373,257,298,260,303,120,378"/>
+<area shape="rect" id="Node000019" href="$classBucketGraph.html#ad36a543a58c7d3cd4ded313dd5069f03" title="Marks a node as visited in the bitmap." alt="" coords="428,511,584,552"/>
+<area shape="poly" id="edge21_Node000001_Node000019" title=" " alt="" coords="133,400,431,503,429,508,131,405"/>
+<area shape="rect" id="Node000003" href="$classBucketGraph.html#af129eff306551dc7cc7fe00b919bbbd0" title="Assigns the buckets based on the specified direction." alt="" coords="861,33,1002,73"/>
+<area shape="poly" id="edge2_Node000002_Node000003" title=" " alt="" coords="299,266,310,224,331,167,366,108,389,82,416,60,467,34,523,16,581,6,639,3,697,5,751,10,846,27,845,32,751,15,696,10,639,8,582,12,524,21,469,39,418,65,392,85,370,111,336,169,315,226,304,267"/>
+<area shape="rect" id="Node000004" href="$classBucketGraph.html#abb791c45d27a9425607480e3101f7d28" title=" " alt="" coords="644,61,811,101"/>
+<area shape="poly" id="edge3_Node000002_Node000004" title=" " alt="" coords="301,265,314,230,337,183,371,135,392,115,416,97,467,76,522,64,577,61,628,63,628,68,577,66,523,69,469,81,418,102,395,119,375,139,342,186,319,232,306,267"/>
+<area shape="rect" id="Node000005" href="$classBucketGraph.html#a07082dcbaab12cbea07fbe16acee9bcf" title="Get the opposite bucket number for a given bucket index." alt="" coords="417,111,594,152"/>
+<area shape="poly" id="edge5_Node000002_Node000005" title=" " alt="" coords="307,265,351,215,382,187,416,162,423,157,426,162,418,166,385,191,355,219,311,268"/>
+<area shape="rect" id="Node000006" href="$classBucketGraph.html#ad15267e0cffaa8dc5222028409c9e082" title=" " alt="" coords="438,176,573,202"/>
+<area shape="poly" id="edge7_Node000002_Node000006" title=" " alt="" coords="318,264,362,238,416,212,436,205,437,210,418,217,365,243,321,269"/>
+<area shape="rect" id="Node000007" href="$classBucketGraph.html#a7ffbc9d76efacdae82ed10f5b7009348" title=" " alt="" coords="436,226,575,267"/>
+<area shape="poly" id="edge8_Node000002_Node000007" title=" " alt="" coords="369,266,421,257,422,263,370,271"/>
+<area shape="rect" id="Node000008" href="$classBucketGraph.html#aac3c165dfb9837288ad63ac34ad91041" title="Checks if a node has been visited based on a bitmap." alt="" coords="432,291,580,332"/>
+<area shape="poly" id="edge9_Node000002_Node000008" title=" " alt="" coords="370,288,417,295,416,301,369,293"/>
+<area shape="rect" id="Node000009" href="$classBucketGraph.html#af2436dd7416920cc8f4bed442dc84c86" title="Processes all resources by iterating through them and applying constraints." alt="" coords="431,357,580,397"/>
+<area shape="poly" id="edge10_Node000002_Node000009" title=" " alt="" coords="323,291,418,341,433,348,431,353,416,346,320,296"/>
+<area shape="poly" id="edge18_Node000002_Node000019" title=" " alt="" coords="310,292,371,395,384,425,391,450,400,473,419,497,423,500,420,504,415,500,395,476,386,452,379,427,367,397,306,294"/>
+<area shape="rect" id="Node000020" href="$classBucketGraph.html#a9902b5f8355e06f0ffaf1101eb350a6e" title=" " alt="" coords="429,446,582,487"/>
+<area shape="poly" id="edge19_Node000002_Node000020" title=" " alt="" coords="312,292,356,345,419,407,457,435,454,440,415,411,352,348,308,295"/>
+<area shape="poly" id="edge4_Node000004_Node000003" title=" " alt="" coords="811,67,845,62,846,68,812,72"/>
+<area shape="poly" id="edge6_Node000005_Node000004" title=" " alt="" coords="594,109,628,101,629,106,595,114"/>
+<area shape="rect" id="Node000010" href="$BucketRes_8h.html#a01cb6322e983d262cc6b687e0894e278" title=" " alt="" coords="642,200,813,226"/>
+<area shape="poly" id="edge11_Node000009_Node000010" title=" " alt="" coords="576,354,593,342,603,329,610,316,615,289,621,262,628,248,641,235,644,232,648,236,644,239,633,252,626,264,620,290,615,318,608,332,596,346,579,358"/>
+<area shape="rect" id="Node000011" href="$BucketRes_8h.html#a5cb124036dd2244f498826336ba75678" title=" " alt="" coords="645,250,810,275"/>
+<area shape="poly" id="edge12_Node000009_Node000011" title=" " alt="" coords="571,354,593,342,607,328,616,314,625,300,641,286,651,280,654,284,644,290,629,303,620,317,611,331,596,346,574,358"/>
+<area shape="rect" id="Node000012" href="$BucketRes_8h.html#adc9ed5f87789d0ecbacc1793d27f9855" title=" " alt="" coords="659,299,796,340"/>
+<area shape="poly" id="edge13_Node000009_Node000012" title=" " alt="" coords="580,355,643,339,645,344,581,360"/>
+<area shape="rect" id="Node000015" href="$BucketRes_8h.html#a621f51219a252a664bbc9d0240e9c646" title=" " alt="" coords="649,364,806,390"/>
+<area shape="poly" id="edge14_Node000009_Node000015" title=" " alt="" coords="581,374,634,374,634,380,581,380"/>
+<area shape="rect" id="Node000016" href="$BucketRes_8h.html#a91340d0cebc8cce4adc13c109946b6c3" title=" " alt="" coords="645,414,810,455"/>
+<area shape="poly" id="edge15_Node000009_Node000016" title=" " alt="" coords="581,394,632,407,631,412,580,399"/>
+<area shape="rect" id="Node000017" href="$BucketRes_8h.html#aa271d5b57809ba00a31d11a88861bc15" title=" " alt="" coords="646,479,809,505"/>
+<area shape="poly" id="edge16_Node000009_Node000017" title=" " alt="" coords="574,396,596,408,611,423,620,437,629,451,644,464,654,470,651,475,641,469,625,455,616,440,607,426,593,413,571,400"/>
+<area shape="rect" id="Node000018" href="$BucketRes_8h.html#af7d18c39ae22f1ea2c5d3cd25971c9d2" title=" " alt="" coords="649,528,806,554"/>
+<area shape="poly" id="edge17_Node000009_Node000018" title=" " alt="" coords="579,396,596,408,608,422,615,437,620,464,626,490,633,503,644,515,648,518,644,522,641,519,628,506,621,492,615,465,610,438,603,425,593,412,576,400"/>
+<area shape="poly" id="edge20_Node000020_Node000020" title=" " alt="" coords="466,446,464,436,471,427,485,421,506,419,528,422,542,428,539,433,527,427,506,425,486,427,474,431,470,437,471,445"/>
+</map>

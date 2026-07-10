@@ -1,0 +1,7 @@
+<map id="precedes" name="precedes">
+<area shape="rect" id="Node000001" title="Checks if element &#39;a&#39; precedes element &#39;b&#39; in the given strongly connected components (SCCs)." alt="" coords="5,5,80,31"/>
+<area shape="rect" id="Node000002" href="$classUnionFind.html#a65a85b39d8df2490b9ea9ef465e112d6" title=" " alt="" coords="128,5,312,31"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="80,16,112,16,112,21,80,21"/>
+<area shape="rect" id="Node000003" href="$classUnionFind.html#a062823e09caac93290691c9ce81edfb3" title=" " alt="" coords="360,5,466,31"/>
+<area shape="poly" id="edge2_Node000002_Node000003" title=" " alt="" coords="313,16,344,16,344,21,313,21"/>
+</map>

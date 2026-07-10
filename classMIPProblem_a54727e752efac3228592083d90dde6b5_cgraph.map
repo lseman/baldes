@@ -1,0 +1,8 @@
+<map id="MIPProblem::operator=" name="MIPProblem::operator=">
+<area shape="rect" id="Node000001" title=" " alt="" coords="5,13,160,38"/>
+<area shape="rect" id="Node000002" href="$classGurobiEnvSingleton.html#a49c3ce63088629c2246dec252a73df16" title=" " alt="" coords="427,5,562,46"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="160,23,411,23,411,28,160,28"/>
+<area shape="rect" id="Node000003" href="$classMIPProblem.html#adaf09269c578d30ea17724fed7535bb0" title=" " alt="" coords="208,38,379,64"/>
+<area shape="poly" id="edge2_Node000001_Node000003" title=" " alt="" coords="160,32,192,36,192,41,160,38"/>
+<area shape="poly" id="edge3_Node000003_Node000002" title=" " alt="" coords="379,38,412,33,412,39,380,43"/>
+</map>

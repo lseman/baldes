@@ -1,0 +1,19 @@
+<map id="core" name="core">
+<area shape="rect" id="node1" href="dir_5c067e43b62dc1a915e487a737196819.html" title="model" alt="" coords="26,126,83,152"/>
+<area shape="rect" id="node2" href="dir_653ed63d62fa3b5c4f20bdbe070dc427.html" title="routing" alt="" coords="107,126,168,152"/>
+<area shape="rect" id="node3" href="dir_eb848a6d5577302b475c9b576c58ba0d.html" title="cuts" alt="" coords="192,126,238,152"/>
+<area shape="rect" id="node4" href="dir_ee0edf35ed50fc491863c0018a344c78.html" title="algebra" alt="" coords="262,126,325,152"/>
+<area shape="rect" id="node5" href="dir_fba38f648377aa56ae5d69782adf9e53.html" title="math" alt="" coords="350,126,400,152"/>
+<area shape="rect" id="node6" href="dir_3d69f64eaf81436fe2b22361382717e5.html" title="core" alt="" coords="192,52,238,78"/>
+<area shape="poly" id="edge1" href="dir_000004_000014.html" alt="" coords="192,79,97,122,94,117,190,75"/>
+<area shape="rect" id="edge1-headlabel" href="dir_000004_000014.html" title="4" alt="" coords="98,118,105,133"/>
+<area shape="poly" id="edge2" href="dir_000004_000019.html" alt="" coords="203,81,163,117,160,113,200,77"/>
+<area shape="rect" id="edge2-headlabel" href="dir_000004_000019.html" title="1" alt="" coords="166,112,173,127"/>
+<area shape="poly" id="edge3" href="dir_000004_000005.html" alt="" coords="217,78,217,110,212,110,212,78"/>
+<area shape="rect" id="edge3-headlabel" href="dir_000004_000005.html" title="1" alt="" coords="220,100,227,115"/>
+<area shape="poly" id="edge4" href="dir_000004_000000.html" alt="" coords="230,77,271,113,267,117,226,81"/>
+<area shape="rect" id="edge4-headlabel" href="dir_000004_000000.html" title="1" alt="" coords="269,100,276,115"/>
+<area shape="poly" id="edge5" href="dir_000004_000011.html" alt="" coords="239,75,336,117,334,122,237,79"/>
+<area shape="rect" id="edge5-headlabel" href="dir_000004_000011.html" title="3" alt="" coords="332,103,339,118"/>
+<area shape="rect" id="clust1" href="dir_d44c64559bbebec7f509842c48db8b23.html" title="include" alt="" coords="16,16,411,162"/>
+</map>

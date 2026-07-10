@@ -1,0 +1,13 @@
+<map id="BucketGraph::collect_concatenation_candidate" name="BucketGraph::collect_concatenation_candidate">
+<area shape="rect" id="Node000001" title=" " alt="" coords="5,79,178,120"/>
+<area shape="rect" id="Node000002" href="$classBucketGraph.html#ad335ca96064db4533616ab8798a75819" title="Checks the feasibility of a given forward and backward label." alt="" coords="227,22,366,62"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="166,76,211,63,213,68,167,81"/>
+<area shape="rect" id="Node000005" href="$namespacenumericutils.html#a2124ad1e887fe39c413948ee927c879e" title=" " alt="" coords="244,87,348,112"/>
+<area shape="poly" id="edge4_Node000001_Node000005" title=" " alt="" coords="178,97,229,97,229,102,178,102"/>
+<area shape="rect" id="Node000006" href="$classBucketGraph.html#a070f3372010cfdc7953354657af97395" title=" " alt="" coords="226,136,367,177"/>
+<area shape="poly" id="edge5_Node000001_Node000006" title=" " alt="" coords="167,118,211,130,210,135,166,123"/>
+<area shape="rect" id="Node000003" href="$classBucketGraph.html#ad15267e0cffaa8dc5222028409c9e082" title=" " alt="" coords="415,5,549,31"/>
+<area shape="poly" id="edge2_Node000002_Node000003" title=" " alt="" coords="366,31,399,26,400,31,366,36"/>
+<area shape="rect" id="Node000004" href="$namespacenumericutils.html#a30fadd8aa82c3a907ce52a6c1735a378" title=" " alt="" coords="428,55,536,80"/>
+<area shape="poly" id="edge3_Node000002_Node000004" title=" " alt="" coords="366,49,413,55,412,61,366,54"/>
+</map>

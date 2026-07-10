@@ -1,0 +1,9 @@
+<map id="SolverInterface" name="SolverInterface">
+<area shape="rect" id="Node000001" title=" " alt="" coords="118,5,227,31"/>
+<area shape="rect" id="Node000002" href="$classGurobiSolver.html" title=" " alt="" coords="5,79,102,105"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="141,42,75,81,72,76,138,37"/>
+<area shape="rect" id="Node000003" href="$classHighsSolver.html" title=" " alt="" coords="126,79,218,105"/>
+<area shape="poly" id="edge2_Node000001_Node000003" title=" " alt="" coords="175,46,175,79,170,79,170,46"/>
+<area shape="rect" id="Node000004" href="$classIPMSolver.html" title=" " alt="" coords="243,79,325,105"/>
+<area shape="poly" id="edge3_Node000001_Node000004" title=" " alt="" coords="205,37,267,76,264,81,202,42"/>
+</map>
