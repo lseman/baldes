@@ -10,7 +10,7 @@
 #pragma once
 
 #include "cuts/Cut.h"
-#include "data/Path.h"
+#include "model/Path.h"
 #include "routing/Serializer.h"
 
 struct Snapshot {

@@ -9,9 +9,9 @@
 #pragma once
 
 #include "math/Common.h"
-#include "data/Label.h"
-#include "data/Path.h"
-#include "data/VRPNode.h"
+#include "model/Label.h"
+#include "model/Path.h"
+#include "model/VRPNode.h"
 
 /**
  * @struct PSTEPDuals

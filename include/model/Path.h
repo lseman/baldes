@@ -13,7 +13,7 @@
 #include <limits>
 #include <vector>
 
-#include "data/Arc.h"
+#include "model/Arc.h"
 #include "math/Common.h"
 #include "math/RNG.h"
 #include "routing/Serializer.h"

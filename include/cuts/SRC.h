@@ -9,11 +9,11 @@
 #include "cuts/Cut.h"
 #include "core/Definitions.h"
 #include "core/Pools.h"
-#include "SparseMatrix.h"
+#include "algebra/SparseMatrix.h"
 #include "ankerl/unordered_dense.h"
-#include "bucket/BucketGraph.h"
-#include "miphandler/LinExp.h"
-#include "miphandler/MIPHandler.h"
+#include "pricing/BucketGraph.h"
+#include "mip/LinExp.h"
+#include "mip/MIPHandler.h"
 // #include "xxhash.h"
 //
 #include <cstdint>

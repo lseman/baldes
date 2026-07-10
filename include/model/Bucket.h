@@ -11,10 +11,10 @@
 #include <memory_resource>
 #include <span>
 
-#include "data/Arc.h"
+#include "model/Arc.h"
 #include "core/Definitions.h"
-#include "data/Label.h"
-#include "NumericUtils.h"
+#include "model/Label.h"
+#include "utils/NumericUtils.h"
 #include "config.h"
 /**
  * @struct Bucket

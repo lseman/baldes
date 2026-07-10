@@ -5,7 +5,7 @@
  */
 
 #pragma once
-#include "LinExp.h"
+#include "mip/LinExp.h"
 #include "ankerl/unordered_dense.h"
 #include <atomic>
 

@@ -5,18 +5,18 @@
  */
 #pragma once
 
-#include "../third_party/pdqsort.h"
+#include "../../third_party/pdqsort.h"
 
 #include "bnb/BCP.h"
 
 #include "core/Definitions.h"
 
 #include "utils/MST.h"
-#include "Node.h"
+#include "bnb/Node.h"
 #include "utils/Reader.h"
 #include "routing/VRPCandidate.h"
 
-#include "data/VRPNode.h"
+#include "model/VRPNode.h"
 #include "ankerl/unordered_dense.h"
 
 #include <optional>

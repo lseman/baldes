@@ -8,7 +8,7 @@
 #include <memory>
 
 #include "core/Definitions.h"
-#include "SparseMatrix.h" // Include your SparseMatrix class
+#include "algebra/SparseMatrix.h"
 
 #ifdef GUROBI
 #include "gurobi_c++.h"
@@ -23,10 +23,10 @@
 #include <string>
 #include <vector>
 
-#include "Constraint.h"
-#include "LinExp.h"
-#include "MIPHelper.h"
-#include "Variable.h"
+#include "mip/Constraint.h"
+#include "mip/LinExp.h"
+#include "mip/MIPHelper.h"
+#include "mip/Variable.h"
 
 using baldesCtrPtr = std::shared_ptr<baldesCtr>;
 using baldesVarPtr = std::shared_ptr<baldesVar>;

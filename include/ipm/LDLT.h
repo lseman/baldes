@@ -12,7 +12,7 @@
 #include <vector>
 #define EIGEN_USE_MKL_ALL
 
-#include "Evaluator.h"
+#include "algebra/Evaluator.h"
 // #include "EvaluatorGPU.h"
 
 #include <Eigen/Sparse>
@@ -23,7 +23,7 @@
 #include <set>
 #include <stdexec/execution.hpp>
 
-#include "AMD.h"
+#include "ipm/AMD.h"
 template <typename T>
 using BVector = std::vector<T>;
 

@@ -4,7 +4,7 @@
  *
  */
 #pragma once
-#include "Variable.h"
+#include "mip/Variable.h"
 #include <iostream>
 #include <string>
 #include <unordered_map>

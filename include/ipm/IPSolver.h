@@ -25,7 +25,7 @@
 #include <vector>
 
 // #include "CuSolver.h"
-#include "LDLT.h"
+#include "ipm/LDLT.h"
 
 /**
  * @struct OptimizationData

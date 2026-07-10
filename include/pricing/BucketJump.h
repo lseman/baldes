@@ -8,9 +8,9 @@
 #include <execution>
 #include <unordered_set>
 
-#include "BucketGraph.h"
-#include "Hashes.h"
-#include "data/VRPNode.h"
+#include "pricing/BucketGraph.h"
+#include "utils/Hashes.h"
+#include "model/VRPNode.h"
 #include "ankerl/unordered_dense.h"
 /**
  * Updates the set of buckets based on the given parameters.

@@ -7,7 +7,7 @@
  */
 
 #pragma once
-#include "SolverInterface.h"
+#include "solvers/SolverInterface.h"
 #include <iostream>
 
 #include "Highs.h"

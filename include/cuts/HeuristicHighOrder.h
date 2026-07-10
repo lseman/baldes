@@ -15,13 +15,13 @@
 
 #include "core/Definitions.h"
 #include "search/Dual.h"
-#include "data/Path.h"
+#include "model/Path.h"
 #include "math/RNG.h"
-#include "data/VRPNode.h"
+#include "model/VRPNode.h"
 #include "utils/NumericUtils.h"
 
 // include CutHelper
-#include "CutHelper.h"
+#include "cuts/CutHelper.h"
 #include "cuts/CutIntelligence.h"
 
 // namespace std {

@@ -7,13 +7,13 @@
 #include <pybind11/stl.h>
 #include <pybind11/stl_bind.h>
 
-#include "bucket/BucketGraph.h"
-#include "bucket/BucketSolve.h"
-#include "bucket/BucketUtils.h"
+#include "pricing/BucketGraph.h"
+#include "pricing/BucketSolve.h"
+#include "pricing/BucketUtils.h"
 #include "core/Definitions.h"
-#include "data/Arc.h"
-#include "data/Label.h"
-#include "data/VRPNode.h"
+#include "model/Arc.h"
+#include "model/Label.h"
+#include "model/VRPNode.h"
 #include "search/Dual.h"
 
 #ifdef GUROBI
@@ -21,7 +21,7 @@
 #include "gurobi_c.h"
 #endif
 
-#include "../third_party/small_vector.hpp"
+#include "../../third_party/small_vector.hpp"
 
 namespace py = pybind11;
 using namespace pybind11::literals; // Enables _a suffix for named arguments

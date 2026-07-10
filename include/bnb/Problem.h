@@ -6,7 +6,7 @@
 #pragma once
 
 #include "core/Definitions.h"
-#include "data/VRPNode.h"
+#include "model/VRPNode.h"
 #include "bnb/Node.h"
 #include <memory>
 

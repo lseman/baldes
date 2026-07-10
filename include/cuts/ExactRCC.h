@@ -11,7 +11,7 @@
 #include "gurobi_c++.h"
 #include "gurobi_c.h"
 
-#include "Hashes.h"
+#include "utils/Hashes.h"
 
 #include <cmath>
 #include <iostream>

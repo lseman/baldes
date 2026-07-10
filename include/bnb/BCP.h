@@ -6,31 +6,31 @@
 
 #pragma once
 
-#include "data/Arc.h"
+#include "model/Arc.h"
 #include "cuts/Cut.h"
 #include "core/Definitions.h"
 #include "cuts/RCC.h"
-#include "data/VRPNode.h"
-#include "miphandler/LinExp.h"
-#include "miphandler/MIPHandler.h"
+#include "model/VRPNode.h"
+#include "mip/LinExp.h"
+#include "mip/MIPHandler.h"
 
 // #include "search/TR.h"
 #include "bnb/Node.h"
-#include "bucket/BucketGraph.h"
-#include "bucket/BucketSolve.h"
-#include "bucket/BucketUtils.h"
+#include "pricing/BucketGraph.h"
+#include "pricing/BucketSolve.h"
+#include "pricing/BucketUtils.h"
 #include "solvers/Gurobi.h"
 
 #ifdef STAB
-#include "extra/Stabilization.h"
+#include "stabilization/Stabilization.h"
 #endif
 
 #include "utils/Reader.h"
 #include "bnb/Problem.h"
 
 #ifdef RCC
-#include "../third_party/cvrpsep/capsep.h"
-#include "../third_party/cvrpsep/cnstrmgr.h"
+#include "../../third_party/cvrpsep/capsep.h"
+#include "../../third_party/cvrpsep/cnstrmgr.h"
 // #include "ModernRCC.h"
 #endif
 
@@ -38,7 +38,7 @@
 #include "cuts/ExactRCC.h"
 #endif
 
-#include "Hashes.h"
+#include "utils/Hashes.h"
 
 #if defined(IPM)
 #include "ipm/IPSolver.h"

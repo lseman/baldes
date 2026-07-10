@@ -6,7 +6,7 @@
 #pragma once
 
 #include "math/Common.h"
-#include "SparseMatrix.h"
+#include "algebra/SparseMatrix.h"
 #include "ankerl/unordered_dense.h"
 
 // General definitions

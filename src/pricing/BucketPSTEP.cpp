@@ -8,11 +8,11 @@
 
 #include "math/Common.h"
 #include "core/Definitions.h"
-#include "bucket/BucketGraph.h"
-#include "bucket/BucketSolve.h"
-#include "bucket/BucketUtils.h"
+#include "pricing/BucketGraph.h"
+#include "pricing/BucketSolve.h"
+#include "pricing/BucketUtils.h"
 
-#include "../third_party/pdqsort.h"
+#include "../../third_party/pdqsort.h"
 
 #include "utils/MST.h"
 #include <omp.h>
