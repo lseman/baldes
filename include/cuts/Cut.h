@@ -6,10 +6,10 @@
 #pragma once
 #include "math/Common.h"
 #include "core/Definitions.h"
-#include "data/Label.h"
-#include "data/Path.h"
+#include "model/Label.h"
+#include "model/Path.h"
 #include "routing/Serializer.h"
-#include "miphandler/Constraint.h"
+#include "mip/Constraint.h"
 struct SRCPermutation {
     std::vector<int>    num;
     std::vector<double> frac;

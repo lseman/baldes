@@ -5,8 +5,8 @@
 
 #pragma once
 
-#include "BucketConcat.h"
-#include "BucketGraph.h"
+#include "pricing/BucketConcat.h"
+#include "pricing/BucketGraph.h"
 
 template <Stage S, Symmetry SYM>
 std::vector<Label *> BucketGraph::bi_labeling_algorithm() {

@@ -10,16 +10,16 @@
 #include <condition_variable>
 #include <cstring>
 
-#include "UnionFind.h"
+#include "utils/UnionFind.h"
 #include "core/CostFunction.h"
 #include "core/Definitions.h"
 #include "core/Pools.h"
 #include "core/Stats.h"
 #include "cuts/Cut.h"
 #include "cuts/RCC.h"
-#include "data/Bucket.h"
-#include "data/Trees.h"
-#include "data/VRPNode.h"
+#include "model/Bucket.h"
+#include "model/Trees.h"
+#include "model/VRPNode.h"
 #include "graph/SCCFinder.h"
 #include "search/Dual.h"
 #include "search/PSTEP.h"

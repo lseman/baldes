@@ -4,7 +4,7 @@
  *
  */
 #pragma once
-#include "data/Arc.h"
+#include "model/Arc.h"
 #include "math/Common.h"
 #include "cuts/Cut.h"
 #include "core/Definitions.h"

@@ -14,25 +14,25 @@
 
 #include "core/Definitions.h"
 #include "search/Dual.h"
-#include "Hashes.h"
-#include "data/Path.h"
+#include "utils/Hashes.h"
+#include "model/Path.h"
 #include "cuts/SRC.h"
 #include "routing/Serializer.h"
 #include "core/State.h"
 #include "routing/VRPCandidate.h"
-#include "miphandler/Constraint.h"
+#include "mip/Constraint.h"
 
 // include unordered_dense_map
 #include "ankerl/unordered_dense.h"
 #include "solvers/SolverInterface.h"
 
 #ifdef RCC
-#include "../third_party/cvrpsep/capsep.h"
-#include "../third_party/cvrpsep/cnstrmgr.h"
+#include "../../third_party/cvrpsep/capsep.h"
+#include "../../third_party/cvrpsep/cnstrmgr.h"
 // #include "ModernRCC.h"
 #endif
 
-#include "miphandler/MIPHandler.h"
+#include "mip/MIPHandler.h"
 
 #ifdef GUROBI
 #include "gurobi_c++.h"

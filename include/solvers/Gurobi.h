@@ -11,7 +11,7 @@
 
 #include <iostream>
 
-#include "SolverInterface.h"
+#include "solvers/SolverInterface.h"
 
 struct GRBModelWrapper {
     std::unique_ptr<GRBModel> model;

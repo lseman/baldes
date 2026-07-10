@@ -11,9 +11,9 @@
 #include "gurobi_c.h"
 #endif
 
-#include "../third_party/pdqsort.h"
+#include "../../third_party/pdqsort.h"
 
-#include "Hashes.h"
+#include "utils/Hashes.h"
 
 #include <exec/static_thread_pool.hpp>
 #include <stdexec/execution.hpp>
@@ -36,7 +36,7 @@
 
 #include "ankerl/unordered_dense.h"
 
-#include "../third_party/small_vector.hpp"
+#include "../../third_party/small_vector.hpp"
 
 #include <fmt/color.h>
 #include <fmt/core.h>

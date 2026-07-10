@@ -255,11 +255,11 @@ configure_file(${CMAKE_CURRENT_SOURCE_DIR}/config.h.in ${CMAKE_CURRENT_BINARY_DI
 # Source Files
 #-------------------------------------------------------------------------------
 set(SOURCES
-  src/BCP.cpp
-  src/BucketGraph.cpp
-  src/MIPHandler.cpp
-  src/Branching.cpp
-  src/BucketPSTEP.cpp
+  src/bnb/BCP.cpp
+  src/bnb/Branching.cpp
+  src/mip/MIPHandler.cpp
+  src/pricing/BucketGraph.cpp
+  src/pricing/BucketPSTEP.cpp
 )
 
 set(CVRPSEP_SOURCES
@@ -306,14 +306,14 @@ set(MUSSPSOURCE
   third_party/muSSP/Sink.cpp
 )
 
-set(IPM_SOURCES src/IPSolver.cpp)
-set(SRC_SOURCES src/SRC.cpp)
+set(IPM_SOURCES src/ipm/IPSolver.cpp)
+set(SRC_SOURCES src/cuts/SRC.cpp)
 
 # Define a list for the source files that will be included
 set(EXECUTABLE_SOURCES ${SOURCES} ${HGS_SOURCES} ${FPSOURCE})
 
 if(RCC)
-  list(APPEND EXECUTABLE_SOURCES ${CVRPSEP_SOURCES} src/RCC.cpp)
+  list(APPEND EXECUTABLE_SOURCES ${CVRPSEP_SOURCES} src/cuts/RCC.cpp)
 endif()
 
 if(IPM OR IPM_ACEL)
@@ -331,11 +331,6 @@ endif()
 # Include directories for third-party libraries
 include_directories(
   ${CMAKE_CURRENT_SOURCE_DIR}/include
-  ${CMAKE_CURRENT_SOURCE_DIR}/include/bucket
-  ${CMAKE_CURRENT_SOURCE_DIR}/include/algebra
-  ${CMAKE_CURRENT_SOURCE_DIR}/include/cuts
-  ${CMAKE_CURRENT_SOURCE_DIR}/include/extra
-  ${CMAKE_CURRENT_SOURCE_DIR}/include/utils
   ${CMAKE_CURRENT_SOURCE_DIR}/third_party/hgs_vrptw # Add this line
   ${CMAKE_CURRENT_SOURCE_DIR}/third_party/cvrpsep
   ${CMAKE_CURRENT_SOURCE_DIR}/third_party/fpmax
@@ -373,7 +368,7 @@ include_directories(${GUROBI_HOME}/include)
 
 # # Add CUDA source files
 # set(CUDA_SOURCES
-#     include/algebra/EvaluatorGPU.cu
+#     src/algebra/EvaluatorGPU.cu
 # )
 
 # # Append CUDA sources to the list of executable sources
@@ -408,7 +403,7 @@ endif()
 # -----------------------------------------------------------------------------
 
 if(BALDES)
-  add_executable(baldes src/Baldes.cpp ${EXECUTABLE_SOURCES})
+  add_executable(baldes src/apps/Baldes.cpp ${EXECUTABLE_SOURCES})
   target_compile_options(baldes PRIVATE -Wno-c++26-extensions -Wno-deprecated-declarations)
   target_link_libraries(baldes PRIVATE ${COMMON_LIBRARIES})
 
@@ -438,7 +433,7 @@ if(BALDES)
 endif()
 
 if(CLIQUER)
-  add_executable(cliquer src/Original.cpp src/BucketGraph.cpp)
+  add_executable(cliquer src/apps/Original.cpp src/pricing/BucketGraph.cpp)
 endif()
 
 if(MTW)
@@ -448,7 +443,7 @@ if(MTW)
 endif()
 
 if(WITH_PYTHON)
-  pybind11_add_module(pybaldes src/BucketBindings.cpp src/BCP.cpp src/BucketGraph.cpp src/MIPHandler.cpp src/Branching.cpp ${EXECUTABLE_SOURCES})
+  pybind11_add_module(pybaldes src/python/BucketBindings.cpp ${EXECUTABLE_SOURCES})
   target_link_libraries(pybaldes PRIVATE stdexec fmt xxhash pybind11::module)
   target_link_libraries(pybaldes PRIVATE ${COMMON_LIBRARIES})
   set_target_properties(pybaldes PROPERTIES POSITION_INDEPENDENT_CODE ON PREFIX "")
@@ -460,7 +455,7 @@ if(WITH_PYTHON)
 endif()
 
 if(HGS)
-  add_executable(hgs src/HGS.cpp ${HGS_SOURCES} ${FPSOURCE})
+  add_executable(hgs src/apps/HGS.cpp ${HGS_SOURCES} ${FPSOURCE})
   target_link_libraries(hgs PRIVATE stdexec fmt xxhash)
   target_compile_options(hgs PRIVATE -Wno-c++26-extensions -Wno-deprecated-declarations)
 endif()

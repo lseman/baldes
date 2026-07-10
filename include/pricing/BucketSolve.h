@@ -8,8 +8,8 @@
 
 #include <cstring>
 
-#include "BucketJump.h"
-#include "BucketRes.h"
+#include "pricing/BucketJump.h"
+#include "pricing/BucketRes.h"
 #include "core/Definitions.h"
 #include "cuts/SRC.h"
 
@@ -19,17 +19,17 @@
 #endif
 
 #ifdef __AVX2__
-#include "BucketAVX.h"
+#include "pricing/BucketAVX.h"
 #endif
 
 #include <execution>
 
-#include "../third_party/small_vector.hpp"
-#include "BucketConcat.h"
-#include "BucketPricing.h"
-#include "BucketPricingPass.h"
-#include "BucketTopology.h"
-#include "BucketUtils.h"
+#include "../../third_party/small_vector.hpp"
+#include "pricing/BucketConcat.h"
+#include "pricing/BucketPricing.h"
+#include "pricing/BucketPricingPass.h"
+#include "pricing/BucketTopology.h"
+#include "pricing/BucketUtils.h"
 
 inline std::vector<Label *> BucketGraph::solveHeuristic() {
     // Initialize the status as not optimal at the start

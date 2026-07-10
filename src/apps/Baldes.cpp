@@ -16,7 +16,7 @@
 #include "bnb/Node.h"
 #include "core/Definitions.h"
 #include "core/Logger.h"
-#include "miphandler/MIPHandler.h"
+#include "mip/MIPHandler.h"
 #include "search/HGS.h"
 #include "utils/Reader.h"
 

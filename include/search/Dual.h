@@ -10,11 +10,11 @@
 
 #include "math/Common.h"
 
-#include "data/Arc.h"
-#include "Hashes.h"
+#include "model/Arc.h"
+#include "utils/Hashes.h"
 
-#include "miphandler/Constraint.h"
-#include "miphandler/MIPHandler.h"
+#include "mip/Constraint.h"
+#include "mip/MIPHandler.h"
 
 #ifdef GUROBI
 #include "gurobi_c++.h"

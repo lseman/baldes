@@ -1,6 +1,6 @@
 #include "Eigen/Core"
 #include "Eigen/Sparse"
-#include "LDLTCuda.h"
+#include "algebra/LDLTCuda.h"
 #include "ipm/LDLTSimp.h"
 
 // Type definitions (adjust as needed)

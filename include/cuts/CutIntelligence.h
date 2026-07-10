@@ -8,11 +8,11 @@
 
 #pragma once
 #include "cuts/Cut.h"
-#include "CutHelper.h"
+#include "cuts/CutHelper.h"
 #include "search/Dual.h"
 #include "math/RNG.h"
-#include "SparseMatrix.h"
-#include "data/VRPNode.h"
+#include "algebra/SparseMatrix.h"
+#include "model/VRPNode.h"
 #include <unordered_set>
 
 class HighRankCuts; // Forward declaration

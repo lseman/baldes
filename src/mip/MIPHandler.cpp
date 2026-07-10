@@ -6,7 +6,7 @@
  *
  */
 
-#include "../include/miphandler/MIPHandler.h"
+#include "mip/MIPHandler.h"
 
 #include <iostream>
 #include <memory>

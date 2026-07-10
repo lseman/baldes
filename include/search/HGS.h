@@ -12,12 +12,12 @@
 #include <map>
 #include <vector>
 
-#include "../third_party/hgs_vrptw/Genetic.h"
-#include "../third_party/hgs_vrptw/Individual.h"
-#include "../third_party/hgs_vrptw/LocalSearch.h"
-#include "../third_party/hgs_vrptw/Params.h"
-#include "../third_party/hgs_vrptw/Population.h"
-#include "../third_party/hgs_vrptw/Split.h"
+#include "../../third_party/hgs_vrptw/Genetic.h"
+#include "../../third_party/hgs_vrptw/Individual.h"
+#include "../../third_party/hgs_vrptw/LocalSearch.h"
+#include "../../third_party/hgs_vrptw/Params.h"
+#include "../../third_party/hgs_vrptw/Population.h"
+#include "../../third_party/hgs_vrptw/Split.h"
 #include "core/Definitions.h"
 #include "utils/Reader.h"
 

@@ -10,7 +10,7 @@
 #include <iomanip>
 #include <iostream>
 
-#include "Supernodal.h"
+#include "algebra/Supernodal.h"
 
 // Helper function to create a test matrix with a different pattern
 Eigen::SparseMatrix<double> createTestMatrix(int size) {

@@ -8,8 +8,8 @@
 
 #include "core/Definitions.h"
 
-#include "data/Arc.h"
-#include "Hashes.h"
+#include "model/Arc.h"
+#include "utils/Hashes.h"
 
 #include <cmath>
 #include <iostream>
@@ -22,7 +22,7 @@
 #include <iostream>
 
 #include "ankerl/unordered_dense.h"
-#include "miphandler/MIPHandler.h"
+#include "mip/MIPHandler.h"
 
 // Define the RawArc struct
 struct RCCut {

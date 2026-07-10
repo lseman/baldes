@@ -14,7 +14,7 @@
 #include <vector>
 
 #include "math/Common.h"
-#include "data/VRPNode.h"
+#include "model/VRPNode.h"
 
 class MST {
 public:
