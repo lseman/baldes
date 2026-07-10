@@ -225,6 +225,14 @@ option(SRC_MEMORY_MODE_NODE "Use node-memory heuristics for SRC cuts" ON)
 option(SRC_MEMORY_MODE_ARC "Use arc-memory heuristics for SRC cuts" OFF)
 option(ITERATIVE_HGS "Enable iterative HGS" OFF)
 option(BALDES_DISABLE_SIMD "Disable SIMD dominance prefilters for benchmarking" OFF)
+set(BALDES_COMPLETION_SCHEDULE "AUTO" CACHE STRING
+    "Exact-stage completion schedule: AUTO, PARALLEL, or BACKWARD_FIRST")
+set_property(CACHE BALDES_COMPLETION_SCHEDULE PROPERTY STRINGS AUTO PARALLEL BACKWARD_FIRST)
+string(TOUPPER "${BALDES_COMPLETION_SCHEDULE}" BALDES_COMPLETION_SCHEDULE_NORMALIZED)
+if(NOT BALDES_COMPLETION_SCHEDULE_NORMALIZED MATCHES "^(AUTO|PARALLEL|BACKWARD_FIRST)$")
+  message(FATAL_ERROR
+    "BALDES_COMPLETION_SCHEDULE must be AUTO, PARALLEL, or BACKWARD_FIRST")
+endif()
 # Resource Definitions
 set(R_SIZE 1 CACHE STRING "Number of resources")
 set(N_SIZE 102 CACHE STRING "Number of nodes")
@@ -252,6 +260,8 @@ endif()
 if(BALDES_DISABLE_SIMD)
   add_compile_definitions(BALDES_DISABLE_SIMD)
 endif()
+add_compile_definitions(
+  BALDES_COMPLETION_SCHEDULE_${BALDES_COMPLETION_SCHEDULE_NORMALIZED})
 
 # Configure the config.h file
 configure_file(${CMAKE_CURRENT_SOURCE_DIR}/config.h.in ${CMAKE_CURRENT_BINARY_DIR}/config.h)
