@@ -404,6 +404,13 @@ public:
     std::atomic<uint64_t>         concatenation_labels_accepted{0};
     std::atomic<uint64_t>         pricing_candidate_hits{0};
     std::atomic_bool              pricing_truncated{false};
+    bool                          forward_completion_bounds_ready = false;
+    std::atomic<uint64_t>         completion_bound_attempts{0};
+    std::atomic<uint64_t>         completion_bound_rejections{0};
+    uint64_t                      completion_exact_calls = 0;
+    bool                          auto_prefer_backward_first = false;
+    double                        last_sequential_completion_ms = std::numeric_limits<double>::infinity();
+    double                        last_parallel_completion_ms   = std::numeric_limits<double>::infinity();
     uint64_t                      last_concatenation_labels_tested   = 0;
     uint64_t                      last_concatenation_labels_accepted = 0;
     std::vector<std::vector<int>> neighborhoods;
@@ -586,6 +593,16 @@ public:
     void profile_record_signature_rejection(Direction D, Stage S) noexcept;
     void profile_record_new_label(Direction D, Stage S) noexcept;
     void profile_record_non_dominated_label(Direction D, Stage S) noexcept;
+    [[nodiscard]] double src_cost_compensation_bound() const noexcept {
+#ifdef SRC
+        if (!cut_storage) return 0.0;
+        double bound = 0.0;
+        for (const auto &cut : cut_storage->getActiveCuts()) bound += std::abs(cut.dual_value);
+        return bound;
+#else
+        return 0.0;
+#endif
+    }
     void generate_arcs();
 
     ankerl::unordered_dense::map<int, std::vector<int>> fw_bucket_splits;

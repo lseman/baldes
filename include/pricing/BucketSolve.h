@@ -94,6 +94,8 @@ std::vector<double> BucketGraph::labeling_algorithm() {
     auto       &best_label        = assign_buckets<D>(fw_best_label, bw_best_label);
 
     const bool profile_labeling = options.profile_labeling;
+    const double src_compensation_bound =
+        (S == Stage::Four || S == Stage::Enumerate) ? src_cost_compensation_bound() : 0.0;
 
     // Reset the total label count.
     n_labels = 0;
@@ -236,9 +238,45 @@ std::vector<double> BucketGraph::labeling_algorithm() {
                     return a->vertex < b->vertex;
                 });
 
+                // Remove dominance among sibling extensions before scanning
+                // the committed destination bucket. Labels are grouped by
+                // destination, so each pair here is directly comparable.
+                for (size_t group_begin = 0; group_begin < destination_batch.size();) {
+                    size_t group_end = group_begin + 1;
+                    while (group_end < destination_batch.size() &&
+                           destination_batch[group_end]->vertex == destination_batch[group_begin]->vertex) {
+                        ++group_end;
+                    }
+
+                    for (size_t i = group_begin; i < group_end; ++i) {
+                        Label *lhs = destination_batch[i];
+                        if (lhs->is_dominated) continue;
+                        for (size_t j = i + 1; j < group_end; ++j) {
+                            Label *rhs = destination_batch[j];
+                            if (rhs->is_dominated) continue;
+                            if constexpr (S == Stage::One) {
+                                if (lhs->cost <= rhs->cost) {
+                                    rhs->set_dominated(true);
+                                } else {
+                                    lhs->set_dominated(true);
+                                    break;
+                                }
+                            } else {
+                                if (is_dominated<D, S>(rhs, lhs)) rhs->set_dominated(true);
+                                if (!rhs->is_dominated && is_dominated<D, S>(lhs, rhs)) {
+                                    lhs->set_dominated(true);
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                    group_begin = group_end;
+                }
+
                 for (Label *new_label : destination_batch) {
                     // Process each new label produced by the extension.
                     if (new_label != nullptr) {
+                        if (new_label->is_dominated) continue;
                         if constexpr (S == Stage::Enumerate) {
                             if (n_labels >= enumeration_policy.max_labels_per_direction) {
                                 enumeration_failed.store(true, std::memory_order_relaxed);
@@ -311,11 +349,6 @@ std::vector<double> BucketGraph::labeling_algorithm() {
                         } else {
                             uint64_t inner_scan_count = 0;
 
-#if defined(SRC)
-                            constexpr bool src_adjusted_dominance = (S == Stage::Four || S == Stage::Enumerate);
-#else
-                            constexpr bool src_adjusted_dominance = false;
-#endif
                             // RC-bracketed single-pass dominance (RouteOpt
                             // dominance.hpp doDominance style). The committed
                             // tier is RC-sorted; for non-SRC stages, raw cost
@@ -327,16 +360,22 @@ std::vector<double> BucketGraph::labeling_algorithm() {
                             //     dominate cur, so test resource/path dominance
                             //     of cur by new; mark cur dominated if true.
                             //   near-equal costs: test both full predicates.
-                            // SRC stages skip this bracketing because SRC dual
-                            // compensation can overturn raw reduced-cost order.
-                            const double cost_lo = new_label->cost - numericutils::eps;
-                            const double cost_hi = new_label->cost + numericutils::eps;
+                            // SRC compensation can overturn raw cost order, so
+                            // widen the bracket by a conservative bound: the
+                            // sum of absolute active SRC duals. Outside this
+                            // interval only one dominance direction is
+                            // possible; inside it the full SRC predicate is
+                            // evaluated in both directions.
+                            const double cost_lo =
+                                new_label->cost - src_compensation_bound - numericutils::eps;
+                            const double cost_hi =
+                                new_label->cost + src_compensation_bound + numericutils::eps;
 
                             auto label_cost_less = [](const Label *label, double value) { return label->cost < value; };
 
                             auto scan_new_dominated_by = [&](size_t begin, size_t end) {
 #if defined(BALDES_HAS_SIMD)
-                                if constexpr (!src_adjusted_dominance) {
+                                {
                                     namespace stdx = std::experimental;
                                     using simd_d   = stdx::native_simd<double>;
                                     using mask_d   = typename simd_d::mask_type;
@@ -410,7 +449,7 @@ std::vector<double> BucketGraph::labeling_algorithm() {
 
                             auto scan_existing_dominated_by_new = [&](size_t begin, size_t end) {
 #if defined(BALDES_HAS_SIMD)
-                                if constexpr (!src_adjusted_dominance) {
+                                {
                                     namespace stdx = std::experimental;
                                     using simd_d   = stdx::native_simd<double>;
                                     using mask_d   = typename simd_d::mask_type;
@@ -478,7 +517,7 @@ std::vector<double> BucketGraph::labeling_algorithm() {
 
                             auto scan_bracket = [&](size_t begin, size_t end) {
 #if defined(BALDES_HAS_SIMD)
-                                if constexpr (!src_adjusted_dominance) {
+                                {
                                     namespace stdx = std::experimental;
                                     using simd_d   = stdx::native_simd<double>;
                                     using mask_d   = typename simd_d::mask_type;
@@ -570,20 +609,7 @@ std::vector<double> BucketGraph::labeling_algorithm() {
 
                             // Forward path: walk sorted committed labels once.
                             const size_t to_bucket_size = to_bucket_labels.size();
-                            if constexpr (src_adjusted_dominance) {
-                                for (size_t i = 0; i < to_bucket_size; ++i) {
-                                    if (i + 8 < to_bucket_size) { __builtin_prefetch(to_bucket_labels[i + 8], 0, 3); }
-                                    Label *cur = to_bucket_labels[i];
-                                    ++inner_scan_count;
-                                    if (__builtin_expect(cur->is_dominated, 0)) continue;
-                                    if (is_dominated<D, S>(new_label, cur)) {
-                                        ++stat_n_dom;
-                                        dominated = true;
-                                        break;
-                                    }
-                                    if (is_dominated<D, S>(cur, new_label)) { cur->set_dominated(true); }
-                                }
-                            } else {
+                            {
                                 static constexpr size_t kLinearCostBracketScanLimit = 32;
                                 if (to_bucket_size <= kLinearCostBracketScanLimit) {
                                     for (size_t i = 0; i < to_bucket_size; ++i) {
@@ -641,14 +667,7 @@ std::vector<double> BucketGraph::labeling_algorithm() {
                                     ++inner_scan_count;
                                     if (__builtin_expect(cur->is_dominated, 0)) continue;
                                     const double cur_cost = cur->cost;
-                                    if constexpr (src_adjusted_dominance) {
-                                        if (is_dominated<D, S>(new_label, cur)) {
-                                            ++stat_n_dom;
-                                            dominated = true;
-                                            break;
-                                        }
-                                        if (is_dominated<D, S>(cur, new_label)) { cur->set_dominated(true); }
-                                    } else if (cur_cost < cost_lo) {
+                                    if (cur_cost < cost_lo) {
                                         if (dominates_resource_path<D, S>(new_label, cur)) {
                                             ++stat_n_dom;
                                             dominated = true;
@@ -916,6 +935,14 @@ inline auto BucketGraph::Extend(const std::conditional_t<M == Mutability::Mut, L
         to_bucket = get_bucket_number<D>(node_id, new_resources);
     }
 
+    const auto &direction_buckets = assign_buckets<D>(fw_buckets, bw_buckets);
+    if (to_bucket < 0 || to_bucket >= static_cast<int>(direction_buckets.size())) {
+        if constexpr (F == Full::Reverse)
+            return -1;
+        else
+            return result;
+    }
+
     // Handle Reverse mode early
     if constexpr (F == Full::Reverse) {
         if (new_resources[options.main_resources[0]] <= std::floor(q_star[options.main_resources[0]])) return -1;
@@ -963,6 +990,30 @@ inline auto BucketGraph::Extend(const std::conditional_t<M == Mutability::Mut, L
             new_cost -= arc_duals.getDual(node_id, initial_node_id);
         }
     })
+
+    // Exact pricing can use the already-computed backward labels as a
+    // current-cost completion lower bound. Account conservatively for every
+    // possible future SRC discount before rejecting the extension. This runs
+    // before allocation and before bitmap/route/SRC state copies.
+    if constexpr (D == Direction::Forward && F == Full::Partial &&
+                  (S == Stage::Four || S == Stage::Enumerate)) {
+        if (forward_completion_bounds_ready) {
+            const int opposite_bucket = get_opposite_bucket_number<D>(to_bucket, new_resources);
+            if (opposite_bucket >= 0 && opposite_bucket < static_cast<int>(bw_c_bar.size())) {
+                const double completion = bw_c_bar[opposite_bucket];
+                if (std::isfinite(completion)) {
+                    completion_bound_attempts.fetch_add(1, std::memory_order_relaxed);
+                    const double cutoff = S == Stage::Enumerate
+                                              ? std::min(gap, enumeration_route_cutoff.load(std::memory_order_relaxed))
+                                              : 0.0;
+                    if (new_cost + completion - src_cost_compensation_bound() >= cutoff - numericutils::eps) {
+                        completion_bound_rejections.fetch_add(1, std::memory_order_relaxed);
+                        return result;
+                    }
+                }
+            }
+        }
+    }
 
     // Create and initialize a new label
     auto &label_pool = assign_buckets<D>(label_pool_fw, label_pool_bw);
@@ -1215,26 +1266,24 @@ inline bool BucketGraph::DominatedInCompWiseSmallerBuckets(const Label *__restri
     // mutate labels in compwise-smaller buckets — they belong to already-
     // processed (or concurrently processed) buckets, and marking them
     // dominated mid-walk silently drops queued pending labels. Cost is a
-    // necessary condition for cur-dominates-L, so once cur->cost > L.cost
-    // (sorted bin) we can break.
+    // necessary condition for cur-dominates-L; SRC-aware stages widen the
+    // sorted-bin stopping threshold by the safe compensation bound.
     const double cost_hi_break = label_cost + numericutils::eps;
-#if defined(SRC)
-    constexpr bool src_adjusted_dominance = (S == Stage::Four || S == Stage::Enumerate);
-#else
-    constexpr bool src_adjusted_dominance = false;
-#endif
+    const double src_compensation_bound =
+        (S == Stage::Four || S == Stage::Enumerate) ? src_cost_compensation_bound() : 0.0;
+    const double bounded_cost_hi = cost_hi_break + src_compensation_bound;
 
     auto inline_check_dominance = [&](const BucketLabelSoAView &view, uint &n_dom) -> bool {
         const size_t size = view.labels.size();
         if (profile_labeling) profile_record_inner_bin_scan(D, S, size);
 #if defined(BALDES_HAS_SIMD)
-        if constexpr (!src_adjusted_dominance) {
+        {
             namespace stdx = std::experimental;
             using simd_d   = stdx::native_simd<double>;
             using mask_d   = typename simd_d::mask_type;
 
             constexpr size_t simd_width = simd_d::size();
-            const simd_d     cost_limit(cost_hi_break);
+            const simd_d     cost_limit(bounded_cost_hi);
             const simd_d     eps(numericutils::eps);
 
             size_t i = 0;
@@ -1242,7 +1291,7 @@ inline bool BucketGraph::DominatedInCompWiseSmallerBuckets(const Label *__restri
                 const simd_d costs(view.costs.data() + i, stdx::element_aligned);
                 mask_d       candidate = costs <= cost_limit;
                 if (!stdx::any_of(candidate)) {
-                    if (view.costs[i] > cost_hi_break) return false;
+                    if (view.costs[i] > bounded_cost_hi) return false;
                     continue;
                 }
 
@@ -1285,7 +1334,7 @@ inline bool BucketGraph::DominatedInCompWiseSmallerBuckets(const Label *__restri
             }
 
             for (; i < size; ++i) {
-                if (view.costs[i] > cost_hi_break) break;
+                if (view.costs[i] > bounded_cost_hi) break;
 
                 bool resource_candidate = true;
                 if constexpr (D == Direction::Forward) {
@@ -1331,9 +1380,7 @@ inline bool BucketGraph::DominatedInCompWiseSmallerBuckets(const Label *__restri
         for (size_t i = 0; i < size; ++i) {
             // Bin is RC-sorted ascending; once cur is more expensive than L,
             // no later label can dominate L (cost ordering).
-            if constexpr (!src_adjusted_dominance) {
-                if (view.costs[i] > cost_hi_break) break;
-            }
+            if (view.costs[i] > bounded_cost_hi) break;
 
             bool resource_candidate = true;
             if constexpr (D == Direction::Forward) {
@@ -1381,9 +1428,7 @@ inline bool BucketGraph::DominatedInCompWiseSmallerBuckets(const Label *__restri
         for (Label *label : labels) {
             if (label->is_dominated) continue;
             // extra is unsorted -> no break, just skip.
-            if constexpr (!src_adjusted_dominance) {
-                if (label->cost > cost_hi_break) continue;
-            }
+            if (label->cost > bounded_cost_hi) continue;
             if (is_dominated<D, S>(L, label)) {
                 ++n_dom;
                 return true;
@@ -1475,13 +1520,71 @@ inline bool BucketGraph::DominatedInCompWiseSmallerBuckets(const Label *__restri
  */
 template <Stage state, Full fullness>
 void BucketGraph::run_labeling_algorithms(std::vector<double> &forward_cbar, std::vector<double> &backward_cbar) {
+    if constexpr (state == Stage::Four || state == Stage::Enumerate) {
+        ++completion_exact_calls;
+        bool use_backward_first = false;
+#if defined(BALDES_COMPLETION_SCHEDULE_BACKWARD_FIRST)
+        use_backward_first = true;
+#elif defined(BALDES_COMPLETION_SCHEDULE_PARALLEL)
+        use_backward_first = false;
+#else
+        // AUTO starts parallel, probes backward-first every eight exact calls,
+        // and periodically rechecks parallel even after choosing sequential.
+        const uint64_t phase = completion_exact_calls % 8;
+        use_backward_first = auto_prefer_backward_first ? phase != 0 : phase == 4;
+#endif
+
+        if (use_backward_first) {
+            completion_bound_attempts.store(0, std::memory_order_relaxed);
+            completion_bound_rejections.store(0, std::memory_order_relaxed);
+            const auto backward_start = std::chrono::steady_clock::now();
+            forward_completion_bounds_ready = false;
+            backward_cbar = labeling_algorithm<Direction::Backward, state, fullness>();
+            const auto backward_end = std::chrono::steady_clock::now();
+            bw_c_bar = backward_cbar;
+            forward_completion_bounds_ready = true;
+            forward_cbar = labeling_algorithm<Direction::Forward, state, fullness>();
+            const auto forward_end = std::chrono::steady_clock::now();
+            forward_completion_bounds_ready = false;
+
+            const double backward_ms =
+                std::chrono::duration<double, std::milli>(backward_end - backward_start).count();
+            const double forward_ms =
+                std::chrono::duration<double, std::milli>(forward_end - backward_end).count();
+            last_sequential_completion_ms = backward_ms + forward_ms;
+
+#if defined(BALDES_COMPLETION_SCHEDULE_AUTO)
+            const double attempts =
+                static_cast<double>(completion_bound_attempts.load(std::memory_order_relaxed));
+            const double rejected =
+                static_cast<double>(completion_bound_rejections.load(std::memory_order_relaxed));
+            const double rejection_ratio = attempts > 0.0 ? rejected / attempts : 0.0;
+            const double estimated_unpruned_forward_ms = forward_ms / std::max(0.10, 1.0 - rejection_ratio);
+            const double estimated_parallel_ms = std::max(backward_ms, estimated_unpruned_forward_ms);
+            auto_prefer_backward_first = last_sequential_completion_ms < 0.95 * estimated_parallel_ms;
+#endif
+            return;
+        }
+    }
+
+    forward_completion_bounds_ready = false;
+    double forward_ms = 0.0;
+    double backward_ms = 0.0;
     // Schedule the forward labeling algorithm task on the scheduler.
-    auto forward_task = stdexec::schedule(bi_sched) |
-                        stdexec::then([&]() { return labeling_algorithm<Direction::Forward, state, fullness>(); });
+    auto forward_task = stdexec::schedule(bi_sched) | stdexec::then([&]() {
+                            const auto start = std::chrono::steady_clock::now();
+                            auto result = labeling_algorithm<Direction::Forward, state, fullness>();
+                            forward_ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count();
+                            return result;
+                        });
 
     // Schedule the backward labeling algorithm task on the scheduler.
-    auto backward_task = stdexec::schedule(bi_sched) |
-                         stdexec::then([&]() { return labeling_algorithm<Direction::Backward, state, fullness>(); });
+    auto backward_task = stdexec::schedule(bi_sched) | stdexec::then([&]() {
+                             const auto start = std::chrono::steady_clock::now();
+                             auto result = labeling_algorithm<Direction::Backward, state, fullness>();
+                             backward_ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count();
+                             return result;
+                         });
 
     // Combine the forward and backward tasks.
     auto combined_work = stdexec::when_all(std::move(forward_task), std::move(backward_task)) |
@@ -1493,6 +1596,14 @@ void BucketGraph::run_labeling_algorithms(std::vector<double> &forward_cbar, std
 
     // Wait for all tasks to complete.
     stdexec::sync_wait(std::move(combined_work));
+    last_parallel_completion_ms = std::max(forward_ms, backward_ms);
+#if defined(BALDES_COMPLETION_SCHEDULE_AUTO)
+    if constexpr (state == Stage::Four || state == Stage::Enumerate) {
+        if (completion_exact_calls % 8 == 0 && std::isfinite(last_sequential_completion_ms)) {
+            auto_prefer_backward_first = last_sequential_completion_ms < 0.95 * last_parallel_completion_ms;
+        }
+    }
+#endif
 }
 
 /**
