@@ -70,7 +70,8 @@ Label *BucketGraph::make_initial_merged_label() {
 }
 
 template <Stage S, Symmetry SYM>
-void BucketGraph::concatenate_from_forward_arc(const Label *label, const BucketArc &arc, BucketPricingPass &pass) {
+void BucketGraph::concatenate_from_forward_arc(const Label *label, const BucketArc &arc, BucketPricingPass &pass,
+                                               std::vector<ConcatenationCandidate> &chunk_candidates) {
     const int to_node = arc.jump ? arc.jump_to_node : fw_buckets[arc.to_bucket].node_id;
     if (to_node < 0) return;
     if constexpr (S >= Stage::Three || S == Stage::Eliminate) {
@@ -110,7 +111,7 @@ void BucketGraph::concatenate_from_forward_arc(const Label *label, const BucketA
 #endif
 
     int bucket_to_process = extended_bucket;
-    concatenate_label_from_bucket<S, SYM>(label, bucket_to_process, pass.best_cost, &splice_state);
+    concatenate_label_from_bucket<S, SYM>(label, bucket_to_process, pass.best_cost, chunk_candidates, &splice_state);
 }
 
 template <Stage S, Symmetry SYM>
@@ -126,6 +127,8 @@ void BucketGraph::concatenate_pricing_pass(BucketPricingPass &pass) {
         [this, chunk_size, &pass](std::size_t chunk_idx) {
             const size_t start_bucket = chunk_idx * chunk_size;
             const size_t end_bucket   = std::min(start_bucket + chunk_size, static_cast<size_t>(fw_buckets_size));
+            std::vector<ConcatenationCandidate> chunk_candidates;
+            chunk_candidates.reserve(64);
 
             for (size_t bucket = start_bucket; bucket < end_bucket; ++bucket) {
                 if constexpr (S == Stage::Four) {
@@ -145,10 +148,12 @@ void BucketGraph::concatenate_pricing_pass(BucketPricingPass &pass) {
                         if constexpr (S == Stage::Four) {
                             if (pricing_truncated.load(std::memory_order_relaxed)) break;
                         }
-                        concatenate_from_forward_arc<S, SYM>(L, arc, pass);
+                        concatenate_from_forward_arc<S, SYM>(L, arc, pass, chunk_candidates);
                     }
                 }
             }
+
+            publish_concatenation_candidates<S>(chunk_candidates, pass.best_cost);
         });
 
     auto work = stdexec::starts_on(merge_sched, bulk_sender);

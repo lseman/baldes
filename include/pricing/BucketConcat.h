@@ -9,8 +9,7 @@
 #include "utils/NumericUtils.h"
 
 template <Stage S>
-void BucketGraph::publish_concatenation_candidates(const Label *forward_label,
-                                                   std::span<const ConcatenationCandidate> candidates,
+void BucketGraph::publish_concatenation_candidates(std::span<const ConcatenationCandidate> candidates,
                                                    std::atomic<double> &best_cost) {
     if (candidates.empty()) return;
 
@@ -18,7 +17,8 @@ void BucketGraph::publish_concatenation_candidates(const Label *forward_label,
 
     double current_best = best_cost.load(std::memory_order_relaxed);
     for (const auto &candidate : candidates) {
-        const Label *candidate_label = candidate.label;
+        const Label *forward_label   = candidate.forward_label;
+        const Label *candidate_label = candidate.backward_label;
         const double candidate_cost  = candidate.cost;
 
         if constexpr (S == Stage::Enumerate) {
@@ -51,15 +51,8 @@ void BucketGraph::publish_concatenation_candidates(const Label *forward_label,
                 enumeration_route_cutoff.store(merged_labels.front()->cost, std::memory_order_relaxed);
             }
         } else {
-            if (numericutils::lt(candidate_cost, current_best)) {
-                best_cost.store(candidate_cost, std::memory_order_relaxed);
-                current_best = candidate_cost;
-            }
-
-            if (numericutils::lte(candidate_cost, current_best)) {
-                auto pbest = compute_label<S>(forward_label, candidate_label, candidate_cost);
-                merged_labels.push_back(pbest);
-            }
+            auto pbest = compute_label<S>(forward_label, candidate_label, candidate_cost);
+            merged_labels.push_back(pbest);
         }
     }
 }
@@ -139,7 +132,27 @@ bool BucketGraph::collect_concatenation_candidate(const Label *forward_label, co
     if (visited_overlap(forward_label->visited_bitmap, backward_label->visited_bitmap)) { return false; }
     if (!check_feasibility(forward_label, backward_label, splice_state)) { return false; }
 
-    scratch.candidates.push_back({backward_label, total_cost});
+    if constexpr (S != Stage::Enumerate) {
+        // Claim this record-low candidate before deferring materialization to
+        // the chunk boundary. A failed CAS refreshes observed_best; keep an
+        // exact tie, but discard a candidate superseded by another worker.
+        double observed_best = best_cost.load(std::memory_order_relaxed);
+        bool   keep_candidate = false;
+        for (;;) {
+            if (!numericutils::lt(total_cost, observed_best)) {
+                keep_candidate = numericutils::lte(total_cost, observed_best);
+                break;
+            }
+            if (best_cost.compare_exchange_weak(observed_best, total_cost, std::memory_order_relaxed,
+                                                std::memory_order_relaxed)) {
+                keep_candidate = true;
+                break;
+            }
+        }
+        if (!keep_candidate) return false;
+    }
+
+    scratch.candidates.push_back({forward_label, backward_label, total_cost});
     ++scratch.stats.labels_accepted;
     if constexpr (S == Stage::Four) {
         constexpr uint64_t kStageFourCandidateCap = static_cast<uint64_t>(N_ADD) + 2ULL;
@@ -151,6 +164,7 @@ bool BucketGraph::collect_concatenation_candidate(const Label *forward_label, co
 
 template <Stage S, Symmetry SYM>
 void BucketGraph::concatenate_label_from_bucket(const Label *L, int b, std::atomic<double> &best_cost,
+                                                std::vector<ConcatenationCandidate> &chunk_candidates,
                                                 const SpliceState *splice_state) {
     const size_t n_segments = (fw_buckets_size + 63) / 64;
     static thread_local ConcatenationScratch scratch;
@@ -230,6 +244,25 @@ void BucketGraph::concatenate_label_from_bucket(const Label *L, int b, std::atom
             if constexpr (S == Stage::Four) {
                 if (pricing_truncated.load(std::memory_order_relaxed)) break;
             }
+
+            double label_prune_limit = best_cost.load(std::memory_order_relaxed);
+            if constexpr (S == Stage::Enumerate) {
+                label_prune_limit =
+                    std::min(gap, enumeration_route_cutoff.load(std::memory_order_relaxed));
+            }
+
+            double remaining_labels_lower_bound = path_cost + L_bw->cost;
+#if defined(SRC)
+            if constexpr (S == Stage::Four || S == Stage::Enumerate) {
+                remaining_labels_lower_bound -= max_src_splice_discount;
+            }
+#endif
+            // The committed tier is sorted by reduced cost. If even the
+            // current label's optimistic splice cost cannot beat the cutoff,
+            // neither can any later committed label. The unsorted extra tier
+            // is still scanned below.
+            if (numericutils::gte(remaining_labels_lower_bound, label_prune_limit)) break;
+
             collect_concatenation_candidate<S>(L, L_bw, path_cost, splice_state, active_cuts, max_src_splice_discount,
                                                best_cost, scratch);
         }
@@ -241,7 +274,23 @@ void BucketGraph::concatenate_label_from_bucket(const Label *L, int b, std::atom
                                                best_cost, scratch);
         }
 
-        publish_concatenation_candidates<S>(L, scratch.candidates, best_cost);
+        if constexpr (S == Stage::Enumerate) {
+            const size_t route_limit = static_cast<size_t>(std::max(1, enumeration_policy.max_routes)) + 1;
+            const auto   cheaper_candidate = [](const ConcatenationCandidate &a,
+                                              const ConcatenationCandidate &b) { return a.cost < b.cost; };
+            for (const auto &candidate : scratch.candidates) {
+                if (chunk_candidates.size() < route_limit) {
+                    chunk_candidates.push_back(candidate);
+                    std::push_heap(chunk_candidates.begin(), chunk_candidates.end(), cheaper_candidate);
+                } else if (numericutils::lt(candidate.cost, chunk_candidates.front().cost)) {
+                    std::pop_heap(chunk_candidates.begin(), chunk_candidates.end(), cheaper_candidate);
+                    chunk_candidates.back() = candidate;
+                    std::push_heap(chunk_candidates.begin(), chunk_candidates.end(), cheaper_candidate);
+                }
+            }
+        } else {
+            chunk_candidates.insert(chunk_candidates.end(), scratch.candidates.begin(), scratch.candidates.end());
+        }
         push_unvisited_phi_neighbors(other_phi[current_bucket], scratch);
     }
 

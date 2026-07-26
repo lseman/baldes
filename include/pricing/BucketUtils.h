@@ -62,7 +62,7 @@ void BucketGraph::add_arc(int from_bucket, int to_bucket, const std::vector<doub
 }
 
 template <Direction D>
-inline int BucketGraph::get_bucket_number(int node, std::vector<double> &resource_values_vec) noexcept {
+inline int BucketGraph::get_bucket_number(int node, std::vector<double> &resource_values_vec) {
     const size_t num_resources = options.main_resources.size();
 
     const auto &buckets = assign_buckets<D>(fw_buckets, bw_buckets);
@@ -93,7 +93,13 @@ inline int BucketGraph::get_bucket_number(int node, std::vector<double> &resourc
         double node_range = node_ub - node_lb;
 
         // Determine the number of splits (i.e. intervals) for resource r.
-        int    splits = std::max(1, static_cast<int>(std::round((node_range / full_range) * intervals[r].interval)));
+        // Keep this identical to define_buckets, including the degenerate
+        // global-range case.
+        int splits = 1;
+        if (std::fabs(full_range) > std::numeric_limits<double>::epsilon()) {
+            splits =
+                std::max(1, static_cast<int>(std::round((node_range / full_range) * intervals[r].interval)));
+        }
         double interval_width =
             (splits == 0 || std::fabs(node_range) < std::numeric_limits<double>::epsilon()) ? 1.0 : node_range / splits;
 
@@ -118,16 +124,31 @@ inline int BucketGraph::get_bucket_number(int node, std::vector<double> &resourc
         multiplier *= splits;
     }
 
-    // check if buckets[bucket_number] contains the resource_vec
-    if (unlikely(!buckets[bucket_number].contains(resource_values_vec))) {
+    // Buckets contain only the bucketed (main) dimensions, whereas labels may
+    // carry additional resources. Validate only the dimensions represented by
+    // the bucket to avoid indexing past its compact bounds.
+    bool bucket_contains_values = bucket_number >= 0 && bucket_number < static_cast<int>(buckets.size());
+    if (bucket_contains_values) {
+        const auto &bucket = buckets[bucket_number];
+        bucket_contains_values =
+            bucket.lb.size() == num_resources && bucket.ub.size() == num_resources &&
+            resource_values_vec.size() >= num_resources;
+        for (size_t r = 0; r < num_resources && bucket_contains_values; ++r) {
+            bucket_contains_values = !numericutils::lt(resource_values_vec[r], bucket.lb[r]) &&
+                                     !numericutils::gt(resource_values_vec[r], bucket.ub[r]);
+        }
+    }
+    if (unlikely(!bucket_contains_values)) {
         // print resource_values_vec
         for (auto val : resource_values_vec) { fmt::print("{}\n", val); }
-        // print bucket bounds
-        fmt::print("{}\n", buckets[bucket_number].lb[0]);
-        fmt::print("{}\n", buckets[bucket_number].ub[0]);
+        // Print bucket bounds only when the computed index itself is valid.
+        if (bucket_number >= 0 && bucket_number < static_cast<int>(buckets.size()) &&
+            !buckets[bucket_number].lb.empty() && !buckets[bucket_number].ub.empty()) {
+            fmt::print("{}\n", buckets[bucket_number].lb[0]);
+            fmt::print("{}\n", buckets[bucket_number].ub[0]);
+        }
 
         std::throw_with_nested(std::runtime_error("Resource values not contained in bucket"));
-        return -1;
     }
 
     return bucket_number;
@@ -235,8 +256,6 @@ void BucketGraph::define_buckets() {
             start = (pos == max_intervals - 1) ? lb : ub - (pos + 1) * base_interval;
             end   = (pos == 0) ? ub : ub - pos * base_interval;
         }
-        start = roundToTwoDecimalPlaces(start);
-        end   = roundToTwoDecimalPlaces(end);
         return {start, end};
     };
 

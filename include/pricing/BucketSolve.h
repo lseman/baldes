@@ -1457,7 +1457,7 @@ inline bool BucketGraph::DominatedInCompWiseSmallerBuckets(const Label *__restri
 
         // Whole-bucket prune: if no label in this bucket or any predecessor bin
         // at this node can dominate L in the second resource, skip it entirely.
-        if (options.resources.size() > 1) {
+        if (options.main_resources.size() > 1) {
             const auto &bucket       = buckets[current_bucket];
             const int   node_id      = bucket.node_id;
             const int   local_bucket = current_bucket - num_buckets_index[node_id];
@@ -1488,7 +1488,7 @@ inline bool BucketGraph::DominatedInCompWiseSmallerBuckets(const Label *__restri
             const auto &bucket  = buckets[b_prime];
             const int   node_id = bucket.node_id;
             const int   local_b = b_prime - num_buckets_index[node_id];
-            if (options.resources.size() > 1 && local_b >= 0 && local_b < num_buckets[node_id]) {
+            if (options.main_resources.size() > 1 && local_b >= 0 && local_b < num_buckets[node_id]) {
                 const double label_rc2 = L->resources[1];
                 if constexpr (D == Direction::Forward) {
                     if (numericutils::gt(rc2_till_this_bin[node_id][local_b], label_rc2)) { continue; }

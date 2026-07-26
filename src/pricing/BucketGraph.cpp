@@ -129,32 +129,18 @@ std::vector<int> BucketGraph::computePhi(int &bucket_id, bool fw) {
 
     // Get references based on the direction.
     auto &buckets = fw ? fw_buckets : bw_buckets;
+    if (bucket_id < 0 || bucket_id >= static_cast<int>(buckets.size())) return phi;
 
     // Multi-dimensional resource case.
-    if (options.resources.size() > 1) {
-        if (bucket_id < 0 || bucket_id >= static_cast<int>(buckets.size())) return phi;
-
-        const int           n_dims = static_cast<int>(intervals.size());
-        std::vector<double> base_intervals(n_dims, 0.0);
-        std::vector<int>    splits_per_dim(n_dims, 1);
+    const int n_dims = static_cast<int>(options.main_resources.size());
+    if (n_dims > 1) {
+        const auto &bucket_splits = fw ? fw_bucket_splits : bw_bucket_splits;
 
         // Get the node associated with the current bucket.
-        int            node_id = buckets[bucket_id].node_id;
-        const VRPNode &node    = nodes[node_id];
-
-        // Recompute splits and base intervals per dimension using the same
-        // logic as in define_buckets.
-        for (int r = 0; r < n_dims; ++r) {
-            double full_range = R_max[r] - R_min[r];
-            double node_range = node.ub[r] - node.lb[r];
-            int    splits     = 1;
-            if (std::fabs(full_range) > std::numeric_limits<double>::epsilon()) {
-                double splits_d = (node_range * intervals[r].interval) / full_range;
-                splits          = std::max(1, static_cast<int>(std::round(splits_d)));
-            }
-            splits_per_dim[r] = splits;
-            base_intervals[r] = node_range / static_cast<double>(splits);
-        }
+        const int  node_id   = buckets[bucket_id].node_id;
+        const auto splits_it = bucket_splits.find(node_id);
+        if (splits_it == bucket_splits.end() || static_cast<int>(splits_it->second.size()) != n_dims) return phi;
+        const auto &splits_per_dim = splits_it->second;
 
         auto &num_buckets_index = fw ? num_buckets_index_fw : num_buckets_index_bw;
         int   local_bucket      = bucket_id - num_buckets_index[node_id];

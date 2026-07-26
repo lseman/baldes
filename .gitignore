@@ -1,96 +1,99 @@
+# Build outputs (CMake / Ninja)
 cmake-build-debug/
-more_examples/
-new_examples/
-rapids-cmake
-.venv/
-*.bs
-*.cmake
-*.csv
-*.ipynb
-*.pdf
-*.pkl
-*.json
-*.ilp
-savings.py
-ambulance/
-third_party/lkh/
-vrpsolve/
-testing/
-mtw/
-evrp/
-__pycache__/
-
 cmake/
-CPM_modules/
-reports/
-.vscode
-.idea
-.gdb_history
-.cache
 build/
-
-*.log
-*.mps
-*.lp
-
-.DS_Store
-
-# Prerequisites
-*.d
-
-# Compiled Object files
-*.slo
-*.lo
-*.o
-*.obj
-
-# Precompiled Headers
-*.gch
-*.pch
-
-# Compiled Dynamic libraries
-*.so
-*.dylib
-*.dll
-
-# Fortran module files
-*.mod
-*.smod
-
-# Compiled Static libraries
-*.lai
-*.la
-*.a
-*.lib
-
-# Executables
-*.exe
-*.out
-*.app
-
+CPM_modules/
 CMakeLists.txt.user
 CMakeCache.txt
 CMakeFiles
 CMakeScripts
-Testing
+CTestTestfile.cmake
 Makefile
 cmake_install.cmake
 install_manifest.txt
 compile_commands.json
-CTestTestfile.cmake
-_deps
+build.ninja
 /.cmake/
 /.ninja_deps
 /.ninja_log
-/build.ninja
 /cmake_install.cmake
 /CMakeCache.txt
-/mip.log
+/build.ninja
 /main
+/mip.log
+Testing
+_deps
+
+# Compiled artifacts
+*.o
+*.obj
+*.slo
+*.lo
+*.so
+*.dylib
+*.dll
+*.a
+*.lib
+*.lai
+*.la
+*.mod
+*.smod
+*.gch
+*.pch
+*.exe
+*.out
+*.app
+
+# Prerequisites
+*.d
+
+# IDE
+.vscode
+.idea
+.gdb_history
+.cache
+
+# Python
+.venv/
+__pycache__/
+savings.py
+
+# Data & notebooks
+*.csv
+*.json
+*.pkl
+*.ipynb
+*.pdf
+*.ilp
+*.mps
+*.lp
+*.bs
+*.cmake
+*.log
+
+# Reports & examples
+reports/
+more_examples/
+new_examples/
+testing/
+mtw/
+evrp/
+ambulance/
+repos/
 RouteOpt/
+bucket-graph-spprc/
+
+# Third-party vendored code
+third_party/lkh/
+vrpsolve/
+rapids-cmake
+
+# Generated / local files
 CLAUDE.md
 .codex
-bucket-graph-spprc/
 ariadne.db
-*.md
 snapshot.bin
+*.md
+
+# OS
+.DS_Store

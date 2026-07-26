@@ -263,8 +263,9 @@ public:
     };
 
     struct ConcatenationCandidate {
-        const Label *label = nullptr;
-        double       cost  = 0.0;
+        const Label *forward_label  = nullptr;
+        const Label *backward_label = nullptr;
+        double       cost           = 0.0;
     };
 
     struct ConcatenationStats {
@@ -1203,7 +1204,7 @@ public:
     UnionFind fw_union_find;
     UnionFind bw_union_find;
     template <Direction D>
-    int get_bucket_number(int node, std::vector<double> &values) noexcept;
+    int get_bucket_number(int node, std::vector<double> &values);
 
     template <Direction D>
     inline int get_static_bucket_number(int node, std::vector<double> &resource_values_vec) noexcept {
@@ -1271,14 +1272,14 @@ public:
     void concatenate_pricing_pass(BucketPricingPass &pass);
 
     template <Stage S, Symmetry SYM = Symmetry::Asymmetric>
-    void concatenate_from_forward_arc(const Label *label, const BucketArc &arc, BucketPricingPass &pass);
+    void concatenate_from_forward_arc(const Label *label, const BucketArc &arc, BucketPricingPass &pass,
+                                      std::vector<ConcatenationCandidate> &chunk_candidates);
 
     template <Stage S>
     BucketPricingResult finalize_pricing_pass();
 
     template <Stage S>
-    void publish_concatenation_candidates(const Label                            *forward_label,
-                                          std::span<const ConcatenationCandidate> candidates,
+    void publish_concatenation_candidates(std::span<const ConcatenationCandidate> candidates,
                                           std::atomic<double>                    &best_cost);
 
     template <Stage S>
@@ -1292,6 +1293,7 @@ public:
 
     template <Stage S, Symmetry SYM = Symmetry::Asymmetric>
     void concatenate_label_from_bucket(const Label *L, int b, std::atomic<double> &best_cost,
+                                       std::vector<ConcatenationCandidate> &chunk_candidates,
                                        const SpliceState *splice_state = nullptr);
 
     template <Direction D>
