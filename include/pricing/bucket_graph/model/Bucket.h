@@ -13,7 +13,7 @@
 
 #include "model/Arc.h"
 #include "core/Definitions.h"
-#include "model/Label.h"
+#include "pricing/bucket_graph/model/Label.h"
 #include "utils/NumericUtils.h"
 #include "config.h"
 /**

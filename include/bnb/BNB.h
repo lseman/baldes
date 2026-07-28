@@ -16,7 +16,7 @@
 #include "../../third_party/concurrentqueue.h"
 #include "core/Definitions.h"
 #include "core/Logger.h"
-#include "bnb/BCP.h"
+#include "bnb/bcp/VRProblem.h"
 #include "bnb/Node.h"
 
 enum class BNBNodeSelectionStrategy {

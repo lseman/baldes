@@ -7,7 +7,7 @@
  */
 
 #pragma once
-#include "pricing/BucketGraph.h"
+#include "pricing/bucket_graph/BucketGraph.h"
 #include "math/Common.h"
 #include "core/Definitions.h"
 #include "config.h"

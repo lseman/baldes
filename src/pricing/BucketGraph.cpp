@@ -4,11 +4,11 @@
  *
  */
 
-#include "pricing/BucketGraph.h"
+#include "pricing/bucket_graph/BucketGraph.h"
 
 #include "../../third_party/pdqsort.h"
-#include "pricing/BucketSolve.h"
-#include "pricing/BucketUtils.h"
+#include "pricing/bucket_graph/Labeling.h"
+#include "pricing/bucket_graph/Utilities.h"
 #include "core/Definitions.h"
 #include "math/Common.h"
 #include "utils/MST.h"

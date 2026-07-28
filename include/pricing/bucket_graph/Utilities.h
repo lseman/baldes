@@ -8,8 +8,8 @@
 
 #include <cstring>
 
-#include "model/Bucket.h"
-#include "pricing/BucketJump.h"
+#include "pricing/bucket_graph/model/Bucket.h"
+#include "pricing/bucket_graph/ArcElimination.h"
 #include "core/Definitions.h"
 #include "utils/MST.h"
 #include "model/Trees.h"
@@ -886,7 +886,10 @@ void BucketGraph::common_initialization() {
     const int depot_id   = (D == Direction::Forward) ? options.depot : options.end_depot;
     auto     &depot_node = nodes[depot_id];
 
-    std::vector<double> initial_resources(options.main_resources.size(), 0.0);
+    // Labels carry every resource, even when only a subset is bucketed.
+    // In particular, backward auxiliary resources must start at their upper
+    // bounds rather than retaining the pool's zero-initialized state.
+    std::vector<double> initial_resources(options.resources.size(), 0.0);
     for (size_t r = 0; r < initial_resources.size(); ++r) {
         initial_resources[r] = (D == Direction::Forward) ? depot_node.lb[r] : depot_node.ub[r];
     }

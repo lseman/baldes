@@ -17,7 +17,7 @@
 #include "core/Stats.h"
 #include "cuts/Cut.h"
 #include "cuts/RCC.h"
-#include "model/Bucket.h"
+#include "pricing/bucket_graph/model/Bucket.h"
 #include "model/Trees.h"
 #include "model/VRPNode.h"
 #include "graph/SCCFinder.h"
@@ -1540,7 +1540,7 @@ public:
                 if (inner_id == options.depot || inner_id == options.end_depot) { continue; }
                 // If this node was already updated, skip it.
                 if (updated_buckets.contains(inner_id)) { continue; }
-                for (auto r = 0; r < options.resources.size(); ++r) {
+                for (size_t r = 0; r < options.main_resources.size(); ++r) {
                     // If the bucket split value is already at maximum (100),
                     // skip.(127)
                     //

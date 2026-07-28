@@ -7,7 +7,7 @@
 
 #include "../../third_party/pdqsort.h"
 
-#include "bnb/BCP.h"
+#include "bnb/bcp/VRProblem.h"
 
 #include "core/Definitions.h"
 

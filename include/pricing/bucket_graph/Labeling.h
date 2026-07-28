@@ -8,8 +8,8 @@
 
 #include <cstring>
 
-#include "pricing/BucketJump.h"
-#include "pricing/BucketRes.h"
+#include "pricing/bucket_graph/ArcElimination.h"
+#include "pricing/bucket_graph/Resources.h"
 #include "core/Definitions.h"
 #include "cuts/SRC.h"
 
@@ -19,17 +19,17 @@
 #endif
 
 #ifdef __AVX2__
-#include "pricing/BucketAVX.h"
+#include "pricing/bucket_graph/Dominance.h"
 #endif
 
 #include <execution>
 
 #include "../../third_party/small_vector.hpp"
-#include "pricing/BucketConcat.h"
-#include "pricing/BucketPricing.h"
-#include "pricing/BucketPricingPass.h"
-#include "pricing/BucketTopology.h"
-#include "pricing/BucketUtils.h"
+#include "pricing/bucket_graph/Concatenation.h"
+#include "pricing/bucket_graph/Pricing.h"
+#include "pricing/bucket_graph/PricingPass.h"
+#include "pricing/bucket_graph/Topology.h"
+#include "pricing/bucket_graph/Utilities.h"
 
 inline std::vector<Label *> BucketGraph::solveHeuristic() {
     // Initialize the status as not optimal at the start
@@ -133,8 +133,16 @@ std::vector<double> BucketGraph::labeling_algorithm() {
         const auto &scc_buckets = sorted_sccs[scc_index];
         if (scc_buckets.empty()) continue;
 
-        pending_labels_by_bucket.clear();
-        pending_labels_by_bucket.resize(scc_buckets.size());
+        // Retain the per-position vector capacities across SCCs. Clearing the
+        // outer vector destroyed every inner allocation on each component,
+        // even though the same buffers are reused throughout every pricing
+        // pass.
+        if (pending_labels_by_bucket.size() < scc_buckets.size()) {
+            pending_labels_by_bucket.resize(scc_buckets.size());
+        }
+        for (size_t i = 0; i < scc_buckets.size(); ++i) {
+            pending_labels_by_bucket[i].clear();
+        }
         pending_label_cursor.assign(scc_buckets.size(), 0);
         bucket_is_active.assign(scc_buckets.size(), 0);
         active_bucket_heap.clear();
@@ -1451,9 +1459,12 @@ inline bool BucketGraph::DominatedInCompWiseSmallerBuckets(const Label *__restri
         if (Bvisited[segment] == 0) { touched_segments.push_back(static_cast<uint32_t>(segment)); }
         Bvisited[segment] |= bit;
 
-        // Fast path: if label cost is lower and bucket precedes L in the SCC
-        // order, return early
-        if (likely(label_cost < c_bar[current_bucket] && bucket_scc_rank[current_bucket] < label_rank)) return false;
+        // Fast path: no predecessor label can dominate L on cost. In
+        // SRC-aware stages a higher raw-cost label may still dominate after
+        // cut-state compensation, so include the safe compensation bound.
+        if (likely(bounded_cost_hi < c_bar[current_bucket] &&
+                   bucket_scc_rank[current_bucket] < label_rank))
+            return false;
 
         // Whole-bucket prune: if no label in this bucket or any predecessor bin
         // at this node can dominate L in the second resource, skip it entirely.

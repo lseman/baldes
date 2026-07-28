@@ -57,7 +57,9 @@ struct BucketOptions {
     double n_warm_start = 0.7;
 
     bool warm_start       = true;
-    bool profile_labeling = true;
+    // Detailed labeling counters sit on the dominance/extension hot path.
+    // Keep them opt-in so production solves do not pay profiling overhead.
+    bool profile_labeling = false;
 
     // EVRP options
     int battery_capacity  = 100;

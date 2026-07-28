@@ -36,14 +36,14 @@ SOFTWARE.*/
 #include <vector>
 
 #include "ankerl/unordered_dense.h"
-#include "Definitions.h"
+#include "core/Definitions.h"
 #include "Matrix.h"
 // #include "xorshift128.h"
 
 #include "CircleSector.h"
-#include "Reader.h"
+#include "utils/Reader.h"
 
-#include "../include/RNG.h"
+#include "math/RNG.h"
 #include "config.h"
 
 #define MY_EPSILON 0.00001 // Precision parameter, used to avoid numerical instabilities

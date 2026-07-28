@@ -9,7 +9,7 @@
 
 #include "../../third_party/fpmax/fitemset.cpp"
 #include "../../third_party/fpmax/fpmax.h"
-#include "Definitions.h"
+#include "core/Definitions.h"
 #include "Individual.h"
 #include "LocalSearch.h"
 #include "Params.h"

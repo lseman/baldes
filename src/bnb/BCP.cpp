@@ -6,7 +6,7 @@
  *
  */
 
-#include "bnb/BCP.h"
+#include "bnb/bcp/VRProblem.h"
 
 #include "bnb/Branching.h"
 

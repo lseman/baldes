@@ -8,9 +8,9 @@
 
 #include "math/Common.h"
 #include "core/Definitions.h"
-#include "pricing/BucketGraph.h"
-#include "pricing/BucketSolve.h"
-#include "pricing/BucketUtils.h"
+#include "pricing/bucket_graph/BucketGraph.h"
+#include "pricing/bucket_graph/Labeling.h"
+#include "pricing/bucket_graph/Utilities.h"
 
 #include "../../third_party/pdqsort.h"
 

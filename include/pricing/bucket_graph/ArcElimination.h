@@ -8,7 +8,7 @@
 #include <execution>
 #include <unordered_set>
 
-#include "pricing/BucketGraph.h"
+#include "pricing/bucket_graph/BucketGraph.h"
 #include "utils/Hashes.h"
 #include "model/VRPNode.h"
 #include "ankerl/unordered_dense.h"
