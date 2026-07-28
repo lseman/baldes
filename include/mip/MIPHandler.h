@@ -258,13 +258,14 @@ public:
             rc_pairs.push_back({rc, i});
         }
 
-        // Sort by absolute RC value in descending order
+        // Sort by RC ascending: most negative (most attractive for a
+        // minimization problem) first.
         std::sort(rc_pairs.begin(), rc_pairs.end(), [](const auto &a, const auto &b) { return a.first < b.first; });
 
         // Calculate how many variables to keep
         size_t keep_count = static_cast<size_t>(std::ceil(rc_pairs.size() * keep_percentage));
 
-        // Create a set of indices to remove (the bottom 30%)
+        // Create a set of indices to remove (the least attractive tail)
         ankerl::unordered_dense::set<int> indices_to_remove;
         for (size_t i = keep_count; i < rc_pairs.size(); i++) {
             int var_index = rc_pairs[i].second;
@@ -295,6 +296,7 @@ public:
         newVar->set_index(index);
         variables.push_back(newVar);
         var_name_to_index.emplace(var_name, index);
+        sparse_matrix.ensure_dims(-1, static_cast<int>(index));
 #ifdef GUROBI
         gurobiCache->addVariable(newVar);
 #endif
@@ -393,12 +395,16 @@ public:
                 batch_cols.push_back(it->second);
                 batch_values.push_back(coeff);
             } else {
-                fmt::print("baldesVar {} not found in the problem's variables list!\n", var_name);
+                throw std::runtime_error("baldesVar '" + var_name + "' not found in the problem's variables list");
             }
         }
 
         // Batch insert the collected terms into the sparse matrix.
         sparse_matrix.insert_batch(batch_rows, batch_cols, batch_values);
+        // Guarantee the row exists even if the constraint has no terms
+        // (insert_batch is a no-op on an empty batch and would otherwise
+        // leave sparse_matrix.num_rows out of sync with constraints.size()).
+        sparse_matrix.ensure_dims(row_index);
 
         return new_constraint;
     }
@@ -442,6 +448,8 @@ public:
 
         // Insert the batch of coefficients into the sparse matrix.
         sparse_matrix.insert_batch(batch_rows, batch_cols, batch_values);
+        // Guarantee the row exists even if the constraint has no terms.
+        sparse_matrix.ensure_dims(row_index);
 
         // Return the newly added constraint.
         return constraints.back();
@@ -577,6 +585,9 @@ public:
         if (constraintIndex < 0 || constraintIndex >= static_cast<int>(constraints.size())) {
             fmt::print("Invalid constraint index: {}\n", constraintIndex);
             throw std::out_of_range("Invalid constraint index");
+        }
+        if (values.size() != variables.size()) {
+            throw std::invalid_argument("chgCoeff: values.size() must match the number of variables");
         }
 
 #ifdef GUROBI
@@ -826,6 +837,8 @@ public:
                 upper_bound = kHighsInf;
             } else if (relation == '=') {
                 lower_bound = upper_bound = rhs;
+            } else {
+                throw std::invalid_argument(std::string("Invalid constraint relation: ") + relation);
             }
 
             highsModel.lp_.row_lower_[row_index] = lower_bound;
@@ -854,21 +867,14 @@ public:
 
     double getSlack(int row, const std::vector<double> &solution) {
         // Get the right-hand side value for this row.
-        const double rhs         = constraints[row]->get_rhs();
-        double       dot_product = 0.0;
+        const double rhs = constraints[row]->get_rhs();
 
-        // Cache local references to the COO arrays.
-        const auto  &rows   = sparse_matrix.rows;
-        const auto  &cols   = sparse_matrix.cols;
-        const auto  &values = sparse_matrix.values;
-        const size_t nnz    = rows.size();
-
-        // Iterate through the non-zero elements in COO format.
-        for (size_t i = 0; i < nnz; ++i) {
-            if (rows[i] == row) {
-                // Use the cached column and value to update the dot product.
-                dot_product += values[i] * solution[cols[i]];
-            }
+        // Use CRS row access instead of a full nnz scan: O(nnz_row) not O(nnz).
+        sparse_matrix.buildRowStart();
+        double dot_product = 0.0;
+        for (auto it = sparse_matrix.row_begin(row); it != sparse_matrix.row_end(row); ++it) {
+            const auto &[col, value] = *it;
+            dot_product += value * solution[col];
         }
 
         // Return the slack: rhs - (dot product of the row and solution)

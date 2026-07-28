@@ -43,7 +43,11 @@ public:
         }
     }
 
-    int getStatus() const override { return 2; }
+    // Callers compare this against Gurobi's GRB_OPTIMAL (2) convention, so map
+    // HiGHS's model status onto that: 2 if optimal, non-2 otherwise.
+    int getStatus() const override {
+        return model->getModelStatus() == HighsModelStatus::kOptimal ? 2 : -1;
+    }
 
     double getObjVal() const override { return model->getObjectiveValue(); }
 
