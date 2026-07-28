@@ -1,5 +1,5 @@
 /*
- * @file CutIntelligence.h
+ * @file cuts/rank1/Intelligence.h
  * @brief Declares CutIntelligence interfaces and types used by the BALDES solver.
  *
  * This file declares the CutIntelligence interfaces and helper functions used by the BALDES solver.
@@ -7,8 +7,8 @@
  */
 
 #pragma once
-#include "cuts/Cut.h"
-#include "cuts/CutHelper.h"
+#include "cuts/model/Cut.h"
+#include "cuts/rank1/Helpers.h"
 #include "search/Dual.h"
 #include "math/RNG.h"
 #include "algebra/SparseMatrix.h"

@@ -1,12 +1,12 @@
 /**
- * @file SRC.h
+ * @file cuts/rank1/Rank1Cuts.h
  * @brief Defines limited memory rank-1 cut handling for VRPTW.
  *
  */
 
 #pragma once
 
-#include "cuts/Cut.h"
+#include "cuts/model/Cut.h"
 #include "core/Definitions.h"
 #include "core/Pools.h"
 #include "algebra/SparseMatrix.h"
@@ -18,7 +18,7 @@
 //
 #include <cstdint>
 
-#include "cuts/HeuristicHighOrder.h"
+#include "cuts/rank1/HighOrder.h"
 #include "math/RNG.h"
 // include nsync
 #ifdef NSYNC
@@ -288,7 +288,7 @@ public:
             cut.coefficient_indices = std::move(coefficient_indices);
             cut.coefficient_values  = std::move(coefficient_values);
 
-            cutStorage.addCut(cut);
+            if (!cutStorage.addCut(cut)) break;
         }
     }
 

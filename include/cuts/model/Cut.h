@@ -1,5 +1,5 @@
 /**
- * @file Cut.h
+ * @file cuts/model/Cut.h
  * @brief Defines cut structures and storage for solver separation.
  *
  */
@@ -287,8 +287,21 @@ public:
         return cuts[index];
     }
 
-    // Add a cut to the storage
-    void addCut(Cut &cut);
+    // Begin a separation round with a shared budget across every SRC family.
+    void beginSeparationRound(size_t max_new_cuts) noexcept {
+        round_new_cut_limit_     = max_new_cuts;
+        round_new_cuts_accepted_ = 0;
+    }
+
+    [[nodiscard]] size_t remainingRoundCutBudget() const noexcept {
+        return round_new_cuts_accepted_ >= round_new_cut_limit_
+                   ? 0
+                   : round_new_cut_limit_ - round_new_cuts_accepted_;
+    }
+
+    // Existing cuts may always be refreshed; a new cut is rejected when the
+    // shared round budget is exhausted.
+    bool addCut(Cut &cut);
 
     // Reset the storage
     void reset() {
@@ -602,6 +615,8 @@ public:
     double  age_decay_alpha_       = 0.97; // Exponential decay factor per epoch (0-1)
     double  dual_ema_alpha_        = 0.20; // EMA weight for current dual magnitude
     double  selection_temperature_ = 2.0;  // Temperature for probabilistic selection (higher = more random)
+    size_t  round_new_cut_limit_     = std::numeric_limits<size_t>::max();
+    size_t  round_new_cuts_accepted_ = 0;
 
 private:
     std::vector<Cut> cuts; // Storage for cuts
@@ -859,7 +874,7 @@ public:
 #if defined(SRC_MEMORY_MODE_ARC)
                 for (const auto &active_cut : active_cuts) {
                     const auto &cut           = *active_cut.cut_ptr;
-                    auto       &src_map_value = label->SRCmap[active_cut.index];
+                    auto        src_map_value = label->SRCmap[active_cut.index];
                     if (!cut.isSRCMemoryArc(prev_node, node_id)) { src_map_value = 0; }
                     if (cut.isSRCset(node_id)) {
                         src_map_value += cut.srcMultiplier(node_id);
@@ -871,7 +886,7 @@ public:
                 }
 #else
                 for (const auto &update : getSRCNodeUpdates(node_id)) {
-                    auto &src_map_value = label->SRCmap[update.active_idx];
+                    auto src_map_value = label->SRCmap[update.active_idx];
                     src_map_value += update.add;
                     if (src_map_value >= update.den) {
                         src_map_value -= update.den;

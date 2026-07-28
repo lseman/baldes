@@ -1,0 +1,182 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="leftBg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#f6f7f5"/>
+      <stop offset="1" stop-color="#e8eceb"/>
+    </linearGradient>
+    <linearGradient id="rightBg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#202a31"/>
+      <stop offset="1" stop-color="#10171d"/>
+    </linearGradient>
+    <linearGradient id="bucketBody" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#111a21"/>
+      <stop offset="0.48" stop-color="#263845"/>
+      <stop offset="0.73" stop-color="#5e7d91"/>
+      <stop offset="1" stop-color="#17232c"/>
+    </linearGradient>
+    <linearGradient id="bucketTop" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#0a1116"/>
+      <stop offset="0.48" stop-color="#334d60"/>
+      <stop offset="0.72" stop-color="#0b1217"/>
+      <stop offset="1" stop-color="#17232b"/>
+    </linearGradient>
+    <linearGradient id="metal" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#dceaf1"/>
+      <stop offset="0.28" stop-color="#ffffff"/>
+      <stop offset="0.55" stop-color="#8fb2c7"/>
+      <stop offset="1" stop-color="#f7fbfd"/>
+    </linearGradient>
+    <filter id="shadow" x="-30%" y="-30%" width="160%" height="180%">
+      <feDropShadow dx="0" dy="14" stdDeviation="14" flood-color="#000" flood-opacity=".32"/>
+    </filter>
+    <clipPath id="leftHalf"><rect x="0" y="0" width="512" height="1024"/></clipPath>
+    <clipPath id="rightHalf"><rect x="512" y="0" width="512" height="1024"/></clipPath>
+
+    <g id="truck">
+      <path d="M8 18h64v35H8z" fill="currentColor"/>
+      <path d="M72 29h20l16 15v9H72z" fill="currentColor"/>
+      <path d="M84 33h8l10 10H84z" fill="#dbe9ef"/>
+      <circle cx="28" cy="57" r="10" fill="currentColor"/>
+      <circle cx="86" cy="57" r="10" fill="currentColor"/>
+      <circle cx="28" cy="57" r="4" fill="#889aa5"/>
+      <circle cx="86" cy="57" r="4" fill="#889aa5"/>
+    </g>
+
+    <g id="circuits" fill="none" stroke-linecap="round" stroke-linejoin="round">
+      <!-- left horizontal logistics lines -->
+      <path d="M112 432 H338"/>
+      <path d="M112 470 H355"/>
+      <path d="M112 508 H373"/>
+      <path d="M113 547 H355"/>
+      <path d="M115 586 H322"/>
+      <path d="M112 625 H352"/>
+      <!-- right branching -->
+      <path d="M673 368 H747 Q775 368 775 340 V285"/>
+      <path d="M674 411 H788 Q820 411 820 379 V316"/>
+      <path d="M671 455 H828 Q861 455 861 421 V354"/>
+      <path d="M666 501 H864 Q900 501 900 463 V415"/>
+      <path d="M657 548 H913"/>
+      <path d="M650 594 H890 Q919 594 919 622 V669"/>
+      <!-- bottom -->
+      <path d="M404 570 V753"/>
+      <path d="M444 584 V776"/>
+      <path d="M484 590 V750"/>
+      <path d="M524 590 V792"/>
+      <path d="M564 590 V752"/>
+      <path d="M604 583 V775"/>
+      <path d="M644 570 V744"/>
+    </g>
+
+    <g id="nodes">
+      <circle cx="112" cy="432" r="8"/><circle cx="112" cy="470" r="8"/>
+      <circle cx="112" cy="508" r="8"/><circle cx="113" cy="547" r="8"/>
+      <circle cx="115" cy="586" r="8"/><circle cx="112" cy="625" r="8"/>
+      <circle cx="775" cy="285" r="13"/><circle cx="820" cy="316" r="11"/>
+      <circle cx="861" cy="354" r="10"/><circle cx="900" cy="415" r="12"/>
+      <circle cx="913" cy="548" r="11"/><circle cx="919" cy="669" r="12"/>
+      <circle cx="404" cy="753" r="12"/><circle cx="444" cy="776" r="10"/>
+      <circle cx="484" cy="750" r="9"/><circle cx="524" cy="792" r="12"/>
+      <circle cx="564" cy="752" r="9"/><circle cx="604" cy="775" r="11"/>
+      <circle cx="644" cy="744" r="10"/>
+    </g>
+  </defs>
+
+  <!-- split background -->
+  <rect width="512" height="1024" fill="url(#leftBg)"/>
+  <rect x="512" width="512" height="1024" fill="url(#rightBg)"/>
+  <rect x="511" width="2" height="1024" fill="#cbd4d8" opacity=".18"/>
+
+  <!-- soft grain-like decoration -->
+  <g opacity=".18">
+    <circle cx="176" cy="295" r="8" fill="#0f1920"/>
+    <circle cx="206" cy="344" r="17" fill="#0f1920"/>
+    <circle cx="247" cy="390" r="6" fill="#0f1920"/>
+    <circle cx="286" cy="324" r="4" fill="#0f1920"/>
+    <circle cx="821" cy="244" r="7" fill="#f4fbff"/>
+    <circle cx="880" cy="326" r="5" fill="#f4fbff"/>
+    <circle cx="935" cy="460" r="8" fill="#f4fbff"/>
+    <circle cx="774" cy="640" r="5" fill="#f4fbff"/>
+    <circle cx="905" cy="715" r="7" fill="#f4fbff"/>
+  </g>
+
+  <!-- circuits duplicated for split contrast -->
+  <g clip-path="url(#leftHalf)" stroke="#101a21" stroke-width="10">
+    <use href="#circuits"/>
+  </g>
+  <g clip-path="url(#rightHalf)" stroke="#eef7fb" stroke-width="10">
+    <use href="#circuits"/>
+  </g>
+
+  <g clip-path="url(#leftHalf)" fill="#101a21">
+    <use href="#nodes"/>
+  </g>
+  <g clip-path="url(#rightHalf)" fill="#eef7fb">
+    <use href="#nodes"/>
+  </g>
+
+  <!-- trucks -->
+  <g>
+    <g color="#111b22" transform="translate(155 355) scale(.62)"><use href="#truck"/></g>
+    <g color="#111b22" transform="translate(172 525) scale(.58)"><use href="#truck"/></g>
+    <g color="#111b22" transform="translate(250 615) scale(.55)"><use href="#truck"/></g>
+    <g color="#111b22" transform="translate(170 674) scale(.48)"><use href="#truck"/></g>
+  </g>
+  <g>
+    <g color="#eef7fb" transform="translate(704 620) scale(.74)"><use href="#truck"/></g>
+  </g>
+
+  <!-- bucket and handle -->
+  <g filter="url(#shadow)">
+    <!-- handle -->
+    <path d="M332 315 C342 205 405 137 512 137 C619 137 682 205 692 315"
+          fill="none" stroke="#f3fbff" stroke-width="26" stroke-linecap="round"/>
+    <path d="M332 315 C342 205 405 137 512 137 C619 137 682 205 692 315"
+          fill="none" stroke="#0d171e" stroke-width="14" stroke-linecap="round"/>
+    <!-- handle side joints -->
+    <circle cx="332" cy="315" r="18" fill="#12202a" stroke="#f5fbff" stroke-width="8"/>
+    <circle cx="692" cy="315" r="18" fill="#12202a" stroke="#f5fbff" stroke-width="8"/>
+    <!-- top grip -->
+    <rect x="456" y="119" width="112" height="48" rx="16" fill="#0b151c" stroke="#f4fbff" stroke-width="8"/>
+    <rect x="478" y="129" width="75" height="13" rx="5" fill="url(#metal)" opacity=".72"/>
+
+    <!-- bucket body -->
+    <path d="M363 333 L398 560 Q408 610 512 620 Q616 610 626 560 L661 333 Z"
+          fill="url(#bucketBody)" stroke="#eef7fb" stroke-width="10"/>
+    <!-- bucket rim -->
+    <ellipse cx="512" cy="328" rx="170" ry="71" fill="#0b1217" stroke="#eef7fb" stroke-width="12"/>
+    <ellipse cx="512" cy="322" rx="142" ry="47" fill="url(#bucketTop)" stroke="url(#metal)" stroke-width="10"/>
+    <!-- inner shine -->
+    <path d="M401 323 C438 293 476 286 506 284 C480 300 463 325 452 356 C431 350 413 340 401 323Z"
+          fill="#b9d1de" opacity=".38"/>
+    <path d="M535 280 C590 287 625 303 642 322 C618 342 594 352 566 358 C560 326 548 301 535 280Z"
+          fill="#7897aa" opacity=".32"/>
+
+    <!-- bands and highlights -->
+    <path d="M378 404 Q512 453 646 404" fill="none" stroke="#0b141a" stroke-width="28" opacity=".92"/>
+    <path d="M390 420 Q512 460 634 420" fill="none" stroke="#a6c1d0" stroke-width="9" opacity=".45"/>
+    <path d="M392 497 Q512 536 632 497" fill="none" stroke="#0c151b" stroke-width="20" opacity=".86"/>
+    <path d="M420 377 L449 568" stroke="#d7e8f0" stroke-width="15" opacity=".2" stroke-linecap="round"/>
+    <path d="M592 388 L570 569" stroke="#051017" stroke-width="18" opacity=".36" stroke-linecap="round"/>
+  </g>
+
+  <!-- orbit dots -->
+  <g>
+    <g fill="#101a21">
+      <circle cx="432" cy="214" r="11"/><circle cx="485" cy="204" r="9"/>
+      <circle cx="282" cy="257" r="11"/><circle cx="201" cy="331" r="8"/>
+      <circle cx="322" cy="365" r="13"/>
+    </g>
+    <g fill="#eef7fb">
+      <circle cx="560" cy="207" r="10"/><circle cx="618" cy="215" r="10"/>
+      <circle cx="739" cy="220" r="7"/><circle cx="820" cy="280" r="6"/>
+      <circle cx="874" cy="370" r="10"/>
+    </g>
+  </g>
+
+  <!-- title, split-colour -->
+  <g font-family="Montserrat, Arial, Helvetica, sans-serif" font-size="132" font-weight="800"
+     letter-spacing="9" text-anchor="middle">
+    <text x="512" y="895" fill="#0f1920" clip-path="url(#leftHalf)">BALDES</text>
+    <text x="512" y="895" fill="#f2f8fb" clip-path="url(#rightHalf)">BALDES</text>
+  </g>
+</svg>
