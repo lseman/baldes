@@ -1,5 +1,5 @@
 /*
- * @file HeuristicHighOrder.h
+ * @file cuts/rank1/HighOrder.h
  * @brief Declares HeuristicHighOrder interfaces and types used by the BALDES solver.
  *
  * This file declares the HeuristicHighOrder interfaces and helper functions used by the BALDES solver.
@@ -21,8 +21,8 @@
 #include "utils/NumericUtils.h"
 
 // include CutHelper
-#include "cuts/CutHelper.h"
-#include "cuts/CutIntelligence.h"
+#include "cuts/rank1/Helpers.h"
+#include "cuts/rank1/Intelligence.h"
 
 // namespace std {
 // template <>
@@ -1411,7 +1411,7 @@ public:
 
         // Add the cut to the global cut storage.
         const size_t previous_size = cutStorage->size();
-        cutStorage->addCut(cut);
+        if (!cutStorage->addCut(cut)) return false;
         return cutStorage->size() > previous_size || cut.updated;
     }
 

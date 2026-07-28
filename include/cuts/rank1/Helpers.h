@@ -1,5 +1,5 @@
 /*
- * @file CutHelper.h
+ * @file cuts/rank1/Helpers.h
  * @brief Declares CutHelper interfaces and types used by the BALDES solver.
  *
  * This file declares the CutHelper interfaces and helper functions used by the BALDES solver.
@@ -9,7 +9,7 @@
 #pragma once
 
 // Move config outside as namespace constants
-#include "cuts/Cut.h"
+#include "cuts/model/Cut.h"
 namespace LocalSearchConfig {
 constexpr double MIN_WEIGHT             = 0.01;
 constexpr int    SEGMENT_SIZE           = 20;

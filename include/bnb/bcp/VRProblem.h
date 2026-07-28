@@ -6,13 +6,13 @@
 
 #pragma once
 
-#include "model/Arc.h"
-#include "cuts/Cut.h"
 #include "core/Definitions.h"
-#include "cuts/RCC.h"
-#include "model/VRPNode.h"
+#include "cuts/capacity/RCC.h"
+#include "cuts/model/Cut.h"
 #include "mip/LinExp.h"
 #include "mip/MIPHandler.h"
+#include "model/Arc.h"
+#include "model/VRPNode.h"
 
 // #include "search/TR.h"
 #include "bnb/Node.h"
@@ -28,8 +28,8 @@
 #include "stabilization/Stabilization.h"
 #endif
 
-#include "utils/Reader.h"
 #include "bnb/Problem.h"
+#include "utils/Reader.h"
 
 #ifdef RCC
 #include "../../third_party/cvrpsep/capsep.h"
@@ -38,7 +38,7 @@
 #endif
 
 #ifdef EXACT_RCC
-#include "cuts/ExactRCC.h"
+#include "cuts/capacity/ExactRoundedCapacityCuts.h"
 #endif
 
 #include "utils/Hashes.h"
@@ -62,8 +62,8 @@
 
 #define NUMERO_CANDIDATOS 10
 
-#include "search/RIH.h"
 #include "core/State.h"
+#include "search/RIH.h"
 class VRProblem {
 public:
     InstanceData         instance;
@@ -332,7 +332,7 @@ public:
             colAdded += stats.added_columns;
         }
 
-        double hgs_incumbent = hgs.best_cost;
+        double     hgs_incumbent   = hgs.best_cost;
         const auto best_hgs_routes = hgs.getBestRoutes();
         if (!best_hgs_routes.empty()) {
             double route_cost = 0.0;
@@ -1119,7 +1119,7 @@ public:
 #endif
 
             if (hasNegativeReducedCost(inner_obj)) {
-                ss = false;
+                ss         = false;
                 force_cuts = false;
                 if (bucket_graph) { bucket_graph->ss = false; }
             }

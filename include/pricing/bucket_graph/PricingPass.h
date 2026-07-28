@@ -10,16 +10,36 @@
 
 template <Stage S, Symmetry SYM>
 std::vector<Label *> BucketGraph::bi_labeling_algorithm() {
+    using Clock = std::chrono::steady_clock;
+    last_pricing_timings = {};
+
+    auto phase_start = Clock::now();
     prepare_pricing_stage<S>();
+    last_pricing_timings.preparation_ms =
+        std::chrono::duration<double, std::milli>(Clock::now() - phase_start).count();
+
+    phase_start = Clock::now();
     initialize_pricing_pass<S>();
+    last_pricing_timings.initialization_ms =
+        std::chrono::duration<double, std::milli>(Clock::now() - phase_start).count();
 
     BucketPricingPass pass(fw_buckets.size(), bw_buckets.size());
+    phase_start = Clock::now();
     run_directional_pricing<S, SYM>(pass.bounds);
+    last_pricing_timings.directional_wall_ms =
+        std::chrono::duration<double, std::milli>(Clock::now() - phase_start).count();
 
     merged_labels.push_back(make_initial_merged_label<S, SYM>());
+    phase_start = Clock::now();
     concatenate_pricing_pass<S, SYM>(pass);
+    last_pricing_timings.concatenation_ms =
+        std::chrono::duration<double, std::milli>(Clock::now() - phase_start).count();
 
-    return finalize_pricing_pass<S>().labels;
+    phase_start = Clock::now();
+    auto result = finalize_pricing_pass<S>();
+    last_pricing_timings.finalization_ms =
+        std::chrono::duration<double, std::milli>(Clock::now() - phase_start).count();
+    return result.labels;
 }
 
 template <Stage S>
@@ -56,7 +76,10 @@ void BucketGraph::run_directional_pricing(BucketDirectionalBounds &bounds) {
     if constexpr (SYM == Symmetry::Asymmetric) {
         run_labeling_algorithms<S, Full::Partial>(bounds.forward, bounds.backward);
     } else {
+        const auto start = std::chrono::steady_clock::now();
         bounds.forward = labeling_algorithm<Direction::Forward, S, Full::Partial>();
+        last_pricing_timings.forward_labeling_ms =
+            std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count();
     }
 }
 
@@ -195,7 +218,7 @@ BucketGraph::BucketPricingResult BucketGraph::finalize_pricing_pass() {
         top_labels.reserve(N_ADD);
         const int n_candidates = std::min(N_ADD, static_cast<int>(merged_labels.size()));
         for (int i = 0; i < n_candidates; ++i) {
-            if (merged_labels[i]->nodes_covered.size() <= 3) continue;
+            if (merged_labels[i]->getRoute().size() <= 3) continue;
             top_labels.push_back(merged_labels[i]);
         }
         ils->submit_task(top_labels, nodes);

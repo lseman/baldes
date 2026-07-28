@@ -1,5 +1,5 @@
 /**
- * @file ExactRCC.h
+ * @file cuts/capacity/ExactRoundedCapacityCuts.h
  * @brief Exact Rounded Capacity Cut generation and separation definitions.
  *
  */

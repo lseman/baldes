@@ -83,10 +83,10 @@ std::vector<Label *> BucketGraph::solvePSTEP(PSTEPDuals &inner_pstep_duals) {
                                   for (auto label : bucket_labels) {
                                       if (!label) continue;
                                       auto new_label = compute_mono_label(label);
-                                      if ((new_label->nodes_covered.size() > 1) &&
-                                          (new_label->nodes_covered.back() == sub_options.end_depot) &&
-                                          (new_label->nodes_covered.size() >= options.min_path_size &&
-                                           new_label->nodes_covered.size() <= options.max_path_size)) {
+                                      const auto &route = new_label->getRoute();
+                                      if ((route.size() > 1) && (route.back() == sub_options.end_depot) &&
+                                          (route.size() >= options.min_path_size &&
+                                           route.size() <= options.max_path_size)) {
                                           paths.push_back(new_label);
                                       }
                                   }
@@ -415,8 +415,9 @@ std::vector<Label *> BucketGraph::solvePSTEP_by_MTZ() {
             paths_added++;
             all_paths.push_back(path->getRoute());
             all_costs.push_back(path->real_cost);
-            all_firsts.push_back(path->nodes_covered.front());
-            all_lasts.push_back(path->nodes_covered.back());
+            const auto &route = path->getRoute();
+            all_firsts.push_back(route.front());
+            all_lasts.push_back(route.back());
         }
         if (paths_added == 0) { break; }
 
@@ -641,8 +642,9 @@ std::vector<Label *> BucketGraph::solveTSPTW_by_MTZ() {
             paths_added++;
             all_paths.push_back(path->getRoute());
             all_costs.push_back(path->real_cost);
-            all_firsts.push_back(path->nodes_covered.front());
-            all_lasts.push_back(path->nodes_covered.back());
+            const auto &route = path->getRoute();
+            all_firsts.push_back(route.front());
+            all_lasts.push_back(route.back());
         }
 
         // If no new paths were added, stop the iteration

@@ -15,10 +15,9 @@
 #include "core/Definitions.h"
 #include "core/Pools.h"
 #include "core/Stats.h"
-#include "cuts/Cut.h"
-#include "cuts/RCC.h"
+#include "cuts/model/Cut.h"
+#include "cuts/capacity/RoundedCapacityCuts.h"
 #include "pricing/bucket_graph/model/Bucket.h"
-#include "model/Trees.h"
 #include "model/VRPNode.h"
 #include "graph/SCCFinder.h"
 #include "search/Dual.h"
@@ -243,6 +242,20 @@ public:
         bool                 pricing_truncated             = false;
     };
 
+    struct BucketPricingTimings {
+        double preparation_ms       = 0.0;
+        double initialization_ms    = 0.0;
+        double forward_labeling_ms  = 0.0;
+        double backward_labeling_ms = 0.0;
+        double directional_wall_ms  = 0.0;
+        double concatenation_ms     = 0.0;
+        double finalization_ms      = 0.0;
+
+        [[nodiscard]] double total_ms() const noexcept {
+            return preparation_ms + initialization_ms + directional_wall_ms + concatenation_ms + finalization_ms;
+        }
+    };
+
     struct BucketDirectionalBounds {
         std::vector<double> forward;
         std::vector<double> backward;
@@ -414,6 +427,7 @@ public:
     double                        last_parallel_completion_ms   = std::numeric_limits<double>::infinity();
     uint64_t                      last_concatenation_labels_tested   = 0;
     uint64_t                      last_concatenation_labels_accepted = 0;
+    BucketPricingTimings          last_pricing_timings{};
     std::vector<std::vector<int>> neighborhoods;
 
     std::vector<std::vector<double>> distance_matrix;
@@ -509,6 +523,8 @@ public:
     std::vector<int> dominance_checks_per_bucket;
     int              non_dominated_labels_per_bucket;
     int              non_dominated_labels_per_bucket_bw = 0;
+    uint64_t         regen_dominance_checks_fw          = 0;
+    uint64_t         regen_dominance_checks_bw          = 0;
 
     // Running average of dominance-checks-per-non-dominant-label across
     // labeling passes. Drives considerRegenerate(): when the average exceeds
@@ -518,8 +534,6 @@ public:
     int    regen_ratio_count = 0;
 
     // Interval tree to store bucket intervals
-    std::vector<SplayTree> fw_node_interval_trees;
-    std::vector<SplayTree> bw_node_interval_trees;
 
 #ifdef SCHRODINGER
     /**
@@ -632,6 +646,7 @@ public:
     void     clearEnumerationFailure() noexcept { enumeration_failed.store(false, std::memory_order_relaxed); }
     uint64_t getLastConcatenationLabelsTested() const noexcept { return last_concatenation_labels_tested; }
     uint64_t getLastConcatenationLabelsAccepted() const noexcept { return last_concatenation_labels_accepted; }
+    const BucketPricingTimings &getLastPricingTimings() const noexcept { return last_pricing_timings; }
 
     size_t current_bucket_arc_count() const noexcept {
         size_t count = 0;
@@ -711,7 +726,7 @@ public:
             snapshot.cost          = label->cost;
             snapshot.node_id       = label->node_id;
             snapshot.resources     = label->resources;
-            snapshot.nodes_covered = label->nodes_covered;
+            label->materializeRoute(snapshot.nodes_covered);
             snapshot.path_len      = label->path_len;
             warm_labels.push_back(std::move(snapshot));
         }
@@ -1159,8 +1174,8 @@ public:
         // Sample the most recent labeling pass: total dominance scans across
         // all forward buckets, divided by non-dominant label count summed over
         // both directions. Avoids div-by-zero when the pass produced nothing.
-        double total_checks = 0.0;
-        for (int v : dominance_checks_per_bucket) total_checks += v;
+        const double total_checks =
+            static_cast<double>(regen_dominance_checks_fw + regen_dominance_checks_bw);
         const int non_dom_total = non_dominated_labels_per_bucket + non_dominated_labels_per_bucket_bw;
         if (non_dom_total <= 0) return false;
         const double pass_ratio = total_checks / static_cast<double>(non_dom_total);
@@ -1205,30 +1220,6 @@ public:
     UnionFind bw_union_find;
     template <Direction D>
     int get_bucket_number(int node, std::vector<double> &values);
-
-    template <Direction D>
-    inline int get_static_bucket_number(int node, std::vector<double> &resource_values_vec) noexcept {
-        const size_t num_resources = options.main_resources.size();
-
-        // Optionally adjust resource values (epsilon adjustments can be enabled
-        // here)
-        for (size_t r = 0; r < num_resources; ++r) {
-            if constexpr (D == Direction::Forward) {
-                // resource_values_vec[r] += numericutils::eps; // Uncomment if
-                // needed.
-            } else {
-                // resource_values_vec[r] -= numericutils::eps; // Uncomment if
-                // needed.
-            }
-        }
-
-        // Query the appropriate node interval tree based on direction.
-        if constexpr (D == Direction::Forward) {
-            return fw_node_interval_trees[node].queryStatic(resource_values_vec);
-        } else { // Direction::Backward
-            return bw_node_interval_trees[node].queryStatic(resource_values_vec);
-        }
-    }
 
     template <Direction D>
     Label *get_best_label(const std::vector<int> &topological_order, const std::vector<double> &c_bar,
@@ -1403,8 +1394,7 @@ public:
         // Prepare new label.
         auto  pool      = fw ? label_pool_fw : label_pool_bw;
         auto  new_label = pool->acquire();
-        auto &route     = new_label->nodes_covered;
-        route.clear();
+        auto &route     = new_label->mutableRoute();
         route.reserve(L.nodes_covered.size());
         route.insert(route.end(), L.nodes_covered.begin(), L.nodes_covered.end());
         new_label->path_len = L.path_len;
@@ -1602,7 +1592,6 @@ public:
         const int num_intervals       = options.main_resources.size(); // number of resource dimensions
         auto     &num_buckets         = assign_buckets<D>(num_buckets_fw, num_buckets_bw);
         auto     &num_buckets_index   = assign_buckets<D>(num_buckets_index_fw, num_buckets_index_bw);
-        auto     &node_interval_trees = assign_buckets<D>(fw_node_interval_trees, bw_node_interval_trees);
         auto     &buckets_size        = assign_buckets<D>(fw_buckets_size, bw_buckets_size);
         auto     &bucket_splits       = assign_buckets<D>(fw_bucket_splits, bw_bucket_splits);
 
@@ -1610,7 +1599,6 @@ public:
         const size_t num_nodes = nodes.size();
         num_buckets.resize(num_nodes);
         num_buckets_index.resize(num_nodes);
-        node_interval_trees.assign(num_nodes, SplayTree());
 
         // Lambda to calculate an interval for a given resource dimension.
         // Rounding is applied after computing boundaries.
@@ -1627,7 +1615,6 @@ public:
             return {roundToTwoDecimalPlaces(start), roundToTwoDecimalPlaces(end)};
         };
 
-        int                 bucket_index = 0;
         int                 cum_sum      = 0;
         std::vector<double> interval_start(num_intervals);
         std::vector<double> interval_end(num_intervals);
@@ -1671,8 +1658,7 @@ public:
             // could store the full vector.)
             bucket_splits[VRPNode.id] = (num_intervals == 1) ? node_split_counts[0] : node_split_counts[0];
 
-            SplayTree node_tree;
-            int       n_buckets = 0;
+            int n_buckets = 0;
 
             if (num_intervals == 1) {
                 // Single-dimensional splitting.
@@ -1686,7 +1672,6 @@ public:
                         end = std::min(end, VRPNode.ub[0]);
                     }
                     buckets.push_back(Bucket(VRPNode.id, std::vector<double>{start}, std::vector<double>{end}));
-                    node_tree.insert(std::vector<double>{start}, std::vector<double>{end}, bucket_index++);
                     n_buckets++;
                     cum_sum++;
                 }
@@ -1707,7 +1692,6 @@ public:
                         }
                     }
                     buckets.push_back(Bucket(VRPNode.id, interval_start, interval_end));
-                    node_tree.insert(interval_start, interval_end, bucket_index++);
                     n_buckets++;
                     cum_sum++;
 
@@ -1727,9 +1711,8 @@ public:
             }
 
             // Update per-node bucket bookkeeping.
-            num_buckets[VRPNode.id]         = n_buckets;
-            num_buckets_index[VRPNode.id]   = cum_sum - n_buckets;
-            node_interval_trees[VRPNode.id] = node_tree;
+            num_buckets[VRPNode.id]       = n_buckets;
+            num_buckets_index[VRPNode.id] = cum_sum - n_buckets;
         }
 
         // Update the overall bucket count.
