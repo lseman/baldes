@@ -97,6 +97,15 @@ struct SparseMatrix {
         values.push_back(value);
     }
 
+    // Ensure the matrix has at least row_index+1 rows / col_index+1 columns,
+    // even if no non-zero entries are ever inserted for them (e.g. an empty
+    // constraint row). Without this, row/column count silently lags behind
+    // the caller's logical index space and CRS row lookups go out of bounds.
+    void ensure_dims(int row_index, int col_index = -1) {
+        if (row_index >= 0) num_rows = std::max(num_rows, row_index + 1);
+        if (col_index >= 0) num_cols = std::max(num_cols, col_index + 1);
+    }
+
     // Batch insertion with deduplication via an unordered_map.
     void insert_batch(const std::vector<int> &batch_rows, const std::vector<int> &batch_cols,
                       const std::vector<double> &batch_values) {
@@ -140,7 +149,13 @@ struct SparseMatrix {
     // Convert from COO to CRS format (if currently in COO mode)
     void convertToCRS() const {
         if (!coo_mode) return;
-        if (!crs_data) { crs_data = std::make_shared<CRSData>(); }
+        // crs_data may still be a non-null pointer shared with another
+        // SparseMatrix copy (e.g. a ModelData snapshot taken while this
+        // matrix was in CRS mode: the copy ctor aliases the shared_ptr, and
+        // switchToCOO() only detaches it when use_count()==1). Rebuilding
+        // in place through a shared pointer would silently corrupt that
+        // other copy's data out from under it. Always allocate fresh here.
+        if (!crs_data || crs_data.use_count() > 1) { crs_data = std::make_shared<CRSData>(); }
         auto &crs = *crs_data;
         crs.row_start.assign(num_rows + 1, 0);
 

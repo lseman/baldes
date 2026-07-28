@@ -10,19 +10,19 @@
 #include <condition_variable>
 #include <cstring>
 
-#include "utils/UnionFind.h"
 #include "core/CostFunction.h"
 #include "core/Definitions.h"
 #include "core/Pools.h"
 #include "core/Stats.h"
+#include "cuts/capacity/RCC.h"
 #include "cuts/model/Cut.h"
-#include "cuts/capacity/RoundedCapacityCuts.h"
-#include "pricing/bucket_graph/model/Bucket.h"
-#include "model/VRPNode.h"
 #include "graph/SCCFinder.h"
+#include "model/VRPNode.h"
+#include "pricing/bucket_graph/model/Bucket.h"
 #include "search/Dual.h"
 #include "search/PSTEP.h"
 #include "search/RIH.h"
+#include "utils/UnionFind.h"
 
 #define RCESPP_TOL_ZERO 1.E-6
 
@@ -421,10 +421,10 @@ public:
     bool                          forward_completion_bounds_ready = false;
     std::atomic<uint64_t>         completion_bound_attempts{0};
     std::atomic<uint64_t>         completion_bound_rejections{0};
-    uint64_t                      completion_exact_calls = 0;
-    bool                          auto_prefer_backward_first = false;
-    double                        last_sequential_completion_ms = std::numeric_limits<double>::infinity();
-    double                        last_parallel_completion_ms   = std::numeric_limits<double>::infinity();
+    uint64_t                      completion_exact_calls             = 0;
+    bool                          auto_prefer_backward_first         = false;
+    double                        last_sequential_completion_ms      = std::numeric_limits<double>::infinity();
+    double                        last_parallel_completion_ms        = std::numeric_limits<double>::infinity();
     uint64_t                      last_concatenation_labels_tested   = 0;
     uint64_t                      last_concatenation_labels_accepted = 0;
     BucketPricingTimings          last_pricing_timings{};
@@ -599,15 +599,15 @@ public:
     std::vector<WarmLabelState> fw_warm_labels;
     std::vector<WarmLabelState> bw_warm_labels;
 
-    void setup();
-    void print_statistics();
-    void print_labeling_profile();
-    void profile_reset_labeling_metrics() noexcept;
-    void profile_record_dominance_check(Direction D, Stage S) noexcept;
-    void profile_record_inner_bin_scan(Direction D, Stage S, uint64_t scanned_labels) noexcept;
-    void profile_record_signature_rejection(Direction D, Stage S) noexcept;
-    void profile_record_new_label(Direction D, Stage S) noexcept;
-    void profile_record_non_dominated_label(Direction D, Stage S) noexcept;
+    void                 setup();
+    void                 print_statistics();
+    void                 print_labeling_profile();
+    void                 profile_reset_labeling_metrics() noexcept;
+    void                 profile_record_dominance_check(Direction D, Stage S) noexcept;
+    void                 profile_record_inner_bin_scan(Direction D, Stage S, uint64_t scanned_labels) noexcept;
+    void                 profile_record_signature_rejection(Direction D, Stage S) noexcept;
+    void                 profile_record_new_label(Direction D, Stage S) noexcept;
+    void                 profile_record_non_dominated_label(Direction D, Stage S) noexcept;
     [[nodiscard]] double src_cost_compensation_bound() const noexcept {
 #ifdef SRC
         if (!cut_storage) return 0.0;
@@ -723,11 +723,11 @@ public:
             if (!label) continue;
 
             WarmLabelState snapshot;
-            snapshot.cost          = label->cost;
-            snapshot.node_id       = label->node_id;
-            snapshot.resources     = label->resources;
+            snapshot.cost      = label->cost;
+            snapshot.node_id   = label->node_id;
+            snapshot.resources = label->resources;
             label->materializeRoute(snapshot.nodes_covered);
-            snapshot.path_len      = label->path_len;
+            snapshot.path_len = label->path_len;
             warm_labels.push_back(std::move(snapshot));
         }
     }
@@ -1174,9 +1174,8 @@ public:
         // Sample the most recent labeling pass: total dominance scans across
         // all forward buckets, divided by non-dominant label count summed over
         // both directions. Avoids div-by-zero when the pass produced nothing.
-        const double total_checks =
-            static_cast<double>(regen_dominance_checks_fw + regen_dominance_checks_bw);
-        const int non_dom_total = non_dominated_labels_per_bucket + non_dominated_labels_per_bucket_bw;
+        const double total_checks  = static_cast<double>(regen_dominance_checks_fw + regen_dominance_checks_bw);
+        const int    non_dom_total = non_dominated_labels_per_bucket + non_dominated_labels_per_bucket_bw;
         if (non_dom_total <= 0) return false;
         const double pass_ratio = total_checks / static_cast<double>(non_dom_total);
 
@@ -1285,7 +1284,7 @@ public:
     template <Stage S, Symmetry SYM = Symmetry::Asymmetric>
     void concatenate_label_from_bucket(const Label *L, int b, std::atomic<double> &best_cost,
                                        std::vector<ConcatenationCandidate> &chunk_candidates,
-                                       const SpliceState *splice_state = nullptr);
+                                       const SpliceState                   *splice_state = nullptr);
 
     template <Direction D>
     void UpdateBucketsSet(double theta, const Label *label, ankerl::unordered_dense::set<int> &Bbidi,
@@ -1589,11 +1588,11 @@ public:
         fixed_buckets_bitmap.clear();
 
         // Get other direction-specific containers.
-        const int num_intervals       = options.main_resources.size(); // number of resource dimensions
-        auto     &num_buckets         = assign_buckets<D>(num_buckets_fw, num_buckets_bw);
-        auto     &num_buckets_index   = assign_buckets<D>(num_buckets_index_fw, num_buckets_index_bw);
-        auto     &buckets_size        = assign_buckets<D>(fw_buckets_size, bw_buckets_size);
-        auto     &bucket_splits       = assign_buckets<D>(fw_bucket_splits, bw_bucket_splits);
+        const int num_intervals     = options.main_resources.size(); // number of resource dimensions
+        auto     &num_buckets       = assign_buckets<D>(num_buckets_fw, num_buckets_bw);
+        auto     &num_buckets_index = assign_buckets<D>(num_buckets_index_fw, num_buckets_index_bw);
+        auto     &buckets_size      = assign_buckets<D>(fw_buckets_size, bw_buckets_size);
+        auto     &bucket_splits     = assign_buckets<D>(fw_bucket_splits, bw_bucket_splits);
 
         // Pre-allocate per-node containers.
         const size_t num_nodes = nodes.size();
@@ -1615,7 +1614,7 @@ public:
             return {roundToTwoDecimalPlaces(start), roundToTwoDecimalPlaces(end)};
         };
 
-        int                 cum_sum      = 0;
+        int                 cum_sum = 0;
         std::vector<double> interval_start(num_intervals);
         std::vector<double> interval_end(num_intervals);
         // "pos" holds the current combination indices when

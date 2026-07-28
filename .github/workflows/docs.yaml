@@ -23,8 +23,9 @@ jobs:
 
       - name: Move to docs/ subdirectory
         run: |
-          mkdir -p docs
-          mv html docs/html
+          rm -rf docs/html html
+          mkdir -p docs/html
+          cp -r html docs/html/ 2>/dev/null || true
 
       - name: GH Pages Deployment
         uses: peaceiris/actions-gh-pages@v3
