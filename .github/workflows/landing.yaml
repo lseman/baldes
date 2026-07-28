@@ -1,36 +1,30 @@
-name: Documentation
+name: Landing Page
 
 on:
   push:
     branches: [ main ]
-
+    paths:
+      - 'landing/**'
+  workflow_dispatch:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
   cancel-in-progress: true
 
 jobs:
-  doxygen:
-    name: "Doxygen"
+  deploy:
+    name: "Deploy landing"
     runs-on: ubuntu-22.04
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
-
-      - name: Run Doxygen
-        uses: mattnotmitt/doxygen-action@edge
-        with:
-          doxyfile-path: './Doxyfile'
-
-      - name: Move to docs/ subdirectory
-        run: |
-          mkdir -p docs
-          mv html docs/html
 
       - name: GH Pages Deployment
         uses: peaceiris/actions-gh-pages@v3
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./docs/html
+          publish_dir: ./landing
           keep_files: true
           enable_jekyll: false
           allow_empty_commit: false

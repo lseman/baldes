@@ -1,0 +1,409 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description"
+        content="BALDES is a high-performance C++23 implementation of a branch-cut-and-price framework for vehicle routing, using bucket-graph labeling for CVRP, VRPTW, and EVRP." />
+    <title>BALDES — Branch-Cut-and-Price for Vehicle Routing</title>
+
+    <!-- Preconnect for fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+        href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,400&family=JetBrains+Mono:wght@400;500&display=swap"
+        rel="stylesheet" />
+
+    <!-- External CSS -->
+    <link rel="stylesheet" href="style.css" />
+</head>
+
+<body>
+
+    <!-- ══════════════════════════
+     BACKGROUND LAYERS
+     ═══════════════════════════ -->
+    <div class="bg-mesh" aria-hidden="true">
+        <div class="blob blob-1"></div>
+        <div class="blob blob-2"></div>
+        <div class="blob blob-3"></div>
+    </div>
+    <div class="bg-grid" aria-hidden="true"></div>
+    <div class="bg-grain" aria-hidden="true"></div>
+
+    <!-- ══════════════════════════
+     NAV
+     ═══════════════════════════ -->
+    <nav id="main-nav">
+        <div class="nav-inner">
+            <a href="#" class="brand">
+                <!-- Inline BALDES logo mark (512 × 512) -->
+                <svg class="brand-logo" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                    <defs>
+                        <linearGradient id="nav-bucket" x1="0" y1="0" x2="1" y2="1">
+                            <stop offset="0%" stop-color="#111a21" />
+                            <stop offset="50%" stop-color="#263845" />
+                            <stop offset="73%" stop-color="#5e7d91" />
+                            <stop offset="100%" stop-color="#17232c" />
+                        </linearGradient>
+                        <linearGradient id="nav-metal" x1="0" y1="0" x2="1" y2="0">
+                            <stop offset="0%" stop-color="#dceaf1" />
+                            <stop offset="30%" stop-color="#ffffff" />
+                            <stop offset="55%" stop-color="#8fb2c7" />
+                            <stop offset="100%" stop-color="#f7fbfd" />
+                        </linearGradient>
+                    </defs>
+                    <!-- handle -->
+                    <path d="M332 315 C342 205 405 137 512 137 C619 137 682 205 692 315"
+                        fill="none" stroke="url(#nav-metal)" stroke-width="26" stroke-linecap="round" opacity="0.9" />
+                    <!-- bucket body -->
+                    <path d="M363 333 L398 560 Q408 610 512 620 Q616 610 626 560 L661 333 Z"
+                        fill="url(#nav-bucket)" stroke="#eef7fb" stroke-width="10" opacity="0.85" />
+                    <!-- rim -->
+                    <ellipse cx="512" cy="328" rx="170" ry="71" fill="#0b1217" stroke="#eef7fb" stroke-width="12" opacity="0.85" />
+                    <ellipse cx="512" cy="322" rx="142" ry="47" fill="#0a1116" stroke="url(#nav-metal)" stroke-width="10" opacity="0.7" />
+                    <!-- title -->
+                    <text x="512" y="900" font-family="Montserrat, Arial, sans-serif" font-size="132" font-weight="800"
+                        letter-spacing="9" text-anchor="middle" fill="#eef7fb" opacity="0.85">BALDES</text>
+                </svg>
+                <span class="brand-name">BALDES</span>
+            </a>
+
+            <div class="nav-actions">
+                <a class="btn btn-ghost" href="docs/html/index.html" target="_blank" rel="noopener">Doxygen</a>
+                <a class="btn btn-ghost" href="https://github.com/lseman/baldes" target="_blank" rel="noopener">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                        <path
+                            d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z" />
+                    </svg>
+                    GitHub
+                </a>
+            </div>
+        </div>
+    </nav>
+
+    <!-- ══════════════════════════
+     HERO
+     ═══════════════════════════ -->
+    <section class="hero">
+        <div class="hero-inner">
+
+            <!-- Large logo -->
+            <div class="hero-logo-wrap reveal">
+                <div class="hero-logo-ring"></div>
+                <div class="hero-logo-ring hero-logo-ring-2"></div>
+                <!-- Inline BALDES logo -->
+                <svg class="hero-logo" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                    <defs>
+                        <linearGradient id="hero-bucket" x1="0" y1="0" x2="1" y2="1">
+                            <stop offset="0%" stop-color="#111a21" />
+                            <stop offset="50%" stop-color="#263845" />
+                            <stop offset="73%" stop-color="#5e7d91" />
+                            <stop offset="100%" stop-color="#17232c" />
+                        </linearGradient>
+                        <linearGradient id="hero-metal" x1="0" y1="0" x2="1" y2="0">
+                            <stop offset="0%" stop-color="#dceaf1" />
+                            <stop offset="30%" stop-color="#ffffff" />
+                            <stop offset="55%" stop-color="#8fb2c7" />
+                            <stop offset="100%" stop-color="#f7fbfd" />
+                        </linearGradient>
+                    </defs>
+                    <path d="M332 315 C342 205 405 137 512 137 C619 137 682 205 692 315"
+                        fill="none" stroke="url(#hero-metal)" stroke-width="26" stroke-linecap="round" />
+                    <path d="M363 333 L398 560 Q408 610 512 620 Q616 610 626 560 L661 333 Z"
+                        fill="url(#hero-bucket)" stroke="#eef7fb" stroke-width="10" />
+                    <ellipse cx="512" cy="328" rx="170" ry="71" fill="#0b1217" stroke="#eef7fb" stroke-width="12" />
+                    <ellipse cx="512" cy="322" rx="142" ry="47" fill="#0a1116" stroke="url(#hero-metal)" stroke-width="10" />
+                    <text x="512" y="900" font-family="Montserrat, Arial, sans-serif" font-size="132" font-weight="800"
+                        letter-spacing="9" text-anchor="middle" fill="#eef7fb">BALDES</text>
+                </svg>
+            </div>
+
+            <!-- Copy -->
+            <div class="hero-copy">
+                <div class="reveal">
+                    <div class="hero-kicker">High-performance C++23 · Branch-Cut-and-Price · Bucket Graphs</div>
+                </div>
+
+                <h1 class="hero-title reveal reveal-d1">
+                    Vehicle routing,<br>
+                    <span class="grad">solved at scale.</span>
+                </h1>
+
+                <p class="hero-desc reveal reveal-d2">
+                    BALDES implements a branch-cut-and-price framework with bucket-graph labeling
+                    for CVRP, VRPTW, and EVRP. Bidirectional pricing, AVX-optimized dominance, cutting planes,
+                    and heuristic warm starts — all in modern C++23.
+                </p>
+
+                <div class="hero-actions reveal reveal-d3">
+                    <a class="btn btn-primary btn-large" href="#quickstart">Build it</a>
+                    <a class="btn btn-ghost btn-large" href="docs/html/index.html" target="_blank"
+                        rel="noopener">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor">
+                            <path
+                                d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z" />
+                        </svg>
+                        View source
+                    </a>
+                </div>
+
+                <div class="hero-tags reveal reveal-d4">
+                    <span class="tag">📐 Bucket Graphs</span>
+                    <span class="tag">✂️ Branch-Cut-and-Price</span>
+                    <span class="tag">⚡ AVX Dominance</span>
+                    <span class="tag">🔷 C++23</span>
+                    <span class="tag">🐍 Python Bindings</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="scroll-hint" aria-hidden="true">scroll</div>
+    </section>
+
+    <div class="divider"></div>
+
+    <!-- ══════════════════════════
+     WHY BALDES
+     ═══════════════════════════ -->
+    <section class="section">
+        <div class="container">
+            <div class="reveal">
+                <div class="section-tag">01 — Engine</div>
+                <h2 class="section-title">Why <span class="grad">BALDES?</span></h2>
+                <p class="section-copy">A purpose-built pricing engine for vehicle routing. Bucket graphs accelerate
+                    dominance checks, bidirectional labeling doubles search throughput, and cutting planes close the
+                    gap — all orchestrated by a branch-cut-and-price core.</p>
+            </div>
+
+            <div class="features-grid">
+                <div class="feat reveal reveal-d1">
+                    <span class="feat-icon">🗂️</span>
+                    <div class="feat-title">Bucket Graph Labeling</div>
+                    <div class="feat-desc">Labels organized in buckets by vertex and resource intervals. N-dimensional
+                        Splay Trees enable efficient access — four-phase solving from fast estimation to exact
+                        dominance.</div>
+                </div>
+                <div class="feat reveal reveal-d2">
+                    <span class="feat-icon">⚡</span>
+                    <div class="feat-title">Parallel Bi-directional Pricing</div>
+                    <div class="feat-desc">Forward and backward search run in parallel with AVX-optimized
+                        n-dimensional dominance checks, cutting labeling time in half.</div>
+                </div>
+                <div class="feat reveal reveal-d3">
+                    <span class="feat-icon">✂️</span>
+                    <div class="feat-title">Cutting Planes</div>
+                    <div class="feat-desc">Limited-memory Subset Row Cuts (SRC) and Rounded Capacity Cuts (RCC)
+                        separate in parallel, tightening the LP relaxation between pricing rounds.</div>
+                </div>
+                <div class="feat reveal reveal-d1">
+                    <span class="feat-icon">🌲</span>
+                    <div class="feat-title">Multi-stage Branching</div>
+                    <div class="feat-desc">Pseudo-cost history → fractional proximity → LP relaxation evaluation. The
+                        branching policy adapts to the problem structure at each node.</div>
+                </div>
+                <div class="feat reveal reveal-d2">
+                    <span class="feat-icon">🧬</span>
+                    <div class="feat-title">Heuristic Warm Starts</div>
+                    <div class="feat-desc">Built-in Hybrid Genetic Search (HGS) provides high-quality initial
+                        solutions. Improvement heuristics (RIH) further refine incumbents during solve.</div>
+                </div>
+                <div class="feat reveal reveal-d3">
+                    <span class="feat-icon">🐍</span>
+                    <div class="feat-title">Python Bindings</div>
+                    <div class="feat-desc">Full Python interface via nanobind. Build instances, run pricing, and
+                        inspect results directly from Python notebooks or scripts.</div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <div class="divider"></div>
+
+    <!-- ══════════════════════════
+     QUICK START
+     ═══════════════════════════ -->
+    <section class="section" id="quickstart">
+        <div class="container">
+            <div class="reveal">
+                <div class="section-tag">02 — Quick start</div>
+                <h2 class="section-title">Up in <span class="grad">three commands</span></h2>
+                <p class="section-copy">Configure, build, run. CMake handles dependency fetching automatically — adjust
+                    the compiler path if needed.</p>
+            </div>
+
+            <div class="commands-wrap reveal reveal-d1">
+                <div class="commands-header">
+                    <span class="term-dot" style="background:#ff5f57"></span>
+                    <span class="term-dot" style="background:#ffbd2e"></span>
+                    <span class="term-dot" style="background:#28c840"></span>
+                    <span class="commands-header-label">terminal — build &amp; run</span>
+                </div>
+
+                <div class="command-item">
+                    <div class="command-code">cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DBALDES=ON</div>
+                    <div class="command-desc">Configure with CMake (Release mode)</div>
+                </div>
+                <div class="command-item">
+                    <div class="command-code">cmake --build build --parallel</div>
+                    <div class="command-desc">Build all targets</div>
+                </div>
+                <div class="command-item">
+                    <div class="command-code">./build/baldes vrptw examples/C203.txt</div>
+                    <div class="command-desc">Run a VRPTW instance</div>
+                </div>
+                <div class="command-item">
+                    <div class="command-code">./build/baldes cvrp examples/XML100_1111_01.vrp</div>
+                    <div class="command-desc">Run a CVRP instance</div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <div class="divider"></div>
+
+    <!-- ══════════════════════════
+     ALGORITHMS
+     ═══════════════════════════ -->
+    <section class="section">
+        <div class="container">
+            <div class="reveal">
+                <div class="section-tag">03 — Algorithms</div>
+                <h2 class="section-title">Four-phase <span class="grad">pricing strategy</span></h2>
+                <p class="section-copy">Bucket graphs transform the labeling problem. Each phase filters and tightens
+                    until the optimal path is isolated — no wasted computation.</p>
+            </div>
+
+            <div class="phases-wrap reveal reveal-d1">
+                <div class="phase">
+                    <div class="phase-num">01</div>
+                    <div class="phase-label">Min cost per bucket</div>
+                    <div class="phase-sub">Filter the search space. Estimate lower bounds on arc costs using bucket
+                        minima — discard paths that can't improve the incumbent.</div>
+                </div>
+                <div class="phase">
+                    <div class="phase-num">02</div>
+                    <div class="phase-label">Relax dominance</div>
+                    <div class="phase-sub">Expand label retention. Relax dominance checks to keep promising but
+                        non-dominated labels that might become optimal after further extension.</div>
+                </div>
+                <div class="phase">
+                    <div class="phase-num">03</div>
+                    <div class="phase-label">Estimate bounds</div>
+                    <div class="phase-sub">Discard suboptimal. Refine bound estimates with tighter resource usage
+                        projections — prune buckets that cannot yield feasible solutions.</div>
+                </div>
+                <div class="phase">
+                    <div class="phase-num">04</div>
+                    <div class="phase-label">Exact dominance</div>
+                    <div class="phase-sub">Find the optimal path. Apply exact n-dimensional dominance on the
+                        surviving labels — the remaining path is provably optimal for the restricted master.</div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <div class="divider"></div>
+
+    <!-- ══════════════════════════
+     DESIGN PRINCIPLES
+     ═══════════════════════════ -->
+    <section class="section">
+        <div class="container">
+            <div class="reveal">
+                <div class="section-tag">04 — Design</div>
+                <h2 class="section-title">Built for <span class="grad">research &amp; production</span></h2>
+                <p class="section-copy">Every architectural decision balances algorithmic correctness, memory
+                    efficiency, and extensibility over convenience magic.</p>
+            </div>
+
+            <div class="principles-strip reveal reveal-d1">
+                <div class="principle">
+                    <div class="principle-num">01</div>
+                    <div class="principle-label">Algorithm-first design</div>
+                    <div class="principle-sub">The bucket graph architecture mirrors the mathematical structure of the
+                        pricing problem — no abstractions leak the model.</div>
+                </div>
+                <div class="principle">
+                    <div class="principle-num">02</div>
+                    <div class="principle-label">Memory-conscious</div>
+                    <div class="principle-sub">Limited-memory SRC cuts, bounded bucket capacity, and in-place label
+                        management keep peak RAM predictable.</div>
+                </div>
+                <div class="principle">
+                    <div class="principle-num">03</div>
+                    <div class="principle-label">Solver-agnostic core</div>
+                    <div class="principle-sub">HiGHS, Gurobi, or the in-house interior-point solver — swap LP backends
+                        without touching the pricing engine.</div>
+                </div>
+                <div class="principle">
+                    <div class="principle-num">04</div>
+                    <div class="principle-label">Extensible via CMake</div>
+                    <div class="principle-sub">Toggle features at configure time — bucket fixing, sorted labels,
+                        unreachable dominance, RIH — no runtime overhead for what you don't enable.</div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <div class="divider"></div>
+
+    <!-- ══════════════════════════
+     FOOTER
+     ═══════════════════════════ -->
+    <footer>
+        <div class="footer-inner">
+            <div>
+                <div class="footer-brand">
+                    <svg class="footer-logo" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg"
+                        aria-hidden="true">
+                        <defs>
+                            <linearGradient id="ft-bucket" x1="0" y1="0" x2="1" y2="1">
+                                <stop offset="0%" stop-color="#111a21" />
+                                <stop offset="50%" stop-color="#263845" />
+                                <stop offset="73%" stop-color="#5e7d91" />
+                                <stop offset="100%" stop-color="#17232c" />
+                            </linearGradient>
+                            <linearGradient id="ft-metal" x1="0" y1="0" x2="1" y2="0">
+                                <stop offset="0%" stop-color="#dceaf1" />
+                                <stop offset="30%" stop-color="#ffffff" />
+                                <stop offset="55%" stop-color="#8fb2c7" />
+                                <stop offset="100%" stop-color="#f7fbfd" />
+                            </linearGradient>
+                        </defs>
+                        <path d="M332 315 C342 205 405 137 512 137 C619 137 682 205 692 315"
+                            fill="none" stroke="url(#ft-metal)" stroke-width="26" stroke-linecap="round" opacity="0.9" />
+                        <path d="M363 333 L398 560 Q408 610 512 620 Q616 610 626 560 L661 333 Z"
+                            fill="url(#ft-bucket)" stroke="#eef7fb" stroke-width="10" opacity="0.85" />
+                        <ellipse cx="512" cy="328" rx="170" ry="71" fill="#0b1217" stroke="#eef7fb" stroke-width="12"
+                            opacity="0.85" />
+                        <ellipse cx="512" cy="322" rx="142" ry="47" fill="#0a1116" stroke="url(#ft-metal)"
+                            stroke-width="10" opacity="0.7" />
+                        <text x="512" y="900" font-family="Montserrat, Arial, sans-serif" font-size="132" font-weight="800"
+                            letter-spacing="9" text-anchor="middle" fill="#eef7fb" opacity="0.85">BALDES</text>
+                    </svg>
+                    <span class="footer-name">BALDES</span>
+                </div>
+                <div class="footer-desc">Branch-cut-and-price for vehicle routing with bucket-graph labeling.</div>
+            </div>
+            <div class="footer-links">
+                <a class="btn btn-ghost" href="docs/html/index.html" target="_blank"
+                    rel="noopener">Doxygen</a>
+                <a class="btn btn-ghost" href="https://github.com/lseman/baldes" target="_blank"
+                    rel="noopener">GitHub</a>
+                <a class="btn btn-ghost" href="https://github.com/lseman/baldes/blob/main/README.md">README</a>
+                <a class="btn btn-ghost" href="https://github.com/lseman/baldes/blob/main/LICENSE">MIT License</a>
+            </div>
+        </div>
+        <div class="footer-bottom">
+            <span>BALDES — MIT License</span>
+            <span>github.com/lseman/baldes</span>
+        </div>
+    </footer>
+
+    <!-- External JS -->
+    <script src="app.js" defer></script>
+</body>
+
+</html>
