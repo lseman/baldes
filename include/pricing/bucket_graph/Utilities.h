@@ -12,8 +12,7 @@
 #include "pricing/bucket_graph/ArcElimination.h"
 #include "core/Definitions.h"
 #include "utils/MST.h"
-#include "model/Trees.h"
-#include "cuts/SRC.h"
+#include "cuts/rank1/Rank1Cuts.h"
 #include "utils/NumericUtils.h"
 
 template <typename T>
@@ -231,14 +230,12 @@ void BucketGraph::define_buckets() {
 
     auto &num_buckets         = assign_buckets<D>(num_buckets_fw, num_buckets_bw);
     auto &num_buckets_index   = assign_buckets<D>(num_buckets_index_fw, num_buckets_index_bw);
-    auto &node_interval_trees = assign_buckets<D>(fw_node_interval_trees, bw_node_interval_trees);
     auto &buckets_size        = assign_buckets<D>(fw_buckets_size, bw_buckets_size);
     auto &bucket_splits       = assign_buckets<D>(fw_bucket_splits, bw_bucket_splits);
 
     const size_t num_nodes = nodes.size();
     num_buckets.resize(num_nodes);
     num_buckets_index.resize(num_nodes);
-    node_interval_trees.assign(num_nodes, SplayTree());
 
     // Lambda to calculate an interval for one dimension. Backward buckets are
     // deliberately emitted in the paper's kappa order:
@@ -336,8 +333,6 @@ void BucketGraph::define_buckets() {
         }
         num_buckets[vrp_node.id]       = n_buckets;
         num_buckets_index[vrp_node.id] = cum_sum - n_buckets;
-        // Optionally assign node_interval_trees[vrp_node.id] = node_tree;
-        //
         if constexpr (D == Direction::Forward) { n_segments = (n_buckets + 63) >> 6; }
     }
 
@@ -856,8 +851,10 @@ void BucketGraph::common_initialization() {
     if constexpr (Direction::Forward == D) {
         dominance_checks_per_bucket.assign(buckets_size + 1, 0);
         non_dominated_labels_per_bucket = 0;
+        regen_dominance_checks_fw = 0;
     } else {
         non_dominated_labels_per_bucket_bw = 0;
+        regen_dominance_checks_bw = 0;
     }
 
     // --- Clear all buckets ---

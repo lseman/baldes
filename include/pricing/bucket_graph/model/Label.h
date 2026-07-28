@@ -8,12 +8,40 @@
 #include "math/Common.h"
 
 #include <cassert>
+#include <memory>
 #include <stdexcept>
 
 #ifdef SRC
 struct SRCMap {
-    std::array<uint16_t, MAX_SRC_CUTS> values       = {};
-    std::size_t                        logical_size = 0;
+    class Reference {
+    public:
+        Reference(SRCMap &owner, std::size_t index) noexcept : owner_(owner), index_(index) {}
+
+        operator uint16_t() const noexcept { return owner_.get(index_); }
+
+        Reference &operator=(uint16_t value) {
+            owner_.set(index_, value);
+            return *this;
+        }
+
+        Reference &operator+=(uint16_t value) {
+            owner_.set(index_, static_cast<uint16_t>(owner_.get(index_) + value));
+            return *this;
+        }
+
+        Reference &operator-=(uint16_t value) {
+            owner_.set(index_, static_cast<uint16_t>(owner_.get(index_) - value));
+            return *this;
+        }
+
+    private:
+        SRCMap    &owner_;
+        std::size_t index_;
+    };
+
+    std::array<uint8_t, MAX_SRC_CUTS> compact_values = {};
+    std::unique_ptr<std::array<uint16_t, MAX_SRC_CUTS>> wide_values;
+    uint8_t logical_size = 0;
 
     SRCMap() = default;
 
@@ -21,10 +49,31 @@ struct SRCMap {
 
     SRCMap(const std::vector<uint16_t> &src) { *this = src; }
 
+    SRCMap(const SRCMap &other)
+        : compact_values(other.compact_values), logical_size(other.logical_size) {
+        if (other.wide_values) {
+            wide_values = std::make_unique<std::array<uint16_t, MAX_SRC_CUTS>>(*other.wide_values);
+        }
+    }
+
+    SRCMap &operator=(const SRCMap &other) {
+        if (this == &other) return *this;
+        compact_values = other.compact_values;
+        logical_size   = other.logical_size;
+        wide_values = other.wide_values
+                          ? std::make_unique<std::array<uint16_t, MAX_SRC_CUTS>>(*other.wide_values)
+                          : nullptr;
+        return *this;
+    }
+
+    SRCMap(SRCMap &&) noexcept            = default;
+    SRCMap &operator=(SRCMap &&) noexcept = default;
+
     SRCMap &operator=(const std::vector<uint16_t> &src) {
         ensure_capacity(src.size());
-        std::copy(src.begin(), src.end(), values.begin());
-        logical_size = src.size();
+        clear();
+        logical_size = static_cast<uint8_t>(src.size());
+        for (std::size_t i = 0; i < src.size(); ++i) set(i, src[i]);
         return *this;
     }
 
@@ -32,43 +81,75 @@ struct SRCMap {
         if (unlikely(n > MAX_SRC_CUTS)) { throw std::length_error("SRCMap capacity exceeded; increase MAX_SRC_CUTS"); }
     }
 
-    void clear() noexcept { logical_size = 0; }
+    void clear() noexcept {
+        logical_size = 0;
+        wide_values.reset();
+    }
 
     void resize(std::size_t n, uint16_t value = 0) {
         ensure_capacity(n);
         assert(n <= MAX_SRC_CUTS);
         if (n > logical_size) {
-            std::fill(values.begin() + static_cast<std::ptrdiff_t>(logical_size),
-                      values.begin() + static_cast<std::ptrdiff_t>(n), value);
+            for (std::size_t i = logical_size; i < n; ++i) set(i, value);
         }
-        logical_size = n;
+        logical_size = static_cast<uint8_t>(n);
     }
 
     void assign(std::size_t n, uint16_t value) {
         ensure_capacity(n);
         assert(n <= MAX_SRC_CUTS);
-        std::fill(values.begin(), values.begin() + static_cast<std::ptrdiff_t>(n), value);
-        logical_size = n;
+        wide_values.reset();
+        logical_size = static_cast<uint8_t>(n);
+        if (value <= UINT8_MAX) {
+            std::fill_n(compact_values.begin(), n, static_cast<uint8_t>(value));
+        } else {
+            promote();
+            std::fill_n(wide_values->begin(), n, value);
+        }
     }
 
     [[nodiscard]] std::size_t size() const noexcept { return logical_size; }
     [[nodiscard]] bool        empty() const noexcept { return logical_size == 0; }
+    [[nodiscard]] bool        is_compact() const noexcept { return !wide_values; }
 
-    uint16_t       *data() noexcept { return values.data(); }
-    const uint16_t *data() const noexcept { return values.data(); }
-
-    uint16_t &operator[](std::size_t idx) noexcept {
-        assert(idx < MAX_SRC_CUTS);
-        return values[idx];
+    [[nodiscard]] const void *storage_data() const noexcept {
+        return wide_values ? static_cast<const void *>(wide_values->data())
+                           : static_cast<const void *>(compact_values.data());
     }
 
-    const uint16_t &operator[](std::size_t idx) const noexcept {
+    Reference operator[](std::size_t idx) noexcept {
         assert(idx < MAX_SRC_CUTS);
-        return values[idx];
+        return Reference(*this, idx);
+    }
+
+    uint16_t operator[](std::size_t idx) const noexcept {
+        assert(idx < MAX_SRC_CUTS);
+        return get(idx);
     }
 
     [[nodiscard]] std::vector<uint16_t> to_vector() const {
-        return {values.begin(), values.begin() + static_cast<std::ptrdiff_t>(logical_size)};
+        std::vector<uint16_t> result(logical_size);
+        for (std::size_t i = 0; i < logical_size; ++i) result[i] = get(i);
+        return result;
+    }
+
+private:
+    [[nodiscard]] uint16_t get(std::size_t idx) const noexcept {
+        return wide_values ? (*wide_values)[idx] : compact_values[idx];
+    }
+
+    void set(std::size_t idx, uint16_t value) {
+        if (value > UINT8_MAX && !wide_values) promote();
+        if (wide_values) {
+            (*wide_values)[idx] = value;
+        } else {
+            compact_values[idx] = static_cast<uint8_t>(value);
+        }
+    }
+
+    void promote() {
+        wide_values = std::make_unique<std::array<uint16_t, MAX_SRC_CUTS>>();
+        std::copy(compact_values.begin(), compact_values.end(), wide_values->begin());
     }
 };
 #endif
@@ -91,27 +172,33 @@ struct SRCMap {
  * The struct overloads the equality and greater than operators for comparison.
  */
 struct Label {
+    static constexpr std::size_t bitmap_words = (N_SIZE + 63) / 64;
+
     // Hot dominance/extension data. Keep the fields most frequently read by
     // dominance scans close together; route reconstruction stays below.
     double                          cost           = 0.0;
     double                          real_cost      = 0.0;
     std::array<double, R_SIZE>      resources      = {};
-    std::array<uint64_t, num_words> visited_bitmap = {0};
+    std::array<uint64_t, bitmap_words> visited_bitmap = {0};
 #ifdef UNREACHABLE_DOMINANCE
-    std::array<uint64_t, num_words> unreachable_bitmap = {0};
+    std::array<uint64_t, bitmap_words> unreachable_bitmap = {0};
 #endif
-    SRC_MODE_BLOCK(SRCMap SRCmap;)
+#ifdef SRC
+    SRCMap SRCmap;
+#endif
 
     int    vertex       = -1;
     int    node_id      = -1;
     int    path_len     = 0;
-    Label *parent       = nullptr;
+    const Label *parent = nullptr;
     bool   is_extended  = false;
     bool   is_dominated = false;
+    bool   bucket_dominance_checked = false;
     bool   fresh        = true;
 
-    // Cold route materialization data.
-    std::vector<uint16_t> nodes_covered = {};
+    // Cold route materialization data. Partial labels pay for one nullable
+    // pointer; accepted columns allocate and own the actual route vector.
+    std::unique_ptr<std::vector<uint16_t>> route_storage;
     // Constructor with node_id
     Label(int v, double c, const std::vector<double> &res, int pred, int node_id)
         : vertex(v), cost(c), resources({res[0]}), node_id(node_id) {}
@@ -126,23 +213,66 @@ struct Label {
     void set_extended(bool extended) { is_extended = extended; }
     void set_dominated(bool dominated) { is_dominated = dominated; }
 
-    const auto &getRoute() const { return nodes_covered; }
+    Label(const Label &)            = delete;
+    Label &operator=(const Label &) = delete;
+    Label(Label &&)                 = default;
+    Label &operator=(Label &&)      = default;
+
+    // Only materialized output labels expose their owned route directly.
+    const std::vector<uint16_t> &getRoute() const noexcept {
+        static const std::vector<uint16_t> empty_route;
+        return route_storage ? *route_storage : empty_route;
+    }
+
+    std::vector<uint16_t> &mutableRoute() {
+        if (!route_storage) route_storage = std::make_unique<std::vector<uint16_t>>();
+        return *route_storage;
+    }
+
+    void materializeRoute(std::vector<uint16_t> &route) const {
+        if (parent == nullptr) {
+            const auto &stored_route = getRoute();
+            route.assign(stored_route.begin(), stored_route.end());
+            return;
+        }
+
+        const Label *root  = this;
+        std::size_t  depth = 0;
+        while (root->parent != nullptr) {
+            ++depth;
+            root = root->parent;
+        }
+
+        const auto       &root_route  = root->getRoute();
+        const std::size_t prefix_size = root_route.size();
+        route.resize(prefix_size + depth);
+        std::copy(root_route.begin(), root_route.end(), route.begin());
+
+        const Label *current = this;
+        std::size_t  write   = route.size();
+        while (current->parent != nullptr) {
+            route[--write] = static_cast<uint16_t>(current->node_id);
+            current        = current->parent;
+        }
+    }
 
     void clearRoute() noexcept {
-        nodes_covered.clear();
+        route_storage.reset();
         path_len = 0;
         parent   = nullptr;
     }
 
     void addRoute(const std::vector<int> &route) {
-        nodes_covered.insert(nodes_covered.end(), route.begin(), route.end());
-        path_len = static_cast<int>(nodes_covered.size());
+        auto &stored_route = mutableRoute();
+        stored_route.insert(stored_route.end(), route.begin(), route.end());
+        path_len = static_cast<int>(stored_route.size());
         parent   = nullptr;
     }
 
     void addRoute(const std::vector<uint16_t> &route) {
-        nodes_covered.insert(nodes_covered.end(), route.begin(), route.end());
-        path_len = static_cast<int>(nodes_covered.size());
+        auto &stored_route = mutableRoute();
+        stored_route.insert(stored_route.end(), route.begin(), route.end());
+        path_len = static_cast<int>(stored_route.size());
         parent   = nullptr;
     }
     /**
@@ -181,12 +311,14 @@ struct Label {
         parent       = nullptr;
         is_extended  = false;
         is_dominated = false;
+        bucket_dominance_checked = false;
         fresh        = true;
         // Reset resources container (assuming operator= clears properly)
         resources = {};
 
-        // Clear route storage; keep capacity for amortized reuse.
-        nodes_covered.clear();
+        // Release cold output storage before this label returns to the hot
+        // partial-label pool.
+        route_storage.reset();
 
         // Zero out the bitmaps efficiently.
         std::memset(visited_bitmap.data(), 0, visited_bitmap.size() * sizeof(uint64_t));
@@ -195,12 +327,15 @@ struct Label {
 #endif
 
         // If using source mode mapping, clear it.
-        SRC_MODE_BLOCK(SRCmap.clear();)
+#ifdef SRC
+        SRCmap.clear();
+#endif
     }
 
     void addNode(int node) {
-        nodes_covered.push_back(node);
-        path_len = static_cast<int>(nodes_covered.size());
+        auto &stored_route = mutableRoute();
+        stored_route.push_back(node);
+        path_len = static_cast<int>(stored_route.size());
         parent   = nullptr;
     }
 

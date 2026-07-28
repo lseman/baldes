@@ -17,7 +17,7 @@
 #include <thread>
 #include <vector>
 
-#include "cuts/Cut.h"
+#include "cuts/model/Cut.h"
 #include "pricing/bucket_graph/model/Label.h"
 #include "model/Path.h"
 #include "math/RNG.h"

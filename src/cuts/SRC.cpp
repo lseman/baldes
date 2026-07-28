@@ -4,12 +4,12 @@
  *
  */
 
-#include "cuts/SRC.h"
+#include "cuts/rank1/Rank1Cuts.h"
 
 #include "bnb/Node.h"
 #include "core/Definitions.h"
-#include "cuts/Cut.h"
-#include "cuts/HeuristicHighOrder.h"
+#include "cuts/model/Cut.h"
+#include "cuts/rank1/HighOrder.h"
 #ifdef IPM
 #include "ipm/IPSolver.h"
 #endif
@@ -19,7 +19,7 @@
 #endif
 using Cuts = std::vector<Cut>;
 
-#include "cuts/CutIntelligence.h"
+#include "cuts/rank1/Intelligence.h"
 
 namespace {
 constexpr double SRC_SEPARATION_TOL          = 1e-3;
@@ -67,7 +67,7 @@ void set_sparse_coefficients(Cut &cut, const std::vector<int> &indices, const st
  * adds the new cut to the storage and updates the necessary mappings.
  *
  */
-void CutStorage::addCut(Cut &cut) {
+bool CutStorage::addCut(Cut &cut) {
     // Compute a unique key for the cut based on its base set and probability
     // data.
     cut.key = compute_cut_key(cut.baseSet, cut.p.num, cut.p.den);
@@ -96,13 +96,17 @@ void CutStorage::addCut(Cut &cut) {
         cut.total_violation         = old_cut.total_violation;
         cut.avg_dual_magnitude      = old_cut.avg_dual_magnitude;
         cuts[cut.id]                = cut;
+        return true;
     } else {
+        if (round_new_cuts_accepted_ >= round_new_cut_limit_) return false;
         // The cut is new; assign a new id and store it.
         cut.id = cuts.size();
         if (cut.creation_epoch == 0) { cut.creation_epoch = current_epoch_; }
         cuts.push_back(cut);
         cutMaster_to_cut_map[cut.key] = cut.id;
         indexCuts[cut.key].push_back(cut.id);
+        ++round_new_cuts_accepted_;
+        return true;
     }
 }
 
@@ -295,7 +299,7 @@ void LimitedMemoryRank1Cuts::separate(const SparseMatrix &A, const std::vector<d
         if (!keep) { continue; }
 
         --max_trials;
-        cutStorage.addCut(cut);
+        if (!cutStorage.addCut(cut)) break;
         cutStorage.markCutSeparated(cut, candidate.first);
         for (int node : nodes) {
             if (node >= 0 && node < N_SIZE) { --vertex_cut_budget[node]; }
@@ -310,6 +314,7 @@ void LimitedMemoryRank1Cuts::separate(const SparseMatrix &A, const std::vector<d
 std::pair<bool, bool> LimitedMemoryRank1Cuts::runSeparation(BNBNode *node, std::vector<baldesCtrPtr> &SRCconstraints) {
     // Pointer to our cut storage
     auto *cuts = &cutStorage;
+    cuts->beginSeparationRound(MAX_SRC_CUTS_PER_ROUND);
 
     // Extract the sparse model data from the node
     ModelData matrix = node->extractModelDataSparse();
@@ -632,7 +637,7 @@ void LimitedMemoryRank1Cuts::separateR1C3Adjacency(const SparseMatrix &A, const 
         }
 
         --max_trials;
-        cutStorage.addCut(cut);
+        if (!cutStorage.addCut(cut)) break;
         cutStorage.markCutSeparated(cut, exact_vio);
         for (int node : nodes_in_cut) {
             if (node >= 0 && node < N_SIZE) --vertex_cut_budget[node];

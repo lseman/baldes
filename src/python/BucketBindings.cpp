@@ -158,7 +158,20 @@ PYBIND11_MODULE(pybaldes, m) {
                 return py_adj_list;
             },
             "Get the adjacency list as a dictionary")
-        .def("reset_fixed_arcs", &BucketGraph::reset_fixed, "Reset all fixed arcs in the graph");
+        .def("reset_fixed_arcs", &BucketGraph::reset_fixed, "Reset all fixed arcs in the graph")
+        .def("get_last_pricing_timings", [](const BucketGraph &self) {
+            const auto &timings = self.getLastPricingTimings();
+            py::dict    result;
+            result["preparation_ms"]        = timings.preparation_ms;
+            result["initialization_ms"]     = timings.initialization_ms;
+            result["forward_labeling_ms"]   = timings.forward_labeling_ms;
+            result["backward_labeling_ms"]  = timings.backward_labeling_ms;
+            result["directional_wall_ms"]   = timings.directional_wall_ms;
+            result["concatenation_ms"]      = timings.concatenation_ms;
+            result["finalization_ms"]       = timings.finalization_ms;
+            result["total_ms"]              = timings.total_ms();
+            return result;
+        });
     // Expose PSTEPDuals class
     py::class_<PSTEPDuals>(m, "PSTEPDuals")
         .def(py::init<>()) // Default constructor
