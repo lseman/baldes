@@ -122,7 +122,7 @@ document.addEventListener('DOMContentLoaded',() => { initNavTree('classHighRankC
 </div><!--header-->
 <div class="contents">
 
-<p><code>#include &lt;<a class="el" href="HeuristicHighOrder_8h_source.html">HeuristicHighOrder.h</a>&gt;</code></p>
+<p><code>#include &lt;<a class="el" href="HighOrder_8h_source.html">HighOrder.h</a>&gt;</code></p>
 <div class="dynheader">
 Collaboration diagram for HighRankCuts:</div>
 <div class="dyncontent">
@@ -172,7 +172,7 @@ Static Public Attributes</h2></td></tr>
 </table>
 <a name="details" id="details"></a><h2 id="header-details" class="groupheader">Detailed Description</h2>
 <div class="textblock">
-<p class="definition">Definition at line <a class="el" href="HeuristicHighOrder_8h_source.html#l00039">39</a> of file <a class="el" href="HeuristicHighOrder_8h_source.html">HeuristicHighOrder.h</a>.</p>
+<p class="definition">Definition at line <a class="el" href="HighOrder_8h_source.html#l00039">39</a> of file <a class="el" href="HighOrder_8h_source.html">HighOrder.h</a>.</p>
 </div><a name="doc-typedef-members" id="doc-typedef-members"></a><h2 id="header-doc-typedef-members" class="groupheader">Member Typedef Documentation</h2>
 <a id="aa4abbcf9ce0d9ed7f02b6a68cf489e90" name="aa4abbcf9ce0d9ed7f02b6a68cf489e90"></a>
 <h2 class="memtitle"><span class="permalink"><a href="#aa4abbcf9ce0d9ed7f02b6a68cf489e90">&#9670;&#160;</a></span>SeedMap</h2>
@@ -186,7 +186,7 @@ Static Public Attributes</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="HeuristicHighOrder_8h_source.html#l00042">42</a> of file <a class="el" href="HeuristicHighOrder_8h_source.html">HeuristicHighOrder.h</a>.</p>
+<p class="definition">Definition at line <a class="el" href="HighOrder_8h_source.html#l00042">42</a> of file <a class="el" href="HighOrder_8h_source.html">HighOrder.h</a>.</p>
 
 </div>
 </div>
@@ -214,12 +214,12 @@ Static Public Attributes</h2></td></tr>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="HeuristicHighOrder_8h_source.html#l01423">1423</a> of file <a class="el" href="HeuristicHighOrder_8h_source.html">HeuristicHighOrder.h</a>.</p>
+<p class="definition">Definition at line <a class="el" href="HighOrder_8h_source.html#l01423">1423</a> of file <a class="el" href="HighOrder_8h_source.html">HighOrder.h</a>.</p>
 <div class="fragment"><div class="line"><span class="lineno"> 1423</span>                   {</div>
 <div class="line"><span class="lineno"> 1424</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> i = <a class="code hl_variable" href="Definitions_8h.html#a49874eebbc35f1cf065f4b613534cf4c">MIN_RANK</a>; i &lt;= <a class="code hl_variable" href="Definitions_8h.html#a61bc8b77c6b016bedc527cff5909738f">MAX_RANK</a>; ++i) {</div>
 <div class="line"><span class="lineno"> 1425</span>            fmt::print(<span class="stringliteral">&quot;Generating hybrid permutations for rank {}\n&quot;</span>, i);</div>
-<div class="line"><span class="lineno"> 1426</span>            <span class="keyword">auto</span> perms = <a class="code hl_function" href="CutHelper_8h.html#a6e2d376e10d40865f9a079e6bef1501f">generateExactPermutations</a>(i);</div>
-<div class="line"><span class="lineno"> 1427</span>            <span class="keyword">auto</span> extra = <a class="code hl_function" href="CutHelper_8h.html#ae16f85cab7674f93b1e3171dbe907d20">generateGeneticPermutations</a>(i);</div>
+<div class="line"><span class="lineno"> 1426</span>            <span class="keyword">auto</span> perms = <a class="code hl_function" href="Helpers_8h.html#a6e2d376e10d40865f9a079e6bef1501f">generateExactPermutations</a>(i);</div>
+<div class="line"><span class="lineno"> 1427</span>            <span class="keyword">auto</span> extra = <a class="code hl_function" href="Helpers_8h.html#ae16f85cab7674f93b1e3171dbe907d20">generateGeneticPermutations</a>(i);</div>
 <div class="line"><span class="lineno"> 1428</span>            <span class="keywordflow">for</span> (<span class="keyword">auto</span> &amp;perm : extra) {</div>
 <div class="line"><span class="lineno"> 1429</span>                <span class="keyword">auto</span> duplicate = std::find_if(perms.begin(), perms.end(), [&amp;](<span class="keyword">const</span> SRCPermutation &amp;existing) {</div>
 <div class="line"><span class="lineno"> 1430</span>                    return existing.den == perm.den &amp;&amp; existing.num == perm.num;</div>
@@ -230,21 +230,21 @@ Static Public Attributes</h2></td></tr>
 <div class="line"><span class="lineno"> 1435</span>        }</div>
 <div class="line"><span class="lineno"> 1436</span>        buildPlanGroupsMap();</div>
 <div class="line"><span class="lineno"> 1437</span>    }</div>
-<div class="ttc" id="aCutHelper_8h_html_a6e2d376e10d40865f9a079e6bef1501f"><div class="ttname"><a href="CutHelper_8h.html#a6e2d376e10d40865f9a079e6bef1501f">generateExactPermutations</a></div><div class="ttdeci">std::vector&lt; SRCPermutation &gt; generateExactPermutations(int candidateSize)</div><div class="ttdef"><b>Definition</b> <a href="CutHelper_8h_source.html#l00125">CutHelper.h:125</a></div></div>
-<div class="ttc" id="aCutHelper_8h_html_ae16f85cab7674f93b1e3171dbe907d20"><div class="ttname"><a href="CutHelper_8h.html#ae16f85cab7674f93b1e3171dbe907d20">generateGeneticPermutations</a></div><div class="ttdeci">std::vector&lt; SRCPermutation &gt; generateGeneticPermutations(int candidateSize)</div><div class="ttdef"><b>Definition</b> <a href="CutHelper_8h_source.html#l00049">CutHelper.h:49</a></div></div>
 <div class="ttc" id="aDefinitions_8h_html_a49874eebbc35f1cf065f4b613534cf4c"><div class="ttname"><a href="Definitions_8h.html#a49874eebbc35f1cf065f4b613534cf4c">MIN_RANK</a></div><div class="ttdeci">constexpr int MIN_RANK</div><div class="ttdef"><b>Definition</b> <a href="Definitions_8h_source.html#l00014">Definitions.h:14</a></div></div>
 <div class="ttc" id="aDefinitions_8h_html_a61bc8b77c6b016bedc527cff5909738f"><div class="ttname"><a href="Definitions_8h.html#a61bc8b77c6b016bedc527cff5909738f">MAX_RANK</a></div><div class="ttdeci">constexpr int MAX_RANK</div><div class="ttdef"><b>Definition</b> <a href="Definitions_8h_source.html#l00015">Definitions.h:15</a></div></div>
+<div class="ttc" id="aHelpers_8h_html_a6e2d376e10d40865f9a079e6bef1501f"><div class="ttname"><a href="Helpers_8h.html#a6e2d376e10d40865f9a079e6bef1501f">generateExactPermutations</a></div><div class="ttdeci">std::vector&lt; SRCPermutation &gt; generateExactPermutations(int candidateSize)</div><div class="ttdef"><b>Definition</b> <a href="Helpers_8h_source.html#l00125">Helpers.h:125</a></div></div>
+<div class="ttc" id="aHelpers_8h_html_ae16f85cab7674f93b1e3171dbe907d20"><div class="ttname"><a href="Helpers_8h.html#ae16f85cab7674f93b1e3171dbe907d20">generateGeneticPermutations</a></div><div class="ttdeci">std::vector&lt; SRCPermutation &gt; generateGeneticPermutations(int candidateSize)</div><div class="ttdef"><b>Definition</b> <a href="Helpers_8h_source.html#l00049">Helpers.h:49</a></div></div>
 </div><!-- fragment --><div class="dynheader">
 Here is the call graph for this function:</div>
 <div class="dyncontent">
 <div class="center"><img src="classHighRankCuts_a7f240fb561539462244c0baa374c9afe_cgraph.png" border="0" usemap="#aclassHighRankCuts_a7f240fb561539462244c0baa374c9afe_cgraph" loading="lazy" alt=""/></div>
 <map name="aclassHighRankCuts_a7f240fb561539462244c0baa374c9afe_cgraph" id="aclassHighRankCuts_a7f240fb561539462244c0baa374c9afe_cgraph">
 <area shape="rect" title=" " alt="" coords="5,31,201,56"/>
-<area shape="rect" href="CutHelper_8h.html#a6e2d376e10d40865f9a079e6bef1501f" title=" " alt="" coords="255,5,436,31"/>
+<area shape="rect" href="Helpers_8h.html#a6e2d376e10d40865f9a079e6bef1501f" title=" " alt="" coords="255,5,436,31"/>
 <area shape="poly" title=" " alt="" coords="201,31,239,27,240,32,201,36"/>
-<area shape="rect" href="CutHelper_8h.html#ae16f85cab7674f93b1e3171dbe907d20" title=" " alt="" coords="249,55,442,80"/>
+<area shape="rect" href="Helpers_8h.html#ae16f85cab7674f93b1e3171dbe907d20" title=" " alt="" coords="249,55,442,80"/>
 <area shape="poly" title=" " alt="" coords="201,51,233,54,233,59,201,56"/>
-<area shape="rect" href="CutHelper_8h.html#acf8696478b8666472dbbc5267f76fd36" title=" " alt="" coords="490,31,686,56"/>
+<area shape="rect" href="Helpers_8h.html#acf8696478b8666472dbbc5267f76fd36" title=" " alt="" coords="490,31,686,56"/>
 <area shape="poly" title=" " alt="" coords="436,25,475,29,474,34,436,30"/>
 <area shape="poly" title=" " alt="" coords="442,55,474,52,475,57,443,61"/>
 </map>
@@ -280,7 +280,7 @@ Here is the call graph for this function:</div>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="HeuristicHighOrder_8h_source.html#l01345">1345</a> of file <a class="el" href="HeuristicHighOrder_8h_source.html">HeuristicHighOrder.h</a>.</p>
+<p class="definition">Definition at line <a class="el" href="HighOrder_8h_source.html#l01345">1345</a> of file <a class="el" href="HighOrder_8h_source.html">HighOrder.h</a>.</p>
 <div class="fragment"><div class="line"><span class="lineno"> 1345</span>                                                                                       {</div>
 <div class="line"><span class="lineno"> 1346</span>        <span class="comment">// Initialize bit arrays for the candidate (C) and augmented memory</span></div>
 <div class="line"><span class="lineno"> 1347</span>        <span class="comment">// (AM).</span></div>
@@ -350,19 +350,19 @@ Here is the call graph for this function:</div>
 <div class="line"><span class="lineno"> 1411</span> </div>
 <div class="line"><span class="lineno"> 1412</span>        <span class="comment">// Add the cut to the global cut storage.</span></div>
 <div class="line"><span class="lineno"> 1413</span>        <span class="keyword">const</span> <span class="keywordtype">size_t</span> previous_size = <a class="code hl_variable" href="#a8d404a874f2bd5a42e1f4f22f7060fc7">cutStorage</a>-&gt;size();</div>
-<div class="line"><span class="lineno"> 1414</span>        <a class="code hl_variable" href="#a8d404a874f2bd5a42e1f4f22f7060fc7">cutStorage</a>-&gt;addCut(cut);</div>
+<div class="line"><span class="lineno"> 1414</span>        <span class="keywordflow">if</span> (!<a class="code hl_variable" href="#a8d404a874f2bd5a42e1f4f22f7060fc7">cutStorage</a>-&gt;addCut(cut)) <span class="keywordflow">return</span> <span class="keyword">false</span>;</div>
 <div class="line"><span class="lineno"> 1415</span>        <span class="keywordflow">return</span> <a class="code hl_variable" href="#a8d404a874f2bd5a42e1f4f22f7060fc7">cutStorage</a>-&gt;size() &gt; previous_size || cut.updated;</div>
 <div class="line"><span class="lineno"> 1416</span>    }</div>
 <div class="ttc" id="aDefinitions_8h_html_a64e2fe830f0e02b5ac2beb9c0ff3425fa11644190d0aa82e0784bd5b8a9530d03"><div class="ttname"><a href="Definitions_8h.html#a64e2fe830f0e02b5ac2beb9c0ff3425fa11644190d0aa82e0784bd5b8a9530d03">CutType::FourRow</a></div><div class="ttdeci">@ FourRow</div><div class="ttdef"><b>Definition</b> <a href="Definitions_8h_source.html#l00082">Definitions.h:82</a></div></div>
 <div class="ttc" id="aDefinitions_8h_html_a64e2fe830f0e02b5ac2beb9c0ff3425fa4c5d066c0fda7499381bc409dd736b70"><div class="ttname"><a href="Definitions_8h.html#a64e2fe830f0e02b5ac2beb9c0ff3425fa4c5d066c0fda7499381bc409dd736b70">CutType::FiveRow</a></div><div class="ttdeci">@ FiveRow</div><div class="ttdef"><b>Definition</b> <a href="Definitions_8h_source.html#l00082">Definitions.h:82</a></div></div>
-<div class="ttc" id="aclassHighRankCuts_html_a8d404a874f2bd5a42e1f4f22f7060fc7"><div class="ttname"><a href="#a8d404a874f2bd5a42e1f4f22f7060fc7">HighRankCuts::cutStorage</a></div><div class="ttdeci">CutStorage * cutStorage</div><div class="ttdef"><b>Definition</b> <a href="HeuristicHighOrder_8h_source.html#l01439">HeuristicHighOrder.h:1439</a></div></div>
-<div class="ttc" id="aclassHighRankCuts_html_abee2a3b3552892037678d2ca670c314e"><div class="ttname"><a href="#abee2a3b3552892037678d2ca670c314e">HighRankCuts::computeLimitedMemoryCoefficient</a></div><div class="ttdeci">int computeLimitedMemoryCoefficient(const std::array&lt; uint64_t, num_words &gt; &amp;C, const std::array&lt; uint64_t, num_words &gt; &amp;AM, const SRCPermutation &amp;p, const std::vector&lt; uint16_t &gt; &amp;P, std::vector&lt; int &gt; &amp;order) const noexcept</div><div class="ttdef"><b>Definition</b> <a href="HeuristicHighOrder_8h_source.html#l01605">HeuristicHighOrder.h:1605</a></div></div>
-<div class="ttc" id="aclassHighRankCuts_html_ac8cc0903ea411c4ae797c871702598af"><div class="ttname"><a href="#ac8cc0903ea411c4ae797c871702598af">HighRankCuts::bit_mask_lookup</a></div><div class="ttdeci">static constexpr std::array&lt; uint64_t, 64 &gt; bit_mask_lookup</div><div class="ttdef"><b>Definition</b> <a href="HeuristicHighOrder_8h_source.html#l01599">HeuristicHighOrder.h:1599</a></div></div>
-<div class="ttc" id="aclassHighRankCuts_html_afab18d7c165bea2a9b9f3a44497033d5"><div class="ttname"><a href="#afab18d7c165bea2a9b9f3a44497033d5">HighRankCuts::allPaths</a></div><div class="ttdeci">std::vector&lt; Path &gt; allPaths</div><div class="ttdef"><b>Definition</b> <a href="HeuristicHighOrder_8h_source.html#l01441">HeuristicHighOrder.h:1441</a></div></div>
+<div class="ttc" id="aclassHighRankCuts_html_a8d404a874f2bd5a42e1f4f22f7060fc7"><div class="ttname"><a href="#a8d404a874f2bd5a42e1f4f22f7060fc7">HighRankCuts::cutStorage</a></div><div class="ttdeci">CutStorage * cutStorage</div><div class="ttdef"><b>Definition</b> <a href="HighOrder_8h_source.html#l01439">HighOrder.h:1439</a></div></div>
+<div class="ttc" id="aclassHighRankCuts_html_abee2a3b3552892037678d2ca670c314e"><div class="ttname"><a href="#abee2a3b3552892037678d2ca670c314e">HighRankCuts::computeLimitedMemoryCoefficient</a></div><div class="ttdeci">int computeLimitedMemoryCoefficient(const std::array&lt; uint64_t, num_words &gt; &amp;C, const std::array&lt; uint64_t, num_words &gt; &amp;AM, const SRCPermutation &amp;p, const std::vector&lt; uint16_t &gt; &amp;P, std::vector&lt; int &gt; &amp;order) const noexcept</div><div class="ttdef"><b>Definition</b> <a href="HighOrder_8h_source.html#l01605">HighOrder.h:1605</a></div></div>
+<div class="ttc" id="aclassHighRankCuts_html_ac8cc0903ea411c4ae797c871702598af"><div class="ttname"><a href="#ac8cc0903ea411c4ae797c871702598af">HighRankCuts::bit_mask_lookup</a></div><div class="ttdeci">static constexpr std::array&lt; uint64_t, 64 &gt; bit_mask_lookup</div><div class="ttdef"><b>Definition</b> <a href="HighOrder_8h_source.html#l01599">HighOrder.h:1599</a></div></div>
+<div class="ttc" id="aclassHighRankCuts_html_afab18d7c165bea2a9b9f3a44497033d5"><div class="ttname"><a href="#afab18d7c165bea2a9b9f3a44497033d5">HighRankCuts::allPaths</a></div><div class="ttdeci">std::vector&lt; Path &gt; allPaths</div><div class="ttdef"><b>Definition</b> <a href="HighOrder_8h_source.html#l01441">HighOrder.h:1441</a></div></div>
 <div class="ttc" id="anamespacenumericutils_html_ab3ee1d3f97fa4d429537dc7a597908b3"><div class="ttname"><a href="namespacenumericutils.html#ab3ee1d3f97fa4d429537dc7a597908b3">numericutils::isZero</a></div><div class="ttdeci">bool isZero(double a, double threshold=eps)</div><div class="ttdef"><b>Definition</b> <a href="NumericUtils_8h_source.html#l00034">NumericUtils.h:34</a></div></div>
-<div class="ttc" id="astructCandidateSet_html_a02d828a29e6a55efc6dd0ec86dd3f9ac"><div class="ttname"><a href="structCandidateSet.html#a02d828a29e6a55efc6dd0ec86dd3f9ac">CandidateSet::perm</a></div><div class="ttdeci">SRCPermutation perm</div><div class="ttdef"><b>Definition</b> <a href="CutHelper_8h_source.html#l00218">CutHelper.h:218</a></div></div>
-<div class="ttc" id="astructCandidateSet_html_a559d5ef0f2f19d180c5aeff17394e1af"><div class="ttname"><a href="structCandidateSet.html#a559d5ef0f2f19d180c5aeff17394e1af">CandidateSet::nodes</a></div><div class="ttdeci">ankerl::unordered_dense::set&lt; int &gt; nodes</div><div class="ttdef"><b>Definition</b> <a href="CutHelper_8h_source.html#l00216">CutHelper.h:216</a></div></div>
-<div class="ttc" id="astructCandidateSet_html_ac847c6fb732d5822e011868f3cc02898"><div class="ttname"><a href="structCandidateSet.html#ac847c6fb732d5822e011868f3cc02898">CandidateSet::neighbor</a></div><div class="ttdeci">ankerl::unordered_dense::set&lt; int &gt; neighbor</div><div class="ttdef"><b>Definition</b> <a href="CutHelper_8h_source.html#l00219">CutHelper.h:219</a></div></div>
+<div class="ttc" id="astructCandidateSet_html_a02d828a29e6a55efc6dd0ec86dd3f9ac"><div class="ttname"><a href="structCandidateSet.html#a02d828a29e6a55efc6dd0ec86dd3f9ac">CandidateSet::perm</a></div><div class="ttdeci">SRCPermutation perm</div><div class="ttdef"><b>Definition</b> <a href="Helpers_8h_source.html#l00218">Helpers.h:218</a></div></div>
+<div class="ttc" id="astructCandidateSet_html_a559d5ef0f2f19d180c5aeff17394e1af"><div class="ttname"><a href="structCandidateSet.html#a559d5ef0f2f19d180c5aeff17394e1af">CandidateSet::nodes</a></div><div class="ttdeci">ankerl::unordered_dense::set&lt; int &gt; nodes</div><div class="ttdef"><b>Definition</b> <a href="Helpers_8h_source.html#l00216">Helpers.h:216</a></div></div>
+<div class="ttc" id="astructCandidateSet_html_ac847c6fb732d5822e011868f3cc02898"><div class="ttname"><a href="structCandidateSet.html#ac847c6fb732d5822e011868f3cc02898">CandidateSet::neighbor</a></div><div class="ttdeci">ankerl::unordered_dense::set&lt; int &gt; neighbor</div><div class="ttdef"><b>Definition</b> <a href="Helpers_8h_source.html#l00219">Helpers.h:219</a></div></div>
 <div class="ttc" id="astructSRCPermutation_html_a73715a9230ef33a4afa75dc51fd09c24"><div class="ttname"><a href="structSRCPermutation.html#a73715a9230ef33a4afa75dc51fd09c24">SRCPermutation::den</a></div><div class="ttdeci">int den</div><div class="ttdef"><b>Definition</b> <a href="Cut_8h_source.html#l00016">Cut.h:16</a></div></div>
 <div class="ttc" id="astructSRCPermutation_html_a7c2eee29003a81f6c79aeb63729838dd"><div class="ttname"><a href="structSRCPermutation.html#a7c2eee29003a81f6c79aeb63729838dd">SRCPermutation::getRHS</a></div><div class="ttdeci">double getRHS() const</div><div class="ttdef"><b>Definition</b> <a href="Cut_8h_source.html#l00027">Cut.h:27</a></div></div>
 <div class="ttc" id="astructSRCPermutation_html_ad388d415d55c248d620a00cddc5d686b"><div class="ttname"><a href="structSRCPermutation.html#ad388d415d55c248d620a00cddc5d686b">SRCPermutation::num</a></div><div class="ttdeci">std::vector&lt; int &gt; num</div><div class="ttdef"><b>Definition</b> <a href="Cut_8h_source.html#l00014">Cut.h:14</a></div></div>
@@ -425,7 +425,7 @@ Here is the call graph for this function:</div>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="HeuristicHighOrder_8h_source.html#l01605">1605</a> of file <a class="el" href="HeuristicHighOrder_8h_source.html">HeuristicHighOrder.h</a>.</p>
+<p class="definition">Definition at line <a class="el" href="HighOrder_8h_source.html#l01605">1605</a> of file <a class="el" href="HighOrder_8h_source.html">HighOrder.h</a>.</p>
 <div class="fragment"><div class="line"><span class="lineno"> 1607</span>                                                                                                            {</div>
 <div class="line"><span class="lineno"> 1608</span>        <span class="keywordtype">int</span>       alpha          = 0.0;</div>
 <div class="line"><span class="lineno"> 1609</span>        <span class="keywordtype">int</span>       cumulative_sum = 0;</div>
@@ -517,14 +517,14 @@ Here is the call graph for this function:</div>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="HeuristicHighOrder_8h_source.html#l01335">1335</a> of file <a class="el" href="HeuristicHighOrder_8h_source.html">HeuristicHighOrder.h</a>.</p>
+<p class="definition">Definition at line <a class="el" href="HighOrder_8h_source.html#l01335">1335</a> of file <a class="el" href="HighOrder_8h_source.html">HighOrder.h</a>.</p>
 <div class="fragment"><div class="line"><span class="lineno"> 1337</span>                                                             {</div>
 <div class="line"><span class="lineno"> 1338</span>        std::vector&lt;int&gt; node_vec(<a class="code hl_variable" href="#ae977e12246adac6ba100b4059863e102">nodes</a>.begin(), <a class="code hl_variable" href="#ae977e12246adac6ba100b4059863e102">nodes</a>.end());</div>
 <div class="line"><span class="lineno"> 1339</span>        std::sort(node_vec.begin(), node_vec.end());</div>
 <div class="line"><span class="lineno"> 1340</span>        <span class="keywordflow">return</span> <a class="code hl_function" href="#aacd417ab274d15c61c5c4d088fa8e884">computeViolationWithBestPerm</a>(node_vec, memory, A, x);</div>
 <div class="line"><span class="lineno"> 1341</span>    }</div>
-<div class="ttc" id="aclassHighRankCuts_html_aacd417ab274d15c61c5c4d088fa8e884"><div class="ttname"><a href="#aacd417ab274d15c61c5c4d088fa8e884">HighRankCuts::computeViolationWithBestPerm</a></div><div class="ttdeci">std::tuple&lt; double, SRCPermutation, double &gt; computeViolationWithBestPerm(const std::vector&lt; int &gt; &amp;nodes, const ankerl::unordered_dense::set&lt; int &gt; &amp;memory, const SparseMatrix &amp;A, const std::vector&lt; double &gt; &amp;x)</div><div class="ttdef"><b>Definition</b> <a href="HeuristicHighOrder_8h_source.html#l01324">HeuristicHighOrder.h:1324</a></div></div>
-<div class="ttc" id="aclassHighRankCuts_html_ae977e12246adac6ba100b4059863e102"><div class="ttname"><a href="#ae977e12246adac6ba100b4059863e102">HighRankCuts::nodes</a></div><div class="ttdeci">std::vector&lt; VRPNode &gt; nodes</div><div class="ttdef"><b>Definition</b> <a href="HeuristicHighOrder_8h_source.html#l01445">HeuristicHighOrder.h:1445</a></div></div>
+<div class="ttc" id="aclassHighRankCuts_html_aacd417ab274d15c61c5c4d088fa8e884"><div class="ttname"><a href="#aacd417ab274d15c61c5c4d088fa8e884">HighRankCuts::computeViolationWithBestPerm</a></div><div class="ttdeci">std::tuple&lt; double, SRCPermutation, double &gt; computeViolationWithBestPerm(const std::vector&lt; int &gt; &amp;nodes, const ankerl::unordered_dense::set&lt; int &gt; &amp;memory, const SparseMatrix &amp;A, const std::vector&lt; double &gt; &amp;x)</div><div class="ttdef"><b>Definition</b> <a href="HighOrder_8h_source.html#l01324">HighOrder.h:1324</a></div></div>
+<div class="ttc" id="aclassHighRankCuts_html_ae977e12246adac6ba100b4059863e102"><div class="ttname"><a href="#ae977e12246adac6ba100b4059863e102">HighRankCuts::nodes</a></div><div class="ttdeci">std::vector&lt; VRPNode &gt; nodes</div><div class="ttdef"><b>Definition</b> <a href="HighOrder_8h_source.html#l01445">HighOrder.h:1445</a></div></div>
 </div><!-- fragment --><div class="dynheader">
 Here is the call graph for this function:</div>
 <div class="dyncontent">
@@ -575,7 +575,7 @@ Here is the call graph for this function:</div>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="HeuristicHighOrder_8h_source.html#l01324">1324</a> of file <a class="el" href="HeuristicHighOrder_8h_source.html">HeuristicHighOrder.h</a>.</p>
+<p class="definition">Definition at line <a class="el" href="HighOrder_8h_source.html#l01324">1324</a> of file <a class="el" href="HighOrder_8h_source.html">HighOrder.h</a>.</p>
 <div class="fragment"><div class="line"><span class="lineno"> 1325</span>                                                                                    {</div>
 <div class="line"><span class="lineno"> 1326</span>        std::array&lt;uint64_t, num_words&gt; augmented_memory_bits{};</div>
 <div class="line"><span class="lineno"> 1327</span>        <span class="keywordflow">for</span> (<span class="keyword">const</span> <span class="keywordtype">int</span> node : memory) {</div>
@@ -614,7 +614,7 @@ Here is the call graph for this function:</div>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="HeuristicHighOrder_8h_source.html#l01452">1452</a> of file <a class="el" href="HeuristicHighOrder_8h_source.html">HeuristicHighOrder.h</a>.</p>
+<p class="definition">Definition at line <a class="el" href="HighOrder_8h_source.html#l01452">1452</a> of file <a class="el" href="HighOrder_8h_source.html">HighOrder.h</a>.</p>
 <div class="fragment"><div class="line"><span class="lineno"> 1452</span>                                                                     {</div>
 <div class="line"><span class="lineno"> 1453</span>        <span class="comment">// Set the solution.</span></div>
 <div class="line"><span class="lineno"> 1454</span>        <a class="code hl_variable" href="#a595d61a9b4844e6c8ccef763252e8af4">solution</a> = x;</div>
@@ -762,10 +762,10 @@ Here is the call graph for this function:</div>
 <div class="line"><span class="lineno"> 1596</span>                  candidates.size(), improved_candidates.size(), <a class="code hl_variable" href="#a8d404a874f2bd5a42e1f4f22f7060fc7">cutStorage</a>-&gt;size() - initial_cut_size);</div>
 <div class="line"><span class="lineno"> 1597</span>    }</div>
 <div class="ttc" id="aDefinitions_8h_html_ae7a1dede4b1a1d5175d2cfa359459e3c"><div class="ttname"><a href="Definitions_8h.html#ae7a1dede4b1a1d5175d2cfa359459e3c">print_cut</a></div><div class="ttdeci">void print_cut(fmt::format_string&lt; Args... &gt; format, Args &amp;&amp;...args)</div><div class="ttdoc">Prints a formatted message with a specific prefix.</div><div class="ttdef"><b>Definition</b> <a href="Definitions_8h_source.html#l00179">Definitions.h:179</a></div></div>
-<div class="ttc" id="aclassHighRankCuts_html_a595d61a9b4844e6c8ccef763252e8af4"><div class="ttname"><a href="#a595d61a9b4844e6c8ccef763252e8af4">HighRankCuts::solution</a></div><div class="ttdeci">std::vector&lt; double &gt; solution</div><div class="ttdef"><b>Definition</b> <a href="HeuristicHighOrder_8h_source.html#l01450">HeuristicHighOrder.h:1450</a></div></div>
-<div class="ttc" id="aclassHighRankCuts_html_ac2cea18dd517033c3ffa62dadaa131c6"><div class="ttname"><a href="#ac2cea18dd517033c3ffa62dadaa131c6">HighRankCuts::addCutToCutStorage</a></div><div class="ttdeci">bool addCutToCutStorage(const CandidateSet &amp;candidate, const std::vector&lt; double &gt; &amp;x)</div><div class="ttdef"><b>Definition</b> <a href="HeuristicHighOrder_8h_source.html#l01345">HeuristicHighOrder.h:1345</a></div></div>
-<div class="ttc" id="aclassHighRankCuts_html_aee8eb560a37af951ab32b3eece63990e"><div class="ttname"><a href="#aee8eb560a37af951ab32b3eece63990e">HighRankCuts::nonzero_paths</a></div><div class="ttdeci">std::vector&lt; int &gt; nonzero_paths</div><div class="ttdef"><b>Definition</b> <a href="HeuristicHighOrder_8h_source.html#l01448">HeuristicHighOrder.h:1448</a></div></div>
-<div class="ttc" id="astructCandidateSet_html_acc7e4feb57c863ad5fc9a649fdf495c7"><div class="ttname"><a href="structCandidateSet.html#acc7e4feb57c863ad5fc9a649fdf495c7">CandidateSet::violation</a></div><div class="ttdeci">double violation</div><div class="ttdef"><b>Definition</b> <a href="CutHelper_8h_source.html#l00217">CutHelper.h:217</a></div></div>
+<div class="ttc" id="aclassHighRankCuts_html_a595d61a9b4844e6c8ccef763252e8af4"><div class="ttname"><a href="#a595d61a9b4844e6c8ccef763252e8af4">HighRankCuts::solution</a></div><div class="ttdeci">std::vector&lt; double &gt; solution</div><div class="ttdef"><b>Definition</b> <a href="HighOrder_8h_source.html#l01450">HighOrder.h:1450</a></div></div>
+<div class="ttc" id="aclassHighRankCuts_html_ac2cea18dd517033c3ffa62dadaa131c6"><div class="ttname"><a href="#ac2cea18dd517033c3ffa62dadaa131c6">HighRankCuts::addCutToCutStorage</a></div><div class="ttdeci">bool addCutToCutStorage(const CandidateSet &amp;candidate, const std::vector&lt; double &gt; &amp;x)</div><div class="ttdef"><b>Definition</b> <a href="HighOrder_8h_source.html#l01345">HighOrder.h:1345</a></div></div>
+<div class="ttc" id="aclassHighRankCuts_html_aee8eb560a37af951ab32b3eece63990e"><div class="ttname"><a href="#aee8eb560a37af951ab32b3eece63990e">HighRankCuts::nonzero_paths</a></div><div class="ttdeci">std::vector&lt; int &gt; nonzero_paths</div><div class="ttdef"><b>Definition</b> <a href="HighOrder_8h_source.html#l01448">HighOrder.h:1448</a></div></div>
+<div class="ttc" id="astructCandidateSet_html_acc7e4feb57c863ad5fc9a649fdf495c7"><div class="ttname"><a href="structCandidateSet.html#acc7e4feb57c863ad5fc9a649fdf495c7">CandidateSet::violation</a></div><div class="ttdeci">double violation</div><div class="ttdef"><b>Definition</b> <a href="Helpers_8h_source.html#l00217">Helpers.h:217</a></div></div>
 </div><!-- fragment --><div class="dynheader">
 Here is the call graph for this function:</div>
 <div class="dyncontent">
@@ -803,7 +803,7 @@ Here is the call graph for this function:</div>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="HeuristicHighOrder_8h_source.html#l01441">1441</a> of file <a class="el" href="HeuristicHighOrder_8h_source.html">HeuristicHighOrder.h</a>.</p>
+<p class="definition">Definition at line <a class="el" href="HighOrder_8h_source.html#l01441">1441</a> of file <a class="el" href="HighOrder_8h_source.html">HighOrder.h</a>.</p>
 
 </div>
 </div>
@@ -819,7 +819,7 @@ Here is the call graph for this function:</div>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="HeuristicHighOrder_8h_source.html#l01443">1443</a> of file <a class="el" href="HeuristicHighOrder_8h_source.html">HeuristicHighOrder.h</a>.</p>
+<p class="definition">Definition at line <a class="el" href="HighOrder_8h_source.html#l01443">1443</a> of file <a class="el" href="HighOrder_8h_source.html">HighOrder.h</a>.</p>
 
 </div>
 </div>
@@ -848,7 +848,7 @@ Here is the call graph for this function:</div>
 <div class="line">    <span class="keywordflow">return</span> masks;</div>
 <div class="line">}()</div>
 </div><!-- fragment -->
-<p class="definition">Definition at line <a class="el" href="HeuristicHighOrder_8h_source.html#l01599">1599</a> of file <a class="el" href="HeuristicHighOrder_8h_source.html">HeuristicHighOrder.h</a>.</p>
+<p class="definition">Definition at line <a class="el" href="HighOrder_8h_source.html#l01599">1599</a> of file <a class="el" href="HighOrder_8h_source.html">HighOrder.h</a>.</p>
 <div class="fragment"><div class="line"><span class="lineno"> 1599</span>                                                                 {</div>
 <div class="line"><span class="lineno"> 1600</span>        std::array&lt;uint64_t, 64&gt; masks{};</div>
 <div class="line"><span class="lineno"> 1601</span>        <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> i = 0; i &lt; 64; ++i) { masks[i] = 1ULL &lt;&lt; i; }</div>
@@ -869,7 +869,7 @@ Here is the call graph for this function:</div>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="HeuristicHighOrder_8h_source.html#l01439">1439</a> of file <a class="el" href="HeuristicHighOrder_8h_source.html">HeuristicHighOrder.h</a>.</p>
+<p class="definition">Definition at line <a class="el" href="HighOrder_8h_source.html#l01439">1439</a> of file <a class="el" href="HighOrder_8h_source.html">HighOrder.h</a>.</p>
 
 </div>
 </div>
@@ -885,7 +885,7 @@ Here is the call graph for this function:</div>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="HeuristicHighOrder_8h_source.html#l01446">1446</a> of file <a class="el" href="HeuristicHighOrder_8h_source.html">HeuristicHighOrder.h</a>.</p>
+<p class="definition">Definition at line <a class="el" href="HighOrder_8h_source.html#l01446">1446</a> of file <a class="el" href="HighOrder_8h_source.html">HighOrder.h</a>.</p>
 
 </div>
 </div>
@@ -901,7 +901,7 @@ Here is the call graph for this function:</div>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="HeuristicHighOrder_8h_source.html#l01445">1445</a> of file <a class="el" href="HeuristicHighOrder_8h_source.html">HeuristicHighOrder.h</a>.</p>
+<p class="definition">Definition at line <a class="el" href="HighOrder_8h_source.html#l01445">1445</a> of file <a class="el" href="HighOrder_8h_source.html">HighOrder.h</a>.</p>
 
 </div>
 </div>
@@ -917,7 +917,7 @@ Here is the call graph for this function:</div>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="HeuristicHighOrder_8h_source.html#l01448">1448</a> of file <a class="el" href="HeuristicHighOrder_8h_source.html">HeuristicHighOrder.h</a>.</p>
+<p class="definition">Definition at line <a class="el" href="HighOrder_8h_source.html#l01448">1448</a> of file <a class="el" href="HighOrder_8h_source.html">HighOrder.h</a>.</p>
 
 </div>
 </div>
@@ -933,7 +933,7 @@ Here is the call graph for this function:</div>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="HeuristicHighOrder_8h_source.html#l01343">1343</a> of file <a class="el" href="HeuristicHighOrder_8h_source.html">HeuristicHighOrder.h</a>.</p>
+<p class="definition">Definition at line <a class="el" href="HighOrder_8h_source.html#l01343">1343</a> of file <a class="el" href="HighOrder_8h_source.html">HighOrder.h</a>.</p>
 
 </div>
 </div>
@@ -949,7 +949,7 @@ Here is the call graph for this function:</div>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="HeuristicHighOrder_8h_source.html#l01447">1447</a> of file <a class="el" href="HeuristicHighOrder_8h_source.html">HeuristicHighOrder.h</a>.</p>
+<p class="definition">Definition at line <a class="el" href="HighOrder_8h_source.html#l01447">1447</a> of file <a class="el" href="HighOrder_8h_source.html">HighOrder.h</a>.</p>
 
 </div>
 </div>
@@ -965,7 +965,7 @@ Here is the call graph for this function:</div>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="HeuristicHighOrder_8h_source.html#l01450">1450</a> of file <a class="el" href="HeuristicHighOrder_8h_source.html">HeuristicHighOrder.h</a>.</p>
+<p class="definition">Definition at line <a class="el" href="HighOrder_8h_source.html#l01450">1450</a> of file <a class="el" href="HighOrder_8h_source.html">HighOrder.h</a>.</p>
 
 </div>
 </div>
@@ -981,12 +981,12 @@ Here is the call graph for this function:</div>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="HeuristicHighOrder_8h_source.html#l01321">1321</a> of file <a class="el" href="HeuristicHighOrder_8h_source.html">HeuristicHighOrder.h</a>.</p>
+<p class="definition">Definition at line <a class="el" href="HighOrder_8h_source.html#l01321">1321</a> of file <a class="el" href="HighOrder_8h_source.html">HighOrder.h</a>.</p>
 
 </div>
 </div>
 <hr/>The documentation for this class was generated from the following file:<ul>
-<li><a class="el" href="HeuristicHighOrder_8h_source.html">HeuristicHighOrder.h</a></li>
+<li><a class="el" href="HighOrder_8h_source.html">HighOrder.h</a></li>
 </ul>
 </div><!-- contents -->
 </div><!-- doc-content -->

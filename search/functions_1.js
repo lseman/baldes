@@ -27,7 +27,7 @@ var searchData=
   ['addcliquefromindex_24',['addCliqueFromIndex',['../classCliqueManager.html#af6feb059bb0affcfdefacac81773c7a8',1,'CliqueManager']]],
   ['addcolumn_25',['addColumn',['../classVRProblem.html#a8733143588a45e28aea2b373aff90518',1,'VRProblem']]],
   ['addconstr_26',['addConstr',['../classBNBNode.html#a87549f077f9e4d102ddec6acd2d88e8a',1,'BNBNode']]],
-  ['addcut_27',['addCut',['../classCutStorage.html#aa59db0e52f4d6d9007f46fdc47324e6c',1,'CutStorage::addCut()'],['../classRCCManager.html#aa093c81a780ec54f1ad5e987cee2e4bb',1,'RCCManager::addCut()']]],
+  ['addcut_27',['addCut',['../classRCCManager.html#aa093c81a780ec54f1ad5e987cee2e4bb',1,'RCCManager::addCut()'],['../classCutStorage.html#a3735d9b48983d730a9386d90c3615c2b',1,'CutStorage::addCut()']]],
   ['addcuttocutstorage_28',['addCutToCutStorage',['../classHighRankCuts.html#ac2cea18dd517033c3ffa62dadaa131c6',1,'HighRankCuts']]],
   ['addedge_29',['addEdge',['../classSCC.html#a8c9aaadeeda1e882c033db0fed40d548',1,'SCC']]],
   ['additem_30',['addItem',['../classKnapsack.html#ad0d13a81a2bc6f1d0f6795eea1f48691',1,'Knapsack']]],

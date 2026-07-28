@@ -4,6 +4,7 @@ var BucketGraph_8h =
     [ "BucketGraph::WarmLabelState", "structBucketGraph_1_1WarmLabelState.html", "structBucketGraph_1_1WarmLabelState" ],
     [ "BucketGraph::EnumerationPolicy", "structBucketGraph_1_1EnumerationPolicy.html", "structBucketGraph_1_1EnumerationPolicy" ],
     [ "BucketGraph::BucketPricingResult", "structBucketGraph_1_1BucketPricingResult.html", "structBucketGraph_1_1BucketPricingResult" ],
+    [ "BucketGraph::BucketPricingTimings", "structBucketGraph_1_1BucketPricingTimings.html", "structBucketGraph_1_1BucketPricingTimings" ],
     [ "BucketGraph::BucketDirectionalBounds", "structBucketGraph_1_1BucketDirectionalBounds.html", "structBucketGraph_1_1BucketDirectionalBounds" ],
     [ "BucketGraph::BucketPricingPass", "structBucketGraph_1_1BucketPricingPass.html", "structBucketGraph_1_1BucketPricingPass" ],
     [ "BucketGraph::BucketStageDecision", "structBucketGraph_1_1BucketStageDecision.html", "structBucketGraph_1_1BucketStageDecision" ],

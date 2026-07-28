@@ -8,23 +8,23 @@
 <area shape="poly" id="edge2_Node000002_Node000003" title=" " alt="" coords="216,98,182,103,146,114,112,130,84,154,72,171,64,191,57,232,56,270,60,299,54,300,51,271,51,231,59,189,68,169,80,151,109,126,144,109,181,98,215,93"/>
 <area shape="rect" id="Node000004" href="$Baldes_8cpp.html" title="Main entry point for the BALDES branch&#45;cut&#45;and&#45;price solver." alt="" coords="16,374,102,399"/>
 <area shape="poly" id="edge4_Node000002_Node000004" title=" " alt="" coords="215,97,178,102,138,112,98,129,64,155,30,194,12,232,9,274,20,325,33,351,49,372,45,375,29,354,15,327,4,275,7,231,26,191,60,151,95,125,136,107,177,97,215,92"/>
-<area shape="rect" id="Node000005" href="$Branching_8cpp.html" title=" " alt="" coords="479,374,583,399"/>
-<area shape="poly" id="edge5_Node000002_Node000005" title=" " alt="" coords="308,90,398,92,506,100,558,108,605,118,642,133,668,151,678,166,684,182,684,214,672,247,651,279,626,309,598,336,550,375,546,371,594,332,622,305,647,276,667,244,679,213,679,183,673,168,664,155,640,137,603,124,557,113,506,106,398,97,308,95"/>
+<area shape="rect" id="Node000005" href="$Branching_8cpp.html" title=" " alt="" coords="530,374,633,399"/>
+<area shape="poly" id="edge5_Node000002_Node000005" title=" " alt="" coords="309,93,426,99,572,111,700,128,744,138,769,151,780,167,786,183,787,200,784,217,766,250,739,282,705,312,668,338,606,375,603,371,665,333,701,307,735,278,762,247,778,215,782,200,781,184,775,169,765,155,743,143,699,133,571,116,426,104,308,98"/>
 <area shape="rect" id="Node000006" href="$Branching_8h.html" title=" " alt="" coords="217,300,306,326"/>
 <area shape="poly" id="edge6_Node000002_Node000006" title=" " alt="" coords="264,120,264,300,259,300,259,120"/>
-<area shape="rect" id="Node000008" href="$ExactRCC_8h.html" title="Exact Rounded Capacity Cut generation and separation definitions." alt="" coords="299,153,390,178"/>
-<area shape="poly" id="edge9_Node000002_Node000008" title=" " alt="" coords="289,113,332,150,329,154,286,117"/>
+<area shape="rect" id="Node000008" href="$ExactRoundedCapacityCuts_8h.html" title="Exact Rounded Capacity Cut generation and separation definitions." alt="" coords="299,153,491,178"/>
+<area shape="poly" id="edge9_Node000002_Node000008" title=" " alt="" coords="299,110,374,150,371,154,297,115"/>
 <area shape="rect" id="Node000009" href="$Problem_8h.html" title=" " alt="" coords="94,153,173,178"/>
 <area shape="poly" id="edge10_Node000002_Node000009" title=" " alt="" coords="228,115,157,154,154,150,226,110"/>
 <area shape="poly" id="edge19_Node000002_Node000010" title=" " alt="" coords="244,119,155,228,151,224,240,115"/>
-<area shape="rect" id="Node000011" href="$RCC_8cpp.html" title=" " alt="" coords="414,153,486,178"/>
-<area shape="poly" id="edge16_Node000002_Node000011" title=" " alt="" coords="308,108,418,150,417,155,307,113"/>
-<area shape="rect" id="Node000012" href="$SRC_8cpp.html" title="Implementation of functions and classes for solving VRP problems using." alt="" coords="510,153,582,178"/>
-<area shape="poly" id="edge17_Node000002_Node000012" title=" " alt="" coords="309,102,510,152,509,158,307,107"/>
-<area shape="rect" id="Node000013" href="$TR_8h.html" title=" " alt="" coords="606,153,654,178"/>
-<area shape="poly" id="edge18_Node000002_Node000013" title=" " alt="" coords="309,97,438,118,594,150,606,153,604,158,593,155,437,123,308,102"/>
+<area shape="rect" id="Node000011" href="$RCC_8cpp.html" title=" " alt="" coords="515,153,587,178"/>
+<area shape="poly" id="edge16_Node000002_Node000011" title=" " alt="" coords="309,102,515,153,514,158,307,107"/>
+<area shape="rect" id="Node000012" href="$SRC_8cpp.html" title="Implementation of functions and classes for solving VRP problems using." alt="" coords="611,153,683,178"/>
+<area shape="poly" id="edge17_Node000002_Node000012" title=" " alt="" coords="309,98,440,120,600,150,611,153,610,158,599,155,439,125,308,103"/>
+<area shape="rect" id="Node000013" href="$TR_8h.html" title=" " alt="" coords="707,153,755,178"/>
+<area shape="poly" id="edge18_Node000002_Node000013" title=" " alt="" coords="309,94,480,113,588,129,696,150,707,153,706,158,694,155,587,134,479,118,308,100"/>
 <area shape="poly" id="edge3_Node000003_Node000004" title=" " alt="" coords="62,341,62,373,56,373,56,341"/>
-<area shape="poly" id="edge8_Node000006_Node000005" title=" " alt="" coords="322,327,486,370,484,376,321,332"/>
+<area shape="poly" id="edge8_Node000006_Node000005" title=" " alt="" coords="322,325,530,371,529,376,321,330"/>
 <area shape="rect" id="Node000007" href="$BCP_8cpp.html" title=" " alt="" coords="183,374,255,399"/>
 <area shape="poly" id="edge7_Node000006_Node000007" title=" " alt="" coords="249,340,229,375,224,372,245,337"/>
 <area shape="poly" id="edge11_Node000009_Node000010" title=" " alt="" coords="140,193,144,226,139,226,135,194"/>

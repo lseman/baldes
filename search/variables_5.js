@@ -10,7 +10,7 @@ var searchData=
   ['enumeration_5fpolicy_7',['enumeration_policy',['../classBucketGraph.html#a53c1119f044ad9ef9da72a492c6db9e1',1,'BucketGraph']]],
   ['enumeration_5froute_5fcutoff_8',['enumeration_route_cutoff',['../classBucketGraph.html#aa4429bad1cbada0144dfefca07b87dd1',1,'BucketGraph']]],
   ['eps_9',['eps',['../namespacenumericutils.html#adaf310759d56f0e70fb4b325dbefc809',1,'numericutils']]],
-  ['epsilon_10',['EPSILON',['../classStabilization.html#ad8faa147c37bf4797c5d661b20e32ec0',1,'Stabilization::EPSILON'],['../Trees_8h.html#a75f355966e0a97665eaf5a4c79baa7af',1,'EPSILON:&#160;Trees.h']]],
+  ['epsilon_10',['EPSILON',['../classStabilization.html#ad8faa147c37bf4797c5d661b20e32ec0',1,'Stabilization']]],
   ['epsilon_11',['epsilon',['../structNumericUtils.html#a52e4a40a5a871a8f0fb8fa8bcfe949ba',1,'NumericUtils']]],
   ['exact_5fpricing_5fpasses_12',['exact_pricing_passes',['../structbaldes_1_1bcp_1_1PricingState.html#a362cdadb8c0ef0fe69f72d73e32d3181',1,'baldes::bcp::PricingState']]],
   ['extra_5flabels_13',['extra_labels',['../structBucket.html#a08b5a6bfc2fda7d5e7ff81c5d8b946d6',1,'Bucket']]]

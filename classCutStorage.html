@@ -148,8 +148,10 @@ Public Member Functions</h2></td></tr>
 <tr class="memitem:a19ad077cc66a398cee24dd126dd42076" id="r_a19ad077cc66a398cee24dd126dd42076"><td class="memItemLeft">const auto &amp;&#160;</td><td class="memItemRight"><a class="el" href="#a19ad077cc66a398cee24dd126dd42076">getSRCNodeUpdates</a> (int node_id) const noexcept</td></tr>
 <tr class="memitem:a572ed2f52059f45f0598ed71c198b6e4" id="r_a572ed2f52059f45f0598ed71c198b6e4"><td class="memItemLeft">const auto &amp;&#160;</td><td class="memItemRight"><a class="el" href="#a572ed2f52059f45f0598ed71c198b6e4">getSRCNodeClears</a> (int node_id) const noexcept</td></tr>
 <tr class="memitem:a1e2dba7e36c7f4707603ce07225b592a" id="r_a1e2dba7e36c7f4707603ce07225b592a"><td class="memItemLeft"><a class="el" href="structCut.html">Cut</a> &amp;&#160;</td><td class="memItemRight"><a class="el" href="#a1e2dba7e36c7f4707603ce07225b592a">operator[]</a> (std::size_t index)</td></tr>
-<tr class="memitem:aa59db0e52f4d6d9007f46fdc47324e6c" id="r_aa59db0e52f4d6d9007f46fdc47324e6c"><td class="memItemLeft">void&#160;</td><td class="memItemRight"><a class="el" href="#aa59db0e52f4d6d9007f46fdc47324e6c">addCut</a> (<a class="el" href="structCut.html">Cut</a> &amp;cut)</td></tr>
-<tr class="memdesc:aa59db0e52f4d6d9007f46fdc47324e6c"><td class="mdescLeft">&#160;</td><td class="mdescRight">Adds a cut to the <a class="el" href="classCutStorage.html" title="Manages the storage and operations related to cuts in a solver.">CutStorage</a>.  <br /></td></tr>
+<tr class="memitem:a671c52c8444db70f237972bd03626e34" id="r_a671c52c8444db70f237972bd03626e34"><td class="memItemLeft">void&#160;</td><td class="memItemRight"><a class="el" href="#a671c52c8444db70f237972bd03626e34">beginSeparationRound</a> (size_t max_new_cuts) noexcept</td></tr>
+<tr class="memitem:a68c5781c0bcb6258cad00872aad61a5e" id="r_a68c5781c0bcb6258cad00872aad61a5e"><td class="memItemLeft">size_t&#160;</td><td class="memItemRight"><a class="el" href="#a68c5781c0bcb6258cad00872aad61a5e">remainingRoundCutBudget</a> () const noexcept</td></tr>
+<tr class="memitem:a3735d9b48983d730a9386d90c3615c2b" id="r_a3735d9b48983d730a9386d90c3615c2b"><td class="memItemLeft">bool&#160;</td><td class="memItemRight"><a class="el" href="#a3735d9b48983d730a9386d90c3615c2b">addCut</a> (<a class="el" href="structCut.html">Cut</a> &amp;cut)</td></tr>
+<tr class="memdesc:a3735d9b48983d730a9386d90c3615c2b"><td class="mdescLeft">&#160;</td><td class="mdescRight">Adds a cut to the <a class="el" href="classCutStorage.html" title="Manages the storage and operations related to cuts in a solver.">CutStorage</a>.  <br /></td></tr>
 <tr class="memitem:a189fc68f66e02c1bdf979504d35056e0" id="r_a189fc68f66e02c1bdf979504d35056e0"><td class="memItemLeft">void&#160;</td><td class="memItemRight"><a class="el" href="#a189fc68f66e02c1bdf979504d35056e0">reset</a> ()</td></tr>
 <tr class="memitem:afde32809d305bf45638195f1f0d015d3" id="r_afde32809d305bf45638195f1f0d015d3"><td class="memItemLeft"><a class="el" href="structCut.html">Cut</a> &amp;&#160;</td><td class="memItemRight"><a class="el" href="#afde32809d305bf45638195f1f0d015d3">getCut</a> (int cutIndex)</td></tr>
 <tr class="memitem:ad284084f3b2e918fddd5e91c7bd02088" id="r_ad284084f3b2e918fddd5e91c7bd02088"><td class="memItemLeft"><a class="el" href="structCut.html">Cut</a> &amp;&#160;</td><td class="memItemRight"><a class="el" href="#ad284084f3b2e918fddd5e91c7bd02088">get_cut</a> (int cutIndex)</td></tr>
@@ -199,6 +201,8 @@ Public Attributes</h2></td></tr>
 <tr class="memitem:a62f4dfeb08c8cb59a1a7c0afacfe4054" id="r_a62f4dfeb08c8cb59a1a7c0afacfe4054"><td class="memItemLeft">double&#160;</td><td class="memItemRight"><a class="el" href="#a62f4dfeb08c8cb59a1a7c0afacfe4054">age_decay_alpha_</a> = 0.97</td></tr>
 <tr class="memitem:a20cdd1c8577667edfb99df01df5de96a" id="r_a20cdd1c8577667edfb99df01df5de96a"><td class="memItemLeft">double&#160;</td><td class="memItemRight"><a class="el" href="#a20cdd1c8577667edfb99df01df5de96a">dual_ema_alpha_</a> = 0.20</td></tr>
 <tr class="memitem:a956140271c50cfbd79335311976e7978" id="r_a956140271c50cfbd79335311976e7978"><td class="memItemLeft">double&#160;</td><td class="memItemRight"><a class="el" href="#a956140271c50cfbd79335311976e7978">selection_temperature_</a> = 2.0</td></tr>
+<tr class="memitem:ac726ebf88b3630c8bed8717506e00e1b" id="r_ac726ebf88b3630c8bed8717506e00e1b"><td class="memItemLeft">size_t&#160;</td><td class="memItemRight"><a class="el" href="#ac726ebf88b3630c8bed8717506e00e1b">round_new_cut_limit_</a> = std::numeric_limits&lt;size_t&gt;::max()</td></tr>
+<tr class="memitem:a98050d41c191d9555038e5d4e8905465" id="r_a98050d41c191d9555038e5d4e8905465"><td class="memItemLeft">size_t&#160;</td><td class="memItemRight"><a class="el" href="#a98050d41c191d9555038e5d4e8905465">round_new_cuts_accepted_</a> = 0</td></tr>
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 id="header-pub-static-attribs" class="groupheader"><a id="pub-static-attribs" name="pub-static-attribs"></a>
 Static Public Attributes</h2></td></tr>
@@ -233,19 +237,19 @@ Static Public Attributes</h2></td></tr>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="Cut_8h_source.html#l00372">372</a> of file <a class="el" href="Cut_8h_source.html">Cut.h</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  372</span>{ <span class="keywordflow">return</span> active_cuts.size(); }</div>
+<p class="definition">Definition at line <a class="el" href="Cut_8h_source.html#l00385">385</a> of file <a class="el" href="Cut_8h_source.html">Cut.h</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  385</span>{ <span class="keywordflow">return</span> active_cuts.size(); }</div>
 </div><!-- fragment -->
 </div>
 </div>
-<a id="aa59db0e52f4d6d9007f46fdc47324e6c" name="aa59db0e52f4d6d9007f46fdc47324e6c"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#aa59db0e52f4d6d9007f46fdc47324e6c">&#9670;&#160;</a></span>addCut()</h2>
+<a id="a3735d9b48983d730a9386d90c3615c2b" name="a3735d9b48983d730a9386d90c3615c2b"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a3735d9b48983d730a9386d90c3615c2b">&#9670;&#160;</a></span>addCut()</h2>
 
 <div class="memitem">
 <div class="memproto">
       <table class="memname">
         <tr>
-          <td class="memname">void CutStorage::addCut </td>
+          <td class="memname">bool CutStorage::addCut </td>
           <td>(</td>
           <td class="paramtype"><a class="el" href="structCut.html">Cut</a> &amp;</td>          <td class="paramname"><span class="paramname"><em>cut</em></span></td><td>)</td>
           <td></td>
@@ -286,19 +290,25 @@ Static Public Attributes</h2></td></tr>
 <div class="line"><span class="lineno">   96</span>        cut.<a class="code hl_variable" href="structCut.html#a50d14e0fb2f30f2cf1af3babbc986dc8">total_violation</a>         = old_cut.total_violation;</div>
 <div class="line"><span class="lineno">   97</span>        cut.<a class="code hl_variable" href="structCut.html#a814f2f9a683243a085ec1d3a6e68a7b6">avg_dual_magnitude</a>      = old_cut.avg_dual_magnitude;</div>
 <div class="line"><span class="lineno">   98</span>        cuts[cut.<a class="code hl_variable" href="structCut.html#ab7e0a20859f72176f8f474850f2e312f">id</a>]                = cut;</div>
-<div class="line"><span class="lineno">   99</span>    } <span class="keywordflow">else</span> {</div>
-<div class="line"><span class="lineno">  100</span>        <span class="comment">// The cut is new; assign a new id and store it.</span></div>
-<div class="line"><span class="lineno">  101</span>        cut.<a class="code hl_variable" href="structCut.html#ab7e0a20859f72176f8f474850f2e312f">id</a> = cuts.size();</div>
-<div class="line"><span class="lineno">  102</span>        <span class="keywordflow">if</span> (cut.<a class="code hl_variable" href="structCut.html#a550b78381dec06753e45db0d26eb3555">creation_epoch</a> == 0) { cut.<a class="code hl_variable" href="structCut.html#a550b78381dec06753e45db0d26eb3555">creation_epoch</a> = <a class="code hl_variable" href="#af72853f1b4437323e3ea1aa2202f1d91">current_epoch_</a>; }</div>
-<div class="line"><span class="lineno">  103</span>        cuts.push_back(cut);</div>
-<div class="line"><span class="lineno">  104</span>        <a class="code hl_variable" href="#a658586ee6b86457ccb13c49154918f78">cutMaster_to_cut_map</a>[cut.<a class="code hl_variable" href="structCut.html#a7065d86454bcb27014bb1cc7ed3e3306">key</a>] = cut.<a class="code hl_variable" href="structCut.html#ab7e0a20859f72176f8f474850f2e312f">id</a>;</div>
-<div class="line"><span class="lineno">  105</span>        indexCuts[cut.<a class="code hl_variable" href="structCut.html#a7065d86454bcb27014bb1cc7ed3e3306">key</a>].push_back(cut.<a class="code hl_variable" href="structCut.html#ab7e0a20859f72176f8f474850f2e312f">id</a>);</div>
-<div class="line"><span class="lineno">  106</span>    }</div>
-<div class="line"><span class="lineno">  107</span>}</div>
+<div class="line"><span class="lineno">   99</span>        <span class="keywordflow">return</span> <span class="keyword">true</span>;</div>
+<div class="line"><span class="lineno">  100</span>    } <span class="keywordflow">else</span> {</div>
+<div class="line"><span class="lineno">  101</span>        <span class="keywordflow">if</span> (<a class="code hl_variable" href="#a98050d41c191d9555038e5d4e8905465">round_new_cuts_accepted_</a> &gt;= <a class="code hl_variable" href="#ac726ebf88b3630c8bed8717506e00e1b">round_new_cut_limit_</a>) <span class="keywordflow">return</span> <span class="keyword">false</span>;</div>
+<div class="line"><span class="lineno">  102</span>        <span class="comment">// The cut is new; assign a new id and store it.</span></div>
+<div class="line"><span class="lineno">  103</span>        cut.<a class="code hl_variable" href="structCut.html#ab7e0a20859f72176f8f474850f2e312f">id</a> = cuts.size();</div>
+<div class="line"><span class="lineno">  104</span>        <span class="keywordflow">if</span> (cut.<a class="code hl_variable" href="structCut.html#a550b78381dec06753e45db0d26eb3555">creation_epoch</a> == 0) { cut.<a class="code hl_variable" href="structCut.html#a550b78381dec06753e45db0d26eb3555">creation_epoch</a> = <a class="code hl_variable" href="#af72853f1b4437323e3ea1aa2202f1d91">current_epoch_</a>; }</div>
+<div class="line"><span class="lineno">  105</span>        cuts.push_back(cut);</div>
+<div class="line"><span class="lineno">  106</span>        <a class="code hl_variable" href="#a658586ee6b86457ccb13c49154918f78">cutMaster_to_cut_map</a>[cut.<a class="code hl_variable" href="structCut.html#a7065d86454bcb27014bb1cc7ed3e3306">key</a>] = cut.<a class="code hl_variable" href="structCut.html#ab7e0a20859f72176f8f474850f2e312f">id</a>;</div>
+<div class="line"><span class="lineno">  107</span>        indexCuts[cut.<a class="code hl_variable" href="structCut.html#a7065d86454bcb27014bb1cc7ed3e3306">key</a>].push_back(cut.<a class="code hl_variable" href="structCut.html#ab7e0a20859f72176f8f474850f2e312f">id</a>);</div>
+<div class="line"><span class="lineno">  108</span>        ++<a class="code hl_variable" href="#a98050d41c191d9555038e5d4e8905465">round_new_cuts_accepted_</a>;</div>
+<div class="line"><span class="lineno">  109</span>        <span class="keywordflow">return</span> <span class="keyword">true</span>;</div>
+<div class="line"><span class="lineno">  110</span>    }</div>
+<div class="line"><span class="lineno">  111</span>}</div>
 <div class="ttc" id="aDefinitions_8h_html_a38c168723ff0872970a49c6ee54e9bf7"><div class="ttname"><a href="Definitions_8h.html#a38c168723ff0872970a49c6ee54e9bf7">num_words</a></div><div class="ttdeci">const size_t num_words</div><div class="ttdef"><b>Definition</b> <a href="Definitions_8h_source.html#l00113">Definitions.h:113</a></div></div>
-<div class="ttc" id="aclassCutStorage_html_a658586ee6b86457ccb13c49154918f78"><div class="ttname"><a href="#a658586ee6b86457ccb13c49154918f78">CutStorage::cutMaster_to_cut_map</a></div><div class="ttdeci">ankerl::unordered_dense::map&lt; std::size_t, int &gt; cutMaster_to_cut_map</div><div class="ttdef"><b>Definition</b> <a href="Cut_8h_source.html#l00597">Cut.h:597</a></div></div>
-<div class="ttc" id="aclassCutStorage_html_a6c546f704d593f06544a3e7aed508dc8"><div class="ttname"><a href="#a6c546f704d593f06544a3e7aed508dc8">CutStorage::compute_cut_key</a></div><div class="ttdeci">std::size_t compute_cut_key(const std::array&lt; uint64_t, num_words &gt; &amp;baseSet, const std::vector&lt; int &gt; &amp;perm_num, const int perm_den)</div><div class="ttdoc">Computes a unique cut key based on the provided base set and multipliers.</div><div class="ttdef"><b>Definition</b> <a href="Cut_8h_source.html#l00472">Cut.h:472</a></div></div>
-<div class="ttc" id="aclassCutStorage_html_af72853f1b4437323e3ea1aa2202f1d91"><div class="ttname"><a href="#af72853f1b4437323e3ea1aa2202f1d91">CutStorage::current_epoch_</a></div><div class="ttdeci">int64_t current_epoch_</div><div class="ttdef"><b>Definition</b> <a href="Cut_8h_source.html#l00601">Cut.h:601</a></div></div>
+<div class="ttc" id="aclassCutStorage_html_a658586ee6b86457ccb13c49154918f78"><div class="ttname"><a href="#a658586ee6b86457ccb13c49154918f78">CutStorage::cutMaster_to_cut_map</a></div><div class="ttdeci">ankerl::unordered_dense::map&lt; std::size_t, int &gt; cutMaster_to_cut_map</div><div class="ttdef"><b>Definition</b> <a href="Cut_8h_source.html#l00610">Cut.h:610</a></div></div>
+<div class="ttc" id="aclassCutStorage_html_a6c546f704d593f06544a3e7aed508dc8"><div class="ttname"><a href="#a6c546f704d593f06544a3e7aed508dc8">CutStorage::compute_cut_key</a></div><div class="ttdeci">std::size_t compute_cut_key(const std::array&lt; uint64_t, num_words &gt; &amp;baseSet, const std::vector&lt; int &gt; &amp;perm_num, const int perm_den)</div><div class="ttdoc">Computes a unique cut key based on the provided base set and multipliers.</div><div class="ttdef"><b>Definition</b> <a href="Cut_8h_source.html#l00485">Cut.h:485</a></div></div>
+<div class="ttc" id="aclassCutStorage_html_a98050d41c191d9555038e5d4e8905465"><div class="ttname"><a href="#a98050d41c191d9555038e5d4e8905465">CutStorage::round_new_cuts_accepted_</a></div><div class="ttdeci">size_t round_new_cuts_accepted_</div><div class="ttdef"><b>Definition</b> <a href="Cut_8h_source.html#l00619">Cut.h:619</a></div></div>
+<div class="ttc" id="aclassCutStorage_html_ac726ebf88b3630c8bed8717506e00e1b"><div class="ttname"><a href="#ac726ebf88b3630c8bed8717506e00e1b">CutStorage::round_new_cut_limit_</a></div><div class="ttdeci">size_t round_new_cut_limit_</div><div class="ttdef"><b>Definition</b> <a href="Cut_8h_source.html#l00618">Cut.h:618</a></div></div>
+<div class="ttc" id="aclassCutStorage_html_af72853f1b4437323e3ea1aa2202f1d91"><div class="ttname"><a href="#af72853f1b4437323e3ea1aa2202f1d91">CutStorage::current_epoch_</a></div><div class="ttdeci">int64_t current_epoch_</div><div class="ttdef"><b>Definition</b> <a href="Cut_8h_source.html#l00614">Cut.h:614</a></div></div>
 <div class="ttc" id="astructCut_html_a00a4ff1824a9a3a0587ed5cd1046ce7d"><div class="ttname"><a href="structCut.html#a00a4ff1824a9a3a0587ed5cd1046ce7d">Cut::last_active_epoch</a></div><div class="ttdeci">int64_t last_active_epoch</div><div class="ttdef"><b>Definition</b> <a href="Cut_8h_source.html#l00108">Cut.h:108</a></div></div>
 <div class="ttc" id="astructCut_html_a02b8d97164f08c1cfa2fbc2eb3c91edd"><div class="ttname"><a href="structCut.html#a02b8d97164f08c1cfa2fbc2eb3c91edd">Cut::inclusion_count</a></div><div class="ttdeci">int64_t inclusion_count</div><div class="ttdef"><b>Definition</b> <a href="Cut_8h_source.html#l00104">Cut.h:104</a></div></div>
 <div class="ttc" id="astructCut_html_a2247cba8febf885d1e77b751be8193d3"><div class="ttname"><a href="structCut.html#a2247cba8febf885d1e77b751be8193d3">Cut::max_violation</a></div><div class="ttdeci">double max_violation</div><div class="ttdef"><b>Definition</b> <a href="Cut_8h_source.html#l00111">Cut.h:111</a></div></div>
@@ -322,8 +332,8 @@ Static Public Attributes</h2></td></tr>
 </div><!-- fragment --><div class="dynheader">
 Here is the call graph for this function:</div>
 <div class="dyncontent">
-<div class="center"><img src="classCutStorage_aa59db0e52f4d6d9007f46fdc47324e6c_cgraph.png" border="0" usemap="#aclassCutStorage_aa59db0e52f4d6d9007f46fdc47324e6c_cgraph" loading="lazy" alt=""/></div>
-<map name="aclassCutStorage_aa59db0e52f4d6d9007f46fdc47324e6c_cgraph" id="aclassCutStorage_aa59db0e52f4d6d9007f46fdc47324e6c_cgraph">
+<div class="center"><img src="classCutStorage_a3735d9b48983d730a9386d90c3615c2b_cgraph.png" border="0" usemap="#aclassCutStorage_a3735d9b48983d730a9386d90c3615c2b_cgraph" loading="lazy" alt=""/></div>
+<map name="aclassCutStorage_a3735d9b48983d730a9386d90c3615c2b_cgraph" id="aclassCutStorage_a3735d9b48983d730a9386d90c3615c2b_cgraph">
 <area shape="rect" title="Adds a cut to the CutStorage." alt="" coords="5,13,139,38"/>
 <area shape="rect" href="classCutStorage.html#a6c546f704d593f06544a3e7aed508dc8" title="Computes a unique cut key based on the provided base set and multipliers." alt="" coords="187,5,329,46"/>
 <area shape="poly" title=" " alt="" coords="139,23,171,23,171,28,139,28"/>
@@ -355,8 +365,8 @@ Here is the call graph for this function:</div>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="Cut_8h_source.html#l00375">375</a> of file <a class="el" href="Cut_8h_source.html">Cut.h</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  375</span>{ <span class="keywordflow">return</span> cuts.begin(); }</div>
+<p class="definition">Definition at line <a class="el" href="Cut_8h_source.html#l00388">388</a> of file <a class="el" href="Cut_8h_source.html">Cut.h</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  388</span>{ <span class="keywordflow">return</span> cuts.begin(); }</div>
 </div><!-- fragment -->
 </div>
 </div>
@@ -383,8 +393,39 @@ Here is the call graph for this function:</div>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="Cut_8h_source.html#l00377">377</a> of file <a class="el" href="Cut_8h_source.html">Cut.h</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  377</span>{ <span class="keywordflow">return</span> cuts.begin(); }</div>
+<p class="definition">Definition at line <a class="el" href="Cut_8h_source.html#l00390">390</a> of file <a class="el" href="Cut_8h_source.html">Cut.h</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  390</span>{ <span class="keywordflow">return</span> cuts.begin(); }</div>
+</div><!-- fragment -->
+</div>
+</div>
+<a id="a671c52c8444db70f237972bd03626e34" name="a671c52c8444db70f237972bd03626e34"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a671c52c8444db70f237972bd03626e34">&#9670;&#160;</a></span>beginSeparationRound()</h2>
+
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">void CutStorage::beginSeparationRound </td>
+          <td>(</td>
+          <td class="paramtype">size_t</td>          <td class="paramname"><span class="paramname"><em>max_new_cuts</em></span></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel inline">inline</span><span class="mlabel noexcept">noexcept</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+<p class="definition">Definition at line <a class="el" href="Cut_8h_source.html#l00291">291</a> of file <a class="el" href="Cut_8h_source.html">Cut.h</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  291</span>                                                            {</div>
+<div class="line"><span class="lineno">  292</span>        <a class="code hl_variable" href="#ac726ebf88b3630c8bed8717506e00e1b">round_new_cut_limit_</a>     = max_new_cuts;</div>
+<div class="line"><span class="lineno">  293</span>        <a class="code hl_variable" href="#a98050d41c191d9555038e5d4e8905465">round_new_cuts_accepted_</a> = 0;</div>
+<div class="line"><span class="lineno">  294</span>    }</div>
 </div><!-- fragment -->
 </div>
 </div>
@@ -423,23 +464,23 @@ Here is the call graph for this function:</div>
 <p>Computes a unique cut key based on the provided base set and multipliers. </p>
 <p>This function generates a hash value that uniquely identifies the combination of the base set and multipliers. The base set is an array of uint64_t values, and the multipliers are a vector of double values. The order of elements in both the base set and multipliers is preserved during hashing. </p>
 
-<p class="definition">Definition at line <a class="el" href="Cut_8h_source.html#l00472">472</a> of file <a class="el" href="Cut_8h_source.html">Cut.h</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  473</span>                                                    {</div>
-<div class="line"><span class="lineno">  474</span>        XXH3_state_t *state = XXH3_createState();</div>
-<div class="line"><span class="lineno">  475</span>        assert(state != <span class="keyword">nullptr</span>);</div>
-<div class="line"><span class="lineno">  476</span>        XXH3_64bits_reset(state);</div>
-<div class="line"><span class="lineno">  477</span> </div>
-<div class="line"><span class="lineno">  478</span>        <span class="comment">// Hash baseSet (array of uint64_t)</span></div>
-<div class="line"><span class="lineno">  479</span>        XXH3_64bits_update(state, baseSet.data(), baseSet.size() * <span class="keyword">sizeof</span>(uint64_t));</div>
-<div class="line"><span class="lineno">  480</span>        <span class="comment">// Hash perm_num</span></div>
-<div class="line"><span class="lineno">  481</span>        XXH3_64bits_update(state, perm_num.data(), perm_num.size() * <span class="keyword">sizeof</span>(<span class="keywordtype">int</span>));</div>
-<div class="line"><span class="lineno">  482</span>        <span class="comment">// Hash perm_den</span></div>
-<div class="line"><span class="lineno">  483</span>        XXH3_64bits_update(state, &amp;perm_den, <span class="keyword">sizeof</span>(<span class="keywordtype">int</span>));</div>
-<div class="line"><span class="lineno">  484</span> </div>
-<div class="line"><span class="lineno">  485</span>        std::size_t cut_key = XXH3_64bits_digest(state);</div>
-<div class="line"><span class="lineno">  486</span>        XXH3_freeState(state);</div>
-<div class="line"><span class="lineno">  487</span>        <span class="keywordflow">return</span> cut_key;</div>
-<div class="line"><span class="lineno">  488</span>    }</div>
+<p class="definition">Definition at line <a class="el" href="Cut_8h_source.html#l00485">485</a> of file <a class="el" href="Cut_8h_source.html">Cut.h</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  486</span>                                                    {</div>
+<div class="line"><span class="lineno">  487</span>        XXH3_state_t *state = XXH3_createState();</div>
+<div class="line"><span class="lineno">  488</span>        assert(state != <span class="keyword">nullptr</span>);</div>
+<div class="line"><span class="lineno">  489</span>        XXH3_64bits_reset(state);</div>
+<div class="line"><span class="lineno">  490</span> </div>
+<div class="line"><span class="lineno">  491</span>        <span class="comment">// Hash baseSet (array of uint64_t)</span></div>
+<div class="line"><span class="lineno">  492</span>        XXH3_64bits_update(state, baseSet.data(), baseSet.size() * <span class="keyword">sizeof</span>(uint64_t));</div>
+<div class="line"><span class="lineno">  493</span>        <span class="comment">// Hash perm_num</span></div>
+<div class="line"><span class="lineno">  494</span>        XXH3_64bits_update(state, perm_num.data(), perm_num.size() * <span class="keyword">sizeof</span>(<span class="keywordtype">int</span>));</div>
+<div class="line"><span class="lineno">  495</span>        <span class="comment">// Hash perm_den</span></div>
+<div class="line"><span class="lineno">  496</span>        XXH3_64bits_update(state, &amp;perm_den, <span class="keyword">sizeof</span>(<span class="keywordtype">int</span>));</div>
+<div class="line"><span class="lineno">  497</span> </div>
+<div class="line"><span class="lineno">  498</span>        std::size_t cut_key = XXH3_64bits_digest(state);</div>
+<div class="line"><span class="lineno">  499</span>        XXH3_freeState(state);</div>
+<div class="line"><span class="lineno">  500</span>        <span class="keywordflow">return</span> cut_key;</div>
+<div class="line"><span class="lineno">  501</span>    }</div>
 </div><!-- fragment -->
 </div>
 </div>
@@ -470,60 +511,60 @@ Here is the call graph for this function:</div>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="Cut_8h_source.html#l00490">490</a> of file <a class="el" href="Cut_8h_source.html">Cut.h</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  490</span>                                                                                               {</div>
-<div class="line"><span class="lineno">  491</span>        <span class="keyword">const</span> <span class="keywordtype">size_t</span> P_size = P.size();</div>
-<div class="line"><span class="lineno">  492</span>        <span class="keywordflow">if</span> (P_size &lt; 3) <span class="keywordflow">return</span> 0.0;</div>
-<div class="line"><span class="lineno">  493</span> </div>
-<div class="line"><span class="lineno">  494</span>        <span class="keyword">const</span> uint16_t *P_data      = P.data();</div>
-<div class="line"><span class="lineno">  495</span>        <span class="keywordtype">double</span>          alpha       = 0.0;</div>
-<div class="line"><span class="lineno">  496</span>        <span class="keywordtype">int</span>             runningSum  = 0;</div>
-<div class="line"><span class="lineno">  497</span>        <span class="keyword">const</span> <span class="keywordtype">int</span>       denominator = cut.<a class="code hl_variable" href="structCut.html#a6d855f0932d06073efa0a9b2c28bc74a">p</a>.<a class="code hl_variable" href="structSRCPermutation.html#a73715a9230ef33a4afa75dc51fd09c24">den</a>;</div>
-<div class="line"><span class="lineno">  498</span> </div>
-<div class="line"><span class="lineno">  499</span>        <span class="keyword">const</span> uint64_t *neighborsBitset = cut.<a class="code hl_variable" href="structCut.html#aebd8094d0163003ba0c2e042c3c8ec2b">neighbors</a>.data();</div>
-<div class="line"><span class="lineno">  500</span>        <span class="keyword">const</span> uint64_t *baseSetBitset   = cut.<a class="code hl_variable" href="structCut.html#a862b27206b16f7a09ec2537a99c99a7b">baseSet</a>.data();</div>
-<div class="line"><span class="lineno">  501</span>        <span class="keyword">const</span> <span class="keyword">auto</span>     &amp;pValues         = cut.<a class="code hl_variable" href="structCut.html#a6d855f0932d06073efa0a9b2c28bc74a">p</a>.<a class="code hl_variable" href="structSRCPermutation.html#ad388d415d55c248d620a00cddc5d686b">num</a>;</div>
-<div class="line"><span class="lineno">  502</span>        <span class="keyword">const</span> <span class="keyword">auto</span>     &amp;baseSetOrder    = cut.<a class="code hl_variable" href="structCut.html#affa96376c876e0c4b9dc35c1f17fd63b">baseSetOrder</a>;</div>
-<div class="line"><span class="lineno">  503</span> </div>
-<div class="line"><span class="lineno">  504</span><span class="preprocessor">#if defined(SRC_MEMORY_MODE_ARC)</span></div>
-<div class="line"><span class="lineno">  505</span>        <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> j = 1; j &lt; P_size - 1; ++j) {</div>
-<div class="line"><span class="lineno">  506</span>            <span class="keyword">const</span> <span class="keywordtype">int</span>      nodeId    = P_data[j];</div>
-<div class="line"><span class="lineno">  507</span>            <span class="keyword">const</span> <span class="keywordtype">int</span>      prevNode  = P_data[j - 1];</div>
-<div class="line"><span class="lineno">  508</span>            <span class="keyword">const</span> <span class="keywordtype">size_t</span>   word      = nodeId &gt;&gt; 6;</div>
-<div class="line"><span class="lineno">  509</span>            <span class="keyword">const</span> uint64_t bit_mask  = 1ULL &lt;&lt; (nodeId &amp; 63);</div>
-<div class="line"><span class="lineno">  510</span>            <span class="keyword">const</span> <span class="keywordtype">size_t</span>   prev_word = prevNode &gt;&gt; 6;</div>
-<div class="line"><span class="lineno">  511</span>            <span class="keyword">const</span> uint64_t prev_mask = 1ULL &lt;&lt; (prevNode &amp; 63);</div>
-<div class="line"><span class="lineno">  512</span> </div>
-<div class="line"><span class="lineno">  513</span>            <span class="keywordflow">if</span> (!(neighborsBitset[word] &amp; bit_mask) || !(neighborsBitset[prev_word] &amp; prev_mask)) { runningSum = 0; }</div>
-<div class="line"><span class="lineno">  514</span>            <span class="keywordflow">if</span> (baseSetBitset[word] &amp; bit_mask) {</div>
-<div class="line"><span class="lineno">  515</span>                <span class="keyword">const</span> <span class="keywordtype">int</span> pos = baseSetOrder[nodeId];</div>
-<div class="line"><span class="lineno">  516</span>                runningSum += pValues[pos];</div>
-<div class="line"><span class="lineno">  517</span>                <span class="keywordflow">if</span> (runningSum &gt;= denominator) {</div>
-<div class="line"><span class="lineno">  518</span>                    runningSum -= denominator;</div>
-<div class="line"><span class="lineno">  519</span>                    alpha += 1.0;</div>
-<div class="line"><span class="lineno">  520</span>                }</div>
-<div class="line"><span class="lineno">  521</span>            }</div>
-<div class="line"><span class="lineno">  522</span>        }</div>
-<div class="line"><span class="lineno">  523</span><span class="preprocessor">#else</span></div>
-<div class="line"><span class="lineno">  524</span>        <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> j = 1; j &lt; P_size - 1; ++j) {</div>
-<div class="line"><span class="lineno">  525</span>            <span class="keyword">const</span> <span class="keywordtype">int</span>      nodeId   = P_data[j];</div>
-<div class="line"><span class="lineno">  526</span>            <span class="keyword">const</span> <span class="keywordtype">size_t</span>   word     = nodeId &gt;&gt; 6;</div>
-<div class="line"><span class="lineno">  527</span>            <span class="keyword">const</span> uint64_t bit_mask = 1ULL &lt;&lt; (nodeId &amp; 63);</div>
-<div class="line"><span class="lineno">  528</span> </div>
-<div class="line"><span class="lineno">  529</span>            <span class="keywordflow">if</span> (!(neighborsBitset[word] &amp; bit_mask)) {</div>
-<div class="line"><span class="lineno">  530</span>                runningSum = 0;</div>
-<div class="line"><span class="lineno">  531</span>            } <span class="keywordflow">else</span> <span class="keywordflow">if</span> (baseSetBitset[word] &amp; bit_mask) {</div>
-<div class="line"><span class="lineno">  532</span>                <span class="keyword">const</span> <span class="keywordtype">int</span> pos = baseSetOrder[nodeId];</div>
-<div class="line"><span class="lineno">  533</span>                runningSum += pValues[pos];</div>
-<div class="line"><span class="lineno">  534</span>                <span class="keywordflow">if</span> (runningSum &gt;= denominator) {</div>
-<div class="line"><span class="lineno">  535</span>                    runningSum -= denominator;</div>
-<div class="line"><span class="lineno">  536</span>                    alpha += 1.0;</div>
-<div class="line"><span class="lineno">  537</span>                }</div>
-<div class="line"><span class="lineno">  538</span>            }</div>
-<div class="line"><span class="lineno">  539</span>        }</div>
-<div class="line"><span class="lineno">  540</span><span class="preprocessor">#endif</span></div>
-<div class="line"><span class="lineno">  541</span>        <span class="keywordflow">return</span> alpha;</div>
-<div class="line"><span class="lineno">  542</span>    }</div>
+<p class="definition">Definition at line <a class="el" href="Cut_8h_source.html#l00503">503</a> of file <a class="el" href="Cut_8h_source.html">Cut.h</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  503</span>                                                                                               {</div>
+<div class="line"><span class="lineno">  504</span>        <span class="keyword">const</span> <span class="keywordtype">size_t</span> P_size = P.size();</div>
+<div class="line"><span class="lineno">  505</span>        <span class="keywordflow">if</span> (P_size &lt; 3) <span class="keywordflow">return</span> 0.0;</div>
+<div class="line"><span class="lineno">  506</span> </div>
+<div class="line"><span class="lineno">  507</span>        <span class="keyword">const</span> uint16_t *P_data      = P.data();</div>
+<div class="line"><span class="lineno">  508</span>        <span class="keywordtype">double</span>          alpha       = 0.0;</div>
+<div class="line"><span class="lineno">  509</span>        <span class="keywordtype">int</span>             runningSum  = 0;</div>
+<div class="line"><span class="lineno">  510</span>        <span class="keyword">const</span> <span class="keywordtype">int</span>       denominator = cut.<a class="code hl_variable" href="structCut.html#a6d855f0932d06073efa0a9b2c28bc74a">p</a>.<a class="code hl_variable" href="structSRCPermutation.html#a73715a9230ef33a4afa75dc51fd09c24">den</a>;</div>
+<div class="line"><span class="lineno">  511</span> </div>
+<div class="line"><span class="lineno">  512</span>        <span class="keyword">const</span> uint64_t *neighborsBitset = cut.<a class="code hl_variable" href="structCut.html#aebd8094d0163003ba0c2e042c3c8ec2b">neighbors</a>.data();</div>
+<div class="line"><span class="lineno">  513</span>        <span class="keyword">const</span> uint64_t *baseSetBitset   = cut.<a class="code hl_variable" href="structCut.html#a862b27206b16f7a09ec2537a99c99a7b">baseSet</a>.data();</div>
+<div class="line"><span class="lineno">  514</span>        <span class="keyword">const</span> <span class="keyword">auto</span>     &amp;pValues         = cut.<a class="code hl_variable" href="structCut.html#a6d855f0932d06073efa0a9b2c28bc74a">p</a>.<a class="code hl_variable" href="structSRCPermutation.html#ad388d415d55c248d620a00cddc5d686b">num</a>;</div>
+<div class="line"><span class="lineno">  515</span>        <span class="keyword">const</span> <span class="keyword">auto</span>     &amp;baseSetOrder    = cut.<a class="code hl_variable" href="structCut.html#affa96376c876e0c4b9dc35c1f17fd63b">baseSetOrder</a>;</div>
+<div class="line"><span class="lineno">  516</span> </div>
+<div class="line"><span class="lineno">  517</span><span class="preprocessor">#if defined(SRC_MEMORY_MODE_ARC)</span></div>
+<div class="line"><span class="lineno">  518</span>        <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> j = 1; j &lt; P_size - 1; ++j) {</div>
+<div class="line"><span class="lineno">  519</span>            <span class="keyword">const</span> <span class="keywordtype">int</span>      nodeId    = P_data[j];</div>
+<div class="line"><span class="lineno">  520</span>            <span class="keyword">const</span> <span class="keywordtype">int</span>      prevNode  = P_data[j - 1];</div>
+<div class="line"><span class="lineno">  521</span>            <span class="keyword">const</span> <span class="keywordtype">size_t</span>   word      = nodeId &gt;&gt; 6;</div>
+<div class="line"><span class="lineno">  522</span>            <span class="keyword">const</span> uint64_t bit_mask  = 1ULL &lt;&lt; (nodeId &amp; 63);</div>
+<div class="line"><span class="lineno">  523</span>            <span class="keyword">const</span> <span class="keywordtype">size_t</span>   prev_word = prevNode &gt;&gt; 6;</div>
+<div class="line"><span class="lineno">  524</span>            <span class="keyword">const</span> uint64_t prev_mask = 1ULL &lt;&lt; (prevNode &amp; 63);</div>
+<div class="line"><span class="lineno">  525</span> </div>
+<div class="line"><span class="lineno">  526</span>            <span class="keywordflow">if</span> (!(neighborsBitset[word] &amp; bit_mask) || !(neighborsBitset[prev_word] &amp; prev_mask)) { runningSum = 0; }</div>
+<div class="line"><span class="lineno">  527</span>            <span class="keywordflow">if</span> (baseSetBitset[word] &amp; bit_mask) {</div>
+<div class="line"><span class="lineno">  528</span>                <span class="keyword">const</span> <span class="keywordtype">int</span> pos = baseSetOrder[nodeId];</div>
+<div class="line"><span class="lineno">  529</span>                runningSum += pValues[pos];</div>
+<div class="line"><span class="lineno">  530</span>                <span class="keywordflow">if</span> (runningSum &gt;= denominator) {</div>
+<div class="line"><span class="lineno">  531</span>                    runningSum -= denominator;</div>
+<div class="line"><span class="lineno">  532</span>                    alpha += 1.0;</div>
+<div class="line"><span class="lineno">  533</span>                }</div>
+<div class="line"><span class="lineno">  534</span>            }</div>
+<div class="line"><span class="lineno">  535</span>        }</div>
+<div class="line"><span class="lineno">  536</span><span class="preprocessor">#else</span></div>
+<div class="line"><span class="lineno">  537</span>        <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> j = 1; j &lt; P_size - 1; ++j) {</div>
+<div class="line"><span class="lineno">  538</span>            <span class="keyword">const</span> <span class="keywordtype">int</span>      nodeId   = P_data[j];</div>
+<div class="line"><span class="lineno">  539</span>            <span class="keyword">const</span> <span class="keywordtype">size_t</span>   word     = nodeId &gt;&gt; 6;</div>
+<div class="line"><span class="lineno">  540</span>            <span class="keyword">const</span> uint64_t bit_mask = 1ULL &lt;&lt; (nodeId &amp; 63);</div>
+<div class="line"><span class="lineno">  541</span> </div>
+<div class="line"><span class="lineno">  542</span>            <span class="keywordflow">if</span> (!(neighborsBitset[word] &amp; bit_mask)) {</div>
+<div class="line"><span class="lineno">  543</span>                runningSum = 0;</div>
+<div class="line"><span class="lineno">  544</span>            } <span class="keywordflow">else</span> <span class="keywordflow">if</span> (baseSetBitset[word] &amp; bit_mask) {</div>
+<div class="line"><span class="lineno">  545</span>                <span class="keyword">const</span> <span class="keywordtype">int</span> pos = baseSetOrder[nodeId];</div>
+<div class="line"><span class="lineno">  546</span>                runningSum += pValues[pos];</div>
+<div class="line"><span class="lineno">  547</span>                <span class="keywordflow">if</span> (runningSum &gt;= denominator) {</div>
+<div class="line"><span class="lineno">  548</span>                    runningSum -= denominator;</div>
+<div class="line"><span class="lineno">  549</span>                    alpha += 1.0;</div>
+<div class="line"><span class="lineno">  550</span>                }</div>
+<div class="line"><span class="lineno">  551</span>            }</div>
+<div class="line"><span class="lineno">  552</span>        }</div>
+<div class="line"><span class="lineno">  553</span><span class="preprocessor">#endif</span></div>
+<div class="line"><span class="lineno">  554</span>        <span class="keywordflow">return</span> alpha;</div>
+<div class="line"><span class="lineno">  555</span>    }</div>
 <div class="ttc" id="astructCut_html_affa96376c876e0c4b9dc35c1f17fd63b"><div class="ttname"><a href="structCut.html#affa96376c876e0c4b9dc35c1f17fd63b">Cut::baseSetOrder</a></div><div class="ttdeci">std::vector&lt; int &gt; baseSetOrder</div><div class="ttdef"><b>Definition</b> <a href="Cut_8h_source.html#l00062">Cut.h:62</a></div></div>
 </div><!-- fragment -->
 </div>
@@ -551,66 +592,66 @@ Here is the call graph for this function:</div>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="Cut_8h_source.html#l00401">401</a> of file <a class="el" href="Cut_8h_source.html">Cut.h</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  401</span>                                                                                           {</div>
-<div class="line"><span class="lineno">  402</span>        <span class="keyword">const</span> <span class="keywordtype">size_t</span>        P_size = P.size();</div>
-<div class="line"><span class="lineno">  403</span>        std::vector&lt;double&gt; alphas;</div>
-<div class="line"><span class="lineno">  404</span>        alphas.reserve(cuts.size());</div>
-<div class="line"><span class="lineno">  405</span> </div>
-<div class="line"><span class="lineno">  406</span>        <span class="keyword">const</span> uint16_t *P_data = P.data();</div>
-<div class="line"><span class="lineno">  407</span> </div>
-<div class="line"><span class="lineno">  408</span>        <span class="keywordflow">for</span> (<span class="keyword">const</span> <span class="keyword">auto</span> &amp;cut : cuts) {</div>
-<div class="line"><span class="lineno">  409</span>            <span class="keywordtype">double</span>          alpha           = 0.0;</div>
-<div class="line"><span class="lineno">  410</span>            <span class="keywordtype">int</span>             runningSum      = 0;</div>
-<div class="line"><span class="lineno">  411</span>            <span class="keyword">const</span> <span class="keywordtype">int</span>       denominator     = cut.p.den;</div>
-<div class="line"><span class="lineno">  412</span>            <span class="keyword">const</span> uint64_t *neighborsBitset = cut.neighbors.data();</div>
-<div class="line"><span class="lineno">  413</span>            <span class="keyword">const</span> uint64_t *baseSetBitset   = cut.baseSet.data();</div>
-<div class="line"><span class="lineno">  414</span>            <span class="keyword">const</span> <span class="keyword">auto</span>     &amp;pValues         = cut.p.num;</div>
-<div class="line"><span class="lineno">  415</span>            <span class="keyword">const</span> <span class="keyword">auto</span>     &amp;baseSetOrder    = cut.baseSetOrder;</div>
-<div class="line"><span class="lineno">  416</span> </div>
-<div class="line"><span class="lineno">  417</span><span class="preprocessor">#if defined(SRC_MEMORY_MODE_ARC)</span></div>
-<div class="line"><span class="lineno">  418</span>            <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> j = 1; j &lt; P_size - 1; ++j) {</div>
-<div class="line"><span class="lineno">  419</span>                <span class="keyword">const</span> <span class="keywordtype">int</span>      nodeId    = P_data[j];</div>
-<div class="line"><span class="lineno">  420</span>                <span class="keyword">const</span> <span class="keywordtype">int</span>      prevNode  = P_data[j - 1];</div>
-<div class="line"><span class="lineno">  421</span>                <span class="keyword">const</span> <span class="keywordtype">size_t</span>   word      = nodeId &gt;&gt; 6;</div>
-<div class="line"><span class="lineno">  422</span>                <span class="keyword">const</span> uint64_t bit_mask  = 1ULL &lt;&lt; (nodeId &amp; 63);</div>
-<div class="line"><span class="lineno">  423</span>                <span class="keyword">const</span> <span class="keywordtype">size_t</span>   prev_word = prevNode &gt;&gt; 6;</div>
-<div class="line"><span class="lineno">  424</span>                <span class="keyword">const</span> uint64_t prev_mask = 1ULL &lt;&lt; (prevNode &amp; 63);</div>
-<div class="line"><span class="lineno">  425</span> </div>
-<div class="line"><span class="lineno">  426</span>                <span class="keywordflow">if</span> (!(neighborsBitset[word] &amp; bit_mask) || !(neighborsBitset[prev_word] &amp; prev_mask)) {</div>
-<div class="line"><span class="lineno">  427</span>                    runningSum = 0;</div>
-<div class="line"><span class="lineno">  428</span>                }</div>
-<div class="line"><span class="lineno">  429</span>                <span class="keywordflow">if</span> (baseSetBitset[word] &amp; bit_mask) {</div>
-<div class="line"><span class="lineno">  430</span>                    <span class="keyword">const</span> <span class="keywordtype">int</span> pos = baseSetOrder[nodeId];</div>
-<div class="line"><span class="lineno">  431</span>                    runningSum += pValues[pos];</div>
-<div class="line"><span class="lineno">  432</span>                    <span class="keywordflow">if</span> (runningSum &gt;= denominator) {</div>
-<div class="line"><span class="lineno">  433</span>                        runningSum -= denominator;</div>
-<div class="line"><span class="lineno">  434</span>                        alpha += 1.0;</div>
-<div class="line"><span class="lineno">  435</span>                    }</div>
-<div class="line"><span class="lineno">  436</span>                }</div>
-<div class="line"><span class="lineno">  437</span>            }</div>
-<div class="line"><span class="lineno">  438</span><span class="preprocessor">#else</span></div>
-<div class="line"><span class="lineno">  439</span>            <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> j = 1; j &lt; P_size - 1; ++j) {</div>
-<div class="line"><span class="lineno">  440</span>                <span class="keyword">const</span> <span class="keywordtype">int</span>      nodeId   = P_data[j];</div>
-<div class="line"><span class="lineno">  441</span>                <span class="keyword">const</span> <span class="keywordtype">size_t</span>   word     = nodeId &gt;&gt; 6;</div>
-<div class="line"><span class="lineno">  442</span>                <span class="keyword">const</span> uint64_t bit_mask = 1ULL &lt;&lt; (nodeId &amp; 63);</div>
-<div class="line"><span class="lineno">  443</span> </div>
-<div class="line"><span class="lineno">  444</span>                <span class="keywordflow">if</span> (!(neighborsBitset[word] &amp; bit_mask)) {</div>
-<div class="line"><span class="lineno">  445</span>                    runningSum = 0;</div>
-<div class="line"><span class="lineno">  446</span>                } <span class="keywordflow">else</span> <span class="keywordflow">if</span> (baseSetBitset[word] &amp; bit_mask) {</div>
-<div class="line"><span class="lineno">  447</span>                    <span class="keyword">const</span> <span class="keywordtype">int</span> pos = baseSetOrder[nodeId];</div>
-<div class="line"><span class="lineno">  448</span>                    runningSum += pValues[pos];</div>
-<div class="line"><span class="lineno">  449</span>                    <span class="keywordflow">if</span> (runningSum &gt;= denominator) {</div>
-<div class="line"><span class="lineno">  450</span>                        runningSum -= denominator;</div>
-<div class="line"><span class="lineno">  451</span>                        alpha += 1.0;</div>
-<div class="line"><span class="lineno">  452</span>                    }</div>
-<div class="line"><span class="lineno">  453</span>                }</div>
-<div class="line"><span class="lineno">  454</span>            }</div>
-<div class="line"><span class="lineno">  455</span><span class="preprocessor">#endif</span></div>
-<div class="line"><span class="lineno">  456</span>            alphas.push_back(alpha);</div>
-<div class="line"><span class="lineno">  457</span>        }</div>
-<div class="line"><span class="lineno">  458</span>        <span class="keywordflow">return</span> alphas;</div>
-<div class="line"><span class="lineno">  459</span>    }</div>
+<p class="definition">Definition at line <a class="el" href="Cut_8h_source.html#l00414">414</a> of file <a class="el" href="Cut_8h_source.html">Cut.h</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  414</span>                                                                                           {</div>
+<div class="line"><span class="lineno">  415</span>        <span class="keyword">const</span> <span class="keywordtype">size_t</span>        P_size = P.size();</div>
+<div class="line"><span class="lineno">  416</span>        std::vector&lt;double&gt; alphas;</div>
+<div class="line"><span class="lineno">  417</span>        alphas.reserve(cuts.size());</div>
+<div class="line"><span class="lineno">  418</span> </div>
+<div class="line"><span class="lineno">  419</span>        <span class="keyword">const</span> uint16_t *P_data = P.data();</div>
+<div class="line"><span class="lineno">  420</span> </div>
+<div class="line"><span class="lineno">  421</span>        <span class="keywordflow">for</span> (<span class="keyword">const</span> <span class="keyword">auto</span> &amp;cut : cuts) {</div>
+<div class="line"><span class="lineno">  422</span>            <span class="keywordtype">double</span>          alpha           = 0.0;</div>
+<div class="line"><span class="lineno">  423</span>            <span class="keywordtype">int</span>             runningSum      = 0;</div>
+<div class="line"><span class="lineno">  424</span>            <span class="keyword">const</span> <span class="keywordtype">int</span>       denominator     = cut.p.den;</div>
+<div class="line"><span class="lineno">  425</span>            <span class="keyword">const</span> uint64_t *neighborsBitset = cut.neighbors.data();</div>
+<div class="line"><span class="lineno">  426</span>            <span class="keyword">const</span> uint64_t *baseSetBitset   = cut.baseSet.data();</div>
+<div class="line"><span class="lineno">  427</span>            <span class="keyword">const</span> <span class="keyword">auto</span>     &amp;pValues         = cut.p.num;</div>
+<div class="line"><span class="lineno">  428</span>            <span class="keyword">const</span> <span class="keyword">auto</span>     &amp;baseSetOrder    = cut.baseSetOrder;</div>
+<div class="line"><span class="lineno">  429</span> </div>
+<div class="line"><span class="lineno">  430</span><span class="preprocessor">#if defined(SRC_MEMORY_MODE_ARC)</span></div>
+<div class="line"><span class="lineno">  431</span>            <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> j = 1; j &lt; P_size - 1; ++j) {</div>
+<div class="line"><span class="lineno">  432</span>                <span class="keyword">const</span> <span class="keywordtype">int</span>      nodeId    = P_data[j];</div>
+<div class="line"><span class="lineno">  433</span>                <span class="keyword">const</span> <span class="keywordtype">int</span>      prevNode  = P_data[j - 1];</div>
+<div class="line"><span class="lineno">  434</span>                <span class="keyword">const</span> <span class="keywordtype">size_t</span>   word      = nodeId &gt;&gt; 6;</div>
+<div class="line"><span class="lineno">  435</span>                <span class="keyword">const</span> uint64_t bit_mask  = 1ULL &lt;&lt; (nodeId &amp; 63);</div>
+<div class="line"><span class="lineno">  436</span>                <span class="keyword">const</span> <span class="keywordtype">size_t</span>   prev_word = prevNode &gt;&gt; 6;</div>
+<div class="line"><span class="lineno">  437</span>                <span class="keyword">const</span> uint64_t prev_mask = 1ULL &lt;&lt; (prevNode &amp; 63);</div>
+<div class="line"><span class="lineno">  438</span> </div>
+<div class="line"><span class="lineno">  439</span>                <span class="keywordflow">if</span> (!(neighborsBitset[word] &amp; bit_mask) || !(neighborsBitset[prev_word] &amp; prev_mask)) {</div>
+<div class="line"><span class="lineno">  440</span>                    runningSum = 0;</div>
+<div class="line"><span class="lineno">  441</span>                }</div>
+<div class="line"><span class="lineno">  442</span>                <span class="keywordflow">if</span> (baseSetBitset[word] &amp; bit_mask) {</div>
+<div class="line"><span class="lineno">  443</span>                    <span class="keyword">const</span> <span class="keywordtype">int</span> pos = baseSetOrder[nodeId];</div>
+<div class="line"><span class="lineno">  444</span>                    runningSum += pValues[pos];</div>
+<div class="line"><span class="lineno">  445</span>                    <span class="keywordflow">if</span> (runningSum &gt;= denominator) {</div>
+<div class="line"><span class="lineno">  446</span>                        runningSum -= denominator;</div>
+<div class="line"><span class="lineno">  447</span>                        alpha += 1.0;</div>
+<div class="line"><span class="lineno">  448</span>                    }</div>
+<div class="line"><span class="lineno">  449</span>                }</div>
+<div class="line"><span class="lineno">  450</span>            }</div>
+<div class="line"><span class="lineno">  451</span><span class="preprocessor">#else</span></div>
+<div class="line"><span class="lineno">  452</span>            <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> j = 1; j &lt; P_size - 1; ++j) {</div>
+<div class="line"><span class="lineno">  453</span>                <span class="keyword">const</span> <span class="keywordtype">int</span>      nodeId   = P_data[j];</div>
+<div class="line"><span class="lineno">  454</span>                <span class="keyword">const</span> <span class="keywordtype">size_t</span>   word     = nodeId &gt;&gt; 6;</div>
+<div class="line"><span class="lineno">  455</span>                <span class="keyword">const</span> uint64_t bit_mask = 1ULL &lt;&lt; (nodeId &amp; 63);</div>
+<div class="line"><span class="lineno">  456</span> </div>
+<div class="line"><span class="lineno">  457</span>                <span class="keywordflow">if</span> (!(neighborsBitset[word] &amp; bit_mask)) {</div>
+<div class="line"><span class="lineno">  458</span>                    runningSum = 0;</div>
+<div class="line"><span class="lineno">  459</span>                } <span class="keywordflow">else</span> <span class="keywordflow">if</span> (baseSetBitset[word] &amp; bit_mask) {</div>
+<div class="line"><span class="lineno">  460</span>                    <span class="keyword">const</span> <span class="keywordtype">int</span> pos = baseSetOrder[nodeId];</div>
+<div class="line"><span class="lineno">  461</span>                    runningSum += pValues[pos];</div>
+<div class="line"><span class="lineno">  462</span>                    <span class="keywordflow">if</span> (runningSum &gt;= denominator) {</div>
+<div class="line"><span class="lineno">  463</span>                        runningSum -= denominator;</div>
+<div class="line"><span class="lineno">  464</span>                        alpha += 1.0;</div>
+<div class="line"><span class="lineno">  465</span>                    }</div>
+<div class="line"><span class="lineno">  466</span>                }</div>
+<div class="line"><span class="lineno">  467</span>            }</div>
+<div class="line"><span class="lineno">  468</span><span class="preprocessor">#endif</span></div>
+<div class="line"><span class="lineno">  469</span>            alphas.push_back(alpha);</div>
+<div class="line"><span class="lineno">  470</span>        }</div>
+<div class="line"><span class="lineno">  471</span>        <span class="keywordflow">return</span> alphas;</div>
+<div class="line"><span class="lineno">  472</span>    }</div>
 </div><!-- fragment -->
 </div>
 </div>
@@ -637,16 +678,16 @@ Here is the call graph for this function:</div>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="Cut_8h_source.html#l00384">384</a> of file <a class="el" href="Cut_8h_source.html">Cut.h</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  384</span>                                                                              {</div>
-<div class="line"><span class="lineno">  385</span>        <span class="keyword">auto</span> it = <a class="code hl_variable" href="#a658586ee6b86457ccb13c49154918f78">cutMaster_to_cut_map</a>.find(cut_key);</div>
-<div class="line"><span class="lineno">  386</span>        <span class="keywordflow">if</span> (it != <a class="code hl_variable" href="#a658586ee6b86457ccb13c49154918f78">cutMaster_to_cut_map</a>.end()) {</div>
-<div class="line"><span class="lineno">  387</span>            <span class="keyword">auto</span> tam    = cuts[it-&gt;second].size();</div>
-<div class="line"><span class="lineno">  388</span>            <span class="keyword">auto</span> coeffs = cuts[it-&gt;second].coefficients;</div>
-<div class="line"><span class="lineno">  389</span>            <span class="keywordflow">return</span> {tam, coeffs};</div>
-<div class="line"><span class="lineno">  390</span>        }</div>
-<div class="line"><span class="lineno">  391</span>        <span class="keywordflow">return</span> {-1, {}};</div>
-<div class="line"><span class="lineno">  392</span>    }</div>
+<p class="definition">Definition at line <a class="el" href="Cut_8h_source.html#l00397">397</a> of file <a class="el" href="Cut_8h_source.html">Cut.h</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  397</span>                                                                              {</div>
+<div class="line"><span class="lineno">  398</span>        <span class="keyword">auto</span> it = <a class="code hl_variable" href="#a658586ee6b86457ccb13c49154918f78">cutMaster_to_cut_map</a>.find(cut_key);</div>
+<div class="line"><span class="lineno">  399</span>        <span class="keywordflow">if</span> (it != <a class="code hl_variable" href="#a658586ee6b86457ccb13c49154918f78">cutMaster_to_cut_map</a>.end()) {</div>
+<div class="line"><span class="lineno">  400</span>            <span class="keyword">auto</span> tam    = cuts[it-&gt;second].size();</div>
+<div class="line"><span class="lineno">  401</span>            <span class="keyword">auto</span> coeffs = cuts[it-&gt;second].coefficients;</div>
+<div class="line"><span class="lineno">  402</span>            <span class="keywordflow">return</span> {tam, coeffs};</div>
+<div class="line"><span class="lineno">  403</span>        }</div>
+<div class="line"><span class="lineno">  404</span>        <span class="keywordflow">return</span> {-1, {}};</div>
+<div class="line"><span class="lineno">  405</span>    }</div>
 </div><!-- fragment -->
 </div>
 </div>
@@ -673,8 +714,8 @@ Here is the call graph for this function:</div>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="Cut_8h_source.html#l00381">381</a> of file <a class="el" href="Cut_8h_source.html">Cut.h</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  381</span>{ <span class="keywordflow">return</span> cuts.empty(); }</div>
+<p class="definition">Definition at line <a class="el" href="Cut_8h_source.html#l00394">394</a> of file <a class="el" href="Cut_8h_source.html">Cut.h</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  394</span>{ <span class="keywordflow">return</span> cuts.empty(); }</div>
 </div><!-- fragment -->
 </div>
 </div>
@@ -701,8 +742,8 @@ Here is the call graph for this function:</div>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="Cut_8h_source.html#l00376">376</a> of file <a class="el" href="Cut_8h_source.html">Cut.h</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  376</span>{ <span class="keywordflow">return</span> cuts.end(); }</div>
+<p class="definition">Definition at line <a class="el" href="Cut_8h_source.html#l00389">389</a> of file <a class="el" href="Cut_8h_source.html">Cut.h</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  389</span>{ <span class="keywordflow">return</span> cuts.end(); }</div>
 </div><!-- fragment -->
 </div>
 </div>
@@ -729,8 +770,8 @@ Here is the call graph for this function:</div>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="Cut_8h_source.html#l00378">378</a> of file <a class="el" href="Cut_8h_source.html">Cut.h</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  378</span>{ <span class="keywordflow">return</span> cuts.end(); }</div>
+<p class="definition">Definition at line <a class="el" href="Cut_8h_source.html#l00391">391</a> of file <a class="el" href="Cut_8h_source.html">Cut.h</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  391</span>{ <span class="keywordflow">return</span> cuts.end(); }</div>
 </div><!-- fragment -->
 </div>
 </div>
@@ -760,35 +801,35 @@ Here is the call graph for this function:</div>
 <p>Enforce pool size limit for cuts that are not in the LP yet. </p>
 <p><a class="el" href="SRC_8cpp.html#a4824cb9788097adb7079a3ea41731fbb">Cuts</a> with an LP row must be removed together with their model constraint and the caller-owned SRCconstraints vector. This storage-only eviction is therefore limited to pending cuts; active/model cuts are cleaned by <a class="el" href="classLimitedMemoryRank1Cuts.html#ae0706cf60ee92fe99ed6d54d4807d4ec">LimitedMemoryRank1Cuts::cutCleaner</a>. </p>
 
-<p class="definition">Definition at line <a class="el" href="Cut_8h_source.html#l00773">773</a> of file <a class="el" href="Cut_8h_source.html">Cut.h</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  773</span>                                {</div>
-<div class="line"><span class="lineno">  774</span>        <span class="keywordflow">if</span> (cuts.size() &lt;= <a class="code hl_variable" href="#a024665043e0869f16b4078f3358cdb7f">max_pool_size_</a>) <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno">  775</span> </div>
-<div class="line"><span class="lineno">  776</span>        <span class="comment">// Compute scores for all cuts.</span></div>
-<div class="line"><span class="lineno">  777</span>        std::vector&lt;std::pair&lt;size_t, double&gt;&gt; scored;</div>
-<div class="line"><span class="lineno">  778</span>        scored.reserve(cuts.size());</div>
-<div class="line"><span class="lineno">  779</span>        <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> i = 0; i &lt; cuts.size(); ++i) {</div>
-<div class="line"><span class="lineno">  780</span>            <span class="keywordflow">if</span> (!cuts[i].added) { scored.emplace_back(i, computeSelectionScore(i)); }</div>
-<div class="line"><span class="lineno">  781</span>        }</div>
-<div class="line"><span class="lineno">  782</span>        <span class="keywordflow">if</span> (scored.empty()) <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno">  783</span> </div>
-<div class="line"><span class="lineno">  784</span>        <span class="comment">// Sort by score ascending (lowest first = candidates for removal)</span></div>
-<div class="line"><span class="lineno">  785</span>        pdqsort(scored.begin(), scored.end(), [](<span class="keyword">const</span> <span class="keyword">auto</span> &amp;a, <span class="keyword">const</span> <span class="keyword">auto</span> &amp;b) { return a.second &lt; b.second; });</div>
-<div class="line"><span class="lineno">  786</span> </div>
-<div class="line"><span class="lineno">  787</span>        <span class="comment">// Remove excess pending cuts (lowest scoring first). Erase in</span></div>
-<div class="line"><span class="lineno">  788</span>        <span class="comment">// descending index order so vector indices remain valid.</span></div>
-<div class="line"><span class="lineno">  789</span>        <span class="keyword">const</span> <span class="keywordtype">size_t</span>     excess = std::min(cuts.size() - <a class="code hl_variable" href="#a024665043e0869f16b4078f3358cdb7f">max_pool_size_</a>, scored.size());</div>
-<div class="line"><span class="lineno">  790</span>        std::vector&lt;int&gt; remove_indices;</div>
-<div class="line"><span class="lineno">  791</span>        remove_indices.reserve(excess);</div>
-<div class="line"><span class="lineno">  792</span>        <span class="keywordflow">for</span> (<span class="keyword">auto</span> &amp;[cut_idx, score] : scored) {</div>
-<div class="line"><span class="lineno">  793</span>            <span class="keywordflow">if</span> (remove_indices.size() &gt;= excess) <span class="keywordflow">break</span>;</div>
-<div class="line"><span class="lineno">  794</span>            remove_indices.push_back(<span class="keyword">static_cast&lt;</span><span class="keywordtype">int</span><span class="keyword">&gt;</span>(cut_idx));</div>
-<div class="line"><span class="lineno">  795</span>        }</div>
-<div class="line"><span class="lineno">  796</span>        std::sort(remove_indices.begin(), remove_indices.end(), std::greater&lt;int&gt;());</div>
-<div class="line"><span class="lineno">  797</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> idx : remove_indices) { <a class="code hl_function" href="#a4439d72adc244e8ee7c120dc2b99f0dd">removeCut</a>(idx); }</div>
-<div class="line"><span class="lineno">  798</span>    }</div>
-<div class="ttc" id="aclassCutStorage_html_a024665043e0869f16b4078f3358cdb7f"><div class="ttname"><a href="#a024665043e0869f16b4078f3358cdb7f">CutStorage::max_pool_size_</a></div><div class="ttdeci">size_t max_pool_size_</div><div class="ttdef"><b>Definition</b> <a href="Cut_8h_source.html#l00600">Cut.h:600</a></div></div>
-<div class="ttc" id="aclassCutStorage_html_a4439d72adc244e8ee7c120dc2b99f0dd"><div class="ttname"><a href="#a4439d72adc244e8ee7c120dc2b99f0dd">CutStorage::removeCut</a></div><div class="ttdeci">void removeCut(Cut *cut)</div><div class="ttdef"><b>Definition</b> <a href="Cut_8h_source.html#l00323">Cut.h:323</a></div></div>
+<p class="definition">Definition at line <a class="el" href="Cut_8h_source.html#l00788">788</a> of file <a class="el" href="Cut_8h_source.html">Cut.h</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  788</span>                                {</div>
+<div class="line"><span class="lineno">  789</span>        <span class="keywordflow">if</span> (cuts.size() &lt;= <a class="code hl_variable" href="#a024665043e0869f16b4078f3358cdb7f">max_pool_size_</a>) <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno">  790</span> </div>
+<div class="line"><span class="lineno">  791</span>        <span class="comment">// Compute scores for all cuts.</span></div>
+<div class="line"><span class="lineno">  792</span>        std::vector&lt;std::pair&lt;size_t, double&gt;&gt; scored;</div>
+<div class="line"><span class="lineno">  793</span>        scored.reserve(cuts.size());</div>
+<div class="line"><span class="lineno">  794</span>        <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> i = 0; i &lt; cuts.size(); ++i) {</div>
+<div class="line"><span class="lineno">  795</span>            <span class="keywordflow">if</span> (!cuts[i].added) { scored.emplace_back(i, computeSelectionScore(i)); }</div>
+<div class="line"><span class="lineno">  796</span>        }</div>
+<div class="line"><span class="lineno">  797</span>        <span class="keywordflow">if</span> (scored.empty()) <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno">  798</span> </div>
+<div class="line"><span class="lineno">  799</span>        <span class="comment">// Sort by score ascending (lowest first = candidates for removal)</span></div>
+<div class="line"><span class="lineno">  800</span>        pdqsort(scored.begin(), scored.end(), [](<span class="keyword">const</span> <span class="keyword">auto</span> &amp;a, <span class="keyword">const</span> <span class="keyword">auto</span> &amp;b) { return a.second &lt; b.second; });</div>
+<div class="line"><span class="lineno">  801</span> </div>
+<div class="line"><span class="lineno">  802</span>        <span class="comment">// Remove excess pending cuts (lowest scoring first). Erase in</span></div>
+<div class="line"><span class="lineno">  803</span>        <span class="comment">// descending index order so vector indices remain valid.</span></div>
+<div class="line"><span class="lineno">  804</span>        <span class="keyword">const</span> <span class="keywordtype">size_t</span>     excess = std::min(cuts.size() - <a class="code hl_variable" href="#a024665043e0869f16b4078f3358cdb7f">max_pool_size_</a>, scored.size());</div>
+<div class="line"><span class="lineno">  805</span>        std::vector&lt;int&gt; remove_indices;</div>
+<div class="line"><span class="lineno">  806</span>        remove_indices.reserve(excess);</div>
+<div class="line"><span class="lineno">  807</span>        <span class="keywordflow">for</span> (<span class="keyword">auto</span> &amp;[cut_idx, score] : scored) {</div>
+<div class="line"><span class="lineno">  808</span>            <span class="keywordflow">if</span> (remove_indices.size() &gt;= excess) <span class="keywordflow">break</span>;</div>
+<div class="line"><span class="lineno">  809</span>            remove_indices.push_back(<span class="keyword">static_cast&lt;</span><span class="keywordtype">int</span><span class="keyword">&gt;</span>(cut_idx));</div>
+<div class="line"><span class="lineno">  810</span>        }</div>
+<div class="line"><span class="lineno">  811</span>        std::sort(remove_indices.begin(), remove_indices.end(), std::greater&lt;int&gt;());</div>
+<div class="line"><span class="lineno">  812</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> idx : remove_indices) { <a class="code hl_function" href="#a4439d72adc244e8ee7c120dc2b99f0dd">removeCut</a>(idx); }</div>
+<div class="line"><span class="lineno">  813</span>    }</div>
+<div class="ttc" id="aclassCutStorage_html_a024665043e0869f16b4078f3358cdb7f"><div class="ttname"><a href="#a024665043e0869f16b4078f3358cdb7f">CutStorage::max_pool_size_</a></div><div class="ttdeci">size_t max_pool_size_</div><div class="ttdef"><b>Definition</b> <a href="Cut_8h_source.html#l00613">Cut.h:613</a></div></div>
+<div class="ttc" id="aclassCutStorage_html_a4439d72adc244e8ee7c120dc2b99f0dd"><div class="ttname"><a href="#a4439d72adc244e8ee7c120dc2b99f0dd">CutStorage::removeCut</a></div><div class="ttdeci">void removeCut(Cut *cut)</div><div class="ttdef"><b>Definition</b> <a href="Cut_8h_source.html#l00336">Cut.h:336</a></div></div>
 </div><!-- fragment --><div class="dynheader">
 Here is the call graph for this function:</div>
 <div class="dyncontent">
@@ -826,17 +867,17 @@ Here is the call graph for this function:</div>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="Cut_8h_source.html#l00580">580</a> of file <a class="el" href="Cut_8h_source.html">Cut.h</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  580</span>                                                                           {</div>
-<div class="line"><span class="lineno">  581</span>        <span class="keywordflow">for</span> (<span class="keyword">auto</span> &amp;cut : cuts) {</div>
-<div class="line"><span class="lineno">  582</span>            <span class="keywordflow">if</span> (cut.coefficients.empty()) <span class="keywordflow">continue</span>;</div>
-<div class="line"><span class="lineno">  583</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> idx : descending_indices) {</div>
-<div class="line"><span class="lineno">  584</span>                <span class="keywordflow">if</span> (idx &gt;= 0 &amp;&amp; <span class="keyword">static_cast&lt;</span><span class="keywordtype">size_t</span><span class="keyword">&gt;</span>(idx) &lt; cut.coefficients.size()) {</div>
-<div class="line"><span class="lineno">  585</span>                    cut.coefficients.erase(cut.coefficients.begin() + idx);</div>
-<div class="line"><span class="lineno">  586</span>                }</div>
-<div class="line"><span class="lineno">  587</span>            }</div>
-<div class="line"><span class="lineno">  588</span>        }</div>
-<div class="line"><span class="lineno">  589</span>    }</div>
+<p class="definition">Definition at line <a class="el" href="Cut_8h_source.html#l00593">593</a> of file <a class="el" href="Cut_8h_source.html">Cut.h</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  593</span>                                                                           {</div>
+<div class="line"><span class="lineno">  594</span>        <span class="keywordflow">for</span> (<span class="keyword">auto</span> &amp;cut : cuts) {</div>
+<div class="line"><span class="lineno">  595</span>            <span class="keywordflow">if</span> (cut.coefficients.empty()) <span class="keywordflow">continue</span>;</div>
+<div class="line"><span class="lineno">  596</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> idx : descending_indices) {</div>
+<div class="line"><span class="lineno">  597</span>                <span class="keywordflow">if</span> (idx &gt;= 0 &amp;&amp; <span class="keyword">static_cast&lt;</span><span class="keywordtype">size_t</span><span class="keyword">&gt;</span>(idx) &lt; cut.coefficients.size()) {</div>
+<div class="line"><span class="lineno">  598</span>                    cut.coefficients.erase(cut.coefficients.begin() + idx);</div>
+<div class="line"><span class="lineno">  599</span>                }</div>
+<div class="line"><span class="lineno">  600</span>            }</div>
+<div class="line"><span class="lineno">  601</span>        }</div>
+<div class="line"><span class="lineno">  602</span>    }</div>
 </div><!-- fragment -->
 </div>
 </div>
@@ -867,12 +908,12 @@ Here is the call graph for this function:</div>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="Cut_8h_source.html#l00591">591</a> of file <a class="el" href="Cut_8h_source.html">Cut.h</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  591</span>                                                                                            {</div>
-<div class="line"><span class="lineno">  592</span>        std::size_t key = cutMaster;</div>
-<div class="line"><span class="lineno">  593</span>        <span class="keywordflow">for</span> (<span class="keywordtype">bool</span> b : baseSetStr) { key = (key &lt;&lt; 1) | b; }</div>
-<div class="line"><span class="lineno">  594</span>        <span class="keywordflow">return</span> key;</div>
-<div class="line"><span class="lineno">  595</span>    }</div>
+<p class="definition">Definition at line <a class="el" href="Cut_8h_source.html#l00604">604</a> of file <a class="el" href="Cut_8h_source.html">Cut.h</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  604</span>                                                                                            {</div>
+<div class="line"><span class="lineno">  605</span>        std::size_t key = cutMaster;</div>
+<div class="line"><span class="lineno">  606</span>        <span class="keywordflow">for</span> (<span class="keywordtype">bool</span> b : baseSetStr) { key = (key &lt;&lt; 1) | b; }</div>
+<div class="line"><span class="lineno">  607</span>        <span class="keywordflow">return</span> key;</div>
+<div class="line"><span class="lineno">  608</span>    }</div>
 </div><!-- fragment -->
 </div>
 </div>
@@ -899,8 +940,8 @@ Here is the call graph for this function:</div>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="Cut_8h_source.html#l00307">307</a> of file <a class="el" href="Cut_8h_source.html">Cut.h</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  307</span>{ <span class="keywordflow">return</span> cuts[cutIndex]; }</div>
+<p class="definition">Definition at line <a class="el" href="Cut_8h_source.html#l00320">320</a> of file <a class="el" href="Cut_8h_source.html">Cut.h</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  320</span>{ <span class="keywordflow">return</span> cuts[cutIndex]; }</div>
 </div><!-- fragment -->
 </div>
 </div>
@@ -927,10 +968,10 @@ Here is the call graph for this function:</div>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="Cut_8h_source.html#l00309">309</a> of file <a class="el" href="Cut_8h_source.html">Cut.h</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  309</span>                                                                {</div>
-<div class="line"><span class="lineno">  310</span>        <span class="keywordflow">return</span> std::span&lt;const ActiveCutInfo&gt;(active_cuts);</div>
-<div class="line"><span class="lineno">  311</span>    }</div>
+<p class="definition">Definition at line <a class="el" href="Cut_8h_source.html#l00322">322</a> of file <a class="el" href="Cut_8h_source.html">Cut.h</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  322</span>                                                                {</div>
+<div class="line"><span class="lineno">  323</span>        <span class="keywordflow">return</span> std::span&lt;const ActiveCutInfo&gt;(active_cuts);</div>
+<div class="line"><span class="lineno">  324</span>    }</div>
 </div><!-- fragment -->
 </div>
 </div>
@@ -957,11 +998,11 @@ Here is the call graph for this function:</div>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="Cut_8h_source.html#l00395">395</a> of file <a class="el" href="Cut_8h_source.html">Cut.h</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  395</span>                             {</div>
-<div class="line"><span class="lineno">  396</span>        assert(i &gt;= 0 &amp;&amp; i &lt; cuts.size());</div>
-<div class="line"><span class="lineno">  397</span>        <span class="keywordflow">return</span> cuts[i].grbConstr;</div>
-<div class="line"><span class="lineno">  398</span>    }</div>
+<p class="definition">Definition at line <a class="el" href="Cut_8h_source.html#l00408">408</a> of file <a class="el" href="Cut_8h_source.html">Cut.h</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  408</span>                             {</div>
+<div class="line"><span class="lineno">  409</span>        assert(i &gt;= 0 &amp;&amp; i &lt; cuts.size());</div>
+<div class="line"><span class="lineno">  410</span>        <span class="keywordflow">return</span> cuts[i].grbConstr;</div>
+<div class="line"><span class="lineno">  411</span>    }</div>
 </div><!-- fragment -->
 </div>
 </div>
@@ -988,8 +1029,8 @@ Here is the call graph for this function:</div>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="Cut_8h_source.html#l00305">305</a> of file <a class="el" href="Cut_8h_source.html">Cut.h</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  305</span>{ <span class="keywordflow">return</span> cuts[cutIndex]; }</div>
+<p class="definition">Definition at line <a class="el" href="Cut_8h_source.html#l00318">318</a> of file <a class="el" href="Cut_8h_source.html">Cut.h</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  318</span>{ <span class="keywordflow">return</span> cuts[cutIndex]; }</div>
 </div><!-- fragment -->
 </div>
 </div>
@@ -1016,8 +1057,8 @@ Here is the call graph for this function:</div>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="Cut_8h_source.html#l00313">313</a> of file <a class="el" href="Cut_8h_source.html">Cut.h</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  313</span>{ <span class="keywordflow">return</span> cuts[cutIndex]; }</div>
+<p class="definition">Definition at line <a class="el" href="Cut_8h_source.html#l00326">326</a> of file <a class="el" href="Cut_8h_source.html">Cut.h</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  326</span>{ <span class="keywordflow">return</span> cuts[cutIndex]; }</div>
 </div><!-- fragment -->
 </div>
 </div>
@@ -1044,8 +1085,8 @@ Here is the call graph for this function:</div>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="Cut_8h_source.html#l00316">316</a> of file <a class="el" href="Cut_8h_source.html">Cut.h</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  316</span>{ <span class="keywordflow">return</span> cuts[cutIndex].id; }</div>
+<p class="definition">Definition at line <a class="el" href="Cut_8h_source.html#l00329">329</a> of file <a class="el" href="Cut_8h_source.html">Cut.h</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  329</span>{ <span class="keywordflow">return</span> cuts[cutIndex].id; }</div>
 </div><!-- fragment -->
 </div>
 </div>
@@ -1166,22 +1207,22 @@ Here is the call graph for this function:</div>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="Cut_8h_source.html#l00545">545</a> of file <a class="el" href="Cut_8h_source.html">Cut.h</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  545</span>                                                                                                     {</div>
-<div class="line"><span class="lineno">  546</span>        std::vector&lt;double&gt; coefficients;</div>
-<div class="line"><span class="lineno">  547</span>        coefficients.assign(allPaths.size(), 0.0);</div>
-<div class="line"><span class="lineno">  548</span>        <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> idx = 0; idx &lt; allPaths.size(); ++idx) {</div>
-<div class="line"><span class="lineno">  549</span>            coefficients[idx] = <a class="code hl_function" href="#ae3c9d08a71c6e3e50586322a4cf74a02">computeLimitedMemoryCoefficient</a>(allPaths[idx].route, cut);</div>
-<div class="line"><span class="lineno">  550</span>        }</div>
-<div class="line"><span class="lineno">  551</span> </div>
-<div class="line"><span class="lineno">  552</span>        <span class="comment">// adjust cut stuff</span></div>
-<div class="line"><span class="lineno">  553</span>        <span class="keywordflow">if</span> (loaded) {</div>
-<div class="line"><span class="lineno">  554</span>            cut.<a class="code hl_variable" href="structCut.html#a7065d86454bcb27014bb1cc7ed3e3306">key</a>                       = <a class="code hl_function" href="#a6c546f704d593f06544a3e7aed508dc8">compute_cut_key</a>(cut.<a class="code hl_variable" href="structCut.html#a862b27206b16f7a09ec2537a99c99a7b">baseSet</a>, cut.<a class="code hl_variable" href="structCut.html#a6d855f0932d06073efa0a9b2c28bc74a">p</a>.<a class="code hl_variable" href="structSRCPermutation.html#ad388d415d55c248d620a00cddc5d686b">num</a>, cut.<a class="code hl_variable" href="structCut.html#a6d855f0932d06073efa0a9b2c28bc74a">p</a>.<a class="code hl_variable" href="structSRCPermutation.html#a73715a9230ef33a4afa75dc51fd09c24">den</a>);</div>
-<div class="line"><span class="lineno">  555</span>            <a class="code hl_variable" href="#a658586ee6b86457ccb13c49154918f78">cutMaster_to_cut_map</a>[cut.<a class="code hl_variable" href="structCut.html#a7065d86454bcb27014bb1cc7ed3e3306">key</a>] = cut.<a class="code hl_variable" href="structCut.html#ab7e0a20859f72176f8f474850f2e312f">id</a>;</div>
-<div class="line"><span class="lineno">  556</span>        }</div>
-<div class="line"><span class="lineno">  557</span>        <span class="keywordflow">return</span> coefficients;</div>
-<div class="line"><span class="lineno">  558</span>    }</div>
-<div class="ttc" id="aclassCutStorage_html_ae3c9d08a71c6e3e50586322a4cf74a02"><div class="ttname"><a href="#ae3c9d08a71c6e3e50586322a4cf74a02">CutStorage::computeLimitedMemoryCoefficient</a></div><div class="ttdeci">double computeLimitedMemoryCoefficient(const std::vector&lt; uint16_t &gt; &amp;P, const Cut &amp;cut) const</div><div class="ttdef"><b>Definition</b> <a href="Cut_8h_source.html#l00490">Cut.h:490</a></div></div>
+<p class="definition">Definition at line <a class="el" href="Cut_8h_source.html#l00558">558</a> of file <a class="el" href="Cut_8h_source.html">Cut.h</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  558</span>                                                                                                     {</div>
+<div class="line"><span class="lineno">  559</span>        std::vector&lt;double&gt; coefficients;</div>
+<div class="line"><span class="lineno">  560</span>        coefficients.assign(allPaths.size(), 0.0);</div>
+<div class="line"><span class="lineno">  561</span>        <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> idx = 0; idx &lt; allPaths.size(); ++idx) {</div>
+<div class="line"><span class="lineno">  562</span>            coefficients[idx] = <a class="code hl_function" href="#ae3c9d08a71c6e3e50586322a4cf74a02">computeLimitedMemoryCoefficient</a>(allPaths[idx].route, cut);</div>
+<div class="line"><span class="lineno">  563</span>        }</div>
+<div class="line"><span class="lineno">  564</span> </div>
+<div class="line"><span class="lineno">  565</span>        <span class="comment">// adjust cut stuff</span></div>
+<div class="line"><span class="lineno">  566</span>        <span class="keywordflow">if</span> (loaded) {</div>
+<div class="line"><span class="lineno">  567</span>            cut.<a class="code hl_variable" href="structCut.html#a7065d86454bcb27014bb1cc7ed3e3306">key</a>                       = <a class="code hl_function" href="#a6c546f704d593f06544a3e7aed508dc8">compute_cut_key</a>(cut.<a class="code hl_variable" href="structCut.html#a862b27206b16f7a09ec2537a99c99a7b">baseSet</a>, cut.<a class="code hl_variable" href="structCut.html#a6d855f0932d06073efa0a9b2c28bc74a">p</a>.<a class="code hl_variable" href="structSRCPermutation.html#ad388d415d55c248d620a00cddc5d686b">num</a>, cut.<a class="code hl_variable" href="structCut.html#a6d855f0932d06073efa0a9b2c28bc74a">p</a>.<a class="code hl_variable" href="structSRCPermutation.html#a73715a9230ef33a4afa75dc51fd09c24">den</a>);</div>
+<div class="line"><span class="lineno">  568</span>            <a class="code hl_variable" href="#a658586ee6b86457ccb13c49154918f78">cutMaster_to_cut_map</a>[cut.<a class="code hl_variable" href="structCut.html#a7065d86454bcb27014bb1cc7ed3e3306">key</a>] = cut.<a class="code hl_variable" href="structCut.html#ab7e0a20859f72176f8f474850f2e312f">id</a>;</div>
+<div class="line"><span class="lineno">  569</span>        }</div>
+<div class="line"><span class="lineno">  570</span>        <span class="keywordflow">return</span> coefficients;</div>
+<div class="line"><span class="lineno">  571</span>    }</div>
+<div class="ttc" id="aclassCutStorage_html_ae3c9d08a71c6e3e50586322a4cf74a02"><div class="ttname"><a href="#ae3c9d08a71c6e3e50586322a4cf74a02">CutStorage::computeLimitedMemoryCoefficient</a></div><div class="ttdeci">double computeLimitedMemoryCoefficient(const std::vector&lt; uint16_t &gt; &amp;P, const Cut &amp;cut) const</div><div class="ttdef"><b>Definition</b> <a href="Cut_8h_source.html#l00503">Cut.h:503</a></div></div>
 </div><!-- fragment --><div class="dynheader">
 Here is the call graph for this function:</div>
 <div class="dyncontent">
@@ -1224,28 +1265,28 @@ Here is the call graph for this function:</div>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="Cut_8h_source.html#l00813">813</a> of file <a class="el" href="Cut_8h_source.html">Cut.h</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  813</span>                                                      {</div>
-<div class="line"><span class="lineno">  814</span>        <span class="keywordflow">if</span> (cut.<a class="code hl_variable" href="structCut.html#a7065d86454bcb27014bb1cc7ed3e3306">key</a> == 0) { cut.<a class="code hl_variable" href="structCut.html#a7065d86454bcb27014bb1cc7ed3e3306">key</a> = <a class="code hl_function" href="#a6c546f704d593f06544a3e7aed508dc8">compute_cut_key</a>(cut.<a class="code hl_variable" href="structCut.html#a862b27206b16f7a09ec2537a99c99a7b">baseSet</a>, cut.<a class="code hl_variable" href="structCut.html#a6d855f0932d06073efa0a9b2c28bc74a">p</a>.<a class="code hl_variable" href="structSRCPermutation.html#ad388d415d55c248d620a00cddc5d686b">num</a>, cut.<a class="code hl_variable" href="structCut.html#a6d855f0932d06073efa0a9b2c28bc74a">p</a>.<a class="code hl_variable" href="structSRCPermutation.html#a73715a9230ef33a4afa75dc51fd09c24">den</a>); }</div>
-<div class="line"><span class="lineno">  815</span>        cut.<a class="code hl_variable" href="structCut.html#ac8243304d7e518989453a6a7c8820942">separation_count</a>++;</div>
-<div class="line"><span class="lineno">  816</span>        cut.<a class="code hl_variable" href="structCut.html#a6f8305cfdeadd48811c9c2a5be9913ac">last_violation</a> = std::max(0.0, violation);</div>
-<div class="line"><span class="lineno">  817</span>        cut.<a class="code hl_variable" href="structCut.html#a50d14e0fb2f30f2cf1af3babbc986dc8">total_violation</a> += cut.<a class="code hl_variable" href="structCut.html#a6f8305cfdeadd48811c9c2a5be9913ac">last_violation</a>;</div>
-<div class="line"><span class="lineno">  818</span>        cut.<a class="code hl_variable" href="structCut.html#a2247cba8febf885d1e77b751be8193d3">max_violation</a>         = std::max(cut.<a class="code hl_variable" href="structCut.html#a2247cba8febf885d1e77b751be8193d3">max_violation</a>, cut.<a class="code hl_variable" href="structCut.html#a6f8305cfdeadd48811c9c2a5be9913ac">last_violation</a>);</div>
-<div class="line"><span class="lineno">  819</span>        cut.<a class="code hl_variable" href="structCut.html#ad135a1662ba5c8a76e31460aace368b9">last_separation_epoch</a> = <a class="code hl_variable" href="#af72853f1b4437323e3ea1aa2202f1d91">current_epoch_</a>;</div>
-<div class="line"><span class="lineno">  820</span>        <span class="keywordflow">if</span> (cut.<a class="code hl_variable" href="structCut.html#a550b78381dec06753e45db0d26eb3555">creation_epoch</a> == 0) { cut.<a class="code hl_variable" href="structCut.html#a550b78381dec06753e45db0d26eb3555">creation_epoch</a> = <a class="code hl_variable" href="#af72853f1b4437323e3ea1aa2202f1d91">current_epoch_</a>; }</div>
-<div class="line"><span class="lineno">  821</span> </div>
-<div class="line"><span class="lineno">  822</span>        <span class="keyword">auto</span> it = <a class="code hl_variable" href="#a658586ee6b86457ccb13c49154918f78">cutMaster_to_cut_map</a>.find(cut.<a class="code hl_variable" href="structCut.html#a7065d86454bcb27014bb1cc7ed3e3306">key</a>);</div>
-<div class="line"><span class="lineno">  823</span>        <span class="keywordflow">if</span> (it != <a class="code hl_variable" href="#a658586ee6b86457ccb13c49154918f78">cutMaster_to_cut_map</a>.end()) {</div>
-<div class="line"><span class="lineno">  824</span>            <span class="keyword">auto</span> &amp;stored = cuts[it-&gt;second];</div>
-<div class="line"><span class="lineno">  825</span>            stored.separation_count++;</div>
-<div class="line"><span class="lineno">  826</span>            stored.last_violation = cut.<a class="code hl_variable" href="structCut.html#a6f8305cfdeadd48811c9c2a5be9913ac">last_violation</a>;</div>
-<div class="line"><span class="lineno">  827</span>            stored.total_violation += cut.<a class="code hl_variable" href="structCut.html#a6f8305cfdeadd48811c9c2a5be9913ac">last_violation</a>;</div>
-<div class="line"><span class="lineno">  828</span>            stored.max_violation         = std::max(stored.max_violation, cut.<a class="code hl_variable" href="structCut.html#a6f8305cfdeadd48811c9c2a5be9913ac">last_violation</a>);</div>
-<div class="line"><span class="lineno">  829</span>            stored.last_separation_epoch = <a class="code hl_variable" href="#af72853f1b4437323e3ea1aa2202f1d91">current_epoch_</a>;</div>
-<div class="line"><span class="lineno">  830</span>            <span class="keywordflow">if</span> (stored.creation_epoch == 0) { stored.creation_epoch = <a class="code hl_variable" href="#af72853f1b4437323e3ea1aa2202f1d91">current_epoch_</a>; }</div>
-<div class="line"><span class="lineno">  831</span>            <span class="keywordflow">if</span> (stored.added) { stored.updated = <span class="keyword">true</span>; }</div>
-<div class="line"><span class="lineno">  832</span>        }</div>
-<div class="line"><span class="lineno">  833</span>    }</div>
+<p class="definition">Definition at line <a class="el" href="Cut_8h_source.html#l00828">828</a> of file <a class="el" href="Cut_8h_source.html">Cut.h</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  828</span>                                                      {</div>
+<div class="line"><span class="lineno">  829</span>        <span class="keywordflow">if</span> (cut.<a class="code hl_variable" href="structCut.html#a7065d86454bcb27014bb1cc7ed3e3306">key</a> == 0) { cut.<a class="code hl_variable" href="structCut.html#a7065d86454bcb27014bb1cc7ed3e3306">key</a> = <a class="code hl_function" href="#a6c546f704d593f06544a3e7aed508dc8">compute_cut_key</a>(cut.<a class="code hl_variable" href="structCut.html#a862b27206b16f7a09ec2537a99c99a7b">baseSet</a>, cut.<a class="code hl_variable" href="structCut.html#a6d855f0932d06073efa0a9b2c28bc74a">p</a>.<a class="code hl_variable" href="structSRCPermutation.html#ad388d415d55c248d620a00cddc5d686b">num</a>, cut.<a class="code hl_variable" href="structCut.html#a6d855f0932d06073efa0a9b2c28bc74a">p</a>.<a class="code hl_variable" href="structSRCPermutation.html#a73715a9230ef33a4afa75dc51fd09c24">den</a>); }</div>
+<div class="line"><span class="lineno">  830</span>        cut.<a class="code hl_variable" href="structCut.html#ac8243304d7e518989453a6a7c8820942">separation_count</a>++;</div>
+<div class="line"><span class="lineno">  831</span>        cut.<a class="code hl_variable" href="structCut.html#a6f8305cfdeadd48811c9c2a5be9913ac">last_violation</a> = std::max(0.0, violation);</div>
+<div class="line"><span class="lineno">  832</span>        cut.<a class="code hl_variable" href="structCut.html#a50d14e0fb2f30f2cf1af3babbc986dc8">total_violation</a> += cut.<a class="code hl_variable" href="structCut.html#a6f8305cfdeadd48811c9c2a5be9913ac">last_violation</a>;</div>
+<div class="line"><span class="lineno">  833</span>        cut.<a class="code hl_variable" href="structCut.html#a2247cba8febf885d1e77b751be8193d3">max_violation</a>         = std::max(cut.<a class="code hl_variable" href="structCut.html#a2247cba8febf885d1e77b751be8193d3">max_violation</a>, cut.<a class="code hl_variable" href="structCut.html#a6f8305cfdeadd48811c9c2a5be9913ac">last_violation</a>);</div>
+<div class="line"><span class="lineno">  834</span>        cut.<a class="code hl_variable" href="structCut.html#ad135a1662ba5c8a76e31460aace368b9">last_separation_epoch</a> = <a class="code hl_variable" href="#af72853f1b4437323e3ea1aa2202f1d91">current_epoch_</a>;</div>
+<div class="line"><span class="lineno">  835</span>        <span class="keywordflow">if</span> (cut.<a class="code hl_variable" href="structCut.html#a550b78381dec06753e45db0d26eb3555">creation_epoch</a> == 0) { cut.<a class="code hl_variable" href="structCut.html#a550b78381dec06753e45db0d26eb3555">creation_epoch</a> = <a class="code hl_variable" href="#af72853f1b4437323e3ea1aa2202f1d91">current_epoch_</a>; }</div>
+<div class="line"><span class="lineno">  836</span> </div>
+<div class="line"><span class="lineno">  837</span>        <span class="keyword">auto</span> it = <a class="code hl_variable" href="#a658586ee6b86457ccb13c49154918f78">cutMaster_to_cut_map</a>.find(cut.<a class="code hl_variable" href="structCut.html#a7065d86454bcb27014bb1cc7ed3e3306">key</a>);</div>
+<div class="line"><span class="lineno">  838</span>        <span class="keywordflow">if</span> (it != <a class="code hl_variable" href="#a658586ee6b86457ccb13c49154918f78">cutMaster_to_cut_map</a>.end()) {</div>
+<div class="line"><span class="lineno">  839</span>            <span class="keyword">auto</span> &amp;stored = cuts[it-&gt;second];</div>
+<div class="line"><span class="lineno">  840</span>            stored.separation_count++;</div>
+<div class="line"><span class="lineno">  841</span>            stored.last_violation = cut.<a class="code hl_variable" href="structCut.html#a6f8305cfdeadd48811c9c2a5be9913ac">last_violation</a>;</div>
+<div class="line"><span class="lineno">  842</span>            stored.total_violation += cut.<a class="code hl_variable" href="structCut.html#a6f8305cfdeadd48811c9c2a5be9913ac">last_violation</a>;</div>
+<div class="line"><span class="lineno">  843</span>            stored.max_violation         = std::max(stored.max_violation, cut.<a class="code hl_variable" href="structCut.html#a6f8305cfdeadd48811c9c2a5be9913ac">last_violation</a>);</div>
+<div class="line"><span class="lineno">  844</span>            stored.last_separation_epoch = <a class="code hl_variable" href="#af72853f1b4437323e3ea1aa2202f1d91">current_epoch_</a>;</div>
+<div class="line"><span class="lineno">  845</span>            <span class="keywordflow">if</span> (stored.creation_epoch == 0) { stored.creation_epoch = <a class="code hl_variable" href="#af72853f1b4437323e3ea1aa2202f1d91">current_epoch_</a>; }</div>
+<div class="line"><span class="lineno">  846</span>            <span class="keywordflow">if</span> (stored.added) { stored.updated = <span class="keyword">true</span>; }</div>
+<div class="line"><span class="lineno">  847</span>        }</div>
+<div class="line"><span class="lineno">  848</span>    }</div>
 </div><!-- fragment --><div class="dynheader">
 Here is the call graph for this function:</div>
 <div class="dyncontent">
@@ -1286,19 +1327,19 @@ Here is the call graph for this function:</div>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="Cut_8h_source.html#l00800">800</a> of file <a class="el" href="Cut_8h_source.html">Cut.h</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  800</span>                                                                 {</div>
-<div class="line"><span class="lineno">  801</span>        <span class="keyword">auto</span> it = <a class="code hl_variable" href="#a658586ee6b86457ccb13c49154918f78">cutMaster_to_cut_map</a>.find(cut_key);</div>
-<div class="line"><span class="lineno">  802</span>        <span class="keywordflow">if</span> (it == <a class="code hl_variable" href="#a658586ee6b86457ccb13c49154918f78">cutMaster_to_cut_map</a>.end()) <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno">  803</span>        <span class="keyword">auto</span> &amp;stored = cuts[it-&gt;second];</div>
-<div class="line"><span class="lineno">  804</span>        stored.separation_count++;</div>
-<div class="line"><span class="lineno">  805</span>        stored.last_violation = std::max(0.0, violation);</div>
-<div class="line"><span class="lineno">  806</span>        stored.total_violation += stored.last_violation;</div>
-<div class="line"><span class="lineno">  807</span>        stored.max_violation         = std::max(stored.max_violation, stored.last_violation);</div>
-<div class="line"><span class="lineno">  808</span>        stored.last_separation_epoch = <a class="code hl_variable" href="#af72853f1b4437323e3ea1aa2202f1d91">current_epoch_</a>;</div>
-<div class="line"><span class="lineno">  809</span>        <span class="keywordflow">if</span> (stored.creation_epoch == 0) { stored.creation_epoch = <a class="code hl_variable" href="#af72853f1b4437323e3ea1aa2202f1d91">current_epoch_</a>; }</div>
-<div class="line"><span class="lineno">  810</span>        <span class="keywordflow">if</span> (stored.added) { stored.updated = <span class="keyword">true</span>; }</div>
-<div class="line"><span class="lineno">  811</span>    }</div>
+<p class="definition">Definition at line <a class="el" href="Cut_8h_source.html#l00815">815</a> of file <a class="el" href="Cut_8h_source.html">Cut.h</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  815</span>                                                                 {</div>
+<div class="line"><span class="lineno">  816</span>        <span class="keyword">auto</span> it = <a class="code hl_variable" href="#a658586ee6b86457ccb13c49154918f78">cutMaster_to_cut_map</a>.find(cut_key);</div>
+<div class="line"><span class="lineno">  817</span>        <span class="keywordflow">if</span> (it == <a class="code hl_variable" href="#a658586ee6b86457ccb13c49154918f78">cutMaster_to_cut_map</a>.end()) <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno">  818</span>        <span class="keyword">auto</span> &amp;stored = cuts[it-&gt;second];</div>
+<div class="line"><span class="lineno">  819</span>        stored.separation_count++;</div>
+<div class="line"><span class="lineno">  820</span>        stored.last_violation = std::max(0.0, violation);</div>
+<div class="line"><span class="lineno">  821</span>        stored.total_violation += stored.last_violation;</div>
+<div class="line"><span class="lineno">  822</span>        stored.max_violation         = std::max(stored.max_violation, stored.last_violation);</div>
+<div class="line"><span class="lineno">  823</span>        stored.last_separation_epoch = <a class="code hl_variable" href="#af72853f1b4437323e3ea1aa2202f1d91">current_epoch_</a>;</div>
+<div class="line"><span class="lineno">  824</span>        <span class="keywordflow">if</span> (stored.creation_epoch == 0) { stored.creation_epoch = <a class="code hl_variable" href="#af72853f1b4437323e3ea1aa2202f1d91">current_epoch_</a>; }</div>
+<div class="line"><span class="lineno">  825</span>        <span class="keywordflow">if</span> (stored.added) { stored.updated = <span class="keyword">true</span>; }</div>
+<div class="line"><span class="lineno">  826</span>    }</div>
 </div><!-- fragment -->
 </div>
 </div>
@@ -1329,17 +1370,17 @@ Here is the call graph for this function:</div>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="Cut_8h_source.html#l00560">560</a> of file <a class="el" href="Cut_8h_source.html">Cut.h</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  560</span>                                                                       {</div>
-<div class="line"><span class="lineno">  561</span>        <span class="keywordflow">if</span> (!cut.<a class="code hl_function" href="structCut.html#a170af5472e1621bd7c06c2e0f6d8908f">hasSparseCoefficients</a>()) <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno">  562</span>        cut.<a class="code hl_variable" href="structCut.html#a053573462a7391e455de56f91fbc7d66">coefficients</a>.assign(n_paths, 0.0);</div>
-<div class="line"><span class="lineno">  563</span>        <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> idx = 0; idx &lt; cut.<a class="code hl_variable" href="structCut.html#a1e24d2d64582387e13368e6b6c3f88b5">coefficient_indices</a>.size(); ++idx) {</div>
-<div class="line"><span class="lineno">  564</span>            <span class="keyword">const</span> <span class="keywordtype">int</span> path_idx = cut.<a class="code hl_variable" href="structCut.html#a1e24d2d64582387e13368e6b6c3f88b5">coefficient_indices</a>[idx];</div>
-<div class="line"><span class="lineno">  565</span>            <span class="keywordflow">if</span> (path_idx &gt;= 0 &amp;&amp; <span class="keyword">static_cast&lt;</span><span class="keywordtype">size_t</span><span class="keyword">&gt;</span>(path_idx) &lt; n_paths) {</div>
-<div class="line"><span class="lineno">  566</span>                cut.<a class="code hl_variable" href="structCut.html#a053573462a7391e455de56f91fbc7d66">coefficients</a>[<span class="keyword">static_cast&lt;</span><span class="keywordtype">size_t</span><span class="keyword">&gt;</span>(path_idx)] = cut.<a class="code hl_variable" href="structCut.html#afc8975a2e6bf2f9bebc4a98ac8b77955">coefficient_values</a>[idx];</div>
-<div class="line"><span class="lineno">  567</span>            }</div>
-<div class="line"><span class="lineno">  568</span>        }</div>
-<div class="line"><span class="lineno">  569</span>    }</div>
+<p class="definition">Definition at line <a class="el" href="Cut_8h_source.html#l00573">573</a> of file <a class="el" href="Cut_8h_source.html">Cut.h</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  573</span>                                                                       {</div>
+<div class="line"><span class="lineno">  574</span>        <span class="keywordflow">if</span> (!cut.<a class="code hl_function" href="structCut.html#a170af5472e1621bd7c06c2e0f6d8908f">hasSparseCoefficients</a>()) <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno">  575</span>        cut.<a class="code hl_variable" href="structCut.html#a053573462a7391e455de56f91fbc7d66">coefficients</a>.assign(n_paths, 0.0);</div>
+<div class="line"><span class="lineno">  576</span>        <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> idx = 0; idx &lt; cut.<a class="code hl_variable" href="structCut.html#a1e24d2d64582387e13368e6b6c3f88b5">coefficient_indices</a>.size(); ++idx) {</div>
+<div class="line"><span class="lineno">  577</span>            <span class="keyword">const</span> <span class="keywordtype">int</span> path_idx = cut.<a class="code hl_variable" href="structCut.html#a1e24d2d64582387e13368e6b6c3f88b5">coefficient_indices</a>[idx];</div>
+<div class="line"><span class="lineno">  578</span>            <span class="keywordflow">if</span> (path_idx &gt;= 0 &amp;&amp; <span class="keyword">static_cast&lt;</span><span class="keywordtype">size_t</span><span class="keyword">&gt;</span>(path_idx) &lt; n_paths) {</div>
+<div class="line"><span class="lineno">  579</span>                cut.<a class="code hl_variable" href="structCut.html#a053573462a7391e455de56f91fbc7d66">coefficients</a>[<span class="keyword">static_cast&lt;</span><span class="keywordtype">size_t</span><span class="keyword">&gt;</span>(path_idx)] = cut.<a class="code hl_variable" href="structCut.html#afc8975a2e6bf2f9bebc4a98ac8b77955">coefficient_values</a>[idx];</div>
+<div class="line"><span class="lineno">  580</span>            }</div>
+<div class="line"><span class="lineno">  581</span>        }</div>
+<div class="line"><span class="lineno">  582</span>    }</div>
 <div class="ttc" id="astructCut_html_a053573462a7391e455de56f91fbc7d66"><div class="ttname"><a href="structCut.html#a053573462a7391e455de56f91fbc7d66">Cut::coefficients</a></div><div class="ttdeci">std::vector&lt; double &gt; coefficients</div><div class="ttdef"><b>Definition</b> <a href="Cut_8h_source.html#l00063">Cut.h:63</a></div></div>
 <div class="ttc" id="astructCut_html_a170af5472e1621bd7c06c2e0f6d8908f"><div class="ttname"><a href="structCut.html#a170af5472e1621bd7c06c2e0f6d8908f">Cut::hasSparseCoefficients</a></div><div class="ttdeci">bool hasSparseCoefficients() const noexcept</div><div class="ttdef"><b>Definition</b> <a href="Cut_8h_source.html#l00140">Cut.h:140</a></div></div>
 <div class="ttc" id="astructCut_html_a1e24d2d64582387e13368e6b6c3f88b5"><div class="ttname"><a href="structCut.html#a1e24d2d64582387e13368e6b6c3f88b5">Cut::coefficient_indices</a></div><div class="ttdeci">std::vector&lt; int &gt; coefficient_indices</div><div class="ttdef"><b>Definition</b> <a href="Cut_8h_source.html#l00064">Cut.h:64</a></div></div>
@@ -1411,10 +1452,10 @@ Here is the call graph for this function:</div>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="Cut_8h_source.html#l00844">844</a> of file <a class="el" href="Cut_8h_source.html">Cut.h</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  844</span>                     {</div>
-<div class="line"><span class="lineno">  845</span>        <span class="keywordflow">for</span> (<span class="keyword">auto</span> &amp;cut : cuts) { cut.printCut(); }</div>
-<div class="line"><span class="lineno">  846</span>    }</div>
+<p class="definition">Definition at line <a class="el" href="Cut_8h_source.html#l00859">859</a> of file <a class="el" href="Cut_8h_source.html">Cut.h</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  859</span>                     {</div>
+<div class="line"><span class="lineno">  860</span>        <span class="keywordflow">for</span> (<span class="keyword">auto</span> &amp;cut : cuts) { cut.printCut(); }</div>
+<div class="line"><span class="lineno">  861</span>    }</div>
 </div><!-- fragment --><div class="dynheader">
 Here is the call graph for this function:</div>
 <div class="dyncontent">
@@ -1453,10 +1494,10 @@ Here is the call graph for this function:</div>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="Cut_8h_source.html#l00319">319</a> of file <a class="el" href="Cut_8h_source.html">Cut.h</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  319</span>                           {</div>
-<div class="line"><span class="lineno">  320</span>        <span class="keywordflow">for</span> (<span class="keyword">const</span> <span class="keyword">auto</span> &amp;cut : cuts) { cut.printCut(); }</div>
-<div class="line"><span class="lineno">  321</span>    }</div>
+<p class="definition">Definition at line <a class="el" href="Cut_8h_source.html#l00332">332</a> of file <a class="el" href="Cut_8h_source.html">Cut.h</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  332</span>                           {</div>
+<div class="line"><span class="lineno">  333</span>        <span class="keywordflow">for</span> (<span class="keyword">const</span> <span class="keyword">auto</span> &amp;cut : cuts) { cut.printCut(); }</div>
+<div class="line"><span class="lineno">  334</span>    }</div>
 </div><!-- fragment -->
 </div>
 </div>
@@ -1483,20 +1524,20 @@ Here is the call graph for this function:</div>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="Cut_8h_source.html#l00358">358</a> of file <a class="el" href="Cut_8h_source.html">Cut.h</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  358</span>                                            {</div>
-<div class="line"><span class="lineno">  359</span>        <span class="keywordflow">if</span> (cuts.empty() || <a class="code hl_variable" href="#a9fa1b82e761a96d16f22638baad6871e">SRCDuals</a>.empty()) <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno">  360</span>        <span class="keywordtype">bool</span> removed = <span class="keyword">false</span>;</div>
-<div class="line"><span class="lineno">  361</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> i = <span class="keyword">static_cast&lt;</span><span class="keywordtype">int</span><span class="keyword">&gt;</span>(cuts.size()) - 1; i &gt;= 0; --i) {</div>
-<div class="line"><span class="lineno">  362</span>            <span class="keywordflow">if</span> (i &lt; <span class="keyword">static_cast&lt;</span><span class="keywordtype">int</span><span class="keyword">&gt;</span>(<a class="code hl_variable" href="#a9fa1b82e761a96d16f22638baad6871e">SRCDuals</a>.size()) &amp;&amp; std::abs(<a class="code hl_variable" href="#a9fa1b82e761a96d16f22638baad6871e">SRCDuals</a>[i]) &lt; threshold) {</div>
-<div class="line"><span class="lineno">  363</span>                <a class="code hl_function" href="#a4439d72adc244e8ee7c120dc2b99f0dd">removeCut</a>(i);</div>
-<div class="line"><span class="lineno">  364</span>                removed = <span class="keyword">true</span>;</div>
-<div class="line"><span class="lineno">  365</span>            }</div>
-<div class="line"><span class="lineno">  366</span>        }</div>
-<div class="line"><span class="lineno">  367</span>        <span class="keywordflow">if</span> (removed) <a class="code hl_function" href="#a8551af14fd920b027955a0e5321b271a">updateActiveCuts</a>();</div>
-<div class="line"><span class="lineno">  368</span>    }</div>
-<div class="ttc" id="aclassCutStorage_html_a8551af14fd920b027955a0e5321b271a"><div class="ttname"><a href="#a8551af14fd920b027955a0e5321b271a">CutStorage::updateActiveCuts</a></div><div class="ttdeci">void updateActiveCuts()</div><div class="ttdef"><b>Definition</b> <a href="Cut_8h_source.html#l00835">Cut.h:835</a></div></div>
-<div class="ttc" id="aclassCutStorage_html_a9fa1b82e761a96d16f22638baad6871e"><div class="ttname"><a href="#a9fa1b82e761a96d16f22638baad6871e">CutStorage::SRCDuals</a></div><div class="ttdeci">std::vector&lt; double &gt; SRCDuals</div><div class="ttdef"><b>Definition</b> <a href="Cut_8h_source.html#l00596">Cut.h:596</a></div></div>
+<p class="definition">Definition at line <a class="el" href="Cut_8h_source.html#l00371">371</a> of file <a class="el" href="Cut_8h_source.html">Cut.h</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  371</span>                                            {</div>
+<div class="line"><span class="lineno">  372</span>        <span class="keywordflow">if</span> (cuts.empty() || <a class="code hl_variable" href="#a9fa1b82e761a96d16f22638baad6871e">SRCDuals</a>.empty()) <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno">  373</span>        <span class="keywordtype">bool</span> removed = <span class="keyword">false</span>;</div>
+<div class="line"><span class="lineno">  374</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> i = <span class="keyword">static_cast&lt;</span><span class="keywordtype">int</span><span class="keyword">&gt;</span>(cuts.size()) - 1; i &gt;= 0; --i) {</div>
+<div class="line"><span class="lineno">  375</span>            <span class="keywordflow">if</span> (i &lt; <span class="keyword">static_cast&lt;</span><span class="keywordtype">int</span><span class="keyword">&gt;</span>(<a class="code hl_variable" href="#a9fa1b82e761a96d16f22638baad6871e">SRCDuals</a>.size()) &amp;&amp; std::abs(<a class="code hl_variable" href="#a9fa1b82e761a96d16f22638baad6871e">SRCDuals</a>[i]) &lt; threshold) {</div>
+<div class="line"><span class="lineno">  376</span>                <a class="code hl_function" href="#a4439d72adc244e8ee7c120dc2b99f0dd">removeCut</a>(i);</div>
+<div class="line"><span class="lineno">  377</span>                removed = <span class="keyword">true</span>;</div>
+<div class="line"><span class="lineno">  378</span>            }</div>
+<div class="line"><span class="lineno">  379</span>        }</div>
+<div class="line"><span class="lineno">  380</span>        <span class="keywordflow">if</span> (removed) <a class="code hl_function" href="#a8551af14fd920b027955a0e5321b271a">updateActiveCuts</a>();</div>
+<div class="line"><span class="lineno">  381</span>    }</div>
+<div class="ttc" id="aclassCutStorage_html_a8551af14fd920b027955a0e5321b271a"><div class="ttname"><a href="#a8551af14fd920b027955a0e5321b271a">CutStorage::updateActiveCuts</a></div><div class="ttdeci">void updateActiveCuts()</div><div class="ttdef"><b>Definition</b> <a href="Cut_8h_source.html#l00850">Cut.h:850</a></div></div>
+<div class="ttc" id="aclassCutStorage_html_a9fa1b82e761a96d16f22638baad6871e"><div class="ttname"><a href="#a9fa1b82e761a96d16f22638baad6871e">CutStorage::SRCDuals</a></div><div class="ttdeci">std::vector&lt; double &gt; SRCDuals</div><div class="ttdef"><b>Definition</b> <a href="Cut_8h_source.html#l00609">Cut.h:609</a></div></div>
 </div><!-- fragment --><div class="dynheader">
 Here is the call graph for this function:</div>
 <div class="dyncontent">
@@ -1511,6 +1552,38 @@ Here is the call graph for this function:</div>
 </map>
 </div>
 
+</div>
+</div>
+<a id="a68c5781c0bcb6258cad00872aad61a5e" name="a68c5781c0bcb6258cad00872aad61a5e"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a68c5781c0bcb6258cad00872aad61a5e">&#9670;&#160;</a></span>remainingRoundCutBudget()</h2>
+
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">size_t CutStorage::remainingRoundCutBudget </td>
+          <td>(</td>
+          <td class="paramname"><span class="paramname"><em></em></span></td><td>)</td>
+          <td> const</td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel inline">inline</span><span class="mlabel nodiscard">nodiscard</span><span class="mlabel noexcept">noexcept</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+<p class="definition">Definition at line <a class="el" href="Cut_8h_source.html#l00296">296</a> of file <a class="el" href="Cut_8h_source.html">Cut.h</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  296</span>                                                                  {</div>
+<div class="line"><span class="lineno">  297</span>        <span class="keywordflow">return</span> <a class="code hl_variable" href="#a98050d41c191d9555038e5d4e8905465">round_new_cuts_accepted_</a> &gt;= <a class="code hl_variable" href="#ac726ebf88b3630c8bed8717506e00e1b">round_new_cut_limit_</a></div>
+<div class="line"><span class="lineno">  298</span>                   ? 0</div>
+<div class="line"><span class="lineno">  299</span>                   : <a class="code hl_variable" href="#ac726ebf88b3630c8bed8717506e00e1b">round_new_cut_limit_</a> - <a class="code hl_variable" href="#a98050d41c191d9555038e5d4e8905465">round_new_cuts_accepted_</a>;</div>
+<div class="line"><span class="lineno">  300</span>    }</div>
+</div><!-- fragment -->
 </div>
 </div>
 <a id="a4439d72adc244e8ee7c120dc2b99f0dd" name="a4439d72adc244e8ee7c120dc2b99f0dd"></a>
@@ -1536,11 +1609,11 @@ Here is the call graph for this function:</div>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="Cut_8h_source.html#l00323">323</a> of file <a class="el" href="Cut_8h_source.html">Cut.h</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  323</span>                             {</div>
-<div class="line"><span class="lineno">  324</span>        <span class="keywordflow">if</span> (!cut) <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno">  325</span>        <a class="code hl_function" href="#a4439d72adc244e8ee7c120dc2b99f0dd">removeCut</a>(cut-&gt;<a class="code hl_variable" href="structCut.html#ab7e0a20859f72176f8f474850f2e312f">id</a>);</div>
-<div class="line"><span class="lineno">  326</span>    }</div>
+<p class="definition">Definition at line <a class="el" href="Cut_8h_source.html#l00336">336</a> of file <a class="el" href="Cut_8h_source.html">Cut.h</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  336</span>                             {</div>
+<div class="line"><span class="lineno">  337</span>        <span class="keywordflow">if</span> (!cut) <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno">  338</span>        <a class="code hl_function" href="#a4439d72adc244e8ee7c120dc2b99f0dd">removeCut</a>(cut-&gt;<a class="code hl_variable" href="structCut.html#ab7e0a20859f72176f8f474850f2e312f">id</a>);</div>
+<div class="line"><span class="lineno">  339</span>    }</div>
 </div><!-- fragment --><div class="dynheader">
 Here is the call graph for this function:</div>
 <div class="dyncontent">
@@ -1576,29 +1649,29 @@ Here is the call graph for this function:</div>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="Cut_8h_source.html#l00329">329</a> of file <a class="el" href="Cut_8h_source.html">Cut.h</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  329</span>                                 {</div>
-<div class="line"><span class="lineno">  330</span>        <span class="comment">// Validate cutIndex.</span></div>
-<div class="line"><span class="lineno">  331</span>        <span class="keywordflow">if</span> (cutIndex &lt; 0 || cutIndex &gt;= <span class="keyword">static_cast&lt;</span><span class="keywordtype">int</span><span class="keyword">&gt;</span>(cuts.size())) {</div>
-<div class="line"><span class="lineno">  332</span>            std::cerr &lt;&lt; <span class="stringliteral">&quot;Cut index &quot;</span> &lt;&lt; cutIndex &lt;&lt; <span class="stringliteral">&quot; is out of bounds.&quot;</span> &lt;&lt; std::endl;</div>
-<div class="line"><span class="lineno">  333</span>            <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno">  334</span>        }</div>
-<div class="line"><span class="lineno">  335</span> </div>
-<div class="line"><span class="lineno">  336</span>        <span class="comment">// Remove the cut from the &#39;cuts&#39; vector.</span></div>
-<div class="line"><span class="lineno">  337</span>        cuts.erase(cuts.begin() + cutIndex);</div>
-<div class="line"><span class="lineno">  338</span> </div>
-<div class="line"><span class="lineno">  339</span>        <span class="comment">// Remove the associated dual if it exists.</span></div>
-<div class="line"><span class="lineno">  340</span>        <span class="keywordflow">if</span> (cutIndex &lt; <span class="keyword">static_cast&lt;</span><span class="keywordtype">int</span><span class="keyword">&gt;</span>(<a class="code hl_variable" href="#a9fa1b82e761a96d16f22638baad6871e">SRCDuals</a>.size())) { <a class="code hl_variable" href="#a9fa1b82e761a96d16f22638baad6871e">SRCDuals</a>.erase(<a class="code hl_variable" href="#a9fa1b82e761a96d16f22638baad6871e">SRCDuals</a>.begin() + cutIndex); }</div>
-<div class="line"><span class="lineno">  341</span> </div>
-<div class="line"><span class="lineno">  342</span>        <a class="code hl_variable" href="#a658586ee6b86457ccb13c49154918f78">cutMaster_to_cut_map</a>.clear();</div>
-<div class="line"><span class="lineno">  343</span>        indexCuts.clear();</div>
-<div class="line"><span class="lineno">  344</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> idx = 0; idx &lt; static_cast&lt;int&gt;(cuts.size()); ++idx) {</div>
-<div class="line"><span class="lineno">  345</span>            cuts[idx].id                        = idx;</div>
-<div class="line"><span class="lineno">  346</span>            <a class="code hl_variable" href="#a658586ee6b86457ccb13c49154918f78">cutMaster_to_cut_map</a>[cuts[idx].key] = idx;</div>
-<div class="line"><span class="lineno">  347</span>            indexCuts[cuts[idx].key].push_back(idx);</div>
-<div class="line"><span class="lineno">  348</span>        }</div>
-<div class="line"><span class="lineno">  349</span>        <a class="code hl_function" href="#a8551af14fd920b027955a0e5321b271a">updateActiveCuts</a>();</div>
-<div class="line"><span class="lineno">  350</span>    }</div>
+<p class="definition">Definition at line <a class="el" href="Cut_8h_source.html#l00342">342</a> of file <a class="el" href="Cut_8h_source.html">Cut.h</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  342</span>                                 {</div>
+<div class="line"><span class="lineno">  343</span>        <span class="comment">// Validate cutIndex.</span></div>
+<div class="line"><span class="lineno">  344</span>        <span class="keywordflow">if</span> (cutIndex &lt; 0 || cutIndex &gt;= <span class="keyword">static_cast&lt;</span><span class="keywordtype">int</span><span class="keyword">&gt;</span>(cuts.size())) {</div>
+<div class="line"><span class="lineno">  345</span>            std::cerr &lt;&lt; <span class="stringliteral">&quot;Cut index &quot;</span> &lt;&lt; cutIndex &lt;&lt; <span class="stringliteral">&quot; is out of bounds.&quot;</span> &lt;&lt; std::endl;</div>
+<div class="line"><span class="lineno">  346</span>            <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno">  347</span>        }</div>
+<div class="line"><span class="lineno">  348</span> </div>
+<div class="line"><span class="lineno">  349</span>        <span class="comment">// Remove the cut from the &#39;cuts&#39; vector.</span></div>
+<div class="line"><span class="lineno">  350</span>        cuts.erase(cuts.begin() + cutIndex);</div>
+<div class="line"><span class="lineno">  351</span> </div>
+<div class="line"><span class="lineno">  352</span>        <span class="comment">// Remove the associated dual if it exists.</span></div>
+<div class="line"><span class="lineno">  353</span>        <span class="keywordflow">if</span> (cutIndex &lt; <span class="keyword">static_cast&lt;</span><span class="keywordtype">int</span><span class="keyword">&gt;</span>(<a class="code hl_variable" href="#a9fa1b82e761a96d16f22638baad6871e">SRCDuals</a>.size())) { <a class="code hl_variable" href="#a9fa1b82e761a96d16f22638baad6871e">SRCDuals</a>.erase(<a class="code hl_variable" href="#a9fa1b82e761a96d16f22638baad6871e">SRCDuals</a>.begin() + cutIndex); }</div>
+<div class="line"><span class="lineno">  354</span> </div>
+<div class="line"><span class="lineno">  355</span>        <a class="code hl_variable" href="#a658586ee6b86457ccb13c49154918f78">cutMaster_to_cut_map</a>.clear();</div>
+<div class="line"><span class="lineno">  356</span>        indexCuts.clear();</div>
+<div class="line"><span class="lineno">  357</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> idx = 0; idx &lt; static_cast&lt;int&gt;(cuts.size()); ++idx) {</div>
+<div class="line"><span class="lineno">  358</span>            cuts[idx].id                        = idx;</div>
+<div class="line"><span class="lineno">  359</span>            <a class="code hl_variable" href="#a658586ee6b86457ccb13c49154918f78">cutMaster_to_cut_map</a>[cuts[idx].key] = idx;</div>
+<div class="line"><span class="lineno">  360</span>            indexCuts[cuts[idx].key].push_back(idx);</div>
+<div class="line"><span class="lineno">  361</span>        }</div>
+<div class="line"><span class="lineno">  362</span>        <a class="code hl_function" href="#a8551af14fd920b027955a0e5321b271a">updateActiveCuts</a>();</div>
+<div class="line"><span class="lineno">  363</span>    }</div>
 </div><!-- fragment --><div class="dynheader">
 Here is the call graph for this function:</div>
 <div class="dyncontent">
@@ -1635,16 +1708,16 @@ Here is the call graph for this function:</div>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="Cut_8h_source.html#l00294">294</a> of file <a class="el" href="Cut_8h_source.html">Cut.h</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  294</span>                 {</div>
-<div class="line"><span class="lineno">  295</span>        cuts.clear();</div>
-<div class="line"><span class="lineno">  296</span>        <a class="code hl_variable" href="#a658586ee6b86457ccb13c49154918f78">cutMaster_to_cut_map</a>.clear();</div>
-<div class="line"><span class="lineno">  297</span>        indexCuts.clear();</div>
-<div class="line"><span class="lineno">  298</span>        <a class="code hl_variable" href="#a9fa1b82e761a96d16f22638baad6871e">SRCDuals</a>.clear();</div>
-<div class="line"><span class="lineno">  299</span>        active_cuts.clear();</div>
-<div class="line"><span class="lineno">  300</span>        <a class="code hl_variable" href="#a473aac9ed7ffdff082ab9f94b8b6b04b">segment_masks</a>.precompute(active_cuts);</div>
-<div class="line"><span class="lineno">  301</span>        precomputeSRCNodeTables();</div>
-<div class="line"><span class="lineno">  302</span>    }</div>
+<p class="definition">Definition at line <a class="el" href="Cut_8h_source.html#l00307">307</a> of file <a class="el" href="Cut_8h_source.html">Cut.h</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  307</span>                 {</div>
+<div class="line"><span class="lineno">  308</span>        cuts.clear();</div>
+<div class="line"><span class="lineno">  309</span>        <a class="code hl_variable" href="#a658586ee6b86457ccb13c49154918f78">cutMaster_to_cut_map</a>.clear();</div>
+<div class="line"><span class="lineno">  310</span>        indexCuts.clear();</div>
+<div class="line"><span class="lineno">  311</span>        <a class="code hl_variable" href="#a9fa1b82e761a96d16f22638baad6871e">SRCDuals</a>.clear();</div>
+<div class="line"><span class="lineno">  312</span>        active_cuts.clear();</div>
+<div class="line"><span class="lineno">  313</span>        <a class="code hl_variable" href="#a473aac9ed7ffdff082ab9f94b8b6b04b">segment_masks</a>.precompute(active_cuts);</div>
+<div class="line"><span class="lineno">  314</span>        precomputeSRCNodeTables();</div>
+<div class="line"><span class="lineno">  315</span>    }</div>
 </div><!-- fragment -->
 </div>
 </div>
@@ -1671,11 +1744,11 @@ Here is the call graph for this function:</div>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="Cut_8h_source.html#l00353">353</a> of file <a class="el" href="Cut_8h_source.html">Cut.h</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  353</span>                                                  {</div>
-<div class="line"><span class="lineno">  354</span>        <a class="code hl_variable" href="#a9fa1b82e761a96d16f22638baad6871e">SRCDuals</a> = duals;</div>
-<div class="line"><span class="lineno">  355</span>        <a class="code hl_function" href="#a8551af14fd920b027955a0e5321b271a">updateActiveCuts</a>();</div>
-<div class="line"><span class="lineno">  356</span>    }</div>
+<p class="definition">Definition at line <a class="el" href="Cut_8h_source.html#l00366">366</a> of file <a class="el" href="Cut_8h_source.html">Cut.h</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  366</span>                                                  {</div>
+<div class="line"><span class="lineno">  367</span>        <a class="code hl_variable" href="#a9fa1b82e761a96d16f22638baad6871e">SRCDuals</a> = duals;</div>
+<div class="line"><span class="lineno">  368</span>        <a class="code hl_function" href="#a8551af14fd920b027955a0e5321b271a">updateActiveCuts</a>();</div>
+<div class="line"><span class="lineno">  369</span>    }</div>
 </div><!-- fragment --><div class="dynheader">
 Here is the call graph for this function:</div>
 <div class="dyncontent">
@@ -1712,8 +1785,8 @@ Here is the call graph for this function:</div>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="Cut_8h_source.html#l00371">371</a> of file <a class="el" href="Cut_8h_source.html">Cut.h</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  371</span>{ <span class="keywordflow">return</span> cuts.size(); }</div>
+<p class="definition">Definition at line <a class="el" href="Cut_8h_source.html#l00384">384</a> of file <a class="el" href="Cut_8h_source.html">Cut.h</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  384</span>{ <span class="keywordflow">return</span> cuts.size(); }</div>
 </div><!-- fragment -->
 </div>
 </div>
@@ -1744,15 +1817,15 @@ Here is the call graph for this function:</div>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="Cut_8h_source.html#l00571">571</a> of file <a class="el" href="Cut_8h_source.html">Cut.h</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  571</span>                                                                        {</div>
-<div class="line"><span class="lineno">  572</span>        <span class="keywordflow">for</span> (<span class="keyword">auto</span> &amp;cut : cuts) {</div>
-<div class="line"><span class="lineno">  573</span>            <span class="keywordflow">if</span> (cut.coefficients.size() == path_idx) {</div>
-<div class="line"><span class="lineno">  574</span>                cut.coefficients.push_back(<a class="code hl_function" href="#ae3c9d08a71c6e3e50586322a4cf74a02">computeLimitedMemoryCoefficient</a>(path.<a class="code hl_variable" href="structPath.html#aefc192566c08e16358f1f13e2f23a5a8">route</a>, cut));</div>
-<div class="line"><span class="lineno">  575</span>            }</div>
-<div class="line"><span class="lineno">  576</span>        }</div>
-<div class="line"><span class="lineno">  577</span>        <a class="code hl_variable" href="#aefbda068371d9c9047dd018cbdd1ffaa">latest_column</a> = <span class="keyword">static_cast&lt;</span><span class="keywordtype">int</span><span class="keyword">&gt;</span>(std::max&lt;size_t&gt;(<a class="code hl_variable" href="#aefbda068371d9c9047dd018cbdd1ffaa">latest_column</a>, path_idx + 1));</div>
-<div class="line"><span class="lineno">  578</span>    }</div>
+<p class="definition">Definition at line <a class="el" href="Cut_8h_source.html#l00584">584</a> of file <a class="el" href="Cut_8h_source.html">Cut.h</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  584</span>                                                                        {</div>
+<div class="line"><span class="lineno">  585</span>        <span class="keywordflow">for</span> (<span class="keyword">auto</span> &amp;cut : cuts) {</div>
+<div class="line"><span class="lineno">  586</span>            <span class="keywordflow">if</span> (cut.coefficients.size() == path_idx) {</div>
+<div class="line"><span class="lineno">  587</span>                cut.coefficients.push_back(<a class="code hl_function" href="#ae3c9d08a71c6e3e50586322a4cf74a02">computeLimitedMemoryCoefficient</a>(path.<a class="code hl_variable" href="structPath.html#aefc192566c08e16358f1f13e2f23a5a8">route</a>, cut));</div>
+<div class="line"><span class="lineno">  588</span>            }</div>
+<div class="line"><span class="lineno">  589</span>        }</div>
+<div class="line"><span class="lineno">  590</span>        <a class="code hl_variable" href="#aefbda068371d9c9047dd018cbdd1ffaa">latest_column</a> = <span class="keyword">static_cast&lt;</span><span class="keywordtype">int</span><span class="keyword">&gt;</span>(std::max&lt;size_t&gt;(<a class="code hl_variable" href="#aefbda068371d9c9047dd018cbdd1ffaa">latest_column</a>, path_idx + 1));</div>
+<div class="line"><span class="lineno">  591</span>    }</div>
 <div class="ttc" id="aclassCutStorage_html_aefbda068371d9c9047dd018cbdd1ffaa"><div class="ttname"><a href="#aefbda068371d9c9047dd018cbdd1ffaa">CutStorage::latest_column</a></div><div class="ttdeci">int latest_column</div><div class="ttdef"><b>Definition</b> <a href="Cut_8h_source.html#l00179">Cut.h:179</a></div></div>
 <div class="ttc" id="astructPath_html_aefc192566c08e16358f1f13e2f23a5a8"><div class="ttname"><a href="structPath.html#aefc192566c08e16358f1f13e2f23a5a8">Path::route</a></div><div class="ttdeci">std::vector&lt; uint16_t &gt; route</div><div class="ttdef"><b>Definition</b> <a href="Path_8h_source.html#l00023">Path.h:23</a></div></div>
 </div><!-- fragment --><div class="dynheader">
@@ -1791,12 +1864,12 @@ Here is the call graph for this function:</div>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="Cut_8h_source.html#l00835">835</a> of file <a class="el" href="Cut_8h_source.html">Cut.h</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  835</span>                            {</div>
-<div class="line"><span class="lineno">  836</span>        <span class="comment">// Increment epoch at each update call for aging</span></div>
-<div class="line"><span class="lineno">  837</span>        <a class="code hl_variable" href="#af72853f1b4437323e3ea1aa2202f1d91">current_epoch_</a>++;</div>
-<div class="line"><span class="lineno">  838</span>        updateActiveCutsProbabilistic();</div>
-<div class="line"><span class="lineno">  839</span>    }</div>
+<p class="definition">Definition at line <a class="el" href="Cut_8h_source.html#l00850">850</a> of file <a class="el" href="Cut_8h_source.html">Cut.h</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  850</span>                            {</div>
+<div class="line"><span class="lineno">  851</span>        <span class="comment">// Increment epoch at each update call for aging</span></div>
+<div class="line"><span class="lineno">  852</span>        <a class="code hl_variable" href="#af72853f1b4437323e3ea1aa2202f1d91">current_epoch_</a>++;</div>
+<div class="line"><span class="lineno">  853</span>        updateActiveCutsProbabilistic();</div>
+<div class="line"><span class="lineno">  854</span>    }</div>
 </div><!-- fragment -->
 </div>
 </div>
@@ -1823,51 +1896,51 @@ Here is the call graph for this function:</div>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="Cut_8h_source.html#l00848">848</a> of file <a class="el" href="Cut_8h_source.html">Cut.h</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  848</span>                                                  {</div>
-<div class="line"><span class="lineno">  849</span>        <span class="keyword">const</span> <span class="keyword">auto</span> active_cuts = <a class="code hl_function" href="#a5661b2dd9924180da3dd03cc2d63bd2c">getActiveCuts</a>();</div>
-<div class="line"><span class="lineno">  850</span> </div>
-<div class="line"><span class="lineno">  851</span>        <span class="keyword">const</span> <span class="keyword">auto</span> n_cuts = <a class="code hl_function" href="#a2f71dd47977fd6afeefd08cb629507a6">activeSize</a>();</div>
-<div class="line"><span class="lineno">  852</span> </div>
-<div class="line"><span class="lineno">  853</span>        <span class="keywordflow">for</span> (<span class="keyword">auto</span> label : labels) {</div>
-<div class="line"><span class="lineno">  854</span>            label-&gt;SRCmap.assign(n_cuts, 0);</div>
-<div class="line"><span class="lineno">  855</span>            <span class="keywordflow">if</span> (n_cuts == 0) <span class="keywordflow">continue</span>;</div>
-<div class="line"><span class="lineno">  856</span>            <span class="keywordtype">int</span> prev_node = -1;</div>
-<div class="line"><span class="lineno">  857</span>            <span class="keywordflow">for</span> (<span class="keyword">auto</span> node_id : label-&gt;getRoute()) {</div>
-<div class="line"><span class="lineno">  858</span>                <span class="keywordtype">double</span> total_cost_update = 0.0;</div>
-<div class="line"><span class="lineno">  859</span><span class="preprocessor">#if defined(SRC_MEMORY_MODE_ARC)</span></div>
-<div class="line"><span class="lineno">  860</span>                <span class="keywordflow">for</span> (<span class="keyword">const</span> <span class="keyword">auto</span> &amp;active_cut : active_cuts) {</div>
-<div class="line"><span class="lineno">  861</span>                    <span class="keyword">const</span> <span class="keyword">auto</span> &amp;cut           = *active_cut.cut_ptr;</div>
-<div class="line"><span class="lineno">  862</span>                    <span class="keyword">auto</span>       &amp;src_map_value = label-&gt;SRCmap[active_cut.index];</div>
-<div class="line"><span class="lineno">  863</span>                    <span class="keywordflow">if</span> (!cut.isSRCMemoryArc(prev_node, node_id)) { src_map_value = 0; }</div>
-<div class="line"><span class="lineno">  864</span>                    <span class="keywordflow">if</span> (cut.isSRCset(node_id)) {</div>
-<div class="line"><span class="lineno">  865</span>                        src_map_value += cut.srcMultiplier(node_id);</div>
-<div class="line"><span class="lineno">  866</span>                        <span class="keywordflow">if</span> (src_map_value &gt;= cut.p.den) {</div>
-<div class="line"><span class="lineno">  867</span>                            src_map_value -= cut.p.den;</div>
-<div class="line"><span class="lineno">  868</span>                            total_cost_update -= active_cut.dual_value;</div>
-<div class="line"><span class="lineno">  869</span>                        }</div>
-<div class="line"><span class="lineno">  870</span>                    }</div>
-<div class="line"><span class="lineno">  871</span>                }</div>
-<div class="line"><span class="lineno">  872</span><span class="preprocessor">#else</span></div>
-<div class="line"><span class="lineno">  873</span>                <span class="keywordflow">for</span> (<span class="keyword">const</span> <span class="keyword">auto</span> &amp;update : <a class="code hl_function" href="#a19ad077cc66a398cee24dd126dd42076">getSRCNodeUpdates</a>(node_id)) {</div>
-<div class="line"><span class="lineno">  874</span>                    <span class="keyword">auto</span> &amp;src_map_value = label-&gt;SRCmap[update.active_idx];</div>
-<div class="line"><span class="lineno">  875</span>                    src_map_value += update.add;</div>
-<div class="line"><span class="lineno">  876</span>                    <span class="keywordflow">if</span> (src_map_value &gt;= update.den) {</div>
-<div class="line"><span class="lineno">  877</span>                        src_map_value -= update.den;</div>
-<div class="line"><span class="lineno">  878</span>                        total_cost_update -= update.dual;</div>
-<div class="line"><span class="lineno">  879</span>                    }</div>
-<div class="line"><span class="lineno">  880</span>                }</div>
-<div class="line"><span class="lineno">  881</span> </div>
-<div class="line"><span class="lineno">  882</span>                <span class="keywordflow">for</span> (<span class="keyword">const</span> <span class="keyword">auto</span> active_idx : <a class="code hl_function" href="#a572ed2f52059f45f0598ed71c198b6e4">getSRCNodeClears</a>(node_id)) { label-&gt;SRCmap[active_idx] = 0; }</div>
-<div class="line"><span class="lineno">  883</span><span class="preprocessor">#endif</span></div>
-<div class="line"><span class="lineno">  884</span>                label-&gt;cost += total_cost_update;</div>
-<div class="line"><span class="lineno">  885</span>                prev_node = node_id;</div>
-<div class="line"><span class="lineno">  886</span>            }</div>
-<div class="line"><span class="lineno">  887</span>        }</div>
-<div class="line"><span class="lineno">  888</span>    }</div>
+<p class="definition">Definition at line <a class="el" href="Cut_8h_source.html#l00863">863</a> of file <a class="el" href="Cut_8h_source.html">Cut.h</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  863</span>                                                  {</div>
+<div class="line"><span class="lineno">  864</span>        <span class="keyword">const</span> <span class="keyword">auto</span> active_cuts = <a class="code hl_function" href="#a5661b2dd9924180da3dd03cc2d63bd2c">getActiveCuts</a>();</div>
+<div class="line"><span class="lineno">  865</span> </div>
+<div class="line"><span class="lineno">  866</span>        <span class="keyword">const</span> <span class="keyword">auto</span> n_cuts = <a class="code hl_function" href="#a2f71dd47977fd6afeefd08cb629507a6">activeSize</a>();</div>
+<div class="line"><span class="lineno">  867</span> </div>
+<div class="line"><span class="lineno">  868</span>        <span class="keywordflow">for</span> (<span class="keyword">auto</span> label : labels) {</div>
+<div class="line"><span class="lineno">  869</span>            label-&gt;SRCmap.assign(n_cuts, 0);</div>
+<div class="line"><span class="lineno">  870</span>            <span class="keywordflow">if</span> (n_cuts == 0) <span class="keywordflow">continue</span>;</div>
+<div class="line"><span class="lineno">  871</span>            <span class="keywordtype">int</span> prev_node = -1;</div>
+<div class="line"><span class="lineno">  872</span>            <span class="keywordflow">for</span> (<span class="keyword">auto</span> node_id : label-&gt;getRoute()) {</div>
+<div class="line"><span class="lineno">  873</span>                <span class="keywordtype">double</span> total_cost_update = 0.0;</div>
+<div class="line"><span class="lineno">  874</span><span class="preprocessor">#if defined(SRC_MEMORY_MODE_ARC)</span></div>
+<div class="line"><span class="lineno">  875</span>                <span class="keywordflow">for</span> (<span class="keyword">const</span> <span class="keyword">auto</span> &amp;active_cut : active_cuts) {</div>
+<div class="line"><span class="lineno">  876</span>                    <span class="keyword">const</span> <span class="keyword">auto</span> &amp;cut           = *active_cut.cut_ptr;</div>
+<div class="line"><span class="lineno">  877</span>                    <span class="keyword">auto</span>        src_map_value = label-&gt;SRCmap[active_cut.index];</div>
+<div class="line"><span class="lineno">  878</span>                    <span class="keywordflow">if</span> (!cut.isSRCMemoryArc(prev_node, node_id)) { src_map_value = 0; }</div>
+<div class="line"><span class="lineno">  879</span>                    <span class="keywordflow">if</span> (cut.isSRCset(node_id)) {</div>
+<div class="line"><span class="lineno">  880</span>                        src_map_value += cut.srcMultiplier(node_id);</div>
+<div class="line"><span class="lineno">  881</span>                        <span class="keywordflow">if</span> (src_map_value &gt;= cut.p.den) {</div>
+<div class="line"><span class="lineno">  882</span>                            src_map_value -= cut.p.den;</div>
+<div class="line"><span class="lineno">  883</span>                            total_cost_update -= active_cut.dual_value;</div>
+<div class="line"><span class="lineno">  884</span>                        }</div>
+<div class="line"><span class="lineno">  885</span>                    }</div>
+<div class="line"><span class="lineno">  886</span>                }</div>
+<div class="line"><span class="lineno">  887</span><span class="preprocessor">#else</span></div>
+<div class="line"><span class="lineno">  888</span>                <span class="keywordflow">for</span> (<span class="keyword">const</span> <span class="keyword">auto</span> &amp;update : <a class="code hl_function" href="#a19ad077cc66a398cee24dd126dd42076">getSRCNodeUpdates</a>(node_id)) {</div>
+<div class="line"><span class="lineno">  889</span>                    <span class="keyword">auto</span> src_map_value = label-&gt;SRCmap[update.active_idx];</div>
+<div class="line"><span class="lineno">  890</span>                    src_map_value += update.add;</div>
+<div class="line"><span class="lineno">  891</span>                    <span class="keywordflow">if</span> (src_map_value &gt;= update.den) {</div>
+<div class="line"><span class="lineno">  892</span>                        src_map_value -= update.den;</div>
+<div class="line"><span class="lineno">  893</span>                        total_cost_update -= update.dual;</div>
+<div class="line"><span class="lineno">  894</span>                    }</div>
+<div class="line"><span class="lineno">  895</span>                }</div>
+<div class="line"><span class="lineno">  896</span> </div>
+<div class="line"><span class="lineno">  897</span>                <span class="keywordflow">for</span> (<span class="keyword">const</span> <span class="keyword">auto</span> active_idx : <a class="code hl_function" href="#a572ed2f52059f45f0598ed71c198b6e4">getSRCNodeClears</a>(node_id)) { label-&gt;SRCmap[active_idx] = 0; }</div>
+<div class="line"><span class="lineno">  898</span><span class="preprocessor">#endif</span></div>
+<div class="line"><span class="lineno">  899</span>                label-&gt;cost += total_cost_update;</div>
+<div class="line"><span class="lineno">  900</span>                prev_node = node_id;</div>
+<div class="line"><span class="lineno">  901</span>            }</div>
+<div class="line"><span class="lineno">  902</span>        }</div>
+<div class="line"><span class="lineno">  903</span>    }</div>
 <div class="ttc" id="aclassCutStorage_html_a19ad077cc66a398cee24dd126dd42076"><div class="ttname"><a href="#a19ad077cc66a398cee24dd126dd42076">CutStorage::getSRCNodeUpdates</a></div><div class="ttdeci">const auto &amp; getSRCNodeUpdates(int node_id) const noexcept</div><div class="ttdef"><b>Definition</b> <a href="Cut_8h_source.html#l00281">Cut.h:281</a></div></div>
-<div class="ttc" id="aclassCutStorage_html_a2f71dd47977fd6afeefd08cb629507a6"><div class="ttname"><a href="#a2f71dd47977fd6afeefd08cb629507a6">CutStorage::activeSize</a></div><div class="ttdeci">size_t activeSize() const noexcept</div><div class="ttdef"><b>Definition</b> <a href="Cut_8h_source.html#l00372">Cut.h:372</a></div></div>
-<div class="ttc" id="aclassCutStorage_html_a5661b2dd9924180da3dd03cc2d63bd2c"><div class="ttname"><a href="#a5661b2dd9924180da3dd03cc2d63bd2c">CutStorage::getActiveCuts</a></div><div class="ttdeci">std::span&lt; const ActiveCutInfo &gt; getActiveCuts() const noexcept</div><div class="ttdef"><b>Definition</b> <a href="Cut_8h_source.html#l00309">Cut.h:309</a></div></div>
+<div class="ttc" id="aclassCutStorage_html_a2f71dd47977fd6afeefd08cb629507a6"><div class="ttname"><a href="#a2f71dd47977fd6afeefd08cb629507a6">CutStorage::activeSize</a></div><div class="ttdeci">size_t activeSize() const noexcept</div><div class="ttdef"><b>Definition</b> <a href="Cut_8h_source.html#l00385">Cut.h:385</a></div></div>
+<div class="ttc" id="aclassCutStorage_html_a5661b2dd9924180da3dd03cc2d63bd2c"><div class="ttname"><a href="#a5661b2dd9924180da3dd03cc2d63bd2c">CutStorage::getActiveCuts</a></div><div class="ttdeci">std::span&lt; const ActiveCutInfo &gt; getActiveCuts() const noexcept</div><div class="ttdef"><b>Definition</b> <a href="Cut_8h_source.html#l00322">Cut.h:322</a></div></div>
 <div class="ttc" id="aclassCutStorage_html_a572ed2f52059f45f0598ed71c198b6e4"><div class="ttname"><a href="#a572ed2f52059f45f0598ed71c198b6e4">CutStorage::getSRCNodeClears</a></div><div class="ttdeci">const auto &amp; getSRCNodeClears(int node_id) const noexcept</div><div class="ttdef"><b>Definition</b> <a href="Cut_8h_source.html#l00282">Cut.h:282</a></div></div>
 </div><!-- fragment --><div class="dynheader">
 Here is the call graph for this function:</div>
@@ -1909,7 +1982,7 @@ Here is the call graph for this function:</div>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="Cut_8h_source.html#l00602">602</a> of file <a class="el" href="Cut_8h_source.html">Cut.h</a>.</p>
+<p class="definition">Definition at line <a class="el" href="Cut_8h_source.html#l00615">615</a> of file <a class="el" href="Cut_8h_source.html">Cut.h</a>.</p>
 
 </div>
 </div>
@@ -1941,7 +2014,7 @@ Here is the call graph for this function:</div>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="Cut_8h_source.html#l00601">601</a> of file <a class="el" href="Cut_8h_source.html">Cut.h</a>.</p>
+<p class="definition">Definition at line <a class="el" href="Cut_8h_source.html#l00614">614</a> of file <a class="el" href="Cut_8h_source.html">Cut.h</a>.</p>
 
 </div>
 </div>
@@ -1957,7 +2030,7 @@ Here is the call graph for this function:</div>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="Cut_8h_source.html#l00597">597</a> of file <a class="el" href="Cut_8h_source.html">Cut.h</a>.</p>
+<p class="definition">Definition at line <a class="el" href="Cut_8h_source.html#l00610">610</a> of file <a class="el" href="Cut_8h_source.html">Cut.h</a>.</p>
 
 </div>
 </div>
@@ -1973,7 +2046,7 @@ Here is the call graph for this function:</div>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="Cut_8h_source.html#l00603">603</a> of file <a class="el" href="Cut_8h_source.html">Cut.h</a>.</p>
+<p class="definition">Definition at line <a class="el" href="Cut_8h_source.html#l00616">616</a> of file <a class="el" href="Cut_8h_source.html">Cut.h</a>.</p>
 
 </div>
 </div>
@@ -2005,7 +2078,39 @@ Here is the call graph for this function:</div>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="Cut_8h_source.html#l00600">600</a> of file <a class="el" href="Cut_8h_source.html">Cut.h</a>.</p>
+<p class="definition">Definition at line <a class="el" href="Cut_8h_source.html#l00613">613</a> of file <a class="el" href="Cut_8h_source.html">Cut.h</a>.</p>
+
+</div>
+</div>
+<a id="ac726ebf88b3630c8bed8717506e00e1b" name="ac726ebf88b3630c8bed8717506e00e1b"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#ac726ebf88b3630c8bed8717506e00e1b">&#9670;&#160;</a></span>round_new_cut_limit_</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">size_t CutStorage::round_new_cut_limit_ = std::numeric_limits&lt;size_t&gt;::max()</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p class="definition">Definition at line <a class="el" href="Cut_8h_source.html#l00618">618</a> of file <a class="el" href="Cut_8h_source.html">Cut.h</a>.</p>
+
+</div>
+</div>
+<a id="a98050d41c191d9555038e5d4e8905465" name="a98050d41c191d9555038e5d4e8905465"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a98050d41c191d9555038e5d4e8905465">&#9670;&#160;</a></span>round_new_cuts_accepted_</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">size_t CutStorage::round_new_cuts_accepted_ = 0</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p class="definition">Definition at line <a class="el" href="Cut_8h_source.html#l00619">619</a> of file <a class="el" href="Cut_8h_source.html">Cut.h</a>.</p>
 
 </div>
 </div>
@@ -2037,7 +2142,7 @@ Here is the call graph for this function:</div>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="Cut_8h_source.html#l00604">604</a> of file <a class="el" href="Cut_8h_source.html">Cut.h</a>.</p>
+<p class="definition">Definition at line <a class="el" href="Cut_8h_source.html#l00617">617</a> of file <a class="el" href="Cut_8h_source.html">Cut.h</a>.</p>
 
 </div>
 </div>
@@ -2077,7 +2182,7 @@ Here is the call graph for this function:</div>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="Cut_8h_source.html#l00596">596</a> of file <a class="el" href="Cut_8h_source.html">Cut.h</a>.</p>
+<p class="definition">Definition at line <a class="el" href="Cut_8h_source.html#l00609">609</a> of file <a class="el" href="Cut_8h_source.html">Cut.h</a>.</p>
 
 </div>
 </div>

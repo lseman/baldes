@@ -13,6 +13,7 @@ var structSparseMatrix =
     [ "copyCRSToCOO", "structSparseMatrix.html#a2f3ea472baced8db64b3257b42147778", null ],
     [ "delete_column", "structSparseMatrix.html#a0258596fb5ba12281547a708a7212126", null ],
     [ "delete_row", "structSparseMatrix.html#ac25e8f241cd1de61244dcff74c474799", null ],
+    [ "ensure_dims", "structSparseMatrix.html#a160e66311608b5ed8e490cac6e9db40d", null ],
     [ "get_row_values", "structSparseMatrix.html#a8375df7432416b456ea3654a78d03c52", null ],
     [ "getIndices", "structSparseMatrix.html#ab1f2c3b353c77c220f6a10f40017123f", null ],
     [ "getRowStart", "structSparseMatrix.html#af31405028c6888168d33185b265b73f6", null ],

@@ -12,12 +12,14 @@ var searchData=
   ['vertex_5froute_5fmap_9',['vertex_route_map',['../classHighRankCuts.html#a8bca70b6432f72518ccc5300e261a953',1,'HighRankCuts::vertex_route_map'],['../classLimitedMemoryRank1Cuts.html#a7a1263ac9b8e29ebfda3deaad281fa6b',1,'LimitedMemoryRank1Cuts::vertex_route_map']]],
   ['violation_10',['violation',['../structCandidateSet.html#acc7e4feb57c863ad5fc9a649fdf495c7',1,'CandidateSet::violation'],['../structCachedCut.html#aabf9e29e74ba4bc71be4cf54b1bd1e9d',1,'CachedCut::violation']]],
   ['virtual_5fsplit_5findex_11',['virtual_split_index',['../structBucket.html#a9e64195296b82e64703a06279ab25ccf',1,'Bucket']]],
-  ['visited_5fbitmap_12',['visited_bitmap',['../structLabel.html#ac020ce84080430f28f2b2651be338693',1,'Label']]],
+  ['visited_5fbitmap_12',['visited_bitmap',['../structLabel.html#ac5629d8044403e1ba299dbffb0e49247',1,'Label']]],
   ['visited_5fbuckets_13',['visited_buckets',['../structBucketGraph_1_1ConcatenationScratch.html#a0fb5776e3a77701a9af4a9ca99af3648',1,'BucketGraph::ConcatenationScratch']]],
-  ['visited_5fsignatures_14',['visited_signatures',['../structBucketLabelSoAView.html#a82777bedf15aa3e9c45046054ac80c69',1,'BucketLabelSoAView']]],
-  ['vivid_5fblue_15',['vivid_blue',['../Definitions_8h.html#a1e48b1ee46ba0e40480f0c2a17e1880d',1,'Definitions.h']]],
-  ['vivid_5fgreen_16',['vivid_green',['../Definitions_8h.html#a4de8d8c985a81b8536b327b9ca34aa7d',1,'Definitions.h']]],
-  ['vivid_5fred_17',['vivid_red',['../Definitions_8h.html#a2dfb84f92b45f8969e9384eb90f00d71',1,'Definitions.h']]],
-  ['vivid_5fyellow_18',['vivid_yellow',['../Definitions_8h.html#a3444494fac99acea552cb20f99b8adee',1,'Definitions.h']]],
-  ['vtype_19',['vtype',['../structModelData.html#a617566304500e8a29923bbffdf372f42',1,'ModelData::vtype'],['../classPreprocessor.html#ae24676d6e738106d619015c6bdc394b1',1,'Preprocessor::vtype']]]
+  ['visited_5fsignature_14',['visited_signature',['../structBucketLabelCacheEntry.html#a186f3a27c2c4cc04fe9953261ebee41a',1,'BucketLabelCacheEntry']]],
+  ['visited_5fsignatures_15',['visited_signatures',['../structBucketLabelSoAView.html#a82777bedf15aa3e9c45046054ac80c69',1,'BucketLabelSoAView']]],
+  ['visited_5fwords_16',['visited_words',['../structBucketLabelSoAView.html#a407cb9c942e808e9d886208a9d6a8450',1,'BucketLabelSoAView::visited_words'],['../structBucketLabelCacheEntry.html#a27d8f6e0aac3e1c63d2ecdcc63430c91',1,'BucketLabelCacheEntry::visited_words']]],
+  ['vivid_5fblue_17',['vivid_blue',['../Definitions_8h.html#a1e48b1ee46ba0e40480f0c2a17e1880d',1,'Definitions.h']]],
+  ['vivid_5fgreen_18',['vivid_green',['../Definitions_8h.html#a4de8d8c985a81b8536b327b9ca34aa7d',1,'Definitions.h']]],
+  ['vivid_5fred_19',['vivid_red',['../Definitions_8h.html#a2dfb84f92b45f8969e9384eb90f00d71',1,'Definitions.h']]],
+  ['vivid_5fyellow_20',['vivid_yellow',['../Definitions_8h.html#a3444494fac99acea552cb20f99b8adee',1,'Definitions.h']]],
+  ['vtype_21',['vtype',['../structModelData.html#a617566304500e8a29923bbffdf372f42',1,'ModelData::vtype'],['../classPreprocessor.html#ae24676d6e738106d619015c6bdc394b1',1,'Preprocessor::vtype']]]
 ];

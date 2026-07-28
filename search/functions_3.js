@@ -62,7 +62,7 @@ var searchData=
   ['concatenate_5fpricing_5fpass_59',['concatenate_pricing_pass',['../classBucketGraph.html#a2f52342c152fe3266985d72ff25915e8',1,'BucketGraph']]],
   ['considerregenerate_60',['considerRegenerate',['../classBucketGraph.html#a7802fb7a8768baf8001cd3f35db9db75',1,'BucketGraph']]],
   ['constraint_5fexists_61',['constraint_exists',['../classMIPProblem.html#ae21d64436d178848ddbbbe44f2a3a803',1,'MIPProblem']]],
-  ['contains_62',['contains',['../structPath.html#a8aaa96eee0314e158f2dc9aa05850639',1,'Path::contains()'],['../classTreeNode.html#ae56d33fb670a7ceea8ee5ec120ea2871',1,'TreeNode::contains()'],['../structBucket.html#ac44f75181a26deab4ea28f266ebd9e64',1,'Bucket::contains()']]],
+  ['contains_62',['contains',['../structPath.html#a8aaa96eee0314e158f2dc9aa05850639',1,'Path::contains()'],['../structBucket.html#ac44f75181a26deab4ea28f266ebd9e64',1,'Bucket::contains()']]],
   ['convert2knapsack_63',['convert2Knapsack',['../classPreprocessor.html#a4ffbbc1d87daaa906841bb8436979f75',1,'Preprocessor']]],
   ['convert2le_64',['convert2LE',['../classPreprocessor.html#afe50cda7db2a25c596eda916d5a1098b',1,'Preprocessor']]],
   ['convert_5fto_5fstandard_5fform_65',['convert_to_standard_form',['../classIPSolver.html#a2651221065511beedd53613296aaddcb',1,'IPSolver']]],

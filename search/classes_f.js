@@ -13,10 +13,9 @@ var searchData=
   ['sparsematrix_3c_20scalar_2c_20colmajor_2c_20storageindex_20_3e_10',['SparseMatrix&lt; Scalar, ColMajor, StorageIndex &gt;',['../structSparseMatrix.html',1,'']]],
   ['sparsesolver_11',['SparseSolver',['../classSparseSolver.html',1,'']]],
   ['sparsesolvetriangular_12',['SparseSolveTriangular',['../structEigen_1_1CustomSimplicialLDLT_1_1SparseSolveTriangular.html',1,'Eigen::CustomSimplicialLDLT&lt; MatrixType_, UpLo_, Ordering_ &gt;::SparseSolveTriangular&lt; Lhs, Rhs, Mode, IsLower, IsRowMajor &gt;'],['../structSparseSolveTriangular.html',1,'SparseSolveTriangular&lt; Lhs, Rhs, Mode, IsLower, IsRowMajor &gt;']]],
-  ['splaytree_13',['SplayTree',['../classSplayTree.html',1,'']]],
-  ['splicestate_14',['SpliceState',['../structBucketGraph_1_1SpliceState.html',1,'BucketGraph']]],
-  ['srcnodeupdate_15',['SRCNodeUpdate',['../structCutStorage_1_1SRCNodeUpdate.html',1,'CutStorage']]],
-  ['srcpermutation_16',['SRCPermutation',['../structSRCPermutation.html',1,'']]],
-  ['stabilization_17',['Stabilization',['../classStabilization.html',1,'']]],
-  ['supernodal_18',['Supernodal',['../classSupernodal.html',1,'']]]
+  ['splicestate_13',['SpliceState',['../structBucketGraph_1_1SpliceState.html',1,'BucketGraph']]],
+  ['srcnodeupdate_14',['SRCNodeUpdate',['../structCutStorage_1_1SRCNodeUpdate.html',1,'CutStorage']]],
+  ['srcpermutation_15',['SRCPermutation',['../structSRCPermutation.html',1,'']]],
+  ['stabilization_16',['Stabilization',['../classStabilization.html',1,'']]],
+  ['supernodal_17',['Supernodal',['../classSupernodal.html',1,'']]]
 ];

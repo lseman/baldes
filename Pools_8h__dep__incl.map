@@ -1,13 +1,13 @@
 <map id="Pools.h" name="Pools.h">
-<area shape="rect" id="Node000001" title="Defines classes to manage pools of paths and labels." alt="" coords="690,5,754,31"/>
+<area shape="rect" id="Node000001" title="Defines classes to manage pools of paths and labels." alt="" coords="699,5,764,31"/>
 <area shape="rect" id="Node000002" href="$BucketGraph_8h.html" title="Defines the BucketGraph class and its bucket&#45;based VRP labeling functionality." alt="" coords="366,79,473,105"/>
-<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="676,33,472,81,471,76,674,28"/>
-<area shape="rect" id="Node000020" href="$SRC_8h.html" title="Defines limited memory rank&#45;1 cut handling for VRPTW." alt="" coords="821,153,879,178"/>
-<area shape="poly" id="edge39_Node000001_Node000020" title=" " alt="" coords="710,46,701,75,702,90,707,103,725,117,754,131,821,154,820,159,752,136,722,122,703,106,697,91,696,75,705,44"/>
-<area shape="rect" id="Node000028" href="$Dominance_8h.html" title=" " alt="" coords="717,79,813,105"/>
-<area shape="poly" id="edge38_Node000001_Node000028" title=" " alt="" coords="739,43,760,77,755,80,735,46"/>
-<area shape="rect" id="Node000029" href="$Stabilization_8h.html" title="Defines the Stabilization class for dual stabilization in column." alt="" coords="837,79,938,105"/>
-<area shape="poly" id="edge40_Node000001_Node000029" title=" " alt="" coords="765,35,860,76,858,81,763,40"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="685,33,473,81,472,76,684,28"/>
+<area shape="rect" id="Node000019" href="$Rank1Cuts_8h.html" title="Defines limited memory rank&#45;1 cut handling for VRPTW." alt="" coords="821,153,917,178"/>
+<area shape="poly" id="edge39_Node000001_Node000019" title=" " alt="" coords="719,46,711,75,711,90,716,103,732,116,758,128,822,150,820,155,756,133,729,120,712,106,706,91,705,75,714,44"/>
+<area shape="rect" id="Node000028" href="$Dominance_8h.html" title=" " alt="" coords="726,79,822,105"/>
+<area shape="poly" id="edge38_Node000001_Node000028" title=" " alt="" coords="749,43,769,77,765,80,744,46"/>
+<area shape="rect" id="Node000029" href="$Stabilization_8h.html" title="Defines the Stabilization class for dual stabilization in column." alt="" coords="846,79,948,105"/>
+<area shape="poly" id="edge40_Node000001_Node000029" title=" " alt="" coords="774,35,870,76,868,81,772,40"/>
 <area shape="rect" id="Node000003" href="$ArcElimination_8h.html" title=" " alt="" coords="457,153,571,178"/>
 <area shape="poly" id="edge2_Node000002_Node000003" title=" " alt="" coords="450,112,500,150,497,154,446,117"/>
 <area shape="rect" id="Node000005" href="$BucketBindings_8cpp.html" title="Python bindings for the BucketGraph, VRPNode, Label, PSTEPDuals, and." alt="" coords="462,374,598,399"/>
@@ -26,9 +26,9 @@
 <area shape="poly" id="edge21_Node000002_Node000017" title=" " alt="" coords="352,111,313,128,279,154,268,172,260,191,255,226,249,225,255,190,263,169,275,151,310,123,350,106"/>
 <area shape="rect" id="Node000018" href="$PricingState_8h.html" title=" " alt="" coords="732,300,835,326"/>
 <area shape="poly" id="edge24_Node000002_Node000018" title=" " alt="" coords="489,94,561,100,639,111,708,127,735,138,753,151,767,168,777,187,788,230,790,270,788,300,783,299,785,270,782,230,772,189,763,171,750,155,732,143,706,132,638,116,561,105,488,99"/>
-<area shape="rect" id="Node000019" href="$Resources_8h.html" title=" " alt="" coords="289,153,382,178"/>
-<area shape="poly" id="edge26_Node000002_Node000019" title=" " alt="" coords="396,117,351,154,348,150,392,113"/>
-<area shape="poly" id="edge28_Node000002_Node000020" title=" " alt="" coords="489,100,634,121,803,150,821,154,820,159,802,155,633,126,488,105"/>
+<area shape="poly" id="edge26_Node000002_Node000019" title=" " alt="" coords="489,101,803,150,821,153,820,158,802,155,488,106"/>
+<area shape="rect" id="Node000026" href="$Resources_8h.html" title=" " alt="" coords="289,153,382,178"/>
+<area shape="poly" id="edge33_Node000002_Node000026" title=" " alt="" coords="396,117,351,154,348,150,392,113"/>
 <area shape="rect" id="Node000027" href="$Topology_8h.html" title=" " alt="" coords="362,226,445,252"/>
 <area shape="poly" id="edge35_Node000002_Node000027" title=" " alt="" coords="419,120,408,226,402,226,414,120"/>
 <area shape="rect" id="Node000004" href="$Labeling_8h.html" title=" " alt="" coords="311,300,392,326"/>
@@ -49,14 +49,14 @@
 <area shape="poly" id="edge20_Node000016_Node000004" title=" " alt="" coords="192,255,317,297,315,302,190,260"/>
 <area shape="poly" id="edge22_Node000017_Node000004" title=" " alt="" coords="282,259,336,297,333,302,279,263"/>
 <area shape="poly" id="edge25_Node000018_Node000008" title=" " alt="" coords="758,338,712,375,709,371,755,334"/>
-<area shape="poly" id="edge27_Node000019_Node000004" title=" " alt="" coords="341,193,353,299,348,300,336,194"/>
-<area shape="poly" id="edge29_Node000020_Node000004" title=" " alt="" coords="808,186,716,219,607,255,491,285,393,306,392,301,489,279,606,249,714,214,806,181"/>
-<area shape="poly" id="edge34_Node000020_Node000014" title=" " alt="" coords="806,180,596,231,594,226,805,175"/>
-<area shape="rect" id="Node000021" href="$Node_8h.html" title="Node class implementation." alt="" coords="840,226,903,252"/>
-<area shape="poly" id="edge30_Node000020_Node000021" title=" " alt="" coords="861,192,871,225,865,227,856,194"/>
-<area shape="rect" id="Node000025" href="$SRC_8cpp.html" title="Implementation of functions and classes for solving VRP problems using." alt="" coords="909,300,981,326"/>
-<area shape="poly" id="edge33_Node000020_Node000025" title=" " alt="" coords="881,186,899,204,917,225,935,264,945,299,940,300,930,266,912,228,896,208,877,190"/>
-<area shape="poly" id="edge32_Node000021_Node000008" title=" " alt="" coords="872,268,865,299,848,327,825,347,799,362,746,380,744,375,797,357,822,343,844,324,860,297,867,267"/>
-<area shape="poly" id="edge31_Node000021_Node000025" title=" " alt="" coords="897,261,934,298,931,301,893,265"/>
+<area shape="poly" id="edge27_Node000019_Node000004" title=" " alt="" coords="821,186,723,219,607,255,491,284,393,306,391,301,489,279,606,249,721,214,820,181"/>
+<area shape="poly" id="edge32_Node000019_Node000014" title=" " alt="" coords="807,184,596,232,595,227,805,179"/>
+<area shape="rect" id="Node000020" href="$Node_8h.html" title="Node class implementation." alt="" coords="840,226,903,252"/>
+<area shape="poly" id="edge28_Node000019_Node000020" title=" " alt="" coords="873,194,874,226,868,226,867,194"/>
+<area shape="rect" id="Node000024" href="$SRC_8cpp.html" title="Implementation of functions and classes for solving VRP problems using." alt="" coords="909,300,981,326"/>
+<area shape="poly" id="edge31_Node000019_Node000024" title=" " alt="" coords="892,189,917,225,934,265,944,299,939,300,929,267,912,228,887,192"/>
+<area shape="poly" id="edge30_Node000020_Node000008" title=" " alt="" coords="872,268,865,299,848,327,825,347,799,362,746,380,744,375,797,357,822,343,844,324,860,297,867,267"/>
+<area shape="poly" id="edge29_Node000020_Node000024" title=" " alt="" coords="897,261,934,298,931,301,893,265"/>
+<area shape="poly" id="edge34_Node000026_Node000004" title=" " alt="" coords="341,193,353,299,348,300,336,194"/>
 <area shape="poly" id="edge36_Node000027_Node000004" title=" " alt="" coords="388,266,363,301,358,298,384,263"/>
 </map>

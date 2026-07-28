@@ -1,5 +1,11 @@
 <map id="BucketGraph::capture_warm_start_labels" name="BucketGraph::capture_warm_start_labels">
-<area shape="rect" id="Node000001" title=" " alt="" coords="5,5,152,46"/>
-<area shape="rect" id="Node000002" href="$classBucketGraph.html#af129eff306551dc7cc7fe00b919bbbd0" title="Assigns the buckets based on the specified direction." alt="" coords="200,5,341,46"/>
-<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="152,23,184,23,184,28,152,28"/>
+<area shape="rect" id="Node000001" title=" " alt="" coords="5,35,152,75"/>
+<area shape="rect" id="Node000002" href="$classBucketGraph.html#af129eff306551dc7cc7fe00b919bbbd0" title="Assigns the buckets based on the specified direction." alt="" coords="207,5,348,46"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="152,42,191,36,192,41,153,47"/>
+<area shape="rect" id="Node000003" href="$structLabel.html#a8fb896b033f65ec802f71301eedd8fa4" title=" " alt="" coords="200,70,355,96"/>
+<area shape="poly" id="edge2_Node000001_Node000003" title=" " alt="" coords="153,63,185,67,184,73,152,68"/>
+<area shape="rect" id="Node000004" href="$structLabel.html#a384585ffaf7cdfd2c142d3b4524bf39e" title=" " alt="" coords="403,45,514,70"/>
+<area shape="poly" id="edge3_Node000003_Node000004" title=" " alt="" coords="355,69,387,65,388,70,356,75"/>
+<area shape="rect" id="Node000005" href="$structLabel.html#a0a48c18a2d05ad71c93ed9220c017e25" title=" " alt="" coords="413,94,504,120"/>
+<area shape="poly" id="edge4_Node000003_Node000005" title=" " alt="" coords="356,91,398,96,397,102,355,96"/>
 </map>

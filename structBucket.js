@@ -65,6 +65,7 @@ var structBucket =
     [ "soa_resources", "structBucket.html#a14691ddd50efecef28614650d7dd0e5a", null ],
     [ "soa_valid", "structBucket.html#a06ff99eaff2ca5c2d169e57ef8c1f0fc", null ],
     [ "soa_visited_signatures", "structBucket.html#a69f4dd0a55d81081fda97366b97a31a4", null ],
+    [ "soa_visited_words", "structBucket.html#a9643caab84441d17a479fc7f02434096", null ],
     [ "sub_buckets", "structBucket.html#a8472b98e08c247ccb2db77b2d013ca20", null ],
     [ "ub", "structBucket.html#abdd01178ab43ad827fec4c50781f5956", null ],
     [ "virtual_split_index", "structBucket.html#a9e64195296b82e64703a06279ab25ccf", null ]

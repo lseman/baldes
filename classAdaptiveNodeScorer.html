@@ -122,7 +122,7 @@ document.addEventListener('DOMContentLoaded',() => { initNavTree('classAdaptiveN
 </div><!--header-->
 <div class="contents">
 
-<p><code>#include &lt;<a class="el" href="CutIntelligence_8h_source.html">CutIntelligence.h</a>&gt;</code></p>
+<p><code>#include &lt;<a class="el" href="Intelligence_8h_source.html">Intelligence.h</a>&gt;</code></p>
 <table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 id="header-pub-methods" class="groupheader"><a id="pub-methods" name="pub-methods"></a>
 Public Member Functions</h2></td></tr>
@@ -131,7 +131,7 @@ Public Member Functions</h2></td></tr>
 </table>
 <a name="details" id="details"></a><h2 id="header-details" class="groupheader">Detailed Description</h2>
 <div class="textblock">
-<p class="definition">Definition at line <a class="el" href="CutIntelligence_8h_source.html#l00304">304</a> of file <a class="el" href="CutIntelligence_8h_source.html">CutIntelligence.h</a>.</p>
+<p class="definition">Definition at line <a class="el" href="Intelligence_8h_source.html#l00304">304</a> of file <a class="el" href="Intelligence_8h_source.html">Intelligence.h</a>.</p>
 </div><a name="doc-func-members" id="doc-func-members"></a><h2 id="header-doc-func-members" class="groupheader">Member Function Documentation</h2>
 <a id="ac97c39c7cf5dc85fdadf76cbd622a175" name="ac97c39c7cf5dc85fdadf76cbd622a175"></a>
 <h2 class="memtitle"><span class="permalink"><a href="#ac97c39c7cf5dc85fdadf76cbd622a175">&#9670;&#160;</a></span>computeNodeScores()</h2>
@@ -180,7 +180,7 @@ Public Member Functions</h2></td></tr>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="CutIntelligence_8h_source.html#l00388">388</a> of file <a class="el" href="CutIntelligence_8h_source.html">CutIntelligence.h</a>.</p>
+<p class="definition">Definition at line <a class="el" href="Intelligence_8h_source.html#l00388">388</a> of file <a class="el" href="Intelligence_8h_source.html">Intelligence.h</a>.</p>
 <div class="fragment"><div class="line"><span class="lineno">  391</span>                                                                                        {</div>
 <div class="line"><span class="lineno">  392</span>        std::vector&lt;std::vector&lt;NodeScore&gt;&gt; scores(N_SIZE);</div>
 <div class="line"><span class="lineno">  393</span>        <span class="keyword">const</span> <span class="keyword">auto</span>                         &amp;active_cuts = cutStorage.<a class="code hl_function" href="classCutStorage.html#a5661b2dd9924180da3dd03cc2d63bd2c">getActiveCuts</a>();</div>
@@ -252,7 +252,7 @@ Public Member Functions</h2></td></tr>
 <div class="line"><span class="lineno">  459</span>            <span class="comment">// Sort candidates for vertex i by score (lowest scores are best).</span></div>
 <div class="line"><span class="lineno">  460</span>            std::partial_sort(</div>
 <div class="line"><span class="lineno">  461</span>                node_scores.begin(),</div>
-<div class="line"><span class="lineno">  462</span>                node_scores.begin() + std::min(<a class="code hl_variable" href="CutIntelligence_8h.html#ad24d37bbf5801d62eec5b2423ee66e94">MAX_CANDIDATES_PER_NODE</a>, <span class="keyword">static_cast&lt;</span><span class="keywordtype">int</span><span class="keyword">&gt;</span>(node_scores.size())),</div>
+<div class="line"><span class="lineno">  462</span>                node_scores.begin() + std::min(<a class="code hl_variable" href="Intelligence_8h.html#ad24d37bbf5801d62eec5b2423ee66e94">MAX_CANDIDATES_PER_NODE</a>, <span class="keyword">static_cast&lt;</span><span class="keywordtype">int</span><span class="keyword">&gt;</span>(node_scores.size())),</div>
 <div class="line"><span class="lineno">  463</span>                node_scores.end(), [](<span class="keyword">const</span> <span class="keyword">auto</span> &amp;a, <span class="keyword">const</span> <span class="keyword">auto</span> &amp;b) { return a.cost_score &lt; b.cost_score; });</div>
 <div class="line"><span class="lineno">  464</span> </div>
 <div class="line"><span class="lineno">  465</span>            <span class="comment">// Store top candidate node scores.</span></div>
@@ -264,10 +264,10 @@ Public Member Functions</h2></td></tr>
 <div class="line"><span class="lineno">  471</span> </div>
 <div class="line"><span class="lineno">  472</span>        <span class="keywordflow">return</span> scores;</div>
 <div class="line"><span class="lineno">  473</span>    }</div>
-<div class="ttc" id="aCutIntelligence_8h_html_ad24d37bbf5801d62eec5b2423ee66e94"><div class="ttname"><a href="CutIntelligence_8h.html#ad24d37bbf5801d62eec5b2423ee66e94">MAX_CANDIDATES_PER_NODE</a></div><div class="ttdeci">constexpr int MAX_CANDIDATES_PER_NODE</div><div class="ttdef"><b>Definition</b> <a href="CutIntelligence_8h_source.html#l00299">CutIntelligence.h:299</a></div></div>
 <div class="ttc" id="aDefinitions_8h_html_a64e2fe830f0e02b5ac2beb9c0ff3425faa11d8f01052a3bc5f0aac78a2ee28baa"><div class="ttname"><a href="Definitions_8h.html#a64e2fe830f0e02b5ac2beb9c0ff3425faa11d8f01052a3bc5f0aac78a2ee28baa">CutType::ThreeRow</a></div><div class="ttdeci">@ ThreeRow</div><div class="ttdef"><b>Definition</b> <a href="Definitions_8h_source.html#l00082">Definitions.h:82</a></div></div>
+<div class="ttc" id="aIntelligence_8h_html_ad24d37bbf5801d62eec5b2423ee66e94"><div class="ttname"><a href="Intelligence_8h.html#ad24d37bbf5801d62eec5b2423ee66e94">MAX_CANDIDATES_PER_NODE</a></div><div class="ttdeci">constexpr int MAX_CANDIDATES_PER_NODE</div><div class="ttdef"><b>Definition</b> <a href="Intelligence_8h_source.html#l00299">Intelligence.h:299</a></div></div>
 <div class="ttc" id="aclassArcDuals_html_ac75e53f0c4f24e6aca539c544e9f8109"><div class="ttname"><a href="classArcDuals.html#ac75e53f0c4f24e6aca539c544e9f8109">ArcDuals::getDual</a></div><div class="ttdeci">double getDual(int i, int j) const</div><div class="ttdef"><b>Definition</b> <a href="Dual_8h_source.html#l00038">Dual.h:38</a></div></div>
-<div class="ttc" id="aclassCutStorage_html_a5661b2dd9924180da3dd03cc2d63bd2c"><div class="ttname"><a href="classCutStorage.html#a5661b2dd9924180da3dd03cc2d63bd2c">CutStorage::getActiveCuts</a></div><div class="ttdeci">std::span&lt; const ActiveCutInfo &gt; getActiveCuts() const noexcept</div><div class="ttdef"><b>Definition</b> <a href="Cut_8h_source.html#l00309">Cut.h:309</a></div></div>
+<div class="ttc" id="aclassCutStorage_html_a5661b2dd9924180da3dd03cc2d63bd2c"><div class="ttname"><a href="classCutStorage.html#a5661b2dd9924180da3dd03cc2d63bd2c">CutStorage::getActiveCuts</a></div><div class="ttdeci">std::span&lt; const ActiveCutInfo &gt; getActiveCuts() const noexcept</div><div class="ttdef"><b>Definition</b> <a href="Cut_8h_source.html#l00322">Cut.h:322</a></div></div>
 </div><!-- fragment --><div class="dynheader">
 Here is the call graph for this function:</div>
 <div class="dyncontent">
@@ -307,7 +307,7 @@ Here is the call graph for this function:</div>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="CutIntelligence_8h_source.html#l00342">342</a> of file <a class="el" href="CutIntelligence_8h_source.html">CutIntelligence.h</a>.</p>
+<p class="definition">Definition at line <a class="el" href="Intelligence_8h_source.html#l00342">342</a> of file <a class="el" href="Intelligence_8h_source.html">Intelligence.h</a>.</p>
 <div class="fragment"><div class="line"><span class="lineno">  343</span>                                                                                                           {</div>
 <div class="line"><span class="lineno">  344</span>        <span class="comment">// Convert candidate set to vector and sort by violation in</span></div>
 <div class="line"><span class="lineno">  345</span>        <span class="comment">// descending</span></div>
@@ -355,7 +355,7 @@ Here is the call graph for this function:</div>
 </div>
 </div>
 <hr/>The documentation for this class was generated from the following file:<ul>
-<li><a class="el" href="CutIntelligence_8h_source.html">CutIntelligence.h</a></li>
+<li><a class="el" href="Intelligence_8h_source.html">Intelligence.h</a></li>
 </ul>
 </div><!-- contents -->
 </div><!-- doc-content -->

@@ -143,7 +143,13 @@ Public Member Functions</h2></td></tr>
 <tr class="memitem:af8f2bccf9faadcb2ca964bd2347dde24" id="r_af8f2bccf9faadcb2ca964bd2347dde24"><td class="memItemLeft">&#160;</td><td class="memItemRight"><a class="el" href="#af8f2bccf9faadcb2ca964bd2347dde24">Label</a> ()</td></tr>
 <tr class="memitem:a19a3474af3d3404369c0fe3cf1797ff2" id="r_a19a3474af3d3404369c0fe3cf1797ff2"><td class="memItemLeft">void&#160;</td><td class="memItemRight"><a class="el" href="#a19a3474af3d3404369c0fe3cf1797ff2">set_extended</a> (bool extended)</td></tr>
 <tr class="memitem:a0c814a4e0a52b6258d1a0c8ff28450d0" id="r_a0c814a4e0a52b6258d1a0c8ff28450d0"><td class="memItemLeft">void&#160;</td><td class="memItemRight"><a class="el" href="#a0c814a4e0a52b6258d1a0c8ff28450d0">set_dominated</a> (bool dominated)</td></tr>
-<tr class="memitem:a1d84d473b620afcd8239768d5757f612" id="r_a1d84d473b620afcd8239768d5757f612"><td class="memItemLeft">const auto &amp;&#160;</td><td class="memItemRight"><a class="el" href="#a1d84d473b620afcd8239768d5757f612">getRoute</a> () const</td></tr>
+<tr class="memitem:a9427079f9857cbf85b54fb859887cccc" id="r_a9427079f9857cbf85b54fb859887cccc"><td class="memItemLeft">&#160;</td><td class="memItemRight"><a class="el" href="#a9427079f9857cbf85b54fb859887cccc">Label</a> (const <a class="el" href="structLabel.html">Label</a> &amp;)=delete</td></tr>
+<tr class="memitem:aab3d367f294b27344c0cc3909efe97f4" id="r_aab3d367f294b27344c0cc3909efe97f4"><td class="memItemLeft"><a class="el" href="structLabel.html">Label</a> &amp;&#160;</td><td class="memItemRight"><a class="el" href="#aab3d367f294b27344c0cc3909efe97f4">operator=</a> (const <a class="el" href="structLabel.html">Label</a> &amp;)=delete</td></tr>
+<tr class="memitem:aed1fd1d202d46ca0051f49ba68d5620f" id="r_aed1fd1d202d46ca0051f49ba68d5620f"><td class="memItemLeft">&#160;</td><td class="memItemRight"><a class="el" href="#aed1fd1d202d46ca0051f49ba68d5620f">Label</a> (<a class="el" href="structLabel.html">Label</a> &amp;&amp;)=default</td></tr>
+<tr class="memitem:afb0835052887411e189343299aa80c24" id="r_afb0835052887411e189343299aa80c24"><td class="memItemLeft"><a class="el" href="structLabel.html">Label</a> &amp;&#160;</td><td class="memItemRight"><a class="el" href="#afb0835052887411e189343299aa80c24">operator=</a> (<a class="el" href="structLabel.html">Label</a> &amp;&amp;)=default</td></tr>
+<tr class="memitem:a384585ffaf7cdfd2c142d3b4524bf39e" id="r_a384585ffaf7cdfd2c142d3b4524bf39e"><td class="memItemLeft">const std::vector&lt; uint16_t &gt; &amp;&#160;</td><td class="memItemRight"><a class="el" href="#a384585ffaf7cdfd2c142d3b4524bf39e">getRoute</a> () const noexcept</td></tr>
+<tr class="memitem:a5dbf0753cf2e3e303947dd9d3467d5db" id="r_a5dbf0753cf2e3e303947dd9d3467d5db"><td class="memItemLeft">std::vector&lt; uint16_t &gt; &amp;&#160;</td><td class="memItemRight"><a class="el" href="#a5dbf0753cf2e3e303947dd9d3467d5db">mutableRoute</a> ()</td></tr>
+<tr class="memitem:a8fb896b033f65ec802f71301eedd8fa4" id="r_a8fb896b033f65ec802f71301eedd8fa4"><td class="memItemLeft">void&#160;</td><td class="memItemRight"><a class="el" href="#a8fb896b033f65ec802f71301eedd8fa4">materializeRoute</a> (std::vector&lt; uint16_t &gt; &amp;route) const</td></tr>
 <tr class="memitem:a4da8b9a22abad1dc419a16e37be39209" id="r_a4da8b9a22abad1dc419a16e37be39209"><td class="memItemLeft">void&#160;</td><td class="memItemRight"><a class="el" href="#a4da8b9a22abad1dc419a16e37be39209">clearRoute</a> () noexcept</td></tr>
 <tr class="memitem:aebe8bba92efc37abd24616cac5a5f4f9" id="r_aebe8bba92efc37abd24616cac5a5f4f9"><td class="memItemLeft">void&#160;</td><td class="memItemRight"><a class="el" href="#aebe8bba92efc37abd24616cac5a5f4f9">addRoute</a> (const std::vector&lt; int &gt; &amp;route)</td></tr>
 <tr class="memitem:a930f04580faf7d07a589f08f80637fba" id="r_a930f04580faf7d07a589f08f80637fba"><td class="memItemLeft">void&#160;</td><td class="memItemRight"><a class="el" href="#a930f04580faf7d07a589f08f80637fba">addRoute</a> (const std::vector&lt; uint16_t &gt; &amp;route)</td></tr>
@@ -163,15 +169,20 @@ Public Attributes</h2></td></tr>
 <tr class="memitem:a1da1930412e730692277e75a94da77c2" id="r_a1da1930412e730692277e75a94da77c2"><td class="memItemLeft">double&#160;</td><td class="memItemRight"><a class="el" href="#a1da1930412e730692277e75a94da77c2">cost</a> = 0.0</td></tr>
 <tr class="memitem:adc41f4aec4ecd0c1c76fd5f151aacedd" id="r_adc41f4aec4ecd0c1c76fd5f151aacedd"><td class="memItemLeft">double&#160;</td><td class="memItemRight"><a class="el" href="#adc41f4aec4ecd0c1c76fd5f151aacedd">real_cost</a> = 0.0</td></tr>
 <tr class="memitem:a5f792e9fa27a10dd13bd4622b1a3044b" id="r_a5f792e9fa27a10dd13bd4622b1a3044b"><td class="memItemLeft">std::array&lt; double, R_SIZE &gt;&#160;</td><td class="memItemRight"><a class="el" href="#a5f792e9fa27a10dd13bd4622b1a3044b">resources</a> = {}</td></tr>
-<tr class="memitem:ac020ce84080430f28f2b2651be338693" id="r_ac020ce84080430f28f2b2651be338693"><td class="memItemLeft">std::array&lt; uint64_t, <a class="el" href="Definitions_8h.html#a38c168723ff0872970a49c6ee54e9bf7">num_words</a> &gt;&#160;</td><td class="memItemRight"><a class="el" href="#ac020ce84080430f28f2b2651be338693">visited_bitmap</a> = {0}</td></tr>
+<tr class="memitem:ac5629d8044403e1ba299dbffb0e49247" id="r_ac5629d8044403e1ba299dbffb0e49247"><td class="memItemLeft">std::array&lt; uint64_t, <a class="el" href="#a9077809d83373a924b5397925f40ab07">bitmap_words</a> &gt;&#160;</td><td class="memItemRight"><a class="el" href="#ac5629d8044403e1ba299dbffb0e49247">visited_bitmap</a> = {0}</td></tr>
 <tr class="memitem:ac6af58cb0b0d0f16da388d10f4259e6f" id="r_ac6af58cb0b0d0f16da388d10f4259e6f"><td class="memItemLeft">int&#160;</td><td class="memItemRight"><a class="el" href="#ac6af58cb0b0d0f16da388d10f4259e6f">vertex</a> = -1</td></tr>
 <tr class="memitem:a51392867ea22ca35fa6eed73d0978f57" id="r_a51392867ea22ca35fa6eed73d0978f57"><td class="memItemLeft">int&#160;</td><td class="memItemRight"><a class="el" href="#a51392867ea22ca35fa6eed73d0978f57">node_id</a> = -1</td></tr>
 <tr class="memitem:abe52e0e4a7584f8667995991c855fd27" id="r_abe52e0e4a7584f8667995991c855fd27"><td class="memItemLeft">int&#160;</td><td class="memItemRight"><a class="el" href="#abe52e0e4a7584f8667995991c855fd27">path_len</a> = 0</td></tr>
-<tr class="memitem:a4e21ca08d2080506ea9f86062af72f6d" id="r_a4e21ca08d2080506ea9f86062af72f6d"><td class="memItemLeft"><a class="el" href="structLabel.html">Label</a> *&#160;</td><td class="memItemRight"><a class="el" href="#a4e21ca08d2080506ea9f86062af72f6d">parent</a> = nullptr</td></tr>
+<tr class="memitem:abe6462f5b9f961b2c63392921940a6cf" id="r_abe6462f5b9f961b2c63392921940a6cf"><td class="memItemLeft">const <a class="el" href="structLabel.html">Label</a> *&#160;</td><td class="memItemRight"><a class="el" href="#abe6462f5b9f961b2c63392921940a6cf">parent</a> = nullptr</td></tr>
 <tr class="memitem:a52f0ce94a73b1235d975ece70367b1ea" id="r_a52f0ce94a73b1235d975ece70367b1ea"><td class="memItemLeft">bool&#160;</td><td class="memItemRight"><a class="el" href="#a52f0ce94a73b1235d975ece70367b1ea">is_extended</a> = false</td></tr>
 <tr class="memitem:af36e4bfda4b5544e93ae446a31a49e7d" id="r_af36e4bfda4b5544e93ae446a31a49e7d"><td class="memItemLeft">bool&#160;</td><td class="memItemRight"><a class="el" href="#af36e4bfda4b5544e93ae446a31a49e7d">is_dominated</a> = false</td></tr>
+<tr class="memitem:a3c9cc3cba793a04ac66a6c69ed80c1dc" id="r_a3c9cc3cba793a04ac66a6c69ed80c1dc"><td class="memItemLeft">bool&#160;</td><td class="memItemRight"><a class="el" href="#a3c9cc3cba793a04ac66a6c69ed80c1dc">bucket_dominance_checked</a> = false</td></tr>
 <tr class="memitem:aa5098be4b306d954a4232e3e077eea6f" id="r_aa5098be4b306d954a4232e3e077eea6f"><td class="memItemLeft">bool&#160;</td><td class="memItemRight"><a class="el" href="#aa5098be4b306d954a4232e3e077eea6f">fresh</a> = true</td></tr>
-<tr class="memitem:aa8b9ad67d235d087a99a02900a54ca7f" id="r_aa8b9ad67d235d087a99a02900a54ca7f"><td class="memItemLeft">std::vector&lt; uint16_t &gt;&#160;</td><td class="memItemRight"><a class="el" href="#aa8b9ad67d235d087a99a02900a54ca7f">nodes_covered</a> = {}</td></tr>
+<tr class="memitem:ab7326e695edc087ceb9200367ea413ff" id="r_ab7326e695edc087ceb9200367ea413ff"><td class="memItemLeft">std::unique_ptr&lt; std::vector&lt; uint16_t &gt; &gt;&#160;</td><td class="memItemRight"><a class="el" href="#ab7326e695edc087ceb9200367ea413ff">route_storage</a></td></tr>
+</table><table class="memberdecls">
+<tr class="heading"><td colspan="2"><h2 id="header-pub-static-attribs" class="groupheader"><a id="pub-static-attribs" name="pub-static-attribs"></a>
+Static Public Attributes</h2></td></tr>
+<tr class="memitem:a9077809d83373a924b5397925f40ab07" id="r_a9077809d83373a924b5397925f40ab07"><td class="memItemLeft">static constexpr std::size_t&#160;</td><td class="memItemRight"><a class="el" href="#a9077809d83373a924b5397925f40ab07">bitmap_words</a> = (N_SIZE + 63) / 64</td></tr>
 </table>
 <a name="details" id="details"></a><h2 id="header-details" class="groupheader">Detailed Description</h2>
 <div class="textblock"><p>Represents a label used in a solver. </p>
@@ -179,10 +190,10 @@ Public Attributes</h2></td></tr>
 <p>The struct provides constructors to initialize the label with or without a node_id. It also provides methods to set the covered nodes, add a node to the covered nodes, check if a node is already covered, and initialize the label with new values.</p>
 <p>The struct overloads the equality and greater than operators for comparison. </p>
 
-<p class="definition">Definition at line <a class="el" href="Label_8h_source.html#l00093">93</a> of file <a class="el" href="Label_8h_source.html">Label.h</a>.</p>
+<p class="definition">Definition at line <a class="el" href="Label_8h_source.html#l00174">174</a> of file <a class="el" href="Label_8h_source.html">Label.h</a>.</p>
 </div><a name="doc-constructors" id="doc-constructors"></a><h2 id="header-doc-constructors" class="groupheader">Constructor &amp; Destructor Documentation</h2>
 <a id="a0a48c18a2d05ad71c93ed9220c017e25" name="a0a48c18a2d05ad71c93ed9220c017e25"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#a0a48c18a2d05ad71c93ed9220c017e25">&#9670;&#160;</a></span>Label() <span class="overload">[1/3]</span></h2>
+<h2 class="memtitle"><span class="permalink"><a href="#a0a48c18a2d05ad71c93ed9220c017e25">&#9670;&#160;</a></span>Label() <span class="overload">[1/5]</span></h2>
 
 <div class="memitem">
 <div class="memproto">
@@ -223,17 +234,17 @@ Public Attributes</h2></td></tr>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="Label_8h_source.html#l00116">116</a> of file <a class="el" href="Label_8h_source.html">Label.h</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  117</span>        : <a class="code hl_variable" href="#ac6af58cb0b0d0f16da388d10f4259e6f">vertex</a>(v), <a class="code hl_variable" href="#a1da1930412e730692277e75a94da77c2">cost</a>(c), <a class="code hl_variable" href="#a5f792e9fa27a10dd13bd4622b1a3044b">resources</a>({res[0]}), <a class="code hl_variable" href="#a51392867ea22ca35fa6eed73d0978f57">node_id</a>(<a class="code hl_variable" href="#a51392867ea22ca35fa6eed73d0978f57">node_id</a>) {}</div>
-<div class="ttc" id="astructLabel_html_a1da1930412e730692277e75a94da77c2"><div class="ttname"><a href="#a1da1930412e730692277e75a94da77c2">Label::cost</a></div><div class="ttdeci">double cost</div><div class="ttdef"><b>Definition</b> <a href="Label_8h_source.html#l00096">Label.h:96</a></div></div>
-<div class="ttc" id="astructLabel_html_a51392867ea22ca35fa6eed73d0978f57"><div class="ttname"><a href="#a51392867ea22ca35fa6eed73d0978f57">Label::node_id</a></div><div class="ttdeci">int node_id</div><div class="ttdef"><b>Definition</b> <a href="Label_8h_source.html#l00106">Label.h:106</a></div></div>
-<div class="ttc" id="astructLabel_html_a5f792e9fa27a10dd13bd4622b1a3044b"><div class="ttname"><a href="#a5f792e9fa27a10dd13bd4622b1a3044b">Label::resources</a></div><div class="ttdeci">std::array&lt; double, R_SIZE &gt; resources</div><div class="ttdef"><b>Definition</b> <a href="Label_8h_source.html#l00098">Label.h:98</a></div></div>
-<div class="ttc" id="astructLabel_html_ac6af58cb0b0d0f16da388d10f4259e6f"><div class="ttname"><a href="#ac6af58cb0b0d0f16da388d10f4259e6f">Label::vertex</a></div><div class="ttdeci">int vertex</div><div class="ttdef"><b>Definition</b> <a href="Label_8h_source.html#l00105">Label.h:105</a></div></div>
+<p class="definition">Definition at line <a class="el" href="Label_8h_source.html#l00203">203</a> of file <a class="el" href="Label_8h_source.html">Label.h</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  204</span>        : <a class="code hl_variable" href="#ac6af58cb0b0d0f16da388d10f4259e6f">vertex</a>(v), <a class="code hl_variable" href="#a1da1930412e730692277e75a94da77c2">cost</a>(c), <a class="code hl_variable" href="#a5f792e9fa27a10dd13bd4622b1a3044b">resources</a>({res[0]}), <a class="code hl_variable" href="#a51392867ea22ca35fa6eed73d0978f57">node_id</a>(<a class="code hl_variable" href="#a51392867ea22ca35fa6eed73d0978f57">node_id</a>) {}</div>
+<div class="ttc" id="astructLabel_html_a1da1930412e730692277e75a94da77c2"><div class="ttname"><a href="#a1da1930412e730692277e75a94da77c2">Label::cost</a></div><div class="ttdeci">double cost</div><div class="ttdef"><b>Definition</b> <a href="Label_8h_source.html#l00179">Label.h:179</a></div></div>
+<div class="ttc" id="astructLabel_html_a51392867ea22ca35fa6eed73d0978f57"><div class="ttname"><a href="#a51392867ea22ca35fa6eed73d0978f57">Label::node_id</a></div><div class="ttdeci">int node_id</div><div class="ttdef"><b>Definition</b> <a href="Label_8h_source.html#l00191">Label.h:191</a></div></div>
+<div class="ttc" id="astructLabel_html_a5f792e9fa27a10dd13bd4622b1a3044b"><div class="ttname"><a href="#a5f792e9fa27a10dd13bd4622b1a3044b">Label::resources</a></div><div class="ttdeci">std::array&lt; double, R_SIZE &gt; resources</div><div class="ttdef"><b>Definition</b> <a href="Label_8h_source.html#l00181">Label.h:181</a></div></div>
+<div class="ttc" id="astructLabel_html_ac6af58cb0b0d0f16da388d10f4259e6f"><div class="ttname"><a href="#ac6af58cb0b0d0f16da388d10f4259e6f">Label::vertex</a></div><div class="ttdeci">int vertex</div><div class="ttdef"><b>Definition</b> <a href="Label_8h_source.html#l00190">Label.h:190</a></div></div>
 </div><!-- fragment -->
 </div>
 </div>
 <a id="ae0a9b83227f56ba5c13b3499528ab09f" name="ae0a9b83227f56ba5c13b3499528ab09f"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#ae0a9b83227f56ba5c13b3499528ab09f">&#9670;&#160;</a></span>Label() <span class="overload">[2/3]</span></h2>
+<h2 class="memtitle"><span class="permalink"><a href="#ae0a9b83227f56ba5c13b3499528ab09f">&#9670;&#160;</a></span>Label() <span class="overload">[2/5]</span></h2>
 
 <div class="memitem">
 <div class="memproto">
@@ -269,13 +280,13 @@ Public Attributes</h2></td></tr>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="Label_8h_source.html#l00120">120</a> of file <a class="el" href="Label_8h_source.html">Label.h</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  121</span>        : <a class="code hl_variable" href="#ac6af58cb0b0d0f16da388d10f4259e6f">vertex</a>(v), <a class="code hl_variable" href="#a1da1930412e730692277e75a94da77c2">cost</a>(c), <a class="code hl_variable" href="#a5f792e9fa27a10dd13bd4622b1a3044b">resources</a>({res[0]}), <a class="code hl_variable" href="#a51392867ea22ca35fa6eed73d0978f57">node_id</a>(-1) {}</div>
+<p class="definition">Definition at line <a class="el" href="Label_8h_source.html#l00207">207</a> of file <a class="el" href="Label_8h_source.html">Label.h</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  208</span>        : <a class="code hl_variable" href="#ac6af58cb0b0d0f16da388d10f4259e6f">vertex</a>(v), <a class="code hl_variable" href="#a1da1930412e730692277e75a94da77c2">cost</a>(c), <a class="code hl_variable" href="#a5f792e9fa27a10dd13bd4622b1a3044b">resources</a>({res[0]}), <a class="code hl_variable" href="#a51392867ea22ca35fa6eed73d0978f57">node_id</a>(-1) {}</div>
 </div><!-- fragment -->
 </div>
 </div>
 <a id="af8f2bccf9faadcb2ca964bd2347dde24" name="af8f2bccf9faadcb2ca964bd2347dde24"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#af8f2bccf9faadcb2ca964bd2347dde24">&#9670;&#160;</a></span>Label() <span class="overload">[3/3]</span></h2>
+<h2 class="memtitle"><span class="permalink"><a href="#af8f2bccf9faadcb2ca964bd2347dde24">&#9670;&#160;</a></span>Label() <span class="overload">[3/5]</span></h2>
 
 <div class="memitem">
 <div class="memproto">
@@ -297,9 +308,79 @@ Public Attributes</h2></td></tr>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="Label_8h_source.html#l00124">124</a> of file <a class="el" href="Label_8h_source.html">Label.h</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  124</span>: <a class="code hl_variable" href="#ac6af58cb0b0d0f16da388d10f4259e6f">vertex</a>(-1), <a class="code hl_variable" href="#a1da1930412e730692277e75a94da77c2">cost</a>(0), <a class="code hl_variable" href="#a5f792e9fa27a10dd13bd4622b1a3044b">resources</a>({0.0}), <a class="code hl_variable" href="#a51392867ea22ca35fa6eed73d0978f57">node_id</a>(-1) {}</div>
+<p class="definition">Definition at line <a class="el" href="Label_8h_source.html#l00211">211</a> of file <a class="el" href="Label_8h_source.html">Label.h</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  211</span>: <a class="code hl_variable" href="#ac6af58cb0b0d0f16da388d10f4259e6f">vertex</a>(-1), <a class="code hl_variable" href="#a1da1930412e730692277e75a94da77c2">cost</a>(0), <a class="code hl_variable" href="#a5f792e9fa27a10dd13bd4622b1a3044b">resources</a>({0.0}), <a class="code hl_variable" href="#a51392867ea22ca35fa6eed73d0978f57">node_id</a>(-1) {}</div>
 </div><!-- fragment -->
+</div>
+</div>
+<a id="a9427079f9857cbf85b54fb859887cccc" name="a9427079f9857cbf85b54fb859887cccc"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a9427079f9857cbf85b54fb859887cccc">&#9670;&#160;</a></span>Label() <span class="overload">[4/5]</span></h2>
+
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">Label::Label </td>
+          <td>(</td>
+          <td class="paramtype">const <a class="el" href="structLabel.html">Label</a> &amp;</td>          <td class="paramname"><span class="paramname"><em></em></span></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel delete">delete</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+<div class="dynheader">
+Here is the call graph for this function:</div>
+<div class="dyncontent">
+<div class="center"><img src="structLabel_a9427079f9857cbf85b54fb859887cccc_cgraph.png" border="0" usemap="#astructLabel_a9427079f9857cbf85b54fb859887cccc_cgraph" loading="lazy" alt=""/></div>
+<map name="astructLabel_a9427079f9857cbf85b54fb859887cccc_cgraph" id="astructLabel_a9427079f9857cbf85b54fb859887cccc_cgraph">
+<area shape="rect" title=" " alt="" coords="5,5,97,31"/>
+<area shape="rect" href="structLabel.html#a0a48c18a2d05ad71c93ed9220c017e25" title=" " alt="" coords="145,5,236,31"/>
+<area shape="poly" title=" " alt="" coords="97,16,129,16,129,21,97,21"/>
+</map>
+</div>
+
+</div>
+</div>
+<a id="aed1fd1d202d46ca0051f49ba68d5620f" name="aed1fd1d202d46ca0051f49ba68d5620f"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#aed1fd1d202d46ca0051f49ba68d5620f">&#9670;&#160;</a></span>Label() <span class="overload">[5/5]</span></h2>
+
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">Label::Label </td>
+          <td>(</td>
+          <td class="paramtype"><a class="el" href="structLabel.html">Label</a> &amp;&amp;</td>          <td class="paramname"><span class="paramname"><em></em></span></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel default">default</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+<div class="dynheader">
+Here is the call graph for this function:</div>
+<div class="dyncontent">
+<div class="center"><img src="structLabel_aed1fd1d202d46ca0051f49ba68d5620f_cgraph.png" border="0" usemap="#astructLabel_aed1fd1d202d46ca0051f49ba68d5620f_cgraph" loading="lazy" alt=""/></div>
+<map name="astructLabel_aed1fd1d202d46ca0051f49ba68d5620f_cgraph" id="astructLabel_aed1fd1d202d46ca0051f49ba68d5620f_cgraph">
+<area shape="rect" title=" " alt="" coords="5,5,97,31"/>
+<area shape="rect" href="structLabel.html#a0a48c18a2d05ad71c93ed9220c017e25" title=" " alt="" coords="145,5,236,31"/>
+<area shape="poly" title=" " alt="" coords="97,16,129,16,129,21,97,21"/>
+</map>
+</div>
+
 </div>
 </div>
 <a name="doc-func-members" id="doc-func-members"></a><h2 id="header-doc-func-members" class="groupheader">Member Function Documentation</h2>
@@ -326,16 +407,27 @@ Public Attributes</h2></td></tr>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="Label_8h_source.html#l00201">201</a> of file <a class="el" href="Label_8h_source.html">Label.h</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  201</span>                           {</div>
-<div class="line"><span class="lineno">  202</span>        <a class="code hl_variable" href="#aa8b9ad67d235d087a99a02900a54ca7f">nodes_covered</a>.push_back(node);</div>
-<div class="line"><span class="lineno">  203</span>        <a class="code hl_variable" href="#abe52e0e4a7584f8667995991c855fd27">path_len</a> = <span class="keyword">static_cast&lt;</span><span class="keywordtype">int</span><span class="keyword">&gt;</span>(<a class="code hl_variable" href="#aa8b9ad67d235d087a99a02900a54ca7f">nodes_covered</a>.size());</div>
-<div class="line"><span class="lineno">  204</span>        <a class="code hl_variable" href="#a4e21ca08d2080506ea9f86062af72f6d">parent</a>   = <span class="keyword">nullptr</span>;</div>
-<div class="line"><span class="lineno">  205</span>    }</div>
-<div class="ttc" id="astructLabel_html_a4e21ca08d2080506ea9f86062af72f6d"><div class="ttname"><a href="#a4e21ca08d2080506ea9f86062af72f6d">Label::parent</a></div><div class="ttdeci">Label * parent</div><div class="ttdef"><b>Definition</b> <a href="Label_8h_source.html#l00108">Label.h:108</a></div></div>
-<div class="ttc" id="astructLabel_html_aa8b9ad67d235d087a99a02900a54ca7f"><div class="ttname"><a href="#aa8b9ad67d235d087a99a02900a54ca7f">Label::nodes_covered</a></div><div class="ttdeci">std::vector&lt; uint16_t &gt; nodes_covered</div><div class="ttdef"><b>Definition</b> <a href="Label_8h_source.html#l00114">Label.h:114</a></div></div>
-<div class="ttc" id="astructLabel_html_abe52e0e4a7584f8667995991c855fd27"><div class="ttname"><a href="#abe52e0e4a7584f8667995991c855fd27">Label::path_len</a></div><div class="ttdeci">int path_len</div><div class="ttdef"><b>Definition</b> <a href="Label_8h_source.html#l00107">Label.h:107</a></div></div>
-</div><!-- fragment -->
+<p class="definition">Definition at line <a class="el" href="Label_8h_source.html#l00335">335</a> of file <a class="el" href="Label_8h_source.html">Label.h</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  335</span>                           {</div>
+<div class="line"><span class="lineno">  336</span>        <span class="keyword">auto</span> &amp;stored_route = <a class="code hl_function" href="#a5dbf0753cf2e3e303947dd9d3467d5db">mutableRoute</a>();</div>
+<div class="line"><span class="lineno">  337</span>        stored_route.push_back(node);</div>
+<div class="line"><span class="lineno">  338</span>        <a class="code hl_variable" href="#abe52e0e4a7584f8667995991c855fd27">path_len</a> = <span class="keyword">static_cast&lt;</span><span class="keywordtype">int</span><span class="keyword">&gt;</span>(stored_route.size());</div>
+<div class="line"><span class="lineno">  339</span>        <a class="code hl_variable" href="#abe6462f5b9f961b2c63392921940a6cf">parent</a>   = <span class="keyword">nullptr</span>;</div>
+<div class="line"><span class="lineno">  340</span>    }</div>
+<div class="ttc" id="astructLabel_html_a5dbf0753cf2e3e303947dd9d3467d5db"><div class="ttname"><a href="#a5dbf0753cf2e3e303947dd9d3467d5db">Label::mutableRoute</a></div><div class="ttdeci">std::vector&lt; uint16_t &gt; &amp; mutableRoute()</div><div class="ttdef"><b>Definition</b> <a href="Label_8h_source.html#l00227">Label.h:227</a></div></div>
+<div class="ttc" id="astructLabel_html_abe52e0e4a7584f8667995991c855fd27"><div class="ttname"><a href="#abe52e0e4a7584f8667995991c855fd27">Label::path_len</a></div><div class="ttdeci">int path_len</div><div class="ttdef"><b>Definition</b> <a href="Label_8h_source.html#l00192">Label.h:192</a></div></div>
+<div class="ttc" id="astructLabel_html_abe6462f5b9f961b2c63392921940a6cf"><div class="ttname"><a href="#abe6462f5b9f961b2c63392921940a6cf">Label::parent</a></div><div class="ttdeci">const Label * parent</div><div class="ttdef"><b>Definition</b> <a href="Label_8h_source.html#l00193">Label.h:193</a></div></div>
+</div><!-- fragment --><div class="dynheader">
+Here is the call graph for this function:</div>
+<div class="dyncontent">
+<div class="center"><img src="structLabel_a2b6137772d885c829df3a4bfd91b91de_cgraph.png" border="0" usemap="#astructLabel_a2b6137772d885c829df3a4bfd91b91de_cgraph" loading="lazy" alt=""/></div>
+<map name="astructLabel_a2b6137772d885c829df3a4bfd91b91de_cgraph" id="astructLabel_a2b6137772d885c829df3a4bfd91b91de_cgraph">
+<area shape="rect" title=" " alt="" coords="5,5,117,31"/>
+<area shape="rect" href="structLabel.html#a5dbf0753cf2e3e303947dd9d3467d5db" title=" " alt="" coords="165,5,304,31"/>
+<area shape="poly" title=" " alt="" coords="117,16,149,16,149,21,117,21"/>
+</map>
+</div>
+
 </div>
 </div>
 <a id="aebe8bba92efc37abd24616cac5a5f4f9" name="aebe8bba92efc37abd24616cac5a5f4f9"></a>
@@ -361,13 +453,24 @@ Public Attributes</h2></td></tr>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="Label_8h_source.html#l00137">137</a> of file <a class="el" href="Label_8h_source.html">Label.h</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  137</span>                                               {</div>
-<div class="line"><span class="lineno">  138</span>        <a class="code hl_variable" href="#aa8b9ad67d235d087a99a02900a54ca7f">nodes_covered</a>.insert(<a class="code hl_variable" href="#aa8b9ad67d235d087a99a02900a54ca7f">nodes_covered</a>.end(), route.begin(), route.end());</div>
-<div class="line"><span class="lineno">  139</span>        <a class="code hl_variable" href="#abe52e0e4a7584f8667995991c855fd27">path_len</a> = <span class="keyword">static_cast&lt;</span><span class="keywordtype">int</span><span class="keyword">&gt;</span>(<a class="code hl_variable" href="#aa8b9ad67d235d087a99a02900a54ca7f">nodes_covered</a>.size());</div>
-<div class="line"><span class="lineno">  140</span>        <a class="code hl_variable" href="#a4e21ca08d2080506ea9f86062af72f6d">parent</a>   = <span class="keyword">nullptr</span>;</div>
-<div class="line"><span class="lineno">  141</span>    }</div>
-</div><!-- fragment -->
+<p class="definition">Definition at line <a class="el" href="Label_8h_source.html#l00265">265</a> of file <a class="el" href="Label_8h_source.html">Label.h</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  265</span>                                               {</div>
+<div class="line"><span class="lineno">  266</span>        <span class="keyword">auto</span> &amp;stored_route = <a class="code hl_function" href="#a5dbf0753cf2e3e303947dd9d3467d5db">mutableRoute</a>();</div>
+<div class="line"><span class="lineno">  267</span>        stored_route.insert(stored_route.end(), route.begin(), route.end());</div>
+<div class="line"><span class="lineno">  268</span>        <a class="code hl_variable" href="#abe52e0e4a7584f8667995991c855fd27">path_len</a> = <span class="keyword">static_cast&lt;</span><span class="keywordtype">int</span><span class="keyword">&gt;</span>(stored_route.size());</div>
+<div class="line"><span class="lineno">  269</span>        <a class="code hl_variable" href="#abe6462f5b9f961b2c63392921940a6cf">parent</a>   = <span class="keyword">nullptr</span>;</div>
+<div class="line"><span class="lineno">  270</span>    }</div>
+</div><!-- fragment --><div class="dynheader">
+Here is the call graph for this function:</div>
+<div class="dyncontent">
+<div class="center"><img src="structLabel_aebe8bba92efc37abd24616cac5a5f4f9_cgraph.png" border="0" usemap="#astructLabel_aebe8bba92efc37abd24616cac5a5f4f9_cgraph" loading="lazy" alt=""/></div>
+<map name="astructLabel_aebe8bba92efc37abd24616cac5a5f4f9_cgraph" id="astructLabel_aebe8bba92efc37abd24616cac5a5f4f9_cgraph">
+<area shape="rect" title=" " alt="" coords="5,5,120,31"/>
+<area shape="rect" href="structLabel.html#a5dbf0753cf2e3e303947dd9d3467d5db" title=" " alt="" coords="168,5,307,31"/>
+<area shape="poly" title=" " alt="" coords="120,16,152,16,152,21,120,21"/>
+</map>
+</div>
+
 </div>
 </div>
 <a id="a930f04580faf7d07a589f08f80637fba" name="a930f04580faf7d07a589f08f80637fba"></a>
@@ -393,13 +496,24 @@ Public Attributes</h2></td></tr>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="Label_8h_source.html#l00143">143</a> of file <a class="el" href="Label_8h_source.html">Label.h</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  143</span>                                                    {</div>
-<div class="line"><span class="lineno">  144</span>        <a class="code hl_variable" href="#aa8b9ad67d235d087a99a02900a54ca7f">nodes_covered</a>.insert(<a class="code hl_variable" href="#aa8b9ad67d235d087a99a02900a54ca7f">nodes_covered</a>.end(), route.begin(), route.end());</div>
-<div class="line"><span class="lineno">  145</span>        <a class="code hl_variable" href="#abe52e0e4a7584f8667995991c855fd27">path_len</a> = <span class="keyword">static_cast&lt;</span><span class="keywordtype">int</span><span class="keyword">&gt;</span>(<a class="code hl_variable" href="#aa8b9ad67d235d087a99a02900a54ca7f">nodes_covered</a>.size());</div>
-<div class="line"><span class="lineno">  146</span>        <a class="code hl_variable" href="#a4e21ca08d2080506ea9f86062af72f6d">parent</a>   = <span class="keyword">nullptr</span>;</div>
-<div class="line"><span class="lineno">  147</span>    }</div>
-</div><!-- fragment -->
+<p class="definition">Definition at line <a class="el" href="Label_8h_source.html#l00272">272</a> of file <a class="el" href="Label_8h_source.html">Label.h</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  272</span>                                                    {</div>
+<div class="line"><span class="lineno">  273</span>        <span class="keyword">auto</span> &amp;stored_route = <a class="code hl_function" href="#a5dbf0753cf2e3e303947dd9d3467d5db">mutableRoute</a>();</div>
+<div class="line"><span class="lineno">  274</span>        stored_route.insert(stored_route.end(), route.begin(), route.end());</div>
+<div class="line"><span class="lineno">  275</span>        <a class="code hl_variable" href="#abe52e0e4a7584f8667995991c855fd27">path_len</a> = <span class="keyword">static_cast&lt;</span><span class="keywordtype">int</span><span class="keyword">&gt;</span>(stored_route.size());</div>
+<div class="line"><span class="lineno">  276</span>        <a class="code hl_variable" href="#abe6462f5b9f961b2c63392921940a6cf">parent</a>   = <span class="keyword">nullptr</span>;</div>
+<div class="line"><span class="lineno">  277</span>    }</div>
+</div><!-- fragment --><div class="dynheader">
+Here is the call graph for this function:</div>
+<div class="dyncontent">
+<div class="center"><img src="structLabel_a930f04580faf7d07a589f08f80637fba_cgraph.png" border="0" usemap="#astructLabel_a930f04580faf7d07a589f08f80637fba_cgraph" loading="lazy" alt=""/></div>
+<map name="astructLabel_a930f04580faf7d07a589f08f80637fba_cgraph" id="astructLabel_a930f04580faf7d07a589f08f80637fba_cgraph">
+<area shape="rect" title=" " alt="" coords="5,5,120,31"/>
+<area shape="rect" href="structLabel.html#a5dbf0753cf2e3e303947dd9d3467d5db" title=" " alt="" coords="168,5,307,31"/>
+<area shape="poly" title=" " alt="" coords="120,16,152,16,152,21,120,21"/>
+</map>
+</div>
+
 </div>
 </div>
 <a id="a4da8b9a22abad1dc419a16e37be39209" name="a4da8b9a22abad1dc419a16e37be39209"></a>
@@ -425,17 +539,18 @@ Public Attributes</h2></td></tr>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="Label_8h_source.html#l00131">131</a> of file <a class="el" href="Label_8h_source.html">Label.h</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  131</span>                               {</div>
-<div class="line"><span class="lineno">  132</span>        <a class="code hl_variable" href="#aa8b9ad67d235d087a99a02900a54ca7f">nodes_covered</a>.clear();</div>
-<div class="line"><span class="lineno">  133</span>        <a class="code hl_variable" href="#abe52e0e4a7584f8667995991c855fd27">path_len</a> = 0;</div>
-<div class="line"><span class="lineno">  134</span>        <a class="code hl_variable" href="#a4e21ca08d2080506ea9f86062af72f6d">parent</a>   = <span class="keyword">nullptr</span>;</div>
-<div class="line"><span class="lineno">  135</span>    }</div>
+<p class="definition">Definition at line <a class="el" href="Label_8h_source.html#l00259">259</a> of file <a class="el" href="Label_8h_source.html">Label.h</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  259</span>                               {</div>
+<div class="line"><span class="lineno">  260</span>        <a class="code hl_variable" href="#ab7326e695edc087ceb9200367ea413ff">route_storage</a>.reset();</div>
+<div class="line"><span class="lineno">  261</span>        <a class="code hl_variable" href="#abe52e0e4a7584f8667995991c855fd27">path_len</a> = 0;</div>
+<div class="line"><span class="lineno">  262</span>        <a class="code hl_variable" href="#abe6462f5b9f961b2c63392921940a6cf">parent</a>   = <span class="keyword">nullptr</span>;</div>
+<div class="line"><span class="lineno">  263</span>    }</div>
+<div class="ttc" id="astructLabel_html_ab7326e695edc087ceb9200367ea413ff"><div class="ttname"><a href="#ab7326e695edc087ceb9200367ea413ff">Label::route_storage</a></div><div class="ttdeci">std::unique_ptr&lt; std::vector&lt; uint16_t &gt; &gt; route_storage</div><div class="ttdef"><b>Definition</b> <a href="Label_8h_source.html#l00201">Label.h:201</a></div></div>
 </div><!-- fragment -->
 </div>
 </div>
-<a id="a1d84d473b620afcd8239768d5757f612" name="a1d84d473b620afcd8239768d5757f612"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#a1d84d473b620afcd8239768d5757f612">&#9670;&#160;</a></span>getRoute()</h2>
+<a id="a384585ffaf7cdfd2c142d3b4524bf39e" name="a384585ffaf7cdfd2c142d3b4524bf39e"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a384585ffaf7cdfd2c142d3b4524bf39e">&#9670;&#160;</a></span>getRoute()</h2>
 
 <div class="memitem">
 <div class="memproto">
@@ -444,7 +559,7 @@ Public Attributes</h2></td></tr>
   <td class="mlabels-left">
       <table class="memname">
         <tr>
-          <td class="memname">const auto &amp; Label::getRoute </td>
+          <td class="memname">const std::vector&lt; uint16_t &gt; &amp; Label::getRoute </td>
           <td>(</td>
           <td class="paramname"><span class="paramname"><em></em></span></td><td>)</td>
           <td> const</td>
@@ -452,13 +567,16 @@ Public Attributes</h2></td></tr>
       </table>
   </td>
   <td class="mlabels-right">
-<span class="mlabels"><span class="mlabel inline">inline</span></span>  </td>
+<span class="mlabels"><span class="mlabel inline">inline</span><span class="mlabel noexcept">noexcept</span></span>  </td>
   </tr>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="Label_8h_source.html#l00129">129</a> of file <a class="el" href="Label_8h_source.html">Label.h</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  129</span>{ <span class="keywordflow">return</span> <a class="code hl_variable" href="#aa8b9ad67d235d087a99a02900a54ca7f">nodes_covered</a>; }</div>
+<p class="definition">Definition at line <a class="el" href="Label_8h_source.html#l00222">222</a> of file <a class="el" href="Label_8h_source.html">Label.h</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  222</span>                                                         {</div>
+<div class="line"><span class="lineno">  223</span>        <span class="keyword">static</span> <span class="keyword">const</span> std::vector&lt;uint16_t&gt; empty_route;</div>
+<div class="line"><span class="lineno">  224</span>        <span class="keywordflow">return</span> <a class="code hl_variable" href="#ab7326e695edc087ceb9200367ea413ff">route_storage</a> ? *<a class="code hl_variable" href="#ab7326e695edc087ceb9200367ea413ff">route_storage</a> : empty_route;</div>
+<div class="line"><span class="lineno">  225</span>    }</div>
 </div><!-- fragment -->
 </div>
 </div>
@@ -501,18 +619,116 @@ Public Attributes</h2></td></tr>
 
 <p>Initializes the object with the given parameters. </p>
 
-<p class="definition">Definition at line <a class="el" href="Label_8h_source.html#l00211">211</a> of file <a class="el" href="Label_8h_source.html">Label.h</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  211</span>                                                                                                     {</div>
-<div class="line"><span class="lineno">  212</span>        this-&gt;<a class="code hl_variable" href="#ac6af58cb0b0d0f16da388d10f4259e6f">vertex</a> = <a class="code hl_variable" href="#ac6af58cb0b0d0f16da388d10f4259e6f">vertex</a>;</div>
-<div class="line"><span class="lineno">  213</span>        this-&gt;<a class="code hl_variable" href="#a1da1930412e730692277e75a94da77c2">cost</a>   = <a class="code hl_variable" href="#a1da1930412e730692277e75a94da77c2">cost</a>;</div>
-<div class="line"><span class="lineno">  214</span> </div>
-<div class="line"><span class="lineno">  215</span>        <span class="comment">// Assuming `resources` is a vector or array-like structure with the</span></div>
-<div class="line"><span class="lineno">  216</span>        <span class="comment">// same size as the input</span></div>
-<div class="line"><span class="lineno">  217</span>        std::copy(<a class="code hl_variable" href="#a5f792e9fa27a10dd13bd4622b1a3044b">resources</a>.begin(), <a class="code hl_variable" href="#a5f792e9fa27a10dd13bd4622b1a3044b">resources</a>.end(), this-&gt;resources.begin());</div>
-<div class="line"><span class="lineno">  218</span> </div>
-<div class="line"><span class="lineno">  219</span>        this-&gt;<a class="code hl_variable" href="#a51392867ea22ca35fa6eed73d0978f57">node_id</a>  = <a class="code hl_variable" href="#a51392867ea22ca35fa6eed73d0978f57">node_id</a>;</div>
-<div class="line"><span class="lineno">  220</span>        this-&gt;<a class="code hl_variable" href="#abe52e0e4a7584f8667995991c855fd27">path_len</a> = 0;</div>
-<div class="line"><span class="lineno">  221</span>    }</div>
+<p class="definition">Definition at line <a class="el" href="Label_8h_source.html#l00346">346</a> of file <a class="el" href="Label_8h_source.html">Label.h</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  346</span>                                                                                                     {</div>
+<div class="line"><span class="lineno">  347</span>        this-&gt;<a class="code hl_variable" href="#ac6af58cb0b0d0f16da388d10f4259e6f">vertex</a> = <a class="code hl_variable" href="#ac6af58cb0b0d0f16da388d10f4259e6f">vertex</a>;</div>
+<div class="line"><span class="lineno">  348</span>        this-&gt;<a class="code hl_variable" href="#a1da1930412e730692277e75a94da77c2">cost</a>   = <a class="code hl_variable" href="#a1da1930412e730692277e75a94da77c2">cost</a>;</div>
+<div class="line"><span class="lineno">  349</span> </div>
+<div class="line"><span class="lineno">  350</span>        <span class="comment">// Assuming `resources` is a vector or array-like structure with the</span></div>
+<div class="line"><span class="lineno">  351</span>        <span class="comment">// same size as the input</span></div>
+<div class="line"><span class="lineno">  352</span>        std::copy(<a class="code hl_variable" href="#a5f792e9fa27a10dd13bd4622b1a3044b">resources</a>.begin(), <a class="code hl_variable" href="#a5f792e9fa27a10dd13bd4622b1a3044b">resources</a>.end(), this-&gt;resources.begin());</div>
+<div class="line"><span class="lineno">  353</span> </div>
+<div class="line"><span class="lineno">  354</span>        this-&gt;<a class="code hl_variable" href="#a51392867ea22ca35fa6eed73d0978f57">node_id</a>  = <a class="code hl_variable" href="#a51392867ea22ca35fa6eed73d0978f57">node_id</a>;</div>
+<div class="line"><span class="lineno">  355</span>        this-&gt;<a class="code hl_variable" href="#abe52e0e4a7584f8667995991c855fd27">path_len</a> = 0;</div>
+<div class="line"><span class="lineno">  356</span>    }</div>
+</div><!-- fragment -->
+</div>
+</div>
+<a id="a8fb896b033f65ec802f71301eedd8fa4" name="a8fb896b033f65ec802f71301eedd8fa4"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a8fb896b033f65ec802f71301eedd8fa4">&#9670;&#160;</a></span>materializeRoute()</h2>
+
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">void Label::materializeRoute </td>
+          <td>(</td>
+          <td class="paramtype">std::vector&lt; uint16_t &gt; &amp;</td>          <td class="paramname"><span class="paramname"><em>route</em></span></td><td>)</td>
+          <td> const</td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel inline">inline</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+<p class="definition">Definition at line <a class="el" href="Label_8h_source.html#l00232">232</a> of file <a class="el" href="Label_8h_source.html">Label.h</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  232</span>                                                            {</div>
+<div class="line"><span class="lineno">  233</span>        <span class="keywordflow">if</span> (<a class="code hl_variable" href="#abe6462f5b9f961b2c63392921940a6cf">parent</a> == <span class="keyword">nullptr</span>) {</div>
+<div class="line"><span class="lineno">  234</span>            <span class="keyword">const</span> <span class="keyword">auto</span> &amp;stored_route = <a class="code hl_function" href="#a384585ffaf7cdfd2c142d3b4524bf39e">getRoute</a>();</div>
+<div class="line"><span class="lineno">  235</span>            route.assign(stored_route.begin(), stored_route.end());</div>
+<div class="line"><span class="lineno">  236</span>            <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno">  237</span>        }</div>
+<div class="line"><span class="lineno">  238</span> </div>
+<div class="line"><span class="lineno">  239</span>        <span class="keyword">const</span> <a class="code hl_function" href="#a0a48c18a2d05ad71c93ed9220c017e25">Label</a> *root  = <span class="keyword">this</span>;</div>
+<div class="line"><span class="lineno">  240</span>        std::size_t  depth = 0;</div>
+<div class="line"><span class="lineno">  241</span>        <span class="keywordflow">while</span> (root-&gt;<a class="code hl_variable" href="#abe6462f5b9f961b2c63392921940a6cf">parent</a> != <span class="keyword">nullptr</span>) {</div>
+<div class="line"><span class="lineno">  242</span>            ++depth;</div>
+<div class="line"><span class="lineno">  243</span>            root = root-&gt;<a class="code hl_variable" href="#abe6462f5b9f961b2c63392921940a6cf">parent</a>;</div>
+<div class="line"><span class="lineno">  244</span>        }</div>
+<div class="line"><span class="lineno">  245</span> </div>
+<div class="line"><span class="lineno">  246</span>        <span class="keyword">const</span> <span class="keyword">auto</span>       &amp;root_route  = root-&gt;<a class="code hl_function" href="#a384585ffaf7cdfd2c142d3b4524bf39e">getRoute</a>();</div>
+<div class="line"><span class="lineno">  247</span>        <span class="keyword">const</span> std::size_t prefix_size = root_route.size();</div>
+<div class="line"><span class="lineno">  248</span>        route.resize(prefix_size + depth);</div>
+<div class="line"><span class="lineno">  249</span>        std::copy(root_route.begin(), root_route.end(), route.begin());</div>
+<div class="line"><span class="lineno">  250</span> </div>
+<div class="line"><span class="lineno">  251</span>        <span class="keyword">const</span> <a class="code hl_function" href="#a0a48c18a2d05ad71c93ed9220c017e25">Label</a> *current = <span class="keyword">this</span>;</div>
+<div class="line"><span class="lineno">  252</span>        std::size_t  write   = route.size();</div>
+<div class="line"><span class="lineno">  253</span>        <span class="keywordflow">while</span> (current-&gt;<a class="code hl_variable" href="#abe6462f5b9f961b2c63392921940a6cf">parent</a> != <span class="keyword">nullptr</span>) {</div>
+<div class="line"><span class="lineno">  254</span>            route[--write] = <span class="keyword">static_cast&lt;</span>uint16_t<span class="keyword">&gt;</span>(current-&gt;<a class="code hl_variable" href="#a51392867ea22ca35fa6eed73d0978f57">node_id</a>);</div>
+<div class="line"><span class="lineno">  255</span>            current        = current-&gt;<a class="code hl_variable" href="#abe6462f5b9f961b2c63392921940a6cf">parent</a>;</div>
+<div class="line"><span class="lineno">  256</span>        }</div>
+<div class="line"><span class="lineno">  257</span>    }</div>
+<div class="ttc" id="astructLabel_html_a0a48c18a2d05ad71c93ed9220c017e25"><div class="ttname"><a href="#a0a48c18a2d05ad71c93ed9220c017e25">Label::Label</a></div><div class="ttdeci">Label(int v, double c, const std::vector&lt; double &gt; &amp;res, int pred, int node_id)</div><div class="ttdef"><b>Definition</b> <a href="Label_8h_source.html#l00203">Label.h:203</a></div></div>
+<div class="ttc" id="astructLabel_html_a384585ffaf7cdfd2c142d3b4524bf39e"><div class="ttname"><a href="#a384585ffaf7cdfd2c142d3b4524bf39e">Label::getRoute</a></div><div class="ttdeci">const std::vector&lt; uint16_t &gt; &amp; getRoute() const noexcept</div><div class="ttdef"><b>Definition</b> <a href="Label_8h_source.html#l00222">Label.h:222</a></div></div>
+</div><!-- fragment --><div class="dynheader">
+Here is the call graph for this function:</div>
+<div class="dyncontent">
+<div class="center"><img src="structLabel_a8fb896b033f65ec802f71301eedd8fa4_cgraph.png" border="0" usemap="#astructLabel_a8fb896b033f65ec802f71301eedd8fa4_cgraph" loading="lazy" alt=""/></div>
+<map name="astructLabel_a8fb896b033f65ec802f71301eedd8fa4_cgraph" id="astructLabel_a8fb896b033f65ec802f71301eedd8fa4_cgraph">
+<area shape="rect" title=" " alt="" coords="5,31,161,56"/>
+<area shape="rect" href="structLabel.html#a384585ffaf7cdfd2c142d3b4524bf39e" title=" " alt="" coords="209,5,320,31"/>
+<area shape="poly" title=" " alt="" coords="161,30,193,25,194,31,162,35"/>
+<area shape="rect" href="structLabel.html#a0a48c18a2d05ad71c93ed9220c017e25" title=" " alt="" coords="219,55,310,80"/>
+<area shape="poly" title=" " alt="" coords="161,51,204,57,203,62,161,56"/>
+</map>
+</div>
+
+</div>
+</div>
+<a id="a5dbf0753cf2e3e303947dd9d3467d5db" name="a5dbf0753cf2e3e303947dd9d3467d5db"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a5dbf0753cf2e3e303947dd9d3467d5db">&#9670;&#160;</a></span>mutableRoute()</h2>
+
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">std::vector&lt; uint16_t &gt; &amp; Label::mutableRoute </td>
+          <td>(</td>
+          <td class="paramname"><span class="paramname"><em></em></span></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel inline">inline</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+<p class="definition">Definition at line <a class="el" href="Label_8h_source.html#l00227">227</a> of file <a class="el" href="Label_8h_source.html">Label.h</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  227</span>                                        {</div>
+<div class="line"><span class="lineno">  228</span>        <span class="keywordflow">if</span> (!<a class="code hl_variable" href="#ab7326e695edc087ceb9200367ea413ff">route_storage</a>) <a class="code hl_variable" href="#ab7326e695edc087ceb9200367ea413ff">route_storage</a> = std::make_unique&lt;std::vector&lt;uint16_t&gt;&gt;();</div>
+<div class="line"><span class="lineno">  229</span>        <span class="keywordflow">return</span> *<a class="code hl_variable" href="#ab7326e695edc087ceb9200367ea413ff">route_storage</a>;</div>
+<div class="line"><span class="lineno">  230</span>    }</div>
 </div><!-- fragment -->
 </div>
 </div>
@@ -539,13 +755,83 @@ Public Attributes</h2></td></tr>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="Label_8h_source.html#l00225">225</a> of file <a class="el" href="Label_8h_source.html">Label.h</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  225</span>{ <span class="keywordflow">return</span> <a class="code hl_variable" href="#a1da1930412e730692277e75a94da77c2">cost</a> &lt; other.<a class="code hl_variable" href="#a1da1930412e730692277e75a94da77c2">cost</a>; }</div>
+<p class="definition">Definition at line <a class="el" href="Label_8h_source.html#l00360">360</a> of file <a class="el" href="Label_8h_source.html">Label.h</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  360</span>{ <span class="keywordflow">return</span> <a class="code hl_variable" href="#a1da1930412e730692277e75a94da77c2">cost</a> &lt; other.<a class="code hl_variable" href="#a1da1930412e730692277e75a94da77c2">cost</a>; }</div>
 </div><!-- fragment --><div class="dynheader">
 Here is the call graph for this function:</div>
 <div class="dyncontent">
 <div class="center"><img src="structLabel_a0bdf718292e926e2f91c1573a29a952a_cgraph.png" border="0" usemap="#astructLabel_a0bdf718292e926e2f91c1573a29a952a_cgraph" loading="lazy" alt=""/></div>
 <map name="astructLabel_a0bdf718292e926e2f91c1573a29a952a_cgraph" id="astructLabel_a0bdf718292e926e2f91c1573a29a952a_cgraph">
+<area shape="rect" title=" " alt="" coords="5,5,120,31"/>
+<area shape="rect" href="structLabel.html#a0a48c18a2d05ad71c93ed9220c017e25" title=" " alt="" coords="168,5,259,31"/>
+<area shape="poly" title=" " alt="" coords="120,16,152,16,152,21,120,21"/>
+</map>
+</div>
+
+</div>
+</div>
+<a id="aab3d367f294b27344c0cc3909efe97f4" name="aab3d367f294b27344c0cc3909efe97f4"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#aab3d367f294b27344c0cc3909efe97f4">&#9670;&#160;</a></span>operator=() <span class="overload">[1/2]</span></h2>
+
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="structLabel.html">Label</a> &amp; Label::operator= </td>
+          <td>(</td>
+          <td class="paramtype">const <a class="el" href="structLabel.html">Label</a> &amp;</td>          <td class="paramname"><span class="paramname"><em></em></span></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel delete">delete</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+<div class="dynheader">
+Here is the call graph for this function:</div>
+<div class="dyncontent">
+<div class="center"><img src="structLabel_aab3d367f294b27344c0cc3909efe97f4_cgraph.png" border="0" usemap="#astructLabel_aab3d367f294b27344c0cc3909efe97f4_cgraph" loading="lazy" alt=""/></div>
+<map name="astructLabel_aab3d367f294b27344c0cc3909efe97f4_cgraph" id="astructLabel_aab3d367f294b27344c0cc3909efe97f4_cgraph">
+<area shape="rect" title=" " alt="" coords="5,5,120,31"/>
+<area shape="rect" href="structLabel.html#a0a48c18a2d05ad71c93ed9220c017e25" title=" " alt="" coords="168,5,259,31"/>
+<area shape="poly" title=" " alt="" coords="120,16,152,16,152,21,120,21"/>
+</map>
+</div>
+
+</div>
+</div>
+<a id="afb0835052887411e189343299aa80c24" name="afb0835052887411e189343299aa80c24"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#afb0835052887411e189343299aa80c24">&#9670;&#160;</a></span>operator=() <span class="overload">[2/2]</span></h2>
+
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="structLabel.html">Label</a> &amp; Label::operator= </td>
+          <td>(</td>
+          <td class="paramtype"><a class="el" href="structLabel.html">Label</a> &amp;&amp;</td>          <td class="paramname"><span class="paramname"><em></em></span></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel default">default</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+<div class="dynheader">
+Here is the call graph for this function:</div>
+<div class="dyncontent">
+<div class="center"><img src="structLabel_afb0835052887411e189343299aa80c24_cgraph.png" border="0" usemap="#astructLabel_afb0835052887411e189343299aa80c24_cgraph" loading="lazy" alt=""/></div>
+<map name="astructLabel_afb0835052887411e189343299aa80c24_cgraph" id="astructLabel_afb0835052887411e189343299aa80c24_cgraph">
 <area shape="rect" title=" " alt="" coords="5,5,120,31"/>
 <area shape="rect" href="structLabel.html#a0a48c18a2d05ad71c93ed9220c017e25" title=" " alt="" coords="168,5,259,31"/>
 <area shape="poly" title=" " alt="" coords="120,16,152,16,152,21,120,21"/>
@@ -577,8 +863,8 @@ Here is the call graph for this function:</div>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="Label_8h_source.html#l00223">223</a> of file <a class="el" href="Label_8h_source.html">Label.h</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  223</span>{ <span class="keywordflow">return</span> <a class="code hl_variable" href="#a1da1930412e730692277e75a94da77c2">cost</a> &gt; other.<a class="code hl_variable" href="#a1da1930412e730692277e75a94da77c2">cost</a>; }</div>
+<p class="definition">Definition at line <a class="el" href="Label_8h_source.html#l00358">358</a> of file <a class="el" href="Label_8h_source.html">Label.h</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  358</span>{ <span class="keywordflow">return</span> <a class="code hl_variable" href="#a1da1930412e730692277e75a94da77c2">cost</a> &gt; other.<a class="code hl_variable" href="#a1da1930412e730692277e75a94da77c2">cost</a>; }</div>
 </div><!-- fragment --><div class="dynheader">
 Here is the call graph for this function:</div>
 <div class="dyncontent">
@@ -617,39 +903,43 @@ Here is the call graph for this function:</div>
 
 <p>Resets the state of the object to its initial values. </p>
 
-<p class="definition">Definition at line <a class="el" href="Label_8h_source.html#l00174">174</a> of file <a class="el" href="Label_8h_source.html">Label.h</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  174</span>                                 {</div>
-<div class="line"><span class="lineno">  175</span>        <span class="comment">// Reset basic properties</span></div>
-<div class="line"><span class="lineno">  176</span>        <a class="code hl_variable" href="#ac6af58cb0b0d0f16da388d10f4259e6f">vertex</a>       = -1;</div>
-<div class="line"><span class="lineno">  177</span>        <a class="code hl_variable" href="#a1da1930412e730692277e75a94da77c2">cost</a>         = 0.0;</div>
-<div class="line"><span class="lineno">  178</span>        <a class="code hl_variable" href="#a51392867ea22ca35fa6eed73d0978f57">node_id</a>      = -1;</div>
-<div class="line"><span class="lineno">  179</span>        <a class="code hl_variable" href="#adc41f4aec4ecd0c1c76fd5f151aacedd">real_cost</a>    = 0.0;</div>
-<div class="line"><span class="lineno">  180</span>        <a class="code hl_variable" href="#abe52e0e4a7584f8667995991c855fd27">path_len</a>     = 0;</div>
-<div class="line"><span class="lineno">  181</span>        <a class="code hl_variable" href="#a4e21ca08d2080506ea9f86062af72f6d">parent</a>       = <span class="keyword">nullptr</span>;</div>
-<div class="line"><span class="lineno">  182</span>        <a class="code hl_variable" href="#a52f0ce94a73b1235d975ece70367b1ea">is_extended</a>  = <span class="keyword">false</span>;</div>
-<div class="line"><span class="lineno">  183</span>        <a class="code hl_variable" href="#af36e4bfda4b5544e93ae446a31a49e7d">is_dominated</a> = <span class="keyword">false</span>;</div>
-<div class="line"><span class="lineno">  184</span>        <a class="code hl_variable" href="#aa5098be4b306d954a4232e3e077eea6f">fresh</a>        = <span class="keyword">true</span>;</div>
-<div class="line"><span class="lineno">  185</span>        <span class="comment">// Reset resources container (assuming operator= clears properly)</span></div>
-<div class="line"><span class="lineno">  186</span>        <a class="code hl_variable" href="#a5f792e9fa27a10dd13bd4622b1a3044b">resources</a> = {};</div>
-<div class="line"><span class="lineno">  187</span> </div>
-<div class="line"><span class="lineno">  188</span>        <span class="comment">// Clear route storage; keep capacity for amortized reuse.</span></div>
-<div class="line"><span class="lineno">  189</span>        <a class="code hl_variable" href="#aa8b9ad67d235d087a99a02900a54ca7f">nodes_covered</a>.clear();</div>
-<div class="line"><span class="lineno">  190</span> </div>
-<div class="line"><span class="lineno">  191</span>        <span class="comment">// Zero out the bitmaps efficiently.</span></div>
-<div class="line"><span class="lineno">  192</span>        std::memset(<a class="code hl_variable" href="#ac020ce84080430f28f2b2651be338693">visited_bitmap</a>.data(), 0, <a class="code hl_variable" href="#ac020ce84080430f28f2b2651be338693">visited_bitmap</a>.size() * <span class="keyword">sizeof</span>(uint64_t));</div>
-<div class="line"><span class="lineno">  193</span><span class="preprocessor">#ifdef UNREACHABLE_DOMINANCE</span></div>
-<div class="line"><span class="lineno">  194</span>        std::memset(unreachable_bitmap.data(), 0, unreachable_bitmap.size() * <span class="keyword">sizeof</span>(uint64_t));</div>
-<div class="line"><span class="lineno">  195</span><span class="preprocessor">#endif</span></div>
-<div class="line"><span class="lineno">  196</span> </div>
-<div class="line"><span class="lineno">  197</span>        <span class="comment">// If using source mode mapping, clear it.</span></div>
-<div class="line"><span class="lineno">  198</span>        <a class="code hl_define" href="Definitions_8h.html#ad656a59074b66ada867116d43ac275d3">SRC_MODE_BLOCK</a>(SRCmap.clear();)</div>
-<div class="line"><span class="lineno">  199</span>    }</div>
-<div class="ttc" id="aDefinitions_8h_html_ad656a59074b66ada867116d43ac275d3"><div class="ttname"><a href="Definitions_8h.html#ad656a59074b66ada867116d43ac275d3">SRC_MODE_BLOCK</a></div><div class="ttdeci">#define SRC_MODE_BLOCK(code_block)</div><div class="ttdef"><b>Definition</b> <a href="Definitions_8h_source.html#l00413">Definitions.h:413</a></div></div>
-<div class="ttc" id="astructLabel_html_a52f0ce94a73b1235d975ece70367b1ea"><div class="ttname"><a href="#a52f0ce94a73b1235d975ece70367b1ea">Label::is_extended</a></div><div class="ttdeci">bool is_extended</div><div class="ttdef"><b>Definition</b> <a href="Label_8h_source.html#l00109">Label.h:109</a></div></div>
-<div class="ttc" id="astructLabel_html_aa5098be4b306d954a4232e3e077eea6f"><div class="ttname"><a href="#aa5098be4b306d954a4232e3e077eea6f">Label::fresh</a></div><div class="ttdeci">bool fresh</div><div class="ttdef"><b>Definition</b> <a href="Label_8h_source.html#l00111">Label.h:111</a></div></div>
-<div class="ttc" id="astructLabel_html_ac020ce84080430f28f2b2651be338693"><div class="ttname"><a href="#ac020ce84080430f28f2b2651be338693">Label::visited_bitmap</a></div><div class="ttdeci">std::array&lt; uint64_t, num_words &gt; visited_bitmap</div><div class="ttdef"><b>Definition</b> <a href="Label_8h_source.html#l00099">Label.h:99</a></div></div>
-<div class="ttc" id="astructLabel_html_adc41f4aec4ecd0c1c76fd5f151aacedd"><div class="ttname"><a href="#adc41f4aec4ecd0c1c76fd5f151aacedd">Label::real_cost</a></div><div class="ttdeci">double real_cost</div><div class="ttdef"><b>Definition</b> <a href="Label_8h_source.html#l00097">Label.h:97</a></div></div>
-<div class="ttc" id="astructLabel_html_af36e4bfda4b5544e93ae446a31a49e7d"><div class="ttname"><a href="#af36e4bfda4b5544e93ae446a31a49e7d">Label::is_dominated</a></div><div class="ttdeci">bool is_dominated</div><div class="ttdef"><b>Definition</b> <a href="Label_8h_source.html#l00110">Label.h:110</a></div></div>
+<p class="definition">Definition at line <a class="el" href="Label_8h_source.html#l00304">304</a> of file <a class="el" href="Label_8h_source.html">Label.h</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  304</span>                                 {</div>
+<div class="line"><span class="lineno">  305</span>        <span class="comment">// Reset basic properties</span></div>
+<div class="line"><span class="lineno">  306</span>        <a class="code hl_variable" href="#ac6af58cb0b0d0f16da388d10f4259e6f">vertex</a>       = -1;</div>
+<div class="line"><span class="lineno">  307</span>        <a class="code hl_variable" href="#a1da1930412e730692277e75a94da77c2">cost</a>         = 0.0;</div>
+<div class="line"><span class="lineno">  308</span>        <a class="code hl_variable" href="#a51392867ea22ca35fa6eed73d0978f57">node_id</a>      = -1;</div>
+<div class="line"><span class="lineno">  309</span>        <a class="code hl_variable" href="#adc41f4aec4ecd0c1c76fd5f151aacedd">real_cost</a>    = 0.0;</div>
+<div class="line"><span class="lineno">  310</span>        <a class="code hl_variable" href="#abe52e0e4a7584f8667995991c855fd27">path_len</a>     = 0;</div>
+<div class="line"><span class="lineno">  311</span>        <a class="code hl_variable" href="#abe6462f5b9f961b2c63392921940a6cf">parent</a>       = <span class="keyword">nullptr</span>;</div>
+<div class="line"><span class="lineno">  312</span>        <a class="code hl_variable" href="#a52f0ce94a73b1235d975ece70367b1ea">is_extended</a>  = <span class="keyword">false</span>;</div>
+<div class="line"><span class="lineno">  313</span>        <a class="code hl_variable" href="#af36e4bfda4b5544e93ae446a31a49e7d">is_dominated</a> = <span class="keyword">false</span>;</div>
+<div class="line"><span class="lineno">  314</span>        <a class="code hl_variable" href="#a3c9cc3cba793a04ac66a6c69ed80c1dc">bucket_dominance_checked</a> = <span class="keyword">false</span>;</div>
+<div class="line"><span class="lineno">  315</span>        <a class="code hl_variable" href="#aa5098be4b306d954a4232e3e077eea6f">fresh</a>        = <span class="keyword">true</span>;</div>
+<div class="line"><span class="lineno">  316</span>        <span class="comment">// Reset resources container (assuming operator= clears properly)</span></div>
+<div class="line"><span class="lineno">  317</span>        <a class="code hl_variable" href="#a5f792e9fa27a10dd13bd4622b1a3044b">resources</a> = {};</div>
+<div class="line"><span class="lineno">  318</span> </div>
+<div class="line"><span class="lineno">  319</span>        <span class="comment">// Release cold output storage before this label returns to the hot</span></div>
+<div class="line"><span class="lineno">  320</span>        <span class="comment">// partial-label pool.</span></div>
+<div class="line"><span class="lineno">  321</span>        <a class="code hl_variable" href="#ab7326e695edc087ceb9200367ea413ff">route_storage</a>.reset();</div>
+<div class="line"><span class="lineno">  322</span> </div>
+<div class="line"><span class="lineno">  323</span>        <span class="comment">// Zero out the bitmaps efficiently.</span></div>
+<div class="line"><span class="lineno">  324</span>        std::memset(<a class="code hl_variable" href="#ac5629d8044403e1ba299dbffb0e49247">visited_bitmap</a>.data(), 0, <a class="code hl_variable" href="#ac5629d8044403e1ba299dbffb0e49247">visited_bitmap</a>.size() * <span class="keyword">sizeof</span>(uint64_t));</div>
+<div class="line"><span class="lineno">  325</span><span class="preprocessor">#ifdef UNREACHABLE_DOMINANCE</span></div>
+<div class="line"><span class="lineno">  326</span>        std::memset(unreachable_bitmap.data(), 0, unreachable_bitmap.size() * <span class="keyword">sizeof</span>(uint64_t));</div>
+<div class="line"><span class="lineno">  327</span><span class="preprocessor">#endif</span></div>
+<div class="line"><span class="lineno">  328</span> </div>
+<div class="line"><span class="lineno">  329</span>        <span class="comment">// If using source mode mapping, clear it.</span></div>
+<div class="line"><span class="lineno">  330</span><span class="preprocessor">#ifdef SRC</span></div>
+<div class="line"><span class="lineno">  331</span>        SRCmap.clear();</div>
+<div class="line"><span class="lineno">  332</span><span class="preprocessor">#endif</span></div>
+<div class="line"><span class="lineno">  333</span>    }</div>
+<div class="ttc" id="astructLabel_html_a3c9cc3cba793a04ac66a6c69ed80c1dc"><div class="ttname"><a href="#a3c9cc3cba793a04ac66a6c69ed80c1dc">Label::bucket_dominance_checked</a></div><div class="ttdeci">bool bucket_dominance_checked</div><div class="ttdef"><b>Definition</b> <a href="Label_8h_source.html#l00196">Label.h:196</a></div></div>
+<div class="ttc" id="astructLabel_html_a52f0ce94a73b1235d975ece70367b1ea"><div class="ttname"><a href="#a52f0ce94a73b1235d975ece70367b1ea">Label::is_extended</a></div><div class="ttdeci">bool is_extended</div><div class="ttdef"><b>Definition</b> <a href="Label_8h_source.html#l00194">Label.h:194</a></div></div>
+<div class="ttc" id="astructLabel_html_aa5098be4b306d954a4232e3e077eea6f"><div class="ttname"><a href="#aa5098be4b306d954a4232e3e077eea6f">Label::fresh</a></div><div class="ttdeci">bool fresh</div><div class="ttdef"><b>Definition</b> <a href="Label_8h_source.html#l00197">Label.h:197</a></div></div>
+<div class="ttc" id="astructLabel_html_ac5629d8044403e1ba299dbffb0e49247"><div class="ttname"><a href="#ac5629d8044403e1ba299dbffb0e49247">Label::visited_bitmap</a></div><div class="ttdeci">std::array&lt; uint64_t, bitmap_words &gt; visited_bitmap</div><div class="ttdef"><b>Definition</b> <a href="Label_8h_source.html#l00182">Label.h:182</a></div></div>
+<div class="ttc" id="astructLabel_html_adc41f4aec4ecd0c1c76fd5f151aacedd"><div class="ttname"><a href="#adc41f4aec4ecd0c1c76fd5f151aacedd">Label::real_cost</a></div><div class="ttdeci">double real_cost</div><div class="ttdef"><b>Definition</b> <a href="Label_8h_source.html#l00180">Label.h:180</a></div></div>
+<div class="ttc" id="astructLabel_html_af36e4bfda4b5544e93ae446a31a49e7d"><div class="ttname"><a href="#af36e4bfda4b5544e93ae446a31a49e7d">Label::is_dominated</a></div><div class="ttdeci">bool is_dominated</div><div class="ttdef"><b>Definition</b> <a href="Label_8h_source.html#l00195">Label.h:195</a></div></div>
 </div><!-- fragment -->
 </div>
 </div>
@@ -676,8 +966,8 @@ Here is the call graph for this function:</div>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="Label_8h_source.html#l00127">127</a> of file <a class="el" href="Label_8h_source.html">Label.h</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  127</span>{ <a class="code hl_variable" href="#af36e4bfda4b5544e93ae446a31a49e7d">is_dominated</a> = dominated; }</div>
+<p class="definition">Definition at line <a class="el" href="Label_8h_source.html#l00214">214</a> of file <a class="el" href="Label_8h_source.html">Label.h</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  214</span>{ <a class="code hl_variable" href="#af36e4bfda4b5544e93ae446a31a49e7d">is_dominated</a> = dominated; }</div>
 </div><!-- fragment -->
 </div>
 </div>
@@ -704,8 +994,8 @@ Here is the call graph for this function:</div>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="Label_8h_source.html#l00126">126</a> of file <a class="el" href="Label_8h_source.html">Label.h</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  126</span>{ <a class="code hl_variable" href="#a52f0ce94a73b1235d975ece70367b1ea">is_extended</a> = extended; }</div>
+<p class="definition">Definition at line <a class="el" href="Label_8h_source.html#l00213">213</a> of file <a class="el" href="Label_8h_source.html">Label.h</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  213</span>{ <a class="code hl_variable" href="#a52f0ce94a73b1235d975ece70367b1ea">is_extended</a> = extended; }</div>
 </div><!-- fragment -->
 </div>
 </div>
@@ -733,12 +1023,12 @@ Here is the call graph for this function:</div>
 </div><div class="memdoc">
 <p>Conservative 64-bit summary used to reject impossible visited-set subset tests before reading the complete bitmap. If A is a subset of B, signature(A) is necessarily a subset of signature(B); collisions only cause a full check, never an incorrect dominance result. </p>
 
-<p class="definition">Definition at line <a class="el" href="Label_8h_source.html#l00164">164</a> of file <a class="el" href="Label_8h_source.html">Label.h</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  164</span>                                                              {</div>
-<div class="line"><span class="lineno">  165</span>        uint64_t signature = 0;</div>
-<div class="line"><span class="lineno">  166</span>        <span class="keywordflow">for</span> (uint64_t word : <a class="code hl_variable" href="#ac020ce84080430f28f2b2651be338693">visited_bitmap</a>) signature |= word;</div>
-<div class="line"><span class="lineno">  167</span>        <span class="keywordflow">return</span> signature;</div>
-<div class="line"><span class="lineno">  168</span>    }</div>
+<p class="definition">Definition at line <a class="el" href="Label_8h_source.html#l00294">294</a> of file <a class="el" href="Label_8h_source.html">Label.h</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  294</span>                                                              {</div>
+<div class="line"><span class="lineno">  295</span>        uint64_t signature = 0;</div>
+<div class="line"><span class="lineno">  296</span>        <span class="keywordflow">for</span> (uint64_t word : <a class="code hl_variable" href="#ac5629d8044403e1ba299dbffb0e49247">visited_bitmap</a>) signature |= word;</div>
+<div class="line"><span class="lineno">  297</span>        <span class="keywordflow">return</span> signature;</div>
+<div class="line"><span class="lineno">  298</span>    }</div>
 </div><!-- fragment -->
 </div>
 </div>
@@ -768,12 +1058,52 @@ Here is the call graph for this function:</div>
 <p>Checks if a node has been visited. </p>
 <p>This function determines whether a node, identified by its node_id, has been visited. It uses a bitmask (visited_bitmap) where each bit represents the visit status of a node. </p>
 
-<p class="definition">Definition at line <a class="el" href="Label_8h_source.html#l00156">156</a> of file <a class="el" href="Label_8h_source.html">Label.h</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  156</span>{ <span class="keywordflow">return</span> <a class="code hl_variable" href="#ac020ce84080430f28f2b2651be338693">visited_bitmap</a>[<a class="code hl_variable" href="#a51392867ea22ca35fa6eed73d0978f57">node_id</a> / 64] &amp; (1ULL &lt;&lt; (<a class="code hl_variable" href="#a51392867ea22ca35fa6eed73d0978f57">node_id</a> % 64)); }</div>
+<p class="definition">Definition at line <a class="el" href="Label_8h_source.html#l00286">286</a> of file <a class="el" href="Label_8h_source.html">Label.h</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  286</span>{ <span class="keywordflow">return</span> <a class="code hl_variable" href="#ac5629d8044403e1ba299dbffb0e49247">visited_bitmap</a>[<a class="code hl_variable" href="#a51392867ea22ca35fa6eed73d0978f57">node_id</a> / 64] &amp; (1ULL &lt;&lt; (<a class="code hl_variable" href="#a51392867ea22ca35fa6eed73d0978f57">node_id</a> % 64)); }</div>
 </div><!-- fragment -->
 </div>
 </div>
 <a name="doc-variable-members" id="doc-variable-members"></a><h2 id="header-doc-variable-members" class="groupheader">Member Data Documentation</h2>
+<a id="a9077809d83373a924b5397925f40ab07" name="a9077809d83373a924b5397925f40ab07"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a9077809d83373a924b5397925f40ab07">&#9670;&#160;</a></span>bitmap_words</h2>
+
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">std::size_t Label::bitmap_words = (N_SIZE + 63) / 64</td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel static">static</span><span class="mlabel constexpr">constexpr</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+<p class="definition">Definition at line <a class="el" href="Label_8h_source.html#l00175">175</a> of file <a class="el" href="Label_8h_source.html">Label.h</a>.</p>
+
+</div>
+</div>
+<a id="a3c9cc3cba793a04ac66a6c69ed80c1dc" name="a3c9cc3cba793a04ac66a6c69ed80c1dc"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a3c9cc3cba793a04ac66a6c69ed80c1dc">&#9670;&#160;</a></span>bucket_dominance_checked</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">bool Label::bucket_dominance_checked = false</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p class="definition">Definition at line <a class="el" href="Label_8h_source.html#l00196">196</a> of file <a class="el" href="Label_8h_source.html">Label.h</a>.</p>
+
+</div>
+</div>
 <a id="a1da1930412e730692277e75a94da77c2" name="a1da1930412e730692277e75a94da77c2"></a>
 <h2 class="memtitle"><span class="permalink"><a href="#a1da1930412e730692277e75a94da77c2">&#9670;&#160;</a></span>cost</h2>
 
@@ -786,7 +1116,7 @@ Here is the call graph for this function:</div>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="Label_8h_source.html#l00096">96</a> of file <a class="el" href="Label_8h_source.html">Label.h</a>.</p>
+<p class="definition">Definition at line <a class="el" href="Label_8h_source.html#l00179">179</a> of file <a class="el" href="Label_8h_source.html">Label.h</a>.</p>
 
 </div>
 </div>
@@ -802,7 +1132,7 @@ Here is the call graph for this function:</div>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="Label_8h_source.html#l00111">111</a> of file <a class="el" href="Label_8h_source.html">Label.h</a>.</p>
+<p class="definition">Definition at line <a class="el" href="Label_8h_source.html#l00197">197</a> of file <a class="el" href="Label_8h_source.html">Label.h</a>.</p>
 
 </div>
 </div>
@@ -818,7 +1148,7 @@ Here is the call graph for this function:</div>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="Label_8h_source.html#l00110">110</a> of file <a class="el" href="Label_8h_source.html">Label.h</a>.</p>
+<p class="definition">Definition at line <a class="el" href="Label_8h_source.html#l00195">195</a> of file <a class="el" href="Label_8h_source.html">Label.h</a>.</p>
 
 </div>
 </div>
@@ -834,7 +1164,7 @@ Here is the call graph for this function:</div>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="Label_8h_source.html#l00109">109</a> of file <a class="el" href="Label_8h_source.html">Label.h</a>.</p>
+<p class="definition">Definition at line <a class="el" href="Label_8h_source.html#l00194">194</a> of file <a class="el" href="Label_8h_source.html">Label.h</a>.</p>
 
 </div>
 </div>
@@ -850,40 +1180,23 @@ Here is the call graph for this function:</div>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="Label_8h_source.html#l00106">106</a> of file <a class="el" href="Label_8h_source.html">Label.h</a>.</p>
+<p class="definition">Definition at line <a class="el" href="Label_8h_source.html#l00191">191</a> of file <a class="el" href="Label_8h_source.html">Label.h</a>.</p>
 
 </div>
 </div>
-<a id="aa8b9ad67d235d087a99a02900a54ca7f" name="aa8b9ad67d235d087a99a02900a54ca7f"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#aa8b9ad67d235d087a99a02900a54ca7f">&#9670;&#160;</a></span>nodes_covered</h2>
+<a id="abe6462f5b9f961b2c63392921940a6cf" name="abe6462f5b9f961b2c63392921940a6cf"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#abe6462f5b9f961b2c63392921940a6cf">&#9670;&#160;</a></span>parent</h2>
 
 <div class="memitem">
 <div class="memproto">
       <table class="memname">
         <tr>
-          <td class="memname">std::vector&lt;uint16_t&gt; Label::nodes_covered = {}</td>
+          <td class="memname">const <a class="el" href="structLabel.html">Label</a>* Label::parent = nullptr</td>
         </tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="Label_8h_source.html#l00114">114</a> of file <a class="el" href="Label_8h_source.html">Label.h</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  114</span>{};</div>
-</div><!-- fragment -->
-</div>
-</div>
-<a id="a4e21ca08d2080506ea9f86062af72f6d" name="a4e21ca08d2080506ea9f86062af72f6d"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#a4e21ca08d2080506ea9f86062af72f6d">&#9670;&#160;</a></span>parent</h2>
-
-<div class="memitem">
-<div class="memproto">
-      <table class="memname">
-        <tr>
-          <td class="memname"><a class="el" href="structLabel.html">Label</a>* Label::parent = nullptr</td>
-        </tr>
-      </table>
-</div><div class="memdoc">
-
-<p class="definition">Definition at line <a class="el" href="Label_8h_source.html#l00108">108</a> of file <a class="el" href="Label_8h_source.html">Label.h</a>.</p>
+<p class="definition">Definition at line <a class="el" href="Label_8h_source.html#l00193">193</a> of file <a class="el" href="Label_8h_source.html">Label.h</a>.</p>
 
 </div>
 </div>
@@ -899,7 +1212,7 @@ Here is the call graph for this function:</div>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="Label_8h_source.html#l00107">107</a> of file <a class="el" href="Label_8h_source.html">Label.h</a>.</p>
+<p class="definition">Definition at line <a class="el" href="Label_8h_source.html#l00192">192</a> of file <a class="el" href="Label_8h_source.html">Label.h</a>.</p>
 
 </div>
 </div>
@@ -915,7 +1228,7 @@ Here is the call graph for this function:</div>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="Label_8h_source.html#l00097">97</a> of file <a class="el" href="Label_8h_source.html">Label.h</a>.</p>
+<p class="definition">Definition at line <a class="el" href="Label_8h_source.html#l00180">180</a> of file <a class="el" href="Label_8h_source.html">Label.h</a>.</p>
 
 </div>
 </div>
@@ -931,9 +1244,25 @@ Here is the call graph for this function:</div>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="Label_8h_source.html#l00098">98</a> of file <a class="el" href="Label_8h_source.html">Label.h</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">   98</span>{};</div>
+<p class="definition">Definition at line <a class="el" href="Label_8h_source.html#l00181">181</a> of file <a class="el" href="Label_8h_source.html">Label.h</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  181</span>{};</div>
 </div><!-- fragment -->
+</div>
+</div>
+<a id="ab7326e695edc087ceb9200367ea413ff" name="ab7326e695edc087ceb9200367ea413ff"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#ab7326e695edc087ceb9200367ea413ff">&#9670;&#160;</a></span>route_storage</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">std::unique_ptr&lt;std::vector&lt;uint16_t&gt; &gt; Label::route_storage</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p class="definition">Definition at line <a class="el" href="Label_8h_source.html#l00201">201</a> of file <a class="el" href="Label_8h_source.html">Label.h</a>.</p>
+
 </div>
 </div>
 <a id="ac6af58cb0b0d0f16da388d10f4259e6f" name="ac6af58cb0b0d0f16da388d10f4259e6f"></a>
@@ -948,24 +1277,24 @@ Here is the call graph for this function:</div>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="Label_8h_source.html#l00105">105</a> of file <a class="el" href="Label_8h_source.html">Label.h</a>.</p>
+<p class="definition">Definition at line <a class="el" href="Label_8h_source.html#l00190">190</a> of file <a class="el" href="Label_8h_source.html">Label.h</a>.</p>
 
 </div>
 </div>
-<a id="ac020ce84080430f28f2b2651be338693" name="ac020ce84080430f28f2b2651be338693"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#ac020ce84080430f28f2b2651be338693">&#9670;&#160;</a></span>visited_bitmap</h2>
+<a id="ac5629d8044403e1ba299dbffb0e49247" name="ac5629d8044403e1ba299dbffb0e49247"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#ac5629d8044403e1ba299dbffb0e49247">&#9670;&#160;</a></span>visited_bitmap</h2>
 
 <div class="memitem">
 <div class="memproto">
       <table class="memname">
         <tr>
-          <td class="memname">std::array&lt;uint64_t, <a class="el" href="Definitions_8h.html#a38c168723ff0872970a49c6ee54e9bf7">num_words</a>&gt; Label::visited_bitmap = {0}</td>
+          <td class="memname">std::array&lt;uint64_t, <a class="el" href="#a9077809d83373a924b5397925f40ab07">bitmap_words</a>&gt; Label::visited_bitmap = {0}</td>
         </tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="Label_8h_source.html#l00099">99</a> of file <a class="el" href="Label_8h_source.html">Label.h</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">   99</span>{0};</div>
+<p class="definition">Definition at line <a class="el" href="Label_8h_source.html#l00182">182</a> of file <a class="el" href="Label_8h_source.html">Label.h</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  182</span>{0};</div>
 </div><!-- fragment -->
 </div>
 </div>

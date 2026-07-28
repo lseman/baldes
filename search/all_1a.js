@@ -11,6 +11,5 @@ var searchData=
   ['_7eschrodingerpool_8',['~SchrodingerPool',['../classSchrodingerPool.html#a99c81087ffc30180e10c3974f3f910e8',1,'SchrodingerPool']]],
   ['_7esolverinterface_9',['~SolverInterface',['../classSolverInterface.html#ab0129934acf5726f0687ba217d062628',1,'SolverInterface']]],
   ['_7esparsesolver_10',['~SparseSolver',['../classSparseSolver.html#a3caecef282cba18aa863de94135f9617',1,'SparseSolver']]],
-  ['_7esplaytree_11',['~SplayTree',['../classSplayTree.html#abe7d3b9a4f9aa5159cd13b12b4913d52',1,'SplayTree']]],
-  ['_7etaskqueue_12',['~TaskQueue',['../classTaskQueue.html#a3e39bbb7287e5942518ed0e6f729609f',1,'TaskQueue']]]
+  ['_7etaskqueue_11',['~TaskQueue',['../classTaskQueue.html#a3e39bbb7287e5942518ed0e6f729609f',1,'TaskQueue']]]
 ];

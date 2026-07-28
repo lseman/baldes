@@ -1,5 +1,4 @@
 var searchData=
 [
-  ['with_0',['with',['../classParametersBuilder.html#a1e1240278c0a415ef1563041756f1dd3',1,'ParametersBuilder']]],
-  ['write_1',['write',['../classserializer_1_1SerializationBuffer.html#ae3e2f5561bdebd72ceb7fd3bfc78a109',1,'serializer::SerializationBuffer']]]
+  ['xoroshiro128plus_0',['Xoroshiro128Plus',['../classXoroshiro128Plus.html#aea5459a30dcd0fa77f1674b3cade23ca',1,'Xoroshiro128Plus::Xoroshiro128Plus(std::uint64_t seed)'],['../classXoroshiro128Plus.html#a2cbfcc809c28ea6f9e5b1fe294d00357',1,'Xoroshiro128Plus::Xoroshiro128Plus()']]]
 ];

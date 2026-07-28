@@ -17,7 +17,7 @@ var searchData=
   ['prepare_5fcandidates_14',['prepare_candidates',['../structBucketGraph_1_1ConcatenationScratch.html#a95f64674e3fb2f039c407bec6e61d07a',1,'BucketGraph::ConcatenationScratch']]],
   ['prepare_5fpricing_5fstage_15',['prepare_pricing_stage',['../classBucketGraph.html#a2cb5131de5ccb572bda80883ebd780f7',1,'BucketGraph']]],
   ['preprocessor_16',['Preprocessor',['../classPreprocessor.html#a0f4c672b25f5a0470f5469320e4139dd',1,'Preprocessor']]],
-  ['print_17',['print',['../classbaldesCtr.html#a2a5a827c227ef92ed8e71012f9194e73',1,'baldesCtr::print()'],['../classSplayTree.html#a5c1fe02ca22d0ebd3e24ec6d64dfede7',1,'SplayTree::print()'],['../classVRPCandidate.html#ad809f2a25aae21608c98c90187dc3769',1,'VRPCandidate::print()']]],
+  ['print_17',['print',['../classbaldesCtr.html#a2a5a827c227ef92ed8e71012f9194e73',1,'baldesCtr::print()'],['../classVRPCandidate.html#ad809f2a25aae21608c98c90187dc3769',1,'VRPCandidate::print()']]],
   ['print_5fblue_18',['print_blue',['../Definitions_8h.html#a90c8aebbd6bc576685f4ed297412aa39',1,'Definitions.h']]],
   ['print_5fbranching_19',['print_branching',['../Definitions_8h.html#af576d1ee32f587dbbccb77e46e4ce2bb',1,'Definitions.h']]],
   ['print_5fcut_20',['print_cut',['../Definitions_8h.html#ae7a1dede4b1a1d5175d2cfa359459e3c',1,'Definitions.h']]],

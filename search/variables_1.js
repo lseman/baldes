@@ -9,7 +9,7 @@ var searchData=
   ['ad_6',['AD',['../classSparseSolver.html#a6dbb6f3775b6e8fee8376915ff55e16d',1,'SparseSolver']]],
   ['add_7',['add',['../structCutStorage_1_1SRCNodeUpdate.html#ae17297ff0990aa82c58dcca6bd457a12',1,'CutStorage::SRCNodeUpdate']]],
   ['added_8',['added',['../structCut.html#acbc86b8beefd19f5e8b5dcbd876ed06f',1,'Cut']]],
-  ['age_5fdecay_5falpha_5f_9',['age_decay_alpha_',['../classCutStorage.html#a62f4dfeb08c8cb59a1a7c0afacfe4054',1,'CutStorage::age_decay_alpha_'],['../classRCCManager.html#a65c17830c79b8892a347d936e9b2be02',1,'RCCManager::age_decay_alpha_']]],
+  ['age_5fdecay_5falpha_5f_9',['age_decay_alpha_',['../classRCCManager.html#a65c17830c79b8892a347d936e9b2be02',1,'RCCManager::age_decay_alpha_'],['../classCutStorage.html#a62f4dfeb08c8cb59a1a7c0afacfe4054',1,'CutStorage::age_decay_alpha_']]],
   ['allpaths_10',['allPaths',['../classHighRankCuts.html#afab18d7c165bea2a9b9f3a44497033d5',1,'HighRankCuts::allPaths'],['../classLimitedMemoryRank1Cuts.html#aaad518dd2434c218df7e9283238a6577',1,'LimitedMemoryRank1Cuts::allPaths']]],
   ['alpha_11',['alpha',['../classStabilization.html#aec3c3704ce91da277ffde90c631dbde6',1,'Stabilization']]],
   ['arc_5fduals_12',['arc_duals',['../classHighRankCuts.html#a0f9958493805b966e093aeddb0498a61',1,'HighRankCuts']]],

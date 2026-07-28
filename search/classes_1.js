@@ -13,9 +13,11 @@ var searchData=
   ['bucketarc_10',['BucketArc',['../structBucketArc.html',1,'']]],
   ['bucketdirectionalbounds_11',['BucketDirectionalBounds',['../structBucketGraph_1_1BucketDirectionalBounds.html',1,'BucketGraph']]],
   ['bucketgraph_12',['BucketGraph',['../classBucketGraph.html',1,'']]],
-  ['bucketlabelsoaview_13',['BucketLabelSoAView',['../structBucketLabelSoAView.html',1,'']]],
-  ['bucketoptions_14',['BucketOptions',['../structBucketOptions.html',1,'']]],
-  ['bucketpricingpass_15',['BucketPricingPass',['../structBucketGraph_1_1BucketPricingPass.html',1,'BucketGraph']]],
-  ['bucketpricingresult_16',['BucketPricingResult',['../structBucketGraph_1_1BucketPricingResult.html',1,'BucketGraph']]],
-  ['bucketstagedecision_17',['BucketStageDecision',['../structBucketGraph_1_1BucketStageDecision.html',1,'BucketGraph']]]
+  ['bucketlabelcacheentry_13',['BucketLabelCacheEntry',['../structBucketLabelCacheEntry.html',1,'']]],
+  ['bucketlabelsoaview_14',['BucketLabelSoAView',['../structBucketLabelSoAView.html',1,'']]],
+  ['bucketoptions_15',['BucketOptions',['../structBucketOptions.html',1,'']]],
+  ['bucketpricingpass_16',['BucketPricingPass',['../structBucketGraph_1_1BucketPricingPass.html',1,'BucketGraph']]],
+  ['bucketpricingresult_17',['BucketPricingResult',['../structBucketGraph_1_1BucketPricingResult.html',1,'BucketGraph']]],
+  ['bucketpricingtimings_18',['BucketPricingTimings',['../structBucketGraph_1_1BucketPricingTimings.html',1,'BucketGraph']]],
+  ['bucketstagedecision_19',['BucketStageDecision',['../structBucketGraph_1_1BucketStageDecision.html',1,'BucketGraph']]]
 ];
