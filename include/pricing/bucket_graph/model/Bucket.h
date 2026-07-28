@@ -31,6 +31,15 @@ struct BucketLabelSoAView {
     std::span<const double>                    costs;
     std::array<std::span<const double>, R_SIZE> resources;
     std::span<const uint64_t>                   visited_signatures;
+    std::array<std::span<const uint64_t>, Label::bitmap_words> visited_words;
+};
+
+struct BucketLabelCacheEntry {
+    Label                                         *label = nullptr;
+    double                                         cost  = 0.0;
+    std::array<double, R_SIZE>                     resources{};
+    uint64_t                                       visited_signature = 0;
+    std::array<uint64_t, Label::bitmap_words>      visited_words{};
 };
 
 struct alignas(64) Bucket {
@@ -49,6 +58,7 @@ struct alignas(64) Bucket {
     mutable std::vector<double>       soa_costs;
     mutable std::array<std::vector<double>, R_SIZE> soa_resources;
     mutable std::vector<uint64_t>     soa_visited_signatures;
+    mutable std::array<std::vector<uint64_t>, Label::bitmap_words> soa_visited_words;
     mutable bool                      soa_valid = false;
 
     // Virtual split: an index that logically partitions the labels vector.
@@ -87,12 +97,16 @@ struct alignas(64) Bucket {
         soa_costs.resize(labels.size());
         soa_visited_signatures.resize(labels.size());
         for (auto &resource_values : soa_resources) { resource_values.resize(labels.size()); }
+        for (auto &visited_word : soa_visited_words) { visited_word.resize(labels.size()); }
 
         for (size_t i = 0; i < labels.size(); ++i) {
             const Label *label = labels[i];
             soa_costs[i]       = label->cost;
             soa_visited_signatures[i] = label->visited_signature();
             for (size_t r = 0; r < R_SIZE; ++r) { soa_resources[r][i] = label->resources[r]; }
+            for (size_t w = 0; w < Label::bitmap_words; ++w) {
+                soa_visited_words[w][i] = label->visited_bitmap[w];
+            }
         }
         soa_valid = true;
     }
@@ -105,6 +119,9 @@ struct alignas(64) Bucket {
             std::span<const uint64_t>(soa_visited_signatures.data() + offset, count);
         for (size_t r = 0; r < R_SIZE; ++r) {
             view.resources[r] = std::span<const double>(soa_resources[r].data() + offset, count);
+        }
+        for (size_t w = 0; w < Label::bitmap_words; ++w) {
+            view.visited_words[w] = std::span<const uint64_t>(soa_visited_words[w].data() + offset, count);
         }
         return view;
     }
@@ -122,9 +139,8 @@ struct alignas(64) Bucket {
         flush_extra_labels();
         if (labels.size() < 2 || is_virtual_split) return;
 
-        // Ensure labels are sorted by cost.
-        pdqsort(labels.begin(), labels.end(), [](const Label *a, const Label *b) { return a->cost < b->cost; });
-        invalidate_label_cache();
+        // flush_extra_labels() leaves the committed tier sorted and keeps an
+        // already-valid SoA cache valid. Avoid a redundant sort/cache rebuild.
         // Set the virtual split index at the median.
         virtual_split_index = labels.size() / 2;
         if (virtual_split_index >= labels.size()) { virtual_split_index = labels.size() - 1; }
@@ -135,21 +151,67 @@ struct alignas(64) Bucket {
         if (extra_labels.empty()) return;
 
         const auto old_size = labels.size();
-        labels.insert(labels.end(), extra_labels.begin(), extra_labels.end());
 #ifndef NDEBUG
-        assert(std::is_sorted(labels.begin(), labels.begin() + static_cast<std::ptrdiff_t>(old_size),
+        assert(std::is_sorted(labels.begin(), labels.end(),
                               [](const Label *a, const Label *b) { return a->cost < b->cost; }));
 #endif
-        pdqsort(labels.begin() + static_cast<std::ptrdiff_t>(old_size), labels.end(),
-                [](const Label *a, const Label *b) { return a->cost < b->cost; });
-        std::inplace_merge(labels.begin(), labels.begin() + static_cast<std::ptrdiff_t>(old_size), labels.end(),
-                           [](const Label *a, const Label *b) { return a->cost < b->cost; });
+        // Preserve the committed SoA and materialize cache fields only for the
+        // staged delta. Merge cache records and labels in one ordered pass.
+        if (old_size != 0) ensure_label_cache();
+        static thread_local std::vector<BucketLabelCacheEntry> merge_entries;
+        merge_entries.clear();
+        merge_entries.reserve(old_size + extra_labels.size());
+
+        for (size_t i = 0; i < old_size; ++i) {
+            BucketLabelCacheEntry entry;
+            entry.label             = labels[i];
+            entry.cost              = soa_costs[i];
+            entry.visited_signature = soa_visited_signatures[i];
+            for (size_t r = 0; r < R_SIZE; ++r) entry.resources[r] = soa_resources[r][i];
+            for (size_t w = 0; w < Label::bitmap_words; ++w) {
+                entry.visited_words[w] = soa_visited_words[w][i];
+            }
+            merge_entries.push_back(entry);
+        }
+
+        for (Label *label : extra_labels) {
+            BucketLabelCacheEntry entry;
+            entry.label             = label;
+            entry.cost              = label->cost;
+            entry.resources         = label->resources;
+            entry.visited_signature = label->visited_signature();
+            entry.visited_words     = label->visited_bitmap;
+            merge_entries.push_back(entry);
+        }
+
+        auto by_cost = [](const BucketLabelCacheEntry &a, const BucketLabelCacheEntry &b) {
+            return a.cost < b.cost;
+        };
+        pdqsort(merge_entries.begin() + static_cast<std::ptrdiff_t>(old_size), merge_entries.end(), by_cost);
+        std::inplace_merge(merge_entries.begin(), merge_entries.begin() + static_cast<std::ptrdiff_t>(old_size),
+                           merge_entries.end(), by_cost);
+
+        labels.resize(merge_entries.size());
+        soa_costs.resize(merge_entries.size());
+        soa_visited_signatures.resize(merge_entries.size());
+        for (auto &resource_values : soa_resources) resource_values.resize(merge_entries.size());
+        for (auto &visited_word : soa_visited_words) visited_word.resize(merge_entries.size());
+        for (size_t i = 0; i < merge_entries.size(); ++i) {
+            const auto &entry        = merge_entries[i];
+            labels[i]                = entry.label;
+            soa_costs[i]             = entry.cost;
+            soa_visited_signatures[i] = entry.visited_signature;
+            for (size_t r = 0; r < R_SIZE; ++r) soa_resources[r][i] = entry.resources[r];
+            for (size_t w = 0; w < Label::bitmap_words; ++w) {
+                soa_visited_words[w][i] = entry.visited_words[w];
+            }
+        }
 #ifndef NDEBUG
         assert(std::is_sorted(labels.begin(), labels.end(),
                               [](const Label *a, const Label *b) { return a->cost < b->cost; }));
 #endif
         extra_labels.clear();
-        invalidate_label_cache();
+        soa_valid = true;
         min_cost = std::numeric_limits<double>::max();
 
         is_virtual_split    = false;
@@ -172,7 +234,7 @@ struct alignas(64) Bucket {
     size_t compact_dominated_labels() {
         size_t removed = 0;
 
-        const auto compact = [&removed](auto &label_vec) {
+        const auto compact_extra = [&removed](auto &label_vec) {
             const auto old_size = label_vec.size();
             size_t     write    = 0;
             for (size_t read = 0; read < label_vec.size(); ++read) {
@@ -185,9 +247,34 @@ struct alignas(64) Bucket {
             removed += old_size - label_vec.size();
         };
 
-        compact(labels);
-        compact(extra_labels);
-        if (removed > 0) invalidate_label_cache();
+        const size_t old_committed_size = labels.size();
+        size_t       write              = 0;
+        for (size_t read = 0; read < old_committed_size; ++read) {
+            Label *label = labels[read];
+            if (label == nullptr || label->is_dominated) continue;
+            if (write != read) {
+                labels[write] = label;
+                if (soa_valid) {
+                    soa_costs[write]             = soa_costs[read];
+                    soa_visited_signatures[write] = soa_visited_signatures[read];
+                    for (size_t r = 0; r < R_SIZE; ++r) soa_resources[r][write] = soa_resources[r][read];
+                    for (size_t w = 0; w < Label::bitmap_words; ++w) {
+                        soa_visited_words[w][write] = soa_visited_words[w][read];
+                    }
+                }
+            }
+            ++write;
+        }
+        labels.resize(write);
+        removed += old_committed_size - write;
+        if (soa_valid) {
+            soa_costs.resize(write);
+            soa_visited_signatures.resize(write);
+            for (auto &resource_values : soa_resources) resource_values.resize(write);
+            for (auto &visited_word : soa_visited_words) visited_word.resize(write);
+        }
+
+        compact_extra(extra_labels);
 
         min_cost = std::numeric_limits<double>::max();
         for (Label *label : extra_labels) {
@@ -306,8 +393,6 @@ struct alignas(64) Bucket {
 
     void sort() {
         flush_extra_labels();
-        pdqsort(labels.begin(), labels.end(), [](const Label *a, const Label *b) { return a->cost < b->cost; });
-        invalidate_label_cache();
     }
 
     /**

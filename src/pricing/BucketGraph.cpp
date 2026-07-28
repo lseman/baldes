@@ -576,6 +576,9 @@ void BucketGraph::mono_initialization() {
 
     dominance_checks_per_bucket.assign(fw_buckets_size + 1, 0);
     non_dominated_labels_per_bucket = 0;
+    non_dominated_labels_per_bucket_bw = 0;
+    regen_dominance_checks_fw = 0;
+    regen_dominance_checks_bw = 0;
 
     // Resize cost vectors to match the number of buckets
     fw_c_bar.resize(fw_buckets_size, std::numeric_limits<double>::infinity());
@@ -1008,10 +1011,8 @@ Label *BucketGraph::compute_mono_label(const Label *L) {
     new_label->cost      = L->cost;      // Use the cost from L
     new_label->real_cost = L->real_cost; // Use the real cost from L
     new_label->path_len  = L->path_len;
-    auto &route          = new_label->nodes_covered;
-    route.clear();
-    route.reserve(L->nodes_covered.size());
-    route.insert(route.end(), L->nodes_covered.begin(), L->nodes_covered.end());
+    auto &route = new_label->mutableRoute();
+    L->materializeRoute(route);
 
     // Calculate the number of nodes covered by the label (its ancestors)
     // size_t label_size = 0;

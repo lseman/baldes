@@ -21,12 +21,17 @@ jobs:
         with:
           doxyfile-path: './Doxyfile'
 
+      - name: Move to docs/ subdirectory
+        run: |
+          mkdir -p docs
+          mv html docs/html
+
       - name: GH Pages Deployment
         uses: peaceiris/actions-gh-pages@v3
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./html/
+          publish_dir: ./docs/html
+          keep_files: true
           enable_jekyll: false
           allow_empty_commit: false
-          force_orphan: true
           publish_branch: gh-pages

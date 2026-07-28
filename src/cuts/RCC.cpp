@@ -6,10 +6,10 @@
  *
  */
 
-#include "cuts/RCC.h"
+#include "cuts/capacity/RCC.h"
 
-#include "cuts/Cut.h"
 #include "bnb/Node.h"
+#include "cuts/model/Cut.h"
 
 ArcDuals RCCManager::computeDuals(BNBNode *model, double threshold) {
     ArcDuals arcDuals;
