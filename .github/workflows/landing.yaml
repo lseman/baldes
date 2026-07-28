@@ -1,0 +1,31 @@
+name: Landing Page
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'landing/**'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    name: "Deploy landing"
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: GH Pages Deployment
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./landing
+          keep_files: true
+          enable_jekyll: false
+          allow_empty_commit: false
+          publish_branch: gh-pages
