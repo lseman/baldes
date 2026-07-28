@@ -21,12 +21,6 @@ jobs:
         with:
           doxyfile-path: './Doxyfile'
 
-      - name: Move to docs/ subdirectory
-        run: |
-          rm -rf docs/html html
-          mkdir -p docs/html
-          cp -r html docs/html/ 2>/dev/null || true
-
       - name: GH Pages Deployment
         uses: peaceiris/actions-gh-pages@v3
         with:

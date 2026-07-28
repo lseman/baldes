@@ -7,7 +7,7 @@ PROJECT_LOGO           =
 
 # Input and output settings
 INPUT = ./src ./include ./bucket
-OUTPUT_DIRECTORY       = 
+OUTPUT_DIRECTORY       = ./docs
 RECURSIVE              = YES
 
 # File patterns to consider
