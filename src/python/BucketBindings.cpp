@@ -7,12 +7,12 @@
 #include <pybind11/stl.h>
 #include <pybind11/stl_bind.h>
 
-#include "pricing/BucketGraph.h"
-#include "pricing/BucketSolve.h"
-#include "pricing/BucketUtils.h"
+#include "pricing/bucket_graph/BucketGraph.h"
+#include "pricing/bucket_graph/Labeling.h"
+#include "pricing/bucket_graph/Utilities.h"
 #include "core/Definitions.h"
 #include "model/Arc.h"
-#include "model/Label.h"
+#include "pricing/bucket_graph/model/Label.h"
 #include "model/VRPNode.h"
 #include "search/Dual.h"
 
@@ -197,6 +197,8 @@ PYBIND11_MODULE(pybaldes, m) {
                        &BucketOptions::resource_type) // Expose resource_type field
         .def_readwrite("bucket_fixing",
                        &BucketOptions::bucket_fixing) // Expose bucket_fixing field
+        .def_readwrite("profile_labeling",
+                       &BucketOptions::profile_labeling) // Enable detailed labeling counters
         .def("__repr__", [](const BucketOptions &options) {
             return "<BucketOptions depot=" + std::to_string(options.depot) +
                    " end_depot=" + std::to_string(options.end_depot) +

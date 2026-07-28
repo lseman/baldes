@@ -15,7 +15,7 @@
 #include <stdexec/execution.hpp>
 
 #include "math/Common.h"
-#include "model/Label.h"
+#include "pricing/bucket_graph/model/Label.h"
 #include "model/Path.h"
 #include "core/TaskQueue.h"
 #include "model/VRPNode.h"

@@ -11,7 +11,7 @@
 #include "core/Pools.h"
 #include "algebra/SparseMatrix.h"
 #include "ankerl/unordered_dense.h"
-#include "pricing/BucketGraph.h"
+#include "pricing/bucket_graph/BucketGraph.h"
 #include "mip/LinExp.h"
 #include "mip/MIPHandler.h"
 // #include "xxhash.h"

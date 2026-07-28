@@ -1,5 +1,5 @@
 /**
- * @file BCP.h
+ * @file VRProblem.h
  * @brief Header file for the BCP class.
  *
  */
@@ -16,9 +16,12 @@
 
 // #include "search/TR.h"
 #include "bnb/Node.h"
-#include "pricing/BucketGraph.h"
-#include "pricing/BucketSolve.h"
-#include "pricing/BucketUtils.h"
+#include "bnb/bcp/MasterSolution.h"
+#include "bnb/bcp/PricingState.h"
+#include "bnb/bcp/Progress.h"
+#include "pricing/bucket_graph/BucketGraph.h"
+#include "pricing/bucket_graph/Labeling.h"
+#include "pricing/bucket_graph/Utilities.h"
 #include "solvers/Gurobi.h"
 
 #ifdef STAB
@@ -78,64 +81,23 @@ public:
     RCCManager rccManager;
 #endif
 
-    static constexpr double kVarIntegralityTol = 1e-6;
-    static constexpr double kBinaryTol         = 1e-5;
-    static constexpr double kRowFeasTol        = 1e-5;
-    static constexpr double kPricingTol        = 1e-6;
+    static constexpr double kVarIntegralityTol = baldes::bcp::kVarIntegralityTol;
+    static constexpr double kBinaryTol         = baldes::bcp::kBinaryTol;
+    static constexpr double kRowFeasTol        = baldes::bcp::kRowFeasTol;
+    static constexpr double kPricingTol        = baldes::bcp::kPricingTol;
 
     static inline bool hasNegativeReducedCost(double inner_obj, double tol = kPricingTol) {
-        return std::isfinite(inner_obj) && inner_obj < -tol;
+        return baldes::bcp::hasNegativeReducedCost(inner_obj, tol);
     }
 
     static inline bool isIntegerSolution(const std::vector<double> &solution, double tol = kVarIntegralityTol) {
-        for (double x : solution) {
-            if (!std::isfinite(x)) return false;
-            const double nearest = std::round(x);
-            if (std::abs(x - nearest) > tol) return false;
-        }
-        return true;
+        return baldes::bcp::isIntegerSolution(solution, tol);
     }
 
     static inline bool detectIntegerMasterSolution(const std::vector<double> &solution, const ModelData &matrix,
                                                    double &integer_obj, double bin_tol = kBinaryTol,
                                                    double row_tol = kRowFeasTol) {
-        const size_t n = std::min(solution.size(), matrix.c.size());
-        if (n == 0) return false;
-
-        std::vector<double> x_bin(n, 0.0);
-        for (size_t j = 0; j < n; ++j) {
-            const double x = solution[j];
-            if (!std::isfinite(x)) return false;
-            if (x < -bin_tol || x > 1.0 + bin_tol) return false;
-
-            if (std::abs(x) <= bin_tol) {
-                x_bin[j] = 0.0;
-            } else if (std::abs(x - 1.0) <= bin_tol) {
-                x_bin[j] = 1.0;
-            } else {
-                return false;
-            }
-        }
-
-        // Feasibility check on master rows.
-        auto lhs = matrix.A_sparse.multiply(x_bin);
-        if (lhs.size() != matrix.b.size() || lhs.size() != matrix.sense.size()) { return false; }
-        for (size_t r = 0; r < lhs.size(); ++r) {
-            const double ar = lhs[r];
-            const double br = matrix.b[r];
-            const char   s  = matrix.sense[r];
-            if (s == '<') {
-                if (ar > br + row_tol) return false;
-            } else if (s == '>') {
-                if (ar < br - row_tol) return false;
-            } else { // '='
-                if (std::abs(ar - br) > row_tol) return false;
-            }
-        }
-
-        integer_obj = 0.0;
-        for (size_t j = 0; j < n; ++j) { integer_obj += matrix.c[j] * x_bin[j]; }
-        return std::isfinite(integer_obj);
+        return baldes::bcp::detectIntegerMasterSolution(solution, matrix, integer_obj, bin_tol, row_tol);
     }
 
     static inline bool updateIncumbentFromMaster(bool integer, double lp_obj, double &integer_solution,
@@ -153,94 +115,11 @@ public:
                                        int col_added, int stage, double lag_gap, double cur_alpha, double tr_val,
                                        double gap, double integer_solution, double bucketgraph_th,
                                        uint64_t concat_tested = 0, uint64_t concat_accepted = 0) {
-        constexpr int threshold   = 1000000;
-        std::string   lag_gap_str = (lag_gap > threshold) ? "∞" : fmt::format("{:10.4f}", lag_gap);
-        std::string   int_sol_str;
-        if (integer_solution > threshold) {
-            int_sol_str = "∞";
-        } else if (std::abs(integer_solution - std::round(integer_solution)) <= kVarIntegralityTol) {
-            int_sol_str = fmt::format("{:.0f}", integer_solution);
-        } else {
-            int_sol_str = fmt::format("{:.6f}", integer_solution);
-        }
-
-        fmt::print("| It.: {:4} | Obj.: {:8.2f} | Price: {:9.2f} | SRC: {:3} "
-                   "| RCC: {:3} | Paths: {:3} | "
-                   "Stage: {:1} | Cat: {:5}/{:<5} | "
-                   "Lag.: {:>10} | α: {:4.2f} | tr: {:2.2f} | gap: {:2.4f} "
-                   "| Int.: {:>4} | Th: {:4.2f} |\n",
-                   iter, lp_obj, inner_obj, n_cuts, n_rcc_cuts, col_added, stage, concat_accepted, concat_tested,
-                   lag_gap_str, cur_alpha, tr_val, gap, int_sol_str, bucketgraph_th);
-
-        Logger::log("| It.: {:4} | Obj.: {:8.2f} | Price: {:9.2f} | SRC: "
-                    "{:3} "
-                    "| RCC: {:3} | Paths: {:3} | "
-                    "Stage: {:1} | Cat: {:5}/{:<5} | "
-                    "Lag.: {:10.4f} | α: {:4.2f} | tr: {:2.2f} | gap: "
-                    "{:2.4f} "
-                    "|\n",
-                    iter, lp_obj, inner_obj, n_cuts, n_rcc_cuts, col_added, stage, concat_accepted, concat_tested,
-                    lag_gap, cur_alpha, tr_val, gap);
+        baldes::bcp::printCgProgress(iter, lp_obj, inner_obj, n_cuts, n_rcc_cuts, col_added, stage, lag_gap, cur_alpha,
+                                     tr_val, gap, integer_solution, bucketgraph_th, concat_tested, concat_accepted);
     }
 
-    struct PricingStateMachine {
-        bool enumerate            = false;
-        int  exact_pricing_passes = 0;
-        int  hgs_interval         = 5;
-        int  failed_enumerations  = 0;
-        int  retry_enumeration_at = 0;
-
-        void recordPricingStage(int stage) {
-            if (stage == 4) { ++exact_pricing_passes; }
-        }
-
-        bool handleEnumerationFailure(BucketGraph *bucket_graph) {
-            if (!bucket_graph->enumerationFailed()) return false;
-            enumerate = false;
-            ++failed_enumerations;
-            retry_enumeration_at = exact_pricing_passes + std::min(10, std::max(1, failed_enumerations));
-            bucket_graph->clearEnumerationFailure();
-            print_info("Enumeration cap reached; falling back to exact pricing\n");
-            return true;
-        }
-
-        static double lowerBound(double lp_obj, int numK, double inner_obj) {
-            return lp_obj + numK * std::min(0.0, inner_obj);
-        }
-
-        static bool cutsStable(const BucketGraph *bucket_graph, bool non_violated_cuts, int non_violated_ctr) {
-            return non_violated_cuts && bucket_graph->A_MAX == N_SIZE &&
-                   non_violated_ctr >= bucket_graph->enumeration_policy.min_stable_cut_passes;
-        }
-
-        bool maybeStartEnumeration(BucketGraph *bucket_graph, double pricing_lower_bound, bool cuts_stable,
-                                   bool no_negative_pricing, double inner_obj) {
-            if (enumerate) return false;
-            if (exact_pricing_passes < retry_enumeration_at) return false;
-            if (!bucket_graph->shouldAttemptEnumeration(pricing_lower_bound, cuts_stable, exact_pricing_passes,
-                                                        no_negative_pricing)) {
-                return false;
-            }
-
-            const double rel_gap = bucket_graph->relative_gap_to_incumbent(pricing_lower_bound);
-            print_info("{} and relative gap {:.4f}; trying enumeration (pricing {:.6g})\n",
-                       no_negative_pricing ? "No negative pricing/cuts" : "Stable cuts/small gap", rel_gap, inner_obj);
-            bucket_graph->enableEnumeration(pricing_lower_bound);
-            enumerate = true;
-            return true;
-        }
-
-        bool shouldForceCuts(int colAdded, double inner_obj, int stage) const {
-            return stage == 4 && colAdded == 0 && !hasNegativeReducedCost(inner_obj);
-        }
-
-        bool shouldRunHGS(int iter, int stage, int colAdded) const {
-            if (enumerate) return false;
-            if (colAdded == 0) return true;
-            if (stage >= 4) return iter % hgs_interval == 0;
-            return false;
-        }
-    };
+    using PricingStateMachine = baldes::bcp::PricingState;
 
 #ifdef ITERATIVE_HGS
     struct HGSIntegrationStats {

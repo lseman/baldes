@@ -5,7 +5,7 @@
 
 #pragma once
 
-#include "pricing/BucketGraph.h"
+#include "pricing/bucket_graph/BucketGraph.h"
 
 inline BucketGraph::BucketStageDecision BucketGraph::current_bucket_pricing_stage() const noexcept {
     if (depth != 0) return {};

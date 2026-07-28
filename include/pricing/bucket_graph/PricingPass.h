@@ -5,8 +5,8 @@
 
 #pragma once
 
-#include "pricing/BucketConcat.h"
-#include "pricing/BucketGraph.h"
+#include "pricing/bucket_graph/Concatenation.h"
+#include "pricing/bucket_graph/BucketGraph.h"
 
 template <Stage S, Symmetry SYM>
 std::vector<Label *> BucketGraph::bi_labeling_algorithm() {
@@ -110,7 +110,13 @@ void BucketGraph::concatenate_from_forward_arc(const Label *label, const BucketA
     }
 #endif
 
+    // Forward and backward buckets use opposite physical numbering. Convert
+    // the actual post-arc resource state before walking backward Phi; reusing
+    // the forward bucket id would start from the wrong physical interval.
     int bucket_to_process = extended_bucket;
+    if constexpr (SYM == Symmetry::Asymmetric) {
+        bucket_to_process = get_bucket_number<Direction::Backward>(to_node, splice_resources);
+    }
     concatenate_label_from_bucket<S, SYM>(label, bucket_to_process, pass.best_cost, chunk_candidates, &splice_state);
 }
 

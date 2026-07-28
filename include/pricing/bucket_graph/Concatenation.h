@@ -5,7 +5,7 @@
 
 #pragma once
 
-#include "pricing/BucketGraph.h"
+#include "pricing/bucket_graph/BucketGraph.h"
 #include "utils/NumericUtils.h"
 
 template <Stage S>

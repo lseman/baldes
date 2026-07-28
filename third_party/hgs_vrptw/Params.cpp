@@ -7,15 +7,15 @@
 #include <string>
 #include <vector>
 
-#include "../Definitions.h"
-#include "Reader.h"
+#include "core/Definitions.h"
+#include "utils/Reader.h"
 
 #include "CircleSector.h"
 #include "Matrix.h"
 
 #include "Params.h"
 
-#include "../RNG.h"
+#include "math/RNG.h"
 
 Params::Params(const InstanceData &instance) {
     // Read and create some parameter values from the commandline

@@ -11,7 +11,7 @@
 #include <string>
 #include <vector>
 
-#include "bnb/BCP.h"
+#include "bnb/bcp/VRProblem.h"
 #include "bnb/BNB.h"
 #include "bnb/Node.h"
 #include "core/Definitions.h"

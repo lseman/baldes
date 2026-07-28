@@ -9,7 +9,7 @@
 #pragma once
 
 #include "math/Common.h"
-#include "model/Label.h"
+#include "pricing/bucket_graph/model/Label.h"
 #include "model/Path.h"
 #include "model/VRPNode.h"
 
