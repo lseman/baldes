@@ -1,0 +1,11 @@
+<map id="BucketGraph::get_opposite_bucket_number" name="BucketGraph::get_opposite_bucket_number">
+<area shape="rect" id="Node000001" title="Get the opposite bucket number for a given bucket index." alt="" coords="5,63,183,103"/>
+<area shape="rect" id="Node000002" href="$classBucketGraph.html#addbec0c4c3ef8fa8e96063b04dd945ca" title=" " alt="" coords="231,63,398,103"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="183,80,215,80,215,86,183,86"/>
+<area shape="rect" id="Node000003" href="$classBucketGraph.html#af129eff306551dc7cc7fe00b919bbbd0" title="Assigns the buckets based on the specified direction." alt="" coords="446,5,587,46"/>
+<area shape="poly" id="edge2_Node000002_Node000003" title=" " alt="" coords="388,60,430,47,432,52,389,65"/>
+<area shape="rect" id="Node000004" href="$namespacenumericutils.html#a30fadd8aa82c3a907ce52a6c1735a378" title=" " alt="" coords="462,70,571,96"/>
+<area shape="poly" id="edge3_Node000002_Node000004" title=" " alt="" coords="399,80,447,80,447,86,399,86"/>
+<area shape="rect" id="Node000005" href="$namespacenumericutils.html#a2124ad1e887fe39c413948ee927c879e" title=" " alt="" coords="464,120,569,145"/>
+<area shape="poly" id="edge4_Node000002_Node000005" title=" " alt="" coords="399,101,450,114,449,119,398,106"/>
+</map>

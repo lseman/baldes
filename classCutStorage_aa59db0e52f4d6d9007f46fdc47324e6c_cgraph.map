@@ -1,0 +1,5 @@
+<map id="CutStorage::addCut" name="CutStorage::addCut">
+<area shape="rect" id="Node000001" title="Adds a cut to the CutStorage." alt="" coords="5,13,139,38"/>
+<area shape="rect" id="Node000002" href="$classCutStorage.html#a6c546f704d593f06544a3e7aed508dc8" title="Computes a unique cut key based on the provided base set and multipliers." alt="" coords="187,5,329,46"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="139,23,171,23,171,28,139,28"/>
+</map>

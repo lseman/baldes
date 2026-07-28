@@ -1,0 +1,7 @@
+<map id="BranchingDuals::computeDuals" name="BranchingDuals::computeDuals">
+<area shape="rect" id="Node000001" title=" " alt="" coords="5,31,207,56"/>
+<area shape="rect" id="Node000002" href="$classBNBNode.html#a7c216d32f620367175809ffa6c56fb97" title=" " alt="" coords="255,5,404,31"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="206,29,239,26,240,31,207,35"/>
+<area shape="rect" id="Node000003" href="$classBranchingDuals.html#a8cfa95af83dab193f7dfd2ffee2b841a" title=" " alt="" coords="259,55,400,80"/>
+<area shape="poly" id="edge2_Node000001_Node000003" title=" " alt="" coords="207,52,244,56,243,61,206,57"/>
+</map>

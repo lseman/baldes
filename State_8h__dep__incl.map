@@ -1,0 +1,35 @@
+<map id="State.h" name="State.h">
+<area shape="rect" id="Node000001" title=" " alt="" coords="103,5,165,31"/>
+<area shape="rect" id="Node000002" href="$Node_8h.html" title="Node class implementation." alt="" coords="231,79,293,105"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="170,37,241,76,239,81,167,41"/>
+<area shape="rect" id="Node000010" href="$VRProblem_8h.html" title="Header file for the BCP class." alt="" coords="94,226,192,252"/>
+<area shape="poly" id="edge20_Node000001_Node000010" title=" " alt="" coords="117,45,100,73,85,106,78,142,79,160,84,177,103,204,126,224,122,228,99,207,79,179,74,161,73,142,80,104,96,70,113,42"/>
+<area shape="rect" id="Node000003" href="$BNB_8h.html" title=" " alt="" coords="29,300,89,326"/>
+<area shape="poly" id="edge2_Node000002_Node000003" title=" " alt="" coords="216,98,182,103,146,114,112,130,84,154,72,171,64,191,57,232,56,270,60,299,54,300,51,271,51,231,59,189,68,169,80,151,109,126,144,109,181,98,215,93"/>
+<area shape="rect" id="Node000004" href="$Baldes_8cpp.html" title="Main entry point for the BALDES branch&#45;cut&#45;and&#45;price solver." alt="" coords="16,374,102,399"/>
+<area shape="poly" id="edge4_Node000002_Node000004" title=" " alt="" coords="215,97,178,102,138,112,98,129,64,155,30,194,12,232,9,274,20,325,33,351,49,372,45,375,29,354,15,327,4,275,7,231,26,191,60,151,95,125,136,107,177,97,215,92"/>
+<area shape="rect" id="Node000005" href="$Branching_8cpp.html" title=" " alt="" coords="479,374,583,399"/>
+<area shape="poly" id="edge5_Node000002_Node000005" title=" " alt="" coords="308,90,398,92,506,100,558,108,605,118,642,133,668,151,678,166,684,182,684,214,672,247,651,279,626,309,598,336,550,375,546,371,594,332,622,305,647,276,667,244,679,213,679,183,673,168,664,155,640,137,603,124,557,113,506,106,398,97,308,95"/>
+<area shape="rect" id="Node000006" href="$Branching_8h.html" title=" " alt="" coords="217,300,306,326"/>
+<area shape="poly" id="edge6_Node000002_Node000006" title=" " alt="" coords="264,120,264,300,259,300,259,120"/>
+<area shape="rect" id="Node000008" href="$ExactRCC_8h.html" title="Exact Rounded Capacity Cut generation and separation definitions." alt="" coords="299,153,390,178"/>
+<area shape="poly" id="edge9_Node000002_Node000008" title=" " alt="" coords="289,113,332,150,329,154,286,117"/>
+<area shape="rect" id="Node000009" href="$Problem_8h.html" title=" " alt="" coords="94,153,173,178"/>
+<area shape="poly" id="edge10_Node000002_Node000009" title=" " alt="" coords="228,115,157,154,154,150,226,110"/>
+<area shape="poly" id="edge19_Node000002_Node000010" title=" " alt="" coords="244,119,155,228,151,224,240,115"/>
+<area shape="rect" id="Node000011" href="$RCC_8cpp.html" title=" " alt="" coords="414,153,486,178"/>
+<area shape="poly" id="edge16_Node000002_Node000011" title=" " alt="" coords="308,108,418,150,417,155,307,113"/>
+<area shape="rect" id="Node000012" href="$SRC_8cpp.html" title="Implementation of functions and classes for solving VRP problems using." alt="" coords="510,153,582,178"/>
+<area shape="poly" id="edge17_Node000002_Node000012" title=" " alt="" coords="309,102,510,152,509,158,307,107"/>
+<area shape="rect" id="Node000013" href="$TR_8h.html" title=" " alt="" coords="606,153,654,178"/>
+<area shape="poly" id="edge18_Node000002_Node000013" title=" " alt="" coords="309,97,438,118,594,150,606,153,604,158,593,155,437,123,308,102"/>
+<area shape="poly" id="edge3_Node000003_Node000004" title=" " alt="" coords="62,341,62,373,56,373,56,341"/>
+<area shape="poly" id="edge8_Node000006_Node000005" title=" " alt="" coords="322,327,486,370,484,376,321,332"/>
+<area shape="rect" id="Node000007" href="$BCP_8cpp.html" title=" " alt="" coords="183,374,255,399"/>
+<area shape="poly" id="edge7_Node000006_Node000007" title=" " alt="" coords="249,340,229,375,224,372,245,337"/>
+<area shape="poly" id="edge11_Node000009_Node000010" title=" " alt="" coords="140,193,144,226,139,226,135,194"/>
+<area shape="poly" id="edge13_Node000010_Node000003" title=" " alt="" coords="119,264,75,302,71,298,116,260"/>
+<area shape="poly" id="edge14_Node000010_Node000004" title=" " alt="" coords="134,267,103,327,70,375,66,372,98,324,129,265"/>
+<area shape="poly" id="edge15_Node000010_Node000006" title=" " alt="" coords="177,258,243,297,240,302,175,263"/>
+<area shape="poly" id="edge12_Node000010_Node000007" title=" " alt="" coords="159,265,215,372,210,374,154,267"/>
+</map>

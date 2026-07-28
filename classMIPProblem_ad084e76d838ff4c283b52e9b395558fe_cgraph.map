@@ -1,0 +1,8 @@
+<map id="MIPProblem::clone" name="MIPProblem::clone">
+<area shape="rect" id="Node000001" title=" " alt="" coords="5,29,136,55"/>
+<area shape="poly" id="edge1_Node000001_Node000001" title=" " alt="" coords="37,30,31,21,35,11,48,5,71,3,95,5,107,12,105,17,93,10,70,8,50,10,38,15,36,20,42,27"/>
+<area shape="rect" id="Node000002" href="$classMIPProblem.html#adaf09269c578d30ea17724fed7535bb0" title=" " alt="" coords="184,29,355,55"/>
+<area shape="poly" id="edge2_Node000001_Node000002" title=" " alt="" coords="136,40,168,40,168,45,136,45"/>
+<area shape="rect" id="Node000003" href="$classGurobiEnvSingleton.html#a49c3ce63088629c2246dec252a73df16" title=" " alt="" coords="403,22,538,62"/>
+<area shape="poly" id="edge3_Node000002_Node000003" title=" " alt="" coords="355,40,388,40,388,45,355,45"/>
+</map>

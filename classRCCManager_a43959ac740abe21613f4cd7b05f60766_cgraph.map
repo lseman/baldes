@@ -1,0 +1,5 @@
+<map id="RCCManager::enforcePoolSizeLimit" name="RCCManager::enforcePoolSizeLimit">
+<area shape="rect" id="Node000001" title="Enforce pool size by removing lowest&#45;scoring cuts." alt="" coords="5,5,204,46"/>
+<area shape="rect" id="Node000002" href="$classRCCManager.html#a7bd633c7cd80648ec04e15e42d56c1f2" title="Compute selection score for probabilistic cut selection. Score = dual_strength * age_penalty * inclus..." alt="" coords="252,5,460,46"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="204,23,236,23,236,28,204,28"/>
+</map>

@@ -1,0 +1,10 @@
+<map id="HighRankCuts::HighRankCuts" name="HighRankCuts::HighRankCuts">
+<area shape="rect" id="Node000001" title=" " alt="" coords="5,31,201,56"/>
+<area shape="rect" id="Node000002" href="$CutHelper_8h.html#a6e2d376e10d40865f9a079e6bef1501f" title=" " alt="" coords="255,5,436,31"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="201,31,239,27,240,32,201,36"/>
+<area shape="rect" id="Node000004" href="$CutHelper_8h.html#ae16f85cab7674f93b1e3171dbe907d20" title=" " alt="" coords="249,55,442,80"/>
+<area shape="poly" id="edge3_Node000001_Node000004" title=" " alt="" coords="201,51,233,54,233,59,201,56"/>
+<area shape="rect" id="Node000003" href="$CutHelper_8h.html#acf8696478b8666472dbbc5267f76fd36" title=" " alt="" coords="490,31,686,56"/>
+<area shape="poly" id="edge2_Node000002_Node000003" title=" " alt="" coords="436,25,475,29,474,34,436,30"/>
+<area shape="poly" id="edge4_Node000004_Node000003" title=" " alt="" coords="442,55,474,52,475,57,443,61"/>
+</map>

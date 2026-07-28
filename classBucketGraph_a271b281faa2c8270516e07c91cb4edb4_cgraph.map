@@ -1,0 +1,18 @@
+<map id="BucketGraph::compute_red_cost" name="BucketGraph::compute_red_cost">
+<area shape="rect" id="Node000001" title=" " alt="" coords="5,157,159,198"/>
+<area shape="rect" id="Node000002" href="$classBucketGraph.html#addbec0c4c3ef8fa8e96063b04dd945ca" title=" " alt="" coords="207,63,374,103"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="121,155,206,113,218,107,220,112,208,117,123,159"/>
+<area shape="rect" id="Node000006" href="$classBucketGraph.html#ad15267e0cffaa8dc5222028409c9e082" title=" " alt="" coords="223,128,358,153"/>
+<area shape="poly" id="edge5_Node000001_Node000006" title=" " alt="" coords="159,161,207,152,208,158,160,166"/>
+<area shape="rect" id="Node000007" href="$classArcDuals.html#ac75e53f0c4f24e6aca539c544e9f8109" title=" " alt="" coords="228,201,352,226"/>
+<area shape="poly" id="edge6_Node000001_Node000007" title=" " alt="" coords="160,188,213,198,213,203,159,194"/>
+<area shape="rect" id="Node000008" href="$classBucketGraph.html#ad36a543a58c7d3cd4ded313dd5069f03" title="Marks a node as visited in the bitmap." alt="" coords="212,251,368,291"/>
+<area shape="poly" id="edge8_Node000001_Node000008" title=" " alt="" coords="124,196,208,237,220,242,218,247,206,241,122,201"/>
+<area shape="rect" id="Node000003" href="$classBucketGraph.html#af129eff306551dc7cc7fe00b919bbbd0" title="Assigns the buckets based on the specified direction." alt="" coords="422,5,563,46"/>
+<area shape="poly" id="edge2_Node000002_Node000003" title=" " alt="" coords="364,60,406,47,408,52,365,65"/>
+<area shape="rect" id="Node000004" href="$namespacenumericutils.html#a30fadd8aa82c3a907ce52a6c1735a378" title=" " alt="" coords="438,70,547,96"/>
+<area shape="poly" id="edge3_Node000002_Node000004" title=" " alt="" coords="375,80,423,80,423,86,375,86"/>
+<area shape="rect" id="Node000005" href="$namespacenumericutils.html#a2124ad1e887fe39c413948ee927c879e" title=" " alt="" coords="440,120,545,145"/>
+<area shape="poly" id="edge4_Node000002_Node000005" title=" " alt="" coords="375,101,426,114,425,119,374,106"/>
+<area shape="poly" id="edge7_Node000007_Node000007" title=" " alt="" coords="256,202,250,192,254,182,268,176,290,174,315,177,328,184,325,188,314,182,290,179,269,181,258,186,255,192,261,199"/>
+</map>

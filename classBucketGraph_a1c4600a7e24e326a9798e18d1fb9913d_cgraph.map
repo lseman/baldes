@@ -1,0 +1,29 @@
+<map id="BucketGraph::concatenate_label_from_bucket" name="BucketGraph::concatenate_label_from_bucket">
+<area shape="rect" id="Node000001" title=" " alt="" coords="5,252,180,293"/>
+<area shape="rect" id="Node000002" href="$classBucketGraph.html#a2a66984a5d0225286c0598b884772f8c" title=" " alt="" coords="252,26,394,66"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="101,250,148,170,184,124,226,83,242,72,245,76,229,87,188,127,153,173,106,253"/>
+<area shape="rect" id="Node000003" href="$classBucketGraph.html#a320420c58f2f68e7f7bb1dd0e8d002d6" title=" " alt="" coords="237,140,409,181"/>
+<area shape="poly" id="edge2_Node000001_Node000003" title=" " alt="" coords="135,250,264,186,267,191,137,254"/>
+<area shape="rect" id="Node000005" href="$classBucketGraph.html#ad15267e0cffaa8dc5222028409c9e082" title=" " alt="" coords="655,173,790,199"/>
+<area shape="poly" id="edge9_Node000001_Node000005" title=" " alt="" coords="180,267,376,253,492,239,607,220,670,202,672,207,608,225,493,244,377,258,180,272"/>
+<area shape="rect" id="Node000007" href="$namespacenumericutils.html#a2124ad1e887fe39c413948ee927c879e" title=" " alt="" coords="484,5,589,31"/>
+<area shape="poly" id="edge11_Node000001_Node000007" title=" " alt="" coords="105,251,153,189,188,155,226,127,253,113,277,105,321,98,365,93,389,87,417,76,441,59,465,41,478,35,480,40,467,46,444,63,419,81,391,92,366,98,322,103,279,110,255,118,229,131,191,159,157,193,109,254"/>
+<area shape="rect" id="Node000010" href="$namespacenumericutils.html#a8d554fdb4468068ab99dc7a219308492" title=" " alt="" coords="265,285,380,311"/>
+<area shape="poly" id="edge10_Node000001_Node000010" title=" " alt="" coords="180,280,250,288,249,293,180,285"/>
+<area shape="rect" id="Node000011" href="$structBucketGraph_1_1ConcatenationScratch.html#a95f64674e3fb2f039c407bec6e61d07a" title=" " alt="" coords="230,335,416,376"/>
+<area shape="poly" id="edge12_Node000001_Node000011" title=" " alt="" coords="149,291,229,321,246,327,244,332,227,326,147,296"/>
+<area shape="rect" id="Node000012" href="$classBucketGraph.html#adcb884152008fa6f2f7f48379c75933e" title=" " alt="" coords="228,400,418,441"/>
+<area shape="poly" id="edge13_Node000001_Node000012" title=" " alt="" coords="115,292,164,338,196,363,229,385,240,391,238,396,226,390,193,367,161,342,111,296"/>
+<area shape="rect" id="Node000013" href="$structBucketGraph_1_1ConcatenationScratch.html#a343971986cf842f7d40d77c79a5efec0" title=" " alt="" coords="230,466,416,506"/>
+<area shape="poly" id="edge14_Node000001_Node000013" title=" " alt="" coords="106,292,153,369,188,413,229,451,237,456,234,460,226,455,184,416,149,372,102,295"/>
+<area shape="rect" id="Node000004" href="$classBucketGraph.html#ad335ca96064db4533616ab8798a75819" title="Checks the feasibility of a given forward and backward label." alt="" coords="468,55,606,96"/>
+<area shape="poly" id="edge3_Node000003_Node000004" title=" " alt="" coords="375,137,469,100,471,105,377,142"/>
+<area shape="poly" id="edge6_Node000003_Node000007" title=" " alt="" coords="389,138,416,120,432,101,439,82,447,62,464,42,471,37,474,41,468,45,452,64,444,84,436,104,420,124,392,142"/>
+<area shape="rect" id="Node000008" href="$namespacenumericutils.html#afa1d31c5f18a361509ba1faacca5feb4" title=" " alt="" coords="481,120,592,146"/>
+<area shape="poly" id="edge7_Node000003_Node000008" title=" " alt="" coords="409,147,466,139,466,145,410,152"/>
+<area shape="rect" id="Node000009" href="$classBucketGraph.html#a070f3372010cfdc7953354657af97395" title=" " alt="" coords="466,170,607,210"/>
+<area shape="poly" id="edge8_Node000003_Node000009" title=" " alt="" coords="410,170,451,176,450,181,409,175"/>
+<area shape="poly" id="edge4_Node000004_Node000005" title=" " alt="" coords="588,94,609,105,693,162,691,166,606,110,585,99"/>
+<area shape="rect" id="Node000006" href="$namespacenumericutils.html#a30fadd8aa82c3a907ce52a6c1735a378" title=" " alt="" coords="668,63,777,88"/>
+<area shape="poly" id="edge5_Node000004_Node000006" title=" " alt="" coords="606,73,653,73,653,78,606,78"/>
+</map>
