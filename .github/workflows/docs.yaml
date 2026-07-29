@@ -28,7 +28,7 @@ jobs:
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ./docs/html
-          destination_dir: baldes/docs
+          destination_dir: docs
           keep_files: true
           enable_jekyll: false
           allow_empty_commit: false
