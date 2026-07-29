@@ -189,7 +189,7 @@ If you prefer a simple text UI for toggling common build flags, run:
 
 Doxygen output is published at:
 
-https://lseman.github.io/baldes
+https://laioseman.com/baldes/docs/
 
 ## Project Status
 
