@@ -1,0 +1,43 @@
+<map id="MIPHelper.h" name="MIPHelper.h">
+<area shape="rect" id="Node000001" title=" " alt="" coords="452,5,545,31"/>
+<area shape="rect" id="Node000002" href="$MIPHandler_8h.html" title=" " alt="" coords="448,79,549,105"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="501,46,501,79,496,79,496,46"/>
+<area shape="rect" id="Node000003" href="$Baldes_8cpp.html" title="Main entry point for the BALDES branch&#45;cut&#45;and&#45;price solver." alt="" coords="524,595,609,620"/>
+<area shape="poly" id="edge2_Node000002_Node000003" title=" " alt="" coords="560,108,605,127,649,154,668,171,683,191,692,213,696,238,696,462,693,485,684,507,657,545,622,575,590,596,587,592,619,571,653,542,680,504,688,484,691,461,691,238,687,214,678,193,664,175,646,158,603,131,558,113"/>
+<area shape="rect" id="Node000004" href="$Dual_8h.html" title=" " alt="" coords="327,153,385,178"/>
+<area shape="poly" id="edge3_Node000002_Node000004" title=" " alt="" coords="462,114,382,154,379,150,460,110"/>
+<area shape="rect" id="Node000021" href="$Rank1Cuts_8h.html" title="Defines limited memory rank&#45;1 cut handling for VRPTW." alt="" coords="146,374,241,399"/>
+<area shape="poly" id="edge26_Node000002_Node000021" title=" " alt="" coords="433,97,358,106,272,127,229,144,190,166,154,194,125,228,120,245,121,270,127,298,138,324,158,351,179,371,176,375,154,354,134,327,122,299,115,271,114,245,120,225,151,190,187,162,227,139,270,122,357,101,433,92"/>
+<area shape="rect" id="Node000022" href="$Node_8h.html" title="Node class implementation." alt="" coords="226,447,288,473"/>
+<area shape="poly" id="edge24_Node000002_Node000022" title=" " alt="" coords="433,101,310,116,169,143,106,161,55,183,20,209,11,223,8,238,8,314,15,348,32,376,59,399,91,417,127,431,164,441,226,453,225,458,162,446,126,436,89,422,56,403,28,379,10,350,3,314,3,238,6,221,16,205,52,178,104,156,168,137,309,111,433,96"/>
+<area shape="rect" id="Node000012" href="$VRProblem_8h.html" title="Header file for the BCP class." alt="" coords="518,521,615,547"/>
+<area shape="poly" id="edge27_Node000002_Node000012" title=" " alt="" coords="540,110,575,131,609,160,635,195,643,216,645,238,645,388,638,429,621,467,599,499,580,522,576,519,595,496,616,465,633,428,640,388,640,238,637,217,630,198,605,163,571,135,537,114"/>
+<area shape="rect" id="Node000032" href="$RCC_8h.html" title="Defines Rounded Capacity Cut separation for vehicle routing." alt="" coords="470,226,528,252"/>
+<area shape="poly" id="edge25_Node000002_Node000032" title=" " alt="" coords="501,120,501,226,496,226,496,120"/>
+<area shape="rect" id="Node000033" href="$MIPHandler_8cpp.html" title=" " alt="" coords="731,153,845,178"/>
+<area shape="poly" id="edge23_Node000002_Node000033" title=" " alt="" coords="563,106,739,149,738,155,562,111"/>
+<area shape="rect" id="Node000005" href="$Branching_8cpp.html" title=" " alt="" coords="284,521,388,547"/>
+<area shape="poly" id="edge4_Node000004_Node000005" title=" " alt="" coords="351,194,339,248,333,312,333,388,338,520,333,521,328,388,328,311,334,247,346,193"/>
+<area shape="rect" id="Node000006" href="$BucketBindings_8cpp.html" title="Python bindings for the BucketGraph, VRPNode, Label, PSTEPDuals, and." alt="" coords="368,374,504,399"/>
+<area shape="poly" id="edge5_Node000004_Node000006" title=" " alt="" coords="366,193,384,254,409,325,432,372,427,374,404,327,379,255,361,194"/>
+<area shape="rect" id="Node000007" href="$BucketGraph_8h.html" title="Defines the BucketGraph class and its bucket&#45;based VRP labeling functionality." alt="" coords="418,300,526,326"/>
+<area shape="poly" id="edge6_Node000004_Node000007" title=" " alt="" coords="377,189,464,298,460,301,373,192"/>
+<area shape="poly" id="edge19_Node000004_Node000022" title=" " alt="" coords="337,192,314,228,291,290,275,354,261,448,256,447,270,353,286,289,310,225,333,189"/>
+<area shape="rect" id="Node000030" href="$HighOrder_8h.html" title=" " alt="" coords="148,300,238,326"/>
+<area shape="poly" id="edge15_Node000004_Node000030" title=" " alt="" coords="312,175,209,194,163,210,146,218,135,228,131,237,131,246,140,265,157,283,176,297,173,302,153,287,135,268,125,247,126,235,131,225,143,214,161,205,208,189,311,170"/>
+<area shape="rect" id="Node000031" href="$Intelligence_8h.html" title=" " alt="" coords="145,226,242,252"/>
+<area shape="poly" id="edge17_Node000004_Node000031" title=" " alt="" coords="316,187,222,228,220,223,313,183"/>
+<area shape="poly" id="edge20_Node000004_Node000032" title=" " alt="" coords="395,183,476,223,473,228,393,188"/>
+<area shape="poly" id="edge7_Node000007_Node000006" title=" " alt="" coords="462,340,444,374,440,372,457,338"/>
+<area shape="poly" id="edge8_Node000007_Node000021" title=" " alt="" coords="411,332,241,376,240,370,410,327"/>
+<area shape="poly" id="edge14_Node000007_Node000012" title=" " alt="" coords="495,336,518,372,536,414,550,455,567,520,562,521,545,457,531,415,514,375,490,339"/>
+<area shape="poly" id="edge9_Node000021_Node000022" title=" " alt="" coords="216,409,249,445,245,449,212,412"/>
+<area shape="poly" id="edge10_Node000022_Node000003" title=" " alt="" coords="257,488,260,518,265,533,274,545,291,557,316,567,384,584,459,594,524,601,523,606,458,600,383,589,315,572,288,561,270,549,261,535,255,520,252,489"/>
+<area shape="poly" id="edge11_Node000022_Node000005" title=" " alt="" coords="283,482,325,519,321,523,280,485"/>
+<area shape="poly" id="edge12_Node000022_Node000012" title=" " alt="" coords="304,469,518,519,517,524,303,475"/>
+<area shape="poly" id="edge13_Node000012_Node000003" title=" " alt="" coords="569,562,569,594,564,594,564,562"/>
+<area shape="poly" id="edge16_Node000030_Node000021" title=" " alt="" coords="196,341,196,373,191,373,191,341"/>
+<area shape="poly" id="edge18_Node000031_Node000030" title=" " alt="" coords="196,267,196,300,191,300,191,267"/>
+<area shape="poly" id="edge21_Node000032_Node000007" title=" " alt="" coords="491,267,479,300,474,299,486,265"/>
+<area shape="poly" id="edge22_Node000032_Node000012" title=" " alt="" coords="520,263,540,299,557,346,567,384,570,423,571,473,570,521,564,521,565,473,565,423,562,385,552,347,535,301,515,266"/>
+</map>

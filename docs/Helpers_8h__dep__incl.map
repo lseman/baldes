@@ -1,0 +1,22 @@
+<map id="Helpers.h" name="Helpers.h">
+<area shape="rect" id="Node000001" title=" " alt="" coords="263,5,340,31"/>
+<area shape="rect" id="Node000002" href="$HighOrder_8h.html" title=" " alt="" coords="215,153,305,178"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="297,46,266,153,261,151,291,45"/>
+<area shape="rect" id="Node000021" href="$Intelligence_8h.html" title=" " alt="" coords="297,79,394,105"/>
+<area shape="poly" id="edge10_Node000001_Node000021" title=" " alt="" coords="319,43,340,77,336,80,315,46"/>
+<area shape="rect" id="Node000003" href="$Rank1Cuts_8h.html" title="Defines limited memory rank&#45;1 cut handling for VRPTW." alt="" coords="128,226,224,252"/>
+<area shape="poly" id="edge2_Node000002_Node000003" title=" " alt="" coords="236,190,192,228,188,224,233,186"/>
+<area shape="rect" id="Node000018" href="$SRC_8cpp.html" title="Implementation of functions and classes for solving VRP problems using." alt="" coords="233,374,306,399"/>
+<area shape="poly" id="edge9_Node000002_Node000018" title=" " alt="" coords="264,194,272,373,266,373,259,194"/>
+<area shape="rect" id="Node000004" href="$Labeling_8h.html" title=" " alt="" coords="5,374,86,399"/>
+<area shape="poly" id="edge3_Node000003_Node000004" title=" " alt="" coords="114,253,70,270,51,284,36,301,30,319,30,338,42,372,36,374,25,339,24,318,31,299,48,280,68,266,112,248"/>
+<area shape="rect" id="Node000014" href="$Node_8h.html" title="Node class implementation." alt="" coords="145,300,207,326"/>
+<area shape="poly" id="edge4_Node000003_Node000014" title=" " alt="" coords="179,267,179,300,174,300,174,267"/>
+<area shape="poly" id="edge6_Node000003_Node000018" title=" " alt="" coords="196,263,221,299,265,372,261,375,217,301,192,266"/>
+<area shape="rect" id="Node000020" href="$Utilities_8h.html" title=" " alt="" coords="45,300,120,326"/>
+<area shape="poly" id="edge7_Node000003_Node000020" title=" " alt="" coords="150,264,100,302,97,298,147,260"/>
+<area shape="poly" id="edge5_Node000014_Node000018" title=" " alt="" coords="206,333,256,371,252,375,202,338"/>
+<area shape="poly" id="edge8_Node000020_Node000004" title=" " alt="" coords="72,340,54,374,49,372,67,338"/>
+<area shape="poly" id="edge11_Node000021_Node000002" title=" " alt="" coords="321,117,276,154,273,150,318,113"/>
+<area shape="poly" id="edge12_Node000021_Node000018" title=" " alt="" coords="341,121,288,326,275,374,270,373,283,325,336,119"/>
+</map>

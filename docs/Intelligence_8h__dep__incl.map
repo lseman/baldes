@@ -1,0 +1,19 @@
+<map id="Intelligence.h" name="Intelligence.h">
+<area shape="rect" id="Node000001" title=" " alt="" coords="256,5,353,31"/>
+<area shape="rect" id="Node000002" href="$HighOrder_8h.html" title=" " alt="" coords="218,79,308,105"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="292,46,272,80,268,77,287,43"/>
+<area shape="rect" id="Node000018" href="$SRC_8cpp.html" title="Implementation of functions and classes for solving VRP problems using." alt="" coords="233,300,306,326"/>
+<area shape="poly" id="edge10_Node000001_Node000018" title=" " alt="" coords="315,45,323,79,323,105,313,163,300,219,276,300,271,299,295,218,308,162,318,104,318,79,310,47"/>
+<area shape="rect" id="Node000003" href="$Rank1Cuts_8h.html" title="Defines limited memory rank&#45;1 cut handling for VRPTW." alt="" coords="128,153,224,178"/>
+<area shape="poly" id="edge2_Node000002_Node000003" title=" " alt="" coords="238,117,192,154,189,150,235,113"/>
+<area shape="poly" id="edge9_Node000002_Node000018" title=" " alt="" coords="266,120,272,300,266,300,261,120"/>
+<area shape="rect" id="Node000004" href="$Labeling_8h.html" title=" " alt="" coords="5,300,86,326"/>
+<area shape="poly" id="edge3_Node000003_Node000004" title=" " alt="" coords="114,179,70,197,51,210,36,228,30,245,30,264,42,299,36,300,25,265,24,244,31,225,48,206,68,192,112,174"/>
+<area shape="rect" id="Node000014" href="$Node_8h.html" title="Node class implementation." alt="" coords="145,226,207,252"/>
+<area shape="poly" id="edge4_Node000003_Node000014" title=" " alt="" coords="179,194,179,226,174,226,174,194"/>
+<area shape="poly" id="edge6_Node000003_Node000018" title=" " alt="" coords="196,190,221,225,265,298,261,301,217,228,192,193"/>
+<area shape="rect" id="Node000020" href="$Utilities_8h.html" title=" " alt="" coords="45,226,120,252"/>
+<area shape="poly" id="edge7_Node000003_Node000020" title=" " alt="" coords="150,190,100,228,97,224,147,186"/>
+<area shape="poly" id="edge5_Node000014_Node000018" title=" " alt="" coords="206,260,256,298,252,302,202,264"/>
+<area shape="poly" id="edge8_Node000020_Node000004" title=" " alt="" coords="72,267,54,301,49,298,67,264"/>
+</map>

@@ -1,0 +1,10 @@
+<map id="BNBNode::loadState" name="BNBNode::loadState">
+<area shape="rect" id="Node000001" title=" " alt="" coords="5,37,147,62"/>
+<area shape="rect" id="Node000002" href="$classserializer_1_1Serializer.html#af1a169ba542672a29e7212ffe5a6b77e" title=" " alt="" coords="195,29,326,70"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="147,47,179,47,179,52,147,52"/>
+<area shape="rect" id="Node000003" href="$namespaceserializer.html#ae5cf979eedffdb2d7531cb52249656aa" title=" " alt="" coords="374,37,513,62"/>
+<area shape="poly" id="edge2_Node000002_Node000003" title=" " alt="" coords="326,47,359,47,359,52,326,52"/>
+<area shape="rect" id="Node000004" href="$namespaceserializer.html#a0fbaffee289277a2bd89a990f3828fbd" title=" " alt="" coords="561,29,701,70"/>
+<area shape="poly" id="edge3_Node000003_Node000004" title=" " alt="" coords="514,47,546,47,546,52,514,52"/>
+<area shape="poly" id="edge4_Node000004_Node000004" title=" " alt="" coords="595,29,593,19,599,10,612,5,631,3,651,5,664,11,661,16,650,10,631,8,613,10,603,15,599,20,600,28"/>
+</map>

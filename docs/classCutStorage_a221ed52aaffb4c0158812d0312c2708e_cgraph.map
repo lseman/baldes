@@ -1,0 +1,19 @@
+<map id="CutStorage::updateRedCost" name="CutStorage::updateRedCost">
+<area shape="rect" id="Node000001" title=" " alt="" coords="5,153,187,179"/>
+<area shape="rect" id="Node000002" href="$classCutStorage.html#a2f71dd47977fd6afeefd08cb629507a6" title=" " alt="" coords="267,5,420,31"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="106,151,157,97,193,66,233,40,251,32,253,37,236,45,196,70,160,101,110,155"/>
+<area shape="rect" id="Node000003" href="$classCutStorage.html#a5661b2dd9924180da3dd03cc2d63bd2c" title=" " alt="" coords="256,55,430,80"/>
+<area shape="poly" id="edge2_Node000001_Node000003" title=" " alt="" coords="116,151,168,120,234,89,253,82,255,88,236,94,171,125,119,155"/>
+<area shape="rect" id="Node000004" href="$classCutStorage.html#a572ed2f52059f45f0598ed71c198b6e4" title=" " alt="" coords="241,104,446,130"/>
+<area shape="poly" id="edge3_Node000001_Node000004" title=" " alt="" coords="164,150,260,131,261,136,165,155"/>
+<area shape="rect" id="Node000005" href="$classCutStorage.html#a19ad077cc66a398cee24dd126dd42076" title=" " alt="" coords="235,153,452,179"/>
+<area shape="poly" id="edge4_Node000001_Node000005" title=" " alt="" coords="187,164,219,164,219,169,187,169"/>
+<area shape="rect" id="Node000006" href="$structCut.html#a303517f8183b2e1311389fa139179e3c" title=" " alt="" coords="268,203,418,228"/>
+<area shape="poly" id="edge5_Node000001_Node000006" title=" " alt="" coords="165,177,261,196,260,202,164,182"/>
+<area shape="rect" id="Node000008" href="$structCut.html#a8479ee968c7a01eb2fc53fd34f02fd2d" title=" " alt="" coords="292,252,394,278"/>
+<area shape="poly" id="edge7_Node000001_Node000008" title=" " alt="" coords="119,177,171,208,236,238,278,251,277,256,234,243,168,213,116,182"/>
+<area shape="rect" id="Node000009" href="$structCut.html#a61682e989ec91d3ddb1ea3f611f8eb26" title=" " alt="" coords="285,301,402,327"/>
+<area shape="poly" id="edge8_Node000001_Node000009" title=" " alt="" coords="110,178,160,232,196,262,236,288,271,301,269,306,233,293,193,267,157,236,106,181"/>
+<area shape="rect" id="Node000007" href="$structCut.html#ab87937ff51e1cb9bbf1a9c5f3d639c00" title=" " alt="" coords="500,203,661,228"/>
+<area shape="poly" id="edge6_Node000006_Node000007" title=" " alt="" coords="419,213,485,213,485,218,419,218"/>
+</map>

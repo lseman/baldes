@@ -1,0 +1,28 @@
+<map id="BucketGraph" name="BucketGraph">
+<area shape="rect" id="Node000001" title="Represents a graph structure used for bucket&#45;based optimization in a solver." alt="" coords="943,238,1041,264"/>
+<area shape="rect" id="Node000002" href="$classCostFunction.html" title=" " alt="" coords="631,25,729,50"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="745,26,787,25,834,29,880,42,921,65,940,84,956,106,977,155,988,202,993,237,987,238,983,203,972,156,951,108,936,87,918,69,878,47,833,35,787,30,745,31"/>
+<area shape="rect" id="Node000003" href="$structBucketOptions.html" title=" " alt="" coords="626,78,734,104"/>
+<area shape="poly" id="edge2_Node000001_Node000003" title=" " alt="" coords="750,90,847,98,891,106,921,118,949,145,969,178,982,211,990,237,985,238,977,213,964,181,945,148,918,123,889,111,846,103,749,95"/>
+<area shape="rect" id="Node000004" href="$structPSTEPDuals.html" title="A structure to manage dual values for arcs and nodes in a network." alt="" coords="632,131,729,157"/>
+<area shape="poly" id="edge3_Node000001_Node000004" title=" " alt="" coords="744,140,830,147,877,158,921,175,941,188,958,205,984,236,980,239,955,208,937,193,918,180,875,163,830,152,744,145"/>
+<area shape="rect" id="Node000005" href="$classArcList.html" title=" " alt="" coords="648,181,712,206"/>
+<area shape="poly" id="edge4_Node000001_Node000005" title=" " alt="" coords="728,195,817,206,920,224,956,235,954,240,919,230,816,211,727,200"/>
+<area shape="rect" id="Node000006" href="$structBucketGraph_1_1EnumerationPolicy.html" title=" " alt="" coords="592,231,768,271"/>
+<area shape="poly" id="edge5_Node000001_Node000006" title=" " alt="" coords="784,248,943,248,943,254,784,254"/>
+<area shape="rect" id="Node000007" href="$classIteratedLocalSearch.html" title=" " alt="" coords="611,295,749,321"/>
+<area shape="poly" id="edge6_Node000001_Node000007" title=" " alt="" coords="764,301,840,292,919,277,961,262,963,267,920,282,841,297,765,306"/>
+<area shape="rect" id="Node000008" href="$structInstanceData.html" title="A structure to hold various data related to an instance of a problem." alt="" coords="353,258,452,284"/>
+<area shape="poly" id="edge7_Node000007_Node000008" title=" " alt="" coords="467,277,611,296,610,302,466,282"/>
+<area shape="rect" id="Node000009" href="$classCutStorage.html" title="Manages the storage and operations related to cuts in a solver." alt="" coords="359,333,446,358"/>
+<area shape="poly" id="edge11_Node000001_Node000009" title=" " alt="" coords="461,352,525,358,603,363,688,363,772,354,848,337,918,303,949,283,975,262,978,266,952,287,921,308,849,342,773,359,688,368,603,368,525,364,461,357"/>
+<area shape="poly" id="edge8_Node000007_Node000009" title=" " alt="" coords="460,335,610,315,611,320,461,341"/>
+<area shape="rect" id="Node000010" href="$structCutStorage_1_1SegmentMasks.html" title=" " alt="" coords="5,333,189,358"/>
+<area shape="poly" id="edge9_Node000009_Node000010" title=" " alt="" coords="204,343,359,343,359,348,204,348"/>
+<area shape="rect" id="Node000011" href="$classXoroshiro128Plus.html" title=" " alt="" coords="341,205,464,230"/>
+<area shape="poly" id="edge10_Node000007_Node000011" title=" " alt="" coords="480,223,524,234,566,253,578,267,590,281,614,292,612,297,586,285,574,271,562,257,522,239,479,228"/>
+<area shape="rect" id="Node000012" href="$structBucketGraph_1_1BucketPricingTimings.html" title=" " alt="" coords="588,416,772,457"/>
+<area shape="poly" id="edge12_Node000001_Node000012" title=" " alt="" coords="787,444,821,442,855,436,888,425,918,408,934,393,948,375,969,334,981,295,986,264,992,265,986,296,974,336,953,378,938,396,921,412,890,429,857,441,822,447,788,449"/>
+<area shape="rect" id="Node000013" href="$classUnionFind.html" title=" " alt="" coords="640,489,720,514"/>
+<area shape="poly" id="edge13_Node000001_Node000013" title=" " alt="" coords="736,514,779,521,827,522,875,514,897,505,918,492,931,476,943,452,963,385,986,264,991,265,968,386,948,453,935,479,921,496,900,510,877,519,828,527,779,526,735,519"/>
+</map>

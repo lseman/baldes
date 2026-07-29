@@ -1,0 +1,52 @@
+<map id="BucketGraph::setup" name="BucketGraph::setup">
+<area shape="rect" id="Node000001" title="Sets up the initial configuration for the BucketGraph." alt="" coords="5,193,141,219"/>
+<area shape="rect" id="Node000002" href="$structVRPNode.html#af622df02028ddacbe293bd258fa4069f" title="Assigns SCC IDs to a vector of VRPNodes." alt="" coords="210,5,378,31"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="77,192,92,160,115,120,147,77,187,41,197,36,199,40,190,46,151,81,120,123,97,163,82,194"/>
+<area shape="rect" id="Node000004" href="$classBucketGraph.html#a5d04c8a2da52796e87c1b443aa221a76" title="Defines the buckets for the BucketGraph." alt="" coords="225,55,362,96"/>
+<area shape="poly" id="edge3_Node000001_Node000004" title=" " alt="" coords="84,191,127,149,156,126,187,105,210,95,212,99,190,110,159,130,131,153,88,195"/>
+<area shape="rect" id="Node000006" href="$classBucketGraph.html#a78afa4d3e7c6078f874480c68f43caff" title="Generates arcs in both forward and backward directions in parallel." alt="" coords="201,144,386,170"/>
+<area shape="poly" id="edge5_Node000001_Node000006" title=" " alt="" coords="133,190,218,171,219,176,135,195"/>
+<area shape="rect" id="Node000015" href="$classBucketGraph.html#a32da6366cb0593f095b3e74c5dd545e9" title=" " alt="" coords="214,193,374,219"/>
+<area shape="poly" id="edge15_Node000001_Node000015" title=" " alt="" coords="141,204,198,204,198,209,141,209"/>
+<area shape="rect" id="Node000016" href="$classBucketGraph.html#afd112fd96d70c59af5ddc19353a69eb5" title=" " alt="" coords="215,243,373,284"/>
+<area shape="poly" id="edge16_Node000001_Node000016" title=" " alt="" coords="126,217,200,236,199,242,125,222"/>
+<area shape="rect" id="Node000017" href="$classBucketGraph.html#af6b54fdc1e45c15dce61742706087dac" title=" " alt="" coords="189,395,399,420"/>
+<area shape="poly" id="edge17_Node000001_Node000017" title=" " alt="" coords="83,218,123,284,154,324,190,359,213,374,237,386,235,391,210,379,187,363,150,327,119,287,79,221"/>
+<area shape="rect" id="Node000023" href="$classBucketGraph.html#af0767e796faf854335073ceb773f288b" title=" " alt="" coords="201,308,387,349"/>
+<area shape="poly" id="edge23_Node000001_Node000023" title=" " alt="" coords="90,217,133,255,190,293,203,300,201,304,187,298,129,259,86,222"/>
+<area shape="rect" id="Node000003" href="$structVRPNode.html#a4527792eb60e8983029ea82f5886d2e2" title="Compute the strongly connected components (SCCs) for a VRP graph." alt="" coords="452,5,621,31"/>
+<area shape="poly" id="edge2_Node000002_Node000003" title=" " alt="" coords="378,16,436,16,436,21,378,21"/>
+<area shape="rect" id="Node000005" href="$classBucketGraph.html#af129eff306551dc7cc7fe00b919bbbd0" title="Assigns the buckets based on the specified direction." alt="" coords="702,14,843,54"/>
+<area shape="poly" id="edge4_Node000004_Node000005" title=" " alt="" coords="363,67,686,39,687,44,363,72"/>
+<area shape="poly" id="edge9_Node000006_Node000006" title=" " alt="" coords="257,145,250,135,254,126,269,119,294,117,321,120,335,127,332,132,319,125,294,123,270,125,258,129,255,135,261,142"/>
+<area shape="rect" id="Node000007" href="$classBucketGraph.html#aa9eea9800ea6652e736b960a729f2c14" title=" " alt="" coords="450,217,623,243"/>
+<area shape="poly" id="edge6_Node000006_Node000007" title=" " alt="" coords="359,168,400,178,489,209,487,214,398,183,358,173"/>
+<area shape="rect" id="Node000011" href="$classBucketGraph.html#a2925857b35aa31c3c5af4a2795840b98" title=" " alt="" coords="447,128,626,154"/>
+<area shape="poly" id="edge10_Node000006_Node000011" title=" " alt="" coords="387,148,431,145,432,150,387,153"/>
+<area shape="rect" id="Node000008" href="$classBucketGraph.html#a90ce1e861b31ed9c05e36aa3f9ab6743" title=" " alt="" coords="693,292,852,333"/>
+<area shape="poly" id="edge7_Node000007_Node000008" title=" " alt="" coords="596,241,627,252,675,277,693,284,691,289,673,282,625,257,594,246"/>
+<area shape="rect" id="Node000010" href="$classBucketGraph.html#a491d87e43d4a6ec6ed9557be1769cd29" title=" " alt="" coords="693,227,852,268"/>
+<area shape="poly" id="edge8_Node000007_Node000010" title=" " alt="" coords="624,234,677,238,677,243,623,239"/>
+<area shape="poly" id="edge11_Node000011_Node000005" title=" " alt="" coords="560,125,673,64,688,58,690,63,675,69,562,130"/>
+<area shape="rect" id="Node000012" href="$classSCC.html#a543f07b9f7debe611ad8c7cd00ae3ca0" title=" " alt="" coords="679,79,866,104"/>
+<area shape="poly" id="edge12_Node000011_Node000012" title=" " alt="" coords="601,125,692,105,693,111,602,130"/>
+<area shape="rect" id="Node000013" href="$classSCC.html#afdc7bf9b9ebc6853227b86fe4cb151ea" title="Finds and returns all Strongly Connected Components (SCCs) in the graph using Tarjan&#39;s algorithm." alt="" coords="716,128,829,154"/>
+<area shape="poly" id="edge13_Node000011_Node000013" title=" " alt="" coords="627,138,701,138,701,144,627,144"/>
+<area shape="rect" id="Node000014" href="$classSCC.html#a62703561fe2b0e0a6f7961b09778ff6e" title="Computes the topological order of Strongly Connected Components (SCCs) in a directed graph." alt="" coords="674,177,871,203"/>
+<area shape="poly" id="edge14_Node000011_Node000014" title=" " alt="" coords="602,152,693,171,692,176,601,157"/>
+<area shape="rect" id="Node000018" href="$classBucketGraph.html#a42e016ec947d0a75ffa73ceab03207d7" title="Represents a bucket in the Bucket Graph. Adds an arc to the bucket graph." alt="" coords="462,316,611,342"/>
+<area shape="poly" id="edge18_Node000017_Node000018" title=" " alt="" coords="329,392,446,350,468,344,470,349,448,355,331,397"/>
+<area shape="rect" id="Node000019" href="$classMST.html#ae8f38e66bc8580c27c85f2455a6a4d2d" title=" " alt="" coords="705,379,840,404"/>
+<area shape="poly" id="edge19_Node000017_Node000019" title=" " alt="" coords="400,405,626,401,690,397,690,402,626,406,400,411"/>
+<area shape="rect" id="Node000020" href="$classBucketGraph.html#ad15267e0cffaa8dc5222028409c9e082" title=" " alt="" coords="470,365,604,391"/>
+<area shape="poly" id="edge20_Node000017_Node000020" title=" " alt="" coords="399,392,454,385,454,391,400,397"/>
+<area shape="rect" id="Node000021" href="$namespacenumericutils.html#a30fadd8aa82c3a907ce52a6c1735a378" title=" " alt="" coords="482,467,591,492"/>
+<area shape="poly" id="edge21_Node000017_Node000021" title=" " alt="" coords="341,418,477,459,475,464,339,423"/>
+<area shape="rect" id="Node000022" href="$Definitions_8h.html#a086546d06aa565cdd48f436973ebc496" title="Prints an informational message with a specific format." alt="" coords="500,516,574,542"/>
+<area shape="poly" id="edge22_Node000017_Node000022" title=" " alt="" coords="313,419,371,460,448,502,485,515,484,520,446,507,368,464,310,423"/>
+<area shape="poly" id="edge24_Node000023_Node000018" title=" " alt="" coords="387,326,446,326,446,332,387,332"/>
+<area shape="poly" id="edge27_Node000023_Node000020" title=" " alt="" coords="388,345,456,359,455,364,387,350"/>
+<area shape="rect" id="Node000024" href="$classMST.html#aab20166a0b84167db616699bcaf02360" title=" " alt="" coords="490,267,584,292"/>
+<area shape="poly" id="edge25_Node000023_Node000024" title=" " alt="" coords="387,307,474,289,475,295,388,313"/>
+<area shape="poly" id="edge26_Node000024_Node000019" title=" " alt="" coords="585,285,628,301,643,311,653,321,676,343,726,370,723,374,673,347,649,325,639,315,625,306,583,290"/>
+</map>

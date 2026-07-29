@@ -1,0 +1,9 @@
+<map id="MIPProblem::reduceByRC" name="MIPProblem::reduceByRC">
+<area shape="rect" id="Node000001" title=" " alt="" coords="5,70,177,96"/>
+<area shape="rect" id="Node000002" href="$classMIPProblem.html#a4cd9a407085c12dbae7b776eb6a99cdc" title=" " alt="" coords="230,5,364,46"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="139,67,214,46,215,51,141,72"/>
+<area shape="rect" id="Node000003" href="$classMIPProblem.html#ad025340e1aefa32995d15175cf6c06f0" title=" " alt="" coords="229,70,364,96"/>
+<area shape="poly" id="edge2_Node000001_Node000003" title=" " alt="" coords="177,80,214,80,214,86,177,86"/>
+<area shape="rect" id="Node000004" href="$classMIPProblem.html#a15cf712c50d97736774b35f6ec269db3" title=" " alt="" coords="225,120,369,145"/>
+<area shape="poly" id="edge3_Node000001_Node000004" title=" " alt="" coords="148,94,226,113,225,118,147,99"/>
+</map>
