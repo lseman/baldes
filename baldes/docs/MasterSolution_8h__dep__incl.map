@@ -1,0 +1,21 @@
+<map id="MasterSolution.h" name="MasterSolution.h">
+<area shape="rect" id="Node000001" title=" " alt="" coords="85,5,204,31"/>
+<area shape="rect" id="Node000002" href="$PricingState_8h.html" title=" " alt="" coords="5,79,108,105"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="119,43,73,81,70,77,116,39"/>
+<area shape="rect" id="Node000003" href="$VRProblem_8h.html" title="Header file for the BCP class." alt="" coords="96,153,193,178"/>
+<area shape="poly" id="edge11_Node000001_Node000003" title=" " alt="" coords="147,47,147,152,142,152,142,47"/>
+<area shape="rect" id="Node000009" href="$Progress_8h.html" title=" " alt="" coords="182,79,265,105"/>
+<area shape="poly" id="edge9_Node000001_Node000009" title=" " alt="" coords="171,40,212,77,208,81,167,43"/>
+<area shape="poly" id="edge2_Node000002_Node000003" title=" " alt="" coords="85,113,131,150,128,154,82,117"/>
+<area shape="rect" id="Node000004" href="$BCP_8cpp.html" title=" " alt="" coords="38,300,110,326"/>
+<area shape="poly" id="edge3_Node000003_Node000004" title=" " alt="" coords="89,187,62,204,40,228,36,246,41,265,64,298,60,301,36,267,31,246,35,225,58,200,87,183"/>
+<area shape="rect" id="Node000005" href="$BNB_8h.html" title=" " alt="" coords="164,226,224,252"/>
+<area shape="poly" id="edge4_Node000003_Node000005" title=" " alt="" coords="164,190,188,224,183,227,159,193"/>
+<area shape="rect" id="Node000006" href="$Baldes_8cpp.html" title="Main entry point for the BALDES branch&#45;cut&#45;and&#45;price solver." alt="" coords="172,300,258,326"/>
+<area shape="poly" id="edge6_Node000003_Node000006" title=" " alt="" coords="193,184,218,201,238,225,243,245,240,266,225,301,220,299,235,265,237,246,233,228,214,205,189,188"/>
+<area shape="rect" id="Node000007" href="$Branching_8h.html" title=" " alt="" coords="50,226,140,252"/>
+<area shape="poly" id="edge7_Node000003_Node000007" title=" " alt="" coords="130,193,106,227,101,224,125,190"/>
+<area shape="poly" id="edge5_Node000005_Node000006" title=" " alt="" coords="204,266,214,299,209,300,199,267"/>
+<area shape="poly" id="edge8_Node000007_Node000004" title=" " alt="" coords="90,267,80,300,75,299,85,266"/>
+<area shape="poly" id="edge10_Node000009_Node000003" title=" " alt="" coords="201,117,159,154,156,150,197,113"/>
+</map>

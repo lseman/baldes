@@ -1,0 +1,5 @@
+<map id="HGS::recordArcUsage" name="HGS::recordArcUsage">
+<area shape="rect" id="Node000001" title="Record that arc (i,j) was used in a route." alt="" coords="5,5,156,31"/>
+<area shape="rect" id="Node000002" href="$classHGS.html#adef29749b7c77cac37d01b490577272f" title="Compute a deterministic arc hash key from (i, j)." alt="" coords="204,5,300,31"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="156,16,188,16,188,21,156,21"/>
+</map>

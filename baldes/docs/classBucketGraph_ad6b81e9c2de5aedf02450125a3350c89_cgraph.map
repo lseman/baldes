@@ -1,0 +1,9 @@
+<map id="BucketGraph::compute_mono_label" name="BucketGraph::compute_mono_label">
+<area shape="rect" id="Node000001" title="Computes the mono label for the BucketGraph." alt="" coords="5,23,159,64"/>
+<area shape="rect" id="Node000002" href="$structLabel.html#a8fb896b033f65ec802f71301eedd8fa4" title=" " alt="" coords="207,31,362,56"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="159,41,191,41,191,46,159,46"/>
+<area shape="rect" id="Node000003" href="$structLabel.html#a384585ffaf7cdfd2c142d3b4524bf39e" title=" " alt="" coords="410,5,521,31"/>
+<area shape="poly" id="edge2_Node000002_Node000003" title=" " alt="" coords="362,30,394,25,395,31,363,35"/>
+<area shape="rect" id="Node000004" href="$structLabel.html#a0a48c18a2d05ad71c93ed9220c017e25" title=" " alt="" coords="420,55,511,80"/>
+<area shape="poly" id="edge3_Node000002_Node000004" title=" " alt="" coords="363,51,405,57,404,62,362,56"/>
+</map>

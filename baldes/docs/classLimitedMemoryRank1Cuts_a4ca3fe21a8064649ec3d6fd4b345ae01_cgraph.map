@@ -1,0 +1,34 @@
+<map id="LimitedMemoryRank1Cuts::runSeparation" name="LimitedMemoryRank1Cuts::runSeparation">
+<area shape="rect" id="Node000001" title=" " alt="" coords="5,211,180,252"/>
+<area shape="rect" id="Node000002" href="$classLimitedMemoryRank1Cuts.html#ae0706cf60ee92fe99ed6d54d4807d4ec" title=" " alt="" coords="234,47,408,88"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="108,209,158,155,190,125,226,99,237,92,240,97,229,103,194,129,161,158,112,212"/>
+<area shape="rect" id="Node000006" href="$classBNBNode.html#a234c0a33d282f8ec5d1017de8c99a037" title=" " alt="" coords="228,112,415,153"/>
+<area shape="poly" id="edge5_Node000001_Node000006" title=" " alt="" coords="133,208,227,164,244,157,246,162,229,169,135,213"/>
+<area shape="rect" id="Node000007" href="$classLimitedMemoryRank1Cuts.html#a0c8178e5e367d5d5124555500f650f97" title=" " alt="" coords="234,178,408,218"/>
+<area shape="poly" id="edge6_Node000001_Node000007" title=" " alt="" coords="180,216,218,210,219,216,180,221"/>
+<area shape="rect" id="Node000008" href="$classLimitedMemoryRank1Cuts.html#a0874059ad71694c574998b73fd797c5f" title="Separates the given solution vector into cuts using Limited Memory Rank&#45;1 Cuts." alt="" coords="234,243,408,284"/>
+<area shape="poly" id="edge7_Node000001_Node000008" title=" " alt="" coords="180,241,219,247,218,252,180,246"/>
+<area shape="rect" id="Node000011" href="$classLimitedMemoryRank1Cuts.html#a33d300a3b76e5e2f109130dacaa8141d" title=" " alt="" coords="234,374,408,414"/>
+<area shape="poly" id="edge10_Node000001_Node000011" title=" " alt="" coords="112,250,161,304,194,333,229,359,240,365,237,369,226,363,190,337,158,308,108,254"/>
+<area shape="rect" id="Node000014" href="$classLimitedMemoryRank1Cuts.html#a41a9ef310b38d9d6909259001cd453bc" title="Adjacency&#45;based rank&#45;3 SRC separation (RouteOpt&#45;style)." alt="" coords="234,308,408,349"/>
+<area shape="poly" id="edge15_Node000001_Node000014" title=" " alt="" coords="136,250,229,293,246,300,244,305,227,298,134,255"/>
+<area shape="rect" id="Node000003" href="$classBNBNode.html#ac4a92f0a90b0517dda3eb0e08c1ffe72" title=" " alt="" coords="508,5,645,31"/>
+<area shape="poly" id="edge2_Node000002_Node000003" title=" " alt="" coords="409,48,492,32,493,37,410,53"/>
+<area shape="rect" id="Node000004" href="$namespacenumericutils.html#a30fadd8aa82c3a907ce52a6c1735a378" title=" " alt="" coords="522,55,630,80"/>
+<area shape="poly" id="edge3_Node000002_Node000004" title=" " alt="" coords="409,65,506,65,506,70,409,70"/>
+<area shape="rect" id="Node000005" href="$classBNBNode.html#a1cc8d061978cecc41e360cb505517267" title=" " alt="" coords="512,104,641,130"/>
+<area shape="poly" id="edge4_Node000002_Node000005" title=" " alt="" coords="410,82,497,99,496,104,409,87"/>
+<area shape="rect" id="Node000009" href="$classLimitedMemoryRank1Cuts.html#a267d89d8d4d4ba61fa2bf551dd041a9c" title="Computes the limited memory coefficient based on the given parameters." alt="" coords="463,308,689,349"/>
+<area shape="poly" id="edge8_Node000008_Node000009" title=" " alt="" coords="404,282,480,302,479,307,403,287"/>
+<area shape="rect" id="Node000010" href="$structSRCPermutation.html#a7c2eee29003a81f6c79aeb63729838dd" title=" " alt="" coords="491,259,661,284"/>
+<area shape="poly" id="edge9_Node000008_Node000010" title=" " alt="" coords="409,264,476,266,476,271,409,269"/>
+<area shape="poly" id="edge11_Node000011_Node000009" title=" " alt="" coords="403,371,479,351,480,356,404,376"/>
+<area shape="poly" id="edge12_Node000011_Node000010" title=" " alt="" coords="393,371,413,359,428,343,436,327,445,310,461,295,475,287,477,292,465,299,449,314,441,329,433,346,417,363,395,376"/>
+<area shape="rect" id="Node000012" href="$classLimitedMemoryRank1Cuts.html#ae6f376dcb6916b93872f02660eabc753" title=" " alt="" coords="466,423,687,464"/>
+<area shape="poly" id="edge13_Node000011_Node000012" title=" " alt="" coords="410,408,453,417,452,422,409,414"/>
+<area shape="rect" id="Node000013" href="$namespacenumericutils.html#ab3ee1d3f97fa4d429537dc7a597908b3" title=" " alt="" coords="510,373,643,399"/>
+<area shape="poly" id="edge14_Node000011_Node000013" title=" " alt="" coords="409,389,494,386,494,391,409,394"/>
+<area shape="poly" id="edge16_Node000014_Node000009" title=" " alt="" coords="409,326,447,326,447,332,409,332"/>
+<area shape="poly" id="edge17_Node000014_Node000010" title=" " alt="" coords="409,306,462,294,500,286,502,291,464,299,410,312"/>
+<area shape="poly" id="edge18_Node000014_Node000013" title=" " alt="" coords="410,346,464,358,502,367,500,372,462,363,409,351"/>
+</map>

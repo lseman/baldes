@@ -1,0 +1,19 @@
+<map id="BucketGraph::DominatedInCompWiseSmallerBuckets" name="BucketGraph::DominatedInCompWiseSmallerBuckets">
+<area shape="rect" id="Node000001" title="Determines if a label is dominated in component&#45;wise smaller buckets." alt="" coords="5,185,182,226"/>
+<area shape="rect" id="Node000002" href="$classBucketGraph.html#af129eff306551dc7cc7fe00b919bbbd0" title="Assigns the buckets based on the specified direction." alt="" coords="249,5,390,46"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="106,183,156,121,190,86,228,55,235,51,238,56,231,60,193,90,160,125,111,187"/>
+<area shape="rect" id="Node000003" href="$namespacenumericutils.html#a30fadd8aa82c3a907ce52a6c1735a378" title=" " alt="" coords="266,70,374,96"/>
+<area shape="poly" id="edge2_Node000001_Node000003" title=" " alt="" coords="116,183,165,143,228,105,250,96,252,101,231,109,168,148,119,187"/>
+<area shape="rect" id="Node000004" href="$classBucketGraph.html#a469baec04539f3c8ae984f5558fbfc25" title=" " alt="" coords="230,144,410,169"/>
+<area shape="poly" id="edge3_Node000001_Node000004" title=" " alt="" coords="181,184,242,170,244,176,183,189"/>
+<area shape="rect" id="Node000005" href="$namespacenumericutils.html#a2124ad1e887fe39c413948ee927c879e" title=" " alt="" coords="268,193,372,218"/>
+<area shape="poly" id="edge5_Node000001_Node000005" title=" " alt="" coords="182,203,253,203,253,208,182,208"/>
+<area shape="rect" id="Node000006" href="$classBucketGraph.html#a9b9b2117b5e749ba9a5d7cc66e1c021c" title=" " alt="" coords="241,243,399,283"/>
+<area shape="poly" id="edge6_Node000001_Node000006" title=" " alt="" coords="177,224,226,237,225,242,176,229"/>
+<area shape="rect" id="Node000007" href="$classBucketGraph.html#a75b5bffb3d4cbcc3822304589de85d79" title=" " alt="" coords="230,308,410,349"/>
+<area shape="poly" id="edge7_Node000001_Node000007" title=" " alt="" coords="124,224,173,258,231,293,244,299,242,304,228,297,170,263,121,229"/>
+<area shape="rect" id="Node000008" href="$classBucketGraph.html#a9902b5f8355e06f0ffaf1101eb350a6e" title=" " alt="" coords="243,397,396,438"/>
+<area shape="poly" id="edge8_Node000001_Node000008" title=" " alt="" coords="112,225,162,287,195,324,231,358,270,387,267,391,228,362,192,328,158,291,108,228"/>
+<area shape="poly" id="edge4_Node000004_Node000004" title=" " alt="" coords="282,145,275,135,279,125,295,119,320,117,347,120,362,126,359,131,346,125,320,122,296,124,283,129,280,134,286,141"/>
+<area shape="poly" id="edge9_Node000008_Node000008" title=" " alt="" coords="277,397,275,387,282,378,297,373,320,371,344,373,359,379,357,384,343,378,320,376,298,378,285,383,280,389,282,396"/>
+</map>

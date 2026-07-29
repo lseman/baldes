@@ -1,0 +1,15 @@
+<map id="LimitedMemoryRank1Cuts" name="LimitedMemoryRank1Cuts">
+<area shape="rect" id="Node000001" title="A class for handling limited memory rank&#45;1 cuts in optimization problems." alt="" coords="100,295,274,321"/>
+<area shape="rect" id="Node000002" href="$classHighRankCuts.html" title=" " alt="" coords="134,199,240,224"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="190,240,190,295,184,295,184,240"/>
+<area shape="rect" id="Node000003" href="$classXoroshiro128Plus.html" title=" " alt="" coords="5,102,129,128"/>
+<area shape="poly" id="edge6_Node000001_Node000003" title=" " alt="" coords="75,142,87,182,106,223,140,263,173,293,170,297,136,267,102,226,82,184,70,144"/>
+<area shape="poly" id="edge2_Node000002_Node000003" title=" " alt="" coords="95,135,173,196,170,200,92,139"/>
+<area shape="rect" id="Node000004" href="$classCutStorage.html" title="Manages the storage and operations related to cuts in a solver." alt="" coords="285,102,372,128"/>
+<area shape="poly" id="edge7_Node000001_Node000004" title=" " alt="" coords="351,140,356,151,359,163,356,175,345,207,333,231,316,252,290,273,267,287,243,297,241,292,265,283,287,269,312,248,328,228,340,205,351,174,353,163,351,152,346,142"/>
+<area shape="poly" id="edge3_Node000002_Node000004" title=" " alt="" coords="302,140,254,177,212,201,210,196,251,172,299,136"/>
+<area shape="rect" id="Node000005" href="$structCutStorage_1_1SegmentMasks.html" title=" " alt="" coords="237,5,420,31"/>
+<area shape="poly" id="edge4_Node000004_Node000005" title=" " alt="" coords="331,46,331,101,326,101,326,46"/>
+<area shape="rect" id="Node000006" href="$classArcDuals.html" title=" " alt="" coords="152,102,227,128"/>
+<area shape="poly" id="edge5_Node000002_Node000006" title=" " alt="" coords="191,143,191,152,190,198,185,198,186,152,186,143"/>
+</map>

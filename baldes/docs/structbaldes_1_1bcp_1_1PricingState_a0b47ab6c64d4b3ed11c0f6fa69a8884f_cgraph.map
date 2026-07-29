@@ -1,0 +1,9 @@
+<map id="baldes::bcp::PricingState::handleEnumerationFailure" name="baldes::bcp::PricingState::handleEnumerationFailure">
+<area shape="rect" id="Node000001" title=" " alt="" coords="5,71,182,111"/>
+<area shape="rect" id="Node000002" href="$classBucketGraph.html#aa28d224fbca7a33f59de21391f4296eb" title=" " alt="" coords="230,5,433,46"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="169,68,240,48,241,53,171,73"/>
+<area shape="rect" id="Node000003" href="$classBucketGraph.html#aba7596250c7680ead43e32fd5f782147" title=" " alt="" coords="244,71,418,111"/>
+<area shape="poly" id="edge2_Node000001_Node000003" title=" " alt="" coords="182,88,228,88,228,94,182,94"/>
+<area shape="rect" id="Node000004" href="$Definitions_8h.html#a086546d06aa565cdd48f436973ebc496" title="Prints an informational message with a specific format." alt="" coords="294,136,368,161"/>
+<area shape="poly" id="edge3_Node000001_Node000004" title=" " alt="" coords="181,109,280,133,279,139,180,114"/>
+</map>

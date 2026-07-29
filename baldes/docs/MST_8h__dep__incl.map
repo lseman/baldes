@@ -1,0 +1,29 @@
+<map id="MST.h" name="MST.h">
+<area shape="rect" id="Node000001" title="Implements the Minimum Spanning Tree clustering algorithm." alt="" coords="117,5,176,31"/>
+<area shape="rect" id="Node000002" href="$Branching_8h.html" title=" " alt="" coords="74,300,163,326"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="126,45,98,78,65,121,34,172,12,227,8,240,11,251,24,266,39,279,75,297,73,302,36,283,20,270,7,253,3,240,7,225,30,170,61,118,93,74,122,41"/>
+<area shape="rect" id="Node000005" href="$BucketGraph_8cpp.html" title="Implements BucketGraph routines and support structures for VRP labeling." alt="" coords="22,226,143,252"/>
+<area shape="poly" id="edge4_Node000001_Node000005" title=" " alt="" coords="141,46,88,227,83,225,136,45"/>
+<area shape="rect" id="Node000006" href="$BucketPSTEP_8cpp.html" title=" " alt="" coords="450,226,579,252"/>
+<area shape="poly" id="edge5_Node000001_Node000006" title=" " alt="" coords="192,33,240,52,292,77,348,111,401,151,500,224,497,228,398,155,345,116,289,81,238,57,190,38"/>
+<area shape="rect" id="Node000007" href="$Utilities_8h.html" title=" " alt="" coords="203,79,279,105"/>
+<area shape="poly" id="edge6_Node000001_Node000007" title=" " alt="" coords="176,39,227,77,224,81,173,43"/>
+<area shape="rect" id="Node000003" href="$BCP_8cpp.html" title=" " alt="" coords="180,374,252,399"/>
+<area shape="poly" id="edge2_Node000002_Node000003" title=" " alt="" coords="149,333,201,371,198,375,145,337"/>
+<area shape="rect" id="Node000004" href="$Branching_8cpp.html" title=" " alt="" coords="52,374,155,399"/>
+<area shape="poly" id="edge3_Node000002_Node000004" title=" " alt="" coords="116,341,109,374,104,373,110,340"/>
+<area shape="poly" id="edge8_Node000007_Node000005" title=" " alt="" coords="219,117,97,228,94,224,215,113"/>
+<area shape="poly" id="edge9_Node000007_Node000006" title=" " alt="" coords="280,110,358,150,494,223,491,228,356,155,277,114"/>
+<area shape="rect" id="Node000008" href="$BucketBindings_8cpp.html" title="Python bindings for the BucketGraph, VRPNode, Label, PSTEPDuals, and." alt="" coords="289,226,425,252"/>
+<area shape="poly" id="edge7_Node000007_Node000008" title=" " alt="" coords="284,110,311,128,334,151,345,170,352,191,359,226,354,227,347,192,340,172,330,154,307,132,281,115"/>
+<area shape="rect" id="Node000009" href="$Labeling_8h.html" title=" " alt="" coords="240,153,320,178"/>
+<area shape="poly" id="edge10_Node000007_Node000009" title=" " alt="" coords="257,117,276,151,271,153,252,120"/>
+<area shape="rect" id="Node000010" href="$VRProblem_8h.html" title="Header file for the BCP class." alt="" coords="167,226,264,252"/>
+<area shape="poly" id="edge17_Node000007_Node000010" title=" " alt="" coords="237,120,230,153,220,227,214,226,225,152,232,119"/>
+<area shape="poly" id="edge12_Node000009_Node000005" title=" " alt="" coords="233,186,117,228,115,223,231,181"/>
+<area shape="poly" id="edge13_Node000009_Node000006" title=" " alt="" coords="335,181,475,223,474,228,333,186"/>
+<area shape="poly" id="edge11_Node000009_Node000008" title=" " alt="" coords="306,187,346,224,342,228,302,191"/>
+<area shape="poly" id="edge14_Node000009_Node000010" title=" " alt="" coords="261,191,229,228,225,224,257,188"/>
+<area shape="poly" id="edge16_Node000010_Node000002" title=" " alt="" coords="189,264,136,302,133,297,186,259"/>
+<area shape="poly" id="edge15_Node000010_Node000003" title=" " alt="" coords="218,268,218,373,213,373,213,268"/>
+</map>

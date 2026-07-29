@@ -1,0 +1,5 @@
+<map id="HGS::recordArcAvoidance" name="HGS::recordArcAvoidance">
+<area shape="rect" id="Node000001" title="Record that arc (i,j) was avoided (not in the route) in an iteration." alt="" coords="5,5,179,31"/>
+<area shape="rect" id="Node000002" href="$classHGS.html#adef29749b7c77cac37d01b490577272f" title="Compute a deterministic arc hash key from (i, j)." alt="" coords="227,5,323,31"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="179,16,211,16,211,21,179,21"/>
+</map>

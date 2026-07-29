@@ -1,0 +1,9 @@
+<map id="VRProblem::applyDeluxingReduction" name="VRProblem::applyDeluxingReduction">
+<area shape="rect" id="Node000001" title=" " alt="" coords="5,71,178,111"/>
+<area shape="rect" id="Node000002" href="$classMIPProblem.html#a4cd9a407085c12dbae7b776eb6a99cdc" title=" " alt="" coords="250,5,384,46"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="163,68,235,47,236,52,165,73"/>
+<area shape="rect" id="Node000003" href="$classMIPProblem.html#a365e22d38b1af83a16a066d4824ba6aa" title=" " alt="" coords="226,71,409,111"/>
+<area shape="poly" id="edge2_Node000001_Node000003" title=" " alt="" coords="178,88,210,88,210,94,178,94"/>
+<area shape="rect" id="Node000004" href="$classBNBNode.html#a826ed1319c03caf3030806fd80098063" title=" " alt="" coords="255,136,380,161"/>
+<area shape="poly" id="edge3_Node000001_Node000004" title=" " alt="" coords="175,109,250,129,248,134,173,114"/>
+</map>

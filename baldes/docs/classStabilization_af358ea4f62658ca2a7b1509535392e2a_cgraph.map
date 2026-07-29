@@ -1,0 +1,9 @@
+<map id="Stabilization::update_stabilization_after_pricing_optim" name="Stabilization::update_stabilization_after_pricing_optim">
+<area shape="rect" id="Node000001" title=" " alt="" coords="5,20,142,75"/>
+<area shape="rect" id="Node000002" href="$classStabilization.html#ac2f24133b3ae9bb48b0d72b7fb0fb996" title=" " alt="" coords="190,5,332,31"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="142,34,174,29,175,34,142,39"/>
+<area shape="rect" id="Node000003" href="$classStabilization.html#ab6b6215da1ae5d49b2e6c0877f00b359" title=" " alt="" coords="193,55,329,96"/>
+<area shape="poly" id="edge2_Node000001_Node000003" title=" " alt="" coords="142,55,177,60,176,66,142,60"/>
+<area shape="rect" id="Node000004" href="$classStabilization.html#a4f4e3b43fbae641f421179c3519a7ff7" title=" " alt="" coords="380,63,506,88"/>
+<area shape="poly" id="edge3_Node000003_Node000004" title=" " alt="" coords="330,73,364,73,364,78,330,78"/>
+</map>

@@ -1,0 +1,17 @@
+<map id="Branching::calculateAggregatedbaldesVars" name="Branching::calculateAggregatedbaldesVars">
+<area shape="rect" id="Node000001" title=" " alt="" coords="5,104,274,130"/>
+<area shape="rect" id="Node000002" href="$classBranching.html#a1b951b8f0bcd6c33f759620087445a73" title=" " alt="" coords="322,29,535,55"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="186,101,321,64,350,56,351,62,322,69,187,106"/>
+<area shape="rect" id="Node000006" href="$classBNBNode.html#ac5cdf235b03dab790bc9ec7222592375" title=" " alt="" coords="342,79,514,104"/>
+<area shape="poly" id="edge5_Node000001_Node000006" title=" " alt="" coords="274,102,326,98,327,103,275,108"/>
+<area shape="rect" id="Node000007" href="$classBNBNode.html#aca6f8d009954c8444675f8ce69cbfaad" title=" " alt="" coords="359,128,498,154"/>
+<area shape="poly" id="edge6_Node000001_Node000007" title=" " alt="" coords="275,125,344,131,344,137,274,131"/>
+<area shape="rect" id="Node000008" href="$classBranching.html#af826a4553e1c487058a28192bc07a181" title=" " alt="" coords="352,177,504,203"/>
+<area shape="poly" id="edge7_Node000001_Node000008" title=" " alt="" coords="189,128,322,164,352,171,351,176,321,169,187,133"/>
+<area shape="rect" id="Node000003" href="$classMST.html#aab20166a0b84167db616699bcaf02360" title=" " alt="" coords="604,5,698,31"/>
+<area shape="poly" id="edge2_Node000002_Node000003" title=" " alt="" coords="535,28,588,22,588,28,536,33"/>
+<area shape="rect" id="Node000005" href="$structInstanceData.html#a8c2987f0a1fcc42b1981f7599ee944d7" title="Retrieves the distance value between two points." alt="" coords="583,55,718,80"/>
+<area shape="poly" id="edge4_Node000002_Node000005" title=" " alt="" coords="536,52,568,55,567,61,535,57"/>
+<area shape="rect" id="Node000004" href="$classMST.html#ae8f38e66bc8580c27c85f2455a6a4d2d" title=" " alt="" coords="766,5,901,31"/>
+<area shape="poly" id="edge3_Node000003_Node000004" title=" " alt="" coords="698,16,751,16,751,21,698,21"/>
+</map>
