@@ -7,12 +7,12 @@
  */
 
 #pragma once
+#include "algebra/SparseMatrix.h"
 #include "cuts/model/Cut.h"
 #include "cuts/rank1/Helpers.h"
-#include "search/Dual.h"
 #include "math/RNG.h"
-#include "algebra/SparseMatrix.h"
 #include "model/VRPNode.h"
+#include "search/Dual.h"
 #include <unordered_set>
 
 class HighRankCuts; // Forward declaration
@@ -57,10 +57,13 @@ private:
     // Helper Functions
     // -----------------------
     // Compute the similarity between two sets based on their intersection size.
-    static double computeSimilarity(const std::vector<int> &set1, const std::vector<int> &set2) {
-        std::vector<int> intersection;
-        std::set_intersection(set1.begin(), set1.end(), set2.begin(), set2.end(), std::back_inserter(intersection));
-        return 2.0 * intersection.size() / (set1.size() + set2.size());
+    static double computeSimilarity(const ankerl::unordered_dense::set<int> &set1,
+                                    const ankerl::unordered_dense::set<int> &set2) {
+        if (set1.empty() && set2.empty()) return 1.0;
+        const auto &[smaller, larger] = set1.size() <= set2.size() ? std::tie(set1, set2) : std::tie(set2, set1);
+        std::size_t intersection_size = 0;
+        for (int value : smaller) { intersection_size += larger.contains(value); }
+        return 2.0 * static_cast<double>(intersection_size) / static_cast<double>(set1.size() + set2.size());
     }
 
     // Select an operator based on current operator scores.
@@ -266,10 +269,8 @@ private:
                 double      diversity_score = 0.0;
                 for (const auto &other : diverse_solutions) {
                     if (&other != &sol) {
-                        double structural_div =
-                            1.0 - computeSimilarity(std::vector<int>(sol.nodes.begin(), sol.nodes.end()),
-                                                    std::vector<int>(other.nodes.begin(), other.nodes.end()));
-                        double violation_div = std::abs(other.violation - sol.violation);
+                        double structural_div = 1.0 - computeSimilarity(sol.nodes, other.nodes);
+                        double violation_div  = std::abs(other.violation - sol.violation);
                         diversity_score += 0.5 * (structural_div + violation_div);
                     }
                 }
@@ -339,8 +340,7 @@ private:
 
 public:
     // Update feedback statistics from the provided candidate set.
-    void provideFeedback(
-        const ankerl::unordered_dense::set<CandidateSet, CandidateSetHasher, CandidateSetCompare> &candidates) {
+    void provideFeedback(const CandidateSetCollection &candidates) {
         // Convert candidate set to vector and sort by violation in
         // descending
         // order.
@@ -356,15 +356,11 @@ public:
             const auto &candidate = candidate_vec[idx];
 
             // Update pair statistics for every pair in candidate.nodes.
-            for (size_t i = 0; i < candidate.nodes.size(); ++i) {
-                for (size_t j = i + 1; j < candidate.nodes.size(); ++j) {
-                    // auto key = std::make_pair(
-                    //     std::min(candidate.nodes[i], candidate.nodes[j]),
-                    //     std::max(candidate.nodes[i], candidate.nodes[j]));
-                    auto a = *std::next(candidate.nodes.begin(), i);
-                    auto b = *std::next(candidate.nodes.begin(), j);
-                    // Optionally ensure a consistent ordering (e.g., always the
-                    // smaller one first)
+            const std::vector<int> candidate_nodes(candidate.nodes.begin(), candidate.nodes.end());
+            for (size_t i = 0; i < candidate_nodes.size(); ++i) {
+                for (size_t j = i + 1; j < candidate_nodes.size(); ++j) {
+                    const int           a     = candidate_nodes[i];
+                    const int           b     = candidate_nodes[j];
                     std::pair<int, int> key   = std::minmax(a, b);
                     auto               &stats = pair_stats[key];
 
@@ -376,10 +372,8 @@ public:
             }
 
             // Update neighbor scores for candidate neighbors.
-            for (int node : candidate.nodes) {
-                for (int neighbor : candidate.neighbor) {
-                    neighbor_scores[neighbor] = neighbor_scores[neighbor] * DECAY_FACTOR + 1;
-                }
+            for (int neighbor : candidate.neighbor) {
+                neighbor_scores[neighbor] = neighbor_scores[neighbor] * DECAY_FACTOR + 1;
             }
         }
     }

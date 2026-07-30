@@ -19,9 +19,8 @@
 #include <iostream>
 #include <limits>
 #include <numeric> // For std::iota
+#include <stdexcept>
 #include <vector>
-
-#define NORM_TOLERANCE 1e-4
 
 /**
  * @class Stabilization
@@ -32,9 +31,10 @@
  */
 class Stabilization {
 public:
-    static constexpr double kAlphaMin = 0.02;
-    static constexpr double kAlphaMax = 0.90;
-    static constexpr double kAlphaEps = 1e-3;
+    static constexpr double kAlphaMin      = 0.02;
+    static constexpr double kAlphaMax      = 0.90;
+    static constexpr double kAlphaEps      = 1e-3;
+    static constexpr double kNormTolerance = 1e-4;
 
     double alpha; // Current alpha parameter
     int    t;     // Iteration counter
@@ -79,8 +79,45 @@ public:
 
     ReducedCostResult   rc;
     std::vector<double> stab_constraint_values;
+    std::vector<char>   constraint_senses;
 
     bool cut_added = false;
+
+    void align_with_master_duals(const DualSolution &master_duals) {
+        const std::size_t new_size = master_duals.size();
+
+        auto align = [&](DualSolution &duals) {
+            const std::size_t old_size = duals.size();
+            duals.resize(new_size);
+            for (std::size_t i = old_size; i < new_size; ++i) { duals[i] = master_duals[i]; }
+        };
+
+        align(cur_stab_center);
+        align(smooth_dual_sol);
+        if (!duals_sep.empty()) align(duals_sep);
+
+        if (subgradient.size() != new_size) {
+            subgradient.clear();
+            subgradient_norm = 0.0;
+            beta             = 0.0;
+        }
+
+        sizeDual = static_cast<int>(new_size);
+    }
+
+    void project_onto_dual_domain(DualSolution &duals) const {
+        const std::size_t count = std::min(duals.size(), constraint_senses.size());
+        for (std::size_t i = 0; i < count; ++i) {
+            // BALDES solves a minimization master. Its '<' row duals are
+            // non-positive, '>' row duals are non-negative, and equality-row
+            // duals are unrestricted.
+            if (constraint_senses[i] == '<') {
+                duals[i] = std::min(0.0, duals[i]);
+            } else if (constraint_senses[i] == '>') {
+                duals[i] = std::max(0.0, duals[i]);
+            }
+        }
+    }
 
     void update_stabilization_after_misprice() {
         nb_misprices++;
@@ -102,12 +139,15 @@ public:
     bool update_stabilization_after_master_optim(const DualSolution &new_center) {
         nb_misprices = 0;
         cur_alpha    = std::clamp(base_alpha, kAlphaMin, kAlphaMax);
+        alpha        = cur_alpha;
 
         if (cur_stab_center.empty()) {
             cur_stab_center = new_center;
             smooth_dual_sol = new_center;
+            sizeDual        = static_cast<int>(new_center.size());
             return false;
         }
+        align_with_master_duals(new_center);
         return cur_alpha > 0;
     }
 
@@ -137,8 +177,8 @@ public:
 
     DualSolution getStabDualSol(const DualSolution &input_duals) {
         if (input_duals.empty()) { return input_duals; }
-        DualSolution pi_out;
-        pi_out.assign(input_duals.begin(), input_duals.begin() + sizeDual);
+        align_with_master_duals(input_duals);
+        DualSolution pi_out = input_duals;
         if (cur_stab_center.empty()) { return pi_out; }
         if (cur_alpha <= 0.0) {
             smooth_dual_sol = pi_out;
@@ -152,10 +192,10 @@ public:
         DualSolution pi_tilde(n);
         for (size_t i = 0; i < n; ++i) { pi_tilde[i] = cur_alpha * cur_stab_center[i] + (1.0 - cur_alpha) * pi_out[i]; }
 
-        // If directional components are unavailable, return pi_tilde projected
-        // to the positive orthant.
+        // If directional components are unavailable, return the convex
+        // combination. Since both endpoints are dual-feasible, the combination
+        // respects each row's dual domain.
         if (subgradient.empty() || subgradient_norm <= EPSILON || beta <= 0.0) {
-            for (double &v : pi_tilde) v = std::max(0.0, v);
             smooth_dual_sol = pi_tilde;
             duals_sep       = pi_tilde;
             return pi_tilde;
@@ -199,23 +239,26 @@ public:
         DualSolution pi_sep(n);
         for (size_t i = 0; i < n; ++i) {
             pi_sep[i] = cur_stab_center[i] + (norm_tilde_in / norm_rho_in) * (rho[i] - cur_stab_center[i]);
-            pi_sep[i] = std::max(0.0, pi_sep[i]);
         }
+        project_onto_dual_domain(pi_sep);
         smooth_dual_sol = pi_sep;
         duals_sep       = pi_sep;
         return pi_sep;
     }
 
-    inline double norm(const std::vector<double> &vector) {
-        double res = 0;
-        for (int i = 0; i < vector.size(); ++i) { res += vector[i] * vector[i]; }
-        return std::sqrt(res + 1e-6);
+    inline double norm(const std::vector<double> &vector) const {
+        return std::sqrt(std::inner_product(vector.begin(), vector.end(), vector.begin(), 0.0));
     }
 
-    inline double norm(const std::vector<double> &vector_1, const std::vector<double> &vector_2) {
-        double res = 0.0;
-        for (auto i = 0; i < vector_1.size(); ++i) { res += (vector_2[i] - vector_1[i]) * (vector_2[i] - vector_1[i]); }
-        return std::sqrt(res + 1e-8);
+    inline double norm(const std::vector<double> &vector_1, const std::vector<double> &vector_2) const {
+        if (vector_1.size() != vector_2.size()) {
+            throw std::invalid_argument("Cannot compute a norm for vectors with different dimensions");
+        }
+        return std::sqrt(std::inner_product(vector_1.begin(), vector_1.end(), vector_2.begin(), 0.0,
+                                            std::plus<double>(), [](double a, double b) {
+                                                const double difference = a - b;
+                                                return difference * difference;
+                                            }));
     }
 
     DualSolution getStabDualSolAdvanced(const DualSolution &input_duals) { return getStabDualSol(input_duals); }
@@ -229,8 +272,8 @@ public:
         // Compute relative distance: ||smooth_dual_sol - cur_stab_center|| /
         // |lp_obj|
         double rel_distance = norm(smooth_dual_sol, cur_stab_center) / (std::abs(lp_obj) + EPSILON);
-        if (rel_distance < NORM_TOLERANCE) {
-            alpha = 0.0;
+        if (rel_distance < kNormTolerance) {
+            alpha = cur_alpha = 0.0;
             return false;
         }
 
@@ -262,51 +305,33 @@ public:
         return cos_angle < DOT_TOLERANCE;
     }
 
-    void update_subgradient(const ModelData &dados, const DualSolution &nodeDuals,
-                            const std::vector<Label *> &best_pricing_cols, bool use_weighted_update = true) {
-        size_t number_of_rows = nodeDuals.size();
+    void update_subgradient(const ModelData &model, const DualSolution &node_duals,
+                            const std::vector<Label *> &pricing_columns) {
+        const std::size_t number_of_rows = node_duals.size();
+        if (model.b.size() != number_of_rows || model.sense.size() != number_of_rows) {
+            throw std::invalid_argument("Master RHS, senses, and dual solution have inconsistent row counts");
+        }
+
         new_rows.assign(number_of_rows, 0.0);
-
-        // Determine how many columns to check.
-        auto cols_to_check = std::min(numK, static_cast<int>(best_pricing_cols.size()));
-        for (size_t i = 0; i < cols_to_check; ++i) {
-            const auto &col = best_pricing_cols[i];
-
-            // Compute a weight for this column.
-            double weight = 1.0;
-            if (use_weighted_update) {
-                // weight inversely proportional to cost
-                weight = 1.0 / (1.0 + std::abs(col->cost));
-            }
-
-            // Accumulate coverage for nodes that are not the artificial start
-            // or end.
-            for (const auto &node : col->getRoute()) {
-                if (node > 0 && node != N_SIZE - 1) { new_rows[node - 1] += weight; }
+        const std::size_t customer_rows = std::min<std::size_t>(number_of_rows, N_SIZE - 2);
+        const std::size_t columns_to_use =
+            std::min<std::size_t>(static_cast<std::size_t>(std::max(0, numK)), pricing_columns.size());
+        for (std::size_t column_index = 0; column_index < columns_to_use; ++column_index) {
+            const Label *column = pricing_columns[column_index];
+            if (column == nullptr) continue;
+            for (uint16_t node : column->getRoute()) {
+                if (node > 0 && node < N_SIZE - 1) {
+                    const std::size_t row = static_cast<std::size_t>(node - 1);
+                    if (row < customer_rows) new_rows[row] += 1.0;
+                }
             }
         }
 
-        // Compute the raw subgradient based on the constraint senses.
+        // Pricing routes expose customer-row coefficients. Extra cut and
+        // branching-row coefficients cannot be reconstructed from a route
+        // alone, so leave those directional components at zero.
         subgradient.assign(number_of_rows, 0.0);
-        for (size_t i = 0; i < number_of_rows; ++i) {
-            if (dados.sense[i] == '<') {
-                subgradient[i] = new_rows[i] - dados.b[i];
-            } else if (dados.sense[i] == '>') {
-                subgradient[i] = dados.b[i] - new_rows[i];
-            } else {
-                subgradient[i] = std::abs(dados.b[i] - new_rows[i]);
-            }
-        }
-
-        // Optionally, blend the computed subgradient with the current duals.
-        // This can help smooth the updates over iterations.
-        // for (size_t i = 0; i < number_of_rows; ++i) {
-        // Here we use a simple average. You might use a different
-        // combination or a momentum term.
-        // subgradient[i] = 0.5 * subgradient[i] + 0.5 * nodeDuals[i];
-        // }
-
-        // Recompute the norm of the subgradient.
+        for (std::size_t row = 0; row < customer_rows; ++row) { subgradient[row] = model.b[row] - new_rows[row]; }
         subgradient_norm = norm(subgradient);
     }
 
@@ -322,7 +347,9 @@ public:
     void update_stabilization_after_pricing_optim(const ModelData &dados, const DualSolution &input_duals,
                                                   const double               &lag_gap,
                                                   const std::vector<Label *> &best_pricing_cols) {
-        std::vector<double> nodeDuals(input_duals.begin(), input_duals.begin() + sizeDual);
+        align_with_master_duals(input_duals);
+        std::vector<double> nodeDuals = input_duals;
+        constraint_senses             = dados.sense;
 
         if (nb_misprices == 0) {
             update_subgradient(dados, nodeDuals, best_pricing_cols);
@@ -330,8 +357,10 @@ public:
             // Dynamic alpha schedule (Table 1 right):
             // if g_sep · (pi_out - pi_in) > 0 -> fincr(alpha)
             // else -> fdecr(alpha)
-            double g_dot_dir = 0.0;
-            if (!subgradient.empty() && subgradient.size() == nodeDuals.size() && !cur_stab_center.empty()) {
+            double     g_dot_dir = 0.0;
+            const bool has_direction =
+                subgradient_norm > EPSILON && subgradient.size() == nodeDuals.size() && !cur_stab_center.empty();
+            if (has_direction) {
                 for (size_t i = 0; i < nodeDuals.size(); ++i) {
                     g_dot_dir += subgradient[i] * (nodeDuals[i] - cur_stab_center[i]);
                 }
@@ -342,9 +371,12 @@ public:
                 if (a >= 0.5) return a / 1.1;
                 return std::max(0.0, a - (1.0 - a) * 0.1);
             };
-            alpha      = (g_dot_dir > 0.0) ? fincr(alpha) : fdecr(alpha);
-            alpha      = std::clamp(alpha, 0.0, kAlphaMax);
-            base_alpha = std::clamp(alpha, kAlphaMin, kAlphaMax);
+            if (has_direction) {
+                alpha      = (g_dot_dir > 0.0) ? fincr(alpha) : fdecr(alpha);
+                alpha      = std::clamp(alpha, 0.0, kAlphaMax);
+                base_alpha = std::clamp(alpha, kAlphaMin, kAlphaMax);
+                cur_alpha  = alpha;
+            }
 
             // Adaptive beta schedule (Section directional smoothing):
             // beta = cos(gamma) between (pi_out - pi_in) and (pi_g - pi_in).
@@ -378,24 +410,26 @@ public:
         }
     }
 
-    bool shouldExit() { return cur_alpha < 1e-3; }
+    bool shouldExit() const { return cur_alpha < kAlphaEps; }
 
     void cleanup() {
         stab_constraint_values.clear();
         smooth_dual_sol.clear();
         subgradient.clear();
         duals_sep.clear();
-        beta  = 0.0;
-        alpha = base_alpha;
+        beta      = 0.0;
+        alpha     = base_alpha;
+        cur_alpha = base_alpha;
     }
 
     bool ipm_active = false;
     void define_smooth_dual_sol(const DualSolution &nodeDuals) {
-        smooth_dual_sol.assign(nodeDuals.begin(), nodeDuals.begin() + sizeDual);
-        ipm_active = true;
+        align_with_master_duals(nodeDuals);
+        smooth_dual_sol = nodeDuals;
+        ipm_active      = true;
     }
 
     void updateNumK(int numK) { this->numK = numK; }
 
-    void clearAlpha() { alpha = 0.0; }
+    void clearAlpha() { alpha = cur_alpha = 0.0; }
 };
