@@ -15,6 +15,7 @@ set(CMAKE_C_COMPILER
 
 
 project(BALDES LANGUAGES C CXX)
+include(CTest)
 
 #-------------------------------------------------------------------------------
 # Compiler Settings
@@ -474,4 +475,16 @@ if(HGS)
   add_executable(hgs src/apps/HGS.cpp ${HGS_SOURCES} ${FPSOURCE})
   target_link_libraries(hgs PRIVATE stdexec fmt xxhash)
   target_compile_options(hgs PRIVATE -Wno-c++26-extensions -Wno-deprecated-declarations)
+endif()
+
+if(BUILD_TESTING)
+  add_executable(stabilization_test tests/stabilization_test.cpp)
+  target_compile_options(stabilization_test PRIVATE -Wno-c++26-extensions -Wno-deprecated-declarations)
+  target_link_libraries(stabilization_test PRIVATE stdexec fmt xxhash)
+  add_test(NAME stabilization_test COMMAND stabilization_test)
+
+  add_executable(rank1_helpers_test tests/rank1_helpers_test.cpp)
+  target_compile_options(rank1_helpers_test PRIVATE -Wno-c++26-extensions -Wno-deprecated-declarations)
+  target_link_libraries(rank1_helpers_test PRIVATE stdexec fmt xxhash)
+  add_test(NAME rank1_helpers_test COMMAND rank1_helpers_test)
 endif()

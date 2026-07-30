@@ -10,6 +10,7 @@
 
 // Move config outside as namespace constants
 #include "cuts/model/Cut.h"
+#include <bit>
 namespace LocalSearchConfig {
 constexpr double MIN_WEIGHT             = 0.01;
 constexpr int    SEGMENT_SIZE           = 20;
@@ -186,19 +187,12 @@ inline std::vector<SRCPermutation> generateExactPermutations(int candidateSize) 
     return allPerms;
 }
 
-namespace std {
-template <>
-struct hash<std::vector<int>> {
-    size_t operator()(const std::vector<int> &v) const {
-        // Handle empty vectors.
-        if (v.empty()) { return 0; }
-        // Compute the hash using XXH64.
-        // v.data() returns a pointer to contiguous storage.
-        // The length is v.size() * sizeof(int) bytes.
-        return static_cast<size_t>(XXH64(v.data(), v.size() * sizeof(int), 0));
+struct IntVectorHasher {
+    size_t operator()(const std::vector<int> &values) const noexcept {
+        if (values.empty()) return 0;
+        return static_cast<size_t>(XXH64(values.data(), values.size() * sizeof(int), 0));
     }
 };
-} // namespace std
 
 struct NodeScore {
     int    node       = 0;
@@ -241,92 +235,66 @@ struct CandidateSet {
                perm.num == other.perm.num;
     }
 
-    // Less than operator for std::set
+    // Less than operator for ordered containers.
     bool operator<(const CandidateSet &other) const {
-        auto a = *this;
-        auto b = other;
-        if (a.nodes == b.nodes && a.perm.num == b.perm.num && a.perm.den == b.perm.den) {
+        if (nodes == other.nodes && perm.num == other.perm.num && perm.den == other.perm.den) {
             // If they're the same, keep the one with higher violation
             // by making it "less than" so it wins
-            return a.violation > b.violation;
+            return violation > other.violation;
         }
 
         // For different elements, establish consistent ordering
-        if (a.nodes != b.nodes) return a.nodes.size() < b.nodes.size();
-        if (a.perm.num != b.perm.num) return a.perm.num < b.perm.num;
-        return a.perm.den < b.perm.den;
+        if (nodes != other.nodes) return nodes.size() < other.nodes.size();
+        if (perm.num != other.perm.num) return perm.num < other.perm.num;
+        return perm.den < other.perm.den;
     }
 };
 
-struct CandidateSetCompare {
-    bool operator()(const CandidateSet &a, const CandidateSet &b) const {
-        // First check if they represent the same core elements
-        if (a.nodes == b.nodes && a.perm.num == b.perm.num && a.perm.den == b.perm.den && a.neighbor == b.neighbor) {
-            // If they're the same, keep the one with higher violation
-            // by making it "less than" so it wins
-            return a.violation > b.violation;
-        }
-
-        // For different elements, establish consistent ordering
-        if (a.nodes != b.nodes) return a.nodes.size() < b.nodes.size();
-        if (a.perm.num != b.perm.num) return a.perm.num < b.perm.num;
-        if (a.perm.den != b.perm.den) return a.perm.den < b.perm.den;
-        if (a.neighbor.size() != b.neighbor.size()) return a.neighbor.size() < b.neighbor.size();
-        std::vector<int> a_neigh(a.neighbor.begin(), a.neighbor.end());
-        std::vector<int> b_neigh(b.neighbor.begin(), b.neighbor.end());
-        std::sort(a_neigh.begin(), a_neigh.end());
-        std::sort(b_neigh.begin(), b_neigh.end());
-        return a_neigh < b_neigh;
-    }
+struct CandidateSetEqual {
+    bool operator()(const CandidateSet &lhs, const CandidateSet &rhs) const noexcept { return lhs == rhs; }
 };
 
 struct CandidateSetHasher {
-    using is_transparent = void;
-    uint64_t operator()(const CandidateSet &cs) const {
-        XXH3_state_t *state = XXH3_createState();
-        assert(state != nullptr);
-        XXH3_64bits_reset(state);
-        // Convert unordered nodes and neighbors to sorted vectors.
-        std::vector<int> sorted_nodes(cs.nodes.begin(), cs.nodes.end());
-        std::sort(sorted_nodes.begin(), sorted_nodes.end());
-        XXH3_64bits_update(state, sorted_nodes.data(), sorted_nodes.size() * sizeof(int));
-        std::vector<int> sorted_neighbor(cs.neighbor.begin(), cs.neighbor.end());
-        std::sort(sorted_neighbor.begin(), sorted_neighbor.end());
-        XXH3_64bits_update(state, sorted_neighbor.data(), sorted_neighbor.size() * sizeof(int));
-        // Hash the permutation numerator (assumed to be a vector<int>).
-        XXH3_64bits_update(state, cs.perm.num.data(), cs.perm.num.size() * sizeof(int));
-        // Hash the permutation denominator.
-        XXH3_64bits_update(state, &cs.perm.den, sizeof(int));
-        uint64_t hash = XXH3_64bits_digest(state);
-        XXH3_freeState(state);
-        return hash;
+    using is_avalanching = void;
+
+    static uint64_t mix(uint64_t value) noexcept {
+        value += 0x9e3779b97f4a7c15ULL;
+        value = (value ^ (value >> 30U)) * 0xbf58476d1ce4e5b9ULL;
+        value = (value ^ (value >> 27U)) * 0x94d049bb133111ebULL;
+        return value ^ (value >> 31U);
     }
 
-    uint64_t mixed_hash(const CandidateSet &cs) const { return operator()(cs); }
+    static uint64_t hash_unordered_set(const ankerl::unordered_dense::set<int> &values, uint64_t seed) noexcept {
+        // Commutative accumulators make the result independent of hash-table
+        // iteration order without sorting or allocating temporary vectors.
+        uint64_t sum  = mix(seed ^ values.size());
+        uint64_t xors = 0;
+        for (int value : values) {
+            const uint64_t element_hash = mix(static_cast<uint32_t>(value) ^ seed);
+            sum += element_hash;
+            xors ^= std::rotl(element_hash, static_cast<int>(element_hash & 63U));
+        }
+        return mix(sum ^ xors);
+    }
+
+    uint64_t operator()(const CandidateSet &candidate) const noexcept {
+        uint64_t hash = hash_unordered_set(candidate.nodes, 0x243f6a8885a308d3ULL);
+        hash ^= std::rotl(hash_unordered_set(candidate.neighbor, 0x13198a2e03707344ULL), 17);
+        hash ^= mix(static_cast<uint32_t>(candidate.perm.den));
+        if (!candidate.perm.num.empty()) {
+            hash ^= XXH3_64bits(candidate.perm.num.data(), candidate.perm.num.size() * sizeof(int));
+        }
+        return mix(hash);
+    }
+
+    uint64_t mixed_hash(const CandidateSet &candidate) const noexcept { return operator()(candidate); }
 };
+
+using CandidateSetCollection = ankerl::unordered_dense::set<CandidateSet, CandidateSetHasher, CandidateSetEqual>;
 
 namespace std {
 template <>
 struct hash<CandidateSet> {
-    size_t operator()(const CandidateSet &cs) const {
-        // Create a state for the hash.
-        XXH3_state_t *state = XXH3_createState();
-        assert(state != nullptr);
-        XXH3_64bits_reset(state);
-        // Convert unordered nodes to a sorted vector.
-        std::vector<int> sorted_nodes(cs.nodes.begin(), cs.nodes.end());
-        std::sort(sorted_nodes.begin(), sorted_nodes.end());
-        XXH3_64bits_update(state, sorted_nodes.data(), sorted_nodes.size() * sizeof(int));
-        std::vector<int> sorted_neighbor(cs.neighbor.begin(), cs.neighbor.end());
-        std::sort(sorted_neighbor.begin(), sorted_neighbor.end());
-        XXH3_64bits_update(state, sorted_neighbor.data(), sorted_neighbor.size() * sizeof(int));
-        // Hash the permutation numerator (assumed to be a vector<int>).
-        XXH3_64bits_update(state, cs.perm.num.data(), cs.perm.num.size() * sizeof(int));
-        // Hash the permutation denominator.
-        XXH3_64bits_update(state, &cs.perm.den, sizeof(int));
-        uint64_t hash_val = XXH3_64bits_digest(state);
-        XXH3_freeState(state);
-        return hash_val;
-    }
+    size_t operator()(const CandidateSet &candidate) const noexcept { return CandidateSetHasher{}(candidate); }
 };
 } // namespace std

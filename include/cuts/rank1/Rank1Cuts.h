@@ -6,14 +6,14 @@
 
 #pragma once
 
-#include "cuts/model/Cut.h"
-#include "core/Definitions.h"
-#include "core/Pools.h"
 #include "algebra/SparseMatrix.h"
 #include "ankerl/unordered_dense.h"
-#include "pricing/bucket_graph/BucketGraph.h"
+#include "core/Definitions.h"
+#include "core/Pools.h"
+#include "cuts/model/Cut.h"
 #include "mip/LinExp.h"
 #include "mip/MIPHandler.h"
+#include "pricing/bucket_graph/BucketGraph.h"
 // #include "xxhash.h"
 //
 #include <cstdint>
@@ -123,15 +123,17 @@ public:
                 if (i == j) continue;
                 cost.emplace_back(high_rank_cuts.distances[i][j], j);
             }
-            std::stable_sort(cost.begin(), cost.end(), [](const auto &a, const auto &b) { return a.first < b.first; });
-            int limit = std::min(MAX_HEURISTIC_SEP_ROW_RANK1, static_cast<int>(cost.size()));
+            const int limit = std::min(MAX_HEURISTIC_SEP_ROW_RANK1, static_cast<int>(cost.size()));
+            std::partial_sort(cost.begin(), cost.begin() + limit, cost.end(),
+                              [](const auto &a, const auto &b) { return a.first < b.first; });
+            rank1_sep_heur_mem4_vertex[i].reserve(limit);
             for (int k = 0; k < limit; ++k) { rank1_sep_heur_mem4_vertex[i].push_back(cost[k].second); }
         }
     }
 
     Xoroshiro128Plus rp; // Seed it (you can change the seed)
 
-    void setDistanceMatrix(const std::vector<std::vector<double>> distances) { high_rank_cuts.distances = distances; }
+    void setDistanceMatrix(const std::vector<std::vector<double>> &distances) { high_rank_cuts.distances = distances; }
     LimitedMemoryRank1Cuts(std::vector<VRPNode> &nodes);
 
     LimitedMemoryRank1Cuts(const LimitedMemoryRank1Cuts &other)
@@ -194,8 +196,6 @@ public:
     void separateR1C1(const SparseMatrix &A, const std::vector<double> &x) {
         if (allPaths.empty()) return;
 
-        initializeRank1HeuristicNeighbors();
-
         struct CandidateVertex {
             double violation;
             int    node;
@@ -238,7 +238,7 @@ public:
         }
         pdqsort(ordered_cuts.begin(), ordered_cuts.end(),
                 [](const std::pair<double, int> &a, const std::pair<double, int> &b) { return a.first > b.first; });
-        const int cuts_to_apply = std::min(static_cast<int>(ordered_cuts.size()), 3);
+        const int      cuts_to_apply = std::min(static_cast<int>(ordered_cuts.size()), 3);
         SRCPermutation p;
         p.num = {1};
         p.den = 2;
@@ -251,7 +251,7 @@ public:
             std::vector<int>                order(N_SIZE, -1);
 
             C[node / 64] |= (1ULL << (node % 64));
-            order[node] = 0;
+            order[node]        = 0;
             const auto cut_key = cutStorage.compute_cut_key(C, p.num, p.den);
             if (cutStorage.cutExists(cut_key).first >= 0) { continue; }
 
@@ -269,8 +269,8 @@ public:
                 if (path_idx < 0 || static_cast<size_t>(path_idx) >= allPaths.size() ||
                     static_cast<size_t>(path_idx) >= x.size())
                     continue;
-                const auto   &clients = allPaths[path_idx].route;
-                const double coeff    = computeLimitedMemoryCoefficient(C, AM, p, clients, order);
+                const auto  &clients = allPaths[path_idx].route;
+                const double coeff   = computeLimitedMemoryCoefficient(C, AM, p, clients, order);
                 exact_violation += coeff * x[path_idx];
                 if (!numericutils::isZero(coeff)) {
                     coefficient_indices.push_back(path_idx);

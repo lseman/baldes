@@ -758,13 +758,8 @@ std::vector<CandidateSet> LocalSearch::solve(const CandidateSet &initial, const 
 
     // Lambda: Check if a candidate solution is "diverse" enough.
     auto isSolutionDiverse = [&](const CandidateSet &candidate) -> bool {
-        // Convert candidate nodes into a sorted vector.
-        std::vector<int> cand_nodes(candidate.nodes.begin(), candidate.nodes.end());
-        std::sort(cand_nodes.begin(), cand_nodes.end());
         for (const auto &sol : diverse_solutions) {
-            std::vector<int> sol_nodes(sol.nodes.begin(), sol.nodes.end());
-            std::sort(sol_nodes.begin(), sol_nodes.end());
-            double similarity = computeSimilarity(cand_nodes, sol_nodes);
+            const double similarity = computeSimilarity(candidate.nodes, sol.nodes);
             if (similarity > 0.9 ||
                 std::abs(sol.violation - candidate.violation) < LocalSearchConfig::DIVERSITY_THRESHOLD) {
                 return false;

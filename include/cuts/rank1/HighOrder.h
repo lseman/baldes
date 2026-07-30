@@ -14,10 +14,10 @@
 #include <unordered_map>
 
 #include "core/Definitions.h"
-#include "search/Dual.h"
-#include "model/Path.h"
 #include "math/RNG.h"
+#include "model/Path.h"
 #include "model/VRPNode.h"
+#include "search/Dual.h"
 #include "utils/NumericUtils.h"
 
 // include CutHelper
@@ -39,7 +39,7 @@
 class HighRankCuts {
 public:
     // Convenience alias — used by separate() and helpers.
-    using SeedMap = std::unordered_map<std::vector<int>, std::vector<int>, std::hash<std::vector<int>>>;
+    using SeedMap = std::unordered_map<std::vector<int>, std::vector<int>, IntVectorHasher>;
 
 private:
     static constexpr int MAX_COMBINATIONS     = 5;
@@ -48,9 +48,7 @@ private:
     exec::static_thread_pool            pool  = exec::static_thread_pool(std::thread::hardware_concurrency());
     exec::static_thread_pool::scheduler sched = pool.get_scheduler();
 
-    static void insertBestCandidate(
-        ankerl::unordered_dense::set<CandidateSet, CandidateSetHasher, CandidateSetCompare> &candidates,
-        CandidateSet candidate) {
+    static void insertBestCandidate(CandidateSetCollection &candidates, CandidateSet candidate) {
         auto it = candidates.find(candidate);
         if (it == candidates.end()) {
             candidates.emplace(std::move(candidate));
@@ -197,10 +195,9 @@ private:
         return seed_map;
     }
 
-    ankerl::unordered_dense::set<CandidateSet, CandidateSetHasher, CandidateSetCompare>
-    generateRouteSupportSeeds(const SparseMatrix &A, const std::vector<double> &x,
-                              const std::vector<std::vector<NodeScore>> &scores) {
-        ankerl::unordered_dense::set<CandidateSet, CandidateSetHasher, CandidateSetCompare> seeds;
+    CandidateSetCollection generateRouteSupportSeeds(const SparseMatrix &A, const std::vector<double> &x,
+                                                     const std::vector<std::vector<NodeScore>> &scores) {
+        CandidateSetCollection seeds;
         if (allPaths.empty() || x.empty()) return seeds;
 
         struct RouteSupport {
@@ -210,18 +207,19 @@ private:
         std::vector<RouteSupport> route_supports;
         route_supports.reserve(nonzero_paths.size());
         for (int path_idx : nonzero_paths) {
-            if (path_idx < 0 || static_cast<size_t>(path_idx) >= allPaths.size() || static_cast<size_t>(path_idx) >= x.size())
+            if (path_idx < 0 || static_cast<size_t>(path_idx) >= allPaths.size() ||
+                static_cast<size_t>(path_idx) >= x.size())
                 continue;
             if (x[path_idx] > 1e-6) { route_supports.push_back({x[path_idx], path_idx}); }
         }
         pdqsort(route_supports.begin(), route_supports.end(),
                 [](const auto &a, const auto &b) { return a.weight > b.weight; });
 
-        constexpr int MAX_ROUTE_SEEDS       = 60;
-        constexpr int MAX_ROUTE_NODE_POOL   = 10;
-        constexpr int MAX_MEMORY_PER_SEED   = 10;
-        constexpr int MAX_SEEDS_PER_ROUTE   = 8;
-        const int     n_routes_to_scan = std::min(MAX_ROUTE_SEEDS, static_cast<int>(route_supports.size()));
+        constexpr int MAX_ROUTE_SEEDS     = 60;
+        constexpr int MAX_ROUTE_NODE_POOL = 10;
+        constexpr int MAX_MEMORY_PER_SEED = 10;
+        constexpr int MAX_SEEDS_PER_ROUTE = 8;
+        const int     n_routes_to_scan    = std::min(MAX_ROUTE_SEEDS, static_cast<int>(route_supports.size()));
 
         std::vector<char> in_candidate(N_SIZE, 0);
         std::vector<int>  route_nodes;
@@ -260,7 +258,7 @@ private:
             int seeds_for_route = 0;
             for (int rank = MAX_RANK; rank >= MIN_RANK && seeds_for_route < MAX_SEEDS_PER_ROUTE; --rank) {
                 if (rank > static_cast<int>(node_pool.size())) continue;
-                uint32_t mask = (1u << rank) - 1;
+                uint32_t       mask  = (1u << rank) - 1;
                 const uint32_t limit = (1u << node_pool.size());
                 while (mask < limit && seeds_for_route < MAX_SEEDS_PER_ROUTE) {
                     candidate_nodes.clear();
@@ -304,10 +302,9 @@ private:
         return seeds;
     }
 
-    ankerl::unordered_dense::set<CandidateSet, CandidateSetHasher, CandidateSetCompare>
-    generateLiftedCutSeeds(const SparseMatrix &A, const std::vector<double> &x,
-                           const std::vector<std::vector<NodeScore>> &scores) {
-        ankerl::unordered_dense::set<CandidateSet, CandidateSetHasher, CandidateSetCompare> seeds;
+    CandidateSetCollection generateLiftedCutSeeds(const SparseMatrix &A, const std::vector<double> &x,
+                                                  const std::vector<std::vector<NodeScore>> &scores) {
+        CandidateSetCollection seeds;
         if (cutStorage == nullptr || cutStorage->empty()) return seeds;
 
         constexpr int MAX_EXTENSION_POOL = 12;
@@ -331,8 +328,7 @@ private:
                     memory_nodes.push_back(node);
                 }
             }
-            if (static_cast<int>(base_nodes.size()) < MIN_RANK ||
-                static_cast<int>(base_nodes.size()) >= MAX_RANK)
+            if (static_cast<int>(base_nodes.size()) < MIN_RANK || static_cast<int>(base_nodes.size()) >= MAX_RANK)
                 continue;
 
             for (int node : base_nodes) { in_candidate[node] = 1; }
@@ -350,11 +346,11 @@ private:
                 if (static_cast<int>(extension_pool.size()) >= MAX_EXTENSION_POOL) break;
             }
 
-            int lifts_for_cut = 0;
-            const int max_extra = std::min(MAX_RANK - static_cast<int>(base_nodes.size()),
-                                           static_cast<int>(extension_pool.size()));
+            int       lifts_for_cut = 0;
+            const int max_extra =
+                std::min(MAX_RANK - static_cast<int>(base_nodes.size()), static_cast<int>(extension_pool.size()));
             for (int extra = 1; extra <= max_extra && lifts_for_cut < MAX_LIFTS_PER_CUT; ++extra) {
-                uint32_t mask = (1u << extra) - 1;
+                uint32_t       mask  = (1u << extra) - 1;
                 const uint32_t limit = (1u << extension_pool.size());
                 while (mask < limit && lifts_for_cut < MAX_LIFTS_PER_CUT) {
                     candidate_nodes = base_nodes;
@@ -394,10 +390,9 @@ private:
         return seeds;
     }
 
-    ankerl::unordered_dense::set<CandidateSet, CandidateSetHasher, CandidateSetCompare>
-    generateFractionalCooccurrenceSeeds(const SparseMatrix &A, const std::vector<double> &x,
-                                        const std::vector<std::vector<NodeScore>> &scores) {
-        ankerl::unordered_dense::set<CandidateSet, CandidateSetHasher, CandidateSetCompare> seeds;
+    CandidateSetCollection generateFractionalCooccurrenceSeeds(const SparseMatrix &A, const std::vector<double> &x,
+                                                               const std::vector<std::vector<NodeScore>> &scores) {
+        CandidateSetCollection seeds;
         if (allPaths.empty() || nonzero_paths.empty()) return seeds;
 
         constexpr int MAX_SUPPORT_NODES     = 48;
@@ -408,7 +403,8 @@ private:
 
         std::vector<double> node_support(N_SIZE, 0.0);
         for (int path_idx : nonzero_paths) {
-            if (path_idx < 0 || static_cast<size_t>(path_idx) >= allPaths.size() || static_cast<size_t>(path_idx) >= x.size())
+            if (path_idx < 0 || static_cast<size_t>(path_idx) >= allPaths.size() ||
+                static_cast<size_t>(path_idx) >= x.size())
                 continue;
             const double x_val = x[path_idx];
             if (numericutils::isZero(x_val)) continue;
@@ -430,12 +426,13 @@ private:
         std::vector<int> top_index(N_SIZE, -1);
         for (int idx = 0; idx < static_cast<int>(support_nodes.size()); ++idx) { top_index[support_nodes[idx]] = idx; }
 
-        const int top_count = static_cast<int>(support_nodes.size());
+        const int                        top_count = static_cast<int>(support_nodes.size());
         std::vector<std::vector<double>> cooc(top_count, std::vector<double>(top_count, 0.0));
         std::vector<int>                 route_top_nodes;
         std::vector<char>                seen_top(top_count, 0);
         for (int path_idx : nonzero_paths) {
-            if (path_idx < 0 || static_cast<size_t>(path_idx) >= allPaths.size() || static_cast<size_t>(path_idx) >= x.size())
+            if (path_idx < 0 || static_cast<size_t>(path_idx) >= allPaths.size() ||
+                static_cast<size_t>(path_idx) >= x.size())
                 continue;
             const double x_val = x[path_idx];
             if (numericutils::isZero(x_val)) continue;
@@ -463,13 +460,13 @@ private:
         std::vector<char> in_candidate(N_SIZE, 0);
         const int         anchor_count = std::min(MAX_ANCHORS, top_count);
         for (int anchor_pos = 0; anchor_pos < anchor_count; ++anchor_pos) {
-            const int anchor = support_nodes[anchor_pos];
+            const int                           anchor = support_nodes[anchor_pos];
             std::vector<std::pair<double, int>> neighbor_scores;
             neighbor_scores.reserve(top_count - 1);
             for (int pos = 0; pos < top_count; ++pos) {
                 if (pos == anchor_pos) continue;
-                const int    node  = support_nodes[pos];
-                double score = cooc[anchor_pos][pos] + 0.25 * node_support[node];
+                const int node  = support_nodes[pos];
+                double    score = cooc[anchor_pos][pos] + 0.25 * node_support[node];
                 if (node < static_cast<int>(scores.size()) && !scores[node].empty()) {
                     score -= 0.01 * scores[node].front().cost_score;
                 }
@@ -489,7 +486,7 @@ private:
             for (int rank = MAX_RANK; rank >= 4 && candidates_for_anchor < MAX_CANDIDATES_ANCHOR; --rank) {
                 const int choose = rank - 1;
                 if (choose > static_cast<int>(extension_pool.size())) continue;
-                uint32_t mask = (1u << choose) - 1;
+                uint32_t       mask  = (1u << choose) - 1;
                 const uint32_t limit = (1u << extension_pool.size());
                 while (mask < limit && candidates_for_anchor < MAX_CANDIDATES_ANCHOR) {
                     candidate_nodes.clear();
@@ -533,9 +530,9 @@ private:
         return seeds;
     }
 
-    ankerl::unordered_dense::set<CandidateSet, CandidateSetHasher, CandidateSetCompare>
-    generateSeedCandidates(const SparseMatrix &A, const std::vector<double> &x, const SeedMap &seed_map) {
-        ankerl::unordered_dense::set<CandidateSet, CandidateSetHasher, CandidateSetCompare> seeds;
+    CandidateSetCollection generateSeedCandidates(const SparseMatrix &A, const std::vector<double> &x,
+                                                  const SeedMap &seed_map) {
+        CandidateSetCollection seeds;
         for (auto &seed_pair : seed_map) {
             const auto                       &candidate_nodes = seed_pair.first;
             const auto                       &memory_nodes    = seed_pair.second;
@@ -558,9 +555,8 @@ private:
 
         return scores;
     }
-    ankerl::unordered_dense::set<CandidateSet, CandidateSetHasher, CandidateSetCompare>
-    generateCandidates(const std::vector<std::vector<NodeScore>> &scores, const SparseMatrix &A,
-                       const std::vector<double> &x) {
+    CandidateSetCollection generateCandidates(const std::vector<std::vector<NodeScore>> &scores, const SparseMatrix &A,
+                                              const std::vector<double> &x) {
         struct ViolationResult {
             double         violation = 0.0;
             SRCPermutation perm;
@@ -569,8 +565,8 @@ private:
 
         // Thread-local data for each thread.
         struct ThreadLocalData {
-            ankerl::unordered_dense::set<CandidateSet, CandidateSetHasher, CandidateSetCompare> candidates;
-            ankerl::unordered_dense::map<CandidateSet, ViolationResult, CandidateSetHasher>     candidate_cache;
+            CandidateSetCollection                                                          candidates;
+            ankerl::unordered_dense::map<CandidateSet, ViolationResult, CandidateSetHasher> candidate_cache;
             ThreadLocalData() {
                 candidates.reserve(1000);
                 candidate_cache.reserve(1000);
@@ -581,7 +577,7 @@ private:
         std::vector<ThreadLocalData> threadData;
         for (size_t t = 0; t < numThreads; ++t) { threadData.emplace_back(); }
 
-        ankerl::unordered_dense::set<CandidateSet, CandidateSetHasher, CandidateSetCompare> finalCandidates;
+        CandidateSetCollection finalCandidates;
         finalCandidates.reserve(numThreads * 1000);
 
         // Use a lambda that accepts an explicit thread index.
@@ -790,13 +786,9 @@ private:
     // Evaluate the best violation over all orderings of a SINGLE plan group.
     // C, AM, and node_order must already be populated for the current node set.
     // The caller must clean up node_order entries after the call.
-    double evalPlanGroup(const std::array<uint64_t, num_words> &C,
-                         const std::array<uint64_t, num_words> &AM,
-                         std::vector<int>                      &node_order,
-                         const std::vector<int>                &paths,
-                         const PlanGroup                       &pg,
-                         const std::vector<double>             &x,
-                         const SRCPermutation                 *&best_perm_out) const {
+    double evalPlanGroup(const std::array<uint64_t, num_words> &C, const std::array<uint64_t, num_words> &AM,
+                         std::vector<int> &node_order, const std::vector<int> &paths, const PlanGroup &pg,
+                         const std::vector<double> &x, const SRCPermutation *&best_perm_out) const {
         double                best_vio  = 0.0;
         const SRCPermutation *best_perm = nullptr;
         for (const auto *pp : pg.perms) {
@@ -806,8 +798,7 @@ private:
                 if (static_cast<size_t>(r) >= x.size()) continue;
                 const double xv = x[r];
                 if (numericutils::isZero(xv)) continue;
-                lhs += static_cast<double>(
-                           computeLimitedMemoryCoefficient(C, AM, *pp, allPaths[r].route, node_order)) *
+                lhs += static_cast<double>(computeLimitedMemoryCoefficient(C, AM, *pp, allPaths[r].route, node_order)) *
                        xv;
             }
             const double vio = lhs - rhs;
@@ -823,11 +814,10 @@ private:
     // Find the plan group with the highest violation for a given node set.
     // Internally sets up C/AM/node_order, evaluates all plan groups, cleans up.
     // Returns {violation, plan_group_index(-1 if none), best_perm}.
-    std::tuple<double, int, const SRCPermutation *>
-    findBestPlanGroupIdx(const std::vector<int>                    &nodes,
-                         const ankerl::unordered_dense::set<int>   &mem,
-                         const std::vector<int>                    &paths,
-                         const std::vector<double>                 &x) const {
+    std::tuple<double, int, const SRCPermutation *> findBestPlanGroupIdx(const std::vector<int>                  &nodes,
+                                                                         const ankerl::unordered_dense::set<int> &mem,
+                                                                         const std::vector<int>                  &paths,
+                                                                         const std::vector<double> &x) const {
         const int RANK = static_cast<int>(nodes.size());
         auto      it   = plan_groups_map.find(RANK);
         if (it == plan_groups_map.end()) return {0.0, -1, nullptr};
@@ -875,7 +865,7 @@ private:
         if (allPaths.empty() || plan_groups_map.empty() || seed_map.empty()) return;
 
         struct HarvestedCut {
-            double                            vio  = 0.0;
+            double                            vio = 0.0;
             std::vector<int>                  nodes;
             ankerl::unordered_dense::set<int> mem;
             const SRCPermutation             *perm = nullptr;
@@ -890,229 +880,224 @@ private:
         std::mutex harvest_mutex;
 
         // ── parallel over seeds ───────────────────────────────────────────────
-        auto bulk_sender = stdexec::bulk(
-            stdexec::just(), seeds_vec.size(),
-            [&](std::size_t idx) {
-                const auto &[nodes_vec, mem_vec] = seeds_vec[idx];
-                if (nodes_vec.empty()) return;
-                const int RANK = static_cast<int>(nodes_vec.size());
-                if (RANK < MIN_RANK || RANK > MAX_RANK) return;
-                if (plan_groups_map.find(RANK) == plan_groups_map.end()) return;
+        auto bulk_sender = stdexec::bulk(stdexec::just(), seeds_vec.size(), [&](std::size_t idx) {
+            const auto &[nodes_vec, mem_vec] = seeds_vec[idx];
+            if (nodes_vec.empty()) return;
+            const int RANK = static_cast<int>(nodes_vec.size());
+            if (RANK < MIN_RANK || RANK > MAX_RANK) return;
+            if (plan_groups_map.find(RANK) == plan_groups_map.end()) return;
 
-                // Thread-local scratch storage (one copy per OS thread).
-                thread_local std::vector<int> cand_paths;
-                thread_local std::vector<int> no2;
-                if (no2.size() < N_SIZE) no2.assign(N_SIZE, -1);
+            // Thread-local scratch storage (one copy per OS thread).
+            thread_local std::vector<int> cand_paths;
+            thread_local std::vector<int> no2;
+            if (no2.size() < N_SIZE) no2.assign(N_SIZE, -1);
 
-                ankerl::unordered_dense::set<int> cur_mem(mem_vec.begin(), mem_vec.end());
-                std::vector<int>                  cur_nodes = nodes_vec; // sorted
+            ankerl::unordered_dense::set<int> cur_mem(mem_vec.begin(), mem_vec.end());
+            std::vector<int>                  cur_nodes = nodes_vec; // sorted
 
-                collectCandidatePathUnion(cur_nodes, cand_paths);
-                if (cand_paths.empty()) return;
+            collectCandidatePathUnion(cur_nodes, cand_paths);
+            if (cand_paths.empty()) return;
 
-                auto [cur_vio, cur_gi, cur_perm] = findBestPlanGroupIdx(cur_nodes, cur_mem, cand_paths, x);
-                if (cur_vio <= 1e-4 || cur_gi < 0) return;
+            auto [cur_vio, cur_gi, cur_perm] = findBestPlanGroupIdx(cur_nodes, cur_mem, cand_paths, x);
+            if (cur_vio <= 1e-4 || cur_gi < 0) return;
 
-                // ── working neighbourhood as sorted small-vector ──────────────
-                std::vector<int> w_no_c;
-                w_no_c.reserve(32);
-                const auto w_insert = [&](int n) {
-                    auto it = std::lower_bound(w_no_c.begin(), w_no_c.end(), n);
-                    if (it == w_no_c.end() || *it != n) w_no_c.insert(it, n);
-                };
-                const auto w_erase = [&](int n) {
-                    auto it = std::lower_bound(w_no_c.begin(), w_no_c.end(), n);
-                    if (it != w_no_c.end() && *it == n) w_no_c.erase(it);
-                };
-                for (int n : cur_nodes) {
-                    if (n >= static_cast<int>(rank1_sep_heur_mem4_vertex.size())) continue;
-                    for (int nb : rank1_sep_heur_mem4_vertex[n]) {
-                        if (nb > 0 && nb < N_SIZE - 1 &&
-                            !std::binary_search(cur_nodes.begin(), cur_nodes.end(), nb))
-                            w_insert(nb);
-                    }
+            // ── working neighbourhood as sorted small-vector ──────────────
+            std::vector<int> w_no_c;
+            w_no_c.reserve(32);
+            const auto w_insert = [&](int n) {
+                auto it = std::lower_bound(w_no_c.begin(), w_no_c.end(), n);
+                if (it == w_no_c.end() || *it != n) w_no_c.insert(it, n);
+            };
+            const auto w_erase = [&](int n) {
+                auto it = std::lower_bound(w_no_c.begin(), w_no_c.end(), n);
+                if (it != w_no_c.end() && *it == n) w_no_c.erase(it);
+            };
+            for (int n : cur_nodes) {
+                if (n >= static_cast<int>(rank1_sep_heur_mem4_vertex.size())) continue;
+                for (int nb : rank1_sep_heur_mem4_vertex[n]) {
+                    if (nb > 0 && nb < N_SIZE - 1 && !std::binary_search(cur_nodes.begin(), cur_nodes.end(), nb))
+                        w_insert(nb);
                 }
-                for (int n : mem_vec) {
-                    if (n > 0 && n < N_SIZE - 1 &&
-                        !std::binary_search(cur_nodes.begin(), cur_nodes.end(), n))
-                        w_insert(n);
-                }
+            }
+            for (int n : mem_vec) {
+                if (n > 0 && n < N_SIZE - 1 && !std::binary_search(cur_nodes.begin(), cur_nodes.end(), n)) w_insert(n);
+            }
 
-                // ── greedy loop ───────────────────────────────────────────────
-                constexpr int MAX_GREEDY_STEPS = 8;
-                for (int step = 0; step < MAX_GREEDY_STEPS; ++step) {
-                    double best_delta    = 1e-5;
-                    int    best_type     = 0; // 0=stay, 1=add, 2=remove, 3=swap
-                    int    best_add      = -1, best_rem = -1;
-                    int    best_swap_out = -1, best_swap_in = -1;
-                    const int cur_rank   = static_cast<int>(cur_nodes.size());
+            // ── greedy loop ───────────────────────────────────────────────
+            constexpr int MAX_GREEDY_STEPS = 8;
+            for (int step = 0; step < MAX_GREEDY_STEPS; ++step) {
+                double    best_delta = 1e-5;
+                int       best_type  = 0; // 0=stay, 1=add, 2=remove, 3=swap
+                int       best_add = -1, best_rem = -1;
+                int       best_swap_out = -1, best_swap_in = -1;
+                const int cur_rank = static_cast<int>(cur_nodes.size());
 
-                    // ── SWAP (rank unchanged → same plan group) ───────────────
-                    // Precompute C_base/AM_base once; flip 2 bits per candidate.
-                    {
-                        auto pgit = plan_groups_map.find(cur_rank);
-                        if (pgit != plan_groups_map.end() && cur_gi >= 0 &&
-                            cur_gi < static_cast<int>(pgit->second.size())) {
-                            const auto &pg = pgit->second[cur_gi];
+                // ── SWAP (rank unchanged → same plan group) ───────────────
+                // Precompute C_base/AM_base once; flip 2 bits per candidate.
+                {
+                    auto pgit = plan_groups_map.find(cur_rank);
+                    if (pgit != plan_groups_map.end() && cur_gi >= 0 &&
+                        cur_gi < static_cast<int>(pgit->second.size())) {
+                        const auto &pg = pgit->second[cur_gi];
 
-                            std::array<uint64_t, num_words> C_base{}, AM_base{};
-                            for (int i = 0; i < cur_rank; ++i) {
-                                const int n = cur_nodes[i];
-                                C_base[n / 64]  |= bit_mask_lookup[n % 64];
-                                AM_base[n / 64] |= bit_mask_lookup[n % 64];
-                            }
-                            for (int n : cur_mem) AM_base[n / 64] |= bit_mask_lookup[n % 64];
+                        std::array<uint64_t, num_words> C_base{}, AM_base{};
+                        for (int i = 0; i < cur_rank; ++i) {
+                            const int n = cur_nodes[i];
+                            C_base[n / 64] |= bit_mask_lookup[n % 64];
+                            AM_base[n / 64] |= bit_mask_lookup[n % 64];
+                        }
+                        for (int n : cur_mem) AM_base[n / 64] |= bit_mask_lookup[n % 64];
 
-                            for (int out_idx = 0; out_idx < cur_rank; ++out_idx) {
-                                const int out_node = cur_nodes[out_idx];
-                                for (const int in_node : w_no_c) {
-                                    // Build swapped node set
-                                    std::vector<int> new_nodes = cur_nodes;
-                                    new_nodes[out_idx]         = in_node;
-                                    std::sort(new_nodes.begin(), new_nodes.end());
+                        for (int out_idx = 0; out_idx < cur_rank; ++out_idx) {
+                            const int out_node = cur_nodes[out_idx];
+                            for (const int in_node : w_no_c) {
+                                // Build swapped node set
+                                std::vector<int> new_nodes = cur_nodes;
+                                new_nodes[out_idx]         = in_node;
+                                std::sort(new_nodes.begin(), new_nodes.end());
 
-                                    // C2/AM2: O(1) bit-flip from base
-                                    std::array<uint64_t, num_words> C2  = C_base;
-                                    C2[out_node / 64] &= ~bit_mask_lookup[out_node % 64];
-                                    C2[in_node / 64]  |=  bit_mask_lookup[in_node  % 64];
+                                // C2/AM2: O(1) bit-flip from base
+                                std::array<uint64_t, num_words> C2 = C_base;
+                                C2[out_node / 64] &= ~bit_mask_lookup[out_node % 64];
+                                C2[in_node / 64] |= bit_mask_lookup[in_node % 64];
 
-                                    std::array<uint64_t, num_words> AM2 = AM_base;
-                                    if (!cur_mem.count(out_node))
-                                        AM2[out_node / 64] &= ~bit_mask_lookup[out_node % 64];
-                                    AM2[in_node / 64] |= bit_mask_lookup[in_node % 64];
+                                std::array<uint64_t, num_words> AM2 = AM_base;
+                                if (!cur_mem.count(out_node)) AM2[out_node / 64] &= ~bit_mask_lookup[out_node % 64];
+                                AM2[in_node / 64] |= bit_mask_lookup[in_node % 64];
 
-                                    // no2: rebuild for new_nodes (O(rank), necessary)
-                                    int pos3 = 0;
-                                    for (int n : new_nodes) no2[n] = pos3++;
+                                // no2: rebuild for new_nodes (O(rank), necessary)
+                                int pos3 = 0;
+                                for (int n : new_nodes) no2[n] = pos3++;
 
-                                    collectCandidatePathUnion(new_nodes, cand_paths);
-                                    const SRCPermutation *pp  = nullptr;
-                                    const double          vio2 =
-                                        evalPlanGroup(C2, AM2, no2, cand_paths, pg, x, pp);
-                                    for (int n : new_nodes) no2[n] = -1;
+                                collectCandidatePathUnion(new_nodes, cand_paths);
+                                const SRCPermutation *pp   = nullptr;
+                                const double          vio2 = evalPlanGroup(C2, AM2, no2, cand_paths, pg, x, pp);
+                                for (int n : new_nodes) no2[n] = -1;
 
-                                    if (vio2 - cur_vio > best_delta) {
-                                        best_delta    = vio2 - cur_vio;
-                                        best_type     = 3;
-                                        best_swap_out = out_node;
-                                        best_swap_in  = in_node;
-                                    }
+                                if (vio2 - cur_vio > best_delta) {
+                                    best_delta    = vio2 - cur_vio;
+                                    best_type     = 3;
+                                    best_swap_out = out_node;
+                                    best_swap_in  = in_node;
                                 }
                             }
-                            // No outer no2 cleanup needed — we never set it in the outer loop.
                         }
+                        // No outer no2 cleanup needed — we never set it in the outer loop.
                     }
-
-                    // ── ADD (rank increases → re-find plan) ───────────────────
-                    if (cur_rank < MAX_RANK) {
-                        for (const int nb : w_no_c) {
-                            std::vector<int> new_nodes = cur_nodes;
-                            new_nodes.push_back(nb);
-                            std::sort(new_nodes.begin(), new_nodes.end());
-                            collectCandidatePathUnion(new_nodes, cand_paths);
-                            auto [vio2, gi2, pp2] =
-                                findBestPlanGroupIdx(new_nodes, cur_mem, cand_paths, x);
-                            if (vio2 - cur_vio > best_delta) {
-                                best_delta = vio2 - cur_vio;
-                                best_type  = 1;
-                                best_add   = nb;
-                            }
-                        }
-                    }
-
-                    // ── REMOVE (rank decreases → re-find plan) ────────────────
-                    if (cur_rank > MIN_RANK) {
-                        for (int ri = 0; ri < cur_rank; ++ri) {
-                            std::vector<int> new_nodes;
-                            new_nodes.reserve(cur_rank - 1);
-                            for (int j2 = 0; j2 < cur_rank; ++j2)
-                                if (j2 != ri) new_nodes.push_back(cur_nodes[j2]);
-                            collectCandidatePathUnion(new_nodes, cand_paths);
-                            auto [vio2, gi2, pp2] =
-                                findBestPlanGroupIdx(new_nodes, cur_mem, cand_paths, x);
-                            // Small bonus: simpler cut is cheaper in pricing.
-                            if (vio2 - cur_vio > best_delta + 5e-5) {
-                                best_delta = vio2 - cur_vio;
-                                best_type  = 2;
-                                best_rem   = cur_nodes[ri];
-                            }
-                        }
-                    }
-
-                    if (best_type == 0) break; // converged
-
-                    // ── apply best move ───────────────────────────────────────
-                    if (best_type == 1) { // ADD
-                        cur_nodes.push_back(best_add);
-                        std::sort(cur_nodes.begin(), cur_nodes.end());
-                        w_erase(best_add);
-                        if (best_add < static_cast<int>(rank1_sep_heur_mem4_vertex.size())) {
-                            for (int nb : rank1_sep_heur_mem4_vertex[best_add]) {
-                                if (nb > 0 && nb < N_SIZE - 1 &&
-                                    !std::binary_search(cur_nodes.begin(), cur_nodes.end(), nb))
-                                    w_insert(nb);
-                            }
-                        }
-                        collectCandidatePathUnion(cur_nodes, cand_paths);
-                        auto [vio2, gi2, pp2] = findBestPlanGroupIdx(cur_nodes, cur_mem, cand_paths, x);
-                        cur_vio = vio2; cur_gi = gi2; cur_perm = pp2;
-
-                    } else if (best_type == 2) { // REMOVE
-                        auto it2 = std::find(cur_nodes.begin(), cur_nodes.end(), best_rem);
-                        if (it2 != cur_nodes.end()) {
-                            w_insert(best_rem);
-                            cur_nodes.erase(it2);
-                        }
-                        collectCandidatePathUnion(cur_nodes, cand_paths);
-                        auto [vio2, gi2, pp2] = findBestPlanGroupIdx(cur_nodes, cur_mem, cand_paths, x);
-                        cur_vio = vio2; cur_gi = gi2; cur_perm = pp2;
-
-                    } else { // SWAP
-                        auto it2 = std::find(cur_nodes.begin(), cur_nodes.end(), best_swap_out);
-                        if (it2 != cur_nodes.end()) *it2 = best_swap_in;
-                        std::sort(cur_nodes.begin(), cur_nodes.end());
-                        w_erase(best_swap_in);
-                        w_insert(best_swap_out);
-                        // Same rank → stay in same plan group, re-eval incrementally
-                        const int new_rank = static_cast<int>(cur_nodes.size());
-                        auto      pgit2    = plan_groups_map.find(new_rank);
-                        if (pgit2 != plan_groups_map.end() && cur_gi >= 0 &&
-                            cur_gi < static_cast<int>(pgit2->second.size())) {
-                            const auto &pg2 = pgit2->second[cur_gi];
-                            std::array<uint64_t, num_words> C3{}, AM3{};
-                            int pos3 = 0;
-                            for (int n : cur_nodes) {
-                                C3[n / 64]  |= bit_mask_lookup[n % 64];
-                                AM3[n / 64] |= bit_mask_lookup[n % 64];
-                                no2[n] = pos3++;
-                            }
-                            for (int n : cur_mem) AM3[n / 64] |= bit_mask_lookup[n % 64];
-                            collectCandidatePathUnion(cur_nodes, cand_paths);
-                            const SRCPermutation *pp2 = nullptr;
-                            cur_vio  = evalPlanGroup(C3, AM3, no2, cand_paths, pg2, x, pp2);
-                            cur_perm = pp2;
-                            for (int n : cur_nodes) no2[n] = -1;
-                        } else {
-                            collectCandidatePathUnion(cur_nodes, cand_paths);
-                            auto [vio2, gi2, pp2] =
-                                findBestPlanGroupIdx(cur_nodes, cur_mem, cand_paths, x);
-                            cur_vio = vio2; cur_gi = gi2; cur_perm = pp2;
-                        }
-                    }
-                } // end greedy steps
-
-                if (cur_vio > 1e-4 && cur_perm != nullptr) {
-                    std::lock_guard<std::mutex> lock(harvest_mutex);
-                    all_harvested.push_back({cur_vio, cur_nodes, std::move(cur_mem), cur_perm});
                 }
-            }); // end bulk lambda
+
+                // ── ADD (rank increases → re-find plan) ───────────────────
+                if (cur_rank < MAX_RANK) {
+                    for (const int nb : w_no_c) {
+                        std::vector<int> new_nodes = cur_nodes;
+                        new_nodes.push_back(nb);
+                        std::sort(new_nodes.begin(), new_nodes.end());
+                        collectCandidatePathUnion(new_nodes, cand_paths);
+                        auto [vio2, gi2, pp2] = findBestPlanGroupIdx(new_nodes, cur_mem, cand_paths, x);
+                        if (vio2 - cur_vio > best_delta) {
+                            best_delta = vio2 - cur_vio;
+                            best_type  = 1;
+                            best_add   = nb;
+                        }
+                    }
+                }
+
+                // ── REMOVE (rank decreases → re-find plan) ────────────────
+                if (cur_rank > MIN_RANK) {
+                    for (int ri = 0; ri < cur_rank; ++ri) {
+                        std::vector<int> new_nodes;
+                        new_nodes.reserve(cur_rank - 1);
+                        for (int j2 = 0; j2 < cur_rank; ++j2)
+                            if (j2 != ri) new_nodes.push_back(cur_nodes[j2]);
+                        collectCandidatePathUnion(new_nodes, cand_paths);
+                        auto [vio2, gi2, pp2] = findBestPlanGroupIdx(new_nodes, cur_mem, cand_paths, x);
+                        // Small bonus: simpler cut is cheaper in pricing.
+                        if (vio2 - cur_vio > best_delta + 5e-5) {
+                            best_delta = vio2 - cur_vio;
+                            best_type  = 2;
+                            best_rem   = cur_nodes[ri];
+                        }
+                    }
+                }
+
+                if (best_type == 0) break; // converged
+
+                // ── apply best move ───────────────────────────────────────
+                if (best_type == 1) { // ADD
+                    cur_nodes.push_back(best_add);
+                    std::sort(cur_nodes.begin(), cur_nodes.end());
+                    w_erase(best_add);
+                    if (best_add < static_cast<int>(rank1_sep_heur_mem4_vertex.size())) {
+                        for (int nb : rank1_sep_heur_mem4_vertex[best_add]) {
+                            if (nb > 0 && nb < N_SIZE - 1 &&
+                                !std::binary_search(cur_nodes.begin(), cur_nodes.end(), nb))
+                                w_insert(nb);
+                        }
+                    }
+                    collectCandidatePathUnion(cur_nodes, cand_paths);
+                    auto [vio2, gi2, pp2] = findBestPlanGroupIdx(cur_nodes, cur_mem, cand_paths, x);
+                    cur_vio               = vio2;
+                    cur_gi                = gi2;
+                    cur_perm              = pp2;
+
+                } else if (best_type == 2) { // REMOVE
+                    auto it2 = std::find(cur_nodes.begin(), cur_nodes.end(), best_rem);
+                    if (it2 != cur_nodes.end()) {
+                        w_insert(best_rem);
+                        cur_nodes.erase(it2);
+                    }
+                    collectCandidatePathUnion(cur_nodes, cand_paths);
+                    auto [vio2, gi2, pp2] = findBestPlanGroupIdx(cur_nodes, cur_mem, cand_paths, x);
+                    cur_vio               = vio2;
+                    cur_gi                = gi2;
+                    cur_perm              = pp2;
+
+                } else { // SWAP
+                    auto it2 = std::find(cur_nodes.begin(), cur_nodes.end(), best_swap_out);
+                    if (it2 != cur_nodes.end()) *it2 = best_swap_in;
+                    std::sort(cur_nodes.begin(), cur_nodes.end());
+                    w_erase(best_swap_in);
+                    w_insert(best_swap_out);
+                    // Same rank → stay in same plan group, re-eval incrementally
+                    const int new_rank = static_cast<int>(cur_nodes.size());
+                    auto      pgit2    = plan_groups_map.find(new_rank);
+                    if (pgit2 != plan_groups_map.end() && cur_gi >= 0 &&
+                        cur_gi < static_cast<int>(pgit2->second.size())) {
+                        const auto                     &pg2 = pgit2->second[cur_gi];
+                        std::array<uint64_t, num_words> C3{}, AM3{};
+                        int                             pos3 = 0;
+                        for (int n : cur_nodes) {
+                            C3[n / 64] |= bit_mask_lookup[n % 64];
+                            AM3[n / 64] |= bit_mask_lookup[n % 64];
+                            no2[n] = pos3++;
+                        }
+                        for (int n : cur_mem) AM3[n / 64] |= bit_mask_lookup[n % 64];
+                        collectCandidatePathUnion(cur_nodes, cand_paths);
+                        const SRCPermutation *pp2 = nullptr;
+                        cur_vio                   = evalPlanGroup(C3, AM3, no2, cand_paths, pg2, x, pp2);
+                        cur_perm                  = pp2;
+                        for (int n : cur_nodes) no2[n] = -1;
+                    } else {
+                        collectCandidatePathUnion(cur_nodes, cand_paths);
+                        auto [vio2, gi2, pp2] = findBestPlanGroupIdx(cur_nodes, cur_mem, cand_paths, x);
+                        cur_vio               = vio2;
+                        cur_gi                = gi2;
+                        cur_perm              = pp2;
+                    }
+                }
+            } // end greedy steps
+
+            if (cur_vio > 1e-4 && cur_perm != nullptr) {
+                std::lock_guard<std::mutex> lock(harvest_mutex);
+                all_harvested.push_back({cur_vio, cur_nodes, std::move(cur_mem), cur_perm});
+            }
+        }); // end bulk lambda
 
         stdexec::sync_wait(stdexec::starts_on(sched, std::move(bulk_sender)));
 
         if (all_harvested.empty()) return;
 
-        pdqsort(all_harvested.begin(), all_harvested.end(),
-                [](const auto &a, const auto &b) { return a.vio > b.vio; });
+        pdqsort(all_harvested.begin(), all_harvested.end(), [](const auto &a, const auto &b) { return a.vio > b.vio; });
 
         constexpr int MAX_GREEDY_CUTS = 6;
         int           added           = 0;
@@ -1144,15 +1129,12 @@ private:
 
     std::array<uint64_t, num_words> buildFullMemoryBits() const {
         std::array<uint64_t, num_words> memory_bits{};
-        for (int node = 1; node < N_SIZE - 1; ++node) {
-            memory_bits[node / 64] |= bit_mask_lookup[node % 64];
-        }
+        for (int node = 1; node < N_SIZE - 1; ++node) { memory_bits[node / 64] |= bit_mask_lookup[node % 64]; }
         return memory_bits;
     }
 
     ankerl::unordered_dense::set<int> deriveLimitedMemory(const std::vector<int> &candidate_nodes,
-                                                          const SRCPermutation &perm,
-                                                          const std::vector<double> &x,
+                                                          const SRCPermutation &perm, const std::vector<double> &x,
                                                           int max_memory_nodes = 18) const {
         ankerl::unordered_dense::set<int> memory;
         memory.reserve(max_memory_nodes);
@@ -1165,7 +1147,7 @@ private:
             const int node = candidate_nodes[pos];
             C[node / 64] |= bit_mask_lookup[node % 64];
             AM[node / 64] |= bit_mask_lookup[node % 64];
-            order[node] = pos;
+            order[node]        = pos;
             in_candidate[node] = 1;
         }
 
@@ -1177,12 +1159,13 @@ private:
             return xa > xb;
         });
 
-        constexpr int MAX_PATHS_FOR_MEMORY = 40;
-        int           paths_seen           = 0;
+        constexpr int    MAX_PATHS_FOR_MEMORY = 40;
+        int              paths_seen           = 0;
         std::vector<int> base_positions;
         for (int path_idx : candidate_paths) {
             if (paths_seen >= MAX_PATHS_FOR_MEMORY || static_cast<int>(memory.size()) >= max_memory_nodes) break;
-            if (path_idx < 0 || static_cast<size_t>(path_idx) >= allPaths.size() || static_cast<size_t>(path_idx) >= x.size())
+            if (path_idx < 0 || static_cast<size_t>(path_idx) >= allPaths.size() ||
+                static_cast<size_t>(path_idx) >= x.size())
                 continue;
             if (numericutils::isZero(x[path_idx])) continue;
             const auto &route = allPaths[path_idx].route;
@@ -1216,8 +1199,8 @@ private:
         return memory;
     }
 
-    std::optional<CandidateSet> evaluateBaseThenMemory(const std::vector<int> &candidate_nodes,
-                                                       const SparseMatrix &A, const std::vector<double> &x) {
+    std::optional<CandidateSet> evaluateBaseThenMemory(const std::vector<int> &candidate_nodes, const SparseMatrix &A,
+                                                       const std::vector<double> &x) {
         auto full_memory_bits = buildFullMemoryBits();
         auto [full_violation, full_perm, full_rhs] =
             computeViolationWithBestPermBits(candidate_nodes, full_memory_bits, A, x);
@@ -1255,9 +1238,8 @@ private:
     }
 
     std::tuple<double, SRCPermutation, double>
-    computeViolationWithBestPermBits(std::vector<int> node_vec,
-                                     std::array<uint64_t, num_words> augmented_memory_bits,
-                                     const SparseMatrix &, const std::vector<double> &x) {
+    computeViolationWithBestPermBits(std::vector<int> node_vec, std::array<uint64_t, num_words> augmented_memory_bits,
+                                     const SparseMatrix &, const std::vector<double>           &x) {
         static constexpr double EPSILON = 1e-6;
         std::sort(node_vec.begin(), node_vec.end());
         const int RANK = static_cast<int>(node_vec.size());
@@ -1382,8 +1364,7 @@ public:
         double       exact_violation = 0.0;
         const double rhs             = p.getRHS();
         for (const int path_idx : candidate_paths) {
-            if (static_cast<size_t>(path_idx) >= allPaths.size() || static_cast<size_t>(path_idx) >= x.size())
-                continue;
+            if (static_cast<size_t>(path_idx) >= allPaths.size() || static_cast<size_t>(path_idx) >= x.size()) continue;
             const double coeff = computeLimitedMemoryCoefficient(C, AM, p, allPaths[path_idx].route, order);
             exact_violation += coeff * x[path_idx];
             if (!numericutils::isZero(coeff)) {
@@ -1477,15 +1458,13 @@ public:
         for (const auto &candidate : seed_candidates) { insertBestCandidate(candidates_set, candidate); }
         for (const auto &candidate : route_seed_candidates) { insertBestCandidate(candidates_set, candidate); }
         for (const auto &candidate : lifted_seed_candidates) { insertBestCandidate(candidates_set, candidate); }
-        for (const auto &candidate : cooccurrence_seed_candidates) {
-            insertBestCandidate(candidates_set, candidate);
-        }
+        for (const auto &candidate : cooccurrence_seed_candidates) { insertBestCandidate(candidates_set, candidate); }
         std::vector<CandidateSet> candidates(candidates_set.begin(), candidates_set.end());
 
         // Prepare for parallel local search.
-        const size_t num_candidates = candidates.size();
-        std::mutex   candidates_mutex;
-        ankerl::unordered_dense::set<CandidateSet, CandidateSetHasher, CandidateSetCompare> improved_candidates;
+        const size_t           num_candidates = candidates.size();
+        std::mutex             candidates_mutex;
+        CandidateSetCollection improved_candidates;
 
         // Parallelize the local search using stdexec::bulk.
         auto bulk_sender = stdexec::bulk(
@@ -1513,7 +1492,9 @@ public:
                 // one lock.
                 {
                     std::lock_guard<std::mutex> lock(candidates_mutex);
-                    for (const auto &candidate : local_improved) { insertBestCandidate(improved_candidates, candidate); }
+                    for (const auto &candidate : local_improved) {
+                        insertBestCandidate(improved_candidates, candidate);
+                    }
                 }
             });
 
@@ -1546,9 +1527,9 @@ public:
                 [&](const CandidateSet &a, const CandidateSet &b) { return candidate_score(a) > candidate_score(b); });
 
         // Add cuts from top candidates while keeping the round diverse.
-        const int max_cuts   = 10;
-        int       cuts_added = 0;
-        int       max_trials = 80;
+        const int        max_cuts   = 10;
+        int              cuts_added = 0;
+        int              max_trials = 80;
         std::vector<int> touched_nodes;
         touched_nodes.reserve(MAX_RANK + MAX_WORKING_SET_SIZE);
         std::vector<char> touched_seen(N_SIZE, 0);
@@ -1621,9 +1602,7 @@ public:
             const size_t   prev_word     = prev_vertex >> 6;
             const uint64_t prev_bit_mask = 1ULL << (prev_vertex & 63);
 
-            if (!(AM[word_index] & bit_mask) || !(AM[prev_word] & prev_bit_mask)) {
-                cumulative_sum = 0;
-            }
+            if (!(AM[word_index] & bit_mask) || !(AM[prev_word] & prev_bit_mask)) { cumulative_sum = 0; }
             if (C[word_index] & bit_mask) {
                 int pos = order[vertex];
                 cumulative_sum += p.num[pos];
