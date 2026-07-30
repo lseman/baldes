@@ -1,5 +1,6 @@
 var NAVTREEINDEX1 =
 {
+"MIPHandler_8cpp.html#aec665b2ab1203ce33949c414d91f9477":[3,0,1,4,0,0],
 "MIPHandler_8cpp_source.html":[3,0,1,4,0],
 "MIPHandler_8h.html":[3,0,0,7,2],
 "MIPHandler_8h.html#a0d786b8d73489295ee627af6439a0aa2":[3,0,0,7,2,20],
@@ -126,7 +127,6 @@ var NAVTREEINDEX1 =
 "SparseMatrix_8h.html":[3,0,0,0,3],
 "SparseMatrix_8h_source.html":[3,0,0,0,3],
 "Stabilization_8h.html":[3,0,0,14,0],
-"Stabilization_8h.html#afe0602c4fa1dd64cb27e91210021c33e":[3,0,0,14,0,1],
 "Stabilization_8h_source.html":[3,0,0,14,0],
 "State_8h.html":[3,0,0,2,4],
 "State_8h_source.html":[3,0,0,2,4],
@@ -170,7 +170,7 @@ var NAVTREEINDEX1 =
 "classATSPInstance.html#a8e6ad127130ddc8dc37a119285a09ff0":[2,0,11,0],
 "classATSPInstance.html#af1d1316c29e5e85b6aabf38c8d530a23":[2,0,11,2],
 "classAdaptiveNodeScorer.html":[2,0,5],
-"classAdaptiveNodeScorer.html#a1c9fc84c8972a200156abbf2c44a7b6f":[2,0,5,1],
+"classAdaptiveNodeScorer.html#a82c31d0c6ffe0cb7a3fbd172af8d60b8":[2,0,5,1],
 "classAdaptiveNodeScorer.html#ac97c39c7cf5dc85fdadf76cbd622a175":[2,0,5,0],
 "classArcDuals.html":[2,0,9],
 "classArcDuals.html#a0d6103f5da5a674856786d7f1123c751":[2,0,9,2],

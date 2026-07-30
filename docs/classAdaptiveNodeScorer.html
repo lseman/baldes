@@ -126,12 +126,12 @@ document.addEventListener('DOMContentLoaded',() => { initNavTree('classAdaptiveN
 <table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 id="header-pub-methods" class="groupheader"><a id="pub-methods" name="pub-methods"></a>
 Public Member Functions</h2></td></tr>
-<tr class="memitem:a1c9fc84c8972a200156abbf2c44a7b6f" id="r_a1c9fc84c8972a200156abbf2c44a7b6f"><td class="memItemLeft">void&#160;</td><td class="memItemRight"><a class="el" href="#a1c9fc84c8972a200156abbf2c44a7b6f">provideFeedback</a> (const ankerl::unordered_dense::set&lt; <a class="el" href="structCandidateSet.html">CandidateSet</a>, <a class="el" href="structCandidateSetHasher.html">CandidateSetHasher</a>, <a class="el" href="structCandidateSetCompare.html">CandidateSetCompare</a> &gt; &amp;candidates)</td></tr>
+<tr class="memitem:a82c31d0c6ffe0cb7a3fbd172af8d60b8" id="r_a82c31d0c6ffe0cb7a3fbd172af8d60b8"><td class="memItemLeft">void&#160;</td><td class="memItemRight"><a class="el" href="#a82c31d0c6ffe0cb7a3fbd172af8d60b8">provideFeedback</a> (const <a class="el" href="Helpers_8h.html#ab304ecfaab103190601d4a2a1969dcfe">CandidateSetCollection</a> &amp;candidates)</td></tr>
 <tr class="memitem:ac97c39c7cf5dc85fdadf76cbd622a175" id="r_ac97c39c7cf5dc85fdadf76cbd622a175"><td class="memItemLeft">std::vector&lt; std::vector&lt; <a class="el" href="structNodeScore.html">NodeScore</a> &gt; &gt;&#160;</td><td class="memItemRight"><a class="el" href="#ac97c39c7cf5dc85fdadf76cbd622a175">computeNodeScores</a> (const <a class="el" href="structSparseMatrix.html">SparseMatrix</a> &amp;A, const std::vector&lt; double &gt; &amp;x, const std::vector&lt; std::vector&lt; double &gt; &gt; &amp;distances, const std::vector&lt; <a class="el" href="structVRPNode.html">VRPNode</a> &gt; &amp;nodes, const <a class="el" href="classArcDuals.html">ArcDuals</a> &amp;arc_duals, const <a class="el" href="classCutStorage.html">CutStorage</a> &amp;cutStorage)</td></tr>
 </table>
 <a name="details" id="details"></a><h2 id="header-details" class="groupheader">Detailed Description</h2>
 <div class="textblock">
-<p class="definition">Definition at line <a class="el" href="Intelligence_8h_source.html#l00304">304</a> of file <a class="el" href="Intelligence_8h_source.html">Intelligence.h</a>.</p>
+<p class="definition">Definition at line <a class="el" href="Intelligence_8h_source.html#l00305">305</a> of file <a class="el" href="Intelligence_8h_source.html">Intelligence.h</a>.</p>
 </div><a name="doc-func-members" id="doc-func-members"></a><h2 id="header-doc-func-members" class="groupheader">Member Function Documentation</h2>
 <a id="ac97c39c7cf5dc85fdadf76cbd622a175" name="ac97c39c7cf5dc85fdadf76cbd622a175"></a>
 <h2 class="memtitle"><span class="permalink"><a href="#ac97c39c7cf5dc85fdadf76cbd622a175">&#9670;&#160;</a></span>computeNodeScores()</h2>
@@ -180,92 +180,92 @@ Public Member Functions</h2></td></tr>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="Intelligence_8h_source.html#l00388">388</a> of file <a class="el" href="Intelligence_8h_source.html">Intelligence.h</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  391</span>                                                                                        {</div>
-<div class="line"><span class="lineno">  392</span>        std::vector&lt;std::vector&lt;NodeScore&gt;&gt; scores(N_SIZE);</div>
-<div class="line"><span class="lineno">  393</span>        <span class="keyword">const</span> <span class="keyword">auto</span>                         &amp;active_cuts = cutStorage.<a class="code hl_function" href="classCutStorage.html#a5661b2dd9924180da3dd03cc2d63bd2c">getActiveCuts</a>();</div>
-<div class="line"><span class="lineno">  394</span> </div>
-<div class="line"><span class="lineno">  395</span><span class="preprocessor">#if defined(SRC_MEMORY_MODE_NODE)</span></div>
-<div class="line"><span class="lineno">  396</span>        <span class="comment">// Pre-calculate node-based adjustments from active cuts.</span></div>
-<div class="line"><span class="lineno">  397</span>        std::vector&lt;double&gt; node_adjustments(N_SIZE, 0.0);</div>
-<div class="line"><span class="lineno">  398</span>        <span class="keywordflow">for</span> (<span class="keyword">const</span> <span class="keyword">auto</span> &amp;cut : active_cuts) {</div>
-<div class="line"><span class="lineno">  399</span>            <span class="keywordflow">if</span> (cut.type == <a class="code hl_enumvalue" href="Definitions_8h.html#a64e2fe830f0e02b5ac2beb9c0ff3425faa11d8f01052a3bc5f0aac78a2ee28baa">CutType::ThreeRow</a>) {</div>
-<div class="line"><span class="lineno">  400</span>                <span class="keywordflow">for</span> (<span class="keywordtype">int</span> i = 1; i &lt; N_SIZE - 1; ++i) {</div>
-<div class="line"><span class="lineno">  401</span>                    <span class="keywordflow">if</span> (cut.isSRCset(i)) { node_adjustments[i] -= cut.dual_value; }</div>
-<div class="line"><span class="lineno">  402</span>                }</div>
-<div class="line"><span class="lineno">  403</span>            }</div>
-<div class="line"><span class="lineno">  404</span>        }</div>
-<div class="line"><span class="lineno">  405</span><span class="preprocessor">#else</span></div>
-<div class="line"><span class="lineno">  406</span>        <span class="comment">// Pre-calculate adjustments from active cuts.</span></div>
-<div class="line"><span class="lineno">  407</span>        std::vector&lt;std::vector&lt;double&gt;&gt; cut_adjustments(N_SIZE, std::vector&lt;double&gt;(N_SIZE, 0.0));</div>
-<div class="line"><span class="lineno">  408</span>        <span class="keywordflow">for</span> (<span class="keyword">const</span> <span class="keyword">auto</span> &amp;cut : active_cuts) {</div>
-<div class="line"><span class="lineno">  409</span>            <span class="keywordflow">if</span> (cut.type == <a class="code hl_enumvalue" href="Definitions_8h.html#a64e2fe830f0e02b5ac2beb9c0ff3425faa11d8f01052a3bc5f0aac78a2ee28baa">CutType::ThreeRow</a>) {</div>
-<div class="line"><span class="lineno">  410</span>                <span class="keywordflow">for</span> (<span class="keywordtype">int</span> i = 1; i &lt; N_SIZE - 1; ++i) {</div>
-<div class="line"><span class="lineno">  411</span>                    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> j = i + 1; j &lt; N_SIZE - 1; ++j) {</div>
-<div class="line"><span class="lineno">  412</span>                        <span class="keywordflow">if</span> (cut.isSRCMemoryArc(i, j)) {</div>
-<div class="line"><span class="lineno">  413</span>                            cut_adjustments[i][j] -= cut.dual_value;</div>
-<div class="line"><span class="lineno">  414</span>                            cut_adjustments[j][i] -= cut.dual_value;</div>
-<div class="line"><span class="lineno">  415</span>                        }</div>
-<div class="line"><span class="lineno">  416</span>                    }</div>
-<div class="line"><span class="lineno">  417</span>                }</div>
-<div class="line"><span class="lineno">  418</span>            }</div>
-<div class="line"><span class="lineno">  419</span>        }</div>
-<div class="line"><span class="lineno">  420</span><span class="preprocessor">#endif</span></div>
-<div class="line"><span class="lineno">  421</span> </div>
-<div class="line"><span class="lineno">  422</span>        <span class="comment">// Compute scores for each vertex i (ignoring depot vertices).</span></div>
-<div class="line"><span class="lineno">  423</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> i = 1; i &lt; N_SIZE - 1; ++i) {</div>
-<div class="line"><span class="lineno">  424</span>            std::vector&lt;NodeScore&gt; node_scores;</div>
-<div class="line"><span class="lineno">  425</span>            node_scores.reserve(N_SIZE - 2);</div>
-<div class="line"><span class="lineno">  426</span> </div>
-<div class="line"><span class="lineno">  427</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> j = 1; j &lt; N_SIZE - 1; ++j) {</div>
-<div class="line"><span class="lineno">  428</span>                <span class="keywordflow">if</span> (i == j) <span class="keywordflow">continue</span>;</div>
-<div class="line"><span class="lineno">  429</span> </div>
-<div class="line"><span class="lineno">  430</span><span class="preprocessor">#if defined(SRC_MEMORY_MODE_NODE)</span></div>
-<div class="line"><span class="lineno">  431</span>                <span class="comment">// Base score incorporates distance, node costs, and node-level</span></div>
-<div class="line"><span class="lineno">  432</span>                <span class="comment">// cut memory adjustments.</span></div>
-<div class="line"><span class="lineno">  433</span>                <span class="keywordtype">double</span> base_score =</div>
-<div class="line"><span class="lineno">  434</span>                    distances[i][j] - (nodes[i].cost + nodes[j].cost) / 2.0 + node_adjustments[i] + node_adjustments[j];</div>
-<div class="line"><span class="lineno">  435</span><span class="preprocessor">#else</span></div>
-<div class="line"><span class="lineno">  436</span>                <span class="comment">// Base score incorporates distance, node costs, arc duals, and</span></div>
-<div class="line"><span class="lineno">  437</span>                <span class="comment">// cut adjustments.</span></div>
-<div class="line"><span class="lineno">  438</span>                <span class="keywordtype">double</span> base_score = distances[i][j] - (nodes[i].cost + nodes[j].cost) / 2.0 - arc_duals.<a class="code hl_function" href="classArcDuals.html#ac75e53f0c4f24e6aca539c544e9f8109">getDual</a>(i, j) +</div>
-<div class="line"><span class="lineno">  439</span>                                    cut_adjustments[i][j];</div>
-<div class="line"><span class="lineno">  440</span><span class="preprocessor">#endif</span></div>
-<div class="line"><span class="lineno">  441</span> </div>
-<div class="line"><span class="lineno">  442</span>                <span class="comment">// // Incorporate historical performance and neighbor relevance.</span></div>
-<div class="line"><span class="lineno">  443</span>                <span class="comment">// double historical_score = getHistoricalScore(i, j);</span></div>
-<div class="line"><span class="lineno">  444</span>                <span class="comment">// double neighbor_score = getNeighborScore(j);</span></div>
-<div class="line"><span class="lineno">  445</span> </div>
-<div class="line"><span class="lineno">  446</span>                <span class="comment">// // Confidence factor based on feedback frequency.</span></div>
-<div class="line"><span class="lineno">  447</span>                <span class="comment">// double confidence = std::min(</span></div>
-<div class="line"><span class="lineno">  448</span>                <span class="comment">//     1.0,</span></div>
-<div class="line"><span class="lineno">  449</span>                <span class="comment">//     std::log1p(pair_stats[std::make_pair(i,</span></div>
-<div class="line"><span class="lineno">  450</span>                <span class="comment">//     j)].occurrences));</span></div>
-<div class="line"><span class="lineno">  451</span>                <span class="comment">// double final_score =</span></div>
-<div class="line"><span class="lineno">  452</span>                <span class="comment">//     (1 - HISTORY_WEIGHT * confidence) * base_score +</span></div>
-<div class="line"><span class="lineno">  453</span>                <span class="comment">//     HISTORY_WEIGHT * confidence * historical_score +</span></div>
-<div class="line"><span class="lineno">  454</span>                <span class="comment">//     NEIGHBOR_WEIGHT * neighbor_score;</span></div>
-<div class="line"><span class="lineno">  455</span> </div>
-<div class="line"><span class="lineno">  456</span>                node_scores.emplace_back(j, i, base_score);</div>
-<div class="line"><span class="lineno">  457</span>            }</div>
+<p class="definition">Definition at line <a class="el" href="Intelligence_8h_source.html#l00382">382</a> of file <a class="el" href="Intelligence_8h_source.html">Intelligence.h</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  385</span>                                                                                        {</div>
+<div class="line"><span class="lineno">  386</span>        std::vector&lt;std::vector&lt;NodeScore&gt;&gt; scores(N_SIZE);</div>
+<div class="line"><span class="lineno">  387</span>        <span class="keyword">const</span> <span class="keyword">auto</span>                         &amp;active_cuts = cutStorage.<a class="code hl_function" href="classCutStorage.html#a5661b2dd9924180da3dd03cc2d63bd2c">getActiveCuts</a>();</div>
+<div class="line"><span class="lineno">  388</span> </div>
+<div class="line"><span class="lineno">  389</span><span class="preprocessor">#if defined(SRC_MEMORY_MODE_NODE)</span></div>
+<div class="line"><span class="lineno">  390</span>        <span class="comment">// Pre-calculate node-based adjustments from active cuts.</span></div>
+<div class="line"><span class="lineno">  391</span>        std::vector&lt;double&gt; node_adjustments(N_SIZE, 0.0);</div>
+<div class="line"><span class="lineno">  392</span>        <span class="keywordflow">for</span> (<span class="keyword">const</span> <span class="keyword">auto</span> &amp;cut : active_cuts) {</div>
+<div class="line"><span class="lineno">  393</span>            <span class="keywordflow">if</span> (cut.type == <a class="code hl_enumvalue" href="Definitions_8h.html#a64e2fe830f0e02b5ac2beb9c0ff3425faa11d8f01052a3bc5f0aac78a2ee28baa">CutType::ThreeRow</a>) {</div>
+<div class="line"><span class="lineno">  394</span>                <span class="keywordflow">for</span> (<span class="keywordtype">int</span> i = 1; i &lt; N_SIZE - 1; ++i) {</div>
+<div class="line"><span class="lineno">  395</span>                    <span class="keywordflow">if</span> (cut.isSRCset(i)) { node_adjustments[i] -= cut.dual_value; }</div>
+<div class="line"><span class="lineno">  396</span>                }</div>
+<div class="line"><span class="lineno">  397</span>            }</div>
+<div class="line"><span class="lineno">  398</span>        }</div>
+<div class="line"><span class="lineno">  399</span><span class="preprocessor">#else</span></div>
+<div class="line"><span class="lineno">  400</span>        <span class="comment">// Pre-calculate adjustments from active cuts.</span></div>
+<div class="line"><span class="lineno">  401</span>        std::vector&lt;std::vector&lt;double&gt;&gt; cut_adjustments(N_SIZE, std::vector&lt;double&gt;(N_SIZE, 0.0));</div>
+<div class="line"><span class="lineno">  402</span>        <span class="keywordflow">for</span> (<span class="keyword">const</span> <span class="keyword">auto</span> &amp;cut : active_cuts) {</div>
+<div class="line"><span class="lineno">  403</span>            <span class="keywordflow">if</span> (cut.type == <a class="code hl_enumvalue" href="Definitions_8h.html#a64e2fe830f0e02b5ac2beb9c0ff3425faa11d8f01052a3bc5f0aac78a2ee28baa">CutType::ThreeRow</a>) {</div>
+<div class="line"><span class="lineno">  404</span>                <span class="keywordflow">for</span> (<span class="keywordtype">int</span> i = 1; i &lt; N_SIZE - 1; ++i) {</div>
+<div class="line"><span class="lineno">  405</span>                    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> j = i + 1; j &lt; N_SIZE - 1; ++j) {</div>
+<div class="line"><span class="lineno">  406</span>                        <span class="keywordflow">if</span> (cut.isSRCMemoryArc(i, j)) {</div>
+<div class="line"><span class="lineno">  407</span>                            cut_adjustments[i][j] -= cut.dual_value;</div>
+<div class="line"><span class="lineno">  408</span>                            cut_adjustments[j][i] -= cut.dual_value;</div>
+<div class="line"><span class="lineno">  409</span>                        }</div>
+<div class="line"><span class="lineno">  410</span>                    }</div>
+<div class="line"><span class="lineno">  411</span>                }</div>
+<div class="line"><span class="lineno">  412</span>            }</div>
+<div class="line"><span class="lineno">  413</span>        }</div>
+<div class="line"><span class="lineno">  414</span><span class="preprocessor">#endif</span></div>
+<div class="line"><span class="lineno">  415</span> </div>
+<div class="line"><span class="lineno">  416</span>        <span class="comment">// Compute scores for each vertex i (ignoring depot vertices).</span></div>
+<div class="line"><span class="lineno">  417</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> i = 1; i &lt; N_SIZE - 1; ++i) {</div>
+<div class="line"><span class="lineno">  418</span>            std::vector&lt;NodeScore&gt; node_scores;</div>
+<div class="line"><span class="lineno">  419</span>            node_scores.reserve(N_SIZE - 2);</div>
+<div class="line"><span class="lineno">  420</span> </div>
+<div class="line"><span class="lineno">  421</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> j = 1; j &lt; N_SIZE - 1; ++j) {</div>
+<div class="line"><span class="lineno">  422</span>                <span class="keywordflow">if</span> (i == j) <span class="keywordflow">continue</span>;</div>
+<div class="line"><span class="lineno">  423</span> </div>
+<div class="line"><span class="lineno">  424</span><span class="preprocessor">#if defined(SRC_MEMORY_MODE_NODE)</span></div>
+<div class="line"><span class="lineno">  425</span>                <span class="comment">// Base score incorporates distance, node costs, and node-level</span></div>
+<div class="line"><span class="lineno">  426</span>                <span class="comment">// cut memory adjustments.</span></div>
+<div class="line"><span class="lineno">  427</span>                <span class="keywordtype">double</span> base_score =</div>
+<div class="line"><span class="lineno">  428</span>                    distances[i][j] - (nodes[i].cost + nodes[j].cost) / 2.0 + node_adjustments[i] + node_adjustments[j];</div>
+<div class="line"><span class="lineno">  429</span><span class="preprocessor">#else</span></div>
+<div class="line"><span class="lineno">  430</span>                <span class="comment">// Base score incorporates distance, node costs, arc duals, and</span></div>
+<div class="line"><span class="lineno">  431</span>                <span class="comment">// cut adjustments.</span></div>
+<div class="line"><span class="lineno">  432</span>                <span class="keywordtype">double</span> base_score = distances[i][j] - (nodes[i].cost + nodes[j].cost) / 2.0 - arc_duals.<a class="code hl_function" href="classArcDuals.html#ac75e53f0c4f24e6aca539c544e9f8109">getDual</a>(i, j) +</div>
+<div class="line"><span class="lineno">  433</span>                                    cut_adjustments[i][j];</div>
+<div class="line"><span class="lineno">  434</span><span class="preprocessor">#endif</span></div>
+<div class="line"><span class="lineno">  435</span> </div>
+<div class="line"><span class="lineno">  436</span>                <span class="comment">// // Incorporate historical performance and neighbor relevance.</span></div>
+<div class="line"><span class="lineno">  437</span>                <span class="comment">// double historical_score = getHistoricalScore(i, j);</span></div>
+<div class="line"><span class="lineno">  438</span>                <span class="comment">// double neighbor_score = getNeighborScore(j);</span></div>
+<div class="line"><span class="lineno">  439</span> </div>
+<div class="line"><span class="lineno">  440</span>                <span class="comment">// // Confidence factor based on feedback frequency.</span></div>
+<div class="line"><span class="lineno">  441</span>                <span class="comment">// double confidence = std::min(</span></div>
+<div class="line"><span class="lineno">  442</span>                <span class="comment">//     1.0,</span></div>
+<div class="line"><span class="lineno">  443</span>                <span class="comment">//     std::log1p(pair_stats[std::make_pair(i,</span></div>
+<div class="line"><span class="lineno">  444</span>                <span class="comment">//     j)].occurrences));</span></div>
+<div class="line"><span class="lineno">  445</span>                <span class="comment">// double final_score =</span></div>
+<div class="line"><span class="lineno">  446</span>                <span class="comment">//     (1 - HISTORY_WEIGHT * confidence) * base_score +</span></div>
+<div class="line"><span class="lineno">  447</span>                <span class="comment">//     HISTORY_WEIGHT * confidence * historical_score +</span></div>
+<div class="line"><span class="lineno">  448</span>                <span class="comment">//     NEIGHBOR_WEIGHT * neighbor_score;</span></div>
+<div class="line"><span class="lineno">  449</span> </div>
+<div class="line"><span class="lineno">  450</span>                node_scores.emplace_back(j, i, base_score);</div>
+<div class="line"><span class="lineno">  451</span>            }</div>
+<div class="line"><span class="lineno">  452</span> </div>
+<div class="line"><span class="lineno">  453</span>            <span class="comment">// Sort candidates for vertex i by score (lowest scores are best).</span></div>
+<div class="line"><span class="lineno">  454</span>            std::partial_sort(</div>
+<div class="line"><span class="lineno">  455</span>                node_scores.begin(),</div>
+<div class="line"><span class="lineno">  456</span>                node_scores.begin() + std::min(<a class="code hl_variable" href="Intelligence_8h.html#ad24d37bbf5801d62eec5b2423ee66e94">MAX_CANDIDATES_PER_NODE</a>, <span class="keyword">static_cast&lt;</span><span class="keywordtype">int</span><span class="keyword">&gt;</span>(node_scores.size())),</div>
+<div class="line"><span class="lineno">  457</span>                node_scores.end(), [](<span class="keyword">const</span> <span class="keyword">auto</span> &amp;a, <span class="keyword">const</span> <span class="keyword">auto</span> &amp;b) { return a.cost_score &lt; b.cost_score; });</div>
 <div class="line"><span class="lineno">  458</span> </div>
-<div class="line"><span class="lineno">  459</span>            <span class="comment">// Sort candidates for vertex i by score (lowest scores are best).</span></div>
-<div class="line"><span class="lineno">  460</span>            std::partial_sort(</div>
-<div class="line"><span class="lineno">  461</span>                node_scores.begin(),</div>
-<div class="line"><span class="lineno">  462</span>                node_scores.begin() + std::min(<a class="code hl_variable" href="Intelligence_8h.html#ad24d37bbf5801d62eec5b2423ee66e94">MAX_CANDIDATES_PER_NODE</a>, <span class="keyword">static_cast&lt;</span><span class="keywordtype">int</span><span class="keyword">&gt;</span>(node_scores.size())),</div>
-<div class="line"><span class="lineno">  463</span>                node_scores.end(), [](<span class="keyword">const</span> <span class="keyword">auto</span> &amp;a, <span class="keyword">const</span> <span class="keyword">auto</span> &amp;b) { return a.cost_score &lt; b.cost_score; });</div>
-<div class="line"><span class="lineno">  464</span> </div>
-<div class="line"><span class="lineno">  465</span>            <span class="comment">// Store top candidate node scores.</span></div>
-<div class="line"><span class="lineno">  466</span>            <span class="keyword">auto</span> &amp;i_scores = scores[i];</div>
-<div class="line"><span class="lineno">  467</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> j = 0; j &lt; std::min(MAX_CANDIDATES_PER_NODE, static_cast&lt;int&gt;(node_scores.size())); ++j) {</div>
-<div class="line"><span class="lineno">  468</span>                i_scores.push_back(node_scores[j]);</div>
-<div class="line"><span class="lineno">  469</span>            }</div>
-<div class="line"><span class="lineno">  470</span>        }</div>
-<div class="line"><span class="lineno">  471</span> </div>
-<div class="line"><span class="lineno">  472</span>        <span class="keywordflow">return</span> scores;</div>
-<div class="line"><span class="lineno">  473</span>    }</div>
+<div class="line"><span class="lineno">  459</span>            <span class="comment">// Store top candidate node scores.</span></div>
+<div class="line"><span class="lineno">  460</span>            <span class="keyword">auto</span> &amp;i_scores = scores[i];</div>
+<div class="line"><span class="lineno">  461</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> j = 0; j &lt; std::min(MAX_CANDIDATES_PER_NODE, static_cast&lt;int&gt;(node_scores.size())); ++j) {</div>
+<div class="line"><span class="lineno">  462</span>                i_scores.push_back(node_scores[j]);</div>
+<div class="line"><span class="lineno">  463</span>            }</div>
+<div class="line"><span class="lineno">  464</span>        }</div>
+<div class="line"><span class="lineno">  465</span> </div>
+<div class="line"><span class="lineno">  466</span>        <span class="keywordflow">return</span> scores;</div>
+<div class="line"><span class="lineno">  467</span>    }</div>
 <div class="ttc" id="aDefinitions_8h_html_a64e2fe830f0e02b5ac2beb9c0ff3425faa11d8f01052a3bc5f0aac78a2ee28baa"><div class="ttname"><a href="Definitions_8h.html#a64e2fe830f0e02b5ac2beb9c0ff3425faa11d8f01052a3bc5f0aac78a2ee28baa">CutType::ThreeRow</a></div><div class="ttdeci">@ ThreeRow</div><div class="ttdef"><b>Definition</b> <a href="Definitions_8h_source.html#l00082">Definitions.h:82</a></div></div>
-<div class="ttc" id="aIntelligence_8h_html_ad24d37bbf5801d62eec5b2423ee66e94"><div class="ttname"><a href="Intelligence_8h.html#ad24d37bbf5801d62eec5b2423ee66e94">MAX_CANDIDATES_PER_NODE</a></div><div class="ttdeci">constexpr int MAX_CANDIDATES_PER_NODE</div><div class="ttdef"><b>Definition</b> <a href="Intelligence_8h_source.html#l00299">Intelligence.h:299</a></div></div>
+<div class="ttc" id="aIntelligence_8h_html_ad24d37bbf5801d62eec5b2423ee66e94"><div class="ttname"><a href="Intelligence_8h.html#ad24d37bbf5801d62eec5b2423ee66e94">MAX_CANDIDATES_PER_NODE</a></div><div class="ttdeci">constexpr int MAX_CANDIDATES_PER_NODE</div><div class="ttdef"><b>Definition</b> <a href="Intelligence_8h_source.html#l00300">Intelligence.h:300</a></div></div>
 <div class="ttc" id="aclassArcDuals_html_ac75e53f0c4f24e6aca539c544e9f8109"><div class="ttname"><a href="classArcDuals.html#ac75e53f0c4f24e6aca539c544e9f8109">ArcDuals::getDual</a></div><div class="ttdeci">double getDual(int i, int j) const</div><div class="ttdef"><b>Definition</b> <a href="Dual_8h_source.html#l00038">Dual.h:38</a></div></div>
 <div class="ttc" id="aclassCutStorage_html_a5661b2dd9924180da3dd03cc2d63bd2c"><div class="ttname"><a href="classCutStorage.html#a5661b2dd9924180da3dd03cc2d63bd2c">CutStorage::getActiveCuts</a></div><div class="ttdeci">std::span&lt; const ActiveCutInfo &gt; getActiveCuts() const noexcept</div><div class="ttdef"><b>Definition</b> <a href="Cut_8h_source.html#l00322">Cut.h:322</a></div></div>
 </div><!-- fragment --><div class="dynheader">
@@ -284,8 +284,8 @@ Here is the call graph for this function:</div>
 
 </div>
 </div>
-<a id="a1c9fc84c8972a200156abbf2c44a7b6f" name="a1c9fc84c8972a200156abbf2c44a7b6f"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#a1c9fc84c8972a200156abbf2c44a7b6f">&#9670;&#160;</a></span>provideFeedback()</h2>
+<a id="a82c31d0c6ffe0cb7a3fbd172af8d60b8" name="a82c31d0c6ffe0cb7a3fbd172af8d60b8"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a82c31d0c6ffe0cb7a3fbd172af8d60b8">&#9670;&#160;</a></span>provideFeedback()</h2>
 
 <div class="memitem">
 <div class="memproto">
@@ -296,7 +296,7 @@ Here is the call graph for this function:</div>
         <tr>
           <td class="memname">void AdaptiveNodeScorer::provideFeedback </td>
           <td>(</td>
-          <td class="paramtype">const ankerl::unordered_dense::set&lt; <a class="el" href="structCandidateSet.html">CandidateSet</a>, <a class="el" href="structCandidateSetHasher.html">CandidateSetHasher</a>, <a class="el" href="structCandidateSetCompare.html">CandidateSetCompare</a> &gt; &amp;</td>          <td class="paramname"><span class="paramname"><em>candidates</em></span></td><td>)</td>
+          <td class="paramtype">const <a class="el" href="Helpers_8h.html#ab304ecfaab103190601d4a2a1969dcfe">CandidateSetCollection</a> &amp;</td>          <td class="paramname"><span class="paramname"><em>candidates</em></span></td><td>)</td>
           <td></td>
         </tr>
       </table>
@@ -307,8 +307,8 @@ Here is the call graph for this function:</div>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="Intelligence_8h_source.html#l00342">342</a> of file <a class="el" href="Intelligence_8h_source.html">Intelligence.h</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  343</span>                                                                                                           {</div>
+<p class="definition">Definition at line <a class="el" href="Intelligence_8h_source.html#l00343">343</a> of file <a class="el" href="Intelligence_8h_source.html">Intelligence.h</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  343</span>                                                                   {</div>
 <div class="line"><span class="lineno">  344</span>        <span class="comment">// Convert candidate set to vector and sort by violation in</span></div>
 <div class="line"><span class="lineno">  345</span>        <span class="comment">// descending</span></div>
 <div class="line"><span class="lineno">  346</span>        <span class="comment">// order.</span></div>
@@ -324,33 +324,27 @@ Here is the call graph for this function:</div>
 <div class="line"><span class="lineno">  356</span>            <span class="keyword">const</span> <span class="keyword">auto</span> &amp;candidate = candidate_vec[idx];</div>
 <div class="line"><span class="lineno">  357</span> </div>
 <div class="line"><span class="lineno">  358</span>            <span class="comment">// Update pair statistics for every pair in candidate.nodes.</span></div>
-<div class="line"><span class="lineno">  359</span>            <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> i = 0; i &lt; candidate.nodes.size(); ++i) {</div>
-<div class="line"><span class="lineno">  360</span>                <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> j = i + 1; j &lt; candidate.nodes.size(); ++j) {</div>
-<div class="line"><span class="lineno">  361</span>                    <span class="comment">// auto key = std::make_pair(</span></div>
-<div class="line"><span class="lineno">  362</span>                    <span class="comment">//     std::min(candidate.nodes[i], candidate.nodes[j]),</span></div>
-<div class="line"><span class="lineno">  363</span>                    <span class="comment">//     std::max(candidate.nodes[i], candidate.nodes[j]));</span></div>
-<div class="line"><span class="lineno">  364</span>                    <span class="keyword">auto</span> a = *std::next(candidate.nodes.begin(), i);</div>
-<div class="line"><span class="lineno">  365</span>                    <span class="keyword">auto</span> b = *std::next(candidate.nodes.begin(), j);</div>
-<div class="line"><span class="lineno">  366</span>                    <span class="comment">// Optionally ensure a consistent ordering (e.g., always the</span></div>
-<div class="line"><span class="lineno">  367</span>                    <span class="comment">// smaller one first)</span></div>
-<div class="line"><span class="lineno">  368</span>                    std::pair&lt;int, int&gt; key   = std::minmax(a, b);</div>
-<div class="line"><span class="lineno">  369</span>                    <span class="keyword">auto</span>               &amp;stats = pair_stats[key];</div>
-<div class="line"><span class="lineno">  370</span> </div>
-<div class="line"><span class="lineno">  371</span>                    stats.success_count   = stats.success_count * DECAY_FACTOR + 1;</div>
-<div class="line"><span class="lineno">  372</span>                    stats.total_violation = stats.total_violation * DECAY_FACTOR + candidate.violation;</div>
-<div class="line"><span class="lineno">  373</span>                    stats.occurrences += 1;</div>
-<div class="line"><span class="lineno">  374</span>                    stats.avg_violation = stats.total_violation / stats.occurrences;</div>
-<div class="line"><span class="lineno">  375</span>                }</div>
-<div class="line"><span class="lineno">  376</span>            }</div>
-<div class="line"><span class="lineno">  377</span> </div>
-<div class="line"><span class="lineno">  378</span>            <span class="comment">// Update neighbor scores for candidate neighbors.</span></div>
-<div class="line"><span class="lineno">  379</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> node : candidate.nodes) {</div>
-<div class="line"><span class="lineno">  380</span>                <span class="keywordflow">for</span> (<span class="keywordtype">int</span> neighbor : candidate.neighbor) {</div>
-<div class="line"><span class="lineno">  381</span>                    neighbor_scores[neighbor] = neighbor_scores[neighbor] * DECAY_FACTOR + 1;</div>
-<div class="line"><span class="lineno">  382</span>                }</div>
-<div class="line"><span class="lineno">  383</span>            }</div>
-<div class="line"><span class="lineno">  384</span>        }</div>
-<div class="line"><span class="lineno">  385</span>    }</div>
+<div class="line"><span class="lineno">  359</span>            <span class="keyword">const</span> std::vector&lt;int&gt; candidate_nodes(candidate.nodes.begin(), candidate.nodes.end());</div>
+<div class="line"><span class="lineno">  360</span>            <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> i = 0; i &lt; candidate_nodes.size(); ++i) {</div>
+<div class="line"><span class="lineno">  361</span>                <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> j = i + 1; j &lt; candidate_nodes.size(); ++j) {</div>
+<div class="line"><span class="lineno">  362</span>                    <span class="keyword">const</span> <span class="keywordtype">int</span>           a     = candidate_nodes[i];</div>
+<div class="line"><span class="lineno">  363</span>                    <span class="keyword">const</span> <span class="keywordtype">int</span>           b     = candidate_nodes[j];</div>
+<div class="line"><span class="lineno">  364</span>                    std::pair&lt;int, int&gt; key   = std::minmax(a, b);</div>
+<div class="line"><span class="lineno">  365</span>                    <span class="keyword">auto</span>               &amp;stats = pair_stats[key];</div>
+<div class="line"><span class="lineno">  366</span> </div>
+<div class="line"><span class="lineno">  367</span>                    stats.success_count   = stats.success_count * DECAY_FACTOR + 1;</div>
+<div class="line"><span class="lineno">  368</span>                    stats.total_violation = stats.total_violation * DECAY_FACTOR + candidate.violation;</div>
+<div class="line"><span class="lineno">  369</span>                    stats.occurrences += 1;</div>
+<div class="line"><span class="lineno">  370</span>                    stats.avg_violation = stats.total_violation / stats.occurrences;</div>
+<div class="line"><span class="lineno">  371</span>                }</div>
+<div class="line"><span class="lineno">  372</span>            }</div>
+<div class="line"><span class="lineno">  373</span> </div>
+<div class="line"><span class="lineno">  374</span>            <span class="comment">// Update neighbor scores for candidate neighbors.</span></div>
+<div class="line"><span class="lineno">  375</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> neighbor : candidate.neighbor) {</div>
+<div class="line"><span class="lineno">  376</span>                neighbor_scores[neighbor] = neighbor_scores[neighbor] * DECAY_FACTOR + 1;</div>
+<div class="line"><span class="lineno">  377</span>            }</div>
+<div class="line"><span class="lineno">  378</span>        }</div>
+<div class="line"><span class="lineno">  379</span>    }</div>
 </div><!-- fragment -->
 </div>
 </div>

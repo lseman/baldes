@@ -1,6 +1,6 @@
 var classHighRankCuts =
 [
-    [ "SeedMap", "classHighRankCuts.html#aa4abbcf9ce0d9ed7f02b6a68cf489e90", null ],
+    [ "SeedMap", "classHighRankCuts.html#a70aa77cc384112cb42ff8017350e2cad", null ],
     [ "HighRankCuts", "classHighRankCuts.html#a7f240fb561539462244c0baa374c9afe", null ],
     [ "addCutToCutStorage", "classHighRankCuts.html#ac2cea18dd517033c3ffa62dadaa131c6", null ],
     [ "computeLimitedMemoryCoefficient", "classHighRankCuts.html#abee2a3b3552892037678d2ca670c314e", null ],

@@ -12,7 +12,7 @@ var classLimitedMemoryRank1Cuts =
     [ "separate", "classLimitedMemoryRank1Cuts.html#a0874059ad71694c574998b73fd797c5f", null ],
     [ "separateR1C1", "classLimitedMemoryRank1Cuts.html#a33d300a3b76e5e2f109130dacaa8141d", null ],
     [ "separateR1C3Adjacency", "classLimitedMemoryRank1Cuts.html#a41a9ef310b38d9d6909259001cd453bc", null ],
-    [ "setDistanceMatrix", "classLimitedMemoryRank1Cuts.html#af6c31b734c82f6e66e8b61bd8d29f652", null ],
+    [ "setDistanceMatrix", "classLimitedMemoryRank1Cuts.html#acea7ba369523c9e5678c418078b8979a", null ],
     [ "setDuals", "classLimitedMemoryRank1Cuts.html#a453b943c51e666a3224c74c15aa2f270", null ],
     [ "setNodes", "classLimitedMemoryRank1Cuts.html#a54329f335586f4f804b543f3d8ce8839", null ],
     [ "setTasks", "classLimitedMemoryRank1Cuts.html#ae8b56b0c378f5310fd26d68954e5268f", null ],

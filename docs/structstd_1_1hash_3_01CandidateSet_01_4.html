@@ -126,14 +126,14 @@ document.addEventListener('DOMContentLoaded',() => { initNavTree('structstd_1_1h
 <table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 id="header-pub-methods" class="groupheader"><a id="pub-methods" name="pub-methods"></a>
 Public Member Functions</h2></td></tr>
-<tr class="memitem:ae2f3f1959c519ec58526463eb64c5c27" id="r_ae2f3f1959c519ec58526463eb64c5c27"><td class="memItemLeft">size_t&#160;</td><td class="memItemRight"><a class="el" href="#ae2f3f1959c519ec58526463eb64c5c27">operator()</a> (const <a class="el" href="structCandidateSet.html">CandidateSet</a> &amp;cs) const</td></tr>
+<tr class="memitem:ad6a40b98e85c9297d516d28f94ef3820" id="r_ad6a40b98e85c9297d516d28f94ef3820"><td class="memItemLeft">size_t&#160;</td><td class="memItemRight"><a class="el" href="#ad6a40b98e85c9297d516d28f94ef3820">operator()</a> (const <a class="el" href="structCandidateSet.html">CandidateSet</a> &amp;candidate) const noexcept</td></tr>
 </table>
 <a name="details" id="details"></a><h2 id="header-details" class="groupheader">Detailed Description</h2>
 <div class="textblock">
-<p class="definition">Definition at line <a class="el" href="Helpers_8h_source.html#l00310">310</a> of file <a class="el" href="Helpers_8h_source.html">Helpers.h</a>.</p>
+<p class="definition">Definition at line <a class="el" href="Helpers_8h_source.html#l00297">297</a> of file <a class="el" href="Helpers_8h_source.html">Helpers.h</a>.</p>
 </div><a name="doc-func-members" id="doc-func-members"></a><h2 id="header-doc-func-members" class="groupheader">Member Function Documentation</h2>
-<a id="ae2f3f1959c519ec58526463eb64c5c27" name="ae2f3f1959c519ec58526463eb64c5c27"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#ae2f3f1959c519ec58526463eb64c5c27">&#9670;&#160;</a></span>operator()()</h2>
+<a id="ad6a40b98e85c9297d516d28f94ef3820" name="ad6a40b98e85c9297d516d28f94ef3820"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#ad6a40b98e85c9297d516d28f94ef3820">&#9670;&#160;</a></span>operator()()</h2>
 
 <div class="memitem">
 <div class="memproto">
@@ -144,43 +144,19 @@ Public Member Functions</h2></td></tr>
         <tr>
           <td class="memname">size_t std::hash&lt; <a class="el" href="structCandidateSet.html">CandidateSet</a> &gt;::operator() </td>
           <td>(</td>
-          <td class="paramtype">const <a class="el" href="structCandidateSet.html">CandidateSet</a> &amp;</td>          <td class="paramname"><span class="paramname"><em>cs</em></span></td><td>)</td>
+          <td class="paramtype">const <a class="el" href="structCandidateSet.html">CandidateSet</a> &amp;</td>          <td class="paramname"><span class="paramname"><em>candidate</em></span></td><td>)</td>
           <td> const</td>
         </tr>
       </table>
   </td>
   <td class="mlabels-right">
-<span class="mlabels"><span class="mlabel inline">inline</span></span>  </td>
+<span class="mlabels"><span class="mlabel inline">inline</span><span class="mlabel noexcept">noexcept</span></span>  </td>
   </tr>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="Helpers_8h_source.html#l00311">311</a> of file <a class="el" href="Helpers_8h_source.html">Helpers.h</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  311</span>                                                    {</div>
-<div class="line"><span class="lineno">  312</span>        <span class="comment">// Create a state for the hash.</span></div>
-<div class="line"><span class="lineno">  313</span>        XXH3_state_t *state = XXH3_createState();</div>
-<div class="line"><span class="lineno">  314</span>        assert(state != <span class="keyword">nullptr</span>);</div>
-<div class="line"><span class="lineno">  315</span>        XXH3_64bits_reset(state);</div>
-<div class="line"><span class="lineno">  316</span>        <span class="comment">// Convert unordered nodes to a sorted vector.</span></div>
-<div class="line"><span class="lineno">  317</span>        std::vector&lt;int&gt; sorted_nodes(cs.<a class="code hl_variable" href="structCandidateSet.html#a559d5ef0f2f19d180c5aeff17394e1af">nodes</a>.begin(), cs.<a class="code hl_variable" href="structCandidateSet.html#a559d5ef0f2f19d180c5aeff17394e1af">nodes</a>.end());</div>
-<div class="line"><span class="lineno">  318</span>        std::sort(sorted_nodes.begin(), sorted_nodes.end());</div>
-<div class="line"><span class="lineno">  319</span>        XXH3_64bits_update(state, sorted_nodes.data(), sorted_nodes.size() * <span class="keyword">sizeof</span>(<span class="keywordtype">int</span>));</div>
-<div class="line"><span class="lineno">  320</span>        std::vector&lt;int&gt; sorted_neighbor(cs.<a class="code hl_variable" href="structCandidateSet.html#ac847c6fb732d5822e011868f3cc02898">neighbor</a>.begin(), cs.<a class="code hl_variable" href="structCandidateSet.html#ac847c6fb732d5822e011868f3cc02898">neighbor</a>.end());</div>
-<div class="line"><span class="lineno">  321</span>        std::sort(sorted_neighbor.begin(), sorted_neighbor.end());</div>
-<div class="line"><span class="lineno">  322</span>        XXH3_64bits_update(state, sorted_neighbor.data(), sorted_neighbor.size() * <span class="keyword">sizeof</span>(<span class="keywordtype">int</span>));</div>
-<div class="line"><span class="lineno">  323</span>        <span class="comment">// Hash the permutation numerator (assumed to be a vector&lt;int&gt;).</span></div>
-<div class="line"><span class="lineno">  324</span>        XXH3_64bits_update(state, cs.<a class="code hl_variable" href="structCandidateSet.html#a02d828a29e6a55efc6dd0ec86dd3f9ac">perm</a>.<a class="code hl_variable" href="structSRCPermutation.html#ad388d415d55c248d620a00cddc5d686b">num</a>.data(), cs.<a class="code hl_variable" href="structCandidateSet.html#a02d828a29e6a55efc6dd0ec86dd3f9ac">perm</a>.<a class="code hl_variable" href="structSRCPermutation.html#ad388d415d55c248d620a00cddc5d686b">num</a>.size() * <span class="keyword">sizeof</span>(<span class="keywordtype">int</span>));</div>
-<div class="line"><span class="lineno">  325</span>        <span class="comment">// Hash the permutation denominator.</span></div>
-<div class="line"><span class="lineno">  326</span>        XXH3_64bits_update(state, &amp;cs.<a class="code hl_variable" href="structCandidateSet.html#a02d828a29e6a55efc6dd0ec86dd3f9ac">perm</a>.<a class="code hl_variable" href="structSRCPermutation.html#a73715a9230ef33a4afa75dc51fd09c24">den</a>, <span class="keyword">sizeof</span>(<span class="keywordtype">int</span>));</div>
-<div class="line"><span class="lineno">  327</span>        uint64_t hash_val = XXH3_64bits_digest(state);</div>
-<div class="line"><span class="lineno">  328</span>        XXH3_freeState(state);</div>
-<div class="line"><span class="lineno">  329</span>        <span class="keywordflow">return</span> hash_val;</div>
-<div class="line"><span class="lineno">  330</span>    }</div>
-<div class="ttc" id="astructCandidateSet_html_a02d828a29e6a55efc6dd0ec86dd3f9ac"><div class="ttname"><a href="structCandidateSet.html#a02d828a29e6a55efc6dd0ec86dd3f9ac">CandidateSet::perm</a></div><div class="ttdeci">SRCPermutation perm</div><div class="ttdef"><b>Definition</b> <a href="Helpers_8h_source.html#l00218">Helpers.h:218</a></div></div>
-<div class="ttc" id="astructCandidateSet_html_a559d5ef0f2f19d180c5aeff17394e1af"><div class="ttname"><a href="structCandidateSet.html#a559d5ef0f2f19d180c5aeff17394e1af">CandidateSet::nodes</a></div><div class="ttdeci">ankerl::unordered_dense::set&lt; int &gt; nodes</div><div class="ttdef"><b>Definition</b> <a href="Helpers_8h_source.html#l00216">Helpers.h:216</a></div></div>
-<div class="ttc" id="astructCandidateSet_html_ac847c6fb732d5822e011868f3cc02898"><div class="ttname"><a href="structCandidateSet.html#ac847c6fb732d5822e011868f3cc02898">CandidateSet::neighbor</a></div><div class="ttdeci">ankerl::unordered_dense::set&lt; int &gt; neighbor</div><div class="ttdef"><b>Definition</b> <a href="Helpers_8h_source.html#l00219">Helpers.h:219</a></div></div>
-<div class="ttc" id="astructSRCPermutation_html_a73715a9230ef33a4afa75dc51fd09c24"><div class="ttname"><a href="structSRCPermutation.html#a73715a9230ef33a4afa75dc51fd09c24">SRCPermutation::den</a></div><div class="ttdeci">int den</div><div class="ttdef"><b>Definition</b> <a href="Cut_8h_source.html#l00016">Cut.h:16</a></div></div>
-<div class="ttc" id="astructSRCPermutation_html_ad388d415d55c248d620a00cddc5d686b"><div class="ttname"><a href="structSRCPermutation.html#ad388d415d55c248d620a00cddc5d686b">SRCPermutation::num</a></div><div class="ttdeci">std::vector&lt; int &gt; num</div><div class="ttdef"><b>Definition</b> <a href="Cut_8h_source.html#l00014">Cut.h:14</a></div></div>
+<p class="definition">Definition at line <a class="el" href="Helpers_8h_source.html#l00298">298</a> of file <a class="el" href="Helpers_8h_source.html">Helpers.h</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  298</span>{ <span class="keywordflow">return</span> CandidateSetHasher{}(candidate); }</div>
 </div><!-- fragment -->
 </div>
 </div>

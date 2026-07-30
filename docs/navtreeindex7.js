@@ -1,5 +1,8 @@
 var NAVTREEINDEX7 =
 {
+"functions_~.html":[2,3,0,26],
+"globals.html":[3,1,0],
+"globals_defs.html":[3,1,5],
 "globals_enum.html":[3,1,4],
 "globals_func.html":[3,1,1],
 "globals_type.html":[3,1,3],
@@ -246,8 +249,5 @@ var NAVTREEINDEX7 =
 "structBucketGraph_1_1WarmLabelState.html":[2,0,23,0],
 "structBucketGraph_1_1WarmLabelState.html#a33be49420063a910f981100301cac83f":[2,0,23,0,4],
 "structBucketGraph_1_1WarmLabelState.html#a4901268b74e55e6335f36257e914f671":[2,0,23,0,1],
-"structBucketGraph_1_1WarmLabelState.html#a6c2f2f0b2dbfed2ac48875652e4c198a":[2,0,23,0,3],
-"structBucketGraph_1_1WarmLabelState.html#a6e6e2215f2e19d6b517829e0fd2d239d":[2,0,23,0,0],
-"structBucketGraph_1_1WarmLabelState.html#abdc0c94bc43f93ffbd12a019f64d0af1":[2,0,23,0,2],
-"structBucketLabelCacheEntry.html":[2,0,24]
+"structBucketGraph_1_1WarmLabelState.html#a6c2f2f0b2dbfed2ac48875652e4c198a":[2,0,23,0,3]
 };

@@ -59,11 +59,12 @@ var searchData=
   ['profile_5frecord_5fnon_5fdominated_5flabel_56',['profile_record_non_dominated_label',['../classBucketGraph.html#a74cbad87aa3441077bc138c3a8092ca6',1,'BucketGraph']]],
   ['profile_5frecord_5fsignature_5frejection_57',['profile_record_signature_rejection',['../classBucketGraph.html#a75b5bffb3d4cbcc3822304589de85d79',1,'BucketGraph']]],
   ['profile_5freset_5flabeling_5fmetrics_58',['profile_reset_labeling_metrics',['../classBucketGraph.html#afd112fd96d70c59af5ddc19353a69eb5',1,'BucketGraph']]],
-  ['providefeedback_59',['provideFeedback',['../classAdaptiveNodeScorer.html#a1c9fc84c8972a200156abbf2c44a7b6f',1,'AdaptiveNodeScorer']]],
-  ['prune_5fng_5fcycles_60',['prune_ng_cycles',['../classBucketGraph.html#ae73a46d652283690ebe471cec4fef2e2',1,'BucketGraph']]],
-  ['prunelowdualcuts_61',['pruneLowDualCuts',['../classCutStorage.html#a5528aa16a1f0f5dc54f9cd2bc6e82af3',1,'CutStorage']]],
-  ['publish_5fconcatenation_5fcandidates_62',['publish_concatenation_candidates',['../classBucketGraph.html#ac26adbd0e4d7fde4c1097d76111b7d4a',1,'BucketGraph']]],
-  ['push_5funvisited_5fphi_5fneighbors_63',['push_unvisited_phi_neighbors',['../classBucketGraph.html#adcb884152008fa6f2f7f48379c75933e',1,'BucketGraph']]],
-  ['put_64',['put',['../classRouteCache.html#ade601651cddd7dbdf0e2b8afdf8e9819',1,'RouteCache']]],
-  ['pybind11_5fmodule_65',['PYBIND11_MODULE',['../BucketBindings_8cpp.html#a3d1e88ffccb66ba85934fcb8f362cfda',1,'BucketBindings.cpp']]]
+  ['project_5fonto_5fdual_5fdomain_59',['project_onto_dual_domain',['../classStabilization.html#af7a7486e7ceeb36e10cfafbc476847f9',1,'Stabilization']]],
+  ['providefeedback_60',['provideFeedback',['../classAdaptiveNodeScorer.html#a82c31d0c6ffe0cb7a3fbd172af8d60b8',1,'AdaptiveNodeScorer']]],
+  ['prune_5fng_5fcycles_61',['prune_ng_cycles',['../classBucketGraph.html#ae73a46d652283690ebe471cec4fef2e2',1,'BucketGraph']]],
+  ['prunelowdualcuts_62',['pruneLowDualCuts',['../classCutStorage.html#a5528aa16a1f0f5dc54f9cd2bc6e82af3',1,'CutStorage']]],
+  ['publish_5fconcatenation_5fcandidates_63',['publish_concatenation_candidates',['../classBucketGraph.html#ac26adbd0e4d7fde4c1097d76111b7d4a',1,'BucketGraph']]],
+  ['push_5funvisited_5fphi_5fneighbors_64',['push_unvisited_phi_neighbors',['../classBucketGraph.html#adcb884152008fa6f2f7f48379c75933e',1,'BucketGraph']]],
+  ['put_65',['put',['../classRouteCache.html#ade601651cddd7dbdf0e2b8afdf8e9819',1,'RouteCache']]],
+  ['pybind11_5fmodule_66',['PYBIND11_MODULE',['../BucketBindings_8cpp.html#a3d1e88ffccb66ba85934fcb8f362cfda',1,'BucketBindings.cpp']]]
 ];

@@ -16,8 +16,7 @@ var annotated_dup =
     [ "std", "namespacestd.html", [
       [ "hash&lt; Bitset&lt; N_BITS &gt; &gt;", "structstd_1_1hash_3_01Bitset_3_01N__BITS_01_4_01_4.html", "structstd_1_1hash_3_01Bitset_3_01N__BITS_01_4_01_4" ],
       [ "hash&lt; CandidateSet &gt;", "structstd_1_1hash_3_01CandidateSet_01_4.html", "structstd_1_1hash_3_01CandidateSet_01_4" ],
-      [ "hash&lt; std::pair&lt; int, int &gt; &gt;", "structstd_1_1hash_3_01std_1_1pair_3_01int_00_01int_01_4_01_4.html", "structstd_1_1hash_3_01std_1_1pair_3_01int_00_01int_01_4_01_4" ],
-      [ "hash&lt; std::vector&lt; int &gt; &gt;", "structstd_1_1hash_3_01std_1_1vector_3_01int_01_4_01_4.html", "structstd_1_1hash_3_01std_1_1vector_3_01int_01_4_01_4" ]
+      [ "hash&lt; std::pair&lt; int, int &gt; &gt;", "structstd_1_1hash_3_01std_1_1pair_3_01int_00_01int_01_4_01_4.html", "structstd_1_1hash_3_01std_1_1pair_3_01int_00_01int_01_4_01_4" ]
     ] ],
     [ "ActiveCutInfo", "structActiveCutInfo.html", "structActiveCutInfo" ],
     [ "AdaptiveNodeScorer", "classAdaptiveNodeScorer.html", "classAdaptiveNodeScorer" ],
@@ -44,7 +43,7 @@ var annotated_dup =
     [ "BucketOptions", "structBucketOptions.html", "structBucketOptions" ],
     [ "CachedCut", "structCachedCut.html", "structCachedCut" ],
     [ "CandidateSet", "structCandidateSet.html", "structCandidateSet" ],
-    [ "CandidateSetCompare", "structCandidateSetCompare.html", "structCandidateSetCompare" ],
+    [ "CandidateSetEqual", "structCandidateSetEqual.html", "structCandidateSetEqual" ],
     [ "CandidateSetHasher", "structCandidateSetHasher.html", "structCandidateSetHasher" ],
     [ "CliqueManager", "classCliqueManager.html", "classCliqueManager" ],
     [ "CostFunction", "classCostFunction.html", "classCostFunction" ],
@@ -63,6 +62,7 @@ var annotated_dup =
     [ "HighsSolver", "classHighsSolver.html", "classHighsSolver" ],
     [ "InstanceData", "structInstanceData.html", "structInstanceData" ],
     [ "Interval", "structInterval.html", "structInterval" ],
+    [ "IntVectorHasher", "structIntVectorHasher.html", "structIntVectorHasher" ],
     [ "IPMSolver", "classIPMSolver.html", "classIPMSolver" ],
     [ "IPSolver", "classIPSolver.html", "classIPSolver" ],
     [ "IteratedLocalSearch", "classIteratedLocalSearch.html", "classIteratedLocalSearch" ],

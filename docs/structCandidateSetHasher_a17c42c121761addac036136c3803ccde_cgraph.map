@@ -1,0 +1,10 @@
+<map id="CandidateSetHasher::mixed_hash" name="CandidateSetHasher::mixed_hash">
+<area shape="rect" id="Node000001" title=" " alt="" coords="5,35,147,75"/>
+<area shape="rect" id="Node000002" href="$structCandidateSetHasher.html#a8e57d03912b39e424c8e29c899c29a58" title=" " alt="" coords="195,35,336,75"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="147,52,179,52,179,58,147,58"/>
+<area shape="rect" id="Node000003" href="$structCandidateSetHasher.html#a8a9d630a86701e8e7beb29123e3be728" title=" " alt="" coords="384,5,528,46"/>
+<area shape="poly" id="edge2_Node000002_Node000003" title=" " alt="" coords="336,42,368,36,369,42,337,47"/>
+<area shape="rect" id="Node000004" href="$structCandidateSetHasher.html#a55ef262f1f6986803f4e8da10df4101e" title=" " alt="" coords="576,42,744,68"/>
+<area shape="poly" id="edge4_Node000002_Node000004" title=" " alt="" coords="336,54,384,55,528,55,561,55,561,60,528,60,384,60,336,60"/>
+<area shape="poly" id="edge3_Node000003_Node000004" title=" " alt="" coords="529,33,561,38,560,43,529,39"/>
+</map>

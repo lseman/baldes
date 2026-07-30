@@ -195,9 +195,10 @@ var NAVTREEINDEX0 =
 "Hashes_8h.html#a34b681a915142619d537251ff2f89a50":[3,0,0,15,0,6],
 "Hashes_8h_source.html":[3,0,0,15,0],
 "Helpers_8h.html":[3,0,0,3,2,0],
-"Helpers_8h.html#a6e2d376e10d40865f9a079e6bef1501f":[3,0,0,3,2,0,6],
-"Helpers_8h.html#acf8696478b8666472dbbc5267f76fd36":[3,0,0,3,2,0,8],
-"Helpers_8h.html#ae16f85cab7674f93b1e3171dbe907d20":[3,0,0,3,2,0,7],
+"Helpers_8h.html#a6e2d376e10d40865f9a079e6bef1501f":[3,0,0,3,2,0,7],
+"Helpers_8h.html#ab304ecfaab103190601d4a2a1969dcfe":[3,0,0,3,2,0,6],
+"Helpers_8h.html#acf8696478b8666472dbbc5267f76fd36":[3,0,0,3,2,0,9],
+"Helpers_8h.html#ae16f85cab7674f93b1e3171dbe907d20":[3,0,0,3,2,0,8],
 "Helpers_8h_source.html":[3,0,0,3,2,0],
 "HighOrder_8h.html":[3,0,0,3,2,1],
 "HighOrder_8h_source.html":[3,0,0,3,2,1],
@@ -248,6 +249,5 @@ var NAVTREEINDEX0 =
 "MIPHandler_8cpp.html#a5429da2a882a13caf061beb8d8e05ee8":[3,0,1,4,0,3],
 "MIPHandler_8cpp.html#a7e5612b25a3d47693efce8e02e5ef7ef":[3,0,1,4,0,7],
 "MIPHandler_8cpp.html#ab2da79ce4ff759ca019a349b492dfb4f":[3,0,1,4,0,5],
-"MIPHandler_8cpp.html#acfc4ad63eb7ee2fd8fb63d33adfc8a8b":[3,0,1,4,0,4],
-"MIPHandler_8cpp.html#aec665b2ab1203ce33949c414d91f9477":[3,0,1,4,0,0]
+"MIPHandler_8cpp.html#acfc4ad63eb7ee2fd8fb63d33adfc8a8b":[3,0,1,4,0,4]
 };

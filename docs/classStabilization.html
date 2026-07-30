@@ -139,6 +139,8 @@ Collaboration diagram for Stabilization:</div>
 <table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 id="header-pub-methods" class="groupheader"><a id="pub-methods" name="pub-methods"></a>
 Public Member Functions</h2></td></tr>
+<tr class="memitem:a54a5e75296eebd75701121415eb6c56b" id="r_a54a5e75296eebd75701121415eb6c56b"><td class="memItemLeft">void&#160;</td><td class="memItemRight"><a class="el" href="#a54a5e75296eebd75701121415eb6c56b">align_with_master_duals</a> (const <a class="el" href="Definitions_8h.html#aca51606dd2572852638d855b039eaa63">DualSolution</a> &amp;master_duals)</td></tr>
+<tr class="memitem:af7a7486e7ceeb36e10cfafbc476847f9" id="r_af7a7486e7ceeb36e10cfafbc476847f9"><td class="memItemLeft">void&#160;</td><td class="memItemRight"><a class="el" href="#af7a7486e7ceeb36e10cfafbc476847f9">project_onto_dual_domain</a> (<a class="el" href="Definitions_8h.html#aca51606dd2572852638d855b039eaa63">DualSolution</a> &amp;duals) const</td></tr>
 <tr class="memitem:aeefeb07a3c590e646333b8fdf7529b76" id="r_aeefeb07a3c590e646333b8fdf7529b76"><td class="memItemLeft">void&#160;</td><td class="memItemRight"><a class="el" href="#aeefeb07a3c590e646333b8fdf7529b76">update_stabilization_after_misprice</a> ()</td></tr>
 <tr class="memitem:ae011305e7f6cfcaed3e33e3be5eff084" id="r_ae011305e7f6cfcaed3e33e3be5eff084"><td class="memItemLeft">void&#160;</td><td class="memItemRight"><a class="el" href="#ae011305e7f6cfcaed3e33e3be5eff084">update_stabilization_after_iter</a> (const <a class="el" href="Definitions_8h.html#aca51606dd2572852638d855b039eaa63">DualSolution</a> &amp;new_center)</td></tr>
 <tr class="memitem:a07b8f88bf6c2f507a936b5b98f8732ac" id="r_a07b8f88bf6c2f507a936b5b98f8732ac"><td class="memItemLeft">bool&#160;</td><td class="memItemRight"><a class="el" href="#a07b8f88bf6c2f507a936b5b98f8732ac">update_stabilization_after_master_optim</a> (const <a class="el" href="Definitions_8h.html#aca51606dd2572852638d855b039eaa63">DualSolution</a> &amp;new_center)</td></tr>
@@ -146,15 +148,15 @@ Public Member Functions</h2></td></tr>
 <tr class="memitem:a6131d15a5672f8a40fbfb9ac8195d2f4" id="r_a6131d15a5672f8a40fbfb9ac8195d2f4"><td class="memItemLeft">double&#160;</td><td class="memItemRight"><a class="el" href="#a6131d15a5672f8a40fbfb9ac8195d2f4">_misprice_schedule</a> (int nb_misprices, double base_alpha)</td></tr>
 <tr class="memitem:a16bbb0a9a4f26d599dde9f42108f23fa" id="r_a16bbb0a9a4f26d599dde9f42108f23fa"><td class="memItemLeft">&#160;</td><td class="memItemRight"><a class="el" href="#a16bbb0a9a4f26d599dde9f42108f23fa">Stabilization</a> (double base_alpha, <a class="el" href="Definitions_8h.html#aca51606dd2572852638d855b039eaa63">DualSolution</a> &amp;mast_dual_sol)</td></tr>
 <tr class="memitem:ac7a5e61a4b3848aef27935e66e735675" id="r_ac7a5e61a4b3848aef27935e66e735675"><td class="memItemLeft"><a class="el" href="Definitions_8h.html#aca51606dd2572852638d855b039eaa63">DualSolution</a>&#160;</td><td class="memItemRight"><a class="el" href="#ac7a5e61a4b3848aef27935e66e735675">getStabDualSol</a> (const <a class="el" href="Definitions_8h.html#aca51606dd2572852638d855b039eaa63">DualSolution</a> &amp;input_duals)</td></tr>
-<tr class="memitem:a4f4e3b43fbae641f421179c3519a7ff7" id="r_a4f4e3b43fbae641f421179c3519a7ff7"><td class="memItemLeft">double&#160;</td><td class="memItemRight"><a class="el" href="#a4f4e3b43fbae641f421179c3519a7ff7">norm</a> (const std::vector&lt; double &gt; &amp;vector)</td></tr>
-<tr class="memitem:a1b375b131cac6b1a5978f725a6fcab27" id="r_a1b375b131cac6b1a5978f725a6fcab27"><td class="memItemLeft">double&#160;</td><td class="memItemRight"><a class="el" href="#a1b375b131cac6b1a5978f725a6fcab27">norm</a> (const std::vector&lt; double &gt; &amp;vector_1, const std::vector&lt; double &gt; &amp;vector_2)</td></tr>
+<tr class="memitem:ada181c63fda918fc904a9d864595ed97" id="r_ada181c63fda918fc904a9d864595ed97"><td class="memItemLeft">double&#160;</td><td class="memItemRight"><a class="el" href="#ada181c63fda918fc904a9d864595ed97">norm</a> (const std::vector&lt; double &gt; &amp;vector) const</td></tr>
+<tr class="memitem:a1e9bd56fcded3169cbeef764d38f31a9" id="r_a1e9bd56fcded3169cbeef764d38f31a9"><td class="memItemLeft">double&#160;</td><td class="memItemRight"><a class="el" href="#a1e9bd56fcded3169cbeef764d38f31a9">norm</a> (const std::vector&lt; double &gt; &amp;vector_1, const std::vector&lt; double &gt; &amp;vector_2) const</td></tr>
 <tr class="memitem:a2300861788cd4d88a8701cd84d80dfd2" id="r_a2300861788cd4d88a8701cd84d80dfd2"><td class="memItemLeft"><a class="el" href="Definitions_8h.html#aca51606dd2572852638d855b039eaa63">DualSolution</a>&#160;</td><td class="memItemRight"><a class="el" href="#a2300861788cd4d88a8701cd84d80dfd2">getStabDualSolAdvanced</a> (const <a class="el" href="Definitions_8h.html#aca51606dd2572852638d855b039eaa63">DualSolution</a> &amp;input_duals)</td></tr>
 <tr class="memitem:ae9092a933972d2d35d8196975e66e555" id="r_ae9092a933972d2d35d8196975e66e555"><td class="memItemLeft">bool&#160;</td><td class="memItemRight"><a class="el" href="#ae9092a933972d2d35d8196975e66e555">dynamic_alpha_schedule</a> (const <a class="el" href="structModelData.html">ModelData</a> &amp;dados)</td></tr>
-<tr class="memitem:ab6b6215da1ae5d49b2e6c0877f00b359" id="r_ab6b6215da1ae5d49b2e6c0877f00b359"><td class="memItemLeft">void&#160;</td><td class="memItemRight"><a class="el" href="#ab6b6215da1ae5d49b2e6c0877f00b359">update_subgradient</a> (const <a class="el" href="structModelData.html">ModelData</a> &amp;dados, const <a class="el" href="Definitions_8h.html#aca51606dd2572852638d855b039eaa63">DualSolution</a> &amp;nodeDuals, const std::vector&lt; <a class="el" href="structLabel.html">Label</a> * &gt; &amp;best_pricing_cols, bool use_weighted_update=true)</td></tr>
+<tr class="memitem:a4ff5dcec21d0c23e1e440ae5761f2a3e" id="r_a4ff5dcec21d0c23e1e440ae5761f2a3e"><td class="memItemLeft">void&#160;</td><td class="memItemRight"><a class="el" href="#a4ff5dcec21d0c23e1e440ae5761f2a3e">update_subgradient</a> (const <a class="el" href="structModelData.html">ModelData</a> &amp;model, const <a class="el" href="Definitions_8h.html#aca51606dd2572852638d855b039eaa63">DualSolution</a> &amp;node_duals, const std::vector&lt; <a class="el" href="structLabel.html">Label</a> * &gt; &amp;pricing_columns)</td></tr>
 <tr class="memitem:ae1865069b94892e39f6af605d08f66cb" id="r_ae1865069b94892e39f6af605d08f66cb"><td class="memItemLeft">void&#160;</td><td class="memItemRight"><a class="el" href="#ae1865069b94892e39f6af605d08f66cb">set_pseudo_dual_bound</a> (double bound)</td></tr>
 <tr class="memitem:af17848288def02f6c163152d9ed75043" id="r_af17848288def02f6c163152d9ed75043"><td class="memItemLeft">void&#160;</td><td class="memItemRight"><a class="el" href="#af17848288def02f6c163152d9ed75043">setObj</a> (double obj)</td></tr>
 <tr class="memitem:af358ea4f62658ca2a7b1509535392e2a" id="r_af358ea4f62658ca2a7b1509535392e2a"><td class="memItemLeft">void&#160;</td><td class="memItemRight"><a class="el" href="#af358ea4f62658ca2a7b1509535392e2a">update_stabilization_after_pricing_optim</a> (const <a class="el" href="structModelData.html">ModelData</a> &amp;dados, const <a class="el" href="Definitions_8h.html#aca51606dd2572852638d855b039eaa63">DualSolution</a> &amp;input_duals, const double &amp;lag_gap, const std::vector&lt; <a class="el" href="structLabel.html">Label</a> * &gt; &amp;best_pricing_cols)</td></tr>
-<tr class="memitem:a608ef16db00c1697748fa3bf8f9d0720" id="r_a608ef16db00c1697748fa3bf8f9d0720"><td class="memItemLeft">bool&#160;</td><td class="memItemRight"><a class="el" href="#a608ef16db00c1697748fa3bf8f9d0720">shouldExit</a> ()</td></tr>
+<tr class="memitem:a3fdc59d8c5f1f63d130184dc2e1b4e9c" id="r_a3fdc59d8c5f1f63d130184dc2e1b4e9c"><td class="memItemLeft">bool&#160;</td><td class="memItemRight"><a class="el" href="#a3fdc59d8c5f1f63d130184dc2e1b4e9c">shouldExit</a> () const</td></tr>
 <tr class="memitem:ac2f24133b3ae9bb48b0d72b7fb0fb996" id="r_ac2f24133b3ae9bb48b0d72b7fb0fb996"><td class="memItemLeft">void&#160;</td><td class="memItemRight"><a class="el" href="#ac2f24133b3ae9bb48b0d72b7fb0fb996">cleanup</a> ()</td></tr>
 <tr class="memitem:a3cec5e44d6b0c46c972862b37f03d93b" id="r_a3cec5e44d6b0c46c972862b37f03d93b"><td class="memItemLeft">void&#160;</td><td class="memItemRight"><a class="el" href="#a3cec5e44d6b0c46c972862b37f03d93b">define_smooth_dual_sol</a> (const <a class="el" href="Definitions_8h.html#aca51606dd2572852638d855b039eaa63">DualSolution</a> &amp;nodeDuals)</td></tr>
 <tr class="memitem:a2ef9fbc21ad3dc9777f05de7af6246c1" id="r_a2ef9fbc21ad3dc9777f05de7af6246c1"><td class="memItemLeft">void&#160;</td><td class="memItemRight"><a class="el" href="#a2ef9fbc21ad3dc9777f05de7af6246c1">updateNumK</a> (int numK)</td></tr>
@@ -194,6 +196,7 @@ Public Attributes</h2></td></tr>
 <tr class="memitem:af93150015a05267d69ef00636f9b66dc" id="r_af93150015a05267d69ef00636f9b66dc"><td class="memItemLeft">double&#160;</td><td class="memItemRight"><a class="el" href="#af93150015a05267d69ef00636f9b66dc">lp_obj</a> = 0.0</td></tr>
 <tr class="memitem:ac0e5303fd52c2a7a9747c5b9dc591d3e" id="r_ac0e5303fd52c2a7a9747c5b9dc591d3e"><td class="memItemLeft"><a class="el" href="structReducedCostResult.html">ReducedCostResult</a>&#160;</td><td class="memItemRight"><a class="el" href="#ac0e5303fd52c2a7a9747c5b9dc591d3e">rc</a></td></tr>
 <tr class="memitem:a170e92b41de7e687684b7d71fd1fc5ae" id="r_a170e92b41de7e687684b7d71fd1fc5ae"><td class="memItemLeft">std::vector&lt; double &gt;&#160;</td><td class="memItemRight"><a class="el" href="#a170e92b41de7e687684b7d71fd1fc5ae">stab_constraint_values</a></td></tr>
+<tr class="memitem:a67928d3781b7c17f8376f56a19d8639c" id="r_a67928d3781b7c17f8376f56a19d8639c"><td class="memItemLeft">std::vector&lt; char &gt;&#160;</td><td class="memItemRight"><a class="el" href="#a67928d3781b7c17f8376f56a19d8639c">constraint_senses</a></td></tr>
 <tr class="memitem:ab7731c3950bc7fef07bd1795e3b79ac3" id="r_ab7731c3950bc7fef07bd1795e3b79ac3"><td class="memItemLeft">bool&#160;</td><td class="memItemRight"><a class="el" href="#ab7731c3950bc7fef07bd1795e3b79ac3">cut_added</a> = false</td></tr>
 <tr class="memitem:a63da696ed026d626470238a17c846dcf" id="r_a63da696ed026d626470238a17c846dcf"><td class="memItemLeft">int&#160;</td><td class="memItemRight"><a class="el" href="#a63da696ed026d626470238a17c846dcf">no_progress_count</a> = 0</td></tr>
 <tr class="memitem:ace689762db9ad131ad16b1ad4c2a4fba" id="r_ace689762db9ad131ad16b1ad4c2a4fba"><td class="memItemLeft">double&#160;</td><td class="memItemRight"><a class="el" href="#ace689762db9ad131ad16b1ad4c2a4fba">lp_obj_prev</a> = 0.0</td></tr>
@@ -205,13 +208,14 @@ Static Public Attributes</h2></td></tr>
 <tr class="memitem:aa21016ba00cd2e21cafe08e8819975e9" id="r_aa21016ba00cd2e21cafe08e8819975e9"><td class="memItemLeft">static constexpr double&#160;</td><td class="memItemRight"><a class="el" href="#aa21016ba00cd2e21cafe08e8819975e9">kAlphaMin</a> = 0.02</td></tr>
 <tr class="memitem:a62ad0e0266e4b86a5b330578da8131f2" id="r_a62ad0e0266e4b86a5b330578da8131f2"><td class="memItemLeft">static constexpr double&#160;</td><td class="memItemRight"><a class="el" href="#a62ad0e0266e4b86a5b330578da8131f2">kAlphaMax</a> = 0.90</td></tr>
 <tr class="memitem:abe3467c9f0c1ce54ffb9d30690d50db3" id="r_abe3467c9f0c1ce54ffb9d30690d50db3"><td class="memItemLeft">static constexpr double&#160;</td><td class="memItemRight"><a class="el" href="#abe3467c9f0c1ce54ffb9d30690d50db3">kAlphaEps</a> = 1e-3</td></tr>
+<tr class="memitem:a9a86584548072aff4d928f02875f074c" id="r_a9a86584548072aff4d928f02875f074c"><td class="memItemLeft">static constexpr double&#160;</td><td class="memItemRight"><a class="el" href="#a9a86584548072aff4d928f02875f074c">kNormTolerance</a> = 1e-4</td></tr>
 <tr class="memitem:ad8faa147c37bf4797c5d661b20e32ec0" id="r_ad8faa147c37bf4797c5d661b20e32ec0"><td class="memItemLeft">static constexpr double&#160;</td><td class="memItemRight"><a class="el" href="#ad8faa147c37bf4797c5d661b20e32ec0">EPSILON</a> = 1e-12</td></tr>
 </table>
 <a name="details" id="details"></a><h2 id="header-details" class="groupheader">Detailed Description</h2>
 <div class="textblock"><p>A class to handle stabilization in optimization problems. </p>
 <p>This class implements various methods to manage and compute stabilization parameters and dual solutions in optimization problems. </p>
 
-<p class="definition">Definition at line <a class="el" href="Stabilization_8h_source.html#l00033">33</a> of file <a class="el" href="Stabilization_8h_source.html">Stabilization.h</a>.</p>
+<p class="definition">Definition at line <a class="el" href="Stabilization_8h_source.html#l00032">32</a> of file <a class="el" href="Stabilization_8h_source.html">Stabilization.h</a>.</p>
 </div><a name="doc-constructors" id="doc-constructors"></a><h2 id="header-doc-constructors" class="groupheader">Constructor &amp; Destructor Documentation</h2>
 <a id="a16bbb0a9a4f26d599dde9f42108f23fa" name="a16bbb0a9a4f26d599dde9f42108f23fa"></a>
 <h2 class="memtitle"><span class="permalink"><a href="#a16bbb0a9a4f26d599dde9f42108f23fa">&#9670;&#160;</a></span>Stabilization()</h2>
@@ -240,25 +244,25 @@ Static Public Attributes</h2></td></tr>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="Stabilization_8h_source.html#l00127">127</a> of file <a class="el" href="Stabilization_8h_source.html">Stabilization.h</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  128</span>        : <a class="code hl_variable" href="#aec3c3704ce91da277ffde90c631dbde6">alpha</a>(std::clamp(<a class="code hl_variable" href="#a7a1b5fb5e2d0384d017ba645a930c691">base_alpha</a>, <a class="code hl_variable" href="#aa21016ba00cd2e21cafe08e8819975e9">kAlphaMin</a>, <a class="code hl_variable" href="#a62ad0e0266e4b86a5b330578da8131f2">kAlphaMax</a>)), <a class="code hl_variable" href="#a165a2b0c9346913f03c0ffbe014a11b4">t</a>(0),</div>
-<div class="line"><span class="lineno">  129</span>          <a class="code hl_variable" href="#a7a1b5fb5e2d0384d017ba645a930c691">base_alpha</a>(std::clamp(<a class="code hl_variable" href="#a7a1b5fb5e2d0384d017ba645a930c691">base_alpha</a>, <a class="code hl_variable" href="#aa21016ba00cd2e21cafe08e8819975e9">kAlphaMin</a>, <a class="code hl_variable" href="#a62ad0e0266e4b86a5b330578da8131f2">kAlphaMax</a>)),</div>
-<div class="line"><span class="lineno">  130</span>          <a class="code hl_variable" href="#a3993b8b7d2b7ba34b5659a465f7c86df">cur_alpha</a>(std::clamp(<a class="code hl_variable" href="#a7a1b5fb5e2d0384d017ba645a930c691">base_alpha</a>, <a class="code hl_variable" href="#aa21016ba00cd2e21cafe08e8819975e9">kAlphaMin</a>, <a class="code hl_variable" href="#a62ad0e0266e4b86a5b330578da8131f2">kAlphaMax</a>)), <a class="code hl_variable" href="#ab23b31507672a0feedce2d90bd612dc4">nb_misprices</a>(0), <a class="code hl_variable" href="#a28cf2ea457b84f4ea34e1720f6a35a2c">cur_stab_center</a>(mast_dual_sol) {</div>
-<div class="line"><span class="lineno">  131</span>        <a class="code hl_variable" href="#a7147f5ffb0ab16dd5f303235f6ea811b">pseudo_dual_bound</a> = std::numeric_limits&lt;double&gt;::infinity();</div>
-<div class="line"><span class="lineno">  132</span>        <a class="code hl_variable" href="#ad363bbd6f965e1a5a2bad5b4d2594f42">valid_dual_bound</a>  = std::numeric_limits&lt;double&gt;::infinity();</div>
-<div class="line"><span class="lineno">  133</span>        <a class="code hl_variable" href="#a8cf47e51d1046c0d1919ee71d024000d">beta</a>              = 0.0;</div>
-<div class="line"><span class="lineno">  134</span>        <a class="code hl_variable" href="#a010068e0a9fe16c1c76567324ba02f6e">sizeDual</a>          = mast_dual_sol.size();</div>
-<div class="line"><span class="lineno">  135</span>        <a class="code hl_variable" href="#ac08359d79f8fddb159d716f4993996a2">smooth_dual_sol</a>   = mast_dual_sol;</div>
-<div class="line"><span class="lineno">  136</span>    }</div>
+<p class="definition">Definition at line <a class="el" href="Stabilization_8h_source.html#l00167">167</a> of file <a class="el" href="Stabilization_8h_source.html">Stabilization.h</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  168</span>        : <a class="code hl_variable" href="#aec3c3704ce91da277ffde90c631dbde6">alpha</a>(std::clamp(<a class="code hl_variable" href="#a7a1b5fb5e2d0384d017ba645a930c691">base_alpha</a>, <a class="code hl_variable" href="#aa21016ba00cd2e21cafe08e8819975e9">kAlphaMin</a>, <a class="code hl_variable" href="#a62ad0e0266e4b86a5b330578da8131f2">kAlphaMax</a>)), <a class="code hl_variable" href="#a165a2b0c9346913f03c0ffbe014a11b4">t</a>(0),</div>
+<div class="line"><span class="lineno">  169</span>          <a class="code hl_variable" href="#a7a1b5fb5e2d0384d017ba645a930c691">base_alpha</a>(std::clamp(<a class="code hl_variable" href="#a7a1b5fb5e2d0384d017ba645a930c691">base_alpha</a>, <a class="code hl_variable" href="#aa21016ba00cd2e21cafe08e8819975e9">kAlphaMin</a>, <a class="code hl_variable" href="#a62ad0e0266e4b86a5b330578da8131f2">kAlphaMax</a>)),</div>
+<div class="line"><span class="lineno">  170</span>          <a class="code hl_variable" href="#a3993b8b7d2b7ba34b5659a465f7c86df">cur_alpha</a>(std::clamp(<a class="code hl_variable" href="#a7a1b5fb5e2d0384d017ba645a930c691">base_alpha</a>, <a class="code hl_variable" href="#aa21016ba00cd2e21cafe08e8819975e9">kAlphaMin</a>, <a class="code hl_variable" href="#a62ad0e0266e4b86a5b330578da8131f2">kAlphaMax</a>)), <a class="code hl_variable" href="#ab23b31507672a0feedce2d90bd612dc4">nb_misprices</a>(0), <a class="code hl_variable" href="#a28cf2ea457b84f4ea34e1720f6a35a2c">cur_stab_center</a>(mast_dual_sol) {</div>
+<div class="line"><span class="lineno">  171</span>        <a class="code hl_variable" href="#a7147f5ffb0ab16dd5f303235f6ea811b">pseudo_dual_bound</a> = std::numeric_limits&lt;double&gt;::infinity();</div>
+<div class="line"><span class="lineno">  172</span>        <a class="code hl_variable" href="#ad363bbd6f965e1a5a2bad5b4d2594f42">valid_dual_bound</a>  = std::numeric_limits&lt;double&gt;::infinity();</div>
+<div class="line"><span class="lineno">  173</span>        <a class="code hl_variable" href="#a8cf47e51d1046c0d1919ee71d024000d">beta</a>              = 0.0;</div>
+<div class="line"><span class="lineno">  174</span>        <a class="code hl_variable" href="#a010068e0a9fe16c1c76567324ba02f6e">sizeDual</a>          = mast_dual_sol.size();</div>
+<div class="line"><span class="lineno">  175</span>        <a class="code hl_variable" href="#ac08359d79f8fddb159d716f4993996a2">smooth_dual_sol</a>   = mast_dual_sol;</div>
+<div class="line"><span class="lineno">  176</span>    }</div>
 <div class="ttc" id="aclassStabilization_html_a010068e0a9fe16c1c76567324ba02f6e"><div class="ttname"><a href="#a010068e0a9fe16c1c76567324ba02f6e">Stabilization::sizeDual</a></div><div class="ttdeci">int sizeDual</div><div class="ttdef"><b>Definition</b> <a href="Stabilization_8h_source.html#l00076">Stabilization.h:76</a></div></div>
 <div class="ttc" id="aclassStabilization_html_a165a2b0c9346913f03c0ffbe014a11b4"><div class="ttname"><a href="#a165a2b0c9346913f03c0ffbe014a11b4">Stabilization::t</a></div><div class="ttdeci">int t</div><div class="ttdef"><b>Definition</b> <a href="Stabilization_8h_source.html#l00040">Stabilization.h:40</a></div></div>
 <div class="ttc" id="aclassStabilization_html_a28cf2ea457b84f4ea34e1720f6a35a2c"><div class="ttname"><a href="#a28cf2ea457b84f4ea34e1720f6a35a2c">Stabilization::cur_stab_center</a></div><div class="ttdeci">DualSolution cur_stab_center</div><div class="ttdef"><b>Definition</b> <a href="Stabilization_8h_source.html#l00047">Stabilization.h:47</a></div></div>
 <div class="ttc" id="aclassStabilization_html_a3993b8b7d2b7ba34b5659a465f7c86df"><div class="ttname"><a href="#a3993b8b7d2b7ba34b5659a465f7c86df">Stabilization::cur_alpha</a></div><div class="ttdeci">double cur_alpha</div><div class="ttdef"><b>Definition</b> <a href="Stabilization_8h_source.html#l00043">Stabilization.h:43</a></div></div>
-<div class="ttc" id="aclassStabilization_html_a62ad0e0266e4b86a5b330578da8131f2"><div class="ttname"><a href="#a62ad0e0266e4b86a5b330578da8131f2">Stabilization::kAlphaMax</a></div><div class="ttdeci">static constexpr double kAlphaMax</div><div class="ttdef"><b>Definition</b> <a href="Stabilization_8h_source.html#l00036">Stabilization.h:36</a></div></div>
+<div class="ttc" id="aclassStabilization_html_a62ad0e0266e4b86a5b330578da8131f2"><div class="ttname"><a href="#a62ad0e0266e4b86a5b330578da8131f2">Stabilization::kAlphaMax</a></div><div class="ttdeci">static constexpr double kAlphaMax</div><div class="ttdef"><b>Definition</b> <a href="Stabilization_8h_source.html#l00035">Stabilization.h:35</a></div></div>
 <div class="ttc" id="aclassStabilization_html_a7147f5ffb0ab16dd5f303235f6ea811b"><div class="ttname"><a href="#a7147f5ffb0ab16dd5f303235f6ea811b">Stabilization::pseudo_dual_bound</a></div><div class="ttdeci">double pseudo_dual_bound</div><div class="ttdef"><b>Definition</b> <a href="Stabilization_8h_source.html#l00045">Stabilization.h:45</a></div></div>
 <div class="ttc" id="aclassStabilization_html_a7a1b5fb5e2d0384d017ba645a930c691"><div class="ttname"><a href="#a7a1b5fb5e2d0384d017ba645a930c691">Stabilization::base_alpha</a></div><div class="ttdeci">double base_alpha</div><div class="ttdef"><b>Definition</b> <a href="Stabilization_8h_source.html#l00042">Stabilization.h:42</a></div></div>
 <div class="ttc" id="aclassStabilization_html_a8cf47e51d1046c0d1919ee71d024000d"><div class="ttname"><a href="#a8cf47e51d1046c0d1919ee71d024000d">Stabilization::beta</a></div><div class="ttdeci">double beta</div><div class="ttdef"><b>Definition</b> <a href="Stabilization_8h_source.html#l00062">Stabilization.h:62</a></div></div>
-<div class="ttc" id="aclassStabilization_html_aa21016ba00cd2e21cafe08e8819975e9"><div class="ttname"><a href="#aa21016ba00cd2e21cafe08e8819975e9">Stabilization::kAlphaMin</a></div><div class="ttdeci">static constexpr double kAlphaMin</div><div class="ttdef"><b>Definition</b> <a href="Stabilization_8h_source.html#l00035">Stabilization.h:35</a></div></div>
+<div class="ttc" id="aclassStabilization_html_aa21016ba00cd2e21cafe08e8819975e9"><div class="ttname"><a href="#aa21016ba00cd2e21cafe08e8819975e9">Stabilization::kAlphaMin</a></div><div class="ttdeci">static constexpr double kAlphaMin</div><div class="ttdef"><b>Definition</b> <a href="Stabilization_8h_source.html#l00034">Stabilization.h:34</a></div></div>
 <div class="ttc" id="aclassStabilization_html_ab23b31507672a0feedce2d90bd612dc4"><div class="ttname"><a href="#ab23b31507672a0feedce2d90bd612dc4">Stabilization::nb_misprices</a></div><div class="ttdeci">int nb_misprices</div><div class="ttdef"><b>Definition</b> <a href="Stabilization_8h_source.html#l00044">Stabilization.h:44</a></div></div>
 <div class="ttc" id="aclassStabilization_html_ac08359d79f8fddb159d716f4993996a2"><div class="ttname"><a href="#ac08359d79f8fddb159d716f4993996a2">Stabilization::smooth_dual_sol</a></div><div class="ttdeci">DualSolution smooth_dual_sol</div><div class="ttdef"><b>Definition</b> <a href="Stabilization_8h_source.html#l00065">Stabilization.h:65</a></div></div>
 <div class="ttc" id="aclassStabilization_html_ad363bbd6f965e1a5a2bad5b4d2594f42"><div class="ttname"><a href="#ad363bbd6f965e1a5a2bad5b4d2594f42">Stabilization::valid_dual_bound</a></div><div class="ttdeci">double valid_dual_bound</div><div class="ttdef"><b>Definition</b> <a href="Stabilization_8h_source.html#l00046">Stabilization.h:46</a></div></div>
@@ -294,20 +298,71 @@ Static Public Attributes</h2></td></tr>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="Stabilization_8h_source.html#l00116">116</a> of file <a class="el" href="Stabilization_8h_source.html">Stabilization.h</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  116</span>                                                                   {</div>
-<div class="line"><span class="lineno">  117</span>        <span class="comment">// Table 1 (left): alpha_tilde = [1 - k * (1 - alpha)]_+</span></div>
-<div class="line"><span class="lineno">  118</span>        <span class="keyword">const</span> <span class="keywordtype">int</span> k     = std::max(1, <a class="code hl_variable" href="#ab23b31507672a0feedce2d90bd612dc4">nb_misprices</a>);</div>
-<div class="line"><span class="lineno">  119</span>        <span class="keywordtype">double</span>    <a class="code hl_variable" href="#aec3c3704ce91da277ffde90c631dbde6">alpha</a> = std::max(0.0, 1.0 - k * (1.0 - <a class="code hl_variable" href="#a7a1b5fb5e2d0384d017ba645a930c691">base_alpha</a>));</div>
-<div class="line"><span class="lineno">  120</span>        <span class="keywordflow">if</span> (<a class="code hl_variable" href="#ab23b31507672a0feedce2d90bd612dc4">nb_misprices</a> &gt; 20 || <a class="code hl_variable" href="#aec3c3704ce91da277ffde90c631dbde6">alpha</a> &lt;= <a class="code hl_variable" href="#abe3467c9f0c1ce54ffb9d30690d50db3">kAlphaEps</a>) {</div>
-<div class="line"><span class="lineno">  121</span>            <a class="code hl_variable" href="#aec3c3704ce91da277ffde90c631dbde6">alpha</a> = 0.0; <span class="comment">// Deactivate stabilization</span></div>
-<div class="line"><span class="lineno">  122</span>        }</div>
-<div class="line"><span class="lineno">  123</span>        <a class="code hl_variable" href="#a4d4c83ea0cfe9d7c7a3904a165e1f2cc">duals_in</a> = <a class="code hl_variable" href="#af4daf812a8380b3b392978645e1ae30e">duals_sep</a>;</div>
-<div class="line"><span class="lineno">  124</span>        <span class="keywordflow">return</span> <a class="code hl_variable" href="#aec3c3704ce91da277ffde90c631dbde6">alpha</a>;</div>
-<div class="line"><span class="lineno">  125</span>    }</div>
+<p class="definition">Definition at line <a class="el" href="Stabilization_8h_source.html#l00156">156</a> of file <a class="el" href="Stabilization_8h_source.html">Stabilization.h</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  156</span>                                                                   {</div>
+<div class="line"><span class="lineno">  157</span>        <span class="comment">// Table 1 (left): alpha_tilde = [1 - k * (1 - alpha)]_+</span></div>
+<div class="line"><span class="lineno">  158</span>        <span class="keyword">const</span> <span class="keywordtype">int</span> k     = std::max(1, <a class="code hl_variable" href="#ab23b31507672a0feedce2d90bd612dc4">nb_misprices</a>);</div>
+<div class="line"><span class="lineno">  159</span>        <span class="keywordtype">double</span>    <a class="code hl_variable" href="#aec3c3704ce91da277ffde90c631dbde6">alpha</a> = std::max(0.0, 1.0 - k * (1.0 - <a class="code hl_variable" href="#a7a1b5fb5e2d0384d017ba645a930c691">base_alpha</a>));</div>
+<div class="line"><span class="lineno">  160</span>        <span class="keywordflow">if</span> (<a class="code hl_variable" href="#ab23b31507672a0feedce2d90bd612dc4">nb_misprices</a> &gt; 20 || <a class="code hl_variable" href="#aec3c3704ce91da277ffde90c631dbde6">alpha</a> &lt;= <a class="code hl_variable" href="#abe3467c9f0c1ce54ffb9d30690d50db3">kAlphaEps</a>) {</div>
+<div class="line"><span class="lineno">  161</span>            <a class="code hl_variable" href="#aec3c3704ce91da277ffde90c631dbde6">alpha</a> = 0.0; <span class="comment">// Deactivate stabilization</span></div>
+<div class="line"><span class="lineno">  162</span>        }</div>
+<div class="line"><span class="lineno">  163</span>        <a class="code hl_variable" href="#a4d4c83ea0cfe9d7c7a3904a165e1f2cc">duals_in</a> = <a class="code hl_variable" href="#af4daf812a8380b3b392978645e1ae30e">duals_sep</a>;</div>
+<div class="line"><span class="lineno">  164</span>        <span class="keywordflow">return</span> <a class="code hl_variable" href="#aec3c3704ce91da277ffde90c631dbde6">alpha</a>;</div>
+<div class="line"><span class="lineno">  165</span>    }</div>
 <div class="ttc" id="aclassStabilization_html_a4d4c83ea0cfe9d7c7a3904a165e1f2cc"><div class="ttname"><a href="#a4d4c83ea0cfe9d7c7a3904a165e1f2cc">Stabilization::duals_in</a></div><div class="ttdeci">DualSolution duals_in</div><div class="ttdef"><b>Definition</b> <a href="Stabilization_8h_source.html#l00058">Stabilization.h:58</a></div></div>
-<div class="ttc" id="aclassStabilization_html_abe3467c9f0c1ce54ffb9d30690d50db3"><div class="ttname"><a href="#abe3467c9f0c1ce54ffb9d30690d50db3">Stabilization::kAlphaEps</a></div><div class="ttdeci">static constexpr double kAlphaEps</div><div class="ttdef"><b>Definition</b> <a href="Stabilization_8h_source.html#l00037">Stabilization.h:37</a></div></div>
+<div class="ttc" id="aclassStabilization_html_abe3467c9f0c1ce54ffb9d30690d50db3"><div class="ttname"><a href="#abe3467c9f0c1ce54ffb9d30690d50db3">Stabilization::kAlphaEps</a></div><div class="ttdeci">static constexpr double kAlphaEps</div><div class="ttdef"><b>Definition</b> <a href="Stabilization_8h_source.html#l00036">Stabilization.h:36</a></div></div>
 <div class="ttc" id="aclassStabilization_html_af4daf812a8380b3b392978645e1ae30e"><div class="ttname"><a href="#af4daf812a8380b3b392978645e1ae30e">Stabilization::duals_sep</a></div><div class="ttdeci">DualSolution duals_sep</div><div class="ttdef"><b>Definition</b> <a href="Stabilization_8h_source.html#l00060">Stabilization.h:60</a></div></div>
+</div><!-- fragment -->
+</div>
+</div>
+<a id="a54a5e75296eebd75701121415eb6c56b" name="a54a5e75296eebd75701121415eb6c56b"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a54a5e75296eebd75701121415eb6c56b">&#9670;&#160;</a></span>align_with_master_duals()</h2>
+
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">void Stabilization::align_with_master_duals </td>
+          <td>(</td>
+          <td class="paramtype">const <a class="el" href="Definitions_8h.html#aca51606dd2572852638d855b039eaa63">DualSolution</a> &amp;</td>          <td class="paramname"><span class="paramname"><em>master_duals</em></span></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel inline">inline</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+<p class="definition">Definition at line <a class="el" href="Stabilization_8h_source.html#l00086">86</a> of file <a class="el" href="Stabilization_8h_source.html">Stabilization.h</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">   86</span>                                                                   {</div>
+<div class="line"><span class="lineno">   87</span>        <span class="keyword">const</span> std::size_t new_size = master_duals.size();</div>
+<div class="line"><span class="lineno">   88</span> </div>
+<div class="line"><span class="lineno">   89</span>        <span class="keyword">auto</span> align = [&amp;](<a class="code hl_typedef" href="Definitions_8h.html#aca51606dd2572852638d855b039eaa63">DualSolution</a> &amp;duals) {</div>
+<div class="line"><span class="lineno">   90</span>            <span class="keyword">const</span> std::size_t old_size = duals.size();</div>
+<div class="line"><span class="lineno">   91</span>            duals.resize(new_size);</div>
+<div class="line"><span class="lineno">   92</span>            <span class="keywordflow">for</span> (std::size_t i = old_size; i &lt; new_size; ++i) { duals[i] = master_duals[i]; }</div>
+<div class="line"><span class="lineno">   93</span>        };</div>
+<div class="line"><span class="lineno">   94</span> </div>
+<div class="line"><span class="lineno">   95</span>        align(<a class="code hl_variable" href="#a28cf2ea457b84f4ea34e1720f6a35a2c">cur_stab_center</a>);</div>
+<div class="line"><span class="lineno">   96</span>        align(<a class="code hl_variable" href="#ac08359d79f8fddb159d716f4993996a2">smooth_dual_sol</a>);</div>
+<div class="line"><span class="lineno">   97</span>        <span class="keywordflow">if</span> (!<a class="code hl_variable" href="#af4daf812a8380b3b392978645e1ae30e">duals_sep</a>.empty()) align(<a class="code hl_variable" href="#af4daf812a8380b3b392978645e1ae30e">duals_sep</a>);</div>
+<div class="line"><span class="lineno">   98</span> </div>
+<div class="line"><span class="lineno">   99</span>        <span class="keywordflow">if</span> (<a class="code hl_variable" href="#a20b515205f9eb12bfb49a9531e73975a">subgradient</a>.size() != new_size) {</div>
+<div class="line"><span class="lineno">  100</span>            <a class="code hl_variable" href="#a20b515205f9eb12bfb49a9531e73975a">subgradient</a>.clear();</div>
+<div class="line"><span class="lineno">  101</span>            <a class="code hl_variable" href="#aac223020026998eef51a5cf0f12addd4">subgradient_norm</a> = 0.0;</div>
+<div class="line"><span class="lineno">  102</span>            <a class="code hl_variable" href="#a8cf47e51d1046c0d1919ee71d024000d">beta</a>             = 0.0;</div>
+<div class="line"><span class="lineno">  103</span>        }</div>
+<div class="line"><span class="lineno">  104</span> </div>
+<div class="line"><span class="lineno">  105</span>        <a class="code hl_variable" href="#a010068e0a9fe16c1c76567324ba02f6e">sizeDual</a> = <span class="keyword">static_cast&lt;</span><span class="keywordtype">int</span><span class="keyword">&gt;</span>(new_size);</div>
+<div class="line"><span class="lineno">  106</span>    }</div>
+<div class="ttc" id="aDefinitions_8h_html_aca51606dd2572852638d855b039eaa63"><div class="ttname"><a href="Definitions_8h.html#aca51606dd2572852638d855b039eaa63">DualSolution</a></div><div class="ttdeci">std::vector&lt; double &gt; DualSolution</div><div class="ttdef"><b>Definition</b> <a href="Definitions_8h_source.html#l00357">Definitions.h:357</a></div></div>
+<div class="ttc" id="aclassStabilization_html_a20b515205f9eb12bfb49a9531e73975a"><div class="ttname"><a href="#a20b515205f9eb12bfb49a9531e73975a">Stabilization::subgradient</a></div><div class="ttdeci">DualSolution subgradient</div><div class="ttdef"><b>Definition</b> <a href="Stabilization_8h_source.html#l00068">Stabilization.h:68</a></div></div>
+<div class="ttc" id="aclassStabilization_html_aac223020026998eef51a5cf0f12addd4"><div class="ttname"><a href="#aac223020026998eef51a5cf0f12addd4">Stabilization::subgradient_norm</a></div><div class="ttdeci">double subgradient_norm</div><div class="ttdef"><b>Definition</b> <a href="Stabilization_8h_source.html#l00067">Stabilization.h:67</a></div></div>
 </div><!-- fragment -->
 </div>
 </div>
@@ -334,17 +389,17 @@ Static Public Attributes</h2></td></tr>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="Stabilization_8h_source.html#l00383">383</a> of file <a class="el" href="Stabilization_8h_source.html">Stabilization.h</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  383</span>                   {</div>
-<div class="line"><span class="lineno">  384</span>        <a class="code hl_variable" href="#a170e92b41de7e687684b7d71fd1fc5ae">stab_constraint_values</a>.clear();</div>
-<div class="line"><span class="lineno">  385</span>        <a class="code hl_variable" href="#ac08359d79f8fddb159d716f4993996a2">smooth_dual_sol</a>.clear();</div>
-<div class="line"><span class="lineno">  386</span>        <a class="code hl_variable" href="#a20b515205f9eb12bfb49a9531e73975a">subgradient</a>.clear();</div>
-<div class="line"><span class="lineno">  387</span>        <a class="code hl_variable" href="#af4daf812a8380b3b392978645e1ae30e">duals_sep</a>.clear();</div>
-<div class="line"><span class="lineno">  388</span>        <a class="code hl_variable" href="#a8cf47e51d1046c0d1919ee71d024000d">beta</a>  = 0.0;</div>
-<div class="line"><span class="lineno">  389</span>        <a class="code hl_variable" href="#aec3c3704ce91da277ffde90c631dbde6">alpha</a> = <a class="code hl_variable" href="#a7a1b5fb5e2d0384d017ba645a930c691">base_alpha</a>;</div>
-<div class="line"><span class="lineno">  390</span>    }</div>
+<p class="definition">Definition at line <a class="el" href="Stabilization_8h_source.html#l00415">415</a> of file <a class="el" href="Stabilization_8h_source.html">Stabilization.h</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  415</span>                   {</div>
+<div class="line"><span class="lineno">  416</span>        <a class="code hl_variable" href="#a170e92b41de7e687684b7d71fd1fc5ae">stab_constraint_values</a>.clear();</div>
+<div class="line"><span class="lineno">  417</span>        <a class="code hl_variable" href="#ac08359d79f8fddb159d716f4993996a2">smooth_dual_sol</a>.clear();</div>
+<div class="line"><span class="lineno">  418</span>        <a class="code hl_variable" href="#a20b515205f9eb12bfb49a9531e73975a">subgradient</a>.clear();</div>
+<div class="line"><span class="lineno">  419</span>        <a class="code hl_variable" href="#af4daf812a8380b3b392978645e1ae30e">duals_sep</a>.clear();</div>
+<div class="line"><span class="lineno">  420</span>        <a class="code hl_variable" href="#a8cf47e51d1046c0d1919ee71d024000d">beta</a>      = 0.0;</div>
+<div class="line"><span class="lineno">  421</span>        <a class="code hl_variable" href="#aec3c3704ce91da277ffde90c631dbde6">alpha</a>     = <a class="code hl_variable" href="#a7a1b5fb5e2d0384d017ba645a930c691">base_alpha</a>;</div>
+<div class="line"><span class="lineno">  422</span>        <a class="code hl_variable" href="#a3993b8b7d2b7ba34b5659a465f7c86df">cur_alpha</a> = <a class="code hl_variable" href="#a7a1b5fb5e2d0384d017ba645a930c691">base_alpha</a>;</div>
+<div class="line"><span class="lineno">  423</span>    }</div>
 <div class="ttc" id="aclassStabilization_html_a170e92b41de7e687684b7d71fd1fc5ae"><div class="ttname"><a href="#a170e92b41de7e687684b7d71fd1fc5ae">Stabilization::stab_constraint_values</a></div><div class="ttdeci">std::vector&lt; double &gt; stab_constraint_values</div><div class="ttdef"><b>Definition</b> <a href="Stabilization_8h_source.html#l00081">Stabilization.h:81</a></div></div>
-<div class="ttc" id="aclassStabilization_html_a20b515205f9eb12bfb49a9531e73975a"><div class="ttname"><a href="#a20b515205f9eb12bfb49a9531e73975a">Stabilization::subgradient</a></div><div class="ttdeci">DualSolution subgradient</div><div class="ttdef"><b>Definition</b> <a href="Stabilization_8h_source.html#l00068">Stabilization.h:68</a></div></div>
 </div><!-- fragment -->
 </div>
 </div>
@@ -371,8 +426,8 @@ Static Public Attributes</h2></td></tr>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="Stabilization_8h_source.html#l00400">400</a> of file <a class="el" href="Stabilization_8h_source.html">Stabilization.h</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  400</span>{ <a class="code hl_variable" href="#aec3c3704ce91da277ffde90c631dbde6">alpha</a> = 0.0; }</div>
+<p class="definition">Definition at line <a class="el" href="Stabilization_8h_source.html#l00434">434</a> of file <a class="el" href="Stabilization_8h_source.html">Stabilization.h</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  434</span>{ <a class="code hl_variable" href="#aec3c3704ce91da277ffde90c631dbde6">alpha</a> = <a class="code hl_variable" href="#a3993b8b7d2b7ba34b5659a465f7c86df">cur_alpha</a> = 0.0; }</div>
 </div><!-- fragment -->
 </div>
 </div>
@@ -399,13 +454,25 @@ Static Public Attributes</h2></td></tr>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="Stabilization_8h_source.html#l00393">393</a> of file <a class="el" href="Stabilization_8h_source.html">Stabilization.h</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  393</span>                                                               {</div>
-<div class="line"><span class="lineno">  394</span>        <a class="code hl_variable" href="#ac08359d79f8fddb159d716f4993996a2">smooth_dual_sol</a>.assign(nodeDuals.begin(), nodeDuals.begin() + <a class="code hl_variable" href="#a010068e0a9fe16c1c76567324ba02f6e">sizeDual</a>);</div>
-<div class="line"><span class="lineno">  395</span>        <a class="code hl_variable" href="#a7c6d2bda3f3bec43ef8f8bdce36ad068">ipm_active</a> = <span class="keyword">true</span>;</div>
-<div class="line"><span class="lineno">  396</span>    }</div>
-<div class="ttc" id="aclassStabilization_html_a7c6d2bda3f3bec43ef8f8bdce36ad068"><div class="ttname"><a href="#a7c6d2bda3f3bec43ef8f8bdce36ad068">Stabilization::ipm_active</a></div><div class="ttdeci">bool ipm_active</div><div class="ttdef"><b>Definition</b> <a href="Stabilization_8h_source.html#l00392">Stabilization.h:392</a></div></div>
-</div><!-- fragment -->
+<p class="definition">Definition at line <a class="el" href="Stabilization_8h_source.html#l00426">426</a> of file <a class="el" href="Stabilization_8h_source.html">Stabilization.h</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  426</span>                                                               {</div>
+<div class="line"><span class="lineno">  427</span>        <a class="code hl_function" href="#a54a5e75296eebd75701121415eb6c56b">align_with_master_duals</a>(nodeDuals);</div>
+<div class="line"><span class="lineno">  428</span>        <a class="code hl_variable" href="#ac08359d79f8fddb159d716f4993996a2">smooth_dual_sol</a> = nodeDuals;</div>
+<div class="line"><span class="lineno">  429</span>        <a class="code hl_variable" href="#a7c6d2bda3f3bec43ef8f8bdce36ad068">ipm_active</a>      = <span class="keyword">true</span>;</div>
+<div class="line"><span class="lineno">  430</span>    }</div>
+<div class="ttc" id="aclassStabilization_html_a54a5e75296eebd75701121415eb6c56b"><div class="ttname"><a href="#a54a5e75296eebd75701121415eb6c56b">Stabilization::align_with_master_duals</a></div><div class="ttdeci">void align_with_master_duals(const DualSolution &amp;master_duals)</div><div class="ttdef"><b>Definition</b> <a href="Stabilization_8h_source.html#l00086">Stabilization.h:86</a></div></div>
+<div class="ttc" id="aclassStabilization_html_a7c6d2bda3f3bec43ef8f8bdce36ad068"><div class="ttname"><a href="#a7c6d2bda3f3bec43ef8f8bdce36ad068">Stabilization::ipm_active</a></div><div class="ttdeci">bool ipm_active</div><div class="ttdef"><b>Definition</b> <a href="Stabilization_8h_source.html#l00425">Stabilization.h:425</a></div></div>
+</div><!-- fragment --><div class="dynheader">
+Here is the call graph for this function:</div>
+<div class="dyncontent">
+<div class="center"><img src="classStabilization_a3cec5e44d6b0c46c972862b37f03d93b_cgraph.png" border="0" usemap="#aclassStabilization_a3cec5e44d6b0c46c972862b37f03d93b_cgraph" loading="lazy" alt=""/></div>
+<map name="aclassStabilization_a3cec5e44d6b0c46c972862b37f03d93b_cgraph" id="aclassStabilization_a3cec5e44d6b0c46c972862b37f03d93b_cgraph">
+<area shape="rect" title=" " alt="" coords="5,5,137,46"/>
+<area shape="rect" href="classStabilization.html#a54a5e75296eebd75701121415eb6c56b" title=" " alt="" coords="185,5,322,46"/>
+<area shape="poly" title=" " alt="" coords="137,23,169,23,169,28,137,28"/>
+</map>
+</div>
+
 </div>
 </div>
 <a id="ae9092a933972d2d35d8196975e66e555" name="ae9092a933972d2d35d8196975e66e555"></a>
@@ -431,50 +498,49 @@ Static Public Attributes</h2></td></tr>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="Stabilization_8h_source.html#l00225">225</a> of file <a class="el" href="Stabilization_8h_source.html">Stabilization.h</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  225</span>                                                        {</div>
-<div class="line"><span class="lineno">  226</span>        <span class="keyword">constexpr</span> <span class="keywordtype">double</span> DOT_TOLERANCE = 1e-3;</div>
-<div class="line"><span class="lineno">  227</span>        <span class="keyword">const</span> <span class="keywordtype">size_t</span>     n             = <a class="code hl_variable" href="#a28cf2ea457b84f4ea34e1720f6a35a2c">cur_stab_center</a>.size();</div>
-<div class="line"><span class="lineno">  228</span> </div>
-<div class="line"><span class="lineno">  229</span>        <span class="comment">// Compute relative distance: ||smooth_dual_sol - cur_stab_center|| /</span></div>
-<div class="line"><span class="lineno">  230</span>        <span class="comment">// |lp_obj|</span></div>
-<div class="line"><span class="lineno">  231</span>        <span class="keywordtype">double</span> rel_distance = <a class="code hl_function" href="#a4f4e3b43fbae641f421179c3519a7ff7">norm</a>(<a class="code hl_variable" href="#ac08359d79f8fddb159d716f4993996a2">smooth_dual_sol</a>, <a class="code hl_variable" href="#a28cf2ea457b84f4ea34e1720f6a35a2c">cur_stab_center</a>) / (std::abs(<a class="code hl_variable" href="#af93150015a05267d69ef00636f9b66dc">lp_obj</a>) + <a class="code hl_variable" href="#ad8faa147c37bf4797c5d661b20e32ec0">EPSILON</a>);</div>
-<div class="line"><span class="lineno">  232</span>        <span class="keywordflow">if</span> (rel_distance &lt; <a class="code hl_define" href="Stabilization_8h.html#afe0602c4fa1dd64cb27e91210021c33e">NORM_TOLERANCE</a>) {</div>
-<div class="line"><span class="lineno">  233</span>            <a class="code hl_variable" href="#aec3c3704ce91da277ffde90c631dbde6">alpha</a> = 0.0;</div>
-<div class="line"><span class="lineno">  234</span>            <span class="keywordflow">return</span> <span class="keyword">false</span>;</div>
-<div class="line"><span class="lineno">  235</span>        }</div>
-<div class="line"><span class="lineno">  236</span> </div>
-<div class="line"><span class="lineno">  237</span>        <span class="comment">// Compute the difference vector (direction = smooth_dual_sol -</span></div>
-<div class="line"><span class="lineno">  238</span>        <span class="comment">// cur_stab_center)</span></div>
-<div class="line"><span class="lineno">  239</span>        std::vector&lt;double&gt; direction(n);</div>
-<div class="line"><span class="lineno">  240</span>        <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> i = 0; i &lt; n; ++i) { direction[i] = <a class="code hl_variable" href="#ac08359d79f8fddb159d716f4993996a2">smooth_dual_sol</a>[i] - <a class="code hl_variable" href="#a28cf2ea457b84f4ea34e1720f6a35a2c">cur_stab_center</a>[i]; }</div>
-<div class="line"><span class="lineno">  241</span> </div>
-<div class="line"><span class="lineno">  242</span>        <span class="comment">// Compute norm of direction vector using inner_product</span></div>
-<div class="line"><span class="lineno">  243</span>        <span class="keywordtype">double</span> dir_norm =</div>
-<div class="line"><span class="lineno">  244</span>            std::sqrt(std::inner_product(direction.begin(), direction.end(), direction.begin(), 0.0) + <a class="code hl_variable" href="#ad8faa147c37bf4797c5d661b20e32ec0">EPSILON</a>);</div>
-<div class="line"><span class="lineno">  245</span>        <span class="keywordflow">if</span> (dir_norm &lt; <a class="code hl_variable" href="#ad8faa147c37bf4797c5d661b20e32ec0">EPSILON</a> || <a class="code hl_variable" href="#aac223020026998eef51a5cf0f12addd4">subgradient_norm</a> &lt; <a class="code hl_variable" href="#ad8faa147c37bf4797c5d661b20e32ec0">EPSILON</a>) { <span class="keywordflow">return</span> <span class="keyword">false</span>; }</div>
-<div class="line"><span class="lineno">  246</span> </div>
-<div class="line"><span class="lineno">  247</span>        <span class="comment">// Normalize the direction and the subgradient vectors.</span></div>
-<div class="line"><span class="lineno">  248</span>        std::vector&lt;double&gt; normalized_direction(n);</div>
-<div class="line"><span class="lineno">  249</span>        std::vector&lt;double&gt; normalized_subgradient(n);</div>
-<div class="line"><span class="lineno">  250</span>        <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> i = 0; i &lt; n; ++i) {</div>
-<div class="line"><span class="lineno">  251</span>            normalized_direction[i]   = direction[i] / dir_norm;</div>
-<div class="line"><span class="lineno">  252</span>            normalized_subgradient[i] = <a class="code hl_variable" href="#a20b515205f9eb12bfb49a9531e73975a">subgradient</a>[i] / <a class="code hl_variable" href="#aac223020026998eef51a5cf0f12addd4">subgradient_norm</a>;</div>
-<div class="line"><span class="lineno">  253</span>        }</div>
-<div class="line"><span class="lineno">  254</span> </div>
-<div class="line"><span class="lineno">  255</span>        <span class="comment">// Compute the cosine of the angle between normalized_direction and</span></div>
-<div class="line"><span class="lineno">  256</span>        <span class="comment">// normalized_subgradient.</span></div>
-<div class="line"><span class="lineno">  257</span>        <span class="keywordtype">double</span> cos_angle = std::inner_product(normalized_direction.begin(), normalized_direction.end(),</div>
-<div class="line"><span class="lineno">  258</span>                                              normalized_subgradient.begin(), 0.0);</div>
-<div class="line"><span class="lineno">  259</span> </div>
-<div class="line"><span class="lineno">  260</span>        <span class="comment">// If the cosine of the angle is very close to zero, then the vectors</span></div>
-<div class="line"><span class="lineno">  261</span>        <span class="comment">// are nearly orthogonal.</span></div>
-<div class="line"><span class="lineno">  262</span>        <span class="keywordflow">return</span> cos_angle &lt; DOT_TOLERANCE;</div>
-<div class="line"><span class="lineno">  263</span>    }</div>
-<div class="ttc" id="aStabilization_8h_html_afe0602c4fa1dd64cb27e91210021c33e"><div class="ttname"><a href="Stabilization_8h.html#afe0602c4fa1dd64cb27e91210021c33e">NORM_TOLERANCE</a></div><div class="ttdeci">#define NORM_TOLERANCE</div><div class="ttdef"><b>Definition</b> <a href="Stabilization_8h_source.html#l00024">Stabilization.h:24</a></div></div>
-<div class="ttc" id="aclassStabilization_html_a4f4e3b43fbae641f421179c3519a7ff7"><div class="ttname"><a href="#a4f4e3b43fbae641f421179c3519a7ff7">Stabilization::norm</a></div><div class="ttdeci">double norm(const std::vector&lt; double &gt; &amp;vector)</div><div class="ttdef"><b>Definition</b> <a href="Stabilization_8h_source.html#l00209">Stabilization.h:209</a></div></div>
-<div class="ttc" id="aclassStabilization_html_aac223020026998eef51a5cf0f12addd4"><div class="ttname"><a href="#aac223020026998eef51a5cf0f12addd4">Stabilization::subgradient_norm</a></div><div class="ttdeci">double subgradient_norm</div><div class="ttdef"><b>Definition</b> <a href="Stabilization_8h_source.html#l00067">Stabilization.h:67</a></div></div>
-<div class="ttc" id="aclassStabilization_html_ad8faa147c37bf4797c5d661b20e32ec0"><div class="ttname"><a href="#ad8faa147c37bf4797c5d661b20e32ec0">Stabilization::EPSILON</a></div><div class="ttdeci">static constexpr double EPSILON</div><div class="ttdef"><b>Definition</b> <a href="Stabilization_8h_source.html#l00223">Stabilization.h:223</a></div></div>
+<p class="definition">Definition at line <a class="el" href="Stabilization_8h_source.html#l00268">268</a> of file <a class="el" href="Stabilization_8h_source.html">Stabilization.h</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  268</span>                                                        {</div>
+<div class="line"><span class="lineno">  269</span>        <span class="keyword">constexpr</span> <span class="keywordtype">double</span> DOT_TOLERANCE = 1e-3;</div>
+<div class="line"><span class="lineno">  270</span>        <span class="keyword">const</span> <span class="keywordtype">size_t</span>     n             = <a class="code hl_variable" href="#a28cf2ea457b84f4ea34e1720f6a35a2c">cur_stab_center</a>.size();</div>
+<div class="line"><span class="lineno">  271</span> </div>
+<div class="line"><span class="lineno">  272</span>        <span class="comment">// Compute relative distance: ||smooth_dual_sol - cur_stab_center|| /</span></div>
+<div class="line"><span class="lineno">  273</span>        <span class="comment">// |lp_obj|</span></div>
+<div class="line"><span class="lineno">  274</span>        <span class="keywordtype">double</span> rel_distance = <a class="code hl_function" href="#ada181c63fda918fc904a9d864595ed97">norm</a>(<a class="code hl_variable" href="#ac08359d79f8fddb159d716f4993996a2">smooth_dual_sol</a>, <a class="code hl_variable" href="#a28cf2ea457b84f4ea34e1720f6a35a2c">cur_stab_center</a>) / (std::abs(<a class="code hl_variable" href="#af93150015a05267d69ef00636f9b66dc">lp_obj</a>) + <a class="code hl_variable" href="#ad8faa147c37bf4797c5d661b20e32ec0">EPSILON</a>);</div>
+<div class="line"><span class="lineno">  275</span>        <span class="keywordflow">if</span> (rel_distance &lt; <a class="code hl_variable" href="#a9a86584548072aff4d928f02875f074c">kNormTolerance</a>) {</div>
+<div class="line"><span class="lineno">  276</span>            <a class="code hl_variable" href="#aec3c3704ce91da277ffde90c631dbde6">alpha</a> = <a class="code hl_variable" href="#a3993b8b7d2b7ba34b5659a465f7c86df">cur_alpha</a> = 0.0;</div>
+<div class="line"><span class="lineno">  277</span>            <span class="keywordflow">return</span> <span class="keyword">false</span>;</div>
+<div class="line"><span class="lineno">  278</span>        }</div>
+<div class="line"><span class="lineno">  279</span> </div>
+<div class="line"><span class="lineno">  280</span>        <span class="comment">// Compute the difference vector (direction = smooth_dual_sol -</span></div>
+<div class="line"><span class="lineno">  281</span>        <span class="comment">// cur_stab_center)</span></div>
+<div class="line"><span class="lineno">  282</span>        std::vector&lt;double&gt; direction(n);</div>
+<div class="line"><span class="lineno">  283</span>        <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> i = 0; i &lt; n; ++i) { direction[i] = <a class="code hl_variable" href="#ac08359d79f8fddb159d716f4993996a2">smooth_dual_sol</a>[i] - <a class="code hl_variable" href="#a28cf2ea457b84f4ea34e1720f6a35a2c">cur_stab_center</a>[i]; }</div>
+<div class="line"><span class="lineno">  284</span> </div>
+<div class="line"><span class="lineno">  285</span>        <span class="comment">// Compute norm of direction vector using inner_product</span></div>
+<div class="line"><span class="lineno">  286</span>        <span class="keywordtype">double</span> dir_norm =</div>
+<div class="line"><span class="lineno">  287</span>            std::sqrt(std::inner_product(direction.begin(), direction.end(), direction.begin(), 0.0) + <a class="code hl_variable" href="#ad8faa147c37bf4797c5d661b20e32ec0">EPSILON</a>);</div>
+<div class="line"><span class="lineno">  288</span>        <span class="keywordflow">if</span> (dir_norm &lt; <a class="code hl_variable" href="#ad8faa147c37bf4797c5d661b20e32ec0">EPSILON</a> || <a class="code hl_variable" href="#aac223020026998eef51a5cf0f12addd4">subgradient_norm</a> &lt; <a class="code hl_variable" href="#ad8faa147c37bf4797c5d661b20e32ec0">EPSILON</a>) { <span class="keywordflow">return</span> <span class="keyword">false</span>; }</div>
+<div class="line"><span class="lineno">  289</span> </div>
+<div class="line"><span class="lineno">  290</span>        <span class="comment">// Normalize the direction and the subgradient vectors.</span></div>
+<div class="line"><span class="lineno">  291</span>        std::vector&lt;double&gt; normalized_direction(n);</div>
+<div class="line"><span class="lineno">  292</span>        std::vector&lt;double&gt; normalized_subgradient(n);</div>
+<div class="line"><span class="lineno">  293</span>        <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> i = 0; i &lt; n; ++i) {</div>
+<div class="line"><span class="lineno">  294</span>            normalized_direction[i]   = direction[i] / dir_norm;</div>
+<div class="line"><span class="lineno">  295</span>            normalized_subgradient[i] = <a class="code hl_variable" href="#a20b515205f9eb12bfb49a9531e73975a">subgradient</a>[i] / <a class="code hl_variable" href="#aac223020026998eef51a5cf0f12addd4">subgradient_norm</a>;</div>
+<div class="line"><span class="lineno">  296</span>        }</div>
+<div class="line"><span class="lineno">  297</span> </div>
+<div class="line"><span class="lineno">  298</span>        <span class="comment">// Compute the cosine of the angle between normalized_direction and</span></div>
+<div class="line"><span class="lineno">  299</span>        <span class="comment">// normalized_subgradient.</span></div>
+<div class="line"><span class="lineno">  300</span>        <span class="keywordtype">double</span> cos_angle = std::inner_product(normalized_direction.begin(), normalized_direction.end(),</div>
+<div class="line"><span class="lineno">  301</span>                                              normalized_subgradient.begin(), 0.0);</div>
+<div class="line"><span class="lineno">  302</span> </div>
+<div class="line"><span class="lineno">  303</span>        <span class="comment">// If the cosine of the angle is very close to zero, then the vectors</span></div>
+<div class="line"><span class="lineno">  304</span>        <span class="comment">// are nearly orthogonal.</span></div>
+<div class="line"><span class="lineno">  305</span>        <span class="keywordflow">return</span> cos_angle &lt; DOT_TOLERANCE;</div>
+<div class="line"><span class="lineno">  306</span>    }</div>
+<div class="ttc" id="aclassStabilization_html_a9a86584548072aff4d928f02875f074c"><div class="ttname"><a href="#a9a86584548072aff4d928f02875f074c">Stabilization::kNormTolerance</a></div><div class="ttdeci">static constexpr double kNormTolerance</div><div class="ttdef"><b>Definition</b> <a href="Stabilization_8h_source.html#l00037">Stabilization.h:37</a></div></div>
+<div class="ttc" id="aclassStabilization_html_ad8faa147c37bf4797c5d661b20e32ec0"><div class="ttname"><a href="#ad8faa147c37bf4797c5d661b20e32ec0">Stabilization::EPSILON</a></div><div class="ttdeci">static constexpr double EPSILON</div><div class="ttdef"><b>Definition</b> <a href="Stabilization_8h_source.html#l00266">Stabilization.h:266</a></div></div>
+<div class="ttc" id="aclassStabilization_html_ada181c63fda918fc904a9d864595ed97"><div class="ttname"><a href="#ada181c63fda918fc904a9d864595ed97">Stabilization::norm</a></div><div class="ttdeci">double norm(const std::vector&lt; double &gt; &amp;vector) const</div><div class="ttdef"><b>Definition</b> <a href="Stabilization_8h_source.html#l00249">Stabilization.h:249</a></div></div>
 <div class="ttc" id="aclassStabilization_html_af93150015a05267d69ef00636f9b66dc"><div class="ttname"><a href="#af93150015a05267d69ef00636f9b66dc">Stabilization::lp_obj</a></div><div class="ttdeci">double lp_obj</div><div class="ttdef"><b>Definition</b> <a href="Stabilization_8h_source.html#l00078">Stabilization.h:78</a></div></div>
 </div><!-- fragment --><div class="dynheader">
 Here is the call graph for this function:</div>
@@ -482,7 +548,7 @@ Here is the call graph for this function:</div>
 <div class="center"><img src="classStabilization_ae9092a933972d2d35d8196975e66e555_cgraph.png" border="0" usemap="#aclassStabilization_ae9092a933972d2d35d8196975e66e555_cgraph" loading="lazy" alt=""/></div>
 <map name="aclassStabilization_ae9092a933972d2d35d8196975e66e555_cgraph" id="aclassStabilization_ae9092a933972d2d35d8196975e66e555_cgraph">
 <area shape="rect" title=" " alt="" coords="5,5,151,46"/>
-<area shape="rect" href="classStabilization.html#a4f4e3b43fbae641f421179c3519a7ff7" title=" " alt="" coords="199,13,325,38"/>
+<area shape="rect" href="classStabilization.html#ada181c63fda918fc904a9d864595ed97" title=" " alt="" coords="199,13,325,38"/>
 <area shape="poly" title=" " alt="" coords="151,23,183,23,183,28,151,28"/>
 </map>
 </div>
@@ -512,80 +578,92 @@ Here is the call graph for this function:</div>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="Stabilization_8h_source.html#l00138">138</a> of file <a class="el" href="Stabilization_8h_source.html">Stabilization.h</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  138</span>                                                                 {</div>
-<div class="line"><span class="lineno">  139</span>        <span class="keywordflow">if</span> (input_duals.empty()) { <span class="keywordflow">return</span> input_duals; }</div>
-<div class="line"><span class="lineno">  140</span>        <a class="code hl_typedef" href="Definitions_8h.html#aca51606dd2572852638d855b039eaa63">DualSolution</a> pi_out;</div>
-<div class="line"><span class="lineno">  141</span>        pi_out.assign(input_duals.begin(), input_duals.begin() + <a class="code hl_variable" href="#a010068e0a9fe16c1c76567324ba02f6e">sizeDual</a>);</div>
-<div class="line"><span class="lineno">  142</span>        <span class="keywordflow">if</span> (<a class="code hl_variable" href="#a28cf2ea457b84f4ea34e1720f6a35a2c">cur_stab_center</a>.empty()) { <span class="keywordflow">return</span> pi_out; }</div>
-<div class="line"><span class="lineno">  143</span>        <span class="keywordflow">if</span> (<a class="code hl_variable" href="#a3993b8b7d2b7ba34b5659a465f7c86df">cur_alpha</a> &lt;= 0.0) {</div>
-<div class="line"><span class="lineno">  144</span>            <a class="code hl_variable" href="#ac08359d79f8fddb159d716f4993996a2">smooth_dual_sol</a> = pi_out;</div>
-<div class="line"><span class="lineno">  145</span>            <a class="code hl_variable" href="#af4daf812a8380b3b392978645e1ae30e">duals_sep</a>       = pi_out;</div>
-<div class="line"><span class="lineno">  146</span>            <span class="keywordflow">return</span> pi_out;</div>
-<div class="line"><span class="lineno">  147</span>        }</div>
-<div class="line"><span class="lineno">  148</span> </div>
-<div class="line"><span class="lineno">  149</span>        <span class="comment">// Non-directional smoothing:</span></div>
-<div class="line"><span class="lineno">  150</span>        <span class="comment">// pi_tilde = alpha * pi_in + (1-alpha) * pi_out</span></div>
-<div class="line"><span class="lineno">  151</span>        <span class="keyword">const</span> <span class="keywordtype">size_t</span> n = pi_out.size();</div>
-<div class="line"><span class="lineno">  152</span>        <a class="code hl_typedef" href="Definitions_8h.html#aca51606dd2572852638d855b039eaa63">DualSolution</a> pi_tilde(n);</div>
-<div class="line"><span class="lineno">  153</span>        <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> i = 0; i &lt; n; ++i) { pi_tilde[i] = <a class="code hl_variable" href="#a3993b8b7d2b7ba34b5659a465f7c86df">cur_alpha</a> * <a class="code hl_variable" href="#a28cf2ea457b84f4ea34e1720f6a35a2c">cur_stab_center</a>[i] + (1.0 - <a class="code hl_variable" href="#a3993b8b7d2b7ba34b5659a465f7c86df">cur_alpha</a>) * pi_out[i]; }</div>
-<div class="line"><span class="lineno">  154</span> </div>
-<div class="line"><span class="lineno">  155</span>        <span class="comment">// If directional components are unavailable, return pi_tilde projected</span></div>
-<div class="line"><span class="lineno">  156</span>        <span class="comment">// to the positive orthant.</span></div>
-<div class="line"><span class="lineno">  157</span>        <span class="keywordflow">if</span> (<a class="code hl_variable" href="#a20b515205f9eb12bfb49a9531e73975a">subgradient</a>.empty() || <a class="code hl_variable" href="#aac223020026998eef51a5cf0f12addd4">subgradient_norm</a> &lt;= <a class="code hl_variable" href="#ad8faa147c37bf4797c5d661b20e32ec0">EPSILON</a> || <a class="code hl_variable" href="#a8cf47e51d1046c0d1919ee71d024000d">beta</a> &lt;= 0.0) {</div>
-<div class="line"><span class="lineno">  158</span>            <span class="keywordflow">for</span> (<span class="keywordtype">double</span> &amp;v : pi_tilde) v = std::max(0.0, v);</div>
-<div class="line"><span class="lineno">  159</span>            <a class="code hl_variable" href="#ac08359d79f8fddb159d716f4993996a2">smooth_dual_sol</a> = pi_tilde;</div>
-<div class="line"><span class="lineno">  160</span>            <a class="code hl_variable" href="#af4daf812a8380b3b392978645e1ae30e">duals_sep</a>       = pi_tilde;</div>
-<div class="line"><span class="lineno">  161</span>            <span class="keywordflow">return</span> pi_tilde;</div>
-<div class="line"><span class="lineno">  162</span>        }</div>
-<div class="line"><span class="lineno">  163</span> </div>
-<div class="line"><span class="lineno">  164</span>        <span class="comment">// Directional smoothing (Table 2):</span></div>
-<div class="line"><span class="lineno">  165</span>        <span class="comment">// pi_g = pi_in + (g_in / ||g_in||) * ||pi_out - pi_in||</span></div>
-<div class="line"><span class="lineno">  166</span>        <span class="comment">// rho = beta*pi_g + (1-beta)*pi_out</span></div>
-<div class="line"><span class="lineno">  167</span>        <span class="comment">// pi_sep = (pi_in + ||pi_tilde-pi_in||/||rho-pi_in|| * (rho-pi_in))_+</span></div>
-<div class="line"><span class="lineno">  168</span>        <span class="keyword">const</span> <span class="keywordtype">double</span> norm_in_out = std::sqrt(std::inner_product(pi_out.begin(), pi_out.end(), <a class="code hl_variable" href="#a28cf2ea457b84f4ea34e1720f6a35a2c">cur_stab_center</a>.begin(),</div>
-<div class="line"><span class="lineno">  169</span>                                                                0.0, std::plus&lt;double&gt;(),</div>
-<div class="line"><span class="lineno">  170</span>                                                                [](<span class="keywordtype">double</span> a, <span class="keywordtype">double</span> b) {</div>
-<div class="line"><span class="lineno">  171</span>                                                                    const double d = a - b;</div>
-<div class="line"><span class="lineno">  172</span>                                                                    return d * d;</div>
-<div class="line"><span class="lineno">  173</span>                                                                }) +</div>
-<div class="line"><span class="lineno">  174</span>                                             <a class="code hl_variable" href="#ad8faa147c37bf4797c5d661b20e32ec0">EPSILON</a>);</div>
-<div class="line"><span class="lineno">  175</span> </div>
-<div class="line"><span class="lineno">  176</span>        <a class="code hl_typedef" href="Definitions_8h.html#aca51606dd2572852638d855b039eaa63">DualSolution</a> pi_g(n);</div>
-<div class="line"><span class="lineno">  177</span>        <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> i = 0; i &lt; n; ++i) {</div>
-<div class="line"><span class="lineno">  178</span>            pi_g[i] = <a class="code hl_variable" href="#a28cf2ea457b84f4ea34e1720f6a35a2c">cur_stab_center</a>[i] + (<a class="code hl_variable" href="#a20b515205f9eb12bfb49a9531e73975a">subgradient</a>[i] / <a class="code hl_variable" href="#aac223020026998eef51a5cf0f12addd4">subgradient_norm</a>) * norm_in_out;</div>
-<div class="line"><span class="lineno">  179</span>        }</div>
-<div class="line"><span class="lineno">  180</span> </div>
-<div class="line"><span class="lineno">  181</span>        <a class="code hl_typedef" href="Definitions_8h.html#aca51606dd2572852638d855b039eaa63">DualSolution</a> <a class="code hl_variable" href="#ad97cc92f5ee1a28620f5c8c001beef97">rho</a>(n);</div>
-<div class="line"><span class="lineno">  182</span>        <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> i = 0; i &lt; n; ++i) { <a class="code hl_variable" href="#ad97cc92f5ee1a28620f5c8c001beef97">rho</a>[i] = <a class="code hl_variable" href="#a8cf47e51d1046c0d1919ee71d024000d">beta</a> * pi_g[i] + (1.0 - <a class="code hl_variable" href="#a8cf47e51d1046c0d1919ee71d024000d">beta</a>) * pi_out[i]; }</div>
-<div class="line"><span class="lineno">  183</span> </div>
-<div class="line"><span class="lineno">  184</span>        <span class="keyword">const</span> <span class="keywordtype">double</span> norm_tilde_in = std::sqrt(std::inner_product(pi_tilde.begin(), pi_tilde.end(),</div>
-<div class="line"><span class="lineno">  185</span>                                                                  <a class="code hl_variable" href="#a28cf2ea457b84f4ea34e1720f6a35a2c">cur_stab_center</a>.begin(), 0.0, std::plus&lt;double&gt;(),</div>
-<div class="line"><span class="lineno">  186</span>                                                                  [](<span class="keywordtype">double</span> a, <span class="keywordtype">double</span> b) {</div>
-<div class="line"><span class="lineno">  187</span>                                                                      const double d = a - b;</div>
-<div class="line"><span class="lineno">  188</span>                                                                      return d * d;</div>
-<div class="line"><span class="lineno">  189</span>                                                                  }) +</div>
-<div class="line"><span class="lineno">  190</span>                                               <a class="code hl_variable" href="#ad8faa147c37bf4797c5d661b20e32ec0">EPSILON</a>);</div>
-<div class="line"><span class="lineno">  191</span>        <span class="keyword">const</span> <span class="keywordtype">double</span> norm_rho_in =</div>
-<div class="line"><span class="lineno">  192</span>            std::sqrt(std::inner_product(<a class="code hl_variable" href="#ad97cc92f5ee1a28620f5c8c001beef97">rho</a>.begin(), <a class="code hl_variable" href="#ad97cc92f5ee1a28620f5c8c001beef97">rho</a>.end(), <a class="code hl_variable" href="#a28cf2ea457b84f4ea34e1720f6a35a2c">cur_stab_center</a>.begin(), 0.0, std::plus&lt;double&gt;(),</div>
-<div class="line"><span class="lineno">  193</span>                                         [](<span class="keywordtype">double</span> a, <span class="keywordtype">double</span> b) {</div>
-<div class="line"><span class="lineno">  194</span>                                             const double d = a - b;</div>
-<div class="line"><span class="lineno">  195</span>                                             return d * d;</div>
-<div class="line"><span class="lineno">  196</span>                                         }) +</div>
-<div class="line"><span class="lineno">  197</span>                      <a class="code hl_variable" href="#ad8faa147c37bf4797c5d661b20e32ec0">EPSILON</a>);</div>
-<div class="line"><span class="lineno">  198</span> </div>
-<div class="line"><span class="lineno">  199</span>        <a class="code hl_typedef" href="Definitions_8h.html#aca51606dd2572852638d855b039eaa63">DualSolution</a> pi_sep(n);</div>
-<div class="line"><span class="lineno">  200</span>        <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> i = 0; i &lt; n; ++i) {</div>
-<div class="line"><span class="lineno">  201</span>            pi_sep[i] = <a class="code hl_variable" href="#a28cf2ea457b84f4ea34e1720f6a35a2c">cur_stab_center</a>[i] + (norm_tilde_in / norm_rho_in) * (<a class="code hl_variable" href="#ad97cc92f5ee1a28620f5c8c001beef97">rho</a>[i] - <a class="code hl_variable" href="#a28cf2ea457b84f4ea34e1720f6a35a2c">cur_stab_center</a>[i]);</div>
-<div class="line"><span class="lineno">  202</span>            pi_sep[i] = std::max(0.0, pi_sep[i]);</div>
-<div class="line"><span class="lineno">  203</span>        }</div>
-<div class="line"><span class="lineno">  204</span>        <a class="code hl_variable" href="#ac08359d79f8fddb159d716f4993996a2">smooth_dual_sol</a> = pi_sep;</div>
-<div class="line"><span class="lineno">  205</span>        <a class="code hl_variable" href="#af4daf812a8380b3b392978645e1ae30e">duals_sep</a>       = pi_sep;</div>
-<div class="line"><span class="lineno">  206</span>        <span class="keywordflow">return</span> pi_sep;</div>
-<div class="line"><span class="lineno">  207</span>    }</div>
-<div class="ttc" id="aDefinitions_8h_html_aca51606dd2572852638d855b039eaa63"><div class="ttname"><a href="Definitions_8h.html#aca51606dd2572852638d855b039eaa63">DualSolution</a></div><div class="ttdeci">std::vector&lt; double &gt; DualSolution</div><div class="ttdef"><b>Definition</b> <a href="Definitions_8h_source.html#l00357">Definitions.h:357</a></div></div>
+<p class="definition">Definition at line <a class="el" href="Stabilization_8h_source.html#l00178">178</a> of file <a class="el" href="Stabilization_8h_source.html">Stabilization.h</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  178</span>                                                                 {</div>
+<div class="line"><span class="lineno">  179</span>        <span class="keywordflow">if</span> (input_duals.empty()) { <span class="keywordflow">return</span> input_duals; }</div>
+<div class="line"><span class="lineno">  180</span>        <a class="code hl_function" href="#a54a5e75296eebd75701121415eb6c56b">align_with_master_duals</a>(input_duals);</div>
+<div class="line"><span class="lineno">  181</span>        <a class="code hl_typedef" href="Definitions_8h.html#aca51606dd2572852638d855b039eaa63">DualSolution</a> pi_out = input_duals;</div>
+<div class="line"><span class="lineno">  182</span>        <span class="keywordflow">if</span> (<a class="code hl_variable" href="#a28cf2ea457b84f4ea34e1720f6a35a2c">cur_stab_center</a>.empty()) { <span class="keywordflow">return</span> pi_out; }</div>
+<div class="line"><span class="lineno">  183</span>        <span class="keywordflow">if</span> (<a class="code hl_variable" href="#a3993b8b7d2b7ba34b5659a465f7c86df">cur_alpha</a> &lt;= 0.0) {</div>
+<div class="line"><span class="lineno">  184</span>            <a class="code hl_variable" href="#ac08359d79f8fddb159d716f4993996a2">smooth_dual_sol</a> = pi_out;</div>
+<div class="line"><span class="lineno">  185</span>            <a class="code hl_variable" href="#af4daf812a8380b3b392978645e1ae30e">duals_sep</a>       = pi_out;</div>
+<div class="line"><span class="lineno">  186</span>            <span class="keywordflow">return</span> pi_out;</div>
+<div class="line"><span class="lineno">  187</span>        }</div>
+<div class="line"><span class="lineno">  188</span> </div>
+<div class="line"><span class="lineno">  189</span>        <span class="comment">// Non-directional smoothing:</span></div>
+<div class="line"><span class="lineno">  190</span>        <span class="comment">// pi_tilde = alpha * pi_in + (1-alpha) * pi_out</span></div>
+<div class="line"><span class="lineno">  191</span>        <span class="keyword">const</span> <span class="keywordtype">size_t</span> n = pi_out.size();</div>
+<div class="line"><span class="lineno">  192</span>        <a class="code hl_typedef" href="Definitions_8h.html#aca51606dd2572852638d855b039eaa63">DualSolution</a> pi_tilde(n);</div>
+<div class="line"><span class="lineno">  193</span>        <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> i = 0; i &lt; n; ++i) { pi_tilde[i] = <a class="code hl_variable" href="#a3993b8b7d2b7ba34b5659a465f7c86df">cur_alpha</a> * <a class="code hl_variable" href="#a28cf2ea457b84f4ea34e1720f6a35a2c">cur_stab_center</a>[i] + (1.0 - <a class="code hl_variable" href="#a3993b8b7d2b7ba34b5659a465f7c86df">cur_alpha</a>) * pi_out[i]; }</div>
+<div class="line"><span class="lineno">  194</span> </div>
+<div class="line"><span class="lineno">  195</span>        <span class="comment">// If directional components are unavailable, return the convex</span></div>
+<div class="line"><span class="lineno">  196</span>        <span class="comment">// combination. Since both endpoints are dual-feasible, the combination</span></div>
+<div class="line"><span class="lineno">  197</span>        <span class="comment">// respects each row&#39;s dual domain.</span></div>
+<div class="line"><span class="lineno">  198</span>        <span class="keywordflow">if</span> (<a class="code hl_variable" href="#a20b515205f9eb12bfb49a9531e73975a">subgradient</a>.empty() || <a class="code hl_variable" href="#aac223020026998eef51a5cf0f12addd4">subgradient_norm</a> &lt;= <a class="code hl_variable" href="#ad8faa147c37bf4797c5d661b20e32ec0">EPSILON</a> || <a class="code hl_variable" href="#a8cf47e51d1046c0d1919ee71d024000d">beta</a> &lt;= 0.0) {</div>
+<div class="line"><span class="lineno">  199</span>            <a class="code hl_variable" href="#ac08359d79f8fddb159d716f4993996a2">smooth_dual_sol</a> = pi_tilde;</div>
+<div class="line"><span class="lineno">  200</span>            <a class="code hl_variable" href="#af4daf812a8380b3b392978645e1ae30e">duals_sep</a>       = pi_tilde;</div>
+<div class="line"><span class="lineno">  201</span>            <span class="keywordflow">return</span> pi_tilde;</div>
+<div class="line"><span class="lineno">  202</span>        }</div>
+<div class="line"><span class="lineno">  203</span> </div>
+<div class="line"><span class="lineno">  204</span>        <span class="comment">// Directional smoothing (Table 2):</span></div>
+<div class="line"><span class="lineno">  205</span>        <span class="comment">// pi_g = pi_in + (g_in / ||g_in||) * ||pi_out - pi_in||</span></div>
+<div class="line"><span class="lineno">  206</span>        <span class="comment">// rho = beta*pi_g + (1-beta)*pi_out</span></div>
+<div class="line"><span class="lineno">  207</span>        <span class="comment">// pi_sep = (pi_in + ||pi_tilde-pi_in||/||rho-pi_in|| * (rho-pi_in))_+</span></div>
+<div class="line"><span class="lineno">  208</span>        <span class="keyword">const</span> <span class="keywordtype">double</span> norm_in_out = std::sqrt(std::inner_product(pi_out.begin(), pi_out.end(), <a class="code hl_variable" href="#a28cf2ea457b84f4ea34e1720f6a35a2c">cur_stab_center</a>.begin(),</div>
+<div class="line"><span class="lineno">  209</span>                                                                0.0, std::plus&lt;double&gt;(),</div>
+<div class="line"><span class="lineno">  210</span>                                                                [](<span class="keywordtype">double</span> a, <span class="keywordtype">double</span> b) {</div>
+<div class="line"><span class="lineno">  211</span>                                                                    const double d = a - b;</div>
+<div class="line"><span class="lineno">  212</span>                                                                    return d * d;</div>
+<div class="line"><span class="lineno">  213</span>                                                                }) +</div>
+<div class="line"><span class="lineno">  214</span>                                             <a class="code hl_variable" href="#ad8faa147c37bf4797c5d661b20e32ec0">EPSILON</a>);</div>
+<div class="line"><span class="lineno">  215</span> </div>
+<div class="line"><span class="lineno">  216</span>        <a class="code hl_typedef" href="Definitions_8h.html#aca51606dd2572852638d855b039eaa63">DualSolution</a> pi_g(n);</div>
+<div class="line"><span class="lineno">  217</span>        <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> i = 0; i &lt; n; ++i) {</div>
+<div class="line"><span class="lineno">  218</span>            pi_g[i] = <a class="code hl_variable" href="#a28cf2ea457b84f4ea34e1720f6a35a2c">cur_stab_center</a>[i] + (<a class="code hl_variable" href="#a20b515205f9eb12bfb49a9531e73975a">subgradient</a>[i] / <a class="code hl_variable" href="#aac223020026998eef51a5cf0f12addd4">subgradient_norm</a>) * norm_in_out;</div>
+<div class="line"><span class="lineno">  219</span>        }</div>
+<div class="line"><span class="lineno">  220</span> </div>
+<div class="line"><span class="lineno">  221</span>        <a class="code hl_typedef" href="Definitions_8h.html#aca51606dd2572852638d855b039eaa63">DualSolution</a> <a class="code hl_variable" href="#ad97cc92f5ee1a28620f5c8c001beef97">rho</a>(n);</div>
+<div class="line"><span class="lineno">  222</span>        <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> i = 0; i &lt; n; ++i) { <a class="code hl_variable" href="#ad97cc92f5ee1a28620f5c8c001beef97">rho</a>[i] = <a class="code hl_variable" href="#a8cf47e51d1046c0d1919ee71d024000d">beta</a> * pi_g[i] + (1.0 - <a class="code hl_variable" href="#a8cf47e51d1046c0d1919ee71d024000d">beta</a>) * pi_out[i]; }</div>
+<div class="line"><span class="lineno">  223</span> </div>
+<div class="line"><span class="lineno">  224</span>        <span class="keyword">const</span> <span class="keywordtype">double</span> norm_tilde_in = std::sqrt(std::inner_product(pi_tilde.begin(), pi_tilde.end(),</div>
+<div class="line"><span class="lineno">  225</span>                                                                  <a class="code hl_variable" href="#a28cf2ea457b84f4ea34e1720f6a35a2c">cur_stab_center</a>.begin(), 0.0, std::plus&lt;double&gt;(),</div>
+<div class="line"><span class="lineno">  226</span>                                                                  [](<span class="keywordtype">double</span> a, <span class="keywordtype">double</span> b) {</div>
+<div class="line"><span class="lineno">  227</span>                                                                      const double d = a - b;</div>
+<div class="line"><span class="lineno">  228</span>                                                                      return d * d;</div>
+<div class="line"><span class="lineno">  229</span>                                                                  }) +</div>
+<div class="line"><span class="lineno">  230</span>                                               <a class="code hl_variable" href="#ad8faa147c37bf4797c5d661b20e32ec0">EPSILON</a>);</div>
+<div class="line"><span class="lineno">  231</span>        <span class="keyword">const</span> <span class="keywordtype">double</span> norm_rho_in =</div>
+<div class="line"><span class="lineno">  232</span>            std::sqrt(std::inner_product(<a class="code hl_variable" href="#ad97cc92f5ee1a28620f5c8c001beef97">rho</a>.begin(), <a class="code hl_variable" href="#ad97cc92f5ee1a28620f5c8c001beef97">rho</a>.end(), <a class="code hl_variable" href="#a28cf2ea457b84f4ea34e1720f6a35a2c">cur_stab_center</a>.begin(), 0.0, std::plus&lt;double&gt;(),</div>
+<div class="line"><span class="lineno">  233</span>                                         [](<span class="keywordtype">double</span> a, <span class="keywordtype">double</span> b) {</div>
+<div class="line"><span class="lineno">  234</span>                                             const double d = a - b;</div>
+<div class="line"><span class="lineno">  235</span>                                             return d * d;</div>
+<div class="line"><span class="lineno">  236</span>                                         }) +</div>
+<div class="line"><span class="lineno">  237</span>                      <a class="code hl_variable" href="#ad8faa147c37bf4797c5d661b20e32ec0">EPSILON</a>);</div>
+<div class="line"><span class="lineno">  238</span> </div>
+<div class="line"><span class="lineno">  239</span>        <a class="code hl_typedef" href="Definitions_8h.html#aca51606dd2572852638d855b039eaa63">DualSolution</a> pi_sep(n);</div>
+<div class="line"><span class="lineno">  240</span>        <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> i = 0; i &lt; n; ++i) {</div>
+<div class="line"><span class="lineno">  241</span>            pi_sep[i] = <a class="code hl_variable" href="#a28cf2ea457b84f4ea34e1720f6a35a2c">cur_stab_center</a>[i] + (norm_tilde_in / norm_rho_in) * (<a class="code hl_variable" href="#ad97cc92f5ee1a28620f5c8c001beef97">rho</a>[i] - <a class="code hl_variable" href="#a28cf2ea457b84f4ea34e1720f6a35a2c">cur_stab_center</a>[i]);</div>
+<div class="line"><span class="lineno">  242</span>        }</div>
+<div class="line"><span class="lineno">  243</span>        <a class="code hl_function" href="#af7a7486e7ceeb36e10cfafbc476847f9">project_onto_dual_domain</a>(pi_sep);</div>
+<div class="line"><span class="lineno">  244</span>        <a class="code hl_variable" href="#ac08359d79f8fddb159d716f4993996a2">smooth_dual_sol</a> = pi_sep;</div>
+<div class="line"><span class="lineno">  245</span>        <a class="code hl_variable" href="#af4daf812a8380b3b392978645e1ae30e">duals_sep</a>       = pi_sep;</div>
+<div class="line"><span class="lineno">  246</span>        <span class="keywordflow">return</span> pi_sep;</div>
+<div class="line"><span class="lineno">  247</span>    }</div>
 <div class="ttc" id="aclassStabilization_html_ad97cc92f5ee1a28620f5c8c001beef97"><div class="ttname"><a href="#ad97cc92f5ee1a28620f5c8c001beef97">Stabilization::rho</a></div><div class="ttdeci">DualSolution rho</div><div class="ttdef"><b>Definition</b> <a href="Stabilization_8h_source.html#l00063">Stabilization.h:63</a></div></div>
-</div><!-- fragment -->
+<div class="ttc" id="aclassStabilization_html_af7a7486e7ceeb36e10cfafbc476847f9"><div class="ttname"><a href="#af7a7486e7ceeb36e10cfafbc476847f9">Stabilization::project_onto_dual_domain</a></div><div class="ttdeci">void project_onto_dual_domain(DualSolution &amp;duals) const</div><div class="ttdef"><b>Definition</b> <a href="Stabilization_8h_source.html#l00108">Stabilization.h:108</a></div></div>
+</div><!-- fragment --><div class="dynheader">
+Here is the call graph for this function:</div>
+<div class="dyncontent">
+<div class="center"><img src="classStabilization_ac7a5e61a4b3848aef27935e66e735675_cgraph.png" border="0" usemap="#aclassStabilization_ac7a5e61a4b3848aef27935e66e735675_cgraph" loading="lazy" alt=""/></div>
+<map name="aclassStabilization_ac7a5e61a4b3848aef27935e66e735675_cgraph" id="aclassStabilization_ac7a5e61a4b3848aef27935e66e735675_cgraph">
+<area shape="rect" title=" " alt="" coords="5,46,193,72"/>
+<area shape="rect" href="classStabilization.html#a54a5e75296eebd75701121415eb6c56b" title=" " alt="" coords="241,5,378,46"/>
+<area shape="poly" title=" " alt="" coords="184,43,225,36,226,42,185,48"/>
+<area shape="rect" href="classStabilization.html#af7a7486e7ceeb36e10cfafbc476847f9" title=" " alt="" coords="241,71,378,111"/>
+<area shape="poly" title=" " alt="" coords="188,70,226,76,225,81,187,75"/>
+</map>
+</div>
+
 </div>
 </div>
 <a id="a2300861788cd4d88a8701cd84d80dfd2" name="a2300861788cd4d88a8701cd84d80dfd2"></a>
@@ -611,24 +689,28 @@ Here is the call graph for this function:</div>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="Stabilization_8h_source.html#l00221">221</a> of file <a class="el" href="Stabilization_8h_source.html">Stabilization.h</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  221</span>{ <span class="keywordflow">return</span> <a class="code hl_function" href="#ac7a5e61a4b3848aef27935e66e735675">getStabDualSol</a>(input_duals); }</div>
-<div class="ttc" id="aclassStabilization_html_ac7a5e61a4b3848aef27935e66e735675"><div class="ttname"><a href="#ac7a5e61a4b3848aef27935e66e735675">Stabilization::getStabDualSol</a></div><div class="ttdeci">DualSolution getStabDualSol(const DualSolution &amp;input_duals)</div><div class="ttdef"><b>Definition</b> <a href="Stabilization_8h_source.html#l00138">Stabilization.h:138</a></div></div>
+<p class="definition">Definition at line <a class="el" href="Stabilization_8h_source.html#l00264">264</a> of file <a class="el" href="Stabilization_8h_source.html">Stabilization.h</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  264</span>{ <span class="keywordflow">return</span> <a class="code hl_function" href="#ac7a5e61a4b3848aef27935e66e735675">getStabDualSol</a>(input_duals); }</div>
+<div class="ttc" id="aclassStabilization_html_ac7a5e61a4b3848aef27935e66e735675"><div class="ttname"><a href="#ac7a5e61a4b3848aef27935e66e735675">Stabilization::getStabDualSol</a></div><div class="ttdeci">DualSolution getStabDualSol(const DualSolution &amp;input_duals)</div><div class="ttdef"><b>Definition</b> <a href="Stabilization_8h_source.html#l00178">Stabilization.h:178</a></div></div>
 </div><!-- fragment --><div class="dynheader">
 Here is the call graph for this function:</div>
 <div class="dyncontent">
 <div class="center"><img src="classStabilization_a2300861788cd4d88a8701cd84d80dfd2_cgraph.png" border="0" usemap="#aclassStabilization_a2300861788cd4d88a8701cd84d80dfd2_cgraph" loading="lazy" alt=""/></div>
 <map name="aclassStabilization_a2300861788cd4d88a8701cd84d80dfd2_cgraph" id="aclassStabilization_a2300861788cd4d88a8701cd84d80dfd2_cgraph">
-<area shape="rect" title=" " alt="" coords="5,5,174,46"/>
-<area shape="rect" href="classStabilization.html#ac7a5e61a4b3848aef27935e66e735675" title=" " alt="" coords="222,13,409,38"/>
-<area shape="poly" title=" " alt="" coords="174,23,206,23,206,28,174,28"/>
+<area shape="rect" title=" " alt="" coords="5,39,174,79"/>
+<area shape="rect" href="classStabilization.html#ac7a5e61a4b3848aef27935e66e735675" title=" " alt="" coords="222,46,409,72"/>
+<area shape="poly" title=" " alt="" coords="174,56,206,56,206,62,174,62"/>
+<area shape="rect" href="classStabilization.html#a54a5e75296eebd75701121415eb6c56b" title=" " alt="" coords="457,5,594,46"/>
+<area shape="poly" title=" " alt="" coords="400,43,441,36,442,42,401,48"/>
+<area shape="rect" href="classStabilization.html#af7a7486e7ceeb36e10cfafbc476847f9" title=" " alt="" coords="458,71,594,111"/>
+<area shape="poly" title=" " alt="" coords="405,70,443,76,442,81,404,75"/>
 </map>
 </div>
 
 </div>
 </div>
-<a id="a4f4e3b43fbae641f421179c3519a7ff7" name="a4f4e3b43fbae641f421179c3519a7ff7"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#a4f4e3b43fbae641f421179c3519a7ff7">&#9670;&#160;</a></span>norm() <span class="overload">[1/2]</span></h2>
+<a id="ada181c63fda918fc904a9d864595ed97" name="ada181c63fda918fc904a9d864595ed97"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#ada181c63fda918fc904a9d864595ed97">&#9670;&#160;</a></span>norm() <span class="overload">[1/2]</span></h2>
 
 <div class="memitem">
 <div class="memproto">
@@ -640,7 +722,7 @@ Here is the call graph for this function:</div>
           <td class="memname">double Stabilization::norm </td>
           <td>(</td>
           <td class="paramtype">const std::vector&lt; double &gt; &amp;</td>          <td class="paramname"><span class="paramname"><em>vector</em></span></td><td>)</td>
-          <td></td>
+          <td> const</td>
         </tr>
       </table>
   </td>
@@ -650,17 +732,15 @@ Here is the call graph for this function:</div>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="Stabilization_8h_source.html#l00209">209</a> of file <a class="el" href="Stabilization_8h_source.html">Stabilization.h</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  209</span>                                                        {</div>
-<div class="line"><span class="lineno">  210</span>        <span class="keywordtype">double</span> res = 0;</div>
-<div class="line"><span class="lineno">  211</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> i = 0; i &lt; vector.size(); ++i) { res += vector[i] * vector[i]; }</div>
-<div class="line"><span class="lineno">  212</span>        <span class="keywordflow">return</span> std::sqrt(res + 1e-6);</div>
-<div class="line"><span class="lineno">  213</span>    }</div>
+<p class="definition">Definition at line <a class="el" href="Stabilization_8h_source.html#l00249">249</a> of file <a class="el" href="Stabilization_8h_source.html">Stabilization.h</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  249</span>                                                              {</div>
+<div class="line"><span class="lineno">  250</span>        <span class="keywordflow">return</span> std::sqrt(std::inner_product(vector.begin(), vector.end(), vector.begin(), 0.0));</div>
+<div class="line"><span class="lineno">  251</span>    }</div>
 </div><!-- fragment -->
 </div>
 </div>
-<a id="a1b375b131cac6b1a5978f725a6fcab27" name="a1b375b131cac6b1a5978f725a6fcab27"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#a1b375b131cac6b1a5978f725a6fcab27">&#9670;&#160;</a></span>norm() <span class="overload">[2/2]</span></h2>
+<a id="a1e9bd56fcded3169cbeef764d38f31a9" name="a1e9bd56fcded3169cbeef764d38f31a9"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a1e9bd56fcded3169cbeef764d38f31a9">&#9670;&#160;</a></span>norm() <span class="overload">[2/2]</span></h2>
 
 <div class="memitem">
 <div class="memproto">
@@ -676,7 +756,7 @@ Here is the call graph for this function:</div>
         <tr>
           <td class="paramkey"></td>
           <td></td>
-          <td class="paramtype">const std::vector&lt; double &gt; &amp;</td>          <td class="paramname"><span class="paramname"><em>vector_2</em></span>&#160;)</td>
+          <td class="paramtype">const std::vector&lt; double &gt; &amp;</td>          <td class="paramname"><span class="paramname"><em>vector_2</em></span>&#160;) const</td>
         </tr>
       </table>
   </td>
@@ -686,12 +766,58 @@ Here is the call graph for this function:</div>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="Stabilization_8h_source.html#l00215">215</a> of file <a class="el" href="Stabilization_8h_source.html">Stabilization.h</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  215</span>                                                                                             {</div>
-<div class="line"><span class="lineno">  216</span>        <span class="keywordtype">double</span> res = 0.0;</div>
-<div class="line"><span class="lineno">  217</span>        <span class="keywordflow">for</span> (<span class="keyword">auto</span> i = 0; i &lt; vector_1.size(); ++i) { res += (vector_2[i] - vector_1[i]) * (vector_2[i] - vector_1[i]); }</div>
-<div class="line"><span class="lineno">  218</span>        <span class="keywordflow">return</span> std::sqrt(res + 1e-8);</div>
-<div class="line"><span class="lineno">  219</span>    }</div>
+<p class="definition">Definition at line <a class="el" href="Stabilization_8h_source.html#l00253">253</a> of file <a class="el" href="Stabilization_8h_source.html">Stabilization.h</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  253</span>                                                                                                   {</div>
+<div class="line"><span class="lineno">  254</span>        <span class="keywordflow">if</span> (vector_1.size() != vector_2.size()) {</div>
+<div class="line"><span class="lineno">  255</span>            <span class="keywordflow">throw</span> std::invalid_argument(<span class="stringliteral">&quot;Cannot compute a norm for vectors with different dimensions&quot;</span>);</div>
+<div class="line"><span class="lineno">  256</span>        }</div>
+<div class="line"><span class="lineno">  257</span>        <span class="keywordflow">return</span> std::sqrt(std::inner_product(vector_1.begin(), vector_1.end(), vector_2.begin(), 0.0,</div>
+<div class="line"><span class="lineno">  258</span>                                            std::plus&lt;double&gt;(), [](<span class="keywordtype">double</span> a, <span class="keywordtype">double</span> b) {</div>
+<div class="line"><span class="lineno">  259</span>                                                const double difference = a - b;</div>
+<div class="line"><span class="lineno">  260</span>                                                return difference * difference;</div>
+<div class="line"><span class="lineno">  261</span>                                            }));</div>
+<div class="line"><span class="lineno">  262</span>    }</div>
+</div><!-- fragment -->
+</div>
+</div>
+<a id="af7a7486e7ceeb36e10cfafbc476847f9" name="af7a7486e7ceeb36e10cfafbc476847f9"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#af7a7486e7ceeb36e10cfafbc476847f9">&#9670;&#160;</a></span>project_onto_dual_domain()</h2>
+
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">void Stabilization::project_onto_dual_domain </td>
+          <td>(</td>
+          <td class="paramtype"><a class="el" href="Definitions_8h.html#aca51606dd2572852638d855b039eaa63">DualSolution</a> &amp;</td>          <td class="paramname"><span class="paramname"><em>duals</em></span></td><td>)</td>
+          <td> const</td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel inline">inline</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+<p class="definition">Definition at line <a class="el" href="Stabilization_8h_source.html#l00108">108</a> of file <a class="el" href="Stabilization_8h_source.html">Stabilization.h</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  108</span>                                                             {</div>
+<div class="line"><span class="lineno">  109</span>        <span class="keyword">const</span> std::size_t count = std::min(duals.size(), <a class="code hl_variable" href="#a67928d3781b7c17f8376f56a19d8639c">constraint_senses</a>.size());</div>
+<div class="line"><span class="lineno">  110</span>        <span class="keywordflow">for</span> (std::size_t i = 0; i &lt; count; ++i) {</div>
+<div class="line"><span class="lineno">  111</span>            <span class="comment">// BALDES solves a minimization master. Its &#39;&lt;&#39; row duals are</span></div>
+<div class="line"><span class="lineno">  112</span>            <span class="comment">// non-positive, &#39;&gt;&#39; row duals are non-negative, and equality-row</span></div>
+<div class="line"><span class="lineno">  113</span>            <span class="comment">// duals are unrestricted.</span></div>
+<div class="line"><span class="lineno">  114</span>            <span class="keywordflow">if</span> (<a class="code hl_variable" href="#a67928d3781b7c17f8376f56a19d8639c">constraint_senses</a>[i] == <span class="charliteral">&#39;&lt;&#39;</span>) {</div>
+<div class="line"><span class="lineno">  115</span>                duals[i] = std::min(0.0, duals[i]);</div>
+<div class="line"><span class="lineno">  116</span>            } <span class="keywordflow">else</span> <span class="keywordflow">if</span> (<a class="code hl_variable" href="#a67928d3781b7c17f8376f56a19d8639c">constraint_senses</a>[i] == <span class="charliteral">&#39;&gt;&#39;</span>) {</div>
+<div class="line"><span class="lineno">  117</span>                duals[i] = std::max(0.0, duals[i]);</div>
+<div class="line"><span class="lineno">  118</span>            }</div>
+<div class="line"><span class="lineno">  119</span>        }</div>
+<div class="line"><span class="lineno">  120</span>    }</div>
+<div class="ttc" id="aclassStabilization_html_a67928d3781b7c17f8376f56a19d8639c"><div class="ttname"><a href="#a67928d3781b7c17f8376f56a19d8639c">Stabilization::constraint_senses</a></div><div class="ttdeci">std::vector&lt; char &gt; constraint_senses</div><div class="ttdef"><b>Definition</b> <a href="Stabilization_8h_source.html#l00082">Stabilization.h:82</a></div></div>
 </div><!-- fragment -->
 </div>
 </div>
@@ -718,8 +844,8 @@ Here is the call graph for this function:</div>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="Stabilization_8h_source.html#l00114">114</a> of file <a class="el" href="Stabilization_8h_source.html">Stabilization.h</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  114</span>{ <a class="code hl_variable" href="#ab23b31507672a0feedce2d90bd612dc4">nb_misprices</a> = 0; }</div>
+<p class="definition">Definition at line <a class="el" href="Stabilization_8h_source.html#l00154">154</a> of file <a class="el" href="Stabilization_8h_source.html">Stabilization.h</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  154</span>{ <a class="code hl_variable" href="#ab23b31507672a0feedce2d90bd612dc4">nb_misprices</a> = 0; }</div>
 </div><!-- fragment -->
 </div>
 </div>
@@ -746,8 +872,8 @@ Here is the call graph for this function:</div>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="Stabilization_8h_source.html#l00313">313</a> of file <a class="el" href="Stabilization_8h_source.html">Stabilization.h</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  313</span>{ <a class="code hl_variable" href="#a7147f5ffb0ab16dd5f303235f6ea811b">pseudo_dual_bound</a> = bound; }</div>
+<p class="definition">Definition at line <a class="el" href="Stabilization_8h_source.html#l00338">338</a> of file <a class="el" href="Stabilization_8h_source.html">Stabilization.h</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  338</span>{ <a class="code hl_variable" href="#a7147f5ffb0ab16dd5f303235f6ea811b">pseudo_dual_bound</a> = bound; }</div>
 </div><!-- fragment -->
 </div>
 </div>
@@ -774,13 +900,13 @@ Here is the call graph for this function:</div>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="Stabilization_8h_source.html#l00317">317</a> of file <a class="el" href="Stabilization_8h_source.html">Stabilization.h</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  317</span>{ <a class="code hl_variable" href="#af93150015a05267d69ef00636f9b66dc">lp_obj</a> = obj; }</div>
+<p class="definition">Definition at line <a class="el" href="Stabilization_8h_source.html#l00342">342</a> of file <a class="el" href="Stabilization_8h_source.html">Stabilization.h</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  342</span>{ <a class="code hl_variable" href="#af93150015a05267d69ef00636f9b66dc">lp_obj</a> = obj; }</div>
 </div><!-- fragment -->
 </div>
 </div>
-<a id="a608ef16db00c1697748fa3bf8f9d0720" name="a608ef16db00c1697748fa3bf8f9d0720"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#a608ef16db00c1697748fa3bf8f9d0720">&#9670;&#160;</a></span>shouldExit()</h2>
+<a id="a3fdc59d8c5f1f63d130184dc2e1b4e9c" name="a3fdc59d8c5f1f63d130184dc2e1b4e9c"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a3fdc59d8c5f1f63d130184dc2e1b4e9c">&#9670;&#160;</a></span>shouldExit()</h2>
 
 <div class="memitem">
 <div class="memproto">
@@ -792,7 +918,7 @@ Here is the call graph for this function:</div>
           <td class="memname">bool Stabilization::shouldExit </td>
           <td>(</td>
           <td class="paramname"><span class="paramname"><em></em></span></td><td>)</td>
-          <td></td>
+          <td> const</td>
         </tr>
       </table>
   </td>
@@ -802,8 +928,8 @@ Here is the call graph for this function:</div>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="Stabilization_8h_source.html#l00381">381</a> of file <a class="el" href="Stabilization_8h_source.html">Stabilization.h</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  381</span>{ <span class="keywordflow">return</span> <a class="code hl_variable" href="#a3993b8b7d2b7ba34b5659a465f7c86df">cur_alpha</a> &lt; 1e-3; }</div>
+<p class="definition">Definition at line <a class="el" href="Stabilization_8h_source.html#l00413">413</a> of file <a class="el" href="Stabilization_8h_source.html">Stabilization.h</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  413</span>{ <span class="keywordflow">return</span> <a class="code hl_variable" href="#a3993b8b7d2b7ba34b5659a465f7c86df">cur_alpha</a> &lt; <a class="code hl_variable" href="#abe3467c9f0c1ce54ffb9d30690d50db3">kAlphaEps</a>; }</div>
 </div><!-- fragment -->
 </div>
 </div>
@@ -830,14 +956,14 @@ Here is the call graph for this function:</div>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="Stabilization_8h_source.html#l00094">94</a> of file <a class="el" href="Stabilization_8h_source.html">Stabilization.h</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">   94</span>                                                                         {</div>
-<div class="line"><span class="lineno">   95</span>        <span class="keywordflow">if</span> (!new_center.empty() &amp;&amp; <a class="code hl_variable" href="#a28cf2ea457b84f4ea34e1720f6a35a2c">cur_stab_center</a>.empty()) { <a class="code hl_variable" href="#a28cf2ea457b84f4ea34e1720f6a35a2c">cur_stab_center</a> = new_center; }</div>
-<div class="line"><span class="lineno">   96</span>        <span class="keywordflow">if</span> (!<a class="code hl_variable" href="#a3144df7de441b23be16c038a702da485">stab_center_for_next_iteration</a>.empty()) {</div>
-<div class="line"><span class="lineno">   97</span>            <a class="code hl_variable" href="#a28cf2ea457b84f4ea34e1720f6a35a2c">cur_stab_center</a> = <a class="code hl_variable" href="#a3144df7de441b23be16c038a702da485">stab_center_for_next_iteration</a>;</div>
-<div class="line"><span class="lineno">   98</span>            <a class="code hl_variable" href="#a3144df7de441b23be16c038a702da485">stab_center_for_next_iteration</a>.clear();</div>
-<div class="line"><span class="lineno">   99</span>        }</div>
-<div class="line"><span class="lineno">  100</span>    }</div>
+<p class="definition">Definition at line <a class="el" href="Stabilization_8h_source.html#l00131">131</a> of file <a class="el" href="Stabilization_8h_source.html">Stabilization.h</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  131</span>                                                                         {</div>
+<div class="line"><span class="lineno">  132</span>        <span class="keywordflow">if</span> (!new_center.empty() &amp;&amp; <a class="code hl_variable" href="#a28cf2ea457b84f4ea34e1720f6a35a2c">cur_stab_center</a>.empty()) { <a class="code hl_variable" href="#a28cf2ea457b84f4ea34e1720f6a35a2c">cur_stab_center</a> = new_center; }</div>
+<div class="line"><span class="lineno">  133</span>        <span class="keywordflow">if</span> (!<a class="code hl_variable" href="#a3144df7de441b23be16c038a702da485">stab_center_for_next_iteration</a>.empty()) {</div>
+<div class="line"><span class="lineno">  134</span>            <a class="code hl_variable" href="#a28cf2ea457b84f4ea34e1720f6a35a2c">cur_stab_center</a> = <a class="code hl_variable" href="#a3144df7de441b23be16c038a702da485">stab_center_for_next_iteration</a>;</div>
+<div class="line"><span class="lineno">  135</span>            <a class="code hl_variable" href="#a3144df7de441b23be16c038a702da485">stab_center_for_next_iteration</a>.clear();</div>
+<div class="line"><span class="lineno">  136</span>        }</div>
+<div class="line"><span class="lineno">  137</span>    }</div>
 <div class="ttc" id="aclassStabilization_html_a3144df7de441b23be16c038a702da485"><div class="ttname"><a href="#a3144df7de441b23be16c038a702da485">Stabilization::stab_center_for_next_iteration</a></div><div class="ttdeci">DualSolution stab_center_for_next_iteration</div><div class="ttdef"><b>Definition</b> <a href="Stabilization_8h_source.html#l00048">Stabilization.h:48</a></div></div>
 </div><!-- fragment -->
 </div>
@@ -865,19 +991,32 @@ Here is the call graph for this function:</div>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="Stabilization_8h_source.html#l00102">102</a> of file <a class="el" href="Stabilization_8h_source.html">Stabilization.h</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  102</span>                                                                                 {</div>
-<div class="line"><span class="lineno">  103</span>        <a class="code hl_variable" href="#ab23b31507672a0feedce2d90bd612dc4">nb_misprices</a> = 0;</div>
-<div class="line"><span class="lineno">  104</span>        <a class="code hl_variable" href="#a3993b8b7d2b7ba34b5659a465f7c86df">cur_alpha</a>    = std::clamp(<a class="code hl_variable" href="#a7a1b5fb5e2d0384d017ba645a930c691">base_alpha</a>, <a class="code hl_variable" href="#aa21016ba00cd2e21cafe08e8819975e9">kAlphaMin</a>, <a class="code hl_variable" href="#a62ad0e0266e4b86a5b330578da8131f2">kAlphaMax</a>);</div>
-<div class="line"><span class="lineno">  105</span> </div>
-<div class="line"><span class="lineno">  106</span>        <span class="keywordflow">if</span> (<a class="code hl_variable" href="#a28cf2ea457b84f4ea34e1720f6a35a2c">cur_stab_center</a>.empty()) {</div>
-<div class="line"><span class="lineno">  107</span>            <a class="code hl_variable" href="#a28cf2ea457b84f4ea34e1720f6a35a2c">cur_stab_center</a> = new_center;</div>
-<div class="line"><span class="lineno">  108</span>            <a class="code hl_variable" href="#ac08359d79f8fddb159d716f4993996a2">smooth_dual_sol</a> = new_center;</div>
-<div class="line"><span class="lineno">  109</span>            <span class="keywordflow">return</span> <span class="keyword">false</span>;</div>
-<div class="line"><span class="lineno">  110</span>        }</div>
-<div class="line"><span class="lineno">  111</span>        <span class="keywordflow">return</span> <a class="code hl_variable" href="#a3993b8b7d2b7ba34b5659a465f7c86df">cur_alpha</a> &gt; 0;</div>
-<div class="line"><span class="lineno">  112</span>    }</div>
-</div><!-- fragment -->
+<p class="definition">Definition at line <a class="el" href="Stabilization_8h_source.html#l00139">139</a> of file <a class="el" href="Stabilization_8h_source.html">Stabilization.h</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  139</span>                                                                                 {</div>
+<div class="line"><span class="lineno">  140</span>        <a class="code hl_variable" href="#ab23b31507672a0feedce2d90bd612dc4">nb_misprices</a> = 0;</div>
+<div class="line"><span class="lineno">  141</span>        <a class="code hl_variable" href="#a3993b8b7d2b7ba34b5659a465f7c86df">cur_alpha</a>    = std::clamp(<a class="code hl_variable" href="#a7a1b5fb5e2d0384d017ba645a930c691">base_alpha</a>, <a class="code hl_variable" href="#aa21016ba00cd2e21cafe08e8819975e9">kAlphaMin</a>, <a class="code hl_variable" href="#a62ad0e0266e4b86a5b330578da8131f2">kAlphaMax</a>);</div>
+<div class="line"><span class="lineno">  142</span>        <a class="code hl_variable" href="#aec3c3704ce91da277ffde90c631dbde6">alpha</a>        = <a class="code hl_variable" href="#a3993b8b7d2b7ba34b5659a465f7c86df">cur_alpha</a>;</div>
+<div class="line"><span class="lineno">  143</span> </div>
+<div class="line"><span class="lineno">  144</span>        <span class="keywordflow">if</span> (<a class="code hl_variable" href="#a28cf2ea457b84f4ea34e1720f6a35a2c">cur_stab_center</a>.empty()) {</div>
+<div class="line"><span class="lineno">  145</span>            <a class="code hl_variable" href="#a28cf2ea457b84f4ea34e1720f6a35a2c">cur_stab_center</a> = new_center;</div>
+<div class="line"><span class="lineno">  146</span>            <a class="code hl_variable" href="#ac08359d79f8fddb159d716f4993996a2">smooth_dual_sol</a> = new_center;</div>
+<div class="line"><span class="lineno">  147</span>            <a class="code hl_variable" href="#a010068e0a9fe16c1c76567324ba02f6e">sizeDual</a>        = <span class="keyword">static_cast&lt;</span><span class="keywordtype">int</span><span class="keyword">&gt;</span>(new_center.size());</div>
+<div class="line"><span class="lineno">  148</span>            <span class="keywordflow">return</span> <span class="keyword">false</span>;</div>
+<div class="line"><span class="lineno">  149</span>        }</div>
+<div class="line"><span class="lineno">  150</span>        <a class="code hl_function" href="#a54a5e75296eebd75701121415eb6c56b">align_with_master_duals</a>(new_center);</div>
+<div class="line"><span class="lineno">  151</span>        <span class="keywordflow">return</span> <a class="code hl_variable" href="#a3993b8b7d2b7ba34b5659a465f7c86df">cur_alpha</a> &gt; 0;</div>
+<div class="line"><span class="lineno">  152</span>    }</div>
+</div><!-- fragment --><div class="dynheader">
+Here is the call graph for this function:</div>
+<div class="dyncontent">
+<div class="center"><img src="classStabilization_a07b8f88bf6c2f507a936b5b98f8732ac_cgraph.png" border="0" usemap="#aclassStabilization_a07b8f88bf6c2f507a936b5b98f8732ac_cgraph" loading="lazy" alt=""/></div>
+<map name="aclassStabilization_a07b8f88bf6c2f507a936b5b98f8732ac_cgraph" id="aclassStabilization_a07b8f88bf6c2f507a936b5b98f8732ac_cgraph">
+<area shape="rect" title=" " alt="" coords="5,5,142,61"/>
+<area shape="rect" href="classStabilization.html#a54a5e75296eebd75701121415eb6c56b" title=" " alt="" coords="190,13,327,54"/>
+<area shape="poly" title=" " alt="" coords="142,30,174,30,174,36,142,36"/>
+</map>
+</div>
+
 </div>
 </div>
 <a id="aeefeb07a3c590e646333b8fdf7529b76" name="aeefeb07a3c590e646333b8fdf7529b76"></a>
@@ -903,16 +1042,16 @@ Here is the call graph for this function:</div>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="Stabilization_8h_source.html#l00085">85</a> of file <a class="el" href="Stabilization_8h_source.html">Stabilization.h</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">   85</span>                                               {</div>
-<div class="line"><span class="lineno">   86</span>        <a class="code hl_variable" href="#ab23b31507672a0feedce2d90bd612dc4">nb_misprices</a>++;</div>
-<div class="line"><span class="lineno">   87</span>        <a class="code hl_variable" href="#a3993b8b7d2b7ba34b5659a465f7c86df">cur_alpha</a> = <a class="code hl_function" href="#a6131d15a5672f8a40fbfb9ac8195d2f4">_misprice_schedule</a>(<a class="code hl_variable" href="#ab23b31507672a0feedce2d90bd612dc4">nb_misprices</a>, <a class="code hl_variable" href="#a7a1b5fb5e2d0384d017ba645a930c691">base_alpha</a>);</div>
-<div class="line"><span class="lineno">   88</span>        <a class="code hl_variable" href="#aec3c3704ce91da277ffde90c631dbde6">alpha</a>     = <a class="code hl_variable" href="#a3993b8b7d2b7ba34b5659a465f7c86df">cur_alpha</a>;</div>
-<div class="line"><span class="lineno">   89</span>        <span class="comment">// As proposed in the paper for mis-pricing sequences, disable</span></div>
-<div class="line"><span class="lineno">   90</span>        <span class="comment">// directional smoothing after a misprice.</span></div>
-<div class="line"><span class="lineno">   91</span>        <a class="code hl_variable" href="#a8cf47e51d1046c0d1919ee71d024000d">beta</a> = 0.0;</div>
-<div class="line"><span class="lineno">   92</span>    }</div>
-<div class="ttc" id="aclassStabilization_html_a6131d15a5672f8a40fbfb9ac8195d2f4"><div class="ttname"><a href="#a6131d15a5672f8a40fbfb9ac8195d2f4">Stabilization::_misprice_schedule</a></div><div class="ttdeci">double _misprice_schedule(int nb_misprices, double base_alpha)</div><div class="ttdef"><b>Definition</b> <a href="Stabilization_8h_source.html#l00116">Stabilization.h:116</a></div></div>
+<p class="definition">Definition at line <a class="el" href="Stabilization_8h_source.html#l00122">122</a> of file <a class="el" href="Stabilization_8h_source.html">Stabilization.h</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  122</span>                                               {</div>
+<div class="line"><span class="lineno">  123</span>        <a class="code hl_variable" href="#ab23b31507672a0feedce2d90bd612dc4">nb_misprices</a>++;</div>
+<div class="line"><span class="lineno">  124</span>        <a class="code hl_variable" href="#a3993b8b7d2b7ba34b5659a465f7c86df">cur_alpha</a> = <a class="code hl_function" href="#a6131d15a5672f8a40fbfb9ac8195d2f4">_misprice_schedule</a>(<a class="code hl_variable" href="#ab23b31507672a0feedce2d90bd612dc4">nb_misprices</a>, <a class="code hl_variable" href="#a7a1b5fb5e2d0384d017ba645a930c691">base_alpha</a>);</div>
+<div class="line"><span class="lineno">  125</span>        <a class="code hl_variable" href="#aec3c3704ce91da277ffde90c631dbde6">alpha</a>     = <a class="code hl_variable" href="#a3993b8b7d2b7ba34b5659a465f7c86df">cur_alpha</a>;</div>
+<div class="line"><span class="lineno">  126</span>        <span class="comment">// As proposed in the paper for mis-pricing sequences, disable</span></div>
+<div class="line"><span class="lineno">  127</span>        <span class="comment">// directional smoothing after a misprice.</span></div>
+<div class="line"><span class="lineno">  128</span>        <a class="code hl_variable" href="#a8cf47e51d1046c0d1919ee71d024000d">beta</a> = 0.0;</div>
+<div class="line"><span class="lineno">  129</span>    }</div>
+<div class="ttc" id="aclassStabilization_html_a6131d15a5672f8a40fbfb9ac8195d2f4"><div class="ttname"><a href="#a6131d15a5672f8a40fbfb9ac8195d2f4">Stabilization::_misprice_schedule</a></div><div class="ttdeci">double _misprice_schedule(int nb_misprices, double base_alpha)</div><div class="ttdef"><b>Definition</b> <a href="Stabilization_8h_source.html#l00156">Stabilization.h:156</a></div></div>
 </div><!-- fragment --><div class="dynheader">
 Here is the call graph for this function:</div>
 <div class="dyncontent">
@@ -963,88 +1102,100 @@ Here is the call graph for this function:</div>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="Stabilization_8h_source.html#l00322">322</a> of file <a class="el" href="Stabilization_8h_source.html">Stabilization.h</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  324</span>                                                                                               {</div>
-<div class="line"><span class="lineno">  325</span>        std::vector&lt;double&gt; nodeDuals(input_duals.begin(), input_duals.begin() + <a class="code hl_variable" href="#a010068e0a9fe16c1c76567324ba02f6e">sizeDual</a>);</div>
-<div class="line"><span class="lineno">  326</span> </div>
-<div class="line"><span class="lineno">  327</span>        <span class="keywordflow">if</span> (<a class="code hl_variable" href="#ab23b31507672a0feedce2d90bd612dc4">nb_misprices</a> == 0) {</div>
-<div class="line"><span class="lineno">  328</span>            <a class="code hl_function" href="#ab6b6215da1ae5d49b2e6c0877f00b359">update_subgradient</a>(dados, nodeDuals, best_pricing_cols);</div>
-<div class="line"><span class="lineno">  329</span> </div>
-<div class="line"><span class="lineno">  330</span>            <span class="comment">// Dynamic alpha schedule (Table 1 right):</span></div>
-<div class="line"><span class="lineno">  331</span>            <span class="comment">// if g_sep · (pi_out - pi_in) &gt; 0 -&gt; fincr(alpha)</span></div>
-<div class="line"><span class="lineno">  332</span>            <span class="comment">// else -&gt; fdecr(alpha)</span></div>
-<div class="line"><span class="lineno">  333</span>            <span class="keywordtype">double</span> g_dot_dir = 0.0;</div>
-<div class="line"><span class="lineno">  334</span>            <span class="keywordflow">if</span> (!<a class="code hl_variable" href="#a20b515205f9eb12bfb49a9531e73975a">subgradient</a>.empty() &amp;&amp; <a class="code hl_variable" href="#a20b515205f9eb12bfb49a9531e73975a">subgradient</a>.size() == nodeDuals.size() &amp;&amp; !<a class="code hl_variable" href="#a28cf2ea457b84f4ea34e1720f6a35a2c">cur_stab_center</a>.empty()) {</div>
-<div class="line"><span class="lineno">  335</span>                <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> i = 0; i &lt; nodeDuals.size(); ++i) {</div>
-<div class="line"><span class="lineno">  336</span>                    g_dot_dir += <a class="code hl_variable" href="#a20b515205f9eb12bfb49a9531e73975a">subgradient</a>[i] * (nodeDuals[i] - <a class="code hl_variable" href="#a28cf2ea457b84f4ea34e1720f6a35a2c">cur_stab_center</a>[i]);</div>
-<div class="line"><span class="lineno">  337</span>                }</div>
-<div class="line"><span class="lineno">  338</span>            }</div>
-<div class="line"><span class="lineno">  339</span> </div>
-<div class="line"><span class="lineno">  340</span>            <span class="keyword">auto</span> fincr = [](<span class="keywordtype">double</span> a) { <span class="keywordflow">return</span> a + (1.0 - a) * 0.1; };</div>
-<div class="line"><span class="lineno">  341</span>            <span class="keyword">auto</span> fdecr = [](<span class="keywordtype">double</span> a) {</div>
-<div class="line"><span class="lineno">  342</span>                <span class="keywordflow">if</span> (a &gt;= 0.5) <span class="keywordflow">return</span> a / 1.1;</div>
-<div class="line"><span class="lineno">  343</span>                <span class="keywordflow">return</span> std::max(0.0, a - (1.0 - a) * 0.1);</div>
-<div class="line"><span class="lineno">  344</span>            };</div>
-<div class="line"><span class="lineno">  345</span>            <a class="code hl_variable" href="#aec3c3704ce91da277ffde90c631dbde6">alpha</a>      = (g_dot_dir &gt; 0.0) ? fincr(<a class="code hl_variable" href="#aec3c3704ce91da277ffde90c631dbde6">alpha</a>) : fdecr(<a class="code hl_variable" href="#aec3c3704ce91da277ffde90c631dbde6">alpha</a>);</div>
-<div class="line"><span class="lineno">  346</span>            <a class="code hl_variable" href="#aec3c3704ce91da277ffde90c631dbde6">alpha</a>      = std::clamp(<a class="code hl_variable" href="#aec3c3704ce91da277ffde90c631dbde6">alpha</a>, 0.0, <a class="code hl_variable" href="#a62ad0e0266e4b86a5b330578da8131f2">kAlphaMax</a>);</div>
-<div class="line"><span class="lineno">  347</span>            <a class="code hl_variable" href="#a7a1b5fb5e2d0384d017ba645a930c691">base_alpha</a> = std::clamp(<a class="code hl_variable" href="#aec3c3704ce91da277ffde90c631dbde6">alpha</a>, <a class="code hl_variable" href="#aa21016ba00cd2e21cafe08e8819975e9">kAlphaMin</a>, <a class="code hl_variable" href="#a62ad0e0266e4b86a5b330578da8131f2">kAlphaMax</a>);</div>
-<div class="line"><span class="lineno">  348</span> </div>
-<div class="line"><span class="lineno">  349</span>            <span class="comment">// Adaptive beta schedule (Section directional smoothing):</span></div>
-<div class="line"><span class="lineno">  350</span>            <span class="comment">// beta = cos(gamma) between (pi_out - pi_in) and (pi_g - pi_in).</span></div>
-<div class="line"><span class="lineno">  351</span>            <span class="keywordflow">if</span> (!<a class="code hl_variable" href="#a20b515205f9eb12bfb49a9531e73975a">subgradient</a>.empty() &amp;&amp; <a class="code hl_variable" href="#aac223020026998eef51a5cf0f12addd4">subgradient_norm</a> &gt; <a class="code hl_variable" href="#ad8faa147c37bf4797c5d661b20e32ec0">EPSILON</a> &amp;&amp; !<a class="code hl_variable" href="#a28cf2ea457b84f4ea34e1720f6a35a2c">cur_stab_center</a>.empty()) {</div>
-<div class="line"><span class="lineno">  352</span>                <span class="keywordtype">double</span> dir_norm_sq = 0.0;</div>
-<div class="line"><span class="lineno">  353</span>                <span class="keywordtype">double</span> dot         = 0.0;</div>
-<div class="line"><span class="lineno">  354</span>                <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> i = 0; i &lt; nodeDuals.size(); ++i) {</div>
-<div class="line"><span class="lineno">  355</span>                    <span class="keyword">const</span> <span class="keywordtype">double</span> d = nodeDuals[i] - <a class="code hl_variable" href="#a28cf2ea457b84f4ea34e1720f6a35a2c">cur_stab_center</a>[i];</div>
-<div class="line"><span class="lineno">  356</span>                    dir_norm_sq += d * d;</div>
-<div class="line"><span class="lineno">  357</span>                    dot += d * <a class="code hl_variable" href="#a20b515205f9eb12bfb49a9531e73975a">subgradient</a>[i];</div>
-<div class="line"><span class="lineno">  358</span>                }</div>
-<div class="line"><span class="lineno">  359</span>                <span class="keyword">const</span> <span class="keywordtype">double</span> dir_norm = std::sqrt(dir_norm_sq + <a class="code hl_variable" href="#ad8faa147c37bf4797c5d661b20e32ec0">EPSILON</a>);</div>
-<div class="line"><span class="lineno">  360</span>                <a class="code hl_variable" href="#a8cf47e51d1046c0d1919ee71d024000d">beta</a>                  = std::clamp(dot / (dir_norm * <a class="code hl_variable" href="#aac223020026998eef51a5cf0f12addd4">subgradient_norm</a>), 0.0, 1.0);</div>
-<div class="line"><span class="lineno">  361</span>            } <span class="keywordflow">else</span> {</div>
-<div class="line"><span class="lineno">  362</span>                <a class="code hl_variable" href="#a8cf47e51d1046c0d1919ee71d024000d">beta</a> = 0.0;</div>
-<div class="line"><span class="lineno">  363</span>            }</div>
-<div class="line"><span class="lineno">  364</span> </div>
-<div class="line"><span class="lineno">  365</span>            <span class="comment">// In-point update between master iterations.</span></div>
-<div class="line"><span class="lineno">  366</span>            <a class="code hl_variable" href="#a3144df7de441b23be16c038a702da485">stab_center_for_next_iteration</a> = <a class="code hl_variable" href="#ac08359d79f8fddb159d716f4993996a2">smooth_dual_sol</a>;</div>
-<div class="line"><span class="lineno">  367</span>        } <span class="keywordflow">else</span> {</div>
-<div class="line"><span class="lineno">  368</span>            <span class="comment">// During mispricing sequence keep in-point fixed.</span></div>
-<div class="line"><span class="lineno">  369</span>            <a class="code hl_variable" href="#a3144df7de441b23be16c038a702da485">stab_center_for_next_iteration</a> = <a class="code hl_variable" href="#a28cf2ea457b84f4ea34e1720f6a35a2c">cur_stab_center</a>;</div>
-<div class="line"><span class="lineno">  370</span>        }</div>
-<div class="line"><span class="lineno">  371</span>        <a class="code hl_variable" href="#ab7731c3950bc7fef07bd1795e3b79ac3">cut_added</a> = <span class="keyword">false</span>;</div>
-<div class="line"><span class="lineno">  372</span> </div>
-<div class="line"><span class="lineno">  373</span>        <a class="code hl_variable" href="#ad70d9934e00d888a73b97554374e579f">lag_gap_prev</a> = <a class="code hl_variable" href="#aaaa4e9185757d59ad90d8f1709849f2b">lag_gap</a>;</div>
-<div class="line"><span class="lineno">  374</span> </div>
-<div class="line"><span class="lineno">  375</span>        <span class="keywordflow">if</span> (std::isnan(<a class="code hl_variable" href="#aec3c3704ce91da277ffde90c631dbde6">alpha</a>) || std::isinf(<a class="code hl_variable" href="#aec3c3704ce91da277ffde90c631dbde6">alpha</a>)) {</div>
-<div class="line"><span class="lineno">  376</span>            <a class="code hl_variable" href="#aff675d7a6ce8aee1ab961840b690f202">stabilization_active</a> = <span class="keyword">false</span>;</div>
-<div class="line"><span class="lineno">  377</span>            <a class="code hl_function" href="#ac2f24133b3ae9bb48b0d72b7fb0fb996">cleanup</a>();</div>
-<div class="line"><span class="lineno">  378</span>        }</div>
-<div class="line"><span class="lineno">  379</span>    }</div>
+<p class="definition">Definition at line <a class="el" href="Stabilization_8h_source.html#l00347">347</a> of file <a class="el" href="Stabilization_8h_source.html">Stabilization.h</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  349</span>                                                                                               {</div>
+<div class="line"><span class="lineno">  350</span>        <a class="code hl_function" href="#a54a5e75296eebd75701121415eb6c56b">align_with_master_duals</a>(input_duals);</div>
+<div class="line"><span class="lineno">  351</span>        std::vector&lt;double&gt; nodeDuals = input_duals;</div>
+<div class="line"><span class="lineno">  352</span>        <a class="code hl_variable" href="#a67928d3781b7c17f8376f56a19d8639c">constraint_senses</a>             = dados.<a class="code hl_variable" href="structModelData.html#ac23a00bb904bdff4445e27b1478f3805">sense</a>;</div>
+<div class="line"><span class="lineno">  353</span> </div>
+<div class="line"><span class="lineno">  354</span>        <span class="keywordflow">if</span> (<a class="code hl_variable" href="#ab23b31507672a0feedce2d90bd612dc4">nb_misprices</a> == 0) {</div>
+<div class="line"><span class="lineno">  355</span>            <a class="code hl_function" href="#a4ff5dcec21d0c23e1e440ae5761f2a3e">update_subgradient</a>(dados, nodeDuals, best_pricing_cols);</div>
+<div class="line"><span class="lineno">  356</span> </div>
+<div class="line"><span class="lineno">  357</span>            <span class="comment">// Dynamic alpha schedule (Table 1 right):</span></div>
+<div class="line"><span class="lineno">  358</span>            <span class="comment">// if g_sep · (pi_out - pi_in) &gt; 0 -&gt; fincr(alpha)</span></div>
+<div class="line"><span class="lineno">  359</span>            <span class="comment">// else -&gt; fdecr(alpha)</span></div>
+<div class="line"><span class="lineno">  360</span>            <span class="keywordtype">double</span>     g_dot_dir = 0.0;</div>
+<div class="line"><span class="lineno">  361</span>            <span class="keyword">const</span> <span class="keywordtype">bool</span> has_direction =</div>
+<div class="line"><span class="lineno">  362</span>                <a class="code hl_variable" href="#aac223020026998eef51a5cf0f12addd4">subgradient_norm</a> &gt; <a class="code hl_variable" href="#ad8faa147c37bf4797c5d661b20e32ec0">EPSILON</a> &amp;&amp; <a class="code hl_variable" href="#a20b515205f9eb12bfb49a9531e73975a">subgradient</a>.size() == nodeDuals.size() &amp;&amp; !<a class="code hl_variable" href="#a28cf2ea457b84f4ea34e1720f6a35a2c">cur_stab_center</a>.empty();</div>
+<div class="line"><span class="lineno">  363</span>            <span class="keywordflow">if</span> (has_direction) {</div>
+<div class="line"><span class="lineno">  364</span>                <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> i = 0; i &lt; nodeDuals.size(); ++i) {</div>
+<div class="line"><span class="lineno">  365</span>                    g_dot_dir += <a class="code hl_variable" href="#a20b515205f9eb12bfb49a9531e73975a">subgradient</a>[i] * (nodeDuals[i] - <a class="code hl_variable" href="#a28cf2ea457b84f4ea34e1720f6a35a2c">cur_stab_center</a>[i]);</div>
+<div class="line"><span class="lineno">  366</span>                }</div>
+<div class="line"><span class="lineno">  367</span>            }</div>
+<div class="line"><span class="lineno">  368</span> </div>
+<div class="line"><span class="lineno">  369</span>            <span class="keyword">auto</span> fincr = [](<span class="keywordtype">double</span> a) { <span class="keywordflow">return</span> a + (1.0 - a) * 0.1; };</div>
+<div class="line"><span class="lineno">  370</span>            <span class="keyword">auto</span> fdecr = [](<span class="keywordtype">double</span> a) {</div>
+<div class="line"><span class="lineno">  371</span>                <span class="keywordflow">if</span> (a &gt;= 0.5) <span class="keywordflow">return</span> a / 1.1;</div>
+<div class="line"><span class="lineno">  372</span>                <span class="keywordflow">return</span> std::max(0.0, a - (1.0 - a) * 0.1);</div>
+<div class="line"><span class="lineno">  373</span>            };</div>
+<div class="line"><span class="lineno">  374</span>            <span class="keywordflow">if</span> (has_direction) {</div>
+<div class="line"><span class="lineno">  375</span>                <a class="code hl_variable" href="#aec3c3704ce91da277ffde90c631dbde6">alpha</a>      = (g_dot_dir &gt; 0.0) ? fincr(<a class="code hl_variable" href="#aec3c3704ce91da277ffde90c631dbde6">alpha</a>) : fdecr(<a class="code hl_variable" href="#aec3c3704ce91da277ffde90c631dbde6">alpha</a>);</div>
+<div class="line"><span class="lineno">  376</span>                <a class="code hl_variable" href="#aec3c3704ce91da277ffde90c631dbde6">alpha</a>      = std::clamp(<a class="code hl_variable" href="#aec3c3704ce91da277ffde90c631dbde6">alpha</a>, 0.0, <a class="code hl_variable" href="#a62ad0e0266e4b86a5b330578da8131f2">kAlphaMax</a>);</div>
+<div class="line"><span class="lineno">  377</span>                <a class="code hl_variable" href="#a7a1b5fb5e2d0384d017ba645a930c691">base_alpha</a> = std::clamp(<a class="code hl_variable" href="#aec3c3704ce91da277ffde90c631dbde6">alpha</a>, <a class="code hl_variable" href="#aa21016ba00cd2e21cafe08e8819975e9">kAlphaMin</a>, <a class="code hl_variable" href="#a62ad0e0266e4b86a5b330578da8131f2">kAlphaMax</a>);</div>
+<div class="line"><span class="lineno">  378</span>                <a class="code hl_variable" href="#a3993b8b7d2b7ba34b5659a465f7c86df">cur_alpha</a>  = <a class="code hl_variable" href="#aec3c3704ce91da277ffde90c631dbde6">alpha</a>;</div>
+<div class="line"><span class="lineno">  379</span>            }</div>
+<div class="line"><span class="lineno">  380</span> </div>
+<div class="line"><span class="lineno">  381</span>            <span class="comment">// Adaptive beta schedule (Section directional smoothing):</span></div>
+<div class="line"><span class="lineno">  382</span>            <span class="comment">// beta = cos(gamma) between (pi_out - pi_in) and (pi_g - pi_in).</span></div>
+<div class="line"><span class="lineno">  383</span>            <span class="keywordflow">if</span> (!<a class="code hl_variable" href="#a20b515205f9eb12bfb49a9531e73975a">subgradient</a>.empty() &amp;&amp; <a class="code hl_variable" href="#aac223020026998eef51a5cf0f12addd4">subgradient_norm</a> &gt; <a class="code hl_variable" href="#ad8faa147c37bf4797c5d661b20e32ec0">EPSILON</a> &amp;&amp; !<a class="code hl_variable" href="#a28cf2ea457b84f4ea34e1720f6a35a2c">cur_stab_center</a>.empty()) {</div>
+<div class="line"><span class="lineno">  384</span>                <span class="keywordtype">double</span> dir_norm_sq = 0.0;</div>
+<div class="line"><span class="lineno">  385</span>                <span class="keywordtype">double</span> dot         = 0.0;</div>
+<div class="line"><span class="lineno">  386</span>                <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> i = 0; i &lt; nodeDuals.size(); ++i) {</div>
+<div class="line"><span class="lineno">  387</span>                    <span class="keyword">const</span> <span class="keywordtype">double</span> d = nodeDuals[i] - <a class="code hl_variable" href="#a28cf2ea457b84f4ea34e1720f6a35a2c">cur_stab_center</a>[i];</div>
+<div class="line"><span class="lineno">  388</span>                    dir_norm_sq += d * d;</div>
+<div class="line"><span class="lineno">  389</span>                    dot += d * <a class="code hl_variable" href="#a20b515205f9eb12bfb49a9531e73975a">subgradient</a>[i];</div>
+<div class="line"><span class="lineno">  390</span>                }</div>
+<div class="line"><span class="lineno">  391</span>                <span class="keyword">const</span> <span class="keywordtype">double</span> dir_norm = std::sqrt(dir_norm_sq + <a class="code hl_variable" href="#ad8faa147c37bf4797c5d661b20e32ec0">EPSILON</a>);</div>
+<div class="line"><span class="lineno">  392</span>                <a class="code hl_variable" href="#a8cf47e51d1046c0d1919ee71d024000d">beta</a>                  = std::clamp(dot / (dir_norm * <a class="code hl_variable" href="#aac223020026998eef51a5cf0f12addd4">subgradient_norm</a>), 0.0, 1.0);</div>
+<div class="line"><span class="lineno">  393</span>            } <span class="keywordflow">else</span> {</div>
+<div class="line"><span class="lineno">  394</span>                <a class="code hl_variable" href="#a8cf47e51d1046c0d1919ee71d024000d">beta</a> = 0.0;</div>
+<div class="line"><span class="lineno">  395</span>            }</div>
+<div class="line"><span class="lineno">  396</span> </div>
+<div class="line"><span class="lineno">  397</span>            <span class="comment">// In-point update between master iterations.</span></div>
+<div class="line"><span class="lineno">  398</span>            <a class="code hl_variable" href="#a3144df7de441b23be16c038a702da485">stab_center_for_next_iteration</a> = <a class="code hl_variable" href="#ac08359d79f8fddb159d716f4993996a2">smooth_dual_sol</a>;</div>
+<div class="line"><span class="lineno">  399</span>        } <span class="keywordflow">else</span> {</div>
+<div class="line"><span class="lineno">  400</span>            <span class="comment">// During mispricing sequence keep in-point fixed.</span></div>
+<div class="line"><span class="lineno">  401</span>            <a class="code hl_variable" href="#a3144df7de441b23be16c038a702da485">stab_center_for_next_iteration</a> = <a class="code hl_variable" href="#a28cf2ea457b84f4ea34e1720f6a35a2c">cur_stab_center</a>;</div>
+<div class="line"><span class="lineno">  402</span>        }</div>
+<div class="line"><span class="lineno">  403</span>        <a class="code hl_variable" href="#ab7731c3950bc7fef07bd1795e3b79ac3">cut_added</a> = <span class="keyword">false</span>;</div>
+<div class="line"><span class="lineno">  404</span> </div>
+<div class="line"><span class="lineno">  405</span>        <a class="code hl_variable" href="#ad70d9934e00d888a73b97554374e579f">lag_gap_prev</a> = <a class="code hl_variable" href="#aaaa4e9185757d59ad90d8f1709849f2b">lag_gap</a>;</div>
+<div class="line"><span class="lineno">  406</span> </div>
+<div class="line"><span class="lineno">  407</span>        <span class="keywordflow">if</span> (std::isnan(<a class="code hl_variable" href="#aec3c3704ce91da277ffde90c631dbde6">alpha</a>) || std::isinf(<a class="code hl_variable" href="#aec3c3704ce91da277ffde90c631dbde6">alpha</a>)) {</div>
+<div class="line"><span class="lineno">  408</span>            <a class="code hl_variable" href="#aff675d7a6ce8aee1ab961840b690f202">stabilization_active</a> = <span class="keyword">false</span>;</div>
+<div class="line"><span class="lineno">  409</span>            <a class="code hl_function" href="#ac2f24133b3ae9bb48b0d72b7fb0fb996">cleanup</a>();</div>
+<div class="line"><span class="lineno">  410</span>        }</div>
+<div class="line"><span class="lineno">  411</span>    }</div>
+<div class="ttc" id="aclassStabilization_html_a4ff5dcec21d0c23e1e440ae5761f2a3e"><div class="ttname"><a href="#a4ff5dcec21d0c23e1e440ae5761f2a3e">Stabilization::update_subgradient</a></div><div class="ttdeci">void update_subgradient(const ModelData &amp;model, const DualSolution &amp;node_duals, const std::vector&lt; Label * &gt; &amp;pricing_columns)</div><div class="ttdef"><b>Definition</b> <a href="Stabilization_8h_source.html#l00308">Stabilization.h:308</a></div></div>
 <div class="ttc" id="aclassStabilization_html_aaaa4e9185757d59ad90d8f1709849f2b"><div class="ttname"><a href="#aaaa4e9185757d59ad90d8f1709849f2b">Stabilization::lag_gap</a></div><div class="ttdeci">double lag_gap</div><div class="ttdef"><b>Definition</b> <a href="Stabilization_8h_source.html#l00071">Stabilization.h:71</a></div></div>
-<div class="ttc" id="aclassStabilization_html_ab6b6215da1ae5d49b2e6c0877f00b359"><div class="ttname"><a href="#ab6b6215da1ae5d49b2e6c0877f00b359">Stabilization::update_subgradient</a></div><div class="ttdeci">void update_subgradient(const ModelData &amp;dados, const DualSolution &amp;nodeDuals, const std::vector&lt; Label * &gt; &amp;best_pricing_cols, bool use_weighted_update=true)</div><div class="ttdef"><b>Definition</b> <a href="Stabilization_8h_source.html#l00265">Stabilization.h:265</a></div></div>
-<div class="ttc" id="aclassStabilization_html_ab7731c3950bc7fef07bd1795e3b79ac3"><div class="ttname"><a href="#ab7731c3950bc7fef07bd1795e3b79ac3">Stabilization::cut_added</a></div><div class="ttdeci">bool cut_added</div><div class="ttdef"><b>Definition</b> <a href="Stabilization_8h_source.html#l00083">Stabilization.h:83</a></div></div>
-<div class="ttc" id="aclassStabilization_html_ac2f24133b3ae9bb48b0d72b7fb0fb996"><div class="ttname"><a href="#ac2f24133b3ae9bb48b0d72b7fb0fb996">Stabilization::cleanup</a></div><div class="ttdeci">void cleanup()</div><div class="ttdef"><b>Definition</b> <a href="Stabilization_8h_source.html#l00383">Stabilization.h:383</a></div></div>
+<div class="ttc" id="aclassStabilization_html_ab7731c3950bc7fef07bd1795e3b79ac3"><div class="ttname"><a href="#ab7731c3950bc7fef07bd1795e3b79ac3">Stabilization::cut_added</a></div><div class="ttdeci">bool cut_added</div><div class="ttdef"><b>Definition</b> <a href="Stabilization_8h_source.html#l00084">Stabilization.h:84</a></div></div>
+<div class="ttc" id="aclassStabilization_html_ac2f24133b3ae9bb48b0d72b7fb0fb996"><div class="ttname"><a href="#ac2f24133b3ae9bb48b0d72b7fb0fb996">Stabilization::cleanup</a></div><div class="ttdeci">void cleanup()</div><div class="ttdef"><b>Definition</b> <a href="Stabilization_8h_source.html#l00415">Stabilization.h:415</a></div></div>
 <div class="ttc" id="aclassStabilization_html_ad70d9934e00d888a73b97554374e579f"><div class="ttname"><a href="#ad70d9934e00d888a73b97554374e579f">Stabilization::lag_gap_prev</a></div><div class="ttdeci">double lag_gap_prev</div><div class="ttdef"><b>Definition</b> <a href="Stabilization_8h_source.html#l00072">Stabilization.h:72</a></div></div>
 <div class="ttc" id="aclassStabilization_html_aff675d7a6ce8aee1ab961840b690f202"><div class="ttname"><a href="#aff675d7a6ce8aee1ab961840b690f202">Stabilization::stabilization_active</a></div><div class="ttdeci">bool stabilization_active</div><div class="ttdef"><b>Definition</b> <a href="Stabilization_8h_source.html#l00051">Stabilization.h:51</a></div></div>
+<div class="ttc" id="astructModelData_html_ac23a00bb904bdff4445e27b1478f3805"><div class="ttname"><a href="structModelData.html#ac23a00bb904bdff4445e27b1478f3805">ModelData::sense</a></div><div class="ttdeci">std::vector&lt; char &gt; sense</div><div class="ttdef"><b>Definition</b> <a href="Definitions_8h_source.html#l00218">Definitions.h:218</a></div></div>
 </div><!-- fragment --><div class="dynheader">
 Here is the call graph for this function:</div>
 <div class="dyncontent">
 <div class="center"><img src="classStabilization_af358ea4f62658ca2a7b1509535392e2a_cgraph.png" border="0" usemap="#aclassStabilization_af358ea4f62658ca2a7b1509535392e2a_cgraph" loading="lazy" alt=""/></div>
 <map name="aclassStabilization_af358ea4f62658ca2a7b1509535392e2a_cgraph" id="aclassStabilization_af358ea4f62658ca2a7b1509535392e2a_cgraph">
-<area shape="rect" title=" " alt="" coords="5,20,142,75"/>
-<area shape="rect" href="classStabilization.html#ac2f24133b3ae9bb48b0d72b7fb0fb996" title=" " alt="" coords="190,5,332,31"/>
-<area shape="poly" title=" " alt="" coords="142,34,174,29,175,34,142,39"/>
-<area shape="rect" href="classStabilization.html#ab6b6215da1ae5d49b2e6c0877f00b359" title=" " alt="" coords="193,55,329,96"/>
-<area shape="poly" title=" " alt="" coords="142,55,177,60,176,66,142,60"/>
-<area shape="rect" href="classStabilization.html#a4f4e3b43fbae641f421179c3519a7ff7" title=" " alt="" coords="380,63,506,88"/>
-<area shape="poly" title=" " alt="" coords="330,73,364,73,364,78,330,78"/>
+<area shape="rect" title=" " alt="" coords="5,55,142,111"/>
+<area shape="rect" href="classStabilization.html#a54a5e75296eebd75701121415eb6c56b" title=" " alt="" coords="192,5,330,46"/>
+<area shape="poly" title=" " alt="" coords="141,60,177,49,178,54,143,65"/>
+<area shape="rect" href="classStabilization.html#ac2f24133b3ae9bb48b0d72b7fb0fb996" title=" " alt="" coords="190,70,332,96"/>
+<area shape="poly" title=" " alt="" coords="142,80,174,80,174,86,142,86"/>
+<area shape="rect" href="classStabilization.html#a4ff5dcec21d0c23e1e440ae5761f2a3e" title=" " alt="" coords="193,120,329,161"/>
+<area shape="poly" title=" " alt="" coords="143,101,178,112,177,117,141,106"/>
+<area shape="rect" href="structLabel.html#a384585ffaf7cdfd2c142d3b4524bf39e" title=" " alt="" coords="388,102,499,128"/>
+<area shape="poly" title=" " alt="" coords="329,128,372,122,372,127,330,133"/>
+<area shape="rect" href="classStabilization.html#ada181c63fda918fc904a9d864595ed97" title=" " alt="" coords="380,152,506,177"/>
+<area shape="poly" title=" " alt="" coords="330,147,365,151,364,157,329,152"/>
 </map>
 </div>
 
 </div>
 </div>
-<a id="ab6b6215da1ae5d49b2e6c0877f00b359" name="ab6b6215da1ae5d49b2e6c0877f00b359"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#ab6b6215da1ae5d49b2e6c0877f00b359">&#9670;&#160;</a></span>update_subgradient()</h2>
+<a id="a4ff5dcec21d0c23e1e440ae5761f2a3e" name="a4ff5dcec21d0c23e1e440ae5761f2a3e"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a4ff5dcec21d0c23e1e440ae5761f2a3e">&#9670;&#160;</a></span>update_subgradient()</h2>
 
 <div class="memitem">
 <div class="memproto">
@@ -1055,22 +1206,17 @@ Here is the call graph for this function:</div>
         <tr>
           <td class="memname">void Stabilization::update_subgradient </td>
           <td>(</td>
-          <td class="paramtype">const <a class="el" href="structModelData.html">ModelData</a> &amp;</td>          <td class="paramname"><span class="paramname"><em>dados</em></span>, </td>
+          <td class="paramtype">const <a class="el" href="structModelData.html">ModelData</a> &amp;</td>          <td class="paramname"><span class="paramname"><em>model</em></span>, </td>
         </tr>
         <tr>
           <td class="paramkey"></td>
           <td></td>
-          <td class="paramtype">const <a class="el" href="Definitions_8h.html#aca51606dd2572852638d855b039eaa63">DualSolution</a> &amp;</td>          <td class="paramname"><span class="paramname"><em>nodeDuals</em></span>, </td>
+          <td class="paramtype">const <a class="el" href="Definitions_8h.html#aca51606dd2572852638d855b039eaa63">DualSolution</a> &amp;</td>          <td class="paramname"><span class="paramname"><em>node_duals</em></span>, </td>
         </tr>
         <tr>
           <td class="paramkey"></td>
           <td></td>
-          <td class="paramtype">const std::vector&lt; <a class="el" href="structLabel.html">Label</a> * &gt; &amp;</td>          <td class="paramname"><span class="paramname"><em>best_pricing_cols</em></span>, </td>
-        </tr>
-        <tr>
-          <td class="paramkey"></td>
-          <td></td>
-          <td class="paramtype">bool</td>          <td class="paramname"><span class="paramname"><em>use_weighted_update</em></span><span class="paramdefsep"> = </span><span class="paramdefval">true</span>&#160;)</td>
+          <td class="paramtype">const std::vector&lt; <a class="el" href="structLabel.html">Label</a> * &gt; &amp;</td>          <td class="paramname"><span class="paramname"><em>pricing_columns</em></span>&#160;)</td>
         </tr>
       </table>
   </td>
@@ -1080,65 +1226,49 @@ Here is the call graph for this function:</div>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="Stabilization_8h_source.html#l00265">265</a> of file <a class="el" href="Stabilization_8h_source.html">Stabilization.h</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  266</span>                                                                                                        {</div>
-<div class="line"><span class="lineno">  267</span>        <span class="keywordtype">size_t</span> number_of_rows = nodeDuals.size();</div>
-<div class="line"><span class="lineno">  268</span>        <a class="code hl_variable" href="#a42a293b74306cec019f1b7cd2c729092">new_rows</a>.assign(number_of_rows, 0.0);</div>
-<div class="line"><span class="lineno">  269</span> </div>
-<div class="line"><span class="lineno">  270</span>        <span class="comment">// Determine how many columns to check.</span></div>
-<div class="line"><span class="lineno">  271</span>        <span class="keyword">auto</span> cols_to_check = std::min(<a class="code hl_variable" href="#aa35e79e794a588c993162c863341006b">numK</a>, <span class="keyword">static_cast&lt;</span><span class="keywordtype">int</span><span class="keyword">&gt;</span>(best_pricing_cols.size()));</div>
-<div class="line"><span class="lineno">  272</span>        <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> i = 0; i &lt; cols_to_check; ++i) {</div>
-<div class="line"><span class="lineno">  273</span>            <span class="keyword">const</span> <span class="keyword">auto</span> &amp;col = best_pricing_cols[i];</div>
-<div class="line"><span class="lineno">  274</span> </div>
-<div class="line"><span class="lineno">  275</span>            <span class="comment">// Compute a weight for this column.</span></div>
-<div class="line"><span class="lineno">  276</span>            <span class="keywordtype">double</span> weight = 1.0;</div>
-<div class="line"><span class="lineno">  277</span>            <span class="keywordflow">if</span> (use_weighted_update) {</div>
-<div class="line"><span class="lineno">  278</span>                <span class="comment">// weight inversely proportional to cost</span></div>
-<div class="line"><span class="lineno">  279</span>                weight = 1.0 / (1.0 + std::abs(col-&gt;cost));</div>
-<div class="line"><span class="lineno">  280</span>            }</div>
-<div class="line"><span class="lineno">  281</span> </div>
-<div class="line"><span class="lineno">  282</span>            <span class="comment">// Accumulate coverage for nodes that are not the artificial start</span></div>
-<div class="line"><span class="lineno">  283</span>            <span class="comment">// or end.</span></div>
-<div class="line"><span class="lineno">  284</span>            <span class="keywordflow">for</span> (<span class="keyword">const</span> <span class="keyword">auto</span> &amp;node : col-&gt;getRoute()) {</div>
-<div class="line"><span class="lineno">  285</span>                <span class="keywordflow">if</span> (node &gt; 0 &amp;&amp; node != N_SIZE - 1) { <a class="code hl_variable" href="#a42a293b74306cec019f1b7cd2c729092">new_rows</a>[node - 1] += weight; }</div>
-<div class="line"><span class="lineno">  286</span>            }</div>
-<div class="line"><span class="lineno">  287</span>        }</div>
-<div class="line"><span class="lineno">  288</span> </div>
-<div class="line"><span class="lineno">  289</span>        <span class="comment">// Compute the raw subgradient based on the constraint senses.</span></div>
-<div class="line"><span class="lineno">  290</span>        <a class="code hl_variable" href="#a20b515205f9eb12bfb49a9531e73975a">subgradient</a>.assign(number_of_rows, 0.0);</div>
-<div class="line"><span class="lineno">  291</span>        <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> i = 0; i &lt; number_of_rows; ++i) {</div>
-<div class="line"><span class="lineno">  292</span>            <span class="keywordflow">if</span> (dados.<a class="code hl_variable" href="structModelData.html#ac23a00bb904bdff4445e27b1478f3805">sense</a>[i] == <span class="charliteral">&#39;&lt;&#39;</span>) {</div>
-<div class="line"><span class="lineno">  293</span>                <a class="code hl_variable" href="#a20b515205f9eb12bfb49a9531e73975a">subgradient</a>[i] = <a class="code hl_variable" href="#a42a293b74306cec019f1b7cd2c729092">new_rows</a>[i] - dados.<a class="code hl_variable" href="structModelData.html#aea9d2f5b3aa72a3af01c62c7cd9d81f2">b</a>[i];</div>
-<div class="line"><span class="lineno">  294</span>            } <span class="keywordflow">else</span> <span class="keywordflow">if</span> (dados.<a class="code hl_variable" href="structModelData.html#ac23a00bb904bdff4445e27b1478f3805">sense</a>[i] == <span class="charliteral">&#39;&gt;&#39;</span>) {</div>
-<div class="line"><span class="lineno">  295</span>                <a class="code hl_variable" href="#a20b515205f9eb12bfb49a9531e73975a">subgradient</a>[i] = dados.<a class="code hl_variable" href="structModelData.html#aea9d2f5b3aa72a3af01c62c7cd9d81f2">b</a>[i] - <a class="code hl_variable" href="#a42a293b74306cec019f1b7cd2c729092">new_rows</a>[i];</div>
-<div class="line"><span class="lineno">  296</span>            } <span class="keywordflow">else</span> {</div>
-<div class="line"><span class="lineno">  297</span>                <a class="code hl_variable" href="#a20b515205f9eb12bfb49a9531e73975a">subgradient</a>[i] = std::abs(dados.<a class="code hl_variable" href="structModelData.html#aea9d2f5b3aa72a3af01c62c7cd9d81f2">b</a>[i] - <a class="code hl_variable" href="#a42a293b74306cec019f1b7cd2c729092">new_rows</a>[i]);</div>
-<div class="line"><span class="lineno">  298</span>            }</div>
-<div class="line"><span class="lineno">  299</span>        }</div>
-<div class="line"><span class="lineno">  300</span> </div>
-<div class="line"><span class="lineno">  301</span>        <span class="comment">// Optionally, blend the computed subgradient with the current duals.</span></div>
-<div class="line"><span class="lineno">  302</span>        <span class="comment">// This can help smooth the updates over iterations.</span></div>
-<div class="line"><span class="lineno">  303</span>        <span class="comment">// for (size_t i = 0; i &lt; number_of_rows; ++i) {</span></div>
-<div class="line"><span class="lineno">  304</span>        <span class="comment">// Here we use a simple average. You might use a different</span></div>
-<div class="line"><span class="lineno">  305</span>        <span class="comment">// combination or a momentum term.</span></div>
-<div class="line"><span class="lineno">  306</span>        <span class="comment">// subgradient[i] = 0.5 * subgradient[i] + 0.5 * nodeDuals[i];</span></div>
-<div class="line"><span class="lineno">  307</span>        <span class="comment">// }</span></div>
-<div class="line"><span class="lineno">  308</span> </div>
-<div class="line"><span class="lineno">  309</span>        <span class="comment">// Recompute the norm of the subgradient.</span></div>
-<div class="line"><span class="lineno">  310</span>        <a class="code hl_variable" href="#aac223020026998eef51a5cf0f12addd4">subgradient_norm</a> = <a class="code hl_function" href="#a4f4e3b43fbae641f421179c3519a7ff7">norm</a>(<a class="code hl_variable" href="#a20b515205f9eb12bfb49a9531e73975a">subgradient</a>);</div>
-<div class="line"><span class="lineno">  311</span>    }</div>
+<p class="definition">Definition at line <a class="el" href="Stabilization_8h_source.html#l00308">308</a> of file <a class="el" href="Stabilization_8h_source.html">Stabilization.h</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  309</span>                                                                       {</div>
+<div class="line"><span class="lineno">  310</span>        <span class="keyword">const</span> std::size_t number_of_rows = node_duals.size();</div>
+<div class="line"><span class="lineno">  311</span>        <span class="keywordflow">if</span> (model.<a class="code hl_variable" href="structModelData.html#aea9d2f5b3aa72a3af01c62c7cd9d81f2">b</a>.size() != number_of_rows || model.<a class="code hl_variable" href="structModelData.html#ac23a00bb904bdff4445e27b1478f3805">sense</a>.size() != number_of_rows) {</div>
+<div class="line"><span class="lineno">  312</span>            <span class="keywordflow">throw</span> std::invalid_argument(<span class="stringliteral">&quot;Master RHS, senses, and dual solution have inconsistent row counts&quot;</span>);</div>
+<div class="line"><span class="lineno">  313</span>        }</div>
+<div class="line"><span class="lineno">  314</span> </div>
+<div class="line"><span class="lineno">  315</span>        <a class="code hl_variable" href="#a42a293b74306cec019f1b7cd2c729092">new_rows</a>.assign(number_of_rows, 0.0);</div>
+<div class="line"><span class="lineno">  316</span>        <span class="keyword">const</span> std::size_t customer_rows = std::min&lt;std::size_t&gt;(number_of_rows, N_SIZE - 2);</div>
+<div class="line"><span class="lineno">  317</span>        <span class="keyword">const</span> std::size_t columns_to_use =</div>
+<div class="line"><span class="lineno">  318</span>            std::min&lt;std::size_t&gt;(<span class="keyword">static_cast&lt;</span>std::size_t<span class="keyword">&gt;</span>(std::max(0, <a class="code hl_variable" href="#aa35e79e794a588c993162c863341006b">numK</a>)), pricing_columns.size());</div>
+<div class="line"><span class="lineno">  319</span>        <span class="keywordflow">for</span> (std::size_t column_index = 0; column_index &lt; columns_to_use; ++column_index) {</div>
+<div class="line"><span class="lineno">  320</span>            <span class="keyword">const</span> Label *column = pricing_columns[column_index];</div>
+<div class="line"><span class="lineno">  321</span>            <span class="keywordflow">if</span> (column == <span class="keyword">nullptr</span>) <span class="keywordflow">continue</span>;</div>
+<div class="line"><span class="lineno">  322</span>            <span class="keywordflow">for</span> (uint16_t node : column-&gt;<a class="code hl_function" href="structLabel.html#a384585ffaf7cdfd2c142d3b4524bf39e">getRoute</a>()) {</div>
+<div class="line"><span class="lineno">  323</span>                <span class="keywordflow">if</span> (node &gt; 0 &amp;&amp; node &lt; N_SIZE - 1) {</div>
+<div class="line"><span class="lineno">  324</span>                    <span class="keyword">const</span> std::size_t row = <span class="keyword">static_cast&lt;</span>std::size_t<span class="keyword">&gt;</span>(node - 1);</div>
+<div class="line"><span class="lineno">  325</span>                    <span class="keywordflow">if</span> (row &lt; customer_rows) <a class="code hl_variable" href="#a42a293b74306cec019f1b7cd2c729092">new_rows</a>[row] += 1.0;</div>
+<div class="line"><span class="lineno">  326</span>                }</div>
+<div class="line"><span class="lineno">  327</span>            }</div>
+<div class="line"><span class="lineno">  328</span>        }</div>
+<div class="line"><span class="lineno">  329</span> </div>
+<div class="line"><span class="lineno">  330</span>        <span class="comment">// Pricing routes expose customer-row coefficients. Extra cut and</span></div>
+<div class="line"><span class="lineno">  331</span>        <span class="comment">// branching-row coefficients cannot be reconstructed from a route</span></div>
+<div class="line"><span class="lineno">  332</span>        <span class="comment">// alone, so leave those directional components at zero.</span></div>
+<div class="line"><span class="lineno">  333</span>        <a class="code hl_variable" href="#a20b515205f9eb12bfb49a9531e73975a">subgradient</a>.assign(number_of_rows, 0.0);</div>
+<div class="line"><span class="lineno">  334</span>        <span class="keywordflow">for</span> (std::size_t row = 0; row &lt; customer_rows; ++row) { <a class="code hl_variable" href="#a20b515205f9eb12bfb49a9531e73975a">subgradient</a>[row] = model.<a class="code hl_variable" href="structModelData.html#aea9d2f5b3aa72a3af01c62c7cd9d81f2">b</a>[row] - <a class="code hl_variable" href="#a42a293b74306cec019f1b7cd2c729092">new_rows</a>[row]; }</div>
+<div class="line"><span class="lineno">  335</span>        <a class="code hl_variable" href="#aac223020026998eef51a5cf0f12addd4">subgradient_norm</a> = <a class="code hl_function" href="#ada181c63fda918fc904a9d864595ed97">norm</a>(<a class="code hl_variable" href="#a20b515205f9eb12bfb49a9531e73975a">subgradient</a>);</div>
+<div class="line"><span class="lineno">  336</span>    }</div>
 <div class="ttc" id="aclassStabilization_html_a42a293b74306cec019f1b7cd2c729092"><div class="ttname"><a href="#a42a293b74306cec019f1b7cd2c729092">Stabilization::new_rows</a></div><div class="ttdeci">std::vector&lt; double &gt; new_rows</div><div class="ttdef"><b>Definition</b> <a href="Stabilization_8h_source.html#l00069">Stabilization.h:69</a></div></div>
 <div class="ttc" id="aclassStabilization_html_aa35e79e794a588c993162c863341006b"><div class="ttname"><a href="#aa35e79e794a588c993162c863341006b">Stabilization::numK</a></div><div class="ttdeci">int numK</div><div class="ttdef"><b>Definition</b> <a href="Stabilization_8h_source.html#l00074">Stabilization.h:74</a></div></div>
-<div class="ttc" id="astructModelData_html_ac23a00bb904bdff4445e27b1478f3805"><div class="ttname"><a href="structModelData.html#ac23a00bb904bdff4445e27b1478f3805">ModelData::sense</a></div><div class="ttdeci">std::vector&lt; char &gt; sense</div><div class="ttdef"><b>Definition</b> <a href="Definitions_8h_source.html#l00218">Definitions.h:218</a></div></div>
+<div class="ttc" id="astructLabel_html_a384585ffaf7cdfd2c142d3b4524bf39e"><div class="ttname"><a href="structLabel.html#a384585ffaf7cdfd2c142d3b4524bf39e">Label::getRoute</a></div><div class="ttdeci">const std::vector&lt; uint16_t &gt; &amp; getRoute() const noexcept</div><div class="ttdef"><b>Definition</b> <a href="Label_8h_source.html#l00222">Label.h:222</a></div></div>
 <div class="ttc" id="astructModelData_html_aea9d2f5b3aa72a3af01c62c7cd9d81f2"><div class="ttname"><a href="structModelData.html#aea9d2f5b3aa72a3af01c62c7cd9d81f2">ModelData::b</a></div><div class="ttdeci">std::vector&lt; double &gt; b</div><div class="ttdef"><b>Definition</b> <a href="Definitions_8h_source.html#l00217">Definitions.h:217</a></div></div>
 </div><!-- fragment --><div class="dynheader">
 Here is the call graph for this function:</div>
 <div class="dyncontent">
-<div class="center"><img src="classStabilization_ab6b6215da1ae5d49b2e6c0877f00b359_cgraph.png" border="0" usemap="#aclassStabilization_ab6b6215da1ae5d49b2e6c0877f00b359_cgraph" loading="lazy" alt=""/></div>
-<map name="aclassStabilization_ab6b6215da1ae5d49b2e6c0877f00b359_cgraph" id="aclassStabilization_ab6b6215da1ae5d49b2e6c0877f00b359_cgraph">
-<area shape="rect" title=" " alt="" coords="5,5,142,46"/>
-<area shape="rect" href="classStabilization.html#a4f4e3b43fbae641f421179c3519a7ff7" title=" " alt="" coords="190,13,316,38"/>
-<area shape="poly" title=" " alt="" coords="142,23,174,23,174,28,142,28"/>
+<div class="center"><img src="classStabilization_a4ff5dcec21d0c23e1e440ae5761f2a3e_cgraph.png" border="0" usemap="#aclassStabilization_a4ff5dcec21d0c23e1e440ae5761f2a3e_cgraph" loading="lazy" alt=""/></div>
+<map name="aclassStabilization_a4ff5dcec21d0c23e1e440ae5761f2a3e_cgraph" id="aclassStabilization_a4ff5dcec21d0c23e1e440ae5761f2a3e_cgraph">
+<area shape="rect" title=" " alt="" coords="5,23,142,64"/>
+<area shape="rect" href="structLabel.html#a384585ffaf7cdfd2c142d3b4524bf39e" title=" " alt="" coords="197,5,308,31"/>
+<area shape="poly" title=" " alt="" coords="142,31,182,25,182,31,143,36"/>
+<area shape="rect" href="classStabilization.html#ada181c63fda918fc904a9d864595ed97" title=" " alt="" coords="190,55,316,80"/>
+<area shape="poly" title=" " alt="" coords="142,50,175,54,174,60,142,55"/>
 </map>
 </div>
 
@@ -1167,8 +1297,8 @@ Here is the call graph for this function:</div>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="Stabilization_8h_source.html#l00398">398</a> of file <a class="el" href="Stabilization_8h_source.html">Stabilization.h</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  398</span>{ this-&gt;<a class="code hl_variable" href="#aa35e79e794a588c993162c863341006b">numK</a> = <a class="code hl_variable" href="#aa35e79e794a588c993162c863341006b">numK</a>; }</div>
+<p class="definition">Definition at line <a class="el" href="Stabilization_8h_source.html#l00432">432</a> of file <a class="el" href="Stabilization_8h_source.html">Stabilization.h</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  432</span>{ this-&gt;<a class="code hl_variable" href="#aa35e79e794a588c993162c863341006b">numK</a> = <a class="code hl_variable" href="#aa35e79e794a588c993162c863341006b">numK</a>; }</div>
 </div><!-- fragment -->
 </div>
 </div>
@@ -1221,6 +1351,22 @@ Here is the call graph for this function:</div>
 
 </div>
 </div>
+<a id="a67928d3781b7c17f8376f56a19d8639c" name="a67928d3781b7c17f8376f56a19d8639c"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a67928d3781b7c17f8376f56a19d8639c">&#9670;&#160;</a></span>constraint_senses</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">std::vector&lt;char&gt; Stabilization::constraint_senses</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p class="definition">Definition at line <a class="el" href="Stabilization_8h_source.html#l00082">82</a> of file <a class="el" href="Stabilization_8h_source.html">Stabilization.h</a>.</p>
+
+</div>
+</div>
 <a id="a3993b8b7d2b7ba34b5659a465f7c86df" name="a3993b8b7d2b7ba34b5659a465f7c86df"></a>
 <h2 class="memtitle"><span class="permalink"><a href="#a3993b8b7d2b7ba34b5659a465f7c86df">&#9670;&#160;</a></span>cur_alpha</h2>
 
@@ -1265,7 +1411,7 @@ Here is the call graph for this function:</div>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="Stabilization_8h_source.html#l00083">83</a> of file <a class="el" href="Stabilization_8h_source.html">Stabilization.h</a>.</p>
+<p class="definition">Definition at line <a class="el" href="Stabilization_8h_source.html#l00084">84</a> of file <a class="el" href="Stabilization_8h_source.html">Stabilization.h</a>.</p>
 
 </div>
 </div>
@@ -1353,7 +1499,7 @@ Here is the call graph for this function:</div>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="Stabilization_8h_source.html#l00223">223</a> of file <a class="el" href="Stabilization_8h_source.html">Stabilization.h</a>.</p>
+<p class="definition">Definition at line <a class="el" href="Stabilization_8h_source.html#l00266">266</a> of file <a class="el" href="Stabilization_8h_source.html">Stabilization.h</a>.</p>
 
 </div>
 </div>
@@ -1369,7 +1515,7 @@ Here is the call graph for this function:</div>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="Stabilization_8h_source.html#l00392">392</a> of file <a class="el" href="Stabilization_8h_source.html">Stabilization.h</a>.</p>
+<p class="definition">Definition at line <a class="el" href="Stabilization_8h_source.html#l00425">425</a> of file <a class="el" href="Stabilization_8h_source.html">Stabilization.h</a>.</p>
 
 </div>
 </div>
@@ -1393,7 +1539,7 @@ Here is the call graph for this function:</div>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="Stabilization_8h_source.html#l00037">37</a> of file <a class="el" href="Stabilization_8h_source.html">Stabilization.h</a>.</p>
+<p class="definition">Definition at line <a class="el" href="Stabilization_8h_source.html#l00036">36</a> of file <a class="el" href="Stabilization_8h_source.html">Stabilization.h</a>.</p>
 
 </div>
 </div>
@@ -1417,7 +1563,7 @@ Here is the call graph for this function:</div>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="Stabilization_8h_source.html#l00036">36</a> of file <a class="el" href="Stabilization_8h_source.html">Stabilization.h</a>.</p>
+<p class="definition">Definition at line <a class="el" href="Stabilization_8h_source.html#l00035">35</a> of file <a class="el" href="Stabilization_8h_source.html">Stabilization.h</a>.</p>
 
 </div>
 </div>
@@ -1441,7 +1587,31 @@ Here is the call graph for this function:</div>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="Stabilization_8h_source.html#l00035">35</a> of file <a class="el" href="Stabilization_8h_source.html">Stabilization.h</a>.</p>
+<p class="definition">Definition at line <a class="el" href="Stabilization_8h_source.html#l00034">34</a> of file <a class="el" href="Stabilization_8h_source.html">Stabilization.h</a>.</p>
+
+</div>
+</div>
+<a id="a9a86584548072aff4d928f02875f074c" name="a9a86584548072aff4d928f02875f074c"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a9a86584548072aff4d928f02875f074c">&#9670;&#160;</a></span>kNormTolerance</h2>
+
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">double Stabilization::kNormTolerance = 1e-4</td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel static">static</span><span class="mlabel constexpr">constexpr</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+<p class="definition">Definition at line <a class="el" href="Stabilization_8h_source.html#l00037">37</a> of file <a class="el" href="Stabilization_8h_source.html">Stabilization.h</a>.</p>
 
 </div>
 </div>
@@ -1505,7 +1675,7 @@ Here is the call graph for this function:</div>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="Stabilization_8h_source.html#l00319">319</a> of file <a class="el" href="Stabilization_8h_source.html">Stabilization.h</a>.</p>
+<p class="definition">Definition at line <a class="el" href="Stabilization_8h_source.html#l00344">344</a> of file <a class="el" href="Stabilization_8h_source.html">Stabilization.h</a>.</p>
 
 </div>
 </div>
@@ -1585,7 +1755,7 @@ Here is the call graph for this function:</div>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="Stabilization_8h_source.html#l00315">315</a> of file <a class="el" href="Stabilization_8h_source.html">Stabilization.h</a>.</p>
+<p class="definition">Definition at line <a class="el" href="Stabilization_8h_source.html#l00340">340</a> of file <a class="el" href="Stabilization_8h_source.html">Stabilization.h</a>.</p>
 
 </div>
 </div>
@@ -1601,7 +1771,7 @@ Here is the call graph for this function:</div>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="Stabilization_8h_source.html#l00320">320</a> of file <a class="el" href="Stabilization_8h_source.html">Stabilization.h</a>.</p>
+<p class="definition">Definition at line <a class="el" href="Stabilization_8h_source.html#l00345">345</a> of file <a class="el" href="Stabilization_8h_source.html">Stabilization.h</a>.</p>
 
 </div>
 </div>

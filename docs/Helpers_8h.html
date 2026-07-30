@@ -122,129 +122,134 @@ document.addEventListener('DOMContentLoaded',() => { initNavTree('Helpers_8h.htm
 </div><!--header-->
 <div class="contents">
 <div class="textblock"><code>#include &quot;<a class="el" href="Cut_8h_source.html">cuts/model/Cut.h</a>&quot;</code><br />
+<code>#include &lt;bit&gt;</code><br />
 </div><div class="textblock"><div class="dynheader">
 Include dependency graph for Helpers.h:</div>
 <div class="dyncontent">
 <div class="center"><img src="Helpers_8h__incl.png" border="0" usemap="#aHelpers_8h" loading="lazy" alt=""/></div>
 <map name="aHelpers_8h" id="aHelpers_8h">
-<area shape="rect" title=" " alt="" coords="2024,5,2101,31"/>
-<area shape="rect" href="Cut_8h.html" title="Defines cut structures and storage for solver separation." alt="" coords="2003,79,2122,105"/>
-<area shape="poly" title=" " alt="" coords="2065,31,2065,63,2060,63,2060,31"/>
-<area shape="rect" href="Common_8h.html" title=" " alt="" coords="1508,315,1625,341"/>
-<area shape="poly" title=" " alt="" coords="2003,102,1924,115,1829,139,1729,176,1682,200,1637,228,1619,245,1603,264,1580,302,1576,300,1599,261,1615,241,1634,224,1679,195,1727,171,1828,134,1923,110,2002,97"/>
-<area shape="rect" href="Definitions_8h.html" title="Header file containing definitions and structures for the solver." alt="" coords="1945,153,2065,178"/>
-<area shape="poly" title=" " alt="" coords="2055,107,2026,142,2022,139,2051,103"/>
-<area shape="rect" href="Label_8h.html" title="Defines the Label state and comparator used by the solver." alt="" coords="1754,226,1896,267"/>
-<area shape="poly" title=" " alt="" coords="2031,108,1984,128,1934,155,1893,186,1857,218,1853,214,1889,182,1932,150,1982,123,2029,103"/>
-<area shape="rect" href="Path_8h.html" title="Memory&#45;optimized implementation of the Path struct." alt="" coords="2395,153,2492,178"/>
-<area shape="poly" title=" " alt="" coords="2123,102,2380,150,2379,155,2122,107"/>
-<area shape="rect" href="Serializer_8h.html" title=" " alt="" coords="2025,315,2153,341"/>
-<area shape="poly" title=" " alt="" coords="2068,104,2080,152,2089,232,2092,300,2086,300,2084,233,2074,153,2063,106"/>
-<area shape="rect" href="Constraint_8h.html" title=" " alt="" coords="2759,153,2875,178"/>
-<area shape="poly" title=" " alt="" coords="2122,96,2744,155,2743,160,2122,101"/>
-<area shape="rect" title=" " alt="" coords="1534,396,1599,422"/>
-<area shape="poly" title=" " alt="" coords="1569,341,1569,380,1564,380,1564,341"/>
-<area shape="rect" title=" " alt="" coords="29,396,187,422"/>
-<area shape="poly" title=" " alt="" coords="1508,331,1295,332,974,339,594,357,397,372,205,391,177,395,177,390,205,386,397,366,593,351,973,333,1295,326,1508,326"/>
-<area shape="rect" href="Hashes_8h.html" title=" " alt="" coords="1624,396,1728,422"/>
-<area shape="poly" title=" " alt="" coords="1585,339,1648,385,1645,389,1581,343"/>
-<area shape="rect" title=" " alt="" coords="188,477,259,503"/>
-<area shape="poly" title=" " alt="" coords="1508,333,1213,337,803,348,432,366,307,377,269,384,251,391,238,406,231,424,225,462,220,461,225,422,234,403,248,386,268,379,307,372,431,360,803,343,1213,332,1508,327"/>
-<area shape="rect" title=" " alt="" coords="261,389,389,429"/>
-<area shape="poly" title=" " alt="" coords="1508,333,972,352,651,369,513,379,404,391,404,386,513,374,650,364,971,347,1507,328"/>
-<area shape="rect" title=" " alt="" coords="413,396,562,422"/>
-<area shape="poly" title=" " alt="" coords="1508,332,1347,335,1116,344,847,362,575,391,552,395,551,390,574,386,847,356,1115,339,1347,330,1508,327"/>
-<area shape="rect" title=" " alt="" coords="587,396,663,422"/>
-<area shape="poly" title=" " alt="" coords="1508,334,1087,351,849,368,751,379,676,391,668,393,667,388,675,386,750,374,849,363,1087,346,1508,328"/>
-<area shape="rect" title=" " alt="" coords="2281,396,2356,422"/>
-<area shape="poly" title=" " alt="" coords="1625,331,1997,361,2270,386,2277,388,2276,393,2269,391,1996,366,1625,336"/>
-<area shape="rect" title=" " alt="" coords="1831,396,1880,422"/>
-<area shape="poly" title=" " alt="" coords="1626,336,1718,356,1819,386,1821,387,1819,392,1818,391,1716,361,1625,342"/>
-<area shape="rect" title=" " alt="" coords="1996,396,2057,422"/>
-<area shape="poly" title=" " alt="" coords="1625,330,1789,347,1887,363,1984,386,1989,388,1988,393,1983,391,1886,368,1788,352,1625,335"/>
-<area shape="rect" title=" " alt="" coords="688,396,744,422"/>
-<area shape="poly" title=" " alt="" coords="1508,333,1126,350,912,367,824,378,758,391,753,393,752,387,756,386,823,373,911,362,1125,345,1508,328"/>
-<area shape="rect" title=" " alt="" coords="2080,396,2146,422"/>
-<area shape="poly" title=" " alt="" coords="1625,331,1859,354,1981,369,2070,386,2075,388,2074,393,2068,391,1981,375,1859,359,1625,337"/>
-<area shape="rect" title=" " alt="" coords="1753,396,1807,422"/>
-<area shape="poly" title=" " alt="" coords="1607,339,1741,386,1743,387,1741,392,1739,391,1605,344"/>
-<area shape="rect" title=" " alt="" coords="769,396,815,422"/>
-<area shape="poly" title=" " alt="" coords="1508,334,1356,339,1159,350,967,367,888,378,828,391,826,392,824,387,827,386,887,373,966,362,1159,345,1356,334,1508,328"/>
-<area shape="rect" title=" " alt="" coords="1905,396,1972,422"/>
-<area shape="poly" title=" " alt="" coords="1625,334,1749,353,1821,368,1892,386,1898,388,1897,393,1891,391,1820,373,1748,358,1624,339"/>
-<area shape="rect" title=" " alt="" coords="840,396,896,422"/>
-<area shape="poly" title=" " alt="" coords="1508,334,1198,354,1030,370,961,380,908,391,904,392,903,387,907,386,960,375,1029,365,1197,349,1508,329"/>
-<area shape="rect" title=" " alt="" coords="920,396,976,422"/>
-<area shape="poly" title=" " alt="" coords="1508,331,1408,334,1278,342,1132,360,1059,374,988,391,984,392,983,387,987,386,1058,369,1132,355,1277,337,1408,328,1508,326"/>
-<area shape="rect" title=" " alt="" coords="1000,396,1061,422"/>
-<area shape="poly" title=" " alt="" coords="1508,333,1422,338,1313,348,1193,365,1074,391,1069,393,1068,388,1072,386,1192,360,1312,342,1422,333,1507,328"/>
-<area shape="rect" title=" " alt="" coords="2169,396,2257,422"/>
-<area shape="poly" title=" " alt="" coords="1625,331,1902,354,2050,370,2158,386,2168,389,2166,394,2157,391,2049,375,1901,359,1625,336"/>
-<area shape="rect" title=" " alt="" coords="2482,396,2539,422"/>
-<area shape="poly" title=" " alt="" coords="1625,331,1723,338,1837,343,1934,344,2099,340,2179,341,2263,347,2358,362,2470,386,2475,387,2473,393,2468,391,2358,367,2263,353,2178,346,2099,345,1934,349,1836,349,1722,343,1625,336"/>
-<area shape="rect" title=" " alt="" coords="2775,396,2944,422"/>
-<area shape="poly" title=" " alt="" coords="1625,331,1723,338,2137,363,2552,386,2760,399,2759,404,2552,391,2137,368,1722,343,1625,336"/>
-<area shape="rect" title=" " alt="" coords="1085,389,1221,429"/>
-<area shape="poly" title=" " alt="" coords="1508,341,1236,391,1236,386,1507,336"/>
-<area shape="rect" title=" " alt="" coords="1245,396,1328,422"/>
-<area shape="poly" title=" " alt="" coords="1516,344,1340,391,1334,393,1332,388,1339,386,1514,339"/>
-<area shape="rect" title=" " alt="" coords="1352,396,1431,422"/>
-<area shape="poly" title=" " alt="" coords="1541,344,1433,392,1431,387,1538,339"/>
-<area shape="rect" title=" " alt="" coords="1456,396,1509,422"/>
-<area shape="poly" title=" " alt="" coords="1555,343,1508,387,1504,384,1552,339"/>
-<area shape="rect" title=" " alt="" coords="2548,477,2609,503"/>
-<area shape="poly" title=" " alt="" coords="1713,420,1742,427,1856,445,1973,458,2201,476,2397,484,2532,486,2532,492,2397,490,2201,482,1972,464,1855,450,1741,432,1712,425"/>
-<area shape="poly" title=" " alt="" coords="1640,425,1611,432,1486,447,1321,459,925,477,538,487,275,491,275,486,538,481,925,471,1320,454,1486,442,1610,427,1639,420"/>
-<area shape="poly" title=" " alt="" coords="1945,173,1828,190,1763,206,1700,229,1650,262,1594,307,1591,303,1647,257,1697,224,1761,201,1827,184,1944,168"/>
-<area shape="poly" title=" " alt="" coords="2066,166,2510,188,2729,205,2801,214,2836,224,2850,241,2860,261,2871,303,2872,346,2868,381,2863,381,2866,345,2865,304,2855,262,2846,244,2833,229,2800,219,2728,210,2509,193,2066,172"/>
-<area shape="rect" href="SparseMatrix_8h.html" title=" " alt="" coords="1920,234,2074,260"/>
-<area shape="poly" title=" " alt="" coords="2006,179,2002,219,1997,218,2001,178"/>
-<area shape="poly" title=" " alt="" coords="1942,263,1908,270,1641,317,1640,312,1907,264,1941,257"/>
-<area shape="poly" title=" " alt="" coords="2033,257,2096,281,2166,313,2233,350,2289,385,2287,389,2230,354,2164,317,2094,286,2031,262"/>
-<area shape="poly" title=" " alt="" coords="1988,262,1878,386,1874,382,1984,258"/>
-<area shape="poly" title=" " alt="" coords="1982,262,1810,389,1807,384,1979,258"/>
-<area shape="poly" title=" " alt="" coords="1995,261,1951,382,1946,381,1990,259"/>
-<area shape="poly" title=" " alt="" coords="2075,253,2205,273,2279,290,2350,313,2423,348,2483,385,2480,389,2421,352,2348,317,2277,295,2204,278,2074,258"/>
-<area shape="rect" title=" " alt="" coords="1734,315,1799,341"/>
-<area shape="poly" title=" " alt="" coords="1962,263,1814,313,1812,308,1961,258"/>
-<area shape="rect" title=" " alt="" coords="2700,315,2771,341"/>
-<area shape="poly" title=" " alt="" coords="2074,253,2637,312,2685,318,2684,323,2637,318,2074,258"/>
-<area shape="rect" title=" " alt="" coords="2380,396,2457,422"/>
-<area shape="poly" title=" " alt="" coords="2074,251,2128,259,2189,271,2252,288,2312,313,2361,346,2400,383,2396,387,2358,350,2309,317,2250,293,2188,276,2128,264,2074,256"/>
-<area shape="poly" title=" " alt="" coords="1761,270,1621,313,1620,307,1760,265"/>
-<area shape="poly" title=" " alt="" coords="1841,266,1923,382,1919,385,1837,269"/>
-<area shape="poly" title=" " alt="" coords="1813,269,1787,304,1782,301,1808,266"/>
-<area shape="poly" title=" " alt="" coords="1897,262,1908,264,2037,286,2094,295,2166,312,2268,346,2369,386,2373,388,2371,393,2367,391,2266,351,2164,318,2093,301,2037,291,1907,270,1896,267"/>
-<area shape="poly" title=" " alt="" coords="2395,170,2251,174,2061,184,1876,201,1800,213,1743,229,1727,237,1716,247,1689,269,1610,311,1607,306,1686,265,1712,243,1724,233,1741,224,1799,208,1875,196,2061,178,2251,169,2394,165"/>
-<area shape="poly" title=" " alt="" coords="2494,173,2548,191,2575,206,2599,224,2617,245,2628,265,2640,315,2641,357,2631,399,2615,436,2598,466,2593,463,2610,434,2626,397,2636,357,2634,315,2623,267,2613,248,2595,228,2572,210,2545,196,2492,178"/>
-<area shape="poly" title=" " alt="" coords="2440,180,2334,384,2329,381,2435,177"/>
-<area shape="poly" title=" " alt="" coords="2450,178,2506,380,2500,382,2444,179"/>
-<area shape="poly" title=" " alt="" coords="2493,167,2607,174,2745,185,2866,202,2908,212,2931,224,2949,253,2952,280,2945,309,2931,342,2915,368,2893,388,2889,384,2911,364,2927,339,2940,308,2946,280,2944,255,2927,228,2906,217,2865,207,2744,191,2607,179,2493,172"/>
-<area shape="poly" title=" " alt="" coords="2493,169,2574,186,2618,202,2659,224,2679,241,2697,261,2724,300,2720,303,2693,264,2676,245,2656,229,2616,207,2573,191,2492,174"/>
-<area shape="rect" title=" " alt="" coords="2532,234,2585,260"/>
-<area shape="poly" title=" " alt="" coords="2463,177,2530,223,2527,227,2460,181"/>
-<area shape="rect" href="Arc_8h.html" title=" " alt="" coords="1488,234,1578,260"/>
-<area shape="poly" title=" " alt="" coords="2395,173,2100,194,1699,229,1594,240,1593,235,1698,224,2100,189,2394,168"/>
-<area shape="rect" href="RNG_8h.html" title=" " alt="" coords="2532,315,2625,341"/>
-<area shape="poly" title=" " alt="" coords="2454,177,2522,265,2557,302,2553,306,2518,269,2450,181"/>
-<area shape="poly" title=" " alt="" coords="2395,177,2313,196,2267,210,2224,229,2163,267,2115,306,2111,302,2160,262,2221,224,2266,205,2312,191,2394,172"/>
-<area shape="poly" title=" " alt="" coords="1541,259,1558,299,1553,301,1536,261"/>
-<area shape="poly" title=" " alt="" coords="1488,251,1170,259,943,268,700,281,463,299,256,323,170,337,100,353,49,371,19,390,9,408,12,423,26,437,49,449,110,468,173,480,172,485,109,473,47,454,23,441,7,426,4,407,15,387,46,366,99,348,169,332,255,318,463,294,699,276,943,263,1170,254,1487,246"/>
-<area shape="poly" title=" " alt="" coords="2581,341,2581,462,2576,462,2576,341"/>
-<area shape="poly" title=" " alt="" coords="2082,343,2048,385,2043,382,2077,339"/>
-<area shape="poly" title=" " alt="" coords="2095,340,2108,380,2102,382,2090,342"/>
-<area shape="poly" title=" " alt="" coords="2067,343,1976,391,1974,386,2065,339"/>
-<area shape="poly" title=" " alt="" coords="2109,339,2183,385,2180,390,2106,343"/>
-<area shape="poly" title=" " alt="" coords="2153,331,2300,349,2385,365,2470,386,2474,387,2472,392,2468,391,2384,370,2299,354,2153,336"/>
-<area shape="poly" title=" " alt="" coords="2154,337,2255,358,2368,386,2375,388,2373,393,2367,391,2254,363,2153,343"/>
-<area shape="poly" title=" " alt="" coords="2824,178,2837,226,2851,310,2860,380,2855,381,2846,311,2832,227,2818,179"/>
-<area shape="rect" href="LinExp_8h.html" title=" " alt="" coords="2727,234,2822,260"/>
-<area shape="poly" title=" " alt="" coords="2813,180,2790,221,2786,219,2808,177"/>
-<area shape="rect" title=" " alt="" coords="2999,234,3059,260"/>
-<area shape="poly" title=" " alt="" coords="2852,176,2981,224,2985,226,2983,231,2979,229,2850,181"/>
-<area shape="poly" title=" " alt="" coords="2727,257,2609,279,2555,296,2535,306,2522,317,2513,331,2509,347,2508,381,2503,381,2504,347,2508,329,2518,313,2532,302,2553,291,2608,274,2726,251"/>
-<area shape="poly" title=" " alt="" coords="2783,259,2849,381,2844,384,2778,261"/>
-<area shape="poly" title=" " alt="" coords="2771,261,2751,302,2746,300,2766,259"/>
+<area shape="rect" title=" " alt="" coords="2557,5,2633,31"/>
+<area shape="rect" href="Cut_8h.html" title="Defines cut structures and storage for solver separation." alt="" coords="2128,79,2247,105"/>
+<area shape="poly" title=" " alt="" coords="2557,29,2263,80,2262,75,2556,24"/>
+<area shape="rect" title=" " alt="" coords="2881,477,2920,503"/>
+<area shape="poly" title=" " alt="" coords="2634,22,2735,39,2857,68,2914,87,2961,109,2993,135,3003,149,3006,164,3006,329,2998,371,2978,410,2953,443,2928,469,2924,465,2949,440,2974,407,2993,370,3001,329,3001,164,2998,151,2990,138,2958,114,2912,92,2856,73,2734,45,2633,27"/>
+<area shape="rect" href="Common_8h.html" title=" " alt="" coords="1490,315,1607,341"/>
+<area shape="poly" title=" " alt="" coords="2128,100,1992,114,1824,138,1742,155,1669,176,1610,200,1587,214,1570,228,1560,244,1553,263,1549,300,1544,300,1548,261,1555,242,1567,225,1584,209,1607,195,1667,171,1741,150,1823,133,1991,108,2127,95"/>
+<area shape="rect" href="Definitions_8h.html" title="Header file containing definitions and structures for the solver." alt="" coords="1843,153,1963,178"/>
+<area shape="poly" title=" " alt="" coords="2140,108,1967,151,1966,146,2138,103"/>
+<area shape="rect" href="Label_8h.html" title="Defines the Label state and comparator used by the solver." alt="" coords="1958,226,2099,267"/>
+<area shape="poly" title=" " alt="" coords="2177,107,2062,217,2058,213,2173,103"/>
+<area shape="rect" href="Path_8h.html" title="Memory&#45;optimized implementation of the Path struct." alt="" coords="2318,153,2416,178"/>
+<area shape="poly" title=" " alt="" coords="2219,103,2323,144,2321,149,2217,108"/>
+<area shape="rect" href="Serializer_8h.html" title=" " alt="" coords="2100,315,2227,341"/>
+<area shape="poly" title=" " alt="" coords="2189,105,2169,300,2163,299,2183,105"/>
+<area shape="rect" href="Constraint_8h.html" title=" " alt="" coords="2640,153,2756,178"/>
+<area shape="poly" title=" " alt="" coords="2248,99,2625,151,2624,157,2247,104"/>
+<area shape="rect" title=" " alt="" coords="772,396,837,422"/>
+<area shape="poly" title=" " alt="" coords="1490,332,1373,334,1215,343,1036,361,945,374,857,391,848,393,847,388,856,386,944,369,1035,355,1214,337,1372,329,1490,326"/>
+<area shape="rect" title=" " alt="" coords="912,396,1070,422"/>
+<area shape="poly" title=" " alt="" coords="1490,338,1308,359,1082,391,1061,395,1060,390,1081,386,1307,354,1489,332"/>
+<area shape="rect" href="Hashes_8h.html" title=" " alt="" coords="1803,396,1907,422"/>
+<area shape="poly" title=" " alt="" coords="1596,339,1794,389,1793,394,1595,344"/>
+<area shape="rect" title=" " alt="" coords="1730,477,1802,503"/>
+<area shape="poly" title=" " alt="" coords="1490,333,1340,337,1153,347,988,364,932,376,913,383,902,391,896,400,894,409,896,418,902,427,918,437,945,446,1027,461,1136,472,1262,479,1521,486,1715,487,1715,492,1521,491,1262,485,1136,477,1026,467,944,452,916,442,899,431,891,420,889,409,891,398,899,387,911,379,930,371,987,359,1153,342,1339,332,1490,327"/>
+<area shape="rect" title=" " alt="" coords="1094,389,1222,429"/>
+<area shape="poly" title=" " alt="" coords="1490,342,1237,391,1236,385,1489,337"/>
+<area shape="rect" title=" " alt="" coords="1246,396,1395,422"/>
+<area shape="poly" title=" " alt="" coords="1514,344,1371,393,1369,388,1513,339"/>
+<area shape="rect" title=" " alt="" coords="1420,396,1496,422"/>
+<area shape="poly" title=" " alt="" coords="1536,343,1485,388,1481,384,1533,339"/>
+<area shape="rect" title=" " alt="" coords="1931,396,2006,422"/>
+<area shape="poly" title=" " alt="" coords="1607,332,1751,351,1836,366,1920,386,1926,388,1925,393,1918,391,1835,372,1750,356,1607,337"/>
+<area shape="rect" title=" " alt="" coords="84,396,133,422"/>
+<area shape="poly" title=" " alt="" coords="1490,334,746,359,348,376,212,384,146,391,143,392,142,387,145,386,212,379,347,371,746,354,1490,328"/>
+<area shape="rect" title=" " alt="" coords="2121,396,2181,422"/>
+<area shape="poly" title=" " alt="" coords="1607,327,1704,330,1830,339,1970,357,2109,386,2115,388,2113,393,2108,391,1969,362,1829,344,1704,335,1607,332"/>
+<area shape="rect" title=" " alt="" coords="1520,396,1577,422"/>
+<area shape="poly" title=" " alt="" coords="1551,341,1551,380,1546,380,1546,341"/>
+<area shape="rect" title=" " alt="" coords="2205,396,2270,422"/>
+<area shape="poly" title=" " alt="" coords="1607,326,1717,328,1864,336,2029,354,2113,368,2194,386,2200,388,2199,393,2193,391,2112,373,2029,359,1864,341,1717,333,1607,331"/>
+<area shape="rect" title=" " alt="" coords="5,396,60,422"/>
+<area shape="poly" title=" " alt="" coords="1490,333,736,350,315,368,162,379,72,391,68,392,66,387,71,386,161,374,315,363,736,345,1490,327"/>
+<area shape="rect" title=" " alt="" coords="1601,396,1648,422"/>
+<area shape="poly" title=" " alt="" coords="1562,339,1604,383,1600,387,1558,343"/>
+<area shape="rect" title=" " alt="" coords="2030,396,2097,422"/>
+<area shape="poly" title=" " alt="" coords="1608,329,1792,345,1906,361,2018,386,2024,388,2023,393,2017,391,1905,367,1792,350,1607,334"/>
+<area shape="rect" title=" " alt="" coords="1672,396,1729,422"/>
+<area shape="poly" title=" " alt="" coords="1573,339,1665,386,1662,391,1570,343"/>
+<area shape="rect" title=" " alt="" coords="158,396,214,422"/>
+<area shape="poly" title=" " alt="" coords="1490,334,788,360,415,377,288,385,226,391,222,393,220,387,225,386,288,379,415,372,788,355,1490,328"/>
+<area shape="rect" title=" " alt="" coords="238,396,299,422"/>
+<area shape="poly" title=" " alt="" coords="1490,333,858,354,512,372,386,381,312,391,306,393,305,388,311,386,385,376,512,366,858,349,1490,328"/>
+<area shape="rect" title=" " alt="" coords="2294,396,2382,422"/>
+<area shape="poly" title=" " alt="" coords="1607,329,1953,350,2145,367,2284,386,2294,389,2293,394,2283,391,2144,372,1953,356,1607,335"/>
+<area shape="rect" title=" " alt="" coords="2508,396,2565,422"/>
+<area shape="poly" title=" " alt="" coords="1607,329,2092,352,2348,369,2441,378,2496,386,2501,387,2499,393,2495,391,2440,383,2347,374,2091,358,1607,334"/>
+<area shape="rect" title=" " alt="" coords="2589,396,2758,422"/>
+<area shape="poly" title=" " alt="" coords="1607,329,2092,351,2373,368,2578,386,2605,390,2604,395,2578,391,2372,373,2092,357,1607,334"/>
+<area shape="rect" title=" " alt="" coords="323,389,459,429"/>
+<area shape="poly" title=" " alt="" coords="1490,334,995,354,701,370,475,391,475,386,701,365,995,348,1490,328"/>
+<area shape="rect" title=" " alt="" coords="483,396,566,422"/>
+<area shape="poly" title=" " alt="" coords="1490,333,1032,351,769,368,660,379,578,391,569,394,568,388,577,386,660,373,769,362,1031,345,1490,328"/>
+<area shape="rect" title=" " alt="" coords="590,396,670,422"/>
+<area shape="poly" title=" " alt="" coords="1490,334,1081,352,850,369,755,380,682,391,674,393,672,388,681,386,754,374,850,364,1081,347,1490,328"/>
+<area shape="rect" title=" " alt="" coords="694,396,747,422"/>
+<area shape="poly" title=" " alt="" coords="1490,333,1329,339,1117,350,910,367,824,378,760,391,756,392,754,387,759,386,823,373,909,362,1117,345,1328,334,1490,328"/>
+<area shape="poly" title=" " alt="" coords="1891,420,1920,427,2061,446,2182,455,2289,455,2389,452,2489,449,2596,449,2717,456,2860,475,2867,476,2866,481,2859,480,2717,462,2596,454,2489,454,2389,457,2289,461,2182,460,2061,452,1919,432,1890,425"/>
+<area shape="rect" title=" " alt="" coords="2786,477,2847,503"/>
+<area shape="poly" title=" " alt="" coords="1891,420,1920,427,2043,446,2170,461,2416,479,2627,486,2771,487,2771,492,2627,491,2416,484,2169,466,2043,451,1919,432,1890,425"/>
+<area shape="poly" title=" " alt="" coords="1843,424,1793,469,1789,465,1840,420"/>
+<area shape="poly" title=" " alt="" coords="1843,176,1713,196,1652,211,1611,229,1594,244,1580,263,1560,301,1555,299,1575,260,1590,240,1608,224,1651,206,1712,191,1843,171"/>
+<area shape="poly" title=" " alt="" coords="1948,176,2112,224,2403,315,2625,388,2623,393,2401,321,2110,229,1946,182"/>
+<area shape="rect" href="SparseMatrix_8h.html" title=" " alt="" coords="1780,234,1933,260"/>
+<area shape="poly" title=" " alt="" coords="1898,180,1874,222,1869,219,1894,177"/>
+<area shape="poly" title=" " alt="" coords="1810,263,1611,313,1610,308,1808,258"/>
+<area shape="poly" title=" " alt="" coords="1855,260,1848,298,1849,319,1856,339,1866,350,1884,363,1929,387,1926,391,1881,367,1863,354,1852,342,1844,320,1843,297,1850,259"/>
+<area shape="poly" title=" " alt="" coords="1806,263,1769,270,1611,286,1413,297,954,313,718,324,496,338,301,360,218,374,147,391,143,392,142,387,145,386,217,369,300,355,496,333,718,318,953,308,1413,291,1610,280,1768,264,1806,258"/>
+<area shape="poly" title=" " alt="" coords="1808,263,1769,270,1567,290,1396,298,1245,299,1105,295,964,292,813,292,642,299,441,318,253,342,173,360,72,391,69,392,68,387,70,386,172,355,252,336,440,312,642,294,813,286,964,286,1105,290,1245,294,1396,293,1567,285,1768,264,1807,257"/>
+<area shape="poly" title=" " alt="" coords="1861,259,1874,298,1885,320,1900,339,1928,360,1954,369,1983,375,2019,386,2021,387,2019,392,2017,391,1982,380,1953,374,1925,364,1896,343,1880,323,1869,300,1856,261"/>
+<area shape="poly" title=" " alt="" coords="1911,258,1946,264,2040,278,2114,285,2188,294,2281,312,2390,344,2496,386,2499,387,2497,392,2494,391,2389,349,2280,318,2187,299,2114,290,2040,283,1945,270,1910,263"/>
+<area shape="rect" title=" " alt="" coords="1910,315,1974,341"/>
+<area shape="poly" title=" " alt="" coords="1871,258,1920,302,1916,306,1868,262"/>
+<area shape="rect" title=" " alt="" coords="2505,315,2576,341"/>
+<area shape="poly" title=" " alt="" coords="1909,257,1946,264,2210,294,2489,319,2489,325,2210,299,1945,270,1908,263"/>
+<area shape="rect" title=" " alt="" coords="2406,396,2483,422"/>
+<area shape="poly" title=" " alt="" coords="1912,258,1946,264,2029,276,2095,281,2160,289,2240,313,2263,325,2284,338,2399,388,2397,393,2282,343,2260,329,2238,317,2159,295,2094,286,2029,281,1945,270,1911,263"/>
+<area shape="poly" title=" " alt="" coords="1958,267,1946,270,1772,299,1622,320,1622,315,1771,294,1945,264,1957,262"/>
+<area shape="poly" title=" " alt="" coords="2035,267,2060,381,2055,382,2030,268"/>
+<area shape="poly" title=" " alt="" coords="2009,269,1968,306,1965,302,2005,265"/>
+<area shape="poly" title=" " alt="" coords="2100,259,2189,281,2284,313,2357,349,2416,385,2413,390,2354,353,2282,317,2187,286,2099,264"/>
+<area shape="poly" title=" " alt="" coords="2318,172,1952,193,1762,210,1694,219,1655,229,1574,306,1570,302,1653,224,1693,214,1762,204,1952,188,2318,166"/>
+<area shape="poly" title=" " alt="" coords="2417,167,2493,172,2583,183,2664,200,2697,211,2719,224,2745,250,2766,280,2782,312,2795,346,2811,410,2818,461,2812,462,2805,411,2790,347,2777,314,2761,282,2741,253,2716,228,2694,216,2663,205,2582,188,2493,178,2416,172"/>
+<area shape="poly" title=" " alt="" coords="2339,181,2236,229,2161,270,2089,317,1996,388,1993,384,2086,313,2158,265,2234,224,2337,176"/>
+<area shape="poly" title=" " alt="" coords="2377,177,2433,265,2520,382,2516,386,2429,269,2372,180"/>
+<area shape="poly" title=" " alt="" coords="2416,166,2489,171,2571,181,2645,198,2673,210,2692,225,2703,243,2710,263,2711,307,2702,348,2689,383,2684,381,2697,347,2705,306,2705,264,2699,245,2688,228,2670,214,2643,203,2570,186,2488,176,2416,171"/>
+<area shape="poly" title=" " alt="" coords="2383,177,2438,224,2519,302,2516,306,2435,228,2380,181"/>
+<area shape="rect" title=" " alt="" coords="2506,234,2559,260"/>
+<area shape="poly" title=" " alt="" coords="2394,177,2495,224,2492,229,2391,181"/>
+<area shape="rect" href="Arc_8h.html" title=" " alt="" coords="1666,234,1756,260"/>
+<area shape="poly" title=" " alt="" coords="2318,171,2217,175,2080,185,1925,202,1769,229,1759,231,1757,226,1768,224,1924,197,2080,180,2217,170,2318,165"/>
+<area shape="rect" href="RNG_8h.html" title=" " alt="" coords="2854,396,2947,422"/>
+<area shape="poly" title=" " alt="" coords="2416,168,2656,189,2772,205,2813,214,2837,224,2853,240,2867,259,2886,302,2897,344,2902,380,2897,381,2892,345,2881,303,2862,262,2849,244,2834,229,2812,219,2772,210,2656,194,2416,173"/>
+<area shape="poly" title=" " alt="" coords="2353,181,2192,307,2189,303,2350,177"/>
+<area shape="poly" title=" " alt="" coords="1687,262,1588,310,1586,306,1685,258"/>
+<area shape="poly" title=" " alt="" coords="1716,259,1762,461,1757,462,1711,260"/>
+<area shape="poly" title=" " alt="" coords="2903,422,2903,461,2898,461,2898,422"/>
+<area shape="poly" title=" " alt="" coords="2890,424,2842,469,2838,465,2886,420"/>
+<area shape="poly" title=" " alt="" coords="2164,341,2158,381,2153,380,2159,341"/>
+<area shape="poly" title=" " alt="" coords="2176,339,2218,383,2214,387,2173,343"/>
+<area shape="poly" title=" " alt="" coords="2150,343,2092,388,2089,384,2146,339"/>
+<area shape="poly" title=" " alt="" coords="2191,339,2299,387,2296,392,2189,344"/>
+<area shape="poly" title=" " alt="" coords="2228,333,2353,352,2425,367,2496,386,2500,387,2498,392,2494,391,2424,372,2352,357,2227,338"/>
+<area shape="poly" title=" " alt="" coords="2217,339,2301,359,2395,386,2401,388,2399,393,2393,391,2300,365,2216,344"/>
+<area shape="poly" title=" " alt="" coords="2710,177,2725,199,2736,225,2745,258,2748,284,2746,310,2736,342,2722,367,2703,388,2699,384,2717,364,2731,340,2741,309,2743,284,2740,259,2731,227,2720,201,2705,180"/>
+<area shape="rect" href="LinExp_8h.html" title=" " alt="" coords="2582,234,2678,260"/>
+<area shape="poly" title=" " alt="" coords="2690,181,2652,224,2648,220,2685,177"/>
+<area shape="rect" title=" " alt="" coords="2905,234,2965,260"/>
+<area shape="poly" title=" " alt="" coords="2739,176,2887,224,2891,225,2890,230,2885,229,2738,181"/>
+<area shape="poly" title=" " alt="" coords="2628,261,2613,298,2591,342,2559,386,2555,383,2586,339,2608,296,2623,259"/>
+<area shape="poly" title=" " alt="" coords="2636,259,2669,380,2664,382,2631,261"/>
+<area shape="poly" title=" " alt="" coords="2618,262,2567,306,2564,302,2615,258"/>
 </map>
 </div>
 </div><div class="textblock"><div class="dynheader">
@@ -279,10 +284,10 @@ This graph shows which files directly or indirectly include this file:</div>
 <table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 id="header-nested-classes" class="groupheader"><a id="nested-classes" name="nested-classes"></a>
 Classes</h2></td></tr>
-<tr class="memitem:std_3A_3Ahash_3C_20std_3A_3Avector_3C_20int_20_3E_20_3E" id="r_std_3A_3Ahash_3C_20std_3A_3Avector_3C_20int_20_3E_20_3E"><td class="memItemLeft">struct &#160;</td><td class="memItemRight"><a class="el" href="structstd_1_1hash_3_01std_1_1vector_3_01int_01_4_01_4.html">std::hash&lt; std::vector&lt; int &gt; &gt;</a></td></tr>
+<tr class="memitem:IntVectorHasher" id="r_IntVectorHasher"><td class="memItemLeft">struct &#160;</td><td class="memItemRight"><a class="el" href="structIntVectorHasher.html">IntVectorHasher</a></td></tr>
 <tr class="memitem:NodeScore" id="r_NodeScore"><td class="memItemLeft">struct &#160;</td><td class="memItemRight"><a class="el" href="structNodeScore.html">NodeScore</a></td></tr>
 <tr class="memitem:CandidateSet" id="r_CandidateSet"><td class="memItemLeft">struct &#160;</td><td class="memItemRight"><a class="el" href="structCandidateSet.html">CandidateSet</a></td></tr>
-<tr class="memitem:CandidateSetCompare" id="r_CandidateSetCompare"><td class="memItemLeft">struct &#160;</td><td class="memItemRight"><a class="el" href="structCandidateSetCompare.html">CandidateSetCompare</a></td></tr>
+<tr class="memitem:CandidateSetEqual" id="r_CandidateSetEqual"><td class="memItemLeft">struct &#160;</td><td class="memItemRight"><a class="el" href="structCandidateSetEqual.html">CandidateSetEqual</a></td></tr>
 <tr class="memitem:CandidateSetHasher" id="r_CandidateSetHasher"><td class="memItemLeft">struct &#160;</td><td class="memItemRight"><a class="el" href="structCandidateSetHasher.html">CandidateSetHasher</a></td></tr>
 <tr class="memitem:std_3A_3Ahash_3C_20CandidateSet_20_3E" id="r_std_3A_3Ahash_3C_20CandidateSet_20_3E"><td class="memItemLeft">struct &#160;</td><td class="memItemRight"><a class="el" href="structstd_1_1hash_3_01CandidateSet_01_4.html">std::hash&lt; CandidateSet &gt;</a></td></tr>
 </table><table class="memberdecls">
@@ -290,6 +295,10 @@ Classes</h2></td></tr>
 Namespaces</h2></td></tr>
 <tr class="memitem:LocalSearchConfig" id="r_LocalSearchConfig"><td class="memItemLeft">namespace &#160;</td><td class="memItemRight"><a class="el" href="namespaceLocalSearchConfig.html">LocalSearchConfig</a></td></tr>
 <tr class="memitem:std" id="r_std"><td class="memItemLeft">namespace &#160;</td><td class="memItemRight"><a class="el" href="namespacestd.html">std</a></td></tr>
+</table><table class="memberdecls">
+<tr class="heading"><td colspan="2"><h2 id="header-typedef-members" class="groupheader"><a id="typedef-members" name="typedef-members"></a>
+Typedefs</h2></td></tr>
+<tr class="memitem:ab304ecfaab103190601d4a2a1969dcfe" id="r_ab304ecfaab103190601d4a2a1969dcfe"><td class="memItemLeft">using&#160;</td><td class="memItemRight"><a class="el" href="#ab304ecfaab103190601d4a2a1969dcfe">CandidateSetCollection</a> = ankerl::unordered_dense::set&lt;<a class="el" href="structCandidateSet.html">CandidateSet</a>, <a class="el" href="structCandidateSetHasher.html">CandidateSetHasher</a>, <a class="el" href="structCandidateSetEqual.html">CandidateSetEqual</a>&gt;</td></tr>
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 id="header-func-members" class="groupheader"><a id="func-members" name="func-members"></a>
 Functions</h2></td></tr>
@@ -318,6 +327,23 @@ Variables</h2></td></tr>
 <tr class="memitem:ad445f1917bb995e1a55720dc346cc907" id="r_ad445f1917bb995e1a55720dc346cc907"><td class="memItemLeft">constexpr double&#160;</td><td class="memItemRight"><a class="el" href="namespaceLocalSearchConfig.html#ad445f1917bb995e1a55720dc346cc907">LocalSearchConfig::REHEATING_FACTOR</a> = 1.5</td></tr>
 <tr class="memitem:aa531b708b049ca0899da7935f0d505b7" id="r_aa531b708b049ca0899da7935f0d505b7"><td class="memItemLeft">constexpr int&#160;</td><td class="memItemRight"><a class="el" href="namespaceLocalSearchConfig.html#aa531b708b049ca0899da7935f0d505b7">LocalSearchConfig::REHEAT_INTERVAL</a> = 50</td></tr>
 </table>
+<a name="doc-typedef-members" id="doc-typedef-members"></a><h2 id="header-doc-typedef-members" class="groupheader">Typedef Documentation</h2>
+<a id="ab304ecfaab103190601d4a2a1969dcfe" name="ab304ecfaab103190601d4a2a1969dcfe"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#ab304ecfaab103190601d4a2a1969dcfe">&#9670;&#160;</a></span>CandidateSetCollection</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">using <a class="el" href="#ab304ecfaab103190601d4a2a1969dcfe">CandidateSetCollection</a> = ankerl::unordered_dense::set&lt;<a class="el" href="structCandidateSet.html">CandidateSet</a>, <a class="el" href="structCandidateSetHasher.html">CandidateSetHasher</a>, <a class="el" href="structCandidateSetEqual.html">CandidateSetEqual</a>&gt;</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p class="definition">Definition at line <a class="el" href="Helpers_8h_source.html#l00293">293</a> of file <a class="el" href="Helpers_8h_source.html">Helpers.h</a>.</p>
+
+</div>
+</div>
 <a name="doc-func-members" id="doc-func-members"></a><h2 id="header-doc-func-members" class="groupheader">Function Documentation</h2>
 <a id="a6e2d376e10d40865f9a079e6bef1501f" name="a6e2d376e10d40865f9a079e6bef1501f"></a>
 <h2 class="memtitle"><span class="permalink"><a href="#a6e2d376e10d40865f9a079e6bef1501f">&#9670;&#160;</a></span>generateExactPermutations()</h2>
@@ -342,71 +368,71 @@ Variables</h2></td></tr>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="Helpers_8h_source.html#l00125">125</a> of file <a class="el" href="Helpers_8h_source.html">Helpers.h</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  125</span>                                                                              {</div>
-<div class="line"><span class="lineno">  126</span>    std::vector&lt;std::pair&lt;std::vector&lt;int&gt;, <span class="keywordtype">int</span>&gt;&gt; plans;</div>
-<div class="line"><span class="lineno">  127</span>    <span class="keyword">auto</span>                                          add_plan = [&amp;](std::vector&lt;int&gt; base, <span class="keywordtype">int</span> den) {</div>
-<div class="line"><span class="lineno">  128</span>        <span class="keywordflow">if</span> (den &lt; 2) <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno">  129</span>        plans.emplace_back(std::move(base), den);</div>
-<div class="line"><span class="lineno">  130</span>    };</div>
-<div class="line"><span class="lineno">  131</span> </div>
-<div class="line"><span class="lineno">  132</span>    <span class="keywordflow">if</span> (candidateSize % 2 == 1) { add_plan(std::vector&lt;int&gt;(candidateSize, 1), 2); }</div>
-<div class="line"><span class="lineno">  133</span> </div>
-<div class="line"><span class="lineno">  134</span>    <span class="keywordflow">if</span> (candidateSize &gt;= 5 &amp;&amp; (candidateSize - 2) % 3 == 0) { add_plan(std::vector&lt;int&gt;(candidateSize, 1), 3); }</div>
-<div class="line"><span class="lineno">  135</span> </div>
-<div class="line"><span class="lineno">  136</span>    <span class="keywordflow">if</span> (candidateSize &gt;= 4) {</div>
-<div class="line"><span class="lineno">  137</span>        <span class="keyword">auto</span> plan = std::vector&lt;int&gt;(candidateSize, 1);</div>
-<div class="line"><span class="lineno">  138</span>        plan[0]   = candidateSize - 2;</div>
-<div class="line"><span class="lineno">  139</span>        add_plan(plan, candidateSize - 1);</div>
-<div class="line"><span class="lineno">  140</span>    }</div>
-<div class="line"><span class="lineno">  141</span> </div>
-<div class="line"><span class="lineno">  142</span>    <span class="keywordflow">if</span> (candidateSize &gt;= 5) {</div>
-<div class="line"><span class="lineno">  143</span>        <span class="keyword">auto</span> plan2 = std::vector&lt;int&gt;(candidateSize, 1);</div>
-<div class="line"><span class="lineno">  144</span>        plan2[0]   = candidateSize - 3;</div>
-<div class="line"><span class="lineno">  145</span>        plan2[1]   = candidateSize - 3;</div>
-<div class="line"><span class="lineno">  146</span>        plan2[2]   = 2;</div>
-<div class="line"><span class="lineno">  147</span>        add_plan(plan2, candidateSize - 2);</div>
-<div class="line"><span class="lineno">  148</span> </div>
-<div class="line"><span class="lineno">  149</span>        <span class="keyword">auto</span> plan3 = std::vector&lt;int&gt;(candidateSize, 1);</div>
-<div class="line"><span class="lineno">  150</span>        plan3[0]   = candidateSize - 2;</div>
-<div class="line"><span class="lineno">  151</span>        plan3[1]   = candidateSize - 2;</div>
-<div class="line"><span class="lineno">  152</span>        plan3[2]   = 2;</div>
-<div class="line"><span class="lineno">  153</span>        plan3[3]   = 2;</div>
-<div class="line"><span class="lineno">  154</span>        add_plan(plan3, candidateSize - 1);</div>
-<div class="line"><span class="lineno">  155</span> </div>
-<div class="line"><span class="lineno">  156</span>        <span class="keyword">auto</span> plan4 = std::vector&lt;int&gt;(candidateSize, 1);</div>
-<div class="line"><span class="lineno">  157</span>        plan4[0]   = candidateSize - 3;</div>
-<div class="line"><span class="lineno">  158</span>        plan4[1]   = 2;</div>
-<div class="line"><span class="lineno">  159</span>        add_plan(plan4, candidateSize - 1);</div>
-<div class="line"><span class="lineno">  160</span> </div>
-<div class="line"><span class="lineno">  161</span>        <span class="keyword">auto</span> plan6 = std::vector&lt;int&gt;(candidateSize, 1);</div>
-<div class="line"><span class="lineno">  162</span>        plan6[0]   = candidateSize - 2;</div>
-<div class="line"><span class="lineno">  163</span>        plan6[1]   = 2;</div>
-<div class="line"><span class="lineno">  164</span>        plan6[2]   = 2;</div>
-<div class="line"><span class="lineno">  165</span>        add_plan(plan6, candidateSize);</div>
-<div class="line"><span class="lineno">  166</span>    }</div>
-<div class="line"><span class="lineno">  167</span> </div>
-<div class="line"><span class="lineno">  168</span>    <span class="keywordflow">if</span> (candidateSize &gt;= 4) {</div>
-<div class="line"><span class="lineno">  169</span>        <span class="keyword">auto</span> plan5 = std::vector&lt;int&gt;(candidateSize, 1);</div>
-<div class="line"><span class="lineno">  170</span>        plan5[0]   = candidateSize - 2;</div>
-<div class="line"><span class="lineno">  171</span>        add_plan(plan5, candidateSize - 1);</div>
-<div class="line"><span class="lineno">  172</span>    }</div>
-<div class="line"><span class="lineno">  173</span> </div>
-<div class="line"><span class="lineno">  174</span>    std::sort(plans.begin(), plans.end(), [](<span class="keyword">const</span> <span class="keyword">auto</span> &amp;a, <span class="keyword">const</span> <span class="keyword">auto</span> &amp;b) {</div>
-<div class="line"><span class="lineno">  175</span>        if (a.second != b.second) return a.second &lt; b.second;</div>
-<div class="line"><span class="lineno">  176</span>        return a.first &lt; b.first;</div>
-<div class="line"><span class="lineno">  177</span>    });</div>
-<div class="line"><span class="lineno">  178</span>    plans.erase(std::unique(plans.begin(), plans.end()), plans.end());</div>
-<div class="line"><span class="lineno">  179</span> </div>
-<div class="line"><span class="lineno">  180</span>    std::vector&lt;SRCPermutation&gt; allPerms;</div>
-<div class="line"><span class="lineno">  181</span>    <span class="keywordflow">for</span> (<span class="keyword">auto</span> &amp;plan : plans) {</div>
-<div class="line"><span class="lineno">  182</span>        <span class="keyword">auto</span> perms = <a class="code hl_function" href="#acf8696478b8666472dbbc5267f76fd36">generateRuntimePermutations</a>(plan.first, plan.second);</div>
-<div class="line"><span class="lineno">  183</span>        allPerms.insert(allPerms.end(), perms.begin(), perms.end());</div>
-<div class="line"><span class="lineno">  184</span>    }</div>
-<div class="line"><span class="lineno">  185</span> </div>
-<div class="line"><span class="lineno">  186</span>    <span class="keywordflow">return</span> allPerms;</div>
-<div class="line"><span class="lineno">  187</span>}</div>
-<div class="ttc" id="aHelpers_8h_html_acf8696478b8666472dbbc5267f76fd36"><div class="ttname"><a href="#acf8696478b8666472dbbc5267f76fd36">generateRuntimePermutations</a></div><div class="ttdeci">std::vector&lt; SRCPermutation &gt; generateRuntimePermutations(const std::vector&lt; int &gt; &amp;base, int den)</div><div class="ttdef"><b>Definition</b> <a href="Helpers_8h_source.html#l00037">Helpers.h:37</a></div></div>
+<p class="definition">Definition at line <a class="el" href="Helpers_8h_source.html#l00126">126</a> of file <a class="el" href="Helpers_8h_source.html">Helpers.h</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  126</span>                                                                              {</div>
+<div class="line"><span class="lineno">  127</span>    std::vector&lt;std::pair&lt;std::vector&lt;int&gt;, <span class="keywordtype">int</span>&gt;&gt; plans;</div>
+<div class="line"><span class="lineno">  128</span>    <span class="keyword">auto</span>                                          add_plan = [&amp;](std::vector&lt;int&gt; base, <span class="keywordtype">int</span> den) {</div>
+<div class="line"><span class="lineno">  129</span>        <span class="keywordflow">if</span> (den &lt; 2) <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno">  130</span>        plans.emplace_back(std::move(base), den);</div>
+<div class="line"><span class="lineno">  131</span>    };</div>
+<div class="line"><span class="lineno">  132</span> </div>
+<div class="line"><span class="lineno">  133</span>    <span class="keywordflow">if</span> (candidateSize % 2 == 1) { add_plan(std::vector&lt;int&gt;(candidateSize, 1), 2); }</div>
+<div class="line"><span class="lineno">  134</span> </div>
+<div class="line"><span class="lineno">  135</span>    <span class="keywordflow">if</span> (candidateSize &gt;= 5 &amp;&amp; (candidateSize - 2) % 3 == 0) { add_plan(std::vector&lt;int&gt;(candidateSize, 1), 3); }</div>
+<div class="line"><span class="lineno">  136</span> </div>
+<div class="line"><span class="lineno">  137</span>    <span class="keywordflow">if</span> (candidateSize &gt;= 4) {</div>
+<div class="line"><span class="lineno">  138</span>        <span class="keyword">auto</span> plan = std::vector&lt;int&gt;(candidateSize, 1);</div>
+<div class="line"><span class="lineno">  139</span>        plan[0]   = candidateSize - 2;</div>
+<div class="line"><span class="lineno">  140</span>        add_plan(plan, candidateSize - 1);</div>
+<div class="line"><span class="lineno">  141</span>    }</div>
+<div class="line"><span class="lineno">  142</span> </div>
+<div class="line"><span class="lineno">  143</span>    <span class="keywordflow">if</span> (candidateSize &gt;= 5) {</div>
+<div class="line"><span class="lineno">  144</span>        <span class="keyword">auto</span> plan2 = std::vector&lt;int&gt;(candidateSize, 1);</div>
+<div class="line"><span class="lineno">  145</span>        plan2[0]   = candidateSize - 3;</div>
+<div class="line"><span class="lineno">  146</span>        plan2[1]   = candidateSize - 3;</div>
+<div class="line"><span class="lineno">  147</span>        plan2[2]   = 2;</div>
+<div class="line"><span class="lineno">  148</span>        add_plan(plan2, candidateSize - 2);</div>
+<div class="line"><span class="lineno">  149</span> </div>
+<div class="line"><span class="lineno">  150</span>        <span class="keyword">auto</span> plan3 = std::vector&lt;int&gt;(candidateSize, 1);</div>
+<div class="line"><span class="lineno">  151</span>        plan3[0]   = candidateSize - 2;</div>
+<div class="line"><span class="lineno">  152</span>        plan3[1]   = candidateSize - 2;</div>
+<div class="line"><span class="lineno">  153</span>        plan3[2]   = 2;</div>
+<div class="line"><span class="lineno">  154</span>        plan3[3]   = 2;</div>
+<div class="line"><span class="lineno">  155</span>        add_plan(plan3, candidateSize - 1);</div>
+<div class="line"><span class="lineno">  156</span> </div>
+<div class="line"><span class="lineno">  157</span>        <span class="keyword">auto</span> plan4 = std::vector&lt;int&gt;(candidateSize, 1);</div>
+<div class="line"><span class="lineno">  158</span>        plan4[0]   = candidateSize - 3;</div>
+<div class="line"><span class="lineno">  159</span>        plan4[1]   = 2;</div>
+<div class="line"><span class="lineno">  160</span>        add_plan(plan4, candidateSize - 1);</div>
+<div class="line"><span class="lineno">  161</span> </div>
+<div class="line"><span class="lineno">  162</span>        <span class="keyword">auto</span> plan6 = std::vector&lt;int&gt;(candidateSize, 1);</div>
+<div class="line"><span class="lineno">  163</span>        plan6[0]   = candidateSize - 2;</div>
+<div class="line"><span class="lineno">  164</span>        plan6[1]   = 2;</div>
+<div class="line"><span class="lineno">  165</span>        plan6[2]   = 2;</div>
+<div class="line"><span class="lineno">  166</span>        add_plan(plan6, candidateSize);</div>
+<div class="line"><span class="lineno">  167</span>    }</div>
+<div class="line"><span class="lineno">  168</span> </div>
+<div class="line"><span class="lineno">  169</span>    <span class="keywordflow">if</span> (candidateSize &gt;= 4) {</div>
+<div class="line"><span class="lineno">  170</span>        <span class="keyword">auto</span> plan5 = std::vector&lt;int&gt;(candidateSize, 1);</div>
+<div class="line"><span class="lineno">  171</span>        plan5[0]   = candidateSize - 2;</div>
+<div class="line"><span class="lineno">  172</span>        add_plan(plan5, candidateSize - 1);</div>
+<div class="line"><span class="lineno">  173</span>    }</div>
+<div class="line"><span class="lineno">  174</span> </div>
+<div class="line"><span class="lineno">  175</span>    std::sort(plans.begin(), plans.end(), [](<span class="keyword">const</span> <span class="keyword">auto</span> &amp;a, <span class="keyword">const</span> <span class="keyword">auto</span> &amp;b) {</div>
+<div class="line"><span class="lineno">  176</span>        if (a.second != b.second) return a.second &lt; b.second;</div>
+<div class="line"><span class="lineno">  177</span>        return a.first &lt; b.first;</div>
+<div class="line"><span class="lineno">  178</span>    });</div>
+<div class="line"><span class="lineno">  179</span>    plans.erase(std::unique(plans.begin(), plans.end()), plans.end());</div>
+<div class="line"><span class="lineno">  180</span> </div>
+<div class="line"><span class="lineno">  181</span>    std::vector&lt;SRCPermutation&gt; allPerms;</div>
+<div class="line"><span class="lineno">  182</span>    <span class="keywordflow">for</span> (<span class="keyword">auto</span> &amp;plan : plans) {</div>
+<div class="line"><span class="lineno">  183</span>        <span class="keyword">auto</span> perms = <a class="code hl_function" href="#acf8696478b8666472dbbc5267f76fd36">generateRuntimePermutations</a>(plan.first, plan.second);</div>
+<div class="line"><span class="lineno">  184</span>        allPerms.insert(allPerms.end(), perms.begin(), perms.end());</div>
+<div class="line"><span class="lineno">  185</span>    }</div>
+<div class="line"><span class="lineno">  186</span> </div>
+<div class="line"><span class="lineno">  187</span>    <span class="keywordflow">return</span> allPerms;</div>
+<div class="line"><span class="lineno">  188</span>}</div>
+<div class="ttc" id="aHelpers_8h_html_acf8696478b8666472dbbc5267f76fd36"><div class="ttname"><a href="#acf8696478b8666472dbbc5267f76fd36">generateRuntimePermutations</a></div><div class="ttdeci">std::vector&lt; SRCPermutation &gt; generateRuntimePermutations(const std::vector&lt; int &gt; &amp;base, int den)</div><div class="ttdef"><b>Definition</b> <a href="Helpers_8h_source.html#l00038">Helpers.h:38</a></div></div>
 </div><!-- fragment --><div class="dynheader">
 Here is the call graph for this function:</div>
 <div class="dyncontent">
@@ -443,82 +469,82 @@ Here is the call graph for this function:</div>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="Helpers_8h_source.html#l00049">49</a> of file <a class="el" href="Helpers_8h_source.html">Helpers.h</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">   49</span>                                                                                {</div>
-<div class="line"><span class="lineno">   50</span>    std::vector&lt;SRCPermutation&gt;                   allPerms;</div>
-<div class="line"><span class="lineno">   51</span>    std::vector&lt;std::pair&lt;std::vector&lt;int&gt;, <span class="keywordtype">int</span>&gt;&gt; plans;</div>
-<div class="line"><span class="lineno">   52</span> </div>
-<div class="line"><span class="lineno">   53</span>    <span class="comment">// Basic rank-3 and rank-5 patterns rely on small denominators.</span></div>
-<div class="line"><span class="lineno">   54</span>    plans.emplace_back(std::vector&lt;int&gt;(candidateSize, 1), 2);</div>
-<div class="line"><span class="lineno">   55</span> </div>
-<div class="line"><span class="lineno">   56</span>    <span class="keywordflow">if</span> (candidateSize &gt;= 4) {</div>
-<div class="line"><span class="lineno">   57</span>        plans.emplace_back(std::vector&lt;int&gt;(candidateSize, 1), 3);</div>
-<div class="line"><span class="lineno">   58</span>        plans.emplace_back(std::vector&lt;int&gt;(candidateSize, 1), 4);</div>
-<div class="line"><span class="lineno">   59</span>    }</div>
-<div class="line"><span class="lineno">   60</span> </div>
-<div class="line"><span class="lineno">   61</span>    <span class="keywordflow">if</span> (candidateSize &gt;= 5) { plans.emplace_back(std::vector&lt;int&gt;(candidateSize, 1), 5); }</div>
-<div class="line"><span class="lineno">   62</span> </div>
-<div class="line"><span class="lineno">   63</span>    <span class="keywordflow">if</span> (candidateSize &gt;= 4) {</div>
-<div class="line"><span class="lineno">   64</span>        <span class="keyword">auto</span> base = std::vector&lt;int&gt;(candidateSize, 1);</div>
-<div class="line"><span class="lineno">   65</span>        base[0]   = candidateSize - 2;</div>
-<div class="line"><span class="lineno">   66</span>        plans.emplace_back(base, candidateSize - 1);</div>
-<div class="line"><span class="lineno">   67</span>        plans.emplace_back(base, candidateSize);</div>
-<div class="line"><span class="lineno">   68</span>        plans.emplace_back(base, candidateSize + 1);</div>
-<div class="line"><span class="lineno">   69</span>    }</div>
-<div class="line"><span class="lineno">   70</span> </div>
-<div class="line"><span class="lineno">   71</span>    <span class="keywordflow">if</span> (candidateSize &gt;= 5) {</div>
-<div class="line"><span class="lineno">   72</span>        <span class="keyword">auto</span> base = std::vector&lt;int&gt;(candidateSize, 1);</div>
-<div class="line"><span class="lineno">   73</span>        base[0]   = candidateSize - 3;</div>
-<div class="line"><span class="lineno">   74</span>        base[1]   = 2;</div>
-<div class="line"><span class="lineno">   75</span>        plans.emplace_back(base, candidateSize - 1);</div>
-<div class="line"><span class="lineno">   76</span>        plans.emplace_back(base, candidateSize);</div>
-<div class="line"><span class="lineno">   77</span>    }</div>
-<div class="line"><span class="lineno">   78</span> </div>
-<div class="line"><span class="lineno">   79</span>    <span class="keywordflow">if</span> (candidateSize &gt;= 5) {</div>
-<div class="line"><span class="lineno">   80</span>        <span class="keyword">auto</span> base = std::vector&lt;int&gt;(candidateSize, 1);</div>
-<div class="line"><span class="lineno">   81</span>        base[0]   = candidateSize - 2;</div>
-<div class="line"><span class="lineno">   82</span>        base[1]   = candidateSize - 2;</div>
-<div class="line"><span class="lineno">   83</span>        <span class="keywordflow">if</span> (candidateSize &gt;= 3) base[2] = 2;</div>
-<div class="line"><span class="lineno">   84</span>        plans.emplace_back(base, candidateSize - 2);</div>
-<div class="line"><span class="lineno">   85</span>        plans.emplace_back(base, candidateSize - 1);</div>
-<div class="line"><span class="lineno">   86</span>    }</div>
-<div class="line"><span class="lineno">   87</span> </div>
-<div class="line"><span class="lineno">   88</span>    <span class="keywordflow">if</span> (candidateSize &gt;= 5) {</div>
-<div class="line"><span class="lineno">   89</span>        <span class="keyword">auto</span> base = std::vector&lt;int&gt;(candidateSize, 1);</div>
-<div class="line"><span class="lineno">   90</span>        base[0]   = candidateSize - 2;</div>
-<div class="line"><span class="lineno">   91</span>        base[1]   = 2;</div>
-<div class="line"><span class="lineno">   92</span>        base[2]   = 2;</div>
-<div class="line"><span class="lineno">   93</span>        plans.emplace_back(base, candidateSize);</div>
-<div class="line"><span class="lineno">   94</span>    }</div>
-<div class="line"><span class="lineno">   95</span> </div>
-<div class="line"><span class="lineno">   96</span>    <span class="keywordflow">if</span> (candidateSize &gt;= 4) {</div>
-<div class="line"><span class="lineno">   97</span>        <span class="keyword">auto</span> base = std::vector&lt;int&gt;(candidateSize, 1);</div>
-<div class="line"><span class="lineno">   98</span>        base[0]   = candidateSize - 2;</div>
-<div class="line"><span class="lineno">   99</span>        base[1]   = candidateSize - 2;</div>
-<div class="line"><span class="lineno">  100</span>        base[2]   = 2;</div>
-<div class="line"><span class="lineno">  101</span>        <span class="keywordflow">if</span> (candidateSize &gt;= 4) base[3] = 2;</div>
-<div class="line"><span class="lineno">  102</span>        plans.emplace_back(base, candidateSize - 1);</div>
-<div class="line"><span class="lineno">  103</span>        plans.emplace_back(base, candidateSize);</div>
-<div class="line"><span class="lineno">  104</span>    }</div>
-<div class="line"><span class="lineno">  105</span> </div>
-<div class="line"><span class="lineno">  106</span>    <span class="comment">// Deduplicate plans by base/den pair.</span></div>
-<div class="line"><span class="lineno">  107</span>    std::vector&lt;std::pair&lt;std::vector&lt;int&gt;, <span class="keywordtype">int</span>&gt;&gt; unique_plans;</div>
-<div class="line"><span class="lineno">  108</span>    <span class="keywordflow">for</span> (<span class="keyword">auto</span> &amp;plan : plans) {</div>
-<div class="line"><span class="lineno">  109</span>        <span class="keywordtype">bool</span> found = <span class="keyword">false</span>;</div>
-<div class="line"><span class="lineno">  110</span>        <span class="keywordflow">for</span> (<span class="keyword">const</span> <span class="keyword">auto</span> &amp;existing : unique_plans) {</div>
-<div class="line"><span class="lineno">  111</span>            <span class="keywordflow">if</span> (existing.second == plan.second &amp;&amp; existing.first == plan.first) {</div>
-<div class="line"><span class="lineno">  112</span>                found = <span class="keyword">true</span>;</div>
-<div class="line"><span class="lineno">  113</span>                <span class="keywordflow">break</span>;</div>
-<div class="line"><span class="lineno">  114</span>            }</div>
-<div class="line"><span class="lineno">  115</span>        }</div>
-<div class="line"><span class="lineno">  116</span>        <span class="keywordflow">if</span> (found) <span class="keywordflow">continue</span>;</div>
-<div class="line"><span class="lineno">  117</span>        unique_plans.emplace_back(plan);</div>
-<div class="line"><span class="lineno">  118</span>        <span class="keyword">auto</span> perms = <a class="code hl_function" href="#acf8696478b8666472dbbc5267f76fd36">generateRuntimePermutations</a>(plan.first, plan.second);</div>
-<div class="line"><span class="lineno">  119</span>        allPerms.insert(allPerms.end(), perms.begin(), perms.end());</div>
-<div class="line"><span class="lineno">  120</span>    }</div>
-<div class="line"><span class="lineno">  121</span> </div>
-<div class="line"><span class="lineno">  122</span>    <span class="keywordflow">return</span> allPerms;</div>
-<div class="line"><span class="lineno">  123</span>}</div>
+<p class="definition">Definition at line <a class="el" href="Helpers_8h_source.html#l00050">50</a> of file <a class="el" href="Helpers_8h_source.html">Helpers.h</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">   50</span>                                                                                {</div>
+<div class="line"><span class="lineno">   51</span>    std::vector&lt;SRCPermutation&gt;                   allPerms;</div>
+<div class="line"><span class="lineno">   52</span>    std::vector&lt;std::pair&lt;std::vector&lt;int&gt;, <span class="keywordtype">int</span>&gt;&gt; plans;</div>
+<div class="line"><span class="lineno">   53</span> </div>
+<div class="line"><span class="lineno">   54</span>    <span class="comment">// Basic rank-3 and rank-5 patterns rely on small denominators.</span></div>
+<div class="line"><span class="lineno">   55</span>    plans.emplace_back(std::vector&lt;int&gt;(candidateSize, 1), 2);</div>
+<div class="line"><span class="lineno">   56</span> </div>
+<div class="line"><span class="lineno">   57</span>    <span class="keywordflow">if</span> (candidateSize &gt;= 4) {</div>
+<div class="line"><span class="lineno">   58</span>        plans.emplace_back(std::vector&lt;int&gt;(candidateSize, 1), 3);</div>
+<div class="line"><span class="lineno">   59</span>        plans.emplace_back(std::vector&lt;int&gt;(candidateSize, 1), 4);</div>
+<div class="line"><span class="lineno">   60</span>    }</div>
+<div class="line"><span class="lineno">   61</span> </div>
+<div class="line"><span class="lineno">   62</span>    <span class="keywordflow">if</span> (candidateSize &gt;= 5) { plans.emplace_back(std::vector&lt;int&gt;(candidateSize, 1), 5); }</div>
+<div class="line"><span class="lineno">   63</span> </div>
+<div class="line"><span class="lineno">   64</span>    <span class="keywordflow">if</span> (candidateSize &gt;= 4) {</div>
+<div class="line"><span class="lineno">   65</span>        <span class="keyword">auto</span> base = std::vector&lt;int&gt;(candidateSize, 1);</div>
+<div class="line"><span class="lineno">   66</span>        base[0]   = candidateSize - 2;</div>
+<div class="line"><span class="lineno">   67</span>        plans.emplace_back(base, candidateSize - 1);</div>
+<div class="line"><span class="lineno">   68</span>        plans.emplace_back(base, candidateSize);</div>
+<div class="line"><span class="lineno">   69</span>        plans.emplace_back(base, candidateSize + 1);</div>
+<div class="line"><span class="lineno">   70</span>    }</div>
+<div class="line"><span class="lineno">   71</span> </div>
+<div class="line"><span class="lineno">   72</span>    <span class="keywordflow">if</span> (candidateSize &gt;= 5) {</div>
+<div class="line"><span class="lineno">   73</span>        <span class="keyword">auto</span> base = std::vector&lt;int&gt;(candidateSize, 1);</div>
+<div class="line"><span class="lineno">   74</span>        base[0]   = candidateSize - 3;</div>
+<div class="line"><span class="lineno">   75</span>        base[1]   = 2;</div>
+<div class="line"><span class="lineno">   76</span>        plans.emplace_back(base, candidateSize - 1);</div>
+<div class="line"><span class="lineno">   77</span>        plans.emplace_back(base, candidateSize);</div>
+<div class="line"><span class="lineno">   78</span>    }</div>
+<div class="line"><span class="lineno">   79</span> </div>
+<div class="line"><span class="lineno">   80</span>    <span class="keywordflow">if</span> (candidateSize &gt;= 5) {</div>
+<div class="line"><span class="lineno">   81</span>        <span class="keyword">auto</span> base = std::vector&lt;int&gt;(candidateSize, 1);</div>
+<div class="line"><span class="lineno">   82</span>        base[0]   = candidateSize - 2;</div>
+<div class="line"><span class="lineno">   83</span>        base[1]   = candidateSize - 2;</div>
+<div class="line"><span class="lineno">   84</span>        <span class="keywordflow">if</span> (candidateSize &gt;= 3) base[2] = 2;</div>
+<div class="line"><span class="lineno">   85</span>        plans.emplace_back(base, candidateSize - 2);</div>
+<div class="line"><span class="lineno">   86</span>        plans.emplace_back(base, candidateSize - 1);</div>
+<div class="line"><span class="lineno">   87</span>    }</div>
+<div class="line"><span class="lineno">   88</span> </div>
+<div class="line"><span class="lineno">   89</span>    <span class="keywordflow">if</span> (candidateSize &gt;= 5) {</div>
+<div class="line"><span class="lineno">   90</span>        <span class="keyword">auto</span> base = std::vector&lt;int&gt;(candidateSize, 1);</div>
+<div class="line"><span class="lineno">   91</span>        base[0]   = candidateSize - 2;</div>
+<div class="line"><span class="lineno">   92</span>        base[1]   = 2;</div>
+<div class="line"><span class="lineno">   93</span>        base[2]   = 2;</div>
+<div class="line"><span class="lineno">   94</span>        plans.emplace_back(base, candidateSize);</div>
+<div class="line"><span class="lineno">   95</span>    }</div>
+<div class="line"><span class="lineno">   96</span> </div>
+<div class="line"><span class="lineno">   97</span>    <span class="keywordflow">if</span> (candidateSize &gt;= 4) {</div>
+<div class="line"><span class="lineno">   98</span>        <span class="keyword">auto</span> base = std::vector&lt;int&gt;(candidateSize, 1);</div>
+<div class="line"><span class="lineno">   99</span>        base[0]   = candidateSize - 2;</div>
+<div class="line"><span class="lineno">  100</span>        base[1]   = candidateSize - 2;</div>
+<div class="line"><span class="lineno">  101</span>        base[2]   = 2;</div>
+<div class="line"><span class="lineno">  102</span>        <span class="keywordflow">if</span> (candidateSize &gt;= 4) base[3] = 2;</div>
+<div class="line"><span class="lineno">  103</span>        plans.emplace_back(base, candidateSize - 1);</div>
+<div class="line"><span class="lineno">  104</span>        plans.emplace_back(base, candidateSize);</div>
+<div class="line"><span class="lineno">  105</span>    }</div>
+<div class="line"><span class="lineno">  106</span> </div>
+<div class="line"><span class="lineno">  107</span>    <span class="comment">// Deduplicate plans by base/den pair.</span></div>
+<div class="line"><span class="lineno">  108</span>    std::vector&lt;std::pair&lt;std::vector&lt;int&gt;, <span class="keywordtype">int</span>&gt;&gt; unique_plans;</div>
+<div class="line"><span class="lineno">  109</span>    <span class="keywordflow">for</span> (<span class="keyword">auto</span> &amp;plan : plans) {</div>
+<div class="line"><span class="lineno">  110</span>        <span class="keywordtype">bool</span> found = <span class="keyword">false</span>;</div>
+<div class="line"><span class="lineno">  111</span>        <span class="keywordflow">for</span> (<span class="keyword">const</span> <span class="keyword">auto</span> &amp;existing : unique_plans) {</div>
+<div class="line"><span class="lineno">  112</span>            <span class="keywordflow">if</span> (existing.second == plan.second &amp;&amp; existing.first == plan.first) {</div>
+<div class="line"><span class="lineno">  113</span>                found = <span class="keyword">true</span>;</div>
+<div class="line"><span class="lineno">  114</span>                <span class="keywordflow">break</span>;</div>
+<div class="line"><span class="lineno">  115</span>            }</div>
+<div class="line"><span class="lineno">  116</span>        }</div>
+<div class="line"><span class="lineno">  117</span>        <span class="keywordflow">if</span> (found) <span class="keywordflow">continue</span>;</div>
+<div class="line"><span class="lineno">  118</span>        unique_plans.emplace_back(plan);</div>
+<div class="line"><span class="lineno">  119</span>        <span class="keyword">auto</span> perms = <a class="code hl_function" href="#acf8696478b8666472dbbc5267f76fd36">generateRuntimePermutations</a>(plan.first, plan.second);</div>
+<div class="line"><span class="lineno">  120</span>        allPerms.insert(allPerms.end(), perms.begin(), perms.end());</div>
+<div class="line"><span class="lineno">  121</span>    }</div>
+<div class="line"><span class="lineno">  122</span> </div>
+<div class="line"><span class="lineno">  123</span>    <span class="keywordflow">return</span> allPerms;</div>
+<div class="line"><span class="lineno">  124</span>}</div>
 </div><!-- fragment --><div class="dynheader">
 Here is the call graph for this function:</div>
 <div class="dyncontent">
@@ -559,14 +585,14 @@ Here is the call graph for this function:</div>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="Helpers_8h_source.html#l00037">37</a> of file <a class="el" href="Helpers_8h_source.html">Helpers.h</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">   37</span>                                                                                                  {</div>
-<div class="line"><span class="lineno">   38</span>    std::vector&lt;SRCPermutation&gt; perms;</div>
-<div class="line"><span class="lineno">   39</span>    std::vector&lt;int&gt;            temp = base;</div>
-<div class="line"><span class="lineno">   40</span>    std::sort(temp.begin(), temp.end());</div>
-<div class="line"><span class="lineno">   41</span>    <span class="keywordflow">do</span> { perms.emplace_back(temp, den); } <span class="keywordflow">while</span> (std::next_permutation(temp.begin(), temp.end()));</div>
-<div class="line"><span class="lineno">   42</span>    <span class="keywordflow">return</span> perms;</div>
-<div class="line"><span class="lineno">   43</span>}</div>
+<p class="definition">Definition at line <a class="el" href="Helpers_8h_source.html#l00038">38</a> of file <a class="el" href="Helpers_8h_source.html">Helpers.h</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">   38</span>                                                                                                  {</div>
+<div class="line"><span class="lineno">   39</span>    std::vector&lt;SRCPermutation&gt; perms;</div>
+<div class="line"><span class="lineno">   40</span>    std::vector&lt;int&gt;            temp = base;</div>
+<div class="line"><span class="lineno">   41</span>    std::sort(temp.begin(), temp.end());</div>
+<div class="line"><span class="lineno">   42</span>    <span class="keywordflow">do</span> { perms.emplace_back(temp, den); } <span class="keywordflow">while</span> (std::next_permutation(temp.begin(), temp.end()));</div>
+<div class="line"><span class="lineno">   43</span>    <span class="keywordflow">return</span> perms;</div>
+<div class="line"><span class="lineno">   44</span>}</div>
 </div><!-- fragment -->
 </div>
 </div>

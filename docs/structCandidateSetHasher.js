@@ -1,6 +1,6 @@
 var structCandidateSetHasher =
 [
-    [ "is_transparent", "structCandidateSetHasher.html#a66d657f6c85afa5163462d2ed2039f69", null ],
-    [ "mixed_hash", "structCandidateSetHasher.html#a409f57b05235483e80fd0b1421522880", null ],
-    [ "operator()", "structCandidateSetHasher.html#a76f26424c32999e577c167d54503a04a", null ]
+    [ "is_avalanching", "structCandidateSetHasher.html#a74bda5a77e952cd9848a531bd593df5d", null ],
+    [ "mixed_hash", "structCandidateSetHasher.html#a17c42c121761addac036136c3803ccde", null ],
+    [ "operator()", "structCandidateSetHasher.html#a8e57d03912b39e424c8e29c899c29a58", null ]
 ];

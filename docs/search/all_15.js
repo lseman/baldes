@@ -14,7 +14,7 @@ var searchData=
   ['update_5fstabilization_5fafter_5fmaster_5foptim_11',['update_stabilization_after_master_optim',['../classStabilization.html#a07b8f88bf6c2f507a936b5b98f8732ac',1,'Stabilization']]],
   ['update_5fstabilization_5fafter_5fmisprice_12',['update_stabilization_after_misprice',['../classStabilization.html#aeefeb07a3c590e646333b8fdf7529b76',1,'Stabilization']]],
   ['update_5fstabilization_5fafter_5fpricing_5foptim_13',['update_stabilization_after_pricing_optim',['../classStabilization.html#af358ea4f62658ca2a7b1509535392e2a',1,'Stabilization']]],
-  ['update_5fsubgradient_14',['update_subgradient',['../classStabilization.html#ab6b6215da1ae5d49b2e6c0877f00b359',1,'Stabilization']]],
+  ['update_5fsubgradient_14',['update_subgradient',['../classStabilization.html#a4ff5dcec21d0c23e1e440ae5761f2a3e',1,'Stabilization']]],
   ['updateactivecuts_15',['updateActiveCuts',['../classCutStorage.html#a8551af14fd920b027955a0e5321b271a',1,'CutStorage']]],
   ['updatebucketsset_16',['UpdateBucketsSet',['../classBucketGraph.html#a394e55293111f386caf44ed9e67c5653',1,'BucketGraph']]],
   ['updated_17',['updated',['../structCut.html#a4d0d8654323e16b90b89fd4a012cb89c',1,'Cut']]],

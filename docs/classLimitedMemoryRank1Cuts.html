@@ -151,7 +151,7 @@ Collaboration diagram for LimitedMemoryRank1Cuts:</div>
 Public Member Functions</h2></td></tr>
 <tr class="memitem:a0c8178e5e367d5d5124555500f650f97" id="r_a0c8178e5e367d5d5124555500f650f97"><td class="memItemLeft">void&#160;</td><td class="memItemRight"><a class="el" href="#a0c8178e5e367d5d5124555500f650f97">initializeVertexRouteMap</a> ()</td></tr>
 <tr class="memitem:ae6f376dcb6916b93872f02660eabc753" id="r_ae6f376dcb6916b93872f02660eabc753"><td class="memItemLeft">void&#160;</td><td class="memItemRight"><a class="el" href="#ae6f376dcb6916b93872f02660eabc753">initializeRank1HeuristicNeighbors</a> ()</td></tr>
-<tr class="memitem:af6c31b734c82f6e66e8b61bd8d29f652" id="r_af6c31b734c82f6e66e8b61bd8d29f652"><td class="memItemLeft">void&#160;</td><td class="memItemRight"><a class="el" href="#af6c31b734c82f6e66e8b61bd8d29f652">setDistanceMatrix</a> (const std::vector&lt; std::vector&lt; double &gt; &gt; distances)</td></tr>
+<tr class="memitem:acea7ba369523c9e5678c418078b8979a" id="r_acea7ba369523c9e5678c418078b8979a"><td class="memItemLeft">void&#160;</td><td class="memItemRight"><a class="el" href="#acea7ba369523c9e5678c418078b8979a">setDistanceMatrix</a> (const std::vector&lt; std::vector&lt; double &gt; &gt; &amp;distances)</td></tr>
 <tr class="memitem:a3689fb1a4c98eeb8f0c4b81f3caaed31" id="r_a3689fb1a4c98eeb8f0c4b81f3caaed31"><td class="memItemLeft">&#160;</td><td class="memItemRight"><a class="el" href="#a3689fb1a4c98eeb8f0c4b81f3caaed31">LimitedMemoryRank1Cuts</a> (std::vector&lt; <a class="el" href="structVRPNode.html">VRPNode</a> &gt; &amp;nodes)</td></tr>
 <tr class="memitem:a0b4483627856623c1ac1e74f36c062bb" id="r_a0b4483627856623c1ac1e74f36c062bb"><td class="memItemLeft">&#160;</td><td class="memItemRight"><a class="el" href="#a0b4483627856623c1ac1e74f36c062bb">LimitedMemoryRank1Cuts</a> (const <a class="el" href="classLimitedMemoryRank1Cuts.html">LimitedMemoryRank1Cuts</a> &amp;other)</td></tr>
 <tr class="memitem:a453b943c51e666a3224c74c15aa2f270" id="r_a453b943c51e666a3224c74c15aa2f270"><td class="memItemLeft">void&#160;</td><td class="memItemRight"><a class="el" href="#a453b943c51e666a3224c74c15aa2f270">setDuals</a> (const std::vector&lt; double &gt; &amp;duals)</td></tr>
@@ -239,23 +239,23 @@ Static Public Attributes</h2></td></tr>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="Rank1Cuts_8h_source.html#l00137">137</a> of file <a class="el" href="Rank1Cuts_8h_source.html">Rank1Cuts.h</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  138</span>        : <a class="code hl_variable" href="#a2ad457505a281134f1d458e81305ccac">rp</a>(other.<a class="code hl_variable" href="#a2ad457505a281134f1d458e81305ccac">rp</a>), <a class="code hl_variable" href="#a8912faee3fa69c5231830bfb3770e262">last_path_idx</a>(other.<a class="code hl_variable" href="#a8912faee3fa69c5231830bfb3770e262">last_path_idx</a>), <a class="code hl_variable" href="#a7a1263ac9b8e29ebfda3deaad281fa6b">vertex_route_map</a>(other.<a class="code hl_variable" href="#a7a1263ac9b8e29ebfda3deaad281fa6b">vertex_route_map</a>),</div>
-<div class="line"><span class="lineno">  139</span>          <a class="code hl_variable" href="#a39f5f769aea5711416e8152e5696c054">rank1_sep_heur_mem4_vertex</a>(other.<a class="code hl_variable" href="#a39f5f769aea5711416e8152e5696c054">rank1_sep_heur_mem4_vertex</a>),</div>
-<div class="line"><span class="lineno">  140</span>          <a class="code hl_variable" href="#a25ff7eb62e64829a67d34d07f6c3d01e">map_rank1_multiplier_dominance</a>(other.<a class="code hl_variable" href="#a25ff7eb62e64829a67d34d07f6c3d01e">map_rank1_multiplier_dominance</a>), <a class="code hl_variable" href="#a582069540ed19e7a5ec234bd7a0fa4d3">cutStorage</a>(other.<a class="code hl_variable" href="#a582069540ed19e7a5ec234bd7a0fa4d3">cutStorage</a>),</div>
-<div class="line"><span class="lineno">  141</span>          <a class="code hl_variable" href="#aaad518dd2434c218df7e9283238a6577">allPaths</a>(other.<a class="code hl_variable" href="#aaad518dd2434c218df7e9283238a6577">allPaths</a>), <a class="code hl_variable" href="#a5b3eac915da287987fb15c33d9cdab99">labels</a>(other.<a class="code hl_variable" href="#a5b3eac915da287987fb15c33d9cdab99">labels</a>), <a class="code hl_variable" href="#ac5bcaab96c5a959c0f9ac7a7cea50ff8">labels_counter</a>(other.<a class="code hl_variable" href="#ac5bcaab96c5a959c0f9ac7a7cea50ff8">labels_counter</a>),</div>
-<div class="line"><span class="lineno">  142</span>          <a class="code hl_variable" href="#a002a7cbc65665f2611315d554f9e563f">row_indices_map</a>(other.<a class="code hl_variable" href="#a002a7cbc65665f2611315d554f9e563f">row_indices_map</a>), nodes(other.nodes), cutType(other.cutType), <a class="code hl_variable" href="#a142cc5af037cc2e127d97ebf1db73a56">tasks</a>(other.<a class="code hl_variable" href="#a142cc5af037cc2e127d97ebf1db73a56">tasks</a>) {}</div>
-<div class="ttc" id="aclassLimitedMemoryRank1Cuts_html_a002a7cbc65665f2611315d554f9e563f"><div class="ttname"><a href="#a002a7cbc65665f2611315d554f9e563f">LimitedMemoryRank1Cuts::row_indices_map</a></div><div class="ttdeci">ankerl::unordered_dense::map&lt; int, std::vector&lt; int &gt; &gt; row_indices_map</div><div class="ttdef"><b>Definition</b> <a href="Rank1Cuts_8h_source.html#l00174">Rank1Cuts.h:174</a></div></div>
-<div class="ttc" id="aclassLimitedMemoryRank1Cuts_html_a142cc5af037cc2e127d97ebf1db73a56"><div class="ttname"><a href="#a142cc5af037cc2e127d97ebf1db73a56">LimitedMemoryRank1Cuts::tasks</a></div><div class="ttdeci">std::vector&lt; std::tuple&lt; int, int, int &gt; &gt; tasks</div><div class="ttdef"><b>Definition</b> <a href="Rank1Cuts_8h_source.html#l00154">Rank1Cuts.h:154</a></div></div>
+<p class="definition">Definition at line <a class="el" href="Rank1Cuts_8h_source.html#l00139">139</a> of file <a class="el" href="Rank1Cuts_8h_source.html">Rank1Cuts.h</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  140</span>        : <a class="code hl_variable" href="#a2ad457505a281134f1d458e81305ccac">rp</a>(other.<a class="code hl_variable" href="#a2ad457505a281134f1d458e81305ccac">rp</a>), <a class="code hl_variable" href="#a8912faee3fa69c5231830bfb3770e262">last_path_idx</a>(other.<a class="code hl_variable" href="#a8912faee3fa69c5231830bfb3770e262">last_path_idx</a>), <a class="code hl_variable" href="#a7a1263ac9b8e29ebfda3deaad281fa6b">vertex_route_map</a>(other.<a class="code hl_variable" href="#a7a1263ac9b8e29ebfda3deaad281fa6b">vertex_route_map</a>),</div>
+<div class="line"><span class="lineno">  141</span>          <a class="code hl_variable" href="#a39f5f769aea5711416e8152e5696c054">rank1_sep_heur_mem4_vertex</a>(other.<a class="code hl_variable" href="#a39f5f769aea5711416e8152e5696c054">rank1_sep_heur_mem4_vertex</a>),</div>
+<div class="line"><span class="lineno">  142</span>          <a class="code hl_variable" href="#a25ff7eb62e64829a67d34d07f6c3d01e">map_rank1_multiplier_dominance</a>(other.<a class="code hl_variable" href="#a25ff7eb62e64829a67d34d07f6c3d01e">map_rank1_multiplier_dominance</a>), <a class="code hl_variable" href="#a582069540ed19e7a5ec234bd7a0fa4d3">cutStorage</a>(other.<a class="code hl_variable" href="#a582069540ed19e7a5ec234bd7a0fa4d3">cutStorage</a>),</div>
+<div class="line"><span class="lineno">  143</span>          <a class="code hl_variable" href="#aaad518dd2434c218df7e9283238a6577">allPaths</a>(other.<a class="code hl_variable" href="#aaad518dd2434c218df7e9283238a6577">allPaths</a>), <a class="code hl_variable" href="#a5b3eac915da287987fb15c33d9cdab99">labels</a>(other.<a class="code hl_variable" href="#a5b3eac915da287987fb15c33d9cdab99">labels</a>), <a class="code hl_variable" href="#ac5bcaab96c5a959c0f9ac7a7cea50ff8">labels_counter</a>(other.<a class="code hl_variable" href="#ac5bcaab96c5a959c0f9ac7a7cea50ff8">labels_counter</a>),</div>
+<div class="line"><span class="lineno">  144</span>          <a class="code hl_variable" href="#a002a7cbc65665f2611315d554f9e563f">row_indices_map</a>(other.<a class="code hl_variable" href="#a002a7cbc65665f2611315d554f9e563f">row_indices_map</a>), nodes(other.nodes), cutType(other.cutType), <a class="code hl_variable" href="#a142cc5af037cc2e127d97ebf1db73a56">tasks</a>(other.<a class="code hl_variable" href="#a142cc5af037cc2e127d97ebf1db73a56">tasks</a>) {}</div>
+<div class="ttc" id="aclassLimitedMemoryRank1Cuts_html_a002a7cbc65665f2611315d554f9e563f"><div class="ttname"><a href="#a002a7cbc65665f2611315d554f9e563f">LimitedMemoryRank1Cuts::row_indices_map</a></div><div class="ttdeci">ankerl::unordered_dense::map&lt; int, std::vector&lt; int &gt; &gt; row_indices_map</div><div class="ttdef"><b>Definition</b> <a href="Rank1Cuts_8h_source.html#l00176">Rank1Cuts.h:176</a></div></div>
+<div class="ttc" id="aclassLimitedMemoryRank1Cuts_html_a142cc5af037cc2e127d97ebf1db73a56"><div class="ttname"><a href="#a142cc5af037cc2e127d97ebf1db73a56">LimitedMemoryRank1Cuts::tasks</a></div><div class="ttdeci">std::vector&lt; std::tuple&lt; int, int, int &gt; &gt; tasks</div><div class="ttdef"><b>Definition</b> <a href="Rank1Cuts_8h_source.html#l00156">Rank1Cuts.h:156</a></div></div>
 <div class="ttc" id="aclassLimitedMemoryRank1Cuts_html_a25ff7eb62e64829a67d34d07f6c3d01e"><div class="ttname"><a href="#a25ff7eb62e64829a67d34d07f6c3d01e">LimitedMemoryRank1Cuts::map_rank1_multiplier_dominance</a></div><div class="ttdeci">std::vector&lt; std::vector&lt; int &gt; &gt; map_rank1_multiplier_dominance</div><div class="ttdef"><b>Definition</b> <a href="Rank1Cuts_8h_source.html#l00071">Rank1Cuts.h:71</a></div></div>
-<div class="ttc" id="aclassLimitedMemoryRank1Cuts_html_a2ad457505a281134f1d458e81305ccac"><div class="ttname"><a href="#a2ad457505a281134f1d458e81305ccac">LimitedMemoryRank1Cuts::rp</a></div><div class="ttdeci">Xoroshiro128Plus rp</div><div class="ttdef"><b>Definition</b> <a href="Rank1Cuts_8h_source.html#l00132">Rank1Cuts.h:132</a></div></div>
+<div class="ttc" id="aclassLimitedMemoryRank1Cuts_html_a2ad457505a281134f1d458e81305ccac"><div class="ttname"><a href="#a2ad457505a281134f1d458e81305ccac">LimitedMemoryRank1Cuts::rp</a></div><div class="ttdeci">Xoroshiro128Plus rp</div><div class="ttdef"><b>Definition</b> <a href="Rank1Cuts_8h_source.html#l00134">Rank1Cuts.h:134</a></div></div>
 <div class="ttc" id="aclassLimitedMemoryRank1Cuts_html_a39f5f769aea5711416e8152e5696c054"><div class="ttname"><a href="#a39f5f769aea5711416e8152e5696c054">LimitedMemoryRank1Cuts::rank1_sep_heur_mem4_vertex</a></div><div class="ttdeci">std::vector&lt; std::vector&lt; int &gt; &gt; rank1_sep_heur_mem4_vertex</div><div class="ttdef"><b>Definition</b> <a href="Rank1Cuts_8h_source.html#l00070">Rank1Cuts.h:70</a></div></div>
-<div class="ttc" id="aclassLimitedMemoryRank1Cuts_html_a582069540ed19e7a5ec234bd7a0fa4d3"><div class="ttname"><a href="#a582069540ed19e7a5ec234bd7a0fa4d3">LimitedMemoryRank1Cuts::cutStorage</a></div><div class="ttdeci">CutStorage cutStorage</div><div class="ttdef"><b>Definition</b> <a href="Rank1Cuts_8h_source.html#l00165">Rank1Cuts.h:165</a></div></div>
-<div class="ttc" id="aclassLimitedMemoryRank1Cuts_html_a5b3eac915da287987fb15c33d9cdab99"><div class="ttname"><a href="#a5b3eac915da287987fb15c33d9cdab99">LimitedMemoryRank1Cuts::labels</a></div><div class="ttdeci">std::vector&lt; std::vector&lt; int &gt; &gt; labels</div><div class="ttdef"><b>Definition</b> <a href="Rank1Cuts_8h_source.html#l00170">Rank1Cuts.h:170</a></div></div>
+<div class="ttc" id="aclassLimitedMemoryRank1Cuts_html_a582069540ed19e7a5ec234bd7a0fa4d3"><div class="ttname"><a href="#a582069540ed19e7a5ec234bd7a0fa4d3">LimitedMemoryRank1Cuts::cutStorage</a></div><div class="ttdeci">CutStorage cutStorage</div><div class="ttdef"><b>Definition</b> <a href="Rank1Cuts_8h_source.html#l00167">Rank1Cuts.h:167</a></div></div>
+<div class="ttc" id="aclassLimitedMemoryRank1Cuts_html_a5b3eac915da287987fb15c33d9cdab99"><div class="ttname"><a href="#a5b3eac915da287987fb15c33d9cdab99">LimitedMemoryRank1Cuts::labels</a></div><div class="ttdeci">std::vector&lt; std::vector&lt; int &gt; &gt; labels</div><div class="ttdef"><b>Definition</b> <a href="Rank1Cuts_8h_source.html#l00172">Rank1Cuts.h:172</a></div></div>
 <div class="ttc" id="aclassLimitedMemoryRank1Cuts_html_a7a1263ac9b8e29ebfda3deaad281fa6b"><div class="ttname"><a href="#a7a1263ac9b8e29ebfda3deaad281fa6b">LimitedMemoryRank1Cuts::vertex_route_map</a></div><div class="ttdeci">std::vector&lt; std::vector&lt; int &gt; &gt; vertex_route_map</div><div class="ttdef"><b>Definition</b> <a href="Rank1Cuts_8h_source.html#l00067">Rank1Cuts.h:67</a></div></div>
 <div class="ttc" id="aclassLimitedMemoryRank1Cuts_html_a8912faee3fa69c5231830bfb3770e262"><div class="ttname"><a href="#a8912faee3fa69c5231830bfb3770e262">LimitedMemoryRank1Cuts::last_path_idx</a></div><div class="ttdeci">int last_path_idx</div><div class="ttdef"><b>Definition</b> <a href="Rank1Cuts_8h_source.html#l00065">Rank1Cuts.h:65</a></div></div>
-<div class="ttc" id="aclassLimitedMemoryRank1Cuts_html_aaad518dd2434c218df7e9283238a6577"><div class="ttname"><a href="#aaad518dd2434c218df7e9283238a6577">LimitedMemoryRank1Cuts::allPaths</a></div><div class="ttdeci">std::vector&lt; Path &gt; allPaths</div><div class="ttdef"><b>Definition</b> <a href="Rank1Cuts_8h_source.html#l00168">Rank1Cuts.h:168</a></div></div>
-<div class="ttc" id="aclassLimitedMemoryRank1Cuts_html_ac5bcaab96c5a959c0f9ac7a7cea50ff8"><div class="ttname"><a href="#ac5bcaab96c5a959c0f9ac7a7cea50ff8">LimitedMemoryRank1Cuts::labels_counter</a></div><div class="ttdeci">int labels_counter</div><div class="ttdef"><b>Definition</b> <a href="Rank1Cuts_8h_source.html#l00171">Rank1Cuts.h:171</a></div></div>
+<div class="ttc" id="aclassLimitedMemoryRank1Cuts_html_aaad518dd2434c218df7e9283238a6577"><div class="ttname"><a href="#aaad518dd2434c218df7e9283238a6577">LimitedMemoryRank1Cuts::allPaths</a></div><div class="ttdeci">std::vector&lt; Path &gt; allPaths</div><div class="ttdef"><b>Definition</b> <a href="Rank1Cuts_8h_source.html#l00170">Rank1Cuts.h:170</a></div></div>
+<div class="ttc" id="aclassLimitedMemoryRank1Cuts_html_ac5bcaab96c5a959c0f9ac7a7cea50ff8"><div class="ttname"><a href="#ac5bcaab96c5a959c0f9ac7a7cea50ff8">LimitedMemoryRank1Cuts::labels_counter</a></div><div class="ttdeci">int labels_counter</div><div class="ttdef"><b>Definition</b> <a href="Rank1Cuts_8h_source.html#l00173">Rank1Cuts.h:173</a></div></div>
 </div><!-- fragment --><div class="dynheader">
 Here is the call graph for this function:</div>
 <div class="dyncontent">
@@ -292,9 +292,9 @@ Here is the call graph for this function:</div>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="Rank1Cuts_8h_source.html#l00150">150</a> of file <a class="el" href="Rank1Cuts_8h_source.html">Rank1Cuts.h</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  150</span>{ <a class="code hl_function" href="#ae8b56b0c378f5310fd26d68954e5268f">setTasks</a>(); }</div>
-<div class="ttc" id="aclassLimitedMemoryRank1Cuts_html_ae8b56b0c378f5310fd26d68954e5268f"><div class="ttname"><a href="#ae8b56b0c378f5310fd26d68954e5268f">LimitedMemoryRank1Cuts::setTasks</a></div><div class="ttdeci">void setTasks()</div><div class="ttdef"><b>Definition</b> <a href="Rank1Cuts_8h_source.html#l00156">Rank1Cuts.h:156</a></div></div>
+<p class="definition">Definition at line <a class="el" href="Rank1Cuts_8h_source.html#l00152">152</a> of file <a class="el" href="Rank1Cuts_8h_source.html">Rank1Cuts.h</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  152</span>{ <a class="code hl_function" href="#ae8b56b0c378f5310fd26d68954e5268f">setTasks</a>(); }</div>
+<div class="ttc" id="aclassLimitedMemoryRank1Cuts_html_ae8b56b0c378f5310fd26d68954e5268f"><div class="ttname"><a href="#ae8b56b0c378f5310fd26d68954e5268f">LimitedMemoryRank1Cuts::setTasks</a></div><div class="ttdeci">void setTasks()</div><div class="ttdef"><b>Definition</b> <a href="Rank1Cuts_8h_source.html#l00158">Rank1Cuts.h:158</a></div></div>
 </div><!-- fragment --><div class="dynheader">
 Here is the call graph for this function:</div>
 <div class="dyncontent">
@@ -529,11 +529,13 @@ Here is the call graph for this function:</div>
 <div class="line"><span class="lineno">  123</span>                <span class="keywordflow">if</span> (i == j) <span class="keywordflow">continue</span>;</div>
 <div class="line"><span class="lineno">  124</span>                cost.emplace_back(<a class="code hl_variable" href="#a4ff11b33c8af62ad27015fd684c45c9a">high_rank_cuts</a>.distances[i][j], j);</div>
 <div class="line"><span class="lineno">  125</span>            }</div>
-<div class="line"><span class="lineno">  126</span>            std::stable_sort(cost.begin(), cost.end(), [](<span class="keyword">const</span> <span class="keyword">auto</span> &amp;a, <span class="keyword">const</span> <span class="keyword">auto</span> &amp;b) { return a.first &lt; b.first; });</div>
-<div class="line"><span class="lineno">  127</span>            <span class="keywordtype">int</span> limit = std::min(<a class="code hl_variable" href="#a8829050aae305d6660dc7913c6575c8b">MAX_HEURISTIC_SEP_ROW_RANK1</a>, <span class="keyword">static_cast&lt;</span><span class="keywordtype">int</span><span class="keyword">&gt;</span>(cost.size()));</div>
-<div class="line"><span class="lineno">  128</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> k = 0; k &lt; limit; ++k) { <a class="code hl_variable" href="#a39f5f769aea5711416e8152e5696c054">rank1_sep_heur_mem4_vertex</a>[i].push_back(cost[k].second); }</div>
-<div class="line"><span class="lineno">  129</span>        }</div>
-<div class="line"><span class="lineno">  130</span>    }</div>
+<div class="line"><span class="lineno">  126</span>            <span class="keyword">const</span> <span class="keywordtype">int</span> limit = std::min(<a class="code hl_variable" href="#a8829050aae305d6660dc7913c6575c8b">MAX_HEURISTIC_SEP_ROW_RANK1</a>, <span class="keyword">static_cast&lt;</span><span class="keywordtype">int</span><span class="keyword">&gt;</span>(cost.size()));</div>
+<div class="line"><span class="lineno">  127</span>            std::partial_sort(cost.begin(), cost.begin() + limit, cost.end(),</div>
+<div class="line"><span class="lineno">  128</span>                              [](<span class="keyword">const</span> <span class="keyword">auto</span> &amp;a, <span class="keyword">const</span> <span class="keyword">auto</span> &amp;b) { return a.first &lt; b.first; });</div>
+<div class="line"><span class="lineno">  129</span>            <a class="code hl_variable" href="#a39f5f769aea5711416e8152e5696c054">rank1_sep_heur_mem4_vertex</a>[i].reserve(limit);</div>
+<div class="line"><span class="lineno">  130</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> k = 0; k &lt; limit; ++k) { <a class="code hl_variable" href="#a39f5f769aea5711416e8152e5696c054">rank1_sep_heur_mem4_vertex</a>[i].push_back(cost[k].second); }</div>
+<div class="line"><span class="lineno">  131</span>        }</div>
+<div class="line"><span class="lineno">  132</span>    }</div>
 <div class="ttc" id="aclassLimitedMemoryRank1Cuts_html_a4ff11b33c8af62ad27015fd684c45c9a"><div class="ttname"><a href="#a4ff11b33c8af62ad27015fd684c45c9a">LimitedMemoryRank1Cuts::high_rank_cuts</a></div><div class="ttdeci">HighRankCuts high_rank_cuts</div><div class="ttdef"><b>Definition</b> <a href="Rank1Cuts_8h_source.html#l00060">Rank1Cuts.h:60</a></div></div>
 <div class="ttc" id="aclassLimitedMemoryRank1Cuts_html_a8829050aae305d6660dc7913c6575c8b"><div class="ttname"><a href="#a8829050aae305d6660dc7913c6575c8b">LimitedMemoryRank1Cuts::MAX_HEURISTIC_SEP_ROW_RANK1</a></div><div class="ttdeci">static constexpr int MAX_HEURISTIC_SEP_ROW_RANK1</div><div class="ttdef"><b>Definition</b> <a href="Rank1Cuts_8h_source.html#l00068">Rank1Cuts.h:68</a></div></div>
 </div><!-- fragment -->
@@ -707,7 +709,7 @@ Here is the call graph for this function:</div>
 <div class="ttc" id="aclassBNBNode_html_a234c0a33d282f8ec5d1017de8c99a037"><div class="ttname"><a href="classBNBNode.html#a234c0a33d282f8ec5d1017de8c99a037">BNBNode::extractModelDataSparse</a></div><div class="ttdeci">ModelData extractModelDataSparse()</div><div class="ttdef"><b>Definition</b> <a href="Node_8h_source.html#l00332">Node.h:332</a></div></div>
 <div class="ttc" id="aclassLimitedMemoryRank1Cuts_html_a0874059ad71694c574998b73fd797c5f"><div class="ttname"><a href="#a0874059ad71694c574998b73fd797c5f">LimitedMemoryRank1Cuts::separate</a></div><div class="ttdeci">void separate(const SparseMatrix &amp;A, const std::vector&lt; double &gt; &amp;x)</div><div class="ttdoc">Separates the given solution vector into cuts using Limited Memory Rank-1 Cuts.</div><div class="ttdef"><b>Definition</b> <a href="SRC_8cpp_source.html#l00124">SRC.cpp:124</a></div></div>
 <div class="ttc" id="aclassLimitedMemoryRank1Cuts_html_a0c8178e5e367d5d5124555500f650f97"><div class="ttname"><a href="#a0c8178e5e367d5d5124555500f650f97">LimitedMemoryRank1Cuts::initializeVertexRouteMap</a></div><div class="ttdeci">void initializeVertexRouteMap()</div><div class="ttdef"><b>Definition</b> <a href="Rank1Cuts_8h_source.html#l00073">Rank1Cuts.h:73</a></div></div>
-<div class="ttc" id="aclassLimitedMemoryRank1Cuts_html_a33d300a3b76e5e2f109130dacaa8141d"><div class="ttname"><a href="#a33d300a3b76e5e2f109130dacaa8141d">LimitedMemoryRank1Cuts::separateR1C1</a></div><div class="ttdeci">void separateR1C1(const SparseMatrix &amp;A, const std::vector&lt; double &gt; &amp;x)</div><div class="ttdef"><b>Definition</b> <a href="Rank1Cuts_8h_source.html#l00194">Rank1Cuts.h:194</a></div></div>
+<div class="ttc" id="aclassLimitedMemoryRank1Cuts_html_a33d300a3b76e5e2f109130dacaa8141d"><div class="ttname"><a href="#a33d300a3b76e5e2f109130dacaa8141d">LimitedMemoryRank1Cuts::separateR1C1</a></div><div class="ttdeci">void separateR1C1(const SparseMatrix &amp;A, const std::vector&lt; double &gt; &amp;x)</div><div class="ttdef"><b>Definition</b> <a href="Rank1Cuts_8h_source.html#l00196">Rank1Cuts.h:196</a></div></div>
 <div class="ttc" id="aclassLimitedMemoryRank1Cuts_html_a41a9ef310b38d9d6909259001cd453bc"><div class="ttname"><a href="#a41a9ef310b38d9d6909259001cd453bc">LimitedMemoryRank1Cuts::separateR1C3Adjacency</a></div><div class="ttdeci">void separateR1C3Adjacency(const SparseMatrix &amp;A, const std::vector&lt; double &gt; &amp;x)</div><div class="ttdoc">Adjacency-based rank-3 SRC separation (RouteOpt-style).</div><div class="ttdef"><b>Definition</b> <a href="SRC_8cpp_source.html#l00393">SRC.cpp:393</a></div></div>
 <div class="ttc" id="aclassLimitedMemoryRank1Cuts_html_ae0706cf60ee92fe99ed6d54d4807d4ec"><div class="ttname"><a href="#ae0706cf60ee92fe99ed6d54d4807d4ec">LimitedMemoryRank1Cuts::cutCleaner</a></div><div class="ttdeci">bool cutCleaner(BNBNode *node, std::vector&lt; baldesCtrPtr &gt; &amp;SRCconstraints)</div><div class="ttdef"><b>Definition</b> <a href="SRC_8cpp_source.html#l00649">SRC.cpp:649</a></div></div>
 <div class="ttc" id="astructModelData_html_a245b4a1967df894ba7ef7ed10a2c111a"><div class="ttname"><a href="structModelData.html#a245b4a1967df894ba7ef7ed10a2c111a">ModelData::A_sparse</a></div><div class="ttdeci">SparseMatrix A_sparse</div><div class="ttdef"><b>Definition</b> <a href="Definitions_8h_source.html#l00216">Definitions.h:216</a></div></div>
@@ -725,29 +727,27 @@ Here is the call graph for this function:</div>
 <area shape="poly" title=" " alt="" coords="180,216,218,210,219,216,180,221"/>
 <area shape="rect" href="classLimitedMemoryRank1Cuts.html#a0874059ad71694c574998b73fd797c5f" title="Separates the given solution vector into cuts using Limited Memory Rank&#45;1 Cuts." alt="" coords="234,243,408,284"/>
 <area shape="poly" title=" " alt="" coords="180,241,219,247,218,252,180,246"/>
-<area shape="rect" href="classLimitedMemoryRank1Cuts.html#a33d300a3b76e5e2f109130dacaa8141d" title=" " alt="" coords="234,374,408,414"/>
-<area shape="poly" title=" " alt="" coords="112,250,161,304,194,333,229,359,240,365,237,369,226,363,190,337,158,308,108,254"/>
-<area shape="rect" href="classLimitedMemoryRank1Cuts.html#a41a9ef310b38d9d6909259001cd453bc" title="Adjacency&#45;based rank&#45;3 SRC separation (RouteOpt&#45;style)." alt="" coords="234,308,408,349"/>
+<area shape="rect" href="classLimitedMemoryRank1Cuts.html#a33d300a3b76e5e2f109130dacaa8141d" title=" " alt="" coords="234,308,408,349"/>
 <area shape="poly" title=" " alt="" coords="136,250,229,293,246,300,244,305,227,298,134,255"/>
+<area shape="rect" href="classLimitedMemoryRank1Cuts.html#a41a9ef310b38d9d6909259001cd453bc" title="Adjacency&#45;based rank&#45;3 SRC separation (RouteOpt&#45;style)." alt="" coords="234,374,408,414"/>
+<area shape="poly" title=" " alt="" coords="112,250,161,304,194,333,229,359,240,365,237,369,226,363,190,337,158,308,108,254"/>
 <area shape="rect" href="classBNBNode.html#ac4a92f0a90b0517dda3eb0e08c1ffe72" title=" " alt="" coords="508,5,645,31"/>
 <area shape="poly" title=" " alt="" coords="409,48,492,32,493,37,410,53"/>
 <area shape="rect" href="namespacenumericutils.html#a30fadd8aa82c3a907ce52a6c1735a378" title=" " alt="" coords="522,55,630,80"/>
 <area shape="poly" title=" " alt="" coords="409,65,506,65,506,70,409,70"/>
 <area shape="rect" href="classBNBNode.html#a1cc8d061978cecc41e360cb505517267" title=" " alt="" coords="512,104,641,130"/>
 <area shape="poly" title=" " alt="" coords="410,82,497,99,496,104,409,87"/>
-<area shape="rect" href="classLimitedMemoryRank1Cuts.html#a267d89d8d4d4ba61fa2bf551dd041a9c" title="Computes the limited memory coefficient based on the given parameters." alt="" coords="463,308,689,349"/>
-<area shape="poly" title=" " alt="" coords="404,282,480,302,479,307,403,287"/>
-<area shape="rect" href="structSRCPermutation.html#a7c2eee29003a81f6c79aeb63729838dd" title=" " alt="" coords="491,259,661,284"/>
-<area shape="poly" title=" " alt="" coords="409,264,476,266,476,271,409,269"/>
-<area shape="poly" title=" " alt="" coords="403,371,479,351,480,356,404,376"/>
-<area shape="poly" title=" " alt="" coords="393,371,413,359,428,343,436,327,445,310,461,295,475,287,477,292,465,299,449,314,441,329,433,346,417,363,395,376"/>
-<area shape="rect" href="classLimitedMemoryRank1Cuts.html#ae6f376dcb6916b93872f02660eabc753" title=" " alt="" coords="466,423,687,464"/>
-<area shape="poly" title=" " alt="" coords="410,408,453,417,452,422,409,414"/>
-<area shape="rect" href="namespacenumericutils.html#ab3ee1d3f97fa4d429537dc7a597908b3" title=" " alt="" coords="510,373,643,399"/>
-<area shape="poly" title=" " alt="" coords="409,389,494,386,494,391,409,394"/>
-<area shape="poly" title=" " alt="" coords="409,326,447,326,447,332,409,332"/>
-<area shape="poly" title=" " alt="" coords="409,306,462,294,500,286,502,291,464,299,410,312"/>
-<area shape="poly" title=" " alt="" coords="410,346,464,358,502,367,500,372,462,363,409,351"/>
+<area shape="rect" href="classLimitedMemoryRank1Cuts.html#a267d89d8d4d4ba61fa2bf551dd041a9c" title="Computes the limited memory coefficient based on the given parameters." alt="" coords="463,259,689,300"/>
+<area shape="poly" title=" " alt="" coords="409,266,448,269,447,274,409,272"/>
+<area shape="rect" href="structSRCPermutation.html#a7c2eee29003a81f6c79aeb63729838dd" title=" " alt="" coords="491,324,661,350"/>
+<area shape="poly" title=" " alt="" coords="380,282,464,309,496,317,495,323,462,314,378,287"/>
+<area shape="poly" title=" " alt="" coords="409,309,452,301,453,306,410,315"/>
+<area shape="poly" title=" " alt="" coords="409,329,476,331,476,336,409,334"/>
+<area shape="rect" href="namespacenumericutils.html#ab3ee1d3f97fa4d429537dc7a597908b3" title=" " alt="" coords="510,377,643,403"/>
+<area shape="poly" title=" " alt="" coords="409,347,506,371,504,376,408,352"/>
+<area shape="poly" title=" " alt="" coords="390,371,414,359,428,347,437,334,446,322,462,309,471,304,473,309,464,314,450,325,441,337,432,350,416,363,393,376"/>
+<area shape="poly" title=" " alt="" coords="409,372,500,351,501,356,410,377"/>
+<area shape="poly" title=" " alt="" coords="409,390,494,389,494,394,409,395"/>
 </map>
 </div>
 
@@ -966,7 +966,7 @@ Here is the call graph for this function:</div>
 <div class="line"><span class="lineno">  311</span>    <a class="code hl_variable" href="#a582069540ed19e7a5ec234bd7a0fa4d3">cutStorage</a>.enforcePoolSizeLimit();</div>
 <div class="line"><span class="lineno">  312</span>}</div>
 <div class="ttc" id="aclassLimitedMemoryRank1Cuts_html_a267d89d8d4d4ba61fa2bf551dd041a9c"><div class="ttname"><a href="#a267d89d8d4d4ba61fa2bf551dd041a9c">LimitedMemoryRank1Cuts::computeLimitedMemoryCoefficient</a></div><div class="ttdeci">double computeLimitedMemoryCoefficient(const std::array&lt; uint64_t, num_words &gt; &amp;C, const std::array&lt; uint64_t, num_words &gt; &amp;AM, const SRCPermutation &amp;p, const std::vector&lt; uint16_t &gt; &amp;P, std::vector&lt; int &gt; &amp;order) noexcept</div><div class="ttdoc">Computes the limited memory coefficient based on the given parameters.</div><div class="ttdef"><b>Definition</b> <a href="SRC_8cpp_source.html#l00694">SRC.cpp:694</a></div></div>
-<div class="ttc" id="aclassLimitedMemoryRank1Cuts_html_aed93e21792cd99c0bdf3ffb9ec2c866c"><div class="ttname"><a href="#aed93e21792cd99c0bdf3ffb9ec2c866c">LimitedMemoryRank1Cuts::sched</a></div><div class="ttdeci">exec::static_thread_pool::scheduler sched</div><div class="ttdef"><b>Definition</b> <a href="Rank1Cuts_8h_source.html#l00192">Rank1Cuts.h:192</a></div></div>
+<div class="ttc" id="aclassLimitedMemoryRank1Cuts_html_aed93e21792cd99c0bdf3ffb9ec2c866c"><div class="ttname"><a href="#aed93e21792cd99c0bdf3ffb9ec2c866c">LimitedMemoryRank1Cuts::sched</a></div><div class="ttdeci">exec::static_thread_pool::scheduler sched</div><div class="ttdef"><b>Definition</b> <a href="Rank1Cuts_8h_source.html#l00194">Rank1Cuts.h:194</a></div></div>
 <div class="ttc" id="astructSRCPermutation_html_a7c2eee29003a81f6c79aeb63729838dd"><div class="ttname"><a href="structSRCPermutation.html#a7c2eee29003a81f6c79aeb63729838dd">SRCPermutation::getRHS</a></div><div class="ttdeci">double getRHS() const</div><div class="ttdef"><b>Definition</b> <a href="Cut_8h_source.html#l00027">Cut.h:27</a></div></div>
 <div class="ttc" id="astructSparseMatrix_html_aa5036f289fb33d08420b8429acb68514"><div class="ttname"><a href="structSparseMatrix.html#aa5036f289fb33d08420b8429acb68514">SparseMatrix::num_cols</a></div><div class="ttdeci">int num_cols</div><div class="ttdef"><b>Definition</b> <a href="SparseMatrix_8h_source.html#l00052">SparseMatrix.h:52</a></div></div>
 </div><!-- fragment --><div class="dynheader">
@@ -1011,11 +1011,9 @@ Here is the call graph for this function:</div>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="Rank1Cuts_8h_source.html#l00194">194</a> of file <a class="el" href="Rank1Cuts_8h_source.html">Rank1Cuts.h</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  194</span>                                                                         {</div>
-<div class="line"><span class="lineno">  195</span>        <span class="keywordflow">if</span> (<a class="code hl_variable" href="#aaad518dd2434c218df7e9283238a6577">allPaths</a>.empty()) <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno">  196</span> </div>
-<div class="line"><span class="lineno">  197</span>        <a class="code hl_function" href="#ae6f376dcb6916b93872f02660eabc753">initializeRank1HeuristicNeighbors</a>();</div>
+<p class="definition">Definition at line <a class="el" href="Rank1Cuts_8h_source.html#l00196">196</a> of file <a class="el" href="Rank1Cuts_8h_source.html">Rank1Cuts.h</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  196</span>                                                                         {</div>
+<div class="line"><span class="lineno">  197</span>        <span class="keywordflow">if</span> (<a class="code hl_variable" href="#aaad518dd2434c218df7e9283238a6577">allPaths</a>.empty()) <span class="keywordflow">return</span>;</div>
 <div class="line"><span class="lineno">  198</span> </div>
 <div class="line"><span class="lineno">  199</span>        <span class="keyword">struct </span>CandidateVertex {</div>
 <div class="line"><span class="lineno">  200</span>            <span class="keywordtype">double</span> violation;</div>
@@ -1059,7 +1057,7 @@ Here is the call graph for this function:</div>
 <div class="line"><span class="lineno">  238</span>        }</div>
 <div class="line"><span class="lineno">  239</span>        pdqsort(ordered_cuts.begin(), ordered_cuts.end(),</div>
 <div class="line"><span class="lineno">  240</span>                [](<span class="keyword">const</span> std::pair&lt;double, int&gt; &amp;a, <span class="keyword">const</span> std::pair&lt;double, int&gt; &amp;b) { return a.first &gt; b.first; });</div>
-<div class="line"><span class="lineno">  241</span>        <span class="keyword">const</span> <span class="keywordtype">int</span> cuts_to_apply = std::min(<span class="keyword">static_cast&lt;</span><span class="keywordtype">int</span><span class="keyword">&gt;</span>(ordered_cuts.size()), 3);</div>
+<div class="line"><span class="lineno">  241</span>        <span class="keyword">const</span> <span class="keywordtype">int</span>      cuts_to_apply = std::min(<span class="keyword">static_cast&lt;</span><span class="keywordtype">int</span><span class="keyword">&gt;</span>(ordered_cuts.size()), 3);</div>
 <div class="line"><span class="lineno">  242</span>        SRCPermutation p;</div>
 <div class="line"><span class="lineno">  243</span>        p.<a class="code hl_variable" href="structSRCPermutation.html#ad388d415d55c248d620a00cddc5d686b">num</a> = {1};</div>
 <div class="line"><span class="lineno">  244</span>        p.<a class="code hl_variable" href="structSRCPermutation.html#a73715a9230ef33a4afa75dc51fd09c24">den</a> = 2;</div>
@@ -1072,7 +1070,7 @@ Here is the call graph for this function:</div>
 <div class="line"><span class="lineno">  251</span>            std::vector&lt;int&gt;                order(N_SIZE, -1);</div>
 <div class="line"><span class="lineno">  252</span> </div>
 <div class="line"><span class="lineno">  253</span>            C[node / 64] |= (1ULL &lt;&lt; (node % 64));</div>
-<div class="line"><span class="lineno">  254</span>            order[node] = 0;</div>
+<div class="line"><span class="lineno">  254</span>            order[node]        = 0;</div>
 <div class="line"><span class="lineno">  255</span>            <span class="keyword">const</span> <span class="keyword">auto</span> cut_key = <a class="code hl_variable" href="#a582069540ed19e7a5ec234bd7a0fa4d3">cutStorage</a>.compute_cut_key(C, p.<a class="code hl_variable" href="structSRCPermutation.html#ad388d415d55c248d620a00cddc5d686b">num</a>, p.<a class="code hl_variable" href="structSRCPermutation.html#a73715a9230ef33a4afa75dc51fd09c24">den</a>);</div>
 <div class="line"><span class="lineno">  256</span>            <span class="keywordflow">if</span> (<a class="code hl_variable" href="#a582069540ed19e7a5ec234bd7a0fa4d3">cutStorage</a>.cutExists(cut_key).first &gt;= 0) { <span class="keywordflow">continue</span>; }</div>
 <div class="line"><span class="lineno">  257</span> </div>
@@ -1090,8 +1088,8 @@ Here is the call graph for this function:</div>
 <div class="line"><span class="lineno">  269</span>                <span class="keywordflow">if</span> (path_idx &lt; 0 || <span class="keyword">static_cast&lt;</span><span class="keywordtype">size_t</span><span class="keyword">&gt;</span>(path_idx) &gt;= <a class="code hl_variable" href="#aaad518dd2434c218df7e9283238a6577">allPaths</a>.size() ||</div>
 <div class="line"><span class="lineno">  270</span>                    <span class="keyword">static_cast&lt;</span><span class="keywordtype">size_t</span><span class="keyword">&gt;</span>(path_idx) &gt;= x.size())</div>
 <div class="line"><span class="lineno">  271</span>                    <span class="keywordflow">continue</span>;</div>
-<div class="line"><span class="lineno">  272</span>                <span class="keyword">const</span> <span class="keyword">auto</span>   &amp;clients = <a class="code hl_variable" href="#aaad518dd2434c218df7e9283238a6577">allPaths</a>[path_idx].route;</div>
-<div class="line"><span class="lineno">  273</span>                <span class="keyword">const</span> <span class="keywordtype">double</span> coeff    = <a class="code hl_function" href="#a267d89d8d4d4ba61fa2bf551dd041a9c">computeLimitedMemoryCoefficient</a>(C, AM, p, clients, order);</div>
+<div class="line"><span class="lineno">  272</span>                <span class="keyword">const</span> <span class="keyword">auto</span>  &amp;clients = <a class="code hl_variable" href="#aaad518dd2434c218df7e9283238a6577">allPaths</a>[path_idx].route;</div>
+<div class="line"><span class="lineno">  273</span>                <span class="keyword">const</span> <span class="keywordtype">double</span> coeff   = <a class="code hl_function" href="#a267d89d8d4d4ba61fa2bf551dd041a9c">computeLimitedMemoryCoefficient</a>(C, AM, p, clients, order);</div>
 <div class="line"><span class="lineno">  274</span>                exact_violation += coeff * x[path_idx];</div>
 <div class="line"><span class="lineno">  275</span>                <span class="keywordflow">if</span> (!<a class="code hl_function" href="namespacenumericutils.html#ab3ee1d3f97fa4d429537dc7a597908b3">numericutils::isZero</a>(coeff)) {</div>
 <div class="line"><span class="lineno">  276</span>                    coefficient_indices.push_back(path_idx);</div>
@@ -1113,22 +1111,19 @@ Here is the call graph for this function:</div>
 <div class="line"><span class="lineno">  292</span>        }</div>
 <div class="line"><span class="lineno">  293</span>    }</div>
 <div class="ttc" id="aDefinitions_8h_html_a64e2fe830f0e02b5ac2beb9c0ff3425face3a95ac88a5118ddc26430b8d20c095"><div class="ttname"><a href="Definitions_8h.html#a64e2fe830f0e02b5ac2beb9c0ff3425face3a95ac88a5118ddc26430b8d20c095">CutType::OneRow</a></div><div class="ttdeci">@ OneRow</div><div class="ttdef"><b>Definition</b> <a href="Definitions_8h_source.html#l00082">Definitions.h:82</a></div></div>
-<div class="ttc" id="aclassLimitedMemoryRank1Cuts_html_ae6f376dcb6916b93872f02660eabc753"><div class="ttname"><a href="#ae6f376dcb6916b93872f02660eabc753">LimitedMemoryRank1Cuts::initializeRank1HeuristicNeighbors</a></div><div class="ttdeci">void initializeRank1HeuristicNeighbors()</div><div class="ttdef"><b>Definition</b> <a href="Rank1Cuts_8h_source.html#l00114">Rank1Cuts.h:114</a></div></div>
 <div class="ttc" id="anamespacenumericutils_html_ab3ee1d3f97fa4d429537dc7a597908b3"><div class="ttname"><a href="namespacenumericutils.html#ab3ee1d3f97fa4d429537dc7a597908b3">numericutils::isZero</a></div><div class="ttdeci">bool isZero(double a, double threshold=eps)</div><div class="ttdef"><b>Definition</b> <a href="NumericUtils_8h_source.html#l00034">NumericUtils.h:34</a></div></div>
 </div><!-- fragment --><div class="dynheader">
 Here is the call graph for this function:</div>
 <div class="dyncontent">
 <div class="center"><img src="classLimitedMemoryRank1Cuts_a33d300a3b76e5e2f109130dacaa8141d_cgraph.png" border="0" usemap="#aclassLimitedMemoryRank1Cuts_a33d300a3b76e5e2f109130dacaa8141d_cgraph" loading="lazy" alt=""/></div>
 <map name="aclassLimitedMemoryRank1Cuts_a33d300a3b76e5e2f109130dacaa8141d_cgraph" id="aclassLimitedMemoryRank1Cuts_a33d300a3b76e5e2f109130dacaa8141d_cgraph">
-<area shape="rect" title=" " alt="" coords="5,92,180,133"/>
+<area shape="rect" title=" " alt="" coords="5,63,180,103"/>
 <area shape="rect" href="classLimitedMemoryRank1Cuts.html#a267d89d8d4d4ba61fa2bf551dd041a9c" title="Computes the limited memory coefficient based on the given parameters." alt="" coords="228,5,454,46"/>
-<area shape="poly" title=" " alt="" coords="140,89,227,55,247,48,249,54,229,60,142,94"/>
+<area shape="poly" title=" " alt="" coords="179,60,235,47,236,53,181,65"/>
 <area shape="rect" href="structSRCPermutation.html#a7c2eee29003a81f6c79aeb63729838dd" title=" " alt="" coords="256,70,426,96"/>
-<area shape="poly" title=" " alt="" coords="180,99,240,92,240,98,180,105"/>
-<area shape="rect" href="classLimitedMemoryRank1Cuts.html#ae6f376dcb6916b93872f02660eabc753" title=" " alt="" coords="230,120,452,161"/>
-<area shape="poly" title=" " alt="" coords="180,120,215,123,215,129,180,125"/>
-<area shape="rect" href="namespacenumericutils.html#ab3ee1d3f97fa4d429537dc7a597908b3" title=" " alt="" coords="274,185,408,210"/>
-<area shape="poly" title=" " alt="" coords="136,131,229,170,260,179,258,184,227,175,134,136"/>
+<area shape="poly" title=" " alt="" coords="180,80,240,80,240,86,180,86"/>
+<area shape="rect" href="namespacenumericutils.html#ab3ee1d3f97fa4d429537dc7a597908b3" title=" " alt="" coords="274,120,408,145"/>
+<area shape="poly" title=" " alt="" coords="181,98,259,113,258,119,180,103"/>
 </map>
 </div>
 
@@ -1436,8 +1431,8 @@ Here is the call graph for this function:</div>
 
 </div>
 </div>
-<a id="af6c31b734c82f6e66e8b61bd8d29f652" name="af6c31b734c82f6e66e8b61bd8d29f652"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#af6c31b734c82f6e66e8b61bd8d29f652">&#9670;&#160;</a></span>setDistanceMatrix()</h2>
+<a id="acea7ba369523c9e5678c418078b8979a" name="acea7ba369523c9e5678c418078b8979a"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#acea7ba369523c9e5678c418078b8979a">&#9670;&#160;</a></span>setDistanceMatrix()</h2>
 
 <div class="memitem">
 <div class="memproto">
@@ -1448,7 +1443,7 @@ Here is the call graph for this function:</div>
         <tr>
           <td class="memname">void LimitedMemoryRank1Cuts::setDistanceMatrix </td>
           <td>(</td>
-          <td class="paramtype">const std::vector&lt; std::vector&lt; double &gt; &gt;</td>          <td class="paramname"><span class="paramname"><em>distances</em></span></td><td>)</td>
+          <td class="paramtype">const std::vector&lt; std::vector&lt; double &gt; &gt; &amp;</td>          <td class="paramname"><span class="paramname"><em>distances</em></span></td><td>)</td>
           <td></td>
         </tr>
       </table>
@@ -1459,8 +1454,8 @@ Here is the call graph for this function:</div>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="Rank1Cuts_8h_source.html#l00134">134</a> of file <a class="el" href="Rank1Cuts_8h_source.html">Rank1Cuts.h</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  134</span>{ <a class="code hl_variable" href="#a4ff11b33c8af62ad27015fd684c45c9a">high_rank_cuts</a>.distances = distances; }</div>
+<p class="definition">Definition at line <a class="el" href="Rank1Cuts_8h_source.html#l00136">136</a> of file <a class="el" href="Rank1Cuts_8h_source.html">Rank1Cuts.h</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  136</span>{ <a class="code hl_variable" href="#a4ff11b33c8af62ad27015fd684c45c9a">high_rank_cuts</a>.distances = distances; }</div>
 </div><!-- fragment -->
 </div>
 </div>
@@ -1487,11 +1482,11 @@ Here is the call graph for this function:</div>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="Rank1Cuts_8h_source.html#l00144">144</a> of file <a class="el" href="Rank1Cuts_8h_source.html">Rank1Cuts.h</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  144</span>                                                  {</div>
-<div class="line"><span class="lineno">  145</span>        <span class="comment">// print nodes.size</span></div>
-<div class="line"><span class="lineno">  146</span>        <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> i = 1; i &lt; N_SIZE - 1; ++i) { nodes[i].setDuals(duals[i - 1]); }</div>
-<div class="line"><span class="lineno">  147</span>    }</div>
+<p class="definition">Definition at line <a class="el" href="Rank1Cuts_8h_source.html#l00146">146</a> of file <a class="el" href="Rank1Cuts_8h_source.html">Rank1Cuts.h</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  146</span>                                                  {</div>
+<div class="line"><span class="lineno">  147</span>        <span class="comment">// print nodes.size</span></div>
+<div class="line"><span class="lineno">  148</span>        <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> i = 1; i &lt; N_SIZE - 1; ++i) { nodes[i].setDuals(duals[i - 1]); }</div>
+<div class="line"><span class="lineno">  149</span>    }</div>
 </div><!-- fragment -->
 </div>
 </div>
@@ -1518,8 +1513,8 @@ Here is the call graph for this function:</div>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="Rank1Cuts_8h_source.html#l00152">152</a> of file <a class="el" href="Rank1Cuts_8h_source.html">Rank1Cuts.h</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  152</span>{ this-&gt;nodes = nodes; }</div>
+<p class="definition">Definition at line <a class="el" href="Rank1Cuts_8h_source.html#l00154">154</a> of file <a class="el" href="Rank1Cuts_8h_source.html">Rank1Cuts.h</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  154</span>{ this-&gt;nodes = nodes; }</div>
 </div><!-- fragment -->
 </div>
 </div>
@@ -1546,15 +1541,15 @@ Here is the call graph for this function:</div>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="Rank1Cuts_8h_source.html#l00156">156</a> of file <a class="el" href="Rank1Cuts_8h_source.html">Rank1Cuts.h</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  156</span>                    {</div>
-<div class="line"><span class="lineno">  157</span>        <span class="comment">// Create tasks for each combination of (i, j, k)</span></div>
-<div class="line"><span class="lineno">  158</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> i = 1; i &lt; N_SIZE - 1; ++i) {</div>
-<div class="line"><span class="lineno">  159</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> j = i + 1; j &lt; N_SIZE - 1; ++j) {</div>
-<div class="line"><span class="lineno">  160</span>                <span class="keywordflow">for</span> (<span class="keywordtype">int</span> k = j + 1; k &lt; N_SIZE - 1; ++k) { <a class="code hl_variable" href="#a142cc5af037cc2e127d97ebf1db73a56">tasks</a>.emplace_back(i, j, k); }</div>
-<div class="line"><span class="lineno">  161</span>            }</div>
-<div class="line"><span class="lineno">  162</span>        }</div>
-<div class="line"><span class="lineno">  163</span>    }</div>
+<p class="definition">Definition at line <a class="el" href="Rank1Cuts_8h_source.html#l00158">158</a> of file <a class="el" href="Rank1Cuts_8h_source.html">Rank1Cuts.h</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  158</span>                    {</div>
+<div class="line"><span class="lineno">  159</span>        <span class="comment">// Create tasks for each combination of (i, j, k)</span></div>
+<div class="line"><span class="lineno">  160</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> i = 1; i &lt; N_SIZE - 1; ++i) {</div>
+<div class="line"><span class="lineno">  161</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> j = i + 1; j &lt; N_SIZE - 1; ++j) {</div>
+<div class="line"><span class="lineno">  162</span>                <span class="keywordflow">for</span> (<span class="keywordtype">int</span> k = j + 1; k &lt; N_SIZE - 1; ++k) { <a class="code hl_variable" href="#a142cc5af037cc2e127d97ebf1db73a56">tasks</a>.emplace_back(i, j, k); }</div>
+<div class="line"><span class="lineno">  163</span>            }</div>
+<div class="line"><span class="lineno">  164</span>        }</div>
+<div class="line"><span class="lineno">  165</span>    }</div>
 </div><!-- fragment -->
 </div>
 </div>
@@ -1571,7 +1566,7 @@ Here is the call graph for this function:</div>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="Rank1Cuts_8h_source.html#l00168">168</a> of file <a class="el" href="Rank1Cuts_8h_source.html">Rank1Cuts.h</a>.</p>
+<p class="definition">Definition at line <a class="el" href="Rank1Cuts_8h_source.html#l00170">170</a> of file <a class="el" href="Rank1Cuts_8h_source.html">Rank1Cuts.h</a>.</p>
 
 </div>
 </div>
@@ -1587,7 +1582,7 @@ Here is the call graph for this function:</div>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="Rank1Cuts_8h_source.html#l00165">165</a> of file <a class="el" href="Rank1Cuts_8h_source.html">Rank1Cuts.h</a>.</p>
+<p class="definition">Definition at line <a class="el" href="Rank1Cuts_8h_source.html#l00167">167</a> of file <a class="el" href="Rank1Cuts_8h_source.html">Rank1Cuts.h</a>.</p>
 
 </div>
 </div>
@@ -1619,7 +1614,7 @@ Here is the call graph for this function:</div>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="Rank1Cuts_8h_source.html#l00170">170</a> of file <a class="el" href="Rank1Cuts_8h_source.html">Rank1Cuts.h</a>.</p>
+<p class="definition">Definition at line <a class="el" href="Rank1Cuts_8h_source.html#l00172">172</a> of file <a class="el" href="Rank1Cuts_8h_source.html">Rank1Cuts.h</a>.</p>
 
 </div>
 </div>
@@ -1635,7 +1630,7 @@ Here is the call graph for this function:</div>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="Rank1Cuts_8h_source.html#l00171">171</a> of file <a class="el" href="Rank1Cuts_8h_source.html">Rank1Cuts.h</a>.</p>
+<p class="definition">Definition at line <a class="el" href="Rank1Cuts_8h_source.html#l00173">173</a> of file <a class="el" href="Rank1Cuts_8h_source.html">Rank1Cuts.h</a>.</p>
 
 </div>
 </div>
@@ -1707,7 +1702,7 @@ Here is the call graph for this function:</div>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="Rank1Cuts_8h_source.html#l00191">191</a> of file <a class="el" href="Rank1Cuts_8h_source.html">Rank1Cuts.h</a>.</p>
+<p class="definition">Definition at line <a class="el" href="Rank1Cuts_8h_source.html#l00193">193</a> of file <a class="el" href="Rank1Cuts_8h_source.html">Rank1Cuts.h</a>.</p>
 
 </div>
 </div>
@@ -1739,7 +1734,7 @@ Here is the call graph for this function:</div>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="Rank1Cuts_8h_source.html#l00174">174</a> of file <a class="el" href="Rank1Cuts_8h_source.html">Rank1Cuts.h</a>.</p>
+<p class="definition">Definition at line <a class="el" href="Rank1Cuts_8h_source.html#l00176">176</a> of file <a class="el" href="Rank1Cuts_8h_source.html">Rank1Cuts.h</a>.</p>
 
 </div>
 </div>
@@ -1755,7 +1750,7 @@ Here is the call graph for this function:</div>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="Rank1Cuts_8h_source.html#l00132">132</a> of file <a class="el" href="Rank1Cuts_8h_source.html">Rank1Cuts.h</a>.</p>
+<p class="definition">Definition at line <a class="el" href="Rank1Cuts_8h_source.html#l00134">134</a> of file <a class="el" href="Rank1Cuts_8h_source.html">Rank1Cuts.h</a>.</p>
 
 </div>
 </div>
@@ -1771,7 +1766,7 @@ Here is the call graph for this function:</div>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="Rank1Cuts_8h_source.html#l00192">192</a> of file <a class="el" href="Rank1Cuts_8h_source.html">Rank1Cuts.h</a>.</p>
+<p class="definition">Definition at line <a class="el" href="Rank1Cuts_8h_source.html#l00194">194</a> of file <a class="el" href="Rank1Cuts_8h_source.html">Rank1Cuts.h</a>.</p>
 
 </div>
 </div>
@@ -1787,7 +1782,7 @@ Here is the call graph for this function:</div>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="Rank1Cuts_8h_source.html#l00154">154</a> of file <a class="el" href="Rank1Cuts_8h_source.html">Rank1Cuts.h</a>.</p>
+<p class="definition">Definition at line <a class="el" href="Rank1Cuts_8h_source.html#l00156">156</a> of file <a class="el" href="Rank1Cuts_8h_source.html">Rank1Cuts.h</a>.</p>
 
 </div>
 </div>

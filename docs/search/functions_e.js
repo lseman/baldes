@@ -6,5 +6,5 @@ var searchData=
   ['nm_5fexchange_5ffun_3',['nm_exchange_fun',['../classIteratedLocalSearch.html#a428b3f95156f560faf7eba8f398b4894',1,'IteratedLocalSearch']]],
   ['nodescore_4',['NodeScore',['../structNodeScore.html#aaf016cafcfdcaec765a82572ac68f6e8',1,'NodeScore::NodeScore()=default'],['../structNodeScore.html#aba2f3d6c918d1f271f40d17f137922d9',1,'NodeScore::NodeScore(int i, int j, double c)']]],
   ['none_5',['none',['../classBitset.html#ab2f1681e2e33e8e46717b38334c0a621',1,'Bitset']]],
-  ['norm_6',['norm',['../classStabilization.html#a4f4e3b43fbae641f421179c3519a7ff7',1,'Stabilization::norm(const std::vector&lt; double &gt; &amp;vector)'],['../classStabilization.html#a1b375b131cac6b1a5978f725a6fcab27',1,'Stabilization::norm(const std::vector&lt; double &gt; &amp;vector_1, const std::vector&lt; double &gt; &amp;vector_2)']]]
+  ['norm_6',['norm',['../classStabilization.html#ada181c63fda918fc904a9d864595ed97',1,'Stabilization::norm(const std::vector&lt; double &gt; &amp;vector) const'],['../classStabilization.html#a1e9bd56fcded3169cbeef764d38f31a9',1,'Stabilization::norm(const std::vector&lt; double &gt; &amp;vector_1, const std::vector&lt; double &gt; &amp;vector_2) const']]]
 ];

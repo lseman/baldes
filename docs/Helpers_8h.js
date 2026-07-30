@@ -1,11 +1,12 @@
 var Helpers_8h =
 [
-    [ "std::hash&lt; std::vector&lt; int &gt; &gt;", "structstd_1_1hash_3_01std_1_1vector_3_01int_01_4_01_4.html", "structstd_1_1hash_3_01std_1_1vector_3_01int_01_4_01_4" ],
+    [ "IntVectorHasher", "structIntVectorHasher.html", "structIntVectorHasher" ],
     [ "NodeScore", "structNodeScore.html", "structNodeScore" ],
     [ "CandidateSet", "structCandidateSet.html", "structCandidateSet" ],
-    [ "CandidateSetCompare", "structCandidateSetCompare.html", "structCandidateSetCompare" ],
+    [ "CandidateSetEqual", "structCandidateSetEqual.html", "structCandidateSetEqual" ],
     [ "CandidateSetHasher", "structCandidateSetHasher.html", "structCandidateSetHasher" ],
     [ "std::hash&lt; CandidateSet &gt;", "structstd_1_1hash_3_01CandidateSet_01_4.html", "structstd_1_1hash_3_01CandidateSet_01_4" ],
+    [ "CandidateSetCollection", "Helpers_8h.html#ab304ecfaab103190601d4a2a1969dcfe", null ],
     [ "generateExactPermutations", "Helpers_8h.html#a6e2d376e10d40865f9a079e6bef1501f", null ],
     [ "generateGeneticPermutations", "Helpers_8h.html#ae16f85cab7674f93b1e3171dbe907d20", null ],
     [ "generateRuntimePermutations", "Helpers_8h.html#acf8696478b8666472dbbc5267f76fd36", null ],

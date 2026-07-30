@@ -65,16 +65,16 @@ var NAVTREE =
 var NAVTREEINDEX =
 [
 "AMD_8h.html",
-"MIPHandler_8cpp_source.html",
+"MIPHandler_8cpp.html#aec665b2ab1203ce33949c414d91f9477",
 "classBNBNode.html#aca6f8d009954c8444675f8ce69cbfaad",
 "classBucketGraph.html#aa1272b542e38efd60f4fe2ba7fc01d52",
 "classGurobiSolver.html",
 "classMIPProblem.html#a54727e752efac3228592083d90dde6b5",
-"classTaskQueue.html",
-"globals_enum.html",
-"structBucketLabelCacheEntry.html#a186f3a27c2c4cc04fe9953261ebee41a",
-"structPSTEPDuals.html#aea54f8d9e5d64bd12e189a80d2c2b5ba",
-"structstd_1_1hash_3_01Bitset_3_01N__BITS_01_4_01_4.html#a313fb5f03a3178123732b147a62abf7a"
+"classSupernodal.html#a9824116ebfe884d5a65fc9cb2b109535",
+"functions_~.html",
+"structBucketGraph_1_1WarmLabelState.html#a6e6e2215f2e19d6b517829e0fd2d239d",
+"structPSTEPDuals.html#a738d412e53bc74c5c1abbe7cace0b2fa",
+"structbaldes_1_1bcp_1_1PricingState.html#ae6641cf08eb448a2a6154a61fda0133f"
 ];
 
 const SYNCONMSG = 'click to disable panel synchronization';

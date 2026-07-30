@@ -2,7 +2,7 @@ var searchData=
 [
   ['cachedcut_0',['CachedCut',['../structCachedCut.html',1,'']]],
   ['candidateset_1',['CandidateSet',['../structCandidateSet.html',1,'']]],
-  ['candidatesetcompare_2',['CandidateSetCompare',['../structCandidateSetCompare.html',1,'']]],
+  ['candidatesetequal_2',['CandidateSetEqual',['../structCandidateSetEqual.html',1,'']]],
   ['candidatesethasher_3',['CandidateSetHasher',['../structCandidateSetHasher.html',1,'']]],
   ['cliquemanager_4',['CliqueManager',['../classCliqueManager.html',1,'']]],
   ['concatenationcandidate_5',['ConcatenationCandidate',['../structBucketGraph_1_1ConcatenationCandidate.html',1,'BucketGraph']]],

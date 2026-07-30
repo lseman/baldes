@@ -14,9 +14,10 @@ var searchData=
   ['knapsack_2eh_11',['Knapsack.h',['../Knapsack_8h.html',1,'']]],
   ['knapsackbound_12',['knapsackBound',['../classBucketGraph.html#aa36fdca6e5bdc9d2f081247808852b34',1,'BucketGraph']]],
   ['knapsackrows_13',['knapsackRows',['../classPreprocessor.html#a573600d9340b6fe33d9bf646ca33f46c',1,'Preprocessor']]],
-  ['kpricingtol_14',['kPricingTol',['../classVRProblem.html#a6c71c83e7a10dd31b96709540f24a0bf',1,'VRProblem::kPricingTol'],['../namespacebaldes_1_1bcp.html#a04dc134aa11975992a4802e67ba7a91d',1,'baldes::bcp::kPricingTol']]],
-  ['krhsinf_15',['kRhsInf',['../structRowInfo.html#a78ac888c1a9e2db013c773cf82fb7238aa041721991b2b4b15336060d1a0d1fd8',1,'RowInfo']]],
-  ['krowfeastol_16',['kRowFeasTol',['../classVRProblem.html#a1b66dc5772eef245d82faee217cce3fe',1,'VRProblem::kRowFeasTol'],['../namespacebaldes_1_1bcp.html#af330844e987622ea5cf1ae085ff8c4a0',1,'baldes::bcp::kRowFeasTol']]],
-  ['kupper_17',['kUpper',['../Activities_8h.html#aab909c136adf4a12e174d517f19f4f1aa47ea365ae543cb59618f5940400548cf',1,'Activities.h']]],
-  ['kvarintegralitytol_18',['kVarIntegralityTol',['../classVRProblem.html#a8a624cfec9a4139d5f12ff43e95084f5',1,'VRProblem::kVarIntegralityTol'],['../namespacebaldes_1_1bcp.html#a8cba5fb34ccfb7bb06793617a62df743',1,'baldes::bcp::kVarIntegralityTol']]]
+  ['knormtolerance_14',['kNormTolerance',['../classStabilization.html#a9a86584548072aff4d928f02875f074c',1,'Stabilization']]],
+  ['kpricingtol_15',['kPricingTol',['../classVRProblem.html#a6c71c83e7a10dd31b96709540f24a0bf',1,'VRProblem::kPricingTol'],['../namespacebaldes_1_1bcp.html#a04dc134aa11975992a4802e67ba7a91d',1,'baldes::bcp::kPricingTol']]],
+  ['krhsinf_16',['kRhsInf',['../structRowInfo.html#a78ac888c1a9e2db013c773cf82fb7238aa041721991b2b4b15336060d1a0d1fd8',1,'RowInfo']]],
+  ['krowfeastol_17',['kRowFeasTol',['../classVRProblem.html#a1b66dc5772eef245d82faee217cce3fe',1,'VRProblem::kRowFeasTol'],['../namespacebaldes_1_1bcp.html#af330844e987622ea5cf1ae085ff8c4a0',1,'baldes::bcp::kRowFeasTol']]],
+  ['kupper_18',['kUpper',['../Activities_8h.html#aab909c136adf4a12e174d517f19f4f1aa47ea365ae543cb59618f5940400548cf',1,'Activities.h']]],
+  ['kvarintegralitytol_19',['kVarIntegralityTol',['../classVRProblem.html#a8a624cfec9a4139d5f12ff43e95084f5',1,'VRProblem::kVarIntegralityTol'],['../namespacebaldes_1_1bcp.html#a8cba5fb34ccfb7bb06793617a62df743',1,'baldes::bcp::kVarIntegralityTol']]]
 ];
