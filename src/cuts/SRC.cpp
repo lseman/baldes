@@ -663,8 +663,13 @@ bool LimitedMemoryRank1Cuts::cutCleaner(BNBNode *node, std::vector<baldesCtrPtr>
         int    current_index = constr->index();
         double slack         = node->getSlack(current_index, solution);
 
-        // If the slack is positive (non-violated), remove the constraint.
-        if (numericutils::gt(slack, 0.0)) {
+        // Remove only clearly inactive cuts. The solution may come from the
+        // interior-point solver, where every inequality has strictly positive
+        // slack (~mu) even when it is binding at the optimum; a near-zero
+        // threshold removed binding cuts each iteration and made the bound
+        // oscillate as they were re-separated.
+        constexpr double kInactiveSlack = 1e-2;
+        if (numericutils::gt(slack, 0.0, kInactiveSlack)) {
             cleaned = true;
             node->remove(constr);
 

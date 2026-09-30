@@ -485,6 +485,11 @@ void IPSolver::run_optimization(ModelData &model, const double tol) {
 
     // Adaptive tolerance parameters
     double adaptive_tol = 1e-9;
+    const double primal_tol = 1e-8;
+
+    // Last iterate with finite residuals, restored on numerical breakdown.
+    Eigen::VectorXd last_x = x, last_lambda = lambda, last_s = s, last_v = v, last_w = w;
+    double          last_tau = tau, last_kappa = kappa;
 
     // Main optimization loop
     for (int k = 0; k < max_iter; ++k) {
@@ -525,7 +530,30 @@ void IPSolver::run_optimization(ModelData &model, const double tol) {
         //     saved_interior_solution_bool = true;
         //     warm_start = true;
         // }
-        if (_d <= adaptive_tol && _g <= tol) break;
+        // Numerical breakdown near the optimum: fall back to the last finite
+        // iterate instead of iterating on NaNs until max_iter.
+        if (!std::isfinite(_p) || !std::isfinite(_d) || !std::isfinite(_g) || !std::isfinite(tau)) {
+            x      = last_x;
+            lambda = last_lambda;
+            s      = last_s;
+            v      = last_v;
+            w      = last_w;
+            tau    = last_tau;
+            kappa  = last_kappa;
+            break;
+        }
+        last_x      = x;
+        last_lambda = lambda;
+        last_s      = s;
+        last_v      = v;
+        last_w      = w;
+        last_tau    = tau;
+        last_kappa  = kappa;
+
+        // Primal feasibility is required as well: stopping on dual residual
+        // and gap alone can return a primal-infeasible point whose duals
+        // price existing master columns negative.
+        if (_p <= primal_tol && _d <= adaptive_tol && _g <= tol) break;
         // adaptive_tol = std::max(min_tol, adaptive_tol * scale_factor);
 
         // Compute scaling factors

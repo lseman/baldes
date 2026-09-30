@@ -331,6 +331,29 @@ struct alignas(64) Bucket {
 
     [[nodiscard]] size_t size() const noexcept { return labels.size() + extra_labels.size(); }
 
+    // Stage One retains only the lowest-cost label in each bucket. Most
+    // candidates are rejected by the cached minimum without touching stored
+    // labels; a new record minimum invalidates the previous representatives.
+    bool apply_stage_one_dominance(const Label *new_label, uint64_t &scanned_labels) noexcept {
+        if (!new_label) return true;
+
+        const double best_cost = get_cb();
+        if (best_cost <= new_label->cost) {
+            scanned_labels += is_empty() ? 0 : 1;
+            return true;
+        }
+
+        for (Label *label : labels) {
+            ++scanned_labels;
+            if (label && !label->is_dominated) label->set_dominated(true);
+        }
+        for (Label *label : extra_labels) {
+            ++scanned_labels;
+            if (label && !label->is_dominated) label->set_dominated(true);
+        }
+        return false;
+    }
+
     // --- Dominance Check ---
     // Checks whether a new label is dominated by any labels already in the
     // bucket. The dominance_func is a lambda or function that performs the

@@ -331,6 +331,7 @@ auto BucketGraph::solveTSP(std::vector<std::vector<uint16_t>> &paths, std::vecto
     auto lp_obj = 0.0;
 #endif
     fmt::print("LP Objective: {}\n", lp_obj);
+#ifdef GUROBI
     GRBEnv   &env      = GurobiEnvSingleton::getInstance();
     GRBModel *modelGRB = model.toGurobiModel(env).release(); // Release ownership from unique_ptr
     // set model verbose
@@ -356,6 +357,7 @@ auto BucketGraph::solveTSP(std::vector<std::vector<uint16_t>> &paths, std::vecto
             }
         }
     }
+#endif
 
     return std::make_tuple(three_two_duals, three_three_duals, three_five_duals);
 }
@@ -547,7 +549,7 @@ auto BucketGraph::solveTSPTW(std::vector<std::vector<uint16_t>> &paths, std::vec
 
     // Solution output and return
     // fmt::print("LP Objective: {}\n", ipSolver->getObjective());
-
+#ifdef GUROBI
     GRBEnv &env = GurobiEnvSingleton::getInstance();
 
     GRBModel *modelGRB = model.toGurobiModel(env).release();
@@ -558,6 +560,7 @@ auto BucketGraph::solveTSPTW(std::vector<std::vector<uint16_t>> &paths, std::vec
 
     modelGRB->update();
     modelGRB->optimize();
+#endif
 
     return std::make_tuple(three_two_duals, three_three_duals, three_five_duals);
 }

@@ -17,7 +17,9 @@ void MIPProblem::addVars(const double *lb, const double *ub, const double *obj, 
     for (size_t i = 0; i < count; ++i) {
         // Add variable with its bounds, objective, and type.
         add_variable(names[i], vtypes[i], lb[i], ub[i], obj[i]);
+#ifdef GUROBI
         gurobiCache->addColumn(cols[i]);
+#endif
 
         // The new variable's index is the last element in 'variables'.
         int col_index = variables.size() - 1;
