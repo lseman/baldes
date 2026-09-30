@@ -69,12 +69,12 @@ var NAVTREEINDEX =
 "classBNBNode.html#aca6f8d009954c8444675f8ce69cbfaad",
 "classBucketGraph.html#aa1272b542e38efd60f4fe2ba7fc01d52",
 "classGurobiSolver.html",
-"classMIPProblem.html#a54727e752efac3228592083d90dde6b5",
-"classSupernodal.html#a9824116ebfe884d5a65fc9cb2b109535",
-"functions_~.html",
-"structBucketGraph_1_1WarmLabelState.html#a6e6e2215f2e19d6b517829e0fd2d239d",
-"structPSTEPDuals.html#a738d412e53bc74c5c1abbe7cace0b2fa",
-"structbaldes_1_1bcp_1_1PricingState.html#ae6641cf08eb448a2a6154a61fda0133f"
+"classMIPProblem.html#a4cd9a407085c12dbae7b776eb6a99cdc",
+"classSupernodal.html#a382595374e88078b231ba5f06b02630d",
+"functions_x.html",
+"structBucketGraph_1_1WarmLabelState.html#a33be49420063a910f981100301cac83f",
+"structPSTEPDuals.html#a62ec870efb76a66d57b9849e8ddd6131",
+"structbaldes_1_1bcp_1_1PricingState.html#ade2081de7f5a9c50c6f111b1e4997794"
 ];
 
 const SYNCONMSG = 'click to disable panel synchronization';

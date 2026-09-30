@@ -1,5 +1,7 @@
 var NAVTREEINDEX9 =
 {
+"structPSTEPDuals.html#a62ec870efb76a66d57b9849e8ddd6131":[2,0,77,6],
+"structPSTEPDuals.html#a653d22e9c33ff3cc8cab42c897f70877":[2,0,77,0],
 "structPSTEPDuals.html#a738d412e53bc74c5c1abbe7cace0b2fa":[2,0,77,3],
 "structPSTEPDuals.html#a76ee64646f52de5a34b08da7311401e9":[2,0,77,11],
 "structPSTEPDuals.html#a85817a821edc614fa9b672ba24da9ef8":[2,0,77,5],
@@ -247,7 +249,5 @@ var NAVTREEINDEX9 =
 "structbaldes_1_1bcp_1_1PricingState.html#ad00677b0f1c95550c2b9b0cb4aff568a":[0,0,0,0,0,8],
 "structbaldes_1_1bcp_1_1PricingState.html#ad00677b0f1c95550c2b9b0cb4aff568a":[2,0,0,0,0,8],
 "structbaldes_1_1bcp_1_1PricingState.html#add219e4feb2d3e81d818c019ded953aa":[0,0,0,0,0,1],
-"structbaldes_1_1bcp_1_1PricingState.html#add219e4feb2d3e81d818c019ded953aa":[2,0,0,0,0,1],
-"structbaldes_1_1bcp_1_1PricingState.html#ade2081de7f5a9c50c6f111b1e4997794":[0,0,0,0,0,4],
-"structbaldes_1_1bcp_1_1PricingState.html#ade2081de7f5a9c50c6f111b1e4997794":[2,0,0,0,0,4]
+"structbaldes_1_1bcp_1_1PricingState.html#add219e4feb2d3e81d818c019ded953aa":[2,0,0,0,0,1]
 };

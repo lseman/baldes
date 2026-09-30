@@ -264,7 +264,7 @@ Public Attributes</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="Node_8h_source.html#l00481">481</a> of file <a class="el" href="Node_8h_source.html">Node.h</a>.</p>
+<p class="definition">Definition at line <a class="el" href="Node_8h_source.html#l00494">494</a> of file <a class="el" href="Node_8h_source.html">Node.h</a>.</p>
 
 </div>
 </div>
@@ -369,101 +369,101 @@ Here is the call graph for this function:</div>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="Node_8h_source.html#l00385">385</a> of file <a class="el" href="Node_8h_source.html">Node.h</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  387</span>                                                                                            {</div>
-<div class="line"><span class="lineno">  388</span>        <span class="comment">// Get the decision variables from the MIP problem</span></div>
-<div class="line"><span class="lineno">  389</span>        <span class="keyword">auto</span>            &amp;variables = <a class="code hl_variable" href="#a7553327a6526826882bb1c4cfeb086aa">mip</a>.getVars(); <span class="comment">// Assumes mip is a pointer to MIPProblem</span></div>
-<div class="line"><span class="lineno">  390</span>        LinearExpression linExpr;                   <span class="comment">// Initialize linear expression for MIP</span></div>
-<div class="line"><span class="lineno">  391</span>        std::string      name;</div>
-<div class="line"><span class="lineno">  392</span> </div>
-<div class="line"><span class="lineno">  393</span>        <span class="keywordflow">if</span> (ctype == <a class="code hl_enumvalue" href="Definitions_8h.html#ac42c2e9f0bdd51b56ae955b2f5c35004ad6af9c1eaff2a89ebd3f8d0c542be12b">CandidateType::Vehicle</a>) {</div>
-<div class="line"><span class="lineno">  394</span>            <span class="keywordflow">for</span> (<span class="keyword">auto</span> var : variables) {</div>
-<div class="line"><span class="lineno">  395</span>                linExpr.<a class="code hl_function" href="classLinearExpression.html#a931036cafcd17fe3553ffd79468da49e">add_or_update_term</a>(var-&gt;get_name(),</div>
-<div class="line"><span class="lineno">  396</span>                                           1.0); <span class="comment">// Add each variable with coefficient 1.0</span></div>
-<div class="line"><span class="lineno">  397</span>                name = <span class="stringliteral">&quot;branching_vehicle_&quot;</span> + std::to_string(<span class="keywordtype">int</span>(rhs));</div>
-<div class="line"><span class="lineno">  398</span>            }</div>
-<div class="line"><span class="lineno">  399</span>        } <span class="keywordflow">else</span> <span class="keywordflow">if</span> (ctype == <a class="code hl_enumvalue" href="Definitions_8h.html#ac42c2e9f0bdd51b56ae955b2f5c35004a6c3a6944a808a7c0bbb6788dbec54a9f">CandidateType::Node</a>) {</div>
-<div class="line"><span class="lineno">  400</span>            <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> i = 0; i &lt; variables.size(); ++i) {</div>
-<div class="line"><span class="lineno">  401</span>                <span class="comment">// Use the payload as int for Node</span></div>
-<div class="line"><span class="lineno">  402</span>                std::visit(</div>
-<div class="line"><span class="lineno">  403</span>                    [&amp;](<span class="keyword">auto</span> &amp;&amp;arg) {</div>
-<div class="line"><span class="lineno">  404</span>                        <span class="keyword">using </span>T = std::decay_t&lt;<span class="keyword">decltype</span>(arg)&gt;;</div>
-<div class="line"><span class="lineno">  405</span>                        <span class="keywordflow">if</span> <span class="keyword">constexpr</span> (std::is_same_v&lt;T, int&gt;) {</div>
-<div class="line"><span class="lineno">  406</span>                            linExpr.<a class="code hl_function" href="classLinearExpression.html#a931036cafcd17fe3553ffd79468da49e">add_or_update_term</a>(variables[i]-&gt;get_name(),</div>
-<div class="line"><span class="lineno">  407</span>                                                       <a class="code hl_variable" href="#af37b13c0c7bda39871ee1e82cfe6b535">paths</a>[i].contains(arg) ? 1.0 : 0.0); <span class="comment">// Use int payload</span></div>
-<div class="line"><span class="lineno">  408</span>                            name = <span class="stringliteral">&quot;branching_node_&quot;</span> + std::to_string(arg) + <span class="stringliteral">&quot;_&quot;</span> + std::to_string(<span class="keywordtype">int</span>(rhs));</div>
-<div class="line"><span class="lineno">  409</span>                        } <span class="keywordflow">else</span> {</div>
-<div class="line"><span class="lineno">  410</span>                            <span class="keywordflow">throw</span> std::invalid_argument(<span class="stringliteral">&quot;Payload for Node must be an int.&quot;</span>);</div>
-<div class="line"><span class="lineno">  411</span>                        }</div>
-<div class="line"><span class="lineno">  412</span>                    },</div>
-<div class="line"><span class="lineno">  413</span>                    *payload);</div>
-<div class="line"><span class="lineno">  414</span>            }</div>
-<div class="line"><span class="lineno">  415</span>        } <span class="keywordflow">else</span> <span class="keywordflow">if</span> (ctype == <a class="code hl_enumvalue" href="Definitions_8h.html#ac42c2e9f0bdd51b56ae955b2f5c35004ae4a297a0f76119a442c2595ac040673e">CandidateType::Edge</a>) {</div>
-<div class="line"><span class="lineno">  416</span>            <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> i = 0; i &lt; variables.size(); ++i) {</div>
-<div class="line"><span class="lineno">  417</span>                <span class="comment">// Use the payload as std::pair&lt;int, int&gt; for Edge</span></div>
-<div class="line"><span class="lineno">  418</span>                std::visit(</div>
-<div class="line"><span class="lineno">  419</span>                    [&amp;](<span class="keyword">auto</span> &amp;&amp;arg) {</div>
-<div class="line"><span class="lineno">  420</span>                        <span class="keyword">using </span>T = std::decay_t&lt;<span class="keyword">decltype</span>(arg)&gt;;</div>
-<div class="line"><span class="lineno">  421</span>                        <span class="keywordflow">if</span> <span class="keyword">constexpr</span> (std::is_same_v&lt;T, std::pair&lt;int, int&gt;&gt;) {</div>
-<div class="line"><span class="lineno">  422</span>                            linExpr.<a class="code hl_function" href="classLinearExpression.html#a931036cafcd17fe3553ffd79468da49e">add_or_update_term</a>(</div>
-<div class="line"><span class="lineno">  423</span>                                variables[i]-&gt;get_name(),</div>
-<div class="line"><span class="lineno">  424</span>                                <a class="code hl_variable" href="#af37b13c0c7bda39871ee1e82cfe6b535">paths</a>[i].timesArc(arg.first, arg.second) ? 1.0 : 0.0); <span class="comment">// Use pair payload</span></div>
-<div class="line"><span class="lineno">  425</span>                            name = <span class="stringliteral">&quot;branching_edge_&quot;</span> + std::to_string(arg.first) + <span class="stringliteral">&quot;_&quot;</span> + std::to_string(arg.second) +</div>
-<div class="line"><span class="lineno">  426</span>                                   <span class="stringliteral">&quot;_&quot;</span> + std::to_string(<span class="keywordtype">int</span>(rhs));</div>
-<div class="line"><span class="lineno">  427</span>                        } <span class="keywordflow">else</span> {</div>
-<div class="line"><span class="lineno">  428</span>                            <span class="keywordflow">throw</span> std::invalid_argument(<span class="stringliteral">&quot;Payload for Edge must be a std::pair&lt;int, &quot;</span></div>
-<div class="line"><span class="lineno">  429</span>                                                        <span class="stringliteral">&quot;int&gt;.&quot;</span>);</div>
-<div class="line"><span class="lineno">  430</span>                        }</div>
-<div class="line"><span class="lineno">  431</span>                    },</div>
-<div class="line"><span class="lineno">  432</span>                    *payload);</div>
-<div class="line"><span class="lineno">  433</span>            }</div>
-<div class="line"><span class="lineno">  434</span>        } <span class="keywordflow">else</span> <span class="keywordflow">if</span> (ctype == <a class="code hl_enumvalue" href="Definitions_8h.html#ac42c2e9f0bdd51b56ae955b2f5c35004a249694a485fc5d3289c38986b4f8e887">CandidateType::Cluster</a>) {</div>
-<div class="line"><span class="lineno">  435</span>            <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> i = 0; i &lt; variables.size(); ++i) {</div>
-<div class="line"><span class="lineno">  436</span>                <span class="comment">// Use the payload as std::vector&lt;int&gt; for Cluster</span></div>
-<div class="line"><span class="lineno">  437</span>                std::visit(</div>
-<div class="line"><span class="lineno">  438</span>                    [&amp;](<span class="keyword">auto</span> &amp;&amp;arg) {</div>
-<div class="line"><span class="lineno">  439</span>                        <span class="keyword">using </span>T = std::decay_t&lt;<span class="keyword">decltype</span>(arg)&gt;;</div>
-<div class="line"><span class="lineno">  440</span>                        <span class="keywordflow">if</span> <span class="keyword">constexpr</span> (std::is_same_v&lt;T, std::vector&lt;int&gt;&gt;) {</div>
-<div class="line"><span class="lineno">  441</span>                            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> cluster_ele : arg) {</div>
-<div class="line"><span class="lineno">  442</span>                                <span class="comment">// Assuming `contains` checks if the path</span></div>
-<div class="line"><span class="lineno">  443</span>                                <span class="comment">// contains `cluster_ele`</span></div>
-<div class="line"><span class="lineno">  444</span>                                <span class="keywordflow">if</span> (<a class="code hl_variable" href="#af37b13c0c7bda39871ee1e82cfe6b535">paths</a>[i].contains(cluster_ele)) {</div>
-<div class="line"><span class="lineno">  445</span>                                    linExpr.<a class="code hl_function" href="classLinearExpression.html#a931036cafcd17fe3553ffd79468da49e">add_or_update_term</a>(variables[i]-&gt;get_name(),</div>
-<div class="line"><span class="lineno">  446</span>                                                               1.0); <span class="comment">// Add term with coefficient 1.0</span></div>
-<div class="line"><span class="lineno">  447</span>                                }</div>
-<div class="line"><span class="lineno">  448</span>                                name =</div>
-<div class="line"><span class="lineno">  449</span>                                    <span class="stringliteral">&quot;branching_cluster_&quot;</span> + std::to_string(cluster_ele) + <span class="stringliteral">&quot;_&quot;</span> + std::to_string(<span class="keywordtype">int</span>(rhs));</div>
-<div class="line"><span class="lineno">  450</span>                            }</div>
-<div class="line"><span class="lineno">  451</span>                        } <span class="keywordflow">else</span> {</div>
-<div class="line"><span class="lineno">  452</span>                            <span class="keywordflow">throw</span> std::invalid_argument(<span class="stringliteral">&quot;Payload for Cluster must be a &quot;</span></div>
-<div class="line"><span class="lineno">  453</span>                                                        <span class="stringliteral">&quot;std::vector&lt;int&gt;.&quot;</span>);</div>
-<div class="line"><span class="lineno">  454</span>                        }</div>
-<div class="line"><span class="lineno">  455</span>                    },</div>
-<div class="line"><span class="lineno">  456</span>                    *payload);</div>
-<div class="line"><span class="lineno">  457</span>            }</div>
-<div class="line"><span class="lineno">  458</span>        }</div>
-<div class="line"><span class="lineno">  459</span> </div>
-<div class="line"><span class="lineno">  460</span>        <span class="comment">// Add the constraint to MIP based on the branching direction</span></div>
-<div class="line"><span class="lineno">  461</span>        <a class="code hl_typedef" href="LinExp_8h.html#ae0d36bb50b88123b348bd645b60e52a9">baldesCtrPtr</a> constraint;</div>
-<div class="line"><span class="lineno">  462</span>        <span class="keywordflow">if</span> (<a class="code hl_variable" href="#a7553327a6526826882bb1c4cfeb086aa">mip</a>.constraint_exists(name)) {</div>
-<div class="line"><span class="lineno">  463</span>            constraint = <a class="code hl_variable" href="#a7553327a6526826882bb1c4cfeb086aa">mip</a>.get_constraint(name);</div>
-<div class="line"><span class="lineno">  464</span>            <span class="keywordflow">return</span> constraint;</div>
-<div class="line"><span class="lineno">  465</span>        }</div>
-<div class="line"><span class="lineno">  466</span>        <span class="keywordflow">if</span> (sense == <a class="code hl_enumvalue" href="Definitions_8h.html#ac8f82cde0cdfcbb1cdf96754f01dc008a8768a6821cd735aea4f5b0df88c1fc6a">BranchingDirection::Greater</a>) {</div>
-<div class="line"><span class="lineno">  467</span>            constraint = <a class="code hl_variable" href="#a7553327a6526826882bb1c4cfeb086aa">mip</a>.add_constraint(linExpr, rhs, <span class="charliteral">&#39;&gt;&#39;</span>);</div>
-<div class="line"><span class="lineno">  468</span>            constraint-&gt;set_name(name);</div>
-<div class="line"><span class="lineno">  469</span>        } <span class="keywordflow">else</span> <span class="keywordflow">if</span> (sense == <a class="code hl_enumvalue" href="Definitions_8h.html#ac8f82cde0cdfcbb1cdf96754f01dc008a1cfdf0e8d0c87a228c1f40d9bee7888b">BranchingDirection::Less</a>) {</div>
-<div class="line"><span class="lineno">  470</span>            constraint = <a class="code hl_variable" href="#a7553327a6526826882bb1c4cfeb086aa">mip</a>.add_constraint(linExpr, rhs, <span class="charliteral">&#39;&lt;&#39;</span>);</div>
-<div class="line"><span class="lineno">  471</span>            constraint-&gt;set_name(name);</div>
-<div class="line"><span class="lineno">  472</span>        } <span class="keywordflow">else</span> {</div>
-<div class="line"><span class="lineno">  473</span>            constraint = <a class="code hl_variable" href="#a7553327a6526826882bb1c4cfeb086aa">mip</a>.add_constraint(linExpr, rhs, <span class="charliteral">&#39;=&#39;</span>);</div>
-<div class="line"><span class="lineno">  474</span>            constraint-&gt;set_name(name);</div>
-<div class="line"><span class="lineno">  475</span>        }</div>
-<div class="line"><span class="lineno">  476</span> </div>
-<div class="line"><span class="lineno">  477</span>        <span class="comment">// Update the MIP structure if necessary</span></div>
-<div class="line"><span class="lineno">  478</span>        <span class="comment">// mip-&gt;update();</span></div>
-<div class="line"><span class="lineno">  479</span>        <span class="keywordflow">return</span> constraint;</div>
-<div class="line"><span class="lineno">  480</span>    }</div>
+<p class="definition">Definition at line <a class="el" href="Node_8h_source.html#l00398">398</a> of file <a class="el" href="Node_8h_source.html">Node.h</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  400</span>                                                                                            {</div>
+<div class="line"><span class="lineno">  401</span>        <span class="comment">// Get the decision variables from the MIP problem</span></div>
+<div class="line"><span class="lineno">  402</span>        <span class="keyword">auto</span>            &amp;variables = <a class="code hl_variable" href="#a7553327a6526826882bb1c4cfeb086aa">mip</a>.getVars(); <span class="comment">// Assumes mip is a pointer to MIPProblem</span></div>
+<div class="line"><span class="lineno">  403</span>        LinearExpression linExpr;                   <span class="comment">// Initialize linear expression for MIP</span></div>
+<div class="line"><span class="lineno">  404</span>        std::string      name;</div>
+<div class="line"><span class="lineno">  405</span> </div>
+<div class="line"><span class="lineno">  406</span>        <span class="keywordflow">if</span> (ctype == <a class="code hl_enumvalue" href="Definitions_8h.html#ac42c2e9f0bdd51b56ae955b2f5c35004ad6af9c1eaff2a89ebd3f8d0c542be12b">CandidateType::Vehicle</a>) {</div>
+<div class="line"><span class="lineno">  407</span>            <span class="keywordflow">for</span> (<span class="keyword">auto</span> var : variables) {</div>
+<div class="line"><span class="lineno">  408</span>                linExpr.<a class="code hl_function" href="classLinearExpression.html#a931036cafcd17fe3553ffd79468da49e">add_or_update_term</a>(var-&gt;get_name(),</div>
+<div class="line"><span class="lineno">  409</span>                                           1.0); <span class="comment">// Add each variable with coefficient 1.0</span></div>
+<div class="line"><span class="lineno">  410</span>                name = <span class="stringliteral">&quot;branching_vehicle_&quot;</span> + std::to_string(<span class="keywordtype">int</span>(rhs));</div>
+<div class="line"><span class="lineno">  411</span>            }</div>
+<div class="line"><span class="lineno">  412</span>        } <span class="keywordflow">else</span> <span class="keywordflow">if</span> (ctype == <a class="code hl_enumvalue" href="Definitions_8h.html#ac42c2e9f0bdd51b56ae955b2f5c35004a6c3a6944a808a7c0bbb6788dbec54a9f">CandidateType::Node</a>) {</div>
+<div class="line"><span class="lineno">  413</span>            <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> i = 0; i &lt; variables.size(); ++i) {</div>
+<div class="line"><span class="lineno">  414</span>                <span class="comment">// Use the payload as int for Node</span></div>
+<div class="line"><span class="lineno">  415</span>                std::visit(</div>
+<div class="line"><span class="lineno">  416</span>                    [&amp;](<span class="keyword">auto</span> &amp;&amp;arg) {</div>
+<div class="line"><span class="lineno">  417</span>                        <span class="keyword">using </span>T = std::decay_t&lt;<span class="keyword">decltype</span>(arg)&gt;;</div>
+<div class="line"><span class="lineno">  418</span>                        <span class="keywordflow">if</span> <span class="keyword">constexpr</span> (std::is_same_v&lt;T, int&gt;) {</div>
+<div class="line"><span class="lineno">  419</span>                            linExpr.<a class="code hl_function" href="classLinearExpression.html#a931036cafcd17fe3553ffd79468da49e">add_or_update_term</a>(variables[i]-&gt;get_name(),</div>
+<div class="line"><span class="lineno">  420</span>                                                       <a class="code hl_variable" href="#af37b13c0c7bda39871ee1e82cfe6b535">paths</a>[i].contains(arg) ? 1.0 : 0.0); <span class="comment">// Use int payload</span></div>
+<div class="line"><span class="lineno">  421</span>                            name = <span class="stringliteral">&quot;branching_node_&quot;</span> + std::to_string(arg) + <span class="stringliteral">&quot;_&quot;</span> + std::to_string(<span class="keywordtype">int</span>(rhs));</div>
+<div class="line"><span class="lineno">  422</span>                        } <span class="keywordflow">else</span> {</div>
+<div class="line"><span class="lineno">  423</span>                            <span class="keywordflow">throw</span> std::invalid_argument(<span class="stringliteral">&quot;Payload for Node must be an int.&quot;</span>);</div>
+<div class="line"><span class="lineno">  424</span>                        }</div>
+<div class="line"><span class="lineno">  425</span>                    },</div>
+<div class="line"><span class="lineno">  426</span>                    *payload);</div>
+<div class="line"><span class="lineno">  427</span>            }</div>
+<div class="line"><span class="lineno">  428</span>        } <span class="keywordflow">else</span> <span class="keywordflow">if</span> (ctype == <a class="code hl_enumvalue" href="Definitions_8h.html#ac42c2e9f0bdd51b56ae955b2f5c35004ae4a297a0f76119a442c2595ac040673e">CandidateType::Edge</a>) {</div>
+<div class="line"><span class="lineno">  429</span>            <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> i = 0; i &lt; variables.size(); ++i) {</div>
+<div class="line"><span class="lineno">  430</span>                <span class="comment">// Use the payload as std::pair&lt;int, int&gt; for Edge</span></div>
+<div class="line"><span class="lineno">  431</span>                std::visit(</div>
+<div class="line"><span class="lineno">  432</span>                    [&amp;](<span class="keyword">auto</span> &amp;&amp;arg) {</div>
+<div class="line"><span class="lineno">  433</span>                        <span class="keyword">using </span>T = std::decay_t&lt;<span class="keyword">decltype</span>(arg)&gt;;</div>
+<div class="line"><span class="lineno">  434</span>                        <span class="keywordflow">if</span> <span class="keyword">constexpr</span> (std::is_same_v&lt;T, std::pair&lt;int, int&gt;&gt;) {</div>
+<div class="line"><span class="lineno">  435</span>                            linExpr.<a class="code hl_function" href="classLinearExpression.html#a931036cafcd17fe3553ffd79468da49e">add_or_update_term</a>(</div>
+<div class="line"><span class="lineno">  436</span>                                variables[i]-&gt;get_name(),</div>
+<div class="line"><span class="lineno">  437</span>                                <a class="code hl_variable" href="#af37b13c0c7bda39871ee1e82cfe6b535">paths</a>[i].timesArc(arg.first, arg.second) ? 1.0 : 0.0); <span class="comment">// Use pair payload</span></div>
+<div class="line"><span class="lineno">  438</span>                            name = <span class="stringliteral">&quot;branching_edge_&quot;</span> + std::to_string(arg.first) + <span class="stringliteral">&quot;_&quot;</span> + std::to_string(arg.second) +</div>
+<div class="line"><span class="lineno">  439</span>                                   <span class="stringliteral">&quot;_&quot;</span> + std::to_string(<span class="keywordtype">int</span>(rhs));</div>
+<div class="line"><span class="lineno">  440</span>                        } <span class="keywordflow">else</span> {</div>
+<div class="line"><span class="lineno">  441</span>                            <span class="keywordflow">throw</span> std::invalid_argument(<span class="stringliteral">&quot;Payload for Edge must be a std::pair&lt;int, &quot;</span></div>
+<div class="line"><span class="lineno">  442</span>                                                        <span class="stringliteral">&quot;int&gt;.&quot;</span>);</div>
+<div class="line"><span class="lineno">  443</span>                        }</div>
+<div class="line"><span class="lineno">  444</span>                    },</div>
+<div class="line"><span class="lineno">  445</span>                    *payload);</div>
+<div class="line"><span class="lineno">  446</span>            }</div>
+<div class="line"><span class="lineno">  447</span>        } <span class="keywordflow">else</span> <span class="keywordflow">if</span> (ctype == <a class="code hl_enumvalue" href="Definitions_8h.html#ac42c2e9f0bdd51b56ae955b2f5c35004a249694a485fc5d3289c38986b4f8e887">CandidateType::Cluster</a>) {</div>
+<div class="line"><span class="lineno">  448</span>            <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> i = 0; i &lt; variables.size(); ++i) {</div>
+<div class="line"><span class="lineno">  449</span>                <span class="comment">// Use the payload as std::vector&lt;int&gt; for Cluster</span></div>
+<div class="line"><span class="lineno">  450</span>                std::visit(</div>
+<div class="line"><span class="lineno">  451</span>                    [&amp;](<span class="keyword">auto</span> &amp;&amp;arg) {</div>
+<div class="line"><span class="lineno">  452</span>                        <span class="keyword">using </span>T = std::decay_t&lt;<span class="keyword">decltype</span>(arg)&gt;;</div>
+<div class="line"><span class="lineno">  453</span>                        <span class="keywordflow">if</span> <span class="keyword">constexpr</span> (std::is_same_v&lt;T, std::vector&lt;int&gt;&gt;) {</div>
+<div class="line"><span class="lineno">  454</span>                            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> cluster_ele : arg) {</div>
+<div class="line"><span class="lineno">  455</span>                                <span class="comment">// Assuming `contains` checks if the path</span></div>
+<div class="line"><span class="lineno">  456</span>                                <span class="comment">// contains `cluster_ele`</span></div>
+<div class="line"><span class="lineno">  457</span>                                <span class="keywordflow">if</span> (<a class="code hl_variable" href="#af37b13c0c7bda39871ee1e82cfe6b535">paths</a>[i].contains(cluster_ele)) {</div>
+<div class="line"><span class="lineno">  458</span>                                    linExpr.<a class="code hl_function" href="classLinearExpression.html#a931036cafcd17fe3553ffd79468da49e">add_or_update_term</a>(variables[i]-&gt;get_name(),</div>
+<div class="line"><span class="lineno">  459</span>                                                               1.0); <span class="comment">// Add term with coefficient 1.0</span></div>
+<div class="line"><span class="lineno">  460</span>                                }</div>
+<div class="line"><span class="lineno">  461</span>                                name =</div>
+<div class="line"><span class="lineno">  462</span>                                    <span class="stringliteral">&quot;branching_cluster_&quot;</span> + std::to_string(cluster_ele) + <span class="stringliteral">&quot;_&quot;</span> + std::to_string(<span class="keywordtype">int</span>(rhs));</div>
+<div class="line"><span class="lineno">  463</span>                            }</div>
+<div class="line"><span class="lineno">  464</span>                        } <span class="keywordflow">else</span> {</div>
+<div class="line"><span class="lineno">  465</span>                            <span class="keywordflow">throw</span> std::invalid_argument(<span class="stringliteral">&quot;Payload for Cluster must be a &quot;</span></div>
+<div class="line"><span class="lineno">  466</span>                                                        <span class="stringliteral">&quot;std::vector&lt;int&gt;.&quot;</span>);</div>
+<div class="line"><span class="lineno">  467</span>                        }</div>
+<div class="line"><span class="lineno">  468</span>                    },</div>
+<div class="line"><span class="lineno">  469</span>                    *payload);</div>
+<div class="line"><span class="lineno">  470</span>            }</div>
+<div class="line"><span class="lineno">  471</span>        }</div>
+<div class="line"><span class="lineno">  472</span> </div>
+<div class="line"><span class="lineno">  473</span>        <span class="comment">// Add the constraint to MIP based on the branching direction</span></div>
+<div class="line"><span class="lineno">  474</span>        <a class="code hl_typedef" href="LinExp_8h.html#ae0d36bb50b88123b348bd645b60e52a9">baldesCtrPtr</a> constraint;</div>
+<div class="line"><span class="lineno">  475</span>        <span class="keywordflow">if</span> (<a class="code hl_variable" href="#a7553327a6526826882bb1c4cfeb086aa">mip</a>.constraint_exists(name)) {</div>
+<div class="line"><span class="lineno">  476</span>            constraint = <a class="code hl_variable" href="#a7553327a6526826882bb1c4cfeb086aa">mip</a>.get_constraint(name);</div>
+<div class="line"><span class="lineno">  477</span>            <span class="keywordflow">return</span> constraint;</div>
+<div class="line"><span class="lineno">  478</span>        }</div>
+<div class="line"><span class="lineno">  479</span>        <span class="keywordflow">if</span> (sense == <a class="code hl_enumvalue" href="Definitions_8h.html#ac8f82cde0cdfcbb1cdf96754f01dc008a8768a6821cd735aea4f5b0df88c1fc6a">BranchingDirection::Greater</a>) {</div>
+<div class="line"><span class="lineno">  480</span>            constraint = <a class="code hl_variable" href="#a7553327a6526826882bb1c4cfeb086aa">mip</a>.add_constraint(linExpr, rhs, <span class="charliteral">&#39;&gt;&#39;</span>);</div>
+<div class="line"><span class="lineno">  481</span>            constraint-&gt;set_name(name);</div>
+<div class="line"><span class="lineno">  482</span>        } <span class="keywordflow">else</span> <span class="keywordflow">if</span> (sense == <a class="code hl_enumvalue" href="Definitions_8h.html#ac8f82cde0cdfcbb1cdf96754f01dc008a1cfdf0e8d0c87a228c1f40d9bee7888b">BranchingDirection::Less</a>) {</div>
+<div class="line"><span class="lineno">  483</span>            constraint = <a class="code hl_variable" href="#a7553327a6526826882bb1c4cfeb086aa">mip</a>.add_constraint(linExpr, rhs, <span class="charliteral">&#39;&lt;&#39;</span>);</div>
+<div class="line"><span class="lineno">  484</span>            constraint-&gt;set_name(name);</div>
+<div class="line"><span class="lineno">  485</span>        } <span class="keywordflow">else</span> {</div>
+<div class="line"><span class="lineno">  486</span>            constraint = <a class="code hl_variable" href="#a7553327a6526826882bb1c4cfeb086aa">mip</a>.add_constraint(linExpr, rhs, <span class="charliteral">&#39;=&#39;</span>);</div>
+<div class="line"><span class="lineno">  487</span>            constraint-&gt;set_name(name);</div>
+<div class="line"><span class="lineno">  488</span>        }</div>
+<div class="line"><span class="lineno">  489</span> </div>
+<div class="line"><span class="lineno">  490</span>        <span class="comment">// Update the MIP structure if necessary</span></div>
+<div class="line"><span class="lineno">  491</span>        <span class="comment">// mip-&gt;update();</span></div>
+<div class="line"><span class="lineno">  492</span>        <span class="keywordflow">return</span> constraint;</div>
+<div class="line"><span class="lineno">  493</span>    }</div>
 <div class="ttc" id="aDefinitions_8h_html_ac42c2e9f0bdd51b56ae955b2f5c35004a249694a485fc5d3289c38986b4f8e887"><div class="ttname"><a href="Definitions_8h.html#ac42c2e9f0bdd51b56ae955b2f5c35004a249694a485fc5d3289c38986b4f8e887">CandidateType::Cluster</a></div><div class="ttdeci">@ Cluster</div><div class="ttdef"><b>Definition</b> <a href="Definitions_8h_source.html#l00084">Definitions.h:84</a></div></div>
 <div class="ttc" id="aDefinitions_8h_html_ac42c2e9f0bdd51b56ae955b2f5c35004a6c3a6944a808a7c0bbb6788dbec54a9f"><div class="ttname"><a href="Definitions_8h.html#ac42c2e9f0bdd51b56ae955b2f5c35004a6c3a6944a808a7c0bbb6788dbec54a9f">CandidateType::Node</a></div><div class="ttdeci">@ Node</div><div class="ttdef"><b>Definition</b> <a href="Definitions_8h_source.html#l00084">Definitions.h:84</a></div></div>
 <div class="ttc" id="aDefinitions_8h_html_ac42c2e9f0bdd51b56ae955b2f5c35004ad6af9c1eaff2a89ebd3f8d0c542be12b"><div class="ttname"><a href="Definitions_8h.html#ac42c2e9f0bdd51b56ae955b2f5c35004ad6af9c1eaff2a89ebd3f8d0c542be12b">CandidateType::Vehicle</a></div><div class="ttdeci">@ Vehicle</div><div class="ttdef"><b>Definition</b> <a href="Definitions_8h_source.html#l00084">Definitions.h:84</a></div></div>
@@ -591,11 +591,11 @@ Here is the call graph for this function:</div>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="Node_8h_source.html#l00318">318</a> of file <a class="el" href="Node_8h_source.html">Node.h</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  318</span>                                                                    {</div>
-<div class="line"><span class="lineno">  319</span>        ctr = <a class="code hl_variable" href="#a7553327a6526826882bb1c4cfeb086aa">mip</a>.add_constraint(ctr, name);</div>
-<div class="line"><span class="lineno">  320</span>        <span class="keywordflow">return</span> ctr;</div>
-<div class="line"><span class="lineno">  321</span>    }</div>
+<p class="definition">Definition at line <a class="el" href="Node_8h_source.html#l00331">331</a> of file <a class="el" href="Node_8h_source.html">Node.h</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  331</span>                                                                    {</div>
+<div class="line"><span class="lineno">  332</span>        ctr = <a class="code hl_variable" href="#a7553327a6526826882bb1c4cfeb086aa">mip</a>.add_constraint(ctr, name);</div>
+<div class="line"><span class="lineno">  333</span>        <span class="keywordflow">return</span> ctr;</div>
+<div class="line"><span class="lineno">  334</span>    }</div>
 </div><!-- fragment -->
 </div>
 </div>
@@ -701,10 +701,10 @@ Here is the call graph for this function:</div>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="Node_8h_source.html#l00293">293</a> of file <a class="el" href="Node_8h_source.html">Node.h</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  293</span>                                                                                               {</div>
-<div class="line"><span class="lineno">  294</span>        <span class="keywordflow">return</span> <a class="code hl_variable" href="#a7553327a6526826882bb1c4cfeb086aa">mip</a>.add_variable(name, type, lb, ub, obj);</div>
-<div class="line"><span class="lineno">  295</span>    }</div>
+<p class="definition">Definition at line <a class="el" href="Node_8h_source.html#l00306">306</a> of file <a class="el" href="Node_8h_source.html">Node.h</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  306</span>                                                                                               {</div>
+<div class="line"><span class="lineno">  307</span>        <span class="keywordflow">return</span> <a class="code hl_variable" href="#a7553327a6526826882bb1c4cfeb086aa">mip</a>.add_variable(name, type, lb, ub, obj);</div>
+<div class="line"><span class="lineno">  308</span>    }</div>
 </div><!-- fragment -->
 </div>
 </div>
@@ -760,10 +760,10 @@ Here is the call graph for this function:</div>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="Node_8h_source.html#l00297">297</a> of file <a class="el" href="Node_8h_source.html">Node.h</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  298</span>                                                      {</div>
-<div class="line"><span class="lineno">  299</span>        <a class="code hl_variable" href="#a7553327a6526826882bb1c4cfeb086aa">mip</a>.addVars(lb, ub, obj, vtypes, names, cols, count);</div>
-<div class="line"><span class="lineno">  300</span>    }</div>
+<p class="definition">Definition at line <a class="el" href="Node_8h_source.html#l00310">310</a> of file <a class="el" href="Node_8h_source.html">Node.h</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  311</span>                                                      {</div>
+<div class="line"><span class="lineno">  312</span>        <a class="code hl_variable" href="#a7553327a6526826882bb1c4cfeb086aa">mip</a>.addVars(lb, ub, obj, vtypes, names, cols, count);</div>
+<div class="line"><span class="lineno">  313</span>    }</div>
 </div><!-- fragment -->
 </div>
 </div>
@@ -814,10 +814,10 @@ Here is the call graph for this function:</div>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="Node_8h_source.html#l00301">301</a> of file <a class="el" href="Node_8h_source.html">Node.h</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  302</span>                               {</div>
-<div class="line"><span class="lineno">  303</span>        <a class="code hl_variable" href="#a7553327a6526826882bb1c4cfeb086aa">mip</a>.addVars(lb, ub, obj, vtypes, names, count);</div>
-<div class="line"><span class="lineno">  304</span>    }</div>
+<p class="definition">Definition at line <a class="el" href="Node_8h_source.html#l00314">314</a> of file <a class="el" href="Node_8h_source.html">Node.h</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  315</span>                               {</div>
+<div class="line"><span class="lineno">  316</span>        <a class="code hl_variable" href="#a7553327a6526826882bb1c4cfeb086aa">mip</a>.addVars(lb, ub, obj, vtypes, names, count);</div>
+<div class="line"><span class="lineno">  317</span>    }</div>
 </div><!-- fragment -->
 </div>
 </div>
@@ -844,11 +844,14 @@ Here is the call graph for this function:</div>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="Node_8h_source.html#l00278">278</a> of file <a class="el" href="Node_8h_source.html">Node.h</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  278</span>                        {</div>
-<div class="line"><span class="lineno">  279</span>        <span class="keyword">auto</span> &amp;vars = <a class="code hl_variable" href="#a7553327a6526826882bb1c4cfeb086aa">mip</a>.getVars();</div>
-<div class="line"><span class="lineno">  280</span>        <span class="keywordflow">for</span> (<span class="keyword">auto</span> var : vars) { var-&gt;set_type(<a class="code hl_enumvalue" href="Variable_8h.html#a20dc844625408b8f19865275d22d4fa0a6ce976e8f061b2b5cfe4d0c50c3405dd">VarType::Binary</a>); }</div>
-<div class="line"><span class="lineno">  281</span>    }</div>
+<p class="definition">Definition at line <a class="el" href="Node_8h_source.html#l00283">283</a> of file <a class="el" href="Node_8h_source.html">Node.h</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  283</span>                        {</div>
+<div class="line"><span class="lineno">  284</span>        <span class="keyword">auto</span> &amp;vars = <a class="code hl_variable" href="#a7553327a6526826882bb1c4cfeb086aa">mip</a>.getVars();</div>
+<div class="line"><span class="lineno">  285</span>        <span class="keywordflow">for</span> (<span class="keyword">auto</span> var : vars) {</div>
+<div class="line"><span class="lineno">  286</span>            var-&gt;set_type(<a class="code hl_enumvalue" href="Variable_8h.html#a20dc844625408b8f19865275d22d4fa0a6ce976e8f061b2b5cfe4d0c50c3405dd">VarType::Binary</a>);</div>
+<div class="line"><span class="lineno">  287</span>            <span class="keywordflow">if</span> (var-&gt;get_ub() &gt; 1.0) { var-&gt;setUB(1.0); }</div>
+<div class="line"><span class="lineno">  288</span>        }</div>
+<div class="line"><span class="lineno">  289</span>    }</div>
 <div class="ttc" id="aVariable_8h_html_a20dc844625408b8f19865275d22d4fa0a6ce976e8f061b2b5cfe4d0c50c3405dd"><div class="ttname"><a href="Variable_8h.html#a20dc844625408b8f19865275d22d4fa0a6ce976e8f061b2b5cfe4d0c50c3405dd">VarType::Binary</a></div><div class="ttdeci">@ Binary</div><div class="ttdef"><b>Definition</b> <a href="Variable_8h_source.html#l00010">Variable.h:10</a></div></div>
 </div><!-- fragment -->
 </div>
@@ -1009,18 +1012,18 @@ Here is the call graph for this function:</div>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="Node_8h_source.html#l00484">484</a> of file <a class="el" href="Node_8h_source.html">Node.h</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  484</span>                            {</div>
-<div class="line"><span class="lineno">  485</span>        <span class="comment">// Iterate over the candidates and enforce the branching constraints</span></div>
-<div class="line"><span class="lineno">  486</span>        <span class="keywordflow">for</span> (<span class="keyword">const</span> <span class="keyword">auto</span> &amp;candidate : <a class="code hl_variable" href="#aa691c25fbeac00ab65f59ba4d5b3e640">candidates</a>) {</div>
-<div class="line"><span class="lineno">  487</span>            <span class="keyword">auto</span> ctr = <a class="code hl_function" href="#a88d143f3bb4f20f932a519fa2d685e97">addBranchingbaldesCtr</a>(candidate-&gt;boundValue, candidate-&gt;boundType, candidate-&gt;candidateType,</div>
-<div class="line"><span class="lineno">  488</span>                                             candidate-&gt;payload);</div>
-<div class="line"><span class="lineno">  489</span>            <a class="code hl_variable" href="#a2e6cadf0b043552483ef9989fc7e15d3">branchingDuals</a>-&gt;addCandidate(candidate, ctr);</div>
-<div class="line"><span class="lineno">  490</span>        }</div>
-<div class="line"><span class="lineno">  491</span>        <a class="code hl_variable" href="#a7553327a6526826882bb1c4cfeb086aa">mip</a>.printBranchingbaldesCtr();</div>
-<div class="line"><span class="lineno">  492</span>    }</div>
-<div class="ttc" id="aclassBNBNode_html_a2e6cadf0b043552483ef9989fc7e15d3"><div class="ttname"><a href="#a2e6cadf0b043552483ef9989fc7e15d3">BNBNode::branchingDuals</a></div><div class="ttdeci">BranchingDualsPtr branchingDuals</div><div class="ttdef"><b>Definition</b> <a href="Node_8h_source.html#l00482">Node.h:482</a></div></div>
-<div class="ttc" id="aclassBNBNode_html_a88d143f3bb4f20f932a519fa2d685e97"><div class="ttname"><a href="#a88d143f3bb4f20f932a519fa2d685e97">BNBNode::addBranchingbaldesCtr</a></div><div class="ttdeci">baldesCtrPtr addBranchingbaldesCtr(double rhs, const BranchingDirection &amp;sense, const CandidateType &amp;ctype, std::optional&lt; std::variant&lt; int, std::pair&lt; int, int &gt;, std::vector&lt; int &gt; &gt; &gt; payload=std::nullopt)</div><div class="ttdef"><b>Definition</b> <a href="Node_8h_source.html#l00385">Node.h:385</a></div></div>
+<p class="definition">Definition at line <a class="el" href="Node_8h_source.html#l00497">497</a> of file <a class="el" href="Node_8h_source.html">Node.h</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  497</span>                            {</div>
+<div class="line"><span class="lineno">  498</span>        <span class="comment">// Iterate over the candidates and enforce the branching constraints</span></div>
+<div class="line"><span class="lineno">  499</span>        <span class="keywordflow">for</span> (<span class="keyword">const</span> <span class="keyword">auto</span> &amp;candidate : <a class="code hl_variable" href="#aa691c25fbeac00ab65f59ba4d5b3e640">candidates</a>) {</div>
+<div class="line"><span class="lineno">  500</span>            <span class="keyword">auto</span> ctr = <a class="code hl_function" href="#a88d143f3bb4f20f932a519fa2d685e97">addBranchingbaldesCtr</a>(candidate-&gt;boundValue, candidate-&gt;boundType, candidate-&gt;candidateType,</div>
+<div class="line"><span class="lineno">  501</span>                                             candidate-&gt;payload);</div>
+<div class="line"><span class="lineno">  502</span>            <a class="code hl_variable" href="#a2e6cadf0b043552483ef9989fc7e15d3">branchingDuals</a>-&gt;addCandidate(candidate, ctr);</div>
+<div class="line"><span class="lineno">  503</span>        }</div>
+<div class="line"><span class="lineno">  504</span>        <a class="code hl_variable" href="#a7553327a6526826882bb1c4cfeb086aa">mip</a>.printBranchingbaldesCtr();</div>
+<div class="line"><span class="lineno">  505</span>    }</div>
+<div class="ttc" id="aclassBNBNode_html_a2e6cadf0b043552483ef9989fc7e15d3"><div class="ttname"><a href="#a2e6cadf0b043552483ef9989fc7e15d3">BNBNode::branchingDuals</a></div><div class="ttdeci">BranchingDualsPtr branchingDuals</div><div class="ttdef"><b>Definition</b> <a href="Node_8h_source.html#l00495">Node.h:495</a></div></div>
+<div class="ttc" id="aclassBNBNode_html_a88d143f3bb4f20f932a519fa2d685e97"><div class="ttname"><a href="#a88d143f3bb4f20f932a519fa2d685e97">BNBNode::addBranchingbaldesCtr</a></div><div class="ttdeci">baldesCtrPtr addBranchingbaldesCtr(double rhs, const BranchingDirection &amp;sense, const CandidateType &amp;ctype, std::optional&lt; std::variant&lt; int, std::pair&lt; int, int &gt;, std::vector&lt; int &gt; &gt; &gt; payload=std::nullopt)</div><div class="ttdef"><b>Definition</b> <a href="Node_8h_source.html#l00398">Node.h:398</a></div></div>
 </div><!-- fragment --><div class="dynheader">
 Here is the call graph for this function:</div>
 <div class="dyncontent">
@@ -1059,8 +1062,8 @@ Here is the call graph for this function:</div>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="Node_8h_source.html#l00332">332</a> of file <a class="el" href="Node_8h_source.html">Node.h</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  332</span>{ <span class="keywordflow">return</span> <a class="code hl_variable" href="#a7553327a6526826882bb1c4cfeb086aa">mip</a>.extractModelDataSparse(); }</div>
+<p class="definition">Definition at line <a class="el" href="Node_8h_source.html#l00345">345</a> of file <a class="el" href="Node_8h_source.html">Node.h</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  345</span>{ <span class="keywordflow">return</span> <a class="code hl_variable" href="#a7553327a6526826882bb1c4cfeb086aa">mip</a>.extractModelDataSparse(); }</div>
 </div><!-- fragment -->
 </div>
 </div>
@@ -1087,8 +1090,8 @@ Here is the call graph for this function:</div>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="Node_8h_source.html#l00341">341</a> of file <a class="el" href="Node_8h_source.html">Node.h</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  341</span>{ <span class="keywordflow">return</span> solver-&gt;extractSolution(); }</div>
+<p class="definition">Definition at line <a class="el" href="Node_8h_source.html#l00354">354</a> of file <a class="el" href="Node_8h_source.html">Node.h</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  354</span>{ <span class="keywordflow">return</span> solver-&gt;extractSolution(); }</div>
 </div><!-- fragment -->
 </div>
 </div>
@@ -1162,8 +1165,8 @@ Here is the call graph for this function:</div>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="Node_8h_source.html#l00291">291</a> of file <a class="el" href="Node_8h_source.html">Node.h</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  291</span>{ <span class="keywordflow">return</span> <a class="code hl_variable" href="#a7553327a6526826882bb1c4cfeb086aa">mip</a>.get_current_index(unique_id); }</div>
+<p class="definition">Definition at line <a class="el" href="Node_8h_source.html#l00304">304</a> of file <a class="el" href="Node_8h_source.html">Node.h</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  304</span>{ <span class="keywordflow">return</span> <a class="code hl_variable" href="#a7553327a6526826882bb1c4cfeb086aa">mip</a>.get_current_index(unique_id); }</div>
 </div><!-- fragment -->
 </div>
 </div>
@@ -1246,8 +1249,8 @@ Here is the call graph for this function:</div>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="Node_8h_source.html#l00330">330</a> of file <a class="el" href="Node_8h_source.html">Node.h</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  330</span>{ <span class="keywordflow">return</span> <a class="code hl_variable" href="#a7553327a6526826882bb1c4cfeb086aa">mip</a>.getbaldesCtrs(); }</div>
+<p class="definition">Definition at line <a class="el" href="Node_8h_source.html#l00343">343</a> of file <a class="el" href="Node_8h_source.html">Node.h</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  343</span>{ <span class="keywordflow">return</span> <a class="code hl_variable" href="#a7553327a6526826882bb1c4cfeb086aa">mip</a>.getbaldesCtrs(); }</div>
 </div><!-- fragment -->
 </div>
 </div>
@@ -1332,8 +1335,8 @@ Here is the call graph for this function:</div>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="Node_8h_source.html#l00365">365</a> of file <a class="el" href="Node_8h_source.html">Node.h</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  365</span>{ <span class="keywordflow">return</span> solver-&gt;getDualObjVal(); }</div>
+<p class="definition">Definition at line <a class="el" href="Node_8h_source.html#l00378">378</a> of file <a class="el" href="Node_8h_source.html">Node.h</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  378</span>{ <span class="keywordflow">return</span> solver-&gt;getDualObjVal(); }</div>
 </div><!-- fragment -->
 </div>
 </div>
@@ -1360,8 +1363,8 @@ Here is the call graph for this function:</div>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="Node_8h_source.html#l00340">340</a> of file <a class="el" href="Node_8h_source.html">Node.h</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  340</span>{ <span class="keywordflow">return</span> solver-&gt;getDuals(); }</div>
+<p class="definition">Definition at line <a class="el" href="Node_8h_source.html#l00353">353</a> of file <a class="el" href="Node_8h_source.html">Node.h</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  353</span>{ <span class="keywordflow">return</span> solver-&gt;getDuals(); }</div>
 </div><!-- fragment -->
 </div>
 </div>
@@ -1388,8 +1391,8 @@ Here is the call graph for this function:</div>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="Node_8h_source.html#l00360">360</a> of file <a class="el" href="Node_8h_source.html">Node.h</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  360</span>{ <span class="keywordflow">return</span> solver-&gt;getDualVal(i); }</div>
+<p class="definition">Definition at line <a class="el" href="Node_8h_source.html#l00373">373</a> of file <a class="el" href="Node_8h_source.html">Node.h</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  373</span>{ <span class="keywordflow">return</span> solver-&gt;getDualVal(i); }</div>
 </div><!-- fragment -->
 </div>
 </div>
@@ -1444,15 +1447,15 @@ Here is the call graph for this function:</div>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="Node_8h_source.html#l00306">306</a> of file <a class="el" href="Node_8h_source.html">Node.h</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  306</span>                                             {</div>
-<div class="line"><span class="lineno">  307</span>        <span class="keywordflow">if</span> (attr == <span class="stringliteral">&quot;NumVars&quot;</span>) {</div>
-<div class="line"><span class="lineno">  308</span>            <span class="keywordflow">return</span> <a class="code hl_variable" href="#a7553327a6526826882bb1c4cfeb086aa">mip</a>.getVars().size();</div>
-<div class="line"><span class="lineno">  309</span>        } <span class="keywordflow">else</span> <span class="keywordflow">if</span> (attr == <span class="stringliteral">&quot;NumConstrs&quot;</span>) {</div>
-<div class="line"><span class="lineno">  310</span>            <span class="keywordflow">return</span> <a class="code hl_variable" href="#a7553327a6526826882bb1c4cfeb086aa">mip</a>.getbaldesCtrs().size();</div>
-<div class="line"><span class="lineno">  311</span>        }</div>
-<div class="line"><span class="lineno">  312</span>        <span class="keywordflow">throw</span> std::invalid_argument(<span class="stringliteral">&quot;Unknown attribute&quot;</span>);</div>
-<div class="line"><span class="lineno">  313</span>    }</div>
+<p class="definition">Definition at line <a class="el" href="Node_8h_source.html#l00319">319</a> of file <a class="el" href="Node_8h_source.html">Node.h</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  319</span>                                             {</div>
+<div class="line"><span class="lineno">  320</span>        <span class="keywordflow">if</span> (attr == <span class="stringliteral">&quot;NumVars&quot;</span>) {</div>
+<div class="line"><span class="lineno">  321</span>            <span class="keywordflow">return</span> <a class="code hl_variable" href="#a7553327a6526826882bb1c4cfeb086aa">mip</a>.getVars().size();</div>
+<div class="line"><span class="lineno">  322</span>        } <span class="keywordflow">else</span> <span class="keywordflow">if</span> (attr == <span class="stringliteral">&quot;NumConstrs&quot;</span>) {</div>
+<div class="line"><span class="lineno">  323</span>            <span class="keywordflow">return</span> <a class="code hl_variable" href="#a7553327a6526826882bb1c4cfeb086aa">mip</a>.getbaldesCtrs().size();</div>
+<div class="line"><span class="lineno">  324</span>        }</div>
+<div class="line"><span class="lineno">  325</span>        <span class="keywordflow">throw</span> std::invalid_argument(<span class="stringliteral">&quot;Unknown attribute&quot;</span>);</div>
+<div class="line"><span class="lineno">  326</span>    }</div>
 </div><!-- fragment -->
 </div>
 </div>
@@ -1479,8 +1482,8 @@ Here is the call graph for this function:</div>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="Node_8h_source.html#l00359">359</a> of file <a class="el" href="Node_8h_source.html">Node.h</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  359</span>{ <span class="keywordflow">return</span> &amp;<a class="code hl_variable" href="#a7553327a6526826882bb1c4cfeb086aa">mip</a>; }</div>
+<p class="definition">Definition at line <a class="el" href="Node_8h_source.html#l00372">372</a> of file <a class="el" href="Node_8h_source.html">Node.h</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  372</span>{ <span class="keywordflow">return</span> &amp;<a class="code hl_variable" href="#a7553327a6526826882bb1c4cfeb086aa">mip</a>; }</div>
 </div><!-- fragment -->
 </div>
 </div>
@@ -1507,8 +1510,8 @@ Here is the call graph for this function:</div>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="Node_8h_source.html#l00339">339</a> of file <a class="el" href="Node_8h_source.html">Node.h</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  339</span>{ <span class="keywordflow">return</span> solver-&gt;getObjVal(); }</div>
+<p class="definition">Definition at line <a class="el" href="Node_8h_source.html#l00352">352</a> of file <a class="el" href="Node_8h_source.html">Node.h</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  352</span>{ <span class="keywordflow">return</span> solver-&gt;getObjVal(); }</div>
 </div><!-- fragment -->
 </div>
 </div>
@@ -1629,8 +1632,8 @@ Here is the call graph for this function:</div>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="Node_8h_source.html#l00338">338</a> of file <a class="el" href="Node_8h_source.html">Node.h</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  338</span>{ <span class="keywordflow">return</span> solver-&gt;getStatus(); }</div>
+<p class="definition">Definition at line <a class="el" href="Node_8h_source.html#l00351">351</a> of file <a class="el" href="Node_8h_source.html">Node.h</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  351</span>{ <span class="keywordflow">return</span> solver-&gt;getStatus(); }</div>
 </div><!-- fragment -->
 </div>
 </div>
@@ -1685,8 +1688,8 @@ Here is the call graph for this function:</div>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="Node_8h_source.html#l00327">327</a> of file <a class="el" href="Node_8h_source.html">Node.h</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  327</span>{ <span class="keywordflow">return</span> <a class="code hl_variable" href="#a7553327a6526826882bb1c4cfeb086aa">mip</a>.getVar(i); }</div>
+<p class="definition">Definition at line <a class="el" href="Node_8h_source.html#l00340">340</a> of file <a class="el" href="Node_8h_source.html">Node.h</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  340</span>{ <span class="keywordflow">return</span> <a class="code hl_variable" href="#a7553327a6526826882bb1c4cfeb086aa">mip</a>.getVar(i); }</div>
 </div><!-- fragment -->
 </div>
 </div>
@@ -1713,8 +1716,8 @@ Here is the call graph for this function:</div>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="Node_8h_source.html#l00358">358</a> of file <a class="el" href="Node_8h_source.html">Node.h</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  358</span>{ <span class="keywordflow">return</span> solver-&gt;getVarValue(i); }</div>
+<p class="definition">Definition at line <a class="el" href="Node_8h_source.html#l00371">371</a> of file <a class="el" href="Node_8h_source.html">Node.h</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  371</span>{ <span class="keywordflow">return</span> solver-&gt;getVarValue(i); }</div>
 </div><!-- fragment -->
 </div>
 </div>
@@ -1837,22 +1840,22 @@ Here is the call graph for this function:</div>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="Node_8h_source.html#l00501">501</a> of file <a class="el" href="Node_8h_source.html">Node.h</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  501</span>                     {</div>
-<div class="line"><span class="lineno">  502</span>        Snapshot snapshot;</div>
-<div class="line"><span class="lineno">  503</span>        <a class="code hl_function" href="classserializer_1_1Serializer.html#af1a169ba542672a29e7212ffe5a6b77e">serializer::Serializer&lt;Snapshot&gt;::fromFile</a>(snapshot, <span class="stringliteral">&quot;snapshot.bin&quot;</span>);</div>
-<div class="line"><span class="lineno">  504</span>        <a class="code hl_variable" href="#af37b13c0c7bda39871ee1e82cfe6b535">paths</a>           = snapshot.<a class="code hl_variable" href="structSnapshot.html#ad7c0e737210752ea2dc44639ca2688fb">paths</a>;</div>
-<div class="line"><span class="lineno">  505</span>        r1c-&gt;cutStorage = snapshot.<a class="code hl_variable" href="structSnapshot.html#a3f7b9b6619c52a77bcc04d16f7fa6c08">cutStorage</a>;</div>
-<div class="line"><span class="lineno">  506</span>        <span class="keyword">auto</span> cutStorage = r1c-&gt;cutStorage;</div>
-<div class="line"><span class="lineno">  507</span>        <span class="comment">// print cutStorage.size()</span></div>
-<div class="line"><span class="lineno">  508</span>        fmt::print(<span class="stringliteral">&quot;CutStorage size: {}\n&quot;</span>, cutStorage.size());</div>
-<div class="line"><span class="lineno">  509</span>        <span class="comment">// print paths.size</span></div>
-<div class="line"><span class="lineno">  510</span>        fmt::print(<span class="stringliteral">&quot;Paths size: {}\n&quot;</span>, <a class="code hl_variable" href="#af37b13c0c7bda39871ee1e82cfe6b535">paths</a>.size());</div>
-<div class="line"><span class="lineno">  511</span>        <a class="code hl_variable" href="#a0ce8279845b98ba63f676e3bf9b599e6">loadedState</a> = <span class="keyword">true</span>;</div>
-<div class="line"><span class="lineno">  512</span>        <a class="code hl_variable" href="#ab26854ae1b9ba9f1724f5fe37ede0bee">integer_sol</a> = 10301;</div>
-<div class="line"><span class="lineno">  513</span>        <a class="code hl_variable" href="#a5e8cb6e93c853a6221e981a3043b9f9d">numK</a>        = 9;</div>
-<div class="line"><span class="lineno">  514</span>    }</div>
-<div class="ttc" id="aclassBNBNode_html_a0ce8279845b98ba63f676e3bf9b599e6"><div class="ttname"><a href="#a0ce8279845b98ba63f676e3bf9b599e6">BNBNode::loadedState</a></div><div class="ttdeci">bool loadedState</div><div class="ttdef"><b>Definition</b> <a href="Node_8h_source.html#l00499">Node.h:499</a></div></div>
+<p class="definition">Definition at line <a class="el" href="Node_8h_source.html#l00514">514</a> of file <a class="el" href="Node_8h_source.html">Node.h</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  514</span>                     {</div>
+<div class="line"><span class="lineno">  515</span>        Snapshot snapshot;</div>
+<div class="line"><span class="lineno">  516</span>        <a class="code hl_function" href="classserializer_1_1Serializer.html#af1a169ba542672a29e7212ffe5a6b77e">serializer::Serializer&lt;Snapshot&gt;::fromFile</a>(snapshot, <span class="stringliteral">&quot;snapshot.bin&quot;</span>);</div>
+<div class="line"><span class="lineno">  517</span>        <a class="code hl_variable" href="#af37b13c0c7bda39871ee1e82cfe6b535">paths</a>           = snapshot.<a class="code hl_variable" href="structSnapshot.html#ad7c0e737210752ea2dc44639ca2688fb">paths</a>;</div>
+<div class="line"><span class="lineno">  518</span>        r1c-&gt;cutStorage = snapshot.<a class="code hl_variable" href="structSnapshot.html#a3f7b9b6619c52a77bcc04d16f7fa6c08">cutStorage</a>;</div>
+<div class="line"><span class="lineno">  519</span>        <span class="keyword">auto</span> cutStorage = r1c-&gt;cutStorage;</div>
+<div class="line"><span class="lineno">  520</span>        <span class="comment">// print cutStorage.size()</span></div>
+<div class="line"><span class="lineno">  521</span>        fmt::print(<span class="stringliteral">&quot;CutStorage size: {}\n&quot;</span>, cutStorage.size());</div>
+<div class="line"><span class="lineno">  522</span>        <span class="comment">// print paths.size</span></div>
+<div class="line"><span class="lineno">  523</span>        fmt::print(<span class="stringliteral">&quot;Paths size: {}\n&quot;</span>, <a class="code hl_variable" href="#af37b13c0c7bda39871ee1e82cfe6b535">paths</a>.size());</div>
+<div class="line"><span class="lineno">  524</span>        <a class="code hl_variable" href="#a0ce8279845b98ba63f676e3bf9b599e6">loadedState</a> = <span class="keyword">true</span>;</div>
+<div class="line"><span class="lineno">  525</span>        <a class="code hl_variable" href="#ab26854ae1b9ba9f1724f5fe37ede0bee">integer_sol</a> = 10301;</div>
+<div class="line"><span class="lineno">  526</span>        <a class="code hl_variable" href="#a5e8cb6e93c853a6221e981a3043b9f9d">numK</a>        = 9;</div>
+<div class="line"><span class="lineno">  527</span>    }</div>
+<div class="ttc" id="aclassBNBNode_html_a0ce8279845b98ba63f676e3bf9b599e6"><div class="ttname"><a href="#a0ce8279845b98ba63f676e3bf9b599e6">BNBNode::loadedState</a></div><div class="ttdeci">bool loadedState</div><div class="ttdef"><b>Definition</b> <a href="Node_8h_source.html#l00512">Node.h:512</a></div></div>
 <div class="ttc" id="aclassBNBNode_html_a5e8cb6e93c853a6221e981a3043b9f9d"><div class="ttname"><a href="#a5e8cb6e93c853a6221e981a3043b9f9d">BNBNode::numK</a></div><div class="ttdeci">int numK</div><div class="ttdef"><b>Definition</b> <a href="Node_8h_source.html#l00096">Node.h:96</a></div></div>
 <div class="ttc" id="aclassBNBNode_html_ab26854ae1b9ba9f1724f5fe37ede0bee"><div class="ttname"><a href="#ab26854ae1b9ba9f1724f5fe37ede0bee">BNBNode::integer_sol</a></div><div class="ttdeci">double integer_sol</div><div class="ttdef"><b>Definition</b> <a href="Node_8h_source.html#l00089">Node.h:89</a></div></div>
 <div class="ttc" id="aclassserializer_1_1Serializer_html_af1a169ba542672a29e7212ffe5a6b77e"><div class="ttname"><a href="classserializer_1_1Serializer.html#af1a169ba542672a29e7212ffe5a6b77e">serializer::Serializer::fromFile</a></div><div class="ttdeci">static void fromFile(T &amp;obj, const std::string &amp;filename)</div><div class="ttdef"><b>Definition</b> <a href="Serializer_8h_source.html#l00275">Serializer.h:275</a></div></div>
@@ -1929,7 +1932,7 @@ Here is the call graph for this function:</div>
 <div class="line"><span class="lineno">  233</span>        <span class="keywordflow">return</span> child;</div>
 <div class="line"><span class="lineno">  234</span>    }</div>
 <div class="ttc" id="aclassBNBNode_html_a332aaaf5da60dea0917b5c29cc6d51e7"><div class="ttname"><a href="#a332aaaf5da60dea0917b5c29cc6d51e7">BNBNode::BNBNode</a></div><div class="ttdeci">BNBNode(const MIPProblem eModel)</div><div class="ttdef"><b>Definition</b> <a href="Node_8h_source.html#l00121">Node.h:121</a></div></div>
-<div class="ttc" id="aclassBNBNode_html_a7964d8a92687a53eff35ecf3c0616cf7"><div class="ttname"><a href="#a7964d8a92687a53eff35ecf3c0616cf7">BNBNode::historyCandidates</a></div><div class="ttdeci">std::vector&lt; BranchingQueueItem &gt; historyCandidates</div><div class="ttdef"><b>Definition</b> <a href="Node_8h_source.html#l00383">Node.h:383</a></div></div>
+<div class="ttc" id="aclassBNBNode_html_a7964d8a92687a53eff35ecf3c0616cf7"><div class="ttname"><a href="#a7964d8a92687a53eff35ecf3c0616cf7">BNBNode::historyCandidates</a></div><div class="ttdeci">std::vector&lt; BranchingQueueItem &gt; historyCandidates</div><div class="ttdef"><b>Definition</b> <a href="Node_8h_source.html#l00396">Node.h:396</a></div></div>
 </div><!-- fragment --><div class="dynheader">
 Here is the call graph for this function:</div>
 <div class="dyncontent">
@@ -1970,22 +1973,22 @@ Here is the call graph for this function:</div>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="Node_8h_source.html#l00343">343</a> of file <a class="el" href="Node_8h_source.html">Node.h</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  343</span>                                   {</div>
-<div class="line"><span class="lineno">  344</span><span class="preprocessor">#ifdef HIGHS</span></div>
-<div class="line"><span class="lineno">  345</span>        solver-&gt;setModel(<a class="code hl_variable" href="#a7553327a6526826882bb1c4cfeb086aa">mip</a>.toHighsModel());</div>
-<div class="line"><span class="lineno">  346</span><span class="preprocessor">#endif</span></div>
-<div class="line"><span class="lineno">  347</span><span class="preprocessor">#ifdef GUROBI</span></div>
-<div class="line"><span class="lineno">  348</span>        GRBEnv &amp;env = <a class="code hl_function" href="classGurobiEnvSingleton.html#a49c3ce63088629c2246dec252a73df16">GurobiEnvSingleton::getInstance</a>();</div>
-<div class="line"><span class="lineno">  349</span>        <span class="comment">// auto    model = new GRBModel(mip.toGurobiModel(env)); // Pass the</span></div>
-<div class="line"><span class="lineno">  350</span>        <span class="comment">// retrieved or new environment</span></div>
-<div class="line"><span class="lineno">  351</span>        <span class="comment">// solver-&gt;setModel(mip.toGurobiModel(env));</span></div>
-<div class="line"><span class="lineno">  352</span>        <span class="keyword">auto</span> model = <a class="code hl_variable" href="#a7553327a6526826882bb1c4cfeb086aa">mip</a>.toGurobiModel(env); <span class="comment">// Returns unique_ptr&lt;GRBModel&gt;</span></div>
-<div class="line"><span class="lineno">  353</span>        solver-&gt;setModel(std::any(GRBModelWrapper(std::move(model))));</div>
-<div class="line"><span class="lineno">  354</span> </div>
-<div class="line"><span class="lineno">  355</span><span class="preprocessor">#endif</span></div>
-<div class="line"><span class="lineno">  356</span>        solver-&gt;optimize(tol);</div>
-<div class="line"><span class="lineno">  357</span>    }</div>
+<p class="definition">Definition at line <a class="el" href="Node_8h_source.html#l00356">356</a> of file <a class="el" href="Node_8h_source.html">Node.h</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  356</span>                                   {</div>
+<div class="line"><span class="lineno">  357</span><span class="preprocessor">#ifdef HIGHS</span></div>
+<div class="line"><span class="lineno">  358</span>        solver-&gt;setModel(<a class="code hl_variable" href="#a7553327a6526826882bb1c4cfeb086aa">mip</a>.toHighsModel());</div>
+<div class="line"><span class="lineno">  359</span><span class="preprocessor">#endif</span></div>
+<div class="line"><span class="lineno">  360</span><span class="preprocessor">#ifdef GUROBI</span></div>
+<div class="line"><span class="lineno">  361</span>        GRBEnv &amp;env = <a class="code hl_function" href="classGurobiEnvSingleton.html#a49c3ce63088629c2246dec252a73df16">GurobiEnvSingleton::getInstance</a>();</div>
+<div class="line"><span class="lineno">  362</span>        <span class="comment">// auto    model = new GRBModel(mip.toGurobiModel(env)); // Pass the</span></div>
+<div class="line"><span class="lineno">  363</span>        <span class="comment">// retrieved or new environment</span></div>
+<div class="line"><span class="lineno">  364</span>        <span class="comment">// solver-&gt;setModel(mip.toGurobiModel(env));</span></div>
+<div class="line"><span class="lineno">  365</span>        <span class="keyword">auto</span> model = <a class="code hl_variable" href="#a7553327a6526826882bb1c4cfeb086aa">mip</a>.toGurobiModel(env); <span class="comment">// Returns unique_ptr&lt;GRBModel&gt;</span></div>
+<div class="line"><span class="lineno">  366</span>        solver-&gt;setModel(std::any(GRBModelWrapper(std::move(model))));</div>
+<div class="line"><span class="lineno">  367</span> </div>
+<div class="line"><span class="lineno">  368</span><span class="preprocessor">#endif</span></div>
+<div class="line"><span class="lineno">  369</span>        solver-&gt;optimize(tol);</div>
+<div class="line"><span class="lineno">  370</span>    }</div>
 </div><!-- fragment --><div class="dynheader">
 Here is the call graph for this function:</div>
 <div class="dyncontent">
@@ -2050,11 +2053,16 @@ Here is the call graph for this function:</div>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="Node_8h_source.html#l00284">284</a> of file <a class="el" href="Node_8h_source.html">Node.h</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  284</span>                     {</div>
-<div class="line"><span class="lineno">  285</span>        <span class="keyword">auto</span> &amp;vars = <a class="code hl_variable" href="#a7553327a6526826882bb1c4cfeb086aa">mip</a>.getVars();</div>
-<div class="line"><span class="lineno">  286</span>        <span class="keywordflow">for</span> (<span class="keyword">auto</span> var : vars) { var-&gt;set_type(<a class="code hl_enumvalue" href="Variable_8h.html#a20dc844625408b8f19865275d22d4fa0a535863a82f163709557e59e2eb8139a7">VarType::Continuous</a>); }</div>
-<div class="line"><span class="lineno">  287</span>    }</div>
+<p class="definition">Definition at line <a class="el" href="Node_8h_source.html#l00292">292</a> of file <a class="el" href="Node_8h_source.html">Node.h</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  292</span>                     {</div>
+<div class="line"><span class="lineno">  293</span>        <span class="keyword">auto</span> &amp;vars = <a class="code hl_variable" href="#a7553327a6526826882bb1c4cfeb086aa">mip</a>.getVars();</div>
+<div class="line"><span class="lineno">  294</span>        <span class="keywordflow">for</span> (<span class="keyword">auto</span> var : vars) {</div>
+<div class="line"><span class="lineno">  295</span>            <span class="keywordflow">if</span> (var-&gt;get_type() == <a class="code hl_enumvalue" href="Variable_8h.html#a20dc844625408b8f19865275d22d4fa0a6ce976e8f061b2b5cfe4d0c50c3405dd">VarType::Binary</a> &amp;&amp; var-&gt;get_ub() == 1.0) {</div>
+<div class="line"><span class="lineno">  296</span>                var-&gt;setUB(std::numeric_limits&lt;double&gt;::infinity());</div>
+<div class="line"><span class="lineno">  297</span>            }</div>
+<div class="line"><span class="lineno">  298</span>            var-&gt;set_type(<a class="code hl_enumvalue" href="Variable_8h.html#a20dc844625408b8f19865275d22d4fa0a535863a82f163709557e59e2eb8139a7">VarType::Continuous</a>);</div>
+<div class="line"><span class="lineno">  299</span>        }</div>
+<div class="line"><span class="lineno">  300</span>    }</div>
 <div class="ttc" id="aVariable_8h_html_a20dc844625408b8f19865275d22d4fa0a535863a82f163709557e59e2eb8139a7"><div class="ttname"><a href="Variable_8h.html#a20dc844625408b8f19865275d22d4fa0a535863a82f163709557e59e2eb8139a7">VarType::Continuous</a></div><div class="ttdeci">@ Continuous</div><div class="ttdef"><b>Definition</b> <a href="Variable_8h_source.html#l00010">Variable.h:10</a></div></div>
 </div><!-- fragment -->
 </div>
@@ -2082,8 +2090,8 @@ Here is the call graph for this function:</div>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="Node_8h_source.html#l00289">289</a> of file <a class="el" href="Node_8h_source.html">Node.h</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  289</span>{ <a class="code hl_variable" href="#a7553327a6526826882bb1c4cfeb086aa">mip</a>.delete_constraint(ctr); }</div>
+<p class="definition">Definition at line <a class="el" href="Node_8h_source.html#l00302">302</a> of file <a class="el" href="Node_8h_source.html">Node.h</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  302</span>{ <a class="code hl_variable" href="#a7553327a6526826882bb1c4cfeb086aa">mip</a>.delete_constraint(ctr); }</div>
 </div><!-- fragment -->
 </div>
 </div>
@@ -2110,8 +2118,8 @@ Here is the call graph for this function:</div>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="Node_8h_source.html#l00290">290</a> of file <a class="el" href="Node_8h_source.html">Node.h</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  290</span>{ <a class="code hl_variable" href="#a7553327a6526826882bb1c4cfeb086aa">mip</a>.delete_variable(var); }</div>
+<p class="definition">Definition at line <a class="el" href="Node_8h_source.html#l00303">303</a> of file <a class="el" href="Node_8h_source.html">Node.h</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  303</span>{ <a class="code hl_variable" href="#a7553327a6526826882bb1c4cfeb086aa">mip</a>.delete_variable(var); }</div>
 </div><!-- fragment -->
 </div>
 </div>
@@ -2138,8 +2146,8 @@ Here is the call graph for this function:</div>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="Node_8h_source.html#l00324">324</a> of file <a class="el" href="Node_8h_source.html">Node.h</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  324</span>{ <a class="code hl_variable" href="#a7553327a6526826882bb1c4cfeb086aa">mip</a>.delete_constraint(constraintIndex); }</div>
+<p class="definition">Definition at line <a class="el" href="Node_8h_source.html#l00337">337</a> of file <a class="el" href="Node_8h_source.html">Node.h</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  337</span>{ <a class="code hl_variable" href="#a7553327a6526826882bb1c4cfeb086aa">mip</a>.delete_constraint(constraintIndex); }</div>
 </div><!-- fragment -->
 </div>
 </div>
@@ -2166,15 +2174,15 @@ Here is the call graph for this function:</div>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="Node_8h_source.html#l00515">515</a> of file <a class="el" href="Node_8h_source.html">Node.h</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  515</span>                     {</div>
-<div class="line"><span class="lineno">  516</span>        <span class="keyword">auto</span>     cutStorage = r1c-&gt;cutStorage;</div>
-<div class="line"><span class="lineno">  517</span>        Snapshot snapshot;</div>
-<div class="line"><span class="lineno">  518</span>        snapshot.<a class="code hl_variable" href="structSnapshot.html#ad7c0e737210752ea2dc44639ca2688fb">paths</a>      = <a class="code hl_variable" href="#af37b13c0c7bda39871ee1e82cfe6b535">paths</a>;</div>
-<div class="line"><span class="lineno">  519</span>        snapshot.<a class="code hl_variable" href="structSnapshot.html#a3f7b9b6619c52a77bcc04d16f7fa6c08">cutStorage</a> = cutStorage;</div>
-<div class="line"><span class="lineno">  520</span> </div>
-<div class="line"><span class="lineno">  521</span>        <a class="code hl_function" href="classserializer_1_1Serializer.html#ad84f87f5c5090a7d1975f49952b0adb0">serializer::Serializer&lt;Snapshot&gt;::toFile</a>(snapshot, <span class="stringliteral">&quot;snapshot.bin&quot;</span>);</div>
-<div class="line"><span class="lineno">  522</span>    }</div>
+<p class="definition">Definition at line <a class="el" href="Node_8h_source.html#l00528">528</a> of file <a class="el" href="Node_8h_source.html">Node.h</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  528</span>                     {</div>
+<div class="line"><span class="lineno">  529</span>        <span class="keyword">auto</span>     cutStorage = r1c-&gt;cutStorage;</div>
+<div class="line"><span class="lineno">  530</span>        Snapshot snapshot;</div>
+<div class="line"><span class="lineno">  531</span>        snapshot.<a class="code hl_variable" href="structSnapshot.html#ad7c0e737210752ea2dc44639ca2688fb">paths</a>      = <a class="code hl_variable" href="#af37b13c0c7bda39871ee1e82cfe6b535">paths</a>;</div>
+<div class="line"><span class="lineno">  532</span>        snapshot.<a class="code hl_variable" href="structSnapshot.html#a3f7b9b6619c52a77bcc04d16f7fa6c08">cutStorage</a> = cutStorage;</div>
+<div class="line"><span class="lineno">  533</span> </div>
+<div class="line"><span class="lineno">  534</span>        <a class="code hl_function" href="classserializer_1_1Serializer.html#ad84f87f5c5090a7d1975f49952b0adb0">serializer::Serializer&lt;Snapshot&gt;::toFile</a>(snapshot, <span class="stringliteral">&quot;snapshot.bin&quot;</span>);</div>
+<div class="line"><span class="lineno">  535</span>    }</div>
 <div class="ttc" id="aclassserializer_1_1Serializer_html_ad84f87f5c5090a7d1975f49952b0adb0"><div class="ttname"><a href="classserializer_1_1Serializer.html#ad84f87f5c5090a7d1975f49952b0adb0">serializer::Serializer::toFile</a></div><div class="ttdeci">static void toFile(const T &amp;obj, const std::string &amp;filename)</div><div class="ttdef"><b>Definition</b> <a href="Serializer_8h_source.html#l00269">Serializer.h:269</a></div></div>
 </div><!-- fragment --><div class="dynheader">
 Here is the call graph for this function:</div>
@@ -2249,8 +2257,8 @@ Here is the call graph for this function:</div>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="Node_8h_source.html#l00316">316</a> of file <a class="el" href="Node_8h_source.html">Node.h</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  316</span>{ <span class="keywordflow">throw</span> std::invalid_argument(<span class="stringliteral">&quot;Unknown attribute&quot;</span>); }</div>
+<p class="definition">Definition at line <a class="el" href="Node_8h_source.html#l00329">329</a> of file <a class="el" href="Node_8h_source.html">Node.h</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  329</span>{ <span class="keywordflow">throw</span> std::invalid_argument(<span class="stringliteral">&quot;Unknown attribute&quot;</span>); }</div>
 </div><!-- fragment -->
 </div>
 </div>
@@ -2281,8 +2289,8 @@ Here is the call graph for this function:</div>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="Node_8h_source.html#l00315">315</a> of file <a class="el" href="Node_8h_source.html">Node.h</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  315</span>{ <span class="keywordflow">throw</span> std::invalid_argument(<span class="stringliteral">&quot;Unknown attribute&quot;</span>); }</div>
+<p class="definition">Definition at line <a class="el" href="Node_8h_source.html#l00328">328</a> of file <a class="el" href="Node_8h_source.html">Node.h</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  328</span>{ <span class="keywordflow">throw</span> std::invalid_argument(<span class="stringliteral">&quot;Unknown attribute&quot;</span>); }</div>
 </div><!-- fragment -->
 </div>
 </div>
@@ -2365,22 +2373,22 @@ Here is the call graph for this function:</div>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="Node_8h_source.html#l00367">367</a> of file <a class="el" href="Node_8h_source.html">Node.h</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  367</span>                                                    {</div>
-<div class="line"><span class="lineno">  368</span>        <span class="keywordtype">bool</span> feasible = <span class="keyword">false</span>;</div>
-<div class="line"><span class="lineno">  369</span>        <a class="code hl_function" href="#a93bf363e7ba8aa5c7dd4ee56a81189b3">relaxNode</a>();</div>
-<div class="line"><span class="lineno">  370</span>        <a class="code hl_function" href="#abb76f5afa8990290b262a0750cede865">optimize</a>();</div>
-<div class="line"><span class="lineno">  371</span>        <span class="keywordflow">if</span> (<a class="code hl_function" href="#a6581837245535f5aa0986dcc0ae4fb07">getStatus</a>() == 2) {</div>
-<div class="line"><span class="lineno">  372</span>            feasible = <span class="keyword">true</span>;</div>
-<div class="line"><span class="lineno">  373</span>            <span class="keywordflow">return</span> std::make_pair(feasible, <a class="code hl_function" href="#a33d2c1c840d8ba9794f5ff4d83949727">getDualObjVal</a>());</div>
-<div class="line"><span class="lineno">  374</span>        } <span class="keywordflow">else</span> {</div>
-<div class="line"><span class="lineno">  375</span>            <span class="keywordflow">return</span> std::make_pair(feasible, -std::numeric_limits&lt;double&gt;::max());</div>
-<div class="line"><span class="lineno">  376</span>        }</div>
-<div class="line"><span class="lineno">  377</span>    }</div>
-<div class="ttc" id="aclassBNBNode_html_a33d2c1c840d8ba9794f5ff4d83949727"><div class="ttname"><a href="#a33d2c1c840d8ba9794f5ff4d83949727">BNBNode::getDualObjVal</a></div><div class="ttdeci">double getDualObjVal()</div><div class="ttdef"><b>Definition</b> <a href="Node_8h_source.html#l00365">Node.h:365</a></div></div>
-<div class="ttc" id="aclassBNBNode_html_a6581837245535f5aa0986dcc0ae4fb07"><div class="ttname"><a href="#a6581837245535f5aa0986dcc0ae4fb07">BNBNode::getStatus</a></div><div class="ttdeci">int getStatus()</div><div class="ttdef"><b>Definition</b> <a href="Node_8h_source.html#l00338">Node.h:338</a></div></div>
-<div class="ttc" id="aclassBNBNode_html_a93bf363e7ba8aa5c7dd4ee56a81189b3"><div class="ttname"><a href="#a93bf363e7ba8aa5c7dd4ee56a81189b3">BNBNode::relaxNode</a></div><div class="ttdeci">void relaxNode()</div><div class="ttdef"><b>Definition</b> <a href="Node_8h_source.html#l00284">Node.h:284</a></div></div>
-<div class="ttc" id="aclassBNBNode_html_abb76f5afa8990290b262a0750cede865"><div class="ttname"><a href="#abb76f5afa8990290b262a0750cede865">BNBNode::optimize</a></div><div class="ttdeci">void optimize(double tol=1e-6)</div><div class="ttdef"><b>Definition</b> <a href="Node_8h_source.html#l00343">Node.h:343</a></div></div>
+<p class="definition">Definition at line <a class="el" href="Node_8h_source.html#l00380">380</a> of file <a class="el" href="Node_8h_source.html">Node.h</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  380</span>                                                    {</div>
+<div class="line"><span class="lineno">  381</span>        <span class="keywordtype">bool</span> feasible = <span class="keyword">false</span>;</div>
+<div class="line"><span class="lineno">  382</span>        <a class="code hl_function" href="#a93bf363e7ba8aa5c7dd4ee56a81189b3">relaxNode</a>();</div>
+<div class="line"><span class="lineno">  383</span>        <a class="code hl_function" href="#abb76f5afa8990290b262a0750cede865">optimize</a>();</div>
+<div class="line"><span class="lineno">  384</span>        <span class="keywordflow">if</span> (<a class="code hl_function" href="#a6581837245535f5aa0986dcc0ae4fb07">getStatus</a>() == 2) {</div>
+<div class="line"><span class="lineno">  385</span>            feasible = <span class="keyword">true</span>;</div>
+<div class="line"><span class="lineno">  386</span>            <span class="keywordflow">return</span> std::make_pair(feasible, <a class="code hl_function" href="#a33d2c1c840d8ba9794f5ff4d83949727">getDualObjVal</a>());</div>
+<div class="line"><span class="lineno">  387</span>        } <span class="keywordflow">else</span> {</div>
+<div class="line"><span class="lineno">  388</span>            <span class="keywordflow">return</span> std::make_pair(feasible, -std::numeric_limits&lt;double&gt;::max());</div>
+<div class="line"><span class="lineno">  389</span>        }</div>
+<div class="line"><span class="lineno">  390</span>    }</div>
+<div class="ttc" id="aclassBNBNode_html_a33d2c1c840d8ba9794f5ff4d83949727"><div class="ttname"><a href="#a33d2c1c840d8ba9794f5ff4d83949727">BNBNode::getDualObjVal</a></div><div class="ttdeci">double getDualObjVal()</div><div class="ttdef"><b>Definition</b> <a href="Node_8h_source.html#l00378">Node.h:378</a></div></div>
+<div class="ttc" id="aclassBNBNode_html_a6581837245535f5aa0986dcc0ae4fb07"><div class="ttname"><a href="#a6581837245535f5aa0986dcc0ae4fb07">BNBNode::getStatus</a></div><div class="ttdeci">int getStatus()</div><div class="ttdef"><b>Definition</b> <a href="Node_8h_source.html#l00351">Node.h:351</a></div></div>
+<div class="ttc" id="aclassBNBNode_html_a93bf363e7ba8aa5c7dd4ee56a81189b3"><div class="ttname"><a href="#a93bf363e7ba8aa5c7dd4ee56a81189b3">BNBNode::relaxNode</a></div><div class="ttdeci">void relaxNode()</div><div class="ttdef"><b>Definition</b> <a href="Node_8h_source.html#l00292">Node.h:292</a></div></div>
+<div class="ttc" id="aclassBNBNode_html_abb76f5afa8990290b262a0750cede865"><div class="ttname"><a href="#abb76f5afa8990290b262a0750cede865">BNBNode::optimize</a></div><div class="ttdeci">void optimize(double tol=1e-6)</div><div class="ttdef"><b>Definition</b> <a href="Node_8h_source.html#l00356">Node.h:356</a></div></div>
 </div><!-- fragment --><div class="dynheader">
 Here is the call graph for this function:</div>
 <div class="dyncontent">
@@ -2470,8 +2478,8 @@ Here is the call graph for this function:</div>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="Node_8h_source.html#l00363">363</a> of file <a class="el" href="Node_8h_source.html">Node.h</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  363</span>{ <a class="code hl_variable" href="#a7553327a6526826882bb1c4cfeb086aa">mip</a>.update(); }</div>
+<p class="definition">Definition at line <a class="el" href="Node_8h_source.html#l00376">376</a> of file <a class="el" href="Node_8h_source.html">Node.h</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  376</span>{ <a class="code hl_variable" href="#a7553327a6526826882bb1c4cfeb086aa">mip</a>.update(); }</div>
 </div><!-- fragment -->
 </div>
 </div>
@@ -2504,7 +2512,7 @@ Here is the call graph for this function:</div>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="Node_8h_source.html#l00482">482</a> of file <a class="el" href="Node_8h_source.html">Node.h</a>.</p>
+<p class="definition">Definition at line <a class="el" href="Node_8h_source.html#l00495">495</a> of file <a class="el" href="Node_8h_source.html">Node.h</a>.</p>
 
 </div>
 </div>
@@ -2568,7 +2576,7 @@ Here is the call graph for this function:</div>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="Node_8h_source.html#l00383">383</a> of file <a class="el" href="Node_8h_source.html">Node.h</a>.</p>
+<p class="definition">Definition at line <a class="el" href="Node_8h_source.html#l00396">396</a> of file <a class="el" href="Node_8h_source.html">Node.h</a>.</p>
 
 </div>
 </div>
@@ -2616,7 +2624,7 @@ Here is the call graph for this function:</div>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="Node_8h_source.html#l00499">499</a> of file <a class="el" href="Node_8h_source.html">Node.h</a>.</p>
+<p class="definition">Definition at line <a class="el" href="Node_8h_source.html#l00512">512</a> of file <a class="el" href="Node_8h_source.html">Node.h</a>.</p>
 
 </div>
 </div>

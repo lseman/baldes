@@ -47,13 +47,14 @@ var searchData=
   ['analyzepattern_5fpreordered_44',['analyzePattern_preordered',['../classEigen_1_1CustomSimplicialLDLT.html#ac8f4fe688e6f2d371f8693673b8be11b',1,'Eigen::CustomSimplicialLDLT']]],
   ['apply_45',['apply',['../classPermutation.html#afe39be113ec179e0b64f9801371a3b21',1,'Permutation']]],
   ['apply_5foperator_46',['apply_operator',['../classIteratedLocalSearch.html#abab6b57e4edf8ee77d1fc8872eef68d6',1,'IteratedLocalSearch']]],
-  ['applybranchingbaldesctrs_47',['applyBranchingbaldesCtrs',['../classBranching.html#ab40fc6214a355c79db1efb6e81d3f9be',1,'Branching']]],
-  ['applydeluxingreduction_48',['applyDeluxingReduction',['../classVRProblem.html#a047ed3f922df7ddbc0f4e01cf70ff1f4',1,'VRProblem']]],
-  ['arc_49',['Arc',['../structArc.html#a83dc91c16778d7fd8664b1e2cd2444c7',1,'Arc::Arc()'],['../structArc.html#a6f6941716e477bd210a91e0819a24eeb',1,'Arc::Arc(int from, int to, const std::vector&lt; double &gt; &amp;res_inc, double cost_inc)'],['../structArc.html#a9a029b7d07f393de2c26ed1a6d630b59',1,'Arc::Arc(int from, int to, const std::vector&lt; double &gt; &amp;res_inc, double cost_inc, bool fixed)'],['../structArc.html#af6804e0a0fb12779ad37d1bebca3ec02',1,'Arc::Arc(int from, int to, const std::vector&lt; double &gt; &amp;res_inc, double cost_inc, double priority)']]],
-  ['arckey_50',['arcKey',['../classHGS.html#adef29749b7c77cac37d01b490577272f',1,'HGS']]],
-  ['assign_5fbuckets_51',['assign_buckets',['../classBucketGraph.html#af129eff306551dc7cc7fe00b919bbbd0',1,'BucketGraph::assign_buckets(auto &amp;FW, auto &amp;BW) noexcept'],['../classBucketGraph.html#a3084429e997dbd4341b9d02316006f3e',1,'BucketGraph::assign_buckets(const auto &amp;FW, const auto &amp;BW) const noexcept']]],
-  ['assign_5fsymmetry_52',['assign_symmetry',['../classBucketGraph.html#a2a66984a5d0225286c0598b884772f8c',1,'BucketGraph::assign_symmetry(auto &amp;FW, auto &amp;BW) noexcept'],['../classBucketGraph.html#a7dc49c1b40dadbde429e084c455ee655',1,'BucketGraph::assign_symmetry(const auto &amp;FW, const auto &amp;BW) const noexcept']]],
-  ['assignsccids_53',['assignSCCIds',['../structVRPNode.html#af622df02028ddacbe293bd258fa4069f',1,'VRPNode']]],
-  ['atspinstance_54',['ATSPInstance',['../classATSPInstance.html#a8e6ad127130ddc8dc37a119285a09ff0',1,'ATSPInstance']]],
-  ['augment_5fng_5fmemories_55',['augment_ng_memories',['../classBucketGraph.html#a044362566d724349a2c40edfa1ea10f9',1,'BucketGraph']]]
+  ['apply_5fstage_5fone_5fdominance_47',['apply_stage_one_dominance',['../structBucket.html#ab7d0e278956c582b3beb4ff69ebf1a79',1,'Bucket']]],
+  ['applybranchingbaldesctrs_48',['applyBranchingbaldesCtrs',['../classBranching.html#ab40fc6214a355c79db1efb6e81d3f9be',1,'Branching']]],
+  ['applydeluxingreduction_49',['applyDeluxingReduction',['../classVRProblem.html#a047ed3f922df7ddbc0f4e01cf70ff1f4',1,'VRProblem']]],
+  ['arc_50',['Arc',['../structArc.html#a83dc91c16778d7fd8664b1e2cd2444c7',1,'Arc::Arc()'],['../structArc.html#a6f6941716e477bd210a91e0819a24eeb',1,'Arc::Arc(int from, int to, const std::vector&lt; double &gt; &amp;res_inc, double cost_inc)'],['../structArc.html#a9a029b7d07f393de2c26ed1a6d630b59',1,'Arc::Arc(int from, int to, const std::vector&lt; double &gt; &amp;res_inc, double cost_inc, bool fixed)'],['../structArc.html#af6804e0a0fb12779ad37d1bebca3ec02',1,'Arc::Arc(int from, int to, const std::vector&lt; double &gt; &amp;res_inc, double cost_inc, double priority)']]],
+  ['arckey_51',['arcKey',['../classHGS.html#adef29749b7c77cac37d01b490577272f',1,'HGS']]],
+  ['assign_5fbuckets_52',['assign_buckets',['../classBucketGraph.html#af129eff306551dc7cc7fe00b919bbbd0',1,'BucketGraph::assign_buckets(auto &amp;FW, auto &amp;BW) noexcept'],['../classBucketGraph.html#a3084429e997dbd4341b9d02316006f3e',1,'BucketGraph::assign_buckets(const auto &amp;FW, const auto &amp;BW) const noexcept']]],
+  ['assign_5fsymmetry_53',['assign_symmetry',['../classBucketGraph.html#a2a66984a5d0225286c0598b884772f8c',1,'BucketGraph::assign_symmetry(auto &amp;FW, auto &amp;BW) noexcept'],['../classBucketGraph.html#a7dc49c1b40dadbde429e084c455ee655',1,'BucketGraph::assign_symmetry(const auto &amp;FW, const auto &amp;BW) const noexcept']]],
+  ['assignsccids_54',['assignSCCIds',['../structVRPNode.html#af622df02028ddacbe293bd258fa4069f',1,'VRPNode']]],
+  ['atspinstance_55',['ATSPInstance',['../classATSPInstance.html#a8e6ad127130ddc8dc37a119285a09ff0',1,'ATSPInstance']]],
+  ['augment_5fng_5fmemories_56',['augment_ng_memories',['../classBucketGraph.html#a044362566d724349a2c40edfa1ea10f9',1,'BucketGraph']]]
 ];

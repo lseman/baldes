@@ -395,62 +395,62 @@ Public Attributes</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="IPSolver_8cpp_source.html#l00718">718</a> of file <a class="el" href="IPSolver_8cpp_source.html">IPSolver.cpp</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  718</span>                                                                               {</div>
-<div class="line"><span class="lineno">  719</span>    OptimizationData optData;</div>
-<div class="line"><span class="lineno">  720</span> </div>
-<div class="line"><span class="lineno">  721</span>    <span class="comment">// Convert SparseMatrix to Eigen::SparseMatrix using Eigen::Triplet</span></div>
-<div class="line"><span class="lineno">  722</span>    std::vector&lt;Eigen::Triplet&lt;double&gt;&gt; triplets;</div>
-<div class="line"><span class="lineno">  723</span>    <span class="keyword">auto</span>                                sparseMatrix = modelData.<a class="code hl_variable" href="structModelData.html#a245b4a1967df894ba7ef7ed10a2c111a">A_sparse</a>;</div>
-<div class="line"><span class="lineno">  724</span> </div>
-<div class="line"><span class="lineno">  725</span>    optData.<a class="code hl_variable" href="structOptimizationData.html#aa2ff8a7b473a5656481967750bd566aa">As</a> = modelData.<a class="code hl_variable" href="structModelData.html#a245b4a1967df894ba7ef7ed10a2c111a">A_sparse</a>.toEigenSparseMatrix();</div>
-<div class="line"><span class="lineno">  726</span> </div>
-<div class="line"><span class="lineno">  727</span>    <span class="comment">// Iterate over the CRS format of SparseMatrix to build triplets</span></div>
-<div class="line"><span class="lineno">  728</span>    <span class="comment">// for (int i = 0; i &lt; sparseMatrix.outerSize(); ++i) {</span></div>
-<div class="line"><span class="lineno">  729</span>    <span class="comment">//    for (Eigen::SparseMatrix&lt;double&gt;::InnerIterator it(sparseMatrix, i);</span></div>
-<div class="line"><span class="lineno">  730</span>    <span class="comment">//    it; ++it) {</span></div>
-<div class="line"><span class="lineno">  731</span>    <span class="comment">//        triplets.push_back(Eigen::Triplet&lt;double&gt;(it.row(), it.col(),</span></div>
-<div class="line"><span class="lineno">  732</span>    <span class="comment">//        it.value()));</span></div>
-<div class="line"><span class="lineno">  733</span>    <span class="comment">//    }</span></div>
-<div class="line"><span class="lineno">  734</span>    <span class="comment">//}</span></div>
-<div class="line"><span class="lineno">  735</span>    <span class="comment">// Resize the Eigen sparse matrix</span></div>
-<div class="line"><span class="lineno">  736</span>    <span class="comment">// optData.As.resize(sparseMatrix.num_rows, sparseMatrix.num_cols);</span></div>
-<div class="line"><span class="lineno">  737</span> </div>
-<div class="line"><span class="lineno">  738</span>    <span class="comment">// Set the values from the triplets</span></div>
-<div class="line"><span class="lineno">  739</span>    <span class="comment">// optData.As.setFromTriplets(triplets.begin(), triplets.end());</span></div>
-<div class="line"><span class="lineno">  740</span> </div>
-<div class="line"><span class="lineno">  741</span>    <span class="comment">// Make the matrix compressed for efficient operations</span></div>
-<div class="line"><span class="lineno">  742</span>    <span class="comment">// optData.As.makeCompressed();</span></div>
-<div class="line"><span class="lineno">  743</span> </div>
-<div class="line"><span class="lineno">  744</span>    <span class="comment">// Convert b to Eigen::VectorXd</span></div>
-<div class="line"><span class="lineno">  745</span>    optData.<a class="code hl_variable" href="structOptimizationData.html#a3d49a2b24845bf93e19f3bbcb6c3de41">bs</a> = Eigen::VectorXd::Map(modelData.<a class="code hl_variable" href="structModelData.html#aea9d2f5b3aa72a3af01c62c7cd9d81f2">b</a>.data(), modelData.<a class="code hl_variable" href="structModelData.html#aea9d2f5b3aa72a3af01c62c7cd9d81f2">b</a>.size());</div>
-<div class="line"><span class="lineno">  746</span> </div>
-<div class="line"><span class="lineno">  747</span>    <span class="comment">// Convert c to Eigen::VectorXd</span></div>
-<div class="line"><span class="lineno">  748</span>    optData.<a class="code hl_variable" href="structOptimizationData.html#a5b82c8604e7c30d49e34be2b83f84705">cs</a> = Eigen::VectorXd::Map(modelData.<a class="code hl_variable" href="structModelData.html#a9524df699303a08928c2424e50f0c212">c</a>.data(), modelData.<a class="code hl_variable" href="structModelData.html#a9524df699303a08928c2424e50f0c212">c</a>.size());</div>
-<div class="line"><span class="lineno">  749</span> </div>
-<div class="line"><span class="lineno">  750</span>    <span class="comment">// Convert lb to Eigen::VectorXd</span></div>
-<div class="line"><span class="lineno">  751</span>    optData.<a class="code hl_variable" href="structOptimizationData.html#aaf56347389a91b3384bd9d65b5b2a7a7">lo</a> = Eigen::VectorXd::Map(modelData.<a class="code hl_variable" href="structModelData.html#a80344318cbffc04660646ec38d3f7180">lb</a>.data(), modelData.<a class="code hl_variable" href="structModelData.html#a80344318cbffc04660646ec38d3f7180">lb</a>.size());</div>
+<p class="definition">Definition at line <a class="el" href="IPSolver_8cpp_source.html#l00746">746</a> of file <a class="el" href="IPSolver_8cpp_source.html">IPSolver.cpp</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  746</span>                                                                               {</div>
+<div class="line"><span class="lineno">  747</span>    OptimizationData optData;</div>
+<div class="line"><span class="lineno">  748</span> </div>
+<div class="line"><span class="lineno">  749</span>    <span class="comment">// Convert SparseMatrix to Eigen::SparseMatrix using Eigen::Triplet</span></div>
+<div class="line"><span class="lineno">  750</span>    std::vector&lt;Eigen::Triplet&lt;double&gt;&gt; triplets;</div>
+<div class="line"><span class="lineno">  751</span>    <span class="keyword">auto</span>                                sparseMatrix = modelData.<a class="code hl_variable" href="structModelData.html#a245b4a1967df894ba7ef7ed10a2c111a">A_sparse</a>;</div>
 <div class="line"><span class="lineno">  752</span> </div>
-<div class="line"><span class="lineno">  753</span>    <span class="comment">// Convert ub to Eigen::VectorXd</span></div>
-<div class="line"><span class="lineno">  754</span>    optData.<a class="code hl_variable" href="structOptimizationData.html#aa4cf17b671a5017a0f5d9a9c42dea1c0">hi</a> = Eigen::VectorXd::Map(modelData.<a class="code hl_variable" href="structModelData.html#a3454e039aeac6532f64f87599813d962">ub</a>.data(), modelData.<a class="code hl_variable" href="structModelData.html#a3454e039aeac6532f64f87599813d962">ub</a>.size());</div>
-<div class="line"><span class="lineno">  755</span> </div>
-<div class="line"><span class="lineno">  756</span>    <span class="comment">// Convert sense to Eigen::VectorXd (mapping &#39;&lt;&#39; to 0, &#39;=&#39; to 1, &#39;&gt;&#39; to 0</span></div>
-<div class="line"><span class="lineno">  757</span>    <span class="comment">// and flipping the corresponding row)</span></div>
-<div class="line"><span class="lineno">  758</span>    optData.<a class="code hl_variable" href="structOptimizationData.html#a11c0e5839dd840148a8bdde9c92c283d">sense</a>.resize(modelData.<a class="code hl_variable" href="structModelData.html#ac23a00bb904bdff4445e27b1478f3805">sense</a>.size());</div>
-<div class="line"><span class="lineno">  759</span>    <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> i = 0; i &lt; modelData.<a class="code hl_variable" href="structModelData.html#ac23a00bb904bdff4445e27b1478f3805">sense</a>.size(); ++i) {</div>
-<div class="line"><span class="lineno">  760</span>        <span class="keywordflow">if</span> (modelData.<a class="code hl_variable" href="structModelData.html#ac23a00bb904bdff4445e27b1478f3805">sense</a>[i] == <span class="charliteral">&#39;&lt;&#39;</span>) {</div>
-<div class="line"><span class="lineno">  761</span>            optData.<a class="code hl_variable" href="structOptimizationData.html#a11c0e5839dd840148a8bdde9c92c283d">sense</a>[i] = 0.0;</div>
-<div class="line"><span class="lineno">  762</span>        } <span class="keywordflow">else</span> <span class="keywordflow">if</span> (modelData.<a class="code hl_variable" href="structModelData.html#ac23a00bb904bdff4445e27b1478f3805">sense</a>[i] == <span class="charliteral">&#39;=&#39;</span>) {</div>
-<div class="line"><span class="lineno">  763</span>            optData.<a class="code hl_variable" href="structOptimizationData.html#a11c0e5839dd840148a8bdde9c92c283d">sense</a>[i] = 1.0;</div>
-<div class="line"><span class="lineno">  764</span>        } <span class="keywordflow">else</span> <span class="keywordflow">if</span> (modelData.<a class="code hl_variable" href="structModelData.html#ac23a00bb904bdff4445e27b1478f3805">sense</a>[i] == <span class="charliteral">&#39;&gt;&#39;</span>) {</div>
-<div class="line"><span class="lineno">  765</span>            optData.<a class="code hl_variable" href="structOptimizationData.html#a11c0e5839dd840148a8bdde9c92c283d">sense</a>[i] = 0.0;</div>
-<div class="line"><span class="lineno">  766</span>            optData.<a class="code hl_variable" href="structOptimizationData.html#a3d49a2b24845bf93e19f3bbcb6c3de41">bs</a>[i]    = -optData.<a class="code hl_variable" href="structOptimizationData.html#a3d49a2b24845bf93e19f3bbcb6c3de41">bs</a>[i];</div>
-<div class="line"><span class="lineno">  767</span>            optData.<a class="code hl_variable" href="structOptimizationData.html#aa2ff8a7b473a5656481967750bd566aa">As</a>.row(i) *= -1; <span class="comment">// Flip the row for &#39;&gt;&#39;</span></div>
-<div class="line"><span class="lineno">  768</span>        }</div>
-<div class="line"><span class="lineno">  769</span>    }</div>
-<div class="line"><span class="lineno">  770</span> </div>
-<div class="line"><span class="lineno">  771</span>    <span class="keywordflow">return</span> optData;</div>
-<div class="line"><span class="lineno">  772</span>}</div>
+<div class="line"><span class="lineno">  753</span>    optData.<a class="code hl_variable" href="structOptimizationData.html#aa2ff8a7b473a5656481967750bd566aa">As</a> = modelData.<a class="code hl_variable" href="structModelData.html#a245b4a1967df894ba7ef7ed10a2c111a">A_sparse</a>.toEigenSparseMatrix();</div>
+<div class="line"><span class="lineno">  754</span> </div>
+<div class="line"><span class="lineno">  755</span>    <span class="comment">// Iterate over the CRS format of SparseMatrix to build triplets</span></div>
+<div class="line"><span class="lineno">  756</span>    <span class="comment">// for (int i = 0; i &lt; sparseMatrix.outerSize(); ++i) {</span></div>
+<div class="line"><span class="lineno">  757</span>    <span class="comment">//    for (Eigen::SparseMatrix&lt;double&gt;::InnerIterator it(sparseMatrix, i);</span></div>
+<div class="line"><span class="lineno">  758</span>    <span class="comment">//    it; ++it) {</span></div>
+<div class="line"><span class="lineno">  759</span>    <span class="comment">//        triplets.push_back(Eigen::Triplet&lt;double&gt;(it.row(), it.col(),</span></div>
+<div class="line"><span class="lineno">  760</span>    <span class="comment">//        it.value()));</span></div>
+<div class="line"><span class="lineno">  761</span>    <span class="comment">//    }</span></div>
+<div class="line"><span class="lineno">  762</span>    <span class="comment">//}</span></div>
+<div class="line"><span class="lineno">  763</span>    <span class="comment">// Resize the Eigen sparse matrix</span></div>
+<div class="line"><span class="lineno">  764</span>    <span class="comment">// optData.As.resize(sparseMatrix.num_rows, sparseMatrix.num_cols);</span></div>
+<div class="line"><span class="lineno">  765</span> </div>
+<div class="line"><span class="lineno">  766</span>    <span class="comment">// Set the values from the triplets</span></div>
+<div class="line"><span class="lineno">  767</span>    <span class="comment">// optData.As.setFromTriplets(triplets.begin(), triplets.end());</span></div>
+<div class="line"><span class="lineno">  768</span> </div>
+<div class="line"><span class="lineno">  769</span>    <span class="comment">// Make the matrix compressed for efficient operations</span></div>
+<div class="line"><span class="lineno">  770</span>    <span class="comment">// optData.As.makeCompressed();</span></div>
+<div class="line"><span class="lineno">  771</span> </div>
+<div class="line"><span class="lineno">  772</span>    <span class="comment">// Convert b to Eigen::VectorXd</span></div>
+<div class="line"><span class="lineno">  773</span>    optData.<a class="code hl_variable" href="structOptimizationData.html#a3d49a2b24845bf93e19f3bbcb6c3de41">bs</a> = Eigen::VectorXd::Map(modelData.<a class="code hl_variable" href="structModelData.html#aea9d2f5b3aa72a3af01c62c7cd9d81f2">b</a>.data(), modelData.<a class="code hl_variable" href="structModelData.html#aea9d2f5b3aa72a3af01c62c7cd9d81f2">b</a>.size());</div>
+<div class="line"><span class="lineno">  774</span> </div>
+<div class="line"><span class="lineno">  775</span>    <span class="comment">// Convert c to Eigen::VectorXd</span></div>
+<div class="line"><span class="lineno">  776</span>    optData.<a class="code hl_variable" href="structOptimizationData.html#a5b82c8604e7c30d49e34be2b83f84705">cs</a> = Eigen::VectorXd::Map(modelData.<a class="code hl_variable" href="structModelData.html#a9524df699303a08928c2424e50f0c212">c</a>.data(), modelData.<a class="code hl_variable" href="structModelData.html#a9524df699303a08928c2424e50f0c212">c</a>.size());</div>
+<div class="line"><span class="lineno">  777</span> </div>
+<div class="line"><span class="lineno">  778</span>    <span class="comment">// Convert lb to Eigen::VectorXd</span></div>
+<div class="line"><span class="lineno">  779</span>    optData.<a class="code hl_variable" href="structOptimizationData.html#aaf56347389a91b3384bd9d65b5b2a7a7">lo</a> = Eigen::VectorXd::Map(modelData.<a class="code hl_variable" href="structModelData.html#a80344318cbffc04660646ec38d3f7180">lb</a>.data(), modelData.<a class="code hl_variable" href="structModelData.html#a80344318cbffc04660646ec38d3f7180">lb</a>.size());</div>
+<div class="line"><span class="lineno">  780</span> </div>
+<div class="line"><span class="lineno">  781</span>    <span class="comment">// Convert ub to Eigen::VectorXd</span></div>
+<div class="line"><span class="lineno">  782</span>    optData.<a class="code hl_variable" href="structOptimizationData.html#aa4cf17b671a5017a0f5d9a9c42dea1c0">hi</a> = Eigen::VectorXd::Map(modelData.<a class="code hl_variable" href="structModelData.html#a3454e039aeac6532f64f87599813d962">ub</a>.data(), modelData.<a class="code hl_variable" href="structModelData.html#a3454e039aeac6532f64f87599813d962">ub</a>.size());</div>
+<div class="line"><span class="lineno">  783</span> </div>
+<div class="line"><span class="lineno">  784</span>    <span class="comment">// Convert sense to Eigen::VectorXd (mapping &#39;&lt;&#39; to 0, &#39;=&#39; to 1, &#39;&gt;&#39; to 0</span></div>
+<div class="line"><span class="lineno">  785</span>    <span class="comment">// and flipping the corresponding row)</span></div>
+<div class="line"><span class="lineno">  786</span>    optData.<a class="code hl_variable" href="structOptimizationData.html#a11c0e5839dd840148a8bdde9c92c283d">sense</a>.resize(modelData.<a class="code hl_variable" href="structModelData.html#ac23a00bb904bdff4445e27b1478f3805">sense</a>.size());</div>
+<div class="line"><span class="lineno">  787</span>    <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> i = 0; i &lt; modelData.<a class="code hl_variable" href="structModelData.html#ac23a00bb904bdff4445e27b1478f3805">sense</a>.size(); ++i) {</div>
+<div class="line"><span class="lineno">  788</span>        <span class="keywordflow">if</span> (modelData.<a class="code hl_variable" href="structModelData.html#ac23a00bb904bdff4445e27b1478f3805">sense</a>[i] == <span class="charliteral">&#39;&lt;&#39;</span>) {</div>
+<div class="line"><span class="lineno">  789</span>            optData.<a class="code hl_variable" href="structOptimizationData.html#a11c0e5839dd840148a8bdde9c92c283d">sense</a>[i] = 0.0;</div>
+<div class="line"><span class="lineno">  790</span>        } <span class="keywordflow">else</span> <span class="keywordflow">if</span> (modelData.<a class="code hl_variable" href="structModelData.html#ac23a00bb904bdff4445e27b1478f3805">sense</a>[i] == <span class="charliteral">&#39;=&#39;</span>) {</div>
+<div class="line"><span class="lineno">  791</span>            optData.<a class="code hl_variable" href="structOptimizationData.html#a11c0e5839dd840148a8bdde9c92c283d">sense</a>[i] = 1.0;</div>
+<div class="line"><span class="lineno">  792</span>        } <span class="keywordflow">else</span> <span class="keywordflow">if</span> (modelData.<a class="code hl_variable" href="structModelData.html#ac23a00bb904bdff4445e27b1478f3805">sense</a>[i] == <span class="charliteral">&#39;&gt;&#39;</span>) {</div>
+<div class="line"><span class="lineno">  793</span>            optData.<a class="code hl_variable" href="structOptimizationData.html#a11c0e5839dd840148a8bdde9c92c283d">sense</a>[i] = 0.0;</div>
+<div class="line"><span class="lineno">  794</span>            optData.<a class="code hl_variable" href="structOptimizationData.html#a3d49a2b24845bf93e19f3bbcb6c3de41">bs</a>[i]    = -optData.<a class="code hl_variable" href="structOptimizationData.html#a3d49a2b24845bf93e19f3bbcb6c3de41">bs</a>[i];</div>
+<div class="line"><span class="lineno">  795</span>            optData.<a class="code hl_variable" href="structOptimizationData.html#aa2ff8a7b473a5656481967750bd566aa">As</a>.row(i) *= -1; <span class="comment">// Flip the row for &#39;&gt;&#39;</span></div>
+<div class="line"><span class="lineno">  796</span>        }</div>
+<div class="line"><span class="lineno">  797</span>    }</div>
+<div class="line"><span class="lineno">  798</span> </div>
+<div class="line"><span class="lineno">  799</span>    <span class="keywordflow">return</span> optData;</div>
+<div class="line"><span class="lineno">  800</span>}</div>
 <div class="ttc" id="astructModelData_html_a245b4a1967df894ba7ef7ed10a2c111a"><div class="ttname"><a href="structModelData.html#a245b4a1967df894ba7ef7ed10a2c111a">ModelData::A_sparse</a></div><div class="ttdeci">SparseMatrix A_sparse</div><div class="ttdef"><b>Definition</b> <a href="Definitions_8h_source.html#l00216">Definitions.h:216</a></div></div>
 <div class="ttc" id="astructModelData_html_a3454e039aeac6532f64f87599813d962"><div class="ttname"><a href="structModelData.html#a3454e039aeac6532f64f87599813d962">ModelData::ub</a></div><div class="ttdeci">std::vector&lt; double &gt; ub</div><div class="ttdef"><b>Definition</b> <a href="Definitions_8h_source.html#l00221">Definitions.h:221</a></div></div>
 <div class="ttc" id="astructModelData_html_a80344318cbffc04660646ec38d3f7180"><div class="ttname"><a href="structModelData.html#a80344318cbffc04660646ec38d3f7180">ModelData::lb</a></div><div class="ttdeci">std::vector&lt; double &gt; lb</div><div class="ttdef"><b>Definition</b> <a href="Definitions_8h_source.html#l00220">Definitions.h:220</a></div></div>
@@ -958,186 +958,214 @@ Here is the call graph for this function:</div>
 <div class="line"><span class="lineno">  485</span> </div>
 <div class="line"><span class="lineno">  486</span>    <span class="comment">// Adaptive tolerance parameters</span></div>
 <div class="line"><span class="lineno">  487</span>    <span class="keywordtype">double</span> adaptive_tol = 1e-9;</div>
-<div class="line"><span class="lineno">  488</span> </div>
-<div class="line"><span class="lineno">  489</span>    <span class="comment">// Main optimization loop</span></div>
-<div class="line"><span class="lineno">  490</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> k = 0; k &lt; <a class="code hl_variable" href="#ad0c2594ea4f46d9be99f18a27b34a7d8">max_iter</a>; ++k) {</div>
-<div class="line"><span class="lineno">  491</span>        ncor = 0;</div>
-<div class="line"><span class="lineno">  492</span>        beta = 0.1;</div>
+<div class="line"><span class="lineno">  488</span>    <span class="keyword">const</span> <span class="keywordtype">double</span> primal_tol = 1e-8;</div>
+<div class="line"><span class="lineno">  489</span> </div>
+<div class="line"><span class="lineno">  490</span>    <span class="comment">// Last iterate with finite residuals, restored on numerical breakdown.</span></div>
+<div class="line"><span class="lineno">  491</span>    Eigen::VectorXd last_x = x, last_lambda = lambda, last_s = s, last_v = v, last_w = w;</div>
+<div class="line"><span class="lineno">  492</span>    <span class="keywordtype">double</span>          last_tau = <a class="code hl_variable" href="#a54987d081f0eebc91d6a0247c471d92a">tau</a>, last_kappa = <a class="code hl_variable" href="#a957045b153c2587ced811544b5772410">kappa</a>;</div>
 <div class="line"><span class="lineno">  493</span> </div>
-<div class="line"><span class="lineno">  494</span>        <span class="comment">// Zero out temporary vectors (reuse allocated memory)</span></div>
-<div class="line"><span class="lineno">  495</span>        delta_x.setZero();</div>
-<div class="line"><span class="lineno">  496</span>        delta_y.setZero();</div>
-<div class="line"><span class="lineno">  497</span>        delta_z.setZero();</div>
-<div class="line"><span class="lineno">  498</span>        Delta_x.setZero();</div>
-<div class="line"><span class="lineno">  499</span>        Delta_lambda.setZero();</div>
-<div class="line"><span class="lineno">  500</span>        Delta_w.setZero();</div>
-<div class="line"><span class="lineno">  501</span>        Delta_s.setZero();</div>
-<div class="line"><span class="lineno">  502</span>        Delta_v.setZero();</div>
-<div class="line"><span class="lineno">  503</span>        Delta_tau   = 0.0;</div>
-<div class="line"><span class="lineno">  504</span>        Delta_kappa = 0.0;</div>
-<div class="line"><span class="lineno">  505</span> </div>
-<div class="line"><span class="lineno">  506</span>        <span class="comment">// Update residuals and compute centrality measure</span></div>
-<div class="line"><span class="lineno">  507</span>        <a class="code hl_function" href="#a1f22b1985e02e839ff3b2791a0389865">update_residuals</a>(<a class="code hl_variable" href="#af3536735b8f4efc21e11a83b8062f5f2">res</a>, x, lambda, s, v, w, A, b, c, ubv, ubi, <a class="code hl_variable" href="#a54987d081f0eebc91d6a0247c471d92a">tau</a>, <a class="code hl_variable" href="#a957045b153c2587ced811544b5772410">kappa</a>);</div>
-<div class="line"><span class="lineno">  508</span>        mu = (<a class="code hl_variable" href="#a54987d081f0eebc91d6a0247c471d92a">tau</a> * <a class="code hl_variable" href="#a957045b153c2587ced811544b5772410">kappa</a> + x.dot(s)) / (n + nu + 1.0);</div>
-<div class="line"><span class="lineno">  509</span> </div>
-<div class="line"><span class="lineno">  510</span>        <span class="comment">// Compute norms for convergence criteria (using Eigen’s vectorized norm</span></div>
-<div class="line"><span class="lineno">  511</span>        <span class="comment">// computations)</span></div>
-<div class="line"><span class="lineno">  512</span>        <span class="keyword">const</span> <span class="keywordtype">double</span> rp_norm = <a class="code hl_variable" href="#af3536735b8f4efc21e11a83b8062f5f2">res</a>.rp.lpNorm&lt;Eigen::Infinity&gt;();</div>
-<div class="line"><span class="lineno">  513</span>        <span class="keyword">const</span> <span class="keywordtype">double</span> ru_norm = <a class="code hl_variable" href="#af3536735b8f4efc21e11a83b8062f5f2">res</a>.ru.lpNorm&lt;Eigen::Infinity&gt;();</div>
-<div class="line"><span class="lineno">  514</span>        <span class="keyword">const</span> <span class="keywordtype">double</span> rd_norm = <a class="code hl_variable" href="#af3536735b8f4efc21e11a83b8062f5f2">res</a>.rd.lpNorm&lt;Eigen::Infinity&gt;();</div>
-<div class="line"><span class="lineno">  515</span>        <span class="comment">// Combined residual computations</span></div>
-<div class="line"><span class="lineno">  516</span>        bl_dot_lambda = b.dot(lambda) - ubv.dot(w);</div>
-<div class="line"><span class="lineno">  517</span>        _p            = std::max(rp_norm / (<a class="code hl_variable" href="#a54987d081f0eebc91d6a0247c471d92a">tau</a> * (1.0 + b_norm)), ru_norm / (<a class="code hl_variable" href="#a54987d081f0eebc91d6a0247c471d92a">tau</a> * (1.0 + ubv_norm)));</div>
-<div class="line"><span class="lineno">  518</span>        _d            = rd_norm / (<a class="code hl_variable" href="#a54987d081f0eebc91d6a0247c471d92a">tau</a> * (1.0 + c_norm));</div>
-<div class="line"><span class="lineno">  519</span>        _g            = std::abs(c.dot(x) - bl_dot_lambda) / (<a class="code hl_variable" href="#a54987d081f0eebc91d6a0247c471d92a">tau</a> + std::abs(bl_dot_lambda));</div>
-<div class="line"><span class="lineno">  520</span> </div>
-<div class="line"><span class="lineno">  521</span>        <span class="comment">// Save interior solution if conditions are met</span></div>
-<div class="line"><span class="lineno">  522</span>        <span class="comment">// if (!saved_interior_solution_bool &amp;&amp;</span></div>
-<div class="line"><span class="lineno">  523</span>        <span class="comment">//     (_d &lt;= adaptive_tol &amp;&amp; _g &lt;= adaptive_tol * 2)) {</span></div>
-<div class="line"><span class="lineno">  524</span>        <span class="comment">//     save_interior_solution(x, lambda, w, s, v, tau, kappa);</span></div>
-<div class="line"><span class="lineno">  525</span>        <span class="comment">//     saved_interior_solution_bool = true;</span></div>
-<div class="line"><span class="lineno">  526</span>        <span class="comment">//     warm_start = true;</span></div>
-<div class="line"><span class="lineno">  527</span>        <span class="comment">// }</span></div>
-<div class="line"><span class="lineno">  528</span>        <span class="keywordflow">if</span> (_d &lt;= adaptive_tol &amp;&amp; _g &lt;= <a class="code hl_variable" href="#ac1a5e7d41b0f72ce616f99b03d4785a5">tol</a>) <span class="keywordflow">break</span>;</div>
-<div class="line"><span class="lineno">  529</span>        <span class="comment">// adaptive_tol = std::max(min_tol, adaptive_tol * scale_factor);</span></div>
-<div class="line"><span class="lineno">  530</span> </div>
-<div class="line"><span class="lineno">  531</span>        <span class="comment">// Compute scaling factors</span></div>
-<div class="line"><span class="lineno">  532</span>        theta_vw = w.cwiseQuotient(v);</div>
-<div class="line"><span class="lineno">  533</span>        theta_xs = s.cwiseQuotient(x);</div>
-<div class="line"><span class="lineno">  534</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> i = 0; i &lt; ubi.size(); ++i) { theta_xs[ubi[i]] += theta_vw[i]; }</div>
-<div class="line"><span class="lineno">  535</span> </div>
-<div class="line"><span class="lineno">  536</span>        <span class="comment">// Update regularization dynamically (reuse regP/regD to avoid extra</span></div>
-<div class="line"><span class="lineno">  537</span>        <span class="comment">// allocation)</span></div>
-<div class="line"><span class="lineno">  538</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> attempt = 0; attempt &lt; 3; ++attempt) {</div>
-<div class="line"><span class="lineno">  539</span>            regP = (regP / 10.0).cwiseMax(r_min);</div>
-<div class="line"><span class="lineno">  540</span>            regD = (regD / 10.0).cwiseMax(r_min);</div>
-<div class="line"><span class="lineno">  541</span>            regG = std::max(r_min, regG / 10.0);</div>
-<div class="line"><span class="lineno">  542</span>            <span class="keywordflow">if</span> (<a class="code hl_function" href="#a22f7028c11d89b7986357f004f269924">update_linear_solver</a>(<a class="code hl_variable" href="#a5c55da355d90e490435337a5427b3c0c">ls</a>, theta_xs, regP, regD) == 0) <span class="keywordflow">break</span>;</div>
-<div class="line"><span class="lineno">  543</span>            regP *= 100.0;</div>
-<div class="line"><span class="lineno">  544</span>            regD *= 100.0;</div>
-<div class="line"><span class="lineno">  545</span>            regG *= 100.0;</div>
-<div class="line"><span class="lineno">  546</span>        }</div>
-<div class="line"><span class="lineno">  547</span> </div>
-<div class="line"><span class="lineno">  548</span>        <span class="comment">// Solve the augmented system</span></div>
-<div class="line"><span class="lineno">  549</span>        <a class="code hl_function" href="#a10d79c906c9f170d975b9404e793a14e">solve_augsys</a>(delta_x, delta_y, delta_z, <a class="code hl_variable" href="#a5c55da355d90e490435337a5427b3c0c">ls</a>, theta_vw, ubi, b, c, ubv);</div>
-<div class="line"><span class="lineno">  550</span>        delta_0 = regG + <a class="code hl_variable" href="#a957045b153c2587ced811544b5772410">kappa</a> / <a class="code hl_variable" href="#a54987d081f0eebc91d6a0247c471d92a">tau</a> - delta_x.dot(c) + delta_y.dot(b) - delta_z.dot(ubv);</div>
-<div class="line"><span class="lineno">  551</span> </div>
-<div class="line"><span class="lineno">  552</span>        <span class="comment">// First Newton solve</span></div>
-<div class="line"><span class="lineno">  553</span>        <a class="code hl_function" href="#ac225cc4dcfe81ae25d3d59bdcb0b029f">solve_newton_system</a>(Delta_x, Delta_lambda, Delta_w, Delta_s, Delta_v, Delta_tau, Delta_kappa, <a class="code hl_variable" href="#a5c55da355d90e490435337a5427b3c0c">ls</a>, theta_vw, b,</div>
-<div class="line"><span class="lineno">  554</span>                            c, ubi, ubv, delta_x, delta_y, delta_z, delta_0, x, lambda, w, s, v, <a class="code hl_variable" href="#a54987d081f0eebc91d6a0247c471d92a">tau</a>, <a class="code hl_variable" href="#a957045b153c2587ced811544b5772410">kappa</a>, <a class="code hl_variable" href="#af3536735b8f4efc21e11a83b8062f5f2">res</a>.rp,</div>
-<div class="line"><span class="lineno">  555</span>                            <a class="code hl_variable" href="#af3536735b8f4efc21e11a83b8062f5f2">res</a>.ru, <a class="code hl_variable" href="#af3536735b8f4efc21e11a83b8062f5f2">res</a>.rd, <a class="code hl_variable" href="#af3536735b8f4efc21e11a83b8062f5f2">res</a>.rg, -x.cwiseProduct(s), -v.cwiseProduct(w), -<a class="code hl_variable" href="#a54987d081f0eebc91d6a0247c471d92a">tau</a> * <a class="code hl_variable" href="#a957045b153c2587ced811544b5772410">kappa</a>);</div>
-<div class="line"><span class="lineno">  556</span> </div>
-<div class="line"><span class="lineno">  557</span>        alpha         = <a class="code hl_function" href="#a16c38201e3fc179e9265a82e67510679">max_alpha</a>(x, Delta_x, v, Delta_v, s, Delta_s, w, Delta_w, <a class="code hl_variable" href="#a54987d081f0eebc91d6a0247c471d92a">tau</a>, Delta_tau, <a class="code hl_variable" href="#a957045b153c2587ced811544b5772410">kappa</a>, Delta_kappa);</div>
-<div class="line"><span class="lineno">  558</span>        oneMinusAlpha = 1.0 - alpha;</div>
-<div class="line"><span class="lineno">  559</span>        gamma         = std::max(oneMinusAlpha * oneMinusAlpha * std::min(beta, oneMinusAlpha), 0.1);</div>
-<div class="line"><span class="lineno">  560</span>        damping       = 1.0 - gamma;</div>
-<div class="line"><span class="lineno">  561</span> </div>
-<div class="line"><span class="lineno">  562</span>        <span class="comment">// Second (damped) Newton solve</span></div>
-<div class="line"><span class="lineno">  563</span>        <a class="code hl_function" href="#ac225cc4dcfe81ae25d3d59bdcb0b029f">solve_newton_system</a>(Delta_x, Delta_lambda, Delta_w, Delta_s, Delta_v, Delta_tau, Delta_kappa, <a class="code hl_variable" href="#a5c55da355d90e490435337a5427b3c0c">ls</a>, theta_vw, b,</div>
-<div class="line"><span class="lineno">  564</span>                            c, ubi, ubv, delta_x, delta_y, delta_z, delta_0, x, lambda, w, s, v, <a class="code hl_variable" href="#a54987d081f0eebc91d6a0247c471d92a">tau</a>, <a class="code hl_variable" href="#a957045b153c2587ced811544b5772410">kappa</a>,</div>
-<div class="line"><span class="lineno">  565</span>                            damping * <a class="code hl_variable" href="#af3536735b8f4efc21e11a83b8062f5f2">res</a>.rp, damping * <a class="code hl_variable" href="#af3536735b8f4efc21e11a83b8062f5f2">res</a>.ru, damping * <a class="code hl_variable" href="#af3536735b8f4efc21e11a83b8062f5f2">res</a>.rd, damping * <a class="code hl_variable" href="#af3536735b8f4efc21e11a83b8062f5f2">res</a>.rg,</div>
-<div class="line"><span class="lineno">  566</span>                            (-x.cwiseProduct(s)).array() + (gamma * mu) - Delta_x.cwiseProduct(Delta_s).array(),</div>
-<div class="line"><span class="lineno">  567</span>                            (-v.cwiseProduct(w)).array() + (gamma * mu) - Delta_v.cwiseProduct(Delta_w).array(),</div>
-<div class="line"><span class="lineno">  568</span>                            (-<a class="code hl_variable" href="#a54987d081f0eebc91d6a0247c471d92a">tau</a> * <a class="code hl_variable" href="#a957045b153c2587ced811544b5772410">kappa</a>) + (gamma * mu) - Delta_tau * Delta_kappa);</div>
-<div class="line"><span class="lineno">  569</span> </div>
-<div class="line"><span class="lineno">  570</span>        alpha = <a class="code hl_function" href="#a16c38201e3fc179e9265a82e67510679">max_alpha</a>(x, Delta_x, v, Delta_v, s, Delta_s, w, Delta_w, <a class="code hl_variable" href="#a54987d081f0eebc91d6a0247c471d92a">tau</a>, Delta_tau, <a class="code hl_variable" href="#a957045b153c2587ced811544b5772410">kappa</a>, Delta_kappa);</div>
-<div class="line"><span class="lineno">  571</span> </div>
-<div class="line"><span class="lineno">  572</span>        <span class="comment">// High-order correction steps</span></div>
-<div class="line"><span class="lineno">  573</span>        <span class="keywordflow">while</span> (ncor &lt;= 2 &amp;&amp; alpha &lt; 0.9995) {</div>
-<div class="line"><span class="lineno">  574</span>            ncor++;</div>
-<div class="line"><span class="lineno">  575</span>            alpha_ = std::min(1.0, 2.0 * alpha);</div>
-<div class="line"><span class="lineno">  576</span>            mu_l   = beta * mu * gamma;</div>
-<div class="line"><span class="lineno">  577</span>            mu_u   = gamma * mu / beta;</div>
-<div class="line"><span class="lineno">  578</span> </div>
-<div class="line"><span class="lineno">  579</span>            xs = x + alpha_ * Delta_x;</div>
-<div class="line"><span class="lineno">  580</span>            xs.array() *= (s + alpha_ * Delta_s).array();</div>
-<div class="line"><span class="lineno">  581</span>            vw = v + alpha_ * Delta_v;</div>
-<div class="line"><span class="lineno">  582</span>            vw.array() *= (w + alpha_ * Delta_w).array();</div>
-<div class="line"><span class="lineno">  583</span> </div>
-<div class="line"><span class="lineno">  584</span>            t_xs = (xs.array() &lt; mu_l).select(mu_l - xs.array(), (xs.array() &gt; mu_u).select(mu_u - xs.array(), 0.0));</div>
-<div class="line"><span class="lineno">  585</span>            t_vw = (vw.array() &lt; mu_l).select(mu_l - vw.array(), (vw.array() &gt; mu_u).select(mu_u - vw.array(), 0.0));</div>
-<div class="line"><span class="lineno">  586</span> </div>
-<div class="line"><span class="lineno">  587</span>            taukappa                    = (<a class="code hl_variable" href="#a54987d081f0eebc91d6a0247c471d92a">tau</a> + alpha_ * Delta_tau) * (<a class="code hl_variable" href="#a957045b153c2587ced811544b5772410">kappa</a> + alpha_ * Delta_kappa);</div>
-<div class="line"><span class="lineno">  588</span>            t0                          = std::clamp(taukappa, mu_l, mu_u) - taukappa;</div>
-<div class="line"><span class="lineno">  589</span>            <span class="keyword">const</span> <span class="keywordtype">double</span> sum_correction = (t_xs.sum() + t_vw.sum() + t0) / (nv + nu + 1);</div>
-<div class="line"><span class="lineno">  590</span>            t_xs.array() -= sum_correction;</div>
-<div class="line"><span class="lineno">  591</span>            t_vw.array() -= sum_correction;</div>
-<div class="line"><span class="lineno">  592</span>            t0 -= sum_correction;</div>
-<div class="line"><span class="lineno">  593</span> </div>
-<div class="line"><span class="lineno">  594</span>            <span class="comment">// Save current directions before correction</span></div>
-<div class="line"><span class="lineno">  595</span>            Delta_x_c      = Delta_x;</div>
-<div class="line"><span class="lineno">  596</span>            Delta_lambda_c = Delta_lambda;</div>
-<div class="line"><span class="lineno">  597</span>            Delta_w_c      = Delta_w;</div>
-<div class="line"><span class="lineno">  598</span>            Delta_s_c      = Delta_s;</div>
-<div class="line"><span class="lineno">  599</span>            Delta_v_c      = Delta_v;</div>
-<div class="line"><span class="lineno">  600</span>            Delta_tau_c    = Delta_tau;</div>
-<div class="line"><span class="lineno">  601</span>            Delta_kappa_c  = Delta_kappa;</div>
-<div class="line"><span class="lineno">  602</span> </div>
-<div class="line"><span class="lineno">  603</span>            <span class="comment">// Solve correction system</span></div>
-<div class="line"><span class="lineno">  604</span>            <a class="code hl_function" href="#ac225cc4dcfe81ae25d3d59bdcb0b029f">solve_newton_system</a>(Delta_x_c, Delta_lambda_c, Delta_w_c, Delta_s_c, Delta_v_c, Delta_tau_c, Delta_kappa_c,</div>
-<div class="line"><span class="lineno">  605</span>                                <a class="code hl_variable" href="#a5c55da355d90e490435337a5427b3c0c">ls</a>, theta_vw, b, c, ubi, ubv, delta_x, delta_y, delta_z, delta_0, x, lambda, w, s, v,</div>
-<div class="line"><span class="lineno">  606</span>                                <a class="code hl_variable" href="#a54987d081f0eebc91d6a0247c471d92a">tau</a>, <a class="code hl_variable" href="#a957045b153c2587ced811544b5772410">kappa</a>, zero_rp, zero_ru, zero_rd, 0, -t_xs, -t_vw, -t0);</div>
-<div class="line"><span class="lineno">  607</span> </div>
-<div class="line"><span class="lineno">  608</span>            alpha_c = <a class="code hl_function" href="#a16c38201e3fc179e9265a82e67510679">max_alpha</a>(x, Delta_x_c, v, Delta_v_c, s, Delta_s_c, w, Delta_w_c, <a class="code hl_variable" href="#a54987d081f0eebc91d6a0247c471d92a">tau</a>, Delta_tau_c, <a class="code hl_variable" href="#a957045b153c2587ced811544b5772410">kappa</a>,</div>
-<div class="line"><span class="lineno">  609</span>                                Delta_kappa_c);</div>
-<div class="line"><span class="lineno">  610</span>            <span class="keywordflow">if</span> (alpha_c &gt; alpha) {</div>
-<div class="line"><span class="lineno">  611</span>                Delta_x      = Delta_x_c;</div>
-<div class="line"><span class="lineno">  612</span>                Delta_lambda = Delta_lambda_c;</div>
-<div class="line"><span class="lineno">  613</span>                Delta_w      = Delta_w_c;</div>
-<div class="line"><span class="lineno">  614</span>                Delta_s      = Delta_s_c;</div>
-<div class="line"><span class="lineno">  615</span>                Delta_v      = Delta_v_c;</div>
-<div class="line"><span class="lineno">  616</span>                Delta_tau    = Delta_tau_c;</div>
-<div class="line"><span class="lineno">  617</span>                Delta_kappa  = Delta_kappa_c;</div>
-<div class="line"><span class="lineno">  618</span>                alpha        = alpha_c;</div>
-<div class="line"><span class="lineno">  619</span>            }</div>
-<div class="line"><span class="lineno">  620</span>            <span class="keywordflow">if</span> (alpha_c &lt; 1.1 * alpha_) <span class="keywordflow">break</span>;</div>
-<div class="line"><span class="lineno">  621</span>        }</div>
-<div class="line"><span class="lineno">  622</span> </div>
-<div class="line"><span class="lineno">  623</span>        <span class="comment">// Final update step (with slight back-off)</span></div>
-<div class="line"><span class="lineno">  624</span>        alpha *= 0.9995;</div>
-<div class="line"><span class="lineno">  625</span>        x += alpha * Delta_x;</div>
-<div class="line"><span class="lineno">  626</span>        lambda += alpha * Delta_lambda;</div>
-<div class="line"><span class="lineno">  627</span>        s += alpha * Delta_s;</div>
-<div class="line"><span class="lineno">  628</span>        v += alpha * Delta_v;</div>
-<div class="line"><span class="lineno">  629</span>        w += alpha * Delta_w;</div>
-<div class="line"><span class="lineno">  630</span>        <a class="code hl_variable" href="#a54987d081f0eebc91d6a0247c471d92a">tau</a> += alpha * Delta_tau;</div>
-<div class="line"><span class="lineno">  631</span>        <a class="code hl_variable" href="#a957045b153c2587ced811544b5772410">kappa</a> += alpha * Delta_kappa;</div>
-<div class="line"><span class="lineno">  632</span>    }</div>
-<div class="line"><span class="lineno">  633</span> </div>
-<div class="line"><span class="lineno">  634</span>    <span class="comment">// Final solution recovery</span></div>
-<div class="line"><span class="lineno">  635</span>    <span class="keyword">const</span> <span class="keywordtype">double</span>    inv_tau = 1.0 / <a class="code hl_variable" href="#a54987d081f0eebc91d6a0247c471d92a">tau</a>;</div>
-<div class="line"><span class="lineno">  636</span>    Eigen::VectorXd original_x(As.cols());</div>
-<div class="line"><span class="lineno">  637</span>    <span class="keywordtype">int</span>             free_var = 0;</div>
-<div class="line"><span class="lineno">  638</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> j = 0; j &lt; lo.size(); ++j) {</div>
-<div class="line"><span class="lineno">  639</span>        <span class="keyword">const</span> <span class="keywordtype">double</span> l = lo[j];</div>
-<div class="line"><span class="lineno">  640</span>        <span class="keyword">const</span> <span class="keywordtype">double</span> h = hi[j];</div>
-<div class="line"><span class="lineno">  641</span>        <span class="keywordflow">if</span> (l == -<a class="code hl_variable" href="#a981ecfeb17af8eebcb536c8ec5075e28">infty</a> &amp;&amp; h == <a class="code hl_variable" href="#a981ecfeb17af8eebcb536c8ec5075e28">infty</a>) {</div>
-<div class="line"><span class="lineno">  642</span>            original_x[j] = (x[j + free_var] - x[nv_orig + free_var]) * inv_tau;</div>
-<div class="line"><span class="lineno">  643</span>            ++free_var;</div>
-<div class="line"><span class="lineno">  644</span>        } <span class="keywordflow">else</span> <span class="keywordflow">if</span> (std::isfinite(l) &amp;&amp; std::isfinite(h)) {</div>
-<div class="line"><span class="lineno">  645</span>            original_x[j] = l + x[j] * inv_tau;</div>
-<div class="line"><span class="lineno">  646</span>        } <span class="keywordflow">else</span> <span class="keywordflow">if</span> (l == -<a class="code hl_variable" href="#a981ecfeb17af8eebcb536c8ec5075e28">infty</a> &amp;&amp; std::isfinite(h)) {</div>
-<div class="line"><span class="lineno">  647</span>            original_x[j] = h - x[j] * inv_tau;</div>
-<div class="line"><span class="lineno">  648</span>        } <span class="keywordflow">else</span> <span class="keywordflow">if</span> (std::isfinite(l) &amp;&amp; h == <a class="code hl_variable" href="#a981ecfeb17af8eebcb536c8ec5075e28">infty</a>) {</div>
-<div class="line"><span class="lineno">  649</span>            original_x[j] = l + x[j] * inv_tau;</div>
-<div class="line"><span class="lineno">  650</span>        }</div>
-<div class="line"><span class="lineno">  651</span>    }</div>
-<div class="line"><span class="lineno">  652</span> </div>
-<div class="line"><span class="lineno">  653</span>    <a class="code hl_variable" href="#a46689efc5c499d0e9b53b661e0a5405e">objVal</a> = cs.dot(original_x);</div>
-<div class="line"><span class="lineno">  654</span>    lambda *= inv_tau;</div>
-<div class="line"><span class="lineno">  655</span>    <a class="code hl_variable" href="#a8b689456be5e57ddcadae9254dc35c4a">dual_vals</a>.assign(lambda.data(), lambda.data() + lambda.size());</div>
-<div class="line"><span class="lineno">  656</span>    <a class="code hl_variable" href="#a77a138d4376f21d730e110d0547af83b">primal_vals</a>.assign(original_x.data(), original_x.data() + original_x.size());</div>
-<div class="line"><span class="lineno">  657</span>}</div>
+<div class="line"><span class="lineno">  494</span>    <span class="comment">// Main optimization loop</span></div>
+<div class="line"><span class="lineno">  495</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> k = 0; k &lt; <a class="code hl_variable" href="#ad0c2594ea4f46d9be99f18a27b34a7d8">max_iter</a>; ++k) {</div>
+<div class="line"><span class="lineno">  496</span>        ncor = 0;</div>
+<div class="line"><span class="lineno">  497</span>        beta = 0.1;</div>
+<div class="line"><span class="lineno">  498</span> </div>
+<div class="line"><span class="lineno">  499</span>        <span class="comment">// Zero out temporary vectors (reuse allocated memory)</span></div>
+<div class="line"><span class="lineno">  500</span>        delta_x.setZero();</div>
+<div class="line"><span class="lineno">  501</span>        delta_y.setZero();</div>
+<div class="line"><span class="lineno">  502</span>        delta_z.setZero();</div>
+<div class="line"><span class="lineno">  503</span>        Delta_x.setZero();</div>
+<div class="line"><span class="lineno">  504</span>        Delta_lambda.setZero();</div>
+<div class="line"><span class="lineno">  505</span>        Delta_w.setZero();</div>
+<div class="line"><span class="lineno">  506</span>        Delta_s.setZero();</div>
+<div class="line"><span class="lineno">  507</span>        Delta_v.setZero();</div>
+<div class="line"><span class="lineno">  508</span>        Delta_tau   = 0.0;</div>
+<div class="line"><span class="lineno">  509</span>        Delta_kappa = 0.0;</div>
+<div class="line"><span class="lineno">  510</span> </div>
+<div class="line"><span class="lineno">  511</span>        <span class="comment">// Update residuals and compute centrality measure</span></div>
+<div class="line"><span class="lineno">  512</span>        <a class="code hl_function" href="#a1f22b1985e02e839ff3b2791a0389865">update_residuals</a>(<a class="code hl_variable" href="#af3536735b8f4efc21e11a83b8062f5f2">res</a>, x, lambda, s, v, w, A, b, c, ubv, ubi, <a class="code hl_variable" href="#a54987d081f0eebc91d6a0247c471d92a">tau</a>, <a class="code hl_variable" href="#a957045b153c2587ced811544b5772410">kappa</a>);</div>
+<div class="line"><span class="lineno">  513</span>        mu = (<a class="code hl_variable" href="#a54987d081f0eebc91d6a0247c471d92a">tau</a> * <a class="code hl_variable" href="#a957045b153c2587ced811544b5772410">kappa</a> + x.dot(s)) / (n + nu + 1.0);</div>
+<div class="line"><span class="lineno">  514</span> </div>
+<div class="line"><span class="lineno">  515</span>        <span class="comment">// Compute norms for convergence criteria (using Eigen’s vectorized norm</span></div>
+<div class="line"><span class="lineno">  516</span>        <span class="comment">// computations)</span></div>
+<div class="line"><span class="lineno">  517</span>        <span class="keyword">const</span> <span class="keywordtype">double</span> rp_norm = <a class="code hl_variable" href="#af3536735b8f4efc21e11a83b8062f5f2">res</a>.rp.lpNorm&lt;Eigen::Infinity&gt;();</div>
+<div class="line"><span class="lineno">  518</span>        <span class="keyword">const</span> <span class="keywordtype">double</span> ru_norm = <a class="code hl_variable" href="#af3536735b8f4efc21e11a83b8062f5f2">res</a>.ru.lpNorm&lt;Eigen::Infinity&gt;();</div>
+<div class="line"><span class="lineno">  519</span>        <span class="keyword">const</span> <span class="keywordtype">double</span> rd_norm = <a class="code hl_variable" href="#af3536735b8f4efc21e11a83b8062f5f2">res</a>.rd.lpNorm&lt;Eigen::Infinity&gt;();</div>
+<div class="line"><span class="lineno">  520</span>        <span class="comment">// Combined residual computations</span></div>
+<div class="line"><span class="lineno">  521</span>        bl_dot_lambda = b.dot(lambda) - ubv.dot(w);</div>
+<div class="line"><span class="lineno">  522</span>        _p            = std::max(rp_norm / (<a class="code hl_variable" href="#a54987d081f0eebc91d6a0247c471d92a">tau</a> * (1.0 + b_norm)), ru_norm / (<a class="code hl_variable" href="#a54987d081f0eebc91d6a0247c471d92a">tau</a> * (1.0 + ubv_norm)));</div>
+<div class="line"><span class="lineno">  523</span>        _d            = rd_norm / (<a class="code hl_variable" href="#a54987d081f0eebc91d6a0247c471d92a">tau</a> * (1.0 + c_norm));</div>
+<div class="line"><span class="lineno">  524</span>        _g            = std::abs(c.dot(x) - bl_dot_lambda) / (<a class="code hl_variable" href="#a54987d081f0eebc91d6a0247c471d92a">tau</a> + std::abs(bl_dot_lambda));</div>
+<div class="line"><span class="lineno">  525</span> </div>
+<div class="line"><span class="lineno">  526</span>        <span class="comment">// Save interior solution if conditions are met</span></div>
+<div class="line"><span class="lineno">  527</span>        <span class="comment">// if (!saved_interior_solution_bool &amp;&amp;</span></div>
+<div class="line"><span class="lineno">  528</span>        <span class="comment">//     (_d &lt;= adaptive_tol &amp;&amp; _g &lt;= adaptive_tol * 2)) {</span></div>
+<div class="line"><span class="lineno">  529</span>        <span class="comment">//     save_interior_solution(x, lambda, w, s, v, tau, kappa);</span></div>
+<div class="line"><span class="lineno">  530</span>        <span class="comment">//     saved_interior_solution_bool = true;</span></div>
+<div class="line"><span class="lineno">  531</span>        <span class="comment">//     warm_start = true;</span></div>
+<div class="line"><span class="lineno">  532</span>        <span class="comment">// }</span></div>
+<div class="line"><span class="lineno">  533</span>        <span class="comment">// Numerical breakdown near the optimum: fall back to the last finite</span></div>
+<div class="line"><span class="lineno">  534</span>        <span class="comment">// iterate instead of iterating on NaNs until max_iter.</span></div>
+<div class="line"><span class="lineno">  535</span>        <span class="keywordflow">if</span> (!std::isfinite(_p) || !std::isfinite(_d) || !std::isfinite(_g) || !std::isfinite(<a class="code hl_variable" href="#a54987d081f0eebc91d6a0247c471d92a">tau</a>)) {</div>
+<div class="line"><span class="lineno">  536</span>            x      = last_x;</div>
+<div class="line"><span class="lineno">  537</span>            lambda = last_lambda;</div>
+<div class="line"><span class="lineno">  538</span>            s      = last_s;</div>
+<div class="line"><span class="lineno">  539</span>            v      = last_v;</div>
+<div class="line"><span class="lineno">  540</span>            w      = last_w;</div>
+<div class="line"><span class="lineno">  541</span>            <a class="code hl_variable" href="#a54987d081f0eebc91d6a0247c471d92a">tau</a>    = last_tau;</div>
+<div class="line"><span class="lineno">  542</span>            <a class="code hl_variable" href="#a957045b153c2587ced811544b5772410">kappa</a>  = last_kappa;</div>
+<div class="line"><span class="lineno">  543</span>            <span class="keywordflow">break</span>;</div>
+<div class="line"><span class="lineno">  544</span>        }</div>
+<div class="line"><span class="lineno">  545</span>        last_x      = x;</div>
+<div class="line"><span class="lineno">  546</span>        last_lambda = lambda;</div>
+<div class="line"><span class="lineno">  547</span>        last_s      = s;</div>
+<div class="line"><span class="lineno">  548</span>        last_v      = v;</div>
+<div class="line"><span class="lineno">  549</span>        last_w      = w;</div>
+<div class="line"><span class="lineno">  550</span>        last_tau    = <a class="code hl_variable" href="#a54987d081f0eebc91d6a0247c471d92a">tau</a>;</div>
+<div class="line"><span class="lineno">  551</span>        last_kappa  = <a class="code hl_variable" href="#a957045b153c2587ced811544b5772410">kappa</a>;</div>
+<div class="line"><span class="lineno">  552</span> </div>
+<div class="line"><span class="lineno">  553</span>        <span class="comment">// Primal feasibility is required as well: stopping on dual residual</span></div>
+<div class="line"><span class="lineno">  554</span>        <span class="comment">// and gap alone can return a primal-infeasible point whose duals</span></div>
+<div class="line"><span class="lineno">  555</span>        <span class="comment">// price existing master columns negative.</span></div>
+<div class="line"><span class="lineno">  556</span>        <span class="keywordflow">if</span> (_p &lt;= primal_tol &amp;&amp; _d &lt;= adaptive_tol &amp;&amp; _g &lt;= <a class="code hl_variable" href="#ac1a5e7d41b0f72ce616f99b03d4785a5">tol</a>) <span class="keywordflow">break</span>;</div>
+<div class="line"><span class="lineno">  557</span>        <span class="comment">// adaptive_tol = std::max(min_tol, adaptive_tol * scale_factor);</span></div>
+<div class="line"><span class="lineno">  558</span> </div>
+<div class="line"><span class="lineno">  559</span>        <span class="comment">// Compute scaling factors</span></div>
+<div class="line"><span class="lineno">  560</span>        theta_vw = w.cwiseQuotient(v);</div>
+<div class="line"><span class="lineno">  561</span>        theta_xs = s.cwiseQuotient(x);</div>
+<div class="line"><span class="lineno">  562</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> i = 0; i &lt; ubi.size(); ++i) { theta_xs[ubi[i]] += theta_vw[i]; }</div>
+<div class="line"><span class="lineno">  563</span> </div>
+<div class="line"><span class="lineno">  564</span>        <span class="comment">// Update regularization dynamically (reuse regP/regD to avoid extra</span></div>
+<div class="line"><span class="lineno">  565</span>        <span class="comment">// allocation)</span></div>
+<div class="line"><span class="lineno">  566</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> attempt = 0; attempt &lt; 3; ++attempt) {</div>
+<div class="line"><span class="lineno">  567</span>            regP = (regP / 10.0).cwiseMax(r_min);</div>
+<div class="line"><span class="lineno">  568</span>            regD = (regD / 10.0).cwiseMax(r_min);</div>
+<div class="line"><span class="lineno">  569</span>            regG = std::max(r_min, regG / 10.0);</div>
+<div class="line"><span class="lineno">  570</span>            <span class="keywordflow">if</span> (<a class="code hl_function" href="#a22f7028c11d89b7986357f004f269924">update_linear_solver</a>(<a class="code hl_variable" href="#a5c55da355d90e490435337a5427b3c0c">ls</a>, theta_xs, regP, regD) == 0) <span class="keywordflow">break</span>;</div>
+<div class="line"><span class="lineno">  571</span>            regP *= 100.0;</div>
+<div class="line"><span class="lineno">  572</span>            regD *= 100.0;</div>
+<div class="line"><span class="lineno">  573</span>            regG *= 100.0;</div>
+<div class="line"><span class="lineno">  574</span>        }</div>
+<div class="line"><span class="lineno">  575</span> </div>
+<div class="line"><span class="lineno">  576</span>        <span class="comment">// Solve the augmented system</span></div>
+<div class="line"><span class="lineno">  577</span>        <a class="code hl_function" href="#a10d79c906c9f170d975b9404e793a14e">solve_augsys</a>(delta_x, delta_y, delta_z, <a class="code hl_variable" href="#a5c55da355d90e490435337a5427b3c0c">ls</a>, theta_vw, ubi, b, c, ubv);</div>
+<div class="line"><span class="lineno">  578</span>        delta_0 = regG + <a class="code hl_variable" href="#a957045b153c2587ced811544b5772410">kappa</a> / <a class="code hl_variable" href="#a54987d081f0eebc91d6a0247c471d92a">tau</a> - delta_x.dot(c) + delta_y.dot(b) - delta_z.dot(ubv);</div>
+<div class="line"><span class="lineno">  579</span> </div>
+<div class="line"><span class="lineno">  580</span>        <span class="comment">// First Newton solve</span></div>
+<div class="line"><span class="lineno">  581</span>        <a class="code hl_function" href="#ac225cc4dcfe81ae25d3d59bdcb0b029f">solve_newton_system</a>(Delta_x, Delta_lambda, Delta_w, Delta_s, Delta_v, Delta_tau, Delta_kappa, <a class="code hl_variable" href="#a5c55da355d90e490435337a5427b3c0c">ls</a>, theta_vw, b,</div>
+<div class="line"><span class="lineno">  582</span>                            c, ubi, ubv, delta_x, delta_y, delta_z, delta_0, x, lambda, w, s, v, <a class="code hl_variable" href="#a54987d081f0eebc91d6a0247c471d92a">tau</a>, <a class="code hl_variable" href="#a957045b153c2587ced811544b5772410">kappa</a>, <a class="code hl_variable" href="#af3536735b8f4efc21e11a83b8062f5f2">res</a>.rp,</div>
+<div class="line"><span class="lineno">  583</span>                            <a class="code hl_variable" href="#af3536735b8f4efc21e11a83b8062f5f2">res</a>.ru, <a class="code hl_variable" href="#af3536735b8f4efc21e11a83b8062f5f2">res</a>.rd, <a class="code hl_variable" href="#af3536735b8f4efc21e11a83b8062f5f2">res</a>.rg, -x.cwiseProduct(s), -v.cwiseProduct(w), -<a class="code hl_variable" href="#a54987d081f0eebc91d6a0247c471d92a">tau</a> * <a class="code hl_variable" href="#a957045b153c2587ced811544b5772410">kappa</a>);</div>
+<div class="line"><span class="lineno">  584</span> </div>
+<div class="line"><span class="lineno">  585</span>        alpha         = <a class="code hl_function" href="#a16c38201e3fc179e9265a82e67510679">max_alpha</a>(x, Delta_x, v, Delta_v, s, Delta_s, w, Delta_w, <a class="code hl_variable" href="#a54987d081f0eebc91d6a0247c471d92a">tau</a>, Delta_tau, <a class="code hl_variable" href="#a957045b153c2587ced811544b5772410">kappa</a>, Delta_kappa);</div>
+<div class="line"><span class="lineno">  586</span>        oneMinusAlpha = 1.0 - alpha;</div>
+<div class="line"><span class="lineno">  587</span>        gamma         = std::max(oneMinusAlpha * oneMinusAlpha * std::min(beta, oneMinusAlpha), 0.1);</div>
+<div class="line"><span class="lineno">  588</span>        damping       = 1.0 - gamma;</div>
+<div class="line"><span class="lineno">  589</span> </div>
+<div class="line"><span class="lineno">  590</span>        <span class="comment">// Second (damped) Newton solve</span></div>
+<div class="line"><span class="lineno">  591</span>        <a class="code hl_function" href="#ac225cc4dcfe81ae25d3d59bdcb0b029f">solve_newton_system</a>(Delta_x, Delta_lambda, Delta_w, Delta_s, Delta_v, Delta_tau, Delta_kappa, <a class="code hl_variable" href="#a5c55da355d90e490435337a5427b3c0c">ls</a>, theta_vw, b,</div>
+<div class="line"><span class="lineno">  592</span>                            c, ubi, ubv, delta_x, delta_y, delta_z, delta_0, x, lambda, w, s, v, <a class="code hl_variable" href="#a54987d081f0eebc91d6a0247c471d92a">tau</a>, <a class="code hl_variable" href="#a957045b153c2587ced811544b5772410">kappa</a>,</div>
+<div class="line"><span class="lineno">  593</span>                            damping * <a class="code hl_variable" href="#af3536735b8f4efc21e11a83b8062f5f2">res</a>.rp, damping * <a class="code hl_variable" href="#af3536735b8f4efc21e11a83b8062f5f2">res</a>.ru, damping * <a class="code hl_variable" href="#af3536735b8f4efc21e11a83b8062f5f2">res</a>.rd, damping * <a class="code hl_variable" href="#af3536735b8f4efc21e11a83b8062f5f2">res</a>.rg,</div>
+<div class="line"><span class="lineno">  594</span>                            (-x.cwiseProduct(s)).array() + (gamma * mu) - Delta_x.cwiseProduct(Delta_s).array(),</div>
+<div class="line"><span class="lineno">  595</span>                            (-v.cwiseProduct(w)).array() + (gamma * mu) - Delta_v.cwiseProduct(Delta_w).array(),</div>
+<div class="line"><span class="lineno">  596</span>                            (-<a class="code hl_variable" href="#a54987d081f0eebc91d6a0247c471d92a">tau</a> * <a class="code hl_variable" href="#a957045b153c2587ced811544b5772410">kappa</a>) + (gamma * mu) - Delta_tau * Delta_kappa);</div>
+<div class="line"><span class="lineno">  597</span> </div>
+<div class="line"><span class="lineno">  598</span>        alpha = <a class="code hl_function" href="#a16c38201e3fc179e9265a82e67510679">max_alpha</a>(x, Delta_x, v, Delta_v, s, Delta_s, w, Delta_w, <a class="code hl_variable" href="#a54987d081f0eebc91d6a0247c471d92a">tau</a>, Delta_tau, <a class="code hl_variable" href="#a957045b153c2587ced811544b5772410">kappa</a>, Delta_kappa);</div>
+<div class="line"><span class="lineno">  599</span> </div>
+<div class="line"><span class="lineno">  600</span>        <span class="comment">// High-order correction steps</span></div>
+<div class="line"><span class="lineno">  601</span>        <span class="keywordflow">while</span> (ncor &lt;= 2 &amp;&amp; alpha &lt; 0.9995) {</div>
+<div class="line"><span class="lineno">  602</span>            ncor++;</div>
+<div class="line"><span class="lineno">  603</span>            alpha_ = std::min(1.0, 2.0 * alpha);</div>
+<div class="line"><span class="lineno">  604</span>            mu_l   = beta * mu * gamma;</div>
+<div class="line"><span class="lineno">  605</span>            mu_u   = gamma * mu / beta;</div>
+<div class="line"><span class="lineno">  606</span> </div>
+<div class="line"><span class="lineno">  607</span>            xs = x + alpha_ * Delta_x;</div>
+<div class="line"><span class="lineno">  608</span>            xs.array() *= (s + alpha_ * Delta_s).array();</div>
+<div class="line"><span class="lineno">  609</span>            vw = v + alpha_ * Delta_v;</div>
+<div class="line"><span class="lineno">  610</span>            vw.array() *= (w + alpha_ * Delta_w).array();</div>
+<div class="line"><span class="lineno">  611</span> </div>
+<div class="line"><span class="lineno">  612</span>            t_xs = (xs.array() &lt; mu_l).select(mu_l - xs.array(), (xs.array() &gt; mu_u).select(mu_u - xs.array(), 0.0));</div>
+<div class="line"><span class="lineno">  613</span>            t_vw = (vw.array() &lt; mu_l).select(mu_l - vw.array(), (vw.array() &gt; mu_u).select(mu_u - vw.array(), 0.0));</div>
+<div class="line"><span class="lineno">  614</span> </div>
+<div class="line"><span class="lineno">  615</span>            taukappa                    = (<a class="code hl_variable" href="#a54987d081f0eebc91d6a0247c471d92a">tau</a> + alpha_ * Delta_tau) * (<a class="code hl_variable" href="#a957045b153c2587ced811544b5772410">kappa</a> + alpha_ * Delta_kappa);</div>
+<div class="line"><span class="lineno">  616</span>            t0                          = std::clamp(taukappa, mu_l, mu_u) - taukappa;</div>
+<div class="line"><span class="lineno">  617</span>            <span class="keyword">const</span> <span class="keywordtype">double</span> sum_correction = (t_xs.sum() + t_vw.sum() + t0) / (nv + nu + 1);</div>
+<div class="line"><span class="lineno">  618</span>            t_xs.array() -= sum_correction;</div>
+<div class="line"><span class="lineno">  619</span>            t_vw.array() -= sum_correction;</div>
+<div class="line"><span class="lineno">  620</span>            t0 -= sum_correction;</div>
+<div class="line"><span class="lineno">  621</span> </div>
+<div class="line"><span class="lineno">  622</span>            <span class="comment">// Save current directions before correction</span></div>
+<div class="line"><span class="lineno">  623</span>            Delta_x_c      = Delta_x;</div>
+<div class="line"><span class="lineno">  624</span>            Delta_lambda_c = Delta_lambda;</div>
+<div class="line"><span class="lineno">  625</span>            Delta_w_c      = Delta_w;</div>
+<div class="line"><span class="lineno">  626</span>            Delta_s_c      = Delta_s;</div>
+<div class="line"><span class="lineno">  627</span>            Delta_v_c      = Delta_v;</div>
+<div class="line"><span class="lineno">  628</span>            Delta_tau_c    = Delta_tau;</div>
+<div class="line"><span class="lineno">  629</span>            Delta_kappa_c  = Delta_kappa;</div>
+<div class="line"><span class="lineno">  630</span> </div>
+<div class="line"><span class="lineno">  631</span>            <span class="comment">// Solve correction system</span></div>
+<div class="line"><span class="lineno">  632</span>            <a class="code hl_function" href="#ac225cc4dcfe81ae25d3d59bdcb0b029f">solve_newton_system</a>(Delta_x_c, Delta_lambda_c, Delta_w_c, Delta_s_c, Delta_v_c, Delta_tau_c, Delta_kappa_c,</div>
+<div class="line"><span class="lineno">  633</span>                                <a class="code hl_variable" href="#a5c55da355d90e490435337a5427b3c0c">ls</a>, theta_vw, b, c, ubi, ubv, delta_x, delta_y, delta_z, delta_0, x, lambda, w, s, v,</div>
+<div class="line"><span class="lineno">  634</span>                                <a class="code hl_variable" href="#a54987d081f0eebc91d6a0247c471d92a">tau</a>, <a class="code hl_variable" href="#a957045b153c2587ced811544b5772410">kappa</a>, zero_rp, zero_ru, zero_rd, 0, -t_xs, -t_vw, -t0);</div>
+<div class="line"><span class="lineno">  635</span> </div>
+<div class="line"><span class="lineno">  636</span>            alpha_c = <a class="code hl_function" href="#a16c38201e3fc179e9265a82e67510679">max_alpha</a>(x, Delta_x_c, v, Delta_v_c, s, Delta_s_c, w, Delta_w_c, <a class="code hl_variable" href="#a54987d081f0eebc91d6a0247c471d92a">tau</a>, Delta_tau_c, <a class="code hl_variable" href="#a957045b153c2587ced811544b5772410">kappa</a>,</div>
+<div class="line"><span class="lineno">  637</span>                                Delta_kappa_c);</div>
+<div class="line"><span class="lineno">  638</span>            <span class="keywordflow">if</span> (alpha_c &gt; alpha) {</div>
+<div class="line"><span class="lineno">  639</span>                Delta_x      = Delta_x_c;</div>
+<div class="line"><span class="lineno">  640</span>                Delta_lambda = Delta_lambda_c;</div>
+<div class="line"><span class="lineno">  641</span>                Delta_w      = Delta_w_c;</div>
+<div class="line"><span class="lineno">  642</span>                Delta_s      = Delta_s_c;</div>
+<div class="line"><span class="lineno">  643</span>                Delta_v      = Delta_v_c;</div>
+<div class="line"><span class="lineno">  644</span>                Delta_tau    = Delta_tau_c;</div>
+<div class="line"><span class="lineno">  645</span>                Delta_kappa  = Delta_kappa_c;</div>
+<div class="line"><span class="lineno">  646</span>                alpha        = alpha_c;</div>
+<div class="line"><span class="lineno">  647</span>            }</div>
+<div class="line"><span class="lineno">  648</span>            <span class="keywordflow">if</span> (alpha_c &lt; 1.1 * alpha_) <span class="keywordflow">break</span>;</div>
+<div class="line"><span class="lineno">  649</span>        }</div>
+<div class="line"><span class="lineno">  650</span> </div>
+<div class="line"><span class="lineno">  651</span>        <span class="comment">// Final update step (with slight back-off)</span></div>
+<div class="line"><span class="lineno">  652</span>        alpha *= 0.9995;</div>
+<div class="line"><span class="lineno">  653</span>        x += alpha * Delta_x;</div>
+<div class="line"><span class="lineno">  654</span>        lambda += alpha * Delta_lambda;</div>
+<div class="line"><span class="lineno">  655</span>        s += alpha * Delta_s;</div>
+<div class="line"><span class="lineno">  656</span>        v += alpha * Delta_v;</div>
+<div class="line"><span class="lineno">  657</span>        w += alpha * Delta_w;</div>
+<div class="line"><span class="lineno">  658</span>        <a class="code hl_variable" href="#a54987d081f0eebc91d6a0247c471d92a">tau</a> += alpha * Delta_tau;</div>
+<div class="line"><span class="lineno">  659</span>        <a class="code hl_variable" href="#a957045b153c2587ced811544b5772410">kappa</a> += alpha * Delta_kappa;</div>
+<div class="line"><span class="lineno">  660</span>    }</div>
+<div class="line"><span class="lineno">  661</span> </div>
+<div class="line"><span class="lineno">  662</span>    <span class="comment">// Final solution recovery</span></div>
+<div class="line"><span class="lineno">  663</span>    <span class="keyword">const</span> <span class="keywordtype">double</span>    inv_tau = 1.0 / <a class="code hl_variable" href="#a54987d081f0eebc91d6a0247c471d92a">tau</a>;</div>
+<div class="line"><span class="lineno">  664</span>    Eigen::VectorXd original_x(As.cols());</div>
+<div class="line"><span class="lineno">  665</span>    <span class="keywordtype">int</span>             free_var = 0;</div>
+<div class="line"><span class="lineno">  666</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> j = 0; j &lt; lo.size(); ++j) {</div>
+<div class="line"><span class="lineno">  667</span>        <span class="keyword">const</span> <span class="keywordtype">double</span> l = lo[j];</div>
+<div class="line"><span class="lineno">  668</span>        <span class="keyword">const</span> <span class="keywordtype">double</span> h = hi[j];</div>
+<div class="line"><span class="lineno">  669</span>        <span class="keywordflow">if</span> (l == -<a class="code hl_variable" href="#a981ecfeb17af8eebcb536c8ec5075e28">infty</a> &amp;&amp; h == <a class="code hl_variable" href="#a981ecfeb17af8eebcb536c8ec5075e28">infty</a>) {</div>
+<div class="line"><span class="lineno">  670</span>            original_x[j] = (x[j + free_var] - x[nv_orig + free_var]) * inv_tau;</div>
+<div class="line"><span class="lineno">  671</span>            ++free_var;</div>
+<div class="line"><span class="lineno">  672</span>        } <span class="keywordflow">else</span> <span class="keywordflow">if</span> (std::isfinite(l) &amp;&amp; std::isfinite(h)) {</div>
+<div class="line"><span class="lineno">  673</span>            original_x[j] = l + x[j] * inv_tau;</div>
+<div class="line"><span class="lineno">  674</span>        } <span class="keywordflow">else</span> <span class="keywordflow">if</span> (l == -<a class="code hl_variable" href="#a981ecfeb17af8eebcb536c8ec5075e28">infty</a> &amp;&amp; std::isfinite(h)) {</div>
+<div class="line"><span class="lineno">  675</span>            original_x[j] = h - x[j] * inv_tau;</div>
+<div class="line"><span class="lineno">  676</span>        } <span class="keywordflow">else</span> <span class="keywordflow">if</span> (std::isfinite(l) &amp;&amp; h == <a class="code hl_variable" href="#a981ecfeb17af8eebcb536c8ec5075e28">infty</a>) {</div>
+<div class="line"><span class="lineno">  677</span>            original_x[j] = l + x[j] * inv_tau;</div>
+<div class="line"><span class="lineno">  678</span>        }</div>
+<div class="line"><span class="lineno">  679</span>    }</div>
+<div class="line"><span class="lineno">  680</span> </div>
+<div class="line"><span class="lineno">  681</span>    <a class="code hl_variable" href="#a46689efc5c499d0e9b53b661e0a5405e">objVal</a> = cs.dot(original_x);</div>
+<div class="line"><span class="lineno">  682</span>    lambda *= inv_tau;</div>
+<div class="line"><span class="lineno">  683</span>    <a class="code hl_variable" href="#a8b689456be5e57ddcadae9254dc35c4a">dual_vals</a>.assign(lambda.data(), lambda.data() + lambda.size());</div>
+<div class="line"><span class="lineno">  684</span>    <a class="code hl_variable" href="#a77a138d4376f21d730e110d0547af83b">primal_vals</a>.assign(original_x.data(), original_x.data() + original_x.size());</div>
+<div class="line"><span class="lineno">  685</span>}</div>
 <div class="ttc" id="aclassIPSolver_html_a10d79c906c9f170d975b9404e793a14e"><div class="ttname"><a href="#a10d79c906c9f170d975b9404e793a14e">IPSolver::solve_augsys</a></div><div class="ttdeci">void solve_augsys(Eigen::VectorXd &amp;delta_x, Eigen::VectorXd &amp;delta_y, Eigen::VectorXd &amp;delta_z, SparseSolver &amp;ls, const Eigen::VectorXd &amp;theta_vw, const Eigen::VectorXi &amp;ubi, const Eigen::VectorXd &amp;xi_p, const Eigen::VectorXd &amp;xi_d, const Eigen::VectorXd &amp;xi_u)</div><div class="ttdef"><b>Definition</b> <a href="IPSolver_8cpp_source.html#l00218">IPSolver.cpp:218</a></div></div>
 <div class="ttc" id="aclassIPSolver_html_a16c38201e3fc179e9265a82e67510679"><div class="ttname"><a href="#a16c38201e3fc179e9265a82e67510679">IPSolver::max_alpha</a></div><div class="ttdeci">double max_alpha(const Eigen::VectorXd &amp;x, const Eigen::VectorXd &amp;dx, const Eigen::VectorXd &amp;v, const Eigen::VectorXd &amp;dv, const Eigen::VectorXd &amp;s, const Eigen::VectorXd &amp;ds, const Eigen::VectorXd &amp;w, const Eigen::VectorXd &amp;dw, double tau, double dtau, double kappa, double dkappa)</div><div class="ttdoc">Computes the maximum step size (alpha) that can be taken along the direction of the search vectors.</div><div class="ttdef"><b>Definition</b> <a href="IPSolver_8cpp_source.html#l00354">IPSolver.cpp:354</a></div></div>
 <div class="ttc" id="aclassIPSolver_html_a1f22b1985e02e839ff3b2791a0389865"><div class="ttname"><a href="#a1f22b1985e02e839ff3b2791a0389865">IPSolver::update_residuals</a></div><div class="ttdeci">void update_residuals(Residuals &amp;res, const Eigen::VectorXd &amp;x, const Eigen::VectorXd &amp;lambda, const Eigen::VectorXd &amp;s, const Eigen::VectorXd &amp;v, const Eigen::VectorXd &amp;w, const Eigen::SparseMatrix&lt; double &gt; &amp;A, const Eigen::VectorXd &amp;b, const Eigen::VectorXd &amp;c, const Eigen::VectorXd &amp;ubv, const Eigen::VectorXi &amp;ubi, double tau, double kappa)</div><div class="ttdoc">Updates the residuals for the interior point method solver.</div><div class="ttdef"><b>Definition</b> <a href="IPSolver_8cpp_source.html#l00146">IPSolver.cpp:146</a></div></div>
-<div class="ttc" id="aclassIPSolver_html_a22f7028c11d89b7986357f004f269924"><div class="ttname"><a href="#a22f7028c11d89b7986357f004f269924">IPSolver::update_linear_solver</a></div><div class="ttdeci">int update_linear_solver(SparseSolver &amp;ls, const Eigen::VectorXd &amp;theta, const Eigen::VectorXd &amp;regP, const Eigen::VectorXd &amp;regD)</div><div class="ttdef"><b>Definition</b> <a href="IPSolver_8cpp_source.html#l00774">IPSolver.cpp:774</a></div></div>
+<div class="ttc" id="aclassIPSolver_html_a22f7028c11d89b7986357f004f269924"><div class="ttname"><a href="#a22f7028c11d89b7986357f004f269924">IPSolver::update_linear_solver</a></div><div class="ttdeci">int update_linear_solver(SparseSolver &amp;ls, const Eigen::VectorXd &amp;theta, const Eigen::VectorXd &amp;regP, const Eigen::VectorXd &amp;regD)</div><div class="ttdef"><b>Definition</b> <a href="IPSolver_8cpp_source.html#l00802">IPSolver.cpp:802</a></div></div>
 <div class="ttc" id="aclassIPSolver_html_a2651221065511beedd53613296aaddcb"><div class="ttname"><a href="#a2651221065511beedd53613296aaddcb">IPSolver::convert_to_standard_form</a></div><div class="ttdeci">void convert_to_standard_form(const Eigen::SparseMatrix&lt; double &gt; &amp;A, const Eigen::VectorXd &amp;b, const Eigen::VectorXd &amp;c, const Eigen::VectorXd &amp;lb, const Eigen::VectorXd &amp;ub, const Eigen::VectorXd &amp;sense, Eigen::SparseMatrix&lt; double &gt; &amp;As, Eigen::VectorXd &amp;bs, Eigen::VectorXd &amp;cs)</div><div class="ttdoc">Converts the given linear programming problem to its standard form.</div><div class="ttdef"><b>Definition</b> <a href="IPSolver_8cpp_source.html#l00045">IPSolver.cpp:45</a></div></div>
-<div class="ttc" id="aclassIPSolver_html_a2f6983d42c0a0af7344a9c7f9b79cdfe"><div class="ttname"><a href="#a2f6983d42c0a0af7344a9c7f9b79cdfe">IPSolver::convertToOptimizationData</a></div><div class="ttdeci">OptimizationData convertToOptimizationData(const ModelData &amp;modelData)</div><div class="ttdef"><b>Definition</b> <a href="IPSolver_8cpp_source.html#l00718">IPSolver.cpp:718</a></div></div>
+<div class="ttc" id="aclassIPSolver_html_a2f6983d42c0a0af7344a9c7f9b79cdfe"><div class="ttname"><a href="#a2f6983d42c0a0af7344a9c7f9b79cdfe">IPSolver::convertToOptimizationData</a></div><div class="ttdeci">OptimizationData convertToOptimizationData(const ModelData &amp;modelData)</div><div class="ttdef"><b>Definition</b> <a href="IPSolver_8cpp_source.html#l00746">IPSolver.cpp:746</a></div></div>
 <div class="ttc" id="aclassIPSolver_html_a4c6e2a7694ec8befa9470e1aa4acf438"><div class="ttname"><a href="#a4c6e2a7694ec8befa9470e1aa4acf438">IPSolver::n_slacks</a></div><div class="ttdeci">int n_slacks</div><div class="ttdef"><b>Definition</b> <a href="IPSolver_8h_source.html#l00190">IPSolver.h:190</a></div></div>
 <div class="ttc" id="aclassIPSolver_html_a5c55da355d90e490435337a5427b3c0c"><div class="ttname"><a href="#a5c55da355d90e490435337a5427b3c0c">IPSolver::ls</a></div><div class="ttdeci">SparseSolver ls</div><div class="ttdef"><b>Definition</b> <a href="IPSolver_8h_source.html#l00176">IPSolver.h:176</a></div></div>
 <div class="ttc" id="aclassIPSolver_html_a6b9b941d7216d239af63eede001ab647"><div class="ttname"><a href="#a6b9b941d7216d239af63eede001ab647">IPSolver::warm_start</a></div><div class="ttdeci">bool warm_start</div><div class="ttdef"><b>Definition</b> <a href="IPSolver_8h_source.html#l00191">IPSolver.h:191</a></div></div>
-<div class="ttc" id="aclassIPSolver_html_a78683bca75935ff72c274f0394d2df48"><div class="ttname"><a href="#a78683bca75935ff72c274f0394d2df48">IPSolver::start_linear_solver</a></div><div class="ttdeci">void start_linear_solver(SparseSolver &amp;ls, const Eigen::SparseMatrix&lt; double &gt; &amp;A)</div><div class="ttdef"><b>Definition</b> <a href="IPSolver_8cpp_source.html#l00796">IPSolver.cpp:796</a></div></div>
+<div class="ttc" id="aclassIPSolver_html_a78683bca75935ff72c274f0394d2df48"><div class="ttname"><a href="#a78683bca75935ff72c274f0394d2df48">IPSolver::start_linear_solver</a></div><div class="ttdeci">void start_linear_solver(SparseSolver &amp;ls, const Eigen::SparseMatrix&lt; double &gt; &amp;A)</div><div class="ttdef"><b>Definition</b> <a href="IPSolver_8cpp_source.html#l00824">IPSolver.cpp:824</a></div></div>
 <div class="ttc" id="aclassIPSolver_html_ac1a5e7d41b0f72ce616f99b03d4785a5"><div class="ttname"><a href="#ac1a5e7d41b0f72ce616f99b03d4785a5">IPSolver::tol</a></div><div class="ttdeci">double tol</div><div class="ttdef"><b>Definition</b> <a href="IPSolver_8h_source.html#l00177">IPSolver.h:177</a></div></div>
 <div class="ttc" id="aclassIPSolver_html_ac225cc4dcfe81ae25d3d59bdcb0b029f"><div class="ttname"><a href="#ac225cc4dcfe81ae25d3d59bdcb0b029f">IPSolver::solve_newton_system</a></div><div class="ttdeci">void solve_newton_system(Eigen::VectorXd &amp;Delta_x, Eigen::VectorXd &amp;Delta_lambda, Eigen::VectorXd &amp;Delta_w, Eigen::VectorXd &amp;Delta_s, Eigen::VectorXd &amp;Delta_v, double &amp;Delta_tau, double &amp;Delta_kappa, SparseSolver &amp;ls, const Eigen::VectorXd &amp;theta_vw, const Eigen::VectorXd &amp;b, const Eigen::VectorXd &amp;c, const Eigen::VectorXi &amp;ubi, const Eigen::VectorXd &amp;ubv, const Eigen::VectorXd &amp;delta_x, const Eigen::VectorXd &amp;delta_y, const Eigen::VectorXd &amp;delta_w, double delta_0, const Eigen::VectorXd &amp;iter_x, const Eigen::VectorXd &amp;iter_lambda, const Eigen::VectorXd &amp;iter_w, const Eigen::VectorXd &amp;iter_s, const Eigen::VectorXd &amp;iter_v, double iter_tau, double iter_kappa, const Eigen::VectorXd &amp;xi_p, const Eigen::VectorXd &amp;xi_u, const Eigen::VectorXd &amp;xi_d, double xi_g, const Eigen::VectorXd &amp;xi_xs, const Eigen::VectorXd &amp;xi_vw, double xi_tau_kappa)</div><div class="ttdoc">Solves the Newton system for the interior point method.</div><div class="ttdef"><b>Definition</b> <a href="IPSolver_8cpp_source.html#l00267">IPSolver.cpp:267</a></div></div>
 <div class="ttc" id="aclassIPSolver_html_ad0c2594ea4f46d9be99f18a27b34a7d8"><div class="ttname"><a href="#ad0c2594ea4f46d9be99f18a27b34a7d8">IPSolver::max_iter</a></div><div class="ttdeci">int max_iter</div><div class="ttdef"><b>Definition</b> <a href="IPSolver_8h_source.html#l00178">IPSolver.h:178</a></div></div>
@@ -1638,52 +1666,52 @@ Here is the call graph for this function:</div>
 </div><div class="memdoc">
 <p>Starts the linear solver by initializing the necessary data structures and performing factorization. </p>
 
-<p class="definition">Definition at line <a class="el" href="IPSolver_8cpp_source.html#l00796">796</a> of file <a class="el" href="IPSolver_8cpp_source.html">IPSolver.cpp</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  796</span>                                                                                       {</div>
-<div class="line"><span class="lineno">  797</span>    <a class="code hl_variable" href="#a5c55da355d90e490435337a5427b3c0c">ls</a>.A = A;</div>
-<div class="line"><span class="lineno">  798</span>    <a class="code hl_variable" href="#a5c55da355d90e490435337a5427b3c0c">ls</a>.m = A.rows();</div>
-<div class="line"><span class="lineno">  799</span>    <a class="code hl_variable" href="#a5c55da355d90e490435337a5427b3c0c">ls</a>.n = A.cols();</div>
-<div class="line"><span class="lineno">  800</span>    <span class="comment">// print ls.A size</span></div>
-<div class="line"><span class="lineno">  801</span> </div>
-<div class="line"><span class="lineno">  802</span>    <a class="code hl_variable" href="#a5c55da355d90e490435337a5427b3c0c">ls</a>.theta = Eigen::VectorXd::Ones(<a class="code hl_variable" href="#a5c55da355d90e490435337a5427b3c0c">ls</a>.n);</div>
-<div class="line"><span class="lineno">  803</span>    <a class="code hl_variable" href="#a5c55da355d90e490435337a5427b3c0c">ls</a>.regP  = Eigen::VectorXd::Ones(<a class="code hl_variable" href="#a5c55da355d90e490435337a5427b3c0c">ls</a>.n);</div>
-<div class="line"><span class="lineno">  804</span>    <a class="code hl_variable" href="#a5c55da355d90e490435337a5427b3c0c">ls</a>.regD  = Eigen::VectorXd::Ones(<a class="code hl_variable" href="#a5c55da355d90e490435337a5427b3c0c">ls</a>.m);</div>
-<div class="line"><span class="lineno">  805</span> </div>
-<div class="line"><span class="lineno">  806</span>    Eigen::SparseMatrix&lt;double&gt; topRight    = <a class="code hl_variable" href="#a5c55da355d90e490435337a5427b3c0c">ls</a>.A.transpose();</div>
-<div class="line"><span class="lineno">  807</span>    Eigen::SparseMatrix&lt;double&gt; bottomLeft  = <a class="code hl_variable" href="#a5c55da355d90e490435337a5427b3c0c">ls</a>.A;</div>
-<div class="line"><span class="lineno">  808</span>    Eigen::SparseMatrix&lt;double&gt; topLeft     = <a class="code hl_function" href="#ad6ab576c321bd6a0506d9c5bf8362f1a">convertToSparseDiagonal</a>(-<a class="code hl_variable" href="#a5c55da355d90e490435337a5427b3c0c">ls</a>.theta - <a class="code hl_variable" href="#a5c55da355d90e490435337a5427b3c0c">ls</a>.regP);</div>
-<div class="line"><span class="lineno">  809</span>    Eigen::SparseMatrix&lt;double&gt; bottomRight = <a class="code hl_function" href="#ad6ab576c321bd6a0506d9c5bf8362f1a">convertToSparseDiagonal</a>(<a class="code hl_variable" href="#a5c55da355d90e490435337a5427b3c0c">ls</a>.regD);</div>
-<div class="line"><span class="lineno">  810</span> </div>
-<div class="line"><span class="lineno">  811</span>    <span class="comment">// S_ is known, reserve space for it</span></div>
-<div class="line"><span class="lineno">  812</span>    Eigen::SparseMatrix&lt;double&gt; S_(<a class="code hl_variable" href="#a5c55da355d90e490435337a5427b3c0c">ls</a>.n + <a class="code hl_variable" href="#a5c55da355d90e490435337a5427b3c0c">ls</a>.m, <a class="code hl_variable" href="#a5c55da355d90e490435337a5427b3c0c">ls</a>.n + <a class="code hl_variable" href="#a5c55da355d90e490435337a5427b3c0c">ls</a>.m);</div>
-<div class="line"><span class="lineno">  813</span> </div>
-<div class="line"><span class="lineno">  814</span>    <span class="comment">// Reserving space for tripletList</span></div>
-<div class="line"><span class="lineno">  815</span>    <span class="keywordtype">int</span> estimated_nonzeros = topLeft.nonZeros() + 2 * topRight.nonZeros() + bottomRight.nonZeros();</div>
-<div class="line"><span class="lineno">  816</span>    std::vector&lt;Eigen::Triplet&lt;double&gt;&gt; tripletList;</div>
-<div class="line"><span class="lineno">  817</span>    tripletList.reserve(estimated_nonzeros);</div>
-<div class="line"><span class="lineno">  818</span> </div>
-<div class="line"><span class="lineno">  819</span>    <span class="comment">// Insert topLeft, topRight, bottomLeft, bottomRight matrices</span></div>
-<div class="line"><span class="lineno">  820</span>    <span class="keyword">auto</span> insertBlock = [&amp;](<span class="keyword">const</span> Eigen::SparseMatrix&lt;double&gt; &amp;block, <span class="keywordtype">int</span> startRow, <span class="keywordtype">int</span> startCol) {</div>
-<div class="line"><span class="lineno">  821</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> k = 0; k &lt; block.outerSize(); ++k) {</div>
-<div class="line"><span class="lineno">  822</span>            <span class="keywordflow">for</span> (Eigen::SparseMatrix&lt;double&gt;::InnerIterator it(block, k); it; ++it) {</div>
-<div class="line"><span class="lineno">  823</span>                tripletList.emplace_back(it.row() + startRow, it.col() + startCol, it.value());</div>
-<div class="line"><span class="lineno">  824</span>            }</div>
-<div class="line"><span class="lineno">  825</span>        }</div>
-<div class="line"><span class="lineno">  826</span>    };</div>
-<div class="line"><span class="lineno">  827</span> </div>
-<div class="line"><span class="lineno">  828</span>    insertBlock(topLeft, 0, 0);</div>
-<div class="line"><span class="lineno">  829</span>    insertBlock(topRight, 0, <a class="code hl_variable" href="#a5c55da355d90e490435337a5427b3c0c">ls</a>.n);</div>
-<div class="line"><span class="lineno">  830</span>    insertBlock(bottomLeft, <a class="code hl_variable" href="#a5c55da355d90e490435337a5427b3c0c">ls</a>.n, 0);</div>
-<div class="line"><span class="lineno">  831</span>    insertBlock(bottomRight, <a class="code hl_variable" href="#a5c55da355d90e490435337a5427b3c0c">ls</a>.n, <a class="code hl_variable" href="#a5c55da355d90e490435337a5427b3c0c">ls</a>.n);</div>
-<div class="line"><span class="lineno">  832</span> </div>
-<div class="line"><span class="lineno">  833</span>    <span class="comment">// Finally, set the values from the triplets</span></div>
-<div class="line"><span class="lineno">  834</span>    S_.setFromTriplets(tripletList.begin(), tripletList.end());</div>
-<div class="line"><span class="lineno">  835</span>    <span class="comment">// S_.makeCompressed();</span></div>
-<div class="line"><span class="lineno">  836</span> </div>
-<div class="line"><span class="lineno">  837</span>    <a class="code hl_variable" href="#a5c55da355d90e490435337a5427b3c0c">ls</a>.S = S_;</div>
-<div class="line"><span class="lineno">  838</span>    <span class="comment">// Factorize</span></div>
-<div class="line"><span class="lineno">  839</span>    <a class="code hl_variable" href="#a5c55da355d90e490435337a5427b3c0c">ls</a>.factorizeMatrix(<a class="code hl_variable" href="#a5c55da355d90e490435337a5427b3c0c">ls</a>.S);</div>
-<div class="line"><span class="lineno">  840</span>}</div>
+<p class="definition">Definition at line <a class="el" href="IPSolver_8cpp_source.html#l00824">824</a> of file <a class="el" href="IPSolver_8cpp_source.html">IPSolver.cpp</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  824</span>                                                                                       {</div>
+<div class="line"><span class="lineno">  825</span>    <a class="code hl_variable" href="#a5c55da355d90e490435337a5427b3c0c">ls</a>.A = A;</div>
+<div class="line"><span class="lineno">  826</span>    <a class="code hl_variable" href="#a5c55da355d90e490435337a5427b3c0c">ls</a>.m = A.rows();</div>
+<div class="line"><span class="lineno">  827</span>    <a class="code hl_variable" href="#a5c55da355d90e490435337a5427b3c0c">ls</a>.n = A.cols();</div>
+<div class="line"><span class="lineno">  828</span>    <span class="comment">// print ls.A size</span></div>
+<div class="line"><span class="lineno">  829</span> </div>
+<div class="line"><span class="lineno">  830</span>    <a class="code hl_variable" href="#a5c55da355d90e490435337a5427b3c0c">ls</a>.theta = Eigen::VectorXd::Ones(<a class="code hl_variable" href="#a5c55da355d90e490435337a5427b3c0c">ls</a>.n);</div>
+<div class="line"><span class="lineno">  831</span>    <a class="code hl_variable" href="#a5c55da355d90e490435337a5427b3c0c">ls</a>.regP  = Eigen::VectorXd::Ones(<a class="code hl_variable" href="#a5c55da355d90e490435337a5427b3c0c">ls</a>.n);</div>
+<div class="line"><span class="lineno">  832</span>    <a class="code hl_variable" href="#a5c55da355d90e490435337a5427b3c0c">ls</a>.regD  = Eigen::VectorXd::Ones(<a class="code hl_variable" href="#a5c55da355d90e490435337a5427b3c0c">ls</a>.m);</div>
+<div class="line"><span class="lineno">  833</span> </div>
+<div class="line"><span class="lineno">  834</span>    Eigen::SparseMatrix&lt;double&gt; topRight    = <a class="code hl_variable" href="#a5c55da355d90e490435337a5427b3c0c">ls</a>.A.transpose();</div>
+<div class="line"><span class="lineno">  835</span>    Eigen::SparseMatrix&lt;double&gt; bottomLeft  = <a class="code hl_variable" href="#a5c55da355d90e490435337a5427b3c0c">ls</a>.A;</div>
+<div class="line"><span class="lineno">  836</span>    Eigen::SparseMatrix&lt;double&gt; topLeft     = <a class="code hl_function" href="#ad6ab576c321bd6a0506d9c5bf8362f1a">convertToSparseDiagonal</a>(-<a class="code hl_variable" href="#a5c55da355d90e490435337a5427b3c0c">ls</a>.theta - <a class="code hl_variable" href="#a5c55da355d90e490435337a5427b3c0c">ls</a>.regP);</div>
+<div class="line"><span class="lineno">  837</span>    Eigen::SparseMatrix&lt;double&gt; bottomRight = <a class="code hl_function" href="#ad6ab576c321bd6a0506d9c5bf8362f1a">convertToSparseDiagonal</a>(<a class="code hl_variable" href="#a5c55da355d90e490435337a5427b3c0c">ls</a>.regD);</div>
+<div class="line"><span class="lineno">  838</span> </div>
+<div class="line"><span class="lineno">  839</span>    <span class="comment">// S_ is known, reserve space for it</span></div>
+<div class="line"><span class="lineno">  840</span>    Eigen::SparseMatrix&lt;double&gt; S_(<a class="code hl_variable" href="#a5c55da355d90e490435337a5427b3c0c">ls</a>.n + <a class="code hl_variable" href="#a5c55da355d90e490435337a5427b3c0c">ls</a>.m, <a class="code hl_variable" href="#a5c55da355d90e490435337a5427b3c0c">ls</a>.n + <a class="code hl_variable" href="#a5c55da355d90e490435337a5427b3c0c">ls</a>.m);</div>
+<div class="line"><span class="lineno">  841</span> </div>
+<div class="line"><span class="lineno">  842</span>    <span class="comment">// Reserving space for tripletList</span></div>
+<div class="line"><span class="lineno">  843</span>    <span class="keywordtype">int</span> estimated_nonzeros = topLeft.nonZeros() + 2 * topRight.nonZeros() + bottomRight.nonZeros();</div>
+<div class="line"><span class="lineno">  844</span>    std::vector&lt;Eigen::Triplet&lt;double&gt;&gt; tripletList;</div>
+<div class="line"><span class="lineno">  845</span>    tripletList.reserve(estimated_nonzeros);</div>
+<div class="line"><span class="lineno">  846</span> </div>
+<div class="line"><span class="lineno">  847</span>    <span class="comment">// Insert topLeft, topRight, bottomLeft, bottomRight matrices</span></div>
+<div class="line"><span class="lineno">  848</span>    <span class="keyword">auto</span> insertBlock = [&amp;](<span class="keyword">const</span> Eigen::SparseMatrix&lt;double&gt; &amp;block, <span class="keywordtype">int</span> startRow, <span class="keywordtype">int</span> startCol) {</div>
+<div class="line"><span class="lineno">  849</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> k = 0; k &lt; block.outerSize(); ++k) {</div>
+<div class="line"><span class="lineno">  850</span>            <span class="keywordflow">for</span> (Eigen::SparseMatrix&lt;double&gt;::InnerIterator it(block, k); it; ++it) {</div>
+<div class="line"><span class="lineno">  851</span>                tripletList.emplace_back(it.row() + startRow, it.col() + startCol, it.value());</div>
+<div class="line"><span class="lineno">  852</span>            }</div>
+<div class="line"><span class="lineno">  853</span>        }</div>
+<div class="line"><span class="lineno">  854</span>    };</div>
+<div class="line"><span class="lineno">  855</span> </div>
+<div class="line"><span class="lineno">  856</span>    insertBlock(topLeft, 0, 0);</div>
+<div class="line"><span class="lineno">  857</span>    insertBlock(topRight, 0, <a class="code hl_variable" href="#a5c55da355d90e490435337a5427b3c0c">ls</a>.n);</div>
+<div class="line"><span class="lineno">  858</span>    insertBlock(bottomLeft, <a class="code hl_variable" href="#a5c55da355d90e490435337a5427b3c0c">ls</a>.n, 0);</div>
+<div class="line"><span class="lineno">  859</span>    insertBlock(bottomRight, <a class="code hl_variable" href="#a5c55da355d90e490435337a5427b3c0c">ls</a>.n, <a class="code hl_variable" href="#a5c55da355d90e490435337a5427b3c0c">ls</a>.n);</div>
+<div class="line"><span class="lineno">  860</span> </div>
+<div class="line"><span class="lineno">  861</span>    <span class="comment">// Finally, set the values from the triplets</span></div>
+<div class="line"><span class="lineno">  862</span>    S_.setFromTriplets(tripletList.begin(), tripletList.end());</div>
+<div class="line"><span class="lineno">  863</span>    <span class="comment">// S_.makeCompressed();</span></div>
+<div class="line"><span class="lineno">  864</span> </div>
+<div class="line"><span class="lineno">  865</span>    <a class="code hl_variable" href="#a5c55da355d90e490435337a5427b3c0c">ls</a>.S = S_;</div>
+<div class="line"><span class="lineno">  866</span>    <span class="comment">// Factorize</span></div>
+<div class="line"><span class="lineno">  867</span>    <a class="code hl_variable" href="#a5c55da355d90e490435337a5427b3c0c">ls</a>.factorizeMatrix(<a class="code hl_variable" href="#a5c55da355d90e490435337a5427b3c0c">ls</a>.S);</div>
+<div class="line"><span class="lineno">  868</span>}</div>
 <div class="ttc" id="aclassIPSolver_html_ad6ab576c321bd6a0506d9c5bf8362f1a"><div class="ttname"><a href="#ad6ab576c321bd6a0506d9c5bf8362f1a">IPSolver::convertToSparseDiagonal</a></div><div class="ttdeci">Eigen::SparseMatrix&lt; double &gt; convertToSparseDiagonal(const Eigen::VectorXd &amp;vec)</div><div class="ttdoc">Converts a dense vector to a sparse diagonal matrix.</div><div class="ttdef"><b>Definition</b> <a href="IPSolver_8cpp_source.html#l00030">IPSolver.cpp:30</a></div></div>
 </div><!-- fragment --><div class="dynheader">
 Here is the call graph for this function:</div>
@@ -1753,22 +1781,22 @@ Here is the call graph for this function:</div>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="IPSolver_8cpp_source.html#l00774">774</a> of file <a class="el" href="IPSolver_8cpp_source.html">IPSolver.cpp</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  775</span>                                                              {</div>
-<div class="line"><span class="lineno">  776</span>    <span class="comment">// Update internal data</span></div>
-<div class="line"><span class="lineno">  777</span>    <a class="code hl_variable" href="#a5c55da355d90e490435337a5427b3c0c">ls</a>.theta = theta;</div>
-<div class="line"><span class="lineno">  778</span>    <a class="code hl_variable" href="#a5c55da355d90e490435337a5427b3c0c">ls</a>.regP  = regP;</div>
-<div class="line"><span class="lineno">  779</span>    <a class="code hl_variable" href="#a5c55da355d90e490435337a5427b3c0c">ls</a>.regD  = regD;</div>
-<div class="line"><span class="lineno">  780</span> </div>
-<div class="line"><span class="lineno">  781</span>    <span class="comment">// Update S. S is stored as upper-triangular and only its diagonal changes.</span></div>
-<div class="line"><span class="lineno">  782</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> i = 0; i &lt; <a class="code hl_variable" href="#a5c55da355d90e490435337a5427b3c0c">ls</a>.n; ++i) { <a class="code hl_variable" href="#a5c55da355d90e490435337a5427b3c0c">ls</a>.S.coeffRef(i, i) = -theta[i] - regP[i]; }</div>
-<div class="line"><span class="lineno">  783</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> i = 0; i &lt; <a class="code hl_variable" href="#a5c55da355d90e490435337a5427b3c0c">ls</a>.m; ++i) { <a class="code hl_variable" href="#a5c55da355d90e490435337a5427b3c0c">ls</a>.S.coeffRef(<a class="code hl_variable" href="#a5c55da355d90e490435337a5427b3c0c">ls</a>.n + i, <a class="code hl_variable" href="#a5c55da355d90e490435337a5427b3c0c">ls</a>.n + i) = regD[i]; }</div>
-<div class="line"><span class="lineno">  784</span> </div>
-<div class="line"><span class="lineno">  785</span>    <span class="comment">// Refactorize</span></div>
-<div class="line"><span class="lineno">  786</span>    <a class="code hl_variable" href="#a5c55da355d90e490435337a5427b3c0c">ls</a>.factorizeMatrix(<a class="code hl_variable" href="#a5c55da355d90e490435337a5427b3c0c">ls</a>.S);</div>
-<div class="line"><span class="lineno">  787</span> </div>
-<div class="line"><span class="lineno">  788</span>    <span class="keywordflow">return</span> <a class="code hl_variable" href="#a5c55da355d90e490435337a5427b3c0c">ls</a>.info();</div>
-<div class="line"><span class="lineno">  789</span>}</div>
+<p class="definition">Definition at line <a class="el" href="IPSolver_8cpp_source.html#l00802">802</a> of file <a class="el" href="IPSolver_8cpp_source.html">IPSolver.cpp</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  803</span>                                                              {</div>
+<div class="line"><span class="lineno">  804</span>    <span class="comment">// Update internal data</span></div>
+<div class="line"><span class="lineno">  805</span>    <a class="code hl_variable" href="#a5c55da355d90e490435337a5427b3c0c">ls</a>.theta = theta;</div>
+<div class="line"><span class="lineno">  806</span>    <a class="code hl_variable" href="#a5c55da355d90e490435337a5427b3c0c">ls</a>.regP  = regP;</div>
+<div class="line"><span class="lineno">  807</span>    <a class="code hl_variable" href="#a5c55da355d90e490435337a5427b3c0c">ls</a>.regD  = regD;</div>
+<div class="line"><span class="lineno">  808</span> </div>
+<div class="line"><span class="lineno">  809</span>    <span class="comment">// Update S. S is stored as upper-triangular and only its diagonal changes.</span></div>
+<div class="line"><span class="lineno">  810</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> i = 0; i &lt; <a class="code hl_variable" href="#a5c55da355d90e490435337a5427b3c0c">ls</a>.n; ++i) { <a class="code hl_variable" href="#a5c55da355d90e490435337a5427b3c0c">ls</a>.S.coeffRef(i, i) = -theta[i] - regP[i]; }</div>
+<div class="line"><span class="lineno">  811</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> i = 0; i &lt; <a class="code hl_variable" href="#a5c55da355d90e490435337a5427b3c0c">ls</a>.m; ++i) { <a class="code hl_variable" href="#a5c55da355d90e490435337a5427b3c0c">ls</a>.S.coeffRef(<a class="code hl_variable" href="#a5c55da355d90e490435337a5427b3c0c">ls</a>.n + i, <a class="code hl_variable" href="#a5c55da355d90e490435337a5427b3c0c">ls</a>.n + i) = regD[i]; }</div>
+<div class="line"><span class="lineno">  812</span> </div>
+<div class="line"><span class="lineno">  813</span>    <span class="comment">// Refactorize</span></div>
+<div class="line"><span class="lineno">  814</span>    <a class="code hl_variable" href="#a5c55da355d90e490435337a5427b3c0c">ls</a>.factorizeMatrix(<a class="code hl_variable" href="#a5c55da355d90e490435337a5427b3c0c">ls</a>.S);</div>
+<div class="line"><span class="lineno">  815</span> </div>
+<div class="line"><span class="lineno">  816</span>    <span class="keywordflow">return</span> <a class="code hl_variable" href="#a5c55da355d90e490435337a5427b3c0c">ls</a>.info();</div>
+<div class="line"><span class="lineno">  817</span>}</div>
 </div><!-- fragment -->
 </div>
 </div>

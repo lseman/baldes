@@ -1,5 +1,7 @@
 var NAVTREEINDEX5 =
 {
+"classMIPProblem.html#a4cd9a407085c12dbae7b776eb6a99cdc":[2,0,62,16],
+"classMIPProblem.html#a4e55c60ce1b0dfd21733f9fbbc157891":[2,0,62,14],
 "classMIPProblem.html#a54727e752efac3228592083d90dde6b5":[2,0,62,37],
 "classMIPProblem.html#a550f286d8605273a89bdaa600ca023d8":[2,0,62,40],
 "classMIPProblem.html#a5b59fa888f97950c5dc4328a70da390e":[2,0,62,34],
@@ -247,7 +249,5 @@ var NAVTREEINDEX5 =
 "classStabilization.html#af93150015a05267d69ef00636f9b66dc":[2,0,97,36],
 "classStabilization.html#aff675d7a6ce8aee1ab961840b690f202":[2,0,97,55],
 "classSupernodal.html":[2,0,98],
-"classSupernodal.html#a2d44bbcce17b95c21396ceb3f06f57b4":[2,0,98,4],
-"classSupernodal.html#a382595374e88078b231ba5f06b02630d":[2,0,98,1],
-"classSupernodal.html#a6ac0ef7a16d0a4ce1836e0a37301d068":[2,0,98,2]
+"classSupernodal.html#a2d44bbcce17b95c21396ceb3f06f57b4":[2,0,98,4]
 };

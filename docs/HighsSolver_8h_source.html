@@ -198,7 +198,24 @@ document.addEventListener('DOMContentLoaded',() => { initNavTree('HighsSolver_8h
 <div class="line"><a id="l00066" name="l00066"></a><span class="lineno"><a class="line" href="classHighsSolver.html#a5f13a239a2358cada2481c0c02125ad5">   66</a></span>    std::vector&lt;double&gt; <a class="code hl_function" href="classHighsSolver.html#a5f13a239a2358cada2481c0c02125ad5">getDuals</a>()<span class="keyword"> const override </span>{ <span class="keywordflow">return</span> model-&gt;getSolution().row_dual; }</div>
 <div class="line"><a id="l00067" name="l00067"></a><span class="lineno">   67</span> </div>
 <div class="line"><a id="l00068" name="l00068"></a><span class="lineno"><a class="line" href="classHighsSolver.html#afa0183ce35755a03e2c49d13e728ac3f">   68</a></span>    std::vector&lt;double&gt; <a class="code hl_function" href="classHighsSolver.html#afa0183ce35755a03e2c49d13e728ac3f">extractSolution</a>()<span class="keyword"> const override </span>{ <span class="keywordflow">return</span> model-&gt;getSolution().col_value; }</div>
-<div class="line"><a id="l00069" name="l00069"></a><span class="lineno">   69</span>};</div>
+<div class="line"><a id="l00069" name="l00069"></a><span class="lineno">   69</span> </div>
+<div class="foldopen" id="foldopen00070" data-start="{" data-end="}">
+<div class="line"><a id="l00070" name="l00070"></a><span class="lineno"><a class="line" href="classHighsSolver.html#af8de27cebd7b5cf21731d762c3026f5a">   70</a></span>    <span class="keywordtype">double</span> <a class="code hl_function" href="classHighsSolver.html#af8de27cebd7b5cf21731d762c3026f5a">getDualObjVal</a>()<span class="keyword"> const override </span>{</div>
+<div class="line"><a id="l00071" name="l00071"></a><span class="lineno">   71</span>        <span class="keywordtype">double</span> val = 0.0;</div>
+<div class="line"><a id="l00072" name="l00072"></a><span class="lineno">   72</span>        model-&gt;getDualObjectiveValue(val);</div>
+<div class="line"><a id="l00073" name="l00073"></a><span class="lineno">   73</span>        <span class="keywordflow">return</span> val;</div>
+<div class="line"><a id="l00074" name="l00074"></a><span class="lineno">   74</span>    }</div>
+</div>
+<div class="line"><a id="l00075" name="l00075"></a><span class="lineno">   75</span> </div>
+<div class="foldopen" id="foldopen00076" data-start="{" data-end="}">
+<div class="line"><a id="l00076" name="l00076"></a><span class="lineno"><a class="line" href="classHighsSolver.html#ad7ef10ed819869a90710fe8aa8b789b6">   76</a></span>    std::vector&lt;int&gt; <a class="code hl_function" href="classHighsSolver.html#ad7ef10ed819869a90710fe8aa8b789b6">getBasicVariableIndices</a>()<span class="keyword"> override </span>{</div>
+<div class="line"><a id="l00077" name="l00077"></a><span class="lineno">   77</span>        HighsInt n = model-&gt;getNumCol();</div>
+<div class="line"><a id="l00078" name="l00078"></a><span class="lineno">   78</span>        std::vector&lt;HighsInt&gt; basic(n);</div>
+<div class="line"><a id="l00079" name="l00079"></a><span class="lineno">   79</span>        model-&gt;getBasicVariables(basic.data());</div>
+<div class="line"><a id="l00080" name="l00080"></a><span class="lineno">   80</span>        <span class="keywordflow">return</span> std::vector&lt;int&gt;(basic.begin(), basic.end());</div>
+<div class="line"><a id="l00081" name="l00081"></a><span class="lineno">   81</span>    }</div>
+</div>
+<div class="line"><a id="l00082" name="l00082"></a><span class="lineno">   82</span>};</div>
 </div>
 <div class="ttc" id="aSolverInterface_8h_html"><div class="ttname"><a href="SolverInterface_8h.html">SolverInterface.h</a></div></div>
 <div class="ttc" id="aclassHighsSolver_html_a15afd8a6bf4c78f542c72b663d208d33"><div class="ttname"><a href="classHighsSolver.html#a15afd8a6bf4c78f542c72b663d208d33">HighsSolver::getStatus</a></div><div class="ttdeci">int getStatus() const override</div><div class="ttdef"><b>Definition</b> <a href="#l00048">HighsSolver.h:48</a></div></div>
@@ -210,6 +227,8 @@ document.addEventListener('DOMContentLoaded',() => { initNavTree('HighsSolver_8h
 <div class="ttc" id="aclassHighsSolver_html_ab1d24af54cb666dbcb1b2d2b1096cfd0"><div class="ttname"><a href="classHighsSolver.html#ab1d24af54cb666dbcb1b2d2b1096cfd0">HighsSolver::getObjVal</a></div><div class="ttdeci">double getObjVal() const override</div><div class="ttdef"><b>Definition</b> <a href="#l00052">HighsSolver.h:52</a></div></div>
 <div class="ttc" id="aclassHighsSolver_html_abb1427a9cedff1f9a2b33a58195bf27d"><div class="ttname"><a href="classHighsSolver.html#abb1427a9cedff1f9a2b33a58195bf27d">HighsSolver::getSlack</a></div><div class="ttdeci">double getSlack(int i) const override</div><div class="ttdef"><b>Definition</b> <a href="#l00058">HighsSolver.h:58</a></div></div>
 <div class="ttc" id="aclassHighsSolver_html_ad62dcefd8a8fa4c578f901c26242eac6"><div class="ttname"><a href="classHighsSolver.html#ad62dcefd8a8fa4c578f901c26242eac6">HighsSolver::getVarValue</a></div><div class="ttdeci">double getVarValue(int i) const override</div><div class="ttdef"><b>Definition</b> <a href="#l00054">HighsSolver.h:54</a></div></div>
+<div class="ttc" id="aclassHighsSolver_html_ad7ef10ed819869a90710fe8aa8b789b6"><div class="ttname"><a href="classHighsSolver.html#ad7ef10ed819869a90710fe8aa8b789b6">HighsSolver::getBasicVariableIndices</a></div><div class="ttdeci">std::vector&lt; int &gt; getBasicVariableIndices() override</div><div class="ttdef"><b>Definition</b> <a href="#l00076">HighsSolver.h:76</a></div></div>
+<div class="ttc" id="aclassHighsSolver_html_af8de27cebd7b5cf21731d762c3026f5a"><div class="ttname"><a href="classHighsSolver.html#af8de27cebd7b5cf21731d762c3026f5a">HighsSolver::getDualObjVal</a></div><div class="ttdeci">double getDualObjVal() const override</div><div class="ttdef"><b>Definition</b> <a href="#l00070">HighsSolver.h:70</a></div></div>
 <div class="ttc" id="aclassHighsSolver_html_afa0183ce35755a03e2c49d13e728ac3f"><div class="ttname"><a href="classHighsSolver.html#afa0183ce35755a03e2c49d13e728ac3f">HighsSolver::extractSolution</a></div><div class="ttdeci">std::vector&lt; double &gt; extractSolution() const override</div><div class="ttdef"><b>Definition</b> <a href="#l00068">HighsSolver.h:68</a></div></div>
 <div class="ttc" id="aclassSolverInterface_html"><div class="ttname"><a href="classSolverInterface.html">SolverInterface</a></div><div class="ttdef"><b>Definition</b> <a href="SolverInterface_8h_source.html#l00013">SolverInterface.h:13</a></div></div>
 </div><!-- fragment --></div><!-- contents -->

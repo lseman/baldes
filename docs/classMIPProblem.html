@@ -616,40 +616,42 @@ Here is the call graph for this function:</div>
 <div class="line"><span class="lineno">   17</span>    <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> i = 0; i &lt; count; ++i) {</div>
 <div class="line"><span class="lineno">   18</span>        <span class="comment">// Add variable with its bounds, objective, and type.</span></div>
 <div class="line"><span class="lineno">   19</span>        <a class="code hl_function" href="#a7d7c950859d42587ebd021023edde212">add_variable</a>(names[i], vtypes[i], lb[i], ub[i], obj[i]);</div>
-<div class="line"><span class="lineno">   20</span>        gurobiCache-&gt;addColumn(cols[i]);</div>
-<div class="line"><span class="lineno">   21</span> </div>
-<div class="line"><span class="lineno">   22</span>        <span class="comment">// The new variable&#39;s index is the last element in &#39;variables&#39;.</span></div>
-<div class="line"><span class="lineno">   23</span>        <span class="keywordtype">int</span> col_index = variables.size() - 1;</div>
-<div class="line"><span class="lineno">   24</span> </div>
-<div class="line"><span class="lineno">   25</span>        <span class="comment">// Get the nonzero terms from the MIP column.</span></div>
-<div class="line"><span class="lineno">   26</span>        <span class="keyword">const</span> <span class="keyword">auto</span> &amp;terms = cols[i].<a class="code hl_function" href="classMIPColumn.html#a3d59b7259557c48827d5061139842d7d">getTerms</a>();</div>
-<div class="line"><span class="lineno">   27</span> </div>
-<div class="line"><span class="lineno">   28</span>        <span class="comment">// Reserve space for batch insertion based on the number of terms.</span></div>
-<div class="line"><span class="lineno">   29</span>        std::vector&lt;int&gt;    batch_rows;</div>
-<div class="line"><span class="lineno">   30</span>        std::vector&lt;int&gt;    batch_cols;</div>
-<div class="line"><span class="lineno">   31</span>        std::vector&lt;double&gt; batch_values;</div>
-<div class="line"><span class="lineno">   32</span>        batch_rows.reserve(terms.size());</div>
-<div class="line"><span class="lineno">   33</span>        batch_cols.reserve(terms.size());</div>
-<div class="line"><span class="lineno">   34</span>        batch_values.reserve(terms.size());</div>
-<div class="line"><span class="lineno">   35</span> </div>
-<div class="line"><span class="lineno">   36</span>        <span class="comment">// Collect all terms for this variable.</span></div>
-<div class="line"><span class="lineno">   37</span>        <span class="keywordflow">for</span> (<span class="keyword">const</span> <span class="keyword">auto</span> &amp;[row_index, value] : terms) {</div>
-<div class="line"><span class="lineno">   38</span>            batch_rows.push_back(row_index);</div>
-<div class="line"><span class="lineno">   39</span>            batch_cols.push_back(col_index);</div>
-<div class="line"><span class="lineno">   40</span>            batch_values.push_back(value);</div>
-<div class="line"><span class="lineno">   41</span>        }</div>
-<div class="line"><span class="lineno">   42</span> </div>
-<div class="line"><span class="lineno">   43</span>        <span class="comment">// Perform batch insertion into the sparse matrix.</span></div>
-<div class="line"><span class="lineno">   44</span>        sparse_matrix.insert_batch(batch_rows, batch_cols, batch_values);</div>
-<div class="line"><span class="lineno">   45</span> </div>
-<div class="line"><span class="lineno">   46</span>        <span class="comment">// Update only the touched constraints instead of scanning every row.</span></div>
-<div class="line"><span class="lineno">   47</span>        <span class="keywordflow">for</span> (<span class="keyword">const</span> <span class="keyword">auto</span> &amp;[row_index, value] : terms) {</div>
-<div class="line"><span class="lineno">   48</span>            <span class="keywordflow">if</span> (<span class="keyword">static_cast&lt;</span><span class="keywordtype">size_t</span><span class="keyword">&gt;</span>(row_index) &lt; constraints.size()) {</div>
-<div class="line"><span class="lineno">   49</span>                constraints[row_index]-&gt;addTerm(variables[col_index], value);</div>
-<div class="line"><span class="lineno">   50</span>            }</div>
-<div class="line"><span class="lineno">   51</span>        }</div>
-<div class="line"><span class="lineno">   52</span>    }</div>
-<div class="line"><span class="lineno">   53</span>}</div>
+<div class="line"><span class="lineno">   20</span><span class="preprocessor">#ifdef GUROBI</span></div>
+<div class="line"><span class="lineno">   21</span>        gurobiCache-&gt;addColumn(cols[i]);</div>
+<div class="line"><span class="lineno">   22</span><span class="preprocessor">#endif</span></div>
+<div class="line"><span class="lineno">   23</span> </div>
+<div class="line"><span class="lineno">   24</span>        <span class="comment">// The new variable&#39;s index is the last element in &#39;variables&#39;.</span></div>
+<div class="line"><span class="lineno">   25</span>        <span class="keywordtype">int</span> col_index = variables.size() - 1;</div>
+<div class="line"><span class="lineno">   26</span> </div>
+<div class="line"><span class="lineno">   27</span>        <span class="comment">// Get the nonzero terms from the MIP column.</span></div>
+<div class="line"><span class="lineno">   28</span>        <span class="keyword">const</span> <span class="keyword">auto</span> &amp;terms = cols[i].<a class="code hl_function" href="classMIPColumn.html#a3d59b7259557c48827d5061139842d7d">getTerms</a>();</div>
+<div class="line"><span class="lineno">   29</span> </div>
+<div class="line"><span class="lineno">   30</span>        <span class="comment">// Reserve space for batch insertion based on the number of terms.</span></div>
+<div class="line"><span class="lineno">   31</span>        std::vector&lt;int&gt;    batch_rows;</div>
+<div class="line"><span class="lineno">   32</span>        std::vector&lt;int&gt;    batch_cols;</div>
+<div class="line"><span class="lineno">   33</span>        std::vector&lt;double&gt; batch_values;</div>
+<div class="line"><span class="lineno">   34</span>        batch_rows.reserve(terms.size());</div>
+<div class="line"><span class="lineno">   35</span>        batch_cols.reserve(terms.size());</div>
+<div class="line"><span class="lineno">   36</span>        batch_values.reserve(terms.size());</div>
+<div class="line"><span class="lineno">   37</span> </div>
+<div class="line"><span class="lineno">   38</span>        <span class="comment">// Collect all terms for this variable.</span></div>
+<div class="line"><span class="lineno">   39</span>        <span class="keywordflow">for</span> (<span class="keyword">const</span> <span class="keyword">auto</span> &amp;[row_index, value] : terms) {</div>
+<div class="line"><span class="lineno">   40</span>            batch_rows.push_back(row_index);</div>
+<div class="line"><span class="lineno">   41</span>            batch_cols.push_back(col_index);</div>
+<div class="line"><span class="lineno">   42</span>            batch_values.push_back(value);</div>
+<div class="line"><span class="lineno">   43</span>        }</div>
+<div class="line"><span class="lineno">   44</span> </div>
+<div class="line"><span class="lineno">   45</span>        <span class="comment">// Perform batch insertion into the sparse matrix.</span></div>
+<div class="line"><span class="lineno">   46</span>        sparse_matrix.insert_batch(batch_rows, batch_cols, batch_values);</div>
+<div class="line"><span class="lineno">   47</span> </div>
+<div class="line"><span class="lineno">   48</span>        <span class="comment">// Update only the touched constraints instead of scanning every row.</span></div>
+<div class="line"><span class="lineno">   49</span>        <span class="keywordflow">for</span> (<span class="keyword">const</span> <span class="keyword">auto</span> &amp;[row_index, value] : terms) {</div>
+<div class="line"><span class="lineno">   50</span>            <span class="keywordflow">if</span> (<span class="keyword">static_cast&lt;</span><span class="keywordtype">size_t</span><span class="keyword">&gt;</span>(row_index) &lt; constraints.size()) {</div>
+<div class="line"><span class="lineno">   51</span>                constraints[row_index]-&gt;addTerm(variables[col_index], value);</div>
+<div class="line"><span class="lineno">   52</span>            }</div>
+<div class="line"><span class="lineno">   53</span>        }</div>
+<div class="line"><span class="lineno">   54</span>    }</div>
+<div class="line"><span class="lineno">   55</span>}</div>
 <div class="ttc" id="aclassMIPColumn_html_a3d59b7259557c48827d5061139842d7d"><div class="ttname"><a href="classMIPColumn.html#a3d59b7259557c48827d5061139842d7d">MIPColumn::getTerms</a></div><div class="ttdeci">const std::vector&lt; std::pair&lt; int, double &gt; &gt; &amp; getTerms() const</div><div class="ttdef"><b>Definition</b> <a href="MIPHelper_8h_source.html#l00046">MIPHelper.h:46</a></div></div>
 <div class="ttc" id="aclassMIPProblem_html_a7d7c950859d42587ebd021023edde212"><div class="ttname"><a href="#a7d7c950859d42587ebd021023edde212">MIPProblem::add_variable</a></div><div class="ttdeci">baldesVarPtr add_variable(const std::string &amp;var_name, VarType type, double lb=0.0, double ub=1.0, double obj_coeff=0.0)</div><div class="ttdef"><b>Definition</b> <a href="MIPHandler_8h_source.html#l00292">MIPHandler.h:292</a></div></div>
 </div><!-- fragment --><div class="dynheader">
@@ -706,23 +708,23 @@ Here is the call graph for this function:</div>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="MIPHandler_8cpp_source.html#l00055">55</a> of file <a class="el" href="MIPHandler_8cpp_source.html">MIPHandler.cpp</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">   56</span>                                                               {</div>
-<div class="line"><span class="lineno">   57</span>    <span class="comment">// Reserve additional space in the containers to avoid reallocations.</span></div>
-<div class="line"><span class="lineno">   58</span>    variables.reserve(variables.size() + count);</div>
-<div class="line"><span class="lineno">   59</span>    var_name_to_index.reserve(var_name_to_index.size() + count);</div>
-<div class="line"><span class="lineno">   60</span> </div>
-<div class="line"><span class="lineno">   61</span>    <span class="keywordtype">size_t</span> start_index = variables.size();</div>
+<p class="definition">Definition at line <a class="el" href="MIPHandler_8cpp_source.html#l00057">57</a> of file <a class="el" href="MIPHandler_8cpp_source.html">MIPHandler.cpp</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">   58</span>                                                               {</div>
+<div class="line"><span class="lineno">   59</span>    <span class="comment">// Reserve additional space in the containers to avoid reallocations.</span></div>
+<div class="line"><span class="lineno">   60</span>    variables.reserve(variables.size() + count);</div>
+<div class="line"><span class="lineno">   61</span>    var_name_to_index.reserve(var_name_to_index.size() + count);</div>
 <div class="line"><span class="lineno">   62</span> </div>
-<div class="line"><span class="lineno">   63</span>    <span class="comment">// Create and store each new variable.</span></div>
-<div class="line"><span class="lineno">   64</span>    <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> i = 0; i &lt; count; ++i) {</div>
-<div class="line"><span class="lineno">   65</span>        <span class="comment">// Create the variable using a shared pointer.</span></div>
-<div class="line"><span class="lineno">   66</span>        <span class="keyword">auto</span> newVar = std::make_shared&lt;baldesVar&gt;(names[i], vtypes[i], lb[i], ub[i], obj[i]);</div>
-<div class="line"><span class="lineno">   67</span>        newVar-&gt;set_index(start_index + i);</div>
-<div class="line"><span class="lineno">   68</span>        variables.push_back(newVar);</div>
-<div class="line"><span class="lineno">   69</span>        var_name_to_index.emplace(names[i], start_index + i);</div>
-<div class="line"><span class="lineno">   70</span>    }</div>
-<div class="line"><span class="lineno">   71</span>}</div>
+<div class="line"><span class="lineno">   63</span>    <span class="keywordtype">size_t</span> start_index = variables.size();</div>
+<div class="line"><span class="lineno">   64</span> </div>
+<div class="line"><span class="lineno">   65</span>    <span class="comment">// Create and store each new variable.</span></div>
+<div class="line"><span class="lineno">   66</span>    <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> i = 0; i &lt; count; ++i) {</div>
+<div class="line"><span class="lineno">   67</span>        <span class="comment">// Create the variable using a shared pointer.</span></div>
+<div class="line"><span class="lineno">   68</span>        <span class="keyword">auto</span> newVar = std::make_shared&lt;baldesVar&gt;(names[i], vtypes[i], lb[i], ub[i], obj[i]);</div>
+<div class="line"><span class="lineno">   69</span>        newVar-&gt;set_index(start_index + i);</div>
+<div class="line"><span class="lineno">   70</span>        variables.push_back(newVar);</div>
+<div class="line"><span class="lineno">   71</span>        var_name_to_index.emplace(names[i], start_index + i);</div>
+<div class="line"><span class="lineno">   72</span>    }</div>
+<div class="line"><span class="lineno">   73</span>}</div>
 </div><!-- fragment -->
 </div>
 </div>

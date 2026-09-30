@@ -1,5 +1,7 @@
 var NAVTREEINDEX6 =
 {
+"classSupernodal.html#a382595374e88078b231ba5f06b02630d":[2,0,98,1],
+"classSupernodal.html#a6ac0ef7a16d0a4ce1836e0a37301d068":[2,0,98,2],
 "classSupernodal.html#a9824116ebfe884d5a65fc9cb2b109535":[2,0,98,3],
 "classSupernodal.html#ac925e29c7bdc840821f6f54c771ea990":[2,0,98,5],
 "classSupernodal.html#afb1aaf3c3899c9a863abd16422ab0e23":[2,0,98,0],
@@ -247,7 +249,5 @@ var NAVTREEINDEX6 =
 "functions_vars_w.html":[2,3,2,23],
 "functions_vars_x.html":[2,3,2,24],
 "functions_vars_y.html":[2,3,2,25],
-"functions_w.html":[2,3,0,23],
-"functions_x.html":[2,3,0,24],
-"functions_y.html":[2,3,0,25]
+"functions_w.html":[2,3,0,23]
 };

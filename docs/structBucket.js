@@ -10,6 +10,7 @@ var structBucket =
     [ "add_jump_arc", "structBucket.html#a656d5d5382b74203cbc407b59a4960f5", null ],
     [ "add_label", "structBucket.html#a501ec800f262d57eb9e840b1313ccc90", null ],
     [ "add_sorted_label", "structBucket.html#a41fc4c431b986ef96513a8a9bc4400f8", null ],
+    [ "apply_stage_one_dominance", "structBucket.html#ab7d0e278956c582b3beb4ff69ebf1a79", null ],
     [ "check_dominance", "structBucket.html#af07a7c82df353f01a8ef6f532172ff2d", null ],
     [ "check_dominance_soa", "structBucket.html#a8e6298eff1d935702b889cb5de80ed95", null ],
     [ "clear", "structBucket.html#affc48d615ec90d1ac711f0962e039008", null ],

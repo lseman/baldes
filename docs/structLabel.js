@@ -22,7 +22,6 @@ var structLabel =
     [ "set_extended", "structLabel.html#a19a3474af3d3404369c0fe3cf1797ff2", null ],
     [ "visited_signature", "structLabel.html#a0854ada2cd1b2b30f5332b01980447f0", null ],
     [ "visits", "structLabel.html#af1966a1609e175a3ee3142cb1dafc8ef", null ],
-    [ "bucket_dominance_checked", "structLabel.html#a3c9cc3cba793a04ac66a6c69ed80c1dc", null ],
     [ "cost", "structLabel.html#a1da1930412e730692277e75a94da77c2", null ],
     [ "fresh", "structLabel.html#aa5098be4b306d954a4232e3e077eea6f", null ],
     [ "is_dominated", "structLabel.html#af36e4bfda4b5544e93ae446a31a49e7d", null ],
