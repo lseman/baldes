@@ -39,8 +39,8 @@ struct SRCMap {
         std::size_t index_;
     };
 
-    std::array<uint8_t, MAX_SRC_CUTS> compact_values = {};
     std::unique_ptr<std::array<uint16_t, MAX_SRC_CUTS>> wide_values;
+    std::array<uint8_t, MAX_SRC_CUTS> compact_values = {};
     uint8_t logical_size = 0;
 
     SRCMap() = default;
@@ -193,7 +193,6 @@ struct Label {
     const Label *parent = nullptr;
     bool   is_extended  = false;
     bool   is_dominated = false;
-    bool   bucket_dominance_checked = false;
     bool   fresh        = true;
 
     // Cold route materialization data. Partial labels pay for one nullable
@@ -311,7 +310,6 @@ struct Label {
         parent       = nullptr;
         is_extended  = false;
         is_dominated = false;
-        bucket_dominance_checked = false;
         fresh        = true;
         // Reset resources container (assuming operator= clears properly)
         resources = {};

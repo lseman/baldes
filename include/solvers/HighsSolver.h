@@ -66,4 +66,17 @@ public:
     std::vector<double> getDuals() const override { return model->getSolution().row_dual; }
 
     std::vector<double> extractSolution() const override { return model->getSolution().col_value; }
+
+    double getDualObjVal() const override {
+        double val = 0.0;
+        model->getDualObjectiveValue(val);
+        return val;
+    }
+
+    std::vector<int> getBasicVariableIndices() override {
+        HighsInt n = model->getNumCol();
+        std::vector<HighsInt> basic(n);
+        model->getBasicVariables(basic.data());
+        return std::vector<int>(basic.begin(), basic.end());
+    }
 };

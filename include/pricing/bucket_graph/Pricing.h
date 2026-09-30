@@ -8,7 +8,6 @@
 #include "pricing/bucket_graph/BucketGraph.h"
 
 inline BucketGraph::BucketStageDecision BucketGraph::current_bucket_pricing_stage() const noexcept {
-    if (depth != 0) return {};
     if (s1) return {Stage::One, true};
     if (s2) return {Stage::Two, true};
     if (s3) return {Stage::Three, true};

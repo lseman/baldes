@@ -275,15 +275,28 @@ public:
     }
 
     // Binarize all variables (set to binary type)
+    //
+    // Route columns carry ub = +inf in the LP master: the covering rows make
+    // x <= 1 redundant, and an explicit bound adds bound duals that pricing
+    // cannot see, so columns at their bound get regenerated forever. The
+    // bound is only imposed while the model is binary.
     void binarizeNode() {
         auto &vars = mip.getVars();
-        for (auto var : vars) { var->set_type(VarType::Binary); }
+        for (auto var : vars) {
+            var->set_type(VarType::Binary);
+            if (var->get_ub() > 1.0) { var->setUB(1.0); }
+        }
     }
 
     // Relax all variables (set to continuous type)
     void relaxNode() {
         auto &vars = mip.getVars();
-        for (auto var : vars) { var->set_type(VarType::Continuous); }
+        for (auto var : vars) {
+            if (var->get_type() == VarType::Binary && var->get_ub() == 1.0) {
+                var->setUB(std::numeric_limits<double>::infinity());
+            }
+            var->set_type(VarType::Continuous);
+        }
     }
 
     void remove(baldesCtrPtr ctr) { mip.delete_constraint(ctr); }

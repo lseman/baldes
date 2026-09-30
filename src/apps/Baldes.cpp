@@ -78,7 +78,7 @@ void initRMP(MIPProblem *model, VRProblem *problem, std::vector<std::vector<int>
 
         // Store the column and variable data
         lb.push_back(0.0);
-        ub.push_back(1.0);
+        ub.push_back(std::numeric_limits<double>::infinity()); // see BNBNode::binarizeNode()
         obj.push_back(cost);
         names.push_back(name);
         vtypes.push_back(VarType::Continuous); // Assuming VarType::Continuous is used

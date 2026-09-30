@@ -531,7 +531,7 @@ public:
 
             // Collect variable data.
             lb.push_back(0.0);
-            ub.push_back(1.0);
+            ub.push_back(std::numeric_limits<double>::infinity()); // see binarizeNode()
             obj.push_back(travel_cost);
             cols.emplace_back(std::move(col));
             names.emplace_back(std::move(var_name));
@@ -672,7 +672,7 @@ public:
 
             // --- Step 5: Collect data for the new variable ---
             lb.push_back(0.0);
-            ub.push_back(1.0);
+            ub.push_back(std::numeric_limits<double>::infinity()); // see binarizeNode()
             obj.push_back(travel_cost);
             cols.emplace_back(std::move(col));
             names.emplace_back(std::move(name));
@@ -1249,7 +1249,6 @@ public:
                 if (std::isnan(gap) || std::signbit(gap)) { gap = 1e-1; }
                 gap = std::clamp(gap, 1e-8,
                                  1e-1); // Clamping gap to be between 1e-6 and 1e-2
-                fmt::print("Gap: {}\n", gap);
                 node->ipSolver->run_optimization(matrix, gap);
 
                 lp_obj_old  = lp_obj;
@@ -1454,7 +1453,11 @@ public:
                         misprice = false;
                     }
                 }
+#endif
 
+                // Termination checks must run in every build: the IPM-only
+                // configuration (STAB undefined) previously compiled them out,
+                // so column generation only stopped at max_iter.
                 pricing_policy.recordPricingStage(stage);
 
                 const double pricing_lower_bound = PricingStateMachine::lowerBound(lp_obj, numK, inner_obj);
@@ -1484,6 +1487,7 @@ public:
 
                 if (pricing_policy.shouldForceCuts(colAdded, inner_obj, stage)) { force_cuts = true; }
 
+#ifdef STAB
                 stab.update_stabilization_after_iter(nodeDuals);
 #if defined(STAB) && defined(IPM)
             }

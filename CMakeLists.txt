@@ -8,10 +8,10 @@ else()
   message(WARNING "ccache not found, compilation will not be cached.")
 endif()
 
-set(CMAKE_CXX_COMPILER
-  "/data/toolchain/llvm/stage2-prof-use-lto/install/bin/clang++" CACHE PATH "C compiler" FORCE)
-set(CMAKE_C_COMPILER
-  "/data/toolchain/llvm/stage2-prof-use-lto/install/bin/clang" CACHE PATH "C compiler" FORCE)
+#set(CMAKE_CXX_COMPILER
+#  "/data/toolchain/llvm/stage2-prof-use-lto/install/bin/clang++" CACHE PATH "C compiler" FORCE)
+#set(CMAKE_C_COMPILER
+#  "/data/toolchain/llvm/stage2-prof-use-lto/install/bin/clang" CACHE PATH "C compiler" FORCE)
 
 
 project(BALDES LANGUAGES C CXX)
@@ -51,7 +51,7 @@ endif()
 # set(CMAKE_CXX_FLAGS_DEBUG "-Og -g -Wall -Wextra -Xclang -Wno-unknown-warning-option")
 
 # set LD flags
-set(CMAKE_EXE_LINKER_FLAGS_RELEASE "-flto -fuse-ld=mold -Wl,--gc-sections")
+set(CMAKE_EXE_LINKER_FLAGS_RELEASE "-flto -Wl,--gc-sections")
 if(APPLE)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -stdlib=libc++ -std=c++20")
 endif()
@@ -148,6 +148,8 @@ cpmaddpackage(
 # )
 
 # Highs
+option(HIGHS "Enable HIGHS" ON)
+
 if(HIGHS)
   cpmaddpackage(
     NAME Highs
@@ -165,6 +167,9 @@ if(WITH_PYTHON)
     GIT_TAG v2.13.6
   )
 endif()
+
+option(IPM "Enable IPM compilation option" ON)
+option(IPM_ACEL "Enable ipm acceleration" OFF)
 
 if(IPM OR IPM_ACEL)
   cpmaddpackage(
@@ -204,7 +209,6 @@ option(SORTED_LABELS "Enable Sorted Labels compilation option" ON)
 option(INTRUSIVE_BUCKET_LABELS "Enable intrusive bucket label storage mode" ON)
 option(MCD "Enable MCD compilation option" OFF)
 option(FIX_BUCKETS "Enable Fixed Buckets compilation option" ON)
-option(IPM "Enable IPM compilation option" ON)
 option(TR "Enable TR compilation option" OFF)
 option(EXACT_RCC "Enable Exact RCC compilation option" OFF)
 option(EVRP "Enable EVRPTW compilation option" OFF)
@@ -215,10 +219,8 @@ option(CLIQUER "Enable Cliquer compilation option" OFF)
 option(VERBOSE "Enable verbose output" OFF)
 option(JEMALLOC "Enable jemalloc" ON)
 option(GUROBI "Enable GUROBI" OFF)
-option(HIGHS "Enable HIGHS" ON)
 option(NSYNC "Enable nsync" OFF)
 option(CHOLMOD "Enable cholmod" OFF)
-option(IPM_ACEL "Enable ipm acelleration" OFF)
 option(BALDES "Enable baldes compilation" OFF)
 option(HGS "Enable HGS" OFF)
 option(CUSTOM_COST "Enable custom cost" OFF)
@@ -438,6 +440,11 @@ if(BALDES)
     target_include_directories(baldes PRIVATE ${Eigen_SOURCE_DIR} ${Eigen_SOURCE_DIR}/unsupported)
   endif()
 
+  if(HIGHS)
+    target_include_directories(baldes PRIVATE ${highs_SOURCE_DIR}/highs)
+    target_link_libraries(baldes PRIVATE highs highs_extras)
+  endif()
+
   if(GUROBI)
     target_link_libraries(baldes PRIVATE gurobi_c++)
   endif()
@@ -481,10 +488,24 @@ if(BUILD_TESTING)
   add_executable(stabilization_test tests/stabilization_test.cpp)
   target_compile_options(stabilization_test PRIVATE -Wno-c++26-extensions -Wno-deprecated-declarations)
   target_link_libraries(stabilization_test PRIVATE stdexec fmt xxhash)
+  if(IPM OR IPM_ACEL)
+    target_include_directories(stabilization_test PRIVATE ${Eigen_SOURCE_DIR} ${Eigen_SOURCE_DIR}/unsupported)
+  endif()
   add_test(NAME stabilization_test COMMAND stabilization_test)
 
   add_executable(rank1_helpers_test tests/rank1_helpers_test.cpp)
   target_compile_options(rank1_helpers_test PRIVATE -Wno-c++26-extensions -Wno-deprecated-declarations)
   target_link_libraries(rank1_helpers_test PRIVATE stdexec fmt xxhash)
+  if(IPM OR IPM_ACEL)
+    target_include_directories(rank1_helpers_test PRIVATE ${Eigen_SOURCE_DIR} ${Eigen_SOURCE_DIR}/unsupported)
+  endif()
   add_test(NAME rank1_helpers_test COMMAND rank1_helpers_test)
+
+  add_executable(bucket_stage_one_test tests/bucket_stage_one_test.cpp)
+  target_compile_options(bucket_stage_one_test PRIVATE -Wno-c++26-extensions -Wno-deprecated-declarations)
+  target_link_libraries(bucket_stage_one_test PRIVATE stdexec fmt xxhash)
+  if(IPM OR IPM_ACEL)
+    target_include_directories(bucket_stage_one_test PRIVATE ${Eigen_SOURCE_DIR} ${Eigen_SOURCE_DIR}/unsupported)
+  endif()
+  add_test(NAME bucket_stage_one_test COMMAND bucket_stage_one_test)
 endif()

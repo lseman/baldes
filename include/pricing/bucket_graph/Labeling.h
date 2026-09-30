@@ -226,9 +226,11 @@ std::vector<double> BucketGraph::labeling_algorithm() {
                     }
                 }
 
-                // Extend first, then process labels grouped by destination
-                // bucket. This keeps the destination bucket and its SoA cache
-                // hot across the whole group and amortizes staged-tier merges.
+                // Extend all outgoing arcs before mutating destination buckets.
+                // Process the successful extensions in arc order: ordinary
+                // bucket insertion already compares later siblings with any
+                // earlier sibling that survived, so sorting/grouping them is
+                // redundant for correctness.
                 static thread_local std::vector<Label *> destination_batch;
                 destination_batch.clear();
                 destination_batch.reserve(node_arcs.size());
@@ -240,103 +242,6 @@ std::vector<double> BucketGraph::labeling_algorithm() {
 
                     auto new_label = Extend<D, S, ArcType::Bucket, Mutability::Mut, F>(label, arc);
                     if (new_label != nullptr) destination_batch.push_back(new_label);
-                }
-
-                std::stable_sort(destination_batch.begin(), destination_batch.end(), [](const Label *a, const Label *b) {
-                    return a->vertex < b->vertex;
-                });
-
-                // Remove dominance among sibling extensions before scanning
-                // the committed destination bucket. Labels are grouped by
-                // destination, so each pair here is directly comparable.
-                for (size_t group_begin = 0; group_begin < destination_batch.size();) {
-                    size_t group_end = group_begin + 1;
-                    while (group_end < destination_batch.size() &&
-                           destination_batch[group_end]->vertex == destination_batch[group_begin]->vertex) {
-                        ++group_end;
-                    }
-
-                    for (size_t i = group_begin; i < group_end; ++i) {
-                        Label *lhs = destination_batch[i];
-                        if (lhs->is_dominated) continue;
-                        for (size_t j = i + 1; j < group_end; ++j) {
-                            Label *rhs = destination_batch[j];
-                            if (rhs->is_dominated) continue;
-                            if constexpr (S == Stage::One) {
-                                if (lhs->cost <= rhs->cost) {
-                                    rhs->set_dominated(true);
-                                } else {
-                                    lhs->set_dominated(true);
-                                    break;
-                                }
-                            } else {
-                                if (is_dominated<D, S>(rhs, lhs)) rhs->set_dominated(true);
-                                if (!rhs->is_dominated && is_dominated<D, S>(lhs, rhs)) {
-                                    lhs->set_dominated(true);
-                                    break;
-                                }
-                            }
-                        }
-                    }
-
-                    // For a sufficiently populated exact-destination group,
-                    // fuse the bucket scan: each existing label is loaded once
-                    // and compared with all sibling survivors. The regular
-                    // per-label destination scan is then skipped.
-                    if (group_end - group_begin >= 4) {
-                        auto &destination = buckets[destination_batch[group_begin]->vertex];
-                        destination.flush_extra_labels_if_large();
-                        const auto &committed = destination.get_sorted_labels();
-                        const auto &staged    = destination.get_extra_labels();
-                        uint64_t    fused_scan_count = 0;
-
-                        auto scan_existing = [&](const auto &existing_labels) {
-                            for (Label *existing : existing_labels) {
-                                if (existing->is_dominated) continue;
-                                for (size_t i = group_begin; i < group_end; ++i) {
-                                    Label *candidate = destination_batch[i];
-                                    if (candidate->is_dominated) continue;
-                                    ++fused_scan_count;
-                                    if constexpr (S == Stage::One) {
-                                        if (existing->cost <= candidate->cost) {
-                                            candidate->set_dominated(true);
-                                        } else {
-                                            existing->set_dominated(true);
-                                            break;
-                                        }
-                                    } else {
-                                        if (is_dominated<D, S>(candidate, existing)) {
-                                            candidate->set_dominated(true);
-                                            ++stat_n_dom;
-                                            continue;
-                                        }
-                                        if (is_dominated<D, S>(existing, candidate)) {
-                                            existing->set_dominated(true);
-                                            break;
-                                        }
-                                    }
-                                }
-                            }
-                        };
-
-                        scan_existing(committed);
-                        scan_existing(staged);
-                        if constexpr (D == Direction::Forward) {
-                            regen_dominance_checks_fw += fused_scan_count;
-                        } else {
-                            regen_dominance_checks_bw += fused_scan_count;
-                        }
-                        if (profile_labeling) {
-                            profile_record_dominance_check(D, S);
-                            profile_record_inner_bin_scan(D, S, fused_scan_count);
-                        }
-                        for (size_t i = group_begin; i < group_end; ++i) {
-                            if (!destination_batch[i]->is_dominated) {
-                                destination_batch[i]->bucket_dominance_checked = true;
-                            }
-                        }
-                    }
-                    group_begin = group_end;
                 }
 
                 for (Label *new_label : destination_batch) {
@@ -404,32 +309,11 @@ std::vector<double> BucketGraph::labeling_algorithm() {
                         }
 
                         bool dominated = false;
-                        if (!new_label->bucket_dominance_checked) {
                         if constexpr (S == Stage::One) {
-                            // Stage One: mark higher-cost labels as
-                            // dominated.
-                            for (auto *existing_label : to_bucket_labels) {
-                                ++bucket_scan_count;
-                                if (existing_label->is_dominated) continue;
-                                if (new_label->cost < existing_label->cost)
-                                    existing_label->set_dominated(true);
-                                else {
-                                    dominated = true;
-                                    break;
-                                }
-                            }
-                            if (!dominated) {
-                                for (auto *existing_label : to_bucket_extra) {
-                                    ++bucket_scan_count;
-                                    if (existing_label->is_dominated) continue;
-                                    if (new_label->cost < existing_label->cost)
-                                        existing_label->set_dominated(true);
-                                    else {
-                                        dominated = true;
-                                        break;
-                                    }
-                                }
-                            }
+                            // Stage One is cost-only. Reject against the
+                            // cached bucket minimum in O(1); only a new record
+                            // minimum needs to invalidate older labels.
+                            dominated = mother_bucket.apply_stage_one_dominance(new_label, bucket_scan_count);
                             if constexpr (D == Direction::Forward) {
                                 regen_dominance_checks_fw += bucket_scan_count;
                             } else {
@@ -790,7 +674,6 @@ std::vector<double> BucketGraph::labeling_algorithm() {
                                 }
                             }
                         }
-                        }
 
                         if (!dominated) {
                             if (profile_labeling) profile_record_non_dominated_label(D, S);
@@ -901,10 +784,7 @@ inline auto BucketGraph::Extend(const std::conditional_t<M == Mutability::Mut, L
                                 const std::conditional_t<A == ArcType::Bucket, BucketArc,
                                                          std::conditional_t<A == ArcType::Jump, JumpArc, Arc>> &gamma,
                                 int depth) noexcept {
-    // Pre-allocated result vector to avoid allocations for the common case of
-    // 0-1 results
-    static thread_local std::vector<Label *> result_vector;
-    Label                                   *result = nullptr;
+    Label *result = nullptr;
 
     // Prepare temporary resource storage (resize to current resources size)
     static thread_local std::vector<double> new_resources;
@@ -989,12 +869,20 @@ inline auto BucketGraph::Extend(const std::conditional_t<M == Mutability::Mut, L
         };
 
         if constexpr (A != ArcType::Jump) {
-            // Only copy resources for non-jump arcs (jump arcs already copied)
-            std::memcpy(new_resources.data(), initial_resources.data(), n_resources * sizeof(double));
-
-            const bool feasible = is_jump_arc ? process_jump_resources()
-                                              : process_all_resources<D>(new_resources, initial_resources, gamma,
-                                                                         nodes[node_id], n_resources);
+            bool feasible;
+            if (is_jump_arc) {
+                feasible = process_jump_resources();
+            } else if (n_resources == 1 &&
+                       static_cast<ResourceType>(options.resource_type[0]) == ResourceType::Disposable) {
+                // The overwhelmingly common VRPTW kernel: one disposable
+                // time resource. Avoid the generic resource loop and switch.
+                feasible = process_disposable_resource<D>(new_resources[0], initial_resources[0],
+                                                          gamma.resource_increment[0], nodes[node_id].lb[0],
+                                                          nodes[node_id].ub[0]);
+            } else {
+                feasible = process_all_resources<D>(new_resources, initial_resources, gamma, nodes[node_id],
+                                                    n_resources);
+            }
             if (!feasible) {
                 if constexpr (F == Full::Reverse)
                     return -1;
