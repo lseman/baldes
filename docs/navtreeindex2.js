@@ -1,5 +1,7 @@
 var NAVTREEINDEX2 =
 {
+"classBNBNode.html#ac4a92f0a90b0517dda3eb0e08c1ffe72":[2,0,15,35],
+"classBNBNode.html#ac5cdf235b03dab790bc9ec7222592375":[2,0,15,18],
 "classBNBNode.html#aca6f8d009954c8444675f8ce69cbfaad":[2,0,15,33],
 "classBNBNode.html#ad14f1ef5179a4f5c4143ca1f0a23ffd1":[2,0,15,67],
 "classBNBNode.html#adaa61c7ee649303ac9ebefecc32101dd":[2,0,15,9],
@@ -247,7 +249,5 @@ var NAVTREEINDEX2 =
 "classBucketGraph.html#a99844125e9fa656e291a8f71ecc659f6":[2,0,23,145],
 "classBucketGraph.html#a99d8354536e1832f57902b79086c5429":[2,0,23,268],
 "classBucketGraph.html#a9a40f10a7c5be4b1bba90286d2d67efc":[2,0,23,19],
-"classBucketGraph.html#a9b9b2117b5e749ba9a5d7cc66e1c021c":[2,0,23,104],
-"classBucketGraph.html#a9c231835ccf2b5c41cb6fea8e2dba1a9":[2,0,23,215],
-"classBucketGraph.html#a9d5f2f83ae5e3849e002e335b749f59f":[2,0,23,79]
+"classBucketGraph.html#a9b9b2117b5e749ba9a5d7cc66e1c021c":[2,0,23,104]
 };

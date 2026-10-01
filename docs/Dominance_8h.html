@@ -299,6 +299,10 @@ Functions</h2></td></tr>
 <tr class="memitem:a4f6006d66fa23bc62965a93c057360af template"><td class="memItemLeft">std::experimental::simd&lt; T &gt;&#160;</td><td class="memItemRight"><a class="el" href="#a4f6006d66fa23bc62965a93c057360af">load_simd_generic</a> (const Container &amp;source, size_t start_index, size_t simd_size) noexcept</td></tr>
 <tr class="memitem:a1055d33f3fa0023a7782b354c84f30d6" id="r_a1055d33f3fa0023a7782b354c84f30d6"><td class="memTemplParams" colspan="2">template&lt;typename T, typename Container, typename Proj&gt; </td></tr>
 <tr class="memitem:a1055d33f3fa0023a7782b354c84f30d6 template"><td class="memItemLeft">std::experimental::simd&lt; T &gt;&#160;</td><td class="memItemRight"><a class="el" href="#a1055d33f3fa0023a7782b354c84f30d6">load_simd</a> (const Container &amp;source, size_t start_index, size_t simd_size, Proj proj) noexcept</td></tr>
+<tr class="memitem:af50959ead7daa760836f9ef6aecae34b" id="r_af50959ead7daa760836f9ef6aecae34b"><td class="memTemplParams" colspan="2">template&lt;typename T&gt; </td></tr>
+<tr class="memitem:af50959ead7daa760836f9ef6aecae34b template"><td class="memItemLeft">std::experimental::simd&lt; T &gt;&#160;</td><td class="memItemRight"><a class="el" href="#af50959ead7daa760836f9ef6aecae34b">load_simd_direct</a> (const T *source, size_t simd_size) noexcept</td></tr>
+<tr class="memitem:a213235db52620273b153f896e3db45df" id="r_a213235db52620273b153f896e3db45df"><td class="memTemplParams" colspan="2">template&lt;typename T, size_t N&gt; </td></tr>
+<tr class="memitem:a213235db52620273b153f896e3db45df template"><td class="memItemLeft">std::experimental::simd&lt; T &gt;&#160;</td><td class="memItemRight"><a class="el" href="#a213235db52620273b153f896e3db45df">load_simd_direct</a> (const std::array&lt; T, N &gt; &amp;source, size_t simd_size) noexcept</td></tr>
 <tr class="memitem:a3a6eac6d6207e8db8b12f76732c242eb" id="r_a3a6eac6d6207e8db8b12f76732c242eb"><td class="memTemplParams" colspan="2">template&lt;<a class="el" href="Definitions_8h.html#a224b9163917ac32fc95a60d8c1eec3aa">Direction</a> D, <a class="el" href="Definitions_8h.html#aca8133200c1122e29b87b314d82604eb">Stage</a> S&gt; </td></tr>
 <tr class="memitem:a3a6eac6d6207e8db8b12f76732c242eb template"><td class="memItemLeft">bool&#160;</td><td class="memItemRight"><a class="el" href="#a3a6eac6d6207e8db8b12f76732c242eb">check_dominance_against_vector</a> (const <a class="el" href="structLabel.html">Label</a> *__restrict__ new_label, std::span&lt; <a class="el" href="structLabel.html">Label</a> *const &gt; labels, const <a class="el" href="classCutStorage.html">CutStorage</a> *__restrict__ cut_storage, uint &amp;__restrict__ stat_n_dom) noexcept</td></tr>
 </table>
@@ -359,382 +363,382 @@ template&lt;<a class="el" href="Definitions_8h.html#a224b9163917ac32fc95a60d8c1e
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="Dominance_8h_source.html#l00051">51</a> of file <a class="el" href="Dominance_8h_source.html">Dominance.h</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">   53</span>                                                                                   {</div>
-<div class="line"><span class="lineno">   54</span>    <span class="keyword">using namespace </span>std::experimental;</div>
-<div class="line"><span class="lineno">   55</span> </div>
-<div class="line"><span class="lineno">   56</span>    <span class="comment">// Cache invariant data and sizes upfront</span></div>
-<div class="line"><span class="lineno">   57</span>    <span class="keyword">constexpr</span> <span class="keywordtype">double</span>   tolerance  = <a class="code hl_variable" href="namespacenumericutils.html#adaf310759d56f0e70fb4b325dbefc809">numericutils::eps</a>;</div>
-<div class="line"><span class="lineno">   58</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span>       num_labels = labels.size();</div>
-<div class="line"><span class="lineno">   59</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span>       simd_width = simd&lt;double&gt;::size();</div>
-<div class="line"><span class="lineno">   60</span>    <span class="keyword">const</span> <span class="keywordtype">double</span>       new_cost   = new_label-&gt;<a class="code hl_variable" href="structLabel.html#a1da1930412e730692277e75a94da77c2">cost</a>;</div>
-<div class="line"><span class="lineno">   61</span>    <span class="keyword">const</span> simd&lt;double&gt; new_cost_simd(new_cost);</div>
-<div class="line"><span class="lineno">   62</span>    <span class="keyword">const</span> simd&lt;double&gt; tolerance_simd(tolerance);</div>
-<div class="line"><span class="lineno">   63</span>    <span class="keyword">const</span> <span class="keyword">auto</span>        &amp;new_resources = new_label-&gt;<a class="code hl_variable" href="structLabel.html#a5f792e9fa27a10dd13bd4622b1a3044b">resources</a>;</div>
-<div class="line"><span class="lineno">   64</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span>       num_resources = new_resources.size();</div>
-<div class="line"><span class="lineno">   65</span>    <span class="keyword">const</span> <span class="keyword">auto</span>        &amp;new_visited   = new_label-&gt;<a class="code hl_variable" href="structLabel.html#ac5629d8044403e1ba299dbffb0e49247">visited_bitmap</a>;</div>
-<div class="line"><span class="lineno">   66</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span>       bitmap_size   = new_visited.size();</div>
-<div class="line"><span class="lineno">   67</span> </div>
-<div class="line"><span class="lineno">   68</span><span class="comment">// SRC optimization - precompute if SRC is active</span></div>
-<div class="line"><span class="lineno">   69</span><span class="preprocessor">#ifdef SRC</span></div>
-<div class="line"><span class="lineno">   70</span>    <span class="keyword">const</span> <span class="keywordtype">bool</span>   has_src = (S == <a class="code hl_enumvalue" href="Definitions_8h.html#aca8133200c1122e29b87b314d82604eba981b8fcee42e1e726a67a2b9a98ea6e9">Stage::Four</a> || S == <a class="code hl_enumvalue" href="Definitions_8h.html#aca8133200c1122e29b87b314d82604eba81999728593fbd0249e73b02f3d7ad74">Stage::Enumerate</a>) &amp;&amp; cut_storage &amp;&amp; cut_storage-&gt;<a class="code hl_function" href="classCutStorage.html#a2f71dd47977fd6afeefd08cb629507a6">activeSize</a>() &gt; 0;</div>
-<div class="line"><span class="lineno">   71</span>    <span class="keyword">const</span> <span class="keyword">auto</span>   active_cuts   = has_src ? cut_storage-&gt;<a class="code hl_function" href="classCutStorage.html#a5661b2dd9924180da3dd03cc2d63bd2c">getActiveCuts</a>() : <span class="keyword">decltype</span>(cut_storage-&gt;<a class="code hl_function" href="classCutStorage.html#a5661b2dd9924180da3dd03cc2d63bd2c">getActiveCuts</a>())();</div>
-<div class="line"><span class="lineno">   72</span>    <span class="keyword">const</span> <span class="keywordtype">int</span>    cut_size      = has_src ? cut_storage-&gt;<a class="code hl_function" href="classCutStorage.html#a2f71dd47977fd6afeefd08cb629507a6">activeSize</a>() : 0;</div>
-<div class="line"><span class="lineno">   73</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> simd_cut_size = cut_size - (cut_size % simd_width);</div>
-<div class="line"><span class="lineno">   74</span><span class="preprocessor">#endif</span></div>
-<div class="line"><span class="lineno">   75</span> </div>
-<div class="line"><span class="lineno">   76</span>    <span class="comment">// Process labels in SIMD-width chunks</span></div>
-<div class="line"><span class="lineno">   77</span>    <span class="keywordtype">size_t</span> i = 0;</div>
-<div class="line"><span class="lineno">   78</span>    <span class="keywordflow">for</span> (; i + simd_width &lt;= num_labels; i += simd_width) {</div>
-<div class="line"><span class="lineno">   79</span>        <span class="comment">// Load all label costs in one SIMD operation</span></div>
-<div class="line"><span class="lineno">   80</span>        simd&lt;double&gt; label_costs = <a class="code hl_function" href="#a1055d33f3fa0023a7782b354c84f30d6">load_simd&lt;double&gt;</a>(labels, i, simd_width, [](<span class="keyword">const</span> <a class="code hl_struct" href="structLabel.html">Label</a> *lbl) { <span class="keywordflow">return</span> lbl-&gt;<a class="code hl_variable" href="structLabel.html#a1da1930412e730692277e75a94da77c2">cost</a>; });</div>
-<div class="line"><span class="lineno">   81</span> </div>
-<div class="line"><span class="lineno">   82</span>        <span class="comment">// Fast raw-cost check is valid only when SRC dual compensation is not</span></div>
-<div class="line"><span class="lineno">   83</span>        <span class="comment">// active. With SRC, a label with higher raw reduced cost may still</span></div>
-<div class="line"><span class="lineno">   84</span>        <span class="comment">// dominate after subtracting applicable cut duals.</span></div>
-<div class="line"><span class="lineno">   85</span><span class="preprocessor">#ifdef SRC</span></div>
-<div class="line"><span class="lineno">   86</span>        <span class="keyword">const</span> <span class="keyword">auto</span> cost_mask = has_src ? (label_costs == label_costs) : (label_costs &lt;= (new_cost_simd + tolerance_simd));</div>
-<div class="line"><span class="lineno">   87</span><span class="preprocessor">#else</span></div>
-<div class="line"><span class="lineno">   88</span>        <span class="keyword">const</span> <span class="keyword">auto</span> cost_mask = (label_costs &lt;= (new_cost_simd + tolerance_simd));</div>
-<div class="line"><span class="lineno">   89</span><span class="preprocessor">#endif</span></div>
-<div class="line"><span class="lineno">   90</span>        <span class="keywordflow">if</span> (!any_of(cost_mask)) <span class="keywordflow">continue</span>;</div>
-<div class="line"><span class="lineno">   91</span> </div>
-<div class="line"><span class="lineno">   92</span>        <span class="comment">// For each label in this SIMD chunk that passed cost check</span></div>
-<div class="line"><span class="lineno">   93</span>        <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> j = 0; j &lt; simd_width; ++j) {</div>
-<div class="line"><span class="lineno">   94</span>            <span class="keywordflow">if</span> (!cost_mask[j]) <span class="keywordflow">continue</span>;</div>
-<div class="line"><span class="lineno">   95</span> </div>
-<div class="line"><span class="lineno">   96</span>            <span class="keyword">const</span> <a class="code hl_struct" href="structLabel.html">Label</a> *label           = labels[i + j];</div>
-<div class="line"><span class="lineno">   97</span>            <span class="keywordflow">if</span> (label-&gt;<a class="code hl_variable" href="structLabel.html#af36e4bfda4b5544e93ae446a31a49e7d">is_dominated</a>) <span class="keywordflow">continue</span>;</div>
-<div class="line"><span class="lineno">   98</span>            <span class="keyword">const</span> <span class="keyword">auto</span>  &amp;label_resources = label-&gt;<a class="code hl_variable" href="structLabel.html#a5f792e9fa27a10dd13bd4622b1a3044b">resources</a>;</div>
-<div class="line"><span class="lineno">   99</span>            <span class="keywordtype">bool</span>         dominated       = <span class="keyword">true</span>;</div>
-<div class="line"><span class="lineno">  100</span> </div>
-<div class="line"><span class="lineno">  101</span>            <span class="comment">// Resource check - use SIMD for larger resource sets</span></div>
-<div class="line"><span class="lineno">  102</span>            <span class="keywordflow">if</span> <span class="keyword">constexpr</span> (R_SIZE &gt;= simd_width) {</div>
-<div class="line"><span class="lineno">  103</span>                <span class="comment">// Process resources in SIMD-width chunks</span></div>
-<div class="line"><span class="lineno">  104</span>                <span class="keyword">const</span> <span class="keywordtype">size_t</span> simd_resource_blocks    = num_resources / simd_width;</div>
-<div class="line"><span class="lineno">  105</span>                <span class="keyword">const</span> <span class="keywordtype">size_t</span> simd_resource_remainder = num_resources % simd_width;</div>
-<div class="line"><span class="lineno">  106</span> </div>
-<div class="line"><span class="lineno">  107</span>                <span class="comment">// Main SIMD blocks</span></div>
-<div class="line"><span class="lineno">  108</span>                <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> k = 0; k &lt; simd_resource_blocks * simd_width; k += simd_width) {</div>
-<div class="line"><span class="lineno">  109</span>                    simd&lt;double&gt; label_res     = <a class="code hl_function" href="#a4f6006d66fa23bc62965a93c057360af">load_simd_generic&lt;double&gt;</a>(label_resources, k, simd_width);</div>
-<div class="line"><span class="lineno">  110</span>                    simd&lt;double&gt; new_label_res = <a class="code hl_function" href="#a4f6006d66fa23bc62965a93c057360af">load_simd_generic&lt;double&gt;</a>(new_resources, k, simd_width);</div>
-<div class="line"><span class="lineno">  111</span> </div>
-<div class="line"><span class="lineno">  112</span>                    <span class="keywordflow">if</span> <span class="keyword">constexpr</span> (D == <a class="code hl_enumvalue" href="Definitions_8h.html#a224b9163917ac32fc95a60d8c1eec3aaa67d2f6740a8eaebf4d5c6f79be8da481">Direction::Forward</a>) {</div>
-<div class="line"><span class="lineno">  113</span>                        <span class="keywordflow">if</span> (!all_of(label_res &lt;= (new_label_res + tolerance_simd))) {</div>
-<div class="line"><span class="lineno">  114</span>                            dominated = <span class="keyword">false</span>;</div>
-<div class="line"><span class="lineno">  115</span>                            <span class="keywordflow">break</span>;</div>
-<div class="line"><span class="lineno">  116</span>                        }</div>
-<div class="line"><span class="lineno">  117</span>                    } <span class="keywordflow">else</span> {</div>
-<div class="line"><span class="lineno">  118</span>                        <span class="keywordflow">if</span> (!all_of(label_res &gt;= (new_label_res - tolerance_simd))) {</div>
-<div class="line"><span class="lineno">  119</span>                            dominated = <span class="keyword">false</span>;</div>
-<div class="line"><span class="lineno">  120</span>                            <span class="keywordflow">break</span>;</div>
-<div class="line"><span class="lineno">  121</span>                        }</div>
-<div class="line"><span class="lineno">  122</span>                    }</div>
-<div class="line"><span class="lineno">  123</span>                }</div>
-<div class="line"><span class="lineno">  124</span> </div>
-<div class="line"><span class="lineno">  125</span>                <span class="comment">// Handle remaining resources</span></div>
-<div class="line"><span class="lineno">  126</span>                <span class="keywordflow">if</span> (dominated &amp;&amp; simd_resource_remainder &gt; 0) {</div>
-<div class="line"><span class="lineno">  127</span>                    <span class="keyword">const</span> <span class="keywordtype">size_t</span> base_idx = simd_resource_blocks * simd_width;</div>
-<div class="line"><span class="lineno">  128</span>                    <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> k = 0; k &lt; simd_resource_remainder; ++k) {</div>
-<div class="line"><span class="lineno">  129</span>                        <span class="keyword">const</span> <span class="keywordtype">size_t</span> idx = base_idx + k;</div>
-<div class="line"><span class="lineno">  130</span>                        <span class="keywordflow">if</span> (idx == 0) <span class="keywordflow">continue</span>;</div>
-<div class="line"><span class="lineno">  131</span>                        <span class="keywordflow">if</span> <span class="keyword">constexpr</span> (D == <a class="code hl_enumvalue" href="Definitions_8h.html#a224b9163917ac32fc95a60d8c1eec3aaa67d2f6740a8eaebf4d5c6f79be8da481">Direction::Forward</a>) {</div>
-<div class="line"><span class="lineno">  132</span>                            <span class="keywordflow">if</span> (<a class="code hl_function" href="namespacenumericutils.html#aaadab3c8a1b76df1e09c11ebaa3d1e49">numericutils::gt</a>(label_resources[idx], new_resources[idx])) {</div>
-<div class="line"><span class="lineno">  133</span>                                dominated = <span class="keyword">false</span>;</div>
-<div class="line"><span class="lineno">  134</span>                                <span class="keywordflow">break</span>;</div>
-<div class="line"><span class="lineno">  135</span>                            }</div>
-<div class="line"><span class="lineno">  136</span>                        } <span class="keywordflow">else</span> {</div>
-<div class="line"><span class="lineno">  137</span>                            <span class="keywordflow">if</span> (<a class="code hl_function" href="namespacenumericutils.html#af55fcfd2b05fe5a20796069445c89aef">numericutils::lt</a>(label_resources[idx], new_resources[idx])) {</div>
-<div class="line"><span class="lineno">  138</span>                                dominated = <span class="keyword">false</span>;</div>
-<div class="line"><span class="lineno">  139</span>                                <span class="keywordflow">break</span>;</div>
-<div class="line"><span class="lineno">  140</span>                            }</div>
-<div class="line"><span class="lineno">  141</span>                        }</div>
-<div class="line"><span class="lineno">  142</span>                    }</div>
-<div class="line"><span class="lineno">  143</span>                    <span class="keywordflow">if</span> (dominated &amp;&amp; num_resources &gt; 0) {</div>
-<div class="line"><span class="lineno">  144</span>                        <span class="keywordflow">if</span> <span class="keyword">constexpr</span> (D == <a class="code hl_enumvalue" href="Definitions_8h.html#a224b9163917ac32fc95a60d8c1eec3aaa67d2f6740a8eaebf4d5c6f79be8da481">Direction::Forward</a>) {</div>
-<div class="line"><span class="lineno">  145</span>                            <span class="keywordflow">if</span> (<a class="code hl_function" href="namespacenumericutils.html#aaadab3c8a1b76df1e09c11ebaa3d1e49">numericutils::gt</a>(label_resources[0], new_resources[0])) { dominated = <span class="keyword">false</span>; }</div>
-<div class="line"><span class="lineno">  146</span>                        } <span class="keywordflow">else</span> {</div>
-<div class="line"><span class="lineno">  147</span>                            <span class="keywordflow">if</span> (<a class="code hl_function" href="namespacenumericutils.html#af55fcfd2b05fe5a20796069445c89aef">numericutils::lt</a>(label_resources[0], new_resources[0])) { dominated = <span class="keyword">false</span>; }</div>
-<div class="line"><span class="lineno">  148</span>                        }</div>
-<div class="line"><span class="lineno">  149</span>                    }</div>
-<div class="line"><span class="lineno">  150</span>                }</div>
-<div class="line"><span class="lineno">  151</span>            } <span class="keywordflow">else</span> {</div>
-<div class="line"><span class="lineno">  152</span>                <span class="comment">// Scalar processing for small resource sets - better for branch</span></div>
-<div class="line"><span class="lineno">  153</span>                <span class="comment">// prediction</span></div>
-<div class="line"><span class="lineno">  154</span>                <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> k = 1; k &lt; num_resources; ++k) {</div>
-<div class="line"><span class="lineno">  155</span>                    <span class="keywordflow">if</span> <span class="keyword">constexpr</span> (D == <a class="code hl_enumvalue" href="Definitions_8h.html#a224b9163917ac32fc95a60d8c1eec3aaa67d2f6740a8eaebf4d5c6f79be8da481">Direction::Forward</a>) {</div>
-<div class="line"><span class="lineno">  156</span>                        <span class="keywordflow">if</span> (<a class="code hl_function" href="namespacenumericutils.html#aaadab3c8a1b76df1e09c11ebaa3d1e49">numericutils::gt</a>(label_resources[k], new_resources[k])) {</div>
-<div class="line"><span class="lineno">  157</span>                            dominated = <span class="keyword">false</span>;</div>
-<div class="line"><span class="lineno">  158</span>                            <span class="keywordflow">break</span>;</div>
-<div class="line"><span class="lineno">  159</span>                        }</div>
-<div class="line"><span class="lineno">  160</span>                    } <span class="keywordflow">else</span> {</div>
-<div class="line"><span class="lineno">  161</span>                        <span class="keywordflow">if</span> (<a class="code hl_function" href="namespacenumericutils.html#af55fcfd2b05fe5a20796069445c89aef">numericutils::lt</a>(label_resources[k], new_resources[k])) {</div>
-<div class="line"><span class="lineno">  162</span>                            dominated = <span class="keyword">false</span>;</div>
-<div class="line"><span class="lineno">  163</span>                            <span class="keywordflow">break</span>;</div>
-<div class="line"><span class="lineno">  164</span>                        }</div>
-<div class="line"><span class="lineno">  165</span>                    }</div>
-<div class="line"><span class="lineno">  166</span>                }</div>
-<div class="line"><span class="lineno">  167</span>                <span class="keywordflow">if</span> (dominated &amp;&amp; num_resources &gt; 0) {</div>
-<div class="line"><span class="lineno">  168</span>                    <span class="keywordflow">if</span> <span class="keyword">constexpr</span> (D == <a class="code hl_enumvalue" href="Definitions_8h.html#a224b9163917ac32fc95a60d8c1eec3aaa67d2f6740a8eaebf4d5c6f79be8da481">Direction::Forward</a>) {</div>
-<div class="line"><span class="lineno">  169</span>                        <span class="keywordflow">if</span> (<a class="code hl_function" href="namespacenumericutils.html#aaadab3c8a1b76df1e09c11ebaa3d1e49">numericutils::gt</a>(label_resources[0], new_resources[0])) { dominated = <span class="keyword">false</span>; }</div>
-<div class="line"><span class="lineno">  170</span>                    } <span class="keywordflow">else</span> {</div>
-<div class="line"><span class="lineno">  171</span>                        <span class="keywordflow">if</span> (<a class="code hl_function" href="namespacenumericutils.html#af55fcfd2b05fe5a20796069445c89aef">numericutils::lt</a>(label_resources[0], new_resources[0])) { dominated = <span class="keyword">false</span>; }</div>
-<div class="line"><span class="lineno">  172</span>                    }</div>
-<div class="line"><span class="lineno">  173</span>                }</div>
-<div class="line"><span class="lineno">  174</span>            }</div>
-<div class="line"><span class="lineno">  175</span> </div>
-<div class="line"><span class="lineno">  176</span>            <span class="comment">// Skip further checks if not dominated based on resources</span></div>
-<div class="line"><span class="lineno">  177</span>            <span class="keywordflow">if</span> (!dominated) <span class="keywordflow">continue</span>;</div>
-<div class="line"><span class="lineno">  178</span> </div>
-<div class="line"><span class="lineno">  179</span>            <span class="comment">// Visited nodes check - only for relevant stages</span></div>
-<div class="line"><span class="lineno">  180</span>            <span class="keywordflow">if</span> <span class="keyword">constexpr</span> (S == <a class="code hl_enumvalue" href="Definitions_8h.html#aca8133200c1122e29b87b314d82604ebaca8a2087e5557e317599344687a57391">Stage::Three</a> || S == <a class="code hl_enumvalue" href="Definitions_8h.html#aca8133200c1122e29b87b314d82604eba981b8fcee42e1e726a67a2b9a98ea6e9">Stage::Four</a> || S == <a class="code hl_enumvalue" href="Definitions_8h.html#aca8133200c1122e29b87b314d82604eba81999728593fbd0249e73b02f3d7ad74">Stage::Enumerate</a>) {</div>
-<div class="line"><span class="lineno">  181</span>                <span class="keyword">const</span> <span class="keyword">auto</span> &amp;label_visited = label-&gt;<a class="code hl_variable" href="structLabel.html#ac5629d8044403e1ba299dbffb0e49247">visited_bitmap</a>;</div>
-<div class="line"><span class="lineno">  182</span> </div>
-<div class="line"><span class="lineno">  183</span>                <span class="comment">// Use SIMD for large bitmaps</span></div>
-<div class="line"><span class="lineno">  184</span>                <span class="keywordflow">if</span> <span class="keyword">constexpr</span> (N_SIZE / 64 &gt;= simd_width) {</div>
-<div class="line"><span class="lineno">  185</span>                    <span class="keyword">const</span> <span class="keywordtype">size_t</span> simd_bitmap_blocks    = bitmap_size / simd_width;</div>
-<div class="line"><span class="lineno">  186</span>                    <span class="keyword">const</span> <span class="keywordtype">size_t</span> simd_bitmap_remainder = bitmap_size % simd_width;</div>
-<div class="line"><span class="lineno">  187</span> </div>
-<div class="line"><span class="lineno">  188</span>                    <span class="comment">// Process bitmap in SIMD-width chunks</span></div>
-<div class="line"><span class="lineno">  189</span>                    <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> k = 0; k &lt; simd_bitmap_blocks * simd_width; k += simd_width) {</div>
-<div class="line"><span class="lineno">  190</span>                        simd&lt;uint64_t&gt; label_vis     = <a class="code hl_function" href="#a4f6006d66fa23bc62965a93c057360af">load_simd_generic&lt;uint64_t&gt;</a>(label_visited, k, simd_width);</div>
-<div class="line"><span class="lineno">  191</span>                        simd&lt;uint64_t&gt; new_label_vis = <a class="code hl_function" href="#a4f6006d66fa23bc62965a93c057360af">load_simd_generic&lt;uint64_t&gt;</a>(new_visited, k, simd_width);</div>
-<div class="line"><span class="lineno">  192</span> </div>
-<div class="line"><span class="lineno">  193</span>                        <span class="comment">// Check if all visited nodes in label are also in</span></div>
-<div class="line"><span class="lineno">  194</span>                        <span class="comment">// new_label</span></div>
-<div class="line"><span class="lineno">  195</span>                        <span class="keywordflow">if</span> (!all_of((label_vis &amp; new_label_vis) == label_vis)) {</div>
-<div class="line"><span class="lineno">  196</span>                            dominated = <span class="keyword">false</span>;</div>
-<div class="line"><span class="lineno">  197</span>                            <span class="keywordflow">break</span>;</div>
-<div class="line"><span class="lineno">  198</span>                        }</div>
-<div class="line"><span class="lineno">  199</span>                    }</div>
-<div class="line"><span class="lineno">  200</span> </div>
-<div class="line"><span class="lineno">  201</span>                    <span class="comment">// Handle remaining bitmap elements</span></div>
-<div class="line"><span class="lineno">  202</span>                    <span class="keywordflow">if</span> (dominated &amp;&amp; simd_bitmap_remainder &gt; 0) {</div>
-<div class="line"><span class="lineno">  203</span>                        <span class="keyword">const</span> <span class="keywordtype">size_t</span> base_idx = simd_bitmap_blocks * simd_width;</div>
-<div class="line"><span class="lineno">  204</span>                        <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> k = 0; k &lt; simd_bitmap_remainder; ++k) {</div>
-<div class="line"><span class="lineno">  205</span>                            <span class="keyword">const</span> <span class="keywordtype">size_t</span> idx = base_idx + k;</div>
-<div class="line"><span class="lineno">  206</span>                            <span class="keywordflow">if</span> ((label_visited[idx] &amp; new_visited[idx]) != label_visited[idx]) {</div>
-<div class="line"><span class="lineno">  207</span>                                dominated = <span class="keyword">false</span>;</div>
-<div class="line"><span class="lineno">  208</span>                                <span class="keywordflow">break</span>;</div>
-<div class="line"><span class="lineno">  209</span>                            }</div>
-<div class="line"><span class="lineno">  210</span>                        }</div>
-<div class="line"><span class="lineno">  211</span>                    }</div>
-<div class="line"><span class="lineno">  212</span>                } <span class="keywordflow">else</span> {</div>
-<div class="line"><span class="lineno">  213</span>                    <span class="comment">// Scalar processing for small bitmaps</span></div>
-<div class="line"><span class="lineno">  214</span>                    <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> k = 0; k &lt; bitmap_size; ++k) {</div>
-<div class="line"><span class="lineno">  215</span>                        <span class="keywordflow">if</span> ((label_visited[k] &amp; new_visited[k]) != label_visited[k]) {</div>
-<div class="line"><span class="lineno">  216</span>                            dominated = <span class="keyword">false</span>;</div>
-<div class="line"><span class="lineno">  217</span>                            <span class="keywordflow">break</span>;</div>
-<div class="line"><span class="lineno">  218</span>                        }</div>
-<div class="line"><span class="lineno">  219</span>                    }</div>
-<div class="line"><span class="lineno">  220</span>                }</div>
-<div class="line"><span class="lineno">  221</span>            }</div>
-<div class="line"><span class="lineno">  222</span> </div>
-<div class="line"><span class="lineno">  223</span>            <span class="comment">// Skip SRC checks if not dominated based on visited nodes</span></div>
-<div class="line"><span class="lineno">  224</span>            <span class="keywordflow">if</span> (!dominated) <span class="keywordflow">continue</span>;</div>
-<div class="line"><span class="lineno">  225</span> </div>
-<div class="line"><span class="lineno">  226</span><span class="comment">// SRC dominance check - only for relevant stages and if SRC is active</span></div>
-<div class="line"><span class="lineno">  227</span><span class="preprocessor">#ifdef SRC</span></div>
-<div class="line"><span class="lineno">  228</span>            <span class="keywordflow">if</span> <span class="keyword">constexpr</span> (S == <a class="code hl_enumvalue" href="Definitions_8h.html#aca8133200c1122e29b87b314d82604eba981b8fcee42e1e726a67a2b9a98ea6e9">Stage::Four</a> || S == <a class="code hl_enumvalue" href="Definitions_8h.html#aca8133200c1122e29b87b314d82604eba81999728593fbd0249e73b02f3d7ad74">Stage::Enumerate</a>) {</div>
-<div class="line"><span class="lineno">  229</span>                <span class="keywordflow">if</span> (has_src) {</div>
-<div class="line"><span class="lineno">  230</span>                    <span class="keyword">alignas</span>(64) std::array&lt;double, simd_width&gt; dual_buf;</div>
-<div class="line"><span class="lineno">  231</span>                    <span class="keyword">alignas</span>(64) std::array&lt;double, simd_width&gt; label_buf;</div>
-<div class="line"><span class="lineno">  232</span>                    <span class="keyword">alignas</span>(64) std::array&lt;double, simd_width&gt; new_label_buf;</div>
-<div class="line"><span class="lineno">  233</span> </div>
-<div class="line"><span class="lineno">  234</span>                    <span class="keywordtype">double</span>       partial_sumSRC = 0.0;</div>
-<div class="line"><span class="lineno">  235</span>                    simd&lt;double&gt; sumSRC_simd    = 0;</div>
-<div class="line"><span class="lineno">  236</span>                    <span class="keywordtype">bool</span>         early_break    = <span class="keyword">false</span>;</div>
-<div class="line"><span class="lineno">  237</span> </div>
-<div class="line"><span class="lineno">  238</span>                    <span class="comment">// Process SRC cuts in SIMD-width chunks</span></div>
-<div class="line"><span class="lineno">  239</span>                    <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> cut_idx = 0; cut_idx &lt; simd_cut_size &amp;&amp; !early_break; cut_idx += simd_width) {</div>
-<div class="line"><span class="lineno">  240</span>                        <span class="comment">// Prefetch next batch of cuts</span></div>
-<div class="line"><span class="lineno">  241</span>                        <span class="keywordflow">if</span> (cut_idx + simd_width &lt; simd_cut_size) {</div>
-<div class="line"><span class="lineno">  242</span>                            __builtin_prefetch(&amp;active_cuts[cut_idx + simd_width], 0, 1);</div>
-<div class="line"><span class="lineno">  243</span>                        }</div>
-<div class="line"><span class="lineno">  244</span> </div>
-<div class="line"><span class="lineno">  245</span>                        <span class="comment">// Load SRC data into aligned buffers</span></div>
-<div class="line"><span class="lineno">  246</span>                        <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> j = 0; j &lt; simd_width; ++j) {</div>
-<div class="line"><span class="lineno">  247</span>                            <span class="keyword">const</span> <span class="keyword">auto</span>  &amp;active_cut = active_cuts[cut_idx + j];</div>
-<div class="line"><span class="lineno">  248</span>                            <span class="keyword">const</span> <span class="keywordtype">size_t</span> idx        = active_cut.index;</div>
-<div class="line"><span class="lineno">  249</span>                            dual_buf[j]             = active_cut.dual_value;</div>
-<div class="line"><span class="lineno">  250</span>                            label_buf[j]            = label-&gt;SRCmap[idx];</div>
-<div class="line"><span class="lineno">  251</span>                            new_label_buf[j]        = new_label-&gt;SRCmap[idx];</div>
-<div class="line"><span class="lineno">  252</span>                        }</div>
-<div class="line"><span class="lineno">  253</span> </div>
-<div class="line"><span class="lineno">  254</span>                        <span class="comment">// Create SIMD vectors from aligned buffers</span></div>
-<div class="line"><span class="lineno">  255</span>                        simd&lt;double&gt; src_duals(dual_buf.data(), vector_aligned);</div>
-<div class="line"><span class="lineno">  256</span>                        simd&lt;double&gt; label_mod(label_buf.data(), vector_aligned);</div>
-<div class="line"><span class="lineno">  257</span>                        simd&lt;double&gt; new_label_mod(new_label_buf.data(), vector_aligned);</div>
+<p class="definition">Definition at line <a class="el" href="Dominance_8h_source.html#l00072">72</a> of file <a class="el" href="Dominance_8h_source.html">Dominance.h</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">   74</span>                                                                                   {</div>
+<div class="line"><span class="lineno">   75</span>    <span class="keyword">using namespace </span>std::experimental;</div>
+<div class="line"><span class="lineno">   76</span> </div>
+<div class="line"><span class="lineno">   77</span>    <span class="comment">// Cache invariant data and sizes upfront</span></div>
+<div class="line"><span class="lineno">   78</span>    <span class="keyword">constexpr</span> <span class="keywordtype">double</span>   tolerance  = <a class="code hl_variable" href="namespacenumericutils.html#adaf310759d56f0e70fb4b325dbefc809">numericutils::eps</a>;</div>
+<div class="line"><span class="lineno">   79</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span>       num_labels = labels.size();</div>
+<div class="line"><span class="lineno">   80</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span>       simd_width = simd&lt;double&gt;::size();</div>
+<div class="line"><span class="lineno">   81</span>    <span class="keyword">const</span> <span class="keywordtype">double</span>       new_cost   = new_label-&gt;<a class="code hl_variable" href="structLabel.html#a1da1930412e730692277e75a94da77c2">cost</a>;</div>
+<div class="line"><span class="lineno">   82</span>    <span class="keyword">const</span> simd&lt;double&gt; new_cost_simd(new_cost);</div>
+<div class="line"><span class="lineno">   83</span>    <span class="keyword">const</span> simd&lt;double&gt; tolerance_simd(tolerance);</div>
+<div class="line"><span class="lineno">   84</span>    <span class="keyword">const</span> <span class="keyword">auto</span>        &amp;new_resources = new_label-&gt;<a class="code hl_variable" href="structLabel.html#a5f792e9fa27a10dd13bd4622b1a3044b">resources</a>;</div>
+<div class="line"><span class="lineno">   85</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span>       num_resources = new_resources.size();</div>
+<div class="line"><span class="lineno">   86</span>    <span class="keyword">const</span> <span class="keyword">auto</span>        &amp;new_visited   = new_label-&gt;<a class="code hl_variable" href="structLabel.html#ac5629d8044403e1ba299dbffb0e49247">visited_bitmap</a>;</div>
+<div class="line"><span class="lineno">   87</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span>       bitmap_size   = new_visited.size();</div>
+<div class="line"><span class="lineno">   88</span> </div>
+<div class="line"><span class="lineno">   89</span><span class="comment">// SRC optimization - precompute if SRC is active</span></div>
+<div class="line"><span class="lineno">   90</span><span class="preprocessor">#ifdef SRC</span></div>
+<div class="line"><span class="lineno">   91</span>    <span class="keyword">const</span> <span class="keywordtype">bool</span>   has_src = (S == <a class="code hl_enumvalue" href="Definitions_8h.html#aca8133200c1122e29b87b314d82604eba981b8fcee42e1e726a67a2b9a98ea6e9">Stage::Four</a> || S == <a class="code hl_enumvalue" href="Definitions_8h.html#aca8133200c1122e29b87b314d82604eba81999728593fbd0249e73b02f3d7ad74">Stage::Enumerate</a>) &amp;&amp; cut_storage &amp;&amp; cut_storage-&gt;<a class="code hl_function" href="classCutStorage.html#a2f71dd47977fd6afeefd08cb629507a6">activeSize</a>() &gt; 0;</div>
+<div class="line"><span class="lineno">   92</span>    <span class="keyword">const</span> <span class="keyword">auto</span>   active_cuts   = has_src ? cut_storage-&gt;<a class="code hl_function" href="classCutStorage.html#a5661b2dd9924180da3dd03cc2d63bd2c">getActiveCuts</a>() : <span class="keyword">decltype</span>(cut_storage-&gt;<a class="code hl_function" href="classCutStorage.html#a5661b2dd9924180da3dd03cc2d63bd2c">getActiveCuts</a>())();</div>
+<div class="line"><span class="lineno">   93</span>    <span class="keyword">const</span> <span class="keywordtype">int</span>    cut_size      = has_src ? cut_storage-&gt;<a class="code hl_function" href="classCutStorage.html#a2f71dd47977fd6afeefd08cb629507a6">activeSize</a>() : 0;</div>
+<div class="line"><span class="lineno">   94</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> simd_cut_size = cut_size - (cut_size % simd_width);</div>
+<div class="line"><span class="lineno">   95</span><span class="preprocessor">#endif</span></div>
+<div class="line"><span class="lineno">   96</span> </div>
+<div class="line"><span class="lineno">   97</span>    <span class="comment">// Process labels in SIMD-width chunks</span></div>
+<div class="line"><span class="lineno">   98</span>    <span class="keywordtype">size_t</span> i = 0;</div>
+<div class="line"><span class="lineno">   99</span>    <span class="keywordflow">for</span> (; i + simd_width &lt;= num_labels; i += simd_width) {</div>
+<div class="line"><span class="lineno">  100</span>        <span class="comment">// Load all label costs in one SIMD operation</span></div>
+<div class="line"><span class="lineno">  101</span>        simd&lt;double&gt; label_costs = <a class="code hl_function" href="#a1055d33f3fa0023a7782b354c84f30d6">load_simd&lt;double&gt;</a>(labels, i, simd_width, [](<span class="keyword">const</span> <a class="code hl_struct" href="structLabel.html">Label</a> *lbl) { <span class="keywordflow">return</span> lbl-&gt;<a class="code hl_variable" href="structLabel.html#a1da1930412e730692277e75a94da77c2">cost</a>; });</div>
+<div class="line"><span class="lineno">  102</span> </div>
+<div class="line"><span class="lineno">  103</span>        <span class="comment">// Fast raw-cost check is valid only when SRC dual compensation is not</span></div>
+<div class="line"><span class="lineno">  104</span>        <span class="comment">// active. With SRC, a label with higher raw reduced cost may still</span></div>
+<div class="line"><span class="lineno">  105</span>        <span class="comment">// dominate after subtracting applicable cut duals.</span></div>
+<div class="line"><span class="lineno">  106</span><span class="preprocessor">#ifdef SRC</span></div>
+<div class="line"><span class="lineno">  107</span>        <span class="keyword">const</span> <span class="keyword">auto</span> cost_mask = has_src ? (label_costs == label_costs) : (label_costs &lt;= (new_cost_simd + tolerance_simd));</div>
+<div class="line"><span class="lineno">  108</span><span class="preprocessor">#else</span></div>
+<div class="line"><span class="lineno">  109</span>        <span class="keyword">const</span> <span class="keyword">auto</span> cost_mask = (label_costs &lt;= (new_cost_simd + tolerance_simd));</div>
+<div class="line"><span class="lineno">  110</span><span class="preprocessor">#endif</span></div>
+<div class="line"><span class="lineno">  111</span>        <span class="keywordflow">if</span> (!any_of(cost_mask)) <span class="keywordflow">continue</span>;</div>
+<div class="line"><span class="lineno">  112</span> </div>
+<div class="line"><span class="lineno">  113</span>        <span class="comment">// For each label in this SIMD chunk that passed cost check</span></div>
+<div class="line"><span class="lineno">  114</span>        <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> j = 0; j &lt; simd_width; ++j) {</div>
+<div class="line"><span class="lineno">  115</span>            <span class="keywordflow">if</span> (!cost_mask[j]) <span class="keywordflow">continue</span>;</div>
+<div class="line"><span class="lineno">  116</span> </div>
+<div class="line"><span class="lineno">  117</span>            <span class="keyword">const</span> <a class="code hl_struct" href="structLabel.html">Label</a> *label           = labels[i + j];</div>
+<div class="line"><span class="lineno">  118</span>            <span class="keywordflow">if</span> (label-&gt;<a class="code hl_variable" href="structLabel.html#af36e4bfda4b5544e93ae446a31a49e7d">is_dominated</a>) <span class="keywordflow">continue</span>;</div>
+<div class="line"><span class="lineno">  119</span>            <span class="keyword">const</span> <span class="keyword">auto</span>  &amp;label_resources = label-&gt;<a class="code hl_variable" href="structLabel.html#a5f792e9fa27a10dd13bd4622b1a3044b">resources</a>;</div>
+<div class="line"><span class="lineno">  120</span>            <span class="keywordtype">bool</span>         dominated       = <span class="keyword">true</span>;</div>
+<div class="line"><span class="lineno">  121</span> </div>
+<div class="line"><span class="lineno">  122</span>            <span class="comment">// Resource check - use SIMD for larger resource sets</span></div>
+<div class="line"><span class="lineno">  123</span>            <span class="keywordflow">if</span> <span class="keyword">constexpr</span> (R_SIZE &gt;= simd_width) {</div>
+<div class="line"><span class="lineno">  124</span>                <span class="comment">// Process resources in SIMD-width chunks</span></div>
+<div class="line"><span class="lineno">  125</span>                <span class="keyword">const</span> <span class="keywordtype">size_t</span> simd_resource_blocks    = num_resources / simd_width;</div>
+<div class="line"><span class="lineno">  126</span>                <span class="keyword">const</span> <span class="keywordtype">size_t</span> simd_resource_remainder = num_resources % simd_width;</div>
+<div class="line"><span class="lineno">  127</span> </div>
+<div class="line"><span class="lineno">  128</span>                <span class="comment">// Main SIMD blocks</span></div>
+<div class="line"><span class="lineno">  129</span>                <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> k = 0; k &lt; simd_resource_blocks * simd_width; k += simd_width) {</div>
+<div class="line"><span class="lineno">  130</span>                    simd&lt;double&gt; label_res     = <a class="code hl_function" href="#af50959ead7daa760836f9ef6aecae34b">load_simd_direct&lt;double&gt;</a>(label_resources.data() + k, simd_width);</div>
+<div class="line"><span class="lineno">  131</span>                    simd&lt;double&gt; new_label_res = <a class="code hl_function" href="#af50959ead7daa760836f9ef6aecae34b">load_simd_direct&lt;double&gt;</a>(new_resources.data() + k, simd_width);</div>
+<div class="line"><span class="lineno">  132</span> </div>
+<div class="line"><span class="lineno">  133</span>                    <span class="keywordflow">if</span> <span class="keyword">constexpr</span> (D == <a class="code hl_enumvalue" href="Definitions_8h.html#a224b9163917ac32fc95a60d8c1eec3aaa67d2f6740a8eaebf4d5c6f79be8da481">Direction::Forward</a>) {</div>
+<div class="line"><span class="lineno">  134</span>                        <span class="keywordflow">if</span> (!all_of(label_res &lt;= (new_label_res + tolerance_simd))) {</div>
+<div class="line"><span class="lineno">  135</span>                            dominated = <span class="keyword">false</span>;</div>
+<div class="line"><span class="lineno">  136</span>                            <span class="keywordflow">break</span>;</div>
+<div class="line"><span class="lineno">  137</span>                        }</div>
+<div class="line"><span class="lineno">  138</span>                    } <span class="keywordflow">else</span> {</div>
+<div class="line"><span class="lineno">  139</span>                        <span class="keywordflow">if</span> (!all_of(label_res &gt;= (new_label_res - tolerance_simd))) {</div>
+<div class="line"><span class="lineno">  140</span>                            dominated = <span class="keyword">false</span>;</div>
+<div class="line"><span class="lineno">  141</span>                            <span class="keywordflow">break</span>;</div>
+<div class="line"><span class="lineno">  142</span>                        }</div>
+<div class="line"><span class="lineno">  143</span>                    }</div>
+<div class="line"><span class="lineno">  144</span>                }</div>
+<div class="line"><span class="lineno">  145</span> </div>
+<div class="line"><span class="lineno">  146</span>                <span class="comment">// Handle remaining resources</span></div>
+<div class="line"><span class="lineno">  147</span>                <span class="keywordflow">if</span> (dominated &amp;&amp; simd_resource_remainder &gt; 0) {</div>
+<div class="line"><span class="lineno">  148</span>                    <span class="keyword">const</span> <span class="keywordtype">size_t</span> base_idx = simd_resource_blocks * simd_width;</div>
+<div class="line"><span class="lineno">  149</span>                    <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> k = 0; k &lt; simd_resource_remainder; ++k) {</div>
+<div class="line"><span class="lineno">  150</span>                        <span class="keyword">const</span> <span class="keywordtype">size_t</span> idx = base_idx + k;</div>
+<div class="line"><span class="lineno">  151</span>                        <span class="keywordflow">if</span> (idx == 0) <span class="keywordflow">continue</span>;</div>
+<div class="line"><span class="lineno">  152</span>                        <span class="keywordflow">if</span> <span class="keyword">constexpr</span> (D == <a class="code hl_enumvalue" href="Definitions_8h.html#a224b9163917ac32fc95a60d8c1eec3aaa67d2f6740a8eaebf4d5c6f79be8da481">Direction::Forward</a>) {</div>
+<div class="line"><span class="lineno">  153</span>                            <span class="keywordflow">if</span> (<a class="code hl_function" href="namespacenumericutils.html#aaadab3c8a1b76df1e09c11ebaa3d1e49">numericutils::gt</a>(label_resources[idx], new_resources[idx])) {</div>
+<div class="line"><span class="lineno">  154</span>                                dominated = <span class="keyword">false</span>;</div>
+<div class="line"><span class="lineno">  155</span>                                <span class="keywordflow">break</span>;</div>
+<div class="line"><span class="lineno">  156</span>                            }</div>
+<div class="line"><span class="lineno">  157</span>                        } <span class="keywordflow">else</span> {</div>
+<div class="line"><span class="lineno">  158</span>                            <span class="keywordflow">if</span> (<a class="code hl_function" href="namespacenumericutils.html#af55fcfd2b05fe5a20796069445c89aef">numericutils::lt</a>(label_resources[idx], new_resources[idx])) {</div>
+<div class="line"><span class="lineno">  159</span>                                dominated = <span class="keyword">false</span>;</div>
+<div class="line"><span class="lineno">  160</span>                                <span class="keywordflow">break</span>;</div>
+<div class="line"><span class="lineno">  161</span>                            }</div>
+<div class="line"><span class="lineno">  162</span>                        }</div>
+<div class="line"><span class="lineno">  163</span>                    }</div>
+<div class="line"><span class="lineno">  164</span>                    <span class="keywordflow">if</span> (dominated &amp;&amp; num_resources &gt; 0) {</div>
+<div class="line"><span class="lineno">  165</span>                        <span class="keywordflow">if</span> <span class="keyword">constexpr</span> (D == <a class="code hl_enumvalue" href="Definitions_8h.html#a224b9163917ac32fc95a60d8c1eec3aaa67d2f6740a8eaebf4d5c6f79be8da481">Direction::Forward</a>) {</div>
+<div class="line"><span class="lineno">  166</span>                            <span class="keywordflow">if</span> (<a class="code hl_function" href="namespacenumericutils.html#aaadab3c8a1b76df1e09c11ebaa3d1e49">numericutils::gt</a>(label_resources[0], new_resources[0])) { dominated = <span class="keyword">false</span>; }</div>
+<div class="line"><span class="lineno">  167</span>                        } <span class="keywordflow">else</span> {</div>
+<div class="line"><span class="lineno">  168</span>                            <span class="keywordflow">if</span> (<a class="code hl_function" href="namespacenumericutils.html#af55fcfd2b05fe5a20796069445c89aef">numericutils::lt</a>(label_resources[0], new_resources[0])) { dominated = <span class="keyword">false</span>; }</div>
+<div class="line"><span class="lineno">  169</span>                        }</div>
+<div class="line"><span class="lineno">  170</span>                    }</div>
+<div class="line"><span class="lineno">  171</span>                }</div>
+<div class="line"><span class="lineno">  172</span>            } <span class="keywordflow">else</span> {</div>
+<div class="line"><span class="lineno">  173</span>                <span class="comment">// Scalar processing for small resource sets - better for branch</span></div>
+<div class="line"><span class="lineno">  174</span>                <span class="comment">// prediction</span></div>
+<div class="line"><span class="lineno">  175</span>                <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> k = 1; k &lt; num_resources; ++k) {</div>
+<div class="line"><span class="lineno">  176</span>                    <span class="keywordflow">if</span> <span class="keyword">constexpr</span> (D == <a class="code hl_enumvalue" href="Definitions_8h.html#a224b9163917ac32fc95a60d8c1eec3aaa67d2f6740a8eaebf4d5c6f79be8da481">Direction::Forward</a>) {</div>
+<div class="line"><span class="lineno">  177</span>                        <span class="keywordflow">if</span> (<a class="code hl_function" href="namespacenumericutils.html#aaadab3c8a1b76df1e09c11ebaa3d1e49">numericutils::gt</a>(label_resources[k], new_resources[k])) {</div>
+<div class="line"><span class="lineno">  178</span>                            dominated = <span class="keyword">false</span>;</div>
+<div class="line"><span class="lineno">  179</span>                            <span class="keywordflow">break</span>;</div>
+<div class="line"><span class="lineno">  180</span>                        }</div>
+<div class="line"><span class="lineno">  181</span>                    } <span class="keywordflow">else</span> {</div>
+<div class="line"><span class="lineno">  182</span>                        <span class="keywordflow">if</span> (<a class="code hl_function" href="namespacenumericutils.html#af55fcfd2b05fe5a20796069445c89aef">numericutils::lt</a>(label_resources[k], new_resources[k])) {</div>
+<div class="line"><span class="lineno">  183</span>                            dominated = <span class="keyword">false</span>;</div>
+<div class="line"><span class="lineno">  184</span>                            <span class="keywordflow">break</span>;</div>
+<div class="line"><span class="lineno">  185</span>                        }</div>
+<div class="line"><span class="lineno">  186</span>                    }</div>
+<div class="line"><span class="lineno">  187</span>                }</div>
+<div class="line"><span class="lineno">  188</span>                <span class="keywordflow">if</span> (dominated &amp;&amp; num_resources &gt; 0) {</div>
+<div class="line"><span class="lineno">  189</span>                    <span class="keywordflow">if</span> <span class="keyword">constexpr</span> (D == <a class="code hl_enumvalue" href="Definitions_8h.html#a224b9163917ac32fc95a60d8c1eec3aaa67d2f6740a8eaebf4d5c6f79be8da481">Direction::Forward</a>) {</div>
+<div class="line"><span class="lineno">  190</span>                        <span class="keywordflow">if</span> (<a class="code hl_function" href="namespacenumericutils.html#aaadab3c8a1b76df1e09c11ebaa3d1e49">numericutils::gt</a>(label_resources[0], new_resources[0])) { dominated = <span class="keyword">false</span>; }</div>
+<div class="line"><span class="lineno">  191</span>                    } <span class="keywordflow">else</span> {</div>
+<div class="line"><span class="lineno">  192</span>                        <span class="keywordflow">if</span> (<a class="code hl_function" href="namespacenumericutils.html#af55fcfd2b05fe5a20796069445c89aef">numericutils::lt</a>(label_resources[0], new_resources[0])) { dominated = <span class="keyword">false</span>; }</div>
+<div class="line"><span class="lineno">  193</span>                    }</div>
+<div class="line"><span class="lineno">  194</span>                }</div>
+<div class="line"><span class="lineno">  195</span>            }</div>
+<div class="line"><span class="lineno">  196</span> </div>
+<div class="line"><span class="lineno">  197</span>            <span class="comment">// Skip further checks if not dominated based on resources</span></div>
+<div class="line"><span class="lineno">  198</span>            <span class="keywordflow">if</span> (!dominated) <span class="keywordflow">continue</span>;</div>
+<div class="line"><span class="lineno">  199</span> </div>
+<div class="line"><span class="lineno">  200</span>            <span class="comment">// Visited nodes check - only for relevant stages</span></div>
+<div class="line"><span class="lineno">  201</span>            <span class="keywordflow">if</span> <span class="keyword">constexpr</span> (S == <a class="code hl_enumvalue" href="Definitions_8h.html#aca8133200c1122e29b87b314d82604ebaca8a2087e5557e317599344687a57391">Stage::Three</a> || S == <a class="code hl_enumvalue" href="Definitions_8h.html#aca8133200c1122e29b87b314d82604eba981b8fcee42e1e726a67a2b9a98ea6e9">Stage::Four</a> || S == <a class="code hl_enumvalue" href="Definitions_8h.html#aca8133200c1122e29b87b314d82604eba81999728593fbd0249e73b02f3d7ad74">Stage::Enumerate</a>) {</div>
+<div class="line"><span class="lineno">  202</span>                <span class="keyword">const</span> <span class="keyword">auto</span> &amp;label_visited = label-&gt;<a class="code hl_variable" href="structLabel.html#ac5629d8044403e1ba299dbffb0e49247">visited_bitmap</a>;</div>
+<div class="line"><span class="lineno">  203</span> </div>
+<div class="line"><span class="lineno">  204</span>                <span class="comment">// Use SIMD for large bitmaps</span></div>
+<div class="line"><span class="lineno">  205</span>                <span class="keywordflow">if</span> <span class="keyword">constexpr</span> (N_SIZE / 64 &gt;= simd_width) {</div>
+<div class="line"><span class="lineno">  206</span>                    <span class="keyword">const</span> <span class="keywordtype">size_t</span> simd_bitmap_blocks    = bitmap_size / simd_width;</div>
+<div class="line"><span class="lineno">  207</span>                    <span class="keyword">const</span> <span class="keywordtype">size_t</span> simd_bitmap_remainder = bitmap_size % simd_width;</div>
+<div class="line"><span class="lineno">  208</span> </div>
+<div class="line"><span class="lineno">  209</span>                    <span class="comment">// Process bitmap in SIMD-width chunks</span></div>
+<div class="line"><span class="lineno">  210</span>                    <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> k = 0; k &lt; simd_bitmap_blocks * simd_width; k += simd_width) {</div>
+<div class="line"><span class="lineno">  211</span>                        simd&lt;uint64_t&gt; label_vis     = <a class="code hl_function" href="#af50959ead7daa760836f9ef6aecae34b">load_simd_direct&lt;uint64_t&gt;</a>(label_visited.data() + k, simd_width);</div>
+<div class="line"><span class="lineno">  212</span>                        simd&lt;uint64_t&gt; new_label_vis = <a class="code hl_function" href="#af50959ead7daa760836f9ef6aecae34b">load_simd_direct&lt;uint64_t&gt;</a>(new_visited.data() + k, simd_width);</div>
+<div class="line"><span class="lineno">  213</span> </div>
+<div class="line"><span class="lineno">  214</span>                        <span class="comment">// Check if all visited nodes in label are also in</span></div>
+<div class="line"><span class="lineno">  215</span>                        <span class="comment">// new_label</span></div>
+<div class="line"><span class="lineno">  216</span>                        <span class="keywordflow">if</span> (!all_of((label_vis &amp; new_label_vis) == label_vis)) {</div>
+<div class="line"><span class="lineno">  217</span>                            dominated = <span class="keyword">false</span>;</div>
+<div class="line"><span class="lineno">  218</span>                            <span class="keywordflow">break</span>;</div>
+<div class="line"><span class="lineno">  219</span>                        }</div>
+<div class="line"><span class="lineno">  220</span>                    }</div>
+<div class="line"><span class="lineno">  221</span> </div>
+<div class="line"><span class="lineno">  222</span>                    <span class="comment">// Handle remaining bitmap elements</span></div>
+<div class="line"><span class="lineno">  223</span>                    <span class="keywordflow">if</span> (dominated &amp;&amp; simd_bitmap_remainder &gt; 0) {</div>
+<div class="line"><span class="lineno">  224</span>                        <span class="keyword">const</span> <span class="keywordtype">size_t</span> base_idx = simd_bitmap_blocks * simd_width;</div>
+<div class="line"><span class="lineno">  225</span>                        <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> k = 0; k &lt; simd_bitmap_remainder; ++k) {</div>
+<div class="line"><span class="lineno">  226</span>                            <span class="keyword">const</span> <span class="keywordtype">size_t</span> idx = base_idx + k;</div>
+<div class="line"><span class="lineno">  227</span>                            <span class="keywordflow">if</span> ((label_visited[idx] &amp; new_visited[idx]) != label_visited[idx]) {</div>
+<div class="line"><span class="lineno">  228</span>                                dominated = <span class="keyword">false</span>;</div>
+<div class="line"><span class="lineno">  229</span>                                <span class="keywordflow">break</span>;</div>
+<div class="line"><span class="lineno">  230</span>                            }</div>
+<div class="line"><span class="lineno">  231</span>                        }</div>
+<div class="line"><span class="lineno">  232</span>                    }</div>
+<div class="line"><span class="lineno">  233</span>                } <span class="keywordflow">else</span> {</div>
+<div class="line"><span class="lineno">  234</span>                    <span class="comment">// Scalar processing for small bitmaps</span></div>
+<div class="line"><span class="lineno">  235</span>                    <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> k = 0; k &lt; bitmap_size; ++k) {</div>
+<div class="line"><span class="lineno">  236</span>                        <span class="keywordflow">if</span> ((label_visited[k] &amp; new_visited[k]) != label_visited[k]) {</div>
+<div class="line"><span class="lineno">  237</span>                            dominated = <span class="keyword">false</span>;</div>
+<div class="line"><span class="lineno">  238</span>                            <span class="keywordflow">break</span>;</div>
+<div class="line"><span class="lineno">  239</span>                        }</div>
+<div class="line"><span class="lineno">  240</span>                    }</div>
+<div class="line"><span class="lineno">  241</span>                }</div>
+<div class="line"><span class="lineno">  242</span>            }</div>
+<div class="line"><span class="lineno">  243</span> </div>
+<div class="line"><span class="lineno">  244</span>            <span class="comment">// Skip SRC checks if not dominated based on visited nodes</span></div>
+<div class="line"><span class="lineno">  245</span>            <span class="keywordflow">if</span> (!dominated) <span class="keywordflow">continue</span>;</div>
+<div class="line"><span class="lineno">  246</span> </div>
+<div class="line"><span class="lineno">  247</span><span class="comment">// SRC dominance check - only for relevant stages and if SRC is active</span></div>
+<div class="line"><span class="lineno">  248</span><span class="preprocessor">#ifdef SRC</span></div>
+<div class="line"><span class="lineno">  249</span>            <span class="keywordflow">if</span> <span class="keyword">constexpr</span> (S == <a class="code hl_enumvalue" href="Definitions_8h.html#aca8133200c1122e29b87b314d82604eba981b8fcee42e1e726a67a2b9a98ea6e9">Stage::Four</a> || S == <a class="code hl_enumvalue" href="Definitions_8h.html#aca8133200c1122e29b87b314d82604eba81999728593fbd0249e73b02f3d7ad74">Stage::Enumerate</a>) {</div>
+<div class="line"><span class="lineno">  250</span>                <span class="keywordflow">if</span> (has_src) {</div>
+<div class="line"><span class="lineno">  251</span>                    <span class="keyword">alignas</span>(64) std::array&lt;double, simd_width&gt; dual_buf;</div>
+<div class="line"><span class="lineno">  252</span>                    <span class="keyword">alignas</span>(64) std::array&lt;double, simd_width&gt; label_buf;</div>
+<div class="line"><span class="lineno">  253</span>                    <span class="keyword">alignas</span>(64) std::array&lt;double, simd_width&gt; new_label_buf;</div>
+<div class="line"><span class="lineno">  254</span> </div>
+<div class="line"><span class="lineno">  255</span>                    <span class="keywordtype">double</span>       partial_sumSRC = 0.0;</div>
+<div class="line"><span class="lineno">  256</span>                    simd&lt;double&gt; sumSRC_simd    = 0;</div>
+<div class="line"><span class="lineno">  257</span>                    <span class="keywordtype">bool</span>         early_break    = <span class="keyword">false</span>;</div>
 <div class="line"><span class="lineno">  258</span> </div>
-<div class="line"><span class="lineno">  259</span>                        <span class="comment">// Apply mask where label&#39;s SRC value exceeds new</span></div>
-<div class="line"><span class="lineno">  260</span>                        <span class="comment">// label&#39;s</span></div>
-<div class="line"><span class="lineno">  261</span>                        <span class="keyword">auto</span>         mask   = label_mod &gt; new_label_mod;</div>
-<div class="line"><span class="lineno">  262</span>                        simd&lt;double&gt; masked = 0.0;</div>
-<div class="line"><span class="lineno">  263</span>                        where(mask, masked) = src_duals;</div>
-<div class="line"><span class="lineno">  264</span>                        sumSRC_simd += masked;</div>
+<div class="line"><span class="lineno">  259</span>                    <span class="comment">// Process SRC cuts in SIMD-width chunks</span></div>
+<div class="line"><span class="lineno">  260</span>                    <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> cut_idx = 0; cut_idx &lt; simd_cut_size &amp;&amp; !early_break; cut_idx += simd_width) {</div>
+<div class="line"><span class="lineno">  261</span>                        <span class="comment">// Prefetch next batch of cuts</span></div>
+<div class="line"><span class="lineno">  262</span>                        <span class="keywordflow">if</span> (cut_idx + simd_width &lt; simd_cut_size) {</div>
+<div class="line"><span class="lineno">  263</span>                            __builtin_prefetch(&amp;active_cuts[cut_idx + simd_width], 0, 1);</div>
+<div class="line"><span class="lineno">  264</span>                        }</div>
 <div class="line"><span class="lineno">  265</span> </div>
-<div class="line"><span class="lineno">  266</span>                        <span class="comment">// Check if we can early-break based on accumulated sum</span></div>
-<div class="line"><span class="lineno">  267</span>                        partial_sumSRC = reduce(sumSRC_simd);</div>
-<div class="line"><span class="lineno">  268</span>                        <span class="keywordflow">if</span> (<a class="code hl_function" href="namespacenumericutils.html#aaadab3c8a1b76df1e09c11ebaa3d1e49">numericutils::gt</a>(label-&gt;<a class="code hl_variable" href="structLabel.html#a1da1930412e730692277e75a94da77c2">cost</a> - partial_sumSRC, new_cost)) {</div>
-<div class="line"><span class="lineno">  269</span>                            early_break = <span class="keyword">true</span>;</div>
-<div class="line"><span class="lineno">  270</span>                            <span class="keywordflow">break</span>;</div>
-<div class="line"><span class="lineno">  271</span>                        }</div>
-<div class="line"><span class="lineno">  272</span>                    }</div>
-<div class="line"><span class="lineno">  273</span> </div>
-<div class="line"><span class="lineno">  274</span>                    <span class="comment">// Process remaining cuts scalar</span></div>
-<div class="line"><span class="lineno">  275</span>                    <span class="keywordflow">if</span> (!early_break) {</div>
-<div class="line"><span class="lineno">  276</span>                        partial_sumSRC = reduce(sumSRC_simd);</div>
-<div class="line"><span class="lineno">  277</span>                        <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> idx = simd_cut_size; idx &lt; static_cast&lt;size_t&gt;(cut_size) &amp;&amp; !early_break; ++idx) {</div>
-<div class="line"><span class="lineno">  278</span>                            <span class="keyword">const</span> <span class="keyword">auto</span>  &amp;active_cut = active_cuts[idx];</div>
-<div class="line"><span class="lineno">  279</span>                            <span class="keyword">const</span> <span class="keywordtype">size_t</span> cut_idx    = active_cut.index;</div>
-<div class="line"><span class="lineno">  280</span> </div>
-<div class="line"><span class="lineno">  281</span>                            <span class="keywordflow">if</span> (label-&gt;SRCmap[cut_idx] &gt; new_label-&gt;SRCmap[cut_idx]) {</div>
-<div class="line"><span class="lineno">  282</span>                                partial_sumSRC += active_cut.dual_value;</div>
-<div class="line"><span class="lineno">  283</span>                                <span class="keywordflow">if</span> (<a class="code hl_function" href="namespacenumericutils.html#aaadab3c8a1b76df1e09c11ebaa3d1e49">numericutils::gt</a>(label-&gt;<a class="code hl_variable" href="structLabel.html#a1da1930412e730692277e75a94da77c2">cost</a> - partial_sumSRC, new_cost)) {</div>
-<div class="line"><span class="lineno">  284</span>                                    early_break = <span class="keyword">true</span>;</div>
-<div class="line"><span class="lineno">  285</span>                                    <span class="keywordflow">break</span>;</div>
-<div class="line"><span class="lineno">  286</span>                                }</div>
-<div class="line"><span class="lineno">  287</span>                            }</div>
-<div class="line"><span class="lineno">  288</span>                        }</div>
-<div class="line"><span class="lineno">  289</span>                    }</div>
-<div class="line"><span class="lineno">  290</span> </div>
-<div class="line"><span class="lineno">  291</span>                    <span class="comment">// If we had an early break, this label doesn&#39;t dominate</span></div>
-<div class="line"><span class="lineno">  292</span>                    <span class="keywordflow">if</span> (early_break) {</div>
-<div class="line"><span class="lineno">  293</span>                        dominated = <span class="keyword">false</span>;</div>
-<div class="line"><span class="lineno">  294</span>                        <span class="keywordflow">continue</span>;</div>
-<div class="line"><span class="lineno">  295</span>                    }</div>
-<div class="line"><span class="lineno">  296</span>                }</div>
-<div class="line"><span class="lineno">  297</span>            }</div>
-<div class="line"><span class="lineno">  298</span><span class="preprocessor">#endif</span></div>
-<div class="line"><span class="lineno">  299</span> </div>
-<div class="line"><span class="lineno">  300</span>            <span class="comment">// If we reach here and dominated is still true, we found domination</span></div>
-<div class="line"><span class="lineno">  301</span>            <span class="keywordflow">if</span> (dominated) {</div>
-<div class="line"><span class="lineno">  302</span>                stat_n_dom++;</div>
-<div class="line"><span class="lineno">  303</span>                <span class="keywordflow">return</span> <span class="keyword">true</span>;</div>
-<div class="line"><span class="lineno">  304</span>            }</div>
-<div class="line"><span class="lineno">  305</span>        }</div>
-<div class="line"><span class="lineno">  306</span>    }</div>
-<div class="line"><span class="lineno">  307</span> </div>
-<div class="line"><span class="lineno">  308</span>    <span class="comment">// Process remaining labels using scalar code</span></div>
-<div class="line"><span class="lineno">  309</span>    <span class="keywordflow">for</span> (; i &lt; num_labels; ++i) {</div>
-<div class="line"><span class="lineno">  310</span>        <span class="keyword">const</span> <a class="code hl_struct" href="structLabel.html">Label</a> *label = labels[i];</div>
-<div class="line"><span class="lineno">  311</span>        <span class="keywordflow">if</span> (label-&gt;<a class="code hl_variable" href="structLabel.html#af36e4bfda4b5544e93ae446a31a49e7d">is_dominated</a>) <span class="keywordflow">continue</span>;</div>
-<div class="line"><span class="lineno">  312</span> </div>
-<div class="line"><span class="lineno">  313</span>        <span class="comment">// Cost check</span></div>
-<div class="line"><span class="lineno">  314</span><span class="preprocessor">#ifdef SRC</span></div>
-<div class="line"><span class="lineno">  315</span>        <span class="keywordflow">if</span> (!has_src &amp;&amp; <a class="code hl_function" href="namespacenumericutils.html#aaadab3c8a1b76df1e09c11ebaa3d1e49">numericutils::gt</a>(label-&gt;<a class="code hl_variable" href="structLabel.html#a1da1930412e730692277e75a94da77c2">cost</a>, new_cost)) <span class="keywordflow">continue</span>;</div>
-<div class="line"><span class="lineno">  316</span><span class="preprocessor">#else</span></div>
-<div class="line"><span class="lineno">  317</span>        <span class="keywordflow">if</span> (<a class="code hl_function" href="namespacenumericutils.html#aaadab3c8a1b76df1e09c11ebaa3d1e49">numericutils::gt</a>(label-&gt;<a class="code hl_variable" href="structLabel.html#a1da1930412e730692277e75a94da77c2">cost</a>, new_cost)) <span class="keywordflow">continue</span>;</div>
-<div class="line"><span class="lineno">  318</span><span class="preprocessor">#endif</span></div>
-<div class="line"><span class="lineno">  319</span> </div>
-<div class="line"><span class="lineno">  320</span>        <span class="keywordtype">bool</span>        dominated       = <span class="keyword">true</span>;</div>
-<div class="line"><span class="lineno">  321</span>        <span class="keyword">const</span> <span class="keyword">auto</span> &amp;label_resources = label-&gt;<a class="code hl_variable" href="structLabel.html#a5f792e9fa27a10dd13bd4622b1a3044b">resources</a>;</div>
-<div class="line"><span class="lineno">  322</span> </div>
-<div class="line"><span class="lineno">  323</span>        <span class="comment">// Resource check</span></div>
-<div class="line"><span class="lineno">  324</span>        <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> k = 1; k &lt; num_resources; ++k) {</div>
-<div class="line"><span class="lineno">  325</span>            <span class="keywordflow">if</span> <span class="keyword">constexpr</span> (D == <a class="code hl_enumvalue" href="Definitions_8h.html#a224b9163917ac32fc95a60d8c1eec3aaa67d2f6740a8eaebf4d5c6f79be8da481">Direction::Forward</a>) {</div>
-<div class="line"><span class="lineno">  326</span>                <span class="keywordflow">if</span> (<a class="code hl_function" href="namespacenumericutils.html#aaadab3c8a1b76df1e09c11ebaa3d1e49">numericutils::gt</a>(label_resources[k], new_resources[k])) {</div>
-<div class="line"><span class="lineno">  327</span>                    dominated = <span class="keyword">false</span>;</div>
-<div class="line"><span class="lineno">  328</span>                    <span class="keywordflow">break</span>;</div>
-<div class="line"><span class="lineno">  329</span>                }</div>
-<div class="line"><span class="lineno">  330</span>            } <span class="keywordflow">else</span> {</div>
-<div class="line"><span class="lineno">  331</span>                <span class="keywordflow">if</span> (<a class="code hl_function" href="namespacenumericutils.html#af55fcfd2b05fe5a20796069445c89aef">numericutils::lt</a>(label_resources[k], new_resources[k])) {</div>
-<div class="line"><span class="lineno">  332</span>                    dominated = <span class="keyword">false</span>;</div>
-<div class="line"><span class="lineno">  333</span>                    <span class="keywordflow">break</span>;</div>
-<div class="line"><span class="lineno">  334</span>                }</div>
-<div class="line"><span class="lineno">  335</span>            }</div>
-<div class="line"><span class="lineno">  336</span>        }</div>
-<div class="line"><span class="lineno">  337</span>        <span class="keywordflow">if</span> (dominated &amp;&amp; num_resources &gt; 0) {</div>
-<div class="line"><span class="lineno">  338</span>            <span class="keywordflow">if</span> <span class="keyword">constexpr</span> (D == <a class="code hl_enumvalue" href="Definitions_8h.html#a224b9163917ac32fc95a60d8c1eec3aaa67d2f6740a8eaebf4d5c6f79be8da481">Direction::Forward</a>) {</div>
-<div class="line"><span class="lineno">  339</span>                <span class="keywordflow">if</span> (<a class="code hl_function" href="namespacenumericutils.html#aaadab3c8a1b76df1e09c11ebaa3d1e49">numericutils::gt</a>(label_resources[0], new_resources[0])) { dominated = <span class="keyword">false</span>; }</div>
-<div class="line"><span class="lineno">  340</span>            } <span class="keywordflow">else</span> {</div>
-<div class="line"><span class="lineno">  341</span>                <span class="keywordflow">if</span> (<a class="code hl_function" href="namespacenumericutils.html#af55fcfd2b05fe5a20796069445c89aef">numericutils::lt</a>(label_resources[0], new_resources[0])) { dominated = <span class="keyword">false</span>; }</div>
-<div class="line"><span class="lineno">  342</span>            }</div>
-<div class="line"><span class="lineno">  343</span>        }</div>
-<div class="line"><span class="lineno">  344</span> </div>
-<div class="line"><span class="lineno">  345</span>        <span class="keywordflow">if</span> (!dominated) <span class="keywordflow">continue</span>;</div>
-<div class="line"><span class="lineno">  346</span> </div>
-<div class="line"><span class="lineno">  347</span>        <span class="comment">// Visited nodes check</span></div>
-<div class="line"><span class="lineno">  348</span>        <span class="keywordflow">if</span> <span class="keyword">constexpr</span> (S == <a class="code hl_enumvalue" href="Definitions_8h.html#aca8133200c1122e29b87b314d82604ebaca8a2087e5557e317599344687a57391">Stage::Three</a> || S == <a class="code hl_enumvalue" href="Definitions_8h.html#aca8133200c1122e29b87b314d82604eba981b8fcee42e1e726a67a2b9a98ea6e9">Stage::Four</a> || S == <a class="code hl_enumvalue" href="Definitions_8h.html#aca8133200c1122e29b87b314d82604eba81999728593fbd0249e73b02f3d7ad74">Stage::Enumerate</a>) {</div>
-<div class="line"><span class="lineno">  349</span>            <span class="keyword">const</span> <span class="keyword">auto</span> &amp;label_visited = label-&gt;<a class="code hl_variable" href="structLabel.html#ac5629d8044403e1ba299dbffb0e49247">visited_bitmap</a>;</div>
-<div class="line"><span class="lineno">  350</span>            <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> k = 0; k &lt; bitmap_size; ++k) {</div>
-<div class="line"><span class="lineno">  351</span>                <span class="keywordflow">if</span> ((label_visited[k] &amp; new_visited[k]) != label_visited[k]) {</div>
-<div class="line"><span class="lineno">  352</span>                    dominated = <span class="keyword">false</span>;</div>
-<div class="line"><span class="lineno">  353</span>                    <span class="keywordflow">break</span>;</div>
-<div class="line"><span class="lineno">  354</span>                }</div>
-<div class="line"><span class="lineno">  355</span>            }</div>
-<div class="line"><span class="lineno">  356</span>        }</div>
-<div class="line"><span class="lineno">  357</span> </div>
-<div class="line"><span class="lineno">  358</span>        <span class="keywordflow">if</span> (!dominated) <span class="keywordflow">continue</span>;</div>
-<div class="line"><span class="lineno">  359</span> </div>
-<div class="line"><span class="lineno">  360</span><span class="comment">// SRC check</span></div>
-<div class="line"><span class="lineno">  361</span><span class="preprocessor">#ifdef SRC</span></div>
-<div class="line"><span class="lineno">  362</span>        <span class="keywordflow">if</span> <span class="keyword">constexpr</span> (S == <a class="code hl_enumvalue" href="Definitions_8h.html#aca8133200c1122e29b87b314d82604eba981b8fcee42e1e726a67a2b9a98ea6e9">Stage::Four</a> || S == <a class="code hl_enumvalue" href="Definitions_8h.html#aca8133200c1122e29b87b314d82604eba81999728593fbd0249e73b02f3d7ad74">Stage::Enumerate</a>) {</div>
-<div class="line"><span class="lineno">  363</span>            <span class="keywordflow">if</span> (has_src) {</div>
-<div class="line"><span class="lineno">  364</span>                <span class="keywordtype">double</span> sumSRC      = 0.0;</div>
-<div class="line"><span class="lineno">  365</span>                <span class="keywordtype">bool</span>   early_break = <span class="keyword">false</span>;</div>
-<div class="line"><span class="lineno">  366</span> </div>
-<div class="line"><span class="lineno">  367</span>                <span class="keywordflow">for</span> (<span class="keywordtype">int</span> cut_idx = 0; cut_idx &lt; cut_size &amp;&amp; !early_break; ++cut_idx) {</div>
-<div class="line"><span class="lineno">  368</span>                    <span class="keyword">const</span> <span class="keyword">auto</span>  &amp;active_cut = active_cuts[cut_idx];</div>
-<div class="line"><span class="lineno">  369</span>                    <span class="keyword">const</span> <span class="keywordtype">size_t</span> idx        = active_cut.index;</div>
-<div class="line"><span class="lineno">  370</span> </div>
-<div class="line"><span class="lineno">  371</span>                    <span class="keywordflow">if</span> (label-&gt;SRCmap[idx] &gt; new_label-&gt;SRCmap[idx]) {</div>
-<div class="line"><span class="lineno">  372</span>                        sumSRC += active_cut.dual_value;</div>
-<div class="line"><span class="lineno">  373</span>                        <span class="keywordflow">if</span> (<a class="code hl_function" href="namespacenumericutils.html#aaadab3c8a1b76df1e09c11ebaa3d1e49">numericutils::gt</a>(label-&gt;<a class="code hl_variable" href="structLabel.html#a1da1930412e730692277e75a94da77c2">cost</a> - sumSRC, new_cost)) {</div>
-<div class="line"><span class="lineno">  374</span>                            early_break = <span class="keyword">true</span>;</div>
-<div class="line"><span class="lineno">  375</span>                            <span class="keywordflow">break</span>;</div>
-<div class="line"><span class="lineno">  376</span>                        }</div>
-<div class="line"><span class="lineno">  377</span>                    }</div>
-<div class="line"><span class="lineno">  378</span>                }</div>
-<div class="line"><span class="lineno">  379</span> </div>
-<div class="line"><span class="lineno">  380</span>                <span class="keywordflow">if</span> (early_break) {</div>
-<div class="line"><span class="lineno">  381</span>                    dominated = <span class="keyword">false</span>;</div>
-<div class="line"><span class="lineno">  382</span>                    <span class="keywordflow">continue</span>;</div>
-<div class="line"><span class="lineno">  383</span>                }</div>
-<div class="line"><span class="lineno">  384</span>            }</div>
-<div class="line"><span class="lineno">  385</span>        }</div>
-<div class="line"><span class="lineno">  386</span><span class="preprocessor">#endif</span></div>
+<div class="line"><span class="lineno">  266</span>                        <span class="comment">// Load SRC data into aligned buffers</span></div>
+<div class="line"><span class="lineno">  267</span>                        <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> j = 0; j &lt; simd_width; ++j) {</div>
+<div class="line"><span class="lineno">  268</span>                            <span class="keyword">const</span> <span class="keyword">auto</span>  &amp;active_cut = active_cuts[cut_idx + j];</div>
+<div class="line"><span class="lineno">  269</span>                            <span class="keyword">const</span> <span class="keywordtype">size_t</span> idx        = active_cut.index;</div>
+<div class="line"><span class="lineno">  270</span>                            dual_buf[j]             = active_cut.dual_value;</div>
+<div class="line"><span class="lineno">  271</span>                            label_buf[j]            = label-&gt;SRCmap[idx];</div>
+<div class="line"><span class="lineno">  272</span>                            new_label_buf[j]        = new_label-&gt;SRCmap[idx];</div>
+<div class="line"><span class="lineno">  273</span>                        }</div>
+<div class="line"><span class="lineno">  274</span> </div>
+<div class="line"><span class="lineno">  275</span>                        <span class="comment">// Create SIMD vectors from aligned buffers</span></div>
+<div class="line"><span class="lineno">  276</span>                        simd&lt;double&gt; src_duals(dual_buf.data(), vector_aligned);</div>
+<div class="line"><span class="lineno">  277</span>                        simd&lt;double&gt; label_mod(label_buf.data(), vector_aligned);</div>
+<div class="line"><span class="lineno">  278</span>                        simd&lt;double&gt; new_label_mod(new_label_buf.data(), vector_aligned);</div>
+<div class="line"><span class="lineno">  279</span> </div>
+<div class="line"><span class="lineno">  280</span>                        <span class="comment">// Apply mask where label&#39;s SRC value exceeds new</span></div>
+<div class="line"><span class="lineno">  281</span>                        <span class="comment">// label&#39;s</span></div>
+<div class="line"><span class="lineno">  282</span>                        <span class="keyword">auto</span>         mask   = label_mod &gt; new_label_mod;</div>
+<div class="line"><span class="lineno">  283</span>                        simd&lt;double&gt; masked = 0.0;</div>
+<div class="line"><span class="lineno">  284</span>                        where(mask, masked) = src_duals;</div>
+<div class="line"><span class="lineno">  285</span>                        sumSRC_simd += masked;</div>
+<div class="line"><span class="lineno">  286</span> </div>
+<div class="line"><span class="lineno">  287</span>                        <span class="comment">// Check if we can early-break based on accumulated sum</span></div>
+<div class="line"><span class="lineno">  288</span>                        partial_sumSRC = reduce(sumSRC_simd);</div>
+<div class="line"><span class="lineno">  289</span>                        <span class="keywordflow">if</span> (<a class="code hl_function" href="namespacenumericutils.html#aaadab3c8a1b76df1e09c11ebaa3d1e49">numericutils::gt</a>(label-&gt;<a class="code hl_variable" href="structLabel.html#a1da1930412e730692277e75a94da77c2">cost</a> - partial_sumSRC, new_cost)) {</div>
+<div class="line"><span class="lineno">  290</span>                            early_break = <span class="keyword">true</span>;</div>
+<div class="line"><span class="lineno">  291</span>                            <span class="keywordflow">break</span>;</div>
+<div class="line"><span class="lineno">  292</span>                        }</div>
+<div class="line"><span class="lineno">  293</span>                    }</div>
+<div class="line"><span class="lineno">  294</span> </div>
+<div class="line"><span class="lineno">  295</span>                    <span class="comment">// Process remaining cuts scalar</span></div>
+<div class="line"><span class="lineno">  296</span>                    <span class="keywordflow">if</span> (!early_break) {</div>
+<div class="line"><span class="lineno">  297</span>                        partial_sumSRC = reduce(sumSRC_simd);</div>
+<div class="line"><span class="lineno">  298</span>                        <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> idx = simd_cut_size; idx &lt; static_cast&lt;size_t&gt;(cut_size) &amp;&amp; !early_break; ++idx) {</div>
+<div class="line"><span class="lineno">  299</span>                            <span class="keyword">const</span> <span class="keyword">auto</span>  &amp;active_cut = active_cuts[idx];</div>
+<div class="line"><span class="lineno">  300</span>                            <span class="keyword">const</span> <span class="keywordtype">size_t</span> cut_idx    = active_cut.index;</div>
+<div class="line"><span class="lineno">  301</span> </div>
+<div class="line"><span class="lineno">  302</span>                            <span class="keywordflow">if</span> (label-&gt;SRCmap[cut_idx] &gt; new_label-&gt;SRCmap[cut_idx]) {</div>
+<div class="line"><span class="lineno">  303</span>                                partial_sumSRC += active_cut.dual_value;</div>
+<div class="line"><span class="lineno">  304</span>                                <span class="keywordflow">if</span> (<a class="code hl_function" href="namespacenumericutils.html#aaadab3c8a1b76df1e09c11ebaa3d1e49">numericutils::gt</a>(label-&gt;<a class="code hl_variable" href="structLabel.html#a1da1930412e730692277e75a94da77c2">cost</a> - partial_sumSRC, new_cost)) {</div>
+<div class="line"><span class="lineno">  305</span>                                    early_break = <span class="keyword">true</span>;</div>
+<div class="line"><span class="lineno">  306</span>                                    <span class="keywordflow">break</span>;</div>
+<div class="line"><span class="lineno">  307</span>                                }</div>
+<div class="line"><span class="lineno">  308</span>                            }</div>
+<div class="line"><span class="lineno">  309</span>                        }</div>
+<div class="line"><span class="lineno">  310</span>                    }</div>
+<div class="line"><span class="lineno">  311</span> </div>
+<div class="line"><span class="lineno">  312</span>                    <span class="comment">// If we had an early break, this label doesn&#39;t dominate</span></div>
+<div class="line"><span class="lineno">  313</span>                    <span class="keywordflow">if</span> (early_break) {</div>
+<div class="line"><span class="lineno">  314</span>                        dominated = <span class="keyword">false</span>;</div>
+<div class="line"><span class="lineno">  315</span>                        <span class="keywordflow">continue</span>;</div>
+<div class="line"><span class="lineno">  316</span>                    }</div>
+<div class="line"><span class="lineno">  317</span>                }</div>
+<div class="line"><span class="lineno">  318</span>            }</div>
+<div class="line"><span class="lineno">  319</span><span class="preprocessor">#endif</span></div>
+<div class="line"><span class="lineno">  320</span> </div>
+<div class="line"><span class="lineno">  321</span>            <span class="comment">// If we reach here and dominated is still true, we found domination</span></div>
+<div class="line"><span class="lineno">  322</span>            <span class="keywordflow">if</span> (dominated) {</div>
+<div class="line"><span class="lineno">  323</span>                stat_n_dom++;</div>
+<div class="line"><span class="lineno">  324</span>                <span class="keywordflow">return</span> <span class="keyword">true</span>;</div>
+<div class="line"><span class="lineno">  325</span>            }</div>
+<div class="line"><span class="lineno">  326</span>        }</div>
+<div class="line"><span class="lineno">  327</span>    }</div>
+<div class="line"><span class="lineno">  328</span> </div>
+<div class="line"><span class="lineno">  329</span>    <span class="comment">// Process remaining labels using scalar code</span></div>
+<div class="line"><span class="lineno">  330</span>    <span class="keywordflow">for</span> (; i &lt; num_labels; ++i) {</div>
+<div class="line"><span class="lineno">  331</span>        <span class="keyword">const</span> <a class="code hl_struct" href="structLabel.html">Label</a> *label = labels[i];</div>
+<div class="line"><span class="lineno">  332</span>        <span class="keywordflow">if</span> (label-&gt;<a class="code hl_variable" href="structLabel.html#af36e4bfda4b5544e93ae446a31a49e7d">is_dominated</a>) <span class="keywordflow">continue</span>;</div>
+<div class="line"><span class="lineno">  333</span> </div>
+<div class="line"><span class="lineno">  334</span>        <span class="comment">// Cost check</span></div>
+<div class="line"><span class="lineno">  335</span><span class="preprocessor">#ifdef SRC</span></div>
+<div class="line"><span class="lineno">  336</span>        <span class="keywordflow">if</span> (!has_src &amp;&amp; <a class="code hl_function" href="namespacenumericutils.html#aaadab3c8a1b76df1e09c11ebaa3d1e49">numericutils::gt</a>(label-&gt;<a class="code hl_variable" href="structLabel.html#a1da1930412e730692277e75a94da77c2">cost</a>, new_cost)) <span class="keywordflow">continue</span>;</div>
+<div class="line"><span class="lineno">  337</span><span class="preprocessor">#else</span></div>
+<div class="line"><span class="lineno">  338</span>        <span class="keywordflow">if</span> (<a class="code hl_function" href="namespacenumericutils.html#aaadab3c8a1b76df1e09c11ebaa3d1e49">numericutils::gt</a>(label-&gt;<a class="code hl_variable" href="structLabel.html#a1da1930412e730692277e75a94da77c2">cost</a>, new_cost)) <span class="keywordflow">continue</span>;</div>
+<div class="line"><span class="lineno">  339</span><span class="preprocessor">#endif</span></div>
+<div class="line"><span class="lineno">  340</span> </div>
+<div class="line"><span class="lineno">  341</span>        <span class="keywordtype">bool</span>        dominated       = <span class="keyword">true</span>;</div>
+<div class="line"><span class="lineno">  342</span>        <span class="keyword">const</span> <span class="keyword">auto</span> &amp;label_resources = label-&gt;<a class="code hl_variable" href="structLabel.html#a5f792e9fa27a10dd13bd4622b1a3044b">resources</a>;</div>
+<div class="line"><span class="lineno">  343</span> </div>
+<div class="line"><span class="lineno">  344</span>        <span class="comment">// Resource check</span></div>
+<div class="line"><span class="lineno">  345</span>        <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> k = 1; k &lt; num_resources; ++k) {</div>
+<div class="line"><span class="lineno">  346</span>            <span class="keywordflow">if</span> <span class="keyword">constexpr</span> (D == <a class="code hl_enumvalue" href="Definitions_8h.html#a224b9163917ac32fc95a60d8c1eec3aaa67d2f6740a8eaebf4d5c6f79be8da481">Direction::Forward</a>) {</div>
+<div class="line"><span class="lineno">  347</span>                <span class="keywordflow">if</span> (<a class="code hl_function" href="namespacenumericutils.html#aaadab3c8a1b76df1e09c11ebaa3d1e49">numericutils::gt</a>(label_resources[k], new_resources[k])) {</div>
+<div class="line"><span class="lineno">  348</span>                    dominated = <span class="keyword">false</span>;</div>
+<div class="line"><span class="lineno">  349</span>                    <span class="keywordflow">break</span>;</div>
+<div class="line"><span class="lineno">  350</span>                }</div>
+<div class="line"><span class="lineno">  351</span>            } <span class="keywordflow">else</span> {</div>
+<div class="line"><span class="lineno">  352</span>                <span class="keywordflow">if</span> (<a class="code hl_function" href="namespacenumericutils.html#af55fcfd2b05fe5a20796069445c89aef">numericutils::lt</a>(label_resources[k], new_resources[k])) {</div>
+<div class="line"><span class="lineno">  353</span>                    dominated = <span class="keyword">false</span>;</div>
+<div class="line"><span class="lineno">  354</span>                    <span class="keywordflow">break</span>;</div>
+<div class="line"><span class="lineno">  355</span>                }</div>
+<div class="line"><span class="lineno">  356</span>            }</div>
+<div class="line"><span class="lineno">  357</span>        }</div>
+<div class="line"><span class="lineno">  358</span>        <span class="keywordflow">if</span> (dominated &amp;&amp; num_resources &gt; 0) {</div>
+<div class="line"><span class="lineno">  359</span>            <span class="keywordflow">if</span> <span class="keyword">constexpr</span> (D == <a class="code hl_enumvalue" href="Definitions_8h.html#a224b9163917ac32fc95a60d8c1eec3aaa67d2f6740a8eaebf4d5c6f79be8da481">Direction::Forward</a>) {</div>
+<div class="line"><span class="lineno">  360</span>                <span class="keywordflow">if</span> (<a class="code hl_function" href="namespacenumericutils.html#aaadab3c8a1b76df1e09c11ebaa3d1e49">numericutils::gt</a>(label_resources[0], new_resources[0])) { dominated = <span class="keyword">false</span>; }</div>
+<div class="line"><span class="lineno">  361</span>            } <span class="keywordflow">else</span> {</div>
+<div class="line"><span class="lineno">  362</span>                <span class="keywordflow">if</span> (<a class="code hl_function" href="namespacenumericutils.html#af55fcfd2b05fe5a20796069445c89aef">numericutils::lt</a>(label_resources[0], new_resources[0])) { dominated = <span class="keyword">false</span>; }</div>
+<div class="line"><span class="lineno">  363</span>            }</div>
+<div class="line"><span class="lineno">  364</span>        }</div>
+<div class="line"><span class="lineno">  365</span> </div>
+<div class="line"><span class="lineno">  366</span>        <span class="keywordflow">if</span> (!dominated) <span class="keywordflow">continue</span>;</div>
+<div class="line"><span class="lineno">  367</span> </div>
+<div class="line"><span class="lineno">  368</span>        <span class="comment">// Visited nodes check</span></div>
+<div class="line"><span class="lineno">  369</span>        <span class="keywordflow">if</span> <span class="keyword">constexpr</span> (S == <a class="code hl_enumvalue" href="Definitions_8h.html#aca8133200c1122e29b87b314d82604ebaca8a2087e5557e317599344687a57391">Stage::Three</a> || S == <a class="code hl_enumvalue" href="Definitions_8h.html#aca8133200c1122e29b87b314d82604eba981b8fcee42e1e726a67a2b9a98ea6e9">Stage::Four</a> || S == <a class="code hl_enumvalue" href="Definitions_8h.html#aca8133200c1122e29b87b314d82604eba81999728593fbd0249e73b02f3d7ad74">Stage::Enumerate</a>) {</div>
+<div class="line"><span class="lineno">  370</span>            <span class="keyword">const</span> <span class="keyword">auto</span> &amp;label_visited = label-&gt;<a class="code hl_variable" href="structLabel.html#ac5629d8044403e1ba299dbffb0e49247">visited_bitmap</a>;</div>
+<div class="line"><span class="lineno">  371</span>            <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> k = 0; k &lt; bitmap_size; ++k) {</div>
+<div class="line"><span class="lineno">  372</span>                <span class="keywordflow">if</span> ((label_visited[k] &amp; new_visited[k]) != label_visited[k]) {</div>
+<div class="line"><span class="lineno">  373</span>                    dominated = <span class="keyword">false</span>;</div>
+<div class="line"><span class="lineno">  374</span>                    <span class="keywordflow">break</span>;</div>
+<div class="line"><span class="lineno">  375</span>                }</div>
+<div class="line"><span class="lineno">  376</span>            }</div>
+<div class="line"><span class="lineno">  377</span>        }</div>
+<div class="line"><span class="lineno">  378</span> </div>
+<div class="line"><span class="lineno">  379</span>        <span class="keywordflow">if</span> (!dominated) <span class="keywordflow">continue</span>;</div>
+<div class="line"><span class="lineno">  380</span> </div>
+<div class="line"><span class="lineno">  381</span><span class="comment">// SRC check</span></div>
+<div class="line"><span class="lineno">  382</span><span class="preprocessor">#ifdef SRC</span></div>
+<div class="line"><span class="lineno">  383</span>        <span class="keywordflow">if</span> <span class="keyword">constexpr</span> (S == <a class="code hl_enumvalue" href="Definitions_8h.html#aca8133200c1122e29b87b314d82604eba981b8fcee42e1e726a67a2b9a98ea6e9">Stage::Four</a> || S == <a class="code hl_enumvalue" href="Definitions_8h.html#aca8133200c1122e29b87b314d82604eba81999728593fbd0249e73b02f3d7ad74">Stage::Enumerate</a>) {</div>
+<div class="line"><span class="lineno">  384</span>            <span class="keywordflow">if</span> (has_src) {</div>
+<div class="line"><span class="lineno">  385</span>                <span class="keywordtype">double</span> sumSRC      = 0.0;</div>
+<div class="line"><span class="lineno">  386</span>                <span class="keywordtype">bool</span>   early_break = <span class="keyword">false</span>;</div>
 <div class="line"><span class="lineno">  387</span> </div>
-<div class="line"><span class="lineno">  388</span>        <span class="comment">// If we reach here and dominated is still true, we found domination</span></div>
-<div class="line"><span class="lineno">  389</span>        <span class="keywordflow">if</span> (dominated) {</div>
-<div class="line"><span class="lineno">  390</span>            stat_n_dom++;</div>
-<div class="line"><span class="lineno">  391</span>            <span class="keywordflow">return</span> <span class="keyword">true</span>;</div>
-<div class="line"><span class="lineno">  392</span>        }</div>
-<div class="line"><span class="lineno">  393</span>    }</div>
-<div class="line"><span class="lineno">  394</span> </div>
-<div class="line"><span class="lineno">  395</span>    <span class="comment">// No domination found</span></div>
-<div class="line"><span class="lineno">  396</span>    <span class="keywordflow">return</span> <span class="keyword">false</span>;</div>
-<div class="line"><span class="lineno">  397</span>}</div>
+<div class="line"><span class="lineno">  388</span>                <span class="keywordflow">for</span> (<span class="keywordtype">int</span> cut_idx = 0; cut_idx &lt; cut_size &amp;&amp; !early_break; ++cut_idx) {</div>
+<div class="line"><span class="lineno">  389</span>                    <span class="keyword">const</span> <span class="keyword">auto</span>  &amp;active_cut = active_cuts[cut_idx];</div>
+<div class="line"><span class="lineno">  390</span>                    <span class="keyword">const</span> <span class="keywordtype">size_t</span> idx        = active_cut.index;</div>
+<div class="line"><span class="lineno">  391</span> </div>
+<div class="line"><span class="lineno">  392</span>                    <span class="keywordflow">if</span> (label-&gt;SRCmap[idx] &gt; new_label-&gt;SRCmap[idx]) {</div>
+<div class="line"><span class="lineno">  393</span>                        sumSRC += active_cut.dual_value;</div>
+<div class="line"><span class="lineno">  394</span>                        <span class="keywordflow">if</span> (<a class="code hl_function" href="namespacenumericutils.html#aaadab3c8a1b76df1e09c11ebaa3d1e49">numericutils::gt</a>(label-&gt;<a class="code hl_variable" href="structLabel.html#a1da1930412e730692277e75a94da77c2">cost</a> - sumSRC, new_cost)) {</div>
+<div class="line"><span class="lineno">  395</span>                            early_break = <span class="keyword">true</span>;</div>
+<div class="line"><span class="lineno">  396</span>                            <span class="keywordflow">break</span>;</div>
+<div class="line"><span class="lineno">  397</span>                        }</div>
+<div class="line"><span class="lineno">  398</span>                    }</div>
+<div class="line"><span class="lineno">  399</span>                }</div>
+<div class="line"><span class="lineno">  400</span> </div>
+<div class="line"><span class="lineno">  401</span>                <span class="keywordflow">if</span> (early_break) {</div>
+<div class="line"><span class="lineno">  402</span>                    dominated = <span class="keyword">false</span>;</div>
+<div class="line"><span class="lineno">  403</span>                    <span class="keywordflow">continue</span>;</div>
+<div class="line"><span class="lineno">  404</span>                }</div>
+<div class="line"><span class="lineno">  405</span>            }</div>
+<div class="line"><span class="lineno">  406</span>        }</div>
+<div class="line"><span class="lineno">  407</span><span class="preprocessor">#endif</span></div>
+<div class="line"><span class="lineno">  408</span> </div>
+<div class="line"><span class="lineno">  409</span>        <span class="comment">// If we reach here and dominated is still true, we found domination</span></div>
+<div class="line"><span class="lineno">  410</span>        <span class="keywordflow">if</span> (dominated) {</div>
+<div class="line"><span class="lineno">  411</span>            stat_n_dom++;</div>
+<div class="line"><span class="lineno">  412</span>            <span class="keywordflow">return</span> <span class="keyword">true</span>;</div>
+<div class="line"><span class="lineno">  413</span>        }</div>
+<div class="line"><span class="lineno">  414</span>    }</div>
+<div class="line"><span class="lineno">  415</span> </div>
+<div class="line"><span class="lineno">  416</span>    <span class="comment">// No domination found</span></div>
+<div class="line"><span class="lineno">  417</span>    <span class="keywordflow">return</span> <span class="keyword">false</span>;</div>
+<div class="line"><span class="lineno">  418</span>}</div>
 <div class="ttc" id="aDefinitions_8h_html_a224b9163917ac32fc95a60d8c1eec3aaa67d2f6740a8eaebf4d5c6f79be8da481"><div class="ttname"><a href="Definitions_8h.html#a224b9163917ac32fc95a60d8c1eec3aaa67d2f6740a8eaebf4d5c6f79be8da481">Direction::Forward</a></div><div class="ttdeci">@ Forward</div><div class="ttdef"><b>Definition</b> <a href="Definitions_8h_source.html#l00076">Definitions.h:76</a></div></div>
 <div class="ttc" id="aDefinitions_8h_html_aca8133200c1122e29b87b314d82604eba81999728593fbd0249e73b02f3d7ad74"><div class="ttname"><a href="Definitions_8h.html#aca8133200c1122e29b87b314d82604eba81999728593fbd0249e73b02f3d7ad74">Stage::Enumerate</a></div><div class="ttdeci">@ Enumerate</div><div class="ttdef"><b>Definition</b> <a href="Definitions_8h_source.html#l00077">Definitions.h:77</a></div></div>
 <div class="ttc" id="aDefinitions_8h_html_aca8133200c1122e29b87b314d82604eba981b8fcee42e1e726a67a2b9a98ea6e9"><div class="ttname"><a href="Definitions_8h.html#aca8133200c1122e29b87b314d82604eba981b8fcee42e1e726a67a2b9a98ea6e9">Stage::Four</a></div><div class="ttdeci">@ Four</div><div class="ttdef"><b>Definition</b> <a href="Definitions_8h_source.html#l00077">Definitions.h:77</a></div></div>
 <div class="ttc" id="aDefinitions_8h_html_aca8133200c1122e29b87b314d82604ebaca8a2087e5557e317599344687a57391"><div class="ttname"><a href="Definitions_8h.html#aca8133200c1122e29b87b314d82604ebaca8a2087e5557e317599344687a57391">Stage::Three</a></div><div class="ttdeci">@ Three</div><div class="ttdef"><b>Definition</b> <a href="Definitions_8h_source.html#l00077">Definitions.h:77</a></div></div>
 <div class="ttc" id="aDominance_8h_html_a1055d33f3fa0023a7782b354c84f30d6"><div class="ttname"><a href="#a1055d33f3fa0023a7782b354c84f30d6">load_simd</a></div><div class="ttdeci">std::experimental::simd&lt; T &gt; load_simd(const Container &amp;source, size_t start_index, size_t simd_size, Proj proj) noexcept</div><div class="ttdef"><b>Definition</b> <a href="Dominance_8h_source.html#l00031">Dominance.h:31</a></div></div>
-<div class="ttc" id="aDominance_8h_html_a4f6006d66fa23bc62965a93c057360af"><div class="ttname"><a href="#a4f6006d66fa23bc62965a93c057360af">load_simd_generic</a></div><div class="ttdeci">std::experimental::simd&lt; T &gt; load_simd_generic(const Container &amp;source, size_t start_index, size_t simd_size) noexcept</div><div class="ttdef"><b>Definition</b> <a href="Dominance_8h_source.html#l00017">Dominance.h:17</a></div></div>
+<div class="ttc" id="aDominance_8h_html_af50959ead7daa760836f9ef6aecae34b"><div class="ttname"><a href="#af50959ead7daa760836f9ef6aecae34b">load_simd_direct</a></div><div class="ttdeci">std::experimental::simd&lt; T &gt; load_simd_direct(const T *source, size_t simd_size) noexcept</div><div class="ttdef"><b>Definition</b> <a href="Dominance_8h_source.html#l00053">Dominance.h:53</a></div></div>
 <div class="ttc" id="aclassCutStorage_html_a2f71dd47977fd6afeefd08cb629507a6"><div class="ttname"><a href="classCutStorage.html#a2f71dd47977fd6afeefd08cb629507a6">CutStorage::activeSize</a></div><div class="ttdeci">size_t activeSize() const noexcept</div><div class="ttdef"><b>Definition</b> <a href="Cut_8h_source.html#l00386">Cut.h:386</a></div></div>
 <div class="ttc" id="aclassCutStorage_html_a5661b2dd9924180da3dd03cc2d63bd2c"><div class="ttname"><a href="classCutStorage.html#a5661b2dd9924180da3dd03cc2d63bd2c">CutStorage::getActiveCuts</a></div><div class="ttdeci">std::span&lt; const ActiveCutInfo &gt; getActiveCuts() const noexcept</div><div class="ttdef"><b>Definition</b> <a href="Cut_8h_source.html#l00323">Cut.h:323</a></div></div>
 <div class="ttc" id="anamespacenumericutils_html_aaadab3c8a1b76df1e09c11ebaa3d1e49"><div class="ttname"><a href="namespacenumericutils.html#aaadab3c8a1b76df1e09c11ebaa3d1e49">numericutils::gt</a></div><div class="ttdeci">constexpr bool gt(double a, double b, double threshold=eps)</div><div class="ttdef"><b>Definition</b> <a href="NumericUtils_8h_source.html#l00021">NumericUtils.h:21</a></div></div>
 <div class="ttc" id="anamespacenumericutils_html_adaf310759d56f0e70fb4b325dbefc809"><div class="ttname"><a href="namespacenumericutils.html#adaf310759d56f0e70fb4b325dbefc809">numericutils::eps</a></div><div class="ttdeci">constexpr double eps</div><div class="ttdef"><b>Definition</b> <a href="NumericUtils_8h_source.html#l00015">NumericUtils.h:15</a></div></div>
 <div class="ttc" id="anamespacenumericutils_html_af55fcfd2b05fe5a20796069445c89aef"><div class="ttname"><a href="namespacenumericutils.html#af55fcfd2b05fe5a20796069445c89aef">numericutils::lt</a></div><div class="ttdeci">constexpr bool lt(double a, double b, double threshold=eps)</div><div class="ttdef"><b>Definition</b> <a href="NumericUtils_8h_source.html#l00024">NumericUtils.h:24</a></div></div>
-<div class="ttc" id="astructLabel_html"><div class="ttname"><a href="structLabel.html">Label</a></div><div class="ttdoc">Represents a label used in a solver.</div><div class="ttdef"><b>Definition</b> <a href="Label_8h_source.html#l00174">Label.h:174</a></div></div>
-<div class="ttc" id="astructLabel_html_a1da1930412e730692277e75a94da77c2"><div class="ttname"><a href="structLabel.html#a1da1930412e730692277e75a94da77c2">Label::cost</a></div><div class="ttdeci">double cost</div><div class="ttdef"><b>Definition</b> <a href="Label_8h_source.html#l00179">Label.h:179</a></div></div>
-<div class="ttc" id="astructLabel_html_a5f792e9fa27a10dd13bd4622b1a3044b"><div class="ttname"><a href="structLabel.html#a5f792e9fa27a10dd13bd4622b1a3044b">Label::resources</a></div><div class="ttdeci">std::array&lt; double, R_SIZE &gt; resources</div><div class="ttdef"><b>Definition</b> <a href="Label_8h_source.html#l00181">Label.h:181</a></div></div>
-<div class="ttc" id="astructLabel_html_ac5629d8044403e1ba299dbffb0e49247"><div class="ttname"><a href="structLabel.html#ac5629d8044403e1ba299dbffb0e49247">Label::visited_bitmap</a></div><div class="ttdeci">std::array&lt; uint64_t, bitmap_words &gt; visited_bitmap</div><div class="ttdef"><b>Definition</b> <a href="Label_8h_source.html#l00182">Label.h:182</a></div></div>
-<div class="ttc" id="astructLabel_html_af36e4bfda4b5544e93ae446a31a49e7d"><div class="ttname"><a href="structLabel.html#af36e4bfda4b5544e93ae446a31a49e7d">Label::is_dominated</a></div><div class="ttdeci">bool is_dominated</div><div class="ttdef"><b>Definition</b> <a href="Label_8h_source.html#l00195">Label.h:195</a></div></div>
+<div class="ttc" id="astructLabel_html"><div class="ttname"><a href="structLabel.html">Label</a></div><div class="ttdoc">Represents a label used in a solver.</div><div class="ttdef"><b>Definition</b> <a href="Label_8h_source.html#l00200">Label.h:200</a></div></div>
+<div class="ttc" id="astructLabel_html_a1da1930412e730692277e75a94da77c2"><div class="ttname"><a href="structLabel.html#a1da1930412e730692277e75a94da77c2">Label::cost</a></div><div class="ttdeci">double cost</div><div class="ttdef"><b>Definition</b> <a href="Label_8h_source.html#l00205">Label.h:205</a></div></div>
+<div class="ttc" id="astructLabel_html_a5f792e9fa27a10dd13bd4622b1a3044b"><div class="ttname"><a href="structLabel.html#a5f792e9fa27a10dd13bd4622b1a3044b">Label::resources</a></div><div class="ttdeci">std::array&lt; double, R_SIZE &gt; resources</div><div class="ttdef"><b>Definition</b> <a href="Label_8h_source.html#l00207">Label.h:207</a></div></div>
+<div class="ttc" id="astructLabel_html_ac5629d8044403e1ba299dbffb0e49247"><div class="ttname"><a href="structLabel.html#ac5629d8044403e1ba299dbffb0e49247">Label::visited_bitmap</a></div><div class="ttdeci">std::array&lt; uint64_t, bitmap_words &gt; visited_bitmap</div><div class="ttdef"><b>Definition</b> <a href="Label_8h_source.html#l00208">Label.h:208</a></div></div>
+<div class="ttc" id="astructLabel_html_af36e4bfda4b5544e93ae446a31a49e7d"><div class="ttname"><a href="structLabel.html#af36e4bfda4b5544e93ae446a31a49e7d">Label::is_dominated</a></div><div class="ttdeci">bool is_dominated</div><div class="ttdef"><b>Definition</b> <a href="Label_8h_source.html#l00221">Label.h:221</a></div></div>
 </div><!-- fragment --><div class="dynheader">
 Here is the call graph for this function:</div>
 <div class="dyncontent">
 <div class="center"><img src="Dominance_8h_a3a6eac6d6207e8db8b12f76732c242eb_cgraph.png" border="0" usemap="#aDominance_8h_a3a6eac6d6207e8db8b12f76732c242eb_cgraph" loading="lazy" alt=""/></div>
 <map name="aDominance_8h_a3a6eac6d6207e8db8b12f76732c242eb_cgraph" id="aDominance_8h_a3a6eac6d6207e8db8b12f76732c242eb_cgraph">
 <area shape="rect" title=" " alt="" coords="5,72,181,113"/>
-<area shape="rect" href="namespacenumericutils.html#aaadab3c8a1b76df1e09c11ebaa3d1e49" title=" " alt="" coords="239,5,348,31"/>
-<area shape="poly" title=" " alt="" coords="149,69,242,34,244,39,151,74"/>
-<area shape="rect" href="Dominance_8h.html#a1055d33f3fa0023a7782b354c84f30d6" title=" " alt="" coords="253,55,334,80"/>
-<area shape="poly" title=" " alt="" coords="181,79,238,72,238,77,181,84"/>
-<area shape="rect" href="Dominance_8h.html#a4f6006d66fa23bc62965a93c057360af" title=" " alt="" coords="229,104,358,130"/>
+<area shape="rect" href="namespacenumericutils.html#aaadab3c8a1b76df1e09c11ebaa3d1e49" title=" " alt="" coords="234,5,342,31"/>
+<area shape="poly" title=" " alt="" coords="148,69,238,34,240,39,149,74"/>
+<area shape="rect" href="Dominance_8h.html#a1055d33f3fa0023a7782b354c84f30d6" title=" " alt="" coords="248,55,328,80"/>
+<area shape="poly" title=" " alt="" coords="181,79,233,72,233,77,181,84"/>
+<area shape="rect" href="Dominance_8h.html#af50959ead7daa760836f9ef6aecae34b" title=" " alt="" coords="229,104,348,130"/>
 <area shape="poly" title=" " alt="" coords="181,101,214,105,213,110,181,106"/>
-<area shape="rect" href="namespacenumericutils.html#af55fcfd2b05fe5a20796069445c89aef" title=" " alt="" coords="241,153,346,179"/>
-<area shape="poly" title=" " alt="" coords="151,111,242,145,241,150,150,116"/>
+<area shape="rect" href="namespacenumericutils.html#af55fcfd2b05fe5a20796069445c89aef" title=" " alt="" coords="236,153,340,179"/>
+<area shape="poly" title=" " alt="" coords="150,111,238,145,236,150,148,116"/>
 </map>
 </div>
 
@@ -797,6 +801,96 @@ template&lt;typename T, typename Container, typename Proj&gt; </div>
 <div class="line"><span class="lineno">   46</span> </div>
 <div class="line"><span class="lineno">   47</span>    <span class="keywordflow">return</span> std::experimental::simd&lt;T&gt;(buffer.data(), std::experimental::vector_aligned);</div>
 <div class="line"><span class="lineno">   48</span>}</div>
+</div><!-- fragment -->
+</div>
+</div>
+<a id="a213235db52620273b153f896e3db45df" name="a213235db52620273b153f896e3db45df"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a213235db52620273b153f896e3db45df">&#9670;&#160;</a></span>load_simd_direct() <span class="overload">[1/2]</span></h2>
+
+<div class="memitem">
+<div class="memproto">
+<div class="memtemplate">
+template&lt;typename T, size_t N&gt; </div>
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">std::experimental::simd&lt; T &gt; load_simd_direct </td>
+          <td>(</td>
+          <td class="paramtype">const std::array&lt; T, N &gt; &amp;</td>          <td class="paramname"><span class="paramname"><em>source</em></span>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">size_t</td>          <td class="paramname"><span class="paramname"><em>simd_size</em></span>&#160;)</td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel inline">inline</span><span class="mlabel noexcept">noexcept</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+<p class="definition">Definition at line <a class="el" href="Dominance_8h_source.html#l00067">67</a> of file <a class="el" href="Dominance_8h_source.html">Dominance.h</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">   67</span>                                                                                                        {</div>
+<div class="line"><span class="lineno">   68</span>    <span class="keywordflow">return</span> <a class="code hl_function" href="#af50959ead7daa760836f9ef6aecae34b">load_simd_direct</a>(source.data(), simd_size);</div>
+<div class="line"><span class="lineno">   69</span>}</div>
+</div><!-- fragment --><div class="dynheader">
+Here is the call graph for this function:</div>
+<div class="dyncontent">
+<div class="center"><img src="Dominance_8h_a213235db52620273b153f896e3db45df_cgraph.png" border="0" usemap="#aDominance_8h_a213235db52620273b153f896e3db45df_cgraph" loading="lazy" alt=""/></div>
+<map name="aDominance_8h_a213235db52620273b153f896e3db45df_cgraph" id="aDominance_8h_a213235db52620273b153f896e3db45df_cgraph">
+<area shape="rect" title=" " alt="" coords="5,5,125,31"/>
+<area shape="rect" href="Dominance_8h.html#af50959ead7daa760836f9ef6aecae34b" title=" " alt="" coords="173,5,292,31"/>
+<area shape="poly" title=" " alt="" coords="125,16,157,16,157,21,125,21"/>
+</map>
+</div>
+
+</div>
+</div>
+<a id="af50959ead7daa760836f9ef6aecae34b" name="af50959ead7daa760836f9ef6aecae34b"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#af50959ead7daa760836f9ef6aecae34b">&#9670;&#160;</a></span>load_simd_direct() <span class="overload">[2/2]</span></h2>
+
+<div class="memitem">
+<div class="memproto">
+<div class="memtemplate">
+template&lt;typename T&gt; </div>
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">std::experimental::simd&lt; T &gt; load_simd_direct </td>
+          <td>(</td>
+          <td class="paramtype">const T *</td>          <td class="paramname"><span class="paramname"><em>source</em></span>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">size_t</td>          <td class="paramname"><span class="paramname"><em>simd_size</em></span>&#160;)</td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel inline">inline</span><span class="mlabel noexcept">noexcept</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+<p class="definition">Definition at line <a class="el" href="Dominance_8h_source.html#l00053">53</a> of file <a class="el" href="Dominance_8h_source.html">Dominance.h</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">   53</span>                                                                                           {</div>
+<div class="line"><span class="lineno">   54</span>    <span class="keyword">constexpr</span> <span class="keywordtype">size_t</span> simd_register_size = std::experimental::simd&lt;T&gt;::size();</div>
+<div class="line"><span class="lineno">   55</span>    <span class="keyword">alignas</span>(64) std::array&lt;T, simd_register_size&gt; buffer = {};</div>
+<div class="line"><span class="lineno">   56</span>    <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> i = 0; i &lt; simd_size; ++i) {</div>
+<div class="line"><span class="lineno">   57</span>        buffer[i] = source[i];</div>
+<div class="line"><span class="lineno">   58</span>    }</div>
+<div class="line"><span class="lineno">   59</span>    <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> i = simd_size; i &lt; simd_register_size; ++i) {</div>
+<div class="line"><span class="lineno">   60</span>        buffer[i] = std::numeric_limits&lt;T&gt;::max();</div>
+<div class="line"><span class="lineno">   61</span>    }</div>
+<div class="line"><span class="lineno">   62</span>    <span class="keywordflow">return</span> std::experimental::simd&lt;T&gt;(buffer.data(), std::experimental::vector_aligned);</div>
+<div class="line"><span class="lineno">   63</span>}</div>
 </div><!-- fragment -->
 </div>
 </div>

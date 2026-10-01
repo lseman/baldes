@@ -14,7 +14,7 @@ var classHighRankCuts =
     [ "nodes", "classHighRankCuts.html#ae977e12246adac6ba100b4059863e102", null ],
     [ "nonzero_paths", "classHighRankCuts.html#aee8eb560a37af951ab32b3eece63990e", null ],
     [ "rng", "classHighRankCuts.html#a9fad30405484c36af6bfbc41f0f1ec8b", null ],
-    [ "row_indices_map", "classHighRankCuts.html#ac75cf5a3cf98eab40c0c0502299edfd3", null ],
+    [ "row_indices_map", "classHighRankCuts.html#a5e0c8e82096fa5ff01f2df032c1d342d", null ],
     [ "solution", "classHighRankCuts.html#a595d61a9b4844e6c8ccef763252e8af4", null ],
     [ "vertex_route_map", "classHighRankCuts.html#a8bca70b6432f72518ccc5300e261a953", null ]
 ];

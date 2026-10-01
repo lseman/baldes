@@ -6,13 +6,14 @@ var searchData=
   ['limitedmemoryrank1cuts_3',['LimitedMemoryRank1Cuts',['../classLimitedMemoryRank1Cuts.html#a3689fb1a4c98eeb8f0c4b81f3caaed31',1,'LimitedMemoryRank1Cuts::LimitedMemoryRank1Cuts(std::vector&lt; VRPNode &gt; &amp;nodes)'],['../classLimitedMemoryRank1Cuts.html#a0b4483627856623c1ac1e74f36c062bb',1,'LimitedMemoryRank1Cuts::LimitedMemoryRank1Cuts(const LimitedMemoryRank1Cuts &amp;other)'],['../classLimitedMemoryRank1Cuts.html#a7cc01e44bf2a33d6fd41fe141fc944d8',1,'LimitedMemoryRank1Cuts::LimitedMemoryRank1Cuts()']]],
   ['linearexpression_4',['LinearExpression',['../classLinearExpression.html#a4978a6a937ea15412114e79cb1a4fe9b',1,'LinearExpression']]],
   ['load_5fsimd_5',['load_simd',['../Dominance_8h.html#a1055d33f3fa0023a7782b354c84f30d6',1,'Dominance.h']]],
-  ['load_5fsimd_5fgeneric_6',['load_simd_generic',['../Dominance_8h.html#a4f6006d66fa23bc62965a93c057360af',1,'Dominance.h']]],
-  ['loadcoefficients_7',['loadCoefficients',['../classCutStorage.html#afee4901c4d29e5278fac75457b73b8a9',1,'CutStorage']]],
-  ['loadstate_8',['loadState',['../classBNBNode.html#a5bf7a3d8f71b6a496509484caee3c081',1,'BNBNode']]],
-  ['localsearch_9',['LocalSearch',['../classLocalSearch.html#a93042d0e00decf2a51033fefee8ae5ac',1,'LocalSearch']]],
-  ['log_10',['log',['../classLogger.html#a8e28e412872f37249d1b6d6209444c57',1,'Logger']]],
-  ['logstatistics_11',['logStatistics',['../classLogger.html#a2b6d76390cbc132ebb8d2add86971978',1,'Logger']]],
-  ['lowerbound_12',['lowerBound',['../structbaldes_1_1bcp_1_1PricingState.html#ac13940ca8cd8d449ab020ad5c6963ccf',1,'baldes::bcp::PricingState']]],
-  ['lt_13',['lt',['../namespacenumericutils.html#af55fcfd2b05fe5a20796069445c89aef',1,'numericutils']]],
-  ['lte_14',['lte',['../namespacenumericutils.html#a2b181fab19fbe6d56b1aaa8a3b75f371',1,'numericutils']]]
+  ['load_5fsimd_5fdirect_6',['load_simd_direct',['../Dominance_8h.html#af50959ead7daa760836f9ef6aecae34b',1,'load_simd_direct(const T *source, size_t simd_size) noexcept:&#160;Dominance.h'],['../Dominance_8h.html#a213235db52620273b153f896e3db45df',1,'load_simd_direct(const std::array&lt; T, N &gt; &amp;source, size_t simd_size) noexcept:&#160;Dominance.h']]],
+  ['load_5fsimd_5fgeneric_7',['load_simd_generic',['../Dominance_8h.html#a4f6006d66fa23bc62965a93c057360af',1,'Dominance.h']]],
+  ['loadcoefficients_8',['loadCoefficients',['../classCutStorage.html#afee4901c4d29e5278fac75457b73b8a9',1,'CutStorage']]],
+  ['loadstate_9',['loadState',['../classBNBNode.html#a5bf7a3d8f71b6a496509484caee3c081',1,'BNBNode']]],
+  ['localsearch_10',['LocalSearch',['../classLocalSearch.html#a93042d0e00decf2a51033fefee8ae5ac',1,'LocalSearch']]],
+  ['log_11',['log',['../classLogger.html#a8e28e412872f37249d1b6d6209444c57',1,'Logger']]],
+  ['logstatistics_12',['logStatistics',['../classLogger.html#a2b6d76390cbc132ebb8d2add86971978',1,'Logger']]],
+  ['lowerbound_13',['lowerBound',['../structbaldes_1_1bcp_1_1PricingState.html#ac13940ca8cd8d449ab020ad5c6963ccf',1,'baldes::bcp::PricingState']]],
+  ['lt_14',['lt',['../namespacenumericutils.html#af55fcfd2b05fe5a20796069445c89aef',1,'numericutils']]],
+  ['lte_15',['lte',['../namespacenumericutils.html#a2b181fab19fbe6d56b1aaa8a3b75f371',1,'numericutils']]]
 ];

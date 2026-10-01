@@ -167,8 +167,10 @@ var NAVTREEINDEX0 =
 "Dominance_8h.html":[3,0,0,10,0,4],
 "Dominance_8h.html#a1055d33f3fa0023a7782b354c84f30d6":[3,0,0,10,0,4,2],
 "Dominance_8h.html#a124033749d81a3bc4fb2417df78f3d45":[3,0,0,10,0,4,0],
+"Dominance_8h.html#a213235db52620273b153f896e3db45df":[3,0,0,10,0,4,3],
 "Dominance_8h.html#a3a6eac6d6207e8db8b12f76732c242eb":[3,0,0,10,0,4,1],
-"Dominance_8h.html#a4f6006d66fa23bc62965a93c057360af":[3,0,0,10,0,4,3],
+"Dominance_8h.html#a4f6006d66fa23bc62965a93c057360af":[3,0,0,10,0,4,5],
+"Dominance_8h.html#af50959ead7daa760836f9ef6aecae34b":[3,0,0,10,0,4,4],
 "Dominance_8h_source.html":[3,0,0,10,0,4],
 "Dual_8h.html":[3,0,0,12,0],
 "Dual_8h_source.html":[3,0,0,12,0],
@@ -247,7 +249,5 @@ var NAVTREEINDEX0 =
 "MIPHandler_8cpp.html#a44b0ac0370d343742f4345d2b9091387":[3,0,1,4,0,2],
 "MIPHandler_8cpp.html#a44b2b7154adc0e5fe26332a2b121417b":[3,0,1,4,0,6],
 "MIPHandler_8cpp.html#a5429da2a882a13caf061beb8d8e05ee8":[3,0,1,4,0,3],
-"MIPHandler_8cpp.html#a7e5612b25a3d47693efce8e02e5ef7ef":[3,0,1,4,0,7],
-"MIPHandler_8cpp.html#ab2da79ce4ff759ca019a349b492dfb4f":[3,0,1,4,0,5],
-"MIPHandler_8cpp.html#acfc4ad63eb7ee2fd8fb63d33adfc8a8b":[3,0,1,4,0,4]
+"MIPHandler_8cpp.html#a7e5612b25a3d47693efce8e02e5ef7ef":[3,0,1,4,0,7]
 };

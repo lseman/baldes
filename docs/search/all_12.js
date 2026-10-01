@@ -102,7 +102,7 @@ var searchData=
   ['row_99',['row',['../classCustomMatIterator.html#a151e555294d123fbb15d1ca4e084d668',1,'CustomMatIterator']]],
   ['row_5fbegin_100',['row_begin',['../structSparseMatrix.html#a72cb7a723d4fe64a0e79969503081993',1,'SparseMatrix']]],
   ['row_5fend_101',['row_end',['../structSparseMatrix.html#a37f4a2e405e8e8bae52b47a8ccffed66',1,'SparseMatrix']]],
-  ['row_5findices_5fmap_102',['row_indices_map',['../classHighRankCuts.html#ac75cf5a3cf98eab40c0c0502299edfd3',1,'HighRankCuts::row_indices_map'],['../classLimitedMemoryRank1Cuts.html#a002a7cbc65665f2611315d554f9e563f',1,'LimitedMemoryRank1Cuts::row_indices_map']]],
+  ['row_5findices_5fmap_102',['row_indices_map',['../classHighRankCuts.html#a5e0c8e82096fa5ff01f2df032c1d342d',1,'HighRankCuts::row_indices_map'],['../classLimitedMemoryRank1Cuts.html#af911060639f37f500b072741b079d017',1,'LimitedMemoryRank1Cuts::row_indices_map']]],
   ['row_5fscaling_103',['row_scaling',['../structScalingFactors.html#a5a7e209cee0d0329e1d5421c2a9cae14',1,'ScalingFactors']]],
   ['row_5fstart_104',['row_start',['../structSparseMatrix_1_1CRSData.html#a78907e95feb3e1b82ae6dcd2ef856577',1,'SparseMatrix::CRSData']]],
   ['rowactivity_105',['RowActivity',['../structRowActivity.html',1,'']]],

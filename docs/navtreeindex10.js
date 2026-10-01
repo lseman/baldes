@@ -1,5 +1,7 @@
 var NAVTREEINDEX10 =
 {
+"structbaldes_1_1bcp_1_1PricingState.html":[2,0,0,0,0],
+"structbaldes_1_1bcp_1_1PricingState.html#a06f032e4b588345d96f87d7e70aa39b6":[0,0,0,0,0,2],
 "structbaldes_1_1bcp_1_1PricingState.html#a06f032e4b588345d96f87d7e70aa39b6":[2,0,0,0,0,2],
 "structbaldes_1_1bcp_1_1PricingState.html#a0b47ab6c64d4b3ed11c0f6fa69a8884f":[0,0,0,0,0,0],
 "structbaldes_1_1bcp_1_1PricingState.html#a0b47ab6c64d4b3ed11c0f6fa69a8884f":[2,0,0,0,0,0],

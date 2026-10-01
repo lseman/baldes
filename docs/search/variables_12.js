@@ -44,7 +44,7 @@ var searchData=
   ['round_5fnew_5fcuts_5faccepted_5f_41',['round_new_cuts_accepted_',['../classCutStorage.html#a98050d41c191d9555038e5d4e8905465',1,'CutStorage']]],
   ['route_42',['route',['../structPath.html#aefc192566c08e16358f1f13e2f23a5a8',1,'Path']]],
   ['route_5fstorage_43',['route_storage',['../structLabel.html#ab7326e695edc087ceb9200367ea413ff',1,'Label']]],
-  ['row_5findices_5fmap_44',['row_indices_map',['../classHighRankCuts.html#ac75cf5a3cf98eab40c0c0502299edfd3',1,'HighRankCuts::row_indices_map'],['../classLimitedMemoryRank1Cuts.html#a002a7cbc65665f2611315d554f9e563f',1,'LimitedMemoryRank1Cuts::row_indices_map']]],
+  ['row_5findices_5fmap_44',['row_indices_map',['../classHighRankCuts.html#a5e0c8e82096fa5ff01f2df032c1d342d',1,'HighRankCuts::row_indices_map'],['../classLimitedMemoryRank1Cuts.html#af911060639f37f500b072741b079d017',1,'LimitedMemoryRank1Cuts::row_indices_map']]],
   ['row_5fscaling_45',['row_scaling',['../structScalingFactors.html#a5a7e209cee0d0329e1d5421c2a9cae14',1,'ScalingFactors']]],
   ['row_5fstart_46',['row_start',['../structSparseMatrix_1_1CRSData.html#a78907e95feb3e1b82ae6dcd2ef856577',1,'SparseMatrix::CRSData']]],
   ['rowflag_47',['rowFlag',['../structRowInfo.html#a503bbbf500861c8e85d114977bed2847',1,'RowInfo']]],

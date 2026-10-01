@@ -1,5 +1,7 @@
 var NAVTREEINDEX9 =
 {
+"structNodeScore.html#a8fc41c53bf1736676048b9107710f32e":[2,0,66,3],
+"structNodeScore.html#aaf016cafcfdcaec765a82572ac68f6e8":[2,0,66,0],
 "structNodeScore.html#aba2f3d6c918d1f271f40d17f137922d9":[2,0,66,1],
 "structNodeScore.html#adb2cad24f5a852f245437cf17959c8f1":[2,0,66,2],
 "structNodeScore.html#af70d1d9ab4145aefb8e4d5515b4505f1":[2,0,66,4],
@@ -247,7 +249,5 @@ var NAVTREEINDEX9 =
 "structarc__hash.html#a883ebe94b960ab76b3d17440611ea839":[2,0,7,0],
 "structarc__map__hash.html":[2,0,8],
 "structarc__map__hash.html#a663a288b7a7e0f9cfc2941398ff573f0":[2,0,8,0],
-"structbaldes_1_1bcp_1_1PricingState.html":[0,0,0,0,0],
-"structbaldes_1_1bcp_1_1PricingState.html":[2,0,0,0,0],
-"structbaldes_1_1bcp_1_1PricingState.html#a06f032e4b588345d96f87d7e70aa39b6":[0,0,0,0,0,2]
+"structbaldes_1_1bcp_1_1PricingState.html":[0,0,0,0,0]
 };
