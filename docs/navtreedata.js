@@ -72,9 +72,9 @@ var NAVTREEINDEX =
 "classMIPProblem.html#a2d45a20f806ee2ede27d9c575758e5d5",
 "classStabilization.html#af358ea4f62658ca2a7b1509535392e2a",
 "functions_vars_t.html",
-"structBucketGraph_1_1EnumerationPolicy.html#a63fcdb2fb19e4b2d6b373ccb0917cc4b",
-"structNodeScore.html#a2db702b3f5726be3620ada41c37baf00",
-"structbaldes_1_1bcp_1_1PricingState.html"
+"structBucketGraph_1_1EnumerationPolicy.html#a4c07245ed0807d5a72223b0856b1135a",
+"structNodeScore.html",
+"structarc__map__hash.html#a663a288b7a7e0f9cfc2941398ff573f0"
 ];
 
 const SYNCONMSG = 'click to disable panel synchronization';

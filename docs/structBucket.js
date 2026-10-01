@@ -40,6 +40,7 @@ var structBucket =
     [ "operator=", "structBucket.html#a5320184fdd53f5a3c6c2d524c13f1695", null ],
     [ "operator=", "structBucket.html#ac1106b4613db5ea0064c9623a7b4c615", null ],
     [ "remove_bucket_arc", "structBucket.html#a3fb321ed8fc82702d9111b9f49ccfe64", null ],
+    [ "reserve_soa", "structBucket.html#add2aa48012f4f0af78d63b8465d65d52", null ],
     [ "reset", "structBucket.html#abe52fe41e8558c68249369793829c962", null ],
     [ "should_flush_extra_labels", "structBucket.html#a3238ca04c496167199328631e5a4331d", null ],
     [ "size", "structBucket.html#a3552371a82cf89de2f9b2715ccd00080", null ],
