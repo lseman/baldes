@@ -28,7 +28,7 @@
 <area shape="poly" id="edge17_Node000003_Node000023" title=" " alt="" coords="858,85,919,68,993,55,1032,53,1071,55,1110,61,1147,74,1183,95,1214,123,1239,153,1259,181,1255,184,1235,156,1210,127,1180,99,1145,79,1109,67,1071,60,1032,58,993,60,921,73,860,90"/>
 <area shape="rect" id="Node000008" href="$classBucketGraph.html#ad15267e0cffaa8dc5222028409c9e082" title=" " alt="" coords="1210,312,1345,337"/>
 <area shape="poly" id="edge4_Node000004_Node000008" title=" " alt="" coords="1085,127,1148,189,1196,247,1251,299,1247,303,1192,250,1144,193,1081,131"/>
-<area shape="rect" id="Node000010" href="$namespacenumericutils.html#a2124ad1e887fe39c413948ee927c879e" title=" " alt="" coords="1428,146,1532,172"/>
+<area shape="rect" id="Node000010" href="$namespacenumericutils.html#af55fcfd2b05fe5a20796069445c89aef" title=" " alt="" coords="1428,146,1532,172"/>
 <area shape="poly" id="edge5_Node000004_Node000010" title=" " alt="" coords="1147,114,1362,138,1413,145,1412,150,1361,143,1146,119"/>
 <area shape="poly" id="edge11_Node000017_Node000008" title=" " alt="" coords="1107,227,1147,246,1162,257,1172,269,1181,279,1195,290,1221,303,1218,308,1193,295,1178,283,1168,272,1159,261,1145,251,1105,232"/>
 <area shape="rect" id="Node000018" href="$classBucketGraph.html#af129eff306551dc7cc7fe00b919bbbd0" title="Assigns the buckets based on the specified direction." alt="" coords="1409,628,1551,669"/>

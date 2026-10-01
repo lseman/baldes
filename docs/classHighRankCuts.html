@@ -324,7 +324,7 @@ Here is the call graph for this function:</div>
 <div class="line"><span class="lineno"> 1367</span>            <span class="keywordflow">if</span> (<span class="keyword">static_cast&lt;</span><span class="keywordtype">size_t</span><span class="keyword">&gt;</span>(path_idx) &gt;= <a class="code hl_variable" href="#afab18d7c165bea2a9b9f3a44497033d5">allPaths</a>.size() || <span class="keyword">static_cast&lt;</span><span class="keywordtype">size_t</span><span class="keyword">&gt;</span>(path_idx) &gt;= x.size()) <span class="keywordflow">continue</span>;</div>
 <div class="line"><span class="lineno"> 1368</span>            <span class="keyword">const</span> <span class="keywordtype">double</span> coeff = <a class="code hl_function" href="#abee2a3b3552892037678d2ca670c314e">computeLimitedMemoryCoefficient</a>(C, AM, p, <a class="code hl_variable" href="#afab18d7c165bea2a9b9f3a44497033d5">allPaths</a>[path_idx].route, order);</div>
 <div class="line"><span class="lineno"> 1369</span>            exact_violation += coeff * x[path_idx];</div>
-<div class="line"><span class="lineno"> 1370</span>            <span class="keywordflow">if</span> (!<a class="code hl_function" href="namespacenumericutils.html#ab3ee1d3f97fa4d429537dc7a597908b3">numericutils::isZero</a>(coeff)) {</div>
+<div class="line"><span class="lineno"> 1370</span>            <span class="keywordflow">if</span> (!<a class="code hl_function" href="namespacenumericutils.html#a7c990ce03a48a2ac185e02868538cc7a">numericutils::isZero</a>(coeff)) {</div>
 <div class="line"><span class="lineno"> 1371</span>                coefficient_indices.push_back(path_idx);</div>
 <div class="line"><span class="lineno"> 1372</span>                coefficient_values.push_back(coeff);</div>
 <div class="line"><span class="lineno"> 1373</span>            }</div>
@@ -358,7 +358,7 @@ Here is the call graph for this function:</div>
 <div class="ttc" id="aclassHighRankCuts_html_abee2a3b3552892037678d2ca670c314e"><div class="ttname"><a href="#abee2a3b3552892037678d2ca670c314e">HighRankCuts::computeLimitedMemoryCoefficient</a></div><div class="ttdeci">int computeLimitedMemoryCoefficient(const std::array&lt; uint64_t, num_words &gt; &amp;C, const std::array&lt; uint64_t, num_words &gt; &amp;AM, const SRCPermutation &amp;p, const std::vector&lt; uint16_t &gt; &amp;P, std::vector&lt; int &gt; &amp;order) const noexcept</div><div class="ttdef"><b>Definition</b> <a href="HighOrder_8h_source.html#l01586">HighOrder.h:1586</a></div></div>
 <div class="ttc" id="aclassHighRankCuts_html_ac8cc0903ea411c4ae797c871702598af"><div class="ttname"><a href="#ac8cc0903ea411c4ae797c871702598af">HighRankCuts::bit_mask_lookup</a></div><div class="ttdeci">static constexpr std::array&lt; uint64_t, 64 &gt; bit_mask_lookup</div><div class="ttdef"><b>Definition</b> <a href="HighOrder_8h_source.html#l01580">HighOrder.h:1580</a></div></div>
 <div class="ttc" id="aclassHighRankCuts_html_afab18d7c165bea2a9b9f3a44497033d5"><div class="ttname"><a href="#afab18d7c165bea2a9b9f3a44497033d5">HighRankCuts::allPaths</a></div><div class="ttdeci">std::vector&lt; Path &gt; allPaths</div><div class="ttdef"><b>Definition</b> <a href="HighOrder_8h_source.html#l01422">HighOrder.h:1422</a></div></div>
-<div class="ttc" id="anamespacenumericutils_html_ab3ee1d3f97fa4d429537dc7a597908b3"><div class="ttname"><a href="namespacenumericutils.html#ab3ee1d3f97fa4d429537dc7a597908b3">numericutils::isZero</a></div><div class="ttdeci">bool isZero(double a, double threshold=eps)</div><div class="ttdef"><b>Definition</b> <a href="NumericUtils_8h_source.html#l00034">NumericUtils.h:34</a></div></div>
+<div class="ttc" id="anamespacenumericutils_html_a7c990ce03a48a2ac185e02868538cc7a"><div class="ttname"><a href="namespacenumericutils.html#a7c990ce03a48a2ac185e02868538cc7a">numericutils::isZero</a></div><div class="ttdeci">constexpr bool isZero(double a, double threshold=eps)</div><div class="ttdef"><b>Definition</b> <a href="NumericUtils_8h_source.html#l00034">NumericUtils.h:34</a></div></div>
 <div class="ttc" id="astructCandidateSet_html_a02d828a29e6a55efc6dd0ec86dd3f9ac"><div class="ttname"><a href="structCandidateSet.html#a02d828a29e6a55efc6dd0ec86dd3f9ac">CandidateSet::perm</a></div><div class="ttdeci">SRCPermutation perm</div><div class="ttdef"><b>Definition</b> <a href="Helpers_8h_source.html#l00220">Helpers.h:220</a></div></div>
 <div class="ttc" id="astructCandidateSet_html_a559d5ef0f2f19d180c5aeff17394e1af"><div class="ttname"><a href="structCandidateSet.html#a559d5ef0f2f19d180c5aeff17394e1af">CandidateSet::nodes</a></div><div class="ttdeci">ankerl::unordered_dense::set&lt; int &gt; nodes</div><div class="ttdef"><b>Definition</b> <a href="Helpers_8h_source.html#l00218">Helpers.h:218</a></div></div>
 <div class="ttc" id="astructCandidateSet_html_ac847c6fb732d5822e011868f3cc02898"><div class="ttname"><a href="structCandidateSet.html#ac847c6fb732d5822e011868f3cc02898">CandidateSet::neighbor</a></div><div class="ttdeci">ankerl::unordered_dense::set&lt; int &gt; neighbor</div><div class="ttdef"><b>Definition</b> <a href="Helpers_8h_source.html#l00221">Helpers.h:221</a></div></div>
@@ -375,7 +375,7 @@ Here is the call graph for this function:</div>
 <area shape="poly" title=" " alt="" coords="188,59,238,48,239,53,189,65"/>
 <area shape="rect" href="structSRCPermutation.html#a7c2eee29003a81f6c79aeb63729838dd" title=" " alt="" coords="258,70,428,96"/>
 <area shape="poly" title=" " alt="" coords="193,80,242,80,242,86,193,86"/>
-<area shape="rect" href="namespacenumericutils.html#ab3ee1d3f97fa4d429537dc7a597908b3" title=" " alt="" coords="276,120,410,145"/>
+<area shape="rect" href="namespacenumericutils.html#a7c990ce03a48a2ac185e02868538cc7a" title=" " alt="" coords="276,120,410,145"/>
 <area shape="poly" title=" " alt="" coords="194,99,261,113,260,118,193,105"/>
 </map>
 </div>
@@ -619,7 +619,7 @@ Here is the call graph for this function:</div>
 <div class="line"><span class="lineno"> 1437</span>        <a class="code hl_variable" href="#aee8eb560a37af951ab32b3eece63990e">nonzero_paths</a>.clear();</div>
 <div class="line"><span class="lineno"> 1438</span>        <a class="code hl_variable" href="#aee8eb560a37af951ab32b3eece63990e">nonzero_paths</a>.reserve(x.size());</div>
 <div class="line"><span class="lineno"> 1439</span>        <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> path_idx = 0; path_idx &lt; x.size(); ++path_idx) {</div>
-<div class="line"><span class="lineno"> 1440</span>            <span class="keywordflow">if</span> (!<a class="code hl_function" href="namespacenumericutils.html#ab3ee1d3f97fa4d429537dc7a597908b3">numericutils::isZero</a>(x[path_idx])) { <a class="code hl_variable" href="#aee8eb560a37af951ab32b3eece63990e">nonzero_paths</a>.push_back(<span class="keyword">static_cast&lt;</span><span class="keywordtype">int</span><span class="keyword">&gt;</span>(path_idx)); }</div>
+<div class="line"><span class="lineno"> 1440</span>            <span class="keywordflow">if</span> (!<a class="code hl_function" href="namespacenumericutils.html#a7c990ce03a48a2ac185e02868538cc7a">numericutils::isZero</a>(x[path_idx])) { <a class="code hl_variable" href="#aee8eb560a37af951ab32b3eece63990e">nonzero_paths</a>.push_back(<span class="keyword">static_cast&lt;</span><span class="keywordtype">int</span><span class="keyword">&gt;</span>(path_idx)); }</div>
 <div class="line"><span class="lineno"> 1441</span>        }</div>
 <div class="line"><span class="lineno"> 1442</span> </div>
 <div class="line"><span class="lineno"> 1443</span>        <span class="comment">// Compute node scores.</span></div>
@@ -772,7 +772,7 @@ Here is the call graph for this function:</div>
 <area shape="rect" title=" " alt="" coords="5,150,167,176"/>
 <area shape="rect" href="classHighRankCuts.html#ac2cea18dd517033c3ffa62dadaa131c6" title=" " alt="" coords="215,60,402,101"/>
 <area shape="poly" title=" " alt="" coords="122,147,236,104,238,109,124,152"/>
-<area shape="rect" href="namespacenumericutils.html#ab3ee1d3f97fa4d429537dc7a597908b3" title=" " alt="" coords="486,121,619,146"/>
+<area shape="rect" href="namespacenumericutils.html#a7c990ce03a48a2ac185e02868538cc7a" title=" " alt="" coords="486,121,619,146"/>
 <area shape="poly" title=" " alt="" coords="167,155,469,136,470,141,167,161"/>
 <area shape="rect" href="Definitions_8h.html#ae7a1dede4b1a1d5175d2cfa359459e3c" title="Prints a formatted message with a specific prefix." alt="" coords="273,176,344,201"/>
 <area shape="poly" title=" " alt="" coords="168,170,257,180,257,185,167,175"/>

@@ -130,9 +130,9 @@ document.addEventListener('DOMContentLoaded',() => { initNavTree('structBucketAr
 <tr class="heading"><td colspan="2"><h2 id="header-pub-methods" class="groupheader"><a id="pub-methods" name="pub-methods"></a>
 Public Member Functions</h2></td></tr>
 <tr class="memitem:a4429fd40979fb35d702de5460b5c3c24" id="r_a4429fd40979fb35d702de5460b5c3c24"><td class="memItemLeft">bool&#160;</td><td class="memItemRight"><a class="el" href="#a4429fd40979fb35d702de5460b5c3c24">operator==</a> (const <a class="el" href="structBucketArc.html">BucketArc</a> &amp;other) const</td></tr>
-<tr class="memitem:aff809095188fc49f75e7b31551225e4e" id="r_aff809095188fc49f75e7b31551225e4e"><td class="memItemLeft">&#160;</td><td class="memItemRight"><a class="el" href="#aff809095188fc49f75e7b31551225e4e">BucketArc</a> (int from, int to, const std::vector&lt; double &gt; &amp;res_inc, double cost_inc)</td></tr>
-<tr class="memitem:a0d9dac78b35671f688aea84bee509933" id="r_a0d9dac78b35671f688aea84bee509933"><td class="memItemLeft">&#160;</td><td class="memItemRight"><a class="el" href="#a0d9dac78b35671f688aea84bee509933">BucketArc</a> (int from, int to, const std::vector&lt; double &gt; &amp;res_inc, double cost_inc, bool fixed)</td></tr>
-<tr class="memitem:a8b6c982ecfda90fb6ad28728bbb361fd" id="r_a8b6c982ecfda90fb6ad28728bbb361fd"><td class="memItemLeft">&#160;</td><td class="memItemRight"><a class="el" href="#a8b6c982ecfda90fb6ad28728bbb361fd">BucketArc</a> (int from, int to, const std::vector&lt; double &gt; &amp;res_inc, double cost_inc, bool fixed, int to_node)</td></tr>
+<tr class="memitem:a465ed2db4db635e412c7b09a50995a12" id="r_a465ed2db4db635e412c7b09a50995a12"><td class="memItemLeft">&#160;</td><td class="memItemRight"><a class="el" href="#a465ed2db4db635e412c7b09a50995a12">BucketArc</a> (int from, int to, const std::array&lt; double, R_SIZE &gt; &amp;res_inc, double cost_inc)</td></tr>
+<tr class="memitem:a3e7ef1e9d4b7e56dabb707df424f2e61" id="r_a3e7ef1e9d4b7e56dabb707df424f2e61"><td class="memItemLeft">&#160;</td><td class="memItemRight"><a class="el" href="#a3e7ef1e9d4b7e56dabb707df424f2e61">BucketArc</a> (int from, int to, const std::array&lt; double, R_SIZE &gt; &amp;res_inc, double cost_inc, bool fixed)</td></tr>
+<tr class="memitem:aba9e9e7b59f56c06e0decdc7a2f8b3fa" id="r_aba9e9e7b59f56c06e0decdc7a2f8b3fa"><td class="memItemLeft">&#160;</td><td class="memItemRight"><a class="el" href="#aba9e9e7b59f56c06e0decdc7a2f8b3fa">BucketArc</a> (int from, int to, const std::array&lt; double, R_SIZE &gt; &amp;res_inc, double cost_inc, bool fixed, int to_node)</td></tr>
 <tr class="memitem:ab3a303e55bf17eec2f51ca095bb15060" id="r_ab3a303e55bf17eec2f51ca095bb15060"><td class="memItemLeft">bool&#160;</td><td class="memItemRight"><a class="el" href="#ab3a303e55bf17eec2f51ca095bb15060">operator&lt;</a> (const <a class="el" href="structBucketArc.html">BucketArc</a> &amp;other) const</td></tr>
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 id="header-pub-attribs" class="groupheader"><a id="pub-attribs" name="pub-attribs"></a>
@@ -150,8 +150,8 @@ Public Attributes</h2></td></tr>
 
 <p class="definition">Definition at line <a class="el" href="Arc_8h_source.html#l00065">65</a> of file <a class="el" href="Arc_8h_source.html">Arc.h</a>.</p>
 </div><a name="doc-constructors" id="doc-constructors"></a><h2 id="header-doc-constructors" class="groupheader">Constructor &amp; Destructor Documentation</h2>
-<a id="aff809095188fc49f75e7b31551225e4e" name="aff809095188fc49f75e7b31551225e4e"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#aff809095188fc49f75e7b31551225e4e">&#9670;&#160;</a></span>BucketArc() <span class="overload">[1/3]</span></h2>
+<a id="a465ed2db4db635e412c7b09a50995a12" name="a465ed2db4db635e412c7b09a50995a12"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a465ed2db4db635e412c7b09a50995a12">&#9670;&#160;</a></span>BucketArc() <span class="overload">[1/3]</span></h2>
 
 <div class="memitem">
 <div class="memproto">
@@ -169,7 +169,7 @@ Public Attributes</h2></td></tr>
         <tr>
           <td class="paramkey"></td>
           <td></td>
-          <td class="paramtype">const std::vector&lt; double &gt; &amp;</td>          <td class="paramname"><span class="paramname"><em>res_inc</em></span>, </td>
+          <td class="paramtype">const std::array&lt; double, R_SIZE &gt; &amp;</td>          <td class="paramname"><span class="paramname"><em>res_inc</em></span>, </td>
         </tr>
         <tr>
           <td class="paramkey"></td>
@@ -192,8 +192,8 @@ Public Attributes</h2></td></tr>
 </div><!-- fragment -->
 </div>
 </div>
-<a id="a0d9dac78b35671f688aea84bee509933" name="a0d9dac78b35671f688aea84bee509933"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#a0d9dac78b35671f688aea84bee509933">&#9670;&#160;</a></span>BucketArc() <span class="overload">[2/3]</span></h2>
+<a id="a3e7ef1e9d4b7e56dabb707df424f2e61" name="a3e7ef1e9d4b7e56dabb707df424f2e61"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a3e7ef1e9d4b7e56dabb707df424f2e61">&#9670;&#160;</a></span>BucketArc() <span class="overload">[2/3]</span></h2>
 
 <div class="memitem">
 <div class="memproto">
@@ -211,7 +211,7 @@ Public Attributes</h2></td></tr>
         <tr>
           <td class="paramkey"></td>
           <td></td>
-          <td class="paramtype">const std::vector&lt; double &gt; &amp;</td>          <td class="paramname"><span class="paramname"><em>res_inc</em></span>, </td>
+          <td class="paramtype">const std::array&lt; double, R_SIZE &gt; &amp;</td>          <td class="paramname"><span class="paramname"><em>res_inc</em></span>, </td>
         </tr>
         <tr>
           <td class="paramkey"></td>
@@ -236,8 +236,8 @@ Public Attributes</h2></td></tr>
 </div><!-- fragment -->
 </div>
 </div>
-<a id="a8b6c982ecfda90fb6ad28728bbb361fd" name="a8b6c982ecfda90fb6ad28728bbb361fd"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#a8b6c982ecfda90fb6ad28728bbb361fd">&#9670;&#160;</a></span>BucketArc() <span class="overload">[3/3]</span></h2>
+<a id="aba9e9e7b59f56c06e0decdc7a2f8b3fa" name="aba9e9e7b59f56c06e0decdc7a2f8b3fa"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#aba9e9e7b59f56c06e0decdc7a2f8b3fa">&#9670;&#160;</a></span>BucketArc() <span class="overload">[3/3]</span></h2>
 
 <div class="memitem">
 <div class="memproto">
@@ -255,7 +255,7 @@ Public Attributes</h2></td></tr>
         <tr>
           <td class="paramkey"></td>
           <td></td>
-          <td class="paramtype">const std::vector&lt; double &gt; &amp;</td>          <td class="paramname"><span class="paramname"><em>res_inc</em></span>, </td>
+          <td class="paramtype">const std::array&lt; double, R_SIZE &gt; &amp;</td>          <td class="paramname"><span class="paramname"><em>res_inc</em></span>, </td>
         </tr>
         <tr>
           <td class="paramkey"></td>
@@ -323,7 +323,7 @@ Here is the call graph for this function:</div>
 <div class="center"><img src="structBucketArc_ab3a303e55bf17eec2f51ca095bb15060_cgraph.png" border="0" usemap="#astructBucketArc_ab3a303e55bf17eec2f51ca095bb15060_cgraph" loading="lazy" alt=""/></div>
 <map name="astructBucketArc_ab3a303e55bf17eec2f51ca095bb15060_cgraph" id="astructBucketArc_ab3a303e55bf17eec2f51ca095bb15060_cgraph">
 <area shape="rect" title=" " alt="" coords="5,5,149,31"/>
-<area shape="rect" href="structBucketArc.html#aff809095188fc49f75e7b31551225e4e" title=" " alt="" coords="197,5,346,31"/>
+<area shape="rect" href="structBucketArc.html#a465ed2db4db635e412c7b09a50995a12" title=" " alt="" coords="197,5,346,31"/>
 <area shape="poly" title=" " alt="" coords="149,16,181,16,181,21,149,21"/>
 </map>
 </div>
@@ -363,7 +363,7 @@ Here is the call graph for this function:</div>
 <div class="center"><img src="structBucketArc_a4429fd40979fb35d702de5460b5c3c24_cgraph.png" border="0" usemap="#astructBucketArc_a4429fd40979fb35d702de5460b5c3c24_cgraph" loading="lazy" alt=""/></div>
 <map name="astructBucketArc_a4429fd40979fb35d702de5460b5c3c24_cgraph" id="astructBucketArc_a4429fd40979fb35d702de5460b5c3c24_cgraph">
 <area shape="rect" title=" " alt="" coords="5,5,157,31"/>
-<area shape="rect" href="structBucketArc.html#aff809095188fc49f75e7b31551225e4e" title=" " alt="" coords="205,5,354,31"/>
+<area shape="rect" href="structBucketArc.html#a465ed2db4db635e412c7b09a50995a12" title=" " alt="" coords="205,5,354,31"/>
 <area shape="poly" title=" " alt="" coords="157,16,189,16,189,21,157,21"/>
 </map>
 </div>

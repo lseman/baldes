@@ -577,24 +577,24 @@ template&lt;<a class="el" href="Definitions_8h.html#a224b9163917ac32fc95a60d8c1e
 <div class="line"><span class="lineno">   34</span>    <span class="keywordflow">if</span> <span class="keyword">constexpr</span> (D == <a class="code hl_enumvalue" href="Definitions_8h.html#a224b9163917ac32fc95a60d8c1eec3aaa67d2f6740a8eaebf4d5c6f79be8da481">Direction::Forward</a>) {</div>
 <div class="line"><span class="lineno">   35</span>        new_resource = std::max(initial_resource + increment, lb);</div>
 <div class="line"><span class="lineno">   36</span>        <span class="comment">// new_resource = roundToTwoDecimalPlaces(new_resource);</span></div>
-<div class="line"><span class="lineno">   37</span>        <span class="keywordflow">return</span> <a class="code hl_function" href="namespacenumericutils.html#afa1d31c5f18a361509ba1faacca5feb4">numericutils::lte</a>(new_resource, ub);</div>
+<div class="line"><span class="lineno">   37</span>        <span class="keywordflow">return</span> <a class="code hl_function" href="namespacenumericutils.html#a2b181fab19fbe6d56b1aaa8a3b75f371">numericutils::lte</a>(new_resource, ub);</div>
 <div class="line"><span class="lineno">   38</span>    } <span class="keywordflow">else</span> {</div>
 <div class="line"><span class="lineno">   39</span>        new_resource = std::min(initial_resource - increment, ub);</div>
 <div class="line"><span class="lineno">   40</span>        <span class="comment">// new_resource = roundToTwoDecimalPlaces(new_resource);</span></div>
-<div class="line"><span class="lineno">   41</span>        <span class="keywordflow">return</span> <a class="code hl_function" href="namespacenumericutils.html#a8d554fdb4468068ab99dc7a219308492">numericutils::gte</a>(new_resource, lb);</div>
+<div class="line"><span class="lineno">   41</span>        <span class="keywordflow">return</span> <a class="code hl_function" href="namespacenumericutils.html#a97fa0d2a500cf097f724453e00e6314a">numericutils::gte</a>(new_resource, lb);</div>
 <div class="line"><span class="lineno">   42</span>    }</div>
 <div class="line"><span class="lineno">   43</span>}</div>
-<div class="ttc" id="anamespacenumericutils_html_a8d554fdb4468068ab99dc7a219308492"><div class="ttname"><a href="namespacenumericutils.html#a8d554fdb4468068ab99dc7a219308492">numericutils::gte</a></div><div class="ttdeci">bool gte(double a, double b, double threshold=eps)</div><div class="ttdef"><b>Definition</b> <a href="NumericUtils_8h_source.html#l00028">NumericUtils.h:28</a></div></div>
-<div class="ttc" id="anamespacenumericutils_html_afa1d31c5f18a361509ba1faacca5feb4"><div class="ttname"><a href="namespacenumericutils.html#afa1d31c5f18a361509ba1faacca5feb4">numericutils::lte</a></div><div class="ttdeci">bool lte(double a, double b, double threshold=eps)</div><div class="ttdef"><b>Definition</b> <a href="NumericUtils_8h_source.html#l00032">NumericUtils.h:32</a></div></div>
+<div class="ttc" id="anamespacenumericutils_html_a2b181fab19fbe6d56b1aaa8a3b75f371"><div class="ttname"><a href="namespacenumericutils.html#a2b181fab19fbe6d56b1aaa8a3b75f371">numericutils::lte</a></div><div class="ttdeci">constexpr bool lte(double a, double b, double threshold=eps)</div><div class="ttdef"><b>Definition</b> <a href="NumericUtils_8h_source.html#l00032">NumericUtils.h:32</a></div></div>
+<div class="ttc" id="anamespacenumericutils_html_a97fa0d2a500cf097f724453e00e6314a"><div class="ttname"><a href="namespacenumericutils.html#a97fa0d2a500cf097f724453e00e6314a">numericutils::gte</a></div><div class="ttdeci">constexpr bool gte(double a, double b, double threshold=eps)</div><div class="ttdef"><b>Definition</b> <a href="NumericUtils_8h_source.html#l00028">NumericUtils.h:28</a></div></div>
 </div><!-- fragment --><div class="dynheader">
 Here is the call graph for this function:</div>
 <div class="dyncontent">
 <div class="center"><img src="Resources_8h_adc9ed5f87789d0ecbacc1793d27f9855_cgraph.png" border="0" usemap="#aResources_8h_adc9ed5f87789d0ecbacc1793d27f9855_cgraph" loading="lazy" alt=""/></div>
 <map name="aResources_8h_adc9ed5f87789d0ecbacc1793d27f9855_cgraph" id="aResources_8h_adc9ed5f87789d0ecbacc1793d27f9855_cgraph">
 <area shape="rect" title=" " alt="" coords="5,23,142,64"/>
-<area shape="rect" href="namespacenumericutils.html#a8d554fdb4468068ab99dc7a219308492" title=" " alt="" coords="190,5,305,31"/>
+<area shape="rect" href="namespacenumericutils.html#a97fa0d2a500cf097f724453e00e6314a" title=" " alt="" coords="190,5,305,31"/>
 <area shape="poly" title=" " alt="" coords="142,31,173,26,174,31,142,36"/>
-<area shape="rect" href="namespacenumericutils.html#afa1d31c5f18a361509ba1faacca5feb4" title=" " alt="" coords="192,55,303,80"/>
+<area shape="rect" href="namespacenumericutils.html#a2b181fab19fbe6d56b1aaa8a3b75f371" title=" " alt="" coords="192,55,303,80"/>
 <area shape="poly" title=" " alt="" coords="142,50,176,55,176,60,142,56"/>
 </map>
 </div>
@@ -645,12 +645,12 @@ template&lt;<a class="el" href="Definitions_8h.html#a224b9163917ac32fc95a60d8c1e
 <div class="line"><span class="lineno">   91</span>    <span class="keywordflow">if</span> <span class="keyword">constexpr</span> (D == <a class="code hl_enumvalue" href="Definitions_8h.html#a224b9163917ac32fc95a60d8c1eec3aaa67d2f6740a8eaebf4d5c6f79be8da481">Direction::Forward</a>) {</div>
 <div class="line"><span class="lineno">   92</span>        <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> i = 0; i &lt; theNode.<a class="code hl_variable" href="structVRPNode.html#af7dff9fcce0cb6c466f786447d30001f">mtw_lb</a>.size(); ++i) {</div>
 <div class="line"><span class="lineno">   93</span>            new_resource = std::max(initial_resource + increment, theNode.<a class="code hl_variable" href="structVRPNode.html#af7dff9fcce0cb6c466f786447d30001f">mtw_lb</a>[i]);</div>
-<div class="line"><span class="lineno">   94</span>            <span class="keywordflow">if</span> (<a class="code hl_function" href="namespacenumericutils.html#afa1d31c5f18a361509ba1faacca5feb4">numericutils::lte</a>(new_resource, theNode.<a class="code hl_variable" href="structVRPNode.html#a586059300c781d3073c3b6d21fd08293">mtw_ub</a>[i])) { <span class="keywordflow">return</span> <span class="keyword">true</span>; }</div>
+<div class="line"><span class="lineno">   94</span>            <span class="keywordflow">if</span> (<a class="code hl_function" href="namespacenumericutils.html#a2b181fab19fbe6d56b1aaa8a3b75f371">numericutils::lte</a>(new_resource, theNode.<a class="code hl_variable" href="structVRPNode.html#a586059300c781d3073c3b6d21fd08293">mtw_ub</a>[i])) { <span class="keywordflow">return</span> <span class="keyword">true</span>; }</div>
 <div class="line"><span class="lineno">   95</span>        }</div>
 <div class="line"><span class="lineno">   96</span>    } <span class="keywordflow">else</span> {</div>
 <div class="line"><span class="lineno">   97</span>        <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> i = 0; i &lt; theNode.<a class="code hl_variable" href="structVRPNode.html#a586059300c781d3073c3b6d21fd08293">mtw_ub</a>.size(); ++i) {</div>
 <div class="line"><span class="lineno">   98</span>            new_resource = std::min(initial_resource - increment, theNode.<a class="code hl_variable" href="structVRPNode.html#a586059300c781d3073c3b6d21fd08293">mtw_ub</a>[i]);</div>
-<div class="line"><span class="lineno">   99</span>            <span class="keywordflow">if</span> (<a class="code hl_function" href="namespacenumericutils.html#a8d554fdb4468068ab99dc7a219308492">numericutils::gte</a>(new_resource, theNode.<a class="code hl_variable" href="structVRPNode.html#af7dff9fcce0cb6c466f786447d30001f">mtw_lb</a>[i])) { <span class="keywordflow">return</span> <span class="keyword">true</span>; }</div>
+<div class="line"><span class="lineno">   99</span>            <span class="keywordflow">if</span> (<a class="code hl_function" href="namespacenumericutils.html#a97fa0d2a500cf097f724453e00e6314a">numericutils::gte</a>(new_resource, theNode.<a class="code hl_variable" href="structVRPNode.html#af7dff9fcce0cb6c466f786447d30001f">mtw_lb</a>[i])) { <span class="keywordflow">return</span> <span class="keyword">true</span>; }</div>
 <div class="line"><span class="lineno">  100</span>        }</div>
 <div class="line"><span class="lineno">  101</span>    }</div>
 <div class="line"><span class="lineno">  102</span>    <span class="keywordflow">return</span> <span class="keyword">false</span>;</div>
@@ -663,9 +663,9 @@ Here is the call graph for this function:</div>
 <div class="center"><img src="Resources_8h_a621f51219a252a664bbc9d0240e9c646_cgraph.png" border="0" usemap="#aResources_8h_a621f51219a252a664bbc9d0240e9c646_cgraph" loading="lazy" alt=""/></div>
 <map name="aResources_8h_a621f51219a252a664bbc9d0240e9c646_cgraph" id="aResources_8h_a621f51219a252a664bbc9d0240e9c646_cgraph">
 <area shape="rect" title=" " alt="" coords="5,31,162,56"/>
-<area shape="rect" href="namespacenumericutils.html#a8d554fdb4468068ab99dc7a219308492" title=" " alt="" coords="210,5,325,31"/>
+<area shape="rect" href="namespacenumericutils.html#a97fa0d2a500cf097f724453e00e6314a" title=" " alt="" coords="210,5,325,31"/>
 <area shape="poly" title=" " alt="" coords="162,30,194,26,194,31,163,35"/>
-<area shape="rect" href="namespacenumericutils.html#afa1d31c5f18a361509ba1faacca5feb4" title=" " alt="" coords="212,55,323,80"/>
+<area shape="rect" href="namespacenumericutils.html#a2b181fab19fbe6d56b1aaa8a3b75f371" title=" " alt="" coords="212,55,323,80"/>
 <area shape="poly" title=" " alt="" coords="163,51,197,56,196,61,162,56"/>
 </map>
 </div>

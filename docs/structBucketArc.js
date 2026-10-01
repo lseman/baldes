@@ -1,8 +1,8 @@
 var structBucketArc =
 [
-    [ "BucketArc", "structBucketArc.html#aff809095188fc49f75e7b31551225e4e", null ],
-    [ "BucketArc", "structBucketArc.html#a0d9dac78b35671f688aea84bee509933", null ],
-    [ "BucketArc", "structBucketArc.html#a8b6c982ecfda90fb6ad28728bbb361fd", null ],
+    [ "BucketArc", "structBucketArc.html#a465ed2db4db635e412c7b09a50995a12", null ],
+    [ "BucketArc", "structBucketArc.html#a3e7ef1e9d4b7e56dabb707df424f2e61", null ],
+    [ "BucketArc", "structBucketArc.html#aba9e9e7b59f56c06e0decdc7a2f8b3fa", null ],
     [ "operator<", "structBucketArc.html#ab3a303e55bf17eec2f51ca095bb15060", null ],
     [ "operator==", "structBucketArc.html#a4429fd40979fb35d702de5460b5c3c24", null ],
     [ "cost_increment", "structBucketArc.html#aa8a9327361182f8ff88987a2e378d4de", null ],

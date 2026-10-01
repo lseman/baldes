@@ -131,8 +131,8 @@ var searchData=
   ['getvarvalue_128',['getVarValue',['../classBNBNode.html#adf352e13be92c0f0838047be84df3bba',1,'BNBNode::getVarValue()'],['../classGurobiSolver.html#ab512a08dfe067f6584e3f0af8095baf6',1,'GurobiSolver::getVarValue()'],['../classHighsSolver.html#ad62dcefd8a8fa4c578f901c26242eac6',1,'HighsSolver::getVarValue()'],['../classIPMSolver.html#a0e8b3b88ae711152df934255554e2575',1,'IPMSolver::getVarValue()'],['../classSolverInterface.html#ab25f3280d5c845084761ead289c96175',1,'SolverInterface::getVarValue()']]],
   ['grbmodelwrapper_129',['GRBModelWrapper',['../structGRBModelWrapper.html#a48a1cfe691c30ec16ad942d5c0c7a1a3',1,'GRBModelWrapper::GRBModelWrapper(std::unique_ptr&lt; GRBModel &gt; m)'],['../structGRBModelWrapper.html#ae7850ff7cdaab29d0a6b12b5f267faff',1,'GRBModelWrapper::GRBModelWrapper(const GRBModelWrapper &amp;other)']]],
   ['greedyupperbound_130',['greedyUpperBound',['../classKnapsack.html#af875f761c9baa1bc78399d7eaf23b269',1,'Knapsack']]],
-  ['gt_131',['gt',['../namespacenumericutils.html#a30fadd8aa82c3a907ce52a6c1735a378',1,'numericutils']]],
-  ['gte_132',['gte',['../namespacenumericutils.html#a8d554fdb4468068ab99dc7a219308492',1,'numericutils']]],
+  ['gt_131',['gt',['../namespacenumericutils.html#aaadab3c8a1b76df1e09c11ebaa3d1e49',1,'numericutils']]],
+  ['gte_132',['gte',['../namespacenumericutils.html#a97fa0d2a500cf097f724453e00e6314a',1,'numericutils']]],
   ['gurobienvsingleton_133',['GurobiEnvSingleton',['../classGurobiEnvSingleton.html#a538f4ba817861d916db888ec881c1375',1,'GurobiEnvSingleton']]],
   ['gurobisolver_134',['GurobiSolver',['../classGurobiSolver.html#a26009f6805f182efe3b5b3e8facb0198',1,'GurobiSolver::GurobiSolver(GRBModel *model)'],['../classGurobiSolver.html#a983dd255ba09001d6f879ac025d45da0',1,'GurobiSolver::GurobiSolver(GRBModel &amp;model)'],['../classGurobiSolver.html#ab26f92f791dba81b8da54d291d480901',1,'GurobiSolver::GurobiSolver(std::unique_ptr&lt; GRBModel &gt; &amp;model)'],['../classGurobiSolver.html#aebe4978a1828dd47902ba7f928a257b7',1,'GurobiSolver::GurobiSolver(GRBModel *model, bool mute)']]]
 ];
