@@ -263,8 +263,8 @@ public:
 
     struct BucketPricingPass {
         BucketDirectionalBounds bounds;
-        std::atomic<double>     best_cost{0.0};
-        std::atomic<size_t>     non_dominated_labels{0};
+        alignas(64) std::atomic<double>     best_cost{0.0};
+        alignas(64) std::atomic<size_t>     non_dominated_labels{0};
 
         BucketPricingPass(size_t fw_size, size_t bw_size)
             : bounds{std::vector<double>(fw_size), std::vector<double>(bw_size)} {}
@@ -429,14 +429,14 @@ public:
     std::vector<BucketArc>        fw_arcs;
     std::vector<BucketArc>        bw_arcs;
     std::vector<Label *>          merged_labels;
-    std::atomic<double>           enumeration_route_cutoff{std::numeric_limits<double>::infinity()};
-    std::atomic<uint64_t>         concatenation_labels_tested{0};
-    std::atomic<uint64_t>         concatenation_labels_accepted{0};
-    std::atomic<uint64_t>         pricing_candidate_hits{0};
-    std::atomic_bool              pricing_truncated{false};
+    alignas(64) std::atomic<double>           enumeration_route_cutoff{std::numeric_limits<double>::infinity()};
+    alignas(64) std::atomic<uint64_t>         concatenation_labels_tested{0};
+    alignas(64) std::atomic<uint64_t>         concatenation_labels_accepted{0};
+    alignas(64) std::atomic<uint64_t>         pricing_candidate_hits{0};
+    alignas(64) std::atomic_bool              pricing_truncated{false};
     bool                          forward_completion_bounds_ready = false;
-    std::atomic<uint64_t>         completion_bound_attempts{0};
-    std::atomic<uint64_t>         completion_bound_rejections{0};
+    alignas(64) std::atomic<uint64_t>         completion_bound_attempts{0};
+    alignas(64) std::atomic<uint64_t>         completion_bound_rejections{0};
     uint64_t                      completion_exact_calls             = 0;
     bool                          auto_prefer_backward_first         = false;
     double                        last_sequential_completion_ms      = std::numeric_limits<double>::infinity();
