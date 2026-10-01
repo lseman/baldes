@@ -110,15 +110,16 @@ void BucketGraph::UpdateBucketsSet(const double theta, const Label *label, anker
             // Determine the reference node for resource checks.
             const VRPNode &ref_node = forward ? nodes[bucketLnode] : nodes[L_opposite->node_id];
 
-            bool         violated      = false;
+            const int time_idx  = options.time_resource_index;
+            bool      violated  = false;
             const size_t num_resources = options.resources.size();
             for (size_t r = 0; r < num_resources; ++r) {
-                if (options.resources[r] == "time") {
+                if (static_cast<int>(r) == time_idx) {
                     const double time_constraint = forward
-                                                       ? label->resources[TIME_INDEX] + cost + ref_node.duration
-                                                       : L_opposite->resources[TIME_INDEX] + cost + ref_node.duration;
+                                                       ? label->resources[time_idx] + cost + ref_node.duration
+                                                       : L_opposite->resources[time_idx] + cost + ref_node.duration;
                     if (numericutils::gt(time_constraint,
-                                         forward ? L_opposite->resources[TIME_INDEX] : label->resources[TIME_INDEX])) {
+                                         forward ? L_opposite->resources[time_idx] : label->resources[time_idx])) {
                         violated = true;
                         break;
                     }
