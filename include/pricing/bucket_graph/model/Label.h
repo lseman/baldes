@@ -40,7 +40,7 @@ struct SRCMap {
     };
 
     std::unique_ptr<std::array<uint16_t, MAX_SRC_CUTS>> wide_values;
-    std::array<uint8_t, MAX_SRC_CUTS> compact_values = {};
+    std::unique_ptr<std::array<uint8_t, MAX_SRC_CUTS>>  compact_values;
     uint8_t logical_size = 0;
 
     SRCMap() = default;
@@ -50,19 +50,24 @@ struct SRCMap {
     SRCMap(const std::vector<uint16_t> &src) { *this = src; }
 
     SRCMap(const SRCMap &other)
-        : compact_values(other.compact_values), logical_size(other.logical_size) {
+        : logical_size(other.logical_size) {
         if (other.wide_values) {
             wide_values = std::make_unique<std::array<uint16_t, MAX_SRC_CUTS>>(*other.wide_values);
+        }
+        if (other.compact_values) {
+            compact_values = std::make_unique<std::array<uint8_t, MAX_SRC_CUTS>>(*other.compact_values);
         }
     }
 
     SRCMap &operator=(const SRCMap &other) {
         if (this == &other) return *this;
-        compact_values = other.compact_values;
         logical_size   = other.logical_size;
         wide_values = other.wide_values
                           ? std::make_unique<std::array<uint16_t, MAX_SRC_CUTS>>(*other.wide_values)
                           : nullptr;
+        compact_values = other.compact_values
+                             ? std::make_unique<std::array<uint8_t, MAX_SRC_CUTS>>(*other.compact_values)
+                             : nullptr;
         return *this;
     }
 
@@ -84,6 +89,7 @@ struct SRCMap {
     void clear() noexcept {
         logical_size = 0;
         wide_values.reset();
+        compact_values.reset();
     }
 
     void resize(std::size_t n, uint16_t value = 0) {
@@ -99,9 +105,11 @@ struct SRCMap {
         ensure_capacity(n);
         assert(n <= MAX_SRC_CUTS);
         wide_values.reset();
+        compact_values.reset();
         logical_size = static_cast<uint8_t>(n);
         if (value <= UINT8_MAX) {
-            std::fill_n(compact_values.begin(), n, static_cast<uint8_t>(value));
+            getCompact(0); // lazy-allocate compact_values
+            std::fill_n(compact_values->begin(), n, static_cast<uint8_t>(value));
         } else {
             promote();
             std::fill_n(wide_values->begin(), n, value);
@@ -113,8 +121,9 @@ struct SRCMap {
     [[nodiscard]] bool        is_compact() const noexcept { return !wide_values; }
 
     [[nodiscard]] const void *storage_data() const noexcept {
-        return wide_values ? static_cast<const void *>(wide_values->data())
-                           : static_cast<const void *>(compact_values.data());
+        if (wide_values) return static_cast<const void *>(wide_values->data());
+        if (compact_values) return static_cast<const void *>(compact_values->data());
+        return nullptr;
     }
 
     Reference operator[](std::size_t idx) noexcept {
@@ -134,22 +143,39 @@ struct SRCMap {
     }
 
 private:
+    [[nodiscard]] uint8_t &getCompact(std::size_t idx) noexcept {
+        if (!compact_values) {
+            compact_values = std::make_unique<std::array<uint8_t, MAX_SRC_CUTS>>();
+            compact_values->fill(0);
+        }
+        return (*compact_values)[idx];
+    }
+
     [[nodiscard]] uint16_t get(std::size_t idx) const noexcept {
-        return wide_values ? (*wide_values)[idx] : compact_values[idx];
+        if (wide_values) return (*wide_values)[idx];
+        return compact_values ? static_cast<uint16_t>((*compact_values)[idx]) : static_cast<uint16_t>(logical_size == 0 ? 0u : 0u);
     }
 
     void set(std::size_t idx, uint16_t value) {
-        if (value > UINT8_MAX && !wide_values) promote();
-        if (wide_values) {
-            (*wide_values)[idx] = value;
+        if (value > UINT8_MAX) {
+            if (!wide_values) promote();
+            if (wide_values) (*wide_values)[idx] = value;
         } else {
-            compact_values[idx] = static_cast<uint8_t>(value);
+            if (wide_values) {
+                (*wide_values)[idx] = value;
+            } else {
+                getCompact(idx) = static_cast<uint8_t>(value);
+            }
         }
     }
 
     void promote() {
         wide_values = std::make_unique<std::array<uint16_t, MAX_SRC_CUTS>>();
-        std::copy(compact_values.begin(), compact_values.end(), wide_values->begin());
+        if (compact_values) {
+            std::copy(compact_values->begin(), compact_values->end(), wide_values->begin());
+        } else {
+            wide_values->fill(0);
+        }
     }
 };
 #endif

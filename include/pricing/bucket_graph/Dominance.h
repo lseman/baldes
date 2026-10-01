@@ -47,6 +47,27 @@ inline std::experimental::simd<T> load_simd(const Container &source, size_t star
     return std::experimental::simd<T>(buffer.data(), std::experimental::vector_aligned);
 }
 
+// Direct SIMD load from contiguous aligned memory (no projection, no bounds check).
+// Use this for SoA data that is already contiguous and aligned.
+template <typename T>
+inline std::experimental::simd<T> load_simd_direct(const T *source, size_t simd_size) noexcept {
+    constexpr size_t simd_register_size = std::experimental::simd<T>::size();
+    alignas(64) std::array<T, simd_register_size> buffer = {};
+    for (size_t i = 0; i < simd_size; ++i) {
+        buffer[i] = source[i];
+    }
+    for (size_t i = simd_size; i < simd_register_size; ++i) {
+        buffer[i] = std::numeric_limits<T>::max();
+    }
+    return std::experimental::simd<T>(buffer.data(), std::experimental::vector_aligned);
+}
+
+// Direct SIMD load for std::array (avoids container indirection).
+template <typename T, size_t N>
+inline std::experimental::simd<T> load_simd_direct(const std::array<T, N> &source, size_t simd_size) noexcept {
+    return load_simd_direct(source.data(), simd_size);
+}
+
 template <Direction D, Stage S>
 inline bool check_dominance_against_vector(const Label *__restrict__ new_label, std::span<Label *const> labels,
                                            const CutStorage *__restrict__ cut_storage,
@@ -106,8 +127,8 @@ inline bool check_dominance_against_vector(const Label *__restrict__ new_label, 
 
                 // Main SIMD blocks
                 for (size_t k = 0; k < simd_resource_blocks * simd_width; k += simd_width) {
-                    simd<double> label_res     = load_simd_generic<double>(label_resources, k, simd_width);
-                    simd<double> new_label_res = load_simd_generic<double>(new_resources, k, simd_width);
+                    simd<double> label_res     = load_simd_direct<double>(label_resources.data() + k, simd_width);
+                    simd<double> new_label_res = load_simd_direct<double>(new_resources.data() + k, simd_width);
 
                     if constexpr (D == Direction::Forward) {
                         if (!all_of(label_res <= (new_label_res + tolerance_simd))) {
@@ -187,8 +208,8 @@ inline bool check_dominance_against_vector(const Label *__restrict__ new_label, 
 
                     // Process bitmap in SIMD-width chunks
                     for (size_t k = 0; k < simd_bitmap_blocks * simd_width; k += simd_width) {
-                        simd<uint64_t> label_vis     = load_simd_generic<uint64_t>(label_visited, k, simd_width);
-                        simd<uint64_t> new_label_vis = load_simd_generic<uint64_t>(new_visited, k, simd_width);
+                        simd<uint64_t> label_vis     = load_simd_direct<uint64_t>(label_visited.data() + k, simd_width);
+                        simd<uint64_t> new_label_vis = load_simd_direct<uint64_t>(new_visited.data() + k, simd_width);
 
                         // Check if all visited nodes in label are also in
                         // new_label
