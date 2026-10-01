@@ -415,7 +415,9 @@ public:
         ss    = bucket_graph->ss;
 
         // Add generated columns.
-        colAdded = addColumn(node, paths, inner_obj, enumerate);
+        const bool enumeration_complete =
+            PricingStateMachine::canApplyDeluxing(enumerate, bucket_graph->enumerationFailed());
+        colAdded = addColumn(node, paths, inner_obj, enumerate, enumeration_complete);
         if (hasNegativeReducedCost(inner_obj)) {
             ss               = false;
             bucket_graph->ss = false;
@@ -555,7 +557,8 @@ public:
      * Adds a column to the GRBModel.
      *
      */
-    inline int addColumn(BNBNode *node, const auto &columns, double &inner_obj, bool enumerate = false) {
+    inline int addColumn(BNBNode *node, const auto &columns, double &inner_obj, bool enumerate = false,
+                         bool enumeration_complete = false) {
         SRC_MODE_BLOCK(auto &r1c = node->r1c; auto &cuts = r1c->cutStorage;)
         RCC_MODE_BLOCK(auto &rccManager = node->rccManager;)
         int   numConstrsLocal = node->getIntAttr("NumConstrs");
@@ -685,11 +688,28 @@ public:
 
         // Add the new columns to the MIP model if any were generated.
         if (!lb.empty()) {
+            // Deluxing uses the reduced costs from the LP solution that
+            // produced this enumeration.  Take that snapshot before changing
+            // the internal master; solver backends are allowed to invalidate
+            // their solution vectors when a model is modified.
+            std::vector<double> deluxing_duals;
+            double              deluxing_lower_bound = 0.0;
+            // Reduced-cost fixing is valid only when enumeration covered the
+            // entire incumbent gap.  If the route cap was reached, omitted
+            // positive-reduced-cost routes may still be required by a better
+            // integer solution and cannot be recovered by ordinary pricing.
+            const bool run_deluxing = enumerate && enumeration_complete &&
+                                      node->integer_sol < std::numeric_limits<double>::max();
+            if (run_deluxing) {
+                deluxing_duals       = node->getDuals();
+                deluxing_lower_bound = node->getObjVal();
+            }
+
             node->addVars(lb.data(), ub.data(), obj.data(), vtypes.data(), names.data(), cols.data(), lb.size());
             node->update();
 
-            if (enumerate && node->integer_sol < std::numeric_limits<double>::max()) {
-                applyDeluxingReduction(node, node->getDuals(), node->integer_sol, node->getObjVal());
+            if (run_deluxing) {
+                applyDeluxingReduction(node, deluxing_duals, node->integer_sol, deluxing_lower_bound);
             }
         }
 
@@ -701,6 +721,17 @@ public:
         if (upper_bound <= lower_bound) { return; }
         auto &allPaths = node->paths;
         if (allPaths.empty()) { return; }
+
+        // Deluxing is only a reduction: skipping it is always safe.  A dual
+        // vector from an older master cannot be matched to rows after cuts
+        // have been inserted or removed, and indexing it would both be
+        // unsafe and produce invalid reduced costs.
+        const auto constraint_count = node->getConstrs().size();
+        if (dual_solution.size() != constraint_count) {
+            print_info("Skipping deluxing: LP snapshot has {} duals for {} master rows\n", dual_solution.size(),
+                       constraint_count);
+            return;
+        }
 
         double gap           = upper_bound - lower_bound;
         auto   reduced_costs = node->mip.getAllReducedCosts(dual_solution);
@@ -745,6 +776,17 @@ public:
         for (auto &cut : cuts) {
             // If the cut was already added and hasn't been updated, skip it.
             if ((cut.added && !cut.updated) && !loaded) { continue; }
+
+            // Exact pricing stores one residue per master SRC row.  Letting
+            // the master accumulate more rows than SRCMap can represent makes
+            // Stage Four silently price against only a subset of the LP
+            // duals, invalidating the lower bound. Pending cuts remain useful
+            // only if a cleaner first frees a master slot.
+            if (!loaded && !cut.added &&
+                !PricingStateMachine::hasSrcMasterCapacity(constraints.size(), MAX_SRC_CUTS)) {
+                cutsToBeRemoved.push_back(cut.id);
+                continue;
+            }
 
             // Mark that at least one cut has been changed.
             changed = true;

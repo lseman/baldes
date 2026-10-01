@@ -826,7 +826,7 @@ template <Direction D>
 void BucketGraph::common_initialization() {
     // Retrieve active cuts and build a vector of ActiveCutInfo.
     auto                      &cutter      = cut_storage;
-    const auto                 active_cuts = cutter->getActiveCuts();
+    const auto                &active_cuts = cutter->getActiveCuts();
     std::vector<ActiveCutInfo> active_cuts_info;
     active_cuts_info.reserve(active_cuts.size());
     for (const auto &cut : active_cuts) { active_cuts_info.push_back(cut); }

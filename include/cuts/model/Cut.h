@@ -10,6 +10,7 @@
 #include "model/Path.h"
 #include "routing/Serializer.h"
 #include "mip/Constraint.h"
+
 struct SRCPermutation {
     std::vector<int>    num;
     std::vector<double> frac;
@@ -861,9 +862,10 @@ public:
     }
 
     void updateRedCost(std::vector<Label *> labels) {
-        const auto active_cuts = getActiveCuts();
-
         const auto n_cuts = activeSize();
+#if defined(SRC_MEMORY_MODE_ARC)
+        const auto &active_cuts = getActiveCuts();
+#endif
 
         for (auto label : labels) {
             label->SRCmap.assign(n_cuts, 0);

@@ -908,6 +908,15 @@ public:
     }
 
     std::vector<double> getAllReducedCosts(const std::vector<double> &dual_solution) {
+        // Row positions define the dual-to-constraint mapping.  A vector with
+        // a different size is not merely incomplete: after row deletion its
+        // entries may refer to different constraints altogether.
+        if (dual_solution.size() != constraints.size()) { return {}; }
+        if (sparse_matrix.rows.size() != sparse_matrix.cols.size() ||
+            sparse_matrix.rows.size() != sparse_matrix.values.size()) {
+            return {};
+        }
+
         // Initialize reduced costs with objective coefficients
         std::vector<double> reduced_costs(variables.size());
         for (size_t i = 0; i < variables.size(); ++i) { reduced_costs[i] = variables[i]->get_objective_coefficient(); }
@@ -918,6 +927,11 @@ public:
             int    col   = sparse_matrix.cols[i];
             int    row   = sparse_matrix.rows[i];
             double value = sparse_matrix.values[i];
+
+            if (row < 0 || static_cast<size_t>(row) >= dual_solution.size() || col < 0 ||
+                static_cast<size_t>(col) >= reduced_costs.size()) {
+                return {};
+            }
 
             // Subtract dual_value * coefficient from the corresponding
             // reduced cost

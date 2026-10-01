@@ -31,9 +31,22 @@ void test_candidate_collection_uses_identity_not_violation_as_equality() {
     assert(candidates.size() == 2);
 }
 
+void test_rank3_sparse_delta_matches_full_floor_coefficient() {
+    for (int i_visits = 0; i_visits <= 4; ++i_visits) {
+        for (int j_visits = 0; j_visits <= 4; ++j_visits) {
+            for (int k_visits = 0; k_visits <= 4; ++k_visits) {
+                const int base = i_visits + j_visits;
+                const int expected = ((base + k_visits) / 2) - (base / 2);
+                assert(rank1::rank3_floor_coefficient_delta(base, k_visits) == expected);
+            }
+        }
+    }
+}
+
 } // namespace
 
 int main() {
     test_hash_is_independent_of_set_insertion_order();
     test_candidate_collection_uses_identity_not_violation_as_equality();
+    test_rank3_sparse_delta_matches_full_floor_coefficient();
 }
