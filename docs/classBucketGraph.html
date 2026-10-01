@@ -3347,54 +3347,54 @@ template&lt;<a class="el" href="Definitions_8h.html#aca8133200c1122e29b87b314d82
 <div class="line"><span class="lineno">  196</span>                                : best_cost.load(std::memory_order_relaxed);</div>
 <div class="line"><span class="lineno">  197</span> </div>
 <div class="line"><span class="lineno">  198</span>    <span class="keywordflow">while</span> (!scratch.bucket_stack.empty()) {</div>
-<div class="line"><span class="lineno">  199</span>        <span class="keywordflow">if</span> <span class="keyword">constexpr</span> (S == <a class="code hl_enumvalue" href="Definitions_8h.html#aca8133200c1122e29b87b314d82604eba981b8fcee42e1e726a67a2b9a98ea6e9">Stage::Four</a>) {</div>
-<div class="line"><span class="lineno">  200</span>            <span class="keywordflow">if</span> (<a class="code hl_variable" href="#aeecc16f38a45babf5c4dc24a56473d70">pricing_truncated</a>.load(std::memory_order_relaxed)) <span class="keywordflow">break</span>;</div>
-<div class="line"><span class="lineno">  201</span>        }</div>
-<div class="line"><span class="lineno">  202</span> </div>
-<div class="line"><span class="lineno">  203</span>        <span class="keyword">const</span> <span class="keywordtype">int</span> current_bucket = scratch.bucket_stack.back();</div>
-<div class="line"><span class="lineno">  204</span>        scratch.bucket_stack.pop_back();</div>
-<div class="line"><span class="lineno">  205</span> </div>
-<div class="line"><span class="lineno">  206</span>        <span class="keyword">const</span> <span class="keywordtype">size_t</span>   segment  = current_bucket &gt;&gt; 6;</div>
-<div class="line"><span class="lineno">  207</span>        <span class="keyword">const</span> uint64_t bit_mask = <a class="code hl_variable" href="#ac8ef42169458fa3ce65c86652e4f1dd8">bit_mask_lookup</a>[current_bucket &amp; 63];</div>
-<div class="line"><span class="lineno">  208</span>        scratch.visited_buckets[segment] |= bit_mask;</div>
-<div class="line"><span class="lineno">  209</span> </div>
-<div class="line"><span class="lineno">  210</span>        <span class="keyword">const</span> <span class="keywordtype">int</span> bucketLprimenode = other_buckets[current_bucket].node_id;</div>
-<div class="line"><span class="lineno">  211</span>        <span class="keywordtype">double</span>    travel_cost      = <a class="code hl_function" href="#ad15267e0cffaa8dc5222028409c9e082">getcij</a>(L_node_id, bucketLprimenode);</div>
-<div class="line"><span class="lineno">  212</span> </div>
-<div class="line"><span class="lineno">  213</span><span class="preprocessor">#if defined(RCC) || defined(EXACT_RCC)</span></div>
-<div class="line"><span class="lineno">  214</span>        <span class="keywordflow">if</span> <span class="keyword">constexpr</span> (S == <a class="code hl_enumvalue" href="Definitions_8h.html#aca8133200c1122e29b87b314d82604eba981b8fcee42e1e726a67a2b9a98ea6e9">Stage::Four</a>) { travel_cost -= arc_duals.getDual(L_node_id, bucketLprimenode); }</div>
-<div class="line"><span class="lineno">  215</span><span class="preprocessor">#endif</span></div>
-<div class="line"><span class="lineno">  216</span> </div>
-<div class="line"><span class="lineno">  217</span>        <span class="keywordflow">if</span> (has_branching) { travel_cost -= <a class="code hl_variable" href="#a38bf6e63a45004dba3e06846ea151983">branching_duals</a>-&gt;getDual(L_node_id, bucketLprimenode); }</div>
+<div class="line"><span class="lineno">  199</span>        <span class="comment">// Hoist pricing_truncated check — set once, never cleared, so one</span></div>
+<div class="line"><span class="lineno">  200</span>        <span class="comment">// load at loop entry is sufficient.</span></div>
+<div class="line"><span class="lineno">  201</span>        <span class="keywordflow">if</span> <span class="keyword">constexpr</span> (S == <a class="code hl_enumvalue" href="Definitions_8h.html#aca8133200c1122e29b87b314d82604eba981b8fcee42e1e726a67a2b9a98ea6e9">Stage::Four</a>) {</div>
+<div class="line"><span class="lineno">  202</span>            <span class="keywordflow">if</span> (<a class="code hl_variable" href="#aeecc16f38a45babf5c4dc24a56473d70">pricing_truncated</a>.load(std::memory_order_relaxed)) <span class="keywordflow">break</span>;</div>
+<div class="line"><span class="lineno">  203</span>        }</div>
+<div class="line"><span class="lineno">  204</span> </div>
+<div class="line"><span class="lineno">  205</span>        <span class="keyword">const</span> <span class="keywordtype">int</span> current_bucket = scratch.bucket_stack.back();</div>
+<div class="line"><span class="lineno">  206</span>        scratch.bucket_stack.pop_back();</div>
+<div class="line"><span class="lineno">  207</span> </div>
+<div class="line"><span class="lineno">  208</span>        <span class="keyword">const</span> <span class="keywordtype">size_t</span>   segment  = current_bucket &gt;&gt; 6;</div>
+<div class="line"><span class="lineno">  209</span>        <span class="keyword">const</span> uint64_t bit_mask = <a class="code hl_variable" href="#ac8ef42169458fa3ce65c86652e4f1dd8">bit_mask_lookup</a>[current_bucket &amp; 63];</div>
+<div class="line"><span class="lineno">  210</span>        scratch.visited_buckets[segment] |= bit_mask;</div>
+<div class="line"><span class="lineno">  211</span> </div>
+<div class="line"><span class="lineno">  212</span>        <span class="keyword">const</span> <span class="keywordtype">int</span> bucketLprimenode = other_buckets[current_bucket].node_id;</div>
+<div class="line"><span class="lineno">  213</span>        <span class="keywordtype">double</span>    travel_cost      = <a class="code hl_function" href="#ad15267e0cffaa8dc5222028409c9e082">getcij</a>(L_node_id, bucketLprimenode);</div>
+<div class="line"><span class="lineno">  214</span> </div>
+<div class="line"><span class="lineno">  215</span><span class="preprocessor">#if defined(RCC) || defined(EXACT_RCC)</span></div>
+<div class="line"><span class="lineno">  216</span>        <span class="keywordflow">if</span> <span class="keyword">constexpr</span> (S == <a class="code hl_enumvalue" href="Definitions_8h.html#aca8133200c1122e29b87b314d82604eba981b8fcee42e1e726a67a2b9a98ea6e9">Stage::Four</a>) { travel_cost -= arc_duals.getDual(L_node_id, bucketLprimenode); }</div>
+<div class="line"><span class="lineno">  217</span><span class="preprocessor">#endif</span></div>
 <div class="line"><span class="lineno">  218</span> </div>
-<div class="line"><span class="lineno">  219</span>        <span class="keyword">const</span> <span class="keywordtype">double</span> path_cost = L_cost + travel_cost + (splice_state ? splice_state-&gt;cost_delta : 0.0);</div>
-<div class="line"><span class="lineno">  220</span>        <span class="keyword">const</span> <span class="keywordtype">double</span> bound     = other_c_bar[current_bucket];</div>
-<div class="line"><span class="lineno">  221</span> </div>
-<div class="line"><span class="lineno">  222</span>        <span class="keywordtype">double</span> bucket_bound_cost = path_cost + bound;</div>
-<div class="line"><span class="lineno">  223</span><span class="preprocessor">#if defined(SRC)</span></div>
-<div class="line"><span class="lineno">  224</span>        <span class="keywordflow">if</span> <span class="keyword">constexpr</span> (S == <a class="code hl_enumvalue" href="Definitions_8h.html#aca8133200c1122e29b87b314d82604eba981b8fcee42e1e726a67a2b9a98ea6e9">Stage::Four</a> || S == <a class="code hl_enumvalue" href="Definitions_8h.html#aca8133200c1122e29b87b314d82604eba81999728593fbd0249e73b02f3d7ad74">Stage::Enumerate</a>) {</div>
-<div class="line"><span class="lineno">  225</span>            bucket_bound_cost -= max_src_splice_discount;</div>
-<div class="line"><span class="lineno">  226</span>        }</div>
-<div class="line"><span class="lineno">  227</span><span class="preprocessor">#endif</span></div>
-<div class="line"><span class="lineno">  228</span> </div>
-<div class="line"><span class="lineno">  229</span>        <span class="keywordflow">if</span> (<a class="code hl_function" href="namespacenumericutils.html#a97fa0d2a500cf097f724453e00e6314a">numericutils::gte</a>(bucket_bound_cost, prune_limit)) { <span class="keywordflow">continue</span>; }</div>
+<div class="line"><span class="lineno">  219</span>        <span class="keywordflow">if</span> (has_branching) { travel_cost -= <a class="code hl_variable" href="#a38bf6e63a45004dba3e06846ea151983">branching_duals</a>-&gt;getDual(L_node_id, bucketLprimenode); }</div>
+<div class="line"><span class="lineno">  220</span> </div>
+<div class="line"><span class="lineno">  221</span>        <span class="keyword">const</span> <span class="keywordtype">double</span> path_cost = L_cost + travel_cost + (splice_state ? splice_state-&gt;cost_delta : 0.0);</div>
+<div class="line"><span class="lineno">  222</span>        <span class="keyword">const</span> <span class="keywordtype">double</span> bound     = other_c_bar[current_bucket];</div>
+<div class="line"><span class="lineno">  223</span> </div>
+<div class="line"><span class="lineno">  224</span>        <span class="keywordtype">double</span> bucket_bound_cost = path_cost + bound;</div>
+<div class="line"><span class="lineno">  225</span><span class="preprocessor">#if defined(SRC)</span></div>
+<div class="line"><span class="lineno">  226</span>        <span class="keywordflow">if</span> <span class="keyword">constexpr</span> (S == <a class="code hl_enumvalue" href="Definitions_8h.html#aca8133200c1122e29b87b314d82604eba981b8fcee42e1e726a67a2b9a98ea6e9">Stage::Four</a> || S == <a class="code hl_enumvalue" href="Definitions_8h.html#aca8133200c1122e29b87b314d82604eba81999728593fbd0249e73b02f3d7ad74">Stage::Enumerate</a>) {</div>
+<div class="line"><span class="lineno">  227</span>            bucket_bound_cost -= max_src_splice_discount;</div>
+<div class="line"><span class="lineno">  228</span>        }</div>
+<div class="line"><span class="lineno">  229</span><span class="preprocessor">#endif</span></div>
 <div class="line"><span class="lineno">  230</span> </div>
-<div class="line"><span class="lineno">  231</span>        <span class="keyword">const</span> <span class="keyword">auto</span> &amp;bucket       = other_buckets[current_bucket];</div>
-<div class="line"><span class="lineno">  232</span>        <span class="keyword">const</span> <span class="keyword">auto</span> &amp;labels       = bucket.get_sorted_labels();</div>
-<div class="line"><span class="lineno">  233</span>        <span class="keyword">const</span> <span class="keyword">auto</span> &amp;extra_labels = bucket.get_extra_labels();</div>
-<div class="line"><span class="lineno">  234</span>        <span class="keyword">const</span> <span class="keyword">auto</span>  label_count  = labels.size() + extra_labels.size();</div>
-<div class="line"><span class="lineno">  235</span>        <span class="keywordflow">if</span> (label_count == 0) <span class="keywordflow">continue</span>;</div>
-<div class="line"><span class="lineno">  236</span>        scratch.prepare_candidates(label_count);</div>
-<div class="line"><span class="lineno">  237</span> </div>
-<div class="line"><span class="lineno">  238</span>        <span class="keywordtype">double</span> label_prune_limit = best_cost.load(std::memory_order_relaxed);</div>
-<div class="line"><span class="lineno">  239</span>        <span class="keywordflow">if</span> <span class="keyword">constexpr</span> (S == <a class="code hl_enumvalue" href="Definitions_8h.html#aca8133200c1122e29b87b314d82604eba81999728593fbd0249e73b02f3d7ad74">Stage::Enumerate</a>) {</div>
-<div class="line"><span class="lineno">  240</span>            label_prune_limit = std::min(<a class="code hl_variable" href="#aab58eac3d548656acb6b33da0d54b799">gap</a>, <a class="code hl_variable" href="#aa4429bad1cbada0144dfefca07b87dd1">enumeration_route_cutoff</a>.load(std::memory_order_relaxed));</div>
-<div class="line"><span class="lineno">  241</span>        }</div>
-<div class="line"><span class="lineno">  242</span> </div>
-<div class="line"><span class="lineno">  243</span>        <span class="keywordflow">for</span> (<span class="keyword">const</span> Label *L_bw : labels) {</div>
-<div class="line"><span class="lineno">  244</span>            <span class="keywordflow">if</span> <span class="keyword">constexpr</span> (S == <a class="code hl_enumvalue" href="Definitions_8h.html#aca8133200c1122e29b87b314d82604eba981b8fcee42e1e726a67a2b9a98ea6e9">Stage::Four</a>) {</div>
-<div class="line"><span class="lineno">  245</span>                <span class="keywordflow">if</span> (<a class="code hl_variable" href="#aeecc16f38a45babf5c4dc24a56473d70">pricing_truncated</a>.load(std::memory_order_relaxed)) <span class="keywordflow">break</span>;</div>
-<div class="line"><span class="lineno">  246</span>            }</div>
+<div class="line"><span class="lineno">  231</span>        <span class="keywordflow">if</span> (<a class="code hl_function" href="namespacenumericutils.html#a97fa0d2a500cf097f724453e00e6314a">numericutils::gte</a>(bucket_bound_cost, prune_limit)) { <span class="keywordflow">continue</span>; }</div>
+<div class="line"><span class="lineno">  232</span> </div>
+<div class="line"><span class="lineno">  233</span>        <span class="keyword">const</span> <span class="keyword">auto</span> &amp;bucket       = other_buckets[current_bucket];</div>
+<div class="line"><span class="lineno">  234</span>        <span class="keyword">const</span> <span class="keyword">auto</span> &amp;labels       = bucket.get_sorted_labels();</div>
+<div class="line"><span class="lineno">  235</span>        <span class="keyword">const</span> <span class="keyword">auto</span> &amp;extra_labels = bucket.get_extra_labels();</div>
+<div class="line"><span class="lineno">  236</span>        <span class="keyword">const</span> <span class="keyword">auto</span>  label_count  = labels.size() + extra_labels.size();</div>
+<div class="line"><span class="lineno">  237</span>        <span class="keywordflow">if</span> (label_count == 0) <span class="keywordflow">continue</span>;</div>
+<div class="line"><span class="lineno">  238</span>        scratch.prepare_candidates(label_count);</div>
+<div class="line"><span class="lineno">  239</span> </div>
+<div class="line"><span class="lineno">  240</span>        <span class="keywordtype">double</span> label_prune_limit = best_cost.load(std::memory_order_relaxed);</div>
+<div class="line"><span class="lineno">  241</span>        <span class="keywordflow">if</span> <span class="keyword">constexpr</span> (S == <a class="code hl_enumvalue" href="Definitions_8h.html#aca8133200c1122e29b87b314d82604eba81999728593fbd0249e73b02f3d7ad74">Stage::Enumerate</a>) {</div>
+<div class="line"><span class="lineno">  242</span>            label_prune_limit = std::min(<a class="code hl_variable" href="#aab58eac3d548656acb6b33da0d54b799">gap</a>, <a class="code hl_variable" href="#aa4429bad1cbada0144dfefca07b87dd1">enumeration_route_cutoff</a>.load(std::memory_order_relaxed));</div>
+<div class="line"><span class="lineno">  243</span>        }</div>
+<div class="line"><span class="lineno">  244</span> </div>
+<div class="line"><span class="lineno">  245</span>        <span class="keywordflow">for</span> (<span class="keyword">const</span> Label *L_bw : labels) {</div>
+<div class="line"><span class="lineno">  246</span>            <span class="comment">// pricing_truncated already checked above; no need to reload here.</span></div>
 <div class="line"><span class="lineno">  247</span> </div>
 <div class="line"><span class="lineno">  248</span>            <span class="keywordtype">double</span> remaining_labels_lower_bound = path_cost + L_bw-&gt;cost;</div>
 <div class="line"><span class="lineno">  249</span><span class="preprocessor">#if defined(SRC)</span></div>
@@ -3412,49 +3412,47 @@ template&lt;<a class="el" href="Definitions_8h.html#aca8133200c1122e29b87b314d82
 <div class="line"><span class="lineno">  261</span>                                               best_cost, scratch);</div>
 <div class="line"><span class="lineno">  262</span>        }</div>
 <div class="line"><span class="lineno">  263</span>        <span class="keywordflow">for</span> (<span class="keyword">const</span> Label *L_bw : extra_labels) {</div>
-<div class="line"><span class="lineno">  264</span>            <span class="keywordflow">if</span> <span class="keyword">constexpr</span> (S == <a class="code hl_enumvalue" href="Definitions_8h.html#aca8133200c1122e29b87b314d82604eba981b8fcee42e1e726a67a2b9a98ea6e9">Stage::Four</a>) {</div>
-<div class="line"><span class="lineno">  265</span>                <span class="keywordflow">if</span> (<a class="code hl_variable" href="#aeecc16f38a45babf5c4dc24a56473d70">pricing_truncated</a>.load(std::memory_order_relaxed)) <span class="keywordflow">break</span>;</div>
-<div class="line"><span class="lineno">  266</span>            }</div>
-<div class="line"><span class="lineno">  267</span>            <a class="code hl_function" href="#a320420c58f2f68e7f7bb1dd0e8d002d6">collect_concatenation_candidate&lt;S&gt;</a>(L, L_bw, path_cost, splice_state, active_cuts, max_src_splice_discount,</div>
-<div class="line"><span class="lineno">  268</span>                                               best_cost, scratch);</div>
-<div class="line"><span class="lineno">  269</span>        }</div>
-<div class="line"><span class="lineno">  270</span> </div>
-<div class="line"><span class="lineno">  271</span>        <span class="keywordflow">if</span> <span class="keyword">constexpr</span> (S == <a class="code hl_enumvalue" href="Definitions_8h.html#aca8133200c1122e29b87b314d82604eba81999728593fbd0249e73b02f3d7ad74">Stage::Enumerate</a>) {</div>
-<div class="line"><span class="lineno">  272</span>            <span class="keyword">const</span> <span class="keywordtype">size_t</span> route_limit = <span class="keyword">static_cast&lt;</span><span class="keywordtype">size_t</span><span class="keyword">&gt;</span>(std::max(1, <a class="code hl_variable" href="#a53c1119f044ad9ef9da72a492c6db9e1">enumeration_policy</a>.max_routes)) + 1;</div>
-<div class="line"><span class="lineno">  273</span>            <span class="keyword">const</span> <span class="keyword">auto</span>   cheaper_candidate = [](<span class="keyword">const</span> <a class="code hl_struct" href="structBucketGraph_1_1ConcatenationCandidate.html">ConcatenationCandidate</a> &amp;a,</div>
-<div class="line"><span class="lineno">  274</span>                                              <span class="keyword">const</span> <a class="code hl_struct" href="structBucketGraph_1_1ConcatenationCandidate.html">ConcatenationCandidate</a> &amp;b) { <span class="keywordflow">return</span> a.cost &lt; b.cost; };</div>
-<div class="line"><span class="lineno">  275</span>            <span class="keywordflow">for</span> (<span class="keyword">const</span> <span class="keyword">auto</span> &amp;candidate : scratch.candidates) {</div>
-<div class="line"><span class="lineno">  276</span>                <span class="keywordflow">if</span> (chunk_candidates.size() &lt; route_limit) {</div>
-<div class="line"><span class="lineno">  277</span>                    chunk_candidates.push_back(candidate);</div>
-<div class="line"><span class="lineno">  278</span>                    std::push_heap(chunk_candidates.begin(), chunk_candidates.end(), cheaper_candidate);</div>
-<div class="line"><span class="lineno">  279</span>                } <span class="keywordflow">else</span> <span class="keywordflow">if</span> (<a class="code hl_function" href="namespacenumericutils.html#af55fcfd2b05fe5a20796069445c89aef">numericutils::lt</a>(candidate.cost, chunk_candidates.front().cost)) {</div>
-<div class="line"><span class="lineno">  280</span>                    std::pop_heap(chunk_candidates.begin(), chunk_candidates.end(), cheaper_candidate);</div>
-<div class="line"><span class="lineno">  281</span>                    chunk_candidates.back() = candidate;</div>
-<div class="line"><span class="lineno">  282</span>                    std::push_heap(chunk_candidates.begin(), chunk_candidates.end(), cheaper_candidate);</div>
-<div class="line"><span class="lineno">  283</span>                }</div>
-<div class="line"><span class="lineno">  284</span>            }</div>
-<div class="line"><span class="lineno">  285</span>        } <span class="keywordflow">else</span> {</div>
-<div class="line"><span class="lineno">  286</span>            chunk_candidates.insert(chunk_candidates.end(), scratch.candidates.begin(), scratch.candidates.end());</div>
-<div class="line"><span class="lineno">  287</span>        }</div>
-<div class="line"><span class="lineno">  288</span> </div>
-<div class="line"><span class="lineno">  289</span>        <span class="comment">// Early termination for Enumerate: if we have enough routes and the</span></div>
-<div class="line"><span class="lineno">  290</span>        <span class="comment">// cheapest found is below the gap, no need to scan more buckets.</span></div>
-<div class="line"><span class="lineno">  291</span>        <span class="keywordflow">if</span> <span class="keyword">constexpr</span> (S == <a class="code hl_enumvalue" href="Definitions_8h.html#aca8133200c1122e29b87b314d82604eba81999728593fbd0249e73b02f3d7ad74">Stage::Enumerate</a>) {</div>
-<div class="line"><span class="lineno">  292</span>            <span class="keyword">const</span> <span class="keywordtype">size_t</span> route_limit = <span class="keyword">static_cast&lt;</span><span class="keywordtype">size_t</span><span class="keyword">&gt;</span>(std::max(1, <a class="code hl_variable" href="#a53c1119f044ad9ef9da72a492c6db9e1">enumeration_policy</a>.max_routes)) + 1;</div>
-<div class="line"><span class="lineno">  293</span>            <span class="keywordflow">if</span> (chunk_candidates.size() &gt;= route_limit &amp;&amp; !chunk_candidates.empty()) {</div>
-<div class="line"><span class="lineno">  294</span>                <span class="keywordtype">double</span> best_chunk_cost = chunk_candidates.front().cost;</div>
-<div class="line"><span class="lineno">  295</span>                <span class="keywordflow">if</span> (<a class="code hl_function" href="namespacenumericutils.html#af55fcfd2b05fe5a20796069445c89aef">numericutils::lt</a>(best_chunk_cost, <a class="code hl_variable" href="#aab58eac3d548656acb6b33da0d54b799">gap</a>)) {</div>
-<div class="line"><span class="lineno">  296</span>                    <a class="code hl_variable" href="#aa4429bad1cbada0144dfefca07b87dd1">enumeration_route_cutoff</a>.store(best_chunk_cost, std::memory_order_relaxed);</div>
-<div class="line"><span class="lineno">  297</span>                    <span class="keywordflow">break</span>;</div>
-<div class="line"><span class="lineno">  298</span>                }</div>
-<div class="line"><span class="lineno">  299</span>            }</div>
-<div class="line"><span class="lineno">  300</span>        }</div>
-<div class="line"><span class="lineno">  301</span>        <a class="code hl_function" href="#adcb884152008fa6f2f7f48379c75933e">push_unvisited_phi_neighbors</a>(other_phi[current_bucket], scratch);</div>
-<div class="line"><span class="lineno">  302</span>    }</div>
-<div class="line"><span class="lineno">  303</span> </div>
-<div class="line"><span class="lineno">  304</span>    <a class="code hl_variable" href="#afc6f658229d927fe4dbf797f0a4e5ce8">concatenation_labels_tested</a>.fetch_add(scratch.stats.labels_tested, std::memory_order_relaxed);</div>
-<div class="line"><span class="lineno">  305</span>    <a class="code hl_variable" href="#a91c027b67143e5ae867c2cb28fc128ca">concatenation_labels_accepted</a>.fetch_add(scratch.stats.labels_accepted, std::memory_order_relaxed);</div>
-<div class="line"><span class="lineno">  306</span>}</div>
+<div class="line"><span class="lineno">  264</span>            <span class="comment">// pricing_truncated already checked above; no need to reload here.</span></div>
+<div class="line"><span class="lineno">  265</span>            <a class="code hl_function" href="#a320420c58f2f68e7f7bb1dd0e8d002d6">collect_concatenation_candidate&lt;S&gt;</a>(L, L_bw, path_cost, splice_state, active_cuts, max_src_splice_discount,</div>
+<div class="line"><span class="lineno">  266</span>                                               best_cost, scratch);</div>
+<div class="line"><span class="lineno">  267</span>        }</div>
+<div class="line"><span class="lineno">  268</span> </div>
+<div class="line"><span class="lineno">  269</span>        <span class="keywordflow">if</span> <span class="keyword">constexpr</span> (S == <a class="code hl_enumvalue" href="Definitions_8h.html#aca8133200c1122e29b87b314d82604eba81999728593fbd0249e73b02f3d7ad74">Stage::Enumerate</a>) {</div>
+<div class="line"><span class="lineno">  270</span>            <span class="keyword">const</span> <span class="keywordtype">size_t</span> route_limit = <span class="keyword">static_cast&lt;</span><span class="keywordtype">size_t</span><span class="keyword">&gt;</span>(std::max(1, <a class="code hl_variable" href="#a53c1119f044ad9ef9da72a492c6db9e1">enumeration_policy</a>.max_routes)) + 1;</div>
+<div class="line"><span class="lineno">  271</span>            <span class="keyword">const</span> <span class="keyword">auto</span>   cheaper_candidate = [](<span class="keyword">const</span> <a class="code hl_struct" href="structBucketGraph_1_1ConcatenationCandidate.html">ConcatenationCandidate</a> &amp;a,</div>
+<div class="line"><span class="lineno">  272</span>                                              <span class="keyword">const</span> <a class="code hl_struct" href="structBucketGraph_1_1ConcatenationCandidate.html">ConcatenationCandidate</a> &amp;b) { <span class="keywordflow">return</span> a.cost &lt; b.cost; };</div>
+<div class="line"><span class="lineno">  273</span>            <span class="keywordflow">for</span> (<span class="keyword">const</span> <span class="keyword">auto</span> &amp;candidate : scratch.candidates) {</div>
+<div class="line"><span class="lineno">  274</span>                <span class="keywordflow">if</span> (chunk_candidates.size() &lt; route_limit) {</div>
+<div class="line"><span class="lineno">  275</span>                    chunk_candidates.push_back(candidate);</div>
+<div class="line"><span class="lineno">  276</span>                    std::push_heap(chunk_candidates.begin(), chunk_candidates.end(), cheaper_candidate);</div>
+<div class="line"><span class="lineno">  277</span>                } <span class="keywordflow">else</span> <span class="keywordflow">if</span> (<a class="code hl_function" href="namespacenumericutils.html#af55fcfd2b05fe5a20796069445c89aef">numericutils::lt</a>(candidate.cost, chunk_candidates.front().cost)) {</div>
+<div class="line"><span class="lineno">  278</span>                    std::pop_heap(chunk_candidates.begin(), chunk_candidates.end(), cheaper_candidate);</div>
+<div class="line"><span class="lineno">  279</span>                    chunk_candidates.back() = candidate;</div>
+<div class="line"><span class="lineno">  280</span>                    std::push_heap(chunk_candidates.begin(), chunk_candidates.end(), cheaper_candidate);</div>
+<div class="line"><span class="lineno">  281</span>                }</div>
+<div class="line"><span class="lineno">  282</span>            }</div>
+<div class="line"><span class="lineno">  283</span>        } <span class="keywordflow">else</span> {</div>
+<div class="line"><span class="lineno">  284</span>            chunk_candidates.insert(chunk_candidates.end(), scratch.candidates.begin(), scratch.candidates.end());</div>
+<div class="line"><span class="lineno">  285</span>        }</div>
+<div class="line"><span class="lineno">  286</span> </div>
+<div class="line"><span class="lineno">  287</span>        <span class="comment">// Early termination for Enumerate: if we have enough routes and the</span></div>
+<div class="line"><span class="lineno">  288</span>        <span class="comment">// cheapest found is below the gap, no need to scan more buckets.</span></div>
+<div class="line"><span class="lineno">  289</span>        <span class="keywordflow">if</span> <span class="keyword">constexpr</span> (S == <a class="code hl_enumvalue" href="Definitions_8h.html#aca8133200c1122e29b87b314d82604eba81999728593fbd0249e73b02f3d7ad74">Stage::Enumerate</a>) {</div>
+<div class="line"><span class="lineno">  290</span>            <span class="keyword">const</span> <span class="keywordtype">size_t</span> route_limit = <span class="keyword">static_cast&lt;</span><span class="keywordtype">size_t</span><span class="keyword">&gt;</span>(std::max(1, <a class="code hl_variable" href="#a53c1119f044ad9ef9da72a492c6db9e1">enumeration_policy</a>.max_routes)) + 1;</div>
+<div class="line"><span class="lineno">  291</span>            <span class="keywordflow">if</span> (chunk_candidates.size() &gt;= route_limit &amp;&amp; !chunk_candidates.empty()) {</div>
+<div class="line"><span class="lineno">  292</span>                <span class="keywordtype">double</span> best_chunk_cost = chunk_candidates.front().cost;</div>
+<div class="line"><span class="lineno">  293</span>                <span class="keywordflow">if</span> (<a class="code hl_function" href="namespacenumericutils.html#af55fcfd2b05fe5a20796069445c89aef">numericutils::lt</a>(best_chunk_cost, <a class="code hl_variable" href="#aab58eac3d548656acb6b33da0d54b799">gap</a>)) {</div>
+<div class="line"><span class="lineno">  294</span>                    <a class="code hl_variable" href="#aa4429bad1cbada0144dfefca07b87dd1">enumeration_route_cutoff</a>.store(best_chunk_cost, std::memory_order_relaxed);</div>
+<div class="line"><span class="lineno">  295</span>                    <span class="keywordflow">break</span>;</div>
+<div class="line"><span class="lineno">  296</span>                }</div>
+<div class="line"><span class="lineno">  297</span>            }</div>
+<div class="line"><span class="lineno">  298</span>        }</div>
+<div class="line"><span class="lineno">  299</span>        <a class="code hl_function" href="#adcb884152008fa6f2f7f48379c75933e">push_unvisited_phi_neighbors</a>(other_phi[current_bucket], scratch);</div>
+<div class="line"><span class="lineno">  300</span>    }</div>
+<div class="line"><span class="lineno">  301</span> </div>
+<div class="line"><span class="lineno">  302</span>    <a class="code hl_variable" href="#afc6f658229d927fe4dbf797f0a4e5ce8">concatenation_labels_tested</a>.fetch_add(scratch.stats.labels_tested, std::memory_order_relaxed);</div>
+<div class="line"><span class="lineno">  303</span>    <a class="code hl_variable" href="#a91c027b67143e5ae867c2cb28fc128ca">concatenation_labels_accepted</a>.fetch_add(scratch.stats.labels_accepted, std::memory_order_relaxed);</div>
+<div class="line"><span class="lineno">  304</span>}</div>
 <div class="ttc" id="aclassBucketGraph_html_a2a66984a5d0225286c0598b884772f8c"><div class="ttname"><a href="#a2a66984a5d0225286c0598b884772f8c">BucketGraph::assign_symmetry</a></div><div class="ttdeci">constexpr auto &amp; assign_symmetry(auto &amp;FW, auto &amp;BW) noexcept</div><div class="ttdef"><b>Definition</b> <a href="BucketGraph_8h_source.html#l00165">BucketGraph.h:165</a></div></div>
 <div class="ttc" id="aclassBucketGraph_html_a320420c58f2f68e7f7bb1dd0e8d002d6"><div class="ttname"><a href="#a320420c58f2f68e7f7bb1dd0e8d002d6">BucketGraph::collect_concatenation_candidate</a></div><div class="ttdeci">bool collect_concatenation_candidate(const Label *forward_label, const Label *backward_label, double path_cost, const SpliceState *splice_state, std::span&lt; const ActiveCutInfo &gt; active_cuts, double max_src_splice_discount, std::atomic&lt; double &gt; &amp;best_cost, ConcatenationScratch &amp;scratch)</div><div class="ttdef"><b>Definition</b> <a href="Concatenation_8h_source.html#l00073">Concatenation.h:73</a></div></div>
 <div class="ttc" id="aclassBucketGraph_html_a53c1119f044ad9ef9da72a492c6db9e1"><div class="ttname"><a href="#a53c1119f044ad9ef9da72a492c6db9e1">BucketGraph::enumeration_policy</a></div><div class="ttdeci">EnumerationPolicy enumeration_policy</div><div class="ttdef"><b>Definition</b> <a href="BucketGraph_8h_source.html#l00232">BucketGraph.h:232</a></div></div>
