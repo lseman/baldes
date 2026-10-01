@@ -134,6 +134,8 @@ Public Member Functions</h2></td></tr>
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 id="header-pub-static-methods" class="groupheader"><a id="pub-static-methods" name="pub-static-methods"></a>
 Static Public Member Functions</h2></td></tr>
+<tr class="memitem:a733681df19810947406ccaa494a95c16" id="r_a733681df19810947406ccaa494a95c16"><td class="memItemLeft">static constexpr bool&#160;</td><td class="memItemRight"><a class="el" href="#a733681df19810947406ccaa494a95c16">canApplyDeluxing</a> (bool enumeration_requested, bool enumeration_failed) noexcept</td></tr>
+<tr class="memitem:a2a55976ba8bfeb24eeaba63d4a09eb8b" id="r_a2a55976ba8bfeb24eeaba63d4a09eb8b"><td class="memItemLeft">static constexpr bool&#160;</td><td class="memItemRight"><a class="el" href="#a2a55976ba8bfeb24eeaba63d4a09eb8b">hasSrcMasterCapacity</a> (size_t current_rows, size_t capacity) noexcept</td></tr>
 <tr class="memitem:ac13940ca8cd8d449ab020ad5c6963ccf" id="r_ac13940ca8cd8d449ab020ad5c6963ccf"><td class="memItemLeft">static double&#160;</td><td class="memItemRight"><a class="el" href="#ac13940ca8cd8d449ab020ad5c6963ccf">lowerBound</a> (double lp_objective, int route_count, double pricing_objective) noexcept</td></tr>
 <tr class="memitem:abb6af324625e86b600b22b1a9f36569e" id="r_abb6af324625e86b600b22b1a9f36569e"><td class="memItemLeft">static bool&#160;</td><td class="memItemRight"><a class="el" href="#abb6af324625e86b600b22b1a9f36569e">cutsStable</a> (const <a class="el" href="classBucketGraph.html">BucketGraph</a> *bucket_graph, bool non_violated_cuts, int non_violated_count) noexcept</td></tr>
 </table><table class="memberdecls">
@@ -149,6 +151,40 @@ Public Attributes</h2></td></tr>
 <div class="textblock">
 <p class="definition">Definition at line <a class="el" href="PricingState_8h_source.html#l00012">12</a> of file <a class="el" href="PricingState_8h_source.html">PricingState.h</a>.</p>
 </div><a name="doc-func-members" id="doc-func-members"></a><h2 id="header-doc-func-members" class="groupheader">Member Function Documentation</h2>
+<a id="a733681df19810947406ccaa494a95c16" name="a733681df19810947406ccaa494a95c16"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a733681df19810947406ccaa494a95c16">&#9670;&#160;</a></span>canApplyDeluxing()</h2>
+
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">constexpr bool baldes::bcp::PricingState::canApplyDeluxing </td>
+          <td>(</td>
+          <td class="paramtype">bool</td>          <td class="paramname"><span class="paramname"><em>enumeration_requested</em></span>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">bool</td>          <td class="paramname"><span class="paramname"><em>enumeration_failed</em></span>&#160;)</td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel inline">inline</span><span class="mlabel static">static</span><span class="mlabel nodiscard">nodiscard</span><span class="mlabel constexpr">constexpr</span><span class="mlabel noexcept">noexcept</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+<p class="definition">Definition at line <a class="el" href="PricingState_8h_source.html#l00019">19</a> of file <a class="el" href="PricingState_8h_source.html">PricingState.h</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">   20</span>                                                                                           {</div>
+<div class="line"><span class="lineno">   21</span>        <span class="keywordflow">return</span> enumeration_requested &amp;&amp; !enumeration_failed;</div>
+<div class="line"><span class="lineno">   22</span>    }</div>
+</div><!-- fragment -->
+</div>
+</div>
 <a id="abb6af324625e86b600b22b1a9f36569e" name="abb6af324625e86b600b22b1a9f36569e"></a>
 <h2 class="memtitle"><span class="permalink"><a href="#abb6af324625e86b600b22b1a9f36569e">&#9670;&#160;</a></span>cutsStable()</h2>
 
@@ -181,11 +217,11 @@ Public Attributes</h2></td></tr>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="PricingState_8h_source.html#l00037">37</a> of file <a class="el" href="PricingState_8h_source.html">PricingState.h</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">   38</span>                                                                          {</div>
-<div class="line"><span class="lineno">   39</span>        <span class="keywordflow">return</span> non_violated_cuts &amp;&amp; bucket_graph-&gt;<a class="code hl_variable" href="classBucketGraph.html#a99844125e9fa656e291a8f71ecc659f6">A_MAX</a> == N_SIZE &amp;&amp;</div>
-<div class="line"><span class="lineno">   40</span>               non_violated_count &gt;= bucket_graph-&gt;<a class="code hl_variable" href="classBucketGraph.html#a53c1119f044ad9ef9da72a492c6db9e1">enumeration_policy</a>.<a class="code hl_variable" href="structBucketGraph_1_1EnumerationPolicy.html#abf869e248f6e809e741bb071ab3f0215">min_stable_cut_passes</a>;</div>
-<div class="line"><span class="lineno">   41</span>    }</div>
+<p class="definition">Definition at line <a class="el" href="PricingState_8h_source.html#l00046">46</a> of file <a class="el" href="PricingState_8h_source.html">PricingState.h</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">   47</span>                                                                          {</div>
+<div class="line"><span class="lineno">   48</span>        <span class="keywordflow">return</span> non_violated_cuts &amp;&amp; bucket_graph-&gt;<a class="code hl_variable" href="classBucketGraph.html#a99844125e9fa656e291a8f71ecc659f6">A_MAX</a> == N_SIZE &amp;&amp;</div>
+<div class="line"><span class="lineno">   49</span>               non_violated_count &gt;= bucket_graph-&gt;<a class="code hl_variable" href="classBucketGraph.html#a53c1119f044ad9ef9da72a492c6db9e1">enumeration_policy</a>.<a class="code hl_variable" href="structBucketGraph_1_1EnumerationPolicy.html#abf869e248f6e809e741bb071ab3f0215">min_stable_cut_passes</a>;</div>
+<div class="line"><span class="lineno">   50</span>    }</div>
 <div class="ttc" id="aclassBucketGraph_html_a53c1119f044ad9ef9da72a492c6db9e1"><div class="ttname"><a href="classBucketGraph.html#a53c1119f044ad9ef9da72a492c6db9e1">BucketGraph::enumeration_policy</a></div><div class="ttdeci">EnumerationPolicy enumeration_policy</div><div class="ttdef"><b>Definition</b> <a href="BucketGraph_8h_source.html#l00232">BucketGraph.h:232</a></div></div>
 <div class="ttc" id="aclassBucketGraph_html_a99844125e9fa656e291a8f71ecc659f6"><div class="ttname"><a href="classBucketGraph.html#a99844125e9fa656e291a8f71ecc659f6">BucketGraph::A_MAX</a></div><div class="ttdeci">int A_MAX</div><div class="ttdef"><b>Definition</b> <a href="BucketGraph_8h_source.html#l00215">BucketGraph.h:215</a></div></div>
 <div class="ttc" id="astructBucketGraph_1_1EnumerationPolicy_html_abf869e248f6e809e741bb071ab3f0215"><div class="ttname"><a href="structBucketGraph_1_1EnumerationPolicy.html#abf869e248f6e809e741bb071ab3f0215">BucketGraph::EnumerationPolicy::min_stable_cut_passes</a></div><div class="ttdeci">int min_stable_cut_passes</div><div class="ttdef"><b>Definition</b> <a href="BucketGraph_8h_source.html#l00225">BucketGraph.h:225</a></div></div>
@@ -215,19 +251,19 @@ Public Attributes</h2></td></tr>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="PricingState_8h_source.html#l00023">23</a> of file <a class="el" href="PricingState_8h_source.html">PricingState.h</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">   23</span>                                                             {</div>
-<div class="line"><span class="lineno">   24</span>        <span class="keywordflow">if</span> (!bucket_graph-&gt;<a class="code hl_function" href="classBucketGraph.html#aba7596250c7680ead43e32fd5f782147">enumerationFailed</a>()) <span class="keywordflow">return</span> <span class="keyword">false</span>;</div>
-<div class="line"><span class="lineno">   25</span>        <a class="code hl_variable" href="#a4ba92726ef8e21edf3c7270730bb560b">enumerate</a> = <span class="keyword">false</span>;</div>
-<div class="line"><span class="lineno">   26</span>        ++<a class="code hl_variable" href="#acbff441501bc97577cb457938b4395db">failed_enumerations</a>;</div>
-<div class="line"><span class="lineno">   27</span>        <a class="code hl_variable" href="#ae6641cf08eb448a2a6154a61fda0133f">retry_enumeration_at</a> = <a class="code hl_variable" href="#a362cdadb8c0ef0fe69f72d73e32d3181">exact_pricing_passes</a> + std::clamp(<a class="code hl_variable" href="#acbff441501bc97577cb457938b4395db">failed_enumerations</a>, 1, 10);</div>
-<div class="line"><span class="lineno">   28</span>        bucket_graph-&gt;<a class="code hl_function" href="classBucketGraph.html#aa28d224fbca7a33f59de21391f4296eb">clearEnumerationFailure</a>();</div>
-<div class="line"><span class="lineno">   29</span>        <a class="code hl_function" href="Definitions_8h.html#a086546d06aa565cdd48f436973ebc496">print_info</a>(<span class="stringliteral">&quot;Enumeration cap reached; falling back to exact pricing\n&quot;</span>);</div>
-<div class="line"><span class="lineno">   30</span>        <span class="keywordflow">return</span> <span class="keyword">true</span>;</div>
-<div class="line"><span class="lineno">   31</span>    }</div>
+<p class="definition">Definition at line <a class="el" href="PricingState_8h_source.html#l00032">32</a> of file <a class="el" href="PricingState_8h_source.html">PricingState.h</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">   32</span>                                                             {</div>
+<div class="line"><span class="lineno">   33</span>        <span class="keywordflow">if</span> (!bucket_graph-&gt;<a class="code hl_function" href="classBucketGraph.html#aba7596250c7680ead43e32fd5f782147">enumerationFailed</a>()) <span class="keywordflow">return</span> <span class="keyword">false</span>;</div>
+<div class="line"><span class="lineno">   34</span>        <a class="code hl_variable" href="#a4ba92726ef8e21edf3c7270730bb560b">enumerate</a> = <span class="keyword">false</span>;</div>
+<div class="line"><span class="lineno">   35</span>        ++<a class="code hl_variable" href="#acbff441501bc97577cb457938b4395db">failed_enumerations</a>;</div>
+<div class="line"><span class="lineno">   36</span>        <a class="code hl_variable" href="#ae6641cf08eb448a2a6154a61fda0133f">retry_enumeration_at</a> = <a class="code hl_variable" href="#a362cdadb8c0ef0fe69f72d73e32d3181">exact_pricing_passes</a> + std::clamp(<a class="code hl_variable" href="#acbff441501bc97577cb457938b4395db">failed_enumerations</a>, 1, 10);</div>
+<div class="line"><span class="lineno">   37</span>        bucket_graph-&gt;<a class="code hl_function" href="classBucketGraph.html#aa28d224fbca7a33f59de21391f4296eb">clearEnumerationFailure</a>();</div>
+<div class="line"><span class="lineno">   38</span>        <a class="code hl_function" href="Definitions_8h.html#a086546d06aa565cdd48f436973ebc496">print_info</a>(<span class="stringliteral">&quot;Enumeration cap reached; falling back to exact pricing\n&quot;</span>);</div>
+<div class="line"><span class="lineno">   39</span>        <span class="keywordflow">return</span> <span class="keyword">true</span>;</div>
+<div class="line"><span class="lineno">   40</span>    }</div>
 <div class="ttc" id="aDefinitions_8h_html_a086546d06aa565cdd48f436973ebc496"><div class="ttname"><a href="Definitions_8h.html#a086546d06aa565cdd48f436973ebc496">print_info</a></div><div class="ttdeci">void print_info(fmt::format_string&lt; Args... &gt; format, Args &amp;&amp;...args)</div><div class="ttdoc">Prints an informational message with a specific format.</div><div class="ttdef"><b>Definition</b> <a href="Definitions_8h_source.html#l00149">Definitions.h:149</a></div></div>
-<div class="ttc" id="aclassBucketGraph_html_aa28d224fbca7a33f59de21391f4296eb"><div class="ttname"><a href="classBucketGraph.html#aa28d224fbca7a33f59de21391f4296eb">BucketGraph::clearEnumerationFailure</a></div><div class="ttdeci">void clearEnumerationFailure() noexcept</div><div class="ttdef"><b>Definition</b> <a href="BucketGraph_8h_source.html#l00646">BucketGraph.h:646</a></div></div>
-<div class="ttc" id="aclassBucketGraph_html_aba7596250c7680ead43e32fd5f782147"><div class="ttname"><a href="classBucketGraph.html#aba7596250c7680ead43e32fd5f782147">BucketGraph::enumerationFailed</a></div><div class="ttdeci">bool enumerationFailed() const noexcept</div><div class="ttdef"><b>Definition</b> <a href="BucketGraph_8h_source.html#l00645">BucketGraph.h:645</a></div></div>
+<div class="ttc" id="aclassBucketGraph_html_aa28d224fbca7a33f59de21391f4296eb"><div class="ttname"><a href="classBucketGraph.html#aa28d224fbca7a33f59de21391f4296eb">BucketGraph::clearEnumerationFailure</a></div><div class="ttdeci">void clearEnumerationFailure() noexcept</div><div class="ttdef"><b>Definition</b> <a href="BucketGraph_8h_source.html#l00662">BucketGraph.h:662</a></div></div>
+<div class="ttc" id="aclassBucketGraph_html_aba7596250c7680ead43e32fd5f782147"><div class="ttname"><a href="classBucketGraph.html#aba7596250c7680ead43e32fd5f782147">BucketGraph::enumerationFailed</a></div><div class="ttdeci">bool enumerationFailed() const noexcept</div><div class="ttdef"><b>Definition</b> <a href="BucketGraph_8h_source.html#l00661">BucketGraph.h:661</a></div></div>
 <div class="ttc" id="astructbaldes_1_1bcp_1_1PricingState_html_a362cdadb8c0ef0fe69f72d73e32d3181"><div class="ttname"><a href="#a362cdadb8c0ef0fe69f72d73e32d3181">baldes::bcp::PricingState::exact_pricing_passes</a></div><div class="ttdeci">int exact_pricing_passes</div><div class="ttdef"><b>Definition</b> <a href="PricingState_8h_source.html#l00014">PricingState.h:14</a></div></div>
 <div class="ttc" id="astructbaldes_1_1bcp_1_1PricingState_html_a4ba92726ef8e21edf3c7270730bb560b"><div class="ttname"><a href="#a4ba92726ef8e21edf3c7270730bb560b">baldes::bcp::PricingState::enumerate</a></div><div class="ttdeci">bool enumerate</div><div class="ttdef"><b>Definition</b> <a href="PricingState_8h_source.html#l00013">PricingState.h:13</a></div></div>
 <div class="ttc" id="astructbaldes_1_1bcp_1_1PricingState_html_acbff441501bc97577cb457938b4395db"><div class="ttname"><a href="#acbff441501bc97577cb457938b4395db">baldes::bcp::PricingState::failed_enumerations</a></div><div class="ttdeci">int failed_enumerations</div><div class="ttdef"><b>Definition</b> <a href="PricingState_8h_source.html#l00016">PricingState.h:16</a></div></div>
@@ -247,6 +283,40 @@ Here is the call graph for this function:</div>
 </map>
 </div>
 
+</div>
+</div>
+<a id="a2a55976ba8bfeb24eeaba63d4a09eb8b" name="a2a55976ba8bfeb24eeaba63d4a09eb8b"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a2a55976ba8bfeb24eeaba63d4a09eb8b">&#9670;&#160;</a></span>hasSrcMasterCapacity()</h2>
+
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">constexpr bool baldes::bcp::PricingState::hasSrcMasterCapacity </td>
+          <td>(</td>
+          <td class="paramtype">size_t</td>          <td class="paramname"><span class="paramname"><em>current_rows</em></span>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">size_t</td>          <td class="paramname"><span class="paramname"><em>capacity</em></span>&#160;)</td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel inline">inline</span><span class="mlabel static">static</span><span class="mlabel nodiscard">nodiscard</span><span class="mlabel constexpr">constexpr</span><span class="mlabel noexcept">noexcept</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+<p class="definition">Definition at line <a class="el" href="PricingState_8h_source.html#l00024">24</a> of file <a class="el" href="PricingState_8h_source.html">PricingState.h</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">   24</span>                                                                                                            {</div>
+<div class="line"><span class="lineno">   25</span>        <span class="keywordflow">return</span> current_rows &lt; capacity;</div>
+<div class="line"><span class="lineno">   26</span>    }</div>
+</div><!-- fragment -->
 </div>
 </div>
 <a id="ac13940ca8cd8d449ab020ad5c6963ccf" name="ac13940ca8cd8d449ab020ad5c6963ccf"></a>
@@ -281,10 +351,10 @@ Here is the call graph for this function:</div>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="PricingState_8h_source.html#l00033">33</a> of file <a class="el" href="PricingState_8h_source.html">PricingState.h</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">   33</span>                                                                                                                    {</div>
-<div class="line"><span class="lineno">   34</span>        <span class="keywordflow">return</span> lp_objective + route_count * std::min(0.0, pricing_objective);</div>
-<div class="line"><span class="lineno">   35</span>    }</div>
+<p class="definition">Definition at line <a class="el" href="PricingState_8h_source.html#l00042">42</a> of file <a class="el" href="PricingState_8h_source.html">PricingState.h</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">   42</span>                                                                                                                    {</div>
+<div class="line"><span class="lineno">   43</span>        <span class="keywordflow">return</span> lp_objective + route_count * std::min(0.0, pricing_objective);</div>
+<div class="line"><span class="lineno">   44</span>    }</div>
 </div><!-- fragment -->
 </div>
 </div>
@@ -330,25 +400,25 @@ Here is the call graph for this function:</div>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="PricingState_8h_source.html#l00043">43</a> of file <a class="el" href="PricingState_8h_source.html">PricingState.h</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">   44</span>                                                                                   {</div>
-<div class="line"><span class="lineno">   45</span>        <span class="keywordflow">if</span> (<a class="code hl_variable" href="#a4ba92726ef8e21edf3c7270730bb560b">enumerate</a> || <a class="code hl_variable" href="#a362cdadb8c0ef0fe69f72d73e32d3181">exact_pricing_passes</a> &lt; <a class="code hl_variable" href="#ae6641cf08eb448a2a6154a61fda0133f">retry_enumeration_at</a>) <span class="keywordflow">return</span> <span class="keyword">false</span>;</div>
-<div class="line"><span class="lineno">   46</span>        <span class="keywordflow">if</span> (!bucket_graph-&gt;<a class="code hl_function" href="classBucketGraph.html#a1d58ad40243f19fb718c2544e01b6275">shouldAttemptEnumeration</a>(pricing_lower_bound, cuts_stable, <a class="code hl_variable" href="#a362cdadb8c0ef0fe69f72d73e32d3181">exact_pricing_passes</a>,</div>
-<div class="line"><span class="lineno">   47</span>                                                    no_negative_pricing)) {</div>
-<div class="line"><span class="lineno">   48</span>            <span class="keywordflow">return</span> <span class="keyword">false</span>;</div>
-<div class="line"><span class="lineno">   49</span>        }</div>
-<div class="line"><span class="lineno">   50</span> </div>
-<div class="line"><span class="lineno">   51</span>        <span class="keyword">const</span> <span class="keywordtype">double</span> relative_gap = bucket_graph-&gt;<a class="code hl_function" href="classBucketGraph.html#a3f471cc18176e30762fecc584ab88505">relative_gap_to_incumbent</a>(pricing_lower_bound);</div>
-<div class="line"><span class="lineno">   52</span>        <a class="code hl_function" href="Definitions_8h.html#a086546d06aa565cdd48f436973ebc496">print_info</a>(<span class="stringliteral">&quot;{} and relative gap {:.4f}; trying enumeration (pricing {:.6g})\n&quot;</span>,</div>
-<div class="line"><span class="lineno">   53</span>                   no_negative_pricing ? <span class="stringliteral">&quot;No negative pricing/cuts&quot;</span> : <span class="stringliteral">&quot;Stable cuts/small gap&quot;</span>, relative_gap,</div>
-<div class="line"><span class="lineno">   54</span>                   pricing_objective);</div>
-<div class="line"><span class="lineno">   55</span>        bucket_graph-&gt;<a class="code hl_function" href="classBucketGraph.html#a190548474155f0faa9dc7627e3fb0737">enableEnumeration</a>(pricing_lower_bound);</div>
-<div class="line"><span class="lineno">   56</span>        <a class="code hl_variable" href="#a4ba92726ef8e21edf3c7270730bb560b">enumerate</a> = <span class="keyword">true</span>;</div>
-<div class="line"><span class="lineno">   57</span>        <span class="keywordflow">return</span> <span class="keyword">true</span>;</div>
-<div class="line"><span class="lineno">   58</span>    }</div>
-<div class="ttc" id="aclassBucketGraph_html_a190548474155f0faa9dc7627e3fb0737"><div class="ttname"><a href="classBucketGraph.html#a190548474155f0faa9dc7627e3fb0737">BucketGraph::enableEnumeration</a></div><div class="ttdeci">void enableEnumeration(double lower_bound) noexcept</div><div class="ttdef"><b>Definition</b> <a href="BucketGraph_8h_source.html#l00686">BucketGraph.h:686</a></div></div>
-<div class="ttc" id="aclassBucketGraph_html_a1d58ad40243f19fb718c2544e01b6275"><div class="ttname"><a href="classBucketGraph.html#a1d58ad40243f19fb718c2544e01b6275">BucketGraph::shouldAttemptEnumeration</a></div><div class="ttdeci">bool shouldAttemptEnumeration(double lower_bound, bool cuts_stable, int exact_iterations, bool no_negative_pricing) const noexcept</div><div class="ttdef"><b>Definition</b> <a href="BucketGraph_8h_source.html#l00664">BucketGraph.h:664</a></div></div>
-<div class="ttc" id="aclassBucketGraph_html_a3f471cc18176e30762fecc584ab88505"><div class="ttname"><a href="classBucketGraph.html#a3f471cc18176e30762fecc584ab88505">BucketGraph::relative_gap_to_incumbent</a></div><div class="ttdeci">double relative_gap_to_incumbent(double lower_bound) const noexcept</div><div class="ttdef"><b>Definition</b> <a href="BucketGraph_8h_source.html#l00658">BucketGraph.h:658</a></div></div>
+<p class="definition">Definition at line <a class="el" href="PricingState_8h_source.html#l00052">52</a> of file <a class="el" href="PricingState_8h_source.html">PricingState.h</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">   53</span>                                                                                   {</div>
+<div class="line"><span class="lineno">   54</span>        <span class="keywordflow">if</span> (<a class="code hl_variable" href="#a4ba92726ef8e21edf3c7270730bb560b">enumerate</a> || <a class="code hl_variable" href="#a362cdadb8c0ef0fe69f72d73e32d3181">exact_pricing_passes</a> &lt; <a class="code hl_variable" href="#ae6641cf08eb448a2a6154a61fda0133f">retry_enumeration_at</a>) <span class="keywordflow">return</span> <span class="keyword">false</span>;</div>
+<div class="line"><span class="lineno">   55</span>        <span class="keywordflow">if</span> (!bucket_graph-&gt;<a class="code hl_function" href="classBucketGraph.html#a1d58ad40243f19fb718c2544e01b6275">shouldAttemptEnumeration</a>(pricing_lower_bound, cuts_stable, <a class="code hl_variable" href="#a362cdadb8c0ef0fe69f72d73e32d3181">exact_pricing_passes</a>,</div>
+<div class="line"><span class="lineno">   56</span>                                                    no_negative_pricing)) {</div>
+<div class="line"><span class="lineno">   57</span>            <span class="keywordflow">return</span> <span class="keyword">false</span>;</div>
+<div class="line"><span class="lineno">   58</span>        }</div>
+<div class="line"><span class="lineno">   59</span> </div>
+<div class="line"><span class="lineno">   60</span>        <span class="keyword">const</span> <span class="keywordtype">double</span> relative_gap = bucket_graph-&gt;<a class="code hl_function" href="classBucketGraph.html#a3f471cc18176e30762fecc584ab88505">relative_gap_to_incumbent</a>(pricing_lower_bound);</div>
+<div class="line"><span class="lineno">   61</span>        <a class="code hl_function" href="Definitions_8h.html#a086546d06aa565cdd48f436973ebc496">print_info</a>(<span class="stringliteral">&quot;{} and relative gap {:.4f}; trying enumeration (pricing {:.6g})\n&quot;</span>,</div>
+<div class="line"><span class="lineno">   62</span>                   no_negative_pricing ? <span class="stringliteral">&quot;No negative pricing/cuts&quot;</span> : <span class="stringliteral">&quot;Stable cuts/small gap&quot;</span>, relative_gap,</div>
+<div class="line"><span class="lineno">   63</span>                   pricing_objective);</div>
+<div class="line"><span class="lineno">   64</span>        bucket_graph-&gt;<a class="code hl_function" href="classBucketGraph.html#a190548474155f0faa9dc7627e3fb0737">enableEnumeration</a>(pricing_lower_bound);</div>
+<div class="line"><span class="lineno">   65</span>        <a class="code hl_variable" href="#a4ba92726ef8e21edf3c7270730bb560b">enumerate</a> = <span class="keyword">true</span>;</div>
+<div class="line"><span class="lineno">   66</span>        <span class="keywordflow">return</span> <span class="keyword">true</span>;</div>
+<div class="line"><span class="lineno">   67</span>    }</div>
+<div class="ttc" id="aclassBucketGraph_html_a190548474155f0faa9dc7627e3fb0737"><div class="ttname"><a href="classBucketGraph.html#a190548474155f0faa9dc7627e3fb0737">BucketGraph::enableEnumeration</a></div><div class="ttdeci">void enableEnumeration(double lower_bound) noexcept</div><div class="ttdef"><b>Definition</b> <a href="BucketGraph_8h_source.html#l00702">BucketGraph.h:702</a></div></div>
+<div class="ttc" id="aclassBucketGraph_html_a1d58ad40243f19fb718c2544e01b6275"><div class="ttname"><a href="classBucketGraph.html#a1d58ad40243f19fb718c2544e01b6275">BucketGraph::shouldAttemptEnumeration</a></div><div class="ttdeci">bool shouldAttemptEnumeration(double lower_bound, bool cuts_stable, int exact_iterations, bool no_negative_pricing) const noexcept</div><div class="ttdef"><b>Definition</b> <a href="BucketGraph_8h_source.html#l00680">BucketGraph.h:680</a></div></div>
+<div class="ttc" id="aclassBucketGraph_html_a3f471cc18176e30762fecc584ab88505"><div class="ttname"><a href="classBucketGraph.html#a3f471cc18176e30762fecc584ab88505">BucketGraph::relative_gap_to_incumbent</a></div><div class="ttdeci">double relative_gap_to_incumbent(double lower_bound) const noexcept</div><div class="ttdef"><b>Definition</b> <a href="BucketGraph_8h_source.html#l00674">BucketGraph.h:674</a></div></div>
 </div><!-- fragment --><div class="dynheader">
 Here is the call graph for this function:</div>
 <div class="dyncontent">
@@ -394,10 +464,10 @@ Here is the call graph for this function:</div>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="PricingState_8h_source.html#l00019">19</a> of file <a class="el" href="PricingState_8h_source.html">PricingState.h</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">   19</span>                                                {</div>
-<div class="line"><span class="lineno">   20</span>        <span class="keywordflow">if</span> (stage == 4) ++<a class="code hl_variable" href="#a362cdadb8c0ef0fe69f72d73e32d3181">exact_pricing_passes</a>;</div>
-<div class="line"><span class="lineno">   21</span>    }</div>
+<p class="definition">Definition at line <a class="el" href="PricingState_8h_source.html#l00028">28</a> of file <a class="el" href="PricingState_8h_source.html">PricingState.h</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">   28</span>                                                {</div>
+<div class="line"><span class="lineno">   29</span>        <span class="keywordflow">if</span> (stage == 4) ++<a class="code hl_variable" href="#a362cdadb8c0ef0fe69f72d73e32d3181">exact_pricing_passes</a>;</div>
+<div class="line"><span class="lineno">   30</span>    }</div>
 </div><!-- fragment -->
 </div>
 </div>
@@ -433,10 +503,10 @@ Here is the call graph for this function:</div>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="PricingState_8h_source.html#l00060">60</a> of file <a class="el" href="PricingState_8h_source.html">PricingState.h</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">   60</span>                                                                                                              {</div>
-<div class="line"><span class="lineno">   61</span>        <span class="keywordflow">return</span> stage == 4 &amp;&amp; columns_added == 0 &amp;&amp; !<a class="code hl_function" href="namespacebaldes_1_1bcp.html#a7b384b6d02e3bf8911866676e21d55d3">hasNegativeReducedCost</a>(pricing_objective);</div>
-<div class="line"><span class="lineno">   62</span>    }</div>
+<p class="definition">Definition at line <a class="el" href="PricingState_8h_source.html#l00069">69</a> of file <a class="el" href="PricingState_8h_source.html">PricingState.h</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">   69</span>                                                                                                              {</div>
+<div class="line"><span class="lineno">   70</span>        <span class="keywordflow">return</span> stage == 4 &amp;&amp; columns_added == 0 &amp;&amp; !<a class="code hl_function" href="namespacebaldes_1_1bcp.html#a7b384b6d02e3bf8911866676e21d55d3">hasNegativeReducedCost</a>(pricing_objective);</div>
+<div class="line"><span class="lineno">   71</span>    }</div>
 <div class="ttc" id="anamespacebaldes_1_1bcp_html_a7b384b6d02e3bf8911866676e21d55d3"><div class="ttname"><a href="namespacebaldes_1_1bcp.html#a7b384b6d02e3bf8911866676e21d55d3">baldes::bcp::hasNegativeReducedCost</a></div><div class="ttdeci">bool hasNegativeReducedCost(double reduced_cost, double tolerance=kPricingTol) noexcept</div><div class="ttdef"><b>Definition</b> <a href="MasterSolution_8h_source.html#l00014">MasterSolution.h:14</a></div></div>
 </div><!-- fragment --><div class="dynheader">
 Here is the call graph for this function:</div>
@@ -483,12 +553,12 @@ Here is the call graph for this function:</div>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="PricingState_8h_source.html#l00064">64</a> of file <a class="el" href="PricingState_8h_source.html">PricingState.h</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">   64</span>                                                                                                {</div>
-<div class="line"><span class="lineno">   65</span>        <span class="keywordflow">if</span> (<a class="code hl_variable" href="#a4ba92726ef8e21edf3c7270730bb560b">enumerate</a>) <span class="keywordflow">return</span> <span class="keyword">false</span>;</div>
-<div class="line"><span class="lineno">   66</span>        <span class="keywordflow">if</span> (columns_added == 0) <span class="keywordflow">return</span> <span class="keyword">true</span>;</div>
-<div class="line"><span class="lineno">   67</span>        <span class="keywordflow">return</span> stage &gt;= 4 &amp;&amp; iteration % <a class="code hl_variable" href="#ad00677b0f1c95550c2b9b0cb4aff568a">hgs_interval</a> == 0;</div>
-<div class="line"><span class="lineno">   68</span>    }</div>
+<p class="definition">Definition at line <a class="el" href="PricingState_8h_source.html#l00073">73</a> of file <a class="el" href="PricingState_8h_source.html">PricingState.h</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">   73</span>                                                                                                {</div>
+<div class="line"><span class="lineno">   74</span>        <span class="keywordflow">if</span> (<a class="code hl_variable" href="#a4ba92726ef8e21edf3c7270730bb560b">enumerate</a>) <span class="keywordflow">return</span> <span class="keyword">false</span>;</div>
+<div class="line"><span class="lineno">   75</span>        <span class="keywordflow">if</span> (columns_added == 0) <span class="keywordflow">return</span> <span class="keyword">true</span>;</div>
+<div class="line"><span class="lineno">   76</span>        <span class="keywordflow">return</span> stage &gt;= 4 &amp;&amp; iteration % <a class="code hl_variable" href="#ad00677b0f1c95550c2b9b0cb4aff568a">hgs_interval</a> == 0;</div>
+<div class="line"><span class="lineno">   77</span>    }</div>
 <div class="ttc" id="astructbaldes_1_1bcp_1_1PricingState_html_ad00677b0f1c95550c2b9b0cb4aff568a"><div class="ttname"><a href="#ad00677b0f1c95550c2b9b0cb4aff568a">baldes::bcp::PricingState::hgs_interval</a></div><div class="ttdeci">int hgs_interval</div><div class="ttdef"><b>Definition</b> <a href="PricingState_8h_source.html#l00015">PricingState.h:15</a></div></div>
 </div><!-- fragment -->
 </div>

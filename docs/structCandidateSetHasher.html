@@ -140,7 +140,7 @@ Static Public Member Functions</h2></td></tr>
 </table>
 <a name="details" id="details"></a><h2 id="header-details" class="groupheader">Detailed Description</h2>
 <div class="textblock">
-<p class="definition">Definition at line <a class="el" href="Helpers_8h_source.html#l00257">257</a> of file <a class="el" href="Helpers_8h_source.html">Helpers.h</a>.</p>
+<p class="definition">Definition at line <a class="el" href="Helpers_8h_source.html#l00265">265</a> of file <a class="el" href="Helpers_8h_source.html">Helpers.h</a>.</p>
 </div><a name="doc-typedef-members" id="doc-typedef-members"></a><h2 id="header-doc-typedef-members" class="groupheader">Member Typedef Documentation</h2>
 <a id="a74bda5a77e952cd9848a531bd593df5d" name="a74bda5a77e952cd9848a531bd593df5d"></a>
 <h2 class="memtitle"><span class="permalink"><a href="#a74bda5a77e952cd9848a531bd593df5d">&#9670;&#160;</a></span>is_avalanching</h2>
@@ -154,7 +154,7 @@ Static Public Member Functions</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="Helpers_8h_source.html#l00258">258</a> of file <a class="el" href="Helpers_8h_source.html">Helpers.h</a>.</p>
+<p class="definition">Definition at line <a class="el" href="Helpers_8h_source.html#l00266">266</a> of file <a class="el" href="Helpers_8h_source.html">Helpers.h</a>.</p>
 
 </div>
 </div>
@@ -186,20 +186,20 @@ Static Public Member Functions</h2></td></tr>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="Helpers_8h_source.html#l00267">267</a> of file <a class="el" href="Helpers_8h_source.html">Helpers.h</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  267</span>                                                                                                            {</div>
-<div class="line"><span class="lineno">  268</span>        <span class="comment">// Commutative accumulators make the result independent of hash-table</span></div>
-<div class="line"><span class="lineno">  269</span>        <span class="comment">// iteration order without sorting or allocating temporary vectors.</span></div>
-<div class="line"><span class="lineno">  270</span>        uint64_t sum  = <a class="code hl_function" href="#a55ef262f1f6986803f4e8da10df4101e">mix</a>(seed ^ values.size());</div>
-<div class="line"><span class="lineno">  271</span>        uint64_t xors = 0;</div>
-<div class="line"><span class="lineno">  272</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> value : values) {</div>
-<div class="line"><span class="lineno">  273</span>            <span class="keyword">const</span> uint64_t element_hash = <a class="code hl_function" href="#a55ef262f1f6986803f4e8da10df4101e">mix</a>(<span class="keyword">static_cast&lt;</span>uint32_t<span class="keyword">&gt;</span>(value) ^ seed);</div>
-<div class="line"><span class="lineno">  274</span>            sum += element_hash;</div>
-<div class="line"><span class="lineno">  275</span>            xors ^= std::rotl(element_hash, <span class="keyword">static_cast&lt;</span><span class="keywordtype">int</span><span class="keyword">&gt;</span>(element_hash &amp; 63U));</div>
-<div class="line"><span class="lineno">  276</span>        }</div>
-<div class="line"><span class="lineno">  277</span>        <span class="keywordflow">return</span> <a class="code hl_function" href="#a55ef262f1f6986803f4e8da10df4101e">mix</a>(sum ^ xors);</div>
-<div class="line"><span class="lineno">  278</span>    }</div>
-<div class="ttc" id="astructCandidateSetHasher_html_a55ef262f1f6986803f4e8da10df4101e"><div class="ttname"><a href="#a55ef262f1f6986803f4e8da10df4101e">CandidateSetHasher::mix</a></div><div class="ttdeci">static uint64_t mix(uint64_t value) noexcept</div><div class="ttdef"><b>Definition</b> <a href="Helpers_8h_source.html#l00260">Helpers.h:260</a></div></div>
+<p class="definition">Definition at line <a class="el" href="Helpers_8h_source.html#l00275">275</a> of file <a class="el" href="Helpers_8h_source.html">Helpers.h</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  275</span>                                                                                                            {</div>
+<div class="line"><span class="lineno">  276</span>        <span class="comment">// Commutative accumulators make the result independent of hash-table</span></div>
+<div class="line"><span class="lineno">  277</span>        <span class="comment">// iteration order without sorting or allocating temporary vectors.</span></div>
+<div class="line"><span class="lineno">  278</span>        uint64_t sum  = <a class="code hl_function" href="#a55ef262f1f6986803f4e8da10df4101e">mix</a>(seed ^ values.size());</div>
+<div class="line"><span class="lineno">  279</span>        uint64_t xors = 0;</div>
+<div class="line"><span class="lineno">  280</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> value : values) {</div>
+<div class="line"><span class="lineno">  281</span>            <span class="keyword">const</span> uint64_t element_hash = <a class="code hl_function" href="#a55ef262f1f6986803f4e8da10df4101e">mix</a>(<span class="keyword">static_cast&lt;</span>uint32_t<span class="keyword">&gt;</span>(value) ^ seed);</div>
+<div class="line"><span class="lineno">  282</span>            sum += element_hash;</div>
+<div class="line"><span class="lineno">  283</span>            xors ^= std::rotl(element_hash, <span class="keyword">static_cast&lt;</span><span class="keywordtype">int</span><span class="keyword">&gt;</span>(element_hash &amp; 63U));</div>
+<div class="line"><span class="lineno">  284</span>        }</div>
+<div class="line"><span class="lineno">  285</span>        <span class="keywordflow">return</span> <a class="code hl_function" href="#a55ef262f1f6986803f4e8da10df4101e">mix</a>(sum ^ xors);</div>
+<div class="line"><span class="lineno">  286</span>    }</div>
+<div class="ttc" id="astructCandidateSetHasher_html_a55ef262f1f6986803f4e8da10df4101e"><div class="ttname"><a href="#a55ef262f1f6986803f4e8da10df4101e">CandidateSetHasher::mix</a></div><div class="ttdeci">static uint64_t mix(uint64_t value) noexcept</div><div class="ttdef"><b>Definition</b> <a href="Helpers_8h_source.html#l00268">Helpers.h:268</a></div></div>
 </div><!-- fragment --><div class="dynheader">
 Here is the call graph for this function:</div>
 <div class="dyncontent">
@@ -236,13 +236,13 @@ Here is the call graph for this function:</div>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="Helpers_8h_source.html#l00260">260</a> of file <a class="el" href="Helpers_8h_source.html">Helpers.h</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  260</span>                                                 {</div>
-<div class="line"><span class="lineno">  261</span>        value += 0x9e3779b97f4a7c15ULL;</div>
-<div class="line"><span class="lineno">  262</span>        value = (value ^ (value &gt;&gt; 30U)) * 0xbf58476d1ce4e5b9ULL;</div>
-<div class="line"><span class="lineno">  263</span>        value = (value ^ (value &gt;&gt; 27U)) * 0x94d049bb133111ebULL;</div>
-<div class="line"><span class="lineno">  264</span>        <span class="keywordflow">return</span> value ^ (value &gt;&gt; 31U);</div>
-<div class="line"><span class="lineno">  265</span>    }</div>
+<p class="definition">Definition at line <a class="el" href="Helpers_8h_source.html#l00268">268</a> of file <a class="el" href="Helpers_8h_source.html">Helpers.h</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  268</span>                                                 {</div>
+<div class="line"><span class="lineno">  269</span>        value += 0x9e3779b97f4a7c15ULL;</div>
+<div class="line"><span class="lineno">  270</span>        value = (value ^ (value &gt;&gt; 30U)) * 0xbf58476d1ce4e5b9ULL;</div>
+<div class="line"><span class="lineno">  271</span>        value = (value ^ (value &gt;&gt; 27U)) * 0x94d049bb133111ebULL;</div>
+<div class="line"><span class="lineno">  272</span>        <span class="keywordflow">return</span> value ^ (value &gt;&gt; 31U);</div>
+<div class="line"><span class="lineno">  273</span>    }</div>
 </div><!-- fragment -->
 </div>
 </div>
@@ -269,9 +269,9 @@ Here is the call graph for this function:</div>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="Helpers_8h_source.html#l00290">290</a> of file <a class="el" href="Helpers_8h_source.html">Helpers.h</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  290</span>{ <span class="keywordflow">return</span> <a class="code hl_function" href="#a8e57d03912b39e424c8e29c899c29a58">operator()</a>(candidate); }</div>
-<div class="ttc" id="astructCandidateSetHasher_html_a8e57d03912b39e424c8e29c899c29a58"><div class="ttname"><a href="#a8e57d03912b39e424c8e29c899c29a58">CandidateSetHasher::operator()</a></div><div class="ttdeci">uint64_t operator()(const CandidateSet &amp;candidate) const noexcept</div><div class="ttdef"><b>Definition</b> <a href="Helpers_8h_source.html#l00280">Helpers.h:280</a></div></div>
+<p class="definition">Definition at line <a class="el" href="Helpers_8h_source.html#l00298">298</a> of file <a class="el" href="Helpers_8h_source.html">Helpers.h</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  298</span>{ <span class="keywordflow">return</span> <a class="code hl_function" href="#a8e57d03912b39e424c8e29c899c29a58">operator()</a>(candidate); }</div>
+<div class="ttc" id="astructCandidateSetHasher_html_a8e57d03912b39e424c8e29c899c29a58"><div class="ttname"><a href="#a8e57d03912b39e424c8e29c899c29a58">CandidateSetHasher::operator()</a></div><div class="ttdeci">uint64_t operator()(const CandidateSet &amp;candidate) const noexcept</div><div class="ttdef"><b>Definition</b> <a href="Helpers_8h_source.html#l00288">Helpers.h:288</a></div></div>
 </div><!-- fragment --><div class="dynheader">
 Here is the call graph for this function:</div>
 <div class="dyncontent">
@@ -313,22 +313,22 @@ Here is the call graph for this function:</div>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="Helpers_8h_source.html#l00280">280</a> of file <a class="el" href="Helpers_8h_source.html">Helpers.h</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  280</span>                                                                      {</div>
-<div class="line"><span class="lineno">  281</span>        uint64_t hash = <a class="code hl_function" href="#a8a9d630a86701e8e7beb29123e3be728">hash_unordered_set</a>(candidate.<a class="code hl_variable" href="structCandidateSet.html#a559d5ef0f2f19d180c5aeff17394e1af">nodes</a>, 0x243f6a8885a308d3ULL);</div>
-<div class="line"><span class="lineno">  282</span>        hash ^= std::rotl(<a class="code hl_function" href="#a8a9d630a86701e8e7beb29123e3be728">hash_unordered_set</a>(candidate.<a class="code hl_variable" href="structCandidateSet.html#ac847c6fb732d5822e011868f3cc02898">neighbor</a>, 0x13198a2e03707344ULL), 17);</div>
-<div class="line"><span class="lineno">  283</span>        hash ^= <a class="code hl_function" href="#a55ef262f1f6986803f4e8da10df4101e">mix</a>(<span class="keyword">static_cast&lt;</span>uint32_t<span class="keyword">&gt;</span>(candidate.<a class="code hl_variable" href="structCandidateSet.html#a02d828a29e6a55efc6dd0ec86dd3f9ac">perm</a>.<a class="code hl_variable" href="structSRCPermutation.html#a73715a9230ef33a4afa75dc51fd09c24">den</a>));</div>
-<div class="line"><span class="lineno">  284</span>        <span class="keywordflow">if</span> (!candidate.<a class="code hl_variable" href="structCandidateSet.html#a02d828a29e6a55efc6dd0ec86dd3f9ac">perm</a>.<a class="code hl_variable" href="structSRCPermutation.html#ad388d415d55c248d620a00cddc5d686b">num</a>.empty()) {</div>
-<div class="line"><span class="lineno">  285</span>            hash ^= XXH3_64bits(candidate.<a class="code hl_variable" href="structCandidateSet.html#a02d828a29e6a55efc6dd0ec86dd3f9ac">perm</a>.<a class="code hl_variable" href="structSRCPermutation.html#ad388d415d55c248d620a00cddc5d686b">num</a>.data(), candidate.<a class="code hl_variable" href="structCandidateSet.html#a02d828a29e6a55efc6dd0ec86dd3f9ac">perm</a>.<a class="code hl_variable" href="structSRCPermutation.html#ad388d415d55c248d620a00cddc5d686b">num</a>.size() * <span class="keyword">sizeof</span>(<span class="keywordtype">int</span>));</div>
-<div class="line"><span class="lineno">  286</span>        }</div>
-<div class="line"><span class="lineno">  287</span>        <span class="keywordflow">return</span> <a class="code hl_function" href="#a55ef262f1f6986803f4e8da10df4101e">mix</a>(hash);</div>
-<div class="line"><span class="lineno">  288</span>    }</div>
-<div class="ttc" id="astructCandidateSetHasher_html_a8a9d630a86701e8e7beb29123e3be728"><div class="ttname"><a href="#a8a9d630a86701e8e7beb29123e3be728">CandidateSetHasher::hash_unordered_set</a></div><div class="ttdeci">static uint64_t hash_unordered_set(const ankerl::unordered_dense::set&lt; int &gt; &amp;values, uint64_t seed) noexcept</div><div class="ttdef"><b>Definition</b> <a href="Helpers_8h_source.html#l00267">Helpers.h:267</a></div></div>
-<div class="ttc" id="astructCandidateSet_html_a02d828a29e6a55efc6dd0ec86dd3f9ac"><div class="ttname"><a href="structCandidateSet.html#a02d828a29e6a55efc6dd0ec86dd3f9ac">CandidateSet::perm</a></div><div class="ttdeci">SRCPermutation perm</div><div class="ttdef"><b>Definition</b> <a href="Helpers_8h_source.html#l00212">Helpers.h:212</a></div></div>
-<div class="ttc" id="astructCandidateSet_html_a559d5ef0f2f19d180c5aeff17394e1af"><div class="ttname"><a href="structCandidateSet.html#a559d5ef0f2f19d180c5aeff17394e1af">CandidateSet::nodes</a></div><div class="ttdeci">ankerl::unordered_dense::set&lt; int &gt; nodes</div><div class="ttdef"><b>Definition</b> <a href="Helpers_8h_source.html#l00210">Helpers.h:210</a></div></div>
-<div class="ttc" id="astructCandidateSet_html_ac847c6fb732d5822e011868f3cc02898"><div class="ttname"><a href="structCandidateSet.html#ac847c6fb732d5822e011868f3cc02898">CandidateSet::neighbor</a></div><div class="ttdeci">ankerl::unordered_dense::set&lt; int &gt; neighbor</div><div class="ttdef"><b>Definition</b> <a href="Helpers_8h_source.html#l00213">Helpers.h:213</a></div></div>
-<div class="ttc" id="astructSRCPermutation_html_a73715a9230ef33a4afa75dc51fd09c24"><div class="ttname"><a href="structSRCPermutation.html#a73715a9230ef33a4afa75dc51fd09c24">SRCPermutation::den</a></div><div class="ttdeci">int den</div><div class="ttdef"><b>Definition</b> <a href="Cut_8h_source.html#l00016">Cut.h:16</a></div></div>
-<div class="ttc" id="astructSRCPermutation_html_ad388d415d55c248d620a00cddc5d686b"><div class="ttname"><a href="structSRCPermutation.html#ad388d415d55c248d620a00cddc5d686b">SRCPermutation::num</a></div><div class="ttdeci">std::vector&lt; int &gt; num</div><div class="ttdef"><b>Definition</b> <a href="Cut_8h_source.html#l00014">Cut.h:14</a></div></div>
+<p class="definition">Definition at line <a class="el" href="Helpers_8h_source.html#l00288">288</a> of file <a class="el" href="Helpers_8h_source.html">Helpers.h</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  288</span>                                                                      {</div>
+<div class="line"><span class="lineno">  289</span>        uint64_t hash = <a class="code hl_function" href="#a8a9d630a86701e8e7beb29123e3be728">hash_unordered_set</a>(candidate.<a class="code hl_variable" href="structCandidateSet.html#a559d5ef0f2f19d180c5aeff17394e1af">nodes</a>, 0x243f6a8885a308d3ULL);</div>
+<div class="line"><span class="lineno">  290</span>        hash ^= std::rotl(<a class="code hl_function" href="#a8a9d630a86701e8e7beb29123e3be728">hash_unordered_set</a>(candidate.<a class="code hl_variable" href="structCandidateSet.html#ac847c6fb732d5822e011868f3cc02898">neighbor</a>, 0x13198a2e03707344ULL), 17);</div>
+<div class="line"><span class="lineno">  291</span>        hash ^= <a class="code hl_function" href="#a55ef262f1f6986803f4e8da10df4101e">mix</a>(<span class="keyword">static_cast&lt;</span>uint32_t<span class="keyword">&gt;</span>(candidate.<a class="code hl_variable" href="structCandidateSet.html#a02d828a29e6a55efc6dd0ec86dd3f9ac">perm</a>.<a class="code hl_variable" href="structSRCPermutation.html#a73715a9230ef33a4afa75dc51fd09c24">den</a>));</div>
+<div class="line"><span class="lineno">  292</span>        <span class="keywordflow">if</span> (!candidate.<a class="code hl_variable" href="structCandidateSet.html#a02d828a29e6a55efc6dd0ec86dd3f9ac">perm</a>.<a class="code hl_variable" href="structSRCPermutation.html#ad388d415d55c248d620a00cddc5d686b">num</a>.empty()) {</div>
+<div class="line"><span class="lineno">  293</span>            hash ^= XXH3_64bits(candidate.<a class="code hl_variable" href="structCandidateSet.html#a02d828a29e6a55efc6dd0ec86dd3f9ac">perm</a>.<a class="code hl_variable" href="structSRCPermutation.html#ad388d415d55c248d620a00cddc5d686b">num</a>.data(), candidate.<a class="code hl_variable" href="structCandidateSet.html#a02d828a29e6a55efc6dd0ec86dd3f9ac">perm</a>.<a class="code hl_variable" href="structSRCPermutation.html#ad388d415d55c248d620a00cddc5d686b">num</a>.size() * <span class="keyword">sizeof</span>(<span class="keywordtype">int</span>));</div>
+<div class="line"><span class="lineno">  294</span>        }</div>
+<div class="line"><span class="lineno">  295</span>        <span class="keywordflow">return</span> <a class="code hl_function" href="#a55ef262f1f6986803f4e8da10df4101e">mix</a>(hash);</div>
+<div class="line"><span class="lineno">  296</span>    }</div>
+<div class="ttc" id="astructCandidateSetHasher_html_a8a9d630a86701e8e7beb29123e3be728"><div class="ttname"><a href="#a8a9d630a86701e8e7beb29123e3be728">CandidateSetHasher::hash_unordered_set</a></div><div class="ttdeci">static uint64_t hash_unordered_set(const ankerl::unordered_dense::set&lt; int &gt; &amp;values, uint64_t seed) noexcept</div><div class="ttdef"><b>Definition</b> <a href="Helpers_8h_source.html#l00275">Helpers.h:275</a></div></div>
+<div class="ttc" id="astructCandidateSet_html_a02d828a29e6a55efc6dd0ec86dd3f9ac"><div class="ttname"><a href="structCandidateSet.html#a02d828a29e6a55efc6dd0ec86dd3f9ac">CandidateSet::perm</a></div><div class="ttdeci">SRCPermutation perm</div><div class="ttdef"><b>Definition</b> <a href="Helpers_8h_source.html#l00220">Helpers.h:220</a></div></div>
+<div class="ttc" id="astructCandidateSet_html_a559d5ef0f2f19d180c5aeff17394e1af"><div class="ttname"><a href="structCandidateSet.html#a559d5ef0f2f19d180c5aeff17394e1af">CandidateSet::nodes</a></div><div class="ttdeci">ankerl::unordered_dense::set&lt; int &gt; nodes</div><div class="ttdef"><b>Definition</b> <a href="Helpers_8h_source.html#l00218">Helpers.h:218</a></div></div>
+<div class="ttc" id="astructCandidateSet_html_ac847c6fb732d5822e011868f3cc02898"><div class="ttname"><a href="structCandidateSet.html#ac847c6fb732d5822e011868f3cc02898">CandidateSet::neighbor</a></div><div class="ttdeci">ankerl::unordered_dense::set&lt; int &gt; neighbor</div><div class="ttdef"><b>Definition</b> <a href="Helpers_8h_source.html#l00221">Helpers.h:221</a></div></div>
+<div class="ttc" id="astructSRCPermutation_html_a73715a9230ef33a4afa75dc51fd09c24"><div class="ttname"><a href="structSRCPermutation.html#a73715a9230ef33a4afa75dc51fd09c24">SRCPermutation::den</a></div><div class="ttdeci">int den</div><div class="ttdef"><b>Definition</b> <a href="Cut_8h_source.html#l00017">Cut.h:17</a></div></div>
+<div class="ttc" id="astructSRCPermutation_html_ad388d415d55c248d620a00cddc5d686b"><div class="ttname"><a href="structSRCPermutation.html#ad388d415d55c248d620a00cddc5d686b">SRCPermutation::num</a></div><div class="ttdeci">std::vector&lt; int &gt; num</div><div class="ttdef"><b>Definition</b> <a href="Cut_8h_source.html#l00015">Cut.h:15</a></div></div>
 </div><!-- fragment --><div class="dynheader">
 Here is the call graph for this function:</div>
 <div class="dyncontent">

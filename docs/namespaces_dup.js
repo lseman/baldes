@@ -35,6 +35,9 @@ var namespaces_dup =
       [ "eps", "namespacenumericutils.html#adaf310759d56f0e70fb4b325dbefc809", null ],
       [ "half", "namespacenumericutils.html#a6d216d1f3b650b856247501f67243a2e", null ]
     ] ],
+    [ "rank1", "namespacerank1.html", [
+      [ "rank3_floor_coefficient_delta", "namespacerank1.html#a92f7b85e4856d3650d38bc116eda77ee", null ]
+    ] ],
     [ "serializer", "namespaceserializer.html", "namespaceserializer" ],
     [ "std", "namespacestd.html", "namespacestd" ]
 ];

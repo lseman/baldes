@@ -11,6 +11,7 @@ var BucketGraph_8h =
     [ "BucketGraph::ConcatenationCandidate", "structBucketGraph_1_1ConcatenationCandidate.html", "structBucketGraph_1_1ConcatenationCandidate" ],
     [ "BucketGraph::ConcatenationStats", "structBucketGraph_1_1ConcatenationStats.html", "structBucketGraph_1_1ConcatenationStats" ],
     [ "BucketGraph::ConcatenationScratch", "structBucketGraph_1_1ConcatenationScratch.html", "structBucketGraph_1_1ConcatenationScratch" ],
+    [ "BucketGraph::LabelingScratch", "structBucketGraph_1_1LabelingScratch.html", "structBucketGraph_1_1LabelingScratch" ],
     [ "BucketGraph::SpliceState", "structBucketGraph_1_1SpliceState.html", "structBucketGraph_1_1SpliceState" ],
     [ "RCESPP_TOL_ZERO", "BucketGraph_8h.html#a9dd4cea2fad5f09b840871a27aeb5fff", null ]
 ];

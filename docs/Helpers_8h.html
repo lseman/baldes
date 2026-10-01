@@ -294,6 +294,7 @@ Classes</h2></td></tr>
 <tr class="heading"><td colspan="2"><h2 id="header-namespaces" class="groupheader"><a id="namespaces" name="namespaces"></a>
 Namespaces</h2></td></tr>
 <tr class="memitem:LocalSearchConfig" id="r_LocalSearchConfig"><td class="memItemLeft">namespace &#160;</td><td class="memItemRight"><a class="el" href="namespaceLocalSearchConfig.html">LocalSearchConfig</a></td></tr>
+<tr class="memitem:rank1" id="r_rank1"><td class="memItemLeft">namespace &#160;</td><td class="memItemRight"><a class="el" href="namespacerank1.html">rank1</a></td></tr>
 <tr class="memitem:std" id="r_std"><td class="memItemLeft">namespace &#160;</td><td class="memItemRight"><a class="el" href="namespacestd.html">std</a></td></tr>
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 id="header-typedef-members" class="groupheader"><a id="typedef-members" name="typedef-members"></a>
@@ -302,6 +303,7 @@ Typedefs</h2></td></tr>
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 id="header-func-members" class="groupheader"><a id="func-members" name="func-members"></a>
 Functions</h2></td></tr>
+<tr class="memitem:a92f7b85e4856d3650d38bc116eda77ee" id="r_a92f7b85e4856d3650d38bc116eda77ee"><td class="memItemLeft">constexpr int&#160;</td><td class="memItemRight"><a class="el" href="namespacerank1.html#a92f7b85e4856d3650d38bc116eda77ee">rank1::rank3_floor_coefficient_delta</a> (int base_visits, int extra_visits) noexcept</td></tr>
 <tr class="memitem:acf8696478b8666472dbbc5267f76fd36" id="r_acf8696478b8666472dbbc5267f76fd36"><td class="memItemLeft">std::vector&lt; <a class="el" href="structSRCPermutation.html">SRCPermutation</a> &gt;&#160;</td><td class="memItemRight"><a class="el" href="#acf8696478b8666472dbbc5267f76fd36">generateRuntimePermutations</a> (const std::vector&lt; int &gt; &amp;base, int den)</td></tr>
 <tr class="memitem:ae16f85cab7674f93b1e3171dbe907d20" id="r_ae16f85cab7674f93b1e3171dbe907d20"><td class="memItemLeft">std::vector&lt; <a class="el" href="structSRCPermutation.html">SRCPermutation</a> &gt;&#160;</td><td class="memItemRight"><a class="el" href="#ae16f85cab7674f93b1e3171dbe907d20">generateGeneticPermutations</a> (int candidateSize)</td></tr>
 <tr class="memitem:a6e2d376e10d40865f9a079e6bef1501f" id="r_a6e2d376e10d40865f9a079e6bef1501f"><td class="memItemLeft">std::vector&lt; <a class="el" href="structSRCPermutation.html">SRCPermutation</a> &gt;&#160;</td><td class="memItemRight"><a class="el" href="#a6e2d376e10d40865f9a079e6bef1501f">generateExactPermutations</a> (int candidateSize)</td></tr>
@@ -340,7 +342,7 @@ Variables</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="Helpers_8h_source.html#l00293">293</a> of file <a class="el" href="Helpers_8h_source.html">Helpers.h</a>.</p>
+<p class="definition">Definition at line <a class="el" href="Helpers_8h_source.html#l00301">301</a> of file <a class="el" href="Helpers_8h_source.html">Helpers.h</a>.</p>
 
 </div>
 </div>
@@ -368,71 +370,71 @@ Variables</h2></td></tr>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="Helpers_8h_source.html#l00126">126</a> of file <a class="el" href="Helpers_8h_source.html">Helpers.h</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  126</span>                                                                              {</div>
-<div class="line"><span class="lineno">  127</span>    std::vector&lt;std::pair&lt;std::vector&lt;int&gt;, <span class="keywordtype">int</span>&gt;&gt; plans;</div>
-<div class="line"><span class="lineno">  128</span>    <span class="keyword">auto</span>                                          add_plan = [&amp;](std::vector&lt;int&gt; base, <span class="keywordtype">int</span> den) {</div>
-<div class="line"><span class="lineno">  129</span>        <span class="keywordflow">if</span> (den &lt; 2) <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno">  130</span>        plans.emplace_back(std::move(base), den);</div>
-<div class="line"><span class="lineno">  131</span>    };</div>
-<div class="line"><span class="lineno">  132</span> </div>
-<div class="line"><span class="lineno">  133</span>    <span class="keywordflow">if</span> (candidateSize % 2 == 1) { add_plan(std::vector&lt;int&gt;(candidateSize, 1), 2); }</div>
-<div class="line"><span class="lineno">  134</span> </div>
-<div class="line"><span class="lineno">  135</span>    <span class="keywordflow">if</span> (candidateSize &gt;= 5 &amp;&amp; (candidateSize - 2) % 3 == 0) { add_plan(std::vector&lt;int&gt;(candidateSize, 1), 3); }</div>
-<div class="line"><span class="lineno">  136</span> </div>
-<div class="line"><span class="lineno">  137</span>    <span class="keywordflow">if</span> (candidateSize &gt;= 4) {</div>
-<div class="line"><span class="lineno">  138</span>        <span class="keyword">auto</span> plan = std::vector&lt;int&gt;(candidateSize, 1);</div>
-<div class="line"><span class="lineno">  139</span>        plan[0]   = candidateSize - 2;</div>
-<div class="line"><span class="lineno">  140</span>        add_plan(plan, candidateSize - 1);</div>
-<div class="line"><span class="lineno">  141</span>    }</div>
+<p class="definition">Definition at line <a class="el" href="Helpers_8h_source.html#l00134">134</a> of file <a class="el" href="Helpers_8h_source.html">Helpers.h</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  134</span>                                                                              {</div>
+<div class="line"><span class="lineno">  135</span>    std::vector&lt;std::pair&lt;std::vector&lt;int&gt;, <span class="keywordtype">int</span>&gt;&gt; plans;</div>
+<div class="line"><span class="lineno">  136</span>    <span class="keyword">auto</span>                                          add_plan = [&amp;](std::vector&lt;int&gt; base, <span class="keywordtype">int</span> den) {</div>
+<div class="line"><span class="lineno">  137</span>        <span class="keywordflow">if</span> (den &lt; 2) <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno">  138</span>        plans.emplace_back(std::move(base), den);</div>
+<div class="line"><span class="lineno">  139</span>    };</div>
+<div class="line"><span class="lineno">  140</span> </div>
+<div class="line"><span class="lineno">  141</span>    <span class="keywordflow">if</span> (candidateSize % 2 == 1) { add_plan(std::vector&lt;int&gt;(candidateSize, 1), 2); }</div>
 <div class="line"><span class="lineno">  142</span> </div>
-<div class="line"><span class="lineno">  143</span>    <span class="keywordflow">if</span> (candidateSize &gt;= 5) {</div>
-<div class="line"><span class="lineno">  144</span>        <span class="keyword">auto</span> plan2 = std::vector&lt;int&gt;(candidateSize, 1);</div>
-<div class="line"><span class="lineno">  145</span>        plan2[0]   = candidateSize - 3;</div>
-<div class="line"><span class="lineno">  146</span>        plan2[1]   = candidateSize - 3;</div>
-<div class="line"><span class="lineno">  147</span>        plan2[2]   = 2;</div>
-<div class="line"><span class="lineno">  148</span>        add_plan(plan2, candidateSize - 2);</div>
-<div class="line"><span class="lineno">  149</span> </div>
-<div class="line"><span class="lineno">  150</span>        <span class="keyword">auto</span> plan3 = std::vector&lt;int&gt;(candidateSize, 1);</div>
-<div class="line"><span class="lineno">  151</span>        plan3[0]   = candidateSize - 2;</div>
-<div class="line"><span class="lineno">  152</span>        plan3[1]   = candidateSize - 2;</div>
-<div class="line"><span class="lineno">  153</span>        plan3[2]   = 2;</div>
-<div class="line"><span class="lineno">  154</span>        plan3[3]   = 2;</div>
-<div class="line"><span class="lineno">  155</span>        add_plan(plan3, candidateSize - 1);</div>
-<div class="line"><span class="lineno">  156</span> </div>
-<div class="line"><span class="lineno">  157</span>        <span class="keyword">auto</span> plan4 = std::vector&lt;int&gt;(candidateSize, 1);</div>
-<div class="line"><span class="lineno">  158</span>        plan4[0]   = candidateSize - 3;</div>
-<div class="line"><span class="lineno">  159</span>        plan4[1]   = 2;</div>
-<div class="line"><span class="lineno">  160</span>        add_plan(plan4, candidateSize - 1);</div>
-<div class="line"><span class="lineno">  161</span> </div>
-<div class="line"><span class="lineno">  162</span>        <span class="keyword">auto</span> plan6 = std::vector&lt;int&gt;(candidateSize, 1);</div>
-<div class="line"><span class="lineno">  163</span>        plan6[0]   = candidateSize - 2;</div>
-<div class="line"><span class="lineno">  164</span>        plan6[1]   = 2;</div>
-<div class="line"><span class="lineno">  165</span>        plan6[2]   = 2;</div>
-<div class="line"><span class="lineno">  166</span>        add_plan(plan6, candidateSize);</div>
-<div class="line"><span class="lineno">  167</span>    }</div>
-<div class="line"><span class="lineno">  168</span> </div>
-<div class="line"><span class="lineno">  169</span>    <span class="keywordflow">if</span> (candidateSize &gt;= 4) {</div>
-<div class="line"><span class="lineno">  170</span>        <span class="keyword">auto</span> plan5 = std::vector&lt;int&gt;(candidateSize, 1);</div>
-<div class="line"><span class="lineno">  171</span>        plan5[0]   = candidateSize - 2;</div>
-<div class="line"><span class="lineno">  172</span>        add_plan(plan5, candidateSize - 1);</div>
-<div class="line"><span class="lineno">  173</span>    }</div>
-<div class="line"><span class="lineno">  174</span> </div>
-<div class="line"><span class="lineno">  175</span>    std::sort(plans.begin(), plans.end(), [](<span class="keyword">const</span> <span class="keyword">auto</span> &amp;a, <span class="keyword">const</span> <span class="keyword">auto</span> &amp;b) {</div>
-<div class="line"><span class="lineno">  176</span>        if (a.second != b.second) return a.second &lt; b.second;</div>
-<div class="line"><span class="lineno">  177</span>        return a.first &lt; b.first;</div>
-<div class="line"><span class="lineno">  178</span>    });</div>
-<div class="line"><span class="lineno">  179</span>    plans.erase(std::unique(plans.begin(), plans.end()), plans.end());</div>
-<div class="line"><span class="lineno">  180</span> </div>
-<div class="line"><span class="lineno">  181</span>    std::vector&lt;SRCPermutation&gt; allPerms;</div>
-<div class="line"><span class="lineno">  182</span>    <span class="keywordflow">for</span> (<span class="keyword">auto</span> &amp;plan : plans) {</div>
-<div class="line"><span class="lineno">  183</span>        <span class="keyword">auto</span> perms = <a class="code hl_function" href="#acf8696478b8666472dbbc5267f76fd36">generateRuntimePermutations</a>(plan.first, plan.second);</div>
-<div class="line"><span class="lineno">  184</span>        allPerms.insert(allPerms.end(), perms.begin(), perms.end());</div>
-<div class="line"><span class="lineno">  185</span>    }</div>
-<div class="line"><span class="lineno">  186</span> </div>
-<div class="line"><span class="lineno">  187</span>    <span class="keywordflow">return</span> allPerms;</div>
-<div class="line"><span class="lineno">  188</span>}</div>
-<div class="ttc" id="aHelpers_8h_html_acf8696478b8666472dbbc5267f76fd36"><div class="ttname"><a href="#acf8696478b8666472dbbc5267f76fd36">generateRuntimePermutations</a></div><div class="ttdeci">std::vector&lt; SRCPermutation &gt; generateRuntimePermutations(const std::vector&lt; int &gt; &amp;base, int den)</div><div class="ttdef"><b>Definition</b> <a href="Helpers_8h_source.html#l00038">Helpers.h:38</a></div></div>
+<div class="line"><span class="lineno">  143</span>    <span class="keywordflow">if</span> (candidateSize &gt;= 5 &amp;&amp; (candidateSize - 2) % 3 == 0) { add_plan(std::vector&lt;int&gt;(candidateSize, 1), 3); }</div>
+<div class="line"><span class="lineno">  144</span> </div>
+<div class="line"><span class="lineno">  145</span>    <span class="keywordflow">if</span> (candidateSize &gt;= 4) {</div>
+<div class="line"><span class="lineno">  146</span>        <span class="keyword">auto</span> plan = std::vector&lt;int&gt;(candidateSize, 1);</div>
+<div class="line"><span class="lineno">  147</span>        plan[0]   = candidateSize - 2;</div>
+<div class="line"><span class="lineno">  148</span>        add_plan(plan, candidateSize - 1);</div>
+<div class="line"><span class="lineno">  149</span>    }</div>
+<div class="line"><span class="lineno">  150</span> </div>
+<div class="line"><span class="lineno">  151</span>    <span class="keywordflow">if</span> (candidateSize &gt;= 5) {</div>
+<div class="line"><span class="lineno">  152</span>        <span class="keyword">auto</span> plan2 = std::vector&lt;int&gt;(candidateSize, 1);</div>
+<div class="line"><span class="lineno">  153</span>        plan2[0]   = candidateSize - 3;</div>
+<div class="line"><span class="lineno">  154</span>        plan2[1]   = candidateSize - 3;</div>
+<div class="line"><span class="lineno">  155</span>        plan2[2]   = 2;</div>
+<div class="line"><span class="lineno">  156</span>        add_plan(plan2, candidateSize - 2);</div>
+<div class="line"><span class="lineno">  157</span> </div>
+<div class="line"><span class="lineno">  158</span>        <span class="keyword">auto</span> plan3 = std::vector&lt;int&gt;(candidateSize, 1);</div>
+<div class="line"><span class="lineno">  159</span>        plan3[0]   = candidateSize - 2;</div>
+<div class="line"><span class="lineno">  160</span>        plan3[1]   = candidateSize - 2;</div>
+<div class="line"><span class="lineno">  161</span>        plan3[2]   = 2;</div>
+<div class="line"><span class="lineno">  162</span>        plan3[3]   = 2;</div>
+<div class="line"><span class="lineno">  163</span>        add_plan(plan3, candidateSize - 1);</div>
+<div class="line"><span class="lineno">  164</span> </div>
+<div class="line"><span class="lineno">  165</span>        <span class="keyword">auto</span> plan4 = std::vector&lt;int&gt;(candidateSize, 1);</div>
+<div class="line"><span class="lineno">  166</span>        plan4[0]   = candidateSize - 3;</div>
+<div class="line"><span class="lineno">  167</span>        plan4[1]   = 2;</div>
+<div class="line"><span class="lineno">  168</span>        add_plan(plan4, candidateSize - 1);</div>
+<div class="line"><span class="lineno">  169</span> </div>
+<div class="line"><span class="lineno">  170</span>        <span class="keyword">auto</span> plan6 = std::vector&lt;int&gt;(candidateSize, 1);</div>
+<div class="line"><span class="lineno">  171</span>        plan6[0]   = candidateSize - 2;</div>
+<div class="line"><span class="lineno">  172</span>        plan6[1]   = 2;</div>
+<div class="line"><span class="lineno">  173</span>        plan6[2]   = 2;</div>
+<div class="line"><span class="lineno">  174</span>        add_plan(plan6, candidateSize);</div>
+<div class="line"><span class="lineno">  175</span>    }</div>
+<div class="line"><span class="lineno">  176</span> </div>
+<div class="line"><span class="lineno">  177</span>    <span class="keywordflow">if</span> (candidateSize &gt;= 4) {</div>
+<div class="line"><span class="lineno">  178</span>        <span class="keyword">auto</span> plan5 = std::vector&lt;int&gt;(candidateSize, 1);</div>
+<div class="line"><span class="lineno">  179</span>        plan5[0]   = candidateSize - 2;</div>
+<div class="line"><span class="lineno">  180</span>        add_plan(plan5, candidateSize - 1);</div>
+<div class="line"><span class="lineno">  181</span>    }</div>
+<div class="line"><span class="lineno">  182</span> </div>
+<div class="line"><span class="lineno">  183</span>    std::sort(plans.begin(), plans.end(), [](<span class="keyword">const</span> <span class="keyword">auto</span> &amp;a, <span class="keyword">const</span> <span class="keyword">auto</span> &amp;b) {</div>
+<div class="line"><span class="lineno">  184</span>        if (a.second != b.second) return a.second &lt; b.second;</div>
+<div class="line"><span class="lineno">  185</span>        return a.first &lt; b.first;</div>
+<div class="line"><span class="lineno">  186</span>    });</div>
+<div class="line"><span class="lineno">  187</span>    plans.erase(std::unique(plans.begin(), plans.end()), plans.end());</div>
+<div class="line"><span class="lineno">  188</span> </div>
+<div class="line"><span class="lineno">  189</span>    std::vector&lt;SRCPermutation&gt; allPerms;</div>
+<div class="line"><span class="lineno">  190</span>    <span class="keywordflow">for</span> (<span class="keyword">auto</span> &amp;plan : plans) {</div>
+<div class="line"><span class="lineno">  191</span>        <span class="keyword">auto</span> perms = <a class="code hl_function" href="#acf8696478b8666472dbbc5267f76fd36">generateRuntimePermutations</a>(plan.first, plan.second);</div>
+<div class="line"><span class="lineno">  192</span>        allPerms.insert(allPerms.end(), perms.begin(), perms.end());</div>
+<div class="line"><span class="lineno">  193</span>    }</div>
+<div class="line"><span class="lineno">  194</span> </div>
+<div class="line"><span class="lineno">  195</span>    <span class="keywordflow">return</span> allPerms;</div>
+<div class="line"><span class="lineno">  196</span>}</div>
+<div class="ttc" id="aHelpers_8h_html_acf8696478b8666472dbbc5267f76fd36"><div class="ttname"><a href="#acf8696478b8666472dbbc5267f76fd36">generateRuntimePermutations</a></div><div class="ttdeci">std::vector&lt; SRCPermutation &gt; generateRuntimePermutations(const std::vector&lt; int &gt; &amp;base, int den)</div><div class="ttdef"><b>Definition</b> <a href="Helpers_8h_source.html#l00046">Helpers.h:46</a></div></div>
 </div><!-- fragment --><div class="dynheader">
 Here is the call graph for this function:</div>
 <div class="dyncontent">
@@ -469,82 +471,82 @@ Here is the call graph for this function:</div>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="Helpers_8h_source.html#l00050">50</a> of file <a class="el" href="Helpers_8h_source.html">Helpers.h</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">   50</span>                                                                                {</div>
-<div class="line"><span class="lineno">   51</span>    std::vector&lt;SRCPermutation&gt;                   allPerms;</div>
-<div class="line"><span class="lineno">   52</span>    std::vector&lt;std::pair&lt;std::vector&lt;int&gt;, <span class="keywordtype">int</span>&gt;&gt; plans;</div>
-<div class="line"><span class="lineno">   53</span> </div>
-<div class="line"><span class="lineno">   54</span>    <span class="comment">// Basic rank-3 and rank-5 patterns rely on small denominators.</span></div>
-<div class="line"><span class="lineno">   55</span>    plans.emplace_back(std::vector&lt;int&gt;(candidateSize, 1), 2);</div>
-<div class="line"><span class="lineno">   56</span> </div>
-<div class="line"><span class="lineno">   57</span>    <span class="keywordflow">if</span> (candidateSize &gt;= 4) {</div>
-<div class="line"><span class="lineno">   58</span>        plans.emplace_back(std::vector&lt;int&gt;(candidateSize, 1), 3);</div>
-<div class="line"><span class="lineno">   59</span>        plans.emplace_back(std::vector&lt;int&gt;(candidateSize, 1), 4);</div>
-<div class="line"><span class="lineno">   60</span>    }</div>
+<p class="definition">Definition at line <a class="el" href="Helpers_8h_source.html#l00058">58</a> of file <a class="el" href="Helpers_8h_source.html">Helpers.h</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">   58</span>                                                                                {</div>
+<div class="line"><span class="lineno">   59</span>    std::vector&lt;SRCPermutation&gt;                   allPerms;</div>
+<div class="line"><span class="lineno">   60</span>    std::vector&lt;std::pair&lt;std::vector&lt;int&gt;, <span class="keywordtype">int</span>&gt;&gt; plans;</div>
 <div class="line"><span class="lineno">   61</span> </div>
-<div class="line"><span class="lineno">   62</span>    <span class="keywordflow">if</span> (candidateSize &gt;= 5) { plans.emplace_back(std::vector&lt;int&gt;(candidateSize, 1), 5); }</div>
-<div class="line"><span class="lineno">   63</span> </div>
-<div class="line"><span class="lineno">   64</span>    <span class="keywordflow">if</span> (candidateSize &gt;= 4) {</div>
-<div class="line"><span class="lineno">   65</span>        <span class="keyword">auto</span> base = std::vector&lt;int&gt;(candidateSize, 1);</div>
-<div class="line"><span class="lineno">   66</span>        base[0]   = candidateSize - 2;</div>
-<div class="line"><span class="lineno">   67</span>        plans.emplace_back(base, candidateSize - 1);</div>
-<div class="line"><span class="lineno">   68</span>        plans.emplace_back(base, candidateSize);</div>
-<div class="line"><span class="lineno">   69</span>        plans.emplace_back(base, candidateSize + 1);</div>
-<div class="line"><span class="lineno">   70</span>    }</div>
+<div class="line"><span class="lineno">   62</span>    <span class="comment">// Basic rank-3 and rank-5 patterns rely on small denominators.</span></div>
+<div class="line"><span class="lineno">   63</span>    plans.emplace_back(std::vector&lt;int&gt;(candidateSize, 1), 2);</div>
+<div class="line"><span class="lineno">   64</span> </div>
+<div class="line"><span class="lineno">   65</span>    <span class="keywordflow">if</span> (candidateSize &gt;= 4) {</div>
+<div class="line"><span class="lineno">   66</span>        plans.emplace_back(std::vector&lt;int&gt;(candidateSize, 1), 3);</div>
+<div class="line"><span class="lineno">   67</span>        plans.emplace_back(std::vector&lt;int&gt;(candidateSize, 1), 4);</div>
+<div class="line"><span class="lineno">   68</span>    }</div>
+<div class="line"><span class="lineno">   69</span> </div>
+<div class="line"><span class="lineno">   70</span>    <span class="keywordflow">if</span> (candidateSize &gt;= 5) { plans.emplace_back(std::vector&lt;int&gt;(candidateSize, 1), 5); }</div>
 <div class="line"><span class="lineno">   71</span> </div>
-<div class="line"><span class="lineno">   72</span>    <span class="keywordflow">if</span> (candidateSize &gt;= 5) {</div>
+<div class="line"><span class="lineno">   72</span>    <span class="keywordflow">if</span> (candidateSize &gt;= 4) {</div>
 <div class="line"><span class="lineno">   73</span>        <span class="keyword">auto</span> base = std::vector&lt;int&gt;(candidateSize, 1);</div>
-<div class="line"><span class="lineno">   74</span>        base[0]   = candidateSize - 3;</div>
-<div class="line"><span class="lineno">   75</span>        base[1]   = 2;</div>
-<div class="line"><span class="lineno">   76</span>        plans.emplace_back(base, candidateSize - 1);</div>
-<div class="line"><span class="lineno">   77</span>        plans.emplace_back(base, candidateSize);</div>
+<div class="line"><span class="lineno">   74</span>        base[0]   = candidateSize - 2;</div>
+<div class="line"><span class="lineno">   75</span>        plans.emplace_back(base, candidateSize - 1);</div>
+<div class="line"><span class="lineno">   76</span>        plans.emplace_back(base, candidateSize);</div>
+<div class="line"><span class="lineno">   77</span>        plans.emplace_back(base, candidateSize + 1);</div>
 <div class="line"><span class="lineno">   78</span>    }</div>
 <div class="line"><span class="lineno">   79</span> </div>
 <div class="line"><span class="lineno">   80</span>    <span class="keywordflow">if</span> (candidateSize &gt;= 5) {</div>
 <div class="line"><span class="lineno">   81</span>        <span class="keyword">auto</span> base = std::vector&lt;int&gt;(candidateSize, 1);</div>
-<div class="line"><span class="lineno">   82</span>        base[0]   = candidateSize - 2;</div>
-<div class="line"><span class="lineno">   83</span>        base[1]   = candidateSize - 2;</div>
-<div class="line"><span class="lineno">   84</span>        <span class="keywordflow">if</span> (candidateSize &gt;= 3) base[2] = 2;</div>
-<div class="line"><span class="lineno">   85</span>        plans.emplace_back(base, candidateSize - 2);</div>
-<div class="line"><span class="lineno">   86</span>        plans.emplace_back(base, candidateSize - 1);</div>
-<div class="line"><span class="lineno">   87</span>    }</div>
-<div class="line"><span class="lineno">   88</span> </div>
-<div class="line"><span class="lineno">   89</span>    <span class="keywordflow">if</span> (candidateSize &gt;= 5) {</div>
-<div class="line"><span class="lineno">   90</span>        <span class="keyword">auto</span> base = std::vector&lt;int&gt;(candidateSize, 1);</div>
-<div class="line"><span class="lineno">   91</span>        base[0]   = candidateSize - 2;</div>
-<div class="line"><span class="lineno">   92</span>        base[1]   = 2;</div>
-<div class="line"><span class="lineno">   93</span>        base[2]   = 2;</div>
-<div class="line"><span class="lineno">   94</span>        plans.emplace_back(base, candidateSize);</div>
+<div class="line"><span class="lineno">   82</span>        base[0]   = candidateSize - 3;</div>
+<div class="line"><span class="lineno">   83</span>        base[1]   = 2;</div>
+<div class="line"><span class="lineno">   84</span>        plans.emplace_back(base, candidateSize - 1);</div>
+<div class="line"><span class="lineno">   85</span>        plans.emplace_back(base, candidateSize);</div>
+<div class="line"><span class="lineno">   86</span>    }</div>
+<div class="line"><span class="lineno">   87</span> </div>
+<div class="line"><span class="lineno">   88</span>    <span class="keywordflow">if</span> (candidateSize &gt;= 5) {</div>
+<div class="line"><span class="lineno">   89</span>        <span class="keyword">auto</span> base = std::vector&lt;int&gt;(candidateSize, 1);</div>
+<div class="line"><span class="lineno">   90</span>        base[0]   = candidateSize - 2;</div>
+<div class="line"><span class="lineno">   91</span>        base[1]   = candidateSize - 2;</div>
+<div class="line"><span class="lineno">   92</span>        <span class="keywordflow">if</span> (candidateSize &gt;= 3) base[2] = 2;</div>
+<div class="line"><span class="lineno">   93</span>        plans.emplace_back(base, candidateSize - 2);</div>
+<div class="line"><span class="lineno">   94</span>        plans.emplace_back(base, candidateSize - 1);</div>
 <div class="line"><span class="lineno">   95</span>    }</div>
 <div class="line"><span class="lineno">   96</span> </div>
-<div class="line"><span class="lineno">   97</span>    <span class="keywordflow">if</span> (candidateSize &gt;= 4) {</div>
+<div class="line"><span class="lineno">   97</span>    <span class="keywordflow">if</span> (candidateSize &gt;= 5) {</div>
 <div class="line"><span class="lineno">   98</span>        <span class="keyword">auto</span> base = std::vector&lt;int&gt;(candidateSize, 1);</div>
 <div class="line"><span class="lineno">   99</span>        base[0]   = candidateSize - 2;</div>
-<div class="line"><span class="lineno">  100</span>        base[1]   = candidateSize - 2;</div>
+<div class="line"><span class="lineno">  100</span>        base[1]   = 2;</div>
 <div class="line"><span class="lineno">  101</span>        base[2]   = 2;</div>
-<div class="line"><span class="lineno">  102</span>        <span class="keywordflow">if</span> (candidateSize &gt;= 4) base[3] = 2;</div>
-<div class="line"><span class="lineno">  103</span>        plans.emplace_back(base, candidateSize - 1);</div>
-<div class="line"><span class="lineno">  104</span>        plans.emplace_back(base, candidateSize);</div>
-<div class="line"><span class="lineno">  105</span>    }</div>
-<div class="line"><span class="lineno">  106</span> </div>
-<div class="line"><span class="lineno">  107</span>    <span class="comment">// Deduplicate plans by base/den pair.</span></div>
-<div class="line"><span class="lineno">  108</span>    std::vector&lt;std::pair&lt;std::vector&lt;int&gt;, <span class="keywordtype">int</span>&gt;&gt; unique_plans;</div>
-<div class="line"><span class="lineno">  109</span>    <span class="keywordflow">for</span> (<span class="keyword">auto</span> &amp;plan : plans) {</div>
-<div class="line"><span class="lineno">  110</span>        <span class="keywordtype">bool</span> found = <span class="keyword">false</span>;</div>
-<div class="line"><span class="lineno">  111</span>        <span class="keywordflow">for</span> (<span class="keyword">const</span> <span class="keyword">auto</span> &amp;existing : unique_plans) {</div>
-<div class="line"><span class="lineno">  112</span>            <span class="keywordflow">if</span> (existing.second == plan.second &amp;&amp; existing.first == plan.first) {</div>
-<div class="line"><span class="lineno">  113</span>                found = <span class="keyword">true</span>;</div>
-<div class="line"><span class="lineno">  114</span>                <span class="keywordflow">break</span>;</div>
-<div class="line"><span class="lineno">  115</span>            }</div>
-<div class="line"><span class="lineno">  116</span>        }</div>
-<div class="line"><span class="lineno">  117</span>        <span class="keywordflow">if</span> (found) <span class="keywordflow">continue</span>;</div>
-<div class="line"><span class="lineno">  118</span>        unique_plans.emplace_back(plan);</div>
-<div class="line"><span class="lineno">  119</span>        <span class="keyword">auto</span> perms = <a class="code hl_function" href="#acf8696478b8666472dbbc5267f76fd36">generateRuntimePermutations</a>(plan.first, plan.second);</div>
-<div class="line"><span class="lineno">  120</span>        allPerms.insert(allPerms.end(), perms.begin(), perms.end());</div>
-<div class="line"><span class="lineno">  121</span>    }</div>
-<div class="line"><span class="lineno">  122</span> </div>
-<div class="line"><span class="lineno">  123</span>    <span class="keywordflow">return</span> allPerms;</div>
-<div class="line"><span class="lineno">  124</span>}</div>
+<div class="line"><span class="lineno">  102</span>        plans.emplace_back(base, candidateSize);</div>
+<div class="line"><span class="lineno">  103</span>    }</div>
+<div class="line"><span class="lineno">  104</span> </div>
+<div class="line"><span class="lineno">  105</span>    <span class="keywordflow">if</span> (candidateSize &gt;= 4) {</div>
+<div class="line"><span class="lineno">  106</span>        <span class="keyword">auto</span> base = std::vector&lt;int&gt;(candidateSize, 1);</div>
+<div class="line"><span class="lineno">  107</span>        base[0]   = candidateSize - 2;</div>
+<div class="line"><span class="lineno">  108</span>        base[1]   = candidateSize - 2;</div>
+<div class="line"><span class="lineno">  109</span>        base[2]   = 2;</div>
+<div class="line"><span class="lineno">  110</span>        <span class="keywordflow">if</span> (candidateSize &gt;= 4) base[3] = 2;</div>
+<div class="line"><span class="lineno">  111</span>        plans.emplace_back(base, candidateSize - 1);</div>
+<div class="line"><span class="lineno">  112</span>        plans.emplace_back(base, candidateSize);</div>
+<div class="line"><span class="lineno">  113</span>    }</div>
+<div class="line"><span class="lineno">  114</span> </div>
+<div class="line"><span class="lineno">  115</span>    <span class="comment">// Deduplicate plans by base/den pair.</span></div>
+<div class="line"><span class="lineno">  116</span>    std::vector&lt;std::pair&lt;std::vector&lt;int&gt;, <span class="keywordtype">int</span>&gt;&gt; unique_plans;</div>
+<div class="line"><span class="lineno">  117</span>    <span class="keywordflow">for</span> (<span class="keyword">auto</span> &amp;plan : plans) {</div>
+<div class="line"><span class="lineno">  118</span>        <span class="keywordtype">bool</span> found = <span class="keyword">false</span>;</div>
+<div class="line"><span class="lineno">  119</span>        <span class="keywordflow">for</span> (<span class="keyword">const</span> <span class="keyword">auto</span> &amp;existing : unique_plans) {</div>
+<div class="line"><span class="lineno">  120</span>            <span class="keywordflow">if</span> (existing.second == plan.second &amp;&amp; existing.first == plan.first) {</div>
+<div class="line"><span class="lineno">  121</span>                found = <span class="keyword">true</span>;</div>
+<div class="line"><span class="lineno">  122</span>                <span class="keywordflow">break</span>;</div>
+<div class="line"><span class="lineno">  123</span>            }</div>
+<div class="line"><span class="lineno">  124</span>        }</div>
+<div class="line"><span class="lineno">  125</span>        <span class="keywordflow">if</span> (found) <span class="keywordflow">continue</span>;</div>
+<div class="line"><span class="lineno">  126</span>        unique_plans.emplace_back(plan);</div>
+<div class="line"><span class="lineno">  127</span>        <span class="keyword">auto</span> perms = <a class="code hl_function" href="#acf8696478b8666472dbbc5267f76fd36">generateRuntimePermutations</a>(plan.first, plan.second);</div>
+<div class="line"><span class="lineno">  128</span>        allPerms.insert(allPerms.end(), perms.begin(), perms.end());</div>
+<div class="line"><span class="lineno">  129</span>    }</div>
+<div class="line"><span class="lineno">  130</span> </div>
+<div class="line"><span class="lineno">  131</span>    <span class="keywordflow">return</span> allPerms;</div>
+<div class="line"><span class="lineno">  132</span>}</div>
 </div><!-- fragment --><div class="dynheader">
 Here is the call graph for this function:</div>
 <div class="dyncontent">
@@ -585,14 +587,14 @@ Here is the call graph for this function:</div>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="Helpers_8h_source.html#l00038">38</a> of file <a class="el" href="Helpers_8h_source.html">Helpers.h</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">   38</span>                                                                                                  {</div>
-<div class="line"><span class="lineno">   39</span>    std::vector&lt;SRCPermutation&gt; perms;</div>
-<div class="line"><span class="lineno">   40</span>    std::vector&lt;int&gt;            temp = base;</div>
-<div class="line"><span class="lineno">   41</span>    std::sort(temp.begin(), temp.end());</div>
-<div class="line"><span class="lineno">   42</span>    <span class="keywordflow">do</span> { perms.emplace_back(temp, den); } <span class="keywordflow">while</span> (std::next_permutation(temp.begin(), temp.end()));</div>
-<div class="line"><span class="lineno">   43</span>    <span class="keywordflow">return</span> perms;</div>
-<div class="line"><span class="lineno">   44</span>}</div>
+<p class="definition">Definition at line <a class="el" href="Helpers_8h_source.html#l00046">46</a> of file <a class="el" href="Helpers_8h_source.html">Helpers.h</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">   46</span>                                                                                                  {</div>
+<div class="line"><span class="lineno">   47</span>    std::vector&lt;SRCPermutation&gt; perms;</div>
+<div class="line"><span class="lineno">   48</span>    std::vector&lt;int&gt;            temp = base;</div>
+<div class="line"><span class="lineno">   49</span>    std::sort(temp.begin(), temp.end());</div>
+<div class="line"><span class="lineno">   50</span>    <span class="keywordflow">do</span> { perms.emplace_back(temp, den); } <span class="keywordflow">while</span> (std::next_permutation(temp.begin(), temp.end()));</div>
+<div class="line"><span class="lineno">   51</span>    <span class="keywordflow">return</span> perms;</div>
+<div class="line"><span class="lineno">   52</span>}</div>
 </div><!-- fragment -->
 </div>
 </div>

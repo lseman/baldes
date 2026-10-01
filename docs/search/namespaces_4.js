@@ -1,5 +1,4 @@
 var searchData=
 [
-  ['serializer_0',['serializer',['../namespaceserializer.html',1,'']]],
-  ['std_1',['std',['../namespacestd.html',1,'']]]
+  ['rank1_0',['rank1',['../namespacerank1.html',1,'']]]
 ];

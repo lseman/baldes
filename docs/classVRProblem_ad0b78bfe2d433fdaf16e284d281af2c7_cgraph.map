@@ -1,9 +1,11 @@
 <map id="VRProblem::cutHandler" name="VRProblem::cutHandler">
-<area shape="rect" id="Node000001" title=" " alt="" coords="5,55,162,80"/>
-<area shape="rect" id="Node000002" href="$classBNBNode.html#a87549f077f9e4d102ddec6acd2d88e8a" title=" " alt="" coords="210,5,355,31"/>
-<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="138,51,212,33,213,38,139,57"/>
-<area shape="rect" id="Node000003" href="$classBNBNode.html#a1bed7031f27bac7f4a80424438c5d5f6" title=" " alt="" coords="214,55,351,80"/>
-<area shape="poly" id="edge2_Node000001_Node000003" title=" " alt="" coords="162,65,198,65,198,70,162,70"/>
-<area shape="rect" id="Node000004" href="$classBNBNode.html#a48d9cceecef21fd2edaff2c9efc93e46" title=" " alt="" coords="220,104,344,130"/>
-<area shape="poly" id="edge3_Node000001_Node000004" title=" " alt="" coords="139,78,213,97,212,102,138,84"/>
+<area shape="rect" id="Node000001" title=" " alt="" coords="5,80,162,106"/>
+<area shape="rect" id="Node000002" href="$classBNBNode.html#a87549f077f9e4d102ddec6acd2d88e8a" title=" " alt="" coords="219,5,364,31"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="114,77,209,40,227,34,229,39,211,45,116,82"/>
+<area shape="rect" id="Node000003" href="$classBNBNode.html#a1bed7031f27bac7f4a80424438c5d5f6" title=" " alt="" coords="223,55,360,80"/>
+<area shape="poly" id="edge2_Node000001_Node000003" title=" " alt="" coords="161,81,206,75,207,80,162,86"/>
+<area shape="rect" id="Node000004" href="$classBNBNode.html#a48d9cceecef21fd2edaff2c9efc93e46" title=" " alt="" coords="229,104,354,130"/>
+<area shape="poly" id="edge3_Node000001_Node000004" title=" " alt="" coords="162,99,214,105,213,111,162,104"/>
+<area shape="rect" id="Node000005" href="$structbaldes_1_1bcp_1_1PricingState.html#a2a55976ba8bfeb24eeaba63d4a09eb8b" title=" " alt="" coords="210,154,373,194"/>
+<area shape="poly" id="edge4_Node000001_Node000005" title=" " alt="" coords="120,104,224,145,222,150,118,109"/>
 </map>

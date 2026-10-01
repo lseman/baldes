@@ -35,12 +35,13 @@ var searchData=
   ['fw_5fc_5fbar_32',['fw_c_bar',['../classBucketGraph.html#a2ad2f263fc468798163873408972df73',1,'BucketGraph']]],
   ['fw_5ffixed_5fbuckets_5fbitmap_33',['fw_fixed_buckets_bitmap',['../classBucketGraph.html#a8e279c08b248c529a0efec509e8a5a47',1,'BucketGraph']]],
   ['fw_5fjump_5farcs_34',['fw_jump_arcs',['../structVRPNode.html#a3713ad736eef75a84914e2392008c8b4',1,'VRPNode::fw_jump_arcs'],['../structBucket.html#ad47a855fcbffbff425c9f6fd4082521c',1,'Bucket::fw_jump_arcs']]],
-  ['fw_5fordered_5fsccs_35',['fw_ordered_sccs',['../classBucketGraph.html#accf4e37b839073ff25d96f21d597241c',1,'BucketGraph']]],
-  ['fw_5frc2_5fbin_36',['fw_rc2_bin',['../classBucketGraph.html#adf9a1fd0a5ea0454f1f7bef19640bf57',1,'BucketGraph']]],
-  ['fw_5frc2_5ftill_5fthis_5fbin_37',['fw_rc2_till_this_bin',['../classBucketGraph.html#ab598954abeb48ebc5f5cc8f300e2dfe2',1,'BucketGraph']]],
-  ['fw_5fsccs_38',['fw_sccs',['../classBucketGraph.html#a3b02edcfecd793303cd6a248e4f88b8f',1,'BucketGraph']]],
-  ['fw_5fsccs_5fsorted_39',['fw_sccs_sorted',['../classBucketGraph.html#ac287ad78f9bc8de787196b4abbc88a57',1,'BucketGraph']]],
-  ['fw_5ftopological_5forder_40',['fw_topological_order',['../classBucketGraph.html#a54765fb92f241628a510eb63571c22a2',1,'BucketGraph']]],
-  ['fw_5funion_5ffind_41',['fw_union_find',['../classBucketGraph.html#a077e9ffa43523f437f55703fcae4a5b5',1,'BucketGraph']]],
-  ['fw_5fwarm_5flabels_42',['fw_warm_labels',['../classBucketGraph.html#a2806219a37d9156573869792f468834a',1,'BucketGraph']]]
+  ['fw_5flabeling_5fscratch_35',['fw_labeling_scratch',['../classBucketGraph.html#a79c4819700f70621d7b3426c307ea6fa',1,'BucketGraph']]],
+  ['fw_5fordered_5fsccs_36',['fw_ordered_sccs',['../classBucketGraph.html#accf4e37b839073ff25d96f21d597241c',1,'BucketGraph']]],
+  ['fw_5frc2_5fbin_37',['fw_rc2_bin',['../classBucketGraph.html#adf9a1fd0a5ea0454f1f7bef19640bf57',1,'BucketGraph']]],
+  ['fw_5frc2_5ftill_5fthis_5fbin_38',['fw_rc2_till_this_bin',['../classBucketGraph.html#ab598954abeb48ebc5f5cc8f300e2dfe2',1,'BucketGraph']]],
+  ['fw_5fsccs_39',['fw_sccs',['../classBucketGraph.html#a3b02edcfecd793303cd6a248e4f88b8f',1,'BucketGraph']]],
+  ['fw_5fsccs_5fsorted_40',['fw_sccs_sorted',['../classBucketGraph.html#ac287ad78f9bc8de787196b4abbc88a57',1,'BucketGraph']]],
+  ['fw_5ftopological_5forder_41',['fw_topological_order',['../classBucketGraph.html#a54765fb92f241628a510eb63571c22a2',1,'BucketGraph']]],
+  ['fw_5funion_5ffind_42',['fw_union_find',['../classBucketGraph.html#a077e9ffa43523f437f55703fcae4a5b5',1,'BucketGraph']]],
+  ['fw_5fwarm_5flabels_43',['fw_warm_labels',['../classBucketGraph.html#a2806219a37d9156573869792f468834a',1,'BucketGraph']]]
 ];

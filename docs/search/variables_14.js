@@ -31,8 +31,9 @@ var searchData=
   ['topheurroutes_28',['topHeurRoutes',['../classBucketGraph.html#a45a2da1c51413ab2df16bf3745fcf03b',1,'BucketGraph']]],
   ['total_5finstances_29',['total_instances',['../structHGSArcStats.html#a35c5572bf144ceac7c63df982606cb57',1,'HGSArcStats']]],
   ['total_5fviolation_30',['total_violation',['../structCut.html#a50d14e0fb2f30f2cf1af3babbc986dc8',1,'Cut']]],
-  ['track_5fid_31',['track_id',['../structVRPNode.html#ab39361c6fb7a3f6bdaf2da221bdb53e4',1,'VRPNode']]],
-  ['transition_32',['transition',['../classBucketGraph.html#aa5f44a67587b3c2ff92903e0a824a233',1,'BucketGraph']]],
-  ['travel_5fcost_33',['travel_cost',['../structInstanceData.html#a2d7a88f1829fac29ef9532f25dc73c19',1,'InstanceData']]],
-  ['type_34',['type',['../structCut.html#a12620a88df0401c51546480bc72a972c',1,'Cut::type'],['../structActiveCutInfo.html#ac61f5b9ac2602ada5afb5e9b90b443f6',1,'ActiveCutInfo::type'],['../structInstanceData.html#a54e32060ae88db98ab124ba90be339e2',1,'InstanceData::type']]]
+  ['touched_5fsegments_31',['touched_segments',['../structBucketGraph_1_1LabelingScratch.html#a8526bd5a5f681fe13b64f7e5f800da1a',1,'BucketGraph::LabelingScratch']]],
+  ['track_5fid_32',['track_id',['../structVRPNode.html#ab39361c6fb7a3f6bdaf2da221bdb53e4',1,'VRPNode']]],
+  ['transition_33',['transition',['../classBucketGraph.html#aa5f44a67587b3c2ff92903e0a824a233',1,'BucketGraph']]],
+  ['travel_5fcost_34',['travel_cost',['../structInstanceData.html#a2d7a88f1829fac29ef9532f25dc73c19',1,'InstanceData']]],
+  ['type_35',['type',['../structCut.html#a12620a88df0401c51546480bc72a972c',1,'Cut::type'],['../structActiveCutInfo.html#ac61f5b9ac2602ada5afb5e9b90b443f6',1,'ActiveCutInfo::type'],['../structInstanceData.html#a54e32060ae88db98ab124ba90be339e2',1,'InstanceData::type']]]
 ];

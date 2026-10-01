@@ -1,7 +1,7 @@
 var classVRProblem =
 [
     [ "PricingStateMachine", "classVRProblem.html#a4468fad24f6c09eb2dccba34d10f17da", null ],
-    [ "addColumn", "classVRProblem.html#a8733143588a45e28aea2b373aff90518", null ],
+    [ "addColumn", "classVRProblem.html#a6c995ecdb06c9b002b586bc65ba16ce2", null ],
     [ "addPath", "classVRProblem.html#a1cc5b34867354d8072feaab73eacecc6", null ],
     [ "applyDeluxingReduction", "classVRProblem.html#a047ed3f922df7ddbc0f4e01cf70ff1f4", null ],
     [ "blue_text", "classVRProblem.html#a61b5e5832a71fe88db990aee2427dcb0", null ],

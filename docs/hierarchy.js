@@ -67,6 +67,7 @@ var hierarchy =
     [ "Knapsack", "classKnapsack.html", null ],
     [ "Label", "structLabel.html", null ],
     [ "LabelComparator", "classLabelComparator.html", null ],
+    [ "BucketGraph::LabelingScratch", "structBucketGraph_1_1LabelingScratch.html", null ],
     [ "LabelPool", "classLabelPool.html", null ],
     [ "LimitedMemoryRank1Cuts", "classLimitedMemoryRank1Cuts.html", null ],
     [ "LinearExpression", "classLinearExpression.html", null ],

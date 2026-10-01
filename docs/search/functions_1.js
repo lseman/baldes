@@ -25,7 +25,7 @@ var searchData=
   ['addchildren_22',['addChildren',['../classBNBNode.html#a5fe96f9b26428400192229a7afd1e5a1',1,'BNBNode']]],
   ['addclique_23',['addClique',['../classCliqueManager.html#a2ce4eabbc924afc0f83b1ea8a7dd9a79',1,'CliqueManager']]],
   ['addcliquefromindex_24',['addCliqueFromIndex',['../classCliqueManager.html#af6feb059bb0affcfdefacac81773c7a8',1,'CliqueManager']]],
-  ['addcolumn_25',['addColumn',['../classVRProblem.html#a8733143588a45e28aea2b373aff90518',1,'VRProblem']]],
+  ['addcolumn_25',['addColumn',['../classVRProblem.html#a6c995ecdb06c9b002b586bc65ba16ce2',1,'VRProblem']]],
   ['addconstr_26',['addConstr',['../classBNBNode.html#a87549f077f9e4d102ddec6acd2d88e8a',1,'BNBNode']]],
   ['addcut_27',['addCut',['../classRCCManager.html#aa093c81a780ec54f1ad5e987cee2e4bb',1,'RCCManager::addCut()'],['../classCutStorage.html#a3735d9b48983d730a9386d90c3615c2b',1,'CutStorage::addCut()']]],
   ['addcuttocutstorage_28',['addCutToCutStorage',['../classHighRankCuts.html#ac2cea18dd517033c3ffa62dadaa131c6',1,'HighRankCuts']]],

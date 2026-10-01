@@ -1,5 +1,10 @@
 var NAVTREEINDEX4 =
 {
+"classGenericParameters.html#a116f4649e15f53707120e04b5e854b37":[2,0,38,1],
+"classGenericParameters.html#a3a50c866b26f72ce2943a3c1fc69dec7":[2,0,38,0],
+"classGurobiEnvSingleton.html":[2,0,40],
+"classGurobiEnvSingleton.html#a538f4ba817861d916db888ec881c1375":[2,0,40,0],
+"classGurobiEnvSingleton.html#ad855b5fc2f045b0defba55c54f73d69d":[2,0,40,1],
 "classGurobiSolver.html":[2,0,41],
 "classGurobiSolver.html#a1f917da913afe75da3589a68d86497b6":[2,0,41,6],
 "classGurobiSolver.html#a21a44eabb88c01784f3abbb4ca4cec48":[2,0,41,5],
@@ -244,10 +249,5 @@ var NAVTREEINDEX4 =
 "classMIPProblem.html#a18aba4d0a3155090b501ddb72b07a6d1":[2,0,62,35],
 "classMIPProblem.html#a29674f674d7f14b118a031cdf734611e":[2,0,62,27],
 "classMIPProblem.html#a2d45a20f806ee2ede27d9c575758e5d5":[2,0,62,32],
-"classMIPProblem.html#a365e22d38b1af83a16a066d4824ba6aa":[2,0,62,28],
-"classMIPProblem.html#a37ce4a12d22bbe71ffb41b7e45e0c724":[2,0,62,3],
-"classMIPProblem.html#a387290a4a6716a8d3db8453d8e20391b":[2,0,62,38],
-"classMIPProblem.html#a38c9f38202c52c5aad1e0a65ac494b7c":[2,0,62,4],
-"classMIPProblem.html#a39fa579848d8e934a5c8ec171bbe320f":[2,0,62,10],
-"classMIPProblem.html#a3c9bda86e4e32dac4ee7d036fef442d3":[2,0,62,2]
+"classMIPProblem.html#a365e22d38b1af83a16a066d4824ba6aa":[2,0,62,28]
 };

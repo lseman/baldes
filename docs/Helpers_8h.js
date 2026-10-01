@@ -10,6 +10,7 @@ var Helpers_8h =
     [ "generateExactPermutations", "Helpers_8h.html#a6e2d376e10d40865f9a079e6bef1501f", null ],
     [ "generateGeneticPermutations", "Helpers_8h.html#ae16f85cab7674f93b1e3171dbe907d20", null ],
     [ "generateRuntimePermutations", "Helpers_8h.html#acf8696478b8666472dbbc5267f76fd36", null ],
+    [ "rank1::rank3_floor_coefficient_delta", "namespacerank1.html#a92f7b85e4856d3650d38bc116eda77ee", null ],
     [ "LocalSearchConfig::BASE_ACCEPTANCE_RATE", "namespaceLocalSearchConfig.html#a1a2a5a1b469f691b4dba73c5d527640b", null ],
     [ "LocalSearchConfig::COOLING_RATE", "namespaceLocalSearchConfig.html#ace0fb227a2896806352c30ac8426cfd7", null ],
     [ "LocalSearchConfig::DIVERSITY_THRESHOLD", "namespaceLocalSearchConfig.html#a2ca101e95b7f7eafff4ae62a9704dee7", null ],
