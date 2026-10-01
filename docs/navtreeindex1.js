@@ -1,5 +1,6 @@
 var NAVTREEINDEX1 =
 {
+"MIPHandler_8cpp.html#a7e5612b25a3d47693efce8e02e5ef7ef":[3,0,1,4,0,7],
 "MIPHandler_8cpp.html#ab2da79ce4ff759ca019a349b492dfb4f":[3,0,1,4,0,5],
 "MIPHandler_8cpp.html#acfc4ad63eb7ee2fd8fb63d33adfc8a8b":[3,0,1,4,0,4],
 "MIPHandler_8cpp.html#aec665b2ab1203ce33949c414d91f9477":[3,0,1,4,0,0],
@@ -248,6 +249,5 @@ var NAVTREEINDEX1 =
 "classBNBNode.html#ab26854ae1b9ba9f1724f5fe37ede0bee":[2,0,15,68],
 "classBNBNode.html#ab26a40d1d6e588f0a4e7ffaaa6e103b4":[2,0,15,53],
 "classBNBNode.html#ab885178fe3620191190f1b166016b7c5":[2,0,15,59],
-"classBNBNode.html#abb76f5afa8990290b262a0750cede865":[2,0,15,45],
-"classBNBNode.html#ac41203309dbd1e03322b6f56a4abf776":[2,0,15,77]
+"classBNBNode.html#abb76f5afa8990290b262a0750cede865":[2,0,15,45]
 };

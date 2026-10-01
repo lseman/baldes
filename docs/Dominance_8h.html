@@ -305,6 +305,9 @@ Functions</h2></td></tr>
 <tr class="memitem:a213235db52620273b153f896e3db45df template"><td class="memItemLeft">std::experimental::simd&lt; T &gt;&#160;</td><td class="memItemRight"><a class="el" href="#a213235db52620273b153f896e3db45df">load_simd_direct</a> (const std::array&lt; T, N &gt; &amp;source, size_t simd_size) noexcept</td></tr>
 <tr class="memitem:a3a6eac6d6207e8db8b12f76732c242eb" id="r_a3a6eac6d6207e8db8b12f76732c242eb"><td class="memTemplParams" colspan="2">template&lt;<a class="el" href="Definitions_8h.html#a224b9163917ac32fc95a60d8c1eec3aa">Direction</a> D, <a class="el" href="Definitions_8h.html#aca8133200c1122e29b87b314d82604eb">Stage</a> S&gt; </td></tr>
 <tr class="memitem:a3a6eac6d6207e8db8b12f76732c242eb template"><td class="memItemLeft">bool&#160;</td><td class="memItemRight"><a class="el" href="#a3a6eac6d6207e8db8b12f76732c242eb">check_dominance_against_vector</a> (const <a class="el" href="structLabel.html">Label</a> *__restrict__ new_label, std::span&lt; <a class="el" href="structLabel.html">Label</a> *const &gt; labels, const <a class="el" href="classCutStorage.html">CutStorage</a> *__restrict__ cut_storage, uint &amp;__restrict__ stat_n_dom) noexcept</td></tr>
+<tr class="memitem:adfdbd69baf9b7b4111717bb5819102be" id="r_adfdbd69baf9b7b4111717bb5819102be"><td class="memTemplParams" colspan="2">template&lt;<a class="el" href="Definitions_8h.html#a224b9163917ac32fc95a60d8c1eec3aa">Direction</a> D, <a class="el" href="Definitions_8h.html#aca8133200c1122e29b87b314d82604eb">Stage</a> S, size_t BATCH_SIZE&gt; </td></tr>
+<tr class="memitem:adfdbd69baf9b7b4111717bb5819102be template"><td class="memItemLeft">bool&#160;</td><td class="memItemRight"><a class="el" href="#adfdbd69baf9b7b4111717bb5819102be">check_dominance_batch</a> (const <a class="el" href="structLabel.html">Label</a> *__restrict__ batch_labels[BATCH_SIZE], std::span&lt; <a class="el" href="structLabel.html">Label</a> *const &gt; labels, const <a class="el" href="classCutStorage.html">CutStorage</a> *__restrict__ cut_storage, uint &amp;__restrict__ stat_n_dom) noexcept</td></tr>
+<tr class="memdesc:adfdbd69baf9b7b4111717bb5819102be"><td class="mdescLeft">&#160;</td><td class="mdescRight">Batch dominance check: test B new_labels against the same set of existing labels.  <br /></td></tr>
 </table>
 <a name="doc-typedef-members" id="doc-typedef-members"></a><h2 id="header-doc-typedef-members" class="groupheader">Typedef Documentation</h2>
 <a id="a124033749d81a3bc4fb2417df78f3d45" name="a124033749d81a3bc4fb2417df78f3d45"></a>
@@ -747,6 +750,145 @@ Here is the call graph for this function:</div>
 <area shape="poly" title=" " alt="" coords="181,101,214,105,213,110,181,106"/>
 <area shape="rect" href="namespacenumericutils.html#af55fcfd2b05fe5a20796069445c89aef" title=" " alt="" coords="236,153,340,179"/>
 <area shape="poly" title=" " alt="" coords="150,111,238,145,236,150,148,116"/>
+</map>
+</div>
+
+</div>
+</div>
+<a id="adfdbd69baf9b7b4111717bb5819102be" name="adfdbd69baf9b7b4111717bb5819102be"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#adfdbd69baf9b7b4111717bb5819102be">&#9670;&#160;</a></span>check_dominance_batch()</h2>
+
+<div class="memitem">
+<div class="memproto">
+<div class="memtemplate">
+template&lt;<a class="el" href="Definitions_8h.html#a224b9163917ac32fc95a60d8c1eec3aa">Direction</a> D, <a class="el" href="Definitions_8h.html#aca8133200c1122e29b87b314d82604eb">Stage</a> S, size_t BATCH_SIZE&gt; </div>
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">bool check_dominance_batch </td>
+          <td>(</td>
+          <td class="paramtype">const <a class="el" href="structLabel.html">Label</a> *__restrict__</td>          <td class="paramname"><span class="paramname"><em>batch_labels</em></span>[BATCH_SIZE], </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">std::span&lt; <a class="el" href="structLabel.html">Label</a> *const &gt;</td>          <td class="paramname"><span class="paramname"><em>labels</em></span>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const <a class="el" href="classCutStorage.html">CutStorage</a> *__restrict__</td>          <td class="paramname"><span class="paramname"><em>cut_storage</em></span>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">uint &amp;__restrict__</td>          <td class="paramname"><span class="paramname"><em>stat_n_dom</em></span>&#160;)</td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel inline">inline</span><span class="mlabel noexcept">noexcept</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+<p>Batch dominance check: test B new_labels against the same set of existing labels. </p>
+<p>Uses SIMD to compare multiple new_labels' costs/resources/visited against each existing label in parallel. Returns true if ANY new_label is dominated by an existing label.</p>
+<p>Batch size is encoded in the template parameter BATCH_SIZE (typically 4 or 8). </p>
+
+<p class="definition">Definition at line <a class="el" href="Dominance_8h_source.html#l00438">438</a> of file <a class="el" href="Dominance_8h_source.html">Dominance.h</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  441</span>                                                                          {</div>
+<div class="line"><span class="lineno">  442</span>    <span class="keyword">using namespace </span>std::experimental;</div>
+<div class="line"><span class="lineno">  443</span> </div>
+<div class="line"><span class="lineno">  444</span>    <span class="keyword">constexpr</span> <span class="keywordtype">double</span>   tolerance  = <a class="code hl_variable" href="namespacenumericutils.html#adaf310759d56f0e70fb4b325dbefc809">numericutils::eps</a>;</div>
+<div class="line"><span class="lineno">  445</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span>       num_labels = labels.size();</div>
+<div class="line"><span class="lineno">  446</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span>       simd_width = simd&lt;double&gt;::size();</div>
+<div class="line"><span class="lineno">  447</span> </div>
+<div class="line"><span class="lineno">  448</span>    <span class="comment">// Pre-load batch costs and resources into SIMD-friendly arrays.</span></div>
+<div class="line"><span class="lineno">  449</span>    <span class="keyword">alignas</span>(64) std::array&lt;double, BATCH_SIZE&gt; batch_costs;</div>
+<div class="line"><span class="lineno">  450</span>    <span class="keyword">alignas</span>(64) std::array&lt;std::array&lt;double, R_SIZE&gt;, BATCH_SIZE&gt; batch_resources;</div>
+<div class="line"><span class="lineno">  451</span>    <span class="keyword">alignas</span>(64) std::array&lt;std::array&lt;uint64_t, Label::bitmap_words&gt;, BATCH_SIZE&gt; batch_visited;</div>
+<div class="line"><span class="lineno">  452</span> </div>
+<div class="line"><span class="lineno">  453</span>    <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> b = 0; b &lt; BATCH_SIZE; ++b) {</div>
+<div class="line"><span class="lineno">  454</span>        <span class="keywordflow">if</span> (!batch_labels[b]) {</div>
+<div class="line"><span class="lineno">  455</span>            batch_costs[b] = std::numeric_limits&lt;double&gt;::max();</div>
+<div class="line"><span class="lineno">  456</span>            <span class="keywordflow">continue</span>;</div>
+<div class="line"><span class="lineno">  457</span>        }</div>
+<div class="line"><span class="lineno">  458</span>        batch_costs[b] = batch_labels[b]-&gt;<a class="code hl_variable" href="structLabel.html#a1da1930412e730692277e75a94da77c2">cost</a>;</div>
+<div class="line"><span class="lineno">  459</span>        <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> r = 0; r &lt; R_SIZE; ++r) batch_resources[b][r] = batch_labels[b]-&gt;resources[r];</div>
+<div class="line"><span class="lineno">  460</span>        <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> w = 0; w &lt; <a class="code hl_variable" href="structLabel.html#a9077809d83373a924b5397925f40ab07">Label::bitmap_words</a>; ++w) batch_visited[b][w] = batch_labels[b]-&gt;visited_bitmap[w];</div>
+<div class="line"><span class="lineno">  461</span>    }</div>
+<div class="line"><span class="lineno">  462</span> </div>
+<div class="line"><span class="lineno">  463</span>    <span class="comment">// Process existing labels in SIMD-width chunks</span></div>
+<div class="line"><span class="lineno">  464</span>    <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> i = 0; i &lt; num_labels; ++i) {</div>
+<div class="line"><span class="lineno">  465</span>        <span class="keyword">const</span> <a class="code hl_struct" href="structLabel.html">Label</a> *label = labels[i];</div>
+<div class="line"><span class="lineno">  466</span>        <span class="keywordflow">if</span> (__builtin_expect(label-&gt;<a class="code hl_variable" href="structLabel.html#af36e4bfda4b5544e93ae446a31a49e7d">is_dominated</a>, 1)) <span class="keywordflow">continue</span>;</div>
+<div class="line"><span class="lineno">  467</span> </div>
+<div class="line"><span class="lineno">  468</span>        <span class="comment">// Cost check: existing label dominates new_label b if label-&gt;cost &lt;= batch_costs[b]</span></div>
+<div class="line"><span class="lineno">  469</span>        <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> b = 0; b &lt; BATCH_SIZE; ++b) {</div>
+<div class="line"><span class="lineno">  470</span>            <span class="keywordflow">if</span> (!batch_labels[b]) <span class="keywordflow">continue</span>;</div>
+<div class="line"><span class="lineno">  471</span>            <span class="keywordflow">if</span> (<a class="code hl_function" href="namespacenumericutils.html#aaadab3c8a1b76df1e09c11ebaa3d1e49">numericutils::gt</a>(label-&gt;<a class="code hl_variable" href="structLabel.html#a1da1930412e730692277e75a94da77c2">cost</a>, batch_costs[b])) <span class="keywordflow">continue</span>;</div>
+<div class="line"><span class="lineno">  472</span> </div>
+<div class="line"><span class="lineno">  473</span>            <span class="keywordtype">bool</span> dominated = <span class="keyword">true</span>;</div>
+<div class="line"><span class="lineno">  474</span> </div>
+<div class="line"><span class="lineno">  475</span>            <span class="comment">// Resource check</span></div>
+<div class="line"><span class="lineno">  476</span>            <span class="keywordflow">if</span> <span class="keyword">constexpr</span> (R_SIZE &gt;= 2) {</div>
+<div class="line"><span class="lineno">  477</span>                <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> r = 1; r &lt; R_SIZE; ++r) {</div>
+<div class="line"><span class="lineno">  478</span>                    <span class="keywordflow">if</span> <span class="keyword">constexpr</span> (D == <a class="code hl_enumvalue" href="Definitions_8h.html#a224b9163917ac32fc95a60d8c1eec3aaa67d2f6740a8eaebf4d5c6f79be8da481">Direction::Forward</a>) {</div>
+<div class="line"><span class="lineno">  479</span>                        <span class="keywordflow">if</span> (__builtin_expect(<a class="code hl_function" href="namespacenumericutils.html#aaadab3c8a1b76df1e09c11ebaa3d1e49">numericutils::gt</a>(label-&gt;<a class="code hl_variable" href="structLabel.html#a5f792e9fa27a10dd13bd4622b1a3044b">resources</a>[r], batch_resources[b][r]), 0)) {</div>
+<div class="line"><span class="lineno">  480</span>                            dominated = <span class="keyword">false</span>; <span class="keywordflow">break</span>;</div>
+<div class="line"><span class="lineno">  481</span>                        }</div>
+<div class="line"><span class="lineno">  482</span>                    } <span class="keywordflow">else</span> {</div>
+<div class="line"><span class="lineno">  483</span>                        <span class="keywordflow">if</span> (__builtin_expect(<a class="code hl_function" href="namespacenumericutils.html#af55fcfd2b05fe5a20796069445c89aef">numericutils::lt</a>(label-&gt;<a class="code hl_variable" href="structLabel.html#a5f792e9fa27a10dd13bd4622b1a3044b">resources</a>[r], batch_resources[b][r]), 0)) {</div>
+<div class="line"><span class="lineno">  484</span>                            dominated = <span class="keyword">false</span>; <span class="keywordflow">break</span>;</div>
+<div class="line"><span class="lineno">  485</span>                        }</div>
+<div class="line"><span class="lineno">  486</span>                    }</div>
+<div class="line"><span class="lineno">  487</span>                }</div>
+<div class="line"><span class="lineno">  488</span>            }</div>
+<div class="line"><span class="lineno">  489</span>            <span class="keywordflow">if</span> (dominated &amp;&amp; R_SIZE &gt; 0) {</div>
+<div class="line"><span class="lineno">  490</span>                <span class="keywordflow">if</span> <span class="keyword">constexpr</span> (D == <a class="code hl_enumvalue" href="Definitions_8h.html#a224b9163917ac32fc95a60d8c1eec3aaa67d2f6740a8eaebf4d5c6f79be8da481">Direction::Forward</a>) {</div>
+<div class="line"><span class="lineno">  491</span>                    <span class="keywordflow">if</span> (__builtin_expect(<a class="code hl_function" href="namespacenumericutils.html#aaadab3c8a1b76df1e09c11ebaa3d1e49">numericutils::gt</a>(label-&gt;<a class="code hl_variable" href="structLabel.html#a5f792e9fa27a10dd13bd4622b1a3044b">resources</a>[0], batch_resources[b][0]), 0)) {</div>
+<div class="line"><span class="lineno">  492</span>                        dominated = <span class="keyword">false</span>;</div>
+<div class="line"><span class="lineno">  493</span>                    }</div>
+<div class="line"><span class="lineno">  494</span>                } <span class="keywordflow">else</span> {</div>
+<div class="line"><span class="lineno">  495</span>                    <span class="keywordflow">if</span> (__builtin_expect(<a class="code hl_function" href="namespacenumericutils.html#af55fcfd2b05fe5a20796069445c89aef">numericutils::lt</a>(label-&gt;<a class="code hl_variable" href="structLabel.html#a5f792e9fa27a10dd13bd4622b1a3044b">resources</a>[0], batch_resources[b][0]), 0)) {</div>
+<div class="line"><span class="lineno">  496</span>                        dominated = <span class="keyword">false</span>;</div>
+<div class="line"><span class="lineno">  497</span>                    }</div>
+<div class="line"><span class="lineno">  498</span>                }</div>
+<div class="line"><span class="lineno">  499</span>            }</div>
+<div class="line"><span class="lineno">  500</span>            <span class="keywordflow">if</span> (!dominated) <span class="keywordflow">continue</span>;</div>
+<div class="line"><span class="lineno">  501</span> </div>
+<div class="line"><span class="lineno">  502</span>            <span class="comment">// Visited check</span></div>
+<div class="line"><span class="lineno">  503</span>            <span class="keywordflow">if</span> <span class="keyword">constexpr</span> (S == <a class="code hl_enumvalue" href="Definitions_8h.html#aca8133200c1122e29b87b314d82604ebaca8a2087e5557e317599344687a57391">Stage::Three</a> || S == <a class="code hl_enumvalue" href="Definitions_8h.html#aca8133200c1122e29b87b314d82604eba981b8fcee42e1e726a67a2b9a98ea6e9">Stage::Four</a> || S == <a class="code hl_enumvalue" href="Definitions_8h.html#aca8133200c1122e29b87b314d82604eba81999728593fbd0249e73b02f3d7ad74">Stage::Enumerate</a>) {</div>
+<div class="line"><span class="lineno">  504</span>                <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> w = 0; w &lt; <a class="code hl_variable" href="structLabel.html#a9077809d83373a924b5397925f40ab07">Label::bitmap_words</a>; ++w) {</div>
+<div class="line"><span class="lineno">  505</span>                    <span class="keywordflow">if</span> ((label-&gt;<a class="code hl_variable" href="structLabel.html#ac5629d8044403e1ba299dbffb0e49247">visited_bitmap</a>[w] &amp; batch_visited[b][w]) != batch_visited[b][w]) {</div>
+<div class="line"><span class="lineno">  506</span>                        dominated = <span class="keyword">false</span>; <span class="keywordflow">break</span>;</div>
+<div class="line"><span class="lineno">  507</span>                    }</div>
+<div class="line"><span class="lineno">  508</span>                }</div>
+<div class="line"><span class="lineno">  509</span>            }</div>
+<div class="line"><span class="lineno">  510</span>            <span class="keywordflow">if</span> (!dominated) <span class="keywordflow">continue</span>;</div>
+<div class="line"><span class="lineno">  511</span> </div>
+<div class="line"><span class="lineno">  512</span>            <span class="comment">// If we reach here, existing label dominates batch_labels[b]</span></div>
+<div class="line"><span class="lineno">  513</span>            stat_n_dom++;</div>
+<div class="line"><span class="lineno">  514</span>            <span class="keywordflow">return</span> <span class="keyword">true</span>;</div>
+<div class="line"><span class="lineno">  515</span>        }</div>
+<div class="line"><span class="lineno">  516</span>    }</div>
+<div class="line"><span class="lineno">  517</span> </div>
+<div class="line"><span class="lineno">  518</span>    <span class="keywordflow">return</span> <span class="keyword">false</span>;</div>
+<div class="line"><span class="lineno">  519</span>}</div>
+<div class="ttc" id="astructLabel_html_a9077809d83373a924b5397925f40ab07"><div class="ttname"><a href="structLabel.html#a9077809d83373a924b5397925f40ab07">Label::bitmap_words</a></div><div class="ttdeci">static constexpr std::size_t bitmap_words</div><div class="ttdef"><b>Definition</b> <a href="Label_8h_source.html#l00207">Label.h:207</a></div></div>
+</div><!-- fragment --><div class="dynheader">
+Here is the call graph for this function:</div>
+<div class="dyncontent">
+<div class="center"><img src="Dominance_8h_adfdbd69baf9b7b4111717bb5819102be_cgraph.png" border="0" usemap="#aDominance_8h_adfdbd69baf9b7b4111717bb5819102be_cgraph" loading="lazy" alt=""/></div>
+<map name="aDominance_8h_adfdbd69baf9b7b4111717bb5819102be_cgraph" id="aDominance_8h_adfdbd69baf9b7b4111717bb5819102be_cgraph">
+<area shape="rect" title="Batch dominance check: test B new_labels against the same set of existing labels." alt="" coords="5,31,171,56"/>
+<area shape="rect" href="namespacenumericutils.html#aaadab3c8a1b76df1e09c11ebaa3d1e49" title=" " alt="" coords="219,5,327,31"/>
+<area shape="poly" title=" " alt="" coords="170,30,203,25,204,30,171,35"/>
+<area shape="rect" href="namespacenumericutils.html#af55fcfd2b05fe5a20796069445c89aef" title=" " alt="" coords="221,55,325,80"/>
+<area shape="poly" title=" " alt="" coords="171,52,206,56,205,61,170,57"/>
 </map>
 </div>
 

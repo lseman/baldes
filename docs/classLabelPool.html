@@ -145,7 +145,7 @@ Public Member Functions</h2></td></tr>
 </table>
 <a name="details" id="details"></a><h2 id="header-details" class="groupheader">Detailed Description</h2>
 <div class="textblock"><p>A highly optimized pool manager for <a class="el" href="structLabel.html" title="Represents a label used in a solver.">Label</a> objects. </p>
-<p>The <a class="el" href="classLabelPool.html" title="A highly optimized pool manager for Label objects.">LabelPool</a> class manages a pool of <a class="el" href="structLabel.html" title="Represents a label used in a solver.">Label</a> objects with optimized allocation and reuse strategies. It uses block-based allocation and fast pointer management for minimal overhead. </p>
+<p>The <a class="el" href="classLabelPool.html" title="A highly optimized pool manager for Label objects.">LabelPool</a> class manages a pool of <a class="el" href="structLabel.html" title="Represents a label used in a solver.">Label</a> objects with optimized allocation and reuse strategies. It pre-allocates all blocks at construction time, eliminating malloc overhead during the hot labeling loop. </p>
 
 <p class="definition">Definition at line <a class="el" href="Pools_8h_source.html#l00150">150</a> of file <a class="el" href="Pools_8h_source.html">Pools.h</a>.</p>
 </div><a name="doc-constructors" id="doc-constructors"></a><h2 id="header-doc-constructors" class="groupheader">Constructor &amp; Destructor Documentation</h2>
@@ -176,8 +176,12 @@ Public Member Functions</h2></td></tr>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="Pools_8h_source.html#l00183">183</a> of file <a class="el" href="Pools_8h_source.html">Pools.h</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  184</span>        : max_pool_size(std::max(initial_pool_size, max_pool_size)), bucket_arenas(1) {}</div>
+<p class="definition">Definition at line <a class="el" href="Pools_8h_source.html#l00191">191</a> of file <a class="el" href="Pools_8h_source.html">Pools.h</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  192</span>        : max_pool_size(std::max(initial_pool_size, max_pool_size)), bucket_arenas(1) {</div>
+<div class="line"><span class="lineno">  193</span>        <span class="comment">// Pre-allocate half the max pool size at construction — eliminates all</span></div>
+<div class="line"><span class="lineno">  194</span>        <span class="comment">// malloc calls during the hot labeling loop.</span></div>
+<div class="line"><span class="lineno">  195</span>        preallocate(max_pool_size / 2);</div>
+<div class="line"><span class="lineno">  196</span>    }</div>
 </div><!-- fragment -->
 </div>
 </div>
@@ -204,9 +208,9 @@ Public Member Functions</h2></td></tr>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="Pools_8h_source.html#l00258">258</a> of file <a class="el" href="Pools_8h_source.html">Pools.h</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  258</span>{ <a class="code hl_function" href="#afe79f22c22ae0c67e8feb3817ecd1916">cleanup</a>(); }</div>
-<div class="ttc" id="aclassLabelPool_html_afe79f22c22ae0c67e8feb3817ecd1916"><div class="ttname"><a href="#afe79f22c22ae0c67e8feb3817ecd1916">LabelPool::cleanup</a></div><div class="ttdeci">void cleanup() noexcept</div><div class="ttdef"><b>Definition</b> <a href="Pools_8h_source.html#l00239">Pools.h:239</a></div></div>
+<p class="definition">Definition at line <a class="el" href="Pools_8h_source.html#l00270">270</a> of file <a class="el" href="Pools_8h_source.html">Pools.h</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  270</span>{ <a class="code hl_function" href="#afe79f22c22ae0c67e8feb3817ecd1916">cleanup</a>(); }</div>
+<div class="ttc" id="aclassLabelPool_html_afe79f22c22ae0c67e8feb3817ecd1916"><div class="ttname"><a href="#afe79f22c22ae0c67e8feb3817ecd1916">LabelPool::cleanup</a></div><div class="ttdeci">void cleanup() noexcept</div><div class="ttdef"><b>Definition</b> <a href="Pools_8h_source.html#l00251">Pools.h:251</a></div></div>
 </div><!-- fragment --><div class="dynheader">
 Here is the call graph for this function:</div>
 <div class="dyncontent">
@@ -244,27 +248,27 @@ Here is the call graph for this function:</div>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="Pools_8h_source.html#l00188">188</a> of file <a class="el" href="Pools_8h_source.html">Pools.h</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  188</span>                                                                   {</div>
-<div class="line"><span class="lineno">  189</span>        <span class="keywordflow">if</span> (!recycled_labels.empty()) {</div>
-<div class="line"><span class="lineno">  190</span>            Label *label = recycled_labels.back();</div>
-<div class="line"><span class="lineno">  191</span>            recycled_labels.pop_back();</div>
-<div class="line"><span class="lineno">  192</span>            label-&gt;<a class="code hl_function" href="structLabel.html#a09ab6e2211ea2dc90992dc2d0854ef20">reset</a>();</div>
-<div class="line"><span class="lineno">  193</span>            ++labels_in_use;</div>
-<div class="line"><span class="lineno">  194</span>            <span class="keywordflow">return</span> label;</div>
-<div class="line"><span class="lineno">  195</span>        }</div>
-<div class="line"><span class="lineno">  196</span> </div>
-<div class="line"><span class="lineno">  197</span>        <span class="keywordflow">if</span> (__builtin_expect(labels_in_use &gt;= max_pool_size, 0)) std::abort();</div>
-<div class="line"><span class="lineno">  198</span>        BucketArena &amp;arena = arena_for(bucket_id);</div>
-<div class="line"><span class="lineno">  199</span>        <span class="keyword">const</span> <span class="keywordtype">size_t</span> block_index = arena.next / labels_per_block;</div>
-<div class="line"><span class="lineno">  200</span>        <span class="keyword">const</span> <span class="keywordtype">size_t</span> slot        = arena.next % labels_per_block;</div>
-<div class="line"><span class="lineno">  201</span>        <span class="keywordflow">if</span> (block_index == arena.blocks.size()) allocate_block(arena);</div>
-<div class="line"><span class="lineno">  202</span>        Label *label = arena.blocks[block_index] + slot;</div>
-<div class="line"><span class="lineno">  203</span>        ++arena.next;</div>
-<div class="line"><span class="lineno">  204</span>        ++labels_in_use;</div>
-<div class="line"><span class="lineno">  205</span>        label-&gt;<a class="code hl_function" href="structLabel.html#a09ab6e2211ea2dc90992dc2d0854ef20">reset</a>();</div>
-<div class="line"><span class="lineno">  206</span>        <span class="keywordflow">return</span> label;</div>
-<div class="line"><span class="lineno">  207</span>    }</div>
+<p class="definition">Definition at line <a class="el" href="Pools_8h_source.html#l00200">200</a> of file <a class="el" href="Pools_8h_source.html">Pools.h</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  200</span>                                                                   {</div>
+<div class="line"><span class="lineno">  201</span>        <span class="keywordflow">if</span> (!recycled_labels.empty()) {</div>
+<div class="line"><span class="lineno">  202</span>            Label *label = recycled_labels.back();</div>
+<div class="line"><span class="lineno">  203</span>            recycled_labels.pop_back();</div>
+<div class="line"><span class="lineno">  204</span>            label-&gt;<a class="code hl_function" href="structLabel.html#a09ab6e2211ea2dc90992dc2d0854ef20">reset</a>();</div>
+<div class="line"><span class="lineno">  205</span>            ++labels_in_use;</div>
+<div class="line"><span class="lineno">  206</span>            <span class="keywordflow">return</span> label;</div>
+<div class="line"><span class="lineno">  207</span>        }</div>
+<div class="line"><span class="lineno">  208</span> </div>
+<div class="line"><span class="lineno">  209</span>        <span class="keywordflow">if</span> (__builtin_expect(labels_in_use &gt;= max_pool_size, 0)) std::abort();</div>
+<div class="line"><span class="lineno">  210</span>        BucketArena &amp;arena = arena_for(bucket_id);</div>
+<div class="line"><span class="lineno">  211</span>        <span class="keyword">const</span> <span class="keywordtype">size_t</span> block_index = arena.next / labels_per_block;</div>
+<div class="line"><span class="lineno">  212</span>        <span class="keyword">const</span> <span class="keywordtype">size_t</span> slot        = arena.next % labels_per_block;</div>
+<div class="line"><span class="lineno">  213</span>        <span class="keywordflow">if</span> (block_index == arena.blocks.size()) allocate_block(arena);</div>
+<div class="line"><span class="lineno">  214</span>        Label *label = arena.blocks[block_index] + slot;</div>
+<div class="line"><span class="lineno">  215</span>        ++arena.next;</div>
+<div class="line"><span class="lineno">  216</span>        ++labels_in_use;</div>
+<div class="line"><span class="lineno">  217</span>        label-&gt;<a class="code hl_function" href="structLabel.html#a09ab6e2211ea2dc90992dc2d0854ef20">reset</a>();</div>
+<div class="line"><span class="lineno">  218</span>        <span class="keywordflow">return</span> label;</div>
+<div class="line"><span class="lineno">  219</span>    }</div>
 <div class="ttc" id="astructLabel_html_a09ab6e2211ea2dc90992dc2d0854ef20"><div class="ttname"><a href="structLabel.html#a09ab6e2211ea2dc90992dc2d0854ef20">Label::reset</a></div><div class="ttdeci">void reset() noexcept</div><div class="ttdoc">Resets the state of the object to its initial values.</div><div class="ttdef"><b>Definition</b> <a href="Label_8h_source.html#l00335">Label.h:335</a></div></div>
 </div><!-- fragment --><div class="dynheader">
 Here is the call graph for this function:</div>
@@ -311,11 +315,11 @@ Here is the call graph for this function:</div>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="Pools_8h_source.html#l00209">209</a> of file <a class="el" href="Pools_8h_source.html">Pools.h</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  209</span>                                                                                           {</div>
-<div class="line"><span class="lineno">  210</span>        <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> i = 0; i &lt; count; ++i) out_labels[i] = <a class="code hl_function" href="#a741b4234523a1e43940a5e8111ee3eed">acquire</a>(bucket_id);</div>
-<div class="line"><span class="lineno">  211</span>    }</div>
-<div class="ttc" id="aclassLabelPool_html_a741b4234523a1e43940a5e8111ee3eed"><div class="ttname"><a href="#a741b4234523a1e43940a5e8111ee3eed">LabelPool::acquire</a></div><div class="ttdeci">Label * acquire(int bucket_id=-1) noexcept</div><div class="ttdef"><b>Definition</b> <a href="Pools_8h_source.html#l00188">Pools.h:188</a></div></div>
+<p class="definition">Definition at line <a class="el" href="Pools_8h_source.html#l00221">221</a> of file <a class="el" href="Pools_8h_source.html">Pools.h</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  221</span>                                                                                           {</div>
+<div class="line"><span class="lineno">  222</span>        <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> i = 0; i &lt; count; ++i) out_labels[i] = <a class="code hl_function" href="#a741b4234523a1e43940a5e8111ee3eed">acquire</a>(bucket_id);</div>
+<div class="line"><span class="lineno">  223</span>    }</div>
+<div class="ttc" id="aclassLabelPool_html_a741b4234523a1e43940a5e8111ee3eed"><div class="ttname"><a href="#a741b4234523a1e43940a5e8111ee3eed">LabelPool::acquire</a></div><div class="ttdeci">Label * acquire(int bucket_id=-1) noexcept</div><div class="ttdef"><b>Definition</b> <a href="Pools_8h_source.html#l00200">Pools.h:200</a></div></div>
 </div><!-- fragment --><div class="dynheader">
 Here is the call graph for this function:</div>
 <div class="dyncontent">
@@ -354,19 +358,19 @@ Here is the call graph for this function:</div>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="Pools_8h_source.html#l00239">239</a> of file <a class="el" href="Pools_8h_source.html">Pools.h</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  239</span>                            {</div>
-<div class="line"><span class="lineno">  240</span>        <span class="keywordflow">for</span> (<span class="keyword">auto</span> &amp;arena : bucket_arenas) {</div>
-<div class="line"><span class="lineno">  241</span>            <span class="keywordflow">for</span> (Label *block : arena.blocks) {</div>
-<div class="line"><span class="lineno">  242</span>                <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> i = 0; i &lt; labels_per_block; ++i) std::destroy_at(block + i);</div>
-<div class="line"><span class="lineno">  243</span>                ::operator <span class="keyword">delete</span>[](block, std::align_val_t{block_alignment});</div>
-<div class="line"><span class="lineno">  244</span>            }</div>
-<div class="line"><span class="lineno">  245</span>        }</div>
-<div class="line"><span class="lineno">  246</span>        bucket_arenas.clear();</div>
-<div class="line"><span class="lineno">  247</span>        recycled_labels.clear();</div>
-<div class="line"><span class="lineno">  248</span>        allocated_labels = 0;</div>
-<div class="line"><span class="lineno">  249</span>        labels_in_use = 0;</div>
-<div class="line"><span class="lineno">  250</span>    }</div>
+<p class="definition">Definition at line <a class="el" href="Pools_8h_source.html#l00251">251</a> of file <a class="el" href="Pools_8h_source.html">Pools.h</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  251</span>                            {</div>
+<div class="line"><span class="lineno">  252</span>        <span class="keywordflow">for</span> (<span class="keyword">auto</span> &amp;arena : bucket_arenas) {</div>
+<div class="line"><span class="lineno">  253</span>            <span class="keywordflow">for</span> (Label *block : arena.blocks) {</div>
+<div class="line"><span class="lineno">  254</span>                <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> i = 0; i &lt; labels_per_block; ++i) std::destroy_at(block + i);</div>
+<div class="line"><span class="lineno">  255</span>                ::operator <span class="keyword">delete</span>[](block, std::align_val_t{block_alignment});</div>
+<div class="line"><span class="lineno">  256</span>            }</div>
+<div class="line"><span class="lineno">  257</span>        }</div>
+<div class="line"><span class="lineno">  258</span>        bucket_arenas.clear();</div>
+<div class="line"><span class="lineno">  259</span>        recycled_labels.clear();</div>
+<div class="line"><span class="lineno">  260</span>        allocated_labels = 0;</div>
+<div class="line"><span class="lineno">  261</span>        labels_in_use = 0;</div>
+<div class="line"><span class="lineno">  262</span>    }</div>
 </div><!-- fragment -->
 </div>
 </div>
@@ -393,12 +397,12 @@ Here is the call graph for this function:</div>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="Pools_8h_source.html#l00226">226</a> of file <a class="el" href="Pools_8h_source.html">Pools.h</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  226</span>                                      {</div>
-<div class="line"><span class="lineno">  227</span>        <span class="keywordflow">for</span> (<span class="keyword">auto</span> &amp;arena : bucket_arenas) arena.next = 0;</div>
-<div class="line"><span class="lineno">  228</span>        recycled_labels.clear();</div>
-<div class="line"><span class="lineno">  229</span>        labels_in_use = 0;</div>
-<div class="line"><span class="lineno">  230</span>    }</div>
+<p class="definition">Definition at line <a class="el" href="Pools_8h_source.html#l00238">238</a> of file <a class="el" href="Pools_8h_source.html">Pools.h</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  238</span>                                      {</div>
+<div class="line"><span class="lineno">  239</span>        <span class="keywordflow">for</span> (<span class="keyword">auto</span> &amp;arena : bucket_arenas) arena.next = 0;</div>
+<div class="line"><span class="lineno">  240</span>        recycled_labels.clear();</div>
+<div class="line"><span class="lineno">  241</span>        labels_in_use = 0;</div>
+<div class="line"><span class="lineno">  242</span>    }</div>
 </div><!-- fragment -->
 </div>
 </div>
@@ -425,8 +429,8 @@ Here is the call graph for this function:</div>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="Pools_8h_source.html#l00232">232</a> of file <a class="el" href="Pools_8h_source.html">Pools.h</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  232</span>{ <span class="keywordflow">return</span> allocated_labels - labels_in_use; }</div>
+<p class="definition">Definition at line <a class="el" href="Pools_8h_source.html#l00244">244</a> of file <a class="el" href="Pools_8h_source.html">Pools.h</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  244</span>{ <span class="keywordflow">return</span> allocated_labels - labels_in_use; }</div>
 </div><!-- fragment -->
 </div>
 </div>
@@ -453,8 +457,8 @@ Here is the call graph for this function:</div>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="Pools_8h_source.html#l00236">236</a> of file <a class="el" href="Pools_8h_source.html">Pools.h</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  236</span>{ <span class="keywordflow">return</span> allocated_labels * <span class="keyword">sizeof</span>(Label); }</div>
+<p class="definition">Definition at line <a class="el" href="Pools_8h_source.html#l00248">248</a> of file <a class="el" href="Pools_8h_source.html">Pools.h</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  248</span>{ <span class="keywordflow">return</span> allocated_labels * <span class="keyword">sizeof</span>(Label); }</div>
 </div><!-- fragment -->
 </div>
 </div>
@@ -481,8 +485,8 @@ Here is the call graph for this function:</div>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="Pools_8h_source.html#l00234">234</a> of file <a class="el" href="Pools_8h_source.html">Pools.h</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  234</span>{ <span class="keywordflow">return</span> max_pool_size; }</div>
+<p class="definition">Definition at line <a class="el" href="Pools_8h_source.html#l00246">246</a> of file <a class="el" href="Pools_8h_source.html">Pools.h</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  246</span>{ <span class="keywordflow">return</span> max_pool_size; }</div>
 </div><!-- fragment -->
 </div>
 </div>
@@ -509,12 +513,12 @@ Here is the call graph for this function:</div>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="Pools_8h_source.html#l00213">213</a> of file <a class="el" href="Pools_8h_source.html">Pools.h</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  213</span>                                               {</div>
-<div class="line"><span class="lineno">  214</span>        <span class="keywordflow">if</span> (!label) <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno">  215</span>        recycled_labels.push_back(label);</div>
-<div class="line"><span class="lineno">  216</span>        --labels_in_use;</div>
-<div class="line"><span class="lineno">  217</span>    }</div>
+<p class="definition">Definition at line <a class="el" href="Pools_8h_source.html#l00225">225</a> of file <a class="el" href="Pools_8h_source.html">Pools.h</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  225</span>                                               {</div>
+<div class="line"><span class="lineno">  226</span>        <span class="keywordflow">if</span> (!label) <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno">  227</span>        recycled_labels.push_back(label);</div>
+<div class="line"><span class="lineno">  228</span>        --labels_in_use;</div>
+<div class="line"><span class="lineno">  229</span>    }</div>
 </div><!-- fragment -->
 </div>
 </div>
@@ -545,12 +549,12 @@ Here is the call graph for this function:</div>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="Pools_8h_source.html#l00219">219</a> of file <a class="el" href="Pools_8h_source.html">Pools.h</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  219</span>                                                                     {</div>
-<div class="line"><span class="lineno">  220</span>        recycled_labels.reserve(recycled_labels.size() + count);</div>
-<div class="line"><span class="lineno">  221</span>        <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> i = 0; i &lt; count; ++i) <a class="code hl_function" href="#ae477153160a09521a446115910f3c66f">release</a>(labels[i]);</div>
-<div class="line"><span class="lineno">  222</span>    }</div>
-<div class="ttc" id="aclassLabelPool_html_ae477153160a09521a446115910f3c66f"><div class="ttname"><a href="#ae477153160a09521a446115910f3c66f">LabelPool::release</a></div><div class="ttdeci">void release(Label *label) noexcept</div><div class="ttdef"><b>Definition</b> <a href="Pools_8h_source.html#l00213">Pools.h:213</a></div></div>
+<p class="definition">Definition at line <a class="el" href="Pools_8h_source.html#l00231">231</a> of file <a class="el" href="Pools_8h_source.html">Pools.h</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  231</span>                                                                     {</div>
+<div class="line"><span class="lineno">  232</span>        recycled_labels.reserve(recycled_labels.size() + count);</div>
+<div class="line"><span class="lineno">  233</span>        <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> i = 0; i &lt; count; ++i) <a class="code hl_function" href="#ae477153160a09521a446115910f3c66f">release</a>(labels[i]);</div>
+<div class="line"><span class="lineno">  234</span>    }</div>
+<div class="ttc" id="aclassLabelPool_html_ae477153160a09521a446115910f3c66f"><div class="ttname"><a href="#ae477153160a09521a446115910f3c66f">LabelPool::release</a></div><div class="ttdeci">void release(Label *label) noexcept</div><div class="ttdef"><b>Definition</b> <a href="Pools_8h_source.html#l00225">Pools.h:225</a></div></div>
 </div><!-- fragment --><div class="dynheader">
 Here is the call graph for this function:</div>
 <div class="dyncontent">
@@ -587,9 +591,9 @@ Here is the call graph for this function:</div>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="Pools_8h_source.html#l00224">224</a> of file <a class="el" href="Pools_8h_source.html">Pools.h</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  224</span>{ <a class="code hl_function" href="#afc2e1660ab7125ea31c8e492d1172123">fast_reset</a>(); }</div>
-<div class="ttc" id="aclassLabelPool_html_afc2e1660ab7125ea31c8e492d1172123"><div class="ttname"><a href="#afc2e1660ab7125ea31c8e492d1172123">LabelPool::fast_reset</a></div><div class="ttdeci">void fast_reset() noexcept</div><div class="ttdef"><b>Definition</b> <a href="Pools_8h_source.html#l00226">Pools.h:226</a></div></div>
+<p class="definition">Definition at line <a class="el" href="Pools_8h_source.html#l00236">236</a> of file <a class="el" href="Pools_8h_source.html">Pools.h</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  236</span>{ <a class="code hl_function" href="#afc2e1660ab7125ea31c8e492d1172123">fast_reset</a>(); }</div>
+<div class="ttc" id="aclassLabelPool_html_afc2e1660ab7125ea31c8e492d1172123"><div class="ttname"><a href="#afc2e1660ab7125ea31c8e492d1172123">LabelPool::fast_reset</a></div><div class="ttdeci">void fast_reset() noexcept</div><div class="ttdef"><b>Definition</b> <a href="Pools_8h_source.html#l00238">Pools.h:238</a></div></div>
 </div><!-- fragment --><div class="dynheader">
 Here is the call graph for this function:</div>
 <div class="dyncontent">
@@ -626,11 +630,11 @@ Here is the call graph for this function:</div>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="Pools_8h_source.html#l00253">253</a> of file <a class="el" href="Pools_8h_source.html">Pools.h</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  253</span>                         {</div>
-<div class="line"><span class="lineno">  254</span>        recycled_labels.shrink_to_fit();</div>
-<div class="line"><span class="lineno">  255</span>        <span class="keywordflow">for</span> (<span class="keyword">auto</span> &amp;arena : bucket_arenas) arena.blocks.shrink_to_fit();</div>
-<div class="line"><span class="lineno">  256</span>    }</div>
+<p class="definition">Definition at line <a class="el" href="Pools_8h_source.html#l00265">265</a> of file <a class="el" href="Pools_8h_source.html">Pools.h</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  265</span>                         {</div>
+<div class="line"><span class="lineno">  266</span>        recycled_labels.shrink_to_fit();</div>
+<div class="line"><span class="lineno">  267</span>        <span class="keywordflow">for</span> (<span class="keyword">auto</span> &amp;arena : bucket_arenas) arena.blocks.shrink_to_fit();</div>
+<div class="line"><span class="lineno">  268</span>    }</div>
 </div><!-- fragment -->
 </div>
 </div>

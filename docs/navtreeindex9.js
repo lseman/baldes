@@ -1,5 +1,6 @@
 var NAVTREEINDEX9 =
 {
+"structModelData.html#aea9d2f5b3aa72a3af01c62c7cd9d81f2":[2,0,63,1],
 "structNodeScore.html":[2,0,66],
 "structNodeScore.html#a2db702b3f5726be3620ada41c37baf00":[2,0,66,5],
 "structNodeScore.html#a8fc41c53bf1736676048b9107710f32e":[2,0,66,3],
@@ -248,6 +249,5 @@ var NAVTREEINDEX9 =
 "structVectorIntHashCompare.html#a8a51c683d9a65c0fb20845980369c840":[2,0,108,0],
 "structVectorIntHashCompare.html#ad87dabd0ac0e5d56f32ef35e74ba17ba":[2,0,108,2],
 "structarc__hash.html":[2,0,7],
-"structarc__hash.html#a883ebe94b960ab76b3d17440611ea839":[2,0,7,0],
-"structarc__map__hash.html":[2,0,8]
+"structarc__hash.html#a883ebe94b960ab76b3d17440611ea839":[2,0,7,0]
 };
