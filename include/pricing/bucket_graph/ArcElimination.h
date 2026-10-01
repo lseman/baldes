@@ -487,10 +487,8 @@ void BucketGraph::ObtainJumpBucketArcs() {
 
                     const int candidate_b = candidate_buckets[i];
                     B_bar.push_back(candidate_b);
-                    std::vector<double> res(candidate_res[i].begin(),
-                                            candidate_res[i].begin() +
-                                                static_cast<std::ptrdiff_t>(options.main_resources.size()));
-                    const double        cost = candidate_costs[i];
+                    const auto &res = candidate_res[i];
+                    const double cost = candidate_costs[i];
 
                     buckets[b].template add_jump_arc<D>(b, candidate_b, res, cost);
                     nodes[buckets[b].node_id].template add_jump_arc<D>(b, candidate_b, res, cost, orig_arc.to);

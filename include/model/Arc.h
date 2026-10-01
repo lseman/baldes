@@ -4,51 +4,47 @@
  *
  */
 #pragma once
+#include <array>
 #include <functional>
 
 #include "math/Common.h"
 #include "xxhash.h"
 
 struct Arc {
-    int                 from;
-    int                 to;
-    std::vector<double> resource_increment;
-    double              cost_increment;
-    bool                fixed;
-    double              priority;
+    int                          from;
+    int                          to;
+    std::array<double, R_SIZE>   resource_increment{};
+    double                       cost_increment;
+    bool                         fixed;
+    double                       priority;
 
     Arc() : from(-1), to(-1), cost_increment(0.0), fixed(false), priority(0.0) {}
 
-    Arc(int from, int to, const std::vector<double> &res_inc, double cost_inc);
+    Arc(int from, int to, const std::array<double, R_SIZE> &res_inc, double cost_inc);
 
-    Arc(int from, int to, const std::vector<double> &res_inc, double cost_inc, bool fixed);
+    Arc(int from, int to, const std::array<double, R_SIZE> &res_inc, double cost_inc, bool fixed);
 
-    Arc(int from, int to, const std::vector<double> &res_inc, double cost_inc, double priority);
+    Arc(int from, int to, const std::array<double, R_SIZE> &res_inc, double cost_inc, double priority);
 
     // Equality operator
     bool operator==(const Arc &other) const {
         return from == other.from && to == other.to && resource_increment == other.resource_increment &&
                cost_increment == other.cost_increment && fixed == other.fixed && priority == other.priority;
-    }
+    } // NOLINT(readability-simplify-boolean-expr)
 };
 
 // Custom hash function for Arc
 struct arc_hash {
     std::size_t operator()(const Arc &arc) const {
         XXH64_state_t *const state = XXH64_createState();
-        XXH64_reset(state, 0); // Use 0 as seed, or choose another seed
+        XXH64_reset(state, 0);
 
-        // Add all members to the hash state
         XXH64_update(state, &arc.from, sizeof(arc.from));
         XXH64_update(state, &arc.to, sizeof(arc.to));
         XXH64_update(state, &arc.cost_increment, sizeof(arc.cost_increment));
         XXH64_update(state, &arc.fixed, sizeof(arc.fixed));
         XXH64_update(state, &arc.priority, sizeof(arc.priority));
-
-        // Add the resource_increment vector
-        if (!arc.resource_increment.empty()) {
-            XXH64_update(state, arc.resource_increment.data(), arc.resource_increment.size() * sizeof(double));
-        }
+        XXH64_update(state, arc.resource_increment.data(), arc.resource_increment.size() * sizeof(double));
 
         const std::size_t hash = XXH64_digest(state);
         XXH64_freeState(state);
@@ -103,14 +99,14 @@ struct BucketArc {
  *
  */
 struct JumpArc {
-    int                 base_bucket;
-    int                 jump_bucket;
-    std::vector<double> resource_increment;
-    double              cost_increment;
-    int                 to_job = -1;
+    int                          base_bucket;
+    int                          jump_bucket;
+    std::array<double, R_SIZE>   resource_increment{};
+    double                       cost_increment;
+    int                          to_job = -1;
 
-    JumpArc(int base, int jump, const std::vector<double> &res_inc, double cost_inc);
-    JumpArc(int base, int jump, const std::vector<double> &res_inc, double cost_inc, int to_job);
+    JumpArc(int base, int jump, const std::array<double, R_SIZE> &res_inc, double cost_inc);
+    JumpArc(int base, int jump, const std::array<double, R_SIZE> &res_inc, double cost_inc, int to_job);
 };
 
 using ArcVariant = std::variant<Arc, BucketArc>;
@@ -145,14 +141,12 @@ public:
     // Method to add arcs using int -> int format, with optional resource
     // increment and cost
     void add_connections(const std::vector<std::pair<int, int>> &connections,
-                         const std::vector<double> &default_resource_increment = {1.0}, // Default increment
+                         const std::array<double, R_SIZE> &default_resource_increment,
                          double default_cost_increment = 0.0, double default_priority = 1.0) {
         for (const auto &conn : connections) {
             int from = conn.first;
             int to   = conn.second;
 
-            // Create an Arc with the provided default resource increment and
-            // cost increment
             Arc arc(from, to, default_resource_increment, default_cost_increment, default_priority);
             add_arc(arc);
         }

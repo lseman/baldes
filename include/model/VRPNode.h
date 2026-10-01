@@ -216,11 +216,11 @@ struct VRPNode {
      * increment.
      *
      */
-    void add_arc(int from_bucket, int to_bucket, std::vector<double> res_inc, double cost_inc, bool fw) {
+    void add_arc(int from_bucket, int to_bucket, const std::array<double, R_SIZE> &res_inc, double cost_inc, bool fw) {
         if (fw) {
-            fw_arcs.push_back({from_bucket, to_bucket, std::move(res_inc), cost_inc});
+            fw_arcs.emplace_back(from_bucket, to_bucket, res_inc, cost_inc);
         } else {
-            bw_arcs.push_back({from_bucket, to_bucket, std::move(res_inc), cost_inc});
+            bw_arcs.emplace_back(from_bucket, to_bucket, res_inc, cost_inc);
         }
     }
 
@@ -233,26 +233,25 @@ struct VRPNode {
      *
      */
     template <Direction D>
-
-    void add_arc(int from_bucket, int to_bucket, std::vector<double> res_inc, double cost_inc, bool fixed) {
+    void add_arc(int from_bucket, int to_bucket, const std::array<double, R_SIZE> &res_inc, double cost_inc, bool fixed) {
         if constexpr (D == Direction::Forward) {
-            fw_arcs.push_back({from_bucket, to_bucket, std::move(res_inc), cost_inc, fixed});
+            fw_arcs.emplace_back(from_bucket, to_bucket, res_inc, cost_inc, fixed);
         } else {
-            bw_arcs.push_back({from_bucket, to_bucket, std::move(res_inc), cost_inc, fixed});
+            bw_arcs.push_back({from_bucket, to_bucket, res_inc, cost_inc, fixed});
         }
     }
 
     template <Direction D>
-    void add_arc(int from_bucket, int to_bucket, std::vector<double> res_inc, double cost_inc, double priority) {
+    void add_arc(int from_bucket, int to_bucket, const std::array<double, R_SIZE> &res_inc, double cost_inc, double priority) {
         if constexpr (D == Direction::Forward) {
-            fw_arcs.push_back({from_bucket, to_bucket, std::move(res_inc), cost_inc, priority});
+            fw_arcs.emplace_back(from_bucket, to_bucket, res_inc, cost_inc, priority);
         } else {
-            bw_arcs.push_back({from_bucket, to_bucket, std::move(res_inc), cost_inc, priority});
+            bw_arcs.push_back({from_bucket, to_bucket, res_inc, cost_inc, priority});
         }
     }
 
     template <Direction D>
-    void add_jump_arc(int from_bucket, int to_bucket, const std::vector<double> &res_inc, double cost_inc,
+    void add_jump_arc(int from_bucket, int to_bucket, const std::array<double, R_SIZE> &res_inc, double cost_inc,
                       int to_job = -1) {
         if constexpr (D == Direction::Forward) {
             fw_jump_arcs.emplace_back(from_bucket, to_bucket, res_inc, cost_inc, to_job);

@@ -48,24 +48,23 @@ void BucketGraph::generate_arcs() {
         bucket.clear_arcs(D == Direction::Forward);
     }
 
-    auto try_add_arc = [&](int from_bucket, const VRPNode &next_node, const std::vector<double> &res_inc,
+    auto try_add_arc = [&](int from_bucket, const VRPNode &next_node, const std::array<double, R_SIZE> &res_inc,
                            double cost_inc) -> bool {
         bool                valid = true;
-        std::vector<double> head_resource(res_inc.size(), 0.0);
-        if constexpr (D == Direction::Forward) {
-            for (int r = 0; r < res_inc.size() && valid; ++r) {
-                if (numericutils::gt(buckets[from_bucket].lb[r] + res_inc[r], next_node.ub[r])) {
+        std::vector<double> head_resource(num_resources, 0.0);
+        for (int r = 0; r < num_resources && valid; ++r) {
+            const double inc = (r < R_SIZE) ? res_inc[r] : 0.0;
+            if constexpr (D == Direction::Forward) {
+                if (numericutils::gt(buckets[from_bucket].lb[r] + inc, next_node.ub[r])) {
                     valid = false;
                 } else {
-                    head_resource[r] = std::max(buckets[from_bucket].lb[r] + res_inc[r], next_node.lb[r]);
+                    head_resource[r] = std::max(buckets[from_bucket].lb[r] + inc, next_node.lb[r]);
                 }
-            }
-        } else {
-            for (int r = 0; r < res_inc.size() && valid; ++r) {
-                if (numericutils::lt(buckets[from_bucket].ub[r] - res_inc[r], next_node.lb[r])) {
+            } else {
+                if (numericutils::lt(buckets[from_bucket].ub[r] - inc, next_node.lb[r])) {
                     valid = false;
                 } else {
-                    head_resource[r] = std::min(buckets[from_bucket].ub[r] - res_inc[r], next_node.ub[r]);
+                    head_resource[r] = std::min(buckets[from_bucket].ub[r] - inc, next_node.ub[r]);
                 }
             }
         }
@@ -78,7 +77,7 @@ void BucketGraph::generate_arcs() {
 
     auto process_node = [&](int node_id) {
         const auto         &node = nodes[node_id];
-        std::vector<double> res_inc(num_resources);
+        std::array<double, R_SIZE> res_inc{};
         const auto          arcs = node.get_arcs<D>();
 
         for (int i = 0; i < num_buckets[node.id]; ++i) {
@@ -89,7 +88,7 @@ void BucketGraph::generate_arcs() {
 
                 const double travel_cost = getcij(node.id, next_node.id);
                 double       cost_inc    = travel_cost - next_node.cost;
-                for (int r = 0; r < num_resources; r++) {
+                for (int r = 0; r < num_resources && r < R_SIZE; r++) {
                     res_inc[r] = node.consumption[r];
                     if (options.resources[r] == "time") { res_inc[r] += travel_cost; }
                 }

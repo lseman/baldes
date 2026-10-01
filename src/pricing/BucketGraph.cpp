@@ -20,34 +20,40 @@
 #endif
 
 // Implementation of Arc constructors
-Arc::Arc(int from, int to, const std::vector<double> &res_inc, double cost_inc)
+Arc::Arc(int from, int to, const std::array<double, R_SIZE> &res_inc, double cost_inc)
     : from(from), to(to), resource_increment(res_inc), cost_increment(cost_inc) {}
 
-Arc::Arc(int from, int to, const std::vector<double> &res_inc, double cost_inc, bool fixed)
+Arc::Arc(int from, int to, const std::array<double, R_SIZE> &res_inc, double cost_inc, bool fixed)
     : from(from), to(to), resource_increment(res_inc), cost_increment(cost_inc), fixed(fixed) {}
 
-Arc::Arc(int from, int to, const std::vector<double> &res_inc, double cost_inc, double priority)
+Arc::Arc(int from, int to, const std::array<double, R_SIZE> &res_inc, double cost_inc, double priority)
     : from(from), to(to), resource_increment(res_inc), cost_increment(cost_inc), priority(priority) {}
 
 BucketArc::BucketArc(int from, int to, const std::vector<double> &res_inc, double cost_inc)
     : from_bucket(from), to_bucket(to), cost_increment(cost_inc) {
-    std::copy_n(res_inc.begin(), std::min(res_inc.size(), resource_increment.size()), resource_increment.begin());
+    for (size_t i = 0; i < res_inc.size() && i < resource_increment.size(); ++i) {
+        resource_increment[i] = res_inc[i];
+    }
 }
 
 BucketArc::BucketArc(int from, int to, const std::vector<double> &res_inc, double cost_inc, bool fixed)
     : from_bucket(from), to_bucket(to), cost_increment(cost_inc), jump(fixed) {
-    std::copy_n(res_inc.begin(), std::min(res_inc.size(), resource_increment.size()), resource_increment.begin());
+    for (size_t i = 0; i < res_inc.size() && i < resource_increment.size(); ++i) {
+        resource_increment[i] = res_inc[i];
+    }
 }
 
 BucketArc::BucketArc(int from, int to, const std::vector<double> &res_inc, double cost_inc, bool fixed, int to_node)
     : from_bucket(from), to_bucket(to), cost_increment(cost_inc), jump(fixed), jump_to_node(to_node) {
-    std::copy_n(res_inc.begin(), std::min(res_inc.size(), resource_increment.size()), resource_increment.begin());
+    for (size_t i = 0; i < res_inc.size() && i < resource_increment.size(); ++i) {
+        resource_increment[i] = res_inc[i];
+    }
 }
 
-JumpArc::JumpArc(int base, int jump, const std::vector<double> &res_inc, double cost_inc)
+JumpArc::JumpArc(int base, int jump, const std::array<double, R_SIZE> &res_inc, double cost_inc)
     : base_bucket(base), jump_bucket(jump), resource_increment(res_inc), cost_increment(cost_inc) {}
 
-JumpArc::JumpArc(int base, int jump, const std::vector<double> &res_inc, double cost_inc, int to_job)
+JumpArc::JumpArc(int base, int jump, const std::array<double, R_SIZE> &res_inc, double cost_inc, int to_job)
     : base_bucket(base), jump_bucket(jump), resource_increment(res_inc), cost_increment(cost_inc), to_job(to_job) {}
 /**
  * @brief Constructs a BucketGraph object.
@@ -473,8 +479,8 @@ void BucketGraph::set_adjacency_list_manual() {
 
     // Step 2: Modify add_arcs_for_node to give priority based on cluster
     // membership
-    auto add_arcs_for_node = [&](const VRPNode &node, int from_bucket, std::vector<double> &res_inc) {
-        using Arc = std::tuple<double, int, std::vector<double>,
+    auto add_arcs_for_node = [&](const VRPNode &node, int from_bucket, std::array<double, R_SIZE> &res_inc) {
+        using Arc = std::tuple<double, int, std::array<double, R_SIZE>,
                                double>; // Arc: priority, to_node, resource
                                         // increments, cost increment
 
@@ -493,7 +499,7 @@ void BucketGraph::set_adjacency_list_manual() {
             double cost_inc    = travel_cost - next_node.cost;  // Adjust cost increment by
                                                                 // subtracting next node's cost
 
-            for (int r = 0; r < options.resources.size(); ++r) {
+            for (int r = 0; r < options.resources.size() && r < R_SIZE; ++r) {
                 if (options.resources[r] == "time") {
                     res_inc[r] = travel_cost + node.duration; // Update resource increment
                                                               // based on node duration
@@ -501,14 +507,12 @@ void BucketGraph::set_adjacency_list_manual() {
                     res_inc[r] = node.consumption[r];
                 }
             }
-            // res_inc[TIME_INDEX] += travel_cost; // Add travel time to
-            // resource increment
 
             int to_bucket = next_node.id;
             if (from_bucket == to_bucket) continue; // Skip arcs that loop back to the same bucket
 
             bool feasible = true; // Check feasibility based on resource constraints
-            for (int r = 0; r < options.resources.size(); ++r) {
+            for (int r = 0; r < options.resources.size() && r < R_SIZE; ++r) {
                 if (node.lb[r] + res_inc[r] > next_node.ub[r]) {
                     feasible = false;
                     break;
@@ -558,7 +562,7 @@ void BucketGraph::set_adjacency_list_manual() {
     for (const auto &VRPNode : nodes) {
         if (VRPNode.id == options.end_depot) continue; // Skip the last node (depot)
 
-        std::vector<double> res_inc(intervals.size()); // Resource increment vector
+        std::array<double, R_SIZE> res_inc{}; // Resource increment array
         add_arcs_for_node(VRPNode, VRPNode.id,
                           res_inc); // Add arcs for the current node
     }
