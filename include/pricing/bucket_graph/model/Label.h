@@ -128,11 +128,17 @@ struct SRCMap {
 
     Reference operator[](std::size_t idx) noexcept {
         assert(idx < MAX_SRC_CUTS);
+#if defined(__GNUC__) || defined(__clang__)
+        if (idx >= MAX_SRC_CUTS) __builtin_unreachable();  // Hot path: index always valid
+#endif
         return Reference(*this, idx);
     }
 
     uint16_t operator[](std::size_t idx) const noexcept {
         assert(idx < MAX_SRC_CUTS);
+#if defined(__GNUC__) || defined(__clang__)
+        if (idx >= MAX_SRC_CUTS) __builtin_unreachable();  // Hot path: index always valid
+#endif
         return get(idx);
     }
 

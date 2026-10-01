@@ -285,6 +285,19 @@ void BucketGraph::concatenate_label_from_bucket(const Label *L, int b, std::atom
         } else {
             chunk_candidates.insert(chunk_candidates.end(), scratch.candidates.begin(), scratch.candidates.end());
         }
+
+        // Early termination for Enumerate: if we have enough routes and the
+        // cheapest found is below the gap, no need to scan more buckets.
+        if constexpr (S == Stage::Enumerate) {
+            const size_t route_limit = static_cast<size_t>(std::max(1, enumeration_policy.max_routes)) + 1;
+            if (chunk_candidates.size() >= route_limit && !chunk_candidates.empty()) {
+                double best_chunk_cost = chunk_candidates.front().cost;
+                if (numericutils::lt(best_chunk_cost, gap)) {
+                    enumeration_route_cutoff.store(best_chunk_cost, std::memory_order_relaxed);
+                    break;
+                }
+            }
+        }
         push_unvisited_phi_neighbors(other_phi[current_bucket], scratch);
     }
 
