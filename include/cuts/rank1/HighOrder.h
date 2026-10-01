@@ -724,19 +724,19 @@ private:
             }
         };
 
-        // Parallelize over vertices. Here we assign explicit thread indices.
-        std::vector<std::thread> threads;
-        std::atomic_size_t       vertexIndex{1}; // starting from 1; skipping index 0
-        for (size_t t = 0; t < numThreads; ++t) {
-            threads.emplace_back([&, t]() {
-                while (true) {
-                    size_t i = vertexIndex.fetch_add(1);
-                    if (i >= N_SIZE - 1) break;
-                    process_vertex(i, t);
+        // Parallelize over vertices using persistent thread pool — no per-call
+        // thread creation/destruction overhead.
+        const int num_vertices = N_SIZE - 1;
+        const int chunk_size   = (num_vertices + numThreads - 1) / numThreads;
+        auto bulk_sender = stdexec::bulk(
+            stdexec::just(), static_cast<size_t>(numThreads), [&, this](std::size_t t) {
+                const size_t start = t * chunk_size;
+                const size_t end   = std::min(start + chunk_size, static_cast<size_t>(num_vertices));
+                for (size_t i = start; i < end; ++i) {
+                    process_vertex(static_cast<int>(i), static_cast<int>(t));
                 }
             });
-        }
-        for (auto &th : threads) th.join();
+        stdexec::sync_wait(stdexec::starts_on(sched, std::move(bulk_sender)));
 
         // Merge thread-local candidate sets into finalCandidates.
         for (const auto &data : threadData) {

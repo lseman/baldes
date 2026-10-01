@@ -144,8 +144,8 @@ public:
  * @brief A highly optimized pool manager for Label objects.
  *
  * The LabelPool class manages a pool of Label objects with optimized allocation
- * and reuse strategies. It uses block-based allocation and fast pointer management
- * for minimal overhead.
+ * and reuse strategies. It pre-allocates all blocks at construction time,
+ * eliminating malloc overhead during the hot labeling loop.
  */
 class LabelPool {
 private:
@@ -179,9 +179,21 @@ private:
         return block;
     }
 
+    // Pre-allocate initial blocks at construction to avoid malloc during labeling.
+    void preallocate(size_t initial_labels) {
+        const size_t blocks_to_alloc = (initial_labels + labels_per_block - 1) / labels_per_block;
+        for (size_t i = 0; i < blocks_to_alloc && allocated_labels < max_pool_size; ++i) {
+            allocate_block(bucket_arenas[0]);
+        }
+    }
+
 public:
     explicit LabelPool(size_t initial_pool_size, size_t max_pool_size = 5000000)
-        : max_pool_size(std::max(initial_pool_size, max_pool_size)), bucket_arenas(1) {}
+        : max_pool_size(std::max(initial_pool_size, max_pool_size)), bucket_arenas(1) {
+        // Pre-allocate half the max pool size at construction — eliminates all
+        // malloc calls during the hot labeling loop.
+        preallocate(max_pool_size / 2);
+    }
 
     // Destination-aware allocation keeps labels of a bucket in contiguous
     // cache-line-aligned blocks. bucket_id < 0 uses the fallback arena.
