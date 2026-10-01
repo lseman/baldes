@@ -91,6 +91,14 @@ struct alignas(64) Bucket {
 
     void invalidate_label_cache() const noexcept { soa_valid = false; }
 
+    // Reserve SoA storage upfront to avoid reallocations during the hot loop.
+    void reserve_soa(size_t n) noexcept {
+        soa_costs.reserve(n);
+        soa_visited_signatures.reserve(n);
+        for (auto &rv : soa_resources) rv.reserve(n);
+        for (auto &vw : soa_visited_words) vw.reserve(n);
+    }
+
     // Append SoA entry for a newly added label. Called during insertion so the
     // cache stays incrementally valid — no full rebuild needed during dominance.
     void append_soa_entry(Label *label) noexcept {
@@ -404,7 +412,7 @@ struct alignas(64) Bucket {
         if (!new_label) return false;
         if (labels.empty() && extra_labels.empty()) return false;
         if (!labels.empty()) {
-            ensure_label_cache();
+            // SoA maintained incrementally via append_soa_entry; always valid.
             if (!is_virtual_split) {
                 if (sorted_dominance_func(make_label_soa_view(0, labels.size()), stat_n_dom)) { return true; }
             } else {
@@ -503,6 +511,7 @@ struct alignas(64) Bucket {
         : node_id(node_id), lb(std::move(lb)), ub(std::move(ub)) {
         labels.reserve(256);
         extra_labels.reserve(64);
+        reserve_soa(256);  // Pre-allocate SoA to avoid reallocations during labeling
     }
 
     // create default constructor
