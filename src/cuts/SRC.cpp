@@ -164,11 +164,10 @@ void LimitedMemoryRank1Cuts::separate(const SparseMatrix &A, const std::vector<d
                 candidate_paths.clear();
 
                 const auto accumulate_node_paths = [&](int customer) {
-                    if (auto it = row_indices_map.find(customer); it != row_indices_map.end()) {
-                        for (int path_idx : it->second) {
-                            if (path_idx < 0 || static_cast<size_t>(path_idx) >= allPaths.size()) continue;
-                            if (expanded[path_idx]++ == 0) { touched_paths.push_back(path_idx); }
-                        }
+                    if (customer < 0 || customer >= static_cast<int>(row_indices_map.size())) return;
+                    for (int path_idx : row_indices_map[customer]) {
+                        if (path_idx < 0 || static_cast<size_t>(path_idx) >= allPaths.size()) continue;
+                        if (expanded[path_idx]++ == 0) { touched_paths.push_back(path_idx); }
                     }
                 };
 
@@ -448,14 +447,14 @@ void LimitedMemoryRank1Cuts::separateR1C3Adjacency(const SparseMatrix &A, const 
 
             // Accumulate visit counts for i and j
             touched_routes.clear();
-            if (auto it = row_indices_map.find(i); it != row_indices_map.end()) {
-                for (int r : it->second) {
+            if (i >= 0 && i < static_cast<int>(row_indices_map.size())) {
+                for (int r : row_indices_map[i]) {
                     if (v_tmp2[r] == 0) touched_routes.push_back(r);
                     v_tmp2[r] += vertex_route_map[i][r];
                 }
             }
-            if (auto it = row_indices_map.find(j); it != row_indices_map.end()) {
-                for (int r : it->second) {
+            if (j >= 0 && j < static_cast<int>(row_indices_map.size())) {
+                for (int r : row_indices_map[j]) {
                     if (v_tmp2[r] == 0) touched_routes.push_back(r);
                     v_tmp2[r] += vertex_route_map[j][r];
                 }
@@ -475,8 +474,8 @@ void LimitedMemoryRank1Cuts::separateR1C3Adjacency(const SparseMatrix &A, const 
                 // Starting from the (i,j) contribution avoids rescanning the
                 // growing union of routes touched by preceding k candidates.
                 double vio = base_lhs - rhs;
-                if (auto it = row_indices_map.find(k); it != row_indices_map.end()) {
-                    for (int r : it->second) {
+                if (k >= 0 && k < static_cast<int>(row_indices_map.size())) {
+                    for (int r : row_indices_map[k]) {
                         if (r < 0 || r >= all_num_routes || static_cast<size_t>(r) >= x.size()) continue;
                         const int base_visits = v_tmp2[r];
                         const int extra_visits = vertex_route_map[k][r];
@@ -526,10 +525,8 @@ void LimitedMemoryRank1Cuts::separateR1C3Adjacency(const SparseMatrix &A, const 
         exact_touched_routes.clear();
         exact_candidate_paths.clear();
         const auto accumulate_base_visits = [&](int node) {
-            auto row_it = row_indices_map.find(node);
-            if (row_it == row_indices_map.end() || node < 0 || node >= static_cast<int>(vertex_route_map.size()))
-                return;
-            for (int r : row_it->second) {
+            if (node < 0 || node >= static_cast<int>(vertex_route_map.size())) return;
+            for (int r : row_indices_map[node]) {
                 if (r < 0 || r >= all_num_routes || static_cast<size_t>(r) >= vertex_route_map[node].size()) continue;
                 if (exact_visit_count[r] == 0) exact_touched_routes.push_back(r);
                 exact_visit_count[r] += vertex_route_map[node][r];

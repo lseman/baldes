@@ -72,8 +72,7 @@ public:
 
     void initializeVertexRouteMap() {
         if (last_path_idx == 0) {
-            row_indices_map.clear();
-            row_indices_map.reserve(N_SIZE);
+            row_indices_map.assign(N_SIZE, {});
             map_rank1_multiplier_dominance.assign(N_SIZE, {});
         }
 
@@ -173,7 +172,7 @@ public:
     int                           labels_counter = 0;
     void                          separate(const SparseMatrix &A, const std::vector<double> &x);
 
-    ankerl::unordered_dense::map<int, std::vector<int>> row_indices_map;
+    std::vector<std::vector<int>> row_indices_map; // indexed by customer ID, no hash needed
     /**
      * @brief Computes the limited memory coefficient based on the given
      * parameters.

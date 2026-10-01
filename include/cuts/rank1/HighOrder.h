@@ -66,8 +66,7 @@ private:
     std::vector<std::vector<int>>      rank1_sep_heur_mem4_vertex;
     void                               initializeVertexRouteMap() {
         if (last_path_idx == 0) {
-            row_indices_map.clear();
-            row_indices_map.reserve(N_SIZE);
+            row_indices_map.assign(N_SIZE, {});
         }
 
         // Initialize the vertex_route_map with N_SIZE rows and allPaths.size()
@@ -599,8 +598,8 @@ private:
             // Build the working set from routes that contain vertex i.
             std::vector<int> working_set;
             working_set.reserve(std::min<size_t>(MAX_WORKING_SET_SIZE, allPaths.size()));
-            if (auto row_it = row_indices_map.find(static_cast<int>(i)); row_it != row_indices_map.end()) {
-                for (int r : row_it->second) {
+            if (i >= 0 && i < static_cast<int>(row_indices_map.size())) {
+                for (int r : row_indices_map[i]) {
                     for (const auto &v : allPaths[r].route) {
                         if (v <= 0 || v >= N_SIZE - 1 || v == static_cast<int>(i) ||
                             !heuristic_memory_lookup.contains(v))
@@ -1226,9 +1225,8 @@ private:
         candidate_paths.clear();
         for (const int node : candidate_nodes) {
             if (node <= 0 || node >= N_SIZE - 1) continue;
-            auto row_it = row_indices_map.find(node);
-            if (row_it == row_indices_map.end()) continue;
-            for (const int path_idx : row_it->second) {
+            if (node < 0 || node >= static_cast<int>(row_indices_map.size())) continue;
+            for (const int path_idx : row_indices_map[node]) {
                 if (path_idx < 0 || static_cast<size_t>(path_idx) >= allPaths.size()) continue;
                 if (seen_epoch[path_idx] == epoch) continue;
                 seen_epoch[path_idx] = epoch;
@@ -1425,7 +1423,7 @@ public:
 
     std::vector<VRPNode>                                nodes;
     std::vector<std::vector<double>>                    distances;
-    ankerl::unordered_dense::map<int, std::vector<int>> row_indices_map;
+    std::vector<std::vector<int>> row_indices_map; // indexed by customer ID, no hash needed
     std::vector<int>                                    nonzero_paths;
 
     std::vector<double> solution;
