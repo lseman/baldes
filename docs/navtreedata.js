@@ -72,8 +72,8 @@ var NAVTREEINDEX =
 "classMIPProblem.html#a2d45a20f806ee2ede27d9c575758e5d5",
 "classStabilization.html#af358ea4f62658ca2a7b1509535392e2a",
 "functions_vars_t.html",
-"structBucketGraph_1_1EnumerationPolicy.html#a76377bf63cb81b8af37a56bcdd4b3303",
-"structNodeScore.html#a8fc41c53bf1736676048b9107710f32e",
+"structBucketGraph_1_1EnumerationPolicy.html#a63fcdb2fb19e4b2d6b373ccb0917cc4b",
+"structNodeScore.html#a2db702b3f5726be3620ada41c37baf00",
 "structbaldes_1_1bcp_1_1PricingState.html"
 ];
 

@@ -432,18 +432,18 @@ template&lt;typename T&gt; </div>
 <p>Checks if element 'a' precedes element 'b' in the given strongly connected components (SCCs). </p>
 <p>This function takes a vector of SCCs and two elements 'a' and 'b' as input. It searches for 'a' and 'b' in the SCCs and determines if 'a' precedes 'b' in the <a class="el" href="classSCC.html" title="A class to find Strongly Connected Components (SCCs) in a directed graph using Tarjan&#39;s algorithm.">SCC</a> list. </p>
 
-<p class="definition">Definition at line <a class="el" href="Labeling_8h_source.html#l01165">1165</a> of file <a class="el" href="Labeling_8h_source.html">Labeling.h</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno"> 1166</span>                                                                           {</div>
-<div class="line"><span class="lineno"> 1167</span>    <span class="comment">// Create a cache key</span></div>
-<div class="line"><span class="lineno"> 1168</span>    <span class="keyword">const</span> std::pair&lt;T, T&gt; key{a, b};</div>
-<div class="line"><span class="lineno"> 1169</span>    <span class="keywordflow">if</span> (<span class="keyword">const</span> <span class="keyword">auto</span> it = cache.find(key); it != cache.end()) { <span class="keywordflow">return</span> it-&gt;second; }</div>
-<div class="line"><span class="lineno"> 1170</span> </div>
-<div class="line"><span class="lineno"> 1171</span>    <span class="comment">// Use the UnionFind&#39;s built-in comparison which already has the</span></div>
-<div class="line"><span class="lineno"> 1172</span>    <span class="comment">// correct ordering</span></div>
-<div class="line"><span class="lineno"> 1173</span>    <span class="keywordtype">bool</span> result = uf.<a class="code hl_function" href="classUnionFind.html#a65a85b39d8df2490b9ea9ef465e112d6">compareSubsets</a>(a, b);</div>
-<div class="line"><span class="lineno"> 1174</span>    cache.emplace(key, result);</div>
-<div class="line"><span class="lineno"> 1175</span>    <span class="keywordflow">return</span> result;</div>
-<div class="line"><span class="lineno"> 1176</span>}</div>
+<p class="definition">Definition at line <a class="el" href="Labeling_8h_source.html#l01159">1159</a> of file <a class="el" href="Labeling_8h_source.html">Labeling.h</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno"> 1160</span>                                                                           {</div>
+<div class="line"><span class="lineno"> 1161</span>    <span class="comment">// Create a cache key</span></div>
+<div class="line"><span class="lineno"> 1162</span>    <span class="keyword">const</span> std::pair&lt;T, T&gt; key{a, b};</div>
+<div class="line"><span class="lineno"> 1163</span>    <span class="keywordflow">if</span> (<span class="keyword">const</span> <span class="keyword">auto</span> it = cache.find(key); it != cache.end()) { <span class="keywordflow">return</span> it-&gt;second; }</div>
+<div class="line"><span class="lineno"> 1164</span> </div>
+<div class="line"><span class="lineno"> 1165</span>    <span class="comment">// Use the UnionFind&#39;s built-in comparison which already has the</span></div>
+<div class="line"><span class="lineno"> 1166</span>    <span class="comment">// correct ordering</span></div>
+<div class="line"><span class="lineno"> 1167</span>    <span class="keywordtype">bool</span> result = uf.<a class="code hl_function" href="classUnionFind.html#a65a85b39d8df2490b9ea9ef465e112d6">compareSubsets</a>(a, b);</div>
+<div class="line"><span class="lineno"> 1168</span>    cache.emplace(key, result);</div>
+<div class="line"><span class="lineno"> 1169</span>    <span class="keywordflow">return</span> result;</div>
+<div class="line"><span class="lineno"> 1170</span>}</div>
 <div class="ttc" id="aclassUnionFind_html_a65a85b39d8df2490b9ea9ef465e112d6"><div class="ttname"><a href="classUnionFind.html#a65a85b39d8df2490b9ea9ef465e112d6">UnionFind::compareSubsets</a></div><div class="ttdeci">bool compareSubsets(int x, int y) const noexcept</div><div class="ttdef"><b>Definition</b> <a href="UnionFind_8h_source.html#l00145">UnionFind.h:145</a></div></div>
 </div><!-- fragment --><div class="dynheader">
 Here is the call graph for this function:</div>

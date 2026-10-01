@@ -1,5 +1,6 @@
 var NAVTREEINDEX8 =
 {
+"structBucketGraph_1_1EnumerationPolicy.html#a63fcdb2fb19e4b2d6b373ccb0917cc4b":[2,0,23,1,1],
 "structBucketGraph_1_1EnumerationPolicy.html#a76377bf63cb81b8af37a56bcdd4b3303":[2,0,23,1,0],
 "structBucketGraph_1_1EnumerationPolicy.html#a9e76698408dc926f0be09b1227238a0f":[2,0,23,1,7],
 "structBucketGraph_1_1EnumerationPolicy.html#aa75f68eb8e3a7396714136edf5645360":[2,0,23,1,9],
@@ -248,6 +249,5 @@ var NAVTREEINDEX8 =
 "structModelData.html#ac23a00bb904bdff4445e27b1478f3805":[2,0,63,6],
 "structModelData.html#ad5d751afdd822c4cc87ab18b6fffda5a":[2,0,63,5],
 "structModelData.html#aea9d2f5b3aa72a3af01c62c7cd9d81f2":[2,0,63,1],
-"structNodeScore.html":[2,0,66],
-"structNodeScore.html#a2db702b3f5726be3620ada41c37baf00":[2,0,66,5]
+"structNodeScore.html":[2,0,66]
 };
