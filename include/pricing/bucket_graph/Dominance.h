@@ -424,3 +424,96 @@ inline bool check_dominance_against_vector(const Label *__restrict__ new_label, 
     // No domination found
     return false;
 }
+
+/**
+ * @brief Batch dominance check: test B new_labels against the same set of existing labels.
+ *
+ * Uses SIMD to compare multiple new_labels' costs/resources/visited against each
+ * existing label in parallel. Returns true if ANY new_label is dominated by an
+ * existing label.
+ *
+ * Batch size is encoded in the template parameter BATCH_SIZE (typically 4 or 8).
+ */
+template <Direction D, Stage S, size_t BATCH_SIZE>
+inline bool check_dominance_batch(const Label *__restrict__ batch_labels[BATCH_SIZE],
+                                  std::span<Label *const> labels,
+                                  const CutStorage *__restrict__ cut_storage,
+                                  uint &__restrict__ stat_n_dom) noexcept {
+    using namespace std::experimental;
+
+    constexpr double   tolerance  = numericutils::eps;
+    const size_t       num_labels = labels.size();
+    const size_t       simd_width = simd<double>::size();
+
+    // Pre-load batch costs and resources into SIMD-friendly arrays.
+    alignas(64) std::array<double, BATCH_SIZE> batch_costs;
+    alignas(64) std::array<std::array<double, R_SIZE>, BATCH_SIZE> batch_resources;
+    alignas(64) std::array<std::array<uint64_t, Label::bitmap_words>, BATCH_SIZE> batch_visited;
+
+    for (size_t b = 0; b < BATCH_SIZE; ++b) {
+        if (!batch_labels[b]) {
+            batch_costs[b] = std::numeric_limits<double>::max();
+            continue;
+        }
+        batch_costs[b] = batch_labels[b]->cost;
+        for (size_t r = 0; r < R_SIZE; ++r) batch_resources[b][r] = batch_labels[b]->resources[r];
+        for (size_t w = 0; w < Label::bitmap_words; ++w) batch_visited[b][w] = batch_labels[b]->visited_bitmap[w];
+    }
+
+    // Process existing labels in SIMD-width chunks
+    for (size_t i = 0; i < num_labels; ++i) {
+        const Label *label = labels[i];
+        if (__builtin_expect(label->is_dominated, 1)) continue;
+
+        // Cost check: existing label dominates new_label b if label->cost <= batch_costs[b]
+        for (size_t b = 0; b < BATCH_SIZE; ++b) {
+            if (!batch_labels[b]) continue;
+            if (numericutils::gt(label->cost, batch_costs[b])) continue;
+
+            bool dominated = true;
+
+            // Resource check
+            if constexpr (R_SIZE >= 2) {
+                for (size_t r = 1; r < R_SIZE; ++r) {
+                    if constexpr (D == Direction::Forward) {
+                        if (__builtin_expect(numericutils::gt(label->resources[r], batch_resources[b][r]), 0)) {
+                            dominated = false; break;
+                        }
+                    } else {
+                        if (__builtin_expect(numericutils::lt(label->resources[r], batch_resources[b][r]), 0)) {
+                            dominated = false; break;
+                        }
+                    }
+                }
+            }
+            if (dominated && R_SIZE > 0) {
+                if constexpr (D == Direction::Forward) {
+                    if (__builtin_expect(numericutils::gt(label->resources[0], batch_resources[b][0]), 0)) {
+                        dominated = false;
+                    }
+                } else {
+                    if (__builtin_expect(numericutils::lt(label->resources[0], batch_resources[b][0]), 0)) {
+                        dominated = false;
+                    }
+                }
+            }
+            if (!dominated) continue;
+
+            // Visited check
+            if constexpr (S == Stage::Three || S == Stage::Four || S == Stage::Enumerate) {
+                for (size_t w = 0; w < Label::bitmap_words; ++w) {
+                    if ((label->visited_bitmap[w] & batch_visited[b][w]) != batch_visited[b][w]) {
+                        dominated = false; break;
+                    }
+                }
+            }
+            if (!dominated) continue;
+
+            // If we reach here, existing label dominates batch_labels[b]
+            stat_n_dom++;
+            return true;
+        }
+    }
+
+    return false;
+}
