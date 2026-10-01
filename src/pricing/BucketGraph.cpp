@@ -29,21 +29,21 @@ Arc::Arc(int from, int to, const std::array<double, R_SIZE> &res_inc, double cos
 Arc::Arc(int from, int to, const std::array<double, R_SIZE> &res_inc, double cost_inc, double priority)
     : from(from), to(to), resource_increment(res_inc), cost_increment(cost_inc), priority(priority) {}
 
-BucketArc::BucketArc(int from, int to, const std::vector<double> &res_inc, double cost_inc)
+BucketArc::BucketArc(int from, int to, const std::array<double, R_SIZE> &res_inc, double cost_inc)
     : from_bucket(from), to_bucket(to), cost_increment(cost_inc) {
     for (size_t i = 0; i < res_inc.size() && i < resource_increment.size(); ++i) {
         resource_increment[i] = res_inc[i];
     }
 }
 
-BucketArc::BucketArc(int from, int to, const std::vector<double> &res_inc, double cost_inc, bool fixed)
+BucketArc::BucketArc(int from, int to, const std::array<double, R_SIZE> &res_inc, double cost_inc, bool fixed)
     : from_bucket(from), to_bucket(to), cost_increment(cost_inc), jump(fixed) {
     for (size_t i = 0; i < res_inc.size() && i < resource_increment.size(); ++i) {
         resource_increment[i] = res_inc[i];
     }
 }
 
-BucketArc::BucketArc(int from, int to, const std::vector<double> &res_inc, double cost_inc, bool fixed, int to_node)
+BucketArc::BucketArc(int from, int to, const std::array<double, R_SIZE> &res_inc, double cost_inc, bool fixed, int to_node)
     : from_bucket(from), to_bucket(to), cost_increment(cost_inc), jump(fixed), jump_to_node(to_node) {
     for (size_t i = 0; i < res_inc.size() && i < resource_increment.size(); ++i) {
         resource_increment[i] = res_inc[i];

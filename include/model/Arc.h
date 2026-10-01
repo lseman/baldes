@@ -63,22 +63,22 @@ struct arc_hash {
  *
  */
 struct BucketArc {
-    int                 from_bucket;
-    int                 to_bucket;
-    std::array<double, R_SIZE> resource_increment{};
-    double              cost_increment;
-    bool                jump = false;
-    int                 jump_to_node = -1;
+    int                          from_bucket;
+    int                          to_bucket;
+    std::array<double, R_SIZE>   resource_increment{};
+    double                       cost_increment;
+    bool                         jump = false;
+    int                          jump_to_node = -1;
 
     bool operator==(const BucketArc &other) const {
         return from_bucket == other.from_bucket && to_bucket == other.to_bucket;
     }
 
-    BucketArc(int from, int to, const std::vector<double> &res_inc, double cost_inc);
+    BucketArc(int from, int to, const std::array<double, R_SIZE> &res_inc, double cost_inc);
 
-    BucketArc(int from, int to, const std::vector<double> &res_inc, double cost_inc, bool fixed);
+    BucketArc(int from, int to, const std::array<double, R_SIZE> &res_inc, double cost_inc, bool fixed);
 
-    BucketArc(int from, int to, const std::vector<double> &res_inc, double cost_inc, bool fixed, int to_node);
+    BucketArc(int from, int to, const std::array<double, R_SIZE> &res_inc, double cost_inc, bool fixed, int to_node);
 
     // Overload < operator for map comparison
     bool operator<(const BucketArc &other) const {

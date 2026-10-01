@@ -231,7 +231,6 @@ std::vector<double> BucketGraph::labeling_algorithm() {
                 // redundant for correctness.
                 static thread_local std::vector<Label *> destination_batch;
                 destination_batch.clear();
-                destination_batch.reserve(node_arcs.size());
                 for (size_t arc_idx = 0; arc_idx < node_arcs.size(); ++arc_idx) {
                     const auto &arc = node_arcs[arc_idx];
 
@@ -292,7 +291,7 @@ std::vector<double> BucketGraph::labeling_algorithm() {
                         };
 #if defined(BALDES_HAS_SIMD)
                         if constexpr (uses_visited_dominance) {
-                            if (!to_bucket_labels.empty()) mother_bucket.ensure_label_cache();
+                            mother_bucket.ensure_label_cache();
                         }
 #endif
 

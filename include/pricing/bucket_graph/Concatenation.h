@@ -195,6 +195,10 @@ void BucketGraph::concatenate_label_from_bucket(const Label *L, int b, std::atom
     }
 #endif
 
+    const double prune_limit =
+        (S == Stage::Enumerate) ? std::min(gap, enumeration_route_cutoff.load(std::memory_order_relaxed))
+                                : best_cost.load(std::memory_order_relaxed);
+
     while (!scratch.bucket_stack.empty()) {
         if constexpr (S == Stage::Four) {
             if (pricing_truncated.load(std::memory_order_relaxed)) break;
@@ -219,11 +223,6 @@ void BucketGraph::concatenate_label_from_bucket(const Label *L, int b, std::atom
         const double path_cost = L_cost + travel_cost + (splice_state ? splice_state->cost_delta : 0.0);
         const double bound     = other_c_bar[current_bucket];
 
-        double prune_limit = best_cost.load(std::memory_order_relaxed);
-        if constexpr (S == Stage::Enumerate) {
-            prune_limit = std::min(gap, enumeration_route_cutoff.load(std::memory_order_relaxed));
-        }
-
         double bucket_bound_cost = path_cost + bound;
 #if defined(SRC)
         if constexpr (S == Stage::Four || S == Stage::Enumerate) {
@@ -240,15 +239,14 @@ void BucketGraph::concatenate_label_from_bucket(const Label *L, int b, std::atom
         if (label_count == 0) continue;
         scratch.prepare_candidates(label_count);
 
+        double label_prune_limit = best_cost.load(std::memory_order_relaxed);
+        if constexpr (S == Stage::Enumerate) {
+            label_prune_limit = std::min(gap, enumeration_route_cutoff.load(std::memory_order_relaxed));
+        }
+
         for (const Label *L_bw : labels) {
             if constexpr (S == Stage::Four) {
                 if (pricing_truncated.load(std::memory_order_relaxed)) break;
-            }
-
-            double label_prune_limit = best_cost.load(std::memory_order_relaxed);
-            if constexpr (S == Stage::Enumerate) {
-                label_prune_limit =
-                    std::min(gap, enumeration_route_cutoff.load(std::memory_order_relaxed));
             }
 
             double remaining_labels_lower_bound = path_cost + L_bw->cost;

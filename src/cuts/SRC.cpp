@@ -125,7 +125,7 @@ void LimitedMemoryRank1Cuts::separate(const SparseMatrix &A, const std::vector<d
     if (tasks.empty() || A.num_cols == 0 || allPaths.empty()) return;
 
     // Determine parallel parameters.
-    const int    JOBS       = std::max(1u, std::thread::hardware_concurrency());
+    const int    JOBS       = std::min(8, (int)std::max(1u, std::thread::hardware_concurrency()));
     const int    chunk_size = (tasks.size() + JOBS - 1) / JOBS;
     const size_t num_chunks = (tasks.size() + chunk_size - 1) / chunk_size;
 
