@@ -219,9 +219,9 @@ PYBIND11_MODULE(pybaldes, m) {
         });
 
     py::class_<Arc>(m, "Arc")
-        .def(py::init<int, int, const std::vector<double> &, double>())
-        .def(py::init<int, int, const std::vector<double> &, double, bool>())
-        .def(py::init<int, int, const std::vector<double> &, double, double>())
+        .def(py::init<int, int, const std::array<double, R_SIZE> &, double>())
+        .def(py::init<int, int, const std::array<double, R_SIZE> &, double, bool>())
+        .def(py::init<int, int, const std::array<double, R_SIZE> &, double, double>())
         .def_readonly("from", &Arc::from)
         .def_readonly("to", &Arc::to)
         .def_readonly("resource_increment", &Arc::resource_increment)
@@ -232,7 +232,7 @@ PYBIND11_MODULE(pybaldes, m) {
     py::class_<ArcList>(m, "ArcList")
         .def(py::init<>())
         .def("add_connections", &ArcList::add_connections, py::arg("connections"),
-             py::arg("default_resource_increment") = std::vector<double>{1.0}, py::arg("default_cost_increment") = 0.0,
+             py::arg("default_resource_increment") = std::array<double, R_SIZE>{1.0}, py::arg("default_cost_increment") = 0.0,
              py::arg("default_priority") = 1.0)
         .def("get_arcs", &ArcList::get_arcs);
 

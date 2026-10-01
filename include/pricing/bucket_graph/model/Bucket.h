@@ -427,7 +427,7 @@ struct alignas(64) Bucket {
      *
      */
     template <Direction D>
-    void add_bucket_arc(int from_bucket, int to_bucket, const std::vector<double> &res_inc, double cost_inc,
+    void add_bucket_arc(int from_bucket, int to_bucket, const std::array<double, R_SIZE> &res_inc, double cost_inc,
                         bool fixed, int jump_to_node = -1) {
         if constexpr (D == Direction::Forward) {
             fw_bucket_arcs.emplace_back(from_bucket, to_bucket, res_inc, cost_inc, fixed, jump_to_node);
@@ -573,7 +573,7 @@ struct alignas(64) Bucket {
     [[nodiscard]] bool empty() const { return labels.empty() && extra_labels.empty(); }
 
     template <Direction D>
-    void add_jump_arc(int from_bucket, int to_bucket, const std::vector<double> &res_inc, double cost_inc) {
+    void add_jump_arc(int from_bucket, int to_bucket, const std::array<double, R_SIZE> &res_inc, double cost_inc) {
         if constexpr (D == Direction::Forward) {
             fw_jump_arcs.emplace_back(from_bucket, to_bucket, res_inc, cost_inc);
         } else {

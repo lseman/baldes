@@ -43,7 +43,7 @@ template class ThreadLocalPool<double>;
  *
  */
 template <Direction D>
-void BucketGraph::add_arc(int from_bucket, int to_bucket, const std::vector<double> &res_inc, double cost_inc) {
+void BucketGraph::add_arc(int from_bucket, int to_bucket, const std::array<double, R_SIZE> &res_inc, double cost_inc) {
     if constexpr (D == Direction::Forward) {
         fw_arcs.emplace_back(from_bucket, to_bucket, res_inc, cost_inc);
         if (from_bucket >= static_cast<int>(fw_bucket_graph.size())) {
@@ -733,27 +733,10 @@ void BucketGraph::set_adjacency_list() {
 
     // === Step 4: Process Arcs for Each Node ===
 
-    // Helper lambda to compute resource increments.
-    // Depending on symmetry, consumption is either taken as-is or averaged.
-    auto compute_resource_increments = [&](const VRPNode &from_node, const VRPNode &to_node, double travel_cost,
-                                           std::vector<double> &inc) {
-        const int nres = options.resources.size();
-        if constexpr (SYM == Symmetry::Asymmetric) {
-            for (int r = 0; r < nres; ++r) {
-                inc[r] = (r == time_resource_idx) ? travel_cost + from_node.duration : from_node.consumption[r];
-            }
-        } else {
-            for (int r = 0; r < nres; ++r) {
-                inc[r] = (r == time_resource_idx) ? (from_node.duration / 2.0 + travel_cost + to_node.duration / 2.0)
-                                                  : ((from_node.consumption[r] + to_node.consumption[r]) / 2.0);
-            }
-        }
-    };
-
     // Lambda to add forward and reverse arcs from a given node.
     auto add_arcs_for_node = [&](const VRPNode &curr_node) {
         // Containers to accumulate arcs before insertion.
-        using ArcTuple = std::tuple<double, int, std::vector<double>, double>;
+        using ArcTuple = std::tuple<double, int, std::array<double, R_SIZE>, double>;
         std::vector<ArcTuple> forward_arcs;
         std::vector<ArcTuple> reverse_arcs;
         forward_arcs.reserve(nodes.size());
@@ -775,15 +758,24 @@ void BucketGraph::set_adjacency_list() {
             // id as bucket id).
             if (curr_node.id == next_node.id) continue;
 
-            // Compute resource increments.
-            std::vector<double> res_inc(options.resources.size());
-            compute_resource_increments(curr_node, next_node, travel_cost, res_inc);
+            // Compute resource increments into a temporary vector, then
+            // convert to std::array for arc construction.
+            const int nres = options.resources.size();
+            std::vector<double> res_inc_vec(nres);
+            for (int r = 0; r < nres; ++r) {
+                res_inc_vec[r] =
+                    (r == time_resource_idx)
+                        ? travel_cost + curr_node.duration
+                        : ((SYM == Symmetry::Asymmetric)
+                               ? curr_node.consumption[r]
+                               : (curr_node.consumption[r] + next_node.consumption[r]) / 2.0);
+            }
 
             // Check feasibility: ensure resource consumption does not
             // exceed next node's upper bound.
             bool feasible = true;
-            for (int r = 0; r < options.resources.size(); ++r) {
-                if (numericutils::gt(curr_node.lb[r] + res_inc[r], next_node.ub[r])) {
+            for (int r = 0; r < nres; ++r) {
+                if (numericutils::gt(curr_node.lb[r] + res_inc_vec[r], next_node.ub[r])) {
                     feasible = false;
                     break;
                 }
@@ -795,9 +787,15 @@ void BucketGraph::set_adjacency_list() {
             double forward_priority = (same_cluster ? 5.0 : 1.0) + 1.E-5 * next_node.start_time;
             double reverse_priority = (same_cluster ? 1.0 : 5.0) + 1.E-5 * curr_node.start_time;
 
+            // Convert to std::array for storage in ArcTuple.
+            std::array<double, R_SIZE> res_inc_arr{};
+            for (size_t r = 0; r < std::min(size_t(R_SIZE), res_inc_vec.size()); ++r) {
+                res_inc_arr[r] = res_inc_vec[r];
+            }
+
             // Collect arcs for forward and reverse directions.
-            forward_arcs.emplace_back(forward_priority, next_node.id, res_inc, cost_inc);
-            reverse_arcs.emplace_back(reverse_priority, next_node.id, res_inc, cost_inc);
+            forward_arcs.emplace_back(forward_priority, next_node.id, res_inc_arr, cost_inc);
+            reverse_arcs.emplace_back(reverse_priority, next_node.id, res_inc_arr, cost_inc);
         }
 
         // Insert the arcs into the corresponding nodes.

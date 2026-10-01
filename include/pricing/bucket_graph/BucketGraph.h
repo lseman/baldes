@@ -1220,7 +1220,7 @@ public:
         return true;
     }
     template <Direction D>
-    void add_arc(int from_bucket, int to_bucket, const std::vector<double> &res_inc, double cost_inc);
+    void add_arc(int from_bucket, int to_bucket, const std::array<double, R_SIZE> &res_inc, double cost_inc);
 
     template <Direction D>
     void generate_arcs();
