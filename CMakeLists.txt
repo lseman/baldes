@@ -46,9 +46,15 @@ if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
   string(REPLACE "-fconcepts-diagnostics-depth=10" "" CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
 endif()
 
-# set(CMAKE_CXX_FLAGS_RELEASE "-O3 -march=native -flto -Xclang -Wno-unknown-warning-option")
-# set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "-O3 -g -march=native -flto -funroll-loops -ftree-vectorize -fomit-frame-pointer -ffunction-sections -fdata-sections -fno-signed-zeros -fno-trapping-math -mtune=native -fvectorize -Xclang -Wno-unknown-warning-option")
-# set(CMAKE_CXX_FLAGS_DEBUG "-Og -g -Wall -Wextra -Xclang -Wno-unknown-warning-option")
+if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+  set(CMAKE_CXX_FLAGS_RELEASE   "-O3 -march=native -flto -Xclang -Wno-unknown-warning-option")
+  set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "-O3 -g -march=native -flto -funroll-loops -ftree-vectorize -fomit-frame-pointer -ffunction-sections -fdata-sections -fno-signed-zeros -fno-trapping-math -mtune=native -fvectorize -Xclang -Wno-unknown-warning-option")
+  set(CMAKE_CXX_FLAGS_DEBUG     "-Og -g -Wall -Wextra -Xclang -Wno-unknown-warning-option")
+elseif(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+  set(CMAKE_CXX_FLAGS_RELEASE   "-O3 -march=native -flto")
+  set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "-O3 -g -march=native -flto -funroll-loops -ftree-vectorize -fomit-frame-pointer -ffunction-sections -fdata-sections -fno-signed-zeros -fno-trapping-math -mtune=native")
+  set(CMAKE_CXX_FLAGS_DEBUG     "-Og -g -Wall -Wextra")
+endif()
 
 # set LD flags
 set(CMAKE_EXE_LINKER_FLAGS_RELEASE "-flto -Wl,--gc-sections")

@@ -289,11 +289,7 @@ std::vector<double> BucketGraph::labeling_algorithm() {
                             }
                             return true;
                         };
-#if defined(BALDES_HAS_SIMD)
-                        if constexpr (uses_visited_dominance) {
-                            mother_bucket.ensure_label_cache();
-                        }
-#endif
+// SoA cache maintained incrementally; always valid.
 
                         // Prefetch first few destination bucket labels
                         if (!to_bucket_labels.empty()) {
@@ -606,9 +602,7 @@ std::vector<double> BucketGraph::labeling_algorithm() {
                                         }
                                     }
                                 } else {
-#if defined(BALDES_HAS_SIMD)
-                                    mother_bucket.ensure_label_cache();
-#endif
+                                    // SoA cache maintained incrementally; always valid.
                                     const auto bracket_begin_it = std::lower_bound(
                                         to_bucket_labels.begin(), to_bucket_labels.end(), cost_lo, label_cost_less);
                                     const auto expensive_begin_it = std::upper_bound(
