@@ -49,10 +49,11 @@ struct BucketOptions {
 
     bool symmetric = false;
 
-    std::vector<int>         main_resources = {0};
-    std::vector<std::string> resources      = {"time"};
-    std::vector<int>         resource_type  = {1};
-    std::vector<int>         or_resources   = {1};
+    std::vector<int>         main_resources      = {0};
+    std::vector<std::string> resources           = {"time"};
+    std::vector<int>         resource_type       = {1};
+    std::vector<int>         or_resources        = {1};
+    int                      time_resource_index = 0;  // Precomputed index of "time" resource
 
     double n_warm_start = 0.7;
 

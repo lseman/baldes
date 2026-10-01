@@ -1146,29 +1146,6 @@ inline bool BucketGraph::dominates_cost_state(const Label *__restrict new_label,
 }
 
 /**
- * @brief Checks if element 'a' precedes element 'b' in the given
- * strongly connected components (SCCs).
- *
- * This function takes a vector of SCCs and two elements 'a' and 'b' as
- * input. It searches for 'a' and 'b' in the SCCs and determines if 'a'
- * precedes 'b' in the SCC list.
- *
- */
-
-template <typename T>
-inline bool precedes(const T a, const T b, const UnionFind &uf,
-                     ankerl::unordered_dense::map<std::pair<T, T>, bool> &cache) {
-    // Create a cache key
-    const std::pair<T, T> key{a, b};
-    if (const auto it = cache.find(key); it != cache.end()) { return it->second; }
-
-    // Use the UnionFind's built-in comparison which already has the
-    // correct ordering
-    bool result = uf.compareSubsets(a, b);
-    cache.emplace(key, result);
-    return result;
-}
-/**
  * @brief Determines if a label is dominated in component-wise smaller
  * buckets.
  *

@@ -124,7 +124,17 @@ public:
     std::vector<Label *> solvePSTEP_by_MTZ();
     std::vector<Label *> solveTSPTW_by_MTZ();
 
-    void setOptions(const BucketOptions &options) { this->options = options; }
+    void setOptions(const BucketOptions &opts) {
+        this->options = opts;
+        // Precompute the index of the "time" resource to avoid string comparisons
+        // in the hot path of check_feasibility and UpdateBucketsSet.
+        for (size_t r = 0; r < options.resources.size(); ++r) {
+            if (options.resources[r] == "time") {
+                options.time_resource_index = static_cast<int>(r);
+                break;
+            }
+        }
+    }
 
 #ifdef SCHRODINGER
     SchrodingerPool sPool = SchrodingerPool(200);
@@ -1048,27 +1058,16 @@ public:
         const auto &bw_resources = bw_label->resources;
         const auto &node         = nodes[fw_label->node_id];
 
-        const size_t n_resources = options.resources.size();
+        const int    time_idx     = options.time_resource_index;
+        const size_t n_resources  = options.resources.size();
 
         // Compute travel time only once.
         const auto travel_time = getcij(fw_label->node_id, bw_label->node_id);
 
-        // Assuming the "time" resource is at a known index (e.g., index 0).
-        // If not, you can either iterate to find it once or precompute a
-        // boolean array.
-        if (n_resources > 0 && options.resources[0] == "time") {
-            // Check time feasibility.
-            const double fw_time = splice_state ? fw_resources[0] : fw_resources[0] + travel_time + node.duration;
-            if (numericutils::gt(fw_time, bw_resources[0])) return false;
-        } else {
-            // Fallback: iterate to check any resource named "time".
-            for (size_t r = 0; r < n_resources; ++r) {
-                if (options.resources[r] == "time") {
-                    const double fw_time =
-                        splice_state ? fw_resources[r] : fw_resources[r] + travel_time + node.duration;
-                    if (numericutils::gt(fw_time, bw_resources[r])) return false;
-                }
-            }
+        // Check time feasibility using precomputed resource index.
+        if (time_idx >= 0 && time_idx < static_cast<int>(n_resources)) {
+            const double fw_time = splice_state ? fw_resources[time_idx] : fw_resources[time_idx] + travel_time + node.duration;
+            if (numericutils::gt(fw_time, bw_resources[time_idx])) return false;
         }
 
         // Check additional resource feasibility (assuming resources[0] is
