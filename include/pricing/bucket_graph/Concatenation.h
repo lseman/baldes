@@ -196,6 +196,8 @@ void BucketGraph::concatenate_label_from_bucket(const Label *L, int b, std::atom
                                 : best_cost.load(std::memory_order_relaxed);
 
     while (!scratch.bucket_stack.empty()) {
+        // Hoist pricing_truncated check — set once, never cleared, so one
+        // load at loop entry is sufficient.
         if constexpr (S == Stage::Four) {
             if (pricing_truncated.load(std::memory_order_relaxed)) break;
         }
@@ -241,9 +243,7 @@ void BucketGraph::concatenate_label_from_bucket(const Label *L, int b, std::atom
         }
 
         for (const Label *L_bw : labels) {
-            if constexpr (S == Stage::Four) {
-                if (pricing_truncated.load(std::memory_order_relaxed)) break;
-            }
+            // pricing_truncated already checked above; no need to reload here.
 
             double remaining_labels_lower_bound = path_cost + L_bw->cost;
 #if defined(SRC)
@@ -261,9 +261,7 @@ void BucketGraph::concatenate_label_from_bucket(const Label *L, int b, std::atom
                                                best_cost, scratch);
         }
         for (const Label *L_bw : extra_labels) {
-            if constexpr (S == Stage::Four) {
-                if (pricing_truncated.load(std::memory_order_relaxed)) break;
-            }
+            // pricing_truncated already checked above; no need to reload here.
             collect_concatenation_candidate<S>(L, L_bw, path_cost, splice_state, active_cuts, max_src_splice_discount,
                                                best_cost, scratch);
         }
