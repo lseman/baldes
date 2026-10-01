@@ -401,10 +401,26 @@ public:
     double gap = std::numeric_limits<double>::infinity();
 
     CutStorage          *cut_storage = new CutStorage();
+    double               pricing_src_compensation_bound = 0.0;
     static constexpr int max_buckets = 10000; // Define maximum number of buckets beforehand
 
     std::vector<Bucket> fw_buckets;
     std::vector<Bucket> bw_buckets;
+
+    struct LabelingScratch {
+        std::vector<uint64_t>             bucket_visited;
+        std::vector<uint32_t>             touched_segments;
+        std::vector<int>                  bucket_pos_in_scc;
+        std::vector<std::vector<Label *>> pending_labels_by_bucket;
+        std::vector<size_t>               pending_label_cursor;
+        std::vector<uint8_t>              bucket_is_active;
+        std::vector<int>                  active_bucket_heap;
+    };
+
+    // Forward and backward labeling can run concurrently, so each direction
+    // owns its scratch buffers while retaining their capacities across stages.
+    LabelingScratch fw_labeling_scratch;
+    LabelingScratch bw_labeling_scratch;
 
     using LabelPoolPtr = std::shared_ptr<LabelPool>;
 
@@ -1240,6 +1256,9 @@ public:
     template <Direction D, Stage S>
     bool is_dominated(const Label *new_label, const Label *labels) noexcept;
 
+    template <Stage S>
+    bool dominates_cost_state(const Label *new_label, const Label *label) noexcept;
+
     template <Direction D, Stage S>
     bool dominates_resource_path(const Label *new_label, const Label *label) noexcept;
 
@@ -1422,10 +1441,7 @@ public:
             red_cost -= nodes[node_id].cost;
 
             // --- SRC Logic ---
-            size_t         segment     = node_id >> 6;
-            const uint64_t bit_mask    = bit_mask_lookup[node_id & 63];
-            auto          &cutter      = cut_storage;
-            const auto     active_cuts = cutter->getActiveCuts();
+            auto &cutter = cut_storage;
 
 #if defined(SRC)
 #if !defined(SRC_MEMORY_MODE_ARC)
@@ -1439,6 +1455,7 @@ public:
             }
             for (const auto active_idx : cutter->getSRCNodeClears(node_id)) { updated_SRCmap[active_idx] = 0; }
 #else
+            const auto &active_cuts = cutter->getActiveCuts();
             for (const auto &active_cut : active_cuts) {
                 const size_t idx = active_cut.index;
                 const auto  &cut = *active_cut.cut_ptr;

@@ -32,6 +32,14 @@ constexpr double REHEATING_FACTOR       = 1.5;
 constexpr int    REHEAT_INTERVAL        = 50;
 } // namespace LocalSearchConfig
 
+namespace rank1 {
+// Change in the rank-3 floor coefficient when a third node contributes
+// extra visits to a route whose first two nodes contribute base_visits.
+constexpr int rank3_floor_coefficient_delta(int base_visits, int extra_visits) noexcept {
+    return ((base_visits + extra_visits) / 2) - (base_visits / 2);
+}
+} // namespace rank1
+
 // Inline helper function: Given a base vector and a denominator, generate all
 // unique runtime permutations (using std::next_permutation) and return them as
 // a vector of Permutations.

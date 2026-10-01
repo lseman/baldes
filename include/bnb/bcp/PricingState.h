@@ -16,6 +16,15 @@ struct PricingState {
     int  failed_enumerations  = 0;
     int  retry_enumeration_at = 0;
 
+    [[nodiscard]] static constexpr bool canApplyDeluxing(bool enumeration_requested,
+                                                         bool enumeration_failed) noexcept {
+        return enumeration_requested && !enumeration_failed;
+    }
+
+    [[nodiscard]] static constexpr bool hasSrcMasterCapacity(size_t current_rows, size_t capacity) noexcept {
+        return current_rows < capacity;
+    }
+
     void recordPricingStage(int stage) noexcept {
         if (stage == 4) ++exact_pricing_passes;
     }

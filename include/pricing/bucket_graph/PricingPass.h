@@ -76,6 +76,11 @@ void BucketGraph::run_directional_pricing(BucketDirectionalBounds &bounds) {
     if constexpr (SYM == Symmetry::Asymmetric) {
         run_labeling_algorithms<S, Full::Partial>(bounds.forward, bounds.backward);
     } else {
+        if constexpr (S == Stage::Four || S == Stage::Enumerate) {
+            pricing_src_compensation_bound = src_cost_compensation_bound();
+        } else {
+            pricing_src_compensation_bound = 0.0;
+        }
         const auto start = std::chrono::steady_clock::now();
         bounds.forward = labeling_algorithm<Direction::Forward, S, Full::Partial>();
         last_pricing_timings.forward_labeling_ms =

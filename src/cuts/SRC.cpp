@@ -424,10 +424,9 @@ void LimitedMemoryRank1Cuts::separateR1C3Adjacency(const SparseMatrix &A, const 
     std::vector<std::pair<double, std::array<int, 3>>> cut_candidates;
     cut_candidates.reserve(1024);
 
-    std::vector<int>  v_tmp;                     // candidate k nodes
-    std::vector<int>  v_tmp2(all_num_routes, 0); // visit-count accumulator
-    std::vector<int>  touched_routes;            // routes with v_tmp2 > 0
-    std::vector<bool> in_touched(all_num_routes, false);
+    std::vector<int> v_tmp;                     // candidate k nodes
+    std::vector<int> v_tmp2(all_num_routes, 0); // visit counts for the current (i,j) pair
+    std::vector<int> touched_routes;            // routes containing i or j
     touched_routes.reserve(256);
 
     for (int i = 1; i < N_SIZE - 1; ++i) {
@@ -451,56 +450,46 @@ void LimitedMemoryRank1Cuts::separateR1C3Adjacency(const SparseMatrix &A, const 
             touched_routes.clear();
             if (auto it = row_indices_map.find(i); it != row_indices_map.end()) {
                 for (int r : it->second) {
-                    if (!in_touched[r]) {
-                        in_touched[r] = true;
-                        touched_routes.push_back(r);
-                    }
+                    if (v_tmp2[r] == 0) touched_routes.push_back(r);
                     v_tmp2[r] += vertex_route_map[i][r];
                 }
             }
             if (auto it = row_indices_map.find(j); it != row_indices_map.end()) {
                 for (int r : it->second) {
-                    if (!in_touched[r]) {
-                        in_touched[r] = true;
-                        touched_routes.push_back(r);
-                    }
+                    if (v_tmp2[r] == 0) touched_routes.push_back(r);
                     v_tmp2[r] += vertex_route_map[j][r];
+                }
+            }
+
+            double base_lhs = 0.0;
+            for (int r : touched_routes) {
+                if (v_tmp2[r] >= 2 && static_cast<size_t>(r) < x.size()) {
+                    base_lhs += static_cast<double>(v_tmp2[r] / 2) * x[r];
                 }
             }
 
             for (int k : v_tmp) {
                 if (k <= j || k <= 0 || k >= N_SIZE - 1) continue;
 
-                // Temporarily add k's visits
+                // Only routes containing k can change their floor coefficient.
+                // Starting from the (i,j) contribution avoids rescanning the
+                // growing union of routes touched by preceding k candidates.
+                double vio = base_lhs - rhs;
                 if (auto it = row_indices_map.find(k); it != row_indices_map.end()) {
                     for (int r : it->second) {
-                        if (!in_touched[r]) {
-                            in_touched[r] = true;
-                            touched_routes.push_back(r);
-                        }
-                        v_tmp2[r] += vertex_route_map[k][r];
+                        if (r < 0 || r >= all_num_routes || static_cast<size_t>(r) >= x.size()) continue;
+                        const int base_visits = v_tmp2[r];
+                        const int extra_visits = vertex_route_map[k][r];
+                        vio += static_cast<double>(rank1::rank3_floor_coefficient_delta(base_visits, extra_visits)) *
+                               x[r];
                     }
-                }
-
-                // Floor-formula violation screening
-                double vio = -rhs;
-                for (int r : touched_routes) {
-                    if (v_tmp2[r] >= 2 && static_cast<size_t>(r) < x.size()) vio += (v_tmp2[r] / 2) * x[r];
-                }
-
-                // Remove k's visits (restore (i,j)-only state)
-                if (auto it = row_indices_map.find(k); it != row_indices_map.end()) {
-                    for (int r : it->second) v_tmp2[r] -= vertex_route_map[k][r];
                 }
 
                 if (vio > SRC_SEPARATION_TOL) { cut_candidates.emplace_back(vio, std::array<int, 3>{i, j, k}); }
             }
 
             // Reset accumulators for the next (i,j) pair
-            for (int r : touched_routes) {
-                v_tmp2[r]     = 0;
-                in_touched[r] = false;
-            }
+            for (int r : touched_routes) v_tmp2[r] = 0;
         }
     }
 
