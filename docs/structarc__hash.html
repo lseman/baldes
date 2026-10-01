@@ -130,7 +130,7 @@ Public Member Functions</h2></td></tr>
 </table>
 <a name="details" id="details"></a><h2 id="header-details" class="groupheader">Detailed Description</h2>
 <div class="textblock">
-<p class="definition">Definition at line <a class="el" href="Arc_8h_source.html#l00036">36</a> of file <a class="el" href="Arc_8h_source.html">Arc.h</a>.</p>
+<p class="definition">Definition at line <a class="el" href="Arc_8h_source.html#l00037">37</a> of file <a class="el" href="Arc_8h_source.html">Arc.h</a>.</p>
 </div><a name="doc-func-members" id="doc-func-members"></a><h2 id="header-doc-func-members" class="groupheader">Member Function Documentation</h2>
 <a id="a883ebe94b960ab76b3d17440611ea839" name="a883ebe94b960ab76b3d17440611ea839"></a>
 <h2 class="memtitle"><span class="permalink"><a href="#a883ebe94b960ab76b3d17440611ea839">&#9670;&#160;</a></span>operator()()</h2>
@@ -155,33 +155,28 @@ Public Member Functions</h2></td></tr>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="Arc_8h_source.html#l00037">37</a> of file <a class="el" href="Arc_8h_source.html">Arc.h</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">   37</span>                                               {</div>
-<div class="line"><span class="lineno">   38</span>        XXH64_state_t *<span class="keyword">const</span> state = XXH64_createState();</div>
-<div class="line"><span class="lineno">   39</span>        XXH64_reset(state, 0); <span class="comment">// Use 0 as seed, or choose another seed</span></div>
-<div class="line"><span class="lineno">   40</span> </div>
-<div class="line"><span class="lineno">   41</span>        <span class="comment">// Add all members to the hash state</span></div>
+<p class="definition">Definition at line <a class="el" href="Arc_8h_source.html#l00038">38</a> of file <a class="el" href="Arc_8h_source.html">Arc.h</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">   38</span>                                               {</div>
+<div class="line"><span class="lineno">   39</span>        XXH64_state_t *<span class="keyword">const</span> state = XXH64_createState();</div>
+<div class="line"><span class="lineno">   40</span>        XXH64_reset(state, 0);</div>
+<div class="line"><span class="lineno">   41</span> </div>
 <div class="line"><span class="lineno">   42</span>        XXH64_update(state, &amp;arc.<a class="code hl_variable" href="structArc.html#ae3e622d8b015312fcc1ad9afa1b2ab85">from</a>, <span class="keyword">sizeof</span>(arc.<a class="code hl_variable" href="structArc.html#ae3e622d8b015312fcc1ad9afa1b2ab85">from</a>));</div>
 <div class="line"><span class="lineno">   43</span>        XXH64_update(state, &amp;arc.<a class="code hl_variable" href="structArc.html#ab496a182b8eacf1aecb763f0c7d1114b">to</a>, <span class="keyword">sizeof</span>(arc.<a class="code hl_variable" href="structArc.html#ab496a182b8eacf1aecb763f0c7d1114b">to</a>));</div>
 <div class="line"><span class="lineno">   44</span>        XXH64_update(state, &amp;arc.<a class="code hl_variable" href="structArc.html#a39418aa5ffc3097cb8529a063c796de9">cost_increment</a>, <span class="keyword">sizeof</span>(arc.<a class="code hl_variable" href="structArc.html#a39418aa5ffc3097cb8529a063c796de9">cost_increment</a>));</div>
 <div class="line"><span class="lineno">   45</span>        XXH64_update(state, &amp;arc.<a class="code hl_variable" href="structArc.html#af6585bc29b66fe037f4c60e7cd9d1cc2">fixed</a>, <span class="keyword">sizeof</span>(arc.<a class="code hl_variable" href="structArc.html#af6585bc29b66fe037f4c60e7cd9d1cc2">fixed</a>));</div>
 <div class="line"><span class="lineno">   46</span>        XXH64_update(state, &amp;arc.<a class="code hl_variable" href="structArc.html#a1f9078b8f29193518c236f45add8a77c">priority</a>, <span class="keyword">sizeof</span>(arc.<a class="code hl_variable" href="structArc.html#a1f9078b8f29193518c236f45add8a77c">priority</a>));</div>
-<div class="line"><span class="lineno">   47</span> </div>
-<div class="line"><span class="lineno">   48</span>        <span class="comment">// Add the resource_increment vector</span></div>
-<div class="line"><span class="lineno">   49</span>        <span class="keywordflow">if</span> (!arc.<a class="code hl_variable" href="structArc.html#a7b2bb3a71d544a7515b665930efbcb86">resource_increment</a>.empty()) {</div>
-<div class="line"><span class="lineno">   50</span>            XXH64_update(state, arc.<a class="code hl_variable" href="structArc.html#a7b2bb3a71d544a7515b665930efbcb86">resource_increment</a>.data(), arc.<a class="code hl_variable" href="structArc.html#a7b2bb3a71d544a7515b665930efbcb86">resource_increment</a>.size() * <span class="keyword">sizeof</span>(<span class="keywordtype">double</span>));</div>
-<div class="line"><span class="lineno">   51</span>        }</div>
-<div class="line"><span class="lineno">   52</span> </div>
-<div class="line"><span class="lineno">   53</span>        <span class="keyword">const</span> std::size_t hash = XXH64_digest(state);</div>
-<div class="line"><span class="lineno">   54</span>        XXH64_freeState(state);</div>
-<div class="line"><span class="lineno">   55</span>        <span class="keywordflow">return</span> hash;</div>
-<div class="line"><span class="lineno">   56</span>    }</div>
-<div class="ttc" id="astructArc_html_a1f9078b8f29193518c236f45add8a77c"><div class="ttname"><a href="structArc.html#a1f9078b8f29193518c236f45add8a77c">Arc::priority</a></div><div class="ttdeci">double priority</div><div class="ttdef"><b>Definition</b> <a href="Arc_8h_source.html#l00018">Arc.h:18</a></div></div>
-<div class="ttc" id="astructArc_html_a39418aa5ffc3097cb8529a063c796de9"><div class="ttname"><a href="structArc.html#a39418aa5ffc3097cb8529a063c796de9">Arc::cost_increment</a></div><div class="ttdeci">double cost_increment</div><div class="ttdef"><b>Definition</b> <a href="Arc_8h_source.html#l00016">Arc.h:16</a></div></div>
-<div class="ttc" id="astructArc_html_a7b2bb3a71d544a7515b665930efbcb86"><div class="ttname"><a href="structArc.html#a7b2bb3a71d544a7515b665930efbcb86">Arc::resource_increment</a></div><div class="ttdeci">std::vector&lt; double &gt; resource_increment</div><div class="ttdef"><b>Definition</b> <a href="Arc_8h_source.html#l00015">Arc.h:15</a></div></div>
-<div class="ttc" id="astructArc_html_ab496a182b8eacf1aecb763f0c7d1114b"><div class="ttname"><a href="structArc.html#ab496a182b8eacf1aecb763f0c7d1114b">Arc::to</a></div><div class="ttdeci">int to</div><div class="ttdef"><b>Definition</b> <a href="Arc_8h_source.html#l00014">Arc.h:14</a></div></div>
-<div class="ttc" id="astructArc_html_ae3e622d8b015312fcc1ad9afa1b2ab85"><div class="ttname"><a href="structArc.html#ae3e622d8b015312fcc1ad9afa1b2ab85">Arc::from</a></div><div class="ttdeci">int from</div><div class="ttdef"><b>Definition</b> <a href="Arc_8h_source.html#l00013">Arc.h:13</a></div></div>
-<div class="ttc" id="astructArc_html_af6585bc29b66fe037f4c60e7cd9d1cc2"><div class="ttname"><a href="structArc.html#af6585bc29b66fe037f4c60e7cd9d1cc2">Arc::fixed</a></div><div class="ttdeci">bool fixed</div><div class="ttdef"><b>Definition</b> <a href="Arc_8h_source.html#l00017">Arc.h:17</a></div></div>
+<div class="line"><span class="lineno">   47</span>        XXH64_update(state, arc.<a class="code hl_variable" href="structArc.html#a207db6a5846f4be165ab7786358db3e9">resource_increment</a>.data(), arc.<a class="code hl_variable" href="structArc.html#a207db6a5846f4be165ab7786358db3e9">resource_increment</a>.size() * <span class="keyword">sizeof</span>(<span class="keywordtype">double</span>));</div>
+<div class="line"><span class="lineno">   48</span> </div>
+<div class="line"><span class="lineno">   49</span>        <span class="keyword">const</span> std::size_t hash = XXH64_digest(state);</div>
+<div class="line"><span class="lineno">   50</span>        XXH64_freeState(state);</div>
+<div class="line"><span class="lineno">   51</span>        <span class="keywordflow">return</span> hash;</div>
+<div class="line"><span class="lineno">   52</span>    }</div>
+<div class="ttc" id="astructArc_html_a1f9078b8f29193518c236f45add8a77c"><div class="ttname"><a href="structArc.html#a1f9078b8f29193518c236f45add8a77c">Arc::priority</a></div><div class="ttdeci">double priority</div><div class="ttdef"><b>Definition</b> <a href="Arc_8h_source.html#l00019">Arc.h:19</a></div></div>
+<div class="ttc" id="astructArc_html_a207db6a5846f4be165ab7786358db3e9"><div class="ttname"><a href="structArc.html#a207db6a5846f4be165ab7786358db3e9">Arc::resource_increment</a></div><div class="ttdeci">std::array&lt; double, R_SIZE &gt; resource_increment</div><div class="ttdef"><b>Definition</b> <a href="Arc_8h_source.html#l00016">Arc.h:16</a></div></div>
+<div class="ttc" id="astructArc_html_a39418aa5ffc3097cb8529a063c796de9"><div class="ttname"><a href="structArc.html#a39418aa5ffc3097cb8529a063c796de9">Arc::cost_increment</a></div><div class="ttdeci">double cost_increment</div><div class="ttdef"><b>Definition</b> <a href="Arc_8h_source.html#l00017">Arc.h:17</a></div></div>
+<div class="ttc" id="astructArc_html_ab496a182b8eacf1aecb763f0c7d1114b"><div class="ttname"><a href="structArc.html#ab496a182b8eacf1aecb763f0c7d1114b">Arc::to</a></div><div class="ttdeci">int to</div><div class="ttdef"><b>Definition</b> <a href="Arc_8h_source.html#l00015">Arc.h:15</a></div></div>
+<div class="ttc" id="astructArc_html_ae3e622d8b015312fcc1ad9afa1b2ab85"><div class="ttname"><a href="structArc.html#ae3e622d8b015312fcc1ad9afa1b2ab85">Arc::from</a></div><div class="ttdeci">int from</div><div class="ttdef"><b>Definition</b> <a href="Arc_8h_source.html#l00014">Arc.h:14</a></div></div>
+<div class="ttc" id="astructArc_html_af6585bc29b66fe037f4c60e7cd9d1cc2"><div class="ttname"><a href="structArc.html#af6585bc29b66fe037f4c60e7cd9d1cc2">Arc::fixed</a></div><div class="ttdeci">bool fixed</div><div class="ttdef"><b>Definition</b> <a href="Arc_8h_source.html#l00018">Arc.h:18</a></div></div>
 </div><!-- fragment -->
 </div>
 </div>

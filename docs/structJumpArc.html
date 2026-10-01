@@ -129,14 +129,14 @@ document.addEventListener('DOMContentLoaded',() => { initNavTree('structJumpArc.
 <table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 id="header-pub-methods" class="groupheader"><a id="pub-methods" name="pub-methods"></a>
 Public Member Functions</h2></td></tr>
-<tr class="memitem:a0e80f0e87c84cc52319f79c395c174e6" id="r_a0e80f0e87c84cc52319f79c395c174e6"><td class="memItemLeft">&#160;</td><td class="memItemRight"><a class="el" href="#a0e80f0e87c84cc52319f79c395c174e6">JumpArc</a> (int base, int jump, const std::vector&lt; double &gt; &amp;res_inc, double cost_inc)</td></tr>
-<tr class="memitem:a99b5edcd9094588787f6d89e7016670b" id="r_a99b5edcd9094588787f6d89e7016670b"><td class="memItemLeft">&#160;</td><td class="memItemRight"><a class="el" href="#a99b5edcd9094588787f6d89e7016670b">JumpArc</a> (int base, int jump, const std::vector&lt; double &gt; &amp;res_inc, double cost_inc, int to_job)</td></tr>
+<tr class="memitem:a50690a21d924e77e96d6d20e904db9dd" id="r_a50690a21d924e77e96d6d20e904db9dd"><td class="memItemLeft">&#160;</td><td class="memItemRight"><a class="el" href="#a50690a21d924e77e96d6d20e904db9dd">JumpArc</a> (int base, int jump, const std::array&lt; double, R_SIZE &gt; &amp;res_inc, double cost_inc)</td></tr>
+<tr class="memitem:a1c597c805359ad61b527931d28848748" id="r_a1c597c805359ad61b527931d28848748"><td class="memItemLeft">&#160;</td><td class="memItemRight"><a class="el" href="#a1c597c805359ad61b527931d28848748">JumpArc</a> (int base, int jump, const std::array&lt; double, R_SIZE &gt; &amp;res_inc, double cost_inc, int to_job)</td></tr>
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 id="header-pub-attribs" class="groupheader"><a id="pub-attribs" name="pub-attribs"></a>
 Public Attributes</h2></td></tr>
 <tr class="memitem:adbb84cb0039fb7eb7924687aeda305a4" id="r_adbb84cb0039fb7eb7924687aeda305a4"><td class="memItemLeft">int&#160;</td><td class="memItemRight"><a class="el" href="#adbb84cb0039fb7eb7924687aeda305a4">base_bucket</a></td></tr>
 <tr class="memitem:a48d9bcdc1e6fe1d601f97d7fca528e35" id="r_a48d9bcdc1e6fe1d601f97d7fca528e35"><td class="memItemLeft">int&#160;</td><td class="memItemRight"><a class="el" href="#a48d9bcdc1e6fe1d601f97d7fca528e35">jump_bucket</a></td></tr>
-<tr class="memitem:af04caea416981df3c0633e22965f4064" id="r_af04caea416981df3c0633e22965f4064"><td class="memItemLeft">std::vector&lt; double &gt;&#160;</td><td class="memItemRight"><a class="el" href="#af04caea416981df3c0633e22965f4064">resource_increment</a></td></tr>
+<tr class="memitem:a9e37aff2b2956be087f10798927e32d4" id="r_a9e37aff2b2956be087f10798927e32d4"><td class="memItemLeft">std::array&lt; double, R_SIZE &gt;&#160;</td><td class="memItemRight"><a class="el" href="#a9e37aff2b2956be087f10798927e32d4">resource_increment</a> {}</td></tr>
 <tr class="memitem:a7cd8d28f39396f7c6b968e0681467f85" id="r_a7cd8d28f39396f7c6b968e0681467f85"><td class="memItemLeft">double&#160;</td><td class="memItemRight"><a class="el" href="#a7cd8d28f39396f7c6b968e0681467f85">cost_increment</a></td></tr>
 <tr class="memitem:a3e8cedf7e39d4395cd0dda3585e02f14" id="r_a3e8cedf7e39d4395cd0dda3585e02f14"><td class="memItemLeft">int&#160;</td><td class="memItemRight"><a class="el" href="#a3e8cedf7e39d4395cd0dda3585e02f14">to_job</a> = -1</td></tr>
 </table>
@@ -144,10 +144,10 @@ Public Attributes</h2></td></tr>
 <div class="textblock"><p>Represents a jump arc between two buckets. </p>
 <p>This struct contains information about a jump arc, including the base bucket, jump bucket, resource increment, and cost increment. </p>
 
-<p class="definition">Definition at line <a class="el" href="Arc_8h_source.html#l00105">105</a> of file <a class="el" href="Arc_8h_source.html">Arc.h</a>.</p>
+<p class="definition">Definition at line <a class="el" href="Arc_8h_source.html#l00101">101</a> of file <a class="el" href="Arc_8h_source.html">Arc.h</a>.</p>
 </div><a name="doc-constructors" id="doc-constructors"></a><h2 id="header-doc-constructors" class="groupheader">Constructor &amp; Destructor Documentation</h2>
-<a id="a0e80f0e87c84cc52319f79c395c174e6" name="a0e80f0e87c84cc52319f79c395c174e6"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#a0e80f0e87c84cc52319f79c395c174e6">&#9670;&#160;</a></span>JumpArc() <span class="overload">[1/2]</span></h2>
+<a id="a50690a21d924e77e96d6d20e904db9dd" name="a50690a21d924e77e96d6d20e904db9dd"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a50690a21d924e77e96d6d20e904db9dd">&#9670;&#160;</a></span>JumpArc() <span class="overload">[1/2]</span></h2>
 
 <div class="memitem">
 <div class="memproto">
@@ -165,7 +165,7 @@ Public Attributes</h2></td></tr>
         <tr>
           <td class="paramkey"></td>
           <td></td>
-          <td class="paramtype">const std::vector&lt; double &gt; &amp;</td>          <td class="paramname"><span class="paramname"><em>res_inc</em></span>, </td>
+          <td class="paramtype">const std::array&lt; double, R_SIZE &gt; &amp;</td>          <td class="paramname"><span class="paramname"><em>res_inc</em></span>, </td>
         </tr>
         <tr>
           <td class="paramkey"></td>
@@ -175,17 +175,17 @@ Public Attributes</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="BucketGraph_8cpp_source.html#l00047">47</a> of file <a class="el" href="BucketGraph_8cpp_source.html">BucketGraph.cpp</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">   48</span>    : <a class="code hl_variable" href="#adbb84cb0039fb7eb7924687aeda305a4">base_bucket</a>(base), <a class="code hl_variable" href="#a48d9bcdc1e6fe1d601f97d7fca528e35">jump_bucket</a>(jump), <a class="code hl_variable" href="#af04caea416981df3c0633e22965f4064">resource_increment</a>(res_inc), <a class="code hl_variable" href="#a7cd8d28f39396f7c6b968e0681467f85">cost_increment</a>(cost_inc) {}</div>
-<div class="ttc" id="astructJumpArc_html_a48d9bcdc1e6fe1d601f97d7fca528e35"><div class="ttname"><a href="#a48d9bcdc1e6fe1d601f97d7fca528e35">JumpArc::jump_bucket</a></div><div class="ttdeci">int jump_bucket</div><div class="ttdef"><b>Definition</b> <a href="Arc_8h_source.html#l00107">Arc.h:107</a></div></div>
-<div class="ttc" id="astructJumpArc_html_a7cd8d28f39396f7c6b968e0681467f85"><div class="ttname"><a href="#a7cd8d28f39396f7c6b968e0681467f85">JumpArc::cost_increment</a></div><div class="ttdeci">double cost_increment</div><div class="ttdef"><b>Definition</b> <a href="Arc_8h_source.html#l00109">Arc.h:109</a></div></div>
-<div class="ttc" id="astructJumpArc_html_adbb84cb0039fb7eb7924687aeda305a4"><div class="ttname"><a href="#adbb84cb0039fb7eb7924687aeda305a4">JumpArc::base_bucket</a></div><div class="ttdeci">int base_bucket</div><div class="ttdef"><b>Definition</b> <a href="Arc_8h_source.html#l00106">Arc.h:106</a></div></div>
-<div class="ttc" id="astructJumpArc_html_af04caea416981df3c0633e22965f4064"><div class="ttname"><a href="#af04caea416981df3c0633e22965f4064">JumpArc::resource_increment</a></div><div class="ttdeci">std::vector&lt; double &gt; resource_increment</div><div class="ttdef"><b>Definition</b> <a href="Arc_8h_source.html#l00108">Arc.h:108</a></div></div>
+<p class="definition">Definition at line <a class="el" href="BucketGraph_8cpp_source.html#l00053">53</a> of file <a class="el" href="BucketGraph_8cpp_source.html">BucketGraph.cpp</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">   54</span>    : <a class="code hl_variable" href="#adbb84cb0039fb7eb7924687aeda305a4">base_bucket</a>(base), <a class="code hl_variable" href="#a48d9bcdc1e6fe1d601f97d7fca528e35">jump_bucket</a>(jump), <a class="code hl_variable" href="#a9e37aff2b2956be087f10798927e32d4">resource_increment</a>(res_inc), <a class="code hl_variable" href="#a7cd8d28f39396f7c6b968e0681467f85">cost_increment</a>(cost_inc) {}</div>
+<div class="ttc" id="astructJumpArc_html_a48d9bcdc1e6fe1d601f97d7fca528e35"><div class="ttname"><a href="#a48d9bcdc1e6fe1d601f97d7fca528e35">JumpArc::jump_bucket</a></div><div class="ttdeci">int jump_bucket</div><div class="ttdef"><b>Definition</b> <a href="Arc_8h_source.html#l00103">Arc.h:103</a></div></div>
+<div class="ttc" id="astructJumpArc_html_a7cd8d28f39396f7c6b968e0681467f85"><div class="ttname"><a href="#a7cd8d28f39396f7c6b968e0681467f85">JumpArc::cost_increment</a></div><div class="ttdeci">double cost_increment</div><div class="ttdef"><b>Definition</b> <a href="Arc_8h_source.html#l00105">Arc.h:105</a></div></div>
+<div class="ttc" id="astructJumpArc_html_a9e37aff2b2956be087f10798927e32d4"><div class="ttname"><a href="#a9e37aff2b2956be087f10798927e32d4">JumpArc::resource_increment</a></div><div class="ttdeci">std::array&lt; double, R_SIZE &gt; resource_increment</div><div class="ttdef"><b>Definition</b> <a href="Arc_8h_source.html#l00104">Arc.h:104</a></div></div>
+<div class="ttc" id="astructJumpArc_html_adbb84cb0039fb7eb7924687aeda305a4"><div class="ttname"><a href="#adbb84cb0039fb7eb7924687aeda305a4">JumpArc::base_bucket</a></div><div class="ttdeci">int base_bucket</div><div class="ttdef"><b>Definition</b> <a href="Arc_8h_source.html#l00102">Arc.h:102</a></div></div>
 </div><!-- fragment -->
 </div>
 </div>
-<a id="a99b5edcd9094588787f6d89e7016670b" name="a99b5edcd9094588787f6d89e7016670b"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#a99b5edcd9094588787f6d89e7016670b">&#9670;&#160;</a></span>JumpArc() <span class="overload">[2/2]</span></h2>
+<a id="a1c597c805359ad61b527931d28848748" name="a1c597c805359ad61b527931d28848748"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a1c597c805359ad61b527931d28848748">&#9670;&#160;</a></span>JumpArc() <span class="overload">[2/2]</span></h2>
 
 <div class="memitem">
 <div class="memproto">
@@ -203,7 +203,7 @@ Public Attributes</h2></td></tr>
         <tr>
           <td class="paramkey"></td>
           <td></td>
-          <td class="paramtype">const std::vector&lt; double &gt; &amp;</td>          <td class="paramname"><span class="paramname"><em>res_inc</em></span>, </td>
+          <td class="paramtype">const std::array&lt; double, R_SIZE &gt; &amp;</td>          <td class="paramname"><span class="paramname"><em>res_inc</em></span>, </td>
         </tr>
         <tr>
           <td class="paramkey"></td>
@@ -218,9 +218,9 @@ Public Attributes</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="BucketGraph_8cpp_source.html#l00050">50</a> of file <a class="el" href="BucketGraph_8cpp_source.html">BucketGraph.cpp</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">   51</span>    : <a class="code hl_variable" href="#adbb84cb0039fb7eb7924687aeda305a4">base_bucket</a>(base), <a class="code hl_variable" href="#a48d9bcdc1e6fe1d601f97d7fca528e35">jump_bucket</a>(jump), <a class="code hl_variable" href="#af04caea416981df3c0633e22965f4064">resource_increment</a>(res_inc), <a class="code hl_variable" href="#a7cd8d28f39396f7c6b968e0681467f85">cost_increment</a>(cost_inc), <a class="code hl_variable" href="#a3e8cedf7e39d4395cd0dda3585e02f14">to_job</a>(<a class="code hl_variable" href="#a3e8cedf7e39d4395cd0dda3585e02f14">to_job</a>) {}</div>
-<div class="ttc" id="astructJumpArc_html_a3e8cedf7e39d4395cd0dda3585e02f14"><div class="ttname"><a href="#a3e8cedf7e39d4395cd0dda3585e02f14">JumpArc::to_job</a></div><div class="ttdeci">int to_job</div><div class="ttdef"><b>Definition</b> <a href="Arc_8h_source.html#l00110">Arc.h:110</a></div></div>
+<p class="definition">Definition at line <a class="el" href="BucketGraph_8cpp_source.html#l00056">56</a> of file <a class="el" href="BucketGraph_8cpp_source.html">BucketGraph.cpp</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">   57</span>    : <a class="code hl_variable" href="#adbb84cb0039fb7eb7924687aeda305a4">base_bucket</a>(base), <a class="code hl_variable" href="#a48d9bcdc1e6fe1d601f97d7fca528e35">jump_bucket</a>(jump), <a class="code hl_variable" href="#a9e37aff2b2956be087f10798927e32d4">resource_increment</a>(res_inc), <a class="code hl_variable" href="#a7cd8d28f39396f7c6b968e0681467f85">cost_increment</a>(cost_inc), <a class="code hl_variable" href="#a3e8cedf7e39d4395cd0dda3585e02f14">to_job</a>(<a class="code hl_variable" href="#a3e8cedf7e39d4395cd0dda3585e02f14">to_job</a>) {}</div>
+<div class="ttc" id="astructJumpArc_html_a3e8cedf7e39d4395cd0dda3585e02f14"><div class="ttname"><a href="#a3e8cedf7e39d4395cd0dda3585e02f14">JumpArc::to_job</a></div><div class="ttdeci">int to_job</div><div class="ttdef"><b>Definition</b> <a href="Arc_8h_source.html#l00106">Arc.h:106</a></div></div>
 </div><!-- fragment -->
 </div>
 </div>
@@ -237,7 +237,7 @@ Public Attributes</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="Arc_8h_source.html#l00106">106</a> of file <a class="el" href="Arc_8h_source.html">Arc.h</a>.</p>
+<p class="definition">Definition at line <a class="el" href="Arc_8h_source.html#l00102">102</a> of file <a class="el" href="Arc_8h_source.html">Arc.h</a>.</p>
 
 </div>
 </div>
@@ -253,7 +253,7 @@ Public Attributes</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="Arc_8h_source.html#l00109">109</a> of file <a class="el" href="Arc_8h_source.html">Arc.h</a>.</p>
+<p class="definition">Definition at line <a class="el" href="Arc_8h_source.html#l00105">105</a> of file <a class="el" href="Arc_8h_source.html">Arc.h</a>.</p>
 
 </div>
 </div>
@@ -269,24 +269,25 @@ Public Attributes</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="Arc_8h_source.html#l00107">107</a> of file <a class="el" href="Arc_8h_source.html">Arc.h</a>.</p>
+<p class="definition">Definition at line <a class="el" href="Arc_8h_source.html#l00103">103</a> of file <a class="el" href="Arc_8h_source.html">Arc.h</a>.</p>
 
 </div>
 </div>
-<a id="af04caea416981df3c0633e22965f4064" name="af04caea416981df3c0633e22965f4064"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#af04caea416981df3c0633e22965f4064">&#9670;&#160;</a></span>resource_increment</h2>
+<a id="a9e37aff2b2956be087f10798927e32d4" name="a9e37aff2b2956be087f10798927e32d4"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a9e37aff2b2956be087f10798927e32d4">&#9670;&#160;</a></span>resource_increment</h2>
 
 <div class="memitem">
 <div class="memproto">
       <table class="memname">
         <tr>
-          <td class="memname">std::vector&lt;double&gt; JumpArc::resource_increment</td>
+          <td class="memname">std::array&lt;double, R_SIZE&gt; JumpArc::resource_increment {}</td>
         </tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="Arc_8h_source.html#l00108">108</a> of file <a class="el" href="Arc_8h_source.html">Arc.h</a>.</p>
-
+<p class="definition">Definition at line <a class="el" href="Arc_8h_source.html#l00104">104</a> of file <a class="el" href="Arc_8h_source.html">Arc.h</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  104</span>{};</div>
+</div><!-- fragment -->
 </div>
 </div>
 <a id="a3e8cedf7e39d4395cd0dda3585e02f14" name="a3e8cedf7e39d4395cd0dda3585e02f14"></a>
@@ -301,7 +302,7 @@ Public Attributes</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="Arc_8h_source.html#l00110">110</a> of file <a class="el" href="Arc_8h_source.html">Arc.h</a>.</p>
+<p class="definition">Definition at line <a class="el" href="Arc_8h_source.html#l00106">106</a> of file <a class="el" href="Arc_8h_source.html">Arc.h</a>.</p>
 
 </div>
 </div>

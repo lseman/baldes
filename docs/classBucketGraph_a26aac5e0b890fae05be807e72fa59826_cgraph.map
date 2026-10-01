@@ -34,7 +34,7 @@
 <area shape="poly" id="edge13_Node000011_Node000013" title=" " alt="" coords="627,138,701,138,701,144,627,144"/>
 <area shape="rect" id="Node000014" href="$classSCC.html#a62703561fe2b0e0a6f7961b09778ff6e" title="Computes the topological order of Strongly Connected Components (SCCs) in a directed graph." alt="" coords="674,177,871,203"/>
 <area shape="poly" id="edge14_Node000011_Node000014" title=" " alt="" coords="602,152,693,171,692,176,601,157"/>
-<area shape="rect" id="Node000018" href="$classBucketGraph.html#a42e016ec947d0a75ffa73ceab03207d7" title="Represents a bucket in the Bucket Graph. Adds an arc to the bucket graph." alt="" coords="462,316,611,342"/>
+<area shape="rect" id="Node000018" href="$classBucketGraph.html#add18b2f35cbb59fcb346629a3094d0d6" title="Represents a bucket in the Bucket Graph. Adds an arc to the bucket graph." alt="" coords="462,316,611,342"/>
 <area shape="poly" id="edge18_Node000017_Node000018" title=" " alt="" coords="329,392,446,350,468,344,470,349,448,355,331,397"/>
 <area shape="rect" id="Node000019" href="$classMST.html#ae8f38e66bc8580c27c85f2455a6a4d2d" title=" " alt="" coords="705,379,840,404"/>
 <area shape="poly" id="edge19_Node000017_Node000019" title=" " alt="" coords="400,405,626,401,690,397,690,402,626,406,400,411"/>

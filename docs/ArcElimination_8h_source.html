@@ -581,24 +581,22 @@ document.addEventListener('DOMContentLoaded',() => { initNavTree('ArcElimination
 <div class="line"><a id="l00487" name="l00487"></a><span class="lineno">  487</span> </div>
 <div class="line"><a id="l00488" name="l00488"></a><span class="lineno">  488</span>                    <span class="keyword">const</span> <span class="keywordtype">int</span> candidate_b = candidate_buckets[i];</div>
 <div class="line"><a id="l00489" name="l00489"></a><span class="lineno">  489</span>                    B_bar.push_back(candidate_b);</div>
-<div class="line"><a id="l00490" name="l00490"></a><span class="lineno">  490</span>                    std::vector&lt;double&gt; res(candidate_res[i].begin(),</div>
-<div class="line"><a id="l00491" name="l00491"></a><span class="lineno">  491</span>                                            candidate_res[i].begin() +</div>
-<div class="line"><a id="l00492" name="l00492"></a><span class="lineno">  492</span>                                                <span class="keyword">static_cast&lt;</span>std::ptrdiff_t<span class="keyword">&gt;</span>(<a class="code hl_variable" href="classBucketGraph.html#a596938fef84ae5ab9d07c64bd98515f1">options</a>.main_resources.size()));</div>
-<div class="line"><a id="l00493" name="l00493"></a><span class="lineno">  493</span>                    <span class="keyword">const</span> <span class="keywordtype">double</span>        cost = candidate_costs[i];</div>
-<div class="line"><a id="l00494" name="l00494"></a><span class="lineno">  494</span> </div>
-<div class="line"><a id="l00495" name="l00495"></a><span class="lineno">  495</span>                    buckets[b].template add_jump_arc&lt;D&gt;(b, candidate_b, res, cost);</div>
-<div class="line"><a id="l00496" name="l00496"></a><span class="lineno">  496</span>                    nodes[buckets[b].node_id].template add_jump_arc&lt;D&gt;(b, candidate_b, res, cost, orig_arc.to);</div>
-<div class="line"><a id="l00497" name="l00497"></a><span class="lineno">  497</span>                    buckets[b].template add_bucket_arc&lt;D&gt;(b, candidate_b, res, cost, <span class="keyword">true</span>, orig_arc.to);</div>
-<div class="line"><a id="l00498" name="l00498"></a><span class="lineno">  498</span>                    ++arc_counter;</div>
-<div class="line"><a id="l00499" name="l00499"></a><span class="lineno">  499</span>                }</div>
-<div class="line"><a id="l00500" name="l00500"></a><span class="lineno">  500</span>            }</div>
-<div class="line"><a id="l00501" name="l00501"></a><span class="lineno">  501</span>        }</div>
-<div class="line"><a id="l00502" name="l00502"></a><span class="lineno">  502</span>    }</div>
-<div class="line"><a id="l00503" name="l00503"></a><span class="lineno">  503</span> </div>
-<div class="line"><a id="l00504" name="l00504"></a><span class="lineno">  504</span>    <span class="comment">// Print summary of jump arcs added.</span></div>
-<div class="line"><a id="l00505" name="l00505"></a><span class="lineno">  505</span>    <a class="code hl_define" href="Definitions_8h.html#a4ab0da18d610e272471a4a974f6a4dd5">CONDITIONAL</a>(D, <a class="code hl_function" href="Definitions_8h.html#a086546d06aa565cdd48f436973ebc496">print_info</a>(<span class="stringliteral">&quot;[Fw] added {} jump arcs\n&quot;</span>, arc_counter),</div>
-<div class="line"><a id="l00506" name="l00506"></a><span class="lineno">  506</span>                <a class="code hl_function" href="Definitions_8h.html#a086546d06aa565cdd48f436973ebc496">print_info</a>(<span class="stringliteral">&quot;[Bw] added {} jump arcs\n&quot;</span>, arc_counter));</div>
-<div class="line"><a id="l00507" name="l00507"></a><span class="lineno">  507</span>}</div>
+<div class="line"><a id="l00490" name="l00490"></a><span class="lineno">  490</span>                    <span class="keyword">const</span> <span class="keyword">auto</span> &amp;res = candidate_res[i];</div>
+<div class="line"><a id="l00491" name="l00491"></a><span class="lineno">  491</span>                    <span class="keyword">const</span> <span class="keywordtype">double</span> cost = candidate_costs[i];</div>
+<div class="line"><a id="l00492" name="l00492"></a><span class="lineno">  492</span> </div>
+<div class="line"><a id="l00493" name="l00493"></a><span class="lineno">  493</span>                    buckets[b].template add_jump_arc&lt;D&gt;(b, candidate_b, res, cost);</div>
+<div class="line"><a id="l00494" name="l00494"></a><span class="lineno">  494</span>                    nodes[buckets[b].node_id].template add_jump_arc&lt;D&gt;(b, candidate_b, res, cost, orig_arc.to);</div>
+<div class="line"><a id="l00495" name="l00495"></a><span class="lineno">  495</span>                    buckets[b].template add_bucket_arc&lt;D&gt;(b, candidate_b, res, cost, <span class="keyword">true</span>, orig_arc.to);</div>
+<div class="line"><a id="l00496" name="l00496"></a><span class="lineno">  496</span>                    ++arc_counter;</div>
+<div class="line"><a id="l00497" name="l00497"></a><span class="lineno">  497</span>                }</div>
+<div class="line"><a id="l00498" name="l00498"></a><span class="lineno">  498</span>            }</div>
+<div class="line"><a id="l00499" name="l00499"></a><span class="lineno">  499</span>        }</div>
+<div class="line"><a id="l00500" name="l00500"></a><span class="lineno">  500</span>    }</div>
+<div class="line"><a id="l00501" name="l00501"></a><span class="lineno">  501</span> </div>
+<div class="line"><a id="l00502" name="l00502"></a><span class="lineno">  502</span>    <span class="comment">// Print summary of jump arcs added.</span></div>
+<div class="line"><a id="l00503" name="l00503"></a><span class="lineno">  503</span>    <a class="code hl_define" href="Definitions_8h.html#a4ab0da18d610e272471a4a974f6a4dd5">CONDITIONAL</a>(D, <a class="code hl_function" href="Definitions_8h.html#a086546d06aa565cdd48f436973ebc496">print_info</a>(<span class="stringliteral">&quot;[Fw] added {} jump arcs\n&quot;</span>, arc_counter),</div>
+<div class="line"><a id="l00504" name="l00504"></a><span class="lineno">  504</span>                <a class="code hl_function" href="Definitions_8h.html#a086546d06aa565cdd48f436973ebc496">print_info</a>(<span class="stringliteral">&quot;[Bw] added {} jump arcs\n&quot;</span>, arc_counter));</div>
+<div class="line"><a id="l00505" name="l00505"></a><span class="lineno">  505</span>}</div>
 </div>
 <div class="ttc" id="aBucketGraph_8h_html"><div class="ttname"><a href="BucketGraph_8h.html">BucketGraph.h</a></div><div class="ttdoc">Defines the BucketGraph class and its bucket-based VRP labeling functionality.</div></div>
 <div class="ttc" id="aDefinitions_8h_html_a086546d06aa565cdd48f436973ebc496"><div class="ttname"><a href="Definitions_8h.html#a086546d06aa565cdd48f436973ebc496">print_info</a></div><div class="ttdeci">void print_info(fmt::format_string&lt; Args... &gt; format, Args &amp;&amp;...args)</div><div class="ttdoc">Prints an informational message with a specific format.</div><div class="ttdef"><b>Definition</b> <a href="Definitions_8h_source.html#l00149">Definitions.h:149</a></div></div>

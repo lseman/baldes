@@ -67,7 +67,7 @@ var NAVTREEINDEX =
 "AMD_8h.html",
 "MIPHandler_8cpp.html#aec665b2ab1203ce33949c414d91f9477",
 "classBNBNode.html#aca6f8d009954c8444675f8ce69cbfaad",
-"classBucketGraph.html#a9d5f2f83ae5e3849e002e335b749f59f",
+"classBucketGraph.html#a9f46e743292dba1a3bd148732d8daea2",
 "classGenericParameters.html#a116f4649e15f53707120e04b5e854b37",
 "classMIPProblem.html#a37ce4a12d22bbe71ffb41b7e45e0c724",
 "classStabilization.html#af7a7486e7ceeb36e10cfafbc476847f9",

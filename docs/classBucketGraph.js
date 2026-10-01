@@ -21,7 +21,7 @@ var classBucketGraph =
     [ "BucketGraph", "classBucketGraph.html#ab8f484b3e417bf03ae4c991496b8a21f", null ],
     [ "BucketGraph", "classBucketGraph.html#a9a40f10a7c5be4b1bba90286d2d67efc", null ],
     [ "activate_bucket_pricing_stage", "classBucketGraph.html#aef455ef49dfd22ea60a92004197cc614", null ],
-    [ "add_arc", "classBucketGraph.html#a42e016ec947d0a75ffa73ceab03207d7", null ],
+    [ "add_arc", "classBucketGraph.html#add18b2f35cbb59fcb346629a3094d0d6", null ],
     [ "assign_buckets", "classBucketGraph.html#af129eff306551dc7cc7fe00b919bbbd0", null ],
     [ "assign_buckets", "classBucketGraph.html#a3084429e997dbd4341b9d02316006f3e", null ],
     [ "assign_symmetry", "classBucketGraph.html#a2a66984a5d0225286c0598b884772f8c", null ],

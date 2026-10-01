@@ -127,14 +127,14 @@ document.addEventListener('DOMContentLoaded',() => { initNavTree('classArcList.h
 <tr class="heading"><td colspan="2"><h2 id="header-pub-methods" class="groupheader"><a id="pub-methods" name="pub-methods"></a>
 Public Member Functions</h2></td></tr>
 <tr class="memitem:a462a3994c9da5b3e40b3c50609210f1d" id="r_a462a3994c9da5b3e40b3c50609210f1d"><td class="memItemLeft">void&#160;</td><td class="memItemRight"><a class="el" href="#a462a3994c9da5b3e40b3c50609210f1d">add_arc</a> (const <a class="el" href="structArc.html">Arc</a> &amp;arc)</td></tr>
-<tr class="memitem:aaf4c85922468302616b83a2313df0b0a" id="r_aaf4c85922468302616b83a2313df0b0a"><td class="memItemLeft">void&#160;</td><td class="memItemRight"><a class="el" href="#aaf4c85922468302616b83a2313df0b0a">add_connections</a> (const std::vector&lt; std::pair&lt; int, int &gt; &gt; &amp;connections, const std::vector&lt; double &gt; &amp;default_resource_increment={1.0}, double default_cost_increment=0.0, double default_priority=1.0)</td></tr>
+<tr class="memitem:a4f08451b8eacd38116943df49239e374" id="r_a4f08451b8eacd38116943df49239e374"><td class="memItemLeft">void&#160;</td><td class="memItemRight"><a class="el" href="#a4f08451b8eacd38116943df49239e374">add_connections</a> (const std::vector&lt; std::pair&lt; int, int &gt; &gt; &amp;connections, const std::array&lt; double, R_SIZE &gt; &amp;default_resource_increment, double default_cost_increment=0.0, double default_priority=1.0)</td></tr>
 <tr class="memitem:a39483409ce71ed1961d069b22be9b3f7" id="r_a39483409ce71ed1961d069b22be9b3f7"><td class="memItemLeft">bool&#160;</td><td class="memItemRight"><a class="el" href="#a39483409ce71ed1961d069b22be9b3f7">has_arc</a> (int from, int to) const</td></tr>
 <tr class="memitem:a322fb164458df43b937bb7ec059eae06" id="r_a322fb164458df43b937bb7ec059eae06"><td class="memItemLeft">const <a class="el" href="structArc.html">Arc</a> *&#160;</td><td class="memItemRight"><a class="el" href="#a322fb164458df43b937bb7ec059eae06">get_arc</a> (int from, int to) const</td></tr>
 <tr class="memitem:a7ef22dd3838b0ad9f736cee94ceb0481" id="r_a7ef22dd3838b0ad9f736cee94ceb0481"><td class="memItemLeft">const std::vector&lt; <a class="el" href="structArc.html">Arc</a> &gt; &amp;&#160;</td><td class="memItemRight"><a class="el" href="#a7ef22dd3838b0ad9f736cee94ceb0481">get_arcs</a> () const</td></tr>
 </table>
 <a name="details" id="details"></a><h2 id="header-details" class="groupheader">Detailed Description</h2>
 <div class="textblock">
-<p class="definition">Definition at line <a class="el" href="Arc_8h_source.html#l00140">140</a> of file <a class="el" href="Arc_8h_source.html">Arc.h</a>.</p>
+<p class="definition">Definition at line <a class="el" href="Arc_8h_source.html#l00136">136</a> of file <a class="el" href="Arc_8h_source.html">Arc.h</a>.</p>
 </div><a name="doc-func-members" id="doc-func-members"></a><h2 id="header-doc-func-members" class="groupheader">Member Function Documentation</h2>
 <a id="a462a3994c9da5b3e40b3c50609210f1d" name="a462a3994c9da5b3e40b3c50609210f1d"></a>
 <h2 class="memtitle"><span class="permalink"><a href="#a462a3994c9da5b3e40b3c50609210f1d">&#9670;&#160;</a></span>add_arc()</h2>
@@ -159,13 +159,13 @@ Public Member Functions</h2></td></tr>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="Arc_8h_source.html#l00143">143</a> of file <a class="el" href="Arc_8h_source.html">Arc.h</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  143</span>{ predefined_arcs.emplace_back(arc); }</div>
+<p class="definition">Definition at line <a class="el" href="Arc_8h_source.html#l00139">139</a> of file <a class="el" href="Arc_8h_source.html">Arc.h</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  139</span>{ predefined_arcs.emplace_back(arc); }</div>
 </div><!-- fragment -->
 </div>
 </div>
-<a id="aaf4c85922468302616b83a2313df0b0a" name="aaf4c85922468302616b83a2313df0b0a"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#aaf4c85922468302616b83a2313df0b0a">&#9670;&#160;</a></span>add_connections()</h2>
+<a id="a4f08451b8eacd38116943df49239e374" name="a4f08451b8eacd38116943df49239e374"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a4f08451b8eacd38116943df49239e374">&#9670;&#160;</a></span>add_connections()</h2>
 
 <div class="memitem">
 <div class="memproto">
@@ -181,7 +181,7 @@ Public Member Functions</h2></td></tr>
         <tr>
           <td class="paramkey"></td>
           <td></td>
-          <td class="paramtype">const std::vector&lt; double &gt; &amp;</td>          <td class="paramname"><span class="paramname"><em>default_resource_increment</em></span><span class="paramdefsep"> = </span><span class="paramdefval">{1.0}</span>, </td>
+          <td class="paramtype">const std::array&lt; double, R_SIZE &gt; &amp;</td>          <td class="paramname"><span class="paramname"><em>default_resource_increment</em></span>, </td>
         </tr>
         <tr>
           <td class="paramkey"></td>
@@ -201,21 +201,28 @@ Public Member Functions</h2></td></tr>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="Arc_8h_source.html#l00147">147</a> of file <a class="el" href="Arc_8h_source.html">Arc.h</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  148</span>                                                                             {1.0}, <span class="comment">// Default increment</span></div>
-<div class="line"><span class="lineno">  149</span>                         <span class="keywordtype">double</span> default_cost_increment = 0.0, <span class="keywordtype">double</span> default_priority = 1.0) {</div>
-<div class="line"><span class="lineno">  150</span>        <span class="keywordflow">for</span> (<span class="keyword">const</span> <span class="keyword">auto</span> &amp;conn : connections) {</div>
-<div class="line"><span class="lineno">  151</span>            <span class="keywordtype">int</span> from = conn.first;</div>
-<div class="line"><span class="lineno">  152</span>            <span class="keywordtype">int</span> to   = conn.second;</div>
-<div class="line"><span class="lineno">  153</span> </div>
-<div class="line"><span class="lineno">  154</span>            <span class="comment">// Create an Arc with the provided default resource increment and</span></div>
-<div class="line"><span class="lineno">  155</span>            <span class="comment">// cost increment</span></div>
-<div class="line"><span class="lineno">  156</span>            Arc arc(from, to, default_resource_increment, default_cost_increment, default_priority);</div>
-<div class="line"><span class="lineno">  157</span>            <a class="code hl_function" href="#a462a3994c9da5b3e40b3c50609210f1d">add_arc</a>(arc);</div>
-<div class="line"><span class="lineno">  158</span>        }</div>
-<div class="line"><span class="lineno">  159</span>    }</div>
-<div class="ttc" id="aclassArcList_html_a462a3994c9da5b3e40b3c50609210f1d"><div class="ttname"><a href="#a462a3994c9da5b3e40b3c50609210f1d">ArcList::add_arc</a></div><div class="ttdeci">void add_arc(const Arc &amp;arc)</div><div class="ttdef"><b>Definition</b> <a href="Arc_8h_source.html#l00143">Arc.h:143</a></div></div>
-</div><!-- fragment -->
+<p class="definition">Definition at line <a class="el" href="Arc_8h_source.html#l00143">143</a> of file <a class="el" href="Arc_8h_source.html">Arc.h</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  145</span>                                                                                         {</div>
+<div class="line"><span class="lineno">  146</span>        <span class="keywordflow">for</span> (<span class="keyword">const</span> <span class="keyword">auto</span> &amp;conn : connections) {</div>
+<div class="line"><span class="lineno">  147</span>            <span class="keywordtype">int</span> from = conn.first;</div>
+<div class="line"><span class="lineno">  148</span>            <span class="keywordtype">int</span> to   = conn.second;</div>
+<div class="line"><span class="lineno">  149</span> </div>
+<div class="line"><span class="lineno">  150</span>            Arc arc(from, to, default_resource_increment, default_cost_increment, default_priority);</div>
+<div class="line"><span class="lineno">  151</span>            <a class="code hl_function" href="#a462a3994c9da5b3e40b3c50609210f1d">add_arc</a>(arc);</div>
+<div class="line"><span class="lineno">  152</span>        }</div>
+<div class="line"><span class="lineno">  153</span>    }</div>
+<div class="ttc" id="aclassArcList_html_a462a3994c9da5b3e40b3c50609210f1d"><div class="ttname"><a href="#a462a3994c9da5b3e40b3c50609210f1d">ArcList::add_arc</a></div><div class="ttdeci">void add_arc(const Arc &amp;arc)</div><div class="ttdef"><b>Definition</b> <a href="Arc_8h_source.html#l00139">Arc.h:139</a></div></div>
+</div><!-- fragment --><div class="dynheader">
+Here is the call graph for this function:</div>
+<div class="dyncontent">
+<div class="center"><img src="classArcList_a4f08451b8eacd38116943df49239e374_cgraph.png" border="0" usemap="#aclassArcList_a4f08451b8eacd38116943df49239e374_cgraph" loading="lazy" alt=""/></div>
+<map name="aclassArcList_a4f08451b8eacd38116943df49239e374_cgraph" id="aclassArcList_a4f08451b8eacd38116943df49239e374_cgraph">
+<area shape="rect" title=" " alt="" coords="5,5,173,31"/>
+<area shape="rect" href="classArcList.html#a462a3994c9da5b3e40b3c50609210f1d" title=" " alt="" coords="221,5,336,31"/>
+<area shape="poly" title=" " alt="" coords="173,16,205,16,205,21,173,21"/>
+</map>
+</div>
+
 </div>
 </div>
 <a id="a322fb164458df43b937bb7ec059eae06" name="a322fb164458df43b937bb7ec059eae06"></a>
@@ -245,13 +252,13 @@ Public Member Functions</h2></td></tr>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="Arc_8h_source.html#l00170">170</a> of file <a class="el" href="Arc_8h_source.html">Arc.h</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  170</span>                                               {</div>
-<div class="line"><span class="lineno">  171</span>        <span class="keywordflow">for</span> (<span class="keyword">const</span> <span class="keyword">auto</span> &amp;arc : predefined_arcs) {</div>
-<div class="line"><span class="lineno">  172</span>            <span class="keywordflow">if</span> (arc.from == from &amp;&amp; arc.to == to) { <span class="keywordflow">return</span> &amp;arc; }</div>
-<div class="line"><span class="lineno">  173</span>        }</div>
-<div class="line"><span class="lineno">  174</span>        <span class="keywordflow">return</span> <span class="keyword">nullptr</span>;</div>
-<div class="line"><span class="lineno">  175</span>    }</div>
+<p class="definition">Definition at line <a class="el" href="Arc_8h_source.html#l00164">164</a> of file <a class="el" href="Arc_8h_source.html">Arc.h</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  164</span>                                               {</div>
+<div class="line"><span class="lineno">  165</span>        <span class="keywordflow">for</span> (<span class="keyword">const</span> <span class="keyword">auto</span> &amp;arc : predefined_arcs) {</div>
+<div class="line"><span class="lineno">  166</span>            <span class="keywordflow">if</span> (arc.from == from &amp;&amp; arc.to == to) { <span class="keywordflow">return</span> &amp;arc; }</div>
+<div class="line"><span class="lineno">  167</span>        }</div>
+<div class="line"><span class="lineno">  168</span>        <span class="keywordflow">return</span> <span class="keyword">nullptr</span>;</div>
+<div class="line"><span class="lineno">  169</span>    }</div>
 </div><!-- fragment -->
 </div>
 </div>
@@ -278,8 +285,8 @@ Public Member Functions</h2></td></tr>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="Arc_8h_source.html#l00178">178</a> of file <a class="el" href="Arc_8h_source.html">Arc.h</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  178</span>{ <span class="keywordflow">return</span> predefined_arcs; }</div>
+<p class="definition">Definition at line <a class="el" href="Arc_8h_source.html#l00172">172</a> of file <a class="el" href="Arc_8h_source.html">Arc.h</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  172</span>{ <span class="keywordflow">return</span> predefined_arcs; }</div>
 </div><!-- fragment -->
 </div>
 </div>
@@ -310,13 +317,13 @@ Public Member Functions</h2></td></tr>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="Arc_8h_source.html#l00162">162</a> of file <a class="el" href="Arc_8h_source.html">Arc.h</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  162</span>                                         {</div>
-<div class="line"><span class="lineno">  163</span>        <span class="keywordflow">for</span> (<span class="keyword">const</span> <span class="keyword">auto</span> &amp;arc : predefined_arcs) {</div>
-<div class="line"><span class="lineno">  164</span>            <span class="keywordflow">if</span> (arc.from == from &amp;&amp; arc.to == to) { <span class="keywordflow">return</span> <span class="keyword">true</span>; }</div>
-<div class="line"><span class="lineno">  165</span>        }</div>
-<div class="line"><span class="lineno">  166</span>        <span class="keywordflow">return</span> <span class="keyword">false</span>;</div>
-<div class="line"><span class="lineno">  167</span>    }</div>
+<p class="definition">Definition at line <a class="el" href="Arc_8h_source.html#l00156">156</a> of file <a class="el" href="Arc_8h_source.html">Arc.h</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  156</span>                                         {</div>
+<div class="line"><span class="lineno">  157</span>        <span class="keywordflow">for</span> (<span class="keyword">const</span> <span class="keyword">auto</span> &amp;arc : predefined_arcs) {</div>
+<div class="line"><span class="lineno">  158</span>            <span class="keywordflow">if</span> (arc.from == from &amp;&amp; arc.to == to) { <span class="keywordflow">return</span> <span class="keyword">true</span>; }</div>
+<div class="line"><span class="lineno">  159</span>        }</div>
+<div class="line"><span class="lineno">  160</span>        <span class="keywordflow">return</span> <span class="keyword">false</span>;</div>
+<div class="line"><span class="lineno">  161</span>    }</div>
 </div><!-- fragment -->
 </div>
 </div>

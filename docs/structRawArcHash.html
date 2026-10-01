@@ -130,7 +130,7 @@ Public Member Functions</h2></td></tr>
 </table>
 <a name="details" id="details"></a><h2 id="header-details" class="groupheader">Detailed Description</h2>
 <div class="textblock">
-<p class="definition">Definition at line <a class="el" href="Arc_8h_source.html#l00130">130</a> of file <a class="el" href="Arc_8h_source.html">Arc.h</a>.</p>
+<p class="definition">Definition at line <a class="el" href="Arc_8h_source.html#l00126">126</a> of file <a class="el" href="Arc_8h_source.html">Arc.h</a>.</p>
 </div><a name="doc-func-members" id="doc-func-members"></a><h2 id="header-doc-func-members" class="groupheader">Member Function Documentation</h2>
 <a id="ab53632178a3f7711c4ce38f20fee8191" name="ab53632178a3f7711c4ce38f20fee8191"></a>
 <h2 class="memtitle"><span class="permalink"><a href="#ab53632178a3f7711c4ce38f20fee8191">&#9670;&#160;</a></span>operator()()</h2>
@@ -155,16 +155,16 @@ Public Member Functions</h2></td></tr>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="Arc_8h_source.html#l00131">131</a> of file <a class="el" href="Arc_8h_source.html">Arc.h</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  131</span>                                                  {</div>
-<div class="line"><span class="lineno">  132</span>        <span class="comment">// Take the address of &#39;arc.from&#39; and &#39;arc.to&#39; for hashing</span></div>
-<div class="line"><span class="lineno">  133</span>        XXH64_hash_t hash_value = XXH3_64bits(&amp;arc.<a class="code hl_variable" href="structRawArc.html#a6f45ba05e140c0d39a72df903f987077">from</a>, <span class="keyword">sizeof</span>(arc.<a class="code hl_variable" href="structRawArc.html#a6f45ba05e140c0d39a72df903f987077">from</a>));                  <span class="comment">// Hash the &#39;from&#39; field</span></div>
-<div class="line"><span class="lineno">  134</span>        hash_value              = XXH3_64bits_withSeed(&amp;arc.<a class="code hl_variable" href="structRawArc.html#a7162640eb341a138c5e34416d7757437">to</a>, <span class="keyword">sizeof</span>(arc.<a class="code hl_variable" href="structRawArc.html#a7162640eb341a138c5e34416d7757437">to</a>), hash_value); <span class="comment">// Combine with &#39;to&#39; field</span></div>
-<div class="line"><span class="lineno">  135</span> </div>
-<div class="line"><span class="lineno">  136</span>        <span class="keywordflow">return</span> <span class="keyword">static_cast&lt;</span>std::size_t<span class="keyword">&gt;</span>(hash_value); <span class="comment">// Return the final hash value</span></div>
-<div class="line"><span class="lineno">  137</span>    }</div>
-<div class="ttc" id="astructRawArc_html_a6f45ba05e140c0d39a72df903f987077"><div class="ttname"><a href="structRawArc.html#a6f45ba05e140c0d39a72df903f987077">RawArc::from</a></div><div class="ttdeci">int from</div><div class="ttdef"><b>Definition</b> <a href="Arc_8h_source.html#l00119">Arc.h:119</a></div></div>
-<div class="ttc" id="astructRawArc_html_a7162640eb341a138c5e34416d7757437"><div class="ttname"><a href="structRawArc.html#a7162640eb341a138c5e34416d7757437">RawArc::to</a></div><div class="ttdeci">int to</div><div class="ttdef"><b>Definition</b> <a href="Arc_8h_source.html#l00120">Arc.h:120</a></div></div>
+<p class="definition">Definition at line <a class="el" href="Arc_8h_source.html#l00127">127</a> of file <a class="el" href="Arc_8h_source.html">Arc.h</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  127</span>                                                  {</div>
+<div class="line"><span class="lineno">  128</span>        <span class="comment">// Take the address of &#39;arc.from&#39; and &#39;arc.to&#39; for hashing</span></div>
+<div class="line"><span class="lineno">  129</span>        XXH64_hash_t hash_value = XXH3_64bits(&amp;arc.<a class="code hl_variable" href="structRawArc.html#a6f45ba05e140c0d39a72df903f987077">from</a>, <span class="keyword">sizeof</span>(arc.<a class="code hl_variable" href="structRawArc.html#a6f45ba05e140c0d39a72df903f987077">from</a>));                  <span class="comment">// Hash the &#39;from&#39; field</span></div>
+<div class="line"><span class="lineno">  130</span>        hash_value              = XXH3_64bits_withSeed(&amp;arc.<a class="code hl_variable" href="structRawArc.html#a7162640eb341a138c5e34416d7757437">to</a>, <span class="keyword">sizeof</span>(arc.<a class="code hl_variable" href="structRawArc.html#a7162640eb341a138c5e34416d7757437">to</a>), hash_value); <span class="comment">// Combine with &#39;to&#39; field</span></div>
+<div class="line"><span class="lineno">  131</span> </div>
+<div class="line"><span class="lineno">  132</span>        <span class="keywordflow">return</span> <span class="keyword">static_cast&lt;</span>std::size_t<span class="keyword">&gt;</span>(hash_value); <span class="comment">// Return the final hash value</span></div>
+<div class="line"><span class="lineno">  133</span>    }</div>
+<div class="ttc" id="astructRawArc_html_a6f45ba05e140c0d39a72df903f987077"><div class="ttname"><a href="structRawArc.html#a6f45ba05e140c0d39a72df903f987077">RawArc::from</a></div><div class="ttdeci">int from</div><div class="ttdef"><b>Definition</b> <a href="Arc_8h_source.html#l00115">Arc.h:115</a></div></div>
+<div class="ttc" id="astructRawArc_html_a7162640eb341a138c5e34416d7757437"><div class="ttname"><a href="structRawArc.html#a7162640eb341a138c5e34416d7757437">RawArc::to</a></div><div class="ttdeci">int to</div><div class="ttdef"><b>Definition</b> <a href="Arc_8h_source.html#l00116">Arc.h:116</a></div></div>
 </div><!-- fragment -->
 </div>
 </div>

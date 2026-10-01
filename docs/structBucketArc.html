@@ -148,7 +148,7 @@ Public Attributes</h2></td></tr>
 <div class="textblock"><p>Represents an arc between two buckets. </p>
 <p>This struct contains information about an arc between two buckets in a solver. It stores the index of the source bucket, the index of the target bucket, the resource increments associated with the arc, the cost increment, and a flag indicating whether the arc is fixed. </p>
 
-<p class="definition">Definition at line <a class="el" href="Arc_8h_source.html#l00069">69</a> of file <a class="el" href="Arc_8h_source.html">Arc.h</a>.</p>
+<p class="definition">Definition at line <a class="el" href="Arc_8h_source.html#l00065">65</a> of file <a class="el" href="Arc_8h_source.html">Arc.h</a>.</p>
 </div><a name="doc-constructors" id="doc-constructors"></a><h2 id="header-doc-constructors" class="groupheader">Constructor &amp; Destructor Documentation</h2>
 <a id="aff809095188fc49f75e7b31551225e4e" name="aff809095188fc49f75e7b31551225e4e"></a>
 <h2 class="memtitle"><span class="permalink"><a href="#aff809095188fc49f75e7b31551225e4e">&#9670;&#160;</a></span>BucketArc() <span class="overload">[1/3]</span></h2>
@@ -181,12 +181,14 @@ Public Attributes</h2></td></tr>
 
 <p class="definition">Definition at line <a class="el" href="BucketGraph_8cpp_source.html#l00032">32</a> of file <a class="el" href="BucketGraph_8cpp_source.html">BucketGraph.cpp</a>.</p>
 <div class="fragment"><div class="line"><span class="lineno">   33</span>    : <a class="code hl_variable" href="#abed70d3f354e1eedcabb599db0fde809">from_bucket</a>(from), <a class="code hl_variable" href="#a593e5a114414f621710ddf37e65f52f0">to_bucket</a>(to), <a class="code hl_variable" href="#aa8a9327361182f8ff88987a2e378d4de">cost_increment</a>(cost_inc) {</div>
-<div class="line"><span class="lineno">   34</span>    std::copy_n(res_inc.begin(), std::min(res_inc.size(), <a class="code hl_variable" href="#a557629e6d63c53c58533619d93cf60a2">resource_increment</a>.size()), <a class="code hl_variable" href="#a557629e6d63c53c58533619d93cf60a2">resource_increment</a>.begin());</div>
-<div class="line"><span class="lineno">   35</span>}</div>
-<div class="ttc" id="astructBucketArc_html_a557629e6d63c53c58533619d93cf60a2"><div class="ttname"><a href="#a557629e6d63c53c58533619d93cf60a2">BucketArc::resource_increment</a></div><div class="ttdeci">std::array&lt; double, R_SIZE &gt; resource_increment</div><div class="ttdef"><b>Definition</b> <a href="Arc_8h_source.html#l00072">Arc.h:72</a></div></div>
-<div class="ttc" id="astructBucketArc_html_a593e5a114414f621710ddf37e65f52f0"><div class="ttname"><a href="#a593e5a114414f621710ddf37e65f52f0">BucketArc::to_bucket</a></div><div class="ttdeci">int to_bucket</div><div class="ttdef"><b>Definition</b> <a href="Arc_8h_source.html#l00071">Arc.h:71</a></div></div>
-<div class="ttc" id="astructBucketArc_html_aa8a9327361182f8ff88987a2e378d4de"><div class="ttname"><a href="#aa8a9327361182f8ff88987a2e378d4de">BucketArc::cost_increment</a></div><div class="ttdeci">double cost_increment</div><div class="ttdef"><b>Definition</b> <a href="Arc_8h_source.html#l00073">Arc.h:73</a></div></div>
-<div class="ttc" id="astructBucketArc_html_abed70d3f354e1eedcabb599db0fde809"><div class="ttname"><a href="#abed70d3f354e1eedcabb599db0fde809">BucketArc::from_bucket</a></div><div class="ttdeci">int from_bucket</div><div class="ttdef"><b>Definition</b> <a href="Arc_8h_source.html#l00070">Arc.h:70</a></div></div>
+<div class="line"><span class="lineno">   34</span>    <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> i = 0; i &lt; res_inc.size() &amp;&amp; i &lt; <a class="code hl_variable" href="#a557629e6d63c53c58533619d93cf60a2">resource_increment</a>.size(); ++i) {</div>
+<div class="line"><span class="lineno">   35</span>        <a class="code hl_variable" href="#a557629e6d63c53c58533619d93cf60a2">resource_increment</a>[i] = res_inc[i];</div>
+<div class="line"><span class="lineno">   36</span>    }</div>
+<div class="line"><span class="lineno">   37</span>}</div>
+<div class="ttc" id="astructBucketArc_html_a557629e6d63c53c58533619d93cf60a2"><div class="ttname"><a href="#a557629e6d63c53c58533619d93cf60a2">BucketArc::resource_increment</a></div><div class="ttdeci">std::array&lt; double, R_SIZE &gt; resource_increment</div><div class="ttdef"><b>Definition</b> <a href="Arc_8h_source.html#l00068">Arc.h:68</a></div></div>
+<div class="ttc" id="astructBucketArc_html_a593e5a114414f621710ddf37e65f52f0"><div class="ttname"><a href="#a593e5a114414f621710ddf37e65f52f0">BucketArc::to_bucket</a></div><div class="ttdeci">int to_bucket</div><div class="ttdef"><b>Definition</b> <a href="Arc_8h_source.html#l00067">Arc.h:67</a></div></div>
+<div class="ttc" id="astructBucketArc_html_aa8a9327361182f8ff88987a2e378d4de"><div class="ttname"><a href="#aa8a9327361182f8ff88987a2e378d4de">BucketArc::cost_increment</a></div><div class="ttdeci">double cost_increment</div><div class="ttdef"><b>Definition</b> <a href="Arc_8h_source.html#l00069">Arc.h:69</a></div></div>
+<div class="ttc" id="astructBucketArc_html_abed70d3f354e1eedcabb599db0fde809"><div class="ttname"><a href="#abed70d3f354e1eedcabb599db0fde809">BucketArc::from_bucket</a></div><div class="ttdeci">int from_bucket</div><div class="ttdef"><b>Definition</b> <a href="Arc_8h_source.html#l00066">Arc.h:66</a></div></div>
 </div><!-- fragment -->
 </div>
 </div>
@@ -224,11 +226,13 @@ Public Attributes</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="BucketGraph_8cpp_source.html#l00037">37</a> of file <a class="el" href="BucketGraph_8cpp_source.html">BucketGraph.cpp</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">   38</span>    : <a class="code hl_variable" href="#abed70d3f354e1eedcabb599db0fde809">from_bucket</a>(from), <a class="code hl_variable" href="#a593e5a114414f621710ddf37e65f52f0">to_bucket</a>(to), <a class="code hl_variable" href="#aa8a9327361182f8ff88987a2e378d4de">cost_increment</a>(cost_inc), <a class="code hl_variable" href="#a37e7c753e085e791dcba70f707a0846d">jump</a>(fixed) {</div>
-<div class="line"><span class="lineno">   39</span>    std::copy_n(res_inc.begin(), std::min(res_inc.size(), <a class="code hl_variable" href="#a557629e6d63c53c58533619d93cf60a2">resource_increment</a>.size()), <a class="code hl_variable" href="#a557629e6d63c53c58533619d93cf60a2">resource_increment</a>.begin());</div>
-<div class="line"><span class="lineno">   40</span>}</div>
-<div class="ttc" id="astructBucketArc_html_a37e7c753e085e791dcba70f707a0846d"><div class="ttname"><a href="#a37e7c753e085e791dcba70f707a0846d">BucketArc::jump</a></div><div class="ttdeci">bool jump</div><div class="ttdef"><b>Definition</b> <a href="Arc_8h_source.html#l00074">Arc.h:74</a></div></div>
+<p class="definition">Definition at line <a class="el" href="BucketGraph_8cpp_source.html#l00039">39</a> of file <a class="el" href="BucketGraph_8cpp_source.html">BucketGraph.cpp</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">   40</span>    : <a class="code hl_variable" href="#abed70d3f354e1eedcabb599db0fde809">from_bucket</a>(from), <a class="code hl_variable" href="#a593e5a114414f621710ddf37e65f52f0">to_bucket</a>(to), <a class="code hl_variable" href="#aa8a9327361182f8ff88987a2e378d4de">cost_increment</a>(cost_inc), <a class="code hl_variable" href="#a37e7c753e085e791dcba70f707a0846d">jump</a>(fixed) {</div>
+<div class="line"><span class="lineno">   41</span>    <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> i = 0; i &lt; res_inc.size() &amp;&amp; i &lt; <a class="code hl_variable" href="#a557629e6d63c53c58533619d93cf60a2">resource_increment</a>.size(); ++i) {</div>
+<div class="line"><span class="lineno">   42</span>        <a class="code hl_variable" href="#a557629e6d63c53c58533619d93cf60a2">resource_increment</a>[i] = res_inc[i];</div>
+<div class="line"><span class="lineno">   43</span>    }</div>
+<div class="line"><span class="lineno">   44</span>}</div>
+<div class="ttc" id="astructBucketArc_html_a37e7c753e085e791dcba70f707a0846d"><div class="ttname"><a href="#a37e7c753e085e791dcba70f707a0846d">BucketArc::jump</a></div><div class="ttdeci">bool jump</div><div class="ttdef"><b>Definition</b> <a href="Arc_8h_source.html#l00070">Arc.h:70</a></div></div>
 </div><!-- fragment -->
 </div>
 </div>
@@ -271,11 +275,13 @@ Public Attributes</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="BucketGraph_8cpp_source.html#l00042">42</a> of file <a class="el" href="BucketGraph_8cpp_source.html">BucketGraph.cpp</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">   43</span>    : <a class="code hl_variable" href="#abed70d3f354e1eedcabb599db0fde809">from_bucket</a>(from), <a class="code hl_variable" href="#a593e5a114414f621710ddf37e65f52f0">to_bucket</a>(to), <a class="code hl_variable" href="#aa8a9327361182f8ff88987a2e378d4de">cost_increment</a>(cost_inc), <a class="code hl_variable" href="#a37e7c753e085e791dcba70f707a0846d">jump</a>(fixed), <a class="code hl_variable" href="#aba0dbc3d27f80be27a5b19e061ef8a63">jump_to_node</a>(to_node) {</div>
-<div class="line"><span class="lineno">   44</span>    std::copy_n(res_inc.begin(), std::min(res_inc.size(), <a class="code hl_variable" href="#a557629e6d63c53c58533619d93cf60a2">resource_increment</a>.size()), <a class="code hl_variable" href="#a557629e6d63c53c58533619d93cf60a2">resource_increment</a>.begin());</div>
-<div class="line"><span class="lineno">   45</span>}</div>
-<div class="ttc" id="astructBucketArc_html_aba0dbc3d27f80be27a5b19e061ef8a63"><div class="ttname"><a href="#aba0dbc3d27f80be27a5b19e061ef8a63">BucketArc::jump_to_node</a></div><div class="ttdeci">int jump_to_node</div><div class="ttdef"><b>Definition</b> <a href="Arc_8h_source.html#l00075">Arc.h:75</a></div></div>
+<p class="definition">Definition at line <a class="el" href="BucketGraph_8cpp_source.html#l00046">46</a> of file <a class="el" href="BucketGraph_8cpp_source.html">BucketGraph.cpp</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">   47</span>    : <a class="code hl_variable" href="#abed70d3f354e1eedcabb599db0fde809">from_bucket</a>(from), <a class="code hl_variable" href="#a593e5a114414f621710ddf37e65f52f0">to_bucket</a>(to), <a class="code hl_variable" href="#aa8a9327361182f8ff88987a2e378d4de">cost_increment</a>(cost_inc), <a class="code hl_variable" href="#a37e7c753e085e791dcba70f707a0846d">jump</a>(fixed), <a class="code hl_variable" href="#aba0dbc3d27f80be27a5b19e061ef8a63">jump_to_node</a>(to_node) {</div>
+<div class="line"><span class="lineno">   48</span>    <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> i = 0; i &lt; res_inc.size() &amp;&amp; i &lt; <a class="code hl_variable" href="#a557629e6d63c53c58533619d93cf60a2">resource_increment</a>.size(); ++i) {</div>
+<div class="line"><span class="lineno">   49</span>        <a class="code hl_variable" href="#a557629e6d63c53c58533619d93cf60a2">resource_increment</a>[i] = res_inc[i];</div>
+<div class="line"><span class="lineno">   50</span>    }</div>
+<div class="line"><span class="lineno">   51</span>}</div>
+<div class="ttc" id="astructBucketArc_html_aba0dbc3d27f80be27a5b19e061ef8a63"><div class="ttname"><a href="#aba0dbc3d27f80be27a5b19e061ef8a63">BucketArc::jump_to_node</a></div><div class="ttdeci">int jump_to_node</div><div class="ttdef"><b>Definition</b> <a href="Arc_8h_source.html#l00071">Arc.h:71</a></div></div>
 </div><!-- fragment -->
 </div>
 </div>
@@ -303,14 +309,14 @@ Public Attributes</h2></td></tr>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="Arc_8h_source.html#l00088">88</a> of file <a class="el" href="Arc_8h_source.html">Arc.h</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">   88</span>                                                 {</div>
-<div class="line"><span class="lineno">   89</span>        <span class="keywordflow">if</span> (<a class="code hl_variable" href="#abed70d3f354e1eedcabb599db0fde809">from_bucket</a> != other.<a class="code hl_variable" href="#abed70d3f354e1eedcabb599db0fde809">from_bucket</a>) <span class="keywordflow">return</span> <a class="code hl_variable" href="#abed70d3f354e1eedcabb599db0fde809">from_bucket</a> &lt; other.<a class="code hl_variable" href="#abed70d3f354e1eedcabb599db0fde809">from_bucket</a>;</div>
-<div class="line"><span class="lineno">   90</span>        <span class="keywordflow">if</span> (<a class="code hl_variable" href="#a593e5a114414f621710ddf37e65f52f0">to_bucket</a> != other.<a class="code hl_variable" href="#a593e5a114414f621710ddf37e65f52f0">to_bucket</a>) <span class="keywordflow">return</span> <a class="code hl_variable" href="#a593e5a114414f621710ddf37e65f52f0">to_bucket</a> &lt; other.<a class="code hl_variable" href="#a593e5a114414f621710ddf37e65f52f0">to_bucket</a>;</div>
-<div class="line"><span class="lineno">   91</span>        <span class="keywordflow">if</span> (<a class="code hl_variable" href="#aa8a9327361182f8ff88987a2e378d4de">cost_increment</a> != other.<a class="code hl_variable" href="#aa8a9327361182f8ff88987a2e378d4de">cost_increment</a>) <span class="keywordflow">return</span> <a class="code hl_variable" href="#aa8a9327361182f8ff88987a2e378d4de">cost_increment</a> &lt; other.<a class="code hl_variable" href="#aa8a9327361182f8ff88987a2e378d4de">cost_increment</a>;</div>
-<div class="line"><span class="lineno">   92</span>        <span class="keywordflow">if</span> (<a class="code hl_variable" href="#a557629e6d63c53c58533619d93cf60a2">resource_increment</a> != other.<a class="code hl_variable" href="#a557629e6d63c53c58533619d93cf60a2">resource_increment</a>) <span class="keywordflow">return</span> <a class="code hl_variable" href="#a557629e6d63c53c58533619d93cf60a2">resource_increment</a> &lt; other.<a class="code hl_variable" href="#a557629e6d63c53c58533619d93cf60a2">resource_increment</a>;</div>
-<div class="line"><span class="lineno">   93</span>        <span class="keywordflow">return</span> <a class="code hl_variable" href="#a37e7c753e085e791dcba70f707a0846d">jump</a> &lt; other.<a class="code hl_variable" href="#a37e7c753e085e791dcba70f707a0846d">jump</a>;</div>
-<div class="line"><span class="lineno">   94</span>    }</div>
+<p class="definition">Definition at line <a class="el" href="Arc_8h_source.html#l00084">84</a> of file <a class="el" href="Arc_8h_source.html">Arc.h</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">   84</span>                                                 {</div>
+<div class="line"><span class="lineno">   85</span>        <span class="keywordflow">if</span> (<a class="code hl_variable" href="#abed70d3f354e1eedcabb599db0fde809">from_bucket</a> != other.<a class="code hl_variable" href="#abed70d3f354e1eedcabb599db0fde809">from_bucket</a>) <span class="keywordflow">return</span> <a class="code hl_variable" href="#abed70d3f354e1eedcabb599db0fde809">from_bucket</a> &lt; other.<a class="code hl_variable" href="#abed70d3f354e1eedcabb599db0fde809">from_bucket</a>;</div>
+<div class="line"><span class="lineno">   86</span>        <span class="keywordflow">if</span> (<a class="code hl_variable" href="#a593e5a114414f621710ddf37e65f52f0">to_bucket</a> != other.<a class="code hl_variable" href="#a593e5a114414f621710ddf37e65f52f0">to_bucket</a>) <span class="keywordflow">return</span> <a class="code hl_variable" href="#a593e5a114414f621710ddf37e65f52f0">to_bucket</a> &lt; other.<a class="code hl_variable" href="#a593e5a114414f621710ddf37e65f52f0">to_bucket</a>;</div>
+<div class="line"><span class="lineno">   87</span>        <span class="keywordflow">if</span> (<a class="code hl_variable" href="#aa8a9327361182f8ff88987a2e378d4de">cost_increment</a> != other.<a class="code hl_variable" href="#aa8a9327361182f8ff88987a2e378d4de">cost_increment</a>) <span class="keywordflow">return</span> <a class="code hl_variable" href="#aa8a9327361182f8ff88987a2e378d4de">cost_increment</a> &lt; other.<a class="code hl_variable" href="#aa8a9327361182f8ff88987a2e378d4de">cost_increment</a>;</div>
+<div class="line"><span class="lineno">   88</span>        <span class="keywordflow">if</span> (<a class="code hl_variable" href="#a557629e6d63c53c58533619d93cf60a2">resource_increment</a> != other.<a class="code hl_variable" href="#a557629e6d63c53c58533619d93cf60a2">resource_increment</a>) <span class="keywordflow">return</span> <a class="code hl_variable" href="#a557629e6d63c53c58533619d93cf60a2">resource_increment</a> &lt; other.<a class="code hl_variable" href="#a557629e6d63c53c58533619d93cf60a2">resource_increment</a>;</div>
+<div class="line"><span class="lineno">   89</span>        <span class="keywordflow">return</span> <a class="code hl_variable" href="#a37e7c753e085e791dcba70f707a0846d">jump</a> &lt; other.<a class="code hl_variable" href="#a37e7c753e085e791dcba70f707a0846d">jump</a>;</div>
+<div class="line"><span class="lineno">   90</span>    }</div>
 </div><!-- fragment --><div class="dynheader">
 Here is the call graph for this function:</div>
 <div class="dyncontent">
@@ -347,10 +353,10 @@ Here is the call graph for this function:</div>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="Arc_8h_source.html#l00077">77</a> of file <a class="el" href="Arc_8h_source.html">Arc.h</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">   77</span>                                                {</div>
-<div class="line"><span class="lineno">   78</span>        <span class="keywordflow">return</span> <a class="code hl_variable" href="#abed70d3f354e1eedcabb599db0fde809">from_bucket</a> == other.<a class="code hl_variable" href="#abed70d3f354e1eedcabb599db0fde809">from_bucket</a> &amp;&amp; <a class="code hl_variable" href="#a593e5a114414f621710ddf37e65f52f0">to_bucket</a> == other.<a class="code hl_variable" href="#a593e5a114414f621710ddf37e65f52f0">to_bucket</a>;</div>
-<div class="line"><span class="lineno">   79</span>    }</div>
+<p class="definition">Definition at line <a class="el" href="Arc_8h_source.html#l00073">73</a> of file <a class="el" href="Arc_8h_source.html">Arc.h</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">   73</span>                                                {</div>
+<div class="line"><span class="lineno">   74</span>        <span class="keywordflow">return</span> <a class="code hl_variable" href="#abed70d3f354e1eedcabb599db0fde809">from_bucket</a> == other.<a class="code hl_variable" href="#abed70d3f354e1eedcabb599db0fde809">from_bucket</a> &amp;&amp; <a class="code hl_variable" href="#a593e5a114414f621710ddf37e65f52f0">to_bucket</a> == other.<a class="code hl_variable" href="#a593e5a114414f621710ddf37e65f52f0">to_bucket</a>;</div>
+<div class="line"><span class="lineno">   75</span>    }</div>
 </div><!-- fragment --><div class="dynheader">
 Here is the call graph for this function:</div>
 <div class="dyncontent">
@@ -377,7 +383,7 @@ Here is the call graph for this function:</div>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="Arc_8h_source.html#l00073">73</a> of file <a class="el" href="Arc_8h_source.html">Arc.h</a>.</p>
+<p class="definition">Definition at line <a class="el" href="Arc_8h_source.html#l00069">69</a> of file <a class="el" href="Arc_8h_source.html">Arc.h</a>.</p>
 
 </div>
 </div>
@@ -393,7 +399,7 @@ Here is the call graph for this function:</div>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="Arc_8h_source.html#l00070">70</a> of file <a class="el" href="Arc_8h_source.html">Arc.h</a>.</p>
+<p class="definition">Definition at line <a class="el" href="Arc_8h_source.html#l00066">66</a> of file <a class="el" href="Arc_8h_source.html">Arc.h</a>.</p>
 
 </div>
 </div>
@@ -409,7 +415,7 @@ Here is the call graph for this function:</div>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="Arc_8h_source.html#l00074">74</a> of file <a class="el" href="Arc_8h_source.html">Arc.h</a>.</p>
+<p class="definition">Definition at line <a class="el" href="Arc_8h_source.html#l00070">70</a> of file <a class="el" href="Arc_8h_source.html">Arc.h</a>.</p>
 
 </div>
 </div>
@@ -425,7 +431,7 @@ Here is the call graph for this function:</div>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="Arc_8h_source.html#l00075">75</a> of file <a class="el" href="Arc_8h_source.html">Arc.h</a>.</p>
+<p class="definition">Definition at line <a class="el" href="Arc_8h_source.html#l00071">71</a> of file <a class="el" href="Arc_8h_source.html">Arc.h</a>.</p>
 
 </div>
 </div>
@@ -441,8 +447,8 @@ Here is the call graph for this function:</div>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="Arc_8h_source.html#l00072">72</a> of file <a class="el" href="Arc_8h_source.html">Arc.h</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">   72</span>{};</div>
+<p class="definition">Definition at line <a class="el" href="Arc_8h_source.html#l00068">68</a> of file <a class="el" href="Arc_8h_source.html">Arc.h</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">   68</span>{};</div>
 </div><!-- fragment -->
 </div>
 </div>
@@ -458,7 +464,7 @@ Here is the call graph for this function:</div>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="Arc_8h_source.html#l00071">71</a> of file <a class="el" href="Arc_8h_source.html">Arc.h</a>.</p>
+<p class="definition">Definition at line <a class="el" href="Arc_8h_source.html#l00067">67</a> of file <a class="el" href="Arc_8h_source.html">Arc.h</a>.</p>
 
 </div>
 </div>
