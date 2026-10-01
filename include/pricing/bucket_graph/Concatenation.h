@@ -117,18 +117,14 @@ bool BucketGraph::collect_concatenation_candidate(const Label *forward_label, co
     } else
 #endif
     {
-        if (!numericutils::lt(total_cost, best_cost.load(std::memory_order_relaxed))) { return false; }
+        const double prune_limit = best_cost.load(std::memory_order_relaxed);
+        if (!numericutils::lt(total_cost, prune_limit)) { return false; }
     }
 
-    bool cost_acceptable;
-    if constexpr (S != Stage::Enumerate) {
-        cost_acceptable = numericutils::lt(total_cost, best_cost.load(std::memory_order_relaxed));
-    } else {
+    if constexpr (S == Stage::Enumerate) {
         const double cutoff = std::min(gap, enumeration_route_cutoff.load(std::memory_order_relaxed));
-        cost_acceptable     = numericutils::lt(total_cost, cutoff);
+        if (!numericutils::lt(total_cost, cutoff)) { return false; }
     }
-
-    if (!cost_acceptable) { return false; }
     if (visited_overlap(forward_label->visited_bitmap, backward_label->visited_bitmap)) { return false; }
     if (!check_feasibility(forward_label, backward_label, splice_state)) { return false; }
 

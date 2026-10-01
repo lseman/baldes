@@ -91,6 +91,15 @@ struct alignas(64) Bucket {
 
     void invalidate_label_cache() const noexcept { soa_valid = false; }
 
+    // Append SoA entry for a newly added label. Called during insertion so the
+    // cache stays incrementally valid — no full rebuild needed during dominance.
+    void append_soa_entry(Label *label) noexcept {
+        soa_costs.push_back(label->cost);
+        soa_visited_signatures.push_back(label->visited_signature());
+        for (size_t r = 0; r < R_SIZE; ++r) soa_resources[r].push_back(label->resources[r]);
+        for (size_t w = 0; w < Label::bitmap_words; ++w) soa_visited_words[w].push_back(label->visited_bitmap[w]);
+    }
+
     void ensure_label_cache() const {
         if (soa_valid && soa_costs.size() == labels.size()) return;
 
@@ -155,9 +164,10 @@ struct alignas(64) Bucket {
         assert(std::is_sorted(labels.begin(), labels.end(),
                               [](const Label *a, const Label *b) { return a->cost < b->cost; }));
 #endif
-        // Preserve the committed SoA and materialize cache fields only for the
-        // staged delta. Merge cache records and labels in one ordered pass.
-        if (old_size != 0) ensure_label_cache();
+        // SoA is kept incrementally valid by append_soa_entry during insertion;
+        // no rebuild needed here. We only need ensure_label_cache for labels
+        // that were added through other paths (warm-start labels appended
+        // directly to the `labels` vector), which is guarded by soa_valid.
         static thread_local std::vector<BucketLabelCacheEntry> merge_entries;
         merge_entries.clear();
         merge_entries.reserve(old_size + extra_labels.size());
@@ -296,11 +306,12 @@ struct alignas(64) Bucket {
         if (!label) return;
 
         extra_labels.push_back(label);
+        append_soa_entry(label);  // Incremental SoA: no rebuild needed later
         if (label->cost < min_cost) min_cost = label->cost;
         if (labels.size() + extra_labels.size() >= BUCKET_CAPACITY) { shall_split = true; }
     }
 
-    // For cases where sorted order isn’t required on insertion.
+    // For cases where sorted order isn't required on insertion.
     void add_label(Label *label) noexcept { add_sorted_label(label); }
 
     // --- Retrieval ---

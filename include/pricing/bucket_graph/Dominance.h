@@ -108,14 +108,14 @@ inline bool check_dominance_against_vector(const Label *__restrict__ new_label, 
 #else
         const auto cost_mask = (label_costs <= (new_cost_simd + tolerance_simd));
 #endif
-        if (!any_of(cost_mask)) continue;
+        if (__builtin_expect(!any_of(cost_mask), 0)) continue;  // [[unlikely]]: most chunks pass cost check
 
         // For each label in this SIMD chunk that passed cost check
         for (size_t j = 0; j < simd_width; ++j) {
-            if (!cost_mask[j]) continue;
+            if (__builtin_expect(!cost_mask[j], 1)) continue;  // [[likely]]: within-passed chunk, most pass
 
             const Label *label           = labels[i + j];
-            if (label->is_dominated) continue;
+            if (__builtin_expect(label->is_dominated, 1)) continue;  // [[likely]]: many labels already dominated
             const auto  &label_resources = label->resources;
             bool         dominated       = true;
 
@@ -131,12 +131,12 @@ inline bool check_dominance_against_vector(const Label *__restrict__ new_label, 
                     simd<double> new_label_res = load_simd_direct<double>(new_resources.data() + k, simd_width);
 
                     if constexpr (D == Direction::Forward) {
-                        if (!all_of(label_res <= (new_label_res + tolerance_simd))) {
-                            dominated = false;
+                        if (__builtin_expect(!all_of(label_res <= (new_label_res + tolerance_simd)), 0)) {
+                            dominated = false;  // [[unlikely]]: new label dominates most candidates
                             break;
                         }
                     } else {
-                        if (!all_of(label_res >= (new_label_res - tolerance_simd))) {
+                        if (__builtin_expect(!all_of(label_res >= (new_label_res - tolerance_simd)), 0)) {
                             dominated = false;
                             break;
                         }
@@ -174,12 +174,12 @@ inline bool check_dominance_against_vector(const Label *__restrict__ new_label, 
                 // prediction
                 for (size_t k = 1; k < num_resources; ++k) {
                     if constexpr (D == Direction::Forward) {
-                        if (numericutils::gt(label_resources[k], new_resources[k])) {
+                        if (__builtin_expect(numericutils::gt(label_resources[k], new_resources[k]), 0)) {
                             dominated = false;
                             break;
                         }
                     } else {
-                        if (numericutils::lt(label_resources[k], new_resources[k])) {
+                        if (__builtin_expect(numericutils::lt(label_resources[k], new_resources[k]), 0)) {
                             dominated = false;
                             break;
                         }
@@ -187,15 +187,19 @@ inline bool check_dominance_against_vector(const Label *__restrict__ new_label, 
                 }
                 if (dominated && num_resources > 0) {
                     if constexpr (D == Direction::Forward) {
-                        if (numericutils::gt(label_resources[0], new_resources[0])) { dominated = false; }
+                        if (__builtin_expect(numericutils::gt(label_resources[0], new_resources[0]), 0)) {
+                            dominated = false;
+                        }
                     } else {
-                        if (numericutils::lt(label_resources[0], new_resources[0])) { dominated = false; }
+                        if (__builtin_expect(numericutils::lt(label_resources[0], new_resources[0]), 0)) {
+                            dominated = false;
+                        }
                     }
                 }
             }
 
             // Skip further checks if not dominated based on resources
-            if (!dominated) continue;
+            if (__builtin_expect(!dominated, 0)) continue;  // [[unlikely]]: new label dominates most candidates
 
             // Visited nodes check - only for relevant stages
             if constexpr (S == Stage::Three || S == Stage::Four || S == Stage::Enumerate) {
@@ -213,8 +217,8 @@ inline bool check_dominance_against_vector(const Label *__restrict__ new_label, 
 
                         // Check if all visited nodes in label are also in
                         // new_label
-                        if (!all_of((label_vis & new_label_vis) == label_vis)) {
-                            dominated = false;
+                        if (__builtin_expect(!all_of((label_vis & new_label_vis) == label_vis), 0)) {
+                            dominated = false;  // [[unlikely]]: new label dominates most candidates
                             break;
                         }
                     }
@@ -224,7 +228,7 @@ inline bool check_dominance_against_vector(const Label *__restrict__ new_label, 
                         const size_t base_idx = simd_bitmap_blocks * simd_width;
                         for (size_t k = 0; k < simd_bitmap_remainder; ++k) {
                             const size_t idx = base_idx + k;
-                            if ((label_visited[idx] & new_visited[idx]) != label_visited[idx]) {
+                            if (__builtin_expect((label_visited[idx] & new_visited[idx]) != label_visited[idx], 0)) {
                                 dominated = false;
                                 break;
                             }
@@ -242,7 +246,7 @@ inline bool check_dominance_against_vector(const Label *__restrict__ new_label, 
             }
 
             // Skip SRC checks if not dominated based on visited nodes
-            if (!dominated) continue;
+            if (__builtin_expect(!dominated, 0)) continue;  // [[unlikely]]
 
 // SRC dominance check - only for relevant stages and if SRC is active
 #ifdef SRC
@@ -329,7 +333,7 @@ inline bool check_dominance_against_vector(const Label *__restrict__ new_label, 
     // Process remaining labels using scalar code
     for (; i < num_labels; ++i) {
         const Label *label = labels[i];
-        if (label->is_dominated) continue;
+        if (__builtin_expect(label->is_dominated, 1)) continue;  // [[likely]]
 
         // Cost check
 #ifdef SRC
@@ -344,12 +348,12 @@ inline bool check_dominance_against_vector(const Label *__restrict__ new_label, 
         // Resource check
         for (size_t k = 1; k < num_resources; ++k) {
             if constexpr (D == Direction::Forward) {
-                if (numericutils::gt(label_resources[k], new_resources[k])) {
-                    dominated = false;
+                if (__builtin_expect(numericutils::gt(label_resources[k], new_resources[k]), 0)) {
+                    dominated = false;  // [[unlikely]]
                     break;
                 }
             } else {
-                if (numericutils::lt(label_resources[k], new_resources[k])) {
+                if (__builtin_expect(numericutils::lt(label_resources[k], new_resources[k]), 0)) {
                     dominated = false;
                     break;
                 }
@@ -357,9 +361,13 @@ inline bool check_dominance_against_vector(const Label *__restrict__ new_label, 
         }
         if (dominated && num_resources > 0) {
             if constexpr (D == Direction::Forward) {
-                if (numericutils::gt(label_resources[0], new_resources[0])) { dominated = false; }
+                if (__builtin_expect(numericutils::gt(label_resources[0], new_resources[0]), 0)) {
+                    dominated = false;
+                }
             } else {
-                if (numericutils::lt(label_resources[0], new_resources[0])) { dominated = false; }
+                if (__builtin_expect(numericutils::lt(label_resources[0], new_resources[0]), 0)) {
+                    dominated = false;
+                }
             }
         }
 
