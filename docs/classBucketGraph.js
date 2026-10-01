@@ -126,7 +126,7 @@ var classBucketGraph =
     [ "set_distance_matrix", "classBucketGraph.html#ad7327dc5d51a2133df91e17da212625e", null ],
     [ "setDuals", "classBucketGraph.html#a227e25383480be62479becdf9f8f778a", null ],
     [ "setManualArcs", "classBucketGraph.html#a67cccb92628b4a0a95e7924fdb07598b", null ],
-    [ "setOptions", "classBucketGraph.html#a0327d3b5366beacc84a51f21a3e318c9", null ],
+    [ "setOptions", "classBucketGraph.html#a2ce41f1b6bb8786635259bc05569fdf7", null ],
     [ "setPSTEPduals", "classBucketGraph.html#a481033b40b7ccf857422bcad842039f0", null ],
     [ "setSplit", "classBucketGraph.html#a8315694fc17b928dfa937aba8d8d0f4b", null ],
     [ "setup", "classBucketGraph.html#a26aac5e0b890fae05be807e72fa59826", null ],

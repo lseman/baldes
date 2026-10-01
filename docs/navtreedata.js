@@ -65,14 +65,14 @@ var NAVTREE =
 var NAVTREEINDEX =
 [
 "AMD_8h.html",
-"MIPHandler_8cpp.html#a7e5612b25a3d47693efce8e02e5ef7ef",
-"classBNBNode.html#ac41203309dbd1e03322b6f56a4abf776",
-"classBucketGraph.html#a9b9b2117b5e749ba9a5d7cc66e1c021c",
+"MIPHandler_8cpp.html#ab2da79ce4ff759ca019a349b492dfb4f",
+"classBNBNode.html#ac4a92f0a90b0517dda3eb0e08c1ffe72",
+"classBucketGraph.html#a9c231835ccf2b5c41cb6fea8e2dba1a9",
 "classEigen_1_1CustomSimplicialLDLT.html#af32b70e7aedd4863e6429addd45548fc",
-"classMIPProblem.html#a29674f674d7f14b118a031cdf734611e",
-"classStabilization.html#af259bd82d78795eb65ce205e1c24c166",
-"functions_vars_s.html",
-"structBucketGraph_1_1EnumerationPolicy.html#a2e4c9d6458ff7995e6ecb0b3e25cf1c9",
+"classMIPProblem.html#a2d45a20f806ee2ede27d9c575758e5d5",
+"classStabilization.html#af358ea4f62658ca2a7b1509535392e2a",
+"functions_vars_t.html",
+"structBucketGraph_1_1EnumerationPolicy.html#a4c07245ed0807d5a72223b0856b1135a",
 "structModelData.html#aea9d2f5b3aa72a3af01c62c7cd9d81f2",
 "structarc__map__hash.html"
 ];

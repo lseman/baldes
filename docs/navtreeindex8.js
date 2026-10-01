@@ -1,6 +1,5 @@
 var NAVTREEINDEX8 =
 {
-"structBucketGraph_1_1EnumerationPolicy.html#a2e4c9d6458ff7995e6ecb0b3e25cf1c9":[2,0,23,1,4],
 "structBucketGraph_1_1EnumerationPolicy.html#a4c07245ed0807d5a72223b0856b1135a":[2,0,23,1,2],
 "structBucketGraph_1_1EnumerationPolicy.html#a63fcdb2fb19e4b2d6b373ccb0917cc4b":[2,0,23,1,1],
 "structBucketGraph_1_1EnumerationPolicy.html#a76377bf63cb81b8af37a56bcdd4b3303":[2,0,23,1,0],
@@ -38,7 +37,7 @@ var NAVTREEINDEX8 =
 "structBucketLabelSoAView.html#a82777bedf15aa3e9c45046054ac80c69":[2,0,25,3],
 "structBucketLabelSoAView.html#ac484136033aa5c3f38393cc190174155":[2,0,25,1],
 "structBucketOptions.html":[2,0,26],
-"structBucketOptions.html#a06aeb73b0da8c26e191c62e3512121a7":[2,0,26,23],
+"structBucketOptions.html#a06aeb73b0da8c26e191c62e3512121a7":[2,0,26,24],
 "structBucketOptions.html#a07c3dabeed73d0cafd3fb3b9a8d7c493":[2,0,26,0],
 "structBucketOptions.html#a0f94d5726eef9e2f669804c854c87eed":[2,0,26,21],
 "structBucketOptions.html#a101e2ff175d62615eeaeb8f4201a0a3c":[2,0,26,18],
@@ -48,7 +47,7 @@ var NAVTREEINDEX8 =
 "structBucketOptions.html#a25f1b15faac9cbc36175a2ed11d98ee3":[2,0,26,8],
 "structBucketOptions.html#a2e623c84907427c6038493ecaa09c1f0":[2,0,26,13],
 "structBucketOptions.html#a32598dc4943be1d63527590d51f7bf55":[2,0,26,20],
-"structBucketOptions.html#a5f65cdf5f8be69a9496868b0526d1bcc":[2,0,26,24],
+"structBucketOptions.html#a5f65cdf5f8be69a9496868b0526d1bcc":[2,0,26,25],
 "structBucketOptions.html#a63a06654da7292fa9bfe6a1733770d8f":[2,0,26,5],
 "structBucketOptions.html#a673554f1d9ce0931f1382273192c46c3":[2,0,26,16],
 "structBucketOptions.html#a6f5669f91115fe3eeb30536a6d4868f6":[2,0,26,10],
@@ -63,6 +62,7 @@ var NAVTREEINDEX8 =
 "structBucketOptions.html#ac58e549feb8958cc88c3fbfd594459e8":[2,0,26,6],
 "structBucketOptions.html#ac62b9aab651372644fc82b5098126300":[2,0,26,9],
 "structBucketOptions.html#add2098953ea3aa1a1ac250eda374d425":[2,0,26,17],
+"structBucketOptions.html#af637a73947c60e9c0d3952076ce4be9a":[2,0,26,23],
 "structCS.html":[2,0,33],
 "structCS.html#a5a52e6c40feab84e43e6d168bbdafe04":[2,0,33,0],
 "structCS.html#aa06a775059698d98f35695be79bac9ad":[2,0,33,1],

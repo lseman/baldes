@@ -1,6 +1,5 @@
 var NAVTREEINDEX6 =
 {
-"classStabilization.html#af259bd82d78795eb65ce205e1c24c166":[2,0,97,45],
 "classStabilization.html#af358ea4f62658ca2a7b1509535392e2a":[2,0,97,19],
 "classStabilization.html#af4daf812a8380b3b392978645e1ae30e":[2,0,97,32],
 "classStabilization.html#af7a7486e7ceeb36e10cfafbc476847f9":[2,0,97,11],
@@ -249,5 +248,6 @@ var NAVTREEINDEX6 =
 "functions_vars_o.html":[2,3,2,15],
 "functions_vars_p.html":[2,3,2,16],
 "functions_vars_q.html":[2,3,2,17],
-"functions_vars_r.html":[2,3,2,18]
+"functions_vars_r.html":[2,3,2,18],
+"functions_vars_s.html":[2,3,2,19]
 };

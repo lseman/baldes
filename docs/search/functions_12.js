@@ -53,7 +53,7 @@ var searchData=
   ['setobj_50',['setOBJ',['../classbaldesVar.html#add19f48d079c02978c8673347b58fb5d',1,'baldesVar']]],
   ['setobj_51',['setObj',['../classStabilization.html#af17848288def02f6c163152d9ed75043',1,'Stabilization']]],
   ['setobjectivesense_52',['setObjectiveSense',['../classMIPProblem.html#a646a4f30d027285df6f5561c8134f619',1,'MIPProblem']]],
-  ['setoptions_53',['setOptions',['../classBucketGraph.html#a0327d3b5366beacc84a51f21a3e318c9',1,'BucketGraph']]],
+  ['setoptions_53',['setOptions',['../classBucketGraph.html#a2ce41f1b6bb8786635259bc05569fdf7',1,'BucketGraph']]],
   ['setorincrementdual_54',['setOrIncrementDual',['../classArcDuals.html#a24a3f7097597ac4d6b76b361a23f5c0c',1,'ArcDuals::setOrIncrementDual()'],['../classNodeDuals.html#aedd1a3e4c6a78e6f4e318287afc43df7',1,'NodeDuals::setOrIncrementDual()']]],
   ['setpaths_55',['setPaths',['../classBNBNode.html#a9226ea401bcd997d34cf84c9719ecb80',1,'BNBNode']]],
   ['setprune_56',['setPrune',['../classBNBNode.html#a5b11319f1f1f635bdee5a0bb71ad4eb9',1,'BNBNode']]],

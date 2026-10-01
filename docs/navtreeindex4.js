@@ -1,6 +1,5 @@
 var NAVTREEINDEX4 =
 {
-"classEigen_1_1CustomSimplicialLDLT.html#af32b70e7aedd4863e6429addd45548fc":[0,0,1,0,21],
 "classEigen_1_1CustomSimplicialLDLT.html#af32b70e7aedd4863e6429addd45548fc":[2,0,1,0,21],
 "classGenericParameters.html":[2,0,38],
 "classGenericParameters.html#a116f4649e15f53707120e04b5e854b37":[2,0,38,1],
@@ -249,5 +248,6 @@ var NAVTREEINDEX4 =
 "classMIPProblem.html#a00841d8835fad12f1b35e83d7b5cf9a5":[2,0,62,25],
 "classMIPProblem.html#a0d66160db6996155b8d3763fb22256e1":[2,0,62,30],
 "classMIPProblem.html#a15cf712c50d97736774b35f6ec269db3":[2,0,62,36],
-"classMIPProblem.html#a18aba4d0a3155090b501ddb72b07a6d1":[2,0,62,35]
+"classMIPProblem.html#a18aba4d0a3155090b501ddb72b07a6d1":[2,0,62,35],
+"classMIPProblem.html#a29674f674d7f14b118a031cdf734611e":[2,0,62,27]
 };

@@ -5,7 +5,7 @@ var dir_e1de90e42c0a5f0005c0c8e5c15e4d6e =
     [ "BucketGraph.h", "BucketGraph_8h.html", "BucketGraph_8h" ],
     [ "Concatenation.h", "Concatenation_8h.html", null ],
     [ "Dominance.h", "Dominance_8h.html", "Dominance_8h" ],
-    [ "Labeling.h", "Labeling_8h.html", "Labeling_8h" ],
+    [ "Labeling.h", "Labeling_8h.html", null ],
     [ "Pricing.h", "Pricing_8h.html", null ],
     [ "PricingPass.h", "PricingPass_8h.html", null ],
     [ "Resources.h", "Resources_8h.html", "Resources_8h" ],

@@ -23,6 +23,7 @@ var structBucketOptions =
     [ "three_five_sign", "structBucketOptions.html#a32598dc4943be1d63527590d51f7bf55", null ],
     [ "three_three_sign", "structBucketOptions.html#a0f94d5726eef9e2f669804c854c87eed", null ],
     [ "three_two_sign", "structBucketOptions.html#ab1d45645dee6f03d717e5d291aeea379", null ],
+    [ "time_resource_index", "structBucketOptions.html#af637a73947c60e9c0d3952076ce4be9a", null ],
     [ "verbose", "structBucketOptions.html#a06aeb73b0da8c26e191c62e3512121a7", null ],
     [ "warm_start", "structBucketOptions.html#a5f65cdf5f8be69a9496868b0526d1bcc", null ]
 ];
