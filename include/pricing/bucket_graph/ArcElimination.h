@@ -178,14 +178,45 @@ void BucketGraph::BucketArcElimination(double theta) {
     // Compute the number of 64-bit segments for bitmaps.
     const size_t n_segments = (buckets_size + 63) / 64;
 
-    // Define ArcMap to store arc information.
-    using ArcMap = ankerl::unordered_dense::map<std::pair<std::pair<int, int>, int>, ankerl::unordered_dense::set<int>,
-                                                arc_map_hash>;
-    ArcMap local_B_Ba_b;
+    // Replace hash map with indexed flat vector for O(log N) lookups instead of O(1) hash.
+    // Key encoding: (from_node << 25) | (to_node << 18) | bucket — fits in 32 bits.
+    // from_node: 7 bits (0-127), to_node: 7 bits (0-127), bucket: 18 bits (0-262143).
+    constexpr int arc_key_from_shift = 25;
+    constexpr int arc_key_to_shift   = 18;
+
+    struct ArcEntry {
+        uint32_t key;
+        ankerl::unordered_dense::set<int> buckets;
+    };
+    std::vector<ArcEntry> arc_storage;
+    arc_storage.reserve(n_buckets * 4);  // Heuristic: ~4 arcs per bucket
     int    removed_arcs = 0;
 
-    // Helper: create an arc key from two node IDs and a bucket.
-    auto create_arc_key = [](int from, int to, int b) { return std::make_pair(std::make_pair(from, to), b); };
+    // Helper: encode arc key from two node IDs and a bucket.
+    auto encode_arc_key = [arc_key_from_shift, arc_key_to_shift](int from, int to, int b) {
+        return static_cast<uint32_t>(from) << arc_key_from_shift |
+               static_cast<uint32_t>(to) << arc_key_to_shift |
+               static_cast<uint32_t>(b);
+    };
+
+    // Helper: find or insert an ArcEntry by encoded key.
+    auto get_or_insert_arc = [&](uint32_t key) -> ankerl::unordered_dense::set<int> & {
+        auto cmp = [key](const ArcEntry &e) { return e.key < key; };
+        auto it  = std::lower_bound(arc_storage.begin(), arc_storage.end(), ArcEntry{key, {}},
+                                    [](const ArcEntry &a, const ArcEntry &b) { return a.key < b.key; });
+        if (it != arc_storage.end() && it->key == key) { return it->buckets; }
+        it = arc_storage.insert(it, {key, {}});
+        return it->buckets;
+    };
+
+    // Helper: lookup an entry by encoded key.
+    auto find_arc = [&](uint32_t key) -> ankerl::unordered_dense::set<int> * {
+        auto cmp = [key](const ArcEntry &e) { return e.key < key; };
+        auto it  = std::lower_bound(arc_storage.begin(), arc_storage.end(), ArcEntry{key, {}},
+                                    [](const ArcEntry &a, const ArcEntry &b) { return a.key < b.key; });
+        if (it != arc_storage.end() && it->key == key) { return &it->buckets; }
+        return nullptr;
+    };
 
     // Helper lambda to quickly reset a bitmap vector.
     auto reset_bitmap = [&](std::vector<uint64_t> &bitmap) {
@@ -246,10 +277,10 @@ void BucketGraph::BucketArcElimination(double theta) {
                 }
             }
 
-            auto  arc_key    = create_arc_key(buckets[a.from_bucket].node_id, to_node, b);
+            auto  arc_key    = encode_arc_key(buckets[a.from_bucket].node_id, to_node, b);
             int   b_opposite = (D == Direction::Forward) ? get_bucket_number<Direction::Backward>(to_node, arrival)
                                                          : get_bucket_number<Direction::Forward>(to_node, arrival);
-            auto &Bidi_map   = local_B_Ba_b[arc_key];
+            auto &Bidi_map   = get_or_insert_arc(arc_key);
 
             // Process each label in the current bucket.
             for (auto &L_item : labels) {
@@ -283,9 +314,9 @@ void BucketGraph::BucketArcElimination(double theta) {
                     increment[r] = buckets[b].ub[r] - a.resource_increment[r];
             }
 
-            auto  arc_key    = create_arc_key(buckets[a.from_bucket].node_id, buckets[a.to_bucket].node_id, b);
+            auto  arc_key    = encode_arc_key(buckets[a.from_bucket].node_id, buckets[a.to_bucket].node_id, b);
             int   b_opposite = get_opposite_bucket_number<D>(a.to_bucket, increment);
-            auto &Bidi_map   = local_B_Ba_b[arc_key];
+            auto &Bidi_map   = get_or_insert_arc(arc_key);
 
             // Process each label in bucket 'b'.
             for (auto &L_item : labels) {
@@ -309,15 +340,15 @@ void BucketGraph::BucketArcElimination(double theta) {
         // Process node arcs.
         const auto &node_arcs = nodes[buckets[b].node_id].template get_arcs<D>();
         for (const auto &a : node_arcs) {
-            auto  arc_key  = std::make_pair(std::make_pair(a.from, a.to), b);
-            auto &Bidi_map = local_B_Ba_b[arc_key];
+            auto  arc_key  = encode_arc_key(a.from, a.to, b);
+            auto &Bidi_map = get_or_insert_arc(arc_key);
 
             if (!Phi[b].empty()) {
                 // Merge neighbor bucket arcs.
                 for (const auto &b_prime : Phi[b]) {
-                    auto neighbor_key = std::make_pair(std::make_pair(a.from, a.to), b_prime);
-                    if (auto it = local_B_Ba_b.find(neighbor_key); it != local_B_Ba_b.end()) {
-                        Bidi_map.insert(it->second.begin(), it->second.end());
+                    auto neighbor_key = encode_arc_key(a.from, a.to, b_prime);
+                    if (auto *src = find_arc(neighbor_key)) {
+                        Bidi_map.insert(src->begin(), src->end());
                     }
                 }
             }
