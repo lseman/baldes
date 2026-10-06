@@ -876,24 +876,27 @@ public:
 #if defined(SRC_MEMORY_MODE_ARC)
                 for (const auto &active_cut : active_cuts) {
                     const auto &cut           = *active_cut.cut_ptr;
-                    auto        src_map_value = label->SRCmap[active_cut.index];
+                    auto       &slot          = label->SRCmap[active_cut.index];
+                    unsigned    src_map_value = slot;
                     if (!cut.isSRCMemoryArc(prev_node, node_id)) { src_map_value = 0; }
                     if (cut.isSRCset(node_id)) {
                         src_map_value += cut.srcMultiplier(node_id);
-                        if (src_map_value >= cut.p.den) {
+                        if (src_map_value >= static_cast<unsigned>(cut.p.den)) {
                             src_map_value -= cut.p.den;
                             total_cost_update -= active_cut.dual_value;
                         }
                     }
+                    slot = static_cast<uint8_t>(src_map_value);
                 }
 #else
                 for (const auto &update : getSRCNodeUpdates(node_id)) {
-                    auto src_map_value = label->SRCmap[update.active_idx];
-                    src_map_value += update.add;
+                    auto    &slot          = label->SRCmap[update.active_idx];
+                    unsigned src_map_value = slot + update.add;
                     if (src_map_value >= update.den) {
                         src_map_value -= update.den;
                         total_cost_update -= update.dual;
                     }
+                    slot = static_cast<uint8_t>(src_map_value);
                 }
 
                 for (const auto active_idx : getSRCNodeClears(node_id)) { label->SRCmap[active_idx] = 0; }

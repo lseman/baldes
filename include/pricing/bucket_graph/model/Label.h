@@ -7,41 +7,31 @@
 #pragma once
 #include "math/Common.h"
 
+#include <algorithm>
+#include <array>
 #include <cassert>
 #include <memory>
+#include <span>
 #include <stdexcept>
+#include <vector>
+#if defined(__AVX2__)
+#include <immintrin.h>
+#endif
 
 #ifdef SRC
+/**
+ * Rank-1 cut memory state of a label, stored inline.
+ *
+ * Every stored value is reduced modulo its cut denominator, so one byte per
+ * cut is enough. Keeping the bytes inline makes copying a label's state a
+ * fixed-size copy instead of a heap allocation, and lets dominance compare
+ * whole 32-byte chunks at once (see src_greater_mask32).
+ */
 struct SRCMap {
-    class Reference {
-    public:
-        Reference(SRCMap &owner, std::size_t index) noexcept : owner_(owner), index_(index) {}
+    static constexpr std::size_t kStorage = (MAX_SRC_CUTS + 31) / 32 * 32;
 
-        operator uint16_t() const noexcept { return owner_.get(index_); }
-
-        Reference &operator=(uint16_t value) {
-            owner_.set(index_, value);
-            return *this;
-        }
-
-        Reference &operator+=(uint16_t value) {
-            owner_.set(index_, static_cast<uint16_t>(owner_.get(index_) + value));
-            return *this;
-        }
-
-        Reference &operator-=(uint16_t value) {
-            owner_.set(index_, static_cast<uint16_t>(owner_.get(index_) - value));
-            return *this;
-        }
-
-    private:
-        SRCMap    &owner_;
-        std::size_t index_;
-    };
-
-    std::unique_ptr<std::array<uint16_t, MAX_SRC_CUTS>> wide_values;
-    std::unique_ptr<std::array<uint8_t, MAX_SRC_CUTS>>  compact_values;
-    uint8_t logical_size = 0;
+    std::array<uint8_t, kStorage> values{};
+    uint8_t                       logical_size = 0;
 
     SRCMap() = default;
 
@@ -49,36 +39,11 @@ struct SRCMap {
 
     SRCMap(const std::vector<uint16_t> &src) { *this = src; }
 
-    SRCMap(const SRCMap &other)
-        : logical_size(other.logical_size) {
-        if (other.wide_values) {
-            wide_values = std::make_unique<std::array<uint16_t, MAX_SRC_CUTS>>(*other.wide_values);
-        }
-        if (other.compact_values) {
-            compact_values = std::make_unique<std::array<uint8_t, MAX_SRC_CUTS>>(*other.compact_values);
-        }
-    }
-
-    SRCMap &operator=(const SRCMap &other) {
-        if (this == &other) return *this;
-        logical_size   = other.logical_size;
-        wide_values = other.wide_values
-                          ? std::make_unique<std::array<uint16_t, MAX_SRC_CUTS>>(*other.wide_values)
-                          : nullptr;
-        compact_values = other.compact_values
-                             ? std::make_unique<std::array<uint8_t, MAX_SRC_CUTS>>(*other.compact_values)
-                             : nullptr;
-        return *this;
-    }
-
-    SRCMap(SRCMap &&) noexcept            = default;
-    SRCMap &operator=(SRCMap &&) noexcept = default;
-
     SRCMap &operator=(const std::vector<uint16_t> &src) {
         ensure_capacity(src.size());
-        clear();
+        values.fill(0);
         logical_size = static_cast<uint8_t>(src.size());
-        for (std::size_t i = 0; i < src.size(); ++i) set(i, src[i]);
+        for (std::size_t i = 0; i < src.size(); ++i) values[i] = narrow(src[i]);
         return *this;
     }
 
@@ -86,104 +51,66 @@ struct SRCMap {
         if (unlikely(n > MAX_SRC_CUTS)) { throw std::length_error("SRCMap capacity exceeded; increase MAX_SRC_CUTS"); }
     }
 
+    static uint8_t narrow(uint16_t value) {
+        if (unlikely(value > UINT8_MAX)) { throw std::out_of_range("SRCMap value does not fit in one byte"); }
+        return static_cast<uint8_t>(value);
+    }
+
     void clear() noexcept {
+        values.fill(0);
         logical_size = 0;
-        wide_values.reset();
-        compact_values.reset();
     }
 
     void resize(std::size_t n, uint16_t value = 0) {
         ensure_capacity(n);
-        assert(n <= MAX_SRC_CUTS);
-        if (n > logical_size) {
-            for (std::size_t i = logical_size; i < n; ++i) set(i, value);
-        }
+        const uint8_t v = narrow(value);
+        for (std::size_t i = logical_size; i < n; ++i) values[i] = v;
+        for (std::size_t i = n; i < logical_size; ++i) values[i] = 0;
         logical_size = static_cast<uint8_t>(n);
     }
 
     void assign(std::size_t n, uint16_t value) {
         ensure_capacity(n);
-        assert(n <= MAX_SRC_CUTS);
-        wide_values.reset();
-        compact_values.reset();
+        values.fill(0);
+        std::fill_n(values.begin(), n, narrow(value));
         logical_size = static_cast<uint8_t>(n);
-        if (value <= UINT8_MAX) {
-            getCompact(0); // lazy-allocate compact_values
-            std::fill_n(compact_values->begin(), n, static_cast<uint8_t>(value));
-        } else {
-            promote();
-            std::fill_n(wide_values->begin(), n, value);
-        }
     }
 
-    [[nodiscard]] std::size_t size() const noexcept { return logical_size; }
-    [[nodiscard]] bool        empty() const noexcept { return logical_size == 0; }
-    [[nodiscard]] bool        is_compact() const noexcept { return !wide_values; }
+    [[nodiscard]] std::size_t    size() const noexcept { return logical_size; }
+    [[nodiscard]] bool           empty() const noexcept { return logical_size == 0; }
+    [[nodiscard]] const uint8_t *data() const noexcept { return values.data(); }
 
-    [[nodiscard]] const void *storage_data() const noexcept {
-        if (wide_values) return static_cast<const void *>(wide_values->data());
-        if (compact_values) return static_cast<const void *>(compact_values->data());
-        return nullptr;
-    }
-
-    Reference operator[](std::size_t idx) noexcept {
+    uint8_t &operator[](std::size_t idx) noexcept {
         assert(idx < MAX_SRC_CUTS);
-#if defined(__GNUC__) || defined(__clang__)
-        if (idx >= MAX_SRC_CUTS) __builtin_unreachable();  // Hot path: index always valid
-#endif
-        return Reference(*this, idx);
+        return values[idx];
     }
 
-    uint16_t operator[](std::size_t idx) const noexcept {
+    uint8_t operator[](std::size_t idx) const noexcept {
         assert(idx < MAX_SRC_CUTS);
-#if defined(__GNUC__) || defined(__clang__)
-        if (idx >= MAX_SRC_CUTS) __builtin_unreachable();  // Hot path: index always valid
-#endif
-        return get(idx);
+        return values[idx];
     }
 
     [[nodiscard]] std::vector<uint16_t> to_vector() const {
-        std::vector<uint16_t> result(logical_size);
-        for (std::size_t i = 0; i < logical_size; ++i) result[i] = get(i);
-        return result;
-    }
-
-private:
-    [[nodiscard]] uint8_t &getCompact(std::size_t idx) noexcept {
-        if (!compact_values) {
-            compact_values = std::make_unique<std::array<uint8_t, MAX_SRC_CUTS>>();
-            compact_values->fill(0);
-        }
-        return (*compact_values)[idx];
-    }
-
-    [[nodiscard]] uint16_t get(std::size_t idx) const noexcept {
-        if (wide_values) return (*wide_values)[idx];
-        return compact_values ? static_cast<uint16_t>((*compact_values)[idx]) : static_cast<uint16_t>(logical_size == 0 ? 0u : 0u);
-    }
-
-    void set(std::size_t idx, uint16_t value) {
-        if (value > UINT8_MAX) {
-            if (!wide_values) promote();
-            if (wide_values) (*wide_values)[idx] = value;
-        } else {
-            if (wide_values) {
-                (*wide_values)[idx] = value;
-            } else {
-                getCompact(idx) = static_cast<uint8_t>(value);
-            }
-        }
-    }
-
-    void promote() {
-        wide_values = std::make_unique<std::array<uint16_t, MAX_SRC_CUTS>>();
-        if (compact_values) {
-            std::copy(compact_values->begin(), compact_values->end(), wide_values->begin());
-        } else {
-            wide_values->fill(0);
-        }
+        return std::vector<uint16_t>(values.begin(), values.begin() + logical_size);
     }
 };
+
+/**
+ * Bit i is set when a[i] > b[i] (unsigned), for the 32 bytes at a and b.
+ */
+inline uint32_t src_greater_mask32(const uint8_t *a, const uint8_t *b) noexcept {
+#if defined(__AVX2__)
+    const __m256i va = _mm256_loadu_si256(reinterpret_cast<const __m256i *>(a));
+    const __m256i vb = _mm256_loadu_si256(reinterpret_cast<const __m256i *>(b));
+    // a > b  <=>  min(a, b) != a
+    const __m256i not_greater = _mm256_cmpeq_epi8(_mm256_min_epu8(va, vb), va);
+    return ~static_cast<uint32_t>(_mm256_movemask_epi8(not_greater));
+#else
+    uint32_t mask = 0;
+    for (int i = 0; i < 32; ++i) mask |= static_cast<uint32_t>(a[i] > b[i]) << i;
+    return mask;
+#endif
+}
 #endif
 
 /**
@@ -373,7 +300,7 @@ struct Label {
      * @brief Initializes the object with the given parameters.
      *
      */
-    inline void initialize(int vertex, double cost, const std::vector<double> &resources, int node_id) {
+    inline void initialize(int vertex, double cost, std::span<const double> resources, int node_id) {
         this->vertex = vertex;
         this->cost   = cost;
 

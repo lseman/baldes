@@ -61,7 +61,7 @@ void BucketGraph::add_arc(int from_bucket, int to_bucket, const std::array<doubl
 }
 
 template <Direction D>
-inline int BucketGraph::get_bucket_number(int node, std::vector<double> &resource_values_vec) {
+inline int BucketGraph::get_bucket_number(int node, std::span<double> resource_values_vec) {
     const size_t num_resources = options.main_resources.size();
 
     const auto &buckets = assign_buckets<D>(fw_buckets, bw_buckets);
@@ -420,7 +420,7 @@ void BucketGraph::define_buckets() {
  *
  */
 template <Direction D>
-int BucketGraph::get_opposite_bucket_number(int current_bucket_index, std::vector<double> &inc) {
+int BucketGraph::get_opposite_bucket_number(int current_bucket_index, std::span<double> inc) {
     // Retrieve the current bucket based on the current direction.
     const auto &current_bucket =
         (D == Direction::Forward) ? fw_buckets[current_bucket_index] : bw_buckets[current_bucket_index];

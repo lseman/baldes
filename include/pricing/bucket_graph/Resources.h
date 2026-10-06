@@ -109,7 +109,7 @@ inline bool process_mtw_resource(double &new_resource, double initial_resource, 
 // theNode: VRPNode with lower/upper bounds and other properties.
 // N: number of resources to process.
 template <Direction D, typename Gamma, typename VRPNode>
-bool BucketGraph::process_all_resources(std::vector<double>              &new_resources,
+bool BucketGraph::process_all_resources(std::span<double>                 new_resources,
                                         const std::array<double, R_SIZE> &initial_resources, const Gamma &gamma,
                                         const VRPNode &theNode, size_t N) {
     for (size_t I = 0; I < N; ++I) {

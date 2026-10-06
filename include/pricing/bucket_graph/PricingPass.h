@@ -77,7 +77,7 @@ void BucketGraph::run_directional_pricing(BucketDirectionalBounds &bounds) {
         run_labeling_algorithms<S, Full::Partial>(bounds.forward, bounds.backward);
     } else {
         if constexpr (S == Stage::Four || S == Stage::Enumerate) {
-            pricing_src_compensation_bound = src_cost_compensation_bound();
+            prepare_src_pricing_state();
         } else {
             pricing_src_compensation_bound = 0.0;
         }

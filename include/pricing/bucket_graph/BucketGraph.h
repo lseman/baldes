@@ -6,6 +6,7 @@
 
 #pragma once
 
+#include <span>
 #include <atomic>
 #include <condition_variable>
 #include <cstring>
@@ -193,7 +194,7 @@ public:
      *
      */
     template <Direction D, typename Gamma, typename VRPNode>
-    bool process_all_resources(std::vector<double> &new_resources, const std::array<double, R_SIZE> &initial_resources,
+    bool process_all_resources(std::span<double> new_resources, const std::array<double, R_SIZE> &initial_resources,
                                const Gamma &gamma, const VRPNode &theNode, size_t N);
 
     // Template recursion for compile-time unrolling
@@ -412,6 +413,11 @@ public:
 
     CutStorage          *cut_storage = new CutStorage();
     double               pricing_src_compensation_bound = 0.0;
+    bool                 src_duals_nonpositive = true;
+#ifdef SRC
+    std::array<double, SRCMap::kStorage> src_dense_duals{};
+    size_t                               src_dense_chunks = 0;
+#endif
     static constexpr int max_buckets = 10000; // Define maximum number of buckets beforehand
 
     std::vector<Bucket> fw_buckets;
@@ -634,14 +640,24 @@ public:
     void                 profile_record_signature_rejection(Direction D, Stage S) noexcept;
     void                 profile_record_new_label(Direction D, Stage S) noexcept;
     void                 profile_record_non_dominated_label(Direction D, Stage S) noexcept;
-    [[nodiscard]] double src_cost_compensation_bound() const noexcept {
+    // Caches per-pass SRC state read by dominance: the compensation bound,
+    // the active duals laid out by active index, and whether every dual is
+    // non-positive (which makes a plain cost comparison a valid prefilter).
+    void prepare_src_pricing_state() noexcept {
+        pricing_src_compensation_bound = 0.0;
 #ifdef SRC
-        if (!cut_storage) return 0.0;
-        double bound = 0.0;
-        for (const auto &cut : cut_storage->getActiveCuts()) bound += std::abs(cut.dual_value);
-        return bound;
-#else
-        return 0.0;
+        src_dense_duals.fill(0.0);
+        src_duals_nonpositive = true;
+        src_dense_chunks      = 0;
+        if (!cut_storage) return;
+        size_t active = 0;
+        for (const auto &cut : cut_storage->getActiveCuts()) {
+            pricing_src_compensation_bound += std::abs(cut.dual_value);
+            if (cut.index < src_dense_duals.size()) src_dense_duals[cut.index] = cut.dual_value;
+            if (cut.dual_value > 0.0) src_duals_nonpositive = false;
+            active = std::max(active, cut.index + 1);
+        }
+        src_dense_chunks = (std::min(active, src_dense_duals.size()) + 31) / 32;
 #endif
     }
     void generate_arcs();
@@ -1233,7 +1249,7 @@ public:
     UnionFind fw_union_find;
     UnionFind bw_union_find;
     template <Direction D>
-    int get_bucket_number(int node, std::vector<double> &values);
+    int get_bucket_number(int node, std::span<double> values);
 
     template <Direction D>
     Label *get_best_label(const std::vector<int> &topological_order, const std::vector<double> &c_bar,
@@ -1315,7 +1331,7 @@ public:
     void BucketArcElimination(double theta);
 
     template <Direction D>
-    int get_opposite_bucket_number(int current_bucket_index, std::vector<double> &inc);
+    int get_opposite_bucket_number(int current_bucket_index, std::span<double> inc);
 
     void update_neighborhoods(const std::vector<std::pair<size_t, size_t>> &conflicts) {
         size_t num_nodes = nodes.size();
