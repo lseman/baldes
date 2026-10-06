@@ -222,7 +222,9 @@ void BucketGraph::calculate_neighborhoods(size_t num_closest) {
     neighborhoods_bitmap.resize(num_nodes);
 
     // Pre-calculate the number of segments needed (each segment is 64 bits).
-    const size_t num_segments = (num_nodes + 63) / 64;
+    // Rows are padded to a full label bitmap so Extend can AND every word
+    // without bounds checks.
+    const size_t num_segments = std::max((num_nodes + 63) / 64, Label::bitmap_words);
 
     // Process each node to compute its neighborhood.
     for (size_t i = 0; i < num_nodes; ++i) {

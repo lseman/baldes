@@ -372,8 +372,10 @@ include_directories("${CMAKE_CURRENT_BINARY_DIR}")
 
 include_directories(${ankerl_unordered_dense_SOURCE_DIR}/include)
 
-set(GUROBI_HOME $ENV{GUROBI_HOME})
-include_directories(${GUROBI_HOME}/include)
+if(GUROBI)
+  set(GUROBI_HOME $ENV{GUROBI_HOME})
+  include_directories(${GUROBI_HOME}/include)
+endif()
 
 # -----------------------------------------------------------------------------
 # CUDA
@@ -405,16 +407,18 @@ include_directories(${GUROBI_HOME}/include)
 #-------------------------------------------------------------------------------
 set(COMMON_LIBRARIES stdexec fmt xxhash)
 
-set(GUROBI_VERSION_MAJOR 130) # Adjust based on Gurobi version
-if(APPLE)
-  # macOS detected, use .dylib for linking
-  list(APPEND COMMON_LIBRARIES ${GUROBI_HOME}/lib/libgurobi_c++.a
-    ${GUROBI_HOME}/lib/libgurobi100.dylib)
-else()
-  # Non-macOS (Linux or other platforms), use .so and .a files
+if(GUROBI)
+  set(GUROBI_VERSION_MAJOR 130) # Adjust based on Gurobi version
+  if(APPLE)
+    # macOS detected, use .dylib for linking
+    list(APPEND COMMON_LIBRARIES ${GUROBI_HOME}/lib/libgurobi_c++.a
+      ${GUROBI_HOME}/lib/libgurobi100.dylib)
+  else()
+    # Non-macOS (Linux or other platforms), use .so and .a files
 
-  list(APPEND COMMON_LIBRARIES ${GUROBI_HOME}/lib/libgurobi_c++.a
-    ${GUROBI_HOME}/lib/libgurobi${GUROBI_VERSION_MAJOR}.so tbb)
+    list(APPEND COMMON_LIBRARIES ${GUROBI_HOME}/lib/libgurobi_c++.a
+      ${GUROBI_HOME}/lib/libgurobi${GUROBI_VERSION_MAJOR}.so tbb)
+  endif()
 endif()
 
 
