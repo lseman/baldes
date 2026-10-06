@@ -20,6 +20,7 @@
 #include <limits>
 #include <numeric> // For std::iota
 #include <stdexcept>
+#include <string>
 #include <vector>
 
 /**
@@ -35,6 +36,7 @@ public:
     static constexpr double kAlphaMax      = 0.90;
     static constexpr double kAlphaEps      = 1e-3;
     static constexpr double kNormTolerance = 1e-4;
+    static constexpr double kBoundTolerance = 1e-9;
 
     double alpha; // Current alpha parameter
     int    t;     // Iteration counter
@@ -68,8 +70,9 @@ public:
     DualSolution        subgradient;
     std::vector<double> new_rows;
 
-    double lag_gap      = 0.0;
-    double lag_gap_prev = -std::numeric_limits<double>::infinity();
+    // Lagrangian bound at the current stability center; the center only
+    // moves to a separation point whose bound beats it (Wentges).
+    double center_bound = -std::numeric_limits<double>::infinity();
 
     int numK = 10;
 
@@ -137,6 +140,12 @@ public:
     }
 
     bool update_stabilization_after_master_optim(const DualSolution &new_center) {
+        // New cuts change the dual problem, so bounds at the old center are
+        // no longer comparable.
+        if (cut_added) {
+            center_bound = -std::numeric_limits<double>::infinity();
+            cut_added    = false;
+        }
         nb_misprices = 0;
         cur_alpha    = std::clamp(base_alpha, kAlphaMin, kAlphaMax);
         alpha        = cur_alpha;
@@ -309,7 +318,17 @@ public:
                             const std::vector<Label *> &pricing_columns) {
         const std::size_t number_of_rows = node_duals.size();
         if (model.b.size() != number_of_rows || model.sense.size() != number_of_rows) {
-            throw std::invalid_argument("Master RHS, senses, and dual solution have inconsistent row counts");
+            throw std::invalid_argument("Master RHS (" + std::to_string(model.b.size()) + "), senses (" +
+                                        std::to_string(model.sense.size()) + "), and dual solution (" +
+                                        std::to_string(number_of_rows) + ") have inconsistent row counts");
+        }
+
+        // Without pricing columns the Lagrangian solution is unknown, so
+        // there is no direction to adapt alpha or beta with.
+        if (pricing_columns.empty()) {
+            subgradient.clear();
+            subgradient_norm = 0.0;
+            return;
         }
 
         new_rows.assign(number_of_rows, 0.0);
@@ -344,25 +363,38 @@ public:
     double    lp_obj_prev           = 0.0;
     const int NO_PROGRESS_THRESHOLD = 50;
 
-    void update_stabilization_after_pricing_optim(const ModelData &dados, const DualSolution &input_duals,
-                                                  const double               &lag_gap,
-                                                  const std::vector<Label *> &best_pricing_cols) {
-        align_with_master_duals(input_duals);
-        std::vector<double> nodeDuals = input_duals;
-        constraint_senses             = dados.sense;
+    /**
+     * Updates the stabilization state after one pricing round.
+     *
+     * @param master_duals      pi_out that this round's separation point was
+     *                          built from (not the duals of a later re-solve).
+     * @param lagrangian_bound  Lagrangian bound at the separation point, or
+     *                          NaN when pricing was not exact.
+     * @param mispriced         true when no column has negative reduced cost
+     *                          at pi_out.
+     */
+    void update_stabilization_after_pricing_optim(const ModelData &dados, const DualSolution &master_duals,
+                                                  double lagrangian_bound,
+                                                  const std::vector<Label *> &best_pricing_cols,
+                                                  bool                        mispriced = false) {
+        align_with_master_duals(master_duals);
+        constraint_senses = dados.sense;
 
-        if (nb_misprices == 0) {
-            update_subgradient(dados, nodeDuals, best_pricing_cols);
+        // The alpha and beta rules use the subgradient of a successful round;
+        // during a misprice sequence alpha follows the misprice schedule.
+        if (!mispriced && nb_misprices == 0) {
+            update_subgradient(dados, master_duals, best_pricing_cols);
 
-            // Dynamic alpha schedule (Table 1 right):
-            // if g_sep · (pi_out - pi_in) > 0 -> fincr(alpha)
-            // else -> fdecr(alpha)
+            // Dynamic alpha schedule (Table 1 right, with the paper's sign
+            // error corrected, as in GCG): if g_sep · (pi_out - pi_in) > 0
+            // the Lagrangian bound still increases toward pi_out, so the step
+            // was too cautious -> fdecr(alpha); otherwise -> fincr(alpha).
             double     g_dot_dir = 0.0;
             const bool has_direction =
-                subgradient_norm > EPSILON && subgradient.size() == nodeDuals.size() && !cur_stab_center.empty();
+                subgradient_norm > EPSILON && subgradient.size() == master_duals.size() && !cur_stab_center.empty();
             if (has_direction) {
-                for (size_t i = 0; i < nodeDuals.size(); ++i) {
-                    g_dot_dir += subgradient[i] * (nodeDuals[i] - cur_stab_center[i]);
+                for (size_t i = 0; i < master_duals.size(); ++i) {
+                    g_dot_dir += subgradient[i] * (master_duals[i] - cur_stab_center[i]);
                 }
             }
 
@@ -372,7 +404,7 @@ public:
                 return std::max(0.0, a - (1.0 - a) * 0.1);
             };
             if (has_direction) {
-                alpha      = (g_dot_dir > 0.0) ? fincr(alpha) : fdecr(alpha);
+                alpha      = (g_dot_dir > 0.0) ? fdecr(alpha) : fincr(alpha);
                 alpha      = std::clamp(alpha, 0.0, kAlphaMax);
                 base_alpha = std::clamp(alpha, kAlphaMin, kAlphaMax);
                 cur_alpha  = alpha;
@@ -380,11 +412,11 @@ public:
 
             // Adaptive beta schedule (Section directional smoothing):
             // beta = cos(gamma) between (pi_out - pi_in) and (pi_g - pi_in).
-            if (!subgradient.empty() && subgradient_norm > EPSILON && !cur_stab_center.empty()) {
+            if (has_direction) {
                 double dir_norm_sq = 0.0;
                 double dot         = 0.0;
-                for (size_t i = 0; i < nodeDuals.size(); ++i) {
-                    const double d = nodeDuals[i] - cur_stab_center[i];
+                for (size_t i = 0; i < master_duals.size(); ++i) {
+                    const double d = master_duals[i] - cur_stab_center[i];
                     dir_norm_sq += d * d;
                     dot += d * subgradient[i];
                 }
@@ -393,16 +425,20 @@ public:
             } else {
                 beta = 0.0;
             }
-
-            // In-point update between master iterations.
-            stab_center_for_next_iteration = smooth_dual_sol;
-        } else {
-            // During mispricing sequence keep in-point fixed.
-            stab_center_for_next_iteration = cur_stab_center;
         }
-        cut_added = false;
 
-        lag_gap_prev = lag_gap;
+        // Stability center (Wentges): move to the separation point only when
+        // its Lagrangian bound beats the center's. Heuristic pricing gives no
+        // valid bound, so then the center follows each successful round.
+        const DualSolution &separation_point = smooth_dual_sol.empty() ? master_duals : smooth_dual_sol;
+        if (std::isfinite(lagrangian_bound)) {
+            if (lagrangian_bound > center_bound + kBoundTolerance) {
+                center_bound                   = lagrangian_bound;
+                stab_center_for_next_iteration = separation_point;
+            }
+        } else if (!mispriced) {
+            stab_center_for_next_iteration = separation_point;
+        }
 
         if (std::isnan(alpha) || std::isinf(alpha)) {
             stabilization_active = false;

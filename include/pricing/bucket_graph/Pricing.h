@@ -75,9 +75,24 @@ BucketGraph::BucketPricingResult BucketGraph::execute_bucket_pricing_stage(Stage
 #endif
         return make_bucket_pricing_result(bi_labeling_algorithm<Stage::Four, SYM>());
     case Stage::Enumerate: {
+        // Enumerate every route with reduced cost below UB - b·v at the
+        // current duals v. That gap is valid only if no route has negative
+        // reduced cost at v (then L(v) = b·v); otherwise the run is
+        // reported as failed and pricing falls back to Stage Four.
+        if (!std::isfinite(pricing_dual_objective) || !std::isfinite(incumbent)) {
+            print_info("Skipping enumeration: no valid bound at current duals\n");
+            enumeration_failed.store(true, std::memory_order_relaxed);
+            return make_bucket_pricing_result({});
+        }
+        gap = std::max(0.0, incumbent - pricing_dual_objective);
         print_info("Starting enumeration with gap {}\n", gap);
         enumeration_failed.store(false, std::memory_order_relaxed);
         auto labels = bi_labeling_algorithm<Stage::Enumerate, SYM>();
+        if (!labels.empty() && labels.front()->cost < -1e-6) {
+            print_info("Enumeration found a negative reduced cost route ({}); bound not valid\n",
+                       labels.front()->cost);
+            enumeration_failed.store(true, std::memory_order_relaxed);
+        }
         if (labels.size() > static_cast<size_t>(enumeration_policy.max_routes)) {
             labels.resize(static_cast<size_t>(enumeration_policy.max_routes));
             enumeration_failed.store(true, std::memory_order_relaxed);
@@ -153,6 +168,7 @@ inline std::vector<Label *> BucketGraph::solve(bool trigger) {
 
     updateSplit();
     const auto decision = current_bucket_pricing_stage();
+    last_pricing_exact  = decision.available && decision.stage == Stage::Four;
     if (!decision.available) {
         ++iter;
         return {};

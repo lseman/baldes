@@ -477,13 +477,10 @@ void BucketGraph::bucket_fixing() {
         fmt::print("\033[34m_STARTING BUCKET FIXING PROCEDURE\033[0m\n");
         fixed = true;
 
-        // Compute gap and check feasibility (if gap is negative, exit
-        // early).
-        gap = std::ceil(incumbent - (relaxation + std::min(0.0, min_red_cost)));
-        if (gap < 0) {
-            fmt::print("\033[34m_BUCKET FIXING PROCEDURE CAN'T BE EXECUTED DUE TO "
-                       "GAP\033[0m\n");
-            fmt::print("gap: {}\n", gap);
+        // Reduced-cost fixing needs a lower bound at the same duals as the
+        // reduced costs it eliminates by.
+        if (!std::isfinite(pricing_dual_objective) || max_vehicles <= 0 || !std::isfinite(incumbent)) {
+            fmt::print("\033[34m_BUCKET FIXING SKIPPED: NO VALID BOUND AT CURRENT DUALS\033[0m\n");
             return;
         }
 
@@ -499,6 +496,23 @@ void BucketGraph::bucket_fixing() {
         // Save computed c_bar values.
         fw_c_bar = forward_cbar;
         bw_c_bar = backward_cbar;
+
+        // Full forward labeling reaches the end depot, so its buckets hold
+        // the minimum reduced cost of a complete route at these duals.
+        double min_route_rc = 0.0;
+        for (size_t b = 0; b < fw_buckets.size(); ++b) {
+            if (fw_buckets[b].node_id == options.end_depot) { min_route_rc = std::min(min_route_rc, fw_c_bar[b]); }
+        }
+        const double lower_bound = pricing_dual_objective + max_vehicles * min_route_rc;
+
+        // Rounding up (as before) assumes integral route costs.
+        gap = std::ceil(incumbent - lower_bound);
+        if (!std::isfinite(gap) || gap < 0) {
+            fmt::print("\033[34m_BUCKET FIXING PROCEDURE CAN'T BE EXECUTED DUE TO "
+                       "GAP\033[0m\n");
+            fmt::print("gap: {}\n", gap);
+            return;
+        }
 
         // Print info about bucket arc elimination.
         print_info("performing bucket arc elimination with theta = {}\n", gap);
