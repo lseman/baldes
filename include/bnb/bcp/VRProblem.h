@@ -121,6 +121,144 @@ public:
 
     using PricingStateMachine = baldes::bcp::PricingState;
 
+    // Simplex stabilization smooths SRC duals with the customer duals. IPM
+    // builds keep master SRC duals (their dual vectors use another sign).
+#if defined(STAB) && !defined(IPM)
+    static constexpr bool kSmoothSRCDuals = true;
+#else
+    static constexpr bool kSmoothSRCDuals = false;
+#endif
+
+    /**
+     * Dual objective b·v of the dual vector v that bucket pricing uses.
+     *
+     * Pricing reads customer-row duals from pricing_duals (possibly
+     * smoothed), reads cut and branching duals from the master, and never
+     * reads the vehicle row, so v takes 0 there (sign-feasible for its '<'
+     * sense). Returns NaN unless b·master_duals matches lp_obj, which guards
+     * against a dual sign or row-order mismatch and against inexact (IPM)
+     * master solves.
+     */
+    double pricingDualObjective(BNBNode *node, double lp_obj, const std::vector<double> &pricing_duals,
+                                const std::vector<double> &master_duals) {
+        constexpr double  nan         = std::numeric_limits<double>::quiet_NaN();
+        constexpr int     kVehicleRow = N_SIZE - 2;
+        double            master_obj  = 0.0;
+        double            pricing_obj = 0.0;
+        std::vector<char> smoothed_row(master_duals.size(), 0);
+        SRC_MODE_BLOCK(if (kSmoothSRCDuals) {
+            for (const auto &ctr : node->SRCconstraints) {
+                const int row = ctr->index();
+                if (row >= 0 && row < static_cast<int>(smoothed_row.size())) smoothed_row[row] = 1;
+            }
+        })
+        for (const auto &ctr : node->getConstrs()) {
+            const int row = ctr->index();
+            if (row < 0 || row >= static_cast<int>(master_duals.size())) return nan;
+            const double rhs = ctr->get_rhs();
+            master_obj += rhs * master_duals[row];
+            double v = master_duals[row];
+            if (row < kVehicleRow || smoothed_row[row]) {
+                if (row >= static_cast<int>(pricing_duals.size())) return nan;
+                v = pricing_duals[row];
+            } else if (row == kVehicleRow) {
+                v = 0.0;
+            }
+            pricing_obj += rhs * v;
+        }
+        if (std::abs(master_obj - lp_obj) > 1e-6 * std::max(1.0, std::abs(lp_obj))) return nan;
+        return pricing_obj;
+    }
+
+    // Full master reduced cost of a route: customer, vehicle, SRC, RCC and
+    // branching rows, at the given duals.
+    double routeReducedCost(BNBNode *node, const std::vector<int> &route, double travel_cost,
+                            const std::vector<double> &pricing_duals) {
+        double rc = travel_cost;
+
+        for (int node_id : route) {
+            if (node_id <= 0 || node_id >= N_SIZE - 1) continue;
+            const int row = node_id - 1;
+            if (row >= 0 && row < static_cast<int>(pricing_duals.size())) { rc -= pricing_duals[row]; }
+        }
+        if (N_SIZE - 2 >= 0 && N_SIZE - 2 < static_cast<int>(pricing_duals.size())) { rc -= pricing_duals[N_SIZE - 2]; }
+
+        Path path(route, travel_cost);
+        SRC_MODE_BLOCK({
+            auto        &cuts           = node->r1c->cutStorage;
+            auto        &SRCconstraints = node->SRCconstraints;
+            auto         coeffs         = cuts.computeLimitedMemoryCoefficients(path.route);
+            const size_t n_terms        = std::min(coeffs.size(), SRCconstraints.size());
+            for (size_t i = 0; i < n_terms; ++i) {
+                const int row = SRCconstraints[i]->index();
+                if (row >= 0 && row < static_cast<int>(pricing_duals.size())) { rc -= coeffs[i] * pricing_duals[row]; }
+            }
+        });
+
+        RCC_MODE_BLOCK({
+            auto        &rccManager = node->rccManager;
+            auto         coeffs     = rccManager->computeRCCCoefficients(path.route);
+            const auto  &cuts       = rccManager->getCuts();
+            const size_t n_terms    = std::min(coeffs.size(), cuts.size());
+            for (size_t i = 0; i < n_terms; ++i) {
+                const int row = cuts[i].ctr->index();
+                if (row >= 0 && row < static_cast<int>(pricing_duals.size())) { rc -= coeffs[i] * pricing_duals[row]; }
+            }
+        });
+
+        auto        &branching = node->branchingDuals;
+        auto         coeffs    = branching->computeCoefficients(path.route);
+        const auto  &ctrs      = branching->getBranchingbaldesCtrs();
+        const size_t n_terms   = std::min(coeffs.size(), ctrs.size());
+        for (size_t i = 0; i < n_terms; ++i) {
+            const int row = ctrs[i]->index();
+            if (row >= 0 && row < static_cast<int>(pricing_duals.size())) { rc -= coeffs[i] * pricing_duals[row]; }
+        }
+
+        return rc;
+    }
+
+    // Cut handling can add or remove master rows without re-solving, which
+    // leaves the solver's duals sized for the old rows. Re-solve in that case
+    // so duals, objective and rows agree. Returns true if it re-solved.
+    bool resolveIfRowsChanged(BNBNode *node, double &lp_obj, std::vector<double> &master_duals,
+                              std::vector<double> &origin_duals) {
+        if (node->getConstrs().size() == master_duals.size()) return false;
+        node->optimize();
+        lp_obj       = node->getObjVal();
+        master_duals = node->getDuals();
+        origin_duals = master_duals;
+        return true;
+    }
+
+    // True when some generated column has negative full reduced cost at the
+    // given master duals, i.e. it can improve the master LP. A round whose
+    // smoothed pricing finds none of these is a misprice.
+    bool hasImprovingColumn(BNBNode *node, const std::vector<Label *> &columns,
+                            const std::vector<double> &master_duals) {
+        std::vector<int> route;
+        for (const Label *label : columns) {
+            if (label == nullptr) continue;
+            const auto &stored = label->getRoute();
+            if (stored.size() < 3) continue;
+            route.assign(stored.begin(), stored.end());
+            if (hasNegativeReducedCost(routeReducedCost(node, route, label->real_cost, master_duals))) return true;
+        }
+        return false;
+    }
+
+    // Lagrangian bound L(v) = b·v + U·min(0, rc_min(v)) at the duals of the
+    // last pricing call, or NaN unless that call was exact Stage Four
+    // pricing that ran to completion.
+    static double lastPricingLagrangianBound(const BucketGraph *bucket_graph) {
+        if (!bucket_graph->last_pricing_exact || bucket_graph->pricing_truncated.load(std::memory_order_relaxed) ||
+            !std::isfinite(bucket_graph->pricing_dual_objective) || bucket_graph->max_vehicles <= 0) {
+            return std::numeric_limits<double>::quiet_NaN();
+        }
+        return bucket_graph->pricing_dual_objective +
+               bucket_graph->max_vehicles * std::min(0.0, bucket_graph->inner_obj);
+    }
+
 #ifdef ITERATIVE_HGS
     struct HGSIntegrationStats {
         int raw_routes         = 0;
@@ -188,51 +326,6 @@ public:
         return cost;
     }
 
-    double routeReducedCost(BNBNode *node, const std::vector<int> &route, double travel_cost,
-                            const std::vector<double> &pricing_duals) {
-        double rc = travel_cost;
-
-        for (int node_id : route) {
-            if (node_id <= 0 || node_id >= N_SIZE - 1) continue;
-            const int row = node_id - 1;
-            if (row >= 0 && row < static_cast<int>(pricing_duals.size())) { rc -= pricing_duals[row]; }
-        }
-        if (N_SIZE - 2 >= 0 && N_SIZE - 2 < static_cast<int>(pricing_duals.size())) { rc -= pricing_duals[N_SIZE - 2]; }
-
-        Path path(route, travel_cost);
-        SRC_MODE_BLOCK({
-            auto        &cuts           = node->r1c->cutStorage;
-            auto        &SRCconstraints = node->SRCconstraints;
-            auto         coeffs         = cuts.computeLimitedMemoryCoefficients(path.route);
-            const size_t n_terms        = std::min(coeffs.size(), SRCconstraints.size());
-            for (size_t i = 0; i < n_terms; ++i) {
-                const int row = SRCconstraints[i]->index();
-                if (row >= 0 && row < static_cast<int>(pricing_duals.size())) { rc -= coeffs[i] * pricing_duals[row]; }
-            }
-        });
-
-        RCC_MODE_BLOCK({
-            auto        &rccManager = node->rccManager;
-            auto         coeffs     = rccManager->computeRCCCoefficients(path.route);
-            const auto  &cuts       = rccManager->getCuts();
-            const size_t n_terms    = std::min(coeffs.size(), cuts.size());
-            for (size_t i = 0; i < n_terms; ++i) {
-                const int row = cuts[i].ctr->index();
-                if (row >= 0 && row < static_cast<int>(pricing_duals.size())) { rc -= coeffs[i] * pricing_duals[row]; }
-            }
-        });
-
-        auto        &branching = node->branchingDuals;
-        auto         coeffs    = branching->computeCoefficients(path.route);
-        const auto  &ctrs      = branching->getBranchingbaldesCtrs();
-        const size_t n_terms   = std::min(coeffs.size(), ctrs.size());
-        for (size_t i = 0; i < n_terms; ++i) {
-            const int row = ctrs[i]->index();
-            if (row >= 0 && row < static_cast<int>(pricing_duals.size())) { rc -= coeffs[i] * pricing_duals[row]; }
-        }
-
-        return rc;
-    }
 
     void recordHGSArcStats(HGS &hgs, const std::vector<std::vector<int>> &raw_routes) const {
         const int num_nodes = static_cast<int>(nodes.size());
@@ -383,12 +476,15 @@ public:
         // are currently in the model. This avoids stale active cuts leaking into
         // reduced-cost pricing after cut cleanup.
         SRC_MODE_BLOCK({
+            // With simplex stabilization the SRC duals are smoothed together
+            // with the customer duals; otherwise they come from the master.
+            const auto &src_dual_source = kSmoothSRCDuals ? nodeDuals : originDuals;
             std::vector<double> cutDuals(cuts.size(), 0.0);
             const auto          n_duals = std::min(SRCconstraints.size(), cuts.size());
             for (size_t i = 0; i < n_duals; ++i) {
                 auto constr = SRCconstraints[i];
-                if (constr->index() < static_cast<int>(originDuals.size())) {
-                    cutDuals[i] = originDuals[constr->index()];
+                if (constr->index() < static_cast<int>(src_dual_source.size())) {
+                    cutDuals[i] = src_dual_source[constr->index()];
                 }
             }
             cuts.setDuals(cutDuals);
@@ -408,6 +504,8 @@ public:
         if (branchingDuals->size() > 0) { branchingDuals->computeDuals(node); }
         bucket_graph->setDuals(nodeDuals);
         SRC_MODE_BLOCK(r1c->setDuals(nodeDuals);)
+        bucket_graph->max_vehicles           = instance.nV;
+        bucket_graph->pricing_dual_objective = pricingDualObjective(node, lp_obj, nodeDuals, originDuals);
 
         // Solve the pricing subproblem.
         paths = bucket_graph->solve();
@@ -1363,8 +1461,13 @@ public:
 
                 misprice = true;
                 while (misprice) {
-                    nodeDuals = stab.getStabDualSol(nodeDuals);
-                    solution  = node->extractSolution();
+                    resolveIfRowsChanged(node, lp_obj, nodeDuals, originDuals);
+                    // pi_out of this round; nodeDuals becomes the separation
+                    // point pricing runs at.
+                    const DualSolution master_duals = nodeDuals;
+                    nodeDuals                       = stab.getStabDualSol(master_duals);
+                    const bool smoothed             = nodeDuals != master_duals;
+                    solution                        = node->extractSolution();
 #endif
 
                     integer = true;
@@ -1471,28 +1574,55 @@ public:
                     if (gap > 1e-4) { gap = 1e-4; }
 #endif
                     // fmt::print("Gap: {}\n", gap);
-                    node->optimize();
-                    lp_obj_old = lp_obj;
-                    lp_obj     = node->getObjVal();
-                    nodeDuals  = node->getDuals();
+                    // If master rows changed during this round, its duals no
+                    // longer match the rows: re-solve and end the sequence
+                    // without a stabilization update.
+                    if (node->getConstrs().size() != master_duals.size()) {
+                        print_info("Master rows changed during pricing ({} -> {}); re-solving\n",
+                                   master_duals.size(), node->getConstrs().size());
+                        node->optimize();
+                        lp_obj_old  = lp_obj;
+                        lp_obj      = node->getObjVal();
+                        nodeDuals   = node->getDuals();
+                        originDuals = nodeDuals;
+                        paths.clear();
+                        misprice = false;
+                        continue;
+                    }
 
-                    // auto RC =
-                    // node->mip.getMostViolatingReducedCost(nodeDuals);
+                    // Decide misprice at this round's pi_out. Without
+                    // smoothing pricing already ran at pi_out.
+                    const double sep_bound = lastPricingLagrangianBound(bucket_graph.get());
+                    const bool   improving =
+                        smoothed ? hasImprovingColumn(node, paths, master_duals) : colAdded > 0;
 
-                    bucket_graph->gap = lp_obj + numK * std::min(0.0, inner_obj);
-                    lag_gap           = integer_solution - (lp_obj + numK * std::min(0.0, inner_obj));
+                    // Re-solve only if the master changed.
+                    if (colAdded > 0) {
+                        node->optimize();
+                        lp_obj_old = lp_obj;
+                        lp_obj     = node->getObjVal();
+                        nodeDuals  = node->getDuals();
+                    } else {
+                        nodeDuals = master_duals;
+                    }
+
+                    lag_gap = integer_solution - (lp_obj + numK * std::min(0.0, inner_obj));
 
                     matrix      = node->extractModelDataSparse();
                     stab.lp_obj = lp_obj;
-                    // stab.rc     = RC;
 
-                    stab.update_stabilization_after_pricing_optim(matrix, nodeDuals, lag_gap, paths);
+                    stab.update_stabilization_after_pricing_optim(matrix, master_duals, sep_bound, paths, !improving);
                     paths.clear();
-                    if (stab.shouldExit()) { misprice = false; }
-                    if (colAdded == 0) {
-                        stab.update_stabilization_after_misprice();
-                    } else {
+                    if (improving || !smoothed) {
+                        // Either the master can improve, or pricing ran at
+                        // pi_out and found nothing.
                         misprice = false;
+                    } else if (stab.shouldExit()) {
+                        // Smoothing is negligible: finish with one round at
+                        // pi_out so termination is decided on exact duals.
+                        stab.clearAlpha();
+                    } else {
+                        stab.update_stabilization_after_misprice();
                     }
                 }
 #endif
@@ -1761,8 +1891,14 @@ public:
             stab.update_stabilization_after_master_optim(nodeDuals);
             misprice = true;
             while (misprice) {
-                nodeDuals = stab.getStabDualSol(nodeDuals);
-                solution  = node->extractSolution();
+                {
+                    std::vector<double> origin_unused;
+                    resolveIfRowsChanged(node, lp_obj, nodeDuals, origin_unused);
+                }
+                const DualSolution master_duals = nodeDuals;
+                nodeDuals                       = stab.getStabDualSol(master_duals);
+                const bool smoothed             = nodeDuals != master_duals;
+                solution                        = node->extractSolution();
 #else
             node->optimize();
             solution = node->extractSolution();
@@ -1805,25 +1941,42 @@ public:
                 }
 
 #ifdef STAB
-                // TODO: check if we should update this before running the
-                // stab update
-                node->optimize();
-                lp_obj = node->getObjVal();
+                if (node->getConstrs().size() != master_duals.size()) {
+                    // Rows changed during the round; see CG().
+                    node->optimize();
+                    lp_obj    = node->getObjVal();
+                    nodeDuals = node->getDuals();
+                    paths.clear();
+                    misprice = false;
+                    continue;
+                }
 
-                nodeDuals = node->getDuals();
+                const bool improving = smoothed ? hasImprovingColumn(node, paths, master_duals) : colAdded > 0;
 
-                lag_gap           = integer_solution - (lp_obj + std::min(0.0, inner_obj));
-                bucket_graph->gap = lag_gap;
+                // Re-solve only if the master changed.
+                if (colAdded > 0) {
+                    node->optimize();
+                    lp_obj    = node->getObjVal();
+                    nodeDuals = node->getDuals();
+                } else {
+                    nodeDuals = master_duals;
+                }
+
+                lag_gap = integer_solution - (lp_obj + std::min(0.0, inner_obj));
 
                 matrix = node->extractModelDataSparse();
 
-                stab.update_stabilization_after_pricing_optim(matrix, nodeDuals, lag_gap, paths);
+                // Heuristic pricing gives no valid Lagrangian bound.
+                stab.update_stabilization_after_pricing_optim(matrix, master_duals,
+                                                              std::numeric_limits<double>::quiet_NaN(), paths,
+                                                              !improving);
 
-                if (colAdded == 0) {
-                    stab.update_stabilization_after_misprice();
-                    if (stab.shouldExit()) { misprice = false; }
-                } else {
+                if (improving || !smoothed) {
                     misprice = false;
+                } else if (stab.shouldExit()) {
+                    stab.clearAlpha();
+                } else {
+                    stab.update_stabilization_after_misprice();
                 }
             }
 

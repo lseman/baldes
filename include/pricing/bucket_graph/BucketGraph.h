@@ -410,6 +410,15 @@ public:
         return (fixed_buckets_bitmap[bit_pos / 64] & (1ULL << (bit_pos % 64))) != 0;
     }
     double gap = std::numeric_limits<double>::infinity();
+    // Dual objective b·v of the dual vector v that the next pricing call
+    // uses, and the fleet-size bound U. Pruning that pairs a lower bound
+    // with reduced costs (bucket fixing, enumeration) needs both at the same
+    // v: L(v) = b·v + U·min(0, rc_min(v)). NaN means unavailable, which
+    // disables that pruning.
+    double pricing_dual_objective = std::numeric_limits<double>::quiet_NaN();
+    int    max_vehicles           = 0;
+    // Whether the last solve() ran exact Stage Four pricing.
+    bool last_pricing_exact = false;
 
     CutStorage          *cut_storage = new CutStorage();
     double               pricing_src_compensation_bound = 0.0;
