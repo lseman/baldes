@@ -1,9 +1,17 @@
 <map id="LimitedMemoryRank1Cuts::separateR1C1" name="LimitedMemoryRank1Cuts::separateR1C1">
-<area shape="rect" id="Node000001" title=" " alt="" coords="5,63,180,103"/>
-<area shape="rect" id="Node000002" href="$classLimitedMemoryRank1Cuts.html#a267d89d8d4d4ba61fa2bf551dd041a9c" title="Computes the limited memory coefficient based on the given parameters." alt="" coords="228,5,454,46"/>
-<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="179,60,235,47,236,53,181,65"/>
-<area shape="rect" id="Node000003" href="$structSRCPermutation.html#a7c2eee29003a81f6c79aeb63729838dd" title=" " alt="" coords="256,70,426,96"/>
-<area shape="poly" id="edge2_Node000001_Node000003" title=" " alt="" coords="180,80,240,80,240,86,180,86"/>
-<area shape="rect" id="Node000004" href="$namespacenumericutils.html#a7c990ce03a48a2ac185e02868538cc7a" title=" " alt="" coords="274,120,408,145"/>
-<area shape="poly" id="edge3_Node000001_Node000004" title=" " alt="" coords="181,98,259,113,258,119,180,103"/>
+<area shape="rect" id="Node000001" title=" " alt="" coords="5,135,180,176"/>
+<area shape="rect" id="Node000002" href="$classCutStorage.html#a3735d9b48983d730a9386d90c3615c2b" title="Adds a cut to the CutStorage." alt="" coords="274,5,408,31"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="113,133,162,90,193,67,226,48,261,34,263,39,229,53,196,72,166,94,116,137"/>
+<area shape="rect" id="Node000003" href="$classCutStorage.html#a6c546f704d593f06544a3e7aed508dc8" title="Computes a unique cut key based on the provided base set and multipliers." alt="" coords="502,23,644,64"/>
+<area shape="poly" id="edge3_Node000001_Node000003" title=" " alt="" coords="131,132,176,111,227,92,294,75,362,62,486,47,487,52,363,67,295,80,228,97,178,115,133,137"/>
+<area shape="rect" id="Node000004" href="$classLimitedMemoryRank1Cuts.html#a267d89d8d4d4ba61fa2bf551dd041a9c" title="Computes the limited memory coefficient based on the given parameters." alt="" coords="228,106,454,146"/>
+<area shape="poly" id="edge4_Node000001_Node000004" title=" " alt="" coords="180,143,212,139,212,144,180,148"/>
+<area shape="rect" id="Node000005" href="$classCutStorage.html#a4e8d8d8526b8df28d9f2ef62993f9cd5" title=" " alt="" coords="268,171,414,196"/>
+<area shape="poly" id="edge5_Node000001_Node000005" title=" " alt="" coords="180,163,253,171,252,176,180,168"/>
+<area shape="rect" id="Node000006" href="$structSRCPermutation.html#a7c2eee29003a81f6c79aeb63729838dd" title=" " alt="" coords="256,220,426,246"/>
+<area shape="poly" id="edge6_Node000001_Node000006" title=" " alt="" coords="142,174,228,206,254,213,253,218,227,211,140,179"/>
+<area shape="rect" id="Node000007" href="$namespacenumericutils.html#a7c990ce03a48a2ac185e02868538cc7a" title=" " alt="" coords="274,293,408,319"/>
+<area shape="poly" id="edge7_Node000001_Node000007" title=" " alt="" coords="119,174,168,214,229,256,289,285,287,290,226,260,165,219,116,178"/>
+<area shape="poly" id="edge2_Node000002_Node000003" title=" " alt="" coords="408,23,487,31,486,37,408,28"/>
+<area shape="poly" id="edge8_Node000007_Node000007" title=" " alt="" coords="302,295,295,285,299,275,315,269,341,267,369,269,384,276,381,281,368,275,341,272,316,274,303,279,300,284,307,291"/>
 </map>

@@ -14,7 +14,7 @@ var searchData=
   ['initcg_11',['initCg',['../classCliqueManager.html#a98e956febf7c699d82eaa81b96e5e45b',1,'CliqueManager']]],
   ['initial_5ftemperature_12',['INITIAL_TEMPERATURE',['../namespaceLocalSearchConfig.html#a0fac396735e5deb656b47d58c45dc488',1,'LocalSearchConfig']]],
   ['initialization_5fms_13',['initialization_ms',['../structBucketGraph_1_1BucketPricingTimings.html#ad9d8ebc1abd72dca9417f4b01703903e',1,'BucketGraph::BucketPricingTimings']]],
-  ['initialize_14',['initialize',['../classBNBNode.html#a4117929b574dc3a51bfca0b935e76d57',1,'BNBNode::initialize()'],['../structLabel.html#a1423053276541b870c57f65baae8570c',1,'Label::initialize()']]],
+  ['initialize_14',['initialize',['../classBNBNode.html#a4117929b574dc3a51bfca0b935e76d57',1,'BNBNode::initialize()'],['../structLabel.html#a522acffcfb5aac76e97c7a63696a4631',1,'Label::initialize()']]],
   ['initialize_5fpricing_5fpass_15',['initialize_pricing_pass',['../classBucketGraph.html#acc64a0d20392af1c008e4cf3949e1a89',1,'BucketGraph']]],
   ['initializerank1heuristicneighbors_16',['initializeRank1HeuristicNeighbors',['../classLimitedMemoryRank1Cuts.html#ae6f376dcb6916b93872f02660eabc753',1,'LimitedMemoryRank1Cuts']]],
   ['initializevertexroutemap_17',['initializeVertexRouteMap',['../classLimitedMemoryRank1Cuts.html#a0c8178e5e367d5d5124555500f650f97',1,'LimitedMemoryRank1Cuts']]],

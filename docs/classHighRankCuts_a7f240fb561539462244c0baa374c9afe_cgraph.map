@@ -1,10 +1,13 @@
 <map id="HighRankCuts::HighRankCuts" name="HighRankCuts::HighRankCuts">
-<area shape="rect" id="Node000001" title=" " alt="" coords="5,31,201,56"/>
-<area shape="rect" id="Node000002" href="$Helpers_8h.html#a6e2d376e10d40865f9a079e6bef1501f" title=" " alt="" coords="255,5,436,31"/>
-<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="201,31,239,27,240,32,201,36"/>
-<area shape="rect" id="Node000004" href="$Helpers_8h.html#ae16f85cab7674f93b1e3171dbe907d20" title=" " alt="" coords="249,55,442,80"/>
-<area shape="poly" id="edge3_Node000001_Node000004" title=" " alt="" coords="201,51,233,54,233,59,201,56"/>
-<area shape="rect" id="Node000003" href="$Helpers_8h.html#acf8696478b8666472dbbc5267f76fd36" title=" " alt="" coords="490,31,686,56"/>
-<area shape="poly" id="edge2_Node000002_Node000003" title=" " alt="" coords="436,25,475,29,474,34,436,30"/>
-<area shape="poly" id="edge4_Node000004_Node000003" title=" " alt="" coords="442,55,474,52,475,57,443,61"/>
+<area shape="rect" id="Node000001" title=" " alt="" coords="5,67,201,92"/>
+<area shape="rect" id="Node000002" href="$Helpers_8h.html#a6e2d376e10d40865f9a079e6bef1501f" title=" " alt="" coords="255,29,436,55"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="190,63,242,55,243,61,191,69"/>
+<area shape="rect" id="Node000004" href="$Helpers_8h.html#ae16f85cab7674f93b1e3171dbe907d20" title=" " alt="" coords="249,103,442,128"/>
+<area shape="poly" id="edge5_Node000001_Node000004" title=" " alt="" coords="194,90,240,97,239,102,194,96"/>
+<area shape="poly" id="edge2_Node000002_Node000002" title=" " alt="" coords="305,31,297,21,302,11,318,5,345,3,375,5,390,13,388,17,374,11,345,8,320,10,306,15,303,20,309,27"/>
+<area shape="rect" id="Node000003" href="$Helpers_8h.html#acf8696478b8666472dbbc5267f76fd36" title=" " alt="" coords="490,67,686,92"/>
+<area shape="poly" id="edge3_Node000002_Node000003" title=" " alt="" coords="434,53,486,61,485,66,433,58"/>
+<area shape="poly" id="edge4_Node000003_Node000003" title=" " alt="" coords="548,68,540,58,545,48,561,42,588,40,618,43,633,50,631,55,617,48,588,45,562,47,548,52,545,57,552,65"/>
+<area shape="poly" id="edge7_Node000004_Node000003" title=" " alt="" coords="436,99,481,93,482,98,437,105"/>
+<area shape="poly" id="edge6_Node000004_Node000004" title=" " alt="" coords="305,104,297,94,302,84,318,78,345,76,375,79,390,86,388,91,374,84,345,81,320,83,306,88,303,93,309,101"/>
 </map>

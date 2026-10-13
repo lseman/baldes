@@ -67,14 +67,14 @@ var NAVTREEINDEX =
 "AMD_8h.html",
 "MIPHandler_8cpp.html#ab2da79ce4ff759ca019a349b492dfb4f",
 "classBNBNode.html#ac4a92f0a90b0517dda3eb0e08c1ffe72",
-"classBucketGraph.html#a9c231835ccf2b5c41cb6fea8e2dba1a9",
-"classEigen_1_1CustomSimplicialLDLT.html#af32b70e7aedd4863e6429addd45548fc",
-"classMIPProblem.html#a2d45a20f806ee2ede27d9c575758e5d5",
-"classStabilization.html#af358ea4f62658ca2a7b1509535392e2a",
-"functions_vars_t.html",
-"structBucketGraph_1_1EnumerationPolicy.html#a4c07245ed0807d5a72223b0856b1135a",
-"structModelData.html#aea9d2f5b3aa72a3af01c62c7cd9d81f2",
-"structarc__map__hash.html"
+"classBucketGraph.html#a969616f31655bd99cbb35c1c863d1ef4",
+"classEigen_1_1CustomSimplicialLDLT.html#ae8917fbeb5898dbed833f3969d97083d",
+"classMIPProblem.html#a0d66160db6996155b8d3763fb22256e1",
+"classStabilization.html#aeefeb07a3c590e646333b8fdf7529b76",
+"functions_vars_o.html",
+"structBucketGraph_1_1ConcatenationStats.html#a49e3a7b547193fadeb743b5c5c120cc0",
+"structModelData.html#a72635fc8840db033fc065f5a606513f2",
+"structVectorIntHashCompare.html#a79b06cf368611ea40ac8e86978bfc59c"
 ];
 
 const SYNCONMSG = 'click to disable panel synchronization';

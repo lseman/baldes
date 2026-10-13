@@ -1,7 +1,8 @@
 <map id="LabelPool::acquire_batch" name="LabelPool::acquire_batch">
-<area shape="rect" id="Node000001" title=" " alt="" coords="5,5,133,46"/>
-<area shape="rect" id="Node000002" href="$classLabelPool.html#a741b4234523a1e43940a5e8111ee3eed" title=" " alt="" coords="181,13,308,38"/>
-<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="133,23,165,23,165,28,133,28"/>
-<area shape="rect" id="Node000003" href="$structLabel.html#a09ab6e2211ea2dc90992dc2d0854ef20" title="Resets the state of the object to its initial values." alt="" coords="356,13,444,38"/>
-<area shape="poly" id="edge2_Node000002_Node000003" title=" " alt="" coords="308,23,340,23,340,28,308,28"/>
+<area shape="rect" id="Node000001" title=" " alt="" coords="5,22,133,62"/>
+<area shape="rect" id="Node000002" href="$classLabelPool.html#a741b4234523a1e43940a5e8111ee3eed" title=" " alt="" coords="181,29,308,55"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="133,40,165,40,165,45,133,45"/>
+<area shape="rect" id="Node000003" href="$structLabel.html#a09ab6e2211ea2dc90992dc2d0854ef20" title="Resets the state of the object to its initial values." alt="" coords="356,29,444,55"/>
+<area shape="poly" id="edge2_Node000002_Node000003" title=" " alt="" coords="308,40,340,40,340,45,308,45"/>
+<area shape="poly" id="edge3_Node000003_Node000003" title=" " alt="" coords="373,30,368,21,371,11,382,5,400,3,419,5,429,12,426,16,417,10,400,8,384,10,376,15,374,20,378,28"/>
 </map>

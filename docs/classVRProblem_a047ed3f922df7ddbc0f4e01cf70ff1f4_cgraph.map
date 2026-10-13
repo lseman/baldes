@@ -6,8 +6,13 @@
 <area shape="poly" id="edge2_Node000001_Node000003" title=" " alt="" coords="173,125,219,113,221,118,175,130"/>
 <area shape="rect" id="Node000004" href="$classBNBNode.html#a8e9719a49d2b149441b61ee4aa790fa2" title=" " alt="" coords="243,136,392,161"/>
 <area shape="poly" id="edge3_Node000001_Node000004" title=" " alt="" coords="178,146,227,146,227,151,178,151"/>
-<area shape="rect" id="Node000005" href="$Definitions_8h.html#a086546d06aa565cdd48f436973ebc496" title="Prints an informational message with a specific format." alt="" coords="280,185,354,210"/>
-<area shape="poly" id="edge4_Node000001_Node000005" title=" " alt="" coords="178,165,265,184,264,189,177,170"/>
-<area shape="rect" id="Node000006" href="$classBNBNode.html#a826ed1319c03caf3030806fd80098063" title=" " alt="" coords="255,234,380,260"/>
-<area shape="poly" id="edge5_Node000001_Node000006" title=" " alt="" coords="126,167,173,194,227,221,243,227,242,232,225,225,170,199,123,171"/>
+<area shape="rect" id="Node000006" href="$Definitions_8h.html#a086546d06aa565cdd48f436973ebc496" title="Prints an informational message with a specific format." alt="" coords="280,209,354,234"/>
+<area shape="poly" id="edge5_Node000001_Node000006" title=" " alt="" coords="157,167,266,202,264,207,155,172"/>
+<area shape="rect" id="Node000007" href="$classBNBNode.html#a826ed1319c03caf3030806fd80098063" title=" " alt="" coords="255,258,380,284"/>
+<area shape="poly" id="edge7_Node000001_Node000007" title=" " alt="" coords="117,167,165,207,227,245,241,251,239,256,224,249,162,211,113,171"/>
+<area shape="rect" id="Node000005" href="$classMIPProblem.html#af3061cfe5612892a459913ae8bcaca81" title=" " alt="" coords="457,136,636,161"/>
+<area shape="poly" id="edge4_Node000004_Node000005" title=" " alt="" coords="392,146,442,146,442,151,392,151"/>
+<area shape="poly" id="edge6_Node000006_Node000006" title=" " alt="" coords="280,210,272,200,277,190,292,184,317,182,345,185,359,192,357,196,343,190,317,187,293,190,281,194,278,200,284,207"/>
+<area shape="rect" id="Node000008" href="$classMIPProblem.html#af74c6183105ff9487dfd97d733b500e7" title=" " alt="" coords="478,258,616,284"/>
+<area shape="poly" id="edge8_Node000007_Node000008" title=" " alt="" coords="381,268,462,268,462,274,381,274"/>
 </map>

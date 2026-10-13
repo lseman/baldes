@@ -1,0 +1,5 @@
+<map id="IPSolver::solve_augmented_system" name="IPSolver::solve_augmented_system">
+<area shape="rect" id="Node000001" title="Solves the augmented system for the given right&#45;hand side vectors." alt="" coords="5,5,185,46"/>
+<area shape="rect" id="Node000002" href="$classSparseSolver.html#a4337137c45bc2ff28f7e35baa5448417" title=" " alt="" coords="233,13,369,38"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="185,23,217,23,217,28,185,28"/>
+</map>

@@ -1,5 +1,10 @@
 <map id="ParametersBuilder::with" name="ParametersBuilder::with">
-<area shape="rect" id="Node000001" title=" " alt="" coords="5,13,164,38"/>
-<area shape="rect" id="Node000002" href="$classParametersBuilder.html#a629109f8a171852550bb4727310492b2" title=" " alt="" coords="212,5,346,46"/>
-<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="164,23,196,23,196,28,164,28"/>
+<area shape="rect" id="Node000001" title=" " alt="" coords="5,29,164,55"/>
+<area shape="rect" id="Node000002" href="$classParametersBuilder.html#a629109f8a171852550bb4727310492b2" title=" " alt="" coords="212,22,346,62"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="164,40,196,40,196,45,164,45"/>
+<area shape="rect" id="Node000003" href="$CostFunction_8h.html#ad87ef7d1fefe5adfa481fad0757c5787" title=" " alt="" coords="394,29,451,55"/>
+<area shape="poly" id="edge2_Node000002_Node000003" title=" " alt="" coords="347,40,378,40,378,45,347,45"/>
+<area shape="poly" id="edge3_Node000003_Node000003" title=" " alt="" coords="398,30,393,21,396,11,406,5,423,3,440,5,450,12,447,16,438,10,423,8,408,10,400,14,398,20,403,28"/>
+<area shape="rect" id="Node000004" href="$structParamType.html#a114758e75d0ecdb6876bb7633f45f3c1" title=" " alt="" coords="499,29,659,55"/>
+<area shape="poly" id="edge4_Node000003_Node000004" title=" " alt="" coords="452,40,483,40,483,45,452,45"/>
 </map>

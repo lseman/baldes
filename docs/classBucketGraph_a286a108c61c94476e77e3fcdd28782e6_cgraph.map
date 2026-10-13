@@ -1,7 +1,9 @@
 <map id="BucketGraph::dominates_resource_path" name="BucketGraph::dominates_resource_path">
-<area shape="rect" id="Node000001" title="Checks if a label is dominated by a new label based on cost and resource conditions." alt="" coords="5,23,169,64"/>
-<area shape="rect" id="Node000002" href="$namespacenumericutils.html#aaadab3c8a1b76df1e09c11ebaa3d1e49" title=" " alt="" coords="217,5,325,31"/>
-<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="168,30,201,25,202,30,169,35"/>
-<area shape="rect" id="Node000003" href="$namespacenumericutils.html#af55fcfd2b05fe5a20796069445c89aef" title=" " alt="" coords="219,55,323,80"/>
-<area shape="poly" id="edge2_Node000001_Node000003" title=" " alt="" coords="169,52,204,56,203,61,169,57"/>
+<area shape="rect" id="Node000001" title="Checks if a label is dominated by a new label based on cost and resource conditions." alt="" coords="5,59,169,100"/>
+<area shape="rect" id="Node000002" href="$namespacenumericutils.html#aaadab3c8a1b76df1e09c11ebaa3d1e49" title=" " alt="" coords="217,29,325,55"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="168,60,201,54,202,59,169,66"/>
+<area shape="rect" id="Node000003" href="$namespacenumericutils.html#af55fcfd2b05fe5a20796069445c89aef" title=" " alt="" coords="219,103,323,128"/>
+<area shape="poly" id="edge3_Node000001_Node000003" title=" " alt="" coords="169,93,204,100,203,105,168,98"/>
+<area shape="poly" id="edge2_Node000002_Node000002" title=" " alt="" coords="240,30,234,21,237,11,250,5,271,3,293,5,305,12,302,16,291,10,271,8,252,10,241,15,239,20,244,27"/>
+<area shape="poly" id="edge4_Node000003_Node000003" title=" " alt="" coords="240,104,234,94,237,84,250,78,271,76,293,79,305,85,302,90,291,84,271,81,252,83,241,88,239,93,244,101"/>
 </map>

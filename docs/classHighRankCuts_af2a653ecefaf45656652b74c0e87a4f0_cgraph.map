@@ -1,16 +1,20 @@
 <map id="HighRankCuts::separate" name="HighRankCuts::separate">
-<area shape="rect" id="Node000001" title=" " alt="" coords="5,150,167,176"/>
-<area shape="rect" id="Node000002" href="$classHighRankCuts.html#ac2cea18dd517033c3ffa62dadaa131c6" title=" " alt="" coords="215,60,402,101"/>
-<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="122,147,236,104,238,109,124,152"/>
-<area shape="rect" id="Node000005" href="$namespacenumericutils.html#a7c990ce03a48a2ac185e02868538cc7a" title=" " alt="" coords="486,121,619,146"/>
-<area shape="poly" id="edge5_Node000001_Node000005" title=" " alt="" coords="167,155,469,136,470,141,167,161"/>
-<area shape="rect" id="Node000006" href="$Definitions_8h.html#ae7a1dede4b1a1d5175d2cfa359459e3c" title="Prints a formatted message with a specific prefix." alt="" coords="273,176,344,201"/>
-<area shape="poly" id="edge6_Node000001_Node000006" title=" " alt="" coords="168,170,257,180,257,185,167,175"/>
-<area shape="rect" id="Node000007" href="$classLocalSearch.html#a41e13d4331a26d3ea88c7e222d1045e0" title=" " alt="" coords="243,225,374,250"/>
-<area shape="poly" id="edge7_Node000001_Node000007" title=" " alt="" coords="119,174,216,211,237,218,235,223,214,216,117,179"/>
+<area shape="rect" id="Node000001" title=" " alt="" coords="5,214,167,240"/>
+<area shape="rect" id="Node000002" href="$classHighRankCuts.html#ac2cea18dd517033c3ffa62dadaa131c6" title=" " alt="" coords="215,67,402,107"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="102,212,151,174,213,131,247,112,250,117,216,136,154,178,105,216"/>
+<area shape="rect" id="Node000005" href="$namespacenumericutils.html#a7c990ce03a48a2ac185e02868538cc7a" title=" " alt="" coords="486,144,619,169"/>
+<area shape="poly" id="edge6_Node000001_Node000005" title=" " alt="" coords="113,211,160,192,214,175,281,163,349,156,470,152,470,157,349,162,281,169,215,180,161,197,115,216"/>
+<area shape="rect" id="Node000006" href="$Definitions_8h.html#ae7a1dede4b1a1d5175d2cfa359459e3c" title="Prints a formatted message with a specific prefix." alt="" coords="273,214,344,240"/>
+<area shape="poly" id="edge7_Node000001_Node000006" title=" " alt="" coords="167,224,257,224,257,230,167,230"/>
+<area shape="rect" id="Node000007" href="$classCutStorage.html#a8e89d9944e00cab31fc1b78554505c07" title=" " alt="" coords="251,264,366,289"/>
+<area shape="poly" id="edge9_Node000001_Node000007" title=" " alt="" coords="148,238,236,258,235,263,147,243"/>
+<area shape="rect" id="Node000008" href="$classLocalSearch.html#a41e13d4331a26d3ea88c7e222d1045e0" title=" " alt="" coords="243,313,374,338"/>
+<area shape="poly" id="edge10_Node000001_Node000008" title=" " alt="" coords="108,238,156,269,216,299,232,305,230,310,214,304,153,273,105,243"/>
 <area shape="rect" id="Node000003" href="$classHighRankCuts.html#abee2a3b3552892037678d2ca670c314e" title=" " alt="" coords="450,5,654,46"/>
-<area shape="poly" id="edge2_Node000002_Node000003" title=" " alt="" coords="402,57,443,47,444,53,403,62"/>
+<area shape="poly" id="edge2_Node000002_Node000003" title=" " alt="" coords="391,63,453,48,454,53,393,69"/>
 <area shape="rect" id="Node000004" href="$structSRCPermutation.html#a7c2eee29003a81f6c79aeb63729838dd" title=" " alt="" coords="467,70,637,96"/>
-<area shape="poly" id="edge3_Node000002_Node000004" title=" " alt="" coords="403,79,451,79,451,85,403,84"/>
-<area shape="poly" id="edge4_Node000002_Node000005" title=" " alt="" coords="403,98,476,114,475,120,402,103"/>
+<area shape="poly" id="edge3_Node000002_Node000004" title=" " alt="" coords="403,83,451,82,451,87,403,88"/>
+<area shape="poly" id="edge4_Node000002_Node000005" title=" " alt="" coords="383,105,490,136,489,141,382,111"/>
+<area shape="poly" id="edge5_Node000005_Node000005" title=" " alt="" coords="512,145,504,135,509,125,525,119,552,117,582,120,597,127,595,132,581,125,552,122,526,124,512,129,509,134,516,141"/>
+<area shape="poly" id="edge8_Node000006_Node000006" title=" " alt="" coords="271,215,264,206,268,196,284,190,308,188,336,190,349,197,347,202,334,195,308,193,285,195,272,200,269,205,276,212"/>
 </map>

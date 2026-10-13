@@ -1,18 +1,26 @@
 <map id="BucketGraph::compute_red_cost" name="BucketGraph::compute_red_cost">
-<area shape="rect" id="Node000001" title=" " alt="" coords="5,157,159,198"/>
-<area shape="rect" id="Node000002" href="$classBucketGraph.html#addbec0c4c3ef8fa8e96063b04dd945ca" title=" " alt="" coords="207,63,374,103"/>
-<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="121,155,206,113,218,107,220,112,208,117,123,159"/>
-<area shape="rect" id="Node000006" href="$classBucketGraph.html#ad15267e0cffaa8dc5222028409c9e082" title=" " alt="" coords="223,128,358,153"/>
-<area shape="poly" id="edge5_Node000001_Node000006" title=" " alt="" coords="159,161,207,152,208,158,160,166"/>
-<area shape="rect" id="Node000007" href="$classArcDuals.html#ac75e53f0c4f24e6aca539c544e9f8109" title=" " alt="" coords="228,201,352,226"/>
-<area shape="poly" id="edge6_Node000001_Node000007" title=" " alt="" coords="160,188,213,198,213,203,159,194"/>
-<area shape="rect" id="Node000008" href="$classBucketGraph.html#ad36a543a58c7d3cd4ded313dd5069f03" title="Marks a node as visited in the bitmap." alt="" coords="212,251,368,291"/>
-<area shape="poly" id="edge8_Node000001_Node000008" title=" " alt="" coords="124,196,208,237,220,242,218,247,206,241,122,201"/>
-<area shape="rect" id="Node000003" href="$classBucketGraph.html#af129eff306551dc7cc7fe00b919bbbd0" title="Assigns the buckets based on the specified direction." alt="" coords="422,5,563,46"/>
-<area shape="poly" id="edge2_Node000002_Node000003" title=" " alt="" coords="364,60,406,47,408,52,365,65"/>
-<area shape="rect" id="Node000004" href="$namespacenumericutils.html#aaadab3c8a1b76df1e09c11ebaa3d1e49" title=" " alt="" coords="438,70,547,96"/>
-<area shape="poly" id="edge3_Node000002_Node000004" title=" " alt="" coords="375,80,423,80,423,86,375,86"/>
-<area shape="rect" id="Node000005" href="$namespacenumericutils.html#af55fcfd2b05fe5a20796069445c89aef" title=" " alt="" coords="440,120,545,145"/>
-<area shape="poly" id="edge4_Node000002_Node000005" title=" " alt="" coords="375,101,426,114,425,119,374,106"/>
-<area shape="poly" id="edge7_Node000007_Node000007" title=" " alt="" coords="256,202,250,192,254,182,268,176,290,174,315,177,328,184,325,188,314,182,290,179,269,181,258,186,255,192,261,199"/>
+<area shape="rect" id="Node000001" title=" " alt="" coords="5,169,159,210"/>
+<area shape="rect" id="Node000002" href="$classCutStorage.html#a2f71dd47977fd6afeefd08cb629507a6" title=" " alt="" coords="218,37,370,62"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="98,167,144,120,173,94,205,73,219,66,221,71,208,77,176,99,147,124,102,171"/>
+<area shape="rect" id="Node000003" href="$classBucketGraph.html#a686a43cb838bd6b0f4e87b4f78167601" title=" " alt="" coords="210,87,378,127"/>
+<area shape="poly" id="edge2_Node000001_Node000003" title=" " alt="" coords="132,166,206,137,221,131,222,136,208,141,134,171"/>
+<area shape="rect" id="Node000007" href="$classCutStorage.html#a5661b2dd9924180da3dd03cc2d63bd2c" title=" " alt="" coords="207,152,381,177"/>
+<area shape="poly" id="edge8_Node000001_Node000007" title=" " alt="" coords="159,178,191,174,191,179,159,183"/>
+<area shape="rect" id="Node000008" href="$classBucketGraph.html#ad15267e0cffaa8dc5222028409c9e082" title=" " alt="" coords="227,201,361,226"/>
+<area shape="poly" id="edge9_Node000001_Node000008" title=" " alt="" coords="159,196,212,202,211,207,159,201"/>
+<area shape="rect" id="Node000009" href="$classArcDuals.html#ac75e53f0c4f24e6aca539c544e9f8109" title=" " alt="" coords="232,274,356,300"/>
+<area shape="poly" id="edge10_Node000001_Node000009" title=" " alt="" coords="129,208,251,265,249,270,127,213"/>
+<area shape="rect" id="Node000011" href="$classBucketGraph.html#ad36a543a58c7d3cd4ded313dd5069f03" title="Marks a node as visited in the bitmap." alt="" coords="216,324,372,365"/>
+<area shape="poly" id="edge13_Node000001_Node000011" title=" " alt="" coords="102,209,147,259,176,286,208,310,215,315,213,319,205,315,173,290,143,263,98,212"/>
+<area shape="rect" id="Node000004" href="$classBucketGraph.html#af129eff306551dc7cc7fe00b919bbbd0" title="Assigns the buckets based on the specified direction." alt="" coords="429,5,570,46"/>
+<area shape="poly" id="edge3_Node000003_Node000004" title=" " alt="" coords="351,84,380,73,435,50,437,55,382,77,353,89"/>
+<area shape="rect" id="Node000005" href="$namespacenumericutils.html#aaadab3c8a1b76df1e09c11ebaa3d1e49" title=" " alt="" coords="446,94,554,120"/>
+<area shape="poly" id="edge4_Node000003_Node000005" title=" " alt="" coords="378,104,430,104,430,110,378,110"/>
+<area shape="rect" id="Node000006" href="$namespacenumericutils.html#af55fcfd2b05fe5a20796069445c89aef" title=" " alt="" coords="448,168,552,193"/>
+<area shape="poly" id="edge6_Node000003_Node000006" title=" " alt="" coords="354,125,448,159,446,164,352,130"/>
+<area shape="poly" id="edge5_Node000005_Node000005" title=" " alt="" coords="465,95,459,86,463,76,477,70,500,68,525,70,538,77,535,82,523,75,500,73,478,75,466,80,464,85,470,92"/>
+<area shape="poly" id="edge7_Node000006_Node000006" title=" " alt="" coords="465,169,459,159,463,149,477,143,500,141,525,144,538,150,535,155,523,149,500,146,478,148,466,153,464,158,470,166"/>
+<area shape="poly" id="edge11_Node000009_Node000009" title=" " alt="" coords="259,275,253,266,257,256,271,250,294,248,319,250,332,257,329,262,318,255,294,253,272,255,261,260,258,265,264,272"/>
+<area shape="rect" id="Node000010" href="$structRawArc.html#afc115249cbf5b7b9987da642e10915d5" title=" " alt="" coords="440,274,559,300"/>
+<area shape="poly" id="edge12_Node000009_Node000010" title=" " alt="" coords="356,284,424,284,424,290,356,290"/>
 </map>

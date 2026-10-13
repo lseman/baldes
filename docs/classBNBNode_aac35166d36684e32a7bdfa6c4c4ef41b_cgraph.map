@@ -1,7 +1,22 @@
 <map id="BNBNode::enforceBranching" name="BNBNode::enforceBranching">
-<area shape="rect" id="Node000001" title=" " alt="" coords="5,13,193,38"/>
-<area shape="rect" id="Node000002" href="$classBNBNode.html#a88d143f3bb4f20f932a519fa2d685e97" title=" " alt="" coords="241,13,461,38"/>
-<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="193,23,225,23,225,28,193,28"/>
-<area shape="rect" id="Node000003" href="$classLinearExpression.html#a931036cafcd17fe3553ffd79468da49e" title=" " alt="" coords="509,5,656,46"/>
-<area shape="poly" id="edge2_Node000002_Node000003" title=" " alt="" coords="461,23,494,23,494,28,461,28"/>
+<area shape="rect" id="Node000001" title=" " alt="" coords="5,226,193,252"/>
+<area shape="rect" id="Node000002" href="$classBNBNode.html#a88d143f3bb4f20f932a519fa2d685e97" title=" " alt="" coords="249,165,470,190"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="156,223,286,192,288,197,157,228"/>
+<area shape="rect" id="Node000009" href="$classMIPProblem.html#ab4b0d5ba095d20b6e18e8f57a7b3e9f7" title=" " alt="" coords="241,250,478,276"/>
+<area shape="poly" id="edge8_Node000001_Node000009" title=" " alt="" coords="193,245,225,248,225,253,193,250"/>
+<area shape="rect" id="Node000003" href="$classMIPProblem.html#a38c9f38202c52c5aad1e0a65ac494b7c" title=" " alt="" coords="526,13,710,38"/>
+<area shape="poly" id="edge2_Node000002_Node000003" title=" " alt="" coords="372,162,435,108,478,76,525,49,541,42,543,47,527,53,481,81,438,112,376,166"/>
+<area shape="rect" id="Node000005" href="$classLinearExpression.html#a931036cafcd17fe3553ffd79468da49e" title=" " alt="" coords="544,63,692,103"/>
+<area shape="poly" id="edge4_Node000002_Node000005" title=" " alt="" coords="396,162,525,114,544,107,546,112,527,119,398,167"/>
+<area shape="rect" id="Node000006" href="$classMIPProblem.html#ae21d64436d178848ddbbbe44f2a3a803" title=" " alt="" coords="540,128,696,169"/>
+<area shape="poly" id="edge5_Node000002_Node000006" title=" " alt="" coords="470,162,524,156,525,162,470,168"/>
+<area shape="rect" id="Node000007" href="$classMIPProblem.html#a855300f7fb9c27b0f2b672707a830347" title=" " alt="" coords="528,193,709,218"/>
+<area shape="poly" id="edge6_Node000002_Node000007" title=" " alt="" coords="470,187,513,192,512,197,470,192"/>
+<area shape="rect" id="Node000008" href="$classMIPProblem.html#a15cf712c50d97736774b35f6ec269db3" title=" " alt="" coords="546,242,690,268"/>
+<area shape="poly" id="edge7_Node000002_Node000008" title=" " alt="" coords="401,189,527,228,550,235,549,240,525,234,399,194"/>
+<area shape="rect" id="Node000004" href="$classLinearExpression.html#a941cd736bd9e19240abed98b3a000c44" title=" " alt="" coords="758,5,903,46"/>
+<area shape="poly" id="edge3_Node000003_Node000004" title=" " alt="" coords="711,23,743,23,743,28,711,28"/>
+<area shape="rect" id="Node000010" href="$Definitions_8h.html#af576d1ee32f587dbbccb77e46e4ce2bb" title=" " alt="" coords="564,316,673,341"/>
+<area shape="poly" id="edge9_Node000009_Node000010" title=" " alt="" coords="414,274,550,309,549,314,412,279"/>
+<area shape="poly" id="edge10_Node000010_Node000010" title=" " alt="" coords="583,317,576,307,580,297,594,291,618,289,644,292,657,298,655,303,643,297,618,294,596,296,584,301,581,306,587,314"/>
 </map>

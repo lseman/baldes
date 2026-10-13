@@ -1,5 +1,15 @@
 <map id="BNBNode::addBranchingbaldesCtr" name="BNBNode::addBranchingbaldesCtr">
-<area shape="rect" id="Node000001" title=" " alt="" coords="5,13,226,38"/>
-<area shape="rect" id="Node000002" href="$classLinearExpression.html#a931036cafcd17fe3553ffd79468da49e" title=" " alt="" coords="274,5,421,46"/>
-<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="226,23,258,23,258,28,226,28"/>
+<area shape="rect" id="Node000001" title=" " alt="" coords="5,136,226,161"/>
+<area shape="rect" id="Node000002" href="$classMIPProblem.html#a38c9f38202c52c5aad1e0a65ac494b7c" title=" " alt="" coords="274,13,458,38"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="133,133,193,92,273,49,292,41,294,46,275,53,196,96,136,137"/>
+<area shape="rect" id="Node000004" href="$classLinearExpression.html#a931036cafcd17fe3553ffd79468da49e" title=" " alt="" coords="292,63,440,103"/>
+<area shape="poly" id="edge3_Node000001_Node000004" title=" " alt="" coords="167,132,276,104,278,109,168,138"/>
+<area shape="rect" id="Node000005" href="$classMIPProblem.html#ae21d64436d178848ddbbbe44f2a3a803" title=" " alt="" coords="288,128,444,169"/>
+<area shape="poly" id="edge4_Node000001_Node000005" title=" " alt="" coords="226,146,272,146,272,151,226,151"/>
+<area shape="rect" id="Node000006" href="$classMIPProblem.html#a855300f7fb9c27b0f2b672707a830347" title=" " alt="" coords="275,193,456,218"/>
+<area shape="poly" id="edge5_Node000001_Node000006" title=" " alt="" coords="176,159,292,186,291,191,174,164"/>
+<area shape="rect" id="Node000007" href="$classMIPProblem.html#a15cf712c50d97736774b35f6ec269db3" title=" " alt="" coords="294,242,438,268"/>
+<area shape="poly" id="edge6_Node000001_Node000007" title=" " alt="" coords="140,159,199,193,275,229,292,235,291,240,273,233,197,198,137,164"/>
+<area shape="rect" id="Node000003" href="$classLinearExpression.html#a941cd736bd9e19240abed98b3a000c44" title=" " alt="" coords="506,5,650,46"/>
+<area shape="poly" id="edge2_Node000002_Node000003" title=" " alt="" coords="459,23,491,23,491,28,459,28"/>
 </map>

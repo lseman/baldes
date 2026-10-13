@@ -1,5 +1,7 @@
 <map id="printDistanceMatrix" name="printDistanceMatrix">
-<area shape="rect" id="Node000001" title="Prints the distance matrix to the standard output." alt="" coords="5,5,138,31"/>
-<area shape="rect" id="Node000002" href="$Definitions_8h.html#a086546d06aa565cdd48f436973ebc496" title="Prints an informational message with a specific format." alt="" coords="186,5,260,31"/>
-<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="138,16,170,16,170,21,138,21"/>
+<area shape="rect" id="Node000001" title="Prints the distance matrix to the standard output." alt="" coords="5,29,138,55"/>
+<area shape="poly" id="edge3_Node000001_Node000001" title=" " alt="" coords="45,30,41,21,44,11,54,5,72,3,90,5,100,12,97,16,88,10,71,8,56,10,48,15,46,20,50,28"/>
+<area shape="rect" id="Node000002" href="$Definitions_8h.html#a086546d06aa565cdd48f436973ebc496" title="Prints an informational message with a specific format." alt="" coords="186,29,260,55"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="138,40,170,40,170,45,138,45"/>
+<area shape="poly" id="edge2_Node000002_Node000002" title=" " alt="" coords="197,30,192,21,195,11,206,5,223,3,241,5,251,12,248,16,239,10,223,8,207,10,199,15,197,20,201,28"/>
 </map>

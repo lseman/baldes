@@ -1,5 +1,8 @@
 <map id="operator*" name="operator*">
-<area shape="rect" id="Node000001" title=" " alt="" coords="5,13,79,38"/>
+<area shape="rect" id="Node000001" title=" " alt="" coords="5,54,79,80"/>
 <area shape="rect" id="Node000002" href="$classLinearExpression.html#a2ccd61b907835cba9b012cacf798078f" title=" " alt="" coords="127,5,297,46"/>
-<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="79,23,111,23,111,28,79,28"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="79,56,111,48,112,53,80,61"/>
+<area shape="rect" id="Node000003" href="$MIPHandler_8h.html#a8ff2b037a275091e5f2c9a050e3aa93e" title=" " alt="" coords="175,94,248,120"/>
+<area shape="poly" id="edge2_Node000001_Node000003" title=" " alt="" coords="80,73,161,92,159,98,79,78"/>
+<area shape="poly" id="edge3_Node000003_Node000003" title=" " alt="" coords="183,95,177,86,181,76,193,70,212,68,232,70,243,77,241,81,231,75,212,73,194,75,185,79,183,85,188,92"/>
 </map>

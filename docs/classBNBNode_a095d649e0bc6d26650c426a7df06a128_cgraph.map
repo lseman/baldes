@@ -6,8 +6,12 @@
 <area shape="poly" id="edge2_Node000001_Node000003" title=" " alt="" coords="182,80,227,75,228,80,183,85"/>
 <area shape="rect" id="Node000004" href="$classBNBNode.html#abb76f5afa8990290b262a0750cede865" title=" " alt="" coords="247,104,382,130"/>
 <area shape="poly" id="edge3_Node000001_Node000004" title=" " alt="" coords="183,100,232,105,231,111,182,105"/>
-<area shape="rect" id="Node000006" href="$classBNBNode.html#a93bf363e7ba8aa5c7dd4ee56a81189b3" title=" " alt="" coords="242,153,386,179"/>
-<area shape="poly" id="edge5_Node000001_Node000006" title=" " alt="" coords="150,111,231,140,250,146,249,151,229,145,148,116"/>
-<area shape="rect" id="Node000005" href="$classGurobiEnvSingleton.html#a49c3ce63088629c2246dec252a73df16" title=" " alt="" coords="447,96,582,137"/>
-<area shape="poly" id="edge4_Node000004_Node000005" title=" " alt="" coords="382,114,432,114,432,120,382,120"/>
+<area shape="rect" id="Node000007" href="$classBNBNode.html#a93bf363e7ba8aa5c7dd4ee56a81189b3" title=" " alt="" coords="242,157,386,183"/>
+<area shape="poly" id="edge6_Node000001_Node000007" title=" " alt="" coords="152,111,231,140,259,149,257,154,229,145,150,116"/>
+<area shape="rect" id="Node000005" href="$classGurobiEnvSingleton.html#a49c3ce63088629c2246dec252a73df16" title=" " alt="" coords="480,31,615,72"/>
+<area shape="poly" id="edge4_Node000004_Node000005" title=" " alt="" coords="362,101,464,72,466,77,364,106"/>
+<area shape="rect" id="Node000006" href="$structGRBModelWrapper.html#a48a1cfe691c30ec16ad942d5c0c7a1a3" title=" " alt="" coords="447,96,648,137"/>
+<area shape="poly" id="edge5_Node000004_Node000006" title=" " alt="" coords="382,114,432,114,432,120,382,120"/>
+<area shape="rect" id="Node000008" href="$classMIPProblem.html#a15cf712c50d97736774b35f6ec269db3" title=" " alt="" coords="476,161,620,187"/>
+<area shape="poly" id="edge7_Node000007_Node000008" title=" " alt="" coords="387,169,460,170,460,175,387,174"/>
 </map>

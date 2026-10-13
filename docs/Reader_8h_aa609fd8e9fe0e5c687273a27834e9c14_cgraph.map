@@ -1,7 +1,10 @@
 <map id="VRPTW_read_instance" name="VRPTW_read_instance">
-<area shape="rect" id="Node000001" title=" " alt="" coords="5,31,162,56"/>
-<area shape="rect" id="Node000002" href="$Reader_8h.html#aba12fb635d3f4c4fe794fa18cbda98ca" title=" " alt="" coords="262,5,362,31"/>
-<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="162,32,246,23,246,28,162,38"/>
-<area shape="rect" id="Node000003" href="$Reader_8h.html#aef54cee0a50255ed1a50ed2fbefadf74" title="Reduces the time windows for the vertices in the VRPTW instance." alt="" coords="210,55,414,80"/>
-<area shape="poly" id="edge2_Node000001_Node000003" title=" " alt="" coords="162,49,194,52,194,58,162,54"/>
+<area shape="rect" id="Node000001" title=" " alt="" coords="5,67,162,92"/>
+<area shape="poly" id="edge3_Node000001_Node000001" title=" " alt="" coords="46,68,38,58,43,48,58,42,84,40,111,43,126,50,123,54,110,48,83,45,59,47,46,52,43,57,50,65"/>
+<area shape="rect" id="Node000002" href="$Reader_8h.html#aba12fb635d3f4c4fe794fa18cbda98ca" title=" " alt="" coords="262,29,362,55"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="161,64,246,50,247,55,162,69"/>
+<area shape="rect" id="Node000003" href="$Reader_8h.html#aef54cee0a50255ed1a50ed2fbefadf74" title="Reduces the time windows for the vertices in the VRPTW instance." alt="" coords="210,103,414,128"/>
+<area shape="poly" id="edge4_Node000001_Node000003" title=" " alt="" coords="162,89,212,97,211,102,161,94"/>
+<area shape="poly" id="edge2_Node000002_Node000002" title=" " alt="" coords="274,31,267,21,271,11,286,5,312,3,340,5,354,12,352,17,338,10,312,8,288,10,275,15,272,20,278,27"/>
+<area shape="poly" id="edge5_Node000003_Node000003" title=" " alt="" coords="274,104,267,94,271,84,286,78,312,76,340,79,354,86,352,90,338,84,312,81,288,83,275,88,272,93,278,101"/>
 </map>

@@ -1,7 +1,8 @@
 <map id="BucketGraph::check_feasibility" name="BucketGraph::check_feasibility">
-<area shape="rect" id="Node000001" title="Checks the feasibility of a given forward and backward label." alt="" coords="5,23,144,64"/>
+<area shape="rect" id="Node000001" title="Checks the feasibility of a given forward and backward label." alt="" coords="5,35,144,76"/>
 <area shape="rect" id="Node000002" href="$classBucketGraph.html#ad15267e0cffaa8dc5222028409c9e082" title=" " alt="" coords="192,5,326,31"/>
-<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="144,31,176,27,177,32,144,37"/>
-<area shape="rect" id="Node000003" href="$namespacenumericutils.html#aaadab3c8a1b76df1e09c11ebaa3d1e49" title=" " alt="" coords="205,55,313,80"/>
-<area shape="poly" id="edge2_Node000001_Node000003" title=" " alt="" coords="144,50,190,56,189,61,144,55"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="143,39,177,32,178,37,145,44"/>
+<area shape="rect" id="Node000003" href="$namespacenumericutils.html#aaadab3c8a1b76df1e09c11ebaa3d1e49" title=" " alt="" coords="205,79,313,104"/>
+<area shape="poly" id="edge2_Node000001_Node000003" title=" " alt="" coords="145,66,190,75,189,81,143,72"/>
+<area shape="poly" id="edge3_Node000003_Node000003" title=" " alt="" coords="228,80,222,70,225,60,238,54,259,52,281,55,293,61,290,66,279,60,259,57,240,59,229,64,227,69,232,77"/>
 </map>

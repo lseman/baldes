@@ -1,0 +1,17 @@
+<map id="VRProblem::resolveIfRowsChanged" name="VRProblem::resolveIfRowsChanged">
+<area shape="rect" id="Node000001" title=" " alt="" coords="5,72,182,113"/>
+<area shape="rect" id="Node000002" href="$classBNBNode.html#a8e9719a49d2b149441b61ee4aa790fa2" title=" " alt="" coords="230,5,379,31"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="148,69,229,40,246,34,248,39,231,45,150,74"/>
+<area shape="rect" id="Node000004" href="$classBNBNode.html#a7a3fcf177f5300da4a800c6234990719" title=" " alt="" coords="236,55,373,80"/>
+<area shape="poly" id="edge3_Node000001_Node000004" title=" " alt="" coords="182,80,220,75,221,80,182,85"/>
+<area shape="rect" id="Node000005" href="$classBNBNode.html#a5ab2003e9b82939f868fe7ddc0cac3ef" title=" " alt="" coords="233,104,376,130"/>
+<area shape="poly" id="edge4_Node000001_Node000005" title=" " alt="" coords="182,100,217,104,217,110,182,106"/>
+<area shape="rect" id="Node000006" href="$classBNBNode.html#abb76f5afa8990290b262a0750cede865" title=" " alt="" coords="237,153,372,179"/>
+<area shape="poly" id="edge5_Node000001_Node000006" title=" " alt="" coords="151,111,231,140,248,145,246,151,229,145,150,116"/>
+<area shape="rect" id="Node000003" href="$classMIPProblem.html#af3061cfe5612892a459913ae8bcaca81" title=" " alt="" coords="438,5,617,31"/>
+<area shape="poly" id="edge2_Node000002_Node000003" title=" " alt="" coords="379,16,422,16,422,21,379,21"/>
+<area shape="rect" id="Node000007" href="$classGurobiEnvSingleton.html#a49c3ce63088629c2246dec252a73df16" title=" " alt="" coords="460,112,595,153"/>
+<area shape="poly" id="edge6_Node000006_Node000007" title=" " alt="" coords="371,154,444,143,445,148,372,159"/>
+<area shape="rect" id="Node000008" href="$structGRBModelWrapper.html#a48a1cfe691c30ec16ad942d5c0c7a1a3" title=" " alt="" coords="427,178,628,218"/>
+<area shape="poly" id="edge7_Node000006_Node000008" title=" " alt="" coords="372,173,412,179,411,184,371,178"/>
+</map>

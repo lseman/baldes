@@ -1,5 +1,6 @@
 <map id="MIPProblem::printBranchingbaldesCtr" name="MIPProblem::printBranchingbaldesCtr">
-<area shape="rect" id="Node000001" title=" " alt="" coords="5,5,243,31"/>
-<area shape="rect" id="Node000002" href="$Definitions_8h.html#af576d1ee32f587dbbccb77e46e4ce2bb" title=" " alt="" coords="291,5,400,31"/>
-<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="243,16,275,16,275,21,243,21"/>
+<area shape="rect" id="Node000001" title=" " alt="" coords="5,29,243,55"/>
+<area shape="rect" id="Node000002" href="$Definitions_8h.html#af576d1ee32f587dbbccb77e46e4ce2bb" title=" " alt="" coords="291,29,400,55"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="243,40,275,40,275,45,243,45"/>
+<area shape="poly" id="edge2_Node000002_Node000002" title=" " alt="" coords="309,31,301,21,306,11,321,5,345,3,372,5,386,12,384,17,371,10,345,8,322,10,309,15,307,20,313,27"/>
 </map>

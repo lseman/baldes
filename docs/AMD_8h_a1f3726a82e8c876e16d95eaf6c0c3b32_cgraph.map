@@ -1,5 +1,7 @@
 <map id="AMDord" name="AMDord">
-<area shape="rect" id="Node000001" title=" " alt="" coords="5,5,74,31"/>
-<area shape="rect" id="Node000002" href="$AMD_8h.html#aaeaf125f128d067d8ff6fe09fb20d084" title=" " alt="" coords="122,5,191,31"/>
-<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="74,16,106,16,106,21,74,21"/>
+<area shape="rect" id="Node000001" title=" " alt="" coords="5,29,74,55"/>
+<area shape="poly" id="edge3_Node000001_Node000001" title=" " alt="" coords="19,30,15,21,17,11,26,5,40,3,54,5,62,12,58,16,52,10,39,8,28,10,22,14,20,20,24,28"/>
+<area shape="rect" id="Node000002" href="$AMD_8h.html#aaeaf125f128d067d8ff6fe09fb20d084" title=" " alt="" coords="122,29,191,55"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="74,40,106,40,106,45,74,45"/>
+<area shape="poly" id="edge2_Node000002_Node000002" title=" " alt="" coords="136,30,132,21,134,11,143,5,156,3,171,5,179,12,175,16,169,10,156,8,145,10,139,14,137,20,141,28"/>
 </map>

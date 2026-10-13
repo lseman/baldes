@@ -1,5 +1,6 @@
 <map id="load_simd_direct" name="load_simd_direct">
-<area shape="rect" id="Node000001" title=" " alt="" coords="5,5,125,31"/>
-<area shape="rect" id="Node000002" href="$Dominance_8h.html#af50959ead7daa760836f9ef6aecae34b" title=" " alt="" coords="173,5,292,31"/>
-<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="125,16,157,16,157,21,125,21"/>
+<area shape="rect" id="Node000001" title=" " alt="" coords="5,29,125,55"/>
+<area shape="rect" id="Node000002" href="$Dominance_8h.html#af50959ead7daa760836f9ef6aecae34b" title=" " alt="" coords="173,29,292,55"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="125,40,157,40,157,45,125,45"/>
+<area shape="poly" id="edge2_Node000002_Node000002" title=" " alt="" coords="204,30,198,21,202,11,213,5,232,3,253,5,263,12,261,16,251,10,232,8,215,10,206,15,204,20,208,28"/>
 </map>

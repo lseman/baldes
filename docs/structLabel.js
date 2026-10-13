@@ -10,7 +10,7 @@ var structLabel =
     [ "addRoute", "structLabel.html#a930f04580faf7d07a589f08f80637fba", null ],
     [ "clearRoute", "structLabel.html#a4da8b9a22abad1dc419a16e37be39209", null ],
     [ "getRoute", "structLabel.html#a384585ffaf7cdfd2c142d3b4524bf39e", null ],
-    [ "initialize", "structLabel.html#a1423053276541b870c57f65baae8570c", null ],
+    [ "initialize", "structLabel.html#a522acffcfb5aac76e97c7a63696a4631", null ],
     [ "materializeRoute", "structLabel.html#a8fb896b033f65ec802f71301eedd8fa4", null ],
     [ "mutableRoute", "structLabel.html#a5dbf0753cf2e3e303947dd9d3467d5db", null ],
     [ "operator<", "structLabel.html#a0bdf718292e926e2f91c1573a29a952a", null ],
