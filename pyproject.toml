@@ -1,0 +1,23 @@
+[build-system]
+requires = ["maturin>=1.0,<2.0"]
+build-backend = "maturin"
+
+[project]
+name = "pybaldes"
+version = "0.1.0"
+description = "Rust-backed RCSP pricing and VRPTW/CVRP root solving with capacity and rank-one cuts"
+requires-python = ">=3.9"
+readme = "README.md"
+license = "MIT"
+classifiers = [
+    "Programming Language :: Rust",
+    "Programming Language :: Python :: Implementation :: CPython",
+]
+
+[tool.maturin]
+manifest-path = "python/rust/Cargo.toml"
+python-source = "python"
+module-name = "pybaldes._core"
+
+[project.optional-dependencies]
+test = ["pytest>=7"]

@@ -1,5 +1,5 @@
 [workspace]
-members = ["baldes-py"]
+members = ["python/rust"]
 resolver = "2"
 
 [package]
@@ -41,6 +41,6 @@ opt-level = 1
 panic = "unwind"
 
 [[bin]]
-name = "baldes-vrptw"
-path = "src/bin/vrptw.rs"
+name = "baldes"
+path = "src/bin/baldes.rs"
 required-features = ["clp"]

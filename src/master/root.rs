@@ -7,6 +7,7 @@ use super::{
     RowSense,
 };
 use crate::cuts::FractionalColumn;
+use crate::cuts::capacity::{CapacityCut, CapacityParameters, CapacitySeparator, TimeWindows};
 use crate::pricing::Solver;
 use crate::{invalid, Graph, Result, Route};
 use std::cell::RefCell;
@@ -100,13 +101,17 @@ impl RootProblem {
         }
         (cost, identities)
     }
-    fn reprice(&self, solver: &mut Solver, duals: &[f64], round: bool) -> Result<f64> {
+    fn reprice(&self, solver: &mut Solver, duals: &[f64], round: bool,
+        capacity_entries: &[Vec<(usize, f64)>]) -> Result<f64> {
         if duals.len() < self.rows.len() || self.arc_entries.len() != self.graph.arcs.len() {
             return Err(invalid("root master dimensions"));
         }
         for (index, arc) in solver.graph.arcs.iter_mut().enumerate() {
             let mut cost = self.graph.arcs[index].cost;
             for &(r, a) in &self.arc_entries[index] {
+                cost -= duals[r] * a;
+            }
+            for &(r, a) in &capacity_entries[index] {
                 cost -= duals[r] * a;
             }
             arc.reduced_cost = if round {
@@ -141,6 +146,23 @@ impl Default for CutOptions {
     }
 }
 #[derive(Clone, Debug)]
+pub struct CapacityCutConfig {
+    /// Depot at index 0, customers at indices 1..n; sink is n+1.
+    pub demands: Vec<f64>,
+    pub capacity: f64,
+    pub parameters: CapacityParameters,
+    pub time_windows: Option<TimeWindows>,
+}
+impl CapacityCutConfig {
+    pub fn new(demands: Vec<f64>, capacity: f64) -> Self {
+        let mut parameters = CapacityParameters::default();
+        // GenericRCSPCapacityCutConstr's packing form, no Kohl resource.
+        parameters.complement_form = true;
+        parameters.use_two_path = false;
+        Self { demands, capacity, parameters, time_windows: None }
+    }
+}
+#[derive(Clone, Debug)]
 pub struct RootOptions {
     pub cg: Options,
     pub pricing_options: Vec<(String, f64)>,
@@ -149,6 +171,7 @@ pub struct RootOptions {
     pub enumerate: bool,
     pub round_reduced_costs: bool,
     pub cuts: CutOptions,
+    pub capacity_cuts: Option<CapacityCutConfig>,
 }
 impl Default for RootOptions {
     fn default() -> Self {
@@ -162,10 +185,18 @@ impl Default for RootOptions {
             enumerate: true,
             round_reduced_costs: true,
             cuts: CutOptions::default(),
+            capacity_cuts: None,
         }
     }
 }
 impl RootOptions {
+    pub fn with_capacity_cuts(mut self, config: CapacityCutConfig) -> Self {
+        self.capacity_cuts = Some(config);
+        self.cg.remove_basic_cuts = true;
+        self.cg.cut_artificial_cost = if self.cg.artificial_cost > 0. { self.cg.artificial_cost / 1.2 } else { 0. };
+        self.cg.tailing_off_counter = 1_000_000;
+        self
+    }
     /// The C++ driver's master options with rank-one separation: basic cut
     /// rows are removed, cut artificials cost artificial_cost / 1.2, and the
     /// separator owns tailing off.
@@ -207,6 +238,11 @@ struct CutState {
     separation_lp: f64,
     rounds: usize,
     tailing: usize,
+    capacity_separator: Option<CapacitySeparator>,
+    capacity_cuts: Vec<CapacityCut>,
+    capacity_rows: Vec<Option<usize>>,
+    capacity_arc_entries: Vec<Vec<(usize, f64)>>,
+    capacity_level_finished: bool,
 }
 struct State {
     solver: Solver,
@@ -234,6 +270,13 @@ impl State {
     }
     fn cut_entries(&self, route: &Route) -> Result<Vec<(usize, f64)>> {
         let mut entries = vec![];
+        let customers = Self::customers(route);
+        for (cut, row) in self.cut.capacity_cuts.iter().zip(&self.cut.capacity_rows) {
+            if let Some(row) = row {
+                let coefficient = cut.coefficient(&customers);
+                if coefficient != 0 { entries.push((*row, coefficient as f64)); }
+            }
+        }
         if self.cut.rows.iter().all(Option::is_none) {
             return Ok(entries);
         }
@@ -253,6 +296,7 @@ impl State {
     fn column(&self, problem: &RootProblem, route: &Route, duals: &[f64], tag: i32) -> Result<Column> {
         let mut entries = problem.base_entries(route)?;
         entries.extend(self.cut_entries(route)?);
+        entries.sort_by_key(|&(row, _)| row);
         let (cost, identities) = problem.route_cost(route);
         let mut reduced_cost = cost;
         for &(r, a) in &entries {
@@ -275,7 +319,7 @@ impl State {
     /// ordered by rounded dual magnitude then index.
     fn reprice(&mut self, problem: &RootProblem, duals: &[f64]) -> Result<f64> {
         let rounded = self.rounded;
-        let offset = problem.reprice(&mut self.solver, duals, rounded)?;
+        let offset = problem.reprice(&mut self.solver, duals, rounded, &self.cut.capacity_arc_entries)?;
         if !self.cut.rows.is_empty() {
             let scaled = |row: usize| (-duals[row] * 1e8 + 0.5).floor();
             let mut order: Vec<usize> = (0..self.cut.rows.len())
@@ -398,6 +442,12 @@ impl Controller for RootController {
     }
     fn remap_rows(&mut self, rows: &[Option<usize>]) -> Result<()> {
         let mut state = self.state.borrow_mut();
+        for row in &mut state.cut.capacity_rows {
+            *row = row.and_then(|r| rows[r]);
+        }
+        for entries in &mut state.cut.capacity_arc_entries {
+            *entries = entries.iter().filter_map(|&(r, a)| rows[r].map(|row| (row, a))).collect();
+        }
         for index in 0..state.cut.rows.len() {
             let Some(row) = state.cut.rows[index] else {
                 continue;
@@ -410,7 +460,8 @@ impl Controller for RootController {
         Ok(())
     }
     fn separates(&self) -> bool {
-        self.state.borrow().cut.options.enabled
+        let state = self.state.borrow();
+        state.cut.options.enabled || state.cut.capacity_separator.is_some()
     }
     fn separate(&mut self, master: &mut ClpMaster, tags: &[i32]) -> Result<usize> {
         let mut state = self.state.borrow_mut();
@@ -420,22 +471,27 @@ impl Controller for RootController {
             state.cut.lp_before_cuts = value;
         } else {
             let gain = (value - state.cut.separation_lp) / (0.1 * state.cut.separation_lp.abs()).max(1e-9);
+            let rank_active = state.cut.options.enabled &&
+                (state.cut.capacity_separator.is_none() || state.cut.capacity_level_finished);
             let enumerated = state.solver.enumeration.is_some();
             let grid = state.solver.engine.as_ref().map(|e| &e.grid);
             let (stop, _) = state.solver.round.action(&state.solver.options, grid, enumerated, false, 0, 1)?;
             let min_rounds = state.cut.options.min_rounds_before_stop_by_sp;
-            if stop && state.cut.rounds >= min_rounds {
+            if rank_active && stop && state.cut.rounds >= min_rounds {
                 return Ok(0);
             }
             if gain < state.cut.options.tailing_off_threshold - 1e-6 {
-                if !state.solver.cuts.separation_phase(&state.solver.options)?.1 {
+                if rank_active && !state.solver.cuts.separation_phase(&state.solver.options)?.1 {
                     let options = state.solver.options.clone();
                     state.solver.cuts.increase_phase(&options)?;
                 } else {
                     state.cut.tailing += 1;
                 }
                 if state.cut.tailing >= state.cut.options.tailing_off_counter && state.cut.rounds >= min_rounds {
-                    return Ok(0);
+                    if !rank_active && state.cut.options.enabled {
+                        state.cut.capacity_level_finished = true;
+                        state.cut.tailing = 0;
+                    } else { return Ok(0); }
                 }
             }
         }
@@ -459,6 +515,34 @@ impl Controller for RootController {
                 });
             }
         }
+        let mut capacity_added = 0;
+        let capacity_active = !state.cut.capacity_level_finished;
+        if let Some(separator) = state.cut.capacity_separator.as_mut().filter(|_| capacity_active) {
+            let columns: Vec<_> = fractional.iter().map(|c| (c.vertices.clone(), c.value)).collect();
+            for cut in separator.separate(&columns)? {
+                let entries: Vec<_> = tagged.iter().filter_map(|&(column, tag)| {
+                    let coefficient = cut.coefficient(&State::customers(&state.routes[tag]));
+                    (coefficient != 0).then_some((column, coefficient as f64))
+                }).collect();
+                let sense = if cut.greater_equal() { RowSense::GreaterEqual } else { RowSense::LessEqual };
+                let row = master.add_row(sense, cut.rhs as f64, &entries)?;
+                for (index, arc) in self.problem.graph.arcs.iter().enumerate() {
+                    let u = if arc.tail == self.problem.graph.sink { 0 } else { arc.tail };
+                    let v = if arc.head == self.problem.graph.sink { 0 } else { arc.head };
+                    let coefficient = cut.edge_coefficient(u, v);
+                    if coefficient != 0. { state.cut.capacity_arc_entries[index].push((row, coefficient)); }
+                }
+                state.cut.capacity_rows.push(Some(row));
+                state.cut.capacity_cuts.push(cut);
+                capacity_added += 1;
+            }
+        }
+        // Capacity cuts have root priority 3; rank-one cuts have priority 1.
+        if capacity_added > 0 || !state.cut.options.enabled {
+            if capacity_added > 0 { state.cut.rounds += 1; }
+            return Ok(capacity_added);
+        }
+        state.cut.capacity_level_finished = true;
         let before = state.solver.cuts.cuts.len();
         let options = state.solver.options.clone();
         let graph = state.solver.graph.clone();
@@ -535,6 +619,17 @@ pub fn solve(problem: RootProblem, mut options: RootOptions) -> Result<RootOutpu
         solver.set_option(name, *value)?;
     }
     let schedule = solver.phases.clone();
+    let capacity_separator = if let Some(config) = options.capacity_cuts.take() {
+        if problem.graph.source != 0 || problem.graph.sink != config.demands.len()
+            || problem.graph.vertices.len() != config.demands.len() + 1 {
+            return Err(invalid("capacity cuts require depot 0, customers 1..n, sink n+1"));
+        }
+        let mut separator = CapacitySeparator::new(config.demands, config.capacity)?;
+        separator.parameters = config.parameters;
+        if let Some(windows) = config.time_windows { separator.set_time_windows(windows)?; }
+        Some(separator)
+    } else { None };
+    let arc_count = problem.graph.arcs.len();
     let state = Rc::new(RefCell::new(State {
         solver,
         routes: vec![],
@@ -552,6 +647,11 @@ pub fn solve(problem: RootProblem, mut options: RootOptions) -> Result<RootOutpu
             separation_lp: f64::NAN,
             rounds: 0,
             tailing: 0,
+            capacity_separator,
+            capacity_cuts: vec![],
+            capacity_rows: vec![],
+            capacity_arc_entries: vec![vec![]; arc_count],
+            capacity_level_finished: false,
         },
         fixing_calls: 0,
         enumerated_routes: 0,
@@ -599,6 +699,9 @@ pub fn solve(problem: RootProblem, mut options: RootOptions) -> Result<RootOutpu
                             for &(r, a) in &problem.arc_entries[index] {
                                 raw -= duals[r] * a;
                             }
+                            for &(r, a) in &state.cut.capacity_arc_entries[index] {
+                                raw -= duals[r] * a;
+                            }
                             let cached = (raw * 1e8 + 0.5).floor() / 1e8;
                             corrected += (raw - cached) * count as f64;
                         }
@@ -634,7 +737,7 @@ pub fn solve(problem: RootProblem, mut options: RootOptions) -> Result<RootOutpu
         incumbent: state.incumbent,
         pricing_seconds: state.pricing_seconds,
         solver_seconds: solve_started.elapsed().as_secs_f64(),
-        cuts: state.solver.cuts.cuts.len(),
+        cuts: state.solver.cuts.cuts.len() + state.cut.capacity_cuts.len(),
         lp_before_cuts: state.cut.lp_before_cuts,
         fixing_calls: state.fixing_calls,
         enumerated_routes: state.enumerated_routes,

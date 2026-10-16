@@ -46,7 +46,7 @@ The library without the master LP:
 cargo build --release
 ```
 
-With the Clp master and the `baldes-vrptw` command:
+With the Clp master and the `baldes` command:
 
 ```bash
 export BALDES_CLP_LIB_DIR=/path/to/clp/archives
@@ -62,8 +62,13 @@ trajectories, comparable.
 ## Run
 
 ```bash
-./target/release/baldes-vrptw instances/R101.txt --customers 25 --rank1
+./target/release/baldes vrptw instances/R101.txt --customers 25 --rank1
+./target/release/baldes cvrp /path/to/P-n16-k8.txt --capacity-cuts
 ```
+
+The first argument selects the instance type. Both commands read Solomon-format
+files, including CVRP instances converted to that format. `vrptw` enforces time
+windows and service times; `cvrp` ignores them. Run `baldes --help` for usage.
 
 | Option | Meaning |
 | --- | --- |
@@ -71,6 +76,7 @@ trajectories, comparable.
 | `--ng N` | NG neighbourhood size (default 8) |
 | `--reference-ng` | the N nearest customers, ties by index (the comparison setup) |
 | `--rank1` | separate limited-memory rank-one cuts |
+| `--capacity` / `--capacity-cuts` | separate native rounded capacity cuts in the Clp root master |
 | `--no-enumeration` | no reduced-cost fixing or enumeration |
 | `--upper-bound X` | initial incumbent for fixing |
 | `--no-stabilization` | no dual-price smoothing |
@@ -79,19 +85,89 @@ trajectories, comparable.
 
 Solomon instances are in [`instances/`](instances/).
 
+## Python: pybaldes
+
+The Python distribution and import are both named `pybaldes`. It contains the
+low-level `Solver`, `Route`, and `Phase` bindings and direct Rust-backed VRPTW/CVRP
+root solving. The default build includes the Clp master and requires the same
+archives as the Rust CLI:
+
+```bash
+export BALDES_CLP_LIB_DIR=/path/to/clp/archives
+python -m pip install .
+```
+
+```python
+import pybaldes
+
+result = pybaldes.solve_root(
+    "instances/R101.txt",
+    problem_type="vrptw",  # or "cvrp" for converted CVRP files
+    customers=25,
+    capacity_cuts=True,
+    rank_one_cuts=True,
+    time_limit=120,
+)
+print(result.status, result.lp, result.bound, result.cuts)
+for route in result.routes:
+    print(route.value, route.cost, route.nodes)
+```
+
+`Instance.from_file(path)` reads Solomon-format files. You can also build inputs
+in memory:
+
+```python
+from pybaldes import Customer, Instance
+
+instance = Instance("small", capacity=2, customers=[
+    Customer(0, 0),  # depot, zero demand
+    Customer(1, 0, demand=1),
+    Customer(0, 1, demand=1),
+])
+result = instance.solve_root(problem_type="cvrp", capacity_cuts=True)
+```
+
+CVRP ignores time windows and service times; in-memory VRPTW data requires finite
+`ready`/`due` windows, including the depot. `vehicles` is retained as input
+metadata; the current root model uses the customer count as its fleet upper
+bound, matching the Rust CLI. Native CVRPLIB `.vrp` input is not supported yet.
+
+Options include `ng`, `reference_ng`, `rounding` (`none`, `nearest`, `tenth`),
+`stabilize`, `reduced_cost_fixing`, `upper_bound`, `max_iterations`,
+`max_cut_rounds`, and a `pricing_options` dictionary of native option values.
+Disabling reduced-cost fixing also disables enumeration. Results include positive
+LP routes, duals, iteration history, cut/fixing counts, and timers;
+`result.to_dict()` and `result.to_json()` export them. Unknown/infinite values
+become `null` in JSON. Cut counts include generated rows later retired.
+These are root LP relaxations; `Optimal` does not certify an integer VRP optimum.
+
+For pricing alone, build without Clp:
+
+```bash
+python -m pip install . --config-settings=build-args=--no-default-features
+```
+
+`pybaldes.has_clp` reports backend availability; root solving raises a clear error
+in a pricing-only build. The wheel uses Python's stable ABI for Python 3.9+.
+For local development, `maturin develop --release` installs the mixed package;
+run `python -m pytest python/tests` to test a build with Clp.
+
 ## Not in 2.0 yet
 
-Strong k-path and rounded capacity cuts, the C API entry points for cuts,
-CVRP and EVRP front ends, branching, the heuristics, and the Python bindings
-of 1.x. [PORTING.md](PORTING.md)
+Strong k-path root integration, the C API entry points for cuts,
+Native CVRPLIB input, EVRP front ends, branching, the heuristics, and remaining
+1.x Python APIs. [PORTING.md](PORTING.md)
 maps each Rust module to its C++ counterpart.
 
 ## Repository layout
 
 | Path | Contents |
 | --- | --- |
-| `src/` | the Rust crate (`baldes`) and `src/bin/vrptw.rs` |
+| `src/` | the Rust crate (`baldes`) and `src/bin/baldes.rs` |
 | `tests/` | integration tests |
+| `python/rust/` | Rust/PyO3 extension crate |
+| `python/pybaldes/` | Python package and typed routing API |
+| `python/tests/` | installed-package integration tests |
 | `tools/` | comparison scripts against the C++ reference |
 | `instances/` | Solomon VRPTW instances |
 | `assets/` | logo |

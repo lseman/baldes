@@ -63,7 +63,7 @@ def compare(args):
             if args.fixing:cmd+=['--fixing']
             if args.rank1:cmd+=['--rank1']
             with open(str(prefix)+'.native.log','w') as log:subprocess.run(cmd,stdout=log,stderr=subprocess.STDOUT,timeout=args.timeout,check=True)
-            cmd=[str(ROOT/'target/release/baldes-vrptw'),str(instance),'--customers',str(n),'--reference-ng','--json',rust_json,'--time',str(args.timeout-5)]
+            cmd=[str(ROOT/'target/release/baldes'),'vrptw',str(instance),'--customers',str(n),'--reference-ng','--json',rust_json,'--time',str(args.timeout-5)]
             if not args.fixing:cmd+=['--no-enumeration']
             if args.rank1:cmd+=['--rank1']
             with open(str(prefix)+'.rust.log','w') as log:subprocess.run(cmd,stdout=log,stderr=subprocess.STDOUT,timeout=args.timeout,check=True)

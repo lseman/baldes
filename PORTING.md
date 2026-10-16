@@ -26,7 +26,7 @@ code is the reference implementation; it is not part of this repository.
 | Clp ownership and sparse master operations | `src/master/clp.rs` |
 | Column-generation loop with cut rounds | `src/master/column_generation.rs` |
 | Route/master integration and rank-one driver | `src/master/root.rs` |
-| Solomon model and command | `src/vrptw.rs`, `src/bin/vrptw.rs` |
+| Solomon model and command | `src/vrptw.rs`, `src/bin/baldes.rs` |
 | No-cut C API entry points | `src/api/mod.rs` |
 
 ## Rank-one cuts
