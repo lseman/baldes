@@ -133,8 +133,142 @@ pub fn sort<T: Clone, F: Fn(&T, &T) -> bool>(v: &mut [T], less: F) {
     }
 }
 
+/// libstdc++ `std::stable_sort` with the temporary buffer it normally gets
+/// ((len + 1) / 2 elements): chunked insertion sort, then buffered merges.
+/// Equivalent elements under a tolerant comparator end where this algorithm
+/// leaves them.
+pub fn stable_sort<T: Clone, F: Fn(&T, &T) -> bool>(v: &mut [T], less: F) {
+    let len = v.len();
+    if len < 2 {
+        return;
+    }
+    let half = (len + 1) / 2;
+    let mut buffer: Vec<T> = v[..half].to_vec();
+    let (left, right) = v.split_at_mut(half);
+    merge_sort_with_buffer(left, &mut buffer, &less);
+    merge_sort_with_buffer(right, &mut buffer, &less);
+    merge_adaptive(v, half, &mut buffer, &less);
+}
+fn merge_sort_with_buffer<T: Clone, F: Fn(&T, &T) -> bool>(v: &mut [T], buffer: &mut Vec<T>, less: &F) {
+    let len = v.len();
+    const CHUNK: usize = 7;
+    let mut start = 0;
+    while len - start >= CHUNK {
+        insertion_sort(&mut v[start..start + CHUNK], less);
+        start += CHUNK;
+    }
+    insertion_sort(&mut v[start..], less);
+    let mut step = CHUNK;
+    buffer.clear();
+    buffer.extend_from_slice(v);
+    while step < len {
+        merge_sort_loop(v, buffer, step, less);
+        step *= 2;
+        let snapshot = buffer.clone();
+        merge_sort_loop(&snapshot, v, step, less);
+        step *= 2;
+    }
+}
+/// __merge_sort_loop: merges runs of `step` from `from` into `to`.
+fn merge_sort_loop<T: Clone, F: Fn(&T, &T) -> bool>(from: &[T], to: &mut [T], step: usize, less: &F) {
+    let two = 2 * step;
+    let len = from.len();
+    let mut first = 0;
+    let mut out = 0;
+    while len - first >= two {
+        out = move_merge(&from[first..first + step], &from[first + step..first + two], to, out, less);
+        first += two;
+    }
+    let step = step.min(len - first);
+    move_merge(&from[first..first + step], &from[first + step..len], to, out, less);
+}
+fn move_merge<T: Clone, F: Fn(&T, &T) -> bool>(a: &[T], b: &[T], to: &mut [T], mut out: usize, less: &F) -> usize {
+    let (mut i, mut j) = (0, 0);
+    while i < a.len() && j < b.len() {
+        if less(&b[j], &a[i]) {
+            to[out] = b[j].clone();
+            j += 1;
+        } else {
+            to[out] = a[i].clone();
+            i += 1;
+        }
+        out += 1;
+    }
+    for x in &a[i..] {
+        to[out] = x.clone();
+        out += 1;
+    }
+    for x in &b[j..] {
+        to[out] = x.clone();
+        out += 1;
+    }
+    out
+}
+/// __merge_adaptive with a sufficient buffer.
+fn merge_adaptive<T: Clone, F: Fn(&T, &T) -> bool>(v: &mut [T], middle: usize, _buffer: &mut Vec<T>, less: &F) {
+    let len1 = middle;
+    let len2 = v.len() - middle;
+    if len1 <= len2 {
+        let left: Vec<T> = v[..middle].to_vec();
+        // __move_merge_adaptive(buffer, buffer_end, middle, last, first)
+        let (mut i, mut j, mut out) = (0, middle, 0);
+        while i < left.len() && j < v.len() {
+            if less(&v[j], &left[i]) {
+                v[out] = v[j].clone();
+                j += 1;
+            } else {
+                v[out] = left[i].clone();
+                i += 1;
+            }
+            out += 1;
+        }
+        for x in &left[i..] {
+            v[out] = x.clone();
+            out += 1;
+        }
+    } else {
+        let right: Vec<T> = v[middle..].to_vec();
+        // __move_merge_adaptive_backward(first, middle, buffer, buffer_end, last)
+        let mut result = v.len();
+        let mut l1 = middle; // one past the last of the first range
+        let mut l2 = right.len();
+        if l2 == 0 {
+            return;
+        }
+        l1 -= 1;
+        l2 -= 1;
+        loop {
+            if less(&right[l2], &v[l1]) {
+                result -= 1;
+                v[result] = v[l1].clone();
+                if l1 == 0 {
+                    for k in (0..=l2).rev() {
+                        result -= 1;
+                        v[result] = right[k].clone();
+                    }
+                    return;
+                }
+                l1 -= 1;
+            } else {
+                result -= 1;
+                v[result] = right[l2].clone();
+                if l2 == 0 {
+                    return;
+                }
+                l2 -= 1;
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn stable_sorts() {
+        let mut v: Vec<(i32, usize)> = (0..200).map(|i| ((i * 7919) % 13, i as usize)).collect();
+        super::stable_sort(&mut v, |a, b| a.0 < b.0);
+        assert!(v.windows(2).all(|w| w[0].0 < w[1].0 || (w[0].0 == w[1].0 && w[0].1 < w[1].1)));
+    }
     #[test]
     fn sorts() {
         let mut v: Vec<i32> = (0..200).map(|i| (i * 7919) % 101).collect();

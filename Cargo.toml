@@ -1,9 +1,19 @@
+[workspace]
+members = ["baldes-py"]
+resolver = "2"
+
 [package]
 name = "baldes"
 version = "2.0.0"
 edition = "2021"
+rust-version = "1.70"
 description = "BALDES 2.0: bucket-graph labeling RCSP solver and branch-cut-and-price root, written in Rust"
 license = "MIT"
+repository = "https://github.com/lseman/baldes"
+documentation = "https://docs.rs/baldes"
+categories = ["algorithms", "science::robotics"]
+keywords = ["vehicle-routing", "rcsp", "branch-cut-and-price", "optimization", "solver"]
+readme = "README.md"
 autobins = false
 
 [lib]
