@@ -81,7 +81,7 @@ evrp/
 ambulance/
 repos/
 RouteOpt/
-bucket-graph-spprc/
+results/
 
 # Third-party vendored code
 third_party/lkh/

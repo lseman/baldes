@@ -32,11 +32,17 @@ fn erase_value(v: &mut Vec<i32>, x: i32) {
 impl MinCutDigraph {
     /// Links i < j in both adjacency lists when cap[j][i] + cap[i][j] > 1e-6.
     pub fn new(capacity: Vec<Vec<f64>>) -> Self {
+        Self::new_with_terminals(capacity, -1, -1)
+    }
+    /// zero capacities that fractional capacity separation later forces.
+    pub fn new_with_terminals(capacity: Vec<Vec<f64>>, source: i32, sink: i32) -> Self {
         let n = capacity.len();
         let mut adjacency = vec![vec![]; n];
         for i in 0..n {
             for j in i + 1..capacity[i].len() {
-                if capacity[j][i] + capacity[i][j] <= 1e-6 {
+                if capacity[j][i] + capacity[i][j] <= 1e-6
+                    && i as i32 != source && j as i32 != source
+                    && i as i32 != sink && j as i32 != sink {
                     continue;
                 }
                 adjacency[i].push(j as i32);

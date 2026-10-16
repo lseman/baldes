@@ -252,6 +252,9 @@ pub fn optimize<P: FnMut(usize, &[f64]) -> Result<Answer>, C: Controller>(
     }
     let mut stage = schedule.len() - 1;
     let mut pass_bound: f64;
+    // the solver Alg4Master +0x28 : phase-local stopping
+    // value, including heuristic passes; never expose it as a global bound.
+    let mut stage_bound = -1e12_f64;
     let mut round_penalty_updates = 0;
     let mut tailing = 0;
     let mut lp_at_separation = 0.0f64;
@@ -282,32 +285,39 @@ pub fn optimize<P: FnMut(usize, &[f64]) -> Result<Answer>, C: Controller>(
         let raw = master.duals.clone();
         let positive = out.artificials.iter().any(|&i| master.values[i] > 1e-6);
         controller.master_solved(master, &out.column_tags, &out.artificials)?;
-        let converged = stage == 0
-            && !positive
-            && out.bound.is_finite()
+        let gap = if out.bound.is_finite() { out.lp - out.bound } else { 0. };
+        if options.stabilize {
+            smoothing.after_master(&raw, &master.senses, gap, 0, iteration == 1);
+        }
+        // earlyCGtermType1  uses the phase value for stage > 0
+        // and the certified bound for stage zero, before another pricing call.
+        let stopping_bound = if stage > 0 { stage_bound } else { out.bound };
+        let converged = !positive
+            && stopping_bound.is_finite()
             && gap_smaller_than_tolerance(
-                out.bound,
+                stopping_bound,
                 out.lp,
                 options.gap_absolute,
                 options.gap_relative,
             );
         let mut minimum = 0.;
         let mut fresh = 0;
-        let mut exact = true;
+        let mut exact = stage == 0;
         let mut answer_phase = stage;
         let mut inserted = 0;
         let mut first_angle = 0.;
         let mut advanced = false;
         let mut penalties = false;
-        if !converged {
-            let gap = if out.bound.is_finite() {
-                out.lp - out.bound
-            } else {
-                0.
-            };
+        if converged && stage > 0 {
+            stage -= 1;
+            // eval  clears both values on each phase change.
+            stage_bound = -1e12;
+            advanced = true;
             if options.stabilize {
-                smoothing.after_master(&raw, &master.senses, gap, 0, iteration == 1);
+                smoothing.after_iteration();
             }
+        }
+        if !converged {
             let mut current = if options.stabilize {
                 smoothing.pricing.clone()
             } else {
@@ -334,6 +344,10 @@ pub fn optimize<P: FnMut(usize, &[f64]) -> Result<Answer>, C: Controller>(
                     .fold(answer.minimum, |best, c| best.min(c.reduced_cost));
                 let corrected = answer.bound_minimum.unwrap_or(minimum);
                 pass_bound = lagrangian(master, &current, corrected, options.multiplicity);
+                let slack = stage_bound.abs().max(pass_bound.abs()) * 1e-10 + 1e-6;
+                if !(stage_bound - slack > pass_bound) {
+                    stage_bound = pass_bound;
+                }
                 if answer.exact && pass_bound > out.bound {
                     out.bound = pass_bound;
                 }
@@ -391,6 +405,7 @@ pub fn optimize<P: FnMut(usize, &[f64]) -> Result<Answer>, C: Controller>(
             advanced = fresh == 0 && !exact && !penalties && stage > 0;
             if advanced {
                 stage -= 1;
+                stage_bound = -1e12;
             }
             for batch in pending {
                 let mut identities = vec![];
@@ -504,6 +519,7 @@ pub fn optimize<P: FnMut(usize, &[f64]) -> Result<Answer>, C: Controller>(
                     out.columns = master.costs.len();
                     smoothing.restart_schedule((schedule.len() - 1) as i32);
                     stage = schedule.len() - 1;
+                    stage_bound = -1e12;
                     continue;
                 }
             }
@@ -523,12 +539,7 @@ pub fn optimize<P: FnMut(usize, &[f64]) -> Result<Answer>, C: Controller>(
             lp_at_separation = out.lp;
             if !stop_cuts {
                 if options.remove_basic_cuts && separated_once {
-                    let mut rows = vec![];
-                    for row in initial_rows..master.rhs.len() {
-                        if master.row_is_basic(row)? {
-                            rows.push(row);
-                        }
-                    }
+                    let rows = master.cleanup_cut_rows(initial_rows)?;
                     let columns: Vec<usize> = cut_artificials
                         .iter()
                         .filter(|(r, _)| rows.binary_search(r).is_ok())
@@ -578,6 +589,7 @@ pub fn optimize<P: FnMut(usize, &[f64]) -> Result<Answer>, C: Controller>(
                     smoothing.restart_schedule((schedule.len() - 1) as i32);
                     separated_once = true;
                     stage = schedule.len() - 1;
+                    stage_bound = -1e12;
                     out.columns = master.costs.len();
                     continue;
                 }

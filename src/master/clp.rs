@@ -237,6 +237,53 @@ impl ClpMaster {
         }
         Ok(unsafe { Clp_getRowStatus(self.model.as_ptr(), row as i32) } == 1)
     }
+    /// the solver cleanupRestrictedMastCuts , default threshold 1
+    /// and retention ratio 0.66. The normalization divides by the SIGNED RHS
+    /// when |rhs| > 1: a slack packing cut with rhs < -1 is retained.
+    pub fn cleanup_cut_rows(&self, initial_rows: usize) -> Result<Vec<usize>> {
+        if initial_rows > self.rhs.len() || !self.solved {
+            return Err(invalid("cut cleanup requires a solved master and valid base rows"));
+        }
+        let count = self.rhs.len() - initial_rows;
+        if count <= 1 { return Ok(vec![]); }
+        let mut activity = vec![0.; self.rhs.len()];
+        for (column, &value) in self.values.iter().enumerate() {
+            if value == 0. { continue; }
+            for (row, coefficient) in self.column_entries(column)? {
+                activity[row] += coefficient * value;
+            }
+        }
+        let mut kept = 0;
+        let mut candidates = vec![];
+        for row in initial_rows..self.rhs.len() {
+            if !self.row_is_basic(row)? { kept += 1; continue; }
+            let rhs = self.rhs[row];
+            let mut slack = match self.senses[row] {
+                RowSense::LessEqual => rhs - activity[row],
+                RowSense::GreaterEqual => activity[row] - rhs,
+                RowSense::Equal => 0.,
+            };
+            if rhs.abs() > 1. { slack /= rhs; }
+            // VarConstr::violation(Double) snaps values in [-precision,precision].
+            if slack.abs() <= 1e-6 { slack = 0.; }
+            if slack < 0. { kept += 1; } else { candidates.push((row, slack)); }
+        }
+        let target = 1.min((count as f32 * 0.66_f32) as usize);
+        if target > kept {
+            // SortConstraintsByViolation: smaller normalized slack first, then
+            // creation order for Double comparisons equal within tolerance.
+            candidates.sort_by(|a,b| {
+                let tolerance = 1e-6 + a.1.abs().max(b.1.abs()) * 1e-10;
+                if a.1 < b.1 - tolerance { std::cmp::Ordering::Less }
+                else if b.1 < a.1 - tolerance { std::cmp::Ordering::Greater }
+                else { a.0.cmp(&b.0) }
+            });
+        }
+        let mut rows: Vec<_> = candidates.into_iter().skip(target.saturating_sub(kept))
+            .map(|(row,_)| row).collect();
+        rows.sort_unstable();
+        Ok(rows)
+    }
     /// Sparse column of the current matrix, sorted by row.
     pub fn column_entries(&self, column: usize) -> Result<Vec<(usize, f64)>> {
         if column >= self.costs.len() {

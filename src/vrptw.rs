@@ -118,6 +118,13 @@ impl Instance {
         }
     }
     pub fn graph(&self, ng_size: usize, rounding: Rounding) -> Result<Graph> {
+        self.build_graph(ng_size, rounding, true)
+    }
+    /// Capacity-only routing: time windows and service times impose no constraints.
+    pub fn capacity_graph(&self, ng_size: usize, rounding: Rounding) -> Result<Graph> {
+        self.build_graph(ng_size, rounding, false)
+    }
+    fn build_graph(&self, ng_size: usize, rounding: Rounding, time_windows: bool) -> Result<Graph> {
         let n = self.customers.len() - 1;
         let sink = n + 1;
         let mut graph = Graph::new(n + 2, 2)?;
@@ -127,8 +134,8 @@ impl Instance {
             let from = &self.customers[i];
             let to = &self.customers[j];
             let d = self.distance(i, j, rounding);
-            let travel = from.service + d;
-            if from.ready + travel > to.due + 1e-6
+            let travel = if time_windows { from.service + d } else { 0. };
+            if (time_windows && from.ready + travel > to.due + 1e-6)
                 || (u != 0 && v != sink && from.demand + to.demand > self.capacity + 1e-6)
             {
                 return Ok(());
@@ -148,7 +155,12 @@ impl Instance {
         }
         for v in 0..=sink {
             let i = if v == sink { 0 } else { v };
-            graph.set_bounds(v, 0, self.customers[i].ready, self.customers[i].due)?;
+            let (ready, due) = if time_windows {
+                (self.customers[i].ready, self.customers[i].due)
+            } else {
+                (0., 1.)
+            };
+            graph.set_bounds(v, 0, ready, due)?;
             graph.set_bounds(v, 1, 0., self.capacity)?;
             let mut order: Vec<_> = (0..=sink).collect();
             order.sort_by(|&a, &b| {
@@ -161,7 +173,11 @@ impl Instance {
             order.truncate(ng_size.min(n + 2));
             graph.set_ng(v, &order)?;
         }
-        graph.initial[0] = Some(self.customers[0].ready);
+        graph.initial[0] = Some(if time_windows {
+            self.customers[0].ready
+        } else {
+            0.
+        });
         Ok(graph)
     }
     #[cfg(feature = "clp")]

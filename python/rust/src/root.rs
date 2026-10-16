@@ -1,0 +1,240 @@
+//! Owned Python inputs and results for the Rust routing front end.
+use baldes::vrptw::Instance;
+use pyo3::exceptions::PyValueError;
+use pyo3::prelude::*;
+use pyo3::types::PyDict;
+use std::path::PathBuf;
+
+type CustomerData = (f64, f64, f64, f64, f64, f64);
+
+#[pyfunction]
+fn _read_instance(py: Python<'_>, path: PathBuf) -> PyResult<Py<PyDict>> {
+    let instance = Instance::read(path).map_err(|e| PyValueError::new_err(e.to_string()))?;
+    let data = PyDict::new(py);
+    data.set_item("name", instance.name)?;
+    data.set_item("vehicles", instance.vehicles)?;
+    data.set_item("capacity", instance.capacity)?;
+    let customers: Vec<CustomerData> = instance
+        .customers
+        .iter()
+        .map(|c| (c.x, c.y, c.demand, c.ready, c.due, c.service))
+        .collect();
+    data.set_item("customers", customers)?;
+    Ok(data.unbind())
+}
+
+#[cfg(feature = "clp")]
+#[pyfunction]
+#[pyo3(signature = (name, vehicles, capacity, customers, problem_type, ng, reference_ng, rounding, capacity_cuts, rank_one_cuts, stabilize, enumerate, upper_bound, time_limit, max_iterations, max_cut_rounds, pricing_options))]
+#[allow(clippy::too_many_arguments)]
+fn _solve_root(
+    py: Python<'_>,
+    name: String,
+    vehicles: usize,
+    capacity: f64,
+    customers: Vec<CustomerData>,
+    problem_type: &str,
+    ng: usize,
+    reference_ng: bool,
+    rounding: &str,
+    capacity_cuts: bool,
+    rank_one_cuts: bool,
+    stabilize: bool,
+    enumerate: bool,
+    upper_bound: f64,
+    time_limit: f64,
+    max_iterations: usize,
+    max_cut_rounds: Option<usize>,
+    pricing_options: std::collections::BTreeMap<String, f64>,
+) -> PyResult<Py<PyDict>> {
+    use baldes::master::root::{self, CapacityCutConfig, RootOptions, RootProblem};
+    use baldes::vrptw::{Customer, Rounding};
+    if problem_type != "vrptw" && problem_type != "cvrp" {
+        return Err(PyValueError::new_err(
+            "problem_type must be 'vrptw' or 'cvrp'",
+        ));
+    }
+    let rounding = match rounding {
+        "none" => Rounding::None,
+        "nearest" => Rounding::Nearest,
+        "tenth" => Rounding::Tenth,
+        _ => {
+            return Err(PyValueError::new_err(
+                "rounding must be 'none', 'nearest', or 'tenth'",
+            ))
+        }
+    };
+    if ng == 0
+        || max_iterations == 0
+        || time_limit <= 0.
+        || !time_limit.is_finite()
+        || upper_bound.is_nan()
+        || upper_bound <= 0.
+    {
+        return Err(PyValueError::new_err("ng, max_iterations, time_limit and upper_bound must be positive; time_limit must be finite"));
+    }
+    if vehicles == 0 || capacity <= 0. || !capacity.is_finite() || customers.len() < 2 {
+        return Err(PyValueError::new_err(
+            "instance needs positive vehicles/capacity, a depot and at least one customer",
+        ));
+    }
+    // CVRP has no time resource constraints, including when callers omit due times.
+    let customers: Vec<_> = customers
+        .into_iter()
+        .map(|(x, y, demand, ready, due, service)| {
+            if problem_type == "cvrp" {
+                (x, y, demand, 0., 1., 0.)
+            } else {
+                (x, y, demand, ready, due, service)
+            }
+        })
+        .collect();
+    for &(x, y, demand, ready, due, service) in &customers {
+        if [x, y, demand, ready, due, service]
+            .iter()
+            .any(|v| !v.is_finite())
+            || demand < 0.
+            || ready > due
+            || service < 0.
+        {
+            return Err(PyValueError::new_err(
+                "invalid customer data; VRPTW needs finite coordinates, demand, time windows and service times",
+            ));
+        }
+    }
+    if customers[0].2 != 0. {
+        return Err(PyValueError::new_err("depot demand must be zero"));
+    }
+    let instance = Instance {
+        name,
+        vehicles,
+        capacity,
+        customers: customers
+            .into_iter()
+            .map(|(x, y, demand, ready, due, service)| Customer {
+                x,
+                y,
+                demand,
+                ready,
+                due,
+                service,
+            })
+            .collect(),
+    };
+    let mut options = RootOptions::default();
+    options.cg.stabilize = stabilize;
+    options.cg.max_iterations = max_iterations;
+    options.cg.time_limit = std::time::Duration::try_from_secs_f64(time_limit)
+        .map_err(|e| PyValueError::new_err(e.to_string()))?;
+    options.enumerate = enumerate;
+    options.incumbent = upper_bound;
+    options.pricing_options = pricing_options.into_iter().collect();
+    if rank_one_cuts {
+        options = options.with_rank_one_cuts();
+    }
+    if capacity_cuts {
+        options = options.with_capacity_cuts(CapacityCutConfig::new(
+            instance.customers.iter().map(|c| c.demand).collect(),
+            instance.capacity,
+        ));
+    }
+    if let Some(limit) = max_cut_rounds {
+        options.cg.max_cut_rounds = limit;
+    }
+    let cvrp = problem_type == "cvrp";
+    // All inputs and the result own their storage. Python can run other threads
+    // while the Rust solver and its private Clp master execute.
+    let started = std::time::Instant::now();
+    let output = py
+        .allow_threads(move || -> baldes::Result<_> {
+            let mut graph = if cvrp {
+                instance.capacity_graph(ng, rounding)?
+            } else {
+                instance.graph(ng, rounding)?
+            };
+            let n = instance.customers.len() - 1;
+            if reference_ng {
+                for v in 0..=n + 1 {
+                    let mut neighbors = if v == 0 || v == n + 1 {
+                        vec![v]
+                    } else {
+                        let mut ids: Vec<_> = (1..=n).collect();
+                        ids.sort_by(|&a, &b| {
+                            instance
+                                .distance(v, a, rounding)
+                                .total_cmp(&instance.distance(v, b, rounding))
+                                .then(a.cmp(&b))
+                        });
+                        ids.truncate(ng);
+                        ids
+                    };
+                    neighbors.sort_unstable();
+                    graph.set_ng(v, &neighbors)?;
+                }
+            }
+            options.cg.multiplicity = n as f64;
+            root::solve(RootProblem::set_partitioning(graph, n as f64)?, options)
+        })
+        .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(e.to_string()))?;
+    let data = PyDict::new(py);
+    macro_rules! field {
+        ($key:literal, $value:expr) => {
+            data.set_item($key, $value)?;
+        };
+    }
+    field!("status", format!("{:?}", output.master.status));
+    field!("lp", output.master.lp);
+    field!("bound", output.master.bound);
+    field!("lp_before_cuts", output.lp_before_cuts);
+    field!("incumbent", output.incumbent);
+    field!("cuts", output.cuts);
+    field!("cut_rounds", output.master.cut_rounds);
+    field!("iterations", output.master.iterations);
+    field!("pricing_calls", output.master.pricing_calls);
+    field!("columns", output.master.columns);
+    field!("fixing_calls", output.fixing_calls);
+    field!("enumerated_routes", output.enumerated_routes);
+    field!("pruned_by_bound", output.master.pruned_by_bound);
+    field!("duals", output.duals);
+    field!("seconds", started.elapsed().as_secs_f64());
+    field!("pricing_seconds", output.pricing_seconds);
+    field!("solver_seconds", output.solver_seconds);
+    let mut routes = Vec::new();
+    for (&tag, &value) in output.master.column_tags.iter().zip(&output.values) {
+        if tag < 0 || value <= 1e-9 {
+            continue;
+        }
+        let route = &output.routes[tag as usize];
+        let item = PyDict::new(py);
+        item.set_item("value", value)?;
+        item.set_item("cost", route.original_cost)?;
+        item.set_item("nodes", &route.nodes)?;
+        item.set_item("arcs", &route.arcs)?;
+        routes.push(item);
+    }
+    field!("routes", routes);
+    let mut history = Vec::new();
+    for h in output.master.history {
+        let item = PyDict::new(py);
+        item.set_item("iteration", h.iteration)?;
+        item.set_item("lp", h.lp)?;
+        item.set_item("minimum_reduced_cost", h.minimum)?;
+        item.set_item("new_columns", h.new_columns)?;
+        item.set_item("columns", h.columns)?;
+        item.set_item("exact", h.exact)?;
+        item.set_item("phase", h.phase)?;
+        item.set_item("pricing_calls", h.pricing_calls)?;
+        item.set_item("alpha", h.alpha)?;
+        item.set_item("misprices", h.misprices)?;
+        history.push(item);
+    }
+    field!("history", history);
+    Ok(data.unbind())
+}
+
+pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
+    m.add_function(wrap_pyfunction!(_read_instance, m)?)?;
+    #[cfg(feature = "clp")]
+    m.add_function(wrap_pyfunction!(_solve_root, m)?)?;
+    Ok(())
+}

@@ -1,0 +1,17 @@
+[package]
+name = "pybaldes"
+version = "0.1.0"
+edition = "2021"
+description = "Python bindings for BALDES 2.0 RCSP solver"
+
+[lib]
+name = "_core"
+crate-type = ["cdylib"]
+
+[features]
+default = ["clp"]
+clp = ["baldes/clp"]
+
+[dependencies]
+baldes = { path = "../.." }
+pyo3 = { version = "0.23", features = ["extension-module", "abi3-py39"] }

@@ -896,7 +896,7 @@ impl Separation {
                 capacity[j][i] = g.flow[nodes[j]][nodes[i]];
             }
         }
-        let mut graph = MinCutDigraph::new(capacity);
+        let mut graph = MinCutDigraph::new_with_terminals(capacity, source as i32, sink as i32);
         graph.find_min_cut(source as i32, sink as i32);
         let mut cut = Candidate::new(4, n);
         let mut candidate = FracCandidate {
