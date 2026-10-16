@@ -15,11 +15,7 @@ categories = ["algorithms", "science::robotics"]
 keywords = ["vehicle-routing", "rcsp", "branch-cut-and-price", "optimization", "solver"]
 readme = "README.md"
 autobins = false
-
-[package.exclude]
-"landing/"
-"pyproject.toml"
-".github/"
+exclude = ["landing/", "pyproject.toml", ".github/"]
 
 [lib]
 name = "baldes"
