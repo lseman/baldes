@@ -189,8 +189,10 @@ impl LabelStorage {
                 cuts,
             ) {
                 stats.dominated += 1;
+                // archives(): only the resources(+cost) tests keep dominated
+                // expanded labels reachable for solution recording.
                 if self.labels[id].expanded
-                    && matches!(test, InsertionTest::Full | InsertionTest::ResourcesAndCost)
+                    && matches!(test, InsertionTest::ResourcesAndCost | InsertionTest::Resources)
                 {
                     self.buckets[b.vertex][b.bucket].archived.push(id);
                 }

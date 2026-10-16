@@ -156,8 +156,12 @@ run `python -m pytest python/tests` to test a build with Clp.
 
 Strong k-path root integration, the C API entry points for cuts,
 Native CVRPLIB input, EVRP front ends, branching, the heuristics, and remaining
-1.x Python APIs. [PORTING.md](PORTING.md)
-maps each Rust module to its C++ counterpart.
+1.x Python APIs.
+
+## TODO
+
+- Cumulative resources
+- Pickup and delivery
 
 ## Repository layout
 

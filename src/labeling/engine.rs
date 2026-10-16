@@ -635,7 +635,10 @@ impl LabelingEngine {
                 ResourceKind::Equality => f.resources[r] == b.resources[r],
             })
     }
-    fn physical_path(&self, forward: bool, mut id: usize) -> Vec<usize> {
+    /// getPrevLabelPtr : every predecessor must still be active
+    /// or archived in its bucket. A dominated expanded label that was not
+    /// archived is gone, and candidates through it cannot be recorded.
+    fn physical_path(&self, forward: bool, mut id: usize) -> Option<Vec<usize>> {
         let s = self.storage(forward);
         let mut arcs = vec![];
         loop {
@@ -643,32 +646,41 @@ impl LabelingEngine {
             if let Some(a) = l.arc {
                 arcs.push(a);
             }
-            if let Some(parent) = l.parent {
-                id = parent;
-            } else {
-                break;
+            let Some(parent) = l.parent else { break };
+            let p = &s.labels[parent];
+            let bucket = &s.buckets[p.bucket.vertex][p.bucket.bucket];
+            if !bucket.active.contains(&parent) && !bucket.archived.contains(&parent) {
+                return None;
             }
+            id = parent;
         }
         if forward {
             arcs.reverse();
         }
-        arcs
+        Some(arcs)
     }
+    /// recordSolution ; `None` when a predecessor is missing.
     fn reconstruct(
         &self,
         g: &Graph,
         pair: (Option<usize>, Option<usize>),
         cost: f64,
-    ) -> Result<Route> {
-        let mut arcs = pair
-            .0
-            .map_or_else(Vec::new, |i| self.physical_path(true, i));
+    ) -> Result<Option<Route>> {
+        let mut arcs = match pair.0 {
+            Some(i) => match self.physical_path(true, i) {
+                Some(arcs) => arcs,
+                None => return Ok(None),
+            },
+            None => vec![],
+        };
         if let Some(i) = pair.1 {
+            let Some(suffix) = self.physical_path(self.consumption_joins, i) else {
+                return Ok(None);
+            };
             if self.consumption_joins {
-                let suffix = self.physical_path(true, i);
                 arcs.extend(suffix.into_iter().rev().map(|a| self.reverse[a]));
             } else {
-                arcs.extend(self.physical_path(false, i));
+                arcs.extend(suffix);
             }
         }
         let mut nodes = vec![g.source as i32];
@@ -690,13 +702,13 @@ impl LabelingEngine {
         if nodes.last().copied() != Some(g.sink as i32) {
             return Err(invalid("labeling predecessor chain does not reach sink"));
         }
-        Ok(Route {
+        Ok(Some(Route {
             nodes,
             arcs: arcs.into_iter().map(|i| g.arcs[i].id).collect(),
             cost,
             original_cost,
             resources: q[..g.resources.len()].to_vec(),
-        })
+        }))
     }
     pub fn solve(&mut self, g: &Graph, controls: &Controls) -> Result<PricingResult> {
         if controls.max_columns == 0 || controls.max_labels == 0 {
@@ -846,11 +858,20 @@ impl LabelingEngine {
             .map(|b| b.active.len())
             .sum();
         self.statistics.elapsed = started.elapsed().as_secs_f64();
-        let minimum = pool.iter().next().map_or(NO_ROUTE_COST, |c| c.cost);
+        // The minimum is the first candidate that can be recorded.
+        let mut minimum = NO_ROUTE_COST;
+        let mut recorded = false;
         let mut columns = vec![];
         for c in pool.into_sorted() {
+            let Some(route) = self.reconstruct(g, c.value, c.cost)? else {
+                continue;
+            };
+            if !recorded {
+                minimum = c.cost;
+                recorded = true;
+            }
             if !controls.negative_only || c.cost < controls.zero_threshold - EPSILON {
-                columns.push(self.reconstruct(g, c.value, c.cost)?);
+                columns.push(route);
             }
         }
         Ok(PricingResult {
